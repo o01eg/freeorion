@@ -1,3 +1,10 @@
+freeorion (0.4.8+git20170912~1999a7a-1) unstable; urgency=medium
+
+  * Use hostless build for VPS.
+  * Downgrade debhelper for Ubuntu 16.04.3 LTS
+
+ -- O01eg <o01eg@yandex.ru>  Tue, 12 Sep 2017 20:28:47 +0300
+
 freeorion (0.4.7-2) unstable; urgency=medium
 
   * Upload to unstable.

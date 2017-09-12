@@ -42,6 +42,3 @@ override_dh_install:
 override_dh_python2:
 	dh_python2 -pfreeorion-data /usr/share/games
 
-get-orig-source:
-	wget https://github.com/freeorion/freeorion/releases/download/v0.4.7/FreeOrion_v0.4.7_2017-04-24.60d06dc_Source.tar.gz
-

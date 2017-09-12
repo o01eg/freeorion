@@ -39,8 +39,6 @@ Description: turn-based space empire and galactic conquest game
 Package: freeorion-data
 Architecture: all
 Depends:
- fonts-dejavu,
- fonts-roboto-unhinted,
  ${misc:Depends},
  ${python:Depends}
 Suggests:

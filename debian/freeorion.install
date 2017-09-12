@@ -1,4 +1,3 @@
 debian/bin/*                                usr/games
 usr/bin/*                                   usr/lib/freeorion
 usr/lib/*/freeorion
-usr/share/applications

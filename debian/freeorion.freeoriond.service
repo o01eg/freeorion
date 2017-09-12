@@ -1,0 +1,10 @@
+[Unit]
+Description=FreeOrion server
+
+[Service]
+User=freeorion
+Group=freeorion
+ExecStart=/usr/games/freeoriond --hostless --log-file /var/log/freeorion/freeoriond.log
+
+[Install]
+WantedBy=multi-user.target

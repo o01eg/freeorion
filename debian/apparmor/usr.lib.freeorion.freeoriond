@@ -1,0 +1,25 @@
+# Last Modified: Wed Sep 13 23:26:05 2017
+#include <tunables/global>
+
+/usr/lib/freeorion/freeoriond {
+  #include <abstractions/base>
+  #include <abstractions/python>
+
+  network inet dgram,
+  network inet6 stream,
+
+  signal send set=kill peer=/usr/lib/freeorion/freeorionca,
+  signal send set=kill peer=/usr/lib/freeorion/freeoriond//null-/usr/lib/freeorion/freeorionca,
+
+  /usr/lib/freeorion/freeorionca Px,
+  /usr/lib/freeorion/freeoriond mr,
+  /usr/share/games/freeorion/default/** r,
+  /var/lib/freeorion/.config/ w,
+  /var/lib/freeorion/.config/freeorion/ w,
+  /var/lib/freeorion/.local/ w,
+  /var/lib/freeorion/.local/share/ w,
+  /var/lib/freeorion/.local/share/freeorion/ w,
+  /var/lib/freeorion/.local/share/freeorion/save/ w,
+  /var/log/freeorion/freeoriond.log w,
+
+}

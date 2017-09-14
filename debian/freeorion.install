@@ -1,3 +1,5 @@
+debian/apparmor/usr.lib.freeorion.freeoriond etc/apparmor.d
+debian/apparmor/usr.lib.freeorion.freeorionca etc/apparmor.d
 debian/bin/*                                usr/games
 usr/bin/*                                   usr/lib/freeorion
 usr/lib/*/freeorion

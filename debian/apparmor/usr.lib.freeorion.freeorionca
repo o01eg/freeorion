@@ -1,0 +1,20 @@
+# Last Modified: Wed Sep 13 23:44:52 2017
+#include <tunables/global>
+
+/usr/lib/freeorion/freeorionca {
+  #include <abstractions/base>
+  #include <abstractions/python>
+
+  network inet stream,
+
+  signal receive set=kill peer=/usr/lib/freeorion/freeoriond,
+
+  /usr/lib/freeorion/freeorionca mr,
+  /usr/share/games/freeorion/default/** r,
+  /var/lib/freeorion/.config/freeorion/AI/ w,
+  /var/lib/freeorion/.config/freeorion/AI/default/ w,
+  /var/lib/freeorion/.config/freeorion/AI/default/config.ini rw,
+  /var/lib/freeorion/.config/freeorion/config.ini rw,
+  /var/lib/freeorion/.local/share/freeorion/*.log w,
+
+}

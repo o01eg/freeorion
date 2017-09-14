@@ -2,6 +2,8 @@
 #export DH_VERBOSE=1
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 WEAK_HOSTS := armel armhf
 
@@ -38,6 +40,11 @@ override_dh_install:
 	$(RM) -v debian/freeorion-data/usr/share/games/freeorion/default/LICENSE* \
 		debian/freeorion-data/usr/share/games/freeorion/default/COPYING \
 		debian/freeorion-data/usr/share/games/freeorion/default/data/fonts/LICENSE.*
+
+override_dh_installdeb:
+	dh_apparmor --profile-name=usr.lib.freeorion.freeoriond -pfreeorion
+	dh_apparmor --profile-name=usr.lib.freeorion.freeorionca -pfreeorion
+	dh_installdeb
 
 override_dh_python2:
 	dh_python2 -pfreeorion-data /usr/share/games

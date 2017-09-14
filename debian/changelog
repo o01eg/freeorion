@@ -1,3 +1,10 @@
+freeorion (0.4.8+git20170914~e3e8d20-1) unstable; urgency=medium
+
+  * Add systemd support.
+  * Add apparmor support.
+
+ -- O01eg <o01eg@yandex.ru>  Thu, 14 Sep 2017 00:35:24 +0300
+
 freeorion (0.4.8+git20170912~1999a7a-1) unstable; urgency=medium
 
   * Use hostless build for VPS.

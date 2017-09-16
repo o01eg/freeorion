@@ -11,3 +11,9 @@ DATAPATH="--resource-dir /usr/share/games/freeorion/default"
 
 LD_LIBRARY_PATH="/usr/lib/freeorion:${LD_LIBRARY_PATH}" \
 /usr/lib/freeorion/freeoriond ${DATAPATH} "$@"
+EXITST=$?
+if [ ${EXITST} -ne 0 ];
+then
+  # do something on fail
+fi
+exit ${EXITST}

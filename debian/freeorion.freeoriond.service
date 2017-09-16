@@ -5,6 +5,8 @@ Description=FreeOrion server
 User=freeorion
 Group=freeorion
 ExecStart=/usr/games/freeoriond --hostless --log-file /var/log/freeorion/freeoriond.log
+RestartSec=5
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target

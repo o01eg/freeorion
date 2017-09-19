@@ -437,6 +437,11 @@ MPLobby::MPLobby(my_context c) :
     ClockSeed();
     ServerApp& server = Server();
     const SpeciesManager& sm = GetSpeciesManager();
+
+    m_lobby_data->m_game_rules.clear();
+    m_lobby_data->m_game_rules.push_back(std::make_pair("RULE_ENABLE_SUPER_TESTER", "0"));
+    m_lobby_data->m_game_rules.push_back(std::make_pair("RULE_ENABLE_EXPERIMENTORS", "0"));
+
     if (server.IsHostless()) {
         DebugLogger(FSM) << "(ServerFSM) MPLobby. Fill MPLobby data from the previous game.";
 
@@ -467,7 +472,7 @@ MPLobby::MPLobby(my_context c) :
 
                 m_lobby_data->m_players.push_back(std::make_pair(player_id, player_setup_data));
             } else if (player_connection->GetClientType() == Networking::CLIENT_TYPE_AI_PLAYER) {
-                if (m_ai_next_index > 2) {
+                if (m_ai_next_index <= 1) {
                     PlayerSetupData player_setup_data;
                     player_setup_data.m_player_id =     Networking::INVALID_PLAYER_ID;
                     player_setup_data.m_player_name =   UserString("AI_PLAYER") + "_" + std::to_string(m_ai_next_index++);
@@ -790,8 +795,8 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 (m_lobby_data->m_monster_freq != incoming_lobby_data.m_monster_freq) ||
                 (m_lobby_data->m_native_freq != incoming_lobby_data.m_native_freq) ||
                 (m_lobby_data->m_ai_aggr != incoming_lobby_data.m_ai_aggr) ||
-                (m_lobby_data->m_new_game != incoming_lobby_data.m_new_game) ||
-                (m_lobby_data->m_game_rules != incoming_lobby_data.m_game_rules);
+                (m_lobby_data->m_new_game != incoming_lobby_data.m_new_game)/* ||
+                (m_lobby_data->m_game_rules != incoming_lobby_data.m_game_rules)*/;
 
             if (player_setup_data_changed) {
                 if (m_lobby_data->m_players.size() != incoming_lobby_data.m_players.size()) {
@@ -825,7 +830,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             m_lobby_data->m_monster_freq   = incoming_lobby_data.m_monster_freq;
             m_lobby_data->m_native_freq    = incoming_lobby_data.m_native_freq;
             m_lobby_data->m_ai_aggr        = incoming_lobby_data.m_ai_aggr;
-            m_lobby_data->m_game_rules     = incoming_lobby_data.m_game_rules;
+            //m_lobby_data->m_game_rules     = incoming_lobby_data.m_game_rules;
 
             // directly configurable lobby data
             m_lobby_data->m_new_game       = incoming_lobby_data.m_new_game;
@@ -845,7 +850,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             }
 
             // restrict count of AI
-            if (ai_count <= 2) {
+            if (ai_count <= 1) {
                 m_lobby_data->m_players        = incoming_lobby_data.m_players;
             } else {
                 has_important_changes = true;

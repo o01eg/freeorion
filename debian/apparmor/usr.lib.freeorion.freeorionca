@@ -1,4 +1,4 @@
-# Last Modified: Wed Sep 13 23:44:52 2017
+# Last Modified: Tue Sep 26 22:36:17 2017
 #include <tunables/global>
 
 /usr/lib/freeorion/freeorionca {
@@ -16,5 +16,6 @@
   /var/lib/freeorion/.config/freeorion/AI/default/config.ini rw,
   /var/lib/freeorion/.config/freeorion/config.ini rw,
   /var/lib/freeorion/.local/share/freeorion/*.log w,
+  /var/log/freeorion/freeoriond.log w,
 
 }

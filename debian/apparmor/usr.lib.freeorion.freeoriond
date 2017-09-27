@@ -1,4 +1,4 @@
-# Last Modified: Wed Sep 13 23:26:05 2017
+# Last Modified: Wed Sep 27 06:36:13 2017
 #include <tunables/global>
 
 /usr/lib/freeorion/freeoriond {
@@ -19,7 +19,8 @@
   /var/lib/freeorion/.local/ w,
   /var/lib/freeorion/.local/share/ w,
   /var/lib/freeorion/.local/share/freeorion/ w,
-  /var/lib/freeorion/.local/share/freeorion/save/ w,
+  /var/lib/freeorion/.local/share/freeorion/save/ rw,
+  /var/lib/freeorion/.local/share/freeorion/save/*.mps rw,
   /var/log/freeorion/freeoriond.log w,
 
 }

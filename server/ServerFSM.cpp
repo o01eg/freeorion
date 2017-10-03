@@ -629,6 +629,8 @@ sc::result MPLobby::react(const JoinGame& msg) {
 
     player_name = new_player_name;
 
+    TraceLogger(FSM) << "(ServerFSM) MPLobby.JoinGame player accepted: " << player_name;
+
     // assign unique player ID to newly connected player
     int player_id = server.m_networking.NewPlayerID();
 

@@ -1,5 +1,6 @@
 [Unit]
 Description=FreeOrion server
+After=network.target
 
 [Service]
 User=freeorion

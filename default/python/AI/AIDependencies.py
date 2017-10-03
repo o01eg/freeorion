@@ -101,6 +101,11 @@ POP_CONST_MOD_MAP = {
     "GRO_PLANET_ECOL":   [0, 0, 0,  1,  1],
     "GRO_SYMBIOTIC_BIO": [0, 0, 0, -1, -1],
 }
+
+# phototrophic star coefficients
+POP_MOD_PHOTOTROPHIC_STAR_MAP = {fo.starType.blue: 3, fo.starType.white: 1.5, fo.starType.red: -1,
+                                 fo.starType.neutron: -1, fo.starType.blackHole: -10, fo.starType.noStar: -10}
+
 # </editor-fold>
 
 
@@ -167,6 +172,7 @@ HONEYCOMB_IND_MULTIPLIER = 2.5
 # </editor-fold>
 
 # <editor-fold desc="Research related specials">
+COMPUTRONIUM_SPECIAL = "COMPUTRONIUM_SPECIAL"
 COMPUTRONIUM_RES_MULTIPLIER = 1.0
 # </editor-fold>
 
@@ -215,6 +221,9 @@ CON_CONC_CAMP = "CON_CONC_CAMP"
 
 SPY_STEALTH_1 = "SPY_STEALTH_1"
 SPY_STEALTH_2 = "SPY_STEALTH_2"
+
+EXOBOT_TECH_NAME = "PRO_EXOBOTS"
+
 # </editor-fold>
 
 

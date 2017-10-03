@@ -9,7 +9,6 @@ import FleetUtilsAI
 import FreeOrionAI as foAI
 import PlanetUtilsAI
 import ProductionAI
-import TechsListsAI
 import MilitaryAI
 from turn_state import state
 from EnumsAI import MissionType, FocusType, EmpireProductionTypes, ShipRoleType, PriorityType
@@ -45,10 +44,17 @@ unowned_empty_planet_ids = set()
 facilities_by_species_grade = {}
 system_facilities = {}
 
-ENVIRONS = {str(fo.planetEnvironment.uninhabitable): 0, str(fo.planetEnvironment.hostile): 1,
-            str(fo.planetEnvironment.poor): 2, str(fo.planetEnvironment.adequate): 3, str(fo.planetEnvironment.good): 4}
-PHOTO_MAP = {fo.starType.blue: 3, fo.starType.white: 1.5, fo.starType.red: -1, fo.starType.neutron: -1,
-             fo.starType.blackHole: -10, fo.starType.noStar: -10}
+
+NEST_VAL_MAP = {
+    "SNOWFLAKE_NEST_SPECIAL": 15,
+    "KRAKEN_NEST_SPECIAL": 40,
+    "JUGGERNAUT_NEST_SPECIAL": 80,
+}
+
+AVG_PILOT_RATING = 2.0
+GOOD_PILOT_RATING = 4.0
+GREAT_PILOT_RATING = 6.0
+ULT_PILOT_RATING = 12.0
 
 
 def _get_planet_size(planet):
@@ -59,7 +65,6 @@ def _get_planet_size(planet):
     :return: size of the planet
     :rtype: int
     """
-
     if planet.size == fo.planetSize.asteroids:
         planet_size = 3
     elif planet.size == fo.planetSize.gasGiant:
@@ -80,7 +85,7 @@ def outpod_pod_cost():
 
 def calc_max_pop(planet, species, detail):
     planet_size = _get_planet_size(planet)
-    planet_env = ENVIRONS[str(species.getPlanetEnvironment(planet.type))]
+    planet_env = species.getPlanetEnvironment(planet.type)
     tag_list = list(species.tags) if species else []
     pop_tag_mod = AIDependencies.SPECIES_POPULATION_MODIFIER.get(get_ai_tag_grade(tag_list, "POPULATION"), 1.0)
 
@@ -157,7 +162,7 @@ def calc_max_pop(planet, species, detail):
 
     if "PHOTOTROPHIC" in tag_list and max_pop_size() > 0:
         star_type = fo.getUniverse().getSystem(planet.systemID).starType
-        star_pop_mod = PHOTO_MAP.get(star_type, 0)
+        star_pop_mod = AIDependencies.POP_MOD_PHOTOTROPHIC_STAR_MAP.get(star_type, 0)
         base_pop_not_modified_by_species += star_pop_mod
         detail.append("Phototropic Star Bonus_PSM_late(%0.1f)" % star_pop_mod)
 
@@ -168,18 +173,6 @@ def calc_max_pop(planet, species, detail):
     detail.append("maxPop %.1f" % max_pop_size())
     print detail
     return max_pop_size()
-
-
-NEST_VAL_MAP = {
-    "SNOWFLAKE_NEST_SPECIAL": 15,
-    "KRAKEN_NEST_SPECIAL": 40,
-    "JUGGERNAUT_NEST_SPECIAL": 80,
-}
-
-AVG_PILOT_RATING = 2.0
-GOOD_PILOT_RATING = 4.0
-GREAT_PILOT_RATING = 6.0
-ULT_PILOT_RATING = 12.0
 
 
 def galaxy_is_sparse():
@@ -267,7 +260,7 @@ def survey_universe():
         empire_metabolisms.clear()
         available_growth_specials.clear()
         active_growth_specials.clear()
-        if tech_is_complete(TechsListsAI.EXOBOT_TECH_NAME):
+        if tech_is_complete(AIDependencies.EXOBOT_TECH_NAME):
             empire_colonizers["SP_EXOBOT"] = []  # get it into colonizer list even if no colony yet
         for spec_name in AIDependencies.EXTINCT_SPECIES:
             if tech_is_complete("TECH_COL_" + spec_name):
@@ -325,15 +318,8 @@ def survey_universe():
                             yard_here = [pid]
                         if this_spec.canColonize and planet.currentMeterValue(fo.meterType.targetPopulation) >= 3:
                             empire_colonizers.setdefault(spec_name, []).extend(yard_here)
-                    if "COMPUTRONIUM_SPECIAL" in planet.specials:  # only counting it if planet is populated
+                    if AIDependencies.COMPUTRONIUM_SPECIAL in planet.specials:  # only counting it if planet is populated
                         state.set_have_computronium()
-                else:
-                    # Logic says this should not happen, but it seems to happen some time for a single turm
-                    # TODO What causes this?
-                    warn("Found a planet we own that has pop > 0 but has no species")
-                    warn("Planet: %s" % universe.getPlanet(pid))
-                    warn("Species: %s(%s)" % (spec_name, this_spec))
-                    warn("Population: %f" % planet_population)
 
                 this_grade_facilities = facilities_by_species_grade.setdefault(weapons_grade, {})
                 for facility in ship_facilities:
@@ -1163,14 +1149,14 @@ def evaluate_planet(planet_id, mission_type, spec_name, detail=None):
             if "TEMPORAL_ANOMALY_SPECIAL" in planet.specials:
                 research_bonus += discount_multiplier * 2 * AIDependencies.RESEARCH_PER_POP * max_pop_size * 25
                 detail.append("Temporal Anomaly Research")
-            if "COMPUTRONIUM_SPECIAL" in planet.specials:
+            if AIDependencies.COMPUTRONIUM_SPECIAL in planet.specials:
                 comp_bonus = (0.5 * AIDependencies.TECH_COST_MULTIPLIER * AIDependencies.RESEARCH_PER_POP *
                               AIDependencies.COMPUTRONIUM_RES_MULTIPLIER * empire_status['researchers'] *
                               discount_multiplier)
                 if state.have_computronium:
                     comp_bonus *= backup_factor
                 research_bonus += comp_bonus
-                detail.append("COMPUTRONIUM_SPECIAL")
+                detail.append(AIDependencies.COMPUTRONIUM_SPECIAL)
 
         retval += max(ind_val + asteroid_bonus + gas_giant_bonus, research_bonus,
                       growth_val) + fixed_ind + fixed_res + supply_val

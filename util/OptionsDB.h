@@ -118,6 +118,12 @@ public:
         if it has changed since it was last saved. */
     void        Commit();
 
+    /** Write any options that are not at default value to persistent config, replacing any existing file
+     *
+     *  @returns bool If file was successfully written
+     */
+    bool        CommitPersistent();
+
     /** validates a value for an option. throws std::runtime_error if no option
       * \a name exists.  throws bad_lexical_cast if \a value cannot be
       * converted to the type of the option \a name. */
@@ -176,8 +182,10 @@ public:
      *
      * @param[in,out] doc  The document this OptionsDB should be written to.
      *      This resets the given @p doc.
+     * @param[in] non_default_only Do not include options which are set to their
+     *      default value, is unrecognized, or is "version-string"
      */
-    void        GetXML(XMLDoc& doc) const;
+    void        GetXML(XMLDoc& doc, bool non_default_only = false) const;
 
     /** find all registered Options that begin with \a prefix and store them in
       * \a ret. If \p allow_unrecognized then include unrecognized options. */
@@ -307,6 +315,17 @@ public:
         if (!OptionExists(it))
             throw std::runtime_error("OptionsDB::Set<>() : Attempted to set nonexistent option \"" + name + "\".");
         m_dirty |= it->second.SetFromValue(value);
+    }
+
+    /** Set the default value of option @p name to @p value */
+    template <class T>
+    void        SetDefault(const std::string& name, const T& value) {
+        std::map<std::string, Option>::iterator it = m_options.find(name);
+        if (!OptionExists(it))
+            throw std::runtime_error("Attempted to set default value of nonexistent option \"" + name + "\".");
+        if (it->second.default_value.type() != typeid(T))
+            throw boost::bad_any_cast();
+        it->second.default_value = value;
     }
 
     /** if an xml file exists at \a file_path and has the same version tag as \a version, fill the

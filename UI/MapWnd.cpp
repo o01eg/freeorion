@@ -326,7 +326,8 @@ namespace {
             DoLayout();
         }
 
-        typedef std::pair<std::shared_ptr<CUILabel>, std::shared_ptr<CUILabel>>         LabelValueType;
+        typedef std::pair<std::shared_ptr<CUILabel>,
+                          std::shared_ptr<CUILabel>> LabelValueType;
 
         bool WndHasBrowseInfo(const Wnd* wnd, std::size_t mode) const override {
             assert(mode <= wnd->BrowseModes().size());
@@ -347,16 +348,17 @@ namespace {
             // summary text background
             GG::FlatRectangle(UL, GG::Pt(LR.x, row_height + offset), BORDER_CLR, BORDER_CLR);
 
-            // Seperation line between armed/unarmed and utility ships
+            // seperation line between armed/unarmed and utility ships
             GG::Y line_ht(UL.y + (row_height * 2) + (row_height * 5 / 4));
             GG::Pt line_ul(UL.x + (m_margin * 2), line_ht);
             GG::Pt line_lr(LR.x - (m_margin * 2), line_ht);
             GG::Line(line_ul, line_lr, BORDER_CLR);
 
-            // inset border for parts/slots
-            GG::Pt part_ul(UL.x + m_margin, LR.y - ((m_margin + row_height) * 2));
-            GG::Pt part_lr(LR.x - m_margin, LR.y - m_margin);
-            GG::BeveledRoundedRectangle(part_ul, part_lr, BG_CLR, BORDER_CLR, false);
+            // seperation line between ships and parts
+            line_ht = {UL.y + (row_height * 5) + (row_height * 6 / 4)};
+            line_ul = {UL.x + (m_margin * 2), line_ht};
+            line_lr = {LR.x - (m_margin * 2), line_ht};
+            GG::Line(line_ul, line_lr, BORDER_CLR);
         }
 
         void DoLayout() {
@@ -5366,6 +5368,7 @@ void MapWnd::PlotFleetMovement(int system_id, bool execute_move, bool append) {
 
         // get path to destination...
         std::list<int> route = GetPathfinder()->ShortestPath(start_system, system_id, empire_id).first;
+        // Prepend a non-empty old_route to the beginning of route.
         if (append && !fleet->TravelRoute().empty()) {
             std::list<int> old_route(fleet->TravelRoute());
             old_route.erase(--old_route.end()); //end of old is begin of new
@@ -6880,7 +6883,12 @@ void MapWnd::SetFleetExploring(const int fleet_id) {
 }
 
 void MapWnd::StopFleetExploring(const int fleet_id) {
-    m_fleets_exploring.erase(fleet_id);
+    auto it = m_fleets_exploring.find(fleet_id);
+    if (it == m_fleets_exploring.end())
+        return;
+
+    m_fleets_exploring.erase(it);
+
     DispatchFleetsExploring();
     // force UI update. Removing a fleet from the UI's list of exploring fleets
     // doesn't actually change the Fleet object's state in any way, so the UI

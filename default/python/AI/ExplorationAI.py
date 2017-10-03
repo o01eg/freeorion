@@ -12,9 +12,6 @@ from common.configure_logging import convenience_function_references_for_logger
 (debug, info, warn, error, fatal) = convenience_function_references_for_logger(__name__)
 
 
-TARGET_POP = 'targetPop'
-TROOPS = 'troops'
-
 graph_flags = set()
 border_unexplored_system_ids = set()
 
@@ -102,8 +99,7 @@ def assign_scouts_to_explore_systems():
         fleet_id = this_fleet_list[0]
         fleet_mission = foAI.foAIstate.get_fleet_mission(fleet_id)
         target = universe_object.System(this_sys_id)
-        if MoveUtilsAI.can_travel_to_system_and_return_to_resupply(fleet_id, fleet_mission.get_location_target(),
-                                                                   target):
+        if MoveUtilsAI.can_travel_to_system(fleet_id, fleet_mission.get_location_target(), target, ensure_return=True):
             fleet_mission.set_target(MissionType.EXPLORATION, target)
             sent_list.append(this_sys_id)
         else:  # system too far out, skip it, but can add scout back to available pool

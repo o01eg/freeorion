@@ -5,21 +5,7 @@ matrix:
       services:
         - docker
       env:
-        - BUILD_APIDOC=true
-        # Auth token to push API documentation
-        - secure: "JKeXk8p65hodb12PVRST6A90swsNubc+46EbSJGSghldIxbFWLBAlwU+KLeOMO4V0veu6k4lnMa50V0UYFZmoUsS6W0aL5Ybo98SpzXHiNLOmOluoqJoF9TBsOTCCRFbWbccgJyVEtulgRcdml96naS51lq9Sw/VO/N3Z472304="
-    - os: linux
-      services:
-        - docker
-      env:
         - BUILD_UNITTEST=true
-    - os: osx
-      osx_image: xcode6.4
-      compiler: clang
-  allow_failures:
-    - env:
-      - BUILD_APIDOC=true
-      - secure: "JKeXk8p65hodb12PVRST6A90swsNubc+46EbSJGSghldIxbFWLBAlwU+KLeOMO4V0veu6k4lnMa50V0UYFZmoUsS6W0aL5Ybo98SpzXHiNLOmOluoqJoF9TBsOTCCRFbWbccgJyVEtulgRcdml96naS51lq9Sw/VO/N3Z472304="
 install:
   - >
     if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
@@ -34,17 +20,9 @@ install:
       hdiutil detach /Volumes/FreeOrionSDK
     fi
 before_script:
-  # Configure git to use the identity of FreeOrion Build Bot and
-  # load credentials
-  - >
-    if [[ "${BUILD_APIDOC}" == "true" ]]; then
-      git config --global user.email "freeorionorg@gmail.com"
-      git config --global user.name "FreeOrion Build Bot"
-      git config --global credential.helper "cache --timeout=300"
-      echo -e "url=https://freeorion-bot:${FreeOrion_AUTH_TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git\n" | git credential approve
-    fi
   - >
     if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
+      git remote -v
       mkdir build
       cd build
       # Add transparent cmake function to allow possible cross platform use of
@@ -59,23 +37,8 @@ before_script:
     fi
 script:
   - >
-    if [[ "${BUILD_APIDOC}" == "true" && "${TRAVIS_BRANCH}" == "master" ]]; then
-      cmake ..
-      cmake --build . --target cpp-apidoc
-
-      git clone --depth=1 --branch=master https://github.com/freeorion/freeorion.github.io.git apidoc-deploy.git
-      pushd apidoc-deploy.git
-      rm -rf cppapi/master
-      mkdir -p cppapi/master
-      cp -R ../doc/cpp-apidoc/html cppapi/master
-      git add -A cppapi/master
-      git commit -m "Update FreeOrion API documentation to match commit \`$(date --iso-8601).${TRAVIS_COMMIT:0:8}\`"
-      git push https://github.com/freeorion/freeorion.github.io.git master:master
-      popd
-    fi
-  - >
     if [[ "${TRAVIS_OS_NAME}" == "linux" && "${BUILD_UNITTEST}" == "true" ]]; then
-      cmake -DBUILD_TESTING=ON ..
+      cmake -DBUILD_HEADLESS=ON -DBUILD_TESTING=ON ..
       cmake --build . -- -j 2 &&
       cmake --build . --target unittest
     fi

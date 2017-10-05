@@ -22,7 +22,8 @@ install:
 before_script:
   - >
     if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
-      git remote -v
+      git remote add -t master -m master upstream https://github.com/freeorion/freeorion.git
+      git fetch upstream
       mkdir build
       cd build
       # Add transparent cmake function to allow possible cross platform use of
@@ -38,6 +39,7 @@ before_script:
 script:
   - >
     if [[ "${TRAVIS_OS_NAME}" == "linux" && "${BUILD_UNITTEST}" == "true" ]]; then
+      git merge --no-commit upstream/master
       cmake -DBUILD_HEADLESS=ON -DBUILD_TESTING=ON ..
       cmake --build . -- -j 2 &&
       cmake --build . --target unittest

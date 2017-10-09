@@ -24,6 +24,7 @@ before_script:
     if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
       git remote add -t master -m master upstream https://github.com/freeorion/freeorion.git
       git fetch upstream
+      git log -1 upstream/master
       mkdir build
       cd build
       # Add transparent cmake function to allow possible cross platform use of

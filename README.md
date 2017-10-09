@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/o01eg/freeorion.svg?branch=no-pullrequest-dedicated-server)](https://travis-ci.org/o01eg/freeorion)
+
 # FreeOrion
 
 FreeOrion is a free, Open Source, turn-based space empire and galactic conquest

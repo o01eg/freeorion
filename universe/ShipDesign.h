@@ -187,7 +187,7 @@ private:
 /** Holds FreeOrion ship part types */
 class FO_COMMON_API PartTypeManager {
 public:
-    typedef std::map<std::string, PartType*>::const_iterator iterator;
+    typedef std::map<std::string, std::unique_ptr<PartType>>::const_iterator iterator;
 
     /** \name Accessors */ //@{
     /** returns the part type with the name \a name; you should use the free function GetPartType() instead */
@@ -213,9 +213,8 @@ public:
 
 private:
     PartTypeManager();
-    ~PartTypeManager();
 
-    std::map<std::string, PartType*>    m_parts;
+    std::map<std::string, std::unique_ptr<PartType>> m_parts;
     static PartTypeManager*             s_instance;
 };
 
@@ -415,7 +414,7 @@ namespace CheckSums {
 /** Holds FreeOrion hull types */
 class FO_COMMON_API HullTypeManager {
 public:
-    typedef std::map<std::string, HullType*>::const_iterator iterator;
+    typedef std::map<std::string, std::unique_ptr<HullType>>::const_iterator iterator;
 
     /** \name Accessors */ //@{
     /** returns the hull type with the name \a name; you should use the free function GetHullType() instead */
@@ -441,9 +440,8 @@ public:
 
 private:
     HullTypeManager();
-    ~HullTypeManager();
 
-    std::map<std::string, HullType*> m_hulls;
+    std::map<std::string, std::unique_ptr<HullType>> m_hulls;
     static HullTypeManager* s_instance;
 };
 

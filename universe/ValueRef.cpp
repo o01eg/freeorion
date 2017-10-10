@@ -642,7 +642,7 @@ StarType Variable<StarType>::Eval(const ScriptingContext& context) const
 template <>
 Visibility Variable<Visibility>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.back();
+    // const std::string& property_name = m_property_name.back();
 
     IF_CURRENT_VALUE(Visibility)
 
@@ -2093,7 +2093,7 @@ namespace {
         const Empire* empire = GetEmpire(empire_id);
         if (!empire)
             return retval;
-        for (const Tech* tech : GetTechManager()) {
+        for (const auto& tech : GetTechManager()) {
             if (empire->TechResearched(tech->Name()))
                 retval.push_back(tech->Name());
         }
@@ -2105,7 +2105,7 @@ namespace {
         const Empire* empire = GetEmpire(empire_id);
         if (!empire)
             return retval;
-        for (const Tech* tech : GetTechManager()) {
+        for (const auto& tech : GetTechManager()) {
             if (empire->ResearchableTech(tech->Name()))
                 retval.push_back(tech->Name());
         }

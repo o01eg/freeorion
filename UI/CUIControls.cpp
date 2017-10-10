@@ -1040,8 +1040,7 @@ void CensoredCUIEdit::SetText(const std::string& str) {
     // generate censored text by appending one placeholder char per char in raw text
     std::string censored_text;
     for (const auto& curr_line : line_data)
-        for (const auto& curr_char : curr_line.char_data)
-            censored_text += m_placeholder;
+        censored_text += std::string(curr_line.char_data.size(), m_placeholder);
 
     CUIEdit::SetText(censored_text);
 }
@@ -1603,7 +1602,7 @@ SpeciesSelector::SpeciesSelector(GG::X w, GG::Y h) :
     Resize(GG::Pt(w, h - 8));
     const SpeciesManager& sm = GetSpeciesManager();
     for (auto it = sm.playable_begin(); it != sm.playable_end(); ++it)
-        Insert(GG::Wnd::Create<SpeciesRow>(it->second, w, h - 4));
+        Insert(GG::Wnd::Create<SpeciesRow>(it->second.get(), w, h - 4));
     if (!this->Empty()) {
         // Add an option for random selection
         Insert(GG::Wnd::Create<SpeciesRow>("RANDOM", UserString("GSETUP_RANDOM"),

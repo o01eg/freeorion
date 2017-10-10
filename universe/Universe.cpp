@@ -91,12 +91,7 @@ namespace EmpireStatistics {
         static std::map<std::string, ValueRef::ValueRefBase<double>*> s_stats;
         if (s_stats.empty()) {
             try {
-                parse::statistics(s_stats);
-
-                unsigned int checksum{0};
-                CheckSums::CheckSumCombine(checksum, s_stats);
-                DebugLogger() << "Empire Statistics checksum: " << checksum;
-
+                s_stats = parse::statistics();
             } catch (const std::exception& e) {
                 ErrorLogger() << "Failed parsing empire statistics: error: " << e.what();
                 throw e;
@@ -1170,7 +1165,7 @@ void Universe::GetEffectsAndTargets(Effect::TargetsCauses& targets_causes,
     // enforce species effects order
     for (const auto& entry : GetSpeciesManager()) {
         const std::string& species_name = entry.first;
-        const Species* species = entry.second;
+        const auto& species = entry.second;
         auto species_objects_it = species_objects.find(species_name);
 
         if (species_objects_it == species_objects.end())
@@ -1334,7 +1329,7 @@ void Universe::GetEffectsAndTargets(Effect::TargetsCauses& targets_causes,
     // enforce hull types effects order
     for (const auto& entry : GetHullTypeManager()) {
         const std::string& hull_type_name = entry.first;
-        const HullType* hull_type = entry.second;
+        const auto& hull_type = entry.second;
         auto ships_by_hull_type_it = ships_by_hull_type.find(hull_type_name);
 
         if (ships_by_hull_type_it == ships_by_hull_type.end())
@@ -1353,7 +1348,7 @@ void Universe::GetEffectsAndTargets(Effect::TargetsCauses& targets_causes,
     // enforce part types effects order
     for (const auto& entry : GetPartTypeManager()) {
         const std::string& part_type_name = entry.first;
-        const PartType* part_type = entry.second;
+        const auto& part_type = entry.second;
         auto ships_by_part_type_it = ships_by_part_type.find(part_type_name);
 
         if (ships_by_part_type_it == ships_by_part_type.end())
@@ -1393,7 +1388,7 @@ void Universe::GetEffectsAndTargets(Effect::TargetsCauses& targets_causes,
     // enforce field types effects order
     for (const auto& entry : GetFieldTypeManager()) {
         const std::string& field_type_name = entry.first;
-        const FieldType* field_type = entry.second;
+        const auto& field_type = entry.second;
         auto fields_by_type_it = fields_by_type.find(field_type_name);
 
         if (fields_by_type_it == fields_by_type.end())

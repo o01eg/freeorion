@@ -18,7 +18,7 @@ namespace std {
     inline ostream& operator<<(ostream& os, const std::set<std::string>&) { return os; }
     inline ostream& operator<<(ostream& os, const std::vector<std::shared_ptr<Effect::EffectsGroup>>&) { return os; }
     inline ostream& operator<<(ostream& os, const Tech::TechInfo&) { return os; }
-    inline ostream& operator<<(ostream& os, const std::pair<const std::string, TechCategory*>&) { return os; }
+    inline ostream& operator<<(ostream& os, const std::pair<const std::string, std::unique_ptr<TechCategory>>&) { return os; }
 }
 #endif
 
@@ -26,56 +26,59 @@ namespace {
     const boost::phoenix::function<parse::detail::is_unique> is_unique_;
 
     std::set<std::string>* g_categories_seen = nullptr;
-    std::map<std::string, TechCategory*>* g_categories = nullptr;
+    std::map<std::string, std::unique_ptr<TechCategory>>* g_categories = nullptr;
 
     /// Check if the tech will be unique.
-    struct check_tech {
-        typedef bool result_type;
-
-        result_type operator()(TechManager::TechContainer& techs, Tech* tech) const {
-            auto retval = true;
-            if (techs.get<TechManager::NameIndex>().find(tech->Name()) != techs.get<TechManager::NameIndex>().end()) {
-                ErrorLogger() <<  "More than one tech has the name " << tech->Name();
-                retval = false;
-            }
-            if (tech->Prerequisites().find(tech->Name()) != tech->Prerequisites().end()) {
-                ErrorLogger() << "Tech " << tech->Name() << " depends on itself!";
-                retval = false;
-            }
-            return retval;
+    bool check_tech(TechManager::TechContainer& techs, const std::unique_ptr<Tech>& tech) {
+        auto retval = true;
+        if (techs.get<TechManager::NameIndex>().find(tech->Name()) != techs.get<TechManager::NameIndex>().end()) {
+            ErrorLogger() <<  "More than one tech has the name " << tech->Name();
+            retval = false;
         }
-    };
-
-    struct insert_tech {
-        typedef void result_type;
-
-        result_type operator()(TechManager::TechContainer& techs, Tech* tech) const {
-            g_categories_seen->insert(tech->Category());
-            techs.insert(tech);
+        if (tech->Prerequisites().find(tech->Name()) != tech->Prerequisites().end()) {
+            ErrorLogger() << "Tech " << tech->Name() << " depends on itself!";
+            retval = false;
         }
-    };
+        return retval;
+    }
 
-    const boost::phoenix::function<check_tech> check_tech_;
-    const boost::phoenix::function<insert_tech> insert_tech_;
+    void insert_tech(TechManager::TechContainer& techs,
+                     const Tech::TechInfo& tech_info,
+                     const std::vector<std::shared_ptr<Effect::EffectsGroup>>& effects,
+                     const std::set<std::string>& prerequisites,
+                     const std::vector<ItemSpec>& unlocked_items,
+                     const std::string& graphic)
+    {
+        auto tech_ptr = std::unique_ptr<Tech>(
+            new Tech(tech_info, effects, prerequisites, unlocked_items, graphic));
 
-    struct insert_category {
-        typedef void result_type;
-
-        void operator()(std::map<std::string, TechCategory*>& categories, TechCategory* category) const {
-            categories.insert(std::make_pair(category->name, category));
+        if (check_tech(techs, tech_ptr)) {
+            g_categories_seen->insert(tech_ptr->Category());
+            techs.insert(std::move(tech_ptr));
         }
-    };
-    const boost::phoenix::function<insert_category> insert_category_;
+    }
+
+    BOOST_PHOENIX_ADAPT_FUNCTION(void, insert_tech_, insert_tech, 6)
+
+    void insert_category(std::map<std::string, std::unique_ptr<TechCategory>>& categories,
+                         const std::string& name, const std::string& graphic, const GG::Clr& color)
+    {
+        auto category_ptr = std::unique_ptr<TechCategory>(new TechCategory(name, graphic, color));
+        categories.insert(std::make_pair(category_ptr->name, std::move(category_ptr)));
+    }
+
+    BOOST_PHOENIX_ADAPT_FUNCTION(void, insert_category_, insert_category, 4)
 
 
     struct rules {
-        rules() {
+        rules(const std::string& filename,
+              const parse::text_iterator& first, const parse::text_iterator& last)
+        {
             namespace phoenix = boost::phoenix;
             namespace qi = boost::spirit::qi;
 
             using phoenix::construct;
             using phoenix::insert;
-            using phoenix::new_;
             using phoenix::push_back;
 
             qi::_1_type _1;
@@ -139,15 +142,14 @@ namespace {
                 >  -unlocks(_c)
                 > -(parse::detail::label(EffectsGroups_token) > parse::detail::effects_group_parser() [ _d = _1 ])
                 > -(parse::detail::label(Graphic_token) > tok.string [ _e = _1 ])
-                   )
-                [ _f = new_<Tech>(_a, _d, _b, _c, _e), _pass = check_tech_(_r1, _f), insert_tech_(_r1, _f) ]
+                   ) [ insert_tech_(_r1, _a, _d, _b, _c, _e) ]
                 ;
 
             category
                 =   tok.Category_
                 >   parse::detail::label(Name_token)    > tok.string [ _pass = is_unique_(_r1, Category_token, _1), _a = _1 ]
                 >   parse::detail::label(Graphic_token) > tok.string [ _b = _1 ]
-                >   parse::detail::label(Colour_token)  > parse::detail::color_parser() [ insert_category_(_r1, new_<TechCategory>(_a, _b, _1)) ]
+                >   parse::detail::label(Colour_token)  > parse::detail::color_parser() [ insert_category_(_r1, _a, _b, _1) ]
                 ;
 
             start
@@ -173,7 +175,7 @@ namespace {
             debug(category);
 #endif
 
-            qi::on_error<qi::fail>(start, parse::report_error(_1, _2, _3, _4));
+            qi::on_error<qi::fail>(start, parse::report_error(filename, first, last, _1, _2, _3, _4));
         }
 
         typedef parse::detail::rule<
@@ -215,7 +217,7 @@ namespace {
         > tech_rule;
 
         typedef parse::detail::rule<
-            void (std::map<std::string, TechCategory*>&),
+            void (std::map<std::string, std::unique_ptr<TechCategory>>&),
             boost::spirit::qi::locals<
                 std::string,
                 std::string
@@ -237,21 +239,24 @@ namespace {
 }
 
 namespace parse {
-    bool techs(TechManager::TechContainer& techs_,
-               std::map<std::string, TechCategory*>& categories,
-               std::set<std::string>& categories_seen)
-    {
-        bool result = true;
+    std::tuple<
+        TechManager::TechContainer, // techs_
+        std::map<std::string, std::unique_ptr<TechCategory>>, // tech_categories,
+        std::set<std::string>> // categories_seen
+    techs() {
+        TechManager::TechContainer techs_;
+        std::map<std::string, std::unique_ptr<TechCategory>> categories;
+        std::set<std::string> categories_seen;
 
         g_categories_seen = &categories_seen;
         g_categories = &categories;
 
-        result &= detail::parse_file<rules, TechManager::TechContainer>(GetResourceDir() / "scripting/techs/Categories.inf", techs_);
+        /*auto success =*/ detail::parse_file<rules, TechManager::TechContainer>(GetResourceDir() / "scripting/techs/Categories.inf", techs_);
 
         for (const boost::filesystem::path& file : ListScripts("scripting/techs")) {
-            result &= detail::parse_file<rules, TechManager::TechContainer>(file, techs_);
+            /*auto success =*/ detail::parse_file<rules, TechManager::TechContainer>(file, techs_);
         }
 
-        return result;
+        return std::make_tuple(std::move(techs_), std::move(categories), categories_seen);
     }
 }

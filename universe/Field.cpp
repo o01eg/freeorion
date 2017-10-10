@@ -227,6 +227,7 @@ unsigned int FieldType::GetCheckSum() const {
     CheckSums::CheckSumCombine(retval, m_effects);
     CheckSums::CheckSumCombine(retval, m_graphic);
 
+    DebugLogger() << "FieldTypeManager checksum: " << retval;
     return retval;
 }
 
@@ -243,31 +244,26 @@ FieldTypeManager::FieldTypeManager() {
     ScopedTimer timer("FieldTypeManager Init", true, std::chrono::milliseconds(1));
 
     try {
-        parse::fields(m_field_types);
+        m_field_types = parse::fields();
     } catch (const std::exception& e) {
         ErrorLogger() << "Failed parsing fields: error: " << e.what();
         throw e;
     }
 
-    TraceLogger() << "Field Types:";
-    for (const auto& entry : *this)
-        TraceLogger() << " ... " << entry.first;
+    TraceLogger() << [this]() {
+            std::string retval("Field Types:");
+            for (const auto& entry : *this)
+                retval.append("\n\t" + entry.first);
+            return retval;
+        }();
 
     // Only update the global pointer on sucessful construction.
     s_instance = this;
-
-    DebugLogger() << "FieldTypeManager checksum: " << GetCheckSum();
-}
-
-FieldTypeManager::~FieldTypeManager() {
-    for (const auto& entry : m_field_types) {
-        delete entry.second;
-    }
 }
 
 const FieldType* FieldTypeManager::GetFieldType(const std::string& name) const {
     auto it = m_field_types.find(name);
-    return it != m_field_types.end() ? it->second : nullptr;
+    return it != m_field_types.end() ? it->second.get() : nullptr;
 }
 
 FieldTypeManager& FieldTypeManager::GetFieldTypeManager() {

@@ -20,24 +20,43 @@ namespace std {
     inline ostream& operator<<(ostream& os, const std::pair<PlanetType, PlanetEnvironment>&) { return os; }
     inline ostream& operator<<(ostream& os, const std::pair<const PlanetType, PlanetEnvironment>&) { return os; }
     inline ostream& operator<<(ostream& os, const std::map<PlanetType, PlanetEnvironment>&) { return os; }
-    inline ostream& operator<<(ostream& os, const std::pair<const std::string, Species*>&) { return os; }
-    inline ostream& operator<<(ostream& os, const std::map<std::string, Species*>&) { return os; }
+    inline ostream& operator<<(ostream& os, const std::pair<const std::string, std::unique_ptr<Species>>&) { return os; }
+    inline ostream& operator<<(ostream& os, const std::map<std::string, std::unique_ptr<Species>>&) { return os; }
 }
 #endif
 
 namespace {
     const boost::phoenix::function<parse::detail::is_unique> is_unique_;
 
-    const boost::phoenix::function<parse::detail::insert> insert_;
+    void insert_species(std::map<std::string, std::unique_ptr<Species>>& species,
+                        const SpeciesStrings& strings,
+                        const std::vector<FocusType>& foci,
+                        const std::string& preferred_focus,
+                        const std::map<PlanetType, PlanetEnvironment>& planet_environments,
+                        const std::vector<std::shared_ptr<Effect::EffectsGroup>>& effects,
+                        const SpeciesParams& params,
+                        const std::set<std::string>& tags,
+                        const std::string& graphic)
+    {
+        // TODO use make_unique when converting to C++14
+        auto species_ptr = std::unique_ptr<Species>(
+            new Species(strings, foci, preferred_focus, planet_environments, effects, params, tags, graphic));
+
+        species.insert(std::make_pair(species_ptr->Name(), std::move(species_ptr)));
+    }
+
+    BOOST_PHOENIX_ADAPT_FUNCTION(void, insert_species_, insert_species, 9)
+
 
     struct rules {
-        rules() {
+        rules(const std::string& filename,
+              const parse::text_iterator& first, const parse::text_iterator& last)
+        {
             namespace phoenix = boost::phoenix;
             namespace qi = boost::spirit::qi;
 
             using phoenix::construct;
             using phoenix::insert;
-            using phoenix::new_;
             using phoenix::push_back;
 
             qi::_1_type _1;
@@ -120,8 +139,7 @@ namespace {
                 >   -effects(_e)
                 >   -environments(_f)
                 >    parse::detail::label(Graphic_token) > tok.string
-                [ insert_(_r1, phoenix::bind(&SpeciesStrings::name, _a),
-                          new_<Species>(_a, _d, _g, _f, _e, _b, _c, _1)) ]
+                [ insert_species_(_r1, _a, _d, _g, _f, _e, _b, _c, _1) ]
                 ;
 
             start
@@ -152,7 +170,7 @@ namespace {
             debug(start);
 #endif
 
-            qi::on_error<qi::fail>(start, parse::report_error(_1, _2, _3, _4));
+            qi::on_error<qi::fail>(start, parse::report_error(filename, first, last, _1, _2, _3, _4));
         }
 
         typedef parse::detail::rule<
@@ -196,7 +214,7 @@ namespace {
         > species_params_rule;
 
         typedef parse::detail::rule<
-            SpeciesStrings (const std::map<std::string, Species*>&),
+            SpeciesStrings (const std::map<std::string, std::unique_ptr<Species>>&),
             boost::spirit::qi::locals<
                 std::string,
                 std::string,
@@ -205,7 +223,7 @@ namespace {
         > species_strings_rule;
 
         typedef parse::detail::rule<
-            void (std::map<std::string, Species*>&),
+            void (std::map<std::string, std::unique_ptr<Species>>&),
             boost::spirit::qi::locals<
                 SpeciesStrings,
                 SpeciesParams,
@@ -218,7 +236,7 @@ namespace {
         > species_rule;
 
         typedef parse::detail::rule<
-            void (std::map<std::string, Species*>&)
+            void (std::map<std::string, std::unique_ptr<Species>>&)
         > start_rule;
 
         foci_rule                       foci;
@@ -235,13 +253,13 @@ namespace {
 }
 
 namespace parse {
-    bool species(std::map<std::string, Species*>& species_) {
-        bool result = true;
+    std::map<std::string, std::unique_ptr<Species>> species() {
+        std::map<std::string, std::unique_ptr<Species>> species_;
 
         for (const boost::filesystem::path& file : ListScripts("scripting/species")) {
-            result &= detail::parse_file<rules, std::map<std::string, Species*>>(file, species_);
+            /*auto success =*/ detail::parse_file<rules, std::map<std::string, std::unique_ptr<Species>>>(file, species_);
         }
 
-        return result;
+        return species_;
     }
 }

@@ -191,33 +191,28 @@ PartTypeManager::PartTypeManager() {
     ScopedTimer timer("PartTypeManager Init", true, std::chrono::milliseconds(1));
 
     try {
-        parse::ship_parts(m_parts);
+        m_parts = parse::ship_parts();
     } catch (const std::exception& e) {
         ErrorLogger() << "Failed parsing ship parts: error: " << e.what();
         throw;
     }
 
-    TraceLogger() << "Part Types:";
-    for (const auto& entry : m_parts) {
-        const PartType* p = entry.second;
-        TraceLogger() << " ... " << p->Name() << " class: " << p->Class();
-    }
+    TraceLogger() << [this]() {
+            std::string retval("Part Types:");
+            for (const auto& pair : m_parts) {
+                const auto& part = pair.second;
+                retval.append("\n\t" + part->Name() + " class: " + boost::lexical_cast<std::string>(part->Class()));
+            }
+            return retval;
+        }();
 
     // Only update the global pointer on sucessful construction.
     s_instance = this;
-
-    DebugLogger() << "PartTypeManager checksum: " << GetCheckSum();
-}
-
-PartTypeManager::~PartTypeManager() {
-    for (auto& entry : m_parts) {
-        delete entry.second;
-    }
 }
 
 const PartType* PartTypeManager::GetPartType(const std::string& name) const {
     auto it = m_parts.find(name);
-    return it != m_parts.end() ? it->second : nullptr;
+    return it != m_parts.end() ? it->second.get() : nullptr;
 }
 
 const PartTypeManager& PartTypeManager::GetPartTypeManager() {
@@ -237,6 +232,8 @@ unsigned int PartTypeManager::GetCheckSum() const {
         CheckSums::CheckSumCombine(retval, name_part_pair);
     CheckSums::CheckSumCombine(retval, m_parts.size());
 
+
+    DebugLogger() << "PartTypeManager checksum: " << retval;
     return retval;
 }
 
@@ -599,15 +596,6 @@ int HullType::ProductionTime(int empire_id, int location_id) const {
 unsigned int HullType::GetCheckSum() const {
     unsigned int retval{0};
 
-    //// test
-    //std::map<unsigned long int, std::shared_ptr<Blah>> int_pBlah_map{
-    //    {103U, std::make_shared<Blah>()}, {0, nullptr}};
-    //CheckSumCombine(retval, int_pBlah_map);
-    //std::map<MeterType, std::string> metertype_string_map{{METER_INDUSTRY, "STRING!"}};
-    //CheckSumCombine(retval, metertype_string_map);
-    //return retval;
-    //// end test
-
     CheckSums::CheckSumCombine(retval, m_name);
     CheckSums::CheckSumCombine(retval, m_description);
     CheckSums::CheckSumCombine(retval, m_speed);
@@ -644,36 +632,30 @@ HullTypeManager::HullTypeManager() {
     ScopedTimer timer("HullTypeManager Init", true, std::chrono::milliseconds(1));
 
     try {
-        parse::ship_hulls(m_hulls);
+        m_hulls = parse::ship_hulls();
     } catch (const std::exception& e) {
         ErrorLogger() << "Failed parsing ship hulls: error: " << e.what();
         throw;
     }
 
-    TraceLogger() << "Hull Types:";
-    for (const auto& entry : m_hulls) {
-        const HullType* h = entry.second;
-        TraceLogger() << " ... " << h->Name();
-    }
+    TraceLogger() << [this]() {
+            std::string retval("Hull Types:");
+            for (const auto& entry : m_hulls) {
+                retval.append("\n\t" + entry.second->Name());
+            }
+            return retval;
+        }();
 
     if (m_hulls.empty())
         ErrorLogger() << "HullTypeManager expects at least one hull type.  All ship design construction will fail.";
 
     // Only update the global pointer on sucessful construction.
     s_instance = this;
-
-    DebugLogger() << "HullTypeManager checksum: " << GetCheckSum();
-}
-
-HullTypeManager::~HullTypeManager() {
-    for (auto& entry : m_hulls) {
-        delete entry.second;
-    }
 }
 
 const HullType* HullTypeManager::GetHullType(const std::string& name) const {
     auto it = m_hulls.find(name);
-    return it != m_hulls.end() ? it->second : nullptr;
+    return it != m_hulls.end() ? it->second.get() : nullptr;
 }
 
 const HullTypeManager& HullTypeManager::GetHullTypeManager() {
@@ -693,6 +675,7 @@ unsigned int HullTypeManager::GetCheckSum() const {
         CheckSums::CheckSumCombine(retval, name_hull_pair);
     CheckSums::CheckSumCombine(retval, m_hulls.size());
 
+    DebugLogger() << "HullTypeManager checksum: " << retval;
     return retval;
 }
 
@@ -1019,16 +1002,16 @@ ShipDesign::MaybeInvalidDesign(const std::string& hull_in,
     auto parts = parts_in;
 
     // ensure hull type exists
-    const HullType* input_hull_type = GetHullTypeManager().GetHullType(hull);
-    HullType* fallback_hull_type;
-    if (!input_hull_type) {
+    const HullType* hull_type = GetHullTypeManager().GetHullType(hull);
+    if (!hull_type) {
         is_valid = false;
         if (produce_log)
             WarnLogger() << "Invalid ShipDesign hull not found: " << hull;
 
         const auto hull_it = GetHullTypeManager().begin();
         if (hull_it != GetHullTypeManager().end()) {
-            std::tie(hull, fallback_hull_type) = *hull_it;
+            hull = hull_it->first;
+            hull_type = hull_it->second.get();
             if (produce_log)
                 WarnLogger() << "Invalid ShipDesign hull falling back to: " << hull;
         } else {
@@ -1039,9 +1022,6 @@ ShipDesign::MaybeInvalidDesign(const std::string& hull_in,
             return std::make_pair(hull, parts);
         }
     }
-
-    const auto hull_type = input_hull_type ? input_hull_type : fallback_hull_type;
-
 
     // ensure hull type has at least enough slots for passed parts
     if (parts.size() > hull_type->NumSlots()) {
@@ -1386,8 +1366,6 @@ PredefinedShipDesignManager::PredefinedShipDesignManager() {
 
     // Only update the global pointer on sucessful construction.
     s_instance = this;
-
-    DebugLogger() << "PredefinedShipDesignManager checksum: " << GetCheckSum();
 }
 
 namespace {
@@ -1485,6 +1463,7 @@ unsigned int PredefinedShipDesignManager::GetCheckSum() const {
     build_checksum(m_ship_ordering);
     build_checksum(m_monster_ordering);
 
+    DebugLogger() << "PredefinedShipDesignManager checksum: " << retval;
     return retval;
 }
 
@@ -1509,10 +1488,10 @@ LoadShipDesignsAndManifestOrderFromFileSystem(const boost::filesystem::path& dir
                        std::pair<std::unique_ptr<ShipDesign>,
                                  boost::filesystem::path>,
                        boost::hash<boost::uuids::uuid>>  saved_designs;
-    std::vector<boost::uuids::uuid> disk_ordering;
 
-    std::vector<std::pair<std::unique_ptr<ShipDesign>, boost::filesystem::path>> designs_and_paths;
-    parse::ship_designs(dir, designs_and_paths, disk_ordering);
+    auto designs_paths_and_ordering = parse::ship_designs(dir);
+    auto& designs_and_paths = designs_paths_and_ordering.first;
+    auto& disk_ordering = designs_paths_and_ordering.second;
 
     for (auto&& design_and_path : designs_and_paths) {
         auto& design = design_and_path.first;

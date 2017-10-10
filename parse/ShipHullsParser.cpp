@@ -21,8 +21,8 @@
 namespace std {
     inline ostream& operator<<(ostream& os, const std::vector<HullType::Slot>&) { return os; }
     inline ostream& operator<<(ostream& os, const std::vector<std::shared_ptr<Effect::EffectsGroup>>&) { return os; }
-    inline ostream& operator<<(ostream& os, const std::map<std::string, HullType*>&) { return os; }
-    inline ostream& operator<<(ostream& os, const std::pair<const std::string, HullType*>&) { return os; }
+    inline ostream& operator<<(ostream& os, const std::map<std::string, std::unique_ptr<HullType>>&) { return os; }
+    inline ostream& operator<<(ostream& os, const std::pair<const std::string, std::unique_ptr<HullType>>&) { return os; }
     inline ostream& operator<<(ostream& os, const HullType::Slot&) { return os; }
     inline ostream& operator<<(ostream& os, const HullTypeStats&) { return os; }
 }
@@ -31,17 +31,28 @@ namespace std {
 namespace {
     const boost::phoenix::function<parse::detail::is_unique> is_unique_;
 
-    const boost::phoenix::function<parse::detail::insert> insert_;
+    void insert_hulltype(std::map<std::string, std::unique_ptr<HullType>>& hulltypes,
+                         const HullTypeStats& stats, const CommonParams& common_params,
+                         const MoreCommonParams& more_common_params,
+                         const std::vector<HullType::Slot>& slots,
+                         const std::string& icon, const std::string& graphic)
+    {
+        auto hulltype = std::unique_ptr<HullType>(
+            new HullType(stats, common_params, more_common_params, slots, icon, graphic));
+        hulltypes.emplace(hulltype->Name(), std::move(hulltype));
+    }
+
+    BOOST_PHOENIX_ADAPT_FUNCTION(void, insert_hulltype_, insert_hulltype, 7)
 
     struct rules {
-        rules() {
+        rules(const std::string& filename,
+              const parse::text_iterator& first, const parse::text_iterator& last)
+        {
             namespace phoenix = boost::phoenix;
             namespace qi = boost::spirit::qi;
 
             using phoenix::construct;
-            using phoenix::new_;
             using phoenix::push_back;
-            using phoenix::insert;
 
             qi::_1_type _1;
             qi::_2_type _2;
@@ -96,8 +107,7 @@ namespace {
                 >   parse::detail::common_params_parser()       [ _d = _1 ]
                 >   parse::detail::label(Icon_token)    > tok.string    [ _f = _1 ]
                 >   parse::detail::label(Graphic_token) > tok.string
-                [ insert_(_r1, phoenix::bind(&MoreCommonParams::name, _a),
-                          new_<HullType>(_c, _d, _a, _e, _f, _1)) ]
+                [ insert_hulltype_(_r1, _c, _d, _a, _e, _f, _1) ]
                 ;
 
             start
@@ -117,7 +127,7 @@ namespace {
             debug(hull);
 #endif
 
-            qi::on_error<qi::fail>(start, parse::report_error(_1, _2, _3, _4));
+            qi::on_error<qi::fail>(start, parse::report_error(filename, first, last, _1, _2, _3, _4));
         }
 
         typedef parse::detail::rule<
@@ -144,7 +154,7 @@ namespace {
         > slots_rule;
 
         typedef parse::detail::rule<
-            void (std::map<std::string, HullType*>&),
+            void (std::map<std::string, std::unique_ptr<HullType>>&),
             boost::spirit::qi::locals<
                 MoreCommonParams,
                 std::string,    // dummy
@@ -156,7 +166,7 @@ namespace {
         > hull_rule;
 
         typedef parse::detail::rule<
-            void (std::map<std::string, HullType*>&)
+            void (std::map<std::string, std::unique_ptr<HullType>>&)
         > start_rule;
 
         hull_stats_rule                             hull_stats;
@@ -168,13 +178,13 @@ namespace {
 }
 
 namespace parse {
-    bool ship_hulls(std::map<std::string, HullType*>& hulls) {
-        bool result = true;
+    std::map<std::string, std::unique_ptr<HullType>> ship_hulls() {
+        std::map<std::string, std::unique_ptr<HullType>> hulls;
 
         for (const boost::filesystem::path& file : ListScripts("scripting/ship_hulls")) {
-            result &= detail::parse_file<rules, std::map<std::string, HullType*>>(file, hulls);
+            /*auto success =*/ detail::parse_file<rules, std::map<std::string, std::unique_ptr<HullType>>>(file, hulls);
         }
 
-        return result;
+        return hulls;
     }
 }

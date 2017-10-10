@@ -318,8 +318,7 @@ HumanClientApp::HumanClientApp(int width, int height, bool calculate_fps, const 
 
     this->SetMouseLRSwapped(GetOptionsDB().Get<bool>("UI.swap-mouse-lr"));
 
-    std::map<std::string, std::map<int, int>> named_key_maps;
-    parse::keymaps(named_key_maps);
+    auto named_key_maps = parse::keymaps();
     TraceLogger() << "Keymaps:";
     for (auto& km : named_key_maps) {
         TraceLogger() << "Keymap name = \"" << km.first << "\"";
@@ -427,8 +426,7 @@ namespace {
 }
 
 void HumanClientApp::StartServer() {
-    auto connected = m_networking->ConnectToLocalHostServer(std::chrono::milliseconds(100));
-    if (connected) {
+    if (m_networking->PingLocalHostServer(std::chrono::milliseconds(100))) {
         ErrorLogger() << "Can't start local server because a server is already connecting at 127.0.0.0.";
         throw LocalServerAlreadyRunningException();
     }

@@ -1,7 +1,6 @@
 
 
 #include "HumanClientApp.h"
-#include "../../parse/Parse.h"
 #include "../../util/OptionsDB.h"
 #include "../../util/Directories.h"
 #include "../../util/Logger.h"
@@ -231,8 +230,6 @@ int mainSetupAndRun() {
             (LONG)LoadIcon (hInst, MAKEINTRESOURCE (IDI_ICON1)));
 #  endif
 #endif
-
-        parse::init();
 
         HumanClientApp app(width, height, true, "FreeOrion " + FreeOrionVersionString(),
                            left, top, fullscreen, fake_mode_change);

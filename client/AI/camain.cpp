@@ -1,6 +1,5 @@
 #include "AIClientApp.h"
 
-#include "../../parse/Parse.h"
 #include "../../util/OptionsDB.h"
 #include "../../util/Directories.h"
 #include "../../util/Logger.h"
@@ -52,8 +51,6 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
 #ifndef FREEORION_CAMAIN_KEEP_STACKTRACE
     try {
 #endif
-        parse::init();
-
         AIClientApp g_app(args);
 
         g_app();

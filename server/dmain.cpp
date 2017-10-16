@@ -1,6 +1,5 @@
 #include "ServerApp.h"
 
-#include "../parse/Parse.h"
 #include "../util/OptionsDB.h"
 #include "../util/Directories.h"
 #include "../util/i18n.h"
@@ -72,8 +71,6 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
             ShutdownLoggingSystemFileSink();
             return 0;   // quit without actually starting server
         }
-
-        parse::init();
 
         ServerApp g_app;
         g_app(); // Calls ServerApp::Run() to run app (intialization and main process loop)

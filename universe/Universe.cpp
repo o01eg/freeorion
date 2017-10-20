@@ -28,6 +28,7 @@
 #include "ValueRef.h"
 #include "Enums.h"
 #include "Pathfinder.h"
+#include "Encyclopedia.h"
 
 #include <boost/property_map/property_map.hpp>
 #include <boost/timer.hpp>
@@ -238,8 +239,8 @@ std::set<int> Universe::EmpireVisibleObjectIDs(int empire_id/* = ALL_EMPIRES*/) 
     // if an empire has visibility of it
     for (auto obj_it = m_objects.const_begin(); obj_it != m_objects.const_end(); ++obj_it) {
         int id = obj_it->ID();
-        for (int empire_id : empire_ids) {
-            Visibility vis = GetObjectVisibilityByEmpire(id, empire_id);
+        for (int detector_empire_id : empire_ids) {
+            Visibility vis = GetObjectVisibilityByEmpire(id, detector_empire_id);
             if (vis >= VIS_BASIC_VISIBILITY) {
                 retval.insert(id);
                 break;
@@ -1597,10 +1598,6 @@ namespace {
     static const std::string EMPTY_STRING;
 
     const std::string& GetSpeciesFromObject(std::shared_ptr<const UniverseObject> obj) {
-        std::shared_ptr<const Fleet> obj_fleet;
-        std::shared_ptr<const Ship> obj_ship;
-        std::shared_ptr<const Building> obj_building;
-
         switch (obj->ObjectType()) {
         case OBJ_PLANET: {
             auto obj_planet = std::static_pointer_cast<const Planet>(obj);
@@ -1900,9 +1897,8 @@ namespace {
             // being detectable by an empire requires the object to have
             // low enough stealth (0 or below the empire's detection strength)
             for (const auto& empire_entry : empire_detection_strengths) {
-                int empire_id = empire_entry.first;
-                if (object_stealth <= empire_entry.second || object_stealth == 0.0f || obj->OwnedBy(empire_id))
-                    retval[empire_id][object_pos].push_back(object_id);
+                if (object_stealth <= empire_entry.second || object_stealth == 0.0f || obj->OwnedBy(empire_entry.first))
+                    retval[empire_entry.first][object_pos].push_back(object_id);
             }
         }
         return retval;
@@ -2709,7 +2705,7 @@ std::set<int> Universe::RecursiveDestroy(int object_id) {
 
     auto system = GetSystem(obj->SystemID());
 
-    if (std::shared_ptr<Ship> ship = std::dynamic_pointer_cast<Ship>(obj)) {
+    if (auto ship = std::dynamic_pointer_cast<Ship>(obj)) {
         // if a ship is being deleted, and it is the last ship in its fleet, then the empty fleet should also be deleted
         auto fleet = GetFleet(ship->FleetID());
         if (fleet) {
@@ -2726,8 +2722,8 @@ std::set<int> Universe::RecursiveDestroy(int object_id) {
         Destroy(object_id);
         retval.insert(object_id);
 
-    } else if (auto fleet = std::dynamic_pointer_cast<Fleet>(obj)) {
-        for (int ship_id : fleet->ShipIDs()) {
+    } else if (auto obj_fleet = std::dynamic_pointer_cast<Fleet>(obj)) {
+        for (int ship_id : obj_fleet->ShipIDs()) {
             if (system)
                 system->Remove(ship_id);
             Destroy(ship_id);
@@ -2738,8 +2734,8 @@ std::set<int> Universe::RecursiveDestroy(int object_id) {
         Destroy(object_id);
         retval.insert(object_id);
 
-    } else if (auto planet = std::dynamic_pointer_cast<Planet>(obj)) {
-        for (int building_id : planet->BuildingIDs()) {
+    } else if (auto obj_planet = std::dynamic_pointer_cast<Planet>(obj)) {
+        for (int building_id : obj_planet->BuildingIDs()) {
             if (system)
                 system->Remove(building_id);
             Destroy(building_id);
@@ -2750,7 +2746,7 @@ std::set<int> Universe::RecursiveDestroy(int object_id) {
         Destroy(object_id);
         retval.insert(object_id);
 
-    } else if (std::shared_ptr<System> obj_system = std::dynamic_pointer_cast<System>(obj)) {
+    } else if (auto obj_system = std::dynamic_pointer_cast<System>(obj)) {
         // destroy all objects in system
         for (int system_id : obj_system->ObjectIDs()) {
             Destroy(system_id);
@@ -2777,7 +2773,7 @@ std::set<int> Universe::RecursiveDestroy(int object_id) {
         // don't need to bother with removing things from system, fleets, or
         // ships, since everything in system is being destroyed
 
-    } else if (std::shared_ptr<Building> building = std::dynamic_pointer_cast<Building>(obj)) {
+    } else if (auto building = std::dynamic_pointer_cast<Building>(obj)) {
         auto planet = GetPlanet(building->PlanetID());
         if (planet)
             planet->RemoveBuilding(object_id);
@@ -2825,7 +2821,7 @@ void Universe::EffectDestroy(int object_id, int source_object_id) {
 }
 
 void Universe::InitializeSystemGraph(int for_empire_id) {
-    std::vector<int> system_ids = ::EmpireKnownObjects(for_empire_id).FindObjectIDs<System>();
+    auto system_ids = ::EmpireKnownObjects(for_empire_id).FindObjectIDs<System>();
     std::vector<std::shared_ptr<const System>> systems;
     for (size_t system1_index = 0; system1_index < system_ids.size(); ++system1_index) {
         int system1_id = system_ids[system1_index];
@@ -3105,4 +3101,20 @@ void Universe::ResetUniverse() {
     ResetAllIDAllocation();
 
     GetSpeciesManager().ClearSpeciesHomeworlds();
+}
+
+std::map<std::string, unsigned int> CheckSumContent() {
+    std::map<std::string, unsigned int> checksums;
+
+    // add entries for various content managers...
+    checksums["BuildingTypeManager"] = GetBuildingTypeManager().GetCheckSum();
+    checksums["Encyclopedia"] = GetEncyclopedia().GetCheckSum();
+    checksums["FieldTypeManager"] = GetFieldTypeManager().GetCheckSum();
+    checksums["HullTypeManager"] = GetHullTypeManager().GetCheckSum();
+    checksums["PartTypeManager"] = GetPartTypeManager().GetCheckSum();
+    checksums["PredefinedShipDesignManager"] = GetPredefinedShipDesignManager().GetCheckSum();
+    checksums["SpeciesManager"] = GetSpeciesManager().GetCheckSum();
+    checksums["TechManager"] = GetTechManager().GetCheckSum();
+
+    return checksums;
 }

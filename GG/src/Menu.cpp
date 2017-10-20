@@ -45,7 +45,7 @@ MenuItem::MenuItem() :
     MenuItem("", false, false)
 {}
 
-MenuItem::MenuItem(bool separator) :
+MenuItem::MenuItem(bool separator_) :
     disabled(true),
     checked(false),
     separator(true),
@@ -148,9 +148,8 @@ void PopupMenu::Render()
                     needs_indicator = true;
             }
             Flags<TextFormat> fmt = FORMAT_LEFT | FORMAT_TOP;
-            std::vector<std::shared_ptr<Font::TextElement>> text_elements
-                = m_font->ExpensiveParseFromTextToTextElements(str, fmt);
-            std::vector<Font::LineData> lines = m_font->DetermineLines(str, fmt, X0, text_elements);
+            auto text_elements = m_font->ExpensiveParseFromTextToTextElements(str, fmt);
+            auto lines = m_font->DetermineLines(str, fmt, X0, text_elements);
             Pt menu_sz = m_font->TextExtent(lines); // get dimensions of text in menu
             menu_sz.x += 2 * HORIZONTAL_MARGIN;
             if (needs_indicator)
@@ -206,12 +205,10 @@ void PopupMenu::Render()
 
                 if (!menu.next_level[j].separator) {
                     // TODO cache line data v expensive calculation
-                    std::vector<std::shared_ptr<Font::TextElement>> text_elements =
-                        m_font->ExpensiveParseFromTextToTextElements(menu.next_level[j].label, fmt);
-                    std::vector<Font::LineData> lines =
-                        m_font->DetermineLines(menu.next_level[j].label, fmt, X0, text_elements);
+                    auto element_data = m_font->ExpensiveParseFromTextToTextElements(menu.next_level[j].label, fmt);
+                    auto line_data = m_font->DetermineLines(menu.next_level[j].label, fmt, X0, element_data);
 
-                    m_font->RenderText(line_rect.ul, line_rect.lr, menu.next_level[j].label, fmt, lines);
+                    m_font->RenderText(line_rect.ul, line_rect.lr, menu.next_level[j].label, fmt, line_data);
 
                 } else {
                     Line(line_rect.ul.x + HORIZONTAL_MARGIN, line_rect.ul.y + INDICATOR_HEIGHT/2 + INDICATOR_VERTICAL_MARGIN,

@@ -184,13 +184,13 @@ std::string UniverseObject::Dump() const {
     } else {
         os << "  at: (" << this->X() << ", " << this->Y() << ")";
         int near_id = GetPathfinder()->NearestSystemTo(this->X(), this->Y());
-        auto system = GetSystem(near_id);
-        if (system) {
-            const std::string& sys_name = system->Name();
+        auto near_system = GetSystem(near_id);
+        if (near_system) {
+            const std::string& sys_name = near_system->Name();
             if (sys_name.empty())
-                os << " nearest (System " << system->ID() << ")";
+                os << " nearest (System " << near_system->ID() << ")";
             else
-                os << " nearest " << system->Name();
+                os << " nearest " << near_system->Name();
         }
     }
     if (Unowned()) {
@@ -277,6 +277,9 @@ bool UniverseObject::Unowned() const
 
 bool UniverseObject::OwnedBy(int empire) const
 { return empire != ALL_EMPIRES && empire == Owner(); }
+
+bool UniverseObject::HostileToEmpire(int empire_id) const
+{ return false; }
 
 Visibility UniverseObject::GetVisibility(int empire_id) const
 { return GetUniverse().GetObjectVisibilityByEmpire(this->ID(), empire_id); }

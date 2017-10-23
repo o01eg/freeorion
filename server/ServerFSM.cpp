@@ -474,7 +474,7 @@ MPLobby::MPLobby(my_context c) :
 
                 m_lobby_data->m_players.push_back(std::make_pair(player_id, player_setup_data));
             } else if (player_connection->GetClientType() == Networking::CLIENT_TYPE_AI_PLAYER) {
-                if (m_ai_next_index <= 1) {
+                if (m_ai_next_index <= GetOptionsDB().Get<int>("mplobby-max-ai") || GetOptionsDB().Get<int>("mplobby-max-ai") < 0) {
                     PlayerSetupData player_setup_data;
                     player_setup_data.m_player_id =     Networking::INVALID_PLAYER_ID;
                     player_setup_data.m_player_name =   UserString("AI_PLAYER") + "_" + std::to_string(m_ai_next_index++);
@@ -911,17 +911,19 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 case Networking::CLIENT_TYPE_HUMAN_PLAYER:
                     human_count++;
                     break;
+                default: // do nothing
+                    break;
                 }
-
             }
 
-            // restrict count of AI
-            if (ai_count <= 1) {
-                m_lobby_data->m_players        = incoming_lobby_data.m_players;
+            // limit count of AI
+            if (ai_count <= GetOptionsDB().Get<int>("mplobby-max-ai") || GetOptionsDB().Get<int>("mplobby-max-ai") < 0) {
+                m_lobby_data->m_players    = incoming_lobby_data.m_players;
             } else {
                 has_important_changes = true;
             }
-            if (human_count < 2) {
+            // restrict minimun number of human players
+            if (human_count < GetOptionsDB().Get<int>("mplobby-min-human")) {
                 has_important_changes = true;
             }
 

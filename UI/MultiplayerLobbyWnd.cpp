@@ -493,14 +493,14 @@ namespace {
         }
     };
 
-    const GG::X     LOBBY_WND_WIDTH(860);
+    const GG::X     LOBBY_WND_WIDTH(960);
     const GG::Y     LOBBY_WND_HEIGHT(720);
     const int       CONTROL_MARGIN = 5; // gap to leave between controls in the window
     const GG::X     GALAXY_SETUP_PANEL_WIDTH(250);
     const GG::Y     GALAXY_SETUP_PANEL_HEIGHT(340);
     const GG::Y     SAVED_GAMES_LIST_ROW_HEIGHT(22);
     const GG::Y     SAVED_GAMES_LIST_DROP_HEIGHT(10 * SAVED_GAMES_LIST_ROW_HEIGHT);
-    const GG::X     CHAT_WIDTH(250);
+    const GG::X     CHAT_WIDTH(350);
     GG::Pt          g_preview_ul;
     const GG::Pt    PREVIEW_SZ(GG::X(248), GG::Y(186));
     const int       PREVIEW_MARGIN = 3;
@@ -709,19 +709,6 @@ void MultiPlayerLobbyWnd::KeyPress(GG::Key key, std::uint32_t key_code_point, GG
         std::string text = m_chat_input_edit->Text();   // copy, so subsequent clearing doesn't affect typed message that is used later...
         HumanClientApp::GetApp()->Networking().SendMessage(PlayerChatMessage(text));
         m_chat_input_edit->SetText("");
-
-        // look up this client's player name by ID
-        std::string player_name;
-        for (std::pair<int, PlayerSetupData>& entry : m_lobby_data.m_players) {
-            if (entry.first == HumanClientApp::GetApp()->PlayerID() && entry.first != Networking::INVALID_PLAYER_ID) {
-                player_name = entry.second.m_player_name;
-                break;
-            }
-        }
-
-        // put message just sent in chat box (local echo)
-        *m_chat_box += player_name + ": " + text + "\n";
-
     } else if (m_ready_bn && (key == GG::GGK_RETURN || key == GG::GGK_KP_ENTER)) {
         m_ready_bn->LeftClickedSignal();
     } else if (key == GG::GGK_ESCAPE) {
@@ -729,7 +716,7 @@ void MultiPlayerLobbyWnd::KeyPress(GG::Key key, std::uint32_t key_code_point, GG
     }
 }
 
-void MultiPlayerLobbyWnd::ChatMessage(int player_id, const std::string& msg) {
+void MultiPlayerLobbyWnd::ChatMessage(int player_id, const boost::posix_time::ptime& timestamp, const std::string& msg) {
     // look up player name by ID
     std::string player_name;
     for (std::pair<int, PlayerSetupData>& entry : m_lobby_data.m_players) {
@@ -739,8 +726,15 @@ void MultiPlayerLobbyWnd::ChatMessage(int player_id, const std::string& msg) {
         }
     }
 
+    ChatMessage(player_name, timestamp, msg);
+}
+
+void MultiPlayerLobbyWnd::ChatMessage(const std::string& player_name,
+                                      const boost::posix_time::ptime& timestamp,
+                                      const std::string& msg)
+{
     // show message with player name in chat box
-    *m_chat_box += player_name + ": " + msg + '\n';
+    *m_chat_box += ClientUI::FormatTimestamp(timestamp) + player_name + ": " + msg + '\n';
 }
 
 namespace {
@@ -790,6 +784,9 @@ void MultiPlayerLobbyWnd::Refresh() {
         m_browse_saves_btn->Disable();
     }
 }
+
+void MultiPlayerLobbyWnd::CleanupChat()
+{ m_chat_box->SetText(""); }
 
 GG::Pt MultiPlayerLobbyWnd::MinUsableSize() const
 { return GG::Pt(LOBBY_WND_WIDTH, LOBBY_WND_HEIGHT); }
@@ -1006,6 +1003,15 @@ bool MultiPlayerLobbyWnd::PopulatePlayerList() {
         m_ready_bn->SetText(UserString("START_GAME_BN"));
     else
         m_ready_bn->SetText(UserString("READY_BN"));
+
+    // set ready button state
+    if (m_lobby_data.m_start_locked) {
+        m_ready_bn->Disable(true);
+        m_start_conditions_text->SetText(UserString(m_lobby_data.m_start_lock_cause));
+    } else {
+        m_ready_bn->Disable(false);
+        m_start_conditions_text->SetText(UserString("MULTIPLAYER_GAME_START_CONDITIONS"));
+    }
 
     Refresh();
 

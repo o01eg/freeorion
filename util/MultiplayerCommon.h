@@ -15,6 +15,7 @@
 #include <vector>
 #include <map>
 #include <boost/serialization/access.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 
 
 FO_COMMON_API extern const std::string MP_SAVE_FILE_EXTENSION;
@@ -332,6 +333,7 @@ struct FO_COMMON_API MultiplayerLobbyData : public GalaxySetupData {
     MultiplayerLobbyData() :
         m_any_can_edit(false),
         m_new_game(true),
+        m_start_locked(false),
         m_players(),
         m_save_game(),
         m_save_game_empire_data()
@@ -341,6 +343,7 @@ struct FO_COMMON_API MultiplayerLobbyData : public GalaxySetupData {
         GalaxySetupData(std::move(base)),
         m_any_can_edit(false),
         m_new_game(true),
+        m_start_locked(false),
         m_players(),
         m_save_game(),
         m_save_game_empire_data()
@@ -351,12 +354,32 @@ struct FO_COMMON_API MultiplayerLobbyData : public GalaxySetupData {
 
     bool                                        m_any_can_edit;
     bool                                        m_new_game;
+    bool                                        m_start_locked;
     // TODO: Change from a list<(player_id, PlayerSetupData)> where
     // PlayerSetupData contain player_id to a vector of PlayerSetupData
     std::list<std::pair<int, PlayerSetupData>>  m_players;              // <player_id, PlayerSetupData>
 
     std::string                                 m_save_game;            //< File name of a save file
     std::map<int, SaveGameEmpireData>           m_save_game_empire_data;// indexed by empire_id
+
+    std::string                                 m_start_lock_cause;
+
+private:
+    friend class boost::serialization::access;
+    template <class Archive>
+    void serialize(Archive& ar, const unsigned int version);
+};
+
+/** The data structure stores information about latest chat massages. */
+struct FO_COMMON_API ChatHistoryEntity {
+    /** \name Structors */ //@{
+    ChatHistoryEntity()
+    {}
+    //@}
+
+    boost::posix_time::ptime m_timestamp;
+    std::string m_player_name;
+    std::string m_text;
 
 private:
     friend class boost::serialization::access;

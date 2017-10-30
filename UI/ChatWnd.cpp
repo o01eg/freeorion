@@ -24,6 +24,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
+
 // boost::spirit::classic pulls in windows.h which in turn defines the macros
 // SendMessage. Undefining those should avoid name collisions with FreeOrion
 // function names
@@ -235,15 +236,15 @@ void MessageWndEdit::AutoComplete() {
     else {
         bool exact_match = false;
 
-        std::pair<GG::CPSize, GG::CPSize> cursor_pos = this->CursorPosn();
+        auto cursor_pos = this->CursorPosn();
         if (cursor_pos.first == cursor_pos.second && 0 < cursor_pos.first && cursor_pos.first <= full_line.size()) {
-            std::string::size_type word_start = full_line.substr(0, Value(cursor_pos.first)).find_last_of(" :");
+            auto word_start = full_line.substr(0, Value(cursor_pos.first)).find_last_of(" :");
             if (word_start == std::string::npos)
                 word_start = 0;
             else
                 ++word_start;
             std::string partial_word = full_line.substr(word_start, Value(cursor_pos.first - word_start));
-            if (partial_word == "")
+            if (partial_word.empty())
                 return;
 
             // Find game words to try an autocomplete
@@ -375,7 +376,11 @@ void MessageWnd::PreRender() {
     DoLayout();
 }
 
-void MessageWnd::HandlePlayerChatMessage(const std::string& text, int sender_player_id, int recipient_player_id) {
+void MessageWnd::HandlePlayerChatMessage(const std::string& text,
+                                         int sender_player_id,
+                                         const boost::posix_time::ptime& timestamp,
+                                         int recipient_player_id)
+{
     const ClientApp* app = ClientApp::GetApp();
     if (!app) {
         ErrorLogger() << "MessageWnd::HandlePlayerChatMessage couldn't get client app!";
@@ -397,7 +402,7 @@ void MessageWnd::HandlePlayerChatMessage(const std::string& text, int sender_pla
         sender_colour = sender_empire->Color();
 
     std::string filtered_message = StringtableTextSubstitute(text);
-    std::string wrapped_text = RgbaTag(sender_colour) + sender_name + ": " + filtered_message + "</rgba>";
+    std::string wrapped_text = RgbaTag(sender_colour) + ClientUI::FormatTimestamp(timestamp) + sender_name + ": " + filtered_message + "</rgba>";
 
     *m_display += wrapped_text + "\n";
     m_display_show_time = GG::GUI::GetGUI()->Ticks();

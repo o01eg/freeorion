@@ -497,6 +497,8 @@ MPLobby::MPLobby(my_context c) :
             server.Networking().Disconnect(player_connection);
         }
 
+        TestHumanPlayers();
+
         server.Networking().SendMessageAll(ServerLobbyUpdateMessage(*m_lobby_data));
     } else {
         int host_id = server.m_networking.HostPlayerID();
@@ -520,6 +522,24 @@ MPLobby::MPLobby(my_context c) :
 
 MPLobby::~MPLobby()
 { TraceLogger(FSM) << "(ServerFSM) ~MPLobby"; }
+
+void MPLobby::TestHumanPlayers() {
+    int human_count = 0;
+    for (const auto& plr : m_lobby_data->m_players) {
+        if (plr.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER) {
+            human_count++;
+        }
+    }
+
+    // restrict minimun number of human players
+    if (human_count < GetOptionsDB().Get<int>("mplobby-min-human")) {
+        m_lobby_data->m_start_locked = true;
+        m_lobby_data->m_start_lock_cause = UserStringNop("ERROR_NOT_ENOUGH_HUMAN_PLAYERS");
+    } else {
+        m_lobby_data->m_start_locked = false;
+        m_lobby_data->m_start_lock_cause.clear();
+    }
+}
 
 sc::result MPLobby::react(const Disconnection& d) {
     TraceLogger(FSM) << "(ServerFSM) MPLobby.Disconnection";
@@ -567,6 +587,8 @@ sc::result MPLobby::react(const Disconnection& d) {
         DebugLogger(FSM) << "MPLobby.Disconnection : Disconnecting player (" << id << ") was not in lobby";
         return discard_event();
     }
+
+    TestHumanPlayers();
 
     // send updated lobby data to players after disconnection-related changes
     for (auto it = server.m_networking.established_begin();
@@ -642,9 +664,25 @@ void MPLobby::EstablishPlayer(const PlayerConnectionPtr& player_connection,
         { server.Networking().Disconnect(conn); }
     }
 
+    TestHumanPlayers();
+
     for (auto it = server.m_networking.established_begin();
          it != server.m_networking.established_end(); ++it)
     { (*it)->SendMessage(ServerLobbyUpdateMessage(*m_lobby_data)); }
+
+    // send chat history
+    if (client_type == Networking::CLIENT_TYPE_HUMAN_MODERATOR ||
+        client_type == Networking::CLIENT_TYPE_HUMAN_OBSERVER ||
+        client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER)
+    {
+        std::vector<std::reference_wrapper<const ChatHistoryEntity>> chat_history;
+        for (const auto& elem : server.GetChatHistory()) {
+            chat_history.push_back(std::cref(elem));
+        }
+        if (chat_history.size() > 0) {
+            player_connection->SendMessage(ChatHistoryMessage(chat_history));
+        }
+    }
 }
 
 sc::result MPLobby::react(const JoinGame& msg) {
@@ -673,7 +711,7 @@ sc::result MPLobby::react(const JoinGame& msg) {
         while (player_name.compare(0, ai_prefix.size(), ai_prefix) == 0)
             player_name.erase(0, ai_prefix.size());
     }
-    if(player_name.empty())
+    if (player_name.empty())
         player_name = "_";
 
     std::string new_player_name = player_name;
@@ -685,7 +723,7 @@ sc::result MPLobby::react(const JoinGame& msg) {
         if (!server.IsAvailableName(new_player_name) || server.IsAuthRequired(new_player_name)) {
             collision = true;
         } else {
-            for (std::pair<int, PlayerSetupData>& plr : m_lobby_data->m_players) {
+            for (auto& plr : m_lobby_data->m_players) {
                 if (plr.second.m_empire_name == new_player_name) {
                     collision = true;
                     break;
@@ -778,7 +816,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
 
         // assign unique names / colours to any lobby entry that lacks them, or
         // remove empire / colours from observers
-        for (std::pair<int, PlayerSetupData>& entry : incoming_lobby_data.m_players) {
+        for (auto& entry : incoming_lobby_data.m_players) {
             PlayerSetupData& psd = entry.second;
             if (psd.m_client_type == Networking::CLIENT_TYPE_HUMAN_OBSERVER ||
                 psd.m_client_type == Networking::CLIENT_TYPE_HUMAN_MODERATOR)
@@ -824,7 +862,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
         // check for color and names
         std::set<GG::Clr> psd_colors;
         std::set<std::string> psd_names;
-        for (std::pair<int, PlayerSetupData>& player : incoming_lobby_data.m_players) {
+        for (auto& player : incoming_lobby_data.m_players) {
             if (psd_colors.count(player.second.m_empire_color) ||
                 psd_names.count(player.second.m_empire_name) ||
                 psd_names.count(player.second.m_player_name))
@@ -840,7 +878,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
 
         if (has_collision) {
             player_setup_data_changed = true;
-            for (std::pair<int, PlayerSetupData>& player : m_lobby_data->m_players) {
+            for (auto& player : m_lobby_data->m_players) {
                 if (player.first == sender->PlayerID()) {
                     player.second.m_player_ready = false;
                     break;
@@ -868,12 +906,12 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 if (m_lobby_data->m_players.size() != incoming_lobby_data.m_players.size()) {
                     has_important_changes = true; // drop ready at number of players changed
                 } else {
-                    for (std::pair<int, PlayerSetupData>& i_player : m_lobby_data->m_players) {
+                    for (auto& i_player : m_lobby_data->m_players) {
                         if (i_player.first < 0) // ignore changes in AI.
                             continue;
                         int player_id = i_player.first;
                         bool is_found_player = false;
-                        for (std::pair<int, PlayerSetupData>& j_player : incoming_lobby_data.m_players) {
+                        for (auto& j_player : incoming_lobby_data.m_players) {
                             if (player_id == j_player.first) {
                                 has_important_changes = has_important_changes || IsPlayerChanged(i_player.second, j_player.second);
                                 is_found_player = true;
@@ -902,17 +940,9 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             m_lobby_data->m_new_game       = incoming_lobby_data.m_new_game;
 
             int ai_count = 0;
-            int human_count = 0;
             for (const auto& plr : incoming_lobby_data.m_players) {
-                switch (plr.second.m_client_type) {
-                case Networking::CLIENT_TYPE_AI_PLAYER:
+                if (plr.second.m_client_type == Networking::CLIENT_TYPE_AI_PLAYER) {
                     ai_count++;
-                    break;
-                case Networking::CLIENT_TYPE_HUMAN_PLAYER:
-                    human_count++;
-                    break;
-                default: // do nothing
-                    break;
                 }
             }
 
@@ -922,10 +952,6 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             } else {
                 has_important_changes = true;
             }
-            // restrict minimun number of human players
-            if (human_count < GetOptionsDB().Get<int>("mplobby-min-human")) {
-                has_important_changes = true;
-            }
 
             LogPlayerSetupData(m_lobby_data->m_players);
 
@@ -933,7 +959,8 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             // while recording connections that are to be dropped
             std::vector<PlayerConnectionPtr> player_connections_to_drop;
             for (auto player_connection_it = server.m_networking.established_begin();
-                 player_connection_it != server.m_networking.established_end(); ++player_connection_it)
+                 player_connection_it != server.m_networking.established_end();
+                 ++player_connection_it)
             {
                 PlayerConnectionPtr player_connection = *player_connection_it;
                 if (!player_connection->IsEstablished())
@@ -959,7 +986,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 }
 
                 // get client type, and drop connections with invalid type, as that indicates a requested drop
-                Networking::ClientType client_type = player_setup_it->second.m_client_type;
+                auto client_type = player_setup_it->second.m_client_type;
 
                 if (client_type != Networking::INVALID_CLIENT_TYPE) {
                     // update player connection type for lobby change
@@ -997,12 +1024,12 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
         }
     } else {
         // can change only himself
-        for (std::pair<int, PlayerSetupData>& i_player : m_lobby_data->m_players) {
+        for (auto& i_player : m_lobby_data->m_players) {
             if (i_player.first != sender->PlayerID())
                 continue;
 
             // found sender at m_lobby_data
-            for (std::pair<int, PlayerSetupData>& j_player : incoming_lobby_data.m_players) {
+            for (auto& j_player : incoming_lobby_data.m_players) {
                 if (j_player.first != sender->PlayerID())
                     continue;
 
@@ -1011,7 +1038,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 // check for color and names
                 std::set<GG::Clr> psd_colors;
                 std::set<std::string> psd_names;
-                for (std::pair<int, PlayerSetupData>& k_player : m_lobby_data->m_players) {
+                for (auto& k_player : m_lobby_data->m_players) {
                     if (k_player.first == sender->PlayerID())
                         continue;
 
@@ -1040,6 +1067,11 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
         }
     }
 
+    TestHumanPlayers();
+    if(m_lobby_data->m_start_locked) {
+        has_important_changes = true;
+    }
+
     // to determine if a new save file was selected, check if the selected file
     // index is different, and the new file index is in the valid range
     bool new_save_file_selected = false;
@@ -1052,7 +1084,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
         m_lobby_data->m_save_game = new_file;
 
         // reset assigned empires in save game for all players.  new loaded game may not have the same set of empire IDs to choose from
-        for (std::pair<int, PlayerSetupData>& psd : m_lobby_data->m_players) {
+        for (auto& psd : m_lobby_data->m_players) {
             psd.second.m_save_game_empire_id = ALL_EMPIRES;
         }
 
@@ -1070,12 +1102,12 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
     }
 
     if (has_important_changes) {
-        for (std::pair<int, PlayerSetupData>& player : m_lobby_data->m_players)
+        for (auto& player : m_lobby_data->m_players)
             player.second.m_player_ready = false;
     } else {
         // check if all established human players ready to play
         bool is_all_ready = true;
-        for (std::pair<int, PlayerSetupData>& player : m_lobby_data->m_players) {
+        for (auto& player : m_lobby_data->m_players) {
             if ((player.first >= 0) && (player.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_OBSERVER ||
                 player.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_MODERATOR ||
                 player.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER))
@@ -1156,15 +1188,18 @@ sc::result MPLobby::react(const PlayerChat& msg) {
     int receiver;
     ExtractPlayerChatMessageData(message, receiver, data);
 
-    if (receiver == Networking::INVALID_PLAYER_ID) { // the receiver is everyone (except the sender)
+    boost::posix_time::ptime timestamp = boost::posix_time::second_clock::universal_time();
+
+    server.PushChatMessage(timestamp, sender->PlayerName(), data);
+
+    if (receiver == Networking::INVALID_PLAYER_ID) { // the receiver is everyone
         for (auto it = server.m_networking.established_begin(); it != server.m_networking.established_end(); ++it) {
-            if ((*it)->PlayerID() != sender->PlayerID())
-                (*it)->SendMessage(ServerPlayerChatMessage(sender->PlayerID(), data));
+            (*it)->SendMessage(ServerPlayerChatMessage(sender->PlayerID(), timestamp, data));
         }
     } else {
         auto it = server.m_networking.GetPlayer(receiver);
         if (it != server.m_networking.established_end())
-            (*it)->SendMessage(ServerPlayerChatMessage(sender->PlayerID(), data));
+            (*it)->SendMessage(ServerPlayerChatMessage(sender->PlayerID(), timestamp, data));
     }
 
     return discard_event();
@@ -1782,6 +1817,10 @@ sc::result PlayingGame::react(const PlayerChat& msg) {
     int receiver;
     ExtractPlayerChatMessageData(message, receiver, data);
 
+    boost::posix_time::ptime timestamp = boost::posix_time::second_clock::universal_time();
+
+    server.PushChatMessage(timestamp, sender->PlayerName(), data);
+
     for (auto it = server.m_networking.established_begin();
          it != server.m_networking.established_end(); ++it)
     {
@@ -1789,6 +1828,7 @@ sc::result PlayingGame::react(const PlayerChat& msg) {
             receiver == (*it)->PlayerID())
         {
             (*it)->SendMessage(ServerPlayerChatMessage(sender->PlayerID(),
+                                                       timestamp,
                                                        data));
         }
     }

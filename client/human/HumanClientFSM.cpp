@@ -411,7 +411,9 @@ MPLobby::MPLobby(my_context ctx) :
 {
     TraceLogger(FSM) << "(HumanClientFSM) MPLobby";
 
-    Client().Register(Client().GetClientUI().GetMultiPlayerLobbyWnd());
+    const auto& wnd = Client().GetClientUI().GetMultiPlayerLobbyWnd();
+    Client().Register(wnd);
+    wnd->CleanupChat();
 }
 
 MPLobby::~MPLobby() {
@@ -459,10 +461,11 @@ boost::statechart::result MPLobby::react(const PlayerChat& msg) {
     TraceLogger(FSM) << "(HumanClientFSM) MPLobby.PlayerChat";
 
     int player_id;
+    boost::posix_time::ptime timestamp;
     std::string data;
-    ExtractServerPlayerChatMessageData(msg.m_message, player_id, data);
+    ExtractServerPlayerChatMessageData(msg.m_message, player_id, timestamp, data);
 
-    Client().GetClientUI().GetMultiPlayerLobbyWnd()->ChatMessage(player_id, data);
+    Client().GetClientUI().GetMultiPlayerLobbyWnd()->ChatMessage(player_id, timestamp, data);
     return discard_event();
 }
 
@@ -533,6 +536,20 @@ boost::statechart::result MPLobby::react(const CheckSum& e) {
     return discard_event();
 }
 
+boost::statechart::result MPLobby::react(const ChatHistory& msg) {
+    TraceLogger(FSM) << "(HumanClientFSM) ChatHistory.";
+
+    std::vector<ChatHistoryEntity> chat_history;
+    ExtractChatHistoryMessage(msg.m_message, chat_history);
+
+    const auto& wnd = Client().GetClientUI().GetMultiPlayerLobbyWnd();
+    for (const auto& elem : chat_history) {
+        wnd->ChatMessage(elem.m_player_name, elem.m_timestamp, elem.m_text);
+    }
+
+    return discard_event();
+}
+
 
 ////////////////////////////////////////////////////////////
 // PlayingGame
@@ -576,9 +593,10 @@ boost::statechart::result PlayingGame::react(const PlayerChat& msg) {
     TraceLogger(FSM) << "(HumanClientFSM) PlayingGame.PlayerChat: " << msg.m_message.Text();
     std::string text;
     int sending_player_id;
-    ExtractPlayerChatMessageData(msg.m_message, sending_player_id, text);
+    boost::posix_time::ptime timestamp;
+    ExtractServerPlayerChatMessageData(msg.m_message, sending_player_id, timestamp, text);
 
-    Client().GetClientUI().GetMessageWnd()->HandlePlayerChatMessage(text, sending_player_id, Client().PlayerID());
+    Client().GetClientUI().GetMessageWnd()->HandlePlayerChatMessage(text, sending_player_id, timestamp, Client().PlayerID());
 
     return discard_event();
 }

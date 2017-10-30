@@ -108,6 +108,7 @@ namespace {
         db.Add("UI.keypress-repeat-interval",   UserStringNop("OPTIONS_DB_KEYPRESS_REPEAT_INTERVAL"),   20,     RangedValidator<int>(0, 1000));
         db.Add("UI.mouse-click-repeat-delay",   UserStringNop("OPTIONS_DB_MOUSE_REPEAT_DELAY"),         360,    RangedValidator<int>(0, 1000));
         db.Add("UI.mouse-click-repeat-interval",UserStringNop("OPTIONS_DB_MOUSE_REPEAT_INTERVAL"),      15,     RangedValidator<int>(0, 1000));
+        db.Add("UI.display-timestamp",          UserStringNop("OPTIONS_DB_DISPLAY_TIMESTAMP"),          true,   Validator<bool>());
 
         Hotkey::AddHotkey("exit",       UserStringNop("HOTKEY_EXIT"),       GG::GGK_NONE,   GG::MOD_KEY_NONE);
         Hotkey::AddHotkey("quit",       UserStringNop("HOTKEY_QUIT"),       GG::GGK_NONE,   GG::MOD_KEY_NONE);
@@ -956,8 +957,9 @@ void HumanClientApp::HandleMessage(Message& msg) {
     case Message::END_GAME:                 m_fsm->process_event(::EndGame(msg));               break;
 
     case Message::DISPATCH_COMBAT_LOGS:     m_fsm->process_event(DispatchCombatLogs(msg));      break;
-    case Message::DISPATCH_SAVE_PREVIEWS:   HandleSaveGamePreviews(msg);                         break;
+    case Message::DISPATCH_SAVE_PREVIEWS:   HandleSaveGamePreviews(msg);                        break;
     case Message::AUTH_REQUEST:             m_fsm->process_event(AuthRequest(msg));             break;
+    case Message::CHAT_HISTORY:             m_fsm->process_event(ChatHistory(msg));             break;
     default:
         ErrorLogger() << "HumanClientApp::HandleMessage : Received an unknown message type \"" << msg.Type() << "\".";
     }

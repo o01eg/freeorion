@@ -5,7 +5,7 @@ After=network.target
 [Service]
 User=freeorion
 Group=freeorion
-ExecStart=/usr/games/freeoriond --hostless --log-file /var/log/freeorion/freeoriond.log --mplobby-max-ai 3 --mplobby-min-human 2
+ExecStart=/usr/games/freeoriond --hostless --log-file /var/log/freeorion/freeoriond.log --mplobby-max-ai 5 --mplobby-min-human 2
 RestartSec=5
 Restart=on-failure
 LimitCORE=infinity

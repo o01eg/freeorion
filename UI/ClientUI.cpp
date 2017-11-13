@@ -189,6 +189,7 @@ std::shared_ptr<GG::Texture> ClientUI::MeterIcon(MeterType meter_type) {
     case METER_RESEARCH:
     case METER_TARGET_RESEARCH:
         icon_filename = "research.png";     break;
+    case METER_IMPERIAL_PP_TRANSFER_EFFICIENCY:
     case METER_TRADE:
     case METER_TARGET_TRADE:
         icon_filename = "trade.png";        break;
@@ -210,6 +211,7 @@ std::shared_ptr<GG::Texture> ClientUI::MeterIcon(MeterType meter_type) {
     case METER_FUEL:
     case METER_MAX_FUEL:
         icon_filename = "fuel.png";         break;
+    case METER_IMPERIAL_PP_USE_LIMIT:
     case METER_SUPPLY:
     case METER_MAX_SUPPLY:
         icon_filename = "supply.png";       break;
@@ -1162,9 +1164,12 @@ namespace GG {
     }
 
     std::istream& operator>>(std::istream& is, Clr& clr) {
-        using namespace boost::spirit::classic;
-        rule<> color_p =
-            ch_p('(') >> *space_p >>
+        namespace classic = boost::spirit::classic;
+        using classic::space_p;
+        using classic::int_p;
+        using classic::assign;
+        classic::rule<> color_p =
+            classic::ch_p('(') >> *space_p >>
             int_p[assign(clr.r)] >> *space_p >> ',' >> *space_p >>
             int_p[assign(clr.g)] >> *space_p >> ',' >> *space_p >>
             int_p[assign(clr.b)] >> *space_p >> ',' >> *space_p >>
@@ -1175,7 +1180,7 @@ namespace GG {
             is >> c;
             str += c;
         } while (is && c != ')');
-        if (!parse(str.c_str(), color_p).full ||
+        if (!classic::parse(str.c_str(), color_p).full ||
             clr.r < 0 || 255 < clr.r ||
             clr.g < 0 || 255 < clr.g ||
             clr.b < 0 || 255 < clr.b ||

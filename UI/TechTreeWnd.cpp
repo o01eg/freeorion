@@ -133,7 +133,7 @@ std::shared_ptr<GG::BrowseInfoWnd> TechRowBrowseWnd(const std::string& tech_name
 
     std::string main_text;
 
-    main_text += UserString(tech->Category()) + " \u2013 ";  // u2013 = 'En dash'
+    main_text += UserString(tech->Category()) + " - ";
     main_text += UserString(tech->ShortDescription()) + "\n";
 
     if (empire) {
@@ -168,7 +168,7 @@ std::shared_ptr<GG::BrowseInfoWnd> TechRowBrowseWnd(const std::string& tech_name
         }
 
         const ResearchQueue& queue = empire->GetResearchQueue();
-        ResearchQueue::const_iterator queue_it = queue.find(tech_name);
+        auto queue_it = queue.find(tech_name);
         if (queue_it != queue.end()) {
             main_text += UserString("TECH_WND_ENQUEUED") + "\n";
 
@@ -947,7 +947,7 @@ void TechTreeWnd::LayoutPanel::TechPanel::Update() {
         m_enqueued = empire->GetResearchQueue().InQueue(m_tech_name);
 
         const ResearchQueue& queue = empire->GetResearchQueue();
-        ResearchQueue::const_iterator queue_it = queue.find(m_tech_name);
+        auto queue_it = queue.find(m_tech_name);
         if (queue_it != queue.end()) {
             m_eta = queue_it->turns_left;
             if (m_eta != -1)

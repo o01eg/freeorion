@@ -218,6 +218,7 @@ CommonParams::CommonParams(std::unique_ptr<ValueRef::ValueRefBase<double>>&& pro
 CommonParams::~CommonParams()
 {}
 
+
 /////////////////////////////////////
 // PartTypeManager                 //
 /////////////////////////////////////
@@ -265,7 +266,6 @@ unsigned int PartTypeManager::GetCheckSum() const {
     return retval;
 }
 
-
 void PartTypeManager::SetPartTypes(Pending::Pending<PartTypeMap>&& pending_part_types)
 { m_pending_part_types = std::move(pending_part_types); }
 
@@ -285,10 +285,10 @@ void PartTypeManager::CheckPendingPartTypes() const {
         }();
 }
 
+
 ////////////////////////////////////////////////
 // PartType
 ////////////////////////////////////////////////
-
 PartType::PartType() :
     m_name("invalid part type"),
     m_description("indescribable"),
@@ -1605,7 +1605,7 @@ namespace {
             return;
 
         DebugLogger() << "Populating pre-defined ships with "
-                      << (are_monsters ? "monster":"ship") << " designs.";
+                      << std::string(are_monsters ? "monster" : "ship") << " designs.";
 
         FillDesignsOrderingAndNameTables(
             *parsed, designs, ordering, name_to_uuid);

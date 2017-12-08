@@ -1,4 +1,8 @@
 language: cpp
+
+# ccache caches obj files between builds
+cache: ccache
+
 matrix:
   include:
     - os: linux
@@ -20,8 +24,37 @@ install:
       hdiutil attach FreeOrionSDK.dmg
       tar -xjf /Volumes/FreeOrionSDK/dep.tar.bz2 -C Xcode
       hdiutil detach /Volumes/FreeOrionSDK
+
+      # download and setup ccache
+      brew install ccache
+      export PATH="/usr/local/opt/ccache/libexec:$PATH"
+
+      # add coreutils to get gtimeout
+      brew install coreutils
     fi
 before_script:
+  # Setup ccache
+  - |
+    # Make certain ~/.ccache exists
+    mkdir -p $HOME/.ccache;
+    
+    if [ -e /Users/travis/.ccache/ccache.conf ]; then
+       echo "Show global /Users/travis/.ccache/ccache.conf"
+       more /Users/travis/.ccache/ccache.conf
+    else
+       echo "Missing global /Users/travis/.ccache/ccache.conf"
+    fi;
+    
+    if [ -e $HOME/.ccache/ccache.conf ]; then
+       echo "Show local $HOME/.ccache/ccache.conf"
+       more $HOME/.ccache/ccache.conf
+    else
+       echo "Missing local $HOME/.ccache/ccache.conf"
+    fi;
+    # Allow ccache to account for __FILE__ macro
+    echo sloppiness = file_macro > $HOME/.ccache/ccache.conf
+    ccache --version
+    ccache --show-stats
   - >
     if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
       git remote add -t master -m master upstream https://github.com/freeorion/freeorion.git
@@ -29,12 +62,17 @@ before_script:
       git log -1 upstream/master
       # Add transparent cmake function to allow possible cross platform use of
       # build sections.
+      # mount ccache dir and set its environment variable
+      # timeout before Travis kills jobs so that ccache is always at least partially populated
       function cmake {
-          docker run -v "${TRAVIS_BUILD_DIR}:/freeorion" -w /freeorion/build freeorion/freeorion-travis-build /usr/bin/cmake $@
+          docker run -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build freeorion/freeorion-travis-build timeout 40m /usr/bin/cmake $@
       }
     fi
   - mkdir build
   - cd build
+before_cache:
+  # Check ccache
+  - ccache --show-stats
 script:
   - >
     if [[ "${TRAVIS_OS_NAME}" == "linux" && "${BUILD_UNITTEST}" == "true" ]]; then
@@ -48,5 +86,6 @@ script:
   - >
     if [[ "${TRAVIS_OS_NAME}" == "osx" && -z "${BUILD_APIDOC}" ]]; then
       cmake -GXcode ..
-      cmake --build . --config Release -- -parallelizeTargets -jobs $(sysctl hw.ncpu | awk '{print $2}')
+      # timeout before Travis kills jobs so that ccache is always at least partially populated
+      gtimeout 40m cmake --build . --config Release -- -parallelizeTargets -jobs $(sysctl hw.ncpu | awk '{print $2}')
     fi

@@ -164,6 +164,9 @@ public:
 
     /** Returns whether the indicated player ID is the host. */
     bool PlayerIsHost(int player_id) const;
+
+    /** Checks if the client has some authorization \a role. */
+    bool HasAuthRole(Networking::RoleType role) const;
     //@}
 
     /** \name Mutators */ //@{
@@ -203,6 +206,9 @@ public:
 
     /** Sets Host player ID. */
     void SetHostPlayerID(int host_player_id);
+
+    /** Get authorization roles access. */
+    Networking::AuthRoles& AuthorizationRoles();
     //@}
 
 private:
@@ -223,6 +229,7 @@ private:
 
     int                             m_player_id;
     int                             m_host_player_id;
+    Networking::AuthRoles           m_roles;
 
     boost::asio::io_service         m_io_service;
     boost::asio::ip::tcp::socket    m_socket;
@@ -285,6 +292,9 @@ bool ClientNetworking::Impl::PlayerIsHost(int player_id) const {
     return player_id == m_host_player_id;
 }
 
+bool ClientNetworking::Impl::HasAuthRole(Networking::RoleType role) const
+{ return m_roles.HasRole(role); }
+
 ClientNetworking::ServerNames ClientNetworking::Impl::DiscoverLANServerNames() {
     if (!IsConnected())
         return ServerNames();
@@ -341,7 +351,7 @@ bool ClientNetworking::Impl::ConnectToServer(
                                          << "  port: " << it->endpoint().port();
 
                     //DebugLogger(network) << "ConnectToServer() : Client using "
-                    //                     << ((GetOptionsDB().Get<bool>("binary-serialization")) ? "binary": "xml")
+                    //                     << ((GetOptionsDB().Get<bool>("save.format.binary.enabled")) ? "binary": "xml")
                     //                     << " serialization.";
 
                     // Prepare the socket
@@ -426,6 +436,9 @@ void ClientNetworking::Impl::SetPlayerID(int player_id) {
 
 void ClientNetworking::Impl::SetHostPlayerID(int host_player_id)
 { m_host_player_id = host_player_id; }
+
+Networking::AuthRoles& ClientNetworking::Impl::AuthorizationRoles()
+{ return m_roles; }
 
 void ClientNetworking::Impl::SendMessage(const Message& message) {
     if (!IsTxConnected()) {
@@ -654,6 +667,9 @@ int ClientNetworking::HostPlayerID() const
 bool ClientNetworking::PlayerIsHost(int player_id) const
 { return m_impl->PlayerIsHost(player_id); }
 
+bool ClientNetworking::HasAuthRole(Networking::RoleType role) const
+{ return m_impl->HasAuthRole(role); }
+
 ClientNetworking::ServerNames ClientNetworking::DiscoverLANServerNames()
 { return m_impl->DiscoverLANServerNames(); }
 
@@ -683,6 +699,9 @@ void ClientNetworking::SetPlayerID(int player_id)
 
 void ClientNetworking::SetHostPlayerID(int host_player_id)
 { return m_impl->SetHostPlayerID(host_player_id); }
+
+Networking::AuthRoles& ClientNetworking::AuthorizationRoles()
+{ return m_impl->AuthorizationRoles(); }
 
 void ClientNetworking::SendMessage(const Message& message)
 { return m_impl->SendMessage(message); }

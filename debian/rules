@@ -51,4 +51,5 @@ override_dh_python2:
 
 override_dh_systemd_enable:
 	dh_systemd_enable -pfreeorion --name=freeoriond
+	dh_systemd_enable -pfreeorion --name=unit-status-freeorion@
 

@@ -1,0 +1,7 @@
+[Unit]
+Description=Unit Status Freeorion Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/bin/true

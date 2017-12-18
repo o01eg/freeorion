@@ -1,6 +1,7 @@
 [Unit]
 Description=FreeOrion server
 After=network.target
+OnFailure=unit-status-freeorion@.service
 
 [Service]
 User=freeorion

@@ -621,7 +621,7 @@ void FileDlg::UpdateList()
         rows.reserve(sorted_rows.size());
         for (auto& row : sorted_rows)
         { rows.push_back(row.second); }
-        m_files_list->Insert(rows, false);
+        m_files_list->Insert(rows);
 
         if (!m_select_directories) {
             sorted_rows.clear();
@@ -746,7 +746,7 @@ void FileDlg::OpenDirectory()
             try {
                 SetWorkingDirectory(fs::path(directory + "\\"));
             } catch (const fs::filesystem_error& e) {
-                if (e.code() == boost::system::posix_error::io_error) {
+                if (e.code() == boost::system::errc::io_error) {
                     m_in_win32_drive_selection = true;
                     m_files_edit->Clear();
                     FilesEditChanged(m_files_edit->Text());

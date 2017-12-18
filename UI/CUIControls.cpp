@@ -1591,7 +1591,7 @@ namespace {
     };
 }
 
-SpeciesSelector::SpeciesSelector(GG::X w, GG::Y h) :
+SpeciesSelector::SpeciesSelector(const std::string& preselect_species, GG::X w, GG::Y h) :
     CUIDropDownList(6)
 {
     ManuallyManageColProps();
@@ -1600,18 +1600,29 @@ SpeciesSelector::SpeciesSelector(GG::X w, GG::Y h) :
     SetChildClippingMode(ClipToClient);
 
     Resize(GG::Pt(w, h - 8));
+
+    SelChangedSignal.connect(
+        [this](GG::DropDownList::iterator it) {
+            SpeciesChangedSignal((it == this->end() || !(*it)) ? EMPTY_STRING : (*it)->Name()); });
+
     const SpeciesManager& sm = GetSpeciesManager();
-    for (auto it = sm.playable_begin(); it != sm.playable_end(); ++it)
-        Insert(GG::Wnd::Create<SpeciesRow>(it->second.get(), w, h - 4));
+    for (auto it = sm.playable_begin(); it != sm.playable_end(); ++it) {
+        auto row_it = Insert(GG::Wnd::Create<SpeciesRow>(it->second.get(), w, h - 4));
+        if (it->first == preselect_species)
+            Select(row_it);
+    }
+
     if (!this->Empty()) {
         // Add an option for random selection
         Insert(GG::Wnd::Create<SpeciesRow>("RANDOM", UserString("GSETUP_RANDOM"),
                                            UserString("GSETUP_SPECIES_RANDOM_DESC"), w, h - 4,
                                            ClientUI::GetTexture(ClientUI::ArtDir() / "icons/unknown.png")));
-        Select(this->begin());
     }
-    SelChangedSignal.connect(
-        boost::bind(&SpeciesSelector::SelectionChanged, this, _1));
+
+    if (!Empty() && CurrentItem() == end()) {
+        ErrorLogger() << "SpeciesSelector::SpeciesSelector was unable to find a species in the list with name " << preselect_species;
+        Select(begin());
+    }
 }
 
 const std::string& SpeciesSelector::CurrentSpeciesName() const {
@@ -1624,34 +1635,6 @@ const std::string& SpeciesSelector::CurrentSpeciesName() const {
         return EMPTY_STRING;
     }
     return row->Name();
-}
-
-std::vector<std::string> SpeciesSelector::AvailableSpeciesNames() const {
-    std::vector<std::string> retval;
-    for (auto& row : *this)
-        if (const auto& species_row = dynamic_cast<const SpeciesRow*>(row.get()))
-            retval.push_back(species_row->Name());
-    return retval;
-}
-
-void SpeciesSelector::SelectSpecies(const std::string& species_name) {
-    for (auto row_it = this->begin(); row_it != this->end(); ++row_it) {
-        auto& row = *row_it;
-        if (const auto& species_row = dynamic_cast<const SpeciesRow*>(row.get())) {
-            if (species_row->Name() == species_name) {
-                Select(row_it);
-                return;
-            }
-        }
-    }
-    ErrorLogger() << "SpeciesSelector::SelectSpecies was unable to find a species in the list with name " << species_name;
-}
-
-void SpeciesSelector::SelectionChanged(GG::DropDownList::iterator it) {
-    if (it == this->end() || !(*it))
-        SpeciesChangedSignal(EMPTY_STRING);
-
-    SpeciesChangedSignal((*it)->Name());
 }
 
 
@@ -1700,11 +1683,14 @@ EmpireColorSelector::EmpireColorSelector(GG::Y h) :
     CUIDropDownList(6)
 {
     Resize(GG::Pt(COLOR_SELECTOR_WIDTH, h - 8));
+
     for (const GG::Clr& color : EmpireColors()) {
         Insert(GG::Wnd::Create<ColorRow>(color, h - 4));
     }
+
     SelChangedSignal.connect(
-        boost::bind(&EmpireColorSelector::SelectionChanged, this, _1));
+        [this](GG::DropDownList::iterator it) {
+            ColorChangedSignal(!(it == end() || !*it || (*it)->empty()) ? (*it)->at(0)->Color() : GG::CLR_RED); });
 }
 
 GG::Clr EmpireColorSelector::CurrentColor() const
@@ -1719,15 +1705,6 @@ void EmpireColorSelector::SelectColor(const GG::Clr& clr) {
         }
     }
     ErrorLogger() << "EmpireColorSelector::SelectColor was unable to find a requested color!";
-}
-
-void EmpireColorSelector::SelectionChanged(GG::DropDownList::iterator it) {
-    const auto& row = *it;
-    bool error(it == end() || !row || row->empty());
-    if (error)
-        ErrorLogger() << "EmpireColorSelector::SelectionChanged had trouble getting colour from row.  Using CLR_RED";
-
-    ColorChangedSignal(!error ? row->at(0)->Color() : GG::CLR_RED);
 }
 
 

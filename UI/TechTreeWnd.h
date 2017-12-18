@@ -35,8 +35,6 @@ public:
 
     /** \name Accessors */ //@{
     double                  Scale() const;
-    std::set<std::string>   GetCategoriesShown() const;
-    std::set<TechStatus>    GetTechStatusesShown() const;
     bool                    PediaVisible();
     /** If tech @p tech_name is currently visible */
     bool                    TechIsVisible(const std::string& tech_name) const;
@@ -50,7 +48,6 @@ public:
     void            Update();
     void            Clear();
     void            Reset();
-    void            SetScale(double scale);
 
     void            ShowCategory(const std::string& category);
     void            ShowAllCategories();
@@ -83,8 +80,8 @@ private:
 
     void    TechLeftClickedSlot(const std::string& tech_name,
                                 const GG::Flags<GG::ModKey>& modkeys);
-    void    TechDoubleClickedSlot(const std::string& tech_name,
-                                  const GG::Flags<GG::ModKey>& modkeys);
+    void    AddTechToResearchQueue(const std::string& tech_name,
+                                   bool to_front);
     void    TechPediaDisplaySlot(const std::string& tech_name);
 
     void    InitializeWindows();

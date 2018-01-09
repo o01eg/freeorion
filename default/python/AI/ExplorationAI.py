@@ -5,8 +5,8 @@ from EnumsAI import MissionType
 import universe_object
 import MoveUtilsAI
 import PlanetUtilsAI
-from freeorion_tools import dict_from_map
 from AIDependencies import INVALID_ID
+from freeorion_tools import get_partial_visibility_turn
 
 from common.configure_logging import convenience_function_references_for_logger
 (debug, info, warn, error, fatal) = convenience_function_references_for_logger(__name__)
@@ -161,7 +161,7 @@ def follow_vis_system_connections(start_system_id, home_system_id):
         else:
             status_info = [system_header]
 
-        has_been_visible = universe.getVisibilityTurnsMap(cur_system_id, empire_id).get(fo.visibility.partial, 0) > 0
+        has_been_visible = get_partial_visibility_turn(cur_system_id) > 0
         is_connected = universe.systemsConnected(cur_system_id, home_system_id, -1)  # self.empire_id)
         status_info.append("    -- is%s partially visible" % ("" if has_been_visible else " not"))
         status_info.append("    -- is%s visibly connected to homesystem" % ("" if is_connected else " not"))
@@ -169,7 +169,7 @@ def follow_vis_system_connections(start_system_id, home_system_id):
             sys_status = foAI.foAIstate.systemStatus.setdefault(cur_system_id, {})
             foAI.foAIstate.visInteriorSystemIDs.add(cur_system_id)
             foAI.foAIstate.visBorderSystemIDs.discard(cur_system_id)
-            neighbors = set(dict_from_map(universe.getSystemNeighborsMap(cur_system_id, empire_id)).keys())
+            neighbors = set(universe.getImmediateNeighbors(cur_system_id, empire_id))
             sys_status.setdefault('neighbors', set()).update(neighbors)
             if neighbors:
                 status_info.append(" -- has neighbors %s" % sorted(neighbors))

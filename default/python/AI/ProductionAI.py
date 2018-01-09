@@ -18,7 +18,7 @@ from turn_state import state
 
 from EnumsAI import (PriorityType, EmpireProductionTypes, MissionType, get_priority_production_types,
                      FocusType, ShipRoleType)
-from freeorion_tools import dict_from_map, ppstring, chat_human, tech_is_complete, AITimer
+from freeorion_tools import ppstring, chat_human, tech_is_complete, AITimer
 from common.print_utils import Table, Sequence, Text
 from AIDependencies import INVALID_ID
 
@@ -380,7 +380,8 @@ def generate_production_orders():
                 sys_id = planet.systemID
                 queued_defenses[sys_id] = queued_defenses.get(sys_id, 0) + element.blocksize*element.remaining
                 defense_allocation += element.allocation
-        print "Queued Defenses:", [(ppstring(PlanetUtilsAI.sys_name_ids([sys_id])), num) for sys_id, num in queued_defenses.items()]
+        print "Queued Defenses:", ppstring([(str(universe.getSystem(sys_id)), num)
+                                            for sys_id, num in queued_defenses.items()])
         for sys_id, pids in state.get_empire_planets_by_system(include_outposts=False).items():
             if foAI.foAIstate.systemStatus.get(sys_id, {}).get('fleetThreat', 1) > 0:
                 continue  # don't build orbital shields if enemy fleet present
@@ -390,7 +391,8 @@ def generate_production_orders():
             fleets_here = foAI.foAIstate.systemStatus.get(sys_id, {}).get('myfleets', [])
             for fid in fleets_here:
                 if foAI.foAIstate.get_fleet_role(fid) == MissionType.ORBITAL_DEFENSE:
-                    print "Found %d existing Orbital Defenses in %s :" % (foAI.foAIstate.fleetStatus.get(fid, {}).get('nships', 0), ppstring(PlanetUtilsAI.sys_name_ids([sys_id])))
+                    print "Found %d existing Orbital Defenses in %s :" % (
+                        foAI.foAIstate.fleetStatus.get(fid, {}).get('nships', 0), universe.getSystem(sys_id))
                     sys_orbital_defenses[sys_id] += foAI.foAIstate.fleetStatus.get(fid, {}).get('nships', 0)
             for pid in pids:
                 sys_orbital_defenses[sys_id] += queued_defenses.get(pid, 0)
@@ -399,10 +401,10 @@ def generate_production_orders():
                 for pid in pids:
                     best_design_id, col_design, build_choices = get_best_ship_info(PriorityType.PRODUCTION_ORBITAL_DEFENSE, pid)
                     if not best_design_id:
-                        print "no orbital defenses can be built at ", ppstring(PlanetUtilsAI.planet_name_ids([pid]))
+                        print "no orbital defenses can be built at ", PlanetUtilsAI.planet_string(pid)
                         continue
                     retval = fo.issueEnqueueShipProductionOrder(best_design_id, pid)
-                    print "queueing %d Orbital Defenses at %s" % (num_needed, ppstring(PlanetUtilsAI.planet_name_ids([pid])))
+                    print "queueing %d Orbital Defenses at %s" % (num_needed, PlanetUtilsAI.planet_string(pid))
                     if retval != 0:
                         if num_needed > 1:
                             fo.issueChangeProductionQuantityOrder(production_queue.size - 1, 1, num_needed)
@@ -991,7 +993,7 @@ def generate_production_orders():
             if sys_id in scanner_locs:
                 continue
             need_scanner = False
-            for nSys in dict_from_map(universe.getSystemNeighborsMap(sys_id, empire.empireID)):
+            for nSys in universe.getImmediateNeighbors(sys_id, empire.empireID):
                 if universe.getVisibility(nSys, empire.empireID) < fo.visibility.partial:
                     need_scanner = True
                     break
@@ -1029,11 +1031,12 @@ def generate_production_orders():
                                     (covered_drydoc_locs, covered_drydoc_locs)]:  # coverage of neighbors up to 2 jumps away from a drydock
             for dd_sys_id in start_set.copy():
                 dest_set.add(dd_sys_id)
-                dd_neighbors = dict_from_map(universe.getSystemNeighborsMap(dd_sys_id, empire.empireID))
-                dest_set.update(dd_neighbors.keys())
+                neighbors = universe.getImmediateNeighbors(dd_sys_id, empire.empireID)
+                dest_set.update(neighbors)
 
         max_dock_builds = int(0.8 + empire.productionPoints/120.0)
-        print "Considering building %s, found current and queued systems %s" % (building_name, ppstring(PlanetUtilsAI.sys_name_ids(cur_drydoc_sys.union(queued_sys))))
+        print "Considering building %s, found current and queued systems %s" % (
+            building_name, PlanetUtilsAI.sys_name_ids(cur_drydoc_sys.union(queued_sys)))
         for sys_id, pids in state.get_empire_planets_by_system(include_outposts=False).items():  # TODO: sort/prioritize in some fashion
             local_top_pilots = dict(top_pilot_systems.get(sys_id, []))
             local_drydocks = state.get_empire_drydocks().get(sys_id, [])
@@ -1055,8 +1058,8 @@ def generate_production_orders():
                 if res:
                     queued_locs.append(planet.systemID)
                     covered_drydoc_locs.add(planet.systemID)
-                    dd_neighbors = dict_from_map(universe.getSystemNeighborsMap(planet.systemID, empire.empireID))
-                    covered_drydoc_locs.update(dd_neighbors.keys())
+                    neighboring_systems = universe.getImmediateNeighbors(planet.systemID, empire.empireID)
+                    covered_drydoc_locs.update(neighboring_systems)
                     if max_dock_builds >= 2:
                         res = fo.issueRequeueProductionOrder(production_queue.size - 1, 0)  # move to front
                         print "Requeueing %s to front of build queue, with result %d" % (building_name, res)
@@ -1257,10 +1260,10 @@ def generate_production_orders():
     planets_with_wasted_pp = set([tuple(pidset) for pidset in empire.planetsWithWastedPP])
     print "avail_pp ( <systems> : pp ):"
     for planet_set in available_pp:
-        print "\t%s\t%.2f" % (ppstring(PlanetUtilsAI.sys_name_ids(set(PlanetUtilsAI.get_systems(planet_set)))), available_pp[planet_set])
+        print "\t%s\t%.2f" % (PlanetUtilsAI.sys_name_ids(set(PlanetUtilsAI.get_systems(planet_set))), available_pp[planet_set])
     print "\nallocated_pp ( <systems> : pp ):"
     for planet_set in allocated_pp:
-        print "\t%s\t%.2f" % (ppstring(PlanetUtilsAI.sys_name_ids(set(PlanetUtilsAI.get_systems(planet_set)))), allocated_pp[planet_set])
+        print "\t%s\t%.2f" % (PlanetUtilsAI.sys_name_ids(set(PlanetUtilsAI.get_systems(planet_set))), allocated_pp[planet_set])
 
     print "\n\nBuilding Ships in system groups with remaining PP:"
     for planet_set in planets_with_wasted_pp:
@@ -1268,9 +1271,9 @@ def generate_production_orders():
         avail_pp = total_pp - allocated_pp.get(planet_set, 0)
         if avail_pp <= 0.01:
             continue
-        print "%.2f PP remaining in system group: %s" % (avail_pp, ppstring(PlanetUtilsAI.sys_name_ids(set(PlanetUtilsAI.get_systems(planet_set)))))
+        print "%.2f PP remaining in system group: %s" % (avail_pp, PlanetUtilsAI.sys_name_ids(set(PlanetUtilsAI.get_systems(planet_set))))
         print "\t owned planets in this group are:"
-        print "\t %s" % (ppstring(PlanetUtilsAI.planet_name_ids(planet_set)))
+        print "\t %s" % PlanetUtilsAI.planet_string(planet_set)
         best_design_id, best_design, build_choices = get_best_ship_info(PriorityType.PRODUCTION_COLONISATION, list(planet_set))
         species_map = {}
         for loc in (build_choices or []):
@@ -1302,7 +1305,7 @@ def generate_production_orders():
             print "best_ships[%s] = %s \t locs are %s from %s" % (priority, best_design.name, build_choices, planet_set)
 
         if len(local_priorities) == 0:
-            print "Alert!! need shipyards in systemSet ", ppstring(PlanetUtilsAI.sys_name_ids(set(PlanetUtilsAI.get_systems(sorted(planet_set)))))
+            print "Alert!! need shipyards in systemSet ", PlanetUtilsAI.sys_name_ids(set(PlanetUtilsAI.get_systems(planet_set)))
         priority_choices = []
         for priority in local_priorities:
             priority_choices.extend(int(local_priorities[priority]) * [priority])
@@ -1376,7 +1379,8 @@ def generate_production_orders():
             retval = fo.issueEnqueueShipProductionOrder(best_design_id, loc)
             if retval != 0:
                 prioritized = False
-                print "adding %d new ship(s) at location %s to production queue: %s; per turn production cost %.1f" % (ship_number, ppstring(PlanetUtilsAI.planet_name_ids([loc])), best_design.name, per_turn_cost)
+                print "adding %d new ship(s) at location %s to production queue: %s; per turn production cost %.1f" % (
+                    ship_number, PlanetUtilsAI.planet_string(loc), best_design.name, per_turn_cost)
                 print
                 if ship_number > 1:
                     fo.issueChangeProductionQuantityOrder(production_queue.size - 1, 1, ship_number)

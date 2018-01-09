@@ -12,8 +12,7 @@ import ProductionAI
 import MilitaryAI
 from turn_state import state
 from EnumsAI import MissionType, FocusType, EmpireProductionTypes, ShipRoleType, PriorityType
-from freeorion_tools import (dict_from_map, tech_is_complete, get_ai_tag_grade, cache_by_turn, AITimer,
-                             get_partial_visibility_turn)
+from freeorion_tools import tech_is_complete, get_ai_tag_grade, cache_by_turn, AITimer, get_partial_visibility_turn
 from AIDependencies import (INVALID_ID, POP_CONST_MOD_MAP, POP_SIZE_MOD_MAP_MODIFIED_BY_SPECIES,
                             POP_SIZE_MOD_MAP_NOT_MODIFIED_BY_SPECIES)
 
@@ -29,7 +28,6 @@ empire_shipyards = {}
 available_growth_specials = {}
 active_growth_specials = {}
 empire_metabolisms = {}
-annexable_system_ids = set()
 planet_supply_cache = {}  # includes system supply
 all_colony_opportunities = {}
 
@@ -201,36 +199,7 @@ def get_supply_tech_range():
     return sum(_range for _tech, _range in AIDependencies.supply_range_techs.iteritems() if tech_is_complete(_tech))
 
 
-def check_supply():
-    print "\n", 10 * "=", "Supply calculations", 10 * "=", "\n"
-    empire = fo.getEmpire()
-
-    colonization_timer.start('Getting Empire Supply Info')
-    print "Base Supply:", dict_from_map(empire.systemSupplyRanges)
-    for i in range(-3, 1):
-        print "Systems %d jumps away from supply:", ', '.join(
-                PlanetUtilsAI.sys_name_ids(state.get_systems_by_supply_tier(i)))
-
-    colonization_timer.start('Determining Annexable Systems')
-    annexable_system_ids.clear()  # TODO: distinguish colony-annexable systems and outpost-annexable systems
-
-    supply_distance = get_supply_tech_range()
-    # extra potential supply contributions:
-    # 3 for up to Ultimate supply species
-    # 2 for possible tiny planets
-    # 1 for World Tree
-    # TODO: +3 to consider capturing planets with Elevators
-    # TODO consider that this should not be more then maximal value in empire.systemSupplyRanges
-    supply_distance += 6  # should not be more than max value in supplyProjections
-
-    # we should not rely on constant here, for system, supply in supplyProjections need to add systems in supply range
-    for jumps in range(-supply_distance, 1):  # [-supply_distance, ..., -2, -1, 0]
-        annexable_system_ids.update(state.get_systems_by_supply_tier(jumps))
-    colonization_timer.stop()
-
-
 def survey_universe():
-    check_supply()
     colonization_timer.start("Categorizing Visible Planets")
     universe = fo.getUniverse()
     empire_id = fo.empireID()
@@ -474,7 +443,7 @@ def get_colony_fleets():
                 PriorityType.PRODUCTION_ORBITAL_OUTPOST, loc)
             if best_ship is None:
                 warn("Can't get standard best outpost base design that can be built at %s" % (
-                    PlanetUtilsAI.planet_name_ids([loc])))
+                    PlanetUtilsAI.planet_string(loc)))
                 outpost_base_design_ids = [design for design in empire.availableShipDesigns if
                                            "SD_OUTPOST_BASE" == fo.getShipDesign(design).name]
                 if outpost_base_design_ids:
@@ -484,7 +453,7 @@ def get_colony_fleets():
                     continue
             retval = fo.issueEnqueueShipProductionOrder(best_ship, loc)
             print "Enqueueing Outpost Base at %s for %s with result %s" % (
-                PlanetUtilsAI.planet_name_ids([loc]), PlanetUtilsAI.planet_name_ids([pid]), retval)
+                PlanetUtilsAI.planet_string(loc), PlanetUtilsAI.planet_string(pid), retval)
             if retval:
                 foAI.foAIstate.qualifyingOutpostBaseTargets[pid][1] = loc
                 queued_outpost_bases.append((planet and planet.systemID) or INVALID_ID)
@@ -1262,7 +1231,7 @@ def send_colony_ships(colony_fleet_ids, evaluated_planets, mission_type):
         if foAI.foAIstate.systemStatus.setdefault(sys_id, {}).setdefault('monsterThreat', 0) > 2000 \
                 or fo.currentTurn() < 20 and foAI.foAIstate.systemStatus[sys_id]['monsterThreat'] > 200:
             print "Skipping colonization of system %s due to Big Monster, threat %d" % (
-                PlanetUtilsAI.sys_name_ids([sys_id]), foAI.foAIstate.systemStatus[sys_id]['monsterThreat'])
+                universe.getSystem(sys_id), foAI.foAIstate.systemStatus[sys_id]['monsterThreat'])
             already_targeted.append(planet_id)
             continue
         this_spec = target[1][1]

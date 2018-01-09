@@ -61,7 +61,7 @@ def get_invasion_fleets():
     num_invasion_fleets = len(FleetUtilsAI.extract_fleet_ids_without_mission_types(invasion_fleet_ids))
 
     print "Current Invasion Targeted SystemIDs: ", PlanetUtilsAI.sys_name_ids(AIstate.invasionTargetedSystemIDs)
-    print "Current Invasion Targeted PlanetIDs: ", PlanetUtilsAI.planet_name_ids(invasion_targeted_planet_ids)
+    print "Current Invasion Targeted PlanetIDs: ", PlanetUtilsAI.planet_string(invasion_targeted_planet_ids)
     print invasion_fleet_ids and "Invasion Fleet IDs: %s" % invasion_fleet_ids or "Available Invasion Fleets: 0"
     print "Invasion Fleets Without Missions: %s" % num_invasion_fleets
 
@@ -197,8 +197,8 @@ def get_invasion_fleets():
             print "Invasion base planning, need %d troops at %d pership, will build %d ships." % (
                 (planet_troops + 1), troops_per_ship, n_bases)
             retval = fo.issueEnqueueShipProductionOrder(col_design.id, loc)
-            print "Enqueueing %d Troop Bases at %s for %s" % (n_bases, PlanetUtilsAI.planet_name_ids([loc]),
-                                                              PlanetUtilsAI.planet_name_ids([pid]))
+            print "Enqueueing %d Troop Bases at %s for %s" % (n_bases, PlanetUtilsAI.planet_string(loc),
+                                                              PlanetUtilsAI.planet_string(pid))
             if retval != 0:
                 all_invasion_targeted_system_ids.add(planet.systemID)
                 reserved_troop_base_targets.append(pid)
@@ -432,24 +432,10 @@ def evaluate_invasion_planet(planet_id, secure_fleet_missions, verbose=True):
                " - sysMonsterThreat: %.1f") % (
             planet, planet.currentMeterValue(fo.meterType.maxShield), system_fleet_treat,
             system_monster_threat)
-    supply_val = 0
     enemy_val = 0
     if planet.owner != -1:  # value in taking this away from an enemy
         enemy_val = 20 * (planet.currentMeterValue(fo.meterType.targetIndustry) +
                           2*planet.currentMeterValue(fo.meterType.targetResearch))
-    if system_id in ColonisationAI.annexable_system_ids:  # TODO: extend to rings
-        supply_val = 100
-    elif system_id in state.get_systems_by_supply_tier(-1):
-        supply_val = 200
-    elif system_id in state.get_systems_by_supply_tier(-2):
-        supply_val = 300
-    elif system_id in state.get_systems_by_supply_tier(-3):
-        supply_val = 400
-    if max_path_threat > 0.5 * mil_ship_rating:
-        if max_path_threat < 3 * mil_ship_rating:
-            supply_val *= 0.5
-        else:
-            supply_val *= 0.2
 
     # devalue invasions that would require too much military force
     threat_factor = min(1, 0.2*MilitaryAI.get_tot_mil_rating()/(sys_total_threat+0.001))**2
@@ -479,7 +465,7 @@ def evaluate_invasion_planet(planet_id, secure_fleet_missions, verbose=True):
     normalized_cost = max(1., normalized_cost)
     cost_score = (normalized_cost**2 / 50.0) * troop_cost
 
-    base_score = colony_base_value + supply_val + bld_tally + tech_tally + enemy_val - cost_score
+    base_score = colony_base_value + bld_tally + tech_tally + enemy_val - cost_score
     planet_score = retaliation_risk_factor(planet.owner) * threat_factor * max(0, base_score)
     if clear_path:
         planet_score *= 1.5
@@ -490,10 +476,9 @@ def evaluate_invasion_planet(planet_id, secure_fleet_missions, verbose=True):
                ' - threat factor: %s\n'
                ' - planet detail: %s\n'
                ' - popval: %.1f\n'
-               ' - supplyval: %.1f\n'
                ' - bldval: %s\n'
                ' - enemyval: %s') % (planet_score, planned_troops, troop_cost,
-                                     threat_factor, detail, colony_base_value, supply_val, bld_tally, enemy_val)
+                                     threat_factor, detail, colony_base_value, bld_tally, enemy_val)
     return [planet_score, planned_troops]
 
 

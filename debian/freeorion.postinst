@@ -35,6 +35,9 @@ case "$1" in
 	# create logdir
 	mkdir -p /var/log/freeorion
 	chown -R freeorion:freeorion /var/log/freeorion
+
+	# fix xmpp.conf mode
+	chmod 0600 /etc/freeorion/xmpp.conf
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

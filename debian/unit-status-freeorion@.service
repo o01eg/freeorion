@@ -4,4 +4,4 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/bin/true
+ExecStart=/usr/local/bin/sendxmpp -f /etc/freeorion/xmpp.conf o01eg@jabber.ru Achtung!

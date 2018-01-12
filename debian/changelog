@@ -1,3 +1,9 @@
+freeorion (0.4.8+git20180109~4b45d52-2) unstable; urgency=medium
+
+  * Send notifycation about fails
+
+ -- O01eg <o01eg@yandex.ru>  Wed, 10 Jan 2018 15:31:02 +0300
+
 freeorion (0.4.8+git20180109~4b45d52-1) unstable; urgency=medium
 
   * Update upstream.

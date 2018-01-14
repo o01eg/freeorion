@@ -977,8 +977,17 @@ Player name %1% already in use.
 ERROR_WRONG_PASSWORD
 Password wrong for player name %1%.
 
+ERROR_NOT_ENOUGH_AI_PLAYERS
+Not enough AI players.
+
+ERROR_TOO_MANY_AI_PLAYERS
+Too many ai players.
+
 ERROR_NOT_ENOUGH_HUMAN_PLAYERS
 Not enough human players.
+
+ERROR_TOO_MANY_HUMAN_PLAYERS
+Too many human players.
 
 ERROR_CONNECTION_WAS_REPLACED
 Your connection was replaced.
@@ -1089,14 +1098,28 @@ Starlanes are generated between every pair of systems, regardless of geometry. L
 ## Command-line and options database entries
 ##
 
+COMMAND_LINE_NOT_FOUND
+'''No options or sections found matching'''
+
 COMMAND_LINE_USAGE
-'''Usage: '''
+'''Usage: -h | --help [group name | option name]'''
 
 COMMAND_LINE_DEFAULT
-'''Default: '''
+'''Default'''
+
+COMMAND_LINE_SECTIONS
+'''Option Groups'''
+
+COMMAND_LINE_OPTIONS
+'''Options'''
 
 OPTIONS_DB_HELP
-Print this help message.
+'''Print this help message.
+Accepts an argument for partial or full option name.
+Special arguments are provided for:
+all - [[OPTIONS_DB_SECTION_ALL]]
+raw - [[OPTIONS_DB_SECTION_RAW]]'''
+
 
 OPTIONS_DB_VERSION
 Print version and exit.
@@ -1109,12 +1132,6 @@ Start server in hostless mode. Server accepts players in the multiplayer lobby, 
 
 OPTIONS_DB_SKIP_CHECKSUM
 Skip comparing the resource directory checksums.  This allows faster startup when client and server are on the same machine, using the same resource directory.
-
-OPTIONS_DB_MPLOBBY_MAX_AI
-Limit the number of AIs allowed in a multiplayer game. Set to -1 for unlimited.
-
-OPTIONS_DB_MPLOBBY_MIN_HUMAN
-Set the minimum number of human players required to start a multiplayer game.
 
 OPTIONS_DB_GENERATE_CONFIG_XML
 Uses default settings, settings from any existing config.xml file, and settings given on the command line to generate a config.xml file. This will overwrite the current config.xml file, if it exists.
@@ -1225,6 +1242,18 @@ Address to connect to when joining a multiplayer game.
 
 OPTIONS_DB_MP_PLAYER_NAME
 Player name to use when hosting or joining a multiplayer game.
+
+OPTIONS_DB_MP_AI_MIN
+Set the minimum number of ai players required to start a multiplayer game.
+
+OPTIONS_DB_MP_AI_MAX
+Limit the number of AIs allowed in a multiplayer game. Set to -1 for unlimited.
+
+OPTIONS_DB_MP_HUMAN_MIN
+Set the minimum number of human players required to start a multiplayer game.
+
+OPTIONS_DB_MP_HUMAN_MAX
+Limit the number of human players allowed in a multiplayer game. Set to -1 for unlimited.
 
 OPTIONS_DB_UI_MAIN_MENU_X
 Position of the center of the intro screen main menu, as a portion of the application's total width.
@@ -1594,7 +1623,7 @@ When set to Low, most systems will typically have one or two starlanes. When set
 OPTIONS_DB_GAMESETUP_SPECIALS_FREQUENCY
 '''The proportion of planets and systems containing Special Features.
 
-Some Special Features are protected by Guardians left by Precursor species—only setting Monster Frequency to None will prevent these appearing if the game contains specials.
+Some Special Features are protected by Guardians left by Precursor species-only setting Monster Frequency to None will prevent these appearing if the game contains specials.
 '''
 
 OPTIONS_DB_GAMESETUP_MONSTER_FREQUENCY
@@ -1852,6 +1881,89 @@ Network port to use for server discovery.
 
 OPTIONS_DB_NETWORK_MESSAGE_PORT
 Network port to use for client-server messaging.
+
+
+##
+## Option sections
+##
+
+OPTIONS_DB_SECTION_ALL
+All options
+
+OPTIONS_DB_SECTION_AUDIO
+Audio
+
+OPTIONS_DB_SECTION_AUDIO_MUSIC
+Background music
+
+OPTIONS_DB_SECTION_AUDIO_EFFECTS
+Sound effects
+
+OPTIONS_DB_SECTION_AUDIO_EFFECTS_PATHS
+Sound effect paths
+
+OPTIONS_DB_SECTION_EFFECTS
+Effects
+
+OPTIONS_DB_SECTION_LOGGING
+Logging
+
+OPTIONS_DB_SECTION_MISC
+Miscellaneous
+
+OPTIONS_DB_SECTION_NETWORK
+Network and server
+
+OPTIONS_DB_SECTION_RAW
+All options with only raw description keys
+
+OPTIONS_DB_SECTION_RESOURCE
+Game data resources
+
+OPTIONS_DB_SECTION_SAVE
+Save game
+
+OPTIONS_DB_SECTION_SETUP
+New game starting settings
+
+OPTIONS_DB_SECTION_UI
+User interface
+
+OPTIONS_DB_SECTION_UI_COLORS
+Colors
+
+OPTIONS_DB_SECTION_UI_CONTROL
+Control (generic)
+
+OPTIONS_DB_SECTION_UI_HOTKEYS
+Hotkeys
+
+OPTIONS_DB_SECTION_UI_MAP
+Main map
+
+OPTIONS_DB_SECTION_UI_MAP_FLEET
+Fleets (map)
+
+OPTIONS_DB_SECTION_UI_FLEET
+Fleet window
+
+OPTIONS_DB_UI_WINDOW
+Window (generic)
+
+OPTIONS_DB_SECTION_VERSION
+Version
+
+OPTIONS_DB_SECTION_VIDEO
+Video
+
+OPTIONS_DB_SECTION_VIDEO_FPS
+Frames per second
+
+OPTIONS_DB_SECTION_VIDEO_FULLSCREEN
+Fullscreen mode
+
+OPTIONS_DB_SECTION_VIDEO_WINDOWED
+Windowed mode
 
 
 ##
@@ -3055,6 +3167,9 @@ Research Output
 TRADE_PRODUCTION
 Trade Output
 
+STOCKPILE_GENERATION
+Stockpile Capacity Generation
+
 INDUSTRY_CONSUMPTION
 Industrial Consumption
 
@@ -3063,6 +3178,9 @@ Research Consumption
 
 TRADE_CONSUMPTION
 Trade Consumption
+
+STOCKPILE_USE
+Stockpile Capacity Use
 
 IMPORT_EXPORT_TOOLTIP
 Import / Export
@@ -5101,14 +5219,6 @@ The Industry of a planet can be used for any production projects of [[metertype 
 For information on the interface, see [[encyclopedia PRODUCTION_WINDOW_ARTICLE_TITLE]].
 '''
 
-METER_STOCKPILE
-Stockpile Capacity
-
-METER_STOCKPILE_DESC
-'''The imperial stockpile capacity indicates an empire's ability to take in excess and to use stockpiled production points. An empire's total stockpiling capacity is the sum of all its planets' stockpile meters. The total determine how many PP can be imported into the imperial stockpile each turn, and how much can be taken out each turn to be used for production.
-
-Species have various innate levels of stockpiling ability.''' 
-
 METER_RESEARCH_VALUE_LABEL
 Research
 
@@ -5198,7 +5308,9 @@ METER_STOCKPILE_VALUE_LABEL
 Stockpile
 
 METER_STOCKPILE_VALUE_DESC
-'''The stockpile is useful...'''
+'''The imperial stockpile capacity indicates an empire's ability to take in excess and to use stockpiled production points. An empire's total stockpiling capacity is the sum of all its planets' stockpile meters. The total determine how many PP can be imported into the imperial stockpile each turn, and how much can be taken out each turn to be used for production.
+
+Species have various innate levels of stockpiling ability.'''
 
 METER_TROOPS_VALUE_LABEL
 Troops
@@ -6028,6 +6140,12 @@ SITREP_WELCOME
 
 SITREP_WELCOME_LABEL
 Welcome
+
+SITREP_SYSTEM_GOT_INCOMING_WARNING
+At %system%: Next turn enemy ships arrive!
+
+SITREP_SYSTEM_GOT_INCOMING_WARNING_LABEL
+Incoming Enemies
 
 SITREP_GAS_GIANT_GENERATION_REMINDER
 %planet% is a prime location for a %buildingtype%, but none is being built there.
@@ -11854,7 +11972,6 @@ Learning to design devices so that different species can use is crucial for deve
 
 Each empire may contain an academy on up to six planets with different species.
 To be able build such an academy the population must be very happy and at least three starlane jumps away from the next academy.
-Each InterDesign Academy improves the [[metertype METER_IMPERIAL_PP_TRANSFER_EFFICIENCY]] by 5% and the allows to draw 2PP/turn more (See [[metertype METER_IMPERIAL_PP_USE_LIMIT]]).
 '''
 
 BLD_MEGALITH

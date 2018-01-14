@@ -6,7 +6,7 @@ OnFailure=unit-status-freeorion@.service
 [Service]
 User=freeorion
 Group=freeorion
-ExecStart=/usr/games/freeoriond --hostless --log-file /var/log/freeorion/freeoriond.log --mplobby-max-ai 5 --mplobby-min-human 2
+ExecStart=/usr/games/freeoriond --hostless --log-file /var/log/freeorion/freeoriond.log --network.server.ai.max 5 --network.server.human.min 2
 RestartSec=10
 Restart=on-failure
 LimitCORE=infinity

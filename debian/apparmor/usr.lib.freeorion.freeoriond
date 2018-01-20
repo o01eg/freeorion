@@ -1,4 +1,4 @@
-# Last Modified: Wed Sep 27 06:36:13 2017
+# Last Modified: Sat Jan 20 14:55:42 2018
 #include <tunables/global>
 
 /usr/lib/freeorion/freeoriond {
@@ -14,13 +14,8 @@
   /usr/lib/freeorion/freeorionca Px,
   /usr/lib/freeorion/freeoriond mr,
   /usr/share/games/freeorion/default/** r,
-  /var/lib/freeorion/.config/ w,
-  /var/lib/freeorion/.config/freeorion/ w,
-  /var/lib/freeorion/.local/ w,
-  /var/lib/freeorion/.local/share/ w,
-  /var/lib/freeorion/.local/share/freeorion/ w,
-  /var/lib/freeorion/.local/share/freeorion/save/ rw,
-  /var/lib/freeorion/.local/share/freeorion/save/*.mps rw,
+  /var/lib/freeorion/save/ w,
+  /var/lib/freeorion/save/*.mps w,
   /var/log/freeorion/freeoriond.log w,
 
 }

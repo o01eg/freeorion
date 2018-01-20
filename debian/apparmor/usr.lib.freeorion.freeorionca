@@ -1,4 +1,4 @@
-# Last Modified: Tue Sep 26 22:36:17 2017
+# Last Modified: Sat Jan 20 16:17:42 2018
 #include <tunables/global>
 
 /usr/lib/freeorion/freeorionca {
@@ -9,13 +9,12 @@
 
   signal receive set=kill peer=/usr/lib/freeorion/freeoriond,
 
+  deny /etc/freeorion/AI/ w,
+  deny /etc/freeorion/config.ini w,
+
   /usr/lib/freeorion/freeorionca mr,
   /usr/share/games/freeorion/default/** r,
-  /var/lib/freeorion/.config/freeorion/AI/ w,
-  /var/lib/freeorion/.config/freeorion/AI/default/ w,
-  /var/lib/freeorion/.config/freeorion/AI/default/config.ini rw,
-  /var/lib/freeorion/.config/freeorion/config.ini rw,
-  /var/lib/freeorion/.local/share/freeorion/*.log w,
+  /var/lib/freeorion/*.log w,
   /var/log/freeorion/freeoriond.log w,
 
 }

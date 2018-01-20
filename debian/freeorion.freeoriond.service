@@ -6,6 +6,7 @@ OnFailure=unit-status-freeorion@.service
 [Service]
 User=freeorion
 Group=freeorion
+Environment="XDG_CONFIG_HOME=/etc" "XDG_DATA_HOME=/var/lib/"
 ExecStart=/usr/games/freeoriond --hostless --log-file /var/log/freeorion/freeoriond.log --network.server.ai.max 5 --network.server.human.min 2
 RestartSec=10
 Restart=on-failure

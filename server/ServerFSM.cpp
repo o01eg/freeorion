@@ -739,6 +739,16 @@ void MPLobby::EstablishPlayer(const PlayerConnectionPtr& player_connection,
             player_connection->SendMessage(ChatHistoryMessage(chat_history));
         }
     }
+
+    // launch sendxmpp
+    std::async(std::launch::async, [player_name] {
+        std::vector<std::string> args{"/usr/local/bin/sendxmpp",
+            "-f", "/etc/freeorion/xmpp.conf",
+            "-c", "smac@conference.bitcheese.net/FreeOrion",
+            "!r", player_name, "@freeorion"};
+        Process sendxmpp = Process("/usr/local/bin/sendxmpp", args);
+        std::this_thread::sleep_for(std::chrono::seconds(7));
+    });
 }
 
 sc::result MPLobby::react(const JoinGame& msg) {

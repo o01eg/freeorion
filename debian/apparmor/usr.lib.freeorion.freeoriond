@@ -1,4 +1,4 @@
-# Last Modified: Sat Jan 20 14:55:42 2018
+# Last Modified: Sat Jan 20 20:54:02 2018
 #include <tunables/global>
 
 /usr/lib/freeorion/freeoriond {
@@ -11,8 +11,10 @@
   signal send set=kill peer=/usr/lib/freeorion/freeorionca,
   signal send set=kill peer=/usr/lib/freeorion/freeoriond//null-/usr/lib/freeorion/freeorionca,
 
+  /etc/freeorion/* r,
   /usr/lib/freeorion/freeorionca Px,
   /usr/lib/freeorion/freeoriond mr,
+  /usr/local/bin/sendxmpp Ux,
   /usr/share/games/freeorion/default/** r,
   /var/lib/freeorion/save/ w,
   /var/lib/freeorion/save/*.mps w,

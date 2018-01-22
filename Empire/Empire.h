@@ -152,24 +152,24 @@ struct FO_COMMON_API ProductionQueue {
         Element(ProductionItem item_, int empire_id_,
                 int ordered_, int remaining_, int blocksize_,
                 int location_, bool paused_ = false,
-                bool allowed_imperial_stockpile_use_ = false);
+                bool allowed_imperial_stockpile_use_ = true);
 
         Element(BuildType build_type, std::string name, int empire_id_,
                 int ordered_, int remaining_, int blocksize_,
                 int location_, bool paused_ = false,
-                bool allowed_imperial_stockpile_use_ = false);
+                bool allowed_imperial_stockpile_use_ = true);
 
         Element(BuildType build_type, int design_id, int empire_id_,
                 int ordered_, int remaining_, int blocksize_,
                 int location_, bool paused_ = false,
-                bool allowed_imperial_stockpile_use_ = false);
+                bool allowed_imperial_stockpile_use_ = true);
 
         ProductionItem  item;
         int             empire_id = ALL_EMPIRES;
-        int             ordered = 1;                ///< how many of item (blocks) to produce
+        int             ordered = 0;                ///< how many of item (blocks) to produce
         int             blocksize = 1;              ///< size of block to produce (default=1)
-        int             remaining;                  ///< how many left to produce
-        int             location;                   ///< the ID of the UniverseObject at which this item is being produced
+        int             remaining = 0;              ///< how many left to produce
+        int             location = INVALID_OBJECT_ID;///< the ID of the UniverseObject at which this item is being produced
         float           allocated_pp = 0.0f;        ///< PP allocated to this ProductionQueue Element by Empire production update
         float           progress = 0.0f;            ///< fraction of this item that is complete.
         float           progress_memory = 0.0f;     ///< updated by server turn processing; aides in allowing blocksize changes to be undone in same turn w/o progress loss
@@ -178,7 +178,7 @@ struct FO_COMMON_API ProductionQueue {
         int             turns_left_to_completion = -1;
         int             rally_point_id = INVALID_OBJECT_ID;
         bool            paused = false;
-        bool            allowed_imperial_stockpile_use = false;
+        bool            allowed_imperial_stockpile_use = true;
 
         std::string Dump() const;
 
@@ -385,9 +385,10 @@ public:
       * exchange supply between themselves (even if not leaving the system). */
     const std::set<int>&                    SupplyUnobstructedSystems() const;
 
-    /** Returns true if the start system is known to this empire and travel to
-        the dest system is not restricted by blockade.  */
-    const bool                              UnrestrictedLaneTravel(int start_system_id, int dest_system_id) const;
+    /** Returns true if the specified lane travel is preserved against being blockaded (i.e., the empire
+     * has in the start system at least one fleet that meets the requirements to preserve the lane (which
+     * is determined in Empire::UpdateSupplyUnobstructedSystems(). */
+    const bool                              PreservedLaneTravel(int start_system_id, int dest_system_id) const;
 
     const std::set<int>&                    ExploredSystems() const;    ///< returns set of ids of systems that this empire has explored
     const std::map<int, std::set<int>>      KnownStarlanes() const;     ///< returns map from system id (start) to set of system ids (endpoints) of all starlanes known to this empire
@@ -510,7 +511,7 @@ public:
     /** Records, in a list of pending updates, the start_system exit lane to the specified destination as accessible to this empire*/
     void RecordPendingLaneUpdate(int start_system_id, int dest_system_id);
     /** Processes all the pending lane access updates.  This is managed as a two step process to avoid order-of-processing issues. */
-    void UpdateAvailableLanes();
+    void UpdatePreservedLanes();
 
     /** Checks for production projects that have been completed, and places them
       * at their respective production sites.  Which projects have been
@@ -680,8 +681,8 @@ private:
     // cached calculation results, returned by reference
     std::map<int, float>            m_supply_system_ranges;         ///< number of starlane jumps away from each system (by id) supply can be conveyed.  This is the number due to a system's contents conveying supply and is computed and set by UpdateSystemSupplyRanges
     std::set<int>                   m_supply_unobstructed_systems;  ///< ids of system that don't block supply from flowing
-    std::map<int, std::set<int>>    m_available_system_exit_lanes;  ///< for each system known to this empire, the set of available/non-blockaded exit lanes for fleet travel
-    std::map<int, std::set<int>>    m_pending_system_exit_lanes;    ///< pending updates to m_available_system_exit_lanes
+    std::map<int, std::set<int>>    m_preserved_system_exit_lanes;  ///< for each system known to this empire, the set of exit lanes preserved for fleet travel even if otherwise blockaded
+    std::map<int, std::set<int>>    m_pending_system_exit_lanes;    ///< pending updates to m_preserved_system_exit_lanes
 
     friend class boost::serialization::access;
     Empire();

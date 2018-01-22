@@ -477,7 +477,7 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
                 if (next_system) {
                     //DebugLogger() << "Fleet::MovePath checking unrestriced lane travel";
                     clear_exit = clear_exit || (next_system && next_system->ID() == m_arrival_starlane) ||
-                    (empire && empire->UnrestrictedLaneTravel(cur_system->ID(), next_system->ID()));
+                    (empire && empire->PreservedLaneTravel(cur_system->ID(), next_system->ID()));
                 }
             }
             if (flag_blockades && !clear_exit) {
@@ -990,6 +990,11 @@ void Fleet::MovementPhase() {
                 if (supply_unobstructed_systems.find(SystemID()) != supply_unobstructed_systems.end()) {
                     m_arrival_starlane = SystemID();//allows departure via any starlane
                 }
+
+                // Add current system to the start of any existing route for next turn
+                if (!m_travel_route.empty() && m_travel_route.front() != SystemID())
+                    m_travel_route.push_front(SystemID());
+
                 break;
 
             } else {
@@ -1223,7 +1228,7 @@ bool Fleet::BlockadedAtSystem(int start_system_id, int dest_system_id) const {
         auto unobstructed_systems = empire->SupplyUnobstructedSystems();
         if (unobstructed_systems.find(start_system_id) != unobstructed_systems.end())
             return false;
-        if (empire->UnrestrictedLaneTravel(start_system_id, dest_system_id)) {
+        if (empire->PreservedLaneTravel(start_system_id, dest_system_id)) {
             return false;
         } else {
             //DebugLogger() << "Fleet::BlockadedAtSystem fleet " << ID() << " considering travel from system (" << start_system_id << ") to system (" << dest_system_id << ")";

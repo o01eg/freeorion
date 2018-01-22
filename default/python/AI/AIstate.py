@@ -191,7 +191,7 @@ class AIstate(object):
         Generates unique identifier.
         It is hexed number of milliseconds.
         To set self.uid use flag first=True result will be
-            number of mils between current time and some recent date
+        number of mils between current time and some recent date
         For turn result is mils between uid and current time
         """
         time_delta = (time() - 1433809768) * 1000
@@ -264,6 +264,10 @@ class AIstate(object):
             del self.fleetStatus[fleet_id]
         if fleet_id in self.__fleetRoleByID:
             del self.__fleetRoleByID[fleet_id]
+        for sys_status in self.systemStatus.values():
+            for fleet_list in [sys_status.get('myfleets', []), sys_status.get('myFleetsAccessible', [])]:
+                if fleet_id in fleet_list:
+                    fleet_list.remove(fleet_id)
 
     def __report_system_threats(self):
         """Print a table with system threats to the logfile."""

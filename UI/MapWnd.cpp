@@ -247,14 +247,14 @@ namespace {
      * objects on the lane is compressed into the space between the apparent
      * ends of the lane, but is proportional to the distance of the actual
      * position along the lane. */
-    boost::optional<std::pair<double, double>> ScreenPosOnStarane(double X, double Y, int lane_start_sys_id, int lane_end_sys_id, const LaneEndpoints& screen_lane_endpoints) {
+    boost::optional<std::pair<double, double>> ScreenPosOnStarlane(double X, double Y, int lane_start_sys_id, int lane_end_sys_id, const LaneEndpoints& screen_lane_endpoints) {
         // get endpoints of lane in universe.  may be different because on-
         // screen lanes are drawn between system circles, not system centres
         int empire_id = HumanClientApp::GetApp()->EmpireID();
         auto prev = GetEmpireKnownObject(lane_start_sys_id, empire_id);
         auto next = GetEmpireKnownObject(lane_end_sys_id, empire_id);
         if (!next || !prev) {
-            ErrorLogger() << "ScreenPosOnStarane couldn't find next system " << lane_start_sys_id << " or prev system " << lane_end_sys_id;
+            ErrorLogger() << "ScreenPosOnStarlane couldn't find next system " << lane_start_sys_id << " or prev system " << lane_end_sys_id;
             return boost::none;
         }
 
@@ -931,8 +931,8 @@ MapWnd::MovementLineData::MovementLineData(const std::list<MovePathNode>& path_,
         const LaneEndpoints& lane_endpoints = ends_it->second;
 
         // get on-screen positions of nodes shifted to fit on starlane
-        auto start_xy = ScreenPosOnStarane(prev_node_x, prev_node_y, prev_sys_id, next_sys_id, lane_endpoints);
-        auto end_xy =   ScreenPosOnStarane(node.x,      node.y,      prev_sys_id, next_sys_id, lane_endpoints);
+        auto start_xy = ScreenPosOnStarlane(prev_node_x, prev_node_y, prev_sys_id, next_sys_id, lane_endpoints);
+        auto end_xy =   ScreenPosOnStarlane(node.x,      node.y,      prev_sys_id, next_sys_id, lane_endpoints);
 
         if (!start_xy) {
             ErrorLogger() << "System " << prev_sys_id << " has invalid screen coordinates.";
@@ -4582,7 +4582,7 @@ void MapWnd::SelectFleet(std::shared_ptr<Fleet> fleet) {
 
 
     // find if there is a FleetWnd for this fleet already open.
-    auto fleet_wnd = manager.WndForFleet(fleet);
+    auto fleet_wnd = manager.WndForFleetID(fleet->ID());
 
     // if there isn't a FleetWnd for this fleet open, need to open one
     if (!fleet_wnd) {
@@ -4915,13 +4915,15 @@ boost::optional<std::pair<double, double>> MapWnd::MovingFleetMapPositionOnLane(
 
     // return apparent position of fleet on starlane
     const LaneEndpoints& screen_lane_endpoints = endpoints_it->second;
-    return ScreenPosOnStarane(fleet->X(), fleet->Y(), sys1_id, sys2_id,
+    return ScreenPosOnStarlane(fleet->X(), fleet->Y(), sys1_id, sys2_id,
                               screen_lane_endpoints);
 }
 
 namespace {
-    typedef boost::unordered_map<std::pair<int, int>, std::vector<int>> SystemXEmpireToFleetsMap;
-    typedef boost::unordered_map<std::pair<std::pair<double, double>, int>, std::vector<int>> LocationXEmpireToFleetsMap;
+    template <typename Key>
+    using KeyToFleetsMap = std::unordered_map<Key, std::vector<int>, boost::hash<Key>>;
+    using SystemXEmpireToFleetsMap = KeyToFleetsMap<std::pair<int, int>>;
+    using LocationXEmpireToFleetsMap = KeyToFleetsMap<std::pair<std::pair<double, double>, int>>;
 
     /** Return fleet if \p obj is not destroyed, not stale, a fleet and not empty.*/
     std::shared_ptr<const Fleet> IsQualifiedFleet(const std::shared_ptr<const UniverseObject>& obj,
@@ -5057,14 +5059,14 @@ void MapWnd::DeferredRefreshFleetButtons() {
         SetFleetMovementLine(fleet_button.first);
 }
 
-template <typename K>
-void MapWnd::CreateFleetButtonsOfType(
-    boost::unordered_map<K, std::unordered_set<std::shared_ptr<FleetButton>>>& type_fleet_buttons,
-    const boost::unordered_map<std::pair<K, int>, std::vector<int>> &fleets_map,
+template <typename FleetButtonMap, typename FleetsMap>
+void MapWnd::CreateFleetButtonsOfType (
+    FleetButtonMap& type_fleet_buttons,
+    const FleetsMap &fleets_map,
     const FleetButton::SizeType & fleet_button_size)
 {
     for (const auto& fleets : fleets_map) {
-        const K& key = fleets.first.first;
+        const typename FleetButtonMap::key_type& key = fleets.first.first;
 
         // buttons need fleet IDs
         const auto& fleet_IDs = fleets.second;
@@ -5557,7 +5559,6 @@ void MapWnd::PlotFleetMovement(int system_id, bool execute_move, bool append) {
 }
 
 void MapWnd::FleetButtonLeftClicked(const FleetButton* fleet_btn) {
-    //std::cout << "MapWnd::FleetButtonLeftClicked" << std::endl;
     if (!fleet_btn)
         return;
 
@@ -5573,15 +5574,12 @@ void MapWnd::FleetButtonLeftClicked(const FleetButton* fleet_btn) {
         ErrorLogger() << "Clicked FleetButton contained no fleets!";
         return;
     }
-    auto first_fleet = GetFleet(btn_fleets[0]);
-
 
     // find if a FleetWnd for this FleetButton's fleet(s) is already open, and if so, if there
     // is a single selected fleet in the window, and if so, what fleet that is
-    const auto& wnd_for_button = FleetUIManager::GetFleetUIManager().WndForFleet(first_fleet);
+    const auto& wnd_for_button = FleetUIManager::GetFleetUIManager().WndForFleetID(btn_fleets[0]);
     int already_selected_fleet_id = INVALID_OBJECT_ID;
     if (wnd_for_button) {
-        //std::cout << "FleetButtonLeftClicked found open fleetwnd for fleet" << std::endl;
         // there is already FleetWnd for this button open.
 
         // check which fleet(s) is/are selected in the button's FleetWnd
@@ -5591,8 +5589,6 @@ void MapWnd::FleetButtonLeftClicked(const FleetButton* fleet_btn) {
         // INVALID_OBJECT_ID to indicate that no single fleet is selected
         if (selected_fleet_ids.size() == 1)
             already_selected_fleet_id = *(selected_fleet_ids.begin());
-    } else {
-        //std::cout << "FleetButtonLeftClicked did not find open fleetwnd for fleet" << std::endl;
     }
 
 

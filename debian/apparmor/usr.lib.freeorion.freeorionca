@@ -1,4 +1,4 @@
-# Last Modified: Sat Jan 20 16:17:42 2018
+# Last Modified: Thu Jan 25 19:53:46 2018
 #include <tunables/global>
 
 /usr/lib/freeorion/freeorionca {
@@ -11,6 +11,7 @@
 
   deny /etc/freeorion/AI/ w,
   deny /etc/freeorion/config.ini w,
+  deny /var/lib/freeorion/save/ w,
 
   /usr/lib/freeorion/freeorionca mr,
   /usr/share/games/freeorion/default/** r,

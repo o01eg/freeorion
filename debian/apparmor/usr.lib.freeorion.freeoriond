@@ -1,4 +1,4 @@
-# Last Modified: Sat Jan 20 20:54:02 2018
+# Last Modified: Thu Jan 25 19:53:46 2018
 #include <tunables/global>
 
 /usr/lib/freeorion/freeoriond {
@@ -16,8 +16,9 @@
   /usr/lib/freeorion/freeoriond mr,
   /usr/local/bin/sendxmpp Ux,
   /usr/share/games/freeorion/default/** r,
-  /var/lib/freeorion/save/ w,
-  /var/lib/freeorion/save/*.mps w,
+  /var/lib/freeorion/save/ rw,
+  /var/lib/freeorion/save/**.mps rw,
+  /var/lib/freeorion/save/*/ rw,
   /var/log/freeorion/freeoriond.log w,
 
 }

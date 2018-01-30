@@ -229,11 +229,15 @@ def generate_production_orders():
             claimed_stars.setdefault(t_sys.starType, []).append(sys_id)
 
     if current_turn == 1 and len(AIstate.opponentPlanetIDs) == 0 and len(production_queue) == 0:
-        best_design_id, _, build_choices = get_best_ship_info(PriorityType.PRODUCTION_EXPLORATION)
-        if best_design_id is not None:
-            for _ in range(3):
-                fo.issueEnqueueShipProductionOrder(best_design_id, build_choices[0])
-            fo.updateProductionQueue()
+        init_build_nums = [(PriorityType.PRODUCTION_EXPLORATION, 2),
+                           (PriorityType.PRODUCTION_OUTPOST, 1),
+                           ]
+        for ship_type, num_ships in init_build_nums:
+            best_design_id, _, build_choices = get_best_ship_info(ship_type)
+            if best_design_id is not None:
+                for _ in range(num_ships):
+                    fo.issueEnqueueShipProductionOrder(best_design_id, build_choices[0])
+                fo.updateProductionQueue()
 
     building_expense = 0.0
     building_ratio = foAI.foAIstate.character.preferred_building_ratio([0.4, 0.35, 0.30])
@@ -314,6 +318,8 @@ def generate_production_orders():
                     if res:
                         cost, time = empire.productionCostAndTime(production_queue[production_queue.size - 1])
                         building_expense += cost / time
+                        res = fo.issueRequeueProductionOrder(production_queue.size - 1, 0)  # move to front
+                        print "Requeueing %s to front of build queue, with result %d" % ("BLD_AUTO_HISTORY_ANALYSER", res)
 
             # TODO: check existence of BLD_INDUSTRY_CENTER (and other buildings) in other locations in case we captured it
             if (total_pp > 40 or ((current_turn > 40) and (state.population_with_industry_focus() >= 20))) and ("BLD_INDUSTRY_CENTER" in possible_building_types) and ("BLD_INDUSTRY_CENTER" not in (capital_buildings+queued_building_names)) and (building_expense < building_ratio*total_pp):
@@ -1081,9 +1087,15 @@ def generate_production_orders():
         else:
             warn("Failed enqueueing %s at planet %s, got result %d" % (building_name, planet, res))
 
-    queued_clny_bld_locs = [element.locationID for element in production_queue if element.name.startswith('BLD_COL_')]
-    colony_bldg_entries = ([entry for entry in foAI.foAIstate.colonisablePlanetIDs.items() if entry[1][0] > 60 and
-                           entry[0] not in queued_clny_bld_locs and entry[0] in state.get_empire_outposts()]
+    # ignore acquired-under-construction colony buildings for which our empire lacks the species
+    queued_clny_bld_locs = [element.locationID for element in production_queue
+                            if (element.name.startswith('BLD_COL_') and
+                                empire_has_colony_bld_species(element.name))]
+    colony_bldg_entries = ([entry for entry in foAI.foAIstate.colonisablePlanetIDs.items() if
+                                entry[1][0] > 60 and
+                                entry[0] not in queued_clny_bld_locs and
+                                entry[0] in state.get_empire_outposts() and
+                                not already_has_completed_colony_building(entry[0])]
                            [:PriorityAI.allottedColonyTargets+2])
     for entry in colony_bldg_entries:
         pid = entry[0]
@@ -1436,6 +1448,25 @@ def update_stockpile_use():
             planets_in_stockpile_enabled_group.update(group)
 
 
+def empire_has_colony_bld_species(building_name):
+    """Checks if this building is a colony building for which this empire has the required source species available.
+    :rtype: bool
+    """
+    if not building_name.startswith('BLD_COL_'):
+        return False
+    species_name = 'SP_' + building_name.split('BLD_COL_')[1]
+    return species_name in ColonisationAI.empire_colonizers
+
+
+def already_has_completed_colony_building(planet_id):
+    """Checks if a planet has an already-completed (but not yet 'hatched') colony building.
+    :rtype: bool
+    """
+    universe = fo.getUniverse()
+    planet = universe.getPlanet(planet_id)
+    return any(universe.getBuilding(bldg).name.startswith('BLD_COL_') for bldg in planet.buildingIDs)
+
+
 def build_ship_facilities(bld_name, best_pilot_facilities, top_locs=None):
     if top_locs is None:
         top_locs = []
@@ -1542,20 +1573,6 @@ def find_automatic_historic_analyzer_candidates():
 
     min_pp, turn_trigger, min_pp_per_additional = conditions.get(foAI.foAIstate.character.get_trait(Aggression).key,
                                                                  (ARB_LARGE_NUMBER, ARB_LARGE_NUMBER, ARB_LARGE_NUMBER))
-    # If we can colonize good planets instead, do not build this.
-    num_colony_targets = 0
-    for pid in ColonisationAI.all_colony_opportunities:
-        try:
-            best_species_score = ColonisationAI.all_colony_opportunities[pid][0][0]
-        except IndexError:
-            continue
-        if best_species_score > 500:
-            num_colony_targets += 1
-
-    num_covered = get_number_of_existing_outpost_and_colony_ships() + get_number_of_queued_outpost_and_colony_ships()
-    remaining_targets = num_colony_targets - num_covered
-    min_pp *= remaining_targets
-
     max_enqueued = 1 if total_pp > min_pp or fo.currentTurn() > turn_trigger else 0
     max_enqueued += int(total_pp / min_pp_per_additional)
 

@@ -168,7 +168,7 @@ namespace {
     void SetGLVersionDependentOptionDefaults() {
         // get OpenGL version string and parse to get version number
         float version_number = GetGLVersion();
-        DebugLogger() << "OpenGL Version Number: " << DoubleToString(version_number, 2, false);    // combination of floating point precision and DoubleToString preferring to round down means the +0.05 is needed to round properly
+        DebugLogger() << "OpenGL Version Number: " << DoubleToString(version_number, 2, false);
         if (version_number < 2.0) {
             ErrorLogger() << "OpenGL Version is less than 2.0. FreeOrion may crash when trying to start a game.";
         }
@@ -539,7 +539,7 @@ void HumanClientApp::NewSinglePlayerGame(bool quickstart) {
         // from just having run GalaxySetupWnd
 
         // GalaxySetupData
-        setup_data.m_seed = GetOptionsDB().Get<std::string>("setup.seed");
+        setup_data.SetSeed(GetOptionsDB().Get<std::string>("setup.seed"));
         setup_data.m_size = GetOptionsDB().Get<int>("setup.star.count");
         setup_data.m_shape = GetOptionsDB().Get<Shape>("setup.galaxy.shape");
         setup_data.m_age = GetOptionsDB().Get<GalaxySetupOption>("setup.galaxy.age");

@@ -433,13 +433,30 @@ FleetWnd* FleetUIManager::ActiveFleetWnd() const
 
 std::shared_ptr<FleetWnd> FleetUIManager::WndForFleetID(int fleet_id) const {
     std::shared_ptr<FleetWnd> retval = nullptr;
-    GG::ProcessThenRemoveExpiredPtrs(m_fleet_wnds,
-                                 [&retval, fleet_id](std::shared_ptr<FleetWnd>& wnd)
-                                 {
-                                     if (!retval && wnd->ContainsFleet(fleet_id))
-                                         retval = wnd;
-                                 });
+    GG::ProcessThenRemoveExpiredPtrs(
+        m_fleet_wnds,
+        [&retval, fleet_id](std::shared_ptr<FleetWnd>& wnd)
+        {
+            if (!retval && wnd->ContainsFleet(fleet_id))
+                retval = wnd;
+        });
     return retval;
+}
+
+std::shared_ptr<FleetWnd> FleetUIManager::WndForFleetIDs(const std::vector<int>& fleet_ids_) const {
+    std::unordered_set<int> fleet_ids;
+    for (const auto id : fleet_ids_)
+        fleet_ids.insert(id);
+    std::shared_ptr<FleetWnd> retval = nullptr;
+    GG::ProcessThenRemoveExpiredPtrs(
+        m_fleet_wnds,
+        [&retval, fleet_ids](std::shared_ptr<FleetWnd>& wnd)
+        {
+            if (!retval && wnd->ContainsFleets(fleet_ids))
+                retval = wnd;
+        });
+    return retval;
+
 }
 
 int FleetUIManager::SelectedShipID() const {
@@ -461,9 +478,11 @@ std::set<int> FleetUIManager::SelectedShipIDs() const {
     return active_wnd->SelectedShipIDs();
 }
 
-std::shared_ptr<FleetWnd> FleetUIManager::NewFleetWnd(const std::vector<int>& fleet_ids,
-                                      int selected_fleet_id/* = INVALID_OBJECT_ID*/,
-                                      GG::Flags<GG::WndFlag> flags/* = GG::INTERACTIVE | GG::DRAGABLE | GG::ONTOP | CLOSABLE | GG::RESIZABLE*/)
+std::shared_ptr<FleetWnd> FleetUIManager::NewFleetWnd(
+    const std::vector<int>& fleet_ids,
+    double allowed_bounding_box_leeway /*= 0*/,
+    int selected_fleet_id/* = INVALID_OBJECT_ID*/,
+    GG::Flags<GG::WndFlag> flags/* = GG::INTERACTIVE | GG::DRAGABLE | GG::ONTOP | CLOSABLE | GG::RESIZABLE*/)
 {
     std::string config_name = "";
     if (!GetOptionsDB().Get<bool>("ui.fleet.multiple.enabled")) {
@@ -471,7 +490,7 @@ std::shared_ptr<FleetWnd> FleetUIManager::NewFleetWnd(const std::vector<int>& fl
         // Only write to OptionsDB if in single fleet window mode.
         config_name = FLEET_WND_NAME;
     }
-    auto retval = GG::Wnd::Create<FleetWnd>(fleet_ids, m_order_issuing_enabled, selected_fleet_id, flags, config_name);
+    auto retval = GG::Wnd::Create<FleetWnd>(fleet_ids, m_order_issuing_enabled, allowed_bounding_box_leeway, selected_fleet_id, flags, config_name);
 
     m_fleet_wnds.insert(std::weak_ptr<FleetWnd>(retval));
     retval->ClosingSignal.connect(
@@ -2434,7 +2453,7 @@ public:
     std::set<int>   SelectedShipIDs() const;    ///< returns ids of ships selected in the detail panel's ShipsListBox
 
     void            SetFleet(int fleet_id);                         ///< sets the currently-displayed Fleet.  setting to INVALID_OBJECT_ID shows no fleet
-    void            SetSelectedShips(const std::set<int>& ship_ids);///< sets the currently-selected ships in the ships list
+    void            SelectShips(const std::set<int>& ship_ids);///< sets the currently-selected ships in the ships list
 
     void            Refresh();
 
@@ -2526,7 +2545,7 @@ void FleetDetailPanel::SetFleet(int fleet_id) {
     }
 }
 
-void FleetDetailPanel::SetSelectedShips(const std::set<int>& ship_ids) {
+void FleetDetailPanel::SelectShips(const std::set<int>& ship_ids) {
     const GG::ListBox::SelectionSet initial_selections = m_ships_lb->Selections();
 
     m_ships_lb->DeselectAll();
@@ -2535,7 +2554,7 @@ void FleetDetailPanel::SetSelectedShips(const std::set<int>& ship_ids) {
     for (auto it = m_ships_lb->begin(); it != m_ships_lb->end(); ++it) {
         ShipRow* row = dynamic_cast<ShipRow*>(it->get());
         if (!row) {
-            ErrorLogger() << "FleetDetailPanel::SetSelectedShips couldn't cast a listbow row to ShipRow?";
+            ErrorLogger() << "FleetDetailPanel::SelectShips couldn't cast a list row to ShipRow?";
             continue;
         }
 
@@ -2769,10 +2788,32 @@ int FleetDetailPanel::ShipInRow(GG::ListBox::iterator it) const {
 ////////////////////////////////////////////////
 // FleetWnd
 ////////////////////////////////////////////////
-FleetWnd::FleetWnd(const std::vector<int>& fleet_ids, bool order_issuing_enabled,
-         int selected_fleet_id/* = INVALID_OBJECT_ID*/,
-         GG::Flags<GG::WndFlag> flags/* = INTERACTIVE | DRAGABLE | ONTOP | CLOSABLE | RESIZABLE*/,
-         const std::string& config_name) :
+namespace {
+    /** \p create or grow a bounding \p box from \p pt. */
+    GG::Rect CreateOrGrowBox(bool create, const GG::Rect box, const GG::Pt pt) {
+        if (create)
+            return GG::Rect(pt, pt);
+        else
+            return GG::Rect(
+                std::min(box.Left(),    pt.x),
+                std::min(box.Top(),     pt.y),
+                std::max(box.Right(),   pt.x),
+                std::max(box.Bottom(),  pt.y));
+    }
+
+    /** Is \p ll smaller or equal to the size of \p rr? */
+    bool SmallerOrEqual(GG::Rect ll, GG::Rect rr) {
+        return (ll.Width() <= rr.Width() && ll.Height() <= rr.Height());
+    }
+}
+
+FleetWnd::FleetWnd(
+    const std::vector<int>& fleet_ids, bool order_issuing_enabled,
+    double allowed_bounding_box_leeway /*= 0*/,
+    int selected_fleet_id/* = INVALID_OBJECT_ID*/,
+    GG::Flags<GG::WndFlag> flags/* = INTERACTIVE | DRAGABLE | ONTOP | CLOSABLE | RESIZABLE*/,
+    const std::string& config_name
+) :
     MapWndPopup("", flags | GG::RESIZABLE, config_name),
     m_fleet_ids(),
     m_empire_id(ALL_EMPIRES),
@@ -2798,6 +2839,24 @@ FleetWnd::FleetWnd(const std::vector<int>& fleet_ids, bool order_issuing_enabled
         ErrorLogger() << "FleetWnd::FleetWnd couldn't find requested selected fleet with id " << selected_fleet_id;
         selected_fleet_id = INVALID_OBJECT_ID;
     }
+
+    // Determine the size of the bounding box containing the fleets, plus the leeway
+    bool is_first_fleet = true;
+    for (int fleet_id : m_fleet_ids) {
+        auto fleet = GetFleet(fleet_id);
+        if (!fleet)
+            continue;
+
+        auto fleet_loc = GG::Pt(GG::X(fleet->X()), GG::Y(fleet->Y()));
+        // Grow the fleets bounding box
+        m_bounding_box = CreateOrGrowBox(is_first_fleet, m_bounding_box, fleet_loc);
+        is_first_fleet = false;
+    }
+    m_bounding_box = GG::Rect(m_bounding_box.UpperLeft(),
+                              m_bounding_box.LowerRight()
+                              + GG::Pt(GG::X(allowed_bounding_box_leeway),
+                                       GG::Y(allowed_bounding_box_leeway)));
+
     m_fleet_detail_panel = GG::Wnd::Create<FleetDetailPanel>(GG::X1, GG::Y1, selected_fleet_id, m_order_issuing_enabled);
 }
 
@@ -2992,6 +3051,7 @@ void FleetWnd::Refresh() {
 
     // Check all fleets in initial_fleet_ids and keep those that exist.
     std::unordered_set<int> fleets_that_exist;
+    GG::Rect fleets_bounding_box;
     for (int fleet_id : initial_fleet_ids) {
         // skip known destroyed and stale info objects
         if (this_client_known_destroyed_objects.find(fleet_id) != this_client_known_destroyed_objects.end())
@@ -3003,13 +3063,18 @@ void FleetWnd::Refresh() {
         if (!fleet)
             continue;
 
+        auto fleet_loc = GG::Pt(GG::X(fleet->X()), GG::Y(fleet->Y()));
+        // Grow the fleets bounding box
+        fleets_bounding_box = CreateOrGrowBox(fleets_that_exist.empty(), fleets_bounding_box, fleet_loc);
+
         fleets_that_exist.insert(fleet_id);
-        fleet_locations_ids.insert({{fleet->SystemID(), GG::Pt(GG::X(fleet->X()), GG::Y(fleet->Y()))},
-                                    fleet_id});
+        fleet_locations_ids.insert({{fleet->SystemID(), fleet_loc}, fleet_id});
 
     }
+    auto bounding_box_center = GG::Pt(fleets_bounding_box.MidX(), fleets_bounding_box.MidY());
 
     // Filter initially selected fleets according to existing fleets
+    GG::Rect selected_fleets_bounding_box;
     for (int fleet_id : initially_selected_fleets) {
         if (!fleets_that_exist.count(fleet_id))
             continue;
@@ -3018,34 +3083,66 @@ void FleetWnd::Refresh() {
         if (!fleet)
             continue;
 
-        selected_fleet_locations_ids.insert(
-            {{fleet->SystemID(), GG::Pt(GG::X(fleet->X()), GG::Y(fleet->Y()))},
-             fleet_id});
+        auto fleet_loc = GG::Pt(GG::X(fleet->X()), GG::Y(fleet->Y()));
+
+        // Grow the selected fleets bounding box
+        selected_fleets_bounding_box = CreateOrGrowBox(
+            selected_fleet_locations_ids.empty(), selected_fleets_bounding_box, fleet_loc);
+        selected_fleet_locations_ids.insert({{fleet->SystemID(), fleet_loc}, fleet_id});
     }
+    auto selected_bounding_box_center = GG::Pt(selected_fleets_bounding_box.MidX(), selected_fleets_bounding_box.MidY());
 
     // Determine FleetWnd location.
 
-    // Are all fleets in one location?  Use that location.
-    // Otherwise, are all selected fleets in one location?  Use that location.
+    // Are all fleets in one system?  Use that location.
+    // Otherwise, are all selected fleets in one system?  Use that location.
+    // Otherwise, are all the moving fleets clustered within m_bounding_box of each other?
+    // Otherwise, are all the selected fleets clustered within m_bounding_box of each other?
     // Otherwise, is the current location a system?  Use that location.
     // Otherwise remove all fleets as all fleets have gone in separate directions.
 
     std::pair<int, GG::Pt> location{INVALID_OBJECT_ID, GG::Pt(GG::X0, GG::Y0)};
     if (!fleet_locations_ids.empty()
+        && fleet_locations_ids.begin()->first.first != INVALID_OBJECT_ID
         && (fleet_locations_ids.count(fleet_locations_ids.begin()->first) == fleet_locations_ids.size()))
     {
         location = fleet_locations_ids.begin()->first;
 
     } else if (!selected_fleet_locations_ids.empty()
-             && (selected_fleet_locations_ids.count(selected_fleet_locations_ids.begin()->first)
-                 == selected_fleet_locations_ids.size()))
+               && selected_fleet_locations_ids.begin()->first.first != INVALID_OBJECT_ID
+               && (selected_fleet_locations_ids.count(selected_fleet_locations_ids.begin()->first)
+                   == selected_fleet_locations_ids.size()))
     {
         location = selected_fleet_locations_ids.begin()->first;
 
-    } else if (auto system = GetSystem(m_system_id))
+    } else if (!fleet_locations_ids.empty()
+               && SmallerOrEqual(fleets_bounding_box, m_bounding_box))
+    {
+        location = {INVALID_OBJECT_ID, bounding_box_center};
+        boost::unordered_multimap<std::pair<int, GG::Pt>, int> fleets_near_enough;
+        for (const auto& loc_and_id: fleet_locations_ids)
+            fleets_near_enough.insert({location, loc_and_id.second});
+        fleet_locations_ids.swap(fleets_near_enough);
+
+    } else if (!selected_fleet_locations_ids.empty()
+               && SmallerOrEqual(selected_fleets_bounding_box, m_bounding_box))
+    {
+        location = {INVALID_OBJECT_ID, selected_bounding_box_center};
+        boost::unordered_multimap<std::pair<int, GG::Pt>, int> fleets_near_enough;
+        // Center bounding box on selected fleets.
+        m_bounding_box = m_bounding_box
+            + GG::Pt(selected_fleets_bounding_box.MidX() - m_bounding_box.MidX(),
+                    selected_fleets_bounding_box.MidY() - m_bounding_box.MidY());
+        for (const auto& loc_and_id: fleet_locations_ids) {
+            const auto& pos = loc_and_id.first.second;
+            if (m_bounding_box.Contains(pos))
+                fleets_near_enough.insert({location, loc_and_id.second});
+        }
+        fleet_locations_ids.swap(fleets_near_enough);
+    } else if (auto system = GetSystem(m_system_id)) {
         location = {m_system_id, GG::Pt(GG::X(system->X()), GG::Y(system->Y()))};
 
-    else {
+    } else {
         fleet_locations_ids.clear();
         selected_fleet_locations_ids.clear();
     }
@@ -3091,16 +3188,16 @@ void FleetWnd::Refresh() {
 
     if (!still_present_initially_selected_fleets.empty()) {
         // reselect any previously-selected fleets
-        this->SetSelectedFleets(still_present_initially_selected_fleets);
+        SelectFleets(still_present_initially_selected_fleets);
         // reselect any previously-selected ships
-        this->SetSelectedShips(initially_selected_ships);
+        SelectShips(initially_selected_ships);
     } else if (!m_fleets_lb->Empty()) {
         // default select first fleet
         int first_fleet_id = FleetInRow(m_fleets_lb->begin());
         if (first_fleet_id != INVALID_OBJECT_ID) {
             std::set<int> fleet_id_set;
             fleet_id_set.insert(first_fleet_id);
-            this->SetSelectedFleets(fleet_id_set);
+            SelectFleets(fleet_id_set);
         }
     }
 
@@ -3209,10 +3306,15 @@ void FleetWnd::AddFleet(int fleet_id) {
     row->Resize(row_size);
 }
 
+void FleetWnd::DeselectAllFleets() {
+    m_fleets_lb->DeselectAll();
+    FleetSelectionChanged(m_fleets_lb->Selections());
+}
+
 void FleetWnd::SelectFleet(int fleet_id) {
     if (fleet_id == INVALID_OBJECT_ID || !(GetFleet(fleet_id))) {
-        m_fleets_lb->DeselectAll();
-        FleetSelectionChanged(m_fleets_lb->Selections());
+        ErrorLogger() << "FleetWnd::SelectFleet invalid id " << fleet_id;
+        DeselectAllFleets();
         return;
     }
 
@@ -3230,7 +3332,7 @@ void FleetWnd::SelectFleet(int fleet_id) {
     }
 }
 
-void FleetWnd::SetSelectedFleets(const std::set<int>& fleet_ids) {
+void FleetWnd::SelectFleets(const std::set<int>& fleet_ids) {
     const GG::ListBox::SelectionSet initial_selections = m_fleets_lb->Selections();
     m_fleets_lb->DeselectAll();
 
@@ -3238,7 +3340,7 @@ void FleetWnd::SetSelectedFleets(const std::set<int>& fleet_ids) {
     for (auto it = m_fleets_lb->begin(); it != m_fleets_lb->end(); ++it) {
         FleetRow* row = dynamic_cast<FleetRow*>(it->get());
         if (!row) {
-            ErrorLogger() << "FleetWnd::SetSelectedFleets couldn't cast a listbow row to FleetRow?";
+            ErrorLogger() << "FleetWnd::SelectFleets couldn't cast a list row to FleetRow?";
             continue;
         }
 
@@ -3255,8 +3357,8 @@ void FleetWnd::SetSelectedFleets(const std::set<int>& fleet_ids) {
         FleetSelectionChanged(sels);
 }
 
-void FleetWnd::SetSelectedShips(const std::set<int>& ship_ids)
-{ m_fleet_detail_panel->SetSelectedShips(ship_ids); }
+void FleetWnd::SelectShips(const std::set<int>& ship_ids)
+{ m_fleet_detail_panel->SelectShips(ship_ids); }
 
 void FleetWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
     GG::Pt old_size = Size();
@@ -3278,6 +3380,26 @@ bool FleetWnd::ContainsFleet(int fleet_id) const {
             return true;
     }
     return false;
+}
+
+template <typename Set>
+bool FleetWnd::ContainsFleets(const Set& fleet_ids_) const {
+    if (fleet_ids_.empty())
+        return false;
+
+    auto fleet_ids = fleet_ids_;
+
+    // Remove found ids from fleet_ids.  If fleet_ids is empty, all have been found.
+    for (auto it = m_fleets_lb->begin(); it != m_fleets_lb->end(); ++it) {
+        auto fleet = GetFleet(FleetInRow(it));
+        if (fleet)
+            fleet_ids.erase(fleet->ID());
+
+        if (fleet_ids.empty())
+            return true;
+    }
+
+    return fleet_ids.empty();
 }
 
 const std::set<int>& FleetWnd::FleetIDs() const
@@ -3732,7 +3854,7 @@ void FleetWnd::CreateNewFleetFromDrops(const std::vector<int>& ship_ids) {
 
     // deselect all ships so that response to fleet rearrangement doesn't attempt
     // to get the selected ships that are no longer in their old fleet.
-    m_fleet_detail_panel->SetSelectedShips(std::set<int>());
+    m_fleet_detail_panel->SelectShips(std::set<int>());
 
     CreateNewFleetFromShips(ship_ids, aggression);
 }
@@ -3741,10 +3863,11 @@ void FleetWnd::ShipSelectionChanged(const GG::ListBox::SelectionSet& rows)
 { SelectedShipsChangedSignal(); }
 
 void FleetWnd::UniverseObjectDeleted(std::shared_ptr<const UniverseObject> obj) {
-    // check if deleted object was a fleet.  if not, abort.
+    // check if deleted object was a fleet.  The universe signals for all
+    // object types, not just fleets.
     std::shared_ptr<const Fleet> deleted_fleet = std::dynamic_pointer_cast<const Fleet>(obj);
     if (!deleted_fleet)
-        return; // TODO: Why exactly does this function not just take a Fleet instead of a UniverseObject?  Maybe rename to FleetDeleted?
+        return;
 
     // if detail panel is showing the deleted fleet, reset to show nothing
     if (GetFleet(m_fleet_detail_panel->FleetID()) == deleted_fleet)

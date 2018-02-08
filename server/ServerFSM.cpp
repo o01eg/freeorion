@@ -109,7 +109,7 @@ namespace {
             case Networking::CLIENT_TYPE_AI_PLAYER:         ss << "AI_PLAYER, ";    break;
             case Networking::CLIENT_TYPE_HUMAN_MODERATOR:   ss << "MODERATOR, ";    break;
             case Networking::CLIENT_TYPE_HUMAN_OBSERVER:    ss << "OBSERVER, ";     break;
-            case Networking::CLIENT_TYPE_HUMAN_PLAYER:      ss << "HUMAN_PLAYER, "; break;
+            case Networking::CLIENT_TYPE_HUMAN_PLAYER:      ss << "PLAYER, "; break;
             default:                                        ss << "<invalid client type>, ";
             }
             ss << entry.second.m_starting_species_name;
@@ -649,10 +649,36 @@ sc::result MPLobby::react(const Disconnection& d) {
 void MPLobby::EstablishPlayer(const PlayerConnectionPtr& player_connection,
                               const std::string& player_name,
                               Networking::ClientType client_type,
-                              const std::string& client_version_string)
+                              const std::string& client_version_string,
+                              const Networking::AuthRoles& roles)
 {
     ServerApp& server = Server();
     const SpeciesManager& sm = GetSpeciesManager();
+
+    player_connection->SetAuthRoles(roles);
+
+    // check client types and roles
+    if (client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER &&
+        !player_connection->HasAuthRole(Networking::ROLE_CLIENT_TYPE_PLAYER))
+    {
+        client_type = Networking::INVALID_CLIENT_TYPE;
+    }
+    if (client_type == Networking::CLIENT_TYPE_HUMAN_OBSERVER &&
+        !player_connection->HasAuthRole(Networking::ROLE_CLIENT_TYPE_OBSERVER))
+    {
+        client_type = Networking::INVALID_CLIENT_TYPE;
+    }
+    if (client_type == Networking::CLIENT_TYPE_HUMAN_MODERATOR &&
+        !player_connection->HasAuthRole(Networking::ROLE_CLIENT_TYPE_MODERATOR))
+    {
+        client_type = Networking::INVALID_CLIENT_TYPE;
+    }
+
+    if (client_type == Networking::INVALID_CLIENT_TYPE) {
+        player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_CLIENT_TYPE_NOT_ALLOWED"), true));
+        server.Networking().Disconnect(player_connection);
+        return;
+    }
 
     // assign unique player ID to newly connected player
     int player_id = server.m_networking.NewPlayerID();
@@ -712,16 +738,6 @@ void MPLobby::EstablishPlayer(const PlayerConnectionPtr& player_connection,
 
     ValidateClientLimits();
 
-    player_connection->SetAuthRoles({
-                    Networking::ROLE_CLIENT_TYPE_MODERATOR,
-                    Networking::ROLE_CLIENT_TYPE_PLAYER,
-                    Networking::ROLE_CLIENT_TYPE_OBSERVER
-                    });
-
-    if (m_lobby_data->m_any_can_edit) {
-        player_connection->SetAuthRole(Networking::ROLE_GALAXY_SETUP);
-    }
-
     for (auto it = server.m_networking.established_begin();
          it != server.m_networking.established_end(); ++it)
     { (*it)->SendMessage(ServerLobbyUpdateMessage(*m_lobby_data)); }
@@ -762,7 +778,8 @@ sc::result MPLobby::react(const JoinGame& msg) {
     std::string client_version_string;
     ExtractJoinGameMessageData(message, player_name, client_type, client_version_string);
 
-    if (client_type != Networking::CLIENT_TYPE_AI_PLAYER && server.IsAuthRequired(player_name)) {
+    Networking::AuthRoles roles;
+    if (client_type != Networking::CLIENT_TYPE_AI_PLAYER && server.IsAuthRequiredOrFillRoles(player_name, roles)) {
         // send authentication request
         player_connection->AwaitPlayer(client_type, client_version_string);
         player_connection->SendMessage(AuthRequestMessage(player_name, "PLAIN-TEXT"));
@@ -786,7 +803,8 @@ sc::result MPLobby::react(const JoinGame& msg) {
     std::size_t t = 1;
     while (t <= m_lobby_data->m_players.size() + 1 && collision) {
         collision = false;
-        if (!server.IsAvailableName(new_player_name) || server.IsAuthRequired(new_player_name)) {
+        roles.Clear();
+        if (!server.IsAvailableName(new_player_name) || server.IsAuthRequiredOrFillRoles(new_player_name, roles)) {
             collision = true;
         } else {
             for (auto& plr : m_lobby_data->m_players) {
@@ -811,7 +829,7 @@ sc::result MPLobby::react(const JoinGame& msg) {
     player_name = new_player_name;
 
     DebugLogger(FSM) << "(ServerFSM) MPLobby.JoinGame player accepted: " << player_name;
-    EstablishPlayer(player_connection, player_name, client_type, client_version_string);
+    EstablishPlayer(player_connection, player_name, client_type, client_version_string, roles);
 
 
     return discard_event();
@@ -827,7 +845,9 @@ sc::result MPLobby::react(const AuthResponse& msg) {
     std::string auth;
     ExtractAuthResponseMessageData(message, player_name, auth);
 
-    if (!server.IsAuthSuccess(player_name, auth)) {
+    Networking::AuthRoles roles;
+
+    if (!server.IsAuthSuccessAndFillRoles(player_name, auth, roles)) {
         // wrong password
         player_connection->SendMessage(ErrorMessage(str(FlexibleFormat(UserString("ERROR_WRONG_PASSWORD")) % player_name),
                                                     true));
@@ -841,7 +861,8 @@ sc::result MPLobby::react(const AuthResponse& msg) {
     EstablishPlayer(player_connection,
                     player_name,
                     client_type,
-                    player_connection->ClientVersionString());
+                    player_connection->ClientVersionString(),
+                    roles);
 
     return discard_event();
 }
@@ -1716,7 +1737,9 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
         }
 
     } else if (client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER) {
-        if (server.IsAuthRequired(player_name)) {
+        // if we don't need to authenticate player we got default roles here
+        Networking::AuthRoles roles;
+        if (server.IsAuthRequiredOrFillRoles(player_name, roles)) {
             // send authentication request
             player_connection->AwaitPlayer(client_type, client_version_string);
             player_connection->SendMessage(AuthRequestMessage(player_name, "PLAIN-TEXT"));
@@ -1735,10 +1758,8 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
 
             // Remove AI prefix to distinguish Human from AI.
             std::string ai_prefix = UserString("AI_PLAYER") + "_";
-            if (client_type != Networking::CLIENT_TYPE_AI_PLAYER) {
-                while (player_name.compare(0, ai_prefix.size(), ai_prefix) == 0)
-                    player_name.erase(0, ai_prefix.size());
-            }
+            while (player_name.compare(0, ai_prefix.size(), ai_prefix) == 0)
+                player_name.erase(0, ai_prefix.size());
             if(player_name.empty())
                 player_name = "_";
 
@@ -1748,7 +1769,8 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
             std::size_t t = 1;
             while (t <= m_lobby_data->m_players.size() + 1 && collision) {
                 collision = false;
-                if (!server.IsAvailableName(new_player_name) || server.IsAuthRequired(new_player_name)) {
+                roles.Clear();
+                if (!server.IsAvailableName(new_player_name) || server.IsAuthRequiredOrFillRoles(new_player_name, roles)) {
                     collision = true;
                 } else {
                     for (std::pair<int, PlayerSetupData>& plr : m_lobby_data->m_players) {
@@ -1770,10 +1792,17 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
                 return discard_event();
             }
 
+            if (!player_connection->HasAuthRole(Networking::ROLE_CLIENT_TYPE_PLAYER)) {
+                player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_CLIENT_TYPE_NOT_ALLOWED"), true));
+                server.Networking().Disconnect(player_connection);
+                return discard_event();
+            }
+
             player_name = new_player_name;
 
             // expected human player
             player_connection->EstablishPlayer(player_id, player_name, client_type, client_version_string);
+            player_connection->SetAuthRoles(roles);
             player_connection->SendMessage(JoinAckMessage(player_id));
         }
     } else {
@@ -1799,7 +1828,9 @@ sc::result WaitingForMPGameJoiners::react(const AuthResponse& msg) {
     std::string auth;
     ExtractAuthResponseMessageData(message, player_name, auth);
 
-    if (!server.IsAuthSuccess(player_name, auth)) {
+    Networking::AuthRoles roles;
+
+    if (!server.IsAuthSuccessAndFillRoles(player_name, auth, roles)) {
         // wrong password
         player_connection->SendMessage(ErrorMessage(str(FlexibleFormat(UserString("ERROR_WRONG_PASSWORD")) % player_name),
                                                     true));
@@ -1832,8 +1863,16 @@ sc::result WaitingForMPGameJoiners::react(const AuthResponse& msg) {
             server.m_networking.Disconnect(player_connection);
         } else {
             // expected human player
+
+            if (!player_connection->HasAuthRole(Networking::ROLE_CLIENT_TYPE_PLAYER)) {
+                player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_CLIENT_TYPE_NOT_ALLOWED"), true));
+                server.Networking().Disconnect(player_connection);
+                return discard_event();
+            }
+
             int player_id = server.m_networking.NewPlayerID();
             player_connection->EstablishPlayer(player_id, player_name, client_type, player_connection->ClientVersionString());
+            player_connection->SetAuthRoles(roles);
             player_connection->SendMessage(JoinAckMessage(player_id));
         }
     } else {

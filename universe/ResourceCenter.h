@@ -23,9 +23,7 @@ class FO_COMMON_API ResourceCenter : virtual public std::enable_shared_from_this
 public:
     /** \name Structors */ //@{
     ResourceCenter();
-
     ResourceCenter(const ResourceCenter& rhs);
-
     virtual ~ResourceCenter();
     //@}
 
@@ -39,7 +37,6 @@ public:
 
     virtual float   InitialMeterValue(MeterType type) const = 0;            ///< implementation should return the initial value of the specified meter \a type
     virtual float   CurrentMeterValue(MeterType type) const = 0;            ///< implementation should return the current value of the specified meter \a type
-    virtual float   NextTurnCurrentMeterValue(MeterType type) const = 0;    ///< implementation should return an estimate of the next turn's current value of the specified meter \a type
 
     /** the state changed signal object for this ResourceCenter */
     mutable boost::signals2::signal<void ()> ResourceCenterChangedSignal;
@@ -47,7 +44,6 @@ public:
 
     /** \name Mutators */ //@{
     void Copy(std::shared_ptr<const ResourceCenter> copied_object, Visibility vis);
-
     void Copy(std::shared_ptr<const ResourceCenter> copied_object);
 
     void SetFocus(const std::string& focus);

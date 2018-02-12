@@ -11,6 +11,7 @@
 #include "ValueRef.h"
 #include "Enums.h"
 #include "../util/Logger.h"
+#include "../util/MultiplayerCommon.h"
 #include "../util/OptionsDB.h"
 #include "../util/Random.h"
 #include "../util/Directories.h"
@@ -97,7 +98,7 @@ void Planet::Copy(std::shared_ptr<const UniverseObject> copied_object, int empir
 
     int copied_object_id = copied_object->ID();
     Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(copied_object_id, empire_id);
-    std::set<std::string> visible_specials = GetUniverse().GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
+    auto visible_specials = GetUniverse().GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
 
     UniverseObject::Copy(copied_object, vis, visible_specials);
     PopCenter::Copy(copied_planet, vis);
@@ -200,15 +201,16 @@ std::string Planet::Dump(unsigned short ntabs) const {
     return os.str();
 }
 
-int Planet::SizeAsInt() const {
+int Planet::HabitableSize() const {
+    const auto& gr = GetGameRules();
     switch (m_size) {
-    case SZ_GASGIANT:   return 6;   break;
-    case SZ_HUGE:       return 5;   break;
-    case SZ_LARGE:      return 4;   break;
-    case SZ_MEDIUM:     return 3;   break;
-    case SZ_ASTEROIDS:  return 3;   break;
-    case SZ_SMALL:      return 2;   break;
-    case SZ_TINY:       return 1;   break;
+    case SZ_GASGIANT:   return gr.Get<int>("RULE_HABITABLE_SIZE_GASGIANT");   break;
+    case SZ_HUGE:       return gr.Get<int>("RULE_HABITABLE_SIZE_HUGE");   break;
+    case SZ_LARGE:      return gr.Get<int>("RULE_HABITABLE_SIZE_LARGE");   break;
+    case SZ_MEDIUM:     return gr.Get<int>("RULE_HABITABLE_SIZE_MEDIUM");   break;
+    case SZ_ASTEROIDS:  return gr.Get<int>("RULE_HABITABLE_SIZE_ASTEROIDS");   break;
+    case SZ_SMALL:      return gr.Get<int>("RULE_HABITABLE_SIZE_SMALL");   break;
+    case SZ_TINY:       return gr.Get<int>("RULE_HABITABLE_SIZE_TINY");   break;
     default:            return 0;   break;
     }
 }
@@ -424,39 +426,6 @@ float Planet::InitialMeterValue(MeterType type) const
 
 float Planet::CurrentMeterValue(MeterType type) const
 { return UniverseObject::CurrentMeterValue(type); }
-
-float Planet::NextTurnCurrentMeterValue(MeterType type) const {
-    MeterType max_meter_type = INVALID_METER_TYPE;
-    switch (type) {
-    case METER_SHIELD:      max_meter_type = METER_MAX_SHIELD;          break;
-    case METER_TROOPS:      max_meter_type = METER_MAX_TROOPS;          break;
-    case METER_DEFENSE:     max_meter_type = METER_MAX_DEFENSE;         break;
-    case METER_SUPPLY:      max_meter_type = METER_MAX_SUPPLY;          break;
-    case METER_STOCKPILE:   max_meter_type = METER_MAX_STOCKPILE;       break;
-        break;
-    default:
-        return UniverseObject::NextTurnCurrentMeterValue(type);
-    }
-
-    const Meter* meter = GetMeter(type);
-    if (!meter) {
-        throw std::invalid_argument("Planet::NextTurnCurrentMeterValue passed meter type that the Planet does not have, but should: " + boost::lexical_cast<std::string>(type));
-    }
-    float current_meter_value = meter->Current();
-
-    const Meter* max_meter = GetMeter(max_meter_type);
-    if (!max_meter) {
-        throw std::runtime_error("Planet::NextTurnCurrentMeterValue dealing with invalid meter type: " + boost::lexical_cast<std::string>(type));
-    }
-    float max_meter_value = max_meter->Current();
-
-    // being attacked prevents meter growth
-    if (LastTurnAttackedByShip() >= CurrentTurn())
-        return std::min(current_meter_value, max_meter_value);
-
-    // currently meter growth is one per turn.
-    return std::min(current_meter_value + 1.0f, max_meter_value);
-}
 
 std::string Planet::CardinalSuffix() const {
     std::string retval = "";

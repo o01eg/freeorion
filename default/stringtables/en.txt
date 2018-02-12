@@ -1102,6 +1102,30 @@ Starlanes Everywhere
 RULE_STARLANES_EVERYWHERE_DESC
 Starlanes are generated between every pair of systems, regardless of geometry. Lanes may still be removed during a game, however. Lanes are also not rendered on the galaxy map.
 
+RULE_HABITABLE_SIZE_TINY
+Tiny planets Habitable size
+
+RULE_HABITABLE_SIZE_SMALL
+Small planets Habitable size
+
+RULE_HABITABLE_SIZE_MEDIUM
+Medium planets Habitable size
+
+RULE_HABITABLE_SIZE_LARGE
+Large planets Habitable size
+
+RULE_HABITABLE_SIZE_HUGE
+Huge planets Habitable size
+
+RULE_HABITABLE_SIZE_ASTEROIDS
+Asteroids Habitable size
+
+RULE_HABITABLE_SIZE_GASGIANT
+Gas Giants Habitable size
+
+RULE_HABITABLE_SIZE_DESC
+Value used to adjust for [[encyclopedia POPULATION_TITLE_SHORT_DESC]] changes on a planet of this size.
+
 
 ##
 ## Command-line and options database entries
@@ -3992,7 +4016,7 @@ It also allows for some interaction with the [[encyclopedia MAP_WINDOW_ARTICLE_T
 The Production Summary panel shows available Production Points.
 If a system is selected, there are two columns shown. The left column shows production points across your entire empire. The right column gives production points for the selected system (but is absent if no system is selected).
 Available Points relates to the PP available for production. The right value are the maximum available production points for the selected system. This may be less than the total available when all of your empire's systems are not [[metertype METER_SUPPLY]] connected.
-Stockpile relates to the PP available for production using the imperial stockpile. Production items specifically need to be enabled to draw from the stockpile.
+Stockpile relates to the PP available for production using the imperial stockpile. Production items are enabled to draw from the Imperial Stockpile by default and have to be explicitly disabled from doing so.
 Generally, most excess PP will be wasted and lost, but a part of the excess will be stored in the imperial stockpile.
 
 <u>Producible Items panel</u>
@@ -4200,6 +4224,18 @@ Obsolete Design
 
 DESIGN_WND_UNOBSOLETE_DESIGN
 Un-Obsolete Design
+
+DESIGN_WND_OBSOLETE_HULL
+Obsolete Hull
+
+DESIGN_WND_UNOBSOLETE_HULL
+Un-Obsolete Hull
+
+DESIGN_WND_OBSOLETE_PART
+Obsolete Part
+
+DESIGN_WND_UNOBSOLETE_PART
+Un-Obsolete Part
 
 DESIGN_WND_DELETE_DESIGN
 Delete Design
@@ -5505,6 +5541,12 @@ Self-Sustaining Metabolism
 SELF_SUSTAINING_SPECIES_TEXT
 [[encyclopedia SELF_SUSTAINING_SPECIES_CLASS]] species may be energy or crystalline beings or something even stranger. Their commonality is that they need no sustenance, so their max population is very high. While there are no specials that boost their growth, their max population is equal to a species that is provided with all three [[encyclopedia GROWTH_FOCUS_TITLE]] specials.
 
+GASEOUS_SPECIES_TITLE
+Gaseous Metabolism
+
+GASEOUS_SPECIES_TEXT
+[[encyclopedia GASEOUS_SPECIES_CLASS]] species have metabolisms based on elements which are in gaseous state in an earth-like environment. Most researchers actually agree that complex life based on a gaseous metabolism is physically impossible. Search for life on the most probable habitat, gas giants, gets mostly neglected. Although gas giant are really huge the habitable area is similar to a medium size planet. Also there exist no specials that boost the growth of gaseous species.
+
 TELEPATHIC_TITLE
 Telepathy
 
@@ -5585,14 +5627,14 @@ Design Window
 DESIGN_WINDOW_ARTICLE_TEXT
 '''The [[DESIGN_WINDOW_ARTICLE_TITLE]] is for viewing or altering the designs of monsters or ships.
 
-Designs and ship parts can be [[PRODUCTION_WND_AVAILABILITY_AVAILABLE]], [[PRODUCTION_WND_AVAILABILITY_UNAVAILABLE]] or [[PRODUCTION_WND_AVAILABILITY_OBSOLETE]]. [[PRODUCTION_WND_AVAILABILITY_AVAILABLE]] designs and parts are unrestricted for use by the empire. [[PRODUCTION_WND_AVAILABILITY_UNAVAILABLE]] designs and parts are restricted in some way. Some unavailable designs and parts may be unlocked by researching associated [[encyclopedia ENC_TECH]]. [[PRODUCTION_WND_AVAILABILITY_OBSOLETE]] designs are obsoleted/unobsoleted at will by the empire. [[PRODUCTION_WND_AVAILABILITY_OBSOLETE]] designs will not appear in the [[encyclopedia PRODUCTION_WINDOW_ARTICLE_TITLE]] and only appear in [[DESIGN_WINDOW_ARTICLE_TITLE]] when the "[[PRODUCTION_WND_AVAILABILITY_OBSOLETE]]" filter is toggled to display them. Ship parts can not be obsoleted.
+Designs and ship parts can be [[PRODUCTION_WND_AVAILABILITY_AVAILABLE]], [[PRODUCTION_WND_AVAILABILITY_UNAVAILABLE]] or [[PRODUCTION_WND_AVAILABILITY_OBSOLETE]]. [[PRODUCTION_WND_AVAILABILITY_AVAILABLE]] designs and parts are unrestricted for use by the empire. [[PRODUCTION_WND_AVAILABILITY_UNAVAILABLE]] designs and parts are restricted in some way. Some unavailable designs and parts may be unlocked by researching associated [[encyclopedia ENC_TECH]]. [[PRODUCTION_WND_AVAILABILITY_OBSOLETE]] designs, hulls and parts are obsoleted/unobsoleted at will by the empire. [[PRODUCTION_WND_AVAILABILITY_OBSOLETE]] designs will not appear in the [[encyclopedia PRODUCTION_WINDOW_ARTICLE_TITLE]] and only appear in [[DESIGN_WINDOW_ARTICLE_TITLE]] when the "[[PRODUCTION_WND_AVAILABILITY_OBSOLETE]]" filter is toggled to display them.
 
 There are four sub windows:  [[DESIGN_WND_STARTS]], [[DESIGN_WND_PART_PALETTE_TITLE]], [[DESIGN_WND_MAIN_PANEL_TITLE]] and the [[MAP_BTN_PEDIA]].
 
 
-[[DESIGN_WND_STARTS]] has four tabs: empty [[DESIGN_WND_HULLS]], [[DESIGN_WND_FINISHED_DESIGNS]] designs, [[DESIGN_WND_SAVED_DESIGNS]] designs from previous games and [[DESIGN_WND_MONSTERS]] designs for inspection. Drag or double click hulls, designs or monsters to edit/examine them on the workbench. Designs can be drag-and-dropped within the list to change their order.
+[[DESIGN_WND_STARTS]] has four tabs: empty [[DESIGN_WND_HULLS]], [[DESIGN_WND_FINISHED_DESIGNS]] designs, [[DESIGN_WND_SAVED_DESIGNS]] designs from previous games and [[DESIGN_WND_MONSTERS]] designs for inspection. Drag or double click hulls, designs or monsters to edit/examine them on the workbench. Designs and hulls can be drag-and-dropped within the list to change their order.
 
-[[DESIGN_WND_FINISHED_DESIGNS]] designs appear in the same order as on the Production Window. The right click context menu provides several options. Obsolete/unobsolete designs with "[[DESIGN_WND_OBSOLETE_DESIGN]]". Ctrl click also obsoletes/unobsoletes designs. Delete designs with "[[DESIGN_WND_DELETE_DESIGN]]". Deleted designs can't be recovered. Ships already queued for production will continue to be built with the old obsolete/deleted design. Rename designs with "[[DESIGN_RENAME]]". Save designs to disk for future games with "[[DESIGN_SAVE]]". Toggle the "[[DESIGN_WND_ADD_ALL_DEFAULT_START]]" option to use/not use the default designs in new games.
+[[DESIGN_WND_FINISHED_DESIGNS]] designs appear in the same order as on the Production Window. The right click context menu provides several options. Obsolete/unobsolete designs with "[[DESIGN_WND_OBSOLETE_DESIGN]]". Ctrl click also obsoletes/unobsoletes designs and hulls. Delete designs with "[[DESIGN_WND_DELETE_DESIGN]]". Deleted designs can't be recovered. Ships already queued for production will continue to be built with the old obsolete/deleted design. Rename designs with "[[DESIGN_RENAME]]". Save designs to disk for future games with "[[DESIGN_SAVE]]". Toggle the "[[DESIGN_WND_ADD_ALL_DEFAULT_START]]" option to use/not use the default designs in new games.
 
 Use the [[DESIGN_WND_SAVED_DESIGNS]] designs right click context menu to copy a single or all saved designs to the [[DESIGN_WND_FINISHED_DESIGNS]] designs. Ctrl click also copies a single design to the [[DESIGN_WND_FINISHED_DESIGNS]] designs. Permanently remove a saved design with "[[DESIGN_WND_DELETE_SAVED]]". Check "[[OPTIONS_ADD_SAVED_DESIGNS]]" to automatically import all the [[DESIGN_WND_SAVED_DESIGNS]] designs at the start of a new game.
 
@@ -5606,7 +5648,7 @@ The [[DESIGN_WND_PART_PALETTE_TITLE]] window has filters to display/hide entire 
 
 [[DESIGN_WND_MAIN_PANEL_TITLE]] is the workbench for the current design.
 
-The current design may have internal, external and/or core [[encyclopedia SLOT_TITLE]]s. Drag and drop or double click parts from [[DESIGN_WND_PART_PALETTE_TITLE]] to add/remove them to/from the current design.
+The current design may have internal, external and/or core [[encyclopedia SLOT_TITLE]]s. Drag and drop or double click parts from [[DESIGN_WND_PART_PALETTE_TITLE]] to add/remove them to/from the current design. Ctrl and drag and drop will add/remove/replace all parts of a similar type.
 
 Add a name and optionally a description to the design.
 
@@ -5994,6 +6036,9 @@ Arrived on Turn
 
 SIZE_AS_DOUBLE
 Size As Number
+
+HABITABLE_SIZE
+Habitable Size
 
 DISTANCE_FROM_ORIGINAL_TYPE
 Distance From Original Planet Type
@@ -6963,6 +7008,13 @@ Self-Sustaining
 SELF_SUSTAINING_SPECIES_CLASS_DESC
 List of [[encyclopedia SELF_SUSTAINING_SPECIES_TITLE]] species:
 
+
+GASEOUS_SPECIES_CLASS
+Gaseous
+
+GASEOUS_SPECIES_CLASS_DESC
+List of [[encyclopedia GASEOUS_SPECIES_TITLE]] species:
+
 # Species Pedia Articles
 
 SP_HUMAN
@@ -7167,14 +7219,16 @@ Sly
 
 SP_SLY_GAMEPLAY_DESC
 '''Friendly overlooked gasbags.
-Only live an [[PT_GASGIANT]]s.
-[[encyclopedia SELF_SUSTAINING_SPECIES_TITLE]]
+Greatly prefer [[PT_GASGIANT]]s.
+
+[[encyclopedia GASEOUS_SPECIES_TITLE]]
 '''
 
 SP_SLY_DESC
 '''Description:
 The Sly live in gas giants. The gas giants are so foreign to most species in the universe that, for most of their history, they have been overlooked.
 Not being able to build devices, they couldn't leave their homeworld. Recently, they were able to obtain necessary equipment and technology for spacefaring from traders in exchange for their knowledge of history.
+On the right diet Sly excrete refined fuel. When in system with a gas giant, a Sly-crewed ship will regenerate fuel.
 
 Social Structure:
 The Sly are very long-lived and keep the songs alive in which the whole cultural knowledge is encoded. They are very open and curious towards the galaxy and the other species they are now finally able to encounter.
@@ -10375,7 +10429,7 @@ The imperial stockpile service has a fleet for distributing raw materials to pla
 This task is difficult as the service has to predict when demand happens, where it happens, what materials and goods are demanded and also who the users will be.
 
 A portion of unused PP will be transferred to the Imperial Production Stockpile, the other part going to waste.
-An item on the production queue can draw on the Imperial Stockpile if the item has been explicitly enabled for doing so.
+An item on the production queue draws automatically on the Imperial Stockpile if the item has not been explicitly disabled from doing so.
 
 This is the basic technology for the imperial stockpile, which increases the [[metertype METER_STOCKPILE]] of stockpile-focused by 1.'''
 
@@ -14096,6 +14150,10 @@ GREAT_WEAPONS_DESC
 ULTIMATE_WEAPONS_DESC
 +++	Ultimate Pilots: Base damage per ship weapon increased by three levels.
 
+GASEOUS_DESC
+'''+	Live on Gas Giants
++	Refuel on Gas Giants 0.1'''
+
 BAD_POPULATION_DESC
 −	Bad Population 75%
 
@@ -14107,6 +14165,9 @@ GOOD_POPULATION_DESC
 
 FIXED_LOW_POPULATION_DESC
 −−	Maximum Population is fixed at 5
+
+VERY_BAD_SUPPLY_DESC
+−−	Very Bad [[metertype METER_SUPPLY]]: -1
 
 BAD_SUPPLY_DESC
 −	Bad [[metertype METER_SUPPLY]]: no bonus
@@ -14130,7 +14191,7 @@ AVERAGE_STOCKPILE_DESC
 	Average [[metertype METER_STOCKPILE]]: 100%
 
 GOOD_STOCKPILE_DESC
-+	Great [[metertype METER_STOCKPILE]]: 400%
++	Great [[metertype METER_STOCKPILE]]: 300%
 
 GREAT_STOCKPILE_DESC
 ++	Great [[metertype METER_STOCKPILE]]: 1000%
@@ -14304,6 +14365,11 @@ ULTIMATE_RESEARCH_LABEL
 
 # %1% FIXME
 # %2% FIXME
+VERY_BAD_SUPPLY_LABEL
+%2% Very Bad Supply
+
+# %1% FIXME
+# %2% FIXME
 BAD_SUPPLY_LABEL
 %2% Bad Supply
 
@@ -14443,6 +14509,12 @@ Excellent Vision
 
 FOCUS_PROTECTION_LABEL
 Protection Focus
+
+GASEOUS_DESC
+Gas giants are huge but are only habitable like medium sized planets.
+
+GASEOUS_LABEL
+Bad Environment
 
 XENOPHOBIC_LABEL_SELF
 Xenophobic Frenzy (other species nearby)

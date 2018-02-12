@@ -29,7 +29,6 @@ public:
 
     float CurrentMeterValue(MeterType type) const override;
     float InitialMeterValue(MeterType type) const override;
-    float NextTurnCurrentMeterValue(MeterType type) const override;
 
     std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const override;
 
@@ -40,7 +39,7 @@ public:
     PlanetType          OriginalType() const                { return m_original_type; }
     int                 DistanceFromOriginalType() const    { return TypeDifference(m_type, m_original_type); }
     PlanetSize          Size() const                        { return m_size; }
-    int                 SizeAsInt() const;
+    int                 HabitableSize() const;
 
     bool                HostileToEmpire(int empire_id) const override;
 

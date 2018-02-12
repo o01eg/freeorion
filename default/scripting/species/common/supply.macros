@@ -2,6 +2,15 @@ NO_SUPPLY
 '''
 '''
 
+VERY_BAD_SUPPLY
+'''     EffectsGroup
+            description = "VERY_BAD_SUPPLY_DESC"
+            scope = Source
+            activation = Planet
+            accountinglabel = "VERY_BAD_SUPPLY_LABEL"
+            effects = SetMaxSupply value = Value - 1
+'''
+
 BAD_SUPPLY
 '''     EffectsGroup
             description = "BAD_SUPPLY_DESC"
@@ -51,7 +60,7 @@ STANDARD_SUPPLY_GROWTH
             activation = And [
                 Planet
                 (Source.LastTurnConquered < CurrentTurn)
-                (Source.LastTurnAttackedByShip < CurrentTurn - 1)
+                (Source.System.LastTurnBattleHere < CurrentTurn)
             ]
             priority = [[AFTER_ALL_TARGET_MAX_METERS_PRIORITY]]
             effects = SetSupply value = min(Value(Target.MaxSupply), Value + 1)

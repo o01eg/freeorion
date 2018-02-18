@@ -1213,14 +1213,13 @@ namespace {
         if (!ship || planet_type == INVALID_PLANET_TYPE)
             return false;
 
-        const ShipDesign* design = nullptr;
-        double colony_ship_capacity = 0.0;
+        float colony_ship_capacity = 0.0f;
 
-        design = ship->Design();
+        const auto design = ship->Design();
         if (design) {
             colony_ship_capacity = design->ColonyCapacity();
-            if (ship->CanColonize() && colony_ship_capacity==0)
-                return true;
+            if (ship->CanColonize() && colony_ship_capacity == 0.0f)
+                return true;    // outpost ship; planet type doesn't matter as there is no species to check against
         }
 
         if (const Species* colony_ship_species = GetSpecies(ship->SpeciesName())) {
@@ -1229,7 +1228,7 @@ namespace {
             // One-Click Colonize planets that are colonizable (even if they are
             // not hospitable), and One-Click Outpost planets that are not
             // colonizable.
-            if (colony_ship_capacity > 0.0) {
+            if (colony_ship_capacity > 0.0f) {
                 return planet_env_for_colony_species >= PE_HOSTILE && planet_env_for_colony_species <= PE_GOOD;
             } else {
                 return planet_env_for_colony_species < PE_HOSTILE || planet_env_for_colony_species > PE_GOOD;
@@ -1302,7 +1301,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
     if (!system)
         return INVALID_OBJECT_ID;
     // is planet a valid colonization target?
-    if (target_planet->CurrentMeterValue(METER_POPULATION) > 0.0 ||
+    if (target_planet->InitialMeterValue(METER_POPULATION) > 0.0 ||
         (!target_planet->Unowned() && !target_planet->OwnedBy(empire_id)))
     { return INVALID_OBJECT_ID; }
 
@@ -1370,9 +1369,11 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
                         changed_planet = true;
                         target_planet->SetOwner(empire_id);
                         target_planet->SetSpecies(ship_species_name);
-                        target_planet->GetMeter(METER_TARGET_POPULATION)->Set(0.0f, 0.0f);
+                        target_planet->GetMeter(METER_TARGET_POPULATION)->Reset();
+
+                        // temporary meter update with currently set species
                         GetUniverse().UpdateMeterEstimates(target_planet_id);
-                        planet_capacity = target_planet->CurrentMeterValue(METER_TARGET_POPULATION);
+                        planet_capacity = target_planet->CurrentMeterValue(METER_TARGET_POPULATION);    // want value after meter update, so check current, not initial value
                     }
                     species_colony_projections[spec_pair] = planet_capacity;
                 }
@@ -1418,7 +1419,7 @@ std::set<std::shared_ptr<const Ship>> AutomaticallyChosenInvasionShips(int targe
 
 
     // get "just enough" ships that can invade and that are free to do so
-    double defending_troops = target_planet->NextTurnCurrentMeterValue(METER_TROOPS);
+    double defending_troops = target_planet->InitialMeterValue(METER_TROOPS);
 
     double invasion_troops = 0;
     for (auto& ship : Objects().FindObjects<Ship>()) {
@@ -1591,17 +1592,18 @@ void SidePanel::PlanetPanel::Refresh() {
     // calculate truth tables for planet colonization and invasion
     bool has_owner =        !planet->Unowned();
     bool mine =             planet->OwnedBy(client_empire_id);
-    bool populated =        planet->CurrentMeterValue(METER_POPULATION) > 0.0;
+    bool populated =        planet->InitialMeterValue(METER_POPULATION) > 0.0f;
     bool habitable =        planet_env_for_colony_species >= PE_HOSTILE && planet_env_for_colony_species <= PE_GOOD;
     bool visible =          GetUniverse().GetObjectVisibilityByEmpire(m_planet_id, client_empire_id) >= VIS_PARTIAL_VISIBILITY;
-    bool shielded =         planet->CurrentMeterValue(METER_SHIELD) > 0.0;
-    bool has_defenses =     planet->CurrentMeterValue(METER_MAX_SHIELD) > 0.0 || 
-                                    planet->CurrentMeterValue(METER_MAX_DEFENSE) > 0.0 ||
-                                    planet->CurrentMeterValue(METER_MAX_TROOPS) > 0.0;
+    bool shielded =         planet->InitialMeterValue(METER_SHIELD) > 0.0f;
+    bool has_defenses =     planet->InitialMeterValue(METER_MAX_SHIELD) > 0.0f ||
+                            planet->InitialMeterValue(METER_MAX_DEFENSE) > 0.0f ||
+                            planet->InitialMeterValue(METER_MAX_TROOPS) > 0.0f;
     bool being_colonized =  planet->IsAboutToBeColonized();
     bool outpostable =                   !populated && (  !has_owner /*&& !shielded*/         ) && visible && !being_colonized;
     bool colonizable =      habitable && !populated && ( (!has_owner /*&& !shielded*/) || mine) && visible && !being_colonized;
-    bool can_colonize =     selected_colony_ship && ((colonizable  && (colony_ship_capacity > 0.0f)) || (outpostable && (colony_ship_capacity == 0.0f)));
+    bool can_colonize =     selected_colony_ship && (   (colonizable  && (colony_ship_capacity > 0.0f))
+                                                     || (outpostable && (colony_ship_capacity == 0.0f)));
 
     bool at_war_with_me =   !mine && (populated || (has_owner && Empires().GetDiplomaticStatus(client_empire_id, planet->Owner()) == DIPLO_WAR));
 
@@ -1688,13 +1690,16 @@ void SidePanel::PlanetPanel::Refresh() {
             float orig_initial_target_pop = planet->GetMeter(METER_TARGET_POPULATION)->Initial();
             planet->SetOwner(client_empire_id);
             planet->SetSpecies(colony_ship_species_name);
-            planet->GetMeter(METER_TARGET_POPULATION)->Set(0.0f, 0.0f);
+            planet->GetMeter(METER_TARGET_POPULATION)->Reset();
+
+            // temporary meter updates for curently set species
             GetUniverse().UpdateMeterEstimates(m_planet_id);
-            planet_capacity = ((planet_env_for_colony_species == PE_UNINHABITABLE) ? 0 : planet->CurrentMeterValue(METER_TARGET_POPULATION));
+            planet_capacity = ((planet_env_for_colony_species == PE_UNINHABITABLE) ? 0 : planet->CurrentMeterValue(METER_TARGET_POPULATION));   // want target pop after meter update, so check current value of meter
             planet->SetOwner(orig_owner);
             planet->SetSpecies(orig_species);
             planet->GetMeter(METER_TARGET_POPULATION)->Set(orig_initial_target_pop, orig_initial_target_pop);
             GetUniverse().UpdateMeterEstimates(m_planet_id);
+
             colony_projections[this_pair] = planet_capacity;
             GetUniverse().InhibitUniverseObjectSignals(false);
         }
@@ -1837,7 +1842,7 @@ void SidePanel::PlanetPanel::Refresh() {
         Visibility visibility = GetUniverse().GetObjectVisibilityByEmpire(m_planet_id, client_empire_id);
         auto visibility_turn_map = GetUniverse().GetObjectVisibilityTurnMapByEmpire(m_planet_id, client_empire_id);
         float client_empire_detection_strength = client_empire->GetMeter("METER_DETECTION_STRENGTH")->Current();
-        float apparent_stealth = planet->CurrentMeterValue(METER_STEALTH);
+        float apparent_stealth = planet->InitialMeterValue(METER_STEALTH);
 
         std::string visibility_info;
         std::string detection_info;
@@ -2231,7 +2236,7 @@ void SidePanel::PlanetPanel::ClickColonize() {
     // been ordered
 
     auto planet = GetPlanet(m_planet_id);
-    if (!planet || planet->CurrentMeterValue(METER_POPULATION) != 0.0 || !m_order_issuing_enabled)
+    if (!planet || planet->InitialMeterValue(METER_POPULATION) != 0.0 || !m_order_issuing_enabled)
         return;
 
     int empire_id = HumanClientApp::GetApp()->EmpireID();
@@ -2275,7 +2280,7 @@ void SidePanel::PlanetPanel::ClickInvade() {
     auto planet = GetPlanet(m_planet_id);
     if (!planet ||
         !m_order_issuing_enabled ||
-        (planet->CurrentMeterValue(METER_POPULATION) <= 0.0 && planet->Unowned()))
+        (planet->InitialMeterValue(METER_POPULATION) <= 0.0 && planet->Unowned()))
     { return; }
 
     int empire_id = HumanClientApp::GetApp()->EmpireID();
@@ -2320,7 +2325,7 @@ void SidePanel::PlanetPanel::ClickBombard() {
     auto planet = GetPlanet(m_planet_id);
     if (!planet ||
         !m_order_issuing_enabled ||
-        (planet->CurrentMeterValue(METER_POPULATION) <= 0.0 && planet->Unowned()))
+        (planet->InitialMeterValue(METER_POPULATION) <= 0.0 && planet->Unowned()))
     { return; }
 
     int empire_id = HumanClientApp::GetApp()->EmpireID();

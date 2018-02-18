@@ -123,7 +123,7 @@ EffectsGroup
                 OwnedBy affiliation = EnemyOf empire = Source.Owner
                 UnOwned
             ]
-	    VisibleToEmpire empire = Source.Owner
+            VisibleToEmpire empire = Source.Owner
         ]
         // Only warn if enemies are incoming
         WithinDistance distance = 120 condition = And [
@@ -133,12 +133,13 @@ EffectsGroup
                 OwnedBy affiliation = EnemyOf empire = Source.Owner
                 UnOwned
             ]
-	    VisibleToEmpire empire = Source.Owner
+            VisibleToEmpire empire = Source.Owner
             Turn low = [[ETA_NEXT_TURN]] high = [[ETA_NEXT_TURN]]
             (RootCandidate.ID = LocalCandidate.NextSystemID)
         ]
     ]
     activation = Source
+    priority = [[END_CLEANUP_PRIORITY]]
     effects =
         GenerateSitRepMessage
             message = "SITREP_SYSTEM_GOT_INCOMING_WARNING"
@@ -293,3 +294,5 @@ EffectsGroup
 
 // Note, the "]" on the following line is functional and important; it must be present and all EffectsGroups must be above it.
 ]
+
+#include "/scripting/common/priorities.macros"

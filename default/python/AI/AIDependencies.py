@@ -107,6 +107,9 @@ POP_CONST_MOD_MAP = {
 POP_MOD_PHOTOTROPHIC_STAR_MAP = {fo.starType.blue: 3, fo.starType.white: 1.5, fo.starType.red: -1,
                                  fo.starType.neutron: -1, fo.starType.blackHole: -10, fo.starType.noStar: -10}
 
+# the percentage of normal population that a species with Gaseous tag has
+GASEOUS_POP_FACTOR = 0.50
+
 # </editor-fold>
 
 
@@ -556,7 +559,7 @@ SP_LAMBALALAM = "SP_LEMBALALAM"
 SPECIES_RESEARCH_MODIFIER = {'NO': 0.0, 'BAD': 0.75, 'GOOD': 1.5, 'GREAT': 2.0, 'ULTIMATE': 3.0}
 SPECIES_INDUSTRY_MODIFIER = {'NO': 0.0, 'BAD': 0.75, 'GOOD': 1.5, 'GREAT': 2.0, 'ULTIMATE': 3.0}
 SPECIES_POPULATION_MODIFIER = {'BAD': 0.75, 'GOOD': 1.25}
-SPECIES_SUPPLY_MODIFIER = {'BAD': 0, 'AVERAGE': 1, 'GREAT': 2, 'ULTIMATE': 3}
+SPECIES_SUPPLY_MODIFIER = {'VERY_BAD': -1, 'BAD': 0, 'AVERAGE': 1, 'GREAT': 2, 'ULTIMATE': 3}
 
 # <editor-fold desc="XenoResurrectionSpecies">
 EXTINCT_SPECIES = [
@@ -642,7 +645,7 @@ building_supply = {
         fo.planetSize.medium: 3,
         fo.planetSize.large: 4,
         fo.planetSize.huge: 5,
-        fo.planetSize.gasGiant: 4,
+        fo.planetSize.gasGiant: 3,
     },
 }
 # </editor-fold>

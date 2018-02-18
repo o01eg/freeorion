@@ -1281,7 +1281,6 @@ void ProductionQueue::clear() {
 // Empire //
 ////////////
 Empire::Empire() :
-    m_id(ALL_EMPIRES),
     m_research_queue(m_id),
     m_production_queue(m_id)
 { Init(); }
@@ -1861,7 +1860,7 @@ void Empire::UpdateSystemSupplyRanges(const std::set<int>& known_objects) {
         // check if object has a supply meter
         if (obj->GetMeter(METER_SUPPLY)) {
             // get resource supply range for next turn for this object
-            float supply_range = obj->NextTurnCurrentMeterValue(METER_SUPPLY);
+            float supply_range = obj->InitialMeterValue(METER_SUPPLY);
 
             // if this object can provide more supply range than the best previously checked object in this system, record its range as the new best for the system
             auto system_it = m_supply_system_ranges.find(system_id);  // try to find a previous entry for this system's supply range

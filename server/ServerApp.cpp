@@ -1621,6 +1621,28 @@ bool ServerApp::IsAuthSuccessAndFillRoles(const std::string& player_name, const 
     return result;
 }
 
+void ServerApp::AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
+    std::map<int, PlayerInfo> player_info_map = GetPlayerInfoMap();
+
+    Networking::ClientType client_type = player_connection->GetClientType();
+    bool use_binary_serialization = player_connection->ClientVersionStringMatchesThisServer();
+
+    if (client_type == Networking::CLIENT_TYPE_HUMAN_OBSERVER ||
+        client_type == Networking::CLIENT_TYPE_HUMAN_MODERATOR)
+    {
+        // simply sends GAME_START message so established player will known he is in the game now
+        player_connection->SendMessage(GameStartMessage(m_single_player_game, ALL_EMPIRES,
+                                                        m_current_turn, m_empires, m_universe,
+                                                        GetSpeciesManager(), GetCombatLogManager(),
+                                                        GetSupplyManager(), player_info_map,
+                                                        m_galaxy_setup_data, use_binary_serialization));
+    } else {
+        ErrorLogger() << "ServerApp::CommonGameInit unsupported client type: skipping game start message.";
+    }
+
+    // TODO: notify other players
+}
+
 bool ServerApp::IsHostless() const
 { return GetOptionsDB().Get<bool>("hostless"); }
 
@@ -1683,7 +1705,7 @@ namespace {
     /** Returns true if \a empire has been eliminated by the applicable
       * definition of elimination.  As of this writing, elimination means
       * having no ships and no planets. */
-      bool EmpireEliminated(int empire_id) {
+    bool EmpireEliminated(int empire_id) {
           return (Objects().FindObjects(OwnedVisitor<Planet>(empire_id)).empty() &&    // no planets
                   Objects().FindObjects(OwnedVisitor<Ship>(empire_id)).empty());      // no ship
       }
@@ -1732,7 +1754,7 @@ namespace {
         for (auto& planet : Objects().FindObjects<const Planet>(system->PlanetIDs())) {
             if (!planet->Unowned())
                 empire_planets[planet->Owner()].insert(planet->ID());
-            else if (planet->CurrentMeterValue(METER_POPULATION) > 0.0)
+            else if (planet->InitialMeterValue(METER_POPULATION) > 0.0f)
                 empire_planets[ALL_EMPIRES].insert(planet->ID());
         }
     }
@@ -1744,7 +1766,7 @@ namespace {
         auto system = GetSystem(system_id);
         if (!system)
             return; // no such system
-        const std::set<int>& fleet_ids = system->FleetIDs();
+        const auto& fleet_ids = system->FleetIDs();
         if (fleet_ids.empty())
             return; // no fleets to be seen
         if (empire_id != ALL_EMPIRES && !GetEmpire(empire_id))
@@ -1772,13 +1794,13 @@ namespace {
 
 
         // get best monster detection strength here.  Use monster detection meters for this...
-        double monster_detection_strength_here = 0.0;
+        float monster_detection_strength_here = 0.0f;
         for (int ship_id : system->ShipIDs()) {
             auto ship = GetShip(ship_id);
             if (!ship || !ship->Unowned())  // only want unowned / monster ships
                 continue;
-            if (ship->CurrentMeterValue(METER_DETECTION) > monster_detection_strength_here)
-                monster_detection_strength_here = ship->CurrentMeterValue(METER_DETECTION);
+            if (ship->InitialMeterValue(METER_DETECTION) > monster_detection_strength_here)
+                monster_detection_strength_here = ship->InitialMeterValue(METER_DETECTION);
         }
 
         // test each ship in each fleet for visibility by best monster detection here
@@ -1796,7 +1818,7 @@ namespace {
                 if (!ship)
                     continue;
                 // if a ship is low enough stealth, its fleet can be seen by monsters
-                if (monster_detection_strength_here >= ship->CurrentMeterValue(METER_STEALTH)) {
+                if (monster_detection_strength_here >= ship->InitialMeterValue(METER_STEALTH)) {
                     visible_fleets.insert(fleet->ID());
                     break;  // fleet is seen, so don't need to check any more ships in it
                 }
@@ -1828,7 +1850,7 @@ namespace {
                     continue;
                 // skip planets that have no owner and that are unpopulated; don't matter for combat conditions test
                 auto planet = GetPlanet(planet_id);
-                if (planet->Unowned() && planet->CurrentMeterValue(METER_POPULATION) <= 0.0)
+                if (planet->Unowned() && planet->InitialMeterValue(METER_POPULATION) <= 0.0f)
                     continue;
                 visible_planets.insert(planet->ID());
             }
@@ -1840,12 +1862,12 @@ namespace {
 
 
         // get best monster detection strength here.  Use monster detection meters for this...
-        double monster_detection_strength_here = 0.0;
+        float monster_detection_strength_here = 0.0f;
         for (auto& ship : Objects().FindObjects<const Ship>(system->ShipIDs())) {
             if (!ship->Unowned())  // only want unowned / monster ships
                 continue;
-            if (ship->CurrentMeterValue(METER_DETECTION) > monster_detection_strength_here)
-                monster_detection_strength_here = ship->CurrentMeterValue(METER_DETECTION);
+            if (ship->InitialMeterValue(METER_DETECTION) > monster_detection_strength_here)
+                monster_detection_strength_here = ship->InitialMeterValue(METER_DETECTION);
         }
 
         // test each planet for visibility by best monster detection here
@@ -1853,7 +1875,7 @@ namespace {
             if (planet->Unowned())
                 continue;       // only want empire-owned planets; unowned planets visible to monsters don't matter for combat conditions test
             // if a planet is low enough stealth, it can be seen by monsters
-            if (monster_detection_strength_here >= planet->CurrentMeterValue(METER_STEALTH))
+            if (monster_detection_strength_here >= planet->InitialMeterValue(METER_STEALTH))
                 visible_planets.insert(planet->ID());
         }
     }
@@ -2171,14 +2193,11 @@ namespace {
         for (const CombatInfo& combat_info : combats) {
             std::vector<WeaponFireEvent::ConstWeaponFireEventPtr> events_that_killed;
             for (CombatEventPtr event : combat_info.combat_events) {
-                WeaponsPlatformEvent::ConstWeaponsPlatformEventPtr maybe_attacker
-                    = std::dynamic_pointer_cast<WeaponsPlatformEvent>(event);
+                auto maybe_attacker = std::dynamic_pointer_cast<WeaponsPlatformEvent>(event);
                 if (maybe_attacker) {
-                    std::vector<ConstCombatEventPtr>sub_events
-                        = maybe_attacker->SubEvents(maybe_attacker->attacker_owner_id);
-                    for (ConstCombatEventPtr weapon_event : sub_events) {
-                        const WeaponFireEvent::ConstWeaponFireEventPtr maybe_fire_event
-                            = std::dynamic_pointer_cast<const WeaponFireEvent>(weapon_event);
+                    auto sub_events = maybe_attacker->SubEvents(maybe_attacker->attacker_owner_id);
+                    for (auto weapon_event : sub_events) {
+                        auto maybe_fire_event = std::dynamic_pointer_cast<const WeaponFireEvent>(weapon_event);
                         if (maybe_fire_event
                             && combat_info.destroyed_object_ids.find(maybe_fire_event->target_id)
                             != combat_info.destroyed_object_ids.end())
@@ -2186,8 +2205,7 @@ namespace {
                     }
                 }
 
-                const WeaponFireEvent::ConstWeaponFireEventPtr maybe_fire_event
-                    = std::dynamic_pointer_cast<const WeaponFireEvent>(event);
+                auto maybe_fire_event = std::dynamic_pointer_cast<const WeaponFireEvent>(event);
                 if (maybe_fire_event
                     && combat_info.destroyed_object_ids.find(maybe_fire_event->target_id)
                             != combat_info.destroyed_object_ids.end())
@@ -2547,11 +2565,11 @@ namespace {
                 ErrorLogger() << "HandleInvasion couldn't get planet";
                 continue;
             }
-            if (planet->CurrentMeterValue(METER_TROOPS) > 0.0f) {
+            if (planet->InitialMeterValue(METER_TROOPS) > 0.0f) {
                 // empires may have garrisons on planets
                 planet_empire_troops[planet->ID()][planet->Owner()] += planet->InitialMeterValue(METER_TROOPS) + 0.0001;    // small bonus to ensure ties are won by initial owner
             }
-            if (!planet->Unowned() && planet->CurrentMeterValue(METER_REBEL_TROOPS) > 0.0f) {
+            if (!planet->Unowned() && planet->InitialMeterValue(METER_REBEL_TROOPS) > 0.0f) {
                 // rebels may be present on empire-owned planets
                 planet_empire_troops[planet->ID()][ALL_EMPIRES] += planet->InitialMeterValue(METER_REBEL_TROOPS);
             }

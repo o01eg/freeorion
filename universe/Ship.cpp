@@ -281,7 +281,7 @@ bool Ship::CanBombard() const {
 }
 
 float Ship::Speed() const
-{ return CurrentMeterValue(METER_SPEED); }
+{ return InitialMeterValue(METER_SPEED); }
 
 float Ship::ColonyCapacity() const {
     float retval = 0.0f;
@@ -290,8 +290,7 @@ float Ship::ColonyCapacity() const {
     if (!design)
         return retval;
 
-    for (const std::string& part_name : design->Parts())
-    {
+    for (const std::string& part_name : design->Parts()) {
         if (part_name.empty())
             continue;
         const PartType* part_type = GetPartType(part_name);
@@ -301,7 +300,7 @@ float Ship::ColonyCapacity() const {
         if (part_class != PC_COLONY)
             continue;
         // add capacity for all instances of colony parts to accumulator
-        retval += this->CurrentPartMeterValue(METER_CAPACITY, part_name);
+        retval += this->InitialPartMeterValue(METER_CAPACITY, part_name);
     }
 
     return retval;
@@ -324,7 +323,7 @@ float Ship::TroopCapacity() const {
         if (part_class != PC_TROOPS)
             continue;
         // add capacity for all instances of colony parts to accumulator
-        retval += this->CurrentPartMeterValue(METER_CAPACITY, part_name);
+        retval += this->InitialPartMeterValue(METER_CAPACITY, part_name);
     }
 
     return retval;
@@ -358,42 +357,6 @@ const std::string& Ship::PublicName(int empire_id) const {
 std::shared_ptr<UniverseObject> Ship::Accept(const UniverseObjectVisitor& visitor) const
 { return visitor.Visit(std::const_pointer_cast<Ship>(std::static_pointer_cast<const Ship>(shared_from_this()))); }
 
-float Ship::NextTurnCurrentMeterValue(MeterType type) const {
-    const Meter* meter = UniverseObject::GetMeter(type);
-    if (!meter)
-        throw std::invalid_argument("Ship::NextTurnCurrentMeterValue passed meter type that the Ship does not have: " + boost::lexical_cast<std::string>(type));
-    float current_meter_value = meter->Current();
-
-    // ResourceCenter-like resource meter growth...
-
-    MeterType target_meter_type = INVALID_METER_TYPE;
-    switch (type) {
-    case METER_TARGET_INDUSTRY:
-    case METER_TARGET_RESEARCH:
-    case METER_TARGET_TRADE:
-        return current_meter_value;
-        break;
-    case METER_INDUSTRY:    target_meter_type = METER_TARGET_INDUSTRY;      break;
-    case METER_RESEARCH:    target_meter_type = METER_TARGET_RESEARCH;      break;
-    case METER_TRADE:       target_meter_type = METER_TARGET_TRADE;         break;
-    default:
-        return UniverseObject::NextTurnCurrentMeterValue(type);
-    }
-
-    const Meter* target_meter = UniverseObject::GetMeter(target_meter_type);
-    if (!target_meter)
-        throw std::runtime_error("Ship::NextTurnCurrentMeterValue dealing with invalid meter type: " + boost::lexical_cast<std::string>(type));
-    float target_meter_value = target_meter->Current();
-
-    // meter growth or decay towards target is one per turn.
-    if (target_meter_value > current_meter_value)
-        return std::min(current_meter_value + 1.0f, target_meter_value);
-    else if (target_meter_value < current_meter_value)
-        return std::max(target_meter_value, current_meter_value - 1.0f);
-    else
-        return current_meter_value;
-}
-
 const Meter* Ship::GetPartMeter(MeterType type, const std::string& part_name) const
 { return const_cast<Ship*>(this)->GetPartMeter(type, part_name); }
 
@@ -424,7 +387,7 @@ float Ship::SumCurrentPartMeterValuesForPartClass(MeterType type, ShipPartClass 
     if (!design)
         return retval;
 
-    const std::vector<std::string>& parts = design->Parts();
+    const auto& parts = design->Parts();
     if (parts.empty())
         return retval;
 
@@ -480,7 +443,7 @@ float Ship::FighterMax() const {
 float Ship::TotalWeaponsDamage(float shield_DR, bool include_fighters) const {
     // sum up all individual weapons' attack strengths
     float total_attack = 0.0f;
-    std::vector<float> all_weapons_damage = AllWeaponsDamage(shield_DR, include_fighters);
+    auto all_weapons_damage = AllWeaponsDamage(shield_DR, include_fighters);
     for (float attack : all_weapons_damage)
         total_attack += attack;
     return total_attack;
@@ -512,9 +475,9 @@ namespace {
                 continue;
             ShipPartClass part_class = part->Class();
 
-            // get the attack power for each weapon part
+            // get the attack power for each weapon part.
             if (part_class == PC_DIRECT_WEAPON) {
-                float part_attack = ship->CurrentPartMeterValue(METER, part_name);
+                float part_attack = ship->CurrentPartMeterValue(METER, part_name);  // used within loop that updates meters, so need current, not initial values
                 float part_shots = ship->CurrentPartMeterValue(SECONDARY_METER, part_name);
                 if (part_attack > DR)
                     retval.push_back((part_attack - DR)*part_shots);
@@ -731,19 +694,6 @@ void Ship::SetShipMetersToMax() {
         max_it->second.SetCurrent(Meter::LARGE_VALUE);
         entry.second.SetCurrent(Meter::LARGE_VALUE);
     }
-}
-
-void Ship::PopGrowthProductionResearchPhase() {
-    UniverseObject::PopGrowthProductionResearchPhase();
-
-    UniverseObject::GetMeter(METER_SHIELD)->SetCurrent(Ship::NextTurnCurrentMeterValue(METER_SHIELD));
-    UniverseObject::GetMeter(METER_INDUSTRY)->SetCurrent(Ship::NextTurnCurrentMeterValue(METER_INDUSTRY));
-    UniverseObject::GetMeter(METER_RESEARCH)->SetCurrent(Ship::NextTurnCurrentMeterValue(METER_RESEARCH));
-    UniverseObject::GetMeter(METER_TRADE)->SetCurrent(Ship::NextTurnCurrentMeterValue(METER_TRADE));
-
-    // part capacity meters set to max only by being in supply
-
-    StateChangedSignal();
 }
 
 void Ship::ClampMeters() {

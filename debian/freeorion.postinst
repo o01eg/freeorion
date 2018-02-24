@@ -36,8 +36,13 @@ case "$1" in
 	mkdir -p /var/log/freeorion
 	chown -R freeorion:freeorion /var/log/freeorion
 
+	chown -R freeorion:freeorion /etc/freeorion
+
 	# fix xmpp.conf mode
 	chmod 0600 /etc/freeorion/xmpp.conf
+	
+	# fix persistent_config.xml
+	chmod 0600 /etc/freeorion/persistent_config.xml
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

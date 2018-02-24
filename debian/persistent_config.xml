@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<XMLDoc>
+ <save>
+  <auto>
+   <hostless>
+    <enabled>1</enabled>
+   </hostless>
+  </auto>
+ </save>
+ <network>
+  <server>
+   <ai>
+    <max>5</max>
+   </ai>
+   <human>
+    <min>2</min>
+   </human>
+  </server>
+ </network>
+</XMLDoc>

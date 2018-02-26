@@ -916,9 +916,9 @@ namespace {
         void ToggleAvailability(const Availability::Enum type);
 
         /** Given the GUI's displayed availabilities as stored in this
-            AvailabilityManager, return the displayed state of the design \p
-            id. Return none if the design should not be displayed. */
-        boost::optional<DisplayedAvailabilies> DisplayedDesignAvailability(int id) const;
+            AvailabilityManager, return the displayed state of the \p design.
+            Return none if the \p design should not be displayed. */
+        boost::optional<DisplayedAvailabilies> DisplayedDesignAvailability(const ShipDesign& design) const;
         /** Given the GUI's displayed availabilities as stored in this
             AvailabilityManager, return the displayed state of the hull \p
             name. Return none if the hull should not be displayed. */
@@ -975,13 +975,13 @@ namespace {
     { SetAvailability(type, !GetAvailability(type)); }
 
     boost::optional<AvailabilityManager::DisplayedAvailabilies>
-    AvailabilityManager::DisplayedDesignAvailability(int id) const {
+    AvailabilityManager::DisplayedDesignAvailability(const ShipDesign& design) const {
         int empire_id = HumanClientApp::GetApp()->EmpireID();
         const Empire* empire = GetEmpire(empire_id);  // may be nullptr
-        bool available = empire ? empire->ShipDesignAvailable(id) : true;
+        bool available = empire ? empire->ShipDesignAvailable(design) : true;
 
         const auto& manager = GetCurrentDesignsManager();
-        const auto maybe_obsolete = manager.IsObsolete(id);
+        const auto maybe_obsolete = manager.IsObsolete(design.ID());
         bool is_obsolete = maybe_obsolete && *maybe_obsolete;
 
         return DisplayedXAvailability(available, is_obsolete);
@@ -2593,10 +2593,10 @@ void CompletedDesignsListBox::PopulateCore() {
         for (int design_id : manager.AllOrderedIDs()) {
             try {
                 const ShipDesign* design = GetShipDesign(design_id);
-                if (!design || !design->Producible())
+                if (!design)
                     continue;
 
-                auto shown = AvailabilityState().DisplayedDesignAvailability(design_id);
+                auto shown = AvailabilityState().DisplayedDesignAvailability(*design);
                 if (shown) {
                     auto row = GG::Wnd::Create<CompletedDesignListBoxRow>(row_size.x, row_size.y, *design);
                     row->SetAvailability(*shown);
@@ -2630,7 +2630,7 @@ void SavedDesignsListBox::PopulateCore() {
 
     for (const auto& uuid : GetSavedDesignsManager().OrderedDesignUUIDs()) {
         const auto design = GetSavedDesignsManager().GetDesign(uuid);
-        auto shown = AvailabilityState().DisplayedDesignAvailability(design->ID());
+        auto shown = AvailabilityState().DisplayedDesignAvailability(*design);
         if (!shown)
             continue;
 
@@ -2713,7 +2713,7 @@ std::shared_ptr<BasesListBox::Row> CompletedDesignsListBox::ChildrenDraggedAwayC
 
     const auto row_size = ListRowSize();
     auto row = GG::Wnd::Create<CompletedDesignListBoxRow>(row_size.x, row_size.y, *design);
-    if (auto shown = AvailabilityState().DisplayedDesignAvailability(design->ID()))
+    if (auto shown = AvailabilityState().DisplayedDesignAvailability(*design))
         row->SetAvailability(*shown);
     return row;
 }
@@ -2734,7 +2734,7 @@ std::shared_ptr<BasesListBox::Row> SavedDesignsListBox::ChildrenDraggedAwayCore(
     const auto row_size = ListRowSize();
     auto row = GG::Wnd::Create<SavedDesignListBoxRow>(row_size.x, row_size.y, *design);
 
-    if (auto shown = AvailabilityState().DisplayedDesignAvailability(design->ID()))
+    if (auto shown = AvailabilityState().DisplayedDesignAvailability(*design))
         row->SetAvailability(*shown);
 
     return row;
@@ -4514,13 +4514,13 @@ void DesignWnd::MainPanel::DesignChanged() {
 
         if (m_disabled_by_part_conflict) {
             m_replace_button->SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(
-                UserString("DESIGN_COMPONENT_CONFLICT"),
-                boost::io::str(FlexibleFormat(UserString("DESIGN_COMPONENT_CONFLICT_DETAIL"))
+                UserString("DESIGN_WND_COMPONENT_CONFLICT"),
+                boost::io::str(FlexibleFormat(UserString("DESIGN_WND_COMPONENT_CONFLICT_DETAIL"))
                                % UserString(problematic_components.first)
                                % UserString(problematic_components.second))));
             m_confirm_button->SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(
-                UserString("DESIGN_COMPONENT_CONFLICT"),
-                boost::io::str(FlexibleFormat(UserString("DESIGN_COMPONENT_CONFLICT_DETAIL"))
+                UserString("DESIGN_WND_COMPONENT_CONFLICT"),
+                boost::io::str(FlexibleFormat(UserString("DESIGN_WND_COMPONENT_CONFLICT_DETAIL"))
                                % UserString(problematic_components.first)
                                % UserString(problematic_components.second))));
 
@@ -4556,7 +4556,7 @@ void DesignWnd::MainPanel::DesignChanged() {
             m_replace_button->SetBrowseInfoWnd(
                 GG::Wnd::Create<TextBrowseWnd>(
                     UserString("DESIGN_WND_UPDATE_SAVED"),
-                    boost::io::str(FlexibleFormat(UserString("DESIGN_WND_UPDATE_DETAIL_SAVED"))
+                    boost::io::str(FlexibleFormat(UserString("DESIGN_WND_UPDATE_SAVED_DETAIL"))
                                    % (*replaced_saved_design)->Name()
                                    % new_design_name)));
             m_replace_button->Disable(false);
@@ -4568,15 +4568,15 @@ void DesignWnd::MainPanel::DesignChanged() {
             // A current design can be replaced if it doesn't duplicate an existing design
             m_replace_button->SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(
                 UserString("DESIGN_WND_UPDATE_FINISHED"),
-                boost::io::str(FlexibleFormat(UserString("DESIGN_WND_UPDATE_DETAIL_FINISHED"))
+                boost::io::str(FlexibleFormat(UserString("DESIGN_WND_UPDATE_FINISHED_DETAIL"))
                                % (*replaced_current_design)->Name()
                                % new_design_name)));
             m_replace_button->Disable(false);
         } else {
             // Otherwise mark it as known.
             m_replace_button->SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(
-                UserString("DESIGN_KNOWN"),
-                boost::io::str(FlexibleFormat(UserString("DESIGN_KNOWN_DETAIL"))
+                UserString("DESIGN_WND_KNOWN"),
+                boost::io::str(FlexibleFormat(UserString("DESIGN_WND_KNOWN_DETAIL"))
                                % *existing_design_name)));
         }
     }
@@ -4590,7 +4590,7 @@ void DesignWnd::MainPanel::DesignChanged() {
         m_confirm_button->SetBrowseInfoWnd(
             GG::Wnd::Create<TextBrowseWnd>(
                 UserString("DESIGN_WND_ADD_SAVED"),
-                boost::io::str(FlexibleFormat(UserString("DESIGN_WND_ADD_DETAIL_SAVED"))
+                boost::io::str(FlexibleFormat(UserString("DESIGN_WND_ADD_SAVED_DETAIL"))
                                % new_design_name)));
         m_confirm_button->Disable(false);
     } else if (producible) {
@@ -4598,15 +4598,15 @@ void DesignWnd::MainPanel::DesignChanged() {
             // A new current can be added if it does not duplicate an existing design.
             m_confirm_button->SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(
                 UserString("DESIGN_WND_ADD_FINISHED"),
-                boost::io::str(FlexibleFormat(UserString("DESIGN_WND_ADD_DETAIL_FINISHED"))
+                boost::io::str(FlexibleFormat(UserString("DESIGN_WND_ADD_FINISHED_DETAIL"))
                                % new_design_name)));
             m_confirm_button->Disable(false);
 
         } else {
             // Otherwise the design is already known.
             m_confirm_button->SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(
-                UserString("DESIGN_KNOWN"),
-                boost::io::str(FlexibleFormat(UserString("DESIGN_KNOWN_DETAIL"))
+                UserString("DESIGN_WND_KNOWN"),
+                boost::io::str(FlexibleFormat(UserString("DESIGN_WND_KNOWN_DETAIL"))
                                % *existing_design_name)));
         }
     }

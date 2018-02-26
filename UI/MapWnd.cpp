@@ -6676,6 +6676,7 @@ void MapWnd::RefreshIndustryResourceIndicator() {
     double total_PP_target_output = empire->GetResourcePool(RE_INDUSTRY)->TargetOutput();
     float  stockpile = empire->GetResourcePool(RE_INDUSTRY)->Stockpile();
     float  stockpile_used = boost::accumulate(empire->GetProductionQueue().AllocatedStockpilePP() | boost::adaptors::map_values, 0.0f);
+    float  stockpile_use_capacity = empire->GetProductionQueue().StockpileCapacity();
     float  expected_stockpile = empire->GetProductionQueue().ExpectedNewStockpileAmount();
 
     float  stockpile_limit = empire->GetProductionQueue().StockpileCapacity();
@@ -6699,7 +6700,7 @@ void MapWnd::RefreshIndustryResourceIndicator() {
         -1.0f, -1.0f, -1.0f,
         true, stockpile_used, stockpile, expected_stockpile));
 
-    if (total_PP_wasted > 0.05) {
+    if (total_PP_wasted > 0.05 || (total_PP_excess > (3 * stockpile_use_capacity))) {
         DebugLogger()  << "MapWnd::RefreshIndustryResourceIndicator: Showing Industry Wasted Icon with Industry spent: "
                        << total_PP_spent << " and Industry Production: " << total_PP_output << ", wasting " << total_PP_wasted;
         m_industry_wasted->Show();
@@ -6751,7 +6752,7 @@ void MapWnd::RefreshPopulationIndicator() {
 
     m_population->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
     m_population->SetBrowseInfoWnd(GG::Wnd::Create<CensusBrowseWnd>(
-        UserString("MAP_POPULATION_DISTRIBUTION"), population_counts, tag_counts));
+        UserString("MAP_POPULATION_DISTRIBUTION"), population_counts, tag_counts, GetSpeciesManager().census_order()));
 }
 
 void MapWnd::UpdateSidePanelSystemObjectMetersAndResourcePools() {

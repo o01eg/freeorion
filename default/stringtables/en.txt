@@ -1000,6 +1000,18 @@ Your connection was replaced.
 ## Game Rules
 ##
 
+RULE_PRODUCTION_QUEUE_FRONTLOAD_FACTOR
+Turn PP overcommit
+
+RULE_PRODUCTION_QUEUE_FRONTLOAD_FACTOR_DESC
+Percentage of PP overcommitment per item build turn to build in time.
+
+RULE_PRODUCTION_QUEUE_TOPPING_UP_FACTOR
+Final PP overcommit
+
+RULE_PRODUCTION_QUEUE_TOPPING_UP_FACTOR_DESC
+Percentage of PP overcommitment on final item build turn to build in time.
+
 RULE_CHEAP_AND_FAST_TECH_RESEARCH
 Cheap and Fast Techs
 
@@ -4298,26 +4310,26 @@ Begin a ship design by selecting its hull.
 DESIGN_INV_NO_NAME
 Design name cannot be empty.
 
-DESIGN_KNOWN
+DESIGN_WND_KNOWN
 Duplicates Existing Design
 
 # %1% name of the equivalent ship design.
-DESIGN_KNOWN_DETAIL
+DESIGN_WND_KNOWN_DETAIL
 This design is a duplicate of "%1%".
 
-DESIGN_COMPONENT_CONFLICT
+DESIGN_WND_COMPONENT_CONFLICT
 Conflicting Design
 
 # %1% first conflicting ship part name.
 # %2% second conflicting ship part name.
-DESIGN_COMPONENT_CONFLICT_DETAIL
+DESIGN_WND_COMPONENT_CONFLICT_DETAIL
 A shipdesign cannot contain both %1% and %2%.
 
 DESIGN_WND_ADD_FINISHED
 Add Finished Design
 
 # %1% name of the new ship design.
-DESIGN_WND_ADD_DETAIL_FINISHED
+DESIGN_WND_ADD_FINISHED_DETAIL
 '''Add new design called
 "%1%"
 to finished designs.'''
@@ -4327,7 +4339,7 @@ Update Finished Design
 
 # %1% previous name of the existing design.
 # %2% new name of the existing design.
-DESIGN_WND_UPDATE_DETAIL_FINISHED
+DESIGN_WND_UPDATE_FINISHED_DETAIL
 '''Replace Finished design
 "%1%"
 with new design
@@ -4338,7 +4350,7 @@ DESIGN_WND_ADD_SAVED
 Add Saved Design
 
 # %1% name of the new ship design.
-DESIGN_WND_ADD_DETAIL_SAVED
+DESIGN_WND_ADD_SAVED_DETAIL
 '''Add a design called
 "%1%"
 to saved designs.'''
@@ -4348,7 +4360,7 @@ Update Saved Design
 
 # %1% old name of the saved design.
 # %2% new name of the saved design.
-DESIGN_WND_UPDATE_DETAIL_SAVED
+DESIGN_WND_UPDATE_SAVED_DETAIL
 '''Replace saved design
 "%1%"
 with new design
@@ -4373,7 +4385,7 @@ Toggle the Obsolete, Available and Unavailable filters to show more
 NO_SAVED_OR_DEFAULT_DESIGNS_ADDED_PROMPT
 '''Select a hull, add parts and then click "[[DESIGN_WND_ADD_FINISHED]]" to create an available design.
 
-Neither the Saved Designs nor the Default Designs were added to the empire at game start.  Options to add these designs at game start can be changed in Options->Other.  Add the Saved Designs with the context menu of any design under the Saved tab.'''
+Neither the Saved Designs nor the Default Designs were added to the empire at game start.  Options to add these designs at game start can be changed in Options->Other.  Add the Saved Designs immediately with the context menu of any design under the Saved tab.'''
 
 # %1% File path of unwritable file
 ERROR_UNABLE_TO_WRITE_FILE
@@ -4497,6 +4509,7 @@ ENC_GALAXY_SETUP
 # %8% monster frequency in the current galaxy.
 # %9% natives frequency in the current galaxy.
 # %10% upper AI aggression level in this galaxy.
+# %11% game UID
 ENC_GALAXY_SETUP_SETTINGS
 '''Seed: %1%
 Number of Systems: %2%
@@ -4508,6 +4521,7 @@ Specials: %7%
 Monsters: %8%
 Natives: %9%
 AI Max Aggression: %10%
+Game UID: %11%
 '''
 
 ENC_GAME_RULES
@@ -7020,7 +7034,6 @@ Self-Sustaining
 SELF_SUSTAINING_SPECIES_CLASS_DESC
 List of [[encyclopedia SELF_SUSTAINING_SPECIES_TITLE]] species:
 
-
 GASEOUS_SPECIES_CLASS
 Gaseous
 
@@ -7232,7 +7245,6 @@ Sly
 SP_SLY_GAMEPLAY_DESC
 '''Friendly overlooked gasbags.
 Greatly prefer [[PT_GASGIANT]]s.
-
 [[encyclopedia GASEOUS_SPECIES_TITLE]]
 '''
 
@@ -14167,13 +14179,13 @@ GASEOUS_DESC
 +	Refuel on Gas Giants 0.1'''
 
 BAD_POPULATION_DESC
-−	Bad Population 75%
+−	Bad [[metertype METER_POPULATION]]: 75%
 
 AVERAGE_POPULATION_DESC
-'''	Average Population'''
+'''	Average [[metertype METER_POPULATION]]: 100%'''
 
 GOOD_POPULATION_DESC
-+	Good Population 125%
++	Good [[metertype METER_POPULATION]]: 125%
 
 FIXED_LOW_POPULATION_DESC
 −−	Maximum Population is fixed at 5
@@ -14194,16 +14206,16 @@ ULTIMATE_SUPPLY_DESC
 ++	Ultimate [[metertype METER_SUPPLY]]: +3
 
 NO_STOCKPILE_DESC
---	No [[metertype METER_STOCKPILE]]
+−−	No [[metertype METER_STOCKPILE]]
 
 BAD_STOCKPILE_DESC
-	Bad [[metertype METER_STOCKPILE]]: 50%
+−	Bad [[metertype METER_STOCKPILE]]: 50%
 
 AVERAGE_STOCKPILE_DESC
-	Average [[metertype METER_STOCKPILE]]: 100%
+'''	Average [[metertype METER_STOCKPILE]]: 100%'''
 
 GOOD_STOCKPILE_DESC
-+	Great [[metertype METER_STOCKPILE]]: 300%
++	Good [[metertype METER_STOCKPILE]]: 300%
 
 GREAT_STOCKPILE_DESC
 ++	Great [[metertype METER_STOCKPILE]]: 1000%
@@ -14318,12 +14330,12 @@ Homeworld
 # %1% FIXME
 # %2% FIXME
 BAD_POPULATION_LABEL
-%2% Bad Population 75%%
+%2% Bad Population
 
 # %1% FIXME
 # %2% FIXME
 GOOD_POPULATION_LABEL
-%2% Good Population 125%%
+%2% Good Population
 
 # %1% FIXME
 # %2% FIXME
@@ -14402,8 +14414,18 @@ ULTIMATE_SUPPLY_LABEL
 
 # %1% FIXME
 # %2% FIXME
+BAD_STOCKPILE_LABEL
+%2% Bad Stockpiling
+
+# %1% FIXME
+# %2% FIXME
 AVERAGE_STOCKPILE_LABEL
 %2% Average Stockpiling
+
+# %1% FIXME
+# %2% FIXME
+GOOD_STOCKPILE_LABEL
+%2% Good Stockpiling
 
 # %1% FIXME
 # %2% FIXME
@@ -18406,6 +18428,5 @@ MONSTER_NAMES
 [[SHIP_NAME_UNSORTED_MYTHOLOGY]]
 [[SHIP_NAME_DEVS]]'''
 
-#include "../global_settings.txt"
 #include "../content_specific_parameters.txt"
 #include "../customizations/common_user_customizations.txt"

@@ -2447,8 +2447,9 @@ sc::result WaitingForSaveData::react(const ClientSaveData& msg) {
 
     try {
         ExtractClientSaveDataMessageData(message, received_orders, ui_data_available, *ui_data, save_state_string_available, save_state_string);
-    } catch (const std::exception& e) {
-        DebugLogger(FSM) << "WaitingForSaveData::react(const ClientSaveData& msg) received invalid save data from player " << player_connection->PlayerName();
+    } catch (const std::exception& error) {
+        ErrorLogger(FSM) << "WaitingForSaveData::react(const ClientSaveData& msg) received invalid save data from player "
+                         << player_connection->PlayerName() << ". Error: " << error.what();
         player_connection->SendMessage(ErrorMessage(UserStringNop("INVALID_CLIENT_SAVE_DATA_RECEIVED"), false));
 
         // TODO: use whatever portion of message data was extracted, and leave the rest as defaults.
@@ -2502,8 +2503,8 @@ sc::result WaitingForSaveData::react(const ClientSaveData& msg) {
                                      GetCombatLogManager(),             server.m_galaxy_setup_data,
                                      !server.m_single_player_game);
 
-        } catch (const std::exception&) {
-            DebugLogger(FSM) << "Catch std::exception&";
+        } catch (const std::exception& error) {
+            ErrorLogger(FSM) << "Catch std::exception: " << error.what();
             SendMessageToAllPlayers(ErrorMessage(UserStringNop("UNABLE_TO_WRITE_SAVE_FILE"), false));
         }
 
@@ -2566,7 +2567,8 @@ sc::result ProcessingTurn::react(const ProcessTurn& u) {
     }
 
     if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.enabled")) {
-        boost::filesystem::path autosave_dir_path = GetServerSaveDir() / "auto";
+        std::string subdir = GetGalaxySetupData().GetGameUID();
+        boost::filesystem::path autosave_dir_path = GetServerSaveDir() / (subdir.empty() ? "auto" : subdir);
         const auto& extension = MP_SAVE_FILE_EXTENSION;
         // Add timestamp to autosave generated files
         std::string datetime_str = FilenameTimestamp();

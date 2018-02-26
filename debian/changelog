@@ -1,3 +1,9 @@
+freeorion (0.4.8+git20180225~23a9904-1) unstable; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg <o01eg@yandex.ru>  Mon, 26 Feb 2018 18:05:35 +0000
+
 freeorion (0.4.8+git20180219~77907e6-2) unstable; urgency=medium
 
   * Use config file.

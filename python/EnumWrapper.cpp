@@ -1,6 +1,7 @@
 #include "../universe/Enums.h"
 #include "../Empire/Diplomacy.h"
 #include "../util/MultiplayerCommon.h"
+#include "../util/GameRules.h"
 
 #include <boost/python.hpp>
 
@@ -66,6 +67,7 @@ namespace FreeOrionPython {
         enum_<BuildType>("buildType")
             .value("building",          BT_BUILDING)
             .value("ship",              BT_SHIP)
+            .value("stockpile",         BT_STOCKPILE)
         ;
         enum_<ResourceType>("resourceType")
             .value("industry",      RE_INDUSTRY)

@@ -3,9 +3,10 @@
 #include "Empire.h"
 #include "../util/Directories.h"
 #include "../util/Logger.h"
-#include "../util/MultiplayerCommon.h"
 #include "../util/XMLDoc.h"
 #include "../universe/Enums.h"
+
+#include <boost/filesystem/fstream.hpp>
 
 namespace {
     // sorted pair, so order of empire IDs specified doesn't matter

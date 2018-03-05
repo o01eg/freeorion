@@ -20,6 +20,7 @@
 #include "../util/Random.h"
 #include "../util/Logger.h"
 #include "../util/MultiplayerCommon.h"
+#include "../util/GameRules.h"
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -2883,7 +2884,7 @@ std::string Operation<std::string>::EvalImpl(const ScriptingContext& context) co
 }
 
 template <>
-double      Operation<double>::EvalImpl(const ScriptingContext& context) const
+double Operation<double>::EvalImpl(const ScriptingContext& context) const
 {
     switch (m_op_type) {
         case PLUS:
@@ -3019,7 +3020,7 @@ double      Operation<double>::EvalImpl(const ScriptingContext& context) const
 }
 
 template <>
-int         Operation<int>::EvalImpl(const ScriptingContext& context) const
+int Operation<int>::EvalImpl(const ScriptingContext& context) const
 {
     switch (m_op_type) {
         case PLUS:

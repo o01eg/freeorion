@@ -1,8 +1,7 @@
-from common.configure_logging import convenience_function_references_for_logger, redirect_logging_to_freeorion_logger
+from common.configure_logging import redirect_logging_to_freeorion_logger
 
 # Logging is redirected before other imports so that import errors appear in log files.
 redirect_logging_to_freeorion_logger()
-(debug, info, warn, error, fatal) = convenience_function_references_for_logger()
 
 import random
 
@@ -153,7 +152,7 @@ def create_universe(psd_map):
     for i, v in enumerate(empire_names):
         empire_names[i] = v.capitalize()[:2]
 
-    fo.get_galaxy_setup_data().gameUID = "".join(empire_names) + str(random.randint(0,999)).zfill(3)
+    fo.get_galaxy_setup_data().gameUID = "".join(empire_names) + str(random.randint(0, 999)).zfill(3)
 
     print "Game UID %s" % fo.get_galaxy_setup_data().gameUID
 

@@ -204,11 +204,7 @@ class FO_COMMON_API FleetMoveOrder : public Order {
 public:
     /** \name Structors */ //@{
     FleetMoveOrder(int empire_id, int fleet_id, int start_system_id, int dest_system_id,
-                   std::vector<int> route, bool append = false);
-
-    FleetMoveOrder(int empire_id, int fleet_id, int start_system_id, int dest_system_id, bool append = false);
-
-    FleetMoveOrder(int empire_id, int fleet_id, std::vector<int> route);
+                   bool append = false);
     //@}
 
     /** \name Accessors */ //@{
@@ -489,9 +485,7 @@ class FO_COMMON_API ResearchQueueOrder : public Order {
 public:
     /** \name Structors */ //@{
     ResearchQueueOrder(int empire, const std::string& tech_name);
-
     ResearchQueueOrder(int empire, const std::string& tech_name, int position);
-
     ResearchQueueOrder(int empire, const std::string& tech_name, bool pause, float dummy);
     //@}
 
@@ -528,23 +522,14 @@ class FO_COMMON_API ProductionQueueOrder : public Order {
 public:
     /** \name Structors */ //@{
     ProductionQueueOrder(int empire, const ProductionQueue::ProductionItem& item, int number, int location, int pos = -1);
-
     ProductionQueueOrder(int empire, int index, int new_quantity, bool dummy);
-
     ProductionQueueOrder(int empire, int index, int rally_point_id, bool dummy1, bool dummy2);
-
     ProductionQueueOrder(int empire, int index, int new_quantity, int new_blocksize);
-
     ProductionQueueOrder(int empire, int index, int new_index);
-
     ProductionQueueOrder(int empire, int index);
-
     ProductionQueueOrder(int empire, int index, bool pause, float dummy);
-
     ProductionQueueOrder(int empire, int index, float dummy1);
-
     ProductionQueueOrder(int empire, int index, float dummy1, float dummy2);
-
     ProductionQueueOrder(int empire, int index, bool allow_use_imperial_pp, float dummy, float dummy2);
     //@}
 
@@ -600,12 +585,10 @@ class FO_COMMON_API ShipDesignOrder : public Order {
 public:
     /** \name Structors */ //@{
     ShipDesignOrder(int empire, int existing_design_id_to_remember);
-
     ShipDesignOrder(int empire, int design_id_to_erase, bool dummy);
-
     ShipDesignOrder(int empire, const ShipDesign& ship_design);
-
-    ShipDesignOrder(int empire, int existing_design_id, const std::string& new_name, const std::string& new_description = "");
+    ShipDesignOrder(int empire, int existing_design_id, const std::string& new_name,
+                    const std::string& new_description = "");
     //@}
 
     int DesignID() const

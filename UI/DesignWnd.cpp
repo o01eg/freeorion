@@ -552,8 +552,7 @@ namespace {
 
             const auto save_path = CreateSaveFileNameForDesign(design);
 
-            m_saved_designs.insert(
-                std::make_pair(design.UUID(), std::make_pair(std::move(design_copy), save_path)));
+            m_saved_designs.insert(std::make_pair(design.UUID(), std::make_pair(std::move(design_copy), save_path)));
             SaveDesign(design.UUID());
         }
 
@@ -877,7 +876,7 @@ namespace {
         design_ids_and_obsoletes.clear();
         for (const auto id : m_ordered_design_ids) {
             try {
-                design_ids_and_obsoletes.push_back(std::make_pair(id, m_id_to_obsolete_and_loc.at(id).first));
+                design_ids_and_obsoletes.push_back({id, m_id_to_obsolete_and_loc.at(id).first});
             } catch (const std::out_of_range&) {
                 ErrorLogger() << "CurrentShipDesignManager::Save missing id = " << id;
                 continue;
@@ -887,7 +886,7 @@ namespace {
         hulls_and_obsoletes.clear();
         for (const auto name : m_ordered_hulls) {
             try {
-               hulls_and_obsoletes.push_back(std::make_pair(name, m_hull_to_obsolete_and_loc.at(name).first));
+               hulls_and_obsoletes.push_back({name, m_hull_to_obsolete_and_loc.at(name).first});
             } catch (const std::out_of_range&) {
                 ErrorLogger() << "CurrentShipDesignManager::Save missing hull = " << name;
                 continue;
@@ -1253,47 +1252,42 @@ public:
 
     /** \name Accessors */ //@{
     const std::set<ShipPartClass>&  GetClassesShown() const;
-    const std::set<ShipSlotType>&   GetSlotTypesShown() const;
-
     const AvailabilityManager&      AvailabilityState() const { return m_availabilities_state; }
-
-    //@}
     bool                            GetShowingSuperfluous() const { return m_show_superfluous_parts; }
+    //@}
 
     /** \name Mutators */ //@{
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
-
     void AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds,
                      GG::Flags<GG::ModKey> mod_keys) override;
 
-    PartGroupsType  GroupAvailableDisplayableParts(const Empire* empire);
-    void            CullSuperfluousParts(std::vector<const PartType* >& this_group,
-                                         ShipPartClass pclass, int empire_id, int loc_id);
-    void            Populate();
+    PartGroupsType GroupAvailableDisplayableParts(const Empire* empire);
+    void CullSuperfluousParts(std::vector<const PartType* >& this_group,
+                              ShipPartClass pclass, int empire_id, int loc_id);
+    void Populate();
 
-    void            ShowClass(ShipPartClass part_class, bool refresh_list = true);
-    void            ShowAllClasses(bool refresh_list = true);
-    void            HideClass(ShipPartClass part_class, bool refresh_list = true);
-    void            HideAllClasses(bool refresh_list = true);
-
-    void            ShowSuperfluousParts(bool refresh_list = true);
-    void            HideSuperfluousParts(bool refresh_list = true);
+    void ShowClass(ShipPartClass part_class, bool refresh_list = true);
+    void ShowAllClasses(bool refresh_list = true);
+    void HideClass(ShipPartClass part_class, bool refresh_list = true);
+    void HideAllClasses(bool refresh_list = true);
+    void ShowSuperfluousParts(bool refresh_list = true);
+    void HideSuperfluousParts(bool refresh_list = true);
     //@}
 
-    mutable boost::signals2::signal<void (const PartType*, GG::Flags<GG::ModKey>)> PartTypeClickedSignal;
-    mutable boost::signals2::signal<void (const PartType*)> PartTypeDoubleClickedSignal;
-    mutable boost::signals2::signal<void (const PartType*, const GG::Pt& pt)> PartTypeRightClickedSignal;
-    mutable boost::signals2::signal<void (const std::string&)> ClearPartSignal;
+    mutable boost::signals2::signal<void (const PartType*, GG::Flags<GG::ModKey>)>  PartTypeClickedSignal;
+    mutable boost::signals2::signal<void (const PartType*)>                         PartTypeDoubleClickedSignal;
+    mutable boost::signals2::signal<void (const PartType*, const GG::Pt& pt)>       PartTypeRightClickedSignal;
+    mutable boost::signals2::signal<void (const std::string&)>                      ClearPartSignal;
 
 protected:
     void DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
                          const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) const override;
 
 private:
-    std::set<ShipPartClass> m_part_classes_shown;   // which part classes should be shown
-    bool                    m_show_superfluous_parts;
-    int                     m_previous_num_columns;
-    const AvailabilityManager& m_availabilities_state;
+    std::set<ShipPartClass>     m_part_classes_shown;   // which part classes should be shown
+    bool                        m_show_superfluous_parts;
+    int                         m_previous_num_columns;
+    const AvailabilityManager&  m_availabilities_state;
 };
 
 PartsListBox::PartsListBoxRow::PartsListBoxRow(GG::X w, GG::Y h, const AvailabilityManager& availabilities_state) :
@@ -1411,7 +1405,7 @@ PartGroupsType PartsListBox::GroupAvailableDisplayableParts(const Empire* empire
 
         // check whether this part should be shown in list
         ShipPartClass part_class = part->Class();
-        if (m_part_classes_shown.find(part_class) == m_part_classes_shown.end())
+        if (!m_part_classes_shown.count(part_class))
             continue;   // part of this class is not requested to be shown
 
         // Check if part satisfies availability and obsolecense
@@ -1604,7 +1598,7 @@ void PartsListBox::Populate() {
     for (auto& part_group : part_groups) {
         std::multimap<double, const PartType*> sorted_group;
         for (const PartType* part : part_group.second) {
-            if (already_added.find(part) != already_added.end())
+            if (already_added.count(part))
                 continue;
             already_added.insert(part);
             sorted_group.insert({GetMainStat(part), part});
@@ -1656,7 +1650,7 @@ void PartsListBox::Populate() {
 }
 
 void PartsListBox::ShowClass(ShipPartClass part_class, bool refresh_list) {
-    if (m_part_classes_shown.find(part_class) == m_part_classes_shown.end()) {
+    if (!m_part_classes_shown.count(part_class)) {
         m_part_classes_shown.insert(part_class);
         if (refresh_list)
             Populate();
@@ -2021,7 +2015,7 @@ void DesignWnd::PartPalette::HideAllClasses(bool refresh_list) {
 void DesignWnd::PartPalette::ToggleClass(ShipPartClass part_class, bool refresh_list) {
     if (part_class >= ShipPartClass(0) && part_class < NUM_SHIP_PART_CLASSES) {
         const auto& classes_shown = m_parts_list->GetClassesShown();
-        if (classes_shown.find(part_class) == classes_shown.end())
+        if (!classes_shown.count(part_class))
             ShowClass(part_class, refresh_list);
         else
             HideClass(part_class, refresh_list);
@@ -4325,8 +4319,7 @@ void DesignWnd::MainPanel::SetDesignComponents(const std::string& hull,
 
 void DesignWnd::MainPanel::HighlightSlotType(std::vector<ShipSlotType>& slot_types) {
     for (auto& control : m_slots) {
-        ShipSlotType slot_type = control->SlotType();
-        if (std::find(slot_types.begin(), slot_types.end(), slot_type) != slot_types.end())
+        if (std::count(slot_types.begin(), slot_types.end(), control->SlotType()))
             control->Highlight(true);
         else
             control->Highlight(false);
@@ -4484,7 +4477,7 @@ void DesignWnd::MainPanel::DesignChanged() {
         for (const std::string& part_name : Parts()) {
             if (part_name.empty())
                 continue;
-            if (hull_exclusions.find(part_name) != hull_exclusions.end()) {
+            if (hull_exclusions.count(part_name)) {
                 m_disabled_by_part_conflict = true;
                 problematic_components.first = m_hull->Name();
                 problematic_components.second = part_name;
@@ -4501,7 +4494,7 @@ void DesignWnd::MainPanel::DesignChanged() {
             if (!part_type)
                 continue;
             for (const std::string& excluded_part : part_type->Exclusions()) {
-                if (already_seen_component_names.find(excluded_part) != already_seen_component_names.end()) {
+                if (already_seen_component_names.count(excluded_part)) {
                     m_disabled_by_part_conflict = true;
                     problematic_components.first = part_name;
                     problematic_components.second = excluded_part;

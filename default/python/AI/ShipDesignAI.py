@@ -45,6 +45,7 @@ global variables:
 import copy
 import math
 from collections import Counter, defaultdict
+from logging import warn, error
 
 import freeOrionAIInterface as fo
 import FreeOrionAI as foAI
@@ -54,9 +55,6 @@ import FleetUtilsAI
 from AIDependencies import INVALID_ID
 from freeorion_tools import UserString, tech_is_complete
 from turn_state import state
-
-from common.configure_logging import convenience_function_references_for_logger
-(debug, info, warn, error, fatal) = convenience_function_references_for_logger(__name__)
 
 # Define meta classes for the ship parts  TODO storing as set may not be needed anymore
 ARMOUR = frozenset({fo.shipPartClass.armour})
@@ -1701,7 +1699,7 @@ class WarShipDesigner(MilitaryShipDesignerBaseClass):
             else:
                 ret_val[idxweapon] = num_slots
         elif armours:
-            armour = max(armours, key=cap).name
+            armour = max(armours, key=_get_capacity).name
             idxarmour = available_parts.index(armour)
             ret_val[idxarmour] = num_slots
         else:

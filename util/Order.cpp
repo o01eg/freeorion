@@ -222,7 +222,7 @@ void NewFleetOrder::ExecuteImpl() const {
         for (auto& ship : validated_ships) {
             if (auto old_fleet = GetFleet(ship->FleetID())) {
                 modified_fleets.insert(old_fleet);
-                old_fleet->RemoveShip(ship->ID());
+                old_fleet->RemoveShips({ship->ID()});
             }
             ship->SetFleetID(fleet->ID());
         }
@@ -257,12 +257,12 @@ void NewFleetOrder::ExecuteImpl() const {
 // FleetMoveOrder
 ////////////////////////////////////////////////
 FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int start_system_id, int dest_system_id,
-                               std::vector<int> route, bool append) :
+                               bool append) :
     Order(empire_id),
     m_fleet(fleet_id),
     m_start_system(start_system_id),
     m_dest_system(dest_system_id),
-    m_route(route),
+    m_route(),
     m_append(append)
 {
     // perform sanity checks
@@ -285,25 +285,14 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int start_system_id,
         return;
     }
 
-    if (m_route.empty()) {
-        auto short_path = GetPathfinder()->ShortestPath(m_start_system, m_dest_system, EmpireID());
+    auto short_path = GetPathfinder()->ShortestPath(m_start_system, m_dest_system, EmpireID());
 
-        m_route.clear();
-        std::copy(short_path.first.begin(), short_path.first.end(), std::back_inserter(m_route));
+    std::copy(short_path.first.begin(), short_path.first.end(), std::back_inserter(m_route));
 
-        // ensure a zero-length (invalid) route is not requested / sent to a fleet
-        if (m_route.empty())
-            m_route.push_back(m_start_system);
-    }
+    // ensure a zero-length (invalid) route is not requested / sent to a fleet
+    if (m_route.empty())
+        m_route.push_back(m_start_system);
 }
-
-FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int start_system_id, int dest_system_id, bool append) :
-    FleetMoveOrder(empire_id, fleet_id, start_system_id, dest_system_id, std::vector<int>(), append)
-{}
-
-FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, std::vector<int> route) :
-    FleetMoveOrder(empire_id, fleet_id, *route.begin(), *route.rbegin(), route, false)
-{}
 
 void FleetMoveOrder::ExecuteImpl() const {
     GetValidatedEmpire();
@@ -454,7 +443,7 @@ void FleetTransferOrder::ExecuteImpl() const {
     std::set<std::shared_ptr<Fleet>> modified_fleets;
     for (auto& ship : validated_ships) {
         if (auto source_fleet = GetFleet(ship->FleetID())) {
-            source_fleet->RemoveShip(ship->ID());
+            source_fleet->RemoveShips({ship->ID()});
             modified_fleets.insert(source_fleet);
         }
         ship->SetFleetID(target_fleet->ID());
@@ -1107,7 +1096,7 @@ void ShipDesignOrder::ExecuteImpl() const {
 
         // check if the empire can see any objects that have this design (thus enabling it to be copied)
         const std::set<int>& empire_known_design_ids = universe.EmpireKnownShipDesignIDs(EmpireID());
-        if (empire_known_design_ids.find(m_design_id) != empire_known_design_ids.end()) {
+        if (empire_known_design_ids.count(m_design_id)) {
             empire->AddShipDesign(m_design_id);
         } else {
             ErrorLogger() << "Empire, " << EmpireID() << ", tried to remember a ShipDesign id = " << m_design_id

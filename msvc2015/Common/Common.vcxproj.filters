@@ -64,10 +64,19 @@
     <ClInclude Include="..\..\Empire\Empire.h">
       <Filter>Header Files\Empire</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Empire\ResearchQueue.h">
+      <Filter>Header Files\Empire</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Empire\ProductionQueue.h">
+      <Filter>Header Files\Empire</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Empire\EmpireManager.h">
       <Filter>Header Files\Empire</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Empire\ResourcePool.h">
+      <Filter>Header Files\Empire</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Empire\PopulationPool.h">
       <Filter>Header Files\Empire</Filter>
     </ClInclude>
     <ClInclude Include="..\..\universe\Building.h">
@@ -306,10 +315,19 @@
     <ClCompile Include="..\..\Empire\Empire.cpp">
       <Filter>Source Files\Empire</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Empire\ResearchQueue.cpp">
+      <Filter>Source Files\Empire</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Empire\ProductionQueue.cpp">
+      <Filter>Source Files\Empire</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Empire\EmpireManager.cpp">
       <Filter>Source Files\Empire</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Empire\ResourcePool.cpp">
+      <Filter>Source Files\Empire</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Empire\PopulationPool.cpp">
       <Filter>Source Files\Empire</Filter>
     </ClCompile>
     <ClCompile Include="..\..\universe\Building.cpp">

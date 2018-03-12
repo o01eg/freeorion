@@ -3,10 +3,9 @@ The TechsListAI module provides functions that describes dependencies between
 various technologies to help the AI decide which technologies should be
 researched next.
 """
-import freeOrionAIInterface as fo  # pylint: disable=import-error
+from logging import warn
 
-from common.configure_logging import convenience_function_references_for_logger
-(debug, info, warn, error, fatal) = convenience_function_references_for_logger(__name__)
+import freeOrionAIInterface as fo  # pylint: disable=import-error
 
 
 def unusable_techs():
@@ -223,7 +222,6 @@ class TechGroup1SparseC(TechGroup1):
             "LRN_FORCE_FIELD",
             "SHP_WEAPON_2_2",
             "PRO_ORBITAL_GEN",
-            "PRO_IMPERIAL_STOCKPILE_2",
             "SPY_DETECT_2",
             "SHP_SPACE_FLUX_DRIVE",
         )
@@ -238,7 +236,6 @@ class TechGroup2(TechGroup):
             "PRO_FUSION_GEN",
             "PRO_SENTIENT_AUTOMATION",
             "PRO_EXOBOTS",
-            "PRO_IMPERIAL_STOCKPILE_2",
             # "PRO_MICROGRAV_MAN",  # handled by fast-forwarding when we have asteroids
             # "PRO_ORBITAL_GEN",    # handled by fast-forwarding when we have a GG
 
@@ -284,8 +281,7 @@ class TechGroup2A(TechGroup2):
             self.weapon,
             self.weapon,
             self.weapon,
-            self.economy,
-            self.economy,
+            self.economy
         )
 
 
@@ -307,8 +303,7 @@ class TechGroup2B(TechGroup2):
             self.weapon,
             self.weapon,
             self.economy,
-            self.economy,
-            self.economy,
+            self.economy
         )
 
 
@@ -329,7 +324,6 @@ class TechGroup2SparseA(TechGroup2):
             self.weapon,
             self.defense,
             self.weapon,
-            self.economy,
             self.weapon,
             self.weapon
         )
@@ -352,7 +346,6 @@ class TechGroup2SparseB(TechGroup2):
             self.defense,
             self.armor,
             self.weapon,
-            self.economy,
             self.weapon,
             self.weapon
         )
@@ -377,7 +370,6 @@ class TechGroup3(TechGroup):
             "PRO_INDUSTRY_CENTER_II",
             "GRO_XENO_HYBRIDS",
             "CON_ORBITAL_HAB",
-            "PRO_IMPERIAL_STOCKPILE_3",
             "CON_NDIM_STRC",
             "GRO_LIFECYCLE_MAN",
         ])
@@ -453,7 +445,6 @@ class TechGroup3A(TechGroup3):
             self.defense,
             self.defense,
             self.economy,
-            self.economy,
             self.misc,
             self.economy,
             self.weapon,
@@ -506,7 +497,6 @@ class TechGroup3B(TechGroup3):
             self.defense,
             self.defense,
             self.economy,
-            self.economy,
             self.misc,
             self.economy
         )
@@ -550,7 +540,6 @@ class TechGroup3Sparse(TechGroup3):
             self.defense,
             self.defense,
             self.misc,
-            self.economy,
             self.economy,
             self.misc,
             self.defense,

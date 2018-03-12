@@ -67,18 +67,18 @@ Ship::Ship(int empire_id, int design_id, const std::string& species_name,
             switch (part->Class()) {
             case PC_COLONY:
             case PC_TROOPS: {
-                m_part_meters[std::make_pair(METER_CAPACITY, part->Name())];
+                m_part_meters[{METER_CAPACITY, part->Name()}];
                 break;
             }
             case PC_DIRECT_WEAPON:      // capacity is damage, secondary stat is shots per attack
             case PC_FIGHTER_HANGAR: {   // capacity is how many fighters contained, secondary stat is damage per fighter attack
-                m_part_meters[std::make_pair(METER_SECONDARY_STAT,      part->Name())];
-                m_part_meters[std::make_pair(METER_MAX_SECONDARY_STAT,  part->Name())];
+                m_part_meters[{METER_SECONDARY_STAT, part->Name()}];
+                m_part_meters[{METER_MAX_SECONDARY_STAT, part->Name()}];
                 // intentionally no break here
             }
             case PC_FIGHTER_BAY: {      // capacity is how many fighters launched per combat round
-                m_part_meters[std::make_pair(METER_CAPACITY,            part->Name())];
-                m_part_meters[std::make_pair(METER_MAX_CAPACITY,        part->Name())];
+                m_part_meters[{METER_CAPACITY, part->Name()}];
+                m_part_meters[{METER_MAX_CAPACITY, part->Name()}];
                 break;
             }
             default:
@@ -118,7 +118,7 @@ void Ship::Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_
         if (this->m_fleet_id != copied_ship->m_fleet_id) {
             // as with other containers, removal from the old container is triggered by the contained Object; removal from System is handled by UniverseObject::Copy
             if (auto old_fleet = GetFleet(this->m_fleet_id))
-                old_fleet->RemoveShip(this->ID());
+                old_fleet->RemoveShips({this->ID()});
             this->m_fleet_id = copied_ship->m_fleet_id; // as with other containers (Systems), actual insertion into fleet ships set is handled by the fleet
         }
 
@@ -362,7 +362,7 @@ const Meter* Ship::GetPartMeter(MeterType type, const std::string& part_name) co
 
 Meter* Ship::GetPartMeter(MeterType type, const std::string& part_name) {
     Meter* retval = nullptr;
-    auto it = m_part_meters.find(std::make_pair(type, part_name));
+    auto it = m_part_meters.find({type, part_name});
     if (it != m_part_meters.end())
         retval = &it->second;
     return retval;
@@ -578,9 +578,9 @@ void Ship::Resupply() {
     for (auto& entry : m_part_meters) {
         auto max_it = m_part_meters.end();
         if (entry.first.first == METER_CAPACITY) {
-            max_it = m_part_meters.find(std::make_pair(METER_MAX_CAPACITY, entry.first.second));
+            max_it = m_part_meters.find({METER_MAX_CAPACITY, entry.first.second});
         } else if (entry.first.first == METER_SECONDARY_STAT) {
-            max_it = m_part_meters.find(std::make_pair(METER_MAX_SECONDARY_STAT, entry.first.second));
+            max_it = m_part_meters.find({METER_MAX_SECONDARY_STAT, entry.first.second});
         }
         if (max_it == m_part_meters.end())
             continue;
@@ -648,9 +648,9 @@ void Ship::ResetTargetMaxUnpairedMeters() {
     for (auto& entry : m_part_meters) {
         auto max_it = m_part_meters.end();
         if (entry.first.first == METER_CAPACITY) {
-            max_it = m_part_meters.find(std::make_pair(METER_MAX_CAPACITY, entry.first.second));
+            max_it = m_part_meters.find({METER_MAX_CAPACITY, entry.first.second});
         } else if (entry.first.first == METER_SECONDARY_STAT) {
-            max_it = m_part_meters.find(std::make_pair(METER_MAX_SECONDARY_STAT, entry.first.second));
+            max_it = m_part_meters.find({METER_MAX_SECONDARY_STAT, entry.first.second});
         }
         if (max_it != m_part_meters.end())
             continue;
@@ -664,9 +664,9 @@ void Ship::ResetPairedActiveMeters() {
     for (auto& entry : m_part_meters) {
         auto max_it = m_part_meters.end();
         if (entry.first.first == METER_CAPACITY) {
-            max_it = m_part_meters.find(std::make_pair(METER_MAX_CAPACITY, entry.first.second));
+            max_it = m_part_meters.find({METER_MAX_CAPACITY, entry.first.second});
         } else if (entry.first.first == METER_SECONDARY_STAT) {
-            max_it = m_part_meters.find(std::make_pair(METER_MAX_SECONDARY_STAT, entry.first.second));
+            max_it = m_part_meters.find({METER_MAX_SECONDARY_STAT, entry.first.second});
         }
         if (max_it != m_part_meters.end())
             entry.second.SetCurrent(entry.second.Initial());
@@ -685,9 +685,9 @@ void Ship::SetShipMetersToMax() {
     for (auto& entry : m_part_meters) {
         auto max_it = m_part_meters.end();
         if (entry.first.first == METER_CAPACITY) {
-            max_it = m_part_meters.find(std::make_pair(METER_MAX_CAPACITY, entry.first.second));
+            max_it = m_part_meters.find({METER_MAX_CAPACITY, entry.first.second});
         } else if (entry.first.first == METER_SECONDARY_STAT) {
-            max_it = m_part_meters.find(std::make_pair(METER_MAX_SECONDARY_STAT, entry.first.second));
+            max_it = m_part_meters.find({METER_MAX_SECONDARY_STAT, entry.first.second});
         }
         if (max_it == m_part_meters.end())
             continue;
@@ -726,9 +726,9 @@ void Ship::ClampMeters() {
     for (auto& entry : m_part_meters) {
         auto max_it = m_part_meters.end();
         if (entry.first.first == METER_CAPACITY) {
-            max_it = m_part_meters.find(std::make_pair(METER_MAX_CAPACITY, entry.first.second));
+            max_it = m_part_meters.find({METER_MAX_CAPACITY, entry.first.second});
         } else if (entry.first.first == METER_SECONDARY_STAT) {
-            max_it = m_part_meters.find(std::make_pair(METER_MAX_SECONDARY_STAT, entry.first.second));
+            max_it = m_part_meters.find({METER_MAX_SECONDARY_STAT, entry.first.second});
         }
 
         if (max_it == m_part_meters.end()) {

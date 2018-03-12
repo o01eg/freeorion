@@ -113,6 +113,7 @@ class ConsoleLogHandler(logging.Handler):
         except:
             self.handleError(record)
 
+
 # Create the log handler, format it and attach it to the root logger
 console_handler = ConsoleLogHandler()
 
@@ -142,19 +143,19 @@ def chat_human(message):
     print "Chat Message to human: %s" % remove_tags(message)
 
 
-def cache_by_session(function):
+def cache_by_session(func):
     """
     Cache a function value by session.
     Wraps only functions with hashable arguments.
     """
     _cache = {}
 
-    @wraps(function)
+    @wraps(func)
     def wrapper(*args, **kwargs):
-        key = (function, args, tuple(kwargs.items()))
+        key = (func, args, tuple(kwargs.items()))
         if key in _cache:
             return _cache[key]
-        res = function(*args, **kwargs)
+        res = func(*args, **kwargs)
         _cache[key] = res
         return res
     wrapper._cache = _cache
@@ -216,13 +217,13 @@ def tuple_to_dict(tup):
             return {}
 
 
-def profile(function):
+def profile(func):
 
-    @wraps(function)
+    @wraps(func)
     def wrapper(*args, **kwargs):
         pr = cProfile.Profile()
         pr.enable()
-        retval = function(*args, **kwargs)
+        retval = func(*args, **kwargs)
         pr.disable()
         s = StringIO.StringIO()
         sortby = 'cumulative'

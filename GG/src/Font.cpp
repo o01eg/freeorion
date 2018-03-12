@@ -620,7 +620,7 @@ namespace {
         { m_known_tags.clear(); }
 
         bool IsKnown(const std::string &tag) const
-        { return m_known_tags.find(tag) != m_known_tags.end(); }
+        { return m_known_tags.count(tag); }
 
         // Return a regex bound to \p text using the currently known
         // tags.  If required \p ignore_tags and/or \p strip_unpaired_tags.
@@ -1309,6 +1309,9 @@ void Font::ProcessTagsBefore(const std::vector<LineData>& line_data, RenderState
     double orig_color[4];
     glGetDoublev(GL_CURRENT_COLOR, orig_color);
 
+    if (line_data.empty())
+        return;
+
     for (std::size_t i = 0; i <= begin_line; ++i) {
         const LineData& line = line_data[i];
         for (CPSize j = CP0;
@@ -1959,7 +1962,7 @@ void Font::Init(FT_Face& face)
 
         // copy glyph images
         for (std::uint32_t c = low; c < high; ++c) {
-            if (temp_glyph_data.find(c) == temp_glyph_data.end() && GenerateGlyph(face, c)) {
+            if (!temp_glyph_data.count(c) && GenerateGlyph(face, c)) {
                 const FT_Bitmap& glyph_bitmap = face->glyph->bitmap;
                 if ((glyph_bitmap.width > TEX_MAX_SIZE) | (glyph_bitmap.rows > TEX_MAX_SIZE)) {
                     ThrowBadGlyph("GG::Font::Init : Glyph too large for buffer'%1%'", c); // catch broken fonts
@@ -2290,7 +2293,7 @@ FontManager::FontManager()
 {}
 
 bool FontManager::HasFont(const std::string& font_filename, unsigned int pts) const
-{ return m_rendered_fonts.find(FontKey(font_filename, pts)) != m_rendered_fonts.end(); }
+{ return m_rendered_fonts.count(FontKey(font_filename, pts)); }
 
 std::shared_ptr<Font> FontManager::GetFont(const std::string& font_filename, unsigned int pts)
 {

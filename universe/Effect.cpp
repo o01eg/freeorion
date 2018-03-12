@@ -50,12 +50,10 @@ namespace {
 
         auto fleet = universe.InsertNew<Fleet>("", x, y, ship->Owner());
 
-        std::vector<int> ship_ids;
-        ship_ids.push_back(ship->ID());
         fleet->Rename(fleet->GenerateFleetName());
         fleet->GetMeter(METER_STEALTH)->SetCurrent(Meter::LARGE_VALUE);
 
-        fleet->AddShip(ship->ID());
+        fleet->AddShips({ship->ID()});
         ship->SetFleetID(fleet->ID());
         fleet->SetAggressive(fleet->HasArmedShips() || fleet->HasFighterShips());
 
@@ -81,7 +79,7 @@ namespace {
 
         if (ship->FleetID() != INVALID_OBJECT_ID) {
             if (auto old_fleet = GetFleet(ship->FleetID())) {
-                old_fleet->RemoveShip(ship->ID());
+                old_fleet->RemoveShips({ship->ID()});
             }
         }
 
@@ -2465,8 +2463,8 @@ void MoveTo::Execute(const ScriptingContext& context) const {
         if (dest_fleet && same_owners) {
             // ship is moving to a different fleet owned by the same empire, so
             // can be inserted into it.
-            old_fleet->RemoveShip(ship->ID());
-            dest_fleet->AddShip(ship->ID());
+            old_fleet->RemoveShips({ship->ID()});
+            dest_fleet->AddShips({ship->ID()});
             ship->SetFleetID(dest_fleet->ID());
 
         } else if (dest_sys_id == ship_sys_id && dest_sys_id != INVALID_OBJECT_ID) {
@@ -2710,7 +2708,7 @@ void MoveInOrbit::Execute(const ScriptingContext& context) const {
 
         auto old_fleet = GetFleet(ship->FleetID());
         if (old_fleet) {
-            old_fleet->RemoveShip(ship->ID());
+            old_fleet->RemoveShips({ship->ID()});
             if (old_fleet->Empty()) {
                 old_sys->Remove(old_fleet->ID());
                 GetUniverse().EffectDestroy(old_fleet->ID(), INVALID_OBJECT_ID);    // no object in particular destroyed this fleet
@@ -2871,7 +2869,7 @@ void MoveTowards::Execute(const ScriptingContext& context) const {
 
         auto old_fleet = GetFleet(ship->FleetID());
         if (old_fleet)
-            old_fleet->RemoveShip(ship->ID());
+            old_fleet->RemoveShips({ship->ID()});
         ship->SetFleetID(INVALID_OBJECT_ID);
 
         CreateNewFleet(new_x, new_y, ship); // creates new fleet and inserts ship into fleet
@@ -3290,7 +3288,7 @@ void GenerateSitRepMessage::Execute(const ScriptingContext& context) const {
     // evaluate all parameter valuerefs so they can be substituted into sitrep template
     std::vector<std::pair<std::string, std::string>> parameter_tag_values;
     for (const auto& entry : m_message_parameters) {
-        parameter_tag_values.push_back(std::make_pair(entry.first, entry.second->Eval(context)));
+        parameter_tag_values.push_back({entry.first, entry.second->Eval(context)});
 
         // special case for ship designs: make sure sitrep recipient knows about the design
         // so the sitrep won't have errors about unknown designs being referenced

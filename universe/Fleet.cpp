@@ -17,8 +17,6 @@
 #include <boost/bind.hpp>
 #include <boost/timer.hpp>
 
-#include <cmath>
-
 namespace {
     const bool ALLOW_ALLIED_SUPPLY = true;
 
@@ -28,41 +26,6 @@ namespace {
 
     bool SystemHasNoVisibleStarlanes(int system_id, int empire_id)
     { return !GetPathfinder()->SystemHasVisibleStarlanes(system_id, empire_id); }
-
-    template<typename IT>
-    double PathLength(const IT& begin, const IT& end) {
-        if (begin == end) {
-            return 0;
-        } else {
-            double distance = 0.0;
-            for (auto it = begin; it != end; ++it) {
-                auto next_it = it;
-                ++next_it;
-                //DebugLogger() << "Fleet::SetRoute() new route has system id " << *it;
-
-                if (next_it == end)
-                    break;  // current system is the last on the route, so don't need to add any additional distance.
-
-                auto cur_sys = GetSystem(*it);
-
-                if (!cur_sys) {
-                    ErrorLogger() << "Fleet::SetRoute() couldn't get system with id " << *it;
-                    return distance;
-                }
-
-                auto next_sys = GetSystem(*next_it);
-                if (!next_sys) {
-                    ErrorLogger() << "Fleet::SetRoute() couldn't get system with id " << *next_it;
-                    return distance;
-                }
-
-                double dist_x = next_sys->X() - cur_sys->X();
-                double dist_y = next_sys->Y() - cur_sys->Y();
-                distance += std::sqrt(dist_x*dist_x + dist_y*dist_y);
-            }
-            return distance;
-        }
-    }
 
     void MoveFleetWithShips(Fleet& fleet, double x, double y){
         fleet.MoveTo(x, y);
@@ -219,7 +182,7 @@ const std::set<int>& Fleet::ContainedObjectIDs() const
 { return m_ships; }
 
 bool Fleet::Contains(int object_id) const
-{ return object_id != INVALID_OBJECT_ID && m_ships.find(object_id) != m_ships.end(); }
+{ return object_id != INVALID_OBJECT_ID && m_ships.count(object_id); }
 
 bool Fleet::ContainedBy(int object_id) const
 { return object_id != INVALID_OBJECT_ID && this->SystemID() == object_id; }
@@ -254,7 +217,11 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
     if (route.size() == 2 && route.front() == route.back())
         return retval;                                      // nowhere to go => empty path
     if (this->Speed() < FLEET_MOVEMENT_EPSILON) {
-        retval.push_back(MovePathNode(this->X(), this->Y(), true, ETA_NEVER, this->SystemID(), INVALID_OBJECT_ID, INVALID_OBJECT_ID));
+        retval.emplace_back(this->X(), this->Y(), true, ETA_NEVER,
+                            this->SystemID(),
+                            INVALID_OBJECT_ID,
+                            INVALID_OBJECT_ID,
+                            false);
         return retval;                                      // can't move => path is just this system with explanatory ETA
     }
 
@@ -271,13 +238,12 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
     // determine if, given fuel available and supplyable systems, fleet will ever be able to move
     if (fuel < 1.0f &&
         this->SystemID() != INVALID_OBJECT_ID &&
-        fleet_supplied_systems.find(this->SystemID()) == fleet_supplied_systems.end())
+        !fleet_supplied_systems.count(this->SystemID()))
     {
-        MovePathNode node(this->X(), this->Y(), true, ETA_OUT_OF_RANGE,
-                          this->SystemID(),
-                          INVALID_OBJECT_ID,
-                          INVALID_OBJECT_ID);
-        retval.push_back(node);
+        retval.emplace_back(this->X(), this->Y(), true, ETA_OUT_OF_RANGE,
+                            this->SystemID(),
+                            INVALID_OBJECT_ID,
+                            INVALID_OBJECT_ID);
         return retval;      // can't move => path is just this system with explanatory ETA
     }
 
@@ -314,8 +280,8 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
     bool is_post_blockade = false;
     if (cur_system) {
         //DebugLogger() << "Fleet::MovePath starting in system "<< SystemID();
-        if (flag_blockades && next_system->ID() != m_arrival_starlane && 
-            (unobstructed_systems.find(cur_system->ID()) == unobstructed_systems.end())) 
+        if (flag_blockades && next_system->ID() != m_arrival_starlane &&
+            !unobstructed_systems.count(cur_system->ID()))
         {
             //DebugLogger() << "Fleet::MovePath checking blockade from "<< cur_system->ID() << " to "<< next_system->ID();
             if (BlockadedAtSystem(cur_system->ID(), next_system->ID())){
@@ -331,11 +297,11 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
         }
     }
     // place initial position MovePathNode
-    MovePathNode initial_pos(this->X(), this->Y(), false /* not an end of turn node */, 0 /* turns taken to reach position of node */,
-                             (cur_system  ? cur_system->ID()  : INVALID_OBJECT_ID),
-                             (prev_system ? prev_system->ID() : INVALID_OBJECT_ID),
-                             (next_system ? next_system->ID() : INVALID_OBJECT_ID));
-    retval.push_back(initial_pos);
+    retval.emplace_back(this->X(), this->Y(), false, 0,
+                        (cur_system  ? cur_system->ID()  : INVALID_OBJECT_ID),
+                        (prev_system ? prev_system->ID() : INVALID_OBJECT_ID),
+                        (next_system ? next_system->ID() : INVALID_OBJECT_ID),
+                        false);
 
 
     const int       TOO_LONG =              100;            // limit on turns to simulate.  99 turns max keeps ETA to two digits, making UI work better
@@ -388,7 +354,7 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
         // check if fuel limits movement or current system refuels passing fleet
         if (cur_system) {
             // check if current system has fuel supply available
-            if (fleet_supplied_systems.find(cur_system->ID()) != fleet_supplied_systems.end()) {
+            if (fleet_supplied_systems.count(cur_system->ID())) {
                 // current system has fuel supply.  don't restrict movement
                 // if had just stopped here, then replenish fleet's supply
                 if (stopped_at_system)
@@ -508,7 +474,7 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
         // if new position is an obstructed system, must end turn here
         // on client side, if have stale info on cur_system it may appear blockaded even if not actually obstructed,
         // and so will force a stop in that situation
-        if (cur_system && (unobstructed_systems.find(cur_system->ID()) == unobstructed_systems.end())) {
+        if (cur_system && !unobstructed_systems.count(cur_system->ID())) {
             turn_dist_remaining = 0.0;
             end_turn_at_cur_position = true;
         }
@@ -526,11 +492,11 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
         //                        " and ETA " << turns_taken;
 
         // add MovePathNode for current position (end of turn position and/or system location)
-        MovePathNode cur_pos(cur_x, cur_y, end_turn_at_cur_position, turns_taken,
-                             (cur_system  ? cur_system->ID()  : INVALID_OBJECT_ID),
-                             (prev_system ? prev_system->ID() : INVALID_OBJECT_ID),
-                             (next_system ? next_system->ID() : INVALID_OBJECT_ID), is_post_blockade);
-        retval.push_back(cur_pos);
+        retval.emplace_back(cur_x, cur_y, end_turn_at_cur_position, turns_taken,
+                            (cur_system  ? cur_system->ID()  : INVALID_OBJECT_ID),
+                            (prev_system ? prev_system->ID() : INVALID_OBJECT_ID),
+                            (next_system ? next_system->ID() : INVALID_OBJECT_ID),
+                            is_post_blockade);
 
 
         // if the turn ended at this position, increment the turns taken and
@@ -552,11 +518,11 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
     //                    (cur_system  ? cur_system->ID()  : INVALID_OBJECT_ID) << " with post blockade status " << is_post_blockade <<
     //                    " and ETA " << turns_taken;
 
-    MovePathNode final_pos(cur_x, cur_y, true, turns_taken,
-                           (cur_system  ? cur_system->ID()  : INVALID_OBJECT_ID),
-                           (prev_system ? prev_system->ID() : INVALID_OBJECT_ID),
-                           (next_system ? next_system->ID() : INVALID_OBJECT_ID), is_post_blockade);
-    retval.push_back(final_pos);
+    retval.emplace_back(cur_x, cur_y, true, turns_taken,
+                        (cur_system  ? cur_system->ID()  : INVALID_OBJECT_ID),
+                        (prev_system ? prev_system->ID() : INVALID_OBJECT_ID),
+                        (next_system ? next_system->ID() : INVALID_OBJECT_ID),
+                        is_post_blockade);
     //DebugLogger() << "Fleet::MovePath for fleet " << this->Name()<<" id "<<this->ID()<<" is complete";
 
     return retval;
@@ -779,23 +745,11 @@ void Fleet::SetAggressive(bool aggressive/* = true*/) {
     StateChangedSignal();
 }
 
-void Fleet::AddShip(int ship_id) {
-    std::vector<int> ship_ids;
-    ship_ids.push_back(ship_id);
-    AddShips(ship_ids);
-}
-
 void Fleet::AddShips(const std::vector<int>& ship_ids) {
     size_t old_ships_size = m_ships.size();
     std::copy(ship_ids.begin(), ship_ids.end(), std::inserter(m_ships, m_ships.end()));
     if (old_ships_size != m_ships.size())
         StateChangedSignal();
-}
-
-void Fleet::RemoveShip(int ship_id) {
-    std::vector<int> ship_ids;
-    ship_ids.push_back(ship_id);
-    RemoveShips(ship_ids);
 }
 
 void Fleet::RemoveShips(const std::vector<int>& ship_ids) {
@@ -854,7 +808,7 @@ void Fleet::MovementPhase() {
     // is the fleet stuck in a system for a whole turn?
     if (current_system) {
         ///update m_arrival_starlane if no blockade, if needed
-        if (supply_unobstructed_systems.find(SystemID()) != supply_unobstructed_systems.end()) {
+        if (supply_unobstructed_systems.count(SystemID())) {
             m_arrival_starlane = SystemID();//allows departure via any starlane
         }
 
@@ -987,9 +941,8 @@ void Fleet::MovementPhase() {
 
                 current_system = system;
 
-                if (supply_unobstructed_systems.find(SystemID()) != supply_unobstructed_systems.end()) {
+                if (supply_unobstructed_systems.count(SystemID()))
                     m_arrival_starlane = SystemID();//allows departure via any starlane
-                }
 
                 // Add current system to the start of any existing route for next turn
                 if (!m_travel_route.empty() && m_travel_route.front() != SystemID())
@@ -1226,7 +1179,7 @@ bool Fleet::BlockadedAtSystem(int start_system_id, int dest_system_id) const {
     auto empire = GetEmpire(this->Owner());
     if (empire) {
         auto unobstructed_systems = empire->SupplyUnobstructedSystems();
-        if (unobstructed_systems.find(start_system_id) != unobstructed_systems.end())
+        if (unobstructed_systems.count(start_system_id))
             return false;
         if (empire->PreservedLaneTravel(start_system_id, dest_system_id)) {
             return false;

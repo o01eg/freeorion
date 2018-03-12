@@ -16,18 +16,6 @@ namespace {
     const std::string EMPTY_STRING;
 }
 
-DiplomaticStatusUpdateInfo::DiplomaticStatusUpdateInfo() :
-    empire1_id(ALL_EMPIRES),
-    empire2_id(ALL_EMPIRES),
-    diplo_status(INVALID_DIPLOMATIC_STATUS)
-{}
-
-DiplomaticStatusUpdateInfo::DiplomaticStatusUpdateInfo(int empire1_id_, int empire2_id_, DiplomaticStatus status) :
-    empire1_id(empire1_id_),
-    empire2_id(empire2_id_),
-    diplo_status(status)
-{}
-
 EmpireManager::EmpireManager()
 {}
 
@@ -134,7 +122,7 @@ void EmpireManager::InsertEmpire(Empire* empire) {
 
     int empire_id = empire->EmpireID();
 
-    if (m_empire_map.find(empire_id) != m_empire_map.end()) {
+    if (m_empire_map.count(empire_id)) {
         ErrorLogger() << "EmpireManager::InsertEmpire passed empire with id (" << empire_id << ") for which there already is an empire.";
         return;
     }

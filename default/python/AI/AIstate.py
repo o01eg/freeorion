@@ -1,5 +1,6 @@
 import copy
 from collections import Counter, OrderedDict as odict
+from logging import error, info, warn
 from operator import itemgetter
 from time import time
 
@@ -15,13 +16,8 @@ import CombatRatingsAI
 import MilitaryAI
 import PlanetUtilsAI
 from freeorion_tools import get_partial_visibility_turn
-from universe_object import System
 from AIDependencies import INVALID_ID
 from character.character_module import create_character, Aggression
-
-from common.configure_logging import convenience_function_references_for_logger
-(debug, info, warn, error, fatal) = convenience_function_references_for_logger(__name__)
-
 
 # moving ALL or NEARLY ALL 'global' variables into AIState object rather than module
 # in general, leaving items as a module attribute if they are recalculated each turn without reference to prior values
@@ -870,15 +866,8 @@ class AIstate(object):
                 fleet_status['sysID'] = next_sys.id
             elif this_sys:
                 fleet_status['sysID'] = this_sys.id
-            else:  # TODO: This branch consists of broken code, must be revisited or removed
-                main_mission = self.get_fleet_mission(fleet_id)
-                main_mission_type = (main_mission.getAIMissionTypes() + [-1])[0]
-                if main_mission_type != -1:
-                    targets = main_mission.getAITargets(main_mission_type)
-                    if targets:
-                        m_mt0 = targets[0]
-                        if isinstance(m_mt0.target_type, System):
-                            fleet_status['sysID'] = m_mt0.target.id  # hmm, but might still be a fair ways from here
+            else:
+                error("Fleet %s has no valid system." % fleet)
         info(fleet_table)
         # Next string used in charts. Don't modify it!
         print "Empire Ship Count: ", self.shipCount

@@ -539,7 +539,6 @@ MPLobby::MPLobby(my_context c) :
 
     m_lobby_data->m_game_rules.clear();
     m_lobby_data->m_game_rules.push_back(std::make_pair("RULE_ENABLE_SUPER_TESTER", "0"));
-    m_lobby_data->m_game_rules.push_back(std::make_pair("RULE_ENABLE_EXPERIMENTORS", "0"));
 
     if (server.IsHostless()) {
         DebugLogger(FSM) << "(ServerFSM) MPLobby. Fill MPLobby data from the previous game.";

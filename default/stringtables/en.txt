@@ -3702,7 +3702,7 @@ FW_ORDER_DISMISS_SENSOR_GHOST
 Dismiss Sensor Ghost
 
 FW_ORDER_DISMISS_SENSOR_GHOST_ALL
-Dismiss All Sensor Ghosts
+Dismiss All Sensor Ghosts Here
 
 ORDER_SHIP_SCRAP
 Scrap Ship
@@ -4159,6 +4159,10 @@ PRODUCTION_WND_PROGRESS
 # %1% location where the item is produced.
 PRODUCTION_QUEUE_ITEM_LOCATION
 At %1%
+
+# %1% location where the item is produced.
+PRODUCTION_QUEUE_ITEM_RALLIED_FROM_LOCATION
+Rallying From %1%
 
 # %1% location where the item is enqueued for production.
 PRODUCTION_QUEUE_ENQUEUED_ITEM_LOCATION

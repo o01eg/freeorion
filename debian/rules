@@ -7,6 +7,11 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 WEAK_HOSTS := armel armhf
 
+CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
+CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
+CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
+LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
+
 ifneq (,$(findstring $(DEB_HOST_ARCH),$(WEAK_HOSTS)))
 	MAX  := 1
 	TYPE := MinSizeRel
@@ -19,6 +24,7 @@ endif
 	dh $@ --max-parallel=$(MAX) --with python2 --with systemd
 
 override_dh_auto_configure:
+	CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" CPPFLAGS="$(CPPFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
 	dh_auto_configure -- \
 		-DBUILD_DOCUMENTATION=off \
 		-DBUILD_TUTORIALS=off \

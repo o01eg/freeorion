@@ -6,11 +6,11 @@ Uploaders:
  Markus Koschany <apo@debian.org>
 Build-Depends:
  cmake,
- debhelper (>= 9),
+ debhelper (>= 11),
  dh-python,
  dh-systemd,
  dh-apparmor,
- dpkg-dev (>= 1.17),
+ dpkg-dev (>= 1.19),
  libboost-all-dev,
  pkg-config,
  python

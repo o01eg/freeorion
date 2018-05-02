@@ -456,7 +456,6 @@ std::shared_ptr<FleetWnd> FleetUIManager::WndForFleetIDs(const std::vector<int>&
                 retval = wnd;
         });
     return retval;
-
 }
 
 int FleetUIManager::SelectedShipID() const {
@@ -490,7 +489,9 @@ std::shared_ptr<FleetWnd> FleetUIManager::NewFleetWnd(
         // Only write to OptionsDB if in single fleet window mode.
         config_name = FLEET_WND_NAME;
     }
-    auto retval = GG::Wnd::Create<FleetWnd>(fleet_ids, m_order_issuing_enabled, allowed_bounding_box_leeway, selected_fleet_id, flags, config_name);
+    auto retval = GG::Wnd::Create<FleetWnd>(fleet_ids, m_order_issuing_enabled,
+                                            allowed_bounding_box_leeway,
+                                            selected_fleet_id, flags, config_name);
 
     m_fleet_wnds.insert(std::weak_ptr<FleetWnd>(retval));
     retval->ClosingSignal.connect(
@@ -2807,13 +2808,11 @@ namespace {
     }
 }
 
-FleetWnd::FleetWnd(
-    const std::vector<int>& fleet_ids, bool order_issuing_enabled,
-    double allowed_bounding_box_leeway /*= 0*/,
-    int selected_fleet_id/* = INVALID_OBJECT_ID*/,
-    GG::Flags<GG::WndFlag> flags/* = INTERACTIVE | DRAGABLE | ONTOP | CLOSABLE | RESIZABLE*/,
-    const std::string& config_name
-) :
+FleetWnd::FleetWnd(const std::vector<int>& fleet_ids, bool order_issuing_enabled,
+                   double allowed_bounding_box_leeway /*= 0*/,
+                   int selected_fleet_id/* = INVALID_OBJECT_ID*/,
+                   GG::Flags<GG::WndFlag> flags/* = INTERACTIVE | DRAGABLE | ONTOP | CLOSABLE | RESIZABLE*/,
+                   const std::string& config_name) :
     MapWndPopup("", flags | GG::RESIZABLE, config_name),
     m_fleet_ids(),
     m_empire_id(ALL_EMPIRES),
@@ -3035,19 +3034,19 @@ void FleetWnd::Refresh() {
     m_needs_refresh = false;
 
     int this_client_empire_id = HumanClientApp::GetApp()->EmpireID();
-    const std::set<int>& this_client_known_destroyed_objects = GetUniverse().EmpireKnownDestroyedObjectIDs(this_client_empire_id);
-    const std::set<int>& this_client_stale_object_info = GetUniverse().EmpireStaleKnowledgeObjectIDs(this_client_empire_id);
+    const auto& this_client_known_destroyed_objects = GetUniverse().EmpireKnownDestroyedObjectIDs(this_client_empire_id);
+    const auto& this_client_stale_object_info = GetUniverse().EmpireStaleKnowledgeObjectIDs(this_client_empire_id);
 
     // save selected fleet(s) and ships(s)
-    std::set<int> initially_selected_fleets = this->SelectedFleetIDs();
-    std::set<int> initially_selected_ships = this->SelectedShipIDs();
+    auto initially_selected_fleets = this->SelectedFleetIDs();
+    auto initially_selected_ships = this->SelectedShipIDs();
 
     // remove existing fleet rows
-    std::set<int> initial_fleet_ids = m_fleet_ids;
+    auto initial_fleet_ids = m_fleet_ids;
     m_fleet_ids.clear();
 
-    boost::unordered_multimap<std::pair<int, GG::Pt>, int> fleet_locations_ids;
-    boost::unordered_multimap<std::pair<int, GG::Pt>, int> selected_fleet_locations_ids;
+    std::multimap<std::pair<int, GG::Pt>, int> fleet_locations_ids;
+    std::multimap<std::pair<int, GG::Pt>, int> selected_fleet_locations_ids;
 
     // Check all fleets in initial_fleet_ids and keep those that exist.
     std::unordered_set<int> fleets_that_exist;
@@ -3069,9 +3068,10 @@ void FleetWnd::Refresh() {
 
         fleets_that_exist.insert(fleet_id);
         fleet_locations_ids.insert({{fleet->SystemID(), fleet_loc}, fleet_id});
-
     }
+
     auto bounding_box_center = GG::Pt(fleets_bounding_box.MidX(), fleets_bounding_box.MidY());
+
 
     // Filter initially selected fleets according to existing fleets
     GG::Rect selected_fleets_bounding_box;
@@ -3086,13 +3086,15 @@ void FleetWnd::Refresh() {
         auto fleet_loc = GG::Pt(GG::X(fleet->X()), GG::Y(fleet->Y()));
 
         // Grow the selected fleets bounding box
-        selected_fleets_bounding_box = CreateOrGrowBox(
-            selected_fleet_locations_ids.empty(), selected_fleets_bounding_box, fleet_loc);
+        selected_fleets_bounding_box = CreateOrGrowBox(selected_fleet_locations_ids.empty(),
+                                                       selected_fleets_bounding_box, fleet_loc);
         selected_fleet_locations_ids.insert({{fleet->SystemID(), fleet_loc}, fleet_id});
     }
-    auto selected_bounding_box_center = GG::Pt(selected_fleets_bounding_box.MidX(), selected_fleets_bounding_box.MidY());
+    auto selected_bounding_box_center = GG::Pt(selected_fleets_bounding_box.MidX(),
+                                               selected_fleets_bounding_box.MidY());
 
-    // Determine FleetWnd location.
+
+    // Determine FleetWnd location
 
     // Are all fleets in one system?  Use that location.
     // Otherwise, are all selected fleets in one system?  Use that location.
@@ -3119,7 +3121,7 @@ void FleetWnd::Refresh() {
                && SmallerOrEqual(fleets_bounding_box, m_bounding_box))
     {
         location = {INVALID_OBJECT_ID, bounding_box_center};
-        boost::unordered_multimap<std::pair<int, GG::Pt>, int> fleets_near_enough;
+        std::multimap<std::pair<int, GG::Pt>, int> fleets_near_enough;
         for (const auto& loc_and_id: fleet_locations_ids)
             fleets_near_enough.insert({location, loc_and_id.second});
         fleet_locations_ids.swap(fleets_near_enough);
@@ -3128,17 +3130,18 @@ void FleetWnd::Refresh() {
                && SmallerOrEqual(selected_fleets_bounding_box, m_bounding_box))
     {
         location = {INVALID_OBJECT_ID, selected_bounding_box_center};
-        boost::unordered_multimap<std::pair<int, GG::Pt>, int> fleets_near_enough;
+        std::multimap<std::pair<int, GG::Pt>, int> fleets_near_enough;
         // Center bounding box on selected fleets.
-        m_bounding_box = m_bounding_box
-            + GG::Pt(selected_fleets_bounding_box.MidX() - m_bounding_box.MidX(),
-                    selected_fleets_bounding_box.MidY() - m_bounding_box.MidY());
+        m_bounding_box = m_bounding_box +
+            GG::Pt(selected_fleets_bounding_box.MidX() - m_bounding_box.MidX(),
+                   selected_fleets_bounding_box.MidY() - m_bounding_box.MidY());
         for (const auto& loc_and_id: fleet_locations_ids) {
             const auto& pos = loc_and_id.first.second;
             if (m_bounding_box.Contains(pos))
                 fleets_near_enough.insert({location, loc_and_id.second});
         }
         fleet_locations_ids.swap(fleets_near_enough);
+
     } else if (auto system = GetSystem(m_system_id)) {
         location = {m_system_id, GG::Pt(GG::X(system->X()), GG::Y(system->Y()))};
 
@@ -3146,6 +3149,7 @@ void FleetWnd::Refresh() {
         fleet_locations_ids.clear();
         selected_fleet_locations_ids.clear();
     }
+
 
     // Use fleets that are at the determined location
     auto flt_at_loc = fleet_locations_ids.equal_range(location);
@@ -3174,23 +3178,33 @@ void FleetWnd::Refresh() {
         }
     }
 
+
     // Add rows for the known good fleet_ids.
     m_fleets_lb->Clear();
     for (int fleet_id : m_fleet_ids)
         AddFleet(fleet_id);
 
-    // Use selected fleets that are at the determined location
-    std::set<int> still_present_initially_selected_fleets;
 
+    // Determine selected fleets that are at the determined location
+    std::set<int> still_present_initially_selected_fleets;
     auto sel_flt_at_loc = selected_fleet_locations_ids.equal_range(location);
     for (auto it = sel_flt_at_loc.first; it != sel_flt_at_loc.second; ++it)
     { still_present_initially_selected_fleets.insert(it->second); }
 
+
+    //std::cout << "Still present initially selected fleets: ";
+    //for (auto entry : still_present_initially_selected_fleets)
+    //    std::cout << entry << " ";
+    //std::cout << std::endl;
+
+
+    // Reselect previously-selected fleets, or default select first fleet in FleetWnd
     if (!still_present_initially_selected_fleets.empty()) {
         // reselect any previously-selected fleets
         SelectFleets(still_present_initially_selected_fleets);
         // reselect any previously-selected ships
         SelectShips(initially_selected_ships);
+
     } else if (!m_fleets_lb->Empty()) {
         // default select first fleet
         int first_fleet_id = FleetInRow(m_fleets_lb->begin());
@@ -3202,9 +3216,7 @@ void FleetWnd::Refresh() {
     }
 
     SetName(TitleText());
-
     SetStatIconValues();
-
     RefreshStateChangedSignals();
 }
 

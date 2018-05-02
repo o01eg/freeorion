@@ -412,6 +412,7 @@ void ServerApp::SetAIsProcessPriorityToLow(bool set_to_low) {
 void ServerApp::HandleMessage(const Message& msg, PlayerConnectionPtr player_connection) {
 
     //DebugLogger() << "ServerApp::HandleMessage type " << boost::lexical_cast<std::string>(msg.Type());
+    m_networking.UpdateCookie(player_connection->Cookie()); // update cookie expire date
 
     switch (msg.Type()) {
     case Message::HOST_SP_GAME:             m_fsm->process_event(HostSPGame(msg, player_connection));       break;
@@ -981,14 +982,16 @@ void ServerApp::UpdateCombatLogs(const Message& msg, PlayerConnectionPtr player_
     player_connection->SendMessage(DispatchCombatLogsMessage(logs));
 }
 
-void ServerApp::PushChatMessage(const boost::posix_time::ptime& timestamp,
+void ServerApp::PushChatMessage(const std::string& text,
                                 const std::string& player_name,
-                                const std::string& msg)
+                                GG::Clr text_color,
+                                const boost::posix_time::ptime& timestamp)
 {
     ChatHistoryEntity chat;
     chat.m_timestamp = timestamp;
     chat.m_player_name = player_name;
-    chat.m_text = msg;
+    chat.m_text_color = text_color;
+    chat.m_text = text;
     m_chat_history.push_back(chat);
 }
 
@@ -1555,7 +1558,8 @@ bool ServerApp::IsAvailableName(const std::string& player_name) const {
         if ((*it)->PlayerName() == player_name)
             return false;
     }
-    return true;
+    // check if some name reserved with cookie
+    return m_networking.IsAvailableNameInCookies(player_name);
 }
 
 bool ServerApp::IsAuthRequiredOrFillRoles(const std::string& player_name, Networking::AuthRoles& roles) {
@@ -3307,6 +3311,18 @@ void ServerApp::PostCombatProcessTurns() {
 
     TraceLogger(effects) << "ServerApp::PostCombatProcessTurns After Final Meter Estimate Update: ";
     TraceLogger(effects) << objects.Dump();
+
+
+    // Re-determine supply distribution and exchanging and resource pools for empires
+    for (auto& entry : empires) {
+        Empire* empire = entry.second;
+        if (empire->Eliminated())
+            continue;   // skip eliminated empires.  presumably this shouldn't be an issue when initializing a new game, but apparently I thought this was worth checking for...
+        empire->UpdateSupplyUnobstructedSystems();  // determines which systems can propagate fleet and resource (same for both)
+        empire->UpdateSystemSupplyRanges();         // sets range systems can propagate fleet and resourse supply (separately)
+    }
+
+    GetSupplyManager().Update();
 
 
     // copy latest visible gamestate to each empire's known object state

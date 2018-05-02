@@ -18,6 +18,7 @@
 #include "../../UI/MapWnd.h"
 
 #include <boost/format.hpp>
+#include <boost/uuid/uuid_io.hpp>
 #include <thread>
 
 /** \page statechart_notes Notes on Boost Statechart transitions
@@ -337,7 +338,22 @@ boost::statechart::result WaitingForMPJoinAck::react(const JoinGame& msg) {
     TraceLogger(FSM) << "(HumanClientFSM) WaitingForMPJoinAck.JoinGame";
 
     try {
-        int player_id = boost::lexical_cast<int>(msg.m_message.Text());
+        int player_id;
+        boost::uuids::uuid cookie;
+        ExtractJoinAckMessageData(msg.m_message, player_id, cookie);
+
+        if (!cookie.is_nil()) {
+            try {
+                std::string cookie_option = "network.server.cookie." + Client().Networking().Destination();
+                GetOptionsDB().Remove(cookie_option);
+                GetOptionsDB().Add(cookie_option, "OPTIONS_DB_SERVER_COOKIE", boost::uuids::to_string(cookie));
+                GetOptionsDB().Commit();
+            } catch(const std::exception& err) {
+                WarnLogger() << "Cann't save cookie for server " << Client().Networking().Destination() << ": "
+                             << err.what();
+                // ignore
+            }
+        }
 
         Client().Networking().SetPlayerID(player_id);
 
@@ -553,9 +569,8 @@ boost::statechart::result MPLobby::react(const ChatHistory& msg) {
     ExtractChatHistoryMessage(msg.m_message, chat_history);
 
     const auto& wnd = Client().GetClientUI().GetMultiPlayerLobbyWnd();
-    for (const auto& elem : chat_history) {
-        wnd->ChatMessage(elem.m_player_name, elem.m_timestamp, elem.m_text);
-    }
+    for (const auto& elem : chat_history)
+        wnd->ChatMessage(elem.m_text, elem.m_player_name, elem.m_text_color, elem.m_timestamp);
 
     return discard_event();
 }
@@ -606,7 +621,17 @@ boost::statechart::result PlayingGame::react(const PlayerChat& msg) {
     boost::posix_time::ptime timestamp;
     ExtractServerPlayerChatMessageData(msg.m_message, sending_player_id, timestamp, text);
 
-    Client().GetClientUI().GetMessageWnd()->HandlePlayerChatMessage(text, sending_player_id, timestamp, Client().PlayerID());
+    std::string player_name{UserString("PLAYER") + " " + std::to_string(sending_player_id)};
+    GG::Clr text_color{Client().GetClientUI().TextColor()};
+    auto players = Client().Players();
+    auto player_it = players.find(sending_player_id);
+    if (player_it != players.end()) {
+        player_name = player_it->second.name;
+        if (auto empire = GetEmpire(player_it->second.empire_id))
+            text_color = empire->Color();
+    }
+
+    Client().GetClientUI().GetMessageWnd()->HandlePlayerChatMessage(text, player_name, text_color, timestamp, Client().PlayerID());
 
     return discard_event();
 }

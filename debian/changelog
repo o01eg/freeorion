@@ -1,3 +1,10 @@
+freeorion (0.4.8+git20180506~72ca0ec-1) unstable; urgency=medium
+
+  * Update upstream.
+  * Latest human player wins the game.
+
+ -- O01eg <o01eg@yandex.ru>  Mon, 07 May 2018 19:16:08 +0000
+
 freeorion (0.4.8+git20180430~2146fa3-1) unstable; urgency=medium
 
   * Update upstream.

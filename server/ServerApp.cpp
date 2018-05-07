@@ -638,6 +638,31 @@ void ServerApp::NewMPGameInit(const MultiplayerLobbyData& multiplayer_lobby_data
         SendNewGameStartMessages();
 }
 
+void UpdateEmpireSupply() {
+    EmpireManager& empires = Empires();
+
+    // Determine initial supply distribution and exchanging and resource pools for empires
+    for (auto& entry : empires) {
+        Empire* empire = entry.second;
+        if (empire->Eliminated())
+            continue;   // skip eliminated empires.  presumably this shouldn't be an issue when initializing a new game, but apparently I thought this was worth checking for...
+
+        empire->UpdateSupplyUnobstructedSystems();  // determines which systems can propagate fleet and resource (same for both)
+        empire->UpdateSystemSupplyRanges();         // sets range systems can propagate fleet and resourse supply (separately)
+    }
+
+    GetSupplyManager().Update();
+
+    for (auto& entry : empires) {
+        Empire* empire = entry.second;
+        if (empire->Eliminated())
+            continue;
+
+        empire->InitResourcePools();                // determines population centers and resource centers of empire, tells resource pools the centers and groups of systems that can share resources (note that being able to share resources doesn't mean a system produces resources)
+        empire->UpdateResourcePools();              // determines how much of each resources is available in each resource sharing group
+    }
+}
+
 void ServerApp::NewGameInitConcurrentWithJoiners(
     const GalaxySetupData& galaxy_setup_data,
     const std::vector<PlayerSetupData>& player_setup_data)
@@ -713,28 +738,7 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
     for (auto& entry : empires)
         entry.second->UpdateOwnedObjectCounters();
 
-
-    // Determine initial supply distribution and exchanging and resource pools for empires
-    for (auto& entry : empires) {
-        Empire* empire = entry.second;
-        if (empire->Eliminated())
-            continue;   // skip eliminated empires.  presumably this shouldn't be an issue when initializing a new game, but apparently I thought this was worth checking for...
-
-        empire->UpdateSupplyUnobstructedSystems();  // determines which systems can propagate fleet and resource (same for both)
-        empire->UpdateSystemSupplyRanges();         // sets range systems can propagate fleet and resourse supply (separately)
-    }
-
-    GetSupplyManager().Update();
-
-    for (auto& entry : empires) {
-        Empire* empire = entry.second;
-        if (empire->Eliminated())
-            continue;
-
-        empire->InitResourcePools();                // determines population centers and resource centers of empire, tells resource pools the centers and groups of systems that can share resources (note that being able to share resources doesn't mean a system produces resources)
-        empire->UpdateResourcePools();              // determines how much of each resources is available in each resource sharing group
-    }
-
+    UpdateEmpireSupply();
     m_universe.UpdateStatRecords();
 }
 
@@ -1273,27 +1277,8 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
     // so need to be reinitialized when loading based on the gamestate
     m_universe.InitializeSystemGraph();
 
-
-    // Determine supply distribution and exchanging and resource pools for empires
-    EmpireManager& empires = Empires();
-    for (auto& entry : empires) {
-        Empire* empire = entry.second;
-        if (empire->Eliminated())
-            continue;   // skip eliminated empires.  presumably this shouldn't be an issue when initializing a new game, but apparently I thought this was worth checking for...
-        empire->UpdateSupplyUnobstructedSystems();  // determines which systems can propagate fleet and resource (same for both)
-        empire->UpdateSystemSupplyRanges();         // sets range systems can propagate fleet and resourse supply (separately)
-    }
-
-    GetSupplyManager().Update();
-
-    for (auto& entry : empires) {
-        Empire* empire = entry.second;
-        if (empire->Eliminated())
-            continue;   // skip eliminated empires.  presumably this shouldn't be an issue when initializing a new game, but apparently I thought this was worth checking for...
-        empire->InitResourcePools();                // determines population centers and resource centers of empire, tells resource pools the centers and groups of systems that can share resources (note that being able to share resources doesn't mean a system produces resources)
-        empire->UpdateResourcePools();              // determines how much of each resources is available in each resource sharing group
-    }
-
+    UpdateEmpireSupply();
+    
     std::map<int, PlayerInfo> player_info_map = GetPlayerInfoMap();
 
     // assemble player state information, and send game start messages
@@ -3181,27 +3166,7 @@ void ServerApp::PostCombatProcessTurns() {
     m_universe.UpdateEmpireObjectVisibilities();
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
 
-    // Determine how much of each resource is available, and determine how to
-    // distribute it to planets or on queues
-    for (auto& entry : empires) {
-        Empire* empire = entry.second;
-        if (empire->Eliminated())
-            continue;   // skip eliminated empires
-
-        empire->UpdateSupplyUnobstructedSystems();  // determines which systems can propagate fleet and resource (same for both)
-        empire->UpdateSystemSupplyRanges();         // sets range systems can propagate fleet and resourse supply (separately)
-    }
-
-    GetSupplyManager().Update();
-
-    for (auto& entry : empires) {
-        Empire* empire = entry.second;
-        if (empire->Eliminated())
-            continue;   // skip eliminated empires
-        empire->InitResourcePools();                // determines population centers and resource centers of empire, tells resource pools the centers and groups of systems that can share resources (note that being able to share resources doesn't mean a system produces resources)
-        empire->UpdateResourcePools();              // determines how much of each resources is available in each resource sharing group
-    }
-
+    UpdateEmpireSupply();
 
     // Update fleet travel restrictions (monsters and empire fleets)
     UpdateMonsterTravelRestrictions();
@@ -3314,16 +3279,7 @@ void ServerApp::PostCombatProcessTurns() {
 
 
     // Re-determine supply distribution and exchanging and resource pools for empires
-    for (auto& entry : empires) {
-        Empire* empire = entry.second;
-        if (empire->Eliminated())
-            continue;   // skip eliminated empires.  presumably this shouldn't be an issue when initializing a new game, but apparently I thought this was worth checking for...
-        empire->UpdateSupplyUnobstructedSystems();  // determines which systems can propagate fleet and resource (same for both)
-        empire->UpdateSystemSupplyRanges();         // sets range systems can propagate fleet and resourse supply (separately)
-    }
-
-    GetSupplyManager().Update();
-
+    UpdateEmpireSupply();
 
     // copy latest visible gamestate to each empire's known object state
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
@@ -3373,17 +3329,42 @@ void ServerApp::PostCombatProcessTurns() {
 
 void ServerApp::CheckForEmpireElimination() {
     std::set<Empire*> surviving_empires;
+    std::set<Empire*> surviving_human_empires;
     for (auto& entry : Empires()) {
         if (entry.second->Eliminated())
             continue;   // don't double-eliminate an empire
         else if (EmpireEliminated(entry.first))
             entry.second->Eliminate();
-        else
+        else {
             surviving_empires.insert(entry.second);
+            if (GetEmpireClientType(entry.second->EmpireID()) == Networking::CLIENT_TYPE_HUMAN_PLAYER)
+                surviving_human_empires.insert(entry.second);
+        }
     }
 
     if (surviving_empires.size() == 1) // last man standing
         (*surviving_empires.begin())->Win(UserStringNop("VICTORY_ALL_ENEMIES_ELIMINATED"));
+    else if (!m_single_player_game &&
+             static_cast<int>(surviving_human_empires.size()) <= GetGameRules().Get<int>("RULE_THRESHOLD_HUMAN_PLAYER_WIN"))
+    {
+        // human victory threshold
+        if (GetGameRules().Get<bool>("RULE_ONLY_ALLIANCE_WIN")) {
+            for (auto emp1_it = surviving_human_empires.begin();
+                 emp1_it != surviving_human_empires.end(); ++emp1_it)
+            {
+                auto emp2_it = emp1_it;
+                ++emp2_it;
+                for (; emp2_it != surviving_human_empires.end(); ++emp2_it) {
+                    if (Empires().GetDiplomaticStatus((*emp1_it)->EmpireID(), (*emp2_it)->EmpireID()) != DIPLO_ALLIED)
+                        return;
+                }
+            }
+        }
+
+        for (auto& empire : surviving_human_empires) {
+            empire->Win(UserStringNop("VICTORY_FEW_HUMANS_ALIVE"));
+        }
+    }
 }
 
 void ServerApp::HandleDiplomaticStatusChange(int empire1_id, int empire2_id) {

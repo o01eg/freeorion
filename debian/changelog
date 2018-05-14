@@ -1,4 +1,4 @@
-freeorion (0.4.7.1+1SNAPSHOT20180506ppa1~bionic) bionic; urgency=medium
+freeorion (0.4.7.1+1SNAPSHOT20180507ppa4~artful) artful; urgency=medium
 
   * Make PPA for weekly snapshots.
 

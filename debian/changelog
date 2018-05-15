@@ -1,3 +1,9 @@
+freeorion (0.4.7.1+1SNAPSHOT20180514ppa1~bionic) bionic; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg <o01eg@yandex.ru>  Mon, 14 May 2018 19:49:10 +0000
+
 freeorion (0.4.7.1+1SNAPSHOT20180507ppa4~artful) artful; urgency=medium
 
   * Make PPA for weekly snapshots.

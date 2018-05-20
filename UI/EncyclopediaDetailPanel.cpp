@@ -1675,14 +1675,18 @@ namespace {
         auto techs = empire->ResearchedTechs();
         if (!techs.empty()) {
             detailed_description += "\n\n" + UserString("RESEARCHED_TECHS");
+            std::multimap<int, std::string> sorted_techs;
             for (const auto& tech_entry : techs) {
+                sorted_techs.emplace(tech_entry.second, tech_entry.first);
+            }
+            for (const auto& sorted_tech_entry : sorted_techs) {
                 detailed_description += "\n";
                 std::string turn_text;
-                if (tech_entry.second == BEFORE_FIRST_TURN)
+                if (sorted_tech_entry.first == BEFORE_FIRST_TURN)
                     turn_text = UserString("BEFORE_FIRST_TURN");
                 else
-                    turn_text = UserString("TURN") + " " + std::to_string(tech_entry.second);
-                detailed_description += LinkTaggedText(VarText::TECH_TAG, tech_entry.first)
+                    turn_text = UserString("TURN") + " " + std::to_string(sorted_tech_entry.first);
+                detailed_description += LinkTaggedText(VarText::TECH_TAG, sorted_tech_entry.second)
                                      + " : " + turn_text;
             }
         } else {
@@ -3151,6 +3155,9 @@ void EncyclopediaDetailPanel::SetItem(const ShipDesign* design)
 
 void EncyclopediaDetailPanel::SetItem(const MeterType& meter_type)
 { SetMeterType(boost::lexical_cast<std::string>(meter_type)); }
+
+void EncyclopediaDetailPanel::SetEncyclopediaArticle(const std::string& name)
+{ AddItem(TextLinker::ENCYCLOPEDIA_TAG, name); }
 
 void EncyclopediaDetailPanel::OnIndex()
 { AddItem(TextLinker::ENCYCLOPEDIA_TAG, "ENC_INDEX"); }

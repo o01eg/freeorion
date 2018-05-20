@@ -1602,16 +1602,11 @@ void MapWnd::CompleteConstruction() {
     // General Gamestate response signals
     //////////////////
     FleetUIManager& fm = FleetUIManager::GetFleetUIManager();
-    fm.ActiveFleetWndChangedSignal.connect(
-        boost::bind(&MapWnd::SelectedFleetsChanged, this));
-    fm.ActiveFleetWndSelectedFleetsChangedSignal.connect(
-        boost::bind(&MapWnd::SelectedFleetsChanged, this));
-    fm.ActiveFleetWndSelectedShipsChangedSignal.connect(
-        boost::bind(&MapWnd::SelectedShipsChanged, this));
-    fm.FleetRightClickedSignal.connect(
-        boost::bind(&MapWnd::FleetRightClicked, this, _1));
-    fm.ShipRightClickedSignal.connect(
-        boost::bind(&MapWnd::ShipRightClicked, this, _1));
+    fm.ActiveFleetWndChangedSignal.connect(boost::bind(&MapWnd::SelectedFleetsChanged, this));
+    fm.ActiveFleetWndSelectedFleetsChangedSignal.connect(boost::bind(&MapWnd::SelectedFleetsChanged, this));
+    fm.ActiveFleetWndSelectedShipsChangedSignal.connect(boost::bind(&MapWnd::SelectedShipsChanged, this));
+    fm.FleetRightClickedSignal.connect(boost::bind(&MapWnd::FleetRightClicked, this, _1));
+    fm.ShipRightClickedSignal.connect(boost::bind(&MapWnd::ShipRightClicked, this, _1));
 
     DoLayout();
 
@@ -4395,7 +4390,7 @@ void MapWnd::ShowMeterTypeArticle(const std::string& meter_string) {
 void MapWnd::ShowEncyclopediaEntry(const std::string& str) {
     if (!m_pedia_panel->Visible())
         TogglePedia();
-    m_pedia_panel->SetText(str, false);
+    m_pedia_panel->SetEncyclopediaArticle(str);
 }
 
 void MapWnd::CenterOnObject(int id) {

@@ -87,6 +87,7 @@ struct MessageEventBase {
     (Diplomacy)                             \
     (ModeratorAct)                          \
     (AuthResponse)                          \
+    (EliminateSelf)                         \
     (Error)
 
 
@@ -299,6 +300,7 @@ struct PlayingGame : sc::state<PlayingGame, ServerFSM, WaitingForTurnEnd> {
         sc::custom_reaction<Hostless>,
         sc::custom_reaction<JoinGame>,
         sc::custom_reaction<AuthResponse>,
+        sc::custom_reaction<EliminateSelf>,
         sc::custom_reaction<Error>
     > reactions;
 
@@ -313,6 +315,7 @@ struct PlayingGame : sc::state<PlayingGame, ServerFSM, WaitingForTurnEnd> {
     sc::result react(const RequestCombatLogs& msg);
     sc::result react(const JoinGame& msg);
     sc::result react(const AuthResponse& msg);
+    sc::result react(const EliminateSelf& msg);
     sc::result react(const Error& msg);
 
     void EstablishPlayer(const PlayerConnectionPtr& player_connection,

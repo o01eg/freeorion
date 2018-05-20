@@ -42,13 +42,13 @@ jobs:
               docker run -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build freeorion/freeorion-travis-build timeout 40m /usr/bin/cmake $@
           }
       before_script:
-        - git remote add -t master -m master upstream https://github.com/freeorion/freeorion.git
+        - git remote add -t release-v0.4.8 -m release-v0.4.8 upstream https://github.com/freeorion/freeorion.git
         - git fetch upstream
-        - git log -1 upstream/master
+        - git log -1 upstream/release-v0.4.8
         - mkdir build
         - cd build
       script:
-        - git merge --no-commit upstream/master
+        - git merge --no-commit upstream/release-v0.4.8
         - cmake -DBUILD_HEADLESS=ON -DBUILD_TESTING=ON ..
         - cmake --build . -- -j 2
         - cmake --build . --target unittest

@@ -1,3 +1,10 @@
+freeorion (0.4.8+git20180522~2e3c6f4-1) unstable; urgency=medium
+
+  * Update upstream to 0.4.8 branch.
+  * Allow to concede with up to 9999 colonies.
+
+ -- O01eg <o01eg@yandex.ru>  Wed, 23 May 2018 03:04:02 +0000
+
 freeorion (0.4.8+git20180514~1f24dc0-1) unstable; urgency=medium
 
   * Update upstream.

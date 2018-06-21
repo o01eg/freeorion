@@ -39,7 +39,7 @@ jobs:
         # timeout before Travis kills jobs so that ccache is always at least partially populated
         - >
           function cmake {
-              docker run -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build freeorion/freeorion-travis-build timeout 40m /usr/bin/cmake $@
+              docker run -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -e CTEST_OUTPUT_ON_FAILURE=1 -w /freeorion/build freeorion/freeorion-travis-build timeout 40m /usr/bin/cmake $@
           }
       before_script:
         - git remote add -t release-v0.4.8 -m release-v0.4.8 upstream https://github.com/freeorion/freeorion.git

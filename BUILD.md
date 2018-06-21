@@ -19,7 +19,7 @@ to compile ; 6 GiB RAM or more is recommended. To build FreeOrion, expect up to
 FreeOrion depends on the following software to build:
 
   * [Visual Studio] - 2015 for Windows Desktop Update 3 ; Windows only
-  * [Xcode] - 6.4 or later ; Mac OS X only
+  * [Xcode] - 8.3 or later ; Mac OS X only
   * [CMake] - 3.4 (Mac OS X) ; 3.1 or later (Other non-Windows)
   * A C++11 compliant compiler - Other Operating Systems
     * [GNU GCC] - 5.0 or later
@@ -58,9 +58,9 @@ manager or compiling from source).
 Step by step procedure:
 
  * On Windows:
-   * Download the [FreeOrionSDK v8] from the FreeOrionSDK respository releases.
+   * Download the [FreeOrionSDK v10] from the FreeOrionSDK respository releases.
  * On Mac OS X:
-   * The [FreeOrionSDK v8] is downloaded automatically when CMake creates the
+   * The [FreeOrionSDK v10] is downloaded automatically when CMake creates the
      build environment.
  * Linux and other Operating Systems:
    * Install build and runtime dependencies by the preferred way for the
@@ -167,6 +167,6 @@ This will leave you with a build of FreeOrion executables.
 [libvorbis]: https://xiph.org/downloads/
 [SDL2]: https://www.libsdl.org/download-2.0.php
 [FreeOrionSDK]: https://github.com/freeorion/freeorion-sdk
-[FreeOrionSDK v8]: https://github.com/freeorion/freeorion-sdk/releases/tag/v8
+[FreeOrionSDK v10]: https://github.com/freeorion/freeorion-sdk/releases/tag/v10
 [FreeOrion Releases]: https://github.com/freeorion/freeorion/releases
 [make jobs]: https://www.gnu.org/software/make/manual/html_node/Parallel.html

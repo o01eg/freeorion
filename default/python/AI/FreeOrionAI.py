@@ -13,7 +13,7 @@ import random
 import freeOrionAIInterface as fo  # interface used to interact with FreeOrion AI client  # pylint: disable=import-error
 
 
-from common.option_tools import parse_config, get_option_dict
+from common.option_tools import parse_config, get_option_dict, check_bool
 parse_config(fo.getOptionsDBOptionStr("ai-config"), fo.getUserConfigDir())
 
 from freeorion_tools import patch_interface
@@ -147,6 +147,8 @@ def resumeLoadedGame(saved_state_string):  # pylint: disable=invalid-name
     diplomatic_corp = diplomatic_corp_configs.get(aggression_trait.key, DiplomaticCorp.DiplomaticCorp)()
     TechsListsAI.test_tech_integrity()
 
+    debug('Size of already issued orders: ' + str(fo.getOrders().size))
+
 
 def prepareForSave():  # pylint: disable=invalid-name
     """Called by client when the game is about to be saved, to let the Python AI know it should save any AI state
@@ -232,7 +234,6 @@ def generateOrders():  # pylint: disable=invalid-name
     """Called once per turn to tell the Python AI to generate and issue orders to control its empire.
     at end of this function, fo.doneTurn() should be called to indicate to the client that orders are finished
     and can be sent to the server for processing."""
-
     rules = fo.getGameRules()
     print "Defined game rules:"
     for rule in rules.getRulesAsStrings:
@@ -305,8 +306,26 @@ def generateOrders():  # pylint: disable=invalid-name
     print "***************************************************************************"
     print "***************************************************************************"
 
+    # When loading a savegame, the AI will already have issued orders for this turn.
+    # To avoid duplicate orders, generally try not to replay turns. However, for debugging
+    # purposes it is often useful to replay the turn and observe varying results after
+    # code changes. Set the replay_after_load flag in the AI config to let the AI issue
+    # new orders after a game load. Note that the orders from the original savegame are
+    # still being issued and the AIstate was saved after those orders were issued.
+    # TODO: Consider adding an option to clear AI orders after load (must save AIstate at turn start then)
+    if fo.currentTurn() == foAIstate.last_turn_played:
+        info("The AIstate indicates that this turn was already played.")
+        if not check_bool(get_option_dict().get('replay_turn_after_load', 'False')):
+            info("Aborting new order generation. Orders from savegame will still be issued.")
+            try:
+                fo.doneTurn()
+            except Exception as e:
+                error("Exception %s while trying doneTurn()" % e, exc_info=True)
+            return
+        else:
+            info("Issuing new orders anyway.")
+
     if turn == 1:
-        declare_war_on_all()
         human_player = fo.empirePlayerID(1)
         greet = diplomatic_corp.get_first_turn_greet_message()
         fo.sendChatMessage(human_player,
@@ -339,12 +358,17 @@ def generateOrders():  # pylint: disable=invalid-name
             error("Exception %s while trying to %s" % (e, action.__name__), exc_info=True)
     main_timer.stop_print_and_clear()
     turn_timer.stop_print_and_clear()
+
+    debug('Size of issued orders: ' + str(fo.getOrders().size))
+
     turn_timer.start("Server_Processing")
 
     try:
         fo.doneTurn()
     except Exception as e:
         error("Exception %s while trying doneTurn()" % e, exc_info=True)  # TODO move it to cycle above
+    finally:
+        foAIstate.last_turn_played = fo.currentTurn()
 
     if using_statprof:
         try:
@@ -353,17 +377,6 @@ def generateOrders():  # pylint: disable=invalid-name
             statprof.start()
         except:
             pass
-
-
-# The following methods should probably be moved to the AIstate module,
-# to keep this module more focused on implementing required interface
-def declare_war_on_all():  # pylint: disable=invalid-name
-    """Used to declare war on all other empires (at start of game)"""
-    my_emp_id = fo.empireID()
-    for emp_id in fo.allEmpireIDs():
-        if emp_id != my_emp_id:
-            msg = fo.diplomaticMessage(my_emp_id, emp_id, fo.diplomaticMessageType.warDeclaration)
-            fo.sendDiplomaticMessage(msg)
 
 
 init_handlers(fo.getOptionsDBOptionStr("ai-config"), fo.getAIDir())

@@ -67,9 +67,22 @@ def calc_max_pop(planet, species, detail):
     if planet_env == fo.planetEnvironment.uninhabitable:
         detail.append("Uninhabitable.")
         return 0
+
+    for bldg_id in planet.buildingIDs:
+        building = fo.getUniverse().getBuilding(bldg_id)
+        if not building:
+            continue
+        if building.buildingTypeName == "BLD_GATEWAY_VOID":
+            detail.append("Gateway to the void: Uninhabitable.")
+            return 0
+
     tag_list = list(species.tags) if species else []
     pop_tag_mod = AIDependencies.SPECIES_POPULATION_MODIFIER.get(get_ai_tag_grade(tag_list, "POPULATION"), 1.0)
-    gaseous_adjustment = AIDependencies.GASEOUS_POP_FACTOR if "GASEOUS" in tag_list else 1.0
+    if planet.type == fo.planetType.gasGiant and "GASEOUS" in tag_list:
+        gaseous_adjustment = AIDependencies.GASEOUS_POP_FACTOR
+        detail.append("GASEOUS adjustment: %.2f" % gaseous_adjustment)
+    else:
+        gaseous_adjustment = 1.0
 
     base_pop_modified_by_species = 0
     base_pop_not_modified_by_species = 0
@@ -135,11 +148,20 @@ def calc_max_pop(planet, species, detail):
         detail.append("boosts_PSM(%d from %s)" % (n_boosts, applicable_boosts))
 
     if planet.id in species.homeworlds:
+        detail.append('Homeworld (2)')
         base_pop_not_modified_by_species += 2
 
+    if AIDependencies.TAG_LIGHT_SENSITIVE in tag_list:
+        star_type = fo.getUniverse().getSystem(planet.systemID).starType
+        star_pop_mod = AIDependencies.POP_MOD_LIGHTSENSITIVE_STAR_MAP.get(star_type, 0)
+        base_pop_not_modified_by_species += star_pop_mod
+        detail.append("Lightsensitive Star Bonus_PSM_late(%.1f)" % star_pop_mod)
+
     def max_pop_size():
-        species_effect = (pop_tag_mod - 1) * abs(base_pop_modified_by_species) * gaseous_adjustment
-        base_pop = base_pop_not_modified_by_species + base_pop_modified_by_species + species_effect
+        species_effect = (pop_tag_mod - 1) * abs(base_pop_modified_by_species)
+        gaseous_effect = (gaseous_adjustment - 1) * abs(base_pop_modified_by_species)
+        base_pop = (base_pop_not_modified_by_species + base_pop_modified_by_species
+                    + species_effect + gaseous_effect)
         return planet_size * base_pop + pop_const_mod
 
     if "PHOTOTROPHIC" in tag_list and max_pop_size() > 0:
@@ -148,11 +170,12 @@ def calc_max_pop(planet, species, detail):
         base_pop_not_modified_by_species += star_pop_mod
         detail.append("Phototropic Star Bonus_PSM_late(%0.1f)" % star_pop_mod)
 
-    detail.append("MaxPop = baseMaxPop + size*(psm_early + (species_mod - 1)*abs(psm_early) + psm_late)"
-                  " = %d + %d * (%d + (%.2f-1)*abs(%d) + %d) = %.2f" % (
+    detail.append("max_pop = base + size*[psm_early + species_mod*abs(psm_early) + psm_late]")
+    detail.append("        = %.2f + %d * [%.2f + %.2f*abs(%.2f) + %.2f]" % (
                     pop_const_mod, planet_size, base_pop_modified_by_species,
-                    pop_tag_mod, base_pop_modified_by_species, base_pop_not_modified_by_species, max_pop_size()))
-    detail.append("maxPop %.1f" % max_pop_size())
+                    (pop_tag_mod+gaseous_adjustment-2), base_pop_modified_by_species,
+                    base_pop_not_modified_by_species))
+    detail.append("        = %.2f" % max_pop_size())
     return max_pop_size()
 
 
@@ -626,7 +649,10 @@ def evaluate_planet(planet_id, mission_type, spec_name, detail=None):
 
     ind_tag_mod = AIDependencies.SPECIES_INDUSTRY_MODIFIER.get(get_ai_tag_grade(tag_list, "INDUSTRY"), 1.0)
     res_tag_mod = AIDependencies.SPECIES_RESEARCH_MODIFIER.get(get_ai_tag_grade(tag_list, "RESEARCH"), 1.0)
-    supply_tag_mod = AIDependencies.SPECIES_SUPPLY_MODIFIER.get(get_ai_tag_grade(tag_list, "SUPPLY"), 1)
+    if species:
+        supply_tag_mod = AIDependencies.SPECIES_SUPPLY_MODIFIER.get(get_ai_tag_grade(tag_list, "SUPPLY"), 1)
+    else:
+        supply_tag_mod = 0
 
     # determine the potential supply provided by owning this planet, and if the planet is currently populated by
     # the evaluated species, then save this supply value in a cache.
@@ -1553,3 +1579,28 @@ class OrbitalColonizationManager(object):
                 success = plan.assign_base(fid)
                 if success:
                     break
+
+
+def test_calc_max_pop():
+    """
+    Verify AI calculation of max population by comparing it with actual client
+    queried values.
+
+    This function may be called in debug mode in a running game and will compare
+    the actual target population meters on all planets owned by this AI with the
+    predicted maximum population. Any mismatch will be reported in chat.
+    """
+    from freeorion_tools import chat_human
+    chat_human("Verifying calculation of ColonisationAI.calc_max_pop()")
+    universe = fo.getUniverse()
+    for spec_name, planets in state.get_empire_planets_by_species().iteritems():
+        species = fo.getSpecies(spec_name)
+        for pid in planets:
+            planet = universe.getPlanet(pid)
+            detail = []
+            predicted = calc_max_pop(planet, species, detail)
+            actual = planet.initialMeterValue(fo.meterType.targetPopulation)
+            if actual != predicted:
+                error("Predicted pop of %.2f on %s but actually is %.2f; Details: %s" %
+                      (predicted, planet, actual, "\n".join(detail)))
+    chat_human("Finished verification of ColonisationAI.calc_max_pop()")

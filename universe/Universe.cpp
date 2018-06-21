@@ -1506,7 +1506,7 @@ void Universe::ExecuteEffects(const Effect::TargetsCauses& targets_causes,
         const Effect::EffectsGroup* last_effects_group   = nullptr;
         Effect::TargetsCauses*      group_targets_causes = nullptr;
 
-        for (const std::pair<Effect::SourcedEffectsGroup, Effect::TargetsAndCause>& targets_cause : targets_causes) {
+        for (const auto& targets_cause : targets_causes) {
             const Effect::SourcedEffectsGroup& sourced_effects_group = targets_cause.first;
             Effect::EffectsGroup* effects_group = sourced_effects_group.effects_group.get();
 
@@ -2562,15 +2562,8 @@ void Universe::UpdateEmpireStaleObjectKnowledge() {
         std::set<int>& stale_set = m_empire_stale_knowledge_object_ids[empire_id];
         const std::set<int>& destroyed_set = m_empire_known_destroyed_object_ids[empire_id];
 
-        // remove stale marking for any known destroyed or currently visible objects
-        for (auto stale_it = stale_set.begin(); stale_it != stale_set.end();) {
-            int object_id = *stale_it;
-            if (vis_map.count(object_id) || destroyed_set.count(object_id))
-                stale_set.erase(stale_it++);
-            else
-                ++stale_it;
-        }
-
+        // clear previous staleness determinations
+        stale_set.clear();
 
         // get empire latest known objects that are potentially detectable
         auto empires_latest_known_objects_that_should_be_detectable =

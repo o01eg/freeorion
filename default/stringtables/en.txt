@@ -267,6 +267,8 @@ Balance
 CONTENT
 Content
 
+MULTIPLAYER
+Multiplayer
 
 ##
 ## Major errors
@@ -339,11 +341,15 @@ PROJECT_BT_STOCKPILE_SHORT_DESC
 Transfers PP into the imperial stockpile
 
 PROJECT_BT_STOCKPILE_DESC
-'''Transfers PP at the planet where this project is enqueued to the imperial stockpile. Anything enqueued below the transfer project at a supply-connected planet will not be allocated PP.
+'''PP allocated to the transfer project are added to the imperial stockpile. The amount to transfer and how many times the transfer should repeat can be specified.
 
-Only transfers PP that are available at this planet; PP allocation on planets that are not supply-connected to here will not be affected by this project.
+Only PP that are produced in the same supply-group (and none from the imperial stockpile) are allocated to the stockpile transfer project.
 
-Surplus PP (PP not allocated to anything on the queue) at this or any other location will be transferred to the stockpile with or without a stockpile transfer project on the queue.  This project is used to transfer PP to the stockpile even if there are things on the queue below it that could have been allocated available PP.'''
+Surplus PP (PP not allocated to anything on the queue) at this or any other location will be transferred to the stockpile with or without a stockpile transfer project on the queue. PP allocated to a stockpile transfer are sent to the stockpile, even if there are additional items later in the production queue.
+
+For example: An empire wants to draw PP from the stockpile in a secondary supply-group, in which there is insufficient PP being generated. To do this, the stockpile needs to be filled from the primary supply-group. The empire has 100 PP industry in the primary supply-group, its stockpile use limit is 10 PP and it wants to have 10 PP always available in the stockpile. The build queue contains items on planets in the primary supply-group which need 120 PP per turn, so all available PP would be used.
+To be able to use the PP in the secondary supply-group, the empire adds to the top of the queue a 10x Stockpile Transfer project on a planet in the primary supply-group.
+Because the Stockpile Transfer project is above other primary supply-group projects in the build queue, it is fully funded and will increase the stockpile by 10 PP on the next turn. To ensure a continuing transfer each turn, the repetition of the project is set to 99 times.'''
 
 
 ##
@@ -1190,6 +1196,11 @@ Only allied players win
 RULE_ONLY_ALLIANCE_WIN_DESC
 Allied players could win together if the number of human players in their alliance is no large than the maximum human player winners and there are no other human player survivors.
 
+RULE_SHIP_PART_BASED_UPKEEP
+Use part-based upkeep
+
+RULE_SHIP_PART_BASED_UPKEEP_DESC
+Calculate upkeep based on ship parts instead of ships themselves.
 
 ##
 ## Command-line and options database entries
@@ -1228,6 +1239,9 @@ Start server in hostless mode. Server accepts players in the multiplayer lobby, 
 
 OPTIONS_DB_SKIP_CHECKSUM
 Skip comparing the resource directory checksums.  This allows faster startup when client and server are on the same machine, using the same resource directory.
+
+OPTIONS_DB_TESTING
+Linux only. AI will output log to console instead file for testing purpose.
 
 OPTIONS_DB_GENERATE_CONFIG_XML
 Uses default settings, settings from any existing config.xml file, and settings given on the command line to generate a config.xml file. This will overwrite the current config.xml file, if it exists.
@@ -3071,6 +3085,10 @@ Unable to create persistent_config.xml, check log file for details.
 MAP_BTN_TURN_UPDATE
 Turn %1%
 
+# %1% current turn number.
+MAP_BTN_TURN_UNREADY
+Revise Orders %1%
+
 # %1% number of frames currently displayed per second.
 MAP_INDICATOR_FPS
 %1% FPS
@@ -4089,8 +4107,8 @@ It also allows for some interaction with the [[encyclopedia MAP_WINDOW_ARTICLE_T
 The Production Summary panel shows available Production Points.
 If a system is selected, there are two columns shown. The left column shows production points across your entire empire. The right column gives production points for the selected system (but is absent if no system is selected).
 Available Points relates to the PP available for production. The right value are the maximum available production points for the selected system. This may be less than the total available when all of your empire's systems are not [[metertype METER_SUPPLY]] connected.
-Stockpile relates to the PP available for production using the imperial stockpile. Production items are enabled to draw from the Imperial Stockpile by default and have to be explicitly disabled from doing so.
-Generally, most excess PP will be wasted and lost, but a part of the excess will be stored in the imperial stockpile.
+Stockpile relates to the PP available for production using the imperial stockpile. Production items are enabled to use PP from the Imperial Stockpile by default and have to be explicitly disabled from doing so.
+PP not allocated to anything on the build queue will automatically be stored in the imperial stockpile.
 
 <u>Producible Items panel</u>
 
@@ -7838,6 +7856,32 @@ Reason for Staying:
 Volp-Uglush are now too integrated and ingrown. They now totally lack the independence and innovation needed to leave Hive and start a new colony.
 '''
 
+SP_FULVER
+Fulver
+
+SP_FULVER_GAMEPLAY_DESC
+'''Precognitive unsatisfied ants.
+Prefer [[PT_TUNDRA]]s.
+[[encyclopedia LITHIC_SPECIES_TITLE]]
+'''
+
+SP_FULVER_DESC
+'''Biology:
+The Fulvers' appearance resembles that of large nervous ants. They possess quantum computing brains which effectively allows them to predict all possible near futures making them hard to surprise in combat.
+
+Name:
+The precognition ability is also unique to the Fulvers species on the Fulver homeworld. As such a "Fulver" is "One who can see" your possible reactions.
+
+Personality:
+Fulver prefer to concentrate on their strength and prefer to live from day to day. Fulver often favor the tools and decisions which allows for the highest number of future choices. Having a bad memory and no capability for long term future prediction they are bad at long term commitments like science and building up defensive structures. Feeling locked in by the limited number of choices they are restless and unsatisfied and constantly try to overcome their situation.
+
+Reason for Leaving:
+The endless possibilites that space promises helped the Fulvers to concentrate and finally develop space-faring technology. Finally they are out going to the frontier and beyond not caring much for what they leave behind.
+
+Social Structure:
+The focus on the near future prevents the Fulver from building long-lasting structures. Knowing each others possible choices and reacting to these leads to a society which could be best described as an informal anarchy.
+'''
+
 SP_FURTHEST
 Furthest
 
@@ -9178,9 +9222,6 @@ local condition candidate
 DESC_VAR_ROOT_CANDIDATE
 root condition candidate
 
-DESC_STATISTIC
-statistic
-
 DESC_STAT_TYPE
 stat type
 
@@ -9427,8 +9468,17 @@ last turn a battle occurred here
 DESC_COMPLEX
 Complex Variable
 
-DESC_VARIABLE_NAME
-Variable Name
+DESC_VAR_JUMPSBETWEEN
+starlane jumps between systems containing objects with ids %1% and %2%
+
+DESC_STATISTIC
+Statistic
+
+DESC_VAR_COUNT
+the number of objects%2%
+
+DESC_VAR_IF
+0, or 1 if there is any object%2%
 
 # FOCS variable reference description text.
 # %1% reference type of the FOCS variable.
@@ -10595,7 +10645,7 @@ PRO_VOID_PREDICTION_DESC
 For the imperial stockpile service, void prediction is the quintessential tool to deliver the right goods even before the need occurs.
 
 This is an upgrade technology for the imperial stockpile. The [[metertype METER_STOCKPILE]] is increased by 0.2 per population.
-These improvements are cumulative with those provided by [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] and [[tech PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY].'''
+These improvements are cumulative with those provided by [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] and [[tech PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY]].'''
 
 PRO_MICROGRAV_MAN
 Microgravity Industry
@@ -12549,6 +12599,12 @@ Furthest Colony
 BLD_COL_FURTHEST_DESC
 [[BLD_COL_PART_1]] [[species SP_FURTHEST]] colony. [[BLD_COL_PART_2]] Furthest colony [[BLD_COL_PART_3]].
 
+BLD_COL_FULVER
+Fulver Colony
+
+BLD_COL_FULVER_DESC
+[[BLD_COL_PART_1]] [[species SP_FULVER]] colony. [[BLD_COL_PART_2]] Fulver colony [[BLD_COL_PART_3]].
+
 BLD_COL_GEORGE
 George Colony
 
@@ -14361,8 +14417,23 @@ FAST_COLONIZATION_DESC
 SLOW_COLONIZATION_DESC
 −	Slow Colonization: +20% time to build colonies
 
+NO_FUEL_DESC
+−−−	Ships have zero [[metertype METER_FUEL]]
+
 BAD_FUEL_DESC
-−	Bad maximum [[metertype METER_FUEL]]: - 1
+−	Bad Maximum [[metertype METER_FUEL]]: -1
+
+AVERAGE_FUEL_DESC
+	Average Maximum [[metertype METER_FUEL]]: +0
+
+GOOD_FUEL_DESC
++	Good Maximum [[metertype METER_FUEL]]: +1
+
+GREAT_FUEL_DESC
+++	Great Maximum [[metertype METER_FUEL]]: +2
+
+ULTIMATE_FUEL_DESC
++++	Bad Maximum [[metertype METER_FUEL]]: +3
 
 GREAT_ASTEROID_INDUSTRY_DESC
 +	Good Asteroid Miners: + 0.2 [[metertype METER_INDUSTRY]] per population when Industry Focused in systems with owned asteroid belts.
@@ -14553,6 +14624,36 @@ ULTIMATE_STOCKPILE_LABEL
 
 # %1% FIXME
 # %2% FIXME
+NO_FUEL_LABEL
+%2% No Fuel
+
+# %1% FIXME
+# %2% FIXME
+BAD_FUEL_LABEL
+%2% Bad Maximum Fuel
+
+# %1% FIXME
+# %2% FIXME
+AVERAGE_FUEL_LABEL
+%2% Average Maximum Fuel
+
+# %1% FIXME
+# %2% FIXME
+GOOD_FUEL_LABEL
+%2% Good Maximum Fuel
+
+# %1% FIXME
+# %2% FIXME
+GREAT_FUEL_LABEL
+%2% Great Maximum Fuel
+
+# %1% FIXME
+# %2% FIXME
+ULTIMATE_FUEL_LABEL
+%2% Ultimate Maximum Fuel
+
+# %1% FIXME
+# %2% FIXME
 BAD_TROOPS_LABEL
 %2% Bad Ground Troops
 
@@ -14631,8 +14732,17 @@ Homeworld
 CAPITAL_LABEL
 Capital
 
+BLD_STOCKPILING_CENTER_LABEL
+Imperial Entanglement Center
+
 CONCENTRATION_CAMPS_LABEL
 Concentration Camps
+
+INTERSTELLAR_ENTANGLEMENT_FACTORY_POPULATION_BONUS_LABEL
+Interstellar Entanglement Factory population based bonus
+
+INTERSTELLAR_ENTANGLEMENT_FACTORY_FIXED_BONUS_LABEL
+Interstellar Entanglement Factory fixed bonus
 
 ORBITAL_HAB_LABEL
 Orbital Habitation

@@ -49,6 +49,12 @@ std::string CUIStyle::Translate(const std::string& text) const
     return UserString("ERROR");
 }
 
+std::shared_ptr<GG::Button> CUIStyle::NewButton(const std::string& str, const std::shared_ptr<GG::Font>& font,
+                                                GG::Clr color, GG::Clr text_color/* = CLR_BLACK*/,
+                                                GG::Flags<GG::WndFlag> flags/* = INTERACTIVE*/) const
+{ return GG::Wnd::Create<CUIButton>(str); }
+
+
 std::shared_ptr<GG::DropDownList> CUIStyle::NewDropDownList(size_t num_shown_elements, GG::Clr color) const
 { return GG::Wnd::Create<CUIDropDownList>(num_shown_elements); }
 
@@ -106,11 +112,11 @@ std::shared_ptr<GG::Button> CUIStyle::NewHSliderTabButton(GG::Clr color) const
 
 std::shared_ptr<GG::Button> CUIStyle::NewSpinIncrButton(
     const std::shared_ptr<GG::Font>& font, GG::Clr color) const
-{ return GG::Wnd::Create<CUIArrowButton>(SHAPE_UP, false, GG::INTERACTIVE | GG::REPEAT_BUTTON_DOWN); }
+{ return GG::Wnd::Create<CUIArrowButton>(ShapeOrientation::UP, false, GG::INTERACTIVE | GG::REPEAT_BUTTON_DOWN); }
 
 std::shared_ptr<GG::Button> CUIStyle::NewSpinDecrButton(
     const std::shared_ptr<GG::Font>& font, GG::Clr color) const
-{ return GG::Wnd::Create<CUIArrowButton>(SHAPE_DOWN, false, GG::INTERACTIVE | GG::REPEAT_BUTTON_DOWN); }
+{ return GG::Wnd::Create<CUIArrowButton>(ShapeOrientation::DOWN, false, GG::INTERACTIVE | GG::REPEAT_BUTTON_DOWN); }
 
 std::shared_ptr<GG::StateButton> CUIStyle::NewTabBarTab(
     const std::string& str, const std::shared_ptr<GG::Font>& font,
@@ -127,9 +133,9 @@ std::shared_ptr<GG::StateButton> CUIStyle::NewTabBarTab(
 std::shared_ptr<GG::Button> CUIStyle::NewTabBarLeftButton(
     const std::shared_ptr<GG::Font>& font,
     GG::Clr color, GG::Clr text_color/* = GG::CLR_BLACK*/) const
-{ return GG::Wnd::Create<CUIArrowButton>(SHAPE_LEFT, true, GG::INTERACTIVE); }
+{ return GG::Wnd::Create<CUIArrowButton>(ShapeOrientation::LEFT, true, GG::INTERACTIVE); }
 
 std::shared_ptr<GG::Button> CUIStyle::NewTabBarRightButton(
     const std::shared_ptr<GG::Font>& font,
     GG::Clr color, GG::Clr text_color/* = GG::CLR_BLACK*/) const
-{ return GG::Wnd::Create<CUIArrowButton>(SHAPE_RIGHT, true, GG::INTERACTIVE); }
+{ return GG::Wnd::Create<CUIArrowButton>(ShapeOrientation::RIGHT, true, GG::INTERACTIVE); }

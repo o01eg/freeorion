@@ -113,9 +113,8 @@ void ClientApp::SetPlayerStatus(int player_id, Message::PlayerStatus status) {
     m_player_status[player_id] = status;
 }
 
-void ClientApp::StartTurn() {
-    m_networking->SendMessage(TurnOrdersMessage(m_orders));
-}
+void ClientApp::StartTurn()
+{ m_networking->SendMessage(TurnOrdersMessage(m_orders)); }
 
 void ClientApp::HandleTurnPhaseUpdate(Message::TurnProgressPhase phase_id) {
     switch (phase_id) {
@@ -165,7 +164,7 @@ void ClientApp::SetEmpireID(int empire_id)
 void ClientApp::SetCurrentTurn(int turn)
 { m_current_turn = turn; }
 
-void ClientApp::VerifyCheckSum(const Message& msg) {
+bool ClientApp::VerifyCheckSum(const Message& msg) {
     std::map<std::string, unsigned int> server_checksums;
     ExtractContentCheckSumMessageData(msg, server_checksums);
 
@@ -173,6 +172,7 @@ void ClientApp::VerifyCheckSum(const Message& msg) {
 
     if (server_checksums == client_checksums) {
         InfoLogger() << "Checksum received from server matches client checksum.";
+        return true;
     } else {
         WarnLogger() << "Checksum received from server does not match client checksum.";
         for (const auto& name_and_checksum : server_checksums) {
@@ -183,5 +183,6 @@ void ClientApp::VerifyCheckSum(const Message& msg) {
                              << name_and_checksum.second << " != client "
                              << client_checksum;
         }
+        return false;
     }
 }

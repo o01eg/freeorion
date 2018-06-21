@@ -1041,7 +1041,10 @@ void MapWnd::CompleteConstruction() {
     // turn button
     // determine size from the text that will go into the button, using a test year string
     std::string turn_button_longest_reasonable_text =  boost::io::str(FlexibleFormat(UserString("MAP_BTN_TURN_UPDATE")) % "99999"); // it is unlikely a game will go over 100000 turns
-    m_btn_turn = Wnd::Create<CUIButton>(turn_button_longest_reasonable_text);
+    std::string unready_button_longest_reasonable_text =  boost::io::str(FlexibleFormat(UserString("MAP_BTN_TURN_UNREADY")) % "99999");
+    m_btn_turn = Wnd::Create<CUIButton>(turn_button_longest_reasonable_text.size() > unready_button_longest_reasonable_text.size() ?
+                                        turn_button_longest_reasonable_text :
+                                        unready_button_longest_reasonable_text);
     m_btn_turn->Resize(m_btn_turn->MinUsableSize());
     m_btn_turn->LeftClickedSignal.connect(
         boost::bind(&MapWnd::EndTurn, this));
@@ -2690,17 +2693,25 @@ void MapWnd::EnableOrderIssuing(bool enable/* = true*/) {
     // and is not a moderator
     HumanClientApp* app = HumanClientApp::GetApp();
     bool moderator = false;
+    m_btn_turn->Disable(HumanClientApp::GetApp()->SinglePlayerGame() && !enable);
     if (!app) {
         enable = false;
+        m_btn_turn->Disable(true);
     } else {
         bool have_empire = (app->EmpireID() != ALL_EMPIRES);
         moderator = (app->GetClientType() == Networking::CLIENT_TYPE_HUMAN_MODERATOR);
-        if (!have_empire && !moderator)
+        if (!have_empire && !moderator) {
             enable = false;
+            m_btn_turn->Disable(true);
+        }
     }
 
     m_moderator_wnd->EnableActions(enable && moderator);
-    m_btn_turn->Disable(!enable);
+    m_ready_turn = !enable;
+    m_btn_turn->SetText(boost::io::str(FlexibleFormat(m_ready_turn && !HumanClientApp::GetApp()->SinglePlayerGame() ?
+                                                      UserString("MAP_BTN_TURN_UNREADY") :
+                                                      UserString("MAP_BTN_TURN_UPDATE")) %
+                                       std::to_string(CurrentTurn())));
     m_side_panel->EnableOrderIssuing(enable);
     m_production_wnd->EnableOrderIssuing(enable);
     m_research_wnd->EnableOrderIssuing(enable);
@@ -2761,6 +2772,7 @@ void MapWnd::InitTurn() {
     // set turn button to current turn
     m_btn_turn->SetText(boost::io::str(FlexibleFormat(UserString("MAP_BTN_TURN_UPDATE")) %
                                        std::to_string(turn_number)));
+    m_ready_turn = false;
     MoveChildUp(m_btn_turn);
 
 
@@ -5183,18 +5195,18 @@ double MapWnd::SystemHaloScaleFactor() const
 { return 1.0 + log10(ZoomFactor()); }
 
 FleetButton::SizeType MapWnd::FleetButtonSizeType() const {
-    // no FLEET_BUTTON_LARGE as these icons are too big for the map.  (they can be used in the FleetWnd, however)
+    // no SizeType::LARGE as these icons are too big for the map.  (they can be used in the FleetWnd, however)
     if      (ZoomFactor() > ClientUI::MediumFleetButtonZoomThreshold())
-        return FleetButton::FLEET_BUTTON_MEDIUM;
+        return FleetButton::SizeType::MEDIUM;
 
     else if (ZoomFactor() > ClientUI::SmallFleetButtonZoomThreshold())
-        return FleetButton::FLEET_BUTTON_SMALL;
+        return FleetButton::SizeType::SMALL;
 
     else if (ZoomFactor() > ClientUI::TinyFleetButtonZoomThreshold())
-        return FleetButton::FLEET_BUTTON_TINY;
+        return FleetButton::SizeType::TINY;
 
     else
-        return FleetButton::FLEET_BUTTON_NONE;
+        return FleetButton::SizeType::NONE;
 }
 
 void MapWnd::Zoom(int delta) {
@@ -5580,7 +5592,14 @@ std::vector<int> MapWnd::FleetIDsOfFleetButtonsOverlapping(int fleet_id) const {
 
     const auto& it = m_fleet_buttons.find(fleet_id);
     if (it == m_fleet_buttons.end()) {
-        ErrorLogger() << "Couldn't find a FleetButton for fleet " << fleet_id;
+        // Log that a FleetButton could not be found for the requested fleet, and include when the fleet was last seen
+        int empire_id = HumanClientApp::GetApp()->EmpireID();
+        auto vis_turn_map = GetUniverse().GetObjectVisibilityTurnMapByEmpire(fleet_id, empire_id);
+        int vis_turn = -1;
+        if (vis_turn_map.find(VIS_BASIC_VISIBILITY) != vis_turn_map.end())
+            vis_turn = vis_turn_map[VIS_BASIC_VISIBILITY];
+        ErrorLogger() << "Couldn't find a FleetButton for fleet " << fleet_id 
+                      << " with last basic vis turn " << vis_turn;
         return fleet_ids;
     }
     const auto& fleet_btn = it->second;
@@ -6042,7 +6061,7 @@ void MapWnd::Sanitize() {
 void MapWnd::PushWndStack(std::shared_ptr<GG::Wnd> wnd) {
     if (!wnd)
         return;
-    // First remove it from its current location in the stack (if any), to prevent it from being 
+    // First remove it from its current location in the stack (if any), to prevent it from being
     // present in two locations at once.
     RemoveFromWndStack(wnd);
     m_wnd_stack.push_back(wnd);
@@ -6116,7 +6135,11 @@ bool MapWnd::ReturnToMap() {
 }
 
 bool MapWnd::EndTurn() {
-    HumanClientApp::GetApp()->StartTurn();
+    if (m_ready_turn) {
+        HumanClientApp::GetApp()->UnreadyTurn();
+    } else {
+        HumanClientApp::GetApp()->StartTurn();
+    }
     return true;
 }
 

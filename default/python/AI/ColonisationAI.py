@@ -67,9 +67,21 @@ def calc_max_pop(planet, species, detail):
     if planet_env == fo.planetEnvironment.uninhabitable:
         detail.append("Uninhabitable.")
         return 0
+
+    for bldg_id in planet.buildingIDs:
+        building = fo.getUniverse().getBuilding(bldg_id)
+        if not building:
+            continue
+        if building.buildingTypeName == "BLD_GATEWAY_VOID":
+            detail.append("Gateway to the void: Uninhabitable.")
+            return 0
+
     tag_list = list(species.tags) if species else []
     pop_tag_mod = AIDependencies.SPECIES_POPULATION_MODIFIER.get(get_ai_tag_grade(tag_list, "POPULATION"), 1.0)
-    gaseous_adjustment = AIDependencies.GASEOUS_POP_FACTOR if "GASEOUS" in tag_list else 1.0
+    if planet.type == fo.planetType.gasGiant and "GASEOUS" in tag_list:
+        gaseous_adjustment = AIDependencies.GASEOUS_POP_FACTOR
+    else:
+        gaseous_adjustment = 1.0
 
     base_pop_modified_by_species = 0
     base_pop_not_modified_by_species = 0
@@ -137,9 +149,17 @@ def calc_max_pop(planet, species, detail):
     if planet.id in species.homeworlds:
         base_pop_not_modified_by_species += 2
 
+    if AIDependencies.TAG_LIGHT_SENSITIVE in tag_list:
+        star_type = fo.getUniverse().getSystem(planet.systemID).starType
+        star_pop_mod = AIDependencies.POP_MOD_LIGHTSENSITIVE_STAR_MAP.get(star_type, 0)
+        base_pop_not_modified_by_species += star_pop_mod
+        detail.append("Lightsensitive Star Bonus_PSM_late(%.1f)" % star_pop_mod)
+
     def max_pop_size():
-        species_effect = (pop_tag_mod - 1) * abs(base_pop_modified_by_species) * gaseous_adjustment
-        base_pop = base_pop_not_modified_by_species + base_pop_modified_by_species + species_effect
+        species_effect = (pop_tag_mod - 1) * abs(base_pop_modified_by_species)
+        gaseous_effect = (gaseous_adjustment - 1) * abs(base_pop_modified_by_species)
+        base_pop = (base_pop_not_modified_by_species + base_pop_modified_by_species
+                    + species_effect + gaseous_effect)
         return planet_size * base_pop + pop_const_mod
 
     if "PHOTOTROPHIC" in tag_list and max_pop_size() > 0:

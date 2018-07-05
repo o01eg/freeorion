@@ -13,10 +13,10 @@ CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
 LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
 
 ifneq (,$(findstring $(DEB_HOST_ARCH),$(WEAK_HOSTS)))
-	MAX  := 1
+	MAX  := 2
 	TYPE := MinSizeRel
 else
-	MAX  := 2
+	MAX  := 3
 	TYPE := RelWithDebInfo
 endif
 

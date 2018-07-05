@@ -14641,6 +14641,15 @@ Centre d'Intrication Impériale
 CONCENTRATION_CAMPS_LABEL
 Camps de Concentration
 
+GENERIC_SUPPLIES_FIXED_BONUS_LABEL
+[[PRO_GENERIC_SUPPLIES]] bonus fixe
+
+GENERIC_SUPPLIES_FOCUS_BONUS_LABEL
+[[PRO_GENERIC_SUPPLIES]] bonus selon Focus
+
+GENERIC_SUPPLIES_POPULATION_BONUS_LABEL
+[[PRO_GENERIC_SUPPLIES]] bonus selon Population
+
 INTERSTELLAR_ENTANGLEMENT_FACTORY_POPULATION_BONUS_LABEL
 Complexe d'Intrication Interstellaire bonus selon Population
 
@@ -14672,7 +14681,7 @@ FOCUS_PROTECTION_LABEL
 Focus Protection
 
 GASEOUS_LABEL
-Environnement Rude
+Environnement Géante Gazeuse
 
 XENOPHOBIC_LABEL_SELF
 Frénésie xénophobe (autre espèce proche)

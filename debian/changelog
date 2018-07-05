@@ -1,3 +1,16 @@
+freeorion (0.4.8-rc1+git20180702-1) unstable; urgency=medium
+
+  * Update upstream.
+  * Allow AI to read config.
+
+ -- O01eg <o01eg@yandex.ru>  Thu, 05 Jul 2018 18:46:43 +0000
+
+freeorion (0.4.8-rc1+git20180625-1) unstable; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg <o01eg@yandex.ru>  Mon, 25 Jun 2018 14:53:43 +0000
+
 freeorion (0.4.8-rc1+git20180617-1) unstable; urgency=medium
 
   * Update upstream.

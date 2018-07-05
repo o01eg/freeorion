@@ -13,6 +13,7 @@
   deny /etc/freeorion/config.ini w,
   deny /var/lib/freeorion/save/ w,
 
+  /etc/freeorion/persistent_config.xml r,
   /usr/lib/freeorion/freeorionca mr,
   /usr/share/games/freeorion/default/** r,
   /var/lib/freeorion/*.log w,

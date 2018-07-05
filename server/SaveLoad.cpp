@@ -540,7 +540,7 @@ void LoadEmpireSaveGameData(const std::string& filename, std::map<int, SaveGameE
     try {
         fs::path path = FilenameToPath(filename);
         DebugLogger() << "LoadEmpireSaveGameData: filename: " << filename << " path:" << path;
-        fs::ifstream ifs(path, std::ios_base::binary);
+        fs::ifstream ifs(path.generic_path(), std::ios_base::binary);
 
         if (!ifs)
             throw std::runtime_error(UNABLE_TO_OPEN_FILE);

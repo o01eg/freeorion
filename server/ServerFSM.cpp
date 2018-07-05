@@ -1347,6 +1347,10 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
         }
     }
 
+    DebugLogger(FSM) << "New save file: " << new_save_file_selected
+	             << ". PSD changed: " << player_setup_data_changed
+		     << ". Important changes: " << has_important_changes;
+
     // propagate lobby changes to players, so everyone has the latest updated
     // version of the lobby data
     for (auto player_connection_it = server.m_networking.established_begin();

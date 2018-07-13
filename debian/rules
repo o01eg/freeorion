@@ -7,9 +7,9 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 WEAK_HOSTS := armel armhf
 
-CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
-CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
-CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
+CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS) -D_GLIBCXX_ASSERTIONS
+CFLAGS:=$(shell dpkg-buildflags --get CFLAGS) -D_GLIBCXX_ASSERTIONS
+CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS) -D_GLIBCXX_ASSERTIONS
 LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
 
 ifneq (,$(findstring $(DEB_HOST_ARCH),$(WEAK_HOSTS)))

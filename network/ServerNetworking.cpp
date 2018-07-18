@@ -399,6 +399,10 @@ bool PlayerConnection::SyncWriteMessage(const Message& message) {
 }
 
 void PlayerConnection::AsyncErrorHandler(boost::system::error_code handled_error, boost::system::error_code error) {
+    InfoLogger(network) << "PlayerConnection::AsyncErrorHandler: player id = " << m_ID
+                        << " handled error #" << handled_error.value()
+                        << " error #" << error.value()
+                        << " this = " << this;
     EventSignal(boost::bind(m_disconnected_callback, shared_from_this()));
 }
 

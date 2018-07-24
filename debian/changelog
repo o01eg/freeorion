@@ -1,3 +1,9 @@
+freeorion (0.4.8-rc2+git20180723-1) unstable; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg <o01eg@yandex.ru>  Tue, 24 Jul 2018 03:21:07 +0000
+
 freeorion (0.4.8-rc2+git20180713-2) unstable; urgency=medium
 
   * Save logs on failure.

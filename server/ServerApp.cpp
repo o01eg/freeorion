@@ -1000,6 +1000,7 @@ void ServerApp::PushChatMessage(const std::string& text,
                                 GG::Clr text_color,
                                 const boost::posix_time::ptime& timestamp)
 {
+    DebugLogger() << "Chat message from " << player_name << ": " << text;
     ChatHistoryEntity chat;
     chat.m_timestamp = timestamp;
     chat.m_player_name = player_name;

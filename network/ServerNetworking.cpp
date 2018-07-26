@@ -71,6 +71,7 @@ PlayerConnection::PlayerConnection(boost::asio::io_service& io_service,
 {}
 
 PlayerConnection::~PlayerConnection() {
+    TraceLogger(network) << "PlayerConnection destruction this = " << this;
     boost::system::error_code error;
     m_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, error);
     if (error && (m_ID != INVALID_PLAYER_ID)) {
@@ -390,7 +391,8 @@ bool PlayerConnection::SyncWriteMessage(const Message& message) {
 
     if (error) {
         ErrorLogger(network) << "PlayerConnection::WriteMessage(): player id = " << m_ID
-                             << " error #" << error.value() << " \"" << error.message();
+                             << " error #" << error.value() << " \"" << error.message()
+                             << " this = " << this;
         boost::asio::high_resolution_timer t(m_service);
         t.async_wait(boost::bind(&PlayerConnection::AsyncErrorHandler, this, error, boost::asio::placeholders::error));
     }
@@ -399,7 +401,7 @@ bool PlayerConnection::SyncWriteMessage(const Message& message) {
 }
 
 void PlayerConnection::AsyncErrorHandler(boost::system::error_code handled_error, boost::system::error_code error) {
-    InfoLogger(network) << "PlayerConnection::AsyncErrorHandler: player id = " << m_ID
+    TraceLogger(network) << "PlayerConnection::AsyncErrorHandler: player id = " << m_ID
                         << " handled error #" << handled_error.value()
                         << " error #" << error.value()
                         << " this = " << this;

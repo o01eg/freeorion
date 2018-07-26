@@ -71,7 +71,7 @@ PlayerConnection::PlayerConnection(boost::asio::io_service& io_service,
 {}
 
 PlayerConnection::~PlayerConnection() {
-    TraceLogger(network) << "PlayerConnection destruction this = " << this;
+    TraceLogger(network) << "PlayerConnection destruction player id " << m_ID << " this = " << this ;
     boost::system::error_code error;
     m_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, error);
     if (error && (m_ID != INVALID_PLAYER_ID)) {
@@ -717,7 +717,8 @@ void ServerNetworking::AcceptConnection(PlayerConnectionPtr player_connection,
 
 void ServerNetworking::DisconnectImpl(PlayerConnectionPtr player_connection) {
     TraceLogger(network) << "ServerNetworking::DisconnectImpl : disconnecting player "
-                         << player_connection->PlayerID();
+                         << player_connection->PlayerID()
+                         << " this = " << player_connection.get();
     m_player_connections.erase(player_connection);
     m_disconnected_callback(player_connection);
 }

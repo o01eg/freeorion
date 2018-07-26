@@ -4,5 +4,6 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStartPre=/bin/bash -c "D=$$(/bin/date \"+%%Y-%%m-%%dT%%H-%%M-%%S\") ; xz -z -S .$$D.xz /var/log/freeorion/freeoriond.log"
+ExecStartPre=/bin/bash -c "D=$$(/bin/date \"+%%Y-%%m-%%dT%%H-%%M-%%S\") ; xz -z -Q -S .$$D.xz /var/log/freeorion/freeoriond.log"
+ExecStartPre=/bin/bash -c "D=$$(/bin/date \"+%%Y-%%m-%%dT%%H-%%M-%%S\") ; xz -z -Q -S .$$D.xz /var/crash/*"
 ExecStart=/usr/local/bin/sendxmpp -f /etc/freeorion/xmpp.conf o01eg@jabber.ru Achtung!

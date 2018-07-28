@@ -1,3 +1,9 @@
+freeorion (0.4.8-rc2+git20180723-3) unstable; urgency=medium
+
+  * Fix some issues with incorrect multiplayer lobby data.
+
+ -- O01eg <o01eg@yandex.ru>  Sat, 28 Jul 2018 21:35:05 +0000
+
 freeorion (0.4.8-rc2+git20180723-2) unstable; urgency=medium
 
   * Make more logs.

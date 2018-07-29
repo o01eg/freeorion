@@ -587,7 +587,7 @@ MPLobby::MPLobby(my_context c) :
                 player_setup_data.m_empire_name =   (player_connection->GetClientType() == Networking::CLIENT_TYPE_HUMAN_PLAYER) ? player_connection->PlayerName() : GenerateEmpireName(player_setup_data.m_player_name, m_lobby_data->m_players);
                 player_setup_data.m_empire_color =  GetUnusedEmpireColour(m_lobby_data->m_players);
                 if (m_lobby_data->m_seed != "")
-                    player_setup_data.m_starting_species_name = sm.RandomPlayableSpeciesName();
+                    player_setup_data.m_starting_species_name = "RANDOM";
                 else
                     player_setup_data.m_starting_species_name = sm.SequentialPlayableSpeciesName(player_id);
 
@@ -608,7 +608,7 @@ MPLobby::MPLobby(my_context c) :
                     player_setup_data.m_empire_name =   GenerateEmpireName(player_setup_data.m_player_name, m_lobby_data->m_players);
                     player_setup_data.m_empire_color =  GetUnusedEmpireColour(m_lobby_data->m_players);
                     if (m_lobby_data->m_seed != "")
-                        player_setup_data.m_starting_species_name = sm.RandomPlayableSpeciesName();
+                        player_setup_data.m_starting_species_name = "RANDOM";
                     else
                         player_setup_data.m_starting_species_name = sm.SequentialPlayableSpeciesName(m_ai_next_index);
 
@@ -638,7 +638,7 @@ MPLobby::MPLobby(my_context c) :
         player_setup_data.m_player_name =           player_connection->PlayerName();
         player_setup_data.m_empire_name =           (player_connection->GetClientType() == Networking::CLIENT_TYPE_HUMAN_PLAYER) ? player_connection->PlayerName() : GenerateEmpireName(player_setup_data.m_player_name, m_lobby_data->m_players);
         player_setup_data.m_empire_color =          EmpireColors().at(0);               // since the host is the first joined player, it can be assumed that no other player is using this colour (unlike subsequent join game message responses)
-        player_setup_data.m_starting_species_name = sm.RandomPlayableSpeciesName();
+        player_setup_data.m_starting_species_name = "RANDOM";
         // leaving save game empire id as default
         player_setup_data.m_client_type =           player_connection->GetClientType();
 
@@ -790,7 +790,7 @@ void MPLobby::EstablishPlayer(const PlayerConnectionPtr& player_connection,
         player_setup_data.m_empire_name =   (client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER) ? player_name : GenerateEmpireName(player_name, m_lobby_data->m_players);
         player_setup_data.m_empire_color =  GetUnusedEmpireColour(m_lobby_data->m_players);
         if (m_lobby_data->m_seed != "")
-            player_setup_data.m_starting_species_name = sm.RandomPlayableSpeciesName();
+            player_setup_data.m_starting_species_name = "RANDOM";
         else
             player_setup_data.m_starting_species_name = sm.SequentialPlayableSpeciesName(player_id);
 
@@ -1007,7 +1007,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                     psd.m_empire_name = GenerateEmpireName(psd.m_player_name, incoming_lobby_data.m_players);
                 if (psd.m_starting_species_name.empty()) {
                     if (m_lobby_data->m_seed != "")
-                        psd.m_starting_species_name = GetSpeciesManager().RandomPlayableSpeciesName();
+                        psd.m_starting_species_name = "RANDOM";
                     else
                         psd.m_starting_species_name = GetSpeciesManager().SequentialPlayableSpeciesName(m_ai_next_index);
                 }
@@ -1018,7 +1018,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 if (psd.m_empire_name.empty())
                     psd.m_empire_name = psd.m_player_name;
                 if (psd.m_starting_species_name.empty())
-                    psd.m_starting_species_name = GetSpeciesManager().RandomPlayableSpeciesName();
+                    psd.m_starting_species_name = "RANDOM";
             }
         }
 

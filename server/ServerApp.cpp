@@ -630,6 +630,8 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
     DebugLogger() << "ServerApp::NewGameInitConcurrentWithJoiners";
 
     m_galaxy_setup_data = galaxy_setup_data;
+
+    // set game rules for server based on those specified in setup data
     GetGameRules().SetFromStrings(m_galaxy_setup_data.GetGameRules());
 
     // validate some connection info / determine which players need empires created
@@ -1144,12 +1146,18 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
     }
 
     // ensure number of players connected and for which data are provided are consistent
-    if (player_id_to_save_game_data_index.size() != player_save_game_data.size()) {
+    if (player_id_to_save_game_data_index.size() != player_save_game_data.size())
         ErrorLogger() << "ServerApp::LoadGameInit passed index mapping and player save game data are of different sizes...";
-    }
-    if (m_networking.NumEstablishedPlayers() != player_save_game_data.size()) {
-        ErrorLogger() << "ServerApp::LoadGameInit has " << m_networking.NumEstablishedPlayers() << " established players but " << player_save_game_data.size() << " entries in player save game data.  Could be ok... so not aborting, but might crash";
-    }
+
+    if (m_networking.NumEstablishedPlayers() != player_save_game_data.size())
+        ErrorLogger() << "ServerApp::LoadGameInit has " << m_networking.NumEstablishedPlayers()
+                      << " established players but " << player_save_game_data.size()
+                      << " entries in player save game data.  Could be ok... so not aborting, but might crash";
+
+
+    // set game rules for server based on those specified in setup data
+    GetGameRules().SetFromStrings(m_galaxy_setup_data.GetGameRules());
+
 
     // validate some connection info
     for (auto player_connection_it = m_networking.established_begin();
@@ -3000,15 +3008,23 @@ void ServerApp::PreCombatProcessTurns() {
         if (fleet)
             fleet->ClearArrivalFlag();
     }
+    // first move unowned fleets, or an empire fleet landing on them could wrongly
+    // blockade them before they move
     for (auto& fleet : fleets) {
         // save for possible SitRep generation after moving...
-        if (fleet)
+        if (fleet && fleet->Unowned())
+            fleet->MovementPhase();
+    }
+    for (auto& fleet : fleets) {
+        // save for possible SitRep generation after moving...
+        if (fleet && !fleet->Unowned())
             fleet->MovementPhase();
     }
 
     // post-movement visibility update
     m_universe.UpdateEmpireObjectVisibilities();
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireStaleObjectKnowledge();
 
     // SitRep for fleets having arrived at destinations
     for (auto& fleet : fleets) {
@@ -3089,7 +3105,10 @@ void ServerApp::ProcessCombats() {
     DisseminateSystemCombatInfo(combats);
     // update visibilities with any new info gleaned during combat
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
-
+    // update stale object info based on any mid- combat glimpses
+    // before visibiity is totally recalculated in the post combat processing
+    m_universe.UpdateEmpireStaleObjectKnowledge();
+    
     CreateCombatSitReps(combats);
 
     //CleanupSystemCombatInfo(combats); - NOTE: No longer needed since ObjectMap.Clear doesn't release any resources that aren't released in the destructor.

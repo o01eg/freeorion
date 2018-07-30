@@ -4548,14 +4548,14 @@ Statistics Test 3
 
 # %1% name of the species.
 ENC_SPECIES_PLANET_TYPE_SUITABILITY_COLUMN1
-'''%1%:	'''
+'''%1%:'''
 
 # %1% content of ENC_SPECIES_PLANET_TYPE_SUITABILITY_COLUMN1 expanded to match
 #     column width.
 # %2% the planet environment for a species.
 # %3% the planet population capacity for a species.
 ENC_SPECIES_PLANET_TYPE_SUITABILITY
-%1%	%2% (%3%)
+%1%        %2% (%3%)
 
 # %1% name of the planet.
 ENC_SUITABILITY_REPORT_POSITIVE_HEADER
@@ -14738,6 +14738,15 @@ Imperial Entanglement Center
 CONCENTRATION_CAMPS_LABEL
 Concentration Camps
 
+GENERIC_SUPPLIES_FIXED_BONUS_LABEL
+[[PRO_GENERIC_SUPPLIES]] fixed bonus
+
+GENERIC_SUPPLIES_FOCUS_BONUS_LABEL
+[[PRO_GENERIC_SUPPLIES]] focus-based bonus
+
+GENERIC_SUPPLIES_POPULATION_BONUS_LABEL
+[[PRO_GENERIC_SUPPLIES]] population-based bonus
+
 INTERSTELLAR_ENTANGLEMENT_FACTORY_POPULATION_BONUS_LABEL
 Interstellar Entanglement Factory population based bonus
 
@@ -14769,7 +14778,7 @@ FOCUS_PROTECTION_LABEL
 Protection Focus
 
 GASEOUS_LABEL
-Bad Environment
+Gas Giant Environment
 
 XENOPHOBIC_LABEL_SELF
 Xenophobic Frenzy (other species nearby)
@@ -14819,6 +14828,8 @@ Flux Interference
 SPATIAL_FLUX_BONUS
 Flux Drive Bonus
 
+DYING_POPULATION_LABEL
+Dying Population
 
 ##
 ## Tags

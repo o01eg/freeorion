@@ -213,65 +213,6 @@ namespace AIInterface {
      */
     const Empire* GetEmpire(int empire_id);
 
-    /** @brief Return the ::Universe known to this client
-     *
-     * @return A constant reference to the single ::Universe instance
-     *      representing the known universe of this client.
-     */
-    const Universe& GetUniverse();
-
-    /** @brief Return the ::Tech identified by @a name
-     *
-     * @param name The identifying name of the requested ::Tech.
-     *
-     * @return A pointer to the ::Tech matching @a name or nullptr if no ::Tech
-     *      with that name was found.
-     */
-    const Tech* GetTech(const std::string& name);
-
-    /** @brief Return the current game turn
-     *
-     * @return The number representing the current game turn.
-     */
-    int CurrentTurn();
-
-    /** @brief Return the OptionsDB option @a option
-     *
-     * @return Return the OptionsDB option @a option or None if not set.
-     * @ throw boost::bad_any_cast if option exists but is not a string
-     */
-    boost::python::object GetOptionsDBOptionStr(std::string const &option);
-
-    /** @brief Return the OptionsDB option @a option
-     *
-     * @return Return the OptionsDB option @a option or None if not set.
-     * @ throw boost::bad_any_cast if option exists but is not an int
-     */
-    boost::python::object GetOptionsDBOptionInt(std::string const &option);
-
-    /** @brief Return the OptionsDB option @a option
-     *
-     * @return Return the OptionsDB option @a option or None if not set.
-     * @ throw boost::bad_any_cast if option exists but is not bool
-     */
-    boost::python::object GetOptionsDBOptionBool(std::string const &option);
-
-    /** @brief Return the OptionsDB option @a option
-     *
-     * @return Return the OptionsDB option @a option or None if not set.
-     * @ throw boost::bad_any_cast if option exists but is not a double
-     */
-    boost::python::object GetOptionsDBOptionDouble(std::string const &option);
-
-    /** @brief Return the canonical AI directory path
-     *
-     * The value depends on the ::OptionsDB `resource.path` and `ai-path` keys.
-     *
-     * @return The canonical path pointing to the directory containing all
-     *      python AI scripts.
-     */
-    std::string GetAIDir();
-
     /** @brief Return the ::GalaxySetupData of this game
      *
      * @return A reference to the ::GalaxySetupData used in this game session.
@@ -281,19 +222,6 @@ namespace AIInterface {
     /** @} */
 
     /** @name Game state prediction */ /** @{ */
-
-    /** @brief Initialize and update game state based last turn update
-     *
-     * Initialize and update game state by updating this client
-     *
-     * * Global ::Meter
-     * * ::ResourcePool
-     * * ::ProductionQueue
-     * * ::ResearchQueue
-     *
-     * instances based on the latest turn update.
-     */
-    void InitTurn();
 
     /** @brief Initialize and update the ::Universe ::Meter s
      *
@@ -323,21 +251,6 @@ namespace AIInterface {
 
     /** \name Issuing orders */ /** @{ */
     OrderSet& IssuedOrders();
-
-    int IssueRenameOrder(int object_id, const std::string& new_name);
-    int IssueScrapOrder(const std::vector<int>& object_ids);
-    int IssueScrapOrder(int object_id);
-    int IssueFleetMoveOrder(int fleet_id, int destination_id);
-    int IssueNewFleetOrder(const std::string& fleet_name, const std::vector<int>& ship_ids);
-    int IssueNewFleetOrder(const std::string& fleet_name, int ship_id);
-    int IssueFleetTransferOrder(int ship_id, int new_fleet_id);
-    int IssueColonizeOrder(int ship_id, int planet_id);
-    int IssueInvadeOrder(int ship_id, int planet_id);
-    int IssueBombardOrder(int ship_id, int planet_id);
-    int IssueAggressionOrder(int object_id, bool aggressive);
-    int IssueGiveObjectToEmpireOrder(int object_id, int recipient_id);
-
-    int IssueChangeFocusOrder(int planet_id, const std::string& focus);
 
     int IssueEnqueueTechOrder(const std::string& tech_name, int position);
     int IssueDequeueTechOrder(const std::string& tech_name);

@@ -204,11 +204,17 @@ find_package(Boost ${MINIMUM_BOOST_VERSION}
         log_setup
         regex
         serialization
-        python
         signals
         system
         thread
     REQUIRED)
+if(${Boost_VERSION} GREATER 106699) # boost >= 1.67
+    find_package(Boost COMPONENTS python27 REQUIRED)
+    set(Boost_PYTHON_LIBRARY ${Boost_PYTHON27_LIBRARY})
+else()
+    find_package(Boost COMPONENTS python REQUIRED)
+endif()
+
 find_package(ZLIB REQUIRED)
 if(NOT BUILD_HEADLESS)
     find_package(Freetype REQUIRED)
@@ -262,7 +268,7 @@ set_property(DIRECTORY APPEND
         # boost::spirit relies on some API the old implementation provided.
         # This define enables the usage of the old boost::optional
         # implementation.  Boost upstream tracks this bug as #12349
-        $<$<VERSION_GREATER:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.60>:BOOST_OPTIONAL_CONFIG_USE_OLD_IMPLEMENTATION_OF_OPTIONAL>
+        $<$<AND:$<VERSION_GREATER:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.60>,$<VERSION_LESS:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.67>>:BOOST_OPTIONAL_CONFIG_USE_OLD_IMPLEMENTATION_OF_OPTIONAL>
 
         # We don't need localized output of Boost date_time and not setting
         # the define causes the inclusion of code, which contains std::tolower.

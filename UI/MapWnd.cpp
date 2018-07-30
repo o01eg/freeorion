@@ -5570,8 +5570,7 @@ void MapWnd::PlotFleetMovement(int system_id, bool execute_move, bool append) {
         // if actually ordering fleet movement, not just prospectively previewing, ... do so
         if (execute_move && !route.empty()){
             HumanClientApp::GetApp()->Orders().IssueOrder(
-                std::make_shared<FleetMoveOrder>(empire_id, fleet_id, start_system,
-                                                 system_id, append));
+                std::make_shared<FleetMoveOrder>(empire_id, fleet_id, system_id, append));
             StopFleetExploring(fleet_id);
         }
 
@@ -6749,9 +6748,19 @@ void MapWnd::RefreshIndustryResourceIndicator() {
         true, stockpile_used, stockpile, expected_stockpile,
         true, stockpile_use_capacity));
 
-    if (total_PP_wasted > 0.05 || (total_PP_excess > (3 * stockpile_use_capacity))) {
+    // red "waste" icon if the non-project transfer to IS is more than either 3x per-turn use or 80% total output
+    // else yellow icon if the non-project transfer to IS is more than 20% total output, or if there is any transfer
+    // to IS and the IS is expected to be above 10x per-turn use.
+    if (total_PP_wasted > 0.05 || (total_PP_excess > std::min(3.0 * stockpile_use_capacity, 0.8 * total_PP_output))) {
         DebugLogger()  << "MapWnd::RefreshIndustryResourceIndicator: Showing Industry Wasted Icon with Industry spent: "
                        << total_PP_spent << " and Industry Production: " << total_PP_output << ", wasting " << total_PP_wasted;
+        boost::filesystem::path button_texture_dir = ClientUI::ArtDir() / "icons" / "buttons";
+        m_industry_wasted->SetUnpressedGraphic(GG::SubTexture(ClientUI::GetTexture(button_texture_dir /
+                                                                "wasted_resource.png", false)));
+        m_industry_wasted->SetPressedGraphic(GG::SubTexture(ClientUI::GetTexture(button_texture_dir /
+                                                                "wasted_resource_clicked.png", false)));
+        m_industry_wasted->SetRolloverGraphic(GG::SubTexture(ClientUI::GetTexture(button_texture_dir /
+                                                                "wasted_resource_mouseover.png", false)));
         m_industry_wasted->Show();
         m_industry_wasted->ClearBrowseInfoWnd();
         m_industry_wasted->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
@@ -6760,7 +6769,23 @@ void MapWnd::RefreshIndustryResourceIndicator() {
             total_PP_output, total_PP_excess,
             true, stockpile_use_capacity, total_PP_to_stockpile, total_PP_wasted,
             UserString("MAP_PROD_CLICK_TO_OPEN")));
-
+    } else if (total_PP_to_stockpile > 0.05 && (expected_stockpile > (10 * stockpile_use_capacity) ||
+                                                total_PP_excess > 0.2 * total_PP_output)) {
+        boost::filesystem::path button_texture_dir = ClientUI::ArtDir() / "icons" / "buttons";
+        m_industry_wasted->SetUnpressedGraphic(GG::SubTexture(ClientUI::GetTexture(button_texture_dir /
+                                                                "warned_resource.png", false)));
+        m_industry_wasted->SetPressedGraphic(GG::SubTexture(ClientUI::GetTexture(button_texture_dir /
+                                                                "warned_resource_clicked.png", false)));
+        m_industry_wasted->SetRolloverGraphic(GG::SubTexture(ClientUI::GetTexture(button_texture_dir /
+                                                                "warned_resource_mouseover.png", false)));
+        m_industry_wasted->Show();
+        m_industry_wasted->ClearBrowseInfoWnd();
+        m_industry_wasted->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
+        m_industry_wasted->SetBrowseInfoWnd(GG::Wnd::Create<WastedStockpiledResourceBrowseWnd>(
+            UserString("MAP_PRODUCTION_WASTED_TITLE"), UserString("PRODUCTION_INFO_PP"),
+            total_PP_output, total_PP_excess,
+            true, stockpile_use_capacity, total_PP_to_stockpile, total_PP_wasted,
+            UserString("MAP_PROD_CLICK_TO_OPEN")));
     } else {
         m_industry_wasted->Hide();
     }
@@ -7454,7 +7479,7 @@ namespace {
         int max_fleet_jumps = std::trunc(fleet->Fuel());
         if (num_jumps_resupply <= max_fleet_jumps) {
             HumanClientApp::GetApp()->Orders().IssueOrder(
-                    std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.second.begin(), *route.second.rbegin()));
+                    std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.second.rbegin()));
         } else {
             TraceLogger() << "Not enough fuel for fleet " << fleet->ID()
                           << " to resupply at system " << *route.second.rbegin();
@@ -7491,7 +7516,7 @@ namespace {
         }
 
         HumanClientApp::GetApp()->Orders().IssueOrder(
-            std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.begin(), *route.rbegin()));
+            std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.rbegin()));
         if (fleet->FinalDestinationID() == *route.rbegin()) {
             TraceLogger() << "Sending fleet " << fleet->ID() << " to explore system " << *route.rbegin();
             return true;
@@ -7582,7 +7607,7 @@ void MapWnd::DispatchFleetsExploring() {
     for (auto it = m_fleets_exploring.begin(); it != m_fleets_exploring.end();) {
         auto fleet = GetFleet(*it);
         if (!fleet || destroyed_objects.count(fleet->ID())) {
-            m_fleets_exploring.erase(it++); //this fleet can't explore anymore
+            it = m_fleets_exploring.erase(it); //this fleet can't explore anymore
         } else {
              if (fleet->MovePath().empty())
                 idle_fleets.insert(fleet->ID());

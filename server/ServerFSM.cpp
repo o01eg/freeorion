@@ -1040,10 +1040,10 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 psd_names.emplace(player.second.m_player_name);
             }
 
-            // check for roles and client types
             if (player.first != Networking::INVALID_PLAYER_ID) {
                 const auto& player_it = server.Networking().GetPlayer(player.first);
                 if (player_it != server.Networking().established_end()) {
+                    // check for roles and client types
                     if ((player.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER &&
                         !(*player_it)->HasAuthRole(Networking::ROLE_CLIENT_TYPE_PLAYER)) ||
                         (player.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_MODERATOR &&
@@ -1061,6 +1061,8 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                     break;
                 }
                 if (!psd_ids.insert(player.first).second) {
+                    // player id was already used
+                    // don't allow ID collision
                     has_collision = true;
                     break;
                 }
@@ -1267,7 +1269,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
     }
 
     ValidateClientLimits();
-    if(m_lobby_data->m_start_locked) {
+    if (m_lobby_data->m_start_locked) {
         has_important_changes = true;
     }
 
@@ -1616,10 +1618,15 @@ WaitingForSPGameJoiners::WaitingForSPGameJoiners(my_context c) :
 
     server.InitializePython();
 
-    if (server.m_python_server.IsPythonRunning() && m_single_player_setup_data->m_new_game) {
-        // For SP game start inializaing while waiting for AI callbacks.
-        DebugLogger(FSM) << "Initializing new SP game...";
-        server.NewSPGameInit(*m_single_player_setup_data);
+    // if Python fails to initialize, don't bother initializing SP game.
+    // Still check start conditions, which will abort the server after all
+    // the expected players have joined if Python is (still) not initialized.
+    if (server.m_python_server.IsPythonRunning()) {
+        if (m_single_player_setup_data->m_new_game) {
+            // For new SP game start inializaing while waiting for AI callbacks.
+            DebugLogger(FSM) << "Initializing new SP game...";
+            server.NewSPGameInit(*m_single_player_setup_data);
+        }
     }
 
     // force immediate check if all expected AIs are present, so that the FSM

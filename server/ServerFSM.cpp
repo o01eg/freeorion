@@ -554,6 +554,7 @@ MPLobby::MPLobby(my_context c) :
     ClockSeed();
     ServerApp& server = Server();
     server.InitializePython();
+    server.LoadChatHistory();
     const SpeciesManager& sm = GetSpeciesManager();
 
     m_lobby_data->m_game_rules.clear();

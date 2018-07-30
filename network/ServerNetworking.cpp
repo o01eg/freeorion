@@ -336,7 +336,8 @@ void PlayerConnection::HandleMessageHeaderRead(boost::system::error_code error,
             }
         } else {
             if (error == boost::asio::error::eof ||
-                error == boost::asio::error::connection_reset) {
+                error == boost::asio::error::connection_reset ||
+		error == boost::asio::error::timed_out) {
                 EventSignal(boost::bind(m_disconnected_callback, shared_from_this()));
             } else {
                 ErrorLogger(network) << "PlayerConnection::HandleMessageHeaderRead(): "
@@ -637,7 +638,7 @@ void ServerNetworking::UpdateCookie(boost::uuids::uuid cookie) {
 
     auto it = m_cookies.find(cookie);
     if (it != m_cookies.end()) {
-        it->second.expired = boost::posix_time::second_clock::local_time() + boost::posix_time::minutes(15);
+        it->second.expired = boost::posix_time::second_clock::local_time() + boost::posix_time::minutes(120);
     }
 }
 

@@ -5,12 +5,25 @@ from common.configure_logging import redirect_logging_to_freeorion_logger
 # Logging is redirected before other imports so that import errors appear in log files.
 redirect_logging_to_freeorion_logger()
 
+import freeorion as fo
+
+import psycopg2
+import psycopg2.extensions
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
+
 
 class ChatHistoryProvider:
     def __init__(self):
         """
         Initializes ChatProvider. Doesn't accept arguments.
         """
+        dsn = ""
+        with open(fo.get_user_config_dir() + "/db.txt", "r") as f:
+            for line in f:
+                dsn = line
+                break
+        self.conn = psycopg2.connect(dsn)
         info("Chat initialized")
 
     def load_history(self):
@@ -24,7 +37,23 @@ class ChatHistoryProvider:
         # c = fo.GGColor(255, 128, 128, 255)
         # e = (123456789012, "P1", "Test1", c)
         # return [e]
-        return []
+        res = []
+        with self.conn:
+            with self.conn.cursor() as curs:
+                curs.execute(""" SELECT date_part('epoch', ts)::int, player_name, text,
+                    text_color / 256 / 256 / 256 % 256,
+                    text_color / 256 / 256 % 256,
+                    text_color / 256 % 256,
+                    text_color % 256
+                    FROM chat_history
+                    ORDER BY ts
+                    LIMIT 1000 """)
+                for r in curs:
+                    info("Color: %i %i %i %i" % (r[3], r[4], r[5], r[6]))
+                    c = fo.GGColor(r[3], r[4], r[5], r[6])
+                    e = (r[0], str(r[1].encode('utf-8')), str(r[2].encode('utf-8')), c)
+                    res.append(e)
+        return res
 
     def put_history_entity(self, timestamp, player_name, text, text_color):
         """
@@ -39,4 +68,10 @@ class ChatHistoryProvider:
         text_color -- freeorion.GGColor
         """
         info("Chat %s: %s %s" % (player_name, text, text_color))
+        with self.conn:
+            with self.conn.cursor() as curs:
+                curs.execute(""" INSERT INTO chat_history (ts, player_name, text, text_color)
+                    VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s)""",
+                    (timestamp, player_name, text,
+                        256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a))
         return True

@@ -745,6 +745,18 @@ sc::result MPLobby::react(const Disconnection& d) {
         for (auto& plrs : m_lobby_data->m_players) {
             plrs.second.m_player_ready = false;
         }
+
+        // launch sendxmpp
+        size_t players_size = m_lobby_data->m_players.size();
+        std::async(std::launch::async, [players_size] {
+            std::vector<std::string> args{"/usr/local/bin/sendxmpp",
+                "-f", "/etc/freeorion/xmpp.conf",
+                "-c", "smac@conference.bitcheese.net/FreeOrion",
+                "@freeorion in lobby",
+                std::to_string(players_size)};
+            Process sendxmpp = Process("/usr/local/bin/sendxmpp", args);
+            std::this_thread::sleep_for(std::chrono::seconds(7));
+        });
     } else {
         DebugLogger(FSM) << "MPLobby.Disconnection : Disconnecting player (" << id << ") was not in lobby";
         return discard_event();
@@ -816,11 +828,13 @@ void MPLobby::EstablishPlayer(const PlayerConnectionPtr& player_connection,
     }
 
     // launch sendxmpp
-    std::async(std::launch::async, [player_name] {
+    size_t players_size = m_lobby_data->m_players.size();
+    std::async(std::launch::async, [player_name, players_size] {
         std::vector<std::string> args{"/usr/local/bin/sendxmpp",
             "-f", "/etc/freeorion/xmpp.conf",
             "-c", "smac@conference.bitcheese.net/FreeOrion",
-            "!r", player_name, "@freeorion"};
+            "!r", player_name, "@freeorion, in lobby",
+            std::to_string(players_size)};
         Process sendxmpp = Process("/usr/local/bin/sendxmpp", args);
         std::this_thread::sleep_for(std::chrono::seconds(7));
     });

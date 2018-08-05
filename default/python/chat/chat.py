@@ -71,7 +71,6 @@ class ChatHistoryProvider:
         with self.conn:
             with self.conn.cursor() as curs:
                 curs.execute(""" INSERT INTO chat_history (ts, player_name, text, text_color)
-                    VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s)""",
-                    (timestamp, player_name, text,
-                        256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a))
+                             VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s)""",
+                             (timestamp, player_name, text, 256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a))
         return True

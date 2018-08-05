@@ -747,7 +747,11 @@ sc::result MPLobby::react(const Disconnection& d) {
         }
 
         // launch sendxmpp
-        size_t players_size = m_lobby_data->m_players.size();
+        size_t players_size = 0;
+        for (const auto& plr : m_lobby_data->m_players) {
+            if (plr.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER)
+                players_size++;
+        }
         std::async(std::launch::async, [players_size] {
             std::vector<std::string> args{"/usr/local/bin/sendxmpp",
                 "-f", "/etc/freeorion/xmpp.conf",
@@ -828,7 +832,11 @@ void MPLobby::EstablishPlayer(const PlayerConnectionPtr& player_connection,
     }
 
     // launch sendxmpp
-    size_t players_size = m_lobby_data->m_players.size();
+    size_t players_size = 0;
+    for (const auto& plr : m_lobby_data->m_players) {
+        if (plr.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER)
+            players_size++;
+    }
     std::async(std::launch::async, [player_name, players_size] {
         std::vector<std::string> args{"/usr/local/bin/sendxmpp",
             "-f", "/etc/freeorion/xmpp.conf",

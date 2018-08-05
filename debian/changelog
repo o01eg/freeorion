@@ -1,3 +1,9 @@
+freeorion (0.4.8-rc2+git20180730-2) unstable; urgency=medium
+
+  * Save chat in Postgresql.
+
+ -- O01eg <o01eg@yandex.ru>  Sun, 05 Aug 2018 15:55:45 +0000
+
 freeorion (0.4.8-rc2+git20180730-1) unstable; urgency=medium
 
   * Update upstream.

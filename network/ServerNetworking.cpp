@@ -274,7 +274,6 @@ namespace {
         case Message::CHAT_HISTORY:             return "Chat history";
         case Message::SET_AUTH_ROLES:           return "Set authorization roles";
         case Message::ELIMINATE_SELF:           return "Eliminate self";
-        case Message::UNREADY:                  return "Unready";
         default:                                return std::string("Unknown Type(") + std::to_string(static_cast<int>(type)) + ")";
         };
     }

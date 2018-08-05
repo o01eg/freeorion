@@ -1,6 +1,6 @@
 [Unit]
 Description=FreeOrion server
-After=network.target
+After=network.target postgresql@10-main.service
 OnFailure=unit-status-freeorion@.service
 
 [Service]

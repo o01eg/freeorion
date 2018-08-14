@@ -1,11 +1,14 @@
-# Last Modified: Thu Jan 25 19:53:46 2018
+# Last Modified: Sun Aug  5 17:47:30 2018
 #include <tunables/global>
 
 /usr/lib/freeorion/freeorionca {
   #include <abstractions/base>
   #include <abstractions/python>
 
+  deny network inet dgram,
+
   network inet stream,
+  network inet6 stream,
 
   signal receive set=kill peer=/usr/lib/freeorion/freeoriond,
 

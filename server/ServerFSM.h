@@ -46,7 +46,6 @@ struct ProcessTurn : sc::event<ProcessTurn>                             {};
 struct DisconnectClients : sc::event<DisconnectClients>                 {};
 struct ShutdownServer : sc::event<ShutdownServer>                       {};
 struct Hostless : sc::event<Hostless>                                   {}; // Empty event to move server into MPLobby state.
-struct HostlessSave : sc::event<HostlessSave>                           {}; // Empty event to initiate saving in hostless state.
 
 /** This is a Boost.Preprocessor list of all non MessageEventBase events. It is
   * used to generate the unconsumed events message. */
@@ -58,8 +57,7 @@ struct HostlessSave : sc::event<HostlessSave>                           {}; // E
     (ProcessTurn)                               \
     (DisconnectClients)                         \
     (ShutdownServer)                            \
-    (Hostless)                                  \
-    (HostlessSave)
+    (Hostless)
 
 //  Message events
 /** The base class for all state machine events that are based on Messages. */
@@ -355,15 +353,13 @@ struct WaitingForTurnEnd : sc::state<WaitingForTurnEnd, PlayingGame, WaitingForT
 /** The default substate of WaitingForTurnEnd. */
 struct WaitingForTurnEndIdle : sc::state<WaitingForTurnEndIdle, WaitingForTurnEnd> {
     typedef boost::mpl::list<
-        sc::custom_reaction<SaveGameRequest>,
-        sc::custom_reaction<HostlessSave>
+        sc::custom_reaction<SaveGameRequest>
     > reactions;
 
     WaitingForTurnEndIdle(my_context c);
     ~WaitingForTurnEndIdle();
 
     sc::result react(const SaveGameRequest& msg);
-    sc::result react(const HostlessSave& e);
 
     SERVER_ACCESSOR
 };
@@ -376,7 +372,6 @@ struct WaitingForSaveData : sc::state<WaitingForSaveData, WaitingForTurnEnd> {
     typedef boost::mpl::list<
         sc::custom_reaction<ClientSaveData>,
         sc::deferral<SaveGameRequest>,
-        sc::deferral<HostlessSave>,
         sc::deferral<TurnOrders>,
         sc::deferral<RevokeReadiness>,
         sc::deferral<PlayerChat>,
@@ -405,7 +400,6 @@ struct ProcessingTurn : sc::state<ProcessingTurn, PlayingGame> {
     typedef boost::mpl::list<
         sc::custom_reaction<ProcessTurn>,
         sc::deferral<SaveGameRequest>,
-        sc::deferral<HostlessSave>,
         sc::deferral<TurnOrders>,
         sc::deferral<RevokeReadiness>,
         sc::deferral<Diplomacy>,

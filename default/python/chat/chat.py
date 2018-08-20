@@ -18,12 +18,12 @@ class ChatHistoryProvider:
         """
         Initializes ChatProvider. Doesn't accept arguments.
         """
-        dsn = ""
+        self.dsn = ""
         with open(fo.get_user_config_dir() + "/db.txt", "r") as f:
             for line in f:
-                dsn = line
+                self.dsn = line
                 break
-        self.conn = psycopg2.connect(dsn)
+        self.conn = psycopg2.connect(self.dsn)
         info("Chat initialized")
 
     def load_history(self):
@@ -68,9 +68,18 @@ class ChatHistoryProvider:
         text_color -- freeorion.GGColor
         """
         info("Chat %s: %s %s" % (player_name, text, text_color))
-        with self.conn:
-            with self.conn.cursor() as curs:
-                curs.execute(""" INSERT INTO chat_history (ts, player_name, text, text_color)
-                             VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s)""",
-                             (timestamp, player_name, text, 256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a))
+        saved = False
+        while not saved:
+            try:
+               with self.conn:
+                   with self.conn.cursor() as curs:
+                       curs.execute(""" INSERT INTO chat_history (ts, player_name, text, text_color)
+                                    VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s)""",
+                                    (timestamp, player_name, text, 256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a))
+                       saved = True
+            except InterfaceError:
+                self.conn = psycopg2.connect(self.dsn)
+                saved = False
+                exctype, value = sys.exc_info()[:2]
+                warn("Cann't save chat message %s: %s %s" % (text, exctype, value))
         return True

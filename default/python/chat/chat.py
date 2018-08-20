@@ -1,9 +1,11 @@
-from logging import info
+from logging import info, warn
 
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
 # Logging is redirected before other imports so that import errors appear in log files.
 redirect_logging_to_freeorion_logger()
+
+import sys
 
 import freeorion as fo
 
@@ -71,13 +73,13 @@ class ChatHistoryProvider:
         saved = False
         while not saved:
             try:
-               with self.conn:
-                   with self.conn.cursor() as curs:
-                       curs.execute(""" INSERT INTO chat_history (ts, player_name, text, text_color)
-                                    VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s)""",
-                                    (timestamp, player_name, text, 256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a))
-                       saved = True
-            except InterfaceError:
+                with self.conn:
+                    with self.conn.cursor() as curs:
+                        curs.execute(""" INSERT INTO chat_history (ts, player_name, text, text_color)
+                                     VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s)""",
+                                     (timestamp, player_name, text, 256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a))
+                        saved = True
+            except psycopg2.InterfaceError:
                 self.conn = psycopg2.connect(self.dsn)
                 saved = False
                 exctype, value = sys.exc_info()[:2]

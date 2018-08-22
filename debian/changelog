@@ -1,3 +1,10 @@
+freeorion (0.4.8-rc2+git20180814-2) unstable; urgency=medium
+
+  * Reconnect to Postgresql if message cann't be saved.
+  * Populate AIs in lobby from save game.
+
+ -- O01eg <o01eg@yandex.ru>  Wed, 22 Aug 2018 09:29:43 +0000
+
 freeorion (0.4.8-rc2+git20180814-1) unstable; urgency=medium
 
   * Update upstream.

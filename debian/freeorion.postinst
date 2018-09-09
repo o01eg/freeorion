@@ -43,6 +43,12 @@ case "$1" in
 	
 	# fix persistent_config.xml
 	chmod 0600 /etc/freeorion/persistent_config.xml
+
+	# fix db.txt mode
+	chmod 0600 /etc/freeorion/db.txt
+
+	# fix auth.txt mode
+	chmod 0600 /etc/freeorion/auth.txt
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

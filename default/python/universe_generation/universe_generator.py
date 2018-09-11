@@ -158,7 +158,6 @@ def create_universe(psd_map):
 
     print "Game UID %s" % fo.get_galaxy_setup_data().gameUID
 
-
     # finally, write some statistics to the log file
     print "############################################################"
     print "##             Universe generation statistics             ##"

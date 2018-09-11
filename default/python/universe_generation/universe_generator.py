@@ -37,6 +37,7 @@ class PyGalaxySetupData:
         self.monster_frequency = galaxy_setup_data.monsterFrequency
         self.native_frequency = galaxy_setup_data.nativeFrequency
         self.max_ai_aggression = galaxy_setup_data.maxAIAggression
+        self.game_uid = galaxy_setup_data.gameUID
 
     def dump(self):
         print "Galaxy Setup Data:"
@@ -50,6 +51,7 @@ class PyGalaxySetupData:
         print "...Monster Frequency:", self.monster_frequency
         print "...Native Frequency:", self.native_frequency
         print "...Max AI Aggression:", self.max_ai_aggression
+        print "...Game UID:", self.game_uid
 
 
 def error_report():
@@ -155,6 +157,7 @@ def create_universe(psd_map):
     fo.get_galaxy_setup_data().gameUID = "".join(empire_names) + str(random.randint(0, 999)).zfill(3)
 
     print "Game UID %s" % fo.get_galaxy_setup_data().gameUID
+
 
     # finally, write some statistics to the log file
     print "############################################################"

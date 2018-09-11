@@ -269,6 +269,8 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
     int start_system = fleet->SystemID();
     if (start_system == INVALID_OBJECT_ID)
         start_system = fleet->NextSystemID();
+    if (append && !fleet->TravelRoute().empty())
+        start_system = fleet->TravelRoute().back();
 
     auto short_path = GetPathfinder()->ShortestPath(start_system, m_dest_system, EmpireID());
 
@@ -298,11 +300,6 @@ bool FleetMoveOrder::Check(int empire_id, int fleet_id, int dest_system_id, bool
     auto dest_system = GetEmpireKnownSystem(dest_system_id, empire_id);
     if (!dest_system) {
         ErrorLogger() << "Empire with id " << empire_id << " ordered fleet to move to system with id " << dest_system_id << " but no such system is known to that empire";
-        return false;
-    }
-
-    if (dest_system_id != INVALID_OBJECT_ID && dest_system_id == start_system) {
-        DebugLogger() << "AIInterface::IssueFleetMoveOrder : pass destination system id (" << dest_system_id << ") that fleet is already in";
         return false;
     }
 
@@ -1193,7 +1190,7 @@ ScrapOrder::ScrapOrder(int empire, int object_id) :
     Order(empire),
     m_object_id(object_id)
 {
-    if (Check(empire, object_id))
+    if (!Check(empire, object_id))
         return;
 }
 
@@ -1226,7 +1223,7 @@ bool ScrapOrder::Check(int empire_id, int object_id) {
 void ScrapOrder::ExecuteImpl() const {
     GetValidatedEmpire();
 
-    if (Check(EmpireID(), m_object_id))
+    if (!Check(EmpireID(), m_object_id))
         return;
 
     if (auto ship = GetShip(m_object_id)) {

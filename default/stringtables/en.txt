@@ -414,13 +414,13 @@ SD_LARGE_MARK_1
 Cruiser Ms
 
 SD_LARGE_MARK1_DESC
-Cruiser equipped for long range independent action with improved lasers and armor. [[BLD_SHIPYARD_BASE_REQUIRED]]
+Cruiser equipped for long range independent action with improved weapons and armor. [[BLD_SHIPYARD_BASE_REQUIRED]]
 
 SD_LARGE_MARK_2
 Cruiser Lz
 
 SD_LARGE_MARK2_DESC
-Cruiser equipped for long range independent action . [[BLD_SHIPYARD_BASE_REQUIRED]]
+Cruiser equipped for long range independent action. [[BLD_SHIPYARD_BASE_REQUIRED]]
 
 SD_LARGE_MARK_3
 Destroyer Ms
@@ -1074,7 +1074,7 @@ RULE_RESEED_PRNG_SERVER
 Random Reseeding
 
 RULE_RESEED_PRNG_SERVER_DESC
-Random number generation is re-seeded frequently to give more predictable and reproducible values.
+With reseeding, replaying the same save or using the same settings and seed is not expected to produce the same random results. This is possibly preferable if players want to be sure that none of them can predict future random results based on previous random results or if a player wants to 're-roll' the results of a battle or random effect when re-playing a turn, and not get the same results as a previous attempt
 
 RULE_SHIP_SPEED_FACTOR
 Ship Speed Scaling
@@ -1122,7 +1122,7 @@ RULE_ENABLE_SUPER_TESTER
 Enable Super-Tester Takeover
 
 RULE_ENABLE_SUPER_TESTER_DESC
-Enables Super-Tester Takeover building
+Enables [[BLD_SUPER_TEST]] building
 
 RULE_STOCKPILE_IMPORT_LIMITED
 Stockpile Import Limited
@@ -4401,6 +4401,17 @@ Duplicates Existing Design
 # %1% name of the equivalent ship design.
 DESIGN_WND_KNOWN_DETAIL
 This design is a duplicate of "%1%".
+
+DESIGN_WND_RENAME_FINISHED
+Rename Finished Design
+
+# %1% name of the equivalent ship design.
+# %2% new name of the ship design.
+DESIGN_WND_RENAME_FINISHED_DETAIL
+'''Rename Finished design from
+"%1%"
+to 
+"%2%"'''
 
 DESIGN_WND_COMPONENT_CONFLICT
 Conflicting Design
@@ -9822,7 +9833,7 @@ DESC_DESIGN_HAS_PART_NOT
 #     matching a part class.
 # %3% textual description of the ship part class.
 DESC_DESIGN_HAS_PART_CLASS
-''' that has a part of class %1%'''
+''' that contains between %1% and %2% parts of class %3%'''
 
 # %1% textual description of the lower limit for the number of ship parts
 #     matching a part class.
@@ -9830,7 +9841,7 @@ DESC_DESIGN_HAS_PART_CLASS
 #     matching a part class.
 # %3% textual description of the ship part class.
 DESC_DESIGN_HAS_PART_CLASS_NOT
-''' that does not have a part of class %1%'''
+''' that does not contain between %1% and %2% parts of class %3%'''
 
 # %1% name of the ship design.
 DESC_PREDEFINED_SHIP_DESIGN

@@ -370,7 +370,6 @@ struct WaitingForSaveData : sc::state<WaitingForSaveData, WaitingForTurnEnd> {
         sc::custom_reaction<ClientSaveData>,
         sc::deferral<SaveGameRequest>,
         sc::deferral<TurnOrders>,
-        sc::deferral<PlayerChat>,
         sc::deferral<Diplomacy>
     > reactions;
 

@@ -11,6 +11,7 @@
 #include "../universe/System.h"
 #include "../universe/Species.h"
 #include "../util/Directories.h"
+#include "../util/base64_filter.h"
 #include "../util/i18n.h"
 #include "../util/Logger.h"
 #include "../util/OptionsDB.h"
@@ -95,6 +96,7 @@ namespace {
     const std::string UNABLE_TO_OPEN_FILE("Unable to open file");
 
     const std::string XML_COMPRESSED_MARKER("zlib-xml");
+    const std::string XML_COMPRESSED_BASE64_MARKER("zb64-xml");
     const std::string XML_DIRECT_MARKER("raw-xml");
     const std::string BINARY_MARKER("binary");
 }
@@ -174,7 +176,7 @@ int SaveGame(const std::string& filename, const ServerSaveGameData& server_save_
                     // then contains a string for compressed second archive
                     // that contains the main gamestate info
                     save_preview_data.SetBinary(false);
-                    save_preview_data.save_format_marker = XML_COMPRESSED_MARKER;
+                    save_preview_data.save_format_marker = XML_COMPRESSED_BASE64_MARKER;
 
                     // allocate buffers for serialized gamestate
                     DebugLogger() << "Allocating buffers for XML serialization...";
@@ -196,14 +198,17 @@ int SaveGame(const std::string& filename, const ServerSaveGameData& server_save_
                     InsertDevice serial_inserter(serial_str);
                     boost::iostreams::stream<InsertDevice> s_sink(serial_inserter);
 
-                    // create archive with (preallocated) buffer...
-                    freeorion_xml_oarchive xoa(s_sink);
-                    // serialize main gamestate info
-                    xoa << BOOST_SERIALIZATION_NVP(player_save_game_data);
-                    xoa << BOOST_SERIALIZATION_NVP(empire_manager);
-                    xoa << BOOST_SERIALIZATION_NVP(species_manager);
-                    xoa << BOOST_SERIALIZATION_NVP(combat_log_manager);
-                    Serialize(xoa, universe);
+                    {
+                        // create archive with (preallocated) buffer...
+                        freeorion_xml_oarchive xoa(s_sink);
+                        // serialize main gamestate info
+                        xoa << BOOST_SERIALIZATION_NVP(player_save_game_data);
+                        xoa << BOOST_SERIALIZATION_NVP(empire_manager);
+                        xoa << BOOST_SERIALIZATION_NVP(species_manager);
+                        xoa << BOOST_SERIALIZATION_NVP(combat_log_manager);
+                        Serialize(xoa, universe);
+                    }
+
                     s_sink.flush();
 
                     // wrap gamestate string in iostream::stream to extract serialized data
@@ -218,6 +223,7 @@ int SaveGame(const std::string& filename, const ServerSaveGameData& server_save_
                     // compression-filter gamestate into compressed string
                     boost::iostreams::filtering_ostreambuf o;
                     o.push(boost::iostreams::zlib_compressor());
+                    o.push(boost::iostreams::base64_encoder());
                     o.push(c_sink);
                     boost::iostreams::copy(s_source, o);
                     c_sink.flush();
@@ -372,6 +378,8 @@ void LoadGame(const std::string& filename, ServerSaveGameData& server_save_game_
 
             } else {
                 // assume compressed XML
+                if (BOOST_VERSION >= 106600 && ignored_save_preview_data.save_format_marker == XML_COMPRESSED_MARKER)
+                    throw std::invalid_argument("Save Format Not Compatible with Boost Version " BOOST_LIB_VERSION);
 
                 // allocate buffers for compressed and deceompressed serialized gamestate
                 DebugLogger() << "Allocating buffers for XML deserialization...";
@@ -409,6 +417,8 @@ void LoadGame(const std::string& filename, ServerSaveGameData& server_save_game_
                 // set up filter to decompress data
                 boost::iostreams::filtering_istreambuf i;
                 i.push(boost::iostreams::zlib_decompressor());
+                if (ignored_save_preview_data.save_format_marker == XML_COMPRESSED_BASE64_MARKER)
+                    i.push(boost::iostreams::base64_decoder());
                 i.push(c_source);
                 boost::iostreams::copy(i, s_sink);
                 // The following line has been commented out because it caused an assertion in boost iostreams to fail
@@ -519,10 +529,12 @@ void LoadPlayerSaveHeaderData(const std::string& filename, std::vector<PlayerSav
     }
 }
 
-void LoadEmpireSaveGameData(const std::string& filename, std::map<int, SaveGameEmpireData>& empire_save_game_data) {
+void LoadEmpireSaveGameData(const std::string& filename,
+                            std::map<int, SaveGameEmpireData>& empire_save_game_data,
+                            std::vector<PlayerSaveHeaderData>& player_save_header_data)
+{
     SaveGamePreviewData                 ignored_save_preview_data;
     ServerSaveGameData                  ignored_server_save_game_data;
-    std::vector<PlayerSaveHeaderData>   ignored_player_save_header_data;
     GalaxySetupData                     ignored_galaxy_setup_data;
 
     ScopedTimer timer("LoadEmpireSaveGameData: " + filename, true);
@@ -542,7 +554,7 @@ void LoadEmpireSaveGameData(const std::string& filename, std::map<int, SaveGameE
             ia >> BOOST_SERIALIZATION_NVP(ignored_save_preview_data);
             ia >> BOOST_SERIALIZATION_NVP(ignored_galaxy_setup_data);
             ia >> BOOST_SERIALIZATION_NVP(ignored_server_save_game_data);
-            ia >> BOOST_SERIALIZATION_NVP(ignored_player_save_header_data);
+            ia >> BOOST_SERIALIZATION_NVP(player_save_header_data);
             ia >> BOOST_SERIALIZATION_NVP(empire_save_game_data);
 
         } catch (...) {
@@ -555,7 +567,7 @@ void LoadEmpireSaveGameData(const std::string& filename, std::map<int, SaveGameE
             ia >> BOOST_SERIALIZATION_NVP(ignored_save_preview_data);
             ia >> BOOST_SERIALIZATION_NVP(ignored_galaxy_setup_data);
             ia >> BOOST_SERIALIZATION_NVP(ignored_server_save_game_data);
-            ia >> BOOST_SERIALIZATION_NVP(ignored_player_save_header_data);
+            ia >> BOOST_SERIALIZATION_NVP(player_save_header_data);
             ia >> BOOST_SERIALIZATION_NVP(empire_save_game_data);
         }
         // skipping additional deserialization which is not needed for this function

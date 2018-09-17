@@ -102,7 +102,9 @@ public:
         AUTH_REQUEST,           ///< sent by server to client if choosed player_name require authentiation
         AUTH_RESPONSE,          ///< sent by client to server to provide password or other credentials
         CHAT_HISTORY,           ///< sent by server to client to show previous messages
-        SET_AUTH_ROLES          ///< sent by server to client to set authorization roles
+        SET_AUTH_ROLES,         ///< sent by server to client to set authorization roles
+        ELIMINATE_SELF,         ///< sent by client to server if the player wants to resign
+        UNREADY                 ///< sent by client to server to revoke ready state of turn orders and sent by server to client to acknowledge it
     )
 
     GG_CLASS_ENUM(TurnProgressPhase,
@@ -359,6 +361,12 @@ FO_COMMON_API Message AuthResponseMessage(const std::string& player_name, const 
 
 /** notifies client about changes in his authorization \a roles. */
 FO_COMMON_API Message SetAuthorizationRolesMessage(const Networking::AuthRoles& roles);
+
+/** creates a ELIMINATE_SELF message to resign from the game. */
+FO_COMMON_API Message EliminateSelfMessage();
+
+/** creates a UNREADY message to revoke ready state of turn orders or acknowledge it */
+FO_COMMON_API Message UnreadyMessage();
 
 ////////////////////////////////////////////////
 // Message data extractors

@@ -293,6 +293,134 @@ std::string ReconstructName(const std::vector<std::string>& property_name,
     return retval;
 }
 
+std::string FormatedDescriptionPropertyNames(ReferenceType ref_type,
+                                             const std::vector<std::string>& property_names,
+                                             bool return_immediate_value)
+{
+    int num_references = property_names.size();
+    if (ref_type == NON_OBJECT_REFERENCE)
+        num_references--;
+    for (const std::string& property_name_part : property_names)
+        if (property_name_part.empty())
+             num_references--;
+    num_references = std::max(0, num_references);
+    std::string format_string;
+    switch (num_references) {
+    case 0: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE0"); break;
+    case 1: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE1"); break;
+    case 2: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE2"); break;
+    case 3: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE3"); break;
+    case 4: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE4"); break;
+    case 5: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE5"); break;
+    case 6: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE6"); break;
+    default:format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLEMANY"); break;
+    }
+
+    boost::format formatter = FlexibleFormat(format_string);
+
+    switch (ref_type) {
+    case SOURCE_REFERENCE:                    formatter % UserString("DESC_VAR_SOURCE");          break;
+    case EFFECT_TARGET_REFERENCE:             formatter % UserString("DESC_VAR_TARGET");          break;
+    case EFFECT_TARGET_VALUE_REFERENCE:       formatter % UserString("DESC_VAR_VALUE");           break;
+    case CONDITION_LOCAL_CANDIDATE_REFERENCE: formatter % UserString("DESC_VAR_LOCAL_CANDIDATE"); break;
+    case CONDITION_ROOT_CANDIDATE_REFERENCE:  formatter % UserString("DESC_VAR_ROOT_CANDIDATE");  break;
+    case NON_OBJECT_REFERENCE:                                                                    break;
+    default:                                  formatter % "???";                                  break;
+    }
+
+    for (const std::string& property_name_part : property_names) {
+        if (property_name_part.empty())  // apparently is empty for a EFFECT_TARGET_VALUE_REFERENCE
+            continue;
+        std::string stringtable_key("DESC_VAR_" + boost::to_upper_copy(property_name_part));
+        formatter % UserString(stringtable_key);
+    }
+
+    std::string retval = boost::io::str(formatter);
+    //std::cerr << "ret: " << retval << std::endl;
+    return retval;
+}
+
+std::string ComplexVariableDescription(const std::vector<std::string>& property_names,
+                                       const ValueRef::ValueRefBase<int>* int_ref1,
+                                       const ValueRef::ValueRefBase<int>* int_ref2,
+                                       const ValueRef::ValueRefBase<int>* int_ref3,
+                                       const ValueRef::ValueRefBase<std::string>* string_ref1,
+                                       const ValueRef::ValueRefBase<std::string>* string_ref2)
+{
+    if (property_names.empty()) {
+        ErrorLogger() << "ComplexVariableDescription passed empty property names?!";
+        return "";
+    }
+
+    std::string stringtable_key("DESC_VAR_" + boost::to_upper_copy(property_names.back()));
+    if (!UserStringExists(stringtable_key))
+        return "";
+
+    boost::format formatter = FlexibleFormat(UserString(stringtable_key));
+
+    if (int_ref1)
+        formatter % int_ref1->Description();
+    if (int_ref2)
+        formatter % int_ref2->Description();
+    if (int_ref3)
+        formatter % int_ref3->Description();
+    if (string_ref1)
+        formatter % string_ref1->Description();
+    if (string_ref2)
+        formatter % string_ref2->Description();
+
+    return boost::io::str(formatter);
+}
+
+std::string ComplexVariableDump(const std::vector<std::string>& property_names,
+                                const ValueRef::ValueRefBase<int>* int_ref1,
+                                const ValueRef::ValueRefBase<int>* int_ref2,
+                                const ValueRef::ValueRefBase<int>* int_ref3,
+                                const ValueRef::ValueRefBase<std::string>* string_ref1,
+                                const ValueRef::ValueRefBase<std::string>* string_ref2)
+{
+    std::string retval;
+    if (property_names.empty()) {
+        ErrorLogger() << "ComplexVariableDump passed empty property names?!";
+        return "ComplexVariable";
+    } else {
+        retval += property_names.back();
+    }
+
+    // TODO: Depending on the property name, the parameter names will vary.
+    //       Need to handle each case correctly, in order for the Dumped
+    //       text to be parsable as the correct ComplexVariable.
+
+    if (int_ref1)
+        retval += " int1 = " + int_ref1->Dump();
+    if (int_ref2)
+        retval += " int2 = " + int_ref2->Dump();
+    if (int_ref3)
+        retval += " int3 = " + int_ref3->Dump();
+    if (string_ref1)
+        retval += " string1 = " + string_ref1->Dump();
+    if (string_ref2)
+        retval += " string2 = " + string_ref2->Dump();
+
+    return retval;
+}
+
+std::string StatisticDescription(StatisticType stat_type,
+                                 const std::string& value_desc,
+                                 const std::string& condition_desc)
+{
+    std::string stringtable_key("DESC_VAR_" + boost::to_upper_copy(
+        boost::lexical_cast<std::string>(stat_type)));
+
+    if (UserStringExists(stringtable_key)) {
+        boost::format formatter = FlexibleFormat(stringtable_key);
+        formatter % value_desc % condition_desc;
+        return boost::io::str(formatter);
+    }
+
+    return UserString("DESC_VAR_STATISITIC");
+}
+
 ///////////////////////////////////////////////////////////
 // Constant                                              //
 ///////////////////////////////////////////////////////////
@@ -430,53 +558,6 @@ std::string Constant<std::string>::Eval(const ScriptingContext& context) const
 ///////////////////////////////////////////////////////////
 // Variable                                              //
 ///////////////////////////////////////////////////////////
-std::string FormatedDescriptionPropertyNames(
-    ReferenceType ref_type, const std::vector<std::string>& property_names,
-    bool return_immediate_value)
-{
-    int num_references = property_names.size();
-    if (ref_type == NON_OBJECT_REFERENCE)
-        num_references--;
-    for (const std::string& property_name_part : property_names)
-        if (property_name_part.empty())
-             num_references--;
-    num_references = std::max(0, num_references);
-    std::string format_string;
-    switch (num_references) {
-        case 0: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE0"); break;
-        case 1: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE1"); break;
-        case 2: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE2"); break;
-        case 3: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE3"); break;
-        case 4: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE4"); break;
-        case 5: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE5"); break;
-        case 6: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE6"); break;
-        default: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLEMANY"); break;
-    }
-
-    boost::format formatter = FlexibleFormat(format_string);
-
-    switch (ref_type) {
-    case SOURCE_REFERENCE:                    formatter % UserString("DESC_VAR_SOURCE");          break;
-    case EFFECT_TARGET_REFERENCE:             formatter % UserString("DESC_VAR_TARGET");          break;
-    case EFFECT_TARGET_VALUE_REFERENCE:       formatter % UserString("DESC_VAR_VALUE");           break;
-    case CONDITION_LOCAL_CANDIDATE_REFERENCE: formatter % UserString("DESC_VAR_LOCAL_CANDIDATE"); break;
-    case CONDITION_ROOT_CANDIDATE_REFERENCE:  formatter % UserString("DESC_VAR_ROOT_CANDIDATE");  break;
-    case NON_OBJECT_REFERENCE:                                                                    break;
-    default:                                            formatter % "???";                                  break;
-    }
-
-    for (const std::string& property_name_part : property_names) {
-        if (property_name_part.empty())  // apparently is empty for a EFFECT_TARGET_VALUE_REFERENCE
-            continue;
-        std::string stringtable_key("DESC_VAR_" + boost::to_upper_copy(property_name_part));
-        formatter % UserString(stringtable_key);
-    }
-
-    std::string retval = boost::io::str(formatter);
-    //std::cerr << "ret: " << retval << std::endl;
-    return retval;
-}
-
 #define IF_CURRENT_VALUE(T)                                            \
 if (m_ref_type == EFFECT_TARGET_VALUE_REFERENCE) {                     \
     if (context.current_value.empty())                                 \
@@ -495,7 +576,7 @@ if (m_ref_type == EFFECT_TARGET_VALUE_REFERENCE) {                     \
 template <>
 PlanetSize Variable<PlanetSize>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     IF_CURRENT_VALUE(PlanetSize)
 
@@ -528,7 +609,7 @@ PlanetSize Variable<PlanetSize>::Eval(const ScriptingContext& context) const
 template <>
 PlanetType Variable<PlanetType>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     IF_CURRENT_VALUE(PlanetType)
 
@@ -567,7 +648,7 @@ PlanetType Variable<PlanetType>::Eval(const ScriptingContext& context) const
 template <>
 PlanetEnvironment Variable<PlanetEnvironment>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     IF_CURRENT_VALUE(PlanetEnvironment)
 
@@ -594,7 +675,7 @@ PlanetEnvironment Variable<PlanetEnvironment>::Eval(const ScriptingContext& cont
 template <>
 UniverseObjectType Variable<UniverseObjectType>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     IF_CURRENT_VALUE(UniverseObjectType)
 
@@ -626,7 +707,7 @@ UniverseObjectType Variable<UniverseObjectType>::Eval(const ScriptingContext& co
 template <>
 StarType Variable<StarType>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     IF_CURRENT_VALUE(StarType)
 
@@ -659,8 +740,6 @@ StarType Variable<StarType>::Eval(const ScriptingContext& context) const
 template <>
 Visibility Variable<Visibility>::Eval(const ScriptingContext& context) const
 {
-    // const std::string& property_name = m_property_name.back();
-
     IF_CURRENT_VALUE(Visibility)
 
     // As of this writing, there are no properties of objects that directly
@@ -675,7 +754,7 @@ Visibility Variable<Visibility>::Eval(const ScriptingContext& context) const
 template <>
 double Variable<double>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     IF_CURRENT_VALUE(float)
 
@@ -779,7 +858,7 @@ double Variable<double>::Eval(const ScriptingContext& context) const
 template <>
 int Variable<int>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     IF_CURRENT_VALUE(int)
 
@@ -1016,10 +1095,9 @@ template <>
 std::vector<std::string> Variable<std::vector<std::string>>::Eval(
     const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     IF_CURRENT_VALUE(std::vector<std::string>)
-
 
     if (m_ref_type == NON_OBJECT_REFERENCE) {
         // add more non-object reference int functions here
@@ -1081,7 +1159,7 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
 template <>
 std::string Variable<std::string>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     IF_CURRENT_VALUE(std::string)
 
@@ -1243,16 +1321,25 @@ int Statistic<int>::Eval(const ScriptingContext& context) const
 template <>
 std::string Statistic<std::string>::Eval(const ScriptingContext& context) const
 {
-    // the only statistic that can be computed on non-number property types
-    // and that is itself of a non-number type is the most common value
-    if (m_stat_type != MODE)
-        throw std::runtime_error("ValueRef evaluated with an invalid StatisticType for the return type (string).");
-
     Condition::ObjectSet condition_matches;
     GetConditionMatches(context, condition_matches, m_sampling_condition.get());
 
     if (condition_matches.empty())
         return "";
+
+    // special case for IF statistic... return a non-empty string for true
+    if (m_stat_type == IF)
+        return " "; // not an empty string
+
+    // todo: consider allowing MAX and MIN using string sorting?
+
+    // the only other statistic that can be computed on non-number property
+    // types and that is itself of a non-number type is the most common value
+    if (m_stat_type != MODE) {
+        ErrorLogger() << "Statistic<std::string>::Eval has invalid statistic type: "
+                      << m_stat_type;
+        return "";
+    }
 
     // evaluate property for each condition-matched object
     std::map<std::shared_ptr<const UniverseObject>, std::string> object_property_values;
@@ -1745,16 +1832,16 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             return 0;
         try {
             // can cast boolean, int, or double-valued rules to int
-            switch (GetGameRules().GetRuleType(rule_name)) {
-            case GameRules::TOGGLE: {
+            switch (GetGameRules().GetType(rule_name)) {
+                case GameRules::Type::TOGGLE: {
                 return GetGameRules().Get<bool>(rule_name);
                 break;
             }
-            case GameRules::INT: {
+            case GameRules::Type::INT: {
                 return GetGameRules().Get<int>(rule_name);
                 break;
             }
-            case GameRules::DOUBLE: {
+            case GameRules::Type::DOUBLE: {
                 return static_cast<int>(GetGameRules().Get<double>(rule_name));
                 break;
             }
@@ -1936,7 +2023,7 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
                 return 0.0;
         }
 
-        // if a key integer specified, get just that entry (for single empire or sum of all empires)
+        // if a key integer is specified, get just that entry (for single empire or sum of all empires)
         if (m_int_ref2) {
             int key_int = m_int_ref2->Eval(context);
             return GetFloatEmpirePropertySingleKey(empire_id, variable_name, key_int);
@@ -1957,16 +2044,16 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
             return 0.0;
         try {
             // can cast boolean, int, or double-valued rules to double
-            switch (GetGameRules().GetRuleType(rule_name)) {
-            case GameRules::TOGGLE: {
+            switch (GetGameRules().GetType(rule_name)) {
+            case GameRules::Type::TOGGLE: {
                 return GetGameRules().Get<bool>(rule_name);
                 break;
             }
-            case GameRules::INT: {
+            case GameRules::Type::INT: {
                 return GetGameRules().Get<int>(rule_name);
                 break;
             }
-            case GameRules::DOUBLE: {
+            case GameRules::Type::DOUBLE: {
                 return GetGameRules().Get<double>(rule_name);
                 break;
             }
@@ -2519,20 +2606,20 @@ std::string ComplexVariable<std::string>::Eval(const ScriptingContext& context) 
             return "";
         try {
             // can cast boolean, int, double, or string-valued rules to strings
-            switch (GetGameRules().GetRuleType(rule_name)) {
-            case GameRules::TOGGLE: {
+            switch (GetGameRules().GetType(rule_name)) {
+            case GameRules::Type::TOGGLE: {
                 return std::to_string(GetGameRules().Get<bool>(rule_name));
                 break;
             }
-            case GameRules::INT: {
+            case GameRules::Type::INT: {
                 return std::to_string(GetGameRules().Get<int>(rule_name));
                 break;
             }
-            case GameRules::DOUBLE: {
+            case GameRules::Type::DOUBLE: {
                 return DoubleToString(GetGameRules().Get<double>(rule_name), 3, false);
                 break;
             }
-            case GameRules::STRING: {
+            case GameRules::Type::STRING: {
                 return GetGameRules().Get<std::string>(rule_name);
                 break;
             }
@@ -2753,9 +2840,6 @@ NameLookup::NameLookup(std::unique_ptr<ValueRefBase<int>>&& value_ref, LookupTyp
     m_lookup_type(lookup_type)
 {}
 
-NameLookup::~NameLookup()
-{}
-
 bool NameLookup::operator==(const ValueRefBase<std::string>& rhs) const {
     if (&rhs == this)
         return true;
@@ -2849,6 +2933,16 @@ std::string Operation<std::string>::EvalImpl(const ScriptingContext& context) co
     if (m_op_type == PLUS) {
         return LHS()->Eval(context) + RHS()->Eval(context);
 
+    } else if (m_op_type == TIMES) {
+        // useful for writing a "Statistic If" expression with strings. Number-
+        // valued types return 0 or 1 for nothing or something matching the sampling
+        // condition. For strings, an empty string indicates no matches, and non-empty
+        // string indicates matches, which is treated like a multiplicative identity
+        // operation, so just returns the RHS of the expression.
+        if (LHS()->Eval(context).empty())
+            return "";
+        return RHS()->Eval(context);
+
     } else if (m_op_type == MINIMUM || m_op_type == MAXIMUM) {
         // evaluate all operands, return sorted first/last
         std::set<std::string> vals;
@@ -2937,7 +3031,8 @@ double Operation<double>::EvalImpl(const ScriptingContext& context) const
             double op1 = LHS()->Eval(context);
             if (op1 == 0.0)
                 return 0.0;
-            return op1 * RHS()->Eval(context); break;
+            return op1 * RHS()->Eval(context);
+            break;
         }
 
         case DIVIDE: {
@@ -2949,7 +3044,7 @@ double Operation<double>::EvalImpl(const ScriptingContext& context) const
         }
 
         case NEGATE:
-            return -(LHS()->Eval(context));                     break;
+            return -(LHS()->Eval(context)); break;
 
         case EXPONENTIATE: {
             double op2 = RHS()->Eval(context);
@@ -2965,10 +3060,8 @@ double Operation<double>::EvalImpl(const ScriptingContext& context) const
             break;
         }
 
-        case ABS: {
-            return std::abs(LHS()->Eval(context));
-            break;
-        }
+        case ABS:
+            return std::abs(LHS()->Eval(context)); break;
 
         case LOGARITHM: {
             double op1 = LHS()->Eval(context);
@@ -2979,10 +3072,10 @@ double Operation<double>::EvalImpl(const ScriptingContext& context) const
         }
 
         case SINE:
-            return std::sin(LHS()->Eval(context));              break;
+            return std::sin(LHS()->Eval(context)); break;
 
         case COSINE:
-            return std::cos(LHS()->Eval(context));              break;
+            return std::cos(LHS()->Eval(context)); break;
 
         case MINIMUM:
         case MAXIMUM: {
@@ -3052,7 +3145,15 @@ double Operation<double>::EvalImpl(const ScriptingContext& context) const
             }
         }
 
-        default:    break;
+        case ROUND_NEAREST:
+            return std::round(LHS()->Eval(context)); break;
+        case ROUND_UP:
+            return std::ceil(LHS()->Eval(context)); break;
+        case ROUND_DOWN:
+            return std::floor(LHS()->Eval(context)); break;
+
+        default:
+            break;
     }
 
     throw std::runtime_error("double ValueRef evaluated with an unknown or invalid OpType.");
@@ -3086,7 +3187,7 @@ int Operation<int>::EvalImpl(const ScriptingContext& context) const
         }
 
         case NEGATE:
-            return -LHS()->Eval(context);                           break;
+            return -LHS()->Eval(context); break;
 
         case EXPONENTIATE: {
             double op2 = RHS()->Eval(context);
@@ -3159,6 +3260,14 @@ int Operation<int>::EvalImpl(const ScriptingContext& context) const
             if (!vr)
                 return 0;
             return vr->Eval(context);
+            break;
+        }
+
+        case ROUND_NEAREST:
+        case ROUND_UP:
+        case ROUND_DOWN: {
+            // integers don't need to be rounded...
+            return LHS()->Eval(context);
             break;
         }
 

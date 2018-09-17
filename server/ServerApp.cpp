@@ -41,6 +41,8 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/date_time/posix_time/time_formatters.hpp>
+#include <boost/uuid/random_generator.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 #include <ctime>
 #include <thread>
@@ -67,56 +69,6 @@ namespace {
         return ALL_EMPIRES;
     }
 };
-
-////////////////////////////////////////////////
-// PlayerSaveHeaderData
-////////////////////////////////////////////////
-PlayerSaveHeaderData::PlayerSaveHeaderData() :
-    m_name(),
-    m_empire_id(ALL_EMPIRES),
-    m_client_type(Networking::INVALID_CLIENT_TYPE)
-{}
-
-PlayerSaveHeaderData::PlayerSaveHeaderData(const std::string& name, int empire_id,
-                                           Networking::ClientType client_type) :
-    m_name(name),
-    m_empire_id(empire_id),
-    m_client_type(client_type)
-{}
-
-
-////////////////////////////////////////////////
-// PlayerSaveGameData
-////////////////////////////////////////////////
-PlayerSaveGameData::PlayerSaveGameData() :
-    PlayerSaveHeaderData(),
-    m_orders(),
-    m_ui_data(),
-    m_save_state_string()
-{}
-
-PlayerSaveGameData::PlayerSaveGameData(const std::string& name, int empire_id,
-                                       const std::shared_ptr<OrderSet>& orders,
-                                       const std::shared_ptr<SaveGameUIData>& ui_data,
-                                       const std::string& save_state_string,
-                                       Networking::ClientType client_type) :
-    PlayerSaveHeaderData(name, empire_id, client_type),
-    m_orders(orders),
-    m_ui_data(ui_data),
-    m_save_state_string(save_state_string)
-{}
-
-
-////////////////////////////////////////////////
-// ServerSaveGameData
-////////////////////////////////////////////////
-ServerSaveGameData::ServerSaveGameData() :
-    m_current_turn(INVALID_GAME_TURN)
-{}
-
-ServerSaveGameData::ServerSaveGameData(int current_turn) :
-    m_current_turn(current_turn)
-{}
 
 
 ////////////////////////////////////////////////
@@ -259,6 +211,14 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
         args.push_back("--log-level");
         args.push_back(GetOptionsDB().Get<std::string>("log-level"));
     }
+
+#ifdef FREEORION_LINUX
+    if (GetOptionsDB().Get<bool>("testing")) {
+        // Dirty hack to output log to console.
+        args.push_back("--log-file");
+        args.push_back("/proc/self/fd/1");
+    }
+#endif
 
     args.push_back("--ai-path");
     args.push_back(GetOptionsDB().Get<std::string>("ai-path"));
@@ -420,10 +380,12 @@ void ServerApp::HandleMessage(const Message& msg, PlayerConnectionPtr player_con
     case Message::LOBBY_UPDATE:             m_fsm->process_event(LobbyUpdate(msg, player_connection));      break;
     case Message::SAVE_GAME_INITIATE:       m_fsm->process_event(SaveGameRequest(msg, player_connection));  break;
     case Message::TURN_ORDERS:              m_fsm->process_event(TurnOrders(msg, player_connection));       break;
+    case Message::UNREADY:                  m_fsm->process_event(RevokeReadiness(msg, player_connection));  break;
     case Message::CLIENT_SAVE_DATA:         m_fsm->process_event(ClientSaveData(msg, player_connection));   break;
     case Message::PLAYER_CHAT:              m_fsm->process_event(PlayerChat(msg, player_connection));       break;
     case Message::DIPLOMACY:                m_fsm->process_event(Diplomacy(msg, player_connection));        break;
     case Message::MODERATOR_ACTION:         m_fsm->process_event(ModeratorAct(msg, player_connection));     break;
+    case Message::ELIMINATE_SELF:           m_fsm->process_event(EliminateSelf(msg, player_connection));    break;
 
     case Message::ERROR_MSG:
     case Message::DEBUG:                    break;
@@ -638,7 +600,7 @@ void ServerApp::NewMPGameInit(const MultiplayerLobbyData& multiplayer_lobby_data
         SendNewGameStartMessages();
 }
 
-void UpdateEmpireSupply() {
+void UpdateEmpireSupply(bool precombat=false) {
     EmpireManager& empires = Empires();
 
     // Determine initial supply distribution and exchanging and resource pools for empires
@@ -647,7 +609,7 @@ void UpdateEmpireSupply() {
         if (empire->Eliminated())
             continue;   // skip eliminated empires.  presumably this shouldn't be an issue when initializing a new game, but apparently I thought this was worth checking for...
 
-        empire->UpdateSupplyUnobstructedSystems();  // determines which systems can propagate fleet and resource (same for both)
+        empire->UpdateSupplyUnobstructedSystems(precombat);  // determines which systems can propagate fleet and resource (same for both)
         empire->UpdateSystemSupplyRanges();         // sets range systems can propagate fleet and resourse supply (separately)
     }
 
@@ -670,6 +632,8 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
     DebugLogger() << "ServerApp::NewGameInitConcurrentWithJoiners";
 
     m_galaxy_setup_data = galaxy_setup_data;
+
+    // set game rules for server based on those specified in setup data
     GetGameRules().SetFromStrings(m_galaxy_setup_data.GetGameRules());
 
     // validate some connection info / determine which players need empires created
@@ -986,6 +950,37 @@ void ServerApp::UpdateCombatLogs(const Message& msg, PlayerConnectionPtr player_
     player_connection->SendMessage(DispatchCombatLogsMessage(logs));
 }
 
+void ServerApp::LoadChatHistory() {
+    // don't load history if it was already loaded
+    if (!m_chat_history.empty())
+        return;
+
+    bool success = false;
+    try {
+        m_python_server.SetCurrentDir(GetPythonChatDir());
+        // Call the Python load_history function
+        success = m_python_server.LoadChatHistory(m_chat_history);
+    } catch (boost::python::error_already_set err) {
+        success = false;
+        m_python_server.HandleErrorAlreadySet();
+        if (!m_python_server.IsPythonRunning()) {
+            ErrorLogger() << "Python interpreter is no longer running.  Attempting to restart.";
+            if (m_python_server.Initialize()) {
+                ErrorLogger() << "Python interpreter successfully restarted.";
+            } else {
+                ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
+                m_fsm->process_event(ShutdownServer());
+            }
+        }
+    }
+
+    if (!success) {
+        ErrorLogger() << "Python scripted chat failed.";
+        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
+                                                                      false));
+    }
+}
+
 void ServerApp::PushChatMessage(const std::string& text,
                                 const std::string& player_name,
                                 GG::Clr text_color,
@@ -997,6 +992,31 @@ void ServerApp::PushChatMessage(const std::string& text,
     chat.m_text_color = text_color;
     chat.m_text = text;
     m_chat_history.push_back(chat);
+
+    bool success = false;
+    try {
+        m_python_server.SetCurrentDir(GetPythonChatDir());
+        // Call the Python load_history function
+        success = m_python_server.PutChatHistoryEntity(chat);
+    } catch (boost::python::error_already_set err) {
+        success = false;
+        m_python_server.HandleErrorAlreadySet();
+        if (!m_python_server.IsPythonRunning()) {
+            ErrorLogger() << "Python interpreter is no longer running.  Attempting to restart.";
+            if (m_python_server.Initialize()) {
+                ErrorLogger() << "Python interpreter successfully restarted.";
+            } else {
+                ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
+                m_fsm->process_event(ShutdownServer());
+            }
+        }
+    }
+
+    if (!success) {
+        ErrorLogger() << "Python scripted chat failed.";
+        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
+                                                                      false));
+    }
 }
 
 namespace {
@@ -1184,12 +1204,18 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
     }
 
     // ensure number of players connected and for which data are provided are consistent
-    if (player_id_to_save_game_data_index.size() != player_save_game_data.size()) {
+    if (player_id_to_save_game_data_index.size() != player_save_game_data.size())
         ErrorLogger() << "ServerApp::LoadGameInit passed index mapping and player save game data are of different sizes...";
-    }
-    if (m_networking.NumEstablishedPlayers() != player_save_game_data.size()) {
-        ErrorLogger() << "ServerApp::LoadGameInit has " << m_networking.NumEstablishedPlayers() << " established players but " << player_save_game_data.size() << " entries in player save game data.  Could be ok... so not aborting, but might crash";
-    }
+
+    if (m_networking.NumEstablishedPlayers() != player_save_game_data.size())
+        ErrorLogger() << "ServerApp::LoadGameInit has " << m_networking.NumEstablishedPlayers()
+                      << " established players but " << player_save_game_data.size()
+                      << " entries in player save game data.  Could be ok... so not aborting, but might crash";
+
+
+    // set game rules for server based on those specified in setup data
+    GetGameRules().SetFromStrings(m_galaxy_setup_data.GetGameRules());
+
 
     // validate some connection info
     for (auto player_connection_it = m_networking.established_begin();
@@ -1277,8 +1303,8 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
     // so need to be reinitialized when loading based on the gamestate
     m_universe.InitializeSystemGraph();
 
-    UpdateEmpireSupply();
-    
+    UpdateEmpireSupply(true);  // precombat type supply update
+
     std::map<int, PlayerInfo> player_info_map = GetPlayerInfoMap();
 
     // assemble player state information, and send game start messages
@@ -1350,6 +1376,11 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
 
 void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_data) {
     Universe& universe = GetUniverse();
+
+    // Set game UID. Needs to be done first so we can use ClockSeed to
+    // prevent reproducible UIDs.
+    ClockSeed();
+    GetGalaxySetupData().SetGameUID(boost::uuids::to_string(boost::uuids::random_generator()()));
 
     // Initialize RNG with provided seed to get reproducible universes
     int seed = 0;
@@ -1537,6 +1568,8 @@ bool ServerApp::IsLocalHumanPlayer(int player_id) {
 }
 
 bool ServerApp::IsAvailableName(const std::string& player_name) const {
+    if (player_name.empty())
+        return false;
     for (auto it = m_networking.established_begin();
          it != m_networking.established_end(); ++it)
     {
@@ -1627,6 +1660,71 @@ void ServerApp::AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_conn
     // TODO: notify other players
 }
 
+bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
+    if (!GetGameRules().Get<bool>("RULE_ALLOW_CONCEDE")) {
+        player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_CONCEDE_DISABLED"), false));
+        return false;
+    }
+
+    int player_id = player_connection->PlayerID();
+    int empire_id = PlayerEmpireID(player_id);
+    if (empire_id == ALL_EMPIRES) {
+        player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_NONPLAYER_CANNOT_CONCEDE"), false));
+        return false;
+    }
+
+    // test if there other human players in the game
+    bool other_human_player = false;
+    for (auto& empires : Empires()) {
+        if (!empires.second->Eliminated() &&
+            empire_id != empires.second->EmpireID() &&
+            GetEmpireClientType(empires.second->EmpireID()) == Networking::CLIENT_TYPE_HUMAN_PLAYER)
+        {
+            other_human_player = true;
+            break;
+        }
+    }
+    if (!other_human_player) {
+        player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_CONCEDE_LAST_HUMAN_PLAYER"), false));
+        return false;
+    }
+
+    Empire* empire = GetEmpire(empire_id);
+    if (!empire) {
+        player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_NONPLAYER_CANNOT_CONCEDE"), false));
+        return false;
+    }
+
+    // test for colonies count
+    std::vector<int> planet_ids = Objects().FindObjectIDs(OwnedVisitor<Planet>(empire_id));
+    if (planet_ids.size() > static_cast<size_t>(GetGameRules().Get<int>("RULE_CONCEDE_COLONIES_THRESHOLD"))) {
+        player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_CONCEDE_EXCEED_COLONIES"), false));
+        return false;
+    }
+
+    // empire elimination
+    empire->Eliminate();
+
+    // unclaim ships and systems
+    for (int planet_id : planet_ids) {
+        auto planet = GetPlanet(planet_id);
+        if (planet)
+            planet->Reset();
+    }
+    for (auto& obj : Objects().FindObjects(OwnedVisitor<Ship>(empire_id))) {
+        obj->SetOwner(ALL_EMPIRES);
+        GetUniverse().RecursiveDestroy(obj->ID());
+    }
+
+    // Don't wait for turn
+    RemoveEmpireTurn(empire_id);
+
+    // break link between player and empire
+    m_player_empire_ids.erase(player_id);
+
+    return true;
+}
+
 void ServerApp::DropPlayerEmpireLink(int player_id)
 { m_player_empire_ids.erase(player_id); }
 
@@ -1645,7 +1743,10 @@ bool ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection) 
             m_player_empire_ids[player_connection->PlayerID()] = empire.first;
 
             const OrderSet dummy;
-            const OrderSet& orders = orders_it->second ? *orders_it->second : dummy;
+            const OrderSet& orders = orders_it->second.second ? *orders_it->second.second : dummy;
+
+            // drop ready status
+            orders_it->second.first = false;
 
             auto player_info_map = GetPlayerInfoMap();
             bool use_binary_serialization = player_connection->ClientVersionStringMatchesThisServer();
@@ -1689,38 +1790,45 @@ int ServerApp::EffectsProcessingThreads() const
 { return GetOptionsDB().Get<int>("effects.server.threads"); }
 
 void ServerApp::AddEmpireTurn(int empire_id)
-{ m_turn_sequence[empire_id].reset(nullptr); }
+{
+    m_turn_sequence[empire_id].second.reset(nullptr);
+    m_turn_sequence[empire_id].first = false;
+}
 
 void ServerApp::RemoveEmpireTurn(int empire_id)
 { m_turn_sequence.erase(empire_id); }
 
 void ServerApp::ClearEmpireTurnOrders() {
     for (auto& order : m_turn_sequence) {
-        if (order.second) {
-            order.second.reset(nullptr);
+        order.second.first = false;
+        if (order.second.second) {
+            order.second.second.reset(nullptr);
         }
     }
 }
 
 void ServerApp::SetEmpireTurnOrders(int empire_id, std::unique_ptr<OrderSet>&& order_set)
-{ m_turn_sequence[empire_id] = std::move(order_set); }
+{ m_turn_sequence[empire_id] = std::make_pair(true, std::move(order_set)); }
+
+void ServerApp::RevokeEmpireTurnReadyness(int empire_id)
+{ m_turn_sequence[empire_id].first = false; }
 
 bool ServerApp::AllOrdersReceived() {
     // debug output
     DebugLogger() << "ServerApp::AllOrdersReceived for turn: " << m_current_turn;
+    bool all_orders_received = true;
     for (const auto& empire_orders : m_turn_sequence) {
-        if (!empire_orders.second)
+        if (!empire_orders.second.second) {
             DebugLogger() << " ... no orders from empire id: " << empire_orders.first;
-        else
+            all_orders_received = false;
+        } else if (!empire_orders.second.first) {
+            DebugLogger() << " ... not ready empire id: " << empire_orders.first;
+            all_orders_received = false;
+        } else {
             DebugLogger() << " ... have orders from empire id: " << empire_orders.first;
+        }
     }
-
-    // Loop through to find empire ID and check for valid orders pointer
-    for (const auto& empire_orders : m_turn_sequence) {
-        if (!empire_orders.second)
-            return false;
-    }
-    return true;
+    return all_orders_received;
 }
 
 namespace {
@@ -2079,7 +2187,7 @@ namespace {
             // update visibilities.
             for (const auto& empire_vis : combat_info.empire_object_visibility) {
                 for (const auto& object_vis : empire_vis.second) {
-                    if (object_vis.second > GetUniverse().GetObjectVisibilityByEmpire(empire_vis.first, object_vis.first))
+                    if (object_vis.second > GetUniverse().GetObjectVisibilityByEmpire(object_vis.first, empire_vis.first))
                         universe.SetEmpireObjectVisibility(empire_vis.first, object_vis.first, object_vis.second);
                 }
             }
@@ -2912,11 +3020,11 @@ void ServerApp::PreCombatProcessTurns() {
     // execute orders
     for (const auto& empire_orders : m_turn_sequence) {
         auto& order_set = empire_orders.second;
-        if (!order_set) {
+        if (!order_set.second) {
             DebugLogger() << "No OrderSet for empire " << empire_orders.first;
             continue;
         }
-        for (const auto& id_and_order : *order_set)
+        for (const auto& id_and_order : *order_set.second)
             id_and_order.second->Execute();
     }
 
@@ -2965,15 +3073,23 @@ void ServerApp::PreCombatProcessTurns() {
         if (fleet)
             fleet->ClearArrivalFlag();
     }
+    // first move unowned fleets, or an empire fleet landing on them could wrongly
+    // blockade them before they move
     for (auto& fleet : fleets) {
         // save for possible SitRep generation after moving...
-        if (fleet)
+        if (fleet && fleet->Unowned())
+            fleet->MovementPhase();
+    }
+    for (auto& fleet : fleets) {
+        // save for possible SitRep generation after moving...
+        if (fleet && !fleet->Unowned())
             fleet->MovementPhase();
     }
 
     // post-movement visibility update
     m_universe.UpdateEmpireObjectVisibilities();
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireStaleObjectKnowledge();
 
     // SitRep for fleets having arrived at destinations
     for (auto& fleet : fleets) {
@@ -3054,6 +3170,9 @@ void ServerApp::ProcessCombats() {
     DisseminateSystemCombatInfo(combats);
     // update visibilities with any new info gleaned during combat
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    // update stale object info based on any mid- combat glimpses
+    // before visibiity is totally recalculated in the post combat processing
+    m_universe.UpdateEmpireStaleObjectKnowledge();
 
     CreateCombatSitReps(combats);
 
@@ -3279,7 +3398,7 @@ void ServerApp::PostCombatProcessTurns() {
 
 
     // Re-determine supply distribution and exchanging and resource pools for empires
-    UpdateEmpireSupply();
+    UpdateEmpireSupply(true);
 
     // copy latest visible gamestate to each empire's known object state
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();

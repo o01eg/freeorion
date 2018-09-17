@@ -349,12 +349,12 @@ bool Empire::BuildingTypeAvailable(const std::string& name) const
 { return m_available_building_types.count(name); }
 
 const std::set<int>& Empire::ShipDesigns() const
-{ return m_ship_designs; }
+{ return m_known_ship_designs; }
 
 std::set<int> Empire::AvailableShipDesigns() const {
     // create new map containing all ship designs that are available
     std::set<int> retval;
-    for (int design_id : m_ship_designs) {
+    for (int design_id : m_known_ship_designs) {
         if (ShipDesignAvailable(design_id))
             retval.insert(design_id);
     }
@@ -385,7 +385,7 @@ bool Empire::ShipDesignAvailable(const ShipDesign& design) const {
 }
 
 bool Empire::ShipDesignKept(int ship_design_id) const
-{ return m_ship_designs.count(ship_design_id); }
+{ return m_known_ship_designs.count(ship_design_id); }
 
 const std::set<std::string>& Empire::AvailableShipParts() const
 { return m_available_part_types; }
@@ -443,9 +443,12 @@ bool Empire::HasExploredSystem(int ID) const
 bool Empire::ProducibleItem(BuildType build_type, int location_id) const {
     if (build_type == BT_SHIP)
         throw std::invalid_argument("Empire::ProducibleItem was passed BuildType BT_SHIP with no further parameters, but ship designs are tracked by number");
-    
+
     if (build_type == BT_BUILDING)
         throw std::invalid_argument("Empire::ProducibleItem was passed BuildType BT_BUILDING with no further parameters, but buildings are tracked by name");
+
+    if (location_id == INVALID_OBJECT_ID)
+        return false;
 
     // must own the production location...
     auto location = GetUniverseObject(location_id);
@@ -603,11 +606,10 @@ void Empire::Eliminate() {
     // m_available_part_types;
     // m_available_hull_types;
     // m_explored_systems;
-    // m_ship_designs;
+    // m_known_ship_designs;
     m_sitrep_entries.clear();
-    for (auto& entry : m_resource_pools) {
+    for (auto& entry : m_resource_pools)
         entry.second->SetObjects(std::vector<int>());
-    }
     m_population_pool.SetPopCenters(std::vector<int>());
 
     // m_ship_names_used;
@@ -698,7 +700,7 @@ void Empire::UpdateUnobstructedFleets() {
     }
 }
 
-void Empire::UpdateSupplyUnobstructedSystems() {
+void Empire::UpdateSupplyUnobstructedSystems(bool precombat /*=false*/) {
     Universe& universe = GetUniverse();
 
     // get ids of systems partially or better visible to this empire.
@@ -712,10 +714,10 @@ void Empire::UpdateSupplyUnobstructedSystems() {
     for (int system_id : known_systems_vec)
         if (!known_destroyed_objects.count(system_id))
             known_systems_set.insert(system_id);
-    UpdateSupplyUnobstructedSystems(known_systems_set);
+    UpdateSupplyUnobstructedSystems(known_systems_set, precombat);
 }
 
-void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems) {
+void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems, bool precombat /*=false*/) {
     //DebugLogger() << "UpdateSupplyUnobstructedSystems for empire " << m_id;
     m_supply_unobstructed_systems.clear();
 
@@ -776,11 +778,13 @@ void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems)
                 // newly created ships are not allowed to block supply since they have not even potentially gone
                 // through a combat round at the present location.  Potential sources for such new ships are monsters
                 // created via Effect.  (Ships/fleets constructed by empires are currently created at a later stage of
-                // turn processing, but even if such were moved forward they should be similarly restricted.)  Because
-                // supply blocks are determined prior to turn advancement, we check against age zero here.  Because the
+                // turn processing, but even if such were moved forward they should be similarly restricted.)  For
+                // checks after combat and prior to turn advancement, we check against age zero here.  For checks
+                // after turn advancement but prior to combat we check against age 1.  Because the
                 // fleets themselves may be created and/or destroyed purely as organizational matters, we check ship
                 // age not fleet age.
-                if (fleet_at_war && fleet->MaxShipAgeInTurns() > 0) {
+                int cutoff_age = precombat ? 1 : 0;
+                if (fleet_at_war && fleet->MaxShipAgeInTurns() > cutoff_age) {
                     systems_containing_obstructing_objects.insert(system_id);
                     if (fleet->ArrivalStarlane() == system_id)
                         unrestricted_obstruction_systems.insert(system_id);
@@ -1440,11 +1444,12 @@ void Empire::AddShipDesign(int ship_design_id, int next_design_id) {
      * list of available designs for human players, and */
     if (ship_design_id == next_design_id)
         return;
+
     const ShipDesign* ship_design = GetUniverse().GetShipDesign(ship_design_id);
     if (ship_design) {  // don't check if design is producible; adding a ship design is useful for more than just producing it
         // design is valid, so just add the id to empire's set of ids that it knows about
-        if (!m_ship_designs.count(ship_design_id)) {
-            m_ship_designs.insert(ship_design_id);
+        if (!m_known_ship_designs.count(ship_design_id)) {
+            m_known_ship_designs.insert(ship_design_id);
 
             ShipDesignsChangedSignal();
 
@@ -1485,8 +1490,8 @@ int Empire::AddShipDesign(ShipDesign* ship_design) {
 }
 
 void Empire::RemoveShipDesign(int ship_design_id) {
-    if (m_ship_designs.count(ship_design_id)) {
-        m_ship_designs.erase(ship_design_id);
+    if (m_known_ship_designs.count(ship_design_id)) {
+        m_known_ship_designs.erase(ship_design_id);
         ShipDesignsChangedSignal();
     } else {
         DebugLogger() << "Empire::RemoveShipDesign: this empire did not have design with id " << ship_design_id;
@@ -2028,7 +2033,11 @@ void Empire::CheckProductionProgress() {
                     fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(), m_id);
 
                     system->Insert(fleet);
-                    fleet->SetNextAndPreviousSystems(system->ID(), system->ID());
+                    // set prev system to prevent conflicts with CalculateRouteTo used for
+                    // rally points below, but leave next system as INVALID_OBJECT_ID so
+                    // fleet won't necessarily be disqualified from making blockades if it
+                    // is left stationary
+                    fleet->SetNextAndPreviousSystems(INVALID_OBJECT_ID, system->ID());
                     // set invalid arrival starlane so that fleet won't necessarily be free from blockades
                     fleet->SetArrivalStarlane(INVALID_OBJECT_ID);
 
@@ -2040,7 +2049,11 @@ void Empire::CheckProductionProgress() {
                         fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(), m_id);
 
                         system->Insert(fleet);
-                        fleet->SetNextAndPreviousSystems(system->ID(), system->ID());
+                        // set prev system to prevent conflicts with CalculateRouteTo used for
+                        // rally points below, but leave next system as INVALID_OBJECT_ID so
+                        // fleet won't necessarily be disqualified from making blockades if it
+                        // is left stationary
+                        fleet->SetNextAndPreviousSystems(INVALID_OBJECT_ID, system->ID());
                         // set invalid arrival starlane so that fleet won't necessarily be free from blockades
                         fleet->SetArrivalStarlane(INVALID_OBJECT_ID);
 

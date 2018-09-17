@@ -1220,9 +1220,15 @@ namespace {
         } else if (item_name == "ENC_GAME_RULES") {
             const GameRules& rules = GetGameRules();
 
-            for (auto& rule : rules)
-                detailed_description += UserString(rule.first) + " : "
-                                     + rule.second.ValueToString() + "\n";
+            for (auto& rule : rules) {
+                if (rule.second.ValueIsDefault()) {
+                    detailed_description += UserString(rule.first) + " : "
+                                         + rule.second.ValueToString() + "\n";
+                } else {
+                    detailed_description += "<u>" + UserString(rule.first) + " : "
+                                         + rule.second.ValueToString() + "</u>\n";
+                }
+            }
             return;
         }
 
@@ -1675,14 +1681,18 @@ namespace {
         auto techs = empire->ResearchedTechs();
         if (!techs.empty()) {
             detailed_description += "\n\n" + UserString("RESEARCHED_TECHS");
+            std::multimap<int, std::string> sorted_techs;
             for (const auto& tech_entry : techs) {
+                sorted_techs.emplace(tech_entry.second, tech_entry.first);
+            }
+            for (const auto& sorted_tech_entry : sorted_techs) {
                 detailed_description += "\n";
                 std::string turn_text;
-                if (tech_entry.second == BEFORE_FIRST_TURN)
+                if (sorted_tech_entry.first == BEFORE_FIRST_TURN)
                     turn_text = UserString("BEFORE_FIRST_TURN");
                 else
-                    turn_text = UserString("TURN") + " " + std::to_string(tech_entry.second);
-                detailed_description += LinkTaggedText(VarText::TECH_TAG, tech_entry.first)
+                    turn_text = UserString("TURN") + " " + std::to_string(sorted_tech_entry.first);
+                detailed_description += LinkTaggedText(VarText::TECH_TAG, sorted_tech_entry.second)
                                      + " : " + turn_text;
             }
         } else {
@@ -2134,7 +2144,7 @@ namespace {
     std::string GetDetailedDescriptionBase(const ShipDesign* design) {
         std::string hull_link;
         if (!design->Hull().empty())
-                hull_link = LinkTaggedText(VarText::SHIP_HULL_TAG, design->Hull());
+            hull_link = LinkTaggedText(VarText::SHIP_HULL_TAG, design->Hull());
 
         std::string parts_list;
         std::map<std::string, int> non_empty_parts_count;
@@ -2158,8 +2168,10 @@ namespace {
         % parts_list);
     }
 
-    std::string GetDetailedDescriptionStats(const std::shared_ptr<Ship> ship, const ShipDesign* design,
-                                            float enemy_DR, std::set<float> enemy_shots, float cost)
+    std::string GetDetailedDescriptionStats(const std::shared_ptr<Ship> ship,
+                                            const ShipDesign* design,
+                                            float enemy_DR,
+                                            std::set<float> enemy_shots, float cost)
     {
         //The strength of a fleet is approximately weapons * armor, or
         //(weapons - enemyShield) * armor / (enemyWeapons - shield). This
@@ -2574,7 +2586,7 @@ namespace {
         return retval;
     }
 
-    GG::Pt SingleTabExtent() {
+    GG::Pt HairSpaceExtent() {
         static GG::Pt retval;
         if (retval > GG::Pt(GG::X0, GG::Y0))
             return retval;
@@ -2582,8 +2594,9 @@ namespace {
         GG::Flags<GG::TextFormat> format = GG::FORMAT_NONE;
         auto font = ClientUI::GetFont();
 
-        auto elems = font->ExpensiveParseFromTextToTextElements("\t", format);
-        auto lines = font->DetermineLines("\t", format, GG::X(1 << 15), elems);
+        const std::string hair_space_str { u8"\u200A" };
+        auto elems = font->ExpensiveParseFromTextToTextElements(hair_space_str, format);
+        auto lines = font->DetermineLines(hair_space_str, format, GG::X(1 << 15), elems);
         retval = font->TextExtent(lines);
         return retval;
     }
@@ -2610,12 +2623,34 @@ namespace {
         }
 
         // align end of column with end of longest row
-        auto single_tab_width = SingleTabExtent().x;
+        auto hair_space_width = HairSpaceExtent().x;
+        auto hair_space_width_str = std::to_string(Value(hair_space_width));
+        const std::string hair_space_str { u8"\u200A" };
         for (auto& it : retval) {
+            if (column1_species_extents.count(it.first) != 1) {
+                ErrorLogger() << "No column1 extent stored for " << it.first;
+                continue;
+            }
             auto distance = longest_width - column1_species_extents.at(it.first).x;
-            std::size_t num_tabs = Value(distance) / Value(single_tab_width);
-            for (std::size_t i = 0; i < num_tabs; ++i)
-                it.second.append("\t");
+            std::size_t num_spaces = Value(distance) / Value(hair_space_width);
+            TraceLogger() << it.first << " Num spaces: " << std::to_string(Value(longest_width))
+                          << " - " << std::to_string(Value(column1_species_extents.at(it.first).x))
+                          << " = " << std::to_string(Value(distance))
+                          << " / " << std::to_string(Value(hair_space_width))
+                          << " = " << std::to_string(num_spaces);;
+            for (std::size_t i = 0; i < num_spaces; ++i)
+                it.second.append(hair_space_str);
+
+            TraceLogger() << "Species Suitability Column 1:\n\t" << it.first << " \"" << it.second << "\"" << [&]() {
+                    std::string out("");
+                    auto col_val = Value(column1_species_extents.at(it.first).x);
+                    out.append("\n\t\t(" + std::to_string(col_val) + " + (" + std::to_string(num_spaces) + " * " + hair_space_width_str);
+                    out.append(") = " + std::to_string(col_val + (num_spaces * Value(hair_space_width))) + ")");
+                    auto text_elements = font->ExpensiveParseFromTextToTextElements(it.second, format);
+                    auto lines = font->DetermineLines(it.second, format, GG::X(1 << 15), text_elements);
+                    out.append(" = " + std::to_string(Value(font->TextExtent(lines).x)));
+                    return out;
+                }();
         }
 
         return retval;
@@ -2659,8 +2694,10 @@ namespace {
         // show image of planet environment at the top of the suitability report
         const auto& filenames = PlanetEnvFilenames(planet->Type());
         if (!filenames.empty()) {
-            detailed_description += "<img src=\"encyclopedia/planet_environments/"
-                                    + filenames[planet_id % filenames.size()] + "\"></img>";
+            auto env_img_tag = "<img src=\"encyclopedia/planet_environments/"
+                               + filenames[planet_id % filenames.size()] + "\"></img>";
+            TraceLogger() << "Suitability report env image tag \"" << env_img_tag << "\"";
+            detailed_description.append(env_img_tag);
         }
 
         name = planet->PublicName(planet_id);
@@ -2679,30 +2716,38 @@ namespace {
 
             if (it->first > 0) {
                 if (!positive_header_placed) {
-                    detailed_description += str(FlexibleFormat(UserString("ENC_SUITABILITY_REPORT_POSITIVE_HEADER"))
-                                                % planet->PublicName(planet_id));
+                    auto pos_header = str(FlexibleFormat(UserString("ENC_SUITABILITY_REPORT_POSITIVE_HEADER"))
+                                          % planet->PublicName(planet_id));
+                    TraceLogger() << "Suitability report positive header \"" << pos_header << "\"";
+                    detailed_description.append(pos_header);
                     positive_header_placed = true;
                 }
 
-                detailed_description += str(FlexibleFormat(UserString("ENC_SPECIES_PLANET_TYPE_SUITABILITY"))
+                auto pos_row = str(FlexibleFormat(UserString("ENC_SPECIES_PLANET_TYPE_SUITABILITY"))
                     % species_name_column1_it->second
                     % UserString(boost::lexical_cast<std::string>(it->second.second))
                     % (GG::RgbaTag(ClientUI::StatIncrColor()) + DoubleToString(it->first, 2, true) + "</rgba>"));
+                TraceLogger() << "Suitability report positive row \"" << pos_row << "\"";
+                detailed_description.append(pos_row);
 
             } else if (it->first <= 0) {
                 if (!negative_header_placed) {
                     if (positive_header_placed)
                         detailed_description += "\n\n";
 
-                    detailed_description += str(FlexibleFormat(UserString("ENC_SUITABILITY_REPORT_NEGATIVE_HEADER"))
-                                                % planet->PublicName(planet_id));
+                    auto neg_header = str(FlexibleFormat(UserString("ENC_SUITABILITY_REPORT_NEGATIVE_HEADER"))
+                                          % planet->PublicName(planet_id));
+                    TraceLogger() << "Suitability report regative header \"" << neg_header << "\"";
+                    detailed_description.append(neg_header);
                     negative_header_placed = true;
                 }
 
-                detailed_description += str(FlexibleFormat(UserString("ENC_SPECIES_PLANET_TYPE_SUITABILITY"))
+                auto neg_row = str(FlexibleFormat(UserString("ENC_SPECIES_PLANET_TYPE_SUITABILITY"))
                     % species_name_column1_it->second
                     % UserString(boost::lexical_cast<std::string>(it->second.second))
                     % (GG::RgbaTag(ClientUI::StatDecrColor()) + DoubleToString(it->first, 2, true) + "</rgba>"));
+                TraceLogger() << "Suitability report negative row \"" << neg_row << "\"";
+                detailed_description.append(neg_row);
             }
 
             detailed_description += "\n";
@@ -3151,6 +3196,9 @@ void EncyclopediaDetailPanel::SetItem(const ShipDesign* design)
 
 void EncyclopediaDetailPanel::SetItem(const MeterType& meter_type)
 { SetMeterType(boost::lexical_cast<std::string>(meter_type)); }
+
+void EncyclopediaDetailPanel::SetEncyclopediaArticle(const std::string& name)
+{ AddItem(TextLinker::ENCYCLOPEDIA_TAG, name); }
 
 void EncyclopediaDetailPanel::OnIndex()
 { AddItem(TextLinker::ENCYCLOPEDIA_TAG, "ENC_INDEX"); }

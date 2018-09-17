@@ -1041,7 +1041,10 @@ void MapWnd::CompleteConstruction() {
     // turn button
     // determine size from the text that will go into the button, using a test year string
     std::string turn_button_longest_reasonable_text =  boost::io::str(FlexibleFormat(UserString("MAP_BTN_TURN_UPDATE")) % "99999"); // it is unlikely a game will go over 100000 turns
-    m_btn_turn = Wnd::Create<CUIButton>(turn_button_longest_reasonable_text);
+    std::string unready_button_longest_reasonable_text =  boost::io::str(FlexibleFormat(UserString("MAP_BTN_TURN_UNREADY")) % "99999");
+    m_btn_turn = Wnd::Create<CUIButton>(turn_button_longest_reasonable_text.size() > unready_button_longest_reasonable_text.size() ?
+                                        turn_button_longest_reasonable_text :
+                                        unready_button_longest_reasonable_text);
     m_btn_turn->Resize(m_btn_turn->MinUsableSize());
     m_btn_turn->LeftClickedSignal.connect(
         boost::bind(&MapWnd::EndTurn, this));
@@ -1602,16 +1605,11 @@ void MapWnd::CompleteConstruction() {
     // General Gamestate response signals
     //////////////////
     FleetUIManager& fm = FleetUIManager::GetFleetUIManager();
-    fm.ActiveFleetWndChangedSignal.connect(
-        boost::bind(&MapWnd::SelectedFleetsChanged, this));
-    fm.ActiveFleetWndSelectedFleetsChangedSignal.connect(
-        boost::bind(&MapWnd::SelectedFleetsChanged, this));
-    fm.ActiveFleetWndSelectedShipsChangedSignal.connect(
-        boost::bind(&MapWnd::SelectedShipsChanged, this));
-    fm.FleetRightClickedSignal.connect(
-        boost::bind(&MapWnd::FleetRightClicked, this, _1));
-    fm.ShipRightClickedSignal.connect(
-        boost::bind(&MapWnd::ShipRightClicked, this, _1));
+    fm.ActiveFleetWndChangedSignal.connect(boost::bind(&MapWnd::SelectedFleetsChanged, this));
+    fm.ActiveFleetWndSelectedFleetsChangedSignal.connect(boost::bind(&MapWnd::SelectedFleetsChanged, this));
+    fm.ActiveFleetWndSelectedShipsChangedSignal.connect(boost::bind(&MapWnd::SelectedShipsChanged, this));
+    fm.FleetRightClickedSignal.connect(boost::bind(&MapWnd::FleetRightClicked, this, _1));
+    fm.ShipRightClickedSignal.connect(boost::bind(&MapWnd::ShipRightClicked, this, _1));
 
     DoLayout();
 
@@ -2695,17 +2693,25 @@ void MapWnd::EnableOrderIssuing(bool enable/* = true*/) {
     // and is not a moderator
     HumanClientApp* app = HumanClientApp::GetApp();
     bool moderator = false;
+    m_btn_turn->Disable(HumanClientApp::GetApp()->SinglePlayerGame() && !enable);
     if (!app) {
         enable = false;
+        m_btn_turn->Disable(true);
     } else {
         bool have_empire = (app->EmpireID() != ALL_EMPIRES);
         moderator = (app->GetClientType() == Networking::CLIENT_TYPE_HUMAN_MODERATOR);
-        if (!have_empire && !moderator)
+        if (!have_empire && !moderator) {
             enable = false;
+            m_btn_turn->Disable(true);
+        }
     }
 
     m_moderator_wnd->EnableActions(enable && moderator);
-    m_btn_turn->Disable(!enable);
+    m_ready_turn = !enable;
+    m_btn_turn->SetText(boost::io::str(FlexibleFormat(m_ready_turn && !HumanClientApp::GetApp()->SinglePlayerGame() ?
+                                                      UserString("MAP_BTN_TURN_UNREADY") :
+                                                      UserString("MAP_BTN_TURN_UPDATE")) %
+                                       std::to_string(CurrentTurn())));
     m_side_panel->EnableOrderIssuing(enable);
     m_production_wnd->EnableOrderIssuing(enable);
     m_research_wnd->EnableOrderIssuing(enable);
@@ -2766,6 +2772,7 @@ void MapWnd::InitTurn() {
     // set turn button to current turn
     m_btn_turn->SetText(boost::io::str(FlexibleFormat(UserString("MAP_BTN_TURN_UPDATE")) %
                                        std::to_string(turn_number)));
+    m_ready_turn = false;
     MoveChildUp(m_btn_turn);
 
 
@@ -4395,7 +4402,7 @@ void MapWnd::ShowMeterTypeArticle(const std::string& meter_string) {
 void MapWnd::ShowEncyclopediaEntry(const std::string& str) {
     if (!m_pedia_panel->Visible())
         TogglePedia();
-    m_pedia_panel->SetText(str, false);
+    m_pedia_panel->SetEncyclopediaArticle(str);
 }
 
 void MapWnd::CenterOnObject(int id) {
@@ -5188,18 +5195,18 @@ double MapWnd::SystemHaloScaleFactor() const
 { return 1.0 + log10(ZoomFactor()); }
 
 FleetButton::SizeType MapWnd::FleetButtonSizeType() const {
-    // no FLEET_BUTTON_LARGE as these icons are too big for the map.  (they can be used in the FleetWnd, however)
+    // no SizeType::LARGE as these icons are too big for the map.  (they can be used in the FleetWnd, however)
     if      (ZoomFactor() > ClientUI::MediumFleetButtonZoomThreshold())
-        return FleetButton::FLEET_BUTTON_MEDIUM;
+        return FleetButton::SizeType::MEDIUM;
 
     else if (ZoomFactor() > ClientUI::SmallFleetButtonZoomThreshold())
-        return FleetButton::FLEET_BUTTON_SMALL;
+        return FleetButton::SizeType::SMALL;
 
     else if (ZoomFactor() > ClientUI::TinyFleetButtonZoomThreshold())
-        return FleetButton::FLEET_BUTTON_TINY;
+        return FleetButton::SizeType::TINY;
 
     else
-        return FleetButton::FLEET_BUTTON_NONE;
+        return FleetButton::SizeType::NONE;
 }
 
 void MapWnd::Zoom(int delta) {
@@ -5563,8 +5570,7 @@ void MapWnd::PlotFleetMovement(int system_id, bool execute_move, bool append) {
         // if actually ordering fleet movement, not just prospectively previewing, ... do so
         if (execute_move && !route.empty()){
             HumanClientApp::GetApp()->Orders().IssueOrder(
-                std::make_shared<FleetMoveOrder>(empire_id, fleet_id, start_system,
-                                                 system_id, append));
+                std::make_shared<FleetMoveOrder>(empire_id, fleet_id, system_id, append));
             StopFleetExploring(fleet_id);
         }
 
@@ -5585,7 +5591,14 @@ std::vector<int> MapWnd::FleetIDsOfFleetButtonsOverlapping(int fleet_id) const {
 
     const auto& it = m_fleet_buttons.find(fleet_id);
     if (it == m_fleet_buttons.end()) {
-        ErrorLogger() << "Couldn't find a FleetButton for fleet " << fleet_id;
+        // Log that a FleetButton could not be found for the requested fleet, and include when the fleet was last seen
+        int empire_id = HumanClientApp::GetApp()->EmpireID();
+        auto vis_turn_map = GetUniverse().GetObjectVisibilityTurnMapByEmpire(fleet_id, empire_id);
+        int vis_turn = -1;
+        if (vis_turn_map.find(VIS_BASIC_VISIBILITY) != vis_turn_map.end())
+            vis_turn = vis_turn_map[VIS_BASIC_VISIBILITY];
+        ErrorLogger() << "Couldn't find a FleetButton for fleet " << fleet_id 
+                      << " with last basic vis turn " << vis_turn;
         return fleet_ids;
     }
     const auto& fleet_btn = it->second;
@@ -6047,7 +6060,7 @@ void MapWnd::Sanitize() {
 void MapWnd::PushWndStack(std::shared_ptr<GG::Wnd> wnd) {
     if (!wnd)
         return;
-    // First remove it from its current location in the stack (if any), to prevent it from being 
+    // First remove it from its current location in the stack (if any), to prevent it from being
     // present in two locations at once.
     RemoveFromWndStack(wnd);
     m_wnd_stack.push_back(wnd);
@@ -6121,7 +6134,11 @@ bool MapWnd::ReturnToMap() {
 }
 
 bool MapWnd::EndTurn() {
-    HumanClientApp::GetApp()->StartTurn();
+    if (m_ready_turn) {
+        HumanClientApp::GetApp()->UnreadyTurn();
+    } else {
+        HumanClientApp::GetApp()->StartTurn();
+    }
     return true;
 }
 
@@ -6731,9 +6748,19 @@ void MapWnd::RefreshIndustryResourceIndicator() {
         true, stockpile_used, stockpile, expected_stockpile,
         true, stockpile_use_capacity));
 
-    if (total_PP_wasted > 0.05 || (total_PP_excess > (3 * stockpile_use_capacity))) {
+    // red "waste" icon if the non-project transfer to IS is more than either 3x per-turn use or 80% total output
+    // else yellow icon if the non-project transfer to IS is more than 20% total output, or if there is any transfer
+    // to IS and the IS is expected to be above 10x per-turn use.
+    if (total_PP_wasted > 0.05 || (total_PP_excess > std::min(3.0 * stockpile_use_capacity, 0.8 * total_PP_output))) {
         DebugLogger()  << "MapWnd::RefreshIndustryResourceIndicator: Showing Industry Wasted Icon with Industry spent: "
                        << total_PP_spent << " and Industry Production: " << total_PP_output << ", wasting " << total_PP_wasted;
+        boost::filesystem::path button_texture_dir = ClientUI::ArtDir() / "icons" / "buttons";
+        m_industry_wasted->SetUnpressedGraphic(GG::SubTexture(ClientUI::GetTexture(button_texture_dir /
+                                                                "wasted_resource.png", false)));
+        m_industry_wasted->SetPressedGraphic(GG::SubTexture(ClientUI::GetTexture(button_texture_dir /
+                                                                "wasted_resource_clicked.png", false)));
+        m_industry_wasted->SetRolloverGraphic(GG::SubTexture(ClientUI::GetTexture(button_texture_dir /
+                                                                "wasted_resource_mouseover.png", false)));
         m_industry_wasted->Show();
         m_industry_wasted->ClearBrowseInfoWnd();
         m_industry_wasted->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
@@ -6742,7 +6769,23 @@ void MapWnd::RefreshIndustryResourceIndicator() {
             total_PP_output, total_PP_excess,
             true, stockpile_use_capacity, total_PP_to_stockpile, total_PP_wasted,
             UserString("MAP_PROD_CLICK_TO_OPEN")));
-
+    } else if (total_PP_to_stockpile > 0.05 && (expected_stockpile > (10 * stockpile_use_capacity) ||
+                                                total_PP_excess > 0.2 * total_PP_output)) {
+        boost::filesystem::path button_texture_dir = ClientUI::ArtDir() / "icons" / "buttons";
+        m_industry_wasted->SetUnpressedGraphic(GG::SubTexture(ClientUI::GetTexture(button_texture_dir /
+                                                                "warned_resource.png", false)));
+        m_industry_wasted->SetPressedGraphic(GG::SubTexture(ClientUI::GetTexture(button_texture_dir /
+                                                                "warned_resource_clicked.png", false)));
+        m_industry_wasted->SetRolloverGraphic(GG::SubTexture(ClientUI::GetTexture(button_texture_dir /
+                                                                "warned_resource_mouseover.png", false)));
+        m_industry_wasted->Show();
+        m_industry_wasted->ClearBrowseInfoWnd();
+        m_industry_wasted->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
+        m_industry_wasted->SetBrowseInfoWnd(GG::Wnd::Create<WastedStockpiledResourceBrowseWnd>(
+            UserString("MAP_PRODUCTION_WASTED_TITLE"), UserString("PRODUCTION_INFO_PP"),
+            total_PP_output, total_PP_excess,
+            true, stockpile_use_capacity, total_PP_to_stockpile, total_PP_wasted,
+            UserString("MAP_PROD_CLICK_TO_OPEN")));
     } else {
         m_industry_wasted->Hide();
     }
@@ -7436,7 +7479,7 @@ namespace {
         int max_fleet_jumps = std::trunc(fleet->Fuel());
         if (num_jumps_resupply <= max_fleet_jumps) {
             HumanClientApp::GetApp()->Orders().IssueOrder(
-                    std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.second.begin(), *route.second.rbegin()));
+                    std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.second.rbegin()));
         } else {
             TraceLogger() << "Not enough fuel for fleet " << fleet->ID()
                           << " to resupply at system " << *route.second.rbegin();
@@ -7473,7 +7516,7 @@ namespace {
         }
 
         HumanClientApp::GetApp()->Orders().IssueOrder(
-            std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.begin(), *route.rbegin()));
+            std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.rbegin()));
         if (fleet->FinalDestinationID() == *route.rbegin()) {
             TraceLogger() << "Sending fleet " << fleet->ID() << " to explore system " << *route.rbegin();
             return true;
@@ -7564,7 +7607,7 @@ void MapWnd::DispatchFleetsExploring() {
     for (auto it = m_fleets_exploring.begin(); it != m_fleets_exploring.end();) {
         auto fleet = GetFleet(*it);
         if (!fleet || destroyed_objects.count(fleet->ID())) {
-            m_fleets_exploring.erase(it++); //this fleet can't explore anymore
+            it = m_fleets_exploring.erase(it); //this fleet can't explore anymore
         } else {
              if (fleet->MovePath().empty())
                 idle_fleets.insert(fleet->ID());

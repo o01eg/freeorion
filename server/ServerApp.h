@@ -20,57 +20,6 @@ struct GalaxySetupData;
 struct SaveGameUIData;
 struct ServerFSM;
 
-/** Contains basic data about a player in a game. */
-struct PlayerSaveHeaderData {
-    PlayerSaveHeaderData();
-
-    PlayerSaveHeaderData(const std::string& name, int empire_id,
-                         Networking::ClientType client_type);
-
-    std::string             m_name;
-    int                     m_empire_id;
-    Networking::ClientType  m_client_type;
-
-private:
-    friend class boost::serialization::access;
-    template <class Archive>
-    void serialize(Archive& ar, const unsigned int version);
-};
-
-/** Contains data that must be saved for a single player. */
-struct PlayerSaveGameData : public PlayerSaveHeaderData {
-    PlayerSaveGameData();
-
-    PlayerSaveGameData(const std::string& name, int empire_id,
-                       const std::shared_ptr<OrderSet>& orders,
-                       const std::shared_ptr<SaveGameUIData>& ui_data,
-                       const std::string& save_state_string,
-                       Networking::ClientType client_type);
-
-    std::shared_ptr<OrderSet>       m_orders;
-    std::shared_ptr<SaveGameUIData> m_ui_data;
-    std::string                     m_save_state_string;
-
-private:
-    friend class boost::serialization::access;
-    template <class Archive>
-    void serialize(Archive& ar, const unsigned int version);
-};
-
-/** contains data that must be retained by the server when saving and loading a
-  * game that isn't player data or the universe */
-struct ServerSaveGameData {
-    ServerSaveGameData();
-    ServerSaveGameData(int current_turn);
-
-    int m_current_turn;
-
-private:
-    friend class boost::serialization::access;
-    template <class Archive>
-    void serialize(Archive& ar, const unsigned int version);
-};
-
 /** the application framework class for the FreeOrion server. */
 class ServerApp : public IApp {
 public:
@@ -163,6 +112,9 @@ public:
       * will be freed when all processing is done for the turn */
     void    SetEmpireTurnOrders(int empire_id, std::unique_ptr<OrderSet>&& order_set);
 
+    /** Revokes turn order's ready state for the given empire. */
+    void    RevokeEmpireTurnReadyness(int empire_id);
+
     /** Sets all empire turn orders to an empty set. */
     void    ClearEmpireTurnOrders();
 
@@ -227,6 +179,9 @@ public:
       * Simply sends GAME_START message so established player knows he is in the game. */
     void AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_connection);
 
+    /** Eliminate player's empire by \a player_connection. Return true if player was eliminated. */
+    bool EliminatePlayer(const PlayerConnectionPtr& player_connection);
+
     /** Drop link between player with \a player_id and his empire. */
     void DropPlayerEmpireLink(int planet_id);
 
@@ -240,6 +195,9 @@ public:
 
     /** Send the requested combat logs to the client.*/
     void UpdateCombatLogs(const Message& msg, PlayerConnectionPtr player_connection);
+
+    /** Loads chat history via python script. */
+    void LoadChatHistory();
 
     void PushChatMessage(const std::string& text,
                          const std::string& player_name,
@@ -348,8 +306,11 @@ private:
 
     /** Turn sequence map is used for turn processing. Each empire is added at
       * the start of a game or reload and then the map maintains OrderSets for
-      * that turn. */
-    std::map<int, std::unique_ptr<OrderSet>>         m_turn_sequence;
+      * that turn.
+      * The map contains ready state which should be true to advance turn and
+      * pointer to orders from empire.
+      * */
+    std::map<int, std::pair<bool, std::unique_ptr<OrderSet>>>      m_turn_sequence;
 
     // Give FSM and its states direct access.  We are using the FSM code as a
     // control-flow mechanism; it is all notionally part of this class.
@@ -365,31 +326,5 @@ private:
     friend struct ProcessingTurn;
     friend struct ShuttingDownServer;
 };
-
-// template implementations
-template <class Archive>
-void PlayerSaveHeaderData::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_NVP(m_name)
-        & BOOST_SERIALIZATION_NVP(m_empire_id)
-        & BOOST_SERIALIZATION_NVP(m_client_type);
-}
-
-template <class Archive>
-void PlayerSaveGameData::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_NVP(m_name)
-        & BOOST_SERIALIZATION_NVP(m_empire_id)
-        & BOOST_SERIALIZATION_NVP(m_orders)
-        & BOOST_SERIALIZATION_NVP(m_ui_data)
-        & BOOST_SERIALIZATION_NVP(m_save_state_string)
-        & BOOST_SERIALIZATION_NVP(m_client_type);
-}
-
-template <class Archive>
-void ServerSaveGameData::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_NVP(m_current_turn);
-}
 
 #endif // _ServerApp_h_

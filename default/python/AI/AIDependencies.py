@@ -83,7 +83,7 @@ POP_SIZE_MOD_MAP_MODIFIED_BY_SPECIES = {
     "environment_bonus": [0, -4, -2, 0, 3],
     "GRO_SYMBIOTIC_BIO": [0,  0,  1, 1, 1],
     "GRO_XENO_GENETICS": [0,  1,  2, 2, 0],
-    "GRO_XENO_HYBRID":   [0,  2,  1, 0, 0],
+    "GRO_XENO_HYBRIDS":   [0,  2,  1, 0, 0],
     "GRO_CYBORG":        [0,  2,  0, 0, 0],
 }
 
@@ -91,7 +91,7 @@ POP_SIZE_MOD_MAP_MODIFIED_BY_SPECIES = {
 #  - [[LATE_PRIORITY]] or later:
 POP_SIZE_MOD_MAP_NOT_MODIFIED_BY_SPECIES = {
     "GRO_SUBTER_HAB":  [0, 1, 1, 1, 1],
-    "CON_NDIM_STRUC":  [0, 2, 2, 2, 2],
+    "CON_NDIM_STRC":  [0, 2, 2, 2, 2],
     "CON_ORBITAL_HAB": [0, 1, 1, 1, 1],
 }
 
@@ -105,6 +105,10 @@ POP_CONST_MOD_MAP = {
 # phototrophic star coefficients
 POP_MOD_PHOTOTROPHIC_STAR_MAP = {fo.starType.blue: 3, fo.starType.white: 1.5, fo.starType.red: -1,
                                  fo.starType.neutron: -1, fo.starType.blackHole: -10, fo.starType.noStar: -10}
+
+# lightsensitive star coefficients
+TAG_LIGHT_SENSITIVE = "LIGHT_SENSITIVE"
+POP_MOD_LIGHTSENSITIVE_STAR_MAP = {fo.starType.blue: -2, fo.starType.white: -1}
 
 # the percentage of normal population that a species with Gaseous tag has
 GASEOUS_POP_FACTOR = 0.50
@@ -644,6 +648,11 @@ PILOT_FIGHTER_CAPACITY_MODIFIER_DICT = {
     "GOOD":     {},
     "GREAT":    {},
     "ULTIMATE": {},
+}
+
+HANGAR_LAUNCH_CAPACITY_MODIFIER_DICT = {
+    # hangar_name: {bay_name: effect, bay_name2: effect, ...}
+    "FT_HANGAR_1": {"FT_BAY_1": 2},
 }
 # </editor-fold>
 

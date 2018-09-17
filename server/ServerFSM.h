@@ -78,6 +78,7 @@ struct MessageEventBase {
     (LeaveGame)                             \
     (SaveGameRequest)                       \
     (TurnOrders)                            \
+    (RevokeReadiness)                       \
     (CombatTurnOrders)                      \
     (ClientSaveData)                        \
     (RequestCombatLogs)                     \
@@ -85,6 +86,7 @@ struct MessageEventBase {
     (Diplomacy)                             \
     (ModeratorAct)                          \
     (AuthResponse)                          \
+    (EliminateSelf)                         \
     (Error)
 
 
@@ -297,6 +299,7 @@ struct PlayingGame : sc::state<PlayingGame, ServerFSM, WaitingForTurnEnd> {
         sc::custom_reaction<Hostless>,
         sc::custom_reaction<JoinGame>,
         sc::custom_reaction<AuthResponse>,
+        sc::custom_reaction<EliminateSelf>,
         sc::custom_reaction<Error>
     > reactions;
 
@@ -311,6 +314,7 @@ struct PlayingGame : sc::state<PlayingGame, ServerFSM, WaitingForTurnEnd> {
     sc::result react(const RequestCombatLogs& msg);
     sc::result react(const JoinGame& msg);
     sc::result react(const AuthResponse& msg);
+    sc::result react(const EliminateSelf& msg);
     sc::result react(const Error& msg);
 
     void EstablishPlayer(const PlayerConnectionPtr& player_connection,
@@ -329,6 +333,7 @@ struct PlayingGame : sc::state<PlayingGame, ServerFSM, WaitingForTurnEnd> {
 struct WaitingForTurnEnd : sc::state<WaitingForTurnEnd, PlayingGame, WaitingForTurnEndIdle> {
     typedef boost::mpl::list<
         sc::custom_reaction<TurnOrders>,
+        sc::custom_reaction<RevokeReadiness>,
         sc::custom_reaction<CheckTurnEndConditions>
     > reactions;
 
@@ -336,6 +341,7 @@ struct WaitingForTurnEnd : sc::state<WaitingForTurnEnd, PlayingGame, WaitingForT
     ~WaitingForTurnEnd();
 
     sc::result react(const TurnOrders& msg);
+    sc::result react(const RevokeReadiness& msg);
     sc::result react(const CheckTurnEndConditions& c);
 
     std::string m_save_filename;
@@ -367,7 +373,7 @@ struct WaitingForSaveData : sc::state<WaitingForSaveData, WaitingForTurnEnd> {
         sc::custom_reaction<ClientSaveData>,
         sc::deferral<SaveGameRequest>,
         sc::deferral<TurnOrders>,
-        sc::deferral<PlayerChat>,
+        sc::deferral<RevokeReadiness>,
         sc::deferral<Diplomacy>
     > reactions;
 
@@ -394,6 +400,7 @@ struct ProcessingTurn : sc::state<ProcessingTurn, PlayingGame> {
         sc::custom_reaction<ProcessTurn>,
         sc::deferral<SaveGameRequest>,
         sc::deferral<TurnOrders>,
+        sc::deferral<RevokeReadiness>,
         sc::deferral<Diplomacy>,
         sc::custom_reaction<CheckTurnEndConditions>
     > reactions;

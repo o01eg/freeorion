@@ -257,10 +257,10 @@ public:
     void UpdateSystemSupplyRanges();
     /** Calculates systems that can propagate supply (fleet or resource) using
       * the specified set of \a known_systems */
-    void UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems);
+    void UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems, bool precombat=false);
     /** Calculates systems that can propagate supply using this empire's own /
       * internal list of explored systems. */
-    void UpdateSupplyUnobstructedSystems();
+    void UpdateSupplyUnobstructedSystems(bool precombat=false);
     /** Updates fleet ArrivalStarlane to flag fleets of this empire that are not blockaded post-combat 
      *  must be done after *all* noneliminated empires have updated their unobstructed systems* */
     void UpdateUnobstructedFleets();
@@ -398,12 +398,13 @@ private:
     std::set<std::string>           m_available_part_types;     ///< list of acquired ship PartType.  These are string names referencing PartType objects
     std::set<std::string>           m_available_hull_types;     ///< list of acquired ship HullType.  These are string names referencing HullType objects
     std::set<int>                   m_explored_systems;         ///< systems explored by this empire
-    std::set<int>                   m_ship_designs;             ///< The Empire's ship designs ids
+    std::set<int>                   m_known_ship_designs;       ///< ids of ship designs in the universe that this empire knows about
 
     std::vector<SitRepEntry>        m_sitrep_entries;           ///< The Empire's sitrep entries
 
-    std::map<ResourceType, std::shared_ptr<ResourcePool>>   m_resource_pools;
-    PopulationPool                                          m_population_pool;
+    std::map<ResourceType, std::shared_ptr<ResourcePool>>
+                                    m_resource_pools;
+    PopulationPool                  m_population_pool;
 
     std::map<std::string, int>      m_ship_names_used;          ///< map from name to number of times used
 

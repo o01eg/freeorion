@@ -8,17 +8,17 @@ import universe_object
 import AIstate
 import EspionageAI
 import FleetUtilsAI
-import FreeOrionAI as foAI
+import InvasionAI
 import PlanetUtilsAI
 import PriorityAI
 import ProductionAI
 import MilitaryAI
+from aistate_interface import get_aistate
 from turn_state import state
 from EnumsAI import MissionType, FocusType, EmpireProductionTypes, ShipRoleType, PriorityType
 from freeorion_tools import tech_is_complete, get_ai_tag_grade, cache_by_turn, AITimer, get_partial_visibility_turn
 from AIDependencies import (INVALID_ID, OUTPOSTING_TECH, POP_CONST_MOD_MAP,
                             POP_SIZE_MOD_MAP_MODIFIED_BY_SPECIES, POP_SIZE_MOD_MAP_NOT_MODIFIED_BY_SPECIES)
-from InvasionAI import MIN_INVASION_SCORE
 
 colonization_timer = AITimer('getColonyFleets()')
 
@@ -67,9 +67,22 @@ def calc_max_pop(planet, species, detail):
     if planet_env == fo.planetEnvironment.uninhabitable:
         detail.append("Uninhabitable.")
         return 0
+
+    for bldg_id in planet.buildingIDs:
+        building = fo.getUniverse().getBuilding(bldg_id)
+        if not building:
+            continue
+        if building.buildingTypeName == "BLD_GATEWAY_VOID":
+            detail.append("Gateway to the void: Uninhabitable.")
+            return 0
+
     tag_list = list(species.tags) if species else []
     pop_tag_mod = AIDependencies.SPECIES_POPULATION_MODIFIER.get(get_ai_tag_grade(tag_list, "POPULATION"), 1.0)
-    gaseous_adjustment = AIDependencies.GASEOUS_POP_FACTOR if "GASEOUS" in tag_list else 1.0
+    if planet.type == fo.planetType.gasGiant and "GASEOUS" in tag_list:
+        gaseous_adjustment = AIDependencies.GASEOUS_POP_FACTOR
+        detail.append("GASEOUS adjustment: %.2f" % gaseous_adjustment)
+    else:
+        gaseous_adjustment = 1.0
 
     base_pop_modified_by_species = 0
     base_pop_not_modified_by_species = 0
@@ -135,11 +148,20 @@ def calc_max_pop(planet, species, detail):
         detail.append("boosts_PSM(%d from %s)" % (n_boosts, applicable_boosts))
 
     if planet.id in species.homeworlds:
+        detail.append('Homeworld (2)')
         base_pop_not_modified_by_species += 2
 
+    if AIDependencies.TAG_LIGHT_SENSITIVE in tag_list:
+        star_type = fo.getUniverse().getSystem(planet.systemID).starType
+        star_pop_mod = AIDependencies.POP_MOD_LIGHTSENSITIVE_STAR_MAP.get(star_type, 0)
+        base_pop_not_modified_by_species += star_pop_mod
+        detail.append("Lightsensitive Star Bonus_PSM_late(%.1f)" % star_pop_mod)
+
     def max_pop_size():
-        species_effect = (pop_tag_mod - 1) * abs(base_pop_modified_by_species) * gaseous_adjustment
-        base_pop = base_pop_not_modified_by_species + base_pop_modified_by_species + species_effect
+        species_effect = (pop_tag_mod - 1) * abs(base_pop_modified_by_species)
+        gaseous_effect = (gaseous_adjustment - 1) * abs(base_pop_modified_by_species)
+        base_pop = (base_pop_not_modified_by_species + base_pop_modified_by_species
+                    + species_effect + gaseous_effect)
         return planet_size * base_pop + pop_const_mod
 
     if "PHOTOTROPHIC" in tag_list and max_pop_size() > 0:
@@ -148,11 +170,12 @@ def calc_max_pop(planet, species, detail):
         base_pop_not_modified_by_species += star_pop_mod
         detail.append("Phototropic Star Bonus_PSM_late(%0.1f)" % star_pop_mod)
 
-    detail.append("MaxPop = baseMaxPop + size*(psm_early + (species_mod - 1)*abs(psm_early) + psm_late)"
-                  " = %d + %d * (%d + (%.2f-1)*abs(%d) + %d) = %.2f" % (
+    detail.append("max_pop = base + size*[psm_early + species_mod*abs(psm_early) + psm_late]")
+    detail.append("        = %.2f + %d * [%.2f + %.2f*abs(%.2f) + %.2f]" % (
                     pop_const_mod, planet_size, base_pop_modified_by_species,
-                    pop_tag_mod, base_pop_modified_by_species, base_pop_not_modified_by_species, max_pop_size()))
-    detail.append("maxPop %.1f" % max_pop_size())
+                    (pop_tag_mod+gaseous_adjustment-2), base_pop_modified_by_species,
+                    base_pop_not_modified_by_species))
+    detail.append("        = %.2f" % max_pop_size())
     return max_pop_size()
 
 
@@ -213,7 +236,7 @@ def survey_universe():
         system_facilities.clear()
 
     # var setup done
-
+    aistate = get_aistate()
     for sys_id in universe.systemIDs:
         system = universe.getSystem(sys_id)
         if not system:
@@ -228,7 +251,7 @@ def survey_universe():
             planet = universe.getPlanet(pid)
             if not planet:
                 continue
-            if pid in foAI.foAIstate.colonisablePlanetIDs:
+            if pid in aistate.colonisablePlanetIDs:
                 empire_has_qualifying_planet = True
             if planet.size == fo.planetSize.asteroids:
                 local_ast = True
@@ -278,7 +301,7 @@ def survey_universe():
                             active_growth_specials.setdefault(special, []).append(pid)
             elif owner_id != -1:
                 if get_partial_visibility_turn(pid) >= current_turn - 1:  # only interested in immediately recent data
-                    foAI.foAIstate.misc.setdefault('enemies_sighted', {}).setdefault(current_turn, []).append(pid)
+                    aistate.misc.setdefault('enemies_sighted', {}).setdefault(current_turn, []).append(pid)
 
         if empire_has_qualifying_planet:
             if local_ast:
@@ -288,7 +311,7 @@ def survey_universe():
 
         if sys_id in state.get_empire_planets_by_system():
             AIstate.empireStars.setdefault(system.starType, []).append(sys_id)
-            sys_status = foAI.foAIstate.systemStatus.setdefault(sys_id, {})
+            sys_status = aistate.systemStatus.setdefault(sys_id, {})
             if sys_status.get('fleetThreat', 0) > 0:
                 colony_status['colonies_under_attack'].append(sys_id)
             if sys_status.get('neighborThreat', 0) > 0:
@@ -312,7 +335,7 @@ def survey_universe():
     # tSys = universe.getSystem(sysID)
     # if not tSys: continue
     # claimedStars.setdefault( tSys.starType, []).append(sysID)
-    # foAI.foAIstate.misc['claimedStars'] = claimedStars
+    # get_aistate().misc['claimedStars'] = claimedStars
     colonization_timer.stop()
 
 
@@ -360,7 +383,8 @@ def get_colony_fleets():
     evaluated_colony_planet_ids = list(state.get_unowned_empty_planets().union(state.get_empire_outposts()) - set(
         colony_targeted_planet_ids))  # places for possible colonyBase
 
-    outpost_base_manager = foAI.foAIstate.orbital_colonization_manager
+    aistate = get_aistate()
+    outpost_base_manager = aistate.orbital_colonization_manager
 
     for pid in evaluated_colony_planet_ids:  # TODO: reorganize
         planet = universe.getPlanet(pid)
@@ -399,8 +423,8 @@ def get_colony_fleets():
 
     sorted_planets = [(planet_id, score[:2]) for planet_id, score in sorted_planets if score[0] > 0]
     # export planets for other AI modules
-    foAI.foAIstate.colonisablePlanetIDs.clear()
-    foAI.foAIstate.colonisablePlanetIDs.update(sorted_planets)
+    aistate.colonisablePlanetIDs.clear()
+    aistate.colonisablePlanetIDs.update(sorted_planets)
 
     evaluated_outpost_planets = assign_colonisation_values(evaluated_outpost_planet_ids, MissionType.OUTPOST, None)
     # if outposted planet would be in supply range, let outpost value be best of outpost value or colonization value
@@ -418,8 +442,8 @@ def get_colony_fleets():
 
     sorted_outposts = [(planet_id, score[:2]) for planet_id, score in sorted_outposts if score[0] > 0]
     # export outposts for other AI modules
-    foAI.foAIstate.colonisableOutpostIDs.clear()
-    foAI.foAIstate.colonisableOutpostIDs.update(sorted_outposts)
+    aistate.colonisableOutpostIDs.clear()
+    aistate.colonisableOutpostIDs.update(sorted_outposts)
     colonization_timer.stop_print_and_clear()
 
 
@@ -555,7 +579,7 @@ def evaluate_planet(planet_id, mission_type, spec_name, detail=None):
     if detail is None:
         detail = []
     retval = 0
-    character = foAI.foAIstate.character
+    character = get_aistate().character
     discount_multiplier = character.preferred_discount_multiplier([30.0, 40.0])
     species = fo.getSpecies(spec_name or "")  # in case None is passed as specName
     species_foci = [] and species and list(species.foci)
@@ -582,7 +606,7 @@ def evaluate_planet(planet_id, mission_type, spec_name, detail=None):
     planet = universe.getPlanet(planet_id)
     prospective_invasion_targets = [pid for pid, pscore, trp in
                                     AIstate.invasionTargets[:PriorityAI.allotted_invasion_targets()]
-                                    if pscore > MIN_INVASION_SCORE]
+                                    if pscore > InvasionAI.MIN_INVASION_SCORE]
 
     if spec_name != planet.speciesName and planet.speciesName and mission_type != MissionType.INVASION:
         return 0
@@ -626,7 +650,10 @@ def evaluate_planet(planet_id, mission_type, spec_name, detail=None):
 
     ind_tag_mod = AIDependencies.SPECIES_INDUSTRY_MODIFIER.get(get_ai_tag_grade(tag_list, "INDUSTRY"), 1.0)
     res_tag_mod = AIDependencies.SPECIES_RESEARCH_MODIFIER.get(get_ai_tag_grade(tag_list, "RESEARCH"), 1.0)
-    supply_tag_mod = AIDependencies.SPECIES_SUPPLY_MODIFIER.get(get_ai_tag_grade(tag_list, "SUPPLY"), 1)
+    if species:
+        supply_tag_mod = AIDependencies.SPECIES_SUPPLY_MODIFIER.get(get_ai_tag_grade(tag_list, "SUPPLY"), 1)
+    else:
+        supply_tag_mod = 0
 
     # determine the potential supply provided by owning this planet, and if the planet is currently populated by
     # the evaluated species, then save this supply value in a cache.
@@ -1060,7 +1087,7 @@ def revise_threat_factor(threat_factor, planet_value, system_id, min_planet_valu
 
     # the default value below for fleetThreat shouldn't come in to play, but is just to be absolutely sure we don't
     # send colony ships into some system for which we have not evaluated fleetThreat
-    system_status = foAI.foAIstate.systemStatus.get(system_id, {})
+    system_status = get_aistate().systemStatus.get(system_id, {})
     system_fleet_treat = system_status.get('fleetThreat', 1000)
     # TODO: consider taking area threat into account here.  Arguments can be made both ways, see discussion in PR2069
     sys_total_threat = system_fleet_treat + system_status.get('monsterThreat', 0) + system_status.get('planetThreat', 0)
@@ -1075,7 +1102,7 @@ def determine_colony_threat_factor(planet_id, spec_name, existing_presence):
     if not planet:  # should have been checked previously, but belt-and-suspenders
         error("Can't retrieve planet ID %d" % planet_id)
         return 0
-    sys_status = foAI.foAIstate.systemStatus.get(planet.systemID, {})
+    sys_status = get_aistate().systemStatus.get(planet.systemID, {})
     cur_best_mil_ship_rating = max(MilitaryAI.cur_best_mil_ship_rating(), 0.001)
     local_defenses = sys_status.get('all_local_defenses', 0)
     local_threat = sys_status.get('fleetThreat', 0) + sys_status.get('monsterThreat', 0)
@@ -1086,7 +1113,7 @@ def determine_colony_threat_factor(planet_id, spec_name, existing_presence):
     # TODO: evaluate detectability by specific source of area threat, also consider if the subject AI already has
     # researched techs that would grant a stealth bonus
     local_enemies = sys_status.get("enemies_nearly_supplied", [])
-    # could more conservatively base detection on foAI.foAIstate.misc.get("observed_empires")
+    # could more conservatively base detection on get_aistate().misc.get("observed_empires")
     if not EspionageAI.colony_detectable_by_empire(planet_id, spec_name, empire=local_enemies, default_result=True):
         area_threat *= 0.05
     net_threat = max(0, local_threat + area_threat - local_defenses)
@@ -1122,18 +1149,19 @@ def get_claimed_stars():
 
 def assign_colony_fleets_to_colonise():
 
-    foAI.foAIstate.orbital_colonization_manager.assign_bases_to_colonize()
+    aistate = get_aistate()
+    aistate.orbital_colonization_manager.assign_bases_to_colonize()
 
     # assign fleet targets to colonisable planets
     all_colony_fleet_ids = FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.COLONISATION)
     send_colony_ships(FleetUtilsAI.extract_fleet_ids_without_mission_types(all_colony_fleet_ids),
-                      foAI.foAIstate.colonisablePlanetIDs.items(),
+                      aistate.colonisablePlanetIDs.items(),
                       MissionType.COLONISATION)
 
     # assign fleet targets to colonisable outposts
     all_outpost_fleet_ids = FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.OUTPOST)
     send_colony_ships(FleetUtilsAI.extract_fleet_ids_without_mission_types(all_outpost_fleet_ids),
-                      foAI.foAIstate.colonisableOutpostIDs.items(),
+                      aistate.colonisableOutpostIDs.items(),
                       MissionType.OUTPOST)
 
 
@@ -1186,6 +1214,7 @@ def send_colony_ships(colony_fleet_ids, evaluated_planets, mission_type):
     print
     already_targeted = []
     # for planetID_value_pair in evaluatedPlanets:
+    aistate = get_aistate()
     while fleet_pool and potential_targets:
         target = potential_targets.pop(0)
         if target in already_targeted:
@@ -1195,10 +1224,10 @@ def send_colony_ships(colony_fleet_ids, evaluated_planets, mission_type):
             continue
         planet = universe.getPlanet(planet_id)
         sys_id = planet.systemID
-        if foAI.foAIstate.systemStatus.setdefault(sys_id, {}).setdefault('monsterThreat', 0) > 2000 \
-                or fo.currentTurn() < 20 and foAI.foAIstate.systemStatus[sys_id]['monsterThreat'] > 200:
+        if aistate.systemStatus.setdefault(sys_id, {}).setdefault('monsterThreat', 0) > 2000 \
+                or fo.currentTurn() < 20 and aistate.systemStatus[sys_id]['monsterThreat'] > 200:
             print "Skipping colonization of system %s due to Big Monster, threat %d" % (
-                universe.getSystem(sys_id), foAI.foAIstate.systemStatus[sys_id]['monsterThreat'])
+                universe.getSystem(sys_id), aistate.systemStatus[sys_id]['monsterThreat'])
             already_targeted.append(planet_id)
             continue
         this_spec = target[1][1]
@@ -1216,7 +1245,7 @@ def send_colony_ships(colony_fleet_ids, evaluated_planets, mission_type):
         fleet_id = this_fleet_list[0]
         already_targeted.append(planet_id)
         ai_target = universe_object.Planet(planet_id)
-        foAI.foAIstate.get_fleet_mission(fleet_id).set_target(mission_type, ai_target)
+        aistate.get_fleet_mission(fleet_id).set_target(mission_type, ai_target)
 
 
 def _print_empire_species_roster():
@@ -1318,7 +1347,7 @@ class OrbitalColonizationPlan(object):
             return False
         # give orders to perform the mission
         target = universe_object.Planet(self.target)
-        fleet_mission = foAI.foAIstate.get_fleet_mission(fleet_id)
+        fleet_mission = get_aistate().get_fleet_mission(fleet_id)
         fleet_mission.set_target(MissionType.ORBITAL_OUTPOST, target)
         self.fleet_id = fleet_id
         return True
@@ -1463,11 +1492,12 @@ class OrbitalColonizationManager(object):
 
         # find enqueued bases which are no longer needed and dequeue those.
         items_to_dequeue = []
+        aistate = get_aistate()
         for idx, element in enumerate(fo.getEmpire().productionQueue):
             if element.buildType != EmpireProductionTypes.BT_SHIP or element.turnsLeft == -1:
                 continue
 
-            role = foAI.foAIstate.get_ship_role(element.designID)
+            role = aistate.get_ship_role(element.designID)
             if role != ShipRoleType.BASE_OUTPOST:
                 continue
 
@@ -1553,3 +1583,28 @@ class OrbitalColonizationManager(object):
                 success = plan.assign_base(fid)
                 if success:
                     break
+
+
+def test_calc_max_pop():
+    """
+    Verify AI calculation of max population by comparing it with actual client
+    queried values.
+
+    This function may be called in debug mode in a running game and will compare
+    the actual target population meters on all planets owned by this AI with the
+    predicted maximum population. Any mismatch will be reported in chat.
+    """
+    from freeorion_tools import chat_human
+    chat_human("Verifying calculation of ColonisationAI.calc_max_pop()")
+    universe = fo.getUniverse()
+    for spec_name, planets in state.get_empire_planets_by_species().iteritems():
+        species = fo.getSpecies(spec_name)
+        for pid in planets:
+            planet = universe.getPlanet(pid)
+            detail = []
+            predicted = calc_max_pop(planet, species, detail)
+            actual = planet.initialMeterValue(fo.meterType.targetPopulation)
+            if actual != predicted:
+                error("Predicted pop of %.2f on %s but actually is %.2f; Details: %s" %
+                      (predicted, planet, actual, "\n".join(detail)))
+    chat_human("Finished verification of ColonisationAI.calc_max_pop()")

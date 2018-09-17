@@ -1,3 +1,9 @@
+freeorion (0.4.8.1+1SNAPSHOT20180916ppa1~cosmic) cosmic; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg <o01eg@yandex.ru>  Mon, 17 Sep 2018 19:38:50 +0000
+
 freeorion (0.4.7.1+1SNAPSHOT20180514ppa1~bionic) bionic; urgency=medium
 
   * Update upstream.

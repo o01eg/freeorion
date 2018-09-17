@@ -186,11 +186,9 @@ namespace {
         return ContainsArmedShips(ship_ids);
     }
 
-    void CreateNewFleetsForShips(const std::vector<std::vector<int>>& ship_id_groups,
+    void CreateNewFleetFromShips(const std::vector<int>& ship_ids,
                                  NewFleetAggression aggression)
     {
-        if (ship_id_groups.empty())
-            return;
         if (ClientPlayerIsModerator())
             return; // todo: handle moderator actions for this...
         int client_empire_id = HumanClientApp::GetApp()->EmpireID();
@@ -202,79 +200,36 @@ namespace {
         Sound::TempUISoundDisabler sound_disabler;
 
         std::set<int> original_fleet_ids;           // ids of fleets from which ships were taken
-        std::set<int> systems_containing_new_fleets;// systems where new fleets are created. should be only one entry.
-
-        // compile data about new fleets to pass to order
-        std::vector<std::string>        order_fleet_names;
-        std::vector<std::vector<int>>   order_ship_id_groups;
-        std::vector<bool>               order_ship_aggressives;
-
 
         // validate ships in each group, and generate fleet names for those ships
-        for (const std::vector<int>& ship_ids : ship_id_groups) {
-            std::vector<std::shared_ptr<const Ship>> ships = Objects().FindObjects<const Ship>(ship_ids);
-            if (ships.empty())
-                continue;
-
-            std::shared_ptr<const Ship> first_ship = *ships.begin();
-            auto system = GetSystem(first_ship->SystemID());
-            if (!system)
-                continue;
-
-            systems_containing_new_fleets.insert(system->ID());
-
-            // validate that ships are in the same system and all owned by this
-            // client's empire.
-            // also record the fleets from which ships are taken
-            for (auto& ship : ships) {
-                if (ship->SystemID() != system->ID()) {
-                    ErrorLogger() << "CreateNewFleetsForShips passed ships with inconsistent system ids";
-                    continue;
-                }
-                if (!ship->OwnedBy(client_empire_id)) {
-                    ErrorLogger() << "CreateNewFleetsForShips passed ships not owned by this client's empire";
-                    return;
-                }
-
-                original_fleet_ids.insert(ship->FleetID());
-            }
-
-            // Request a generated fleet name
-            std::string fleet_name = "";
-
-            // add entry to order data
-            order_fleet_names.push_back(fleet_name);
-            order_ship_id_groups.push_back(ship_ids);
-        }
-
-        // sanity check
-        if (   systems_containing_new_fleets.size() != 1
-            || *systems_containing_new_fleets.begin() == INVALID_OBJECT_ID)
-        {
-            ErrorLogger() << "CreateNewFleetsForShips got ships in invalid or inconsistent system(s)";
+        std::vector<std::shared_ptr<const Ship>> ships = Objects().FindObjects<const Ship>(ship_ids);
+        if (ships.empty())
             return;
-        }
 
-        // set / determine aggressiveness for new fleets
-        for (const std::vector<int>& ship_ids : order_ship_id_groups) {
-            order_ship_aggressives.push_back(AggressionForFleet(aggression, ship_ids));
+        std::shared_ptr<const Ship> first_ship = *ships.begin();
+        auto system = GetSystem(first_ship->SystemID());
+        if (!system)
+            return;
+
+        // validate that ships are in the same system and all owned by this
+        // client's empire.
+        // also record the fleets from which ships are taken
+        for (auto& ship : ships) {
+             if (ship->SystemID() != system->ID()) {
+                 ErrorLogger() << "CreateNewFleetFromShips passed ships with inconsistent system ids";
+                 continue;
+             }
+             if (!ship->OwnedBy(client_empire_id)) {
+                 ErrorLogger() << "CreateNewFleetFromShips passed ships not owned by this client's empire";
+                 return;
+             }
+
+             original_fleet_ids.insert(ship->FleetID());
         }
 
         // create new fleet with ships
         HumanClientApp::GetApp()->Orders().IssueOrder(
-            std::make_shared<NewFleetOrder>(client_empire_id, order_fleet_names,
-                                       *systems_containing_new_fleets.begin(),
-                                       order_ship_id_groups, order_ship_aggressives));
-    }
-
-    void CreateNewFleetFromShips(const std::vector<int>& ship_ids,
-                                 NewFleetAggression aggression)
-    {
-        DebugLogger() << "CreateNewFleetFromShips with " << ship_ids.size();
-        std::vector<std::vector<int>> ship_id_groups;
-        ship_id_groups.push_back(ship_ids);
-
-        CreateNewFleetsForShips(ship_id_groups, aggression);
+            std::make_shared<NewFleetOrder>(client_empire_id, "", ship_ids, AggressionForFleet(aggression, ship_ids)));
     }
 
     void CreateNewFleetFromShipsWithDesign(const std::set<int>& ship_ids,
@@ -1484,11 +1439,11 @@ void FleetDataPanel::Refresh() {
         std::vector<std::shared_ptr<GG::Texture>>   icons;
         std::vector<GG::Flags<GG::GraphicStyle>>    styles;
 
-        std::shared_ptr<GG::Texture> size_icon = FleetSizeIcon(fleet, FleetButton::FLEET_BUTTON_LARGE);
+        std::shared_ptr<GG::Texture> size_icon = FleetSizeIcon(fleet, FleetButton::SizeType::LARGE);
         icons.push_back(size_icon);
         styles.push_back(DataPanelIconStyle());
 
-        std::vector<std::shared_ptr<GG::Texture>> head_icons = FleetHeadIcons(fleet, FleetButton::FLEET_BUTTON_LARGE);
+        std::vector<std::shared_ptr<GG::Texture>> head_icons = FleetHeadIcons(fleet, FleetButton::SizeType::LARGE);
         std::copy(head_icons.begin(), head_icons.end(), std::back_inserter(icons));
         for (size_t i = 0; i < head_icons.size(); ++i)
             styles.push_back(DataPanelIconStyle());
@@ -1748,7 +1703,7 @@ void FleetDataPanel::UpdateAggressionToggle() {
         m_aggression_toggle->SetPressedGraphic  (GG::SubTexture(FleetAggressiveIcon()));
         m_aggression_toggle->SetRolloverGraphic (GG::SubTexture(FleetAutoMouseoverIcon()));
         m_aggression_toggle->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
-            FleetPassiveIcon(), UserString("FW_AUTO"), UserString("FW_AUTO_DESC")));
+            FleetAutoIcon(), UserString("FW_AUTO"), UserString("FW_AUTO_DESC")));
     }
 }
 
@@ -2677,20 +2632,18 @@ void FleetDetailPanel::ShipRightClicked(GG::ListBox::iterator it, const GG::Pt& 
     // Rename ship context item
     if (ship->OwnedBy(client_empire_id) || ClientPlayerIsModerator()) {
         auto rename_action = [ship, client_empire_id]() {
-            std::string ship_name = ship->Name();
-            auto edit_wnd = GG::Wnd::Create<CUIEditWnd>(GG::X(350), UserString("ENTER_NEW_NAME"), ship_name);
+            auto edit_wnd = GG::Wnd::Create<CUIEditWnd>(GG::X(350), UserString("ENTER_NEW_NAME"), ship->Name());
             edit_wnd->Run();
 
-            std::string new_name = edit_wnd->Result();
-
-            if (!ClientPlayerIsModerator()) {
-                if (new_name != "" && new_name != ship_name) {
-                    HumanClientApp::GetApp()->Orders().IssueOrder(
-                        std::make_shared<RenameOrder>(client_empire_id, ship->ID(), new_name));
-                }
-            } else {
+            if (ClientPlayerIsModerator())
                 // TODO: Moderator action for renaming ships
-            }
+                return;
+
+            if (!RenameOrder::Check(client_empire_id, ship->ID(), edit_wnd->Result()))
+                return;
+
+            HumanClientApp::GetApp()->Orders().IssueOrder(
+                std::make_shared<RenameOrder>(client_empire_id, ship->ID(), edit_wnd->Result()));
         };
         popup->AddMenuItem(GG::MenuItem(UserString("RENAME"), false, false, rename_action));
     }
@@ -3629,19 +3582,17 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
             auto ship_id_it = ship_ids_set.begin();
             ship_ids_set.erase(ship_id_it);
 
-            // assemble container of containers of ids of fleets to create.
-            // one ship id per vector
-            std::vector<std::vector<int>> ship_id_groups;
-            for (int ship_id : ship_ids_set) {
-                std::vector<int> single_id(1, ship_id);
-                ship_id_groups.push_back(single_id);
-            }
-
             NewFleetAggression new_aggression_setting = INVALID_FLEET_AGGRESSION;
             if (m_new_fleet_drop_target)
                 new_aggression_setting = m_new_fleet_drop_target->GetNewFleetAggression();
 
-            CreateNewFleetsForShips(ship_id_groups, new_aggression_setting);
+            // assemble container of containers of ids of fleets to create.
+            // one ship id per vector
+            for (int ship_id : ship_ids_set) {
+                CreateNewFleetFromShips(
+                    std::vector<int>{ship_id},
+                    new_aggression_setting);
+            }
         };
 
         auto split_per_design_action = [this, fleet]() {
@@ -3662,19 +3613,18 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
         || ClientPlayerIsModerator())
     {
         auto rename_action = [fleet, client_empire_id]() {
-            std::string fleet_name = fleet->Name();
-            auto edit_wnd = GG::Wnd::Create<CUIEditWnd>(GG::X(350), UserString("ENTER_NEW_NAME"), fleet_name);
+            auto edit_wnd = GG::Wnd::Create<CUIEditWnd>(GG::X(350), UserString("ENTER_NEW_NAME"), fleet->Name());
             edit_wnd->Run();
 
-            std::string new_name = edit_wnd->Result();
-
             if (ClientPlayerIsModerator())
-                return; // todo: handle moderator actions for this...
+                // TODO: handle moderator actions for this...
+                return;
 
-            if (!new_name.empty() && new_name != fleet_name) {
-                HumanClientApp::GetApp()->Orders().IssueOrder(
-                    std::make_shared<RenameOrder>(client_empire_id, fleet->ID(), new_name));
-            }
+            if (!RenameOrder::Check(client_empire_id, fleet->ID(), edit_wnd->Result()))
+                return;
+
+            HumanClientApp::GetApp()->Orders().IssueOrder(
+                std::make_shared<RenameOrder>(client_empire_id, fleet->ID(), edit_wnd->Result()));
         };
         popup->AddMenuItem(GG::MenuItem(UserString("RENAME"),                       false, false, rename_action));
         popup->AddMenuItem(GG::MenuItem(true));

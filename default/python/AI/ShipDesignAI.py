@@ -48,7 +48,7 @@ from collections import Counter, defaultdict
 from logging import debug, info, warn, error
 
 import freeOrionAIInterface as fo
-import FreeOrionAI as foAI
+from aistate_interface import get_aistate
 import AIDependencies
 import CombatRatingsAI
 import FleetUtilsAI
@@ -182,7 +182,7 @@ class ShipDesignCache(object):
         :param pid: None, int or list of ints
         """
         if pid is None:
-            planets = [pid for pid in self.hulls_for_planets]
+            planets = list(self.hulls_for_planets)
         elif isinstance(pid, int):
             planets = [pid]
         elif isinstance(pid, list):
@@ -201,7 +201,7 @@ class ShipDesignCache(object):
         :param pid: int or list of ints
         """
         if pid is None:
-            planets = [pid for pid in self.parts_for_planets]
+            planets = list(self.parts_for_planets)
         elif isinstance(pid, int):
             planets = [pid]
         elif isinstance(pid, list):
@@ -622,6 +622,7 @@ class AdditionalSpecifications(object):
         # TODO: Extend this framework according to needs of future implementations
         self.minimum_fuel = 0
         self.minimum_speed = 0
+        self.orbital = False
         self.minimum_structure = 1
         self.minimum_fighter_launch_rate = 0
         self.enemy_shields = 1  # to avoid spamming flak cannons
@@ -638,7 +639,7 @@ class AdditionalSpecifications(object):
         else:
             self.enemy_mine_dmg = 14
         self.enemy = None
-        self.update_enemy(foAI.foAIstate.get_standard_enemy())
+        self.update_enemy(get_aistate().get_standard_enemy())
 
     def update_enemy(self, enemy):
         """Read out the enemies stats and save them.
@@ -769,6 +770,8 @@ class ShipDesigner(object):
             max(0, self._minimum_structure() - (self.design_stats.structure + self._expected_organic_growth())),
             max(0, self._minimum_fighter_launch_rate() - self.design_stats.fighter_launch_rate)
         ])
+        if self._orbital() and self.design_stats.speed > 0:
+            rating = min(-100, rating - 99999)
         return rating if rating < 0 else self._rating_function()
 
     def _minimum_fuel(self):
@@ -776,6 +779,9 @@ class ShipDesigner(object):
 
     def _minimum_speed(self):
         return self.additional_specifications.minimum_speed
+
+    def _orbital(self):
+        return self.additional_specifications.orbital
 
     def _minimum_structure(self):
         return self.additional_specifications.minimum_structure
@@ -850,7 +856,8 @@ class ShipDesigner(object):
 
         # read out part stats
         shield_counter = cloak_counter = detection_counter = colonization_counter = engine_counter = 0  # to deal with Non-stacking parts
-        hangar_parts = set()
+        hangar_part_names = set()
+        bay_parts = list()
         for part in self.parts:
             self.production_cost += local_cost_cache.get(part.name, part.productionCost(fo.empireID(), self.pid))
             self.production_time = max(self.production_time,
@@ -897,16 +904,23 @@ class ShipDesigner(object):
                 else:
                     self.design_stats.stealth = 0
             elif partclass in FIGHTER_BAY:
-                self.design_stats.fighter_launch_rate += capacity
+                bay_parts.append(part)
             elif partclass in FIGHTER_HANGAR:
-                hangar_parts.add(part.name)
-                if len(hangar_parts) > 1:
+                hangar_part_names.add(part.name)
+                if len(hangar_part_names) > 1:
                     # enforce only one hangar part per design
                     self.design_stats.fighter_capacity = 0
                     self.design_stats.fighter_damage = 0
+                    self.design_stats.fighter_launch_rate = 0
                 else:
                     self.design_stats.fighter_capacity += self._calculate_hangar_capacity(part)
                     self.design_stats.fighter_damage = self._calculate_hangar_damage(part)
+
+        if len(bay_parts) > 0:
+            hangar_part_name = None
+            for hangar_part_name in hangar_part_names:
+                break
+            self.design_stats.fighter_launch_rate = self._calculate_fighter_launch_rate(bay_parts, hangar_part_name)
 
         self._apply_hardcoded_effects()
 
@@ -1552,6 +1566,14 @@ class ShipDesigner(object):
             species_modifier = 0
         return base + species_modifier + tech_bonus
 
+    def _calculate_fighter_launch_rate(self, bay_parts, hangar_part_name):
+        launch_rate = 0
+        bays_bonus = AIDependencies.HANGAR_LAUNCH_CAPACITY_MODIFIER_DICT.get(hangar_part_name, {})
+        for bay_part in bay_parts:
+            launch_rate += bay_part.capacity
+            launch_rate += bays_bonus.get(bay_part.name, 0)
+        return launch_rate
+
     def _calculate_hangar_damage(self, hangar_part, ignore_species=False):
         hangar_name = hangar_part.name
         base = hangar_part.secondaryStat
@@ -1593,7 +1615,7 @@ class MilitaryShipDesignerBaseClass(ShipDesigner):
     def _adjusted_production_cost(self):
         # as military ships are grouped up in fleets, their power rating scales quadratic in numbers.
         # To account for this, we need to maximize rating/cost_squared not rating/cost as usual.
-        exponent = foAI.foAIstate.character.warship_adjusted_production_cost_exponent()
+        exponent = get_aistate().character.warship_adjusted_production_cost_exponent()
         return super(MilitaryShipDesignerBaseClass, self)._adjusted_production_cost()**exponent
 
     def _effective_structure(self):
@@ -1769,7 +1791,7 @@ class CarrierShipDesigner(MilitaryShipDesignerBaseClass):
             current_available_parts = {}
             forbidden_hangar_parts = {part for part in hangar_parts if part != this_hangar_part}
             for slot, partlist in available_parts.iteritems():
-                current_available_parts[slot] = [part for part in partlist if part not in forbidden_hangar_parts]
+                current_available_parts[slot] = [part_ for part_ in partlist if part_ not in forbidden_hangar_parts]
             this_rating, this_partlist = ShipDesigner._filling_algorithm(self, current_available_parts)
             if verbose:
                 debug("Best rating for part %s is %.2f with partlist %s" % (this_hangar_part, this_rating, this_partlist))
@@ -1846,6 +1868,9 @@ class OrbitalTroopShipDesigner(TroopShipDesignerBaseClass):
         TroopShipDesignerBaseClass.__init__(self)
         self.additional_specifications.minimum_speed = 0
         self.additional_specifications.minimum_fuel = 0
+        # require that the orbital trooper base have zero speed, otherwise once completed it won't be recognized as an
+        # orbital trooper base
+        self.additional_specifications.orbital = True
 
 
 class StandardTroopShipDesigner(TroopShipDesignerBaseClass):

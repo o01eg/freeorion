@@ -20,7 +20,7 @@
 #include "../../network/ClientNetworking.h"
 #include "../../util/i18n.h"
 #include "../../util/LoggerWithOptionsDB.h"
-#include "../util/GameRules.h"
+#include "../../util/GameRules.h"
 #include "../../util/OptionsDB.h"
 #include "../../util/Process.h"
 #include "../../util/SaveGamePreviewUtils.h"
@@ -514,7 +514,7 @@ void HumanClientApp::NewSinglePlayerGame(bool quickstart) {
     }
 
     bool ended_with_ok = false;
-    std::vector<std::pair<std::string, std::string>> game_rules = GetGameRules().GetRulesAsStrings();
+    auto game_rules = GetGameRules().GetRulesAsStrings();
     if (!quickstart) {
         auto galaxy_wnd = GG::Wnd::Create<GalaxySetupWnd>();
         galaxy_wnd->Run();
@@ -541,11 +541,11 @@ void HumanClientApp::NewSinglePlayerGame(bool quickstart) {
 
         // GalaxySetupData
         setup_data.SetSeed(GetOptionsDB().Get<std::string>("setup.seed"));
-        setup_data.m_size = GetOptionsDB().Get<int>("setup.star.count");
-        setup_data.m_shape = GetOptionsDB().Get<Shape>("setup.galaxy.shape");
-        setup_data.m_age = GetOptionsDB().Get<GalaxySetupOption>("setup.galaxy.age");
-        setup_data.m_starlane_freq = GetOptionsDB().Get<GalaxySetupOption>("setup.starlane.frequency");
-        setup_data.m_planet_density = GetOptionsDB().Get<GalaxySetupOption>("setup.planet.density");
+        setup_data.m_size =             GetOptionsDB().Get<int>("setup.star.count");
+        setup_data.m_shape =            GetOptionsDB().Get<Shape>("setup.galaxy.shape");
+        setup_data.m_age =              GetOptionsDB().Get<GalaxySetupOption>("setup.galaxy.age");
+        setup_data.m_starlane_freq =    GetOptionsDB().Get<GalaxySetupOption>("setup.starlane.frequency");
+        setup_data.m_planet_density =   GetOptionsDB().Get<GalaxySetupOption>("setup.planet.density");
         setup_data.m_specials_freq =    GetOptionsDB().Get<GalaxySetupOption>("setup.specials.frequency");
         setup_data.m_monster_freq =     GetOptionsDB().Get<GalaxySetupOption>("setup.monster.frequency");
         setup_data.m_native_freq =      GetOptionsDB().Get<GalaxySetupOption>("setup.native.frequency");
@@ -933,6 +933,10 @@ void HumanClientApp::StartTurn() {
     m_fsm->process_event(TurnEnded());
 }
 
+void HumanClientApp::UnreadyTurn() {
+    m_networking->SendMessage(UnreadyMessage());
+}
+
 void HumanClientApp::HandleTurnPhaseUpdate(Message::TurnProgressPhase phase_id) {
     ClientApp::HandleTurnPhaseUpdate(phase_id);
 
@@ -977,6 +981,7 @@ void HumanClientApp::HandleMessage(Message& msg) {
     case Message::TURN_UPDATE:              m_fsm->process_event(TurnUpdate(msg));              break;
     case Message::TURN_PARTIAL_UPDATE:      m_fsm->process_event(TurnPartialUpdate(msg));       break;
     case Message::TURN_PROGRESS:            m_fsm->process_event(TurnProgress(msg));            break;
+    case Message::UNREADY:                  m_fsm->process_event(TurnRevoked(msg));             break;
     case Message::PLAYER_STATUS:            m_fsm->process_event(::PlayerStatus(msg));          break;
     case Message::PLAYER_CHAT:              m_fsm->process_event(PlayerChat(msg));              break;
     case Message::DIPLOMACY:                m_fsm->process_event(Diplomacy(msg));               break;
@@ -1191,8 +1196,17 @@ namespace {
             if (files_by_write_time.empty())
                 return boost::none;
 
-            // Return the newest
-            return PathToString(files_by_write_time.rbegin()->second);
+            // Return the newest file that has a valid header
+            for (auto file_it = files_by_write_time.rbegin();
+                 file_it != files_by_write_time.rend(); ++file_it)
+            {
+                auto file = file_it->second;
+                // attempt to load header
+                if (SaveFileWithValidHeader(file))
+                    return PathToString(file);  // load succeeded, return path to OK file
+            }
+
+            return boost::none;
 
         } catch (const boost::filesystem::filesystem_error& e) {
             ErrorLogger() << "File system error " << e.what() << " while finding newest autosave";
@@ -1366,9 +1380,8 @@ void HumanClientApp::ContinueSinglePlayerGame() {
         LoadSinglePlayerGame(*file);
 }
 
-bool HumanClientApp::IsLoadGameAvailable() const {
-    return bool(NewestSinglePlayerSavegame());
-}
+bool HumanClientApp::IsLoadGameAvailable() const
+{ return bool(NewestSinglePlayerSavegame()); }
 
 std::string HumanClientApp::SelectLoadFile() {
     return ClientUI::GetClientUI()->GetFilenameWithSaveFileDialog(
@@ -1389,30 +1402,6 @@ void HumanClientApp::ResetClientData(bool save_connection) {
     m_orders.Reset();
     GetCombatLogManager().Clear();
     ClearPreviousPendingSaves(m_game_saves_in_progress);
-}
-
-namespace {
-    // Ask the player if they want to wait for the save game to complete
-    // The dialog automatically closes if the save completes while the user is waiting
-    class SaveGamePendingDialog : public GG::ThreeButtonDlg {
-        public:
-        SaveGamePendingDialog(bool reset, boost::signals2::signal<void()>& save_completed_signal) :
-            GG::ThreeButtonDlg(
-                GG::X(320), GG::Y(200), UserString("SAVE_GAME_IN_PROGRESS"),
-                ClientUI::GetFont(ClientUI::Pts()+2),
-                ClientUI::WndColor(), ClientUI::WndOuterBorderColor(),
-                ClientUI::CtrlColor(), ClientUI::TextColor(), 1,
-                (reset ? UserString("ABORT_SAVE_AND_RESET") : UserString("ABORT_SAVE_AND_EXIT")))
-        {
-            save_completed_signal.connect(
-                boost::bind(&SaveGamePendingDialog::SaveCompletedHandler, this));
-        }
-
-        void SaveCompletedHandler() {
-            DebugLogger() << "SaveGamePendingDialog::SaveCompletedHandler save game completed handled.";
-            m_done = true;
-        }
-    };
 }
 
 void HumanClientApp::ResetToIntro(bool skip_savegame)
@@ -1437,7 +1426,25 @@ void HumanClientApp::ResetOrExitApp(bool reset, bool skip_savegame, int exit_cod
 
         if (!m_game_saves_in_progress.empty()) {
             DebugLogger() << "save game in progress. Checking with player.";
-            auto dlg = GG::Wnd::Create<SaveGamePendingDialog>(reset, this->SaveGamesCompletedSignal);
+            // Ask the player if they want to wait for the save game to complete
+            auto dlg = GG::GUI::GetGUI()->GetStyleFactory()->NewThreeButtonDlg(
+                GG::X(320), GG::Y(200), UserString("SAVE_GAME_IN_PROGRESS"),
+                ClientUI::GetFont(ClientUI::Pts()+2),
+                ClientUI::WndColor(), ClientUI::WndOuterBorderColor(),
+                ClientUI::CtrlColor(), ClientUI::TextColor(), 1,
+                (reset ?
+                    UserString("ABORT_SAVE_AND_RESET") :
+                    UserString("ABORT_SAVE_AND_EXIT")));
+            // The dialog automatically closes if the save completes while the
+            // user is waiting
+            this->SaveGamesCompletedSignal.connect(
+                [dlg](){
+                    DebugLogger() << "SaveGamePendingDialog::SaveCompletedHandler save game completed handled.";
+
+                    dlg->EndRun();
+                }
+            );
+
             dlg->Run();
         }
     }
@@ -1461,6 +1468,9 @@ void HumanClientApp::InitAutoTurns(int auto_turns) {
 
 void HumanClientApp::DecAutoTurns(int n)
 { InitAutoTurns(m_auto_turns - n); }
+
+void HumanClientApp::EliminateSelf()
+{ m_networking->SendMessage(EliminateSelfMessage()); }
 
 int HumanClientApp::AutoTurnsLeft() const
 { return m_auto_turns; }

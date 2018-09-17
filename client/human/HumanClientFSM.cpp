@@ -570,7 +570,10 @@ boost::statechart::result MPLobby::react(const ChatHistory& msg) {
 
     const auto& wnd = Client().GetClientUI().GetMultiPlayerLobbyWnd();
     for (const auto& elem : chat_history)
-        wnd->ChatMessage(elem.m_text, elem.m_player_name, elem.m_text_color, elem.m_timestamp);
+        wnd->ChatMessage(elem.m_text,
+                         elem.m_player_name,
+                         elem.m_player_name.empty() ? Client().GetClientUI().TextColor() : elem.m_text_color,
+                         elem.m_timestamp);
 
     return discard_event();
 }
@@ -623,12 +626,17 @@ boost::statechart::result PlayingGame::react(const PlayerChat& msg) {
 
     std::string player_name{UserString("PLAYER") + " " + std::to_string(sending_player_id)};
     GG::Clr text_color{Client().GetClientUI().TextColor()};
-    auto players = Client().Players();
-    auto player_it = players.find(sending_player_id);
-    if (player_it != players.end()) {
-        player_name = player_it->second.name;
-        if (auto empire = GetEmpire(player_it->second.empire_id))
-            text_color = empire->Color();
+    if (sending_player_id != Networking::INVALID_PLAYER_ID) {
+        auto players = Client().Players();
+        auto player_it = players.find(sending_player_id);
+        if (player_it != players.end()) {
+            player_name = player_it->second.name;
+            if (auto empire = GetEmpire(player_it->second.empire_id))
+                text_color = empire->Color();
+        }
+    } else {
+        // It's a server message. Don't set player name.
+        player_name = "";
     }
 
     Client().GetClientUI().GetMessageWnd()->HandlePlayerChatMessage(text, player_name, text_color, timestamp, Client().PlayerID());
@@ -824,6 +832,8 @@ boost::statechart::result WaitingForGameStart::react(const GameStart& msg) {
     if (is_new_game && Client().Networking().PlayerIsHost(Client().PlayerID()))
         Client().Autosave();
 
+    Client().GetClientUI().GetPlayerListWnd()->Refresh();
+
     return transit<PlayingTurn>();
 }
 
@@ -888,6 +898,15 @@ boost::statechart::result WaitingForTurnData::react(const TurnUpdate& msg) {
 
     Client().HandleTurnUpdate();
 
+    Client().GetClientUI().GetPlayerListWnd()->Refresh();
+
+    return transit<PlayingTurn>();
+}
+
+boost::statechart::result WaitingForTurnData::react(const TurnRevoked& msg) {
+    TraceLogger(FSM) << "(HumanClientFSM) PlayingGame.TurnRevoked";
+
+    // Allow player to change orders
     return transit<PlayingTurn>();
 }
 
@@ -912,7 +931,6 @@ PlayingTurn::PlayingTurn(my_context ctx) :
     Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(
         boost::io::str(FlexibleFormat(UserString("TURN_BEGIN")) % CurrentTurn()) + "\n");
     Client().GetClientUI().GetMessageWnd()->HandlePlayerStatusUpdate(Message::PLAYING_TURN, Client().PlayerID());
-    Client().GetClientUI().GetPlayerListWnd()->Refresh();
     Client().GetClientUI().GetPlayerListWnd()->HandlePlayerStatusUpdate(Message::PLAYING_TURN, Client().PlayerID());
 
     if (Client().GetApp()->GetClientType() != Networking::CLIENT_TYPE_HUMAN_OBSERVER)

@@ -53,6 +53,7 @@ public:
     /** \name Mutators */ //@{
     void HandleTurnUpdate() override;           ///< Handle background events that need starting when the turn updates
     void StartTurn() override;
+    void UnreadyTurn();                         ///< Revoke ready state of turn orders.
 
     /** \brief Handle UI and state updates with changes in turn phase. */
     void HandleTurnPhaseUpdate(Message::TurnProgressPhase phase_id) override;
@@ -94,6 +95,7 @@ public:
     std::string SelectLoadFile();       ///< Lets the user select a multiplayer save to load
     void InitAutoTurns(int auto_turns); ///< Initialize auto turn counter
     void DecAutoTurns(int n = 1);       ///< Decrease auto turn counter
+    void EliminateSelf();               ///< Resign from the game
 
     ClientUI& GetClientUI()
     { return *m_ui.get(); }

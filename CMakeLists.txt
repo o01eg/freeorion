@@ -39,7 +39,7 @@ include(GNUInstallDirs)
 include(UseCodeCoverage)
 include(TargetDependencies)
 
-set(FreeOrion_VERSION 0.4.7+)
+set(FreeOrion_VERSION 0.4.8+)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -75,9 +75,28 @@ if(WIN32)
 endif()
 
 if(APPLE)
+    set(FreeOrionSDK_VERSION 10)
+    set(FreeOrionSDK_FILE "FreeOrionSDK_${FreeOrionSDK_VERSION}_Clang-MacOSX-10.9-x86_64.tar.bz2")
+    if(NOT EXISTS "${CMAKE_BINARY_DIR}/${FreeOrionSDK_FILE}")
+    file(DOWNLOAD
+            "https://github.com/freeorion/freeorion-sdk/releases/download/v${FreeOrionSDK_VERSION}/${FreeOrionSDK_FILE}"
+            "${CMAKE_BINARY_DIR}/${FreeOrionSDK_FILE}"
+            SHOW_PROGRESS
+        )
+    endif()
+    set(FreeOrionSDK_INSTALL_VERSION 0)
+    if(EXISTS "${CMAKE_BINARY_DIR}/dep/sdkversion")
+        file(READ "${CMAKE_BINARY_DIR}/dep/sdkversion" FreeOrionSDK_INSTALL_VERSION)
+    endif()
+    if(NOT "${FreeOrionSDK_VERSION}" EQUAL "${FreeOrionSDK_INSTALL_VERSION}")
+        file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/dep")
+        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/dep")
+        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfj "${CMAKE_BINARY_DIR}/${FreeOrionSDK_FILE}" WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/dep")
+        file(WRITE "${CMAKE_BINARY_DIR}/dep/sdkversion" "${FreeOrionSDK_VERSION}")
+    endif()
     # Location of the FreeOrionSDK root
-    set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/Xcode/dep/")
-    set(CMAKE_FRAMEWORK_PATH "${CMAKE_SOURCE_DIR}/Xcode/dep/Frameworks")
+    set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/dep/")
+    set(CMAKE_FRAMEWORK_PATH "${CMAKE_BINARY_DIR}/dep/Frameworks")
     set(CMAKE_PROGRAM_PATH "${CMAKE_FRAMEWORK_PATH}/Python.framework/Versions/Current/bin")
 endif()
 
@@ -185,11 +204,17 @@ find_package(Boost ${MINIMUM_BOOST_VERSION}
         log_setup
         regex
         serialization
-        python
         signals
         system
         thread
     REQUIRED)
+if(${Boost_VERSION} GREATER 106699) # boost >= 1.67
+    find_package(Boost COMPONENTS python27 REQUIRED)
+    set(Boost_PYTHON_LIBRARY ${Boost_PYTHON27_LIBRARY})
+else()
+    find_package(Boost COMPONENTS python REQUIRED)
+endif()
+
 find_package(ZLIB REQUIRED)
 if(NOT BUILD_HEADLESS)
     find_package(Freetype REQUIRED)
@@ -243,7 +268,7 @@ set_property(DIRECTORY APPEND
         # boost::spirit relies on some API the old implementation provided.
         # This define enables the usage of the old boost::optional
         # implementation.  Boost upstream tracks this bug as #12349
-        $<$<VERSION_GREATER:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.60>:BOOST_OPTIONAL_CONFIG_USE_OLD_IMPLEMENTATION_OF_OPTIONAL>
+        $<$<AND:$<VERSION_GREATER:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.60>,$<VERSION_LESS:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.67>>:BOOST_OPTIONAL_CONFIG_USE_OLD_IMPLEMENTATION_OF_OPTIONAL>
 
         # We don't need localized output of Boost date_time and not setting
         # the define causes the inclusion of code, which contains std::tolower.
@@ -737,15 +762,19 @@ if(WIN32)
     install(
         FILES
         OpenAL32.dll
-        boost_date_time-vc90-mt-1_44.dll
-        boost_filesystem-vc90-mt-1_44.dll
-        boost_iostreams-vc90-mt-1_44.dll
-        boost_python-vc90-mt-1_44.dll
-        boost_regex-vc90-mt-1_44.dll
-        boost_serialization-vc90-mt-1_44.dll
-        boost_signals-vc90-mt-1_44.dll
-        boost_system-vc90-mt-1_44.dll
-        boost_thread-vc90-mt-1_44.dll
+        boost_chrono.dll
+        boost_date_time.dll
+        boost_filesystem.dll
+        boost_iostreams.dll
+        boost_locale.dll
+        boost_log.dll
+        boost_log_setup.dll
+        boost_python.dll
+        boost_regex.dll
+        boost_serialization.dll
+        boost_signals.dll
+        boost_system.dll
+        boost_thread.dll
         glew32.dll
         libexpat.dll
         libogg.dll

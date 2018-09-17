@@ -432,6 +432,7 @@ void ListBox::Row::SetColAlignments(const std::vector<Alignment>& aligns)
         return;
 
     m_col_alignments = aligns;
+    m_col_alignments.resize(m_cells.size(), ALIGN_NONE);
     auto&& layout = GetLayout();
     ValidateLayoutSize(layout.get(), aligns.size());
     for (std::size_t ii = 0; ii < m_cells.size(); ++ii) {
@@ -459,6 +460,7 @@ void ListBox::Row::SetColWidths(const std::vector<X>& widths)
         return;
 
     m_col_widths = widths;
+    m_col_widths.resize(m_cells.size(), GG::X(5));
     auto&& layout = GetLayout();
     ValidateLayoutSize(layout.get(), widths.size());
     for (std::size_t ii = 0; ii < m_cells.size(); ++ii) {
@@ -485,6 +487,7 @@ void ListBox::Row::SetColStretches(const std::vector<double>& stretches)
         return;
 
     m_col_stretches = stretches;
+    m_col_stretches.resize(m_cells.size(), 0.0);
     auto&& layout = GetLayout();
     ValidateLayoutSize(layout.get(), m_col_stretches.size());
     for (std::size_t ii = 0; ii < m_cells.size(); ++ii) {
@@ -523,47 +526,17 @@ bool ListBox::RowPtrIteratorLess::operator()(const ListBox::iterator& lhs, const
 
 ListBox::ListBox(Clr color, Clr interior/* = CLR_ZERO*/) :
     Control(X0, Y0, X1, Y1, INTERACTIVE),
-    m_rows(),
-    m_vscroll(),
-    m_hscroll(),
-    m_vscroll_wheel_scroll_increment(0),
-    m_hscroll_wheel_scroll_increment(0),
     m_caret(m_rows.end()),
-    m_selections(),
     m_old_sel_row(m_rows.end()),
-    m_old_sel_row_selected(false),
     m_old_rdown_row(m_rows.end()),
     m_lclick_row(m_rows.end()),
     m_rclick_row(m_rows.end()),
     m_last_row_browsed(m_rows.end()),
-    m_first_row_offset(Pt(X(BORDER_THICK), Y(BORDER_THICK))),
     m_first_row_shown(m_rows.end()),
-    m_first_col_shown(0),
-    m_num_cols(1),
-    m_col_widths(),
-    m_col_alignments(),
-    m_col_stretches(),
     m_cell_margin(DEFAULT_MARGIN),
     m_int_color(interior),
-    m_hilite_color(CLR_SHADOW),
-    m_style(LIST_NONE),
     m_header_row(Wnd::Create<Row>()),
-    m_keep_col_widths(false),
-    m_clip_cells(false),
-    m_sort_col(0),
-    m_sort_cmp(DefaultRowCmp<Row>()),
-    m_allow_drops(false),
-    m_allowed_drop_types(boost::none),
-    m_auto_scroll_during_drag_drops(true),
-    m_auto_scroll_margin(8),
-    m_auto_scrolling_up(false),
-    m_auto_scrolling_down(false),
-    m_auto_scrolling_left(false),
-    m_auto_scrolling_right(false),
-    m_auto_scroll_timer(250),
-    m_normalize_rows_on_insert(true),
-    m_manage_column_props(true),
-    m_add_padding_at_end(true)
+    m_sort_cmp(DefaultRowCmp<Row>())
 {
     Control::SetColor(color);
 }

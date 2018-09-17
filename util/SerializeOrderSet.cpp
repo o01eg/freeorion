@@ -9,15 +9,11 @@
 #include <boost/uuid/nil_generator.hpp>
 
 
-////////////////////////////////////////////////////////////
-// Galaxy Map orders
-////////////////////////////////////////////////////////////
-
-// exports for boost serialization of polymorphic Order hierarchy
 BOOST_CLASS_EXPORT(Order)
 BOOST_CLASS_VERSION(Order, 1)
 BOOST_CLASS_EXPORT(RenameOrder)
 BOOST_CLASS_EXPORT(NewFleetOrder)
+BOOST_CLASS_VERSION(NewFleetOrder, 1)
 BOOST_CLASS_EXPORT(FleetMoveOrder)
 BOOST_CLASS_EXPORT(FleetTransferOrder)
 BOOST_CLASS_EXPORT(ColonizeOrder)
@@ -37,9 +33,8 @@ template <class Archive>
 void Order::serialize(Archive& ar, const unsigned int version)
 {
     ar  & BOOST_SERIALIZATION_NVP(m_empire);
-    /** m_executed is intentionally not serialized so that orders always deserialize with m_execute
-      = false.  See class comment for OrderSet.
-      ar    & BOOST_SERIALIZATION_NVP(m_executed); */
+    // m_executed is intentionally not serialized so that orders always
+    // deserialize with m_execute = false.  See class comment for OrderSet.
     if (Archive::is_loading::value && version < 1) {
         bool dummy_executed;
         ar  & boost::serialization::make_nvp("m_executed", dummy_executed);
@@ -59,11 +54,10 @@ template <class Archive>
 void NewFleetOrder::serialize(Archive& ar, const unsigned int version)
 {
     ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(Order)
-        & BOOST_SERIALIZATION_NVP(m_fleet_names)
-        & BOOST_SERIALIZATION_NVP(m_system_id)
-        & BOOST_SERIALIZATION_NVP(m_fleet_ids)
-        & BOOST_SERIALIZATION_NVP(m_ship_id_groups)
-        & BOOST_SERIALIZATION_NVP(m_aggressives);
+        & BOOST_SERIALIZATION_NVP(m_fleet_name)
+        & BOOST_SERIALIZATION_NVP(m_fleet_id)
+        & BOOST_SERIALIZATION_NVP(m_ship_ids)
+        & BOOST_SERIALIZATION_NVP(m_aggressive);
 }
 
 template <class Archive>
@@ -71,7 +65,6 @@ void FleetMoveOrder::serialize(Archive& ar, const unsigned int version)
 {
     ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(Order)
         & BOOST_SERIALIZATION_NVP(m_fleet)
-        & BOOST_SERIALIZATION_NVP(m_start_system)
         & BOOST_SERIALIZATION_NVP(m_dest_system)
         & BOOST_SERIALIZATION_NVP(m_route);
     if (version > 0) {
@@ -81,7 +74,7 @@ void FleetMoveOrder::serialize(Archive& ar, const unsigned int version)
     }
 }
 
-BOOST_CLASS_VERSION(FleetMoveOrder, 1);
+BOOST_CLASS_VERSION(FleetMoveOrder, 2);
 
 template <class Archive>
 void FleetTransferOrder::serialize(Archive& ar, const unsigned int version)
@@ -158,9 +151,9 @@ void ShipDesignOrder::serialize(Archive& ar, const unsigned int version)
     ar  & BOOST_SERIALIZATION_NVP(m_design_id);
 
     if (version >= 1) {
-        // UUID serialization as a primitive doesn't work as expected from the documentation
-        // ar & BOOST_SERIALIZATION_NVP(m_uuid);
-        // This workaround instead serializes a string representation.
+        // Serialization of m_uuid as a primitive doesn't work as expected from
+        // the documentation.  This workaround instead serializes a string
+        // representation.
         if (Archive::is_saving::value) {
             auto string_uuid = boost::uuids::to_string(m_uuid);
             ar & BOOST_SERIALIZATION_NVP(string_uuid);

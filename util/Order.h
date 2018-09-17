@@ -43,8 +43,11 @@ public:
 
     /** \name Accessors */ //@{
     /** Returns the ID of the Empire issuing the order. */
-    int EmpireID() const
-    { return m_empire; }
+    int EmpireID() const { return m_empire; }
+
+    /** Returns true iff this order has been executed (a second execution
+      * indicates server-side execution). */
+    bool Executed() const;
     //@}
 
     /** Executes the order on the Universe and Empires.
@@ -71,15 +74,10 @@ protected:
     /** Verifies that the empire ID in this order is valid and return the Empire pointer.
      *  Throws an std::runtime_error if not valid. */
     Empire* GetValidatedEmpire() const;
-
-    /** Returns true iff this order has been executed (a second execution
-     *  indicates server-side execution). */
-    bool Executed() const;
     //@}
 
 private:
     virtual void ExecuteImpl() const = 0;
-
     virtual bool UndoImpl() const;
 
     int m_empire = ALL_EMPIRES;
@@ -113,6 +111,9 @@ public:
     { return m_name; }
     //@}
 
+    //! Returns true when the Order parameters are valid.
+    static bool Check(int empire, int object, const std::string& new_name);
+
 private:
     RenameOrder() = default;
 
@@ -144,31 +145,25 @@ class FO_COMMON_API NewFleetOrder : public Order {
 public:
     /** \name Structors */ //@{
     NewFleetOrder(int empire, const std::string& fleet_name,
-                  int system_id, const std::vector<int>& ship_ids,
-                  bool aggressive = false);
-
-    NewFleetOrder(int empire, const std::vector<std::string>& fleet_names,
-                  int system_id, const std::vector<std::vector<int>>& ship_id_groups,
-                  const std::vector<bool>& aggressives);
+                  const std::vector<int>& ship_ids,
+                  bool aggressive);
     //@}
 
     /** \name Accessors */ //@{
-    int SystemID() const
-    { return m_system_id; }
+    const std::string& FleetName() const
+    { return m_fleet_name; }
 
-    const std::vector<std::string>& FleetNames() const
-    { return m_fleet_names; }
+    const int& FleetID() const
+    { return m_fleet_id; }
 
-    const std::vector<int>& FleetIDs() const
-    { return m_fleet_ids; }
+    const std::vector<int>& ShipIDs() const
+    { return m_ship_ids; }
 
-    const std::vector<std::vector<int>>& ShipIDGroups() const
-    { return m_ship_id_groups; }
-
-    const std::vector<bool>& Aggressive() const
-    { return m_aggressives; }
+    bool Aggressive() const
+    { return m_aggressive; }
     //@}
 
+    static bool Check(int empire, const std::string& fleet_name, const std::vector<int>& ship_ids, bool aggressive);
 private:
     NewFleetOrder() = default;
 
@@ -182,12 +177,11 @@ private:
      */
     void ExecuteImpl() const override;
 
-    std::vector<std::string> m_fleet_names;
-    int m_system_id = INVALID_OBJECT_ID;
-    /** m_fleet_ids is mutable because ExecuteImpl generates the fleet ids. */
-    mutable std::vector<int> m_fleet_ids;
-    std::vector<std::vector<int>> m_ship_id_groups;
-    std::vector<bool> m_aggressives;
+    std::string m_fleet_name;
+    /** m_fleet_id is mutable because ExecuteImpl generates the fleet id. */
+    mutable int m_fleet_id;
+    std::vector<int> m_ship_ids;
+    bool m_aggressive;
 
     friend class boost::serialization::access;
     template <class Archive>
@@ -203,7 +197,7 @@ private:
 class FO_COMMON_API FleetMoveOrder : public Order {
 public:
     /** \name Structors */ //@{
-    FleetMoveOrder(int empire_id, int fleet_id, int start_system_id, int dest_system_id,
+    FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
                    bool append = false);
     //@}
 
@@ -211,11 +205,6 @@ public:
     /** Returns ID of fleet selected in this order. */
     int FleetID() const
     { return m_fleet; }
-
-    /** Returns ID of system set as the start system for this order (the system
-        the route starts from). */
-    int StartSystemID() const
-    { return m_start_system; }
 
     /* Returns ID of system set as destination for this order. */
     int DestinationSystemID() const
@@ -226,6 +215,7 @@ public:
     { return m_route; }
     //@}
 
+    static bool Check(int empire_id, int fleet_id, int dest_fleet_id, bool append = false);
 private:
     FleetMoveOrder() = default;
 
@@ -243,7 +233,6 @@ private:
     void ExecuteImpl() const override;
 
     int m_fleet = INVALID_OBJECT_ID;
-    int m_start_system = INVALID_OBJECT_ID;
     int m_dest_system = INVALID_OBJECT_ID;
     std::vector<int> m_route;
     bool m_append = false;
@@ -275,6 +264,8 @@ public:
     const std::vector<int>& Ships() const
     { return m_add_ships; }
     //@}
+
+    static bool Check(int empire_id, int dest_fleet_id, const std::vector<int>& ship_ids);
 
 private:
     FleetTransferOrder() = default;
@@ -318,6 +309,8 @@ public:
     int ShipID() const
     { return m_ship; }
     //@}
+
+    static bool Check(int empire_id, int ship_id, int planet_id);
 
 private:
     ColonizeOrder() = default;
@@ -366,6 +359,8 @@ public:
     { return m_ship; }
     //@}
 
+    static bool Check(int empire_id, int ship_id, int planet_id);
+
 private:
     InvadeOrder() = default;
 
@@ -413,6 +408,8 @@ public:
     { return m_ship; }
     //@}
 
+    static bool Check(int empire_id, int ship_id, int planet_id);
+
 private:
     BombardOrder() = default;
 
@@ -453,6 +450,8 @@ public:
     int PlanetID() const
     { return m_planet; }
     //@}
+
+    static bool Check(int empire_id, int planet_id, const std::string& focus);
 
 private:
     ChangeFocusOrder() = default;
@@ -659,6 +658,7 @@ public:
     { return m_object_id; }
     //@}
 
+    static bool Check(int empire_id, int object_id);
 private:
     ScrapOrder() = default;
 
@@ -703,6 +703,8 @@ public:
     { return m_aggression; }
     //@}
 
+    static bool Check(int empire_id, int object_id, bool aggression);
+
 private:
     AggressiveOrder() = default;
 
@@ -746,6 +748,7 @@ public:
     { return m_recipient_empire_id; }
     //@}
 
+    static bool Check(int empire_id, int object_id, int recipient_empire_id);
 private:
     GiveObjectToEmpireOrder() = default;
 

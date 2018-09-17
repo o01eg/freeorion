@@ -267,6 +267,8 @@ Balance
 CONTENT
 Content
 
+MULTIPLAYER
+Multiplayer
 
 ##
 ## Major errors
@@ -333,10 +335,22 @@ FORMAT_LIST_MANY_ITEMS
 ##
 
 PROJECT_BT_STOCKPILE
-Stockpile Transfer Units
+Stockpile Transfer
+
+PROJECT_BT_STOCKPILE_SHORT_DESC
+Transfers PP into the imperial stockpile
 
 PROJECT_BT_STOCKPILE_DESC
-Transfers PP into the imperial stockpile
+'''PP allocated to the transfer project are added to the imperial stockpile. The amount to transfer and how many times the transfer should repeat can be specified.
+
+Only PP that are produced in the same supply-group (and none from the imperial stockpile) are allocated to the stockpile transfer project.
+
+Surplus PP (PP not allocated to anything on the queue) at this or any other location will be transferred to the stockpile with or without a stockpile transfer project on the queue. PP allocated to a stockpile transfer are sent to the stockpile, even if there are additional items later in the production queue.
+
+For example: An empire wants to draw PP from the stockpile in a secondary supply-group, in which there is insufficient PP being generated. To do this, the stockpile needs to be filled from the primary supply-group. The empire has 100 PP industry in the primary supply-group, its stockpile use limit is 10 PP and it wants to have 10 PP always available in the stockpile. The build queue contains items on planets in the primary supply-group which need 120 PP per turn, so all available PP would be used.
+To be able to use the PP in the secondary supply-group, the empire adds to the top of the queue a 10x Stockpile Transfer project on a planet in the primary supply-group.
+Because the Stockpile Transfer project is above other primary supply-group projects in the build queue, it is fully funded and will increase the stockpile by 10 PP on the next turn. To ensure a continuing transfer each turn, the repetition of the project is set to 99 times.'''
+
 
 ##
 ## Predefined Ship Designs (located in default/scripting/ship_designs/)
@@ -400,13 +414,13 @@ SD_LARGE_MARK_1
 Cruiser Ms
 
 SD_LARGE_MARK1_DESC
-Cruiser equipped for long range independent action with improved lasers and armor. [[BLD_SHIPYARD_BASE_REQUIRED]]
+Cruiser equipped for long range independent action with improved weapons and armor. [[BLD_SHIPYARD_BASE_REQUIRED]]
 
 SD_LARGE_MARK_2
 Cruiser Lz
 
 SD_LARGE_MARK2_DESC
-Cruiser equipped for long range independent action . [[BLD_SHIPYARD_BASE_REQUIRED]]
+Cruiser equipped for long range independent action. [[BLD_SHIPYARD_BASE_REQUIRED]]
 
 SD_LARGE_MARK_3
 Destroyer Ms
@@ -1004,6 +1018,17 @@ Too many human players.
 ERROR_CONNECTION_WAS_REPLACED
 Your connection was replaced.
 
+ERROR_NONPLAYER_CANNOT_CONCEDE
+Only Players can concede.
+
+ERROR_CONCEDE_DISABLED
+Concede is disabled.
+
+ERROR_CONCEDE_EXCEED_COLONIES
+Cannot concede; empire controls too many colonies.
+
+ERROR_CONCEDE_LAST_HUMAN_PLAYER
+Cannot concede from a game with only one human player.
 
 ##
 ## Game Rules
@@ -1049,7 +1074,7 @@ RULE_RESEED_PRNG_SERVER
 Random Reseeding
 
 RULE_RESEED_PRNG_SERVER_DESC
-Random number generation is re-seeded frequently to give more predictable and reproducible values.
+With reseeding, replaying the same save or using the same settings and seed is not expected to produce the same random results. This is possibly preferable if players want to be sure that none of them can predict future random results based on previous random results or if a player wants to 're-roll' the results of a battle or random effect when re-playing a turn, and not get the same results as a previous attempt
 
 RULE_SHIP_SPEED_FACTOR
 Ship Speed Scaling
@@ -1097,7 +1122,7 @@ RULE_ENABLE_SUPER_TESTER
 Enable Super-Tester Takeover
 
 RULE_ENABLE_SUPER_TESTER_DESC
-Enables Super-Tester Takeover building
+Enables [[BLD_SUPER_TEST]] building
 
 RULE_STOCKPILE_IMPORT_LIMITED
 Stockpile Import Limited
@@ -1147,6 +1172,18 @@ Gas Giants Habitable size
 RULE_HABITABLE_SIZE_DESC
 Value used to adjust for [[encyclopedia POPULATION_TITLE_SHORT_DESC]] changes on a planet of this size.
 
+RULE_ALLOW_CONCEDE
+Allow Conceding
+
+RULE_ALLOW_CONCEDE_DESC
+Allows empires to concede from a game. This eliminates the empire's assets from the universe. The game continues with the remaining players.
+
+RULE_CONCEDE_COLONIES_THRESHOLD
+Maximum Colonies When Conceding
+
+RULE_CONCEDE_COLONIES_THRESHOLD_DESC
+Empires with more than this number of colonies may not concede.
+
 RULE_THRESHOLD_HUMAN_PLAYER_WIN
 Max human player winners
 
@@ -1159,6 +1196,11 @@ Only allied players win
 RULE_ONLY_ALLIANCE_WIN_DESC
 Allied players could win together if the number of human players in their alliance is no large than the maximum human player winners and there are no other human player survivors.
 
+RULE_SHIP_PART_BASED_UPKEEP
+Use part-based upkeep
+
+RULE_SHIP_PART_BASED_UPKEEP_DESC
+Calculate upkeep based on ship parts instead of ships themselves.
 
 ##
 ## Command-line and options database entries
@@ -1197,6 +1239,9 @@ Start server in hostless mode. Server accepts players in the multiplayer lobby, 
 
 OPTIONS_DB_SKIP_CHECKSUM
 Skip comparing the resource directory checksums.  This allows faster startup when client and server are on the same machine, using the same resource directory.
+
+OPTIONS_DB_TESTING
+Linux only. AI will output log to console instead file for testing purpose.
 
 OPTIONS_DB_GENERATE_CONFIG_XML
 Uses default settings, settings from any existing config.xml file, and settings given on the command line to generate a config.xml file. This will overwrite the current config.xml file, if it exists.
@@ -1319,6 +1364,9 @@ Set the minimum number of human players required to start a multiplayer game.
 
 OPTIONS_DB_MP_HUMAN_MAX
 Limit the number of human players allowed in a multiplayer game. Set to -1 for unlimited.
+
+OPTIONS_DB_COOKIES_EXPIRE
+Count of minutes after the cookie record will be considered expired.
 
 OPTIONS_DB_UI_MAIN_MENU_X
 Position of the center of the intro screen main menu, as a portion of the application's total width.
@@ -2414,6 +2462,9 @@ Load Game
 GAME_MENU_RESIGN
 Resign
 
+GAME_MENU_CONCEDE
+Concede
+
 GAME_MENU_SAVE_FILES
 Save Game Files
 
@@ -2423,6 +2474,8 @@ Button Disabled
 SAVE_DISABLED_BROWSE_TEXT
 The Save Game button is disabled, either because this is a multiplayer game in which this client is neither Host nor Moderator, or because at the time this menu was opened at least one of the AIs had not yet finished submitting its moves for the turn (indicated by a green triangle status icon just to the left of its player-type icon in the Empires window).
 
+GAME_MENU_REALLY_CONCEDE
+Confirm conceding? This empire will be removed from the game.
 
 ##
 ## Save game dialog
@@ -3034,6 +3087,10 @@ Unable to create persistent_config.xml, check log file for details.
 # %1% current turn number.
 MAP_BTN_TURN_UPDATE
 Turn %1%
+
+# %1% current turn number.
+MAP_BTN_TURN_UNREADY
+Revise Orders %1%
 
 # %1% number of frames currently displayed per second.
 MAP_INDICATOR_FPS
@@ -4053,8 +4110,8 @@ It also allows for some interaction with the [[encyclopedia MAP_WINDOW_ARTICLE_T
 The Production Summary panel shows available Production Points.
 If a system is selected, there are two columns shown. The left column shows production points across your entire empire. The right column gives production points for the selected system (but is absent if no system is selected).
 Available Points relates to the PP available for production. The right value are the maximum available production points for the selected system. This may be less than the total available when all of your empire's systems are not [[metertype METER_SUPPLY]] connected.
-Stockpile relates to the PP available for production using the imperial stockpile. Production items are enabled to draw from the Imperial Stockpile by default and have to be explicitly disabled from doing so.
-Generally, most excess PP will be wasted and lost, but a part of the excess will be stored in the imperial stockpile.
+Stockpile relates to the PP available for production using the imperial stockpile. Production items are enabled to use PP from the Imperial Stockpile by default and have to be explicitly disabled from doing so.
+PP not allocated to anything on the build queue will automatically be stored in the imperial stockpile.
 
 <u>Producible Items panel</u>
 
@@ -4302,6 +4359,9 @@ Saved
 DESIGN_WND_MONSTERS
 Monsters
 
+DESIGN_WND_ALL
+All Known
+
 DESIGN_WND_PART_PALETTE_TITLE
 Ship Parts
 
@@ -4341,6 +4401,17 @@ Duplicates Existing Design
 # %1% name of the equivalent ship design.
 DESIGN_WND_KNOWN_DETAIL
 This design is a duplicate of "%1%".
+
+DESIGN_WND_RENAME_FINISHED
+Rename Finished Design
+
+# %1% name of the equivalent ship design.
+# %2% new name of the ship design.
+DESIGN_WND_RENAME_FINISHED_DETAIL
+'''Rename Finished design from
+"%1%"
+to 
+"%2%"'''
 
 DESIGN_WND_COMPONENT_CONFLICT
 Conflicting Design
@@ -4491,14 +4562,14 @@ Statistics Test 3
 
 # %1% name of the species.
 ENC_SPECIES_PLANET_TYPE_SUITABILITY_COLUMN1
-'''%1%:	'''
+'''%1%:'''
 
 # %1% content of ENC_SPECIES_PLANET_TYPE_SUITABILITY_COLUMN1 expanded to match
 #     column width.
 # %2% the planet environment for a species.
 # %3% the planet population capacity for a species.
 ENC_SPECIES_PLANET_TYPE_SUITABILITY
-%1%	%2% (%3%)
+%1%        %2% (%3%)
 
 # %1% name of the planet.
 ENC_SUITABILITY_REPORT_POSITIVE_HEADER
@@ -5135,6 +5206,9 @@ CATEGORY_GAME_CONCEPTS
 GROWTH_ARTICLE_SHORT_DESC
 Growth
 
+STOCKPILE_ARTICLE_SHORT_DESC
+Stockpile
+
 OUTPOSTS_ARTICLE_SHORT_DESC
 Outpost
 
@@ -5330,7 +5404,7 @@ Industry
 METER_INDUSTRY_VALUE_DESC
 '''Industry represents the production and modification of physical goods. It is needed to produce buildings, space ships and other projects.
 
-The Industry of a planet can be used for any production projects of [[metertype METER_SUPPLY]] line connected planets. Unallocated Industry up to the [[metertype METER_STOCKPILE]] gets added to the Imperial Stockpile.
+The Industry of a planet can be used for any production projects of [[metertype METER_SUPPLY]] line connected planets. Unallocated Industry gets added to the Imperial Stockpile.
 
 For information on the interface, see [[encyclopedia PRODUCTION_WINDOW_ARTICLE_TITLE]].
 '''
@@ -5424,7 +5498,7 @@ METER_STOCKPILE_VALUE_LABEL
 Stockpile
 
 METER_STOCKPILE_VALUE_DESC
-'''The imperial stockpile capacity indicates an empire's ability to take in excess and to use stockpiled production points. An empire's total stockpiling capacity is the sum of all its planets' stockpile meters. The total determine how many PP can be imported into the imperial stockpile each turn, and how much can be taken out each turn to be used for production.
+'''The imperial stockpile capacity indicates an empire's ability to take in excess and to use stockpiled production points. An empire's total stockpiling capacity is the sum of all its planets' stockpile meters plus technology bonus. The total determines how many PP can be taken out of the stockpile each turn to be used for production.
 
 Species have various innate levels of stockpiling ability.'''
 
@@ -5522,13 +5596,21 @@ TRADE_FOCUS_TITLE
 Trade Focus
 
 TRADE_FOCUS_TEXT
-Trade doesn't do anything, yet. It is just a placeholder to show that more resources are planned.
+Trade doesn't do anything. It is just a placeholder to show that more resources are planned.
 
 PROTECTION_FOCUS_TITLE
 Protection Focus
 
 PROTECTION_FOCUS_TEXT
 The Protection focus represents a planet wholly focused on defending itself. [[metertype METER_TROOPS]], Planetary [[metertype METER_DEFENSE]], and Planetary [[metertype METER_SHIELD]] are doubled.
+
+STOCKPILE_FOCUS_TITLE
+Stockpile Focus
+
+STOCKPILE_FOCUS_TEXT
+'''The Stockpile focus increases the [[metertype METER_STOCKPILE]] of a planet.
+
+[[METER_STOCKPILE_VALUE_DESC]]'''
 
 ARMOR_TITLE
 Armor Plating
@@ -7788,6 +7870,32 @@ Reason for Staying:
 Volp-Uglush are now too integrated and ingrown. They now totally lack the independence and innovation needed to leave Hive and start a new colony.
 '''
 
+SP_FULVER
+Fulver
+
+SP_FULVER_GAMEPLAY_DESC
+'''Precognitive unsatisfied ants.
+Prefer [[PT_TUNDRA]]s.
+[[encyclopedia LITHIC_SPECIES_TITLE]]
+'''
+
+SP_FULVER_DESC
+'''Biology:
+The Fulvers' appearance resembles that of large nervous ants. They possess quantum computing brains which effectively allows them to predict all possible near futures making them hard to surprise in combat.
+
+Name:
+The precognition ability is also unique to the Fulvers species on the Fulver homeworld. As such a "Fulver" is "One who can see" your possible reactions.
+
+Personality:
+Fulver prefer to concentrate on their strength and prefer to live from day to day. Fulver often favor the tools and decisions which allows for the highest number of future choices. Having a bad memory and no capability for long term future prediction they are bad at long term commitments like science and building up defensive structures. Feeling locked in by the limited number of choices they are restless and unsatisfied and constantly try to overcome their situation.
+
+Reason for Leaving:
+The endless possibilites that space promises helped the Fulvers to concentrate and finally develop space-faring technology. Finally they are out going to the frontier and beyond not caring much for what they leave behind.
+
+Social Structure:
+The focus on the near future prevents the Fulver from building long-lasting structures. Knowing each others possible choices and reacting to these leads to a society which could be best described as an informal anarchy.
+'''
+
 SP_FURTHEST
 Furthest
 
@@ -8500,7 +8608,7 @@ FOCUS_STOCKPILE
 Stockpile
 
 FOCUS_STOCKPILE_DESC
-Allows stockpile techs to boost stockpile transfer
+Allows stockpile techs to boost stockpile withdrawl capacity
 
 # Focus types
 FOCUS_RESEARCH
@@ -9128,9 +9236,6 @@ local condition candidate
 DESC_VAR_ROOT_CANDIDATE
 root condition candidate
 
-DESC_STATISTIC
-statistic
-
 DESC_STAT_TYPE
 stat type
 
@@ -9377,8 +9482,17 @@ last turn a battle occurred here
 DESC_COMPLEX
 Complex Variable
 
-DESC_VARIABLE_NAME
-Variable Name
+DESC_VAR_JUMPSBETWEEN
+starlane jumps between systems containing objects with ids %1% and %2%
+
+DESC_STATISTIC
+Statistic
+
+DESC_VAR_COUNT
+the number of objects%2%
+
+DESC_VAR_IF
+0, or 1 if there is any object%2%
 
 # FOCS variable reference description text.
 # %1% reference type of the FOCS variable.
@@ -9719,7 +9833,7 @@ DESC_DESIGN_HAS_PART_NOT
 #     matching a part class.
 # %3% textual description of the ship part class.
 DESC_DESIGN_HAS_PART_CLASS
-''' that has a part of class %1%'''
+''' that contains between %1% and %2% parts of class %3%'''
 
 # %1% textual description of the lower limit for the number of ship parts
 #     matching a part class.
@@ -9727,7 +9841,7 @@ DESC_DESIGN_HAS_PART_CLASS
 #     matching a part class.
 # %3% textual description of the ship part class.
 DESC_DESIGN_HAS_PART_CLASS_NOT
-''' that does not have a part of class %1%'''
+''' that does not contain between %1% and %2% parts of class %3%'''
 
 # %1% name of the ship design.
 DESC_PREDEFINED_SHIP_DESIGN
@@ -10506,10 +10620,10 @@ PRO_PREDICTIVE_STOCKPILING_DESC
 The imperial stockpile service has a fleet for distributing raw materials to places where important projects are predicted to be started.
 This task is difficult as the service has to predict when demand happens, where it happens, what materials and goods are demanded and also who the users will be.
 
-A portion of unused PP will be transferred to the Imperial Production Stockpile, the other part going to waste.
+Unused PP will automatically be transferred to the Imperial Production Stockpile.
 An item on the production queue draws automatically on the Imperial Stockpile if the item has not been explicitly disabled from doing so.
 
-This is the basic technology for the imperial stockpile, which increases the [[metertype METER_STOCKPILE]] of stockpile-focused by 1.'''
+This is the basic technology for the imperial stockpile, which increases the [[metertype METER_STOCKPILE]] of growth-focused and stockpile-focused planets by 1.'''
 
 PRO_GENERIC_SUPPLIES
 Generic Supplies
@@ -10520,18 +10634,22 @@ PRO_GENERIC_SUPPLIES_DESC
 Generic Supplies can be created a long time before the demand occurs. Supply packages usually include bootstrap devices which construct the facilities for constructing new products from the Generic Supplies.
 Reaching this state of sophistication, Generic Supplies can be used to construct new technology products which were not available at the time the supplies were produced.
 
-This frees the imperial stockpile service from having to know which goods will be demanded exactly. Predicting the location is enough.
+This frees the imperial stockpile service from having to know which goods will be demanded exactly. Predicting the location and amount is enough.
 
-This is an upgrade technology for the imperial stockpile, which increases the [[metertype METER_STOCKPILE]] of stockpiling-focused planets by 3.'''
+This is an upgrade technology for the imperial stockpile. The [[metertype METER_STOCKPILE]] is increased by 2, plus an additional 0.01 per population, plus an additional 3 for each growth-focused and stockpiling-focused planet.
+These improvements are cumulative with that provided by [[tech PRO_PREDICTIVE_STOCKPILING]].'''
 
 PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY
 Interstellar Entanglement Factory
 
 PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY_DESC
-'''Quantum entanglement of factory control rooms allows to operate machines remotely from other star systems.
+'''Quantum entanglement of factory control rooms allows the operation of machines remotely from other star systems.
 Decoupling workforce and the means of production helps to produce just in time and increases efficiency of the imperial stockpile service.
 
-This is an upgrade technology for the imperial stockpile, which increases the [[metertype METER_STOCKPILE]] of stockpiling-focused planets by 3.'''
+This is an upgrade technology for the imperial stockpile. The [[metertype METER_STOCKPILE]] is increased by 6 plus an additional 0.02 per population.
+These improvements are cumulative with those provided by [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] and [[tech PRO_VOID_PREDICTION]].
+
+This also unlocks the [[building BLD_STOCKPILING_CENTER]] which additionally increases the [[metertype METER_STOCKPILE]] by 0.1 per industry .'''
 
 PRO_VOID_PREDICTION
 Void Prediction
@@ -10540,9 +10658,8 @@ PRO_VOID_PREDICTION_DESC
 '''While classic prediction always relies on statistical knowledge of the past, studying the chaotic wisdom of the void leads to robust predictions of first-time and freak occurences.
 For the imperial stockpile service, void prediction is the quintessential tool to deliver the right goods even before the need occurs.
 
-This is an upgrade technology for the imperial stockpile, which increases the [[metertype METER_STOCKPILE]].
-For planets focused on growth or logistics by 0.1 per population.
-For planets focused on stockpile by 0.2 per population.'''
+This is an upgrade technology for the imperial stockpile. The [[metertype METER_STOCKPILE]] is increased by 0.2 per population.
+These improvements are cumulative with those provided by [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] and [[tech PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY]].'''
 
 PRO_MICROGRAV_MAN
 Microgravity Industry
@@ -12113,10 +12230,19 @@ Species InterDesign Academy
 
 BLD_INTERSPECIES_ACADEMY_DESC
 '''Increases stockpile extraction on its planet by 10, if that planet has stockpiling focus.
-Increases research on its planet by 5, if that planet has research focus.
+Increases [[metertype METER_RESEARCH]] on its planet by 5, if that planet has research focus.
+
+Learning to design devices for use by different species is crucial for developing universally usable tools.
 
 Each empire may contain an academy on up to six planets with different species. To support an academy, a planet's population must be happy, and at least three starlane jumps away from the nearest existing academy.'''
 
+BLD_STOCKPILING_CENTER
+Imperial Entanglement Center
+
+BLD_STOCKPILING_CENTER_DESC
+'''Provides a bonus to [[metertype METER_STOCKPILE]] by 0.1 per [[metertype METER_INDUSTRY]].
+
+Instead of using factories entangled directly between the production place and the workers planet, a central hub can connect any entangled factories with any entangled factory workers. This provides great flexibility in production location.'''
 
 BLD_MEGALITH
 Megalith
@@ -12487,6 +12613,12 @@ Furthest Colony
 BLD_COL_FURTHEST_DESC
 [[BLD_COL_PART_1]] [[species SP_FURTHEST]] colony. [[BLD_COL_PART_2]] Furthest colony [[BLD_COL_PART_3]].
 
+BLD_COL_FULVER
+Fulver Colony
+
+BLD_COL_FULVER_DESC
+[[BLD_COL_PART_1]] [[species SP_FULVER]] colony. [[BLD_COL_PART_2]] Fulver colony [[BLD_COL_PART_3]].
+
 BLD_COL_GEORGE
 George Colony
 
@@ -12655,11 +12787,11 @@ PART_DESC_DIRECT_FIRE_STATS
 '''Shot [[encyclopedia DAMAGE_TITLE]]: %1%
 Shots per Attack: %2%'''
 
-# %1% ship part damage done (fighters).
-# %2% number of deployable fighters.
+# %1% number of deployable fighters.
+# %2% ship part damage done (fighters).
 PART_DESC_HANGAR_STATS
-'''Shot [[encyclopedia DAMAGE_TITLE]]: %2%
-Fighter Capacity: %1%'''
+'''Fighter Capacity: %1%
+Shot [[encyclopedia DAMAGE_TITLE]]: %2%'''
 
 
 ##
@@ -14261,19 +14393,19 @@ NO_STOCKPILE_DESC
 −−	No [[metertype METER_STOCKPILE]]
 
 BAD_STOCKPILE_DESC
-−	Bad [[metertype METER_STOCKPILE]]: 50%
+−	Bad [[metertype METER_STOCKPILE]]: +0.01 per population
 
 AVERAGE_STOCKPILE_DESC
-'''	Average [[metertype METER_STOCKPILE]]: 100%'''
+'''	Average [[metertype METER_STOCKPILE]]: +0.02 per population'''
 
 GOOD_STOCKPILE_DESC
-+	Good [[metertype METER_STOCKPILE]]: 300%
++	Good [[metertype METER_STOCKPILE]]: +0.06 per population
 
 GREAT_STOCKPILE_DESC
-++	Great [[metertype METER_STOCKPILE]]: 1000%
+++	Great [[metertype METER_STOCKPILE]]: +0.2 per population
 
 ULTIMATE_STOCKPILE_DESC
-+++	Ultimate [[metertype METER_STOCKPILE]]: 1500%
++++	Ultimate [[metertype METER_STOCKPILE]]: +0.3 per population
 
 GOOD_SHIP_SHIELD_DESC
 +	Good ship [[metertype METER_SHIELD]]: +1
@@ -14299,8 +14431,23 @@ FAST_COLONIZATION_DESC
 SLOW_COLONIZATION_DESC
 −	Slow Colonization: +20% time to build colonies
 
+NO_FUEL_DESC
+−−−	Ships have zero [[metertype METER_FUEL]]
+
 BAD_FUEL_DESC
-−	Bad maximum [[metertype METER_FUEL]]: - 1
+−	Bad Maximum [[metertype METER_FUEL]]: -1
+
+AVERAGE_FUEL_DESC
+	Average Maximum [[metertype METER_FUEL]]: +0
+
+GOOD_FUEL_DESC
++	Good Maximum [[metertype METER_FUEL]]: +1
+
+GREAT_FUEL_DESC
+++	Great Maximum [[metertype METER_FUEL]]: +2
+
+ULTIMATE_FUEL_DESC
++++	Bad Maximum [[metertype METER_FUEL]]: +3
 
 GREAT_ASTEROID_INDUSTRY_DESC
 +	Good Asteroid Miners: + 0.2 [[metertype METER_INDUSTRY]] per population when Industry Focused in systems with owned asteroid belts.
@@ -14491,6 +14638,36 @@ ULTIMATE_STOCKPILE_LABEL
 
 # %1% FIXME
 # %2% FIXME
+NO_FUEL_LABEL
+%2% No Fuel
+
+# %1% FIXME
+# %2% FIXME
+BAD_FUEL_LABEL
+%2% Bad Maximum Fuel
+
+# %1% FIXME
+# %2% FIXME
+AVERAGE_FUEL_LABEL
+%2% Average Maximum Fuel
+
+# %1% FIXME
+# %2% FIXME
+GOOD_FUEL_LABEL
+%2% Good Maximum Fuel
+
+# %1% FIXME
+# %2% FIXME
+GREAT_FUEL_LABEL
+%2% Great Maximum Fuel
+
+# %1% FIXME
+# %2% FIXME
+ULTIMATE_FUEL_LABEL
+%2% Ultimate Maximum Fuel
+
+# %1% FIXME
+# %2% FIXME
 BAD_TROOPS_LABEL
 %2% Bad Ground Troops
 
@@ -14569,8 +14746,26 @@ Homeworld
 CAPITAL_LABEL
 Capital
 
+BLD_STOCKPILING_CENTER_LABEL
+Imperial Entanglement Center
+
 CONCENTRATION_CAMPS_LABEL
 Concentration Camps
+
+GENERIC_SUPPLIES_FIXED_BONUS_LABEL
+[[PRO_GENERIC_SUPPLIES]] fixed bonus
+
+GENERIC_SUPPLIES_FOCUS_BONUS_LABEL
+[[PRO_GENERIC_SUPPLIES]] focus-based bonus
+
+GENERIC_SUPPLIES_POPULATION_BONUS_LABEL
+[[PRO_GENERIC_SUPPLIES]] population-based bonus
+
+INTERSTELLAR_ENTANGLEMENT_FACTORY_POPULATION_BONUS_LABEL
+Interstellar Entanglement Factory population based bonus
+
+INTERSTELLAR_ENTANGLEMENT_FACTORY_FIXED_BONUS_LABEL
+Interstellar Entanglement Factory fixed bonus
 
 ORBITAL_HAB_LABEL
 Orbital Habitation
@@ -14597,7 +14792,7 @@ FOCUS_PROTECTION_LABEL
 Protection Focus
 
 GASEOUS_LABEL
-Bad Environment
+Gas Giant Environment
 
 XENOPHOBIC_LABEL_SELF
 Xenophobic Frenzy (other species nearby)
@@ -14647,6 +14842,8 @@ Flux Interference
 SPATIAL_FLUX_BONUS
 Flux Drive Bonus
 
+DYING_POPULATION_LABEL
+Dying Population
 
 ##
 ## Tags

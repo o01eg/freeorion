@@ -1,18 +1,18 @@
 import freeOrionAIInterface as fo  # pylint: disable=import-error
-import FreeOrionAI as foAI
 import AIstate
-import universe_object
-from EnumsAI import MissionType
+import CombatRatingsAI
 import EspionageAI
 import FleetUtilsAI
-from CombatRatingsAI import combine_ratings
+import InvasionAI
 import PlanetUtilsAI
 import PriorityAI
 import ProductionAI
-import CombatRatingsAI
-from freeorion_tools import cache_by_turn
+import universe_object
 from AIDependencies import INVALID_ID
-from InvasionAI import MIN_INVASION_SCORE
+from aistate_interface import get_aistate
+from CombatRatingsAI import combine_ratings, combine_ratings_list, rating_difference
+from EnumsAI import MissionType
+from freeorion_tools import cache_by_turn
 from turn_state import state
 
 MinThreat = 10  # the minimum threat level that will be ascribed to an unknown threat capable of killing scouts
@@ -36,10 +36,11 @@ def cur_best_mil_ship_rating(include_designs=False):
         return best_rating
     best_rating = 0.001
     universe = fo.getUniverse()
+    aistate = get_aistate()
     for fleet_id in FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.MILITARY):
         fleet = universe.getFleet(fleet_id)
         for ship_id in fleet.shipIDs:
-            ship_rating = CombatRatingsAI.ShipCombatStats(ship_id).get_rating(enemy_stats=foAI.foAIstate.get_standard_enemy())
+            ship_rating = CombatRatingsAI.ShipCombatStats(ship_id).get_rating(enemy_stats=aistate.get_standard_enemy())
             best_rating = max(best_rating, ship_rating)
     _best_ship_rating_cache[current_turn] = best_rating
     if include_designs:
@@ -89,8 +90,9 @@ def get_preferred_max_military_portion_for_single_battle():
 
 def try_again(mil_fleet_ids, try_reset=False, thisround=""):
     """Clear targets and orders for all specified fleets then call get_military_fleets again."""
+    aistate = get_aistate()
     for fid in mil_fleet_ids:
-        mission = foAI.foAIstate.get_fleet_mission(fid)
+        mission = aistate.get_fleet_mission(fid)
         mission.clear_fleet_orders()
         mission.clear_target()
     get_military_fleets(try_reset=try_reset, thisround=thisround)
@@ -101,6 +103,7 @@ def avail_mil_needing_repair(mil_fleet_ids, split_ships=False, on_mission=False,
     fleet_buckets = [[], []]
     universe = fo.getUniverse()
     cutoff = [repair_limit, 0.25][on_mission]
+    aistate = get_aistate()
     for fleet_id in mil_fleet_ids:
         fleet = universe.getFleet(fleet_id)
         ship_buckets = [[], []]
@@ -116,10 +119,10 @@ def avail_mil_needing_repair(mil_fleet_ids, split_ships=False, on_mission=False,
             ships_max_health[ship_ok] += max_struc
         this_sys_id = fleet.systemID if fleet.nextSystemID == INVALID_ID else fleet.nextSystemID
         fleet_ok = (sum(ships_cur_health) >= cutoff * sum(ships_max_health))
-        local_status = foAI.foAIstate.systemStatus.get(this_sys_id, {})
+        local_status = aistate.systemStatus.get(this_sys_id, {})
         my_local_rating = combine_ratings(local_status.get('mydefenses', {}).get('overall', 0), local_status.get('myFleetRating', 0))
         my_local_rating_vs_planets = local_status.get('myFleetRatingVsPlanets', 0)
-        combat_trigger = local_status.get('fleetThreat', 0) or local_status.get('monsterThreat', 0)
+        combat_trigger = bool(local_status.get('fleetThreat', 0) or local_status.get('monsterThreat', 0))
         if not combat_trigger and local_status.get('planetThreat', 0):
             universe = fo.getUniverse()
             system = universe.getSystem(this_sys_id)
@@ -143,7 +146,7 @@ def avail_mil_needing_repair(mil_fleet_ids, split_ships=False, on_mission=False,
                     print "Fleet %d at %s needed present for combat, but is damaged and deemed unsafe to remain." % (fleet_id, universe.getSystem(fleet.systemID))
                     print "\t my_local_rating: %.1f ; threat: %.1f" % (my_local_rating, local_status.get('totalThreat', 0))
                 print "Selecting fleet %d at %s for repair" % (fleet_id, universe.getSystem(fleet.systemID))
-        fleet_buckets[fleet_ok or safely_needed].append(fleet_id)
+        fleet_buckets[fleet_ok or bool(safely_needed)].append(fleet_id)
     return fleet_buckets
 
 
@@ -163,7 +166,7 @@ class AllocationHelper(object):
         self._remaining_rating = available_rating
 
         self.threat_bias = 0.
-        self.safety_factor = foAI.foAIstate.character.military_safety_factor()
+        self.safety_factor = get_aistate().character.military_safety_factor()
 
         self.already_assigned_rating = dict(already_assigned_rating)
         self.already_assigned_rating_vs_planets = dict(already_assigned_rating_vs_planets)
@@ -183,7 +186,10 @@ class AllocationHelper(object):
         tup = (sys_id, min_rating, min_rating_vs_planets, take_any, max_rating)
         self.allocations.append(tup)
         self.allocation_by_groups.setdefault(group, []).append(tup)
-        self._remaining_rating -= min_rating
+        if self._remaining_rating <= min_rating:
+            self._remaining_rating = 0
+        else:
+            self._remaining_rating = rating_difference(self._remaining_rating, min_rating)
 
 
 class Allocator(object):
@@ -395,7 +401,7 @@ class Allocator(object):
         return get_system_planetary_threat(self.sys_id)
 
     def _enemy_ship_count(self):
-        return foAI.foAIstate.systemStatus.get(self.sys_id, {}).get('enemy_ship_count', 0.)
+        return get_aistate().systemStatus.get(self.sys_id, {}).get('enemy_ship_count', 0.)
 
 
 class CapitalDefenseAllocator(Allocator):
@@ -521,7 +527,7 @@ class LocalThreatAllocator(Allocator):
 
     def _calculate_threat(self):
 
-        systems_status = foAI.foAIstate.systemStatus.get(self.sys_id, {})
+        systems_status = get_aistate().systemStatus.get(self.sys_id, {})
         threat = self.safety_factor * CombatRatingsAI.combine_ratings(systems_status.get('fleetThreat', 0),
                                                                       systems_status.get('monsterThreat', 0) +
                                                                       + systems_status.get('planetThreat', 0))
@@ -576,40 +582,40 @@ class ReleaseMilitaryException(Exception):
 
 # TODO: May want to move these functions into AIstate class
 def get_system_local_threat(sys_id):
-    return foAI.foAIstate.systemStatus.get(sys_id, {}).get('totalThreat', 0.)
+    return get_aistate().systemStatus.get(sys_id, {}).get('totalThreat', 0.)
 
 
 def get_system_jump2_threat(sys_id):
-    return foAI.foAIstate.systemStatus.get(sys_id, {}).get('jump2_threat', 0.)
+    return get_aistate().systemStatus.get(sys_id, {}).get('jump2_threat', 0.)
 
 
 def get_system_neighbor_support(sys_id):
-    return foAI.foAIstate.systemStatus.get(sys_id, {}).get('my_neighbor_rating', 0.)
+    return get_aistate().systemStatus.get(sys_id, {}).get('my_neighbor_rating', 0.)
 
 
 def get_system_neighbor_threat(sys_id):
-    return foAI.foAIstate.systemStatus.get(sys_id, {}).get('neighborThreat', 0.)
+    return get_aistate().systemStatus.get(sys_id, {}).get('neighborThreat', 0.)
 
 
 def get_system_regional_threat(sys_id):
-    return foAI.foAIstate.systemStatus.get(sys_id, {}).get('regional_threat', 0.)
+    return get_aistate().systemStatus.get(sys_id, {}).get('regional_threat', 0.)
 
 
 def get_system_planetary_threat(sys_id):
-    return foAI.foAIstate.systemStatus.get(sys_id, {}).get('planetThreat', 0.)
+    return get_aistate().systemStatus.get(sys_id, {}).get('planetThreat', 0.)
 
 
 def enemy_rating():
     """:rtype: float"""
-    return foAI.foAIstate.empire_standard_enemy_rating
+    return get_aistate().empire_standard_enemy_rating
 
 
 def get_my_defense_rating_in_system(sys_id):
-    return foAI.foAIstate.systemStatus.get(sys_id, {}).get('mydefenses', {}).get('overall')
+    return get_aistate().systemStatus.get(sys_id, {}).get('mydefenses', {}).get('overall')
 
 
 def enemies_nearly_supplying_system(sys_id):
-    return foAI.foAIstate.systemStatus.get(sys_id, {}).get('enemies_nearly_supplied', [])
+    return get_aistate().systemStatus.get(sys_id, {}).get('enemies_nearly_supplied', [])
 
 
 def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
@@ -629,7 +635,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
 
     mil_fleets_ids = list(FleetUtilsAI.extract_fleet_ids_without_mission_types(all_military_fleet_ids))
     mil_needing_repair_ids, mil_fleets_ids = avail_mil_needing_repair(mil_fleets_ids, split_ships=True)
-    avail_mil_rating = sum(map(CombatRatingsAI.get_fleet_rating, mil_fleets_ids))
+    avail_mil_rating = combine_ratings_list(map(CombatRatingsAI.get_fleet_rating, mil_fleets_ids))
 
     if not mil_fleets_ids:
         if "Main" in thisround:
@@ -639,14 +645,15 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
     # for each system, get total rating of fleets assigned to it
     already_assigned_rating = {}
     already_assigned_rating_vs_planets = {}
-    systems_status = foAI.foAIstate.systemStatus
+    aistate = get_aistate()
+    systems_status = aistate.systemStatus
     enemy_sup_factor = {}  # enemy supply
     for sys_id in universe.systemIDs:
         already_assigned_rating[sys_id] = 0
         already_assigned_rating_vs_planets[sys_id] = 0
         enemy_sup_factor[sys_id] = min(2, len(systems_status.get(sys_id, {}).get('enemies_nearly_supplied', [])))
     for fleet_id in [fid for fid in all_military_fleet_ids if fid not in mil_fleets_ids]:
-        ai_fleet_mission = foAI.foAIstate.get_fleet_mission(fleet_id)
+        ai_fleet_mission = aistate.get_fleet_mission(fleet_id)
         if not ai_fleet_mission.target:  # shouldn't really be possible
             continue
         last_sys = ai_fleet_mission.target.get_system().id  # will count this fleet as assigned to last system in target list  # TODO last_sys or target sys?
@@ -676,7 +683,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
         capital_sys_id = None  # unless we can find one to use
         system_dict = {}
         for fleet_id in all_military_fleet_ids:
-            status = foAI.foAIstate.fleetStatus.get(fleet_id, None)
+            status = aistate.fleetStatus.get(fleet_id, None)
             if status is not None:
                 system_id = status['sysID']
                 if not list(universe.getSystem(system_id).planetIDs):
@@ -687,23 +694,24 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
             capital_sys_id = ranked_systems[-1][-1]
         else:
             try:
-                capital_sys_id = foAI.foAIstate.fleetStatus.items()[0][1]['sysID']
+                capital_sys_id = aistate.fleetStatus.items()[0][1]['sysID']
             except:
                 pass
 
     num_targets = max(10, PriorityAI.allotted_outpost_targets)
     top_target_planets = ([pid for pid, pscore, trp in AIstate.invasionTargets[:PriorityAI.allotted_invasion_targets()]
-                           if pscore > MIN_INVASION_SCORE] +
-                          [pid for pid, (pscore, spec) in foAI.foAIstate.colonisableOutpostIDs.items()[:num_targets]
-                           if pscore > MIN_INVASION_SCORE] +
-                          [pid for pid, (pscore, spec) in foAI.foAIstate.colonisablePlanetIDs.items()[:num_targets]
-                           if pscore > MIN_INVASION_SCORE])
-    top_target_planets.extend(foAI.foAIstate.qualifyingTroopBaseTargets.keys())
+                           if pscore > InvasionAI.MIN_INVASION_SCORE] +
+                          [pid for pid, (pscore, spec) in aistate.colonisableOutpostIDs.items()[:num_targets]
+                           if pscore > InvasionAI.MIN_INVASION_SCORE] +
+                          [pid for pid, (pscore, spec) in aistate.colonisablePlanetIDs.items()[:num_targets]
+                           if pscore > InvasionAI.MIN_INVASION_SCORE])
+    top_target_planets.extend(aistate.qualifyingTroopBaseTargets.keys())
+
     base_col_target_systems = PlanetUtilsAI.get_systems(top_target_planets)
     top_target_systems = []
     for sys_id in AIstate.invasionTargetedSystemIDs + base_col_target_systems:
         if sys_id not in top_target_systems:
-            if foAI.foAIstate.systemStatus[sys_id]['totalThreat'] > get_tot_mil_rating():
+            if aistate.systemStatus[sys_id]['totalThreat'] > get_tot_mil_rating():
                 continue
             top_target_systems.append(sys_id)  # doing this rather than set, to preserve order
 
@@ -750,7 +758,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
         # TODO Exploration targets
 
         # border protections
-        visible_system_ids = foAI.foAIstate.visInteriorSystemIDs | foAI.foAIstate.visBorderSystemIDs
+        visible_system_ids = aistate.visInteriorSystemIDs | aistate.visBorderSystemIDs
         accessible_system_ids = ([sys_id for sys_id in visible_system_ids if
                                  universe.systemsConnected(sys_id, home_system_id, empire_id)]
                                  if home_system_id != INVALID_ID else [])
@@ -774,7 +782,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
                 break
             this_alloc = min(remaining_mil_rating, max_alloc)
             new_allocations.append((sid, this_alloc, alloc, rvp, take_any))
-            remaining_mil_rating -= this_alloc
+            remaining_mil_rating = rating_difference(remaining_mil_rating,  this_alloc)
 
     base_allocs = set()
     # for lower priority categories, first assign base_alloc around to all, then top up as available
@@ -782,8 +790,9 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
         for sid, alloc, rvp, take_any, max_alloc in allocation_helper.allocation_by_groups.get(cat, []):
             if remaining_mil_rating <= 0:
                 break
+            alloc = min(remaining_mil_rating, alloc)
             base_allocs.add(sid)
-            remaining_mil_rating -= alloc
+            remaining_mil_rating = rating_difference(remaining_mil_rating,  alloc)
     for cat in ['otherTargets', 'accessibleTargets', 'exploreTargets']:
         for sid, alloc, rvp, take_any, max_alloc in allocation_helper.allocation_by_groups.get(cat, []):
             if sid not in base_allocs:
@@ -791,9 +800,10 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
             if remaining_mil_rating <= 0:
                 new_allocations.append((sid, alloc, alloc, rvp, take_any))
             else:
-                new_rating = min(remaining_mil_rating + alloc, max_alloc)
+                local_max_avail = combine_ratings(remaining_mil_rating, alloc)
+                new_rating = min(local_max_avail, max_alloc)
                 new_allocations.append((sid, new_rating, alloc, rvp, take_any))
-                remaining_mil_rating -= (new_rating - alloc)
+                remaining_mil_rating = rating_difference(local_max_avail, new_rating)
 
     if "Main" in thisround:
         _military_allocations = new_allocations
@@ -812,8 +822,9 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
         allocations = []
 
     doing_main = (use_fleet_id_list is None)
+    aistate = get_aistate()
     if doing_main:
-        foAI.foAIstate.misc['ReassignedFleetMissions'] = []
+        aistate.misc['ReassignedFleetMissions'] = []
         base_defense_ids = FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.ORBITAL_DEFENSE)
         unassigned_base_defense_ids = FleetUtilsAI.extract_fleet_ids_without_mission_types(base_defense_ids)
         for fleet_id in unassigned_base_defense_ids:
@@ -822,7 +833,7 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
                 continue
             sys_id = fleet.systemID
             target = universe_object.System(sys_id)
-            fleet_mission = foAI.foAIstate.get_fleet_mission(fleet_id)
+            fleet_mission = aistate.get_fleet_mission(fleet_id)
             fleet_mission.clear_fleet_orders()
             fleet_mission.clear_target()
             mission_type = MissionType.ORBITAL_DEFENSE
@@ -871,7 +882,7 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
         target = universe_object.System(sys_id)
         for fleet_id in these_fleets:
             fo.issueAggressionOrder(fleet_id, True)
-            fleet_mission = foAI.foAIstate.get_fleet_mission(fleet_id)
+            fleet_mission = aistate.get_fleet_mission(fleet_id)
             fleet_mission.clear_fleet_orders()
             fleet_mission.clear_target()
             if sys_id in set(AIstate.colonyTargetedSystemIDs + AIstate.outpostTargetedSystemIDs + AIstate.invasionTargetedSystemIDs):
@@ -881,7 +892,7 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
             fleet_mission.set_target(mission_type, target)
             fleet_mission.generate_fleet_orders()
             if not doing_main:
-                foAI.foAIstate.misc.setdefault('ReassignedFleetMissions', []).append(fleet_mission)
+                aistate.misc.setdefault('ReassignedFleetMissions', []).append(fleet_mission)
 
     if doing_main:
         print "---------------------------------"
@@ -927,14 +938,15 @@ def get_concentrated_tot_mil_rating():
 
 @cache_by_turn
 def get_num_military_ships():
-    return sum(foAI.foAIstate.fleetStatus.get(fid, {}).get('nships', 0)
+    fleet_status = get_aistate().fleetStatus
+    return sum(fleet_status.get(fid, {}).get('nships', 0)
                for fid in FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.MILITARY))
 
 
 def get_military_fleets_with_target_system(target_system_id):
     military_mission_types = [MissionType.MILITARY,  MissionType.SECURE]
     found_fleets = []
-    for fleet_mission in foAI.foAIstate.get_fleet_missions_with_any_mission_types(military_mission_types):
+    for fleet_mission in get_aistate().get_fleet_missions_with_any_mission_types(military_mission_types):
         if fleet_mission.target and fleet_mission.target.id == target_system_id:
             found_fleets.append(fleet_mission.fleet.id)
     return found_fleets

@@ -554,6 +554,7 @@ MPLobby::MPLobby(my_context c) :
     ClockSeed();
     ServerApp& server = Server();
     server.InitializePython();
+    server.LoadChatHistory();
     const SpeciesManager& sm = GetSpeciesManager();
     if (server.IsHostless()) {
         DebugLogger(FSM) << "(ServerFSM) MPLobby. Fill MPLobby data from the previous game.";
@@ -852,7 +853,9 @@ sc::result MPLobby::react(const JoinGame& msg) {
 
         bool collision = true;
         std::size_t t = 1;
-        while (t <= m_lobby_data->m_players.size() + 1 && collision) {
+        while (collision &&
+               t <= m_lobby_data->m_players.size() + server.Networking().GetCookiesSize() + 1)
+        {
             collision = false;
             roles.Clear();
             if (!server.IsAvailableName(new_player_name) || server.IsAuthRequiredOrFillRoles(new_player_name, roles)) {
@@ -1004,9 +1007,10 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
         }
 
         bool has_collision = false;
-        // check for color and names
+        // check for color, names, and IDs
         std::set<GG::Clr> psd_colors;
         std::set<std::string> psd_names;
+        std::set<int> psd_ids;
         for (auto& player : incoming_lobby_data.m_players) {
             if (psd_colors.count(player.second.m_empire_color) ||
                 psd_names.count(player.second.m_empire_name) ||
@@ -1020,17 +1024,29 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 psd_names.emplace(player.second.m_player_name);
             }
 
-            // check for roles and client types
-            const auto& player_it = server.Networking().GetPlayer(player.first);
-            if (player_it != server.Networking().established_end()) {
-
-                if ((player.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER &&
-                    !(*player_it)->HasAuthRole(Networking::ROLE_CLIENT_TYPE_PLAYER)) ||
-                    (player.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_MODERATOR &&
-                    !(*player_it)->HasAuthRole(Networking::ROLE_CLIENT_TYPE_MODERATOR)) ||
-                    (player.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_OBSERVER &&
-                    !(*player_it)->HasAuthRole(Networking::ROLE_CLIENT_TYPE_OBSERVER)))
-                {
+            if (player.first != Networking::INVALID_PLAYER_ID) {
+                const auto& player_it = server.Networking().GetPlayer(player.first);
+                if (player_it != server.Networking().established_end()) {
+                    // check for roles and client types
+                    if ((player.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER &&
+                        !(*player_it)->HasAuthRole(Networking::ROLE_CLIENT_TYPE_PLAYER)) ||
+                        (player.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_MODERATOR &&
+                        !(*player_it)->HasAuthRole(Networking::ROLE_CLIENT_TYPE_MODERATOR)) ||
+                        (player.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_OBSERVER &&
+                        !(*player_it)->HasAuthRole(Networking::ROLE_CLIENT_TYPE_OBSERVER)))
+                    {
+                        has_collision = true;
+                        break;
+                    }
+                } else {
+                    // player wasn't found
+                    // don't allow "ghost" records
+                    has_collision = true;
+                    break;
+                }
+                if (!psd_ids.insert(player.first).second) {
+                    // player id was already used
+                    // don't allow ID collision
                     has_collision = true;
                     break;
                 }
@@ -1237,7 +1253,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
     }
 
     ValidateClientLimits();
-    if(m_lobby_data->m_start_locked) {
+    if (m_lobby_data->m_start_locked) {
         has_important_changes = true;
     }
 
@@ -1257,11 +1273,45 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             psd.second.m_save_game_empire_id = ALL_EMPIRES;
         }
 
+        // remove all AIs from current lobby data,
+        // so that when the save is loaded no AI state as appropriate,
+        // without having potential extra AIs lingering from the previous
+        m_lobby_data->m_players.remove_if([](const std::pair<int, PlayerSetupData>& plr) {
+            return plr.second.m_client_type == Networking::CLIENT_TYPE_AI_PLAYER;
+        });
+        m_ai_next_index = 1;
+
         // refresh save game empire data
         boost::filesystem::path save_dir(GetServerSaveDir());
+        std::vector<PlayerSaveHeaderData> player_save_header_data;
         try {
             LoadEmpireSaveGameData((save_dir / m_lobby_data->m_save_game).string(),
-                                   m_lobby_data->m_save_game_empire_data);
+                                   m_lobby_data->m_save_game_empire_data,
+                                   player_save_header_data);
+
+            // read all AI players from save game and add them into current lobby
+            // with appropriate empire's data
+            for (const auto& pshd : player_save_header_data) {
+                if (pshd.m_client_type != Networking::CLIENT_TYPE_AI_PLAYER)
+                    continue;
+                const auto& empire_data_it = m_lobby_data->m_save_game_empire_data.find(pshd.m_empire_id);
+                if (empire_data_it == m_lobby_data->m_save_game_empire_data.end())
+                    continue;
+
+                PlayerSetupData player_setup_data;
+                player_setup_data.m_player_id =     Networking::INVALID_PLAYER_ID;
+                // don't use original names to prevent collision with manually added AIs
+                player_setup_data.m_player_name =   UserString("AI_PLAYER") + "_" + std::to_string(m_ai_next_index++);
+                player_setup_data.m_client_type =   Networking::CLIENT_TYPE_AI_PLAYER;
+                player_setup_data.m_save_game_empire_id = pshd.m_empire_id;
+                player_setup_data.m_empire_name =   empire_data_it->second.m_empire_name;
+                player_setup_data.m_empire_color =  empire_data_it->second.m_color;
+                if (m_lobby_data->m_seed != "")
+                    player_setup_data.m_starting_species_name = GetSpeciesManager().RandomPlayableSpeciesName();
+                else
+                    player_setup_data.m_starting_species_name = GetSpeciesManager().SequentialPlayableSpeciesName(m_ai_next_index);
+                m_lobby_data->m_players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
+            }
         } catch (const std::exception&) {
             // inform player who attempted to change the save file that there was a problem
             sender->SendMessage(ErrorMessage(UserStringNop("UNABLE_TO_READ_SAVE_FILE"), false));
@@ -1582,10 +1632,15 @@ WaitingForSPGameJoiners::WaitingForSPGameJoiners(my_context c) :
 
     server.InitializePython();
 
-    if (server.m_python_server.IsPythonRunning() && m_single_player_setup_data->m_new_game) {
-        // For SP game start inializaing while waiting for AI callbacks.
-        DebugLogger(FSM) << "Initializing new SP game...";
-        server.NewSPGameInit(*m_single_player_setup_data);
+    // if Python fails to initialize, don't bother initializing SP game.
+    // Still check start conditions, which will abort the server after all
+    // the expected players have joined if Python is (still) not initialized.
+    if (server.m_python_server.IsPythonRunning()) {
+        if (m_single_player_setup_data->m_new_game) {
+            // For new SP game start inializaing while waiting for AI callbacks.
+            DebugLogger(FSM) << "Initializing new SP game...";
+            server.NewSPGameInit(*m_single_player_setup_data);
+        }
     }
 
     // force immediate check if all expected AIs are present, so that the FSM
@@ -1850,7 +1905,9 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
 
             bool collision = true;
             std::size_t t = 1;
-            while (t <= m_lobby_data->m_players.size() + 1 && collision) {
+            while (collision &&
+                   t <= m_lobby_data->m_players.size() + server.Networking().GetCookiesSize() + 1)
+            {
                 collision = false;
                 roles.Clear();
                 if (!server.IsAvailableName(new_player_name) || server.IsAuthRequiredOrFillRoles(new_player_name, roles)) {
@@ -2237,7 +2294,9 @@ sc::result PlayingGame::react(const JoinGame& msg) {
 
         bool collision = true;
         std::size_t t = 1;
-        while (t <= server.Networking().NumEstablishedPlayers() + 1 && collision) {
+        while (collision &&
+               t <= server.Networking().NumEstablishedPlayers() + server.Networking().GetCookiesSize() + 1)
+        {
             collision = false;
             roles.Clear();
             if (!server.IsAvailableName(new_player_name) || server.IsAuthRequiredOrFillRoles(new_player_name, roles)) {
@@ -2296,6 +2355,30 @@ sc::result PlayingGame::react(const AuthResponse& msg) {
 
     EstablishPlayer(player_connection, player_name, client_type,
                     player_connection->ClientVersionString(), roles);
+
+    return discard_event();
+}
+
+sc::result PlayingGame::react(const EliminateSelf& msg) {
+    DebugLogger(FSM) << "(ServerFSM) PlayingGame::EliminateSelf message received";
+    ServerApp& server = Server();
+    const PlayerConnectionPtr& player_connection = msg.m_player_connection;
+
+    if (player_connection->GetClientType() != Networking::CLIENT_TYPE_HUMAN_PLAYER
+        && player_connection->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER)
+    {
+        WarnLogger(FSM) << "(ServerFSM) PlayingGame::EliminateSelf non-player connection " << player_connection->PlayerID();
+        player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_NONPLAYER_CANNOT_CONCEDE"), true));
+        server.Networking().Disconnect(player_connection);
+        return discard_event();
+    }
+
+    if (!server.EliminatePlayer(player_connection)) {
+        WarnLogger(FSM) << "(ServerFSM) PlayingGame::EliminateSelf player " << player_connection->PlayerID() << " not allowed to concede";
+        return discard_event();
+    }
+
+    server.Networking().Disconnect(player_connection);
 
     return discard_event();
 }
@@ -2419,6 +2502,44 @@ sc::result WaitingForTurnEnd::react(const TurnOrders& msg) {
     return discard_event();
 }
 
+sc::result WaitingForTurnEnd::react(const RevokeReadiness& msg) {
+    TraceLogger(FSM) << "(ServerFSM) WaitingForTurnEnd.RevokeReadiness";
+    ServerApp& server = Server();
+    const PlayerConnectionPtr& sender = msg.m_player_connection;
+
+    int player_id = sender->PlayerID();
+    Networking::ClientType client_type = sender->GetClientType();
+
+    if (client_type == Networking::CLIENT_TYPE_AI_PLAYER ||
+        client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER)
+    {
+        // store empire orders and resume waiting for more
+        const Empire* empire = GetEmpire(server.PlayerEmpireID(player_id));
+        if (!empire) {
+            ErrorLogger(FSM) << "WaitingForTurnEnd::react(RevokeReadiness&) couldn't get empire for player with id:" << player_id;
+            sender->SendMessage(ErrorMessage(UserStringNop("EMPIRE_NOT_FOUND_CANT_HANDLE_ORDERS"), false));
+            return discard_event();
+        }
+
+        TraceLogger(FSM) << "WaitingForTurnEnd.RevokeReadiness : Revoke orders from player " << player_id;
+
+        server.RevokeEmpireTurnReadyness(empire->EmpireID());
+    }
+
+    // inform player who just submitted of acknowledge revoking status.
+    sender->SendMessage(msg.m_message);
+
+    // notify other player that this player revoked orders
+    for (auto player_it = server.m_networking.established_begin();
+         player_it != server.m_networking.established_end(); ++player_it)
+    {
+        PlayerConnectionPtr player_ctn = *player_it;
+        player_ctn->SendMessage(PlayerStatusMessage(player_id, Message::PLAYING_TURN));
+    }
+
+    return discard_event();
+}
+
 sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
     TraceLogger(FSM) << "(ServerFSM) WaitingForTurnEnd.CheckTurnEndConditions";
     ServerApp& server = Server();
@@ -2522,7 +2643,7 @@ sc::result WaitingForSaveData::react(const ClientSaveData& msg) {
     // received orders are ignored if there are already existing orders?
     std::shared_ptr<OrderSet> order_set;
     if (const Empire* empire = GetEmpire(server.PlayerEmpireID(player_id))) {
-        const auto& existing_orders = server.m_turn_sequence[empire->EmpireID()];
+        const auto& existing_orders = server.m_turn_sequence[empire->EmpireID()].second;
         if (existing_orders)
             order_set.reset(new OrderSet(*existing_orders));
         else

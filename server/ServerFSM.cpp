@@ -2138,8 +2138,13 @@ sc::result PlayingGame::react(const PlayerChat& msg) {
 
     if (sender->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER) {
         GG::Clr text_color(255, 255, 255, 0);
-        if (auto empire = GetEmpire(sender->PlayerID()))
+        if (auto empire = GetEmpire(sender->PlayerID())) {
             text_color = empire->Color();
+        } else {
+            WarnLogger(FSM) << "(ServerFSM) PlayingGame.PlayerChat not found empire for player "
+                    << sender->PlayerID() << " player name \""
+                    << sender->PlayerName() << "\"";
+        }
 
         server.PushChatMessage(data, sender->PlayerName(), text_color, timestamp);
     }

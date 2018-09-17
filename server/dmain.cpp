@@ -60,6 +60,7 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
         GetOptionsDB().Add<int>("network.server.ai.max", UserStringNop("OPTIONS_DB_MP_AI_MAX"), -1, Validator<int>());
         GetOptionsDB().Add<int>("network.server.human.min", UserStringNop("OPTIONS_DB_MP_HUMAN_MIN"), 0, Validator<int>());
         GetOptionsDB().Add<int>("network.server.human.max", UserStringNop("OPTIONS_DB_MP_HUMAN_MAX"), -1, Validator<int>());
+        GetOptionsDB().Add<bool>("network.server.publish-statistics", UserStringNop("OPTIONS_DB_PUBLISH_STATISTICS"), true, Validator<bool>());
 
         // if config.xml and persistent_config.xml are present, read and set options entries
         GetOptionsDB().SetFromFile(GetConfigPath(), FreeOrionVersionString());

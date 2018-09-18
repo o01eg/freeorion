@@ -130,6 +130,7 @@ struct ServerFSM : sc::state_machine<ServerFSM, Idle> {
     void unconsumed_event(const sc::event_base &event);
     ServerApp& Server();
     void HandleNonLobbyDisconnection(const Disconnection& d);
+    void UpdateIngameLobby();
     bool EstablishPlayer(const PlayerConnectionPtr& player_connection,
                          const std::string& player_name,
                          Networking::ClientType client_type,
@@ -299,7 +300,8 @@ struct PlayingGame : sc::state<PlayingGame, ServerFSM, WaitingForTurnEnd> {
         sc::custom_reaction<JoinGame>,
         sc::custom_reaction<AuthResponse>,
         sc::custom_reaction<EliminateSelf>,
-        sc::custom_reaction<Error>
+        sc::custom_reaction<Error>,
+        sc::custom_reaction<LobbyUpdate>
     > reactions;
 
     PlayingGame(my_context c);
@@ -315,6 +317,7 @@ struct PlayingGame : sc::state<PlayingGame, ServerFSM, WaitingForTurnEnd> {
     sc::result react(const AuthResponse& msg);
     sc::result react(const EliminateSelf& msg);
     sc::result react(const Error& msg);
+    sc::result react(const LobbyUpdate& msg);
 
     void EstablishPlayer(const PlayerConnectionPtr& player_connection,
                          const std::string& player_name,

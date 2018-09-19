@@ -1,3 +1,12 @@
+freeorion (0.4.8-2) unstable; urgency=medium
+
+  * Allow players to chat if some player hasn't yet responded client save data.
+  * Add option to enable/disable empire statistics.
+  * Set alpha of default text color to 1.0 to show them in chat.
+  * Ingame multiplayer lobby.
+
+ -- O01eg <o01eg@yandex.ru>  Wed, 19 Sep 2018 18:39:32 +0000
+
 freeorion (0.4.8-1) unstable; urgency=medium
 
   * Fix segfault in second game.

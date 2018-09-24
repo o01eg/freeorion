@@ -586,13 +586,6 @@ MPLobby::MPLobby(my_context c) :
                     player_setup_data.m_starting_species_name = sm.SequentialPlayableSpeciesName(player_id);
 
                 m_lobby_data->m_players.push_back({player_id, player_setup_data});
-
-                player_connection->SetAuthRoles({
-                                Networking::ROLE_CLIENT_TYPE_MODERATOR,
-                                Networking::ROLE_CLIENT_TYPE_PLAYER,
-                                Networking::ROLE_CLIENT_TYPE_OBSERVER,
-                                Networking::ROLE_GALAXY_SETUP
-                                });
             } else if (player_connection->GetClientType() == Networking::CLIENT_TYPE_AI_PLAYER) {
                 if (m_ai_next_index <= max_ai || max_ai < 0) {
                     PlayerSetupData player_setup_data;
@@ -1410,7 +1403,7 @@ sc::result MPLobby::react(const PlayerChat& msg) {
     boost::posix_time::ptime timestamp = boost::posix_time::second_clock::universal_time();
 
     if (sender->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER) {
-        GG::Clr text_color(255, 255, 255, 0);
+        GG::Clr text_color(255, 255, 255, 255);
         for (const auto& player : m_lobby_data->m_players) {
             if (player.first != sender->PlayerID())
                 continue;
@@ -2097,7 +2090,7 @@ sc::result PlayingGame::react(const PlayerChat& msg) {
     boost::posix_time::ptime timestamp = boost::posix_time::second_clock::universal_time();
 
     if (sender->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER) {
-        GG::Clr text_color(255, 255, 255, 0);
+        GG::Clr text_color(255, 255, 255, 255);
         if (auto empire = GetEmpire(sender->PlayerID()))
             text_color = empire->Color();
 
@@ -2605,8 +2598,12 @@ WaitingForSaveData::WaitingForSaveData(my_context c) :
     {
         PlayerConnectionPtr player = *player_it;
         int player_id = player->PlayerID();
-        player->SendMessage(ServerSaveGameDataRequestMessage());
-        m_needed_reponses.insert(player_id);
+        if (const Empire* empire = GetEmpire(server.PlayerEmpireID(player_id))) {
+            if (!empire->Eliminated()) {
+                player->SendMessage(ServerSaveGameDataRequestMessage());
+                m_needed_reponses.insert(player_id);
+            }
+        }
     }
 }
 

@@ -2940,9 +2940,6 @@ void Universe::UpdateStatRecords() {
     }
 }
 
-void Universe::SetStatRecordsPublish(bool publish /*= true*/)
-{ m_stat_records_publish = publish; }
-
 void Universe::GetShipDesignsToSerialize(ShipDesignMap& designs_to_serialize,
                                          int encoding_empire) const
 {

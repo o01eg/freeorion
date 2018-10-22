@@ -1375,7 +1375,6 @@ void Source::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_co
 {
     if (parent_context.source)
         condition_non_targets.push_back(parent_context.source);
-    //DebugLogger() << "ConditionBase::Eval will check at most one source object rather than " << Objects().NumObjects() << " total objects";
 }
 
 unsigned int Source::GetCheckSum() const {
@@ -1407,6 +1406,14 @@ bool RootCandidate::Match(const ScriptingContext& local_context) const {
         return false;
     return local_context.condition_root_candidate == local_context.condition_local_candidate;
 }
+
+void RootCandidate::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
+                                                      ObjectSet& condition_non_targets) const
+{
+    if (parent_context.condition_root_candidate)
+        condition_non_targets.push_back(parent_context.condition_root_candidate);
+}
+
 
 unsigned int RootCandidate::GetCheckSum() const {
     unsigned int retval{0};
@@ -1852,6 +1859,7 @@ namespace {
             case OBJ_PLANET:
             case OBJ_SYSTEM:
             case OBJ_FIELD:
+            case OBJ_FIGHTER:
                 return candidate->ObjectType() == m_type;
                 break;
             case OBJ_POP_CENTER:
@@ -1917,6 +1925,7 @@ std::string Type::Dump(unsigned short ntabs) const {
         case OBJ_PROD_CENTER: retval += "ProductionCenter\n"; break;
         case OBJ_SYSTEM:      retval += "System\n"; break;
         case OBJ_FIELD:       retval += "Field\n"; break;
+        case OBJ_FIGHTER:     retval += "Fighter\n"; break;
         default: retval += "?\n"; break;
         }
     } else {
@@ -1968,6 +1977,7 @@ void Type::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_cont
             case OBJ_SYSTEM:
                 AddSystemSet(condition_non_targets);
                 break;
+            case OBJ_FIGHTER:   // shouldn't exist outside of combat as a separate object
             default: 
                 found_type = false;
                 break;

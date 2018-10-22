@@ -122,6 +122,7 @@
 #define TOKEN_SEQ_4                             \
     (Field)                                     \
     (FieldType)                                 \
+    (Fighter)                                   \
     (FighterBay)                                \
     (FighterHangar)                             \
     (FighterWeapon)                             \
@@ -199,6 +200,7 @@
     (LastTurnBattleHere)                        \
     (LastTurnConquered)                         \
     (LastTurnResupplied)                        \
+    (LaunchedFrom)                              \
     (LeastHappySpecies)                         \
     (LocalCandidate)                            \
     (Location)                                  \

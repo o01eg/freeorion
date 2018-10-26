@@ -205,7 +205,6 @@ find_package(Boost ${MINIMUM_BOOST_VERSION}
         log_setup
         regex
         serialization
-        signals
         system
         thread
     REQUIRED)

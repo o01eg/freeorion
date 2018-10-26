@@ -1,3 +1,9 @@
+freeorion (0.4.8-3) unstable; urgency=medium
+
+  * Remove signals dependency.
+
+ -- O01eg <o01eg@yandex.ru>  Fri, 26 Oct 2018 14:20:12 +0000
+
 freeorion (0.4.8-2) unstable; urgency=medium
 
   * Allow players to chat if some player hasn't yet responded client save data.

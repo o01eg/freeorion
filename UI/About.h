@@ -5,12 +5,11 @@
 #include "CUIWnd.h"
 
 //! This is a screen showing license and vision
-class About : public CUIWnd {
+class About final : public CUIWnd {
 public:
     //! \name Structors
     //!@{
     About();
-    ~About();
     //!@}
     void CompleteConstruction() override;
 
@@ -25,7 +24,7 @@ public:
 private:
     void DoLayout();
 
-    std::shared_ptr<GG::Button>     m_done_btn;     //!< Done button
+    std::shared_ptr<GG::Button>     m_done;         //!< Done button
     std::shared_ptr<GG::Button>     m_license;      //!< License button
     std::shared_ptr<GG::Button>     m_vision;       //!< Vision button
     std::shared_ptr<GG::MultiEdit>  m_info;         //!< Displays the license or vision information

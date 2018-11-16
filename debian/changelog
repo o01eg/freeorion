@@ -1,8 +1,10 @@
 freeorion (0.4.8-3) unstable; urgency=medium
 
   * Remove signals dependency.
+  * Fix saving empire statistics.
+  * Fix hang on eliminating empire.
 
- -- O01eg <o01eg@yandex.ru>  Fri, 26 Oct 2018 14:20:12 +0000
+ -- O01eg <o01eg@yandex.ru>  Fri, 16 Nov 2018 13:17:07 +0000
 
 freeorion (0.4.8-2) unstable; urgency=medium
 

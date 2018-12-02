@@ -47,9 +47,13 @@ class ChatHistoryProvider:
                     text_color / 256 / 256 % 256,
                     text_color / 256 % 256,
                     text_color % 256
-                    FROM chat_history
-                    ORDER BY ts
-                    LIMIT 1000 """)
+                    FROM (
+                        SELECT *
+                        FROM chat_history
+                        ORDER BY ts DESC
+                        LIMIT 500
+                    ) d
+                    ORDER BY ts""")
                 for r in curs:
                     info("Color: %i %i %i %i" % (r[3], r[4], r[5], r[6]))
                     c = fo.GGColor(r[3], r[4], r[5], r[6])

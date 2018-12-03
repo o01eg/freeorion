@@ -812,6 +812,8 @@ void ExtractGameStartMessageData(const Message& msg, bool& single_player_game, i
                    >> BOOST_SERIALIZATION_NVP(current_turn);
                 GetUniverse().EncodingEmpire() = empire_id;
 
+                DebugLogger() << "ExtractGameStartMessage binary empire_id = " << empire_id;
+
                 boost::timer deserialize_timer;
                 ia >> BOOST_SERIALIZATION_NVP(empires);
                 DebugLogger() << "ExtractGameStartMessage empire deserialization time " << (deserialize_timer.elapsed() * 1000.0);
@@ -843,6 +845,7 @@ void ExtractGameStartMessageData(const Message& msg, bool& single_player_game, i
                 ia >> BOOST_SERIALIZATION_NVP(galaxy_setup_data);
             } catch (...) {
                 try_xml = true;
+                DebugLogger() << "ExtractGameStartMessage binary failed";
             }
         } else {
             try_xml = true;
@@ -856,6 +859,8 @@ void ExtractGameStartMessageData(const Message& msg, bool& single_player_game, i
                >> BOOST_SERIALIZATION_NVP(empire_id)
                >> BOOST_SERIALIZATION_NVP(current_turn);
             GetUniverse().EncodingEmpire() = empire_id;
+
+            DebugLogger() << "ExtractGameStartMessage xml empire_id = " << empire_id;
 
             boost::timer deserialize_timer;
             ia >> BOOST_SERIALIZATION_NVP(empires);

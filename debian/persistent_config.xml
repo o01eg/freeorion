@@ -16,6 +16,9 @@
     <min>2</min>
    </human>
    <publish-statistics>0</publish-statistics>
+   <binary>
+    <enabled>0</enabled>
+   </binary>
   </server>
  </network>
 </XMLDoc>

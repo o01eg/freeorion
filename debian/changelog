@@ -1,3 +1,12 @@
+freeorion (0.4.8-4) unstable; urgency=medium
+
+  * Fix crash on incorrect turn orders.
+  * Reduce chat history to 500 messages.
+  * Forced disable for binary serialization.
+  * Don't send private information about empires.
+
+ -- O01eg <o01eg@yandex.ru>  Mon, 03 Dec 2018 18:20:23 +0000
+
 freeorion (0.4.8-3) unstable; urgency=medium
 
   * Remove signals dependency.

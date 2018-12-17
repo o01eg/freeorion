@@ -1,4 +1,10 @@
-freeorion (0.4.8.1+1SNAPSHOT20181209ppa1~xenial) xenial; urgency=medium
+freeorion (0.4.8.1+1SNAPSHOT20181217ppa1~xenial) xenial; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg <o01eg@yandex.ru>  Mon, 17 Dec 2018 18:53:06 +0000
+
+freeorion (0.4.8.1+1SNAPSHOT20181209ppa1~cosmic) cosmic; urgency=medium
 
   * Update upstream.
 

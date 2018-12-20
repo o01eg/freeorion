@@ -21,4 +21,9 @@
    </binary>
   </server>
  </network>
+ <logging>
+  <sources>
+   <network>trace</network>
+  </sources>
+ </logging>
 </XMLDoc>

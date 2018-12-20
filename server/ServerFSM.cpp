@@ -244,7 +244,7 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
 
     if (player_connection->IsEstablished()) {
         // update cookie expire date
-        // so player could reconnect within 15 minutes
+        // so player could reconnect within 120 minutes
         m_server.Networking().UpdateCookie(player_connection->Cookie());
 
         int id = player_connection->PlayerID();
@@ -791,7 +791,7 @@ sc::result MPLobby::react(const Disconnection& d) {
     }
     if (player_was_in_lobby) {
         // update cookie's expire date
-        // so player could reconnect within 15 minutes
+        // so player could reconnect within 120 minutes
         Server().Networking().UpdateCookie(player_connection->Cookie());
 
         // drop ready flag as player list changed

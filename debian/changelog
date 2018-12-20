@@ -1,3 +1,10 @@
+freeorion (0.4.8-5) unstable; urgency=medium
+
+  * Fix 2 hours cookies timeout.
+  * More logs about network.
+
+ -- O01eg <o01eg@yandex.ru>  Thu, 20 Dec 2018 16:45:39 +0000
+
 freeorion (0.4.8-4) unstable; urgency=medium
 
   * Fix crash on incorrect turn orders.

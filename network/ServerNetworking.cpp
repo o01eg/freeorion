@@ -215,8 +215,7 @@ void PlayerConnection::SetCookie(boost::uuids::uuid cookie)
 const std::string& PlayerConnection::ClientVersionString() const
 { return m_client_version_string; }
 
-bool PlayerConnection::ClientVersionStringMatchesThisServer() const
-{
+bool PlayerConnection::ClientVersionStringMatchesThisServer() const {
     return GetOptionsDB().Get<bool>("network.server.binary.enabled")
         && !m_client_version_string.empty()
         && m_client_version_string == FreeOrionVersionString();

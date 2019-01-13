@@ -1,3 +1,10 @@
+freeorion (0.4.8-6) unstable; urgency=medium
+
+  * Fix lobby freeze on loading game.
+  * Show known research of enemies' empires.
+
+ -- O01eg <o01eg@yandex.ru>  Sun, 13 Jan 2019 16:21:36 +0000
+
 freeorion (0.4.8-5) unstable; urgency=medium
 
   * Fix 2 hours cookies timeout.

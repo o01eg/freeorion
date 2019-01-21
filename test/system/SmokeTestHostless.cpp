@@ -134,6 +134,7 @@ BOOST_AUTO_TEST_CASE(hostless_server) {
     }
 
     for (unsigned int g = 0; g < num_games; ++g) {
+        m_game_started = false;
         BOOST_TEST_MESSAGE("Game " << g << ". Connecting to server...");
 
         BOOST_REQUIRE(ConnectToServer("localhost"));
@@ -179,7 +180,7 @@ BOOST_AUTO_TEST_CASE(hostless_server) {
             BOOST_REQUIRE(ProcessMessages(start_time, MAX_WAITING_SEC));
         }
 
-        BOOST_REQUIRE_EQUAL(m_ai_players.size(), num_AIs);
+        BOOST_REQUIRE_EQUAL(m_ai_empires.size(), num_AIs);
 
         start_time = boost::posix_time::microsec_clock::local_time();
         while (! m_ai_waiting.empty()) {
@@ -190,7 +191,7 @@ BOOST_AUTO_TEST_CASE(hostless_server) {
             SendTurnOrders();
 
             m_turn_done = false;
-            m_ai_waiting = m_ai_players;
+            m_ai_waiting = m_ai_empires;
 
             BOOST_TEST_MESSAGE("Turn done. Waiting server for update...");
             start_time = boost::posix_time::microsec_clock::local_time();

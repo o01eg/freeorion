@@ -1,3 +1,9 @@
+freeorion (0.4.8-7) unstable; urgency=medium
+
+  * Fix crash on disconnecting.
+
+ -- O01eg <o01eg@yandex.ru>  Mon, 21 Jan 2019 04:03:13 +0000
+
 freeorion (0.4.8-6) unstable; urgency=medium
 
   * Fix lobby freeze on loading game.

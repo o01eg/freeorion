@@ -21,7 +21,7 @@ public:
     //! \name Mutators //@{
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
 
-    void            HandlePlayerStatusUpdate(Message::PlayerStatus player_status, int about_player_id);
+    void            HandleEmpireStatusUpdate(Message::PlayerStatus player_status, int about_empire_id);
     void            Update();
     void            Refresh();
     void            Clear();
@@ -42,6 +42,7 @@ private:
     void            PlayerDoubleClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
     void            PlayerRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
     int             PlayerInRow(GG::ListBox::iterator it) const;
+    int             EmpireInRow(GG::ListBox::iterator it) const;
 
     std::shared_ptr<PlayerListBox>  m_player_list;
 };

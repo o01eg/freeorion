@@ -55,6 +55,8 @@ jobs:
       before_cache:
         - ccache --clean
         - ccache --show-stats
+        - export HOMEBREW_LOGS="~/homebrew-logs"
+        - export HOMEBREW_TEMP="~/homebrew-temp"
     - stage: test
       os: linux
       language: python

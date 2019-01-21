@@ -4,9 +4,10 @@ import cProfile
 import logging
 import pstats
 import re
-import sys
+import traceback
 from collections import Mapping
 from functools import wraps
+from logging import debug, error
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
 
@@ -140,7 +141,7 @@ def chat_human(message):
     human_id = [x for x in fo.allPlayerIDs() if fo.playerIsHost(x)][0]
     message = str(message)
     fo.sendChatMessage(human_id, message)
-    print "Chat Message to human: %s" % remove_tags(message)
+    debug("Chat Message to human: %s", remove_tags(message))
 
 
 def cache_by_session(func):
@@ -213,7 +214,7 @@ def tuple_to_dict(tup):
         try:
             return {k: v for k, v in [tup]}
         except:
-            print >> sys.stderr, "Can't convert tuple_list to dict: ", tup
+            error("Can't convert tuple_list to dict: %s", tup)
             return {}
 
 
@@ -229,7 +230,7 @@ def profile(func):
         sortby = 'cumulative'
         ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
         ps.print_stats()
-        print s.getvalue()
+        debug(s.getvalue())
         return retval
 
     return wrapper
@@ -274,7 +275,7 @@ class ReadOnlyDict(Mapping):
             try:
                 hash(v)
             except TypeError:
-                print >> sys.stderr, "Tried to store a non-hashable value in ReadOnlyDict"
+                error("Tried to store a non-hashable value in ReadOnlyDict")
                 raise
 
     def __getitem__(self, item):
@@ -347,3 +348,28 @@ def with_log_level(log_level):
 
         return wrapper
     return decorator
+
+
+def assertion_fails(cond, msg="", logger=logging.error):
+    """
+    Check if condition fails and if so, log a traceback but raise no Exception.
+
+    This is a useful functions for generic sanity checks and may be used to
+    replace manual error logging with more context provided by the traceback.
+
+    :param bool cond: condition to be asserted
+    :param str msg: additional info to be logged
+    :param func logger: may be used to override default log level (error)
+    :return: True if assertion failed, otherwise false.
+    """
+    if cond:
+        return False
+
+    if msg:
+        header = "Assertion failed: %s." % msg
+    else:
+        header = "Assertion failed!"
+    stack = traceback.extract_stack()[:-1]  # do not log this function
+    logger("%s Traceback (most recent call last): %s", header,
+           ''.join(traceback.format_list(stack)))
+    return True

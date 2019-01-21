@@ -270,6 +270,7 @@ Content
 MULTIPLAYER
 Multiplayer
 
+
 ##
 ## Major errors
 ##
@@ -329,6 +330,7 @@ FORMAT_LIST_10_ITEMS
 
 FORMAT_LIST_MANY_ITEMS
 %1% %2%, %3%, %4%, %5%, %6%, %7%, %8%, %9%, %10%, %11% ...
+
 
 ##
 ## Build Projects
@@ -1030,6 +1032,9 @@ Cannot concede; empire controls too many colonies.
 ERROR_CONCEDE_LAST_HUMAN_PLAYER
 Cannot concede from a game with only one human player.
 
+ERROR_INCOMPATIBLE_VERSION
+Server cannot properly read messages from your client, most likely due to incompatible game versions.
+
 ##
 ## Game Rules
 ##
@@ -1074,7 +1079,7 @@ RULE_RESEED_PRNG_SERVER
 Random Reseeding
 
 RULE_RESEED_PRNG_SERVER_DESC
-With reseeding, replaying the same save or using the same settings and seed is not expected to produce the same random results. This is possibly preferable if players want to be sure that none of them can predict future random results based on previous random results or if a player wants to 're-roll' the results of a battle or random effect when re-playing a turn, and not get the same results as a previous attempt
+With reseeding, replaying the same save or using the same settings and seed is not expected to produce the same random results. This is possibly preferable if players want to be sure that none of them can predict future random results based on previous random results or if a player wants to 're-roll' the results of a battle or random effect when re-playing a turn, and not get the same results as a previous attempt.
 
 RULE_SHIP_SPEED_FACTOR
 Ship Speed Scaling
@@ -1201,6 +1206,7 @@ Use part-based upkeep
 
 RULE_SHIP_PART_BASED_UPKEEP_DESC
 Calculate upkeep based on ship parts instead of ships themselves.
+
 
 ##
 ## Command-line and options database entries
@@ -1367,6 +1373,9 @@ Limit the number of human players allowed in a multiplayer game. Set to -1 for u
 
 OPTIONS_DB_COOKIES_EXPIRE
 Count of minutes after the cookie record will be considered expired.
+
+OPTIONS_DB_PUBLISH_STATISTICS
+Enable sending empire staticstics to the player.
 
 OPTIONS_DB_UI_MAIN_MENU_X
 Position of the center of the intro screen main menu, as a portion of the application's total width.
@@ -1908,6 +1917,9 @@ Automatically quits once any turns specified by --auto-advance-n-turns are compl
 OPTIONS_DB_BINARY_SERIALIZATION
 Use Binary serialization for saving games. Binary serialization is faster to save and load, but may not be possible to load on a different operating system.
 
+OPTIONS_DB_SERVER_BINARY_SERIALIZATION
+The server will use Binary serialization for client-server interaction if the client's version matches the server's version. Binary serialization is faster to transfer, but may not be compatible between different operating systems and architectures.
+
 OPTIONS_DB_XML_ZLIB_SERIALIZATION
 When saving games with XML serialization, compress most of the XML before writing the file. Compression substantially reduces save file sizes, but may make saves unloadable due to memory requirements to decompress the save data.
 
@@ -2276,6 +2288,9 @@ Accept
 NOT_READY_BN
 Decline
 
+# %1% is a turn progress phase
+PLAYING_GAME
+Playing game: %1%
 
 ##
 ## Galaxy Setup Screen
@@ -2476,6 +2491,7 @@ The Save Game button is disabled, either because this is a multiplayer game in w
 
 GAME_MENU_REALLY_CONCEDE
 Confirm conceding? This empire will be removed from the game.
+
 
 ##
 ## Save game dialog
@@ -4805,6 +4821,15 @@ ENC_HOMEWORLDS
 ENC_TEXTURES
 [Test - Textures]
 
+ENC_POP_CENTER
+Population Center
+
+ENC_PROD_CENTER
+Production Center
+
+ENC_FIGHTER
+Fighter
+
 ENC_TEXTURE_INFO
 %4% -- %1% x %2% px @ %3% BPP<img src = "%4%"></img>
 
@@ -5415,6 +5440,8 @@ Research
 METER_RESEARCH_VALUE_DESC
 '''The Research (or RP "Research Points") of all planets in the empire is combined to discover new [[encyclopedia ENC_TECH]].
 
+The Target Research is the stable Research output level a planet will approach, given the current factors influencing the Research resources. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, and various other game effects. If these factors change, then the Target Research value is likely to shift.
+
 Each tech has a minimum number of turns required to research it. For example, if a tech costs 15 RP and has a minimum time of 3 turns, only 5 RP may be allocated to the tech per turn.
 The tech at the top of the queue is given RP first. Any remaining RP are then given to the next tech in the queue, and if there is still more remaining to the next-- and so on. Items can be re-prioritized in the queue by dragging the most important items closer to the top. If any RP are left over after giving to all techs in the queue, they are automatically allocated to the unlocked tech(s) with the fewest remaining RP to completion.
 
@@ -5584,11 +5611,9 @@ GROWTH_FOCUS_TITLE
 Growth Focus
 
 GROWTH_FOCUS_TEXT
-'''The Growth Focus represents exporting rare materials and substances that can increase population of planets. Is only available in certain situations: on some homeworlds, and on planets with growth specials that can be exported.
+'''The Growth Focus represents exporting rare materials and substances that can increase the max Population of planets. Is only available in certain situations: on some homeworlds, and on planets with growth specials that can be exported.
 
-A planet focused on Growth increases the max Population only of other planets connected to it by [[metertype METER_SUPPLY]] lines.
-
-A Homeworld focused on Growth only helps other planets of the same species.
+A planet focused on Growth extends those benefits to other planets connected to it by [[metertype METER_SUPPLY]] lines, provided that the species of those other planets are of the right type, i.e., a Homeworld focused on Growth only helps other planets of the same species, and Growth Specials (and Growth Focus based on them) only help species with a respective type of [[encyclopedia METABOLISM_TITLE]].  The benefits from different types of applicable Growth Focus will stack with each other, but not from multiple sources of the identical specific type.
 
 [[GROWTH_SPECIALS_ENTRY_LIST]]'''
 
@@ -5696,7 +5721,7 @@ GASEOUS_SPECIES_TITLE
 Gaseous Metabolism
 
 GASEOUS_SPECIES_TEXT
-[[encyclopedia GASEOUS_SPECIES_CLASS]] species have metabolisms based on elements which are in gaseous state in an earth-like environment. Most researchers actually agree that complex life based on a gaseous metabolism is physically impossible. Search for life on the most probable habitat, gas giants, gets mostly neglected. Although gas giant are really huge the habitable area is similar to a medium size planet. Also there exist no specials that boost the growth of gaseous species.
+[[encyclopedia GASEOUS_SPECIES_CLASS]] species have metabolisms based on elements which are in gaseous state in an earth-like environment. Most researchers actually agree that complex life based on a gaseous metabolism is physically impossible. Search for life on the most probable habitat, gas giants, gets mostly neglected. Although gas giants are really huge, the habitable area is similar to a medium size planet. Also there exist no specials that boost the growth of gaseous species.
 
 TELEPATHIC_TITLE
 Telepathy
@@ -7380,7 +7405,7 @@ SP_SLY_DESC
 '''Description:
 The Sly live in gas giants. The gas giants are so foreign to most species in the universe that, for most of their history, they have been overlooked.
 Not being able to build devices, they couldn't leave their homeworld. Recently, they were able to obtain necessary equipment and technology for spacefaring from traders in exchange for their knowledge of history.
-On the right diet Sly excrete refined fuel. When in system with a gas giant, a Sly-crewed ship will regenerate fuel.
+On the right diet, Sly excrete refined fuel. When in system with a gas giant, a Sly-crewed ship will regenerate fuel.
 
 Social Structure:
 The Sly are very long-lived and keep the songs alive in which the whole cultural knowledge is encoded. They are very open and curious towards the galaxy and the other species they are now finally able to encounter.
@@ -7876,7 +7901,7 @@ Fulver
 SP_FULVER_GAMEPLAY_DESC
 '''Precognitive unsatisfied ants.
 Prefer [[PT_TUNDRA]]s.
-[[encyclopedia LITHIC_SPECIES_TITLE]]
+[[encyclopedia LITHIC_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]]
 '''
 
 SP_FULVER_DESC
@@ -7890,7 +7915,7 @@ Personality:
 Fulver prefer to concentrate on their strength and prefer to live from day to day. Fulver often favor the tools and decisions which allows for the highest number of future choices. Having a bad memory and no capability for long term future prediction they are bad at long term commitments like science and building up defensive structures. Feeling locked in by the limited number of choices they are restless and unsatisfied and constantly try to overcome their situation.
 
 Reason for Leaving:
-The endless possibilites that space promises helped the Fulvers to concentrate and finally develop space-faring technology. Finally they are out going to the frontier and beyond not caring much for what they leave behind.
+The endless possibilities that space promises helped the Fulvers to concentrate and finally develop space-faring technology. Finally they are out going to the frontier and beyond not caring much for what they leave behind.
 
 Social Structure:
 The focus on the near future prevents the Fulver from building long-lasting structures. Knowing each others possible choices and reacting to these leads to a society which could be best described as an informal anarchy.
@@ -8070,7 +8095,7 @@ ANCIENT_RUINS_DEPLETED_SPECIAL
 Ancient Ruins (Excavated)
 
 ANCIENT_RUINS_DEPLETED_SPECIAL_DESC
-'''Increases [[metertype METER_RESEARCH]] on this planet by 1 per Population when Focus is set to Research.
+'''Increases [[metertype METER_TARGET_RESEARCH]] on this planet by 1 per Population when Focus is set to Research.
 
 This planet holds the ruins of an unknown, advanced ancient race. A valuable discovery has already been made here.'''
 
@@ -8078,7 +8103,7 @@ ANCIENT_RUINS_SPECIAL
 Ancient Ruins
 
 ANCIENT_RUINS_SPECIAL_DESCRIPTION
-'''Increases [[metertype METER_RESEARCH]] on this planet by 1 per Population when Focus is set to Research.
+'''Increases [[metertype METER_TARGET_RESEARCH]] on this planet by 1 per Population when Focus is set to Research.
 
 This planet holds the ruins of an unknown, advanced ancient race. The first empire with the tech [[tech LRN_XENOARCH]] to possess this planet receives one free advanced tech or uncovers a powerful building or ship. There's also a good chance that well preserved bodies of an extinct species will be found.'''
 
@@ -8110,7 +8135,7 @@ EXTINCT_MISIORLA_SPECIAL
 Misiorla Remains
 
 EXTINCT_MISIORLA_SPECIAL_DESC
-On this planet well, preserved bodies of the extinct species [[species SP_MISIORLA]] were found. Building a [[buildingtype BLD_XENORESURRECTION_LAB]] here will allow production of a [[buildingtype BLD_COL_MISIORLA]] on [[metertype METER_SUPPLY]] connected planets.
+On this planet, well preserved bodies of the extinct species [[species SP_MISIORLA]] were found. Building a [[buildingtype BLD_XENORESURRECTION_LAB]] here will allow production of a [[buildingtype BLD_COL_MISIORLA]] on [[metertype METER_SUPPLY]] connected planets.
 
 TECH_COL_MISIORLA
 Misiorla Resequencing
@@ -8141,7 +8166,7 @@ ECCENTRIC_ORBIT_SPECIAL
 Eccentric Orbit
 
 ECCENTRIC_ORBIT_SPECIAL_DESC
-'''Increases [[metertype METER_RESEARCH]] by 3, but [[metertype METER_SUPPLY]] is decreased by 2.
+'''Increases [[metertype METER_TARGET_RESEARCH]] by 3, but [[metertype METER_SUPPLY]] is decreased by 2.
 
 This planet's orbit is very eccentric. It has a large distance between its closest and farthest approaches to its star. Total insolation varies significantly throughout the year. The varied conditions inhibit the supply the planet can provide, but are a beneficial platform for research.'''
 
@@ -8162,7 +8187,7 @@ TEMPORAL_ANOMALY_SPECIAL
 Temporal Anomaly
 
 TEMPORAL_ANOMALY_SPECIAL_DESC
-'''Increases [[metertype METER_RESEARCH]] on this planet by 5 per Population when Focus is set to [[metertype METER_RESEARCH]]. Decreases population (regardless of Focus) depending on the planet size:
+'''Increases [[metertype METER_TARGET_RESEARCH]] on this planet by 5 per Population when Focus is set to [[metertype METER_RESEARCH]]. Decreases population (regardless of Focus) depending on the planet size:
 • [[SZ_TINY]] (-5)
 • [[SZ_SMALL]] (-10)
 • [[SZ_MEDIUM]] (-15)
@@ -8184,7 +8209,7 @@ COMPUTRONIUM_SPECIAL
 Computronium Moon
 
 COMPUTRONIUM_SPECIAL_DESC
-'''When a planet with a Computronium Moon is focused on [[metertype METER_RESEARCH]], all research focused planets in the empire gain 0.2 [[metertype METER_RESEARCH]] per Population.
+'''When a planet with a Computronium Moon is focused on [[metertype METER_RESEARCH]], all research focused planets in the empire gain 0.2 [[metertype METER_TARGET_RESEARCH]] per Population.
 
 Left by some vanished civilization, the entire moon - from surface to core - is a computing device of awesome power. It can complete the most complicated simulations and equations faster than they can be entered.'''
 
@@ -8200,7 +8225,7 @@ PHILOSOPHER_SPECIAL
 Philosopher Planet
 
 PHILOSOPHER_SPECIAL_DESC
-'''As long as the Philosopher Planet is uninhabited, all inhabited planets in the same system have their [[metertype METER_RESEARCH]] increased by 5. [[metertype METER_CONSTRUCTION]] on the Philosopher Planet is decreased by 20.
+'''As long as the Philosopher Planet is uninhabited, all inhabited planets in the same system have their [[metertype METER_TARGET_RESEARCH]] increased by 5. [[metertype METER_CONSTRUCTION]] on the Philosopher Planet is decreased by 20.
 
 The lone remnant of a planet-sized space wandering species has found his final rest orbiting in this system like a normal planet. Having lived for thousands of years he lost the will and ability to travel and resorts to pondering about the mysteries of the universe he has seen and learned about. Eccentric and slightly demented he refuses to communicate with anything that isn't the size and shape of his kin, leaving scientists no choice but to ask questions via the planet they are living on. Understandably colonizing the Philosopher Planet will disturb him gravely and he will fall silent. Construction on his surface is difficult as is to be expected from a living being.'''
 
@@ -8608,7 +8633,7 @@ FOCUS_STOCKPILE
 Stockpile
 
 FOCUS_STOCKPILE_DESC
-Allows stockpile techs to boost stockpile withdrawl capacity
+Allows stockpile techs to boost stockpile withdrawal capacity
 
 # Focus types
 FOCUS_RESEARCH
@@ -10053,11 +10078,82 @@ DESC_ORDERED_BOMBARDED
 DESC_ORDERED_BOMBARDED_NOT
 ''' that is not being bombarded by an object %1%'''
 
+
+# AND Descriptions for expressions 'AND [ A B C ]'
+DESC_AND_BEFORE_OPERANDS
+''' ['''
+
 DESC_AND_BETWEEN_OPERANDS
-''' and'''
+''', and'''
+
+DESC_AND_AFTER_OPERANDS
+''' ]'''
+
+DESC_AND_BEFORE_SINGLE_OPERAND
+''''''
+
+DESC_AND_AFTER_SINGLE_OPERAND
+''''''
+
+# NOT AND Descriptions for expressions  'NOT AND [ A B C ]'
+# We actually describe the the logically equivalent expression ( (not A) or (not B) or (not C) )
+# Note: the operands (not A), (not B).. are handled in the descriptions of A, B.. respectively
+DESC_NOT_AND_BEFORE_OPERANDS
+'''[[DESC_NOT_OR_BEFORE_OPERANDS]]'''
+
+DESC_NOT_AND_BETWEEN_OPERANDS
+'''[[DESC_NOT_OR_BETWEEN_OPERANDS]]'''
+
+DESC_NOT_AND_AFTER_OPERANDS
+'''[[DESC_NOT_OR_AFTER_OPERANDS]]'''
+
+
+# Description for 'not ( AND [ A ] )' expressions
+# Actually instead we describe 'OR [ not A ]' and leave the description of negation to A
+DESC_NOT_AND_BEFORE_SINGLE_OPERAND
+'''[[DESC_OR_BEFORE_SINGLE_OPERAND]]'''
+
+DESC_NOT_AND_AFTER_SINGLE_OPERAND
+'''[[DESC_OR_AFTER_SINGLE_OPERAND]]'''
+
+
+# OR Descriptions: for expressions of the form ( A or B or C )
+DESC_OR_BEFORE_OPERANDS
+''' (either'''
 
 DESC_OR_BETWEEN_OPERANDS
-''' or'''
+''', or'''
+
+DESC_OR_AFTER_OPERANDS
+''' )'''
+
+DESC_OR_BEFORE_SINGLE_OPERAND
+''''''
+
+DESC_OR_AFTER_SINGLE_OPERAND
+''''''
+
+
+# NOT OR Descriptions; for expressions of the form 'NOT OR [ A B C ]'
+# We actually describe the logically equivalent expression 'AND [ (NOT A) (NOT B) (NOT C) ]'
+# Note: (NOT A), (NOT B).. are handled in the descriptions of A, B.. respectively
+DESC_NOT_OR_BEFORE_OPERANDS
+'''[[DESC_AND_BEFORE_OPERANDS]]'''
+
+DESC_NOT_OR_BETWEEN_OPERANDS
+'''[[DESC_AND_BETWEEN_OPERANDS]]'''
+
+DESC_NOT_OR_AFTER_OPERANDS
+'''[[DESC_AND_AFTER_OPERANDS]]'''
+
+# for expressions of the form 'NOT OR [ A ]' we describe instead 'AND [ NOT A ]'
+# Note: (NOT A) is handled in the description of A
+DESC_NOT_OR_BEFORE_SINGLE_OPERAND
+'''[[DESC_AND_BEFORE_SINGLE_OPERAND]]'''
+
+DESC_NOT_OR_AFTER_SINGLE_OPERAND
+'''[[DESC_AND_AFTER_SINGLE_OPERAND]]'''
+
 
 # %1% textual description of the lower turn limit.
 # %2% textual description of the upper turn limit.
@@ -10385,7 +10481,7 @@ LRN_ALGO_ELEGANCE
 Algorithmic Elegance
 
 LRN_ALGO_ELEGANCE_DESC
-'''Increases Target [[metertype METER_RESEARCH]] on all Research focused planets by 0.1 per Population.
+'''Increases [[metertype METER_TARGET_RESEARCH]] on all Research focused planets by 0.1 per Population.
 
 With greater and greater difficulty of data analysis problems, traditional measures of algorithm performance become less useful due to the limitations of irreducible complexity. At this stage, other measures of algorithm form and function become significant; aesthetically and metaphorically, the elegance of the solution must be optimized.'''
 
@@ -10409,7 +10505,7 @@ LRN_ARTIF_MINDS
 Nascent Artificial Intelligence
 
 LRN_ARTIF_MINDS_DESC
-'''Increases Target [[metertype METER_RESEARCH]] on all planets by 2.
+'''Increases [[metertype METER_TARGET_RESEARCH]] on all planets by 2.
 
 While traditional computers have nearly unfathomable intelligence and computational abilities, they lack the essential qualities of self-awareness, consciousness or sentience. While these traits remain elusive, reasonable facsimiles may be produced. These investigations open new avenues of research into cognitive sciences and novel metaparadigms.
 
@@ -10478,7 +10574,7 @@ LRN_QUANT_NET
 Quantum Networking
 
 LRN_QUANT_NET_DESC
-'''Increases target [[metertype METER_RESEARCH]] on all planets with the Research focus by 0.5 per Population.
+'''Increases [[metertype METER_TARGET_RESEARCH]] on all planets with the Research focus by 0.5 per Population.
 
 A massive, empire-wide data network able to transfer information instantaneously between any two places, rather than via the lengthy and indirect path of starlanes. This advancement greatly facilitates research throughout the empire.
 
@@ -10594,7 +10690,7 @@ GRO_ENERGY_META
 Pure-Energy Metabolism
 
 GRO_ENERGY_META_DESC
-'''Increases max [[metertype METER_FUEL]] on all ships by 2, max [[metertype METER_DEFENSE]] on all planets by 5, max [[metertype METER_SHIELD]] on all planets by 5, target [[metertype METER_INDUSTRY]] on all planets with the Industry focus by 0.2 per Population, and target [[metertype METER_RESEARCH]] on all planets with the Research focus by 0.5 per Population.
+'''Increases max [[metertype METER_FUEL]] on all ships by 2, max [[metertype METER_DEFENSE]] on all planets by 5, max [[metertype METER_SHIELD]] on all planets by 5, target [[metertype METER_INDUSTRY]] on all planets with the Industry focus by 0.2 per Population, and [[metertype METER_TARGET_RESEARCH]] on all planets with the Research focus by 0.5 per Population.
 
 While transforming an entire population into beings of pure energy would be impractical, certain tasks are better suited to individuals able to manifest themselves non-corporeally. Ship's crews for example, would no longer have to waste space with crew quarters or rations storage. Beings with greater energy channeling abilities would be able to enhance planetary shields and defense, and resource production would be generally enhanced.
 
@@ -10649,7 +10745,7 @@ Decoupling workforce and the means of production helps to produce just in time a
 This is an upgrade technology for the imperial stockpile. The [[metertype METER_STOCKPILE]] is increased by 6 plus an additional 0.02 per population.
 These improvements are cumulative with those provided by [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] and [[tech PRO_VOID_PREDICTION]].
 
-This also unlocks the [[building BLD_STOCKPILING_CENTER]] which additionally increases the [[metertype METER_STOCKPILE]] by 0.1 per industry .'''
+This also unlocks the [[building BLD_STOCKPILING_CENTER]] which additionally increases the [[metertype METER_STOCKPILE]] by 0.1 per industry.'''
 
 PRO_VOID_PREDICTION
 Void Prediction
@@ -11235,7 +11331,7 @@ LRN_DISTRIB_THOUGHT
 Distributed Thought Computing
 
 LRN_DISTRIB_THOUGHT_DESC
-'''Increases target [[metertype METER_RESEARCH]] on all planets with any focus by 0.1 per Population.
+'''Increases [[metertype METER_TARGET_RESEARCH]] on all planets with any focus by 0.1 per Population.
 
 The average citizen literally wastes his mind away, one of the finest computing devices in the universe. By tapping into the idle brain cycles of a sufficiently large population through a network of simple cybernetic transceivers, the research centers of a world can gain access to cheap and plentiful raw computing power.'''
 
@@ -11243,7 +11339,7 @@ LRN_STELLAR_TOMOGRAPHY
 Stellar Tomography
 
 LRN_STELLAR_TOMOGRAPHY_DESC
-'''Increases target [[metertype METER_RESEARCH]] on planets with the Research focus, per Population and depending on the star type:
+'''Increases [[metertype METER_TARGET_RESEARCH]] on planets with the Research focus, per Population and depending on the star type:
 * [[STAR_BLACK]] (x1)
 * [[STAR_NEUTRON]] (x0.75)
 * [[STAR_BLUE]] or [[STAR_WHITE]] (x0.5)
@@ -11712,7 +11808,7 @@ Planetary Cloud Cover
 SPY_STEALTH_1_DESC
 '''Gives all planets and outposts in the empire the [[special CLOUD_COVER_SLAVE_SPECIAL]] special which increases the [[metertype METER_STEALTH]] of all planets and buildings by 20.
 
-The research cost of this tech is reduced by the cost of researching [[tech SPY_STEALTH_PART_1]] if it has already been completed.'''
+The [[metertype METER_RESEARCH]] cost of this tech is reduced by the cost of researching [[tech SPY_STEALTH_PART_1]] if it has already been completed.'''
 
 SPY_STEALTH_PART_1
 Electromagnetic Dampening
@@ -11726,7 +11822,7 @@ Planetary Ash Clouds
 SPY_STEALTH_2_DESC
 '''Gives all planets and outposts in the empire the [[special VOLCANIC_ASH_SLAVE_SPECIAL]] special which increases the [[metertype METER_STEALTH]] of all planets and buildings by 40.
 
-The research cost of this tech is reduced by the cost of researching [[tech SPY_STEALTH_PART_2]] if it has already been completed.'''
+The [[metertype METER_RESEARCH]] cost of this tech is reduced by the cost of researching [[tech SPY_STEALTH_PART_2]] if it has already been completed.'''
 
 SPY_STEALTH_PART_2
 Radiation Absorbing
@@ -11740,7 +11836,7 @@ Planetary Dimensional Cloak
 SPY_STEALTH_3_DESC
 '''Gives all planets and outposts in the empire the [[special DIM_RIFT_SLAVE_SPECIAL]] special which increases the [[metertype METER_STEALTH]] of all planets and buildings by 60.
 
-The research cost of this tech is reduced by the cost of researching [[tech SPY_STEALTH_PART_3]] if it has already been completed.'''
+The [[metertype METER_RESEARCH]] cost of this tech is reduced by the cost of researching [[tech SPY_STEALTH_PART_3]] if it has already been completed.'''
 
 SPY_STEALTH_PART_3
 Dimensional Cloaking
@@ -12058,7 +12154,7 @@ BLD_CULTURE_ARCHIVES
 Cultural Archives
 
 BLD_CULTURE_ARCHIVES_DESC
-'''Increases target [[metertype METER_RESEARCH]] by 5 and target [[metertype METER_INDUSTRY]] by half the planet's Population.
+'''Increases [[metertype METER_TARGET_RESEARCH]] by 5 and target [[metertype METER_INDUSTRY]] by half the planet's Population.
 
 Stores the sum accumulated knowledge from thousands of years of life on this planet, improving many aspects of planetary productivity.'''
 
@@ -12066,7 +12162,7 @@ BLD_CULTURE_LIBRARY
 Cultural Library
 
 BLD_CULTURE_LIBRARY_DESC
-'''Increases target [[metertype METER_RESEARCH]] by 5.
+'''Increases [[metertype METER_TARGET_RESEARCH]] by 5.
 
 Stores the accumulated knowledge from thousands of years of life on this planet, giving a bonuses to research. This building will be destroyed when the population of the high tech natives reaches zero.'''
 
@@ -12074,7 +12170,7 @@ BLD_AUTO_HISTORY_ANALYSER
 Automated History Analyser
 
 BLD_AUTO_HISTORY_ANALYSER_DESC
-'''The Automated History Analyser can only be built on a planet with [[buildingtype BLD_CULTURE_ARCHIVES]]. Increases target [[metertype METER_RESEARCH]] by 5.
+'''The Automated History Analyser can only be built on a planet with [[buildingtype BLD_CULTURE_ARCHIVES]]. Increases [[metertype METER_TARGET_RESEARCH]] by 5.
 
 An automated research center with enormous computing power that scours the digitalised cultural archives to come up with patterns, interdisciplinary parallels and lost or unfinished insights.'''
 
@@ -12286,7 +12382,7 @@ BLD_COLLECTIVE_NET
 Collective Thought Network
 
 BLD_COLLECTIVE_NET_DESC
-'''Increases [[metertype METER_INDUSTRY]] on planets with the Industry focus by 0.5 per Population, and [[metertype METER_RESEARCH]] on Planets with the Research focus by 0.5 per Population. Starlane travel within 200 uu will disrupt this building's effectiveness and eliminate these bonuses.
+'''Increases [[metertype METER_INDUSTRY]] on planets with the Industry focus by 0.5 per Population, and [[metertype METER_TARGET_RESEARCH]] on Planets with the Research focus by 0.5 per Population. Starlane travel within 200 uu will disrupt this building's effectiveness and eliminate these bonuses.
 [[NO_STACK_SUPPLY_CONNECTION_TEXT]]
 
 By transferring the mind into cyberspace, thousands of minds can act as one, solving problems and making breakthroughs that no single mind could.'''
@@ -12303,7 +12399,7 @@ BLD_ENCLAVE_VOID
 Enclave of the Void
 
 BLD_ENCLAVE_VOID_DESC
-'''Increases target [[metertype METER_RESEARCH]] on all planets with the Research focus by 0.75 per Population.
+'''Increases [[metertype METER_TARGET_RESEARCH]] on all planets with the Research focus by 0.75 per Population.
 Multiple copies do not stack.
 
 The population of an entire planet is genetically attuned to the Void Mind and dedicated to channeling its wisdom to the empire. The denizens of the Void Enclave are regarded as priests, channels of higher thinking and wisdom. In all matters of importance to the empire, their advice is sought after. Emissaries from the Enclave can even be sent to assist in the empire's research projects.'''
@@ -14225,7 +14321,7 @@ GROWTH_SPECIAL_INDUSTRY_BOOST
 If this planet is set to the Industry Focus, target [[metertype METER_INDUSTRY]] is increased by 0.2 per Population.
 
 GROWTH_SPECIALS_ENTRY_LIST
-'''Growth Special planets focused on growth only help a single classification of species. Some specials function for organic species only, some for lithic species only, and some for robotic species only.
+'''Some specials function for organic species only, some for lithic species only, and some for robotic species only; no other [[encyclopedia METABOLISM_TITLE]] currently has applicable Growth Specials.
 
 [[encyclopedia ORGANIC_SPECIES_TITLE]] specials:
 [[special FRUIT_SPECIAL]] | [[special SPICE_SPECIAL]] | [[special PROBIOTIC_SPECIAL]]
@@ -14438,7 +14534,7 @@ BAD_FUEL_DESC
 −	Bad Maximum [[metertype METER_FUEL]]: -1
 
 AVERAGE_FUEL_DESC
-	Average Maximum [[metertype METER_FUEL]]: +0
+'''	Average Maximum [[metertype METER_FUEL]]: +0'''
 
 GOOD_FUEL_DESC
 +	Good Maximum [[metertype METER_FUEL]]: +1
@@ -14447,7 +14543,7 @@ GREAT_FUEL_DESC
 ++	Great Maximum [[metertype METER_FUEL]]: +2
 
 ULTIMATE_FUEL_DESC
-+++	Bad Maximum [[metertype METER_FUEL]]: +3
++++	Ultimate Maximum [[metertype METER_FUEL]]: +3
 
 GREAT_ASTEROID_INDUSTRY_DESC
 +	Good Asteroid Miners: + 0.2 [[metertype METER_INDUSTRY]] per population when Industry Focused in systems with owned asteroid belts.
@@ -14459,7 +14555,7 @@ TELEPATHIC_DETECTION_DESC
 +	Telepathic Detection: can sense nearby populated planets.
 
 COMMUNAL_VISION_DESC
-	Communal Vision: shares visibility within the same species.
+'''	Communal Vision: shares visibility within the same species.'''
 
 
 ##
@@ -14844,6 +14940,7 @@ Flux Drive Bonus
 
 DYING_POPULATION_LABEL
 Dying Population
+
 
 ##
 ## Tags

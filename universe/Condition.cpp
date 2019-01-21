@@ -1375,7 +1375,6 @@ void Source::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_co
 {
     if (parent_context.source)
         condition_non_targets.push_back(parent_context.source);
-    //DebugLogger() << "ConditionBase::Eval will check at most one source object rather than " << Objects().NumObjects() << " total objects";
 }
 
 unsigned int Source::GetCheckSum() const {
@@ -1407,6 +1406,14 @@ bool RootCandidate::Match(const ScriptingContext& local_context) const {
         return false;
     return local_context.condition_root_candidate == local_context.condition_local_candidate;
 }
+
+void RootCandidate::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
+                                                      ObjectSet& condition_non_targets) const
+{
+    if (parent_context.condition_root_candidate)
+        condition_non_targets.push_back(parent_context.condition_root_candidate);
+}
+
 
 unsigned int RootCandidate::GetCheckSum() const {
     unsigned int retval{0};
@@ -1852,6 +1859,7 @@ namespace {
             case OBJ_PLANET:
             case OBJ_SYSTEM:
             case OBJ_FIELD:
+            case OBJ_FIGHTER:
                 return candidate->ObjectType() == m_type;
                 break;
             case OBJ_POP_CENTER:
@@ -1917,6 +1925,7 @@ std::string Type::Dump(unsigned short ntabs) const {
         case OBJ_PROD_CENTER: retval += "ProductionCenter\n"; break;
         case OBJ_SYSTEM:      retval += "System\n"; break;
         case OBJ_FIELD:       retval += "Field\n"; break;
+        case OBJ_FIGHTER:     retval += "Fighter\n"; break;
         default: retval += "?\n"; break;
         }
     } else {
@@ -1968,6 +1977,7 @@ void Type::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_cont
             case OBJ_SYSTEM:
                 AddSystemSet(condition_non_targets);
                 break;
+            case OBJ_FIGHTER:   // shouldn't exist outside of combat as a separate object
             default: 
                 found_type = false;
                 break;
@@ -9391,19 +9401,34 @@ bool And::SourceInvariant() const {
 }
 
 std::string And::Description(bool negated/* = false*/) const {
+    std::string values_str;
     if (m_operands.size() == 1) {
-        return m_operands[0]->Description();
+        values_str += (!negated)
+            ? UserString("DESC_AND_BEFORE_SINGLE_OPERAND")
+            : UserString("DESC_NOT_AND_BEFORE_SINGLE_OPERAND");
+        // Pushing the negation to the enclosed conditions
+        values_str += m_operands[0]->Description(negated);
+        values_str += (!negated)
+            ? UserString("DESC_AND_AFTER_SINGLE_OPERAND")
+            : UserString("DESC_NOT_AND_AFTER_SINGLE_OPERAND");
     } else {
-        // TODO: use per-operand-type connecting language
-        std::string values_str;
+        values_str += (!negated)
+            ? UserString("DESC_AND_BEFORE_OPERANDS")
+            : UserString("DESC_NOT_AND_BEFORE_OPERANDS");
         for (unsigned int i = 0; i < m_operands.size(); ++i) {
-            values_str += m_operands[i]->Description();
+            // Pushing the negation to the enclosed conditions
+            values_str += m_operands[i]->Description(negated);
             if (i != m_operands.size() - 1) {
-                values_str += UserString("DESC_AND_BETWEEN_OPERANDS");
+                values_str += (!negated)
+                    ? UserString("DESC_AND_BETWEEN_OPERANDS")
+                    : UserString("DESC_NOT_AND_BETWEEN_OPERANDS");
             }
         }
-        return values_str;
+        values_str += (!negated)
+            ? UserString("DESC_AND_AFTER_OPERANDS")
+            : UserString("DESC_NOT_AND_AFTER_OPERANDS");
     }
+    return values_str;
 }
 
 std::string And::Dump(unsigned short ntabs) const {
@@ -9566,19 +9591,35 @@ bool Or::SourceInvariant() const {
 }
 
 std::string Or::Description(bool negated/* = false*/) const {
+    std::string values_str;
     if (m_operands.size() == 1) {
-        return m_operands[0]->Description();
+        values_str += (!negated)
+            ? UserString("DESC_OR_BEFORE_SINGLE_OPERAND")
+            : UserString("DESC_NOT_OR_BEFORE_SINGLE_OPERAND");
+        // Pushing the negation to the enclosed conditions
+        values_str += m_operands[0]->Description(negated);
+        values_str += (!negated)
+            ? UserString("DESC_OR_AFTER_SINGLE_OPERAND")
+            : UserString("DESC_NOT_OR_AFTER_SINGLE_OPERAND");
     } else {
         // TODO: use per-operand-type connecting language
-        std::string values_str;
+        values_str += (!negated)
+            ? UserString("DESC_OR_BEFORE_OPERANDS")
+            : UserString("DESC_NOT_OR_BEFORE_OPERANDS");
         for (unsigned int i = 0; i < m_operands.size(); ++i) {
-            values_str += m_operands[i]->Description();
+            // Pushing the negation to the enclosed conditions
+            values_str += m_operands[i]->Description(negated);
             if (i != m_operands.size() - 1) {
-                values_str += UserString("DESC_OR_BETWEEN_OPERANDS");
+                values_str += (!negated)
+                    ? UserString("DESC_OR_BETWEEN_OPERANDS")
+                    : UserString("DESC_NOT_OR_BETWEEN_OPERANDS");
             }
         }
-        return values_str;
+        values_str += (!negated)
+            ? UserString("DESC_OR_AFTER_OPERANDS")
+            : UserString("DESC_NOT_OR_AFTER_OPERANDS");
     }
+    return values_str;
 }
 
 std::string Or::Dump(unsigned short ntabs) const {
@@ -9670,7 +9711,7 @@ bool Not::SourceInvariant() const {
 }
 
 std::string Not::Description(bool negated/* = false*/) const
-{ return m_operand->Description(true); }
+{ return m_operand->Description(!negated); }
 
 std::string Not::Dump(unsigned short ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Not\n";

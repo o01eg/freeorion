@@ -1,3 +1,5 @@
+from logging import debug
+
 import freeOrionAIInterface as fo  # pylint: disable=import-error
 import AIstate
 import CombatRatingsAI
@@ -7,12 +9,12 @@ import InvasionAI
 import PlanetUtilsAI
 import PriorityAI
 import ProductionAI
-import universe_object
 from AIDependencies import INVALID_ID
 from aistate_interface import get_aistate
 from CombatRatingsAI import combine_ratings, combine_ratings_list, rating_difference
 from EnumsAI import MissionType
 from freeorion_tools import cache_by_turn
+from target import TargetSystem
 from turn_state import state
 
 MinThreat = 10  # the minimum threat level that will be ascribed to an unknown threat capable of killing scouts
@@ -140,12 +142,12 @@ def avail_mil_needing_repair(mil_fleet_ids, split_ships=False, on_mission=False,
         safely_needed = needed_here and my_local_rating > local_status.get('totalThreat', 0) and my_local_rating_vs_planets > local_status.get('planetThreat', 0)  # TODO: improve both assessment prongs
         if not fleet_ok:
             if safely_needed:
-                print "Fleet %d at %s needs repair but deemed safely needed to remain for defense" % (fleet_id, universe.getSystem(fleet.systemID))
+                debug("Fleet %d at %s needs repair but deemed safely needed to remain for defense" % (fleet_id, universe.getSystem(fleet.systemID)))
             else:
                 if needed_here:
-                    print "Fleet %d at %s needed present for combat, but is damaged and deemed unsafe to remain." % (fleet_id, universe.getSystem(fleet.systemID))
-                    print "\t my_local_rating: %.1f ; threat: %.1f" % (my_local_rating, local_status.get('totalThreat', 0))
-                print "Selecting fleet %d at %s for repair" % (fleet_id, universe.getSystem(fleet.systemID))
+                    debug("Fleet %d at %s needed present for combat, but is damaged and deemed unsafe to remain." % (fleet_id, universe.getSystem(fleet.systemID)))
+                    debug("\t my_local_rating: %.1f ; threat: %.1f" % (my_local_rating, local_status.get('totalThreat', 0)))
+                debug("Selecting fleet %d at %s for repair" % (fleet_id, universe.getSystem(fleet.systemID)))
         fleet_buckets[fleet_ok or bool(safely_needed)].append(fleet_id)
     return fleet_buckets
 
@@ -435,8 +437,8 @@ class CapitalDefenseAllocator(Allocator):
 class PlanetDefenseAllocator(Allocator):
 
     _allocation_group = 'occupied'
-    _min_alloc_factor = 1.3
-    _max_alloc_factor = 2
+    _min_alloc_factor = 1.1
+    _max_alloc_factor = 1.5
     _potential_threat_factor = 0.5
     _military_reset_ratio = 0.8
 
@@ -469,8 +471,8 @@ class PlanetDefenseAllocator(Allocator):
 class TargetAllocator(Allocator):
 
     _allocation_group = 'otherTargets'
-    _min_alloc_factor = 1.4
-    _max_alloc_factor = 2
+    _min_alloc_factor = 1.3
+    _max_alloc_factor = 2.5
     _potential_threat_factor = 0.5
 
     def _calculate_threat(self):
@@ -521,7 +523,7 @@ class BlockadeAllocator(TargetAllocator):
 
 class LocalThreatAllocator(Allocator):
     _potential_threat_factor = 0
-    _min_alloc_factor = 1.4
+    _min_alloc_factor = 1.3
     _max_alloc_factor = 2
     _allocation_group = 'otherTargets'
 
@@ -539,8 +541,8 @@ class LocalThreatAllocator(Allocator):
 
 
 class InteriorTargetsAllocator(LocalThreatAllocator):
-    _max_alloc_factor = 3
-    _min_alloc_factor = 1.5
+    _max_alloc_factor = 2.5
+    _min_alloc_factor = 1.3
 
     def _calculate_threat(self):
         return self.threat_bias + self.safety_factor * self._local_threat()
@@ -554,7 +556,7 @@ class InteriorTargetsAllocator(LocalThreatAllocator):
 
 class ExplorationTargetAllocator(LocalThreatAllocator):
     _potential_threat_factor = 0.25
-    _max_alloc_factor = 2 * 1.4
+    _max_alloc_factor = 2.0
     _allocation_group = 'exploreTargets'
 
     def _calculate_threat(self):
@@ -629,7 +631,15 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
     all_military_fleet_ids = (mil_fleets_ids if mil_fleets_ids is not None
                               else FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.MILITARY))
 
-    if try_reset and (fo.currentTurn() + empire_id) % 30 == 0 and thisround == "Main":
+    # Todo: This block had been originally added to address situations where fleet missions were not properly
+    #  terminating, leaving fleets stuck in stale deployments. Assess if this block is still needed at all; delete
+    #  if not, otherwise restructure the following code so that in event a reset is occurring greater priority is given
+    #  to providing military support to locations where a necessary Secure mission might have just been released (i.e.,
+    #  at invasion and colony/outpost targets where the troopships and colony ships are on their way), or else allow
+    #  only a partial reset which does not reset Secure missions.
+    enable_periodic_mission_reset = False
+    if enable_periodic_mission_reset and try_reset and (fo.currentTurn() + empire_id) % 30 == 0 and thisround == "Main":
+        debug("Resetting all Military missions as part of an automatic periodic reset to clear stale missions.")
         try_again(all_military_fleet_ids, try_reset=False, thisround=thisround + " Reset")
         return
 
@@ -667,8 +677,8 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
         my_defense_rating = systems_status.get(sys_id, {}).get('mydefenses', {}).get('overall', 0)
         already_assigned_rating[sys_id] = CombatRatingsAI.combine_ratings(my_defense_rating, already_assigned_rating[sys_id])
         if _verbose_mil_reporting and already_assigned_rating[sys_id]:
-            print "\t System %s already assigned rating %.1f" % (
-                universe.getSystem(sys_id), already_assigned_rating[sys_id])
+            debug("\t System %s already assigned rating %.1f" % (
+                universe.getSystem(sys_id), already_assigned_rating[sys_id]))
 
     # get systems to defend
     capital_id = PlanetUtilsAI.get_capital()
@@ -808,8 +818,8 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
     if "Main" in thisround:
         _military_allocations = new_allocations
     if _verbose_mil_reporting or "Main" in thisround:
-        print "------------------------------\nFinal %s Round Military Allocations: %s \n-----------------------" % (thisround, dict([(sid, alloc) for sid, alloc, _, _, _ in new_allocations]))
-        print "(Apparently) remaining military rating: %.1f" % remaining_mil_rating
+        debug("------------------------------\nFinal %s Round Military Allocations: %s \n-----------------------" % (thisround, dict([(sid, alloc) for sid, alloc, _, _, _ in new_allocations])))
+        debug("(Apparently) remaining military rating: %.1f" % remaining_mil_rating)
 
     return new_allocations
 
@@ -832,7 +842,7 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
             if not fleet:
                 continue
             sys_id = fleet.systemID
-            target = universe_object.System(sys_id)
+            target = TargetSystem(sys_id)
             fleet_mission = aistate.get_fleet_mission(fleet_id)
             fleet_mission.clear_fleet_orders()
             fleet_mission.clear_target()
@@ -846,9 +856,9 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
         avail_mil_fleet_ids = list(FleetUtilsAI.extract_fleet_ids_without_mission_types(all_military_fleet_ids))
         mil_needing_repair_ids, avail_mil_fleet_ids = avail_mil_needing_repair(avail_mil_fleet_ids)
         these_allocations = _military_allocations
-        print "=================================================="
-        print "Assigning military fleets"
-        print "---------------------------------"
+        debug("==================================================")
+        debug("Assigning military fleets")
+        debug("---------------------------------")
     else:
         avail_mil_fleet_ids = list(use_fleet_id_list)
         mil_needing_repair_ids, avail_mil_fleet_ids = avail_mil_needing_repair(avail_mil_fleet_ids)
@@ -864,22 +874,27 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
             break
         found_fleets = []
         found_stats = {}
-        these_fleets = FleetUtilsAI.get_fleets_for_mission({'rating': alloc, 'ratingVsPlanets': rvp},
-                                                           {'rating': minalloc, 'ratingVsPlanets': rvp}, found_stats,
-                                                           starting_system=sys_id, fleet_pool_set=avail_mil_fleet_ids,
-                                                           fleet_list=found_fleets)
+        ensure_return = sys_id not in set(AIstate.colonyTargetedSystemIDs
+                                          + AIstate.outpostTargetedSystemIDs
+                                          + AIstate.invasionTargetedSystemIDs)
+        these_fleets = FleetUtilsAI.get_fleets_for_mission(
+            target_stats={'rating': alloc, 'ratingVsPlanets': rvp, 'target_system': TargetSystem(sys_id)},
+            min_stats={'rating': minalloc, 'ratingVsPlanets': rvp, 'target_system': TargetSystem(sys_id)},
+            cur_stats=found_stats, starting_system=sys_id, fleet_pool_set=avail_mil_fleet_ids,
+            fleet_list=found_fleets, ensure_return=ensure_return)
         if not these_fleets:
             if not found_fleets or not (FleetUtilsAI.stats_meet_reqs(found_stats, {'rating': minalloc}) or takeAny):
                 if doing_main:
                     if _verbose_mil_reporting:
-                        print "NO available/suitable military allocation for system %d ( %s ) -- requested allocation %8d, found available rating %8d in fleets %s" % (sys_id, universe.getSystem(sys_id).name, minalloc, found_stats.get('rating', 0), found_fleets)
+                        debug("NO available/suitable military allocation for system %d ( %s ) -- requested allocation %8d, found available rating %8d in fleets %s" % (sys_id, universe.getSystem(sys_id).name, minalloc, found_stats.get('rating', 0), found_fleets))
                 avail_mil_fleet_ids.update(found_fleets)
                 continue
             else:
                 these_fleets = found_fleets
         elif doing_main and _verbose_mil_reporting:
-            print "FULL+ military allocation for system %d ( %s ) -- requested allocation %8d, got %8d with fleets %s" % (sys_id, universe.getSystem(sys_id).name, alloc, found_stats.get('rating', 0), these_fleets)
-        target = universe_object.System(sys_id)
+            debug("FULL+ military allocation for system %d ( %s ) -- requested allocation %8d, got %8d with fleets %s"
+                  % (sys_id, universe.getSystem(sys_id).name, alloc, found_stats.get('rating', 0), these_fleets))
+        target = TargetSystem(sys_id)
         for fleet_id in these_fleets:
             fo.issueAggressionOrder(fleet_id, True)
             fleet_mission = aistate.get_fleet_mission(fleet_id)
@@ -895,7 +910,7 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
                 aistate.misc.setdefault('ReassignedFleetMissions', []).append(fleet_mission)
 
     if doing_main:
-        print "---------------------------------"
+        debug("---------------------------------")
     last_round = 3
     last_round_name = "LastRound"
     if round <= last_round:
@@ -906,7 +921,7 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
         round += 1
         thisround = "Extras Remaining Round %d" % round if round < last_round else last_round_name
         if avail_mil_fleet_ids:
-            print "Still have available military fleets: %s" % avail_mil_fleet_ids
+            debug("Still have available military fleets: %s" % avail_mil_fleet_ids)
             allocations = get_military_fleets(mil_fleets_ids=avail_mil_fleet_ids, try_reset=False, thisround=thisround)
         if allocations:
             assign_military_fleets_to_systems(use_fleet_id_list=avail_mil_fleet_ids, allocations=allocations, round=round)

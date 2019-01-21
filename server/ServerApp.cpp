@@ -798,7 +798,7 @@ void ServerApp::SendNewGameStartMessages() {
         const PlayerConnectionPtr player_connection = *player_connection_it;
         int player_id = player_connection->PlayerID();
         int empire_id = PlayerEmpireID(player_id);
-        bool use_binary_serialization = player_connection->ClientVersionStringMatchesThisServer();
+        bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
         player_connection->SendMessage(GameStartMessage(m_single_player_game,    empire_id,
                                                         m_current_turn,          m_empires,
                                                         m_universe,              GetSpeciesManager(),
@@ -1337,7 +1337,7 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
         // when they end their turn
         auto orders = psgd.m_orders;
 
-        bool use_binary_serialization = player_connection->ClientVersionStringMatchesThisServer();
+        bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
 
         if (client_type == Networking::CLIENT_TYPE_AI_PLAYER) {
             // get save state string
@@ -1642,7 +1642,7 @@ void ServerApp::AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_conn
     std::map<int, PlayerInfo> player_info_map = GetPlayerInfoMap();
 
     Networking::ClientType client_type = player_connection->GetClientType();
-    bool use_binary_serialization = player_connection->ClientVersionStringMatchesThisServer();
+    bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
 
     if (client_type == Networking::CLIENT_TYPE_HUMAN_OBSERVER ||
         client_type == Networking::CLIENT_TYPE_HUMAN_MODERATOR)
@@ -1653,6 +1653,16 @@ void ServerApp::AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_conn
                                                         GetSpeciesManager(), GetCombatLogManager(),
                                                         GetSupplyManager(), player_info_map,
                                                         m_galaxy_setup_data, use_binary_serialization));
+
+        // send other empires' statuses
+        for (const auto& empire : Empires()) {
+            auto other_orders_it = m_turn_sequence.find(empire.first);
+            bool ready = other_orders_it == m_turn_sequence.end() ||
+                    (other_orders_it->second.second && other_orders_it->second.first);
+            player_connection->SendMessage(PlayerStatusMessage(EmpirePlayerID(empire.first),
+                                                               ready ? Message::WAITING : Message::PLAYING_TURN,
+                                                               empire.first));
+        }
     } else {
         ErrorLogger() << "ServerApp::CommonGameInit unsupported client type: skipping game start message.";
     }
@@ -1728,42 +1738,59 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
 void ServerApp::DropPlayerEmpireLink(int player_id)
 { m_player_empire_ids.erase(player_id); }
 
-bool ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
+int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
+    int empire_id = ALL_EMPIRES;
     // search empire by player name
     for (auto empire : Empires()) {
         if (empire.second->PlayerName() == player_connection->PlayerName()) {
-            auto orders_it = m_turn_sequence.find(empire.first);
-            if (orders_it == m_turn_sequence.end()) {
-                WarnLogger() << "ServerApp::AddPlayerIntoGame empire " << empire.first
-                             << " for \"" << player_connection->PlayerName()
-                             << "\" doesn't wait for orders";
-                return false;
-            }
-            // make a link to new connection
-            m_player_empire_ids[player_connection->PlayerID()] = empire.first;
-
-            const OrderSet dummy;
-            const OrderSet& orders = orders_it->second.second ? *orders_it->second.second : dummy;
-
-            // drop ready status
-            orders_it->second.first = false;
-
-            auto player_info_map = GetPlayerInfoMap();
-            bool use_binary_serialization = player_connection->ClientVersionStringMatchesThisServer();
-
-            player_connection->SendMessage(GameStartMessage(
-                m_single_player_game, empire.first,
-                m_current_turn, m_empires, m_universe,
-                GetSpeciesManager(), GetCombatLogManager(),
-                GetSupplyManager(),  player_info_map, orders,
-                static_cast<const SaveGameUIData*>(nullptr),
-                m_galaxy_setup_data,
-                use_binary_serialization));
-
-            return true;
+            empire_id = empire.first;
+            break;
         }
     }
-    return false;
+
+    if (empire_id == ALL_EMPIRES)
+        return false;
+
+    auto orders_it = m_turn_sequence.find(empire_id);
+    if (orders_it == m_turn_sequence.end()) {
+        WarnLogger() << "ServerApp::AddPlayerIntoGame empire " << empire_id
+                     << " for \"" << player_connection->PlayerName()
+                     << "\" doesn't wait for orders";
+        return false;
+    }
+
+    // make a link to new connection
+    m_player_empire_ids[player_connection->PlayerID()] = empire_id;
+
+    const OrderSet dummy;
+    const OrderSet& orders = orders_it->second.second ? *orders_it->second.second : dummy;
+
+    // drop ready status
+    orders_it->second.first = false;
+
+    auto player_info_map = GetPlayerInfoMap();
+    bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
+
+    player_connection->SendMessage(GameStartMessage(
+        m_single_player_game, empire_id,
+        m_current_turn, m_empires, m_universe,
+        GetSpeciesManager(), GetCombatLogManager(),
+        GetSupplyManager(),  player_info_map, orders,
+        static_cast<const SaveGameUIData*>(nullptr),
+        m_galaxy_setup_data,
+        use_binary_serialization));
+
+    // send other empires' statuses
+    for (const auto& empire : Empires()) {
+        auto other_orders_it = m_turn_sequence.find(empire.first);
+        bool ready = other_orders_it == m_turn_sequence.end() ||
+                (other_orders_it->second.second && other_orders_it->second.first);
+        player_connection->SendMessage(PlayerStatusMessage(EmpirePlayerID(empire.first),
+                                                           ready ? Message::WAITING : Message::PLAYING_TURN,
+                                                           empire.first));
+    }
+
+    return true;
 }
 
 bool ServerApp::IsHostless() const
@@ -2154,6 +2181,7 @@ namespace {
     /** Clears and refills \a combats with CombatInfo structs for
       * every system where a combat should occur this turn. */
     void AssembleSystemCombatInfo(std::vector<CombatInfo>& combats) {
+        combats.clear();
         // for each system, find if a combat will occur in it, and if so, assemble
         // necessary information about that combat in combats
         for (int sys_id : GetUniverse().Objects().FindObjectIDs<System>()) {
@@ -3109,13 +3137,21 @@ void ServerApp::PreCombatProcessTurns() {
     m_networking.SendMessageAll(TurnProgressMessage(Message::DOWNLOADING));
 
     // send partial turn updates to all players after orders and movement
+    // exclude those without empire and who are not Observer or Moderator
     for (auto player_it = m_networking.established_begin();
          player_it != m_networking.established_end(); ++player_it)
     {
         PlayerConnectionPtr player = *player_it;
-        bool use_binary_serialization = player->ClientVersionStringMatchesThisServer();
-        player->SendMessage(TurnPartialUpdateMessage(PlayerEmpireID(player->PlayerID()),
-                                                     m_universe, use_binary_serialization));
+        int empire_id = PlayerEmpireID(player->PlayerID());
+        const Empire* empire = GetEmpire(empire_id);
+        if (empire ||
+            player->GetClientType() == Networking::CLIENT_TYPE_HUMAN_MODERATOR ||
+            player->GetClientType() == Networking::CLIENT_TYPE_HUMAN_OBSERVER)
+        {
+            bool use_binary_serialization = player->IsBinarySerializationUsed();
+            player->SendMessage(TurnPartialUpdateMessage(PlayerEmpireID(player->PlayerID()),
+                                                         m_universe, use_binary_serialization));
+        }
     }
 }
 
@@ -3137,27 +3173,12 @@ void ServerApp::ProcessCombats() {
         if (auto system = combat_info.GetSystem())
             system->SetLastTurnBattleHere(CurrentTurn());
 
-        //// DEBUG
-        //const System* combat_system = combat_info.GetSystem();
-        //DebugLogger() << "Processing combat at " << (combat_system ? combat_system->Name() : "(No System)");
-        //DebugLogger() << combat_info.objects.Dump();
-        //for (const auto& eko : combat_info.empire_known_objects) {
-        //    DebugLogger() << "known objects for empire " << eko.first;
-        //    DebugLogger() << eko.second.Dump();
-        //}
-        //// END DEBUG
-
-        // find which human players are involved in this battle
-        std::set<int> human_empires_involved;
-        for (int empire_id : combat_info.empire_ids) {
-            if (human_controlled_empire_ids.count(empire_id))
-                human_empires_involved.insert(empire_id);
-        }
-
-        // if no human players are involved, resolve battle automatically
-        if (human_empires_involved.empty()) {
-            AutoResolveCombat(combat_info);
-            continue;
+        auto combat_system = combat_info.GetSystem();
+        DebugLogger(combat) << "Processing combat at " << (combat_system ? combat_system->Name() : "(No System)");
+        TraceLogger(combat) << combat_info.objects.Dump();
+        for (const auto& eko : combat_info.empire_known_objects) {
+            TraceLogger(combat) << "known objects for empire " << eko.first;
+            TraceLogger(combat) << eko.second.Dump();
         }
 
         AutoResolveCombat(combat_info);
@@ -3432,16 +3453,24 @@ void ServerApp::PostCombatProcessTurns() {
 
     DebugLogger() << "ServerApp::PostCombatProcessTurns Sending turn updates to players";
     // send new-turn updates to all players
+    // exclude those without empire and who are not Observer or Moderator
     for (auto player_it = m_networking.established_begin();
          player_it != m_networking.established_end(); ++player_it)
     {
         PlayerConnectionPtr player = *player_it;
-        bool use_binary_serialization = player->ClientVersionStringMatchesThisServer();
-        player->SendMessage(TurnUpdateMessage(PlayerEmpireID(player->PlayerID()), m_current_turn,
-                                              m_empires,                          m_universe,
-                                              GetSpeciesManager(),                GetCombatLogManager(),
-                                              GetSupplyManager(),                 players,
-                                              use_binary_serialization));
+        int empire_id = PlayerEmpireID(player->PlayerID());
+        const Empire* empire = GetEmpire(empire_id);
+        if (empire ||
+            player->GetClientType() == Networking::CLIENT_TYPE_HUMAN_MODERATOR ||
+            player->GetClientType() == Networking::CLIENT_TYPE_HUMAN_OBSERVER)
+        {
+            bool use_binary_serialization = player->IsBinarySerializationUsed();
+            player->SendMessage(TurnUpdateMessage(empire_id, m_current_turn,
+                                                  m_empires,                          m_universe,
+                                                  GetSpeciesManager(),                GetCombatLogManager(),
+                                                  GetSupplyManager(),                 players,
+                                                  use_binary_serialization));
+        }
     }
     DebugLogger() << "ServerApp::PostCombatProcessTurns done";
 }

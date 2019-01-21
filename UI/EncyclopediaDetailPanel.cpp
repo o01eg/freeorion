@@ -1186,6 +1186,7 @@ namespace {
         case OBJ_FIELD:         return UserString("ENC_FIELD");         break;
         case OBJ_POP_CENTER:    return UserString("ENC_POP_CENTER");    break;
         case OBJ_PROD_CENTER:   return UserString("ENC_PROD_CENTER");   break;
+        case OBJ_FIGHTER:       return UserString("ENC_FIGHTER");       break;
         default:                return EMPTY_STRING;
         }
     }
@@ -1234,6 +1235,7 @@ namespace {
 
         // search for article in custom pedia entries.
         for (const auto& entry : GetEncyclopedia().Articles()) {
+            bool done = false;
             for (const EncyclopediaArticle& article : entry.second) {
                 if (article.name != item_name)
                     continue;
@@ -1250,8 +1252,11 @@ namespace {
 
                 texture = ClientUI::GetTexture(ClientUI::ArtDir() / article.icon, true);
 
+                done = true;
                 break;
             }
+            if (done)
+                break;
         }
 
         // add listing of articles in this category

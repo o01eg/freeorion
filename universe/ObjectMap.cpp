@@ -218,6 +218,7 @@ void ObjectMap::InsertCore(std::shared_ptr<UniverseObject> item, int empire_id/*
             case OBJ_SYSTEM:
                 m_existing_systems[item->ID()] = this_item;
                 break;
+            case OBJ_FIGHTER:
             default:
                 break;
         }
@@ -244,8 +245,7 @@ void ObjectMap::Clear() {
     FOR_EACH_EXISTING_MAP(ClearMap);
 }
 
-void ObjectMap::swap(ObjectMap& rhs)
-{
+void ObjectMap::swap(ObjectMap& rhs) {
     // SwapMap uses ObjectMap::Map<T> but this function isn't available for the existing maps,
     // so the FOR_EACH_EXISTING_MAP macro doesn't work with with SwapMap
     // and it is instead necessary to write them out explicitly.
@@ -304,6 +304,7 @@ void ObjectMap::UpdateCurrentDestroyedObjects(const std::set<int>& destroyed_obj
             case OBJ_SYSTEM:
                 m_existing_systems[entry.first] = this_item;
                 break;
+            case OBJ_FIGHTER:
             default:
                 break;
         }
@@ -312,12 +313,12 @@ void ObjectMap::UpdateCurrentDestroyedObjects(const std::set<int>& destroyed_obj
 
 void ObjectMap::AuditContainment(const std::set<int>& destroyed_object_ids) {
     // determine all objects that some other object thinks contains them
-    std::map<int, std::set<int>>    contained_objs;
-    std::map<int, std::set<int>>    contained_planets;
-    std::map<int, std::set<int>>    contained_buildings;
-    std::map<int, std::set<int>>    contained_fleets;
-    std::map<int, std::set<int>>    contained_ships;
-    std::map<int, std::set<int>>    contained_fields;
+    std::map<int, std::set<int>> contained_objs;
+    std::map<int, std::set<int>> contained_planets;
+    std::map<int, std::set<int>> contained_buildings;
+    std::map<int, std::set<int>> contained_fleets;
+    std::map<int, std::set<int>> contained_ships;
+    std::map<int, std::set<int>> contained_fields;
 
     for (const auto& contained : *this) {
         if (destroyed_object_ids.count(contained->ID()))
@@ -358,7 +359,7 @@ void ObjectMap::AuditContainment(const std::set<int>& destroyed_object_ids) {
     // set contained objects of all possible containers
     for (const auto& obj : *this) {
         if (obj->ObjectType() == OBJ_SYSTEM) {
-            std::shared_ptr<System> sys = std::dynamic_pointer_cast<System>(obj);
+            auto sys = std::dynamic_pointer_cast<System>(obj);
             if (!sys)
                 continue;
             sys->m_objects =    contained_objs[sys->ID()];
@@ -367,13 +368,15 @@ void ObjectMap::AuditContainment(const std::set<int>& destroyed_object_ids) {
             sys->m_fleets =     contained_fleets[sys->ID()];
             sys->m_ships =      contained_ships[sys->ID()];
             sys->m_fields =     contained_fields[sys->ID()];
+
         } else if (obj->ObjectType() == OBJ_PLANET) {
-            std::shared_ptr<Planet> plt = std::dynamic_pointer_cast<Planet>(obj);
+            auto plt = std::dynamic_pointer_cast<Planet>(obj);
             if (!plt)
                 continue;
             plt->m_buildings =  contained_buildings[plt->ID()];
+
         } else if (obj->ObjectType() == OBJ_FLEET) {
-            std::shared_ptr<Fleet> flt = std::dynamic_pointer_cast<Fleet>(obj);
+            auto flt = std::dynamic_pointer_cast<Fleet>(obj);
             if (!flt)
                 continue;
             flt->m_ships =      contained_ships[flt->ID()];

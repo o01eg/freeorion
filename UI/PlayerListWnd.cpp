@@ -49,10 +49,6 @@ namespace {
         static std::shared_ptr<GG::Texture> retval = ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "ready.png");
         return retval;
     }
-    std::shared_ptr<GG::Texture> CombatIcon() {
-        static std::shared_ptr<GG::Texture> retval = ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "combat.png");
-        return retval;
-    }
     std::shared_ptr<GG::Texture> WarIcon() {
         static std::shared_ptr<GG::Texture> retval = ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "war.png");
         return retval;
@@ -102,9 +98,10 @@ namespace {
       * each PlayerRow. */
     class PlayerDataPanel : public GG::Control {
     public:
-        PlayerDataPanel(GG::X w, GG::Y h, int player_id) :
+        PlayerDataPanel(GG::X w, GG::Y h, int player_id, int empire_id) :
             Control(GG::X0, GG::Y0, w, h, GG::NO_WND_FLAGS),
             m_player_id(player_id),
+            m_empire_id(empire_id),
             //m_player_name_text(nullptr),
             m_empire_name_text(nullptr),
             m_empire_ship_text(nullptr),
@@ -197,7 +194,6 @@ namespace {
             // render player status icon
             switch (m_player_status) {
             case Message::PLAYING_TURN:     PlayingIcon()->OrthoBlit(UpperLeft() + m_player_status_icon_ul, UpperLeft() + m_player_status_icon_ul + ICON_SIZE); break;
-            case Message::RESOLVING_COMBAT: CombatIcon()->OrthoBlit( UpperLeft() + m_player_status_icon_ul, UpperLeft() + m_player_status_icon_ul + ICON_SIZE); break;
             case Message::WAITING:          WaitingIcon()->OrthoBlit(UpperLeft() + m_player_status_icon_ul, UpperLeft() + m_player_status_icon_ul + ICON_SIZE); break;
             default:    break;
             }
@@ -240,26 +236,33 @@ namespace {
                 return;
             }
 
+            // empire name
+            std::string empire_name;
             const std::map<int, PlayerInfo>& players = app->Players();
 
             auto player_it = players.find(m_player_id);
-            if (player_it == players.end()) {
-                ErrorLogger() << "PlayerDataPanel::Update couldn't find player with id " << m_player_id;
-                return;
+            if (player_it != players.end()) {
+                const PlayerInfo& player_info = player_it->second;
+
+                m_player_type = player_info.client_type;
+                m_host = player_info.host;
+                empire_name = player_info.name;
+            } else {
+                m_player_type = Networking::INVALID_CLIENT_TYPE;
+                m_host = false;
             }
-            const PlayerInfo& player_info = player_it->second;
 
             // if player has an empire, get its name and colour.  (Some player types might not have empires...)
             GG::Clr empire_color = ClientUI::TextColor();
-            std::string empire_name;
-            const Empire* empire = GetEmpire(player_info.empire_id);
+            const Empire* empire = GetEmpire(m_empire_id);
             if (empire) {
                 empire_color = empire->Color();
+                // ignore player name
                 empire_name = empire->Name();
-                if (player_info.empire_id == ALL_EMPIRES || player_info.empire_id == app->EmpireID())
+                if (m_empire_id == ALL_EMPIRES || m_empire_id == app->EmpireID())
                     m_diplo_status = INVALID_DIPLOMATIC_STATUS;
                 else
-                    m_diplo_status = Empires().GetDiplomaticStatus(player_info.empire_id, app->EmpireID());
+                    m_diplo_status = Empires().GetDiplomaticStatus(m_empire_id, app->EmpireID());
                 if (empire->Won())
                     m_win_status = WON; // even if you later get eliminated, you still won
                 else if (empire->Eliminated())
@@ -341,8 +344,7 @@ namespace {
             m_empire_research_text->SetText(research_text);
             m_empire_detection_text->SetText(detection_text);
 
-            m_player_type = player_info.client_type;
-            m_host = player_info.host;
+
         }
 
         void            SetStatus(Message::PlayerStatus player_status)
@@ -419,6 +421,7 @@ namespace {
         }
 
         int                     m_player_id;
+        int                     m_empire_id;
         //std::shared_ptr<GG::Label>            m_player_name_text;
         std::shared_ptr<GG::Label>              m_empire_name_text;
         std::shared_ptr<GG::Label>              m_empire_ship_text;
@@ -457,9 +460,10 @@ namespace {
     ////////////////////////////////////////////////
     class PlayerRow : public GG::ListBox::Row {
     public:
-        PlayerRow(GG::X w, GG::Y h, int player_id) :
+        PlayerRow(GG::X w, GG::Y h, int player_id, int empire_id) :
             GG::ListBox::Row(w, h, "", GG::ALIGN_NONE, 0),
             m_player_id(player_id),
+            m_empire_id(empire_id),
             m_panel(nullptr)
         {
             SetName("PlayerRow");
@@ -469,12 +473,16 @@ namespace {
         void CompleteConstruction() override {
 
             GG::ListBox::Row::CompleteConstruction();
-            m_panel = GG::Wnd::Create<PlayerDataPanel>(Width(), Height(), m_player_id);
+            m_panel = GG::Wnd::Create<PlayerDataPanel>(Width(), Height(), m_player_id, m_empire_id);
             push_back(m_panel);
         }
 
         int     PlayerID() const {
             return m_player_id;
+        }
+
+        int     EmpireID() const {
+            return m_empire_id;
         }
 
         void    Update() {
@@ -499,6 +507,7 @@ namespace {
 
     private:
         int                 m_player_id;
+        int                 m_empire_id;
         std::shared_ptr<PlayerDataPanel>    m_panel;
     };
 }
@@ -584,12 +593,12 @@ std::set<int> PlayerListWnd::SelectedPlayerIDs() const {
     return retval;
 }
 
-void PlayerListWnd::HandlePlayerStatusUpdate(Message::PlayerStatus player_status, int about_player_id) {
+void PlayerListWnd::HandleEmpireStatusUpdate(Message::PlayerStatus player_status, int about_empire_id) {
     for (auto& row : *m_player_list) {
         if (PlayerRow* player_row = dynamic_cast<PlayerRow*>(row.get())) {
-            if (about_player_id == Networking::INVALID_PLAYER_ID) {
-                player_row->SetStatus(player_status);
-            } else if (player_row->PlayerID() == about_player_id) {
+            if (about_empire_id == ALL_EMPIRES) {
+                WarnLogger() << "PlayerListWnd::HandleEmpireStatusUpdate got no empire";
+            } else if (player_row->EmpireID() == about_empire_id) {
                 player_row->SetStatus(player_status);
                 return;
             }
@@ -614,15 +623,27 @@ void PlayerListWnd::Refresh() {
         ErrorLogger() << "PlayerListWnd::Refresh couldn't get client app!";
         return;
     }
-    const std::map<int, PlayerInfo>& players = app->Players();
 
     const GG::Pt row_size = m_player_list->ListRowSize();
 
-    for (const auto& player : players) {
-        int player_id = player.first;
-        auto player_row = GG::Wnd::Create<PlayerRow>(row_size.x, row_size.y, player_id);
+    // first fill empires
+    for (const auto& empire : Empires()) {
+        int player_id = app->EmpirePlayerID(empire.first);
+        auto player_row = GG::Wnd::Create<PlayerRow>(row_size.x, row_size.y, player_id, empire.first);
         m_player_list->Insert(player_row);
         player_row->Resize(row_size);
+    }
+
+    // second fill players without empires
+    const std::map<int, PlayerInfo>& players = app->Players();
+
+    for (const auto& player : players) {
+        if (player.second.empire_id == ALL_EMPIRES) {
+            int player_id = player.first;
+            auto player_row = GG::Wnd::Create<PlayerRow>(row_size.x, row_size.y, player_id, ALL_EMPIRES);
+            m_player_list->Insert(player_row);
+            player_row->Resize(row_size);
+        }
     }
 
     this->SetSelectedPlayers(initially_selected_players);
@@ -727,8 +748,8 @@ namespace {
 
 void PlayerListWnd::PlayerRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
     // check that a valid player was clicked and that it wasn't this client's own player
-    int clicked_player_id = PlayerInRow(it);
-    if (clicked_player_id == Networking::INVALID_PLAYER_ID)
+    int clicked_empire_id = EmpireInRow(it);
+    if (clicked_empire_id == ALL_EMPIRES)
         return;
     const ClientApp* app = ClientApp::GetApp();
     if (!app) {
@@ -740,19 +761,9 @@ void PlayerListWnd::PlayerRightClicked(GG::ListBox::iterator it, const GG::Pt& p
         return;
     int client_empire_id = app->EmpireID();
 
-    // get empire id of clicked player
-    const std::map<int, PlayerInfo>& players = app->Players();
-    auto clicked_player_it = players.find(clicked_player_id);
-    if (clicked_player_it == players.end()) {
-        ErrorLogger() << "PlayerListWnd::PlayerRightClicked couldn't find player with id " << clicked_player_id;
-        return;
-    }
-    const PlayerInfo& clicked_player_info = clicked_player_it->second;
-    int clicked_empire_id = clicked_player_info.empire_id;
-
     if (!GetEmpire(clicked_empire_id)) {
         ErrorLogger() << "PlayerListWnd::PlayerRightClicked tried to look up empire id "
-                      << clicked_empire_id << " for player " << clicked_player_id
+                      << clicked_empire_id
                       << " but couldn't find such an empire";
         return;
     }
@@ -783,7 +794,7 @@ void PlayerListWnd::PlayerRightClicked(GG::ListBox::iterator it, const GG::Pt& p
     {
         // get diplomatic status between client and clicked empires
         DiplomaticStatus diplo_status = Empires().GetDiplomaticStatus(clicked_empire_id, client_empire_id);
-        if (diplo_status == INVALID_DIPLOMATIC_STATUS && clicked_player_id != client_player_id) {
+        if (diplo_status == INVALID_DIPLOMATIC_STATUS && clicked_empire_id != client_empire_id) {
             ErrorLogger() << "PlayerListWnd::PlayerRightClicked found invalid diplomatic status between client and clicked empires.";
             return;
         }
@@ -866,4 +877,14 @@ int PlayerListWnd::PlayerInRow(GG::ListBox::iterator it) const {
         return player_row->PlayerID();
 
     return Networking::INVALID_PLAYER_ID;
+}
+
+int PlayerListWnd::EmpireInRow(GG::ListBox::iterator it) const {
+    if (it == m_player_list->end())
+        return ALL_EMPIRES;
+
+    if (PlayerRow* player_row = dynamic_cast<PlayerRow*>(it->get()))
+        return player_row->EmpireID();
+
+    return ALL_EMPIRES;
 }

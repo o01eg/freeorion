@@ -2235,6 +2235,37 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
 
         return object->SpecialCapacity(special_name);
     }
+    else if (variable_name == "ShipPartMeter") {
+        int object_id = INVALID_OBJECT_ID;
+        if (m_int_ref1)
+            object_id = m_int_ref1->Eval(context);
+        auto object = GetUniverseObject(object_id);
+        if (!object)
+            return 0.0;
+        auto ship = std::dynamic_pointer_cast<const Ship>(object);
+        if (!ship)
+            return 0.0;
+
+        std::string part_name;
+        if (m_string_ref1)
+            part_name = m_string_ref1->Eval(context);
+        if (part_name.empty())
+            return 0.0;
+
+        std::string meter_name;
+        if (m_string_ref2)
+            meter_name = m_string_ref2->Eval(context);
+        if (meter_name.empty())
+            return 0.0;
+
+        MeterType meter_type = ValueRef::NameToMeter(meter_name);
+        if (meter_type != INVALID_METER_TYPE) {
+            if (m_return_immediate_value)
+                return ship->CurrentPartMeterValue(meter_type, part_name);
+            else
+                return ship->InitialPartMeterValue(meter_type, part_name);
+        }
+    }
 
     return 0.0;
 }
@@ -2698,6 +2729,16 @@ std::string ComplexVariable<double>::Dump(unsigned short ntabs) const
             retval += " empire = " + m_int_ref1->Dump(ntabs);
         if (m_string_ref1)
             retval += " meter = " + m_string_ref1->Dump(ntabs);
+
+    }
+    else if (variable_name == "ShipPartMeter") {
+        // ShipPartMeter part = "SR_WEAPON_1_1" meter = Capacity object = Source.ID
+        if (m_string_ref1)
+            retval += " part = " + m_string_ref1->Dump(ntabs);
+        if (m_string_ref2)
+            retval += " meter = " + m_string_ref2->Dump(ntabs); // wrapped in quotes " but shouldn't be to be consistent with parser
+        if (m_int_ref1)
+            retval += " object = " + m_int_ref1->Dump(ntabs);
 
     }
     else if (variable_name == "DirectDistanceBetween" ||

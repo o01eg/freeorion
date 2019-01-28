@@ -280,6 +280,14 @@ ERROR_SOUND_INITIALIZATION_FAILED
 Check log files for more detailed messages.
 '''
 
+OPENGL_VERSION_LOW_TITLE
+OpenGL Version Low
+
+OPENGL_VERSION_LOW_TEXT
+'''The OpenGL version on this system is less than 2.0
+
+FreeOrion may crash while starting.'''
+
 # Used as a prefix for the FORMAT_LIST_[1-MANY]_ITEMS translation entries.
 FORMAT_LIST_DEFAULT_PLURAL_HEADER
 There are:
@@ -5431,6 +5439,8 @@ METER_INDUSTRY_VALUE_DESC
 
 The Industry of a planet can be used for any production projects of [[metertype METER_SUPPLY]] line connected planets. Unallocated Industry gets added to the Imperial Stockpile.
 
+The Target Industry is the stable Industry output level a planet will approach, given the current factors influencing the Industry resources. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, and various other game effects. If these factors change, then the Target Industry value is likely to shift.
+
 For information on the interface, see [[encyclopedia PRODUCTION_WINDOW_ARTICLE_TITLE]].
 '''
 
@@ -5457,13 +5467,17 @@ METER_CONSTRUCTION_VALUE_LABEL
 Infrastructure
 
 METER_CONSTRUCTION_VALUE_DESC
-The term Infrastructure refers to technical structures that support a colonized planet: energy, transportation, telecommunication and social services for the citizens.
+'''The term Infrastructure refers to technical structures that support a colonized planet: energy, transportation, telecommunication and social services for the citizens.
+
+The Target Infrastructure is the stable Infrastructure level a planet will approach, given the current factors influencing the planetary Infrastructure. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, and various other game effects. If these factors change, then the Target Infrastructure value is likely to shift.'''
 
 METER_HAPPINESS_VALUE_LABEL
 Happiness
 
 METER_HAPPINESS_VALUE_DESC
-The Happiness of a colony's population starts out low after initial colonization or after invasion, and may also be affected by other factors. A minimum Happiness of 5 is necessary for a colony to act as a source of settlers for colonizing other planets.
+'''The Happiness of a colony's population starts out low after initial colonization or after invasion, and may also be affected by other factors. A minimum Happiness of 5 is necessary for a colony to act as a source of settlers for colonizing other planets.
+
+The Target Happiness is the stable Happiness level a planet's population will approach, given the current factors influencing the planetary Happiness. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, and various other game effects. If these factors change, then the Target Happiness value is likely to shift.'''
 
 METER_CAPACITY_VALUE_LABEL
 Stat - Primary
@@ -8079,7 +8093,7 @@ GAIA_SPECIAL_DESC
 • [[SZ_MEDIUM]] (+9)
 • [[SZ_LARGE]] (+12)
 • [[SZ_HUGE]] (+15)
-and increases max [[metertype METER_HAPPINESS]] by 5.
+and increases [[metertype METER_TARGET_HAPPINESS]] by 5.
 
 This planet has essentially been transformed into a living organism, allowing it to change and adapt to suit the needs of its population. If the world is a [[PE_GOOD]] [[encyclopedia ENVIRONMENT_TITLE]], a substantial population bonus is added. If it is not, then it will slowly terraform itself in stages to eventually reach [[PE_GOOD]] (NB: [[species SP_EXOBOT]] do not have a [[PE_GOOD]] environment so it cannot improve beyond [[PE_ADEQUATE]] for them).'''
 
@@ -8087,7 +8101,7 @@ WORLDTREE_SPECIAL
 World Tree
 
 WORLDTREE_SPECIAL_DESC
-'''Increases [[metertype METER_SUPPLY]] by +1, [[metertype METER_DETECTION]] by +10, max Population by +1, and [[metertype METER_HAPPINESS]] on the planet that has the special by +5. Increases [[metertype METER_HAPPINESS]] on all other planets owned by the same empire by +1.
+'''Increases [[metertype METER_SUPPLY]] by +1, [[metertype METER_DETECTION]] by +10, max Population by +1, and [[metertype METER_TARGET_HAPPINESS]] on the planet that has the special by +5. Increases [[metertype METER_TARGET_HAPPINESS]] on all other planets owned by the same empire by +1.
 
 A gigantic tree has grown so large that its crown has left the atmosphere of the planet. Scientists suspect that it was planted by the Caretakers in ancient times.'''
 
@@ -8174,7 +8188,7 @@ TIDAL_LOCK_SPECIAL
 Tidally Locked Rotation
 
 TIDAL_LOCK_SPECIAL_DESC
-'''Increases [[metertype METER_INDUSTRY]] on this planet by 0.2 per Population when Focus is set to [[metertype METER_INDUSTRY]]. Decreases population (regardless of Focus) depending on the planet size:
+'''Increases [[metertype METER_TARGET_INDUSTRY]] on this planet by 0.2 per Population when Focus is set to [[metertype METER_INDUSTRY]]. Decreases population (regardless of Focus) depending on the planet size:
 • [[SZ_TINY]] (-1)
 • [[SZ_SMALL]] (-2)
 • [[SZ_MEDIUM]] (-3)
@@ -8217,7 +8231,7 @@ HONEYCOMB_SPECIAL
 Honeycomb
 
 HONEYCOMB_SPECIAL_DESC
-'''When a planet with a Honeycomb is focused on [[metertype METER_INDUSTRY]], all industry focused [[metertype METER_SUPPLY]] connected planets gain 0.5 [[metertype METER_INDUSTRY]] per Population.
+'''When a planet with a Honeycomb is focused on [[metertype METER_INDUSTRY]], all industry focused [[metertype METER_SUPPLY]] connected planets gain 0.5 [[metertype METER_TARGET_INDUSTRY]] per Population.
 
 The Honeycomb is a planet that was prepared as a stash by the Builders in ancient times. Almost all other planets in surrounding systems were stripped of valuable materials and then dismantled. The materials were sorted and stored separately in gigantic tubes embedded into the planets crust. The sprectrum ranges from rare and valuable elementals to hard to produce molecules and a vast array of energy sources. What the Builders wanted to create with this treasure or why they didn't use it in the end, is unclear.'''
 
@@ -8225,7 +8239,7 @@ PHILOSOPHER_SPECIAL
 Philosopher Planet
 
 PHILOSOPHER_SPECIAL_DESC
-'''As long as the Philosopher Planet is uninhabited, all inhabited planets in the same system have their [[metertype METER_TARGET_RESEARCH]] increased by 5. [[metertype METER_CONSTRUCTION]] on the Philosopher Planet is decreased by 20.
+'''As long as the Philosopher Planet is uninhabited, all inhabited planets in the same system have their [[metertype METER_TARGET_RESEARCH]] increased by 5. [[metertype METER_TARGET_CONSTRUCTION]] on the Philosopher Planet is decreased by 20.
 
 The lone remnant of a planet-sized space wandering species has found his final rest orbiting in this system like a normal planet. Having lived for thousands of years he lost the will and ability to travel and resorts to pondering about the mysteries of the universe he has seen and learned about. Eccentric and slightly demented he refuses to communicate with anything that isn't the size and shape of his kin, leaving scientists no choice but to ask questions via the planet they are living on. Understandably colonizing the Philosopher Planet will disturb him gravely and he will fall silent. Construction on his surface is difficult as is to be expected from a living being.'''
 
@@ -10690,7 +10704,7 @@ GRO_ENERGY_META
 Pure-Energy Metabolism
 
 GRO_ENERGY_META_DESC
-'''Increases max [[metertype METER_FUEL]] on all ships by 2, max [[metertype METER_DEFENSE]] on all planets by 5, max [[metertype METER_SHIELD]] on all planets by 5, target [[metertype METER_INDUSTRY]] on all planets with the Industry focus by 0.2 per Population, and [[metertype METER_TARGET_RESEARCH]] on all planets with the Research focus by 0.5 per Population.
+'''Increases max [[metertype METER_FUEL]] on all ships by 2, max [[metertype METER_DEFENSE]] on all planets by 5, max [[metertype METER_SHIELD]] on all planets by 5, [[metertype METER_TARGET_INDUSTRY]] on all planets with the Industry focus by 0.2 per Population, and [[metertype METER_TARGET_RESEARCH]] on all planets with the Research focus by 0.5 per Population.
 
 While transforming an entire population into beings of pure energy would be impractical, certain tasks are better suited to individuals able to manifest themselves non-corporeally. Ship's crews for example, would no longer have to waste space with crew quarters or rations storage. Beings with greater energy channeling abilities would be able to enhance planetary shields and defense, and resource production would be generally enhanced.
 
@@ -10745,7 +10759,7 @@ Decoupling workforce and the means of production helps to produce just in time a
 This is an upgrade technology for the imperial stockpile. The [[metertype METER_STOCKPILE]] is increased by 6 plus an additional 0.02 per population.
 These improvements are cumulative with those provided by [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] and [[tech PRO_VOID_PREDICTION]].
 
-This also unlocks the [[building BLD_STOCKPILING_CENTER]] which additionally increases the [[metertype METER_STOCKPILE]] by 0.1 per industry.'''
+This also unlocks the [[building BLD_STOCKPILING_CENTER]] which additionally increases the [[metertype METER_STOCKPILE]] by 0.1 per [[metertype METER_INDUSTRY]].'''
 
 PRO_VOID_PREDICTION
 Void Prediction
@@ -10761,7 +10775,7 @@ PRO_MICROGRAV_MAN
 Microgravity Industry
 
 PRO_MICROGRAV_MAN_DESC
-'''Increases [[metertype METER_INDUSTRY]] by +5 on all Industry-focused colonies in systems with asteroid belt outposts or colonies. Additional claimed asteroid belts do not provide additional benefit.
+'''Increases [[metertype METER_TARGET_INDUSTRY]] by +5 on all Industry-focused colonies in systems with asteroid belt outposts or colonies. Additional claimed asteroid belts do not provide additional benefit.
 
 Mineral resource extraction from sub-planetoid-sized bodies involves challenges and provides opportunities quite distinct from those of full-fledged planets. Lacking sufficient mass to self-liquefy and differentiate, asteroids can provide much easier access to some heavier elements, and lack of a gravity can make extraction for use in space much more efficient. Conversely, the limited size of each source asteroid requires fully portable self-sufficient extraction facilities. As well, the challenges of any microgravity environment must be overcome, requiring redesign of many traditional methods.
 
@@ -10771,7 +10785,7 @@ PRO_ROBOTIC_PROD
 Robotic Production
 
 PRO_ROBOTIC_PROD_DESC
-'''Increases target [[metertype METER_INDUSTRY]] on all planets with the Industry focus by 0.1 per Population.
+'''Increases [[metertype METER_TARGET_INDUSTRY]] on all planets with the Industry focus by 0.1 per Population.
 
 Exobots, as they become commonly known, are a marvel of form meets function. They are robots designed to fulfill nearly any manufacturing job, in fields as wide ranging as electronics to large-scale construction. Easily mass produced, they serve best on colonies that place a high priority on industry. Every world focused primarily on industry receives a team of Exobots, greatly increasing industrial production.
 
@@ -10786,7 +10800,7 @@ PRO_FUSION_GEN
 Fusion Generation
 
 PRO_FUSION_GEN_DESC
-'''Increases target [[metertype METER_INDUSTRY]] on planets with the Industry focus by 0.2 per Population.
+'''Increases [[metertype METER_TARGET_INDUSTRY]] on planets with the Industry focus by 0.2 per Population.
 
 Fusion plants, while expensive to produce and maintain, easily pay for themselves on industrialized worlds with ever increasing power demands. Reliance on old fission based nuclear plants will gradually become a thing of the past.
 
@@ -10810,7 +10824,7 @@ PRO_SENTIENT_AUTOMATION
 Adaptive Automation
 
 PRO_SENTIENT_AUTOMATION_DESC
-'''Increases target [[metertype METER_INDUSTRY]] on all planets by 5.
+'''Increases [[metertype METER_TARGET_INDUSTRY]] on all planets by 5.
 
 By producing automated factories that operate without direct supervision, it is possible to increase industrial output in an entirely automated facility. These factories can be built and maintained on any planet, regardless of focus, providing a bonus to industry on all worlds.
 
@@ -10930,7 +10944,7 @@ N-Dimensional Structures
 CON_NDIM_STRC_DESC
 '''Increases Population capacity by planet size on all habitable planets: ([[SZ_TINY]] +2) ([[SZ_SMALL]] +4) ([[SZ_MEDIUM]] +6) ([[SZ_LARGE]] +8) ([[SZ_HUGE]] +10).
 
-Also increases target [[metertype METER_CONSTRUCTION]] by 10 on populated planets.
+Also increases [[metertype METER_TARGET_CONSTRUCTION]] by 10 on populated planets.
 
 The primary limiting factors on a planets population capacity are environmental desirability and space. By phasing basic infrastructure development into multiple dimensions, spatial limitations are all but eliminated, and under ideal environmental conditions, the maximum population of a planet can be greatly increased.
 
@@ -12154,7 +12168,7 @@ BLD_CULTURE_ARCHIVES
 Cultural Archives
 
 BLD_CULTURE_ARCHIVES_DESC
-'''Increases [[metertype METER_TARGET_RESEARCH]] by 5 and target [[metertype METER_INDUSTRY]] by half the planet's Population.
+'''Increases [[metertype METER_TARGET_RESEARCH]] by 5 and [[metertype METER_TARGET_INDUSTRY]] by half the planet's Population.
 
 Stores the sum accumulated knowledge from thousands of years of life on this planet, improving many aspects of planetary productivity.'''
 
@@ -12178,7 +12192,7 @@ BLD_IMPERIAL_PALACE
 Imperial Palace
 
 BLD_IMPERIAL_PALACE_DESC
-'''Increases [[metertype METER_SUPPLY]] line range by 2, [[metertype METER_CONSTRUCTION]] by 20, [[metertype METER_DEFENSE]] by 5, and [[metertype METER_TROOPS]] by 6. Also sets the owner's Capital for the empire.
+'''Increases [[metertype METER_SUPPLY]] line range by 2, [[metertype METER_TARGET_CONSTRUCTION]] by 20, [[metertype METER_DEFENSE]] by 5, and [[metertype METER_TROOPS]] by 6. Also sets the owner's Capital for the empire.
 
 Represents imperial power and prestige and functions as a center of control for the empire's holdings.'''
 
@@ -12314,7 +12328,7 @@ BLD_INDUSTRY_CENTER
 Industrial Center
 
 BLD_INDUSTRY_CENTER_DESC
-'''Initially provides a bonus to [[metertype METER_INDUSTRY]] on all [[metertype METER_SUPPLY]] line connected planets with Industry focus by 0.2 per Population.
+'''Initially provides a bonus to [[metertype METER_TARGET_INDUSTRY]] on all [[metertype METER_SUPPLY]] line connected planets with Industry focus by 0.2 per Population.
 [[NO_STACK_SUPPLY_CONNECTION_TEXT]]
 
 [[tech PRO_INDUSTRY_CENTER_II]] refinement doubles the bonus.
@@ -12344,7 +12358,7 @@ BLD_MEGALITH
 Megalith
 
 BLD_MEGALITH_DESC
-'''This building may only be built in the owner empire's capital, where it further adds to the splendor of the [[buildingtype BLD_IMPERIAL_PALACE]]. All resource meters for the planet on which it is built are able to reach target in a single turn. This planet also receives an increase of 30 to [[metertype METER_CONSTRUCTION]]. Populated planets in the owning empire receive an increase of 1 to [[metertype METER_SUPPLY]] line range. Populated planets within two starlane jumps have their [[metertype METER_TROOPS]] increased by 10.
+'''This building may only be built in the owner empire's capital, where it further adds to the splendor of the [[buildingtype BLD_IMPERIAL_PALACE]]. All resource meters for the planet on which it is built are able to reach target in a single turn. This planet also receives an increase of 30 to [[metertype METER_TARGET_CONSTRUCTION]]. Populated planets in the owning empire receive an increase of 1 to [[metertype METER_SUPPLY]] line range. Populated planets within two starlane jumps have their [[metertype METER_TROOPS]] increased by 10.
 
 The Megalith is an abnormally massive starscraper, kilometers in diameter, and an inspiration to architects empire-wide.'''
 
@@ -12374,7 +12388,7 @@ BLD_GAIA_TRANS_DESC
 • [[SZ_MEDIUM]] (+9)
 • [[SZ_LARGE]] (+12)
 • [[SZ_HUGE]] (+15)
-and increases max [[metertype METER_HAPPINESS]] by 5.
+and increases [[metertype METER_TARGET_HAPPINESS]] by 5.
 
 Convert a planet into a Gaia world by way of a sentient, almost god-like, cell-based computer program. This planet is wondrous to behold and famous throughout the known galaxy as a celebration of life and harmony. The inhabitants of this world think and act as though part of a larger organism, serving its needs simultaneously with their own.'''
 
@@ -12382,7 +12396,7 @@ BLD_COLLECTIVE_NET
 Collective Thought Network
 
 BLD_COLLECTIVE_NET_DESC
-'''Increases [[metertype METER_INDUSTRY]] on planets with the Industry focus by 0.5 per Population, and [[metertype METER_TARGET_RESEARCH]] on Planets with the Research focus by 0.5 per Population. Starlane travel within 200 uu will disrupt this building's effectiveness and eliminate these bonuses.
+'''Increases [[metertype METER_TARGET_INDUSTRY]] on planets with the Industry focus by 0.5 per Population, and [[metertype METER_TARGET_RESEARCH]] on Planets with the Research focus by 0.5 per Population. Starlane travel within 200 uu will disrupt this building's effectiveness and eliminate these bonuses.
 [[NO_STACK_SUPPLY_CONNECTION_TEXT]]
 
 By transferring the mind into cyberspace, thousands of minds can act as one, solving problems and making breakthroughs that no single mind could.'''
@@ -12420,7 +12434,7 @@ BLD_HYPER_DAM
 Hyperspatial Dam
 
 BLD_HYPER_DAM_DESC
-'''For planets not connected to a [[buildingtype BLD_BLACK_HOLE_POW_GEN]], increases target [[metertype METER_INDUSTRY]] on [[metertype METER_SUPPLY]] line connected planets with the Industry focus by 1 per Population, but decreases Population on such planets by planet size: ([[SZ_TINY]] -1) ([[SZ_SMALL]] -2) ([[SZ_MEDIUM]] -3) ([[SZ_LARGE]] -4) ([[SZ_HUGE]] -5).
+'''For planets not connected to a [[buildingtype BLD_BLACK_HOLE_POW_GEN]], increases [[metertype METER_TARGET_INDUSTRY]] on [[metertype METER_SUPPLY]] line connected planets with the Industry focus by 1 per Population, but decreases Population on such planets by planet size: ([[SZ_TINY]] -1) ([[SZ_SMALL]] -2) ([[SZ_MEDIUM]] -3) ([[SZ_LARGE]] -4) ([[SZ_HUGE]] -5).
 [[NO_STACK_SUPPLY_CONNECTION_TEXT]]
 
 A tear in the fabric of the universe, safely controlled and harnessed. Each planet may construct its own hyperspatial dams, but a single control center is required to ensure that the space-time continuum is not torn apart by the stresses. Additionally, all planets who use hyperspatial dams experience health problems, unless they are orbiting a [[STAR_BLACK]].
@@ -12437,7 +12451,7 @@ BLD_SOL_ORB_GEN
 Solar Orbital Generator
 
 BLD_SOL_ORB_GEN_DESC
-'''Increases target [[metertype METER_INDUSTRY]] on [[metertype METER_SUPPLY]] line connected planets, per Population and depending on the star type:
+'''Increases [[metertype METER_TARGET_INDUSTRY]] on [[metertype METER_SUPPLY]] line connected planets, per Population and depending on the star type:
 * [[STAR_BLUE]] or [[STAR_WHITE]] (x0.4)
 * [[STAR_YELLOW]] or [[STAR_ORANGE]] (x0.2)
 * [[STAR_RED]] (x0.1)
@@ -12505,7 +12519,7 @@ BLD_CONC_CAMP
 Concentration Camps
 
 BLD_CONC_CAMP_DESC
-'''Decreases the planet's population at a rate of 3 per turn, increases target [[metertype METER_INDUSTRY]] by 5 times the planet's population and sets the target [[metertype METER_HAPPINESS]] to 0.
+'''Decreases the planet's population at a rate of 3 per turn, increases [[metertype METER_TARGET_INDUSTRY]] by 5 times the planet's population and sets the [[metertype METER_TARGET_HAPPINESS]] to 0.
 
 Ridding a planet of an undesirable species allows the introduction of a more suited species. By creating a planet-wide network of concentration camps designed to work the citizens to death, this goal can be achieved quickly and efficiently.'''
 
@@ -12519,7 +12533,7 @@ BLD_BLACK_HOLE_POW_GEN
 Black Hole Power Generator
 
 BLD_BLACK_HOLE_POW_GEN_DESC
-'''Increases [[metertype METER_INDUSTRY]] on all [[metertype METER_SUPPLY]] line connected planets with the Industry focus by 1 per Population.
+'''Increases [[metertype METER_TARGET_INDUSTRY]] on all [[metertype METER_SUPPLY]] line connected planets with the Industry focus by 1 per Population.
 [[NO_STACK_SUPPLY_CONNECTION_TEXT]]
 
 [[BUILDING_AVAILABLE_ON_OUTPOSTS]], but must be in a [[STAR_BLACK]] system.'''
@@ -12608,7 +12622,7 @@ BLD_GAS_GIANT_GEN
 Gas Giant Generator
 
 BLD_GAS_GIANT_GEN_DESC
-'''This building can only be constructed at a [[PT_GASGIANT]] and gives a +10 [[metertype METER_INDUSTRY]] bonus to planets with the Industry focus in the same system.
+'''This building can only be constructed at a [[PT_GASGIANT]] and gives a +10 [[metertype METER_TARGET_INDUSTRY]] bonus to planets with the Industry focus in the same system.
 Multiple copies in the same system do not stack.
 
 A power generator designed to harvest the energy of a [[PT_GASGIANT]].'''
@@ -14318,7 +14332,7 @@ regardless of planetary [[encyclopedia ENVIRONMENT_TITLE]].
 If this planet is set to the [[encyclopedia GROWTH_FOCUS_TITLE]], the bonus is applied to all [[metertype METER_SUPPLY]] connected worlds inhabited by species with'''
 
 GROWTH_SPECIAL_INDUSTRY_BOOST
-If this planet is set to the Industry Focus, target [[metertype METER_INDUSTRY]] is increased by 0.2 per Population.
+If this planet is set to the Industry Focus, [[metertype METER_TARGET_INDUSTRY]] is increased by 0.2 per Population.
 
 GROWTH_SPECIALS_ENTRY_LIST
 '''Some specials function for organic species only, some for lithic species only, and some for robotic species only; no other [[encyclopedia METABOLISM_TITLE]] currently has applicable Growth Specials.

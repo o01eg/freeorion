@@ -4476,6 +4476,7 @@ void MapWnd::SelectSystem(int system_id) {
     } else {
         // selected a valid system, show sidepanel
         m_side_panel->Show();
+        GG::GUI::GetGUI()->MoveUp(m_side_panel);
         PushWndStack(m_side_panel);
     }
 }
@@ -4543,15 +4544,9 @@ void MapWnd::SelectFleet(std::shared_ptr<Fleet> fleet) {
 
     //std::cout << "MapWnd::SelectFleet " << fleet->ID() << std::endl;
 
-
-    // if indicated fleet is already the only selected fleet in the active FleetWnd, don't need to do anything
-    if (m_selected_fleet_ids.size() == 1 &&
-            m_selected_fleet_ids.count(fleet->ID()))
-        return;
-
     // find if there is a FleetWnd for this fleet already open.
     auto fleet_wnd = manager.WndForFleetID(fleet->ID());
-
+    
     // if there isn't a FleetWnd for this fleet open, need to open one
     if (!fleet_wnd) {
         // Add any overlapping fleet buttons for moving or offroad fleets.
@@ -4570,14 +4565,15 @@ void MapWnd::SelectFleet(std::shared_ptr<Fleet> fleet) {
         FleetButton::PlayFleetButtonOpenSound();
     }
 
-
     // make sure selected fleet's FleetWnd is active
     manager.SetActiveFleetWnd(fleet_wnd);
     GG::GUI::GetGUI()->MoveUp(fleet_wnd);
     PushWndStack(fleet_wnd);
 
-
-
+    // if indicated fleet is already the only selected fleet in the active FleetWnd, nothing to do.
+    if (m_selected_fleet_ids.size() == 1 && m_selected_fleet_ids.count(fleet->ID()))
+        return;
+    
     // select fleet in FleetWnd.  this deselects all other fleets in the FleetWnd.
     // this->m_selected_fleet_ids will be updated by ActiveFleetWndSelectedFleetsChanged or ActiveFleetWndChanged
     // signals being emitted and connected to MapWnd::SelectedFleetsChanged
@@ -5597,7 +5593,7 @@ std::vector<int> MapWnd::FleetIDsOfFleetButtonsOverlapping(int fleet_id) const {
         int vis_turn = -1;
         if (vis_turn_map.find(VIS_BASIC_VISIBILITY) != vis_turn_map.end())
             vis_turn = vis_turn_map[VIS_BASIC_VISIBILITY];
-        ErrorLogger() << "Couldn't find a FleetButton for fleet " << fleet_id 
+        ErrorLogger() << "Couldn't find a FleetButton for fleet " << fleet_id
                       << " with last basic vis turn " << vis_turn;
         return fleet_ids;
     }
@@ -6137,7 +6133,14 @@ bool MapWnd::EndTurn() {
     if (m_ready_turn) {
         HumanClientApp::GetApp()->UnreadyTurn();
     } else {
-        HumanClientApp::GetApp()->StartTurn();
+        ClientUI* cui = ClientUI::GetClientUI();
+        if (!cui) {
+            ErrorLogger() << "MapWnd::EndTurn: No client UI available";
+            return false;
+        }
+        SaveGameUIData ui_data;
+        cui->GetSaveGameUIData(ui_data);
+        HumanClientApp::GetApp()->StartTurn(ui_data);
     }
     return true;
 }
@@ -6438,6 +6441,8 @@ void MapWnd::HideSidePanel() {
 void MapWnd::RestoreSidePanel() {
     if (m_sidepanel_open_before_showing_other)
         ReselectLastSystem();
+    // send order changes could be made in research, production or other windows
+    HumanClientApp::GetApp()->SendPartialOrders();
 }
 
 void MapWnd::ShowResearch() {

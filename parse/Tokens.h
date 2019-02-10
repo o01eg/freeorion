@@ -57,6 +57,7 @@
     (ClockwiseNextPlanetType)                   \
     (Colony)                                    \
     (Colour)                                    \
+    (CombatTargets)                             \
     (Condition)                                 \
     (Construction)                              \
     (Consumption)                               \
@@ -215,6 +216,7 @@
     (MaxDefense)                                \
     (MaxFuel)                                   \
     (MaximumNumberOf)                           \
+    (MaxSecondaryStat)                          \
     (MaxShield)                                 \
     (MaxStockpile)                              \
     (MaxStructure)                              \
@@ -356,7 +358,8 @@
     (RMS)                                       \
     (RootCandidate)                             \
     (Round)                                     \
-    (Scope)
+    (Scope)                                     \
+    (SecondaryStat)
 
 #define TOKEN_SEQ_11                            \
     (SetAggressive)                             \

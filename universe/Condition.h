@@ -84,11 +84,7 @@ FO_COMMON_API std::string ConditionDescription(const std::vector<ConditionBase*>
 
 /** The base class for all Conditions. */
 struct FO_COMMON_API ConditionBase {
-    ConditionBase() :
-        m_root_candidate_invariant(UNKNOWN_INVARIANCE),
-        m_target_invariant(UNKNOWN_INVARIANCE),
-        m_source_invariant(UNKNOWN_INVARIANCE)
-    {}
+    ConditionBase() {}
     virtual ~ConditionBase();
 
     virtual bool operator==(const ConditionBase& rhs) const;
@@ -147,9 +143,9 @@ struct FO_COMMON_API ConditionBase {
     { return 0; }
 
 protected:
-    mutable Invariance m_root_candidate_invariant;
-    mutable Invariance m_target_invariant;
-    mutable Invariance m_source_invariant;
+    mutable Invariance m_root_candidate_invariant = UNKNOWN_INVARIANCE;
+    mutable Invariance m_target_invariant = UNKNOWN_INVARIANCE;
+    mutable Invariance m_source_invariant = UNKNOWN_INVARIANCE;
 
 private:
     struct MatchHelper;
@@ -256,7 +252,7 @@ struct FO_COMMON_API SortedNumberOf final : public ConditionBase {
 private:
     std::unique_ptr<ValueRef::ValueRefBase<int>> m_number;
     std::unique_ptr<ValueRef::ValueRefBase<double>> m_sort_key;
-    SortingMethod m_sorting_method;
+    SortingMethod m_sorting_method = SORT_RANDOM;
     std::unique_ptr<ConditionBase> m_condition;
 
     friend class boost::serialization::access;
@@ -1219,7 +1215,7 @@ private:
   * value is >= \a low and <= \a high. */
 struct FO_COMMON_API MeterValue final : public ConditionBase {
     MeterValue(MeterType meter,
-               std::unique_ptr< ValueRef::ValueRefBase<double>>&& low,
+               std::unique_ptr<ValueRef::ValueRefBase<double>>&& low,
                std::unique_ptr<ValueRef::ValueRefBase<double>>&& high);
 
     bool operator==(const ConditionBase& rhs) const override;
@@ -1888,6 +1884,7 @@ private:
 /** Matches all objects that match at least one Condition in \a operands. */
 struct FO_COMMON_API Or final : public ConditionBase {
     explicit Or(std::vector<std::unique_ptr<ConditionBase>>&& operands);
+    Or(std::unique_ptr<ConditionBase>&& operand1, std::unique_ptr<ConditionBase>&& operand2);
 
     bool operator==(const ConditionBase& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,

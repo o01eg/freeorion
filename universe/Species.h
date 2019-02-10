@@ -45,7 +45,8 @@ public:
     {}
 
     FocusType(const std::string& name, const std::string& description,
-              std::unique_ptr<Condition::ConditionBase>&& location, const std::string& graphic);
+              std::unique_ptr<Condition::ConditionBase>&& location,
+              const std::string& graphic);
 
     ~FocusType();
     //@}
@@ -75,11 +76,7 @@ private:
 
 /** Used by parser due to limits on number of sub-items per parsed main item. */
 struct SpeciesParams {
-    SpeciesParams() :
-        playable(false),
-        native(false),
-        can_colonize(false),
-        can_produce_ships(false)
+    SpeciesParams()
     {}
     SpeciesParams(bool playable_, bool native_, bool can_colonize_, bool can_produce_ships_) :
         playable(playable_),
@@ -87,18 +84,15 @@ struct SpeciesParams {
         can_colonize(can_colonize_),
         can_produce_ships(can_produce_ships_)
     {}
-    bool    playable;
-    bool    native;
-    bool    can_colonize;
-    bool    can_produce_ships;
+    bool playable = false;
+    bool native = false;
+    bool can_colonize = false;
+    bool can_produce_ships = false;
 };
 
 /** Used by parser due to limits on number of sub-items per parsed main item. */
 struct SpeciesStrings {
-    SpeciesStrings() :
-        name(),
-        desc(),
-        gameplay_desc()
+    SpeciesStrings()
     {}
     SpeciesStrings(const std::string& name_, const std::string& desc_,
                    const std::string& gameplay_desc_) :
@@ -106,9 +100,9 @@ struct SpeciesStrings {
         desc(desc_),
         gameplay_desc(gameplay_desc_)
     {}
-    std::string             name;
-    std::string             desc;
-    std::string             gameplay_desc;
+    std::string name;
+    std::string desc;
+    std::string gameplay_desc;
 };
 
 /** A predefined type of population that can exist on a PopulationCenter.
@@ -124,6 +118,7 @@ public:
             const std::string& preferred_focus,
             const std::map<PlanetType, PlanetEnvironment>& planet_environments,
             std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
+            std::unique_ptr<Condition::ConditionBase>&& combat_targets,
             const SpeciesParams& params,
             const std::set<std::string>& tags,
             const std::string& graphic);
@@ -141,7 +136,8 @@ public:
     const std::map<int, double>&            EmpireOpinions() const      { return m_empire_opinions; }       ///< returns the positive/negative opinions of this species about empires
     const std::map<std::string, double>&    OtherSpeciesOpinions() const{ return m_other_species_opinions; }///< returns the positive/negative opinions of this species about other species
 
-    const Condition::ConditionBase* Location() const;
+    const Condition::ConditionBase*         Location() const            { return m_location.get(); }        ///< returns the condition determining what planets on which this species may spawn
+    const Condition::ConditionBase*         CombatTargets() const       { return m_combat_targets.get(); }  ///< returns the condition for possible targets. may be nullptr if no condition was specified.
 
     std::string                     Dump(unsigned short ntabs = 0) const;                                           ///< returns a data file format representation of this object
     const std::vector<FocusType>&   Foci() const            { return m_foci; }              ///< returns the focus types this species can use
@@ -196,9 +192,9 @@ private:
     std::string                             m_preferred_focus;
     std::map<PlanetType, PlanetEnvironment> m_planet_environments;
 
-    std::vector<std::shared_ptr<Effect::EffectsGroup>> m_effects;
-
-    mutable std::unique_ptr<Condition::ConditionBase>       m_location;
+    std::vector<std::shared_ptr<Effect::EffectsGroup>>  m_effects;
+    std::unique_ptr<Condition::ConditionBase>           m_location;
+    std::unique_ptr<Condition::ConditionBase>           m_combat_targets;
 
     bool                                    m_playable;
     bool                                    m_native;
@@ -246,7 +242,7 @@ public:
     native_iterator     native_end() const;
 
     /** returns an ordered list of tags that should be considered for census listings. */
-    const CensusOrder& census_order() const;
+    const CensusOrder&  census_order() const;
 
     /** returns true iff this SpeciesManager is empty. */
     bool                empty() const;
@@ -337,7 +333,7 @@ private:
 
     /** sets the homeworld ids of species in this SpeciesManager to those
       * specified in \a species_homeworld_ids */
-    void    SetSpeciesHomeworlds(const std::map<std::string, std::set<int>>& species_homeworld_ids);
+    void SetSpeciesHomeworlds(const std::map<std::string, std::set<int>>& species_homeworld_ids);
 
     /** Assigns any m_pending_types to m_species. */
     void CheckPendingSpeciesTypes() const;

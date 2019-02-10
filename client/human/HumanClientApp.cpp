@@ -204,13 +204,7 @@ void HumanClientApp::AddWindowSizeOptionsAfterMainStart(OptionsDB& db) {
 HumanClientApp::HumanClientApp(int width, int height, bool calculate_fps, const std::string& name,
                                int x, int y, bool fullscreen, bool fake_mode_change) :
     ClientApp(),
-    SDLGUI(width, height, calculate_fps, name, x, y, fullscreen, fake_mode_change),
-    m_single_player_game(true),
-    m_game_started(false),
-    m_connected(false),
-    m_auto_turns(0),
-    m_have_window_focus(true),
-    m_game_saves_in_progress()
+    SDLGUI(width, height, calculate_fps, name, x, y, fullscreen, fake_mode_change)
 {
 #ifdef ENABLE_CRASH_BACKTRACE
     signal(SIGSEGV, SigHandler);
@@ -260,6 +254,19 @@ HumanClientApp::HumanClientApp(int width, int height, bool calculate_fps, const 
 
     LogDependencyVersions();
 
+    float version_number = GetGLVersion();
+    if (version_number < 2.0f) {
+        ErrorLogger() << "OpenGL version is less than 2; FreeOrion will likely crash while starting up...";
+        if (!GetOptionsDB().Get<bool>("version.gl.check.done")) {
+            auto mb_result = SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, UserString("OPENGL_VERSION_LOW_TITLE").c_str(),
+                                                      UserString("OPENGL_VERSION_LOW_TEXT").c_str(), nullptr);
+            if (mb_result)
+                std::cerr << "OpenGL version is less than 2; FreeOrion will likely crash during initialization";
+        }
+    } else if (version_number < 2.1f) {
+        ErrorLogger() << "OpenGL version is less than 2.1; FreeOrion may crash during initialization";
+    }
+
     SetStyleFactory(std::make_shared<CUIStyle>());
 
     SetMinDragTime(0);
@@ -304,16 +311,11 @@ HumanClientApp::HumanClientApp(int width, int height, bool calculate_fps, const 
                                 GetOptionsDB().Get<int>("ui.input.mouse.button.repeat.interval"));
     EnableModalAcceleratorSignals(true);
 
-    WindowResizedSignal.connect(
-        boost::bind(&HumanClientApp::HandleWindowResize, this, _1, _2));
-    FocusChangedSignal.connect(
-        boost::bind(&HumanClientApp::HandleFocusChange, this, _1));
-    WindowMovedSignal.connect(
-        boost::bind(&HumanClientApp::HandleWindowMove, this, _1, _2));
-    WindowClosingSignal.connect(
-        boost::bind(&HumanClientApp::HandleAppQuitting, this));
-    AppQuittingSignal.connect(
-        boost::bind(&HumanClientApp::HandleAppQuitting, this));
+    WindowResizedSignal.connect(boost::bind(&HumanClientApp::HandleWindowResize,this, _1, _2));
+    FocusChangedSignal.connect( boost::bind(&HumanClientApp::HandleFocusChange, this, _1));
+    WindowMovedSignal.connect(  boost::bind(&HumanClientApp::HandleWindowMove,  this, _1, _2));
+    WindowClosingSignal.connect(boost::bind(&HumanClientApp::HandleAppQuitting, this));
+    AppQuittingSignal.connect(  boost::bind(&HumanClientApp::HandleAppQuitting, this));
 
     SetStringtableDependentOptionDefaults();
     SetGLVersionDependentOptionDefaults();
@@ -906,7 +908,7 @@ void HumanClientApp::Reinitialize() {
 float HumanClientApp::GLVersion() const
 { return GetGLVersion(); }
 
-void HumanClientApp::StartTurn() {
+void HumanClientApp::StartTurn(const SaveGameUIData& ui_data) {
     DebugLogger() << "HumanClientApp::StartTurn";
 
     if (const Empire* empire = GetEmpire(EmpireID())) {
@@ -928,7 +930,7 @@ void HumanClientApp::StartTurn() {
         Autosave();
     }
 
-    ClientApp::StartTurn();
+    ClientApp::StartTurn(ui_data);
     m_fsm->process_event(TurnEnded());
 }
 
@@ -973,7 +975,6 @@ void HumanClientApp::HandleMessage(Message& msg) {
     case Message::JOIN_GAME:                m_fsm->process_event(JoinGame(msg));                break;
     case Message::HOST_ID:                  m_fsm->process_event(HostID(msg));                  break;
     case Message::LOBBY_UPDATE:             m_fsm->process_event(LobbyUpdate(msg));             break;
-    case Message::SAVE_GAME_DATA_REQUEST:   m_fsm->process_event(SaveGameDataRequest(msg));     break;
     case Message::SAVE_GAME_COMPLETE:       m_fsm->process_event(SaveGameComplete(msg));        break;
     case Message::CHECKSUM:                 m_fsm->process_event(CheckSum(msg));                break;
     case Message::GAME_START:               m_fsm->process_event(GameStart(msg));               break;
@@ -995,14 +996,6 @@ void HumanClientApp::HandleMessage(Message& msg) {
     default:
         ErrorLogger() << "HumanClientApp::HandleMessage : Received an unknown message type \"" << msg.Type() << "\".";
     }
-}
-
-void HumanClientApp::HandleSaveGameDataRequest() {
-    if (INSTRUMENT_MESSAGE_HANDLING)
-        std::cerr << "HumanClientApp::HandleSaveGameDataRequest(" << Message::SAVE_GAME_DATA_REQUEST << ")\n";
-    SaveGameUIData ui_data;
-    m_ui->GetSaveGameUIData(ui_data);
-    m_networking->SendMessage(ClientSaveDataMessage(Orders(), ui_data));
 }
 
 void HumanClientApp::UpdateCombatLogs(const Message& msg){

@@ -27,6 +27,7 @@
 #include "../util/Export.h"
 #include "../util/Pending.h"
 
+
 FO_COMMON_API extern const int INVALID_OBJECT_ID;
 namespace Condition {
     struct ConditionBase;
@@ -56,12 +57,12 @@ struct FO_COMMON_API CommonParams {
 
     std::unique_ptr<ValueRef::ValueRefBase<double>> production_cost;
     std::unique_ptr<ValueRef::ValueRefBase<int>>    production_time;
-    bool                                             producible;
-    std::set<std::string>                            tags;
-    ConsumptionMap<MeterType>                        production_meter_consumption;
-    ConsumptionMap<std::string>                      production_special_consumption;
-    std::unique_ptr<Condition::ConditionBase> location;
-    std::unique_ptr<Condition::ConditionBase> enqueue_location;
+    bool                                            producible;
+    std::set<std::string>                           tags;
+    ConsumptionMap<MeterType>                       production_meter_consumption;
+    ConsumptionMap<std::string>                     production_special_consumption;
+    std::unique_ptr<Condition::ConditionBase>       location;
+    std::unique_ptr<Condition::ConditionBase>       enqueue_location;
     std::vector<std::unique_ptr<Effect::EffectsGroup>> effects;
 };
 
@@ -90,7 +91,8 @@ public:
     PartType(ShipPartClass part_class, double capacity, double stat2,
              CommonParams& common_params, const MoreCommonParams& more_common_params,
              std::vector<ShipSlotType> mountable_slot_types,
-             const std::string& icon, bool add_standard_capacity_effect = true);
+             const std::string& icon, bool add_standard_capacity_effect = true,
+             std::unique_ptr<Condition::ConditionBase>&& combat_targets = nullptr);
 
     ~PartType();
     //@}
@@ -104,13 +106,15 @@ public:
     float                   SecondaryStat() const;
 
     bool                    CanMountInSlotType(ShipSlotType slot_type) const;       ///< returns true if this part can be placed in a slot of the indicated type
+    const Condition::ConditionBase*
+                            CombatTargets() const { return m_combat_targets.get(); }///< returns the condition for possible targets. may be nullptr if no condition was specified.
     const std::vector<ShipSlotType>&
-                            MountableSlotTypes() const  { return m_mountable_slot_types; }
+                            MountableSlotTypes() const { return m_mountable_slot_types; }
 
     bool                    ProductionCostTimeLocationInvariant() const;            ///< returns true if the production cost and time are invariant (does not depend on) the location
     float                   ProductionCost(int empire_id, int location_id) const;   ///< returns the number of production points required to produce this part
     int                     ProductionTime(int empire_id, int location_id) const;   ///< returns the number of turns required to produce this part
-    bool                    Producible() const      { return m_producible; }        ///< returns whether this part type is producible by players and appears on the design screen
+    bool                    Producible() const { return m_producible; }             ///< returns whether this part type is producible by players and appears on the design screen
 
     const CommonParams::ConsumptionMap<MeterType>&
                             ProductionMeterConsumption() const  { return m_production_meter_consumption; }
@@ -139,8 +143,8 @@ public:
 private:
     void Init(std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects);
 
-    std::string     m_name = "";
-    std::string     m_description = "";
+    std::string     m_name;
+    std::string     m_description;
     ShipPartClass   m_class;
     float           m_capacity = 0.0f;
     float           m_secondary_stat = 0.0f;    // damage for a hangar bay, shots per turn for a weapon, etc.
@@ -155,9 +159,9 @@ private:
     std::unique_ptr<Condition::ConditionBase>           m_location;
     std::set<std::string>                               m_exclusions;
     std::vector<std::shared_ptr<Effect::EffectsGroup>>  m_effects;
-
-    std::string     m_icon = "";
-    bool            m_add_standard_capacity_effect = false;
+    std::string                                         m_icon;
+    bool                                                m_add_standard_capacity_effect = false;
+    std::unique_ptr<Condition::ConditionBase>           m_combat_targets;
 
     friend class boost::serialization::access;
     template <class Archive>
@@ -746,7 +750,8 @@ void PartType::serialize(Archive& ar, const unsigned int version)
         & BOOST_SERIALIZATION_NVP(m_exclusions)
         & BOOST_SERIALIZATION_NVP(m_effects)
         & BOOST_SERIALIZATION_NVP(m_icon)
-        & BOOST_SERIALIZATION_NVP(m_add_standard_capacity_effect);
+        & BOOST_SERIALIZATION_NVP(m_add_standard_capacity_effect)
+        & BOOST_SERIALIZATION_NVP(m_combat_targets);
 }
 
 template <class Archive>

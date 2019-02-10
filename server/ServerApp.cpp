@@ -43,6 +43,8 @@
 #include <boost/date_time/posix_time/time_formatters.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
+//TODO: replace with std::make_unique when transitioning to C++14
+#include <boost/smart_ptr/make_unique.hpp>
 
 #include <ctime>
 #include <thread>
@@ -380,8 +382,8 @@ void ServerApp::HandleMessage(const Message& msg, PlayerConnectionPtr player_con
     case Message::LOBBY_UPDATE:             m_fsm->process_event(LobbyUpdate(msg, player_connection));      break;
     case Message::SAVE_GAME_INITIATE:       m_fsm->process_event(SaveGameRequest(msg, player_connection));  break;
     case Message::TURN_ORDERS:              m_fsm->process_event(TurnOrders(msg, player_connection));       break;
+    case Message::TURN_PARTIAL_ORDERS:      m_fsm->process_event(TurnPartialOrders(msg, player_connection));break;
     case Message::UNREADY:                  m_fsm->process_event(RevokeReadiness(msg, player_connection));  break;
-    case Message::CLIENT_SAVE_DATA:         m_fsm->process_event(ClientSaveData(msg, player_connection));   break;
     case Message::PLAYER_CHAT:              m_fsm->process_event(PlayerChat(msg, player_connection));       break;
     case Message::DIPLOMACY:                m_fsm->process_event(Diplomacy(msg, player_connection));        break;
     case Message::MODERATOR_ACTION:         m_fsm->process_event(ModeratorAct(msg, player_connection));     break;
@@ -690,7 +692,9 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
         // add empires to turn processing
         int empire_id = PlayerEmpireID(player_id);
         if (GetEmpire(empire_id))
-            AddEmpireTurn(empire_id);
+            AddEmpireTurn(empire_id, PlayerSaveGameData(player_id_and_setup.second.m_player_name, empire_id,
+                                                        nullptr, nullptr, std::string(),
+                                                        player_id_and_setup.second.m_client_type));
     }
 
     // update visibility information to ensure data sent out is up-to-date
@@ -1288,11 +1292,14 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
         // the player controlling a particular empire might have a different
         // player ID than when the game was first created
         m_player_empire_ids[player_id] = empire_id;
+    }
 
-
+    for (const auto& psgd : player_save_game_data) {
+        int empire_id = psgd.m_empire_id;
         // add empires to turn processing, and restore saved orders and UI data or save state data
-        if (GetEmpire(empire_id)) {
-            AddEmpireTurn(empire_id);
+        if (Empire* empire = GetEmpire(empire_id)) {
+            if (!empire->Eliminated())
+                AddEmpireTurn(empire_id, psgd);
         } else {
             ErrorLogger() << "ServerApp::LoadGameInit couldn't find empire with id " << empire_id << " to add to turn processing";
         }
@@ -1322,7 +1329,8 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
         auto save_data_it = player_id_save_game_data.find(player_id);
         if (save_data_it != player_id_save_game_data.end()) {
             psgd = save_data_it->second;
-        } else {
+        }
+        if (!psgd.m_orders) {
             psgd.m_orders.reset(new OrderSet());    // need an empty order set pointed to for serialization in case no data is loaded but the game start message wants orders to send
         }
 
@@ -1763,7 +1771,8 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
     m_player_empire_ids[player_connection->PlayerID()] = empire_id;
 
     const OrderSet dummy;
-    const OrderSet& orders = orders_it->second.second ? *orders_it->second.second : dummy;
+    const OrderSet& orders = orders_it->second.second && orders_it->second.second->m_orders ? *(orders_it->second.second->m_orders) : dummy;
+    const SaveGameUIData* ui_data = orders_it->second.second ? orders_it->second.second->m_ui_data.get() : nullptr;
 
     // drop ready status
     orders_it->second.first = false;
@@ -1776,7 +1785,7 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
         m_current_turn, m_empires, m_universe,
         GetSpeciesManager(), GetCombatLogManager(),
         GetSupplyManager(),  player_info_map, orders,
-        static_cast<const SaveGameUIData*>(nullptr),
+        ui_data,
         m_galaxy_setup_data,
         use_binary_serialization));
 
@@ -1799,6 +1808,19 @@ bool ServerApp::IsHostless() const
 const boost::circular_buffer<ChatHistoryEntity>& ServerApp::GetChatHistory() const
 { return m_chat_history; }
 
+std::vector<PlayerSaveGameData> ServerApp::GetPlayerSaveGameData() const {
+    std::vector<PlayerSaveGameData> player_save_game_data;
+    for (const auto& m_save_data : m_turn_sequence) {
+        DebugLogger() << "ServerApp::GetPlayerSaveGameData() Empire " << m_save_data.first
+                      << " ready " << m_save_data.second.first
+                      << " save_game_data " << m_save_data.second.second.get();
+        if (m_save_data.second.second) {
+            player_save_game_data.push_back(*m_save_data.second.second);
+        }
+    }
+    return player_save_game_data;
+}
+
 Networking::ClientType ServerApp::GetEmpireClientType(int empire_id) const
 { return GetPlayerClientType(ServerApp::EmpirePlayerID(empire_id)); }
 
@@ -1816,9 +1838,9 @@ Networking::ClientType ServerApp::GetPlayerClientType(int player_id) const {
 int ServerApp::EffectsProcessingThreads() const
 { return GetOptionsDB().Get<int>("effects.server.threads"); }
 
-void ServerApp::AddEmpireTurn(int empire_id)
+void ServerApp::AddEmpireTurn(int empire_id, const PlayerSaveGameData& psgd)
 {
-    m_turn_sequence[empire_id].second.reset(nullptr);
+    m_turn_sequence[empire_id].second = boost::make_unique<PlayerSaveGameData>(psgd);
     m_turn_sequence[empire_id].first = false;
 }
 
@@ -1829,13 +1851,29 @@ void ServerApp::ClearEmpireTurnOrders() {
     for (auto& order : m_turn_sequence) {
         order.second.first = false;
         if (order.second.second) {
-            order.second.second.reset(nullptr);
+            // reset only orders
+            // left UI data and AI state intact
+            order.second.second->m_orders.reset();
         }
     }
 }
 
-void ServerApp::SetEmpireTurnOrders(int empire_id, std::unique_ptr<OrderSet>&& order_set)
-{ m_turn_sequence[empire_id] = std::make_pair(true, std::move(order_set)); }
+void ServerApp::SetEmpireSaveGameData(int empire_id, std::unique_ptr<PlayerSaveGameData>&& save_game_data)
+{ m_turn_sequence[empire_id] = std::make_pair(true, std::move(save_game_data)); }
+
+void ServerApp::UpdatePartialOrders(int empire_id, const OrderSet& added, const std::set<int>& deleted) {
+    const auto& psgd = m_turn_sequence[empire_id].second;
+    if (psgd) {
+        if (psgd->m_orders) {
+            for (int id : deleted)
+                 psgd->m_orders->erase(id);
+            for (auto it : added)
+                 psgd->m_orders->insert(it);
+        } else {
+            psgd->m_orders = std::make_shared<OrderSet>(added);
+        }
+    }
+}
 
 void ServerApp::RevokeEmpireTurnReadyness(int empire_id)
 { m_turn_sequence[empire_id].first = false; }
@@ -1846,6 +1884,9 @@ bool ServerApp::AllOrdersReceived() {
     bool all_orders_received = true;
     for (const auto& empire_orders : m_turn_sequence) {
         if (!empire_orders.second.second) {
+            DebugLogger() << " ... no save data from empire id: " << empire_orders.first;
+            all_orders_received = false;
+        } else if (!empire_orders.second.second->m_orders) {
             DebugLogger() << " ... no orders from empire id: " << empire_orders.first;
             all_orders_received = false;
         } else if (!empire_orders.second.first) {
@@ -2206,19 +2247,28 @@ namespace {
     void DisseminateSystemCombatInfo(const std::vector<CombatInfo>& combats) {
         Universe& universe = GetUniverse();
 
-        // loop through resolved combat infos, updating actual main universe
-        // with changes from combat
+        // as of this writing, pointers to objects are inserted into combat
+        // ObjectMap, and these pointers refer to the main gamestate objects
+        // therefore, copying the combat result state back into the main
+        // gamestate object map isn't necessary, as these objects have already
+        // been updated by the combat processing. similarly, standard
+        // visibility updating will transfer the results to empires' known
+        // gamestate ObjectMaps.
         for (const CombatInfo& combat_info : combats) {
-            // indexed by fleet id, which empire ids to inform that a fleet is destroyed
-            std::map<int, std::set<int>> empires_to_update_of_fleet_destruction;
-
-            // update visibilities.
+            // update visibilities from combat, in case anything was revealed
+            // by shooting during combat
             for (const auto& empire_vis : combat_info.empire_object_visibility) {
                 for (const auto& object_vis : empire_vis.second) {
+                    if (object_vis.first < 0)
+                        continue;   // temporary fighter IDs
                     if (object_vis.second > GetUniverse().GetObjectVisibilityByEmpire(object_vis.first, empire_vis.first))
                         universe.SetEmpireObjectVisibility(empire_vis.first, object_vis.first, object_vis.second);
                 }
             }
+
+
+            // indexed by fleet id, which empire ids to inform that a fleet is destroyed
+            std::map<int, std::set<int>> empires_to_update_of_fleet_destruction;
 
             // update which empires know objects are destroyed.  this may
             // duplicate the destroyed object knowledge that is set when the
@@ -2234,8 +2284,8 @@ namespace {
                     //                       << " for empire " << empire_id;
                     universe.SetEmpireKnowledgeOfDestroyedObject(object_id, empire_id);
 
-                    // should empire also be informed of potential fleet
-                    // destruction if all ships in the fleet are destroyed?
+                    // record if empire should be informed of potential fleet
+                    // destruction (which is checked later)
                     if (auto ship = GetShip(object_id)) {
                         if (ship->FleetID() != INVALID_OBJECT_ID)
                             empires_to_update_of_fleet_destruction[ship->FleetID()].insert(empire_id);
@@ -2249,7 +2299,7 @@ namespace {
             // destroyed
             std::set<int> all_destroyed_object_ids;
             for (int destroyed_object_id : combat_info.destroyed_object_ids) {
-                std::set<int> dest_obj_ids = universe.RecursiveDestroy(destroyed_object_id);
+                auto dest_obj_ids = universe.RecursiveDestroy(destroyed_object_id);
                 all_destroyed_object_ids.insert(dest_obj_ids.begin(), dest_obj_ids.end());
             }
 
@@ -2323,23 +2373,15 @@ namespace {
                     //DebugLogger() << "Object is destroyed and doesn't need a sitrep.";
                     continue;
                 // which empires know about this object?
-                for (const auto& empire_ko : combat_info.empire_known_objects) {
-                    //DebugLogger() << "Checking if empire " << empire_ko.first << " knows about the object.";
+                for (const auto& empire_ok : combat_info.empire_object_visibility) {
                     // does this empire know about this object?
-                    const ObjectMap& objects = empire_ko.second;
-                    if (!objects.Object(damaged_object_id)) {
-                        //DebugLogger() << "Nope.";
+                    const auto& empire_known_objects = empire_ok.second;
+                    if (!empire_known_objects.count(damaged_object_id))
                         continue;
-                    }
-                    //DebugLogger() << "Yep.";
-                    // empire knows about object, so generate a sitrep about it
-                    int empire_id = empire_ko.first;
-                    Empire* empire = GetEmpire(empire_id);
-                    if (!empire)
-                        continue;
-                    //DebugLogger() << "Creating sitrep.";
-                    empire->AddSitRepEntry(CreateCombatDamagedObjectSitRep(damaged_object_id, combat_info.system_id,
-                                                                           empire_id));
+                    int empire_id = empire_ok.first;
+                    if (auto empire = GetEmpire(empire_id))
+                        empire->AddSitRepEntry(CreateCombatDamagedObjectSitRep(
+                            damaged_object_id, combat_info.system_id, empire_id));
                 }
             }
         }
@@ -3047,12 +3089,16 @@ void ServerApp::PreCombatProcessTurns() {
 
     // execute orders
     for (const auto& empire_orders : m_turn_sequence) {
-        auto& order_set = empire_orders.second;
-        if (!order_set.second) {
+        auto& save_game_data = empire_orders.second;
+        if (!save_game_data.second) {
+            DebugLogger() << "No SaveGameData for empire " << empire_orders.first;
+            continue;
+        }
+        if (!save_game_data.second->m_orders) {
             DebugLogger() << "No OrderSet for empire " << empire_orders.first;
             continue;
         }
-        for (const auto& id_and_order : *order_set.second)
+        for (const auto& id_and_order : *save_game_data.second->m_orders)
             id_and_order.second->Execute();
     }
 
@@ -3176,10 +3222,6 @@ void ServerApp::ProcessCombats() {
         auto combat_system = combat_info.GetSystem();
         DebugLogger(combat) << "Processing combat at " << (combat_system ? combat_system->Name() : "(No System)");
         TraceLogger(combat) << combat_info.objects.Dump();
-        for (const auto& eko : combat_info.empire_known_objects) {
-            TraceLogger(combat) << "known objects for empire " << eko.first;
-            TraceLogger(combat) << eko.second.Dump();
-        }
 
         AutoResolveCombat(combat_info);
     }
@@ -3192,12 +3234,10 @@ void ServerApp::ProcessCombats() {
     // update visibilities with any new info gleaned during combat
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
     // update stale object info based on any mid- combat glimpses
-    // before visibiity is totally recalculated in the post combat processing
+    // before visibility is totally recalculated in the post combat processing
     m_universe.UpdateEmpireStaleObjectKnowledge();
 
     CreateCombatSitReps(combats);
-
-    //CleanupSystemCombatInfo(combats); - NOTE: No longer needed since ObjectMap.Clear doesn't release any resources that aren't released in the destructor.
 }
 
 void ServerApp::UpdateMonsterTravelRestrictions() {

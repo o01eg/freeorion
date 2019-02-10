@@ -15,6 +15,10 @@
    <human>
     <min>2</min>
    </human>
+   <publish-statistics>0</publish-statistics>
+   <cookies>
+    <expire-minutes>120</expire-minutes>
+   </cookies>
   </server>
  </network>
 </XMLDoc>

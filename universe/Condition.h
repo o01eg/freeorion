@@ -84,11 +84,7 @@ FO_COMMON_API std::string ConditionDescription(const std::vector<ConditionBase*>
 
 /** The base class for all Conditions. */
 struct FO_COMMON_API ConditionBase {
-    ConditionBase() :
-        m_root_candidate_invariant(UNKNOWN_INVARIANCE),
-        m_target_invariant(UNKNOWN_INVARIANCE),
-        m_source_invariant(UNKNOWN_INVARIANCE)
-    {}
+    ConditionBase() {}
     virtual ~ConditionBase();
 
     virtual bool operator==(const ConditionBase& rhs) const;
@@ -147,9 +143,9 @@ struct FO_COMMON_API ConditionBase {
     { return 0; }
 
 protected:
-    mutable Invariance m_root_candidate_invariant;
-    mutable Invariance m_target_invariant;
-    mutable Invariance m_source_invariant;
+    mutable Invariance m_root_candidate_invariant = UNKNOWN_INVARIANCE;
+    mutable Invariance m_target_invariant = UNKNOWN_INVARIANCE;
+    mutable Invariance m_source_invariant = UNKNOWN_INVARIANCE;
 
 private:
     struct MatchHelper;
@@ -256,7 +252,7 @@ struct FO_COMMON_API SortedNumberOf final : public ConditionBase {
 private:
     std::unique_ptr<ValueRef::ValueRefBase<int>> m_number;
     std::unique_ptr<ValueRef::ValueRefBase<double>> m_sort_key;
-    SortingMethod m_sorting_method;
+    SortingMethod m_sorting_method = SORT_RANDOM;
     std::unique_ptr<ConditionBase> m_condition;
 
     friend class boost::serialization::access;
@@ -403,7 +399,7 @@ private:
     void serialize(Archive& ar, const unsigned int version);
 };
 
-/** There is no LocalCandidate condition.  To match any local candidate object,
+/** There is no LocalCandidate condition. To match any local candidate object,
   * use the All condition. */
 
 /** Matches the target of an effect being executed. */
@@ -1858,10 +1854,43 @@ private:
     void serialize(Archive& ar, const unsigned int version);
 };
 
+/** Matches objects that match the combat targeting condition of the specified
+  * content.  */
+struct FO_COMMON_API CombatTarget final : public ConditionBase {
+public:
+    CombatTarget(ContentType content_type,
+                 std::unique_ptr<ValueRef::ValueRefBase<std::string>>&& name);
+
+    bool operator==(const ConditionBase& rhs) const override;
+    void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
+              ObjectSet& non_matches, SearchDomain search_domain = NON_MATCHES) const override;
+    bool RootCandidateInvariant() const override;
+    bool TargetInvariant() const override;
+    bool SourceInvariant() const override;
+    std::string Description(bool negated = false) const override;
+    std::string Dump(unsigned short ntabs = 0) const override;
+    void SetTopLevelContent(const std::string& content_name) override;
+    unsigned int GetCheckSum() const override;
+
+private:
+    bool Match(const ScriptingContext& local_context) const override;
+
+    std::unique_ptr<ValueRef::ValueRefBase<std::string>> m_name;
+    ContentType m_content_type;
+
+    friend class boost::serialization::access;
+    template <class Archive>
+    void serialize(Archive& ar, const unsigned int version);
+};
+
+
 /** Matches all objects that match every Condition in \a operands. */
 struct FO_COMMON_API And final : public ConditionBase {
     explicit And(std::vector<std::unique_ptr<ConditionBase>>&& operands);
-    And(std::unique_ptr<ConditionBase>&& operand1, std::unique_ptr<ConditionBase>&& operand2);
+    And(std::unique_ptr<ConditionBase>&& operand1,
+        std::unique_ptr<ConditionBase>&& operand2,
+        std::unique_ptr<ConditionBase>&& operand3 = nullptr,
+        std::unique_ptr<ConditionBase>&& operand4 = nullptr);
 
     bool operator==(const ConditionBase& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
@@ -1888,7 +1917,10 @@ private:
 /** Matches all objects that match at least one Condition in \a operands. */
 struct FO_COMMON_API Or final : public ConditionBase {
     explicit Or(std::vector<std::unique_ptr<ConditionBase>>&& operands);
-    Or(std::unique_ptr<ConditionBase>&& operand1, std::unique_ptr<ConditionBase>&& operand2);
+    Or(std::unique_ptr<ConditionBase>&& operand1,
+       std::unique_ptr<ConditionBase>&& operand2,
+       std::unique_ptr<ConditionBase>&& operand3 = nullptr,
+       std::unique_ptr<ConditionBase>&& operand4 = nullptr);
 
     bool operator==(const ConditionBase& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
@@ -2370,6 +2402,14 @@ void Location::serialize(Archive& ar, const unsigned int version)
     ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(ConditionBase)
         & BOOST_SERIALIZATION_NVP(m_name1)
         & BOOST_SERIALIZATION_NVP(m_name2)
+        & BOOST_SERIALIZATION_NVP(m_content_type);
+}
+
+template <class Archive>
+void CombatTarget::serialize(Archive& ar, const unsigned int version)
+{
+    ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(ConditionBase)
+        & BOOST_SERIALIZATION_NVP(m_name)
         & BOOST_SERIALIZATION_NVP(m_content_type);
 }
 

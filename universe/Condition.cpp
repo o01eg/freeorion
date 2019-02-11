@@ -36,6 +36,10 @@ FO_COMMON_API extern const int INVALID_DESIGN_ID;
 bool UserStringExists(const std::string& str);
 
 namespace {
+    const std::string EMPTY_STRING;
+}
+
+namespace {
     void AddAllObjectsSet(Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + Objects().ExistingObjects().size());
         std::transform(Objects().ExistingObjects().begin(), Objects().ExistingObjects().end(),
@@ -141,9 +145,10 @@ namespace {
         return retval;
     }
 
-    std::map<std::string, bool> ConditionDescriptionAndTest(const std::vector<Condition::ConditionBase*>& conditions,
-                                                            const ScriptingContext& parent_context,
-                                                            std::shared_ptr<const UniverseObject> candidate_object/* = nullptr*/)
+    std::map<std::string, bool> ConditionDescriptionAndTest(
+        const std::vector<Condition::ConditionBase*>& conditions,
+        const ScriptingContext& parent_context,
+        std::shared_ptr<const UniverseObject> candidate_object/* = nullptr*/)
     {
         std::map<std::string, bool> retval;
 
@@ -638,8 +643,6 @@ unsigned int Turn::GetCheckSum() const {
 SortedNumberOf::SortedNumberOf(std::unique_ptr<ValueRef::ValueRefBase<int>>&& number,
                                std::unique_ptr<ConditionBase>&& condition) :
     m_number(std::move(number)),
-    m_sort_key(nullptr),
-    m_sorting_method(SORT_RANDOM),
     m_condition(std::move(condition))
 {}
 
@@ -673,9 +676,8 @@ bool SortedNumberOf::operator==(const ConditionBase& rhs) const {
 
 namespace {
     /** Random number genrator function to use with random_shuffle */
-    int CustomRandInt(int max_plus_one) {
-        return RandSmallInt(0, max_plus_one - 1);
-    }
+    int CustomRandInt(int max_plus_one)
+    { return RandSmallInt(0, max_plus_one - 1); }
     int (*CRI)(int) = CustomRandInt;
 
     /** Transfers the indicated \a number of objects, randomly selected from from_set to to_set */
@@ -758,6 +760,7 @@ namespace {
                         return;
                 }
             }
+
         } else if (sorting_method == SORT_MAX) {
             // move (number) objects with largest sort key (at end of map)
             // from the from_set into the to_set.
@@ -775,17 +778,19 @@ namespace {
                         return;
                 }
             }
+
         } else if (sorting_method == SORT_MODE) {
             // compile histogram of of number of times each sort key occurs
             std::map<float, unsigned int> histogram;
             for (const auto& entry : sort_key_objects) {
                 histogram[entry.first]++;
             }
+
             // invert histogram to index by number of occurances
             std::multimap<unsigned int, float> inv_histogram;
-            for (const auto& entry : histogram) {
+            for (const auto& entry : histogram)
                 inv_histogram.insert({entry.second, entry.first});
-            }
+
             // reverse-loop through inverted histogram to find which sort keys
             // occurred most frequently, and transfer objects with those sort
             // keys from from_set to to_set.
@@ -813,8 +818,9 @@ namespace {
                     }
                 }
             }
+
         } else {
-            DebugLogger() << "TransferSortedObjects given unknown sort method";
+             ErrorLogger() << "TransferSortedObjects given unknown sort method";
         }
     }
 }
@@ -9098,10 +9104,9 @@ namespace {
             break;
         }
         case CONTENT_SPECIES: {
-            auto s = GetSpecies(name1);
-            if (!s)
-                return nullptr;
-            return s->Location();
+            if (auto s = GetSpecies(name1))
+                return s->Location();
+            break;
         }
         case CONTENT_SHIP_HULL: {
             if (auto h = GetHullType(name1))
@@ -9118,7 +9123,7 @@ namespace {
                 return s->Location();
             break;
         }
-        case CONTENT_FOCUS : {
+        case CONTENT_FOCUS: {
             if (name2.empty())
                 return nullptr;
             // get species, then focus from that species
@@ -9134,6 +9139,18 @@ namespace {
             return nullptr;
         }
         return nullptr;
+    }
+
+    const std::string& GetContentTypeName(ContentType content_type) {
+        switch (content_type) {
+        case CONTENT_BUILDING:  return UserString("UIT_BUILDING");          break;
+        case CONTENT_SPECIES:   return UserString("ENC_SPECIES");           break;
+        case CONTENT_SHIP_HULL: return UserString("UIT_SHIP_HULL");         break;
+        case CONTENT_SHIP_PART: return UserString("UIT_SHIP_PART");         break;
+        case CONTENT_SPECIAL:   return UserString("ENC_SPECIAL");           break;
+        case CONTENT_FOCUS:     return UserString("PLANETARY_FOCUS_TITLE"); break;
+        default:                return EMPTY_STRING;                        break;
+        }
     }
 }
 
@@ -9223,15 +9240,14 @@ std::string Location::Description(bool negated/* = false*/) const {
     if (m_name2)
         name2_str = m_name2->Description();
 
-    std::string content_type_str;
-    // todo: get content type as string
+    std::string content_type_str = GetContentTypeName(m_content_type);
+    std::string name_str = (m_content_type == CONTENT_FOCUS ? name2_str : name1_str);
 
     return str(FlexibleFormat((!negated)
                ? UserString("DESC_LOCATION")
                : UserString("DESC_LOCATION_NOT"))
                % content_type_str
-               % name1_str
-               % name2_str);
+               % name_str);
 }
 
 std::string Location::Dump(unsigned short ntabs) const {
@@ -9293,6 +9309,170 @@ unsigned int Location::GetCheckSum() const {
 }
 
 ///////////////////////////////////////////////////////////
+// CombatTarget                                          //
+///////////////////////////////////////////////////////////
+namespace {
+    const ConditionBase* GetCombatTargetCondition(
+        ContentType content_type, const std::string& name)
+    {
+        if (name.empty())
+            return nullptr;
+        switch (content_type) {
+        case CONTENT_SPECIES: {
+            if (auto s = GetSpecies(name))
+                return s->CombatTargets();
+            break;
+        }
+        case CONTENT_SHIP_PART: {
+            if (auto p = GetPartType(name))
+                return p->CombatTargets();
+            break;
+        }
+        case CONTENT_BUILDING:
+        case CONTENT_SHIP_HULL:
+        case CONTENT_SPECIAL:
+        case CONTENT_FOCUS:
+        default:
+            return nullptr;
+        }
+        return nullptr;
+    }
+}
+
+CombatTarget::CombatTarget(ContentType content_type,
+                           std::unique_ptr<ValueRef::ValueRefBase<std::string>>&& name) :
+    ConditionBase(),
+    m_name(std::move(name)),
+    m_content_type(content_type)
+{}
+
+bool CombatTarget::operator==(const ConditionBase& rhs) const {
+    if (this == &rhs)
+        return true;
+    if (typeid(*this) != typeid(rhs))
+        return false;
+
+    const CombatTarget& rhs_ = static_cast<const CombatTarget&>(rhs);
+
+    if (m_content_type != rhs_.m_content_type)
+        return false;
+
+    CHECK_COND_VREF_MEMBER(m_name)
+
+    return true;
+}
+
+void CombatTarget::Eval(const ScriptingContext& parent_context,
+                        ObjectSet& matches, ObjectSet& non_matches,
+                        SearchDomain search_domain/* = NON_MATCHES*/) const
+{
+    bool simple_eval_safe = ((!m_name || m_name->LocalCandidateInvariant()) &&
+                             (parent_context.condition_root_candidate || RootCandidateInvariant()));
+
+    if (simple_eval_safe) {
+        // evaluate value and range limits once, use to match all candidates
+        std::shared_ptr<const UniverseObject> no_object;
+        ScriptingContext local_context(parent_context, no_object);
+
+        std::string name = (m_name ? m_name->Eval(local_context) : "");
+
+        // get condition from content, apply to matches / non_matches
+        const auto condition = GetCombatTargetCondition(m_content_type, name);
+        if (condition && condition != this) {
+            condition->Eval(parent_context, matches, non_matches, search_domain);
+        } else {
+            // if somehow in a cyclical loop because some content's location
+            // was defined as CombatTarget or if there is no available combat
+            // targetting condition (eg. in valid content type, or name of
+            // a bit of content that doesn't exist), match nothing
+            if (search_domain == MATCHES) {
+                non_matches.insert(non_matches.end(), matches.begin(), matches.end());
+                matches.clear();
+            }
+        }
+
+    } else {
+        // re-evaluate value and ranges for each candidate object
+        ConditionBase::Eval(parent_context, matches, non_matches, search_domain);
+    }
+}
+
+bool CombatTarget::RootCandidateInvariant() const
+{ return (!m_name || m_name->RootCandidateInvariant()); }
+
+bool CombatTarget::TargetInvariant() const
+{ return (!m_name|| m_name->TargetInvariant()); }
+
+bool CombatTarget::SourceInvariant() const
+{ return (!m_name || m_name->SourceInvariant()); }
+
+std::string CombatTarget::Description(bool negated/* = false*/) const {
+    std::string name_str;
+    if (m_name)
+        name_str = m_name->Description();
+
+    std::string content_type_str = GetContentTypeName(m_content_type);
+
+    return str(FlexibleFormat((!negated)
+               ? UserString("DESC_COMBAT_TARGET")
+               : UserString("DESC_COMBAT_TARGET_NOT"))
+               % content_type_str
+               % name_str);
+}
+
+std::string CombatTarget::Dump(unsigned short ntabs) const {
+    std::string retval = DumpIndent(ntabs) + "CombatTarget content_type = ";
+
+    switch (m_content_type) {
+    case CONTENT_BUILDING:  retval += "Building";   break;
+    case CONTENT_FOCUS:     retval += "Focus";      break;
+    case CONTENT_SHIP_HULL: retval += "Hull";       break;
+    case CONTENT_SHIP_PART: retval += "Part";       break;
+    case CONTENT_SPECIAL:   retval += "Special";    break;
+    case CONTENT_SPECIES:   retval += "Species";    break;
+    default:                retval += "???";
+    }
+
+    if (m_name)
+        retval += " name = " + m_name->Dump(ntabs);
+    return retval;
+}
+
+bool CombatTarget::Match(const ScriptingContext& local_context) const {
+    auto candidate = local_context.condition_local_candidate;
+    if (!candidate) {
+        ErrorLogger() << "CombatTarget::Match passed no candidate object";
+        return false;
+    }
+
+    std::string name = (m_name ? m_name->Eval(local_context) : "");
+
+    const auto condition = GetCombatTargetCondition(m_content_type, name);
+    if (!condition || condition == this)
+        return false;
+
+    // other Conditions' Match functions not directly callable, so can't do any
+    // better than just calling Eval for each candidate...
+    return condition->Eval(local_context, candidate);
+}
+
+void CombatTarget::SetTopLevelContent(const std::string& content_name) {
+    if (m_name)
+        m_name->SetTopLevelContent(content_name);
+}
+
+unsigned int CombatTarget::GetCheckSum() const {
+    unsigned int retval{0};
+
+    CheckSums::CheckSumCombine(retval, "Condition::CombatTarget");
+    CheckSums::CheckSumCombine(retval, m_name);
+    CheckSums::CheckSumCombine(retval, m_content_type);
+
+    TraceLogger() << "GetCheckSum(CombatTarget): retval: " << retval;
+    return retval;
+}
+
+///////////////////////////////////////////////////////////
 // And                                                   //
 ///////////////////////////////////////////////////////////
 And::And(std::vector<std::unique_ptr<ConditionBase>>&& operands) :
@@ -9300,12 +9480,19 @@ And::And(std::vector<std::unique_ptr<ConditionBase>>&& operands) :
     m_operands(std::move(operands))
 {}
 
-And::And(std::unique_ptr<ConditionBase>&& operand1, std::unique_ptr<ConditionBase>&& operand2) :
+And::And(std::unique_ptr<ConditionBase>&& operand1, std::unique_ptr<ConditionBase>&& operand2,
+         std::unique_ptr<ConditionBase>&& operand3, std::unique_ptr<ConditionBase>&& operand4) :
     ConditionBase()
 {
     // would prefer to initialize the vector m_operands in the initializer list, but this is difficult with non-copyable unique_ptr parameters
-    m_operands.push_back(std::move(operand1));
-    m_operands.push_back(std::move(operand2));
+    if (operand1)
+        m_operands.push_back(std::move(operand1));
+    if (operand2)
+        m_operands.push_back(std::move(operand2));
+    if (operand3)
+        m_operands.push_back(std::move(operand3));
+    if (operand4)
+        m_operands.push_back(std::move(operand4));
 }
 
 bool And::operator==(const ConditionBase& rhs) const {
@@ -9496,12 +9683,21 @@ Or::Or(std::vector<std::unique_ptr<ConditionBase>>&& operands) :
     m_operands(std::move(operands))
 {}
 
-Or::Or(std::unique_ptr<ConditionBase>&& operand1, std::unique_ptr<ConditionBase>&& operand2) :
+Or::Or(std::unique_ptr<ConditionBase>&& operand1,
+       std::unique_ptr<ConditionBase>&& operand2,
+       std::unique_ptr<ConditionBase>&& operand3,
+       std::unique_ptr<ConditionBase>&& operand4) :
     ConditionBase()
 {
     // would prefer to initialize the vector m_operands in the initializer list, but this is difficult with non-copyable unique_ptr parameters
-    m_operands.push_back(std::move(operand1));
-    m_operands.push_back(std::move(operand2));
+    if (operand1)
+        m_operands.push_back(std::move(operand1));
+    if (operand2)
+        m_operands.push_back(std::move(operand2));
+    if (operand3)
+        m_operands.push_back(std::move(operand3));
+    if (operand4)
+        m_operands.push_back(std::move(operand4));
 }
 
 bool Or::operator==(const ConditionBase& rhs) const {

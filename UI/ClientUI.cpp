@@ -607,12 +607,6 @@ namespace {
 // ClientUI
 ////////////////////////////////////////////////
 ClientUI::ClientUI() :
-    m_map_wnd(nullptr),
-    m_message_wnd(nullptr),
-    m_player_list_wnd(nullptr),
-    m_intro_screen(nullptr),
-    m_multiplayer_lobby_wnd(nullptr),
-    m_password_enter_wnd(nullptr),
     m_ship_designs(new ShipDesignManager())
 {
     s_the_UI = this;
@@ -1153,11 +1147,6 @@ int FontBasedUpscale(int x) {
 }
 
 namespace GG {
-    std::ostream& operator<<(std::ostream& os, const Clr& clr) {
-        os << "(" << +clr.r << "," << +clr.g << "," << +clr.b << "," << +clr.a << ")";
-        return os;
-    }
-
     std::istream& operator>>(std::istream& is, Clr& clr) {
         namespace classic = boost::spirit::classic;
         using classic::space_p;

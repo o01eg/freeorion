@@ -1292,6 +1292,11 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
         // the player controlling a particular empire might have a different
         // player ID than when the game was first created
         m_player_empire_ids[player_id] = empire_id;
+
+        // set actual authentication status
+        if (Empire* empire = GetEmpire(empire_id)) {
+            empire->SetAuthenticated(player_connection->IsAuthenticated());
+        }
     }
 
     for (const auto& psgd : player_save_game_data) {
@@ -1747,28 +1752,31 @@ void ServerApp::DropPlayerEmpireLink(int player_id)
 { m_player_empire_ids.erase(player_id); }
 
 int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
+    Empire* empire = nullptr;
     int empire_id = ALL_EMPIRES;
     // search empire by player name
-    for (auto empire : Empires()) {
-        if (empire.second->PlayerName() == player_connection->PlayerName()) {
-            empire_id = empire.first;
+    for (auto e : Empires()) {
+        if (e.second->PlayerName() == player_connection->PlayerName()) {
+            empire_id = e.first;
+            empire = e.second;
             break;
         }
     }
 
-    if (empire_id == ALL_EMPIRES)
-        return false;
+    if (empire_id == ALL_EMPIRES || empire == nullptr)
+        return ALL_EMPIRES;
 
     auto orders_it = m_turn_sequence.find(empire_id);
     if (orders_it == m_turn_sequence.end()) {
         WarnLogger() << "ServerApp::AddPlayerIntoGame empire " << empire_id
                      << " for \"" << player_connection->PlayerName()
                      << "\" doesn't wait for orders";
-        return false;
+        return ALL_EMPIRES;
     }
 
     // make a link to new connection
     m_player_empire_ids[player_connection->PlayerID()] = empire_id;
+    empire->SetAuthenticated(player_connection->IsAuthenticated());
 
     const OrderSet dummy;
     const OrderSet& orders = orders_it->second.second && orders_it->second.second->m_orders ? *(orders_it->second.second->m_orders) : dummy;
@@ -1799,7 +1807,7 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
                                                            empire.first));
     }
 
-    return true;
+    return empire_id;
 }
 
 bool ServerApp::IsHostless() const

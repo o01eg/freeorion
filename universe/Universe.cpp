@@ -295,8 +295,7 @@ void Universe::RenameShipDesign(int design_id, const std::string& name/* = ""*/,
     }
     ShipDesign* design = design_it->second;
 
-    if (name != "")
-        design->SetName(name);
+    design->SetName(name);
     design->SetDescription(description);
 }
 
@@ -1011,13 +1010,11 @@ namespace {
         Effect::TargetSet&                                              target_objects,
         std::string&                                                    match_log)
     {
-        std::pair<bool, Effect::TargetSet>* cache_entry = nullptr;
-
         if (!cond)
             return EMPTY_TARGET_SET;
 
         // the passed-in cached_condition_matches are here expected be specific for the current source object
-        cache_entry = cached_condition_matches.Find(cond, false);
+        std::pair<bool, Effect::TargetSet>* cache_entry = cached_condition_matches.Find(cond, false);
         if (cache_entry)
             return cache_entry->second;
 
@@ -1807,7 +1804,8 @@ void Universe::ForgetKnownObject(int empire_id, int object_id) {
     for (int child_id : contained_ids)
         ForgetKnownObject(empire_id, child_id);
 
-    if (int container_id = obj->ContainerObjectID() != INVALID_OBJECT_ID) {
+    int container_id = obj->ContainerObjectID();
+    if (container_id != INVALID_OBJECT_ID) {
         if (auto container = objects.Object(container_id)) {
             if (auto system = std::dynamic_pointer_cast<System>(container))
                 system->Remove(object_id);
@@ -2322,7 +2320,6 @@ namespace {
         // ensure systems on either side of a starlane along which a fleet is
         // moving are at least basically visible, so that the starlane itself can /
         // will be visible
-        std::vector<std::shared_ptr<const Fleet>> moving_fleets;
         for (auto& obj : objects.FindObjects(MovingFleetVisitor())) {
             if (obj->Unowned() || obj->SystemID() == INVALID_OBJECT_ID || obj->ObjectType() != OBJ_FLEET)
                 continue;
@@ -2416,7 +2413,7 @@ namespace {
         // second-order visibility sharing (but only through allies with lower
         // empire id)
         auto input_eov_copy = empire_object_visibility;
-        auto input_eovs_copy = empire_object_visible_specials;
+        // unused variable auto input_eovs_copy = empire_object_visible_specials;
         Universe& universe = GetUniverse();
 
         for (auto& empire_entry : Empires()) {

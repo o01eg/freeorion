@@ -1769,7 +1769,7 @@ void ServerApp::DropPlayerEmpireLink(int player_id)
 bool ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
     // search empire by player name
     for (auto empire : Empires()) {
-        if (empire.second->PlayerName() == player_connection->PlayerName()) {
+        if (!empire.second->Eliminated() && empire.second->PlayerName() == player_connection->PlayerName()) {
             auto orders_it = m_turn_sequence.find(empire.first);
             if (orders_it == m_turn_sequence.end()) {
                 WarnLogger() << "ServerApp::AddPlayerIntoGame empire " << empire.first

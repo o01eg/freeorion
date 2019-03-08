@@ -241,50 +241,81 @@ ServerApp& ServerFSM::Server()
 void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
     PlayerConnectionPtr& player_connection = d.m_player_connection;
     bool must_quit = false;
+    int id = Networking::INVALID_PLAYER_ID;
 
     if (player_connection->IsEstablished()) {
         // update cookie expire date
         // so player could reconnect within 120 minutes
         m_server.Networking().UpdateCookie(player_connection->Cookie());
 
-        int id = player_connection->PlayerID();
+        id = player_connection->PlayerID();
         DebugLogger(FSM) << "ServerFSM::HandleNonLobbyDisconnection : Lost connection to player #" << id
                          << ", named \"" << player_connection->PlayerName() << "\".";
 
-        // Did an active player (AI or Human) disconnect?  If so, game is over
-        if (player_connection->GetClientType() == Networking::CLIENT_TYPE_HUMAN_OBSERVER ||
-            player_connection->GetClientType() == Networking::CLIENT_TYPE_HUMAN_MODERATOR)
-        {
-            // can continue.  Select new host if necessary.
-            if (m_server.m_networking.PlayerIsHost(id))
-                m_server.SelectNewHost();
-
-        } else if (player_connection->GetClientType() == Networking::CLIENT_TYPE_HUMAN_PLAYER ||
-                   player_connection->GetClientType() == Networking::CLIENT_TYPE_AI_PLAYER)
-        {
+        if (player_connection->GetClientType() == Networking::CLIENT_TYPE_AI_PLAYER) {
+            // AI could safely disconnect only if empire was eliminated
+            const Empire* empire = GetEmpire(m_server.PlayerEmpireID(id));
+            if (empire && !empire->Eliminated()) {
+                must_quit = true;
+                // AI abnormally disconnected during a regular game
+                ErrorLogger(FSM) << "AI Player #" << id << ", named \""
+                                 << player_connection->PlayerName() << "\"quit before empire was eliminated.";
+            }
+        } else if (player_connection->GetClientType() == Networking::CLIENT_TYPE_HUMAN_PLAYER) {
             const Empire* empire = GetEmpire(m_server.PlayerEmpireID(id));
             // eliminated and non-empire players can leave safely
             if (empire && !empire->Eliminated()) {
-                must_quit = true;
                 // player abnormally disconnected during a regular game
-                ErrorLogger(FSM) << "Player #" << id << ", named \""
+                WarnLogger(FSM) << "Player #" << id << ", named \""
                                  << player_connection->PlayerName() << "\"quit before empire was eliminated.";
-            } else if (player_connection->GetClientType() == Networking::CLIENT_TYPE_HUMAN_PLAYER && !empire) {
-                // should be in ingame lobby
-                // update ingame lobby
-                UpdateIngameLobby();
+                // detach player from empire
+                m_server.DropPlayerEmpireLink(id);
             }
         }
     } else {
         DebugLogger(FSM) << "Client quit before id was assigned.";
     }
 
-    // independently of everything else, if there are no humans left, it's time to terminate
-    if (m_server.m_networking.empty()
-        || m_server.m_ai_client_processes.size() == m_server.m_networking.NumEstablishedPlayers())
-    {
+    // count of active (non-eliminated) empires, which currently have a connected human players
+    int empire_connected_plr_cnt = 0;
+    // count of active (non-eliminated) empires, which currently have a disconnected human players
+    int empire_disconnected_plr_cnt = 0;
+    for (const auto& empire : Empires()) {
+        if (!empire.second->Eliminated()) {
+            switch (m_server.GetEmpireClientType(empire.first)) {
+            case Networking::CLIENT_TYPE_HUMAN_PLAYER:
+                empire_connected_plr_cnt++;
+                break;
+            case Networking::INVALID_CLIENT_TYPE:
+                empire_disconnected_plr_cnt++;
+                break;
+            case Networking::CLIENT_TYPE_AI_PLAYER:
+                // ignore
+                break;
+            default:
+                ErrorLogger(FSM) << "Incorrect client type " << m_server.GetEmpireClientType(empire.first)
+                                 << " for empire #" << empire.first;
+                break;
+            }
+        }
+    }
+
+    // Stop server if connected human player count is less than minimum
+    if (empire_connected_plr_cnt < GetOptionsDB().Get<int>("network.server.conn-human.min")) {
+        ErrorLogger(FSM) << "Too low connected human player " << empire_connected_plr_cnt
+                         << " expected " << GetOptionsDB().Get<int>("network.server.conn-human.min")
+                         << "; server terminating.";
         must_quit = true;
-        DebugLogger(FSM) << "ServerFSM::HandleNonLobbyDisconnection : All human players disconnected; server terminating.";
+    }
+
+    // Stop server if disconnected human player count exceeds maximum and maximum is set
+    if (GetOptionsDB().Get<int>("network.server.disconn-human.max") > 0 &&
+        empire_disconnected_plr_cnt >= GetOptionsDB().Get<int>("network.server.disconn-human.max"))
+    {
+        ErrorLogger(FSM) << "Too high disconnected human player " << empire_disconnected_plr_cnt
+                         << " expected " << GetOptionsDB().Get<int>("network.server.disconn-human.max")
+                         << "; server terminating.";
+        must_quit = true;
     }
 
     m_server.Networking().CleanupCookies();
@@ -296,6 +327,14 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
         } else {
             m_server.m_fsm->process_event(ShutdownServer());
         }
+    } else {
+        // can continue.  Select new host if necessary.
+        if (m_server.m_networking.PlayerIsHost(id))
+            m_server.SelectNewHost();
+
+        // player list changed
+        // notify those in ingame lobby
+        UpdateIngameLobby();
     }
 }
 
@@ -319,6 +358,7 @@ void ServerFSM::UpdateIngameLobby() {
         } else {
             player_setup_data.m_empire_color = GG::Clr(255, 255, 255, 255);
         }
+        player_setup_data.m_authenticated = (*player_it)->IsAuthenticated();
         dummy_lobby_data.m_players.push_back({player_id, player_setup_data});
     }
     dummy_lobby_data.m_start_lock_cause = UserStringNop("SERVER_ALREADY_PLAYING_GAME");
@@ -652,6 +692,7 @@ MPLobby::MPLobby(my_context c) :
                     player_setup_data.m_starting_species_name = "RANDOM";
                 else
                     player_setup_data.m_starting_species_name = sm.SequentialPlayableSpeciesName(player_id);
+                player_setup_data.m_authenticated = player_connection->IsAuthenticated();
 
                 m_lobby_data->m_players.push_back({player_id, player_setup_data});
             } else if (player_connection->GetClientType() == Networking::CLIENT_TYPE_AI_PLAYER) {
@@ -696,6 +737,7 @@ MPLobby::MPLobby(my_context c) :
         player_setup_data.m_starting_species_name = "RANDOM";
         // leaving save game empire id as default
         player_setup_data.m_client_type =           player_connection->GetClientType();
+        player_setup_data.m_authenticated =         player_connection->IsAuthenticated();
 
         player_connection->SendMessage(ServerLobbyUpdateMessage(*m_lobby_data));
     }
@@ -864,6 +906,7 @@ void MPLobby::EstablishPlayer(const PlayerConnectionPtr& player_connection,
             player_setup_data.m_starting_species_name = "RANDOM";
         else
             player_setup_data.m_starting_species_name = sm.SequentialPlayableSpeciesName(player_id);
+        player_setup_data.m_authenticated =  player_connection->IsAuthenticated();
 
         // after setting all details, push into lobby data
         m_lobby_data->m_players.push_back({player_id, player_setup_data});
@@ -973,7 +1016,7 @@ sc::result MPLobby::react(const JoinGame& msg) {
             return discard_event();
         }
 
-        player_name = new_player_name;
+        player_name = std::move(new_player_name);
     }
 
     DebugLogger(FSM) << "(ServerFSM) MPLobby.JoinGame player accepted: " << player_name;
@@ -1133,6 +1176,8 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                         WarnLogger(FSM) << "Got unallowed client types.";
                         break;
                     }
+                    // set correct authentication status
+                    player.second.m_authenticated = (*player_it)->IsAuthenticated();
                 } else {
                     // player wasn't found
                     // don't allow "ghost" records
@@ -1217,7 +1262,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 m_lobby_data->m_save_game = "";
                 m_lobby_data->m_save_game_empire_data.clear();
                 // prevent updating lobby by having old and new file name equal
-                incoming_lobby_data.m_save_game = "";
+                incoming_lobby_data.m_save_game.clear();
             }
 
             int ai_count = 0;
@@ -1230,7 +1275,43 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             // limit count of AI
             auto max_ai = GetOptionsDB().Get<int>("network.server.ai.max");
             if (ai_count <= max_ai || max_ai < 0) {
-                m_lobby_data->m_players    = incoming_lobby_data.m_players;
+                if (sender->HasAuthRole(Networking::ROLE_HOST)) {
+                    // don't check host player
+                    // treat host player as superuser or administrator
+                    m_lobby_data->m_players = incoming_lobby_data.m_players;
+                } else {
+                    // check players shouldn't set protected empire to themselves
+                    // if they don't have required player's name
+                    bool incorrect_empire = false;
+                    for (const auto& plr : incoming_lobby_data.m_players) {
+                        if (plr.first != sender->PlayerID())
+                            continue;
+                        if (plr.second.m_save_game_empire_id != ALL_EMPIRES) {
+                            const auto empire_it = m_lobby_data->m_save_game_empire_data.find(plr.second.m_save_game_empire_id);
+                            if (empire_it != m_lobby_data->m_save_game_empire_data.end()) {
+                                if (empire_it->second.m_authenticated) {
+                                    if (empire_it->second.m_player_name != sender->PlayerName()) {
+                                        WarnLogger(FSM) << "Unauthorized access to protected empire \"" << empire_it->second.m_empire_name << "\"."
+                                                        << " Expected player \"" << empire_it->second.m_player_name << "\""
+                                                        << " got \"" << sender->PlayerName() << "\"";
+                                        incorrect_empire = true;
+                                    }
+                                }
+                            } else {
+                                WarnLogger(FSM) << "Unknown empire #" << plr.second.m_save_game_empire_id;
+                                incorrect_empire = true;
+                            }
+                        }
+                        break;
+                    }
+                    if (incorrect_empire) {
+                        has_important_changes = true;
+                        player_setup_data_changed = true;
+                    } else {
+                        // ToDo: non-host player should change only AI and himself
+                        m_lobby_data->m_players = incoming_lobby_data.m_players;
+                    }
+                }
             } else {
                 has_important_changes = true;
             }
@@ -1344,6 +1425,30 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                     i_player.second.m_player_ready = false;
                     player_setup_data_changed = true;
                 } else {
+                    // check loaded empire
+                    bool incorrect_empire = false;
+                    if (j_player.second.m_save_game_empire_id != ALL_EMPIRES) {
+                        const auto empire_it = m_lobby_data->m_save_game_empire_data.find(j_player.second.m_save_game_empire_id);
+                        if (empire_it != m_lobby_data->m_save_game_empire_data.end()) {
+                            if (empire_it->second.m_authenticated) {
+                                if (empire_it->second.m_player_name != sender->PlayerName()) {
+                                    WarnLogger(FSM) << "Unauthorized access to protected empire \"" << empire_it->second.m_empire_name << "\"."
+                                                    << " Expected player \"" << empire_it->second.m_player_name << "\""
+                                                    << " got \"" << sender->PlayerName() << "\"";
+                                    incorrect_empire = true;
+                                }
+                            }
+                        } else {
+                            WarnLogger(FSM) << "Unknown empire #" << j_player.second.m_save_game_empire_id;
+                            incorrect_empire = true;
+                        }
+                    }
+                    if (incorrect_empire) {
+                        i_player.second.m_player_ready = false;
+                        player_setup_data_changed = true;
+                        break;
+                    }
+
                     has_important_changes = IsPlayerChanged(i_player.second, j_player.second);
                     player_setup_data_changed = ! (i_player.second == j_player.second);
 
@@ -2436,7 +2541,7 @@ sc::result PlayingGame::react(const JoinGame& msg) {
             return discard_event();
         }
 
-        player_name = new_player_name;
+        player_name = std::move(new_player_name);
     }
 
     EstablishPlayer(player_connection, player_name, client_type,

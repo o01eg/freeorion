@@ -29,6 +29,8 @@
 #ifndef _GG_Clr_h_
 #define _GG_Clr_h_
 
+#include <GG/Export.h>
+
 #include <string>
 #include <stdexcept>
 #include <sstream>
@@ -53,9 +55,9 @@ struct Clr
 
     /** ctor that constructs a Clr from four ints that represent the color channels */
     constexpr Clr(unsigned char r_,
-        unsigned char g_,
-        unsigned char b_,
-        unsigned char a_) :
+                  unsigned char g_,
+                  unsigned char b_,
+                  unsigned char a_) :
         r(r_), g(g_), b(b_), a(a_)
         {}
     //@}
@@ -65,6 +67,9 @@ struct Clr
     unsigned char b;   ///< the blue channel
     unsigned char a;   ///< the alpha channel
 };
+
+GG_API std::ostream& operator<<(std::ostream& os, const Clr& pt);
+
 
 /** Named ctor that constructs a Clr from four floats that represent the color
     channels (each must be >= 0.0 and <= 1.0). */
@@ -84,14 +89,14 @@ inline Clr FloatClr(float r, float g, float b, float a)
     */
 inline Clr HexClr(const std::string& hex_colour)
 {
-    GG::Clr retval = GG::Clr(0, 0, 0, 255);
-
     std::istringstream iss(hex_colour);
 
     unsigned long rgba = 0;
     if ((hex_colour.size() == 7 || hex_colour.size() == 9) &&
             '#' == iss.get() && !(iss >> std::hex >> rgba).fail())
     {
+        GG::Clr retval = GG::Clr(0, 0, 0, 255);
+
         if (hex_colour.size() == 7) {
             retval.r = (rgba >> 16) & 0xFF;
             retval.g = (rgba >> 8)  & 0xFF;

@@ -39,9 +39,7 @@ namespace {
                 ErrorLogger() << "SetTechQueueElementSpending couldn't find tech with name " << elem.name << " in the research status map";
                 continue;
             }
-            bool researchable = false;
-            if (status_it->second == TS_RESEARCHABLE)
-                researchable = true;
+            bool researchable = status_it->second == TS_RESEARCHABLE;
 
             if (researchable && !elem.paused) {
                 auto progress_it = research_progress.find(elem.name);
@@ -199,7 +197,7 @@ void ResearchQueue::Update(float RPs, const std::map<std::string, float>& resear
         dpsim_research_progress[i] = dp_prog[tname];
     }
 
-    std::map<std::string, TechStatus> dpsim_tech_status_map = sim_tech_status_map;
+    std::map<std::string, TechStatus> dpsim_tech_status_map = std::move(sim_tech_status_map);
 
     // initialize simulation_results with -1 for all techs, so that any techs that aren't
     // finished in simulation by turn TOO_MANY_TURNS will be left marked as never to be finished
@@ -260,7 +258,7 @@ void ResearchQueue::Update(float RPs, const std::map<std::string, float>& resear
             const std::string& tech_name = m_queue[cur_tech].name;
             const Tech* tech = GetTech(tech_name);
             float progress = dpsim_research_progress[cur_tech];
-            float tech_cost = tech->ResearchCost(m_empire_id);
+            float tech_cost = tech ? tech->ResearchCost(m_empire_id) : 0.0f;
             float RPs_needed = tech ? tech_cost * (1.0f - std::min(progress, 1.0f)) : 0.0f;
             float RPs_per_turn_limit = tech ? tech->PerTurnCost(m_empire_id) : 1.0f;
             float RPs_to_spend = std::min(std::min(RPs_needed, RPs_per_turn_limit), rp_still_available[dp_turns-1]);

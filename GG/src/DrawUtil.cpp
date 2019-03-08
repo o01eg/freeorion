@@ -567,6 +567,12 @@ namespace { // file-scope constants and functions
 
 
 namespace GG {
+    std::ostream& operator<<(std::ostream& os, const Clr& clr)
+    {
+        os << "(" << +clr.r << ", " << +clr.g << ", " << +clr.b << ", " << +clr.a << ")";
+        return os;
+    }
+
     void glColor(Clr clr)
     { glColor4ub(clr.r, clr.g, clr.b, clr.a); }
 
@@ -632,6 +638,13 @@ namespace GG {
             glScissor(Value(r.Left()), Value(GUI::GetGUI()->AppHeight() - r.Bottom()),
                       Value(r.Width()), Value(r.Height()));
         }
+    }
+
+    Rect ActiveScissorClippingRegion()
+    {
+        if (g_scissor_clipping_rects.empty())
+            return Rect();
+        return g_scissor_clipping_rects.back();
     }
 
     void BeginStencilClipping(Pt inner_ul, Pt inner_lr, Pt outer_ul, Pt outer_lr)

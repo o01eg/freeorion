@@ -852,7 +852,7 @@ sc::result MPLobby::react(const Disconnection& d) {
             std::vector<std::string> args{"/usr/bin/curl",
                 "http://localhost:8083/",
                 "-H", "X-XMPP-Muc: smac",
-                "-d", "@freeorion in lobby " + std::to_string(players_size)};
+                "-d", " @freeorion in lobby " + std::to_string(players_size)};
             Process sendxmpp = Process("/usr/bin/curl", args);
             std::this_thread::sleep_for(std::chrono::seconds(3));
         });

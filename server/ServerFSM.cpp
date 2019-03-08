@@ -805,13 +805,12 @@ sc::result MPLobby::react(const Disconnection& d) {
                 players_size++;
         }
         std::async(std::launch::async, [players_size] {
-            std::vector<std::string> args{"/usr/local/bin/sendxmpp",
-                "-f", "/etc/freeorion/xmpp.conf",
-                "-c", "smac@conference.bitcheese.net/FreeOrion",
-                "@freeorion in lobby",
-                std::to_string(players_size)};
-            Process sendxmpp = Process("/usr/local/bin/sendxmpp", args);
-            std::this_thread::sleep_for(std::chrono::seconds(7));
+            std::vector<std::string> args{"/usr/bin/curl",
+                "http://localhost:8083/",
+                "-H", "X-XMPP-Muc: smac",
+                "-d", "@freeorion in lobby " + std::to_string(players_size)};
+            Process sendxmpp = Process("/usr/bin/curl", args);
+            std::this_thread::sleep_for(std::chrono::seconds(3));
         });
     } else {
         DebugLogger(FSM) << "MPLobby.Disconnection : Disconnecting player (" << id << ") was not in lobby";
@@ -890,13 +889,12 @@ void MPLobby::EstablishPlayer(const PlayerConnectionPtr& player_connection,
             players_size++;
     }
     std::async(std::launch::async, [player_name, players_size] {
-        std::vector<std::string> args{"/usr/local/bin/sendxmpp",
-            "-f", "/etc/freeorion/xmpp.conf",
-            "-c", "smac@conference.bitcheese.net/FreeOrion",
-            "!r", player_name, "@freeorion, in lobby",
-            std::to_string(players_size)};
-        Process sendxmpp = Process("/usr/local/bin/sendxmpp", args);
-        std::this_thread::sleep_for(std::chrono::seconds(7));
+        std::vector<std::string> args{"/usr/bin/curl",
+            "http://localhost:8083/",
+            "-H", "X-XMPP-Muc: smac",
+            "-d", "!r " + player_name + " @freeorion in lobby " + std::to_string(players_size)};
+            Process sendxmpp = Process("/usr/bin/curl", args);
+        std::this_thread::sleep_for(std::chrono::seconds(3));
     });
 }
 

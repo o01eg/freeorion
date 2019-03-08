@@ -1,6 +1,5 @@
 debian/apparmor/usr.lib.freeorion.freeoriond etc/apparmor.d
 debian/apparmor/usr.lib.freeorion.freeorionca etc/apparmor.d
-debian/xmpp.conf                            etc/freeorion
 debian/auth.txt                             etc/freeorion
 debian/db.txt                               etc/freeorion
 debian/persistent_config.xml                etc/freeorion

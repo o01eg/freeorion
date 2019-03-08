@@ -38,9 +38,6 @@ case "$1" in
 
 	chown -R freeorion:freeorion /etc/freeorion
 
-	# fix xmpp.conf mode
-	chmod 0600 /etc/freeorion/xmpp.conf
-	
 	# fix persistent_config.xml
 	chmod 0600 /etc/freeorion/persistent_config.xml
 

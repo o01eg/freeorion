@@ -1,3 +1,11 @@
+freeorion (0.4.8-8) unstable; urgency=medium
+
+  * Disallow to take over eliminated empire.
+  * Notify other players eliminated empire made its turn.
+  * Move from sendxmpp to sendxmppd-rust service.
+
+ -- O01eg <o01eg@yandex.ru>  Fri, 08 Mar 2019 12:03:47 +0000
+
 freeorion (0.4.8-7) unstable; urgency=medium
 
   * Fix crash on disconnecting.

@@ -18,7 +18,7 @@
   /run/postgresql/* rw,
   /usr/lib/freeorion/freeorionca Px,
   /usr/lib/freeorion/freeoriond mr,
-  /usr/local/bin/sendxmpp Ux,
+  /usr/bin/curl Ux,
   /usr/share/games/freeorion/default/** r,
   /var/lib/freeorion/save/ rw,
   /var/lib/freeorion/save/**.mps rw,

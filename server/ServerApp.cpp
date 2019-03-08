@@ -1760,6 +1760,15 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
     // break link between player and empire
     m_player_empire_ids.erase(player_id);
 
+    // notify other player that this empire finished orders
+    for (auto player_it = m_networking.established_begin();
+        player_it != m_networking.established_end(); ++player_it)
+    {
+        PlayerConnectionPtr player_ctn = *player_it;
+        player_ctn->SendMessage(PlayerStatusMessage(player_id,
+                                                    Message::WAITING));
+    }
+
     return true;
 }
 

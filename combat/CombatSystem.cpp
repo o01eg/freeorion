@@ -11,6 +11,7 @@
 #include "../universe/Fighter.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/System.h"
+#include "../universe/Species.h"
 #include "../universe/Enums.h"
 #include "../universe/Condition.h"
 #include "../universe/ValueRef.h"
@@ -342,6 +343,29 @@ namespace {
                                 nullptr,
                                 boost::make_unique<ValueRef::Constant<double>>(0.0)))))));
 
+    const std::unique_ptr<Condition::ConditionBase> if_source_is_planet_then_ships_else_all =
+        boost::make_unique<Condition::Or>(
+            boost::make_unique<Condition::And>(     // if source is a planet, match ships
+                boost::make_unique<Condition::Number>(
+                    boost::make_unique<ValueRef::Constant<int>>(1), // minimum objects matching subcondition
+                    nullptr,
+                    boost::make_unique<Condition::And>(             // subcondition: source is a planet
+                        boost::make_unique<Condition::Source>(),
+                        boost::make_unique<Condition::Type>(OBJ_PLANET)
+                    )
+                ),
+                boost::make_unique<Condition::Type>(OBJ_SHIP)
+            ),
+
+            boost::make_unique<Condition::Number>(  // if source is not a planet, match anything
+                nullptr,
+                boost::make_unique<ValueRef::Constant<int>>(0),     // maximum objects matching subcondition
+                boost::make_unique<Condition::And>(                 // subcondition: source is a planet
+                    boost::make_unique<Condition::Source>(),
+                    boost::make_unique<Condition::Type>(OBJ_PLANET)
+                )
+            )
+        );
 
     struct PartAttackInfo {
         PartAttackInfo(ShipPartClass part_class_, const std::string& part_name_,
@@ -497,7 +521,7 @@ namespace {
 
     void AttackShipFighter(std::shared_ptr<Ship> attacker, const PartAttackInfo& weapon,
                            std::shared_ptr<Fighter> target, CombatInfo& combat_info,
-                           int bout, int round, AttacksEventPtr& attacks_event,
+                           int bout, int round,
                            WeaponsPlatformEvent::WeaponsPlatformEventPtr& combat_event)
     {
         float power = weapon.part_attack;
@@ -557,9 +581,87 @@ namespace {
         target->SetLastTurnActiveInCombat(CurrentTurn());
     }
 
+    void AttackPlanetPlanet(std::shared_ptr<Planet> attacker, const PartAttackInfo& weapon,
+                            std::shared_ptr<Planet> target, CombatInfo& combat_info,
+                            int bout, int round,
+                            WeaponsPlatformEvent::WeaponsPlatformEventPtr& combat_event)
+    {
+        if (!attacker || !target) return;
+
+        float power = 0.0f;
+        const Meter* attacker_damage = attacker->UniverseObject::GetMeter(METER_DEFENSE);
+        if (attacker_damage)
+            power = attacker_damage->Current();   // planet "Defense" meter is actually its attack power
+
+        std::set<int>& damaged_object_ids = combat_info.damaged_object_ids;
+
+        Meter* target_shield = target->GetMeter(METER_SHIELD);
+        Meter* target_defense = target->UniverseObject::GetMeter(METER_DEFENSE);
+        Meter* target_construction = target->UniverseObject::GetMeter(METER_CONSTRUCTION);
+        if (!target_shield) {
+            ErrorLogger() << "couldn't get target shield meter";
+            return;
+        }
+        if (!target_defense) {
+            ErrorLogger() << "couldn't get target defense meter";
+            return;
+        }
+        if (!target_construction) {
+            ErrorLogger() << "couldn't get target construction meter";
+            return;
+        }
+
+        DebugLogger(combat) << "AttackPlanetPlanet: attacker: " << attacker->Name() << " power: " << power
+                            << "\ntarget: " << target->Name() << " shield: " << target_shield->Current()
+                            << " defense: " << target_defense->Current() << " infra: " << target_construction->Current();
+
+        // damage shields, limited by shield current value and damage amount.
+        // remaining damage, if any, above shield current value goes to defense.
+        // remaining damage, if any, above defense current value goes to construction
+        float shield_damage = std::min(target_shield->Current(), power);
+        float defense_damage = 0.0f;
+        float construction_damage = 0.0f;
+        if (shield_damage >= target_shield->Current())
+            defense_damage = std::min(target_defense->Current(), power - shield_damage);
+
+        if (power > 0)
+            damaged_object_ids.insert(target->ID());
+
+        if (defense_damage >= target_defense->Current())
+            construction_damage = std::min(target_construction->Current(),
+                                           power - shield_damage - defense_damage);
+
+        if (shield_damage >= 0) {
+            target_shield->AddToCurrent(-shield_damage);
+            DebugLogger(combat) << "COMBAT: Planet " << attacker->Name() << " (" << attacker->ID() << ") does "
+                                << shield_damage << " shield damage to Planet " << target->Name() << " ("
+                                << target->ID() << ")";
+        }
+        if (defense_damage >= 0) {
+            target_defense->AddToCurrent(-defense_damage);
+            DebugLogger(combat) << "COMBAT: Planet " << attacker->Name() << " (" << attacker->ID() << ") does "
+                                << defense_damage << " defense damage to Planet " << target->Name() << " ("
+                                << target->ID() << ")";
+        }
+        if (construction_damage >= 0) {
+            target_construction->AddToCurrent(-construction_damage);
+            DebugLogger(combat) << "COMBAT: Planet " << attacker->Name() << " (" << attacker->ID() << ") does "
+                                << construction_damage << " instrastructure damage to Planet " << target->Name()
+                                << " (" << target->ID() << ")";
+        }
+
+        //TODO report the planet damage details more clearly
+        float total_damage = shield_damage + defense_damage + construction_damage;
+        combat_event->AddEvent(round, target->ID(), target->Owner(), weapon.part_type_name,
+                               power, 0.0f, total_damage);
+
+        //attacker->SetLastTurnActiveInCombat(CurrentTurn());
+        //target->SetLastTurnAttackedByShip(CurrentTurn());
+    }
+
     void AttackPlanetFighter(std::shared_ptr<Planet> attacker, const PartAttackInfo& weapon,
                              std::shared_ptr<Fighter> target, CombatInfo& combat_info,
-                             int bout, int round, AttacksEventPtr& attacks_event,
+                             int bout, int round,
                              WeaponsPlatformEvent::WeaponsPlatformEventPtr& combat_event)
     {
         if (!attacker || !target) return;
@@ -571,7 +673,7 @@ namespace {
 
         if (power > 0.0f) {
             // any damage is enough to destroy any fighter
-           DebugLogger(combat) << "COMBAT: " << attacker->Name() << " of empire " << attacker->Owner()
+            DebugLogger(combat) << "COMBAT: " << attacker->Name() << " of empire " << attacker->Owner()
                                 << " (" << attacker->ID() << ") does " << power
                                 << " damage to " << target->Name() << " (" << target->ID() << ")";
             target->SetDestroyed();
@@ -623,6 +725,84 @@ namespace {
         target->SetLastTurnActiveInCombat(CurrentTurn());
     }
 
+    void AttackFighterPlanet(std::shared_ptr<Fighter> attacker, const PartAttackInfo& weapon,
+                             std::shared_ptr<Planet> target, CombatInfo& combat_info,
+                             int bout, int round, AttacksEventPtr& attacks_event)
+    {
+        if (!attacker || !target) return;
+
+        float power = attacker->Damage();
+
+        std::set<int>& damaged_object_ids = combat_info.damaged_object_ids;
+
+        Meter* target_shield = target->GetMeter(METER_SHIELD);
+        Meter* target_defense = target->UniverseObject::GetMeter(METER_DEFENSE);
+        Meter* target_construction = target->UniverseObject::GetMeter(METER_CONSTRUCTION);
+        if (!target_shield) {
+            ErrorLogger() << "couldn't get target shield meter";
+            return;
+        }
+        if (!target_defense) {
+            ErrorLogger() << "couldn't get target defense meter";
+            return;
+        }
+        if (!target_construction) {
+            ErrorLogger() << "couldn't get target construction meter";
+            return;
+        }
+
+        DebugLogger(combat) << "AttackFighterPlanet: attacker: " << attacker->Name() << " power: " << power
+                            << "\ntarget: " << target->Name() << " shield: " << target_shield->Current()
+                            << " defense: " << target_defense->Current() << " infra: " << target_construction->Current();
+
+        // damage shields, limited by shield current value and damage amount.
+        // remaining damage, if any, above shield current value goes to defense.
+        // remaining damage, if any, above defense current value goes to construction
+        float shield_damage = std::min(target_shield->Current(), power);
+        float defense_damage = 0.0f;
+        float construction_damage = 0.0f;
+        if (shield_damage >= target_shield->Current())
+            defense_damage = std::min(target_defense->Current(), power - shield_damage);
+
+        if (power > 0)
+            damaged_object_ids.insert(target->ID());
+
+        if (defense_damage >= target_defense->Current())
+            construction_damage = std::min(target_construction->Current(),
+                                           power - shield_damage - defense_damage);
+
+        if (shield_damage >= 0) {
+            target_shield->AddToCurrent(-shield_damage);
+            DebugLogger(combat) << "COMBAT: Ship " << attacker->Name() << " (" << attacker->ID() << ") does "
+                                << shield_damage << " shield damage to Planet " << target->Name() << " ("
+                                << target->ID() << ")";
+        }
+        if (defense_damage >= 0) {
+            target_defense->AddToCurrent(-defense_damage);
+            DebugLogger(combat) << "COMBAT: Ship " << attacker->Name() << " (" << attacker->ID() << ") does "
+                                << defense_damage << " defense damage to Planet " << target->Name() << " ("
+                                << target->ID() << ")";
+        }
+        if (construction_damage >= 0) {
+            target_construction->AddToCurrent(-construction_damage);
+            DebugLogger(combat) << "COMBAT: Ship " << attacker->Name() << " (" << attacker->ID() << ") does "
+                                << construction_damage << " instrastructure damage to Planet " << target->Name()
+                                << " (" << target->ID() << ")";
+        }
+
+        //TODO report the planet damage details more clearly
+        float total_damage = shield_damage + defense_damage + construction_damage;
+
+        float pierced_shield_value(0.0);
+        CombatEventPtr attack_event = std::make_shared<WeaponFireEvent>(
+            bout, round, attacker->ID(), target->ID(), weapon.part_type_name,
+            std::tie(power, pierced_shield_value, total_damage),
+            attacker->Owner(), target->Owner());
+        attacks_event->AddEvent(attack_event);
+
+        target->SetLastTurnAttackedByShip(CurrentTurn());
+    }
+
     void AttackFighterFighter(std::shared_ptr<Fighter> attacker, const PartAttackInfo& weapon,
                               std::shared_ptr<Fighter> target, CombatInfo& combat_info,
                               int bout, int round,
@@ -657,23 +837,23 @@ namespace {
         auto target_fighter = std::dynamic_pointer_cast<Fighter>(target);
 
         if (attack_ship && target_ship) {
-            AttackShipShip(attack_ship, weapon, target_ship, combat_info, bout, round, platform_event);
+            AttackShipShip(         attack_ship,    weapon, target_ship,    combat_info, bout, round, platform_event);
         } else if (attack_ship && target_planet) {
-            AttackShipPlanet(attack_ship, weapon, target_planet, combat_info, bout, round, platform_event);
+            AttackShipPlanet(       attack_ship,    weapon, target_planet,  combat_info, bout, round, platform_event);
         } else if (attack_ship && target_fighter) {
-            AttackShipFighter(attack_ship, weapon, target_fighter, combat_info, bout, round, attacks_event, platform_event);
+            AttackShipFighter(      attack_ship,    weapon, target_fighter, combat_info, bout, round, platform_event);
         } else if (attack_planet && target_ship) {
-            AttackPlanetShip(attack_planet, weapon, target_ship, combat_info, bout, round, platform_event);
+            AttackPlanetShip(       attack_planet,  weapon, target_ship,    combat_info, bout, round, platform_event);
         } else if (attack_planet && target_planet) {
-            // Planets don't attack each other, silly
+            AttackPlanetPlanet(     attack_planet,  weapon, target_planet,  combat_info, bout, round, platform_event);
         } else if (attack_planet && target_fighter) {
-            AttackPlanetFighter(attack_planet, weapon, target_fighter, combat_info, bout, round, attacks_event, platform_event);
+            AttackPlanetFighter(    attack_planet,  weapon, target_fighter, combat_info, bout, round, platform_event);
         } else if (attack_fighter && target_ship) {
-            AttackFighterShip(attack_fighter, weapon, target_ship, combat_info, bout, round, attacks_event);
+            AttackFighterShip(      attack_fighter, weapon, target_ship,    combat_info, bout, round, attacks_event);
         } else if (attack_fighter && target_planet) {
-            // Fighters can't attack planets
+            AttackFighterPlanet(    attack_fighter, weapon, target_planet,  combat_info, bout, round, attacks_event);
         } else if (attack_fighter && target_fighter) {
-            AttackFighterFighter(attack_fighter, weapon, target_fighter, combat_info, bout, round, fighter_on_fighter_event);
+            AttackFighterFighter(   attack_fighter, weapon, target_fighter, combat_info, bout, round, fighter_on_fighter_event);
         }
     }
 
@@ -871,7 +1051,7 @@ namespace {
                 if (!attacker_empire_info.HasAttackers() && !attacker_empire_info.HasUnlauchedArmedFighters(combat_info))
                     continue;
 
-                // todo: check if any of these ships or fighters have targeting
+                // TODO: check if any of these ships or fighters have targeting
                 // conditions that match anything present in this combat
                 return true;
             }
@@ -1115,18 +1295,89 @@ namespace {
         }
     };
 
+    std::vector<PartAttackInfo> GetWeapons(std::shared_ptr<UniverseObject>& attacker) {
+        // Loop over weapons of attacking object. Each gets a shot at a
+        // randomly selected target object, from the objects in the combat
+        // that match the weapon's targetting condition.
+        std::vector<PartAttackInfo> weapons;
+
+        auto attack_ship = std::dynamic_pointer_cast<Ship>(attacker);
+        auto attack_planet = std::dynamic_pointer_cast<Planet>(attacker);
+        auto attack_fighter = std::dynamic_pointer_cast<Fighter>(attacker);
+
+        if (attack_ship) {
+            weapons = ShipWeaponsStrengths(attack_ship);    // includes info about fighter launches with PC_FIGHTER_BAY part class, and direct fire weapons with PC_DIRECT_WEAPON part class
+            for (PartAttackInfo& part : weapons) {
+                if (part.part_class == PC_DIRECT_WEAPON) {
+                    DebugLogger(combat) << "Attacker Ship has direct weapon: " << part.part_type_name
+                                        << " attack: " << part.part_attack;
+                } else if (part.part_class == PC_FIGHTER_BAY) {
+                    DebugLogger(combat) << "Attacker Ship can fighter launch: " << part.fighters_launched
+                                        << " damage: " << part.fighter_damage;
+                    if (part.combat_targets)
+                        TraceLogger(combat) << " ... fighter targeting condition: " << part.combat_targets->Dump();
+                    else
+                        TraceLogger(combat) << " ... fighter has no targeting condition";
+                }
+            }
+
+        } else if (attack_planet) {     // treat planet defenses as direct fire weapon that only target ships
+            weapons.push_back(PartAttackInfo(PC_DIRECT_WEAPON, UserStringNop("DEF_DEFENSE"),
+                                             attack_planet->CurrentMeterValue(METER_DEFENSE),
+                                             is_enemy_ship.get()));
+
+        } else if (attack_fighter) {    // treat fighter damage as direct fire weapon
+            weapons.push_back(PartAttackInfo(PC_DIRECT_WEAPON, UserStringNop("FT_WEAPON_1"),
+                                             attack_fighter->Damage(),
+                                             attack_fighter->CombatTargets()));
+        }
+        return weapons;
+    }
+
+    const Condition::ConditionBase* SpeciesTargettingCondition(const std::shared_ptr<UniverseObject>& attacker) {
+        if (!attacker)
+            return if_source_is_planet_then_ships_else_all.get();
+
+        const Species* species = nullptr;
+        if (auto attack_ship = std::dynamic_pointer_cast<Ship>(attacker))
+            species = GetSpecies(attack_ship->SpeciesName());
+        else if (auto attack_planet = std::dynamic_pointer_cast<Planet>(attacker))
+            species = GetSpecies(attack_planet->SpeciesName());
+        else if (auto attack_fighter = std::dynamic_pointer_cast<Fighter>(attacker))
+            species = GetSpecies(attack_fighter->SpeciesName());
+
+        if (!species || !species->CombatTargets())
+            return if_source_is_planet_then_ships_else_all.get();
+
+        return species->CombatTargets();
+    }
+
+    void AddAllObjectsSet(ObjectMap& obj_map, Condition::ObjectSet& condition_non_targets) {
+        condition_non_targets.reserve(condition_non_targets.size() + obj_map.ExistingObjects().size());
+        std::transform(obj_map.ExistingObjects().begin(), obj_map.ExistingObjects().end(),  // ExistingObjects() here does not consider whether objects have been destroyed during this combat
+                       std::back_inserter(condition_non_targets),
+                       boost::bind(&std::map<int, std::shared_ptr<UniverseObject>>::value_type::second, _1));
+    }
+
     void ShootAllWeapons(std::shared_ptr<UniverseObject>& attacker,
-                         const std::vector<PartAttackInfo>& weapons,
                          AutoresolveInfo& combat_state, int bout, int round,
                          AttacksEventPtr& attacks_event,
                          WeaponsPlatformEvent::WeaponsPlatformEventPtr& platform_event,
                          std::shared_ptr<FightersAttackFightersEvent>& fighter_on_fighter_event)
     {
+        auto weapons = GetWeapons(attacker);
         if (weapons.empty()) {
             DebugLogger(combat) << "Attacker " << attacker->Name() << " ("
                                 << attacker->ID() << ") has no weapons, so can't attack";
             return;   // no ability to attack!
         }
+
+        const auto* species_targetting_condition = SpeciesTargettingCondition(attacker);
+        if (!species_targetting_condition) {
+            ErrorLogger(combat) << "Null Species Targetting Condition...!?";
+            return;
+        }
+        TraceLogger(combat) << "Species targeting condition: " << species_targetting_condition->Dump();
 
         for (const PartAttackInfo& weapon : weapons) {
             // skip non-direct-fire weapons (as only direct fire weapons can "shoot").
@@ -1143,46 +1394,31 @@ namespace {
                 DebugLogger(combat) << "Weapon has no targeting condition?? Should have been set when initializing PartAttackInfo";
                 continue;
             }
-            TraceLogger(combat) << "Targeting condition: " << weapon.combat_targets->Dump();
+            TraceLogger(combat) << "Weapon targeting condition: " << weapon.combat_targets->Dump();
 
-            Condition::ObjectSet possible_targets;
-            possible_targets.reserve(combat_state.combat_info.objects.NumObjects());
-            for (auto it = combat_state.combat_info.objects.begin();
-                 it != combat_state.combat_info.objects.end(); ++it)
-            { possible_targets.push_back(*it); }    // tried to do this with std::transform, but couldn't get it to compile
-            //std::transform(combat_state.combat_info.objects.const_begin(),
-            //               combat_state.combat_info.objects.const_end(),
-            //               std::back_inserter(possible_targets),
-            //               boost::bind(&ObjectMap::const_iterator<>::operator*, _1));
 
-            Condition::ObjectSet matched_targets;
+            Condition::ObjectSet targets, rejected_targets;
+            AddAllObjectsSet(combat_state.combat_info.objects, targets);
+
             // attacker is source object for condition evaluation. use combat-specific vis info.
             ScriptingContext context(attacker, combat_state.combat_info.empire_object_visibility);
 
-            weapon.combat_targets->Eval(context, matched_targets, possible_targets);
-            if (matched_targets.empty()) {
+            // apply species targeting condition and then weapon targeting condition
+            species_targetting_condition->Eval(context, targets, rejected_targets, Condition::MATCHES);
+            weapon.combat_targets->Eval(context, targets, rejected_targets, Condition::MATCHES);
+
+
+            if (targets.empty()) {
                 DebugLogger(combat) << "No objects matched targeting condition!";
                 continue;
             }
-            DebugLogger(combat) << matched_targets.size() << " objects matched targeting condition";
-            for (const auto& match : matched_targets)
+            DebugLogger(combat) << targets.size() << " objects matched targeting condition";
+            for (const auto& match : targets)
                 TraceLogger(combat) << " ... " << match->Name() << " (" << match->ID() << ")";
 
-
-            // if species has a targeting condition, apply that to the
-            // possible targets from the weapon
-
-            // option 1: species filter first
-            // exclude based on species or empire, then apply part conditions to exclude more
-            // can 
-
-            // option 2: part filter first
-            // exclude based on target type, then apply 
-
-
             // select target object from matches
-            int target_idx = RandInt(0, matched_targets.size() - 1);
-            auto target = *std::next(matched_targets.begin(), target_idx);
+            int target_idx = RandInt(0, targets.size() - 1);
+            auto target = *std::next(targets.begin(), target_idx);
 
             if (!target) {
                 ErrorLogger(combat) << "AutoResolveCombat selected null target object?";
@@ -1389,45 +1625,6 @@ namespace {
         }
     }
 
-    std::vector<PartAttackInfo> GetWeapons(std::shared_ptr<UniverseObject>& attacker) {
-        // Loop over weapons of attacking object. Each gets a shot at a
-        // randomly selected target object, from the objects in the combat
-        // that match the weapon's targetting condition.
-        std::vector<PartAttackInfo> weapons;
-
-        auto attack_ship = std::dynamic_pointer_cast<Ship>(attacker);
-        auto attack_planet = std::dynamic_pointer_cast<Planet>(attacker);
-        auto attack_fighter = std::dynamic_pointer_cast<Fighter>(attacker);
-
-        if (attack_ship) {
-            weapons = ShipWeaponsStrengths(attack_ship);    // includes info about fighter launches with PC_FIGHTER_BAY part class, and direct fire weapons with PC_DIRECT_WEAPON part class
-            for (PartAttackInfo& part : weapons) {
-                if (part.part_class == PC_DIRECT_WEAPON) {
-                    DebugLogger(combat) << "Attacker Ship has direct weapon: " << part.part_type_name
-                                        << " attack: " << part.part_attack;
-                } else if (part.part_class == PC_FIGHTER_BAY) {
-                    DebugLogger(combat) << "Attacker Ship can fighter launch: " << part.fighters_launched
-                                        << " damage: " << part.fighter_damage;
-                    if (part.combat_targets)
-                        TraceLogger(combat) << " ... fighter targeting condition: " << part.combat_targets->Dump();
-                    else
-                        TraceLogger(combat) << " ... fighter has no targeting condition";
-                }
-            }
-
-        } else if (attack_planet) {     // treat planet defenses as direct fire weapon that only target ships
-            weapons.push_back(PartAttackInfo(PC_DIRECT_WEAPON, UserStringNop("DEF_DEFENSE"),
-                                             attack_planet->CurrentMeterValue(METER_DEFENSE),
-                                             is_enemy_ship.get()));
-
-        } else if (attack_fighter) {    // treat fighter damage as direct fire weapon
-            weapons.push_back(PartAttackInfo(PC_DIRECT_WEAPON, UserStringNop("FT_WEAPON_1"),
-                                             attack_fighter->Damage(),
-                                             attack_fighter->CombatTargets()));
-        }
-        return weapons;
-    }
-
     void CombatRound(int bout, AutoresolveInfo& combat_state) {
         CombatInfo& combat_info = combat_state.combat_info;
 
@@ -1477,11 +1674,11 @@ namespace {
             }
             DebugLogger(combat) << "Planet: " << attacker->Name();
 
-            auto weapons = GetWeapons(attacker); // includes info about fighter launches with PC_FIGHTER_BAY part class, and direct fire weapons (ships, planets, or fighters) with PC_DIRECT_WEAPON part class
             auto platform_event = std::make_shared<WeaponsPlatformEvent>(
                 bout, attacker_id, attacker->Owner());
             attacks_event->AddEvent(platform_event);
-            ShootAllWeapons(attacker, weapons, combat_state, bout, round++,
+
+            ShootAllWeapons(attacker, combat_state, bout, round++,
                             attacks_event, platform_event, fighter_on_fighter_event);
         }
 
@@ -1503,13 +1700,12 @@ namespace {
             }
             DebugLogger(combat) << "Attacker: " << attacker->Name();
 
-            // loop over weapons of the attacking object.  each gets a shot at a
-            // randomly selected target object
-            auto weapons = GetWeapons(attacker);  // includes info about fighter launches with PC_FIGHTER_BAY part class, and direct fire weapons (ships, planets, or fighters) with PC_DIRECT_WEAPON part class
             auto platform_event = std::make_shared<WeaponsPlatformEvent>(
                 bout, attacker_id, attacker->Owner());
-            ShootAllWeapons(attacker, weapons, combat_state, bout, round++,
+
+            ShootAllWeapons(attacker, combat_state, bout, round++,
                             attacks_event, platform_event, fighter_on_fighter_event);
+
             if (!platform_event->AreSubEventsEmpty(attacker->Owner()))
                 attacks_event->AddEvent(platform_event);
         }
@@ -1616,7 +1812,7 @@ void AutoResolveCombat(CombatInfo& combat_info) {
     int base_seed = 0;
     if (GetGameRules().Get<bool>("RULE_RESEED_PRNG_SERVER")) {
         //static boost::hash<std::string> cs_string_hash;
-        // todo: salt further with galaxy setup seed
+        // TODO: salt further with galaxy setup seed
         base_seed = combat_info.objects.begin()->ID() + CurrentTurn();
     }
 

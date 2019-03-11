@@ -175,6 +175,18 @@ namespace {
 
         return fatal;
     }
+
+    std::string GetAutoSaveFileName(int current_turn) {
+        std::string subdir = GetGalaxySetupData().GetGameUID();
+        boost::filesystem::path autosave_dir_path = GetServerSaveDir() / (subdir.empty() ? "auto" : subdir);
+        const auto& extension = MP_SAVE_FILE_EXTENSION;
+        // Add timestamp to autosave generated files
+        std::string datetime_str = FilenameTimestamp();
+
+        std::string save_filename = boost::io::str(boost::format("FreeOrion_%04d_%s%s") % current_turn % datetime_str % extension);
+        boost::filesystem::path save_path(autosave_dir_path / save_filename);
+        return save_path.string();
+    }
 }
 
 ////////////////////////////////////////////////////////////
@@ -278,8 +290,8 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
 
     // count of active (non-eliminated) empires, which currently have a connected human players
     int empire_connected_plr_cnt = 0;
-    // count of active (non-eliminated) empires, which currently have a disconnected human players
-    int empire_disconnected_plr_cnt = 0;
+    // count of active (non-eliminated) empires, which currently have a unconnected human players
+    int empire_unconnected_plr_cnt = 0;
     for (const auto& empire : Empires()) {
         if (!empire.second->Eliminated()) {
             switch (m_server.GetEmpireClientType(empire.first)) {
@@ -287,7 +299,7 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
                 empire_connected_plr_cnt++;
                 break;
             case Networking::INVALID_CLIENT_TYPE:
-                empire_disconnected_plr_cnt++;
+                empire_unconnected_plr_cnt++;
                 break;
             case Networking::CLIENT_TYPE_AI_PLAYER:
                 // ignore
@@ -300,20 +312,20 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
         }
     }
 
-    // Stop server if connected human player count is less than minimum
-    if (empire_connected_plr_cnt < GetOptionsDB().Get<int>("network.server.conn-human.min")) {
+    // Stop server if connected human player empires count is less than minimum
+    if (empire_connected_plr_cnt < GetOptionsDB().Get<int>("network.server.conn-human-empire-players.min")) {
         ErrorLogger(FSM) << "Too low connected human player " << empire_connected_plr_cnt
-                         << " expected " << GetOptionsDB().Get<int>("network.server.conn-human.min")
+                         << " expected " << GetOptionsDB().Get<int>("network.server.conn-human-empire-players.min")
                          << "; server terminating.";
         must_quit = true;
     }
 
-    // Stop server if disconnected human player count exceeds maximum and maximum is set
-    if (GetOptionsDB().Get<int>("network.server.disconn-human.max") > 0 &&
-        empire_disconnected_plr_cnt >= GetOptionsDB().Get<int>("network.server.disconn-human.max"))
+    // Stop server if unconnected human player empires count exceeds maximum and maximum is set
+    if (GetOptionsDB().Get<int>("network.server.unconn-human-empire-players.max") > 0 &&
+        empire_unconnected_plr_cnt >= GetOptionsDB().Get<int>("network.server.unconn-human-empire-players.max"))
     {
-        ErrorLogger(FSM) << "Too high disconnected human player " << empire_disconnected_plr_cnt
-                         << " expected " << GetOptionsDB().Get<int>("network.server.disconn-human.max")
+        ErrorLogger(FSM) << "Too high unconnected human player " << empire_unconnected_plr_cnt
+                         << " expected " << GetOptionsDB().Get<int>("network.server.unconn-human-empire-players.max")
                          << "; server terminating.";
         must_quit = true;
     }
@@ -323,6 +335,25 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
     if (must_quit) {
         ErrorLogger(FSM) << "Unable to recover server terminating.";
         if (m_server.IsHostless()) {
+            if (GetOptionsDB().Get<bool>("save.auto.hostless.enabled")) {
+                // save game on exit
+                std::string save_filename = GetAutoSaveFileName(m_server.CurrentTurn());
+                ServerSaveGameData server_data(m_server.CurrentTurn());
+                int bytes_written = 0;
+                // save game...
+                try {
+                    bytes_written = SaveGame(save_filename,     server_data,    m_server.GetPlayerSaveGameData(),
+                                             GetUniverse(),     Empires(),      GetSpeciesManager(),
+                                             GetCombatLogManager(),             m_server.m_galaxy_setup_data,
+                                             !m_server.m_single_player_game);
+                } catch (const std::exception& error) {
+                    ErrorLogger(FSM) << "While saving, catch std::exception: " << error.what();
+                    SendMessageToAllPlayers(ErrorMessage(UserStringNop("UNABLE_TO_WRITE_SAVE_FILE"), false));
+                }
+
+                // inform players that save is complete
+                SendMessageToAllPlayers(ServerSaveGameCompleteMessage(save_filename, bytes_written));
+            }
             m_server.m_fsm->process_event(Hostless());
         } else {
             m_server.m_fsm->process_event(ShutdownServer());
@@ -472,6 +503,8 @@ bool ServerFSM::EstablishPlayer(const PlayerConnectionPtr& player_connection,
 
     return client_type != Networking::INVALID_CLIENT_TYPE;
 }
+
+
 
 ////////////////////////////////////////////////////////////
 // Idle
@@ -748,6 +781,14 @@ void MPLobby::ValidateClientLimits() {
             ai_count++;
     }
 
+    const int human_connected_count = human_count;
+
+    // for load game consider as human all non-AI empires
+    // because human player could connect later in game
+    if (!m_lobby_data->m_new_game) {
+        human_count = m_lobby_data->m_save_game_empire_data.size() - ai_count;
+    }
+
     int min_ai = GetOptionsDB().Get<int>("network.server.ai.min");
     int max_ai = GetOptionsDB().Get<int>("network.server.ai.max");
     if (max_ai >= 0 && max_ai < min_ai) {
@@ -762,11 +803,22 @@ void MPLobby::ValidateClientLimits() {
         max_human = min_human;
         GetOptionsDB().Set<int>("network.server.human.max", max_human);
     }
+    int min_connected_human_empire_players = GetOptionsDB().Get<int>("network.server.conn-human-empire-players.min");
+    int max_unconnected_human_empire_players = GetOptionsDB().Get<int>("network.server.unconn-human-empire-players.max");
 
     // restrict minimun number of human and ai players
     if (human_count < min_human) {
         m_lobby_data->m_start_locked = true;
         m_lobby_data->m_start_lock_cause = UserStringNop("ERROR_NOT_ENOUGH_HUMAN_PLAYERS");
+    } else if (human_connected_count < min_connected_human_empire_players) {
+        m_lobby_data->m_start_locked = true;
+        m_lobby_data->m_start_lock_cause = UserStringNop("ERROR_NOT_ENOUGH_CONNECTED_HUMAN_PLAYERS");
+    } else if (max_unconnected_human_empire_players > 0 &&
+        !m_lobby_data->m_new_game &&
+        static_cast<int>(m_lobby_data->m_save_game_empire_data.size()) - ai_count - human_connected_count >= max_unconnected_human_empire_players)
+    {
+        m_lobby_data->m_start_locked = true;
+        m_lobby_data->m_start_lock_cause = UserStringNop("ERROR_TOO_MANY_UNCONNECTED_HUMAN_PLAYERS");
     } else if (max_human >= 0 && human_count > max_human) {
         m_lobby_data->m_start_locked = true;
         m_lobby_data->m_start_lock_cause = UserStringNop("ERROR_TOO_MANY_HUMAN_PLAYERS");
@@ -2582,13 +2634,23 @@ sc::result PlayingGame::react(const LobbyUpdate& msg) {
 // WaitingForTurnEnd
 ////////////////////////////////////////////////////////////
 WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
-    my_base(c)
+    my_base(c),
+    m_timeout(Server().m_io_service)
 {
     TraceLogger(FSM) << "(ServerFSM) WaitingForTurnEnd";
+    if (GetOptionsDB().Get<int>("save.auto.interval") > 0) {
+        m_timeout.expires_from_now(std::chrono::seconds(GetOptionsDB().Get<int>("save.auto.interval")));
+        m_timeout.async_wait(boost::bind(&WaitingForTurnEnd::SaveTimedoutHandler,
+                                         this,
+                                         boost::asio::placeholders::error));
+    }
 }
 
 WaitingForTurnEnd::~WaitingForTurnEnd()
-{ TraceLogger(FSM) << "(ServerFSM) ~WaitingForTurnEnd"; }
+{
+    TraceLogger(FSM) << "(ServerFSM) ~WaitingForTurnEnd";
+    m_timeout.cancel();
+}
 
 sc::result WaitingForTurnEnd::react(const TurnOrders& msg) {
     TraceLogger(FSM) << "(ServerFSM) WaitingForTurnEnd.TurnOrders";
@@ -2674,7 +2736,7 @@ sc::result WaitingForTurnEnd::react(const TurnOrders& msg) {
 
         server.SetEmpireSaveGameData(empire_id, boost::make_unique<PlayerSaveGameData>(sender->PlayerName(), empire_id,
                                      order_set, ui_data, save_state_string,
-                                     client_type));
+                                     client_type, true));
 
         // notify other player that this empire submitted orders
         for (auto player_it = server.m_networking.established_begin();
@@ -2840,26 +2902,14 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
     return discard_event();
 }
 
-////////////////////////////////////////////////////////////
-// WaitingForTurnEndIdle
-////////////////////////////////////////////////////////////
-WaitingForTurnEndIdle::WaitingForTurnEndIdle(my_context c) :
-    my_base(c)
-{
-    TraceLogger(FSM) << "(ServerFSM) WaitingForTurnEndIdle";
-}
-
-WaitingForTurnEndIdle::~WaitingForTurnEndIdle()
-{ TraceLogger(FSM) << "(ServerFSM) ~WaitingForTurnEndIdle"; }
-
-sc::result WaitingForTurnEndIdle::react(const SaveGameRequest& msg) {
-    TraceLogger(FSM) << "(ServerFSM) WaitingForTurnEndIdle.SaveGameRequest";
+sc::result WaitingForTurnEnd::react(const SaveGameRequest& msg) {
+    TraceLogger(FSM) << "(ServerFSM) WaitingForTurnEnd.SaveGameRequest";
     ServerApp& server = Server();
     const Message& message = msg.m_message;
     const PlayerConnectionPtr& player_connection = msg.m_player_connection;
 
     if (player_connection && !server.m_networking.PlayerIsHost(player_connection->PlayerID())) {
-        ErrorLogger(FSM) << "WaitingForTurnEndIdle.SaveGameRequest : Player #" << player_connection->PlayerID()
+        ErrorLogger(FSM) << "WaitingForTurnEnd.SaveGameRequest : Player #" << player_connection->PlayerID()
                          << " attempted to initiate a game save, but is not the host.  Ignoring request connection.";
         player_connection->SendMessage(ErrorMessage(UserStringNop("NON_HOST_SAVE_REQUEST_IGNORED"), false));
         return discard_event();
@@ -2870,7 +2920,7 @@ sc::result WaitingForTurnEndIdle::react(const SaveGameRequest& msg) {
     ServerSaveGameData server_data(server.m_current_turn);
 
     // retreive requested save name from Base state, which should have been
-    // set in WaitingForTurnEndIdle::react(const SaveGameRequest& msg)
+    // set in WaitingForTurnEnd::react(const SaveGameRequest& msg)
     int bytes_written = 0;
 
     // save game...
@@ -2891,6 +2941,22 @@ sc::result WaitingForTurnEndIdle::react(const SaveGameRequest& msg) {
     return discard_event();
 }
 
+void WaitingForTurnEnd::SaveTimedoutHandler(const boost::system::error_code& error) {
+    if (error) {
+        DebugLogger() << "Save timed out cancelled";
+        return;
+    }
+
+    DebugLogger() << "Save timed out.";
+    PlayerConnectionPtr dummy_connection = nullptr;
+    Server().m_fsm->process_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(Server().CurrentTurn())), dummy_connection));
+    if (GetOptionsDB().Get<int>("save.auto.interval") > 0) {
+        m_timeout.expires_from_now(std::chrono::seconds(GetOptionsDB().Get<int>("save.auto.interval")));
+        m_timeout.async_wait(boost::bind(&WaitingForTurnEnd::SaveTimedoutHandler,
+                                         this,
+                                         boost::asio::placeholders::error));
+    }
+}
 
 ////////////////////////////////////////////////////////////
 // ProcessingTurn
@@ -2931,19 +2997,8 @@ sc::result ProcessingTurn::react(const ProcessTurn& u) {
     }
 
     if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.enabled")) {
-        std::string subdir = GetGalaxySetupData().GetGameUID();
-        boost::filesystem::path autosave_dir_path = GetServerSaveDir() / (subdir.empty() ? "auto" : subdir);
-        const auto& extension = MP_SAVE_FILE_EXTENSION;
-        // Add timestamp to autosave generated files
-        std::string datetime_str = FilenameTimestamp();
-
-        std::string save_filename = boost::io::str(boost::format("FreeOrion_%04d_%s%s") % server.CurrentTurn() % datetime_str % extension);
-
-        boost::filesystem::path save_path(autosave_dir_path / save_filename);
-
         PlayerConnectionPtr dummy_connection = nullptr;
-
-        post_event(SaveGameRequest(HostSaveGameInitiateMessage(save_path.string()), dummy_connection));
+        post_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(server.CurrentTurn())), dummy_connection));
     }
     return transit<WaitingForTurnEnd>();
 }

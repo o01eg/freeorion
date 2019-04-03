@@ -78,8 +78,8 @@ namespace {
 ////////////////////////////////////////////////
 ServerApp::ServerApp() :
     IApp(),
-    m_signals(m_io_service, SIGINT, SIGTERM),
-    m_networking(m_io_service,
+    m_signals(m_io_context, SIGINT, SIGTERM),
+    m_networking(m_io_context,
                  boost::bind(&ServerApp::HandleNonPlayerMessage, this, _1, _2),
                  boost::bind(&ServerApp::HandleMessage, this, _1, _2),
                  boost::bind(&ServerApp::PlayerDisconnected, this, _1)),
@@ -104,10 +104,11 @@ ServerApp::ServerApp() :
     InfoLogger() << FreeOrionVersionString();
     LogDependencyVersions();
 
-    m_fsm->initiate();
-
-    // Start parsing content
+    // Start parsing content before FSM initialization
+    // to have data initialized before autostart execution
     StartBackgroundParsing();
+
+    m_fsm->initiate();
 
     Empires().DiplomaticStatusChangedSignal.connect(
         boost::bind(&ServerApp::HandleDiplomaticStatusChange, this, _1, _2));
@@ -298,7 +299,7 @@ void ServerApp::Run() {
     DebugLogger() << "FreeOrion server waiting for network events";
     try {
         while (1) {
-            if (m_io_service.run_one())
+            if (m_io_context.run_one())
                 m_networking.HandleNextEvent();
             else
                 break;

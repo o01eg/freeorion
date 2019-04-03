@@ -1,4 +1,4 @@
-English
+﻿English
 
 # This is the English String Table file for FreeOrion
 #
@@ -1609,6 +1609,24 @@ Sets the color of the scan-line shading over field icons.
 OPTIONS_DB_UI_PLANET_FOG_CLR
 Sets the color of the scan-line shading over planet graphics on the sidepanel.
 
+OPTIONS_DB_UI_PLANET_STATUS_ICON_SIZE
+Sets the size of the planet status icon.
+
+OPTIONS_DB_UI_PLANET_STATUS_ICON_TITLE
+Planet status notification
+
+OPTIONS_DB_UI_PLANET_STATUS_ATTACKED
+%1% was attacked on the previous turn.
+
+OPTIONS_DB_UI_PLANET_STATUS_CONQUERED
+%1% has just been conquered. Happiness will probably be reduced.
+
+OPTIONS_DB_UI_PLANET_STATUS_UNHAPPY
+The population on %1% is very unhappy. It can not be used as a source for settlers.
+
+OPTIONS_DB_UI_PLANET_STATUS_NO_SUPPLY
+%1% has been cut off from supply. Industry generated on this planet can only be used here.
+
 OPTIONS_DB_UI_SYSTEM_CIRCLES
 Toggles whether to draw circles around systems.
 
@@ -1928,7 +1946,7 @@ OPTIONS_DB_UI_SITREP_ICONSIZE
 Sets the sitrep icon width and height; default 16 (min 12, max 64).
 
 OPTIONS_DB_LOAD
-Loads the specified single-player save game.
+Loads and starts the specified single-player or multi-player save game. In multi-player, it requires hostless mode and no restriction on the minimum number of connected players, because the server will start with no connected players.
 
 OPTIONS_DB_EFFECTS_THREADS_UI_DESC
 Specifies number of threads to use for effects processing in the user interface. More than one thread may lead to unpredictable crashes.

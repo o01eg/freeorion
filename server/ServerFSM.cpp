@@ -513,9 +513,10 @@ Idle::Idle(my_context c) :
     my_base(c)
 {
     TraceLogger(FSM) << "(ServerFSM) Idle";
-    if (Server().IsHostless()) {
+    if (Server().IsHostless())
         post_event(Hostless());
-    }
+    else if (!GetOptionsDB().Get<std::string>("load").empty())
+        throw std::invalid_argument("Autostart load file was choosed but the server wasn't started in a hostless mode");
 }
 
 Idle::~Idle()
@@ -622,7 +623,63 @@ sc::result Idle::react(const Error& msg) {
 }
 
 sc::result Idle::react(const Hostless&) {
-    return transit<MPLobby>();
+    TraceLogger(FSM) << "(ServerFSM) Idle.Hostless";
+    std::string autostart_load_filename = GetOptionsDB().Get<std::string>("load");
+    if (autostart_load_filename.empty())
+        return transit<MPLobby>();
+
+    if (GetOptionsDB().Get<int>("network.server.conn-human-empire-players.min") > 0) {
+        throw std::invalid_argument("A save file to load and autostart in hostless mode was specified, but the server has a non-zero minimum number of connected players, so cannot be started without a connected player.");
+    }
+    std::shared_ptr<ServerSaveGameData> server_save_game_data(new ServerSaveGameData());
+    std::vector<PlayerSaveGameData> player_save_game_data;
+
+    DebugLogger(FSM) << "Loading file " << autostart_load_filename;
+
+    try {
+        ServerApp& server = Server();
+
+        LoadGame(autostart_load_filename,   *server_save_game_data,
+                 player_save_game_data,     GetUniverse(),
+                 Empires(),                 GetSpeciesManager(),
+                 GetCombatLogManager(),     server.m_galaxy_setup_data);
+        int seed = 0;
+        try {
+            seed = boost::lexical_cast<unsigned int>(server.m_galaxy_setup_data.m_seed);
+        } catch (...) {
+            try {
+                boost::hash<std::string> string_hash;
+                std::size_t h = string_hash(server.m_galaxy_setup_data.m_seed);
+                seed = static_cast<unsigned int>(h);
+            } catch (...) {}
+        }
+        DebugLogger(FSM) << "Seeding with loaded galaxy seed: " << server.m_galaxy_setup_data.m_seed << "  interpreted as actual seed: " << seed;
+        Seed(seed);
+
+        std::shared_ptr<MultiplayerLobbyData> lobby_data(new MultiplayerLobbyData());
+        // fill lobby data with AI to start them with server
+        int ai_next_index = 1;
+        for (const auto& psgd : player_save_game_data) {
+            if (psgd.m_client_type != Networking::CLIENT_TYPE_AI_PLAYER)
+                continue;
+            PlayerSetupData player_setup_data;
+            player_setup_data.m_player_id =     Networking::INVALID_PLAYER_ID;
+            player_setup_data.m_player_name =   UserString("AI_PLAYER") + "_" + std::to_string(ai_next_index++);
+            player_setup_data.m_client_type =   Networking::CLIENT_TYPE_AI_PLAYER;
+            player_setup_data.m_save_game_empire_id = psgd.m_empire_id;
+            lobby_data->m_players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
+        }
+
+        // copy locally stored data to common server fsm context so it can be
+        // retreived in WaitingForMPGameJoiners
+        context<ServerFSM>().m_lobby_data = lobby_data;
+        context<ServerFSM>().m_player_save_game_data = player_save_game_data;
+        context<ServerFSM>().m_server_save_game_data = server_save_game_data;
+    } catch (const std::exception& e) {
+        throw e;
+    }
+
+    return transit<WaitingForMPGameJoiners>();
 }
 
 ////////////////////////////////////////////////////////////
@@ -2635,11 +2692,15 @@ sc::result PlayingGame::react(const LobbyUpdate& msg) {
 ////////////////////////////////////////////////////////////
 WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
     my_base(c),
-    m_timeout(Server().m_io_service)
+    m_timeout(Server().m_io_context)
 {
     TraceLogger(FSM) << "(ServerFSM) WaitingForTurnEnd";
     if (GetOptionsDB().Get<int>("save.auto.interval") > 0) {
+#if BOOST_VERSION >= 106600
+        m_timeout.expires_after(std::chrono::seconds(GetOptionsDB().Get<int>("save.auto.interval")));
+#else
         m_timeout.expires_from_now(std::chrono::seconds(GetOptionsDB().Get<int>("save.auto.interval")));
+#endif
         m_timeout.async_wait(boost::bind(&WaitingForTurnEnd::SaveTimedoutHandler,
                                          this,
                                          boost::asio::placeholders::error));
@@ -2951,7 +3012,11 @@ void WaitingForTurnEnd::SaveTimedoutHandler(const boost::system::error_code& err
     PlayerConnectionPtr dummy_connection = nullptr;
     Server().m_fsm->process_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(Server().CurrentTurn())), dummy_connection));
     if (GetOptionsDB().Get<int>("save.auto.interval") > 0) {
+#if BOOST_VERSION >= 106600
+        m_timeout.expires_after(std::chrono::seconds(GetOptionsDB().Get<int>("save.auto.interval")));
+#else
         m_timeout.expires_from_now(std::chrono::seconds(GetOptionsDB().Get<int>("save.auto.interval")));
+#endif
         m_timeout.async_wait(boost::bind(&WaitingForTurnEnd::SaveTimedoutHandler,
                                          this,
                                          boost::asio::placeholders::error));
@@ -3017,7 +3082,7 @@ const auto SHUTDOWN_POLLING_TIME = std::chrono::milliseconds(5000);
 ShuttingDownServer::ShuttingDownServer(my_context c) :
     my_base(c),
     m_player_id_ack_expected(),
-    m_timeout(Server().m_io_service, Clock::now() + SHUTDOWN_POLLING_TIME)
+    m_timeout(Server().m_io_context, Clock::now() + SHUTDOWN_POLLING_TIME)
 {
     TraceLogger(FSM) << "(ServerFSM) ShuttingDownServer";
 

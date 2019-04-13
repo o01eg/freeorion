@@ -1,3 +1,11 @@
+freeorion (0.4.8-9) unstable; urgency=medium
+
+  * Send new chat messages to MUC.
+  * Notify MUC about new game started.
+  * Send authentication OTP via XMPP.
+
+ -- O01eg <o01eg@yandex.ru>  Sat, 13 Apr 2019 08:13:25 +0000
+
 freeorion (0.4.8-8) unstable; urgency=medium
 
   * Disallow to take over eliminated empire.

@@ -2163,6 +2163,14 @@ sc::result WaitingForMPGameJoiners::react(const CheckStartConditions& u) {
             DebugLogger(FSM) << "Initializing loaded MP game";
             server.LoadMPGameInit(*m_lobby_data, m_player_save_game_data, m_server_save_game_data);
         }
+        std::async(std::launch::async, [] {
+            std::vector<std::string> args{"/usr/bin/curl",
+                "http://localhost:8083/",
+                "-H", "X-XMPP-Muc: smac",
+                "-d", "Game started!"};
+                Process sendxmpp = Process("/usr/bin/curl", args);
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+        });
         return transit<PlayingGame>();
     }
 

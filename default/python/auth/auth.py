@@ -1,4 +1,4 @@
-from logging import warn, info
+from logging import warn, info, error
 
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
@@ -7,34 +7,32 @@ redirect_logging_to_freeorion_logger()
 
 import sys
 
+import random
+
 import freeorion as fo
+
+import psycopg2
+import psycopg2.extensions
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
+
+import urllib2
 
 
 class AuthProvider:
     def __init__(self):
-        self.logins = {}
+        self.dsn = ""
+        with open(fo.get_user_config_dir() + "/db.txt", "r") as f:
+            for line in f:
+                self.dsn = line
+                break
+        self.conn = psycopg2.connect(self.dsn)
         self.roles_symbols = {
             'h': fo.roleType.host, 'm': fo.roleType.clientTypeModerator,
             'p': fo.roleType.clientTypePlayer, 'o': fo.roleType.clientTypeObserver,
             'g': fo.roleType.galaxySetup
         }
-        try:
-            with open(fo.get_user_config_dir() + "/auth.txt") as f:
-                first_line = True
-                for line in f:
-                    if first_line:
-                        first_line = False
-                        self.default_roles = self.__parse_roles(line.strip())
-                    else:
-                        l = line.rsplit(':', 2)
-                        self.logins[l[0]] = (l[2].strip(), self.__parse_roles(l[1].strip()))
-        except IOError:
-            exctype, value = sys.exc_info()[:2]
-            warn("Cann't read auth file %s: %s %s" % (fo.get_user_config_dir() + "/auth.txt", exctype, value))
-            self.default_roles = [
-                fo.roleType.clientTypeModerator, fo.roleType.clientTypePlayer,
-                fo.roleType.clientTypeObserver, fo.roleType.galaxySetup
-            ]
+        self.default_roles = [ fo.roleType.galaxySetup, fo.roleType.clientTypePlayer ]
         info("Auth initialized")
 
     def __parse_roles(self, roles_str):
@@ -49,7 +47,28 @@ class AuthProvider:
 
     def is_require_auth_or_return_roles(self, player_name):
         """Returns True if player should be authenticated or list of roles for anonymous players"""
-        known_login = player_name in self.logins
+        otp = "%0.6d" % random.randint(999,999999)
+        known_login = False
+        try:
+            with self.conn:
+                with self.conn.cursor() as curs:
+                    curs.execute(""" SELECT * FROM auth.check_contact(%s, %s) """,
+                                 (player_name, otp))
+                    for r in curs:
+                        known_login = True
+                        if r[0] == "xmpp":
+                            req = urllib2.Request("http://localhost:8083/")
+                            req.add_header("X-XMPP-To", r[1])
+                            req.add_data("Enter OTP into freeorion client: %s" % otp)
+                            urllib2.urlopen(req).read()
+                        else:
+                            warn("Unsupported protocol %s for %s" % (r[0], player_name))
+        except psycopg2.InterfaceError:
+            self.conn = psycopg2.connect(self.dsn)
+            exctype, value = sys.exc_info()[:2]
+            error("Cann't check player %s: %s %s" % (player_name, exctype, value))
+            known_login = True
+
         if not known_login:
             # default list of roles
             return self.default_roles
@@ -57,8 +76,21 @@ class AuthProvider:
 
     def is_success_auth_and_return_roles(self, player_name, auth):
         """Return False if passowrd doesn't match or list of roles for authenticated player"""
-        auth_data = self.logins.get(player_name)
-        if auth_data[0] == auth:
-            return auth_data[1]
+        authenticated = False
+        try:
+            with self.conn:
+                with self.conn.cursor() as curs:
+                    curs.execute(""" SELECT auth.check_otp(%s, %s) """,
+                                 (player_name, auth))
+                    for r in curs:
+                        authenticated = not not r[0]
+                        info("Player %s was accepted %r" % (player_name, authenticated));
+        except psycopg2.InterfaceError:
+            self.conn = psycopg2.connect(self.dsn)
+            exctype, value = sys.exc_info()[:2]
+            error("Cann't check OTP %s: %s %s" % (player_name, exctype, value))
+
+        if authenticated:
+            return self.default_roles
         else:
             return False

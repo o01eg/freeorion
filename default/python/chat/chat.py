@@ -1,4 +1,4 @@
-from logging import info, warn
+from logging import info, warn, error
 
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
@@ -55,7 +55,6 @@ class ChatHistoryProvider:
                     ) d
                     ORDER BY ts""")
                 for r in curs:
-                    info("Color: %i %i %i %i" % (r[3], r[4], r[5], r[6]))
                     c = fo.GGColor(r[3], r[4], r[5], r[6])
                     e = (r[0], str(r[1].encode('utf-8')), str(r[2].encode('utf-8')), c)
                     res.append(e)
@@ -87,5 +86,5 @@ class ChatHistoryProvider:
                 self.conn = psycopg2.connect(self.dsn)
                 saved = False
                 exctype, value = sys.exc_info()[:2]
-                warn("Cann't save chat message %s: %s %s" % (text, exctype, value))
+                error("Cann't save chat message %s: %s %s" % (text, exctype, value))
         return True

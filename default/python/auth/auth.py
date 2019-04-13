@@ -32,7 +32,7 @@ class AuthProvider:
             'p': fo.roleType.clientTypePlayer, 'o': fo.roleType.clientTypeObserver,
             'g': fo.roleType.galaxySetup
         }
-        self.default_roles = [ fo.roleType.galaxySetup, fo.roleType.clientTypePlayer ]
+        self.default_roles = [fo.roleType.galaxySetup, fo.roleType.clientTypePlayer]
         info("Auth initialized")
 
     def __parse_roles(self, roles_str):
@@ -47,7 +47,7 @@ class AuthProvider:
 
     def is_require_auth_or_return_roles(self, player_name):
         """Returns True if player should be authenticated or list of roles for anonymous players"""
-        otp = "%0.6d" % random.randint(999,999999)
+        otp = "%0.6d" % random.randint(999, 999999)
         known_login = False
         try:
             with self.conn:
@@ -84,7 +84,7 @@ class AuthProvider:
                                  (player_name, auth))
                     for r in curs:
                         authenticated = not not r[0]
-                        info("Player %s was accepted %r" % (player_name, authenticated));
+                        info("Player %s was accepted %r" % (player_name, authenticated))
         except psycopg2.InterfaceError:
             self.conn = psycopg2.connect(self.dsn)
             exctype, value = sys.exc_info()[:2]

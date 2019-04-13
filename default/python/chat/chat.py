@@ -1,4 +1,4 @@
-from logging import info, warn, error
+from logging import info, error
 
 from common.configure_logging import redirect_logging_to_freeorion_logger
 

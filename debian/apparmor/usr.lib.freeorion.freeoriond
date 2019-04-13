@@ -15,6 +15,7 @@
   /etc/freeorion/* r,
   /etc/nsswitch.conf r,
   /etc/passwd r,
+  /etc/hosts r,
   /run/postgresql/* rw,
   /usr/lib/freeorion/freeorionca Px,
   /usr/lib/freeorion/freeoriond mr,

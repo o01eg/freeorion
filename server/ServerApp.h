@@ -296,7 +296,7 @@ private:
       * an empire is eliminated from the game */
     void    RemoveEmpireTurn(int empire_id);
 
-    boost::asio::io_service m_io_service;
+    boost::asio::io_context m_io_context;
     boost::asio::signal_set m_signals;
 
     Universe                m_universe;
@@ -315,10 +315,10 @@ private:
     /** Turn sequence map is used for turn processing. Each empire is added at
       * the start of a game or reload and then the map maintains OrderSets for
       * that turn.
-      * The map contains ready state which should be true to advance turn and
-      * pointer to orders from empire.
+      * The map contains pointer to orders from empire with ready state which should be true
+      * to advance turn.
       * */
-    std::map<int, std::pair<bool, std::unique_ptr<PlayerSaveGameData>>>  m_turn_sequence;
+    std::map<int, std::unique_ptr<PlayerSaveGameData>>  m_turn_sequence;
 
     // Give FSM and its states direct access.  We are using the FSM code as a
     // control-flow mechanism; it is all notionally part of this class.

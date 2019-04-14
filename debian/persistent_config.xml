@@ -5,6 +5,7 @@
    <hostless>
     <enabled>1</enabled>
    </hostless>
+   <interval>7200</interval>
   </auto>
  </save>
  <network>
@@ -15,10 +16,19 @@
    <human>
     <min>2</min>
    </human>
+   <conn-human-empire-players>
+    <min>2</min>
+   </conn-human-empire-players>
+   <unconn-human-empire-players>
+    <max>2</max>
+   </unconn-human-empire-players>
    <publish-statistics>0</publish-statistics>
    <cookies>
     <expire-minutes>120</expire-minutes>
    </cookies>
+   <binary>
+    <enabled>0</enabled>
+   </binary>
   </server>
  </network>
 </XMLDoc>

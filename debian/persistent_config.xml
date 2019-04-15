@@ -5,6 +5,9 @@
    <hostless>
     <enabled>1</enabled>
    </hostless>
+   <exit>
+    <enabled>1</enabled>
+   </exit>
    <interval>7200</interval>
   </auto>
  </save>

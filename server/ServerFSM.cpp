@@ -750,11 +750,11 @@ MPLobby::MPLobby(my_context c) :
     const SpeciesManager& sm = GetSpeciesManager();
 
     m_lobby_data->m_game_rules.clear();
-    m_lobby_data->m_game_rules.push_back(std::make_pair("RULE_ENABLE_SUPER_TESTER", "0"));
-    m_lobby_data->m_game_rules.push_back(std::make_pair("RULE_THRESHOLD_HUMAN_PLAYER_WIN", "1"));
-    m_lobby_data->m_game_rules.push_back(std::make_pair("RULE_ALLOW_CONCEDE", "1"));
-    m_lobby_data->m_game_rules.push_back(std::make_pair("RULE_CONCEDE_COLONIES_THRESHOLD", "9999"));
-    m_lobby_data->m_game_rules.push_back(std::make_pair("RULE_SHOW_DETAILED_EMPIRES_DATA", "0"));
+    m_lobby_data->m_game_rules.insert({"RULE_ENABLE_SUPER_TESTER", "0"});
+    m_lobby_data->m_game_rules.insert({"RULE_THRESHOLD_HUMAN_PLAYER_WIN", "1"});
+    m_lobby_data->m_game_rules.insert({"RULE_ALLOW_CONCEDE", "1"});
+    m_lobby_data->m_game_rules.insert({"RULE_CONCEDE_COLONIES_THRESHOLD", "9999"});
+    m_lobby_data->m_game_rules.insert({"RULE_SHOW_DETAILED_EMPIRES_DATA", "0"});
 
     if (server.IsHostless()) {
         DebugLogger(FSM) << "(ServerFSM) MPLobby. Fill MPLobby data from the previous game.";

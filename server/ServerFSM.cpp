@@ -9,6 +9,7 @@
 #include "../network/ServerNetworking.h"
 #include "../network/Message.h"
 #include "../util/Directories.h"
+#include "../util/GameRules.h"
 #include "../util/i18n.h"
 #include "../util/Logger.h"
 #include "../util/LoggerWithOptionsDB.h"
@@ -747,15 +748,8 @@ MPLobby::MPLobby(my_context c) :
     ServerApp& server = Server();
     server.InitializePython();
     server.LoadChatHistory();
+    m_lobby_data->m_game_rules = GetGameRules().GetRulesAsStrings();
     const SpeciesManager& sm = GetSpeciesManager();
-
-    m_lobby_data->m_game_rules.clear();
-    m_lobby_data->m_game_rules.insert({"RULE_ENABLE_SUPER_TESTER", "0"});
-    m_lobby_data->m_game_rules.insert({"RULE_THRESHOLD_HUMAN_PLAYER_WIN", "1"});
-    m_lobby_data->m_game_rules.insert({"RULE_ALLOW_CONCEDE", "1"});
-    m_lobby_data->m_game_rules.insert({"RULE_CONCEDE_COLONIES_THRESHOLD", "9999"});
-    m_lobby_data->m_game_rules.insert({"RULE_SHOW_DETAILED_EMPIRES_DATA", "0"});
-
     if (server.IsHostless()) {
         DebugLogger(FSM) << "(ServerFSM) MPLobby. Fill MPLobby data from the previous game.";
 
@@ -1327,8 +1321,8 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 (m_lobby_data->m_monster_freq != incoming_lobby_data.m_monster_freq) ||
                 (m_lobby_data->m_native_freq != incoming_lobby_data.m_native_freq) ||
                 (m_lobby_data->m_ai_aggr != incoming_lobby_data.m_ai_aggr) ||
-                (m_lobby_data->m_new_game != incoming_lobby_data.m_new_game)/* ||
-                (m_lobby_data->m_game_rules != incoming_lobby_data.m_game_rules)*/;
+                (m_lobby_data->m_new_game != incoming_lobby_data.m_new_game) ||
+                (m_lobby_data->m_game_rules != incoming_lobby_data.m_game_rules);
 
             if (player_setup_data_changed) {
                 if (m_lobby_data->m_players.size() != incoming_lobby_data.m_players.size()) {
@@ -1362,7 +1356,16 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             m_lobby_data->m_monster_freq   = incoming_lobby_data.m_monster_freq;
             m_lobby_data->m_native_freq    = incoming_lobby_data.m_native_freq;
             m_lobby_data->m_ai_aggr        = incoming_lobby_data.m_ai_aggr;
-            //m_lobby_data->m_game_rules     = incoming_lobby_data.m_game_rules;
+
+            // copy rules from incoming lobby data to server lobby data, only if those rules are
+            // not locked by the server
+            for (const auto& incoming_rule : incoming_lobby_data.m_game_rules) {
+                if (GetOptionsDB().OptionExists("setup.rules.server-locked." + incoming_rule.first) &&
+                    !GetOptionsDB().Get<bool>("setup.rules.server-locked." + incoming_rule.first))
+                {
+                    m_lobby_data->m_game_rules[incoming_rule.first] = incoming_rule.second;
+                }
+            }
 
             // directly configurable lobby data
             m_lobby_data->m_new_game       = incoming_lobby_data.m_new_game;

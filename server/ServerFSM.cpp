@@ -9,6 +9,7 @@
 #include "../network/ServerNetworking.h"
 #include "../network/Message.h"
 #include "../util/Directories.h"
+#include "../util/GameRules.h"
 #include "../util/i18n.h"
 #include "../util/Logger.h"
 #include "../util/LoggerWithOptionsDB.h"
@@ -747,6 +748,7 @@ MPLobby::MPLobby(my_context c) :
     ServerApp& server = Server();
     server.InitializePython();
     server.LoadChatHistory();
+    m_lobby_data->m_game_rules = GetGameRules().GetRulesAsStrings();
     const SpeciesManager& sm = GetSpeciesManager();
     if (server.IsHostless()) {
         DebugLogger(FSM) << "(ServerFSM) MPLobby. Fill MPLobby data from the previous game.";
@@ -801,6 +803,26 @@ MPLobby::MPLobby(my_context c) :
 
         for (const auto& player_connection : to_disconnect) {
             server.Networking().Disconnect(player_connection);
+        }
+
+        // check if there weren't previous AIs
+        if (m_ai_next_index == 1) {
+            // use AI count from option
+            const int ai_count = GetOptionsDB().Get<int>("setup.ai.player.count");
+            while (m_ai_next_index <= ai_count && (m_ai_next_index <= max_ai || max_ai < 0)) {
+                PlayerSetupData player_setup_data;
+                player_setup_data.m_player_id =     Networking::INVALID_PLAYER_ID;
+                player_setup_data.m_player_name =   UserString("AI_PLAYER") + "_" + std::to_string(m_ai_next_index++);
+                player_setup_data.m_client_type =   Networking::CLIENT_TYPE_AI_PLAYER;
+                player_setup_data.m_empire_name =   GenerateEmpireName(player_setup_data.m_player_name, m_lobby_data->m_players);
+                player_setup_data.m_empire_color =  GetUnusedEmpireColour(m_lobby_data->m_players);
+                if (!m_lobby_data->m_seed.empty())
+                    player_setup_data.m_starting_species_name = sm.RandomPlayableSpeciesName();
+                else
+                    player_setup_data.m_starting_species_name = sm.SequentialPlayableSpeciesName(m_ai_next_index);
+
+                m_lobby_data->m_players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
+            }
         }
 
         ValidateClientLimits();
@@ -1322,7 +1344,16 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             m_lobby_data->m_monster_freq   = incoming_lobby_data.m_monster_freq;
             m_lobby_data->m_native_freq    = incoming_lobby_data.m_native_freq;
             m_lobby_data->m_ai_aggr        = incoming_lobby_data.m_ai_aggr;
-            m_lobby_data->m_game_rules     = incoming_lobby_data.m_game_rules;
+
+            // copy rules from incoming lobby data to server lobby data, only if those rules are
+            // not locked by the server
+            for (const auto& incoming_rule : incoming_lobby_data.m_game_rules) {
+                if (GetOptionsDB().OptionExists("setup.rules.server-locked." + incoming_rule.first) &&
+                    !GetOptionsDB().Get<bool>("setup.rules.server-locked." + incoming_rule.first))
+                {
+                    m_lobby_data->m_game_rules[incoming_rule.first] = incoming_rule.second;
+                }
+            }
 
             // directly configurable lobby data
             m_lobby_data->m_new_game       = incoming_lobby_data.m_new_game;
@@ -2550,8 +2581,7 @@ void PlayingGame::EstablishPlayer(const PlayerConnectionPtr& player_connection,
                          player_it != server.m_networking.established_end(); ++player_it)
                     {
                         PlayerConnectionPtr player_ctn = *player_it;
-                        player_ctn->SendMessage(PlayerStatusMessage(player_connection->PlayerID(),
-                                                                    Message::PLAYING_TURN,
+                        player_ctn->SendMessage(PlayerStatusMessage(Message::PLAYING_TURN,
                                                                     empire_id));
                     }
                 }
@@ -2831,7 +2861,7 @@ sc::result WaitingForTurnEnd::react(const TurnOrders& msg) {
              player_it != server.m_networking.established_end(); ++player_it)
         {
             PlayerConnectionPtr player_ctn = *player_it;
-            player_ctn->SendMessage(PlayerStatusMessage(player_id, Message::WAITING, empire_id));
+            player_ctn->SendMessage(PlayerStatusMessage(Message::WAITING, empire_id));
         }
     }
 
@@ -2963,7 +2993,7 @@ sc::result WaitingForTurnEnd::react(const RevokeReadiness& msg) {
              player_it != server.m_networking.established_end(); ++player_it)
         {
             PlayerConnectionPtr player_ctn = *player_it;
-            player_ctn->SendMessage(PlayerStatusMessage(player_id, Message::PLAYING_TURN, empire_id));
+            player_ctn->SendMessage(PlayerStatusMessage(Message::PLAYING_TURN, empire_id));
         }
     }
 
@@ -3080,8 +3110,7 @@ sc::result ProcessingTurn::react(const ProcessTurn& u) {
             ++recipient_player_it)
         {
             const PlayerConnectionPtr& recipient_player_ctn = *recipient_player_it;
-            recipient_player_ctn->SendMessage(PlayerStatusMessage(server.EmpirePlayerID(empire.first),
-                                                                  empire.second->Eliminated() ?
+            recipient_player_ctn->SendMessage(PlayerStatusMessage(empire.second->Eliminated() ?
                                                                       Message::WAITING :
                                                                       Message::PLAYING_TURN,
                                                                   empire.first));

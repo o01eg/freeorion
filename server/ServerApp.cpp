@@ -104,6 +104,17 @@ ServerApp::ServerApp() :
     InfoLogger() << FreeOrionVersionString();
     LogDependencyVersions();
 
+    m_galaxy_setup_data.m_seed = GetOptionsDB().Get<std::string>("setup.seed");
+    m_galaxy_setup_data.m_size = GetOptionsDB().Get<int>("setup.star.count");
+    m_galaxy_setup_data.m_shape = GetOptionsDB().Get<Shape>("setup.galaxy.shape");
+    m_galaxy_setup_data.m_age = GetOptionsDB().Get<GalaxySetupOption>("setup.galaxy.age");
+    m_galaxy_setup_data.m_starlane_freq = GetOptionsDB().Get<GalaxySetupOption>("setup.starlane.frequency");
+    m_galaxy_setup_data.m_planet_density = GetOptionsDB().Get<GalaxySetupOption>("setup.planet.density");
+    m_galaxy_setup_data.m_specials_freq = GetOptionsDB().Get<GalaxySetupOption>("setup.specials.frequency");
+    m_galaxy_setup_data.m_monster_freq = GetOptionsDB().Get<GalaxySetupOption>("setup.monster.frequency");
+    m_galaxy_setup_data.m_native_freq = GetOptionsDB().Get<GalaxySetupOption>("setup.native.frequency");
+    m_galaxy_setup_data.m_ai_aggr = GetOptionsDB().Get<Aggression>("setup.ai.aggression");
+
     // Start parsing content before FSM initialization
     // to have data initialized before autostart execution
     StartBackgroundParsing();
@@ -1400,8 +1411,7 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
             auto other_orders_it = m_turn_sequence.find(empire.first);
             bool ready = other_orders_it == m_turn_sequence.end() ||
                     (other_orders_it->second && other_orders_it->second->m_ready);
-            (*player_connection_it)->SendMessage(PlayerStatusMessage(EmpirePlayerID(empire.first),
-                                                                     ready ? Message::WAITING : Message::PLAYING_TURN,
+            (*player_connection_it)->SendMessage(PlayerStatusMessage(ready ? Message::WAITING : Message::PLAYING_TURN,
                                                                      empire.first));
         }
     }
@@ -1671,6 +1681,34 @@ bool ServerApp::IsAuthSuccessAndFillRoles(const std::string& player_name, const 
     return result;
 }
 
+std::list<PlayerSetupData> ServerApp::FillListPlayers() {
+    std::list<PlayerSetupData> result;
+    bool success = false;
+    try {
+        m_python_server.SetCurrentDir(GetPythonAuthDir());
+        success = m_python_server.FillListPlayers(result);
+    } catch (const boost::python::error_already_set& err) {
+        success = false;
+        m_python_server.HandleErrorAlreadySet();
+        if (!m_python_server.IsPythonRunning()) {
+            ErrorLogger() << "Python interpreter is no longer running.  Attempting to restart.";
+            if (m_python_server.Initialize()) {
+                ErrorLogger() << "Python interpreter successfully restarted.";
+            } else {
+                ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
+                m_fsm->process_event(ShutdownServer());
+            }
+        }
+    }
+
+    if (!success) {
+        ErrorLogger() << "Python scripted player list failed.";
+        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
+                                                                      false));
+    }
+    return result;
+}
+
 void ServerApp::AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
     std::map<int, PlayerInfo> player_info_map = GetPlayerInfoMap();
 
@@ -1692,8 +1730,7 @@ void ServerApp::AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_conn
             auto other_orders_it = m_turn_sequence.find(empire.first);
             bool ready = other_orders_it == m_turn_sequence.end() ||
                     (other_orders_it->second && other_orders_it->second->m_ready);
-            player_connection->SendMessage(PlayerStatusMessage(EmpirePlayerID(empire.first),
-                                                               ready ? Message::WAITING : Message::PLAYING_TURN,
+            player_connection->SendMessage(PlayerStatusMessage(ready ? Message::WAITING : Message::PLAYING_TURN,
                                                                empire.first));
         }
     } else {
@@ -1771,8 +1808,7 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
         player_it != m_networking.established_end(); ++player_it)
     {
         PlayerConnectionPtr player_ctn = *player_it;
-        player_ctn->SendMessage(PlayerStatusMessage(player_id,
-                                                    Message::WAITING,
+        player_ctn->SendMessage(PlayerStatusMessage(Message::WAITING,
                                                     empire_id));
     }
 
@@ -1837,8 +1873,7 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
         auto other_orders_it = m_turn_sequence.find(empire.first);
         bool ready = other_orders_it == m_turn_sequence.end() ||
                 (other_orders_it->second && other_orders_it->second->m_ready);
-        player_connection->SendMessage(PlayerStatusMessage(EmpirePlayerID(empire.first),
-                                                           ready ? Message::WAITING : Message::PLAYING_TURN,
+        player_connection->SendMessage(PlayerStatusMessage(ready ? Message::WAITING : Message::PLAYING_TURN,
                                                            empire.first));
     }
 

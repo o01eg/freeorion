@@ -33,13 +33,15 @@ jobs:
         - ccache --version
         - ccache --show-stats
         - docker pull freeorion/freeorion-travis-build
+        - docker run --name freeorion-psql freeorion/freeorion-travis-build /bin/bash -c "apt-get update --assume-yes && apt-get install --assume-yes python-psycopg2"
+        - docker commit freeorion-psql freeorion-travis-build-psql
         # Add transparent cmake function to allow possible cross platform use of
         # build sections.
         # mount ccache dir and set its environment variable
         # timeout before Travis kills jobs so that ccache is always at least partially populated
         - >
           function cmake {
-              docker run -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build freeorion/freeorion-travis-build timeout 40m /usr/bin/cmake $@
+              docker run -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build freeorion-travis-build-psql timeout 40m /usr/bin/cmake $@
           }
       before_script:
         - git remote add -t master -m master upstream https://github.com/freeorion/freeorion.git

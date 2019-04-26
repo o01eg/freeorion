@@ -35,7 +35,7 @@ jobs:
         - ccache --show-stats
         - psql -c 'create database freeorion;' -U postgres
         - docker pull freeorion/freeorion-travis-build
-        - docker run --name freeorion-psql freeorion/freeorion-travis-build /bin/bash -c "apt-get update --assume-yes && apt-get install --assume-yes python-psycopg2 && echo host=localhost user=postgres dbname=freeorion > /root/.config/freeorion/db.txt"
+        - docker run --name freeorion-psql freeorion/freeorion-travis-build /bin/bash -c "apt-get update --assume-yes && apt-get install --assume-yes python-psycopg2 && mkdir -p /root/.config/freeorion/ && echo host=localhost user=postgres dbname=freeorion > /root/.config/freeorion/db.txt"
         - docker commit freeorion-psql freeorion-travis-build-psql
         # Add transparent cmake function to allow possible cross platform use of
         # build sections.

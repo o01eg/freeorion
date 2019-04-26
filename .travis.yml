@@ -45,6 +45,10 @@ jobs:
           function cmake {
               docker run -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -e CTEST_OUTPUT_ON_FAILURE=1 -w /freeorion/build freeorion-travis-build-psql timeout 40m /usr/bin/cmake $@
           }
+        - >
+          function cmake-local {
+              docker run --network="host" -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -e CTEST_OUTPUT_ON_FAILURE=1 -w /freeorion/build freeorion-travis-build-psql timeout 40m /usr/bin/cmake $@
+          }
       before_script:
         - git remote add -t release-v0.4.8 -m release-v0.4.8 upstream https://github.com/freeorion/freeorion.git
         - git fetch upstream
@@ -55,7 +59,7 @@ jobs:
         - git merge --no-commit upstream/release-v0.4.8
         - cmake -DBUILD_HEADLESS=ON -DBUILD_TESTING=ON ..
         - cmake --build . -- -j 2
-        - cmake --build . --target unittest
+        - cmake-local --build . --target unittest
       before_cache:
         - ccache --clean
         - ccache --show-stats

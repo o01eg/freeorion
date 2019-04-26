@@ -23,6 +23,7 @@ jobs:
       language: cpp
       services:
         - docker
+        - postgresql
       cache: ccache
       env:
         - NAME="Build FreeOrion"
@@ -32,8 +33,9 @@ jobs:
         - echo max_size = 200M >> $HOME/.ccache/ccache.conf
         - ccache --version
         - ccache --show-stats
+        - psql -c 'create database freeorion;' -U postgres
         - docker pull freeorion/freeorion-travis-build
-        - docker run --name freeorion-psql freeorion/freeorion-travis-build /bin/bash -c "apt-get update --assume-yes && apt-get install --assume-yes python-psycopg2"
+        - docker run --name freeorion-psql freeorion/freeorion-travis-build /bin/bash -c "apt-get update --assume-yes && apt-get install --assume-yes python-psycopg2 && echo host=localhost user=postgres dbname=freeorion > /root/.config/freeorion/db.txt"
         - docker commit freeorion-psql freeorion-travis-build-psql
         # Add transparent cmake function to allow possible cross platform use of
         # build sections.

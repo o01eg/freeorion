@@ -37,49 +37,131 @@
 namespace {
     const std::string OPEN_TAG = "[[";
     const std::string CLOSE_TAG = "]]";
+    const std::string SEPARATOR = ",";
 
     /** Converts (first, last) to a string, looks it up as a key in the
-      * stringtable, then then appends this to the end of a string. */
+      * stringtable, then then appends this to the end of the string str. */
     struct UserStringSubstituteAndAppend {
         UserStringSubstituteAndAppend(std::string& str) :
             m_str(str)
-        {}
+        {
+            //std::cout << "UserStringSubstituteAndAppend with str:" << str << std::endl;
+        }
 
         void operator()(const char* first, const char* last) const {
             std::string token(first, last);
             if (token.empty() || !UserStringExists(token))
                 return;
             m_str += UserString(token);
+            //std::cout << "str at end of UserStringSubstituteAndAppend operator():" << m_str << std::endl;
         }
 
-        std::string&    m_str;
+        std::string& m_str;
     };
 
     // sticks a sequence of characters onto the end of a string
     struct StringAppend {
         StringAppend(std::string& str) :
             m_str(str)
-        {}
+        {
+            //std::cout << "StringAppend with str:" << str << std::endl;
+        }
 
-        void operator()(const char* first, const char* last) const
-        { m_str += std::string(first, last); }
+        void operator()(const char* first, const char* last) const {
+            m_str += std::string(first, last);
+            //std::cout << "str at end of StringAppend operator():" << m_str << std::endl;
+        }
 
-        std::string&    m_str;
+        std::string& m_str;
     };
 
+    // replaces \a formatter_ with a new formatter with the template string
+    // from within the specified range of characters \a first to \a last.
+    struct StartNewFormatterFromUserString {
+        StartNewFormatterFromUserString(boost::format& formatter_) :
+            formatter(formatter_)
+        {}
 
+        void operator()(const char* first, const char* last) const {
+            std::string token(first, last);
+            if (token.empty())
+                formatter = FlexibleFormat("");
+            else if (UserStringExists(token))
+                formatter = FlexibleFormat(UserString(token));
+            else
+                formatter = FlexibleFormat(token);
+            //std::cout << std::endl << "Started new formatter with token:" << token << std::endl;
+        }
+
+        boost::format& formatter;
+    };
+
+    // Each time called, binds the next argument to \a formatter_ with the
+    // string within the specified range of characters \a first to \a last.
+    struct BindFormatterArgument {
+        BindFormatterArgument(boost::format& formatter_) :
+            formatter(formatter_)
+        {}
+
+        void operator()(const char* first, const char* last) const {
+            std::string token(first, last);
+            //std::cout << "Binding formatter arg:" << arg_num << " with str:" << token << std::endl;
+            formatter.bind_arg(arg_num++, token);
+        }
+
+        boost::format& formatter;
+        mutable int arg_num = 1;
+    };
+
+    // Appends to \a str_ the string extracted from \a formatter. The
+    // character range \a first to \a last is ignored.
+    struct AppendFormatterString {
+        AppendFormatterString(const boost::format& formatter_, std::string& str_) :
+            formatter(formatter_),
+            m_str(str_)
+        {}
+
+        void operator()(const char* first, const char* last) const {
+            m_str += formatter.str();
+            //std::cout << "Appending formatted str:" << formatter.str() << std::endl;
+        }
+
+        const boost::format& formatter;
+        std::string& m_str;
+    };
+
+    // finds instances of stringtable substitutions and/or string formatting
+    // within the text \a input and evaluates them. [[KEY]] will be looked up
+    // in the stringtable, and if found, replaced with the corresponding
+    // stringtable entry. If not found, KEY is used instead. [[KEY,var1,var2]]
+    // will look up KEY in the stringtable or use just KEY if there is no
+    // such stringtable entry, and then substitute var1 for all instances of %1%
+    // in the string, and var2 for all instances of %2% in the string. Any
+    // intance of %3% or higher numbers will be deleted from the string, unless
+    // a third or more parameters are specified.
     std::string StringtableTextSubstitute(const std::string& input) {
         std::string retval;
 
-        // set up parser
         namespace classic = boost::spirit::classic;
-        classic::rule<> token = *(classic::anychar_p - classic::space_p - CLOSE_TAG.c_str());
+        classic::rule<> token = *(classic::anychar_p - CLOSE_TAG.c_str() - SEPARATOR.c_str());
+
         classic::rule<> var = OPEN_TAG.c_str() >> token[UserStringSubstituteAndAppend(retval)] >> CLOSE_TAG.c_str();
         classic::rule<> non_var = classic::anychar_p - OPEN_TAG.c_str();
 
+        boost::format formatter;
+        classic::rule<> substitution = OPEN_TAG.c_str() >> token[StartNewFormatterFromUserString(formatter)]
+                                     >> *(SEPARATOR.c_str() >> token[BindFormatterArgument(formatter)])
+                                     >> CLOSE_TAG.c_str();
+
+
         // parse and substitute variables
         try {
-            classic::parse(input.c_str(), *(non_var[StringAppend(retval)] | var));
+            classic::parse(input.c_str(), *(
+                  non_var[StringAppend(retval)]
+                | substitution[AppendFormatterString(formatter, retval)]
+                //| var
+                )
+            );
         } catch (const std::exception&) {
             ErrorLogger() << "StringtableTextSubstitute caught exception when parsing input: " << input;
         }
@@ -104,13 +186,13 @@ public:
     mutable boost::signals2::signal<void ()> DownPressedSignal;
 
 private:
-    void            FindGameWords();                    //!< Finds all game words for autocomplete
-    void            AutoComplete();                     //!< Autocomplete current word
+    void FindGameWords();                    //!< Finds all game words for autocomplete
+    void AutoComplete();                     //!< Autocomplete current word
 
     /** AutoComplete helper function */
-    bool            CompleteWord(const std::set<std::string>& names, const std::string& partial_word,
-                                 const std::pair<GG::CPSize, const GG::CPSize>& cursor_pos,
-                                 std::string& text);
+    bool CompleteWord(const std::set<std::string>& names, const std::string& partial_word,
+                      const std::pair<GG::CPSize, const GG::CPSize>& cursor_pos,
+                      std::string& text);
 
     // Set for autocomplete game words
     std::set<std::string>       m_game_words;

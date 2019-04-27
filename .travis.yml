@@ -60,7 +60,7 @@ jobs:
         - mkdir build
         - cd build
       script:
-        - git merge --no-commit upstream/release-v0.4.8
+        - git merge --no-commit upstream/release-v0.4.8 || true
         - cmake -DBUILD_HEADLESS=ON -DBUILD_TESTING=ON ..
         - cmake --build . -- -j 2
         - cmake-local --build . --target unittest

@@ -35,7 +35,8 @@ jobs:
         - echo max_size = 200M >> $HOME/.ccache/ccache.conf
         - ccache --version
         - ccache --show-stats
-        - psql -c 'SELECT version(); CREATE DATABASE freeorion;' -U postgres
+        - psql -c 'SELECT version();' -U postgres
+        - psql -c 'CREATE DATABASE freeorion;' -U postgres
         - psql -U postgres freeorion < ${TRAVIS_BUILD_DIR}/.ci/freeorion.sql
         - docker pull freeorion/freeorion-travis-build
         - docker run --name freeorion-psql freeorion/freeorion-travis-build /bin/bash -c "apt-get update --assume-yes && apt-get install --assume-yes python-psycopg2 && mkdir -p /root/.config/freeorion/ && echo host=localhost user=postgres dbname=freeorion > /root/.config/freeorion/db.txt"

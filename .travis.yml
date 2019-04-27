@@ -25,7 +25,7 @@ jobs:
         - docker
         - postgresql
       addons:
-        - postgresql: "9.6"
+        postgresql: "9.6"
       cache: ccache
       env:
         - NAME="Build FreeOrion"

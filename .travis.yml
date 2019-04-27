@@ -21,6 +21,8 @@ jobs:
     - stage: build
       os: linux
       language: cpp
+      addons:
+        - postgresql: "9.6"
       services:
         - docker
         - postgresql

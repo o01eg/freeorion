@@ -6,6 +6,7 @@
   #include <abstractions/python>
 
   network inet dgram,
+  network inet stream,
   network inet6 stream,
 
   signal send set=kill peer=/usr/lib/freeorion/freeorionca,

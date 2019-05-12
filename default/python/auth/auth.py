@@ -47,7 +47,7 @@ class AuthProvider:
 
     def is_require_auth_or_return_roles(self, player_name):
         """Returns True if player should be authenticated or list of roles for anonymous players"""
-        otp = "%0.6d" % random.randint(999, 999999)
+        otp = "%0.5d" % random.randint(999, 99999)
         known_login = False
         try:
             with self.conn:
@@ -59,7 +59,7 @@ class AuthProvider:
                         if r[0] == "xmpp":
                             req = urllib2.Request("http://localhost:8083/")
                             req.add_header("X-XMPP-To", r[1])
-                            req.add_data("Enter OTP into freeorion client: %s" % otp)
+                            req.add_data("%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp))
                             urllib2.urlopen(req).read()
                         else:
                             warn("Unsupported protocol %s for %s" % (r[0], player_name))

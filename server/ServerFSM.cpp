@@ -805,6 +805,8 @@ MPLobby::MPLobby(my_context c) :
     m_ai_next_index(1)
 {
     TraceLogger(FSM) << "(ServerFSM) MPLobby";
+    throw std::invalid_argument("MPLobby is disallowed in longturn games.");
+
     ClockSeed();
     ServerApp& server = Server();
     server.InitializePython();

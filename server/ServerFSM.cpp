@@ -1040,21 +1040,6 @@ sc::result MPLobby::react(const Disconnection& d) {
             if (player_connection != (*it))
                 (*it)->SendMessage(ServerPlayerChatMessage(Networking::INVALID_PLAYER_ID, timestamp, data));
         }
-
-        // launch sendxmpp
-        size_t players_size = 0;
-        for (const auto& plr : m_lobby_data->m_players) {
-            if (plr.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER)
-                players_size++;
-        }
-        std::async(std::launch::async, [players_size] {
-            std::vector<std::string> args{"/usr/bin/curl",
-                "http://localhost:8083/",
-                "-H", "X-XMPP-Muc: smac",
-                "-d", " @freeorion in lobby " + std::to_string(players_size)};
-            Process sendxmpp = Process("/usr/bin/curl", args);
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-        });
     } else {
         DebugLogger(FSM) << "MPLobby.Disconnection : Disconnecting player (" << id << ") was not in lobby";
         return discard_event();
@@ -1125,21 +1110,6 @@ void MPLobby::EstablishPlayer(const PlayerConnectionPtr& player_connection,
              it != server.m_networking.established_end(); ++it)
         { (*it)->SendMessage(ServerLobbyUpdateMessage(*m_lobby_data)); }
     }
-
-    // launch sendxmpp
-    size_t players_size = 0;
-    for (const auto& plr : m_lobby_data->m_players) {
-        if (plr.second.m_client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER)
-            players_size++;
-    }
-    std::async(std::launch::async, [player_name, players_size] {
-        std::vector<std::string> args{"/usr/bin/curl",
-            "http://localhost:8083/",
-            "-H", "X-XMPP-Muc: smac",
-            "-d", "!r " + player_name + " @freeorion in lobby " + std::to_string(players_size)};
-            Process sendxmpp = Process("/usr/bin/curl", args);
-        std::this_thread::sleep_for(std::chrono::seconds(3));
-    });
 }
 
 sc::result MPLobby::react(const JoinGame& msg) {
@@ -2482,14 +2452,6 @@ sc::result WaitingForMPGameJoiners::react(const CheckStartConditions& u) {
             DebugLogger(FSM) << "Initializing loaded MP game";
             server.LoadMPGameInit(*m_lobby_data, m_player_save_game_data, m_server_save_game_data);
         }
-        std::async(std::launch::async, [] {
-            std::vector<std::string> args{"/usr/bin/curl",
-                "http://localhost:8083/",
-                "-H", "X-XMPP-Muc: smac",
-                "-d", "Game started!"};
-                Process sendxmpp = Process("/usr/bin/curl", args);
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-        });
         return transit<PlayingGame>();
     }
 

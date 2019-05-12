@@ -54,7 +54,6 @@ class AuthProvider:
                     curs.execute(""" SELECT * FROM auth.check_contact(%s, %s) """,
                                  (player_name, otp))
                     for r in curs:
-                        known_login = True
                         if r[0] == "xmpp":
                             req = urllib2.Request("http://localhost:8083/")
                             req.add_header("X-XMPP-To", r[1])

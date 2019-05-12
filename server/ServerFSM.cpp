@@ -27,6 +27,7 @@
 #include <boost/uuid/nil_generator.hpp>
 //TODO: replace with std::make_unique when transitioning to C++14
 #include <boost/smart_ptr/make_unique.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <GG/ClrConstants.h>
 
@@ -187,6 +188,45 @@ namespace {
         std::string save_filename = boost::io::str(boost::format("FreeOrion_%04d_%s%s") % current_turn % datetime_str % extension);
         boost::filesystem::path save_path(autosave_dir_path / save_filename);
         return save_path.string();
+    }
+
+    GG::Clr GetUnusedEmpireColour(const std::list<std::pair<int, PlayerSetupData>>& psd,
+                                  const std::map<int, SaveGameEmpireData> &sged = std::map<int, SaveGameEmpireData>())
+    {
+        //DebugLogger(FSM) << "finding colours for empire of player " << player_name;
+        GG::Clr empire_colour = GG::Clr(192, 192, 192, 255);
+        for (const GG::Clr& possible_colour : EmpireColors()) {
+            //DebugLogger(FSM) << "trying colour " << possible_colour.r << ", " << possible_colour.g << ", " << possible_colour.b;
+
+            // check if any other player / empire is using this colour
+            bool colour_is_new = true;
+            for (const std::pair<int, PlayerSetupData>& entry : psd) {
+                const GG::Clr& player_colour = entry.second.m_empire_color;
+                if (player_colour == possible_colour) {
+                    colour_is_new = false;
+                    break;
+                }
+            }
+
+            if (colour_is_new) {
+                for (const auto& entry : sged) {
+                    const GG::Clr& player_colour = entry.second.m_color;
+                    if (player_colour == possible_colour) {
+                        colour_is_new = false;
+                        break;
+                    }
+                }
+            }
+
+            // use colour and exit loop if no other empire is using the colour
+            if (colour_is_new) {
+                empire_colour = possible_colour;
+                break;
+            }
+
+            //DebugLogger(FSM) << " ... colour already used.";
+        }
+        return empire_colour;
     }
 }
 
@@ -545,6 +585,8 @@ Idle::Idle(my_context c) :
         post_event(Hostless());
     else if (!GetOptionsDB().Get<std::string>("load").empty())
         throw std::invalid_argument("Autostart load file was choosed but the server wasn't started in a hostless mode");
+    else if (GetOptionsDB().Get<bool>("quickstart"))
+        throw std::invalid_argument("Quickstart was choosed but the server wasn't started in a hostless mode");
 }
 
 Idle::~Idle()
@@ -653,59 +695,92 @@ sc::result Idle::react(const Error& msg) {
 sc::result Idle::react(const Hostless&) {
     TraceLogger(FSM) << "(ServerFSM) Idle.Hostless";
     std::string autostart_load_filename = GetOptionsDB().Get<std::string>("load");
-    if (autostart_load_filename.empty())
+    bool quickstart = GetOptionsDB().Get<bool>("quickstart");
+    if (!quickstart && autostart_load_filename.empty())
         return transit<MPLobby>();
 
     if (GetOptionsDB().Get<int>("network.server.conn-human-empire-players.min") > 0) {
-        throw std::invalid_argument("A save file to load and autostart in hostless mode was specified, but the server has a non-zero minimum number of connected players, so cannot be started without a connected player.");
+        throw std::invalid_argument("A save file to load or quickstart and autostart in hostless mode was specified, but the server has a non-zero minimum number of connected players, so cannot be started without a connected player.");
     }
+
+    ServerApp& server = Server();
+    std::shared_ptr<MultiplayerLobbyData> lobby_data(new MultiplayerLobbyData(std::move(server.m_galaxy_setup_data)));
     std::shared_ptr<ServerSaveGameData> server_save_game_data(new ServerSaveGameData());
     std::vector<PlayerSaveGameData> player_save_game_data;
+    if (autostart_load_filename.empty()) {
+        DebugLogger(FSM) << "Start new game";
+        server.InitializePython();
+        std::list<PlayerSetupData> human_players = server.FillListPlayers();
 
-    DebugLogger(FSM) << "Loading file " << autostart_load_filename;
-
-    try {
-        ServerApp& server = Server();
-
-        LoadGame(autostart_load_filename,   *server_save_game_data,
-                 player_save_game_data,     GetUniverse(),
-                 Empires(),                 GetSpeciesManager(),
-                 GetCombatLogManager(),     server.m_galaxy_setup_data);
-        int seed = 0;
-        try {
-            seed = boost::lexical_cast<unsigned int>(server.m_galaxy_setup_data.m_seed);
-        } catch (...) {
-            try {
-                boost::hash<std::string> string_hash;
-                std::size_t h = string_hash(server.m_galaxy_setup_data.m_seed);
-                seed = static_cast<unsigned int>(h);
-            } catch (...) {}
+        for (auto& player_setup_data : human_players) {
+            DebugLogger(FSM) << "Create player " << player_setup_data.m_player_name;
+            player_setup_data.m_player_id =     Networking::INVALID_PLAYER_ID;
+            player_setup_data.m_client_type =   Networking::CLIENT_TYPE_HUMAN_PLAYER;
+            player_setup_data.m_empire_color =  GetUnusedEmpireColour(lobby_data->m_players);
+            player_setup_data.m_authenticated = true;
+            lobby_data->m_players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
         }
-        DebugLogger(FSM) << "Seeding with loaded galaxy seed: " << server.m_galaxy_setup_data.m_seed << "  interpreted as actual seed: " << seed;
-        Seed(seed);
 
-        std::shared_ptr<MultiplayerLobbyData> lobby_data(new MultiplayerLobbyData());
-        // fill lobby data with AI to start them with server
+        const SpeciesManager& sm = GetSpeciesManager();
+        auto max_ai = GetOptionsDB().Get<int>("network.server.ai.max");
+        const int ai_count = GetOptionsDB().Get<int>("setup.ai.player.count");
         int ai_next_index = 1;
-        for (const auto& psgd : player_save_game_data) {
-            if (psgd.m_client_type != Networking::CLIENT_TYPE_AI_PLAYER)
-                continue;
+        while (ai_next_index <= ai_count && (ai_next_index <= max_ai || max_ai < 0)) {
             PlayerSetupData player_setup_data;
             player_setup_data.m_player_id =     Networking::INVALID_PLAYER_ID;
             player_setup_data.m_player_name =   UserString("AI_PLAYER") + "_" + std::to_string(ai_next_index++);
             player_setup_data.m_client_type =   Networking::CLIENT_TYPE_AI_PLAYER;
-            player_setup_data.m_save_game_empire_id = psgd.m_empire_id;
+            player_setup_data.m_empire_name =   GenerateEmpireName(player_setup_data.m_player_name, lobby_data->m_players);
+            player_setup_data.m_empire_color =  GetUnusedEmpireColour(lobby_data->m_players);
+            if (lobby_data->m_seed != "")
+                player_setup_data.m_starting_species_name = sm.RandomPlayableSpeciesName();
+            else
+                player_setup_data.m_starting_species_name = sm.SequentialPlayableSpeciesName(ai_next_index);
+
             lobby_data->m_players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
         }
+    } else {
+        DebugLogger(FSM) << "Loading file " << autostart_load_filename;
+        try {
+            LoadGame(autostart_load_filename,   *server_save_game_data,
+                     player_save_game_data,     GetUniverse(),
+                     Empires(),                 GetSpeciesManager(),
+                     GetCombatLogManager(),     server.m_galaxy_setup_data);
+            int seed = 0;
+            try {
+                seed = boost::lexical_cast<unsigned int>(server.m_galaxy_setup_data.m_seed);
+            } catch (...) {
+                try {
+                    boost::hash<std::string> string_hash;
+                    std::size_t h = string_hash(server.m_galaxy_setup_data.m_seed);
+                    seed = static_cast<unsigned int>(h);
+                } catch (...) {}
+            }
+            DebugLogger(FSM) << "Seeding with loaded galaxy seed: " << server.m_galaxy_setup_data.m_seed << "  interpreted as actual seed: " << seed;
+            Seed(seed);
 
-        // copy locally stored data to common server fsm context so it can be
-        // retreived in WaitingForMPGameJoiners
-        context<ServerFSM>().m_lobby_data = lobby_data;
-        context<ServerFSM>().m_player_save_game_data = player_save_game_data;
-        context<ServerFSM>().m_server_save_game_data = server_save_game_data;
-    } catch (const std::exception& e) {
-        throw e;
+            // fill lobby data with AI to start them with server
+            int ai_next_index = 1;
+            for (const auto& psgd : player_save_game_data) {
+                if (psgd.m_client_type != Networking::CLIENT_TYPE_AI_PLAYER)
+                    continue;
+                PlayerSetupData player_setup_data;
+                player_setup_data.m_player_id =     Networking::INVALID_PLAYER_ID;
+                player_setup_data.m_player_name =   UserString("AI_PLAYER") + "_" + std::to_string(ai_next_index++);
+                player_setup_data.m_client_type =   Networking::CLIENT_TYPE_AI_PLAYER;
+                player_setup_data.m_save_game_empire_id = psgd.m_empire_id;
+                lobby_data->m_players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
+            }
+        } catch (const std::exception& e) {
+            throw e;
+        }
     }
+
+    // copy locally stored data to common server fsm context so it can be
+    // retreived in WaitingForMPGameJoiners
+    context<ServerFSM>().m_lobby_data = lobby_data;
+    context<ServerFSM>().m_player_save_game_data = player_save_game_data;
+    context<ServerFSM>().m_server_save_game_data = server_save_game_data;
 
     return transit<WaitingForMPGameJoiners>();
 }
@@ -714,45 +789,6 @@ sc::result Idle::react(const Hostless&) {
 // MPLobby
 ////////////////////////////////////////////////////////////
 namespace {
-    GG::Clr GetUnusedEmpireColour(const std::list<std::pair<int, PlayerSetupData>>& psd,
-                                  const std::map<int, SaveGameEmpireData> &sged = std::map<int, SaveGameEmpireData>())
-    {
-        //DebugLogger(FSM) << "finding colours for empire of player " << player_name;
-        GG::Clr empire_colour = GG::Clr(192, 192, 192, 255);
-        for (const GG::Clr& possible_colour : EmpireColors()) {
-            //DebugLogger(FSM) << "trying colour " << possible_colour.r << ", " << possible_colour.g << ", " << possible_colour.b;
-
-            // check if any other player / empire is using this colour
-            bool colour_is_new = true;
-            for (const std::pair<int, PlayerSetupData>& entry : psd) {
-                const GG::Clr& player_colour = entry.second.m_empire_color;
-                if (player_colour == possible_colour) {
-                    colour_is_new = false;
-                    break;
-                }
-            }
-
-            if (colour_is_new) {
-                for (const auto& entry : sged) {
-                    const GG::Clr& player_colour = entry.second.m_color;
-                    if (player_colour == possible_colour) {
-                        colour_is_new = false;
-                        break;
-                    }
-                }
-            }
-
-            // use colour and exit loop if no other empire is using the colour
-            if (colour_is_new) {
-                empire_colour = possible_colour;
-                break;
-            }
-
-            //DebugLogger(FSM) << " ... colour already used.";
-        }
-        return empire_colour;
-    }
-
     // return true if player has important changes.
     bool IsPlayerChanged(const PlayerSetupData& lhs, const PlayerSetupData& rhs) {
         return (lhs.m_client_type != rhs.m_client_type) ||
@@ -2487,11 +2523,39 @@ sc::result WaitingForMPGameJoiners::react(const Error& msg) {
 // PlayingGame
 ////////////////////////////////////////////////////////////
 PlayingGame::PlayingGame(my_context c) :
-    my_base(c)
-{ TraceLogger(FSM) << "(ServerFSM) PlayingGame"; }
+    my_base(c),
+    m_turn_timeout(Server().m_io_context)
+{
+    TraceLogger(FSM) << "(ServerFSM) PlayingGame";
+
+    if (!GetOptionsDB().Get<std::string>("network.server.turn-timeout.first-turn-time").empty()) {
+        // Set first turn advance to absolute time point
+        try {
+            m_turn_timeout.expires_at(boost::posix_time::time_from_string(GetOptionsDB().Get<std::string>("network.server.turn-timeout.first-turn-time")));
+            m_turn_timeout.async_wait(boost::bind(&PlayingGame::TurnTimedoutHandler,
+                                                  this,
+                                                  boost::asio::placeholders::error));
+            return;
+        } catch (...) {
+            WarnLogger(FSM) << "(ServerFSM) PlayingGame: Cann't parse first turn time: "
+                            << GetOptionsDB().Get<std::string>("network.server.turn-timeout.first-turn-time");
+        }
+    }
+
+    if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0) {
+        // Set turn advance after time interval
+        m_turn_timeout.expires_from_now(boost::posix_time::seconds(GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval")));
+        m_turn_timeout.async_wait(boost::bind(&PlayingGame::TurnTimedoutHandler,
+                                              this,
+                                              boost::asio::placeholders::error));
+    }
+}
 
 PlayingGame::~PlayingGame()
-{ TraceLogger(FSM) << "(ServerFSM) ~PlayingGame"; }
+{
+    TraceLogger(FSM) << "(ServerFSM) ~PlayingGame";
+    m_turn_timeout.cancel();
+}
 
 sc::result PlayingGame::react(const PlayerChat& msg) {
     TraceLogger(FSM) << "(ServerFSM) PlayingGame.PlayerChat";
@@ -2694,6 +2758,14 @@ void PlayingGame::EstablishPlayer(const PlayerConnectionPtr& player_connection,
             }
             // In both cases update ingame lobby
             fsm.UpdateIngameLobby();
+
+            // send timeout data
+            if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0) {
+                auto remaining = m_turn_timeout.expires_from_now();
+                player_connection->SendMessage(TurnTimeoutMessage(remaining.total_seconds()));
+            } else {
+                player_connection->SendMessage(TurnTimeoutMessage(0));
+            }
         }
     }
 }
@@ -2850,6 +2922,29 @@ sc::result PlayingGame::react(const LobbyUpdate& msg) {
     return discard_event();
 }
 
+void PlayingGame::TurnTimedoutHandler(const boost::system::error_code& error) {
+    DebugLogger(FSM) << "(ServerFSM) PlayingGame::TurnTimedoutHandler";
+
+    if (error) {
+        DebugLogger() << "Turn timed out cancelled";
+        return;
+    }
+
+    if (GetOptionsDB().Get<bool>("network.server.turn-timeout.fixed-interval") &&
+        GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0)
+    {
+        auto turn_expired_time = m_turn_timeout.expires_at();
+        turn_expired_time += boost::posix_time::seconds(GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval"));
+        m_turn_timeout.expires_at(turn_expired_time);
+        m_turn_timeout.async_wait(boost::bind(&PlayingGame::TurnTimedoutHandler,
+                                              this,
+                                              boost::asio::placeholders::error));
+    }
+    Server().ExpireTurn();
+    // check if AI players made their orders and advance turn
+    Server().m_fsm->process_event(CheckTurnEndConditions());
+}
+
 ////////////////////////////////////////////////////////////
 // WaitingForTurnEnd
 ////////////////////////////////////////////////////////////
@@ -2867,6 +2962,26 @@ WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
         m_timeout.async_wait(boost::bind(&WaitingForTurnEnd::SaveTimedoutHandler,
                                          this,
                                          boost::asio::placeholders::error));
+    }
+
+    auto& playing_game = context<PlayingGame>();
+
+    // reset turn timer if there no fixed interval
+    if (!GetOptionsDB().Get<bool>("network.server.turn-timeout.fixed-interval")) {
+        playing_game.m_turn_timeout.cancel();
+        if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0) {
+            playing_game.m_turn_timeout.expires_from_now(boost::posix_time::seconds(GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval")));
+            playing_game.m_turn_timeout.async_wait(boost::bind(&PlayingGame::TurnTimedoutHandler,
+                                                               &playing_game,
+                                                               boost::asio::placeholders::error));
+        }
+    }
+
+    if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0) {
+        auto remaining = playing_game.m_turn_timeout.expires_from_now();
+        Server().Networking().SendMessageAll(TurnTimeoutMessage(remaining.total_seconds()));
+    } else {
+        Server().Networking().SendMessageAll(TurnTimeoutMessage(0));
     }
 }
 
@@ -3116,8 +3231,12 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
 
     // no moderator; wait for all player orders to be submitted before
     // processing turn.
-    if (server.AllOrdersReceived()) {
-        // if all players have submitted orders, proceed to turn processing
+    if (server.AllOrdersReceived() &&
+        (server.IsTurnExpired() ||
+        !GetOptionsDB().Get<bool>("network.server.turn-timeout.fixed-interval")))
+    {
+        // if all players have submitted orders and the server doesn't wait until fixed turn timeout
+        // expires, proceed to turn processing
         TraceLogger(FSM) << "WaitingForTurnEnd.TurnOrders : All orders received.";
         post_event(ProcessTurn());
         return transit<ProcessingTurn>();

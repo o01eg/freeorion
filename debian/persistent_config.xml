@@ -8,38 +8,55 @@
    <exit>
     <enabled>1</enabled>
    </exit>
-   <interval>7200</interval>
+   <interval>21600</interval>
   </auto>
  </save>
  <setup>
+  <ai>
+   <player>
+    <count>0</count>
+   </player>
+  </ai>
   <rules>
    <RULE_ENABLE_SUPER_TESTER>0</RULE_ENABLE_SUPER_TESTER>
-   <RULE_THRESHOLD_HUMAN_PLAYER_WIN>1</RULE_THRESHOLD_HUMAN_PLAYER_WIN>
+   <RULE_THRESHOLD_HUMAN_PLAYER_WIN>2</RULE_THRESHOLD_HUMAN_PLAYER_WIN>
+   <RULE_ONLY_ALLIANCE_WIN>1</RULE_ONLY_ALLIANCE_WIN>
    <RULE_ALLOW_CONCEDE>1</RULE_ALLOW_CONCEDE>
    <RULE_CONCEDE_COLONIES_THRESHOLD>9999</RULE_CONCEDE_COLONIES_THRESHOLD>
    <RULE_SHOW_DETAILED_EMPIRES_DATA>0</RULE_SHOW_DETAILED_EMPIRES_DATA>
+   <RULE_SHIP_PART_BASED_UPKEEP>1</RULE_SHIP_PART_BASED_UPKEEP>
+   <RULE_SHIP_HULL_COST_FACTOR>0.5</RULE_SHIP_HULL_COST_FACTOR>
+   <RULE_SHIP_PART_COST_FACTOR>0.5</RULE_SHIP_PART_COST_FACTOR>
+   <RULE_BUILDING_COST_FACTOR>0.5</RULE_BUILDING_COST_FACTOR>
+   <RULE_TECH_COST_FACTOR>1.0</RULE_TECH_COST_FACTOR>
    <server-locked>
     <RULE_ENABLE_SUPER_TESTER>1</RULE_ENABLE_SUPER_TESTER>
     <RULE_THRESHOLD_HUMAN_PLAYER_WIN>1</RULE_THRESHOLD_HUMAN_PLAYER_WIN>
+    <RULE_ONLY_ALLIANCE_WIN>1</RULE_ONLY_ALLIANCE_WIN>
     <RULE_ALLOW_CONCEDE>1</RULE_ALLOW_CONCEDE>
     <RULE_CONCEDE_COLONIES_THRESHOLD>1</RULE_CONCEDE_COLONIES_THRESHOLD>
-    <RULE_SHOW_DETAILED_EMPIRES_DATA>1</RULE_SHOW_DETAILED_EMPIRES_DATA>    
+    <RULE_SHOW_DETAILED_EMPIRES_DATA>1</RULE_SHOW_DETAILED_EMPIRES_DATA>
+    <RULE_SHIP_PART_BASED_UPKEEP>1</RULE_SHIP_PART_BASED_UPKEEP>
+    <RULE_SHIP_HULL_COST_FACTOR>1</RULE_SHIP_HULL_COST_FACTOR>
+    <RULE_SHIP_PART_COST_FACTOR>1</RULE_SHIP_PART_COST_FACTOR>
+    <RULE_BUILDING_COST_FACTOR>1</RULE_BUILDING_COST_FACTOR>
+    <RULE_TECH_COST_FACTOR>1</RULE_TECH_COST_FACTOR>
    </server-locked>
   </rules>
  </setup>
  <network>
   <server>
    <ai>
-    <max>5</max>
+    <max>0</max>
    </ai>
    <human>
     <min>2</min>
    </human>
    <conn-human-empire-players>
-    <min>2</min>
+    <min>0</min>
    </conn-human-empire-players>
    <unconn-human-empire-players>
-    <max>2</max>
+    <max>0</max>
    </unconn-human-empire-players>
    <publish-statistics>0</publish-statistics>
    <cookies>
@@ -48,6 +65,10 @@
    <binary>
     <enabled>0</enabled>
    </binary>
+   <turn-timeout>
+     <fixed-interval>1</fixed-interval>
+     <max-interval>86400</max-interval>
+   </turn-timeout>
   </server>
  </network>
 </XMLDoc>

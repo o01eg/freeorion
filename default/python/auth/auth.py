@@ -48,7 +48,6 @@ class AuthProvider:
     def is_require_auth_or_return_roles(self, player_name):
         """Returns True if player should be authenticated or list of roles for anonymous players"""
         otp = "%0.5d" % random.randint(999, 99999)
-        known_login = False
         try:
             with self.conn:
                 with self.conn.cursor() as curs:
@@ -67,7 +66,6 @@ class AuthProvider:
             self.conn = psycopg2.connect(self.dsn)
             exctype, value = sys.exc_info()[:2]
             error("Cann't check player %s: %s %s" % (player_name, exctype, value))
-            known_login = True
 
         # in longturn games always require authorization
         return True

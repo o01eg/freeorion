@@ -17,6 +17,9 @@
     <count>0</count>
    </player>
   </ai>
+  <star>
+   <count>10</count>
+  </star>
   <rules>
    <RULE_ENABLE_SUPER_TESTER>0</RULE_ENABLE_SUPER_TESTER>
    <RULE_THRESHOLD_HUMAN_PLAYER_WIN>2</RULE_THRESHOLD_HUMAN_PLAYER_WIN>

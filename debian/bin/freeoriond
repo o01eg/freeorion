@@ -9,8 +9,17 @@ pwd
 
 DATAPATH="--resource-dir /usr/share/games/freeorion/default"
 
+SAVEFILE=`ls -t /var/lib/freeorion/save/FO0001/*.mps | head -n1`
+
+if [ -f "${SAVEFILE}" ];
+then
+    SAVEARGS=--load "${SAVEFILE}"
+else
+    SAVEARGS=-q
+fi
+
 LD_LIBRARY_PATH="/usr/lib/freeorion:${LD_LIBRARY_PATH}" \
-/usr/lib/freeorion/freeoriond ${DATAPATH} "$@"
+/usr/lib/freeorion/freeoriond ${DATAPATH} ${SAVEARGS} "$@"
 EXITST=$?
 if [ ${EXITST} -ne 0 ];
 then

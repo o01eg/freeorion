@@ -18,6 +18,8 @@ psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
 import urllib2
 
+import smtplib
+import ConfigParser
 
 class AuthProvider:
     def __init__(self):
@@ -33,6 +35,8 @@ class AuthProvider:
             'g': fo.roleType.galaxySetup
         }
         self.default_roles = [fo.roleType.clientTypePlayer]
+        self.mailconf = ConfigParser.ConfigParser()
+        self.mailconf.read(fo.get_user_config_dir() + "/mail.cfg")
         info("Auth initialized")
 
     def __parse_roles(self, roles_str):
@@ -55,10 +59,24 @@ class AuthProvider:
                                  (player_name, otp))
                     for r in curs:
                         if r[0] == "xmpp":
-                            req = urllib2.Request("http://localhost:8083/")
-                            req.add_header("X-XMPP-To", r[1])
-                            req.add_data("%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp))
-                            urllib2.urlopen(req).read()
+                            try:
+                                req = urllib2.Request("http://localhost:8083/")
+                                req.add_header("X-XMPP-To", r[1])
+                                req.add_data("%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp))
+                                urllib2.urlopen(req).read()
+                            except:
+                                error("Cann't send xmpp message to %s" % player_name)
+                        elif r[0] == "email":
+                            try:
+                                server = smtplib.SMTP_SSL(self.mailconf.get('mail', 'server'), 465)
+                                server.ehlo()
+                                server.login(self.mailconf.get('mail', 'login'), self.mailconf.get('mail', 'passwd'))
+                                server.sendmail(self.mailconf.get('mail', 'from'), r[1], "From: %s\r\nTo: %s\r\nSubject: FreeOrion OTP\r\n\r\nPassword %s for player %s"
+                                        % (self.mailconf.get('mail', 'from'), r[1], otp, player_name))
+                                server.close()
+                            except:
+                                exctype, value = sys.exc_info()[:2]
+                                error("Cann't send email to %s: %s %s" % (player_name, exctype, value));
                         else:
                             warn("Unsupported protocol %s for %s" % (r[0], player_name))
         except psycopg2.InterfaceError:
@@ -101,7 +119,8 @@ class AuthProvider:
                             INNER JOIN auth.contacts c
                             ON c.player_name = u.player_name
                             AND c.is_active
-                            AND c.delete_ts IS NULL """)
+                            AND c.delete_ts IS NULL
+                            GROUP BY u.player_name """)
                     for r in curs:
                         psd = fo.PlayerSetupData()
                         psd.player_name = r[0]

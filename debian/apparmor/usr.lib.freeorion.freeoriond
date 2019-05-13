@@ -17,6 +17,8 @@
   /etc/nsswitch.conf r,
   /etc/passwd r,
   /etc/hosts r,
+  /etc/host.conf r,
+  /run/resolvconf/resolv.conf r,
   /run/postgresql/* rw,
   /usr/lib/freeorion/freeorionca Px,
   /usr/lib/freeorion/freeoriond mr,

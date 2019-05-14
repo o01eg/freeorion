@@ -63,7 +63,7 @@
    </unconn-human-empire-players>
    <publish-statistics>0</publish-statistics>
    <cookies>
-    <expire-minutes>180</expire-minutes>
+    <expire-minutes>960</expire-minutes>
    </cookies>
    <binary>
     <enabled>0</enabled>

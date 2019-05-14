@@ -3,6 +3,12 @@ Fleet
     ships = [
         "SD_SCOUT"
     ]
+
+Fleet
+    name = "FN_SCOUT_FLEET"
+    ships = [
+        "SD_SCOUT"
+    ]
     
 Fleet
     name = "FN_SCOUT_FLEET"
@@ -15,9 +21,21 @@ Fleet
     ships = [
         "SD_MARK_1"
     ]
+
+Fleet
+    name = "FN_BATTLE_FLEET"
+    ships = [
+        "SD_MARK_1"
+    ]
     
 Fleet
     name = "FN_COLONY_FLEET"
     ships = [
         "SD_COLONY_SHIP"
+    ]
+
+Fleet
+    name = "FN_COLONY_FLEET"
+    ships = [
+        "SD_OUTPOST_SHIP"
     ]

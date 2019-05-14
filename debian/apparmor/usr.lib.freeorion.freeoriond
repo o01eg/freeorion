@@ -6,6 +6,7 @@
   #include <abstractions/python>
 
   network inet dgram,
+  network inet6 dgram,
   network inet stream,
   network inet6 stream,
 
@@ -18,6 +19,8 @@
   /etc/passwd r,
   /etc/hosts r,
   /etc/host.conf r,
+  /etc/resolv.conf r,
+  /etc/gai.conf r,
   /run/resolvconf/resolv.conf r,
   /run/postgresql/* rw,
   /usr/lib/freeorion/freeorionca Px,

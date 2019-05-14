@@ -3606,7 +3606,7 @@ void ServerApp::CheckForEmpireElimination() {
             entry.second->Eliminate();
         else {
             surviving_empires.insert(entry.second);
-            if (GetEmpireClientType(entry.second->EmpireID()) == Networking::CLIENT_TYPE_HUMAN_PLAYER)
+            if (GetEmpireClientType(entry.second->EmpireID()) != Networking::CLIENT_TYPE_AI_PLAYER)
                 surviving_human_empires.insert(entry.second);
         }
     }

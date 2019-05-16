@@ -21,6 +21,7 @@ import urllib2
 import smtplib
 import ConfigParser
 
+
 class AuthProvider:
     def __init__(self):
         self.dsn = ""
@@ -72,13 +73,14 @@ class AuthProvider:
                                 server = smtplib.SMTP_SSL(self.mailconf.get('mail', 'server'), 465)
                                 server.ehlo()
                                 server.login(self.mailconf.get('mail', 'login'), self.mailconf.get('mail', 'passwd'))
-                                server.sendmail(self.mailconf.get('mail', 'from'), r[1], "From: %s\r\nTo: %s\r\nSubject: FreeOrion OTP\r\n\r\nPassword %s for player %s"
-                                        % (self.mailconf.get('mail', 'from'), r[1], otp, player_name))
+                                server.sendmail(self.mailconf.get('mail', 'from'), r[1], """From:
+                                        %s\r\nTo: %s\r\nSubject: FreeOrion OTP\r\n\r\nPassword %s
+                                        for player %s""" % (self.mailconf.get('mail', 'from'), r[1], otp, player_name))
                                 server.close()
                                 info("OTP was send to %s via email" % player_name)
                             except:
                                 exctype, value = sys.exc_info()[:2]
-                                error("Cann't send email to %s: %s %s" % (player_name, exctype, value));
+                                error("Cann't send email to %s: %s %s" % (player_name, exctype, value))
                         else:
                             warn("Unsupported protocol %s for %s" % (r[0], player_name))
         except psycopg2.InterfaceError:

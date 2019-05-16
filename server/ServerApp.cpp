@@ -1839,9 +1839,11 @@ void ServerApp::DropPlayerEmpireLink(int player_id)
 int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
     Empire* empire = nullptr;
     int empire_id = ALL_EMPIRES;
+    // compare player name case-insensitive way
+    const std::string lower_player_name = boost::algorithm::to_lower_copy(player_connection->PlayerName());
     // search empire by player name
     for (auto e : Empires()) {
-        if (e.second->PlayerName() == player_connection->PlayerName()) {
+        if (boost::algorithm::to_lower_copy(e.second->PlayerName()) == lower_player_name) {
             empire_id = e.first;
             empire = e.second;
             break;

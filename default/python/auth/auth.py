@@ -64,6 +64,7 @@ class AuthProvider:
                                 req.add_header("X-XMPP-To", r[1])
                                 req.add_data("%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp))
                                 urllib2.urlopen(req).read()
+                                info("OTP was send to %s via XMPP" % player_name)
                             except:
                                 error("Cann't send xmpp message to %s" % player_name)
                         elif r[0] == "email":
@@ -74,6 +75,7 @@ class AuthProvider:
                                 server.sendmail(self.mailconf.get('mail', 'from'), r[1], "From: %s\r\nTo: %s\r\nSubject: FreeOrion OTP\r\n\r\nPassword %s for player %s"
                                         % (self.mailconf.get('mail', 'from'), r[1], otp, player_name))
                                 server.close()
+                                info("OTP was send to %s via email" % player_name)
                             except:
                                 exctype, value = sys.exc_info()[:2]
                                 error("Cann't send email to %s: %s %s" % (player_name, exctype, value));

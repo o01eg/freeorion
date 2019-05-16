@@ -1,3 +1,11 @@
+freeorion (0.4.9+git20180513~bbb72e1-fo0001-2) unstable; urgency=medium
+
+  * Increase cookies time.
+  * Log if OTP was sent.
+  * Accept player name in a case insensitive way.
+
+ -- O01eg <o01eg@yandex.ru>  Thu, 16 May 2019 16:45:26 +0000
+
 freeorion (0.4.9+git20180513~bbb72e1-fo0001-1) unstable; urgency=medium
 
   * Game FO0001

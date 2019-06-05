@@ -344,7 +344,7 @@ boost::statechart::result WaitingForMPJoinAck::react(const JoinGame& msg) {
 
         if (!cookie.is_nil()) {
             try {
-                std::string cookie_option = "network.server.cookie." + Client().Networking().Destination();
+                std::string cookie_option = HumanClientApp::EncodeServerAddressOption(Client().Networking().Destination());
                 GetOptionsDB().Remove(cookie_option);
                 GetOptionsDB().Add(cookie_option, "OPTIONS_DB_SERVER_COOKIE", boost::uuids::to_string(cookie));
                 GetOptionsDB().Commit();
@@ -798,6 +798,19 @@ boost::statechart::result PlayingGame::react(const LobbyUpdate& msg) {
     return transit<MPLobby>();
 }
 
+boost::statechart::result PlayingGame::react(const TurnTimeout& msg) {
+    DebugLogger(FSM) << "(PlayerFSM) PlayingGame::TurnTimeout message received: " << msg.m_message.Text();
+    const std::string& text = msg.m_message.Text();
+    int timeout_remain = 0;
+    try {
+        timeout_remain = boost::lexical_cast<int>(text);
+    } catch (const boost::bad_lexical_cast& ex) {
+        ErrorLogger(FSM) << "PlayingGame::react(const TurnTimeout& msg) could not convert \"" << text << "\" to timeout";
+    }
+    Client().GetClientUI().GetMapWnd()->ResetTimeoutClock(timeout_remain);
+    return discard_event();
+}
+
 
 ////////////////////////////////////////////////////////////
 // WaitingForGameStart
@@ -895,6 +908,7 @@ boost::statechart::result WaitingForTurnData::react(const TurnUpdate& msg) {
     TraceLogger(FSM) << "(HumanClientFSM) PlayingGame.TurnUpdate";
 
     int current_turn = INVALID_GAME_TURN;
+    Client().Orders().Reset();
 
     try {
         ExtractTurnUpdateMessageData(msg.m_message,           Client().EmpireID(),    current_turn,
@@ -1071,19 +1085,6 @@ boost::statechart::result PlayingTurn::react(const PlayerStatus& msg) {
 boost::statechart::result PlayingTurn::react(const DispatchCombatLogs& msg) {
     DebugLogger(FSM) << "(PlayerFSM) PlayingGame::DispatchCombatLogs message received";
     Client().UpdateCombatLogs(msg.m_message);
-    return discard_event();
-}
-
-boost::statechart::result PlayingTurn::react(const TurnTimeout& msg) {
-    DebugLogger(FSM) << "(PlayerFSM) PlayingGame::TurnTimeout message received: " << msg.m_message.Text();
-    const std::string& text = msg.m_message.Text();
-    int timeout_remain = 0;
-    try {
-        timeout_remain = boost::lexical_cast<int>(text);
-    } catch (const boost::bad_lexical_cast& ex) {
-        ErrorLogger(FSM) << "PlayingGame::react(const TurnTimout& msg) could not convert \"" << text << "\" to timeout";
-    }
-    Client().GetClientUI().GetMapWnd()->ResetTimeoutClock(timeout_remain);
     return discard_event();
 }
 

@@ -70,8 +70,13 @@
    </binary>
    <turn-timeout>
      <fixed-interval>1</fixed-interval>
-     <max-interval>86400</max-interval>
+     <max-interval>82800</max-interval>
    </turn-timeout>
   </server>
  </network>
+ <logging>
+  <sources>
+   <network>trace</network>
+  </sources>
+ </logging>
 </XMLDoc>

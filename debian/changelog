@@ -1,3 +1,11 @@
+freeorion (0.4.9+git20180603~8193654-fo0001-3) unstable; urgency=medium
+
+  * Set turn timeout to 23h.
+  * Log network.
+  * Try to fix multiple disconnections.
+
+ -- O01eg <o01eg@yandex.ru>  Wed, 05 Jun 2019 18:32:54 +0000
+
 freeorion (0.4.9+git20180513~bbb72e1-fo0001-2) unstable; urgency=medium
 
   * Increase cookies time.

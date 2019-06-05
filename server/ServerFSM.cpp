@@ -776,6 +776,8 @@ sc::result Idle::react(const Hostless&) {
         }
     }
 
+    lobby_data->m_game_rules = GetGameRules().GetRulesAsStrings();
+
     // copy locally stored data to common server fsm context so it can be
     // retreived in WaitingForMPGameJoiners
     context<ServerFSM>().m_lobby_data = lobby_data;
@@ -3071,7 +3073,8 @@ sc::result WaitingForTurnEnd::react(const TurnOrders& msg) {
             }
         }
 
-        TraceLogger(FSM) << "WaitingForTurnEnd.TurnOrders : Received orders from player " << player_id;
+        DebugLogger(FSM) << "WaitingForTurnEnd.TurnOrders : Received orders from player " << player_id
+                         << " for empire " << empire_id << " count of " << order_set->size();
 
         server.SetEmpireSaveGameData(empire_id, boost::make_unique<PlayerSaveGameData>(sender->PlayerName(), empire_id,
                                      order_set, ui_data, save_state_string,

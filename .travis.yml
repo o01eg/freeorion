@@ -7,6 +7,7 @@ jobs:
   include:
     - stage: lint
       os: linux
+      dist: xenial
       language: python
       python: 2.7.14
       before_install:
@@ -20,6 +21,7 @@ jobs:
         - NAME="Lint Python script"
     - stage: build
       os: linux
+      dist: xenial
       language: cpp
       services:
         - docker
@@ -67,10 +69,9 @@ jobs:
       before_cache:
         - ccache --clean
         - ccache --show-stats
-        - export HOMEBREW_LOGS="~/homebrew-logs"
-        - export HOMEBREW_TEMP="~/homebrew-temp"
     - stage: test
       os: linux
+      dist: xenial
       language: python
       python: 2.7.14
       before_install:

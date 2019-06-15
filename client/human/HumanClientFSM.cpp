@@ -345,8 +345,8 @@ boost::statechart::result WaitingForMPJoinAck::react(const JoinGame& msg) {
         if (!cookie.is_nil()) {
             try {
                 std::string cookie_option = HumanClientApp::EncodeServerAddressOption(Client().Networking().Destination());
-                GetOptionsDB().Remove(cookie_option);
-                GetOptionsDB().Add(cookie_option, "OPTIONS_DB_SERVER_COOKIE", boost::uuids::to_string(cookie));
+                GetOptionsDB().Remove(cookie_option + ".cookie");
+                GetOptionsDB().Add(cookie_option + ".cookie", "OPTIONS_DB_SERVER_COOKIE", boost::uuids::to_string(cookie));
                 GetOptionsDB().Commit();
             } catch(const std::exception& err) {
                 WarnLogger() << "Cann't save cookie for server " << Client().Networking().Destination() << ": "
@@ -862,8 +862,12 @@ boost::statechart::result WaitingForGameStart::react(const GameStart& msg) {
     bool is_new_game = !(loaded_game_data && ui_data_available);
     Client().StartGame(is_new_game);
 
+    TraceLogger(FSM) << "Restoring UI data from save data...";
+
     if (!is_new_game)
         Client().GetClientUI().RestoreFromSaveData(ui_data);
+
+    TraceLogger(FSM) << "UI data from save data restored";
 
     // if I am the host on the first turn, do an autosave.
     if (is_new_game && Client().Networking().PlayerIsHost(Client().PlayerID()))

@@ -196,6 +196,16 @@ set_property(DIRECTORY APPEND
         $<$<PLATFORM_ID:OpenBSD>:FREEORION_OPENBSD>
 )
 
+if(WIN32 AND MSVC AND NOT (MSVC_VERSION LESS 1900)) # _MSC_VER >= 1900
+    # fix https://bugs.python.org/issue36020
+    # ToDo: remove after fix will be applied in python-cmake
+    # ToDo: use GREATER_EQUAL after updating to cmake >= 3.7
+    set_property(DIRECTORY APPEND
+        PROPERTY COMPILE_DEFINITIONS
+        HAVE_SNPRINTF
+    )
+endif()
+
 if(WIN32 AND MSVC)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /NODEFAULTLIB:LIBCMT")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /NODEFAULTLIB:LIBCMT")
@@ -237,10 +247,22 @@ find_package(Boost ${MINIMUM_BOOST_VERSION}
         thread
     REQUIRED)
 if(${Boost_VERSION} GREATER 106699) # boost >= 1.67
-    find_package(Boost COMPONENTS python27 REQUIRED)
-    set(Boost_PYTHON_LIBRARY ${Boost_PYTHON27_LIBRARY})
+    find_package(Boost COMPONENTS python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR} REQUIRED)
+    set(Boost_PYTHON_LIBRARY ${Boost_PYTHON${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}_LIBRARY})
 else()
-    find_package(Boost COMPONENTS python REQUIRED)
+    # boost python suffixes are determined by distributives
+    # try different alternatives
+    find_package(Boost OPTIONAL_COMPONENTS python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR})
+    if(Boost_PYTHON${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}_FOUND)
+        set(Boost_PYTHON_LIBRARY ${Boost_PYTHON${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}_LIBRARY})
+    else()
+        find_package(Boost OPTIONAL_COMPONENTS python-py${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR})
+        if(Boost_PYTHON-PY${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}_FOUND)
+            set(Boost_PYTHON_LIBRARY ${Boost_PYTHON-PY${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}_LIBRARY})
+        else()
+            find_package(Boost COMPONENTS python REQUIRED)
+        endif()
+    endif()
 endif()
 
 find_package(ZLIB REQUIRED)

@@ -17,6 +17,7 @@
     <count>0</count>
    </player>
   </ai>
+  <seed>RANDOM</seed>
   <star>
    <count>10</count>
   </star>

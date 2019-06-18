@@ -96,11 +96,9 @@ private:
     friend class boost::serialization::access;
     template <class Archive>
     void serialize(Archive& ar, const unsigned int version);
-    template <class Archive>
-    void legacy_serialize(Archive& ar, const unsigned int version);
 };
 
-BOOST_CLASS_VERSION(SaveGameUIData, 2);
+BOOST_CLASS_VERSION(SaveGameUIData, 3);
 
 
 /** The data for one empire necessary for game-setup during multiplayer loading. */

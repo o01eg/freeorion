@@ -7,9 +7,11 @@ cd ${ROOT}
 printf 'CWD: '
 pwd
 
+GAME_UID=FO0001
+
 DATAPATH="--resource-dir /usr/share/games/freeorion/default"
 
-SAVEFILE=`ls -t /var/lib/freeorion/save/FO0001/*.mps | head -n1`
+SAVEFILE=`ls -t /var/lib/freeorion/save/${GAME_UID}/*.mps | head -n1`
 
 if [ -f "${SAVEFILE}" ];
 then
@@ -19,7 +21,7 @@ else
 fi
 
 LD_LIBRARY_PATH="/usr/lib/freeorion:${LD_LIBRARY_PATH}" \
-/usr/lib/freeorion/freeoriond --network.server.turn-timeout.first-turn-time "$(date -u "+%Y-%m-%d 00:00:00" -d "+2 days")"  ${DATAPATH} ${SAVEARGS} "$@"
+/usr/lib/freeorion/freeoriond --setup.game.uid ${GAME_UID} --network.server.turn-timeout.first-turn-time "$(date -u "+%Y-%m-%d 00:00:00" -d "+2 days")"  ${DATAPATH} ${SAVEARGS} "$@"
 EXITST=$?
 if [ ${EXITST} -ne 0 ];
 then

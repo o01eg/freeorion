@@ -152,10 +152,6 @@ def create_universe(psd_map):
     seed_rng(seed_pool.pop())
     distribute_specials(gsd.specials_frequency, fo.get_all_objects())
 
-    fo.get_galaxy_setup_data().gameUID = "FO0001"
-
-    print "Game UID %s" % fo.get_galaxy_setup_data().gameUID
-
     # finally, write some statistics to the log file
     print "############################################################"
     print "##             Universe generation statistics             ##"

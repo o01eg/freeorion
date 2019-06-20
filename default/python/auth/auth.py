@@ -114,6 +114,7 @@ class AuthProvider:
 
     def list_players(self):
         """Returns list of PlayerSetupData to use in quickstart"""
+        info("Loading players for game %s" % fo.get_galaxy_setup_data().gameUID)
         players = []
         try:
             with self.conn:

@@ -214,3 +214,37 @@ INSERT INTO auth.contacts (player_name, protocol, address, is_active, create_ts)
 VALUES ('testUserWithContact', 'email', 'test@example.com', TRUE, NOW()::timestamp);
 ```
 
+# Add games (2019-06-21)
+
+To manage multiple games in the one database create table with games. As there planned to be a much
+data let's create separate scheme:
+
+```sql
+CREATE SCHEMA games;
+GRANT USAGE ON SCHEMA games TO freeorion;
+```
+
+Create table itself:
+
+```sql
+CREATE TABLE games.games (
+ game_uid VARCHAR(20) PRIMARY KEY,
+ start_ts TIMESTAMP WITHOUT TIME ZONE NOT NULL
+);
+GRANT SELECT ON games.games TO freeorion;
+```
+
+Create table to link users and games:
+
+```sql
+CREATE TABLE games.players (
+ game_uid VARCHAR(20) REFERENCES games.games(game_uid),
+ player_name CITEXT REFERENCES auth.users(player_name),
+ is_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+ species VARCHAR(20) NOT NULL DEFAULT 'RANDOM',
+ CONSTRAINT pk_players PRIMARY KEY (game_uid, player_name)
+);
+GRANT SELECT ON games.players TO freeorion;
+```
+
+

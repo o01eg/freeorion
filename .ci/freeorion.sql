@@ -16,7 +16,7 @@ CREATE TABLE auth.users (
  create_ts TIMESTAMP WITHOUT TIME ZONE NOT NULL
 );
 
-CREATE TYPE auth.contact_protocol AS ENUM ('xmpp');
+CREATE TYPE auth.contact_protocol AS ENUM ('xmpp', 'email');
 
 CREATE TABLE auth.contacts (
  player_name CITEXT REFERENCES auth.users(player_name),
@@ -45,7 +45,6 @@ BEGIN
  FROM auth.users u
  LEFT JOIN auth.contacts c ON c.player_name = u.player_name
   AND c.is_active = TRUE
-  AND c.protocol = 'xmpp'
   AND c.delete_ts IS NULL
  WHERE u.player_name = player_name_param;
  
@@ -67,3 +66,21 @@ $$
   WITH hashed_otp AS (DELETE FROM auth.otp WHERE otp.player_name = player_name_param RETURNING otp.otp)
   SELECT (TABLE hashed_otp) IS NOT NULL AND (TABLE hashed_otp) = crypt(otp, (TABLE hashed_otp));
 $$ LANGUAGE sql VOLATILE;
+
+CREATE SCHEMA games;
+
+CREATE TABLE games.games (
+ game_uid VARCHAR(20) PRIMARY KEY,
+ start_ts TIMESTAMP WITHOUT TIME ZONE NOT NULL
+);
+GRANT SELECT ON games.games TO freeorion;
+
+CREATE TABLE games.players (
+ game_uid VARCHAR(20) REFERENCES games.games(game_uid),
+ player_name CITEXT REFERENCES auth.users(player_name),
+ is_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+ species VARCHAR(20) NOT NULL DEFAULT 'RANDOM',
+ CONSTRAINT pk_players PRIMARY KEY (game_uid, player_name)
+);
+GRANT SELECT ON games.players TO freeorion;
+

@@ -119,21 +119,29 @@ class AuthProvider:
         try:
             with self.conn:
                 with self.conn.cursor() as curs:
-                    curs.execute(""" SELECT u.player_name
+                    curs.execute(""" SELECT u.player_name, p.species
                             FROM auth.users u
                             INNER JOIN auth.contacts c
                             ON c.player_name = u.player_name
-                            AND c.is_active
+                            INNER JOIN games.players p
+                            ON p.player_name = u.player_name
+                            INNER JOIN games.games g
+                            ON g.game_uid = p.game_uid
+                            WHERE c.is_active
                             AND c.delete_ts IS NULL
-                            GROUP BY u.player_name """)
+                            AND p.is_confirmed
+                            AND g.game_uid = %s
+                            GROUP BY u.player_name """,
+                            fo.get_galaxy_setup_data().gameUID)
                     for r in curs:
                         psd = fo.PlayerSetupData()
                         psd.player_name = r[0]
                         psd.empire_name = r[0]
-                        psd.starting_species = "RANDOM"
+                        psd.starting_species = r[1]
                         players.append(psd)
         except psycopg2.InterfaceError:
             self.conn = psycopg2.connect(self.dsn)
             exctype, value = sys.exc_info()[:2]
             error("Cann't load players: %s %s" % (exctype, value))
+        fo.get_galaxy_setup_data().size = fo.get_galaxy_setup_data().size * len(players)
         return players

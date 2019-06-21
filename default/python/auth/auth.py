@@ -132,7 +132,7 @@ class AuthProvider:
                             AND p.is_confirmed
                             AND g.game_uid = %s
                             GROUP BY u.player_name """,
-                            fo.get_galaxy_setup_data().gameUID)
+                                 fo.get_galaxy_setup_data().gameUID)
                     for r in curs:
                         psd = fo.PlayerSetupData()
                         psd.player_name = r[0]

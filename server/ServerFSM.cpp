@@ -741,6 +741,7 @@ sc::result Idle::react(const Hostless&) {
 
             lobby_data->m_players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
         }
+        lobby_data->m_size*=lobby_data->m_players.size();
     } else {
         DebugLogger(FSM) << "Loading file " << autostart_load_filename;
         try {

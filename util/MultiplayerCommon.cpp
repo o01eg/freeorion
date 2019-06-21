@@ -190,9 +190,6 @@ void GalaxySetupData::SetSeed(const std::string& seed) {
 void GalaxySetupData::SetGameUID(const std::string& game_uid)
 { m_game_uid = game_uid; }
 
-void GalaxySetupData::SetSize(int size)
-{ m_size = size; }
-
 /////////////////////////////////////////////////////
 // PlayerSetupData
 /////////////////////////////////////////////////////

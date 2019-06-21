@@ -759,8 +759,7 @@ namespace FreeOrionPython {
     void WrapGalaxySetupData() {
         class_<GalaxySetupData>("GalaxySetupData")
             .add_property("seed",               make_function(&GalaxySetupData::GetSeed,            return_value_policy<return_by_value>()))
-            .add_property("size",               make_function(&GalaxySetupData::GetSize,            return_value_policy<return_by_value>()),
-                                                &GalaxySetupData::SetSize)
+            .add_property("size",               make_function(&GalaxySetupData::GetSize,            return_value_policy<return_by_value>()))
             .add_property("shape",              make_function(&GalaxySetupData::GetShape,           return_value_policy<return_by_value>()))
             .add_property("age",                make_function(&GalaxySetupData::GetAge,             return_value_policy<return_by_value>()))
             .add_property("starlaneFrequency",  make_function(&GalaxySetupData::GetStarlaneFreq,    return_value_policy<return_by_value>()))

@@ -98,7 +98,7 @@ private:
     void serialize(Archive& ar, const unsigned int version);
 };
 
-BOOST_CLASS_VERSION(SaveGameUIData, 3);
+BOOST_CLASS_VERSION(SaveGameUIData, 4);
 
 
 /** The data for one empire necessary for game-setup during multiplayer loading. */
@@ -280,6 +280,16 @@ private:
 struct FO_COMMON_API MultiplayerLobbyData : public GalaxySetupData {
     /** \name Structors */ //@{
     MultiplayerLobbyData() :
+        m_any_can_edit(false),
+        m_new_game(true),
+        m_start_locked(false),
+        m_players(),
+        m_save_game(),
+        m_save_game_empire_data()
+    {}
+
+    MultiplayerLobbyData(const GalaxySetupData& base) :
+        GalaxySetupData(base),
         m_any_can_edit(false),
         m_new_game(true),
         m_start_locked(false),

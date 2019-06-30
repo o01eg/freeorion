@@ -147,7 +147,7 @@ namespace {
     };
 
 
-    // persistant between-executions galaxy setup settings, mainly so I don't have to redo these settings to what I want every time I run FO to test something
+    // persistant between-executions game setup settings
     void AddOptions(OptionsDB& db) {
         db.Add("setup.empire.name",             UserStringNop("OPTIONS_DB_GAMESETUP_EMPIRE_NAME"),              std::string(""),            Validator<std::string>());
         db.Add("setup.player.name",             UserStringNop("OPTIONS_DB_GAMESETUP_PLAYER_NAME"),              std::string(""),            Validator<std::string>());
@@ -537,7 +537,7 @@ GalaxySetupPanel::GalaxySetupPanel(GG::X w, GG::Y h) :
 
 void GalaxySetupPanel::CompleteConstruction() {
     GG::Control::CompleteConstruction();
-
+    DebugLogger() << "GalaxySetupPanel::CompleteConstruction";
     Sound::TempUISoundDisabler sound_disabler;
 
     // seed
@@ -647,8 +647,10 @@ void GalaxySetupPanel::CompleteConstruction() {
     AttachChild(m_ai_aggression_label);
     AttachChild(m_ai_aggression_list);
 
+    TraceLogger() << "GalaxySetupPanel::CompleteConstruction layout";
     DoLayout();
 
+    TraceLogger() << "GalaxySetupPanel::CompleteConstruction connecting signals and loading textures";
     m_random->LeftClickedSignal.connect(
         boost::bind(&GalaxySetupPanel::RandomClicked, this));
     m_seed_edit->FocusUpdateSignal.connect(
@@ -689,6 +691,7 @@ void GalaxySetupPanel::CompleteConstruction() {
     m_textures[RANDOM] =      ClientUI::GetTexture(ClientUI::ArtDir() / "gp_random.png");
 
     // fill droplists
+    TraceLogger() << "GalaxySetupPanel::CompleteConstruction filling droplists";
     m_galaxy_shapes_list->Insert(GG::Wnd::Create<CUISimpleDropDownListRow>(UserString("GSETUP_2ARM")));
     m_galaxy_shapes_list->Insert(GG::Wnd::Create<CUISimpleDropDownListRow>(UserString("GSETUP_3ARM")));
     m_galaxy_shapes_list->Insert(GG::Wnd::Create<CUISimpleDropDownListRow>(UserString("GSETUP_4ARM")));
@@ -741,6 +744,8 @@ void GalaxySetupPanel::CompleteConstruction() {
     m_ai_aggression_list->Insert(GG::Wnd::Create<CUISimpleDropDownListRow>(UserString("GSETUP_MANIACAL")));
 
     // initial settings from stored results or defaults
+    TraceLogger() << "GalaxySetupPanel::CompleteConstruction selecting stored settings or defaults";
+
     SetSeed(GetOptionsDB().Get<std::string>("setup.seed"), true);
     m_seed_edit->Disable(GetSeed() == "RANDOM");
     m_stars_spin->SetValue(GetOptionsDB().Get<int>("setup.star.count"));
@@ -754,7 +759,9 @@ void GalaxySetupPanel::CompleteConstruction() {
     m_native_freq_list->Select(GetOptionsDB().Get<GalaxySetupOption>("setup.native.frequency"));
     m_ai_aggression_list->Select(GetOptionsDB().Get<Aggression>("setup.ai.aggression"));
 
+    TraceLogger() << "GalaxySetupPanel::CompleteConstruction settings changed signal...";
     SettingsChangedSignal();
+    TraceLogger() << "GalaxySetupPanel::CompleteConstruction done";
 }
 
 void GalaxySetupPanel::RandomClicked() {
@@ -960,8 +967,20 @@ GalaxySetupWnd::GalaxySetupWnd() :
 void GalaxySetupWnd::CompleteConstruction() {
     Sound::TempUISoundDisabler sound_disabler;
 
-    m_galaxy_setup_panel = GG::Wnd::Create<GalaxySetupPanel>();
-    m_game_rules_panel = GG::Wnd::Create<GameRulesPanel>();
+    DebugLogger() << "GalaxySetupWnd::CompleteConstruction";
+
+    try {
+        m_galaxy_setup_panel = GG::Wnd::Create<GalaxySetupPanel>();
+    } catch (const boost::bad_any_cast& e) {
+        ErrorLogger() << "bad any cast creating galaxy setup panel: " << e.what();
+        throw;
+    }
+    try {
+        m_game_rules_panel = GG::Wnd::Create<GameRulesPanel>();
+    } catch (const boost::bad_any_cast& e) {
+        ErrorLogger() << "bad any cast creating game rules panel: " << e.what();
+        throw;
+    }
 
     const GG::X LABELS_WIDTH = (GalaxySetupPanel::DefaultWidth() - 5) / 2;
 
@@ -1032,16 +1051,11 @@ void GalaxySetupWnd::CompleteConstruction() {
     DoLayout();
     SaveDefaultedOptions();
 
-    m_galaxy_setup_panel->ImageChangedSignal.connect(
-        boost::bind(&GalaxySetupWnd::PreviewImageChanged, this, _1));
-    m_player_name_edit->EditedSignal.connect(
-        boost::bind(&GalaxySetupWnd::PlayerNameChanged, this, _1));
-    m_empire_name_edit->EditedSignal.connect(
-        boost::bind(&GalaxySetupWnd::EmpireNameChanged, this, _1));
-    m_ok->LeftClickedSignal.connect(
-        boost::bind(&GalaxySetupWnd::OkClicked, this));
-    m_cancel->LeftClickedSignal.connect(
-        boost::bind(&GalaxySetupWnd::CancelClicked, this));
+    m_galaxy_setup_panel->ImageChangedSignal.connect(boost::bind(&GalaxySetupWnd::PreviewImageChanged,  this, _1));
+    m_player_name_edit->EditedSignal.connect(        boost::bind(&GalaxySetupWnd::PlayerNameChanged,    this, _1));
+    m_empire_name_edit->EditedSignal.connect(        boost::bind(&GalaxySetupWnd::EmpireNameChanged,    this, _1));
+    m_ok->LeftClickedSignal.connect(                 boost::bind(&GalaxySetupWnd::OkClicked,            this));
+    m_cancel->LeftClickedSignal.connect(             boost::bind(&GalaxySetupWnd::CancelClicked,        this));
 
     PreviewImageChanged(m_galaxy_setup_panel->PreviewImage());
 

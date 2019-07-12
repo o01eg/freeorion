@@ -164,8 +164,7 @@ class AuthProvider:
                             try:
                                 req = urllib2.Request("http://localhost:8083/")
                                 req.add_header("X-XMPP-To", r[1])
-                                req.add_data("%s\r\n%s" %
-                                        (subject, text))
+                                req.add_data("%s\r\n%s" % (subject, text))
                                 urllib2.urlopen(req).read()
                                 info("OTP was send to %s via XMPP" % player_name)
                             except:
@@ -177,8 +176,7 @@ class AuthProvider:
                                 server.login(self.mailconf.get('mail', 'login'), self.mailconf.get('mail', 'passwd'))
                                 server.sendmail(self.mailconf.get('mail', 'from'), r[1], """From:
                                         %s\r\nTo: %s\r\nSubject: %s\r\n\r\n
-                                        %s""" % (self.mailconf.get('mail', 'from'), r[1], subject,
-                                            text))
+                                        %s""" % (self.mailconf.get('mail', 'from'), r[1], subject, text))
                                 server.close()
                                 info("OTP was send to %s via email" % player_name)
                             except:

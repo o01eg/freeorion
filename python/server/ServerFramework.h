@@ -21,6 +21,7 @@ public:
     bool FillListPlayers(std::list<PlayerSetupData>& players) const; // Wraps call to AuthProvider's method list_player
     bool LoadChatHistory(boost::circular_buffer<ChatHistoryEntity>& chat_history); // Wraps call to ChatProvider's method load_history
     bool PutChatHistoryEntity(const ChatHistoryEntity& chat_history_entity); // Wraps call to ChatProvider's method put_history_entity
+    bool SendOutboundChatMessage(const std::string& text, const std::string& player_name); // Sends message to player basd on contact info stored in DBMS
 
 private:
     // reference to imported Python universe generator module

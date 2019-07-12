@@ -191,6 +191,20 @@ bool PythonServer::FillListPlayers(std::list<PlayerSetupData>& players) const {
     return true;
 }
 
+bool PythonServer::SendOutboundChatMessage(const std::string& text, const std::string& player_name) {
+    boost::python::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
+    if (!auth_provider) {
+        ErrorLogger() << "Unable to get Python object auth_provider";
+        return false;
+    }
+    boost::python::object f = auth_provider.attr("send_outbound_chat_message");
+    if (!f) {
+        ErrorLogger() << "Unable to call Python method is_success_auth";
+        return false;
+    }
+    return f(text, player_name);
+}
+
 bool PythonServer::LoadChatHistory(boost::circular_buffer<ChatHistoryEntity>& chat_history) {
     boost::python::object chat_provider = m_python_module_chat.attr("__dict__")["chat_history_provider"];
     if (!chat_provider) {

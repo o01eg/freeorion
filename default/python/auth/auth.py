@@ -144,3 +144,51 @@ class AuthProvider:
             exctype, value = sys.exc_info()[:2]
             error("Cann't load players: %s %s" % (exctype, value))
         return players
+
+    def send_outbound_chat_message(self, text, player_name):
+        """ Send message to player """
+        subject = "FreeOrion LT %s Notification" % fo.get_galaxy_setup_data().gameUID
+        try:
+            with self.conn:
+                with self.conn.cursor() as curs:
+                    curs.execute("""SELECT c.protocol, c.address
+                            FROM auth.users u
+                            INNER JOIN auth.contacts c
+                            ON c.player_name = u.player_name
+                            WHERE u.player_name = %s
+                            AND c.is_active
+                            AND c.delete_ts IS NULL """,
+                                 (player_name,))
+                    for r in curs:
+                        if r[0] == "xmpp":
+                            try:
+                                req = urllib2.Request("http://localhost:8083/")
+                                req.add_header("X-XMPP-To", r[1])
+                                req.add_data("%s\r\n%s" %
+                                        (subject, text))
+                                urllib2.urlopen(req).read()
+                                info("OTP was send to %s via XMPP" % player_name)
+                            except:
+                                error("Cann't send xmpp message to %s" % player_name)
+                        elif r[0] == "email":
+                            try:
+                                server = smtplib.SMTP_SSL(self.mailconf.get('mail', 'server'), 465)
+                                server.ehlo()
+                                server.login(self.mailconf.get('mail', 'login'), self.mailconf.get('mail', 'passwd'))
+                                server.sendmail(self.mailconf.get('mail', 'from'), r[1], """From:
+                                        %s\r\nTo: %s\r\nSubject: %s\r\n\r\n
+                                        %s""" % (self.mailconf.get('mail', 'from'), r[1], subject,
+                                            text))
+                                server.close()
+                                info("OTP was send to %s via email" % player_name)
+                            except:
+                                exctype, value = sys.exc_info()[:2]
+                                error("Cann't send email to %s: %s %s" % (player_name, exctype, value))
+                        else:
+                            warn("Unsupported protocol %s for %s" % (r[0], player_name))
+        except psycopg2.InterfaceError:
+            self.conn = psycopg2.connect(self.dsn)
+            exctype, value = sys.exc_info()[:2]
+            error("Cann't send message: %s %s" % (exctype, value))
+            return False
+        return True

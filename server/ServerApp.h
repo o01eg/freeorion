@@ -212,6 +212,8 @@ public:
                          GG::Clr text_color,
                          const boost::posix_time::ptime& timestamp);
 
+    void SendOutboundChatMessage(const std::string& text, const std::string& player_name);
+
     ServerNetworking&           Networking();     ///< returns the networking object for the server
 private:
     void    Run();          ///< initializes app state, then executes main event handler/render loop (Poll())

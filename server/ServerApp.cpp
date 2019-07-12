@@ -1042,6 +1042,32 @@ void ServerApp::PushChatMessage(const std::string& text,
     }
 }
 
+void ServerApp::SendOutboundChatMessage(const std::string& text, const std::string& player_name) {
+    bool success = false;
+    try {
+        m_python_server.SetCurrentDir(GetPythonAuthDir());
+        success = m_python_server.SendOutboundChatMessage(text, player_name);
+    } catch (const boost::python::error_already_set& err) {
+        success = false;
+        m_python_server.HandleErrorAlreadySet();
+        if (!m_python_server.IsPythonRunning()) {
+            ErrorLogger() << "Python interpreter is no longer running.  Attempting to restart.";
+            if (m_python_server.Initialize()) {
+                ErrorLogger() << "Python interpreter successfully restarted.";
+            } else {
+                ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
+                m_fsm->process_event(ShutdownServer());
+            }
+        }
+    }
+
+    if (!success) {
+        ErrorLogger() << "Python scripted player notification failed.";
+        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
+                                                                      false));
+    }
+}
+
 void ServerApp::ExpireTurn() {
     InfoLogger() << "Turn was set to expired";
     m_turn_expired = true;

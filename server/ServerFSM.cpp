@@ -3208,6 +3208,18 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
         // if all players have submitted orders and the server doesn't wait until fixed turn timeout
         // expires, proceed to turn processing
         TraceLogger(FSM) << "WaitingForTurnEnd.TurnOrders : All orders received.";
+
+        // notify all disconnected players about turn advance
+        if (!server.IsTurnExpired()) {
+            for (const auto& empire : Empires()) {
+                if (server.GetEmpireClientType(empire.first) == Networking::INVALID_CLIENT_TYPE &&
+                    !empire.second->Eliminated())
+                {
+                    server.SendOutboundChatMessage("Hello, " + empire.second->PlayerName() + ". New turn started", empire.second->PlayerName());
+                }
+            }
+        }
+
         post_event(ProcessTurn());
         return transit<ProcessingTurn>();
     }

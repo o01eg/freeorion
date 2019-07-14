@@ -70,7 +70,7 @@
     <enabled>0</enabled>
    </binary>
    <turn-timeout>
-     <fixed-interval>1</fixed-interval>
+     <fixed-interval>0</fixed-interval>
      <max-interval>82800</max-interval>
    </turn-timeout>
   </server>

@@ -6184,6 +6184,18 @@ Received unexpected turn update from server.
 MESSAGES_PANEL_TITLE
 Messages
 
+# %1% and %2% are color coded empire names
+MESSAGES_WAR_DECLARATION
+%1% and %2% are now at war.
+
+# %1% and %2% are color coded empire names
+MESSAGES_PEACE_TREATY
+%1% and %2% are now at peace.
+
+# %1% and %2% are color coded empire names
+MESSAGES_ALLIANCE
+%1% and %2% have entered an alliance.
+
 
 ##
 ## Players list
@@ -7456,7 +7468,8 @@ SP_HHHOH
 Hhhoh
 
 SP_HHHOH_GAMEPLAY_DESC
-'''Huge, slow, multi-trunked Mammoths.
+'''<img src="species/preview/hhhoh.png"></img>
+Huge, slow, multi-trunked Mammoths.
 Prefer [[PT_TUNDRA]] planets.
 [[encyclopedia ORGANIC_SPECIES_TITLE]]
 '''
@@ -7468,6 +7481,8 @@ Hhhoh locomotion is performed by using their two, large front legs, while using 
 
 Personality:
 Hhhohs describe themselves as social pragmatists. Elders are very much revered, some living close to 230 years. Their sloth-like disposition makes them aversive to any fast movements, as well as hasty decisions.
+
+<img src="species/hhhoh.png"></img>
 '''
 
 SP_EAXAW

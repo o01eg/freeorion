@@ -42,14 +42,6 @@
 namespace fs = boost::filesystem;
 
 namespace {
-    std::map<int, SaveGameEmpireData> CompileSaveGameEmpireData(const EmpireManager& empire_manager) {
-        std::map<int, SaveGameEmpireData> retval;
-        for (const auto& entry : Empires())
-            if (!entry.second->Eliminated())
-                retval[entry.first] = SaveGameEmpireData(entry.first, entry.second->Name(), entry.second->PlayerName(), entry.second->Color(), entry.second->IsAuthenticated());
-        return retval;
-    }
-
     void CompileSaveGamePreviewData(const ServerSaveGameData& server_save_game_data,
                                     const std::vector<PlayerSaveGameData>& player_save_game_data,
                                     const std::map<int, SaveGameEmpireData>& empire_save_game_data,
@@ -104,6 +96,13 @@ namespace {
     const std::string BINARY_MARKER("binary");
 }
 
+std::map<int, SaveGameEmpireData> CompileSaveGameEmpireData() {
+    std::map<int, SaveGameEmpireData> retval;
+    for (const auto& entry : Empires())
+        retval[entry.first] = SaveGameEmpireData(entry.first, entry.second->Name(), entry.second->PlayerName(), entry.second->Color(), entry.second->IsAuthenticated(), entry.second->Eliminated(), entry.second->Won());
+    return retval;
+}
+
 int SaveGame(const std::string& filename, const ServerSaveGameData& server_save_game_data,
              const std::vector<PlayerSaveGameData>& player_save_game_data, const Universe& universe,
              const EmpireManager& empire_manager, const SpeciesManager& species_manager,
@@ -118,7 +117,7 @@ int SaveGame(const std::string& filename, const ServerSaveGameData& server_save_
     GetUniverse().EncodingEmpire() = ALL_EMPIRES;
 
     DebugLogger() << "Compiling save empire and preview data";
-    std::map<int, SaveGameEmpireData> empire_save_game_data = CompileSaveGameEmpireData(empire_manager);
+    std::map<int, SaveGameEmpireData> empire_save_game_data = CompileSaveGameEmpireData();
     SaveGamePreviewData save_preview_data;
     CompileSaveGamePreviewData(server_save_game_data, player_save_game_data,
                                empire_save_game_data, save_preview_data);
@@ -540,10 +539,11 @@ void LoadPlayerSaveHeaderData(const std::string& filename, std::vector<PlayerSav
 void LoadEmpireSaveGameData(const std::string& filename,
                             std::map<int, SaveGameEmpireData>& empire_save_game_data,
                             std::vector<PlayerSaveHeaderData>& player_save_header_data,
-                            GalaxySetupData& galaxy_setup_data)
+                            GalaxySetupData& galaxy_setup_data,
+                            int& current_turn)
 {
     SaveGamePreviewData                 ignored_save_preview_data;
-    ServerSaveGameData                  ignored_server_save_game_data;
+    ServerSaveGameData                  saved_server_save_game_data;
     GalaxySetupData                     saved_galaxy_setup_data;
 
     ScopedTimer timer("LoadEmpireSaveGameData: " + filename, true);
@@ -568,7 +568,7 @@ void LoadEmpireSaveGameData(const std::string& filename,
 
             ia >> BOOST_SERIALIZATION_NVP(ignored_save_preview_data);
             ia >> BOOST_SERIALIZATION_NVP(saved_galaxy_setup_data);
-            ia >> BOOST_SERIALIZATION_NVP(ignored_server_save_game_data);
+            ia >> BOOST_SERIALIZATION_NVP(saved_server_save_game_data);
             ia >> BOOST_SERIALIZATION_NVP(player_save_header_data);
             ia >> BOOST_SERIALIZATION_NVP(empire_save_game_data);
 
@@ -578,7 +578,7 @@ void LoadEmpireSaveGameData(const std::string& filename,
 
             ia >> BOOST_SERIALIZATION_NVP(ignored_save_preview_data);
             ia >> BOOST_SERIALIZATION_NVP(saved_galaxy_setup_data);
-            ia >> BOOST_SERIALIZATION_NVP(ignored_server_save_game_data);
+            ia >> BOOST_SERIALIZATION_NVP(saved_server_save_game_data);
             ia >> BOOST_SERIALIZATION_NVP(player_save_header_data);
             ia >> BOOST_SERIALIZATION_NVP(empire_save_game_data);
         }
@@ -600,4 +600,6 @@ void LoadEmpireSaveGameData(const std::string& filename,
     galaxy_setup_data.m_ai_aggr = saved_galaxy_setup_data.m_ai_aggr;
     galaxy_setup_data.m_game_rules = saved_galaxy_setup_data.m_game_rules;
     galaxy_setup_data.m_game_uid = saved_galaxy_setup_data.m_game_uid;
+
+    current_turn = saved_server_save_game_data.m_current_turn;
 }

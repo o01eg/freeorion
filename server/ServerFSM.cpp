@@ -430,6 +430,8 @@ void ServerFSM::UpdateIngameLobby() {
     dummy_lobby_data.m_any_can_edit = false;
     dummy_lobby_data.m_new_game = false;
     dummy_lobby_data.m_start_locked = true;
+    dummy_lobby_data.m_save_game_current_turn = m_server.CurrentTurn();
+    dummy_lobby_data.m_save_game_empire_data = CompileSaveGameEmpireData();
     for (auto player_it = m_server.m_networking.established_begin();
         player_it != m_server.m_networking.established_end(); ++player_it)
     {
@@ -439,6 +441,7 @@ void ServerFSM::UpdateIngameLobby() {
         player_setup_data.m_player_name = (*player_it)->PlayerName();
         player_setup_data.m_client_type = (*player_it)->GetClientType();
         if (const Empire* empire = GetEmpire(m_server.PlayerEmpireID(player_id))) {
+            player_setup_data.m_save_game_empire_id = empire->EmpireID();
             player_setup_data.m_empire_name = empire->Name();
             player_setup_data.m_empire_color = empire->Color();
         } else {
@@ -1332,7 +1335,8 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 psd_names.count(player.second.m_player_name))
             {
                 has_collision = true;
-                WarnLogger(FSM) << "Got color, empire's name or player's name collision.";
+                WarnLogger(FSM) << "Got color, empire's name or player's name collision for player "
+                                << player.second.m_player_name << "(" << player.first << ")";
                 break;
             } else {
                 psd_colors.emplace(player.second.m_empire_color);
@@ -1477,7 +1481,10 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                         if (plr.second.m_save_game_empire_id != ALL_EMPIRES) {
                             const auto empire_it = m_lobby_data->m_save_game_empire_data.find(plr.second.m_save_game_empire_id);
                             if (empire_it != m_lobby_data->m_save_game_empire_data.end()) {
-                                if (empire_it->second.m_authenticated) {
+                                if (empire_it->second.m_eliminated) {
+                                    WarnLogger(FSM) << "Trying to take over eliminated empire \"" << empire_it->second.m_empire_name << "\"";
+                                    incorrect_empire = true;
+                                } else if (empire_it->second.m_authenticated) {
                                     if (empire_it->second.m_player_name != sender->PlayerName()) {
                                         WarnLogger(FSM) << "Unauthorized access to protected empire \"" << empire_it->second.m_empire_name << "\"."
                                                         << " Expected player \"" << empire_it->second.m_player_name << "\""
@@ -1618,7 +1625,10 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                     if (j_player.second.m_save_game_empire_id != ALL_EMPIRES) {
                         const auto empire_it = m_lobby_data->m_save_game_empire_data.find(j_player.second.m_save_game_empire_id);
                         if (empire_it != m_lobby_data->m_save_game_empire_data.end()) {
-                            if (empire_it->second.m_authenticated) {
+                            if (empire_it->second.m_eliminated) {
+                                WarnLogger(FSM) << "Trying to take over eliminated empire \"" << empire_it->second.m_empire_name << "\"";
+                                incorrect_empire = true;
+                            } else if (empire_it->second.m_authenticated) {
                                 if (empire_it->second.m_player_name != sender->PlayerName()) {
                                     WarnLogger(FSM) << "Unauthorized access to protected empire \"" << empire_it->second.m_empire_name << "\"."
                                                     << " Expected player \"" << empire_it->second.m_player_name << "\""
@@ -1686,7 +1696,8 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             LoadEmpireSaveGameData((save_dir / m_lobby_data->m_save_game).string(),
                                    m_lobby_data->m_save_game_empire_data,
                                    player_save_header_data,
-                                   *m_lobby_data);
+                                   *m_lobby_data,
+                                   m_lobby_data->m_save_game_current_turn);
 
             // read all AI players from save game and add them into current lobby
             // with appropriate empire's data

@@ -15,6 +15,9 @@ struct PlayerSaveHeaderData;
 struct SaveGameEmpireData;
 struct ServerSaveGameData;
 
+/** Prepared empire data for save game or lobby. */
+std::map<int, SaveGameEmpireData> CompileSaveGameEmpireData();
+
 /** Saves the provided data to savefile \a filename. */
 int SaveGame(const std::string& filename,
              const ServerSaveGameData& server_save_game_data,
@@ -49,6 +52,7 @@ void LoadPlayerSaveHeaderData(const std::string& filename,
 void LoadEmpireSaveGameData(const std::string& filename,
                             std::map<int, SaveGameEmpireData>& empire_save_game_data,
                             std::vector<PlayerSaveHeaderData>& player_save_header_data,
-                            GalaxySetupData& galaxy_setup_data);
+                            GalaxySetupData& galaxy_setup_data,
+                            int &current_turn);
 
 #endif

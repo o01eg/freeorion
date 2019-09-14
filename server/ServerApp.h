@@ -125,6 +125,11 @@ public:
       * orders for the given turn */
     bool    AllOrdersReceived();
 
+    /** Determines if only one empire left to make orders. Returns empire id if one or
+     * ALL_EMPIRES if all empires ready or more that one is unready.
+     * */
+    int     LastOneNotReadyEmpire();
+
     /** Executes player orders, does colonization, does ordered scrapping, does
       * fleet movements, and updates visibility before combats are handled. */
     void    PreCombatProcessTurns();

@@ -2935,7 +2935,8 @@ void PlayingGame::TurnTimedoutHandler(const boost::system::error_code& error) {
 ////////////////////////////////////////////////////////////
 WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
     my_base(c),
-    m_timeout(Server().m_io_context)
+    m_timeout(Server().m_io_context),
+    m_last_empire_id(ALL_EMPIRES)
 {
     TraceLogger(FSM) << "(ServerFSM) WaitingForTurnEnd";
     if (GetOptionsDB().Get<int>("save.auto.interval") > 0) {
@@ -3247,18 +3248,29 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
         TraceLogger(FSM) << "WaitingForTurnEnd.TurnOrders : All orders received.";
 
         // notify all disconnected players about turn advance
-        if (!server.IsTurnExpired()) {
-            for (const auto& empire : Empires()) {
-                if (server.GetEmpireClientType(empire.first) == Networking::INVALID_CLIENT_TYPE &&
-                    !empire.second->Eliminated())
-                {
-                    server.SendOutboundChatMessage("Hello, " + empire.second->PlayerName() + ". New turn started", empire.second->PlayerName());
-                }
+        for (const auto& empire : Empires()) {
+            if (server.GetEmpireClientType(empire.first) == Networking::INVALID_CLIENT_TYPE &&
+                !empire.second->Eliminated())
+            {
+                server.SendOutboundChatMessage((boost::format("Hello, %s. New turn %d started") % empire.second->PlayerName() % (server.CurrentTurn()+1)).str(), empire.second->PlayerName());
             }
         }
 
         post_event(ProcessTurn());
         return transit<ProcessingTurn>();
+    }
+
+    // check if only one player have to make orders and he wasn't notified about it before
+    int last_empire_id = server.LastOneNotReadyEmpire();
+    if (last_empire_id != ALL_EMPIRES && last_empire_id != m_last_empire_id) {
+        Empire* empire = server.GetEmpire(last_empire_id);
+        if (empire != nullptr &&
+            server.GetEmpireClientType(last_empire_id) == Networking::INVALID_CLIENT_TYPE &&
+            !empire->Eliminated())
+        {
+            m_last_empire_id = last_empire_id;
+            server.SendOutboundChatMessage((boost::format("Hello, %s. You are last to end %d turn.") % empire->PlayerName() % server.CurrentTurn()).str(), empire->PlayerName());
+        }
     }
 
     return discard_event();

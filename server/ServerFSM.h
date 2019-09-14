@@ -353,6 +353,7 @@ struct WaitingForTurnEnd : sc::state<WaitingForTurnEnd, PlayingGame> {
 
     std::string                        m_save_filename;
     boost::asio::high_resolution_timer m_timeout;
+    int                                m_last_empire_id;
 
     SERVER_ACCESSOR
 };

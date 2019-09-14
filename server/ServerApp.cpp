@@ -2036,6 +2036,35 @@ bool ServerApp::AllOrdersReceived() {
     return all_orders_received;
 }
 
+int ServerApp::LastOneNotReadyEmpire() {
+    int last_empire_id = ALL_EMPIRES;
+    for (const auto& empire_orders : m_turn_sequence) {
+        bool empire_orders_received = true;
+        if (!empire_orders.second) {
+            DebugLogger() << " ... no save data from empire id: " << empire_orders.first;
+            empire_orders_received = false;
+        } else if (!empire_orders.second->m_orders) {
+            DebugLogger() << " ... no orders from empire id: " << empire_orders.first;
+            empire_orders_received = false;
+        } else if (!empire_orders.second->m_ready) {
+            DebugLogger() << " ... not ready empire id: " << empire_orders.first;
+            empire_orders_received = false;
+        } else {
+            DebugLogger() << " ... have orders from empire id: " << empire_orders.first;
+        }
+        if (!empire_orders_received) {
+            if (last_empire_id == ALL_EMPIRES) {
+                last_empire_id = empire_orders.first;
+            } else {
+                // multiple empires are n't ready
+                return ALL_EMPIRES;
+            }
+        }
+
+    }
+    return last_empire_id;
+}
+
 namespace {
     /** Returns true if \a empire has been eliminated by the applicable
       * definition of elimination.  As of this writing, elimination means

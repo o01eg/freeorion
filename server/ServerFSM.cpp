@@ -3040,6 +3040,13 @@ sc::result WaitingForTurnEnd::react(const TurnOrders& msg) {
         }
 
         int empire_id = empire->EmpireID();
+        if (empire->Eliminated()) {
+            ErrorLogger(FSM) << "WaitingForTurnEnd::react(TurnOrders&) received orders from player " << empire->PlayerName() << "(id: "
+                             << player_id << ") who controls empire " << empire_id
+                             << " but empire was eliminated";
+            sender->SendMessage(ErrorMessage(UserStringNop("ORDERS_FOR_WRONG_EMPIRE"), false));
+            return discard_event();
+        }
 
         for (const auto& id_and_order : *order_set) {
             auto& order = id_and_order.second;
@@ -3143,6 +3150,13 @@ sc::result WaitingForTurnEnd::react(const TurnPartialOrders& msg) {
         }
 
         int empire_id = empire->EmpireID();
+        if (empire->Eliminated()) {
+            ErrorLogger(FSM) << "WaitingForTurnEnd::react(TurnPartialOrders&) received orders from player " << empire->PlayerName() << "(id: "
+                             << player_id << ") who controls empire " << empire_id
+                             << " but empire was eliminated";
+            sender->SendMessage(ErrorMessage(UserStringNop("ORDERS_FOR_WRONG_EMPIRE"), false));
+            return discard_event();
+        }
 
         for (const auto& id_and_order : *added) {
             auto& order = id_and_order.second;
@@ -3187,6 +3201,13 @@ sc::result WaitingForTurnEnd::react(const RevokeReadiness& msg) {
         }
 
         int empire_id = empire->EmpireID();
+        if (empire->Eliminated()) {
+            ErrorLogger(FSM) << "WaitingForTurnEnd::react(RevokeReadiness&) received orders from player " << empire->PlayerName() << "(id: "
+                             << player_id << ") who controls empire " << empire_id
+                             << " but empire was eliminated";
+            sender->SendMessage(ErrorMessage(UserStringNop("ORDERS_FOR_WRONG_EMPIRE"), false));
+            return discard_event();
+        }
 
         TraceLogger(FSM) << "WaitingForTurnEnd.RevokeReadiness : Revoke orders from player " << player_id;
 

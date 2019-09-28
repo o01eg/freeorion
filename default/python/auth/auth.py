@@ -24,6 +24,7 @@ import ConfigParser
 # Constants defined by the C++ game engine
 NO_TEAM_ID = -1
 
+
 class AuthProvider:
     def __init__(self):
         self.dsn = ""

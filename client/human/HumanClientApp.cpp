@@ -1015,6 +1015,7 @@ void HumanClientApp::HandleMessage(Message& msg) {
     case Message::CHAT_HISTORY:             m_fsm->process_event(ChatHistory(msg));             break;
     case Message::SET_AUTH_ROLES:           HandleSetAuthRoles(msg);                            break;
     case Message::TURN_TIMEOUT:             m_fsm->process_event(TurnTimeout(msg));             break;
+    case Message::PLAYER_INFO:              m_fsm->process_event(PlayerInfoMsg(msg));           break;
     default:
         ErrorLogger() << "HumanClientApp::HandleMessage : Received an unknown message type \"" << msg.Type() << "\".";
     }
@@ -1175,8 +1176,15 @@ void HumanClientApp::HandleTurnUpdate()
 
 void HumanClientApp::UpdateCombatLogManager() {
     boost::optional<std::vector<int>> incomplete_ids = GetCombatLogManager().IncompleteLogIDs();
-    if (incomplete_ids)
-        m_networking->SendMessage(RequestCombatLogsMessage(*incomplete_ids));
+    if (incomplete_ids) {
+        for (auto it = incomplete_ids->begin(); it != incomplete_ids->end();) {
+            // request at most 50 logs per message to avoid trying to allocate too much space to send all at once
+            std::vector<int> a_few_log_ids;
+            for (unsigned int count = 0; count < 50 && it != incomplete_ids->end(); ++it, ++count)
+                a_few_log_ids.push_back(*it);
+            m_networking->SendMessage(RequestCombatLogsMessage(a_few_log_ids));
+        }
+    }
 }
 
 namespace {

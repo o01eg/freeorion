@@ -452,8 +452,10 @@ void ServerFSM::UpdateIngameLobby() {
     }
     dummy_lobby_data.m_start_lock_cause = UserStringNop("SERVER_ALREADY_PLAYING_GAME");
 
-    // send it to all those without empire
-    // and who are CLIENT_TYPE_HUMAN_PLAYER
+    auto player_info_map = m_server.GetPlayerInfoMap();
+
+    // send it to all either in the ingame lobby
+    // or in the playing game
     for (auto player_it = m_server.m_networking.established_begin();
         player_it != m_server.m_networking.established_end(); ++player_it)
     {
@@ -461,6 +463,8 @@ void ServerFSM::UpdateIngameLobby() {
             !GetEmpire(m_server.PlayerEmpireID((*player_it)->PlayerID())))
         {
             (*player_it)->SendMessage(ServerLobbyUpdateMessage(dummy_lobby_data));
+        } else {
+            (*player_it)->SendMessage(PlayerInfoMessage(player_info_map));
         }
     }
 }
@@ -937,8 +941,14 @@ void MPLobby::ValidateClientLimits() {
 
     // for load game consider as human all non-AI empires
     // because human player could connect later in game
+    int non_eliminated_empires_count = 0;
     if (!m_lobby_data->m_new_game) {
-        human_count = m_lobby_data->m_save_game_empire_data.size() - ai_count;
+        for (const auto& empire_data : m_lobby_data->m_save_game_empire_data) {
+            if (!empire_data.second.m_eliminated)
+                non_eliminated_empires_count ++;
+        }
+
+        human_count = non_eliminated_empires_count - ai_count;
     }
 
     int min_ai = GetOptionsDB().Get<int>("network.server.ai.min");
@@ -967,7 +977,7 @@ void MPLobby::ValidateClientLimits() {
         m_lobby_data->m_start_lock_cause = UserStringNop("ERROR_NOT_ENOUGH_CONNECTED_HUMAN_PLAYERS");
     } else if (max_unconnected_human_empire_players > 0 &&
         !m_lobby_data->m_new_game &&
-        static_cast<int>(m_lobby_data->m_save_game_empire_data.size()) - ai_count - human_connected_count >= max_unconnected_human_empire_players)
+        non_eliminated_empires_count - ai_count - human_connected_count >= max_unconnected_human_empire_players)
     {
         m_lobby_data->m_start_locked = true;
         m_lobby_data->m_start_lock_cause = UserStringNop("ERROR_TOO_MANY_UNCONNECTED_HUMAN_PLAYERS");

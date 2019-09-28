@@ -1,4 +1,4 @@
-﻿English
+English
 
 # This is the English String Table file for FreeOrion
 #
@@ -1089,6 +1089,12 @@ Combat Rounds
 RULE_NUM_COMBAT_ROUNDS_DESC
 How many rounds of combat occur each turn.
 
+RULE_AGGRESSIVE_SHIPS_COMBAT_VISIBLE
+Aggressive Ships Combat Visible
+
+RULE_AGGRESSIVE_SHIPS_COMBAT_VISIBLE_DESC
+Ships in fleets that are set to control their system start combat visible to all empires, regardless of their stealth and detection levels.
+
 RULE_RESEED_PRNG_SERVER
 Random Reseeding
 
@@ -1226,6 +1232,18 @@ Show detailed empires data
 
 RULE_SHOW_DETAILED_EMPIRES_DATA_DESC
 Show research and production, researched buildings, parts, and hulls of all empires.
+
+RULE_DIPLOMACY
+Allowed diplomacy
+
+RULE_DIPLOMACY_DESC
+Manages diplomatic restrictions between players. By default all interactions are allowed.
+
+RULE_DIPLOMACY_ALLOWED_FOR_ALL
+All Allowed
+
+RULE_DIPLOMACY_FORBIDDEN_FOR_ALL
+All Forbidden
 
 ##
 ## Command-line and options database entries
@@ -1410,6 +1428,9 @@ Maximum interval in seconds between turn advances. If 0, turn advances by timeou
 
 OPTIONS_DB_TIMEOUT_FIXED_INTERVAL
 Turns advance after fixed intervals, regardless of when and whether players have submitted turn orders.
+
+OPTIONS_DB_CLIENT_MESSAGE_SIZE_MAX
+Limit of client message size in bytes.
 
 OPTIONS_DB_UI_MAIN_MENU_X
 Position of the center of the intro screen main menu, as a portion of the application's total width.
@@ -5757,6 +5778,8 @@ Stockpile Focus
 STOCKPILE_FOCUS_TEXT
 '''The Stockpile focus increases the [[metertype METER_STOCKPILE]] of a planet.
 
+A Homeworld focused on Stockpile also helps other planets of the same species and increases the [[metertype METER_STOCKPILE]] there by an additional 0.04 per population.
+
 [[METER_STOCKPILE_VALUE_DESC]]'''
 
 ARMOR_TITLE
@@ -7532,7 +7555,8 @@ SP_LAENFA
 Laenfa
 
 SP_LAENFA_GAMEPLAY_DESC
-'''Sneaky, telepathic, sentient vines.
+'''<img src="species/preview/laenfa.png"></img>
+Sneaky, telepathic, sentient vines.
 Prefer [[PT_OCEAN]] planets.
 [[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]]
 '''
@@ -7543,6 +7567,7 @@ The Laenfa are long and vine-like, able to attach and detach into any number of 
 
 Social Structure:
 The Laenfa have a unified culture due to their telepathy but because their telepathic communication weakens with distance, there is a large central vine that decides on most important decisions. This vine carries out its debates in secret but takes into account the voices of all Laenfa it is able to detect. The Laenfa carry out their duties with hive-like efficiency with each individual working for the collective goals of gaining knowledge of other species and protecting knowledge of themselves.
+<img src="species/laenfa.png"></img>
 '''
 
 SP_SLY
@@ -10936,7 +10961,7 @@ This task is difficult as the service has to predict when demand happens, where 
 Unused PP will automatically be transferred to the Imperial Production Stockpile.
 An item on the production queue draws automatically on the Imperial Stockpile if the item has not been explicitly disabled from doing so.
 
-This is the basic technology for the imperial stockpile, which increases the [[metertype METER_STOCKPILE]] of growth-focused and stockpile-focused planets by 1.'''
+This is the basic technology for the imperial stockpile, which increases the [[metertype METER_STOCKPILE]] of stockpile-focused planets by 1.'''
 
 PRO_GENERIC_SUPPLIES
 Generic Supplies
@@ -10949,7 +10974,7 @@ Reaching this state of sophistication, Generic Supplies can be used to construct
 
 This frees the imperial stockpile service from having to know which goods will be demanded exactly. Predicting the location and amount is enough.
 
-This is an upgrade technology for the imperial stockpile. The [[metertype METER_STOCKPILE]] is increased by 2, plus an additional 0.01 per [[metertype METER_POPULATION]], plus an additional 3 for each growth-focused and stockpiling-focused planet.
+This is an upgrade technology for the imperial stockpile. The [[metertype METER_STOCKPILE]] is increased by 2, plus an additional 0.01 per [[metertype METER_POPULATION]], plus an additional 3 for each stockpiling-focused planet.
 These improvements are cumulative with that provided by [[tech PRO_PREDICTIVE_STOCKPILING]].'''
 
 PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY
@@ -12825,7 +12850,7 @@ BLD_GAS_GIANT_GEN
 Gas Giant Generator
 
 BLD_GAS_GIANT_GEN_DESC
-'''This building can only be constructed at a [[PT_GASGIANT]] and gives a +10 [[metertype METER_TARGET_INDUSTRY]] bonus to planets with the Industry focus in the same system.
+'''This building can only be constructed at a [[PT_GASGIANT]] and gives a +10 [[metertype METER_INDUSTRY]] bonus to planets with the Industry focus in the same system. If the [[BLD_GAS_GIANT_GEN]] is build on an inhabited gas giant it gives only a +5 [[metertype METER_INDUSTRY]] bonus.
 Multiple copies in the same system do not stack.
 
 A power generator designed to harvest the energy of a [[PT_GASGIANT]].'''
@@ -15230,6 +15255,9 @@ Self-Sustaining
 TELEPATHIC
 Telepathic
 
+GASEOUS
+Gaseous
+
 ORBITAL
 Orbital
 
@@ -15671,6 +15699,9 @@ Select All
 
 HOTKEY_DESELECT
 Deselect
+
+HOTKEY_AUTOCOMPLETE
+Autocomplete Typed Word
 
 HOTKEY_FOCUS_PREV_WND
 Previous Control

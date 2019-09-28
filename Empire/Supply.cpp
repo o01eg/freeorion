@@ -8,6 +8,7 @@
 #include "../universe/Planet.h"
 #include "../universe/Fleet.h"
 #include "../universe/Enums.h"
+#include "../universe/Predicates.h"
 #include "../util/AppInterface.h"
 #include "../util/Logger.h"
 
@@ -244,8 +245,40 @@ std::string SupplyManager::Dump(int empire_id) const {
 }
 
 namespace {
-    float EmpireTotalSupplyRangeSumInSystem(int empire_id, int system_id) {
-        return 0.0f;
+    std::pair<float, float> EmpireTotalSupplyRangeSumInSystem(int empire_id, int system_id) {
+        if (empire_id == ALL_EMPIRES || system_id == INVALID_OBJECT_ID)
+            return {0.0f, 0.0f};
+        const auto sys = GetSystem(system_id);
+        if (!sys)
+            return {0.0f, 0.0f};
+
+        float accumulator_current = 0.0f;
+        float accumulator_max = 0.0f;
+
+        for (auto obj : Objects().FindObjects(sys->ObjectIDs())) {
+            if (!obj || !obj->OwnedBy(empire_id))
+                continue;
+            if (obj->Meters().count(METER_SUPPLY) > 0)
+                accumulator_current += obj->CurrentMeterValue(METER_SUPPLY);
+            if (obj->Meters().count(METER_MAX_SUPPLY) > 0)
+                accumulator_max += obj->CurrentMeterValue(METER_MAX_SUPPLY);
+        }
+        return {accumulator_current, accumulator_max};
+    }
+
+    float EmpireTotalSupplyRange(int empire_id) {
+        if (empire_id == ALL_EMPIRES)
+            return 0.0f;
+
+        float accumulator_current = 0.0f;
+
+        for (auto obj : Objects().FindObjects(OwnedVisitor<UniverseObject>(empire_id))) {
+            if (!obj || !obj->OwnedBy(empire_id))
+                continue;
+            if (obj->Meters().count(METER_SUPPLY) > 0)
+                accumulator_current += obj->CurrentMeterValue(METER_SUPPLY);
+        }
+        return accumulator_current;
     }
 
     float DistanceBetweenObjects(int obj1_id, int obj2_id) {
@@ -286,9 +319,11 @@ void SupplyManager::Update() {
     // map from empire id to which systems are obstructed for it for supply
     // propagation
     std::map<int, std::set<int>> empire_supply_unobstructed_systems;
-    // map from empire id to map from system id to sum of supply source ranges
-    // owned by empire in that in system
-    std::map<int, std::map<int, float>> empire_system_supply_range_sums;
+    // map from empire id to map from system id to pair of sum of supply source
+    // ranges and max ranges of objects owned by empire in that in system
+    std::map<int, std::map<int, std::pair<float, float>>> empire_system_supply_range_sums;
+    // map from empire id to total supply range sum of objects it owns
+    std::map<int, float> empire_total_supply_range_sums;
 
     for (const auto& entry : Empires()) {
         const Empire* empire = entry.second;
@@ -305,6 +340,7 @@ void SupplyManager::Update() {
             empire_system_supply_range_sums[empire_id_pair.first][sys_id_pair.first] =
                 EmpireTotalSupplyRangeSumInSystem(empire_id_pair.first, sys_id_pair.first);
         }
+        empire_total_supply_range_sums[empire_id_pair.first] = EmpireTotalSupplyRange(empire_id_pair.first);
     }
 
 
@@ -324,7 +360,7 @@ void SupplyManager::Update() {
             if (system_id == INVALID_OBJECT_ID || known_destroyed_objects.count(fleet->ID()))
                 continue;
 
-            if ((fleet->HasArmedShips() || fleet->HasFighterShips()) && fleet->Aggressive()) {
+            if (fleet->HasArmedShips() && fleet->Aggressive()) {
                 if (fleet->OwnedBy(empire_id)) {
                     if (fleet->NextSystemID() == INVALID_OBJECT_ID || fleet->NextSystemID() == fleet->SystemID()) {
                         systems_containing_friendly_fleets.insert(system_id);
@@ -457,11 +493,14 @@ void SupplyManager::Update() {
                     bonus += 0.3f;
 
                 // sum of all supply sources in this system
-                bonus += empire_system_supply_range_sums[empire_id][sys_id] / 1000.0f;
+                bonus += empire_system_supply_range_sums[empire_id][sys_id].first / 1000.0f;
+                // sum of max supply of sourses in this system
+                bonus += empire_system_supply_range_sums[empire_id][sys_id].second / 100000.0f;
+                bonus += empire_total_supply_range_sums[empire_id] / 100000000.0f;
 
                 // distance to supply source from here
                 float propagated_distance_to_supply_source = std::max(1.0f, empire_supply_it->second.second);
-                bonus += 0.0001f / propagated_distance_to_supply_source;
+                bonus += propagated_distance_to_supply_source / 10000.0f;
 
                 // store ids of empires indexed by adjusted propgated range, in order to sort by range
                 float propagated_range = empire_supply_it->second.first;
@@ -476,15 +515,35 @@ void SupplyManager::Update() {
             // at least two empires have supply sources here...
             // check if one is stronger
 
-            // remove supply for all empires except the top-ranged empire here
-            // if there is a tie for top-ranged, remove all
+            // remove supply for all empires except the top-ranged empire here,
+            // or one of the empires at the top if all top empires are allies
             auto range_empire_it = empire_ranges_here.rbegin();
             int top_range_empire_id = ALL_EMPIRES;
             if (range_empire_it->second.size() == 1) {
                 // if just one empire has the most range, it is the top empire
                 top_range_empire_id = *(range_empire_it->second.begin());
+            } else {
+                // if all empires that share the top range are allies, pick one
+                // to be the top empire
+                const auto& top_empires = range_empire_it->second;
+                bool any_non_allied_pair = false;
+                for (auto id1 : top_empires) {
+                    if (id1 == ALL_EMPIRES) continue;
+                    for (auto id2 : top_empires) {
+                        if (id2 == ALL_EMPIRES || id2 <= id1) continue;
+                        if (Empires().GetDiplomaticStatus(id1, id2) != DIPLO_ALLIED) {
+                            any_non_allied_pair = true;
+                            break;
+                        }
+                    }
+                }
+                if (!any_non_allied_pair) {
+                    // arbitrarily pick the lowest ID empire
+                    top_range_empire_id = *(range_empire_it->second.begin());
+                }
             }
             //DebugLogger() << "top ranged empire here: " << top_range_empire_id;
+
 
             // remove range entries and traversals for all but the top empire
             // (or all empires if there is no single top empire)
@@ -694,7 +753,6 @@ void SupplyManager::Update() {
 
 
 
-    // TEST STUFF FOR INTER-EMPIRE-MERGING
     auto ally_merged_supply_starlane_traversals = m_supply_starlane_traversals;
 
     // add connections into allied empire systems when their obstructed lane
@@ -746,8 +804,6 @@ void SupplyManager::Update() {
                 output_empire_ids.insert(sys_id);
         }
     }
-
-    // END TEST STUFF FOR INTER-EMPIRE-MERGING
 
 
 

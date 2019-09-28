@@ -27,13 +27,13 @@ namespace {
     const GG::Y CONTROL_HEIGHT(30);
     const GG::Y PANEL_CONTROL_SPACING(33);
     const GG::X INDENTATION(20);
-    const GG::X SPIN_WIDTH(92);
+    const GG::X SPIN_WIDTH(128);
     const GG::Y GAL_SETUP_PANEL_HT(PANEL_CONTROL_SPACING * 10);
     const GG::X GalSetupWndWidth()
-    { return GG::X(345 + FontBasedUpscale(300)); }
+    { return GG::X(445 + FontBasedUpscale(300)); }
     const GG::Y GalSetupWndHeight()
     { return GG::Y(FontBasedUpscale(29) + (PANEL_CONTROL_SPACING * 6) + GAL_SETUP_PANEL_HT); }
-    const GG::Pt PREVIEW_SZ(GG::X(300), GG::Y(222));
+    const GG::Pt PREVIEW_SZ(GG::X(400), GG::Y(222));
 
     class RowContentsWnd : public GG::Control {
     public:
@@ -165,6 +165,9 @@ GameRulesPanel::GameRulesPanel(GG::X w, GG::Y h) :
 {}
 
 void GameRulesPanel::CompleteConstruction() {
+    GG::Control::CompleteConstruction();
+    DebugLogger() << "GalaxySetupPanel::CompleteConstruction";
+
     m_tabs = GG::Wnd::Create<GG::TabWnd>(GG::X0, GG::Y0, SPIN_WIDTH, GG::Y1,
                                          ClientUI::GetFont(), ClientUI::WndColor(), ClientUI::TextColor());
     AttachChild(m_tabs);
@@ -401,6 +404,7 @@ namespace {
             GG::ListBox::Row::CompleteConstruction();
             auto species_label = GG::Wnd::Create<CUILabel>(UserString(Name()), GG::FORMAT_LEFT | GG::FORMAT_VCENTER);
             push_back(species_label);
+            SetChildClippingMode(ClipToClient);
         }
     };
 }
@@ -416,9 +420,7 @@ GG::DropDownList* GameRulesPanel::StringRuleWidget(GG::ListBox* page, int indent
     auto drop = GG::Wnd::Create<CUIDropDownList>(5);
     drop->Resize(GG::Pt(SPIN_WIDTH, drop->MinUsableSize().y));
 
-    if (auto desc_val =
-        std::dynamic_pointer_cast<const DiscreteValidator<std::string>>(validator))
-    {
+    if (auto desc_val = std::dynamic_pointer_cast<const DiscreteValidator<std::string>>(validator)) {
         // add rows for all allowed options
         for (auto& poss : desc_val->m_values)
             drop->Insert(GG::Wnd::Create<UserStringRow>(poss, drop->Width(), drop->Height() - 4));
@@ -435,7 +437,7 @@ GG::DropDownList* GameRulesPanel::StringRuleWidget(GG::ListBox* page, int indent
     }
 
 
-    auto layout = GG::Wnd::Create<GG::Layout>(GG::X0, GG::Y0, Width(), drop->MinUsableSize().y, 1, 2, 0, 5);
+    auto layout = GG::Wnd::Create<GG::Layout>(GG::X0, GG::Y0, Width(), drop->MinUsableSize().y, 1, 2, 1, 5);
     layout->Add(drop, 0, 0, GG::ALIGN_VCENTER | GG::ALIGN_LEFT);
     layout->Add(text_control, 0, 1, GG::ALIGN_VCENTER | GG::ALIGN_LEFT);
     layout->SetMinimumColumnWidth(0, SPIN_WIDTH);
@@ -543,8 +545,10 @@ void GalaxySetupPanel::CompleteConstruction() {
     // seed
     m_seed_label = GG::Wnd::Create<CUILabel>(UserString("GSETUP_SEED"), GG::FORMAT_RIGHT, GG::INTERACTIVE);
     m_seed_label->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
+    TraceLogger() << "GalaxySetupPanel::CompleteConstruction attempting to access common galaxy settings from OptionsDB";
     m_seed_label->SetBrowseText(UserString(GetOptionsDB().GetDescription("setup.seed")));
     m_seed = GetOptionsDB().Get<std::string>("setup.seed");
+    TraceLogger() << "GalaxySetupPanel::CompleteConstruction got seed and seed label";
     if (m_seed == "RANDOM" || m_seed.empty()) {
         m_seed = "RANDOM";
         m_seed_edit = GG::Wnd::Create<CUIEdit>(UserString("GSETUP_RANDOM"));
@@ -961,7 +965,7 @@ void GalaxySetupPanel::ShapeChanged(GG::DropDownList::iterator it)
 // GalaxySetupWnd
 ////////////////////////////////////////////////
 GalaxySetupWnd::GalaxySetupWnd() :
-    CUIWnd(UserString("GSETUP_WINDOW_TITLE"), GG::INTERACTIVE | GG::MODAL)
+    CUIWnd(UserString("GSETUP_WINDOW_TITLE"), GG::INTERACTIVE | GG::MODAL | GG::DRAGABLE /*| GG::RESIZABLE*/)
 {}
 
 void GalaxySetupWnd::CompleteConstruction() {
@@ -1185,23 +1189,90 @@ void GalaxySetupWnd::PlayerNameChanged(const std::string& name)
 { m_ok->Disable(name.empty()); }
 
 void GalaxySetupWnd::OkClicked() {
+    TraceLogger() << "GalaxySetupWnd::OkClicked start";
     // record selected galaxy setup options as new defaults
-    GetOptionsDB().Set("setup.seed", m_galaxy_setup_panel->GetSeed());
-    GetOptionsDB().Set("setup.star.count", m_galaxy_setup_panel->Systems());
-    GetOptionsDB().Set("setup.galaxy.shape", m_galaxy_setup_panel->GetShape());
-    GetOptionsDB().Set("setup.galaxy.age", m_galaxy_setup_panel->GetAge());
-    GetOptionsDB().Set("setup.starlane.frequency", m_galaxy_setup_panel->GetStarlaneFrequency());
-    GetOptionsDB().Set("setup.planet.density", m_galaxy_setup_panel->GetPlanetDensity());
-    GetOptionsDB().Set("setup.specials.frequency", m_galaxy_setup_panel->GetSpecialsFrequency());
-    GetOptionsDB().Set("setup.monster.frequency", m_galaxy_setup_panel->GetMonsterFrequency());
-    GetOptionsDB().Set("setup.native.frequency", m_galaxy_setup_panel->GetNativeFrequency());
-    GetOptionsDB().Set("setup.ai.aggression", m_galaxy_setup_panel->GetAIAggression());
-    GetOptionsDB().Set("setup.player.name", m_player_name_edit->Text());
-    GetOptionsDB().Set("setup.empire.name", EmpireName());
-    GetOptionsDB().Set("setup.empire.color.index", static_cast<int>(m_empire_color_selector->CurrentItemIndex()));
-    GetOptionsDB().Set("setup.initial.species", m_starting_secies_selector->CurrentSpeciesName());
-    GetOptionsDB().Set("setup.ai.player.count", m_number_ais_spin->Value());
-    GetOptionsDB().Commit();
+    try {
+        GetOptionsDB().Set("setup.seed",                m_galaxy_setup_panel->GetSeed());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting setup seed from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.star.count",          m_galaxy_setup_panel->Systems());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting star count from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.galaxy.shape",        m_galaxy_setup_panel->GetShape());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting galaxy shape from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.galaxy.age",          m_galaxy_setup_panel->GetAge());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting galaxy age from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.starlane.frequency",  m_galaxy_setup_panel->GetStarlaneFrequency());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting starlane frequency from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.planet.density",      m_galaxy_setup_panel->GetPlanetDensity());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting planet density from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.specials.frequency",  m_galaxy_setup_panel->GetSpecialsFrequency());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting special frequency from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.monster.frequency",   m_galaxy_setup_panel->GetMonsterFrequency());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting monster frequency from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.native.frequency",    m_galaxy_setup_panel->GetNativeFrequency());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting native frequency from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.ai.aggression",       m_galaxy_setup_panel->GetAIAggression());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting ai aggression from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.player.name",         m_player_name_edit->Text());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting player name from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.empire.name",         EmpireName());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting empire name from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.empire.color.index",  static_cast<int>(m_empire_color_selector->CurrentItemIndex()));
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting color from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.initial.species",     m_starting_secies_selector->CurrentSpeciesName());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting species from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Set("setup.ai.player.count",     m_number_ais_spin->Value());
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception setting player count from setup panel results: " << e.what();
+    }
+    try {
+        GetOptionsDB().Commit();
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception committing options from panel results: " << e.what();
+    }
+
+    TraceLogger() << "GalaxySetupWnd::OkClicked end";
 
     m_ended_with_ok = true;
     m_done = true;

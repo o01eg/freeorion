@@ -21,6 +21,8 @@ import urllib2
 import smtplib
 import ConfigParser
 
+# Constants defined by the C++ game engine
+NO_TEAM_ID = -1
 
 class AuthProvider:
     def __init__(self):
@@ -119,7 +121,7 @@ class AuthProvider:
         try:
             with self.conn:
                 with self.conn.cursor() as curs:
-                    curs.execute(""" SELECT u.player_name, MIN(p.species)
+                    curs.execute(""" SELECT u.player_name, MIN(p.species), MIN(p.team_id)
                             FROM auth.users u
                             INNER JOIN auth.contacts c
                             ON c.player_name = u.player_name
@@ -138,6 +140,7 @@ class AuthProvider:
                         psd.player_name = r[0]
                         psd.empire_name = r[0]
                         psd.starting_species = r[1].encode('utf-8')
+                        psd.starting_team = r[2]
                         players.append(psd)
         except psycopg2.InterfaceError:
             self.conn = psycopg2.connect(self.dsn)

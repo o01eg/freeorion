@@ -109,16 +109,20 @@ struct FO_COMMON_API SaveGameEmpireData {
         m_empire_name(),
         m_player_name(),
         m_color(),
-        m_authenticated(false)
+        m_authenticated(false),
+        m_eliminated(false),
+        m_won(false)
     {}
     SaveGameEmpireData(int empire_id, const std::string& empire_name,
                        const std::string& player_name, const GG::Clr& colour,
-                       bool authenticated) :
+                       bool authenticated, bool eliminated, bool won) :
         m_empire_id(empire_id),
         m_empire_name(empire_name),
         m_player_name(player_name),
         m_color(colour),
-        m_authenticated(authenticated)
+        m_authenticated(authenticated),
+        m_eliminated(eliminated),
+        m_won(won)
     {}
     //@}
 
@@ -127,6 +131,8 @@ struct FO_COMMON_API SaveGameEmpireData {
     std::string m_player_name;
     GG::Clr     m_color;
     bool        m_authenticated;
+    bool        m_eliminated;
+    bool        m_won;
 
 private:
     friend class boost::serialization::access;
@@ -134,7 +140,7 @@ private:
     void serialize(Archive& ar, const unsigned int version);
 };
 
-BOOST_CLASS_VERSION(SaveGameEmpireData, 1);
+BOOST_CLASS_VERSION(SaveGameEmpireData, 2);
 
 /** Contains basic data about a player in a game. */
 struct FO_COMMON_API PlayerSaveHeaderData {
@@ -229,7 +235,8 @@ struct PlayerSetupData {
         m_save_game_empire_id(ALL_EMPIRES),
         m_client_type(Networking::INVALID_CLIENT_TYPE),
         m_player_ready(false),
-        m_authenticated(false)
+        m_authenticated(false),
+        m_starting_team(Networking::NO_TEAM_ID)
     {}
     //@}
 
@@ -242,6 +249,7 @@ struct PlayerSetupData {
     Networking::ClientType  m_client_type;          ///< is this player an AI, human player or...?
     bool                    m_player_ready;         ///< if player ready to play.
     bool                    m_authenticated;        ///< if player was authenticated
+    int                     m_starting_team;        ///< team id or -1 if no team.
 
 private:
     friend class boost::serialization::access;
@@ -251,7 +259,7 @@ private:
 bool FO_COMMON_API operator==(const PlayerSetupData& lhs, const PlayerSetupData& rhs);
 bool operator!=(const PlayerSetupData& lhs, const PlayerSetupData& rhs);
 
-BOOST_CLASS_VERSION(PlayerSetupData, 1);
+BOOST_CLASS_VERSION(PlayerSetupData, 2);
 
 /** The data needed to establish a new single player game.  If \a m_new_game
   * is true, a new game is to be started, using the remaining members besides
@@ -285,7 +293,8 @@ struct FO_COMMON_API MultiplayerLobbyData : public GalaxySetupData {
         m_start_locked(false),
         m_players(),
         m_save_game(),
-        m_save_game_empire_data()
+        m_save_game_empire_data(),
+        m_save_game_current_turn(0)
     {}
 
     MultiplayerLobbyData(const GalaxySetupData& base) :
@@ -295,7 +304,8 @@ struct FO_COMMON_API MultiplayerLobbyData : public GalaxySetupData {
         m_start_locked(false),
         m_players(),
         m_save_game(),
-        m_save_game_empire_data()
+        m_save_game_empire_data(),
+        m_save_game_current_turn(0)
     {}
 
     MultiplayerLobbyData(GalaxySetupData&& base) :
@@ -305,7 +315,8 @@ struct FO_COMMON_API MultiplayerLobbyData : public GalaxySetupData {
         m_start_locked(false),
         m_players(),
         m_save_game(),
-        m_save_game_empire_data()
+        m_save_game_empire_data(),
+        m_save_game_current_turn(0)
     {}
     //@}
 
@@ -320,6 +331,7 @@ struct FO_COMMON_API MultiplayerLobbyData : public GalaxySetupData {
 
     std::string                                 m_save_game;            //< File name of a save file
     std::map<int, SaveGameEmpireData>           m_save_game_empire_data;// indexed by empire_id
+    int                                         m_save_game_current_turn;
 
     std::string                                 m_start_lock_cause;
 
@@ -328,6 +340,8 @@ private:
     template <class Archive>
     void serialize(Archive& ar, const unsigned int version);
 };
+
+BOOST_CLASS_VERSION(MultiplayerLobbyData, 1);
 
 /** The data structure stores information about latest chat massages. */
 struct FO_COMMON_API ChatHistoryEntity {

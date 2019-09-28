@@ -430,6 +430,8 @@ void ServerFSM::UpdateIngameLobby() {
     dummy_lobby_data.m_any_can_edit = false;
     dummy_lobby_data.m_new_game = false;
     dummy_lobby_data.m_start_locked = true;
+    dummy_lobby_data.m_save_game_current_turn = m_server.CurrentTurn();
+    dummy_lobby_data.m_save_game_empire_data = CompileSaveGameEmpireData();
     for (auto player_it = m_server.m_networking.established_begin();
         player_it != m_server.m_networking.established_end(); ++player_it)
     {
@@ -439,6 +441,7 @@ void ServerFSM::UpdateIngameLobby() {
         player_setup_data.m_player_name = (*player_it)->PlayerName();
         player_setup_data.m_client_type = (*player_it)->GetClientType();
         if (const Empire* empire = GetEmpire(m_server.PlayerEmpireID(player_id))) {
+            player_setup_data.m_save_game_empire_id = empire->EmpireID();
             player_setup_data.m_empire_name = empire->Name();
             player_setup_data.m_empire_color = empire->Color();
         } else {
@@ -449,8 +452,10 @@ void ServerFSM::UpdateIngameLobby() {
     }
     dummy_lobby_data.m_start_lock_cause = UserStringNop("SERVER_ALREADY_PLAYING_GAME");
 
-    // send it to all those without empire
-    // and who are CLIENT_TYPE_HUMAN_PLAYER
+    auto player_info_map = m_server.GetPlayerInfoMap();
+
+    // send it to all either in the ingame lobby
+    // or in the playing game
     for (auto player_it = m_server.m_networking.established_begin();
         player_it != m_server.m_networking.established_end(); ++player_it)
     {
@@ -458,6 +463,8 @@ void ServerFSM::UpdateIngameLobby() {
             !GetEmpire(m_server.PlayerEmpireID((*player_it)->PlayerID())))
         {
             (*player_it)->SendMessage(ServerLobbyUpdateMessage(dummy_lobby_data));
+        } else {
+            (*player_it)->SendMessage(PlayerInfoMessage(player_info_map));
         }
     }
 }
@@ -931,8 +938,14 @@ void MPLobby::ValidateClientLimits() {
 
     // for load game consider as human all non-AI empires
     // because human player could connect later in game
+    int non_eliminated_empires_count = 0;
     if (!m_lobby_data->m_new_game) {
-        human_count = m_lobby_data->m_save_game_empire_data.size() - ai_count;
+        for (const auto& empire_data : m_lobby_data->m_save_game_empire_data) {
+            if (!empire_data.second.m_eliminated)
+                non_eliminated_empires_count ++;
+        }
+
+        human_count = non_eliminated_empires_count - ai_count;
     }
 
     int min_ai = GetOptionsDB().Get<int>("network.server.ai.min");
@@ -961,7 +974,7 @@ void MPLobby::ValidateClientLimits() {
         m_lobby_data->m_start_lock_cause = UserStringNop("ERROR_NOT_ENOUGH_CONNECTED_HUMAN_PLAYERS");
     } else if (max_unconnected_human_empire_players > 0 &&
         !m_lobby_data->m_new_game &&
-        static_cast<int>(m_lobby_data->m_save_game_empire_data.size()) - ai_count - human_connected_count >= max_unconnected_human_empire_players)
+        non_eliminated_empires_count - ai_count - human_connected_count >= max_unconnected_human_empire_players)
     {
         m_lobby_data->m_start_locked = true;
         m_lobby_data->m_start_lock_cause = UserStringNop("ERROR_TOO_MANY_UNCONNECTED_HUMAN_PLAYERS");
@@ -1359,7 +1372,8 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 psd_names.count(player.second.m_player_name))
             {
                 has_collision = true;
-                WarnLogger(FSM) << "Got color, empire's name or player's name collision.";
+                WarnLogger(FSM) << "Got color, empire's name or player's name collision for player "
+                                << player.second.m_player_name << "(" << player.first << ")";
                 break;
             } else {
                 psd_colors.emplace(player.second.m_empire_color);
@@ -1504,7 +1518,10 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                         if (plr.second.m_save_game_empire_id != ALL_EMPIRES) {
                             const auto empire_it = m_lobby_data->m_save_game_empire_data.find(plr.second.m_save_game_empire_id);
                             if (empire_it != m_lobby_data->m_save_game_empire_data.end()) {
-                                if (empire_it->second.m_authenticated) {
+                                if (empire_it->second.m_eliminated) {
+                                    WarnLogger(FSM) << "Trying to take over eliminated empire \"" << empire_it->second.m_empire_name << "\"";
+                                    incorrect_empire = true;
+                                } else if (empire_it->second.m_authenticated) {
                                     if (empire_it->second.m_player_name != sender->PlayerName()) {
                                         WarnLogger(FSM) << "Unauthorized access to protected empire \"" << empire_it->second.m_empire_name << "\"."
                                                         << " Expected player \"" << empire_it->second.m_player_name << "\""
@@ -1645,7 +1662,10 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                     if (j_player.second.m_save_game_empire_id != ALL_EMPIRES) {
                         const auto empire_it = m_lobby_data->m_save_game_empire_data.find(j_player.second.m_save_game_empire_id);
                         if (empire_it != m_lobby_data->m_save_game_empire_data.end()) {
-                            if (empire_it->second.m_authenticated) {
+                            if (empire_it->second.m_eliminated) {
+                                WarnLogger(FSM) << "Trying to take over eliminated empire \"" << empire_it->second.m_empire_name << "\"";
+                                incorrect_empire = true;
+                            } else if (empire_it->second.m_authenticated) {
                                 if (empire_it->second.m_player_name != sender->PlayerName()) {
                                     WarnLogger(FSM) << "Unauthorized access to protected empire \"" << empire_it->second.m_empire_name << "\"."
                                                     << " Expected player \"" << empire_it->second.m_player_name << "\""
@@ -1712,7 +1732,9 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
         try {
             LoadEmpireSaveGameData((save_dir / m_lobby_data->m_save_game).string(),
                                    m_lobby_data->m_save_game_empire_data,
-                                   player_save_header_data);
+                                   player_save_header_data,
+                                   *m_lobby_data,
+                                   m_lobby_data->m_save_game_current_turn);
 
             // read all AI players from save game and add them into current lobby
             // with appropriate empire's data
@@ -1844,7 +1866,9 @@ sc::result MPLobby::react(const PlayerChat& msg) {
 
     boost::posix_time::ptime timestamp = boost::posix_time::second_clock::universal_time();
 
-    if (sender->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER) {
+    if (receiver == Networking::INVALID_PLAYER_ID &&
+        sender->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER)
+    {
         GG::Clr text_color(255, 255, 255, 255);
         for (const auto& player : m_lobby_data->m_players) {
             if (player.first != sender->PlayerID())
@@ -2573,7 +2597,9 @@ sc::result PlayingGame::react(const PlayerChat& msg) {
 
     boost::posix_time::ptime timestamp = boost::posix_time::second_clock::universal_time();
 
-    if (sender->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER) {
+    if (receiver == Networking::INVALID_PLAYER_ID &&
+        sender->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER)
+    {
         GG::Clr text_color(255, 255, 255, 255);
         if (auto empire = GetEmpire(sender->PlayerID()))
             text_color = empire->Color();
@@ -3059,6 +3085,13 @@ sc::result WaitingForTurnEnd::react(const TurnOrders& msg) {
         }
 
         int empire_id = empire->EmpireID();
+        if (empire->Eliminated()) {
+            ErrorLogger(FSM) << "WaitingForTurnEnd::react(TurnOrders&) received orders from player " << empire->PlayerName() << "(id: "
+                             << player_id << ") who controls empire " << empire_id
+                             << " but empire was eliminated";
+            sender->SendMessage(ErrorMessage(UserStringNop("ORDERS_FOR_WRONG_EMPIRE"), false));
+            return discard_event();
+        }
 
         for (const auto& id_and_order : *order_set) {
             auto& order = id_and_order.second;
@@ -3162,6 +3195,13 @@ sc::result WaitingForTurnEnd::react(const TurnPartialOrders& msg) {
         }
 
         int empire_id = empire->EmpireID();
+        if (empire->Eliminated()) {
+            ErrorLogger(FSM) << "WaitingForTurnEnd::react(TurnPartialOrders&) received orders from player " << empire->PlayerName() << "(id: "
+                             << player_id << ") who controls empire " << empire_id
+                             << " but empire was eliminated";
+            sender->SendMessage(ErrorMessage(UserStringNop("ORDERS_FOR_WRONG_EMPIRE"), false));
+            return discard_event();
+        }
 
         for (const auto& id_and_order : *added) {
             auto& order = id_and_order.second;
@@ -3206,6 +3246,13 @@ sc::result WaitingForTurnEnd::react(const RevokeReadiness& msg) {
         }
 
         int empire_id = empire->EmpireID();
+        if (empire->Eliminated()) {
+            ErrorLogger(FSM) << "WaitingForTurnEnd::react(RevokeReadiness&) received orders from player " << empire->PlayerName() << "(id: "
+                             << player_id << ") who controls empire " << empire_id
+                             << " but empire was eliminated";
+            sender->SendMessage(ErrorMessage(UserStringNop("ORDERS_FOR_WRONG_EMPIRE"), false));
+            return discard_event();
+        }
 
         TraceLogger(FSM) << "WaitingForTurnEnd.RevokeReadiness : Revoke orders from player " << player_id;
 

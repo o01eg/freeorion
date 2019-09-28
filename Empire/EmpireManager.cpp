@@ -2,6 +2,8 @@
 
 #include "Empire.h"
 #include "../util/Directories.h"
+#include "../util/GameRules.h"
+#include "../util/i18n.h"
 #include "../util/Logger.h"
 #include "../util/XMLDoc.h"
 #include "../universe/Enums.h"
@@ -52,6 +54,16 @@ EmpireManager::const_iterator EmpireManager::end() const
 
 int EmpireManager::NumEmpires() const
 { return m_empire_map.size(); }
+
+int EmpireManager::NumEliminatedEmpires() const {
+    int eliminated_count = 0;
+
+    for (const auto& empire : m_empire_map)
+        if (empire.second->Eliminated())
+            eliminated_count++;
+
+    return eliminated_count;
+}
 
 std::string EmpireManager::Dump() const {
     std::string retval = "Empires:\n";
@@ -215,6 +227,9 @@ void EmpireManager::RemoveDiplomaticMessage(int sender_id, int recipient_id) {
 void EmpireManager::HandleDiplomaticMessage(const DiplomaticMessage& message) {
     int sender_empire_id = message.SenderEmpireID();
     int recipient_empire_id = message.RecipientEmpireID();
+
+    if (!message.IsAllowed())
+        return;
 
     DiplomaticStatus diplo_status = GetDiplomaticStatus(sender_empire_id, recipient_empire_id);
     bool message_from_recipient_to_sender_available = DiplomaticMessageAvailable(recipient_empire_id, sender_empire_id);

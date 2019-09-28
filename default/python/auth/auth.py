@@ -16,6 +16,9 @@ import psycopg2.extensions
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
+# Constants defined by the C++ game engine
+NO_TEAM_ID = -1
+
 import urllib2
 
 

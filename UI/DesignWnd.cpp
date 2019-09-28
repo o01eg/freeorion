@@ -414,11 +414,11 @@ namespace {
     void DeleteFromDisplayedDesigns(const int design_id) {
         auto& manager = GetDisplayedDesignsManager();
 
-        //const auto empire_id = HumanClientApp::GetApp()->EmpireID();
-        //const auto maybe_obsolete = manager.IsObsolete(design_id);
-        //if (maybe_obsolete && !*maybe_obsolete)
-        //    HumanClientApp::GetApp()->Orders().IssueOrder(
-        //        std::make_shared<ShipDesignOrder>(empire_id, design_id, true));
+        const auto empire_id = HumanClientApp::GetApp()->EmpireID();
+        const auto maybe_obsolete = manager.IsObsolete(design_id);  // purpose of this obsolescence check is unclear... author didn't comment
+        if (maybe_obsolete && !*maybe_obsolete)
+            HumanClientApp::GetApp()->Orders().IssueOrder(          // erase design id order : empire should forget this design
+                std::make_shared<ShipDesignOrder>(empire_id, design_id, true));
         manager.Remove(design_id);
     }
 
@@ -1130,7 +1130,7 @@ void ShipDesignManager::StartGame(int empire_id, bool is_new_game) {
         displayed_designs->InsertHullBefore(hull_name);
     }
 
-    // If requested initialize the current designs to all designs known by the empire
+    // If requested, initialize the current designs to all designs known by the empire
     if (GetOptionsDB().Get<bool>("resource.shipdesign.default.enabled")) {
         // While initializing a new game, before sending info to players, the
         // server should have added the default design ids to an empire's known
@@ -1140,15 +1140,17 @@ void ShipDesignManager::StartGame(int empire_id, bool is_new_game) {
         std::set<int> ordered_ids(ids.begin(), ids.end());
 
         displayed_designs->InsertOrderedIDs(ordered_ids);
-    }/* else {
+
+    } else {
         // Remove the default designs from the empire's current designs.
+        // Purpose and logic of this is unclear... author didn't comment upon inquiry, but having this here reportedly fixes some issues...
         DebugLogger() << "Remove default designs from empire";
         const auto ids = empire->ShipDesigns();
         for (const auto design_id : ids) {
             HumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<ShipDesignOrder>(empire_id, design_id, true));
         }
-    }*/
+    }
 
     TraceLogger() << "ShipDesignManager initialized";
 }
@@ -2158,6 +2160,7 @@ public:
     //@}
 
     mutable boost::signals2::signal<void (int)>                 DesignSelectedSignal;
+    mutable boost::signals2::signal<void (int)>                 DesignUpdatedSignal;
     mutable boost::signals2::signal<void (const std::string&, const std::vector<std::string>&)>
                                                                 DesignComponentsSelectedSignal;
     mutable boost::signals2::signal<void (const boost::uuids::uuid&)>  SavedDesignSelectedSignal;
@@ -3057,6 +3060,7 @@ void CompletedDesignsListBox::BaseRightClicked(GG::ListBox::iterator it, const G
     auto delete_design_action = [&design_id, this]() {
         DeleteFromDisplayedDesigns(design_id);
         Populate();
+        DesignUpdatedSignal(design_id);
     };
 
     auto rename_design_action = [&empire_id, &design_id, design, &design_row]() {
@@ -3334,6 +3338,7 @@ public:
     //@}
 
     mutable boost::signals2::signal<void (int)>                         DesignSelectedSignal;
+    mutable boost::signals2::signal<void (int)>                         DesignUpdatedSignal;
     mutable boost::signals2::signal<void (const std::string&, const std::vector<std::string>&)>
                                                                         DesignComponentsSelectedSignal;
     mutable boost::signals2::signal<void (const boost::uuids::uuid&)>   SavedDesignSelectedSignal;
@@ -3407,6 +3412,7 @@ void DesignWnd::BaseSelector::CompleteConstruction() {
     m_designs_list->Resize(GG::Pt(GG::X(10), GG::Y(10)));
     m_tabs->AddWnd(m_designs_list, UserString("DESIGN_WND_FINISHED_DESIGNS"));
     m_designs_list->DesignSelectedSignal.connect(DesignWnd::BaseSelector::DesignSelectedSignal);
+    m_designs_list->DesignUpdatedSignal.connect(DesignWnd::BaseSelector::DesignUpdatedSignal);
     m_designs_list->DesignClickedSignal.connect(DesignWnd::BaseSelector::DesignClickedSignal);
 
     m_saved_designs_list = GG::Wnd::Create<SavedDesignsListBox>(m_availabilities_state, SAVED_DESIGN_ROW_DROP_STRING);
@@ -3933,6 +3939,9 @@ public:
                              const std::string& name,
                              const std::string& desc);
 
+    /** Responds to the design being changed **/
+    void DesignChanged();
+
     /** Add a design. */
     std::pair<int, boost::uuids::uuid> AddDesign();
 
@@ -3977,7 +3986,6 @@ protected:
 private:
     void            Populate();                         //!< creates and places SlotControls for current hull
     void            DoLayout();                         //!< positions buttons, text entry boxes and SlotControls
-    void            DesignChanged();                    //!< responds to the design being changed
     void            DesignNameChanged();                //!< responds to the design name being changed
     void            RefreshIncompleteDesign() const;
     std::string     GetCleanDesignDump(const ShipDesign* ship_design);  //!< similar to ship design dump but without 'lookup_strings', icon and model entries
@@ -5006,6 +5014,8 @@ void DesignWnd::CompleteConstruction() {
 
     m_base_selector->DesignSelectedSignal.connect(
         boost::bind(static_cast<void (MainPanel::*)(int)>(&MainPanel::SetDesign), m_main_panel, _1));
+    m_base_selector->DesignUpdatedSignal.connect(
+        boost::bind(static_cast<void (MainPanel::*)()>(&MainPanel::DesignChanged), m_main_panel));
     m_base_selector->DesignComponentsSelectedSignal.connect(
         boost::bind(&MainPanel::SetDesignComponents, m_main_panel, _1, _2));
     m_base_selector->SavedDesignSelectedSignal.connect(

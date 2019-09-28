@@ -361,11 +361,7 @@ void ServerApp::CleanupAIs() {
         ErrorLogger() << "ServerApp::CleanupAIs() exception while killing processes";
     }
 
-    try {
-        m_ai_client_processes.clear();
-    } catch (...) {
-        ErrorLogger() << "ServerApp::CleanupAIs() exception while clearing client processes";
-    }
+    m_ai_client_processes.clear();
 }
 
 void ServerApp::SetAIsProcessPriorityToLow(bool set_to_low) {
@@ -970,7 +966,14 @@ void ServerApp::UpdateCombatLogs(const Message& msg, PlayerConnectionPtr player_
     // Return them to the client
     DebugLogger() << "UpdateCombatLogs returning " << logs.size()
                   << " logs to player " << player_connection->PlayerID();
-    player_connection->SendMessage(DispatchCombatLogsMessage(logs));
+
+    try {
+        player_connection->SendMessage(DispatchCombatLogsMessage(logs));
+    } catch (std::exception e) {
+        ErrorLogger() << "caught exception sending combat logs message: " << e.what();
+        std::vector<std::pair<int, const CombatLog>> empty_logs;
+        player_connection->SendMessage(DispatchCombatLogsMessage(empty_logs));
+    }
 }
 
 void ServerApp::LoadChatHistory() {
@@ -1501,6 +1504,9 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
     if (!success)
         ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_UNIVERSE_GENERATION_ERRORS"), false));
 
+    for (auto& empire : Empires()) {
+        empire.second->ApplyNewTechs();
+    }
 
     DebugLogger() << "Applying first turn effects and updating meters";
 
@@ -1769,15 +1775,19 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
         return false;
     }
 
-    // test if there other human players in the game
+    // test if there other human or disconnected players in the game
     bool other_human_player = false;
     for (auto& empires : Empires()) {
         if (!empires.second->Eliminated() &&
-            empire_id != empires.second->EmpireID() &&
-            GetEmpireClientType(empires.second->EmpireID()) == Networking::CLIENT_TYPE_HUMAN_PLAYER)
+            empire_id != empires.second->EmpireID())
         {
-            other_human_player = true;
-            break;
+            Networking::ClientType other_client_type = GetEmpireClientType(empires.second->EmpireID());
+            if (other_client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER ||
+                other_client_type == Networking::INVALID_CLIENT_TYPE)
+            {
+                other_human_player = true;
+                break;
+            }
         }
     }
     if (!other_human_player) {
@@ -2189,7 +2199,7 @@ namespace {
                     continue;
                 // an unarmed Monster will not trigger combat
                 if (  (fleet->Aggressive() || fleet->Unowned())  &&
-                      (fleet->HasArmedShips() || fleet->HasFighterShips() || !fleet->Unowned())  )
+                      (fleet->HasArmedShips() || !fleet->Unowned())  )
                 {
                     if (!empires_with_aggressive_fleets_here.count(empire_id))
                         DebugLogger(combat) << "\t Empire " << empire_id << " has at least one aggressive fleet present";
@@ -2710,7 +2720,7 @@ namespace {
             // find which empires have aggressive armed ships in system
             std::set<int> empires_with_armed_ships_in_system;
             for (auto& fleet : Objects().FindObjects<const Fleet>(system->FleetIDs())) {
-                if (fleet->Aggressive() && (fleet->HasArmedShips() || fleet->HasFighterShips()))
+                if (fleet->Aggressive() && fleet->HasArmedShips())
                     empires_with_armed_ships_in_system.insert(fleet->Owner());  // may include ALL_EMPIRES, which is fine; this makes monsters prevent colonization
             }
 
@@ -3343,7 +3353,7 @@ void ServerApp::UpdateMonsterTravelRestrictions() {
             // before you, or be in cahoots with someone who did.
             bool unrestricted = ((fleet->ArrivalStarlane() == system->ID())
                                  && fleet->Aggressive()
-                                 && (fleet->HasArmedShips() || fleet->HasFighterShips()));
+                                 && fleet->HasArmedShips());
             if (fleet->Unowned()) {
                 monsters.push_back(fleet);
                 if (unrestricted)
@@ -3449,7 +3459,9 @@ void ServerApp::PostCombatProcessTurns() {
         if (empire->Eliminated())
             continue;   // skip eliminated empires
 
-        empire->CheckResearchProgress();
+        for (const auto& tech : empire->CheckResearchProgress()) {
+            empire->AddNewlyResearchedTechToGrantAtStartOfNextTurn(tech);
+        }
         empire->CheckProductionProgress();
         empire->CheckTradeSocialProgress();
     }
@@ -3481,7 +3493,6 @@ void ServerApp::PostCombatProcessTurns() {
     // store initial values of meters for this turn.
     m_universe.BackPropagateObjectMeters();
     empires.BackPropagateMeters();
-
 
     // check for loss of empire capitals
     for (auto& entry : empires) {
@@ -3550,6 +3561,14 @@ void ServerApp::PostCombatProcessTurns() {
     GetSpeciesManager().UpdatePopulationCounter();
 
 
+    // apply new techs
+    for (auto& entry : empires) {
+        Empire* empire = entry.second;
+        if (empire && !empire->Eliminated())
+            empire->ApplyNewTechs();
+    }
+
+
     // indicate that the clients are waiting for their new gamestate
     m_networking.SendMessageAll(TurnProgressMessage(Message::DOWNLOADING));
 
@@ -3600,9 +3619,10 @@ void ServerApp::CheckForEmpireElimination() {
     for (auto& entry : Empires()) {
         if (entry.second->Eliminated())
             continue;   // don't double-eliminate an empire
-        else if (EmpireEliminated(entry.first))
+        else if (EmpireEliminated(entry.first)) {
             entry.second->Eliminate();
-        else {
+            RemoveEmpireTurn(entry.first);
+        } else {
             surviving_empires.insert(entry.second);
             // empires could be controlled only by connected AI client, connected human client, or
             // disconnected human client.

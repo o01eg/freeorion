@@ -178,6 +178,7 @@ public:
 
     //! \name Mutators //@{
     void KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override;
+    bool AutoComplete() override;   //!< Autocomplete current word
     //@}
 
     /** emitted when user presses enter/return while entering text */
@@ -187,7 +188,6 @@ public:
 
 private:
     void FindGameWords();                    //!< Finds all game words for autocomplete
-    void AutoComplete();                     //!< Autocomplete current word
 
     /** AutoComplete helper function */
     bool CompleteWord(const std::set<std::string>& names, const std::string& partial_word,
@@ -197,9 +197,9 @@ private:
     // Set for autocomplete game words
     std::set<std::string>       m_game_words;
 
-    // Repeated tabs variables
+    // Repeated autocomplete variables
      std::vector<std::string>   m_auto_complete_choices;
-     unsigned int               m_repeated_tab_count;
+     unsigned int               m_repeated_tab_count = 0;
      std::string                m_last_line_read;
      std::string                m_last_game_word;
 };
@@ -208,11 +208,7 @@ private:
 // MessageWndEdit //
 ////////////////////
 MessageWndEdit::MessageWndEdit() :
-    CUIEdit(""),
-    m_auto_complete_choices(),
-    m_repeated_tab_count(0),
-    m_last_line_read(),
-    m_last_game_word()
+    CUIEdit("")
 {}
 
 void MessageWndEdit::KeyPress(GG::Key key, std::uint32_t key_code_point,
@@ -291,12 +287,12 @@ void MessageWndEdit::FindGameWords() {
     }
  }
 
-void MessageWndEdit::AutoComplete() {
+bool MessageWndEdit::AutoComplete() {
     std::string full_line = this->Text();
 
     // Check for repeated tab
     // if current line is same as the last read line
-    if (m_last_line_read != "" && boost::equals(full_line, m_last_line_read)){
+    if (m_last_line_read != "" && boost::equals(full_line, m_last_line_read)) {
         if (m_repeated_tab_count >= m_auto_complete_choices.size())
             m_repeated_tab_count = 0;
 
@@ -314,8 +310,10 @@ void MessageWndEdit::AutoComplete() {
             m_last_line_read = this->Text();
         }
         ++m_repeated_tab_count;
-    }
-    else {
+
+        return true;    // indicates to calling signal that a hotkey press was processed
+
+    } else {
         bool exact_match = false;
 
         auto cursor_pos = this->CursorPosn();
@@ -327,7 +325,7 @@ void MessageWndEdit::AutoComplete() {
                 ++word_start;
             std::string partial_word = full_line.substr(word_start, Value(cursor_pos.first - word_start));
             if (partial_word.empty())
-                return;
+                return true;    // indicates to calling signal that a hotkey press was processed
 
             // Find game words to try an autocomplete
             FindGameWords();
@@ -347,6 +345,8 @@ void MessageWndEdit::AutoComplete() {
                 CompleteWord(m_game_words, partial_word, cursor_pos, full_line);
         }
     }
+
+    return true;    // indicates to calling signal that a hotkey press was processed
 }
 
 bool MessageWndEdit::CompleteWord(const std::set<std::string>& names, const std::string& partial_word,
@@ -357,25 +357,19 @@ bool MessageWndEdit::CompleteWord(const std::set<std::string>& names, const std:
     m_auto_complete_choices.clear();
     m_repeated_tab_count = 0;
 
-    bool partial_word_match = false;
     std::string game_word;
 
     // Check if the partial_word is contained in any game words
     for (const std::string& temp_game_word : names) {
         if (temp_game_word.size() >= partial_word.size()) {
+            // Add all possible word choices for repeated tab
             std::string game_word_partial = temp_game_word.substr(0, partial_word.size());
-
-            if (boost::iequals(game_word_partial, partial_word)) {
-                if (game_word_partial != "") {
-                    // Add all possible word choices for repeated tab
-                    m_auto_complete_choices.push_back(temp_game_word);
-                    partial_word_match = true;
-                }
-            }
+            if (!game_word_partial.empty() && boost::iequals(game_word_partial, partial_word))
+                m_auto_complete_choices.push_back(temp_game_word);
         }
     }
 
-    if (!partial_word_match)
+    if (m_auto_complete_choices.empty())
         return false;
 
     // Grab first autocomplete choice
@@ -429,6 +423,9 @@ void MessageWnd::CompleteConstruction() {
 
     m_history.push_front("");
 
+    Empires().DiplomaticStatusChangedSignal.connect(
+        boost::bind(&MessageWnd::HandleDiplomaticStatusChange, this, _1, _2));
+
     DoLayout();
     SaveDefaultedOptions();
 }
@@ -441,8 +438,20 @@ void MessageWnd::DoLayout() {
                      GG::Pt(ClientWidth() - GG::X(CUIWnd::INNER_BORDER_ANGLE_OFFSET), ClientHeight()));
 }
 
-void MessageWnd::CloseClicked()
-{ ClosingSignal(); }
+void MessageWnd::CloseClicked() {
+    StopFlash();
+    ClosingSignal();
+}
+
+void MessageWnd::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+    CUIWnd::LClick(pt, mod_keys);
+    StopFlash();
+}
+
+void MessageWnd::LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKey> mod_keys) {
+    CUIWnd::LDrag(pt, move, mod_keys);
+    StopFlash();
+}
 
 void MessageWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
     const GG::Pt old_size = Size();
@@ -479,6 +488,18 @@ void MessageWnd::HandlePlayerChatMessage(const std::string& text,
 
     *m_display += wrapped_text + "\n";
     m_display_show_time = GG::GUI::GetGUI()->Ticks();
+
+    // if client empire is target of message, show message window
+    const ClientApp* app = ClientApp::GetApp();
+    if (!app) {
+        ErrorLogger() << "MessageWnd::HandlePlayerChatMessage couldn't get client app!";
+        return;
+    }
+    int client_empire_id = app->EmpireID();  
+    if (recipient_player_id == client_empire_id) {
+        Flash();
+        Show();
+    }
 }
 
 void MessageWnd::HandleTurnPhaseUpdate(Message::TurnProgressPhase phase_id, bool prefixed /*= false*/) {
@@ -535,6 +556,50 @@ void MessageWnd::HandleGameStatusUpdate(const std::string& text) {
 void MessageWnd::HandleLogMessage(const std::string& text) {
     *m_display += text;
     m_display_show_time = GG::GUI::GetGUI()->Ticks();
+}
+
+void MessageWnd::HandleDiplomaticStatusChange(int empire1_id, int empire2_id) {
+    const ClientApp* app = ClientApp::GetApp();
+    if (!app) {
+        ErrorLogger() << "MessageWnd::HandleDiplomaticStatusChange couldn't get client app!";
+        return;
+    }
+
+    int client_empire_id = app->EmpireID();
+    DiplomaticStatus status = Empires().GetDiplomaticStatus(empire1_id, empire2_id);
+    std::string text;
+
+    const Empire* empire1 = GetEmpire(empire1_id);
+    const Empire* empire2 = GetEmpire(empire2_id);
+
+    std::string empire1_str = GG::RgbaTag(empire1->Color()) + empire1->Name() + "</rgba>";
+    std::string empire2_str = GG::RgbaTag(empire2->Color()) + empire2->Name() + "</rgba>";
+
+    switch (status) {
+    case DIPLO_WAR:
+        text = boost::str(FlexibleFormat(UserString("MESSAGES_WAR_DECLARATION"))
+                   % empire1_str % empire2_str);
+        break;
+    case DIPLO_PEACE:
+        text = boost::str(FlexibleFormat(UserString("MESSAGES_PEACE_TREATY"))
+                   % empire1_str % empire2_str);
+        break;
+    case DIPLO_ALLIED:
+        text = boost::str(FlexibleFormat(UserString("MESSAGES_ALLIANCE"))
+                   % empire1_str % empire2_str);
+        break;
+    default:
+        ErrorLogger() << "MessageWnd::HandleDiplomaticStatusChange: no valid diplomatic status found.";
+    }
+
+    *m_display += text + "\n";
+    m_display_show_time = GG::GUI::GetGUI()->Ticks();
+
+    // if client empire is target of diplomatic status change, show message window
+    if (empire2_id == client_empire_id) {
+        Flash();
+        Show();
+    }
 }
 
 void MessageWnd::Clear()
@@ -617,6 +682,7 @@ void MessageWnd::MessageEntered() {
     }
 
     m_edit->Clear();
+    StopFlash();
 }
 
 void MessageWnd::MessageHistoryUpRequested() {

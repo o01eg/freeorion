@@ -19,12 +19,18 @@
 #include <algorithm>
 
 namespace {
-    const int           DATA_PANEL_BORDER = 1;
+    const int DATA_PANEL_BORDER = 1;
 
     std::shared_ptr<GG::Texture> AIIcon() {
         static std::shared_ptr<GG::Texture> retval = ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "ai.png");
         return retval;
     }
+
+    std::shared_ptr<GG::Texture> MessageIcon() {
+        static std::shared_ptr<GG::Texture> retval = ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "messages.png");
+        return retval;
+    }
+
     std::shared_ptr<GG::Texture> HumanIcon() {
         static std::shared_ptr<GG::Texture> retval = ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "human.png");
         return retval;
@@ -92,6 +98,130 @@ namespace {
 
 
     ////////////////////////////////////////////////
+    // DiplomaticStatusIndicator
+    ////////////////////////////////////////////////
+    /** Shows specified diplomatic status from specified empire to each other empire. */
+    class DiplomaticStatusIndicator : public GG::Control {
+    public:
+        DiplomaticStatusIndicator(GG::X w, GG::Y h, int empire_id, DiplomaticStatus diplo_status) :
+            Control(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
+            m_empire_id(empire_id),
+            m_empire_ids(),
+            m_diplo_status(diplo_status),
+            m_icon(nullptr)
+        {}
+
+        void CompleteConstruction() override {
+            GG::Control::CompleteConstruction();
+
+            switch (m_diplo_status) {
+            case DIPLO_WAR:
+                m_icon = WarIcon();
+                break;
+            case DIPLO_PEACE:
+                m_icon = PeaceIcon();
+                break;
+            case DIPLO_ALLIED:
+                m_icon = AlliedIcon();
+                break;
+            default:
+                m_icon = UnknownIcon();
+                break;
+            }
+
+        }
+
+        void Update() {
+            const ClientApp* app = ClientApp::GetApp();
+            if (!app) {
+                ErrorLogger() << "DiplomaticStatusIndicator::Render couldn't get client app!";
+                return;
+            }
+
+            // add id for each empire with specified diplomatic status
+            m_empire_ids.clear();
+
+            for (const auto& empire : Empires()) {
+                int empire_id = empire.second->EmpireID();
+
+                if (empire.second->Eliminated()) continue;
+                if (m_empire_id == empire_id) continue;
+
+                if (Empires().GetDiplomaticStatus(empire_id, m_empire_id) == m_diplo_status) {
+                    m_empire_ids.emplace_back(empire_id);
+                }
+            }
+
+            // generate tooltip text
+            std::string tooltip_title = "";
+            std::string tooltip_text = "";
+
+            switch (m_diplo_status) {
+            case DIPLO_WAR:
+                tooltip_title = UserString("AT_WAR_WITH") + ":";
+                break;
+            case DIPLO_PEACE:
+                tooltip_title = UserString("AT_PEACE_WITH") + ":";
+                break;
+            case DIPLO_ALLIED:
+                tooltip_title = UserString("ALLIED_WITH") + ":";
+                break;
+            default:
+                break;
+            }
+
+            if (m_empire_ids.size() == 0)
+                tooltip_text += UserString("NONE");
+
+            for (int empire_id : m_empire_ids) {
+                const Empire* empire = GetEmpire(empire_id);
+                if (!empire) continue;
+
+                tooltip_text += GG::RgbaTag(empire->Color()) + empire->Name() + "\n";
+            }
+
+            // add tooltip
+            SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(tooltip_title, tooltip_text));
+            SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
+        }
+
+        void Render() override {
+            int ICON_SIZE = IconSize();
+            GG::Pt ul = UpperLeft();
+            const GG::Clr& border_clr = ClientUI::WndOuterBorderColor();
+
+            // diplomatic status icon
+            glColor(GG::CLR_WHITE);
+            m_icon->OrthoBlit(ul, ul + GG::Pt(GG::X(ICON_SIZE), GG::Y(ICON_SIZE)));
+
+            // empire color squares; move squares to the left if empire with lower id was eliminated
+            int square_position = 0;
+            for (const auto& empire : Empires()) {
+                if (empire.second->Eliminated()) continue;
+                square_position++;
+                if (std::find(m_empire_ids.begin(), m_empire_ids.end(), empire.first) != m_empire_ids.end()) {
+                    const GG::Clr& square_color = empire.second->Color();
+                    GG::Pt square_ul = ul + GG::Pt(GG::X(square_position * (ICON_SIZE + PAD)), GG::Y0);
+                    GG::FlatRectangle(square_ul, square_ul + GG::Pt(GG::X(ICON_SIZE), GG::Y(ICON_SIZE)), square_color, border_clr, DATA_PANEL_BORDER);
+                }
+            }
+        }
+
+        void RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override { ForwardEventToParent(); }
+        void RButtonDown(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override { ForwardEventToParent(); }
+
+    private:
+        int                                        m_empire_id;
+        std::vector<int>                           m_empire_ids;
+        DiplomaticStatus                           m_diplo_status;
+        std::shared_ptr<GG::Texture>               m_icon;
+
+        int IconSize() const { return Value(Height()); }
+        int PAD = 3;
+    };
+
+
+    ////////////////////////////////////////////////
     // PlayerDataPanel
     ////////////////////////////////////////////////
     /** Represents a player.  This class is used as the sole Control in
@@ -109,6 +239,9 @@ namespace {
             m_empire_production_text(nullptr),
             m_empire_research_text(nullptr),
             m_empire_detection_text(nullptr),
+            m_war_indicator(nullptr),
+            m_peace_indicator(nullptr),
+            m_allied_indicator(nullptr),
             m_diplo_status(INVALID_DIPLOMATIC_STATUS),
             m_player_status(Message::PLAYING_TURN),
             m_player_type(Networking::INVALID_CLIENT_TYPE),
@@ -130,6 +263,10 @@ namespace {
             m_empire_research_text = GG::Wnd::Create<CUILabel>("", GG::FORMAT_LEFT);
             m_empire_detection_text = GG::Wnd::Create<CUILabel>("", GG::FORMAT_LEFT);
 
+            m_war_indicator =      GG::Wnd::Create<DiplomaticStatusIndicator>(GG::X0, Height(), m_empire_id, DIPLO_WAR);
+            m_peace_indicator =    GG::Wnd::Create<DiplomaticStatusIndicator>(GG::X0, Height(), m_empire_id, DIPLO_PEACE);
+            m_allied_indicator =   GG::Wnd::Create<DiplomaticStatusIndicator>(GG::X0, Height(), m_empire_id, DIPLO_ALLIED);
+
             //AttachChild(m_player_name_text);
             AttachChild(m_empire_name_text);
             AttachChild(m_empire_ship_text);
@@ -137,6 +274,9 @@ namespace {
             AttachChild(m_empire_production_text);
             AttachChild(m_empire_research_text);
             AttachChild(m_empire_detection_text);
+            AttachChild(m_war_indicator);
+            AttachChild(m_peace_indicator);
+            AttachChild(m_allied_indicator);
 
             DoLayout();
             Update();
@@ -191,6 +331,12 @@ namespace {
                 }
             }
 
+            // render incoming diplomatic message icon, if there is one
+            const DiplomaticMessage& incoming_message_to_client =
+                Empires().GetDiplomaticMessage(m_player_id, app->PlayerID());
+            if (incoming_message_to_client.GetType() != DiplomaticMessage::INVALID_DIPLOMATIC_MESSAGE_TYPE)
+                MessageIcon()->OrthoBlit(UpperLeft() + m_diplo_msg_ul, UpperLeft() + m_diplo_msg_ul + ICON_SIZE);
+
             // render player status icon
             switch (m_player_status) {
             case Message::PLAYING_TURN:     PlayingIcon()->OrthoBlit(UpperLeft() + m_player_status_icon_ul, UpperLeft() + m_player_status_icon_ul + ICON_SIZE); break;
@@ -210,7 +356,12 @@ namespace {
             if (m_host)
                 HostIcon()->OrthoBlit(UpperLeft() + m_host_icon_ul, UpperLeft() + m_host_icon_ul + ICON_SIZE);
 
+            // render diplomatic status indicators
+            m_war_indicator->Render();
+            m_peace_indicator->Render();
+            m_allied_indicator->Render();
 
+            // render win/lose icon
             switch (m_win_status)
             {
             case WON:     WonIcon()->OrthoBlit(UpperLeft() + m_win_status_icon_ul, UpperLeft() + m_win_status_icon_ul + ICON_SIZE); break;
@@ -344,7 +495,9 @@ namespace {
             m_empire_research_text->SetText(research_text);
             m_empire_detection_text->SetText(detection_text);
 
-
+            m_war_indicator->Update();
+            m_peace_indicator->Update();
+            m_allied_indicator->Update();
         }
 
         void            SetStatus(Message::PlayerStatus player_status)
@@ -362,14 +515,18 @@ namespace {
             const GG::X EMPIRE_RESEARCH_WIDTH(ClientUI::Pts()   * 16/5);
             const GG::X EMPIRE_DETECTION_WIDTH(ClientUI::Pts()  * 16/5);
 
-
             GG::X left(DATA_PANEL_BORDER);
             GG::Y top(DATA_PANEL_BORDER);
             GG::Y bottom(ClientHeight());
             GG::X PAD(3);
 
+            int diplo_status_width = (Empires().NumEmpires() - Empires().NumEliminatedEmpires() + 1) * (IconSize() + Value(PAD));
+
             m_diplo_status_icon_ul = GG::Pt(left, top);
             left += GG::X(IconSize()) + PAD;
+
+            m_diplo_msg_ul = GG::Pt(left, top);
+            left += GG::X(IconSize());
 
             //m_player_name_text->SizeMove(GG::Pt(left, top), GG::Pt(left + PLAYER_NAME_WIDTH, bottom));
             //left += PLAYER_NAME_WIDTH;
@@ -418,19 +575,34 @@ namespace {
 
             m_win_status_icon_ul = GG::Pt(left, top);
             left += GG::X(IconSize()) + PAD;
+
+            m_war_indicator->SizeMove(GG::Pt(left, top), GG::Pt(GG::X(left + diplo_status_width), bottom));
+            left += diplo_status_width;
+
+            m_peace_indicator->SizeMove(GG::Pt(left, top), GG::Pt(GG::X(left + diplo_status_width), bottom));
+            left += diplo_status_width;
+
+            m_allied_indicator->SizeMove(GG::Pt(left, top), GG::Pt(GG::X(left + diplo_status_width), bottom));
+            left += diplo_status_width;
+
         }
 
         int                     m_player_id;
         int                     m_empire_id;
-        //std::shared_ptr<GG::Label>            m_player_name_text;
-        std::shared_ptr<GG::Label>              m_empire_name_text;
-        std::shared_ptr<GG::Label>              m_empire_ship_text;
-        std::shared_ptr<GG::Label>              m_empire_planet_text;
-        std::shared_ptr<GG::Label>              m_empire_production_text;
-        std::shared_ptr<GG::Label>              m_empire_research_text;
-        std::shared_ptr<GG::Label>              m_empire_detection_text;
+        //std::shared_ptr<GG::Label>               m_player_name_text;
+        std::shared_ptr<GG::Label>                 m_empire_name_text;
+        std::shared_ptr<GG::Label>                 m_empire_ship_text;
+        std::shared_ptr<GG::Label>                 m_empire_planet_text;
+        std::shared_ptr<GG::Label>                 m_empire_production_text;
+        std::shared_ptr<GG::Label>                 m_empire_research_text;
+        std::shared_ptr<GG::Label>                 m_empire_detection_text;
+
+        std::shared_ptr<DiplomaticStatusIndicator> m_war_indicator;
+        std::shared_ptr<DiplomaticStatusIndicator> m_peace_indicator;
+        std::shared_ptr<DiplomaticStatusIndicator> m_allied_indicator;
 
         GG::Pt                  m_diplo_status_icon_ul;
+        GG::Pt                  m_diplo_msg_ul;
         GG::Pt                  m_ship_icon_ul;
         GG::Pt                  m_planet_icon_ul;
         GG::Pt                  m_production_icon_ul;
@@ -574,7 +746,7 @@ void PlayerListWnd::CompleteConstruction() {
     Empires().DiplomaticStatusChangedSignal.connect(
         boost::bind(&PlayerListWnd::Update, this));
     Empires().DiplomaticMessageChangedSignal.connect(
-        boost::bind(&PlayerListWnd::Update, this));
+        boost::bind(&PlayerListWnd::PlayerListWnd::HandleDiplomaticMessageChange, this, _1, _2));
     DoLayout();
 
     Refresh();
@@ -604,6 +776,39 @@ void PlayerListWnd::HandleEmpireStatusUpdate(Message::PlayerStatus player_status
             }
         }
     }
+}
+
+void PlayerListWnd::HandleDiplomaticMessageChange(int empire1_id, int empire2_id) {
+    Update();
+
+    const ClientApp* app = ClientApp::GetApp();
+    if (!app) {
+        ErrorLogger() << "PlayerListWnd::HandleDiplomaticMessageChange couldn't get client app!";
+        return;
+    }
+    int client_empire_id = app->PlayerID();
+
+    DiplomaticMessage message = Empires().GetDiplomaticMessage(empire1_id, empire2_id);
+    bool active_message = message.GetType() != DiplomaticMessage::INVALID_DIPLOMATIC_MESSAGE_TYPE;
+
+    // only show PlayerListWnd if there is a new diplomatic offer for the client empire
+    if (active_message && (empire2_id == client_empire_id)) {
+        Show();
+        Flash();
+    };
+
+    // if there is no more pending messages, stop flashing
+    active_message = false;
+    for (const auto& empire : Empires()) {
+        message = Empires().GetDiplomaticMessage(empire.first, client_empire_id);
+        if (message.GetType() != DiplomaticMessage::INVALID_DIPLOMATIC_MESSAGE_TYPE) {
+            active_message = true;
+            break;
+        }
+    }
+
+    if (!active_message)
+        StopFlash();
 }
 
 void PlayerListWnd::Update() {
@@ -696,8 +901,20 @@ void PlayerListWnd::DoLayout()
         m_player_list->SizeMove(GG::Pt(), GG::Pt(ClientWidth(), ClientHeight() - GG::Y(INNER_BORDER_ANGLE_OFFSET)));
 }
 
-void PlayerListWnd::CloseClicked()
-{ ClosingSignal(); }
+void PlayerListWnd::CloseClicked() {
+    ClosingSignal();
+    StopFlash();
+}
+
+void PlayerListWnd::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+    CUIWnd::LClick(pt, mod_keys);
+    StopFlash();
+}
+
+void PlayerListWnd::LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKey> mod_keys) {
+    CUIWnd::LDrag(pt, move, mod_keys);
+    StopFlash();
+}
 
 void PlayerListWnd::PlayerSelectionChanged(const GG::ListBox::SelectionSet& rows) {
     // mark as selected all PlayerDataPanel that are in \a rows and mark as not

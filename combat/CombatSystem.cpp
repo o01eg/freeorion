@@ -230,7 +230,7 @@ void CombatInfo::InitializeObjectVisibility() {
                     vis = VIS_PARTIAL_VISIBILITY;
                     DebugLogger() << "Ship " << obj->Name() << " visible empire stealth check: " << empire_detection << " >= " << obj->CurrentMeterValue(METER_STEALTH);
                 }
-                if (vis < VIS_PARTIAL_VISIBILITY) {
+                if (vis < VIS_PARTIAL_VISIBILITY && GetGameRules().Get<bool>("RULE_AGGRESSIVE_SHIPS_COMBAT_VISIBLE")) {
                     if (auto ship = std::dynamic_pointer_cast<Ship>(obj)) {
                         if (auto fleet = ::GetFleet(ship->FleetID())) {
                             if (fleet->Aggressive()) {
@@ -260,34 +260,34 @@ namespace {
     // if source is owned by an empire, match unowned objects and objects owned by enemies of source's owner empire
     Condition::ConditionBase* VisibleEnemyOfOwnerCondition() {
         return new Condition::Or(
-                // unowned candidate object case
-                boost::make_unique<Condition::And>(
-                    boost::make_unique<Condition::EmpireAffiliation>(AFFIL_NONE),   // unowned candidate object
+            // unowned candidate object case
+            boost::make_unique<Condition::And>(
+                boost::make_unique<Condition::EmpireAffiliation>(AFFIL_NONE),   // unowned candidate object
 
-                    boost::make_unique<Condition::ValueTest>(           // when source object is owned (ie. not the same owner as the candidate object)
-                        boost::make_unique<ValueRef::Variable<int>>(
-                            ValueRef::SOURCE_REFERENCE, "Owner"),
-                        Condition::NOT_EQUAL,
-                        boost::make_unique<ValueRef::Variable<int>>(
-                            ValueRef::CONDITION_LOCAL_CANDIDATE_REFERENCE, "Owner")),
+                boost::make_unique<Condition::ValueTest>(           // when source object is owned (ie. not the same owner as the candidate object)
+                    boost::make_unique<ValueRef::Variable<int>>(
+                        ValueRef::SOURCE_REFERENCE, "Owner"),
+                    Condition::NOT_EQUAL,
+                    boost::make_unique<ValueRef::Variable<int>>(
+                        ValueRef::CONDITION_LOCAL_CANDIDATE_REFERENCE, "Owner")),
 
-                    boost::make_unique<Condition::VisibleToEmpire>(     // when source object's owner empire can detect the candidate object
-                        boost::make_unique<ValueRef::Variable<int>>(    // source's owner empire id
-                            ValueRef::SOURCE_REFERENCE, "Owner"))),
+                boost::make_unique<Condition::VisibleToEmpire>(     // when source object's owner empire can detect the candidate object
+                    boost::make_unique<ValueRef::Variable<int>>(    // source's owner empire id
+                        ValueRef::SOURCE_REFERENCE, "Owner"))),
 
-                // owned candidate object case
-                boost::make_unique<Condition::And>(
-                    boost::make_unique<Condition::EmpireAffiliation>(AFFIL_ANY),    // candidate is owned by an empire
+            // owned candidate object case
+            boost::make_unique<Condition::And>(
+                boost::make_unique<Condition::EmpireAffiliation>(AFFIL_ANY),    // candidate is owned by an empire
 
-                    boost::make_unique<Condition::EmpireAffiliation>(               // candidate is owned by enemy of source's owner
-                        boost::make_unique<ValueRef::Variable<int>>(
-                            ValueRef::SOURCE_REFERENCE, "Owner"), AFFIL_ENEMY),
+                boost::make_unique<Condition::EmpireAffiliation>(               // candidate is owned by enemy of source's owner
+                    boost::make_unique<ValueRef::Variable<int>>(
+                        ValueRef::SOURCE_REFERENCE, "Owner"), AFFIL_ENEMY),
 
-                    boost::make_unique<Condition::VisibleToEmpire>(     // when source empire can detect the candidate object
-                        boost::make_unique<ValueRef::Variable<int>>(    // source's owner empire id
-                            ValueRef::SOURCE_REFERENCE, "Owner"))
-                ))
-            ;
+                boost::make_unique<Condition::VisibleToEmpire>(     // when source empire can detect the candidate object
+                    boost::make_unique<ValueRef::Variable<int>>(    // source's owner empire id
+                        ValueRef::SOURCE_REFERENCE, "Owner"))
+            ))
+        ;
     }
 
     const std::unique_ptr<Condition::ConditionBase> is_enemy_ship_or_fighter =
@@ -340,6 +340,11 @@ namespace {
                         boost::make_unique<Condition::Not>(
                             boost::make_unique<Condition::MeterValue>(
                                 METER_SHIELD,
+                                nullptr,
+                                boost::make_unique<ValueRef::Constant<double>>(0.0))),
+                        boost::make_unique<Condition::Not>(
+                            boost::make_unique<Condition::MeterValue>(
+                                METER_CONSTRUCTION,
                                 nullptr,
                                 boost::make_unique<ValueRef::Constant<double>>(0.0)))))));
 
@@ -859,7 +864,7 @@ namespace {
 
     bool ObjectCanAttack(std::shared_ptr<const UniverseObject> obj) {
         if (auto ship = std::dynamic_pointer_cast<const Ship>(obj)) {
-            return ship->IsArmed() || ship->HasFighters();
+            return ship->IsArmed();
         } else if (auto planet = std::dynamic_pointer_cast<const Planet>(obj)) {
             return planet->CurrentMeterValue(METER_DEFENSE) > 0.0f;
         } else if (auto fighter = std::dynamic_pointer_cast<const Fighter>(obj)) {
@@ -1715,6 +1720,7 @@ namespace {
                 attacks_event->AddEvent(platform_event);
         }
 
+        auto stealth_change_event = std::make_shared<StealthChangeEvent>(bout);
 
         // Launch fighters (which can attack in any subsequent combat bouts).
         // There is no point to launching fighters during the last bout, since
@@ -1741,6 +1747,31 @@ namespace {
                                launches_event);
 
                 DebugLogger(combat) << "Attacker: " << attacker->Name();
+
+                // Set launching carrier as at least basically visible to other empires.
+                if (!launches_event->AreSubEventsEmpty(ALL_EMPIRES)) {
+                    for (auto detector_empire_id : combat_info.empire_ids) {
+                        Visibility initial_vis = combat_info.empire_object_visibility[detector_empire_id][attacker_id];
+                        TraceLogger(combat) << "Pre-attack visibility of launching carrier id: " << attacker_id
+                                            << " by empire: " << detector_empire_id << " was: " << initial_vis;
+
+                        if (initial_vis >= VIS_BASIC_VISIBILITY)
+                            continue;
+
+                        combat_info.empire_object_visibility[detector_empire_id][attacker_id] = VIS_BASIC_VISIBILITY;
+
+                        DebugLogger(combat) << " ... Setting post-attack visability to " << VIS_BASIC_VISIBILITY;
+
+                        // record visibility change event due to attack
+                        // FIXME attacker, TARGET, attacker empire, target empire, visibility
+                        stealth_change_event->AddEvent(attacker_id,
+                                                       attacker_id,
+                                                       attacker->Owner(),
+                                                       detector_empire_id,
+                                                       VIS_BASIC_VISIBILITY);
+                    }
+                }
+
             }
 
             if (!launches_event->AreSubEventsEmpty(ALL_EMPIRES))
@@ -1750,7 +1781,6 @@ namespace {
 
         // Create weapon fire events and mark attackers as visible to other battle participants
         auto attacks_this_bout = attacks_event->SubEvents(ALL_EMPIRES);
-        auto stealth_change_event = std::make_shared<StealthChangeEvent>(bout);
         for (auto this_event : attacks_this_bout) {
             // Generate attack events
             std::vector<std::shared_ptr<const WeaponFireEvent>> weapon_fire_events;

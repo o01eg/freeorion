@@ -15,7 +15,6 @@
 
 ClientApp::ClientApp() :
     IApp(),
-    m_universe(),
     m_networking(std::make_shared<ClientNetworking>()),
     m_empire_id(ALL_EMPIRES),
     m_current_turn(INVALID_GAME_TURN)
@@ -123,7 +122,7 @@ void ClientApp::StartTurn(const std::string& save_state_string)
 { m_networking->SendMessage(TurnOrdersMessage(m_orders, save_state_string)); }
 
 void ClientApp::SendPartialOrders() {
-    if (!this || !m_networking || !m_networking->IsTxConnected())
+    if (!m_networking || !m_networking->IsTxConnected())
         return;
     auto changes = m_orders.ExtractChanges();
     if (changes.first.empty() && changes.second.empty())

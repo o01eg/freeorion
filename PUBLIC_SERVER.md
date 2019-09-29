@@ -292,3 +292,46 @@ Add field for team id:
 ALTER TABLE games.players ADD COLUMN team_id INT NOT NULL DEFAULT -1;
 ```
 
+# Add delegate support (2019-09-29)
+Alter function to send OTP to delegate also:
+
+```sql
+DROP FUNCTION auth.check_contact;
+CREATE FUNCTION auth.check_contact(player_name_param CITEXT, otp CHAR(6), game_uid_param VARCHAR(20))
+RETURNS TABLE (
+ protocol auth.contact_protocol,
+ address CITEXT) AS
+$$
+BEGIN
+ CREATE TEMP TABLE tmp_cnts ON COMMIT DROP AS
+ SELECT c.protocol, c.address
+ FROM auth.users u
+ INNER JOIN auth.contacts c ON c.player_name = u.player_name
+  AND c.is_active = TRUE
+  AND c.delete_ts IS NULL
+ WHERE u.player_name = player_name_param
+ UNION ALL
+ SELECT c.protocol, c.address
+ FROM games.players p
+ INNER JOIN auth.users u ON u.player_name = p.delegate_name
+ INNER JOIN auth.contacts c ON c.player_name = u.player_name
+  AND c.is_active = TRUE
+  AND c.delete_ts IS NULL
+ WHERE p.player_name = player_name_param
+ AND p.game_uid = game_uid_param
+ AND delegate_name IS NOT NULL;
+
+ IF EXISTS (SELECT * FROM tmp_cnts t WHERE t.protocol IS NOT NULL AND t.address IS NOT NULL) THEN
+  WITH hashed_otp AS (VALUES (crypt(otp, gen_salt('bf', 8))))
+  INSERT INTO auth.otp (player_name, otp, create_ts)
+  VALUES (player_name_param, (TABLE hashed_otp), NOW()::timestamp)
+  ON CONFLICT (player_name) DO UPDATE SET otp = (TABLE hashed_otp), create_ts = NOW()::timestamp;
+ END IF;
+
+ RETURN QUERY SELECT *
+ FROM tmp_cnts;
+END
+$$ LANGUAGE plpgsql;
+```
+
+

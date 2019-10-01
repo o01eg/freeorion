@@ -7,7 +7,7 @@ cd ${ROOT}
 printf 'CWD: '
 pwd
 
-GAME_UID=FO0004
+GAME_UID=FO0005
 
 DATAPATH="--resource-dir /usr/share/games/freeorion/default"
 

@@ -55,7 +55,7 @@ namespace {
 
         fleet->AddShips({ship->ID()});
         ship->SetFleetID(fleet->ID());
-        fleet->SetAggressive(fleet->HasArmedShips() || fleet->HasFighterShips());
+        fleet->SetAggressive(fleet->HasArmedShips());
 
         return fleet;
     }
@@ -3111,7 +3111,7 @@ void GiveEmpireTech::Execute(const ScriptingContext& context) const {
         return;
     }
 
-    empire->AddTech(tech_name);
+    empire->AddNewlyResearchedTechToGrantAtStartOfNextTurn(tech_name);
 }
 
 std::string GiveEmpireTech::Dump(unsigned short ntabs) const {

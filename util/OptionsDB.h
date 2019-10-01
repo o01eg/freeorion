@@ -141,11 +141,11 @@ public:
             throw std::runtime_error("OptionsDB::Get<>() : Attempted to get nonexistent option \"" + name + "\".");
         try {
             return boost::any_cast<T>(it->second.value);
-        } catch (const boost::bad_any_cast& e) {
+        } catch (const boost::bad_any_cast&) {
             ErrorLogger() << "bad any cast converting value option named: " << name << ". Returning default value instead";
             try {
                 return boost::any_cast<T>(it->second.default_value);
-            } catch (const boost::bad_any_cast& e) {
+            } catch (const boost::bad_any_cast&) {
                 ErrorLogger() << "bad any cast converting default value of option named: " << name << ". Returning data-type default value instead: " << T();
                 return T();
             }
@@ -163,7 +163,7 @@ public:
             throw std::runtime_error("OptionsDB::GetDefault<>() : Attempted to get nonexistent option \"" + name + "\".");
         try {
             return boost::any_cast<T>(it->second.default_value);
-        } catch (const boost::bad_any_cast& e) {
+        } catch (const boost::bad_any_cast&) {
             ErrorLogger() << "bad any cast converting default value of option named: " << name << "  returning type default value instead";
             return T();
         }
@@ -448,7 +448,7 @@ private:
 template <typename T>
 bool OptionsDB::Option::SetFromValue(const T& value_) {
     if (value.type() != typeid(T))
-        throw boost::bad_any_cast();
+        ErrorLogger() << "OptionsDB::Option::SetFromValue expected type " << value.type().name() << " but got value of type " << typeid(T).name();
 
     bool changed = false;
 

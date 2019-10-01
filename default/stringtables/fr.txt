@@ -1089,6 +1089,12 @@ Passes de Combat
 RULE_NUM_COMBAT_ROUNDS_DESC
 Nombre de passes de combat se déroulant à chaque tour.
 
+RULE_AGGRESSIVE_SHIPS_COMBAT_VISIBLE
+Visibilité astronefs en mode Agression
+
+RULE_AGGRESSIVE_SHIPS_COMBAT_VISIBLE_DESC
+Les astronefs au sein d'une flotte en mode Agression débutent les combats en étant visibles pour tous les empires, indépendamment des niveaux de Furtivité et de Capacité de Détection.
+
 RULE_RESEED_PRNG_SERVER
 Regénération aléatoire
 
@@ -1226,6 +1232,18 @@ Afficher les données détaillées des empires
 
 RULE_SHOW_DETAILED_EMPIRES_DATA_DESC
 Afficher la recherche et la production, les structures acquises, coques et équipements, de tous les empires.
+
+RULE_DIPLOMACY
+Interactions Diplomatie
+
+RULE_DIPLOMACY_DESC
+Gère les restrictions en matière de diplomatie entre les joueurs. Par défaut, toutes les interactions sont autorisées.
+
+RULE_DIPLOMACY_ALLOWED_FOR_ALL
+Toutes autorisées
+
+RULE_DIPLOMACY_FORBIDDEN_FOR_ALL
+Toutes interdites
 
 ##
 ## Command-line and options database entries
@@ -1410,6 +1428,9 @@ Intervalle maximum en secondes entre la validation de chaque tour. Si 0, la fin 
 
 OPTIONS_DB_TIMEOUT_FIXED_INTERVAL
 Le passage au tour suivant est exécuté à intervalle fixe, indépendamment du fait que les joueurs aient envoyé ou non leurs ordres pour le tour en cours.
+
+OPTIONS_DB_CLIENT_MESSAGE_SIZE_MAX
+Limite de taille en octets des messages client.
 
 OPTIONS_DB_UI_MAIN_MENU_X
 Position horizontale du centre du menu principal de l'écran d'introduction, en pourcentage de la largeur totale de la fenêtre de jeu ou du plein écran.
@@ -5757,6 +5778,8 @@ Focus Stock
 STOCKPILE_FOCUS_TEXT
 '''Le Focus Stock augmente le [[metertype METER_STOCKPILE]] d'une planète.
 
+Une Planète Natale privilégiant le Stock favorise également les autres planètes peuplées par la même espèce, en y augmentant le [[metertype METER_STOCKPILE]] de 0.04 par [[metertype METER_POPULATION]].
+
 [[METER_STOCKPILE_VALUE_DESC]]'''
 
 ARMOR_TITLE
@@ -7532,7 +7555,8 @@ SP_LAENFA  # translated
 Laenfa
 
 SP_LAENFA_GAMEPLAY_DESC
-'''Vignes sensibles, télépathes, et insidieuses.
+'''<img src="species/preview/laenfa.png"></img>
+Vignes sensibles, télépathes, et insidieuses.
 Préfèrent les Planètes [[PT_OCEAN]]s.
 [[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]]
 '''
@@ -7543,6 +7567,7 @@ Les Laenfa sont de longs organismes végétaux semblables à des vignes, capable
 
 Structure sociale:
 Les Laenfa jouissent d'une culture unifiée due à la télépathie, mais comme leur capacité télépathique s'affaiblit avec la distance, le tronc central de la vigne est en charge des décisions importantes. Cette vigne centrale gère seule les arbitrages, mais prend en compte les voix des Laenfa qu'elle est en mesure de détecter. Les Laenfa évoluent donc à la manière d'un super-organisme, chaque individu œuvrant pour le collectif, dont le but est d'acquérir le savoir des autres espèces et de protéger le leur.
+<img src="species/laenfa.png"></img>
 '''
 
 SP_SLY  # translated
@@ -10936,7 +10961,7 @@ Cette tâche s'avère difficile étant donné que le service doit présager du m
 Les PP inutilisés sont transférés automatiquement au Stock Impérial de Production.
 Un projet de la file d'attente de Production puise automatiquement dans le Stock Impérial si son usage n'a pas été explicitement bloqué pour le projet en question.
 
-Il s'agit donc de la technologie de base du Stock Impérial, augmentant de 1 le [[metertype METER_STOCKPILE]] des planètes réglées sur le [[encyclopedia STOCKPILE_FOCUS_TITLE]] ou le [[encyclopedia GROWTH_FOCUS_TITLE]].'''
+Il s'agit donc de la technologie de base du Stock Impérial, augmentant de 1 le [[metertype METER_STOCKPILE]] des planètes réglées sur le [[encyclopedia STOCKPILE_FOCUS_TITLE]].'''
 
 PRO_GENERIC_SUPPLIES
 Stocks Génériques
@@ -10949,7 +10974,7 @@ En atteignant ce degré de sophistication, les Stocks Génériques peuvent être
 
 Cela exempte le service du Stock Impérial de connaître à l'avance quels biens seront exactement demandés. Prévoir le lieu de la demande et les quantités s'avère désormais suffisant.
 
-Il s'agit donc d'une technologie d'amélioration du Stock Impérial. Le [[metertype METER_STOCKPILE]] augmente de 2, plus un supplément de 0.01 par [[metertype METER_POPULATION]], plus un supplément de 3 pour chaque planète réglée sur le [[encyclopedia STOCKPILE_FOCUS_TITLE]] ou le [[encyclopedia GROWTH_FOCUS_TITLE]].
+Il s'agit donc d'une technologie d'amélioration du Stock Impérial. Le [[metertype METER_STOCKPILE]] augmente de 2, plus un supplément de 0.01 par [[metertype METER_POPULATION]], plus un supplément de 3 pour chaque planète réglée sur le [[encyclopedia STOCKPILE_FOCUS_TITLE]].
 Ces amélioriations sont cumulables avec le bonus de la technologie [[tech PRO_PREDICTIVE_STOCKPILING]].'''
 
 PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY
@@ -12825,7 +12850,7 @@ BLD_GAS_GIANT_GEN
 Convertisseur de Géante Gazeuse
 
 BLD_GAS_GIANT_GEN_DESC
-'''Cette structure ne peut être construite que sur une [[PT_GASGIANT]] et augmente de 10 la [[metertype METER_TARGET_INDUSTRY]] sur les planètes du même système réglées sur le Focus Industrie.
+'''Cette structure ne peut être construite que sur une [[PT_GASGIANT]] et augmente de 10 la [[metertype METER_TARGET_INDUSTRY]] sur les planètes du même système réglées sur le Focus Industrie. Si le [[BLD_GAS_GIANT_GEN]] est construit sur une [[PT_GASGIANT]] inhabitée, le bonus de [[metertype METER_TARGET_INDUSTRY]] n'est que de 5.
 Les bonus de plusieurs exemplaires dans le même système ne s'additionnent pas.
 
 Un puissant générateur conçu pour puiser l'énergie des Géantes Gazeuses.'''
@@ -15192,6 +15217,12 @@ Coque <i>%2%</i> [[encyclopedia FUEL_EFFICIENCY_TITLE]] 100%%
 BAD_FUEL_EFFICIENCY_LABEL
 Coque <i>%2%</i> [[encyclopedia FUEL_EFFICIENCY_TITLE]] 60%%
 
+MAX_FUEL_LESS_THAN_ONE_DESC
+Ravitaillement en Carburant impossible
+
+MAX_FUEL_LESS_THAN_ONE_LABEL
+Réservoir trop petit pour Ravitaillement (Carburant Max < 1.0)
+
 SPATIAL_FLUX_MALUS
 Interférence Flux
 
@@ -15229,6 +15260,9 @@ Autosuffisant
 
 TELEPATHIC
 Télépathique
+
+GASEOUS
+Gazeux
 
 ORBITAL  # translated
 Orbital
@@ -15671,6 +15705,9 @@ Tout sélectionner
 
 HOTKEY_DESELECT
 Désélectionner
+
+HOTKEY_AUTOCOMPLETE
+Autocompléter mot saisi
 
 HOTKEY_FOCUS_PREV_WND
 Champ précédent

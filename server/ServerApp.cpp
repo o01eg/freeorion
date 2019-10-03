@@ -2049,6 +2049,8 @@ bool ServerApp::AllOrdersReceived() {
 }
 
 int ServerApp::LastOneNotReadyEmpire() {
+    DebugLogger() << "ServerApp::LastOneNotReadyEmpire for turn: " << m_current_turn
+                  << (m_turn_expired ? " (expired)" : "");
     int last_empire_id = ALL_EMPIRES;
     for (const auto& empire_orders : m_turn_sequence) {
         bool empire_orders_received = true;

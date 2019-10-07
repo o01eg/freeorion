@@ -2981,8 +2981,7 @@ WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
     }
 }
 
-WaitingForTurnEnd::~WaitingForTurnEnd()
-{
+WaitingForTurnEnd::~WaitingForTurnEnd() {
     TraceLogger(FSM) << "(ServerFSM) ~WaitingForTurnEnd";
     m_timeout.cancel();
 }

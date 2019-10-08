@@ -2061,10 +2061,19 @@ int ServerApp::LastOneNotReadyEmpire() {
                   << (m_turn_expired ? " (expired)" : "");
     int last_empire_id = ALL_EMPIRES;
     for (const auto& empire_orders : m_turn_sequence) {
+        const auto empire = GetEmpire(empire_orders.first);
         bool empire_orders_received = true;
         if (!empire_orders.second) {
-            DebugLogger() << " ... no save data from empire id: " << empire_orders.first;
-            empire_orders_received = false;
+            if (!empire) {
+                ErrorLogger() << " ... invalid empire id in turn sequence: "<< empire_orders.first;
+                continue;
+            } else if (empire->Eliminated()) {
+                ErrorLogger() << " ... eliminated empire in turn sequence: " << empire_orders.first;
+                continue;
+            } else {
+                DebugLogger() << " ... no orders from empire id: " << empire_orders.first;
+                empire_orders_received = false;
+            }
         } else if (!empire_orders.second->m_orders) {
             DebugLogger() << " ... no orders from empire id: " << empire_orders.first;
             empire_orders_received = false;
@@ -2082,7 +2091,6 @@ int ServerApp::LastOneNotReadyEmpire() {
                 return ALL_EMPIRES;
             }
         }
-
     }
     return last_empire_id;
 }

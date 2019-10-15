@@ -1396,7 +1396,25 @@ PlanetType ComplexVariable<PlanetType>::Eval(const ScriptingContext& context) co
 
 template <>
 PlanetEnvironment ComplexVariable<PlanetEnvironment>::Eval(const ScriptingContext& context) const
-{ return INVALID_PLANET_ENVIRONMENT; }
+{
+    const std::string& variable_name = m_property_name.back();
+
+    if (variable_name == "PlanetEnvironmentForSpecies") {
+        int planet_id = INVALID_OBJECT_ID;
+        if (m_int_ref1)
+            planet_id = m_int_ref1->Eval(context);
+        const auto planet = GetPlanet(planet_id);
+        if (!planet)
+            return INVALID_PLANET_ENVIRONMENT;
+
+        std::string species_name;
+        if (m_string_ref1)
+            species_name = m_string_ref1->Eval(context);
+        return planet->EnvironmentForSpecies(species_name);
+    }
+
+    return INVALID_PLANET_ENVIRONMENT;
+}
 
 template <>
 UniverseObjectType ComplexVariable<UniverseObjectType>::Eval(const ScriptingContext& context) const
@@ -1722,8 +1740,20 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
 
             // if a string specified, get just that entry (for single empire, or
             // summed for all empires)
-            return GetIntEmpirePropertySingleKey(empire_id, variable_name,
-                                                 key_string);
+            if (variable_name != "TurnTechResearched") {
+                return GetIntEmpirePropertySingleKey(empire_id, variable_name,
+                                                     key_string);
+            } else {
+                // special case for techs: make unresearched-tech's research-turn a big number
+                if (const auto* empire = GetEmpire(empire_id)) {
+                    if (empire->TechResearched(key_string))
+                        return GetIntEmpirePropertySingleKey(empire_id, variable_name,
+                                                             key_string);
+                    return IMPOSSIBLY_LARGE_TURN;
+                }
+                return GetIntEmpirePropertySingleKey(empire_id, variable_name,
+                                                     key_string);
+            }
         }
 
         // if no string specified, get sum of all entries (for single empire

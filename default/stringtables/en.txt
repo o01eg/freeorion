@@ -3477,8 +3477,9 @@ PL_TYPE_SIZE
 # %1% the planet size as text (small, medium, large, ...).
 # %2% type of the planet environment (desert, oceanic, terran, ...).
 # %3% suitability of the planet for a concrete species (adequate, hostile, ...).
+# %4% species name for which suitability applies (Human, Trith, ...).
 PL_TYPE_SIZE_ENV
-%1% %2% (%3%)
+%1% %2% (%4%: %3%)
 
 PL_NO_VISIBILITY
 Planet is not currently visible.
@@ -6223,6 +6224,17 @@ MESSAGES_PEACE_TREATY
 MESSAGES_ALLIANCE
 %1% and %2% have entered an alliance.
 
+MESSAGES_HELP_COMMAND
+'''/pedia [article]: open the specified article in the pedia
+/pm [player] [message]: sends private message to specified player
+/zoom [object]: zoom to the specified universe object (system, planet, ship, fleet or building)
+'''
+
+MESSAGES_WHISPER
+(Whispers)
+
+MESSAGES_INVALID
+Invalid player or no message entered.
 
 ##
 ## Players list
@@ -6267,6 +6279,9 @@ Planets
 
 FLEETS_SUBMENU
 Fleet / Ships
+
+PLANET_ENVIRONMENTS_SUBMENU
+Environment For Species
 
 ID
 ID
@@ -6572,6 +6587,12 @@ SITREP_TECH_RESEARCHED
 SITREP_TECH_RESEARCHED_LABEL
 Tech Researched
 
+SITREP_EMPIRE_TECH_RESEARCHED_DETECTION
+The %empire% [[encyclopedia DETECTION_TITLE]] has upgraded to %rawtext:dstrength%
+
+SITREP_EMPIRE_TECH_RESEARCHED_DETECTION_LABEL
+Empire Detection Tech Upgrade
+
 SITREP_TECH_UNLOCKED
 %tech% has been unlocked and can now be researched.
 
@@ -6595,6 +6616,12 @@ SITREP_BUILDING_TYPE_UNLOCKED
 
 SITREP_BUILDING_TYPE_UNLOCKED_LABEL
 Building Type Unlocked
+
+SITREP_WEAPONS_UPGRADED
+All %shippart% weapons on supplied ships have been upgraded to %tech%. Upgraded weapons do %rawtext:dam% extra damage per shot
+
+SITREP_WEAPONS_UPGRADED_LABEL
+Weapon Tech Upgrade
 
 SITREP_COMBAT_SYSTEM
 At %system%: there was %combat%.

@@ -141,7 +141,11 @@ namespace {
 
 
         // set fleet with newly recalculated route
-        fleet->SetRoute(route_pair.first);
+        try {
+            fleet->SetRoute(route_pair.first);
+        } catch (const std::exception& e) {
+            ErrorLogger() << "Caught exception updating fleet route in effect code: " << e.what();
+        }
     }
 
     std::string GenerateSystemName() {
@@ -2921,7 +2925,11 @@ void SetDestination::Execute(const ScriptingContext& context) const {
     if (eta.first == Fleet::ETA_NEVER || eta.first == Fleet::ETA_OUT_OF_RANGE)
         return;
 
-    target_fleet->SetRoute(route_list);
+    try {
+        target_fleet->SetRoute(route_list);
+    } catch (const std::exception& e) {
+        ErrorLogger() << "Caught exception in Effect::SetDestination setting fleet route: " << e.what();
+    }
 }
 
 std::string SetDestination::Dump(unsigned short ntabs) const
@@ -3241,7 +3249,7 @@ void GenerateSitRepMessage::Execute(const ScriptingContext& context) const {
                 continue;
 
             DiplomaticStatus status = Empires().GetDiplomaticStatus(recipient_id, empire_id.first);
-            if (status == DIPLO_PEACE)
+            if (status >= DIPLO_PEACE)
                 recipient_empire_ids.insert(empire_id.first);
         }
         break;
@@ -3507,7 +3515,7 @@ void SetVisibility::Execute(const ScriptingContext& context) const {
                 continue;
 
             DiplomaticStatus status = Empires().GetDiplomaticStatus(empire_id, empire_entry.first);
-            if (status == DIPLO_PEACE)
+            if (status >= DIPLO_PEACE)
                 empire_ids.insert(empire_entry.first);
         }
         break;
@@ -3693,14 +3701,18 @@ void Conditional::Execute(const ScriptingContext& context,
         *reinterpret_cast<const Condition::ObjectSet*>(&targets);
     Condition::ObjectSet matches = potential_target_objects;
     Condition::ObjectSet non_matches;
-    if (m_target_condition)
-        m_target_condition->Eval(context, matches, non_matches,
-                                 Condition::MATCHES);
+
+    if (m_target_condition) {
+        if (!m_target_condition->TargetInvariant())
+            ErrorLogger() << "Conditional::Execute has a subcondition that depends on the target object. The subcondition is currently evaluated once to pick the targets, so when evaluating it, there is no defined target object. Instead use RootCandidate.";
+
+        m_target_condition->Eval(context, matches, non_matches, Condition::MATCHES);
+    }
+
 
     // execute true and false effects to target matches and non-matches respectively
     if (!matches.empty() && !m_true_effects.empty()) {
-        Effect::TargetSet& match_targets =
-            *reinterpret_cast<Effect::TargetSet*>(&matches);
+        Effect::TargetSet& match_targets = *reinterpret_cast<Effect::TargetSet*>(&matches);
         for (const auto& effect : m_true_effects) {
             effect->Execute(context, match_targets, accounting_map,
                             effect_cause,
@@ -3710,8 +3722,7 @@ void Conditional::Execute(const ScriptingContext& context,
         }
     }
     if (!non_matches.empty() && !m_false_effects.empty()) {
-        Effect::TargetSet& non_match_targets =
-            *reinterpret_cast<Effect::TargetSet*>(&non_matches);
+        Effect::TargetSet& non_match_targets = *reinterpret_cast<Effect::TargetSet*>(&non_matches);
         for (const auto& effect : m_false_effects) {
             effect->Execute(context, non_match_targets, accounting_map,
                             effect_cause,

@@ -103,10 +103,13 @@ namespace AIInterface {
         return ALL_EMPIRES; // default invalid value
     }
 
-    std::vector<int>  AllEmpireIDs() {
+    std::vector<int> AllEmpireIDs() {
         std::vector<int> empire_ids;
-        for (auto& entry : AIClientApp::GetApp()->Players())
-            empire_ids.push_back(entry.second.empire_id);
+        for (auto& entry : AIClientApp::GetApp()->Players()) {
+            auto empire_id = entry.second.empire_id;
+            if (empire_id != ALL_EMPIRES)
+                empire_ids.push_back(empire_id);
+        }
         return empire_ids;
     }
 
@@ -421,18 +424,19 @@ namespace AIInterface {
         return 1;
     }
 
-    void SendPlayerChatMessage(int recipient_player_id, const std::string& message_text) {
-        AIClientApp::GetApp()->Networking().SendMessage(PlayerChatMessage(message_text, recipient_player_id));
-    }
+    void SendPlayerChatMessage(int recipient_player_id, const std::string& message_text)
+    { AIClientApp::GetApp()->Networking().SendMessage(PlayerChatMessage(message_text, {recipient_player_id}, false)); }
 
     void SendDiplomaticMessage(const DiplomaticMessage& diplo_message) {
         AIClientApp* app = AIClientApp::GetApp();
         if (!app) return;
+
         int sender_player_id = app->PlayerID();
         if (sender_player_id == Networking::INVALID_PLAYER_ID) return;
-        int recipient_empire_id = diplo_message.RecipientEmpireID();
-        int recipient_player_id = app->EmpirePlayerID(recipient_empire_id);
+
+        int recipient_player_id = app->EmpirePlayerID(diplo_message.RecipientEmpireID());
         if (recipient_player_id == Networking::INVALID_PLAYER_ID) return;
+
         app->Networking().SendMessage(DiplomacyMessage(diplo_message));
     }
 

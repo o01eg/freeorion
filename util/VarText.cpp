@@ -102,8 +102,12 @@ namespace {
             return boost::none;
         }
         T* object = GetByID(id);
-        if (!object)
-            return boost::none;
+        if (!object) {
+            if (std::is_same<T, const ShipDesign>::value)
+                return UserString("FW_UNKNOWN_DESIGN_NAME");
+            else
+                return boost::none;
+        }
 
         return WithTags(object->Name(), tag, data);
     }
@@ -233,8 +237,7 @@ const std::string VarText::FIELD_TYPE_TAG = "fieldtype";
 const std::string VarText::METER_TYPE_TAG = "metertype";
 
 
-VarText::VarText() :
-    m_stringtable_lookup_flag(false)
+VarText::VarText()
 {}
 
 VarText::VarText(const std::string& template_string, bool stringtable_lookup/* = true*/) :

@@ -1861,13 +1861,13 @@ sc::result MPLobby::react(const PlayerChat& msg) {
     const PlayerConnectionPtr& sender = msg.m_player_connection;
 
     std::string data;
-    int receiver;
-    ExtractPlayerChatMessageData(message, receiver, data);
+    std::set<int> recipients;
+    bool pm;
+    ExtractPlayerChatMessageData(message, recipients, data, pm);
 
     boost::posix_time::ptime timestamp = boost::posix_time::second_clock::universal_time();
 
-    if (receiver == Networking::INVALID_PLAYER_ID &&
-        sender->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER)
+    if (recipients.empty() && sender->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER)
     {
         GG::Clr text_color(255, 255, 255, 255);
         for (const auto& player : m_lobby_data->m_players) {
@@ -1878,9 +1878,9 @@ sc::result MPLobby::react(const PlayerChat& msg) {
         server.PushChatMessage(data, sender->PlayerName(), text_color, timestamp);
     }
 
-    if (receiver == Networking::INVALID_PLAYER_ID) { // the receiver is everyone
+    if (recipients.empty()) { // the receiver is everyone
         for (auto it = server.m_networking.established_begin(); it != server.m_networking.established_end(); ++it) {
-            (*it)->SendMessage(ServerPlayerChatMessage(sender->PlayerID(), timestamp, data));
+            (*it)->SendMessage(ServerPlayerChatMessage(sender->PlayerID(), timestamp, data, pm));
         }
 
         std::string player_name = sender->PlayerName();
@@ -1893,9 +1893,10 @@ sc::result MPLobby::react(const PlayerChat& msg) {
             std::this_thread::sleep_for(std::chrono::seconds(3));
         });
     } else {
-        auto it = server.m_networking.GetPlayer(receiver);
-        if (it != server.m_networking.established_end())
-            (*it)->SendMessage(ServerPlayerChatMessage(sender->PlayerID(), timestamp, data));
+        for (auto it = server.m_networking.established_begin(); it != server.m_networking.established_end(); ++it) {
+            if (recipients.find((*it)->PlayerID()) != recipients.end())
+                (*it)->SendMessage(ServerPlayerChatMessage(sender->PlayerID(), timestamp, data, pm));
+        }
     }
 
     return discard_event();
@@ -2552,7 +2553,8 @@ sc::result WaitingForMPGameJoiners::react(const Error& msg) {
 ////////////////////////////////////////////////////////////
 PlayingGame::PlayingGame(my_context c) :
     my_base(c),
-    m_turn_timeout(Server().m_io_context)
+    m_turn_timeout(Server().m_io_context),
+    m_start(std::chrono::high_resolution_clock::now())
 {
     TraceLogger(FSM) << "(ServerFSM) PlayingGame";
 
@@ -2579,8 +2581,10 @@ PlayingGame::PlayingGame(my_context c) :
     }
 }
 
-PlayingGame::~PlayingGame()
-{
+PlayingGame::~PlayingGame() {
+    auto duration = std::chrono::high_resolution_clock::now() - m_start;
+    DebugLogger(FSM) << "PlayingGame time: " << std::chrono::duration_cast<std::chrono::seconds>(duration).count() << " s";
+
     TraceLogger(FSM) << "(ServerFSM) ~PlayingGame";
     m_turn_timeout.cancel();
 }
@@ -2592,34 +2596,20 @@ sc::result PlayingGame::react(const PlayerChat& msg) {
     const PlayerConnectionPtr& sender = msg.m_player_connection;
 
     std::string data;
-    int receiver;
-    ExtractPlayerChatMessageData(message, receiver, data);
+    std::set<int> recipients;
+    bool pm;
+    ExtractPlayerChatMessageData(message, recipients, data, pm);
 
     boost::posix_time::ptime timestamp = boost::posix_time::second_clock::universal_time();
 
-    if (receiver == Networking::INVALID_PLAYER_ID &&
-        sender->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER)
+    if (recipients.empty() && sender->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER)
     {
         GG::Clr text_color(255, 255, 255, 255);
         if (auto empire = GetEmpire(sender->PlayerID()))
             text_color = empire->Color();
 
         server.PushChatMessage(data, sender->PlayerName(), text_color, timestamp);
-    }
 
-    for (auto it = server.m_networking.established_begin();
-         it != server.m_networking.established_end(); ++it)
-    {
-        if (receiver == Networking::INVALID_PLAYER_ID ||
-            receiver == (*it)->PlayerID())
-        {
-            (*it)->SendMessage(ServerPlayerChatMessage(sender->PlayerID(),
-                                                       timestamp,
-                                                       data));
-        }
-    }
-
-    if (receiver == Networking::INVALID_PLAYER_ID) {
         std::string player_name = sender->PlayerName();
         std::async(std::launch::async, [player_name, data] {
             std::vector<std::string> args{"/usr/bin/curl",
@@ -2629,6 +2619,18 @@ sc::result PlayingGame::react(const PlayerChat& msg) {
                 Process sendxmpp = Process("/usr/bin/curl", args);
             std::this_thread::sleep_for(std::chrono::seconds(3));
         });
+    }
+
+    for (auto it = server.m_networking.established_begin();
+         it != server.m_networking.established_end(); ++it)
+    {
+        // send message to: (1) specified recipients, (2) all if no recipient  specified, (3) sender
+        if (recipients.find((*it)->PlayerID()) != recipients.end() || recipients.empty()
+            || ((*it)->PlayerID() == sender->PlayerID()))
+        {
+            (*it)->SendMessage(ServerPlayerChatMessage(sender->PlayerID(), timestamp,
+                                                       data, pm));
+        }
     }
 
     return discard_event();
@@ -2980,7 +2982,8 @@ void PlayingGame::TurnTimedoutHandler(const boost::system::error_code& error) {
 ////////////////////////////////////////////////////////////
 WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
     my_base(c),
-    m_timeout(Server().m_io_context)
+    m_timeout(Server().m_io_context),
+    m_start(std::chrono::high_resolution_clock::now())
 {
     TraceLogger(FSM) << "(ServerFSM) WaitingForTurnEnd";
     if (GetOptionsDB().Get<int>("save.auto.interval") > 0) {
@@ -3015,8 +3018,10 @@ WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
     }
 }
 
-WaitingForTurnEnd::~WaitingForTurnEnd()
-{
+WaitingForTurnEnd::~WaitingForTurnEnd() {
+    auto duration = std::chrono::high_resolution_clock::now() - m_start;
+    DebugLogger(FSM) << "WaitingForTurnEnd time: " << std::chrono::duration_cast<std::chrono::seconds>(duration).count() << " s";
+
     TraceLogger(FSM) << "(ServerFSM) ~WaitingForTurnEnd";
     m_timeout.cancel();
 }
@@ -3361,8 +3366,14 @@ void WaitingForTurnEnd::SaveTimedoutHandler(const boost::system::error_code& err
 // ProcessingTurn
 ////////////////////////////////////////////////////////////
 ProcessingTurn::ProcessingTurn(my_context c) :
-    my_base(c)
-{ TraceLogger(FSM) << "(ServerFSM) ProcessingTurn"; }
+    my_base(c),
+    m_start(std::chrono::high_resolution_clock::now())
+{
+    auto duration = std::chrono::high_resolution_clock::now() - m_start;
+    DebugLogger(FSM) << "ProcessingTurn time: " << std::chrono::duration_cast<std::chrono::seconds>(duration).count() << " s";
+
+    TraceLogger(FSM) << "(ServerFSM) ProcessingTurn";
+}
 
 ProcessingTurn::~ProcessingTurn()
 { TraceLogger(FSM) << "(ServerFSM) ~ProcessingTurn"; }

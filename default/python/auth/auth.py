@@ -194,3 +194,7 @@ class AuthProvider:
             error("Cann't send message: %s %s" % (exctype, value))
             return False
         return True
+
+    def get_player_delegation(self, player_name):
+        """Returns list of players delegated by this player"""
+        return []

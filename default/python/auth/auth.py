@@ -161,8 +161,21 @@ class AuthProvider:
                             ON c.player_name = u.player_name
                             WHERE u.player_name = %s
                             AND c.is_active
-                            AND c.delete_ts IS NULL """,
-                                 (player_name,))
+                            AND c.delete_ts IS NULL
+                            UNION ALL
+                            SELECT c.protocol, c.address
+                            FROM games.players p
+                            INNER JOIN auth.users u
+                            ON u.player_name = p.delegate_name
+                            INNER JOIN auth.contacts c
+                            ON c.player_name = u.player_name
+                            WHERE p.player_name = %s
+                            AND p.game_uid = %s
+                            AND p.delegate_name IS NOT NULL
+                            AND c.is_active
+                            AND c.delete_ts IS NULL
+                            """,
+                                 (player_name, player_name, fo.get_galaxy_setup_data().gameUID))
                     for r in curs:
                         if r[0] == "xmpp":
                             try:
@@ -197,4 +210,19 @@ class AuthProvider:
 
     def get_player_delegation(self, player_name):
         """Returns list of players delegated by this player"""
-        return []
+        players = []
+        try:
+            with self.conn:
+                with self.conn.cursor() as curs:
+                    curs.execute("""SELECT player_name
+                            FROM games.players p
+                            WHERE p.game_uid = %s
+                            AND p.delegate_name = %s """,
+                                 (fo.get_galaxy_setup_data().gameUID, player_name))
+                    for r in curs:
+                        players.append(r[0])
+        except psycopg2.InterfaceError:
+            self.conn = psycopg2.connect(self.dsn)
+            exctype, value = sys.exc_info()[:2]
+            error("Cann't get delegation info: %s %s" % (exctype, value))
+        return players

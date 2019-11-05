@@ -1,4 +1,4 @@
-English
+﻿English
 
 # This is the English String Table file for FreeOrion
 #
@@ -1219,7 +1219,7 @@ RULE_ONLY_ALLIANCE_WIN
 Only allied players win
 
 RULE_ONLY_ALLIANCE_WIN_DESC
-Allied players could win together if the number of human players in their alliance is no large than the maximum human player winners and there are no other human player survivors.
+Allied players can win together if the number of human players in their alliance is no more than the maximum human player winners and there are no other human player survivors.
 
 RULE_SHIP_PART_BASED_UPKEEP
 Use part-based upkeep
@@ -3197,6 +3197,43 @@ Turn %1%
 # %1% current turn number.
 MAP_BTN_TURN_UNREADY
 Revise Orders %1%
+
+MAP_BTN_TURN_TOOLTIP
+Start Turn
+
+MAP_BTN_TURN_TOOLTIP_DESC_SP
+'''Starts turn processing with the following sequence:
+
+[[MAP_BTN_TURN_TOOLTIP_SEQUENCE_MACRO]]
+'''
+
+MAP_BTN_TURN_TOOLTIP_DESC_MP
+'''Send orders to the server. Turn processing will be executed with the following sequence:
+
+[[MAP_BTN_TURN_TOOLTIP_SEQUENCE_MACRO]]
+'''
+
+MAP_BTN_TURN_TOOLTIP_DESC_OBS
+Observers are unable to start turn processing.
+
+MAP_BTN_TURN_TOOLTIP_DESC_MOD
+'''Starts turn processing even if some players have not sent their orders to the server.
+Turn processing will be executed with the following sequence:
+
+[[MAP_BTN_TURN_TOOLTIP_SEQUENCE_MACRO]]
+'''
+
+MAP_BTN_TURN_TOOLTIP_DESC_WAIT
+Waiting for other players to send their orders. Click again to revise orders.
+
+MAP_BTN_TURN_TOOLTIP_SEQUENCE_MACRO
+'''<u>Order execution</u>
+Colonisation, invasion, bombardment, gifting, scrapping and fleet movement
+
+<u>Combat resolution</u>
+
+<u>Production, Research and Growth</u>
+Effect execution, production of ships and buildings, unlocking of new technologies, population growth, update of supply propagation'''
 
 # %1% number of seconds
 MAP_TIMEOUT_SECONDS
@@ -5631,7 +5668,7 @@ Fuel
 METER_FUEL_VALUE_DESC
 '''Fuel allows ships to travel the starlanes outside of [[metertype METER_SUPPLY]] of your empire. Fuel is consumed for each starlane traversed outside of supply; stopping within [[metertype METER_SUPPLY]] lines will fully refuel a ship. If a ship remains stationary beyond friendly [[metertype METER_SUPPLY]] lines, fuel will slowly regenerate.
 
-The effective amount of fuel a <encyclopedia ENC_SHIP_DESIGN>Ship Design</encyclopedia> is scaled by the [[encyclopedia FUEL_EFFICIENCY_TITLE]] of the [[encyclopedia ENC_SHIP_HULL]]. Fuel efficiency modifies the base fuel capacity of a <encyclopedia ENC_SHIP_DESIGN>Ship Design</encyclopedia> which depends on the [[encyclopedia ENC_SHIP_HULL]] used, but it can also be increased using some [[encyclopedia ENC_SHIP_PART]]s.
+The effective amount of fuel a <encyclopedia ENC_SHIP_DESIGN>Ship Design</encyclopedia> depends on the base fuel of the hull and additional fuel effects scaled by the [[encyclopedia FUEL_EFFICIENCY_TITLE]] of the [[encyclopedia ENC_SHIP_HULL]]. Fuel efficiency changes the effective capacity of fuel [[encyclopedia ENC_SHIP_PART]]s and will multiply any other fuel-modifying effects.
 
 The game will always show the effective fuel levels, after scaling for hull efficiency. Details about the efficiency effect can be seen in the mouse over.'''
 
@@ -15251,7 +15288,7 @@ FUEL_REFUEL_EFFICIENCY_TEXT
 
 The base fuel capacity of a <encyclopedia ENC_SHIP_DESIGN>Ship Design</encyclopedia> depends on the [[encyclopedia ENC_SHIP_HULL]] used, but it can also be increased using some [[encyclopedia ENC_SHIP_PART]]s.
 
-Ship hulls have a great (400%), good (200%), normal (100%), or bad (60%) efficiency which determines how effective the base fuel capacity can be used. 60% efficiency means for five base fuel you get three jumps. 200% efficiency means you can do two jumps per base fuel capacity. Fuel efficiency typically decreases with hull mass, so only very small ships have a high fuel efficiency and huge ships struggle outside of [[metertype METER_SUPPLY]]. The game will always show the effective fuel levels, after scaling for hull efficiency.'''
+Ship hulls have a great (400%), good (200%), normal (100%), or bad (60%) efficiency which determines the effectiveness of any additional fuel parts or other fuel-modifying effects. Fuel efficiency typically decreases with hull mass, so only very small ships have a high fuel efficiency and huge ships struggle outside of [[metertype METER_SUPPLY]]. The game will always show the effective fuel levels, after scaling for hull efficiency.'''
 
 BASE_FUEL_REGEN_LABEL
 Stationary Fuel Regen
@@ -15259,17 +15296,29 @@ Stationary Fuel Regen
 FUEL_EFFICIENCY_DESC
 [[FUEL_EFFICIENCY_TITLE]]
 
-GREAT_FUEL_EFFICIENCY_LABEL
-Hull <i>%2%</i> [[encyclopedia FUEL_EFFICIENCY_TITLE]] 400%%
-
-GOOD_FUEL_EFFICIENCY_LABEL
-Hull <i>%2%</i> [[encyclopedia FUEL_EFFICIENCY_TITLE]] 200%%
+BAD_FUEL_EFFICIENCY_LABEL
+Hull <i>%2%</i> [[encyclopedia FUEL_EFFICIENCY_TITLE]] 60%%
 
 AVERAGE_FUEL_EFFICIENCY_LABEL
 Hull <i>%2%</i> [[encyclopedia FUEL_EFFICIENCY_TITLE]] 100%%
 
-BAD_FUEL_EFFICIENCY_LABEL
-Hull <i>%2%</i> [[encyclopedia FUEL_EFFICIENCY_TITLE]] 60%%
+GOOD_FUEL_EFFICIENCY_LABEL
+Hull <i>%2%</i> [[encyclopedia FUEL_EFFICIENCY_TITLE]] 200%%
+
+GREAT_FUEL_EFFICIENCY_LABEL
+Hull <i>%2%</i> [[encyclopedia FUEL_EFFICIENCY_TITLE]] 400%%
+
+HULL_DESC_BAD_FUEL_EFFICIENCY
+[[encyclopedia FUEL_EFFICIENCY_TITLE]]: 60%
+
+HULL_DESC_AVERAGE_FUEL_EFFICIENCY
+[[encyclopedia FUEL_EFFICIENCY_TITLE]]: 100%
+
+HULL_DESC_GOOD_FUEL_EFFICIENCY
+[[encyclopedia FUEL_EFFICIENCY_TITLE]]: 200%
+
+HULL_DESC_GREAT_FUEL_EFFICIENCY
+[[encyclopedia FUEL_EFFICIENCY_TITLE]]: 400%
 
 MAX_FUEL_LESS_THAN_ONE_DESC
 Refueling Impossible

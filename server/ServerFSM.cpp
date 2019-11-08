@@ -2481,6 +2481,15 @@ sc::result WaitingForMPGameJoiners::react(const CheckStartConditions& u) {
         if (m_player_save_game_data.empty()) {
             DebugLogger(FSM) << "Initializing new MP game...";
             server.NewMPGameInit(*m_lobby_data);
+
+            // notify all disconnected players about new game
+            for (const auto& empire : Empires()) {
+                if (server.GetEmpireClientType(empire.first) == Networking::INVALID_CLIENT_TYPE &&
+                    !empire.second->Eliminated())
+                {
+                    server.SendOutboundChatMessage((boost::format("Hello, %s. New game started") % empire.second->PlayerName()).str(), empire.second->PlayerName(), GetOptionsDB().Get<bool>("network.server.allow-email.new-turn"));
+                }
+            }
         } else {
             DebugLogger(FSM) << "Initializing loaded MP game";
             server.LoadMPGameInit(*m_lobby_data, m_player_save_game_data, m_server_save_game_data);

@@ -82,6 +82,15 @@ class ChatHistoryProvider:
                                      VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s)""",
                                      (timestamp, player_name, text, 256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a))
                         saved = True
+                try:
+                    req = urllib2.Request("http://localhost:8083/")
+                    req.add_header("X-XMPP-Muc", "smac")
+                    req.add_data("<%s> %s" % (player_name, text))
+                    urllib2.urlopen(req).read()
+                    info("Chat message was send via XMPP")
+                except:
+                    exctype, value = sys.exc_info()[:2]
+                    error("Cann't send chat message %s: %s %s" % (text, exctype, value))
             except psycopg2.InterfaceError:
                 self.conn = psycopg2.connect(self.dsn)
                 saved = False

@@ -191,7 +191,7 @@ bool PythonServer::FillListPlayers(std::list<PlayerSetupData>& players) const {
     return true;
 }
 
-bool PythonServer::SendOutboundChatMessage(const std::string& text, const std::string& player_name) {
+bool PythonServer::SendOutboundChatMessage(const std::string& text, const std::string& player_name, bool allow_email) {
     boost::python::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
     if (!auth_provider) {
         ErrorLogger() << "Unable to get Python object auth_provider";
@@ -202,7 +202,7 @@ bool PythonServer::SendOutboundChatMessage(const std::string& text, const std::s
         ErrorLogger() << "Unable to call Python method is_success_auth";
         return false;
     }
-    return f(text, player_name);
+    return f(text, player_name, allow_email);
 }
 
 bool PythonServer::GetPlayerDelegation(const std::string& player_name, std::list<std::string> &result) const {

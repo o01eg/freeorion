@@ -3291,7 +3291,7 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
             if (server.GetEmpireClientType(empire.first) == Networking::INVALID_CLIENT_TYPE &&
                 !empire.second->Eliminated())
             {
-                server.SendOutboundChatMessage((boost::format("Hello, %s. New turn %d started") % empire.second->PlayerName() % (server.CurrentTurn()+1)).str(), empire.second->PlayerName());
+                server.SendOutboundChatMessage((boost::format("Hello, %s. New turn %d started") % empire.second->PlayerName() % (server.CurrentTurn()+1)).str(), empire.second->PlayerName(), GetOptionsDB().Get<bool>("network.server.allow-email.new-turn"));
             }
         }
 
@@ -3308,7 +3308,7 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
             !empire->Eliminated())
         {
             m_last_empire_id = last_empire_id;
-            server.SendOutboundChatMessage((boost::format("Hello, %s. You are last to end %d turn.") % empire->PlayerName() % server.CurrentTurn()).str(), empire->PlayerName());
+            server.SendOutboundChatMessage((boost::format("Hello, %s. You are last to end %d turn.") % empire->PlayerName() % server.CurrentTurn()).str(), empire->PlayerName(), GetOptionsDB().Get<bool>("network.server.allow-email.new-turn"));
         }
     }
 

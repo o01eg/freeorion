@@ -22,7 +22,7 @@ public:
     bool GetPlayerDelegation(const std::string& player_name, std::list<std::string> &result) const; // Wraps call to AuthProvider's method get_player_delegation
     bool LoadChatHistory(boost::circular_buffer<ChatHistoryEntity>& chat_history); // Wraps call to ChatProvider's method load_history
     bool PutChatHistoryEntity(const ChatHistoryEntity& chat_history_entity); // Wraps call to ChatProvider's method put_history_entity
-    bool SendOutboundChatMessage(const std::string& text, const std::string& player_name); // Sends message to player basd on contact info stored in DBMS
+    bool SendOutboundChatMessage(const std::string& text, const std::string& player_name, bool allow_email); // Sends message to player based on contact info stored in DBMS
 
 private:
     // reference to imported Python universe generator module

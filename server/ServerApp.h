@@ -221,7 +221,7 @@ public:
                          GG::Clr text_color,
                          const boost::posix_time::ptime& timestamp);
 
-    void SendOutboundChatMessage(const std::string& text, const std::string& player_name);
+    void SendOutboundChatMessage(const std::string& text, const std::string& player_name, bool allow_email);
 
     ServerNetworking&           Networking();     ///< returns the networking object for the server
 private:

@@ -149,7 +149,7 @@ class AuthProvider:
             error("Cann't load players: %s %s" % (exctype, value))
         return players
 
-    def send_outbound_chat_message(self, text, player_name):
+    def send_outbound_chat_message(self, text, player_name, allow_email):
         """ Send message to player """
         subject = "FreeOrion LT %s Notification" % fo.get_galaxy_setup_data().gameUID
         try:
@@ -183,10 +183,10 @@ class AuthProvider:
                                 req.add_header("X-XMPP-To", r[1])
                                 req.add_data("%s\r\n%s" % (subject, text))
                                 urllib2.urlopen(req).read()
-                                info("OTP was send to %s via XMPP" % player_name)
+                                info("Message was send to %s via XMPP" % player_name)
                             except:
                                 error("Cann't send xmpp message to %s" % player_name)
-                        elif r[0] == "email":
+                        elif r[0] == "email" and allow_email:
                             try:
                                 server = smtplib.SMTP_SSL(self.mailconf.get('mail', 'server'), 465)
                                 server.ehlo()
@@ -195,7 +195,7 @@ class AuthProvider:
                                         %s\r\nTo: %s\r\nSubject: %s\r\n\r\n
                                         %s""" % (self.mailconf.get('mail', 'from'), r[1], subject, text))
                                 server.close()
-                                info("OTP was send to %s via email" % player_name)
+                                info("Message was send to %s via email" % player_name)
                             except:
                                 exctype, value = sys.exc_info()[:2]
                                 error("Cann't send email to %s: %s %s" % (player_name, exctype, value))

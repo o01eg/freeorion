@@ -132,8 +132,8 @@ public:
     //@}
 
     /** \name Mutators */ //@{
-    /** Sends a synchronous message \a message to the player indicated in the message and returns true on success. */
-    bool SendMessageAll(const Message& message);
+    /** Sends a synchronous message \a message to the all established players. */
+    void SendMessageAll(const Message& message);
 
     /** Disconnects the server from player \a id. */
     void Disconnect(int id);
@@ -266,8 +266,8 @@ public:
     /** Starts the connection reading incoming messages on its socket. */
     void Start();
 
-    /** Sends \a synchronous message to out on the connection and return true on success. */
-    bool SendMessage(const Message& message);
+    /** Sends \a synchronous message to out on the connection. */
+    void SendMessage(const Message& message);
 
     /** Set player properties to use them after authentication successed. */
     void AwaitPlayer(Networking::ClientType client_type,
@@ -311,13 +311,22 @@ private:
     void HandleMessageBodyRead(boost::system::error_code error, std::size_t bytes_transferred);
     void HandleMessageHeaderRead(boost::system::error_code error, std::size_t bytes_transferred);
     void AsyncReadMessage();
-    bool SyncWriteMessage(const Message& message);
+    void AsyncWriteMessage();
+    static void HandleMessageWrite(PlayerConnectionPtr self,
+                                   boost::system::error_code error,
+                                   std::size_t bytes_transferred);
+
+    /** Places message to the end of sending queue and start asynchronous write if \a message was
+        first in the queue. */
+    static void SendMessageImpl(PlayerConnectionPtr self, Message message);
     static void AsyncErrorHandler(PlayerConnectionPtr self, boost::system::error_code handled_error, boost::system::error_code error);
 
     boost::asio::io_context&        m_service;
     boost::asio::ip::tcp::socket    m_socket;
     Message::HeaderBuffer           m_incoming_header_buffer;
     Message                         m_incoming_message;
+    Message::HeaderBuffer           m_outgoing_header;
+    std::list<Message>              m_outgoing_messages;
     int                             m_ID = Networking::INVALID_PLAYER_ID;
     std::string                     m_player_name;
     bool                            m_new_connection = true;

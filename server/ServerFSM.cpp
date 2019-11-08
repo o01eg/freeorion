@@ -1856,16 +1856,6 @@ sc::result MPLobby::react(const PlayerChat& msg) {
         for (auto it = server.m_networking.established_begin(); it != server.m_networking.established_end(); ++it) {
             (*it)->SendMessage(ServerPlayerChatMessage(sender->PlayerID(), timestamp, data, pm));
         }
-
-        std::string player_name = sender->PlayerName();
-        std::async(std::launch::async, [player_name, data] {
-            std::vector<std::string> args{"/usr/bin/curl",
-                "http://localhost:8083/",
-                "-H", "X-XMPP-Muc: smac",
-                "-d", "<" + player_name + "> " + data};
-                Process sendxmpp = Process("/usr/bin/curl", args);
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-        });
     } else {
         for (auto it = server.m_networking.established_begin(); it != server.m_networking.established_end(); ++it) {
             if (recipients.find((*it)->PlayerID()) != recipients.end())
@@ -2584,16 +2574,6 @@ sc::result PlayingGame::react(const PlayerChat& msg) {
             text_color = empire->Color();
 
         server.PushChatMessage(data, sender->PlayerName(), text_color, timestamp);
-
-        std::string player_name = sender->PlayerName();
-        std::async(std::launch::async, [player_name, data] {
-            std::vector<std::string> args{"/usr/bin/curl",
-                "http://localhost:8083/",
-                "-H", "X-XMPP-Muc: smac",
-                "-d", "<" + player_name + "> " + data};
-                Process sendxmpp = Process("/usr/bin/curl", args);
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-        });
     }
 
     for (auto it = server.m_networking.established_begin();

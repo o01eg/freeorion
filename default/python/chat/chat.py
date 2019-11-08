@@ -14,6 +14,8 @@ import psycopg2.extensions
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
+import urllib2
+
 
 class ChatHistoryProvider:
     def __init__(self):

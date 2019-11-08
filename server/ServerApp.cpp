@@ -3667,8 +3667,18 @@ void ServerApp::PostCombatProcessTurns() {
     m_universe.UpdateEmpireObjectVisibilities();
 
 
+    DebugLogger() << "ServerApp::PostCombatProcessTurns applying Newly Added Techs";
+    // apply new techs
+    for (auto& entry : empires) {
+        Empire* empire = entry.second;
+        if (empire && !empire->Eliminated())
+            empire->ApplyNewTechs();
+    }
+
+
     TraceLogger(effects) << "ServerApp::PostCombatProcessTurns Before Final Meter Estimate Update: ";
     TraceLogger(effects) << objects.Dump();
+
 
     // redo meter estimates to hopefully be consistent with what happens in clients
     m_universe.UpdateMeterEstimates(false);
@@ -3689,14 +3699,6 @@ void ServerApp::PostCombatProcessTurns() {
     for (auto& entry : empires)
         entry.second->UpdateOwnedObjectCounters();
     GetSpeciesManager().UpdatePopulationCounter();
-
-
-    // apply new techs
-    for (auto& entry : empires) {
-        Empire* empire = entry.second;
-        if (empire && !empire->Eliminated())
-            empire->ApplyNewTechs();
-    }
 
 
     // indicate that the clients are waiting for their new gamestate

@@ -1879,9 +1879,12 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     // compare player name case-insensitive way
     const std::string lower_player_name = boost::algorithm::to_lower_copy(player_connection->PlayerName());
     std::list<std::string> delegation = GetPlayerDelegation(lower_player_name);
+    DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Get delegates of size " << delegation.size();
     if (target_empire_id == ALL_EMPIRES) {
-        if (!delegation.empty())
+        if (!delegation.empty()) {
+            DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Player should choose between delegates.";
             return ALL_EMPIRES;
+        }
         // search empire by player name
         for (auto e : Empires()) {
             if (boost::algorithm::to_lower_copy(e.second->PlayerName()) == lower_player_name) {
@@ -1894,8 +1897,10 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
         // use provided empire and test if it's player himself or one of delegated
         empire_id = target_empire_id;
         empire = Empires().GetEmpire(target_empire_id);
-        if (empire == nullptr)
+        if (empire == nullptr) {
+            DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Not found empire #" << target_empire_id;
             return ALL_EMPIRES;
+        }
 
         if (boost::algorithm::to_lower_copy(empire->PlayerName()) != lower_player_name) {
             bool matched = false;
@@ -1905,16 +1910,22 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
                     break;
                 }
             }
-            if (!matched)
+            if (!matched) {
+                DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Not found delegated empire #" << target_empire_id;
                 return ALL_EMPIRES;
+            }
         }
     }
 
-    if (empire_id == ALL_EMPIRES || empire == nullptr)
+    if (empire_id == ALL_EMPIRES || empire == nullptr) {
+        DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Not found empire";
         return ALL_EMPIRES;
+    }
 
-    if (empire->Eliminated())
+    if (empire->Eliminated()) {
+        DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Found eliminated empire #" << empire_id;
         return ALL_EMPIRES;
+    }
 
     auto orders_it = m_turn_sequence.find(empire_id);
     if (orders_it == m_turn_sequence.end()) {

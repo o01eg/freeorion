@@ -162,7 +162,7 @@ namespace {
                 //| var
                 )
             );
-        } catch (const std::exception&) {
+        } catch (...) {
             ErrorLogger() << "StringtableTextSubstitute caught exception when parsing input: " << input;
         }
 
@@ -453,6 +453,9 @@ void MessageWnd::LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKe
     StopFlash();
 }
 
+std::string MessageWnd::GetText() const
+{ return *m_display; }
+
 void MessageWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
     const GG::Pt old_size = Size();
     CUIWnd::SizeMove(ul, lr);
@@ -499,8 +502,10 @@ void MessageWnd::HandlePlayerChatMessage(const std::string& text,
         ErrorLogger() << "MessageWnd::HandlePlayerChatMessage couldn't get client app!";
         return;
     }
-    int client_empire_id = app->EmpireID();  
-    if (recipient_player_id == client_empire_id) {
+    // only show and flash message window if other player sent message
+    const std::map<int, PlayerInfo>& players = app->Players();
+    const auto it = players.find(app->PlayerID());
+    if (it == players.end() || it->second.name != player_name) {
         Flash();
         Show();
     }
@@ -613,6 +618,9 @@ void MessageWnd::OpenForInput() {
     GG::GUI::GetGUI()->SetFocusWnd(m_edit);
     m_display_show_time = GG::GUI::GetGUI()->Ticks();
 }
+
+void MessageWnd::SetChatText(const std::string& chat_text)
+{ m_display->SetText(chat_text); }
 
 namespace {
     void SendChatMessage(const std::string& text, std::set<int> recipients, bool pm) {

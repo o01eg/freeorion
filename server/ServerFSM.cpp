@@ -1734,7 +1734,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 if (psd.second.m_save_game_empire_id == ALL_EMPIRES)
                     psd.second.m_empire_color = GetUnusedEmpireColour(m_lobby_data->m_players, m_lobby_data->m_save_game_empire_data);
             }
-        } catch (const std::exception&) {
+        } catch (...) {
             // inform player who attempted to change the save file that there was a problem
             sender->SendMessage(ErrorMessage(UserStringNop("UNABLE_TO_READ_SAVE_FILE"), false));
             // revert to old save file
@@ -1784,7 +1784,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                     DebugLogger(FSM) << "Seeding with loaded galaxy seed: " << server.m_galaxy_setup_data.m_seed << "  interpreted as actual seed: " << seed;
                     Seed(seed);
 
-                } catch (const std::exception&) {
+                } catch (...) {
                     SendMessageToAllPlayers(ErrorMessage(UserStringNop("UNABLE_TO_READ_SAVE_FILE"), true));
                     return discard_event();
                 }
@@ -1895,7 +1895,7 @@ sc::result MPLobby::react(const StartMPGame& msg) {
                 DebugLogger(FSM) << "Seeding with loaded galaxy seed: " << server.m_galaxy_setup_data.m_seed << "  interpreted as actual seed: " << seed;
                 Seed(seed);
 
-            } catch (const std::exception&) {
+            } catch (...) {
                 SendMessageToAllPlayers(ErrorMessage(UserStringNop("UNABLE_TO_READ_SAVE_FILE"), true));
                 return discard_event();
             }
@@ -2167,7 +2167,7 @@ sc::result WaitingForSPGameJoiners::react(const CheckStartConditions& u) {
                          m_player_save_game_data,   GetUniverse(),          Empires(),
                          GetSpeciesManager(),       GetCombatLogManager(),  server.m_galaxy_setup_data);
 
-            } catch (const std::exception&) {
+            } catch (...) {
                 SendMessageToHost(ErrorMessage(UserStringNop("UNABLE_TO_READ_SAVE_FILE"), true));
                 return transit<Idle>();
             }
@@ -2712,7 +2712,7 @@ void PlayingGame::EstablishPlayer(const PlayerConnectionPtr& player_connection,
                 // previous connection was dropped
                 // set empire link to new connection by name
                 // send playing game
-                int empire_id = server.AddPlayerIntoGame(player_connection);
+                int empire_id = server.AddPlayerIntoGame(player_connection, ALL_EMPIRES);
                 if (empire_id != ALL_EMPIRES) {
                     // notify other player that this empire revoked orders
                     for (auto player_it = server.m_networking.established_begin();
@@ -2879,9 +2879,32 @@ sc::result PlayingGame::react(const Error& msg) {
 }
 
 sc::result PlayingGame::react(const LobbyUpdate& msg) {
-    TraceLogger(FSM) << "(ServerFSM) MPLobby.LobbyUpdate";
+    TraceLogger(FSM) << "(ServerFSM) PlayingGame.LobbyUpdate";
     ServerApp& server = Server();
     const PlayerConnectionPtr& sender = msg.m_player_connection;
+    const Message& message = msg.m_message;
+
+    MultiplayerLobbyData incoming_lobby_data;
+    ExtractLobbyUpdateMessageData(message, incoming_lobby_data);
+
+    // try to add the player into the game if he choose empire
+    for (const auto& player : incoming_lobby_data.m_players) {
+        if (player.first == sender->PlayerID() && player.second.m_save_game_empire_id != ALL_EMPIRES) {
+            int empire_id = server.AddPlayerIntoGame(sender, player.second.m_save_game_empire_id);
+            if (empire_id != ALL_EMPIRES) {
+                // notify other player that this empire revoked orders
+                for (auto player_it = server.m_networking.established_begin();
+                    player_it != server.m_networking.established_end(); ++player_it)
+                {
+                    PlayerConnectionPtr player_ctn = *player_it;
+                    player_ctn->SendMessage(PlayerStatusMessage(Message::PLAYING_TURN,
+                                                                empire_id));
+                }
+                context<ServerFSM>().UpdateIngameLobby();
+                return discard_event();
+            }
+        }
+    }
 
     // ignore data
     sender->SendMessage(ErrorMessage(UserStringNop("SERVER_ALREADY_PLAYING_GAME")));

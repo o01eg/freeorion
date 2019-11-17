@@ -3292,10 +3292,7 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
     int last_empire_id = server.LastOneNotReadyEmpire();
     if (last_empire_id != ALL_EMPIRES && last_empire_id != m_last_empire_id) {
         Empire* empire = server.GetEmpire(last_empire_id);
-        if (empire != nullptr &&
-            server.GetEmpireClientType(last_empire_id) == Networking::INVALID_CLIENT_TYPE &&
-            !empire->Eliminated())
-        {
+        if (empire != nullptr && !empire->Eliminated()) {
             m_last_empire_id = last_empire_id;
             server.SendOutboundChatMessage((boost::format("Hello, %s. You are last to end %d turn.") % empire->PlayerName() % server.CurrentTurn()).str(), empire->PlayerName(), GetOptionsDB().Get<bool>("network.server.allow-email.new-turn"));
         }

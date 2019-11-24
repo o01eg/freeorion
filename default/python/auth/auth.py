@@ -101,3 +101,7 @@ class AuthProvider:
     def list_players(self):
         """Not supported for public server"""
         raise NameError('Not supported')
+
+    def get_player_delegation(self, player_name):
+        """Returns list of players delegated by this player"""
+        return []

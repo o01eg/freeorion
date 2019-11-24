@@ -1330,6 +1330,9 @@ Render gassy substance around systems to give galaxy shape. May slow rendering o
 OPTIONS_DB_GALAXY_MAP_STARFIELDS
 Render star fields around systems. May slow rendering on older systems.
 
+OPTIONS_DB_GALAXY_MAP_STARFIELDS_SCALE
+Sets size of star fields around systems.
+
 OPTIONS_DB_GALAXY_MAP_SCALE_LINE
 Show scale line for universe distance on galaxy map.
 
@@ -2873,6 +2876,9 @@ Galaxy map gas rendering
 
 OPTIONS_GALAXY_MAP_STARFIELDS
 Galaxy map star fields rendering
+
+OPTIONS_GALAXY_MAP_STARFIELDS_SCALE
+Galaxy map star fields star size
 
 OPTIONS_GALAXY_MAP_SCALE_LINE
 Galaxy distance scale line
@@ -14233,7 +14239,7 @@ SH_BASIC_SMALL
 Basic Small Hull
 
 SH_BASIC_SMALL_DESC
-'''A small, basic interstellar hull. It has only one external slot but can make an extra jump compared to other basic hulls.
+'''A small, basic interstellar hull. It has only one external slot but is very efficient at starlane travel.
 
 [[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is medium and [[metertype METER_SPEED]] is average.
 

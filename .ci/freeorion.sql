@@ -80,6 +80,8 @@ CREATE TABLE games.players (
  player_name CITEXT REFERENCES auth.users(player_name),
  is_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
  species VARCHAR(20) NOT NULL DEFAULT 'RANDOM',
+ delegate_name CITEXT REFERENCES auth.users(player_name) NULL,
+ team_id INT NOT NULL DEFAULT -1,
  CONSTRAINT pk_players PRIMARY KEY (game_uid, player_name)
 );
 GRANT SELECT ON games.players TO freeorion;

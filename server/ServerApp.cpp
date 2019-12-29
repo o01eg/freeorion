@@ -1839,6 +1839,7 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
     // empire elimination
     empire->Eliminate();
 
+#if 0
     // destroy owned ships
     for (auto& obj : Objects().find<Ship>(OwnedVisitor(empire_id))) {
         obj->SetOwner(ALL_EMPIRES);
@@ -1853,6 +1854,7 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
     for (const auto& planet : planets) {
         planet->Reset();
     }
+ #endif
 
     // Don't wait for turn
     RemoveEmpireTurn(empire_id);

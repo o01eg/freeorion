@@ -10,6 +10,7 @@ have their future focus decided.
 # Note: The algorithm is not stable with respect to pid order.  i.e. Two empire with
 #       exactly the same colonies, but different pids may make different choices.
 from logging import info, warn, debug
+from operator import itemgetter
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
 from aistate_interface import get_aistate
@@ -262,7 +263,7 @@ class Reporter(object):
             resource_priorities[priority_type] = aistate.get_priority(priority_type)
 
         sorted_priorities = resource_priorities.items()
-        sorted_priorities.sort(lambda x, y: cmp(x[1], y[1]), reverse=True)
+        sorted_priorities.sort(key=itemgetter(1), reverse=True)
         top_priority = -1
         for evaluation_priority, evaluation_score in sorted_priorities:
             if top_priority < 0:
@@ -297,7 +298,7 @@ class Reporter(object):
         info(foci_table)
         debug("Empire Totals:\nPopulation: %5d \nProduction: %5d\nResearch: %5d\n",
               empire.population(), empire.productionPoints, empire.resourceProduction(fo.resourceType.research))
-        for name, (cp, mp) in warnings.iteritems():
+        for name, (cp, mp) in warnings.items():
             warn("Population Warning! -- %s has unsustainable current pop %d -- target %d", name, cp, mp)
 
 
@@ -405,7 +406,7 @@ def set_planet_growth_specials(focus_manager):
         return
 
     # TODO Consider actual resource output of the candidate locations rather than only population
-    for special, locations in ColonisationAI.available_growth_specials.iteritems():
+    for special, locations in ColonisationAI.available_growth_specials.items():
         # Find which metabolism is boosted by this special
         metabolism = AIDependencies.metabolismBoosts.get(special)
         if not metabolism:

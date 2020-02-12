@@ -275,21 +275,6 @@ private:
 
     void RefreshFleetButtonSelectionIndicators();    //!< marks (only) selected fleets' buttons as selected
 
-    /** Connect all \p fleets StateChangedSignal to RefreshFleetButtons. */
-    void AddFleetsStateChangedSignal(const std::vector<std::shared_ptr<Fleet>>& fleets);
-
-    /** Disconnect all \p fleets StateChangedSignal from RefreshFleetButtons. */
-    void RemoveFleetsStateChangedSignal(const std::vector<std::shared_ptr<Fleet>>& fleets);
-
-    /** Handle FleetsInsertedSignal by connecting signals and refreshing fleet
-        buttons. */
-    void FleetsInsertedSignalHandler(const std::vector<std::shared_ptr<Fleet>>& fleets);
-
-    /** Handle FleetsRemovedSignal by disconnecting signals and refreshing fleet
-        buttons. */
-    void FleetsRemovedSignalHandler(const std::vector<std::shared_ptr<Fleet>>& fleets);
-
-
     void DoFleetButtonsLayout();                     //!< does layout of fleet buttons
 
     /** Return fleets ids of all fleet buttons containing or overlapping the
@@ -307,8 +292,6 @@ private:
 
     void DoSystemIconsLayout();          //!< does layout of system icons
     void DoFieldIconsLayout();           //!< does layout of field icons
-
-    void RefreshFleetSignals();          //!< disconnects and reconnects all fleet change signals
 
     void RefreshSliders();               //!< shows or hides sliders on map
 
@@ -520,7 +503,7 @@ private:
     std::map<int, MovementLineData> m_fleet_lines;                  //!< lines used for moving fleets in the main map
     std::map<int, MovementLineData> m_projected_fleet_lines;        //!< lines that show the projected path of the active fleet in the FleetWnd
 
-    std::pair<int, int>             m_line_between_systems;         //!< set when map should render line connecting 2 systems
+    std::pair<int, int>             m_line_between_systems = {INVALID_OBJECT_ID, INVALID_OBJECT_ID};//!< set when map should render line connecting 2 systems
 
     std::map<std::shared_ptr<GG::Texture>, GG::GL2DVertexBuffer> m_star_core_quad_vertices;
     std::map<std::shared_ptr<GG::Texture>, GG::GL2DVertexBuffer> m_star_halo_quad_vertices;
@@ -569,8 +552,8 @@ private:
     GG::Timer                       m_timeout_clock{1000};      //!< clock to update remaining time
     std::list<std::weak_ptr<MapWndPopup>> m_popups;             //!< list of currently active popup windows
     bool                            m_menu_showing = false;     //!< set during ShowMenu() to prevent reentrency
-    int                             m_current_owned_system;
-    int                             m_current_fleet_id;
+    int                             m_current_owned_system = INVALID_OBJECT_ID;
+    int                             m_current_fleet_id = INVALID_OBJECT_ID;
     bool                            m_in_production_view_mode = false;
 
     bool                            m_sidepanel_open_before_showing_other = false;  //!< was the sidepanel open before switching to production, research or design screens?  If so, it should be restored when leaving them.

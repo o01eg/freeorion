@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 """This module defines the decoding for the FreeOrion AI savegames.
 
 The decoder is subclassed from the standard library json decoder and
@@ -14,11 +15,12 @@ to provide a __setstate__ method to verify and possibly sanitize the content of 
 import json
 
 import EnumsAI
+from common import six
 from freeorion_tools import profile
 from logging import debug
 
-from _definitions import (ENUM_PREFIX, FALSE, FLOAT_PREFIX, INT_PREFIX, InvalidSaveGameException, NONE, PLACEHOLDER,
-                          SET_PREFIX, TRUE, TUPLE_PREFIX, trusted_classes, )
+from ._definitions import (ENUM_PREFIX, FALSE, FLOAT_PREFIX, INT_PREFIX, InvalidSaveGameException, NONE, PLACEHOLDER,
+                           SET_PREFIX, TRUE, TUPLE_PREFIX, trusted_classes, )
 
 
 @profile
@@ -78,7 +80,7 @@ class _FreeOrionAISaveGameDecoder(json.JSONDecoder):
         # then it is a standard dictionary.
         if not all(key in obj for key in ('__class__', '__module__')):
             return {self.__interpret(key): self.__interpret(value)
-                    for key, value in obj.iteritems()}
+                    for key, value in obj.items()}
 
         # pop and verify class and module name, then parse the class content
         class_name = obj.pop('__class__')
@@ -123,9 +125,11 @@ class _FreeOrionAISaveGameDecoder(json.JSONDecoder):
         if isinstance(x, list):
             return list(self.__interpret(element) for element in x)
 
-        # encode a unicode str according to systems standard encoding
-        if isinstance(x, unicode):
-            x = x.encode('utf-8')
+        if six.PY2:
+            # encode a unicode str(six.text_type)
+            # according to systems standard encoding
+            if isinstance(x, six.text_type):
+                x = x.encode('utf-8')
 
         # if it is a string, check if it encodes another data type
         if isinstance(x, str):

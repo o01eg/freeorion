@@ -1009,9 +1009,16 @@ class AIstate(object):
     def __report_exploration_status(self):
         universe = fo.getUniverse()
         explored_system_ids = self.get_explored_system_ids()
-        debug("Unexplored Systems: %s " % map(universe.getSystem, self.get_unexplored_system_ids()))
-        debug("Explored SystemIDs: %s" % map(universe.getSystem, explored_system_ids))
+        debug("Unexplored Systems: %s " % [universe.getSystem(sys_id) for sys_id in self.get_unexplored_system_ids()])
+        debug("Explored SystemIDs: %s" % [universe.getSystem(sys_id) for sys_id in explored_system_ids])
         debug("Explored PlanetIDs: %s" % PlanetUtilsAI.get_planets_in__systems_ids(explored_system_ids))
+
+    def log_alliance_request(self, initiating_empire_id, recipient_empire_id):
+        """Keep a record of alliance requests made or received by this empire."""
+
+        alliance_requests = self.diplomatic_logs.setdefault('alliance_requests', {})
+        log_index = (initiating_empire_id, recipient_empire_id)
+        alliance_requests.setdefault(log_index, []).append(fo.currentTurn())
 
     def log_peace_request(self, initiating_empire_id, recipient_empire_id):
         """Keep a record of peace requests made or received by this empire."""

@@ -1227,6 +1227,12 @@ Use part-based upkeep
 RULE_SHIP_PART_BASED_UPKEEP_DESC
 Calculate upkeep based on ship parts instead of ships themselves.
 
+RULE_ENABLE_ALLIED_REPAIR
+Drydocks and Fleet Field Repair repair allied ships
+
+RULE_ENABLE_ALLIED_REPAIR_DESC
+Allow Drydocks building and Fleet Field Repair tech to repair ships of allied empires.
+
 RULE_SHOW_DETAILED_EMPIRES_DATA
 Show detailed empires data
 
@@ -1329,6 +1335,9 @@ Render gassy substance around systems to give galaxy shape. May slow rendering o
 
 OPTIONS_DB_GALAXY_MAP_STARFIELDS
 Render star fields around systems. May slow rendering on older systems.
+
+OPTIONS_DB_GALAXY_MAP_STARFIELDS_SCALE
+Sets size of star fields around systems.
 
 OPTIONS_DB_GALAXY_MAP_SCALE_LINE
 Show scale line for universe distance on galaxy map.
@@ -2873,6 +2882,9 @@ Galaxy map gas rendering
 
 OPTIONS_GALAXY_MAP_STARFIELDS
 Galaxy map star fields rendering
+
+OPTIONS_GALAXY_MAP_STARFIELDS_SCALE
+Galaxy map star fields star size
 
 OPTIONS_GALAXY_MAP_SCALE_LINE
 Galaxy distance scale line
@@ -6386,6 +6398,9 @@ Hull
 ATTACK
 Total Weapon Damage
 
+PRODUCTION_COST
+Production Cost
+
 OBJECT_TYPE
 Type
 
@@ -6436,6 +6451,9 @@ Next System
 
 PREV_SYSTEM
 Previous System
+
+ARRIVAL_STARLANE
+Arrived From System
 
 LAST_TURN_BATTLE_HERE
 Last Turn Battle Here
@@ -12730,7 +12748,7 @@ BLD_GATEWAY_VOID
 Gateway to the Void
 
 BLD_GATEWAY_VOID_DESC
-'''The ability to close off a system almost entirely can be useful for an empire on the defensive. Any ships who enter this system without passing through on the same turn are destroyed, and all colonies within are immediately reduced to [[encyclopedia OUTPOSTS_TITLE]] status. The [[metertype METER_STEALTH]] of all objects within the system is increased by 1000, making them almost impossible to detect.
+'''The ability to close off a system almost entirely can be useful for an empire on the defensive. Any ships that enter this system without passing through on the same turn are destroyed, and all colonies within are immediately reduced to [[encyclopedia OUTPOSTS_TITLE]] status. The [[metertype METER_STEALTH]] of all objects within the system is increased by 1000, making them almost impossible to detect.
 
 A dimensional tear capable of magnifying the destructive potential of the Void Mind in a localized region.'''
 
@@ -12947,7 +12965,7 @@ BLD_GAS_GIANT_GEN
 Gas Giant Generator
 
 BLD_GAS_GIANT_GEN_DESC
-'''This building can only be constructed at a [[PT_GASGIANT]] and gives a +10 [[metertype METER_INDUSTRY]] bonus to planets with the Industry focus in the same system. If the [[BLD_GAS_GIANT_GEN]] is build on an inhabited gas giant it gives only a +5 [[metertype METER_INDUSTRY]] bonus.
+'''This building can only be constructed at a [[PT_GASGIANT]] and gives a +10 [[metertype METER_INDUSTRY]] bonus to planets with the Industry focus in the same system. If the [[BLD_GAS_GIANT_GEN]] is built on an inhabited gas giant it gives only a +5 [[metertype METER_INDUSTRY]] bonus.
 Multiple copies in the same system do not stack.
 
 A power generator designed to harvest the energy of a [[PT_GASGIANT]].'''
@@ -13306,7 +13324,7 @@ SR_WEAPON_0_1
 Flak Cannon
 
 SR_WEAPON_0_1_DESC
-'''The flak cannon does negligible damage to most ships, but is inexpensive and effective at destroying fighters.
+'''The flak cannon is inexpensive and effective at destroying fighters, but does not target ships or planets.
 
 Each flak cannon on a ship built by a species with the piloting trait will have an additional number of shots equal to 1 per piloting level (-1 shot for Bad Pilots).'''
 
@@ -14233,7 +14251,7 @@ SH_BASIC_SMALL
 Basic Small Hull
 
 SH_BASIC_SMALL_DESC
-'''A small, basic interstellar hull. It has only one external slot but can make an extra jump compared to other basic hulls.
+'''A small, basic interstellar hull. It has only one external slot but is very efficient at starlane travel.
 
 [[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is medium and [[metertype METER_SPEED]] is average.
 
@@ -14274,7 +14292,7 @@ SH_COLONY_BASE
 Colony Base Hull
 
 SH_COLONY_BASE_DESC
-'''A hull designed to create a colony on another planet in system. It cannot move between systems or move quickly in-system and consequently has only one internal slot.
+'''A hull designed to create a colony on another planet in system. It cannot move between systems or move quickly in-system and consequently has only three internal slots.
 
 [[metertype METER_STEALTH]] is medium and [[metertype METER_DETECTION]] is medium.'''
 
@@ -15152,13 +15170,23 @@ Outpost
 
 # %1% FIXME
 # %2% FIXME
+NATIVE_PLANETARY_DETECTION_LABEL
+%2% Native Planetary Detection
+
+# %1% FIXME
+# %2% FIXME
 NATIVE_PLANETARY_DEFENSE_LABEL
-%2% Planetary Defense
+%2% Native Planetary Defense
 
 # %1% FIXME
 # %2% FIXME
 NATIVE_PLANETARY_SHIELDS_LABEL
-%2% Planetary Shields
+%2% Native Planetary Shields
+
+# %1% FIXME
+# %2% FIXME
+NATIVE_PLANETARY_TROOPS_LABEL
+%2% Native Planetary Troops
 
 VERY_BRIGHT_STAR
 Very bright star
@@ -15494,6 +15522,43 @@ Krill Spawner
 ##
 ## AI diplomacy strings and lists
 ##
+
+
+# Newline separated list of polite alliance proposal acknowlegements.
+AI_ALLIANCE_PROPOSAL_ACKNOWLEDGEMENTS_MILD_LIST
+'''Nice to hear from you again.
+Receipt of transmission acknowledged.
+'''
+
+# Newline separated list of harsh alliance proposal acknowlegements.
+AI_ALLIANCE_PROPOSAL_ACKNOWLEDGEMENTS_HARSH_LIST
+'''If you cannot sustain your own ambitions, you are unworthy of our help.
+Please find another benefactor to leech sustenance from.
+'''
+
+# Newline separated list of polite positive alliance proposal acknowlegements.
+AI_ALLIANCE_PROPOSAL_RESPONSES_YES_MILD_LIST
+'''Our empires will benefit from mutual support and collaboration.
+We are honoured to work more closely together towards our mutual success.
+'''
+
+# Newline separated list of polite negative alliance proposal acknowlegements.
+AI_ALLIANCE_PROPOSAL_RESPONSES_NO_MILD_LIST
+'''We do not believe such an agreement would be to our mutual benefit at this time.
+We cannot spare the resources that such an agreement would require of us.
+'''
+
+# Newline separated list of harsh positive alliance proposal acknowlegements.
+AI_ALLIANCE_PROPOSAL_RESPONSES_YES_HARSH_LIST
+'''We reluctantly agree to support your futile efforts.
+Perhaps we will find amusement from prolonging your hopeless struggles.
+'''
+
+# Newline separated list of harsh negative alliance proposal acknowlegements.
+AI_ALLIANCE_PROPOSAL_RESPONSES_NO_HARSH_LIST
+'''We would never agree to share our resources with you!
+You are wholely unworthy of such trust and support.
+'''
 
 # Newline separated list of polite peace proposal acknowlegements.
 AI_PEACE_PROPOSAL_ACKNOWLEDGEMENTS_MILD_LIST
@@ -16441,6 +16506,7 @@ Imlach
 Imra
 Incedius
 Ingwaz
+Interrobang
 Inti
 Inupiaq
 Ioram
@@ -19143,9 +19209,15 @@ SHIP_NAME_DEVS
 Aquataine
 Big Joe
 Cami
+Cjkjvfnby
+Dbenage-CX
 Dilvish
 Eleazar
 Geoff the Medio
+LGM-Doyle
+Morlic
+O01eg
+Ophiuchusagrrr
 PD
 Tyreth
 Tzlaine

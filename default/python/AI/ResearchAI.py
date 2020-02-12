@@ -5,6 +5,7 @@ from logging import warn, debug
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
 from common.print_utils import print_in_columns
+from common import six
 
 import AIDependencies as Dep
 import AIstate
@@ -389,7 +390,7 @@ def init():
     )
 
     for k, v in tech_handlers:
-        if isinstance(k, basestring):
+        if isinstance(k, six.string_types):
             k = (k, )  # wrap single techs to tuple
         for tech in k:
             priority_funcs[tech] = v
@@ -481,7 +482,7 @@ def generate_research_orders():
 
     # inherited priorities are modestly attenuated by total time
     timescale_period = 30.0
-    for tech_name, priority in base_priorities.iteritems():
+    for tech_name, priority in base_priorities.items():
         if priority >= 0:
             turns_needed = max(research_reqs[tech_name][REQS_TIME_IDX], math.ceil(float(research_reqs[tech_name][REQS_COST_IDX]) / total_rp))
             time_attenuation = 2**(-max(0.0, turns_needed - 5) / timescale_period)
@@ -492,7 +493,7 @@ def generate_research_orders():
                     on_path_to[prereq] = tech_name
 
     # final priorities are scaled by a combination of relative per-turn cost and relative total cost
-    for tech_name, priority in priorities.iteritems():
+    for tech_name, priority in priorities.items():
         if priority >= 0:
             relative_turn_cost = max(research_reqs[tech_name][REQS_PER_TURN_COST_IDX], 0.1) / total_rp
             relative_total_cost = max(research_reqs[tech_name][REQS_COST_IDX], 0.1) / total_rp

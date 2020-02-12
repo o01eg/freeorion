@@ -8,7 +8,6 @@
 #include "Ship.h"
 #include "System.h"
 #include "UniverseObject.h"
-#include "ValueRef.h"
 #include "Universe.h"
 #include "Predicates.h"
 
@@ -607,7 +606,7 @@ namespace {
                 }
 
                 // Discard edge if it finds a contained object or matches either system for visitor
-                for (auto object : EmpireKnownObjects(m_empire_id).FindObjects(*m_pred.get())) {
+                for (auto object : EmpireKnownObjects(m_empire_id).find(*m_pred.get())) {
                     if (!object)
                         continue;
                     // object is destination system
@@ -1351,10 +1350,10 @@ int Pathfinder::NearestSystemTo(double x, double y) const
 { return pimpl->NearestSystemTo(x, y); }
 
 int Pathfinder::PathfinderImpl::NearestSystemTo(double x, double y) const {
-    double min_dist2 = DBL_MAX;
+    double min_dist2 = std::numeric_limits<double>::max();
     int min_dist2_sys_id = INVALID_OBJECT_ID;
 
-    auto systems = Objects().FindObjects<System>();
+    auto systems = Objects().all<System>();
 
     for (auto const& system : systems) {
         double xs = system->X();

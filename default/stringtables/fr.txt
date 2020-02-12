@@ -1227,6 +1227,12 @@ Activer Entretien des Équipements
 RULE_SHIP_PART_BASED_UPKEEP_DESC
 Calculer le coût d'entretien selon les équipements de l'astronef plutôt que selon le modèle d'astronef lui-même.
 
+RULE_ENABLE_ALLIED_REPAIR
+Réparation en Cale Sèche et Spatiale pour astronefs alliés
+
+RULE_ENABLE_ALLIED_REPAIR_DESC
+Autorise la structure Cale Sèche Orbitale et la technologie Réparation Spatiale à réparer les astronefs des empires alliés.
+
 RULE_SHOW_DETAILED_EMPIRES_DATA
 Afficher les données détaillées des empires
 
@@ -1329,6 +1335,9 @@ Rendu de la densité gazeuse qui donne sa forme à la galaxie. Peut ralentir l'a
 
 OPTIONS_DB_GALAXY_MAP_STARFIELDS
 Rendu du champ d'étoiles sur lequel se détachent les systèmes. Peut ralentir l'affichage sur les machines les plus anciennes.
+
+OPTIONS_DB_GALAXY_MAP_STARFIELDS_SCALE
+Fixe la taille du fond stellaire autour des systèmes.
 
 OPTIONS_DB_GALAXY_MAP_SCALE_LINE
 Affiche la barre d'échelle des distances sur la carte galactique.
@@ -2872,7 +2881,10 @@ OPTIONS_GALAXY_MAP_GAS
 Rendu du fond nébuleux de la galaxie
 
 OPTIONS_GALAXY_MAP_STARFIELDS
-Rendu du fond étoilé de la galaxie
+Rendu du fond stellaire de la galaxie
+
+OPTIONS_GALAXY_MAP_STARFIELDS_SCALE
+Taille des étoiles du fond stellaire de la galaxie
 
 OPTIONS_GALAXY_MAP_SCALE_LINE
 Barre d'échelle des distances galactiques
@@ -13306,7 +13318,7 @@ SR_WEAPON_0_1
 Canon Antiaérien
 
 SR_WEAPON_0_1_DESC
-'''Le Canon Antiaérien inflige des dommages négligeables à la plupart des astronefs, mais reste bon marché et efficace pour contrer les chasseurs.
+'''Le Canon Antiaérien est peu coûteux et efficace pour contrer les chasseurs, mais ne permet pas de cibler les astronefs et planètes.
 
 Chaque Canon Antiaérien monté sur un astronef construit par une espèce présentant l'attribut "Pilotes", aura un nombre additionnel de tirs égal à 1 par rang de Pilotes (-1 tir pour "Mauvais Pilotes").'''
 
@@ -14233,7 +14245,7 @@ SH_BASIC_SMALL
 Coque Basique Légère
 
 SH_BASIC_SMALL_DESC
-'''Une petite coque interstellaire de base pour astronef. Ne dispose que d'une niche externe, mais comparée aux autres coques de base, elle est capable d'effectuer un voyage supplémentaire sur une Voie spatiale.
+'''Une petite coque interstellaire de base pour astronef. Ne dispose que d'une niche externe, mais est très efficace en matière de voyage sur Voies spatiales.
 
 Sa [[metertype METER_STEALTH]] est standard de même que son [[metertype METER_DETECTION]], tandis que sa [[metertype METER_SPEED]] est moyenne.
 
@@ -14274,7 +14286,7 @@ SH_COLONY_BASE
 Coque Colon Stellaire
 
 SH_COLONY_BASE_DESC
-'''Une coque conçue pour le transport de colons et la création d'une colonie sur une autre planète du système où elle a été produite. Elle ne peut pas voyager sur les Voies spatiales entre les systèmes stellaires, pas plus qu'elle n'est rapide dans son propre système. Étant donné son rôle, elle dispose seulement d'une niche interne.
+'''Une coque conçue pour le transport de colons et la création d'une colonie sur une autre planète du système où elle a été produite. Elle ne peut pas voyager sur les Voies spatiales entre les systèmes stellaires, pas plus qu'elle n'est rapide dans son propre système. Étant donné son rôle, elle dispose seulement de trois niches internes.
 
 Sa [[metertype METER_STEALTH]] est standard de même que son [[metertype METER_DETECTION]].'''
 

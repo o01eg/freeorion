@@ -51,7 +51,6 @@
 #include "../network/ClientNetworking.h"
 #include "../client/human/HumanClientApp.h"
 
-#include <boost/timer.hpp>
 #include <boost/graph/graph_concepts.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/optional/optional.hpp>
@@ -112,18 +111,19 @@ namespace {
     void AddOptions(OptionsDB& db) {
         db.Add("ui.map.background.gas.shown",               UserStringNop("OPTIONS_DB_GALAXY_MAP_GAS"),                         true,                           Validator<bool>());
         db.Add("ui.map.background.starfields.shown",        UserStringNop("OPTIONS_DB_GALAXY_MAP_STARFIELDS"),                  true,                           Validator<bool>());
+        db.Add("ui.map.background.starfields.scale",        UserStringNop("OPTIONS_DB_GALAXY_MAP_STARFIELDS_SCALE"),            1.0,                            RangedStepValidator<double>(0.2, 0.2, 4.0));
 
         db.Add("ui.map.scale.legend.shown",                 UserStringNop("OPTIONS_DB_GALAXY_MAP_SCALE_LINE"),                  true,                           Validator<bool>());
         db.Add("ui.map.scale.circle.shown",                 UserStringNop("OPTIONS_DB_GALAXY_MAP_SCALE_CIRCLE"),                false,                          Validator<bool>());
 
         db.Add("ui.map.zoom.slider.shown",                  UserStringNop("OPTIONS_DB_GALAXY_MAP_ZOOM_SLIDER"),                 false,                          Validator<bool>());
 
-        db.Add("ui.map.starlane.thickness",                 UserStringNop("OPTIONS_DB_STARLANE_THICKNESS"),                     2.0,                            RangedStepValidator<double>(0.25, 0.25, 10.0));
+        db.Add("ui.map.starlane.thickness",                 UserStringNop("OPTIONS_DB_STARLANE_THICKNESS"),                     2.0,                            RangedStepValidator<double>(0.2, 0.2, 10.0));
         db.Add("ui.map.starlane.thickness.factor",          UserStringNop("OPTIONS_DB_STARLANE_CORE"),                          2.0,                            RangedStepValidator<double>(1.0, 1.0, 10.0));
         db.Add("ui.map.starlane.empire.color.shown",        UserStringNop("OPTIONS_DB_RESOURCE_STARLANE_COLOURING"),            true,                           Validator<bool>());
 
         db.Add("ui.map.fleet.supply.shown",                 UserStringNop("OPTIONS_DB_FLEET_SUPPLY_LINES"),                     true,                           Validator<bool>());
-        db.Add("ui.map.fleet.supply.width",                 UserStringNop("OPTIONS_DB_FLEET_SUPPLY_LINE_WIDTH"),                3.0,                            RangedStepValidator<double>(0.25, 0.25, 10.0));
+        db.Add("ui.map.fleet.supply.width",                 UserStringNop("OPTIONS_DB_FLEET_SUPPLY_LINE_WIDTH"),                3.0,                            RangedStepValidator<double>(0.2, 0.2, 10.0));
         db.Add("ui.map.fleet.supply.dot.spacing",           UserStringNop("OPTIONS_DB_FLEET_SUPPLY_LINE_DOT_SPACING"),          20,                             RangedStepValidator<int>(1, 3, 40));
         db.Add("ui.map.fleet.supply.dot.rate",              UserStringNop("OPTIONS_DB_FLEET_SUPPLY_LINE_DOT_RATE"),             0.02,                           RangedStepValidator<double>(0.01, 0.01, 0.1));
 
@@ -136,14 +136,14 @@ namespace {
         db.Add("ui.map.detection.range.shown",              UserStringNop("OPTIONS_DB_GALAXY_MAP_DETECTION_RANGE"),             true,                           Validator<bool>());
 
         db.Add("ui.map.scanlines.shown",                    UserStringNop("OPTIONS_DB_UI_SYSTEM_FOG"),                          true,                           Validator<bool>());
-        db.Add("ui.map.system.scanlines.spacing",           UserStringNop("OPTIONS_DB_UI_SYSTEM_FOG_SPACING"),                  4.0,                            RangedStepValidator<double>(0.25, 1.5, 8.0));
+        db.Add("ui.map.system.scanlines.spacing",           UserStringNop("OPTIONS_DB_UI_SYSTEM_FOG_SPACING"),                  4.0,                            RangedStepValidator<double>(0.2, 1.4, 8.0));
         db.Add("ui.map.system.scanlines.color",             UserStringNop("OPTIONS_DB_UI_SYSTEM_FOG_CLR"),                      GG::Clr(36, 36, 36, 192),       Validator<GG::Clr>());
         db.Add("ui.map.field.scanlines.color",              UserStringNop("OPTIONS_DB_UI_FIELD_FOG_CLR"),                       GG::Clr(0, 0, 0, 64),           Validator<GG::Clr>());
 
         db.Add("ui.map.system.icon.size",                   UserStringNop("OPTIONS_DB_UI_SYSTEM_ICON_SIZE"),                    14,                             RangedValidator<int>(8, 50));
 
         db.Add("ui.map.system.circle.shown",                UserStringNop("OPTIONS_DB_UI_SYSTEM_CIRCLES"),                      true,                           Validator<bool>());
-        db.Add("ui.map.system.circle.size",                 UserStringNop("OPTIONS_DB_UI_SYSTEM_CIRCLE_SIZE"),                  1.5,                            RangedStepValidator<double>(0.125, 1.0, 2.5));
+        db.Add("ui.map.system.circle.size",                 UserStringNop("OPTIONS_DB_UI_SYSTEM_CIRCLE_SIZE"),                  1.5,                            RangedStepValidator<double>(0.1, 1.0, 2.5));
         db.Add("ui.map.system.circle.inner.width",          UserStringNop("OPTIONS_DB_UI_SYSTEM_INNER_CIRCLE_WIDTH"),           2.0,                            RangedStepValidator<double>(0.5, 1.0, 8.0));
         db.Add("ui.map.system.circle.outer.width",          UserStringNop("OPTIONS_DB_UI_SYSTEM_OUTER_CIRCLE_WIDTH"),           2.0,                            RangedStepValidator<double>(0.5, 1.0, 8.0));
         db.Add("ui.map.system.circle.inner.max.width",      UserStringNop("OPTIONS_DB_UI_SYSTEM_INNER_CIRCLE_MAX_WIDTH"),       5.0,                            RangedStepValidator<double>(0.5, 1.0, 12.0));
@@ -153,14 +153,14 @@ namespace {
 
         db.Add("ui.map.system.icon.tiny.threshold",         UserStringNop("OPTIONS_DB_UI_SYSTEM_TINY_ICON_SIZE_THRESHOLD"),     10,                             RangedValidator<int>(1, 16));
 
-        db.Add("ui.map.system.select.indicator.size",       UserStringNop("OPTIONS_DB_UI_SYSTEM_SELECTION_INDICATOR_SIZE"),     1.625,                          RangedStepValidator<double>(0.125, 0.5, 5));
+        db.Add("ui.map.system.select.indicator.size",       UserStringNop("OPTIONS_DB_UI_SYSTEM_SELECTION_INDICATOR_SIZE"),     1.6,                            RangedStepValidator<double>(0.1, 0.5, 5));
         db.Add("ui.map.system.select.indicator.rpm",        UserStringNop("OPTIONS_DB_UI_SYSTEM_SELECTION_INDICATOR_FPS"),      12,                             RangedValidator<int>(1, 60));
 
         db.Add("ui.map.system.unowned.name.color",          UserStringNop("OPTIONS_DB_UI_SYSTEM_NAME_UNOWNED_COLOR"),           GG::Clr(160, 160, 160, 255),    Validator<GG::Clr>());
 
-        db.Add("ui.map.fleet.button.tiny.zoom.threshold",   UserStringNop("OPTIONS_DB_UI_TINY_FLEET_BUTTON_MIN_ZOOM"),          0.75,                           RangedStepValidator<double>(0.125, 0.125, 4.0));
-        db.Add("ui.map.fleet.button.small.zoom.threshold",  UserStringNop("OPTIONS_DB_UI_SMALL_FLEET_BUTTON_MIN_ZOOM"),         1.50,                           RangedStepValidator<double>(0.125, 0.125, 4.0));
-        db.Add("ui.map.fleet.button.medium.zoom.threshold", UserStringNop("OPTIONS_DB_UI_MEDIUM_FLEET_BUTTON_MIN_ZOOM"),        4.00,                           RangedStepValidator<double>(0.125, 0.125, 4.0));
+        db.Add("ui.map.fleet.button.tiny.zoom.threshold",   UserStringNop("OPTIONS_DB_UI_TINY_FLEET_BUTTON_MIN_ZOOM"),          0.8,                            RangedStepValidator<double>(0.1, 0.1, 4.0));
+        db.Add("ui.map.fleet.button.small.zoom.threshold",  UserStringNop("OPTIONS_DB_UI_SMALL_FLEET_BUTTON_MIN_ZOOM"),         1.50,                           RangedStepValidator<double>(0.1, 0.1, 4.0));
+        db.Add("ui.map.fleet.button.medium.zoom.threshold", UserStringNop("OPTIONS_DB_UI_MEDIUM_FLEET_BUTTON_MIN_ZOOM"),        4.00,                           RangedStepValidator<double>(0.1, 0.1, 4.0));
 
         db.Add("ui.map.detection.range.opacity",            UserStringNop("OPTIONS_DB_GALAXY_MAP_DETECTION_RANGE_OPACITY"),     3,                              RangedValidator<int>(0, 8));
 
@@ -472,7 +472,7 @@ namespace {
                 return;
 
             const auto& destroyed_objects = GetUniverse().EmpireKnownDestroyedObjectIDs(m_empire_id);
-            for (auto& ship : Objects().FindObjects<Ship>()) {
+            for (auto& ship : Objects().all<Ship>()) {
                 if (!ship->OwnedBy(m_empire_id) || destroyed_objects.count(ship->ID()))
                     continue;
                 m_values[FLEET_DETAIL_SHIP_COUNT]++;
@@ -973,46 +973,7 @@ MapWnd::MapWnd() :
     GG::Wnd(-AppWidth(), -AppHeight(),
             static_cast<GG::X>(GetUniverse().UniverseWidth() * ZOOM_MAX + AppWidth() * 1.5),
             static_cast<GG::Y>(GetUniverse().UniverseWidth() * ZOOM_MAX + AppHeight() * 1.5),
-            GG::INTERACTIVE | GG::DRAGABLE),
-    m_selected_fleet_ids(),
-    m_selected_ship_ids(),
-    m_system_icons(),
-    m_wnd_stack(),
-    m_starlane_endpoints(),
-    m_stationary_fleet_buttons(),
-    m_departing_fleet_buttons(),
-    m_moving_fleet_buttons(),
-    m_offroad_fleet_buttons(),
-    m_fleet_buttons(),
-    m_fleet_state_change_signals(),
-    m_system_fleet_insert_remove_signals(),
-    m_fleet_lines(),
-    m_projected_fleet_lines(),
-    m_line_between_systems{INVALID_OBJECT_ID, INVALID_OBJECT_ID},
-    m_star_core_quad_vertices(),
-    m_star_halo_quad_vertices(),
-    m_galaxy_gas_quad_vertices(),
-    m_galaxy_gas_texture_coords(),
-    m_star_texture_coords(),
-    m_star_circle_vertices(),
-    m_starlane_vertices(),
-    m_starlane_colors(),
-    m_RC_starlane_vertices(),
-    m_RC_starlane_colors(),
-    m_field_vertices(),
-    m_field_scanline_circles(),
-    m_field_texture_coords(),
-    m_visibility_radii_vertices(),
-    m_visibility_radii_colors(),
-    m_visibility_radii_border_vertices(),
-    m_visibility_radii_border_colors(),
-    m_radii_radii_vertices_indices_runs(),
-    m_scale_circle_vertices(),
-    m_starfield_verts(),
-    m_starfield_colours(),
-    m_popups(),
-    m_current_owned_system(INVALID_OBJECT_ID),
-    m_current_fleet_id(INVALID_OBJECT_ID)
+            GG::INTERACTIVE | GG::DRAGABLE)
 {}
 
 void MapWnd::CompleteConstruction() {
@@ -1874,7 +1835,8 @@ void MapWnd::RenderStarfields() {
     }
 
 
-    glPointSize(std::min(5.0, 0.5 * ZoomFactor()));
+    float point_star_scale = GetOptionsDB().Get<double>("ui.map.background.starfields.scale");
+    glPointSize(point_star_scale * std::max(1.0, std::sqrt(ZoomFactor())));
     glEnable(GL_POINT_SMOOTH);
     glDisable(GL_TEXTURE_2D);
 
@@ -2106,7 +2068,7 @@ void MapWnd::RenderSystems() {
                     std::map<int, int> colony_count_by_empire_id;
                     const std::set<int>& known_destroyed_object_ids = GetUniverse().EmpireKnownDestroyedObjectIDs(HumanClientApp::GetApp()->EmpireID());
 
-                    for (auto& planet : Objects().FindObjects<const Planet>(system->PlanetIDs())) {
+                    for (auto& planet : Objects().find<const Planet>(system->PlanetIDs())) {
                         if (known_destroyed_object_ids.count(planet->ID()) > 0)
                             continue;
 
@@ -2269,7 +2231,6 @@ void MapWnd::RenderFleetMovementLines() {
     // texture for dots
     auto move_line_dot_texture = MoveLineDotTexture();
     float dot_size = Value(move_line_dot_texture->DefaultWidth());
-    //std::cout << "dot size: " << dot_size << std::endl;
 
     // texture coords
     if (dot_star_texture_coords.empty()) {
@@ -2409,7 +2370,6 @@ void MapWnd::RenderMovementLine(const MapWnd::MovementLineData& move_line, float
     dot_vertices_buffer.activate();
     dot_star_texture_coords.activate();
     glDrawArrays(GL_QUADS, 0, dot_vertices_buffer.size());
-    //std::cout << "dot verts buffer size: " << dot_vertices_buffer.size() << std::endl;
 }
 
 void MapWnd::RenderMovementLineETAIndicators(const MapWnd::MovementLineData& move_line,
@@ -2753,7 +2713,7 @@ void MapWnd::EnableOrderIssuing(bool enable/* = true*/) {
 void MapWnd::InitTurn() {
     int turn_number = CurrentTurn();
     DebugLogger() << "Initializing turn " << turn_number;
-    SectionedScopedTimer timer("MapWnd::InitTurn", std::chrono::milliseconds(1));
+    SectionedScopedTimer timer("MapWnd::InitTurn");
     timer.EnterSection("init");
 
     //DebugLogger() << GetSupplyManager().Dump();
@@ -2762,7 +2722,7 @@ void MapWnd::InitTurn() {
     ObjectMap& objects = Objects();
 
     TraceLogger(effects) << "MapWnd::InitTurn initial:";
-    for (auto obj : objects)
+    for (auto obj : objects.all())
         TraceLogger(effects) << obj->Dump();
 
     timer.EnterSection("system graph");
@@ -2790,15 +2750,39 @@ void MapWnd::InitTurn() {
 
     timer.EnterSection("fleet signals");
     // connect system fleet add and remove signals
-    for (auto& system : objects.FindObjects<System>()) {
+    for (auto& system : objects.all<System>()) {
         m_system_fleet_insert_remove_signals[system->ID()].push_back(system->FleetsInsertedSignal.connect(
-            boost::bind(&MapWnd::FleetsInsertedSignalHandler, this, _1)));
+            [this](const std::vector<std::shared_ptr<Fleet>>& fleets) {
+                RefreshFleetButtons();
+                for (auto& fleet : fleets) {
+                    if (!m_fleet_state_change_signals.count(fleet->ID()))
+                        m_fleet_state_change_signals[fleet->ID()] = fleet->StateChangedSignal.connect(
+                            boost::bind(&MapWnd::RefreshFleetButtons, this));
+                }
+            }));
         m_system_fleet_insert_remove_signals[system->ID()].push_back(system->FleetsRemovedSignal.connect(
-            boost::bind(&MapWnd::FleetsRemovedSignalHandler, this, _1)));
+            [this](const std::vector<std::shared_ptr<Fleet>>& fleets) {
+                RefreshFleetButtons();
+                for (auto& fleet : fleets) {
+                    auto found_signal = m_fleet_state_change_signals.find(fleet->ID());
+                    if (found_signal != m_fleet_state_change_signals.end()) {
+                        found_signal->second.disconnect();
+                        m_fleet_state_change_signals.erase(found_signal);
+                    }
+                }
+            }));
     }
 
-    RefreshFleetSignals();
+    for (auto& con : m_fleet_state_change_signals)
+        con.second.disconnect();
+    m_fleet_state_change_signals.clear();
 
+    // connect fleet change signals to update fleet movement lines, so that ordering
+    // fleets to move updates their displayed path and rearranges fleet buttons (if necessary)
+    for (auto& fleet : Objects().all<Fleet>()) {
+        m_fleet_state_change_signals[fleet->ID()] = fleet->StateChangedSignal.connect(
+            boost::bind(&MapWnd::RefreshFleetButtons, this));
+    }
 
     // set turn button to current turn
     m_btn_turn->SetText(boost::io::str(FlexibleFormat(UserString("MAP_BTN_TURN_UPDATE")) %
@@ -2891,7 +2875,7 @@ void MapWnd::InitTurn() {
 
     if (turn_number == 1 && this_client_empire) {
         // start first turn with player's system selected
-        if (auto obj = objects.Object(this_client_empire->CapitalID())) {
+        if (auto obj = objects.get(this_client_empire->CapitalID())) {
             SelectSystem(obj->SystemID());
             CenterOnMapCoord(obj->X(), obj->Y());
         }
@@ -2982,7 +2966,7 @@ void MapWnd::InitTurnRendering() {
     m_system_icons.clear();
 
     // create system icons
-    for (auto& sys : objects.FindObjects<System>()) {
+    for (auto& sys : objects.all<System>()) {
         int sys_id = sys->ID();
 
         // skip known destroyed objects
@@ -3029,7 +3013,7 @@ void MapWnd::InitTurnRendering() {
     m_field_icons.clear();
 
     // create field icons
-    for (auto& field : objects.FindObjects<Field>()) {
+    for (auto& field : objects.all<Field>()) {
         int fld_id = field->ID();
 
         // skip known destroyed and stale fields
@@ -3646,7 +3630,6 @@ namespace {
                 auto dest_system = GetSystem(render_lane.first);
                 if (!dest_system)
                     continue;
-                //std::cout << "colouring lanes between " << start_system->Name() << " and " << dest_system->Name() << std::endl;
 
 
                 // check that this lane isn't already in map / being rendered.
@@ -3656,7 +3639,6 @@ namespace {
                 already_rendered_full_lanes.insert({dest_system->ID(), start_system->ID()});
 
 
-                //std::cout << "adding full length lane" << std::endl;
                 // add vertices for this full-length starlane
                 LaneEndpoints lane_endpoints = StarlaneEndPointsFromSystemPositions(start_system->X(), start_system->Y(), dest_system->X(), dest_system->Y());
                 starlane_vertices.store(lane_endpoints.X1, lane_endpoints.Y1);
@@ -3670,15 +3652,12 @@ namespace {
                     Empire* empire = entry.second;
                     const auto& resource_supply_lanes = GetSupplyManager().SupplyStarlaneTraversals(entry.first);
 
-                    //std::cout << "resource supply starlane traversals for empire " << empire->Name() << ": " << resource_supply_lanes.size() << std::endl;
-
                     std::pair<int, int> lane_forward{start_system->ID(), dest_system->ID()};
                     std::pair<int, int> lane_backward{dest_system->ID(), start_system->ID()};
 
                     // see if this lane exists in this empire's supply propagation lanes set.  either direction accepted.
                     if (resource_supply_lanes.count(lane_forward) || resource_supply_lanes.count(lane_backward)) {
                         lane_colour = empire->Color();
-                        //std::cout << "selected colour of empire " << empire->Name() << " for this full lane" << std::endl;
                         break;
                     }
                 }
@@ -3686,8 +3665,6 @@ namespace {
                 // vertex colours for starlane
                 starlane_colors.store(lane_colour);
                 starlane_colors.store(lane_colour);
-
-                //DebugLogger() << "adding full lane from " << start_system->Name() << " to " << dest_system->Name();
             }
         }
     }
@@ -4083,12 +4060,11 @@ void MapWnd::InitVisibilityRadiiRenderingBuffers() {
     int client_empire_id = HumanClientApp::GetApp()->EmpireID();
     const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
     const auto& stale_object_ids = GetUniverse().EmpireStaleKnowledgeObjectIDs(client_empire_id);
-    const auto& objects = GetUniverse().Objects();
 
     // for each map position and empire, find max value of detection range at that position
     std::map<std::pair<int, std::pair<float, float>>, float> empire_position_max_detection_ranges;
 
-    for (auto& obj : objects.FindObjects<UniverseObject>()) {
+    for (auto& obj : Objects().all<UniverseObject>()) {
         int object_id = obj->ID();
         // skip destroyed objects
         if (destroyed_object_ids.count(object_id))
@@ -4106,17 +4082,14 @@ void MapWnd::InitVisibilityRadiiRenderingBuffers() {
             continue;
 
         // don't show radii for fleets or moving ships
-        if (obj->ObjectType() == OBJ_FLEET)
+        if (obj->ObjectType() == OBJ_FLEET) {
             continue;
-        if (obj->ObjectType() == OBJ_SHIP) {
+        } else if (obj->ObjectType() == OBJ_SHIP) {
             auto ship = std::dynamic_pointer_cast<const Ship>(obj);
             if (!ship)
                 continue;
-            auto fleet = objects.Object<Fleet>(ship->FleetID());
-            if (!fleet)
-                continue;
-            int cur_id = fleet->SystemID();
-            if (cur_id == INVALID_OBJECT_ID)
+            auto fleet = GetFleet(ship->FleetID());
+            if (!fleet || INVALID_OBJECT_ID == fleet->SystemID())
                 continue;
         }
 
@@ -4529,10 +4502,9 @@ void MapWnd::ReselectLastFleet() {
 
     // search through stored selected fleets' ids and remove ids of missing fleets
     std::set<int> missing_fleets;
-    for (int fleet_id : m_selected_fleet_ids) {
-        auto fleet = objects.Object<Fleet>(fleet_id);
+    for (const auto& fleet : objects.find<Fleet>(m_selected_fleet_ids)) {
         if (!fleet)
-            missing_fleets.insert(fleet_id);
+            missing_fleets.insert(fleet->ID());
     }
     for (int fleet_id : missing_fleets)
         m_selected_fleet_ids.erase(fleet_id);
@@ -4744,7 +4716,7 @@ void MapWnd::ForgetObject(int id) {
     // If there is only 1 ship in a fleet, forget the fleet
     auto ship = std::dynamic_pointer_cast<const Ship>(obj);
     if (ship) {
-        if (auto ship_s_fleet = GetUniverse().Objects().Object<const Fleet>(ship->FleetID())) {
+        if (auto ship_s_fleet = GetUniverse().Objects().get<const Fleet>(ship->FleetID())) {
             bool only_ship_in_fleet = ship_s_fleet->NumShips() == 1;
             if (only_ship_in_fleet)
                 return ForgetObject(ship->FleetID());
@@ -4853,7 +4825,7 @@ void MapWnd::DoFleetButtonsLayout() {
             std::shared_ptr<const Fleet> fleet;
 
             // skip button if it has no fleets (somehow...?) or if the first fleet in the button is 0
-            if (fb->Fleets().empty() || !(fleet = objects.Object<Fleet>(*fb->Fleets().begin()))) {
+            if (fb->Fleets().empty() || !(fleet = objects.get<Fleet>(*fb->Fleets().begin()))) {
                 ErrorLogger() << "DoFleetButtonsLayout couldn't get first fleet for button";
                 continue;
             }
@@ -4877,7 +4849,7 @@ void MapWnd::DoFleetButtonsLayout() {
             std::shared_ptr<const Fleet> fleet;
 
             // skip button if it has no fleets (somehow...?) or if the first fleet in the button is 0
-            if (fb->Fleets().empty() || !(fleet = objects.Object<Fleet>(*fb->Fleets().begin()))) {
+            if (fb->Fleets().empty() || !(fleet = objects.get<Fleet>(*fb->Fleets().begin()))) {
                 ErrorLogger() << "DoFleetButtonsLayout couldn't get first fleet for button";
                 continue;
             }
@@ -5154,52 +5126,6 @@ void MapWnd::DeleteFleetButtons() {
     m_offroad_fleet_buttons.clear();
 }
 
-void MapWnd::RemoveFleetsStateChangedSignal(const std::vector<std::shared_ptr<Fleet>>& fleets) {
-    ScopedTimer timer("RemoveFleetsStateChangedSignal()", true);
-    for (auto& fleet : fleets) {
-        auto found_signal = m_fleet_state_change_signals.find(fleet->ID());
-        if (found_signal != m_fleet_state_change_signals.end()) {
-            found_signal->second.disconnect();
-            m_fleet_state_change_signals.erase(found_signal);
-        }
-    }
-}
-
-void MapWnd::AddFleetsStateChangedSignal(const std::vector<std::shared_ptr<Fleet>>& fleets) {
-    ScopedTimer timer("AddFleetsStateChangedSignal()", true);
-    for (auto& fleet : fleets) {
-        m_fleet_state_change_signals[fleet->ID()] = fleet->StateChangedSignal.connect(
-            boost::bind(&MapWnd::RefreshFleetButtons, this));
-    }
-}
-
-void MapWnd::FleetsInsertedSignalHandler(const std::vector<std::shared_ptr<Fleet>>& fleets) {
-    ScopedTimer timer("FleetsInsertedSignalHandler()", true);
-    RefreshFleetButtons();
-    RemoveFleetsStateChangedSignal(fleets);
-    AddFleetsStateChangedSignal(fleets);
-}
-
-void MapWnd::FleetsRemovedSignalHandler(const std::vector<std::shared_ptr<Fleet>>& fleets) {
-    ScopedTimer timer("FleetsRemovedSignalHandler()", true);
-    RefreshFleetButtons();
-    RemoveFleetsStateChangedSignal(fleets);
-}
-
-void MapWnd::RefreshFleetSignals() {
-    ScopedTimer timer("RefreshFleetSignals()", true);
-    // disconnect old fleet statechangedsignal connections
-    for (auto& con : m_fleet_state_change_signals)
-    { con.second.disconnect(); }
-    m_fleet_state_change_signals.clear();
-
-
-    // connect fleet change signals to update fleet movement lines, so that ordering
-    // fleets to move updates their displayed path and rearranges fleet buttons (if necessary)
-    auto fleets = Objects().FindObjects<Fleet>();
-    AddFleetsStateChangedSignal(fleets);
-}
-
 void MapWnd::RefreshSliders() {
     if (m_zoom_slider) {
         if (GetOptionsDB().Get<bool>("ui.map.zoom.slider.shown") && Visible())
@@ -5434,7 +5360,7 @@ void MapWnd::SystemRightClicked(int system_id, GG::Flags<GG::ModKey> mod_keys) {
             if (!system)
                 return;
 
-            for (auto& obj : Objects().FindObjects<const UniverseObject>(system->ContainedObjectIDs())) {
+            for (auto& obj : Objects().find<const UniverseObject>(system->ContainedObjectIDs())) {
                 UniverseObjectType obj_type = obj->ObjectType();
                 if (obj_type >= OBJ_BUILDING && obj_type < OBJ_SYSTEM) {
                     net.SendMessage(ModeratorActionMessage(
@@ -5643,17 +5569,6 @@ std::vector<int> MapWnd::FleetIDsOfFleetButtonsOverlapping(int fleet_id) const {
                    || test_fb.InWindow(GG::Pt(fleet_btn->Left(), fleet_btn->Bottom()))
                    || test_fb.InWindow(fleet_btn->LowerRight());
 
-        //std::cout << "FleetButton with fleets: ";
-        //for (const auto entry : test_fb.Fleets())
-        //    std::cout << entry << " ";
-        //if (retval)
-        //    std::cout << "  overlaps FleetButton with fleets: ";
-        //else
-        //    std::cout << "  does not overlap FleetButton with fleets: ";
-        //for (const auto entry : fleet_btn->Fleets())
-        //    std::cout << entry << " ";
-        //std::cout << std::endl;
-
         return retval;
     };
 
@@ -5742,10 +5657,6 @@ void MapWnd::FleetButtonLeftClicked(const FleetButton* fleet_btn) {
     if (const auto& wnd_for_button = FleetUIManager::GetFleetUIManager().WndForFleetIDs(fleet_ids_to_include_in_fleet_wnd)) {
         // check which fleet(s) is/are selected in the button's FleetWnd
         auto selected_fleet_ids = wnd_for_button->SelectedFleetIDs();
-        //std::cout << "Initially selected fleets: " << selected_fleet_ids.size() << " : ";
-        //for (auto id : selected_fleet_ids)
-        //    std::cout << id << " ";
-        //std::cout << std::endl;
 
         // record selected fleet if just one fleet is selected.  otherwise, keep default
         // INVALID_OBJECT_ID to indicate that no single fleet is selected
@@ -5954,8 +5865,6 @@ void MapWnd::SelectedShipsChanged() {
 }
 
 void MapWnd::RefreshFleetButtonSelectionIndicators() {
-    //std::cout << "MapWnd::RefreshFleetButtonSelectionIndicators()" << std::endl;
-
     // clear old selection indicators
     for (auto& stationary_fleet_button : m_stationary_fleet_buttons) {
         for (auto& button : stationary_fleet_button.second)
@@ -6743,7 +6652,7 @@ void MapWnd::RefreshFleetResourceIndicator() {
     const auto& this_client_known_destroyed_objects = GetUniverse().EmpireKnownDestroyedObjectIDs(empire_id);
 
     int total_fleet_count = 0;
-    for (auto& ship : Objects().FindObjects<Ship>()) {
+    for (auto& ship : Objects().all<Ship>()) {
         if (ship->OwnedBy(empire_id) && !this_client_known_destroyed_objects.count(ship->ID()))
             total_fleet_count++;
     }
@@ -6903,9 +6812,7 @@ void MapWnd::RefreshPopulationIndicator() {
     const ObjectMap& objects = Objects();
 
     //tally up all species population counts
-    for (int pop_center_id : pop_center_ids) {
-        auto obj = objects.Object(pop_center_id);
-        auto pc = std::dynamic_pointer_cast<const PopCenter>(obj);
+    for (const auto& pc : objects.find<PopCenter>(pop_center_ids)) {
         if (!pc)
             continue;
 
@@ -6971,14 +6878,14 @@ namespace {
     std::set<std::pair<std::string, int>, CustomRowCmp> GetSystemNamesIDs() {
         // get systems, store alphabetized
         std::set<std::pair<std::string, int>, CustomRowCmp> system_names_ids;
-        for (auto& system : Objects().FindObjects<System>()) {
+        for (auto& system : Objects().all<System>()) {
             system_names_ids.insert({system->Name(), system->ID()});
         }
         return system_names_ids;
     }
 
     std::set<std::pair<std::string, int>, CustomRowCmp> GetOwnedSystemNamesIDs(int empire_id) {
-        auto owned_planets = Objects().FindObjects(OwnedVisitor<Planet>(empire_id));
+        auto owned_planets = Objects().find<Planet>(OwnedVisitor<Planet>(empire_id));
 
         // get IDs of systems that contain any owned planets
         std::unordered_set<int> system_ids;
@@ -7097,16 +7004,17 @@ bool MapWnd::ZoomToNextSystem() {
 }
 
 bool MapWnd::ZoomToPrevIdleFleet() {
-    auto vec = GetUniverse().Objects().FindObjectIDs(StationaryFleetVisitor(HumanClientApp::GetApp()->EmpireID()));
-    auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
+    auto vec = GetUniverse().Objects().find<Fleet>(StationaryFleetVisitor(HumanClientApp::GetApp()->EmpireID()));
+    auto it = std::find_if(vec.begin(), vec.end(),
+        [this](const std::shared_ptr<UniverseObject>& o){ return o->ID() == this->m_current_fleet_id; });
     const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
     if (it != vec.begin())
         --it;
     else
         it = vec.end();
-    while (it != vec.begin() && (it == vec.end() || destroyed_object_ids.count(*it)))
+    while (it != vec.begin() && (it == vec.end() || destroyed_object_ids.count((*it)->ID())))
         --it;
-    m_current_fleet_id = it != vec.end() ? *it : vec.empty() ? INVALID_OBJECT_ID : vec.back();
+    m_current_fleet_id = it != vec.end() ? (*it)->ID() : vec.empty() ? INVALID_OBJECT_ID : vec.back()->ID();
 
     if (m_current_fleet_id != INVALID_OBJECT_ID) {
         CenterOnObject(m_current_fleet_id);
@@ -7117,14 +7025,15 @@ bool MapWnd::ZoomToPrevIdleFleet() {
 }
 
 bool MapWnd::ZoomToNextIdleFleet() {
-    auto vec = GetUniverse().Objects().FindObjectIDs(StationaryFleetVisitor(HumanClientApp::GetApp()->EmpireID()));
-    auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
+    auto vec = GetUniverse().Objects().find<Fleet>(StationaryFleetVisitor(HumanClientApp::GetApp()->EmpireID()));
+    auto it = std::find_if(vec.begin(), vec.end(),
+        [this](const std::shared_ptr<UniverseObject>& o){ return o->ID() == this->m_current_fleet_id; });
     const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
     if (it != vec.end())
         ++it;
-    while (it != vec.end() && destroyed_object_ids.count(*it))
+    while (it != vec.end() && destroyed_object_ids.count((*it)->ID()))
         ++it;
-    m_current_fleet_id = it != vec.end() ? *it : vec.empty() ? INVALID_OBJECT_ID : vec.front();
+    m_current_fleet_id = it != vec.end() ? (*it)->ID() : vec.empty() ? INVALID_OBJECT_ID : vec.front()->ID();
 
     if (m_current_fleet_id != INVALID_OBJECT_ID) {
         CenterOnObject(m_current_fleet_id);
@@ -7135,16 +7044,17 @@ bool MapWnd::ZoomToNextIdleFleet() {
 }
 
 bool MapWnd::ZoomToPrevFleet() {
-    auto vec = GetUniverse().Objects().FindObjectIDs(OwnedVisitor<Fleet>(HumanClientApp::GetApp()->EmpireID()));
-    auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
+    auto vec = GetUniverse().Objects().find<Fleet>(OwnedVisitor<Fleet>(HumanClientApp::GetApp()->EmpireID()));
+    auto it = std::find_if(vec.begin(), vec.end(),
+        [this](const std::shared_ptr<UniverseObject>& o){ return o->ID() == this->m_current_fleet_id; });
     const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
     if (it != vec.begin())
         --it;
     else
         it = vec.end();
-    while (it != vec.begin() && (it == vec.end() || destroyed_object_ids.count(*it)))
+    while (it != vec.begin() && (it == vec.end() || destroyed_object_ids.count((*it)->ID())))
         --it;
-    m_current_fleet_id = it != vec.end() ? *it : vec.empty() ? INVALID_OBJECT_ID : vec.back();
+    m_current_fleet_id = it != vec.end() ? (*it)->ID() : vec.empty() ? INVALID_OBJECT_ID : vec.back()->ID();
 
     if (m_current_fleet_id != INVALID_OBJECT_ID) {
         CenterOnObject(m_current_fleet_id);
@@ -7155,14 +7065,15 @@ bool MapWnd::ZoomToPrevFleet() {
 }
 
 bool MapWnd::ZoomToNextFleet() {
-    auto vec = GetUniverse().Objects().FindObjectIDs(OwnedVisitor<Fleet>(HumanClientApp::GetApp()->EmpireID()));
-    auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
+    auto vec = GetUniverse().Objects().find<Fleet>(OwnedVisitor<Fleet>(HumanClientApp::GetApp()->EmpireID()));
+    auto it = std::find_if(vec.begin(), vec.end(),
+        [this](const std::shared_ptr<UniverseObject>& o){ return o->ID() == this->m_current_fleet_id; });
     auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
     if (it != vec.end())
         ++it;
-    while (it != vec.end() && destroyed_object_ids.count(*it))
+    while (it != vec.end() && destroyed_object_ids.count((*it)->ID()))
         ++it;
-    m_current_fleet_id = it != vec.end() ? *it : vec.empty() ? INVALID_OBJECT_ID : vec.front();
+    m_current_fleet_id = it != vec.end() ? (*it)->ID() : vec.empty() ? INVALID_OBJECT_ID : vec.front()->ID();
 
     if (m_current_fleet_id != INVALID_OBJECT_ID) {
         CenterOnObject(m_current_fleet_id);
@@ -7683,7 +7594,7 @@ namespace {
 
 void MapWnd::DispatchFleetsExploring() {
     DebugLogger() << "MapWnd::DispatchFleetsExploring called";
-    SectionedScopedTimer timer("MapWnd::DispatchFleetsExploring", true);
+    SectionedScopedTimer timer("MapWnd::DispatchFleetsExploring");
 
     int empire_id = HumanClientApp::GetApp()->EmpireID();
     const Empire *empire = GetEmpire(empire_id);

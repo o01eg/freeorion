@@ -2,7 +2,7 @@
 
 #include "Parse.h"
 #include "MovableEnvelope.h"
-#include "../universe/ValueRef.h"
+#include "../universe/ValueRefs.h"
 
 #include <boost/spirit/include/phoenix.hpp>
 
@@ -62,6 +62,7 @@ parse::detail::simple_int_parser_rules::simple_int_parser_rules(const parse::lex
         |   tok.GalaxySize_
         |   tok.GalaxySpecialFrequency_
         |   tok.GalaxyStarlaneFrequency_
+        |   tok.UsedInDesignID_
         ;
 
     constant

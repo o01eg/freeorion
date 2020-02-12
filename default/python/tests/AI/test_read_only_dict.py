@@ -11,16 +11,16 @@ dict_content = {
 
 def test_dict_content():
     test_dict = ReadOnlyDict(dict_content)
-    assert test_dict.keys() == dict_content.keys()
-    assert test_dict.values() == dict_content.values()
-    assert test_dict.items() == dict_content.items()
+    assert set(test_dict.keys()) == set(dict_content.keys())
+    assert set(test_dict.values()) == set(dict_content.values())
+    assert set(test_dict.items()) == set(dict_content.items())
     assert len(test_dict) == len(dict_content)
 
 
 def test_membership():
     test_dict = ReadOnlyDict(dict_content)
     # check for membership checks and retrieval
-    for key, value in dict_content.iteritems():
+    for key, value in dict_content.items():
         assert key in test_dict
         assert test_dict[key] == value
         assert test_dict.get(key, -99999) == value
@@ -36,12 +36,6 @@ def test_non_existing_keys():
         test_dict['INVALID_KEY']
 
 
-def test_str_conversion():
-    # check bool and str conversions
-    test_dict = ReadOnlyDict(dict_content)
-    assert str(test_dict) == str(dict_content)
-
-
 def test_bool():
     test_dict = ReadOnlyDict(dict_content)
     assert bool(test_dict)
@@ -55,7 +49,7 @@ def test_conversion_to_dict():
     read_only_dict = ReadOnlyDict(dict_content)
     normal_dict = dict(read_only_dict)
     assert len(normal_dict) == len(dict_content)
-    assert normal_dict.items() == dict_content.items()
+    assert set(normal_dict.items()) == set(dict_content.items())
 
 
 def test_deletion():

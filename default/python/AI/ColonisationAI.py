@@ -1,3 +1,4 @@
+from __future__ import print_function
 from logging import debug, warn, error, info
 from operator import itemgetter
 
@@ -207,7 +208,7 @@ def rate_planetary_piloting(pid):
 
 @cache_by_turn
 def get_supply_tech_range():
-    return sum(_range for _tech, _range in AIDependencies.supply_range_techs.iteritems() if tech_is_complete(_tech))
+    return sum(_range for _tech, _range in AIDependencies.supply_range_techs.items() if tech_is_complete(_tech))
 
 
 def survey_universe():
@@ -417,8 +418,8 @@ def get_colony_fleets():
         assign_colonisation_values(evaluated_colony_planet_ids, MissionType.COLONISATION, None, [], True))
     colonization_timer.start('Evaluate Outpost Opportunities')
 
-    sorted_planets = evaluated_colony_planets.items()
-    sorted_planets.sort(lambda x, y: cmp(x[1], y[1]), reverse=True)
+    sorted_planets = list(evaluated_colony_planets.items())
+    sorted_planets.sort(key=itemgetter(1), reverse=True)
 
     _print_colony_candidate_table(sorted_planets, show_detail=False)
 
@@ -436,8 +437,8 @@ def get_colony_fleets():
 
     colonization_timer.stop()
 
-    sorted_outposts = evaluated_outpost_planets.items()
-    sorted_outposts.sort(lambda x, y: cmp(x[1], y[1]), reverse=True)
+    sorted_outposts = list(evaluated_outpost_planets.items())
+    sorted_outposts.sort(key=itemgetter(1), reverse=True)
 
     _print_outpost_candidate_table(sorted_outposts)
 
@@ -1068,7 +1069,7 @@ def revise_threat_factor(threat_factor, planet_value, system_id, min_planet_valu
     """
     Check if the threat_factor should be made less severe.
 
-    If the AI does have enough total miltary to secure this system, and the target has more than minimal value,
+    If the AI does have enough total military to secure this system, and the target has more than minimal value,
     don't let the threat_factor discount the adjusted value below min_planet_value +1, so that if there are no
     other targets the AI could still pursue this one.  Otherwise, scoring pressure from
     MilitaryAI.get_preferred_max_military_portion_for_single_battle might prevent the AI from pursuing a heavily
@@ -1156,13 +1157,13 @@ def assign_colony_fleets_to_colonise():
     # assign fleet targets to colonisable planets
     all_colony_fleet_ids = FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.COLONISATION)
     send_colony_ships(FleetUtilsAI.extract_fleet_ids_without_mission_types(all_colony_fleet_ids),
-                      aistate.colonisablePlanetIDs.items(),
+                      list(aistate.colonisablePlanetIDs.items()),
                       MissionType.COLONISATION)
 
     # assign fleet targets to colonisable outposts
     all_outpost_fleet_ids = FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.OUTPOST)
     send_colony_ships(FleetUtilsAI.extract_fleet_ids_without_mission_types(all_outpost_fleet_ids),
-                      aistate.colonisableOutpostIDs.items(),
+                      list(aistate.colonisableOutpostIDs.items()),
                       MissionType.OUTPOST)
 
 
@@ -1193,7 +1194,7 @@ def send_colony_ships(colony_fleet_ids, evaluated_planets, mission_type):
             for rating in ratings:
                 if rating[0] >= 0.75 * best_scores.get(pid, [9999])[0]:
                     potential_targets.append((pid, rating))
-        potential_targets.sort(lambda x, y: cmp(x[1], y[1]), reverse=True)
+        potential_targets.sort(key=itemgetter(1), reverse=True)
 
     # added a lot of checking because have been getting mysterious exception, after too many recursions to get info
     fleet_pool = set(fleet_pool)
@@ -1266,7 +1267,7 @@ def _print_empire_species_roster():
         this_row.extend(grade_map.get(get_ai_tag_grade(species_tags, tag).upper(), "o") for tag in grade_tags)
         this_row.append([tag for tag in species_tags if not any(s in tag for s in grade_tags) and 'PEDIA' not in tag])
         species_table.add_row(this_row)
-    print
+    print()
     info(species_table)
 
 
@@ -1458,7 +1459,7 @@ class OrbitalColonizationManager(object):
 
         :rtype: list[int]
         """
-        return self._colonization_plans.keys()
+        return list(self._colonization_plans.keys())
 
     def create_new_plan(self, target_id, source_id):
         """
@@ -1504,7 +1505,7 @@ class OrbitalColonizationManager(object):
 
             self.num_enqueued_bases += 1
             # check if a target for this base remains
-            original_target = next((target for target, plan in unaccounted_plans.iteritems() if
+            original_target = next((target for target, plan in unaccounted_plans.items() if
                                     plan.source == element.locationID and plan.base_enqueued), None)
             if original_target:
                 debug("Base built at %d still has its original target." % element.locationID)
@@ -1513,7 +1514,7 @@ class OrbitalColonizationManager(object):
 
             # the original target may be no longer valid but maybe there is another
             # orbital colonization plan which wasn't started yet and has the same source planet
-            alternative_target = next((target for target, plan in unaccounted_plans.iteritems()
+            alternative_target = next((target for target, plan in unaccounted_plans.items()
                                        if plan.source == element.locationID), None)
             if alternative_target:
                 debug("Reassigning base built at %d to new target %d as old target is no longer valid" % (
@@ -1524,7 +1525,7 @@ class OrbitalColonizationManager(object):
 
             # final try: unstarted plans with source in the same system
             target_system = universe.getSystem(universe.getPlanet(element.locationID).systemID)
-            alternative_plan = next((plan for target, plan in unaccounted_plans.iteritems()
+            alternative_plan = next((plan for target, plan in unaccounted_plans.items()
                                      if plan.source in target_system.planetIDs and not plan.base_enqueued
                                      and not plan.base_assigned), None)
             if alternative_plan:
@@ -1554,7 +1555,7 @@ class OrbitalColonizationManager(object):
         if not empire.techResearched(OUTPOSTING_TECH):
             return
 
-        considered_plans = [plan for plan in self._colonization_plans.itervalues()
+        considered_plans = [plan for plan in self._colonization_plans.values()
                             if not plan.base_enqueued and plan.score > MINIMUM_COLONY_SCORE]
         queue_limit = max(1, int(2*empire.productionPoints / outpod_pod_cost()))
         for colonization_plan in sorted(considered_plans, key=lambda x: x.score, reverse=True):
@@ -1577,7 +1578,7 @@ class OrbitalColonizationManager(object):
             sys_id = fleet.systemID
             system = universe.getSystem(sys_id)
 
-            avail_plans = [plan for plan in self._colonization_plans.itervalues()
+            avail_plans = [plan for plan in self._colonization_plans.values()
                            if plan.target in system.planetIDs and not plan.base_assigned]
             avail_plans.sort(key=lambda x: x.score, reverse=True)
             for plan in avail_plans:
@@ -1598,7 +1599,7 @@ def test_calc_max_pop():
     from freeorion_tools import chat_human
     chat_human("Verifying calculation of ColonisationAI.calc_max_pop()")
     universe = fo.getUniverse()
-    for spec_name, planets in state.get_empire_planets_by_species().iteritems():
+    for spec_name, planets in state.get_empire_planets_by_species().items():
         species = fo.getSpecies(spec_name)
         for pid in planets:
             planet = universe.getPlanet(pid)

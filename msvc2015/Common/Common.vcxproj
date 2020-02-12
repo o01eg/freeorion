@@ -165,9 +165,9 @@
     <ClInclude Include="..\..\network\MessageQueue.h" />
     <ClInclude Include="..\..\network\Networking.h" />
     <ClInclude Include="..\..\universe\Building.h" />
-    <ClInclude Include="..\..\universe\Condition.h" />
+    <ClInclude Include="..\..\universe\Conditions.h" />
+    <ClInclude Include="..\..\universe\Effects.h" />
     <ClInclude Include="..\..\universe\Effect.h" />
-    <ClInclude Include="..\..\universe\EffectAccounting.h" />
     <ClInclude Include="..\..\universe\Encyclopedia.h" />
     <ClInclude Include="..\..\universe\Enums.h" />
     <ClInclude Include="..\..\universe\Field.h" />
@@ -190,8 +190,7 @@
     <ClInclude Include="..\..\universe\Universe.h" />
     <ClInclude Include="..\..\universe\Pathfinder.h" />
     <ClInclude Include="..\..\universe\UniverseObject.h" />
-    <ClInclude Include="..\..\universe\ValueRef.h" />
-    <ClInclude Include="..\..\universe\ValueRefFwd.h" />
+    <ClInclude Include="..\..\universe\ValueRefs.h" />
     <ClInclude Include="..\..\util\AppInterface.h" />
     <ClInclude Include="..\..\util\CheckSums.h" />
     <ClInclude Include="..\..\util\Directories.h" />

@@ -3,7 +3,6 @@
 
 
 #include "EnumsFwd.h"
-#include "ValueRefFwd.h"
 #include "ObjectMap.h"
 #include "UniverseObject.h"
 #include "../util/Pending.h"
@@ -11,6 +10,7 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/serialization/access.hpp>
 #include <boost/thread/shared_mutex.hpp>
+#include <boost/container/flat_map.hpp>
 
 #include <list>
 #include <map>
@@ -18,6 +18,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 #include "../util/Export.h"
 
@@ -35,7 +36,7 @@ class MonsterFleetPlan;
 
 
 namespace Condition {
-    struct ConditionBase;
+    struct Condition;
     typedef std::vector<std::shared_ptr<const UniverseObject>> ObjectSet;
 }
 
@@ -45,13 +46,12 @@ namespace Effect {
     struct SourcedEffectsGroup;
     class EffectsGroup;
     typedef std::vector<std::shared_ptr<UniverseObject>> TargetSet;
-    typedef std::map<int, std::map<MeterType, std::vector<AccountingInfo>>> AccountingMap;
+    typedef std::unordered_map<int, boost::container::flat_map<MeterType, std::vector<AccountingInfo>>> AccountingMap;
     typedef std::vector<std::pair<SourcedEffectsGroup, TargetsAndCause>> TargetsCauses;
-    typedef std::map<int, std::map<MeterType, double>> DiscrepancyMap;
 }
 
 namespace ValueRef {
-    template <class T> struct ValueRefBase;
+    template <class T> struct ValueRef;
 }
 
 #if defined(_MSC_VER)
@@ -82,10 +82,17 @@ private:
 
     typedef std::map<int, std::set<int>>            ObjectKnowledgeMap;             ///< IDs of Empires which know information about an object (or deleted object); keyed by object id
 
-    typedef const ValueRef::ValueRefBase<Visibility>*   VisValRef;
+    typedef const ValueRef::ValueRef<Visibility>*   VisValRef;
     typedef std::vector<std::pair<int, VisValRef>>      SrcVisValRefVec;
     typedef std::map<int, SrcVisValRefVec>              ObjSrcVisValRefVecMap;
     typedef std::map<int, ObjSrcVisValRefVecMap>        EmpireObjectVisValueRefMap;
+
+    /** Discrepancy between meter's value at start of turn, and the value that
+      * this client calculate that the meter should have with the knowledge
+      * available -> the unknown factor affecting the meter.  This is used
+      * when generating effect accounting, in the case where the expected
+      * and actual meter values don't match. */
+    typedef std::unordered_map<int, boost::container::flat_map<MeterType, double>> DiscrepancyMap;
 
 public:
     typedef std::map<int, Visibility>               ObjectVisibilityMap;            ///< map from object id to Visibility level for a particular empire
@@ -254,9 +261,6 @@ public:
     /** Sets all objects' meters' initial values to their current values. */
     void BackPropagateObjectMeters();
 
-    /** Sets indicated objects' meters' initial values to their current values. */
-    void BackPropagateObjectMeters(const std::vector<int>& object_ids);
-
     /** Determines which empires can see which objects at what visibility
       * level, based on  */
     void UpdateEmpireObjectVisibilities();
@@ -264,7 +268,7 @@ public:
     /** Sets a special record of visibility that overrides the standard
       * empire-object visibility after the latter is processed. */
     void SetEffectDerivedVisibility(int empire_id, int object_id, int source_id,
-                                    const ValueRef::ValueRefBase<Visibility>* vis);
+                                    const ValueRef::ValueRef<Visibility>* vis);
 
     /** Applies empire-object visibilities set by effects. */
     void ApplyEffectDerivedVisibilities();
@@ -418,7 +422,7 @@ public:
     const std::vector<MonsterFleetPlan*> MonsterFleetPlans() const;
 
     /** Set the empire stats from \p future. */
-    using EmpireStatsMap = std::map<std::string, std::unique_ptr<ValueRef::ValueRefBase<double>>>;
+    using EmpireStatsMap = std::map<std::string, std::unique_ptr<ValueRef::ValueRef<double>>>;
     void SetEmpireStats(Pending::Pending<EmpireStatsMap> future);
 private:
     const EmpireStatsMap& EmpireStats() const;
@@ -509,7 +513,12 @@ private:
     std::map<int, std::set<int>>    m_empire_known_ship_design_ids;     ///< ship designs known to each empire
 
     Effect::AccountingMap           m_effect_accounting_map;            ///< map from target object id, to map from target meter, to orderered list of structs with details of an effect and what it does to the meter
-    Effect::DiscrepancyMap          m_effect_discrepancy_map;           ///< map from target object id, to map from target meter, to discrepancy between meter's actual initial value, and the initial value that this meter should have as far as the client can tell: the unknown factor affecting the meter
+
+    /// map from target object id, to map from target meter, to discrepancy
+    /// between meter's actual initial value, and the initial value that this
+    /// meter should have as far as the client can tell: the unknown factor
+    /// affecting the meter.
+    DiscrepancyMap                  m_effect_discrepancy_map;
 
     std::map<int, std::set<int>>    m_marked_destroyed;                 ///< used while applying effects to cache objects that have been destroyed.  this allows to-be-destroyed objects to remain undestroyed until all effects have been processed, which ensures that to-be-destroyed objects still exist when other effects need to access them as a source object. key is destroyed object, and value set are the ids of objects that caused the destruction (may be multiples destroying a single target on a given turn)
 

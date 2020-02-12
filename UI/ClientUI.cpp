@@ -39,14 +39,8 @@
 #include <GG/RichText/ImageBlock.h>
 #include <GG/UnicodeCharsets.h>
 
-// boost::spirit::classic pulls in windows.h which in turn defines the macros
-// MessageBox and PlaySound. Undefining those should avoid name collisions with
-// FreeOrion function names
-#include <boost/spirit/include/classic.hpp>
-#ifdef FREEORION_WIN32
-#  undef MessageBox
-#  undef PlaySound
-#endif
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/phoenix_operator.hpp>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -481,7 +475,7 @@ namespace {
         db.Add("video.fps.max.enabled",                                 UserStringNop("OPTIONS_DB_LIMIT_FPS"),                      true);
         db.Add("video.fps.max",                                         UserStringNop("OPTIONS_DB_MAX_FPS"),                        60.0,                           RangedStepValidator<double>(1.0, 0.0, 240.0));
         db.Add("video.fps.unfocused.enabled",                           UserStringNop("OPTIONS_DB_LIMIT_FPS_NO_FOCUS"),             true);
-        db.Add("video.fps.unfocused",                                   UserStringNop("OPTIONS_DB_MAX_FPS_NO_FOCUS"),               15.0,                           RangedStepValidator<double>(1.0, 1.0, 30.0));
+        db.Add("video.fps.unfocused",                                   UserStringNop("OPTIONS_DB_MAX_FPS_NO_FOCUS"),               15.0,                           RangedStepValidator<double>(0.125, 0.125, 30.0));
 
         // sound and music
         db.Add<std::string>("audio.music.path",                         UserStringNop("OPTIONS_DB_BG_MUSIC"),                       (GetRootDataDir() / "default" / "data" / "sound" / "artificial_intelligence_v3.ogg").string());
@@ -769,15 +763,23 @@ std::string ClientUI::FormatTimestamp(boost::posix_time::ptime timestamp) {
 }
 
 bool ClientUI::ZoomToObject(const std::string& name) {
-    for (auto& obj : GetUniverse().Objects().FindObjects<UniverseObject>())
+    // try first by finding the object by name
+    for (auto& obj : GetUniverse().Objects().all<UniverseObject>())
         if (boost::iequals(obj->Name(), name))
             return ZoomToObject(obj->ID());
+
+    // try again by converting string to an ID
+    try {
+        return ZoomToObject(std::stoi(name));
+    } catch (...) {
+    }
+
     return false;
 }
 
 bool ClientUI::ZoomToObject(int id) {
     return ZoomToSystem(id)     || ZoomToPlanet(id) || ZoomToBuilding(id)   ||
-           ZoomToFleet(id)      || ZoomToShip(id);
+           ZoomToFleet(id)      || ZoomToShip(id)   || ZoomToField(id);
 }
 
 bool ClientUI::ZoomToPlanet(int id) {
@@ -1156,23 +1158,22 @@ int FontBasedUpscale(int x) {
 
 namespace GG {
     std::istream& operator>>(std::istream& is, Clr& clr) {
-        namespace classic = boost::spirit::classic;
-        using classic::space_p;
-        using classic::int_p;
-        using classic::assign;
-        classic::rule<> color_p =
-            classic::ch_p('(') >> *space_p >>
-            int_p[assign(clr.r)] >> *space_p >> ',' >> *space_p >>
-            int_p[assign(clr.g)] >> *space_p >> ',' >> *space_p >>
-            int_p[assign(clr.b)] >> *space_p >> ',' >> *space_p >>
-            int_p[assign(clr.a)] >> *space_p >> ')';
+        namespace qi = boost::spirit::qi;
+        namespace phx = boost::phoenix;
         std::string str;
-        char c;
-        do {
-            is >> c;
-            str += c;
-        } while (is && c != ')');
-        if (!classic::parse(str.c_str(), color_p).full ||
+        std::getline(is, str, ')');
+        str.push_back(')');
+        bool parsed = qi::phrase_parse(
+            str.begin(), str.end(),
+            (
+                qi::lit('(') >>
+                qi::int_[phx::ref(clr.r) = qi::_1] >> ',' >>
+                qi::int_[phx::ref(clr.g) = qi::_1] >> ',' >>
+                qi::int_[phx::ref(clr.b) = qi::_1] >> ',' >>
+                qi::int_[phx::ref(clr.a) = qi::_1] >> ')'),
+            qi::blank
+        );
+        if (!parsed ||
             clr.r < 0 || 255 < clr.r ||
             clr.g < 0 || 255 < clr.g ||
             clr.b < 0 || 255 < clr.b ||

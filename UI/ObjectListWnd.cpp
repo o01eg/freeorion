@@ -20,8 +20,8 @@
 #include "../universe/Building.h"
 #include "../universe/Field.h"
 #include "../universe/Species.h"
-#include "../universe/Condition.h"
-#include "../universe/ValueRef.h"
+#include "../universe/Conditions.h"
+#include "../universe/ValueRefs.h"
 #include "../universe/Enums.h"
 
 #include <GG/DrawUtil.h>
@@ -62,7 +62,7 @@ namespace {
     bool temp_bool = RegisterOptions(&AddOptions);
 
     // returns a condition which matches objects with the specififed \a object_types
-    std::unique_ptr<Condition::ConditionBase> ConditionForObjectTypes(
+    std::unique_ptr<Condition::Condition> ConditionForObjectTypes(
         const std::vector<UniverseObjectType>& object_types)
     {
         if (object_types.empty())
@@ -71,7 +71,7 @@ namespace {
         if (object_types.size() == 1)
             return boost::make_unique<Condition::Type>(*object_types.begin());
 
-        std::vector<std::unique_ptr<Condition::ConditionBase>> subconditions;
+        std::vector<std::unique_ptr<Condition::Condition>> subconditions;
         for (auto obj_type : object_types)
             subconditions.emplace_back(boost::make_unique<Condition::Type>(obj_type));
         return boost::make_unique<Condition::Or>(std::move(subconditions));
@@ -81,9 +81,9 @@ namespace {
     // specified type(s), in which case \a value_ref is evaluated and the
     // result returned
     template <typename T>
-    std::unique_ptr<ValueRef::ValueRefBase<T>> ObjectTypeFilteredRef(
+    std::unique_ptr<ValueRef::ValueRef<T>> ObjectTypeFilteredRef(
         const std::vector<UniverseObjectType>& object_types,
-        std::unique_ptr<ValueRef::ValueRefBase<T>>&& value_ref)
+        std::unique_ptr<ValueRef::ValueRef<T>>&& value_ref)
     {
         if (object_types.empty())
             return boost::make_unique<ValueRef::Constant<T>>(T());
@@ -145,11 +145,11 @@ namespace {
     template <typename T>
     std::unique_ptr<ValueRef::Variable<std::string>> StringCastedComplexValueRef(
         const std::string& token,
-        std::unique_ptr<ValueRef::ValueRefBase<int>>&& int_ref1 = nullptr,
-        std::unique_ptr<ValueRef::ValueRefBase<int>>&& int_ref2 = nullptr,
-        std::unique_ptr<ValueRef::ValueRefBase<int>>&& int_ref3 = nullptr,
-        std::unique_ptr<ValueRef::ValueRefBase<std::string>>&& string_ref1 = nullptr,
-        std::unique_ptr<ValueRef::ValueRefBase<std::string>>&& string_ref2 = nullptr)
+        std::unique_ptr<ValueRef::ValueRef<int>>&& int_ref1 = nullptr,
+        std::unique_ptr<ValueRef::ValueRef<int>>&& int_ref2 = nullptr,
+        std::unique_ptr<ValueRef::ValueRef<int>>&& int_ref3 = nullptr,
+        std::unique_ptr<ValueRef::ValueRef<std::string>>&& string_ref1 = nullptr,
+        std::unique_ptr<ValueRef::ValueRef<std::string>>&& string_ref2 = nullptr)
     {
         return boost::make_unique<ValueRef::StringCast<T>>(
             boost::make_unique<ValueRef::ComplexVariable<T>>(
@@ -172,7 +172,16 @@ namespace {
             boost::make_unique<ValueRef::Variable<int>>(ValueRef::SOURCE_REFERENCE, "SystemID"));
     }
 
-    std::unique_ptr<ValueRef::ValueRefBase<std::string>> PlanetEnvForSpecies(
+
+    std::unique_ptr<ValueRef::Variable<std::string>> DesignCostValueRef() {
+        return StringCastedComplexValueRef<double>(
+            "ShipDesignCost",
+            boost::make_unique<ValueRef::Variable<int>>(ValueRef::SOURCE_REFERENCE, "DesignID"),
+            boost::make_unique<ValueRef::Variable<int>>(ValueRef::SOURCE_REFERENCE, "ProducedByEmpireID"),
+            nullptr);   // TODO: try to get a valid production location for the owner empire?
+    }
+
+    std::unique_ptr<ValueRef::ValueRef<std::string>> PlanetEnvForSpecies(
         const std::string& species_name)
     {
         return ObjectTypeFilteredRef<std::string>({OBJ_PLANET},
@@ -223,10 +232,10 @@ namespace {
     }
 
     const std::map<std::pair<std::string, std::string>,
-                   std::unique_ptr<ValueRef::ValueRefBase<std::string>>>& AvailableColumnTypes()
+                   std::unique_ptr<ValueRef::ValueRef<std::string>>>& AvailableColumnTypes()
     {
         static std::map<std::pair<std::string, std::string>,
-                        std::unique_ptr<ValueRef::ValueRefBase<std::string>>> col_types;
+                        std::unique_ptr<ValueRef::ValueRef<std::string>>> col_types;
         if (col_types.empty()) {
             // General
             col_types[{UserStringNop("NAME"),                   ""}] =  StringValueRef("Name");
@@ -280,10 +289,12 @@ namespace {
             col_types[{UserStringNop("FINAL_DEST"),                 UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("FinalDestinationID");
             col_types[{UserStringNop("NEXT_SYSTEM"),                UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("NextSystemID");
             col_types[{UserStringNop("PREV_SYSTEM"),                UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("PreviousSystemID");
+            col_types[{UserStringNop("ARRIVAL_STARLANE"),           UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("ArrivalStarlaneID");
             col_types[{UserStringNop("NEAREST_SYSTEM"),             UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("NearestSystemID");
             col_types[{UserStringNop("HULL"),                       UserStringNop("FLEETS_SUBMENU")}] = UserStringValueRef("Hull");
             col_types[{UserStringNop("PARTS"),                      UserStringNop("FLEETS_SUBMENU")}] = UserStringVecValueRef("Parts");
             col_types[{UserStringNop("ATTACK"),                     UserStringNop("FLEETS_SUBMENU")}] = StringCastedValueRef<double>("Attack");
+            col_types[{UserStringNop("PRODUCTION_COST"),            UserStringNop("FLEETS_SUBMENU")}] = DesignCostValueRef();
 
             // planet environments species
             for (const auto& entry : GetSpeciesManager())
@@ -299,7 +310,7 @@ namespace {
         return col_types;
     }
 
-    const ValueRef::ValueRefBase<std::string>* GetValueRefByName(const std::string& name) {
+    const ValueRef::ValueRef<std::string>* GetValueRefByName(const std::string& name) {
         for (const auto& entry : AvailableColumnTypes()) {
             if (entry.first.first == name)
                 return entry.second.get();
@@ -343,7 +354,7 @@ namespace {
             GetOptionsDB().Set(option_name, name);
     }
 
-    const ValueRef::ValueRefBase<std::string>* GetColumnValueRef(int column) {
+    const ValueRef::ValueRef<std::string>* GetColumnValueRef(int column) {
         if (column < 0)
             return nullptr;
         std::string option_name = "ui.objects.columns.c" + std::to_string(column) + ".stringkey";
@@ -383,13 +394,13 @@ namespace {
     const std::string STARTYPE_CONDITION(UserStringNop("CONDITION_STARTYPE"));
     const std::string METERVALUE_CONDITION(UserStringNop("CONDITION_METERVALUE"));
     const std::string HASGROWTHSPECIAL_CONDITION(UserStringNop("CONDITION_HAS_GROWTH_SPECIAL"));
-    const std::string GGWITHPTYPE_CONDITION(UserStringNop("CONDITION_PTYPE_W_GG"));
-    const std::string ASTWITHPTYPE_CONDITION(UserStringNop("CONDITION_PTYPE_W_AST"));
+    const std::string GGWITHPTYPE_CONDITION(UserStringNop("CONDITION_PTYPE_W_GG"));     // with gas giant
+    const std::string ASTWITHPTYPE_CONDITION(UserStringNop("CONDITION_PTYPE_W_AST"));   // with asteroids
 
     const std::string FILTER_OPTIONS_WND_NAME = "object-list-filter";
 
     template <class enumT>
-    std::unique_ptr<ValueRef::ValueRefBase<enumT>> CopyEnumValueRef(const ValueRef::ValueRefBase<enumT>* const value_ref) {
+    std::unique_ptr<ValueRef::ValueRef<enumT>> CopyEnumValueRef(const ValueRef::ValueRef<enumT>* const value_ref) {
         if (auto constant = dynamic_cast<const ValueRef::Constant<enumT>*>(value_ref))
             return boost::make_unique<ValueRef::Constant<enumT>>(constant->Value());
         return boost::make_unique<ValueRef::Constant<enumT>>(enumT(-1));
@@ -397,7 +408,7 @@ namespace {
 
     std::map<std::string, std::string> object_list_cond_description_map;
 
-    const std::string& ConditionClassName(const Condition::ConditionBase* const condition) {
+    const std::string& ConditionClassName(const Condition::Condition* const condition) {
         if (dynamic_cast<const Condition::All* const>(condition))
             return ALL_CONDITION;
         else if (dynamic_cast<const Condition::EmpireAffiliation* const>(condition))
@@ -470,7 +481,7 @@ const GG::X CONDITION_WIDGET_WIDTH(380);
 
 class ConditionWidget : public GG::Control {
 public:
-    ConditionWidget(GG::X x, GG::Y y, const Condition::ConditionBase* initial_condition = nullptr) :
+    ConditionWidget(GG::X x, GG::Y y, const Condition::Condition* initial_condition = nullptr) :
         GG::Control(x, y, CONDITION_WIDGET_WIDTH, GG::Y1, GG::INTERACTIVE)
     {
         if (!initial_condition) {
@@ -494,7 +505,7 @@ public:
     ~ConditionWidget()
     {}
 
-    std::unique_ptr<Condition::ConditionBase> GetCondition() {
+    std::unique_ptr<Condition::Condition> GetCondition() {
         auto row_it = m_class_drop->CurrentItem();
         if (row_it == m_class_drop->end())
             return boost::make_unique<Condition::All>();
@@ -528,7 +539,7 @@ public:
             const std::string& species_name = GetString();
             if (species_name.empty())
                 return boost::make_unique<Condition::Homeworld>();
-            std::vector<std::unique_ptr<ValueRef::ValueRefBase<std::string>>> names;
+            std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> names;
             names.push_back(boost::make_unique<ValueRef::Constant<std::string>>(species_name));
             return boost::make_unique<Condition::Homeworld>(std::move(names));
 
@@ -542,54 +553,54 @@ public:
             return boost::make_unique<Condition::HasSpecial>(GetString());
 
         } else if (condition_key == HASGROWTHSPECIAL_CONDITION) {
-            std::vector<std::unique_ptr<Condition::ConditionBase>> operands;
+            std::vector<std::unique_ptr<Condition::Condition>> operands;
             // determine sitrep order
             std::istringstream template_stream(UserString("FUNCTIONAL_GROWTH_SPECIALS_LIST"));
             for (auto stream_it = std::istream_iterator<std::string>(template_stream);
                  stream_it != std::istream_iterator<std::string>(); stream_it++)
             { operands.push_back(boost::make_unique<Condition::HasSpecial>(*stream_it)); }
 
-            std::unique_ptr<Condition::ConditionBase> this_cond = boost::make_unique<Condition::Or>(std::move(operands));
+            std::unique_ptr<Condition::Condition> this_cond = boost::make_unique<Condition::Or>(std::move(operands));
             object_list_cond_description_map[this_cond->Description()] = HASGROWTHSPECIAL_CONDITION;
             return this_cond;
 
         } else if (condition_key == ASTWITHPTYPE_CONDITION) { // And [Planet PlanetType PT_ASTEROIDS ContainedBy And [System Contains PlanetType X]]
-            std::vector<std::unique_ptr<Condition::ConditionBase>> operands1;
+            std::vector<std::unique_ptr<Condition::Condition>> operands1;
             operands1.push_back(boost::make_unique<Condition::Type>(boost::make_unique<ValueRef::Constant<UniverseObjectType>>(OBJ_PLANET)));
             const std::string& text = GetString();
             if (text == UserString("CONDITION_ANY")) {
-                std::vector<std::unique_ptr<ValueRef::ValueRefBase<PlanetType>>> copytype;
+                std::vector<std::unique_ptr<ValueRef::ValueRef<PlanetType>>> copytype;
                 copytype.push_back(boost::make_unique<ValueRef::Constant<PlanetType>>(PT_ASTEROIDS));
                 operands1.push_back(boost::make_unique<Condition::Not>(boost::make_unique<Condition::PlanetType>(std::move(copytype))));
             } else {
                 operands1.push_back(boost::make_unique<Condition::PlanetType>(GetEnumValueRefVec< ::PlanetType>()));
             }
-            std::vector<std::unique_ptr<Condition::ConditionBase>> operands2;
+            std::vector<std::unique_ptr<Condition::Condition>> operands2;
             operands2.push_back(boost::make_unique<Condition::Type>(boost::make_unique<ValueRef::Constant<UniverseObjectType>>(OBJ_SYSTEM)));
-            std::vector<std::unique_ptr<ValueRef::ValueRefBase<PlanetType>>> maintype;
+            std::vector<std::unique_ptr<ValueRef::ValueRef<PlanetType>>> maintype;
             maintype.push_back(boost::make_unique<ValueRef::Constant<PlanetType>>(PT_ASTEROIDS));
             operands2.push_back(boost::make_unique<Condition::Contains>(boost::make_unique<Condition::PlanetType>(std::move(maintype))));
             operands1.push_back(boost::make_unique<Condition::ContainedBy>(boost::make_unique<Condition::And>(std::move(operands2))));
-            std::unique_ptr<Condition::ConditionBase> this_cond = boost::make_unique<Condition::And>(std::move(operands1));
+            std::unique_ptr<Condition::Condition> this_cond = boost::make_unique<Condition::And>(std::move(operands1));
             object_list_cond_description_map[this_cond->Description()] = ASTWITHPTYPE_CONDITION;
             return this_cond;
 
         } else if (condition_key == GGWITHPTYPE_CONDITION) { // And [Planet PlanetType PT_GASGIANT ContainedBy And [System Contains PlanetType X]]
-            std::vector<std::unique_ptr<Condition::ConditionBase>> operands1;
+            std::vector<std::unique_ptr<Condition::Condition>> operands1;
             const std::string& text = GetString();
             if (text == UserString("CONDITION_ANY")) {
-                std::vector<std::unique_ptr<ValueRef::ValueRefBase<PlanetType>>> copytype;
+                std::vector<std::unique_ptr<ValueRef::ValueRef<PlanetType>>> copytype;
                     copytype.push_back(boost::make_unique<ValueRef::Constant<PlanetType>>(PT_GASGIANT));
                     operands1.push_back(boost::make_unique<Condition::Not>(boost::make_unique<Condition::PlanetType>(std::move(copytype))));
             } else
                 operands1.push_back(boost::make_unique<Condition::PlanetType>(GetEnumValueRefVec< ::PlanetType>()));
-            std::vector<std::unique_ptr<Condition::ConditionBase>> operands2;
+            std::vector<std::unique_ptr<Condition::Condition>> operands2;
             operands2.push_back(boost::make_unique<Condition::Type>(boost::make_unique<ValueRef::Constant<UniverseObjectType>>(OBJ_SYSTEM)));
-            std::vector<std::unique_ptr<ValueRef::ValueRefBase<PlanetType>>> maintype;
+            std::vector<std::unique_ptr<ValueRef::ValueRef<PlanetType>>> maintype;
             maintype.push_back(boost::make_unique<ValueRef::Constant<PlanetType>>(PT_GASGIANT));
             operands2.push_back(boost::make_unique<Condition::Contains>(boost::make_unique<Condition::PlanetType>(std::move(maintype))));
             operands1.push_back(boost::make_unique<Condition::ContainedBy>(boost::make_unique<Condition::And>(std::move(operands2))));
-            std::unique_ptr<Condition::ConditionBase> this_cond = boost::make_unique<Condition::And>(std::move(operands1));
+            std::unique_ptr<Condition::Condition> this_cond = boost::make_unique<Condition::And>(std::move(operands1));
             object_list_cond_description_map[this_cond->Description()] = GGWITHPTYPE_CONDITION;
             return this_cond;
 
@@ -691,11 +702,11 @@ private:
         return string_row->Text();
     }
 
-    std::unique_ptr<ValueRef::ValueRefBase<std::string>> GetStringValueRef()
+    std::unique_ptr<ValueRef::ValueRef<std::string>> GetStringValueRef()
     { return boost::make_unique<ValueRef::Constant<std::string>>(GetString()); }
 
-    std::vector<std::unique_ptr<ValueRef::ValueRefBase<std::string>>> GetStringValueRefVec() {
-        std::vector<std::unique_ptr<ValueRef::ValueRefBase<std::string>>> retval;
+    std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> GetStringValueRefVec() {
+        std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> retval;
         retval.push_back(GetStringValueRef());
         return retval;
     }
@@ -707,7 +718,7 @@ private:
             return 0;
     }
 
-    std::unique_ptr<ValueRef::ValueRefBase<int>> GetInt1ValueRef()
+    std::unique_ptr<ValueRef::ValueRef<int>> GetInt1ValueRef()
     { return boost::make_unique<ValueRef::Constant<int>>(GetInt1()); }
 
     int GetInt2() {
@@ -717,7 +728,7 @@ private:
             return 0;
     }
 
-    std::unique_ptr<ValueRef::ValueRefBase<int>> GetInt2ValueRef()
+    std::unique_ptr<ValueRef::ValueRef<int>> GetInt2ValueRef()
     { return boost::make_unique<ValueRef::Constant<int>>(GetInt2()); }
 
     double GetDouble1() {
@@ -727,7 +738,7 @@ private:
             return 0;
     }
 
-    std::unique_ptr<ValueRef::ValueRefBase<double>> GetDouble1ValueRef()
+    std::unique_ptr<ValueRef::ValueRef<double>> GetDouble1ValueRef()
     { return boost::make_unique<ValueRef::Constant<double>>(GetDouble1()); }
 
     double GetDouble2() {
@@ -737,7 +748,7 @@ private:
             return 0;
     }
 
-    std::unique_ptr<ValueRef::ValueRefBase<double>> GetDouble2ValueRef()
+    std::unique_ptr<ValueRef::ValueRef<double>> GetDouble2ValueRef()
     { return boost::make_unique<ValueRef::Constant<double>>(GetDouble2()); }
 
     template <typename T>
@@ -753,12 +764,12 @@ private:
     }
 
     template <typename T>
-    std::unique_ptr<ValueRef::ValueRefBase<T>> GetEnumValueRef()
+    std::unique_ptr<ValueRef::ValueRef<T>> GetEnumValueRef()
     { return boost::make_unique<ValueRef::Constant<T>>(GetEnum<T>()); }
 
     template <typename T>
-    std::vector<std::unique_ptr<ValueRef::ValueRefBase<T>>> GetEnumValueRefVec() {
-        std::vector<std::unique_ptr<ValueRef::ValueRefBase<T>>> retval;
+    std::vector<std::unique_ptr<ValueRef::ValueRef<T>>> GetEnumValueRefVec() {
+        std::vector<std::unique_ptr<ValueRef::ValueRef<T>>> retval;
         retval.push_back(std::move(GetEnumValueRef<T>()));
         return retval;
     }
@@ -778,7 +789,7 @@ private:
     int DropListDropHeight() const
     { return 12; }
 
-    void Init(const Condition::ConditionBase* init_condition) {
+    void Init(const Condition::Condition* init_condition) {
         // fill droplist with basic types of conditions and select appropriate row
         m_class_drop = GG::Wnd::Create<CUIDropDownList>(DropListDropHeight());
         m_class_drop->Resize(GG::Pt(DropListWidth(), DropListHeight()));
@@ -902,7 +913,7 @@ private:
             // collect all valid tags on any object in universe
             std::set<std::string> all_tags;
 
-            for (auto& obj : GetUniverse().Objects().FindObjects<UniverseObject>()) {
+            for (auto& obj : GetUniverse().Objects().all<UniverseObject>()) {
                 auto tags = obj->Tags();
                 all_tags.insert(tags.begin(), tags.end());
             }
@@ -924,13 +935,13 @@ private:
             param_widget_top += m_string_drop->Height();
 
             std::vector< ::PlanetSize> planet_sizes;
+            planet_sizes.reserve(NUM_PLANET_SIZES);
             for (auto size = SZ_TINY; size != NUM_PLANET_SIZES; size = ::PlanetSize(size + 1))
                 planet_sizes.push_back(size);
 
             auto row_it = m_string_drop->end();
-            for (const std::string& text : StringsFromEnums(planet_sizes)) {
+            for (const std::string& text : StringsFromEnums(planet_sizes))
                 row_it = m_string_drop->Insert(GG::Wnd::Create<StringRow>(text, GG::Y(ClientUI::Pts())));
-            }
             if (!m_string_drop->Empty())
                 m_string_drop->Select(0);
 
@@ -944,6 +955,7 @@ private:
             AttachChild(m_string_drop);
 
             std::vector< ::PlanetType> planet_types;
+            planet_types.reserve(NUM_PLANET_TYPES);
             for (::PlanetType type = PT_SWAMP; type != NUM_PLANET_TYPES; type = ::PlanetType(type + 1))
                 planet_types.push_back(type);
 
@@ -968,6 +980,7 @@ private:
             param_widget_top += m_string_drop->Height();
 
             std::vector< ::StarType> star_types;
+            star_types.reserve(NUM_STAR_TYPES);
             for (::StarType type = STAR_BLUE; type != NUM_STAR_TYPES; type = ::StarType(type + 1))
                 star_types.push_back(type);
 
@@ -990,7 +1003,7 @@ private:
 
             // collect all valid foci on any object in universe
             std::set<std::string> all_foci;
-            for (auto& planet : Objects().FindObjects<Planet>()) {
+            for (auto& planet : Objects().all<Planet>()) {
                 auto obj_foci = planet->AvailableFoci();
                 std::copy(obj_foci.begin(), obj_foci.end(),
                           std::inserter(all_foci, all_foci.end()));
@@ -1014,6 +1027,7 @@ private:
             param_widget_top = m_string_drop->Height() + GG::Y(Value(PAD));
 
             std::vector< ::MeterType> meter_types;
+            meter_types.reserve(NUM_METER_TYPES);
             for (auto type = METER_TARGET_POPULATION; type != NUM_METER_TYPES; type = ::MeterType(type + 1))
                 meter_types.push_back(type);
 
@@ -1072,12 +1086,12 @@ private:
 class FilterDialog : public CUIWnd {
 public:
     FilterDialog(const std::map<UniverseObjectType, std::set<VIS_DISPLAY>>& vis_filters,
-                 const Condition::ConditionBase* const condition_filter);
+                 const Condition::Condition* const condition_filter);
 
     void CompleteConstruction() override;
     bool ChangesAccepted();
     std::map<UniverseObjectType, std::set<VIS_DISPLAY>> GetVisibilityFilters() const;
-    std::unique_ptr<Condition::ConditionBase> GetConditionFilter();
+    std::unique_ptr<Condition::Condition> GetConditionFilter();
 
 protected:
     GG::Rect CalculatePosition() const override;
@@ -1105,7 +1119,7 @@ private:
 
 FilterDialog::FilterDialog(const std::map<UniverseObjectType,
                            std::set<VIS_DISPLAY>>& vis_filters,
-                           const Condition::ConditionBase* const condition_filter) :
+                           const Condition::Condition* const condition_filter) :
     CUIWnd(UserString("FILTERS"),
            GG::INTERACTIVE | GG::DRAGABLE | GG::MODAL,
            FILTER_OPTIONS_WND_NAME),
@@ -1215,7 +1229,7 @@ bool FilterDialog::ChangesAccepted()
 std::map<UniverseObjectType, std::set<VIS_DISPLAY>> FilterDialog::GetVisibilityFilters() const
 { return m_vis_filters; }
 
-std::unique_ptr<Condition::ConditionBase> FilterDialog::GetConditionFilter()
+std::unique_ptr<Condition::Condition> FilterDialog::GetConditionFilter()
 { return m_condition_widget->GetCondition(); }
 
 GG::Rect FilterDialog::CalculatePosition() const
@@ -1550,6 +1564,7 @@ private:
 
     std::vector<std::shared_ptr<GG::Control>> GetControls() {
         std::vector<std::shared_ptr<GG::Control>> retval;
+        retval.reserve(NUM_COLUMNS);
 
         RefreshCache();
 
@@ -1687,6 +1702,7 @@ public:
         m_controls.clear();
 
         auto&& controls = GetControls();
+        m_controls.reserve(controls.size());
         for (int i = 0; i < static_cast<int>(controls.size()); ++i) {
             m_controls.push_back(controls[i]);
             AttachChild(controls[i]);
@@ -1787,6 +1803,7 @@ private:
 
     std::vector<std::shared_ptr<GG::Button>> GetControls() {
         std::vector<std::shared_ptr<GG::Button>> retval;
+        retval.reserve(NUM_COLUMNS);
 
         auto control = Wnd::Create<CUIButton>("-");
         retval.push_back(control);
@@ -1935,7 +1952,7 @@ public:
     static GG::Y ListRowHeight()
     { return GG::Y(ClientUI::Pts() * 2); }
 
-    const Condition::ConditionBase* const FilterCondition() const
+    const Condition::Condition* const FilterCondition() const
     { return m_filter_condition.get(); }
 
     const std::map<UniverseObjectType, std::set<VIS_DISPLAY>> Visibilities() const
@@ -1968,7 +1985,7 @@ public:
     bool AnythingCollapsed() const
     { return !m_collapsed_objects.empty(); }
 
-    void SetFilterCondition(std::unique_ptr<Condition::ConditionBase>&& condition) {
+    void SetFilterCondition(std::unique_ptr<Condition::Condition>&& condition) {
         m_filter_condition = std::move(condition);
         Refresh();
     }
@@ -2023,7 +2040,7 @@ public:
         std::map<int, std::set<int>>    planet_buildings;
         std::set<int>                   fields;
 
-        for (const auto& obj : GetUniverse().Objects()) {
+        for (const auto& obj : GetUniverse().Objects().all()) {
             if (!ObjectShown(obj))
                 continue;
 
@@ -2356,7 +2373,7 @@ private:
 
     std::map<int, boost::signals2::connection>          m_object_change_connections;
     std::set<int>                                       m_collapsed_objects;
-    std::unique_ptr<Condition::ConditionBase>           m_filter_condition = nullptr;
+    std::unique_ptr<Condition::Condition>           m_filter_condition = nullptr;
     std::map<UniverseObjectType, std::set<VIS_DISPLAY>> m_visibilities;
     std::shared_ptr<ObjectHeaderRow>                    m_header_row = nullptr;
     boost::signals2::connection                         m_obj_deleted_connection;

@@ -7,7 +7,6 @@
 #include "ValueRefParser.h"
 
 #include "../universe/Tech.h"
-#include "../universe/Effect.h"
 #include "../util/Logger.h"
 #include "../util/Directories.h"
 
@@ -22,7 +21,7 @@
 
 #if DEBUG_PARSERS
 namespace std {
-    inline ostream& operator<<(ostream& os, const std::vector<Effect::EffectBase*>&) { return os; }
+    inline ostream& operator<<(ostream& os, const std::vector<Effect::Effect*>&) { return os; }
     inline ostream& operator<<(ostream& os, const GG::Clr&) { return os; }
     inline ostream& operator<<(ostream& os, const ItemSpec&) { return os; }
 }

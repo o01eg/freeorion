@@ -46,7 +46,8 @@ namespace {
      */
     template <typename T>
     void AddTraitBypassOption(OptionsDB& db, std::string const & root, std::string ROOT,
-                                 T def, ValidatorBase const & validator) {
+                              T def, ValidatorBase const & validator)
+    {
         std::string option_root = "ai.trait." + root + ".";
         std::string user_string_root = "OPTIONS_DB_AI_CONFIG_TRAIT_"+ROOT;
         db.Add<bool>(option_root + "force.enabled", UserStringNop(user_string_root + "_FORCE"), false);
@@ -249,7 +250,6 @@ void AIClientApp::HandleMessage(const Message& msg) {
         SaveGameUIData ui_data;         // ignored
         bool state_string_available;    // ignored, as save_state_string is sent even if not set by ExtractMessageData
         std::string save_state_string;
-        m_empire_status.clear();
 
         ExtractGameStartMessageData(msg,                     single_player_game,     m_empire_id,
                                     m_current_turn,          m_empires,              m_universe,

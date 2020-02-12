@@ -1252,10 +1252,10 @@ namespace {
             return retval;
 
         // is there a valid single selected ship in the active FleetWnd?
-        for (int ship_id : FleetUIManager::GetFleetUIManager().SelectedShipIDs())
-            if (auto ship = GetUniverse().Objects().Object<Ship>(ship_id))
-                if (ship->SystemID() == system_id && ship->HasTroops() && ship->OwnedBy(HumanClientApp::GetApp()->EmpireID()))
-                    retval.insert(ship);
+        for (const auto& ship : GetUniverse().Objects().find<Ship>(
+                FleetUIManager::GetFleetUIManager().SelectedShipIDs()))
+            if (ship->SystemID() == system_id && ship->HasTroops() && ship->OwnedBy(HumanClientApp::GetApp()->EmpireID()))
+                retval.insert(ship);
 
         return retval;
     }
@@ -1314,8 +1314,8 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
 
     PlanetType target_planet_type = target_planet->Type();
 
-    // todo: return vector of ships from system ids using new Objects().FindObjects<Ship>(system->FindObjectIDs())
-    auto ships = Objects().FindObjects<const Ship>(system->ShipIDs());
+    // todo: return vector of ships from system ids using new Objects().find<Ship>(system->FindObjectIDs())
+    auto ships = Objects().find<const Ship>(system->ShipIDs());
     std::vector<std::shared_ptr<const Ship>> capable_and_available_colony_ships;
     capable_and_available_colony_ships.reserve(ships.size());
 
@@ -1429,7 +1429,7 @@ std::set<std::shared_ptr<const Ship>> AutomaticallyChosenInvasionShips(int targe
     double defending_troops = target_planet->InitialMeterValue(METER_TROOPS);
 
     double invasion_troops = 0;
-    for (auto& ship : Objects().FindObjects<Ship>()) {
+    for (auto& ship : Objects().all<Ship>()) {
         if (!AvailableToInvade(ship, system_id, empire_id))
             continue;
 
@@ -1466,7 +1466,7 @@ std::set<std::shared_ptr<const Ship>> AutomaticallyChosenBombardShips(int target
     if (target_planet->OwnedBy(empire_id))
         return retval;
 
-    for (auto& ship : Objects().FindObjects<Ship>()) {
+    for (auto& ship : Objects().all<Ship>()) {
         // owned ship is capable of bombarding a planet in this system
         if (!AvailableToBombard(ship, system_id, empire_id))
             continue;
@@ -1753,13 +1753,9 @@ void SidePanel::PlanetPanel::Refresh() {
         // underestimate, since one needs to drop more droops than there are defenders
         // to capture a planet
         float defending_troops = planet->InitialMeterValue(METER_TROOPS);
-        //std::cout << "def troops: " << defending_troops << std::endl;
         float log10_df = floor(std::log10(defending_troops));
-        //std::cout << "def troops log10: " << log10_df << std::endl;
         float rounding_adjustment = std::pow(10.0f, log10_df - 2.0f);
-        //std::cout << "adjustment: " << rounding_adjustment << std::endl;
         defending_troops += rounding_adjustment;
-        //std::cout << "adjusted def troops: " << defending_troops<< std::endl;
 
         std::string defending_troops_text = DoubleToString(defending_troops, 3, false);
         std::string invasion_text = boost::io::str(FlexibleFormat(UserString("PL_INVADE"))
@@ -2055,7 +2051,7 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
     // an owned object in this fleet's system
     std::set<int> peaceful_empires_in_system;
     if (system) {
-        auto system_objects = Objects().FindObjects<const UniverseObject>(system->ObjectIDs());
+        auto system_objects = Objects().find<const UniverseObject>(system->ObjectIDs());
         for (auto& obj : system_objects) {
             if (obj->GetVisibility(client_empire_id) < VIS_PARTIAL_VISIBILITY)
                 continue;
@@ -2552,8 +2548,6 @@ void SidePanel::PlanetPanelContainer::Clear() {
 }
 
 void SidePanel::PlanetPanelContainer::SetPlanets(const std::vector<int>& planet_ids, StarType star_type) {
-    //std::cout << "SidePanel::PlanetPanelContainer::SetPlanets( size: " << planet_ids.size() << " )" << std::endl;
-
     int initial_selected_planet_panel = m_selected_planet_id;
 
     // remove old panels
@@ -2863,7 +2857,7 @@ namespace {
 
             GG::Y top = row_height;
             // add label-value pair for each resource-producing object in system to indicate amount of resource produced
-            auto objects = Objects().FindObjects<const Planet>(system->ContainedObjectIDs());
+            auto objects = Objects().find<const Planet>(system->ContainedObjectIDs());
             for (const auto& planet : objects) {
                 // Ignore empty planets
                 if (planet->Unowned() && planet->SpeciesName().empty())
@@ -3170,12 +3164,12 @@ void SidePanel::RefreshInPreRender() {
         return;
     }
 
-    for (auto& planet : Objects().FindObjects<Planet>(system->PlanetIDs())) {
+    for (auto& planet : Objects().find<Planet>(system->PlanetIDs())) {
         s_system_connections.insert(planet->ResourceCenterChangedSignal.connect(
                                         SidePanel::ResourceCenterChangedSignal));
     }
 
-    for (auto& fleet : Objects().FindObjects<Fleet>(system->FleetIDs())) {
+    for (auto& fleet : Objects().find<Fleet>(system->FleetIDs())) {
         s_fleet_state_change_signals[fleet->ID()] = fleet->StateChangedSignal.connect(
                                                         &SidePanel::Update);
     }
@@ -3211,7 +3205,7 @@ void SidePanel::RefreshSystemNames() {
     // maintaing the list by incrementally inserting/deleting system
     // names, then this approach should also be dropped.
     std::set<std::pair<std::string, int>> sorted_systems;
-    for (auto& system : Objects().FindObjects<System>()) {
+    for (auto& system : Objects().all<System>()) {
         // Skip rows for systems that aren't known to this client, except the selected system
         if (!system->Name().empty() || system->ID() == s_system_id)
             sorted_systems.insert({system->Name(), system->ID()});
@@ -3308,7 +3302,7 @@ void SidePanel::RefreshImpl() {
     int all_owner_id = ALL_EMPIRES;
     bool all_planets_share_owner = true;
     std::vector<int> all_planets, player_planets;
-    for (auto& planet : Objects().FindObjects<const Planet>(planet_ids)) {
+    for (auto& planet : Objects().find<const Planet>(planet_ids)) {
         // If it is neither owned nor populated with natives, it can be ignored.
         if (planet->Unowned() && planet->SpeciesName().empty())
             continue;

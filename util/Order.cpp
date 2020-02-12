@@ -293,26 +293,10 @@ bool FleetMoveOrder::Check(int empire_id, int fleet_id, int dest_system_id, bool
         return false;
     }
 
-    int start_system = fleet->SystemID();
-    if (start_system == INVALID_OBJECT_ID)
-        start_system = fleet->NextSystemID();
-
     auto dest_system = GetEmpireKnownSystem(dest_system_id, empire_id);
     if (!dest_system) {
         ErrorLogger() << "Empire with id " << empire_id << " ordered fleet to move to system with id " << dest_system_id << " but no such system is known to that empire";
         return false;
-    }
-
-    // verify fleet route first system
-    if (append && !fleet->TravelRoute().empty()) {
-        // We should append and there is something to append to
-        int last_system = fleet->TravelRoute().back();
-        if (last_system != start_system) {
-            ErrorLogger() << "Empire with id " << empire_id
-                          << " ordered a fleet to continue from system with id " << start_system
-                          << ", but the fleet's current route won't lead there, it leads to system " << last_system;
-            return false;
-        }
     }
 
     return true;
@@ -386,7 +370,7 @@ bool FleetTransferOrder::Check(int empire_id, int dest_fleet_id, const std::vect
 
     bool invalid_ships {false};
 
-    for (auto ship : Objects().FindObjects<Ship>(ship_ids)) {
+    for (auto ship : Objects().find<Ship>(ship_ids)) {
         if (!ship) {
             ErrorLogger() << "IssueFleetTransferOrder : passed an invalid ship_id";
             invalid_ships = true;
@@ -425,7 +409,7 @@ void FleetTransferOrder::ExecuteImpl() const {
     auto target_fleet = GetFleet(DestinationFleet());
 
     // check that all ships are in the same system
-    auto ships = Objects().FindObjects<Ship>(m_add_ships);
+    auto ships = Objects().find<Ship>(m_add_ships);
 
     GetUniverse().InhibitUniverseObjectSignals(true);
 
@@ -1333,7 +1317,7 @@ bool GiveObjectToEmpireOrder::Check(int empire_id, int object_id, int recipient_
         return false;
     }
 
-    auto system_objects = Objects().FindObjects<const UniverseObject>(system->ObjectIDs());
+    auto system_objects = Objects().find<const UniverseObject>(system->ObjectIDs());
     if (!std::any_of(system_objects.begin(), system_objects.end(),
                      [recipient_empire_id](const std::shared_ptr<const UniverseObject> o){ return o->Owner() == recipient_empire_id; }))
     {

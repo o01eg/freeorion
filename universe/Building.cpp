@@ -1,7 +1,7 @@
 #include "Building.h"
 
-#include "Effect.h"
 #include "Condition.h"
+#include "Effect.h"
 #include "Planet.h"
 #include "Predicates.h"
 #include "Universe.h"
@@ -15,6 +15,7 @@
 #include "../util/GameRules.h"
 #include "../util/CheckSums.h"
 #include "../util/ScopedTimer.h"
+#include "../util/i18n.h"
 
 #include <boost/filesystem/fstream.hpp>
 
@@ -259,6 +260,7 @@ bool BuildingType::ProductionCostTimeLocationInvariant() const {
 float BuildingType::ProductionCost(int empire_id, int location_id) const {
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_BUILDING_PRODUCTION") || !m_production_cost) {
         return 1.0f;
+
     } else {
         if (m_production_cost && m_production_cost->ConstantExpr())
             return m_production_cost->Eval();

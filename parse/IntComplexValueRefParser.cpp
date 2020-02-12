@@ -1,7 +1,7 @@
 #include "ValueRefParser.h"
 
 #include "MovableEnvelope.h"
-#include "../universe/ValueRef.h"
+#include "../universe/ValueRefs.h"
 #include <boost/spirit/include/phoenix.hpp>
 #include <boost/spirit/include/qi_as.hpp>
 
@@ -71,12 +71,12 @@ namespace parse {
                > label(tok.Object_)
                > ( int_rules.expr
                    // "cast" the ValueRef::Statistic<int> into
-                   // ValueRef::ValueRefBase<int> so the alternative contains a
+                   // ValueRef::ValueRef<int> so the alternative contains a
                    // single type
-                   | qi::as<parse::detail::MovableEnvelope<ValueRef::ValueRefBase<int>>>()[int_rules.statistic_expr])
+                   | qi::as<parse::detail::MovableEnvelope<ValueRef::ValueRef<int>>>()[int_rules.statistic_expr])
                > label(tok.Object_)
                > (int_rules.expr
-                  | qi::as<parse::detail::MovableEnvelope<ValueRef::ValueRefBase<int>>>()[int_rules.statistic_expr])
+                  | qi::as<parse::detail::MovableEnvelope<ValueRef::ValueRef<int>>>()[int_rules.statistic_expr])
               ) [ _val = construct_movable_(new_<ValueRef::ComplexVariable<int>>(_1, deconstruct_movable_(_2, _pass), deconstruct_movable_(_3, _pass), nullptr, nullptr, nullptr)) ]
             ;
 
@@ -145,6 +145,7 @@ namespace parse {
             =   (
                     (   tok.ShipDesignsDestroyed_
                     |   tok.ShipDesignsLost_
+                    |   tok.ShipDesignsInProduction_
                     |   tok.ShipDesignsOwned_
                     |   tok.ShipDesignsProduced_
                     |   tok.ShipDesignsScrapped_
@@ -202,7 +203,7 @@ namespace parse {
         part_class_in_ship_design.name("PartOfClassInShipDesign");
         part_class_as_int.name("PartClass");
         ship_parts_owned.name("ShipPartsOwned");
-        empire_design_ref.name("ShipDesignsDestroyed, ShipDesignsLost, ShipDesignsOwned, ShipDesignsProduced, or ShipDesignsScrapped");
+        empire_design_ref.name("ShipDesignsDestroyed, ShipDesignsInProduction, ShipDesignsLost, ShipDesignsOwned, ShipDesignsProduced, or ShipDesignsScrapped");
         slots_in_hull.name("SlotsInHull");
         slots_in_ship_design.name("SlotsInShipDesign");
         special_added_on_turn.name("SpecialAddedOnTurn");

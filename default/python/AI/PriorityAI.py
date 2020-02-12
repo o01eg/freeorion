@@ -1,5 +1,6 @@
 import math
 from logging import debug
+from operator import itemgetter
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
 
@@ -49,7 +50,7 @@ def calculate_priorities():
     prioritiees_timer.start('Evaluating Military Status')
     MilitaryAI.get_military_fleets()
 
-    print("\n** Calculating Production Priorities ***\n")
+    debug("\n** Calculating Production Priorities ***\n")
     prioritiees_timer.start('reporting Production Priority')
     _calculate_industry_priority()  # purely for reporting purposes
     prioritiees_timer.start('setting Exploration Priority')
@@ -490,7 +491,7 @@ def _calculate_top_production_queue_priority():
         production_queue_priorities[priorityType] = aistate.get_priority(priorityType)
 
     sorted_priorities = production_queue_priorities.items()
-    sorted_priorities.sort(lambda x, y: cmp(x[1], y[1]), reverse=True)
+    sorted_priorities.sort(key=itemgetter(1), reverse=True)
     top_production_queue_priority = -1
     for evaluationPair in sorted_priorities:
         if top_production_queue_priority < 0:

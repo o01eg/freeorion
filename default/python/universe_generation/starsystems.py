@@ -1,3 +1,4 @@
+from __future__ import print_function
 import random
 import sys
 from itertools import product
@@ -90,7 +91,7 @@ def generate_systems(pos_list, gsd):
             continue
         sys_list.append(system)
 
-        orbits = range(fo.sys_get_num_orbits(system))
+        orbits = list(range(fo.sys_get_num_orbits(system)))
 
         if not planets.can_have_planets(star_type, orbits, gsd.planet_density, gsd.shape):
             continue
@@ -110,12 +111,12 @@ def generate_systems(pos_list, gsd):
             continue
 
         recursion_limit = 1000
-        for _, orbit in product(range(recursion_limit), orbits):
+        for _, orbit in product(range(recursion_limit), orbits):  # pylint: disable=range-builtin-not-iterating PY_3_MIGRATION
             if planets.generate_a_planet(system, star_type, orbit, gsd.planet_density, gsd.shape):
                 break
         else:
             # Intentionally non-modal.  Should be a warning.
-            print >> sys.stderr, ("Python generate_systems: place planets in system %d at position (%.2f, %.2f) failed"
-                                  % (system, position[0], position[1]))
+            print(("Python generate_systems: place planets in system %d at position (%.2f, %.2f) failed"
+                   % (system, position[0], position[1])), file=sys.stderr)
 
     return sys_list

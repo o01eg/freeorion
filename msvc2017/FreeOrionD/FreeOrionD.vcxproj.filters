@@ -89,10 +89,10 @@
     <ClInclude Include="..\..\universe\Building.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\universe\Condition.h">
+    <ClInclude Include="..\..\universe\Conditions.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\universe\Effect.h">
+    <ClInclude Include="..\..\universe\Effects.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
     <ClInclude Include="..\..\universe\Enums.h">
@@ -146,7 +146,7 @@
     <ClInclude Include="..\..\universe\UniverseObject.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\universe\ValueRef.h">
+    <ClInclude Include="..\..\universe\ValueRefs.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
     <ClInclude Include="..\..\server\ServerApp.h">
@@ -209,13 +209,10 @@
     <ClInclude Include="..\..\util\XMLDoc.h">
       <Filter>Header Files\util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\universe\ValueRefFwd.h">
-      <Filter>Header Files\universe</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\universe\ObjectMap.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\universe\EffectAccounting.h">
+    <ClInclude Include="..\..\universe\Effect.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
     <ClInclude Include="..\..\universe\UniverseGenerator.h">

@@ -154,9 +154,9 @@
     <ClInclude Include="..\..\python\CommonWrappers.h" />
     <ClInclude Include="..\..\python\SetWrapper.h" />
     <ClInclude Include="..\..\universe\Building.h" />
-    <ClInclude Include="..\..\universe\Condition.h" />
+    <ClInclude Include="..\..\universe\Conditions.h" />
+    <ClInclude Include="..\..\universe\Effects.h" />
     <ClInclude Include="..\..\universe\Effect.h" />
-    <ClInclude Include="..\..\universe\EffectAccounting.h" />
     <ClInclude Include="..\..\universe\Enums.h" />
     <ClInclude Include="..\..\universe\Fleet.h" />
     <ClInclude Include="..\..\util\blocking_combiner.h" />
@@ -175,8 +175,7 @@
     <ClInclude Include="..\..\universe\Tech.h" />
     <ClInclude Include="..\..\universe\Universe.h" />
     <ClInclude Include="..\..\universe\UniverseObject.h" />
-    <ClInclude Include="..\..\universe\ValueRef.h" />
-    <ClInclude Include="..\..\universe\ValueRefFwd.h" />
+    <ClInclude Include="..\..\universe\ValueRefs.h" />
     <ClInclude Include="..\..\util\AppInterface.h" />
     <ClInclude Include="..\..\util\binreloc.h" />
     <ClInclude Include="..\..\util\Directories.h" />

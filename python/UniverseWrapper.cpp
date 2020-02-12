@@ -13,7 +13,7 @@
 #include "../universe/Special.h"
 #include "../universe/Species.h"
 #include "../universe/Enums.h"
-#include "../universe/EffectAccounting.h"
+#include "../universe/Effect.h"
 #include "../universe/Predicates.h"
 #include "../util/Logger.h"
 #include "../util/MultiplayerCommon.h"
@@ -51,6 +51,8 @@ namespace boost {
 namespace {
     void                    DumpObjects(const Universe& universe)
     { DebugLogger() << universe.Objects().Dump(); }
+    std::string             ObjectDump(const UniverseObject& obj)
+    { return obj.Dump(0); }
 
     // We're returning the result of operator-> here so that python doesn't
     // need to deal with std::shared_ptr class.
@@ -70,29 +72,25 @@ namespace {
     const Building*         GetBuildingP(const Universe& universe, int id)
     { return ::GetBuilding(id).operator->(); }
 
-    std::vector<int>        ObjectIDs(const Universe& universe)
-    { return Objects().FindObjectIDs(); }
-    std::vector<int>        FleetIDs(const Universe& universe)
-    { return Objects().FindObjectIDs<Fleet>(); }
-    std::vector<int>        SystemIDs(const Universe& universe)
-    { return Objects().FindObjectIDs<System>(); }
-    std::vector<int>        FieldIDs(const Universe& universe)
-    { return Objects().FindObjectIDs<Field>(); }
-    std::vector<int>        PlanetIDs(const Universe& universe)
-    { return Objects().FindObjectIDs<Planet>(); }
-    std::vector<int>        ShipIDs(const Universe& universe)
-    { return Objects().FindObjectIDs<Ship>(); }
-    std::vector<int>        BuildingIDs(const Universe& universe)
-    { return Objects().FindObjectIDs<Building>(); }
+    template<typename T>
+    std::vector<int> ObjectIDs(const Universe& universe)
+    {
+        std::vector<int> result;
+        result.reserve(universe.Objects().size<T>());
+        for (const auto& obj : universe.Objects().all<T>())
+            result.push_back(obj->ID());
+        return result;
+    }
 
     std::vector<std::string>SpeciesFoci(const Species& species) {
         std::vector<std::string> retval;
+        retval.reserve(species.Foci().size());
         for (const FocusType& focus : species.Foci())
             retval.push_back(focus.Name());
         return retval;
     }
 
-    void                    UpdateMetersWrapper(const Universe& universe, const boost::python::list& objList) {
+    void UpdateMetersWrapper(const Universe& universe, const boost::python::list& objList) {
         std::vector<int> objvec;
         int const numObjects = boost::python::len(objList);
         for (int i = 0; i < numObjects; i++)
@@ -100,20 +98,20 @@ namespace {
         GetUniverse().UpdateMeterEstimates(objvec);
     }
 
-    //void                    (Universe::*UpdateMeterEstimatesVoidFunc)(void) =                   &Universe::UpdateMeterEstimates;
+    //void (Universe::*UpdateMeterEstimatesVoidFunc)(void) =                                      &Universe::UpdateMeterEstimates;
 
-    double                  LinearDistance(const Universe& universe, int system1_id, int system2_id) {
+    double LinearDistance(const Universe& universe, int system1_id, int system2_id) {
         double retval = universe.GetPathfinder()->LinearDistance(system1_id, system2_id);
         return retval;
     }
     boost::function<double(const Universe&, int, int)> LinearDistanceFunc =                     &LinearDistance;
 
-    int                     JumpDistanceBetweenObjects(const Universe& universe, int object1_id, int object2_id) {
+    int JumpDistanceBetweenObjects(const Universe& universe, int object1_id, int object2_id) {
         return universe.GetPathfinder()->JumpDistanceBetweenObjects(object1_id, object2_id);
     }
     boost::function<int(const Universe&, int, int)> JumpDistanceFunc =                          &JumpDistanceBetweenObjects;
 
-    std::vector<int>        ShortestPath(const Universe& universe, int start_sys, int end_sys, int empire_id) {
+    std::vector<int> ShortestPath(const Universe& universe, int start_sys, int end_sys, int empire_id) {
         std::vector<int> retval;
         std::pair<std::list<int>, int> path = universe.GetPathfinder()->ShortestPath(start_sys, end_sys, empire_id);
         std::copy(path.first.begin(), path.first.end(), std::back_inserter(retval));
@@ -121,7 +119,7 @@ namespace {
     }
     boost::function<std::vector<int>(const Universe&, int, int, int)> ShortestPathFunc =        &ShortestPath;
 
-    std::vector<int>        ShortestNonHostilePath(const Universe& universe, int start_sys, int end_sys, int empire_id) {
+    std::vector<int> ShortestNonHostilePath(const Universe& universe, int start_sys, int end_sys, int empire_id) {
         std::vector<int> retval;
         auto fleet_pred = std::make_shared<HostileVisitor<System>>(empire_id);
         std::pair<std::list<int>, int> path = universe.GetPathfinder()->ShortestPath(start_sys, end_sys, empire_id, fleet_pred);
@@ -130,12 +128,12 @@ namespace {
     }
     boost::function<std::vector<int>(const Universe&, int, int, int)> ShortestNonHostilePathFunc = &ShortestNonHostilePath;
 
-    double                  ShortestPathDistance(const Universe& universe, int object1_id, int object2_id) {
+    double ShortestPathDistance(const Universe& universe, int object1_id, int object2_id) {
         return universe.GetPathfinder()->ShortestPathDistance(object1_id, object2_id);
     }
     boost::function<double(const Universe&, int, int)> ShortestPathDistanceFunc =               &ShortestPathDistance;
 
-    std::vector<int>        LeastJumpsPath(const Universe& universe, int start_sys, int end_sys, int empire_id) {
+    std::vector<int> LeastJumpsPath(const Universe& universe, int start_sys, int end_sys, int empire_id) {
         std::vector<int> retval;
         std::pair<std::list<int>, int> path = universe.GetPathfinder()->LeastJumpsPath(start_sys, end_sys, empire_id);
         std::copy(path.first.begin(), path.first.end(), std::back_inserter(retval));
@@ -143,7 +141,7 @@ namespace {
     }
     boost::function<std::vector<int>(const Universe&, int, int, int)> LeastJumpsFunc =          &LeastJumpsPath;
 
-    bool                    SystemsConnectedP(const Universe& universe, int system1_id, int system2_id, int empire_id=ALL_EMPIRES) {
+    bool SystemsConnectedP(const Universe& universe, int system1_id, int system2_id, int empire_id=ALL_EMPIRES) {
         //DebugLogger() << "SystemsConnected!(" << system1_id << ", " << system2_id << ")";
         bool retval = universe.GetPathfinder()->SystemsConnected(system1_id, system2_id, empire_id);
         //DebugLogger() << "SystemsConnected! retval: " << retval;
@@ -151,12 +149,12 @@ namespace {
     }
     boost::function<bool(const Universe&, int, int, int)> SystemsConnectedFunc =                &SystemsConnectedP;
 
-    bool                    SystemHasVisibleStarlanesP(const Universe& universe, int system_id, int empire_id = ALL_EMPIRES) {
+    bool SystemHasVisibleStarlanesP(const Universe& universe, int system_id, int empire_id = ALL_EMPIRES) {
         return universe.GetPathfinder()->SystemHasVisibleStarlanes(system_id, empire_id);
     }
     boost::function<bool(const Universe&, int, int)> SystemHasVisibleStarlanesFunc =            &SystemHasVisibleStarlanesP;
 
-    std::vector<int>        ImmediateNeighborsP(const Universe& universe, int system1_id, int empire_id = ALL_EMPIRES) {
+    std::vector<int> ImmediateNeighborsP(const Universe& universe, int system1_id, int empire_id = ALL_EMPIRES) {
         std::vector<int> retval;
         for (const auto& entry : universe.GetPathfinder()->ImmediateNeighbors(system1_id, empire_id))
         { retval.push_back(entry.second); }
@@ -164,8 +162,8 @@ namespace {
     }
     boost::function<std::vector<int> (const Universe&, int, int)> ImmediateNeighborsFunc =      &ImmediateNeighborsP;
 
-    std::map<int,double>    SystemNeighborsMapP(const Universe& universe, int system1_id, int empire_id = ALL_EMPIRES) {
-        std::map<int,double> retval;
+    std::map<int, double> SystemNeighborsMapP(const Universe& universe, int system1_id, int empire_id = ALL_EMPIRES) {
+        std::map<int, double> retval;
         for (const auto& entry : universe.GetPathfinder()->ImmediateNeighbors(system1_id, empire_id))
         { retval[entry.second] = entry.first; }
         return retval;
@@ -178,6 +176,7 @@ namespace {
 
     std::vector<std::string> ObjectSpecials(const UniverseObject& object) {
         std::vector<std::string> retval;
+        retval.reserve(object.Specials().size());
         for (const auto& special : object.Specials())
         { retval.push_back(special.first); }
         return retval;
@@ -187,11 +186,11 @@ namespace {
     const Ship::PartMeterMap&
                             (Ship::*ShipPartMeters)(void) const =                               &Ship::PartMeters;
 
-    const std::string&      ShipDesignName(const ShipDesign& ship_design)
+    const std::string& ShipDesignName(const ShipDesign& ship_design)
     { return ship_design.Name(false); }
     boost::function<const std::string& (const ShipDesign&)> ShipDesignNameFunc =                &ShipDesignName;
 
-    const std::string&      ShipDesignDescription(const ShipDesign& ship_design)
+    const std::string& ShipDesignDescription(const ShipDesign& ship_design)
     { return ship_design.Description(false); }
     boost::function<const std::string& (const ShipDesign&)> ShipDesignDescriptionFunc =         &ShipDesignDescription;
 
@@ -202,13 +201,13 @@ namespace {
     // The following (PartsSlotType) is not currently used, but left as an example for this kind of wrapper
     //std::vector<std::string>        (ShipDesign::*PartsSlotType)(ShipSlotType) const =          &ShipDesign::Parts;
 
-    std::vector<int>        AttackStatsP(const ShipDesign& ship_design) {
+    std::vector<int> AttackStatsP(const ShipDesign& ship_design) {
         std::vector<int> results;
+        results.reserve(ship_design.Parts().size());
         for (const std::string& part_name : ship_design.Parts()) {
             const PartType* part = GetPartType(part_name);
-            if (part && part->Class() == PC_DIRECT_WEAPON) { // TODO: handle other weapon classes when they are implemented
+            if (part && part->Class() == PC_DIRECT_WEAPON)  // TODO: handle other weapon classes when they are implemented
                 results.push_back(part->Capacity());
-            }
         }
         return results;
     }
@@ -225,7 +224,7 @@ namespace {
     unsigned int            (HullType::*NumSlotsTotal)(void) const =                            &HullType::NumSlots;
     unsigned int            (HullType::*NumSlotsOfSlotType)(ShipSlotType) const =               &HullType::NumSlots;
 
-    bool                    ObjectInField(const Field& field, const UniverseObject& obj)
+    bool ObjectInField(const Field& field, const UniverseObject& obj)
     { return field.InField(obj.X(), obj.Y()); }
     bool                    (Field::*LocationInField)(double x, double y) const =               &Field::InField;
 
@@ -349,13 +348,13 @@ namespace FreeOrionPython {
             .def("getBuilding",                 make_function(GetBuildingP,         return_value_policy<reference_existing_object>()))
             .def("getGenericShipDesign",        &Universe::GetGenericShipDesign,    return_value_policy<reference_existing_object>(), "Returns the ship design (ShipDesign) with the indicated name (string).")
 
-            .add_property("allObjectIDs",       make_function(ObjectIDs,            return_value_policy<return_by_value>()))
-            .add_property("fleetIDs",           make_function(FleetIDs,             return_value_policy<return_by_value>()))
-            .add_property("systemIDs",          make_function(SystemIDs,            return_value_policy<return_by_value>()))
-            .add_property("fieldIDs",           make_function(FieldIDs,             return_value_policy<return_by_value>()))
-            .add_property("planetIDs",          make_function(PlanetIDs,            return_value_policy<return_by_value>()))
-            .add_property("shipIDs",            make_function(ShipIDs,              return_value_policy<return_by_value>()))
-            .add_property("buildingIDs",        make_function(BuildingIDs,          return_value_policy<return_by_value>()))
+            .add_property("allObjectIDs",       make_function(ObjectIDs<UniverseObject>,  return_value_policy<return_by_value>()))
+            .add_property("fleetIDs",           make_function(ObjectIDs<Fleet>,           return_value_policy<return_by_value>()))
+            .add_property("systemIDs",          make_function(ObjectIDs<System>,          return_value_policy<return_by_value>()))
+            .add_property("fieldIDs",           make_function(ObjectIDs<Field>,           return_value_policy<return_by_value>()))
+            .add_property("planetIDs",          make_function(ObjectIDs<Planet>,          return_value_policy<return_by_value>()))
+            .add_property("shipIDs",            make_function(ObjectIDs<Ship>,            return_value_policy<return_by_value>()))
+            .add_property("buildingIDs",        make_function(ObjectIDs<Building>,        return_value_policy<return_by_value>()))
             .def("destroyedObjectIDs",          make_function(&Universe::EmpireKnownDestroyedObjectIDs,
                                                                                     return_value_policy<return_by_value>()))
 
@@ -473,7 +472,7 @@ namespace FreeOrionPython {
             .def("hasTag",                      &UniverseObject::HasTag)
             .add_property("meters",             make_function(ObjectMeters,                 return_internal_reference<>()))
             .def("getMeter",                    make_function(ObjectGetMeter,               return_internal_reference<>()))
-            .def("dump",                        &UniverseObject::Dump,                      return_value_policy<return_by_value>(), "Returns string with debug information, use '0' as argument.")
+            .def("dump",                        make_function(&ObjectDump,                  return_value_policy<return_by_value>()), "Returns string with debug information.")
         ;
 
         ///////////////////

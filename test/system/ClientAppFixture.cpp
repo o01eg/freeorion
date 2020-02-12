@@ -171,7 +171,6 @@ bool ClientAppFixture::HandleMessage(Message& msg) {
         SaveGameUIData ui_data;      // ignored
         bool state_string_available; // ignored
         std::string save_state_string;
-        m_empire_status.clear();
 
         ExtractGameStartMessageData(msg,                     single_player_game,     m_empire_id,
                                     m_current_turn,          m_empires,              m_universe,
@@ -196,11 +195,13 @@ bool ClientAppFixture::HandleMessage(Message& msg) {
     case Message::PLAYER_CHAT:
     case Message::CHAT_HISTORY:
     case Message::TURN_TIMEOUT:
+    case Message::PLAYER_INFO:
         return true; // ignore
     case Message::PLAYER_STATUS: {
         int about_empire_id;
         Message::PlayerStatus status;
         ExtractPlayerStatusMessageData(msg, status, about_empire_id);
+        SetEmpireStatus(about_empire_id, status);
 
         if (status == Message::WAITING) {
             m_ai_waiting.erase(about_empire_id);

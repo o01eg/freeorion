@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys
 from collections import defaultdict
 from math import acos, ceil, cos, floor, pi, sin, sqrt
@@ -17,7 +18,7 @@ class AdjacencyGrid(object):
         self.cell_size = min(max(universe_width / 50, self.min_dist), self.max_dist / sqrt(2))
         self.width = int(universe_width / self.cell_size) + 1
         self.grid = defaultdict(set)
-        print "Adjacency Grid: width {}, cell size {}".format(self.width, self.cell_size)
+        print("Adjacency Grid: width {}, cell size {}".format(self.width, self.cell_size))
 
     def cell(self, pos):
         """Returns cell index."""
@@ -31,8 +32,9 @@ class AdjacencyGrid(object):
         """Removes pos."""
         self.grid[self.cell(pos)].discard(pos)
 
-    def _square_indices_containing_cell(self, (cell_x, cell_y), radius):
+    def _square_indices_containing_cell(self, cell, radius):
         """Return a square of indices containing cell."""
+        cell_x, cell_y = cell
         upper_left_x = max(0, cell_x - radius)
         upper_left_y = max(0, cell_y - radius)
         lower_right_x = min(self.width - 1, cell_x + radius)
@@ -333,7 +335,7 @@ def enforce_max_distance(positions, adjacency_grid):
     clusterer = Clusterer(positions, adjacency_grid)
 
     if len(clusterer) == 1:
-        print "All systems positioned in a single connected cluster"
+        print("All systems positioned in a single connected cluster")
     else:
         print("{} clusters separated by more than the MAX_STARLANE_LENGTH."
               "  Starting to fill gaps.".format(len(clusterer)))
@@ -362,7 +364,7 @@ def enforce_max_distance(positions, adjacency_grid):
         clusterer.stitch_clusters(p1, p2, extra_positions)
 
         if len(clusterer) == 1:
-            print "All systems now positioned in a single connected cluster"
+            print("All systems now positioned in a single connected cluster")
         else:
             print("{} clusters separated by more the MAX_STARLANE_LENGTH.  "
                   "Continuing to fill gaps.".format(len(clusterer)))
@@ -520,7 +522,7 @@ def cluster_galaxy_calc_positions(positions, adjacency_grid, size, width):
     Calculate positions for the cluster galaxy shape.
     """
     if size < 1:
-        print >> sys.stderr, "Cluster galaxy requested for less than 1 star"
+        print("Cluster galaxy requested for less than 1 star", file=sys.stderr)
         return
 
     if size == 1:
@@ -670,7 +672,7 @@ def irregular_galaxy_calc_positions(positions, adjacency_grid, size, width):
     Calculate positions for the irregular galaxy shape.
     """
     max_delta = max(min(float(universe_tables.MAX_STARLANE_LENGTH), width / 10.0), adjacency_grid.min_dist * 2.0)
-    print "Irregular galaxy shape: max delta distance = {}".format(max_delta)
+    print("Irregular galaxy shape: max delta distance = {}".format(max_delta))
     origin_x, origin_y = width / 2.0, width / 2.0
     prev_x, prev_y = origin_x, origin_y
     reset_to_origin = 0
@@ -693,7 +695,7 @@ def irregular_galaxy_calc_positions(positions, adjacency_grid, size, width):
             adjacency_grid.insert_pos(pos)
             positions.append(pos)
         prev_x, prev_y = x, y
-    print "Reset to origin {} times".format(reset_to_origin)
+    print("Reset to origin {} times".format(reset_to_origin))
 
 
 def recalc_universe_width(positions):
@@ -704,7 +706,7 @@ def recalc_universe_width(positions):
 
     Returns the new universe width and the recalculated positions.
     """
-    print "Recalculating universe width..."
+    print("Recalculating universe width...")
     # first, get the uppermost, lowermost, leftmost and rightmost positions
     # (these are those with their x or y coordinate closest to or farthest away from the x or y axis)
     min_x = min(positions, key=lambda p: p[0])[0]
@@ -726,13 +728,13 @@ def recalc_universe_width(positions):
     width = max_x - min_x
     height = max_y - min_y
     actual_width = max(width, height) + 20.0
-    print "...recalculated universe width: {}".format(actual_width)
+    print("...recalculated universe width: {}".format(actual_width))
 
     # shift all positions so the entire map is centered in a quadratic box of the width we just calculated
     # this box defines the extends of our universe
     delta_x = ((actual_width - width) / 2) - min_x
     delta_y = ((actual_width - height) / 2) - min_y
-    print "...shifting all system positions by {}/{}".format(delta_x, delta_y)
+    print("...shifting all system positions by {}/{}".format(delta_x, delta_y))
     new_positions = [(p[0] + delta_x, p[1] + delta_y) for p in positions]
 
     print("...the leftmost system position is now at x coordinate {}"
@@ -756,13 +758,13 @@ def calc_star_system_positions(gsd):
 
     # calculate typical width for universe based on number of systems
     width = calc_universe_width(gsd.shape, gsd.size)
-    print "Set universe width to {}".format(width)
+    print("Set universe width to {}".format(width))
     fo.set_universe_width(width)
 
     positions = []
     adjacency_grid = AdjacencyGrid(width)
 
-    print "Creating {} galaxy shape".format(gsd.shape)
+    print("Creating {} galaxy shape".format(gsd.shape))
     if gsd.shape == fo.galaxyShape.spiral2:
         spiral_galaxy_calc_positions(positions, adjacency_grid, 2, gsd.size, width)
     elif gsd.shape == fo.galaxyShape.spiral3:
@@ -790,7 +792,7 @@ def calc_star_system_positions(gsd):
     # to avoid having too much "extra space" around the system positions of our galaxy map, recalculate the universe
     # width and shift all positions accordingly
     width, positions = recalc_universe_width(positions)
-    print "Set universe width to {}".format(width)
+    print("Set universe width to {}".format(width))
     fo.set_universe_width(width)
 
     return positions

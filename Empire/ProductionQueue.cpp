@@ -2,11 +2,13 @@
 
 #include "Empire.h"
 #include "../universe/Building.h"
+#include "../universe/Condition.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/ValueRef.h"
 #include "../util/AppInterface.h"
 #include "../util/GameRules.h"
 #include "../util/ScopedTimer.h"
+#include "../util/i18n.h"
 
 #include <boost/range/numeric.hpp>
 #include <boost/range/adaptor/map.hpp>
@@ -313,8 +315,7 @@ namespace {
 }
 
 
-ProductionQueue::ProductionItem::ProductionItem() :
-    build_type(INVALID_BUILD_TYPE)
+ProductionQueue::ProductionItem::ProductionItem()
 {}
 
 ProductionQueue::ProductionItem::ProductionItem(BuildType build_type_) :
@@ -365,7 +366,7 @@ bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id) 
     case BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
             auto location_obj = GetUniverseObject(location_id);
-            const Condition::ConditionBase* c = bt->EnqueueLocation();
+            const Condition::Condition* c = bt->EnqueueLocation();
             if (!c)
                 return true;
             ScriptingContext context(location_obj);
@@ -878,7 +879,7 @@ void ProductionQueue::Update() {
     }
     DebugLogger() << "ProductionQueue::Update: Projections took "
                   << ((sim_time_end - sim_time_start).total_microseconds()) << " microseconds with "
-                  << empire->ProductionPoints() << " total Production Points";
+                  << empire->ResourceOutput(RE_INDUSTRY) << " industry output";
     ProductionQueueChangedSignal();
 }
 

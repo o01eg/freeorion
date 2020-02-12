@@ -104,10 +104,15 @@
     (EffectsGroups)                             \
     (Else)                                      \
     (Empire)                                    \
+    (EmpireHasBuildingAvailable)                \
+    (EmpireHasShipDesignAvailable)              \
+    (EmpireHasShipPartAvailable)                \
+    (EmpireHasTechResearched)                   \
     (EmpireMeter)                               \
     (EmpireMeterValue)                          \
     (EmpireObjectVisibility)                    \
     (EmpireShipsDestroyed)                      \
+    (EmpireStockpile)                           \
     (Enabled)                                   \
     (Endpoint)                                  \
     (EnemyOf)                                   \
@@ -286,7 +291,6 @@
     (Owner)                                     \
     (OwnerHasShipPartAvailable)                 \
     (OwnerHasTech)                              \
-    (OwnerTradeStockpile)                       \
     (Parameters)                                \
     (Part)                                      \
     (PartCapacity)                              \
@@ -302,6 +306,7 @@
     (PartsInShipDesign)                         \
     (PartType)                                  \
     (Passive)                                   \
+    (PeaceWith)                                 \
     (Planet)                                    \
     (Planetbound)                               \
     (PlanetEnvironment)                         \
@@ -423,8 +428,10 @@
 #define TOKEN_SEQ_13                            \
     (Shield)                                    \
     (ShipDesign)                                \
+    (ShipDesignCost)                            \
     (ShipDesignOrdering)                        \
     (ShipDesignsDestroyed)                      \
+    (ShipDesignsInProduction)                   \
     (ShipDesignsLost)                           \
     (ShipDesignsOwned)                          \
     (ShipDesignsProduced)                       \
@@ -541,6 +548,7 @@
     (Unproducible)                              \
     (Unresearchable)                            \
     (UpgradeVisibility)                         \
+    (UsedInDesignID)                            \
     (UserString)                                \
     (UUID)                                      \
     (Value)                                     \

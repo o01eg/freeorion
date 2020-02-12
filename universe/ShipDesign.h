@@ -2,8 +2,6 @@
 #define _ShipDesign_h_
 
 
-#include "ValueRefFwd.h"
-
 #include <map>
 #include <memory>
 #include <set>
@@ -29,11 +27,16 @@
 
 
 FO_COMMON_API extern const int INVALID_OBJECT_ID;
+FO_COMMON_API extern const int INVALID_DESIGN_ID;
 namespace Condition {
-    struct ConditionBase;
+    struct Condition;
 }
 namespace Effect {
     class EffectsGroup;
+}
+namespace ValueRef {
+    template <typename T>
+    struct ValueRef;
 }
 class Empire;
 
@@ -41,28 +44,28 @@ class Empire;
   * storage for parsing to reduce number of sub-items parsed per item. */
 struct FO_COMMON_API CommonParams {
     template <typename T>
-    using ConsumptionMap = std::map<T, std::pair<std::unique_ptr<ValueRef::ValueRefBase<double>>,
-                                                 std::unique_ptr<Condition::ConditionBase>>>;
+    using ConsumptionMap = std::map<T, std::pair<std::unique_ptr<ValueRef::ValueRef<double>>,
+                                                 std::unique_ptr<Condition::Condition>>>;
     CommonParams();
-    CommonParams(std::unique_ptr<ValueRef::ValueRefBase<double>>&& production_cost_,
-                 std::unique_ptr<ValueRef::ValueRefBase<int>>&& production_time_,
+    CommonParams(std::unique_ptr<ValueRef::ValueRef<double>>&& production_cost_,
+                 std::unique_ptr<ValueRef::ValueRef<int>>&& production_time_,
                  bool producible_,
                  const std::set<std::string>& tags_,
-                 std::unique_ptr<Condition::ConditionBase>&& location_,
+                 std::unique_ptr<Condition::Condition>&& location_,
                  std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects_,
                  ConsumptionMap<MeterType>&& production_meter_consumption_,
                  ConsumptionMap<std::string>&& production_special_consumption_,
-                 std::unique_ptr<Condition::ConditionBase>&& enqueue_location_);
+                 std::unique_ptr<Condition::Condition>&& enqueue_location_);
     ~CommonParams();
 
-    std::unique_ptr<ValueRef::ValueRefBase<double>> production_cost;
-    std::unique_ptr<ValueRef::ValueRefBase<int>>    production_time;
+    std::unique_ptr<ValueRef::ValueRef<double>> production_cost;
+    std::unique_ptr<ValueRef::ValueRef<int>>    production_time;
     bool                                            producible;
     std::set<std::string>                           tags;
     ConsumptionMap<MeterType>                       production_meter_consumption;
     ConsumptionMap<std::string>                     production_special_consumption;
-    std::unique_ptr<Condition::ConditionBase>       location;
-    std::unique_ptr<Condition::ConditionBase>       enqueue_location;
+    std::unique_ptr<Condition::Condition>       location;
+    std::unique_ptr<Condition::Condition>       enqueue_location;
     std::vector<std::unique_ptr<Effect::EffectsGroup>> effects;
 };
 
@@ -92,7 +95,7 @@ public:
              CommonParams& common_params, const MoreCommonParams& more_common_params,
              std::vector<ShipSlotType> mountable_slot_types,
              const std::string& icon, bool add_standard_capacity_effect = true,
-             std::unique_ptr<Condition::ConditionBase>&& combat_targets = nullptr);
+             std::unique_ptr<Condition::Condition>&& combat_targets = nullptr);
 
     ~PartType();
     //@}
@@ -106,14 +109,14 @@ public:
     float                   SecondaryStat() const;
 
     bool                    CanMountInSlotType(ShipSlotType slot_type) const;       ///< returns true if this part can be placed in a slot of the indicated type
-    const Condition::ConditionBase*
+    const Condition::Condition*
                             CombatTargets() const { return m_combat_targets.get(); }///< returns the condition for possible targets. may be nullptr if no condition was specified.
     const std::vector<ShipSlotType>&
                             MountableSlotTypes() const { return m_mountable_slot_types; }
 
     bool                    ProductionCostTimeLocationInvariant() const;            ///< returns true if the production cost and time are invariant (does not depend on) the location
-    float                   ProductionCost(int empire_id, int location_id) const;   ///< returns the number of production points required to produce this part
-    int                     ProductionTime(int empire_id, int location_id) const;   ///< returns the number of turns required to produce this part
+    float                   ProductionCost(int empire_id, int location_id, int in_design_id = INVALID_DESIGN_ID) const; ///< returns the number of production points required to produce this part
+    int                     ProductionTime(int empire_id, int location_id, int in_design_id = INVALID_DESIGN_ID) const; ///< returns the number of turns required to produce this part
     bool                    Producible() const { return m_producible; }             ///< returns whether this part type is producible by players and appears on the design screen
 
     const CommonParams::ConsumptionMap<MeterType>&
@@ -122,7 +125,7 @@ public:
                             ProductionSpecialConsumption() const{ return m_production_special_consumption; }
 
     const std::set<std::string>& Tags() const       { return m_tags; }
-    const Condition::ConditionBase* Location() const{ return m_location.get(); }          ///< returns the condition that determines the locations where ShipDesign containing part can be produced
+    const Condition::Condition* Location() const{ return m_location.get(); }          ///< returns the condition that determines the locations where ShipDesign containing part can be produced
     const std::set<std::string>& Exclusions() const { return m_exclusions; }        ///< returns the names of other content that cannot be used in the same ship design as this part
 
     /** Returns the EffectsGroups that encapsulate the effects this part has. */
@@ -150,18 +153,18 @@ private:
     float           m_secondary_stat = 0.0f;    // damage for a hangar bay, shots per turn for a weapon, etc.
     bool            m_producible = false;
 
-    std::unique_ptr<ValueRef::ValueRefBase<double>>     m_production_cost;
-    std::unique_ptr<ValueRef::ValueRefBase<int>>        m_production_time;
+    std::unique_ptr<ValueRef::ValueRef<double>>     m_production_cost;
+    std::unique_ptr<ValueRef::ValueRef<int>>        m_production_time;
     std::vector<ShipSlotType>                           m_mountable_slot_types;
     std::set<std::string>                               m_tags;
     CommonParams::ConsumptionMap<MeterType>             m_production_meter_consumption;
     CommonParams::ConsumptionMap<std::string>           m_production_special_consumption;
-    std::unique_ptr<Condition::ConditionBase>           m_location;
+    std::unique_ptr<Condition::Condition>           m_location;
     std::set<std::string>                               m_exclusions;
     std::vector<std::shared_ptr<Effect::EffectsGroup>>  m_effects;
     std::string                                         m_icon;
     bool                                                m_add_standard_capacity_effect = false;
-    std::unique_ptr<Condition::ConditionBase>           m_combat_targets;
+    std::unique_ptr<Condition::Condition>           m_combat_targets;
 
     friend class boost::serialization::access;
     template <class Archive>
@@ -292,8 +295,8 @@ public:
     float               Detection() const       { return 0.0f; }                ///< returns detection ability of hull
 
     bool                ProductionCostTimeLocationInvariant() const;            ///< returns true if the production cost and time are invariant (does not depend on) the location
-    float               ProductionCost(int empire_id, int location_id) const;   ///< returns the number of production points required to produce this hull
-    int                 ProductionTime(int empire_id, int location_id) const;   ///< returns the number of turns required to produce this hull
+    float               ProductionCost(int empire_id, int location_id, int in_design_id = INVALID_DESIGN_ID) const; ///< returns the number of production points required to produce this hull
+    int                 ProductionTime(int empire_id, int location_id, int in_design_id = INVALID_DESIGN_ID) const; ///< returns the number of turns required to produce this hull
     bool                Producible() const      { return m_producible; }        ///< returns whether this hull type is producible by players and appears on the design screen
 
     const CommonParams::ConsumptionMap<MeterType>&
@@ -308,7 +311,7 @@ public:
     const std::set<std::string>& Tags() const   { return m_tags; }
     bool HasTag(const std::string& tag) const   { return m_tags.count(tag) != 0; }
 
-    const Condition::ConditionBase* Location() const{ return m_location.get(); }      ///< returns the condition that determines the locations where ShipDesign containing hull can be produced
+    const Condition::Condition* Location() const{ return m_location.get(); }      ///< returns the condition that determines the locations where ShipDesign containing hull can be produced
     const std::set<std::string>& Exclusions() const { return m_exclusions; }    ///< returns the names of other content that cannot be used in the same ship design as this part
 
     /** Returns the EffectsGroups that encapsulate the effects this part hull
@@ -338,14 +341,14 @@ private:
     float       m_stealth = 0.0f;
     float       m_structure = 0.0f;
 
-    std::unique_ptr<ValueRef::ValueRefBase<double>>     m_production_cost;
-    std::unique_ptr<ValueRef::ValueRefBase<int>>        m_production_time;
+    std::unique_ptr<ValueRef::ValueRef<double>>     m_production_cost;
+    std::unique_ptr<ValueRef::ValueRef<int>>        m_production_time;
     bool                                                m_producible = false;
     std::vector<Slot>                                   m_slots;
     std::set<std::string>                               m_tags;
     CommonParams::ConsumptionMap<MeterType>             m_production_meter_consumption;
     CommonParams::ConsumptionMap<std::string>           m_production_special_consumption;
-    std::unique_ptr<Condition::ConditionBase>           m_location;
+    std::unique_ptr<Condition::Condition>           m_location;
     std::set<std::string>                               m_exclusions;
     std::vector<std::shared_ptr<Effect::EffectsGroup>>  m_effects;
     std::string                                         m_graphic = "";
@@ -541,8 +544,7 @@ public:
     float                           Defense() const;
 
     const std::string&              Hull() const            { return m_hull; }      ///< returns name of hull on which design is based
-    const HullType*                 GetHull() const
-    { return GetHullTypeManager().GetHullType(m_hull); }                            ///< returns HullType on which design is based
+    const HullType*                 GetHull() const         { return GetHullTypeManager().GetHullType(m_hull); }    ///< returns HullType on which design is based
 
     const std::vector<std::string>& Parts() const           { return m_parts; }     ///< returns vector of names of all parts in this design, with position in vector corresponding to slot positions
     std::vector<std::string>        Parts(ShipSlotType slot_type) const;            ///< returns vector of names of parts in slots of indicated type in this design, unrelated to slot positions
@@ -553,7 +555,8 @@ public:
     bool                            LookupInStringtable() const { return m_name_desc_in_stringtable; }
 
     /** returns number of parts in this ship design, indexed by PartType name */
-    const std::map<std::string, int>&     PartTypeCount() const { return m_num_part_types; }
+    const std::map<std::string, int>&   PartTypeCount() const { return m_num_part_types; }
+    int                                 PartCount() const;
 
     /** returns number of parts in this ship design, indexed by ShipPartClass */
     const std::map<ShipPartClass, int>&   PartClassCount() const { return m_num_part_classes; }

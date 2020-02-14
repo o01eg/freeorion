@@ -17,5 +17,6 @@
   /usr/share/games/freeorion/default/** r,
   /var/lib/freeorion/*.log w,
   /var/log/freeorion/freeoriond.log w,
+  /var/crash/* rw,
 
 }

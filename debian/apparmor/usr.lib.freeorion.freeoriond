@@ -26,5 +26,6 @@
   /var/lib/freeorion/save/**.mps rw,
   /var/lib/freeorion/save/*/ rw,
   /var/log/freeorion/freeoriond.log w,
+  /var/crash/* rw,
 
 }

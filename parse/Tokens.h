@@ -57,6 +57,7 @@
     (ClockwiseNextPlanetType)                   \
     (Colony)                                    \
     (Colour)                                    \
+    (CombatBout)                                \
     (CombatTargets)                             \
     (Condition)                                 \
     (Construction)                              \
@@ -263,6 +264,10 @@
     (NextTurnPopGrowth)                         \
     (NextYoungerStarType)                       \
     (NoDefaultCapacityEffect)                   \
+    (NoDefaultFuelEffect)                       \
+    (NoDefaultSpeedEffect)                      \
+    (NoDefaultStealthEffect)                    \
+    (NoDefaultStructureEffect)                  \
     (None)                                      \
     (NoOp)                                      \
     (NoStar)                                    \

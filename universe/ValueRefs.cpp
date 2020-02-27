@@ -74,19 +74,19 @@ namespace {
             std::string property_name = *first;
             if (property_name == "Planet") {
                 if (auto b = std::dynamic_pointer_cast<const Building>(obj)) {
-                    obj = GetPlanet(b->PlanetID());
+                    obj = Objects().get<Planet>(b->PlanetID());
                 } else {
                     ErrorLogger() << "FollowReference : object not a building, so can't get its planet.";
                     obj = nullptr;
                 }
             } else if (property_name == "System") {
                 if (obj)
-                    obj = GetSystem(obj->SystemID());
+                    obj = Objects().get<System>(obj->SystemID());
                 if (!obj)
                     ErrorLogger() << "FollowReference : Unable to get system for object";
             } else if (property_name == "Fleet") {
                 if (auto s = std::dynamic_pointer_cast<const Ship>(obj)) {
-                    obj = GetFleet(s->FleetID());
+                    obj = Objects().get<Fleet>(s->FleetID());
                 } else {
                     ErrorLogger() << "FollowReference : object not a ship, so can't get its fleet";
                     obj = nullptr;
@@ -144,18 +144,18 @@ namespace {
             if (property_name_part == "Planet") {
                 if (auto b = std::dynamic_pointer_cast<const Building>(obj)) {
                     retval += "(" + std::to_string(b->PlanetID()) + "): ";
-                    obj = GetPlanet(b->PlanetID());
+                    obj = Objects().get<Planet>(b->PlanetID());
                 } else
                     obj = nullptr;
             } else if (property_name_part == "System") {
                 if (obj) {
                     retval += "(" + std::to_string(obj->SystemID()) + "): ";
-                    obj = GetSystem(obj->SystemID());
+                    obj = Objects().get<System>(obj->SystemID());
                 }
             } else if (property_name_part == "Fleet") {
                 if (auto s = std::dynamic_pointer_cast<const Ship>(obj))  {
                     retval += "(" + std::to_string(s->FleetID()) + "): ";
-                    obj = GetFleet(s->FleetID());
+                    obj = Objects().get<Fleet>(s->FleetID());
                 } else
                     obj = nullptr;
             }
@@ -573,6 +573,17 @@ if (m_ref_type == EFFECT_TARGET_VALUE_REFERENCE) {                     \
     }                                                                  \
 }
 
+#define LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(T)                         \
+ErrorLogger() << "Variable<" #T ">::Eval unrecognized object "         \
+                 "property: "                                          \
+              << TraceReference(m_property_name, m_ref_type, context); \
+if (context.source)                                                    \
+    ErrorLogger() << "source: " << context.source->ObjectType() << " " \
+                  << context.source->ID() << " ( "                     \
+                  << context.source->Name() << " ) ";                  \
+else                                                                   \
+    ErrorLogger() << "source (none)";
+
 template <>
 PlanetSize Variable<PlanetSize>::Eval(const ScriptingContext& context) const
 {
@@ -603,13 +614,7 @@ PlanetSize Variable<PlanetSize>::Eval(const ScriptingContext& context) const
         return INVALID_PLANET_SIZE;
     }
 
-
-    ErrorLogger() << "Variable<PlanetSize>::Eval unrecognized object property: " << TraceReference(m_property_name, m_ref_type, context);
-    if (context.source)
-        ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                      << context.source->ID() << " ( " << context.source->Name() << " ) ";
-    else
-        ErrorLogger() << "source (none)";
+    LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(PlanetSize)
 
     return INVALID_PLANET_SIZE;
 }
@@ -659,16 +664,12 @@ PlanetType Variable<PlanetType>::Eval(const ScriptingContext& context) const
         return INVALID_PLANET_TYPE;
     }
 
-
-    ErrorLogger() << "Variable<PlanetType>::Eval unrecognized object property: " << TraceReference(m_property_name, m_ref_type, context);
-    if (context.source)
-        ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                      << context.source->ID() << " ( " << context.source->Name() << " ) ";
-    else
-        ErrorLogger() << "source (none)";
+    LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(PlanetType)
 
     return INVALID_PLANET_TYPE;
 }
+
+
 
 template <>
 PlanetEnvironment Variable<PlanetEnvironment>::Eval(const ScriptingContext& context) const
@@ -689,12 +690,7 @@ PlanetEnvironment Variable<PlanetEnvironment>::Eval(const ScriptingContext& cont
         return INVALID_PLANET_ENVIRONMENT;
     }
 
-    ErrorLogger() << "Variable<PlanetEnvironment>::Eval unrecognized object property: " << TraceReference(m_property_name, m_ref_type, context);
-    if (context.source)
-        ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                      << context.source->ID() << " ( " << context.source->Name() << " ) ";
-    else
-        ErrorLogger() << "source (none)";
+    LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(PlanetEnvironment)
 
     return INVALID_PLANET_ENVIRONMENT;
 }
@@ -723,12 +719,7 @@ UniverseObjectType Variable<UniverseObjectType>::Eval(const ScriptingContext& co
         return INVALID_UNIVERSE_OBJECT_TYPE;
     }
 
-    ErrorLogger() << "Variable<UniverseObjectType>::Eval unrecognized object property: " << TraceReference(m_property_name, m_ref_type, context);
-    if (context.source)
-        ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                      << context.source->ID() << " ( " << context.source->Name() << " ) ";
-    else
-        ErrorLogger() << "source (none)";
+    LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(UniverseObjectType)
 
     return INVALID_UNIVERSE_OBJECT_TYPE;
 }
@@ -763,12 +754,7 @@ StarType Variable<StarType>::Eval(const ScriptingContext& context) const
         return INVALID_STAR_TYPE;
     }
 
-    ErrorLogger() << "Variable<StarType>::Eval unrecognized object property: " << TraceReference(m_property_name, m_ref_type, context);
-    if (context.source)
-        ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                      << std::to_string(context.source->ID()) << " ( " << context.source->Name() << " ) ";
-    else
-        ErrorLogger() << "source (none)";
+    LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(StarType)
 
     return INVALID_STAR_TYPE;
 }
@@ -804,13 +790,8 @@ double Variable<double>::Eval(const ScriptingContext& context) const
         }
 
         // add more non-object reference double functions here
-        ErrorLogger() << "Variable<double>::Eval unrecognized non-object property: "
-                      << TraceReference(m_property_name, m_ref_type, context);
-        if (context.source)
-            ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                          << context.source->ID() << " ( " << context.source->Name() << " ) ";
-        else
-            ErrorLogger() << "source (none)";
+
+        LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(float)
 
         return 0.0;
     }
@@ -818,13 +799,7 @@ double Variable<double>::Eval(const ScriptingContext& context) const
     auto object = FollowReference(m_property_name.begin(), m_property_name.end(),
                                   m_ref_type, context);
     if (!object) {
-        ErrorLogger() << "Variable<double>::Eval unable to follow reference: "
-                      << TraceReference(m_property_name, m_ref_type, context);
-        if (context.source)
-            ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                          << context.source->ID() << " ( " << context.source->Name() << " ) ";
-        else
-            ErrorLogger() << "source (none)";
+        LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(float)
 
         return 0.0;
     }
@@ -860,6 +835,9 @@ double Variable<double>::Eval(const ScriptingContext& context) const
             return planet->DistanceFromOriginalType();
         return 0.0;
 
+    } else if (property_name == "CombatBout") {
+        return context.combat_info.bout;
+
     } else if (property_name == "CurrentTurn") {
         return CurrentTurn();
 
@@ -887,13 +865,7 @@ double Variable<double>::Eval(const ScriptingContext& context) const
         return range_it->second;
     }
 
-    ErrorLogger() << "Variable<double>::Eval unrecognized object property: "
-                  << TraceReference(m_property_name, m_ref_type, context);
-    if (context.source)
-        ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                      << context.source->ID() << " ( " << context.source->Name() << " ) ";
-    else
-        ErrorLogger() << "source (none)";
+    LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(float)
 
     return 0.0;
 }
@@ -906,6 +878,8 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     IF_CURRENT_VALUE(int)
 
     if (m_ref_type == NON_OBJECT_REFERENCE) {
+        if (property_name == "CombatBout")
+            return context.combat_info.bout;
         if (property_name == "CurrentTurn")
             return CurrentTurn();
         if (property_name == "GalaxySize")
@@ -943,12 +917,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
 
         // add more non-object reference int functions here
 
-        ErrorLogger() << "Variable<int>::Eval unrecognized non-object property: " << TraceReference(m_property_name, m_ref_type, context);
-        if (context.source)
-            ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                          << context.source->ID() << " ( " << context.source->Name() << " ) ";
-        else
-            ErrorLogger() << "source (none)";
+        LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(int)
 
         return 0;
     }
@@ -956,12 +925,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     auto object = FollowReference(m_property_name.begin(), m_property_name.end(),
                                   m_ref_type, context);
     if (!object) {
-        ErrorLogger() << "Variable<int>::Eval unable to follow reference: " << TraceReference(m_property_name, m_ref_type, context);
-        if (context.source)
-            ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                          << context.source->ID() << " ( " << context.source->Name() << " ) ";
-        else
-            ErrorLogger() << "source (none)";
+        LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(int)
 
         return 0;
     }
@@ -1081,7 +1045,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     else if (property_name == "LastTurnBattleHere") {
         if (auto const_system = std::dynamic_pointer_cast<const System>(object))
             return const_system->LastTurnBattleHere();
-        else if (auto system = GetSystem(object->SystemID()))
+        else if (auto system = Objects().get<System>(object->SystemID()))
             return system->LastTurnBattleHere();
         return INVALID_GAME_TURN;
 
@@ -1111,7 +1075,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
 
     }
     else if (property_name == "Orbit") {
-        if (auto system = GetSystem(object->SystemID()))
+        if (auto system = Objects().get<System>(object->SystemID()))
             return system->OrbitOfPlanet(object->ID());
         return -1;
 
@@ -1132,12 +1096,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
         return INVALID_OBJECT_ID;
     }
 
-    ErrorLogger() << "Variable<int>::Eval unrecognized object property: " << TraceReference(m_property_name, m_ref_type, context);
-    if (context.source)
-        ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                      << context.source->ID() << " ( " << context.source->Name() << " ) ";
-    else
-        ErrorLogger() << "source (none)";
+    LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(int)
 
     return 0;
 }
@@ -1152,24 +1111,16 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
 
     if (m_ref_type == NON_OBJECT_REFERENCE) {
         // add more non-object reference string vector functions here
-        ErrorLogger() << "std::vector<std::string>::Eval unrecognized non-object property: " << TraceReference(m_property_name, m_ref_type, context);
-        if (context.source)
-            ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                          << context.source->ID() << " ( " << context.source->Name() << " ) ";
-        else
-            ErrorLogger() << "source (none)";
+        LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(std::vector<std::string>)
+
         return {};
     }
 
     auto object = FollowReference(m_property_name.begin(), m_property_name.end(),
                                   m_ref_type, context);
     if (!object) {
-        ErrorLogger() << "Variable<int>::Eval unable to follow reference: " << TraceReference(m_property_name, m_ref_type, context);
-        if (context.source)
-            ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                          << context.source->ID() << " ( " << context.source->Name() << " ) ";
-        else
-            ErrorLogger() << "source (none)";
+        LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(std::vector<std::string>)
+
         return {};
     }
 
@@ -1197,12 +1148,7 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
         return {};
     }
 
-    ErrorLogger() << "std::vector<std::string>::Eval unrecognized object property: " << TraceReference(m_property_name, m_ref_type, context);
-    if (context.source)
-        ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                      << context.source->ID() << " ( " << context.source->Name() << " ) ";
-    else
-        ErrorLogger() << "source (none)";
+    LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(std::vector<std::string>)
 
     return {};
 }
@@ -1219,12 +1165,7 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
             return GetGalaxySetupData().GetSeed();
 
         // add more non-object reference string functions here
-        ErrorLogger() << "Variable<std::string>::Eval unrecognized non-object property: " << TraceReference(m_property_name, m_ref_type, context);
-        if (context.source)
-            ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                          << context.source->ID() << " ( " << context.source->Name() << " ) ";
-        else
-            ErrorLogger() << "source (none)";
+        LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(std::string)
 
         return "";
     }
@@ -1232,12 +1173,7 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
     auto object = FollowReference(m_property_name.begin(), m_property_name.end(),
                                   m_ref_type, context);
     if (!object) {
-        ErrorLogger() << "Variable<std::string>::Eval unable to follow reference: " << TraceReference(m_property_name, m_ref_type, context);
-        if (context.source)
-            ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                          << context.source->ID() << " ( " << context.source->Name() << " ) ";
-        else
-            ErrorLogger() << "source (none)";
+        LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(std::string)
 
         return "";
     }
@@ -1267,6 +1203,11 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
         if (auto ship = std::dynamic_pointer_cast<const Ship>(object))
             if (const ShipDesign* design = ship->Design())
                 return design->Hull();
+        return "";
+
+    } else if (property_name == "FieldType") {
+        if (auto field = std::dynamic_pointer_cast<const Field>(object))
+            return field->FieldTypeName();
         return "";
 
     } else if (property_name == "BuildingType") {
@@ -1321,12 +1262,7 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
         return empire->TopPriorityEnqueuedTech();
     }
 
-    ErrorLogger() << "Variable<std::string>::Eval unrecognized object property: " << TraceReference(m_property_name, m_ref_type, context);
-    if (context.source)
-        ErrorLogger() << "source: " << context.source->ObjectType() << " "
-                      << context.source->ID() << " ( " << context.source->Name() << " ) ";
-    else
-        ErrorLogger() << "source (none)";
+    LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(std::string)
 
     return "";
 }
@@ -1448,7 +1384,7 @@ PlanetEnvironment ComplexVariable<PlanetEnvironment>::Eval(const ScriptingContex
         int planet_id = INVALID_OBJECT_ID;
         if (m_int_ref1)
             planet_id = m_int_ref1->Eval(context);
-        const auto planet = GetPlanet(planet_id);
+        const auto planet = Objects().get<Planet>(planet_id);
         if (!planet)
             return INVALID_PLANET_ENVIRONMENT;
 
@@ -2080,7 +2016,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             object_id = m_int_ref1->Eval(context);
         if (object_id == INVALID_OBJECT_ID)
             return 0;
-        auto object = GetUniverseObject(object_id);
+        auto object = Objects().get(object_id);
         if (!object)
             return 0;
 
@@ -2266,14 +2202,14 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         int object1_id = INVALID_OBJECT_ID;
         if (m_int_ref1)
             object1_id = m_int_ref1->Eval(context);
-        auto obj1 = GetUniverseObject(object1_id);
+        auto obj1 = Objects().get(object1_id);
         if (!obj1)
             return 0.0;
 
         int object2_id = INVALID_OBJECT_ID;
         if (m_int_ref2)
             object2_id = m_int_ref2->Eval(context);
-        auto obj2 = GetUniverseObject(object2_id);
+        auto obj2 = Objects().get(object2_id);
         if (!obj2)
             return 0.0;
 
@@ -2321,7 +2257,7 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         int object_id = INVALID_OBJECT_ID;
         if (m_int_ref1)
             object_id = m_int_ref1->Eval(context);
-        auto object = GetUniverseObject(object_id);
+        auto object = Objects().get(object_id);
         if (!object)
             return 0.0;
 
@@ -2337,7 +2273,7 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         int object_id = INVALID_OBJECT_ID;
         if (m_int_ref1)
             object_id = m_int_ref1->Eval(context);
-        auto object = GetUniverseObject(object_id);
+        auto object = Objects().get(object_id);
         if (!object)
             return 0.0;
         auto ship = std::dynamic_pointer_cast<const Ship>(object);
@@ -3023,7 +2959,7 @@ std::string NameLookup::Eval(const ScriptingContext& context) const {
 
     switch (m_lookup_type) {
     case OBJECT_NAME: {
-        auto obj = GetUniverseObject(m_value_ref->Eval(context));
+        auto obj = Objects().get(m_value_ref->Eval(context));
         return obj ? obj->Name() : "";
         break;
     }

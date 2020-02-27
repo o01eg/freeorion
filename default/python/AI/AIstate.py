@@ -1,3 +1,4 @@
+from __future__ import division
 import copy
 from collections import Counter, OrderedDict as odict
 from logging import error, info, warn, debug
@@ -719,7 +720,7 @@ class AIstate(object):
 
     def get_all_fleet_missions(self):
         """Returns all AIFleetMissions."""
-        return self.__aiMissionsByFleetID.values()
+        return self.__aiMissionsByFleetID.values()  # pylint: disable=dict-values-not-iterating; # PY_3_MIGRATION
 
     def get_fleet_missions_map(self):
         return self.__aiMissionsByFleetID
@@ -985,7 +986,7 @@ class AIstate(object):
         universe = fo.getUniverse()
         empire_id = fo.empireID()
         for dct in [self.qualifyingTroopBaseTargets]:
-            for pid in dct.keys():
+            for pid in list(dct.keys()):
                 planet = universe.getPlanet(pid)
                 if planet and planet.ownedBy(empire_id):
                     del dct[pid]

@@ -6,7 +6,7 @@
 #include "../../universe/Species.h"
 #include "../../universe/Universe.h"
 #include "../../network/Networking.h"
-#include "../../network/ClientNetworking.h"
+#include "../ClientNetworking.h"
 #include "../../util/i18n.h"
 #include "../util/GameRules.h"
 #include "../../util/OptionsDB.h"
@@ -243,7 +243,9 @@ boost::statechart::result WaitingForSPHostAck::react(const StartQuittingGame& e)
 
 boost::statechart::result WaitingForSPHostAck::react(const CheckSum& e) {
     TraceLogger(FSM) << "(HumanClientFSM) CheckSum.";
-    Client().VerifyCheckSum(e.m_message);
+    bool result = Client().VerifyCheckSum(e.m_message);
+    if (!result)
+        ClientUI::MessageBox(UserString("ERROR_CHECKSUM_MISMATCH"), true);
     return discard_event();
 }
 
@@ -320,7 +322,9 @@ boost::statechart::result WaitingForMPHostAck::react(const StartQuittingGame& e)
 
 boost::statechart::result WaitingForMPHostAck::react(const CheckSum& e) {
     TraceLogger(FSM) << "(HumanClientFSM) CheckSum.";
-    Client().VerifyCheckSum(e.m_message);
+    bool result = Client().VerifyCheckSum(e.m_message);
+    if (!result)
+        ClientUI::MessageBox(UserString("ERROR_CHECKSUM_MISMATCH"), true);
     return discard_event();
 }
 
@@ -566,7 +570,9 @@ boost::statechart::result MPLobby::react(const StartQuittingGame& e) {
 
 boost::statechart::result MPLobby::react(const CheckSum& e) {
     TraceLogger(FSM) << "(HumanClientFSM) CheckSum.";
-    Client().VerifyCheckSum(e.m_message);
+    bool result = Client().VerifyCheckSum(e.m_message);
+    if (!result)
+        ClientUI::MessageBox(UserString("ERROR_CHECKSUM_MISMATCH"), true);
     return discard_event();
 }
 
@@ -1073,8 +1079,6 @@ boost::statechart::result PlayingTurn::react(const PlayerStatus& msg) {
         // check status of all empires: are they all done their turns?
         bool all_participants_waiting = true;
         for (auto& entry : Client().Empires()) {
-            int empire_id = entry.first;
-
             if (!entry.second->Ready()) {
                 all_participants_waiting = false;
                 break;

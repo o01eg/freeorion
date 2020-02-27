@@ -1,3 +1,4 @@
+from __future__ import division
 from collections import Counter
 from logging import warn
 
@@ -52,16 +53,16 @@ class ShipCombatStats(object):
             """
 
             :param attacks:
-            :type attacks: dict|None
+            :type attacks: dict[float, int]|None
             :param structure:
             :type structure: int|None
             :param shields:
             :type shields: int|None
             :return:
             """
-            self.structure = 1 if structure is None else structure
-            self.shields = 0 if shields is None else shields
-            self.attacks = {} if attacks is None else tuple_to_dict(attacks)
+            self.structure = 1.0 if structure is None else structure
+            self.shields = 0.0 if shields is None else shields
+            self.attacks = {} if attacks is None else tuple_to_dict(attacks)  # type: dict[float, int]
 
         def get_stats(self, hashable=False):
             """
@@ -156,7 +157,7 @@ class ShipCombatStats(object):
 
         :param hashable: if true, returns tuple instead of attacks-dict
         :return: attacks, structure, shields
-        :rtype: (dict|tuple, int, int)
+        :rtype: (dict|tuple, float, float)
         """
         return self._basic_stats.get_stats(hashable=hashable)
 
@@ -249,7 +250,7 @@ class FleetCombatStats(object):
         :return: list of ship stats
         :rtype: list
         """
-        return map(lambda x: x.get_stats(hashable=hashable), self.__ship_stats)  # pylint: disable=map-builtin-not-iterating PY_3_MIGRATION
+        return map(lambda x: x.get_stats(hashable=hashable), self.__ship_stats)  # pylint: disable=map-builtin-not-iterating; # PY_3_MIGRATION
 
     def get_ship_combat_stats(self):
         """Returns list of ShipCombatStats of fleet."""
@@ -404,7 +405,7 @@ def combine_ratings_list(ratings_list):
     :return: combined rating
     :rtype: float
     """
-    return six.moves.reduce(combine_ratings, ratings_list) if ratings_list else 0
+    return six.moves.reduce(combine_ratings, ratings_list, 0)
 
 
 def rating_needed(target, current=0):

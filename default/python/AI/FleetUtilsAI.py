@@ -1,3 +1,4 @@
+from __future__ import division
 import math
 from logging import error, warn, debug
 
@@ -25,6 +26,10 @@ def stats_meet_reqs(stats, requirements):
     :rtype: bool
     """
     for key in requirements:
+        if key not in stats:  # skip requirements not related to stats
+            if key != "target_system":  # expected not to be in stats
+                warn("Requirement %s not in stats", key)
+            continue
         if stats.get(key, 0) < requirements[key]:
             return False
     return True
@@ -559,7 +564,7 @@ def generate_fleet_orders_for_fleet_missions():
     for orb_defence_fleet_mission in orb_defense_fleet_missions:
         debug("    %s" % orb_defence_fleet_mission)
 
-    fleet_missions = aistate.get_all_fleet_missions()
+    fleet_missions = list(aistate.get_all_fleet_missions())
     destroyed_objects = fo.getUniverse().destroyedObjectIDs(fo.empireID())
 
     # merge fleets where appropriate before generating fleet orders.
@@ -582,7 +587,7 @@ def issue_fleet_orders_for_fleet_missions():
     debug('')
     universe = fo.getUniverse()
     aistate = get_aistate()
-    fleet_missions = aistate.get_all_fleet_missions()
+    fleet_missions = list(aistate.get_all_fleet_missions())
     thisround = 0
     while thisround < 3:
         thisround += 1

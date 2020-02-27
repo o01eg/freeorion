@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import division
 from logging import debug, warn, error, info
 from operator import itemgetter
 
@@ -183,7 +184,7 @@ def calc_max_pop(planet, species, detail):
 
 def galaxy_is_sparse():
     setup_data = fo.getGalaxySetupData()
-    avg_empire_systems = setup_data.size / len(fo.allEmpireIDs())
+    avg_empire_systems = setup_data.size // len(fo.allEmpireIDs())
     return ((setup_data.monsterFrequency <= fo.galaxySetupOption.low) and
             ((avg_empire_systems >= 40) or
              ((avg_empire_systems >= 35) and (setup_data.shape != fo.galaxyShape.elliptical))))
@@ -327,7 +328,7 @@ def survey_universe():
         if len(pilot_ratings) == 1:
             state.set_medium_pilot_rating(rating_list[0])
         else:
-            state.set_medium_pilot_rating(rating_list[1 + int(len(rating_list) / 5)])
+            state.set_medium_pilot_rating(rating_list[1 + int(len(rating_list) // 5)])
     # the idea behind this was to note systems that the empire has claimed-- either has a current colony or has targeted
     # for making/invading a colony
     # claimedStars = {}
@@ -488,7 +489,10 @@ def assign_colonisation_values(planet_ids, mission_type, species, detail=None, r
 
 
 def next_turn_pop_change(cur_pop, target_pop):
-    """Population change calc taken from PopCenter.cpp."""
+    """Population change calc taken from PopCenter.cpp.
+    :type cur_pop: float
+    :type target_pop: float
+    """
     if target_pop > cur_pop:
         pop_change = cur_pop * (target_pop + 1 - cur_pop) / 100
         return min(pop_change, target_pop - cur_pop)
@@ -1478,7 +1482,7 @@ class OrbitalColonizationManager(object):
     def turn_start_cleanup(self):
         universe = fo.getUniverse()
         # clean up invalid or finished plans
-        for pid in self._colonization_plans.keys():
+        for pid in list(self._colonization_plans.keys()):
             if not self._colonization_plans[pid].is_valid():
                 del self._colonization_plans[pid]
 
@@ -1488,7 +1492,7 @@ class OrbitalColonizationManager(object):
         unaccounted_plans = dict(self._colonization_plans)
 
         # Check which plans still have valid bases assigned (possibly interrupted by combat last turn)
-        for pid in unaccounted_plans.keys():
+        for pid in list(unaccounted_plans.keys()):
             if unaccounted_plans[pid].base_assigned:
                 del unaccounted_plans[pid]
 

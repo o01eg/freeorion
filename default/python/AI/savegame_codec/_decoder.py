@@ -44,19 +44,23 @@ def load_savegame_string(string):
     except zlib.error:
         pass  # probably an uncompressed (or wrongly base64 decompressed) string
     try:
-        decoded_state = decode(new_string)
+        decoded_state = decode(six.ensure_str(new_string, 'utf-8'))
         debug("Decoded a zlib-compressed and apparently base64-encoded save-state string.")
         return decoded_state
     except (InvalidSaveGameException, ValueError, TypeError) as e:
         debug("Base64/zlib decoding path for savestate failed: %s" % e)
 
     try:
-        string = zlib.decompress(string)
+        string = zlib.decompress(six.ensure_binary(string, 'utf-8'))
         debug("zlib-decompressed a non-base64-encoded save-state string.")
     except zlib.error:
         # probably an uncompressed string
         debug("Will try decoding savestate string without base64 or zlib compression.")
-    return decode(string)
+
+    # We need to check uncompressed string, since zip archive of the empty string is not the empty string.
+    if not string:
+        raise Exception("Save game string is empty")
+    return decode(six.ensure_str(string, 'utf-8'))
 
 
 def decode(obj):

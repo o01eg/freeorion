@@ -9,6 +9,7 @@ have their future focus decided.
 """
 # Note: The algorithm is not stable with respect to pid order.  i.e. Two empire with
 #       exactly the same colonies, but different pids may make different choices.
+from __future__ import division
 from logging import info, warn, debug
 from operator import itemgetter
 
@@ -64,7 +65,7 @@ class PlanetFocusManager(object):
         self.raw_planet_info = dict(self.all_planet_info)
         self.baked_planet_info = {}
 
-        for pid, pinfo in self.raw_planet_info.items():
+        for pid, pinfo in list(self.raw_planet_info.items()):
             if not pinfo.planet.availableFoci:
                 self.baked_planet_info[pid] = self.raw_planet_info.pop(pid)
 
@@ -262,8 +263,7 @@ class Reporter(object):
         for priority_type in get_priority_resource_types():
             resource_priorities[priority_type] = aistate.get_priority(priority_type)
 
-        sorted_priorities = resource_priorities.items()
-        sorted_priorities.sort(key=itemgetter(1), reverse=True)
+        sorted_priorities = sorted(resource_priorities.items(), key=itemgetter(1), reverse=True)
         top_priority = -1
         for evaluation_priority, evaluation_score in sorted_priorities:
             if top_priority < 0:
@@ -513,7 +513,7 @@ def set_planet_production_and_research_specials(focus_manager):
 def set_planet_protection_foci(focus_manager):
     """Assess and set protection foci"""
     universe = fo.getUniverse()
-    for pid, pinfo in focus_manager.raw_planet_info.items():
+    for pid, pinfo in list(focus_manager.raw_planet_info.items()):
         planet = pinfo.planet
         if PROTECTION in planet.availableFoci and assess_protection_focus(pinfo):
             current_focus = planet.focus
@@ -572,7 +572,7 @@ def set_planet_industry_and_research_foci(focus_manager, priority_ratio):
 
     aistate = get_aistate()
     for adj_round in [1, 2, 3, 4]:
-        for pid, pinfo in focus_manager.raw_planet_info.items():
+        for pid, pinfo in list(focus_manager.raw_planet_info.items()):
             ii, tr = pinfo.possible_output[INDUSTRY]
             ri, rr = pinfo.possible_output[RESEARCH]
             ci, cr = pinfo.current_output
@@ -690,7 +690,7 @@ def set_planet_industry_and_research_foci(focus_manager, priority_ratio):
         target_pp -= (ii - ri)
 
     # Any planet still raw is set to industry
-    for pid in focus_manager.raw_planet_info.keys():
+    for pid in list(focus_manager.raw_planet_info.keys()):
         focus_manager.bake_future_focus(pid, INDUSTRY, False)
 
 

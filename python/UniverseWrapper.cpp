@@ -58,19 +58,19 @@ namespace {
     // need to deal with std::shared_ptr class.
     // Please don't use this trick elsewhere to grab a raw UniverseObject*!
     const UniverseObject*   GetUniverseObjectP(const Universe& universe, int id)
-    { return ::GetUniverseObject(id).operator->(); }
+    { return ::Objects().get<UniverseObject>(id).operator->(); }
     const Ship*             GetShipP(const Universe& universe, int id)
-    { return ::GetShip(id).operator->(); }
+    { return ::Objects().get<Ship>(id).operator->(); }
     const Fleet*            GetFleetP(const Universe& universe, int id)
-    { return ::GetFleet(id).operator->(); }
+    { return ::Objects().get<Fleet>(id).operator->(); }
     const Planet*           GetPlanetP(const Universe& universe, int id)
-    { return ::GetPlanet(id).operator->(); }
+    { return ::Objects().get<Planet>(id).operator->(); }
     const System*           GetSystemP(const Universe& universe, int id)
-    { return ::GetSystem(id).operator->(); }
+    { return ::Objects().get<System>(id).operator->(); }
     const Field*            GetFieldP(const Universe& universe, int id)
-    { return ::GetField(id).operator->();  }
+    { return ::Objects().get<Field>(id).operator->();  }
     const Building*         GetBuildingP(const Universe& universe, int id)
-    { return ::GetBuilding(id).operator->(); }
+    { return ::Objects().get<Building>(id).operator->(); }
 
     template<typename T>
     std::vector<int> ObjectIDs(const Universe& universe)
@@ -121,7 +121,7 @@ namespace {
 
     std::vector<int> ShortestNonHostilePath(const Universe& universe, int start_sys, int end_sys, int empire_id) {
         std::vector<int> retval;
-        auto fleet_pred = std::make_shared<HostileVisitor<System>>(empire_id);
+        auto fleet_pred = std::make_shared<HostileVisitor>(empire_id);
         std::pair<std::list<int>, int> path = universe.GetPathfinder()->ShortestPath(start_sys, end_sys, empire_id, fleet_pred);
         std::copy(path.first.begin(), path.first.end(), std::back_inserter(retval));
         return retval;

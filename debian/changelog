@@ -1,4 +1,10 @@
-freeorion (0.4.9.1+1SNAPSHOT20200226ppa1~xenial) xenial; urgency=medium
+freeorion (0.4.9.1+1SNAPSHOT20200302ppa1~xenial) xenial; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg <o01eg@yandex.ru>  Tue, 03 Mar 2020 18:39:32 +0000
+
+freeorion (0.4.9.1+1SNAPSHOT20200226ppa1~eoan) eoan; urgency=medium
 
   * Update upstream.
 

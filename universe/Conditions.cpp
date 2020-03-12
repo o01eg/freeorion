@@ -41,65 +41,65 @@ namespace {
 
     DeclareThreadSafeLogger(conditions);
 
-    void AddAllObjectsSet(Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + Objects().ExistingObjects().size());
-        std::transform(Objects().ExistingObjects().begin(), Objects().ExistingObjects().end(),
+    void AddAllObjectsSet(ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
+        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingObjects().size());
+        std::transform(objects.ExistingObjects().begin(), objects.ExistingObjects().end(),
                        std::back_inserter(condition_non_targets),
                        boost::bind(&std::map<int, std::shared_ptr<UniverseObject>>::value_type::second, _1));
     }
 
-    void AddBuildingSet(Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + Objects().ExistingBuildings().size());
-        std::transform(Objects().ExistingBuildings().begin(), Objects().ExistingBuildings().end(),
+    void AddBuildingSet(ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
+        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingBuildings().size());
+        std::transform(objects.ExistingBuildings().begin(), objects.ExistingBuildings().end(),
                        std::back_inserter(condition_non_targets),
                        boost::bind(&std::map<int, std::shared_ptr<UniverseObject>>::value_type::second, _1));
     }
 
-    void AddFieldSet(Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + Objects().ExistingFields().size());
-        std::transform(Objects().ExistingFields().begin(), Objects().ExistingFields().end(),
+    void AddFieldSet(ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
+        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingFields().size());
+        std::transform(objects.ExistingFields().begin(), objects.ExistingFields().end(),
                        std::back_inserter(condition_non_targets),
                        boost::bind(&std::map<int, std::shared_ptr<UniverseObject>>::value_type::second, _1));
     }
 
-    void AddFleetSet(Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + Objects().ExistingFleets().size());
-        std::transform(Objects().ExistingFleets().begin(), Objects().ExistingFleets().end(),
+    void AddFleetSet(ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
+        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingFleets().size());
+        std::transform(objects.ExistingFleets().begin(), objects.ExistingFleets().end(),
                        std::back_inserter(condition_non_targets),
                        boost::bind(&std::map<int, std::shared_ptr<UniverseObject>>::value_type::second,_1));
     }
 
-    void AddPlanetSet(Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + Objects().ExistingPlanets().size());
-        std::transform(Objects().ExistingPlanets().begin(), Objects().ExistingPlanets().end(),
+    void AddPlanetSet(ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
+        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingPlanets().size());
+        std::transform(objects.ExistingPlanets().begin(), objects.ExistingPlanets().end(),
                        std::back_inserter(condition_non_targets),
                        boost::bind(&std::map<int, std::shared_ptr<UniverseObject>>::value_type::second,_1));
     }
 
-    void AddPopCenterSet(Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + Objects().ExistingPopCenters().size());
-        std::transform(Objects().ExistingPopCenters().begin(), Objects().ExistingPopCenters().end(),
+    void AddPopCenterSet(ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
+        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingPopCenters().size());
+        std::transform(objects.ExistingPopCenters().begin(), objects.ExistingPopCenters().end(),
                        std::back_inserter(condition_non_targets),
                        boost::bind(&std::map<int, std::shared_ptr<UniverseObject>>::value_type::second,_1));
     }
 
-    void AddResCenterSet(Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + Objects().ExistingResourceCenters().size());
-        std::transform(Objects().ExistingResourceCenters().begin(), Objects().ExistingResourceCenters().end(),
+    void AddResCenterSet(ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
+        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingResourceCenters().size());
+        std::transform(objects.ExistingResourceCenters().begin(), objects.ExistingResourceCenters().end(),
                        std::back_inserter(condition_non_targets),
                        boost::bind(&std::map<int, std::shared_ptr<UniverseObject>>::value_type::second,_1));
     }
 
-    void AddShipSet(Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + Objects().ExistingShips().size());
-        std::transform(Objects().ExistingShips().begin(), Objects().ExistingShips().end(),
+    void AddShipSet(ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
+        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingShips().size());
+        std::transform(objects.ExistingShips().begin(), objects.ExistingShips().end(),
                        std::back_inserter(condition_non_targets),
                        boost::bind(&std::map<int, std::shared_ptr<UniverseObject>>::value_type::second,_1));
     }
 
-    void AddSystemSet(Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + Objects().ExistingSystems().size());
-        std::transform(Objects().ExistingSystems().begin(), Objects().ExistingSystems().end(),
+    void AddSystemSet(ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
+        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingSystems().size());
+        std::transform(objects.ExistingSystems().begin(), objects.ExistingSystems().end(),
                        std::back_inserter(condition_non_targets),
                        boost::bind(&std::map<int, std::shared_ptr<UniverseObject>>::value_type::second,_1));
     }
@@ -178,11 +178,10 @@ std::string ConditionFailedDescription(const std::vector<Condition*>& conditions
     if (conditions.empty())
         return UserString("NONE");
 
-    ScriptingContext parent_context(source_object);
     std::string retval;
 
     // test candidate against all input conditions, and store descriptions of each
-    for (const auto& result : ConditionDescriptionAndTest(conditions, parent_context, candidate_object)) {
+    for (const auto& result : ConditionDescriptionAndTest(conditions, ScriptingContext(source_object), candidate_object)) {
             if (!result.second)
                  retval += UserString("FAILED") + " <rgba 255 0 0 255>" + result.first +"</rgba>\n";
     }
@@ -200,10 +199,9 @@ std::string ConditionDescription(const std::vector<Condition*>& conditions,
     if (conditions.empty())
         return UserString("NONE");
 
-    ScriptingContext parent_context(source_object);
     // test candidate against all input conditions, and store descriptions of each
     auto condition_description_and_test_results =
-        ConditionDescriptionAndTest(conditions, parent_context, candidate_object);
+        ConditionDescriptionAndTest(conditions, ScriptingContext(source_object), candidate_object);
     bool all_conditions_match_candidate = true, at_least_one_condition_matches_candidate = false;
     for (const auto& result : condition_description_and_test_results) {
         all_conditions_match_candidate = all_conditions_match_candidate && result.second;
@@ -305,7 +303,7 @@ bool Condition::Eval(std::shared_ptr<const UniverseObject> candidate) const {
 
 void Condition::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                   ObjectSet& condition_non_targets) const
-{ AddAllObjectsSet(condition_non_targets); }
+{ AddAllObjectsSet(parent_context.objects, condition_non_targets); }
 
 std::string Condition::Description(bool negated/* = false*/) const
 { return ""; }
@@ -1498,8 +1496,9 @@ bool Homeworld::operator==(const Condition& rhs) const {
 
 namespace {
     struct HomeworldSimpleMatch {
-        HomeworldSimpleMatch(const std::vector<std::string>& names) :
-            m_names(names)
+        HomeworldSimpleMatch(const std::vector<std::string>& names, const ObjectMap& objects) :
+            m_names(names),
+            m_objects(objects)
         {}
 
         bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
@@ -1509,9 +1508,8 @@ namespace {
             // is it a planet or a building on a planet?
             auto planet = std::dynamic_pointer_cast<const Planet>(candidate);
             std::shared_ptr<const ::Building> building;
-            if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-                planet = Objects().get<Planet>(building->PlanetID());
-            }
+            if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
+                planet = m_objects.get<Planet>(building->PlanetID());
             if (!planet)
                 return false;
 
@@ -1543,6 +1541,7 @@ namespace {
         }
 
         const std::vector<std::string>& m_names;
+        const ObjectMap& m_objects;
     };
 }
 
@@ -1567,7 +1566,7 @@ void Homeworld::Eval(const ScriptingContext& parent_context,
         // get all names from valuerefs
         for (auto& name : m_names)
             names.push_back(name->Eval(parent_context));
-        EvalImpl(matches, non_matches, search_domain, HomeworldSimpleMatch(names));
+        EvalImpl(matches, non_matches, search_domain, HomeworldSimpleMatch(names, parent_context.objects));
     } else {
         // re-evaluate allowed names for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -1642,9 +1641,8 @@ bool Homeworld::Match(const ScriptingContext& local_context) const {
     // is it a planet or a building on a planet?
     auto planet = std::dynamic_pointer_cast<const Planet>(candidate);
     std::shared_ptr<const ::Building> building;
-    if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-        planet = Objects().get<Planet>(building->PlanetID());
-    }
+    if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
+        planet = local_context.objects.get<Planet>(building->PlanetID());
     if (!planet)
         return false;
 
@@ -1678,7 +1676,7 @@ bool Homeworld::Match(const ScriptingContext& local_context) const {
 
 void Homeworld::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                   ObjectSet& condition_non_targets) const
-{ AddPlanetSet(condition_non_targets); }
+{ AddPlanetSet(parent_context.objects, condition_non_targets); }
 
 void Homeworld::SetTopLevelContent(const std::string& content_name) {
     for (auto& name : m_names) {
@@ -1730,7 +1728,7 @@ bool Capital::Match(const ScriptingContext& local_context) const {
 
 void Capital::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                 ObjectSet& condition_non_targets) const
-{ AddPlanetSet(condition_non_targets); }
+{ AddPlanetSet(parent_context.objects, condition_non_targets); }
 
 unsigned int Capital::GetCheckSum() const {
     unsigned int retval{0};
@@ -1772,7 +1770,7 @@ bool Monster::Match(const ScriptingContext& local_context) const {
 
 void Monster::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                 ObjectSet& condition_non_targets) const
-{ AddShipSet(condition_non_targets); }
+{ AddShipSet(parent_context.objects, condition_non_targets); }
 
 unsigned int Monster::GetCheckSum() const {
     unsigned int retval{0};
@@ -1959,28 +1957,28 @@ void Type::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_cont
         //std::vector<std::shared_ptr<const T>> this_base;
         switch (m_type->Eval()) {
             case OBJ_BUILDING:
-                AddBuildingSet(condition_non_targets);
+                AddBuildingSet(parent_context.objects, condition_non_targets);
                 break;
             case OBJ_FIELD:
-                AddFieldSet(condition_non_targets);
+                AddFieldSet(parent_context.objects, condition_non_targets);
                 break;
             case OBJ_FLEET:
-                AddFleetSet(condition_non_targets);
+                AddFleetSet(parent_context.objects, condition_non_targets);
                 break;
             case OBJ_PLANET:
-                AddPlanetSet(condition_non_targets);
+                AddPlanetSet(parent_context.objects, condition_non_targets);
                 break;
             case OBJ_POP_CENTER:
-                AddPopCenterSet(condition_non_targets);
+                AddPopCenterSet(parent_context.objects, condition_non_targets);
                 break;
             case OBJ_PROD_CENTER:
-                AddResCenterSet(condition_non_targets);
+                AddResCenterSet(parent_context.objects, condition_non_targets);
                 break;
             case OBJ_SHIP:
-                AddShipSet(condition_non_targets);
+                AddShipSet(parent_context.objects, condition_non_targets);
                 break;
             case OBJ_SYSTEM:
-                AddSystemSet(condition_non_targets);
+                AddSystemSet(parent_context.objects, condition_non_targets);
                 break;
             case OBJ_FIGHTER:   // shouldn't exist outside of combat as a separate object
             default: 
@@ -1989,10 +1987,10 @@ void Type::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_cont
         }
     }
     if (found_type) {
-        //if (int(condition_non_targets.size()) < Objects().size()) {
+        //if (int(condition_non_targets.size()) < parent_context.objects.size()) {
         //    DebugLogger() << "Type::GetBaseNonMatches will provide " << condition_non_targets.size()
         //                  << " objects of type " << GetType()->Eval() << " rather than "
-        //                  << Objects().size() << " total objects";
+        //                  << parent_context.objects.size() << " total objects";
         //}
     } else {
         Condition::GetDefaultInitialCandidateObjects(parent_context, condition_non_targets);
@@ -2154,7 +2152,7 @@ std::string Building::Dump(unsigned short ntabs) const {
 
 void Building::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                  ObjectSet& condition_non_targets) const
-{ AddBuildingSet(condition_non_targets); }
+{ AddBuildingSet(parent_context.objects, condition_non_targets); }
 
 bool Building::Match(const ScriptingContext& local_context) const {
     auto candidate = local_context.condition_local_candidate;
@@ -2823,7 +2821,7 @@ void Contains::Eval(const ScriptingContext& parent_context,
         ScriptingContext local_context(parent_context, search_domain == MATCHES ? *matches.begin() : *non_matches.begin());
 
         // initialize subcondition candidates from local candidate's contents
-        const ObjectMap& objects = Objects();
+        const ObjectMap& objects = parent_context.objects;
         ObjectSet subcondition_matches = objects.find(local_context.condition_local_candidate->ContainedObjectIDs());
 
         // apply subcondition to candidates
@@ -2882,9 +2880,9 @@ void Contains::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
                                                  ObjectSet& condition_non_targets) const
 {
     // objects that can contain other objects: systems, fleets, planets
-    AddSystemSet(condition_non_targets);
-    AddFleetSet(condition_non_targets);
-    AddPlanetSet(condition_non_targets);
+    AddSystemSet(parent_context.objects, condition_non_targets);
+    AddFleetSet(parent_context.objects, condition_non_targets);
+    AddPlanetSet(parent_context.objects, condition_non_targets);
 }
 
 bool Contains::Match(const ScriptingContext& local_context) const {
@@ -3031,7 +3029,7 @@ void ContainedBy::Eval(const ScriptingContext& parent_context,
         ScriptingContext local_context(parent_context, search_domain == MATCHES ? *matches.begin() : *non_matches.begin());
 
         // initialize subcondition candidates from local candidate's containers
-        const ObjectMap& objects = Objects();
+        const ObjectMap& objects = parent_context.objects;
         std::set<int> container_object_ids;
         if (local_context.condition_local_candidate->ContainerObjectID() != INVALID_OBJECT_ID)
             container_object_ids.insert(local_context.condition_local_candidate->ContainerObjectID());
@@ -3096,10 +3094,10 @@ void ContainedBy::GetDefaultInitialCandidateObjects(const ScriptingContext& pare
                                                     ObjectSet& condition_non_targets) const
 {
     // objects that can be contained by other objects: fleets, planets, ships, buildings
-    AddFleetSet(condition_non_targets);
-    AddPlanetSet(condition_non_targets);
-    AddShipSet(condition_non_targets);
-    AddBuildingSet(condition_non_targets);
+    AddFleetSet(parent_context.objects, condition_non_targets);
+    AddPlanetSet(parent_context.objects, condition_non_targets);
+    AddShipSet(parent_context.objects, condition_non_targets);
+    AddBuildingSet(parent_context.objects, condition_non_targets);
 }
 
 bool ContainedBy::Match(const ScriptingContext& local_context) const {
@@ -3116,7 +3114,7 @@ bool ContainedBy::Match(const ScriptingContext& local_context) const {
     if (candidate->ContainerObjectID() != INVALID_OBJECT_ID && candidate->ContainerObjectID() != candidate->SystemID())
         containers.insert(candidate->ContainerObjectID());
 
-    ObjectSet container_objects = Objects().find<const UniverseObject>(containers);
+    ObjectSet container_objects = local_context.objects.find<const UniverseObject>(containers);
     if (container_objects.empty())
         return false;
 
@@ -3242,7 +3240,7 @@ void InSystem::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
 {
     if (!m_system_id) {
         // can match objects in any system, or any system
-        AddAllObjectsSet(condition_non_targets);
+        AddAllObjectsSet(parent_context.objects, condition_non_targets);
         return;
     }
 
@@ -3252,19 +3250,18 @@ void InSystem::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
 
     if (!simple_eval_safe) {
         // almost anything can be in a system, and can also match the system itself
-        AddAllObjectsSet(condition_non_targets);
+        AddAllObjectsSet(parent_context.objects, condition_non_targets);
         return;
     }
 
     // simple case of a single specified system id; can add just objects in that system
     int system_id = m_system_id->Eval(parent_context);
-    auto system = Objects().get<System>(system_id);
+    auto system = parent_context.objects.get<System>(system_id);
     if (!system)
         return;
 
-    const ObjectMap& obj_map = Objects();
     const std::set<int>& system_object_ids = system->ObjectIDs();
-    auto sys_objs = obj_map.find(system_object_ids);
+    auto sys_objs = parent_context.objects.find(system_object_ids);
 
     // insert all objects that have the specified system id
     condition_non_targets.reserve(sys_objs.size() + 1);
@@ -3393,18 +3390,16 @@ void ObjectID::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
                             (parent_context.condition_root_candidate || RootCandidateInvariant()));
 
     if (!simple_eval_safe) {
-        AddAllObjectsSet(condition_non_targets);
+        AddAllObjectsSet(parent_context.objects, condition_non_targets);
         return;
     }
 
     // simple case of a single specified id; can add just that object
-    std::shared_ptr<const UniverseObject> no_object;
-    int object_id = m_object_id->Eval(ScriptingContext(parent_context, no_object));
+    int object_id = m_object_id->Eval(parent_context);
     if (object_id == INVALID_OBJECT_ID)
         return;
 
-    auto obj = Objects().ExistingObject(object_id);
-    if (obj)
+    if (auto obj = parent_context.objects.ExistingObject(object_id))
         condition_non_targets.push_back(obj);
 }
 
@@ -3460,8 +3455,9 @@ bool PlanetType::operator==(const Condition& rhs) const {
 
 namespace {
     struct PlanetTypeSimpleMatch {
-        PlanetTypeSimpleMatch(const std::vector< ::PlanetType>& types) :
-            m_types(types)
+        PlanetTypeSimpleMatch(const std::vector< ::PlanetType>& types, const ObjectMap& objects) :
+            m_types(types),
+            m_objects(objects)
         {}
 
         bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
@@ -3471,9 +3467,8 @@ namespace {
             // is it a planet or on a planet?
             auto planet = std::dynamic_pointer_cast<const Planet>(candidate);
             std::shared_ptr<const ::Building> building;
-            if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-                planet = Objects().get<Planet>(building->PlanetID());
-            }
+            if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
+                planet = m_objects.get<Planet>(building->PlanetID());
             if (planet) {
                 // is it one of the specified building types?
                 return std::count(m_types.begin(), m_types.end(), planet->Type());
@@ -3483,12 +3478,13 @@ namespace {
         }
 
         const std::vector< ::PlanetType>& m_types;
+        const ObjectMap& m_objects;
     };
 }
 
 void PlanetType::Eval(const ScriptingContext& parent_context,
-                                 ObjectSet& matches, ObjectSet& non_matches,
-                                 SearchDomain search_domain/* = NON_MATCHES*/) const
+                      ObjectSet& matches, ObjectSet& non_matches,
+                      SearchDomain search_domain/* = NON_MATCHES*/) const
 {
     bool simple_eval_safe = parent_context.condition_root_candidate || RootCandidateInvariant();
     if (simple_eval_safe) {
@@ -3507,7 +3503,7 @@ void PlanetType::Eval(const ScriptingContext& parent_context,
         for (auto& type : m_types) {
             types.push_back(type->Eval(parent_context));
         }
-        EvalImpl(matches, non_matches, search_domain, PlanetTypeSimpleMatch(types));
+        EvalImpl(matches, non_matches, search_domain, PlanetTypeSimpleMatch(types, parent_context.objects));
     } else {
         // re-evaluate contained objects for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -3575,8 +3571,8 @@ std::string PlanetType::Dump(unsigned short ntabs) const {
 void PlanetType::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                    ObjectSet& condition_non_targets) const
 {
-    AddPlanetSet(condition_non_targets);
-    AddBuildingSet(condition_non_targets);
+    AddPlanetSet(parent_context.objects, condition_non_targets);
+    AddBuildingSet(parent_context.objects, condition_non_targets);
 }
 
 bool PlanetType::Match(const ScriptingContext& local_context) const {
@@ -3588,12 +3584,12 @@ bool PlanetType::Match(const ScriptingContext& local_context) const {
 
     auto planet = std::dynamic_pointer_cast<const Planet>(candidate);
     std::shared_ptr<const ::Building> building;
-    if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-        planet = Objects().get<Planet>(building->PlanetID());
-    }
+    if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
+        planet = local_context.objects.get<Planet>(building->PlanetID());
+
     if (planet) {
         for (auto& type : m_types) {
-            if (type->Eval(ScriptingContext(local_context)) == planet->Type())
+            if (type->Eval(local_context) == planet->Type())
                 return true;
         }
     }
@@ -3644,8 +3640,9 @@ bool PlanetSize::operator==(const Condition& rhs) const {
 
 namespace {
     struct PlanetSizeSimpleMatch {
-        PlanetSizeSimpleMatch(const std::vector< ::PlanetSize>& sizes) :
-            m_sizes(sizes)
+        PlanetSizeSimpleMatch(const std::vector< ::PlanetSize>& sizes, const ObjectMap& objects) :
+            m_sizes(sizes),
+            m_objects(objects)
         {}
 
         bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
@@ -3655,9 +3652,8 @@ namespace {
             // is it a planet or on a planet? TODO: This concept should be generalized and factored out.
             auto planet = std::dynamic_pointer_cast<const Planet>(candidate);
             std::shared_ptr<const ::Building> building;
-            if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-                planet = Objects().get<Planet>(building->PlanetID());
-            }
+            if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
+                planet = m_objects.get<Planet>(building->PlanetID());
             if (planet) {
                 // is it one of the specified building types?
                 for (auto size : m_sizes) {
@@ -3670,6 +3666,7 @@ namespace {
         }
 
         const std::vector< ::PlanetSize>& m_sizes;
+        const ObjectMap& m_objects;
     };
 }
 
@@ -3694,7 +3691,7 @@ void PlanetSize::Eval(const ScriptingContext& parent_context,
         for (auto& size : m_sizes) {
             sizes.push_back(size->Eval(parent_context));
         }
-        EvalImpl(matches, non_matches, search_domain, PlanetSizeSimpleMatch(sizes));
+        EvalImpl(matches, non_matches, search_domain, PlanetSizeSimpleMatch(sizes, parent_context.objects));
     } else {
         // re-evaluate contained objects for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -3762,8 +3759,8 @@ std::string PlanetSize::Dump(unsigned short ntabs) const {
 void PlanetSize::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                    ObjectSet& condition_non_targets) const
 {
-    AddPlanetSet(condition_non_targets);
-    AddBuildingSet(condition_non_targets);
+    AddPlanetSet(parent_context.objects, condition_non_targets);
+    AddBuildingSet(parent_context.objects, condition_non_targets);
 }
 
 bool PlanetSize::Match(const ScriptingContext& local_context) const {
@@ -3775,9 +3772,9 @@ bool PlanetSize::Match(const ScriptingContext& local_context) const {
 
     auto planet = std::dynamic_pointer_cast<const Planet>(candidate);
     std::shared_ptr<const ::Building> building;
-    if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-        planet = Objects().get<Planet>(building->PlanetID());
-    }
+    if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
+        planet = local_context.objects.get<Planet>(building->PlanetID());
+
     if (planet) {
         for (auto& size : m_sizes) {
             if (size->Eval(local_context) == planet->Size())
@@ -3836,9 +3833,11 @@ bool PlanetEnvironment::operator==(const Condition& rhs) const {
 namespace {
     struct PlanetEnvironmentSimpleMatch {
         PlanetEnvironmentSimpleMatch(const std::vector< ::PlanetEnvironment>& environments,
+                                     const ObjectMap& objects,
                                      const std::string& species = "") :
             m_environments(environments),
-            m_species(species)
+            m_species(species),
+            m_objects(objects)
         {}
 
         bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
@@ -3848,9 +3847,8 @@ namespace {
             // is it a planet or on a planet? TODO: factor out
             auto planet = std::dynamic_pointer_cast<const Planet>(candidate);
             std::shared_ptr<const ::Building> building;
-            if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-                planet = Objects().get<Planet>(building->PlanetID());
-            }
+            if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
+                planet = m_objects.get<Planet>(building->PlanetID());
             if (planet) {
                 // is it one of the specified building types?
                 for (auto environment : m_environments) {
@@ -3864,6 +3862,7 @@ namespace {
 
         const std::vector< ::PlanetEnvironment>&    m_environments;
         const std::string&                          m_species;
+        const ObjectMap&                            m_objects;
     };
 }
 
@@ -3892,7 +3891,7 @@ void PlanetEnvironment::Eval(const ScriptingContext& parent_context,
         std::string species_name;
         if (m_species_name)
             species_name = m_species_name->Eval(parent_context);
-        EvalImpl(matches, non_matches, search_domain, PlanetEnvironmentSimpleMatch(environments, species_name));
+        EvalImpl(matches, non_matches, search_domain, PlanetEnvironmentSimpleMatch(environments, parent_context.objects, species_name));
     } else {
         // re-evaluate contained objects for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -3978,8 +3977,8 @@ std::string PlanetEnvironment::Dump(unsigned short ntabs) const {
 void PlanetEnvironment::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                           ObjectSet& condition_non_targets) const
 {
-    AddPlanetSet(condition_non_targets);
-    AddBuildingSet(condition_non_targets);
+    AddPlanetSet(parent_context.objects, condition_non_targets);
+    AddBuildingSet(parent_context.objects, condition_non_targets);
 }
 
 bool PlanetEnvironment::Match(const ScriptingContext& local_context) const {
@@ -3992,9 +3991,8 @@ bool PlanetEnvironment::Match(const ScriptingContext& local_context) const {
     // is it a planet or on a planet? TODO: factor out
     auto planet = std::dynamic_pointer_cast<const Planet>(candidate);
     std::shared_ptr<const ::Building> building;
-    if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-        planet = Objects().get<Planet>(building->PlanetID());
-    }
+    if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
+        planet = local_context.objects.get<Planet>(building->PlanetID());
     if (!planet)
         return false;
 
@@ -4062,8 +4060,9 @@ bool Species::operator==(const Condition& rhs) const {
 
 namespace {
     struct SpeciesSimpleMatch {
-        SpeciesSimpleMatch(const std::vector<std::string>& names) :
-            m_names(names)
+        SpeciesSimpleMatch(const std::vector<std::string>& names, const ObjectMap& objects) :
+            m_names(names),
+            m_objects(objects)
         {}
 
         bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
@@ -4084,7 +4083,7 @@ namespace {
             }
             // is it a building on a planet?
             if (auto building = std::dynamic_pointer_cast<const ::Building>(candidate)) {
-                auto planet = Objects().get<Planet>(building->PlanetID());
+                auto planet = m_objects.get<Planet>(building->PlanetID());
                 const std::string& species_name = planet->SpeciesName();
                 // if the planet (which IS a popcenter) has a species and that species is one of those specified...
                 return !species_name.empty() && (m_names.empty() || std::count(m_names.begin(), m_names.end(), species_name));
@@ -4094,6 +4093,7 @@ namespace {
         }
 
         const std::vector<std::string>& m_names;
+        const ObjectMap& m_objects;
     };
 }
 
@@ -4118,7 +4118,7 @@ void Species::Eval(const ScriptingContext& parent_context,
         for (auto& name : m_names) {
             names.push_back(name->Eval(parent_context));
         }
-        EvalImpl(matches, non_matches, search_domain, SpeciesSimpleMatch(names));
+        EvalImpl(matches, non_matches, search_domain, SpeciesSimpleMatch(names, parent_context.objects));
     } else {
         // re-evaluate allowed building types range for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -4190,9 +4190,9 @@ std::string Species::Dump(unsigned short ntabs) const {
 void Species::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                 ObjectSet& condition_non_targets) const
 {
-    AddPlanetSet(condition_non_targets);
-    AddBuildingSet(condition_non_targets);
-    AddShipSet(condition_non_targets);
+    AddPlanetSet(parent_context.objects, condition_non_targets);
+    AddBuildingSet(parent_context.objects, condition_non_targets);
+    AddShipSet(parent_context.objects, condition_non_targets);
 }
 
 bool Species::Match(const ScriptingContext& local_context) const {
@@ -4205,9 +4205,8 @@ bool Species::Match(const ScriptingContext& local_context) const {
     // is it a planet or a building on a planet? TODO: factor out
     auto planet = std::dynamic_pointer_cast<const Planet>(candidate);
     std::shared_ptr<const ::Building> building;
-    if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-        planet = Objects().get<Planet>(building->PlanetID());
-    }
+    if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
+        planet = local_context.objects.get<Planet>(building->PlanetID());
     if (planet) {
         if (m_names.empty()) {
             return !planet->SpeciesName().empty();  // match any species name
@@ -4554,7 +4553,7 @@ bool Enqueued::Match(const ScriptingContext& local_context) const {
 void Enqueued::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                  ObjectSet& condition_non_targets) const
 {
-    AddPlanetSet(condition_non_targets);
+    AddPlanetSet(parent_context.objects, condition_non_targets);
 }
 
 void Enqueued::SetTopLevelContent(const std::string& content_name) {
@@ -4611,8 +4610,9 @@ bool FocusType::operator==(const Condition& rhs) const {
 
 namespace {
     struct FocusTypeSimpleMatch {
-        FocusTypeSimpleMatch(const std::vector<std::string>& names) :
-            m_names(names)
+        FocusTypeSimpleMatch(const std::vector<std::string>& names, const ObjectMap& objects) :
+            m_names(names),
+            m_objects(objects)
         {}
 
         bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
@@ -4623,7 +4623,7 @@ namespace {
             auto res_center = std::dynamic_pointer_cast<const ResourceCenter>(candidate);
             std::shared_ptr<const ::Building> building;
             if (!res_center && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-                if (auto planet = Objects().get<Planet>(building->PlanetID()))
+                if (auto planet = m_objects.get<Planet>(building->PlanetID()))
                     res_center = std::dynamic_pointer_cast<const ResourceCenter>(planet);
             }
             if (res_center) {
@@ -4635,6 +4635,7 @@ namespace {
         }
 
         const std::vector<std::string>& m_names;
+        const ObjectMap& m_objects;
     };
 }
 
@@ -4659,7 +4660,7 @@ void FocusType::Eval(const ScriptingContext& parent_context,
         for (auto& name : m_names) {
             names.push_back(name->Eval(parent_context));
         }
-        EvalImpl(matches, non_matches, search_domain, FocusTypeSimpleMatch(names));
+        EvalImpl(matches, non_matches, search_domain, FocusTypeSimpleMatch(names, parent_context.objects));
     } else {
         // re-evaluate allowed building types range for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -4735,7 +4736,7 @@ bool FocusType::Match(const ScriptingContext& local_context) const {
     auto res_center = std::dynamic_pointer_cast<const ResourceCenter>(candidate);
     std::shared_ptr<const ::Building> building;
     if (!res_center && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-        if (auto planet = Objects().get<Planet>(building->PlanetID()))
+        if (auto planet = local_context.objects.get<Planet>(building->PlanetID()))
             res_center = std::dynamic_pointer_cast<const ResourceCenter>(planet);
     }
     if (res_center) {
@@ -4750,8 +4751,8 @@ bool FocusType::Match(const ScriptingContext& local_context) const {
 void FocusType::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                   ObjectSet& condition_non_targets) const
 {
-    AddPlanetSet(condition_non_targets);
-    AddBuildingSet(condition_non_targets);
+    AddPlanetSet(parent_context.objects, condition_non_targets);
+    AddBuildingSet(parent_context.objects, condition_non_targets);
 }
 
 void FocusType::SetTopLevelContent(const std::string& content_name) {
@@ -4798,15 +4799,16 @@ bool StarType::operator==(const Condition& rhs) const {
 
 namespace {
     struct StarTypeSimpleMatch {
-        StarTypeSimpleMatch(const std::vector< ::StarType>& types) :
-            m_types(types)
+        StarTypeSimpleMatch(const std::vector< ::StarType>& types, const ObjectMap& objects) :
+            m_types(types),
+            m_objects(objects)
         {}
 
         bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
             if (!candidate)
                 return false;
 
-            std::shared_ptr<const System> system = Objects().get<System>(candidate->SystemID());
+            std::shared_ptr<const System> system = m_objects.get<System>(candidate->SystemID());
             if (system || (system = std::dynamic_pointer_cast<const System>(candidate)))
                 return !m_types.empty() && std::count(m_types.begin(), m_types.end(), system->GetStarType());
 
@@ -4814,6 +4816,7 @@ namespace {
         }
 
         const std::vector< ::StarType>& m_types;
+        const ObjectMap& m_objects;
     };
 }
 
@@ -4838,7 +4841,7 @@ void StarType::Eval(const ScriptingContext& parent_context,
         for (auto& type : m_types) {
             types.push_back(type->Eval(parent_context));
         }
-        EvalImpl(matches, non_matches, search_domain, StarTypeSimpleMatch(types));
+        EvalImpl(matches, non_matches, search_domain, StarTypeSimpleMatch(types, parent_context.objects));
     } else {
         // re-evaluate contained objects for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -4910,7 +4913,7 @@ bool StarType::Match(const ScriptingContext& local_context) const {
         return false;
     }
 
-    std::shared_ptr<const System> system = Objects().get<System>(candidate->SystemID());
+    std::shared_ptr<const System> system = local_context.objects.get<System>(candidate->SystemID());
     if (system || (system = std::dynamic_pointer_cast<const System>(candidate))) {
         for (auto& type : m_types) {
             if (type->Eval(local_context) == system->GetStarType())
@@ -5048,7 +5051,7 @@ bool DesignHasHull::Match(const ScriptingContext& local_context) const {
 void DesignHasHull::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                       ObjectSet& condition_non_targets) const
 {
-    AddShipSet(condition_non_targets);
+    AddShipSet(parent_context.objects, condition_non_targets);
 }
 
 void DesignHasHull::SetTopLevelContent(const std::string& content_name) {
@@ -5095,10 +5098,11 @@ bool DesignHasPart::operator==(const Condition& rhs) const {
 
 namespace {
     struct DesignHasPartSimpleMatch {
-        DesignHasPartSimpleMatch(int low, int high, const std::string& name) :
+        DesignHasPartSimpleMatch(int low, int high, const std::string& name, const ObjectMap& objects) :
             m_low(low),
             m_high(high),
-            m_name(name)
+            m_name(name),
+            m_objects(objects)
         {}
 
         bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
@@ -5108,7 +5112,7 @@ namespace {
             std::shared_ptr<const Ship> ship = nullptr;
             if (auto fighter = std::dynamic_pointer_cast<const ::Fighter>(candidate)) {
                 // it is a fighter
-                ship = Objects().get<Ship>(fighter->LaunchedFrom());
+                ship = m_objects.get<Ship>(fighter->LaunchedFrom());
             } else {
                 ship = std::dynamic_pointer_cast<const ::Ship>(candidate);
             }
@@ -5135,6 +5139,7 @@ namespace {
         int                 m_low;
         int                 m_high;
         const std::string&  m_name;
+        const ObjectMap&    m_objects;
     };
 }
 
@@ -5154,7 +5159,7 @@ void DesignHasPart::Eval(const ScriptingContext& parent_context,
 
         // need to test each candidate separately using EvalImpl and because the
         // design of the candidate object is tested
-        EvalImpl(matches, non_matches, search_domain, DesignHasPartSimpleMatch(low, high, name));
+        EvalImpl(matches, non_matches, search_domain, DesignHasPartSimpleMatch(low, high, name, parent_context.objects));
     } else {
         // re-evaluate allowed turn range for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -5226,13 +5231,13 @@ bool DesignHasPart::Match(const ScriptingContext& local_context) const {
     int high = (m_high ? std::min(m_high->Eval(local_context), IMPOSSIBLY_LARGE_TURN) : IMPOSSIBLY_LARGE_TURN);
     std::string name = (m_name ? m_name->Eval(local_context) : "");
 
-    return DesignHasPartSimpleMatch(low, high, name)(candidate);
+    return DesignHasPartSimpleMatch(low, high, name, local_context.objects)(candidate);
 }
 
 void DesignHasPart::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                       ObjectSet& condition_non_targets) const
 {
-    AddShipSet(condition_non_targets);
+    AddShipSet(parent_context.objects, condition_non_targets);
 }
 
 void DesignHasPart::SetTopLevelContent(const std::string& content_name) {
@@ -5401,7 +5406,7 @@ bool DesignHasPartClass::Match(const ScriptingContext& local_context) const {
 void DesignHasPartClass::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                            ObjectSet& condition_non_targets) const
 {
-    AddShipSet(condition_non_targets);
+    AddShipSet(parent_context.objects, condition_non_targets);
 }
 
 void DesignHasPartClass::SetTopLevelContent(const std::string& content_name) {
@@ -7812,12 +7817,11 @@ namespace {
     }
 
     bool LaneCrossesExistingLane(std::shared_ptr<const System> lane_end_sys1,
-                                 std::shared_ptr<const System> lane_end_sys2)
+                                 std::shared_ptr<const System> lane_end_sys2,
+                                 const ObjectMap& objects)
     {
         if (!lane_end_sys1 || !lane_end_sys2 || lane_end_sys1 == lane_end_sys2)
             return true;
-
-        const ObjectMap& objects = Objects();
 
         // loop over all existing lanes in all systems, checking if a lane
         // beween the specified systems would cross any of the existing lanes
@@ -7829,7 +7833,7 @@ namespace {
 
             // check all existing lanes of currently-being-checked system
             for (const auto& lane : sys_existing_lanes) {
-                auto lane_end_sys3 = Objects().get<System>(lane.first);
+                auto lane_end_sys3 = objects.get<System>(lane.first);
                 if (!lane_end_sys3)
                     continue;
                 // don't need to check against existing lanes that include one
@@ -7849,17 +7853,15 @@ namespace {
     }
 
     bool LaneTooCloseToOtherSystem(std::shared_ptr<const System> lane_end_sys1,
-                                   std::shared_ptr<const System> lane_end_sys2)
+                                   std::shared_ptr<const System> lane_end_sys2,
+                                   const ObjectMap& objects)
     {
         if (!lane_end_sys1 || !lane_end_sys2 || lane_end_sys1 == lane_end_sys2)
             return true;
 
-        const ObjectMap& objects = Objects();
-        auto systems = objects.all<System>();
-
         // loop over all existing systems, checking if each is too close to a
         // lane between the specified lane endpoints
-        for (auto& system : systems) {
+        for (auto& system : objects.all<System>()) {
             if (system == lane_end_sys1 || system == lane_end_sys2)
                 continue;
 
@@ -7871,14 +7873,15 @@ namespace {
     }
 
     struct CanAddStarlaneConnectionSimpleMatch {
-        CanAddStarlaneConnectionSimpleMatch(const ObjectSet& destination_objects) :
-            m_destination_systems()
+        CanAddStarlaneConnectionSimpleMatch(const ObjectSet& destination_objects, const ObjectMap& objects) :
+            m_destination_systems(),
+            m_objects(objects)
         {
             // get (one of each of) set of systems that are or that contain any
             // destination objects
             std::set<std::shared_ptr<const System>> dest_systems;
             for (auto& obj : destination_objects) {
-                if (auto sys = Objects().get<System>(obj->SystemID()))
+                if (auto sys = m_objects.get<System>(obj->SystemID()))
                     dest_systems.insert(sys);
             }
             std::copy(dest_systems.begin(), dest_systems.end(), std::inserter(m_destination_systems, m_destination_systems.end()));
@@ -7891,7 +7894,7 @@ namespace {
             // get system from candidate
             auto candidate_sys = std::dynamic_pointer_cast<const System>(candidate);
             if (!candidate_sys)
-                candidate_sys = Objects().get<System>(candidate->SystemID());
+                candidate_sys = m_objects.get<System>(candidate->SystemID());
             if (!candidate_sys)
                 return false;
 
@@ -7913,7 +7916,7 @@ namespace {
             // present lanes of the candidate system
             //TraceLogger() << "... Checking lanes of candidate system: " << candidate->UniverseObject::Name() << std::endl;
             for (const auto& lane : candidate_sys->StarlanesWormholes()) {
-                auto candidate_existing_lane_end_sys = Objects().get<System>(lane.first);
+                auto candidate_existing_lane_end_sys = m_objects.get<System>(lane.first);
                 if (!candidate_existing_lane_end_sys)
                     continue;
 
@@ -7934,7 +7937,7 @@ namespace {
                 // check this destination system's existing lanes against a lane
                 // to the candidate system
                 for (const auto& dest_lane : dest_sys->StarlanesWormholes()) {
-                    auto dest_lane_end_sys = Objects().get<System>(dest_lane.first);
+                    auto dest_lane_end_sys = m_objects.get<System>(dest_lane.first);
                     if (!dest_lane_end_sys)
                         continue;
 
@@ -7970,7 +7973,7 @@ namespace {
             // system they are not connected to
             //TraceLogger() << "... Checking proposed lanes for proximity to other systems" <<std::endl;
             for (auto& dest_sys : m_destination_systems) {
-                if (LaneTooCloseToOtherSystem(candidate_sys, dest_sys)) {
+                if (LaneTooCloseToOtherSystem(candidate_sys, dest_sys, m_objects)) {
                     //TraceLogger() << " ... ... can't add lane from candidate: " << candidate_sys->Name() << " to " << dest_sys->Name() << " due to proximity to another system." << std::endl;
                     return false;
                 }
@@ -7980,7 +7983,7 @@ namespace {
             // check that there are no lanes already existing that cross the proposed lanes
             //TraceLogger() << "... Checking for potential lanes crossing existing lanes" << std::endl;
             for (auto& dest_sys : m_destination_systems) {
-                if (LaneCrossesExistingLane(candidate_sys, dest_sys)) {
+                if (LaneCrossesExistingLane(candidate_sys, dest_sys, m_objects)) {
                     //TraceLogger() << " ... ... can't add lane from candidate: " << candidate_sys->Name() << " to " << dest_sys->Name() << " due to crossing an existing lane." << std::endl;
                     return false;
                 }
@@ -7990,6 +7993,7 @@ namespace {
         }
 
         std::vector<std::shared_ptr<const System>> m_destination_systems;
+        const ObjectMap& m_objects;
     };
 }
 
@@ -8005,7 +8009,7 @@ void CanAddStarlaneConnection::Eval(const ScriptingContext& parent_context,
         ObjectSet subcondition_matches;
         m_condition->Eval(parent_context, subcondition_matches);
 
-        EvalImpl(matches, non_matches, search_domain, CanAddStarlaneConnectionSimpleMatch(subcondition_matches));
+        EvalImpl(matches, non_matches, search_domain, CanAddStarlaneConnectionSimpleMatch(subcondition_matches, parent_context.objects));
     } else {
         // re-evaluate contained objects for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -8044,7 +8048,7 @@ bool CanAddStarlaneConnection::Match(const ScriptingContext& local_context) cons
     ObjectSet subcondition_matches;
     m_condition->Eval(local_context, subcondition_matches);
 
-    return CanAddStarlaneConnectionSimpleMatch(subcondition_matches)(candidate);
+    return CanAddStarlaneConnectionSimpleMatch(subcondition_matches, local_context.objects)(candidate);
 }
 
 void CanAddStarlaneConnection::SetTopLevelContent(const std::string& content_name) {
@@ -8205,7 +8209,7 @@ bool Stationary::Match(const ScriptingContext& local_context) const {
     auto fleet = std::dynamic_pointer_cast<const Fleet>(candidate);
     if (!fleet)
         if (auto ship = std::dynamic_pointer_cast<const Ship>(candidate))
-            fleet = Objects().get<Fleet>(ship->FleetID());
+            fleet = local_context.objects.get<Fleet>(ship->FleetID());
 
     if (fleet) {
         // if a fleet is available, it is "moving", or not stationary, if it's
@@ -8263,7 +8267,7 @@ bool Aggressive::Match(const ScriptingContext& local_context) const {
     auto fleet = std::dynamic_pointer_cast<const Fleet>(candidate);
     if (!fleet)
         if (auto ship = std::dynamic_pointer_cast<const Ship>(candidate))
-            fleet = Objects().get<Fleet>(ship->FleetID());
+            fleet = local_context.objects.get<Fleet>(ship->FleetID());
 
     if (!fleet)
         return false;
@@ -8428,9 +8432,10 @@ bool ResourceSupplyConnectedByEmpire::operator==(const Condition& rhs) const {
 
 namespace {
     struct ResourceSupplySimpleMatch {
-        ResourceSupplySimpleMatch(int empire_id, const ObjectSet& from_objects) :
+        ResourceSupplySimpleMatch(int empire_id, const ObjectSet& from_objects, const ObjectMap& objects) :
             m_empire_id(empire_id),
-            m_from_objects(from_objects)
+            m_from_objects(from_objects),
+            m_objects(objects)
         {}
 
         bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
@@ -8457,7 +8462,7 @@ namespace {
                 auto candidate_planet = std::dynamic_pointer_cast<const Planet>(candidate);
                 std::shared_ptr<const ::Building> building;
                 if (!candidate_planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
-                    candidate_planet = Objects().get<Planet>(building->PlanetID());
+                    candidate_planet = m_objects.get<Planet>(building->PlanetID());
                 if (candidate_planet) {
                     int candidate_planet_id = candidate_planet->ID();
                     // can only match if the from_object is (or is on) the same planet
@@ -8465,7 +8470,7 @@ namespace {
                         auto from_obj_planet = std::dynamic_pointer_cast<const Planet>(from_object);
                         std::shared_ptr<const ::Building> from_building;
                         if (!from_obj_planet && (from_building = std::dynamic_pointer_cast<const ::Building>(from_object)))
-                            from_obj_planet = Objects().get<Planet>(from_building->PlanetID());
+                            from_obj_planet = m_objects.get<Planet>(from_building->PlanetID());
                         if (from_obj_planet && from_obj_planet->ID() == candidate_planet_id)
                             return true;
                     }
@@ -8495,6 +8500,7 @@ namespace {
 
         int m_empire_id;
         const ObjectSet& m_from_objects;
+        const ObjectMap& m_objects;
     };
 }
 
@@ -8513,7 +8519,7 @@ void ResourceSupplyConnectedByEmpire::Eval(const ScriptingContext& parent_contex
         m_condition->Eval(parent_context, subcondition_matches);
         int empire_id = m_empire_id->Eval(parent_context);
 
-        EvalImpl(matches, non_matches, search_domain, ResourceSupplySimpleMatch(empire_id, subcondition_matches));
+        EvalImpl(matches, non_matches, search_domain, ResourceSupplySimpleMatch(empire_id, subcondition_matches, parent_context.objects));
     } else {
         // re-evaluate empire id for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -8541,7 +8547,7 @@ bool ResourceSupplyConnectedByEmpire::Match(const ScriptingContext& local_contex
     m_condition->Eval(local_context, subcondition_matches);
     int empire_id = m_empire_id->Eval(local_context);
 
-    return ResourceSupplySimpleMatch(empire_id, subcondition_matches)(candidate);
+    return ResourceSupplySimpleMatch(empire_id, subcondition_matches, local_context.objects)(candidate);
 }
 
 std::string ResourceSupplyConnectedByEmpire::Description(bool negated/* = false*/) const {
@@ -8626,7 +8632,7 @@ bool CanColonize::Match(const ScriptingContext& local_context) const {
             ErrorLogger() << "CanColonize couldn't cast supposedly building candidate";
             return false;
         }
-        auto planet = Objects().get<Planet>(building->PlanetID());
+        auto planet = local_context.objects.get<Planet>(building->PlanetID());
         if (!planet) {
             ErrorLogger() << "CanColonize couldn't get building's planet";
             return false;
@@ -8699,7 +8705,7 @@ bool CanProduceShips::Match(const ScriptingContext& local_context) const {
             ErrorLogger() << "CanProduceShips couldn't cast supposedly building candidate";
             return false;
         }
-        auto planet = Objects().get<Planet>(building->PlanetID());
+        auto planet = local_context.objects.get<Planet>(building->PlanetID());
         if (!planet) {
             ErrorLogger() << "CanProduceShips couldn't get building's planet";
             return false;

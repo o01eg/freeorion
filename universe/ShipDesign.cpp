@@ -464,10 +464,12 @@ float PartType::ProductionCost(int empire_id, int location_id, int in_design_id)
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_cost)
         return 1.0f;
 
-    if (m_production_cost->ConstantExpr())
+    if (m_production_cost->ConstantExpr()) {
         return static_cast<float>(m_production_cost->Eval());
-    else if (m_production_cost->SourceInvariant() && m_production_cost->TargetInvariant())
-        return static_cast<float>(m_production_cost->Eval(ScriptingContext(nullptr, nullptr, in_design_id)));
+    } else if (m_production_cost->SourceInvariant() && m_production_cost->TargetInvariant()) {
+        ScriptingContext context(nullptr, nullptr, in_design_id);
+        return static_cast<float>(m_production_cost->Eval(context));
+    }
 
     const auto arbitrary_large_number = 999999.9f;
 
@@ -480,7 +482,6 @@ float PartType::ProductionCost(int empire_id, int location_id, int in_design_id)
         return arbitrary_large_number;
 
     ScriptingContext context(source, location, in_design_id);
-
     return static_cast<float>(m_production_cost->Eval(context));
 }
 
@@ -490,10 +491,12 @@ int PartType::ProductionTime(int empire_id, int location_id, int in_design_id) c
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_time)
         return 1;
 
-    if (m_production_time->ConstantExpr())
+    if (m_production_time->ConstantExpr()) {
         return m_production_time->Eval();
-    else if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant())
-        return m_production_time->Eval(ScriptingContext(nullptr, nullptr, in_design_id));
+    } else if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant()) {
+        ScriptingContext context(nullptr, nullptr, in_design_id);
+        return m_production_time->Eval(context);
+    }
 
     auto location = Objects().get(location_id);
     if (!location && !m_production_time->TargetInvariant())
@@ -504,7 +507,6 @@ int PartType::ProductionTime(int empire_id, int location_id, int in_design_id) c
         return arbitrary_large_number;
 
     ScriptingContext context(source, location, in_design_id);
-
     return m_production_time->Eval(context);
 }
 
@@ -628,10 +630,12 @@ float HullType::ProductionCost(int empire_id, int location_id, int in_design_id)
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_cost)
         return 1.0f;
 
-    if (m_production_cost->ConstantExpr())
+    if (m_production_cost->ConstantExpr()) {
         return static_cast<float>(m_production_cost->Eval());
-    else if (m_production_cost->SourceInvariant() && m_production_cost->TargetInvariant())
-        return static_cast<float>(m_production_cost->Eval(ScriptingContext(nullptr, nullptr, in_design_id)));
+    } else if (m_production_cost->SourceInvariant() && m_production_cost->TargetInvariant()) {
+        ScriptingContext context(nullptr, nullptr, in_design_id);
+        return static_cast<float>(m_production_cost->Eval(context));
+    }
 
     const auto arbitrary_large_number = 999999.9f;
 
@@ -644,7 +648,6 @@ float HullType::ProductionCost(int empire_id, int location_id, int in_design_id)
         return arbitrary_large_number;
 
     ScriptingContext context(source, location, in_design_id);
-
     return static_cast<float>(m_production_cost->Eval(context));
 }
 
@@ -652,10 +655,12 @@ int HullType::ProductionTime(int empire_id, int location_id, int in_design_id) c
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_time)
         return 1;
 
-    if (m_production_time->ConstantExpr())
+    if (m_production_time->ConstantExpr()) {
         return m_production_time->Eval();
-    else if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant())
-        return m_production_time->Eval(ScriptingContext(nullptr, nullptr, in_design_id));
+    } else if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant()) {
+        ScriptingContext context(nullptr, nullptr, in_design_id);
+        return m_production_time->Eval(context);
+    }
 
     const auto arbitrary_large_number = 999999;
 
@@ -668,7 +673,6 @@ int HullType::ProductionTime(int empire_id, int location_id, int in_design_id) c
         return arbitrary_large_number;
 
     ScriptingContext context(source, location, in_design_id);
-
     return m_production_time->Eval(context);
 }
 
@@ -1081,7 +1085,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id) const {
         return false;
     }
     // evaluate using location as the source, as it should be an object owned by this empire.
-    ScriptingContext location_as_source_context(location);
+    ScriptingContext location_as_source_context(location, location);
     if (!hull->Location()->Eval(location_as_source_context, location))
         return false;
 

@@ -369,8 +369,7 @@ bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id) 
             const Condition::Condition* c = bt->EnqueueLocation();
             if (!c)
                 return true;
-            ScriptingContext context(location_obj);
-            return c->Eval(context, location_obj);
+            return c->Eval(ScriptingContext(location_obj), location_obj);
         }
         return true;
         break;

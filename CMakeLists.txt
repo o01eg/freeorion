@@ -37,7 +37,7 @@ include(UseCodeCoverage)
 include(TargetDependencies)
 
 set(FreeOrion_VERSION 0.4.9+)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -73,7 +73,7 @@ if(WIN32)
 endif()
 
 if(APPLE)
-    set(FreeOrionSDK_VERSION 10)
+    set(FreeOrionSDK_VERSION 11)
     set(FreeOrionSDK_FILE "FreeOrionSDK_${FreeOrionSDK_VERSION}_Clang-MacOSX-10.9-x86_64.tar.bz2")
     if(NOT EXISTS "${CMAKE_BINARY_DIR}/${FreeOrionSDK_FILE}")
     file(DOWNLOAD

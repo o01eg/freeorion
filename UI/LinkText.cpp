@@ -210,7 +210,7 @@ std::string ColorByOwner::Decorate(const std::string& object_id_str, const std::
     const Empire* empire = nullptr;
     // get object indicated by object_id, and then get object's owner, if any
     int object_id = CastStringToInt(object_id_str);
-    auto object = Objects().Object(object_id);
+    auto object = Objects().get(object_id);
     if (object && !object->Unowned())
         empire = GetEmpire(object->Owner());
     if (empire)
@@ -503,9 +503,6 @@ void TextLinker::MarkLinks() {
         return;
     }
 
-    //std::cout << "TextLinker::MarkLinks:" << std::endl;
-    //std::cout << "raw text:" << raw_text << std::endl;
-
     int copy_start_index = 0;
     auto raw_text_start_it = raw_text.begin();
 
@@ -542,7 +539,6 @@ void TextLinker::MarkLinks() {
 
     // set underlying UI control text
     SetLinkedText(marked_text);
-    //std::cout << "marktext:" << marked_text << std::endl << std::endl;
 }
 
 const LinkDecorator TextLinker::DEFAULT_DECORATOR;

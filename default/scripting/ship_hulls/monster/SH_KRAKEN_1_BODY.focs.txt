@@ -3,6 +3,7 @@ Hull
     description = "SH_KRAKEN_1_BODY_DESC"
     speed = 40
     fuel = 4
+    NoDefaultFuelEffect
     stealth = 5
     structure = 20
     slots = [
@@ -41,6 +42,7 @@ Hull
 
         [[MONSTER_MOVE_ALWAYS]]
         [[INFINITE_FUEL]]
+        [[ADD_HULL_FUEL_TO_MAX_FUEL_METER]]
         [[MONSTER_SHIELD_REGENERATION]]
 
         EffectsGroup

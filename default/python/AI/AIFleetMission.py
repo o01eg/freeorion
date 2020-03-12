@@ -1,3 +1,4 @@
+from __future__ import division
 from logging import debug, warn
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
@@ -539,7 +540,7 @@ class AIFleetMission(object):
                         debug("Threat remains in target system; Considering to release some ships.")
                         new_fleets = []
                         fleet_portion_to_remain = self._portion_of_fleet_needed_here()
-                        if fleet_portion_to_remain > 1:
+                        if fleet_portion_to_remain >= 1:
                             debug("Can not release fleet yet due to large threat.")
                         elif fleet_portion_to_remain > 0:
                             debug("Not all ships are needed here - considering releasing a few")
@@ -623,7 +624,7 @@ class AIFleetMission(object):
 
         # TODO: Rate against specific threat here
         fleet_rating = CombatRatingsAI.get_fleet_rating(self.fleet.id)
-        return CombatRatingsAI.rating_needed(potential_threat, local_defenses) / float(fleet_rating)
+        return CombatRatingsAI.rating_needed(potential_threat, local_defenses) / float(max(fleet_rating, 1.))
 
     def generate_fleet_orders(self):
         """generates AIFleetOrders from fleets targets to accomplish"""
@@ -717,6 +718,9 @@ class AIFleetMission(object):
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.fleet == other.target
+
+    def __hash__(self):
+        return hash(self.fleet)
 
     def __str__(self):
         fleet = self.fleet.get_object()

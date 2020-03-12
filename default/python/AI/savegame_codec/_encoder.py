@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 """This module defines the encoding for the FreeOrion AI savegames.
 
 The encoding is json-based with custom prefixes to support some objects
@@ -16,13 +17,14 @@ If not defined, its __dict__ will be encoded instead.
 
 If an object could not be encoded, raise a CanNotSaveGameException.
 """
+from common import six
 import collections
 
 import EnumsAI
 from freeorion_tools import profile
 
-from _definitions import (CanNotSaveGameException, ENUM_PREFIX, FALSE, FLOAT_PREFIX, INT_PREFIX, NONE, PLACEHOLDER,
-                          SET_PREFIX, TRUE, TUPLE_PREFIX, trusted_classes, )
+from ._definitions import (CanNotSaveGameException, ENUM_PREFIX, FALSE, FLOAT_PREFIX, INT_PREFIX, NONE, PLACEHOLDER,
+                           SET_PREFIX, TRUE, TUPLE_PREFIX, trusted_classes, )
 
 
 @profile
@@ -39,7 +41,7 @@ def build_savegame_string(use_compression=True):
     if use_compression:
         import base64
         import zlib
-        savegame_string = base64.b64encode(zlib.compress(savegame_string))
+        savegame_string = base64.b64encode(zlib.compress(six.ensure_binary(savegame_string, 'utf-8')))
     return savegame_string
 
 
@@ -50,9 +52,20 @@ def encode(o):
     :return: String representation of the object state
     :rtype: str
     """
+
+    # Start hack
+    # This is hack for python3 compatibility.
+    # In python2 we have both str and unicode, which inherited from the basestring (six.string_types for python2)
+    # In python 3 is only one type str (six.string_types for python2)
+    # After migration is finished replace this code with `o_type = type(o)`
+    if isinstance(o, six.string_types):
+        o_type = six.string_types
+    else:
+        o_type = type(o)
+    # end hack
+
     # Find and call the correct encoder based
     # on the type of the object to encode
-    o_type = type(o)
     try:
         encoder = _encoder_table[o_type]
     except KeyError:
@@ -127,12 +140,11 @@ def _encode_set(o):
 
 def _encode_dict(o):
     """Get a string representation of a dict with its encoded content."""
-    return "{%s}" % (', '.join(['%s: %s' % (encode(k), encode(v)) for k, v in o.iteritems()]))
+    return "{%s}" % (', '.join(['%s: %s' % (encode(k), encode(v)) for k, v in o.items()]))
 
 
 _encoder_table = {
-    str: _encode_str,
-    unicode: _encode_str,
+    six.string_types: _encode_str,
     bool: _encode_bool,
     int: _encode_int,
     float: _encode_float,

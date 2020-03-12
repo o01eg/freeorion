@@ -16,16 +16,8 @@
 #include <GG/Layout.h>
 #include <GG/TabWnd.h>
 
-//boost::spirit::classic pulls in windows.h which in turn defines the macros
-//MessageBox, PlaySound, min and max. Disabling the generation of the min and
-// max macros and undefining those should avoid name collisions with std c++
-// library and FreeOrion function names.
-#define NOMINMAX
-#include <boost/spirit/include/classic.hpp>
-#ifdef FREEORION_WIN32
-#  undef MessageBox
-#  undef PlaySound
-#endif
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/phoenix_operator.hpp>
 
 #include <boost/format.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -206,7 +198,7 @@ namespace {
             m_code_point = key_code_point;
             m_mods = mod_keys;
             // exit modal loop only if not a modifier
-            if (!(m_key >= GG::GGK_NUMLOCK && m_key <= GG::GGK_COMPOSE))
+            if (GG::GGK_LCONTROL > m_key || GG::GGK_RGUI < m_key)
                 m_done = true;
 
             /// @todo Clean up, ie transform LCTRL or RCTRL into CTRL and
@@ -227,10 +219,7 @@ namespace {
             CUIWnd(UserString("OPTIONS_FONTS"),
                    GG::GUI::GetGUI()->AppWidth() / 6,       GG::GUI::GetGUI()->AppHeight() / 6,
                    GG::GUI::GetGUI()->AppWidth() * 2 / 3,   GG::GUI::GetGUI()->AppHeight() * 2 / 3,
-                   GG::INTERACTIVE | GG::DRAGABLE | GG::MODAL | GG::RESIZABLE | CLOSABLE),
-            m_font_graphic(nullptr),
-            m_title_font_graphic(nullptr),
-            m_hscroll(nullptr)
+                   GG::INTERACTIVE | GG::DRAGABLE | GG::MODAL | GG::RESIZABLE | CLOSABLE)
         {}
 
         void CompleteConstruction() override {
@@ -248,6 +237,17 @@ namespace {
                 m_font_graphic->Resize(GG::Pt(texture->Width(), texture->Height()));
                 AttachChild(m_font_graphic);
                 top += m_font_graphic->Height() + 1;
+            }
+
+            font = ClientUI::GetBoldFont();
+            if (font)
+                texture = font->GetTexture();
+            if (texture) {
+                m_bold_font_graphic = GG::Wnd::Create<GG::StaticGraphic>(texture);
+                m_bold_font_graphic->MoveTo(GG::Pt(GG::X0, top));
+                m_bold_font_graphic->Resize(GG::Pt(texture->Width(), texture->Height()));
+                AttachChild(m_bold_font_graphic);
+                top += m_bold_font_graphic->Height() + 1;
             }
 
             font = ClientUI::GetTitleFont();
@@ -300,6 +300,7 @@ namespace {
 
     private:
         std::shared_ptr<GG::StaticGraphic>  m_font_graphic;
+        std::shared_ptr<GG::StaticGraphic>  m_bold_font_graphic;
         std::shared_ptr<GG::StaticGraphic>  m_title_font_graphic;
         std::shared_ptr<GG::Scroll>         m_hscroll;
     };
@@ -555,6 +556,7 @@ void OptionsWnd::CompleteConstruction() {
 
     CreateSectionHeader(current_page, 0,                                UserString("OPTIONS_FONTS"));
     FontOption(current_page, 0, "ui.font.path",                         UserString("OPTIONS_FONT_TEXT"));
+    FontOption(current_page, 0, "ui.font.bold.path",                    UserString("OPTIONS_FONT_BOLD_TEXT"));
     FontOption(current_page, 0, "ui.font.title.path",                   UserString("OPTIONS_FONT_TITLE"));
 
     // show font texture button
@@ -1266,9 +1268,12 @@ void OptionsWnd::ResolutionOption(GG::ListBox* page, int indentation_level) {
             if (!drop_list_row)
                 return;
             int w, h;
-            namespace classic = boost::spirit::classic;
-            classic::rule<> resolution_p = classic::int_p[classic::assign_a(w)] >> classic::str_p(" x ") >> classic::int_p[classic::assign_a(h)];
-            classic::parse(drop_list_row->Name().c_str(), resolution_p);
+            namespace phx = boost::phoenix;
+            namespace qi = boost::spirit::qi;
+            qi::parse(
+                drop_list_row->Name().begin(), drop_list_row->Name().end(),
+                (qi::int_[phx::ref(w) = qi::_1] >> " x " >> qi::int_[phx::ref(h) = qi::_1])
+            );
             GetOptionsDB().Set<int>("video.fullscreen.width", w);
             GetOptionsDB().Set<int>("video.fullscreen.height", h);
         }
@@ -1284,7 +1289,7 @@ namespace {
 
         const std::regex dot { "\\.+" };
         const std::vector<std::string> nodes {
-            std::sregex_token_iterator(name.cbegin(), name.cend(), dot, -1),
+            std::sregex_token_iterator(name.begin(), name.end(), dot, -1),
             std::sregex_token_iterator()
         };
 

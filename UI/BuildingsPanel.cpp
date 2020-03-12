@@ -68,7 +68,7 @@ void BuildingsPanel::CompleteConstruction() {
         boost::bind(&BuildingsPanel::ExpandCollapseButtonPressed, this));
 
     // get owner, connect its production queue changed signal to update this panel
-    auto planet = GetUniverseObject(m_planet_id);
+    auto planet = Objects().get(m_planet_id);
     if (planet) {
         if (const Empire* empire = GetEmpire(planet->Owner())) {
             const ProductionQueue& queue = empire->GetProductionQueue();
@@ -91,14 +91,12 @@ void BuildingsPanel::ExpandCollapse(bool expanded) {
 }
 
 void BuildingsPanel::Update() {
-    //std::cout << "BuildingsPanel::Update" << std::endl;
-
     // remove old indicators
     for (auto& indicator : m_building_indicators)
         DetachChild(indicator.get());
     m_building_indicators.clear();
 
-    auto planet = GetPlanet(m_planet_id);
+    auto planet = Objects().get<Planet>(m_planet_id);
     if (!planet) {
         ErrorLogger() << "BuildingsPanel::Update couldn't get planet with id " << m_planet_id;
         return;
@@ -119,7 +117,7 @@ void BuildingsPanel::Update() {
         if (this_client_stale_object_info.count(object_id))
             continue;
 
-        auto building = GetBuilding(object_id);
+        auto building = Objects().get<Building>(object_id);
         if (!building) {
             ErrorLogger() << "BuildingsPanel::Update couldn't get building with id: " << object_id << " on planet " << planet->Name();
             continue;
@@ -142,7 +140,6 @@ void BuildingsPanel::Update() {
     int queue_index = -1;
     for (const auto& elem : empire->GetProductionQueue()) {
         ++queue_index;
-        //std::cout << "queue index: " << queue_index << " elem: " << elem.Dump() << std::endl;
         if (elem.item.build_type != BT_BUILDING) continue;  // don't show in-progress ships in BuildingsPanel...
         if (elem.location != m_planet_id) continue;         // don't show buildings located elsewhere
 
@@ -262,7 +259,7 @@ BuildingIndicator::BuildingIndicator(GG::X w, int building_id) :
     GG::Wnd(GG::X0, GG::Y0, w, GG::Y(Value(w)), GG::INTERACTIVE),
     m_building_id(building_id)
 {
-    if (auto building = GetBuilding(m_building_id))
+    if (auto building = Objects().get<Building>(m_building_id))
         building->StateChangedSignal.connect(
             boost::bind(&BuildingIndicator::RequirePreRender, this));
 }
@@ -353,7 +350,7 @@ void BuildingIndicator::PreRender() {
 void BuildingIndicator::Refresh() {
     SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
 
-    auto building = GetBuilding(m_building_id);
+    auto building = Objects().get<Building>(m_building_id);
     if (!building)
         return;
 
@@ -403,7 +400,7 @@ void BuildingIndicator::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
     // queued production item, and that the owner of the building is this
     // client's player's empire
     int empire_id = HumanClientApp::GetApp()->EmpireID();
-    auto building = GetBuilding(m_building_id);
+    auto building = Objects().get<Building>(m_building_id);
     if (!building)
         return;
 

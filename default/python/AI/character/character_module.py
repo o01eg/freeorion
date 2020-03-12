@@ -42,7 +42,7 @@ assigned some additional mandatory trait(s).  For example the Trith and
 a mandatory Genocidal trait.  Perhaps add a probabilty distribution of
 trait components to the FOCS description of a playable species.
 """
-
+from __future__ import division
 
 # Some ideas for future trait modules are:
 # TODO: challenge/difficulty -- to replace the difficulty related portions
@@ -90,8 +90,10 @@ import random
 from logging import warn, debug
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
+from common import six
 
 
+@six.add_metaclass(abc.ABCMeta)
 class Trait(object):
     """An abstract class representing a type of trait of the AI.
 
@@ -117,7 +119,6 @@ class Trait(object):
     Any given Trait class should not implement all the taps, only those
     it needs to override to cause the relevant trait.
     """
-    __metaclass__ = abc.ABCMeta
 
     def __repr__(self):
         return "Trait"
@@ -441,10 +442,11 @@ class Aggression(Trait):
         if self.aggression == fo.aggression.beginner:
             return 9
         log_index = (other_empire_id, fo.empireID())
+        num_alliance_requests = len(diplomatic_logs.get('alliance_requests', {}).get(log_index, []))
         num_peace_requests = len(diplomatic_logs.get('peace_requests', {}).get(log_index, []))
         num_war_declarations = len(diplomatic_logs.get('war_declarations', {}).get(log_index, []))
         # Too many requests for peace irritate the AI, as do any war declarations
-        irritation = (self.aggression * (2.0 + num_peace_requests / 10.0 + 2.0 * num_war_declarations) + 0.5)
+        irritation = (self.aggression * (2.0 + num_alliance_requests / 5.0 + num_peace_requests / 10.0 + 2.0 * num_war_declarations) + 0.5)
         attitude = 10 * random.random() - irritation
         return min(10, max(-10, attitude))
 
@@ -573,6 +575,16 @@ def _make_single_function_combiner(funcnamei, f_combo):
     return func
 
 
+def _maxmin_not_none(f_combo):
+    """Make a combiner that collects not None items and applies min or max"""
+    def func(llin):
+        ll = [x for x in llin if x is not None]
+        if not ll:
+            return 0
+        return f_combo(ll)
+    return func
+
+
 # Create combiners for traits that all must be true
 for funcname in ["may_explore_system", "may_surge_industry", "may_maximize_research", "may_invade",
                  "may-invade_with_bases", "may_build_building", "may_produce_troops",
@@ -585,11 +597,11 @@ for funcname in ["may_explore_system", "may_surge_industry", "may_maximize_resea
 # Create combiners for traits that take min result
 for funcname in ["max_number_colonies", "invasion_priority_scaling",
                  "military_priority_scaling", "max_defense_portion"]:
-    setattr(Character, funcname, _make_single_function_combiner(funcname, min))
+    setattr(Character, funcname, _make_single_function_combiner(funcname, _maxmin_not_none(min)))
 
 # Create combiners for traits that take max result
 for funcname in ["target_number_of_orbitals", "military_safety_factor", "get_research_index"]:
-    setattr(Character, funcname, _make_single_function_combiner(funcname, max))
+    setattr(Character, funcname, _make_single_function_combiner(funcname, _maxmin_not_none(max)))
 
 # Create combiners for traits that take any result
 for funcname in ["check_orbital_production"]:

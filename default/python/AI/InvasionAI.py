@@ -1,3 +1,4 @@
+from __future__ import division
 import math
 from logging import debug, info, warn
 
@@ -136,7 +137,7 @@ def get_invasion_fleets():
         # Pass 2: for each target previously identified for base troopers, check that still qualifies and
         # check how many base troopers would be needed; if reasonable then queue up the troops and record this in
         # get_aistate().qualifyingTroopBaseTargets
-        for pid in aistate.qualifyingTroopBaseTargets.keys():
+        for pid in list(aistate.qualifyingTroopBaseTargets.keys()):
             planet = universe.getPlanet(pid)
             if planet and planet.owner == empire_id:
                 del aistate.qualifyingTroopBaseTargets[pid]
@@ -230,7 +231,7 @@ def get_invasion_fleets():
         ])
     info(invasion_table)
 
-    sorted_planets = filter(lambda x: x[1] > 0, sorted_planets)
+    sorted_planets = [x for x in sorted_planets if x[1] > 0]
     # export opponent planets for other AI modules
     AIstate.opponentPlanetIDs = [pid for pid, __, __ in sorted_planets]
     AIstate.invasionTargets = sorted_planets
@@ -483,7 +484,7 @@ def evaluate_invasion_planet(planet_id, secure_fleet_missions, verbose=True):
     cost_score = (normalized_cost**2 / 50.0) * troop_cost
 
     base_score = colony_base_value + bld_tally + tech_tally + enemy_val - cost_score
-    # If the AI does have enough total miltary to attack this target, and the target is more than minimally valuable,
+    # If the AI does have enough total military to attack this target, and the target is more than minimally valuable,
     # don't let the threat_factor discount the adjusted value below MIN_INVASION_SCORE +1, so that if there are no
     # other targets the AI could still pursue this one.  Otherwise, scoring pressure from
     # MilitaryAI.get_preferred_max_military_portion_for_single_battle might prevent the AI from attacking heavily

@@ -795,6 +795,8 @@ void CUIDropDownList::Render() {
     GG::Pt ul = UpperLeft();
     GG::Clr lb_color = LB()->Color();
     GG::Clr border_color = Disabled() ? DisabledColor(lb_color) : lb_color;
+    if (GG::GUI::GetGUI()->FocusWnd().get() == this)
+        border_color = GG::LightColor(border_color);
     GG::Clr interior_color = Disabled() ? DisabledColor(InteriorColor()) : InteriorColor();
 
     glPushMatrix();
@@ -953,7 +955,10 @@ void CUIEdit::LosingFocus() {
 void CUIEdit::Render() {
     GG::Clr color = Color();
     GG::Clr border_color = Disabled() ? DisabledColor(color) : color;
+    if (GG::GUI::GetGUI()->FocusWnd().get() == this)
+        border_color = GG::LightColor(border_color);
     GG::Clr int_color_to_use = Disabled() ? DisabledColor(InteriorColor()) : InteriorColor();
+
 
     GG::Pt ul = UpperLeft(), lr = LowerRight();
     //GG::Pt client_ul = ClientUpperLeft(), client_lr = ClientLowerRight();
@@ -989,53 +994,12 @@ void CensoredCUIEdit::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
 
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
+    // omits copy command from base CUIEdit
     popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_PASTE"),         false, false, hotkey_paste_action));
     popup->AddMenuItem(GG::MenuItem(true)); // separator
     popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_SELECT_ALL"),    false, false, hotkey_select_all_action));
     popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_DESELECT"),      false, false, hotkey_deselect_action));
     popup->Run();
-}
-
-void CensoredCUIEdit::KeyPress(GG::Key key, std::uint32_t key_code_point,
-                               GG::Flags<GG::ModKey> mod_keys)
-{
-    if (Disabled()) {
-        CUIEdit::KeyPress(key, key_code_point, mod_keys);
-        return;
-    }
-
-    bool shift_down = mod_keys & (GG::MOD_KEY_LSHIFT | GG::MOD_KEY_RSHIFT);
-    //bool ctrl_down = mod_keys & (GG::MOD_KEY_CTRL | GG::MOD_KEY_RCTRL);
-    //bool numlock_on = mod_keys & GG::MOD_KEY_NUM;
-
-    if (key == GG::GGK_DELETE && shift_down) {
-        GG::GUI::GetGUI()->CutWndText(this);    // should just copy the placeholder character
-
-    } else if (key == GG::GGK_INSERT && shift_down) {
-        GG::GUI::GetGUI()->PasteWndText(this, GG::GUI::GetGUI()->ClipboardText());
-
-    } else if (key == GG::GGK_BACKSPACE) {
-        if (MultiSelected()) {
-            ClearSelected();
-
-        } else if (0 < m_cursor_pos.first) {
-            // delete character before cursor
-            m_cursor_pos.second = m_cursor_pos.first--;
-            ClearSelected();
-        }
-
-    } else if (key == GG::GGK_DELETE) {
-        if (MultiSelected()) {
-            ClearSelected();
-
-        } else {
-            m_cursor_pos.second = m_cursor_pos.first + 1;
-            ClearSelected();
-        }
-
-    } else {
-        CUIEdit::KeyPress(key, key_code_point, mod_keys);
-    }
 }
 
 void CensoredCUIEdit::SetText(const std::string& str) {
@@ -1109,7 +1073,7 @@ void CensoredCUIEdit::ClearSelected() {
     auto it = m_raw_text.begin() + Value(low);
     auto end_it = m_raw_text.begin() + Value(high);
 
-    if (it == end_it)
+    if (it == m_raw_text.end() || it == end_it)
         return;
 
     m_raw_text.erase(it, end_it);
@@ -1136,6 +1100,8 @@ void CUIMultiEdit::CompleteConstruction() {
 void CUIMultiEdit::Render() {
     GG::Clr color = Color();
     GG::Clr border_color =      Disabled()  ?   DisabledColor(color)            :   color;
+    if (GG::GUI::GetGUI()->FocusWnd().get() == this)
+        border_color = GG::LightColor(border_color);
     GG::Clr int_color_to_use =  Disabled()  ?   DisabledColor(InteriorColor())  :   InteriorColor();
 
     GG::Pt ul = UpperLeft(), lr = LowerRight();
@@ -1342,32 +1308,9 @@ StatisticIcon::StatisticIcon(const std::shared_ptr<GG::Texture> texture,
                              double value, int digits, bool showsign,
                              GG::X w /*= GG::X1*/, GG::Y h /*= GG::Y1*/) :
     GG::Control(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
-    m_num_values(1),
-    m_values(std::vector<double>(1, value)),
-    m_digits(std::vector<int>(1, digits)),
-    m_show_signs(std::vector<bool>(1, showsign))
+    m_values(1, std::tuple<double, int, bool>{value, digits, showsign})
 {
     m_icon = GG::Wnd::Create<GG::StaticGraphic>(texture, GG::GRAPHIC_FITGRAPHIC);
-}
-
-StatisticIcon::StatisticIcon(const std::shared_ptr<GG::Texture> texture,
-                             double value0, double value1, int digits0, int digits1,
-                             bool showsign0, bool showsign1,
-                             GG::X w /*= GG::X1*/, GG::Y h /*= GG::Y1*/) :
-    GG::Control(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
-    m_num_values(2),
-    m_values(std::vector<double>(2, 0.0)),
-    m_digits(std::vector<int>(2, 2)),
-    m_show_signs(std::vector<bool>(2, false))
-{
-    m_icon = GG::Wnd::Create<GG::StaticGraphic>(texture, GG::GRAPHIC_FITGRAPHIC);
-
-    m_values[0] = value0;
-    m_values[1] = value1;
-    m_digits[0] = digits0;
-    m_digits[1] = digits1;
-    m_show_signs[0] = showsign0;
-    m_show_signs[1] = showsign1;
 }
 
 void StatisticIcon::CompleteConstruction() {
@@ -1387,26 +1330,23 @@ void StatisticIcon::PreRender() {
     DoLayout();
 }
 
-double StatisticIcon::GetValue(int index) const {
-    if (index < 0) throw std::invalid_argument("negative index passed to StatisticIcon::Value");
+double StatisticIcon::GetValue(size_t index) const {
     if (index > 1) throw std::invalid_argument("index greater than 1 passed to StatisticIcon::Value.  Only 1 or 2 values, with indices 0 or 1, supported.");
-    if (index >= m_num_values) throw std::invalid_argument("index greater than largest index available passed to StatisticIcon::Value");
-    return m_values[index];
+    if (index >= m_values.size()) throw std::invalid_argument("index greater than largest index available passed to StatisticIcon::Value");
+    return std::get<0>(m_values[index]);
 }
 
-void StatisticIcon::SetValue(double value, int index) {
-    if (index < 0) throw std::invalid_argument("negative index passed to StatisticIcon::SetValue");
+void StatisticIcon::SetValue(double value, size_t index) {
     if (index > 1) throw std::invalid_argument("index greater than 1 passed to StatisticIcon::SetValue.  Only 1 or 2 values, with indices 0 or 1, supported.");
-    if (index + 1 > m_num_values) {
-        m_num_values = index + 1;
-        m_values.resize(m_num_values, 0.0);
-        m_show_signs.resize(m_num_values, m_show_signs[0]);
-        m_digits.resize(m_num_values, m_digits[0]);
+    if (index + 1 > m_values.size()) {
+        auto entry = std::tuple<double, int, bool>(m_values[0]);
+        std::get<0>(entry) = value;
+        m_values.resize(index + 1, entry);
         RequirePreRender();
     }
-    if (value != m_values[index])
+    if (value != std::get<0>(m_values[index]))
         RequirePreRender();
-    m_values[index] = value;
+    std::get<0>(m_values[index]) = value;
 }
 
 void StatisticIcon::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
@@ -1427,18 +1367,33 @@ void StatisticIcon::RButtonDown(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys
 void StatisticIcon::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
     if (Disabled())
         return;
-    LeftClickedSignal();
-    ForwardEventToParent();
+    LeftClickedSignal(pt);
 }
 
 void StatisticIcon::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
     if (Disabled())
         return;
-    RightClickedSignal();
-    ForwardEventToParent();
+    RightClickedSignal(pt);
 }
 
 void StatisticIcon::MouseWheel(const GG::Pt& pt, int move, GG::Flags<GG::ModKey> mod_keys)
+{ ForwardEventToParent(); }
+
+void StatisticIcon::AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys)
+{ ForwardEventToParent(); }
+
+void StatisticIcon::DragDropEnter(const GG::Pt& pt, std::map<const GG::Wnd*, bool>& drop_wnds_acceptable,
+                                  GG::Flags<GG::ModKey> mod_keys)
+{ ForwardEventToParent(); }
+
+void StatisticIcon::DragDropHere(const GG::Pt& pt, std::map<const GG::Wnd*, bool>& drop_wnds_acceptable,
+                                 GG::Flags<GG::ModKey> mod_keys)
+{ ForwardEventToParent(); }
+
+void StatisticIcon::CheckDrops(const GG::Pt& pt, std::map<const GG::Wnd*, bool>& drop_wnds_acceptable, GG::Flags<GG::ModKey> mod_keys)
+{ ForwardEventToParent(); }
+
+void StatisticIcon::DragDropLeave()
 { ForwardEventToParent(); }
 
 void StatisticIcon::DoLayout() {
@@ -1447,21 +1402,31 @@ void StatisticIcon::DoLayout() {
     m_icon->SizeMove(GG::Pt(GG::X0, GG::Y0),
                      GG::Pt(GG::X(icon_dim), GG::Y(icon_dim)));
 
-    if (m_num_values <= 0)
+    if (m_values.size() <= 0)
         return;
 
     // Precompute text elements
     GG::Font::TextAndElementsAssembler text_elements(*ClientUI::GetFont());
-    text_elements.AddOpenTag(ValueColor(0))
-        .AddText(DoubleToString(m_values[0], m_digits[0], m_show_signs[0]))
+    text_elements.AddOpenTag(ClientUI::TextColor())
+        .AddText(DoubleToString(std::get<0>(m_values[0]), std::get<1>(m_values[0]), std::get<2>(m_values[0])))
         .AddCloseTag("rgba");
-    if (m_num_values > 1)
+    if (m_values.size() > 1) {
+        GG::Clr clr = ClientUI::TextColor();
+
+        int effectiveSign = EffectiveSign(std::get<0>(m_values.at(1)));
+
+        if (effectiveSign == -1)
+            clr = ClientUI::StatDecrColor();
+        if (effectiveSign == 1)
+            clr = ClientUI::StatIncrColor();
+
         text_elements
             .AddText(" (")
-            .AddOpenTag(ValueColor(1))
-            .AddText(DoubleToString(m_values[1], m_digits[1], m_show_signs[1]) )
+            .AddOpenTag(clr)
+            .AddText(DoubleToString(std::get<0>(m_values[1]), std::get<1>(m_values[1]), std::get<2>(m_values[1])))
             .AddCloseTag("rgba")
             .AddText(")");
+    }
 
     // Calculate location and format
     GG::Flags<GG::TextFormat> format;
@@ -1489,25 +1454,11 @@ void StatisticIcon::DoLayout() {
     }
 }
 
-GG::Clr StatisticIcon::ValueColor(int index) const {
-    if (m_values.empty() || index >= m_num_values || index < 0)
-        return ClientUI::TextColor();
-
-    int effectiveSign = EffectiveSign(m_values.at(index));
-
-    if (index == 0) return ClientUI::TextColor();
-
-    if (effectiveSign == -1) return ClientUI::StatDecrColor();
-    if (effectiveSign == 1) return ClientUI::StatIncrColor();
-
-    return ClientUI::TextColor();
-}
-
 GG::Pt StatisticIcon::MinUsableSize() const {
     if (!m_icon)
         return GG::Pt(GG::X1, GG::Y1);
 
-    if (m_num_values <= 0 || !m_text)
+    if (m_values.empty() || !m_text)
         return m_icon->Size();
 
     if (Width() >= Value(Height()))

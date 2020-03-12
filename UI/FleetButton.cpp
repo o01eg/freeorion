@@ -72,21 +72,14 @@ FleetButton::FleetButton(int fleet_id, SizeType size_type) :
 {}
 
 FleetButton::FleetButton(const std::vector<int>& fleet_IDs, SizeType size_type) :
-    GG::Button("", nullptr, GG::CLR_ZERO),
-    m_fleets(),
-    m_icons(),
-    m_selection_indicator(nullptr),
-    m_scanline_control(nullptr),
-    m_selected(false)
+    GG::Button("", nullptr, GG::CLR_ZERO)
 {
     std::vector<std::shared_ptr<const Fleet>> fleets;
-    for (int fleet_id : fleet_IDs) {
-        auto fleet = GetFleet(fleet_id);
-        if (!fleet) {
-            ErrorLogger() << "FleetButton::FleetButton couldn't get fleet with id " << fleet_id;
+    fleets.reserve(fleet_IDs.size());
+    for (const auto& fleet : Objects().find<Fleet>(fleet_IDs)) {
+        if (!fleet)
             continue;
-        }
-        m_fleets.push_back(fleet_id);
+        m_fleets.push_back(fleet->ID());
         fleets.push_back(fleet);
     }
 
@@ -119,12 +112,12 @@ FleetButton::FleetButton(const std::vector<int>& fleet_IDs, SizeType size_type) 
         bool monsters = true;
         // find if any ship in fleets in button is not a monster
         for (auto& fleet : fleets) {
-            for (int ship_id : fleet->ShipIDs()) {
-                if (auto ship = GetShip(ship_id)) {
-                    if (!ship->IsMonster()) {
-                        monsters = false;
-                        break;
-                    }
+            for (const auto& ship : Objects().find<Ship>(fleet->ShipIDs())) {
+                if (!ship)
+                    continue;
+                if (!ship->IsMonster()) {
+                    monsters = false;
+                    break;
                 }
             }
         }
@@ -150,7 +143,7 @@ FleetButton::FleetButton(const std::vector<int>& fleet_IDs, SizeType size_type) 
         first_fleet = *fleets.begin();
     if (first_fleet && first_fleet->SystemID() == INVALID_OBJECT_ID && first_fleet->NextSystemID() != INVALID_OBJECT_ID) {
         int next_sys_id = first_fleet->NextSystemID();
-        if (auto obj = GetUniverseObject(next_sys_id)) {
+        if (auto obj = Objects().get(next_sys_id)) {
             // fleet is not in a system and has a valid next destination, so can orient it in that direction
             // fleet icons might not appear on the screen in the exact place corresponding to their
             // actual universe position, but if they're moving along a starlane, this code will assume
@@ -181,9 +174,10 @@ FleetButton::FleetButton(const std::vector<int>& fleet_IDs, SizeType size_type) 
     }  
 
     // add graphics for all icons needed
+    m_icons.reserve(4);
+
     if (m_fleet_blockaded) {
-        std::shared_ptr<GG::Texture> blockaded_texture = FleetBlockadedIcon(size_type);
-        if (blockaded_texture) {
+        if (auto blockaded_texture = FleetBlockadedIcon(size_type)) {
             auto icon = GG::Wnd::Create<GG::StaticGraphic>(blockaded_texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
             GG::Clr opposite_clr(255 - this->Color().r, 255 - this->Color().g, 255 - this->Color().b, this->Color().a);
             icon->SetColor(opposite_clr);
@@ -191,8 +185,7 @@ FleetButton::FleetButton(const std::vector<int>& fleet_IDs, SizeType size_type) 
         }
     }
 
-    std::shared_ptr<GG::Texture> size_texture = FleetSizeIcon(num_ships, size_type);
-    if (size_texture) {
+    if (auto size_texture = FleetSizeIcon(num_ships, size_type)) {
         auto icon = GG::Wnd::Create<RotatingGraphic>(size_texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
         icon->SetPhaseOffset(pointing_angle);
         icon->SetRPM(0.0f);
@@ -230,9 +223,8 @@ FleetButton::FleetButton(const std::vector<int>& fleet_IDs, SizeType size_type) 
 void FleetButton::CompleteConstruction() {
     Button::CompleteConstruction();
 
-    for (auto& icon: m_icons) {
+    for (auto& icon: m_icons)
         AttachChild(icon);
-    }
 
     // Scanlines for not currently-visible objects?
     int empire_id = HumanClientApp::GetApp()->EmpireID();
@@ -297,7 +289,6 @@ void FleetButton::LayoutIcons() {
     for (auto& graphic : m_icons) {
         GG::SubTexture subtexture = graphic->GetTexture();
         GG::Pt subtexture_sz = GG::Pt(subtexture.Width(), subtexture.Height());
-        //std::cout << "FleetButton::LayoutIcons repositioning icon: sz: " << subtexture_sz << "  tex: " << subtexture.GetTexture()->Filename() << std::endl;
         GG::Pt graphic_ul = middle - GG::Pt(subtexture_sz.x / 2, subtexture_sz.y / 2);
         graphic->SizeMove(graphic_ul, graphic_ul + subtexture_sz);
     }
@@ -314,22 +305,19 @@ void FleetButton::LayoutIcons() {
     // refresh fleet button tooltip
     if (m_fleet_blockaded) {
         std::shared_ptr<Fleet> fleet;
-        std::shared_ptr<System> current_system;
         std::string available_exits = "";
         int available_exits_count = 0;
 
         if (!m_fleets.empty())
             // can just pick first fleet because all fleets in system should have same exits
-            fleet = GetFleet(*m_fleets.begin());
+            fleet = Objects().get<Fleet>(*m_fleets.begin());
         else return;
 
-        current_system = GetSystem(fleet->SystemID());
-
-        for (const auto& target_system_id : current_system->StarlanesWormholes()) {
+        for (const auto& target_system_id : Objects().get<System>(fleet->SystemID())->StarlanesWormholes()) {
             if (fleet->BlockadedAtSystem(fleet->SystemID(), target_system_id.first))
                 continue;
 
-            std::shared_ptr<System> target_system = GetSystem(target_system_id.first);
+            auto target_system = Objects().get<System>(target_system_id.first);
             if (target_system) {
                 available_exits += "\n" + target_system->ApparentName(HumanClientApp::GetApp()->EmpireID());
                 available_exits_count++;
@@ -433,6 +421,7 @@ std::vector<std::shared_ptr<GG::Texture>> FleetHeadIcons(const std::vector<std::
         if (hasArmedShips)   { main_filenames.push_back("head-monster.png"); }
         else                 { main_filenames.push_back("head-monster-harmless.png"); }
     } else {
+        main_filenames.reserve(4);
         if (hasArmedShips)   { main_filenames.push_back("head-warship.png"); }
         if (hasColonyShips)  { main_filenames.push_back("head-colony.png");  }
         if (hasOutpostShips) { main_filenames.push_back("head-outpost.png"); }
@@ -441,6 +430,7 @@ std::vector<std::shared_ptr<GG::Texture>> FleetHeadIcons(const std::vector<std::
     if (main_filenames.empty()) { main_filenames.push_back("head-scout.png"); }
 
     std::vector<std::shared_ptr<GG::Texture>> result;
+    result.reserve(main_filenames.size());
     for (const std::string& name : main_filenames) {
         std::shared_ptr<GG::Texture> texture_temp = ClientUI::GetTexture(
             ClientUI::ArtDir() / "icons" / "fleet" / (size_prefix + name), false);

@@ -28,8 +28,6 @@ public:
     /** \name Mutators */ //@{
     void PreRender() override;
 
-    bool EventFilter(GG::Wnd* w, const GG::WndEvent& event) override;
-
     /** expands or collapses panel to show details or just summary info */
     void ExpandCollapse(bool expanded);
 
@@ -51,9 +49,6 @@ private:
 
     /** object id for the ResourceCenter that this panel displays */
     int m_rescenter_id;
-
-    /** returns the ResourceCenter object with id m_rescenter_id */
-    std::shared_ptr<const ResourceCenter> GetResCenter() const;
 
     /** Icons for the associated meter type. */
     std::vector<std::pair<MeterType, std::shared_ptr<StatisticIcon>>> m_meter_stats;

@@ -7,7 +7,7 @@
 #include "../Empire/Empire.h"
 #include "../Empire/EmpireManager.h"
 #include "../network/Networking.h"
-#include "../network/ClientNetworking.h"
+#include "ClientNetworking.h"
 
 #include <stdexcept>
 #include <boost/bind.hpp>
@@ -54,7 +54,7 @@ SupplyManager& ClientApp::GetSupplyManager()
 { return m_supply_manager; }
 
 std::shared_ptr<UniverseObject> ClientApp::GetUniverseObject(int object_id)
-{ return GetUniverse().Objects().Object(object_id); }
+{ return GetUniverse().Objects().get(object_id); }
 
 ObjectMap& ClientApp::EmpireKnownObjects(int empire_id) {
     // observers and moderators should have accurate info about what each empire knows
@@ -67,7 +67,7 @@ ObjectMap& ClientApp::EmpireKnownObjects(int empire_id) {
 }
 
 std::shared_ptr<UniverseObject> ClientApp::EmpireKnownObject(int object_id, int empire_id)
-{ return EmpireKnownObjects(empire_id).Object(object_id); }
+{ return EmpireKnownObjects(empire_id).get(object_id); }
 
 const OrderSet& ClientApp::Orders() const
 { return m_orders; }
@@ -103,16 +103,9 @@ const std::map<int, PlayerInfo>& ClientApp::Players() const
 std::map<int, PlayerInfo>& ClientApp::Players()
 { return m_player_info; }
 
-const std::map<int, Message::PlayerStatus>& ClientApp::EmpireStatus() const
-{ return m_empire_status; }
-
-std::map<int, Message::PlayerStatus>& ClientApp::EmpireStatus()
-{ return m_empire_status; }
-
 void ClientApp::SetEmpireStatus(int empire_id, Message::PlayerStatus status) {
-    if (empire_id == ALL_EMPIRES)
-        return;
-    m_empire_status[empire_id] = status;
+    if (auto* empire = m_empires.GetEmpire(empire_id))
+        empire->SetReady(status == Message::WAITING);
 }
 
 void ClientApp::StartTurn(const SaveGameUIData& ui_data)

@@ -5,11 +5,12 @@
 #include "CUISpin.h"
 #include "FleetButton.h"
 #include "../client/human/HumanClientApp.h"
-#include "../network/ClientNetworking.h"
+#include "../client/ClientNetworking.h"
 #include "../util/i18n.h"
 #include "../util/Logger.h"
 #include "../util/Order.h"
 #include "../util/ModeratorAction.h"
+#include "../util/ScopedTimer.h"
 #include "../Empire/Empire.h"
 #include "../Empire/EmpireManager.h"
 #include "../universe/System.h"
@@ -20,8 +21,8 @@
 #include "../universe/Building.h"
 #include "../universe/Field.h"
 #include "../universe/Species.h"
-#include "../universe/Condition.h"
-#include "../universe/ValueRef.h"
+#include "../universe/Conditions.h"
+#include "../universe/ValueRefs.h"
 #include "../universe/Enums.h"
 
 #include <GG/DrawUtil.h>
@@ -37,13 +38,15 @@
 std::vector<std::string> SpecialNames();
 
 namespace {
+    using id_range = boost::any_range<int, boost::forward_traversal_tag>;
+
     const unsigned int NUM_COLUMNS(12u);
 
     void AddOptions(OptionsDB& db) {
         std::vector<std::pair<std::string, int>> default_columns_widths = {
-            {"NAME",             12*12},    {"ID",               4*12},
-            {"OBJECT_TYPE",      5*12},     {"OWNER",            10*12},
-            {"SPECIES",          8*12},     {"PLANET_TYPE",      8*12},
+            {"NAME",             16*12},    {"ID",               8*12},
+            {"OBJECT_TYPE",      8*12},     {"OWNER",            10*12},
+            {"SPECIES",          8*12},     {"PLANET_TYPE",      16*12},
             {"SIZE_AS_DOUBLE",   8*12}};
 
         for (unsigned int i = default_columns_widths.size(); i < NUM_COLUMNS; ++i)
@@ -62,7 +65,7 @@ namespace {
     bool temp_bool = RegisterOptions(&AddOptions);
 
     // returns a condition which matches objects with the specififed \a object_types
-    std::unique_ptr<Condition::ConditionBase> ConditionForObjectTypes(
+    std::unique_ptr<Condition::Condition> ConditionForObjectTypes(
         const std::vector<UniverseObjectType>& object_types)
     {
         if (object_types.empty())
@@ -71,7 +74,7 @@ namespace {
         if (object_types.size() == 1)
             return boost::make_unique<Condition::Type>(*object_types.begin());
 
-        std::vector<std::unique_ptr<Condition::ConditionBase>> subconditions;
+        std::vector<std::unique_ptr<Condition::Condition>> subconditions;
         for (auto obj_type : object_types)
             subconditions.emplace_back(boost::make_unique<Condition::Type>(obj_type));
         return boost::make_unique<Condition::Or>(std::move(subconditions));
@@ -81,9 +84,9 @@ namespace {
     // specified type(s), in which case \a value_ref is evaluated and the
     // result returned
     template <typename T>
-    std::unique_ptr<ValueRef::ValueRefBase<T>> ObjectTypeFilteredRef(
+    std::unique_ptr<ValueRef::ValueRef<T>> ObjectTypeFilteredRef(
         const std::vector<UniverseObjectType>& object_types,
-        std::unique_ptr<ValueRef::ValueRefBase<T>>&& value_ref)
+        std::unique_ptr<ValueRef::ValueRef<T>>&& value_ref)
     {
         if (object_types.empty())
             return boost::make_unique<ValueRef::Constant<T>>(T());
@@ -145,11 +148,11 @@ namespace {
     template <typename T>
     std::unique_ptr<ValueRef::Variable<std::string>> StringCastedComplexValueRef(
         const std::string& token,
-        std::unique_ptr<ValueRef::ValueRefBase<int>>&& int_ref1 = nullptr,
-        std::unique_ptr<ValueRef::ValueRefBase<int>>&& int_ref2 = nullptr,
-        std::unique_ptr<ValueRef::ValueRefBase<int>>&& int_ref3 = nullptr,
-        std::unique_ptr<ValueRef::ValueRefBase<std::string>>&& string_ref1 = nullptr,
-        std::unique_ptr<ValueRef::ValueRefBase<std::string>>&& string_ref2 = nullptr)
+        std::unique_ptr<ValueRef::ValueRef<int>>&& int_ref1 = nullptr,
+        std::unique_ptr<ValueRef::ValueRef<int>>&& int_ref2 = nullptr,
+        std::unique_ptr<ValueRef::ValueRef<int>>&& int_ref3 = nullptr,
+        std::unique_ptr<ValueRef::ValueRef<std::string>>&& string_ref1 = nullptr,
+        std::unique_ptr<ValueRef::ValueRef<std::string>>&& string_ref2 = nullptr)
     {
         return boost::make_unique<ValueRef::StringCast<T>>(
             boost::make_unique<ValueRef::ComplexVariable<T>>(
@@ -172,7 +175,16 @@ namespace {
             boost::make_unique<ValueRef::Variable<int>>(ValueRef::SOURCE_REFERENCE, "SystemID"));
     }
 
-    std::unique_ptr<ValueRef::ValueRefBase<std::string>> PlanetEnvForSpecies(
+
+    std::unique_ptr<ValueRef::Variable<std::string>> DesignCostValueRef() {
+        return StringCastedComplexValueRef<double>(
+            "ShipDesignCost",
+            boost::make_unique<ValueRef::Variable<int>>(ValueRef::SOURCE_REFERENCE, "DesignID"),
+            boost::make_unique<ValueRef::Variable<int>>(ValueRef::SOURCE_REFERENCE, "ProducedByEmpireID"),
+            nullptr);   // TODO: try to get a valid production location for the owner empire?
+    }
+
+    std::unique_ptr<ValueRef::ValueRef<std::string>> PlanetEnvForSpecies(
         const std::string& species_name)
     {
         return ObjectTypeFilteredRef<std::string>({OBJ_PLANET},
@@ -223,10 +235,10 @@ namespace {
     }
 
     const std::map<std::pair<std::string, std::string>,
-                   std::unique_ptr<ValueRef::ValueRefBase<std::string>>>& AvailableColumnTypes()
+                   std::unique_ptr<ValueRef::ValueRef<std::string>>>& AvailableColumnTypes()
     {
         static std::map<std::pair<std::string, std::string>,
-                        std::unique_ptr<ValueRef::ValueRefBase<std::string>>> col_types;
+                        std::unique_ptr<ValueRef::ValueRef<std::string>>> col_types;
         if (col_types.empty()) {
             // General
             col_types[{UserStringNop("NAME"),                   ""}] =  StringValueRef("Name");
@@ -280,10 +292,12 @@ namespace {
             col_types[{UserStringNop("FINAL_DEST"),                 UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("FinalDestinationID");
             col_types[{UserStringNop("NEXT_SYSTEM"),                UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("NextSystemID");
             col_types[{UserStringNop("PREV_SYSTEM"),                UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("PreviousSystemID");
+            col_types[{UserStringNop("ARRIVAL_STARLANE"),           UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("ArrivalStarlaneID");
             col_types[{UserStringNop("NEAREST_SYSTEM"),             UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("NearestSystemID");
             col_types[{UserStringNop("HULL"),                       UserStringNop("FLEETS_SUBMENU")}] = UserStringValueRef("Hull");
             col_types[{UserStringNop("PARTS"),                      UserStringNop("FLEETS_SUBMENU")}] = UserStringVecValueRef("Parts");
             col_types[{UserStringNop("ATTACK"),                     UserStringNop("FLEETS_SUBMENU")}] = StringCastedValueRef<double>("Attack");
+            col_types[{UserStringNop("PRODUCTION_COST"),            UserStringNop("FLEETS_SUBMENU")}] = DesignCostValueRef();
 
             // planet environments species
             for (const auto& entry : GetSpeciesManager())
@@ -299,7 +313,7 @@ namespace {
         return col_types;
     }
 
-    const ValueRef::ValueRefBase<std::string>* GetValueRefByName(const std::string& name) {
+    const ValueRef::ValueRef<std::string>* GetValueRefByName(const std::string& name) {
         for (const auto& entry : AvailableColumnTypes()) {
             if (entry.first.first == name)
                 return entry.second.get();
@@ -343,7 +357,7 @@ namespace {
             GetOptionsDB().Set(option_name, name);
     }
 
-    const ValueRef::ValueRefBase<std::string>* GetColumnValueRef(int column) {
+    const ValueRef::ValueRef<std::string>* GetColumnValueRef(int column) {
         if (column < 0)
             return nullptr;
         std::string option_name = "ui.objects.columns.c" + std::to_string(column) + ".stringkey";
@@ -383,13 +397,13 @@ namespace {
     const std::string STARTYPE_CONDITION(UserStringNop("CONDITION_STARTYPE"));
     const std::string METERVALUE_CONDITION(UserStringNop("CONDITION_METERVALUE"));
     const std::string HASGROWTHSPECIAL_CONDITION(UserStringNop("CONDITION_HAS_GROWTH_SPECIAL"));
-    const std::string GGWITHPTYPE_CONDITION(UserStringNop("CONDITION_PTYPE_W_GG"));
-    const std::string ASTWITHPTYPE_CONDITION(UserStringNop("CONDITION_PTYPE_W_AST"));
+    const std::string GGWITHPTYPE_CONDITION(UserStringNop("CONDITION_PTYPE_W_GG"));     // with gas giant
+    const std::string ASTWITHPTYPE_CONDITION(UserStringNop("CONDITION_PTYPE_W_AST"));   // with asteroids
 
     const std::string FILTER_OPTIONS_WND_NAME = "object-list-filter";
 
     template <class enumT>
-    std::unique_ptr<ValueRef::ValueRefBase<enumT>> CopyEnumValueRef(const ValueRef::ValueRefBase<enumT>* const value_ref) {
+    std::unique_ptr<ValueRef::ValueRef<enumT>> CopyEnumValueRef(const ValueRef::ValueRef<enumT>* const value_ref) {
         if (auto constant = dynamic_cast<const ValueRef::Constant<enumT>*>(value_ref))
             return boost::make_unique<ValueRef::Constant<enumT>>(constant->Value());
         return boost::make_unique<ValueRef::Constant<enumT>>(enumT(-1));
@@ -397,7 +411,7 @@ namespace {
 
     std::map<std::string, std::string> object_list_cond_description_map;
 
-    const std::string& ConditionClassName(const Condition::ConditionBase* const condition) {
+    const std::string& ConditionClassName(const Condition::Condition* const condition) {
         if (dynamic_cast<const Condition::All* const>(condition))
             return ALL_CONDITION;
         else if (dynamic_cast<const Condition::EmpireAffiliation* const>(condition))
@@ -470,7 +484,7 @@ const GG::X CONDITION_WIDGET_WIDTH(380);
 
 class ConditionWidget : public GG::Control {
 public:
-    ConditionWidget(GG::X x, GG::Y y, const Condition::ConditionBase* initial_condition = nullptr) :
+    ConditionWidget(GG::X x, GG::Y y, const Condition::Condition* initial_condition = nullptr) :
         GG::Control(x, y, CONDITION_WIDGET_WIDTH, GG::Y1, GG::INTERACTIVE)
     {
         if (!initial_condition) {
@@ -494,7 +508,7 @@ public:
     ~ConditionWidget()
     {}
 
-    std::unique_ptr<Condition::ConditionBase> GetCondition() {
+    std::unique_ptr<Condition::Condition> GetCondition() {
         auto row_it = m_class_drop->CurrentItem();
         if (row_it == m_class_drop->end())
             return boost::make_unique<Condition::All>();
@@ -528,7 +542,7 @@ public:
             const std::string& species_name = GetString();
             if (species_name.empty())
                 return boost::make_unique<Condition::Homeworld>();
-            std::vector<std::unique_ptr<ValueRef::ValueRefBase<std::string>>> names;
+            std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> names;
             names.push_back(boost::make_unique<ValueRef::Constant<std::string>>(species_name));
             return boost::make_unique<Condition::Homeworld>(std::move(names));
 
@@ -542,54 +556,54 @@ public:
             return boost::make_unique<Condition::HasSpecial>(GetString());
 
         } else if (condition_key == HASGROWTHSPECIAL_CONDITION) {
-            std::vector<std::unique_ptr<Condition::ConditionBase>> operands;
+            std::vector<std::unique_ptr<Condition::Condition>> operands;
             // determine sitrep order
             std::istringstream template_stream(UserString("FUNCTIONAL_GROWTH_SPECIALS_LIST"));
             for (auto stream_it = std::istream_iterator<std::string>(template_stream);
                  stream_it != std::istream_iterator<std::string>(); stream_it++)
             { operands.push_back(boost::make_unique<Condition::HasSpecial>(*stream_it)); }
 
-            std::unique_ptr<Condition::ConditionBase> this_cond = boost::make_unique<Condition::Or>(std::move(operands));
+            std::unique_ptr<Condition::Condition> this_cond = boost::make_unique<Condition::Or>(std::move(operands));
             object_list_cond_description_map[this_cond->Description()] = HASGROWTHSPECIAL_CONDITION;
             return this_cond;
 
         } else if (condition_key == ASTWITHPTYPE_CONDITION) { // And [Planet PlanetType PT_ASTEROIDS ContainedBy And [System Contains PlanetType X]]
-            std::vector<std::unique_ptr<Condition::ConditionBase>> operands1;
+            std::vector<std::unique_ptr<Condition::Condition>> operands1;
             operands1.push_back(boost::make_unique<Condition::Type>(boost::make_unique<ValueRef::Constant<UniverseObjectType>>(OBJ_PLANET)));
             const std::string& text = GetString();
             if (text == UserString("CONDITION_ANY")) {
-                std::vector<std::unique_ptr<ValueRef::ValueRefBase<PlanetType>>> copytype;
+                std::vector<std::unique_ptr<ValueRef::ValueRef<PlanetType>>> copytype;
                 copytype.push_back(boost::make_unique<ValueRef::Constant<PlanetType>>(PT_ASTEROIDS));
                 operands1.push_back(boost::make_unique<Condition::Not>(boost::make_unique<Condition::PlanetType>(std::move(copytype))));
             } else {
                 operands1.push_back(boost::make_unique<Condition::PlanetType>(GetEnumValueRefVec< ::PlanetType>()));
             }
-            std::vector<std::unique_ptr<Condition::ConditionBase>> operands2;
+            std::vector<std::unique_ptr<Condition::Condition>> operands2;
             operands2.push_back(boost::make_unique<Condition::Type>(boost::make_unique<ValueRef::Constant<UniverseObjectType>>(OBJ_SYSTEM)));
-            std::vector<std::unique_ptr<ValueRef::ValueRefBase<PlanetType>>> maintype;
+            std::vector<std::unique_ptr<ValueRef::ValueRef<PlanetType>>> maintype;
             maintype.push_back(boost::make_unique<ValueRef::Constant<PlanetType>>(PT_ASTEROIDS));
             operands2.push_back(boost::make_unique<Condition::Contains>(boost::make_unique<Condition::PlanetType>(std::move(maintype))));
             operands1.push_back(boost::make_unique<Condition::ContainedBy>(boost::make_unique<Condition::And>(std::move(operands2))));
-            std::unique_ptr<Condition::ConditionBase> this_cond = boost::make_unique<Condition::And>(std::move(operands1));
+            std::unique_ptr<Condition::Condition> this_cond = boost::make_unique<Condition::And>(std::move(operands1));
             object_list_cond_description_map[this_cond->Description()] = ASTWITHPTYPE_CONDITION;
             return this_cond;
 
         } else if (condition_key == GGWITHPTYPE_CONDITION) { // And [Planet PlanetType PT_GASGIANT ContainedBy And [System Contains PlanetType X]]
-            std::vector<std::unique_ptr<Condition::ConditionBase>> operands1;
+            std::vector<std::unique_ptr<Condition::Condition>> operands1;
             const std::string& text = GetString();
             if (text == UserString("CONDITION_ANY")) {
-                std::vector<std::unique_ptr<ValueRef::ValueRefBase<PlanetType>>> copytype;
+                std::vector<std::unique_ptr<ValueRef::ValueRef<PlanetType>>> copytype;
                     copytype.push_back(boost::make_unique<ValueRef::Constant<PlanetType>>(PT_GASGIANT));
                     operands1.push_back(boost::make_unique<Condition::Not>(boost::make_unique<Condition::PlanetType>(std::move(copytype))));
             } else
                 operands1.push_back(boost::make_unique<Condition::PlanetType>(GetEnumValueRefVec< ::PlanetType>()));
-            std::vector<std::unique_ptr<Condition::ConditionBase>> operands2;
+            std::vector<std::unique_ptr<Condition::Condition>> operands2;
             operands2.push_back(boost::make_unique<Condition::Type>(boost::make_unique<ValueRef::Constant<UniverseObjectType>>(OBJ_SYSTEM)));
-            std::vector<std::unique_ptr<ValueRef::ValueRefBase<PlanetType>>> maintype;
+            std::vector<std::unique_ptr<ValueRef::ValueRef<PlanetType>>> maintype;
             maintype.push_back(boost::make_unique<ValueRef::Constant<PlanetType>>(PT_GASGIANT));
             operands2.push_back(boost::make_unique<Condition::Contains>(boost::make_unique<Condition::PlanetType>(std::move(maintype))));
             operands1.push_back(boost::make_unique<Condition::ContainedBy>(boost::make_unique<Condition::And>(std::move(operands2))));
-            std::unique_ptr<Condition::ConditionBase> this_cond = boost::make_unique<Condition::And>(std::move(operands1));
+            std::unique_ptr<Condition::Condition> this_cond = boost::make_unique<Condition::And>(std::move(operands1));
             object_list_cond_description_map[this_cond->Description()] = GGWITHPTYPE_CONDITION;
             return this_cond;
 
@@ -691,11 +705,11 @@ private:
         return string_row->Text();
     }
 
-    std::unique_ptr<ValueRef::ValueRefBase<std::string>> GetStringValueRef()
+    std::unique_ptr<ValueRef::ValueRef<std::string>> GetStringValueRef()
     { return boost::make_unique<ValueRef::Constant<std::string>>(GetString()); }
 
-    std::vector<std::unique_ptr<ValueRef::ValueRefBase<std::string>>> GetStringValueRefVec() {
-        std::vector<std::unique_ptr<ValueRef::ValueRefBase<std::string>>> retval;
+    std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> GetStringValueRefVec() {
+        std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> retval;
         retval.push_back(GetStringValueRef());
         return retval;
     }
@@ -707,7 +721,7 @@ private:
             return 0;
     }
 
-    std::unique_ptr<ValueRef::ValueRefBase<int>> GetInt1ValueRef()
+    std::unique_ptr<ValueRef::ValueRef<int>> GetInt1ValueRef()
     { return boost::make_unique<ValueRef::Constant<int>>(GetInt1()); }
 
     int GetInt2() {
@@ -717,7 +731,7 @@ private:
             return 0;
     }
 
-    std::unique_ptr<ValueRef::ValueRefBase<int>> GetInt2ValueRef()
+    std::unique_ptr<ValueRef::ValueRef<int>> GetInt2ValueRef()
     { return boost::make_unique<ValueRef::Constant<int>>(GetInt2()); }
 
     double GetDouble1() {
@@ -727,7 +741,7 @@ private:
             return 0;
     }
 
-    std::unique_ptr<ValueRef::ValueRefBase<double>> GetDouble1ValueRef()
+    std::unique_ptr<ValueRef::ValueRef<double>> GetDouble1ValueRef()
     { return boost::make_unique<ValueRef::Constant<double>>(GetDouble1()); }
 
     double GetDouble2() {
@@ -737,7 +751,7 @@ private:
             return 0;
     }
 
-    std::unique_ptr<ValueRef::ValueRefBase<double>> GetDouble2ValueRef()
+    std::unique_ptr<ValueRef::ValueRef<double>> GetDouble2ValueRef()
     { return boost::make_unique<ValueRef::Constant<double>>(GetDouble2()); }
 
     template <typename T>
@@ -753,12 +767,12 @@ private:
     }
 
     template <typename T>
-    std::unique_ptr<ValueRef::ValueRefBase<T>> GetEnumValueRef()
+    std::unique_ptr<ValueRef::ValueRef<T>> GetEnumValueRef()
     { return boost::make_unique<ValueRef::Constant<T>>(GetEnum<T>()); }
 
     template <typename T>
-    std::vector<std::unique_ptr<ValueRef::ValueRefBase<T>>> GetEnumValueRefVec() {
-        std::vector<std::unique_ptr<ValueRef::ValueRefBase<T>>> retval;
+    std::vector<std::unique_ptr<ValueRef::ValueRef<T>>> GetEnumValueRefVec() {
+        std::vector<std::unique_ptr<ValueRef::ValueRef<T>>> retval;
         retval.push_back(std::move(GetEnumValueRef<T>()));
         return retval;
     }
@@ -778,7 +792,7 @@ private:
     int DropListDropHeight() const
     { return 12; }
 
-    void Init(const Condition::ConditionBase* init_condition) {
+    void Init(const Condition::Condition* init_condition) {
         // fill droplist with basic types of conditions and select appropriate row
         m_class_drop = GG::Wnd::Create<CUIDropDownList>(DropListDropHeight());
         m_class_drop->Resize(GG::Pt(DropListWidth(), DropListHeight()));
@@ -902,15 +916,15 @@ private:
             // collect all valid tags on any object in universe
             std::set<std::string> all_tags;
 
-            for (auto& obj : GetUniverse().Objects().FindObjects<UniverseObject>()) {
+            for (auto& obj : Objects().all<UniverseObject>()) {
                 auto tags = obj->Tags();
                 all_tags.insert(tags.begin(), tags.end());
             }
 
             auto row_it = m_string_drop->end();
-            for (const std::string& tag : all_tags) {
+            for (const std::string& tag : all_tags)
                 row_it = m_string_drop->Insert(GG::Wnd::Create<StringRow>(tag, GG::Y(ClientUI::Pts())));
-            }
+
             if (!m_string_drop->Empty())
                 m_string_drop->Select(0);
 
@@ -924,13 +938,13 @@ private:
             param_widget_top += m_string_drop->Height();
 
             std::vector< ::PlanetSize> planet_sizes;
+            planet_sizes.reserve(NUM_PLANET_SIZES);
             for (auto size = SZ_TINY; size != NUM_PLANET_SIZES; size = ::PlanetSize(size + 1))
                 planet_sizes.push_back(size);
 
             auto row_it = m_string_drop->end();
-            for (const std::string& text : StringsFromEnums(planet_sizes)) {
+            for (const std::string& text : StringsFromEnums(planet_sizes))
                 row_it = m_string_drop->Insert(GG::Wnd::Create<StringRow>(text, GG::Y(ClientUI::Pts())));
-            }
             if (!m_string_drop->Empty())
                 m_string_drop->Select(0);
 
@@ -944,6 +958,7 @@ private:
             AttachChild(m_string_drop);
 
             std::vector< ::PlanetType> planet_types;
+            planet_types.reserve(NUM_PLANET_TYPES);
             for (::PlanetType type = PT_SWAMP; type != NUM_PLANET_TYPES; type = ::PlanetType(type + 1))
                 planet_types.push_back(type);
 
@@ -968,6 +983,7 @@ private:
             param_widget_top += m_string_drop->Height();
 
             std::vector< ::StarType> star_types;
+            star_types.reserve(NUM_STAR_TYPES);
             for (::StarType type = STAR_BLUE; type != NUM_STAR_TYPES; type = ::StarType(type + 1))
                 star_types.push_back(type);
 
@@ -990,7 +1006,7 @@ private:
 
             // collect all valid foci on any object in universe
             std::set<std::string> all_foci;
-            for (auto& planet : Objects().FindObjects<Planet>()) {
+            for (auto& planet : Objects().all<Planet>()) {
                 auto obj_foci = planet->AvailableFoci();
                 std::copy(obj_foci.begin(), obj_foci.end(),
                           std::inserter(all_foci, all_foci.end()));
@@ -1014,6 +1030,7 @@ private:
             param_widget_top = m_string_drop->Height() + GG::Y(Value(PAD));
 
             std::vector< ::MeterType> meter_types;
+            meter_types.reserve(NUM_METER_TYPES);
             for (auto type = METER_TARGET_POPULATION; type != NUM_METER_TYPES; type = ::MeterType(type + 1))
                 meter_types.push_back(type);
 
@@ -1072,12 +1089,12 @@ private:
 class FilterDialog : public CUIWnd {
 public:
     FilterDialog(const std::map<UniverseObjectType, std::set<VIS_DISPLAY>>& vis_filters,
-                 const Condition::ConditionBase* const condition_filter);
+                 const Condition::Condition* const condition_filter);
 
     void CompleteConstruction() override;
     bool ChangesAccepted();
     std::map<UniverseObjectType, std::set<VIS_DISPLAY>> GetVisibilityFilters() const;
-    std::unique_ptr<Condition::ConditionBase> GetConditionFilter();
+    std::unique_ptr<Condition::Condition> GetConditionFilter();
 
 protected:
     GG::Rect CalculatePosition() const override;
@@ -1105,7 +1122,7 @@ private:
 
 FilterDialog::FilterDialog(const std::map<UniverseObjectType,
                            std::set<VIS_DISPLAY>>& vis_filters,
-                           const Condition::ConditionBase* const condition_filter) :
+                           const Condition::Condition* const condition_filter) :
     CUIWnd(UserString("FILTERS"),
            GG::INTERACTIVE | GG::DRAGABLE | GG::MODAL,
            FILTER_OPTIONS_WND_NAME),
@@ -1215,7 +1232,7 @@ bool FilterDialog::ChangesAccepted()
 std::map<UniverseObjectType, std::set<VIS_DISPLAY>> FilterDialog::GetVisibilityFilters() const
 { return m_vis_filters; }
 
-std::unique_ptr<Condition::ConditionBase> FilterDialog::GetConditionFilter()
+std::unique_ptr<Condition::Condition> FilterDialog::GetConditionFilter()
 { return m_condition_widget->GetCondition(); }
 
 GG::Rect FilterDialog::CalculatePosition() const
@@ -1366,40 +1383,43 @@ public:
         m_object_id(obj ? obj->ID() : INVALID_OBJECT_ID),
         m_indent(indent),
         m_expanded(expanded),
-        m_has_contents(has_contents),
-        m_column_val_cache()
+        m_has_contents(has_contents)
     {
         SetChildClippingMode(ClipToClient);
         auto rcobj = std::dynamic_pointer_cast<const ResourceCenter>(obj);
         if (rcobj)
             rcobj->ResourceCenterChangedSignal.connect(
                 boost::bind(&ObjectPanel::ResourceCenterChanged, this));
+
+        RequirePreRender();
     }
 
     void ResourceCenterChanged() {
-        RefreshCache();
+        m_column_val_cache.clear();
         RequirePreRender();
     }
 
     std::string SortKey(std::size_t column) const {
-        if (column >= m_column_val_cache.size())
-            RefreshCache();
-        if (column >= m_column_val_cache.size())
-            return "";
-        return m_column_val_cache[column];
+        // result cached? if not, calculate and cache
+        auto it = m_column_val_cache.find(column);
+        if (it != m_column_val_cache.end())
+            return it->second;
+
+        auto ref = GetColumnValueRef(column);
+        auto val = ref ? ref->Eval(ScriptingContext(Objects().get(m_object_id))) : "";
+        m_column_val_cache[column] = val;
+        return val;
     }
 
     int ObjectID() const { return m_object_id; }
 
     void PreRender() override {
         GG::Control::PreRender();
-        RefreshLayout();
+        Init();
+        DoLayout();
     }
 
     void Render() override {
-        if (!m_initialized)
-            Init();
-
         const GG::Clr& background_colour = ClientUI::WndColor();
         const GG::Clr& unselected_colour = ClientUI::WndOuterBorderColor();
         const GG::Clr& selected_colour = ClientUI::WndInnerBorderColor();
@@ -1417,60 +1437,7 @@ public:
         const GG::Pt old_size = Size();
         GG::Control::SizeMove(ul, lr);
         if (old_size != Size())
-            DoLayout();
-    }
-
-    void RefreshLayout() {
-        if (!m_initialized)
-            return;
-        GG::Flags<GG::GraphicStyle> style = GG::GRAPHIC_CENTER | GG::GRAPHIC_VCENTER |
-                                            GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE;
-
-        DetachChildAndReset(m_dot);
-        DetachChildAndReset(m_expand_button);
-        DetachChildAndReset(m_icon);
-
-        if (m_has_contents) {
-            boost::filesystem::path button_texture_dir = ClientUI::ArtDir() / "icons" / "buttons";
-
-            if (m_expanded) {
-                m_expand_button = Wnd::Create<CUIButton>(
-                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "minusnormal.png"     , true)),
-                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "minusclicked.png"    , true)),
-                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "minusmouseover.png"  , true)));
-            } else {
-                m_expand_button = Wnd::Create<CUIButton>(
-                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "plusnormal.png"   , true)),
-                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "plusclicked.png"  , true)),
-                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "plusmouseover.png", true)));
-            }
-
-            AttachChild(m_expand_button);
-            m_expand_button->LeftPressedSignal.connect(
-                boost::bind(&ObjectPanel::ExpandCollapseButtonPressed, this));
-        } else {
-            m_dot = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(
-                ClientUI::ArtDir() / "icons" / "dot.png", true), style);
-            AttachChild(m_dot);
-        }
-
-        auto obj = GetUniverseObject(m_object_id);
-        auto textures = ObjectTextures(obj);
-
-        m_icon = GG::Wnd::Create<MultiTextureStaticGraphic>(
-            textures, std::vector<GG::Flags<GG::GraphicStyle>>(textures.size(), style));
-        AttachChild(m_icon);
-
-        for (auto& control : m_controls)
-        { DetachChild(control); }
-        m_controls.clear();
-
-        for (auto& control : GetControls()) {
-            m_controls.push_back(control);
-            AttachChild(control);
-        }
-
-        DoLayout();
+            RequirePreRender();//DoLayout();//RequirePreRender();
     }
 
     void SetHasContents(bool has_contents)
@@ -1490,11 +1457,11 @@ private:
         GG::Y top(GG::Y0);
         GG::Y bottom(ClientHeight());
 
-        if (m_expand_button) {
+        if (m_expand_button)
             m_expand_button->SizeMove(GG::Pt(left, top), GG::Pt(left + ICON_WIDTH, bottom));
-        } else if (m_dot) {
+        else if (m_dot)
             m_dot->SizeMove(GG::Pt(left, top), GG::Pt(left + ICON_WIDTH, bottom));
-        }
+
         left += ICON_WIDTH + PAD;
 
         if (m_icon) {
@@ -1529,32 +1496,63 @@ private:
         if (m_initialized)
             return;
         m_initialized = true;
-        RefreshLayout();
-    }
 
-    void RefreshCache() const {
-        m_column_val_cache.clear();
-        m_column_val_cache.reserve(NUM_COLUMNS);
-        auto obj = GetUniverseObject(m_object_id);
-        ScriptingContext context(obj);
+        GG::Flags<GG::GraphicStyle> style = GG::GRAPHIC_CENTER | GG::GRAPHIC_VCENTER |
+                                            GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE;
 
-        // get currently displayed column value refs, put values into this panel's cache
-        for (unsigned int i = 0; i < NUM_COLUMNS; ++i) {
-            auto ref = GetColumnValueRef(static_cast<int>(i));
-            if (ref)
-                m_column_val_cache.push_back(ref->Eval(context));
-            else
-                m_column_val_cache.push_back("");
+        DetachChildAndReset(m_dot);
+        DetachChildAndReset(m_expand_button);
+        DetachChildAndReset(m_icon);
+
+        if (m_has_contents) {
+            boost::filesystem::path button_texture_dir = ClientUI::ArtDir() / "icons" / "buttons";
+
+            if (m_expanded) {
+                m_expand_button = Wnd::Create<CUIButton>(
+                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "minusnormal.png"     , true)),
+                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "minusclicked.png"    , true)),
+                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "minusmouseover.png"  , true)));
+            } else {
+                m_expand_button = Wnd::Create<CUIButton>(
+                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "plusnormal.png"   , true)),
+                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "plusclicked.png"  , true)),
+                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "plusmouseover.png", true)));
+            }
+
+            AttachChild(m_expand_button);
+            m_expand_button->LeftPressedSignal.connect(
+                boost::bind(&ObjectPanel::ExpandCollapseButtonPressed, this));
+        } else {
+            m_dot = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(
+                ClientUI::ArtDir() / "icons" / "dot.png", true), style);
+            AttachChild(m_dot);
         }
+
+        auto obj = Objects().get(m_object_id);
+        auto textures = ObjectTextures(obj);
+
+        m_icon = GG::Wnd::Create<MultiTextureStaticGraphic>(
+            textures, std::vector<GG::Flags<GG::GraphicStyle>>(textures.size(), style));
+        AttachChild(m_icon);
+
+        for (auto& control : m_controls)
+        { DetachChild(control); }
+        m_controls.clear();
+
+        for (auto& control : GetControls()) {
+            m_controls.push_back(control);
+            AttachChild(control);
+        }
+
+        RequirePreRender();
     }
 
     std::vector<std::shared_ptr<GG::Control>> GetControls() {
         std::vector<std::shared_ptr<GG::Control>> retval;
-
-        RefreshCache();
+        retval.reserve(NUM_COLUMNS);
 
         for (unsigned int i = 0; i < NUM_COLUMNS; ++i) {
-            std::string col_val = m_column_val_cache[i];
+            std::string col_val = SortKey(i);
             auto control = GG::Wnd::Create<CUILabel>(col_val, GG::FORMAT_LEFT);
             control->Resize(GG::Pt(GG::X(GetColumnWidth(i)), ClientHeight()));
             retval.push_back(control);
@@ -1569,11 +1567,11 @@ private:
     bool    m_expanded = false;
     bool    m_has_contents = false;
 
-    std::shared_ptr<GG::Button>                 m_expand_button = nullptr;
-    std::shared_ptr<GG::StaticGraphic>          m_dot = nullptr;
-    std::shared_ptr<MultiTextureStaticGraphic>  m_icon = nullptr;
+    std::shared_ptr<GG::Button>                 m_expand_button;
+    std::shared_ptr<GG::StaticGraphic>          m_dot;
+    std::shared_ptr<MultiTextureStaticGraphic>  m_icon;
     std::vector<std::shared_ptr<GG::Control>>   m_controls;
-    mutable std::vector<std::string>            m_column_val_cache;
+    mutable std::map<std::size_t, std::string>  m_column_val_cache;
     bool                                        m_selected = false;
 };
 
@@ -1583,11 +1581,11 @@ private:
 class ObjectRow : public GG::ListBox::Row {
 public:
     ObjectRow(GG::X w, GG::Y h, std::shared_ptr<const UniverseObject> obj, bool expanded,
-              int container_object_panel, const std::set<int>& contained_object_panels,
+              int container_object_panel, const id_range& contained_object_panels,
               int indent) :
         GG::ListBox::Row(w, h, "", GG::ALIGN_CENTER, 1),
         m_container_object_panel(container_object_panel),
-        m_contained_object_panels(contained_object_panels),
+        m_contained_object_panels(contained_object_panels.begin(), contained_object_panels.end()),
         m_obj_init(obj),
         m_expanded_init(expanded),
         m_indent_init(indent)
@@ -1652,12 +1650,12 @@ public:
 
     mutable boost::signals2::signal<void (int)> ExpandCollapseSignal;
 private:
-    std::shared_ptr<ObjectPanel>            m_panel = nullptr;
+    std::shared_ptr<ObjectPanel>            m_panel;
     int                                     m_container_object_panel;
     std::set<int>                           m_contained_object_panels;
-    std::shared_ptr<const UniverseObject>   m_obj_init = nullptr;
-    bool                                    m_expanded_init;
-    int                                     m_indent_init;
+    std::shared_ptr<const UniverseObject>   m_obj_init;
+    bool                                    m_expanded_init = false;
+    int                                     m_indent_init = 0;
 };
 
 ////////////////////////////////////////////////
@@ -1687,6 +1685,7 @@ public:
         m_controls.clear();
 
         auto&& controls = GetControls();
+        m_controls.reserve(controls.size());
         for (int i = 0; i < static_cast<int>(controls.size()); ++i) {
             m_controls.push_back(controls[i]);
             AttachChild(controls[i]);
@@ -1787,6 +1786,7 @@ private:
 
     std::vector<std::shared_ptr<GG::Button>> GetControls() {
         std::vector<std::shared_ptr<GG::Button>> retval;
+        retval.reserve(NUM_COLUMNS);
 
         auto control = Wnd::Create<CUIButton>("-");
         retval.push_back(control);
@@ -1847,9 +1847,7 @@ private:
 
 namespace {
     struct CustomRowCmp {
-        bool operator()(const GG::ListBox::Row& lhs, const GG::ListBox::Row& rhs,
-                        std::size_t column)
-        {
+        bool operator()(const GG::ListBox::Row& lhs, const GG::ListBox::Row& rhs, std::size_t column) const {
             auto lhs_key = lhs.SortKey(column);
             auto rhs_key = rhs.SortKey(column);
             try {
@@ -1917,16 +1915,20 @@ public:
     virtual ~ObjectListBox()
     {}
 
+    void PreRender() override {
+        CUIListBox::PreRender();
+        const GG::Pt row_size = ListRowSize();
+        for (auto& row : *this)
+            row->Resize(row_size);
+        m_header_row->Resize(row_size);
+        ListBox::AdjustScrolls(true);
+    }
+
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
         const GG::Pt old_size = Size();
         Wnd::SizeMove(ul, lr);
-        if (old_size != Size()) {
-            const GG::Pt row_size = ListRowSize();
-            for (auto& row : *this)
-                row->Resize(row_size);
-            m_header_row->Resize(row_size);
-            ListBox::AdjustScrolls(true);
-        }
+        if (old_size != Size())
+            RequirePreRender();
     }
 
     GG::Pt ListRowSize() const
@@ -1935,7 +1937,7 @@ public:
     static GG::Y ListRowHeight()
     { return GG::Y(ClientUI::Pts() * 2); }
 
-    const Condition::ConditionBase* const FilterCondition() const
+    const Condition::Condition* const FilterCondition() const
     { return m_filter_condition.get(); }
 
     const std::map<UniverseObjectType, std::set<VIS_DISPLAY>> Visibilities() const
@@ -1961,14 +1963,13 @@ public:
         Refresh();
     }
 
-    bool ObjectCollapsed(int object_id) const {
-        return object_id != INVALID_OBJECT_ID && m_collapsed_objects.count(object_id);
-    }
+    bool ObjectCollapsed(int object_id) const
+    { return object_id != INVALID_OBJECT_ID && m_collapsed_objects.count(object_id); }
 
     bool AnythingCollapsed() const
     { return !m_collapsed_objects.empty(); }
 
-    void SetFilterCondition(std::unique_ptr<Condition::ConditionBase>&& condition) {
+    void SetFilterCondition(std::unique_ptr<Condition::Condition>&& condition) {
         m_filter_condition = std::move(condition);
         Refresh();
     }
@@ -1983,7 +1984,7 @@ public:
     void ClearContents() {
         Clear();
         for (auto& entry : m_object_change_connections)
-        { entry.second.disconnect(); }
+            entry.second.disconnect();
         m_object_change_connections.clear();
     }
 
@@ -2010,187 +2011,204 @@ public:
     }
 
     void Refresh() {
+        SectionedScopedTimer timer("ObjectListBox::Refresh");
         std::size_t first_visible_queue_row = std::distance(this->begin(), this->FirstRowShown());
         ClearContents();
+        auto initial_style = this->Style();
+        this->SetStyle(GG::LIST_NOSORT);    // to avoid sorting while inserting
 
         m_header_row->Update();
 
         // sort objects by containment associations
-        std::set<int>                   systems;
-        std::map<int, std::set<int>>    system_fleets;
-        std::map<int, std::set<int>>    fleet_ships;
-        std::map<int, std::set<int>>    system_planets;
-        std::map<int, std::set<int>>    planet_buildings;
-        std::set<int>                   fields;
+        std::set<std::shared_ptr<System>>                   systems;
+        std::map<int, std::set<std::shared_ptr<Fleet>>>     system_fleets;
+        std::map<int, std::set<std::shared_ptr<Ship>>>      fleet_ships;
+        std::map<int, std::set<std::shared_ptr<Planet>>>    system_planets;
+        std::map<int, std::set<std::shared_ptr<Building>>>  planet_buildings;
+        std::map<int, std::set<std::shared_ptr<Field>>>     system_fields;
 
-        for (const auto& obj : GetUniverse().Objects()) {
-            if (!ObjectShown(obj))
-                continue;
-
-            int object_id = obj->ID();
-
-            if (obj->ObjectType() == OBJ_SYSTEM) {
-                systems.insert(object_id);
-            } else if (obj->ObjectType() == OBJ_FIELD) {
-                fields.insert(object_id);
-            } else if (auto fleet = std::dynamic_pointer_cast<const Fleet>(obj)) {
-                system_fleets[fleet->SystemID()].insert(object_id);
-            } else if (auto ship = std::dynamic_pointer_cast<const Ship>(obj)) {
-                fleet_ships[ship->FleetID()].insert(object_id);
-            } else if (auto planet = std::dynamic_pointer_cast<const Planet>(obj)) {
-                system_planets[planet->SystemID()].insert(object_id);
-            } else if (auto building = std::dynamic_pointer_cast<const Building>(obj)) {
-                planet_buildings[building->PlanetID()].insert(object_id);
-            } // OBJ_FIGHTER shouldn't exist outside combat, so ignored here
+        timer.EnterSection("object cast-sorting");
+        for (const auto& obj : Objects().all<System>()) {
+            if (ObjectShown(obj))
+                systems.insert(obj);
         }
+        for (const auto& obj : Objects().all<Field>()) {
+            if (ObjectShown(obj))
+                system_fields[obj->SystemID()].insert(obj);
+        }
+        for (const auto& obj : Objects().all<Fleet>()) {
+            if (ObjectShown(obj))
+                system_fleets[obj->SystemID()].insert(obj);
+        }
+        for (const auto& obj : Objects().all<Ship>()) {
+            if (ObjectShown(obj))
+                fleet_ships[obj->FleetID()].insert(obj);
+        }
+        for (const auto& obj : Objects().all<Planet>()) {
+            if (ObjectShown(obj))
+                system_planets[obj->SystemID()].insert(obj);
+        }
+        for (const auto& obj : Objects().all<Building>()) {
+            if (ObjectShown(obj))
+                planet_buildings[obj->PlanetID()].insert(obj);
+        }
+        // OBJ_FIGHTER shouldn't exist outside combat, so ignored here
+
 
         int indent = 0;
 
-
         // add system rows
-        for (int system_id : systems) {
-            auto sp_it = system_planets.find(system_id);
-            auto sf_it = system_fleets.find(system_id);
-            std::set<int> system_contents;
-            if (sp_it != system_planets.end())
-                system_contents = sp_it->second;
-            if (sf_it != system_fleets.end())
-                system_contents.insert(sf_it->second.begin(), sf_it->second.end());
+        for (auto& system : systems) {
+            timer.EnterSection("system rows");
+            std::vector<int> system_contents;
+            system_contents.reserve(system_planets[system->ID()].size() + system_fleets[system->ID()].size());
+            for (const auto& planet : system_planets[system->ID()])
+                system_contents.push_back(planet->ID());
+            for (const auto& fleet : system_fleets[system->ID()])
+                system_contents.push_back(fleet->ID());
 
-            AddObjectRow(system_id, INVALID_OBJECT_ID, system_contents, indent);
+            AddObjectRow(system, INVALID_OBJECT_ID, system_contents, indent);
+            if (ObjectCollapsed(system->ID())) {
+                timer.EnterSection("");
+                // remove contained planets and buildings, which will not be shown
+                for (const auto& planet : system_planets[system->ID()])
+                    planet_buildings[planet->ID()].clear();
+                system_planets[system->ID()].clear();
+                continue;
+            }
+
             ++indent;
 
             // add planet rows in this system
-            if (sp_it != system_planets.end()) {
-                for (int planet_id : sp_it->second) {
-                    auto pb_it = planet_buildings.find(planet_id);
+            timer.EnterSection("system planet rows");
+            for (const auto& planet : system_planets[system->ID()]) {
+                std::vector<int> planet_contents;
+                planet_contents.reserve(planet_buildings[planet->ID()].size());
+                for (const auto& building : planet_buildings[planet->ID()])
+                    planet_contents.push_back(building->ID());
 
-                    if (!ObjectCollapsed(system_id)) {
-                        AddObjectRow(planet_id, system_id,
-                                        pb_it != planet_buildings.end() ? pb_it->second : std::set<int>(),
-                                        indent);
-                        ++indent;
-                    }
-
-                    // add building rows on this planet
-                    if (pb_it != planet_buildings.end()) {
-                        if (!ObjectCollapsed(planet_id) && !ObjectCollapsed(system_id)) {
-                            for (int building_id : pb_it->second) {
-                                AddObjectRow(building_id, planet_id, std::set<int>(), indent);
-                            }
-                        }
-                        planet_buildings.erase(pb_it);
-                    }
-
-                    if (!ObjectCollapsed(system_id))
-                        indent--;
+                AddObjectRow(planet, system->ID(), planet_contents, indent);
+                if (ObjectCollapsed(planet->ID())) {
+                    // remove contained buildings, which will not be shown
+                    planet_buildings[planet->ID()].clear();
+                    continue;
                 }
-                system_planets.erase(sp_it);
+
+                ++indent;
+                // add building rows on this planet
+                for (const auto& building : planet_buildings[planet->ID()])
+                    AddObjectRow(building, planet->ID(), id_range(), indent);
+                planet_buildings[planet->ID()].clear();
+                --indent;
             }
+            system_planets[system->ID()].clear();
 
             // add fleet rows in this system
-            if (sf_it != system_fleets.end()) {
-                for (int fleet_id : sf_it->second) {
-                    auto fs_it = fleet_ships.find(fleet_id);
+            timer.EnterSection("system fleet rows");
+            for (const auto& fleet : system_fleets[system->ID()]) {
+                std::vector<int> fleet_contents;
+                fleet_contents.reserve(fleet_ships[fleet->ID()].size());
+                for (const auto& ship : fleet_ships[fleet->ID()])
+                    fleet_contents.push_back(ship->ID());
 
-                    if (!ObjectCollapsed(system_id)) {
-                        AddObjectRow(fleet_id, system_id,
-                                        fs_it != fleet_ships.end() ? fs_it->second : std::set<int>(),
-                                        indent);
-                        ++indent;
-                    }
-
-                    // add ship rows in this fleet
-                    if (fs_it != fleet_ships.end()) {
-                        if (!ObjectCollapsed(fleet_id) && !ObjectCollapsed(system_id)) {
-                            for (int ship_id : fs_it->second) {
-                                AddObjectRow(ship_id, fleet_id, std::set<int>(), indent);
-                            }
-                        }
-                        fleet_ships.erase(fs_it);
-                    }
-
-                    if (!ObjectCollapsed(system_id))
-                        indent--;
+                AddObjectRow(fleet, system->ID(), fleet_contents, indent);
+                if (ObjectCollapsed(fleet->ID())) {
+                    // remove contained ships, which will not be shown
+                    fleet_ships[fleet->ID()].clear();
+                    continue;
                 }
-                system_fleets.erase(sf_it);
+
+                ++indent;
+                // add ship rows in this fleet
+                for (const auto& ship : fleet_ships[fleet->ID()])
+                    AddObjectRow(ship, fleet->ID(), id_range(), indent);
+                fleet_ships[fleet->ID()].clear();
+                --indent;
             }
+            system_fleets[system->ID()].clear();
+
+            // add field rows in this system
+            timer.EnterSection("system field rows");
+            for (const auto& field : system_fields[system->ID()])
+                AddObjectRow(field, system->ID(), id_range(), indent);
+            system_fields[system->ID()].clear();
 
             indent--;
         }
 
+        // add planets not in shown systems (ie. in no system or in systems that aren't shown)
+        timer.EnterSection("non-system planet rows");
+        for (const auto& sys_planets : system_planets) {
+            for (const auto& planet : sys_planets.second) {
+                std::vector<int> planet_contents;
+                planet_contents.reserve(planet_buildings[planet->ID()].size());
+                for (const auto& building : planet_buildings[planet->ID()])
+                    planet_contents.push_back(building->ID());
 
-        // add planets not in shown systems
-        for (const auto& sp : system_planets) {
-            for (int planet_id : sp.second) {
-                auto pb_it = planet_buildings.find(planet_id);
-
-                AddObjectRow(planet_id, INVALID_OBJECT_ID,
-                             pb_it != planet_buildings.end() ? pb_it->second : std::set<int>(),
-                             indent);
-                ++indent;
-
-                // add building rows on this planet
-                if (pb_it != planet_buildings.end()) {
-                    if (!ObjectCollapsed(planet_id)) {
-                        for (int building_id : pb_it->second) {
-                            AddObjectRow(building_id, planet_id, std::set<int>(), indent);
-                        }
-                    }
-                    planet_buildings.erase(pb_it);
+                AddObjectRow(planet, sys_planets.first, planet_contents, indent);
+                if (ObjectCollapsed(planet->ID())) {
+                    // remove contained buildings, which will not be shown
+                    planet_buildings[planet->ID()].clear();
+                    continue;
                 }
 
+                ++indent;
+                // add building rows on this planet
+                for (const auto& building : planet_buildings[planet->ID()])
+                    AddObjectRow(building, planet->ID(), id_range(), indent);
+                planet_buildings[planet->ID()].clear();
                 --indent;
             }
         }
-        system_planets.clear();
 
-
-        // add buildings not in a shown planet
-        for (const auto& pb : planet_buildings) {
-            for (int building_id : pb.second) {
-                AddObjectRow(building_id, INVALID_OBJECT_ID, std::set<int>(), indent);
-            }
-        }
-        planet_buildings.clear();
-
+        // add buildings not on shown planets
+        for (const auto& plt_buildings : planet_buildings)
+            for (const auto& building : plt_buildings.second)
+                AddObjectRow(building, plt_buildings.first, id_range(), indent);
 
         // add fleets not in shown systems
-        for (const auto& sf : system_fleets) {
-            for (int fleet_id : sf.second) {
-                auto fs_it = fleet_ships.find(fleet_id);
+        timer.EnterSection("non-system fleet rows");
+        for (const auto& sys_fleets : system_fleets) {
+           for (const auto& fleet : sys_fleets.second) {
+            // add fleet rows in this system
+                std::vector<int> fleet_contents;
+                fleet_contents.reserve(fleet_ships[fleet->ID()].size());
+                for (const auto& ship : fleet_ships[fleet->ID()])
+                    fleet_contents.push_back(ship->ID());
 
-                AddObjectRow(fleet_id, INVALID_OBJECT_ID,
-                                fs_it != fleet_ships.end() ? fs_it->second : std::set<int>(),
-                                indent);
-                ++indent;
-
-                // add ship rows on this fleet
-                if (fs_it != fleet_ships.end()) {
-                    if (!ObjectCollapsed(fleet_id)) {
-                        for (int ship_id : fs_it->second) {
-                            AddObjectRow(ship_id, fleet_id, std::set<int>(), indent);
-                        }
-                    }
-                    fleet_ships.erase(fs_it);
+                AddObjectRow(fleet, sys_fleets.first, fleet_contents, indent);
+                if (ObjectCollapsed(fleet->ID())) {
+                    // remove contained ships, which will not be shown
+                    fleet_ships[fleet->ID()].clear();
+                    continue;
                 }
-                indent--;
+
+                ++indent;
+                // add ship rows in this fleet
+                for (const auto& ship : fleet_ships[fleet->ID()])
+                    AddObjectRow(ship, fleet->ID(), id_range(), indent);
+                fleet_ships[fleet->ID()].clear();
+                --indent;
             }
-        }
-        system_fleets.clear();
+       }
+
+        // add ships not in shown fleets
+        for (const auto& flt_ships : fleet_ships)
+            for (const auto& ship : flt_ships.second)
+                AddObjectRow(ship, flt_ships.first, id_range(), indent);
+
+        // add fields not in shown systems
+        timer.EnterSection("non-system field rows");
+        for (const auto& sys_fields : system_fields)
+            for (const auto& field : sys_fields.second)
+                AddObjectRow(field, sys_fields.first, id_range(), indent);
 
 
-        // add any remaining ships not in shown fleets
-        for (const auto& fs : fleet_ships) {
-            for (int ship_id : fs.second) {
-                AddObjectRow(ship_id, INVALID_OBJECT_ID, std::set<int>(), indent);
-            }
-        }
-        fleet_ships.clear();
+        // sort added rows
+        timer.EnterSection("sorting");
+        this->SetStyle(initial_style);
 
-        for (int field_id : fields)
-            AddObjectRow(field_id, INVALID_OBJECT_ID, std::set<int>(), indent);
-
+        timer.EnterSection("final");
         if (!this->Empty())
             this->BringRowIntoView(--this->end());
         if (first_visible_queue_row < this->NumRows())
@@ -2241,19 +2259,18 @@ public:
     mutable boost::signals2::signal<void ()> ExpandCollapseSignal;
 
 private:
-    void AddObjectRow(int object_id, int container, const std::set<int>& contents, int indent)
-    { AddObjectRow(object_id, container, contents, indent, this->end()); }
+    void AddObjectRow(int object_id, int container, const id_range& contents, int indent)
+    { AddObjectRow(Objects().get(object_id), container, contents, indent); }
 
-    void AddObjectRow(int object_id, int container, const std::set<int>& contents,
-                      int indent, GG::ListBox::iterator it)
+    void AddObjectRow(std::shared_ptr<const UniverseObject> obj, int container,
+                      const id_range& contents, int indent)
     {
-        auto obj = GetUniverseObject(object_id);
         if (!obj)
             return;
         const GG::Pt row_size = ListRowSize();
-        auto object_row = GG::Wnd::Create<ObjectRow>(row_size.x, row_size.y, obj, !ObjectCollapsed(object_id),
-                                              container, contents, indent);
-        this->Insert(object_row, it);
+        auto object_row = GG::Wnd::Create<ObjectRow>(row_size.x, row_size.y, obj, !ObjectCollapsed(obj->ID()),
+                                                     container, contents, indent);
+        this->Insert(object_row);
         object_row->Resize(row_size);
         object_row->ExpandCollapseSignal.connect(
             boost::bind(&ObjectListBox::ObjectExpandCollapseClicked, this, _1), boost::signals2::at_front);
@@ -2339,7 +2356,7 @@ private:
     void ObjectStateChanged(int object_id) {
         if (object_id == INVALID_OBJECT_ID)
             return;
-        auto obj = GetUniverseObject(object_id);
+        auto obj = Objects().get(object_id);
         DebugLogger() << "ObjectListBox::ObjectStateChanged: " << obj->Name();
         if (!obj)
             return;
@@ -2356,7 +2373,7 @@ private:
 
     std::map<int, boost::signals2::connection>          m_object_change_connections;
     std::set<int>                                       m_collapsed_objects;
-    std::unique_ptr<Condition::ConditionBase>           m_filter_condition = nullptr;
+    std::unique_ptr<Condition::Condition>           m_filter_condition = nullptr;
     std::map<UniverseObjectType, std::set<VIS_DISPLAY>> m_visibilities;
     std::shared_ptr<ObjectHeaderRow>                    m_header_row = nullptr;
     boost::signals2::connection                         m_obj_deleted_connection;
@@ -2368,10 +2385,7 @@ private:
 ObjectListWnd::ObjectListWnd(const std::string& config_name) :
     CUIWnd(UserString("MAP_BTN_OBJECTS"),
            GG::ONTOP | GG::INTERACTIVE | GG::DRAGABLE | GG::RESIZABLE | CLOSABLE | PINABLE,
-           config_name, false),
-    m_list_box(nullptr),
-    m_filter_button(nullptr),
-    m_collapse_button(nullptr)
+           config_name, false)
 {}
 
 void ObjectListWnd::CompleteConstruction() {
@@ -2532,7 +2546,7 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
     // create popup menu with object commands in it
     popup->AddMenuItem(GG::MenuItem(UserString("DUMP"), false, false, dump_action));
 
-    auto obj = GetUniverseObject(object_id);
+    auto obj = Objects().get(object_id);
     //DebugLogger() << "ObjectListBox::ObjectStateChanged: " << obj->Name();
     if (!obj)
         return;
@@ -2553,7 +2567,7 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
         for (const auto& entry : m_list_box->Selections()) {
             ObjectRow *row = dynamic_cast<ObjectRow *>(entry->get());
             if (row) {
-                auto one_planet = GetPlanet(row->ObjectID());
+                auto one_planet = Objects().get<Planet>(row->ObjectID());
                 if (one_planet && one_planet->OwnedBy(app->EmpireID())) {
                     for (const std::string& planet_focus : one_planet->AvailableFoci())
                         all_foci[planet_focus]++;
@@ -2583,7 +2597,7 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
                     if (!row)
                         continue;
 
-                    auto one_planet = GetPlanet(row->ObjectID());
+                    auto one_planet = Objects().get<Planet>(row->ObjectID());
                     if (!(one_planet && one_planet->OwnedBy(app->EmpireID())))
                         continue;
 
@@ -2617,7 +2631,7 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
                     ObjectRow* row = dynamic_cast<ObjectRow*>(entry->get());
                     if (!row)
                         continue;
-                    auto one_planet = GetPlanet(row->ObjectID());
+                    auto one_planet = Objects().get<Planet>(row->ObjectID());
                     if (!one_planet || !one_planet->OwnedBy(app->EmpireID()) || !cur_empire->ProducibleItem(BT_SHIP, ship_design, row->ObjectID()))
                         continue;
                     ProductionQueue::ProductionItem ship_item(BT_SHIP, ship_design);
@@ -2655,7 +2669,7 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
                     ObjectRow *row = dynamic_cast<ObjectRow *>(selection->get());
                     if (!row)
                         continue;
-                    std::shared_ptr<Planet> one_planet = GetPlanet(row->ObjectID());
+                    std::shared_ptr<Planet> one_planet = Objects().get<Planet>(row->ObjectID());
                     if (!one_planet || !one_planet->OwnedBy(app->EmpireID())
                         || !cur_empire->EnqueuableItem(BT_BUILDING, bld, row->ObjectID())
                         || !cur_empire->ProducibleItem(BT_BUILDING, bld, row->ObjectID()))

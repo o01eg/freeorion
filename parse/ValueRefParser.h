@@ -4,21 +4,21 @@
 #include "EnumParser.h"
 #include "MovableEnvelope.h"
 
-#include "../universe/ValueRefFwd.h"
+#include "../universe/ValueRefs.h"
 #include "../universe/EnumsFwd.h"
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/phoenix.hpp>
 
 namespace Condition {
-    struct ConditionBase;
+    struct Condition;
 }
 
 namespace parse { namespace detail {
     // TODO: Investigate refactoring ValueRef to use variant,
     // for increased locality of reference.
     template <typename T>
-    using value_ref_payload = MovableEnvelope<ValueRef::ValueRefBase<T>>;
+    using value_ref_payload = MovableEnvelope<ValueRef::ValueRef<T>>;
     template <typename T>
     using value_ref_signature = value_ref_payload<T> ();
     template <typename T>
@@ -26,7 +26,7 @@ namespace parse { namespace detail {
     template <typename T>
     using value_ref_grammar = detail::grammar<value_ref_signature<T>>;
 
-    using condition_payload        = MovableEnvelope<Condition::ConditionBase>;
+    using condition_payload        = MovableEnvelope<Condition::Condition>;
     using condition_signature      = condition_payload ();
     using condition_parser_grammar = grammar<condition_signature>;
 
@@ -258,6 +258,7 @@ namespace parse {
 
         detail::simple_int_parser_rules         simple_int_rules;
         detail::complex_variable_rule<double>   name_property_rule;
+        detail::complex_variable_rule<double>   id_empire_location_rule;
         detail::complex_variable_rule<double>   empire_meter_value;
         detail::complex_variable_rule<double>   direct_distance;
         detail::complex_variable_rule<double>   shortest_path;

@@ -39,14 +39,14 @@ void MilitaryPanel::CompleteConstruction() {
 
     SetName("MilitaryPanel");
 
-    auto planet = this->GetPlanet();
+    auto planet = Objects().get<Planet>(m_planet_id);
     if (!planet)
         throw std::invalid_argument("Attempted to construct a MilitaryPanel with an object id is not a Planet");
 
     m_expand_button->LeftPressedSignal.connect(
         boost::bind(&MilitaryPanel::ExpandCollapseButtonPressed, this));
 
-    const auto obj = GetUniverseObject(m_planet_id);
+    const auto obj = Objects().get(m_planet_id);
     if (!obj) {
         ErrorLogger() << "Invalid object id " << m_planet_id;
         return;
@@ -61,10 +61,20 @@ void MilitaryPanel::CompleteConstruction() {
         auto stat = GG::Wnd::Create<StatisticIcon>(
             ClientUI::MeterIcon(meter), obj->InitialMeterValue(meter),
             3, false, MeterIconSize().x, MeterIconSize().y);
-        stat->InstallEventFilter(shared_from_this());
         AttachChild(stat);
         m_meter_stats.push_back({meter, stat});
         meters.push_back({meter, AssociatedMeterType(meter)});
+        stat->RightClickedSignal.connect([meter](const GG::Pt& pt) {
+            std::string meter_string = boost::lexical_cast<std::string>(meter);
+
+            auto zoom_action = [meter_string]() { ClientUI::GetClientUI()->ZoomToMeterTypeArticle(meter_string); };
+
+            auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
+            std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) %
+                                                                    UserString(meter_string));
+            popup->AddMenuItem(GG::MenuItem(popup_label, false, false, zoom_action));
+            popup->Run();
+        });
     }
 
     // attach and show meter bars and large resource indicators
@@ -89,41 +99,8 @@ void MilitaryPanel::ExpandCollapse(bool expanded) {
     DoLayout();
 }
 
-bool MilitaryPanel::EventFilter(GG::Wnd* w, const GG::WndEvent& event) {
-    if (event.Type() != GG::WndEvent::RClick)
-        return false;
-    const GG::Pt& pt = event.Point();
-
-    MeterType meter_type = INVALID_METER_TYPE;
-    for (auto& meter_stat : m_meter_stats) {
-        if (meter_stat.second.get() == w) {
-            meter_type = meter_stat.first;
-            break;
-        }
-    }
-
-    if (meter_type == INVALID_METER_TYPE)
-        return false;
-
-    std::string meter_string = boost::lexical_cast<std::string>(meter_type);
-    std::string meter_title;
-    if (UserStringExists(meter_string))
-        meter_title = UserString(meter_string);
-    if (meter_title.empty())
-        return false;
-
-    bool retval = false;
-    auto zoom_action = [&retval, &meter_string]() { retval = ClientUI::GetClientUI()->ZoomToMeterTypeArticle(meter_string); };
-
-    auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
-    std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) % meter_title);
-    popup->AddMenuItem(GG::MenuItem(popup_label, false, false, zoom_action));
-
-    return retval;
-}
-
 void MilitaryPanel::Update() {
-    auto obj = GetUniverseObject(m_planet_id);
+    auto obj = Objects().get(m_planet_id);
     if (!obj) {
         ErrorLogger() << "MilitaryPanel::Update coudln't get object with id  " << m_planet_id;
         return;
@@ -211,20 +188,6 @@ void MilitaryPanel::DoLayout() {
     }
 
     SetCollapsed(!s_expanded_map[m_planet_id]);
-}
-
-std::shared_ptr<const Planet> MilitaryPanel::GetPlanet() const {
-    auto obj = GetUniverseObject(m_planet_id);
-    if (!obj) {
-        ErrorLogger() << "MilitaryPanel tried to get an object with an invalid m_planet_id";
-        return nullptr;
-    }
-    auto planet = std::dynamic_pointer_cast<const Planet>(obj);
-    if (!planet) {
-        ErrorLogger() << "MilitaryPanel failed casting an object pointer to a Planet pointer";
-        return nullptr;
-    }
-    return planet;
 }
 
 std::map<int, bool> MilitaryPanel::s_expanded_map;

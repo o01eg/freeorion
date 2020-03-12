@@ -122,6 +122,7 @@ public:
 
     bool                    Eliminated() const;                                         ///< whether this empire has lost the game
     bool                    Won() const;                                                ///< whether this empire has won the game
+    bool                    Ready() const;                                              ///< Returns readiness status of empire
 
     int                     NumSitRepEntries(int turn = INVALID_GAME_TURN) const;       ///< number of entries in the SitRep.
 
@@ -233,6 +234,7 @@ public:
     std::string NewShipName();                              ///< generates a random ship name, appending II, III, etc., to it if it has been used before by this empire
     void Eliminate();                                ///< Marks empire as eliminated and cleans up empire after it is eliminated.  Queues are cleared, capital is reset, and other state info not relevant to an eliminated empire is cleared
     void Win(const std::string& reason);             ///< Marks this empire as having won for this reason, and sends the appropriate sitreps
+    void SetReady(bool ready);                       ///< Marks this empire with readiness status
 
     /** Inserts the a pointer to given SitRep entry into the empire's sitrep list.
      *  \warning When you call this method, you are transferring ownership
@@ -349,6 +351,8 @@ public:
 
     std::map<std::string, int>& SpeciesPlanetsInvaded() { return m_species_planets_invaded; }
 
+    std::map<int, int>&         ShipDesignsInProduction() { return m_ship_designs_in_production; }
+
     std::map<std::string, int>& SpeciesShipsProduced()  { return m_species_ships_produced; }
     std::map<int, int>&         ShipDesignsProduced()   { return m_ship_designs_produced; }
 
@@ -424,6 +428,8 @@ private:
     int                             m_outposts_owned = 0;       ///< how many uncolonized outposts does this empire currently own?
     std::map<std::string, int>      m_building_types_owned;     ///< how many buildings does this empire currently own?
 
+    std::map<int, int>              m_ship_designs_in_production;   ///< how many ships of each design has this empire in active production in its production queue
+
     std::map<int, int>              m_empire_ships_destroyed;   ///< how many ships of each empire has this empire destroyed?
     std::map<int, int>              m_ship_designs_destroyed;   ///< how many ships of each design has this empire destroyed?
     std::map<std::string, int>      m_species_ships_destroyed;  ///< how many ships crewed by each species has this empire destroyed?
@@ -447,6 +453,7 @@ private:
     std::set<int>                   m_supply_unobstructed_systems;  ///< ids of system that don't block supply from flowing
     std::map<int, std::set<int>>    m_preserved_system_exit_lanes;  ///< for each system known to this empire, the set of exit lanes preserved for fleet travel even if otherwise blockaded
     std::map<int, std::set<int>>    m_pending_system_exit_lanes;    ///< pending updates to m_preserved_system_exit_lanes
+    bool                            m_ready;                        ///< readiness status of empire
 
     friend class boost::serialization::access;
     Empire();

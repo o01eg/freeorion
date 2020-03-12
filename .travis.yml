@@ -1,50 +1,86 @@
+---
 stages:
   - lint
   - build
   - test
 
+_lint_python_common: &_lint_python_common
+  stage: lint
+  os: linux
+  dist: bionic
+  language: python
+  install:
+    - pip install flake8-putty==0.4.0
+  before_script:
+    - cd default/python
+  script:
+    - flake8
+    - python -m compileall -q .
+
+_build_cpp_common: &_build_cpp_common
+  stage: build
+  language: cpp
+  cache: ccache
+  install:
+    - mkdir -p $HOME/.ccache;
+    - echo sloppiness = file_macro > $HOME/.ccache/ccache.conf
+    - echo max_size = 200M >> $HOME/.ccache/ccache.conf
+    - ccache --version
+    - ccache --show-stats
+  before_script:
+    - git remote add -t master -m master upstream https://github.com/freeorion/freeorion.git
+    - git fetch upstream
+    - git log -1 upstream/master
+    - mkdir build
+    - cd build
+  after_success:
+    - cmake-local --build . --config Release --target unittest
+  before_cache:
+    - ccache --clean
+    - ccache --show-stats
+
+_test_python_common: &_test_python_common
+  stage: test
+  os: linux
+  dist: bionic
+  language: python
+  install:
+    - pip install pytest==3.6.3
+  script:
+    - pytest
+
 jobs:
   include:
-    - stage: lint
-      os: linux
-      dist: xenial
-      language: python
-      python: 2.7.14
+    - name: Lint AI with Python 2.7
+      <<: *_lint_python_common
+      python: 2.7
       before_install:
-        - pip install flake8-putty==0.4.0
-      before_script:
-        - cd default/python
-      script:
-        - flake8
-        - python -m compileall -q .
-      env:
-        - NAME="Lint Python script"
-    - stage: build
+        - alias pip=/usr/bin/pip
+        - alias python=/usr/bin/python2
+
+    - name: Lint AI with Python 3.5
+      <<: *_lint_python_common
+      python: 3.5
+      before_install:
+        - alias pip=/usr/bin/pip3
+        - alias python=/usr/bin/python3
+
+    - name: Build FreeOrion on Ubunutu 18.04 (Bionic)
+      <<: *_build_cpp_common
       os: linux
-      dist: xenial
-      language: cpp
+      dist: bionic
       services:
         - docker
-        - postgresql
+        - postgres
       addons:
-        postgresql: "9.6"
-      cache: ccache
-      env:
-        - NAME="Build FreeOrion"
+        - postgres: "9.6"
       before_install:
-        - mkdir -p $HOME/.ccache;
-        - echo sloppiness = file_macro > $HOME/.ccache/ccache.conf
-        - echo max_size = 200M >> $HOME/.ccache/ccache.conf
-        - ccache --version
-        - ccache --show-stats
         - psql -c 'SELECT version();' -U postgres
         - psql -c 'CREATE DATABASE freeorion;' -U postgres
         - psql -U postgres freeorion < ${TRAVIS_BUILD_DIR}/.ci/freeorion.sql
         - docker pull freeorion/freeorion-travis-build
         - docker run --name freeorion-psql freeorion/freeorion-travis-build /bin/bash -c "apt-get update --assume-yes && apt-get install --assume-yes python-psycopg2 && mkdir -p /root/.config/freeorion/ && echo host=localhost user=postgres dbname=freeorion > /root/.config/freeorion/db.txt"
         - docker commit freeorion-psql freeorion-travis-build-psql
-        # Add transparent cmake function to allow possible cross platform use of
-        # build sections.
         # mount ccache dir and set its environment variable
         # timeout before Travis kills jobs so that ccache is always at least partially populated
         - >
@@ -55,28 +91,25 @@ jobs:
           function cmake-local {
               docker run --network="host" -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -e CTEST_OUTPUT_ON_FAILURE=1 -w /freeorion/build freeorion-travis-build-psql timeout 40m /usr/bin/cmake $@
           }
-      before_script:
-        - git remote add -t master -m master upstream https://github.com/freeorion/freeorion.git
-        - git fetch upstream
-        - git log -1 upstream/master
-        - mkdir build
-        - cd build
       script:
         - git merge --no-commit upstream/master
-        - cmake -DBUILD_HEADLESS=ON -DBUILD_TESTING=ON ..
+        - cmake -DBUILD_TESTING=ON -DBUILD_HEADLESS=ON ..
         - cmake --build . -- -j 2
-        - cmake-local --build . --target unittest
-      before_cache:
-        - ccache --clean
-        - ccache --show-stats
-    - stage: test
-      os: linux
-      dist: xenial
-      language: python
-      python: 2.7.14
+
+    - name: Unittest AI with Python 2.7
+      <<: *_test_python_common
+      python: 2.7
       before_install:
-        - pip install pytest==3.6.3
-      script:
-        - pytest
-      env:
-        - NAME="Pytest"
+        - alias pip=/usr/bin/pip
+
+    - name: Unittest AI with Python 3.5
+      <<: *_test_python_common
+      python: 3.5
+      before_install:
+        - alias pip=/usr/bin/pip3
+
+    - name: Unittest AI with Python 3.8
+      <<: *_test_python_common
+      python: 3.8
+      before_install:
+        - alias pip=/usr/bin/pip3

@@ -7,14 +7,14 @@
 #include "../util/CheckSums.h"
 #include "../Empire/Empire.h"
 #include "../Empire/EmpireManager.h"
-#include "Condition.h"
-#include "Effect.h"
+#include "Conditions.h"
+#include "Effects.h"
 #include "Planet.h"
 #include "Ship.h"
 #include "Predicates.h"
 #include "Species.h"
 #include "Universe.h"
-#include "ValueRef.h"
+#include "ValueRefs.h"
 #include "Enums.h"
 
 #include <cfloat>
@@ -51,9 +51,9 @@ namespace {
     // by the result of evalulating \a increase_vr
     std::shared_ptr<Effect::EffectsGroup>
     IncreaseMeter(MeterType meter_type,
-                  std::unique_ptr<ValueRef::ValueRefBase<double>>&& increase_vr)
+                  std::unique_ptr<ValueRef::ValueRef<double>>&& increase_vr)
     {
-        typedef std::vector<std::unique_ptr<Effect::EffectBase>> Effects;
+        typedef std::vector<std::unique_ptr<Effect::Effect>> Effects;
         auto scope = boost::make_unique<Condition::Source>();
         auto activation = boost::make_unique<Condition::Source>();
 
@@ -107,7 +107,7 @@ namespace {
     IncreaseMeter(MeterType meter_type, const std::string& part_name,
                   float increase, bool allow_stacking = true)
     {
-        typedef std::vector<std::unique_ptr<Effect::EffectBase>> Effects;
+        typedef std::vector<std::unique_ptr<Effect::Effect>> Effects;
         auto scope = boost::make_unique<Condition::Source>();
         auto activation = boost::make_unique<Condition::Source>();
 
@@ -180,31 +180,20 @@ const ShipDesign* GetShipDesign(int ship_design_id)
 ////////////////////////////////////////////////
 // CommonParams
 ////////////////////////////////////////////////
-CommonParams::CommonParams() :
-    production_cost(nullptr),
-    production_time(nullptr),
-    producible(false),
-    tags(),
-    production_meter_consumption(),
-    production_special_consumption(),
-    location(nullptr),
-    enqueue_location(nullptr),
-    effects()
-{}
+CommonParams::CommonParams() {}
 
-CommonParams::CommonParams(std::unique_ptr<ValueRef::ValueRefBase<double>>&& production_cost_,
-                           std::unique_ptr<ValueRef::ValueRefBase<int>>&& production_time_,
+CommonParams::CommonParams(std::unique_ptr<ValueRef::ValueRef<double>>&& production_cost_,
+                           std::unique_ptr<ValueRef::ValueRef<int>>&& production_time_,
                            bool producible_,
                            const std::set<std::string>& tags_,
-                           std::unique_ptr<Condition::ConditionBase>&& location_,
+                           std::unique_ptr<Condition::Condition>&& location_,
                            std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects_,
                            ConsumptionMap<MeterType>&& production_meter_consumption_,
                            ConsumptionMap<std::string>&& production_special_consumption_,
-                           std::unique_ptr<Condition::ConditionBase>&& enqueue_location_) :
+                           std::unique_ptr<Condition::Condition>&& enqueue_location_) :
     production_cost(std::move(production_cost_)),
     production_time(std::move(production_time_)),
     producible(producible_),
-    tags(),
     production_meter_consumption(std::move(production_meter_consumption_)),
     production_special_consumption(std::move(production_special_consumption_)),
     location(std::move(location_)),
@@ -215,8 +204,7 @@ CommonParams::CommonParams(std::unique_ptr<ValueRef::ValueRefBase<double>>&& pro
         tags.insert(boost::to_upper_copy<std::string>(tag));
 }
 
-CommonParams::~CommonParams()
-{}
+CommonParams::~CommonParams() {}
 
 
 /////////////////////////////////////
@@ -297,7 +285,7 @@ PartType::PartType(ShipPartClass part_class, double capacity, double stat2,
                    CommonParams& common_params, const MoreCommonParams& more_common_params,
                    std::vector<ShipSlotType> mountable_slot_types,
                    const std::string& icon, bool add_standard_capacity_effect,
-                   std::unique_ptr<Condition::ConditionBase>&& combat_targets) :
+                   std::unique_ptr<Condition::Condition>&& combat_targets) :
     m_name(more_common_params.name),
     m_description(more_common_params.description),
     m_class(part_class),
@@ -472,54 +460,54 @@ bool PartType::ProductionCostTimeLocationInvariant() const {
     return true;
 }
 
-float PartType::ProductionCost(int empire_id, int location_id) const {
-    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_cost) {
+float PartType::ProductionCost(int empire_id, int location_id, int in_design_id) const {
+    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_cost)
         return 1.0f;
-    } else {
-        if (m_production_cost->ConstantExpr())
-            return static_cast<float>(m_production_cost->Eval());
-        else if (m_production_cost->SourceInvariant() && m_production_cost->TargetInvariant())
-            return static_cast<float>(m_production_cost->Eval());
 
-        const auto arbitrary_large_number = 999999.9f;
-
-        auto location = GetUniverseObject(location_id);
-        if (!location && !m_production_cost->TargetInvariant())
-            return arbitrary_large_number;
-
-        auto source = Empires().GetSource(empire_id);
-        if (!source && !m_production_cost->SourceInvariant())
-            return arbitrary_large_number;
-
-        ScriptingContext context(source, location);
-
+    if (m_production_cost->ConstantExpr()) {
+        return static_cast<float>(m_production_cost->Eval());
+    } else if (m_production_cost->SourceInvariant() && m_production_cost->TargetInvariant()) {
+        ScriptingContext context(nullptr, nullptr, in_design_id);
         return static_cast<float>(m_production_cost->Eval(context));
     }
+
+    const auto arbitrary_large_number = 999999.9f;
+
+    auto location = Objects().get(location_id);
+    if (!location && !m_production_cost->TargetInvariant())
+        return arbitrary_large_number;
+
+    auto source = Empires().GetSource(empire_id);
+    if (!source && !m_production_cost->SourceInvariant())
+        return arbitrary_large_number;
+
+    ScriptingContext context(source, location, in_design_id);
+    return static_cast<float>(m_production_cost->Eval(context));
 }
 
-int PartType::ProductionTime(int empire_id, int location_id) const {
+int PartType::ProductionTime(int empire_id, int location_id, int in_design_id) const {
     const auto arbitrary_large_number = 9999;
 
-    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_time) {
+    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_time)
         return 1;
-    } else {
-        if (m_production_time->ConstantExpr())
-            return m_production_time->Eval();
-        else if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant())
-            return m_production_time->Eval();
 
-        auto location = GetUniverseObject(location_id);
-        if (!location && !m_production_time->TargetInvariant())
-            return arbitrary_large_number;
-
-        auto source = Empires().GetSource(empire_id);
-        if (!source && !m_production_time->SourceInvariant())
-            return arbitrary_large_number;
-
-        ScriptingContext context(source, location);
-
+    if (m_production_time->ConstantExpr()) {
+        return m_production_time->Eval();
+    } else if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant()) {
+        ScriptingContext context(nullptr, nullptr, in_design_id);
         return m_production_time->Eval(context);
     }
+
+    auto location = Objects().get(location_id);
+    if (!location && !m_production_time->TargetInvariant())
+        return arbitrary_large_number;
+
+    auto source = Empires().GetSource(empire_id);
+    if (!source && !m_production_time->SourceInvariant())
+        return arbitrary_large_number;
+
+    ScriptingContext context(source, location, in_design_id);
+    return m_production_time->Eval(context);
 }
 
 unsigned int PartType::GetCheckSum() const {
@@ -550,18 +538,7 @@ unsigned int PartType::GetCheckSum() const {
 ////////////////////////////////////////////////
 // HullType
 ////////////////////////////////////////////////
-HullType::HullType() :
-    m_production_cost(nullptr),
-    m_production_time(nullptr),
-    m_slots(),
-    m_tags(),
-    m_production_meter_consumption(),
-    m_production_special_consumption(),
-    m_location(nullptr),
-    m_effects(),
-    m_graphic(),
-    m_icon()
-{}
+HullType::HullType() {}
 
 HullType::HullType(const HullTypeStats& stats,
                    CommonParams&& common_params,
@@ -578,17 +555,15 @@ HullType::HullType(const HullTypeStats& stats,
     m_production_time(std::move(common_params.production_time)),
     m_producible(common_params.producible),
     m_slots(slots),
-    m_tags(),
     m_production_meter_consumption(std::move(common_params.production_meter_consumption)),
     m_production_special_consumption(std::move(common_params.production_special_consumption)),
     m_location(std::move(common_params.location)),
     m_exclusions(more_common_params.exclusions),
-    m_effects(),
     m_graphic(graphic),
     m_icon(icon)
 {
     TraceLogger() << "hull type: " << m_name << " producible: " << m_producible << std::endl;
-    Init(std::move(common_params.effects));
+    Init(std::move(common_params.effects), stats);
 
     for (const std::string& tag : common_params.tags)
         m_tags.insert(boost::to_upper_copy<std::string>(tag));
@@ -598,17 +573,18 @@ HullType::Slot::Slot() :
     type(INVALID_SHIP_SLOT_TYPE)
 {}
 
-HullType::~HullType()
-{}
+HullType::~HullType() {}
 
-void HullType::Init(std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects) {
-    if (m_fuel != 0)
+void HullType::Init(std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
+                    const HullTypeStats& stats)
+{
+    if (stats.default_fuel_effects && m_fuel != 0)
         m_effects.push_back(IncreaseMeter(METER_MAX_FUEL,       m_fuel));
-    if (m_stealth != 0)
+    if (stats.default_stealth_effects && m_stealth != 0)
         m_effects.push_back(IncreaseMeter(METER_STEALTH,        m_stealth));
-    if (m_structure != 0)
+    if (stats.default_structure_effects && m_structure != 0)
         m_effects.push_back(IncreaseMeter(METER_MAX_STRUCTURE,  m_structure,    "RULE_SHIP_STRUCTURE_FACTOR"));
-    if (m_speed != 0)
+    if (stats.default_speed_effects && m_speed != 0)
         m_effects.push_back(IncreaseMeter(METER_SPEED,          m_speed,        "RULE_SHIP_SPEED_FACTOR"));
 
     if (m_production_cost)
@@ -650,54 +626,54 @@ bool HullType::ProductionCostTimeLocationInvariant() const {
     return true;
 }
 
-float HullType::ProductionCost(int empire_id, int location_id) const {
-    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_cost) {
+float HullType::ProductionCost(int empire_id, int location_id, int in_design_id) const {
+    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_cost)
         return 1.0f;
-    } else {
-        if (m_production_cost->ConstantExpr())
-            return static_cast<float>(m_production_cost->Eval());
-        else if (m_production_cost->SourceInvariant() && m_production_cost->TargetInvariant())
-            return static_cast<float>(m_production_cost->Eval());
 
-        const auto arbitrary_large_number = 999999.9f;
-
-        auto location = GetUniverseObject(location_id);
-        if (!location && !m_production_cost->TargetInvariant())
-            return arbitrary_large_number;
-
-        auto source = Empires().GetSource(empire_id);
-        if (!source && !m_production_cost->SourceInvariant())
-            return arbitrary_large_number;
-
-        ScriptingContext context(source, location);
-
+    if (m_production_cost->ConstantExpr()) {
+        return static_cast<float>(m_production_cost->Eval());
+    } else if (m_production_cost->SourceInvariant() && m_production_cost->TargetInvariant()) {
+        ScriptingContext context(nullptr, nullptr, in_design_id);
         return static_cast<float>(m_production_cost->Eval(context));
     }
+
+    const auto arbitrary_large_number = 999999.9f;
+
+    auto location = Objects().get(location_id);
+    if (!location && !m_production_cost->TargetInvariant())
+        return arbitrary_large_number;
+
+    auto source = Empires().GetSource(empire_id);
+    if (!source && !m_production_cost->SourceInvariant())
+        return arbitrary_large_number;
+
+    ScriptingContext context(source, location, in_design_id);
+    return static_cast<float>(m_production_cost->Eval(context));
 }
 
-int HullType::ProductionTime(int empire_id, int location_id) const {
-    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_time) {
+int HullType::ProductionTime(int empire_id, int location_id, int in_design_id) const {
+    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_time)
         return 1;
-    } else {
-        if (m_production_time->ConstantExpr())
-            return m_production_time->Eval();
-        else if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant())
-            return m_production_time->Eval();
 
-        const auto arbitrary_large_number = 999999;
-
-        auto location = GetUniverseObject(location_id);
-        if (!location && !m_production_time->TargetInvariant())
-            return arbitrary_large_number;
-
-        auto source = Empires().GetSource(empire_id);
-        if (!source && !m_production_time->SourceInvariant())
-            return arbitrary_large_number;
-
-        ScriptingContext context(source, location);
-
+    if (m_production_time->ConstantExpr()) {
+        return m_production_time->Eval();
+    } else if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant()) {
+        ScriptingContext context(nullptr, nullptr, in_design_id);
         return m_production_time->Eval(context);
     }
+
+    const auto arbitrary_large_number = 999999;
+
+    auto location = Objects().get(location_id);
+    if (!location && !m_production_time->TargetInvariant())
+        return arbitrary_large_number;
+
+    auto source = Empires().GetSource(empire_id);
+    if (!source && !m_production_time->SourceInvariant())
+        return arbitrary_large_number;
+
+    ScriptingContext context(source, location, in_design_id);
+    return m_production_time->Eval(context);
 }
 
 unsigned int HullType::GetCheckSum() const {
@@ -787,12 +763,12 @@ void HullTypeManager::CheckPendingHullTypes() const {
     Pending::SwapPending(m_pending_hull_types, m_hulls);
 
     TraceLogger() << [this]() {
-            std::string retval("Hull Types:");
-            for (const auto& entry : m_hulls) {
-                retval.append("\n\t" + entry.second->Name());
-            }
-            return retval;
-        }();
+        std::string retval("Hull Types:");
+        for (const auto& entry : m_hulls) {
+            retval.append("\n\t" + entry.second->Name());
+        }
+        return retval;
+    }();
 
     if (m_hulls.empty())
         ErrorLogger() << "HullTypeManager expects at least one hull type.  All ship design construction will fail.";
@@ -808,8 +784,7 @@ ParsedShipDesign::ParsedShipDesign(
     const std::vector<std::string>& parts,
     const std::string& icon, const std::string& model,
     bool name_desc_in_stringtable, bool monster,
-    const boost::uuids::uuid& uuid /*= boost::uuids::nil_uuid()*/
-) :
+    const boost::uuids::uuid& uuid) :
     m_name(name),
     m_description(description),
     m_uuid(uuid),
@@ -827,8 +802,6 @@ ParsedShipDesign::ParsedShipDesign(
 // ShipDesign
 ////////////////////////////////////////////////
 ShipDesign::ShipDesign() :
-    m_name(),
-    m_description(),
     m_uuid(boost::uuids::nil_generator()()),
     m_designed_on_turn(UniverseObject::INVALID_OBJECT_AGE),
     m_designed_by_empire(ALL_EMPIRES),
@@ -908,6 +881,7 @@ bool ShipDesign::ProductionCostTimeLocationInvariant() const {
     if (const HullType* hull = GetHullType(m_hull))
         if (!hull->ProductionCostTimeLocationInvariant())
             return false;
+
     for (const std::string& part_name : m_parts)
         if (const PartType* part = GetPartType(part_name))
             if (!part->ProductionCostTimeLocationInvariant())
@@ -918,34 +892,37 @@ bool ShipDesign::ProductionCostTimeLocationInvariant() const {
 }
 
 float ShipDesign::ProductionCost(int empire_id, int location_id) const {
-    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION")) {
+    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION"))
         return 1.0f;
-    } else {
-        float cost_accumulator = 0.0f;
-        if (const HullType* hull = GetHullType(m_hull))
-            cost_accumulator += hull->ProductionCost(empire_id, location_id);
-        for (const std::string& part_name : m_parts)
-            if (const PartType* part = GetPartType(part_name))
-                cost_accumulator += part->ProductionCost(empire_id, location_id);
-        return std::max(0.0f, cost_accumulator);
+
+    float cost_accumulator = 0.0f;
+    if (const HullType* hull = GetHullType(m_hull))
+        cost_accumulator += hull->ProductionCost(empire_id, location_id, m_id);
+    int part_count = 0;
+    for (const std::string& part_name : m_parts) {
+        if (const PartType* part = GetPartType(part_name)) {
+            cost_accumulator += part->ProductionCost(empire_id, location_id, m_id);
+            part_count++;
+        }
     }
+
+    return std::max(0.0f, cost_accumulator);
 }
 
 float ShipDesign::PerTurnCost(int empire_id, int location_id) const
 { return ProductionCost(empire_id, location_id) / std::max(1, ProductionTime(empire_id, location_id)); }
 
 int ShipDesign::ProductionTime(int empire_id, int location_id) const {
-    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION")) {
+    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION"))
         return 1;
-    } else {
-        int time_accumulator = 1;
-        if (const HullType* hull = GetHullType(m_hull))
-            time_accumulator = std::max(time_accumulator, hull->ProductionTime(empire_id, location_id));
-        for (const std::string& part_name : m_parts)
-            if (const PartType* part = GetPartType(part_name))
-                time_accumulator = std::max(time_accumulator, part->ProductionTime(empire_id, location_id));
-        return std::max(1, time_accumulator);
-    }
+
+    int time_accumulator = 1;
+    if (const HullType* hull = GetHullType(m_hull))
+        time_accumulator = std::max(time_accumulator, hull->ProductionTime(empire_id, location_id));
+    for (const std::string& part_name : m_parts)
+        if (const PartType* part = GetPartType(part_name))
+            time_accumulator = std::max(time_accumulator, part->ProductionTime(empire_id, location_id));
+    return std::max(1, time_accumulator);
 }
 
 bool ShipDesign::CanColonize() const {
@@ -1030,7 +1007,7 @@ std::vector<std::string> ShipDesign::Parts(ShipSlotType slot_type) const {
         ErrorLogger() << "Design hull not found: " << m_hull;
         return retval;
     }
-    const std::vector<HullType::Slot>& slots = hull->Slots();
+    const auto& slots = hull->Slots();
 
     if (m_parts.empty())
         return retval;
@@ -1046,7 +1023,7 @@ std::vector<std::string> ShipDesign::Parts(ShipSlotType slot_type) const {
 std::vector<std::string> ShipDesign::Weapons() const {
     std::vector<std::string> retval;
     retval.reserve(m_parts.size());
-    for (const std::string& part_name : m_parts) {
+    for (const auto& part_name : m_parts) {
         const PartType* part = GetPartType(part_name);
         if (!part)
             continue;
@@ -1057,6 +1034,13 @@ std::vector<std::string> ShipDesign::Weapons() const {
     return retval;
 }
 
+int ShipDesign::PartCount() const {
+    int count = 0;
+    for (auto& entry : m_num_part_classes)
+         count += entry.second;
+    return count;
+}
+
 bool ShipDesign::ProductionLocation(int empire_id, int location_id) const {
     Empire* empire = GetEmpire(empire_id);
     if (!empire) {
@@ -1065,7 +1049,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id) const {
     }
 
     // must own the production location...
-    auto location = GetUniverseObject(location_id);
+    auto location = Objects().get(location_id);
     if (!location) {
         WarnLogger() << "ShipDesign::ProductionLocation unable to get location object with id " << location_id;
         return false;
@@ -1101,7 +1085,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id) const {
         return false;
     }
     // evaluate using location as the source, as it should be an object owned by this empire.
-    ScriptingContext location_as_source_context(location);
+    ScriptingContext location_as_source_context(location, location);
     if (!hull->Location()->Eval(location_as_source_context, location))
         return false;
 

@@ -1355,6 +1355,9 @@ static unsigned char *stbi__convert_format(unsigned char *data, int img_n, int r
       unsigned char *src  = data + j * x * img_n   ;
       unsigned char *dest = good + j * x * req_comp;
 
+      #pragma GCC diagnostic push
+      #pragma GCC diagnostic ignored "-Wmisleading-indentation"
+
       #define COMBO(a,b)  ((a)*8+(b))
       #define CASE(a,b)   case COMBO(a,b): for(i=x-1; i >= 0; --i, src += a, dest += b)
       // convert source image with img_n components to one with req_comp components;
@@ -1375,6 +1378,8 @@ static unsigned char *stbi__convert_format(unsigned char *data, int img_n, int r
          default: STBI_ASSERT(0);
       }
       #undef CASE
+
+      #pragma GCC diagnostic pop
    }
 
    STBI_FREE(data);
@@ -4041,6 +4046,9 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
          prior += 1;
       }
 
+      #pragma GCC diagnostic push
+      #pragma GCC diagnostic ignored "-Wmisleading-indentation"
+
       // this is a little gross, so that we don't switch per-pixel or per-component
       if (depth < 8 || img_n == out_n) {
          int nk = (width - 1)*img_n;
@@ -4076,6 +4084,8 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
          }
          #undef CASE
       }
+
+      #pragma GCC diagnostic pop
    }
 
    // we make a separate pass to expand bits to pixels; for performance,

@@ -41,9 +41,10 @@
 # else
 #  define GG_SDL_API __declspec(dllimport)
 # endif
-#else
-# define GG_SDL_API
 #endif
+# ifdef __GNUC__
+#  define GG_SDL_API __attribute__((__visibility__("default")))
+# endif
 
 namespace GG {
 
@@ -128,7 +129,6 @@ public:
     //@}
 
     static SDLGUI*  GetGUI();                             ///< allows any code to access the gui framework by calling SDLGUI::GetGUI()
-    GG::Key         GGKeyFromSDLKey(const SDL_Keysym& key); ///< gives the GGKey equivalent of key
 
     static  Pt      GetDefaultResolutionStatic(int display_id);
     static int      NumVideoDisplaysStatic();
@@ -191,8 +191,6 @@ private:
     /** Virtual screen for fake fullscreen.  Equals nullptr ifi
         m_fake_mode_change == false. */
     std::unique_ptr<Framebuffer> m_framebuffer;
-
-    std::map<SDL_Keycode, Key>      m_key_map; //< a mapping from sdl keycodes to GiGi keys
 };
 
 } // namespace GG

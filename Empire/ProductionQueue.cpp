@@ -2,11 +2,13 @@
 
 #include "Empire.h"
 #include "../universe/Building.h"
+#include "../universe/Condition.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/ValueRef.h"
 #include "../util/AppInterface.h"
 #include "../util/GameRules.h"
 #include "../util/ScopedTimer.h"
+#include "../util/i18n.h"
 
 #include <boost/range/numeric.hpp>
 #include <boost/range/adaptor/map.hpp>
@@ -313,8 +315,7 @@ namespace {
 }
 
 
-ProductionQueue::ProductionItem::ProductionItem() :
-    build_type(INVALID_BUILD_TYPE)
+ProductionQueue::ProductionItem::ProductionItem()
 {}
 
 ProductionQueue::ProductionItem::ProductionItem(BuildType build_type_) :
@@ -364,12 +365,11 @@ bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id) 
     switch (build_type) {
     case BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
-            auto location_obj = GetUniverseObject(location_id);
-            const Condition::ConditionBase* c = bt->EnqueueLocation();
+            auto location_obj = Objects().get(location_id);
+            const Condition::Condition* c = bt->EnqueueLocation();
             if (!c)
                 return true;
-            ScriptingContext context(location_obj);
-            return c->Eval(context, location_obj);
+            return c->Eval(ScriptingContext(location_obj), location_obj);
         }
         return true;
         break;
@@ -401,7 +401,7 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id) c
     switch (build_type) {
     case BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
-            auto location_obj = GetUniverseObject(location_id);
+            auto location_obj = Objects().get(location_id);
             ScriptingContext context(location_obj);
 
             for (const auto& psc : bt->ProductionSpecialConsumption()) {
@@ -427,7 +427,7 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id) c
     }
     case BT_SHIP: {
         if (const ShipDesign* sd = GetShipDesign(design_id)) {
-            auto location_obj = GetUniverseObject(location_id);
+            auto location_obj = Objects().get(location_id);
             ScriptingContext context(location_obj);
 
             if (const HullType* ht = GetHullType(sd->Hull())) {
@@ -468,7 +468,7 @@ ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id) con
     switch (build_type) {
     case BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
-            auto obj = GetUniverseObject(location_id);
+            auto obj = Objects().get(location_id);
             ScriptingContext context(obj);
 
             for (const auto& pmc : bt->ProductionMeterConsumption()) {
@@ -481,7 +481,7 @@ ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id) con
     }
     case BT_SHIP: {
         if (const ShipDesign* sd = GetShipDesign(design_id)) {
-            auto obj = GetUniverseObject(location_id);
+            auto obj = Objects().get(location_id);
             ScriptingContext context(obj);
 
             if (const HullType* ht = GetHullType(sd->Hull())) {
@@ -878,7 +878,7 @@ void ProductionQueue::Update() {
     }
     DebugLogger() << "ProductionQueue::Update: Projections took "
                   << ((sim_time_end - sim_time_start).total_microseconds()) << " microseconds with "
-                  << empire->ProductionPoints() << " total Production Points";
+                  << empire->ResourceOutput(RE_INDUSTRY) << " industry output";
     ProductionQueueChangedSignal();
 }
 

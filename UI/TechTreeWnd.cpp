@@ -12,10 +12,11 @@
 #include "../util/Logger.h"
 #include "../util/OptionsDB.h"
 #include "../util/Directories.h"
+#include "../util/ScopedTimer.h"
 #include "../universe/Tech.h"
-#include "../universe/Effect.h"
-#include "../universe/ValueRef.h"
+#include "../universe/Effects.h"
 #include "../universe/Enums.h"
+#include "../universe/ValueRef.h"
 #include "../Empire/Empire.h"
 #include "TechTreeLayout.h"
 #include "TechTreeArcs.h"
@@ -28,8 +29,6 @@
 #include <GG/StaticGraphic.h>
 
 #include <algorithm>
-
-#include <boost/timer.hpp>
 
 namespace {
     const std::string RES_PEDIA_WND_NAME = "research.pedia";
@@ -987,17 +986,17 @@ void TechTreeWnd::LayoutPanel::TechPanel::Update() {
             std::set<std::string> specials_affected;
             std::set<std::string> parts_whose_meters_are_affected;
             for (auto& effects_group : tech->Effects()) {
-                for (Effect::EffectBase* effect : effects_group->EffectsList()) {
+                for (Effect::Effect* effect : effects_group->EffectsList()) {
                     if (const Effect::SetMeter* set_meter_effect = dynamic_cast<const Effect::SetMeter*>(effect)) {
                         meters_affected.insert(set_meter_effect->GetMeterType());
 
                     } else if (const Effect::SetShipPartMeter* set_ship_part_meter_effect = dynamic_cast<const Effect::SetShipPartMeter*>(effect)) {
-                        const ValueRef::ValueRefBase<std::string>* part_name = set_ship_part_meter_effect->GetPartName();
+                        const ValueRef::ValueRef<std::string>* part_name = set_ship_part_meter_effect->GetPartName();
                         if (part_name && part_name->ConstantExpr())
                             parts_whose_meters_are_affected.insert(part_name->Eval());
 
                     } else if (const Effect::AddSpecial* add_special_effect = dynamic_cast<const Effect::AddSpecial*>(effect)) {
-                        const ValueRef::ValueRefBase<std::string>* special_name = add_special_effect->GetSpecialName();
+                        const ValueRef::ValueRef<std::string>* special_name = add_special_effect->GetSpecialName();
                         if (special_name && special_name->ConstantExpr())
                             specials_affected.insert(special_name->Eval());
                     }
@@ -1842,7 +1841,7 @@ void TechTreeWnd::TechListBox::Update(bool populate /* = true */) {
     DebugLogger() << "Tech List Box Updating";
 
     double insertion_elapsed = 0.0;
-    boost::timer insertion_timer;
+    ScopedTimer insertion_timer;
     GG::X row_width = Width() - ClientUI::ScrollWidth() - ClientUI::Pts();
 
     // Try to preserve the first row, only works if a row for the tech is still visible
@@ -1870,7 +1869,7 @@ void TechTreeWnd::TechListBox::Update(bool populate /* = true */) {
             tech_row->Update();
             insertion_timer.restart();
             auto listbox_row_it = Insert(tech_row);
-            insertion_elapsed += insertion_timer.elapsed();
+            insertion_elapsed += insertion_timer.duration();
             if (!first_tech_set && row.first == first_tech_shown) {
                 first_tech_set = true;
                 SetFirstRowShown(listbox_row_it);
@@ -1900,7 +1899,7 @@ void TechTreeWnd::TechListBox::Populate(bool update /* = true*/) {
 
     GG::X row_width = Width() - ClientUI::ScrollWidth() - ClientUI::Pts();
 
-    boost::timer creation_timer;
+    ScopedTimer creation_timer;
 
     // Skip lookup check when starting with empty cache
     bool new_cache = m_tech_row_cache.empty();
@@ -1909,9 +1908,7 @@ void TechTreeWnd::TechListBox::Populate(bool update /* = true*/) {
             m_tech_row_cache.emplace(tech->Name(), GG::Wnd::Create<TechRow>(row_width, tech->Name()));
     }
 
-    auto creation_elapsed = creation_timer.elapsed();
-
-    DebugLogger() << "Tech List Box Populating Done,  Creation time = " << (creation_elapsed * 1000) << "ms";
+    DebugLogger() << "Tech List Box Populating Done,  Creation time = " << creation_timer.DurationString();
 
     if (update)
         Update(false);

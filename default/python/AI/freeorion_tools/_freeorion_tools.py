@@ -1,11 +1,10 @@
 # This Python file uses the following encoding: utf-8
-import StringIO
+from common import six
 import cProfile
 import logging
 import pstats
 import re
 import traceback
-from collections import Mapping
 from functools import wraps
 from logging import debug, error
 
@@ -30,7 +29,7 @@ def get_ai_tag_grade(tag_list, tag_type):
     X is most commonly (but not necessarily) one of [NO, BAD, AVERAGE, GOOD, GREAT, ULTIMATE]
     If no matching tags, returns empty string (which for most types should be considered equivalent to AVERAGE)
     """
-    for tag in [tag for tag in tag_list if tag.count("_") > 0]:
+    for tag in [tag_ for tag_ in tag_list if tag_.count("_") > 0]:
         parts = tag.split("_", 1)
         if parts[1] == tag_type.upper():
             return parts[0]
@@ -83,7 +82,7 @@ def ppstring(foo):
     if isinstance(foo, list):
         return "[" + ",".join(map(ppstring, foo)) + "]"
     elif isinstance(foo, dict):
-        return "{" + ",".join([ppstring(k) + ":" + ppstring(v) for k, v in foo.iteritems()]) + "}"
+        return "{" + ",".join([ppstring(k) + ":" + ppstring(v) for k, v in foo.items()]) + "}"
     elif isinstance(foo, tuple):
         return "(" + ",".join(map(ppstring, foo)) + ")"
     elif isinstance(foo, set) or isinstance(foo, frozenset):
@@ -129,7 +128,7 @@ logging.getLogger().addHandler(console_handler)
 
 def remove_tags(message):
     """Remove tags described in Font.h from message."""
-    expr = '</?(i|u|(rgba ([0-1]\.)?\d+ ([0-1]\.)?\d+ ([0-1]\.)?\d+ ([0-1]\.)?\d+)|rgba|left|center|right|pre)>'
+    expr = r'</?(i|u|(rgba ([0-1]\.)?\d+ ([0-1]\.)?\d+ ([0-1]\.)?\d+ ([0-1]\.)?\d+)|rgba|left|center|right|pre)>'
     return re.sub(expr, '', message)
 
 
@@ -204,7 +203,7 @@ def cache_by_turn(func):
 
 
 def dict_to_tuple(dic):
-    return tuple(dic.iteritems())
+    return tuple(dic.items())
 
 
 def tuple_to_dict(tup):
@@ -226,7 +225,7 @@ def profile(func):
         pr.enable()
         retval = func(*args, **kwargs)
         pr.disable()
-        s = StringIO.StringIO()
+        s = six.StringIO()
         sortby = 'cumulative'
         ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
         ps.print_stats()
@@ -247,7 +246,7 @@ def get_partial_visibility_turn(obj_id):
     return visibility_turns_map.get(fo.visibility.partial, -9999)
 
 
-class ReadOnlyDict(Mapping):
+class ReadOnlyDict(six.moves.collections_abc.Mapping):
     """A dict that offers only read access.
 
      Note that if the values of the ReadOnlyDict are mutable,
@@ -271,7 +270,7 @@ class ReadOnlyDict(Mapping):
 
     def __init__(self, *args, **kwargs):
         self._data = dict(*args, **kwargs)
-        for k, v in self._data.iteritems():
+        for k, v in self._data.items():
             try:
                 hash(v)
             except TypeError:

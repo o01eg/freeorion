@@ -12,8 +12,8 @@
 #include "Planet.h"
 #include "System.h"
 #include "Species.h"
-#include "ValueRef.h"
 #include "Enums.h"
+#include "Condition.h"
 
 #include <limits>
 
@@ -658,9 +658,11 @@ void GenerateStarlanes(int max_jumps_between_systems, int max_starlane_length) {
     std::map<int, std::set<int>> potential_system_lanes;
 
     // get systems
-    auto sys_vec = Objects().FindObjects<System>();
+    auto sys_rng = Objects().all<System>();
+    std::vector<std::shared_ptr<System>> sys_vec;
     std::map<int, std::shared_ptr<System>> sys_map;
-    std::transform(sys_vec.begin(), sys_vec.end(), std::inserter(sys_map, sys_map.end()),
+    std::copy(sys_rng.begin(), sys_rng.end(), std::back_inserter(sys_vec));
+    std::transform(sys_rng.begin(), sys_rng.end(), std::inserter(sys_map, sys_map.end()),
                    [](const std::shared_ptr<System>& p) { return std::make_pair(p->ID(), p); });
 
     // generate lanes
@@ -768,7 +770,7 @@ void GenerateStarlanes(int max_jumps_between_systems, int max_starlane_length) {
     }
 
     // add the starlane to the stars
-    for (auto& sys : Objects().FindObjects<System>()) {
+    for (auto& sys : Objects().all<System>()) {
         const auto& sys_lanes = system_lanes[sys->ID()];
         for (auto& lane_end_id : sys_lanes)
             sys->AddStarlane(lane_end_id);
@@ -782,7 +784,7 @@ void SetActiveMetersToTargetMaxCurrentValues(ObjectMap& object_map) {
     TraceLogger(effects) << "SetActiveMetersToTargetMaxCurrentValues";
     // check for each pair of meter types.  if both exist, set active
     // meter current value equal to target meter current value.
-    for (const auto& object : object_map) {
+    for (const auto& object : object_map.all()) {
         TraceLogger(effects) << "  object: " << object->Name() << " (" << object->ID() << ")";
         for (auto& entry : AssociatedMeterTypes()) {
             if (Meter* meter = object->GetMeter(entry.first)) {
@@ -798,7 +800,7 @@ void SetActiveMetersToTargetMaxCurrentValues(ObjectMap& object_map) {
 }
 
 void SetNativePopulationValues(ObjectMap& object_map) {
-    for (const auto& object : object_map) {
+    for (const auto& object : object_map.all()) {
         Meter* meter = object->GetMeter(METER_POPULATION);
         Meter* targetmax_meter = object->GetMeter(METER_TARGET_POPULATION);
         // only applies to unowned planets
@@ -812,14 +814,12 @@ void SetNativePopulationValues(ObjectMap& object_map) {
 
 bool SetEmpireHomeworld(Empire* empire, int planet_id, std::string species_name) {
     // get home planet and system, check if they exist
-    auto home_planet = GetPlanet(planet_id);
-    std::shared_ptr<System> home_system;
-    if (home_planet)
-        home_system = GetSystem(home_planet->SystemID());
-    if (!home_planet || !home_system) {
-        ErrorLogger() << "SetEmpireHomeworld: couldn't get homeworld or system for empire" << empire->EmpireID();
+    auto home_planet = Objects().get<Planet>(planet_id);
+    if (!home_planet)
         return false;
-    }
+    auto home_system = Objects().get<System>(home_planet->SystemID());
+    if (!home_system)
+        return false;
 
     DebugLogger() << "SetEmpireHomeworld: setting system " << home_system->ID()
                   << " (planet " <<  home_planet->ID() << ") to be home system for empire " << empire->EmpireID();

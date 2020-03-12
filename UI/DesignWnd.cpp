@@ -17,7 +17,7 @@
 #include "../util/Directories.h"
 #include "../Empire/Empire.h"
 #include "../client/human/HumanClientApp.h"
-#include "../universe/Condition.h"
+#include "../universe/Conditions.h"
 #include "../universe/UniverseObject.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/Enums.h"
@@ -28,7 +28,6 @@
 
 #include <boost/cast.hpp>
 #include <boost/function.hpp>
-#include <boost/timer.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -45,6 +44,17 @@
 #include <functional>
 
 FO_COMMON_API extern const int INVALID_DESIGN_ID;
+
+struct Availability {
+    // Declaring an enum inside a struct makes the syntax when using the enum 
+    // with tuples simpler, without polluting the global namespace with 3
+    // generic names.
+    enum Enum {
+        Obsolete,  // A design/part is researched/known by the player has marked it obsolete
+        Available, // A design/part is researched/known and currently available
+        Future     // A design/part is unresearched and hence not available
+    };
+};
 
 namespace {
     const std::string   PART_CONTROL_DROP_TYPE_STRING = "Part Control";
@@ -767,6 +777,7 @@ namespace {
     bool DisplayedShipDesignManager::IsKnown(const int id) const
     { return m_id_to_obsolete_and_loc.count(id); }
 
+
     boost::optional<bool> DisplayedShipDesignManager::IsObsolete(const int id) const {
         // A non boost::none value for a specific design overrides the hull and part values
         auto it_id = m_id_to_obsolete_and_loc.find(id);
@@ -954,7 +965,6 @@ namespace {
     //////////////////////////////////////////////////
     //  AvailabilityManager                         //
     //////////////////////////////////////////////////
-
     /** A class to allow the storage of the state of a GUI availabilty filter
         and the querying of that state WRT a ship design. */
     class AvailabilityManager {
@@ -1299,7 +1309,7 @@ public:
     };
 
     /** \name Structors */ //@{
-    PartsListBox(const AvailabilityManager& availabilities_state);
+    explicit PartsListBox(const AvailabilityManager& availabilities_state);
     //@}
 
     /** \name Accessors */ //@{
@@ -1312,10 +1322,6 @@ public:
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
     void AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds,
                      GG::Flags<GG::ModKey> mod_keys) override;
-
-    PartGroupsType GroupAvailableDisplayableParts(const Empire* empire);
-    void CullSuperfluousParts(std::vector<const PartType* >& this_group,
-                              ShipPartClass pclass, int empire_id, int loc_id);
     void Populate();
 
     void ShowClass(ShipPartClass part_class, bool refresh_list = true);
@@ -1336,9 +1342,13 @@ protected:
                          const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) const override;
 
 private:
+    PartGroupsType GroupAvailableDisplayableParts(const Empire* empire) const;
+    void CullSuperfluousParts(std::vector<const PartType*>& this_group,
+                              ShipPartClass part_class, int empire_id, int loc_id) const;
+
     std::set<ShipPartClass>     m_part_classes_shown;   // which part classes should be shown
-    bool                        m_show_superfluous_parts;
-    int                         m_previous_num_columns;
+    bool                        m_show_superfluous_parts = true;
+    int                         m_previous_num_columns = -1;
     const AvailabilityManager&  m_availabilities_state;
 };
 
@@ -1397,9 +1407,6 @@ void PartsListBox::PartsListBoxRow::ChildrenDraggedAway(const std::vector<GG::Wn
 
 PartsListBox::PartsListBox(const AvailabilityManager& availabilities_state) :
     CUIListBox(),
-    m_part_classes_shown(),
-    m_show_superfluous_parts(true),
-    m_previous_num_columns(-1),
     m_availabilities_state(availabilities_state)
 {
     ManuallyManageColProps();
@@ -1427,11 +1434,12 @@ void PartsListBox::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
     }
 }
 
-/** Accept parts being discarded from the ship under design.*/
 void PartsListBox::AcceptDrops(const GG::Pt& pt,
                                std::vector<std::shared_ptr<GG::Wnd>> wnds,
                                GG::Flags<GG::ModKey> mod_keys)
 {
+    // Accept parts being discarded from the ship under design
+
     // If ctrl is pressed then signal all parts of the same type to be cleared.
     if (!(GG::GUI::GetGUI()->ModKeys() & GG::MOD_KEY_CTRL))
         return;
@@ -1439,16 +1447,17 @@ void PartsListBox::AcceptDrops(const GG::Pt& pt,
     if (wnds.empty())
         return;
 
-    const PartControl* control = boost::polymorphic_downcast<const PartControl*>(wnds.begin()->get());
-    const PartType* part_type = control ? control->Part() : nullptr;
+    auto* control = boost::polymorphic_downcast<const PartControl*>(wnds.begin()->get());
+    auto* part_type = control ? control->Part() : nullptr;
     if (!part_type)
         return;
 
     ClearPartSignal(part_type->Name());
 }
 
-PartGroupsType PartsListBox::GroupAvailableDisplayableParts(const Empire* empire) {
+PartGroupsType PartsListBox::GroupAvailableDisplayableParts(const Empire* empire) const {
     PartGroupsType part_groups;
+
     // loop through all possible parts
     for (const auto& entry : GetPartTypeManager()) {
         const auto& part = entry.second;
@@ -1465,59 +1474,62 @@ PartGroupsType PartsListBox::GroupAvailableDisplayableParts(const Empire* empire
         if (!shown)
             continue;
 
-        for (ShipSlotType slot_type : part->MountableSlotTypes()) {
+        for (ShipSlotType slot_type : part->MountableSlotTypes())
             part_groups[{part_class, slot_type}].push_back(part.get());
-        }
     }
     return part_groups;
 }
 
-// Checks if the Location condition of the check_part totally contains the Location condition of ref_part
-// i,e,, the ref_part condition is met anywhere the check_part condition is
-bool LocationASubsumesLocationB(const Condition::ConditionBase* check_part_loc,
-                                const Condition::ConditionBase* ref_part_loc)
-{
-    //const Condition::ConditionBase* check_part_loc = check_part->Location();
-    //const Condition::ConditionBase* ref_part_loc = ref_part->Location();
-    if (dynamic_cast<const Condition::All*>(ref_part_loc))
-        return true;
-    if (!check_part_loc || !ref_part_loc)
+namespace {
+    // Checks if the Location condition of the check_part totally contains the Location condition of ref_part
+    // i,e,, the ref_part condition is met anywhere the check_part condition is
+    bool LocationASubsumesLocationB(const Condition::Condition* check_part_loc,
+                                    const Condition::Condition* ref_part_loc)
+    {
+        //const Condition::ConditionBase* check_part_loc = check_part->Location();
+        //const Condition::ConditionBase* ref_part_loc = ref_part->Location();
+        if (dynamic_cast<const Condition::All*>(ref_part_loc))
+            return true;
+        if (!check_part_loc || !ref_part_loc)
+            return false;
+        if (*check_part_loc == *ref_part_loc)
+            return true;
+        // could do more involved checking for And conditions & Or, etc,
+        // for now, will simply be conservative
         return false;
-    if (*check_part_loc == *ref_part_loc)
-        return true;
-    // could do more involved checking for And conditions & Or, etc,
-    // for now, will simply be conservative
-    return false;
+    }
+
+    bool PartALocationSubsumesPartB(const PartType* check_part, const PartType* ref_part) {
+        static std::map<std::pair<std::string, std::string>, bool> part_loc_comparison_map;
+
+        auto part_pair = std::make_pair(check_part->Name(), ref_part->Name());
+        auto map_it = part_loc_comparison_map.find(part_pair);
+        if (map_it != part_loc_comparison_map.end())
+            return map_it->second;
+
+        bool result = true;
+        if (check_part->Name() == "SH_MULTISPEC" || ref_part->Name() == "SH_MULTISPEC")
+            result = false;
+
+        auto check_part_loc = check_part->Location();
+        auto ref_part_loc = ref_part->Location();
+        result = result && LocationASubsumesLocationB(check_part_loc, ref_part_loc);
+        part_loc_comparison_map[part_pair] = result;
+        //if (result && check_part_loc && ref_part_loc) {
+        //    DebugLogger() << "Location for partA, " << check_part->Name() << ", subsumes that for partB, " << ref_part->Name();
+        //    DebugLogger() << "   ...PartA Location is " << check_part_loc->Description();
+        //    DebugLogger() << "   ...PartB Location is " << ref_part_loc->Description();
+        //}
+        return result;
+    }
 }
 
-bool PartALocationSubsumesPartB(const PartType* check_part, const PartType* ref_part) {
-    static std::map<std::pair<std::string, std::string>, bool> part_loc_comparison_map;
-
-    auto part_pair = std::make_pair(check_part->Name(), ref_part->Name());
-    auto map_it = part_loc_comparison_map.find(part_pair);
-    if (map_it != part_loc_comparison_map.end())
-        return map_it->second;
-
-    bool result = true;
-    if (check_part->Name() == "SH_MULTISPEC" || ref_part->Name() == "SH_MULTISPEC")
-        result = false;
-
-    auto check_part_loc = check_part->Location();
-    auto ref_part_loc = ref_part->Location();
-    result = result && LocationASubsumesLocationB(check_part_loc, ref_part_loc);
-    part_loc_comparison_map[part_pair] = result;
-    //if (result && check_part_loc && ref_part_loc) {
-    //    DebugLogger() << "Location for partA, " << check_part->Name() << ", subsumes that for partB, " << ref_part->Name();
-    //    DebugLogger() << "   ...PartA Location is " << check_part_loc->Description();
-    //    DebugLogger() << "   ...PartB Location is " << ref_part_loc->Description();
-    //}
-    return result;
-}
-
-void PartsListBox::CullSuperfluousParts(std::vector<const PartType* >& this_group,
-                                        ShipPartClass pclass, int empire_id, int loc_id)
+void PartsListBox::CullSuperfluousParts(std::vector<const PartType*>& this_group,
+                                        ShipPartClass part_class, int empire_id,
+                                        int loc_id) const
 {
-    /// This is not merely a check for obsolescence; see PartsListBox::Populate for more info
+    // This is not merely a check for obsolescence; see PartsListBox::Populate
+    // for more info
     static float min_bargain_ratio = -1.0;
     static float max_cost_ratio = -1.0;
     static float max_time_ratio = -1.0;
@@ -1630,16 +1642,16 @@ void PartsListBox::Populate() {
     // get empire id and location to use for cost and time comparisons
     int loc_id = INVALID_OBJECT_ID;
     if (empire) {
-        auto location = GetUniverseObject(empire->CapitalID());
+        auto location = Objects().get(empire->CapitalID());
         loc_id = location ? location->ID() : INVALID_OBJECT_ID;
     }
 
     // if showing parts for a particular empire, cull redundant parts (if enabled)
     if (empire) {
         for (auto& part_group : part_groups) {
-            ShipPartClass pclass = part_group.first.first;
+            ShipPartClass part_class = part_group.first.first;
             if (!m_show_superfluous_parts)
-                CullSuperfluousParts(part_group.second, pclass, empire_id, loc_id);
+                CullSuperfluousParts(part_group.second, part_class, empire_id, loc_id);
         }
     }
 
@@ -1797,7 +1809,7 @@ private:
     std::shared_ptr<CUIStateButton>                             m_superfluous_parts_button = nullptr;
 
     // Holds the state of the availabilities filter.
-    AvailabilityManager m_availabilities_state;
+    AvailabilityManager                         m_availabilities_state;
     std::tuple<std::shared_ptr<CUIStateButton>,
                std::shared_ptr<CUIStateButton>,
                std::shared_ptr<CUIStateButton>> m_availabilities_buttons;
@@ -1964,9 +1976,9 @@ void DesignWnd::PartPalette::DoLayout() {
          BUTTON_EDGE_PAD, COL_OFFSET, ROW_OFFSET, BUTTON_WIDTH, BUTTON_HEIGHT]
         (GG::Wnd* avail_btn)
         {
-            if (num_non_class_buttons_per_row == 1)
+            if (num_non_class_buttons_per_row == 1) {
                 ++row;
-            else {
+            } else {
                 if (col >= NUM_CLASS_BUTTONS_PER_ROW + num_non_class_buttons_per_row - 1) {
                     col = NUM_CLASS_BUTTONS_PER_ROW - 1;
                     ++row;
@@ -3565,7 +3577,8 @@ public:
     /** \name Mutators */ //@{
     void StartingChildDragDrop(const GG::Wnd* wnd, const GG::Pt& offset) override;
     void CancellingChildDragDrop(const std::vector<const GG::Wnd*>& wnds) override;
-    void AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys) override;
+    void AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds,
+                     GG::Flags<GG::ModKey> mod_keys) override;
     void ChildrenDraggedAway(const std::vector<GG::Wnd*>& wnds, const GG::Wnd* destination) override;
     void DragDropEnter(const GG::Pt& pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
                        GG::Flags<GG::ModKey> mod_keys) override;
@@ -3721,7 +3734,9 @@ void SlotControl::CancellingChildDragDrop(const std::vector<const GG::Wnd*>& wnd
     }
 }
 
-void SlotControl::AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys) {
+void SlotControl::AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds,
+                              GG::Flags<GG::ModKey> mod_keys)
+{
     if (wnds.size() != 1)
         ErrorLogger() << "SlotControl::AcceptDrops given multiple wnds unexpectedly...";
 
@@ -3733,7 +3748,9 @@ void SlotControl::AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::
         SlotContentsAlteredSignal(part_type, (mod_keys & GG::MOD_KEY_CTRL));
 }
 
-void SlotControl::ChildrenDraggedAway(const std::vector<GG::Wnd*>& wnds, const GG::Wnd* destination) {
+void SlotControl::ChildrenDraggedAway(const std::vector<GG::Wnd*>& wnds,
+                                      const GG::Wnd* destination)
+{
     if (wnds.empty())
         return;
     const GG::Wnd* wnd = wnds.front();
@@ -3779,42 +3796,43 @@ void SlotControl::SetPart(const PartType* part_type) {
     // remove existing part control, if any
     DetachChildAndReset(m_part_control);
 
+    if (!part_type)
+        return;
+
     // create new part control for passed in part_type
-    if (part_type) {
-        m_part_control = GG::Wnd::Create<PartControl>(part_type);
-        AttachChild(m_part_control);
-        m_part_control->InstallEventFilter(shared_from_this());
+    m_part_control = GG::Wnd::Create<PartControl>(part_type);
+    AttachChild(m_part_control);
+    m_part_control->InstallEventFilter(shared_from_this());
 
-        // single click shows encyclopedia data
-        m_part_control->ClickedSignal.connect(
-            PartTypeClickedSignal);
+    // single click shows encyclopedia data
+    m_part_control->ClickedSignal.connect(PartTypeClickedSignal);
 
-        // double click clears slot
-        m_part_control->DoubleClickedSignal.connect(
-            [this](const PartType*){ this->SlotContentsAlteredSignal(nullptr, false); });
-        SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
+    // double click clears slot
+    m_part_control->DoubleClickedSignal.connect(
+        [this](const PartType*){ this->SlotContentsAlteredSignal(nullptr, false); });
+    SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
 
-        // set part occupying slot's tool tip to say slot type
-        std::string title_text;
-        if (m_slot_type == SL_EXTERNAL)
-            title_text = UserString("SL_EXTERNAL");
-        else if (m_slot_type == SL_INTERNAL)
-            title_text = UserString("SL_INTERNAL");
-        else if (m_slot_type == SL_CORE)
-            title_text = UserString("SL_CORE");
+    // set part occupying slot's tool tip to say slot type
+    std::string title_text;
+    if (m_slot_type == SL_EXTERNAL)
+        title_text = UserString("SL_EXTERNAL");
+    else if (m_slot_type == SL_INTERNAL)
+        title_text = UserString("SL_INTERNAL");
+    else if (m_slot_type == SL_CORE)
+        title_text = UserString("SL_CORE");
 
-        m_part_control->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
-            ClientUI::PartIcon(part_type->Name()),
-            UserString(part_type->Name()) + " (" + title_text + ")",
-            UserString(part_type->Description())
-        ));
-    }
+    m_part_control->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
+        ClientUI::PartIcon(part_type->Name()),
+        UserString(part_type->Name()) + " (" + title_text + ")",
+        UserString(part_type->Description())
+    ));
 }
 
-/** PartsListBox accepts parts that are being removed from a SlotControl.*/
 void PartsListBox::DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
                                    const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) const
 {
+    // PartsListBox accepts parts that are being removed from a SlotControl
+
     for (DropsAcceptableIter it = first; it != last; ++it)
         it->second = false;
 
@@ -3948,6 +3966,8 @@ public:
     /** Replace an existing design.*/
     void ReplaceDesign();
 
+    void ToggleDescriptionEditor();
+  
     void HighlightSlotType(std::vector<ShipSlotType>& slot_types);   //!< renders slots of the indicated types differently, perhaps to indicate that that those slots can be drop targets for a particular part?
 
     /** Track changes in base type. */
@@ -4015,8 +4035,8 @@ private:
     std::shared_ptr<GG::StaticGraphic>          m_background_image = nullptr;
     std::shared_ptr<GG::Label>                  m_design_name_label = nullptr;
     std::shared_ptr<GG::Edit>                   m_design_name = nullptr;
-    std::shared_ptr<GG::Label>                  m_design_description_label = nullptr;
-    std::shared_ptr<GG::Edit>                   m_design_description = nullptr;
+    std::shared_ptr<GG::StateButton>            m_design_description_toggle = nullptr;
+    std::shared_ptr<GG::MultiEdit>              m_design_description_edit = nullptr;
     std::shared_ptr<GG::Button>                 m_replace_button = nullptr;
     std::shared_ptr<GG::Button>                 m_confirm_button = nullptr;
     std::shared_ptr<GG::Button>                 m_clear_button = nullptr;
@@ -4037,8 +4057,9 @@ void DesignWnd::MainPanel::CompleteConstruction() {
 
     m_design_name_label = GG::Wnd::Create<CUILabel>(UserString("DESIGN_WND_DESIGN_NAME"), GG::FORMAT_RIGHT, GG::INTERACTIVE);
     m_design_name = GG::Wnd::Create<CUIEdit>(UserString("DESIGN_NAME_DEFAULT"));
-    m_design_description_label = GG::Wnd::Create<CUILabel>(UserString("DESIGN_WND_DESIGN_DESCRIPTION"), GG::FORMAT_RIGHT, GG::INTERACTIVE);
-    m_design_description = GG::Wnd::Create<CUIEdit>(UserString("DESIGN_DESCRIPTION_DEFAULT"));
+    m_design_description_toggle = GG::Wnd::Create<CUIStateButton>(UserString("DESIGN_WND_DESIGN_DESCRIPTION"),GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
+    m_design_description_edit = GG::Wnd::Create<CUIMultiEdit>(UserString("DESIGN_DESCRIPTION_DEFAULT"));
+    m_design_description_edit->SetTextFormat(m_design_description_edit->GetTextFormat() | GG::FORMAT_IGNORETAGS);
     m_replace_button = Wnd::Create<CUIButton>(UserString("DESIGN_WND_UPDATE"));
     m_confirm_button = Wnd::Create<CUIButton>(UserString("DESIGN_WND_ADD_FINISHED"));
     m_clear_button = Wnd::Create<CUIButton>(UserString("DESIGN_WND_CLEAR"));
@@ -4048,8 +4069,8 @@ void DesignWnd::MainPanel::CompleteConstruction() {
 
     AttachChild(m_design_name_label);
     AttachChild(m_design_name);
-    AttachChild(m_design_description_label);
-    AttachChild(m_design_description);
+    AttachChild(m_design_description_toggle);
+    AttachChild(m_design_description_edit);
     AttachChild(m_replace_button);
     AttachChild(m_confirm_button);
     AttachChild(m_clear_button);
@@ -4060,6 +4081,7 @@ void DesignWnd::MainPanel::CompleteConstruction() {
         boost::bind(&DesignWnd::MainPanel::DesignNameEditedSlot, this, _1));
     m_replace_button->LeftClickedSignal.connect(DesignReplacedSignal);
     m_confirm_button->LeftClickedSignal.connect(DesignConfirmedSignal);
+    m_design_description_toggle->CheckedSignal.connect(boost::bind(&DesignWnd::MainPanel::ToggleDescriptionEditor,this));
     DesignChangedSignal.connect(boost::bind(&DesignWnd::MainPanel::DesignChanged, this));
     DesignReplacedSignal.connect(boost::bind(&DesignWnd::MainPanel::ReplaceDesign, this));
     DesignConfirmedSignal.connect(boost::bind(&DesignWnd::MainPanel::AddDesign, this));
@@ -4133,9 +4155,9 @@ DesignWnd::MainPanel::ValidatedNameAndDescription() const
 
     // Is the descrition a stringtable index or the same as the saved designs value
     const std::string desc_index =
-        (UserStringExists(m_design_description->Text()) ? m_design_description->Text() :
+        (UserStringExists(m_design_description_edit->Text()) ? m_design_description_edit->Text() :
          ((maybe_saved && (*maybe_saved)->LookupInStringtable()
-           && (m_design_description->Text() == (*maybe_saved)->Description())) ? (*maybe_saved)->Description(false) : ""));
+           && (m_design_description_edit->Text() == (*maybe_saved)->Description())) ? (*maybe_saved)->Description(false) : ""));
 
     // Are both the title and the description string table lookup values
     if (!name_index.empty() && !desc_index.empty())
@@ -4145,7 +4167,7 @@ DesignWnd::MainPanel::ValidatedNameAndDescription() const
 
     return std::make_pair(
         I18nString(false, (IsDesignNameValid()) ? m_design_name->Text() : UserString("DESIGN_NAME_DEFAULT")),
-        I18nString(false, m_design_description->Text()));
+        I18nString(false, m_design_description_edit->Text()));
 }
 
 const DesignWnd::MainPanel::I18nString DesignWnd::MainPanel::ValidatedDesignName() const
@@ -4194,7 +4216,7 @@ void DesignWnd::MainPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
 void DesignWnd::MainPanel::Sanitize() {
     SetHull(nullptr, false);
     m_design_name->SetText(UserString("DESIGN_NAME_DEFAULT"));
-    m_design_description->SetText(UserString("DESIGN_DESCRIPTION_DEFAULT"));
+    m_design_description_edit->SetText(UserString("DESIGN_DESCRIPTION_DEFAULT"));
     // disconnect old empire design signal
     m_empire_designs_changed_signal.disconnect();
 }
@@ -4202,7 +4224,10 @@ void DesignWnd::MainPanel::Sanitize() {
 void DesignWnd::MainPanel::SetPart(const std::string& part_name, unsigned int slot)
 { SetPart(GetPartType(part_name), slot); }
 
-void DesignWnd::MainPanel::SetPart(const PartType* part, unsigned int slot, bool emit_signal /* = false */, bool change_all_similar_parts /*= false*/) {
+void DesignWnd::MainPanel::SetPart(const PartType* part, unsigned int slot,
+                                   bool emit_signal /* = false */,
+                                   bool change_all_similar_parts /*= false*/)
+{
     //DebugLogger() << "DesignWnd::MainPanel::SetPart(" << (part ? part->Name() : "no part") << ", slot " << slot << ")";
     if (slot > m_slots.size()) {
         ErrorLogger() << "DesignWnd::MainPanel::SetPart specified nonexistant slot";
@@ -4266,7 +4291,9 @@ bool DesignWnd::MainPanel::AddPartEmptySlot(const PartType* part, int slot_numbe
     return true;
 }
 
-bool DesignWnd::MainPanel::AddPartWithSwapping(const PartType* part, std::pair<int, int> swap_and_empty_slot) {
+bool DesignWnd::MainPanel::AddPartWithSwapping(const PartType* part,
+                                               std::pair<int, int> swap_and_empty_slot)
+{
     if (!part || swap_and_empty_slot.first < 0 || swap_and_empty_slot.second < 0)
         return false;
     // Move the flexible part to the first open spot
@@ -4420,7 +4447,7 @@ void DesignWnd::MainPanel::SetDesign(const ShipDesign* ship_design) {
     }
 
     m_design_name->SetText(ship_design->Name());
-    m_design_description->SetText(ship_design->Description());
+    m_design_description_edit->SetText(ship_design->Description());
 
     bool suppress_design_changed_signal = true;
     SetHull(ship_design->GetHull(), !suppress_design_changed_signal);
@@ -4451,7 +4478,7 @@ void DesignWnd::MainPanel::SetDesignComponents(const std::string& hull,
 {
     SetDesignComponents(hull, parts);
     m_design_name->SetText(name);
-    m_design_description->SetText(desc);
+    m_design_description_edit->SetText(desc);
 }
 
 void DesignWnd::MainPanel::HighlightSlotType(std::vector<ShipSlotType>& slot_types) {
@@ -4477,7 +4504,7 @@ void DesignWnd::MainPanel::HandleBaseTypeChange(DesignWnd::BaseSelector::BaseSel
     DesignChanged();
 }
 
-void DesignWnd::MainPanel::Populate(){
+void DesignWnd::MainPanel::Populate() {
     for (const auto& slot: m_slots)
         DetachChild(slot);
     m_slots.clear();
@@ -4487,13 +4514,16 @@ void DesignWnd::MainPanel::Populate(){
 
     const std::vector<HullType::Slot>& hull_slots = m_hull->Slots();
 
-    for (std::vector<HullType::Slot>::size_type i = 0; i != hull_slots.size(); ++i) {
+    for (size_t i = 0; i != hull_slots.size(); ++i) {
         const HullType::Slot& slot = hull_slots[i];
         auto slot_control = GG::Wnd::Create<SlotControl>(slot.x, slot.y, slot.type);
         m_slots.push_back(slot_control);
         AttachChild(slot_control);
+
         slot_control->SlotContentsAlteredSignal.connect(
-            boost::bind(static_cast<void (DesignWnd::MainPanel::*)(const PartType*, unsigned int, bool, bool)>(&DesignWnd::MainPanel::SetPart), this, _1, i, true, _2));
+            boost::bind(static_cast<void (DesignWnd::MainPanel::*)(
+                const PartType*, unsigned int, bool, bool)>(&DesignWnd::MainPanel::SetPart),
+                    this, _1, i, true, _2));
         slot_control->PartTypeClickedSignal.connect(
             PartTypeClickedSignal);
     }
@@ -4504,45 +4534,38 @@ void DesignWnd::MainPanel::DoLayout() {
 
     const int PTS = ClientUI::Pts();
     const GG::X PTS_WIDE(PTS / 2);           // guess at how wide per character the font needs
-    const GG::Y BUTTON_HEIGHT(PTS * 2);
-    const GG::X LABEL_WIDTH = PTS_WIDE * 15;
     const int PAD = 6;
-    const int GUESSTIMATE_NUM_CHARS_IN_BUTTON_TEXT = 25;    // rough guesstimate... avoid overly long part class names
-    const GG::X BUTTON_WIDTH = PTS_WIDE*GUESSTIMATE_NUM_CHARS_IN_BUTTON_TEXT;
+	
+	GG::Pt ul,lr,ll,ur,mus;
+	lr = ClientSize() - GG::Pt(GG::X(PAD), GG::Y(PAD));
+    m_confirm_button->SizeMove(lr - m_confirm_button->MinUsableSize(), lr);
 
-    GG::X edit_right = ClientWidth();
-    GG::X confirm_right = ClientWidth() - PAD;
+	mus=m_replace_button->MinUsableSize();
+	ul = m_confirm_button->RelativeUpperLeft() - GG::Pt(mus.x+PAD, GG::Y(0));
+    m_replace_button->SizeMove(ul, ul+mus);
 
-    GG::Pt lr = GG::Pt(confirm_right, BUTTON_HEIGHT) + GG::Pt(GG::X0, GG::Y(PAD));
-    GG::Pt ul = lr - GG::Pt(BUTTON_WIDTH, BUTTON_HEIGHT);
-    m_confirm_button->SizeMove(ul, lr);
-
-    lr = lr - GG::Pt(BUTTON_WIDTH, GG::Y(0))- GG::Pt(GG::X(PAD),GG::Y(0));
-    ul = lr - GG::Pt(BUTTON_WIDTH, BUTTON_HEIGHT);
-    m_replace_button->SizeMove(ul, lr);
-
-    edit_right = ul.x - PAD;
-
-    lr = ClientSize() + GG::Pt(-GG::X(PAD), -GG::Y(PAD));
-    ul = lr - GG::Pt(BUTTON_WIDTH, BUTTON_HEIGHT);
-    m_clear_button->SizeMove(ul, lr);
+	ll= GG::Pt(GG::X(PAD), ClientHeight() - PAD);
+	mus=m_clear_button->MinUsableSize();
+	ul = ll-GG::Pt(GG::X0, mus.y);
+    m_clear_button->SizeMove(ul, ul+mus);
 
     ul = GG::Pt(GG::X(PAD), GG::Y(PAD));
-    lr = ul + GG::Pt(LABEL_WIDTH, m_design_name->MinUsableSize().y);
+	// adjust based on the (bigger) height of the edit bar 
+	lr= ul+GG::Pt(m_design_name_label->MinUsableSize().x, m_design_name->MinUsableSize().y);
     m_design_name_label->SizeMove(ul, lr);
 
-    ul.x += lr.x;
-    lr.x = edit_right;
-    m_design_name->SizeMove(ul, lr);
+	ul= GG::Pt(m_design_name_label->RelativeLowerRight().x+PAD, GG::Y(PAD));
+    m_design_name->SizeMove(ul, GG::Pt(GG::X(ClientWidth()-PAD), ul.y+m_design_name->MinUsableSize().y));
 
-    ul.x = GG::X(PAD);
-    ul.y += (m_design_name->Height() + PAD);
-    lr = ul + GG::Pt(LABEL_WIDTH, m_design_name->MinUsableSize().y);
-    m_design_description_label->SizeMove(ul, lr);
+	ul=GG::Pt(GG::X(PAD), GG::Y(m_design_name->RelativeLowerRight().y+PAD));
+	// Apparently calling minuseablesize on the button itself doesn't work
+	lr= ul+GG::Pt(m_design_description_toggle->GetLabel()->MinUsableSize().x+10, m_design_name->MinUsableSize().y);
+    m_design_description_toggle->SizeMove(ul, lr);
 
-    ul.x = lr.x + PAD;
-    lr.x = confirm_right;
-    m_design_description->SizeMove(ul, lr);
+    ul.x = m_design_description_toggle->RelativeLowerRight().x + PAD;
+    m_design_description_edit->SizeMove(ul, GG::Pt(GG::X(ClientWidth()-PAD),ul.y+PTS*4+8));
+	if (m_design_description_toggle->Checked()) { m_design_description_edit->Show() ; }
+	else { m_design_description_edit->Hide(); }
 
     // place background image of hull
     ul.x = GG::X0;
@@ -4965,6 +4988,10 @@ void DesignWnd::MainPanel::ReplaceDesign() {
     DesignChangedSignal();
 }
 
+void DesignWnd::MainPanel::ToggleDescriptionEditor() {
+  if (m_design_description_toggle->Checked()) { m_design_description_edit->Show() ; }
+  else { m_design_description_edit->Hide(); }
+}
 
 //////////////////////////////////////////////////
 // DesignWnd                                    //

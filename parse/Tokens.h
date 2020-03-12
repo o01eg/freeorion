@@ -57,6 +57,7 @@
     (ClockwiseNextPlanetType)                   \
     (Colony)                                    \
     (Colour)                                    \
+    (CombatBout)                                \
     (CombatTargets)                             \
     (Condition)                                 \
     (Construction)                              \
@@ -104,10 +105,15 @@
     (EffectsGroups)                             \
     (Else)                                      \
     (Empire)                                    \
+    (EmpireHasBuildingAvailable)                \
+    (EmpireHasShipDesignAvailable)              \
+    (EmpireHasShipPartAvailable)                \
+    (EmpireHasTechResearched)                   \
     (EmpireMeter)                               \
     (EmpireMeterValue)                          \
     (EmpireObjectVisibility)                    \
     (EmpireShipsDestroyed)                      \
+    (EmpireStockpile)                           \
     (Enabled)                                   \
     (Endpoint)                                  \
     (EnemyOf)                                   \
@@ -258,6 +264,10 @@
     (NextTurnPopGrowth)                         \
     (NextYoungerStarType)                       \
     (NoDefaultCapacityEffect)                   \
+    (NoDefaultFuelEffect)                       \
+    (NoDefaultSpeedEffect)                      \
+    (NoDefaultStealthEffect)                    \
+    (NoDefaultStructureEffect)                  \
     (None)                                      \
     (NoOp)                                      \
     (NoStar)                                    \
@@ -286,7 +296,6 @@
     (Owner)                                     \
     (OwnerHasShipPartAvailable)                 \
     (OwnerHasTech)                              \
-    (OwnerTradeStockpile)                       \
     (Parameters)                                \
     (Part)                                      \
     (PartCapacity)                              \
@@ -302,6 +311,7 @@
     (PartsInShipDesign)                         \
     (PartType)                                  \
     (Passive)                                   \
+    (PeaceWith)                                 \
     (Planet)                                    \
     (Planetbound)                               \
     (PlanetEnvironment)                         \
@@ -423,8 +433,10 @@
 #define TOKEN_SEQ_13                            \
     (Shield)                                    \
     (ShipDesign)                                \
+    (ShipDesignCost)                            \
     (ShipDesignOrdering)                        \
     (ShipDesignsDestroyed)                      \
+    (ShipDesignsInProduction)                   \
     (ShipDesignsLost)                           \
     (ShipDesignsOwned)                          \
     (ShipDesignsProduced)                       \
@@ -541,6 +553,7 @@
     (Unproducible)                              \
     (Unresearchable)                            \
     (UpgradeVisibility)                         \
+    (UsedInDesignID)                            \
     (UserString)                                \
     (UUID)                                      \
     (Value)                                     \

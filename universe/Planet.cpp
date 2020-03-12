@@ -1,21 +1,22 @@
 #include "Planet.h"
 
 #include "Building.h"
+#include "Condition.h"
 #include "Fleet.h"
 #include "Ship.h"
 #include "System.h"
 #include "Predicates.h"
 #include "Species.h"
-#include "Condition.h"
 #include "Universe.h"
-#include "ValueRef.h"
 #include "Enums.h"
+#include "ValueRef.h"
 #include "../util/Logger.h"
 #include "../util/GameRules.h"
 #include "../util/OptionsDB.h"
 #include "../util/Random.h"
 #include "../util/Directories.h"
 #include "../util/SitRepEntry.h"
+#include "../util/i18n.h"
 #include "../Empire/Empire.h"
 #include "../Empire/EmpireManager.h"
 
@@ -435,7 +436,7 @@ std::string Planet::CardinalSuffix() const {
         return retval;
     }
 
-    auto cur_system = GetSystem(SystemID());
+    auto cur_system = Objects().get<System>(SystemID());
     // Early return for no system
     if (!cur_system) {
         ErrorLogger() << "Planet " << Name() << "(" << ID()
@@ -467,7 +468,7 @@ std::string Planet::CardinalSuffix() const {
             continue;
         }
 
-        PlanetType other_planet_type = GetPlanet(sys_orbit)->Type();
+        PlanetType other_planet_type = Objects().get<Planet>(sys_orbit)->Type();
         if (other_planet_type == INVALID_PLANET_TYPE)
             continue;
 
@@ -610,9 +611,11 @@ void Planet::Reset() {
     GetMeter(METER_REBEL_TROOPS)->Reset();
 
     if (m_is_about_to_be_colonized && !OwnedBy(ALL_EMPIRES)) {
-        for (int building_id : m_buildings)
-            if (auto building = GetBuilding(building_id))
-                building->Reset();
+        for (const auto& building : Objects().find<Building>(m_buildings)) {
+            if (!building)
+                continue;
+            building->Reset();
+        }
     }
 
     //m_turn_last_conquered left unchanged
@@ -640,7 +643,7 @@ void Planet::Conquer(int conquerer) {
     Empire::ConquerProductionQueueItemsAtLocation(ID(), conquerer);
 
     // deal with UniverseObjects (eg. buildings) located on this planet
-    for (auto& building : Objects().FindObjects<Building>(m_buildings)) {
+    for (auto& building : Objects().find<Building>(m_buildings)) {
         const BuildingType* type = GetBuildingType(building->BuildingTypeName());
 
         // determine what to do with building of this type...
@@ -653,7 +656,7 @@ void Planet::Conquer(int conquerer) {
             // destroy object
             //DebugLogger() << "Planet::Conquer destroying object: " << building->Name();
             this->RemoveBuilding(building->ID());
-            if (auto system = GetSystem(this->SystemID()))
+            if (auto system = Objects().get<System>(this->SystemID()))
                 system->Remove(building->ID());
             GetUniverse().Destroy(building->ID());
         } else if (cap_result == CR_RETAIN) {
@@ -709,9 +712,11 @@ bool Planet::Colonize(int empire_id, const std::string& species_name, double pop
         Reset();
     } else {
         PopCenter::Reset();
-        for (int building_id : m_buildings)
-            if (auto building = GetBuilding(building_id))
-                building->Reset();
+        for (const auto& building : Objects().find<Building>(m_buildings)) {
+            if (!building)
+                continue;
+            building->Reset();
+        }
         m_is_about_to_be_colonized = false;
         m_is_about_to_be_invaded = false;
         m_is_about_to_be_bombarded = false;
@@ -752,7 +757,7 @@ bool Planet::Colonize(int empire_id, const std::string& species_name, double pop
     SetOwner(empire_id);
 
     // if there are buildings on the planet, set the specified empire as their owner too
-    for (auto& building : Objects().FindObjects<Building>(BuildingIDs()))
+    for (auto& building : Objects().find<Building>(BuildingIDs()))
     { building->SetOwner(empire_id); }
 
     return true;

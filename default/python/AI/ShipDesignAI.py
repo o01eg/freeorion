@@ -42,18 +42,20 @@ global variables:
 # TODO: Implement a better system for the new weapon upgrade functionality:
 #       - _calculate_weapon_strength() may be removed
 #       - Filtering the weapon parts must be updated: current cache does not consider tech upgrades, weapons are ignored
+from __future__ import division
 import copy
 import math
 from collections import Counter, defaultdict
-from logging import debug, info, warn, error
+from logging import debug, error, info, warn
 
 import freeOrionAIInterface as fo
-from aistate_interface import get_aistate
+
 import AIDependencies
 import CombatRatingsAI
 import FleetUtilsAI
 from AIDependencies import INVALID_ID
-from freeorion_tools import UserString, tech_is_complete, get_ai_tag_grade
+from aistate_interface import get_aistate
+from freeorion_tools import UserString, get_ai_tag_grade, tech_is_complete
 from turn_state import state
 
 # Define meta classes for the ship parts  TODO storing as set may not be needed anymore
@@ -314,13 +316,13 @@ class ShipDesignCache(object):
         for partname in parts_to_update:
             part = get_part_type(partname)
             for pid in pids:
-                self.production_cost.setdefault(pid, {})[partname] = part.productionCost(empire_id, pid)
-                self.production_time.setdefault(pid, {})[partname] = part.productionTime(empire_id, pid)
+                self.production_cost.setdefault(pid, {})[partname] = part.productionCost(empire_id, pid, INVALID_ID)
+                self.production_time.setdefault(pid, {})[partname] = part.productionTime(empire_id, pid, INVALID_ID)
         for hullname in hulls_to_update:
             hull = fo.getHullType(hullname)
             for pid in pids:
-                self.production_cost.setdefault(pid, {})[hullname] = hull.productionCost(empire_id, pid)
-                self.production_time.setdefault(pid, {})[hullname] = hull.productionTime(empire_id, pid)
+                self.production_cost.setdefault(pid, {})[hullname] = hull.productionCost(empire_id, pid, INVALID_ID)
+                self.production_time.setdefault(pid, {})[hullname] = hull.productionTime(empire_id, pid, INVALID_ID)
 
     def _build_cache_after_load(self):
         """Build cache after loading or starting a game.
@@ -384,7 +386,7 @@ class ShipDesignCache(object):
                     corrupted.append(designname)
         for corrupted_entry in corrupted:
             del self.design_id_by_name[corrupted_entry]
-            bad_ref = next(iter([_key for _key, _val in self.map_reference_design_name.iteritems()
+            bad_ref = next(iter([_key for _key, _val in self.map_reference_design_name.items()
                                  if _val == corrupted_entry]), None)
             if bad_ref is not None:
                 del self.map_reference_design_name[bad_ref]
@@ -436,7 +438,7 @@ class ShipDesignCache(object):
                                 for slottype in slotlist}
         new_parts = [get_part_type(part) for part in empire.availableShipParts
                      if part not in self.strictly_worse_parts]
-        pid = self.production_cost.keys()[0]  # as only location invariant parts are considered, use arbitrary planet.
+        pid = next(iter(self.production_cost.keys()))  # as only location invariant parts are considered, use arbitrary planet.
         for new_part in new_parts:
             self.strictly_worse_parts[new_part.name] = []
             if new_part.partClass in WEAPONS:
@@ -471,7 +473,7 @@ class ShipDesignCache(object):
         if not self.testhulls:
             debug("Testhull cache not found. This may happen only at first turn after game start or load.")
             for hullname in available_hulls:
-                des = [des for des in testdesign_names_part if des.endswith(hullname)]
+                des = [des_ for des_ in testdesign_names_part if des_.endswith(hullname)]
                 if des:
                     self.testhulls.add(hullname)
             if verbose:
@@ -542,7 +544,7 @@ class ShipDesignCache(object):
                 slotlist = [s for s in get_hulltype(testhull).slots]
                 slot_index = slotlist.index(slot)
                 num_slots = len(slotlist)
-                for part in [part for part in needs_update if slot in part.mountableSlotTypes]:
+                for part in [part_ for part_ in needs_update if slot in part_.mountableSlotTypes]:
                     partlist = num_slots * [""]
                     partlist[slot_index] = part.name
                     testdesign_name = "%s_%s_%s" % (TESTDESIGN_NAME_PART, part.name, testhull)
@@ -654,10 +656,10 @@ class AdditionalSpecifications(object):
             self.max_enemy_weapon_strength = max(enemy_attack_stats.keys())
             n = 0
             d = 0
-            for dmg, count in enemy_attack_stats.iteritems():
+            for dmg, count in enemy_attack_stats.items():
                 d += dmg*count
                 n += count
-            self.avg_enemy_weapon_strength = d/n
+            self.avg_enemy_weapon_strength = d // n  # TODO check if we need floor division here
 
     def convert_to_tuple(self):
         """Create a tuple of this class' attributes (e.g. to use as key in dict).
@@ -744,7 +746,7 @@ class ShipDesigner(object):
         self.partnames = []         # list of partnames (string)
         self.parts = []             # list of actual part objects
         self.design_stats = DesignStats()
-        self.production_cost = 9999
+        self.production_cost = 9999.0
         self.production_time = 1
         self.pid = INVALID_ID               # planetID for checks on production cost if not LocationInvariant.
         self.additional_specifications = AdditionalSpecifications()
@@ -858,17 +860,17 @@ class ShipDesigner(object):
         self.design_stats.fuel = self.hull.fuel
         self.design_stats.speed = self.hull.speed
         self.design_stats.stealth = self.hull.stealth
-        self.production_cost = local_cost_cache.get(self.hull.name, self.hull.productionCost(fo.empireID(), self.pid))
-        self.production_time = local_time_cache.get(self.hull.name, self.hull.productionTime(fo.empireID(), self.pid))
+        self.production_cost = local_cost_cache.get(self.hull.name, self.hull.productionCost(fo.empireID(), self.pid, INVALID_ID))
+        self.production_time = local_time_cache.get(self.hull.name, self.hull.productionTime(fo.empireID(), self.pid, INVALID_ID))
 
         # read out part stats
         shield_counter = cloak_counter = detection_counter = colonization_counter = engine_counter = 0  # to deal with Non-stacking parts
         hangar_part_names = set()
         bay_parts = list()
         for part in self.parts:
-            self.production_cost += local_cost_cache.get(part.name, part.productionCost(fo.empireID(), self.pid))
+            self.production_cost += local_cost_cache.get(part.name, part.productionCost(fo.empireID(), self.pid, INVALID_ID))
             self.production_time = max(self.production_time,
-                                       local_time_cache.get(part.name, part.productionTime(fo.empireID(), self.pid)))
+                                       local_time_cache.get(part.name, part.productionTime(fo.empireID(), self.pid, INVALID_ID)))
             partclass = part.partClass
             capacity = part.capacity if partclass not in WEAPONS else self._calculate_weapon_strength(part)
             if partclass in FUEL:
@@ -1246,8 +1248,14 @@ class ShipDesigner(object):
             for x in partname_dict:
                 debug("  %s: %s" % (x, partname_dict[x]))
 
-        part_dict = {slottype: zip(partname_dict[slottype], map(get_part_type, partname_dict[slottype]))
-                     for slottype in partname_dict}  # {slottype: [(partname, parttype_object)]}
+        part_dict = {
+            slottype: list(
+                zip(
+                    partname_dict[slottype],
+                    (get_part_type(x) for x in partname_dict[slottype])
+                )
+            ) for slottype in partname_dict
+        }  # {slottype: [(partname, parttype_object)]}
 
         for slottype in part_dict:
             part_dict[slottype] = [tup for tup in part_dict[slottype] if tup[1].partClass in self.useful_part_classes]
@@ -1265,7 +1273,7 @@ class ShipDesigner(object):
                     partclass = tup[1].partClass
                     if partclass in check_for_redundance:
                         partclass_dict[partclass].append(tup[1])
-                for shipPartsPerClass in partclass_dict.itervalues():
+                for shipPartsPerClass in partclass_dict.values():
                     for a in shipPartsPerClass:
                         if a.capacity == 0:  # TODO: Modify this if effects of items get hardcoded
                             part_dict[slottype].remove((a.name, a))
@@ -1275,9 +1283,9 @@ class ShipDesigner(object):
                         if len(shipPartsPerClass) == 1:
                             break
                         # cost_a = local_cost_cache[a.name]
-                        cost_a = local_cost_cache.get(a.name, a.productionCost(empire_id, self.pid))
+                        cost_a = local_cost_cache.get(a.name, a.productionCost(empire_id, self.pid, INVALID_ID))
                         for b in shipPartsPerClass:
-                            cost_b = local_cost_cache.get(b.name, b.productionCost(empire_id, self.pid))
+                            cost_b = local_cost_cache.get(b.name, b.productionCost(empire_id, self.pid, INVALID_ID))
                             if (b is not a
                                     and (b.capacity/cost_b - a.capacity/cost_a) > -1e-6
                                     and b.capacity >= a.capacity):
@@ -1363,7 +1371,7 @@ class ShipDesigner(object):
                     break
                 current_filling = total_filling[slot]
                 num_parts = len(current_filling)
-                range_parts = range(num_parts)
+                range_parts = list(range(num_parts))
                 current_parts = []
                 other_parts = []
                 for s in number_of_slots_by_slottype:
@@ -1371,7 +1379,7 @@ class ShipDesigner(object):
                         for j in range_parts:
                             current_parts += current_filling[j] * [parts[s][j]]
                     else:
-                        for j in xrange(len(total_filling[s])):
+                        for j in range(len(total_filling[s])):
                             other_parts += total_filling[s][j] * [parts[s][j]]
                 self.update_parts(other_parts + current_parts)
                 current_rating = self.evaluate()
@@ -1407,7 +1415,7 @@ class ShipDesigner(object):
         slot_filling = {}
         for slot in number_of_slots_by_slottype:
             slot_filling[slot] = []
-            for j in xrange(len(total_filling[slot])):
+            for j in range(len(total_filling[slot])):
                 slot_filling[slot] += total_filling[slot][j] * [parts[slot][j]]
         for slot in self.hull.slots:
             partlist.append(slot_filling[slot].pop())
@@ -1430,7 +1438,7 @@ class ShipDesigner(object):
 
         :return: summed up damage vs shielded enemy
         """
-        total_dmg = 0
+        total_dmg = 0.0
         for dmg, count in self.design_stats.attacks.items():
             total_dmg += max(0, dmg - self.additional_specifications.enemy_shields) * count
         return total_dmg
@@ -1440,7 +1448,7 @@ class ShipDesigner(object):
 
         :return: Total damage of the design (against no shields)
         """
-        total_dmg = 0
+        total_dmg = 0.0
         for dmg, count in self.design_stats.attacks.items():
             total_dmg += dmg * count
         return total_dmg
@@ -1506,14 +1514,6 @@ class ShipDesigner(object):
         else:
             return self.production_cost / FleetUtilsAI.get_fleet_upkeep()  # base cost
 
-    def _shield_factor(self):
-        """Calculate the effective factor by which structure is increased by shields.
-
-        :rtype: float
-        """
-        enemy_dmg = self.additional_specifications.max_enemy_weapon_strength
-        return max(enemy_dmg / max(0.01, enemy_dmg - self.design_stats.shields), 1)
-
     def _effective_fuel(self):
         """Return the number of turns the ship can move without refueling.
 
@@ -1529,14 +1529,6 @@ class ShipDesigner(object):
         """
         return min(self.additional_specifications.expected_turns_till_fight * self.design_stats.organic_growth,
                    self.design_stats.maximum_organic_growth)
-
-    def _remaining_growth(self):
-        """Get growth potential after _expected_organic_growth() took place.
-
-        :return: Remaining growth after _expected_organic_growth()
-        :rtype: float
-        """
-        return self.design_stats.maximum_organic_growth - self._expected_organic_growth()
 
     def _effective_mine_damage(self):
         """Return enemy mine damage corrected by self-repair-rate.
@@ -1644,11 +1636,6 @@ class MilitaryShipDesignerBaseClass(ShipDesigner):
         exponent = get_aistate().character.warship_adjusted_production_cost_exponent()
         return super(MilitaryShipDesignerBaseClass, self)._adjusted_production_cost()**exponent
 
-    def _effective_structure(self):
-        effective_structure = self.design_stats.structure + self._expected_organic_growth() + self._remaining_growth() / 5
-        effective_structure *= self._shield_factor()
-        return effective_structure
-
     def _speed_factor(self):
         return 1 + 0.005*(self.design_stats.speed - 85)
 
@@ -1717,17 +1704,17 @@ class WarShipDesigner(MilitaryShipDesignerBaseClass):
             weapon_part = max(weapons, key=self._calculate_weapon_strength)
             weapon = weapon_part.name
             idxweapon = available_parts.index(weapon)
-            cw = Cache.production_cost[self.pid].get(weapon, weapon_part.productionCost(fo.empireID(), self.pid))
+            cw = Cache.production_cost[self.pid].get(weapon, weapon_part.productionCost(fo.empireID(), self.pid, INVALID_ID))
             if armours:
                 armour_part = max(armours, key=_get_capacity)
                 armour = armour_part.name
                 idxarmour = available_parts.index(armour)
                 a = get_part_type(armour).capacity
-                ca = Cache.production_cost[self.pid].get(armour, armour_part.productionCost(fo.empireID(), self.pid))
+                ca = Cache.production_cost[self.pid].get(armour, armour_part.productionCost(fo.empireID(), self.pid, INVALID_ID))
                 s = num_slots
                 h = self.hull.structure
                 ch = Cache.production_cost[self.pid].get(self.hull.name,
-                                                         self.hull.productionCost(fo.empireID(), self.pid))
+                                                         self.hull.productionCost(fo.empireID(), self.pid, INVALID_ID))
                 if ca == cw:
                     n = (s+h/a)/2
                 else:
@@ -1812,7 +1799,7 @@ class CarrierShipDesigner(MilitaryShipDesignerBaseClass):
         for this_hangar_part in hangar_parts:
             current_available_parts = {}
             forbidden_hangar_parts = {part for part in hangar_parts if part != this_hangar_part}
-            for slot, partlist in available_parts.iteritems():
+            for slot, partlist in available_parts.items():
                 current_available_parts[slot] = [part_ for part_ in partlist if part_ not in forbidden_hangar_parts]
             this_rating, this_partlist = ShipDesigner._filling_algorithm(self, current_available_parts)
             if verbose:
@@ -2167,7 +2154,7 @@ class KrillSpawnerShipDesigner(ShipDesigner):
         structure_factor = (1 + self.design_stats.structure - self._minimum_structure())**0.03  # nice to have but not too important
         fuel_factor = self._effective_fuel()
         speed_factor = 1 + (self.design_stats.speed - self._minimum_speed())**0.1
-        stealth_factor = 1 + (self.design_stats.stealth + self.design_stats.asteroid_stealth / 2)  # TODO: Adjust for enemy detection strength
+        stealth_factor = 1 + (self.design_stats.stealth + self.design_stats.asteroid_stealth // 2)  # TODO: Adjust for enemy detection strength
         detection_factor = self.design_stats.detection**1.5
         return (structure_factor * fuel_factor * speed_factor *
                 stealth_factor * detection_factor / self.production_cost)
@@ -2358,7 +2345,7 @@ def recursive_dict_diff(dict_new, dict_old, dict_diff, diff_level_threshold=0):
     """
     NO_DIFF = 9999
     min_diff_level = NO_DIFF
-    for key, value in dict_new.iteritems():
+    for key, value in dict_new.items():
         if key not in dict_old:
             dict_diff[key] = copy.deepcopy(value)
             min_diff_level = 0

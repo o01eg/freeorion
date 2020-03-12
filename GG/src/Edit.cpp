@@ -292,7 +292,16 @@ CPSize Edit::CharIndexOf(X x) const
 }
 
 X Edit::FirstCharOffset() const
-{ return (!GetLineData().empty() && m_first_char_shown ? GetLineData()[0].char_data[Value(m_first_char_shown - 1)].extent : X0); }
+{
+    const auto& line_data = GetLineData();
+    if (line_data.empty() || m_first_char_shown == CP0)
+        return X0;
+    const auto& char_data = line_data.at(0).char_data;
+    if (char_data.empty())
+        return X0;
+    auto char_idx = std::min(char_data.size() - 1, Value(m_first_char_shown) - 1);
+    return char_data.at(char_idx).extent;
+}
 
 X Edit::ScreenPosOfChar(CPSize idx) const
 {
@@ -644,12 +653,6 @@ void GG::GetTranslatedCodePoint(Key key, std::uint32_t key_code_point, Flags<Mod
         } catch (const utf8::invalid_code_point&) {
             translated_code_point.clear();
         }
-    } else {
-        KeypadKeyToPrintable(key, mod_keys);
-        if (GGK_DELETE <= key || !isprint(key))
-            translated_code_point.clear();
-        else
-            translated_code_point = key;
     }
 }
 

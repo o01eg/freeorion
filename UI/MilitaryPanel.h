@@ -20,8 +20,6 @@ public:
     void CompleteConstruction() override;
 
     /** \name Accessors */ //@{
-    bool EventFilter(GG::Wnd* w, const GG::WndEvent& event) override;
-
     int PlanetID() const { return m_planet_id; }
     //@}
 
@@ -48,9 +46,6 @@ private:
 
     /** object id for the Planet that this panel displays */
     int m_planet_id;
-
-    /** returns the Planet object with id m_planet_id */
-    std::shared_ptr<const Planet> GetPlanet() const;
 
     /** Icons for the associated meter type. */
     std::vector<std::pair<MeterType, std::shared_ptr<StatisticIcon>>> m_meter_stats;

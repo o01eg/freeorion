@@ -17,7 +17,7 @@
 #include "../../UI/ServerConnectWnd.h"
 #include "../../UI/Sound.h"
 #include "../../network/Message.h"
-#include "../../network/ClientNetworking.h"
+#include "../ClientNetworking.h"
 #include "../../util/i18n.h"
 #include "../../util/LoggerWithOptionsDB.h"
 #include "../../util/GameRules.h"
@@ -28,6 +28,7 @@
 #include "../../util/SitRepEntry.h"
 #include "../../util/Directories.h"
 #include "../../util/Version.h"
+#include "../../util/ScopedTimer.h"
 #include "../../universe/Planet.h"
 #include "../../universe/Species.h"
 #include "../../universe/Enums.h"
@@ -193,12 +194,12 @@ void HumanClientApp::AddWindowSizeOptionsAfterMainStart(OptionsDB& db) {
     const int max_width_plus_one = HumanClientApp::MaximumPossibleWidth() + 1;
     const int max_height_plus_one = HumanClientApp::MaximumPossibleHeight() + 1;
 
-    db.Add("video.fullscreen.width", UserStringNop("OPTIONS_DB_APP_WIDTH"),            DEFAULT_WIDTH,       RangedValidator<int>(MIN_WIDTH, max_width_plus_one));
-    db.Add("video.fullscreen.height", UserStringNop("OPTIONS_DB_APP_HEIGHT"),          DEFAULT_HEIGHT,      RangedValidator<int>(MIN_HEIGHT, max_height_plus_one));
-    db.Add("video.windowed.width",  UserStringNop("OPTIONS_DB_APP_WIDTH_WINDOWED"),    DEFAULT_WIDTH,       RangedValidator<int>(MIN_WIDTH, max_width_plus_one));
-    db.Add("video.windowed.height", UserStringNop("OPTIONS_DB_APP_HEIGHT_WINDOWED"),   DEFAULT_HEIGHT,      RangedValidator<int>(MIN_HEIGHT, max_height_plus_one));
-    db.Add("video.windowed.left", UserStringNop("OPTIONS_DB_APP_LEFT_WINDOWED"),  DEFAULT_LEFT,        OrValidator<int>( RangedValidator<int>(-max_width_plus_one, max_width_plus_one), DiscreteValidator<int>(DEFAULT_LEFT) ));
-    db.Add("video.windowed.top", UserStringNop("OPTIONS_DB_APP_TOP_WINDOWED"),    DEFAULT_TOP,         RangedValidator<int>(-max_height_plus_one, max_height_plus_one));
+    db.Add("video.fullscreen.width", UserStringNop("OPTIONS_DB_APP_WIDTH"),             DEFAULT_WIDTH,  RangedValidator<int>(MIN_WIDTH, max_width_plus_one));
+    db.Add("video.fullscreen.height", UserStringNop("OPTIONS_DB_APP_HEIGHT"),           DEFAULT_HEIGHT, RangedValidator<int>(MIN_HEIGHT, max_height_plus_one));
+    db.Add("video.windowed.width",  UserStringNop("OPTIONS_DB_APP_WIDTH_WINDOWED"),     DEFAULT_WIDTH,  RangedValidator<int>(MIN_WIDTH, max_width_plus_one));
+    db.Add("video.windowed.height", UserStringNop("OPTIONS_DB_APP_HEIGHT_WINDOWED"),    DEFAULT_HEIGHT, RangedValidator<int>(MIN_HEIGHT, max_height_plus_one));
+    db.Add("video.windowed.left", UserStringNop("OPTIONS_DB_APP_LEFT_WINDOWED"),        DEFAULT_LEFT,   OrValidator<int>( RangedValidator<int>(-max_width_plus_one, max_width_plus_one), DiscreteValidator<int>(DEFAULT_LEFT) ));
+    db.Add("video.windowed.top", UserStringNop("OPTIONS_DB_APP_TOP_WINDOWED"),          DEFAULT_TOP,    RangedValidator<int>(-max_height_plus_one, max_height_plus_one));
 }
 
 std::string HumanClientApp::EncodeServerAddressOption(const std::string& server) {
@@ -244,12 +245,14 @@ HumanClientApp::HumanClientApp(int width, int height, bool calculate_fps, const 
     RegisterLoggerWithOptionsDB("server", true);
     RegisterLoggerWithOptionsDB("combat_log");
     RegisterLoggerWithOptionsDB("combat");
+    RegisterLoggerWithOptionsDB("supply");
     RegisterLoggerWithOptionsDB("effects");
     RegisterLoggerWithOptionsDB("conditions");
     RegisterLoggerWithOptionsDB("FSM");
     RegisterLoggerWithOptionsDB("network");
     RegisterLoggerWithOptionsDB("python");
     RegisterLoggerWithOptionsDB("timer");
+    RegisterLoggerWithOptionsDB("IDallocator");
 
     InfoLogger() << FreeOrionVersionString();
 
@@ -401,12 +404,7 @@ bool HumanClientApp::CanSaveNow() const {
         if (GetEmpireClientType(entry.first) != Networking::CLIENT_TYPE_AI_PLAYER)
             continue;   // only care about AIs
 
-        auto status_it = m_empire_status.find(entry.first);
-
-        if (status_it == this->m_empire_status.end()) {
-            return false;  // missing status for AI; can't assume it's ready
-        }
-        if (status_it->second != Message::WAITING) {
+        if (!entry.second->Ready()) {
             return false;
         }
     }
@@ -1023,16 +1021,15 @@ void HumanClientApp::HandleMessage(Message& msg) {
 }
 
 void HumanClientApp::UpdateCombatLogs(const Message& msg){
-    DebugLogger() << "HCL Update Combat Logs";
+    ScopedTimer timer("HumanClientApp::UpdateCombatLogs");
 
     // Unpack the combat logs from the message
     std::vector<std::pair<int, CombatLog>> logs;
     ExtractDispatchCombatLogsMessageData(msg, logs);
 
     // Update the combat log manager with the completed logs.
-    for (auto it = logs.begin(); it != logs.end(); ++it) {
+    for (auto it = logs.begin(); it != logs.end(); ++it)
         GetCombatLogManager().CompleteLog(it->first, it->second);
-    }
 }
 
 void HumanClientApp::HandleSaveGamePreviews(const Message& msg) {
@@ -1447,8 +1444,9 @@ void HumanClientApp::ResetOrExitApp(bool reset, bool skip_savegame, int exit_cod
     // Only save or allow user to cancel if not exiting due to an error.
     if (!skip_savegame) {
         // Check if this is a multiplayer game and the player has not set status to ready
-        if (was_playing && !m_single_player_game && 
-            m_empire_status[m_empire_id] != Message::WAITING &&
+        if (was_playing && !m_single_player_game &&
+            m_empires.GetEmpire(m_empire_id) != nullptr &&
+            !m_empires.GetEmpire(m_empire_id)->Ready() &&
             GetClientType() == Networking::CLIENT_TYPE_HUMAN_PLAYER)
         {
             std::shared_ptr<GG::Font> font = ClientUI::GetFont();
@@ -1502,7 +1500,7 @@ void HumanClientApp::ResetOrExitApp(bool reset, bool skip_savegame, int exit_cod
         after_server_shutdown_action = std::bind(&HumanClientApp::ExitSDL, this, exit_code);
 
     m_fsm->process_event(StartQuittingGame(m_server_process, std::move(after_server_shutdown_action)));
-    
+
     m_exit_handled = false;
 }
 

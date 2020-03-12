@@ -7,23 +7,12 @@
 class EncyclopediaDetailPanel;
 struct SaveGameUIData;
 
-struct Availability {
-    // Declaring an enum inside a struct makes the syntax when using the enum with tuples simpler,
-    // without polluting the global namespace with 3 generic names.
-
-    enum Enum {Obsolete,  // A design/part is researched/known by the player has marked it obsolete
-               Available, // A design/part is researched/known and currently available
-               Future     // A design/part is unresearched and hence not available
-    };
-};
-
 /** ShipDesignManager tracks information known to the client about ShipDesigns.
   * This includes the order of designs to be shown DesignWnd and the
   * BuildDesignator. */
 class ShipDesignManager {
 public:
     /** Designs provides ordered lists of designs for display in the UI.
-
      Derived classes provide an implementation for the pure virtual
      OrderedIDs(), which provides ship design ids in display order. They may
      also provide additional functionality used by the DesignWnd. */
@@ -60,9 +49,7 @@ public:
 
     /** \name Mutators */ //@{
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
-
     void Render() override;
-
     void Reset();
     void Sanitize();
 

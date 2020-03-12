@@ -1,6 +1,7 @@
 #include "AIClientApp.h"
 
-#include "../../python/AI/AIFramework.h"
+#include "AIFramework.h"
+#include "../ClientNetworking.h"
 #include "../../util/Logger.h"
 #include "../../util/LoggerWithOptionsDB.h"
 #include "../../util/OptionsDB.h"
@@ -9,7 +10,6 @@
 #include "../../util/i18n.h"
 #include "../util/AppInterface.h"
 #include "../../network/Message.h"
-#include "../../network/ClientNetworking.h"
 #include "../util/Random.h"
 #include "../util/Version.h"
 
@@ -46,7 +46,8 @@ namespace {
      */
     template <typename T>
     void AddTraitBypassOption(OptionsDB& db, std::string const & root, std::string ROOT,
-                                 T def, ValidatorBase const & validator) {
+                              T def, ValidatorBase const & validator)
+    {
         std::string option_root = "ai.trait." + root + ".";
         std::string user_string_root = "OPTIONS_DB_AI_CONFIG_TRAIT_"+ROOT;
         db.Add<bool>(option_root + "force.enabled", UserStringNop(user_string_root + "_FORCE"), false);
@@ -129,7 +130,7 @@ int AIClientApp::EffectsProcessingThreads() const
 AIClientApp* AIClientApp::GetApp()
 { return static_cast<AIClientApp*>(s_app); }
 
-const AIBase* AIClientApp::GetAI()
+const PythonAI* AIClientApp::GetAI()
 { return m_AI.get(); }
 
 void AIClientApp::Run() {
@@ -249,7 +250,6 @@ void AIClientApp::HandleMessage(const Message& msg) {
         SaveGameUIData ui_data;         // ignored
         bool state_string_available;    // ignored, as save_state_string is sent even if not set by ExtractMessageData
         std::string save_state_string;
-        m_empire_status.clear();
 
         ExtractGameStartMessageData(msg,                     single_player_game,     m_empire_id,
                                     m_current_turn,          m_empires,              m_universe,
@@ -401,7 +401,11 @@ void AIClientApp::HandleMessage(const Message& msg) {
 
     case Message::CHECKSUM: {
         TraceLogger() << "(AIClientApp) CheckSum.";
-        VerifyCheckSum(msg);
+        bool result = VerifyCheckSum(msg);
+        if (!result) {
+            ErrorLogger() << "Wrong checksum";
+            throw std::runtime_error("AI got incorrect checksum.");
+        }
         break;
     }
 

@@ -1,3 +1,4 @@
+from __future__ import division
 import math
 import random
 from functools import partial
@@ -5,6 +6,7 @@ from logging import warn, debug
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
 from common.print_utils import print_in_columns
+from common import six
 
 import AIDependencies as Dep
 import AIstate
@@ -389,7 +391,7 @@ def init():
     )
 
     for k, v in tech_handlers:
-        if isinstance(k, basestring):
+        if isinstance(k, six.string_types):
             k = (k, )  # wrap single techs to tuple
         for tech in k:
             priority_funcs[tech] = v
@@ -398,7 +400,7 @@ def init():
     # if tech already in priority_funcs do nothing
     # if tech starts with prefix add prefix handler
     # otherwise print warning and add DEFAULT_PRIORITY
-    for tech in [tech for tech in fo.techs() if not tech_is_complete(tech)]:
+    for tech in [tech_ for tech_ in fo.techs() if not tech_is_complete(tech_)]:
         if tech in priority_funcs:
             continue
         for prefix, handler in prefixes:
@@ -481,7 +483,7 @@ def generate_research_orders():
 
     # inherited priorities are modestly attenuated by total time
     timescale_period = 30.0
-    for tech_name, priority in base_priorities.iteritems():
+    for tech_name, priority in base_priorities.items():
         if priority >= 0:
             turns_needed = max(research_reqs[tech_name][REQS_TIME_IDX], math.ceil(float(research_reqs[tech_name][REQS_COST_IDX]) / total_rp))
             time_attenuation = 2**(-max(0.0, turns_needed - 5) / timescale_period)
@@ -492,7 +494,7 @@ def generate_research_orders():
                     on_path_to[prereq] = tech_name
 
     # final priorities are scaled by a combination of relative per-turn cost and relative total cost
-    for tech_name, priority in priorities.iteritems():
+    for tech_name, priority in priorities.items():
         if priority >= 0:
             relative_turn_cost = max(research_reqs[tech_name][REQS_PER_TURN_COST_IDX], 0.1) / total_rp
             relative_total_cost = max(research_reqs[tech_name][REQS_COST_IDX], 0.1) / total_rp
@@ -622,8 +624,7 @@ def generate_classic_research_orders():
     debug("Techs researched and available for use:")
     completed_techs = sorted(list(get_completed_techs()))
     tlist = completed_techs + [" "] * 3
-    tlines = zip(tlist[0::3], tlist[1::3], tlist[2::3])
-    for tline in tlines:
+    for tline in zip(tlist[0::3], tlist[1::3], tlist[2::3]):
         debug("%25s %25s %25s", *tline)
     debug('')
 
@@ -776,11 +777,11 @@ def generate_classic_research_orders():
         if len(aistate.colonisablePlanetIDs) == 0:
             best_colony_site_score = 0
         else:
-            best_colony_site_score = aistate.colonisablePlanetIDs.items()[0][1]
+            best_colony_site_score = next(iter(aistate.colonisablePlanetIDs.items()))[1]
         if len(aistate.colonisableOutpostIDs) == 0:
             best_outpost_site_score = 0
         else:
-            best_outpost_site_score = aistate.colonisableOutpostIDs.items()[0][1]
+            best_outpost_site_score = next(iter(aistate.colonisableOutpostIDs.items()))[1]
         need_improved_scouting = (best_colony_site_score < 150 or best_outpost_site_score < 200)
 
         if need_improved_scouting:

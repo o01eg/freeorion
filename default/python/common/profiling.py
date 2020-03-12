@@ -1,10 +1,10 @@
 from __future__ import print_function
 
+from common import six
 import cProfile
 import os
 import pstats
 import time
-import StringIO
 
 
 def profile(save_path, sort_by='cumulative'):
@@ -31,14 +31,14 @@ def profile(save_path, sort_by='cumulative'):
             end = time.clock()
             pr.disable()
             print("Profile %s tooks %f s, saved to %s" % (function.__name__, end - start, save_path))
-            s = StringIO.StringIO()
+            s = six.StringIO()
             ps = pstats.Stats(pr, stream=s).strip_dirs().sort_stats(sort_by)
             ps.print_stats()
 
             base_path = os.path.dirname(save_path)
             if not os.path.exists(base_path):
                 os.makedirs(base_path)
-            with open(unicode(save_path, 'utf-8'), 'a') as f:
+            with open(six.ensure_text(save_path, 'utf-8'), 'a') as f:
                 f.write(s.getvalue())
                 f.write('\n')
 

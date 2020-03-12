@@ -3,6 +3,7 @@ Hull
     description = "SH_ORGANIC_DESC"
     speed = 90
     fuel = 2
+    NoDefaultFuelEffect
     stealth = 5
     structure = 5
     slots = [
@@ -41,6 +42,7 @@ Hull
             effects = SetMaxStructure value = Value + min(Source.Age*0.2, 5)
 
         [[GOOD_FUEL_EFFICIENCY]]
+        [[ADD_HULL_FUEL_TO_MAX_FUEL_METER]]
         [[LIVING_HULL_BASE_FUEL_REGEN]]
         [[SCAVANGE_FUEL_UNOWNED]]
         [[UNOWNED_GOOD_VISION]]

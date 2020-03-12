@@ -45,8 +45,10 @@ namespace {
                 auto progress_it = research_progress.find(elem.name);
                 float tech_cost = tech->ResearchCost(empire_id);
                 float progress = progress_it == research_progress.end() ? 0.0f : progress_it->second;
-                float RPs_needed = tech->ResearchCost(empire_id) - progress*tech_cost;
-                float RPs_per_turn_limit = tech->PerTurnCost(empire_id);
+                float RPs_needed = tech_cost - progress*tech_cost;
+                int tech_min_turns = std::max(1, tech ? tech->ResearchTime(empire_id) : 1);
+
+                float RPs_per_turn_limit = tech ? (tech_cost / tech_min_turns) : 1.0f;
                 float RPs_to_spend = std::min(RPs_needed, RPs_per_turn_limit);
 
                 if (total_RPs_spent + RPs_to_spend <= RPs - EPSILON) {
@@ -153,8 +155,12 @@ const ResearchQueue::Element& ResearchQueue::operator[](int i) const {
 void ResearchQueue::Update(float RPs, const std::map<std::string, float>& research_progress) {
     // status of all techs for this empire
     const Empire* empire = GetEmpire(m_empire_id);
-    if (!empire)
+    if (!empire) {
+        ErrorLogger() << "ResearchQueue::Update passed null empire.  doing nothing.";
+        m_projects_in_progress = 0;
+        m_total_RPs_spent = 0.0f;
         return;
+    }
 
     std::map<std::string, TechStatus> sim_tech_status_map;
     for (const auto& tech : GetTechManager()) {
@@ -190,7 +196,7 @@ void ResearchQueue::Update(float RPs, const std::map<std::string, float>& resear
     //record original order & progress
     // will take advantage of fact that sets (& map keys) are by default kept in sorted order lowest to highest
     std::map<std::string, float> dp_prog = research_progress;
-    std::map< std::string, int > orig_queue_order;
+    std::map<std::string, int> orig_queue_order;
     std::map<int, float> dpsim_research_progress;
     for (unsigned int i = 0; i < m_queue.size(); ++i) {
         std::string tname = m_queue[i].name;
@@ -202,7 +208,7 @@ void ResearchQueue::Update(float RPs, const std::map<std::string, float>& resear
 
     // initialize simulation_results with -1 for all techs, so that any techs that aren't
     // finished in simulation by turn TOO_MANY_TURNS will be left marked as never to be finished
-    std::vector<int>  dpsimulation_results(m_queue.size(), -1);
+    std::vector<int> dpsimulation_results(m_queue.size(), -1);
 
     const int DP_TURNS = TOO_MANY_TURNS; // track up to this many turns
 
@@ -260,8 +266,11 @@ void ResearchQueue::Update(float RPs, const std::map<std::string, float>& resear
             const Tech* tech = GetTech(tech_name);
             float progress = dpsim_research_progress[cur_tech];
             float tech_cost = tech ? tech->ResearchCost(m_empire_id) : 0.0f;
+            int tech_min_turns = std::max(1, tech ? tech->ResearchTime(m_empire_id) : 1);
+
             float RPs_needed = tech ? tech_cost * (1.0f - std::min(progress, 1.0f)) : 0.0f;
-            float RPs_per_turn_limit = tech ? tech->PerTurnCost(m_empire_id) : 1.0f;
+            float RPs_per_turn_limit = tech ? (tech_cost / tech_min_turns) : 1.0f;
+
             float RPs_to_spend = std::min(std::min(RPs_needed, RPs_per_turn_limit), rp_still_available[dp_turns-1]);
             progress += RPs_to_spend / std::max(EPSILON, tech_cost);
             dpsim_research_progress[cur_tech] = progress;

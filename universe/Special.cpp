@@ -9,6 +9,7 @@
 #include "../util/AppInterface.h"
 #include "../util/CheckSums.h"
 #include "../util/ScopedTimer.h"
+#include "../util/i18n.h"
 
 #include <boost/filesystem/fstream.hpp>
 
@@ -62,11 +63,11 @@ SpecialsManager& GetSpecialsManager() {
 // Special                                     //
 /////////////////////////////////////////////////
 Special::Special(const std::string& name, const std::string& description,
-                 std::unique_ptr<ValueRef::ValueRefBase<double>>&& stealth,
+                 std::unique_ptr<ValueRef::ValueRef<double>>&& stealth,
                  std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
                  double spawn_rate /*= 1.0*/, int spawn_limit /*= 99999*/,
-                 std::unique_ptr<ValueRef::ValueRefBase<double>>&& initial_capaicty /*= nullptr*/,
-                 std::unique_ptr<Condition::ConditionBase>&& location /*= nullptr*/,
+                 std::unique_ptr<ValueRef::ValueRef<double>>&& initial_capaicty /*= nullptr*/,
+                 std::unique_ptr<Condition::Condition>&& location /*= nullptr*/,
                  const std::string& graphic /*= ""*/) :
     m_name(name),
     m_description(description),
@@ -153,13 +154,11 @@ float Special::InitialCapacity(int object_id) const {
     if (!m_initial_capacity)
         return 0.0f;
 
-    auto obj = GetUniverseObject(object_id);
+    auto obj = Objects().get(object_id);
     if (!obj)
         return 0.0f;
 
-    ScriptingContext context(obj);
-
-    return m_initial_capacity->Eval(context);
+    return m_initial_capacity->Eval(ScriptingContext(obj));
 }
 
 unsigned int Special::GetCheckSum() const {

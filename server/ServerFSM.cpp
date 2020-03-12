@@ -2,11 +2,11 @@
 
 #include "SaveLoad.h"
 #include "ServerApp.h"
+#include "ServerNetworking.h"
 #include "../Empire/Empire.h"
 #include "../Empire/EmpireManager.h"
 #include "../universe/System.h"
 #include "../universe/Species.h"
-#include "../network/ServerNetworking.h"
 #include "../network/Message.h"
 #include "../util/Directories.h"
 #include "../util/GameRules.h"
@@ -3061,7 +3061,7 @@ sc::result WaitingForTurnEnd::react(const TurnOrders& msg) {
                client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER)
     {
         // store empire orders and resume waiting for more
-        const Empire* empire = GetEmpire(server.PlayerEmpireID(player_id));
+        Empire* empire = GetEmpire(server.PlayerEmpireID(player_id));
         if (!empire) {
             ErrorLogger(FSM) << "WaitingForTurnEnd::react(TurnOrders&) couldn't get empire for player with id:" << player_id;
             sender->SendMessage(ErrorMessage(UserStringNop("EMPIRE_NOT_FOUND_CANT_HANDLE_ORDERS"), false));
@@ -3097,7 +3097,8 @@ sc::result WaitingForTurnEnd::react(const TurnOrders& msg) {
 
         server.SetEmpireSaveGameData(empire_id, boost::make_unique<PlayerSaveGameData>(sender->PlayerName(), empire_id,
                                      order_set, ui_data, save_state_string,
-                                     client_type, true));
+                                     client_type));
+        empire->SetReady(true);
 
         // notify other player that this empire submitted orders
         for (auto player_it = server.m_networking.established_begin();
@@ -3367,15 +3368,13 @@ void WaitingForTurnEnd::SaveTimedoutHandler(const boost::system::error_code& err
 ProcessingTurn::ProcessingTurn(my_context c) :
     my_base(c),
     m_start(std::chrono::high_resolution_clock::now())
-{
+{ TraceLogger(FSM) << "(ServerFSM) ProcessingTurn"; }
+
+ProcessingTurn::~ProcessingTurn() {
     auto duration = std::chrono::high_resolution_clock::now() - m_start;
     DebugLogger(FSM) << "ProcessingTurn time: " << std::chrono::duration_cast<std::chrono::seconds>(duration).count() << " s";
-
-    TraceLogger(FSM) << "(ServerFSM) ProcessingTurn";
+    TraceLogger(FSM) << "(ServerFSM) ~ProcessingTurn";
 }
-
-ProcessingTurn::~ProcessingTurn()
-{ TraceLogger(FSM) << "(ServerFSM) ~ProcessingTurn"; }
 
 sc::result ProcessingTurn::react(const ProcessTurn& u) {
     TraceLogger(FSM) << "(ServerFSM) ProcessingTurn.ProcessTurn";

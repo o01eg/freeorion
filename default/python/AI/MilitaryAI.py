@@ -1,3 +1,4 @@
+from __future__ import division
 from logging import debug
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
@@ -61,7 +62,7 @@ def get_preferred_max_military_portion_for_single_battle():
     size of the the military grows, this portion is further reduced to promote pursuit of multiple battlefronts in
     parallel as opposed to single battlefronts against heavily defended positions.
 
-    :return: a number in range (0:1] for preferred max portion of miltary to be allocated to a single battle
+    :return: a number in range (0:1] for preferred max portion of military to be allocated to a single battle
     :rtype: float
     """
     # TODO: this is a roughcut first pass, needs plenty of refinement
@@ -645,7 +646,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
 
     mil_fleets_ids = list(FleetUtilsAI.extract_fleet_ids_without_mission_types(all_military_fleet_ids))
     mil_needing_repair_ids, mil_fleets_ids = avail_mil_needing_repair(mil_fleets_ids, split_ships=True)
-    avail_mil_rating = combine_ratings_list(map(CombatRatingsAI.get_fleet_rating, mil_fleets_ids))
+    avail_mil_rating = combine_ratings_list(CombatRatingsAI.get_fleet_rating(x) for x in mil_fleets_ids)
 
     if not mil_fleets_ids:
         if "Main" in thisround:
@@ -704,18 +705,18 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
             capital_sys_id = ranked_systems[-1][-1]
         else:
             try:
-                capital_sys_id = aistate.fleetStatus.items()[0][1]['sysID']
+                capital_sys_id = next(iter(aistate.fleetStatus.items()))[1]['sysID']
             except:
                 pass
 
     num_targets = max(10, PriorityAI.allotted_outpost_targets)
     top_target_planets = ([pid for pid, pscore, trp in AIstate.invasionTargets[:PriorityAI.allotted_invasion_targets()]
                            if pscore > InvasionAI.MIN_INVASION_SCORE] +
-                          [pid for pid, (pscore, spec) in aistate.colonisableOutpostIDs.items()[:num_targets]
+                          [pid for pid, (pscore, spec) in list(aistate.colonisableOutpostIDs.items())[:num_targets]
                            if pscore > InvasionAI.MIN_INVASION_SCORE] +
-                          [pid for pid, (pscore, spec) in aistate.colonisablePlanetIDs.items()[:num_targets]
+                          [pid for pid, (pscore, spec) in list(aistate.colonisablePlanetIDs.items())[:num_targets]
                            if pscore > InvasionAI.MIN_INVASION_SCORE])
-    top_target_planets.extend(aistate.qualifyingTroopBaseTargets.keys())
+    top_target_planets.extend(aistate.qualifyingTroopBaseTargets.keys())  # pylint: disable=dict-keys-not-iterating; # PY_3_MIGRATION
 
     base_col_target_systems = PlanetUtilsAI.get_systems(top_target_planets)
     top_target_systems = []
@@ -974,7 +975,7 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
 @cache_by_turn
 def get_tot_mil_rating():
     """
-    Give an assessment of total miltary rating considering all fleets as if distributed to separate systems.
+    Give an assessment of total military rating considering all fleets as if distributed to separate systems.
 
     :return: a military rating value
     :rtype: float
@@ -986,7 +987,7 @@ def get_tot_mil_rating():
 @cache_by_turn
 def get_concentrated_tot_mil_rating():
     """
-    Give an assessment of total miltary rating as if all fleets were merged into a single mega-fleet.
+    Give an assessment of total military rating as if all fleets were merged into a single mega-fleet.
 
     :return: a military rating value
     :rtype: float

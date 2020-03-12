@@ -3,6 +3,7 @@ Hull
     description = "SH_KRILL_2_BODY_DESC"
     speed = 30
     fuel = 6
+    NoDefaultFuelEffect
     stealth = 15
     structure = 40
     slots = [
@@ -90,6 +91,7 @@ Hull
 
         [[MONSTER_MOVE_ALWAYS]]
         [[INFINITE_FUEL]]
+        [[ADD_HULL_FUEL_TO_MAX_FUEL_METER]]
         [[MODERATE_VISION]]
         [[MONSTER_SHIELD_REGENERATION]]
 

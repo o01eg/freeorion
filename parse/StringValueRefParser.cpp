@@ -4,7 +4,7 @@
 #include "ConditionParserImpl.h"
 #include "EnumValueRefRules.h"
 #include "MovableEnvelope.h"
-#include "../universe/ValueRef.h"
+#include "../universe/ValueRefs.h"
 
 #include <boost/spirit/include/phoenix.hpp>
 
@@ -41,8 +41,10 @@ namespace parse {
             %=   tok.Name_
             |    tok.Species_
             |    tok.BuildingType_
+            |    tok.FieldType_
             |    tok.Focus_
             |    tok.PreferredFocus_
+            |    tok.Hull_
             ;
 
         constant

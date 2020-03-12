@@ -1,12 +1,12 @@
 #include "Field.h"
 
-#include "Condition.h"
-#include "Effect.h"
+#include "Conditions.h"
+#include "Effects.h"
 #include "Enums.h"
 #include "Meter.h"
 #include "Predicates.h"
 #include "Universe.h"
-#include "ValueRef.h"
+#include "ValueRefs.h"
 #include "../util/AppInterface.h"
 #include "../util/OptionsDB.h"
 #include "../util/Logger.h"
@@ -21,7 +21,7 @@
 namespace {
     std::shared_ptr<Effect::EffectsGroup>
     IncreaseMeter(MeterType meter_type, double increase) {
-        typedef std::vector<std::unique_ptr<Effect::EffectBase>> Effects;
+        typedef std::vector<std::unique_ptr<Effect::Effect>> Effects;
         auto scope = boost::make_unique<Condition::Source>();
         std::unique_ptr<Condition::Source> activation = nullptr;
         auto vr =

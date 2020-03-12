@@ -3,6 +3,7 @@ Hull
     description = "SH_RAVENOUS_DESC"
     speed = 100
     fuel = 1
+    NoDefaultFuelEffect
     stealth = 5
     structure = 5
     slots = [
@@ -45,6 +46,7 @@ Hull
             effects = SetMaxStructure value = Value + min(Source.Age*0.5, 20)
 
         [[AVERAGE_FUEL_EFFICIENCY]]
+        [[ADD_HULL_FUEL_TO_MAX_FUEL_METER]]
         [[AVERAGE_BASE_FUEL_REGEN]]
         [[SCAVANGE_FUEL_UNOWNED]]
         [[UNOWNED_GOOD_VISION]]

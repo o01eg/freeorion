@@ -18,8 +18,7 @@
 #include "../Empire/EmpireManager.h"
 #include "../universe/Building.h"
 #include "../universe/ShipDesign.h"
-#include "../universe/Effect.h"
-#include "../universe/Condition.h"
+#include "../universe/Conditions.h"
 #include "../universe/Enums.h"
 #include "../universe/ValueRef.h"
 #include "../client/human/HumanClientApp.h"
@@ -66,7 +65,6 @@ namespace {
         void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
             const GG::Pt old_size = Size();
             GG::Control::SizeMove(ul, lr);
-            //std::cout << "ProductionItemPanel::SizeMove new size: (" << Value(Width()) << ", " << Value(Height()) << ")" << std::endl;
             if (old_size != Size())
                 DoLayout();
         }
@@ -108,7 +106,7 @@ namespace {
             std::string                             cost_text;
             std::string                             time_text;
             std::string                             desc_text;
-            std::vector<Condition::ConditionBase*>  location_conditions;
+            std::vector<Condition::Condition*>  location_conditions;
 
             switch (m_item.build_type) {
             case BT_BUILDING: {
@@ -178,11 +176,11 @@ namespace {
         if (!empire)
             return nullptr;
 
-        if (auto source = GetUniverseObject(empire->CapitalID()))
+        if (auto source = Objects().get(empire->CapitalID()))
             return source;
 
         // not a valid source?!  scan through all objects to find one owned by this empire
-        for (const auto& obj : GetUniverse().Objects()) {
+        for (const auto& obj : GetUniverse().Objects().all()) {
             if (obj->OwnedBy(empire_id))
                 return obj;
         }
@@ -194,47 +192,47 @@ namespace {
     std::string EnqueueAndLocationConditionDescription(const std::string& building_name, int candidate_object_id,
                                                        int empire_id, bool only_failed_conditions)
     {
-        std::vector<Condition::ConditionBase*> enqueue_conditions;
+        std::vector<Condition::Condition*> enqueue_conditions;
         Condition::OwnerHasBuildingTypeAvailable bld_avail_cond(building_name);
         enqueue_conditions.push_back(&bld_avail_cond);
         if (const BuildingType* building_type = GetBuildingType(building_name)) {
-            enqueue_conditions.push_back(const_cast<Condition::ConditionBase*>(building_type->EnqueueLocation()));
-            enqueue_conditions.push_back(const_cast<Condition::ConditionBase*>(building_type->Location()));
+            enqueue_conditions.push_back(const_cast<Condition::Condition*>(building_type->EnqueueLocation()));
+            enqueue_conditions.push_back(const_cast<Condition::Condition*>(building_type->Location()));
         }
         auto source = GetSourceObjectForEmpire(empire_id);
         if (only_failed_conditions)
-            return ConditionFailedDescription(enqueue_conditions, GetUniverseObject(candidate_object_id), source);
+            return ConditionFailedDescription(enqueue_conditions, Objects().get(candidate_object_id), source);
         else
-            return ConditionDescription(enqueue_conditions, GetUniverseObject(candidate_object_id), source);
+            return ConditionDescription(enqueue_conditions, Objects().get(candidate_object_id), source);
     }
 
     std::string LocationConditionDescription(int ship_design_id, int candidate_object_id,
                                              int empire_id, bool only_failed_conditions)
     {
-        std::vector<Condition::ConditionBase*> location_conditions;
+        std::vector<Condition::Condition*> location_conditions;
         auto can_prod_ship_cond = std::make_shared<Condition::CanProduceShips>();
         location_conditions.push_back(can_prod_ship_cond.get());
         auto ship_avail_cond = std::make_shared<Condition::OwnerHasShipDesignAvailable>(ship_design_id);
         location_conditions.push_back(ship_avail_cond.get());
-        std::shared_ptr<Condition::ConditionBase> can_colonize_cond;
+        std::shared_ptr<Condition::Condition> can_colonize_cond;
         if (const ShipDesign* ship_design = GetShipDesign(ship_design_id)) {
             if (ship_design->CanColonize()) {
                 can_colonize_cond.reset(new Condition::CanColonize());
                 location_conditions.push_back(can_colonize_cond.get());
             }
             if (const HullType* hull_type = ship_design->GetHull())
-                location_conditions.push_back(const_cast<Condition::ConditionBase*>(hull_type->Location()));
+                location_conditions.push_back(const_cast<Condition::Condition*>(hull_type->Location()));
             for (const std::string& part_name : ship_design->Parts()) {
                 if (const PartType* part_type = GetPartType(part_name))
-                    location_conditions.push_back(const_cast<Condition::ConditionBase*>(part_type->Location()));
+                    location_conditions.push_back(const_cast<Condition::Condition*>(part_type->Location()));
             }
         }
         auto source = GetSourceObjectForEmpire(empire_id);
 
         if (only_failed_conditions)
-            return ConditionFailedDescription(location_conditions, GetUniverseObject(candidate_object_id), source);
+            return ConditionFailedDescription(location_conditions, Objects().get(candidate_object_id), source);
         else
-            return ConditionDescription(location_conditions, GetUniverseObject(candidate_object_id), source);
+            return ConditionDescription(location_conditions, Objects().get(candidate_object_id), source);
     }
 
     std::shared_ptr<GG::BrowseInfoWnd> ProductionItemRowBrowseWnd(const ProductionQueue::ProductionItem& item,
@@ -261,7 +259,7 @@ namespace {
             const std::string& enqueue_and_location_condition_failed_text =
                 EnqueueAndLocationConditionDescription(item.name, candidate_object_id, empire_id, true);
             if (!enqueue_and_location_condition_failed_text.empty())
-                if (auto location = GetUniverseObject(candidate_object_id)) {
+                if (auto location = Objects().get(candidate_object_id)) {
                     std::string failed_cond_loc = boost::io::str(
                         FlexibleFormat(UserString("PRODUCTION_WND_TOOLTIP_FAILED_COND")) % location->Name());
                     main_text += "\n\n" + failed_cond_loc + ":\n" + enqueue_and_location_condition_failed_text;
@@ -317,7 +315,7 @@ namespace {
             const std::string& location_condition_failed_text =
                 LocationConditionDescription(item.design_id, candidate_object_id, empire_id, true);
             if (!location_condition_failed_text.empty())
-                if (auto location = GetUniverseObject(candidate_object_id)) {
+                if (auto location = Objects().get(candidate_object_id)) {
                     std::string failed_cond_loc = boost::io::str(FlexibleFormat(
                         UserString("PRODUCTION_WND_TOOLTIP_FAILED_COND")) % location->Name());
                     main_text += ("\n\n" + failed_cond_loc + ":\n" + location_condition_failed_text);
@@ -385,8 +383,6 @@ namespace {
 
             SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
             SetBrowseInfoWnd(ProductionItemRowBrowseWnd(m_item, location_id, empire_id));
-
-            //std::cout << "ProductionItemRow(building) height: " << Value(Height()) << std::endl;
         };
 
         void CompleteConstruction() override {
@@ -400,7 +396,6 @@ namespace {
         void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
             const GG::Pt old_size = Size();
             GG::ListBox::Row::SizeMove(ul, lr);
-            //std::cout << "ProductionItemRow::SizeMove size: (" << Value(Width()) << ", " << Value(Height()) << ")" << std::endl;
             if (!empty() && old_size != Size() && m_panel)
                 m_panel->Resize(Size());
         }
@@ -431,10 +426,8 @@ namespace {
         void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
             const GG::Pt old_size = Size();
             CUIListBox::SizeMove(ul, lr);
-            //std::cout << "BuildableItemsListBox::SizeMove size: (" << Value(Width()) << ", " << Value(Height()) << ")" << std::endl;
             if (old_size != Size()) {
                 const GG::Pt row_size = ListRowSize();
-                //std::cout << "BuildableItemsListBox::SizeMove list row size: (" << Value(row_size.x) << ", " << Value(row_size.y) << ")" << std::endl;
                 for (auto& row : *this)
                     row->Resize(row_size);
             }
@@ -626,15 +619,12 @@ void BuildDesignatorWnd::BuildSelector::DoLayout() {
 
 void BuildDesignatorWnd::BuildSelector::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
     GG::Pt old_size = GG::Wnd::Size();
-
     CUIWnd::SizeMove(ul, lr);
-
     if (old_size != GG::Wnd::Size())
         DoLayout();
 }
 
 void BuildDesignatorWnd::BuildSelector::SetBuildLocation(int location_id, bool refresh_list) {
-    //std::cout << "BuildDesignatorWnd::BuildSelector::SetBuildLocation(" << location_id << ")" << std::endl;
     if (m_production_location != location_id) {
         m_production_location = location_id;
         if (refresh_list)
@@ -662,7 +652,7 @@ void BuildDesignatorWnd::BuildSelector::SetEmpireID(int empire_id/* = ALL_EMPIRE
 
 void BuildDesignatorWnd::BuildSelector::Refresh() {
     ScopedTimer timer("BuildDesignatorWnd::BuildSelector::Refresh()");
-    if (auto prod_loc = GetUniverseObject(this->m_production_location))
+    if (auto prod_loc = Objects().get(this->m_production_location))
         this->SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_WND_BUILD_ITEMS_TITLE_LOCATION")) % prod_loc->Name()));
     else
         this->SetName(UserString("PRODUCTION_WND_BUILD_ITEMS_TITLE"));
@@ -801,7 +791,6 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
 }
 
 void BuildDesignatorWnd::BuildSelector::PopulateList() {
-    //std::cout << "BuildDesignatorWnd::BuildSelector::PopulateList start" << std::endl;
     Empire* empire = GetEmpire(m_empire_id);
     if (!empire)
         return;
@@ -1101,7 +1090,7 @@ void BuildDesignatorWnd::CenterOnBuild(int queue_idx, bool open) {
     const ProductionQueue& queue = empire->GetProductionQueue();
     if (0 <= queue_idx && queue_idx < static_cast<int>(queue.size())) {
         int location_id = queue[queue_idx].location;
-        if (auto build_location = objects.Object(location_id)) {
+        if (auto build_location = objects.get(location_id)) {
             // centre map on system of build location
             int system_id = build_location->SystemID();
             auto&& map = ClientUI::GetClientUI()->GetMapWnd();
@@ -1142,8 +1131,6 @@ void BuildDesignatorWnd::SetBuild(int queue_idx) {
 }
 
 void BuildDesignatorWnd::SelectSystem(int system_id) {
-    //std::cout << "BuildDesignatorWnd::SelectSystem(" << system_id << ")" << std::endl;
-
     if (system_id == SidePanel::SystemID()) {
         // don't need to do anything.  already showing the requested system.
         return;
@@ -1157,7 +1144,6 @@ void BuildDesignatorWnd::SelectSystem(int system_id) {
 }
 
 void BuildDesignatorWnd::SelectPlanet(int planet_id) {
-    //std::cout << "BuildDesignatorWnd::SelectPlanet(" << planet_id << ")" << std::endl;
     SidePanel::SelectPlanet(planet_id);
     if (planet_id != INVALID_OBJECT_ID)
         m_system_default_planets[SidePanel::SystemID()] = planet_id;
@@ -1170,7 +1156,6 @@ void BuildDesignatorWnd::Refresh() {
 }
 
 void BuildDesignatorWnd::Update() {
-    //std::cout << "BuildDesignatorWnd::Update()" << std::endl;
     SidePanel::Update();
     m_build_selector->Refresh();
     m_enc_detail_panel->Refresh();
@@ -1197,7 +1182,6 @@ void BuildDesignatorWnd::InitializeWindows() {
 }
 
 void BuildDesignatorWnd::Reset() {
-    //std::cout << "BuildDesignatorWnd::Reset()" << std::endl;
     SelectSystem(INVALID_OBJECT_ID);
     ShowAllTypes(false);            // show all types without populating the list
     HideAvailability(false, false); // hide unavailable items without populating the list
@@ -1207,7 +1191,6 @@ void BuildDesignatorWnd::Reset() {
 }
 
 void BuildDesignatorWnd::Clear() {
-    //std::cout << "BuildDesignatorWnd::Clear()" << std::endl;
     SidePanel::SetSystem(INVALID_OBJECT_ID);
     Reset();
     m_system_default_planets.clear();
@@ -1391,13 +1374,13 @@ void BuildDesignatorWnd::SelectDefaultPlanet() {
     // only checking visible objects for this clients empire (and not the
     // latest known objects) as an empire shouldn't be able to use a planet or
     // system it can't currently see as a production location.
-    auto sys = GetSystem(system_id);
+    auto sys = Objects().get<System>(system_id);
     if (!sys) {
         ErrorLogger() << "BuildDesignatorWnd::SelectDefaultPlanet couldn't get system with id " << system_id;
         return;
     }
 
-    auto planets = Objects().FindObjects<const Planet>(sys->PlanetIDs());
+    auto planets = Objects().find<const Planet>(sys->PlanetIDs());
 
     if (planets.empty()) {
         this->SelectPlanet(INVALID_OBJECT_ID);

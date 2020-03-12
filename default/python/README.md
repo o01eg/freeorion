@@ -22,7 +22,7 @@ game and create the galaxy. You can customise the galaxy generation by
 editing options.py and universe_tables.py, both of which have more information
 in comments over there. The latter, specifically, controls which star types,
 planet types, planet sizes, and also other content get placed.
-
+* py3_migration* - various files required for python3 migrations
 
 # Code style check
 
@@ -38,6 +38,10 @@ see `putty-ignore` section in `tox.ini`. This allows ignoring certain
 warnings only for specified files, like bare excepts, that are hard to fix,
 or special files with tables.
 
+## Migration artifacts
+- `six` library and all its usage should be removed after migration
+- Comment with tag `PY_3_MIGRATION` should be checked and resolved after migration
+- from __future__, python 3 is a future, remove all after migration
 
 ## TODO section
 
@@ -55,4 +59,10 @@ This script should be run from directory where `tox.ini` located
 ```sh
 cd default/python
 flake8
+```
+
+This script should be run from directory where `mypi.ini` located
+```sh
+cd default/python
+mypy --config-file mypy.ini
 ```

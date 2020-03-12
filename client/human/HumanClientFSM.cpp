@@ -6,7 +6,7 @@
 #include "../../universe/Species.h"
 #include "../../universe/Universe.h"
 #include "../../network/Networking.h"
-#include "../../network/ClientNetworking.h"
+#include "../ClientNetworking.h"
 #include "../../util/i18n.h"
 #include "../util/GameRules.h"
 #include "../../util/OptionsDB.h"
@@ -69,7 +69,7 @@
 
 
 class CombatLogManager;
-CombatLogManager&   GetCombatLogManager();
+CombatLogManager& GetCombatLogManager();
 
 namespace {
     DeclareThreadSafeLogger(FSM);
@@ -127,6 +127,7 @@ IntroMenu::IntroMenu(my_context ctx) :
 {
     TraceLogger(FSM) << "(HumanClientFSM) IntroMenu";
     Client().GetClientUI().ShowIntroScreen();
+    GetGameRules().ResetToDefaults();
 }
 
 IntroMenu::~IntroMenu() {
@@ -242,7 +243,9 @@ boost::statechart::result WaitingForSPHostAck::react(const StartQuittingGame& e)
 
 boost::statechart::result WaitingForSPHostAck::react(const CheckSum& e) {
     TraceLogger(FSM) << "(HumanClientFSM) CheckSum.";
-    Client().VerifyCheckSum(e.m_message);
+    bool result = Client().VerifyCheckSum(e.m_message);
+    if (!result)
+        ClientUI::MessageBox(UserString("ERROR_CHECKSUM_MISMATCH"), true);
     return discard_event();
 }
 
@@ -319,7 +322,9 @@ boost::statechart::result WaitingForMPHostAck::react(const StartQuittingGame& e)
 
 boost::statechart::result WaitingForMPHostAck::react(const CheckSum& e) {
     TraceLogger(FSM) << "(HumanClientFSM) CheckSum.";
-    Client().VerifyCheckSum(e.m_message);
+    bool result = Client().VerifyCheckSum(e.m_message);
+    if (!result)
+        ClientUI::MessageBox(UserString("ERROR_CHECKSUM_MISMATCH"), true);
     return discard_event();
 }
 
@@ -565,7 +570,9 @@ boost::statechart::result MPLobby::react(const StartQuittingGame& e) {
 
 boost::statechart::result MPLobby::react(const CheckSum& e) {
     TraceLogger(FSM) << "(HumanClientFSM) CheckSum.";
-    Client().VerifyCheckSum(e.m_message);
+    bool result = Client().VerifyCheckSum(e.m_message);
+    if (!result)
+        ClientUI::MessageBox(UserString("ERROR_CHECKSUM_MISMATCH"), true);
     return discard_event();
 }
 
@@ -693,7 +700,6 @@ boost::statechart::result PlayingGame::react(const PlayerStatus& msg) {
     ExtractPlayerStatusMessageData(msg.m_message, status, about_empire_id);
 
     Client().SetEmpireStatus(about_empire_id, status);
-    Client().GetClientUI().GetPlayerListWnd()->HandleEmpireStatusUpdate(status, about_empire_id);
     // TODO: tell the map wnd or something else as well?
 
     return discard_event();
@@ -821,7 +827,7 @@ boost::statechart::result PlayingGame::react(const TurnTimeout& msg) {
 boost::statechart::result PlayingGame::react(const PlayerInfoMsg& msg) {
     DebugLogger(FSM) << "(PlayerFSM) PlayingGame::PlayerInfoMsg message received: " << msg.m_message.Text();
     ExtractPlayerInfoMessageData(msg.m_message, Client().Players());
-    Client().GetClientUI().GetPlayerListWnd()->Refresh(false);
+    Client().GetClientUI().GetPlayerListWnd()->Refresh();
     return discard_event();
 }
 
@@ -853,7 +859,6 @@ boost::statechart::result WaitingForGameStart::react(const GameStart& msg) {
     bool single_player_game = false;
     int empire_id = ALL_EMPIRES;
     int current_turn = INVALID_GAME_TURN;
-    Client().EmpireStatus().clear();
     Client().Orders().Reset();
 
     ExtractGameStartMessageData(msg.m_message,       single_player_game,             empire_id,
@@ -885,7 +890,7 @@ boost::statechart::result WaitingForGameStart::react(const GameStart& msg) {
     if (is_new_game && Client().Networking().PlayerIsHost(Client().PlayerID()))
         Client().Autosave();
 
-    Client().GetClientUI().GetPlayerListWnd()->Refresh(true);
+    Client().GetClientUI().GetPlayerListWnd()->Refresh();
     Client().GetClientUI().GetMapWnd()->ResetTimeoutClock(0);
 
     return transit<PlayingTurn>();
@@ -945,7 +950,7 @@ boost::statechart::result WaitingForTurnData::react(const TurnUpdate& msg) {
 
     Client().HandleTurnUpdate();
 
-    Client().GetClientUI().GetPlayerListWnd()->Refresh(true);
+    Client().GetClientUI().GetPlayerListWnd()->Refresh();
     Client().GetClientUI().GetMapWnd()->ResetTimeoutClock(0);
 
     return transit<PlayingTurn>();
@@ -978,7 +983,6 @@ PlayingTurn::PlayingTurn(my_context ctx) :
     // TODO: reselect last fleet if stored in save game ui data?
     Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(
         boost::io::str(FlexibleFormat(UserString("TURN_BEGIN")) % CurrentTurn()) + "\n");
-    Client().GetClientUI().GetPlayerListWnd()->HandleEmpireStatusUpdate(Message::PLAYING_TURN, Client().EmpireID());
 
     if (Client().GetApp()->GetClientType() != Networking::CLIENT_TYPE_HUMAN_OBSERVER)
         Client().GetClientUI().GetMapWnd()->EnableOrderIssuing(true);
@@ -1068,23 +1072,14 @@ boost::statechart::result PlayingTurn::react(const PlayerStatus& msg) {
     ExtractPlayerStatusMessageData(msg.m_message, status, about_empire_id);
 
     Client().SetEmpireStatus(about_empire_id, status);
-    Client().GetClientUI().GetPlayerListWnd()->HandleEmpireStatusUpdate(status, about_empire_id);
 
     if (Client().GetApp()->GetClientType() == Networking::CLIENT_TYPE_HUMAN_MODERATOR &&
         Client().GetClientUI().GetMapWnd()->AutoEndTurnEnabled())
     {
         // check status of all empires: are they all done their turns?
         bool all_participants_waiting = true;
-        const auto& empire_status = Client().EmpireStatus();
         for (auto& entry : Client().Empires()) {
-            int empire_id = entry.first;
-
-            auto status_it = empire_status.find(empire_id);
-            if (status_it == empire_status.end()) {
-                all_participants_waiting = false;
-                break;
-            }
-            if (status_it->second != Message::WAITING) {
+            if (!entry.second->Ready()) {
                 all_participants_waiting = false;
                 break;
             }

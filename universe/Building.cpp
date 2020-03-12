@@ -1,7 +1,7 @@
 #include "Building.h"
 
-#include "Effect.h"
 #include "Condition.h"
+#include "Effect.h"
 #include "Planet.h"
 #include "Predicates.h"
 #include "Universe.h"
@@ -15,6 +15,7 @@
 #include "../util/GameRules.h"
 #include "../util/CheckSums.h"
 #include "../util/ScopedTimer.h"
+#include "../util/i18n.h"
 
 #include <boost/filesystem/fstream.hpp>
 
@@ -259,6 +260,7 @@ bool BuildingType::ProductionCostTimeLocationInvariant() const {
 float BuildingType::ProductionCost(int empire_id, int location_id) const {
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_BUILDING_PRODUCTION") || !m_production_cost) {
         return 1.0f;
+
     } else {
         if (m_production_cost && m_production_cost->ConstantExpr())
             return m_production_cost->Eval();
@@ -267,7 +269,7 @@ float BuildingType::ProductionCost(int empire_id, int location_id) const {
 
         const auto arbitrary_large_number = 999999.9f;
 
-        auto location = GetUniverseObject(location_id);
+        auto location = Objects().get(location_id);
         if (!location && !m_production_cost->TargetInvariant())
             return arbitrary_large_number;
 
@@ -295,7 +297,7 @@ int BuildingType::ProductionTime(int empire_id, int location_id) const {
 
         const auto arbitrary_large_number = 9999;
 
-        auto location = GetUniverseObject(location_id);
+        auto location = Objects().get(location_id);
         if (!location && !m_production_time->TargetInvariant())
             return arbitrary_large_number;
 
@@ -313,7 +315,7 @@ bool BuildingType::ProductionLocation(int empire_id, int location_id) const {
     if (!m_location)
         return true;
 
-    auto location = GetUniverseObject(location_id);
+    auto location = Objects().get(location_id);
     if (!location)
         return false;
 
@@ -328,7 +330,7 @@ bool BuildingType::EnqueueLocation(int empire_id, int location_id) const {
     if (!m_enqueue_location)
         return true;
 
-    auto location = GetUniverseObject(location_id);
+    auto location = Objects().get(location_id);
     if (!location)
         return false;
 

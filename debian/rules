@@ -21,7 +21,7 @@ else
 endif
 
 %:
-	dh $@ --max-parallel=$(MAX) --with python2 --with systemd
+	dh $@ --max-parallel=$(MAX) --with python3 --with systemd
 
 override_dh_auto_configure:
 	CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" CPPFLAGS="$(CPPFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
@@ -52,8 +52,8 @@ override_dh_installdeb:
 	dh_apparmor --profile-name=usr.lib.freeorion.freeorionca -pfreeorion
 	dh_installdeb
 
-override_dh_python2:
-	dh_python2 -pfreeorion-data /usr/share/games
+override_dh_python3:
+	dh_python3 -pfreeorion-data /usr/share/games
 
 override_dh_systemd_enable:
 	dh_systemd_enable -pfreeorion --name=freeoriond

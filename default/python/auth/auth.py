@@ -19,7 +19,7 @@ psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 # Constants defined by the C++ game engine
 NO_TEAM_ID = -1
 
-import urllib2
+import urllib
 
 
 class AuthProvider:
@@ -60,10 +60,9 @@ class AuthProvider:
                     for r in curs:
                         known_login = True
                         if r[0] == "xmpp":
-                            req = urllib2.Request("http://localhost:8083/")
+                            req = urllib.request.Request("http://localhost:8083/", "%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp))
                             req.add_header("X-XMPP-To", r[1])
-                            req.add_data("%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp))
-                            urllib2.urlopen(req).read()
+                            urllib.request.urlopen(req).read()
                         else:
                             warn("Unsupported protocol %s for %s" % (r[0], player_name))
         except psycopg2.InterfaceError:

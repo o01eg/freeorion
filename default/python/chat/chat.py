@@ -14,7 +14,7 @@ import psycopg2.extensions
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
-import urllib2
+import urllib
 
 
 class ChatHistoryProvider:
@@ -85,10 +85,9 @@ class ChatHistoryProvider:
                                      (timestamp, player_name, text, 256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a))
                         saved = True
                 try:
-                    req = urllib2.Request("http://localhost:8083/")
+                    req = urllib.request.Request("http://localhost:8083/", "<%s> %s" % (player_name, text))
                     req.add_header("X-XMPP-Muc", "smac")
-                    req.add_data("<%s> %s" % (player_name, text))
-                    urllib2.urlopen(req).read()
+                    urllib.request.urlopen(req).read()
                     info("Chat message was send via XMPP")
                 except:
                     exctype, value = sys.exc_info()[:2]

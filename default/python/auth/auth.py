@@ -16,7 +16,7 @@ import psycopg2.extensions
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
-import urllib2
+import urllib
 
 import smtplib
 import ConfigParser
@@ -64,10 +64,9 @@ class AuthProvider:
                     for r in curs:
                         if r[0] == "xmpp":
                             try:
-                                req = urllib2.Request("http://localhost:8083/")
+                                req = urllib.request.Request("http://localhost:8083/", "%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp))
                                 req.add_header("X-XMPP-To", r[1])
-                                req.add_data("%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp))
-                                urllib2.urlopen(req).read()
+                                urllib.request.urlopen(req).read()
                                 info("OTP was send to %s via XMPP" % player_name)
                             except:
                                 error("Cann't send xmpp message to %s" % player_name)
@@ -179,10 +178,9 @@ class AuthProvider:
                     for r in curs:
                         if r[0] == "xmpp":
                             try:
-                                req = urllib2.Request("http://localhost:8083/")
+                                req = urllib.request.Request("http://localhost:8083/", "%s\r\n%s" % (subject, text))
                                 req.add_header("X-XMPP-To", r[1])
-                                req.add_data("%s\r\n%s" % (subject, text))
-                                urllib2.urlopen(req).read()
+                                urllib.request.urlopen(req).read()
                                 info("Message was send to %s via XMPP" % player_name)
                             except:
                                 error("Cann't send xmpp message to %s" % player_name)

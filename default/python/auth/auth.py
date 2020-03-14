@@ -19,7 +19,7 @@ psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 import urllib.request
 
 import smtplib
-import ConfigParser
+import configparser
 
 # Constants defined by the C++ game engine
 NO_TEAM_ID = -1
@@ -39,7 +39,7 @@ class AuthProvider:
             'g': fo.roleType.galaxySetup
         }
         self.default_roles = [fo.roleType.clientTypePlayer]
-        self.mailconf = ConfigParser.ConfigParser()
+        self.mailconf = configparser.ConfigParser()
         self.mailconf.read(fo.get_user_config_dir() + "/mail.cfg")
         info("Auth initialized")
 

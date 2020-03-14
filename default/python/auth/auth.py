@@ -16,7 +16,7 @@ import psycopg2.extensions
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
-import urllib
+import urllib.request
 
 import smtplib
 import ConfigParser
@@ -64,7 +64,7 @@ class AuthProvider:
                     for r in curs:
                         if r[0] == "xmpp":
                             try:
-                                req = urllib.request.Request("http://localhost:8083/", "%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp))
+                                req = urllib.request.Request("http://localhost:8083/", ("%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp)).encode())
                                 req.add_header("X-XMPP-To", r[1])
                                 urllib.request.urlopen(req).read()
                                 info("OTP was send to %s via XMPP" % player_name)
@@ -139,7 +139,7 @@ class AuthProvider:
                         psd = fo.PlayerSetupData()
                         psd.player_name = r[0]
                         psd.empire_name = r[0]
-                        psd.starting_species = r[1].encode('utf-8')
+                        psd.starting_species = r[1]
                         psd.starting_team = r[2]
                         players.append(psd)
         except psycopg2.InterfaceError:
@@ -178,7 +178,7 @@ class AuthProvider:
                     for r in curs:
                         if r[0] == "xmpp":
                             try:
-                                req = urllib.request.Request("http://localhost:8083/", "%s\r\n%s" % (subject, text))
+                                req = urllib.request.Request("http://localhost:8083/", ("%s\r\n%s" % (subject, text)).encode())
                                 req.add_header("X-XMPP-To", r[1])
                                 urllib.request.urlopen(req).read()
                                 info("Message was send to %s via XMPP" % player_name)

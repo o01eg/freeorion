@@ -55,8 +55,8 @@ class AuthProvider:
         try:
             with self.conn:
                 with self.conn.cursor() as curs:
-                    curs.execute(""" SELECT * FROM auth.check_contact(%s, %s) """,
-                                 (player_name, otp))
+                    curs.execute(""" SELECT * FROM auth.check_contact(%s, %s, %s) """,
+                                 (player_name, otp, fo.get_galaxy_setup_data().gameUID))
                     for r in curs:
                         known_login = True
                         if r[0] == "xmpp":

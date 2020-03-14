@@ -19,7 +19,7 @@ psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 # Constants defined by the C++ game engine
 NO_TEAM_ID = -1
 
-import urllib
+import urllib.request
 
 
 class AuthProvider:
@@ -60,7 +60,7 @@ class AuthProvider:
                     for r in curs:
                         known_login = True
                         if r[0] == "xmpp":
-                            req = urllib.request.Request("http://localhost:8083/", "%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp))
+                            req = urllib.request.Request("http://localhost:8083/", ("%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp)).encode())
                             req.add_header("X-XMPP-To", r[1])
                             urllib.request.urlopen(req).read()
                         else:

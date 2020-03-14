@@ -14,7 +14,7 @@ import psycopg2.extensions
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
-import urllib
+import urllib.request
 
 
 class ChatHistoryProvider:
@@ -58,7 +58,7 @@ class ChatHistoryProvider:
                     ORDER BY ts""")
                 for r in curs:
                     c = fo.GGColor(r[3], r[4], r[5], r[6])
-                    e = (r[0], str(r[1].encode('utf-8')), str(r[2].encode('utf-8')), c)
+                    e = (r[0], r[1], r[2], c)
                     res.append(e)
         return res
 
@@ -85,7 +85,7 @@ class ChatHistoryProvider:
                                      (timestamp, player_name, text, 256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a))
                         saved = True
                 try:
-                    req = urllib.request.Request("http://localhost:8083/", "<%s> %s" % (player_name, text))
+                    req = urllib.request.Request("http://localhost:8083/", ("<%s> %s" % (player_name, text)).encode())
                     req.add_header("X-XMPP-Muc", "smac")
                     urllib.request.urlopen(req).read()
                     info("Chat message was send via XMPP")

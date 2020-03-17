@@ -23,7 +23,7 @@ Build-Depends:
  libtiff-dev,
  libvorbis-dev,
  pkg-config,
- python
+ python3
 Standards-Version: 4.1.0
 Homepage: http://www.freeorion.org
 Vcs-Git: https://anonscm.debian.org/git/pkg-games/freeorion.git
@@ -54,7 +54,7 @@ Depends:
  fonts-dejavu,
  fonts-roboto-unhinted,
  ${misc:Depends},
- ${python:Depends}
+ ${python3:Depends}
 Suggests:
  freeorion
 Description: turn-based space empire and galactic conquest game -- data

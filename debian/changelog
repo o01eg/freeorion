@@ -1,4 +1,11 @@
-freeorion (0.4.9.1+1SNAPSHOT20200310ppa1~bionic) bionic; urgency=medium
+freeorion (0.4.9.1+1SNAPSHOT20200317ppa1~bionic) bionic; urgency=medium
+
+  * Update upstream.
+  * Switch to python3.
+
+ -- O01eg <o01eg@yandex.ru>  Tue, 17 Mar 2020 21:06:22 +0000
+
+freeorion (0.4.9.1+1SNAPSHOT20200310ppa1~eoan) eoan; urgency=medium
 
   * Update upstream.
 

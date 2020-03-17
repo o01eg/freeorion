@@ -782,8 +782,6 @@ void Fleet::SetNextAndPreviousSystems(int next, int prev) {
 }
 
 void Fleet::MovementPhase() {
-    //DebugLogger() << "Fleet::MovementPhase this: " << this->Name() << " id: " << this->ID();
-
     Empire* empire = GetEmpire(Owner());
     std::set<int> supply_unobstructed_systems;
     if (empire)
@@ -803,8 +801,34 @@ void Fleet::MovementPhase() {
     auto initial_system = current_system;
     auto move_path = MovePath();
 
-    // If the move path cannot lead to our destination,
-    // make our route take us as far as it can
+    if (!move_path.empty()) {
+        DebugLogger() << "Fleet::MovementPhase " << this->Name() << " (" << this->ID()
+                      << ")  route:" << [&]() {
+            std::stringstream ss;
+            for (auto sys_id : this->TravelRoute()) {
+                auto sys = Objects().get<System>(sys_id);
+                if (sys)
+                    ss << "  " << sys->Name() << " (" << sys_id << ")";
+                else
+                    ss << "  (???) (" << sys_id << ")";
+            }
+            return ss.str();
+        }()
+                      << "   move path:" << [&]() {
+            std::stringstream ss;
+            for (auto node : move_path) {
+                auto sys = Objects().get<System>(node.object_id);
+                if (sys)
+                    ss << "  " << sys->Name() << " (" << node.object_id << ")";
+                else
+                    ss << "  (-)";
+            }
+            return ss.str();
+        }();
+    }
+
+    // If the move path cannot lead to the destination,
+    // make the route go as far as it can
     if (!move_path.empty() && !m_travel_route.empty() &&
          move_path.back().object_id != m_travel_route.back())
     {
@@ -825,22 +849,27 @@ void Fleet::MovementPhase() {
 
     // is the fleet stuck in a system for a whole turn?
     if (current_system) {
-        ///update m_arrival_starlane if no blockade, if needed
+        // update m_arrival_starlane if no blockade, if needed
         if (supply_unobstructed_systems.count(SystemID()))
-            m_arrival_starlane = SystemID();//allows departure via any starlane
+            m_arrival_starlane = SystemID();// allows departure via any starlane
 
-        // in a system.  if there is no system after the current one in the
-        // path, or the current and next nodes have the same system id, that
-        // is an actual system, or if blockaded from intended path, then won't
-        // be moving this turn.
+        // in a system.  if either:
+        // - there is no system after the current one in the path
+        // - the current and next nodes are the same and are system IDs or actual systems (not empty space)
+        // - this fleet is blockaded from its intended path
+        // then this fleet won't be moving further this turn
         bool stopped = false;
+
         if (next_it == move_path.end()) {
+            // at end of path
             stopped = true;
 
         } else if (it->object_id != INVALID_OBJECT_ID && it->object_id == next_it->object_id) {
+            // arriving at system
             stopped = true;
 
         } else if (m_arrival_starlane != SystemID()) {
+            // blockaded
             int next_sys_id;
             if (next_it->object_id != INVALID_OBJECT_ID) {
                 next_sys_id = next_it->object_id;
@@ -869,7 +898,7 @@ void Fleet::MovementPhase() {
 
 
     // if fleet not moving, nothing more to do.
-    if (move_path.empty() || move_path.size() == 1)
+    if (move_path.empty())
         return;
 
 
@@ -895,35 +924,8 @@ void Fleet::MovementPhase() {
             m_prev_system = system->ID();               // passing a system, so update previous system of this fleet
 
             // reached a system, so remove it from the route
-            if (m_travel_route.front() == system->ID()) {
+            if (m_travel_route.front() == system->ID())
                 m_travel_route.erase(m_travel_route.begin());
-            } else {
-                std::stringstream ss;
-                for (const auto& loc : m_travel_route) {
-                    auto route_system = Objects().get<System>(loc);
-                    ss << (route_system ? route_system->Name() : "invalid id") << "("<< loc << ") ";
-                }
-
-                std::stringstream ss_path_back;
-                try {
-                    const auto path_back_to_expected = GetPathfinder()->ShortestPath(
-                        system->ID(), m_travel_route.front(), ALL_EMPIRES);
-                    for (const auto& loc : path_back_to_expected.first) {
-                        auto route_system = Objects().get<System>(loc);
-                        ss_path_back << (route_system ? route_system->Name() : "invalid id") << "("<< loc << ") ";
-                    }
-                } catch (const std::out_of_range&) {
-                    ErrorLogger() << "Couldn't find route from current location back to expected path";
-                }
-
-                ErrorLogger() << "Fleet::MovementPhase: Encountered an unexpected system on route."
-                              << "  Fleet is " << Name() << "(" << ID() << ")"
-                              << " Expected system is " << system->Name() << "(" << system->ID() << ")"
-                              << " but front of route is " << m_travel_route.front()
-                              << ". Whole route is [" << ss.str() <<"]"
-                              << ". Path back to expected path is [" << ss_path_back.str() << "]";
-                // TODO: Notify the suer with a sitrep?
-            }
 
             bool resupply_here = GetSupplyManager().SystemHasFleetSupply(system->ID(), this->Owner(), ALLOW_ALLIED_SUPPLY);
 

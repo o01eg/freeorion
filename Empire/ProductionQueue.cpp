@@ -12,6 +12,7 @@
 
 #include <boost/range/numeric.hpp>
 #include <boost/range/adaptor/map.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 
 namespace {
@@ -366,7 +367,7 @@ bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id) 
     case BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
             auto location_obj = Objects().get(location_id);
-            const Condition::Condition* c = bt->EnqueueLocation();
+            auto c = bt->EnqueueLocation();
             if (!c)
                 return true;
             return c->Eval(ScriptingContext(location_obj), location_obj);
@@ -461,8 +462,7 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id) c
 }
 
 std::map<MeterType, std::map<int, float>>
-ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id) const
-{
+ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id) const {
     std::map<MeterType, std::map<int, float>> retval;
 
     switch (build_type) {
@@ -515,11 +515,11 @@ ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id) con
 }
 
 std::string ProductionQueue::ProductionItem::Dump() const {
-    std::string retval = "ProductionItem: " + boost::lexical_cast<std::string>(build_type) + " ";
+    std::string retval = "ProductionItem: " + boost::lexical_cast<std::string>(build_type);
     if (!name.empty())
-        retval += "name: " + name;
+        retval += " name: " + name;
     if (design_id != INVALID_DESIGN_ID)
-        retval += "id: " + std::to_string(design_id);
+        retval += " id: " + std::to_string(design_id);
     return retval;
 }
 
@@ -527,10 +527,12 @@ std::string ProductionQueue::ProductionItem::Dump() const {
 //////////////////////////////
 // ProductionQueue::Element //
 //////////////////////////////
-ProductionQueue::Element::Element()
+ProductionQueue::Element::Element() :
+     uuid(boost::uuids::nil_generator()())
 {}
 
-ProductionQueue::Element::Element(ProductionItem item_, int empire_id_, int ordered_,
+ProductionQueue::Element::Element(ProductionItem item_, int empire_id_,
+                                  boost::uuids::uuid uuid_, int ordered_,
                                   int remaining_, int blocksize_, int location_, bool paused_,
                                   bool allowed_imperial_stockpile_use_) :
     item(item_),
@@ -541,10 +543,12 @@ ProductionQueue::Element::Element(ProductionItem item_, int empire_id_, int orde
     location(location_),
     blocksize_memory(blocksize_),
     paused(paused_),
-    allowed_imperial_stockpile_use(allowed_imperial_stockpile_use_)
+    allowed_imperial_stockpile_use(allowed_imperial_stockpile_use_),
+    uuid(uuid_)
 {}
 
-ProductionQueue::Element::Element(BuildType build_type, std::string name, int empire_id_, int ordered_,
+ProductionQueue::Element::Element(BuildType build_type, std::string name, int empire_id_,
+                                  boost::uuids::uuid uuid_, int ordered_,
                                   int remaining_, int blocksize_, int location_, bool paused_,
                                   bool allowed_imperial_stockpile_use_) :
     item(build_type, name),
@@ -555,10 +559,12 @@ ProductionQueue::Element::Element(BuildType build_type, std::string name, int em
     location(location_),
     blocksize_memory(blocksize_),
     paused(paused_),
-    allowed_imperial_stockpile_use(allowed_imperial_stockpile_use_)
+    allowed_imperial_stockpile_use(allowed_imperial_stockpile_use_),
+    uuid(uuid_)
 {}
 
-ProductionQueue::Element::Element(BuildType build_type, int design_id, int empire_id_, int ordered_,
+ProductionQueue::Element::Element(BuildType build_type, int design_id, int empire_id_,
+                                  boost::uuids::uuid uuid_, int ordered_,
                                   int remaining_, int blocksize_, int location_, bool paused_,
                                   bool allowed_imperial_stockpile_use_) :
     item(build_type, design_id),
@@ -569,13 +575,14 @@ ProductionQueue::Element::Element(BuildType build_type, int design_id, int empir
     location(location_),
     blocksize_memory(blocksize_),
     paused(paused_),
-    allowed_imperial_stockpile_use(allowed_imperial_stockpile_use_)
+    allowed_imperial_stockpile_use(allowed_imperial_stockpile_use_),
+    uuid(uuid_)
 {}
 
 std::string ProductionQueue::Element::Dump() const {
     std::string retval = "ProductionQueue::Element (" + item.Dump() + ") (" +
         std::to_string(blocksize) + ") x" + std::to_string(ordered) + " ";
-    retval += " (remaining: " + std::to_string(remaining) + ") ";
+    retval += " (remaining: " + std::to_string(remaining) + ")  uuid: " + boost::uuids::to_string(uuid);
     return retval;
 }
 
@@ -584,9 +591,6 @@ std::string ProductionQueue::Element::Dump() const {
 // ProductionQueue //
 /////////////////////
 ProductionQueue::ProductionQueue(int empire_id) :
-    m_projects_in_progress(0),
-    m_expected_new_stockpile_amount(0),
-    m_expected_project_transfer_to_stockpile(0),
     m_empire_id(empire_id)
 {}
 
@@ -689,6 +693,22 @@ const ProductionQueue::Element& ProductionQueue::operator[](int i) const {
     if (i < 0 || i >= static_cast<int>(m_queue.size()))
         throw std::out_of_range("Tried to access ProductionQueue element out of bounds");
     return m_queue[i];
+}
+
+ProductionQueue::const_iterator ProductionQueue::find(boost::uuids::uuid uuid) const {
+    if (uuid == boost::uuids::nil_generator()())
+        return m_queue.end();
+    for (auto it = m_queue.begin(); it != m_queue.end(); ++it)
+        if (it->uuid == uuid)
+            return it;
+    return m_queue.end();
+}
+
+int ProductionQueue::IndexOfUUID(boost::uuids::uuid uuid) const {
+    auto it = find(uuid);
+    if (it == end())
+        return -1;
+    return std::distance(begin(), it);
 }
 
 void ProductionQueue::Update() {

@@ -14,7 +14,6 @@ Build-Depends:
  libfreetype6-dev,
  libgl1-mesa-dev,
  libglew-dev,
- libglu1-mesa-dev,
  libjpeg-dev,
  libogg-dev,
  libopenal-dev,

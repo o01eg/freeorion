@@ -2,6 +2,7 @@
 
 #include "../util/i18n.h"
 #include "../util/Logger.h"
+#include "../util/AppInterface.h"
 #include "../Empire/EmpireManager.h"
 #include "Meter.h"
 #include "System.h"
@@ -173,7 +174,7 @@ std::string UniverseObject::Dump(unsigned short ntabs) const {
 
     std::stringstream os;
 
-    os << boost::lexical_cast<std::string>(this->ObjectType()) << " "
+    os << this->ObjectType() << " "
        << this->ID() << ": "
        << this->Name();
     if (system) {

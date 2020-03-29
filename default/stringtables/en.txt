@@ -1730,7 +1730,7 @@ OPTIONS_DB_UI_TOOLTIP_LONG_DELAY
 Sets UI tooltip pop-up delay for alternate pop-ups, in ms.
 
 OPTIONS_DB_UI_ENC_SEARCH_ARTICLE
-When searching the pedia, check for matches in article contents.
+When searching the pedia, check for matches in article contents. Search will be slower, but may find more matches.
 
 # Section title for options window logging
 OPTIONS_DB_UI_LOGGER_THRESHOLDS
@@ -2697,6 +2697,9 @@ Really overwrite %1%?
 OPTIONS_TITLE
 Options
 
+OPTIONS_PEDIA_SEARCH_ARTICLE_TEXT
+Search Pedia Article Text
+
 OPTIONS_MULTIPLE_FLEET_WNDS
 Multiple fleet windows
 
@@ -3194,8 +3197,11 @@ Create Persistent Config (Advanced Feature)
 
 OPTIONS_CREATE_PERSISTENT_CONFIG_TOOLTIP_DESC
 '''Saves the current config settings as persistent default settings.
+
 Such settings take priority over any settings in config.xml, but not the command line.
+
 Only stores settings that have been modified from default values.
+
 Any existing persistent config file is overwritten.
 
 Settings may not always be valid across versions.
@@ -3208,6 +3214,25 @@ Successfully (re)created persistent_config.xml
 
 OPTIONS_CREATE_PERSISTENT_CONFIG_FAILURE
 Unable to create persistent_config.xml, check log file for details.
+
+OPTIONS_CREATE_ALL_CONFIG_SUCCESS
+Successfully wrote config.xml
+
+OPTIONS_CREATE_ALL_CONFIG_FAILURE
+Unable to write config.xml, check log file for details.
+
+
+OPTIONS_WRITE_ALL_CONFIG
+Write Complete Config File
+
+OPTIONS_CREATE_ALL_CONFIG_TOOLTIP_TITLE
+Create Full Config (Intermediate Feature)
+
+OPTIONS_CREATE_ALL_CONFIG_TOOLTIP_DESC
+'''Saves the current config settings in config.xml including all settings, even if not modified from their defaults.
+
+The existing options.xml is overwitten, but may be regenerated (with just non-default options) if another option is changed, including by repositioning some game windows or within the options window.'''
+
 
 
 ##
@@ -5780,7 +5805,11 @@ Troops
 METER_TROOPS_VALUE_DESC
 '''The term Troops combines all kinds of military forces capable of operating on a planet's surface.
 
-The Troop meter on a planet represents the power of the defending ground forces. The invading force must send a more powerful force (i.e. a higher cumulative number) to conquer a planet. Ships must be built with special parts for carrying troops, and such troops cannot invade if the defending planet has active [[metertype METER_SHIELD]].'''
+The Troop meter on a planet represents the power of the defending ground forces. The invading force must send a more powerful force (i.e. a higher cumulative number) to conquer a planet.
+
+Ships must be built with [[encyclopedia PC_TROOPS]] parts for carrying troops to use for invasion.
+
+Ships cannot invade a planets if it has active [[metertype METER_SHIELD]].'''
 
 METER_REBEL_TROOPS_VALUE_LABEL
 Rebel Troops
@@ -9354,7 +9383,10 @@ PC_TROOPS_DESC
 '''Troop parts increase the [[metertype METER_TROOPS]] on-board, which can be used to invade enemy planets.
 
 To successfully invade a planet, the total number of [[metertype METER_TROOPS]] from all invading ships must exceed the total defending (ties are awarded to the defender).
-An invading ship is destroyed as part of the landing operation (any additional parts on the ship are lost as well).'''
+
+When invading a planet, the troop ships selected in the fleet window will be used for the invasion. If no troop ships are selected, troop ships will be automatically selected from the available ships and based on the number of defending troops.
+
+An invading ship is destroyed as part of the landing operation. All parts on the ship are lost with the ship.'''
 
 # Ship part classes
 PC_DETECTION
@@ -11974,25 +12006,28 @@ SHP_FIGHTERS_1_DESC
 
 A [[encyclopedia PC_FIGHTER_BAY]] can launch a number of fighters in each combat round. These fighters will then be both valid targets and able to attack ships and other fighters in subsequent combat rounds, but a single hit from any source will destroy a fighter. Unlike [[encyclopedia DAMAGE_TITLE]] inflicted by regular weapons, fighter damage ignores [[metertype METER_SHIELD]] on warships (they fire from within the shields).
 
+Piloting traits affect [[FT_HANGAR_2]], [[FT_HANGAR_3]], and [[FT_HANGAR_4]] fighters in the same way: bad piloting reduces damage by 1 per fighter; good piloting increases damage by 1, great piloting by 2, and ultimate piloting by 3 per fighter shot.
+Piloting traits do not affect [[FT_HANGAR_1]] fighters.
+
 At the end of combat, carriers will collect any fighters that have survived. If a carrier is in [[metertype METER_SUPPLY]] immediately after movement is resolved, it will refill hangars to maximum.'''
 
 SHP_FIGHTERS_2
 Laser Fighters
 
 SHP_FIGHTERS_2_DESC
-Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have laser weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_1]] is increased by 1, [[shippart FT_HANGAR_2]] is increased by 2 and [[shippart FT_HANGAR_3]] by 3.
+Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have laser weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 2, [[shippart FT_HANGAR_3]] by 3, and [[shippart FT_HANGAR_4]] by 6. For [[shippart FT_HANGAR_1]] fighters the capacity as well as the launch rate of the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_FIGHTERS_3
 Plasma Fighters
 
 SHP_FIGHTERS_3_DESC
-Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have plasma weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_1]] is increased by 1, [[shippart FT_HANGAR_2]] is increased by 3 and [[shippart FT_HANGAR_3]] by 4.
+Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have plasma weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 2, [[shippart FT_HANGAR_3]] by 3, and [[shippart FT_HANGAR_4]] by 6. For [[shippart FT_HANGAR_1]] fighters the capacity as well as the launch rate of the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_FIGHTERS_4
 Death Ray Fighters
 
 SHP_FIGHTERS_4_DESC
-Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have death ray weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_1]] is increased by 1, [[shippart FT_HANGAR_2]] is increased by 5 and [[shippart FT_HANGAR_3]] by 7.
+Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have death ray weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 2, [[shippart FT_HANGAR_3]] by 3, and [[shippart FT_HANGAR_4]] by 6. For [[shippart FT_HANGAR_1]] fighters the capacity as well as the launch rate of the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_WEAPON_1_2
 Mass Driver 2
@@ -12083,6 +12118,24 @@ Death Ray 4
 
 SHP_WEAPON_4_4_DESC
 Upgrades [[shippart SR_WEAPON_4_1]] parts on all ships within [[metertype METER_SUPPLY]] (or after entering it later). The improved weapon part has shot damage of 30.
+
+SHP_WEAPON_ARC_DISRUPTOR_1
+Arc Disruptors
+
+SHP_WEAPON_ARC_DISRUPTOR_1_DESC
+Unlocks the [[shippart SR_ARC_DISRUPTOR]], an automated weapon system doing low damage to multiple targets. The base weapon part has shot damage 2.
+
+SHP_WEAPON_ARC_DISRUPTOR_2
+Arc Disruptor 2
+
+SHP_WEAPON_ARC_DISRUPTOR_2_DESC
+Upgrades [[shippart SR_ARC_DISRUPTOR]] parts on all ships within [[metertype METER_SUPPLY]] (or after entering it later). The improved weapon part has shot damage of 4.
+
+SHP_WEAPON_ARC_DISRUPTOR_3
+Arc Disruptor 3
+
+SHP_WEAPON_ARC_DISRUPTOR_3_DESC
+Upgrades [[shippart SR_ARC_DISRUPTOR]] parts on all ships within [[metertype METER_SUPPLY]] (or after entering it later). The improved weapon part has shot damage of 7.
 
 SHP_ION_CANNON
 Ion Cannon
@@ -13303,7 +13356,7 @@ FT_BAY_1
 Launch Bay
 
 FT_BAY_1_DESC
-Launch system for fighters.
+Launch system for fighters. Launches [[FT_HANGAR_1_FIGHTER]] faster: Can launch all fighters in a single [[shippart FT_HANGAR_1]].
 
 FT_HANGAR_0
 Decoy Hangar
@@ -13321,7 +13374,7 @@ FT_HANGAR_1_FIGHTER
 Interceptor
 
 FT_HANGAR_1_DESC
-Storage system for minimally armed fighters.
+Storage system for minimally armed fighters. Can attack enemy fighters only. Launches faster: A [[shippart FT_BAY_1]] can launch all fighters in a single [[shippart FT_HANGAR_1]].
 
 FT_HANGAR_2
 Fighter Hangar
@@ -13330,7 +13383,7 @@ FT_HANGAR_2_FIGHTER
 Fighter
 
 FT_HANGAR_2_DESC
-Storage system for lightly armed fighters.
+Storage system for lightly armed fighters. Can attack enemy ships and fighters.
 
 FT_HANGAR_3
 Bomber Hangar
@@ -13339,7 +13392,7 @@ FT_HANGAR_3_FIGHTER
 Bomber
 
 FT_HANGAR_3_DESC
-Storage system for moderately armed fighters.
+Storage system for moderately armed fighters. Can attack enemy ships only.
 
 FT_HANGAR_4
 Heavy-Bomber Hangar
@@ -13348,7 +13401,7 @@ FT_HANGAR_4_FIGHTER
 Heavy-Bomber
 
 FT_HANGAR_4_DESC
-Storage system for heavily armed fighters.
+Storage system for heavily armed fighters. Can attack enemy ships and planets.
 
 FT_HANGAR_KRILL
 Krill Swarm
@@ -13374,7 +13427,7 @@ SR_WEAPON_1_1
 Mass Driver
 
 SR_WEAPON_1_1_DESC
-'''The Mass Driver, a basic weapon.
+'''The Mass Driver, a basic weapon. Attacks ships and planets.
 
 Upgrading the weapon technology will increase the shot damage.
 
@@ -13384,7 +13437,7 @@ SR_WEAPON_2_1
 Laser Weapon
 
 SR_WEAPON_2_1_DESC
-'''The Laser, a more powerful ship's weapon than the Mass Driver.
+'''The Laser, a more powerful ship's weapon than the Mass Driver. Attacks ships and planets.
 
 Upgrading the weapon technology will increase the shot damage.
 
@@ -13394,7 +13447,7 @@ SR_WEAPON_3_1
 Plasma Cannons
 
 SR_WEAPON_3_1_DESC
-'''The Plasma Cannon, a more powerful ship's weapon than the Laser.
+'''The Plasma Cannon, a more powerful ship's weapon than the Laser. Attacks ships and planets.
 
 Upgrading the weapon technology will increase the shot damage.
 
@@ -13404,17 +13457,29 @@ SR_WEAPON_4_1
 Death Ray
 
 SR_WEAPON_4_1_DESC
-'''The Death Ray, a more powerful ship's weapon than the Plasma Cannon.
+'''The Death Ray, a more powerful ship's weapon than the Plasma Cannon. Attacks ships and planets.
 
 Upgrading the weapon technology will increase the shot damage.
 
 The weapon's [[encyclopedia DAMAGE_TITLE]] is a combination of the shot damage and any active modifiers. Each death ray on a ship built by a species with the piloting trait will do an additional 5 damage per piloting level (-5 for Bad Pilots).'''
 
+SR_ARC_DISRUPTOR
+Arc Disruptor
+
+SR_ARC_DISRUPTOR_DESC
+'''The Arc Disruptor, a multi-shot ship weapon which has good long-term upgrade research options.
+
+Charged polaron capacitors generate a molecular disruption flux wave that arcs through space hitting several ships before dispersing. The disruption flux can be substantially deflected around ship shields.
+
+Upgrading the weapon technology will increase the shot damage.
+
+The weapon's [[encyclopedia DAMAGE_TITLE]] is a combination of the shot damage and any active modifiers. Piloting trait does not affect damage.'''
+
 SR_SPINAL_ANTIMATTER
 Spinal Antimatter Cannon
 
 SR_SPINAL_ANTIMATTER_DESC
-A huge spinal mount mass driver firing heavy projectiles made of antimatter.
+A huge spinal mount mass driver firing heavy projectiles made of antimatter. Attacks ships and planets.
 
 SR_JAWS
 Jaws

@@ -144,7 +144,7 @@ const GG::X CUIWnd::BORDER_RIGHT(5);
 const GG::Y CUIWnd::BORDER_BOTTOM(5);
 const int CUIWnd::OUTER_EDGE_ANGLE_OFFSET = 8;
 const int CUIWnd::INNER_BORDER_ANGLE_OFFSET = 15;
-const int CUIWnd::TITLE_OFFSET = 3;
+const int CUIWnd::TITLE_OFFSET = 2;
 const int CUIWnd::RESIZE_HASHMARK1_OFFSET = 9;
 const int CUIWnd::RESIZE_HASHMARK2_OFFSET = 4;
 
@@ -500,7 +500,7 @@ GG::X CUIWnd::LeftBorder() const
 { return BORDER_LEFT; }
 
 GG::Y CUIWnd::TopBorder() const
-{ return GG::Y(ClientUI::TitlePts()*3/2); }
+{ return GG::Y(ClientUI::TitlePts() + TITLE_OFFSET*4); }
 
 GG::X CUIWnd::RightBorder() const
 { return BORDER_RIGHT; }
@@ -728,10 +728,10 @@ void CUIWnd::SaveOptions() const {
     std::string window_mode = db.Get<bool>("video.fullscreen.enabled") ?
                               ".fullscreen" : ".windowed";
 
-    db.Set<int>(option_prefix + window_mode + ".left",     Value(RelativeUpperLeft().x));
-    db.Set<int>(option_prefix + window_mode + ".top",      Value(RelativeUpperLeft().y));
-    db.Set<int>(option_prefix + window_mode + ".width",         Value(size.x));
-    db.Set<int>(option_prefix + window_mode + ".height",        Value(size.y));
+    db.Set<int>(option_prefix + window_mode + ".left",      Value(RelativeUpperLeft().x));
+    db.Set<int>(option_prefix + window_mode + ".top",       Value(RelativeUpperLeft().y));
+    db.Set<int>(option_prefix + window_mode + ".width",     Value(size.x));
+    db.Set<int>(option_prefix + window_mode + ".height",    Value(size.y));
 
     if (!Modal()) {
         db.Set<bool>(option_prefix + ".visible", Visible());

@@ -1,4 +1,4 @@
-from logging import warn, info, error
+from logging import warning, info, error
 
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
@@ -43,7 +43,7 @@ class AuthProvider:
         for c in roles_str:
             r = self.roles_symbols.get(c)
             if r is None:
-                warn("unknown role symbol '%c'" % c)
+                warning("unknown role symbol '%c'" % c)
             else:
                 roles.append(r)
         return roles
@@ -64,7 +64,7 @@ class AuthProvider:
                             req.add_header("X-XMPP-To", r[1])
                             urllib.request.urlopen(req).read()
                         else:
-                            warn("Unsupported protocol %s for %s" % (r[0], player_name))
+                            warning("Unsupported protocol %s for %s" % (r[0], player_name))
         except psycopg2.InterfaceError:
             self.conn = psycopg2.connect(self.dsn)
             exctype, value = sys.exc_info()[:2]

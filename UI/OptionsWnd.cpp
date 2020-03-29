@@ -445,9 +445,7 @@ OptionsWnd::OptionsWnd(bool is_game_running_):
     CUIWnd(UserString("OPTIONS_TITLE"),
            GG::INTERACTIVE | GG::DRAGABLE | GG::MODAL | GG::RESIZABLE,
            OPTIONS_WND_NAME),
-    is_game_running(is_game_running_),
-    m_tabs(nullptr),
-    m_done_button(nullptr)
+    is_game_running(is_game_running_)
 {}
 
 void OptionsWnd::CompleteConstruction() {
@@ -519,6 +517,8 @@ void OptionsWnd::CompleteConstruction() {
     // UI settings tab
     current_page = CreatePage(UserString("OPTIONS_PAGE_UI"));
     CreateSectionHeader(current_page, 0, UserString("OPTIONS_MISC_UI"));
+
+    BoolOption(current_page, 0, "ui.pedia.search.articles.enabled", UserString("OPTIONS_PEDIA_SEARCH_ARTICLE_TEXT"));
     BoolOption(current_page, 0, "ui.input.mouse.button.swap.enabled", UserString("OPTIONS_SWAP_MOUSE_LR"));
     BoolOption(current_page, 0, "ui.fleet.multiple.enabled", UserString("OPTIONS_MULTIPLE_FLEET_WNDS"));
     BoolOption(current_page, 0, "ui.quickclose.enabled", UserString("OPTIONS_QUICK_CLOSE_WNDS"));
@@ -554,7 +554,27 @@ void OptionsWnd::CompleteConstruction() {
     IntOption(current_page, 0, "ui.input.mouse.button.repeat.delay",    UserString("OPTIONS_MOUSE_REPEAT_DELAY"));
     IntOption(current_page, 0, "ui.input.mouse.button.repeat.interval", UserString("OPTIONS_MOUSE_REPEAT_INTERVAL"));
 
-    CreateSectionHeader(current_page, 0,                                UserString("OPTIONS_FONTS"));
+    CreateSectionHeader(current_page, 0,                                UserString("OPTIONS_RESEARCH_WND"));
+    DoubleOption(current_page, 0, "ui.research.tree.spacing.horizontal",UserString("OPTIONS_TECH_SPACING_HORIZONTAL"));
+    DoubleOption(current_page, 0, "ui.research.tree.spacing.vertical",  UserString("OPTIONS_TECH_SPACING_VERTICAL"));
+    DoubleOption(current_page, 0, "ui.research.tree.zoom.scale",        UserString("OPTIONS_TECH_LAYOUT_ZOOM"));
+    DoubleOption(current_page, 0, "ui.research.control.graphic.size",   UserString("OPTIONS_TECH_CTRL_ICON_SIZE"));
+
+    CreateSectionHeader(current_page, 0,                                UserString("OPTIONS_QUEUES"));
+    IntOption(current_page,    0, "ui.queue.width",                     UserString("OPTIONS_UI_QUEUE_WIDTH"));
+    BoolOption(current_page,   0, "ui.queue.production_location.shown", UserString("OPTIONS_UI_PROD_QUEUE_LOCATION"));
+
+    CreateSectionHeader(current_page, 0,                                UserString("OPTIONS_DESCRIPTIONS"));
+    BoolOption(current_page,   0, "resource.effects.description.shown", UserString("OPTIONS_DUMP_EFFECTS_GROUPS_DESC"));
+    BoolOption(current_page,   0, "ui.map.sitrep.invalid.shown",        UserString("OPTIONS_VERBOSE_SITREP_DESC"));
+    BoolOption(current_page,   0, "ui.name.id.shown",                   UserString("OPTIONS_SHOW_IDS_AFTER_NAMES"));
+
+    m_tabs->SetCurrentWnd(0);
+
+    // Font tab
+    current_page = CreatePage(UserString("OPTIONS_FONTS"));
+
+    CreateSectionHeader(current_page, 0, UserString("OPTIONS_FONTS"));
     FontOption(current_page, 0, "ui.font.path",                         UserString("OPTIONS_FONT_TEXT"));
     FontOption(current_page, 0, "ui.font.bold.path",                    UserString("OPTIONS_FONT_BOLD_TEXT"));
     FontOption(current_page, 0, "ui.font.title.path",                   UserString("OPTIONS_FONT_TITLE"));
@@ -571,21 +591,6 @@ void OptionsWnd::CompleteConstruction() {
     CreateSectionHeader(current_page, 0, UserString("OPTIONS_FONT_SIZES"));
     IntOption(current_page,    0, "ui.font.size",                       UserString("OPTIONS_FONT_TEXT"));
     IntOption(current_page,    0, "ui.font.title.size",                 UserString("OPTIONS_FONT_TITLE"));
-
-    CreateSectionHeader(current_page, 0,                                UserString("OPTIONS_RESEARCH_WND"));
-    DoubleOption(current_page, 0, "ui.research.tree.spacing.horizontal",UserString("OPTIONS_TECH_SPACING_HORIZONTAL"));
-    DoubleOption(current_page, 0, "ui.research.tree.spacing.vertical",  UserString("OPTIONS_TECH_SPACING_VERTICAL"));
-    DoubleOption(current_page, 0, "ui.research.tree.zoom.scale",        UserString("OPTIONS_TECH_LAYOUT_ZOOM"));
-    DoubleOption(current_page, 0, "ui.research.control.graphic.size",   UserString("OPTIONS_TECH_CTRL_ICON_SIZE"));
-
-    CreateSectionHeader(current_page, 0,                                UserString("OPTIONS_QUEUES"));
-    IntOption(current_page,    0, "ui.queue.width",                     UserString("OPTIONS_UI_QUEUE_WIDTH"));
-    BoolOption(current_page,   0, "ui.queue.production_location.shown", UserString("OPTIONS_UI_PROD_QUEUE_LOCATION"));
-
-    CreateSectionHeader(current_page, 0,                                UserString("OPTIONS_DESCRIPTIONS"));
-    BoolOption(current_page,   0, "resource.effects.description.shown", UserString("OPTIONS_DUMP_EFFECTS_GROUPS_DESC"));
-    BoolOption(current_page,   0, "ui.map.sitrep.invalid.shown",        UserString("OPTIONS_VERBOSE_SITREP_DESC"));
-    BoolOption(current_page,   0, "ui.name.id.shown",                   UserString("OPTIONS_SHOW_IDS_AFTER_NAMES"));
 
     m_tabs->SetCurrentWnd(0);
 
@@ -749,6 +754,22 @@ void OptionsWnd::CompleteConstruction() {
     BoolOption(current_page, 0, "save.format.xml.zlib.enabled", UserString("OPTIONS_USE_XML_ZLIB_SERIALIZATION"));
     BoolOption(current_page, 0, "ui.map.sitrep.invalid.shown", UserString("OPTIONS_VERBOSE_SITREP_DESC"));
     BoolOption(current_page, 0, "effects.accounting.enabled", UserString("OPTIONS_EFFECT_ACCOUNTING"));
+
+    // Create full state config button
+    auto all_config_button = GG::Wnd::Create<CUIButton>(UserString("OPTIONS_WRITE_ALL_CONFIG"));
+    all_config_button->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
+    all_config_button->SetBrowseInfoWnd(
+        GG::Wnd::Create<TextBrowseWnd>(UserString("OPTIONS_CREATE_ALL_CONFIG_TOOLTIP_TITLE"),
+                                       UserString("OPTIONS_CREATE_ALL_CONFIG_TOOLTIP_DESC"), ROW_WIDTH));
+    all_config_button->LeftClickedSignal.connect([]() {
+        if (GetOptionsDB().Commit(false, false))
+            ClientUI::MessageBox(UserString("OPTIONS_CREATE_ALL_CONFIG_SUCCESS"));
+        else
+            ClientUI::MessageBox(UserString("OPTIONS_CREATE_ALL_CONFIG_FAILURE"));
+    });
+    current_page->Insert(GG::Wnd::Create<OptionsListRow>(ROW_WIDTH,
+                                                         all_config_button->MinUsableSize().y + LAYOUT_MARGIN + 6,
+                                                         all_config_button, 0));
 
     // Create persistent config button
     auto persistent_config_button = GG::Wnd::Create<CUIButton>(UserString("OPTIONS_CREATE_PERSISTENT_CONFIG"));

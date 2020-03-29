@@ -281,6 +281,10 @@ SPY_STEALTH_2 = "SPY_STEALTH_2"
 
 EXOBOT_TECH_NAME = "PRO_EXOBOTS"
 
+SHP_WEAPON_ARC_DISRUPTOR_1 = "SHP_WEAPON_ARC_DISRUPTOR_1"
+SHP_WEAPON_ARC_DISRUPTOR_2 = "SHP_WEAPON_ARC_DISRUPTOR_2"
+SHP_WEAPON_ARC_DISRUPTOR_3 = "SHP_WEAPON_ARC_DISRUPTOR_3"
+
 # </editor-fold>
 
 
@@ -358,6 +362,7 @@ WEAPON_UPGRADE_DICT = {
     "SR_WEAPON_2_1": tuple(("SHP_WEAPON_2_%d" % i, 2) for i in [2, 3, 4]),
     "SR_WEAPON_3_1": tuple(("SHP_WEAPON_3_%d" % i, 3) for i in [2, 3, 4]),
     "SR_WEAPON_4_1": tuple(("SHP_WEAPON_4_%d" % i, 5) for i in [2, 3, 4]),
+    "SR_ARC_DISRUPTOR": tuple(("SHP_WEAPON_ARC_DISRUPTOR_%d" % i, i) for i in [2, 3]),
     "SR_SPINAL_ANTIMATTER": (),
 }
 
@@ -368,20 +373,21 @@ WEAPON_ROF_UPGRADE_DICT = {
     "SR_WEAPON_2_1": (),
     "SR_WEAPON_3_1": (),
     "SR_WEAPON_4_1": (),
+    "SR_ARC_DISRUPTOR": (),
     "SR_SPINAL_ANTIMATTER": (),
 }
 
 FIGHTER_DAMAGE_UPGRADE_DICT = {
     # "PARTNAME": tuple((tech_name, dmg_upgrade), (tech_name2, dmg_upgrade2), ...)
-    "FT_HANGAR_1": (("SHP_FIGHTERS_2", 1), ("SHP_FIGHTERS_3", 1), ("SHP_FIGHTERS_4", 1)),
-    "FT_HANGAR_2": (("SHP_FIGHTERS_2", 2), ("SHP_FIGHTERS_3", 3), ("SHP_FIGHTERS_4", 5)),
-    "FT_HANGAR_3": (("SHP_FIGHTERS_2", 3), ("SHP_FIGHTERS_3", 4), ("SHP_FIGHTERS_4", 7)),
-    "FT_HANGAR_4": (),
+    "FT_HANGAR_1": (("SHP_FIGHTERS_2", 0), ("SHP_FIGHTERS_3", 0), ("SHP_FIGHTERS_4", 0)),
+    "FT_HANGAR_2": (("SHP_FIGHTERS_2", 2), ("SHP_FIGHTERS_3", 2), ("SHP_FIGHTERS_4", 2)),
+    "FT_HANGAR_3": (("SHP_FIGHTERS_2", 3), ("SHP_FIGHTERS_3", 3), ("SHP_FIGHTERS_4", 3)),
+    "FT_HANGAR_4": (("SHP_FIGHTERS_2", 6), ("SHP_FIGHTERS_3", 6), ("SHP_FIGHTERS_4", 6)),
 }
 
 FIGHTER_CAPACITY_UPGRADE_DICT = {
     # "PARTNAME": tuple((tech_name, capacity_upgrade), (tech_name2, capacity_upgrade2), ...)
-    "FT_HANGAR_1": (),
+    "FT_HANGAR_1": (("SHP_FIGHTERS_2", 1), ("SHP_FIGHTERS_3", 1), ("SHP_FIGHTERS_4", 1)),
     "FT_HANGAR_2": (),
     "FT_HANGAR_3": (),
     "FT_HANGAR_4": (),
@@ -652,11 +658,12 @@ PILOT_ROF_MODIFIER_DICT = {
 
 PILOT_FIGHTERDAMAGE_MODIFIER_DICT = {
     # TRAIT:    {hangar_name: effect, hangar_name2: effect2,...}
+    # TODO FT_HANGAR_1 fighters are not able to attack ships so pilot damage modifier does not apply
     "NO":       {},
-    "BAD":      {"FT_HANGAR_1": -1, "FT_HANGAR_2": -2, "FT_HANGAR_3": -3, "FT_HANGAR_4": -4},
-    "GOOD":     {"FT_HANGAR_1":  1, "FT_HANGAR_2":  2, "FT_HANGAR_3":  3, "FT_HANGAR_4": 4},
-    "GREAT":    {"FT_HANGAR_1":  2, "FT_HANGAR_2":  4, "FT_HANGAR_3":  6, "FT_HANGAR_4": 8},
-    "ULTIMATE": {"FT_HANGAR_1":  3, "FT_HANGAR_2":  6, "FT_HANGAR_3":  9, "FT_HANGAR_4": 12},
+    "BAD":      {"FT_HANGAR_1":  0, "FT_HANGAR_2": -1, "FT_HANGAR_3": -1, "FT_HANGAR_4": -1},
+    "GOOD":     {"FT_HANGAR_1":  0, "FT_HANGAR_2":  1, "FT_HANGAR_3":  1, "FT_HANGAR_4": 1},
+    "GREAT":    {"FT_HANGAR_1":  0, "FT_HANGAR_2":  2, "FT_HANGAR_3":  2, "FT_HANGAR_4": 2},
+    "ULTIMATE": {"FT_HANGAR_1":  0, "FT_HANGAR_2":  3, "FT_HANGAR_3":  3, "FT_HANGAR_4": 3},
 }
 
 PILOT_FIGHTER_CAPACITY_MODIFIER_DICT = {
@@ -669,8 +676,8 @@ PILOT_FIGHTER_CAPACITY_MODIFIER_DICT = {
 }
 
 HANGAR_LAUNCH_CAPACITY_MODIFIER_DICT = {
-    # hangar_name: {bay_name: effect, bay_name2: effect, ...}
-    "FT_HANGAR_1": {"FT_BAY_1": 2},
+    # hangar_name: {bay_name: ((tech_name, effect), ...), bay_name2: ((tech_name, effect), ...}
+    "FT_HANGAR_1": {"FT_BAY_1": (("SHP_FIGHTERS_1", 1), ("SHP_FIGHTERS_2", 1), ("SHP_FIGHTERS_3", 1), ("SHP_FIGHTERS_4", 1))},
 }
 # </editor-fold>
 

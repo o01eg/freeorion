@@ -23,13 +23,22 @@
   <native>
     <frequency>GALAXY_SETUP_LOW</frequency>
   </native>
+  <specials>
+    <frequency>GALAXY_SETUP_LOW</frequency>
+  </specials>
+  <planet>
+    <density>GALAXY_SETUP_HIGH</density>
+  </planet>
+  <galaxy>
+    <shape>RING</shape>
+  </galaxy>
   <seed>RANDOM</seed>
   <star>
-   <count>18</count>
+   <count>22</count>
   </star>
   <rules>
    <RULE_ENABLE_SUPER_TESTER>0</RULE_ENABLE_SUPER_TESTER>
-   <RULE_THRESHOLD_HUMAN_PLAYER_WIN>2</RULE_THRESHOLD_HUMAN_PLAYER_WIN>
+   <RULE_THRESHOLD_HUMAN_PLAYER_WIN>1</RULE_THRESHOLD_HUMAN_PLAYER_WIN>
    <RULE_ONLY_ALLIANCE_WIN>1</RULE_ONLY_ALLIANCE_WIN>
    <RULE_ALLOW_CONCEDE>1</RULE_ALLOW_CONCEDE>
    <RULE_CONCEDE_COLONIES_THRESHOLD>9999</RULE_CONCEDE_COLONIES_THRESHOLD>
@@ -39,7 +48,8 @@
    <RULE_SHIP_PART_COST_FACTOR>0.5</RULE_SHIP_PART_COST_FACTOR>
    <RULE_BUILDING_COST_FACTOR>0.5</RULE_BUILDING_COST_FACTOR>
    <RULE_TECH_COST_FACTOR>1.0</RULE_TECH_COST_FACTOR>
-   <!--<RULE_DIPLOMACY>RULE_DIPLOMACY_FORBIDDEN_FOR_ALL</RULE_DIPLOMACY>-->
+   <RULE_DIPLOMACY>RULE_DIPLOMACY_FORBIDDEN_FOR_ALL</RULE_DIPLOMACY>
+   <RULE_ENABLE_ALLIED_REPAIR>1</RULE_ENABLE_ALLIED_REPAIR>
    <server-locked>
     <RULE_ENABLE_SUPER_TESTER>1</RULE_ENABLE_SUPER_TESTER>
     <RULE_THRESHOLD_HUMAN_PLAYER_WIN>1</RULE_THRESHOLD_HUMAN_PLAYER_WIN>
@@ -53,6 +63,7 @@
     <RULE_BUILDING_COST_FACTOR>1</RULE_BUILDING_COST_FACTOR>
     <RULE_TECH_COST_FACTOR>1</RULE_TECH_COST_FACTOR>
     <RULE_DIPLOMACY>1</RULE_DIPLOMACY>
+    <RULE_ENABLE_ALLIED_REPAIR>1</RULE_ENABLE_ALLIED_REPAIR>
    </server-locked>
   </rules>
  </setup>
@@ -61,6 +72,9 @@
    <ai>
     <max>0</max>
    </ai>
+   <allow-email>
+     <new-turn>0</new-turn>
+   </allow-email>
    <human>
     <min>3</min>
    </human>
@@ -79,7 +93,7 @@
    </binary>
    <turn-timeout>
      <fixed-interval>0</fixed-interval>
-     <max-interval>82800</max-interval>
+     <max-interval>300</max-interval>
    </turn-timeout>
    <client-message-size>
      <max>10485760</max>

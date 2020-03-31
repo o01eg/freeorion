@@ -25,10 +25,6 @@
 
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
-if(POLICY CMP0044)
-    cmake_policy(SET CMP0044 OLD)
-endif()
-
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_HOME_DIRECTORY}/cmake)
 
 
@@ -87,11 +83,7 @@ if(NOT BUILD_HEADLESS)
     find_package(OpenGL REQUIRED)
     find_package(GLEW REQUIRED)
     find_package(Freetype REQUIRED)
-    
-    if(NOT OPENGL_GLU_FOUND)
-        message(FATAL_ERROR "OpenGL GLU library not found.")
-    endif()
-    
+
     if(ENABLE_PNG_TEXTURES)
         find_package(PNG REQUIRED)
         set(int_have_png 1)
@@ -164,7 +156,6 @@ if(NOT BUILD_HEADLESS)
             Boost::dynamic_linking
             Boost::filesystem
             ${OPENGL_gl_LIBRARY}
-            ${OPENGL_glu_LIBRARY}
         PRIVATE
             Boost::regex
             ${FREETYPE_LIBRARIES}
@@ -333,7 +324,7 @@ endif()
 # Deb-specific settings
 set(CPACK_DEBIAN_PACKAGE_SECTION libs)
 
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libgl1-mesa-glx | libgl1, libglu1-mesa | libglu, libfreetype6")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libgl1-mesa-glx | libgl1, libfreetype6")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_DEBIAN_PACKAGE_DEPENDS}, gigi (= ${GIGI_VERSION})")
 
 if(BUILD_SDL_DRIVER)
@@ -341,7 +332,7 @@ if(BUILD_SDL_DRIVER)
 endif()
 
 if(BUILD_DEVEL_PACKAGE)
-    set(CPACK_DEBIAN_PACKAGE_DEPENDS "boost-devel (>= 1.44.0), libgl1-mesa-dev | libgl-dev, libglu1-mesa-dev | libglu-dev, libfreetype6-dev")
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "boost-devel (>= 1.44.0), libgl1-mesa-dev | libgl-dev, libfreetype6-dev")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_DEBIAN_PACKAGE_DEPENDS}, gigi-dev (= ${GIGI_VERSION})")
 endif()
 

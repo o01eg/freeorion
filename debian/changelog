@@ -1,3 +1,9 @@
+freeorion (0.4.9+git20200330~025f545-fo0009-2) unstable; urgency=medium
+
+  * Notify about empire victory
+
+ -- O01eg <o01eg@yandex.ru>  Sat, 04 Apr 2020 13:01:42 +0000
+
 freeorion (0.4.9+git20200330~025f545-fo0009-1) unstable; urgency=medium
 
   * update upstream

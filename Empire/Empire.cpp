@@ -5,6 +5,7 @@
 #include "../util/Logger.h"
 #include "../util/AppInterface.h"
 #include "../util/SitRepEntry.h"
+#include "../util/Process.h"
 #include "../universe/Building.h"
 #include "../universe/Fleet.h"
 #include "../universe/Ship.h"
@@ -634,6 +635,14 @@ void Empire::Win(const std::string& reason) {
         for (auto& entry : Empires()) {
             entry.second->AddSitRepEntry(CreateVictorySitRep(reason, EmpireID()));
         }
+            std::async(std::launch::async, [this] {
+                std::vector<std::string> args{"/usr/bin/curl",
+                "http://localhost:8083/",
+                "-H", "X-XMPP-Muc: smac",
+                "-d", " Empire " + this->m_name + " won the game."};
+                Process sendxmpp = Process("/usr/bin/curl", args);
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+            });
     }
 }
 

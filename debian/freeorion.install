@@ -2,3 +2,4 @@ debian/bin/*                                usr/games
 usr/bin/*                                   usr/lib/freeorion
 usr/lib/*/freeorion
 usr/share/applications
+usr/share/metainfo/org.freeorion.FreeOrion.metainfo.xml

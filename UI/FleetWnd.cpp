@@ -23,16 +23,14 @@
 #include "../network/Message.h"
 #include "../Empire/Empire.h"
 
-#include <GG/DrawUtil.h>
 #include <GG/Enum.h>
 #include <GG/GUI.h>
 #include <GG/Layout.h>
 #include <GG/StaticGraphic.h>
 
 #include <boost/cast.hpp>
-#include <boost/unordered_map.hpp>
-#include <tuple>
 
+#include <tuple>
 #include <unordered_set>
 
 

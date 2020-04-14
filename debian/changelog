@@ -1,3 +1,10 @@
+freeorion (0.4.9+git20200414~60fb514-fo0009-4) unstable; urgency=medium
+
+  * Update upstream.
+  * New multiplayer options.
+
+ -- O01eg <o01eg@yandex.ru>  Tue, 14 Apr 2020 18:02:24 +0000
+
 freeorion (0.4.9+git20200405~aa122c8-fo0009-3) unstable; urgency=medium
 
   * Update upstream.

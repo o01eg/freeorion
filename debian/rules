@@ -41,7 +41,8 @@ override_dh_installchangelogs:
 	dh_installchangelogs ChangeLog.md
 
 override_dh_install:
-	dh_install --fail-missing
+	dh_install
+	dh_missing --fail-missing
 	find debian -type d -empty -delete -printf 'removed %p\n'
 	$(RM) -v debian/freeorion-data/usr/share/games/freeorion/default/LICENSE* \
 		debian/freeorion-data/usr/share/games/freeorion/default/COPYING \

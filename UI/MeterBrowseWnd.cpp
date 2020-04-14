@@ -9,6 +9,7 @@
 #include "../universe/PopCenter.h"
 #include "../universe/Ship.h"
 #include "../universe/ShipDesign.h"
+#include "../universe/ShipPartHull.h"
 #include "../universe/UniverseObject.h"
 #include "../universe/Enums.h"
 #include "../Empire/Empire.h"
@@ -560,7 +561,7 @@ namespace {
          * @param [in] base_value optional; If greater than 0.0f: the value label is formatted to "value of base_value"
          */
         ShipFightersBrowseRow(const std::string& label, int qty, double value, double base_value = 0.0f) :
-            GG::ListBox::Row(FighterBrowseListWidth(), MeterBrowseRowHeight(), "")
+            GG::ListBox::Row(FighterBrowseListWidth(), MeterBrowseRowHeight())
         {
             const GG::Clr QTY_COLOR = GG::CLR_GRAY;
 
@@ -607,8 +608,6 @@ namespace {
 
 ShipFightersBrowseWnd::ShipFightersBrowseWnd(int object_id, MeterType primary_meter_type, bool show_all_bouts /* = false*/) :
     MeterBrowseWnd(object_id, primary_meter_type),
-    m_bay_list(nullptr),
-    m_hangar_list(nullptr),
     m_show_all_bouts(show_all_bouts)
 {}
 

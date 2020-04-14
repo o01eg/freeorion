@@ -17,9 +17,10 @@
 #include "../util/Directories.h"
 #include "../Empire/Empire.h"
 #include "../client/human/HumanClientApp.h"
-#include "../universe/Conditions.h"
+#include "../universe/ConditionAll.h"
 #include "../universe/UniverseObject.h"
 #include "../universe/ShipDesign.h"
+#include "../universe/ShipPartHull.h"
 #include "../universe/Enums.h"
 
 #include <GG/StaticGraphic.h>
@@ -129,8 +130,7 @@ namespace {
         }
     }
 
-    typedef std::map<std::pair<ShipPartClass, ShipSlotType>,
-                     std::vector<const PartType*>>              PartGroupsType;
+    typedef std::map<std::pair<ShipPartClass, ShipSlotType>, std::vector<const PartType*>> PartGroupsType;
 
     const std::string DESIGN_FILENAME_PREFIX = "ShipDesign-";
     const std::string DESIGN_FILENAME_EXTENSION = ".focs.txt";
@@ -1349,7 +1349,7 @@ private:
 };
 
 PartsListBox::PartsListBoxRow::PartsListBoxRow(GG::X w, GG::Y h, const AvailabilityManager& availabilities_state) :
-    CUIListBox::Row(w, h, ""),    // drag_drop_data_type = "" implies not draggable row
+    CUIListBox::Row(w, h),
     m_availabilities_state(availabilities_state)
 {}
 
@@ -2306,8 +2306,9 @@ void BasesListBox::HullAndNamePanel::SetDisplayName(const std::string& name) {
 }
 
 BasesListBox::BasesListBoxRow::BasesListBoxRow(GG::X w, GG::Y h, const std::string& hull, const std::string& name) :
-    CUIListBox::Row(w, h, BASES_LIST_BOX_DROP_TYPE)
+    CUIListBox::Row(w, h)
 {
+    SetDragDropDataType(BASES_LIST_BOX_DROP_TYPE);
     if (hull.empty()) {
         ErrorLogger() << "No hull name provided for ship row display.";
         return;
@@ -4446,7 +4447,7 @@ void DesignWnd::MainPanel::SetDesign(const ShipDesign* ship_design) {
     m_design_description_edit->SetText(ship_design->Description());
 
     bool suppress_design_changed_signal = true;
-    SetHull(ship_design->GetHull(), !suppress_design_changed_signal);
+    SetHull(ship_design->Hull(), !suppress_design_changed_signal);
 
     SetParts(ship_design->Parts());
     DesignChangedSignal();

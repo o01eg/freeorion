@@ -81,7 +81,7 @@ import traceback
 
 try:
     import freeorion_logger  # FreeOrion logger interface pylint: disable=import-error
-except ImportError as e:
+except ImportError:
 
     # Create an alternative logger for use in testing when the server is unavailable
     class _FreeOrionLoggerForTest(object):
@@ -206,6 +206,12 @@ def redirect_logging_to_freeorion_logger(initial_log_level=logging.DEBUG):
         sys.stdout = _stdXLikeStream(logging.DEBUG)
         sys.stderr = _stdXLikeStream(logging.ERROR)
         print('Python stdout and stderr are redirected to ai process.')
+
+        # thread and process information is already provided by boost logging framework
+        # we can avoid some logging call overheads by turning this off
+        logging.logThreads = 0
+        logging.logProcesses = 0
+        logging.logMultiprocessing = 0
 
         logger = logging.getLogger()
         logger.addHandler(_create_narrow_handler(logging.DEBUG))

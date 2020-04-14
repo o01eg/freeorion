@@ -1,5 +1,5 @@
 // -*- C++ -*-
-/* GG is a GUI for SDL and OpenGL.
+/* GG is a GUI for OpenGL.
    Copyright (C) 2003-2008 T. Zachary Laine
 
    This library is free software; you can redistribute it and/or
@@ -77,7 +77,7 @@ class GG_API WndEvent
 public:
     /** The types of Wnd events.  Each of these corresponds to a Wnd member
         function of the same name. */
-    enum EventType {
+    enum EventType : int {
         LButtonDown,
         LDrag,
         LButtonUp,

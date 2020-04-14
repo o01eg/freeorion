@@ -10,6 +10,7 @@
 #include "../universe/Fleet.h"
 #include "../universe/Ship.h"
 #include "../universe/ShipDesign.h"
+#include "../universe/ShipPartHull.h"
 #include "../universe/Planet.h"
 #include "../universe/System.h"
 #include "../universe/Tech.h"
@@ -432,12 +433,14 @@ std::pair<float, int> Empire::ProductionCostAndTime(const ProductionQueue::Produ
             return std::make_pair(-1.0, -1);
         return std::make_pair(type->ProductionCost(m_id, location_id),
                               type->ProductionTime(m_id, location_id));
+
     } else if (item.build_type == BT_SHIP) {
         const ShipDesign* design = GetShipDesign(item.design_id);
         if (design)
             return std::make_pair(design->ProductionCost(m_id, location_id),
                                   design->ProductionTime(m_id, location_id));
         return std::make_pair(-1.0, -1);
+
     } else if (item.build_type == BT_STOCKPILE) {
         return std::make_pair(1.0, 1);
     }

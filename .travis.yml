@@ -58,6 +58,16 @@ jobs:
         - alias pip=/usr/bin/pip3
         - alias python=/usr/bin/python3
 
+    - name: Lint string tables
+      stage: lint
+      os: linux
+      dist: bionic
+      language: python
+      python: 3.5
+      script:
+        - ./check/st-tool.py check --reference default/stringtables/en.txt default/stringtables/*.txt
+        - diff -u default/stringtables/en.txt <(check/st-tool.py format default/stringtables/en.txt) || { echo "String table is not properly formatted"; exit 1; }
+
     - name: Build headless FreeOrion on Ubunutu 18.04 (Bionic)
       <<: *_build_cpp_common
       os: linux

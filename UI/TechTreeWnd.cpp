@@ -668,15 +668,7 @@ private:
 TechTreeWnd::LayoutPanel::TechPanel::TechPanel(const std::string& tech_name, const LayoutPanel* panel) :
     GG::Wnd(GG::X0, GG::Y0, TechPanelWidth(), TechPanelHeight(), GG::INTERACTIVE),
     m_tech_name(tech_name),
-    m_name_text(),
-    m_cost_and_duration_text(),
-    m_eta_text(),
     m_layout_panel(panel),
-    m_icon(nullptr),
-    m_unlock_icons(),
-    m_name_label(nullptr),
-    m_cost_and_duration_label(nullptr),
-    m_eta_label(nullptr),
     m_colour(GG::CLR_GRAY),
     m_status(TS_RESEARCHABLE),
     m_browse_highlight(false),
@@ -1623,11 +1615,11 @@ bool TechTreeWnd::TechListBox::TechRowCmp(const GG::ListBox::Row& lhs, const GG:
 }
 
 TechTreeWnd::TechListBox::TechRow::TechRow(GG::X w, const std::string& tech_name) :
-    CUIListBox::Row(w, GG::Y(ClientUI::Pts() * 2 + 5), "TechListBox::TechRow"),
+    CUIListBox::Row(w, GG::Y(ClientUI::Pts() * 2 + 5)),
     m_tech(tech_name),
     m_background_color(ClientUI::WndColor()),
     m_enqueued(false)
-{}
+{ SetDragDropDataType("TechListBox::TechRow"); }
 
 void TechTreeWnd::TechListBox::TechRow::CompleteConstruction() {
 
@@ -1766,7 +1758,7 @@ void TechTreeWnd::TechListBox::CompleteConstruction() {
     GG::X row_width = Width() - ClientUI::ScrollWidth() - ClientUI::Pts();
     std::vector<GG::X> col_widths = TechRow::ColWidths(row_width);
     const GG::Y HEIGHT(Value(col_widths[0]));
-    m_header_row = GG::Wnd::Create<GG::ListBox::Row>(row_width, HEIGHT, "");
+    m_header_row = GG::Wnd::Create<GG::ListBox::Row>(row_width, HEIGHT);
 
     auto graphic_col = GG::Wnd::Create<CUILabel>("");  // graphic
     graphic_col->Resize(GG::Pt(col_widths[0], HEIGHT));
@@ -2011,13 +2003,8 @@ void TechTreeWnd::TechListBox::TechDoubleClicked(GG::ListBox::iterator it, const
 //////////////////////////////////////////////////
 TechTreeWnd::TechTreeWnd(GG::X w, GG::Y h, bool initially_hidden /*= true*/) :
     GG::Wnd(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
-    m_tech_tree_controls(nullptr),
-    m_enc_detail_panel(nullptr),
-    m_layout_panel(nullptr),
-    m_tech_list(nullptr),
     m_init_flag(initially_hidden)
-{
-}
+{}
 
 void TechTreeWnd::CompleteConstruction() {
     GG::Wnd::CompleteConstruction();

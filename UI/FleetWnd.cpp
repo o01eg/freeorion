@@ -107,9 +107,8 @@ namespace {
 
             // name of final destination
             std::string dest_name = dest_sys->ApparentName(client_empire_id);
-            if (GetOptionsDB().Get<bool>("ui.name.id.shown")) {
-                dest_name = dest_name + " (" + std::to_string(dest_sys->ID()) + ")";
-            }
+            if (GetOptionsDB().Get<bool>("ui.name.id.shown"))
+                dest_name += " (" + std::to_string(dest_sys->ID()) + ")";
 
             // next system on path
             std::string next_eta_text;
@@ -387,7 +386,7 @@ FleetWnd* FleetUIManager::ActiveFleetWnd() const
 { return GG::LockAndResetIfExpired(m_active_fleet_wnd).get(); }
 
 std::shared_ptr<FleetWnd> FleetUIManager::WndForFleetID(int fleet_id) const {
-    std::shared_ptr<FleetWnd> retval = nullptr;
+    std::shared_ptr<FleetWnd> retval;
     GG::ProcessThenRemoveExpiredPtrs(
         m_fleet_wnds,
         [&retval, fleet_id](std::shared_ptr<FleetWnd>& wnd)
@@ -402,7 +401,7 @@ std::shared_ptr<FleetWnd> FleetUIManager::WndForFleetIDs(const std::vector<int>&
     std::unordered_set<int> fleet_ids;
     for (const auto id : fleet_ids_)
         fleet_ids.insert(id);
-    std::shared_ptr<FleetWnd> retval = nullptr;
+    std::shared_ptr<FleetWnd> retval;
     GG::ProcessThenRemoveExpiredPtrs(
         m_fleet_wnds,
         [&retval, fleet_ids](std::shared_ptr<FleetWnd>& wnd)
@@ -646,12 +645,12 @@ namespace {
         bool                                m_initialized = false;
         bool                                m_needs_refresh = true;
         int                                 m_ship_id = INVALID_OBJECT_ID;
-        std::shared_ptr<GG::StaticGraphic>  m_ship_icon = nullptr;
+        std::shared_ptr<GG::StaticGraphic>  m_ship_icon;
         std::vector<std::shared_ptr<GG::StaticGraphic>>
                                             m_ship_icon_overlays;   /// An overlays for orders like scrap, colonize, invade, bombard destroy etc.
-        std::shared_ptr<ScanlineControl>    m_scanline_control = nullptr;
-        std::shared_ptr<GG::Label>          m_ship_name_text = nullptr;
-        std::shared_ptr<GG::Label>          m_design_name_text = nullptr;
+        std::shared_ptr<ScanlineControl>    m_scanline_control;
+        std::shared_ptr<GG::Label>          m_ship_name_text;
+        std::shared_ptr<GG::Label>          m_design_name_text;
         std::vector<std::pair<MeterType, std::shared_ptr<StatisticIcon>>>
                                             m_stat_icons;           /// statistic icons and associated meter types
         bool                                m_selected = false;
@@ -1008,7 +1007,7 @@ namespace {
     class ShipRow : public GG::ListBox::Row {
     public:
         ShipRow(GG::X w, GG::Y h, int ship_id) :
-            GG::ListBox::Row(w, h, ""),
+            GG::ListBox::Row(w, h),
             m_ship_id(ship_id)
         {
             SetName("ShipRow");
@@ -1034,7 +1033,7 @@ namespace {
 
     private:
         int                             m_ship_id = INVALID_OBJECT_ID;
-        std::shared_ptr<ShipDataPanel>  m_panel = nullptr;
+        std::shared_ptr<ShipDataPanel>  m_panel;
     };
 }
 
@@ -1101,12 +1100,12 @@ private:
     boost::signals2::connection                     m_fleet_connection;
     std::vector<boost::signals2::connection>        m_ship_connections;
 
-    std::shared_ptr<GG::Control>                    m_fleet_icon = nullptr;
-    std::shared_ptr<GG::Label>                      m_fleet_name_text = nullptr;
-    std::shared_ptr<GG::Label>                      m_fleet_destination_text = nullptr;
-    std::shared_ptr<GG::Button>                     m_aggression_toggle = nullptr;
+    std::shared_ptr<GG::Control>                    m_fleet_icon;
+    std::shared_ptr<GG::Label>                      m_fleet_name_text;
+    std::shared_ptr<GG::Label>                      m_fleet_destination_text;
+    std::shared_ptr<GG::Button>                     m_aggression_toggle;
     std::vector<std::shared_ptr<GG::StaticGraphic>> m_fleet_icon_overlays;
-    std::shared_ptr<ScanlineControl>                m_scanline_control = nullptr;
+    std::shared_ptr<ScanlineControl>                m_scanline_control;
 
     std::vector<std::pair<MeterType, std::shared_ptr<StatisticIcon>>> m_stat_icons; // statistic icons and associated meter types
 
@@ -1796,9 +1795,11 @@ namespace {
     class FleetRow : public GG::ListBox::Row {
     public:
         FleetRow(int fleet_id, GG::X w, GG::Y h) :
-            GG::ListBox::Row(w, h, Objects().get<Fleet>(fleet_id) ? FLEET_DROP_TYPE_STRING : ""),
+            GG::ListBox::Row(w, h),
             m_fleet_id(fleet_id)
         {
+            if (Objects().get<Fleet>(fleet_id))
+                SetDragDropDataType(FLEET_DROP_TYPE_STRING);
             SetName("FleetRow");
             SetChildClippingMode(ClipToClient);
         }
@@ -1820,7 +1821,7 @@ namespace {
 
     private:
         int                             m_fleet_id = INVALID_OBJECT_ID;
-        std::shared_ptr<FleetDataPanel> m_panel = nullptr;
+        std::shared_ptr<FleetDataPanel> m_panel;
     };
 }
 
@@ -2390,7 +2391,7 @@ private:
     int                             m_fleet_id = INVALID_OBJECT_ID;
     bool                            m_order_issuing_enabled = false;
     boost::signals2::connection     m_fleet_connection;
-    std::shared_ptr<ShipsListBox>   m_ships_lb = nullptr;
+    std::shared_ptr<ShipsListBox>   m_ships_lb;
 };
 
 FleetDetailPanel::FleetDetailPanel(GG::X w, GG::Y h, int fleet_id, bool order_issuing_enabled,

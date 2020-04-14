@@ -1,5 +1,5 @@
 // -*- C++ -*-
-/* GG is a GUI for SDL and OpenGL.
+/* GG is a GUI for OpenGL.
    Copyright (C) 2003-2008 T. Zachary Laine
 
    This library is free software; you can redistribute it and/or
@@ -85,8 +85,7 @@ std::shared_ptr<T> LockAndResetIfExpired(std::weak_ptr<T>& ptr) {
     HandleEvent() must be driven from PollAndRender().  The code driving
     HandleEvent() must interact with the hardware and/or operating system, and
     supply the appropriate EventType's, key presses, and mouse position info
-    to HandleEvent().  It is the author's recommendation that the user use the
-    provided SDL driver to do this.
+    to HandleEvent().
 
     <p>Keyboard accelerators may be defined, as mentioned above.  Each defined
     accelerator has its own signal which is emitted each time the accelerator
@@ -143,7 +142,7 @@ public:
 
     /// These are the only events absolutely necessary for GG to function
     /// properly
-    enum EventType {
+    enum EventType : int {
         IDLE,        ///< nothing has changed since the last message, but the GUI might want to update some things anyway
         KEYPRESS,    ///< a down key press or key repeat, with or without modifiers like Alt, Ctrl, Meta, etc.
         KEYRELEASE,  ///< a key release, with or without modifiers like Alt, Ctrl, Meta, etc.

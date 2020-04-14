@@ -941,6 +941,13 @@ void CUIEdit::KeyPress(GG::Key key, std::uint32_t key_code_point,
     }
 }
 
+void CUIEdit::AcceptPastedText(const std::string& text) {
+    std::string text_copy;
+    std::copy_if(text.begin(), text.end(), std::back_inserter(text_copy),
+                 [this](char c){ return m_disallowed_chars.find(c) == std::string::npos; });
+    GG::Edit::AcceptPastedText(text_copy);
+}
+
 void CUIEdit::GainingFocus() {
     GG::Edit::GainingFocus();
     GainingFocusSignal();
@@ -1279,7 +1286,7 @@ const GG::Y CUISimpleDropDownListRow::DEFAULT_ROW_HEIGHT(22);
 
 CUISimpleDropDownListRow::CUISimpleDropDownListRow(const std::string& row_text,
                                                    GG::Y row_height/* = DEFAULT_ROW_HEIGHT*/) :
-    GG::ListBox::Row(GG::X1, row_height, ""),
+    GG::ListBox::Row(GG::X1, row_height),
     m_row_label(GG::Wnd::Create<CUILabel>(row_text, GG::FORMAT_LEFT | GG::FORMAT_NOWRAP))
 {}
 
@@ -1498,8 +1505,9 @@ namespace {
     // row type used in the SpeciesSelector
     struct SpeciesRow : public GG::ListBox::Row {
         SpeciesRow(const Species* species, GG::X w, GG::Y h) :
-            GG::ListBox::Row(w, h, "", GG::ALIGN_VCENTER, 0)
+            GG::ListBox::Row(w, h)
         {
+            SetMargin(0);
             if (!species)
                 return;
             const std::string& species_name = species->Name();
@@ -1510,8 +1518,9 @@ namespace {
 
         SpeciesRow(const std::string& species_name, const std::string& localized_name, const std::string& species_desc,
                    GG::X w, GG::Y h, std::shared_ptr<GG::Texture> species_icon) :
-            GG::ListBox::Row(w, h, "", GG::ALIGN_VCENTER, 0)
+            GG::ListBox::Row(w, h)
         {
+            SetMargin(0);
             GG::Wnd::SetName(species_name);
             Init(species_name, localized_name, species_desc, w, h, species_icon);
         };
@@ -1620,7 +1629,7 @@ namespace {
         };
 
         ColorRow(const GG::Clr& color, GG::Y h) :
-            GG::ListBox::Row(GG::X(Value(h)), h, ""),
+            GG::ListBox::Row(GG::X(Value(h)), h),
             m_color_square(GG::Wnd::Create<ColorSquare>(color, h))
         {}
 

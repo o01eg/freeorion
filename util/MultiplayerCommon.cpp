@@ -108,7 +108,6 @@ namespace {
 }
 
 GalaxySetupData::GalaxySetupData() :
-    m_seed(),
     m_size(100),
     m_shape(SPIRAL_2),
     m_age(GALAXY_SETUP_MEDIUM),
@@ -117,7 +116,8 @@ GalaxySetupData::GalaxySetupData() :
     m_specials_freq(GALAXY_SETUP_MEDIUM),
     m_monster_freq(GALAXY_SETUP_MEDIUM),
     m_native_freq(GALAXY_SETUP_MEDIUM),
-    m_ai_aggr(MANIACAL)
+    m_ai_aggr(MANIACAL),
+    m_encoding_empire(ALL_EMPIRES)
 {}
 
 GalaxySetupData::GalaxySetupData(GalaxySetupData&& base) :
@@ -132,7 +132,8 @@ GalaxySetupData::GalaxySetupData(GalaxySetupData&& base) :
     m_native_freq(base.m_native_freq),
     m_ai_aggr(base.m_ai_aggr),
     m_game_rules(std::move(base.m_game_rules)),
-    m_game_uid(std::move(base.m_game_uid))
+    m_game_uid(std::move(base.m_game_uid)),
+    m_encoding_empire(base.m_encoding_empire)
 { SetSeed(m_seed); }
 
 const std::string& GalaxySetupData::GetSeed() const

@@ -67,10 +67,10 @@ namespace {
     //////////////////////////////////////////////////
     struct QueueRow : GG::ListBox::Row {
         QueueRow(GG::X w, const ResearchQueue::Element& queue_element) :
-            GG::ListBox::Row(w, QueueTechPanel::DefaultHeight(), "RESEARCH_QUEUE_ROW"),
-            elem(queue_element),
-            panel(nullptr)
+            GG::ListBox::Row(w, QueueTechPanel::DefaultHeight()),
+            elem(queue_element)
         {
+            SetDragDropDataType("RESEARCH_QUEUE_ROW");
             RequirePreRender();
             Resize(GG::Pt(w, QueueTechPanel::DefaultHeight()));
         }
@@ -353,8 +353,7 @@ public:
     /** \name Structors */ //@{
     ResearchQueueWnd(GG::X x, GG::Y y, GG::X w, GG::Y h) :
         CUIWnd("", x, y, w, h, GG::INTERACTIVE | GG::RESIZABLE | GG::DRAGABLE | GG::ONTOP | PINABLE,
-               "research.queue"),
-        m_queue_lb(nullptr)
+               "research.queue")
     {}
 
     void CompleteConstruction() override {
@@ -407,9 +406,6 @@ private:
 //////////////////////////////////////////////////
 ResearchWnd::ResearchWnd(GG::X w, GG::Y h, bool initially_hidden /*= true*/) :
     GG::Wnd(GG::X0, GG::Y0, w, h, GG::INTERACTIVE | GG::ONTOP),
-    m_research_info_panel(nullptr),
-    m_queue_wnd(nullptr),
-    m_tech_tree_wnd(nullptr),
     m_enabled(false),
     m_empire_shown_id(ALL_EMPIRES)
 {

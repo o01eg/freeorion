@@ -1,5 +1,5 @@
 // -*- C++ -*-
-/* GG is a GUI for SDL and OpenGL.
+/* GG is a GUI for OpenGL.
    Copyright (C) 2003-2008 T. Zachary Laine
 
    This library is free software; you can redistribute it and/or
@@ -312,7 +312,7 @@ public:
     typedef std::map<const Wnd*, bool>::iterator DropsAcceptableIter;
 
     /** The modes of child clipping. */
-    enum ChildClippingMode {
+    enum ChildClippingMode : int {
         /** No child clipping is performed. */
         DontClip,
 
@@ -795,7 +795,7 @@ protected:
     /** The states a Wnd may be in, with respect to drag-and-drop operations.
         Wnds may wish to consider the current state when rendering to provide
         visual feedback to the user. */
-    enum DragDropRenderingState {
+    enum DragDropRenderingState : int {
         /** No drag-and-drop is taking place at all with this Wnd. */
         NOT_DRAGGED,
 

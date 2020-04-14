@@ -313,15 +313,14 @@ namespace {
     class OptionsListRow : public GG::ListBox::Row {
     public:
         OptionsListRow(GG::X w, GG::Y h, std::shared_ptr<RowContentsWnd> contents) :
-            GG::ListBox::Row(w, h, ""),
+            GG::ListBox::Row(w, h),
             m_contents(std::forward<std::shared_ptr<RowContentsWnd>>(contents))
         {
             SetChildClippingMode(ClipToClient);
         }
 
         OptionsListRow(GG::X w, GG::Y h, std::shared_ptr<Wnd> contents, int indentation = 0) :
-            GG::ListBox::Row(w, h, ""),
-            m_contents(nullptr)
+            GG::ListBox::Row(w, h)
         {
             SetChildClippingMode(ClipToClient);
             if (contents)
@@ -1234,7 +1233,7 @@ void OptionsWnd::ResolutionOption(GG::ListBox* page, int indentation_level) {
     // fullscreen / windowed toggle
     BoolOption(page, indentation_level, "video.fullscreen.enabled", UserString("OPTIONS_FULLSCREEN"));
     // Fake mode change is not possible without the opengl frame buffer extension
-    if (GG::SDLGUI::GetGUI()->FramebuffersAvailable()) {
+    if (SDLGUI::GetGUI()->FramebuffersAvailable()) {
         BoolOption(page, indentation_level, "video.fullscreen.fake.enabled", UserString("OPTIONS_FAKE_MODE_CHANGE"));
     } else {
         GetOptionsDB().Set<bool>("video.fullscreen.fake.enabled", false);

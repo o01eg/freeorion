@@ -1,4 +1,10 @@
-freeorion (0.4.9.1+1SNAPSHOT20200405ppa2~bionic) bionic; urgency=medium
+freeorion (0.4.9.1+1SNAPSHOT20200414ppa1~bionic) bionic; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg <o01eg@yandex.ru>  Tue, 14 Apr 2020 18:05:41 +0000
+
+freeorion (0.4.9.1+1SNAPSHOT20200405ppa2~focal) focal; urgency=medium
 
   * Fix building deb
 

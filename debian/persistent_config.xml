@@ -85,6 +85,8 @@
     <max>0</max>
    </unconn-human-empire-players>
    <publish-statistics>0</publish-statistics>
+   <publish-seed>0</publish-seed>
+   <drop-empire-ready>0</drop-empire-ready>
    <cookies>
     <expire-minutes>2160</expire-minutes>
    </cookies>

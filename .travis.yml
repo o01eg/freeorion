@@ -1,66 +1,12 @@
 ---
 stages:
-  - lint
-  - test
   - name: deploy
     # matches tags like ppa-2020-04-14.60fb514_9 where 2020-04-14.60fb514 is build revision from
     # forum and 9 is ppa9 suffix
-    if: tag =~ /^ppa-\d{4}-\d{2}-\d{2}.\h{7}_\d+$/
-    
-_lint_python_common: &_lint_python_common
-  stage: lint
-  os: linux
-  dist: bionic
-  language: python
-  install:
-    - pip install flake8-putty==0.4.0
-  before_script:
-    - cd default/python
-  script:
-    - flake8
-    - python -m compileall -q .
-
-_test_python_common: &_test_python_common
-  stage: test
-  os: linux
-  dist: bionic
-  language: python
-  install:
-    - pip install pytest==3.6.3
-  script:
-    - pytest
+    if: tag =~ /^ppa-\d{4}-\d{2}-\d{2}.\h{7}_\d+$/  
 
 jobs:
   include:
-    - name: Lint AI with Python 3.5
-      <<: *_lint_python_common
-      python: 3.5
-      before_install:
-        - alias pip=/usr/bin/pip3
-        - alias python=/usr/bin/python3
-
-    - name: Lint string tables
-      stage: lint
-      os: linux
-      dist: bionic
-      language: python
-      python: 3.5
-      script:
-        - ./check/st-tool.py check --reference default/stringtables/en.txt default/stringtables/*.txt
-        - diff -u default/stringtables/en.txt <(check/st-tool.py format default/stringtables/en.txt) || { echo "String table is not properly formatted"; exit 1; }
-
-    - name: Unittest AI with Python 3.5
-      <<: *_test_python_common
-      python: 3.5
-      before_install:
-        - alias pip=/usr/bin/pip3
-
-    - name: Unittest AI with Python 3.8
-      <<: *_test_python_common
-      python: 3.8
-      before_install:
-        - alias pip=/usr/bin/pip3
-
     - name: Deploy PPA
       stage: deploy
       os: linux

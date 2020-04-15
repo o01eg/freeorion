@@ -1,7 +1,6 @@
 ---
 stages:
   - lint
-  - build
   - test
   - name: deploy
     # matches tags like ppa-2020-04-14.60fb514_9 where 2020-04-14.60fb514 is build revision from
@@ -20,25 +19,6 @@ _lint_python_common: &_lint_python_common
   script:
     - flake8
     - python -m compileall -q .
-
-_build_cpp_common: &_build_cpp_common
-  stage: build
-  language: cpp
-  cache: ccache
-  install:
-    - mkdir -p $HOME/.ccache;
-    - echo sloppiness = file_macro > $HOME/.ccache/ccache.conf
-    - echo max_size = 200M >> $HOME/.ccache/ccache.conf
-    - ccache --version
-    - ccache --show-stats
-  before_script:
-    - mkdir build
-    - cd build
-  after_success:
-    - cmake --build . --config Release --target unittest
-  before_cache:
-    - ccache --clean
-    - ccache --show-stats
 
 _test_python_common: &_test_python_common
   stage: test
@@ -69,104 +49,6 @@ jobs:
         - ./check/st-tool.py check --reference default/stringtables/en.txt default/stringtables/*.txt
         - diff -u default/stringtables/en.txt <(check/st-tool.py format default/stringtables/en.txt) || { echo "String table is not properly formatted"; exit 1; }
 
-    - name: Build C++ API documentation
-      stage: build
-      os: linux
-      dist: bionic
-      language: shell
-      services:
-        - docker
-      env:
-        # Auth token to push API documentation
-        - secure: "JKeXk8p65hodb12PVRST6A90swsNubc+46EbSJGSghldIxbFWLBAlwU+KLeOMO4V0veu6k4lnMa50V0UYFZmoUsS6W0aL5Ybo98SpzXHiNLOmOluoqJoF9TBsOTCCRFbWbccgJyVEtulgRcdml96naS51lq9Sw/VO/N3Z472304="
-      before_install:
-        - docker pull freeorion/freeorion-travis-build
-        # Add transparent cmake function to allow possible cross platform use of
-        # build sections.
-        - >
-          function cmake {
-              docker run -v "${TRAVIS_BUILD_DIR}:/freeorion"  -w /freeorion/build freeorion/freeorion-travis-build timeout 40m /usr/bin/cmake $@
-          }
-      before_script:
-        - mkdir build
-        - cd build
-      script:
-        - cmake ..
-        - cmake --build . --target cpp-apidoc
-      before_deploy:
-        # Configure git to use the identity of FreeOrion Build Bot and
-        # load credentials
-        - git config --global user.email "freeorionorg@gmail.com"
-        - git config --global user.name "FreeOrion Build Bot"
-        - git config --global credential.helper "cache --timeout=300"
-        - echo -e "url=https://freeorion-bot:${FreeOrion_AUTH_TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git\n" | git credential approve
-        - git clone --depth=1 --branch=master https://github.com/freeorion/freeorion.github.io.git apidoc-deploy.git
-        - pushd apidoc-deploy.git
-        - rm -rf cppapi/master
-        - mkdir -p cppapi/master
-        - cp -R ../doc/cpp-apidoc/html cppapi/master
-        - git add -A cppapi/master
-        - git commit -m "Update FreeOrion API documentation to match commit \`$(date --iso-8601).${TRAVIS_COMMIT:0:8}\`" || true
-      deploy:
-        provider: script
-        script: git push https://github.com/freeorion/freeorion.github.io.git master:master
-        skip_cleanup: true
-        on:
-          branch: master
-
-    - name: Build FreeOrion on Ubunutu 18.04 (Bionic)
-      <<: *_build_cpp_common
-      os: linux
-      dist: bionic
-      services:
-        - docker
-      before_install:
-        - docker pull freeorion/freeorion-travis-build
-        # mount ccache dir and set its environment variable
-        # timeout before Travis kills jobs so that ccache is always at least partially populated
-        - >
-          function cmake {
-              docker run -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build freeorion/freeorion-travis-build timeout 40m /usr/bin/cmake $@
-          }
-      script:
-        - cmake -DBUILD_TESTING=ON ..
-        - cmake --build . -- -j 2
-
-    - name: Build headless FreeOrion on Ubunutu 18.04 (Bionic)
-      <<: *_build_cpp_common
-      os: linux
-      dist: bionic
-      services:
-        - docker
-      before_install:
-        - docker pull freeorion/freeorion-travis-build
-        # mount ccache dir and set its environment variable
-        # timeout before Travis kills jobs so that ccache is always at least partially populated
-        - >
-          function cmake {
-              docker run -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build freeorion/freeorion-travis-build timeout 40m /usr/bin/cmake $@
-          }
-      script:
-        - cmake -DBUILD_HEADLESS=ON -DBUILD_TESTING=ON ..
-        - cmake --build . -- -j 2
-
-    - name: Build FreeOrion on MacOS 10.12
-      <<: *_build_cpp_common
-      os: osx
-      osx_image: xcode8.3
-      compiler: clang
-      before_install:
-        - brew install ccache
-        - export PATH="/usr/local/opt/ccache/libexec:$PATH"
-        # timeout before Travis kills jobs so that ccache is always at least partially populated
-        - >
-          function cmake {
-              /usr/local/bin/gtimeout 40m /usr/local/bin/cmake $@
-          }
-      script:
-        - cmake -GXcode -DBUILD_TESTING=ON ..
-        - cmake --build . --config Release -- -parallelizeTargets -jobs $(sysctl hw.ncpu | awk '{print $2}')
-
     - name: Unittest AI with Python 3.5
       <<: *_test_python_common
       python: 3.5
@@ -187,6 +69,11 @@ jobs:
       python: 3.5
       env:
         - secure: "5l5H2VUpPDAnxngueT2KlE5Yt+SEXNpA2SaitoxuDSVLuoFD2nDcaao7DA20M0JlpDMVQNPdFyB601XRmQGfzq5T4jJlDgcVEGx4sN/9LJ90xVC0YfyE8E+U4UZmUkkjfFPimpxJuoxOl0STX8u/yzzFfSz7VDhFBqKH2we6JJImdHOMw3NpZBzq5dtky8xbjgGs39BkllOVXdHroeT+LqhESa1pB94U3VXz+/FRwjODK2KLzeN3Hdp+Hs2bRCM5ZP5lVWg8hP6ky6ZLk9wY3RfjLhDQUVdbGlbaUw45UdA/3LbINUZuD9K71areY/bAy3Li8V/zPz5OgnPSNxeBsIO7a+pqcxMVcH0NISI/NjoYpUgyN8eGqQzbzQQ5J+oBtbUlJhfSby1q7AZ9t0OlqE9LQuP3bPqAe9IhCFGUtwmRrqMK47UzAXCcZIQ8LqwoHKfbO7g3IOEpoIEpgdoM43U/wZ0sUnVEelqHf1T5MNnKQFuqwTDwhtal2T8IhVJ6x0Zcsa9pCYa9roY50gevOZFbfNsR6BTv6A3aXikrCZxDQ+PkDDn3EEd1KZ7NJtBwTDOIWtj1vTYWZELc7ZuInc9Bi4VrWQv+m6v1tp3O8qJhHgrUXK5GRwywvfxYGY3tf/kWZ9/tUXQiZ9yaAW8iI+J8yOWo1J9y6VnuNkD+Bt0="
+      addons:
+        apt:
+          packages:
+            - devscripts
+            - dput
       before_script:
         - .ci/before_script.sh
       script:
@@ -198,15 +85,15 @@ jobs:
         - sed -i "s/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.[0-9a-f]\{7\}\]/${BUILD_REV}\]/" util/Version.cpp
         # set base debian version before tag
         - sed -i "1,+1{s/bionic\|disco\|eoan\|focal/bionic/g}" debian/changelog
-        - tar --xz -cvf ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~bionic.orig.tar.xz --exclude .git .
+        - tar --xz -cvf ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~bionic.orig.tar.xz --exclude .git --exclude .ci --exclude .github .
         - debuild -S -sa
         - dput ppa:o01eg/freeorion ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~bionic_source.changes
         - sed -i "1,+1{s/bionic\|disco\|eoan\|focal/eoan/g}" debian/changelog
-        - tar --xz -cvf ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~eoan.orig.tar.xz --exclude .git .
+        - tar --xz -cvf ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~eoan.orig.tar.xz --exclude .git --exclude .ci --exclude .github .
         - debuild -S -sa
         - dput ppa:o01eg/freeorion ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~eoan_source.changes
         - sed -i "1,+1{s/bionic\|disco\|eoan\|focal/focal/g}" debian/changelog
-        - tar --xz -cvf ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~focal.orig.tar.xz --exclude .git .
+        - tar --xz -cvf ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~focal.orig.tar.xz --exclude .git --exclude .ci --exclude .github .
         - debuild -S -sa
         - dput ppa:o01eg/freeorion ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~focal_source.changes
 

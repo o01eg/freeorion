@@ -20,6 +20,6 @@ echo Success!
 
 echo
 echo Importing keyrings..
-{ gpg --home "${custom_gpg_home}" --import "${secring_auto}" ; } || { end_with_error "Could not import secret keyring into gpg." ; }
-{ gpg --home "${custom_gpg_home}" --import "${pubring_auto}" ; } || { end_with_error "Could not import public keyring into gpg." ; }
+{ gpg --import "${secring_auto}" ; } || { end_with_error "Could not import secret keyring into gpg." ; }
+{ gpg --import "${pubring_auto}" ; } || { end_with_error "Could not import public keyring into gpg." ; }
 echo Success!

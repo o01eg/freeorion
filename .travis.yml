@@ -20,6 +20,7 @@ jobs:
           packages:
             - devscripts
             - dput
+            - fakeroot
       before_script:
         - .ci/before_script.sh
       script:

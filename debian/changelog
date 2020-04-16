@@ -1,3 +1,9 @@
+freeorion (0.4.9.1+1SNAPSHOT20200414ppa3~bionic) bionic; urgency=medium
+
+  * Upload PPA via SFTP
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Wed, 16 Apr 2020 09:41:38 +0000
+
 freeorion (0.4.9.1+1SNAPSHOT20200414ppa2~bionic) bionic; urgency=medium
 
   * Make PPA automatically

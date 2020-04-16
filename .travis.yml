@@ -3,37 +3,48 @@ stages:
   - name: deploy
     # matches tags like ppa-2020-04-14.60fb514_9 where 2020-04-14.60fb514 is build revision from
     # forum and 9 is ppa9 suffix
-    if: tag =~ /^ppa-\d{4}-\d{2}-\d{2}.\h{7}_\d+$/  
+    if: tag =~ /^ppa-\d{4}-\d{2}-\d{2}.\h{7}_\d+$/
+
+_build_ppa_common: &_build_ppa_common
+  stage: deploy
+  os: linux
+  dist: bionic
+  language: python
+  env:
+    - secure: "5l5H2VUpPDAnxngueT2KlE5Yt+SEXNpA2SaitoxuDSVLuoFD2nDcaao7DA20M0JlpDMVQNPdFyB601XRmQGfzq5T4jJlDgcVEGx4sN/9LJ90xVC0YfyE8E+U4UZmUkkjfFPimpxJuoxOl0STX8u/yzzFfSz7VDhFBqKH2we6JJImdHOMw3NpZBzq5dtky8xbjgGs39BkllOVXdHroeT+LqhESa1pB94U3VXz+/FRwjODK2KLzeN3Hdp+Hs2bRCM5ZP5lVWg8hP6ky6ZLk9wY3RfjLhDQUVdbGlbaUw45UdA/3LbINUZuD9K71areY/bAy3Li8V/zPz5OgnPSNxeBsIO7a+pqcxMVcH0NISI/NjoYpUgyN8eGqQzbzQQ5J+oBtbUlJhfSby1q7AZ9t0OlqE9LQuP3bPqAe9IhCFGUtwmRrqMK47UzAXCcZIQ8LqwoHKfbO7g3IOEpoIEpgdoM43U/wZ0sUnVEelqHf1T5MNnKQFuqwTDwhtal2T8IhVJ6x0Zcsa9pCYa9roY50gevOZFbfNsR6BTv6A3aXikrCZxDQ+PkDDn3EEd1KZ7NJtBwTDOIWtj1vTYWZELc7ZuInc9Bi4VrWQv+m6v1tp3O8qJhHgrUXK5GRwywvfxYGY3tf/kWZ9/tUXQiZ9yaAW8iI+J8yOWo1J9y6VnuNkD+Bt0="
+  addons:
+    apt:
+      packages:
+        - devscripts
+        - dput
+        - python3-paramiko
+        - fakeroot
+        - cmake
+        - debhelper
+        - libalut-dev
+        - libboost-all-dev
+        - libgl1-mesa-dev
+        - libglew-dev
+        - libogg-dev
+        - libopenal-dev
+        - libsdl2-dev
+        - libvorbis-dev
+  before_script:
+    - .ci/before_script.sh
+    - python cmake/make_versioncpp.py . CMake
 
 jobs:
   include:
-    - name: Deploy PPA
-      stage: deploy
-      os: linux
-      dist: bionic
-      language: python
-      python: 3.5
-      env:
-        - secure: "5l5H2VUpPDAnxngueT2KlE5Yt+SEXNpA2SaitoxuDSVLuoFD2nDcaao7DA20M0JlpDMVQNPdFyB601XRmQGfzq5T4jJlDgcVEGx4sN/9LJ90xVC0YfyE8E+U4UZmUkkjfFPimpxJuoxOl0STX8u/yzzFfSz7VDhFBqKH2we6JJImdHOMw3NpZBzq5dtky8xbjgGs39BkllOVXdHroeT+LqhESa1pB94U3VXz+/FRwjODK2KLzeN3Hdp+Hs2bRCM5ZP5lVWg8hP6ky6ZLk9wY3RfjLhDQUVdbGlbaUw45UdA/3LbINUZuD9K71areY/bAy3Li8V/zPz5OgnPSNxeBsIO7a+pqcxMVcH0NISI/NjoYpUgyN8eGqQzbzQQ5J+oBtbUlJhfSby1q7AZ9t0OlqE9LQuP3bPqAe9IhCFGUtwmRrqMK47UzAXCcZIQ8LqwoHKfbO7g3IOEpoIEpgdoM43U/wZ0sUnVEelqHf1T5MNnKQFuqwTDwhtal2T8IhVJ6x0Zcsa9pCYa9roY50gevOZFbfNsR6BTv6A3aXikrCZxDQ+PkDDn3EEd1KZ7NJtBwTDOIWtj1vTYWZELc7ZuInc9Bi4VrWQv+m6v1tp3O8qJhHgrUXK5GRwywvfxYGY3tf/kWZ9/tUXQiZ9yaAW8iI+J8yOWo1J9y6VnuNkD+Bt0="
-      addons:
-        apt:
-          packages:
-            - devscripts
-            - dput
-            - fakeroot
-            - cmake
-            - debhelper
-            - libalut-dev
-            - libboost-all-dev
-            - libgl1-mesa-dev
-            - libglew-dev
-            - libogg-dev
-            - libopenal-dev
-            - libsdl2-dev
-            - libvorbis-dev
-      before_script:
-        - .ci/before_script.sh
-        - python cmake/make_versioncpp.py . CMake
+    - name: Deploy PPA Bionic 18.04
+      <<: *_build_ppa_common
       script:
-        - .ci/script.sh
+        - .ci/script.sh bionic
+    - name: Deploy PPA Eoan 19.10
+      <<: *_build_ppa_common
+      script:
+        - .ci/script.sh eoan
+    - name: Deploy PPA Focal 20.04
+      <<: *_build_ppa_common
+      script:
+        - .ci/script.sh focal
 

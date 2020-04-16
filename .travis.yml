@@ -33,26 +33,7 @@ jobs:
             - libvorbis-dev
       before_script:
         - .ci/before_script.sh
-      script:
         - python cmake/make_versioncpp.py . CMake
-        - BUILD_REV=$(echo "${TRAVIS_TAG}" | sed -s 's/^ppa-\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.[0-9a-f]\{7\}\).*/\1/')
-        - BUILD_DATE=$(echo "${TRAVIS_TAG}" | sed -s 's/^ppa-\([0-9]\{4\}\)-\([0-9]\{2\}\)-\([0-9]\{2\}\)\.[0-9a-f]\{7\}.*/\1\2\3/')
-        - BUILD_PPA=$(echo "${TRAVIS_TAG}" | sed -s 's/^ppa-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.[0-9a-f]\{7\}_\([0-9]\+\).*/\1/')
-        - echo "REV=${BUILD_REV} DATE=${BUILD_DATE} PPA=${BUILD_PPA}"
-        - sed -i "s/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.[0-9a-f]\{7\}\]/${BUILD_REV}\]/" util/Version.cpp
-        # set base debian version before tag
-        - sed -i "1,+1{s/bionic\|disco\|eoan\|focal/bionic/g}" debian/changelog
-        - tar --xz -cvf ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~bionic.orig.tar.xz --exclude .git --exclude .ci --exclude .github .
-        - debuild -S -sa
-        - sed -i "1,+1{s/bionic\|disco\|eoan\|focal/eoan/g}" debian/changelog
-        - tar --xz -cvf ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~eoan.orig.tar.xz --exclude .git --exclude .ci --exclude .github .
-        - debuild -S -sa
-        - sed -i "1,+1{s/bionic\|disco\|eoan\|focal/focal/g}" debian/changelog
-        - tar --xz -cvf ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~focal.orig.tar.xz --exclude .git --exclude .ci --exclude .github .
-        - debuild -S -sa
-      after_success:
-        - curl -v -T ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~*.debian.tar.xz ftp://anonymous@ppa.launchpad.net/~o01eg/freeorion/
-        - curl -v -T ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~*.orig.tar.xz ftp://anonymous@ppa.launchpad.net/~o01eg/freeorion/
-        - curl -v -T ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~*_source.changes ftp://anonymous@ppa.launchpad.net/~o01eg/freeorion/
-        - curl -v -T ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~*.dsc ftp://anonymous@ppa.launchpad.net/~o01eg/freeorion/
+      script:
+        - .ci/script.sh
 

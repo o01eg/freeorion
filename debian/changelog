@@ -1,4 +1,4 @@
-freeorion (0.4.9+git20200414~60fb514-fo0009-ppa5~bionic) bionic; urgency=medium
+freeorion (0.4.9.fo0009+git20200414.60fb514ppa5~bionic) bionic; urgency=medium
 
   * Automatically build with PPA
 

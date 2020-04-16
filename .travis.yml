@@ -4,9 +4,9 @@ stages:
   - build
   - test
   - name: deploy
-    # matches tags like ppa-2020-04-14.60fb514_9 where 2020-04-14.60fb514 is build revision from
+    # matches tags like ppa-lt-2020-04-14.60fb514_9 where 2020-04-14.60fb514 is build revision from
     # forum and 9 is ppa9 suffix
-    if: tag =~ /^ppa-\d{4}-\d{2}-\d{2}.\h{7}_\d+$/    
+    if: tag =~ /^ppa-lt-\d{4}-\d{2}-\d{2}.\h{7}_\d+$/    
 
 _lint_python_common: &_lint_python_common
   stage: lint

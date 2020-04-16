@@ -6,9 +6,9 @@ end_with_error()
  exit 1
 }
 
-BUILD_REV=$(echo "${TRAVIS_TAG}" | sed -s 's/^ppa-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.\([0-9a-f]\{7\}\).*/\1/')
-BUILD_DATE=$(echo "${TRAVIS_TAG}" | sed -s 's/^ppa-\([0-9]\{4\}\)-\([0-9]\{2\}\)-\([0-9]\{2\}\)\.[0-9a-f]\{7\}.*/\1\2\3/')
-BUILD_PPA=$(echo "${TRAVIS_TAG}" | sed -s 's/^ppa-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.[0-9a-f]\{7\}_\([0-9]\+\).*/\1/')
+BUILD_REV=$(echo "${TRAVIS_TAG}" | sed -s 's/^ppa-lt-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.\([0-9a-f]\{7\}\).*/\1/')
+BUILD_DATE=$(echo "${TRAVIS_TAG}" | sed -s 's/^ppa-lt-\([0-9]\{4\}\)-\([0-9]\{2\}\)-\([0-9]\{2\}\)\.[0-9a-f]\{7\}.*/\1\2\3/')
+BUILD_PPA=$(echo "${TRAVIS_TAG}" | sed -s 's/^ppa-lt-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.[0-9a-f]\{7\}_\([0-9]\+\).*/\1/')
 echo "REV=${BUILD_REV} DATE=${BUILD_DATE} PPA=${BUILD_PPA}"
 
 DIST=$1

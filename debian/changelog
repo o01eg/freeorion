@@ -2,7 +2,7 @@ freeorion (0.4.9.fo0009+git20200414.60fb514ppa5~bionic) bionic; urgency=medium
 
   * Automatically build with PPA
 
- -- O01eg <o01eg@yandex.ru>  Tue, 16 Apr 2020 18:06:41 +0000
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Tue, 16 Apr 2020 18:06:41 +0000
 
 freeorion (0.4.9+git20200414~60fb514-fo0009-4) unstable; urgency=medium
 

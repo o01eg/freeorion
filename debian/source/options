@@ -1,2 +1,2 @@
-tar-ignore = "(^|/)\.(git|github|ci)($|/)"
-diff-ignore = "(^|/)\.(git|github|ci)($|/)"
+tar-ignore = "(^|/)(\.git|\.github|\.ci|msvc2017)($|/)"
+diff-ignore = "(^|/)(\.git|\.github|\.ci|msvc2017)($|/)"

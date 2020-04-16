@@ -1,3 +1,10 @@
+freeorion (0.4.9.1+1SNAPSHOT20200414ppa4~bionic) bionic; urgency=medium
+
+  * Try to reduce source archive size.
+  * Split deploy step.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Wed, 16 Apr 2020 14:26:17 +0000
+
 freeorion (0.4.9.1+1SNAPSHOT20200414ppa3~bionic) bionic; urgency=medium
 
   * Upload PPA via SFTP

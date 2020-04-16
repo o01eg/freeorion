@@ -44,13 +44,13 @@ jobs:
         - sed -i "1,+1{s/bionic\|disco\|eoan\|focal/bionic/g}" debian/changelog
         - tar --xz -cvf ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~bionic.orig.tar.xz --exclude .git --exclude .ci --exclude .github .
         - debuild -S -sa
-        - dput ppa:o01eg/freeorion ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~bionic_source.changes
+        - dput -d -p ppa:o01eg/freeorion ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~bionic_source.changes
         - sed -i "1,+1{s/bionic\|disco\|eoan\|focal/eoan/g}" debian/changelog
         - tar --xz -cvf ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~eoan.orig.tar.xz --exclude .git --exclude .ci --exclude .github .
         - debuild -S -sa
-        - dput ppa:o01eg/freeorion ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~eoan_source.changes
+        - dput -d -p ppa:o01eg/freeorion ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~eoan_source.changes
         - sed -i "1,+1{s/bionic\|disco\|eoan\|focal/focal/g}" debian/changelog
         - tar --xz -cvf ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~focal.orig.tar.xz --exclude .git --exclude .ci --exclude .github .
         - debuild -S -sa
-        - dput ppa:o01eg/freeorion ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~focal_source.changes
+        - dput -d -p ppa:o01eg/freeorion ../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~focal_source.changes
 

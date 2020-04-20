@@ -89,7 +89,7 @@ class ChatHistoryProvider:
                     req.add_header("X-XMPP-Muc", "smac")
                     urllib.request.urlopen(req).read()
                     info("Chat message was send via XMPP")
-                except:
+                except Exception:
                     exctype, value = sys.exc_info()[:2]
                     error("Cann't send chat message %s: %s %s" % (text, exctype, value))
             except psycopg2.InterfaceError:

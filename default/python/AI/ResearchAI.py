@@ -1,4 +1,3 @@
-from __future__ import division
 import math
 import random
 from functools import partial
@@ -6,7 +5,6 @@ from logging import warning, debug
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
 from common.print_utils import print_in_columns
-from common import six
 
 import AIDependencies as Dep
 from AIDependencies import Tags
@@ -21,7 +19,7 @@ from turn_state import state
 inProgressTechs = {}
 
 
-class Choices(object):
+class Choices:
     # Cannot construct on import, because fo.getEmpire() is None at this time
     def init(self):
         rng = random.Random()
@@ -389,7 +387,7 @@ def init():
     )
 
     for k, v in tech_handlers:
-        if isinstance(k, six.string_types):
+        if isinstance(k, str):
             k = (k, )  # wrap single techs to tuple
         for tech in k:
             priority_funcs[tech] = v
@@ -691,7 +689,7 @@ def generate_classic_research_orders():
                     debug("    Enqueued Tech: %20s \t\t %8.0f \t %8.0f", name, this_cost, cum_cost)
                 else:
                     warning("    Failed attempt to enqueued Tech: " + name)
-            except:
+            except:  # noqa: E722
                 warning("    Failed attempt to enqueued Tech: " + name, exc_info=True)
 
         debug('\n\nAll techs:')

@@ -14,13 +14,16 @@
 #include "Building.h"
 #include "Effect.h"
 #include "Fleet.h"
+#include "FleetPlan.h"
 #include "Planet.h"
 #include "Ship.h"
 #include "System.h"
 #include "Field.h"
+#include "FieldType.h"
 #include "UniverseObject.h"
-#include "UniverseGenerator.h"
+#include "UnlockableItem.h"
 #include "Predicates.h"
+#include "ShipPart.h"
 #include "ShipPartHull.h"
 #include "ShipDesign.h"
 #include "Special.h"
@@ -169,16 +172,16 @@ void Universe::ResetAllIDAllocation(const std::vector<int>& empire_ids) {
                   << " and highest design id = " << highest_allocated_design_id;
 }
 
-void Universe::SetInitiallyUnlockedItems(Pending::Pending<std::vector<ItemSpec>>&& future)
+void Universe::SetInitiallyUnlockedItems(Pending::Pending<std::vector<UnlockableItem>>&& future)
 { m_pending_items = std::move(future); }
 
-const std::vector<ItemSpec>& Universe::InitiallyUnlockedItems() const
+const std::vector<UnlockableItem>& Universe::InitiallyUnlockedItems() const
 { return Pending::SwapPending(m_pending_items, m_unlocked_items); }
 
-void Universe::SetInitiallyUnlockedBuildings(Pending::Pending<std::vector<ItemSpec>>&& future)
+void Universe::SetInitiallyUnlockedBuildings(Pending::Pending<std::vector<UnlockableItem>>&& future)
 { m_pending_buildings = std::move(future); }
 
-const std::vector<ItemSpec>& Universe::InitiallyUnlockedBuildings() const
+const std::vector<UnlockableItem>& Universe::InitiallyUnlockedBuildings() const
 { return Pending::SwapPending(m_pending_buildings, m_unlocked_buildings); }
 
 void Universe::SetInitiallyUnlockedFleetPlans(Pending::Pending<std::vector<std::unique_ptr<FleetPlan>>>&& future)
@@ -782,8 +785,9 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec, boo
     if (objects_vec.empty()) {
         object_ptrs.reserve(m_objects.ExistingObjects().size());
         std::transform(m_objects.ExistingObjects().begin(), m_objects.ExistingObjects().end(),
-                       std::back_inserter(object_ptrs),
-                       boost::bind(&std::map<int, std::shared_ptr<UniverseObject>>::value_type::second, _1));
+                       std::back_inserter(object_ptrs), [](const std::map<int, std::shared_ptr<const UniverseObject>>::value_type& p) {
+            return std::const_pointer_cast<UniverseObject>(p.second);
+        });
     }
 
     for (auto& obj : object_ptrs) {
@@ -899,7 +903,7 @@ namespace {
             boost::condition_variable_any m_state_changed;
         };
         StoreTargetsAndCausesOfEffectsGroupsWorkItem(
-            ObjectMap&                                                  the_object_map,
+            const ObjectMap&                                            the_object_map,
             const std::shared_ptr<Effect::EffectsGroup>&                the_effects_group,
             const std::vector<std::shared_ptr<const UniverseObject>>&   the_sources,
             EffectsCauseType                                            the_effect_cause_type,
@@ -917,7 +921,7 @@ namespace {
 
     private:
         // WARNING: do NOT copy the shared_pointers! Use raw pointers, shared_ptr may not be thread-safe.
-        ObjectMap&                                                  m_object_map;
+        const ObjectMap&                                            m_object_map;
         std::shared_ptr<Effect::EffectsGroup>                       m_effects_group;
         const std::vector<std::shared_ptr<const UniverseObject>>*   m_sources;
         EffectsCauseType                                            m_effect_cause_type;
@@ -939,7 +943,7 @@ namespace {
     };
 
     StoreTargetsAndCausesOfEffectsGroupsWorkItem::StoreTargetsAndCausesOfEffectsGroupsWorkItem(
-            ObjectMap&                                                  the_object_map,
+            const ObjectMap&                                            the_object_map,
             const std::shared_ptr<Effect::EffectsGroup>&                the_effects_group,
             const std::vector<std::shared_ptr<const UniverseObject>>&   the_sources,
             EffectsCauseType                                            the_effect_cause_type,
@@ -1117,7 +1121,7 @@ namespace {
         std::string match_log;
         // process all sources in set provided
         for (auto& source : *m_sources) {
-            ScriptingContext source_context(source, &m_object_map);
+            ScriptingContext source_context(source, m_object_map);
             int source_object_id = (source ? source->ID() : INVALID_OBJECT_ID);
             ScopedTimer update_timer("... StoreTargetsAndCausesOfEffectsGroups done processing source " +
                                      std::to_string(source_object_id) +
@@ -1193,18 +1197,19 @@ namespace {
 
 } // namespace
 
-void Universe::GetEffectsAndTargets(Effect::TargetsCauses& targets_causes) {
+void Universe::GetEffectsAndTargets(Effect::TargetsCauses& targets_causes) const {
     targets_causes.clear();
     GetEffectsAndTargets(targets_causes, std::vector<int>());
 }
 
 void Universe::GetEffectsAndTargets(Effect::TargetsCauses& targets_causes,
-                                    const std::vector<int>& target_objects)
+                                    const std::vector<int>& target_objects) const
 {
     ScopedTimer timer("Universe::GetEffectsAndTargets");
 
-    // transfer target objects from input vector to a set
-    Effect::TargetSet all_potential_targets = m_objects.find(target_objects);
+    // assemble target objects from input vector of IDs
+    Condition::ObjectSet const_target_objects{m_objects.find(target_objects)};
+    Effect::TargetSet& all_potential_targets = reinterpret_cast<Effect::TargetSet&>(const_target_objects);
 
     TraceLogger(effects) << "GetEffectsAndTargets target objects:";
     for (auto& obj : all_potential_targets)
@@ -1399,7 +1404,7 @@ void Universe::GetEffectsAndTargets(Effect::TargetsCauses& targets_causes,
     // the same ship might be added multiple times if it contains the part multiple times
     // recomputing targets for the same ship and part is kind of silly here, but shouldn't hurt
     std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> ships_by_hull_type;
-    std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> ships_by_part_type;
+    std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> ships_by_ship_part;
 
     for (auto& ship : m_objects.all<Ship>()) {
         if (m_destroyed_object_ids.count(ship->ID()))
@@ -1419,13 +1424,13 @@ void Universe::GetEffectsAndTargets(Effect::TargetsCauses& targets_causes,
         for (const std::string& part : ship_design->Parts()) {
             if (part.empty())
                 continue;
-            const PartType* part_type = GetPartType(part);
-            if (!part_type) {
-                ErrorLogger() << "GetEffectsAndTargets couldn't get PartType";
+            const ShipPart* ship_part = GetShipPart(part);
+            if (!ship_part) {
+                ErrorLogger() << "GetEffectsAndTargets couldn't get ShipPart";
                 continue;
             }
 
-            ships_by_part_type[part].push_back(ship);
+            ships_by_ship_part[part].push_back(ship);
         }
     }
 
@@ -1450,19 +1455,19 @@ void Universe::GetEffectsAndTargets(Effect::TargetsCauses& targets_causes,
         }
     }
     // enforce part types effects order
-    for (const auto& entry : GetPartTypeManager()) {
-        const std::string& part_type_name = entry.first;
-        const auto& part_type = entry.second;
-        auto ships_by_part_type_it = ships_by_part_type.find(part_type_name);
+    for (const auto& entry : GetShipPartManager()) {
+        const std::string& ship_part_name = entry.first;
+        const auto& ship_part = entry.second;
+        auto ships_by_ship_part_it = ships_by_ship_part.find(ship_part_name);
 
-        if (ships_by_part_type_it == ships_by_part_type.end())
+        if (ships_by_ship_part_it == ships_by_ship_part.end())
             continue;
 
-        for (auto& effects_group : part_type->Effects()) {
+        for (auto& effects_group : ship_part->Effects()) {
             targets_causes_reorder_buffer.push_back(Effect::TargetsCauses());
             run_queue.AddWork(new StoreTargetsAndCausesOfEffectsGroupsWorkItem(
-                m_objects, effects_group, ships_by_part_type_it->second,
-                ECT_SHIP_PART, part_type_name,
+                m_objects, effects_group, ships_by_ship_part_it->second,
+                ECT_SHIP_PART, ship_part_name,
                 all_potential_targets, targets_causes_reorder_buffer.back(),
                 cached_source_condition_matches,
                 invariant_condition_matches,
@@ -1619,7 +1624,8 @@ void Universe::ExecuteEffects(const Effect::TargetsCauses& targets_causes,
                                  << " " << effects_group->AccountingLabel() << " " << effects_group->StackingGroup() << ")";
 
             // execute Effects in the EffectsGroup
-            effects_group->Execute(ScriptingContext(nullptr, m_objects),
+            ScriptingContext context{m_objects};
+            effects_group->Execute(context,
                                    group_targets_causes,
                                    update_effect_accounting ? &m_effect_accounting_map : nullptr,
                                    only_meter_effects,
@@ -3146,7 +3152,7 @@ std::map<std::string, unsigned int> CheckSumContent() {
     checksums["Encyclopedia"] = GetEncyclopedia().GetCheckSum();
     checksums["FieldTypeManager"] = GetFieldTypeManager().GetCheckSum();
     checksums["HullTypeManager"] = GetHullTypeManager().GetCheckSum();
-    checksums["PartTypeManager"] = GetPartTypeManager().GetCheckSum();
+    checksums["ShipPartManager"] = GetShipPartManager().GetCheckSum();
     checksums["PredefinedShipDesignManager"] = GetPredefinedShipDesignManager().GetCheckSum();
     checksums["SpeciesManager"] = GetSpeciesManager().GetCheckSum();
     checksums["TechManager"] = GetTechManager().GetCheckSum();

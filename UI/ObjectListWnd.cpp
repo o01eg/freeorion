@@ -277,6 +277,7 @@ namespace {
             col_types[{UserStringNop("PLANET_ENVIRONMENT"),         UserStringNop("PLANETS_SUBMENU")}]= UserStringCastedValueRef<PlanetEnvironment>("PlanetEnvironment");
             col_types[{UserStringNop("SUPPLY_RANGE"),               UserStringNop("PLANETS_SUBMENU")}]= StringCastedValueRef<double>("PropagatedSupplyRange");
             col_types[{UserStringNop("AVAILABLE_FOCI"),             UserStringNop("PLANETS_SUBMENU")}]= UserStringVecValueRef("AvailableFoci");
+            col_types[{UserStringNop("LAST_TURN_COLONIZED"),        UserStringNop("PLANETS_SUBMENU")}]= StringCastedValueRef<int>("LastTurnColonized");
             col_types[{UserStringNop("LAST_TURN_CONQUERED"),        UserStringNop("PLANETS_SUBMENU")}]= StringCastedValueRef<int>("LastTurnConquered");
             col_types[{UserStringNop("LAST_TURN_ATTACKED_BY_SHIP"), UserStringNop("PLANETS_SUBMENU")}]= StringCastedValueRef<int>("LastTurnAttackedByShip");
 
@@ -1075,10 +1076,10 @@ private:
         Resize(GG::Pt(Width(), param_widget_top));
     }
 
-    std::shared_ptr<GG::DropDownList>   m_class_drop = nullptr;
-    std::shared_ptr<GG::DropDownList>   m_string_drop = nullptr;
-    std::shared_ptr<GG::Spin<int>>      m_param_spin1 = nullptr;
-    std::shared_ptr<GG::Spin<int>>      m_param_spin2 = nullptr;
+    std::shared_ptr<GG::DropDownList>   m_class_drop;
+    std::shared_ptr<GG::DropDownList>   m_string_drop;
+    std::shared_ptr<GG::Spin<int>>      m_param_spin1;
+    std::shared_ptr<GG::Spin<int>>      m_param_spin2;
 };
 
 ////////////////////////////////////////////////
@@ -1111,10 +1112,10 @@ private:
                       std::shared_ptr<GG::StateButton>>>    m_filter_buttons;
     bool                                                    m_accept_changes = false;
 
-    std::shared_ptr<ConditionWidget>    m_condition_widget = nullptr;
-    std::shared_ptr<GG::Layout>         m_filters_layout = nullptr;
-    std::shared_ptr<GG::Button>         m_cancel_button = nullptr;
-    std::shared_ptr<GG::Button>         m_apply_button = nullptr;
+    std::shared_ptr<ConditionWidget>    m_condition_widget;
+    std::shared_ptr<GG::Layout>         m_filters_layout;
+    std::shared_ptr<GG::Button>         m_cancel_button;
+    std::shared_ptr<GG::Button>         m_apply_button;
 };
 
 
@@ -2372,9 +2373,9 @@ private:
 
     std::map<int, boost::signals2::connection>          m_object_change_connections;
     std::set<int>                                       m_collapsed_objects;
-    std::unique_ptr<Condition::Condition>           m_filter_condition = nullptr;
+    std::unique_ptr<Condition::Condition>               m_filter_condition;
     std::map<UniverseObjectType, std::set<VIS_DISPLAY>> m_visibilities;
-    std::shared_ptr<ObjectHeaderRow>                    m_header_row = nullptr;
+    std::shared_ptr<ObjectHeaderRow>                    m_header_row;
     boost::signals2::connection                         m_obj_deleted_connection;
 };
 

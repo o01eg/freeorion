@@ -1,4 +1,3 @@
-from __future__ import division
 from logging import debug
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
@@ -154,7 +153,7 @@ def avail_mil_needing_repair(mil_fleet_ids, split_ships=False, on_mission=False,
 
 
 # TODO Move relevant initialization code from get_military_fleets into this class
-class AllocationHelper(object):
+class AllocationHelper:
 
     def __init__(self, already_assigned_rating, already_assigned_rating_vs_planets, available_rating, try_reset):
         """
@@ -195,7 +194,7 @@ class AllocationHelper(object):
             self._remaining_rating = rating_difference(self._remaining_rating, min_rating)
 
 
-class Allocator(object):
+class Allocator:
     """
     Base class for Military allocation for a single system.
 
@@ -706,7 +705,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
         else:
             try:
                 capital_sys_id = next(iter(aistate.fleetStatus.items()))[1]['sysID']
-            except:
+            except:  # noqa: E722
                 pass
 
     num_targets = max(10, PriorityAI.allotted_outpost_targets)
@@ -716,7 +715,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
                            if pscore > InvasionAI.MIN_INVASION_SCORE] +
                           [pid for pid, (pscore, spec) in list(aistate.colonisablePlanetIDs.items())[:num_targets]
                            if pscore > InvasionAI.MIN_INVASION_SCORE])
-    top_target_planets.extend(aistate.qualifyingTroopBaseTargets.keys())  # pylint: disable=dict-keys-not-iterating; # PY_3_MIGRATION
+    top_target_planets.extend(aistate.qualifyingTroopBaseTargets.keys())
 
     base_col_target_systems = PlanetUtilsAI.get_systems(top_target_planets)
     top_target_systems = []

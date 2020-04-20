@@ -1,4 +1,3 @@
-from __future__ import division
 from logging import debug, warning
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
@@ -50,7 +49,7 @@ MERGEABLE_MISSION_TYPES = (
 )
 
 
-class AIFleetMission(object):
+class AIFleetMission:
     """
     Stores information about AI mission. Every mission has fleetID and AI targets depending upon AI fleet mission type.
     :type orders: list[AIFleetOrder]

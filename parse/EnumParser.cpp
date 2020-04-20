@@ -1,6 +1,8 @@
 #include "EnumParser.h"
 
 #include "../universe/Enums.h"
+#include "../universe/ShipPart.h"
+#include "../universe/UnlockableItem.h"
 
 
 namespace qi = boost::spirit::qi;

@@ -1,6 +1,3 @@
-from __future__ import print_function
-from __future__ import division
-
 import random
 
 import freeorion as fo
@@ -85,7 +82,7 @@ def min_planets_in_vicinity_limit(num_systems):
     return min(HS_MIN_PLANETS_IN_VICINITY_TOTAL, num_systems * HS_MIN_PLANETS_IN_VICINITY_PER_SYSTEM)
 
 
-class HomeSystemFinder(object):
+class HomeSystemFinder:
     """Finds a set of home systems with a least ''num_home_systems'' systems."""
     def __init__(self, _num_home_systems):
         # cache of sytem merits
@@ -509,7 +506,7 @@ def setup_empire(empire, empire_name, home_system, starting_species, player_name
     # unlock starting techs, buildings, hulls, ship parts, etc.
     # use default content file
     print("Player", player_name, ": add unlocked items")
-    for item in fo.load_item_spec_list():
+    for item in fo.load_unlockable_item_list():
         fo.empire_unlock_item(empire, item.type, item.name)
 
     # add premade ship designs to empire

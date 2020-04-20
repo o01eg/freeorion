@@ -19,12 +19,15 @@
 #include "../universe/System.h"
 #include "../universe/Ship.h"
 #include "../universe/ShipDesign.h"
+#include "../universe/ShipPart.h"
 #include "../universe/ShipPartHull.h"
 #include "../universe/Fleet.h"
 #include "../universe/Special.h"
 #include "../universe/Species.h"
 #include "../universe/Field.h"
+#include "../universe/FieldType.h"
 #include "../universe/Predicates.h"
+#include "../universe/UnlockableItem.h"
 #include "../Empire/Empire.h"
 #include "../Empire/EmpireManager.h"
 #include "../util/EnumText.h"
@@ -190,7 +193,7 @@ namespace {
 
         }
         else if (dir_name == "ENC_SHIP_PART") {
-            for (const auto& entry : GetPartTypeManager()) {
+            for (const auto& entry : GetShipPartManager()) {
                 std::string custom_category = DetermineCustomCategory(entry.second->Tags());
                 if (custom_category.empty()) {
                     sorted_entries_list.insert({UserString(entry.first),
@@ -478,7 +481,7 @@ namespace {
             std::map<std::string, std::pair<std::string, std::string>> dir_entries;
 
             // part types
-            for (const auto& entry : GetPartTypeManager())
+            for (const auto& entry : GetShipPartManager())
                 if (DetermineCustomCategory(entry.second->Tags()) == dir_name)
                     dir_entries[UserString(entry.first)] =
                         std::make_pair(VarText::SHIP_PART_TAG, entry.first);
@@ -925,7 +928,7 @@ void EncyclopediaDetailPanel::HandleLinkClick(const std::string& link_type, cons
         } else if (link_type == VarText::SHIP_HULL_TAG) {
             this->SetHullType(data);
         } else if (link_type == VarText::SHIP_PART_TAG) {
-            this->SetPartType(data);
+            this->SetShipPart(data);
         } else if (link_type == VarText::SPECIES_TAG) {
             this->SetSpecies(data);
         } else if (link_type == TextLinker::ENCYCLOPEDIA_TAG) {
@@ -1055,7 +1058,7 @@ namespace {
         return location ? location->ID() : INVALID_OBJECT_ID;
     }
 
-    std::vector<std::string> TechsThatUnlockItem(const ItemSpec& item) {
+    std::vector<std::string> TechsThatUnlockItem(const UnlockableItem& item) {
         std::vector<std::string> retval;
 
         for (const auto& tech : GetTechManager()) {
@@ -1063,7 +1066,7 @@ namespace {
             const std::string& tech_name = tech->Name();
 
             bool found_item = false;
-            for (const ItemSpec& unlocked_item : tech->UnlockedItems()) {
+            for (const UnlockableItem& unlocked_item : tech->UnlockedItems()) {
                 if (unlocked_item == item) {
                     found_item = true;
                     break;
@@ -1178,7 +1181,7 @@ namespace {
                                             std::string& specific_type, std::string& detailed_description,
                                             GG::Clr& color)
     {
-        const PartType* part = GetPartType(item_name);
+        const ShipPart* part = GetShipPart(item_name);
         if (!part) {
             ErrorLogger() << "EncyclopediaDetailPanel::Refresh couldn't find part with name " << item_name;
             return;
@@ -1211,7 +1214,7 @@ namespace {
         if (!exclusions.empty()) {
             detailed_description += "\n\n" + UserString("ENC_SHIP_EXCLUSIONS");
             for (const auto& exclusion : exclusions) {
-                if (GetPartType(exclusion)) {
+                if (GetShipPart(exclusion)) {
                     detailed_description += LinkTaggedText(VarText::SHIP_PART_TAG, exclusion) + "  ";
                 } else if (GetHullType(exclusion)) {
                     detailed_description += LinkTaggedText(VarText::SHIP_HULL_TAG, exclusion) + "  ";
@@ -1221,7 +1224,7 @@ namespace {
             }
         }
 
-        auto unlocked_by_techs = TechsThatUnlockItem(ItemSpec(UIT_SHIP_PART, item_name));
+        auto unlocked_by_techs = TechsThatUnlockItem(UnlockableItem(UIT_SHIP_PART, item_name));
         if (!unlocked_by_techs.empty()) {
             detailed_description += "\n\n" + UserString("ENC_UNLOCKED_BY");
             for (const auto& tech_name : unlocked_by_techs)
@@ -1285,7 +1288,7 @@ namespace {
         if (!exclusions.empty()) {
             detailed_description += "\n\n" + UserString("ENC_SHIP_EXCLUSIONS");
             for (const std::string& exclusion : exclusions) {
-                if (GetPartType(exclusion)) {
+                if (GetShipPart(exclusion)) {
                     detailed_description += LinkTaggedText(VarText::SHIP_PART_TAG, exclusion) + "  ";
                 } else if (GetHullType(exclusion)) {
                     detailed_description += LinkTaggedText(VarText::SHIP_HULL_TAG, exclusion) + "  ";
@@ -1295,7 +1298,7 @@ namespace {
             }
         }
 
-        auto unlocked_by_techs = TechsThatUnlockItem(ItemSpec(UIT_SHIP_HULL, item_name));
+        auto unlocked_by_techs = TechsThatUnlockItem(UnlockableItem(UIT_SHIP_HULL, item_name));
         if (!unlocked_by_techs.empty()) {
             detailed_description += "\n\n" + UserString("ENC_UNLOCKED_BY");
             for (const auto& tech_name : unlocked_by_techs)
@@ -1353,7 +1356,7 @@ namespace {
         }
 
         if (!unlocked_items.empty()) {
-            for (const ItemSpec& item : unlocked_items) {
+            for (const UnlockableItem& item : unlocked_items) {
                 std::string TAG;
                 switch (item.type) {
                 case UIT_BUILDING:      TAG = VarText::BUILDING_TYPE_TAG;       break;
@@ -1450,7 +1453,7 @@ namespace {
                 detailed_description += "\n\nEffects:\n" + Dump(building_type->Effects());
         }
 
-        auto unlocked_by_techs = TechsThatUnlockItem(ItemSpec(UIT_BUILDING, item_name));
+        auto unlocked_by_techs = TechsThatUnlockItem(UnlockableItem(UIT_BUILDING, item_name));
         if (!unlocked_by_techs.empty()) {
             detailed_description += "\n\n" + UserString("ENC_UNLOCKED_BY");
             for (const std::string& tech_name : unlocked_by_techs)
@@ -3112,7 +3115,7 @@ void EncyclopediaDetailPanel::SetTech(const std::string& tech_name) {
     AddItem("ENC_TECH", tech_name);
 }
 
-void EncyclopediaDetailPanel::SetPartType(const std::string& part_name) {
+void EncyclopediaDetailPanel::SetShipPart(const std::string& part_name) {
     if (m_items_it != m_items.end() && part_name == m_items_it->second)
         return;
     AddItem("ENC_SHIP_PART", part_name);
@@ -3234,8 +3237,8 @@ void EncyclopediaDetailPanel::SetItem(std::shared_ptr<const Planet> planet)
 void EncyclopediaDetailPanel::SetItem(const Tech* tech)
 { SetTech(tech ? tech->Name() : EMPTY_STRING); }
 
-void EncyclopediaDetailPanel::SetItem(const PartType* part)
-{ SetPartType(part ? part->Name() : EMPTY_STRING); }
+void EncyclopediaDetailPanel::SetItem(const ShipPart* part)
+{ SetShipPart(part ? part->Name() : EMPTY_STRING); }
 
 void EncyclopediaDetailPanel::SetItem(const HullType* hull_type)
 { SetHullType(hull_type ? hull_type->Name() : EMPTY_STRING); }

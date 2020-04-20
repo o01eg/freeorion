@@ -2535,7 +2535,7 @@ PlayingGame::PlayingGame(my_context c) :
         }
     }
 
-    if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0) {
+    if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0 && !Server().IsHaveWinner()) {
         // Set turn advance after time interval
         m_turn_timeout.expires_from_now(boost::posix_time::seconds(GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval")));
         m_turn_timeout.async_wait(boost::bind(&PlayingGame::TurnTimedoutHandler,
@@ -2735,7 +2735,7 @@ void PlayingGame::EstablishPlayer(const PlayerConnectionPtr& player_connection,
             fsm.UpdateIngameLobby();
 
             // send timeout data
-            if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0) {
+            if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0 && !Server().IsHaveWinner()) {
                 auto remaining = m_turn_timeout.expires_from_now();
                 player_connection->SendMessage(TurnTimeoutMessage(remaining.total_seconds()));
             } else {
@@ -2921,7 +2921,8 @@ void PlayingGame::TurnTimedoutHandler(const boost::system::error_code& error) {
     }
 
     if (GetOptionsDB().Get<bool>("network.server.turn-timeout.fixed-interval") &&
-        GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0)
+        GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0 &&
+        !Server().IsHaveWinner())
     {
         auto turn_expired_time = m_turn_timeout.expires_at();
         turn_expired_time += boost::posix_time::seconds(GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval"));
@@ -2961,7 +2962,7 @@ WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
     // reset turn timer if there no fixed interval
     if (!GetOptionsDB().Get<bool>("network.server.turn-timeout.fixed-interval")) {
         playing_game.m_turn_timeout.cancel();
-        if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0) {
+        if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0 && !Server().IsHaveWinner()) {
             playing_game.m_turn_timeout.expires_from_now(boost::posix_time::seconds(GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval")));
             playing_game.m_turn_timeout.async_wait(boost::bind(&PlayingGame::TurnTimedoutHandler,
                                                                &playing_game,
@@ -2969,7 +2970,7 @@ WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
         }
     }
 
-    if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0) {
+    if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0 && !Server().IsHaveWinner()) {
         auto remaining = playing_game.m_turn_timeout.expires_from_now();
         Server().Networking().SendMessageAll(TurnTimeoutMessage(remaining.total_seconds()));
     } else {

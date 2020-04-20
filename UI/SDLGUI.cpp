@@ -1,6 +1,5 @@
 #include "SDLGUI.h"
 
-#include <GG/EventPump.h>
 #include <GG/WndEvent.h>
 #include <GG/utf8/checked.h>
 
@@ -236,9 +235,6 @@ std::string SDLGUI::ClipboardText() const {
     return std::string();
 }
 
-void SDLGUI::operator()()
-{ GUI::operator()(); }
-
 void SDLGUI::ExitApp(int code)
 { throw QuitSignal(code); }
 
@@ -350,7 +346,7 @@ void SDLGUI::GLInit()
     // set up perspective with vertical FOV of 50°. 1:1 application
     // window ratio, near plane of 1.0 and far plane of 10.0
     float ratio = Value(m_app_width) * 1.0f / Value(m_app_height);
-    float radians = 50.0f * M_PI / 180.0f;
+    float radians = static_cast<float>(50.0 * M_PI / 180.0);
     float near = 1.0f;
     float far = 10.0f;
     float cotangent = std::cos(radians) / std::sin(radians);
@@ -554,8 +550,7 @@ void SDLGUI::Run()
 {
     try {
         Initialize();
-        ModalEventPump pump(m_done);
-        pump();
+        RunModal(nullptr, m_done);
     } catch (const QuitSignal& e) {
         if (e.exit_code != 0)
             throw;

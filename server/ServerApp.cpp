@@ -2,6 +2,7 @@
 
 #include "SaveLoad.h"
 #include "ServerFSM.h"
+#include "UniverseGenerator.h"
 #include "../combat/CombatSystem.h"
 #include "../combat/CombatEvents.h"
 #include "../combat/CombatLogManager.h"
@@ -9,6 +10,7 @@
 #include "../universe/Building.h"
 #include "../universe/Condition.h"
 #include "../universe/Fleet.h"
+#include "../universe/FleetPlan.h"
 #include "../universe/Ship.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/Planet.h"
@@ -17,7 +19,7 @@
 #include "../universe/System.h"
 #include "../universe/Species.h"
 #include "../universe/Tech.h"
-#include "../universe/UniverseGenerator.h"
+#include "../universe/UnlockableItem.h"
 #include "../universe/Enums.h"
 #include "../universe/ValueRef.h"
 #include "../Empire/Empire.h"
@@ -1094,6 +1096,14 @@ void ServerApp::ExpireTurn() {
 
 bool ServerApp::IsTurnExpired() const
 { return m_turn_expired; }
+
+bool ServerApp::IsHaveWinner() const {
+    for (const auto& empire : m_empires) {
+        if (empire.second->Won())
+            return true;
+    }
+    return false;
+}
 
 namespace {
     /** Verifies that a human player is connected with the indicated \a id. */

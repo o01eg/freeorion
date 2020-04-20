@@ -622,7 +622,7 @@ class IntVec(object):
         return None
 
 
-class ItemSpec(object):
+class UnlockableItem(object):
     @property
     def name(self):
         return str()
@@ -632,7 +632,7 @@ class ItemSpec(object):
         return unlockableItemType()
 
 
-class ItemSpecVec(object):
+class UnlockableItemVec(object):
     def __contains__(self, obj):
         """
         :param obj:
@@ -1734,7 +1734,7 @@ class meter(object):
         return float()
 
 
-class partType(object):
+class shipPart(object):
     @property
     def capacity(self):
         return float()
@@ -2315,7 +2315,7 @@ class tech(object):
 
     @property
     def unlockedItems(self):
-        return ItemSpecVec()
+        return UnlockableItemVec()
 
     @property
     def unlockedTechs(self):
@@ -3801,15 +3801,15 @@ def getOrders():
     return OrderSet()
 
 
-def getPartType(string):
+def getShipPart(string):
     """
-    Returns the ship part (PartType) with the indicated name (string).
+    Returns the ShipPart with the indicated name (string).
 
     :param string:
     :type string: str
-    :rtype: partType
+    :rtype: shipPart
     """
-    return partType()
+    return shipPart()
 
 
 def getSaveStateString():

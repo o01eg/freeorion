@@ -32,8 +32,6 @@ _build_ppa_common: &_build_ppa_common
   before_script:
     - .ci/before_script.sh
     - python cmake/make_versioncpp.py . CMake
-  deploy:
-
 
 jobs:
   include:

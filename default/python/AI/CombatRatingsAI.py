@@ -1,14 +1,13 @@
-from __future__ import division
 from collections import Counter
+from functools import reduce
 from logging import warning, error
 
-from common import six
 import freeOrionAIInterface as fo
 import FleetUtilsAI
 from aistate_interface import get_aistate
 from EnumsAI import MissionType
 from freeorion_tools import dict_to_tuple, tuple_to_dict, cache_for_current_turn
-from ShipDesignAI import get_part_type
+from ShipDesignAI import get_ship_part
 from AIDependencies import INVALID_ID, CombatTarget
 
 
@@ -68,9 +67,9 @@ def default_ship_stats():
                                   damage_vs_planets, has_bomber))
 
 
-class ShipCombatStats(object):
+class ShipCombatStats:
     """Stores all relevant stats of a ship for combat strength evaluation."""
-    class BasicStats(object):
+    class BasicStats:
         """Stores non-fighter-related stats."""
         def __init__(self, attacks, structure, shields):
             """
@@ -101,7 +100,7 @@ class ShipCombatStats(object):
         def __str__(self):
             return str(self.get_stats())
 
-    class FighterStats(object):
+    class FighterStats:
         """ Stores fighter-related stats """
         def __init__(self, capacity, launch_rate, damage):
             self.capacity = capacity
@@ -117,7 +116,7 @@ class ShipCombatStats(object):
             """
             return self.capacity, self.launch_rate, self.damage
 
-    class AntiFighterStats(object):
+    class AntiFighterStats:
         def __init__(self, flak_shots: int, has_interceptors: bool):
             """
             :param flak_shots: number of shots per bout with flak weapon part
@@ -135,7 +134,7 @@ class ShipCombatStats(object):
             """
             return self.flak_shots, self.has_interceptors
 
-    class AntiPlanetStats(object):
+    class AntiPlanetStats:
         def __init__(self, damage_vs_planets, has_bomber):
             self.damage_vs_planets = damage_vs_planets
             self.has_bomber = has_bomber
@@ -194,7 +193,7 @@ class ShipCombatStats(object):
             for partname in design.parts:
                 if not partname:
                     continue
-                pc = get_part_type(partname).partClass
+                pc = get_ship_part(partname).partClass
                 if pc == fo.shipPartClass.shortRange:
                     allowed_targets = get_allowed_targets(partname)
                     damage = ship.currentPartMeterValue(meter_choice, partname)
@@ -323,7 +322,7 @@ class ShipCombatStats(object):
                 + self.get_anti_fighter_stats() + self.get_anti_planet_stats())
 
 
-class FleetCombatStats(object):
+class FleetCombatStats:
     """Stores combat related stats of the fleet."""
     def __init__(self, fleet_id=INVALID_ID, consider_refuel=False):
         self.__fleet_id = fleet_id
@@ -339,7 +338,7 @@ class FleetCombatStats(object):
         :return: list of ship stats
         :rtype: list
         """
-        return map(lambda x: x.get_stats(hashable=hashable), self.__ship_stats)  # pylint: disable=map-builtin-not-iterating; # PY_3_MIGRATION
+        return map(lambda x: x.get_stats(hashable=hashable), self.__ship_stats)
 
     def get_ship_combat_stats(self):
         """Returns list of ShipCombatStats of fleet."""
@@ -455,7 +454,7 @@ def combine_ratings_list(ratings_list):
     :return: combined rating
     :rtype: float
     """
-    return six.moves.reduce(combine_ratings, ratings_list, 0)
+    return reduce(combine_ratings, ratings_list, 0)
 
 
 def rating_needed(target, current=0):

@@ -4,6 +4,7 @@
 #include "../universe/Fleet.h"
 #include "../universe/Ship.h"
 #include "../universe/ShipDesign.h"
+#include "../universe/ShipPart.h"
 #include "../universe/ShipPartHull.h"
 #include "../universe/Building.h"
 #include "../universe/ResourceCenter.h"
@@ -11,11 +12,14 @@
 #include "../universe/Planet.h"
 #include "../universe/System.h"
 #include "../universe/Field.h"
+#include "../universe/FieldType.h"
 #include "../universe/Special.h"
 #include "../universe/Species.h"
 #include "../universe/Enums.h"
 #include "../universe/Effect.h"
 #include "../universe/Predicates.h"
+#include "../universe/ScriptingContext.h"
+#include "../universe/Condition.h"
 #include "../util/Logger.h"
 #include "../util/MultiplayerCommon.h"
 #include "../util/GameRules.h"
@@ -209,7 +213,7 @@ namespace {
         std::vector<int> results;
         results.reserve(ship_design.Parts().size());
         for (const std::string& part_name : ship_design.Parts()) {
-            const PartType* part = GetPartType(part_name);
+            const ShipPart* part = GetShipPart(part_name);
             if (part && part->Class() == PC_DIRECT_WEAPON)  // TODO: handle other weapon classes when they are implemented
                 results.push_back(part->Capacity());
         }
@@ -236,6 +240,26 @@ namespace {
 
     bool EnqueueLocationTest(const BuildingType& building_type, int empire_id, int loc_id)
     { return building_type.EnqueueLocation(empire_id, loc_id);}
+
+    bool HullProductionLocation(const HullType& hull, int location_id) {
+        auto location = Objects().get(location_id);
+        if (!location) {
+            ErrorLogger() << "UniverseWrapper::HullProductionLocation Could not find location with id " << location_id;
+            return false;
+        }
+        ScriptingContext location_as_source_context(location, location);
+        return hull.Location()->Eval(location_as_source_context, location);
+    }
+
+    bool ShipPartProductionLocation(const ShipPart& part_type, int location_id) {
+        auto location = Objects().get(location_id);
+        if (!location) {
+            ErrorLogger() << "UniverseWrapper::PartTypeProductionLocation Could not find location with id " << location_id;
+            return false;
+        }
+        ScriptingContext location_as_source_context(location, location);
+        return part_type.Location()->Eval(location_as_source_context, location);
+    }
 
     bool RuleExistsAnyType(const GameRules& rules, const std::string& name)
     { return rules.RuleExists(name); }
@@ -593,19 +617,20 @@ namespace FreeOrionPython {
         def("getPredefinedShipDesign",          &GetPredefinedShipDesign,                   return_value_policy<reference_existing_object>(), "Returns the ship design (ShipDesign) with the indicated name (string).");
 
 
-        class_<PartType, noncopyable>("partType", no_init)
-            .add_property("name",               make_function(&PartType::Name,              return_value_policy<copy_const_reference>()))
-            .add_property("partClass",          &PartType::Class)
-            .add_property("capacity",           &PartType::Capacity)
-            .add_property("secondaryStat",      &PartType::SecondaryStat)
-            .add_property("mountableSlotTypes", make_function(&PartType::MountableSlotTypes,return_value_policy<return_by_value>()))
-            .def("productionCost",              &PartType::ProductionCost)
-            .def("productionTime",              &PartType::ProductionTime)
-            .def("canMountInSlotType",          &PartType::CanMountInSlotType)
+        class_<ShipPart, noncopyable>("shipPart", no_init)
+            .add_property("name",               make_function(&ShipPart::Name,              return_value_policy<copy_const_reference>()))
+            .add_property("partClass",          &ShipPart::Class)
+            .add_property("capacity",           &ShipPart::Capacity)
+            .add_property("secondaryStat",      &ShipPart::SecondaryStat)
+            .add_property("mountableSlotTypes", make_function(&ShipPart::MountableSlotTypes,return_value_policy<return_by_value>()))
+            .def("productionCost",              &ShipPart::ProductionCost)
+            .def("productionTime",              &ShipPart::ProductionTime)
+            .def("canMountInSlotType",          &ShipPart::CanMountInSlotType)
             .add_property("costTimeLocationInvariant",
-                                                &PartType::ProductionCostTimeLocationInvariant)
+                                                &ShipPart::ProductionCostTimeLocationInvariant)
+            .def("productionLocation",          &ShipPartProductionLocation, "Returns the result of Location condition (bool) in passed location_id (int)")
         ;
-        def("getPartType",                      &GetPartType,                               return_value_policy<reference_existing_object>(), "Returns the ship part (PartType) with the indicated name (string).");
+        def("getShipPart",                      &GetShipPart,                               return_value_policy<reference_existing_object>(), "Returns the ShipPart with the indicated name (string).");
 
         class_<HullType, noncopyable>("hullType", no_init)
             .add_property("name",               make_function(&HullType::Name,              return_value_policy<copy_const_reference>()))
@@ -626,6 +651,7 @@ namespace FreeOrionPython {
             .add_property("costTimeLocationInvariant",
                                                 &HullType::ProductionCostTimeLocationInvariant)
             .def("hasTag",                      &HullType::HasTag)
+            .def("productionLocation",          &HullProductionLocation, "Returns the result of Location condition (bool) in passed location_id (int)")
         ;
         def("getHullType",                      &GetHullType,                               return_value_policy<reference_existing_object>(), "Returns the ship hull (HullType) with the indicated name (string).");
 

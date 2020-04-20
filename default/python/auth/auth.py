@@ -68,8 +68,9 @@ class AuthProvider:
                                 req.add_header("X-XMPP-To", r[1])
                                 urllib.request.urlopen(req).read()
                                 info("OTP was send to %s via XMPP" % player_name)
-                            except:
-                                error("Cann't send xmpp message to %s" % player_name)
+                            except Exception:
+                                exctype, value = sys.exc_info()[:2]
+                                error("Cann't send xmpp message to %s: %s %s" % (player_name, exctype, value))
                         elif r[0] == "email":
                             try:
                                 server = smtplib.SMTP_SSL(self.mailconf.get('mail', 'server'), 465)
@@ -80,7 +81,7 @@ class AuthProvider:
                                         for player %s""" % (self.mailconf.get('mail', 'from'), r[1], otp, player_name))
                                 server.close()
                                 info("OTP was send to %s via email" % player_name)
-                            except:
+                            except Exception:
                                 exctype, value = sys.exc_info()[:2]
                                 error("Cann't send email to %s: %s %s" % (player_name, exctype, value))
                         else:
@@ -182,8 +183,9 @@ class AuthProvider:
                                 req.add_header("X-XMPP-To", r[1])
                                 urllib.request.urlopen(req).read()
                                 info("Message was send to %s via XMPP" % player_name)
-                            except:
-                                error("Cann't send xmpp message to %s" % player_name)
+                            except Exception:
+                                exctype, value = sys.exc_info()[:2]
+                                error("Cann't send xmpp message to %s: %s %s" % (player_name, exctype, value))
                         elif r[0] == "email" and allow_email:
                             try:
                                 server = smtplib.SMTP_SSL(self.mailconf.get('mail', 'server'), 465)
@@ -194,7 +196,7 @@ class AuthProvider:
                                         %s""" % (self.mailconf.get('mail', 'from'), r[1], subject, text))
                                 server.close()
                                 info("Message was send to %s via email" % player_name)
-                            except:
+                            except Exception:
                                 exctype, value = sys.exc_info()[:2]
                                 error("Cann't send email to %s: %s %s" % (player_name, exctype, value))
                         else:

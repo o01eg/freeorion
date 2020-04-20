@@ -1,5 +1,5 @@
 // -*- C++ -*-
-/* GG is a GUI for SDL and OpenGL.
+/* GG is a GUI for OpenGL.
    Copyright (C) 2003-2008 T. Zachary Laine
 
    This library is free software; you can redistribute it and/or
@@ -31,7 +31,6 @@
 #define _GG_Spin_h_
 
 #include <GG/Button.h>
-#include <GG/DrawUtil.h>
 #include <GG/Edit.h>
 #include <GG/GUI.h>
 #include <GG/StyleFactory.h>

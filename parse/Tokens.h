@@ -205,6 +205,7 @@
     (LastTurnActiveInBattle)                    \
     (LastTurnAttackedByShip)                    \
     (LastTurnBattleHere)                        \
+    (LastTurnColonized)                         \
     (LastTurnConquered)                         \
     (LastTurnResupplied)                        \
     (LaunchedFrom)                              \
@@ -309,7 +310,6 @@
     (Parts)                                     \
     (PartOfClassInShipDesign)                   \
     (PartsInShipDesign)                         \
-    (PartType)                                  \
     (Passive)                                   \
     (PeaceWith)                                 \
     (Planet)                                    \

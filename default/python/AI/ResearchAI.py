@@ -1,4 +1,3 @@
-from __future__ import division
 import math
 import random
 from functools import partial
@@ -6,21 +5,21 @@ from logging import warning, debug
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
 from common.print_utils import print_in_columns
-from common import six
 
 import AIDependencies as Dep
+from AIDependencies import Tags
 import AIstate
 import ColonisationAI
 from aistate_interface import get_aistate
 import ShipDesignAI
 import TechsListsAI
-from freeorion_tools import chat_human, get_ai_tag_grade, tech_is_complete
+from freeorion_tools import chat_human, get_species_tag_grade, tech_is_complete
 from turn_state import state
 
 inProgressTechs = {}
 
 
-class Choices(object):
+class Choices:
     # Cannot construct on import, because fo.getEmpire() is None at this time
     def init(self):
         rng = random.Random()
@@ -158,13 +157,10 @@ def get_max_stealth_species():
     stealth_grades = {'BAD': -15, 'GOOD': 15, 'GREAT': 40, 'ULTIMATE': 60}
     stealth = -999
     stealth_species = ""
-    for specName in ColonisationAI.empire_colonizers:
-        this_spec = fo.getSpecies(specName)
-        if not this_spec:
-            continue
-        this_stealth = stealth_grades.get(get_ai_tag_grade(list(this_spec.tags), "STEALTH"), 0)
+    for species_name in ColonisationAI.empire_colonizers:
+        this_stealth = stealth_grades.get(get_species_tag_grade(species_name, Tags.STEALTH), 0)
         if this_stealth > stealth:
-            stealth_species = specName
+            stealth_species = species_name
             stealth = this_stealth
     result = (stealth_species, stealth)
     return result
@@ -391,7 +387,7 @@ def init():
     )
 
     for k, v in tech_handlers:
-        if isinstance(k, six.string_types):
+        if isinstance(k, str):
             k = (k, )  # wrap single techs to tuple
         for tech in k:
             priority_funcs[tech] = v
@@ -693,7 +689,7 @@ def generate_classic_research_orders():
                     debug("    Enqueued Tech: %20s \t\t %8.0f \t %8.0f", name, this_cost, cum_cost)
                 else:
                     warning("    Failed attempt to enqueued Tech: " + name)
-            except:
+            except:  # noqa: E722
                 warning("    Failed attempt to enqueued Tech: " + name, exc_info=True)
 
         debug('\n\nAll techs:')

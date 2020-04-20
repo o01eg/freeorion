@@ -1,4 +1,3 @@
-from __future__ import division
 import math
 import random
 from logging import debug, error, info, warning
@@ -283,7 +282,7 @@ def generate_production_orders():
             try:
                 if fo.getBuildingType(type_id).canBeProduced(empire.empireID, homeworld.id):
                     possible_building_type_ids.append(type_id)
-            except:
+            except:  # noqa: E722
                 if fo.getBuildingType(type_id) is None:
                     debug("For empire %d, 'available Building Type priority_id' %s returns None from fo.getBuildingType(type_id)" % (empire.empireID, type_id))
                 else:
@@ -334,7 +333,7 @@ def generate_production_orders():
                 try:
                     res = fo.issueEnqueueBuildingProductionOrder("BLD_SHIPYARD_BASE", homeworld.id)
                     debug("Enqueueing BLD_SHIPYARD_BASE, with result %d" % res)
-                except:
+                except:  # noqa: E722
                     warning("Can't build shipyard at new capital, probably no population; we're hosed")
 
             for building_name in ["BLD_SHIPYARD_ORG_ORB_INC"]:
@@ -347,7 +346,7 @@ def generate_production_orders():
                             building_expense += cost / time
                             res = fo.issueRequeueProductionOrder(production_queue.size - 1, 0)  # move to front
                             debug("Requeueing %s to front of build queue, with result %d" % (building_name, res))
-                    except:
+                    except:  # noqa: E722
                         error("Exception triggered and caught: ", exc_info=True)
 
             if ("BLD_IMPERIAL_PALACE" in possible_building_types) and ("BLD_IMPERIAL_PALACE" not in (capital_buildings + queued_building_names)):
@@ -588,7 +587,7 @@ def generate_production_orders():
             yard_locs = []
             need_yard = {}
             top_pilot_locs = []
-            for sys_id in set(asteroid_systems.keys()).difference(asteroid_yards.keys()):  # pylint: disable=dict-keys-not-iterating; # PY_3_MIGRATION
+            for sys_id in set(asteroid_systems.keys()).difference(asteroid_yards.keys()):
                 if sys_id in top_pilot_systems:
                     for pid, _ in top_pilot_systems[sys_id]:
                         if pid not in queued_shipyard_locs:  # will catch it later if shipyard already present
@@ -600,11 +599,11 @@ def generate_production_orders():
                     for pid, _ in top_pilot_systems[sys_id]:
                         if pid not in queued_shipyard_locs:  # will catch it later if shipyard already present
                             need_yard[sys_id] = pid
-            if (not yard_locs) and len(asteroid_yards.values()) <= int(current_turn // 50):  # pylint: disable=dict-values-not-iterating; # PY_3_MIGRATION # not yet building & not enough current locs, find a location to build one
+            if (not yard_locs) and len(asteroid_yards.values()) <= int(current_turn // 50):  # not yet building & not enough current locs, find a location to build one
                 colonizer_loc_choices = []
                 builder_loc_choices = []
-                bld_systems = set(asteroid_systems.keys()).difference(asteroid_yards.keys())  # pylint: disable=dict-keys-not-iterating; # PY_3_MIGRATION
-                for sys_id in bld_systems.intersection(builder_systems.keys()):  # pylint: disable=dict-keys-not-iterating; # PY_3_MIGRATION
+                bld_systems = set(asteroid_systems.keys()).difference(asteroid_yards.keys())
+                for sys_id in bld_systems.intersection(builder_systems.keys()):
                     for this_spec, pid in builder_systems[sys_id]:
                         if this_spec in ColonisationAI.empire_colonizers:
                             if pid in (ColonisationAI.empire_colonizers[this_spec] + queued_shipyard_locs):
@@ -717,7 +716,7 @@ def generate_production_orders():
                             continue
                         try:
                             distance_map[sys_id] = universe.jumpDistance(homeworld.systemID, sys_id)
-                        except:
+                        except:  # noqa: E722
                             pass
                     use_sys = ([(-1, INVALID_ID)] + sorted([(dist, sys_id) for sys_id, dist in distance_map.items()]))[:2][-1][-1]  # kinda messy, but ensures a value
                 if use_sys != INVALID_ID:
@@ -730,7 +729,7 @@ def generate_production_orders():
                             building_expense += cost / time  # production_queue[production_queue.size -1].blocksize *
                             res = fo.issueRequeueProductionOrder(production_queue.size - 1, 0)  # move to front
                             debug("Requeueing %s to front of build queue, with result %d", building_name, res)
-                    except:
+                    except:  # noqa: E722
                         debug("problem queueing BLD_SOL_ORB_GEN at planet %s of system", use_loc, use_sys)
                         pass
 
@@ -756,7 +755,7 @@ def generate_production_orders():
                     continue
                 try:
                     distance_map[sys_id] = universe.jumpDistance(nominal_home.systemID, sys_id)
-                except:
+                except:  # noqa: E722
                     pass
             red_sys_list = sorted([(dist, sys_id) for sys_id, dist in distance_map.items()])
             for dist, sys_id in red_sys_list:
@@ -783,7 +782,7 @@ def generate_production_orders():
                             chat_human("Enqueueing %s at planet %s , with result %d" % (building_name, planet_used, res))
                         res = fo.issueRequeueProductionOrder(production_queue.size - 1, 0)  # move to front
                         debug("Requeueing %s to front of build queue, with result %d", building_name, res)
-                except:
+                except:  # noqa: E722
                     debug("problem queueing %s at planet %s" % (building_name, planet_used))
 
     building_name = "BLD_BLACK_HOLE_POW_GEN"
@@ -804,7 +803,7 @@ def generate_production_orders():
                         continue
                     try:
                         distance_map[sys_id] = universe.jumpDistance(homeworld.systemID, sys_id)
-                    except:
+                    except:  # noqa: E722
                         pass
                 use_sys = ([(-1, INVALID_ID)] + sorted([(dist, sys_id) for sys_id, dist in distance_map.items()]))[:2][-1][-1]  # kinda messy, but ensures a value
             if use_sys != INVALID_ID:
@@ -815,7 +814,7 @@ def generate_production_orders():
                     if res:
                         res = fo.issueRequeueProductionOrder(production_queue.size - 1, 0)  # move to front
                         debug("Requeueing %s to front of build queue, with result %d" % (building_name, res))
-                except:
+                except:  # noqa: E722
                     warning("problem queueing BLD_BLACK_HOLE_POW_GEN at planet %s of system %s", use_loc, use_sys)
                     pass
 
@@ -834,7 +833,7 @@ def generate_production_orders():
                 if res:
                     res = fo.issueRequeueProductionOrder(production_queue.size - 1, 0)  # move to front
                     debug("Requeueing %s to front of build queue, with result %d", building_name, res)
-            except:
+            except:  # noqa: E722
                 pass
 
     building_name = "BLD_GENOME_BANK"
@@ -852,7 +851,7 @@ def generate_production_orders():
                 if res:
                     res = fo.issueRequeueProductionOrder(production_queue.size - 1, 0)  # move to front
                     debug("Requeueing %s to front of build queue, with result %d", building_name, res)
-            except:
+            except:  # noqa: E722
                 pass
 
     building_name = "BLD_NEUTRONIUM_EXTRACTOR"
@@ -894,7 +893,7 @@ def generate_production_orders():
                     if res:
                         res = fo.issueRequeueProductionOrder(production_queue.size - 1, 0)  # move to front
                         debug("Requeueing %s to front of build queue, with result %d", building_name, res)
-                except:
+                except:  # noqa: E722
                     warning("problem queueing BLD_NEUTRONIUM_EXTRACTOR at planet %s of system %s" % (use_loc, use_sys))
                     pass
 

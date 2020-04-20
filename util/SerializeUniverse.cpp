@@ -23,7 +23,7 @@
 BOOST_CLASS_EXPORT(System)
 BOOST_CLASS_EXPORT(Field)
 BOOST_CLASS_EXPORT(Planet)
-BOOST_CLASS_VERSION(Planet, 1)
+BOOST_CLASS_VERSION(Planet, 2)
 BOOST_CLASS_EXPORT(Building)
 BOOST_CLASS_EXPORT(Fleet)
 BOOST_CLASS_VERSION(Fleet, 3)
@@ -165,7 +165,7 @@ void Universe::serialize(Archive& ar, const unsigned int version)
     }
 
     timer.EnterSection("stats");
-    if (Archive::is_saving::value && (!GetOptionsDB().Get<bool>("network.server.publish-statistics")) && m_encoding_empire != ALL_EMPIRES) {
+    if (Archive::is_saving::value && m_encoding_empire != ALL_EMPIRES && (!GetOptionsDB().Get<bool>("network.server.publish-statistics"))) {
         std::map<std::string, std::map<int, std::map<int, double>>> dummy_stat_records;
         ar  & boost::serialization::make_nvp("m_stat_records", dummy_stat_records);
     } else {
@@ -246,6 +246,14 @@ void Planet::serialize(Archive& ar, const unsigned int version)
         & BOOST_SERIALIZATION_NVP(m_rotational_period)
         & BOOST_SERIALIZATION_NVP(m_axial_tilt)
         & BOOST_SERIALIZATION_NVP(m_buildings);
+    if (version < 2) {
+        // if deserializing an old save, default to standard default never-colonized turn
+        m_turn_last_colonized = INVALID_GAME_TURN;
+        if (!SpeciesName().empty()) // but if a planet has a species, it must have been colonized, so default to the previous turn
+            m_turn_last_colonized = CurrentTurn() - 1;
+    } else {
+        ar   & BOOST_SERIALIZATION_NVP(m_turn_last_colonized);
+    }
     if (version < 1) {
         bool dummy = false;
         ar   & boost::serialization::make_nvp("m_just_conquered", dummy);

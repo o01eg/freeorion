@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 from logging import error
 import re
 
@@ -29,7 +27,7 @@ normalization_dict = {
     'tech': 'tech_object',
     'list': 'item_list',
     'planet': 'planet_object',
-    'partType': 'part_type',
+    'shipPart': 'ship_part',
     'resPool': 'res_pool',
     'researchQueueElement': 'research_queue_element',
     'shipSlotType': 'ship_slot_type',
@@ -40,7 +38,7 @@ normalization_dict = {
     'IntSetSet': 'int_set_set',
     'IntVec': 'int_list',
     'IntVisibilityMap': 'int_visibility_map',
-    'ItemSpecVec': 'item_spec_vec',
+    'UnlockableItemVec': 'unlockable_item_vec',
     'StringSet': 'string_set',
     'VisibilityIntMap': 'visibility_int_map',
     'buildingType': 'buildingType',
@@ -105,7 +103,7 @@ def get_argument_names(arguments, is_class):
 
 
 def parse_name(txt):
-    match = re.match('\w+\((.*)\) -> (.+) :', txt)
+    match = re.match(r'\w+\((.*)\) -> (.+) :', txt)
     args, return_type = match.group(1, 2)
     args = [x.strip(' (').split(')') for x in args.split(',') if x]
     return [x[0] for x in args], return_type
@@ -153,7 +151,7 @@ def normalize_rtype(rtype):
     return rtype
 
 
-class Docs(object):
+class Docs:
     def __init__(self, text, indent, is_class=False):
         self.indent = indent
         self.is_class = is_class
@@ -169,9 +167,9 @@ class Docs(object):
         lines = [x.strip() for x in self.text.split('\n')]
 
         def parse_signature(line):
-            expre = re.compile('(\w+)\((.*)\) -> (\w+)')
+            expre = re.compile(r'(\w+)\((.*)\) -> (\w+)')
             name, args, rtype = expre.match(line).group(1, 2, 3)
-            args = tuple(re.findall('\((\w+)\) *(\w+)', args))
+            args = tuple(re.findall(r'\((\w+)\) *(\w+)', args))
             return name, args, rtype
 
         res = []

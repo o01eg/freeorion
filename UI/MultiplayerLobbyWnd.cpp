@@ -1,7 +1,6 @@
 #include "MultiplayerLobbyWnd.h"
 
 #include <GG/Button.h>
-#include <GG/DrawUtil.h>
 #include <GG/Layout.h>
 #include <GG/StaticGraphic.h>
 
@@ -49,12 +48,12 @@ namespace {
     // players or the host.
     struct PlayerRow : GG::ListBox::Row {
         PlayerRow() :
-            GG::ListBox::Row(GG::X(90), PlayerRowHeight(), ""),
+            GG::ListBox::Row(GG::X(90), PlayerRowHeight()),
             m_player_data(),
             m_player_id(Networking::INVALID_PLAYER_ID)
         {}
         PlayerRow(const PlayerSetupData& player_data, int player_id) :
-            GG::ListBox::Row(GG::X(90), PlayerRowHeight(), ""),
+            GG::ListBox::Row(GG::X(90), PlayerRowHeight()),
             m_player_data(player_data),
             m_player_id(player_id)
         {}
@@ -85,9 +84,10 @@ namespace {
             {}
 
             TypeRow(GG::X w, GG::Y h, Networking::ClientType type_, bool show_add_drop = false) :
-                GG::DropDownList::Row(w, h, "PlayerTypeSelectorRow"),
+                GG::DropDownList::Row(w, h),
                 type(type_)
             {
+                SetDragDropDataType("PlayerTypeSelectorRow");
                 switch (type) {
                 case Networking::CLIENT_TYPE_AI_PLAYER:
                     if (show_add_drop)
@@ -366,7 +366,6 @@ namespace {
     struct LoadGamePlayerRow : PlayerRow {
         LoadGamePlayerRow(const PlayerSetupData& player_data, int player_id, const std::map<int, SaveGameEmpireData>& save_game_empire_data, bool disabled, bool in_game) :
             PlayerRow(player_data, player_id),
-            m_empire_list(nullptr),
             m_save_game_empire_data(save_game_empire_data),
             m_initial_disabled(disabled),
             m_in_game(in_game)
@@ -596,18 +595,7 @@ namespace {
 
 MultiPlayerLobbyWnd::MultiPlayerLobbyWnd() :
     CUIWnd(UserString("MPLOBBY_WINDOW_TITLE"),
-           GG::ONTOP | GG::INTERACTIVE | GG::RESIZABLE),
-    m_chat_wnd(nullptr),
-    m_any_can_edit(nullptr),
-    m_new_load_game_buttons(nullptr),
-    m_galaxy_setup_panel(nullptr),
-    m_browse_saves_btn(nullptr),
-    m_preview_image(nullptr),
-    m_players_lb(nullptr),
-    m_players_lb_headers(nullptr),
-    m_ready_bn(nullptr),
-    m_cancel_bn(nullptr),
-    m_start_conditions_text(nullptr)
+           GG::ONTOP | GG::INTERACTIVE | GG::RESIZABLE)
 {}
 
 void MultiPlayerLobbyWnd::CompleteConstruction() {
@@ -706,7 +694,7 @@ void MultiPlayerLobbyWnd::CompleteConstruction() {
 }
 
 MultiPlayerLobbyWnd::PlayerLabelRow::PlayerLabelRow(GG::X width /* = GG::X(580)*/) :
-    GG::ListBox::Row(width, PlayerRowHeight(), "")
+    GG::ListBox::Row(width, PlayerRowHeight())
 {}
 
 void MultiPlayerLobbyWnd::PlayerLabelRow::CompleteConstruction() {

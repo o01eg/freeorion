@@ -53,8 +53,8 @@ public:
     void Reset();
     void Sanitize();
 
-    /** Shows \a part_type in design encyclopedia window */
-    void ShowPartTypeInEncyclopedia(const std::string& part_type);
+    //! Shows @a ship_part in design encyclopedia window
+    void ShowShipPartInEncyclopedia(const std::string& ship_part);
 
     /** Shows \a hull_type in design encyclopedia window */
     void ShowHullTypeInEncyclopedia(const std::string& hull_type);
@@ -75,10 +75,10 @@ private:
     void DesignNameChanged();
     void InitializeWindows();
 
-    std::shared_ptr<EncyclopediaDetailPanel>    m_detail_panel = nullptr;
-    std::shared_ptr<BaseSelector>               m_base_selector = nullptr;
-    std::shared_ptr<PartPalette>                m_part_palette = nullptr;
-    std::shared_ptr<MainPanel>                  m_main_panel = nullptr;
+    std::shared_ptr<EncyclopediaDetailPanel>    m_detail_panel;
+    std::shared_ptr<BaseSelector>               m_base_selector;
+    std::shared_ptr<PartPalette>                m_part_palette;
+    std::shared_ptr<MainPanel>                  m_main_panel;
 };
 
 #endif // _DesignWnd_h_

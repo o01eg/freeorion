@@ -1,6 +1,6 @@
 from collections import namedtuple
 from logging import warning, error
-from freeorion_tools import ReadOnlyDict
+from freeorion_tools import ReadOnlyDict, cache_for_current_turn
 
 import freeOrionAIInterface as fo
 
@@ -11,7 +11,7 @@ from EnumsAI import FocusType
 PlanetInfo = namedtuple('PlanetInfo', ['pid', 'species_name', 'owner', 'system_id'])
 
 
-class State(object):
+class State:
     """
     This class represent state for current turn.
     It contains variables that renewed each turn.
@@ -71,7 +71,7 @@ class State(object):
                 if AIDependencies.PANOPTICON_SPECIAL in planet.specials:
                     self.__have_panopticon = True
                 if population > 0 and AIDependencies.COMPUTRONIUM_SPECIAL in planet.specials:
-                        self.__have_computronium = True  # TODO: Check if species can set research focus
+                    self.__have_computronium = True  # TODO: Check if species can set research focus
 
                 if planet.focus == FocusType.FOCUS_INDUSTRY:
                     self.__num_industrialists += population
@@ -170,6 +170,7 @@ class State(object):
             return self.__empire_planets_by_system[include_outposts].get(sys_id, tuple())
         return self.__empire_planets_by_system[include_outposts]
 
+    @cache_for_current_turn
     def get_inhabited_planets(self):
         """
         Return frozenset of empire planet ids with species.
@@ -277,5 +278,6 @@ class State(object):
 
     def set_medium_pilot_rating(self, value):
         self.__medium_pilot_rating = value
+
 
 state = State()

@@ -70,6 +70,18 @@ DRYDOCK_HAPPINESS_THRESHOLD = 5
 INVALID_ID = -1
 ALL_EMPIRES = -1
 
+
+class Tags:
+    POPULATION = "POPULATION"
+    INDUSTRY = "INDUSTRY"
+    WEAPONS = "WEAPONS"
+    RESEARCH = "RESEARCH"
+    SUPPLY = "SUPPLY"
+    ATTACKTROOPS = "ATTACKTROOPS"
+    STEALTH = "STEALTH"
+    SHIELDS = "SHIELDS"
+    FUEL = "FUEL"
+
 # </editor-fold>
 
 
@@ -143,11 +155,11 @@ STEALTH_SPECIAL_STRENGTHS = {
 BASE_PLANET_STEALTH = 5
 
 STEALTH_STRENGTHS_BY_SPECIES_TAG = {
-    "BAD_STEALTH": -PRIMARY_FOCS_STEALTH_LEVELS["LOW_STEALTH"],
-    "GOOD_STEALTH": PRIMARY_FOCS_STEALTH_LEVELS["LOW_STEALTH"],
-    "GREAT_STEALTH": PRIMARY_FOCS_STEALTH_LEVELS["MEDIUM_STEALTH"],
-    "ULTIMATE_STEALTH": PRIMARY_FOCS_STEALTH_LEVELS["HIGH_STEALTH"],
-    "INFINITE_STEALTH": 500,  # used by super testers
+    "BAD": -PRIMARY_FOCS_STEALTH_LEVELS["LOW_STEALTH"],
+    "GOOD": PRIMARY_FOCS_STEALTH_LEVELS["LOW_STEALTH"],
+    "GREAT": PRIMARY_FOCS_STEALTH_LEVELS["MEDIUM_STEALTH"],
+    "ULTIMATE": PRIMARY_FOCS_STEALTH_LEVELS["HIGH_STEALTH"],
+    "INFINITE": 500,  # used by super testers
 }
 # </editor-fold>
 
@@ -351,6 +363,10 @@ FUEL_TANK_UPGRADE_DICT = {
     "FU_RAMSCOOP": (),
     "FU_ZERO_FUEL": (),
 }
+
+# DO NOT TOUCH THIS ENTRY BUT UPDATE FUEL_TANK_UPGRADE_DICT INSTEAD!
+FUEL_UPGRADE_TECHS = frozenset(tech_name for _dict in (FUEL_TANK_UPGRADE_DICT, )
+                               for tups in _dict.values() for (tech_name, _) in tups)
 # </editor-fold>
 
 # <editor-fold desc="Weapon techs">
@@ -394,7 +410,10 @@ FIGHTER_CAPACITY_UPGRADE_DICT = {
 }
 
 # DO NOT TOUCH THIS ENTRY BUT UPDATE WEAPON_UPGRADE_DICT INSTEAD!
-WEAPON_UPGRADE_TECHS = [tech_name for tups in WEAPON_UPGRADE_DICT.values() for (tech_name, _) in tups]
+WEAPON_UPGRADE_TECHS = frozenset(tech_name for _dict in (WEAPON_UPGRADE_DICT, WEAPON_ROF_UPGRADE_DICT)
+                                 for tups in _dict.values() for (tech_name, _) in tups)
+FIGHTER_UPGRADE_TECHS = frozenset(tech_name for _dict in (FIGHTER_DAMAGE_UPGRADE_DICT, FIGHTER_CAPACITY_UPGRADE_DICT)
+                                  for tups in _dict.values() for (tech_name, _) in tups)
 # </editor-fold>
 
 # <editor-fold desc="Tech Groups for Automated Research Approach">
@@ -757,6 +776,41 @@ SYSTEM_SHIP_FACILITIES = frozenset((
 
 # <editor-fold desc="Shipdesign/-parts">
 PART_KRILL_SPAWNER = "SP_KRILL_SPAWNER"
+
+
+# <editor-fold desc="Allowed Combat Targets">
+# TODO: Inherit from enum.Flag after switch to Python 3.6+
+class CombatTarget:
+    NONE = 0
+    SHIP = 1 << 0
+    PLANET = 1 << 1
+    FIGHTER = 1 << 2
+    ANY = SHIP | PLANET | FIGHTER
+
+    # map from weapon to allowed targets
+    PART_ALLOWED_TARGETS = {
+        "SR_WEAPON_0_1": FIGHTER,
+        "SR_WEAPON_1_1": SHIP | PLANET,
+        "SR_WEAPON_2_1": SHIP | PLANET,
+        "SR_WEAPON_3_1": SHIP | PLANET,
+        "SR_WEAPON_4_1": SHIP | PLANET,
+        "SR_SPINAL_ANTIMATTER": SHIP | PLANET,
+        "FT_HANGAR_0": NONE,
+        "FT_HANGAR_1": FIGHTER,
+        "FT_HANGAR_2": SHIP | FIGHTER,
+        "FT_HANGAR_3": SHIP,
+        "FT_HANGAR_4": SHIP | PLANET,
+        # monster weapons
+        "SR_ARC_DISRUPTOR": ANY,
+        "SR_ICE_BEAM": ANY,
+        "SR_JAWS": ANY,
+        "SR_PLASMA_DISCHARGE": ANY,
+        "SR_SPINES": ANY,
+        "SR_TENTACLE": ANY,
+        "FT_HANGAR_KRILL": SHIP | FIGHTER,
+    }
+# </editor-fold>
+
 
 # <editor-fold desc="Effect Scripting for Shipdesigns">
 # <editor-fold desc="Tokens">

@@ -1,4 +1,4 @@
-/* GG is a GUI for SDL and OpenGL.
+/* GG is a GUI for OpenGL.
    Copyright (C) 2003-2008 T. Zachary Laine
 
    This library is free software; you can redistribute it and/or
@@ -84,7 +84,7 @@ namespace {
     class RowSorter // used to sort rows by a certain column (which may contain some empty cells)
     {
     public:
-        RowSorter(const boost::function<bool (const ListBox::Row&, const ListBox::Row&, std::size_t)>& cmp,
+        RowSorter(const std::function<bool (const ListBox::Row&, const ListBox::Row&, std::size_t)>& cmp,
                   std::size_t col, bool invert) :
             m_cmp(cmp),
             m_sort_col(col),
@@ -97,7 +97,7 @@ namespace {
         { return m_invert ? m_cmp(*r, *l, m_sort_col) : m_cmp(*l, *r, m_sort_col); }
 
     private:
-        boost::function<bool (const ListBox::Row&, const ListBox::Row&, std::size_t)> m_cmp;
+        std::function<bool (const ListBox::Row&, const ListBox::Row&, std::size_t)> m_cmp;
         std::size_t m_sort_col;
         bool m_invert;
     };
@@ -201,16 +201,14 @@ namespace {
 // GG::ListBox::Row
 ////////////////////////////////////////////////
 ListBox::Row::Row() :
-    Control(X0, Y0, ListBox::DEFAULT_ROW_WIDTH, ListBox::DEFAULT_ROW_HEIGHT),
-    m_row_alignment(ALIGN_VCENTER)
+    Row(ListBox::DEFAULT_ROW_WIDTH, ListBox::DEFAULT_ROW_HEIGHT)
 {}
 
-ListBox::Row::Row(X w, Y h, const std::string& drag_drop_data_type,
-                  Alignment align/* = ALIGN_VCENTER*/, unsigned int margin/* = 2*/) : 
+ListBox::Row::Row(X w, Y h) :
     Control(X0, Y0, w, h),
-    m_row_alignment(align),
-    m_margin(margin)
-{ SetDragDropDataType(drag_drop_data_type); }
+    m_row_alignment(ALIGN_VCENTER),
+    m_margin(ListBox::DEFAULT_MARGIN)
+{}
 
 void ListBox::Row::CompleteConstruction()
 { SetLayout(Wnd::Create<DeferredLayout>(X0, Y0, Width(), Height(), 1, 1, m_margin, m_margin)); }
@@ -488,9 +486,12 @@ void ListBox::Row::SetMargin(unsigned int margin)
         return;
 
     m_margin = margin;
-    auto&& layout = GetLayout();
-    layout->SetBorderMargin(margin);
-    layout->SetCellMargin(margin);
+    auto layout = GetLayout();
+    if (layout)
+    {
+        layout->SetBorderMargin(margin);
+        layout->SetCellMargin(margin);
+    }
 }
 
 void ListBox::Row::SetNormalized(bool normalized)
@@ -1361,7 +1362,7 @@ void ListBox::SetSortCol(std::size_t n)
         Resort();
 }
 
-void ListBox::SetSortCmp(const boost::function<bool (const Row&, const Row&, std::size_t)>& sort_cmp)
+void ListBox::SetSortCmp(const std::function<bool (const Row&, const Row&, std::size_t)>& sort_cmp)
 {
     m_sort_cmp = sort_cmp;
     if (!(m_style & LIST_NOSORT))

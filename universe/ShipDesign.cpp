@@ -1,5 +1,7 @@
 #include "ShipDesign.h"
 
+#include "ShipPart.h"
+#include "ShipPartHull.h"
 #include "../util/OptionsDB.h"
 #include "../util/Logger.h"
 #include "../util/AppInterface.h"
@@ -7,14 +9,14 @@
 #include "../util/CheckSums.h"
 #include "../Empire/Empire.h"
 #include "../Empire/EmpireManager.h"
-#include "Conditions.h"
+#include "ConditionSource.h"
 #include "Effects.h"
 #include "Planet.h"
 #include "Ship.h"
 #include "Predicates.h"
 #include "Species.h"
 #include "Universe.h"
-#include "ValueRefs.h"
+#include "ValueRefs.h"  // Operation, PLUS, TIMES, Variable, EFFECT_TARGET_VALUE_REFERENCE, Constant, ComplexVariable
 #include "Enums.h"
 
 #include <cfloat>
@@ -25,8 +27,7 @@
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/lexical_cast.hpp>
-//TODO: replace with std::make_unique when transitioning to C++14
-#include <boost/smart_ptr/make_unique.hpp>
+
 
 extern FO_COMMON_API const int INVALID_DESIGN_ID = -1;
 
@@ -46,6 +47,9 @@ namespace {
     bool temp_bool = RegisterGameRules(&AddRules);
 
     const std::string EMPTY_STRING;
+    const int ARBITRARY_LARGE_TURNS = 999999;
+    const float ARBITRARY_LARGE_COST = 999999.9f;
+
 
     // create effectsgroup that increases the value of \a meter_type
     // by the result of evalulating \a increase_vr
@@ -54,18 +58,18 @@ namespace {
                   std::unique_ptr<ValueRef::ValueRef<double>>&& increase_vr)
     {
         typedef std::vector<std::unique_ptr<Effect::Effect>> Effects;
-        auto scope = boost::make_unique<Condition::Source>();
-        auto activation = boost::make_unique<Condition::Source>();
+        auto scope = std::make_unique<Condition::Source>();
+        auto activation = std::make_unique<Condition::Source>();
 
         auto vr =
-            boost::make_unique<ValueRef::Operation<double>>(
+            std::make_unique<ValueRef::Operation<double>>(
                 ValueRef::PLUS,
-                boost::make_unique<ValueRef::Variable<double>>(
+                std::make_unique<ValueRef::Variable<double>>(
                     ValueRef::EFFECT_TARGET_VALUE_REFERENCE, std::vector<std::string>()),
                 std::move(increase_vr)
             );
         auto effects = Effects();
-        effects.push_back(boost::make_unique<Effect::SetMeter>(meter_type, std::move(vr)));
+        effects.push_back(std::make_unique<Effect::SetMeter>(meter_type, std::move(vr)));
         return std::make_shared<Effect::EffectsGroup>(std::move(scope), std::move(activation), std::move(effects));
     }
 
@@ -73,7 +77,7 @@ namespace {
     // by the specified amount \a fixed_increase
     std::shared_ptr<Effect::EffectsGroup>
     IncreaseMeter(MeterType meter_type, float fixed_increase) {
-        auto increase_vr = boost::make_unique<ValueRef::Constant<double>>(fixed_increase);
+        auto increase_vr = std::make_unique<ValueRef::Constant<double>>(fixed_increase);
         return IncreaseMeter(meter_type, std::move(increase_vr));
     }
 
@@ -88,48 +92,16 @@ namespace {
         if (scaling_factor_rule_name.empty())
             return IncreaseMeter(meter_type, base_increase);
 
-        auto increase_vr = boost::make_unique<ValueRef::Operation<double>>(
+        auto increase_vr = std::make_unique<ValueRef::Operation<double>>(
             ValueRef::TIMES,
-            boost::make_unique<ValueRef::Constant<double>>(base_increase),
-            boost::make_unique<ValueRef::ComplexVariable<double>>(
+            std::make_unique<ValueRef::Constant<double>>(base_increase),
+            std::make_unique<ValueRef::ComplexVariable<double>>(
                 "GameRule", nullptr, nullptr, nullptr,
-                boost::make_unique<ValueRef::Constant<std::string>>(scaling_factor_rule_name)
+                std::make_unique<ValueRef::Constant<std::string>>(scaling_factor_rule_name)
             )
         );
 
         return IncreaseMeter(meter_type, std::move(increase_vr));
-    }
-
-    // create effectsgroup that increases the value of the part meter
-    // of type \a meter_type for part name \a part_name by the fixed
-    // amount \a increase
-    std::shared_ptr<Effect::EffectsGroup>
-    IncreaseMeter(MeterType meter_type, const std::string& part_name,
-                  float increase, bool allow_stacking = true)
-    {
-        typedef std::vector<std::unique_ptr<Effect::Effect>> Effects;
-        auto scope = boost::make_unique<Condition::Source>();
-        auto activation = boost::make_unique<Condition::Source>();
-
-        auto value_vr = boost::make_unique<ValueRef::Operation<double>>(
-            ValueRef::PLUS,
-            boost::make_unique<ValueRef::Variable<double>>(
-                ValueRef::EFFECT_TARGET_VALUE_REFERENCE, std::vector<std::string>()),
-            boost::make_unique<ValueRef::Constant<double>>(increase)
-        );
-
-        auto part_name_vr =
-            boost::make_unique<ValueRef::Constant<std::string>>(part_name);
-
-        std::string stacking_group = (allow_stacking ? "" :
-            (part_name + "_" + boost::lexical_cast<std::string>(meter_type) + "_PartMeter"));
-
-        auto effects = Effects();
-        effects.push_back(boost::make_unique<Effect::SetShipPartMeter>(
-                              meter_type, std::move(part_name_vr), std::move(value_vr)));
-
-        return std::make_shared<Effect::EffectsGroup>(
-            std::move(scope), std::move(activation), std::move(effects), part_name, stacking_group);
     }
 
     bool DesignsTheSame(const ShipDesign& one, const ShipDesign& two) {
@@ -161,12 +133,6 @@ namespace CheckSums {
 ////////////////////////////////////////////////
 // Free Functions                             //
 ////////////////////////////////////////////////
-PartTypeManager& GetPartTypeManager()
-{ return PartTypeManager::GetPartTypeManager(); }
-
-const PartType* GetPartType(const std::string& name)
-{ return GetPartTypeManager().GetPartType(name); }
-
 HullTypeManager& GetHullTypeManager()
 { return HullTypeManager::GetHullTypeManager(); }
 
@@ -205,334 +171,6 @@ CommonParams::CommonParams(std::unique_ptr<ValueRef::ValueRef<double>>&& product
 }
 
 CommonParams::~CommonParams() {}
-
-
-/////////////////////////////////////
-// PartTypeManager                 //
-/////////////////////////////////////
-// static
-PartTypeManager* PartTypeManager::s_instance = nullptr;
-
-PartTypeManager::PartTypeManager() {
-    if (s_instance)
-        throw std::runtime_error("Attempted to create more than one PartTypeManager.");
-
-    // Only update the global pointer on sucessful construction.
-    s_instance = this;
-}
-
-const PartType* PartTypeManager::GetPartType(const std::string& name) const {
-    CheckPendingPartTypes();
-    auto it = m_parts.find(name);
-    return it != m_parts.end() ? it->second.get() : nullptr;
-}
-
-PartTypeManager& PartTypeManager::GetPartTypeManager() {
-    static PartTypeManager manager;
-    return manager;
-}
-
-PartTypeManager::iterator PartTypeManager::begin() const {
-    CheckPendingPartTypes();
-    return m_parts.begin();
-}
-
-PartTypeManager::iterator PartTypeManager::end() const{
-    CheckPendingPartTypes();
-    return m_parts.end();
-}
-
-unsigned int PartTypeManager::GetCheckSum() const {
-    CheckPendingPartTypes();
-    unsigned int retval{0};
-    for (auto const& name_part_pair : m_parts)
-        CheckSums::CheckSumCombine(retval, name_part_pair);
-    CheckSums::CheckSumCombine(retval, m_parts.size());
-
-
-    DebugLogger() << "PartTypeManager checksum: " << retval;
-    return retval;
-}
-
-void PartTypeManager::SetPartTypes(Pending::Pending<PartTypeMap>&& pending_part_types)
-{ m_pending_part_types = std::move(pending_part_types); }
-
-void PartTypeManager::CheckPendingPartTypes() const {
-    if (!m_pending_part_types)
-        return;
-
-    Pending::SwapPending(m_pending_part_types, m_parts);
-
-    TraceLogger() << [this]() {
-            std::string retval("Part Types:");
-            for (const auto& pair : m_parts) {
-                const auto& part = pair.second;
-                retval.append("\n\t" + part->Name() + " class: " + boost::lexical_cast<std::string>(part->Class()));
-            }
-            return retval;
-        }();
-}
-
-
-////////////////////////////////////////////////
-// PartType
-////////////////////////////////////////////////
-PartType::PartType() :
-    m_class(INVALID_SHIP_PART_CLASS)
-{}
-
-PartType::PartType(ShipPartClass part_class, double capacity, double stat2,
-                   CommonParams& common_params, const MoreCommonParams& more_common_params,
-                   std::vector<ShipSlotType> mountable_slot_types,
-                   const std::string& icon, bool add_standard_capacity_effect,
-                   std::unique_ptr<Condition::Condition>&& combat_targets) :
-    m_name(more_common_params.name),
-    m_description(more_common_params.description),
-    m_class(part_class),
-    m_capacity(capacity),
-    m_secondary_stat(stat2),
-    m_producible(common_params.producible),
-    m_production_cost(std::move(common_params.production_cost)),
-    m_production_time(std::move(common_params.production_time)),
-    m_mountable_slot_types(mountable_slot_types),
-    m_production_meter_consumption(std::move(common_params.production_meter_consumption)),
-    m_production_special_consumption(std::move(common_params.production_special_consumption)),
-    m_location(std::move(common_params.location)),
-    m_exclusions(more_common_params.exclusions),
-    m_icon(icon),
-    m_add_standard_capacity_effect(add_standard_capacity_effect),
-    m_combat_targets(std::move(combat_targets))
-{
-    Init(std::move(common_params.effects));
-
-    for (const std::string& tag : common_params.tags)
-        m_tags.insert(boost::to_upper_copy<std::string>(tag));
-
-    TraceLogger() << "PartType::PartType: name: " << m_name
-                  << " description: " << m_description
-                  << " class: " << m_class
-                  << " capacity: " << m_capacity
-                  << " secondary stat: " << m_secondary_stat
-                  //<< " prod cost: " << m_production_cost
-                  //<< " prod time: " << m_production_time
-                  << " producible: " << m_producible
-                  //<< " mountable slot types: " << m_mountable_slot_types
-                  //<< " tags: " << m_tags
-                  //<< " prod meter consump: " << m_production_meter_consumption
-                  //<< " prod special consump: " << m_production_special_consumption
-                  //<< " location: " << m_location
-                  //<< " exclusions: " << m_exclusions
-                  //<< " effects: " << m_effects
-                  << " icon: " << m_icon
-                  << " add standard cap effect: " << m_add_standard_capacity_effect;
-}
-
-void PartType::Init(std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects) {
-    if ((m_capacity != 0 || m_secondary_stat != 0) && m_add_standard_capacity_effect) {
-        switch (m_class) {
-        case PC_COLONY:
-        case PC_TROOPS:
-            m_effects.push_back(IncreaseMeter(METER_CAPACITY,       m_name, m_capacity, false));
-            break;
-        case PC_FIGHTER_HANGAR: {   // capacity indicates how many fighters are stored in this type of part (combined for all copies of the part)
-            m_effects.push_back(IncreaseMeter(METER_MAX_CAPACITY,       m_name, m_capacity, true));         // stacking capacities allowed for this part, so each part contributes to the total capacity
-            m_effects.push_back(IncreaseMeter(METER_MAX_SECONDARY_STAT, m_name, m_secondary_stat, false));  // stacking damage not allowed, as damage per shot should be the same regardless of number of shots
-            break;
-        }
-        case PC_FIGHTER_BAY:        // capacity indicates how many fighters each instance of the part can launch per combat bout...
-        case PC_DIRECT_WEAPON: {    // capacity indicates weapon damage per shot
-            m_effects.push_back(IncreaseMeter(METER_MAX_CAPACITY,       m_name, m_capacity, false));
-            m_effects.push_back(IncreaseMeter(METER_MAX_SECONDARY_STAT, m_name, m_secondary_stat, false));
-            break;
-        }
-        case PC_SHIELD:
-            m_effects.push_back(IncreaseMeter(METER_MAX_SHIELD,     m_capacity));
-            break;
-        case PC_DETECTION:
-            m_effects.push_back(IncreaseMeter(METER_DETECTION,      m_capacity));
-            break;
-        case PC_STEALTH:
-            m_effects.push_back(IncreaseMeter(METER_STEALTH,        m_capacity));
-            break;
-        case PC_FUEL:
-            m_effects.push_back(IncreaseMeter(METER_MAX_FUEL,       m_capacity));
-            break;
-        case PC_ARMOUR:
-            m_effects.push_back(IncreaseMeter(METER_MAX_STRUCTURE,  m_capacity,     "RULE_SHIP_STRUCTURE_FACTOR"));
-            break;
-        case PC_SPEED:
-            m_effects.push_back(IncreaseMeter(METER_SPEED,          m_capacity,     "RULE_SHIP_SPEED_FACTOR"));
-            break;
-        case PC_RESEARCH:
-            m_effects.push_back(IncreaseMeter(METER_TARGET_RESEARCH,m_capacity));
-            break;
-        case PC_INDUSTRY:
-            m_effects.push_back(IncreaseMeter(METER_TARGET_INDUSTRY,m_capacity));
-            break;
-        case PC_TRADE:
-            m_effects.push_back(IncreaseMeter(METER_TARGET_TRADE,   m_capacity));
-            break;
-        default:
-            break;
-        }
-    }
-
-    if (m_production_cost)
-        m_production_cost->SetTopLevelContent(m_name);
-    if (m_production_time)
-        m_production_time->SetTopLevelContent(m_name);
-    if (m_location)
-        m_location->SetTopLevelContent(m_name);
-    if (m_combat_targets)
-        m_combat_targets->SetTopLevelContent(m_name);
-    for (auto&& effect : effects) {
-        effect->SetTopLevelContent(m_name);
-        m_effects.emplace_back(std::move(effect));
-    }
-}
-
-PartType::~PartType()
-{}
-
-float PartType::Capacity() const {
-    switch (m_class) {
-    case PC_ARMOUR:
-        return m_capacity * GetGameRules().Get<double>("RULE_SHIP_STRUCTURE_FACTOR");
-        break;
-    case PC_SPEED:
-        return m_capacity * GetGameRules().Get<double>("RULE_SHIP_SPEED_FACTOR");
-        break;
-    default:
-        return m_capacity;
-    }
-}
-
-float PartType::SecondaryStat() const
-{ return m_secondary_stat; }
-
-std::string PartType::CapacityDescription() const {
-    std::string desc_string;
-    float main_stat = Capacity();
-    float sdry_stat = SecondaryStat();
-
-    switch (m_class) {
-    case PC_FUEL:
-    case PC_TROOPS:
-    case PC_COLONY:
-    case PC_FIGHTER_BAY:
-        desc_string += str(FlexibleFormat(UserString("PART_DESC_CAPACITY")) % main_stat);
-        break;
-    case PC_DIRECT_WEAPON:
-        desc_string += str(FlexibleFormat(UserString("PART_DESC_DIRECT_FIRE_STATS")) % main_stat % sdry_stat);
-        break;
-    case PC_FIGHTER_HANGAR:
-        desc_string += str(FlexibleFormat(UserString("PART_DESC_HANGAR_STATS")) % main_stat % sdry_stat);
-        break;
-    case PC_SHIELD:
-        desc_string = str(FlexibleFormat(UserString("PART_DESC_SHIELD_STRENGTH")) % main_stat);
-        break;
-    case PC_DETECTION:
-        desc_string = str(FlexibleFormat(UserString("PART_DESC_DETECTION")) % main_stat);
-        break;
-    default:
-        desc_string = str(FlexibleFormat(UserString("PART_DESC_STRENGTH")) % main_stat);
-        break;
-    }
-    return desc_string;
-}
-
-bool PartType::CanMountInSlotType(ShipSlotType slot_type) const {
-    if (INVALID_SHIP_SLOT_TYPE == slot_type)
-        return false;
-    for (ShipSlotType mountable_slot_type : m_mountable_slot_types)
-        if (mountable_slot_type == slot_type)
-            return true;
-    return false;
-}
-
-bool PartType::ProductionCostTimeLocationInvariant() const {
-    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION"))
-        return true;
-    if (m_production_cost && !m_production_cost->TargetInvariant())
-        return false;
-    if (m_production_time && !m_production_time->TargetInvariant())
-        return false;
-    return true;
-}
-
-float PartType::ProductionCost(int empire_id, int location_id, int in_design_id) const {
-    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_cost)
-        return 1.0f;
-
-    if (m_production_cost->ConstantExpr()) {
-        return static_cast<float>(m_production_cost->Eval());
-    } else if (m_production_cost->SourceInvariant() && m_production_cost->TargetInvariant()) {
-        ScriptingContext context(nullptr, nullptr, in_design_id);
-        return static_cast<float>(m_production_cost->Eval(context));
-    }
-
-    const auto arbitrary_large_number = 999999.9f;
-
-    auto location = Objects().get(location_id);
-    if (!location && !m_production_cost->TargetInvariant())
-        return arbitrary_large_number;
-
-    auto source = Empires().GetSource(empire_id);
-    if (!source && !m_production_cost->SourceInvariant())
-        return arbitrary_large_number;
-
-    ScriptingContext context(source, location, in_design_id);
-    return static_cast<float>(m_production_cost->Eval(context));
-}
-
-int PartType::ProductionTime(int empire_id, int location_id, int in_design_id) const {
-    const auto arbitrary_large_number = 9999;
-
-    if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_time)
-        return 1;
-
-    if (m_production_time->ConstantExpr()) {
-        return m_production_time->Eval();
-    } else if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant()) {
-        ScriptingContext context(nullptr, nullptr, in_design_id);
-        return m_production_time->Eval(context);
-    }
-
-    auto location = Objects().get(location_id);
-    if (!location && !m_production_time->TargetInvariant())
-        return arbitrary_large_number;
-
-    auto source = Empires().GetSource(empire_id);
-    if (!source && !m_production_time->SourceInvariant())
-        return arbitrary_large_number;
-
-    ScriptingContext context(source, location, in_design_id);
-    return m_production_time->Eval(context);
-}
-
-unsigned int PartType::GetCheckSum() const {
-    unsigned int retval{0};
-
-    CheckSums::CheckSumCombine(retval, m_name);
-    CheckSums::CheckSumCombine(retval, m_description);
-    CheckSums::CheckSumCombine(retval, m_class);
-    CheckSums::CheckSumCombine(retval, m_capacity);
-    CheckSums::CheckSumCombine(retval, m_secondary_stat);
-    CheckSums::CheckSumCombine(retval, m_production_cost);
-    CheckSums::CheckSumCombine(retval, m_production_time);
-    CheckSums::CheckSumCombine(retval, m_producible);
-    CheckSums::CheckSumCombine(retval, m_mountable_slot_types);
-    CheckSums::CheckSumCombine(retval, m_tags);
-    CheckSums::CheckSumCombine(retval, m_production_meter_consumption);
-    CheckSums::CheckSumCombine(retval, m_production_special_consumption);
-    CheckSums::CheckSumCombine(retval, m_location);
-    CheckSums::CheckSumCombine(retval, m_exclusions);
-    CheckSums::CheckSumCombine(retval, m_effects);
-    CheckSums::CheckSumCombine(retval, m_icon);
-    CheckSums::CheckSumCombine(retval, m_add_standard_capacity_effect);
-
-    return retval;
-}
 
 
 ////////////////////////////////////////////////
@@ -613,7 +251,7 @@ unsigned int HullType::NumSlots(ShipSlotType slot_type) const {
     return count;
 }
 
-// HullType:: and PartType::ProductionCost and ProductionTime are almost identical.
+// HullType:: and ShipPart::ProductionCost and ProductionTime are almost identical.
 // Chances are, the same is true of buildings and techs as well.
 // TODO: Eliminate duplication
 bool HullType::ProductionCostTimeLocationInvariant() const {
@@ -637,15 +275,13 @@ float HullType::ProductionCost(int empire_id, int location_id, int in_design_id)
         return static_cast<float>(m_production_cost->Eval(context));
     }
 
-    const auto arbitrary_large_number = 999999.9f;
-
     auto location = Objects().get(location_id);
     if (!location && !m_production_cost->TargetInvariant())
-        return arbitrary_large_number;
+        return ARBITRARY_LARGE_COST;
 
     auto source = Empires().GetSource(empire_id);
     if (!source && !m_production_cost->SourceInvariant())
-        return arbitrary_large_number;
+        return ARBITRARY_LARGE_COST;
 
     ScriptingContext context(source, location, in_design_id);
     return static_cast<float>(m_production_cost->Eval(context));
@@ -662,15 +298,13 @@ int HullType::ProductionTime(int empire_id, int location_id, int in_design_id) c
         return m_production_time->Eval(context);
     }
 
-    const auto arbitrary_large_number = 999999;
-
     auto location = Objects().get(location_id);
     if (!location && !m_production_time->TargetInvariant())
-        return arbitrary_large_number;
+        return ARBITRARY_LARGE_TURNS;
 
     auto source = Empires().GetSource(empire_id);
     if (!source && !m_production_time->SourceInvariant())
-        return arbitrary_large_number;
+        return ARBITRARY_LARGE_TURNS;
 
     ScriptingContext context(source, location, in_design_id);
     return m_production_time->Eval(context);
@@ -866,8 +500,8 @@ void ShipDesign::SetDescription(const std::string& description)
 bool ShipDesign::ProductionCostTimeLocationInvariant() const {
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION"))
         return true;
-    // as seen in ShipDesign::ProductionCost, the location is passed as the
-    // local candidate in the ScriptingContext
+    // as seen in ShipDesign::ProductionCost, the production location is passed
+    // as the local candidate in the ScriptingContext
 
     // check hull and all parts
     if (const HullType* hull = GetHullType(m_hull))
@@ -875,7 +509,7 @@ bool ShipDesign::ProductionCostTimeLocationInvariant() const {
             return false;
 
     for (const std::string& part_name : m_parts)
-        if (const PartType* part = GetPartType(part_name))
+        if (const ShipPart* part = GetShipPart(part_name))
             if (!part->ProductionCostTimeLocationInvariant())
                 return false;
 
@@ -890,15 +524,20 @@ float ShipDesign::ProductionCost(int empire_id, int location_id) const {
     float cost_accumulator = 0.0f;
     if (const HullType* hull = GetHullType(m_hull))
         cost_accumulator += hull->ProductionCost(empire_id, location_id, m_id);
+
     int part_count = 0;
     for (const std::string& part_name : m_parts) {
-        if (const PartType* part = GetPartType(part_name)) {
+        if (const ShipPart* part = GetShipPart(part_name)) {
             cost_accumulator += part->ProductionCost(empire_id, location_id, m_id);
             part_count++;
         }
     }
 
-    return std::max(0.0f, cost_accumulator);
+    // Assuming no reasonable combination of parts and hull will add up to more
+    // than ARBITRARY_LARGE_COST. Truncating cost here to return it to indicate
+    // an uncalculable cost (ie. due to lacking a valid location object)
+
+    return std::min(std::max(0.0f, cost_accumulator), ARBITRARY_LARGE_COST);
 }
 
 float ShipDesign::PerTurnCost(int empire_id, int location_id) const
@@ -911,9 +550,14 @@ int ShipDesign::ProductionTime(int empire_id, int location_id) const {
     int time_accumulator = 1;
     if (const HullType* hull = GetHullType(m_hull))
         time_accumulator = std::max(time_accumulator, hull->ProductionTime(empire_id, location_id));
+
     for (const std::string& part_name : m_parts)
-        if (const PartType* part = GetPartType(part_name))
+        if (const ShipPart* part = GetShipPart(part_name))
             time_accumulator = std::max(time_accumulator, part->ProductionTime(empire_id, location_id));
+
+    // assuming that ARBITRARY_LARGE_TURNS is larger than any reasonable turns,
+    // so the std::max calls will preserve it be returned
+
     return std::max(1, time_accumulator);
 }
 
@@ -921,7 +565,7 @@ bool ShipDesign::CanColonize() const {
     for (const std::string& part_name : m_parts) {
         if (part_name.empty())
             continue;
-        if (const PartType* part = GetPartType(part_name))
+        if (const ShipPart* part = GetShipPart(part_name))
             if (part->Class() == PC_COLONY)
                 return true;
     }
@@ -931,9 +575,9 @@ bool ShipDesign::CanColonize() const {
 float ShipDesign::Defense() const {
     // accumulate defense from defensive parts in design.
     float total_defense = 0.0f;
-    const PartTypeManager& part_manager = GetPartTypeManager();
+    const ShipPartManager& part_manager = GetShipPartManager();
     for (const std::string& part_name : Parts()) {
-        const PartType* part = part_manager.GetPartType(part_name);
+        const ShipPart* part = part_manager.GetShipPart(part_name);
         if (part && (part->Class() == PC_SHIELD || part->Class() == PC_ARMOUR))
             total_defense += part->Capacity();
     }
@@ -954,7 +598,7 @@ float ShipDesign::AdjustedAttack(float shield) const {
     float direct_attack = 0.0f;
 
     for (const std::string& part_name : m_parts) {
-        const PartType* part = GetPartType(part_name);
+        const ShipPart* part = GetShipPart(part_name);
         if (!part)
             continue;
         ShipPartClass part_class = part->Class();
@@ -994,7 +638,7 @@ float ShipDesign::AdjustedAttack(float shield) const {
 std::vector<std::string> ShipDesign::Parts(ShipSlotType slot_type) const {
     std::vector<std::string> retval;
 
-    const HullType* hull = GetHull();
+    const HullType* hull = GetHullTypeManager().GetHullType(m_hull);
     if (!hull) {
         ErrorLogger() << "Design hull not found: " << m_hull;
         return retval;
@@ -1016,7 +660,7 @@ std::vector<std::string> ShipDesign::Weapons() const {
     std::vector<std::string> retval;
     retval.reserve(m_parts.size());
     for (const auto& part_name : m_parts) {
-        const PartType* part = GetPartType(part_name);
+        const ShipPart* part = GetShipPart(part_name);
         if (!part)
             continue;
         ShipPartClass part_class = part->Class();
@@ -1071,7 +715,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id) const {
         return false;
 
     // apply hull location conditions to potential location
-    const HullType* hull = GetHull();
+    const HullType* hull = GetHullType(m_hull);
     if (!hull) {
         ErrorLogger() << "ShipDesign::ProductionLocation  ShipDesign couldn't get its own hull with name " << m_hull;
         return false;
@@ -1086,7 +730,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id) const {
         if (part_name.empty())
             continue;       // empty slots don't limit build location
 
-        const PartType* part = GetPartType(part_name);
+        const ShipPart* part = GetShipPart(part_name);
         if (!part) {
             ErrorLogger() << "ShipDesign::ProductionLocation  ShipDesign couldn't get part with name " << part_name;
             return false;
@@ -1184,8 +828,8 @@ ShipDesign::MaybeInvalidDesign(const std::string& hull_in,
             continue;
 
         // Parts must exist...
-        const auto part_type = GetPartType(part_name);
-        if (!part_type) {
+        const auto ship_part = GetShipPart(part_name);
+        if (!ship_part) {
             if (produce_log)
                 WarnLogger() << "Invalid ShipDesign part \"" << part_name << "\" not found"
                              << ". Removing \"" << part_name <<"\"";
@@ -1193,7 +837,7 @@ ShipDesign::MaybeInvalidDesign(const std::string& hull_in,
             continue;
         }
 
-        for (const auto& excluded : part_type->Exclusions()) {
+        for (const auto& excluded : ship_part->Exclusions()) {
             // confict if a different excluded part is present, or if there are
             // two or more of a part that excludes itself
             if ((excluded == part_name && component_name_counts[excluded] > 1) ||
@@ -1210,7 +854,7 @@ ShipDesign::MaybeInvalidDesign(const std::string& hull_in,
         // verify part can mount in indicated slot
         const ShipSlotType& slot_type = slots[ii].type;
 
-        if (!part_type->CanMountInSlotType(slot_type)) {
+        if (!ship_part->CanMountInSlotType(slot_type)) {
             if (produce_log)
                 DebugLogger() << "Invalid ShipDesign part \"" << part_name << "\" can't be mounted in "
                               << slot_type << " slot. Removing \"" << part_name <<"\"";
@@ -1284,7 +928,7 @@ void ShipDesign::BuildStatCaches() {
         if (part_name.empty())
             continue;
 
-        const PartType* part = GetPartType(part_name);
+        const ShipPart* part = GetShipPart(part_name);
         if (!part) {
             ErrorLogger() << "ShipDesign::BuildStatCaches couldn't get part with name " << part_name;
             continue;
@@ -1356,7 +1000,7 @@ void ShipDesign::BuildStatCaches() {
         m_has_fighters = has_fighter_bays && has_fighter_hangars;
         m_is_armed = m_is_armed || (can_launch_fighters && has_armed_fighters);
 
-        m_num_part_types[part_name]++;
+        m_num_ship_parts[part_name]++;
         if (part_class > INVALID_SHIP_PART_CLASS && part_class < NUM_SHIP_PART_CLASSES)
             m_num_part_classes[part_class]++;
     }
@@ -1530,7 +1174,7 @@ unsigned int PredefinedShipDesignManager::GetCheckSum() const {
         for (auto const& uuid : ordering) {
             auto it = m_designs.find(uuid);
             if (it != m_designs.end())
-                CheckSums::CheckSumCombine(retval, std::make_pair(it->second->Name(), *it->second));
+                CheckSums::CheckSumCombine(retval, std::make_pair(it->second->Name(false), *it->second));
         }
         CheckSums::CheckSumCombine(retval, ordering.size());
     };
@@ -1623,7 +1267,6 @@ namespace {
 }
 
 void PredefinedShipDesignManager::CheckPendingDesignsTypes() const {
-
     CheckPendingAndFillDesignsOrderingAndNameTables(
         m_pending_designs, m_designs, m_ship_ordering, m_name_to_ship_design, false);
 
@@ -1658,7 +1301,7 @@ LoadShipDesignsAndManifestOrderFromParseResults(
     auto& disk_ordering = designs_paths_and_ordering.second;
 
     for (auto&& design_and_path : designs_and_paths) {
-        auto design = boost::make_unique<ShipDesign>(*design_and_path.first);
+        auto design = std::make_unique<ShipDesign>(*design_and_path.first);
 
         // If the UUID is nil this is a legacy design that needs a new UUID
         if(design->UUID() == boost::uuids::uuid{{0}}) {

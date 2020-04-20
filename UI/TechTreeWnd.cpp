@@ -13,16 +13,16 @@
 #include "../util/OptionsDB.h"
 #include "../util/Directories.h"
 #include "../util/ScopedTimer.h"
-#include "../universe/Tech.h"
 #include "../universe/Effects.h"
 #include "../universe/Enums.h"
+#include "../universe/Tech.h"
+#include "../universe/UnlockableItem.h"
 #include "../universe/ValueRef.h"
 #include "../Empire/Empire.h"
 #include "TechTreeLayout.h"
 #include "TechTreeArcs.h"
 #include "Hotkeys.h"
 
-#include <GG/DrawUtil.h>
 #include <GG/GLClientAndServerBuffer.h>
 #include <GG/GUI.h>
 #include <GG/Layout.h>
@@ -572,25 +572,25 @@ private:
     bool TreeZoomOutKeyboard();
     void ConnectKeyboardAcceleratorSignals();
 
-    double                  m_scale;
+    double                  m_scale = INITIAL_SCALE;
     std::set<std::string>   m_categories_shown;
     std::set<TechStatus>    m_tech_statuses_shown;
     std::string             m_selected_tech_name;
     std::string             m_browsed_tech_name;
     TechTreeLayout          m_graph;
 
-    std::map<std::string, std::shared_ptr<TechPanel>>   m_techs;
-    TechTreeArcs                        m_dependency_arcs;
+    std::map<std::string, std::shared_ptr<TechPanel>> m_techs;
+    TechTreeArcs                    m_dependency_arcs;
 
-    std::shared_ptr<LayoutSurface> m_layout_surface;
-    std::shared_ptr<GG::Scroll>    m_vscroll;
-    std::shared_ptr<GG::Scroll>    m_hscroll;
-    double         m_scroll_position_x;     //actual scroll position
-    double         m_scroll_position_y;
-    double         m_drag_scroll_position_x;//position when drag started
-    double         m_drag_scroll_position_y;
-    std::shared_ptr<GG::Button>    m_zoom_in_button;
-    std::shared_ptr<GG::Button>    m_zoom_out_button;
+    std::shared_ptr<LayoutSurface>  m_layout_surface;
+    std::shared_ptr<GG::Scroll>     m_vscroll;
+    std::shared_ptr<GG::Scroll>     m_hscroll;
+    double                          m_scroll_position_x = 0.0;      //actual scroll position
+    double                          m_scroll_position_y = 0.0;
+    double                          m_drag_scroll_position_x = 0.0; //position when drag started
+    double                          m_drag_scroll_position_y = 0.0;
+    std::shared_ptr<GG::Button>     m_zoom_in_button;
+    std::shared_ptr<GG::Button>     m_zoom_out_button;
 };
 
 
@@ -669,15 +669,7 @@ private:
 TechTreeWnd::LayoutPanel::TechPanel::TechPanel(const std::string& tech_name, const LayoutPanel* panel) :
     GG::Wnd(GG::X0, GG::Y0, TechPanelWidth(), TechPanelHeight(), GG::INTERACTIVE),
     m_tech_name(tech_name),
-    m_name_text(),
-    m_cost_and_duration_text(),
-    m_eta_text(),
     m_layout_panel(panel),
-    m_icon(nullptr),
-    m_unlock_icons(),
-    m_name_label(nullptr),
-    m_cost_and_duration_label(nullptr),
-    m_eta_label(nullptr),
     m_colour(GG::CLR_GRAY),
     m_status(TS_RESEARCHABLE),
     m_browse_highlight(false),
@@ -965,7 +957,7 @@ void TechTreeWnd::LayoutPanel::TechPanel::Update() {
             GG::Y icon_top = icon_bottom - icon_height;
 
             // add icons for unlocked items
-            for (const ItemSpec& item : tech->UnlockedItems()) {
+            for (const UnlockableItem& item : tech->UnlockedItems()) {
                 std::shared_ptr<GG::Texture> texture;
                 switch (item.type) {
                 case UIT_BUILDING:  texture = ClientUI::BuildingIcon(item.name);    break;
@@ -1057,18 +1049,7 @@ void TechTreeWnd::LayoutPanel::TechPanel::Update() {
 // TechTreeWnd::LayoutPanel                     //
 //////////////////////////////////////////////////
 TechTreeWnd::LayoutPanel::LayoutPanel(GG::X w, GG::Y h) :
-    GG::Wnd(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
-    m_scale(INITIAL_SCALE),
-    m_categories_shown(),
-    m_tech_statuses_shown(),
-    m_selected_tech_name(),
-    m_browsed_tech_name(),
-    m_graph(),
-    m_layout_surface(nullptr),
-    m_vscroll(nullptr),
-    m_hscroll(nullptr),
-    m_zoom_in_button(nullptr),
-    m_zoom_out_button(nullptr)
+    GG::Wnd(GG::X0, GG::Y0, w, h, GG::INTERACTIVE)
 {}
 
 void TechTreeWnd::LayoutPanel::CompleteConstruction() {
@@ -1548,10 +1529,10 @@ private:
 
         void Render() override;
 
-        const std::string&          GetTech() { return m_tech; }
-        static std::vector<GG::X>   ColWidths(GG::X total_width);
-        static std::vector<GG::Alignment> ColAlignments();
-        void                        Update();
+        const std::string&                  GetTech() { return m_tech; }
+        static std::vector<GG::X>           ColWidths(GG::X total_width);
+        static std::vector<GG::Alignment>   ColAlignments();
+        void                                Update();
 
     private:
         std::string m_tech;
@@ -1559,17 +1540,17 @@ private:
         bool m_enqueued;
     };
 
-    void    Populate(bool update = true);
-    void    TechDoubleClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
-    void    TechLeftClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
-    void    TechRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
-    void    ToggleSortCol(unsigned int col);
+    void Populate(bool update = true);
+    void TechDoubleClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
+    void TechLeftClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
+    void TechRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
+    void ToggleSortCol(unsigned int col);
 
-    std::set<std::string>                   m_categories_shown;
-    std::set<TechStatus>                    m_tech_statuses_shown;
-    std::unordered_map<std::string, std::shared_ptr<TechRow>> m_tech_row_cache;
-    std::shared_ptr<GG::ListBox::Row>                       m_header_row;
-    size_t                                  m_previous_sort_col;
+    std::set<std::string>                                       m_categories_shown;
+    std::set<TechStatus>                                        m_tech_statuses_shown;
+    std::unordered_map<std::string, std::shared_ptr<TechRow>>   m_tech_row_cache;
+    std::shared_ptr<GG::ListBox::Row>                           m_header_row;
+    size_t                                                      m_previous_sort_col;
 };
 
 void TechTreeWnd::TechListBox::TechRow::Render() {
@@ -1624,11 +1605,11 @@ bool TechTreeWnd::TechListBox::TechRowCmp(const GG::ListBox::Row& lhs, const GG:
 }
 
 TechTreeWnd::TechListBox::TechRow::TechRow(GG::X w, const std::string& tech_name) :
-    CUIListBox::Row(w, GG::Y(ClientUI::Pts() * 2 + 5), "TechListBox::TechRow"),
+    CUIListBox::Row(w, GG::Y(ClientUI::Pts() * 2 + 5)),
     m_tech(tech_name),
     m_background_color(ClientUI::WndColor()),
     m_enqueued(false)
-{}
+{ SetDragDropDataType("TechListBox::TechRow"); }
 
 void TechTreeWnd::TechListBox::TechRow::CompleteConstruction() {
 
@@ -1767,7 +1748,7 @@ void TechTreeWnd::TechListBox::CompleteConstruction() {
     GG::X row_width = Width() - ClientUI::ScrollWidth() - ClientUI::Pts();
     std::vector<GG::X> col_widths = TechRow::ColWidths(row_width);
     const GG::Y HEIGHT(Value(col_widths[0]));
-    m_header_row = GG::Wnd::Create<GG::ListBox::Row>(row_width, HEIGHT, "");
+    m_header_row = GG::Wnd::Create<GG::ListBox::Row>(row_width, HEIGHT);
 
     auto graphic_col = GG::Wnd::Create<CUILabel>("");  // graphic
     graphic_col->Resize(GG::Pt(col_widths[0], HEIGHT));
@@ -2012,13 +1993,8 @@ void TechTreeWnd::TechListBox::TechDoubleClicked(GG::ListBox::iterator it, const
 //////////////////////////////////////////////////
 TechTreeWnd::TechTreeWnd(GG::X w, GG::Y h, bool initially_hidden /*= true*/) :
     GG::Wnd(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
-    m_tech_tree_controls(nullptr),
-    m_enc_detail_panel(nullptr),
-    m_layout_panel(nullptr),
-    m_tech_list(nullptr),
     m_init_flag(initially_hidden)
-{
-}
+{}
 
 void TechTreeWnd::CompleteConstruction() {
     GG::Wnd::CompleteConstruction();

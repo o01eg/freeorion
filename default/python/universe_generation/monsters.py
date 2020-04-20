@@ -1,6 +1,3 @@
-from __future__ import print_function
-from __future__ import division
-
 import random
 
 import freeorion as fo
@@ -11,7 +8,7 @@ from galaxy import DisjointSets
 from util import MapGenerationError, report_error
 
 
-class StarlaneAlteringMonsters(object):
+class StarlaneAlteringMonsters:
     def __init__(self, systems):
         self.systems = systems
         self.placed = set()

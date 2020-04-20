@@ -10,7 +10,7 @@ _lint_python_common: &_lint_python_common
   dist: bionic
   language: python
   install:
-    - pip install flake8-putty==0.4.0
+    - pip install flake8==3.7.9
   before_script:
     - cd default/python
   script:
@@ -45,7 +45,7 @@ _test_python_common: &_test_python_common
   dist: bionic
   language: python
   install:
-    - pip install pytest==3.6.3
+    - pip install pytest==5.4.1
   script:
     - pytest
 
@@ -57,6 +57,16 @@ jobs:
       before_install:
         - alias pip=/usr/bin/pip3
         - alias python=/usr/bin/python3
+
+    - name: Lint string tables
+      stage: lint
+      os: linux
+      dist: bionic
+      language: python
+      python: 3.5
+      script:
+        - ./check/st-tool.py check --reference default/stringtables/en.txt default/stringtables/*.txt
+        - diff -u default/stringtables/en.txt <(check/st-tool.py format default/stringtables/en.txt) || { echo "String table is not properly formatted"; exit 1; }
 
     - name: Build headless FreeOrion on Ubunutu 18.04 (Bionic)
       <<: *_build_cpp_common

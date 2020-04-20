@@ -12,7 +12,6 @@
 #include "../util/SitRepEntry.h"
 #include "../universe/ShipDesign.h"
 
-#include <GG/DrawUtil.h>
 #include <GG/Layout.h>
 
 #include <boost/lexical_cast.hpp>
@@ -309,8 +308,8 @@ namespace {
         }
 
         const SitRepEntry&                  m_sitrep_entry;
-        std::shared_ptr<GG::StaticGraphic>  m_icon = nullptr;
-        std::shared_ptr<SitRepLinkText>     m_link_text = nullptr;
+        std::shared_ptr<GG::StaticGraphic>  m_icon;
+        std::shared_ptr<SitRepLinkText>     m_link_text;
     };
 
     ////////////////////////////////////////////////
@@ -320,7 +319,7 @@ namespace {
     class SitRepRow : public GG::ListBox::Row {
     public:
         SitRepRow(GG::X w, GG::Y h, const SitRepEntry& sitrep) :
-            GG::ListBox::Row(w, h, ""),
+            GG::ListBox::Row(w, h),
             m_sitrep(sitrep)
         {
             SetName("SitRepRow");
@@ -366,7 +365,7 @@ namespace {
         const SitRepEntry& GetSitRepEntry() const { return m_panel->GetSitRepEntry(); }
 
     private:
-        std::shared_ptr<SitRepDataPanel>    m_panel = nullptr;
+        std::shared_ptr<SitRepDataPanel>    m_panel;
         const SitRepEntry                   m_sitrep;
     };
 }

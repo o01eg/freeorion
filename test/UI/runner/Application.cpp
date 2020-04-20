@@ -3,7 +3,7 @@
 #include <GG/Texture.h>
 #include <GG/Cursor.h>
 
-#include <GG/SDL/SDLGUI.h>
+#include "../../../UI/SDLGUI.h"
 
 #include <boost/format.hpp>
 
@@ -27,7 +27,7 @@ class Application::Impl {
 };
 
 
-class MinimalGGApp : public GG::SDLGUI {
+class MinimalGGApp : public SDLGUI {
     public:
         MinimalGGApp(int width, int height, bool calculate_FPS,
                      const std::string& name, int x, int y, bool fullscreen,
@@ -135,8 +135,6 @@ void MinimalGGApp::Render() {
 
     glPushMatrix();
 
-    // DeltaT() returns the time in whole milliseconds since the last frame
-    // was rendered (in other words, since this method was last invoked).
     glRotated ( (Ticks() % 60000) * DEGREES_PER_MS, 0.0, 1.0, 0.0);
 
     glBegin (GL_LINES);
@@ -263,7 +261,7 @@ void Application::Impl::Run(std::shared_ptr<GG::Wnd> window) {
     try {
 
         m_app->Register(std::forward<std::shared_ptr<GG::Wnd>>(window));
-        (*m_app)();
+        m_app->Run();
 
     } catch (const std::invalid_argument& e) {
         std::cerr << "main() caught exception(std::invalid_arg): " << e.what() << std::endl;

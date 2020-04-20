@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 """configure_logging redirects print and the logger to use the freeorion server.
 
 Output redirected to the freeorion server prints in the appropriate log:
@@ -81,10 +79,10 @@ import traceback
 
 try:
     import freeorion_logger  # FreeOrion logger interface pylint: disable=import-error
-except ImportError as e:
+except ImportError:
 
     # Create an alternative logger for use in testing when the server is unavailable
-    class _FreeOrionLoggerForTest(object):
+    class _FreeOrionLoggerForTest:
         """A stub freeorion_logger for testing"""
         @staticmethod
         def debug(msg, *args):
@@ -109,7 +107,7 @@ except ImportError as e:
     freeorion_logger = _FreeOrionLoggerForTest()
 
 
-class _stdXLikeStream(object):
+class _stdXLikeStream:
     """A stream-like object to redirect stdout or stderr to the C++ process."""
     def __init__(self, level):
         self.logger = {
@@ -129,7 +127,7 @@ class _stdXLikeStream(object):
                 line_number = frame.f_lineno
                 function_name = frame.f_code.co_name
                 filename = frame.f_code.co_filename
-            except:
+            except:  # noqa: E722
                 (filename, line_number, function_name) = ("", "", "")
             finally:
                 # Explicitly del references to the caller's frame to avoid persistent reference cycles
@@ -206,6 +204,12 @@ def redirect_logging_to_freeorion_logger(initial_log_level=logging.DEBUG):
         sys.stdout = _stdXLikeStream(logging.DEBUG)
         sys.stderr = _stdXLikeStream(logging.ERROR)
         print('Python stdout and stderr are redirected to ai process.')
+
+        # thread and process information is already provided by boost logging framework
+        # we can avoid some logging call overheads by turning this off
+        logging.logThreads = 0
+        logging.logProcesses = 0
+        logging.logMultiprocessing = 0
 
         logger = logging.getLogger()
         logger.addHandler(_create_narrow_handler(logging.DEBUG))

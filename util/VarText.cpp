@@ -11,6 +11,7 @@
 
 #include <boost/xpressive/xpressive.hpp>
 
+#include <functional>
 #include <map>
 
 namespace xpr = boost::xpressive;
@@ -20,12 +21,15 @@ class BuildingType;
 class Special;
 class Species;
 class FieldType;
+class HullType;
+class ShipPart;
 const Tech*         GetTech(const std::string& name);
 const BuildingType* GetBuildingType(const std::string& name);
 const Special*      GetSpecial(const std::string& name);
 const Species*      GetSpecies(const std::string& name);
 const FieldType*    GetFieldType(const std::string& name);
-
+const HullType*     GetHullType(const std::string& name);
+const ShipPart*     GetShipPart(const std::string& name);
 
 namespace {
     //! Return @p content surrounded by the given @p tags.
@@ -51,7 +55,7 @@ namespace {
     //! @param data
     //!     Data values The signature of functions that generate substitution
     //!     strings for tags.
-    typedef boost::optional<std::string> (*TagString)(const std::string& data);
+    typedef std::function<boost::optional<std::string> (const std::string& data)> TagString;
 
     //! Get string substitute for a tag that is a universe object
     boost::optional<std::string> UniverseObjectString(const std::string& data, const std::string& tag) {
@@ -152,7 +156,7 @@ namespace {
             {VarText::SHIP_HULL_TAG, [](const std::string& data)
                 { return NameString<HullType, GetHullType>(data, VarText::SHIP_HULL_TAG); }},
             {VarText::SHIP_PART_TAG, [](const std::string& data)
-                { return NameString<PartType, GetPartType>(data, VarText::SHIP_PART_TAG); }},
+                { return NameString<ShipPart, GetShipPart>(data, VarText::SHIP_PART_TAG); }},
             {VarText::SPECIAL_TAG, [](const std::string& data)
                 { return NameString<Special, GetSpecial>(data, VarText::SPECIAL_TAG); }},
             {VarText::SPECIES_TAG, [](const std::string& data)

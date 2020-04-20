@@ -2,6 +2,7 @@
 
 #include "SaveLoad.h"
 #include "ServerFSM.h"
+#include "UniverseGenerator.h"
 #include "../combat/CombatSystem.h"
 #include "../combat/CombatEvents.h"
 #include "../combat/CombatLogManager.h"
@@ -9,6 +10,7 @@
 #include "../universe/Building.h"
 #include "../universe/Condition.h"
 #include "../universe/Fleet.h"
+#include "../universe/FleetPlan.h"
 #include "../universe/Ship.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/Planet.h"
@@ -17,7 +19,7 @@
 #include "../universe/System.h"
 #include "../universe/Species.h"
 #include "../universe/Tech.h"
-#include "../universe/UniverseGenerator.h"
+#include "../universe/UnlockableItem.h"
 #include "../universe/Enums.h"
 #include "../universe/ValueRef.h"
 #include "../Empire/Empire.h"
@@ -44,8 +46,6 @@
 #include <boost/date_time/posix_time/time_formatters.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
-//TODO: replace with std::make_unique when transitioning to C++14
-#include <boost/smart_ptr/make_unique.hpp>
 
 #include <ctime>
 #include <thread>
@@ -1071,6 +1071,14 @@ void ServerApp::ExpireTurn() {
 bool ServerApp::IsTurnExpired() const
 { return m_turn_expired; }
 
+bool ServerApp::IsHaveWinner() const {
+    for (const auto& empire : m_empires) {
+        if (empire.second->Won())
+            return true;
+    }
+    return false;
+}
+
 namespace {
     /** Verifies that a human player is connected with the indicated \a id. */
     bool HumanPlayerWithIdConnected(const ServerNetworking& sn, int id) {
@@ -1899,8 +1907,12 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     const OrderSet& orders = orders_it->second && orders_it->second->m_orders ? *(orders_it->second->m_orders) : dummy;
     const SaveGameUIData* ui_data = orders_it->second ? orders_it->second->m_ui_data.get() : nullptr;
 
-    // drop ready status
-    empire->SetReady(false);
+    if (GetOptionsDB().Get<bool>("network.server.drop-empire-ready")) {
+        // drop ready status
+        empire->SetReady(false);
+        m_networking.SendMessageAll(PlayerStatusMessage(Message::PLAYING_TURN,
+                                                        empire_id));
+    }
 
     auto player_info_map = GetPlayerInfoMap();
     bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
@@ -1982,7 +1994,7 @@ int ServerApp::EffectsProcessingThreads() const
 { return GetOptionsDB().Get<int>("effects.server.threads"); }
 
 void ServerApp::AddEmpireTurn(int empire_id, const PlayerSaveGameData& psgd)
-{ m_turn_sequence[empire_id] = boost::make_unique<PlayerSaveGameData>(psgd); }
+{ m_turn_sequence[empire_id] = std::make_unique<PlayerSaveGameData>(psgd); }
 
 void ServerApp::RemoveEmpireTurn(int empire_id)
 { m_turn_sequence.erase(empire_id); }

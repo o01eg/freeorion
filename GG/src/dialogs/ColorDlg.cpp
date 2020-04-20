@@ -1,4 +1,4 @@
-/* GG is a GUI for SDL and OpenGL.
+/* GG is a GUI for OpenGL.
    Copyright (C) 2003-2008 T. Zachary Laine
 
    This library is free software; you can redistribute it and/or
@@ -24,7 +24,6 @@
 
 #include <GG/dialogs/ColorDlg.h>
 
-#include <GG/DrawUtil.h>
 #include <GG/Font.h>
 #include <GG/GLClientAndServerBuffer.h>
 #include <GG/GUI.h>

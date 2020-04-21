@@ -1,3 +1,9 @@
+freeorion (0.4.9.fo0009+git20200420.b2112feppa1~bionic) bionic; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Tue, 21 Apr 2020 17:04:52 +0000
+
 freeorion (0.4.9.fo0009+git20200414.60fb514ppa6~bionic) bionic; urgency=medium
 
   * Fix installation without icons

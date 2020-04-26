@@ -7,6 +7,7 @@
 #include "../util/SitRepEntry.h"
 #include "../util/Process.h"
 #include "../universe/Building.h"
+#include "../universe/BuildingType.h"
 #include "../universe/Fleet.h"
 #include "../universe/Ship.h"
 #include "../universe/ShipDesign.h"

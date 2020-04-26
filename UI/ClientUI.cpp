@@ -19,6 +19,7 @@
 #include "../util/i18n.h"
 #include "../util/OptionsDB.h"
 #include "../universe/Building.h"
+#include "../universe/BuildingType.h"
 #include "../universe/Fleet.h"
 #include "../universe/Planet.h"
 #include "../universe/System.h"
@@ -575,7 +576,7 @@ namespace {
     const std::string MESSAGE_WND_NAME = "map.messages";
     const std::string PLAYER_LIST_WND_NAME = "map.empires";
 
-    template <class OptionType, class PredicateType>
+    template <typename OptionType, typename PredicateType>
     void ConditionalForward(const std::string& option_name,
                             const OptionsDB::OptionChangedSignalType::slot_type& slot,
                             OptionType ref_val,
@@ -585,7 +586,7 @@ namespace {
             slot();
     }
 
-    template <class OptionType, class PredicateType>
+    template <typename OptionType, typename PredicateType>
     void ConditionalConnectOption(const std::string& option_name,
                                   const OptionsDB::OptionChangedSignalType::slot_type& slot,
                                   OptionType ref_val,

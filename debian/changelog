@@ -1,3 +1,9 @@
+freeorion (0.4.9.fo0009+git20200427.45334b6ppa1~bionic) bionic; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Tue, 27 Apr 2020 19:05:03 +0000
+
 freeorion (0.4.9.fo0009+git20200420.b2112feppa1~bionic) bionic; urgency=medium
 
   * Update upstream.

@@ -23,6 +23,16 @@ def dict_from_map(thismap):
     return {el.key(): el.data() for el in thismap}
 
 
+def dict_from_map_recursive(thismap):
+    retval = {}
+    try:
+        for el in thismap:
+            retval[el.key()] = dict_from_map_recursive(el.data())
+        return retval
+    except Exception:
+        return dict_from_map(thismap)
+
+
 def get_ai_tag_grade(tag_list, tag_type):
     """
     Accepts a list of string tags and a tag_type (like 'WEAPONS').
@@ -274,6 +284,11 @@ class ReadOnlyDict(Mapping):
           print k, v
       my_dict[5] = 4  # throws TypeError
       del my_dict[1]  # throws TypeError
+
+      Implementation note:
+
+     The checks that values are hashable is the main difference from the built-in types.MappingProxyType.
+     MappingProxyType has slightly different signature and cannot be inherited.
      """
 
     def __init__(self, *args, **kwargs):

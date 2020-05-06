@@ -18,23 +18,23 @@
    </player>
   </ai>
   <monster>
-    <frequency>GALAXY_SETUP_LOW</frequency>
+    <frequency>GALAXY_SETUP_NONE</frequency>
   </monster>
   <native>
-    <frequency>GALAXY_SETUP_LOW</frequency>
+    <frequency>GALAXY_SETUP_NONE</frequency>
   </native>
   <specials>
     <frequency>GALAXY_SETUP_LOW</frequency>
   </specials>
   <planet>
-    <density>GALAXY_SETUP_HIGH</density>
+    <density>GALAXY_SETUP_MEDIUM</density>
   </planet>
   <galaxy>
-    <shape>RING</shape>
+    <shape>CLUSTER</shape>
   </galaxy>
   <seed>RANDOM</seed>
   <star>
-   <count>22</count>
+   <count>26</count>
   </star>
   <rules>
    <RULE_ENABLE_SUPER_TESTER>0</RULE_ENABLE_SUPER_TESTER>

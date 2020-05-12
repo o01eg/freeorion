@@ -36,6 +36,7 @@
 #include "Encyclopedia.h"
 
 #include <boost/property_map/property_map.hpp>
+#include <boost/algorithm/string.hpp>
 #if BOOST_VERSION >= 106600
 #  include <boost/asio/thread_pool.hpp>
 #  include <boost/asio/post.hpp>
@@ -929,10 +930,10 @@ namespace {
         auto message{"StoreTargetsAndCausesOfEffectsGroup < " + std::to_string(n) + " >"
                      + "  cause type: " + boost::lexical_cast<std::string>(effect_cause_type)
                      + "  specific cause: " + specific_cause_name
-                     + (scope_is_just_source ? "  [Scope = Source]" : "")
-                     + "  sources: " + std::to_string(source_objects.size())};
+                     + "  sources: " + std::to_string(source_objects.size())
+                     + "  scope: " + boost::algorithm::erase_all_copy(effects_group->Scope()->Dump(), "\n")};
 
-        ScopedTimer timer(message, std::chrono::milliseconds(5));
+        ScopedTimer timer(message, std::chrono::milliseconds(20));
 
         source_effects_targets_causes_out.reserve(source_objects.size());
         ScriptingContext source_context(object_map);
@@ -1543,7 +1544,7 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
 
     // within each priority group, execute effects in dispatch order
     for (auto& priority_group : source_effects_targets_causes) {
-        int priority = priority_group.first;
+        //int priority = priority_group.first;
         Effect::SourcesEffectsTargetsAndCausesVec& setc{priority_group.second};
 
         // construct a source context, which is updated for each entry in sources-effects-targets.
@@ -1641,34 +1642,6 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
     }
 }
 
-namespace {
-    static const std::string EMPTY_STRING;
-
-    const std::string& GetSpeciesFromObject(std::shared_ptr<const UniverseObject> obj) {
-        switch (obj->ObjectType()) {
-        case OBJ_PLANET: {
-            auto obj_planet = std::static_pointer_cast<const Planet>(obj);
-            return obj_planet->SpeciesName();
-            break;
-        }
-        case OBJ_SHIP: {
-            auto obj_ship = std::static_pointer_cast<const Ship>(obj);
-            return obj_ship->SpeciesName();
-            break;
-        }
-        default:
-            return EMPTY_STRING;
-        }
-    }
-
-    int GetDesignIDFromObject(std::shared_ptr<const UniverseObject> obj) {
-        if (obj->ObjectType() != OBJ_SHIP)
-            return INVALID_DESIGN_ID;
-        auto shp = std::static_pointer_cast<const Ship>(obj);
-        return shp->DesignID();
-    }
-}
-
 void Universe::CountDestructionInStats(int object_id, int source_object_id) {
     auto obj = m_objects.get(object_id);
     if (!obj)
@@ -1676,30 +1649,11 @@ void Universe::CountDestructionInStats(int object_id, int source_object_id) {
     auto source = m_objects.get(source_object_id);
     if (!source)
         return;
-
-    const std::string& species_for_obj = GetSpeciesFromObject(obj);
-
-    int empire_for_obj_id = obj->Owner();
-    int empire_for_source_id = source->Owner();
-
-    int design_for_obj_id = GetDesignIDFromObject(obj);
-
-    if (Empire* source_empire = GetEmpire(empire_for_source_id)) {
-        source_empire->EmpireShipsDestroyed()[empire_for_obj_id]++;
-
-        if (design_for_obj_id != INVALID_DESIGN_ID)
-            source_empire->ShipDesignsDestroyed()[design_for_obj_id]++;
-
-        if (species_for_obj.empty())
-            source_empire->SpeciesShipsDestroyed()[species_for_obj]++;
-    }
-
-    if (Empire* obj_empire = GetEmpire(empire_for_obj_id)) {
-        if (!species_for_obj.empty())
-            obj_empire->SpeciesShipsLost()[species_for_obj]++;
-
-        if (design_for_obj_id != INVALID_DESIGN_ID)
-            obj_empire->ShipDesignsLost()[design_for_obj_id]++;
+    if (auto shp = std::dynamic_pointer_cast<const Ship>(obj)) {
+        if (auto source_empire = GetEmpire(source->Owner()))
+            source_empire->RecordShipShotDown(*shp);
+        if (auto obj_empire = GetEmpire(obj->Owner()))
+            obj_empire->RecordShipLost(*shp);
     }
 }
 

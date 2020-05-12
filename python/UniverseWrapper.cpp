@@ -103,7 +103,7 @@ namespace {
         GetUniverse().UpdateMeterEstimates(objvec);
     }
 
-    //void (Universe::*UpdateMeterEstimatesVoidFunc)(void) =                                      &Universe::UpdateMeterEstimates;
+    //void (Universe::*UpdateMeterEstimatesVoidFunc)(void) = &Universe::UpdateMeterEstimates;
 
     double LinearDistance(const Universe& universe, int system1_id, int system2_id) {
         double retval = universe.GetPathfinder()->LinearDistance(system1_id, system2_id);
@@ -176,8 +176,10 @@ namespace {
     std::function<std::map<int, double> (const Universe&, int, int)> SystemNeighborsMapFunc = &SystemNeighborsMapP;
 
     const Meter*            (UniverseObject::*ObjectGetMeter)(MeterType) const =                &UniverseObject::GetMeter;
-    const std::map<MeterType, Meter>&
-                            (UniverseObject::*ObjectMeters)(void) const =                       &UniverseObject::Meters;
+
+    std::map<MeterType, Meter> ObjectMetersP(const UniverseObject& object)
+    { return std::map<MeterType, Meter>{object.Meters().begin(), object.Meters().end()}; }
+    std::function<std::map<MeterType, Meter> (const UniverseObject&)> ObjectMetersFunc = &ObjectMetersP;
 
     std::vector<std::string> ObjectSpecials(const UniverseObject& object) {
         std::vector<std::string> retval;
@@ -188,8 +190,21 @@ namespace {
     }
 
     const Meter*            (Ship::*ShipGetPartMeter)(MeterType, const std::string&) const =    &Ship::GetPartMeter;
-    const Ship::PartMeterMap&
-                            (Ship::*ShipPartMeters)(void) const =                               &Ship::PartMeters;
+    const auto&             (Ship::*ShipPartMeters)(void) const =                               &Ship::PartMeters;
+
+    float ObjectCurrentMeterValueP(const UniverseObject& o, MeterType meter_type) {
+        if (auto* m = o.GetMeter(meter_type))
+            return m->Current();
+        return 0.0f;
+    }
+    std::function<float(const UniverseObject&, MeterType)> ObjectCurrentMeterValueFunc = &ObjectCurrentMeterValueP;
+
+    float ObjectInitialMeterValueP(const UniverseObject& o, MeterType meter_type) {
+        if (auto* m = o.GetMeter(meter_type))
+            return m->Initial();
+        return 0.0f;
+    }
+    std::function<float(const UniverseObject&, MeterType)> ObjectInitialMeterValueFunc = &ObjectInitialMeterValueP;
 
     const ShipHull* ShipDesignHullP(const ShipDesign& design)
     { return GetShipHull(design.Hull()); }
@@ -324,7 +339,8 @@ namespace FreeOrionPython {
         class_<std::map<MeterType, Meter>>("MeterTypeMeterMap")
             .def(boost::python::map_indexing_suite<std::map<MeterType, Meter>, true>())
         ;
-        // typedef std::map<std::pair<MeterType, std::string>, Meter>          PartMeterMap;
+
+        // typedef std::map<std::pair<MeterType, std::string>, Meter> PartMeterMap;
         class_<std::pair<MeterType, std::string>>("MeterTypeStringPair")
             .add_property("meterType",  &std::pair<MeterType, std::string>::first)
             .add_property("string",     &std::pair<MeterType, std::string>::second)
@@ -518,11 +534,23 @@ namespace FreeOrionPython {
             .def("containedBy",                 &UniverseObject::ContainedBy)
             .add_property("containedObjects",   make_function(&UniverseObject::ContainedObjectIDs,  return_value_policy<return_by_value>()))
             .add_property("containerObject",    &UniverseObject::ContainerObjectID)
-            .def("currentMeterValue",           &UniverseObject::CurrentMeterValue)
-            .def("initialMeterValue",           &UniverseObject::InitialMeterValue)
+            .def("currentMeterValue",           make_function(
+                                                    ObjectCurrentMeterValueFunc,
+                                                    return_value_policy<return_by_value>(),
+                                                    boost::mpl::vector<float, const UniverseObject&, MeterType>()
+                                                ))
+            .def("initialMeterValue",           make_function(
+                                                    ObjectInitialMeterValueFunc,
+                                                    return_value_policy<return_by_value>(),
+                                                    boost::mpl::vector<float, const UniverseObject&, MeterType>()
+                                                ))
             .add_property("tags",               make_function(&UniverseObject::Tags,        return_value_policy<return_by_value>()))
             .def("hasTag",                      &UniverseObject::HasTag)
-            .add_property("meters",             make_function(ObjectMeters,                 return_internal_reference<>()))
+            .add_property("meters",             make_function(
+                                                    ObjectMetersFunc,
+                                                    return_value_policy<return_by_value>(),
+                                                    boost::mpl::vector<std::map<MeterType, Meter>, const UniverseObject&>()
+                                                ))
             .def("getMeter",                    make_function(ObjectGetMeter,               return_internal_reference<>()))
             .def("dump",                        make_function(&ObjectDump,                  return_value_policy<return_by_value>()), "Returns string with debug information.")
         ;

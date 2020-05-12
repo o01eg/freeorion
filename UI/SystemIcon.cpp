@@ -165,7 +165,7 @@ OwnerColoredSystemName::OwnerColoredSystemName(int system_id, int font_size,
 
         // is planet populated by neutral species
         if (!has_neutrals) {
-            if (planet->Unowned() && !planet->SpeciesName().empty() && planet->InitialMeterValue(METER_POPULATION) > 0.0f)
+            if (planet->Unowned() && !planet->SpeciesName().empty() && planet->GetMeter(METER_POPULATION)->Initial() > 0.0f)
                 has_neutrals = true;
         }
 
@@ -643,7 +643,7 @@ void SystemIcon::Refresh() {
     if (system) {
         name = system->Name();
         m_system_connection = system->StateChangedSignal.connect(
-            boost::bind(&SystemIcon::Refresh, this), boost::signals2::at_front);
+            std::bind(&SystemIcon::Refresh, this), boost::signals2::at_front);
     }
 
     SetName(name);   // sets GG::Control name.  doesn't affect displayed system name

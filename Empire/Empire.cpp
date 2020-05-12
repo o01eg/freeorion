@@ -674,7 +674,7 @@ void Empire::UpdateSystemSupplyRanges(const std::set<int>& known_objects) {
         // check if object has a supply meter
         if (obj->GetMeter(METER_SUPPLY)) {
             // get resource supply range for next turn for this object
-            float supply_range = obj->InitialMeterValue(METER_SUPPLY);
+            float supply_range = obj->GetMeter(METER_SUPPLY)->Initial();
 
             // if this object can provide more supply range than the best previously checked object in this system, record its range as the new best for the system
             auto system_it = m_supply_system_ranges.find(system_id);  // try to find a previous entry for this system's supply range
@@ -2303,6 +2303,34 @@ int Empire::TotalShipsOwned() const {
     for (const auto& entry : m_ship_designs_owned)
     { counter += entry.second; }
     return counter;
+}
+
+void Empire::RecordShipShotDown(const Ship& ship) {
+    m_empire_ships_destroyed[ship.Owner()]++;
+    m_ship_designs_destroyed[ship.DesignID()]++;
+    m_species_ships_destroyed[ship.SpeciesName()]++;
+}
+
+void Empire::RecordShipLost(const Ship& ship) {
+    m_species_ships_lost[ship.SpeciesName()]++;
+    m_ship_designs_lost[ship.DesignID()]++;
+}
+
+void Empire::RecordShipScrapped(const Ship& ship) {
+    m_ship_designs_scrapped[ship.DesignID()]++;
+    m_species_ships_scrapped[ship.SpeciesName()]++;
+}
+
+void Empire::RecordBuildingScrapped(const Building& building) {
+    m_building_types_scrapped[building.BuildingTypeName()]++;
+}
+
+void Empire::RecordPlanetInvaded(const Planet& planet) {
+    m_species_planets_invaded[planet.SpeciesName()]++;
+}
+
+void Empire::RecordPlanetDepopulated(const Planet& planet) {
+    m_species_planets_depoped[planet.SpeciesName()]++;
 }
 
 int Empire::TotalShipPartsOwned() const {

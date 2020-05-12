@@ -4,7 +4,6 @@
 #include "../util/Logger.h"
 #include "../util/AppInterface.h"
 #include "../Empire/EmpireManager.h"
-#include "Meter.h"
 #include "System.h"
 #include "Special.h"
 #include "Pathfinder.h"
@@ -248,22 +247,6 @@ const Meter* UniverseObject::GetMeter(MeterType type) const {
     return nullptr;
 }
 
-float UniverseObject::CurrentMeterValue(MeterType type) const {
-    auto it = m_meters.find(type);
-    if (it == m_meters.end())
-        throw std::invalid_argument("UniverseObject::CurrentMeterValue was passed a MeterType that this UniverseObject does not have: " + boost::lexical_cast<std::string>(type));
-
-    return it->second.Current();
-}
-
-float UniverseObject::InitialMeterValue(MeterType type) const {
-    auto it = m_meters.find(type);
-    if (it == m_meters.end())
-        throw std::invalid_argument("UniverseObject::InitialMeterValue was passed a MeterType that this UniverseObject does not have: " + boost::lexical_cast<std::string>(type));
-
-    return it->second.Initial();
-}
-
 void UniverseObject::AddMeter(MeterType meter_type) {
     if (INVALID_METER_TYPE == meter_type)
         ErrorLogger() << "UniverseObject::AddMeter asked to add invalid meter type!";
@@ -366,8 +349,8 @@ void UniverseObject::SetSpecialCapacity(const std::string& name, float capacity)
 void UniverseObject::RemoveSpecial(const std::string& name)
 { m_specials.erase(name); }
 
-std::map<MeterType, Meter> UniverseObject::CensoredMeters(Visibility vis) const {
-    std::map<MeterType, Meter> retval;
+UniverseObject::MeterMap UniverseObject::CensoredMeters(Visibility vis) const {
+    MeterMap retval;
     if (vis >= VIS_PARTIAL_VISIBILITY) {
         retval = m_meters;
     } else if (vis == VIS_BASIC_VISIBILITY && m_meters.count(METER_STEALTH))

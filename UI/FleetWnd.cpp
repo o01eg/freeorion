@@ -447,11 +447,13 @@ std::shared_ptr<FleetWnd> FleetUIManager::NewFleetWnd(
                                             allowed_bounding_box_leeway,
                                             selected_fleet_id, flags, config_name);
 
+    using std::placeholders::_1;
+
     m_fleet_wnds.insert(std::weak_ptr<FleetWnd>(retval));
     retval->ClosingSignal.connect(
-        boost::bind(&FleetUIManager::FleetWndClosing, this, _1));
+        std::bind(&FleetUIManager::FleetWndClosing, this, _1));
     retval->ClickedSignal.connect(
-        boost::bind(&FleetUIManager::FleetWndClicked, this, _1));
+        std::bind(&FleetUIManager::FleetWndClicked, this, _1));
     retval->FleetRightClickedSignal.connect(
         FleetRightClickedSignal);
     retval->ShipRightClickedSignal.connect(
@@ -881,7 +883,7 @@ namespace {
             else if (stat_name == METER_POPULATION)
                 return ship->ColonyCapacity();
             else if (ship->UniverseObject::GetMeter(stat_name))
-                return ship->InitialMeterValue(stat_name);
+                return ship->GetMeter(stat_name)->Initial();
 
             ErrorLogger() << "ShipDataPanel::StatValue couldn't get stat of name: " << stat_name;
         }
@@ -959,11 +961,11 @@ namespace {
             meters_icons.push_back({METER_TROOPS,         TroopIcon()});
         if (ship->CanColonize())
             meters_icons.push_back({METER_POPULATION,     ColonyIcon()});
-        if (ship->InitialMeterValue(METER_INDUSTRY) > 0.0f)
+        if (ship->GetMeter(METER_INDUSTRY)->Initial() > 0.0f)
             meters_icons.push_back({METER_INDUSTRY,       IndustryIcon()});
-        if (ship->InitialMeterValue(METER_RESEARCH) > 0.0f)
+        if (ship->GetMeter(METER_RESEARCH)->Initial() > 0.0f)
             meters_icons.push_back({METER_RESEARCH,       ResearchIcon()});
-        if (ship->InitialMeterValue(METER_TRADE) > 0.0f)
+        if (ship->GetMeter(METER_TRADE)->Initial() > 0.0f)
             meters_icons.push_back({METER_TRADE,          TradeIcon()});
 
         for (auto& meter : {METER_SHIELD, METER_FUEL, METER_DETECTION,
@@ -993,11 +995,11 @@ namespace {
 
         // bookkeeping
         m_ship_connection = ship->StateChangedSignal.connect(
-            boost::bind(&ShipDataPanel::RequireRefresh, this));
+            std::bind(&ShipDataPanel::RequireRefresh, this));
 
         if (auto fleet = Objects().get<Fleet>(ship->FleetID()))
             m_fleet_connection = fleet->StateChangedSignal.connect(
-                boost::bind(&ShipDataPanel::RequireRefresh, this));
+                std::bind(&ShipDataPanel::RequireRefresh, this));
     }
 
     ////////////////////////////////////////////////
@@ -1536,10 +1538,10 @@ void FleetDataPanel::SetStatIconValues() {
             fighters_tally += ship->FighterCount();
             troops_tally += ship->TroopCapacity();
             colony_tally += ship->ColonyCapacity();
-            structure_tally += ship->InitialMeterValue(METER_STRUCTURE);
-            shield_tally += ship->InitialMeterValue(METER_SHIELD);
-            fuels.push_back(ship->InitialMeterValue(METER_FUEL));
-            speeds.push_back(ship->InitialMeterValue(METER_SPEED));
+            structure_tally += ship->GetMeter(METER_STRUCTURE)->Initial();
+            shield_tally += ship->GetMeter(METER_SHIELD)->Initial();
+            fuels.push_back(ship->GetMeter(METER_FUEL)->Initial());
+            speeds.push_back(ship->GetMeter(METER_SPEED)->Initial());
         }
     }
     if (!fuels.empty())
@@ -1715,7 +1717,7 @@ void FleetDataPanel::Init() {
             GG::SubTexture(FleetAggressiveMouseoverIcon()));
         AttachChild(m_aggression_toggle);
         m_aggression_toggle->LeftClickedSignal.connect(
-            boost::bind(&FleetDataPanel::ToggleAggression, this));
+            std::bind(&FleetDataPanel::ToggleAggression, this));
 
     } else if (auto fleet = Objects().get<Fleet>(m_fleet_id)) {
         int tooltip_delay = GetOptionsDB().Get<int>("ui.tooltip.delay");
@@ -1766,7 +1768,7 @@ void FleetDataPanel::Init() {
                 GG::SubTexture(FleetAggressiveMouseoverIcon()));
             AttachChild(m_aggression_toggle);
             m_aggression_toggle->LeftClickedSignal.connect(
-                boost::bind(&FleetDataPanel::ToggleAggression, this));
+                std::bind(&FleetDataPanel::ToggleAggression, this));
         }
 
         ColorTextForSelect();
@@ -2414,12 +2416,14 @@ FleetDetailPanel::FleetDetailPanel(GG::X w, GG::Y h, int fleet_id, bool order_is
         m_ships_lb->AllowDropType(SHIP_DROP_TYPE_STRING);
     }
 
+    namespace ph = std::placeholders;
+
     m_ships_lb->SelRowsChangedSignal.connect(
-        boost::bind(&FleetDetailPanel::ShipSelectionChanged, this, _1));
+        std::bind(&FleetDetailPanel::ShipSelectionChanged, this, ph::_1));
     m_ships_lb->RightClickedRowSignal.connect(
-        boost::bind(&FleetDetailPanel::ShipRightClicked, this, _1, _2, _3));
+        std::bind(&FleetDetailPanel::ShipRightClicked, this, ph::_1, ph::_2, ph::_3));
     GetUniverse().UniverseObjectDeleteSignal.connect(
-        boost::bind(&FleetDetailPanel::UniverseObjectDeleted, this, _1));
+        std::bind(&FleetDetailPanel::UniverseObjectDeleted, this, ph::_1));
 }
 
 void FleetDetailPanel::CompleteConstruction() {
@@ -2786,17 +2790,19 @@ void FleetWnd::CompleteConstruction() {
         AttachChild(icon);
     }
 
+    namespace ph = std::placeholders;
+
     // create fleet list box
     m_fleets_lb = GG::Wnd::Create<FleetsListBox>(m_order_issuing_enabled);
     m_fleets_lb->SetHiliteColor(GG::CLR_ZERO);
     m_fleets_lb->SelRowsChangedSignal.connect(
-        boost::bind(&FleetWnd::FleetSelectionChanged, this, _1));
+        std::bind(&FleetWnd::FleetSelectionChanged, this, ph::_1));
     m_fleets_lb->LeftClickedRowSignal.connect(
-        boost::bind(&FleetWnd::FleetLeftClicked, this, _1, _2, _3));
+        std::bind(&FleetWnd::FleetLeftClicked, this, ph::_1, ph::_2, ph::_3));
     m_fleets_lb->RightClickedRowSignal.connect(
-        boost::bind(&FleetWnd::FleetRightClicked, this, _1, _2, _3));
+        std::bind(&FleetWnd::FleetRightClicked, this, ph::_1, ph::_2, ph::_3));
     m_fleets_lb->DoubleClickedRowSignal.connect(
-        boost::bind(&FleetWnd::FleetDoubleClicked, this, _1, _2, _3));
+        std::bind(&FleetWnd::FleetDoubleClicked, this, ph::_1, ph::_2, ph::_3));
     AttachChild(m_fleets_lb);
     m_fleets_lb->SetStyle(GG::LIST_NOSORT | GG::LIST_BROWSEUPDATES);
     m_fleets_lb->AllowDropType(SHIP_DROP_TYPE_STRING);
@@ -2804,7 +2810,7 @@ void FleetWnd::CompleteConstruction() {
 
     // create fleet detail panel
     m_fleet_detail_panel->SelectedShipsChangedSignal.connect(
-        boost::bind(&FleetWnd::ShipSelectionChanged, this, _1));
+        std::bind(&FleetWnd::ShipSelectionChanged, this, std::placeholders::_1));
     m_fleet_detail_panel->ShipRightClickedSignal.connect(
         ShipRightClickedSignal);
     AttachChild(m_fleet_detail_panel);
@@ -2812,14 +2818,16 @@ void FleetWnd::CompleteConstruction() {
     // determine fleets to show and populate list
     Refresh();
 
+    using std::placeholders::_1;
+
     // create drop target
     m_new_fleet_drop_target = GG::Wnd::Create<FleetDataPanel>(GG::X1, ListRowHeight(), m_system_id, true);
     AttachChild(m_new_fleet_drop_target);
     m_new_fleet_drop_target->NewFleetFromShipsSignal.connect(
-        boost::bind(&FleetWnd::CreateNewFleetFromDrops, this, _1));
+        std::bind(&FleetWnd::CreateNewFleetFromDrops, this, _1));
 
     GetUniverse().UniverseObjectDeleteSignal.connect(
-        boost::bind(&FleetWnd::UniverseObjectDeleted, this, _1));
+        std::bind(&FleetWnd::UniverseObjectDeleted, this, _1));
 
     RefreshStateChangedSignals();
 
@@ -2884,8 +2892,8 @@ void FleetWnd::SetStatIconValues() {
                 ship_count++;
                 damage_tally += ship->TotalWeaponsDamage(0.0f, false);
                 fighters_tally += ship->FighterCount();
-                structure_tally += ship->InitialMeterValue(METER_STRUCTURE);
-                shield_tally += ship->InitialMeterValue(METER_SHIELD);
+                structure_tally += ship->GetMeter(METER_STRUCTURE)->Initial();
+                shield_tally += ship->GetMeter(METER_SHIELD)->Initial();
                 troop_tally += ship->TroopCapacity();
                 colony_tally += ship->ColonyCapacity();
             }
@@ -2915,7 +2923,7 @@ void FleetWnd::RefreshStateChangedSignals() {
     m_system_connection.disconnect();
     if (auto system = Objects().get<System>(m_system_id))
         m_system_connection = system->StateChangedSignal.connect(
-            boost::bind(&FleetWnd::RequireRefresh, this), boost::signals2::at_front);
+            std::bind(&FleetWnd::RequireRefresh, this), boost::signals2::at_front);
 
     for (auto& fleet_connection : m_fleet_connections)
         fleet_connection.disconnect();
@@ -3393,10 +3401,10 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
             continue;
 
         // find damaged ships
-        if (ship->InitialMeterValue(METER_STRUCTURE) < ship->InitialMeterValue(METER_MAX_STRUCTURE))
+        if (ship->GetMeter(METER_STRUCTURE)->Initial() < ship->GetMeter(METER_MAX_STRUCTURE)->Initial())
             damaged_ship_ids.push_back(ship->ID());
         // find ships with no remaining fuel
-        if (ship->InitialMeterValue(METER_FUEL) < 1)
+        if (ship->GetMeter(METER_FUEL)->Initial() < 1.0f)
             unfueled_ship_ids.push_back(ship->ID());
         // find ships that can carry fighters but dont have a full complement of them
         if (ship->HasFighters() && ship->FighterCount() < ship->FighterMax())

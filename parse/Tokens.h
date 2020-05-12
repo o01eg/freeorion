@@ -63,6 +63,7 @@
     (Construction)                              \
     (Consumption)                               \
     (ContainedBy)                               \
+    (ContainerID)                               \
     (Contains)                                  \
     (Core)                                      \
     (Cos)                                       \
@@ -181,7 +182,6 @@
     (HullSpeed)                                 \
     (HullStealth)                               \
     (HullStructure)                             \
-    (HullType)                                  \
     (Human)                                     \
     (Icon)                                      \
     (ID)                                        \
@@ -286,6 +286,7 @@
     (Off)                                       \
     (On)                                        \
     (OneOf)                                     \
+    (OnPlanet)                                  \
     (Opinion)                                   \
     (Or)                                        \
     (Orange)                                    \

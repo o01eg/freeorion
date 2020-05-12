@@ -1,5 +1,5 @@
 from common.listeners import register_pre_handler
-from stub_generator import inspect
+from stub_generator import generate_stub
 
 
 def inspect_ai_interface():
@@ -38,7 +38,7 @@ def inspect_ai_interface():
 
     meter = planet.getMeter(fo.meterType.population)
 
-    inspect(
+    generate_stub(
         fo,
         instances=[
             meter,
@@ -56,7 +56,7 @@ def inspect_ai_interface():
             fo.getFieldType('FLD_ION_STORM'),
             fo.getBuildingType('BLD_SHIPYARD_BASE'),
             fo.getGalaxySetupData(),
-            fo.getHullType('SH_XENTRONIUM'),
+            fo.getShipHull('SH_XENTRONIUM'),
             fo.getShipPart('SR_WEAPON_1_1'),
             fo.getSpecial('MODERATE_TECH_NATIVES_SPECIAL'),
             fo.getSpecies('SP_ABADDONI'),
@@ -79,7 +79,8 @@ def inspect_ai_interface():
             # this item cannot be get from generate orders
             'diplomaticStatusUpdate',
         ),
-        path='AI'
+        path='AI',
+        dump=False
     )
     exit(1)  # exit game to main menu no need to play anymore.
 

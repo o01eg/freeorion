@@ -426,12 +426,6 @@ Meter* Planet::GetMeter(MeterType type)
 const Meter* Planet::GetMeter(MeterType type) const
 { return UniverseObject::GetMeter(type); }
 
-float Planet::InitialMeterValue(MeterType type) const
-{ return UniverseObject::InitialMeterValue(type); }
-
-float Planet::CurrentMeterValue(MeterType type) const
-{ return UniverseObject::CurrentMeterValue(type); }
-
 std::string Planet::CardinalSuffix() const {
     std::string retval = "";
     // Early return for invalid ID
@@ -830,18 +824,12 @@ void Planet::PopGrowthProductionResearchPhase() {
     // should be run after a meter update, but before a backpropagation, so check current, not initial, meter values
 
     // check for colonies without positive population, and change to outposts
-    if (!SpeciesName().empty() && CurrentMeterValue(METER_POPULATION) <= 0.0f) {
+    if (!SpeciesName().empty() && GetMeter(METER_POPULATION)->Current() <= 0.0f) {
         if (Empire* empire = GetEmpire(this->Owner())) {
             empire->AddSitRepEntry(CreatePlanetDepopulatedSitRep(this->ID()));
 
-            if (!HasTag(TAG_STAT_SKIP_DEPOP)) {
-                // record depopulation of planet with species while owned by this empire
-                auto species_it = empire->SpeciesPlanetsDepoped().find(SpeciesName());
-                if (species_it == empire->SpeciesPlanetsDepoped().end())
-                    empire->SpeciesPlanetsDepoped()[SpeciesName()] = 1;
-                else
-                    species_it->second++;
-            }
+            if (!HasTag(TAG_STAT_SKIP_DEPOP))
+                empire->RecordPlanetDepopulated(*this);
         }
         // remove species
         PopCenter::Reset();

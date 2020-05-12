@@ -20,8 +20,8 @@
 #include "../universe/System.h"
 #include "../universe/Ship.h"
 #include "../universe/ShipDesign.h"
+#include "../universe/ShipHull.h"
 #include "../universe/ShipPart.h"
-#include "../universe/ShipPartHull.h"
 #include "../universe/Fleet.h"
 #include "../universe/Special.h"
 #include "../universe/Species.h"
@@ -205,7 +205,7 @@ namespace {
 
         }
         else if (dir_name == "ENC_SHIP_HULL") {
-            for (const auto& entry : GetHullTypeManager()) {
+            for (const auto& entry : GetShipHullManager()) {
                 std::string custom_category = DetermineCustomCategory(entry.second->Tags());
                 if (custom_category.empty()) {
                     sorted_entries_list.insert({UserString(entry.first),
@@ -488,7 +488,7 @@ namespace {
                         std::make_pair(VarText::SHIP_PART_TAG, entry.first);
 
             // hull types
-            for (const auto& entry : GetHullTypeManager())
+            for (const auto& entry : GetShipHullManager())
                 if (DetermineCustomCategory(entry.second->Tags()) == dir_name)
                     dir_entries[UserString(entry.first)] =
                         std::make_pair(VarText::SHIP_HULL_TAG, entry.first);
@@ -622,11 +622,11 @@ void EncyclopediaDetailPanel::CompleteConstruction() {
     m_next_button->Disable();
 
     m_index_button->LeftClickedSignal.connect(
-        boost::bind(&EncyclopediaDetailPanel::OnIndex, this));
+        std::bind(&EncyclopediaDetailPanel::OnIndex, this));
     m_back_button->LeftClickedSignal.connect(
-        boost::bind(&EncyclopediaDetailPanel::OnBack, this));
+        std::bind(&EncyclopediaDetailPanel::OnBack, this));
     m_next_button->LeftClickedSignal.connect(
-        boost::bind(&EncyclopediaDetailPanel::OnNext, this));
+        std::bind(&EncyclopediaDetailPanel::OnNext, this));
 
     m_description_rich_text = GG::Wnd::Create<GG::RichText>(
         GG::X(0), GG::Y(0), ClientWidth(), ClientHeight(), "",
@@ -636,17 +636,19 @@ void EncyclopediaDetailPanel::CompleteConstruction() {
     m_scroll_panel = GG::Wnd::Create<GG::ScrollPanel>(GG::X(0), GG::Y(0), ClientWidth(),
                                                       ClientHeight(), m_description_rich_text);
 
+    namespace ph = std::placeholders;
+
     // Copy default block factory.
     std::shared_ptr<GG::RichText::BLOCK_FACTORY_MAP>
         factory_map(new GG::RichText::BLOCK_FACTORY_MAP(*GG::RichText::DefaultBlockFactoryMap()));
     auto factory = new CUILinkTextBlock::Factory();
     // Wire this factory to produce links that talk to us.
     factory->LinkClickedSignal.connect(
-        boost::bind(&EncyclopediaDetailPanel::HandleLinkClick, this, _1, _2));
+        std::bind(&EncyclopediaDetailPanel::HandleLinkClick, this, ph::_1, ph::_2));
     factory->LinkDoubleClickedSignal.connect(
-        boost::bind(&EncyclopediaDetailPanel::HandleLinkDoubleClick, this, _1, _2));
+        std::bind(&EncyclopediaDetailPanel::HandleLinkDoubleClick, this, ph::_1, ph::_2));
     factory->LinkRightClickedSignal.connect(
-        boost::bind(&EncyclopediaDetailPanel::HandleLinkDoubleClick, this, _1, _2));
+        std::bind(&EncyclopediaDetailPanel::HandleLinkDoubleClick, this, ph::_1, ph::_2));
     (*factory_map)[GG::RichText::PLAINTEXT_TAG] =
         std::shared_ptr<GG::RichText::IBlockControlFactory>(factory);
     m_description_rich_text->SetBlockFactoryMap(factory_map);
@@ -661,7 +663,7 @@ void EncyclopediaDetailPanel::CompleteConstruction() {
     auto search_edit = GG::Wnd::Create<SearchEdit>();
     m_search_edit = search_edit;
     search_edit->TextEnteredSignal.connect(
-        boost::bind(&EncyclopediaDetailPanel::HandleSearchTextEntered, this));
+        std::bind(&EncyclopediaDetailPanel::HandleSearchTextEntered, this));
 
     AttachChild(m_search_edit);
     AttachChild(m_graph);
@@ -927,7 +929,7 @@ void EncyclopediaDetailPanel::HandleLinkClick(const std::string& link_type, cons
         } else if (link_type == VarText::SPECIAL_TAG) {
             this->SetSpecial(data);
         } else if (link_type == VarText::SHIP_HULL_TAG) {
-            this->SetHullType(data);
+            this->SetShipHull(data);
         } else if (link_type == VarText::SHIP_PART_TAG) {
             this->SetShipPart(data);
         } else if (link_type == VarText::SPECIES_TAG) {
@@ -1217,7 +1219,7 @@ namespace {
             for (const auto& exclusion : exclusions) {
                 if (GetShipPart(exclusion)) {
                     detailed_description += LinkTaggedText(VarText::SHIP_PART_TAG, exclusion) + "  ";
-                } else if (GetHullType(exclusion)) {
+                } else if (GetShipHull(exclusion)) {
                     detailed_description += LinkTaggedText(VarText::SHIP_HULL_TAG, exclusion) + "  ";
                 } else {
                     // unknown exclusion...?
@@ -1248,7 +1250,7 @@ namespace {
                                             std::string& specific_type, std::string& detailed_description,
                                             GG::Clr& color)
     {
-        const HullType* hull = GetHullType(item_name);
+        const ShipHull* hull = GetShipHull(item_name);
         if (!hull) {
             ErrorLogger() << "EncyclopediaDetailPanel::Refresh couldn't find hull with name " << item_name;
             return;
@@ -1291,7 +1293,7 @@ namespace {
             for (const std::string& exclusion : exclusions) {
                 if (GetShipPart(exclusion)) {
                     detailed_description += LinkTaggedText(VarText::SHIP_PART_TAG, exclusion) + "  ";
-                } else if (GetHullType(exclusion)) {
+                } else if (GetShipHull(exclusion)) {
                     detailed_description += LinkTaggedText(VarText::SHIP_HULL_TAG, exclusion) + "  ";
                 } else {
                     // unknown exclusion...?
@@ -2106,8 +2108,8 @@ namespace {
         // meter values for display
 
         auto& species = ship->SpeciesName().empty() ? "Generic" : UserString(ship->SpeciesName());
-        float structure = ship->CurrentMeterValue(METER_MAX_STRUCTURE);
-        float shield = ship->CurrentMeterValue(METER_MAX_SHIELD);
+        float structure = ship->GetMeter(METER_MAX_STRUCTURE)->Current();
+        float shield = ship->GetMeter(METER_MAX_SHIELD)->Current();
         float attack = ship->TotalWeaponsDamage();
         float strength = std::pow(attack * structure, 0.6f);
         float typical_shot = *std::max_element(enemy_shots.begin(), enemy_shots.end());
@@ -2118,10 +2120,10 @@ namespace {
             % ship->SumCurrentPartMeterValuesForPartClass(METER_MAX_SECONDARY_STAT, PC_DIRECT_WEAPON)
             % structure
             % shield
-            % ship->CurrentMeterValue(METER_DETECTION)
-            % ship->CurrentMeterValue(METER_STEALTH)
-            % ship->CurrentMeterValue(METER_SPEED)
-            % ship->CurrentMeterValue(METER_MAX_FUEL)
+            % ship->GetMeter(METER_DETECTION)->Current()
+            % ship->GetMeter(METER_STEALTH)->Current()
+            % ship->GetMeter(METER_SPEED)->Current()
+            % ship->GetMeter(METER_MAX_FUEL)->Current()
             % ship->SumCurrentPartMeterValuesForPartClass(METER_CAPACITY, PC_COLONY)
             % ship->SumCurrentPartMeterValuesForPartClass(METER_CAPACITY, PC_TROOPS)
             % ship->FighterMax()
@@ -2206,7 +2208,7 @@ namespace {
                 if (!this_ship->SpeciesName().empty())
                     additional_species.insert(this_ship->SpeciesName());
                 if (!this_ship->OwnedBy(client_empire_id)) {
-                    enemy_DR = this_ship->InitialMeterValue(METER_MAX_SHIELD);
+                    enemy_DR = this_ship->GetMeter(METER_MAX_SHIELD)->Initial();
                     DebugLogger() << "Using selected ship for enemy values, DR: " << enemy_DR;
                     enemy_shots.clear();
                     auto this_damage = this_ship->AllWeaponsMaxDamage();
@@ -2321,8 +2323,11 @@ namespace {
         if (selected_ship != INVALID_OBJECT_ID) {
             chosen_ships.insert(selected_ship);
             if (const auto this_ship = Objects().get<Ship>(selected_ship)) {
-                if (!additional_species.empty() && ((this_ship->InitialMeterValue(METER_MAX_SHIELD) > 0) || !this_ship->OwnedBy(client_empire_id))) {
-                    enemy_DR = this_ship->InitialMeterValue(METER_MAX_SHIELD);
+                if (!additional_species.empty() && (
+                        (this_ship->GetMeter(METER_MAX_SHIELD)->Initial() > 0) ||
+                         !this_ship->OwnedBy(client_empire_id)))
+                {
+                    enemy_DR = this_ship->GetMeter(METER_MAX_SHIELD)->Initial();
                     DebugLogger() << "Using selected ship for enemy values, DR: " << enemy_DR;
                     enemy_shots.clear();
                     auto this_damage = this_ship->AllWeaponsMaxDamage();
@@ -2493,7 +2498,7 @@ namespace {
                 planet_environment = species->GetPlanetEnvironment(planet.Type());
 
             float planet_capacity = ((planet_environment == PE_UNINHABITABLE) ?
-                                     0.0f : planet.CurrentMeterValue(METER_TARGET_POPULATION)); // want value after temporary meter update, so get current, not initial value of meter
+                                     0.0f : planet.GetMeter(METER_TARGET_POPULATION)->Current()); // want value after temporary meter update, so get current, not initial value of meter
 
             retval.insert({planet_capacity, {species_name, planet_environment}});
         }
@@ -3122,7 +3127,7 @@ void EncyclopediaDetailPanel::SetShipPart(const std::string& part_name) {
     AddItem("ENC_SHIP_PART", part_name);
 }
 
-void EncyclopediaDetailPanel::SetHullType(const std::string& hull_name) {
+void EncyclopediaDetailPanel::SetShipHull(const std::string& hull_name) {
     if (m_items_it != m_items.end() && hull_name == m_items_it->second)
         return;
     AddItem("ENC_SHIP_HULL", hull_name);
@@ -3241,8 +3246,8 @@ void EncyclopediaDetailPanel::SetItem(const Tech* tech)
 void EncyclopediaDetailPanel::SetItem(const ShipPart* part)
 { SetShipPart(part ? part->Name() : EMPTY_STRING); }
 
-void EncyclopediaDetailPanel::SetItem(const HullType* hull_type)
-{ SetHullType(hull_type ? hull_type->Name() : EMPTY_STRING); }
+void EncyclopediaDetailPanel::SetItem(const ShipHull* ship_hull)
+{ SetShipHull(ship_hull ? ship_hull->Name() : EMPTY_STRING); }
 
 void EncyclopediaDetailPanel::SetItem(const BuildingType* building_type)
 { SetBuildingType(building_type ? building_type->Name() : EMPTY_STRING); }

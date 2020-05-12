@@ -10,8 +10,8 @@
 #include "../universe/Fleet.h"
 #include "../universe/Ship.h"
 #include "../universe/ShipDesign.h"
+#include "../universe/ShipHull.h"
 #include "../universe/ShipPart.h"
-#include "../universe/ShipPartHull.h"
 #include "../universe/Planet.h"
 #include "../universe/System.h"
 #include "../universe/Tech.h"
@@ -405,10 +405,10 @@ bool Empire::ShipPartAvailable(const std::string& name) const
 { return m_available_ship_parts.count(name); }
 
 const std::set<std::string>& Empire::AvailableShipHulls() const
-{ return m_available_hull_types; }
+{ return m_available_ship_hulls; }
 
 bool Empire::ShipHullAvailable(const std::string& name) const
-{ return m_available_hull_types.count(name); }
+{ return m_available_ship_hulls.count(name); }
 
 const ProductionQueue& Empire::GetProductionQueue() const
 { return m_production_queue; }
@@ -618,7 +618,7 @@ void Empire::Eliminate() {
     m_production_queue.clear();
     // m_available_building_types;
     // m_available_ship_parts;
-    // m_available_hull_types;
+    // m_available_ship_hulls;
     // m_explored_systems;
     // m_known_ship_designs;
     m_sitrep_entries.clear();
@@ -674,7 +674,7 @@ void Empire::UpdateSystemSupplyRanges(const std::set<int>& known_objects) {
         // check if object has a supply meter
         if (obj->GetMeter(METER_SUPPLY)) {
             // get resource supply range for next turn for this object
-            float supply_range = obj->InitialMeterValue(METER_SUPPLY);
+            float supply_range = obj->GetMeter(METER_SUPPLY)->Initial();
 
             // if this object can provide more supply range than the best previously checked object in this system, record its range as the new best for the system
             auto system_it = m_supply_system_ranges.find(system_id);  // try to find a previous entry for this system's supply range
@@ -1396,7 +1396,7 @@ void Empire::UnlockItem(const UnlockableItem& item) {
         AddShipPart(item.name);
         break;
     case UIT_SHIP_HULL:
-        AddHullType(item.name);
+        AddShipHull(item.name);
         break;
     case UIT_SHIP_DESIGN:
         AddShipDesign(GetPredefinedShipDesignManager().GetDesignID(item.name));
@@ -1435,15 +1435,15 @@ void Empire::AddShipPart(const std::string& name) {
     AddSitRepEntry(CreateShipPartUnlockedSitRep(name));
 }
 
-void Empire::AddHullType(const std::string& name) {
-    const HullType* hull_type = GetHullType(name);
-    if (!hull_type) {
-        ErrorLogger() << "Empire::AddHullType given an invalid hull type name: " << name;
+void Empire::AddShipHull(const std::string& name) {
+    const ShipHull* ship_hull = GetShipHull(name);
+    if (!ship_hull) {
+        ErrorLogger() << "Empire::AddShipHull given an invalid hull type name: " << name;
         return;
     }
-    if (!hull_type->Producible())
+    if (!ship_hull->Producible())
         return;
-    m_available_hull_types.insert(name);
+    m_available_ship_hulls.insert(name);
     AddSitRepEntry(CreateShipHullUnlockedSitRep(name));
 }
 
@@ -1547,7 +1547,7 @@ void Empire::LockItem(const UnlockableItem& item) {
         RemoveShipPart(item.name);
         break;
     case UIT_SHIP_HULL:
-        RemoveHullType(item.name);
+        RemoveShipHull(item.name);
         break;
     case UIT_SHIP_DESIGN:
         RemoveShipDesign(GetPredefinedShipDesignManager().GetDesignID(item.name));
@@ -1573,11 +1573,11 @@ void Empire::RemoveShipPart(const std::string& name) {
     m_available_ship_parts.erase(name);
 }
 
-void Empire::RemoveHullType(const std::string& name) {
-    auto it = m_available_hull_types.find(name);
-    if (it == m_available_hull_types.end())
-        DebugLogger() << "Empire::RemoveHullType asked to remove hull type " << name << " that was no available to this empire";
-    m_available_hull_types.erase(name);
+void Empire::RemoveShipHull(const std::string& name) {
+    auto it = m_available_ship_hulls.find(name);
+    if (it == m_available_ship_hulls.end())
+        DebugLogger() << "Empire::RemoveShipHull asked to remove hull type " << name << " that was no available to this empire";
+    m_available_ship_hulls.erase(name);
 }
 
 void Empire::ClearSitRep()
@@ -1974,6 +1974,9 @@ void Empire::CheckProductionProgress() {
                 // have been applied, letting new ships start with maxed
                 // everything that is traced with an associated max meter.
                 ship->SetShipMetersToMax();
+                // set ship speed so that it can be affected by non-zero speed checks
+                if (auto* design = GetShipDesign(elem.item.design_id))
+                    ship->GetMeter(METER_SPEED)->Set(design->Speed(), design->Speed());
                 ship->BackPropagateMeters();
 
                 ship->Rename(NewShipName());
@@ -2300,6 +2303,34 @@ int Empire::TotalShipsOwned() const {
     for (const auto& entry : m_ship_designs_owned)
     { counter += entry.second; }
     return counter;
+}
+
+void Empire::RecordShipShotDown(const Ship& ship) {
+    m_empire_ships_destroyed[ship.Owner()]++;
+    m_ship_designs_destroyed[ship.DesignID()]++;
+    m_species_ships_destroyed[ship.SpeciesName()]++;
+}
+
+void Empire::RecordShipLost(const Ship& ship) {
+    m_species_ships_lost[ship.SpeciesName()]++;
+    m_ship_designs_lost[ship.DesignID()]++;
+}
+
+void Empire::RecordShipScrapped(const Ship& ship) {
+    m_ship_designs_scrapped[ship.DesignID()]++;
+    m_species_ships_scrapped[ship.SpeciesName()]++;
+}
+
+void Empire::RecordBuildingScrapped(const Building& building) {
+    m_building_types_scrapped[building.BuildingTypeName()]++;
+}
+
+void Empire::RecordPlanetInvaded(const Planet& planet) {
+    m_species_planets_invaded[planet.SpeciesName()]++;
+}
+
+void Empire::RecordPlanetDepopulated(const Planet& planet) {
+    m_species_planets_depoped[planet.SpeciesName()]++;
 }
 
 int Empire::TotalShipPartsOwned() const {

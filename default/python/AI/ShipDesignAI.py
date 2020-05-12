@@ -295,7 +295,7 @@ class ShipDesignCache:
                 self.production_cost.setdefault(pid, {})[partname] = part.productionCost(empire_id, pid, INVALID_ID)
                 self.production_time.setdefault(pid, {})[partname] = part.productionTime(empire_id, pid, INVALID_ID)
         for hullname in hulls_to_update:
-            hull = fo.getHullType(hullname)
+            hull = fo.getShipHull(hullname)
             for pid in pids:
                 self.production_cost.setdefault(pid, {})[hullname] = hull.productionCost(empire_id, pid, INVALID_ID)
                 self.production_time.setdefault(pid, {})[hullname] = hull.productionTime(empire_id, pid, INVALID_ID)
@@ -375,7 +375,7 @@ class ShipDesignCache:
 
         for pid in state.get_inhabited_planets():
             for hull_name in all_hulls:
-                hull = fo.getHullType(hull_name)
+                hull = fo.getShipHull(hull_name)
                 if assertion_fails(hull is not None):
                     continue
 
@@ -611,7 +611,7 @@ class ShipDesigner:
         :param hullname:
         :type hullname: str
         """
-        self.hull = fo.getHullType(hullname)
+        self.hull = fo.getShipHull(hullname)
 
     def update_parts(self, partname_list):
         """Set both partnames and parts attributes.
@@ -1004,6 +1004,12 @@ class ShipDesigner:
             best_hull = None
             best_parts = None
             for hullname in available_hulls:
+                # TODO: Expose FOCS Exclusions and replace manually maintained AIDependencies dict
+                hull_excluded_part_classes = AIDependencies.HULL_EXCLUDED_SHIP_PART_CLASSES.get(hullname, [])
+                available_parts_in_hull = {
+                    slot: [part_name for part_name in available_parts[slot]
+                           if get_ship_part(part_name).partClass not in hull_excluded_part_classes]
+                    for slot in available_parts}
                 if hullname in design_cache_parts:
                     cache = design_cache_parts[hullname]
                     best_hull_rating = cache[0]
@@ -1013,7 +1019,7 @@ class ShipDesigner:
                             hullname, best_hull_rating, current_parts))
                 else:
                     self.update_hull(hullname)
-                    best_hull_rating, current_parts = self._filling_algorithm(available_parts)
+                    best_hull_rating, current_parts = self._filling_algorithm(available_parts_in_hull)
                     design_cache_parts.update({hullname: (best_hull_rating, current_parts)})
                     if verbose:
                         debug("Best rating for hull %s: %f %s" % (hullname, best_hull_rating, current_parts))

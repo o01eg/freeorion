@@ -5,7 +5,7 @@
 #include "../universe/Ship.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/ShipPart.h"
-#include "../universe/ShipPartHull.h"
+#include "../universe/ShipHull.h"
 #include "../universe/Building.h"
 #include "../universe/BuildingType.h"
 #include "../universe/ResourceCenter.h"
@@ -103,7 +103,7 @@ namespace {
         GetUniverse().UpdateMeterEstimates(objvec);
     }
 
-    //void (Universe::*UpdateMeterEstimatesVoidFunc)(void) =                                      &Universe::UpdateMeterEstimates;
+    //void (Universe::*UpdateMeterEstimatesVoidFunc)(void) = &Universe::UpdateMeterEstimates;
 
     double LinearDistance(const Universe& universe, int system1_id, int system2_id) {
         double retval = universe.GetPathfinder()->LinearDistance(system1_id, system2_id);
@@ -176,8 +176,10 @@ namespace {
     std::function<std::map<int, double> (const Universe&, int, int)> SystemNeighborsMapFunc = &SystemNeighborsMapP;
 
     const Meter*            (UniverseObject::*ObjectGetMeter)(MeterType) const =                &UniverseObject::GetMeter;
-    const std::map<MeterType, Meter>&
-                            (UniverseObject::*ObjectMeters)(void) const =                       &UniverseObject::Meters;
+
+    std::map<MeterType, Meter> ObjectMetersP(const UniverseObject& object)
+    { return std::map<MeterType, Meter>{object.Meters().begin(), object.Meters().end()}; }
+    std::function<std::map<MeterType, Meter> (const UniverseObject&)> ObjectMetersFunc = &ObjectMetersP;
 
     std::vector<std::string> ObjectSpecials(const UniverseObject& object) {
         std::vector<std::string> retval;
@@ -188,12 +190,25 @@ namespace {
     }
 
     const Meter*            (Ship::*ShipGetPartMeter)(MeterType, const std::string&) const =    &Ship::GetPartMeter;
-    const Ship::PartMeterMap&
-                            (Ship::*ShipPartMeters)(void) const =                               &Ship::PartMeters;
+    const auto&             (Ship::*ShipPartMeters)(void) const =                               &Ship::PartMeters;
 
-    const HullType* ShipDesignHullP(const ShipDesign& design)
-    { return GetHullType(design.Hull()); }
-    std::function<const HullType*(const ShipDesign& ship)> ShipDesignHullFunc = &ShipDesignHullP;
+    float ObjectCurrentMeterValueP(const UniverseObject& o, MeterType meter_type) {
+        if (auto* m = o.GetMeter(meter_type))
+            return m->Current();
+        return 0.0f;
+    }
+    std::function<float(const UniverseObject&, MeterType)> ObjectCurrentMeterValueFunc = &ObjectCurrentMeterValueP;
+
+    float ObjectInitialMeterValueP(const UniverseObject& o, MeterType meter_type) {
+        if (auto* m = o.GetMeter(meter_type))
+            return m->Initial();
+        return 0.0f;
+    }
+    std::function<float(const UniverseObject&, MeterType)> ObjectInitialMeterValueFunc = &ObjectInitialMeterValueP;
+
+    const ShipHull* ShipDesignHullP(const ShipDesign& design)
+    { return GetShipHull(design.Hull()); }
+    std::function<const ShipHull*(const ShipDesign& ship)> ShipDesignHullFunc = &ShipDesignHullP;
 
     const std::string& ShipDesignName(const ShipDesign& ship_design)
     { return ship_design.Name(false); }
@@ -222,16 +237,16 @@ namespace {
     }
     std::function<std::vector<int> (const ShipDesign&)> AttackStatsFunc = &AttackStatsP;
 
-    std::vector<ShipSlotType> HullSlots(const HullType& hull) {
+    std::vector<ShipSlotType> HullSlots(const ShipHull& hull) {
         std::vector<ShipSlotType> retval;
-        for (const HullType::Slot& slot : hull.Slots())
+        for (const ShipHull::Slot& slot : hull.Slots())
             retval.push_back(slot.type);
         return retval;
     }
-    std::function<std::vector<ShipSlotType> (const HullType&)> HullSlotsFunc = &HullSlots;
+    std::function<std::vector<ShipSlotType> (const ShipHull&)> HullSlotsFunc = &HullSlots;
 
-    unsigned int            (HullType::*NumSlotsTotal)(void) const =                            &HullType::NumSlots;
-    unsigned int            (HullType::*NumSlotsOfSlotType)(ShipSlotType) const =               &HullType::NumSlots;
+    unsigned int            (ShipHull::*NumSlotsTotal)(void) const =                            &ShipHull::NumSlots;
+    unsigned int            (ShipHull::*NumSlotsOfSlotType)(ShipSlotType) const =               &ShipHull::NumSlots;
 
     bool ObjectInField(const Field& field, const UniverseObject& obj)
     { return field.InField(obj.X(), obj.Y()); }
@@ -242,7 +257,7 @@ namespace {
     bool EnqueueLocationTest(const BuildingType& building_type, int empire_id, int loc_id)
     { return building_type.EnqueueLocation(empire_id, loc_id);}
 
-    bool HullProductionLocation(const HullType& hull, int location_id) {
+    bool HullProductionLocation(const ShipHull& hull, int location_id) {
         auto location = Objects().get(location_id);
         if (!location) {
             ErrorLogger() << "UniverseWrapper::HullProductionLocation Could not find location with id " << location_id;
@@ -317,16 +332,30 @@ namespace FreeOrionPython {
         class_<std::vector<ShipSlotType>>("ShipSlotVec")
             .def(boost::python::vector_indexing_suite<std::vector<ShipSlotType>, true>())
         ;
+        class_<std::map<std::string, std::string>>("StringsMap")
+            .def(boost::python::map_indexing_suite<std::map<std::string, std::string>, true>())
+        ;
+
         class_<std::map<MeterType, Meter>>("MeterTypeMeterMap")
             .def(boost::python::map_indexing_suite<std::map<MeterType, Meter>, true>())
         ;
-        // typedef std::map<std::pair<MeterType, std::string>, Meter>          PartMeterMap;
+
+        // typedef std::map<std::pair<MeterType, std::string>, Meter> PartMeterMap;
         class_<std::pair<MeterType, std::string>>("MeterTypeStringPair")
             .add_property("meterType",  &std::pair<MeterType, std::string>::first)
             .add_property("string",     &std::pair<MeterType, std::string>::second)
         ;
         class_<Ship::PartMeterMap>("ShipPartMeterMap")
             .def(boost::python::map_indexing_suite<Ship::PartMeterMap>())
+        ;
+
+        class_<std::map<std::string, std::map<int, std::map<int, double>>>>("StatRecordsMap")
+            .def(boost::python::map_indexing_suite<
+                 std::map<std::string, std::map<int, std::map<int, double>>>, true>())
+        ;
+        class_<std::map<int, std::map<int, double>>>("IntIntDblMapMap")
+            .def(boost::python::map_indexing_suite<
+                 std::map<int, std::map<int, double>>, true>())
         ;
 
         ///////////////////////////
@@ -377,15 +406,15 @@ namespace FreeOrionPython {
             .def("getBuilding",                 make_function(GetBuildingP,         return_value_policy<reference_existing_object>()))
             .def("getGenericShipDesign",        &Universe::GetGenericShipDesign,    return_value_policy<reference_existing_object>(), "Returns the ship design (ShipDesign) with the indicated name (string).")
 
-            .add_property("allObjectIDs",       make_function(ObjectIDs<UniverseObject>,  return_value_policy<return_by_value>()))
-            .add_property("fleetIDs",           make_function(ObjectIDs<Fleet>,           return_value_policy<return_by_value>()))
-            .add_property("systemIDs",          make_function(ObjectIDs<System>,          return_value_policy<return_by_value>()))
-            .add_property("fieldIDs",           make_function(ObjectIDs<Field>,           return_value_policy<return_by_value>()))
-            .add_property("planetIDs",          make_function(ObjectIDs<Planet>,          return_value_policy<return_by_value>()))
-            .add_property("shipIDs",            make_function(ObjectIDs<Ship>,            return_value_policy<return_by_value>()))
-            .add_property("buildingIDs",        make_function(ObjectIDs<Building>,        return_value_policy<return_by_value>()))
+            .add_property("allObjectIDs",       make_function(ObjectIDs<UniverseObject>,return_value_policy<return_by_value>()))
+            .add_property("fleetIDs",           make_function(ObjectIDs<Fleet>,         return_value_policy<return_by_value>()))
+            .add_property("systemIDs",          make_function(ObjectIDs<System>,        return_value_policy<return_by_value>()))
+            .add_property("fieldIDs",           make_function(ObjectIDs<Field>,         return_value_policy<return_by_value>()))
+            .add_property("planetIDs",          make_function(ObjectIDs<Planet>,        return_value_policy<return_by_value>()))
+            .add_property("shipIDs",            make_function(ObjectIDs<Ship>,          return_value_policy<return_by_value>()))
+            .add_property("buildingIDs",        make_function(ObjectIDs<Building>,      return_value_policy<return_by_value>()))
             .def("destroyedObjectIDs",          make_function(&Universe::EmpireKnownDestroyedObjectIDs,
-                                                                                    return_value_policy<return_by_value>()))
+                                                              return_value_policy<return_by_value>()))
 
             .def("systemHasStarlane",           make_function(
                                                     SystemHasVisibleStarlanesFunc,
@@ -471,6 +500,16 @@ namespace FreeOrionPython {
                                                     return_value_policy<return_by_value>()
                                                 ))
 
+            // Indexed by stat name (string), contains a map indexed by empire id,
+            // contains a map from turn number (int) to stat value (double).
+            .def("statRecords",                 make_function(
+                                                    &Universe::GetStatRecords,
+                                                    return_value_policy<reference_existing_object>()),
+                                                "Empire statistics recorded by the server each turn. Indexed first by "
+                                                "staistic name (string), then by empire id (int), then by turn "
+                                                "number (int), pointing to the statisic value (double)."
+                                                )
+
             .def("dump",                        &DumpObjects)
         ;
 
@@ -495,11 +534,23 @@ namespace FreeOrionPython {
             .def("containedBy",                 &UniverseObject::ContainedBy)
             .add_property("containedObjects",   make_function(&UniverseObject::ContainedObjectIDs,  return_value_policy<return_by_value>()))
             .add_property("containerObject",    &UniverseObject::ContainerObjectID)
-            .def("currentMeterValue",           &UniverseObject::CurrentMeterValue)
-            .def("initialMeterValue",           &UniverseObject::InitialMeterValue)
+            .def("currentMeterValue",           make_function(
+                                                    ObjectCurrentMeterValueFunc,
+                                                    return_value_policy<return_by_value>(),
+                                                    boost::mpl::vector<float, const UniverseObject&, MeterType>()
+                                                ))
+            .def("initialMeterValue",           make_function(
+                                                    ObjectInitialMeterValueFunc,
+                                                    return_value_policy<return_by_value>(),
+                                                    boost::mpl::vector<float, const UniverseObject&, MeterType>()
+                                                ))
             .add_property("tags",               make_function(&UniverseObject::Tags,        return_value_policy<return_by_value>()))
             .def("hasTag",                      &UniverseObject::HasTag)
-            .add_property("meters",             make_function(ObjectMeters,                 return_internal_reference<>()))
+            .add_property("meters",             make_function(
+                                                    ObjectMetersFunc,
+                                                    return_value_policy<return_by_value>(),
+                                                    boost::mpl::vector<std::map<MeterType, Meter>, const UniverseObject&>()
+                                                ))
             .def("getMeter",                    make_function(ObjectGetMeter,               return_internal_reference<>()))
             .def("dump",                        make_function(&ObjectDump,                  return_value_policy<return_by_value>()), "Returns string with debug information.")
         ;
@@ -598,10 +649,10 @@ namespace FreeOrionPython {
             .add_property("costTimeLocationInvariant",
                                                 &ShipDesign::ProductionCostTimeLocationInvariant)
             .add_property("hull",               make_function(&ShipDesign::Hull,            return_value_policy<return_by_value>()))
-            .add_property("hull_type",          make_function(
+            .add_property("ship_hull",          make_function(
                                                     ShipDesignHullFunc,
                                                     return_value_policy<reference_existing_object>(),
-                                                    boost::mpl::vector<const HullType*, const ShipDesign&>()
+                                                    boost::mpl::vector<const ShipHull*, const ShipDesign&>()
                                                 ))
             .add_property("parts",              make_function(PartsVoid,                    return_internal_reference<>()))
             .add_property("attackStats",        make_function(
@@ -633,28 +684,28 @@ namespace FreeOrionPython {
         ;
         def("getShipPart",                      &GetShipPart,                               return_value_policy<reference_existing_object>(), "Returns the ShipPart with the indicated name (string).");
 
-        class_<HullType, noncopyable>("hullType", no_init)
-            .add_property("name",               make_function(&HullType::Name,              return_value_policy<copy_const_reference>()))
+        class_<ShipHull, noncopyable>("shipHull", no_init)
+            .add_property("name",               make_function(&ShipHull::Name,              return_value_policy<copy_const_reference>()))
             .add_property("numSlots",           make_function(NumSlotsTotal,                return_value_policy<return_by_value>()))
-            .add_property("structure",          &HullType::Structure)
-            .add_property("stealth",            &HullType::Stealth)
-            .add_property("fuel",               &HullType::Fuel)
-            .add_property("starlaneSpeed",      &HullType::Speed) // TODO: Remove this after transition period
-            .add_property("speed",              &HullType::Speed)
+            .add_property("structure",          &ShipHull::Structure)
+            .add_property("stealth",            &ShipHull::Stealth)
+            .add_property("fuel",               &ShipHull::Fuel)
+            .add_property("starlaneSpeed",      &ShipHull::Speed) // TODO: Remove this after transition period
+            .add_property("speed",              &ShipHull::Speed)
             .def("numSlotsOfSlotType",          NumSlotsOfSlotType)
             .add_property("slots",              make_function(
                                                     HullSlotsFunc,
                                                     return_value_policy<return_by_value>(),
-                                                    boost::mpl::vector<std::vector<ShipSlotType>, const HullType&>()
+                                                    boost::mpl::vector<std::vector<ShipSlotType>, const ShipHull&>()
                                                 ))
-            .def("productionCost",              &HullType::ProductionCost)
-            .def("productionTime",              &HullType::ProductionTime)
+            .def("productionCost",              &ShipHull::ProductionCost)
+            .def("productionTime",              &ShipHull::ProductionTime)
             .add_property("costTimeLocationInvariant",
-                                                &HullType::ProductionCostTimeLocationInvariant)
-            .def("hasTag",                      &HullType::HasTag)
+                                                &ShipHull::ProductionCostTimeLocationInvariant)
+            .def("hasTag",                      &ShipHull::HasTag)
             .def("productionLocation",          &HullProductionLocation, "Returns the result of Location condition (bool) in passed location_id (int)")
         ;
-        def("getHullType",                      &GetHullType,                               return_value_policy<reference_existing_object>(), "Returns the ship hull (HullType) with the indicated name (string).");
+        def("getShipHull",                      &GetShipHull,                               return_value_policy<reference_existing_object>(), "Returns the ship hull with the indicated name (string).");
 
         //////////////////
         //   Building   //
@@ -807,11 +858,6 @@ namespace FreeOrionPython {
             .add_property("maxAIAggression",    make_function(&GalaxySetupData::GetAggression,      return_value_policy<return_by_value>()))
             .add_property("gameUID",            make_function(&GalaxySetupData::GetGameUID,         return_value_policy<return_by_value>()),
                                                 &GalaxySetupData::SetGameUID);
-
-
-        class_<std::map<std::string, std::string>>("StringsMap")
-            .def(boost::python::map_indexing_suite<std::map<std::string, std::string>, true>())
-        ;
 
         class_<GameRules, noncopyable>("GameRules", no_init)
             .add_property("empty",              make_function(&GameRules::Empty,                return_value_policy<return_by_value>()))

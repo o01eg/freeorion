@@ -26,7 +26,7 @@
 #include "../universe/Ship.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/ShipPart.h"
-#include "../universe/ShipPartHull.h"
+#include "../universe/ShipHull.h"
 #include "../universe/Tech.h"
 #include "../universe/Special.h"
 #include "../universe/Species.h"
@@ -305,7 +305,7 @@ std::shared_ptr<GG::Texture> ClientUI::PartIcon(const std::string& part_name) {
 }
 
 std::shared_ptr<GG::Texture> ClientUI::HullTexture(const std::string& hull_name) {
-    const HullType* hull = GetHullType(hull_name);
+    const ShipHull* hull = GetShipHull(hull_name);
     std::string texture_name;
     if (hull) {
         texture_name = hull->Graphic();
@@ -318,7 +318,7 @@ std::shared_ptr<GG::Texture> ClientUI::HullTexture(const std::string& hull_name)
 }
 
 std::shared_ptr<GG::Texture> ClientUI::HullIcon(const std::string& hull_name) {
-    const HullType* hull = GetHullType(hull_name);
+    const ShipHull* hull = GetShipHull(hull_name);
     std::string texture_name;
     if (hull) {
         texture_name = hull->Icon();
@@ -593,7 +593,7 @@ namespace {
                                   PredicateType pred)
     {
         GetOptionsDB().OptionChangedSignal(option_name).connect(
-            boost::bind(&ConditionalForward<OptionType, PredicateType>,
+            std::bind(&ConditionalForward<OptionType, PredicateType>,
                         option_name, slot, ref_val, pred));
     }
 }
@@ -615,15 +615,15 @@ ClientUI::ClientUI() :
     InitializeWindows();
 
     GetOptionsDB().OptionChangedSignal("video.fullscreen.width").connect(
-        boost::bind(&ClientUI::HandleSizeChange, this, true));
+        std::bind(&ClientUI::HandleSizeChange, this, true));
     GetOptionsDB().OptionChangedSignal("video.fullscreen.height").connect(
-        boost::bind(&ClientUI::HandleSizeChange, this, true));
+        std::bind(&ClientUI::HandleSizeChange, this, true));
     GetOptionsDB().OptionChangedSignal("video.windowed.width").connect(
-        boost::bind(&ClientUI::HandleSizeChange, this, false));
+        std::bind(&ClientUI::HandleSizeChange, this, false));
     GetOptionsDB().OptionChangedSignal("video.windowed.height").connect(
-        boost::bind(&ClientUI::HandleSizeChange, this, false));
+        std::bind(&ClientUI::HandleSizeChange, this, false));
     HumanClientApp::GetApp()->RepositionWindowsSignal.connect(
-        boost::bind(&ClientUI::InitializeWindows, this));
+        std::bind(&ClientUI::InitializeWindows, this));
     HumanClientApp::GetApp()->RepositionWindowsSignal.connect(
         &CUIWnd::InvalidateUnusedOptions,
         boost::signals2::at_front);
@@ -631,7 +631,7 @@ ClientUI::ClientUI() :
     // Connected at front to make sure CUIWnd::LoadOptions() doesn't overwrite
     // the values we're checking here...
     HumanClientApp::GetApp()->FullscreenSwitchSignal.connect(
-        boost::bind(&ClientUI::HandleFullscreenSwitch, this),
+        std::bind(&ClientUI::HandleFullscreenSwitch, this),
         boost::signals2::at_front);
 
     ConditionalConnectOption("ui.reposition.auto.enabled",
@@ -878,7 +878,7 @@ bool ClientUI::ZoomToContent(const std::string& name, bool reverse_lookup/* = fa
             if (boost::iequals(name, UserString(special_name)))
                 return ZoomToSpecial(special_name);
 
-        for (const auto& entry : GetHullTypeManager())
+        for (const auto& entry : GetShipHullManager())
             if (boost::iequals(name, UserString(entry.first)))
                 return ZoomToShipHull(entry.first);
 
@@ -925,9 +925,9 @@ bool ClientUI::ZoomToSpecial(const std::string& special_name) {
 }
 
 bool ClientUI::ZoomToShipHull(const std::string& hull_name) {
-    if (!GetHullType(hull_name))
+    if (!GetShipHull(hull_name))
         return false;
-    GetMapWnd()->ShowHullType(hull_name);
+    GetMapWnd()->ShowShipHull(hull_name);
     return true;
 }
 

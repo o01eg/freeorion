@@ -977,14 +977,15 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
     m_planet_name->Resize(m_planet_name->MinUsableSize());
     AttachChild(m_planet_name);
 
+    using std::placeholders::_1;
 
     // focus-selection droplist
     m_focus_drop = GG::Wnd::Create<CUIDropDownList>(6);
     AttachChild(m_focus_drop);
     m_focus_drop->SelChangedSignal.connect(
-        boost::bind(&SidePanel::PlanetPanel::FocusDropListSelectionChangedSlot, this, _1));
+        std::bind(&SidePanel::PlanetPanel::FocusDropListSelectionChangedSlot, this, _1));
     this->FocusChangedSignal.connect(
-        boost::bind(&SidePanel::PlanetPanel::SetFocus, this, _1));
+        std::bind(&SidePanel::PlanetPanel::SetFocus, this, _1));
     m_focus_drop->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
     m_focus_drop->SetStyle(GG::LIST_NOSORT | GG::LIST_SINGLESEL);
     m_focus_drop->ManuallyManageColProps();
@@ -999,22 +1000,22 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
     m_population_panel = GG::Wnd::Create<PopulationPanel>(panel_width, m_planet_id);
     AttachChild(m_population_panel);
     m_population_panel->ExpandCollapseSignal.connect(
-        boost::bind(&SidePanel::PlanetPanel::RequirePreRender, this));
+        std::bind(&SidePanel::PlanetPanel::RequirePreRender, this));
 
     m_resource_panel = GG::Wnd::Create<ResourcePanel>(panel_width, m_planet_id);
     AttachChild(m_resource_panel);
     m_resource_panel->ExpandCollapseSignal.connect(
-        boost::bind(&SidePanel::PlanetPanel::RequirePreRender, this));
+        std::bind(&SidePanel::PlanetPanel::RequirePreRender, this));
 
     m_military_panel = GG::Wnd::Create<MilitaryPanel>(panel_width, m_planet_id);
     AttachChild(m_military_panel);
     m_military_panel->ExpandCollapseSignal.connect(
-        boost::bind(&SidePanel::PlanetPanel::RequirePreRender, this));
+        std::bind(&SidePanel::PlanetPanel::RequirePreRender, this));
 
     m_buildings_panel = GG::Wnd::Create<BuildingsPanel>(panel_width, 4, m_planet_id);
     AttachChild(m_buildings_panel);
     m_buildings_panel->ExpandCollapseSignal.connect(
-        boost::bind(&SidePanel::PlanetPanel::RequirePreRender, this));
+        std::bind(&SidePanel::PlanetPanel::RequirePreRender, this));
     m_buildings_panel->BuildingRightClickedSignal.connect(
         BuildingRightClickedSignal);
 
@@ -1028,15 +1029,15 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
 
     m_colonize_button = Wnd::Create<CUIButton>(UserString("PL_COLONIZE"));
     m_colonize_button->LeftClickedSignal.connect(
-        boost::bind(&SidePanel::PlanetPanel::ClickColonize, this));
+        std::bind(&SidePanel::PlanetPanel::ClickColonize, this));
 
     m_invade_button   = Wnd::Create<CUIButton>(UserString("PL_INVADE"));
     m_invade_button->LeftClickedSignal.connect(
-        boost::bind(&SidePanel::PlanetPanel::ClickInvade, this));
+        std::bind(&SidePanel::PlanetPanel::ClickInvade, this));
 
     m_bombard_button  = Wnd::Create<CUIButton>(UserString("PL_BOMBARD"));
     m_bombard_button->LeftClickedSignal.connect(
-        boost::bind(&SidePanel::PlanetPanel::ClickBombard, this));
+        std::bind(&SidePanel::PlanetPanel::ClickBombard, this));
 
     SetChildClippingMode(ClipToWindow);
 
@@ -1333,7 +1334,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
     if (!system)
         return INVALID_OBJECT_ID;
     // is planet a valid colonization target?
-    if (target_planet->InitialMeterValue(METER_POPULATION) > 0.0 ||
+    if (target_planet->GetMeter(METER_POPULATION)->Initial() > 0.0f ||
         (!target_planet->Unowned() && !target_planet->OwnedBy(empire_id)))
     { return INVALID_OBJECT_ID; }
 
@@ -1405,7 +1406,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
 
                         // temporary meter update with currently set species
                         GetUniverse().UpdateMeterEstimates(target_planet_id);
-                        planet_capacity = target_planet->CurrentMeterValue(METER_TARGET_POPULATION);    // want value after meter update, so check current, not initial value
+                        planet_capacity = target_planet->GetMeter(METER_TARGET_POPULATION)->Current();  // want value after meter update, so check current, not initial value
                     }
                     species_colony_projections[spec_pair] = planet_capacity;
                 }
@@ -1451,7 +1452,7 @@ std::set<std::shared_ptr<const Ship>> AutomaticallyChosenInvasionShips(int targe
 
 
     // get "just enough" ships that can invade and that are free to do so
-    double defending_troops = target_planet->InitialMeterValue(METER_TROOPS);
+    double defending_troops = target_planet->GetMeter(METER_TROOPS)->Initial();
 
     double invasion_troops = 0;
     for (auto& ship : Objects().all<Ship>()) {
@@ -1622,13 +1623,13 @@ void SidePanel::PlanetPanel::Refresh() {
     // calculate truth tables for planet colonization and invasion
     bool has_owner =        !planet->Unowned();
     bool mine =             planet->OwnedBy(client_empire_id);
-    bool populated =        planet->InitialMeterValue(METER_POPULATION) > 0.0f;
+    bool populated =        planet->GetMeter(METER_POPULATION)->Initial() > 0.0f;
     bool habitable =        planet_env_for_colony_species >= PE_HOSTILE && planet_env_for_colony_species <= PE_GOOD;
     bool visible =          GetUniverse().GetObjectVisibilityByEmpire(m_planet_id, client_empire_id) >= VIS_PARTIAL_VISIBILITY;
-    bool shielded =         planet->InitialMeterValue(METER_SHIELD) > 0.0f;
-    bool has_defenses =     planet->InitialMeterValue(METER_MAX_SHIELD) > 0.0f ||
-                            planet->InitialMeterValue(METER_MAX_DEFENSE) > 0.0f ||
-                            planet->InitialMeterValue(METER_MAX_TROOPS) > 0.0f;
+    bool shielded =         planet->GetMeter(METER_SHIELD)->Initial() > 0.0f;
+    bool has_defenses =     planet->GetMeter(METER_MAX_SHIELD)->Initial() > 0.0f ||
+                            planet->GetMeter(METER_MAX_DEFENSE)->Initial() > 0.0f ||
+                            planet->GetMeter(METER_MAX_TROOPS)->Initial() > 0.0f;
     bool being_colonized =  planet->IsAboutToBeColonized();
     bool outpostable =                   !populated && (  !has_owner /*&& !shielded*/         ) && visible && !being_colonized;
     bool colonizable =      habitable && !populated && ( (!has_owner /*&& !shielded*/) || mine) && visible && !being_colonized;
@@ -1725,7 +1726,7 @@ void SidePanel::PlanetPanel::Refresh() {
 
             // temporary meter updates for curently set species
             GetUniverse().UpdateMeterEstimates(m_planet_id);
-            planet_capacity = ((planet_env_for_colony_species == PE_UNINHABITABLE) ? 0 : planet->CurrentMeterValue(METER_TARGET_POPULATION));   // want target pop after meter update, so check current value of meter
+            planet_capacity = ((planet_env_for_colony_species == PE_UNINHABITABLE) ? 0.0 : planet->GetMeter(METER_TARGET_POPULATION)->Current());   // want target pop after meter update, so check current value of meter
             planet->SetOwner(orig_owner);
             planet->SetSpecies(orig_species);
             planet->GetMeter(METER_TARGET_POPULATION)->Set(orig_initial_target_pop, orig_initial_target_pop);
@@ -1774,7 +1775,7 @@ void SidePanel::PlanetPanel::Refresh() {
         // rounding up, as it's better to slightly overestimate defending troops than
         // underestimate, since one needs to drop more droops than there are defenders
         // to capture a planet
-        float defending_troops = planet->InitialMeterValue(METER_TROOPS);
+        float defending_troops = planet->GetMeter(METER_TROOPS)->Initial();
         float log10_df = floor(std::log10(defending_troops));
         float rounding_adjustment = std::pow(10.0f, log10_df - 2.0f);
         defending_troops += rounding_adjustment;
@@ -1927,7 +1928,7 @@ void SidePanel::PlanetPanel::Refresh() {
         Visibility visibility = GetUniverse().GetObjectVisibilityByEmpire(m_planet_id, client_empire_id);
         auto visibility_turn_map = GetUniverse().GetObjectVisibilityTurnMapByEmpire(m_planet_id, client_empire_id);
         float client_empire_detection_strength = client_empire->GetMeter("METER_DETECTION_STRENGTH")->Current();
-        float apparent_stealth = planet->InitialMeterValue(METER_STEALTH);
+        float apparent_stealth = planet->GetMeter(METER_STEALTH)->Initial();
 
         std::string visibility_info;
         std::string detection_info;
@@ -1995,7 +1996,7 @@ void SidePanel::PlanetPanel::Refresh() {
     // which should be connected to SidePanel::PlanetPanel::DoLayout
 
     m_planet_connection = planet->StateChangedSignal.connect(
-        boost::bind(&SidePanel::PlanetPanel::Refresh, this), boost::signals2::at_front);
+        std::bind(&SidePanel::PlanetPanel::Refresh, this), boost::signals2::at_front);
 }
 
 void SidePanel::PlanetPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
@@ -2322,7 +2323,7 @@ void SidePanel::PlanetPanel::ClickColonize() {
     // been ordered
 
     auto planet = Objects().get<Planet>(m_planet_id);
-    if (!planet || planet->InitialMeterValue(METER_POPULATION) != 0.0 || !m_order_issuing_enabled)
+    if (!planet || planet->GetMeter(METER_POPULATION)->Initial() != 0.0 || !m_order_issuing_enabled)
         return;
 
     int empire_id = HumanClientApp::GetApp()->EmpireID();
@@ -2366,7 +2367,7 @@ void SidePanel::PlanetPanel::ClickInvade() {
     auto planet = Objects().get<Planet>(m_planet_id);
     if (!planet ||
         !m_order_issuing_enabled ||
-        (planet->InitialMeterValue(METER_POPULATION) <= 0.0 && planet->Unowned()))
+        (planet->GetMeter(METER_POPULATION)->Initial() <= 0.0 && planet->Unowned()))
     { return; }
 
     int empire_id = HumanClientApp::GetApp()->EmpireID();
@@ -2411,7 +2412,7 @@ void SidePanel::PlanetPanel::ClickBombard() {
     auto planet = Objects().get<Planet>(m_planet_id);
     if (!planet ||
         !m_order_issuing_enabled ||
-        (planet->InitialMeterValue(METER_POPULATION) <= 0.0 && planet->Unowned()))
+        (planet->GetMeter(METER_POPULATION)->Initial() <= 0.0 && planet->Unowned()))
     { return; }
 
     int empire_id = HumanClientApp::GetApp()->EmpireID();
@@ -2505,8 +2506,11 @@ SidePanel::PlanetPanelContainer::PlanetPanelContainer() :
 {
     SetName("PlanetPanelContainer");
     SetChildClippingMode(ClipToClient);
+
+    namespace ph = std::placeholders;
+
     m_vscroll->ScrolledSignal.connect(
-        boost::bind(&SidePanel::PlanetPanelContainer::VScroll, this, _1, _2, _3, _4));
+        std::bind(&SidePanel::PlanetPanelContainer::VScroll, this, ph::_1, ph::_2, ph::_3, ph::_4));
     RequirePreRender();
 }
 
@@ -2604,7 +2608,7 @@ void SidePanel::PlanetPanelContainer::SetPlanets(const std::vector<int>& planet_
         m_planet_panels.back()->BuildingRightClickedSignal.connect(
             BuildingRightClickedSignal);
         m_planet_panels.back()->ResizedSignal.connect(
-            boost::bind(&SidePanel::PlanetPanelContainer::RequirePreRender, this));
+            std::bind(&SidePanel::PlanetPanelContainer::RequirePreRender, this));
         m_planet_panels.back()->OrderButtonChangedSignal.connect(
             [this](int excluded_planet_id) {
                 RefreshAllPlanetPanels(excluded_planet_id, true);
@@ -2889,7 +2893,7 @@ namespace {
                 label->Resize(GG::Pt(LabelWidth(), row_height));
                 AttachChild(label);
 
-                const auto meter_value = planet->InitialMeterValue(m_meter_type);
+                const auto meter_value = planet->GetMeter(m_meter_type)->Initial();
                 if (m_meter_type == METER_SUPPLY) {
                     total_meter_value = std::max(total_meter_value, meter_value);
                 } else {
@@ -2980,18 +2984,20 @@ void SidePanel::CompleteConstruction() {
     m_system_resource_summary = GG::Wnd::Create<MultiIconValueIndicator>(Width() - EDGE_PAD*2);
     AttachChild(m_system_resource_summary);
 
+    using std::placeholders::_1;
+
     m_system_name->DropDownOpenedSignal.connect(
-        boost::bind(&SidePanel::SystemNameDropListOpenedSlot, this, _1));
+        std::bind(&SidePanel::SystemNameDropListOpenedSlot, this, _1));
     m_system_name->SelChangedSignal.connect(
-        boost::bind(&SidePanel::SystemSelectionChangedSlot, this, _1));
+        std::bind(&SidePanel::SystemSelectionChangedSlot, this, _1));
     m_system_name->SelChangedWhileDroppedSignal.connect(
-        boost::bind(&SidePanel::SystemSelectionChangedSlot, this, _1));
+        std::bind(&SidePanel::SystemSelectionChangedSlot, this, _1));
     m_button_prev->LeftClickedSignal.connect(
-        boost::bind(&SidePanel::PrevButtonClicked, this));
+        std::bind(&SidePanel::PrevButtonClicked, this));
     m_button_next->LeftClickedSignal.connect(
-        boost::bind(&SidePanel::NextButtonClicked, this));
+        std::bind(&SidePanel::NextButtonClicked, this));
     m_planet_panel_container->PlanetClickedSignal.connect(
-        boost::bind(&SidePanel::PlanetClickedSlot, this, _1));
+        std::bind(&SidePanel::PlanetClickedSlot, this, _1));
     m_planet_panel_container->PlanetLeftDoubleClickedSignal.connect(
         PlanetDoubleClickedSignal);
     m_planet_panel_container->PlanetRightClickedSignal.connect(

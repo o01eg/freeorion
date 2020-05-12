@@ -78,9 +78,9 @@ ServerApp::ServerApp() :
     IApp(),
     m_signals(m_io_context, SIGINT, SIGTERM),
     m_networking(m_io_context,
-                 boost::bind(&ServerApp::HandleNonPlayerMessage, this, _1, _2),
-                 boost::bind(&ServerApp::HandleMessage, this, _1, _2),
-                 boost::bind(&ServerApp::PlayerDisconnected, this, _1)),
+                 std::bind(&ServerApp::HandleNonPlayerMessage, this, std::placeholders::_1, std::placeholders::_2),
+                 std::bind(&ServerApp::HandleMessage, this, std::placeholders::_1, std::placeholders::_2),
+                 std::bind(&ServerApp::PlayerDisconnected, this, std::placeholders::_1)),
     m_fsm(new ServerFSM(*this)),
     m_chat_history(500)
 {
@@ -118,12 +118,14 @@ ServerApp::ServerApp() :
 
     m_fsm->initiate();
 
-    Empires().DiplomaticStatusChangedSignal.connect(
-        boost::bind(&ServerApp::HandleDiplomaticStatusChange, this, _1, _2));
-    Empires().DiplomaticMessageChangedSignal.connect(
-        boost::bind(&ServerApp::HandleDiplomaticMessageChange,this, _1, _2));
+    namespace ph = std::placeholders;
 
-    m_signals.async_wait(boost::bind(&ServerApp::SignalHandler, this, _1, _2));
+    Empires().DiplomaticStatusChangedSignal.connect(
+        std::bind(&ServerApp::HandleDiplomaticStatusChange, this, ph::_1, ph::_2));
+    Empires().DiplomaticMessageChangedSignal.connect(
+        std::bind(&ServerApp::HandleDiplomaticMessageChange,this, ph::_1, ph::_2));
+
+    m_signals.async_wait(std::bind(&ServerApp::SignalHandler, this, ph::_1, ph::_2));
 }
 
 ServerApp::~ServerApp() {
@@ -2178,7 +2180,7 @@ namespace {
         for (auto& planet : Objects().find<const Planet>(system->PlanetIDs())) {
             if (!planet->Unowned())
                 empire_planets[planet->Owner()].insert(planet->ID());
-            else if (planet->InitialMeterValue(METER_POPULATION) > 0.0f)
+            else if (planet->GetMeter(METER_POPULATION)->Initial() > 0.0f)
                 empire_planets[ALL_EMPIRES].insert(planet->ID());
         }
     }
@@ -2221,8 +2223,8 @@ namespace {
         for (const auto& ship : Objects().find<Ship>(system->ShipIDs())) {
             if (!ship || !ship->Unowned())  // only want unowned / monster ships
                 continue;
-            if (ship->InitialMeterValue(METER_DETECTION) > monster_detection_strength_here)
-                monster_detection_strength_here = ship->InitialMeterValue(METER_DETECTION);
+            if (ship->GetMeter(METER_DETECTION)->Initial() > monster_detection_strength_here)
+                monster_detection_strength_here = ship->GetMeter(METER_DETECTION)->Initial();
         }
 
         // test each ship in each fleet for visibility by best monster detection here
@@ -2238,7 +2240,7 @@ namespace {
                 if (!ship)
                     continue;
                 // if a ship is low enough stealth, its fleet can be seen by monsters
-                if (monster_detection_strength_here >= ship->InitialMeterValue(METER_STEALTH)) {
+                if (monster_detection_strength_here >= ship->GetMeter(METER_STEALTH)->Initial()) {
                     visible_fleets.insert(fleet->ID());
                     break;  // fleet is seen, so don't need to check any more ships in it
                 }
@@ -2270,7 +2272,7 @@ namespace {
                     continue;
                 // skip planets that have no owner and that are unpopulated; don't matter for combat conditions test
                 auto planet = Objects().get<Planet>(planet_id);
-                if (planet->Unowned() && planet->InitialMeterValue(METER_POPULATION) <= 0.0f)
+                if (planet->Unowned() && planet->GetMeter(METER_POPULATION)->Initial() <= 0.0f)
                     continue;
                 visible_planets.insert(planet->ID());
             }
@@ -2286,8 +2288,8 @@ namespace {
         for (auto& ship : Objects().find<const Ship>(system->ShipIDs())) {
             if (!ship->Unowned())  // only want unowned / monster ships
                 continue;
-            if (ship->InitialMeterValue(METER_DETECTION) > monster_detection_strength_here)
-                monster_detection_strength_here = ship->InitialMeterValue(METER_DETECTION);
+            if (ship->GetMeter(METER_DETECTION)->Initial() > monster_detection_strength_here)
+                monster_detection_strength_here = ship->GetMeter(METER_DETECTION)->Initial();
         }
 
         // test each planet for visibility by best monster detection here
@@ -2295,7 +2297,7 @@ namespace {
             if (planet->Unowned())
                 continue;       // only want empire-owned planets; unowned planets visible to monsters don't matter for combat conditions test
             // if a planet is low enough stealth, it can be seen by monsters
-            if (monster_detection_strength_here >= planet->InitialMeterValue(METER_STEALTH))
+            if (monster_detection_strength_here >= planet->GetMeter(METER_STEALTH)->Initial())
                 visible_planets.insert(planet->ID());
         }
     }
@@ -2649,58 +2651,20 @@ namespace {
                 auto target_ship = Objects().get<Ship>(attack_event->target_id);
                 if (!target_ship)
                     continue;
-                int target_empire_id = target_ship->Owner();
-                int target_design_id = target_ship->DesignID();
-                const std::string& target_species_name = target_ship->SpeciesName();
-                Empire* target_empire = GetEmpire(target_empire_id);
+                Empire* target_empire = GetEmpire(target_ship->Owner());
 
                 DebugLogger() << "Attacker " << attacker->Name() << " (id: " << attacker->ID() << "  empire: " << attacker_empire_id << ")  attacks "
                               << target_ship->Name() << " (id: " << target_ship->ID() << "  empire: "
-                              << (target_empire ? std::to_string(target_empire->EmpireID()) : "(unowned)") << "  species: " << target_species_name << ")";
+                              << (target_empire ? std::to_string(target_empire->EmpireID()) : "(unowned)") << "  species: " << target_ship->SpeciesName() << ")";
 
-                std::map<int, int>::iterator map_it;
-                std::map<std::string, int>::iterator species_it;
-
-                if (attacker_empire) {
-                    // record destruction of an empire's ship by attacker empire
-                    map_it = attacker_empire->EmpireShipsDestroyed().find(target_empire_id);
-                    if (map_it == attacker_empire->EmpireShipsDestroyed().end())
-                        attacker_empire->EmpireShipsDestroyed()[target_empire_id] = 1;
-                    else
-                        map_it->second++;
-
-                    // record destruction of a design by attacker empire
-                    map_it = attacker_empire->ShipDesignsDestroyed().find(target_design_id);
-                    if (map_it == attacker_empire->ShipDesignsDestroyed().end())
-                        attacker_empire->ShipDesignsDestroyed()[target_design_id] = 1;
-                    else
-                        map_it->second++;
-
-                    // record destruction of ship with a species on it by attacker empire
-                    species_it = attacker_empire->SpeciesShipsDestroyed().find(target_species_name);
-                    if (species_it == attacker_empire->SpeciesShipsDestroyed().end())
-                        attacker_empire->SpeciesShipsDestroyed()[target_species_name] = 1;
-                    else
-                        species_it->second++;
-                }
+                if (attacker_empire)
+                    attacker_empire->RecordShipShotDown(*target_ship);
 
                 if (target_empire) {
                     if (already_logged__target_ships.count(attack_event->target_id))
                         continue;
                     already_logged__target_ships.insert(attack_event->target_id);
-                    // record destruction of a ship with a species on it owned by defender empire
-                    species_it = target_empire->SpeciesShipsLost().find(target_species_name);
-                    if (species_it == target_empire->SpeciesShipsLost().end())
-                        target_empire->SpeciesShipsLost()[target_species_name] = 1;
-                    else
-                        species_it->second++;
-
-                    // record destruction of with a design owned by defender empire
-                    map_it = target_empire->ShipDesignsLost().find(target_design_id);
-                    if (map_it == target_empire->ShipDesignsLost().end())
-                        target_empire->ShipDesignsLost()[target_design_id] = 1;
-                    else
-                        map_it->second++;
+                    target_empire->RecordShipLost(*target_ship);
                 }
             }
         }
@@ -2713,20 +2677,14 @@ namespace {
             auto planet = Objects().get<Planet>(planet_id);
             if (!planet)
                 continue;
-            const auto& planet_species = planet->SpeciesName();
-            if (planet_species.empty())
+            if (planet->SpeciesName().empty())
                 continue;
 
             for (const auto& empire_troops : planet_empire_troops.second) {
                 Empire* invader_empire = GetEmpire(empire_troops.first);
                 if (!invader_empire)
                     continue;
-
-                auto species_it = invader_empire->SpeciesPlanetsInvaded().find(planet_species);
-                if (species_it == invader_empire->SpeciesPlanetsInvaded().end())
-                    invader_empire->SpeciesPlanetsInvaded()[planet_species] = 1;
-                else
-                    species_it->second++;
+                invader_empire->RecordPlanetInvaded(*planet);
             }
         }
     }
@@ -2994,13 +2952,13 @@ namespace {
                 ErrorLogger() << "HandleInvasion couldn't get planet";
                 continue;
             }
-            if (planet->InitialMeterValue(METER_TROOPS) > 0.0f) {
+            if (planet->GetMeter(METER_TROOPS)->Initial() > 0.0f) {
                 // empires may have garrisons on planets
-                planet_empire_troops[planet->ID()][planet->Owner()] += planet->InitialMeterValue(METER_TROOPS) + 0.0001;    // small bonus to ensure ties are won by initial owner
+                planet_empire_troops[planet->ID()][planet->Owner()] += planet->GetMeter(METER_TROOPS)->Initial() + 0.0001;    // small bonus to ensure ties are won by initial owner
             }
-            if (!planet->Unowned() && planet->InitialMeterValue(METER_REBEL_TROOPS) > 0.0f) {
+            if (!planet->Unowned() && planet->GetMeter(METER_REBEL_TROOPS)->Initial() > 0.0f) {
                 // rebels may be present on empire-owned planets
-                planet_empire_troops[planet->ID()][ALL_EMPIRES] += planet->InitialMeterValue(METER_REBEL_TROOPS);
+                planet_empire_troops[planet->ID()][ALL_EMPIRES] += planet->GetMeter(METER_REBEL_TROOPS)->Initial();
             }
         }
 
@@ -3228,19 +3186,8 @@ namespace {
 
             // record scrapping in empire stats
             Empire* scrapping_empire = GetEmpire(ship->Owner());
-            if (scrapping_empire) {
-                auto& designs_scrapped = scrapping_empire->ShipDesignsScrapped();
-                if (designs_scrapped.count(ship->DesignID()))
-                    designs_scrapped[ship->DesignID()]++;
-                else
-                    designs_scrapped[ship->DesignID()] = 1;
-
-                auto& species_ships_scrapped = scrapping_empire->SpeciesShipsScrapped();
-                if (species_ships_scrapped.count(ship->SpeciesName()))
-                    species_ships_scrapped[ship->SpeciesName()]++;
-                else
-                    species_ships_scrapped[ship->SpeciesName()] = 1;
-            }
+            if (scrapping_empire)
+                scrapping_empire->RecordShipScrapped(*ship);
 
             //scrapped_object_ids.push_back(ship->ID());
             GetUniverse().Destroy(ship->ID());
@@ -3262,13 +3209,8 @@ namespace {
 
             // record scrapping in empire stats
             Empire* scrapping_empire = GetEmpire(building->Owner());
-            if (scrapping_empire) {
-                auto& buildings_scrapped = scrapping_empire->BuildingTypesScrapped();
-                if (buildings_scrapped.count(building->BuildingTypeName()))
-                    buildings_scrapped[building->BuildingTypeName()]++;
-                else
-                    buildings_scrapped[building->BuildingTypeName()] = 1;
-            }
+            if (scrapping_empire)
+                scrapping_empire->RecordBuildingScrapped(*building);
 
             //scrapped_object_ids.push_back(building->ID());
             GetUniverse().Destroy(building->ID());

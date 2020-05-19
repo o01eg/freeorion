@@ -545,6 +545,8 @@ def setup_empire(empire, empire_name, home_system, starting_species, player_name
                              % (ship_design, fleet_plan.name()))
 
     return True
+
+
 def home_system_layout(home_systems, systems):
     """
     Home systems layout generation to place teams.

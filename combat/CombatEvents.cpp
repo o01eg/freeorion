@@ -21,9 +21,8 @@ namespace {
     // would be better in CombatSystem, but that is server-only, and rules need
     // to exist on client and server.
     void AddRules(GameRules& rules) {
-        // makes all buildings cost 1 PP and take 1 turn to produce
         rules.Add<int>("RULE_NUM_COMBAT_ROUNDS", "RULE_NUM_COMBAT_ROUNDS_DESC",
-                       "", 3, true, RangedValidator<int>(1, 20));
+                       "", 3, true, RangedValidator<int>(2, 20));
         rules.Add<bool>("RULE_AGGRESSIVE_SHIPS_COMBAT_VISIBLE", "RULE_AGGRESSIVE_SHIPS_COMBAT_VISIBLE_DESC",
                         "", false, true);
 
@@ -400,10 +399,7 @@ StealthChangeEvent::StealthChangeEvent(int bout_) :
 {}
 
 StealthChangeEvent::StealthChangeEventDetail::StealthChangeEventDetail() :
-    attacker_id(INVALID_OBJECT_ID),
-    target_id(INVALID_OBJECT_ID),
-    attacker_empire_id(INVALID_OBJECT_ID),
-    target_empire_id(INVALID_OBJECT_ID)
+    StealthChangeEventDetail(INVALID_OBJECT_ID, INVALID_OBJECT_ID, ALL_EMPIRES, ALL_EMPIRES, VIS_NO_VISIBILITY)
 {}
 
 StealthChangeEvent::StealthChangeEventDetail::StealthChangeEventDetail(

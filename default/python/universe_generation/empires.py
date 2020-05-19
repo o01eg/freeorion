@@ -5,10 +5,11 @@ import freeorion as fo
 import universe_statistics
 from names import get_name_list, random_name
 from options import (HS_ACCEPTABLE_PLANET_SIZES, HS_ACCEPTABLE_PLANET_TYPES, HS_MAX_JUMP_DISTANCE_LIMIT,
-                     HS_MIN_DISTANCE_PRIORITY_LIMIT, HS_MIN_VICINITY_RANGE, HS_MAX_VICINITY_RANGE)
+                     HS_MIN_DISTANCE_PRIORITY_LIMIT, HS_MIN_PLANETS_IN_VICINITY_PER_SYSTEM,
+                     HS_MIN_PLANETS_IN_VICINITY_TOTAL, HS_MIN_SYSTEMS_IN_VICINITY, HS_VICINITY_RANGE)
 from planets import calc_planet_size, calc_planet_type, planet_sizes_real, planet_types_real
 from starsystems import pick_star_type, star_types_real
-from util import report_error
+from util import report_error, unique_product
 
 
 def get_empire_name_generator():
@@ -67,36 +68,26 @@ def count_planets_in_systems(systems, planet_types_filter=HS_ACCEPTABLE_PLANET_T
     return num_planets
 
 
-def vicinity_range(systems_per_empire):
-    """
-    Calculates the vicinity range (jumps away from home world) for the specified number of systems per empire.
-    This limit is the square root of systems_per_empire with a minimum value of HS_MIN_VICINITY_RANGE and
-    a maximum value of HS_MAX_VICINITY_RANGE.
-    """
-    return min(HS_MAX_VICINITY_RANGE, max(HS_MIN_VICINITY_RANGE, int(systems_per_empire**0.5)))
+def calculate_home_system_merit(system):
+    """Calculate the system's merit as the number of planets within HS_VICINTIY_RANGE."""
+    return count_planets_in_systems(fo.systems_within_jumps_unordered(HS_VICINITY_RANGE, [system]))
 
 
-def calculate_home_system_merit(system, systems_per_empire):
-    """Calculate the system's merit as the number of planets within its vicinity range."""
-    return count_planets_in_systems(fo.systems_within_jumps_unordered(vicinity_range(systems_per_empire), [system]))
-
-
-def min_planets_in_vicinity_limit(num_systems, planet_density):
+def min_planets_in_vicinity_limit(num_systems):
     """
-    Calculates the minimum planet limit for the specified number of systems and planet density.
-    This limit is the number of systems multiplied by 1, 1.5 or 2 depending on planet density.
+    Calculates the minimum planet limit for the specified number of systems.
+    This limit is the lower of HS_MIN_PLANETS_IN_VICINITY_TOTAL or HS_MIN_PLANETS_IN_VICINITY_PER_SYSTEM
+    planets per system.
     """
-    return int(num_systems * planet_density / 2.0)
+    return min(HS_MIN_PLANETS_IN_VICINITY_TOTAL, num_systems * HS_MIN_PLANETS_IN_VICINITY_PER_SYSTEM)
 
 
 class HomeSystemFinder:
     """Finds a set of home systems with a least ''num_home_systems'' systems."""
-    def __init__(self, _num_home_systems, _systems_per_empire, _planet_density):
+    def __init__(self, _num_home_systems):
         # cache of sytem merits
         self.system_merit = {}
         self.num_home_systems = _num_home_systems
-        self.systems_per_empire = _systems_per_empire
-        self.planet_density = _planet_density
 
     def find_home_systems_for_min_jump_distance(self, systems_pool, min_jumps):
         """
@@ -117,7 +108,7 @@ class HomeSystemFinder:
         # precalculate the system merits
         for system in systems_pool:
             if system not in self.system_merit:
-                self.system_merit[system] = calculate_home_system_merit(system, self.systems_per_empire)
+                self.system_merit[system] = calculate_home_system_merit(system)
 
         # The list of merits and systems sorted in descending order by merit.
         all_merit_system = sorted([(self.system_merit[s], s)
@@ -193,14 +184,13 @@ class HomeSystemFinder:
 
                 # Quit successfully if the lowest merit system meets the minimum threshold
                 if merit >= min_planets_in_vicinity_limit(
-                        len(fo.systems_within_jumps_unordered(vicinity_range(self.systems_per_empire), [system])),
-                        self.planet_density):
+                        len(fo.systems_within_jumps_unordered(HS_VICINITY_RANGE, [system]))):
                     break
 
         return best_candidate
 
 
-def find_home_systems(num_home_systems, pool_list, jump_distance, min_jump_distance, systems_per_empire, planet_density):
+def find_home_systems(num_home_systems, pool_list, jump_distance, min_jump_distance):
     """
     Tries to find a specified number of home systems which are as far apart from each other as possible.
     Starts with the specified jump distance and reduces that limit until enough systems can be found or the
@@ -210,7 +200,7 @@ def find_home_systems(num_home_systems, pool_list, jump_distance, min_jump_dista
     of the pool for logging purposes as second element.
     """
 
-    finder = HomeSystemFinder(num_home_systems, systems_per_empire, planet_density)
+    finder = HomeSystemFinder(num_home_systems)
     # try to find home systems, decrease the min jumps until enough systems can be found, or the jump distance drops
     # below the specified minimum jump distance (which means failure)
     while jump_distance >= min_jump_distance:
@@ -345,16 +335,14 @@ def compile_home_system_list(num_home_systems, systems, gsd):
     #     and with large galaxies an excessive amount of time can be used in failed attempts
     # b.) lower than the minimum jump distance limit that should be considered high priority (see options.py),
     #     otherwise no attempt at all would be made to enforce the other requirements for home systems (see below)
-    systems_per_empire = len(systems)/num_home_systems
-    min_jumps = min(max(int(systems_per_empire**(0.75)), HS_MIN_DISTANCE_PRIORITY_LIMIT), HS_MAX_JUMP_DISTANCE_LIMIT)
+    min_jumps = min(HS_MAX_JUMP_DISTANCE_LIMIT, max(int(len(systems) / (num_home_systems * 2)),
+                                                    HS_MIN_DISTANCE_PRIORITY_LIMIT))
 
     # home systems must have a certain minimum of systems and planets in their near vicinity
     # we will try to select our home systems from systems that match this criteria, if that fails, we will select our
     # home systems from all systems and add the missing number planets to the systems in their vicinity afterwards
     # the minimum system and planet limit and the jump range that defines the "near vicinity" are controlled by the
     # HS_* option constants in options.py (see there)
-    # Here we adjust those values to the number of systems per empire in this galaxy
-    min_systems_in_vicinity = int(vicinity_range(systems_per_empire)**((4+gsd.starlane_frequency)/3.0))
 
     # we start by building two additional pools of systems: one that contains all systems that match the criteria
     # completely (meets the min systems and planets limit), and one that contains all systems that match the criteria
@@ -362,10 +350,10 @@ def compile_home_system_list(num_home_systems, systems, gsd):
     pool_matching_sys_and_planet_limit = []
     pool_matching_sys_limit = []
     for system in systems:
-        systems_in_vicinity = fo.systems_within_jumps_unordered(vicinity_range(systems_per_empire), [system])
-        if len(systems_in_vicinity) >= min_systems_in_vicinity:
+        systems_in_vicinity = fo.systems_within_jumps_unordered(HS_VICINITY_RANGE, [system])
+        if len(systems_in_vicinity) >= HS_MIN_SYSTEMS_IN_VICINITY:
             pool_matching_sys_limit.append(system)
-            if count_planets_in_systems(systems_in_vicinity) >= min_planets_in_vicinity_limit(len(systems_in_vicinity), gsd.planet_density):
+            if count_planets_in_systems(systems_in_vicinity) >= min_planets_in_vicinity_limit(len(systems_in_vicinity)):
                 pool_matching_sys_and_planet_limit.append(system)
     print(len(pool_matching_sys_and_planet_limit),
           "systems meet the min systems and planets in the near vicinity limit")
@@ -387,7 +375,7 @@ def compile_home_system_list(num_home_systems, systems, gsd):
         # specify 0 as number of requested home systems to pick as much systems as possible
         (pool_matching_sys_limit, "pool of systems that meet at least the min systems limit"),
     ]
-    home_systems = find_home_systems(num_home_systems, pool_list, min_jumps, HS_MIN_DISTANCE_PRIORITY_LIMIT, systems_per_empire, gsd.planet_density)
+    home_systems = find_home_systems(num_home_systems, pool_list, min_jumps, HS_MIN_DISTANCE_PRIORITY_LIMIT)
 
     # check if the first attempt delivered a list with enough home systems
     # if not, we make our second attempt, this time disregarding the filtered pools and using all systems, starting
@@ -395,7 +383,7 @@ def compile_home_system_list(num_home_systems, systems, gsd):
     # systems as possible
     if len(home_systems) < num_home_systems:
         print("Second attempt: trying to pick home systems from all systems")
-        home_systems = find_home_systems(num_home_systems, [(systems, "complete pool")], min_jumps, 1, systems_per_empire, gsd.planet_density)
+        home_systems = find_home_systems(num_home_systems, [(systems, "complete pool")], min_jumps, 1)
 
     # check if the selection process delivered a list with enough home systems
     # if not, our galaxy obviously is too crowded, report an error and return an empty list
@@ -408,7 +396,7 @@ def compile_home_system_list(num_home_systems, systems, gsd):
     if len(home_systems) > num_home_systems:
         # yes: calculate the number of planets in the near vicinity of each system
         # and store that value with each system in a map
-        hs_planets_in_vicinity_map = {s: calculate_home_system_merit(s, systems_per_empire) for s in home_systems}
+        hs_planets_in_vicinity_map = {s: calculate_home_system_merit(s) for s in home_systems}
         # sort the home systems by the number of planets in their near vicinity using the map
         # now only pick the number of home systems we need, taking those with the highest number of planets
         home_systems = sorted(home_systems, key=hs_planets_in_vicinity_map.get, reverse=True)[:num_home_systems]
@@ -440,13 +428,12 @@ def compile_home_system_list(num_home_systems, systems, gsd):
     print("Checking if home systems have the required minimum of planets within the near vicinity...")
     for home_system in home_systems:
         # calculate the number of missing planets, and add them if this number is > 0
-        systems_in_vicinity = fo.systems_within_jumps_unordered(vicinity_range(systems_per_empire), [home_system])
+        systems_in_vicinity = fo.systems_within_jumps_unordered(HS_VICINITY_RANGE, [home_system])
         num_systems_in_vicinity = len(systems_in_vicinity)
         num_planets_in_vicinity = count_planets_in_systems(systems_in_vicinity)
-        num_planets_to_add = min_planets_in_vicinity_limit(num_systems_in_vicinity, gsd.planet_density) - num_planets_in_vicinity
+        num_planets_to_add = min_planets_in_vicinity_limit(num_systems_in_vicinity) - num_planets_in_vicinity
         print("Home system", home_system, "has", num_systems_in_vicinity, "systems and", num_planets_in_vicinity,
-              "planets in the near vicinity, required minimum:",
-              min_planets_in_vicinity_limit(num_systems_in_vicinity, gsd.planet_density))
+              "planets in the near vicinity, required minimum:", min_planets_in_vicinity_limit(num_systems_in_vicinity))
         if num_planets_to_add > 0:
             systems_in_vicinity.remove(home_system)  # don't add planets to the home system, so remove it from the list
             # sort the systems_in_vicinity before adding, since the C++ engine doesn't guarrantee the same
@@ -558,12 +545,10 @@ def setup_empire(empire, empire_name, home_system, starting_species, player_name
                              % (ship_design, fleet_plan.name()))
 
     return True
-
-
 def home_system_layout(home_systems, systems):
     """
     Home systems layout generation to place teams.
-    Returns map from home system to neighbor home systems
+    Returns map from home system to neighbor home systems.
     """
     # for each system found nearest home systems
     # maybe multiple if home worlds placed on the same jump distnace
@@ -575,7 +560,7 @@ def home_system_layout(home_systems, systems):
             dist = fo.jump_distance(system, hs)
             if nearest_dist is None or nearest_dist > dist:
                 nearest_dist = dist
-                nearest_hs = set([hs])
+                nearest_hs = {hs}
             elif nearest_dist == dist:
                 nearest_hs.add(hs)
         system_hs[system] = nearest_hs
@@ -586,27 +571,15 @@ def home_system_layout(home_systems, systems):
     home_system_connections = {}
     for system, connected_home_systems in system_hs.items():
         if len(connected_home_systems) >= 2:
-            for hs1 in connected_home_systems:
-                for hs2 in connected_home_systems:
-                    if hs1 < hs2:
-                        conns = home_system_connections.get(hs1, set())
-                        conns.add(hs2)
-                        home_system_connections[hs1] = conns
-                        conns = home_system_connections.get(hs2, set())
-                        conns.add(hs1)
-                        home_system_connections[hs2] = conns
+            for hs1, hs2 in unique_product(connected_home_systems, connected_home_systems):
+                home_system_connections.setdefault(hs1, set()).add(hs2)
+                home_system_connections.setdefault(hs2, set()).add(hs1)
 
     for system, connected_home_systems in system_hs.items():
         adj_systems = fo.systems_within_jumps_unordered(1, [system])
         for system2 in adj_systems:
             connected_home_systems2 = system_hs.get(system2, set())
-            for hs1 in connected_home_systems:
-                for hs2 in connected_home_systems2:
-                    if hs1 < hs2:
-                        conns = home_system_connections.get(hs1, set())
-                        conns.add(hs2)
-                        home_system_connections[hs1] = conns
-                        conns = home_system_connections.get(hs2, set())
-                        conns.add(hs1)
-                        home_system_connections[hs2] = conns
+            for hs1, hs2 in unique_product(connected_home_systems, connected_home_systems2):
+                home_system_connections.setdefault(hs1, set()).add(hs2)
+                home_system_connections.setdefault(hs2, set()).add(hs1)
     return home_system_connections

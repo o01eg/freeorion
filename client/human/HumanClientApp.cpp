@@ -324,32 +324,16 @@ HumanClientApp::HumanClientApp(int width, int height, bool calculate_fps, const 
 
     namespace ph = std::placeholders;
 
-    WindowResizedSignal.connect(std::bind(&HumanClientApp::HandleWindowResize,this, ph::_1, ph::_2));
-    FocusChangedSignal.connect( std::bind(&HumanClientApp::HandleFocusChange, this, ph::_1));
-    WindowMovedSignal.connect(  std::bind(&HumanClientApp::HandleWindowMove,  this, ph::_1, ph::_2));
-    WindowClosingSignal.connect(std::bind(&HumanClientApp::HandleAppQuitting, this));
-    AppQuittingSignal.connect(  std::bind(&HumanClientApp::HandleAppQuitting, this));
+    WindowResizedSignal.connect(boost::bind(&HumanClientApp::HandleWindowResize,this, _1, _2));
+    FocusChangedSignal.connect( boost::bind(&HumanClientApp::HandleFocusChange, this, _1));
+    WindowMovedSignal.connect(  boost::bind(&HumanClientApp::HandleWindowMove,  this, _1, _2));
+    WindowClosingSignal.connect(boost::bind(&HumanClientApp::HandleAppQuitting, this));
+    AppQuittingSignal.connect(  boost::bind(&HumanClientApp::HandleAppQuitting, this));
 
     SetStringtableDependentOptionDefaults();
     SetGLVersionDependentOptionDefaults();
 
     this->SetMouseLRSwapped(GetOptionsDB().Get<bool>("ui.input.mouse.button.swap.enabled"));
-
-    auto named_key_maps = parse::keymaps(GetResourceDir() / "scripting/keymaps.inf");
-    TraceLogger() << "Keymaps:";
-    for (auto& km : named_key_maps) {
-        TraceLogger() << "Keymap name = \"" << km.first << "\"";
-        for (auto& keys : km.second)
-            TraceLogger() << "    " << char(keys.first) << " : " << char(keys.second);
-    }
-    auto km_it = named_key_maps.find("TEST");
-    if (km_it != named_key_maps.end()) {
-        const auto int_key_map = km_it->second;
-        std::map<GG::Key, GG::Key> key_map;
-        for (const auto& int_key : int_key_map)
-        { key_map[GG::Key(int_key.first)] = GG::Key(int_key.second); }
-        this->SetKeyMap(key_map);
-    }
 
     ConnectKeyboardAcceleratorSignals();
 
@@ -1438,7 +1422,15 @@ void HumanClientApp::ExitSDL(int exit_code)
 { SDLGUI::ExitApp(exit_code); }
 
 void HumanClientApp::ResetOrExitApp(bool reset, bool skip_savegame, int exit_code /* = 0*/) {
-    if (m_exit_handled) return;
+    if (m_exit_handled) {
+        static int repeat_count = 0;
+        if (repeat_count++ > 2) {
+            m_exit_handled = false;
+            skip_savegame = true;
+        } else {
+            return;
+        }
+    }
     m_exit_handled = true;
     DebugLogger() << (reset ? "HumanClientApp::ResetToIntro" : "HumanClientApp::ExitApp");
 

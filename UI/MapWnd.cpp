@@ -979,7 +979,7 @@ void MapWnd::CompleteConstruction() {
     using std::placeholders::_2;
 
     GetUniverse().UniverseObjectDeleteSignal.connect(
-        std::bind(&MapWnd::UniverseObjectDeleted, this, _1));
+        boost::bind(&MapWnd::UniverseObjectDeleted, this, boost::placeholders::_1));
 
     // toolbar
     m_toolbar = GG::Wnd::Create<CUIToolBar>();
@@ -1020,7 +1020,7 @@ void MapWnd::CompleteConstruction() {
         GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "manual_turn_mouseover.png")));
 
     m_btn_auto_turn->LeftClickedSignal.connect(
-        std::bind(&MapWnd::ToggleAutoEndTurn, this));
+        boost::bind(&MapWnd::ToggleAutoEndTurn, this));
     m_btn_auto_turn->Resize(GG::Pt(GG::X(24), GG::Y(24)));
     m_btn_auto_turn->SetMinSize(GG::Pt(GG::X(24), GG::Y(24)));
     ToggleAutoEndTurn();    // toggle twice to set textures without changing default setting state
@@ -2822,20 +2822,20 @@ void MapWnd::InitTurn() {
     Empire* this_client_empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
     if (this_client_empire) {
         this_client_empire->GetResourcePool(RE_TRADE)->ChangedSignal.connect(
-            std::bind(&MapWnd::RefreshTradeResourceIndicator, this));
+            boost::bind(&MapWnd::RefreshTradeResourceIndicator, this));
         this_client_empire->GetResourcePool(RE_RESEARCH)->ChangedSignal.connect(
-            std::bind(&MapWnd::RefreshResearchResourceIndicator, this));
+            boost::bind(&MapWnd::RefreshResearchResourceIndicator, this));
         this_client_empire->GetResourcePool(RE_INDUSTRY)->ChangedSignal.connect(
-            std::bind(&MapWnd::RefreshIndustryResourceIndicator, this));
+            boost::bind(&MapWnd::RefreshIndustryResourceIndicator, this));
         this_client_empire->GetPopulationPool().ChangedSignal.connect(
-            std::bind(&MapWnd::RefreshPopulationIndicator, this));
+            boost::bind(&MapWnd::RefreshPopulationIndicator, this));
         this_client_empire->GetProductionQueue().ProductionQueueChangedSignal.connect(
-            std::bind(&MapWnd::RefreshIndustryResourceIndicator, this));
+            boost::bind(&MapWnd::RefreshIndustryResourceIndicator, this));
         // so lane colouring to indicate wasted PP is updated
         this_client_empire->GetProductionQueue().ProductionQueueChangedSignal.connect(
-            std::bind(&MapWnd::InitStarlaneRenderingBuffers, this));
+            boost::bind(&MapWnd::InitStarlaneRenderingBuffers, this));
         this_client_empire->GetResearchQueue().ResearchQueueChangedSignal.connect(
-            std::bind(&MapWnd::RefreshResearchResourceIndicator, this));
+            boost::bind(&MapWnd::RefreshResearchResourceIndicator, this));
     }
 
     m_toolbar->Show();

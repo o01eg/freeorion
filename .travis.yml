@@ -65,4 +65,15 @@ jobs:
         script: bash .ci/deploy.sh focal
         on:
           tags: true
+    - name: Deploy PPA Groovy 20.10
+      <<: *_build_ppa_common
+      script:
+        - .ci/script.sh groovy
+      deploy:
+        provider: script
+        skip_cleanup: true
+        script: bash .ci/deploy.sh groovy
+        on:
+          tags: true
+
 

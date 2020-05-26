@@ -44,69 +44,69 @@ namespace {
 
     DeclareThreadSafeLogger(conditions);
 
-    using std::placeholders::_1;
+    using boost::placeholders::_1;
 
     void AddAllObjectsSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingObjects().size());
         std::transform(objects.ExistingObjects().begin(), objects.ExistingObjects().end(),
                        std::back_inserter(condition_non_targets),
-                       std::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
     }
 
     void AddBuildingSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingBuildings().size());
         std::transform(objects.ExistingBuildings().begin(), objects.ExistingBuildings().end(),
                        std::back_inserter(condition_non_targets),
-                       std::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
     }
 
     void AddFieldSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingFields().size());
         std::transform(objects.ExistingFields().begin(), objects.ExistingFields().end(),
                        std::back_inserter(condition_non_targets),
-                       std::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
     }
 
     void AddFleetSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingFleets().size());
         std::transform(objects.ExistingFleets().begin(), objects.ExistingFleets().end(),
                        std::back_inserter(condition_non_targets),
-                       std::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
     }
 
     void AddPlanetSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingPlanets().size());
         std::transform(objects.ExistingPlanets().begin(), objects.ExistingPlanets().end(),
                        std::back_inserter(condition_non_targets),
-                       std::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
     }
 
     void AddPopCenterSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingPopCenters().size());
         std::transform(objects.ExistingPopCenters().begin(), objects.ExistingPopCenters().end(),
                        std::back_inserter(condition_non_targets),
-                       std::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
     }
 
     void AddResCenterSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingResourceCenters().size());
         std::transform(objects.ExistingResourceCenters().begin(), objects.ExistingResourceCenters().end(),
                        std::back_inserter(condition_non_targets),
-                       std::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
     }
 
     void AddShipSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingShips().size());
         std::transform(objects.ExistingShips().begin(), objects.ExistingShips().end(),
                        std::back_inserter(condition_non_targets),
-                       std::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
     }
 
     void AddSystemSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingSystems().size());
         std::transform(objects.ExistingSystems().begin(), objects.ExistingSystems().end(),
                        std::back_inserter(condition_non_targets),
-                       std::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
     }
 
     /** Used by 4-parameter Condition::Eval function, and some of its
@@ -274,6 +274,16 @@ void Condition::Eval(const ScriptingContext& parent_context,
 { EvalImpl(matches, non_matches, search_domain, MatchHelper(this, parent_context)); }
 
 void Condition::Eval(const ScriptingContext& parent_context,
+                     Effect::TargetSet& matches, Effect::TargetSet& non_matches,
+                     SearchDomain search_domain/* = NON_MATCHES*/) const
+{
+    // reinterpret sets of mutable objects as sets of non-mutable objects.
+    auto& matches_as_objectset = reinterpret_cast<ObjectSet&>(matches);
+    auto& non_matches_as_objectset = reinterpret_cast<ObjectSet&>(non_matches);
+    this->Eval(parent_context, matches_as_objectset, non_matches_as_objectset, search_domain);
+}
+
+void Condition::Eval(const ScriptingContext& parent_context,
                      ObjectSet& matches) const
 {
     matches.clear();
@@ -284,6 +294,14 @@ void Condition::Eval(const ScriptingContext& parent_context,
 
     matches.reserve(condition_initial_candidates.size());
     Eval(parent_context, matches, condition_initial_candidates);
+}
+
+void Condition::Eval(const ScriptingContext& parent_context,
+                     Effect::TargetSet& matches) const
+{
+    // reinterpret sets of mutable objects as sets of non-mutable objects.
+    auto& matches_as_objectset = reinterpret_cast<ObjectSet&>(matches);
+    this->Eval(parent_context, matches_as_objectset);
 }
 
 bool Condition::Eval(const ScriptingContext& parent_context,
@@ -1861,7 +1879,7 @@ Type::Type(std::unique_ptr<ValueRef::ValueRef<UniverseObjectType>>&& type) :
 }
 
 Type::Type(UniverseObjectType type) :
-    Type(std::move(std::make_unique<ValueRef::Constant<UniverseObjectType>>(type)))
+    Type(std::make_unique<ValueRef::Constant<UniverseObjectType>>(type))
 {}
 
 bool Type::operator==(const Condition& rhs) const {
@@ -2202,15 +2220,21 @@ unsigned int Building::GetCheckSum() const {
 // HasSpecial                                            //
 ///////////////////////////////////////////////////////////
 HasSpecial::HasSpecial() :
-    HasSpecial(nullptr, std::unique_ptr<ValueRef::ValueRef<int>>{}, std::unique_ptr<ValueRef::ValueRef<int>>{})
+    HasSpecial(nullptr,
+               std::unique_ptr<ValueRef::ValueRef<int>>{},
+               std::unique_ptr<ValueRef::ValueRef<int>>{})
 {}
 
 HasSpecial::HasSpecial(const std::string& name) :
-    HasSpecial(std::move(std::make_unique<ValueRef::Constant<std::string>>(name)), std::unique_ptr<ValueRef::ValueRef<int>>{}, std::unique_ptr<ValueRef::ValueRef<int>>{})
+    HasSpecial(std::make_unique<ValueRef::Constant<std::string>>(name),
+               std::unique_ptr<ValueRef::ValueRef<int>>{},
+               std::unique_ptr<ValueRef::ValueRef<int>>{})
 {}
 
 HasSpecial::HasSpecial(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
-    HasSpecial(std::move(name), std::unique_ptr<ValueRef::ValueRef<int>>{}, std::unique_ptr<ValueRef::ValueRef<int>>{})
+    HasSpecial(std::move(name),
+               std::unique_ptr<ValueRef::ValueRef<int>>{},
+               std::unique_ptr<ValueRef::ValueRef<int>>{})
 {}
 
 HasSpecial::HasSpecial(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name,
@@ -2449,7 +2473,7 @@ HasTag::HasTag() :
 {}
 
 HasTag::HasTag(const std::string& name) :
-    HasTag(std::move(std::make_unique<ValueRef::Constant<std::string>>(name)))
+    HasTag(std::make_unique<ValueRef::Constant<std::string>>(name))
 {}
 
 HasTag::HasTag(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
@@ -6702,10 +6726,11 @@ OwnerHasBuildingTypeAvailable::OwnerHasBuildingTypeAvailable(
 }
 
 OwnerHasBuildingTypeAvailable::OwnerHasBuildingTypeAvailable(const std::string& name) :
-    OwnerHasBuildingTypeAvailable(nullptr, std::move(std::make_unique<ValueRef::Constant<std::string>>(name)))
+    OwnerHasBuildingTypeAvailable(nullptr, std::make_unique<ValueRef::Constant<std::string>>(name))
 {}
 
-OwnerHasBuildingTypeAvailable::OwnerHasBuildingTypeAvailable(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
+OwnerHasBuildingTypeAvailable::OwnerHasBuildingTypeAvailable(
+    std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
     OwnerHasBuildingTypeAvailable(nullptr, std::move(name))
 {}
 
@@ -6842,7 +6867,7 @@ OwnerHasShipDesignAvailable::OwnerHasShipDesignAvailable(
 }
 
 OwnerHasShipDesignAvailable::OwnerHasShipDesignAvailable(int design_id) :
-    OwnerHasShipDesignAvailable(nullptr, std::move(std::make_unique<ValueRef::Constant<int>>(design_id)))
+    OwnerHasShipDesignAvailable(nullptr, std::make_unique<ValueRef::Constant<int>>(design_id))
 {}
 
 OwnerHasShipDesignAvailable::OwnerHasShipDesignAvailable(std::unique_ptr<ValueRef::ValueRef<int>>&& design_id) :
@@ -6987,7 +7012,7 @@ OwnerHasShipPartAvailable::OwnerHasShipPartAvailable(
 }
 
 OwnerHasShipPartAvailable::OwnerHasShipPartAvailable(const std::string& name) :
-    OwnerHasShipPartAvailable(nullptr, std::move(std::make_unique<ValueRef::Constant<std::string>>(name)))
+    OwnerHasShipPartAvailable(nullptr, std::make_unique<ValueRef::Constant<std::string>>(name))
 {}
 
 OwnerHasShipPartAvailable::OwnerHasShipPartAvailable(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
@@ -9758,7 +9783,7 @@ void Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_contex
     }
 
     if (parent_context.source && m_operands.size() == 2) {
-        if (auto* src_condition = dynamic_cast<const Source*>(m_operands[0].get())) {
+        if (/*auto* src_condition =*/ dynamic_cast<const Source*>(m_operands[0].get())) {
             // special case when first of two subconditions is just Source:
             // get the default candidates of the second and add the source if
             // it is not already present.

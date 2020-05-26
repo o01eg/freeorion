@@ -32,9 +32,9 @@ _build_cpp_common: &_build_cpp_common
     - ccache --version
     - ccache --show-stats
   before_script:
-    - git remote add -t master -m master upstream https://github.com/freeorion/freeorion.git
+    - git remote add -t release-v0.4.10 -m release-v0.4.10 upstream https://github.com/freeorion/freeorion.git
     - git fetch upstream
-    - git log -1 upstream/master
+    - git log -1 upstream/release-v0.4.10
     - mkdir build
     - cd build
   after_success:
@@ -130,7 +130,7 @@ jobs:
               docker run --network="host" -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -e CTEST_OUTPUT_ON_FAILURE=1 -w /freeorion/build freeorion/freeorion-travis-build timeout 40m /usr/bin/cmake $@
           }
       script:
-        - git merge --no-commit upstream/master
+        - [ -z "$TRAVIS_TAG" ] && git merge --no-commit upstream/release-v0.4.10
         - cmake -DBUILD_TESTING=ON -DBUILD_HEADLESS=ON ..
         - cmake --build . -- -j 2
 

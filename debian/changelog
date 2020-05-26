@@ -1,3 +1,10 @@
+freeorion (0.4.10.fo0010+git20200525.d034b5dppa1~bionic) bionic; urgency=medium
+
+  * Update upstream.
+  * Send new turn notification to the chat.
+
+ -- O01eg <o01eg@yandex.ru>  Tue, 26 May 2020 19:52:11 +0000
+
 freeorion (0.4.10.fo0010+git20200525.c132c36ppa1~bionic) bionic; urgency=medium
 
   * Update upstream.

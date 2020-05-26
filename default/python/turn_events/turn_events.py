@@ -1,3 +1,5 @@
+from logging import info, error
+
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
 # Logging is redirected before other imports so that import errors appear in log files.
@@ -10,9 +12,21 @@ from math import sin, cos, pi, hypot
 import freeorion as fo
 from universe_tables import MONSTER_FREQUENCY
 
+import urllib.request
+
 
 def execute_turn_events():
     print("Executing turn events for turn", fo.current_turn())
+
+    try:
+        req = urllib.request.Request("http://localhost:8083/",
+                                     ("%s: new turn %d started." % (fo.get_galaxy_setup_data().gameUID, fo.current_turn())).encode())
+        req.add_header("X-XMPP-Muc", "smac")
+        urllib.request.urlopen(req).read()
+        info("Chat notification was send via XMPP")
+    except Exception:
+        exctype, value = sys.exc_info()[:2]
+        error("Cann't send chat notification: %s %s" % (exctype, value))
 
     # creating fields
     systems = fo.get_systems()

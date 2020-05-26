@@ -214,7 +214,7 @@ void PlayerConnection::SendMessage(const Message& message) {
         ErrorLogger(network) << "PlayerConnection::SendMessage can't send message when not transmit connected";
         return;
     }
-    m_service.post(std::bind(&PlayerConnection::SendMessageImpl, shared_from_this(), message));
+    m_service.post(boost::bind(&PlayerConnection::SendMessageImpl, shared_from_this(), message));
 }
 
 bool PlayerConnection::IsEstablished() const {
@@ -387,7 +387,7 @@ void PlayerConnection::HandleMessageBodyRead(boost::system::error_code error,
             error == boost::asio::error::connection_reset) {
             ErrorLogger(network) << "PlayerConnection::HandleMessageBodyRead(): "
                                  << "error #" << error.value() << " \"" << error.message() << "\"";
-            EventSignal(std::bind(m_disconnected_callback, shared_from_this()));
+            EventSignal(boost::bind(m_disconnected_callback, shared_from_this()));
         } else {
             ErrorLogger(network) << "PlayerConnection::HandleMessageBodyRead(): "
                                  << "error #" << error.value() << " \"" << error.message() << "\"";
@@ -402,13 +402,9 @@ void PlayerConnection::HandleMessageBodyRead(boost::system::error_code error,
                 //TraceLogger(network) << "     Full message: " << m_incoming_message;
             }
             if (EstablishedPlayer()) {
-                EventSignal(std::bind(m_player_message_callback,
-                                      m_incoming_message,
-                                      shared_from_this()));
+                EventSignal(boost::bind(m_player_message_callback, m_incoming_message, shared_from_this()));
             } else {
-                EventSignal(std::bind(m_nonplayer_message_callback,
-                                      m_incoming_message,
-                                      shared_from_this()));
+                EventSignal(boost::bind(m_nonplayer_message_callback, m_incoming_message, shared_from_this()));
             }
             m_incoming_message = Message();
             AsyncReadMessage();
@@ -448,7 +444,7 @@ void PlayerConnection::HandleMessageHeaderRead(boost::system::error_code error,
                 error == boost::asio::error::connection_reset ||
                 error == boost::asio::error::timed_out)
             {
-                EventSignal(std::bind(m_disconnected_callback, shared_from_this()));
+                EventSignal(boost::bind(m_disconnected_callback, shared_from_this()));
             } else {
                 ErrorLogger(network) << "PlayerConnection::HandleMessageHeaderRead(): "
                                      << "error #" << error.value() << " \"" << error.message() << "\"";
@@ -460,6 +456,7 @@ void PlayerConnection::HandleMessageHeaderRead(boost::system::error_code error,
         if (bytes_transferred == Message::HeaderBufferSize) {
             BufferToHeader(m_incoming_header_buffer, m_incoming_message);
             auto msg_size = m_incoming_header_buffer[Message::Parts::SIZE];
+            TraceLogger(network) << "Server Handling Message maybe allocating buffer of size: " << msg_size;
             if (GetOptionsDB().Get<int>("network.server.client-message-size.max") > 0 &&
                 msg_size > GetOptionsDB().Get<int>("network.server.client-message-size.max"))
             {
@@ -470,7 +467,17 @@ void PlayerConnection::HandleMessageHeaderRead(boost::system::error_code error,
                 m_socket.close();
                 return;
             }
-            m_incoming_message.Resize(m_incoming_header_buffer[Message::Parts::SIZE]);
+            try {
+                m_incoming_message.Resize(msg_size);
+            } catch (const std::exception& e) {
+                ErrorLogger(network) << "PlayerConnection::HandleMessageHeaderRead(): "
+                                     << "caught exception resizing message buffer to size "
+                                     << msg_size << " : " << e.what();
+                boost::system::error_code error;
+                m_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, error);
+                m_socket.close();
+                return;
+            }
             boost::asio::async_read(
                 m_socket,
                 boost::asio::buffer(m_incoming_message.Data(), m_incoming_message.Size()),
@@ -538,7 +545,7 @@ void PlayerConnection::HandleMessageWrite(PlayerConnectionPtr self,
 
 void PlayerConnection::AsyncErrorHandler(PlayerConnectionPtr self, boost::system::error_code handled_error,
                                          boost::system::error_code error)
-{ self->EventSignal(std::bind(self->m_disconnected_callback, self)); }
+{ self->EventSignal(boost::bind(self->m_disconnected_callback, self)); }
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -802,7 +809,7 @@ void ServerNetworking::Init() {
 }
 
 void ServerNetworking::AcceptNextMessagingConnection() {
-    using std::placeholders::_1;
+    using boost::placeholders::_1;
 
     auto next_connection = PlayerConnection::NewConnection(
 #if BOOST_VERSION >= 106600
@@ -812,9 +819,9 @@ void ServerNetworking::AcceptNextMessagingConnection() {
 #endif
         m_nonplayer_message_callback,
         m_player_message_callback,
-        std::bind(&ServerNetworking::DisconnectImpl, this, _1));
+        boost::bind(&ServerNetworking::DisconnectImpl, this, _1));
     next_connection->EventSignal.connect(
-        std::bind(&ServerNetworking::EnqueueEvent, this, _1));
+        boost::bind(&ServerNetworking::EnqueueEvent, this, _1));
     m_player_connection_acceptor.async_accept(
         next_connection->m_socket,
         boost::bind(&ServerNetworking::AcceptPlayerMessagingConnection,

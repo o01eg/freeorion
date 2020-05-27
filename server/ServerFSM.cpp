@@ -2949,7 +2949,6 @@ void PlayingGame::TurnTimedoutHandler(const boost::system::error_code& error) {
 WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
     my_base(c),
     m_timeout(Server().m_io_context),
-    m_last_empire_id(ALL_EMPIRES),
     m_start(std::chrono::high_resolution_clock::now())
 {
     TraceLogger(FSM) << "(ServerFSM) WaitingForTurnEnd";
@@ -3087,6 +3086,7 @@ sc::result WaitingForTurnEnd::react(const TurnOrders& msg) {
                                      order_set, ui_data, save_state_string,
                                      client_type));
         empire->SetReady(true);
+        m_last_empire_ids.erase(empire_id);
 
         // notify other player that this empire submitted orders
         for (auto player_it = server.m_networking.established_begin();
@@ -3278,12 +3278,14 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
     }
 
     // check if only one player have to make orders and he wasn't notified about it before
-    int last_empire_id = server.LastOneNotReadyEmpire();
-    if (last_empire_id != ALL_EMPIRES && last_empire_id != m_last_empire_id) {
-        Empire* empire = server.GetEmpire(last_empire_id);
-        if (empire != nullptr && !empire->Eliminated()) {
-            m_last_empire_id = last_empire_id;
-            server.SendOutboundChatMessage((boost::format("Hello, %s. You are last to end %d turn.") % empire->PlayerName() % server.CurrentTurn()).str(), empire->PlayerName(), GetOptionsDB().Get<bool>("network.server.allow-email.new-turn"));
+    std::set<int> last_empires_id = server.LastOneNotReadyEmpire(2);
+    for (int last_empire_id : last_empires_id) {
+        if (m_last_empire_ids.count(last_empire_id) == 0) {
+            const Empire* empire = server.GetEmpire(last_empire_id);
+            if (empire != nullptr && !empire->Eliminated()) {
+                m_last_empire_ids.insert(last_empire_id);
+                server.SendOutboundChatMessage((boost::format("Hello, %s. You are last to end %d turn.") % empire->PlayerName() % server.CurrentTurn()).str(), empire->PlayerName(), GetOptionsDB().Get<bool>("network.server.allow-email.new-turn"));
+            }
         }
     }
 

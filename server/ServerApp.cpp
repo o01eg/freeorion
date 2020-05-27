@@ -2116,10 +2116,10 @@ bool ServerApp::AllOrdersReceived() {
     return all_orders_received;
 }
 
-int ServerApp::LastOneNotReadyEmpire() {
+std::set<int> ServerApp::LastOneNotReadyEmpire(int count) {
     DebugLogger() << "ServerApp::LastOneNotReadyEmpire for turn: " << m_current_turn
                   << (m_turn_expired ? " (expired)" : "");
-    int last_empire_id = ALL_EMPIRES;
+    std::set<int> last_empire_ids;
     for (const auto& empire_orders : m_turn_sequence) {
         bool empire_orders_received = true;
         const auto empire = GetEmpire(empire_orders.first);
@@ -2142,15 +2142,15 @@ int ServerApp::LastOneNotReadyEmpire() {
             DebugLogger() << " ... have orders from empire id: " << empire_orders.first;
         }
         if (!empire_orders_received) {
-            if (last_empire_id == ALL_EMPIRES) {
-                last_empire_id = empire_orders.first;
+            if (last_empire_ids.size() < count) {
+                last_empire_ids.insert(empire_orders.first);
             } else {
                 // multiple empires are n't ready
-                return ALL_EMPIRES;
+                return std::set<int>();
             }
         }
     }
-    return last_empire_id;
+    return last_empire_ids;
 }
 
 namespace {

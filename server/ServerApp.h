@@ -127,10 +127,10 @@ public:
       * orders for the given turn */
     bool    AllOrdersReceived();
 
-    /** Determines if only one empire left to make orders. Returns empire id if one or
-     * ALL_EMPIRES if all empires ready or more that one is unready.
+    /** Determines if \a count ot less empires left to make orders. Returns empire's ids or
+     * empty set if all empires ready or more that \a count is unready.
      * */
-    int     LastOneNotReadyEmpire();
+    std::set<int> LastOneNotReadyEmpire(int count);
 
     /** Executes player orders, does colonization, does ordered scrapping, does
       * fleet movements, and updates visibility before combats are handled. */

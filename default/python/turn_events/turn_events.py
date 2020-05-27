@@ -20,7 +20,7 @@ def execute_turn_events():
 
     try:
         req = urllib.request.Request("http://localhost:8083/",
-                                     ("%s: new turn %d started." % (fo.get_galaxy_setup_data().gameUID, fo.current_turn())).encode())
+                                     ("%s: Turn %d has come to an end." % (fo.get_galaxy_setup_data().gameUID, fo.current_turn())).encode())
         req.add_header("X-XMPP-Muc", "smac")
         urllib.request.urlopen(req).read()
         info("Chat notification was send via XMPP")

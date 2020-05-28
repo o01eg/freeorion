@@ -3296,6 +3296,12 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
         }
     }
 
+    // save game so orders from the player will be backuped
+    if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.each-player.enabled")) {
+        PlayerConnectionPtr dummy_connection = nullptr;
+        post_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(server.CurrentTurn())), dummy_connection));
+    }
+
     return discard_event();
 }
 

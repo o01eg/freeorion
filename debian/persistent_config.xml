@@ -4,6 +4,9 @@
   <auto>
    <hostless>
     <enabled>1</enabled>
+    <each-player>
+     <enabled>1</enabled>
+    </each-player>
    </hostless>
    <exit>
     <enabled>1</enabled>

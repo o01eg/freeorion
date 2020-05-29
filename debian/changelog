@@ -1,3 +1,9 @@
+freeorion (0.4.10.fo0010+git20200525.d034b5dppa3~bionic) bionic; urgency=medium
+
+  * Fix allied empires serialization
+
+ -- O01eg <o01eg@yandex.ru>  Fri, 29 May 2020 17:44:29 +0000
+
 freeorion (0.4.10.fo0010+git20200525.d034b5dppa2~bionic) bionic; urgency=medium
 
   * Close socket asynchronously to prevent server freeze.

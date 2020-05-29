@@ -28,6 +28,17 @@ def execute_turn_events():
         exctype, value = sys.exc_info()[:2]
         error("Cann't send chat notification: %s %s" % (exctype, value))
 
+    try:
+        req = urllib.request.Request("http://localhost:8083/",
+                                     ("Turn %d" % (fo.current_turn()+1)).encode())
+        req.add_header("X-XMPP-Muc", "smac")
+        req.add_header("X-XMPP-Presence", "away")
+        urllib.request.urlopen(req).read()
+        info("Chat notification was send via XMPP")
+    except Exception:
+        exctype, value = sys.exc_info()[:2]
+        error("Cann't send chat notification: %s %s" % (exctype, value))
+
     # creating fields
     systems = fo.get_systems()
     radius = fo.get_universe_width() / 2.0

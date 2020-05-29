@@ -1,3 +1,14 @@
+freeorion (0.4.10.fo0010+git20200525.d034b5dppa2~bionic) bionic; urgency=medium
+
+  * Close socket asynchronously to prevent server freeze.
+  * Fix turn notifications.
+  * Try catch around ExtractJoinGameMessageData in PlayingGame state.
+  * Add option to save game after player issued orders.
+  * Hide some sensible info from enemy empires.
+  * Set xmpp bot status with slowpockes.
+
+ -- O01eg <o01eg@yandex.ru>  Fri, 29 May 2020 13:35:39 +0000
+
 freeorion (0.4.10.fo0010+git20200525.d034b5dppa1~bionic) bionic; urgency=medium
 
   * Update upstream.

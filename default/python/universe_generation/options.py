@@ -35,6 +35,17 @@ NAMING_LARGE_GALAXY_SIZE = 200  # a galaxy with 200+ star systems is considered 
 HS_MIN_VICINITY_RANGE = 2
 HS_MAX_VICINITY_RANGE = 7
 
+# The following two options are used to determine the minimum number of systems and planets. This limit is
+# HS_MIN_SYSTEMS_IN_VICINITY systems and HS_MIN_PLANETS_IN_VICINITY_PER_SYSTEM planets per system within the near
+# vicinity of a home system, capped at HS_MIN_PLANETS_IN_VICINITY_TOTAL
+HS_MIN_SYSTEMS_IN_VICINITY = 8
+HS_MIN_PLANETS_IN_VICINITY_TOTAL = 10
+HS_MIN_PLANETS_IN_VICINITY_PER_SYSTEM = 1
+
+# This option defines the extend of what is considered the "near vicinity" of a home system. This are all systems that
+# are within the number of jumps specified by HS_VICINITY_RANGE.
+HS_VICINITY_RANGE = 3
+
 # This option sets the maximum starting value for the minimum jump distance limit required between home systems.
 # With large galaxies an excessive amount of time can be used in failed attempts to select home systems, so defining
 # an upper limit for the home system selection process to use when calculating the starting value for the minimum

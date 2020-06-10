@@ -34,6 +34,7 @@ namespace {
         db.Add("save.format.binary.enabled",                UserStringNop("OPTIONS_DB_BINARY_SERIALIZATION"),   false);
         db.Add("save.format.xml.zlib.enabled",              UserStringNop("OPTIONS_DB_XML_ZLIB_SERIALIZATION"), true);
         db.Add("save.auto.hostless.enabled",                UserStringNop("OPTIONS_DB_AUTOSAVE_HOSTLESS"),      true);
+        db.Add("save.auto.hostless.each-player.enabled",    UserStringNop("OPTIONS_DB_AUTOSAVE_HOSTLESS_EACH_PLAYER"), false);
         db.Add<int>("save.auto.interval",                   UserStringNop("OPTIONS_DB_AUTOSAVE_INTERVAL"),      0);
         db.Add<std::string>("load",                         UserStringNop("OPTIONS_DB_LOAD"),                   "",                     Validator<std::string>(), false);
         db.Add("save.auto.exit.enabled",                    UserStringNop("OPTIONS_DB_AUTOSAVE_GAME_CLOSE"),    true);
@@ -74,9 +75,6 @@ namespace {
 
         rules.Add<int>("RULE_CONCEDE_COLONIES_THRESHOLD", "RULE_CONCEDE_COLONIES_THRESHOLD_DESC",
                        "MULTIPLAYER", 1, true,  RangedValidator<int>(0, 9999));
-
-        rules.Add<bool>("RULE_SHOW_DETAILED_EMPIRES_DATA", "RULE_SHOW_DETAILED_EMPIRES_DATA_DESC",
-                       "MULTIPLAYER", true, true);
     }
     bool temp_bool2 = RegisterGameRules(&AddRules);
 }
@@ -200,7 +198,7 @@ void GalaxySetupData::SetSeed(const std::string& seed) {
         ClockSeed();
         new_seed.clear();
         for (int i = 0; i < 8; ++i)
-            new_seed += alphanum[RandSmallInt(0, (sizeof(alphanum) - 2))];
+            new_seed += alphanum[RandInt(0, (sizeof(alphanum) - 2))];
         DebugLogger() << "Set empty or requested random seed to " << new_seed;
     }
     m_seed = std::move(new_seed);

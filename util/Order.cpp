@@ -1,29 +1,26 @@
 #include "Order.h"
 
-#include "Logger.h"
-#include "OrderSet.h"
-#include "AppInterface.h"
-#include "../universe/Fleet.h"
-#include "../universe/Predicates.h"
-#include "../universe/Species.h"
-#include "../universe/Building.h"
-#include "../universe/Planet.h"
-#include "../universe/Ship.h"
-#include "../universe/ShipDesign.h"
-#include "../universe/System.h"
-#include "../universe/Pathfinder.h"
-#include "../universe/Universe.h"
-#include "../universe/UniverseObject.h"
-#include "../universe/Enums.h"
-#include "../Empire/EmpireManager.h"
-#include "../Empire/Empire.h"
-
+#include <fstream>
+#include <vector>
 #include <boost/uuid/nil_generator.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
-
-#include <fstream>
-#include <vector>
+#include "AppInterface.h"
+#include "Logger.h"
+#include "OrderSet.h"
+#include "../Empire/Empire.h"
+#include "../Empire/EmpireManager.h"
+#include "../universe/Building.h"
+#include "../universe/Enums.h"
+#include "../universe/Fleet.h"
+#include "../universe/Pathfinder.h"
+#include "../universe/Planet.h"
+#include "../universe/ShipDesign.h"
+#include "../universe/Ship.h"
+#include "../universe/Species.h"
+#include "../universe/System.h"
+#include "../universe/Universe.h"
+#include "../universe/UniverseObject.h"
 
 
 /////////////////////////////////////////////////////
@@ -894,6 +891,28 @@ void ChangeFocusOrder::ExecuteImpl() const {
 }
 
 ////////////////////////////////////////////////
+// PolicyOrder
+////////////////////////////////////////////////
+PolicyOrder::PolicyOrder(int empire, const std::string& name,
+                         const std::string& category, bool adopt,
+                         int slot) :
+    Order(empire),
+    m_policy_name(name),
+    m_category(category),
+    m_slot(slot),
+    m_adopt(adopt)
+{}
+
+void PolicyOrder::ExecuteImpl() const {
+    auto empire = GetValidatedEmpire();
+    if (m_adopt)
+        DebugLogger() << "PolicyOrder adopt " << m_policy_name << " in category " << m_category << " in slot " << m_slot;
+    else
+        DebugLogger() << "PolicyOrder revoke " << m_policy_name << " from category " << m_category << " in slot " << m_slot;
+    empire->AdoptPolicy(m_policy_name, m_category, m_adopt, m_slot);
+}
+
+////////////////////////////////////////////////
 // ResearchQueueOrder
 ////////////////////////////////////////////////
 ResearchQueueOrder::ResearchQueueOrder(int empire, const std::string& tech_name) :
@@ -1243,7 +1262,7 @@ void ShipDesignOrder::ExecuteImpl() const {
         // be used to construct ships by that empire.
 
         // TODO: consider removing this order, so that an empire needs to use
-        // espionage or trade to gain access to a ship design made by another
+        // espionage or influence to gain access to a ship design made by another
         // player
 
         // check if empire is already remembering the design

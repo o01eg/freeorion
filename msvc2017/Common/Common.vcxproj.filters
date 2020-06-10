@@ -124,7 +124,7 @@
     <ClInclude Include="..\..\universe\PopCenter.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\universe\Predicates.h">
+    <ClInclude Include="..\..\universe\UniverseObjectVisitors.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
     <ClInclude Include="..\..\universe\ResourceCenter.h">
@@ -149,6 +149,9 @@
       <Filter>Header Files\universe</Filter>
     </ClInclude>
     <ClInclude Include="..\..\universe\Tech.h">
+      <Filter>Header Files\universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\universe\UniverseObjectVistor.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
     <ClInclude Include="..\..\universe\Universe.h">
@@ -275,6 +278,9 @@
     <ClInclude Include="..\..\universe\ScriptingContext.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Empire\Government.h">
+      <Filter>Header Files\Empire</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\universe\ConditionSource.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
@@ -282,6 +288,12 @@
       <Filter>Header Files\universe</Filter>
     </ClInclude>
     <ClInclude Include="..\..\universe\CommonParams.h">
+      <Filter>Header Files\universe</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Empire\InfluenceQueue.h">
+      <Filter>Header Files\Empire</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\universe\ShipHull.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
   </ItemGroup>
@@ -400,7 +412,7 @@
     <ClCompile Include="..\..\universe\PopCenter.cpp">
       <Filter>Source Files\universe</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\universe\Predicates.cpp">
+    <ClCompile Include="..\..\universe\UniverseObjectVisitors.cpp">
       <Filter>Source Files\universe</Filter>
     </ClCompile>
     <ClCompile Include="..\..\universe\ResourceCenter.cpp">
@@ -425,6 +437,9 @@
       <Filter>Source Files\universe</Filter>
     </ClCompile>
     <ClCompile Include="..\..\universe\Tech.cpp">
+      <Filter>Source Files\universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\universe\UniverseObjectVisitor.cpp">
       <Filter>Source Files\universe</Filter>
     </ClCompile>
     <ClCompile Include="..\..\universe\Universe.cpp">
@@ -498,6 +513,15 @@
       <Filter>Source Files\universe</Filter>
     </ClCompile>
     <ClCompile Include="..\..\universe\ValueRefs.cpp">
+      <Filter>Source Files\universe</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Empire\Government.cpp">
+      <Filter>Source Files\Empire</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Empire\InfluenceQueue.cpp">
+      <Filter>Source Files\Empire</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\universe\ShipHull.cpp">
       <Filter>Source Files\universe</Filter>
     </ClCompile>
   </ItemGroup>

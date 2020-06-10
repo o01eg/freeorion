@@ -69,6 +69,9 @@ namespace {
     const GG::Y         PART_CONTROL_HEIGHT(54);
     const GG::X         SLOT_CONTROL_WIDTH(60);
     const GG::Y         SLOT_CONTROL_HEIGHT(60);
+    const GG::Pt        PALETTE_MIN_SIZE{GG::X{450}, GG::Y{400}};
+    const GG::Pt        MAIN_PANEL_MIN_SIZE{GG::X{400}, GG::Y{160}};
+    const GG::Pt        BASES_MIN_SIZE{GG::X{160}, GG::Y{160}};
     const int           PAD(3);
 
     /** Returns texture with which to render a SlotControl, depending on \a slot_type. */
@@ -121,7 +124,7 @@ namespace {
             case PC_TROOPS:
             case PC_RESEARCH:
             case PC_INDUSTRY:
-            case PC_TRADE:
+            case PC_INFLUENCE:
                 return part->Capacity();
                 break;
             case PC_GENERAL:
@@ -1896,6 +1899,8 @@ void DesignWnd::PartPalette::CompleteConstruction() {
 
     CUIWnd::CompleteConstruction();
 
+    SetMinSize(PALETTE_MIN_SIZE);
+
     DoLayout();
     SaveDefaultedOptions();
 }
@@ -3448,6 +3453,8 @@ void DesignWnd::BaseSelector::CompleteConstruction() {
 
     CUIWnd::CompleteConstruction();
 
+    SetMinSize(BASES_MIN_SIZE);
+
     DoLayout();
     SaveDefaultedOptions();
 }
@@ -4115,6 +4122,7 @@ void DesignWnd::MainPanel::CompleteConstruction() {
     DesignChanged(); // Initialize components that rely on the current state of the design.
 
     CUIWnd::CompleteConstruction();
+    SetMinSize(MAIN_PANEL_MIN_SIZE);
 
     DoLayout();
     SaveDefaultedOptions();
@@ -4540,7 +4548,7 @@ void DesignWnd::MainPanel::Populate() {
 
     const std::vector<ShipHull::Slot>& hull_slots = m_hull->Slots();
 
-    for (size_t i = 0; i != hull_slots.size(); ++i) {
+    for (std::size_t i = 0; i < hull_slots.size(); ++i) {
         const ShipHull::Slot& slot = hull_slots[i];
         auto slot_control = GG::Wnd::Create<SlotControl>(slot.x, slot.y, slot.type);
         m_slots.push_back(slot_control);
@@ -4563,37 +4571,37 @@ void DesignWnd::MainPanel::DoLayout() {
     const int PTS = ClientUI::Pts();
     const GG::X PTS_WIDE(PTS / 2);           // guess at how wide per character the font needs
     const int PAD = 6;
-	
-	GG::Pt ul,lr,ll,ur,mus;
-	lr = ClientSize() - GG::Pt(GG::X(PAD), GG::Y(PAD));
+
+    GG::Pt ul,lr,ll,ur,mus;
+    lr = ClientSize() - GG::Pt(GG::X(PAD), GG::Y(PAD));
     m_confirm_button->SizeMove(lr - m_confirm_button->MinUsableSize(), lr);
 
-	mus=m_replace_button->MinUsableSize();
-	ul = m_confirm_button->RelativeUpperLeft() - GG::Pt(mus.x+PAD, GG::Y(0));
+    mus=m_replace_button->MinUsableSize();
+    ul = m_confirm_button->RelativeUpperLeft() - GG::Pt(mus.x+PAD, GG::Y(0));
     m_replace_button->SizeMove(ul, ul+mus);
 
-	ll= GG::Pt(GG::X(PAD), ClientHeight() - PAD);
-	mus=m_clear_button->MinUsableSize();
-	ul = ll-GG::Pt(GG::X0, mus.y);
+    ll= GG::Pt(GG::X(PAD), ClientHeight() - PAD);
+    mus=m_clear_button->MinUsableSize();
+    ul = ll-GG::Pt(GG::X0, mus.y);
     m_clear_button->SizeMove(ul, ul+mus);
 
     ul = GG::Pt(GG::X(PAD), GG::Y(PAD));
-	// adjust based on the (bigger) height of the edit bar 
-	lr= ul+GG::Pt(m_design_name_label->MinUsableSize().x, m_design_name->MinUsableSize().y);
+    // adjust based on the (bigger) height of the edit bar 
+    lr= ul+GG::Pt(m_design_name_label->MinUsableSize().x, m_design_name->MinUsableSize().y);
     m_design_name_label->SizeMove(ul, lr);
 
-	ul= GG::Pt(m_design_name_label->RelativeLowerRight().x+PAD, GG::Y(PAD));
+    ul= GG::Pt(m_design_name_label->RelativeLowerRight().x+PAD, GG::Y(PAD));
     m_design_name->SizeMove(ul, GG::Pt(GG::X(ClientWidth()-PAD), ul.y+m_design_name->MinUsableSize().y));
 
-	ul=GG::Pt(GG::X(PAD), GG::Y(m_design_name->RelativeLowerRight().y+PAD));
-	// Apparently calling minuseablesize on the button itself doesn't work
-	lr= ul+GG::Pt(m_design_description_toggle->GetLabel()->MinUsableSize().x+10, m_design_name->MinUsableSize().y);
+    ul=GG::Pt(GG::X(PAD), GG::Y(m_design_name->RelativeLowerRight().y+PAD));
+    // Apparently calling minuseablesize on the button itself doesn't work
+    lr= ul+GG::Pt(m_design_description_toggle->GetLabel()->MinUsableSize().x+10, m_design_name->MinUsableSize().y);
     m_design_description_toggle->SizeMove(ul, lr);
 
     ul.x = m_design_description_toggle->RelativeLowerRight().x + PAD;
     m_design_description_edit->SizeMove(ul, GG::Pt(GG::X(ClientWidth()-PAD),ul.y+PTS*4+8));
-	if (m_design_description_toggle->Checked()) { m_design_description_edit->Show() ; }
-	else { m_design_description_edit->Hide(); }
+    if (m_design_description_toggle->Checked()) { m_design_description_edit->Show() ; }
+    else { m_design_description_edit->Hide(); }
 
     // place background image of hull
     ul.x = GG::X0;

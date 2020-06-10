@@ -3,7 +3,6 @@
 #include "i18n.h"
 #include "Logger.h"
 #include "AppInterface.h"
-#include "../universe/Predicates.h"
 #include "../universe/Building.h"
 #include "../universe/Planet.h"
 #include "../universe/System.h"
@@ -108,6 +107,16 @@ SitRepEntry CreateTechUnlockedSitRep(const std::string& tech_name) {
         "icons/sitrep/tech_unlocked.png",
         UserStringNop("SITREP_TECH_UNLOCKED_LABEL"), true);
     sitrep.AddVariable(VarText::TECH_TAG,          tech_name);
+    return sitrep;
+}
+
+SitRepEntry CreatePolicyUnlockedSitRep(const std::string& policy_name) {
+    SitRepEntry sitrep(
+        UserStringNop("SITREP_POLICY_UNLOCKED"),
+        CurrentTurn() + 1,
+        "icons/sitrep/policy_unlocked.png",
+        UserStringNop("SITREP_POLICY_UNLOCKED_LABEL"), true);
+    sitrep.AddVariable(VarText::POLICY_TAG,        policy_name);
     return sitrep;
 }
 

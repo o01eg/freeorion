@@ -1,6 +1,5 @@
 #include "ShipHull.h"
 
-
 #include "ConditionSource.h"
 #include "Effects.h"
 #include "Enums.h"
@@ -14,11 +13,11 @@ namespace {
         rules.Add<double>("RULE_SHIP_SPEED_FACTOR", "RULE_SHIP_SPEED_FACTOR_DESC",
                           "BALANCE", 1.0, true, RangedValidator<double>(0.1, 10.0));
         rules.Add<double>("RULE_SHIP_STRUCTURE_FACTOR", "RULE_SHIP_STRUCTURE_FACTOR_DESC",
-                          "BALANCE", 1.0, true, RangedValidator<double>(0.1, 80.0));
+                          "BALANCE", 8.0, true, RangedValidator<double>(0.1, 80.0));
         rules.Add<double>("RULE_SHIP_WEAPON_DAMAGE_FACTOR", "RULE_SHIP_WEAPON_DAMAGE_FACTOR_DESC",
-                          "BALANCE", 1.0, true, RangedValidator<double>(0.1, 60.0));
+                          "BALANCE", 6.0, true, RangedValidator<double>(0.1, 60.0));
         rules.Add<double>("RULE_FIGHTER_DAMAGE_FACTOR", "RULE_FIGHTER_DAMAGE_FACTOR_DESC",
-                          "BALANCE", 1.0, true, RangedValidator<double>(0.1, 60.0));
+                          "BALANCE", 6.0, true, RangedValidator<double>(0.1, 60.0));
     }
     bool temp_bool = RegisterGameRules(&AddRules);
 
@@ -38,8 +37,7 @@ namespace {
         auto vr =
             std::make_unique<ValueRef::Operation<double>>(
                 ValueRef::PLUS,
-                std::make_unique<ValueRef::Variable<double>>(
-                    ValueRef::EFFECT_TARGET_VALUE_REFERENCE, std::vector<std::string>()),
+                std::make_unique<ValueRef::Variable<double>>(ValueRef::EFFECT_TARGET_VALUE_REFERENCE),
                 std::move(increase_vr)
             );
         auto effects = Effects();

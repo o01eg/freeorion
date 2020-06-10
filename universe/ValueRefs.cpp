@@ -1,40 +1,38 @@
 #include "ValueRefs.h"
 
-#include "Building.h"
-#include "Fleet.h"
-#include "ShipDesign.h"
-#include "ShipPart.h"
-#include "ShipHull.h"
-#include "Ship.h"
-#include "Planet.h"
-#include "Predicates.h"
-#include "Species.h"
-#include "System.h"
-#include "Field.h"
-#include "Fighter.h"
-#include "Pathfinder.h"
-#include "Universe.h"
-#include "UniverseObject.h"
-#include "Enums.h"
-#include "Tech.h"
-#include "../Empire/EmpireManager.h"
-#include "../Empire/Empire.h"
-#include "../Empire/Supply.h"
-#include "../util/Random.h"
-#include "../util/Logger.h"
-#include "../util/MultiplayerCommon.h"
-#include "../util/GameRules.h"
-
+#include <functional>
+#include <iomanip>
+#include <iterator>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/range/adaptor/filtered.hpp>
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/numeric.hpp>
-
-#include <functional>
-#include <iomanip>
-#include <iterator>
+#include "Building.h"
+#include "Enums.h"
+#include "Field.h"
+#include "Fighter.h"
+#include "Fleet.h"
+#include "Pathfinder.h"
+#include "Planet.h"
+#include "ShipDesign.h"
+#include "ShipHull.h"
+#include "ShipPart.h"
+#include "Ship.h"
+#include "Species.h"
+#include "System.h"
+#include "Tech.h"
+#include "UniverseObjectVisitors.h"
+#include "UniverseObject.h"
+#include "Universe.h"
+#include "../Empire/EmpireManager.h"
+#include "../Empire/Empire.h"
+#include "../Empire/Supply.h"
+#include "../util/GameRules.h"
+#include "../util/Logger.h"
+#include "../util/MultiplayerCommon.h"
+#include "../util/Random.h"
 
 
 std::string DoubleToString(double val, int digits, bool always_show_sign);
@@ -210,8 +208,8 @@ namespace {
             {"TargetIndustry",       METER_TARGET_INDUSTRY},
             {"Research",             METER_RESEARCH},
             {"TargetResearch",       METER_TARGET_RESEARCH},
-            {"Trade",                METER_TRADE},
-            {"TargetTrade",          METER_TARGET_TRADE},
+            {"Influence",            METER_INFLUENCE},
+            {"TargetInfluence",      METER_TARGET_INFLUENCE},
             {"Construction",         METER_CONSTRUCTION},
             {"TargetConstruction",   METER_TARGET_CONSTRUCTION},
             {"Happiness",            METER_HAPPINESS},
@@ -246,6 +244,8 @@ namespace {
 
     // force early init to avoid threading issues later
     std::map<std::string, MeterType> dummy = GetMeterNameMap();
+
+    const std::string EMPTY_STRING;
 }
 
 namespace ValueRef {
@@ -257,12 +257,12 @@ MeterType NameToMeter(const std::string& name) {
     return retval;
 }
 
-std::string MeterToName(MeterType meter) {
+const std::string& MeterToName(MeterType meter) {
     for (const auto& entry : GetMeterNameMap()) {
         if (entry.second == meter)
             return entry.first;
     }
-    return "";
+    return EMPTY_STRING;
 }
 
 std::string ReconstructName(const std::vector<std::string>& property_name,
@@ -270,6 +270,7 @@ std::string ReconstructName(const std::vector<std::string>& property_name,
                             bool return_immediate_value)
 {
     std::string retval;
+    retval.reserve(64);
 
     if (return_immediate_value)
         retval += "Value(";
@@ -309,17 +310,19 @@ std::string FormatedDescriptionPropertyNames(ReferenceType ref_type,
         if (property_name_part.empty())
              num_references--;
     num_references = std::max(0, num_references);
-    std::string format_string;
-    switch (num_references) {
-    case 0: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE0"); break;
-    case 1: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE1"); break;
-    case 2: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE2"); break;
-    case 3: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE3"); break;
-    case 4: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE4"); break;
-    case 5: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE5"); break;
-    case 6: format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLE6"); break;
-    default:format_string = UserString("DESC_VALUE_REF_MULTIPART_VARIABLEMANY"); break;
-    }
+    const std::string& format_string{
+        [num_references]() {
+            switch (num_references) {
+            case 0: return UserString("DESC_VALUE_REF_MULTIPART_VARIABLE0"); break;
+            case 1: return UserString("DESC_VALUE_REF_MULTIPART_VARIABLE1"); break;
+            case 2: return UserString("DESC_VALUE_REF_MULTIPART_VARIABLE2"); break;
+            case 3: return UserString("DESC_VALUE_REF_MULTIPART_VARIABLE3"); break;
+            case 4: return UserString("DESC_VALUE_REF_MULTIPART_VARIABLE4"); break;
+            case 5: return UserString("DESC_VALUE_REF_MULTIPART_VARIABLE5"); break;
+            case 6: return UserString("DESC_VALUE_REF_MULTIPART_VARIABLE6"); break;
+            default:return UserString("DESC_VALUE_REF_MULTIPART_VARIABLEMANY"); break;
+            }
+        }()};
 
     boost::format formatter = FlexibleFormat(format_string);
 
@@ -336,13 +339,10 @@ std::string FormatedDescriptionPropertyNames(ReferenceType ref_type,
     for (const std::string& property_name_part : property_names) {
         if (property_name_part.empty())  // apparently is empty for a EFFECT_TARGET_VALUE_REFERENCE
             continue;
-        std::string stringtable_key("DESC_VAR_" + boost::to_upper_copy(property_name_part));
-        formatter % UserString(stringtable_key);
+        formatter % UserString("DESC_VAR_" + boost::to_upper_copy(property_name_part));
     }
 
-    std::string retval = boost::io::str(formatter);
-    //std::cerr << "ret: " << retval << std::endl;
-    return retval;
+    return boost::io::str(formatter);
 }
 
 std::string ComplexVariableDescription(const std::vector<std::string>& property_names,
@@ -592,9 +592,9 @@ else                                                                   \
 template <>
 PlanetSize Variable<PlanetSize>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
-
     IF_CURRENT_VALUE(PlanetSize)
+
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     auto object = FollowReference(m_property_name.begin(), m_property_name.end(),
                                   m_ref_type, context);
@@ -626,9 +626,9 @@ PlanetSize Variable<PlanetSize>::Eval(const ScriptingContext& context) const
 template <>
 PlanetType Variable<PlanetType>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
-
     IF_CURRENT_VALUE(PlanetType)
+
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     auto object = FollowReference(m_property_name.begin(), m_property_name.end(),
                                   m_ref_type, context);
@@ -666,9 +666,9 @@ PlanetType Variable<PlanetType>::Eval(const ScriptingContext& context) const
 template <>
 PlanetEnvironment Variable<PlanetEnvironment>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
-
     IF_CURRENT_VALUE(PlanetEnvironment)
+
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     if (property_name == "PlanetEnvironment") {
         auto object = FollowReference(m_property_name.begin(), m_property_name.end(), m_ref_type, context);
@@ -690,9 +690,9 @@ PlanetEnvironment Variable<PlanetEnvironment>::Eval(const ScriptingContext& cont
 template <>
 UniverseObjectType Variable<UniverseObjectType>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
-
     IF_CURRENT_VALUE(UniverseObjectType)
+
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     if (property_name == "ObjectType") {
         auto object = FollowReference(m_property_name.begin(), m_property_name.end(), m_ref_type, context);
@@ -719,9 +719,9 @@ UniverseObjectType Variable<UniverseObjectType>::Eval(const ScriptingContext& co
 template <>
 StarType Variable<StarType>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
-
     IF_CURRENT_VALUE(StarType)
+
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     auto object = FollowReference(m_property_name.begin(), m_property_name.end(),
                                   m_ref_type, context);
@@ -767,9 +767,9 @@ Visibility Variable<Visibility>::Eval(const ScriptingContext& context) const
 template <>
 double Variable<double>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
-
     IF_CURRENT_VALUE(float)
+
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     if (m_ref_type == NON_OBJECT_REFERENCE) {
         if ((property_name == "UniverseCentreX") |
@@ -863,9 +863,9 @@ double Variable<double>::Eval(const ScriptingContext& context) const
 template <>
 int Variable<int>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
-
     IF_CURRENT_VALUE(int)
+
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     if (m_ref_type == NON_OBJECT_REFERENCE) {
         if (property_name == "CombatBout")
@@ -1093,9 +1093,9 @@ template <>
 std::vector<std::string> Variable<std::vector<std::string>>::Eval(
     const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
-
     IF_CURRENT_VALUE(std::vector<std::string>)
+
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     if (m_ref_type == NON_OBJECT_REFERENCE) {
         // add more non-object reference string vector functions here
@@ -1113,16 +1113,12 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
     }
 
     if (property_name == "Tags") {
-        std::vector<std::string> retval;
-        for (auto tag : object->Tags())
-            retval.push_back(tag);
-        return retval;
+        auto tags = object->Tags();
+        return {tags.begin(), tags.end()};
     }
     else if (property_name == "Specials") {
-        std::vector<std::string> retval;
-        for (auto spec : object->Specials())
-            retval.push_back(spec.first);
-        return retval;
+        auto obj_special_names_range = object->Specials() | boost::adaptors::map_keys;
+        return {obj_special_names_range.begin(), obj_special_names_range.end()};
     }
     else if (property_name == "AvailableFoci") {
         if (auto planet = std::dynamic_pointer_cast<const Planet>(object))
@@ -1144,9 +1140,9 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
 template <>
 std::string Variable<std::string>::Eval(const ScriptingContext& context) const
 {
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
-
     IF_CURRENT_VALUE(std::string)
+
+    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     if (m_ref_type == NON_OBJECT_REFERENCE) {
         if (property_name == "GalaxySeed")
@@ -1391,7 +1387,7 @@ Visibility ComplexVariable<Visibility>::Eval(const ScriptingContext& context) co
 {
     const std::string& variable_name = m_property_name.back();
 
-    if (variable_name == "EmpireObjectVisiblity") {
+    if (variable_name == "EmpireObjectVisibility") {
         int empire_id = ALL_EMPIRES;
         if (m_int_ref1) {
             empire_id = m_int_ref1->Eval(context);
@@ -1447,6 +1443,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         empire_property_string_key = &Empire::ShipPartsOwned;
     if (variable_name == "TurnTechResearched")
         empire_property_string_key = &Empire::ResearchedTechs;
+    if (variable_name == "TurnPolicyAdopted")
+        empire_property_string_key = &Empire::TurnsPoliciesAdopted;
 
     // empire properties indexed by strings
     if (empire_property_string_key) {
@@ -1765,6 +1763,26 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             return 0;
 
         return object->SpecialAddedOnTurn(special_name);
+
+    }
+    else if (variable_name == "TurnPolicyAdopted") {
+        if (!m_string_ref1)
+            return 0;
+        std::string policy_name = m_string_ref1->Eval();
+        if (policy_name.empty())
+            return 0;
+
+        int empire_id = ALL_EMPIRES;
+        if (m_int_ref1) {
+            empire_id = m_int_ref1->Eval(context);
+            if (empire_id == ALL_EMPIRES)
+                return 0;
+        }
+        const Empire* empire = GetEmpire(empire_id);
+        if (!empire)
+            return 0;
+
+        return empire->TurnPolicyAdopted(policy_name);
     }
 
     return 0;
@@ -2034,25 +2052,22 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
 
 namespace {
     std::vector<std::string> TechsResearchedByEmpire(int empire_id) {
-        std::vector<std::string> retval;
         const Empire* empire = GetEmpire(empire_id);
-        if (!empire)
-            return retval;
-        for (const auto& tech : GetTechManager()) {
-            if (empire->TechResearched(tech->Name()))
-                retval.push_back(tech->Name());
-        }
-        return retval;
+        if (!empire) return {};
+
+        auto researched_techs_range = empire->ResearchedTechs() | boost::adaptors::map_keys;
+        return {researched_techs_range.begin(), researched_techs_range.end()};
     }
 
     std::vector<std::string> TechsResearchableByEmpire(int empire_id) {
-        std::vector<std::string> retval;
         const Empire* empire = GetEmpire(empire_id);
-        if (!empire)
-            return retval;
+        if (!empire) return {};
+
+        std::vector<std::string> retval;
+        retval.reserve(GetTechManager().size());
         for (const auto& tech : GetTechManager()) {
-            if (empire->ResearchableTech(tech->Name()))
-                retval.push_back(tech->Name());
+            if (tech && empire->ResearchableTech(tech->Name()))
+                retval.emplace_back(tech->Name());
         }
         return retval;
     }
@@ -2143,11 +2158,11 @@ std::string ComplexVariable<std::string>::Eval(const ScriptingContext& context) 
         if (!empire)
             return "";
         // get all techs on queue, randomly pick one
-        const ResearchQueue& queue = empire->GetResearchQueue();
-        std::vector<std::string> all_enqueued_techs = queue.AllEnqueuedProjects();
+        const auto& queue = empire->GetResearchQueue();
+        auto all_enqueued_techs = queue.AllEnqueuedProjects();
         if (all_enqueued_techs.empty())
             return "";
-        std::size_t idx = RandSmallInt(0, static_cast<int>(all_enqueued_techs.size()) - 1);
+        std::size_t idx = RandInt(0, static_cast<int>(all_enqueued_techs.size()) - 1);
         return *std::next(all_enqueued_techs.begin(), idx);
 
     } else if (variable_name == "RandomResearchableTech") {
@@ -2161,10 +2176,10 @@ std::string ComplexVariable<std::string>::Eval(const ScriptingContext& context) 
         if (!empire)
             return "";
 
-        std::vector<std::string> researchable_techs = TechsResearchableByEmpire(empire_id);
+        auto researchable_techs = TechsResearchableByEmpire(empire_id);
         if (researchable_techs.empty())
             return "";
-        std::size_t idx = RandSmallInt(0, static_cast<int>(researchable_techs.size()) - 1);
+        std::size_t idx = RandInt(0, static_cast<int>(researchable_techs.size()) - 1);
         return *std::next(researchable_techs.begin(), idx);
     } else if (variable_name == "RandomCompleteTech") {
         int empire_id = ALL_EMPIRES;
@@ -2177,10 +2192,10 @@ std::string ComplexVariable<std::string>::Eval(const ScriptingContext& context) 
         if (!empire)
             return "";
 
-        std::vector<std::string> complete_techs = TechsResearchedByEmpire(empire_id);
+        auto complete_techs = TechsResearchedByEmpire(empire_id);
         if (complete_techs.empty())
             return "";
-        std::size_t idx = RandSmallInt(0, static_cast<int>(complete_techs.size()) - 1);
+        std::size_t idx = RandInt(0, static_cast<int>(complete_techs.size()) - 1);
         return *std::next(complete_techs.begin(), idx);
     } else if (variable_name == "LowestCostTransferrableTech") {
         int empire1_id = ALL_EMPIRES;
@@ -2200,7 +2215,7 @@ std::string ComplexVariable<std::string>::Eval(const ScriptingContext& context) 
         std::vector<std::string> sendable_techs = TransferrableTechs(empire1_id, empire2_id);
         if (sendable_techs.empty())
             return "";
-        std::size_t idx = RandSmallInt(0, static_cast<int>(sendable_techs.size()) - 1);
+        std::size_t idx = RandInt(0, static_cast<int>(sendable_techs.size()) - 1);
         return *std::next(sendable_techs.begin(), idx);
 
     } else if (variable_name == "HighestCostTransferrableTech") {
@@ -2315,6 +2330,46 @@ std::string ComplexVariable<std::string>::Eval(const ScriptingContext& context) 
     return "";
 }
 
+template <>
+std::vector<std::string> ComplexVariable<std::vector<std::string>>::Eval(
+    const ScriptingContext& context) const
+{
+    const std::string& variable_name = m_property_name.back();
+
+    // unindexed empire properties
+    if (variable_name == "EmpireAdoptedPolices") {
+        int empire_id = ALL_EMPIRES;
+        if (m_int_ref1) {
+            empire_id = m_int_ref1->Eval(context);
+            if (empire_id == ALL_EMPIRES)
+                return {};
+        }
+        const Empire* empire = GetEmpire(empire_id);
+        if (!empire)
+            return {};
+
+        return empire->AdoptedPolicies();
+
+    } else if (variable_name == "EmpireAvailablePolices") {
+        int empire_id = ALL_EMPIRES;
+        if (m_int_ref1) {
+            empire_id = m_int_ref1->Eval(context);
+            if (empire_id == ALL_EMPIRES)
+                return {};
+        }
+        const Empire* empire = GetEmpire(empire_id);
+        if (!empire)
+            return {};
+
+        std::vector<std::string> retval;
+        const auto& pols = empire->AvailablePolicies();
+        std::copy(pols.begin(), pols.end(), std::back_inserter(retval));
+        return retval;
+    }
+
+    return {};
+}
+
 #undef IF_CURRENT_VALUE
 
 template <>
@@ -2323,7 +2378,7 @@ std::string ComplexVariable<Visibility>::Dump(unsigned short ntabs) const
     const std::string& variable_name = m_property_name.back();
     std::string retval = variable_name;
 
-    if (variable_name == "EmpireObjectVisiblity") {
+    if (variable_name == "EmpireObjectVisibility") {
         if (m_int_ref1)
             retval += " empire = " + m_int_ref1->Dump(ntabs);
         if (m_int_ref2)
@@ -2418,7 +2473,7 @@ std::string ComplexVariable<int>::Dump(unsigned short ntabs) const
 {
     const std::string& variable_name = m_property_name.back();
     std::string retval = variable_name;
-
+    // todo: implement like <double> case
     return retval;
 }
 
@@ -2427,7 +2482,16 @@ std::string ComplexVariable<std::string>::Dump(unsigned short ntabs) const
 {
     const std::string& variable_name = m_property_name.back();
     std::string retval = variable_name;
+    // todo: implement like <double> case
+    return retval;
+}
 
+template <>
+std::string ComplexVariable<std::vector<std::string>>::Dump(unsigned short ntabs) const
+{
+    const std::string& variable_name = m_property_name.back();
+    std::string retval = variable_name;
+    // todo: implement like <double> case
     return retval;
 }
 
@@ -2650,7 +2714,7 @@ std::string Operation<std::string>::EvalImpl(const ScriptingContext& context) co
         // select one operand, evaluate it, return result
         if (m_operands.empty())
             return "";
-        unsigned int idx = RandSmallInt(0, m_operands.size() - 1);
+        unsigned int idx = RandInt(0, m_operands.size() - 1);
         auto& vr = *std::next(m_operands.begin(), idx);
         if (!vr)
             return "";
@@ -2795,7 +2859,7 @@ double Operation<double>::EvalImpl(const ScriptingContext& context) const
             // select one operand, evaluate it, return result
             if (m_operands.empty())
                 return 0.0;
-            unsigned int idx = RandSmallInt(0, m_operands.size() - 1);
+            unsigned int idx = RandInt(0, m_operands.size() - 1);
             auto& vr = *std::next(m_operands.begin(), idx);
             if (!vr)
                 return 0.0;
@@ -2946,7 +3010,7 @@ int Operation<int>::EvalImpl(const ScriptingContext& context) const
             // select one operand, evaluate it, return result
             if (m_operands.empty())
                 return 0;
-            unsigned int idx = RandSmallInt(0, m_operands.size() - 1);
+            unsigned int idx = RandInt(0, m_operands.size() - 1);
             auto& vr = *std::next(m_operands.begin(), idx);
             if (!vr)
                 return 0;

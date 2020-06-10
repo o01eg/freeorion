@@ -143,7 +143,7 @@ namespace {
         }
         if (!valid_names.empty()) {
             // pick a name from the list of empire names
-            int empire_name_idx = RandSmallInt(0, static_cast<int>(valid_names.size()) - 1);
+            int empire_name_idx = RandInt(0, static_cast<int>(valid_names.size()) - 1);
             return *std::next(valid_names.begin(), empire_name_idx);
         }
         // use a player_name as it unique among players
@@ -817,7 +817,6 @@ MPLobby::MPLobby(my_context c) :
 {
     TraceLogger(FSM) << "(ServerFSM) MPLobby";
     throw std::invalid_argument("MPLobby is disallowed in longturn games.");
-
     ClockSeed();
     ServerApp& server = Server();
     server.InitializePython();
@@ -1219,7 +1218,6 @@ sc::result MPLobby::react(const JoinGame& msg) {
 
     DebugLogger(FSM) << "(ServerFSM) MPLobby.JoinGame player accepted: " << player_name;
     EstablishPlayer(player_connection, player_name, client_type, client_version_string, roles);
-
 
     return discard_event();
 }
@@ -1809,7 +1807,6 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             return transit<WaitingForMPGameJoiners>();
         }
     }
-
     DebugLogger(FSM) << "New save file: " << new_save_file_selected
 	             << ". PSD changed: " << player_setup_data_changed
 		     << ". Important changes: " << has_important_changes;
@@ -2476,7 +2473,6 @@ sc::result WaitingForMPGameJoiners::react(const CheckStartConditions& u) {
         if (m_player_save_game_data.empty()) {
             DebugLogger(FSM) << "Initializing new MP game...";
             server.NewMPGameInit(*m_lobby_data);
-
             // notify all disconnected players about new game
             for (const auto& empire : Empires()) {
                 if (server.GetEmpireClientType(empire.first) == Networking::INVALID_CLIENT_TYPE &&
@@ -2592,7 +2588,6 @@ sc::result PlayingGame::react(const PlayerChat& msg) {
                                                        data, pm));
         }
     }
-
     return discard_event();
 }
 
@@ -2762,7 +2757,14 @@ sc::result PlayingGame::react(const JoinGame& msg) {
     Networking::ClientType client_type;
     std::string client_version_string;
     boost::uuids::uuid cookie;
-    ExtractJoinGameMessageData(message, player_name, client_type, client_version_string, cookie);
+    try {
+        ExtractJoinGameMessageData(message, player_name, client_type, client_version_string, cookie);
+    } catch (const std::exception& e) {
+        ErrorLogger(FSM) << "PlayingGame::react(const JoinGame& msg): couldn't extract data from join game message";
+        player_connection->SendMessage(ErrorMessage(UserString("ERROR_INCOMPATIBLE_VERSION"), true));
+        server.Networking().Disconnect(player_connection);
+        return discard_event();
+    }
 
     Networking::AuthRoles roles;
     bool authenticated;
@@ -3263,7 +3265,6 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
         // if all players have submitted orders and the server doesn't wait until fixed turn timeout
         // expires, proceed to turn processing
         TraceLogger(FSM) << "WaitingForTurnEnd.TurnOrders : All orders received.";
-
         // notify all disconnected players about turn advance
         for (const auto& empire : Empires()) {
             if (server.GetEmpireClientType(empire.first) == Networking::INVALID_CLIENT_TYPE &&
@@ -3272,7 +3273,6 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
                 server.SendOutboundChatMessage((boost::format("Hello, %s. New turn %d started") % empire.second->PlayerName() % (server.CurrentTurn()+1)).str(), empire.second->PlayerName(), GetOptionsDB().Get<bool>("network.server.allow-email.new-turn"));
             }
         }
-
         post_event(ProcessTurn());
         return transit<ProcessingTurn>();
     }
@@ -3293,6 +3293,11 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
         }
     }
 
+    // save game so orders from the player will be backuped
+    if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.each-player.enabled")) {
+        PlayerConnectionPtr dummy_connection = nullptr;
+        post_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(server.CurrentTurn())), dummy_connection));
+    }
     std::thread([last_player_names] {
         std::vector<std::string> args{"/usr/bin/curl",
             "http://localhost:8083/",

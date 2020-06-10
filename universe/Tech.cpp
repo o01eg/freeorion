@@ -1,21 +1,21 @@
 #include "Tech.h"
 
+#include <boost/filesystem/fstream.hpp>
 #include "Effect.h"
+#include "Enums.h"
+#include "ObjectMap.h"
 #include "UniverseObject.h"
 #include "UnlockableItem.h"
-#include "ObjectMap.h"
-#include "../util/OptionsDB.h"
-#include "../util/Logger.h"
-#include "../util/AppInterface.h"
-#include "../util/GameRules.h"
-#include "../util/CheckSums.h"
-#include "../util/ScopedTimer.h"
-#include "../Empire/Empire.h"
-#include "../Empire/EmpireManager.h"
 #include "ValueRef.h"
-#include "Enums.h"
+#include "../Empire/EmpireManager.h"
+#include "../Empire/Empire.h"
+#include "../util/AppInterface.h"
+#include "../util/CheckSums.h"
+#include "../util/GameRules.h"
+#include "../util/Logger.h"
+#include "../util/OptionsDB.h"
+#include "../util/ScopedTimer.h"
 
-#include <boost/filesystem/fstream.hpp>
 
 namespace {
     void AddRules(GameRules& rules) {
@@ -380,6 +380,9 @@ const Tech* TechManager::CheapestNextTechTowards(const std::set<std::string>& kn
                                                  const std::string& desired_tech,
                                                  int empire_id)
 { return Cheapest(NextTechsTowards(known_techs, desired_tech, empire_id), empire_id); }
+
+size_t TechManager::size() const
+{ return m_techs.size(); }
 
 TechManager::iterator TechManager::begin() const {
     CheckPendingTechs();

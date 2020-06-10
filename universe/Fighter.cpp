@@ -1,7 +1,7 @@
 #include "Fighter.h"
 
-#include "Predicates.h"
 #include "Enums.h"
+#include "UniverseObjectVisitor.h"
 #include "../Empire/EmpireManager.h"
 #include "../util/AppInterface.h"
 #include "../util/Logger.h"

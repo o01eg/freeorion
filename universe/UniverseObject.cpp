@@ -1,18 +1,18 @@
 #include "UniverseObject.h"
 
-#include "../util/i18n.h"
-#include "../util/Logger.h"
-#include "../util/AppInterface.h"
-#include "../Empire/EmpireManager.h"
-#include "System.h"
-#include "Special.h"
-#include "Pathfinder.h"
-#include "Universe.h"
-#include "Predicates.h"
-#include "Enums.h"
-
 #include <stdexcept>
 #include <boost/lexical_cast.hpp>
+#include "Enums.h"
+#include "Pathfinder.h"
+#include "Special.h"
+#include "System.h"
+#include "UniverseObjectVisitor.h"
+#include "Universe.h"
+#include "../Empire/EmpireManager.h"
+#include "../util/AppInterface.h"
+#include "../util/Logger.h"
+#include "../util/i18n.h"
+
 
 // static(s)
 const int INVALID_OBJECT_ID      = -1;
@@ -160,7 +160,7 @@ float UniverseObject::SpecialCapacity(const std::string& name) const {
 }
 
 std::set<std::string> UniverseObject::Tags() const
-{ return std::set<std::string>(); }
+{ return {}; }
 
 bool UniverseObject::HasTag(const std::string& name) const
 { return false; }
@@ -354,7 +354,7 @@ UniverseObject::MeterMap UniverseObject::CensoredMeters(Visibility vis) const {
     if (vis >= VIS_PARTIAL_VISIBILITY) {
         retval = m_meters;
     } else if (vis == VIS_BASIC_VISIBILITY && m_meters.count(METER_STEALTH))
-        retval.emplace(std::make_pair(METER_STEALTH, Meter{Meter::LARGE_VALUE, Meter::LARGE_VALUE}));
+        retval.emplace(METER_STEALTH, Meter{Meter::LARGE_VALUE, Meter::LARGE_VALUE});
     return retval;
 }
 

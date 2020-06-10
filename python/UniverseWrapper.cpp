@@ -1,35 +1,34 @@
-#include "../universe/Pathfinder.h"
-#include "../universe/Universe.h"
-#include "../universe/UniverseObject.h"
-#include "../universe/Fleet.h"
-#include "../universe/Ship.h"
-#include "../universe/ShipDesign.h"
-#include "../universe/ShipPart.h"
-#include "../universe/ShipHull.h"
-#include "../universe/Building.h"
-#include "../universe/BuildingType.h"
-#include "../universe/ResourceCenter.h"
-#include "../universe/PopCenter.h"
-#include "../universe/Planet.h"
-#include "../universe/System.h"
-#include "../universe/Field.h"
-#include "../universe/FieldType.h"
-#include "../universe/Special.h"
-#include "../universe/Species.h"
-#include "../universe/Enums.h"
-#include "../universe/Effect.h"
-#include "../universe/Predicates.h"
-#include "../universe/ScriptingContext.h"
-#include "../universe/Condition.h"
-#include "../util/Logger.h"
-#include "../util/MultiplayerCommon.h"
-#include "../util/GameRules.h"
-#include "../util/AppInterface.h"
-
 #include <boost/mpl/vector.hpp>
 #include <boost/python.hpp>
 #include <boost/python/suite/indexing/map_indexing_suite.hpp>
 #include <boost/python/suite/indexing/vector_indexing_suite.hpp>
+#include "../universe/Building.h"
+#include "../universe/BuildingType.h"
+#include "../universe/Condition.h"
+#include "../universe/Effect.h"
+#include "../universe/Enums.h"
+#include "../universe/Field.h"
+#include "../universe/FieldType.h"
+#include "../universe/Fleet.h"
+#include "../universe/Pathfinder.h"
+#include "../universe/Planet.h"
+#include "../universe/PopCenter.h"
+#include "../universe/ResourceCenter.h"
+#include "../universe/ScriptingContext.h"
+#include "../universe/ShipDesign.h"
+#include "../universe/Ship.h"
+#include "../universe/ShipHull.h"
+#include "../universe/ShipPart.h"
+#include "../universe/Special.h"
+#include "../universe/Species.h"
+#include "../universe/System.h"
+#include "../universe/Universe.h"
+#include "../universe/UniverseObject.h"
+#include "../universe/UniverseObjectVisitors.h"
+#include "../util/AppInterface.h"
+#include "../util/GameRules.h"
+#include "../util/Logger.h"
+#include "../util/MultiplayerCommon.h"
 
 
 #if defined(_MSC_VER)
@@ -632,9 +631,9 @@ namespace FreeOrionPython {
             .add_property("colonyCapacity",     make_function(&ShipDesign::ColonyCapacity,  return_value_policy<return_by_value>()))
             .add_property("troopCapacity",      make_function(&ShipDesign::TroopCapacity,   return_value_policy<return_by_value>()))
             .add_property("stealth",            make_function(&ShipDesign::Stealth,         return_value_policy<return_by_value>()))
-            .add_property("industryGeneration", make_function(&ShipDesign::IndustryGeneration, return_value_policy<return_by_value>()))
-            .add_property("researchGeneration", make_function(&ShipDesign::ResearchGeneration, return_value_policy<return_by_value>()))
-            .add_property("tradeGeneration",    make_function(&ShipDesign::TradeGeneration, return_value_policy<return_by_value>()))
+            .add_property("industryGeneration", make_function(&ShipDesign::IndustryGeneration,  return_value_policy<return_by_value>()))
+            .add_property("researchGeneration", make_function(&ShipDesign::ResearchGeneration,  return_value_policy<return_by_value>()))
+            .add_property("influenceGeneration",make_function(&ShipDesign::InfluenceGeneration, return_value_policy<return_by_value>()))
             .add_property("defense",            make_function(&ShipDesign::Defense,         return_value_policy<return_by_value>()))
             .add_property("attack",             make_function(&ShipDesign::Attack,          return_value_policy<return_by_value>()))
             .add_property("canColonize",        make_function(&ShipDesign::CanColonize,     return_value_policy<return_by_value>()))

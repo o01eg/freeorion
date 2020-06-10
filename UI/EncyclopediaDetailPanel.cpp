@@ -1,57 +1,57 @@
 #include "EncyclopediaDetailPanel.h"
 
-#include "CUIControls.h"
-#include "DesignWnd.h"
-#include "FleetWnd.h"
-#include "GraphControl.h"
-#include "Hotkeys.h"
-#include "LinkText.h"
-#include "CUILinkTextBlock.h"
-#include "MapWnd.h"
-#include "../universe/Condition.h"
-#include "../universe/Effect.h"
-#include "../universe/ValueRef.h"
-#include "../universe/Encyclopedia.h"
-#include "../universe/Universe.h"
-#include "../universe/Tech.h"
-#include "../universe/Building.h"
-#include "../universe/BuildingType.h"
-#include "../universe/Planet.h"
-#include "../universe/System.h"
-#include "../universe/Ship.h"
-#include "../universe/ShipDesign.h"
-#include "../universe/ShipHull.h"
-#include "../universe/ShipPart.h"
-#include "../universe/Fleet.h"
-#include "../universe/Special.h"
-#include "../universe/Species.h"
-#include "../universe/Field.h"
-#include "../universe/FieldType.h"
-#include "../universe/Predicates.h"
-#include "../universe/UnlockableItem.h"
-#include "../Empire/Empire.h"
-#include "../Empire/EmpireManager.h"
-#include "../util/EnumText.h"
-#include "../util/i18n.h"
-#include "../util/Logger.h"
-#include "../util/OptionsDB.h"
-#include "../util/GameRules.h"
-#include "../util/Directories.h"
-#include "../util/VarText.h"
-#include "../util/ScopedTimer.h"
-#include "../client/human/HumanClientApp.h"
-#include "../combat/CombatLogManager.h"
-
+#include <unordered_map>
+#include <boost/algorithm/clamp.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/replace.hpp>
 #include <GG/GUI.h>
 #include <GG/RichText/RichText.h>
 #include <GG/ScrollPanel.h>
 #include <GG/StaticGraphic.h>
 #include <GG/Texture.h>
+#include "CUIControls.h"
+#include "CUILinkTextBlock.h"
+#include "DesignWnd.h"
+#include "FleetWnd.h"
+#include "GraphControl.h"
+#include "Hotkeys.h"
+#include "LinkText.h"
+#include "MapWnd.h"
+#include "../client/human/HumanClientApp.h"
+#include "../combat/CombatLogManager.h"
+#include "../Empire/Empire.h"
+#include "../Empire/EmpireManager.h"
+#include "../Empire/Government.h"
+#include "../universe/Building.h"
+#include "../universe/BuildingType.h"
+#include "../universe/Condition.h"
+#include "../universe/Effect.h"
+#include "../universe/Encyclopedia.h"
+#include "../universe/Field.h"
+#include "../universe/FieldType.h"
+#include "../universe/Fleet.h"
+#include "../universe/Planet.h"
+#include "../universe/ShipDesign.h"
+#include "../universe/Ship.h"
+#include "../universe/ShipHull.h"
+#include "../universe/ShipPart.h"
+#include "../universe/Special.h"
+#include "../universe/Species.h"
+#include "../universe/System.h"
+#include "../universe/Tech.h"
+#include "../universe/UniverseObjectVisitors.h"
+#include "../universe/Universe.h"
+#include "../universe/UnlockableItem.h"
+#include "../universe/ValueRef.h"
+#include "../util/Directories.h"
+#include "../util/EnumText.h"
+#include "../util/GameRules.h"
+#include "../util/i18n.h"
+#include "../util/Logger.h"
+#include "../util/OptionsDB.h"
+#include "../util/ScopedTimer.h"
+#include "../util/VarText.h"
 
-#include <boost/algorithm/clamp.hpp>
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <unordered_map>
 
 FO_COMMON_API extern const int INVALID_DESIGN_ID;
 
@@ -140,6 +140,7 @@ namespace {
     const std::vector<std::string>& GetSearchTextDirNames() {
         static std::vector<std::string> dir_names {
             "ENC_INDEX",        "ENC_SHIP_PART",    "ENC_SHIP_HULL",    "ENC_TECH",
+            "ENC_POLICY",
             "ENC_BUILDING_TYPE","ENC_SPECIAL",      "ENC_SPECIES",      "ENC_FIELD_TYPE",
             "ENC_METER_TYPE",   "ENC_EMPIRE",       "ENC_SHIP_DESIGN",  "ENC_SHIP",
             "ENC_MONSTER",      "ENC_MONSTER_TYPE", "ENC_FLEET",        "ENC_PLANET",
@@ -229,6 +230,14 @@ namespace {
                                                 {LinkTaggedText(VarText::TECH_TAG, tech_name.second) + "\n",
                                                  tech_name.second}});
                 }
+            }
+
+        }
+        else if (dir_name == "ENC_POLICY") {
+            for (const auto& policy_name : GetPolicyManager().PolicyNames()) {
+                sorted_entries_list.insert({policy_name,
+                                            {LinkTaggedText(VarText::POLICY_TAG, policy_name) + "\n",
+                                             policy_name}});
             }
 
         }
@@ -593,6 +602,9 @@ void EncyclopediaDetailPanel::CompleteConstruction() {
     const int PTS = ClientUI::Pts();
     const int NAME_PTS = PTS*3/2;
     const int SUMMARY_PTS = PTS*4/3;
+    const GG::X CONTROL_WIDTH(54);
+    const GG::Y CONTROL_HEIGHT(74);
+    const GG::Pt PALETTE_MIN_SIZE{GG::X{CONTROL_WIDTH + 70}, GG::Y{CONTROL_HEIGHT + 70}};
 
     m_name_text =    GG::Wnd::Create<CUILabel>("");
     m_cost_text =    GG::Wnd::Create<CUILabel>("");
@@ -673,6 +685,9 @@ void EncyclopediaDetailPanel::CompleteConstruction() {
 
     SetChildClippingMode(ClipToWindow);
     DoLayout();
+
+    SetMinSize(PALETTE_MIN_SIZE);
+
     MoveChildUp(m_graph);
     SaveDefaultedOptions();
 
@@ -916,6 +931,8 @@ void EncyclopediaDetailPanel::HandleLinkClick(const std::string& link_type, cons
 
         } else if (link_type == VarText::TECH_TAG) {
             this->SetTech(data);
+        } else if (link_type == VarText::POLICY_TAG) {
+            this->SetPolicy(data);
         } else if (link_type == VarText::BUILDING_TYPE_TAG) {
             this->SetBuildingType(data);
         } else if (link_type == VarText::FIELD_TYPE_TAG) {
@@ -969,6 +986,8 @@ void EncyclopediaDetailPanel::HandleLinkDoubleClick(const std::string& link_type
 
         } else if (link_type == VarText::TECH_TAG) {
             ClientUI::GetClientUI()->ZoomToTech(data);
+        } else if (link_type == VarText::POLICY_TAG) {
+            ClientUI::GetClientUI()->ZoomToPolicy(data);
         } else if (link_type == VarText::BUILDING_TYPE_TAG) {
             ClientUI::GetClientUI()->ZoomToBuildingType(data);
         } else if (link_type == VarText::SPECIAL_TAG) {
@@ -1363,6 +1382,7 @@ namespace {
                 case UIT_SHIP_HULL:     TAG = VarText::SHIP_HULL_TAG;           break;
                 case UIT_SHIP_DESIGN:   TAG = VarText::PREDEFINED_DESIGN_TAG;   break;
                 case UIT_TECH:          TAG = VarText::TECH_TAG;                break;
+                case UIT_POLICY:        TAG = VarText::POLICY_TAG;              break;
                 default: break;
                 }
 
@@ -1394,6 +1414,46 @@ namespace {
             { detailed_description += LinkTaggedText(VarText::TECH_TAG, tech_name) + "  "; }
             detailed_description += "\n\n";
         }
+    }
+
+    void RefreshDetailPanelPolicyTag(       const std::string& item_type, const std::string& item_name,
+                                            std::string& name, std::shared_ptr<GG::Texture>& texture,
+                                            std::shared_ptr<GG::Texture>& other_texture, int& turns,
+                                            float& cost, std::string& cost_units, std::string& general_type,
+                                            std::string& specific_type, std::string& detailed_description,
+                                            GG::Clr& color)
+    {
+        const Policy* policy = GetPolicy(item_name);
+        if (!policy) {
+            ErrorLogger() << "EncyclopediaDetailPanel::Refresh couldn't find policy with name " << item_name;
+            return;
+        }
+        int client_empire_id = HumanClientApp::GetApp()->EmpireID();
+
+        // Policies
+        name = UserString(item_name);
+        texture = ClientUI::PolicyIcon(item_name);
+        cost = policy->AdoptionCost(client_empire_id);
+        cost_units = UserString("ENC_IP");
+        general_type = str(FlexibleFormat(UserString("ENC_TECH_DETAIL_TYPE_STR"))
+            % UserString(policy->Category())
+            % ""
+            % UserString(policy->ShortDescription()));
+
+        detailed_description += UserString(policy->Description());
+
+        auto unlocked_by_techs = TechsThatUnlockItem(UnlockableItem(UIT_POLICY, item_name));
+        if (!unlocked_by_techs.empty()) {
+            detailed_description += "\n\n" + UserString("ENC_UNLOCKED_BY");
+            for (const auto& tech_name : unlocked_by_techs)
+            { detailed_description += LinkTaggedText(VarText::TECH_TAG, tech_name) + "  "; }
+            detailed_description += "\n\n";
+        }
+
+        if (GetOptionsDB().Get<bool>("resource.effects.description.shown") && !policy->Effects().empty()) {
+            detailed_description += "\n" + Dump(policy->Effects());
+        }
+
     }
 
     void RefreshDetailPanelBuildingTypeTag( const std::string& item_type, const std::string& item_name,
@@ -1561,6 +1621,26 @@ namespace {
                                      + DoubleToString(meter_it->second.Initial(), 3, false)
                                      + "\n";
             }
+        }
+
+
+        // Policies
+        auto policies = empire->AdoptedPolicies();
+        if (!policies.empty()) {
+            detailed_description += "\n" + UserString("ADOPTED_POLICIES");
+            for (const auto& entry : policies) {
+                detailed_description += "\n";
+                std::string turn_text;
+                int turn = empire->TurnPolicyAdopted(entry);
+                if (turn == BEFORE_FIRST_TURN)
+                    turn_text = UserString("BEFORE_FIRST_TURN");
+                else
+                    turn_text = UserString("TURN") + " " + std::to_string(turn);
+                detailed_description += LinkTaggedText(VarText::TECH_TAG, entry)
+                                     + " : " + turn_text;
+            }
+        } else {
+            detailed_description += "\n\n" + UserString("NO_POLICIES_ADOPTED");
         }
 
 
@@ -2680,8 +2760,10 @@ namespace {
             detailed_description += "\n";
         }
 
-        detailed_description += UserString("ENC_SUITABILITY_REPORT_WHEEL_INTRO")
-                                + "<img src=\"encyclopedia/EP_wheel.png\"></img>";
+        if (planet->Type() < PT_ASTEROIDS && planet->Type() > INVALID_PLANET_TYPE) {
+            detailed_description += UserString("ENC_SUITABILITY_REPORT_WHEEL_INTRO")
+                                    + "<img src=\"encyclopedia/EP_wheel.png\"></img>";
+        }
     }
 
     void RefreshDetailPanelSearchResultsTag(const std::string& item_type, const std::string& item_name,
@@ -2720,6 +2802,11 @@ namespace {
         }
         else if (item_type == "ENC_TECH") {
             RefreshDetailPanelTechTag(          item_type, item_name,
+                                                name, texture, other_texture, turns, cost, cost_units,
+                                                general_type, specific_type, detailed_description, color);
+        }
+        else if (item_type == "ENC_POLICY") {
+            RefreshDetailPanelPolicyTag(        item_type, item_name,
                                                 name, texture, other_texture, turns, cost, cost_units,
                                                 general_type, specific_type, detailed_description, color);
         }
@@ -3036,6 +3123,10 @@ void EncyclopediaDetailPanel::RefreshImpl() {
             % DoubleToString(cost, 3, false)
             % cost_units
             % turns));
+    } else if (cost != 0.0) {
+        m_cost_text->SetText(str(FlexibleFormat(UserString("ENC_COST_STR"))
+            % DoubleToString(cost, 3, false)
+            % cost_units));
     }
 
     if (!detailed_description.empty())
@@ -3118,6 +3209,12 @@ void EncyclopediaDetailPanel::SetTech(const std::string& tech_name) {
     if (m_items_it != m_items.end() && tech_name == m_items_it->second)
         return;
     AddItem("ENC_TECH", tech_name);
+}
+
+void EncyclopediaDetailPanel::SetPolicy(const std::string& policy_name) {
+    if (m_items_it != m_items.end() && policy_name == m_items_it->second)
+        return;
+    AddItem("ENC_POLICY", policy_name);
 }
 
 void EncyclopediaDetailPanel::SetShipPart(const std::string& part_name) {
@@ -3241,6 +3338,9 @@ void EncyclopediaDetailPanel::SetItem(std::shared_ptr<const Planet> planet)
 
 void EncyclopediaDetailPanel::SetItem(const Tech* tech)
 { SetTech(tech ? tech->Name() : EMPTY_STRING); }
+
+void EncyclopediaDetailPanel::SetItem(const Policy* policy)
+{ SetPolicy(policy ? policy->Name() : EMPTY_STRING); }
 
 void EncyclopediaDetailPanel::SetItem(const ShipPart* part)
 { SetShipPart(part ? part->Name() : EMPTY_STRING); }

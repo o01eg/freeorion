@@ -4,7 +4,6 @@
 #include "../universe/Universe.h"
 #include "../util/GameRules.h"
 #include "../util/OptionsDB.h"
-#include "../universe/Predicates.h"
 #include "../universe/Planet.h"
 #include "../universe/Fleet.h"
 #include "../universe/Ship.h"
@@ -1223,12 +1222,7 @@ namespace {
         void GetShuffledValidAttackerIDs(std::vector<int>& shuffled) {
             shuffled.clear();
             shuffled.insert(shuffled.begin(), valid_attacker_object_ids.begin(), valid_attacker_object_ids.end());
-
-            const unsigned swaps = shuffled.size();
-            for (unsigned i = 0; i < swaps; ++i) {
-                int pos2 = RandInt(i, swaps - 1);
-                std::swap(shuffled[i], shuffled[pos2]);
-            }
+            RandomShuffle(shuffled);
         }
 
         float EmpireDetectionStrength(int empire_id) {

@@ -1,10 +1,11 @@
 #ifndef _Ship_h_
 #define _Ship_h_
 
-#include "UniverseObject.h"
-#include "Meter.h"
 
+#include "Meter.h"
+#include "UniverseObject.h"
 #include "../util/Export.h"
+
 
 FO_COMMON_API extern const int ALL_EMPIRES;
 FO_COMMON_API extern const int INVALID_DESIGN_ID;
@@ -83,7 +84,7 @@ public:
     float                       FighterCount() const;
     float                       FighterMax() const;
     std::vector<float>          AllWeaponsDamage(float shield_DR = 0.0f, bool include_fighters = true) const;   ///< any nonzero weapons strengths after adjustment versus an enemy with a given shields DR
-    std::vector<float>          AllWeaponsMaxDamage(float shield_DR = 0.0f, bool include_fighters = true) const;///< any nonzero weapons strengths, assuming the shpi has been refueled recently, after adjustment versus an enemy with a given shields DR
+    std::vector<float>          AllWeaponsMaxDamage(float shield_DR = 0.0f, bool include_fighters = true) const;///< any nonzero weapons strengths, assuming the ship has been refueled recently, after adjustment versus an enemy with a given shields DR
     //@}
 
     /** \name Mutators */ //@{

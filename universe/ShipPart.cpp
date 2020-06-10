@@ -1,13 +1,12 @@
 #include "ShipPart.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
-
-#include "Enums.h"
 #include "ConditionSource.h"
 #include "Effects.h"
+#include "Enums.h"
 #include "ValueRefs.h"
-#include "../Empire/Empire.h"
 #include "../Empire/EmpireManager.h"
+#include "../Empire/Empire.h"
 #include "../util/CheckSums.h"
 #include "../util/GameRules.h"
 
@@ -29,8 +28,7 @@ namespace {
         auto vr =
             std::make_unique<ValueRef::Operation<double>>(
                 ValueRef::PLUS,
-                std::make_unique<ValueRef::Variable<double>>(
-                    ValueRef::EFFECT_TARGET_VALUE_REFERENCE, std::vector<std::string>()),
+                std::make_unique<ValueRef::Variable<double>>(ValueRef::EFFECT_TARGET_VALUE_REFERENCE),
                 std::move(increase_vr)
             );
         auto effects = Effects();
@@ -59,8 +57,7 @@ namespace {
 
         auto value_vr = std::make_unique<ValueRef::Operation<double>>(
             ValueRef::PLUS,
-            std::make_unique<ValueRef::Variable<double>>(
-                ValueRef::EFFECT_TARGET_VALUE_REFERENCE, std::vector<std::string>()),
+            std::make_unique<ValueRef::Variable<double>>(ValueRef::EFFECT_TARGET_VALUE_REFERENCE),
             std::move(increase_vr)
         );
 
@@ -234,8 +231,8 @@ void ShipPart::Init(std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects
         case PC_INDUSTRY:
             m_effects.push_back(IncreaseMeter(METER_TARGET_INDUSTRY,         m_capacity));
             break;
-        case PC_TRADE:
-            m_effects.push_back(IncreaseMeter(METER_TARGET_TRADE,            m_capacity));
+        case PC_INFLUENCE:
+            m_effects.push_back(IncreaseMeter(METER_TARGET_INFLUENCE,        m_capacity));
             break;
         default:
             break;

@@ -1,35 +1,34 @@
 #include "Effects.h"
 
+#include <cctype>
+#include <iterator>
+#include <boost/filesystem/fstream.hpp>
+#include "BuildingType.h"
+#include "Building.h"
+#include "Condition.h"
+#include "Enums.h"
+#include "FieldType.h"
+#include "Field.h"
+#include "Fleet.h"
+#include "Pathfinder.h"
+#include "Planet.h"
+#include "ShipDesign.h"
+#include "Ship.h"
+#include "Species.h"
+#include "System.h"
+#include "Tech.h"
+#include "UniverseObject.h"
+#include "Universe.h"
+#include "ValueRefs.h"
+#include "../Empire/EmpireManager.h"
+#include "../Empire/Empire.h"
+#include "../util/Directories.h"
 #include "../util/Logger.h"
 #include "../util/OptionsDB.h"
 #include "../util/Random.h"
-#include "../util/Directories.h"
-#include "../util/i18n.h"
 #include "../util/SitRepEntry.h"
-#include "../Empire/EmpireManager.h"
-#include "../Empire/Empire.h"
-#include "ValueRefs.h"
-#include "Condition.h"
-#include "Pathfinder.h"
-#include "Universe.h"
-#include "UniverseObject.h"
-#include "Building.h"
-#include "BuildingType.h"
-#include "Planet.h"
-#include "System.h"
-#include "Field.h"
-#include "FieldType.h"
-#include "Fleet.h"
-#include "Ship.h"
-#include "ShipDesign.h"
-#include "Tech.h"
-#include "Species.h"
-#include "Enums.h"
+#include "../util/i18n.h"
 
-#include <boost/filesystem/fstream.hpp>
-
-#include <cctype>
-#include <iterator>
 
 namespace {
     DeclareThreadSafeLogger(effects);
@@ -395,11 +394,13 @@ unsigned int NoOp::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 SetMeter::SetMeter(MeterType meter,
                    std::unique_ptr<ValueRef::ValueRef<double>>&& value,
-                   const boost::optional<std::string>& accounting_label) :
+                   boost::optional<std::string> accounting_label) :
     m_meter(meter),
-    m_value(std::move(value)),
-    m_accounting_label(accounting_label ? *accounting_label : std::string())
-{}
+    m_value(std::move(value))
+{
+    if (accounting_label)
+        m_accounting_label = std::move(*accounting_label);
+}
 
 void SetMeter::Execute(ScriptingContext& context) const {
     if (!context.effect_target) return;
@@ -525,7 +526,7 @@ std::string SetMeter::Dump(unsigned short ntabs) const {
     case METER_TARGET_POPULATION:   retval += "TargetPopulation"; break;
     case METER_TARGET_INDUSTRY:     retval += "TargetIndustry"; break;
     case METER_TARGET_RESEARCH:     retval += "TargetResearch"; break;
-    case METER_TARGET_TRADE:        retval += "TargetTrade"; break;
+    case METER_TARGET_INFLUENCE:    retval += "TargetInfluence"; break;
     case METER_TARGET_CONSTRUCTION: retval += "TargetConstruction"; break;
     case METER_TARGET_HAPPINESS:    retval += "TargetHappiness"; break;
 
@@ -542,7 +543,7 @@ std::string SetMeter::Dump(unsigned short ntabs) const {
     case METER_POPULATION:          retval += "Population"; break;
     case METER_INDUSTRY:            retval += "Industry"; break;
     case METER_RESEARCH:            retval += "Research"; break;
-    case METER_TRADE:               retval += "Trade"; break;
+    case METER_INFLUENCE:           retval += "Influence"; break;
     case METER_CONSTRUCTION:        retval += "Construction"; break;
     case METER_HAPPINESS:           retval += "Happiness"; break;
 
@@ -768,16 +769,16 @@ unsigned int SetShipPartMeter::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // SetEmpireMeter                                        //
 ///////////////////////////////////////////////////////////
-SetEmpireMeter::SetEmpireMeter(const std::string& meter, std::unique_ptr<ValueRef::ValueRef<double>>&& value) :
-    m_empire_id(std::make_unique<ValueRef::Variable<int>>(ValueRef::EFFECT_TARGET_REFERENCE, std::vector<std::string>(1, "Owner"))),
-    m_meter(meter),
+SetEmpireMeter::SetEmpireMeter(std::string& meter, std::unique_ptr<ValueRef::ValueRef<double>>&& value) :
+    m_empire_id(std::make_unique<ValueRef::Variable<int>>(ValueRef::EFFECT_TARGET_REFERENCE, "Owner")),
+    m_meter(std::move(meter)),
     m_value(std::move(value))
 {}
 
-SetEmpireMeter::SetEmpireMeter(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id, const std::string& meter,
+SetEmpireMeter::SetEmpireMeter(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id, std::string& meter,
                                std::unique_ptr<ValueRef::ValueRef<double>>&& value) :
     m_empire_id(std::move(empire_id)),
-    m_meter(meter),
+    m_meter(std::move(meter)),
     m_value(std::move(value))
 {}
 
@@ -875,7 +876,7 @@ unsigned int SetEmpireMeter::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 SetEmpireStockpile::SetEmpireStockpile(ResourceType stockpile,
                                        std::unique_ptr<ValueRef::ValueRef<double>>&& value) :
-    m_empire_id(std::make_unique<ValueRef::Variable<int>>(ValueRef::EFFECT_TARGET_REFERENCE, std::vector<std::string>(1, "Owner"))),
+    m_empire_id(std::make_unique<ValueRef::Variable<int>>(ValueRef::EFFECT_TARGET_REFERENCE, "Owner")),
     m_stockpile(stockpile),
     m_value(std::move(value))
 {}
@@ -936,7 +937,7 @@ unsigned int SetEmpireStockpile::GetCheckSum() const {
 // SetEmpireCapital                                      //
 ///////////////////////////////////////////////////////////
 SetEmpireCapital::SetEmpireCapital() :
-    m_empire_id(std::make_unique<ValueRef::Variable<int>>(ValueRef::EFFECT_TARGET_REFERENCE, std::vector<std::string>(1, "Owner")))
+    m_empire_id(std::make_unique<ValueRef::Variable<int>>(ValueRef::EFFECT_TARGET_REFERENCE, "Owner"))
 {}
 
 SetEmpireCapital::SetEmpireCapital(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id) :
@@ -1885,7 +1886,7 @@ void CreateSystem::Execute(ScriptingContext& context) const {
         star_type = m_type->Eval(context);
     } else {
         int max_type_idx = int(NUM_STAR_TYPES) - 1;
-        int type_idx = RandSmallInt(0, max_type_idx);
+        int type_idx = RandInt(0, max_type_idx);
         star_type = StarType(type_idx);
     }
 
@@ -2002,8 +2003,8 @@ unsigned int Destroy::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // AddSpecial                                            //
 ///////////////////////////////////////////////////////////
-AddSpecial::AddSpecial(const std::string& name, float capacity) :
-    m_name(std::make_unique<ValueRef::Constant<std::string>>(name)),
+AddSpecial::AddSpecial(std::string& name, float capacity) :
+    m_name(std::make_unique<ValueRef::Constant<std::string>>(std::move(name))),
     m_capacity(std::make_unique<ValueRef::Constant<double>>(capacity))
 {}
 
@@ -2054,8 +2055,8 @@ unsigned int AddSpecial::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // RemoveSpecial                                         //
 ///////////////////////////////////////////////////////////
-RemoveSpecial::RemoveSpecial(const std::string& name) :
-    m_name(std::make_unique<ValueRef::Constant<std::string>>(name))
+RemoveSpecial::RemoveSpecial(std::string& name) :
+    m_name(std::make_unique<ValueRef::Constant<std::string>>(std::move(name)))
 {}
 
 RemoveSpecial::RemoveSpecial(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
@@ -2883,7 +2884,7 @@ void SetDestination::Execute(ScriptingContext& context) const {
         return;
 
     // "randomly" pick a destination
-    int destination_idx = RandSmallInt(0, valid_locations.size() - 1);
+    int destination_idx = RandInt(0, valid_locations.size() - 1);
     auto destination = std::const_pointer_cast<UniverseObject>(
         *std::next(valid_locations.begin(), destination_idx));
     int destination_system_id = destination->SystemID();
@@ -2978,8 +2979,8 @@ unsigned int SetAggression::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // Victory                                               //
 ///////////////////////////////////////////////////////////
-Victory::Victory(const std::string& reason_string) :
-    m_reason_string(reason_string)
+Victory::Victory(std::string& reason_string) :
+    m_reason_string(std::move(reason_string))
 {}
 
 void Victory::Execute(ScriptingContext& context) const {
@@ -3018,7 +3019,7 @@ SetEmpireTechProgress::SetEmpireTechProgress(std::unique_ptr<ValueRef::ValueRef<
     m_empire_id(
         empire_id
         ? std::move(empire_id)
-        : std::make_unique<ValueRef::Variable<int>>(ValueRef::EFFECT_TARGET_REFERENCE, std::vector<std::string>(1, "Owner")))
+        : std::make_unique<ValueRef::Variable<int>>(ValueRef::EFFECT_TARGET_REFERENCE, "Owner"))
 {}
 
 void SetEmpireTechProgress::Execute(ScriptingContext& context) const {
@@ -3087,7 +3088,7 @@ GiveEmpireTech::GiveEmpireTech(std::unique_ptr<ValueRef::ValueRef<std::string>>&
     m_empire_id(std::move(empire_id))
 {
     if (!m_empire_id)
-        m_empire_id.reset(new ValueRef::Variable<int>(ValueRef::EFFECT_TARGET_REFERENCE, std::vector<std::string>(1, "Owner")));
+        m_empire_id.reset(new ValueRef::Variable<int>(ValueRef::EFFECT_TARGET_REFERENCE, "Owner"));
 }
 
 void GiveEmpireTech::Execute(ScriptingContext& context) const {
@@ -3144,48 +3145,48 @@ unsigned int GiveEmpireTech::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // GenerateSitRepMessage                                 //
 ///////////////////////////////////////////////////////////
-GenerateSitRepMessage::GenerateSitRepMessage(const std::string& message_string,
-                                             const std::string& icon,
+GenerateSitRepMessage::GenerateSitRepMessage(std::string& message_string,
+                                             std::string& icon,
                                              MessageParams&& message_parameters,
                                              std::unique_ptr<ValueRef::ValueRef<int>>&& recipient_empire_id,
                                              EmpireAffiliationType affiliation,
-                                             const std::string label,
+                                             std::string label,
                                              bool stringtable_lookup) :
-    m_message_string(message_string),
-    m_icon(icon),
+    m_message_string(std::move(message_string)),
+    m_icon(std::move(icon)),
     m_message_parameters(std::move(message_parameters)),
     m_recipient_empire_id(std::move(recipient_empire_id)),
     m_affiliation(affiliation),
-    m_label(label),
+    m_label(std::move(label)),
     m_stringtable_lookup(stringtable_lookup)
 {}
 
-GenerateSitRepMessage::GenerateSitRepMessage(const std::string& message_string,
-                                             const std::string& icon,
+GenerateSitRepMessage::GenerateSitRepMessage(std::string& message_string,
+                                             std::string& icon,
                                              MessageParams&& message_parameters,
                                              EmpireAffiliationType affiliation,
                                              std::unique_ptr<Condition::Condition>&& condition,
-                                             const std::string label,
+                                             std::string label,
                                              bool stringtable_lookup) :
-    m_message_string(message_string),
-    m_icon(icon),
+    m_message_string(std::move(message_string)),
+    m_icon(std::move(icon)),
     m_message_parameters(std::move(message_parameters)),
     m_condition(std::move(condition)),
     m_affiliation(affiliation),
-    m_label(label),
+    m_label(std::move(label)),
     m_stringtable_lookup(stringtable_lookup)
 {}
 
-GenerateSitRepMessage::GenerateSitRepMessage(const std::string& message_string, const std::string& icon,
+GenerateSitRepMessage::GenerateSitRepMessage(std::string& message_string, std::string& icon,
                                              MessageParams&& message_parameters,
                                              EmpireAffiliationType affiliation,
-                                             const std::string& label,
+                                             std::string label,
                                              bool stringtable_lookup):
-    m_message_string(message_string),
-    m_icon(icon),
+    m_message_string(std::move(message_string)),
+    m_icon(std::move(icon)),
     m_message_parameters(std::move(message_parameters)),
     m_affiliation(affiliation),
-    m_label(label),
+    m_label(std::move(label)),
     m_stringtable_lookup(stringtable_lookup)
 {}
 
@@ -3394,14 +3395,14 @@ GenerateSitRepMessage::MessageParameters() const {
 ///////////////////////////////////////////////////////////
 // SetOverlayTexture                                     //
 ///////////////////////////////////////////////////////////
-SetOverlayTexture::SetOverlayTexture(const std::string& texture,
+SetOverlayTexture::SetOverlayTexture(std::string& texture,
                                      std::unique_ptr<ValueRef::ValueRef<double>>&& size) :
-    m_texture(texture),
+    m_texture(std::move(texture)),
     m_size(std::move(size))
 {}
 
-SetOverlayTexture::SetOverlayTexture(const std::string& texture, ValueRef::ValueRef<double>* size) :
-    m_texture(texture),
+SetOverlayTexture::SetOverlayTexture(std::string& texture, ValueRef::ValueRef<double>* size) :
+    m_texture(std::move(texture)),
     m_size(size)
 {}
 
@@ -3444,8 +3445,8 @@ unsigned int SetOverlayTexture::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // SetTexture                                            //
 ///////////////////////////////////////////////////////////
-SetTexture::SetTexture(const std::string& texture) :
-    m_texture(texture)
+SetTexture::SetTexture(std::string& texture) :
+    m_texture(std::move(texture))
 {}
 
 void SetTexture::Execute(ScriptingContext& context) const {

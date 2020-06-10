@@ -1,54 +1,53 @@
 #include "ServerApp.h"
 
+#include <ctime>
+#include <thread>
+#include <boost/date_time/posix_time/time_formatters.hpp>
+#include <boost/filesystem/exception.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/functional/hash.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/uuid/random_generator.hpp>
+#include <boost/uuid/uuid_io.hpp>
 #include "SaveLoad.h"
 #include "ServerFSM.h"
 #include "UniverseGenerator.h"
-#include "../combat/CombatSystem.h"
 #include "../combat/CombatEvents.h"
 #include "../combat/CombatLogManager.h"
+#include "../combat/CombatSystem.h"
+#include "../Empire/Empire.h"
 #include "../parse/Parse.h"
 #include "../universe/Building.h"
 #include "../universe/Condition.h"
+#include "../universe/Enums.h"
 #include "../universe/Fleet.h"
 #include "../universe/FleetPlan.h"
-#include "../universe/Ship.h"
-#include "../universe/ShipDesign.h"
 #include "../universe/Planet.h"
-#include "../universe/Predicates.h"
+#include "../universe/ShipDesign.h"
+#include "../universe/Ship.h"
 #include "../universe/Special.h"
-#include "../universe/System.h"
 #include "../universe/Species.h"
+#include "../universe/System.h"
 #include "../universe/Tech.h"
+#include "../universe/UniverseObjectVisitors.h"
 #include "../universe/UnlockableItem.h"
-#include "../universe/Enums.h"
 #include "../universe/ValueRef.h"
-#include "../Empire/Empire.h"
 #include "../util/Directories.h"
+#include "../util/GameRules.h"
 #include "../util/i18n.h"
 #include "../util/Logger.h"
 #include "../util/LoggerWithOptionsDB.h"
-#include "../util/GameRules.h"
 #include "../util/OptionsDB.h"
 #include "../util/Order.h"
 #include "../util/OrderSet.h"
 #include "../util/Pending.h"
 #include "../util/Random.h"
 #include "../util/SaveGamePreviewUtils.h"
-#include "../util/SitRepEntry.h"
 #include "../util/ScopedTimer.h"
+#include "../util/SitRepEntry.h"
 #include "../util/Version.h"
 
-#include <boost/filesystem/exception.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/functional/hash.hpp>
-#include <boost/date_time/posix_time/time_formatters.hpp>
-#include <boost/uuid/random_generator.hpp>
-#include <boost/uuid/uuid_io.hpp>
-
-#include <ctime>
-#include <thread>
 
 namespace fs = boost::filesystem;
 
@@ -3158,6 +3157,13 @@ namespace {
             planet->UpdateFocusHistory();
     }
 
+    /** Check validity of adopted policies, overwrite initial adopted
+      * policies with those currently adopted, update adopted turns counters. */
+    void UpdateEmpirePolicies() {
+        for (auto id_empire_pair : Empires())
+            id_empire_pair.second->UpdatePolicies();
+    }
+
     /** Deletes empty fleets. */
     void CleanEmptyFleets() {
         std::vector<std::shared_ptr<Fleet>> empty_fleets;
@@ -3214,6 +3220,11 @@ void ServerApp::PreCombatProcessTurns() {
     // update ResourceCenter focus history info
     UpdateResourceCenterFocusHistoryInfo();
 
+    // validate adopted policies, and update Empire Policy history
+    // actual policy adoption and influence consumption occurrs during order
+    // execution above
+    UpdateEmpirePolicies();
+
     // clean up empty fleets that empires didn't order deleted
     CleanEmptyFleets();
 
@@ -3241,11 +3252,8 @@ void ServerApp::PreCombatProcessTurns() {
 
 
     DebugLogger() << "ServerApp::ProcessTurns movement";
-    // process movement phase
-
     // player notifications
     m_networking.SendMessageAll(TurnProgressMessage(Message::FLEET_MOVEMENT));
-
 
     // Update system-obstruction after orders, colonization, invasion, gifting, scrapping
     for (auto& entry : Empires()) {
@@ -3265,7 +3273,6 @@ void ServerApp::PreCombatProcessTurns() {
     // first move unowned fleets, or an empire fleet landing on them could wrongly
     // blockade them before they move
     for (auto& fleet : fleets) {
-        // save for possible SitRep generation after moving...
         if (fleet && fleet->Unowned())
             fleet->MovementPhase();
     }
@@ -3280,7 +3287,7 @@ void ServerApp::PreCombatProcessTurns() {
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
     m_universe.UpdateEmpireStaleObjectKnowledge();
 
-    // SitRep for fleets having arrived at destinations
+    // SitReps for fleets having arrived at destinations
     for (auto& fleet : fleets) {
         // save for possible SitRep generation after moving...
         if (!fleet || !fleet->ArrivedThisTurn())
@@ -3302,7 +3309,7 @@ void ServerApp::PreCombatProcessTurns() {
     for (auto player_it = m_networking.established_begin();
          player_it != m_networking.established_end(); ++player_it)
     {
-        PlayerConnectionPtr player = *player_it;
+        auto player = *player_it;
         int empire_id = PlayerEmpireID(player->PlayerID());
         const Empire* empire = GetEmpire(empire_id);
         if (empire ||
@@ -3483,7 +3490,7 @@ void ServerApp::PostCombatProcessTurns() {
             empire->AddNewlyResearchedTechToGrantAtStartOfNextTurn(tech);
         }
         empire->CheckProductionProgress();
-        empire->CheckTradeSocialProgress();
+        empire->CheckInfluenceProgress();
     }
 
     TraceLogger(effects) << "!!!!!!! AFTER CHECKING QUEUE AND RESOURCE PROGRESS";

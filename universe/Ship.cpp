@@ -1,22 +1,21 @@
 #include "Ship.h"
 
-#include "../util/i18n.h"
-#include "../util/Logger.h"
-#include "../util/Random.h"
+#include "Enums.h"
+#include "Fleet.h"
+#include "ShipDesign.h"
+#include "ShipHull.h"
+#include "ShipPart.h"
+#include "Species.h"
+#include "UniverseObjectVisitor.h"
+#include "Universe.h"
+#include "../Empire/EmpireManager.h"
+#include "../Empire/Empire.h"
 #include "../util/AppInterface.h"
 #include "../util/GameRules.h"
-#include "Fleet.h"
-#include "Predicates.h"
-#include "ShipDesign.h"
-#include "ShipPart.h"
-#include "ShipHull.h"
-#include "Species.h"
-#include "Universe.h"
-#include "Enums.h"
-#include "../Empire/Empire.h"
-#include "../Empire/EmpireManager.h"
+#include "../util/Logger.h"
+#include "../util/Random.h"
+#include "../util/i18n.h"
 
-#include <boost/lexical_cast.hpp>
 
 class Species;
 const Species* GetSpecies(const std::string& name);
@@ -54,8 +53,8 @@ Ship::Ship(int empire_id, int design_id, const std::string& species_name,
     AddMeter(METER_INDUSTRY);
     AddMeter(METER_TARGET_RESEARCH);
     AddMeter(METER_RESEARCH);
-    AddMeter(METER_TARGET_TRADE);
-    AddMeter(METER_TRADE);
+    AddMeter(METER_TARGET_INFLUENCE);
+    AddMeter(METER_INFLUENCE);
 
     const std::vector<std::string>& part_names = Design()->Parts();
     for (const std::string& part_name : part_names) {
@@ -156,16 +155,15 @@ bool Ship::HostileToEmpire(int empire_id) const
 }
 
 std::set<std::string> Ship::Tags() const {
-    std::set<std::string> retval;
-
     const ShipDesign* design = GetShipDesign(m_design_id);
     if (!design)
-        return retval;
+        return {};
 
     const ShipHull* hull = ::GetShipHull(design->Hull());
     if (!hull)
-        return retval;
-    retval.insert(hull->Tags().begin(), hull->Tags().end());
+        return {};
+
+    std::set<std::string> retval{hull->Tags().begin(), hull->Tags().end()};
 
     const std::vector<std::string>& parts = design->Parts();
     if (parts.empty())
@@ -644,7 +642,7 @@ void Ship::ResetTargetMaxUnpairedMeters() {
     UniverseObject::GetMeter(METER_MAX_STRUCTURE)->ResetCurrent();
     UniverseObject::GetMeter(METER_TARGET_INDUSTRY)->ResetCurrent();
     UniverseObject::GetMeter(METER_TARGET_RESEARCH)->ResetCurrent();
-    UniverseObject::GetMeter(METER_TARGET_TRADE)->ResetCurrent();
+    UniverseObject::GetMeter(METER_TARGET_INFLUENCE)->ResetCurrent();
 
     UniverseObject::GetMeter(METER_DETECTION)->ResetCurrent();
     UniverseObject::GetMeter(METER_SPEED)->ResetCurrent();
@@ -737,8 +735,8 @@ void Ship::ClampMeters() {
     UniverseObject::GetMeter(METER_INDUSTRY)->ClampCurrentToRange();
     UniverseObject::GetMeter(METER_TARGET_RESEARCH)->ClampCurrentToRange();
     UniverseObject::GetMeter(METER_RESEARCH)->ClampCurrentToRange();
-    UniverseObject::GetMeter(METER_TARGET_TRADE)->ClampCurrentToRange();
-    UniverseObject::GetMeter(METER_TRADE)->ClampCurrentToRange();
+    UniverseObject::GetMeter(METER_TARGET_INFLUENCE)->ClampCurrentToRange();
+    UniverseObject::GetMeter(METER_INFLUENCE)->ClampCurrentToRange();
 
     UniverseObject::GetMeter(METER_DETECTION)->ClampCurrentToRange();
     UniverseObject::GetMeter(METER_SPEED)->ClampCurrentToRange();
@@ -789,7 +787,7 @@ std::string NewMonsterName() {
         monster_names.push_back(UserString("MONSTER"));
 
     // select name randomly from list
-    int monster_name_index = RandSmallInt(0, static_cast<int>(monster_names.size()) - 1);
+    int monster_name_index = RandInt(0, static_cast<int>(monster_names.size()) - 1);
     std::string result = monster_names[monster_name_index];
     if (monster_names_used[result]++) {
         result += " " + RomanNumber(monster_names_used[result]);

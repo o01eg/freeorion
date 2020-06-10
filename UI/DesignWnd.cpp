@@ -69,6 +69,9 @@ namespace {
     const GG::Y         PART_CONTROL_HEIGHT(54);
     const GG::X         SLOT_CONTROL_WIDTH(60);
     const GG::Y         SLOT_CONTROL_HEIGHT(60);
+    const GG::Pt        PALETTE_MIN_SIZE{GG::X{450}, GG::Y{400}};
+    const GG::Pt        MAIN_PANEL_MIN_SIZE{GG::X{400}, GG::Y{160}};
+    const GG::Pt        BASES_MIN_SIZE{GG::X{160}, GG::Y{160}};
     const int           PAD(3);
 
     /** Returns texture with which to render a SlotControl, depending on \a slot_type. */
@@ -1896,6 +1899,8 @@ void DesignWnd::PartPalette::CompleteConstruction() {
 
     CUIWnd::CompleteConstruction();
 
+    SetMinSize(PALETTE_MIN_SIZE);
+
     DoLayout();
     SaveDefaultedOptions();
 }
@@ -3448,6 +3453,8 @@ void DesignWnd::BaseSelector::CompleteConstruction() {
 
     CUIWnd::CompleteConstruction();
 
+    SetMinSize(BASES_MIN_SIZE);
+
     DoLayout();
     SaveDefaultedOptions();
 }
@@ -4115,6 +4122,7 @@ void DesignWnd::MainPanel::CompleteConstruction() {
     DesignChanged(); // Initialize components that rely on the current state of the design.
 
     CUIWnd::CompleteConstruction();
+    SetMinSize(MAIN_PANEL_MIN_SIZE);
 
     DoLayout();
     SaveDefaultedOptions();

@@ -1,13 +1,12 @@
 #ifndef _Condition_h_
 #define _Condition_h_
 
-#include "../util/Export.h"
-
-#include <boost/serialization/access.hpp>
 
 #include <memory>
 #include <string>
 #include <vector>
+#include "../util/Export.h"
+
 
 class UniverseObject;
 struct ScriptingContext;
@@ -104,10 +103,6 @@ private:
     friend struct MatchHelper;
 
     virtual bool Match(const ScriptingContext& local_context) const;
-
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
 
 }

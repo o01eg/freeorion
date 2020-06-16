@@ -1,22 +1,20 @@
 #include "Species.h"
 
+#include <iterator>
+#include <boost/filesystem/fstream.hpp>
 #include "Conditions.h"
 #include "Effect.h"
+#include "Enums.h"
 #include "PopCenter.h"
 #include "Ship.h"
 #include "UniverseObject.h"
 #include "ValueRefs.h"
-#include "Enums.h"
-#include "../util/OptionsDB.h"
-#include "../util/Logger.h"
-#include "../util/Random.h"
 #include "../util/AppInterface.h"
 #include "../util/CheckSums.h"
+#include "../util/Logger.h"
+#include "../util/OptionsDB.h"
+#include "../util/Random.h"
 #include "../util/ScopedTimer.h"
-
-#include <boost/filesystem/fstream.hpp>
-
-#include <iterator>
 
 
 /////////////////////////////////////////////////
@@ -399,14 +397,6 @@ Species* SpeciesManager::GetSpecies(const std::string& name) {
     return it != m_species.end() ? it->second.get() : nullptr;
 }
 
-int SpeciesManager::GetSpeciesID(const std::string& name) const {
-    CheckPendingSpeciesTypes();
-    auto it = m_species.find(name);
-    if (it == m_species.end())
-        return -1;
-    return std::distance(m_species.begin(), it);
-}
-
 SpeciesManager& SpeciesManager::GetSpeciesManager() {
     static SpeciesManager manager;
     return manager;
@@ -482,7 +472,7 @@ const std::string& SpeciesManager::RandomSpeciesName() const {
     if (m_species.empty())
         return EMPTY_STRING;
 
-    int species_idx = RandSmallInt(0, static_cast<int>(m_species.size()) - 1);
+    int species_idx = RandInt(0, static_cast<int>(m_species.size()) - 1);
     return std::next(begin(), species_idx)->first;
 }
 
@@ -490,7 +480,7 @@ const std::string& SpeciesManager::RandomPlayableSpeciesName() const {
     if (NumPlayableSpecies() <= 0)
         return EMPTY_STRING;
 
-    int species_idx = RandSmallInt(0, NumPlayableSpecies() - 1);
+    int species_idx = RandInt(0, NumPlayableSpecies() - 1);
     return std::next(playable_begin(), species_idx)->first;
 }
 

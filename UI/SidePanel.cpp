@@ -1,51 +1,49 @@
 #include "SidePanel.h"
 
-#include "CUIWnd.h"
-#include "CUIControls.h"
-#include "MultiIconValueIndicator.h"
-#include "SystemIcon.h"
-#include "Sound.h"
-#include "FleetWnd.h"
-#include "BuildingsPanel.h"
-#include "MilitaryPanel.h"
-#include "PopulationPanel.h"
-#include "ResourcePanel.h"
-#include "MapWnd.h"
-#include "ShaderProgram.h"
-#include "SpecialsPanel.h"
-#include "SystemResourceSummaryBrowseWnd.h"
-#include "TextBrowseWnd.h"
-#include "../universe/Predicates.h"
-#include "../universe/ShipDesign.h"
-#include "../universe/Fleet.h"
-#include "../universe/Ship.h"
-#include "../universe/Building.h"
-#include "../universe/Species.h"
-#include "../universe/System.h"
-#include "../universe/Enums.h"
-#include "../Empire/Empire.h"
-#include "../util/Directories.h"
-#include "../util/i18n.h"
-#include "../util/Logger.h"
-#include "../util/Random.h"
-#include "../util/XMLDoc.h"
-#include "../util/Order.h"
-#include "../util/OptionsDB.h"
-#include "../util/ScopedTimer.h"
-#include "../client/human/HumanClientApp.h"
-
+#include <cmath>
+#include <boost/cast.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/format.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/range/irange.hpp>
 #include <GG/DynamicGraphic.h>
 #include <GG/GUI.h>
 #include <GG/Layout.h>
 #include <GG/Scroll.h>
 #include <GG/StaticGraphic.h>
+#include "BuildingsPanel.h"
+#include "CUIControls.h"
+#include "CUIWnd.h"
+#include "FleetWnd.h"
+#include "MapWnd.h"
+#include "MilitaryPanel.h"
+#include "MultiIconValueIndicator.h"
+#include "PopulationPanel.h"
+#include "ResourcePanel.h"
+#include "ShaderProgram.h"
+#include "Sound.h"
+#include "SpecialsPanel.h"
+#include "SystemIcon.h"
+#include "SystemResourceSummaryBrowseWnd.h"
+#include "TextBrowseWnd.h"
+#include "../client/human/HumanClientApp.h"
+#include "../Empire/Empire.h"
+#include "../universe/Building.h"
+#include "../universe/Enums.h"
+#include "../universe/Fleet.h"
+#include "../universe/ShipDesign.h"
+#include "../universe/Ship.h"
+#include "../universe/Species.h"
+#include "../universe/System.h"
+#include "../universe/UniverseObjectVisitors.h"
+#include "../util/i18n.h"
+#include "../util/Logger.h"
+#include "../util/OptionsDB.h"
+#include "../util/Order.h"
+#include "../util/Random.h"
+#include "../util/ScopedTimer.h"
+#include "../util/XMLDoc.h"
 
-#include <boost/cast.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/format.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/range/irange.hpp>
-#include <cmath>
 
 class RotatingPlanetControl;
 
@@ -745,7 +743,7 @@ public:
             const auto& atmosphere_data = GetPlanetAtmosphereData();
             auto it = atmosphere_data.find(rpd.filename);
             if (it != atmosphere_data.end()) {
-                const auto& atmosphere = it->second.atmospheres[RandSmallInt(0, it->second.atmospheres.size() - 1)];
+                const auto& atmosphere = it->second.atmospheres[RandInt(0, it->second.atmospheres.size() - 1)];
                 m_atmosphere_texture = ClientUI::GetTexture(ClientUI::ArtDir() / atmosphere.filename, true);
                 m_atmosphere_alpha = atmosphere.alpha;
                 m_atmosphere_planet_rect = GG::Rect(GG::X1, GG::Y1, m_atmosphere_texture->DefaultWidth() - 4, m_atmosphere_texture->DefaultHeight() - 4);
@@ -1151,7 +1149,7 @@ void SidePanel::PlanetPanel::RefreshPlanetGraphic() {
                                                                texture_width, texture_height, 0, textures,
                                                                GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
         m_planet_graphic->SetFPS(GetAsteroidsFPS());
-        m_planet_graphic->SetFrameIndex(RandSmallInt(0, textures.size() - 1));
+        m_planet_graphic->SetFrameIndex(RandInt(0, textures.size() - 1));
         AttachChild(m_planet_graphic);
         m_planet_graphic->Play();
     } else if (planet->Type() < NUM_PLANET_TYPES) {
@@ -3324,7 +3322,7 @@ void SidePanel::RefreshImpl() {
     int empire_id = HumanClientApp::GetApp()->EmpireID();
     // If all planets are owned by the same empire, then we show the Shields/Defense/Troops/Supply;
     // regardless, if there are any planets owned by the player in the system, we show
-    // Production/Research/Trade.
+    // Production/Research/Influnce.
     int all_owner_id = ALL_EMPIRES;
     bool all_planets_share_owner = true;
     std::vector<int> all_planets, player_planets;
@@ -3350,7 +3348,7 @@ void SidePanel::RefreshImpl() {
     const std::vector<std::pair<MeterType, MeterType>> resource_meters =
        {{METER_INDUSTRY, METER_TARGET_INDUSTRY},
         {METER_RESEARCH, METER_TARGET_RESEARCH},
-        //{METER_TRADE,    METER_TARGET_TRADE},
+        {METER_INFLUENCE,METER_TARGET_INFLUENCE},
         {METER_STOCKPILE,METER_MAX_STOCKPILE}};
     // general meters; show only if all planets are owned by same empire
     const std::vector<std::pair<MeterType, MeterType>> general_meters =

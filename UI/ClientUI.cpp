@@ -32,10 +32,12 @@
 #include "../universe/Species.h"
 #include "../universe/FieldType.h"
 #include "../universe/Enums.h"
+#include "../Empire/Government.h"
 #include "../combat/CombatLogManager.h"
 #include "../client/human/HumanClientApp.h"
 
 #include <GG/Clr.h>
+#include <GG/utf8/checked.h>
 #include <GG/dialogs/ThreeButtonDlg.h>
 #include <GG/GUI.h>
 #include <GG/RichText/ImageBlock.h>
@@ -185,9 +187,9 @@ std::shared_ptr<GG::Texture> ClientUI::MeterIcon(MeterType meter_type) {
     case METER_RESEARCH:
     case METER_TARGET_RESEARCH:
         icon_filename = "research.png";     break;
-    case METER_TRADE:
-    case METER_TARGET_TRADE:
-        icon_filename = "trade.png";        break;
+    case METER_INFLUENCE:
+    case METER_TARGET_INFLUENCE:
+        icon_filename = "influence.png";    break;
     case METER_CONSTRUCTION:
     case METER_TARGET_CONSTRUCTION:
         icon_filename = "construction.png"; break;
@@ -196,10 +198,10 @@ std::shared_ptr<GG::Texture> ClientUI::MeterIcon(MeterType meter_type) {
         icon_filename = "happiness.png";    break;
     case METER_CAPACITY:
     case METER_MAX_CAPACITY:
-        icon_filename = "capacity.png";   break;
+        icon_filename = "capacity.png";     break;
     case METER_SECONDARY_STAT:
     case METER_MAX_SECONDARY_STAT:
-        icon_filename = "secondary.png";   break;
+        icon_filename = "secondary.png";    break;
     case METER_STRUCTURE:
     case METER_MAX_STRUCTURE:
         icon_filename = "structure.png";    break;
@@ -264,6 +266,14 @@ std::shared_ptr<GG::Texture> ClientUI::TechIcon(const std::string& tech_name) {
     return ClientUI::GetTexture(ArtDir() / texture_name, true);
 }
 
+std::shared_ptr<GG::Texture> ClientUI::PolicyIcon(const std::string& policy_name) {
+    const Policy* policy = GetPolicyManager().GetPolicy(policy_name);
+    std::string texture_name;
+    if (policy)
+        texture_name = policy->Graphic();
+    return ClientUI::GetTexture(ArtDir() / texture_name, true);
+}
+
 std::shared_ptr<GG::Texture> ClientUI::SpecialIcon(const std::string& special_name) {
     const Special* special = GetSpecial(special_name);
     std::string texture_name;
@@ -290,7 +300,7 @@ std::shared_ptr<GG::Texture> ClientUI::FieldTexture(const std::string& field_typ
     if (type)
         texture_name = type->Graphic();
     if (texture_name.empty())
-        return ClientUI::GetTexture(ArtDir() / "fields" / "rainbow_storm.png", true);
+        return ClientUI::GetTexture(ArtDir() / "fields" / "ion_storm.png", true);
     return ClientUI::GetTexture(ArtDir() / texture_name, true);
 }
 
@@ -756,10 +766,11 @@ std::string ClientUI::FormatTimestamp(boost::posix_time::ptime timestamp) {
         // Determine local time from provided UTC timestamp
         auto local_timestamp = boost::date_time::c_local_adjustor<boost::posix_time::ptime>::utc_to_local(timestamp);
         date_format_sstream << local_timestamp;
-        TraceLogger() << "ClientUI::FormatTimestamp date formatted: " << date_format_sstream.str()
-                      << " Valid utf8?: " << (IsValidUTF8(date_format_sstream.str()) ? "yes" : "no");
+        auto date_format_str = date_format_sstream.str();
+        TraceLogger() << "ClientUI::FormatTimestamp date formatted: " << date_format_str
+                      << " Valid utf8?: " << (utf8::is_valid(date_format_str.begin(), date_format_str.end()) ? "yes" : "no");
 
-        return date_format_sstream.str();
+        return date_format_str;
     }
     return "";
 }
@@ -910,6 +921,13 @@ bool ClientUI::ZoomToTech(const std::string& tech_name) {
     return true;
 }
 
+bool ClientUI::ZoomToPolicy(const std::string& policy_name) {
+    if (!GetPolicy(policy_name))
+        return false;
+    GetMapWnd()->ShowPolicy(policy_name);
+    return true;
+}
+
 bool ClientUI::ZoomToBuildingType(const std::string& building_type_name) {
     if (!GetBuildingType(building_type_name))
         return false;
@@ -1019,33 +1037,27 @@ void ClientUI::HandleFullscreenSwitch() const {
     // This relies on the message window not supplying a default position to
     // the CUIWnd constructor...
     std::string option_name = "ui." + MESSAGE_WND_NAME + window_mode + ".left";
-    if (db.Get<int>(option_name) == db.GetDefault<int>(option_name)) {
+    if (db.Get<int>(option_name) == db.GetDefault<int>(option_name))
         HumanClientApp::GetApp()->RepositionWindowsSignal();
-    }
 }
 
 std::shared_ptr<GG::Texture> ClientUI::GetRandomTexture(const boost::filesystem::path& dir,
                                                         const std::string& prefix, bool mipmap/* = false*/)
 {
-    TexturesAndDist prefixed_textures_and_dist = PrefixedTexturesAndDist(dir, prefix, mipmap);
-    return prefixed_textures_and_dist.first[(*prefixed_textures_and_dist.second)()];
+    auto prefixed_textures = GetPrefixedTextures(dir, prefix, mipmap);
+    if (prefixed_textures.empty())
+        return nullptr;
+    return prefixed_textures.at(RandInt(0, prefixed_textures.size()));
 }
 
 std::shared_ptr<GG::Texture> ClientUI::GetModuloTexture(const boost::filesystem::path& dir,
                                                         const std::string& prefix, int n, bool mipmap/* = false*/)
 {
     assert(0 <= n);
-    TexturesAndDist prefixed_textures_and_dist = PrefixedTexturesAndDist(dir, prefix, mipmap);
-    return prefixed_textures_and_dist.first.empty() ?
-        nullptr :
-        prefixed_textures_and_dist.first[n % prefixed_textures_and_dist.first.size()];
-}
-
-std::vector<std::shared_ptr<GG::Texture>> ClientUI::GetPrefixedTextures(const boost::filesystem::path& dir,
-                                                                        const std::string& prefix, bool mipmap/* = false*/)
-{
-    TexturesAndDist prefixed_textures_and_dist = PrefixedTexturesAndDist(dir, prefix, mipmap);
-    return prefixed_textures_and_dist.first;
+    auto prefixed_textures = GetPrefixedTextures(dir, prefix, mipmap);
+    if (prefixed_textures.empty())
+        return nullptr;
+    return prefixed_textures.at(n % prefixed_textures.size());
 }
 
 void ClientUI::RestoreFromSaveData(const SaveGameUIData& ui_data) {
@@ -1121,31 +1133,37 @@ std::shared_ptr<GG::Font> ClientUI::GetTitleFont(int pts/* = TitlePts()*/) {
    }
 }
 
-ClientUI::TexturesAndDist ClientUI::PrefixedTexturesAndDist(const boost::filesystem::path& dir,
-                                                            const std::string& prefix, bool mipmap)
+std::vector<std::shared_ptr<GG::Texture>> ClientUI::GetPrefixedTextures(
+    const boost::filesystem::path& dir, const std::string& prefix, bool mipmap)
 {
     namespace fs = boost::filesystem;
-    assert(fs::is_directory(dir));
+    if (!fs::is_directory(dir)) {
+        ErrorLogger() << "GetPrefixedTextures passed invalid dir: " << dir;
+        return {};
+    }
     const std::string KEY = dir.string() + "/" + prefix;
     auto prefixed_textures_it = m_prefixed_textures.find(KEY);
+
     if (prefixed_textures_it == m_prefixed_textures.end()) {
-        prefixed_textures_it = m_prefixed_textures.insert({KEY, TexturesAndDist()}).first;
-        auto& textures = prefixed_textures_it->second.first;
-        auto& rand_int = prefixed_textures_it->second.second;
+        // if not already loaded, load textures with requested key
+        prefixed_textures_it = m_prefixed_textures.insert({KEY, {}}).first;
+        auto& textures = prefixed_textures_it->second;
         fs::directory_iterator end_it;
         for (fs::directory_iterator it(dir); it != end_it; ++it) {
             try {
-                if (fs::exists(*it) && !fs::is_directory(*it) && boost::algorithm::starts_with(it->path().filename().string(), prefix))
-                    textures.push_back(ClientUI::GetTexture(*it, mipmap));
+                if (fs::exists(*it) &&
+                    !fs::is_directory(*it)
+                    && boost::algorithm::starts_with(it->path().filename().string(), prefix))
+                { textures.emplace_back(ClientUI::GetTexture(*it, mipmap)); }
             } catch (const fs::filesystem_error& e) {
                 // ignore files for which permission is denied, and rethrow other exceptions
                 if (e.code() != boost::system::errc::permission_denied)
                     throw;
             }
         }
-        rand_int.reset(new SmallIntDistType(SmallIntDist(0, textures.size() - 1)));
         std::sort(textures.begin(), textures.end(), TextureFileNameCompare);
     }
+
     return prefixed_textures_it->second;
 }
 

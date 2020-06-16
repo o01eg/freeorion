@@ -6,9 +6,9 @@
 #include "Effect.h"
 #include "Planet.h"
 #include "ScriptingContext.h"
-#include "Ship.h"
 #include "ShipHull.h"
 #include "ShipPart.h"
+#include "Ship.h"
 #include "Species.h"
 #include "ValueRef.h"
 #include "../util/AppInterface.h"
@@ -667,8 +667,8 @@ void ShipDesign::BuildStatCaches() {
         case PC_INDUSTRY:
             m_industry_generation += part->Capacity();
             break;
-        case PC_TRADE:
-            m_trade_generation += part->Capacity();
+        case PC_INFLUENCE:
+            m_influence_generation += part->Capacity();
             break;
         case PC_PRODUCTION_LOCATION:
             m_is_production_location = true;

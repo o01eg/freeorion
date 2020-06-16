@@ -3,7 +3,7 @@
 #include "Enums.h"
 #include "FieldType.h"
 #include "Meter.h"
-#include "Predicates.h"
+#include "UniverseObjectVisitor.h"
 #include "Universe.h"
 #include "../util/AppInterface.h"
 #include "../util/i18n.h"
@@ -71,7 +71,7 @@ void Field::Copy(std::shared_ptr<const UniverseObject> copied_object, int empire
 std::set<std::string> Field::Tags() const {
     const FieldType* type = GetFieldType(m_type_name);
     if (!type)
-        return std::set<std::string>();
+        return {};
     return type->Tags();
 }
 

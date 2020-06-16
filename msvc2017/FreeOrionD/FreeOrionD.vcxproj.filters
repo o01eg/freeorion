@@ -110,9 +110,6 @@
     <ClInclude Include="..\..\universe\PopCenter.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\universe\Predicates.h">
-      <Filter>Header Files\universe</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\universe\ResourceCenter.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
@@ -165,9 +162,6 @@
       <Filter>Header Files\server</Filter>
     </ClInclude>
     <ClInclude Include="..\..\util\binreloc.h">
-      <Filter>Header Files\util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\util\Directories.h">
       <Filter>Header Files\util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\util\MultiplayerCommon.h">

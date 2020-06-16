@@ -1,25 +1,24 @@
 #include "Planet.h"
 
-#include "Building.h"
 #include "BuildingType.h"
+#include "Building.h"
 #include "Condition.h"
+#include "Enums.h"
 #include "Fleet.h"
 #include "Ship.h"
-#include "System.h"
-#include "Predicates.h"
 #include "Species.h"
+#include "System.h"
+#include "UniverseObjectVisitor.h"
 #include "Universe.h"
-#include "Enums.h"
 #include "ValueRef.h"
-#include "../util/Logger.h"
+#include "../Empire/EmpireManager.h"
+#include "../Empire/Empire.h"
 #include "../util/GameRules.h"
+#include "../util/Logger.h"
 #include "../util/OptionsDB.h"
 #include "../util/Random.h"
-#include "../util/Directories.h"
 #include "../util/SitRepEntry.h"
 #include "../util/i18n.h"
-#include "../Empire/Empire.h"
-#include "../Empire/EmpireManager.h"
 
 
 namespace {
@@ -161,7 +160,7 @@ bool Planet::HostileToEmpire(int empire_id) const
 std::set<std::string> Planet::Tags() const {
     const Species* species = GetSpecies(SpeciesName());
     if (!species)
-        return std::set<std::string>();
+        return {};
     return species->Tags();
 }
 
@@ -629,7 +628,7 @@ void Planet::Depopulate() {
 
     GetMeter(METER_INDUSTRY)->Reset();
     GetMeter(METER_RESEARCH)->Reset();
-    GetMeter(METER_TRADE)->Reset();
+    GetMeter(METER_INFLUENCE)->Reset();
     GetMeter(METER_CONSTRUCTION)->Reset();
 
     ClearFocus();
@@ -674,8 +673,8 @@ void Planet::Conquer(int conquerer) {
     GetMeter(METER_INDUSTRY)->BackPropagate();
     GetMeter(METER_RESEARCH)->SetCurrent(0.0f);
     GetMeter(METER_RESEARCH)->BackPropagate();
-    GetMeter(METER_TRADE)->SetCurrent(0.0f);
-    GetMeter(METER_TRADE)->BackPropagate();
+    GetMeter(METER_INFLUENCE)->SetCurrent(0.0f);
+    GetMeter(METER_INFLUENCE)->BackPropagate();
     GetMeter(METER_CONSTRUCTION)->SetCurrent(0.0f);
     GetMeter(METER_CONSTRUCTION)->BackPropagate();
     GetMeter(METER_DEFENSE)->SetCurrent(0.0f);

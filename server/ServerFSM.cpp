@@ -143,7 +143,7 @@ namespace {
         }
         if (!valid_names.empty()) {
             // pick a name from the list of empire names
-            int empire_name_idx = RandSmallInt(0, static_cast<int>(valid_names.size()) - 1);
+            int empire_name_idx = RandInt(0, static_cast<int>(valid_names.size()) - 1);
             return *std::next(valid_names.begin(), empire_name_idx);
         }
         // use a player_name as it unique among players
@@ -391,7 +391,7 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
             {
                 // save game on exit
                 std::string save_filename = GetAutoSaveFileName(m_server.CurrentTurn());
-                ServerSaveGameData server_data(m_server.CurrentTurn());
+                ServerSaveGameData server_data{m_server.CurrentTurn()};
                 int bytes_written = 0;
                 // save game...
                 try {
@@ -2634,7 +2634,7 @@ sc::result PlayingGame::react(const ShutdownServer& msg) {
     {
         // save game on exit
         std::string save_filename = GetAutoSaveFileName(server.CurrentTurn());
-        ServerSaveGameData server_data(server.CurrentTurn());
+        ServerSaveGameData server_data{server.CurrentTurn()};
         int bytes_written = 0;
         // save game...
         try {
@@ -2743,7 +2743,14 @@ sc::result PlayingGame::react(const JoinGame& msg) {
     Networking::ClientType client_type;
     std::string client_version_string;
     boost::uuids::uuid cookie;
-    ExtractJoinGameMessageData(message, player_name, client_type, client_version_string, cookie);
+    try {
+        ExtractJoinGameMessageData(message, player_name, client_type, client_version_string, cookie);
+    } catch (const std::exception& e) {
+        ErrorLogger(FSM) << "PlayingGame::react(const JoinGame& msg): couldn't extract data from join game message";
+        player_connection->SendMessage(ErrorMessage(UserString("ERROR_INCOMPATIBLE_VERSION"), true));
+        server.Networking().Disconnect(player_connection);
+        return discard_event();
+    }
 
     Networking::AuthRoles roles;
     bool authenticated;
@@ -3247,6 +3254,12 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
         return transit<ProcessingTurn>();
     }
 
+    // save game so orders from the player will be backuped
+    if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.each-player.enabled")) {
+        PlayerConnectionPtr dummy_connection = nullptr;
+        post_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(server.CurrentTurn())), dummy_connection));
+    }
+
     return discard_event();
 }
 
@@ -3265,7 +3278,7 @@ sc::result WaitingForTurnEnd::react(const SaveGameRequest& msg) {
 
     std::string save_filename = message.Text(); // store requested save file name in Base state context so that sibling state can retreive it
 
-    ServerSaveGameData server_data(server.m_current_turn);
+    ServerSaveGameData server_data{server.m_current_turn};
 
     // retreive requested save name from Base state, which should have been
     // set in WaitingForTurnEnd::react(const SaveGameRequest& msg)

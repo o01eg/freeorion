@@ -1,36 +1,35 @@
 #include "Conditions.h"
 
-#include "../util/Logger.h"
-#include "../util/Random.h"
-#include "../util/i18n.h"
-#include "../util/ScopedTimer.h"
-#include "UniverseObject.h"
-#include "Pathfinder.h"
-#include "Universe.h"
-#include "Building.h"
-#include "BuildingType.h"
-#include "Fighter.h"
-#include "Fleet.h"
-#include "Ship.h"
-#include "ShipDesign.h"
-#include "ShipPart.h"
-#include "ShipHull.h"
-#include "ObjectMap.h"
-#include "Planet.h"
-#include "System.h"
-#include "Species.h"
-#include "Special.h"
-#include "Meter.h"
-#include "ValueRefs.h"
-#include "Enums.h"
-#include "../Empire/Empire.h"
-#include "../Empire/EmpireManager.h"
-#include "../Empire/Supply.h"
-
 #include <boost/algorithm/cxx11/all_of.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/st_connected.hpp>
+#include "BuildingType.h"
+#include "Building.h"
+#include "Enums.h"
+#include "Fighter.h"
+#include "Fleet.h"
+#include "Meter.h"
+#include "ObjectMap.h"
+#include "Pathfinder.h"
+#include "Planet.h"
+#include "ShipDesign.h"
+#include "ShipHull.h"
+#include "ShipPart.h"
+#include "Ship.h"
+#include "Special.h"
+#include "Species.h"
+#include "System.h"
+#include "UniverseObject.h"
+#include "Universe.h"
+#include "ValueRefs.h"
+#include "../Empire/EmpireManager.h"
+#include "../Empire/Empire.h"
+#include "../Empire/Supply.h"
+#include "../util/Logger.h"
+#include "../util/Random.h"
+#include "../util/ScopedTimer.h"
+#include "../util/i18n.h"
 
 
 using boost::io::str;
@@ -48,65 +47,57 @@ namespace {
 
     void AddAllObjectsSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingObjects().size());
-        std::transform(objects.ExistingObjects().begin(), objects.ExistingObjects().end(),
-                       std::back_inserter(condition_non_targets),
-                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+        for (const auto& obj : objects.ExistingObjects())
+            condition_non_targets.emplace_back(obj.second);
+        // in my tests, this range for loop with emplace_back was about 5% faster than std::transform with std::back_inserter and a lambda returning the .second of the map entries
     }
 
     void AddBuildingSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingBuildings().size());
-        std::transform(objects.ExistingBuildings().begin(), objects.ExistingBuildings().end(),
-                       std::back_inserter(condition_non_targets),
-                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+        for (const auto& obj : objects.ExistingBuildings())
+            condition_non_targets.emplace_back(obj.second);
     }
 
     void AddFieldSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingFields().size());
-        std::transform(objects.ExistingFields().begin(), objects.ExistingFields().end(),
-                       std::back_inserter(condition_non_targets),
-                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+        for (const auto& obj : objects.ExistingFields())
+            condition_non_targets.emplace_back(obj.second);
     }
 
     void AddFleetSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingFleets().size());
-        std::transform(objects.ExistingFleets().begin(), objects.ExistingFleets().end(),
-                       std::back_inserter(condition_non_targets),
-                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+        for (const auto& obj : objects.ExistingFleets())
+            condition_non_targets.emplace_back(obj.second);
     }
 
     void AddPlanetSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingPlanets().size());
-        std::transform(objects.ExistingPlanets().begin(), objects.ExistingPlanets().end(),
-                       std::back_inserter(condition_non_targets),
-                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+        for (const auto& obj : objects.ExistingPlanets())
+            condition_non_targets.emplace_back(obj.second);
     }
 
     void AddPopCenterSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingPopCenters().size());
-        std::transform(objects.ExistingPopCenters().begin(), objects.ExistingPopCenters().end(),
-                       std::back_inserter(condition_non_targets),
-                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+        for (const auto& obj : objects.ExistingPopCenters())
+            condition_non_targets.emplace_back(obj.second);
     }
 
     void AddResCenterSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingResourceCenters().size());
-        std::transform(objects.ExistingResourceCenters().begin(), objects.ExistingResourceCenters().end(),
-                       std::back_inserter(condition_non_targets),
-                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+        for (const auto& obj : objects.ExistingResourceCenters())
+            condition_non_targets.emplace_back(obj.second);
     }
 
     void AddShipSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingShips().size());
-        std::transform(objects.ExistingShips().begin(), objects.ExistingShips().end(),
-                       std::back_inserter(condition_non_targets),
-                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+        for (const auto& obj : objects.ExistingShips())
+            condition_non_targets.emplace_back(obj.second);
     }
 
     void AddSystemSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingSystems().size());
-        std::transform(objects.ExistingSystems().begin(), objects.ExistingSystems().end(),
-                       std::back_inserter(condition_non_targets),
-                       boost::bind(&std::map<int, std::shared_ptr<const UniverseObject>>::value_type::second, _1));
+        for (const auto& obj : objects.ExistingSystems())
+            condition_non_targets.emplace_back(obj.second);
     }
 
     /** Used by 4-parameter Condition::Eval function, and some of its
@@ -118,20 +109,19 @@ namespace {
     void EvalImpl(Condition::ObjectSet& matches, Condition::ObjectSet& non_matches,
                   Condition::SearchDomain search_domain, const Pred& pred)
     {
-        auto& from_set = search_domain == Condition::MATCHES ? matches : non_matches;
-        auto& to_set = search_domain == Condition::MATCHES ? non_matches : matches;
-        for (auto it = from_set.begin(); it != from_set.end(); ) {
-            bool match = pred(*it);
-            if ((search_domain == Condition::MATCHES && !match) ||
-                (search_domain == Condition::NON_MATCHES && match))
-            {
-                to_set.push_back(*it);
-                *it = from_set.back();
-                from_set.pop_back();
-            } else {
-                ++it;
-            }
-        }
+        bool domain_matches = search_domain == Condition::MATCHES;
+        auto& from_set = domain_matches ? matches : non_matches;
+        auto& to_set = domain_matches ? non_matches : matches;
+
+        // move objects into to_set (resets moved-from pointers)
+        std::copy_if(std::make_move_iterator(from_set.begin()),
+                     std::make_move_iterator(from_set.end()),
+                     std::back_inserter(to_set),
+                     [pred, domain_matches](const auto& o) { return pred(o) != domain_matches; });
+
+        // erase the reset-pointer entries in from_set
+        from_set.erase(std::remove_if(from_set.begin(), from_set.end(), [](const auto& o) { return !o; }),
+                       from_set.end());
     }
 
     std::vector<Condition::Condition*> FlattenAndNestedConditions(
@@ -252,7 +242,7 @@ struct Condition::MatchHelper {
     bool operator()(std::shared_ptr<const UniverseObject> candidate) const
     { return m_this->Match(ScriptingContext(m_parent_context, candidate)); }
 
-    const Condition* m_this;
+    const Condition* m_this = nullptr;
     const ScriptingContext& m_parent_context;
 };
 
@@ -445,11 +435,11 @@ void Number::Eval(const ScriptingContext& parent_context,
         // number of matches was within the requested range.
         if (search_domain == MATCHES && !in_range) {
             // move all objects from matches to non_matches
-            non_matches.insert(non_matches.end(), matches.begin(), matches.end());
+            std::move(matches.begin(), matches.end(), std::back_inserter(non_matches));
             matches.clear();
         } else if (search_domain == NON_MATCHES && in_range) {
             // move all objects from non_matches to matches
-            matches.insert(matches.end(), non_matches.begin(), non_matches.end());
+            std::move(non_matches.begin(), non_matches.end(), std::back_inserter(matches));
             non_matches.clear();
         }
     }
@@ -541,14 +531,14 @@ void Turn::Eval(const ScriptingContext& parent_context,
 
         // transfer objects to or from candidate set, according to whether the
         // current turn was within the requested range.
-        if (match && search_domain == NON_MATCHES) {
-            // move all objects from non_matches to matches
-            matches.insert(matches.end(), non_matches.begin(), non_matches.end());
-            non_matches.clear();
-        } else if (!match && search_domain == MATCHES) {
+        if (search_domain == MATCHES && !match) {
             // move all objects from matches to non_matches
-            non_matches.insert(non_matches.end(), matches.begin(), matches.end());
+            std::move(matches.begin(), matches.end(), std::back_inserter(non_matches));
             matches.clear();
+        } else if (search_domain == NON_MATCHES && match) {
+            // move all objects from non_matches to matches
+            std::move(non_matches.begin(), non_matches.end(), std::back_inserter(matches));
+            non_matches.clear();
         }
     } else {
         // re-evaluate allowed turn range for each candidate object
@@ -684,11 +674,6 @@ bool SortedNumberOf::operator==(const Condition& rhs) const {
 }
 
 namespace {
-    /** Random number genrator function to use with random_shuffle */
-    int CustomRandInt(int max_plus_one)
-    { return RandSmallInt(0, max_plus_one - 1); }
-    int (*CRI)(int) = CustomRandInt;
-
     /** Transfers the indicated \a number of objects, randomly selected from from_set to to_set */
     void TransferRandomObjects(unsigned int number, ObjectSet& from_set, ObjectSet& to_set) {
         // ensure number of objects to be moved is within reasonable range
@@ -704,7 +689,7 @@ namespace {
         std::fill_n(transfer_flags.begin(), number, true);
 
         // shuffle flags to randomize which flags are set
-        std::random_shuffle(transfer_flags.begin(), transfer_flags.end(), CRI);
+        RandomShuffle(transfer_flags);
 
         // transfer objects that have been flagged
         int i = 0;
@@ -880,8 +865,12 @@ void SortedNumberOf::Eval(const ScriptingContext& parent_context,
     // assemble single set of subcondition matching objects
     ObjectSet all_subcondition_matches;
     all_subcondition_matches.reserve(subcondition_matching_matches.size() + subcondition_matching_non_matches.size());
-    all_subcondition_matches.insert(all_subcondition_matches.end(), subcondition_matching_matches.begin(), subcondition_matching_matches.end());
-    all_subcondition_matches.insert(all_subcondition_matches.end(), subcondition_matching_non_matches.begin(), subcondition_matching_non_matches.end());
+    all_subcondition_matches.insert(all_subcondition_matches.end(),
+                                    subcondition_matching_matches.begin(),
+                                    subcondition_matching_matches.end());
+    all_subcondition_matches.insert(all_subcondition_matches.end(),
+                                    subcondition_matching_non_matches.begin(),
+                                    subcondition_matching_non_matches.end());
 
     // how many subcondition matches to select as matches to this condition
     int number = m_number->Eval(local_context);
@@ -891,7 +880,8 @@ void SortedNumberOf::Eval(const ScriptingContext& parent_context,
     // matches, or those left in matches while the rest are moved into non_matches
     ObjectSet matched_objects;
     matched_objects.reserve(number);
-    TransferSortedObjects(number, m_sort_key.get(), parent_context, m_sorting_method, all_subcondition_matches, matched_objects);
+    TransferSortedObjects(number, m_sort_key.get(), parent_context, m_sorting_method,
+                          all_subcondition_matches, matched_objects);
 
     // put objects back into matches and non_target sets as output...
 
@@ -1063,7 +1053,7 @@ void All::Eval(const ScriptingContext& parent_context,
 {
     if (search_domain == NON_MATCHES) {
         // move all objects from non_matches to matches
-        matches.insert(matches.end(), non_matches.begin(), non_matches.end());
+        std::move(non_matches.begin(), non_matches.end(), std::back_inserter(matches));
         non_matches.clear();
     }
     // if search_comain is MATCHES, do nothing: all objects in matches set
@@ -1108,7 +1098,7 @@ void None::Eval(const ScriptingContext& parent_context,
 {
     if (search_domain == MATCHES) {
         // move all objects from matches to non_matches
-        non_matches.insert(non_matches.end(), matches.begin(), matches.end());
+        std::move(matches.begin(), matches.end(), std::back_inserter(non_matches));
         matches.clear();
     }
     // if search domain is non_matches, no need to do anything since none of them match None.
@@ -1511,8 +1501,7 @@ unsigned int Target::GetCheckSum() const {
 // Homeworld                                             //
 ///////////////////////////////////////////////////////////
 Homeworld::Homeworld() :
-    Condition(),
-    m_names()
+    Homeworld(std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>{})
 {}
 
 Homeworld::Homeworld(std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>&& names) :
@@ -2225,8 +2214,8 @@ HasSpecial::HasSpecial() :
                std::unique_ptr<ValueRef::ValueRef<int>>{})
 {}
 
-HasSpecial::HasSpecial(const std::string& name) :
-    HasSpecial(std::make_unique<ValueRef::Constant<std::string>>(name),
+HasSpecial::HasSpecial(std::string name) :
+    HasSpecial(std::make_unique<ValueRef::Constant<std::string>>(std::move(name)),
                std::unique_ptr<ValueRef::ValueRef<int>>{},
                std::unique_ptr<ValueRef::ValueRef<int>>{})
 {}
@@ -2502,7 +2491,7 @@ namespace {
     struct HasTagSimpleMatch {
         HasTagSimpleMatch() :
             m_any_tag_ok(true),
-            m_name()
+            m_name(EMPTY_STRING)
         {}
 
         HasTagSimpleMatch(const std::string& name) :
@@ -2520,8 +2509,8 @@ namespace {
             return candidate->HasTag(m_name);
         }
 
-        bool        m_any_tag_ok;
-        std::string m_name;
+        bool               m_any_tag_ok;
+        const std::string& m_name;
     };
 }
 
@@ -2942,22 +2931,20 @@ bool ContainedBy::operator==(const Condition& rhs) const {
 
 namespace {
     struct ContainedBySimpleMatch {
-        ContainedBySimpleMatch(const ObjectSet& subcondition_matches) :
-            m_subcondition_matches_ids()
-        {
-            // We need a sorted container for efficiently intersecting 
+        ContainedBySimpleMatch(const ObjectSet& subcondition_matches) {
+            // We need a sorted container for efficiently intersecting
             // subcondition_matches with the set of objects containing some
             // candidate object.
             // We only need ids, not objects, so we can do that conversion
             // here as well, simplifying later code.
-            // Note that this constructor is called only once per 
+            // Note that this constructor is called only once per
             // ContainedBy::Eval(), its work cannot help performance when
             // executed for each candidate.
             m_subcondition_matches_ids.reserve(subcondition_matches.size());
             // gather the ids
             for (auto& obj : subcondition_matches) {
                 if (obj)
-                { m_subcondition_matches_ids.push_back(obj->ID()); }
+                    m_subcondition_matches_ids.push_back(obj->ID());
             }
             // sort them
             std::sort(m_subcondition_matches_ids.begin(), m_subcondition_matches_ids.end());
@@ -4193,10 +4180,10 @@ void Species::Eval(const ScriptingContext& parent_context,
     if (simple_eval_safe) {
         // evaluate names once, and use to check all candidate objects
         std::vector<std::string> names;
+        names.reserve(m_names.size());
         // get all names from valuerefs
-        for (auto& name : m_names) {
-            names.push_back(name->Eval(parent_context));
-        }
+        for (auto& name : m_names)
+            names.emplace_back(name->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, SpeciesSimpleMatch(names, parent_context.ContextObjects()));
     } else {
         // re-evaluate allowed building types range for each candidate object
@@ -4440,12 +4427,12 @@ namespace {
             return (m_low <= count && count <= m_high);
         }
 
-        BuildType   m_build_type;
-        std::string m_name;
-        int         m_design_id;
-        int         m_empire_id;
-        int         m_low;
-        int         m_high;
+        BuildType          m_build_type;
+        const std::string& m_name;
+        int                m_design_id;
+        int                m_empire_id;
+        int                m_low;
+        int                m_high;
     };
 }
 
@@ -4482,7 +4469,7 @@ void Enqueued::Eval(const ScriptingContext& parent_context,
 
         // need to test each candidate separately using EvalImpl and EnqueuedSimpleMatch
         // because the test checks that something is enqueued at the candidate location
-        EvalImpl(matches, non_matches, search_domain, EnqueuedSimpleMatch(m_build_type, name, design_id, 
+        EvalImpl(matches, non_matches, search_domain, EnqueuedSimpleMatch(m_build_type, name, design_id,
                                                                           empire_id, low, high));
     } else {
         // re-evaluate allowed building types range for each candidate object
@@ -4980,7 +4967,7 @@ namespace {
             return design->Hull() == m_name;
         }
 
-        const std::string&  m_name;
+        const std::string& m_name;
     };
 }
 
@@ -5437,7 +5424,7 @@ namespace {
     struct PredefinedShipDesignSimpleMatch {
         PredefinedShipDesignSimpleMatch() :
             m_any_predef_design_ok(true),
-            m_name()
+            m_name(EMPTY_STRING)
         {}
 
         PredefinedShipDesignSimpleMatch(const std::string& name) :
@@ -5465,8 +5452,8 @@ namespace {
             return (m_name == candidate_design->Name(false)); // don't look up in stringtable; predefined designs are stored by stringtable entry key
         }
 
-        bool        m_any_predef_design_ok;
-        std::string m_name;
+        bool               m_any_predef_design_ok;
+        const std::string& m_name;
     };
 }
 
@@ -5911,7 +5898,7 @@ namespace {
         case METER_TARGET_POPULATION:   return "TargetPopulation";   break;
         case METER_TARGET_INDUSTRY:     return "TargetIndustry";     break;
         case METER_TARGET_RESEARCH:     return "TargetResearch";     break;
-        case METER_TARGET_TRADE:        return "TargetTrade";        break;
+        case METER_TARGET_INFLUENCE:    return "TargetInfluence";    break;
         case METER_TARGET_CONSTRUCTION: return "TargetConstruction"; break;
         case METER_TARGET_HAPPINESS:    return "TargetHappiness";    break;
         case METER_MAX_CAPACITY:        return "MaxCapacity";        break;
@@ -5926,7 +5913,7 @@ namespace {
         case METER_POPULATION:          return "Population";         break;
         case METER_INDUSTRY:            return "Industry";           break;
         case METER_RESEARCH:            return "Research";           break;
-        case METER_TRADE:               return "Trade";              break;
+        case METER_INFLUENCE:           return "Influence";          break;
         case METER_CONSTRUCTION:        return "Construction";       break;
         case METER_HAPPINESS:           return "Happiness";          break;
         case METER_CAPACITY:            return "Capacity";           break;
@@ -6105,10 +6092,10 @@ namespace {
             return (m_low <= meter_current && meter_current <= m_high);
         }
 
-        std::string m_part_name;
-        float       m_low;
-        float       m_high;
-        MeterType   m_meter;
+        const std::string& m_part_name;
+        float              m_low;
+        float              m_high;
+        MeterType          m_meter;
     };
 }
 
@@ -6183,7 +6170,7 @@ bool ShipPartMeterValue::Match(const ScriptingContext& local_context) const {
     float low = (m_low ? m_low->Eval(local_context) : -Meter::LARGE_VALUE);
     float high = (m_high ? m_high->Eval(local_context) : Meter::LARGE_VALUE);
     std::string part_name = (m_part_name ? m_part_name->Eval(local_context) : "");
-    return ShipPartMeterValueSimpleMatch(part_name, m_meter, low, high)(candidate);
+    return ShipPartMeterValueSimpleMatch(std::move(part_name), m_meter, low, high)(candidate);
 }
 
 void ShipPartMeterValue::SetTopLevelContent(const std::string& content_name) {
@@ -6211,19 +6198,19 @@ unsigned int ShipPartMeterValue::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // EmpireMeterValue                                      //
 ///////////////////////////////////////////////////////////
-EmpireMeterValue::EmpireMeterValue(const std::string& meter,
+EmpireMeterValue::EmpireMeterValue(std::string meter,
                                    std::unique_ptr<ValueRef::ValueRef<double>>&& low,
                                    std::unique_ptr<ValueRef::ValueRef<double>>&& high) :
-    EmpireMeterValue(nullptr, meter, std::move(low), std::move(high))
+    EmpireMeterValue(nullptr, std::move(meter), std::move(low), std::move(high))
 {}
 
 EmpireMeterValue::EmpireMeterValue(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
-                                   const std::string& meter,
+                                   std::string meter,
                                    std::unique_ptr<ValueRef::ValueRef<double>>&& low,
                                    std::unique_ptr<ValueRef::ValueRef<double>>&& high) :
     Condition(),
     m_empire_id(std::move(empire_id)),
-    m_meter(meter),
+    m_meter(std::move(meter)),
     m_low(std::move(low)),
     m_high(std::move(high))
 {
@@ -6247,8 +6234,7 @@ bool EmpireMeterValue::operator==(const Condition& rhs) const {
 
     const EmpireMeterValue& rhs_ = static_cast<const EmpireMeterValue&>(rhs);
 
-    if (m_empire_id != rhs_.m_empire_id)
-        return false;
+    CHECK_COND_VREF_MEMBER(m_empire_id)
 
     if (m_meter != rhs_.m_meter)
         return false;
@@ -6258,7 +6244,6 @@ bool EmpireMeterValue::operator==(const Condition& rhs) const {
 
     return true;
 }
-
 
 void EmpireMeterValue::Eval(const ScriptingContext& parent_context,
                             ObjectSet& matches, ObjectSet& non_matches,
@@ -6277,18 +6262,20 @@ void EmpireMeterValue::Eval(const ScriptingContext& parent_context,
 
         // transfer objects to or from candidate set, according to whether the
         // specified empire meter was in the requested range
-        if (match && search_domain == NON_MATCHES) {
-            // move all objects from non_matches to matches
-            matches.insert(matches.end(), non_matches.begin(), non_matches.end());
-            non_matches.clear();
-        } else if (!match && search_domain == MATCHES) {
+        if (search_domain == MATCHES && !match) {
             // move all objects from matches to non_matches
-            non_matches.insert(non_matches.end(), matches.begin(), matches.end());
+            std::move(matches.begin(), matches.end(), std::back_inserter(non_matches));
             matches.clear();
+        } else if (search_domain == NON_MATCHES && match) {
+            // move all objects from non_matches to matches
+            std::move(non_matches.begin(), non_matches.end(), std::back_inserter(matches));
+            non_matches.clear();
         }
 
     } else {
-        // re-evaluate allowed turn range for each candidate object
+        // re-evaluate all parameters for each candidate object.
+        // could optimize further by only re-evaluating the local-candidate
+        // variants.
         Condition::Eval(parent_context, matches, non_matches, search_domain);
     }
 }
@@ -6412,6 +6399,17 @@ EmpireStockpileValue::EmpireStockpileValue(ResourceType stockpile,
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
 }
 
+EmpireStockpileValue::EmpireStockpileValue(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
+                                           ResourceType stockpile,
+                                           std::unique_ptr<ValueRef::ValueRef<double>>&& low,
+                                           std::unique_ptr<ValueRef::ValueRef<double>>&& high) :
+    Condition(),
+    m_empire_id(std::move(empire_id)),
+    m_stockpile(stockpile),
+    m_low(std::move(low)),
+    m_high(std::move(high))
+{}
+
 bool EmpireStockpileValue::operator==(const Condition& rhs) const {
     if (this == &rhs)
         return true;
@@ -6419,6 +6417,8 @@ bool EmpireStockpileValue::operator==(const Condition& rhs) const {
         return false;
 
     const EmpireStockpileValue& rhs_ = static_cast<const EmpireStockpileValue&>(rhs);
+
+    CHECK_COND_VREF_MEMBER(m_empire_id)
 
     if (m_stockpile != rhs_.m_stockpile)
         return false;
@@ -6447,14 +6447,14 @@ void EmpireStockpileValue::Eval(const ScriptingContext& parent_context,
 
         // transfer objects to or from candidate set, according to whether the
         // specified empire meter was in the requested range
-        if (match && search_domain == NON_MATCHES) {
-            // move all objects from non_matches to matches
-            matches.insert(matches.end(), non_matches.begin(), non_matches.end());
-            non_matches.clear();
-        } else if (!match && search_domain == MATCHES) {
+        if (search_domain == MATCHES && !match) {
             // move all objects from matches to non_matches
-            non_matches.insert(non_matches.end(), matches.begin(), matches.end());
+            std::move(matches.begin(), matches.end(), std::back_inserter(non_matches));
             matches.clear();
+        } else if (search_domain == NON_MATCHES && match) {
+            // move all objects from non_matches to matches
+            std::move(non_matches.begin(), non_matches.end(), std::back_inserter(matches));
+            non_matches.clear();
         }
 
     } else {
@@ -6483,7 +6483,7 @@ std::string EmpireStockpileValue::Description(bool negated/* = false*/) const {
 std::string EmpireStockpileValue::Dump(unsigned short ntabs) const {
     std::string retval = DumpIndent(ntabs);
     switch (m_stockpile) {
-    case RE_TRADE:      retval += "OwnerTradeStockpile";    break;
+    case RE_INFLUENCE:  retval += "OwnerInfluenceStockpile";    break;
     case RE_RESEARCH:   retval += "OwnerResearchStockpile"; break;
     case RE_INDUSTRY:   retval += "OwnerIndustryStockpile"; break;
     default:            retval += "?";                      break;
@@ -6560,6 +6560,154 @@ unsigned int EmpireStockpileValue::GetCheckSum() const {
 }
 
 ///////////////////////////////////////////////////////////
+// EmpireHasAdoptedPolicy                                //
+///////////////////////////////////////////////////////////
+EmpireHasAdoptedPolicy::EmpireHasAdoptedPolicy(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
+                                               std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
+    Condition(),
+    m_name(std::move(name)),
+    m_empire_id(std::move(empire_id))
+{
+    m_root_candidate_invariant =
+        (!m_empire_id || m_empire_id->RootCandidateInvariant()) &&
+        (!m_name || m_name->RootCandidateInvariant());
+    m_target_invariant =
+        (!m_empire_id || m_empire_id->TargetInvariant()) &&
+        (!m_name || m_name->TargetInvariant());
+    m_source_invariant =
+        (!m_empire_id || m_empire_id->SourceInvariant()) &&
+        (!m_name || m_name->SourceInvariant());
+}
+
+EmpireHasAdoptedPolicy::EmpireHasAdoptedPolicy(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
+    EmpireHasAdoptedPolicy(nullptr, std::move(name))
+{}
+
+EmpireHasAdoptedPolicy::~EmpireHasAdoptedPolicy()
+{}
+
+bool EmpireHasAdoptedPolicy::operator==(const Condition& rhs) const {
+    if (this == &rhs)
+        return true;
+    if (typeid(*this) != typeid(rhs))
+        return false;
+
+    const EmpireHasAdoptedPolicy& rhs_ = static_cast<const EmpireHasAdoptedPolicy&>(rhs);
+
+    CHECK_COND_VREF_MEMBER(m_empire_id)
+    CHECK_COND_VREF_MEMBER(m_name)
+
+    return true;
+}
+
+void EmpireHasAdoptedPolicy::Eval(const ScriptingContext& parent_context,
+                                  ObjectSet& matches, ObjectSet& non_matches,
+                                  SearchDomain search_domain/* = NON_MATCHES*/) const
+{
+    bool simple_eval_safe = ((m_empire_id && m_empire_id->LocalCandidateInvariant()) &&
+                             (!m_name || m_name->LocalCandidateInvariant()) &&
+                             (parent_context.condition_root_candidate || RootCandidateInvariant()));
+    if (simple_eval_safe) {
+        // If m_empire_id is specified (not null), and all parameters are
+        // local-candidate-invariant, then matching for this condition doesn't
+        // need to check each candidate object separately for matching, so
+        // don't need to use EvalImpl and can instead do a simpler transfer
+        bool match = Match(parent_context);
+
+        // transfer objects to or from candidate set, according to whether the
+        // specified empire meter was in the requested range
+        if (match && search_domain == NON_MATCHES) {
+            // move all objects from non_matches to matches
+            matches.insert(matches.end(), non_matches.begin(), non_matches.end());
+            non_matches.clear();
+        } else if (!match && search_domain == MATCHES) {
+            // move all objects from matches to non_matches
+            non_matches.insert(non_matches.end(), matches.begin(), matches.end());
+            matches.clear();
+        }
+
+    } else {
+        // re-evaluate allowed turn range for each candidate object
+        Condition::Eval(parent_context, matches, non_matches, search_domain);
+    }
+}
+
+std::string EmpireHasAdoptedPolicy::Description(bool negated/* = false*/) const {
+    std::string name_str;
+    if (m_name) {
+        name_str = m_name->Description();
+        if (m_name->ConstantExpr() && UserStringExists(name_str))
+            name_str = UserString(name_str);
+    }
+    return str(FlexibleFormat((!negated)
+        ? UserString("DESC_EMPIRE_HAS_ADOPTED_POLICY")
+        : UserString("DESC_EMPIRE_HAS_ADOPTED_POLICY_NOT"))
+        % name_str);
+}
+
+std::string EmpireHasAdoptedPolicy::Dump(unsigned short ntabs) const {
+    std::string retval = DumpIndent(ntabs) + "EmpireHasAdoptedPolicy";
+    if (m_empire_id)
+        retval += " empire = " + m_empire_id->Dump(ntabs);
+    if (m_name)
+        retval += " name = " + m_name->Dump(ntabs);
+    retval += "\n";
+    return retval;
+}
+
+bool EmpireHasAdoptedPolicy::Match(const ScriptingContext& local_context) const {
+    int empire_id = ALL_EMPIRES;
+    auto candidate = local_context.condition_local_candidate;
+    // if m_empire_id not set, default to candidate object's owner
+    if (!m_empire_id && !candidate) {
+        ErrorLogger() << "EmpireHasAdoptedPolicy::Match passed no candidate object but expects one due to having no empire id valueref specified and thus wanting to use the local candidate's owner as the empire id";
+        return false;
+
+    } else if (m_empire_id && !candidate && !m_empire_id->LocalCandidateInvariant()) {
+        ErrorLogger() << "EmpireHasAdoptedPolicy::Match passed no candidate object but but empire id valueref references the local candidate";
+        return false;
+
+    } else if (!m_empire_id && candidate) {
+        // default to candidate's owner if no empire id valueref is specified
+        empire_id = candidate->Owner();
+
+    } else if (m_empire_id) {
+        // either candidate exists or m_empire_id is local-candidate-invariant (or both)
+        empire_id = m_empire_id->Eval(local_context);
+
+    } else {
+        ErrorLogger() << "EmpireHasAdoptedPolicy::Match reached unexpected default case for candidate and empire id valueref existance";
+        return false;
+    }
+
+    const Empire* empire = GetEmpire(empire_id);
+    if (!empire)
+         return false;
+
+    std::string name = m_name ? m_name->Eval(local_context) : "";
+
+    return empire->PolicyAdopted(name);
+}
+
+void EmpireHasAdoptedPolicy::SetTopLevelContent(const std::string& content_name) {
+    if (m_empire_id)
+        m_empire_id->SetTopLevelContent(content_name);
+    if (m_name)
+        m_name->SetTopLevelContent(content_name);
+}
+
+unsigned int EmpireHasAdoptedPolicy::GetCheckSum() const {
+    unsigned int retval{0};
+
+    CheckSums::CheckSumCombine(retval, "Condition::EmpireHasAdoptedPolicy");
+    CheckSums::CheckSumCombine(retval, m_empire_id);
+    CheckSums::CheckSumCombine(retval, m_name);
+
+    TraceLogger() << "GetCheckSum(EmpireHasAdoptedPolicy): retval: " << retval;
+    return retval;
+}
+
+///////////////////////////////////////////////////////////
 // OwnerHasTech                                          //
 ///////////////////////////////////////////////////////////
 OwnerHasTech::OwnerHasTech(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
@@ -6591,9 +6739,7 @@ bool OwnerHasTech::operator==(const Condition& rhs) const {
 
     const OwnerHasTech& rhs_ = static_cast<const OwnerHasTech&>(rhs);
 
-    if (m_empire_id != rhs_.m_empire_id)
-        return false;
-
+    CHECK_COND_VREF_MEMBER(m_empire_id)
     CHECK_COND_VREF_MEMBER(m_name)
 
     return true;
@@ -6624,8 +6770,8 @@ namespace {
             return empire->TechResearched(m_name);
         }
 
-        int         m_empire_id;
-        std::string m_name;
+        int                m_empire_id;
+        const std::string& m_name;
     };
 }
 
@@ -6742,9 +6888,7 @@ bool OwnerHasBuildingTypeAvailable::operator==(const Condition& rhs) const {
 
     const OwnerHasBuildingTypeAvailable& rhs_ = static_cast<const OwnerHasBuildingTypeAvailable&>(rhs);
 
-    if (m_empire_id != rhs_.m_empire_id)
-        return false;
-
+    CHECK_COND_VREF_MEMBER(m_empire_id)
     CHECK_COND_VREF_MEMBER(m_name)
 
     return true;
@@ -6775,8 +6919,8 @@ namespace {
             return empire->BuildingTypeAvailable(m_name);
         }
 
-        int         m_empire_id;
-        std::string m_name;
+        int                m_empire_id;
+        const std::string& m_name;
     };
 }
 
@@ -6882,9 +7026,7 @@ bool OwnerHasShipDesignAvailable::operator==(const Condition& rhs) const {
 
     const OwnerHasShipDesignAvailable& rhs_ = static_cast<const OwnerHasShipDesignAvailable&>(rhs);
 
-    if (m_empire_id != rhs_.m_empire_id)
-        return false;
-
+    CHECK_COND_VREF_MEMBER(m_empire_id)
     CHECK_COND_VREF_MEMBER(m_id)
 
     return true;
@@ -7025,12 +7167,9 @@ bool OwnerHasShipPartAvailable::operator==(const Condition& rhs) const {
     if (typeid(*this) != typeid(rhs))
         return false;
 
-    const OwnerHasShipPartAvailable& rhs_ =
-        static_cast<const OwnerHasShipPartAvailable&>(rhs);
+    const OwnerHasShipPartAvailable& rhs_ = static_cast<const OwnerHasShipPartAvailable&>(rhs);
 
-    if (m_empire_id != rhs_.m_empire_id)
-        return false;
-
+    CHECK_COND_VREF_MEMBER(m_empire_id)
     CHECK_COND_VREF_MEMBER(m_name)
 
     return true;
@@ -7061,8 +7200,8 @@ namespace {
             return empire->ShipPartAvailable(m_name);
         }
 
-        int         m_empire_id;
-        std::string m_name;
+        int                 m_empire_id;
+        const std::string&  m_name;
     };
 }
 
@@ -8903,15 +9042,16 @@ void ValueTest::Eval(const ScriptingContext& parent_context,
 
     if (simple_eval_safe) {
         // evaluate value and range limits once, use to match all candidates
-        bool passed = Match(parent_context);
+        bool match = Match(parent_context);
 
         // transfer objects to or from candidate set, according to whether the value comparisons were true
-        if (search_domain == MATCHES && !passed) {
-            non_matches.insert(non_matches.end(), matches.begin(), matches.end());
+        if (search_domain == MATCHES && !match) {
+            // move all objects from matches to non_matches
+            std::move(matches.begin(), matches.end(), std::back_inserter(non_matches));
             matches.clear();
-        }
-        if (search_domain == NON_MATCHES && passed) {
-            matches.insert(matches.end(), non_matches.begin(), non_matches.end());
+        } else if (search_domain == NON_MATCHES && match) {
+            // move all objects from non_matches to matches
+            std::move(non_matches.begin(), non_matches.end(), std::back_inserter(matches));
             non_matches.clear();
         }
 
@@ -9210,7 +9350,8 @@ void Location::Eval(const ScriptingContext& parent_context,
             // was defined as Location or if there is no location
             // condition, match nothing
             if (search_domain == MATCHES) {
-                non_matches.insert(non_matches.end(), matches.begin(), matches.end());
+                // move all objects from matches to non_matches
+                std::move(matches.begin(), matches.end(), std::back_inserter(non_matches));
                 matches.clear();
             }
         }
@@ -9904,11 +10045,13 @@ unsigned int Not::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // OrderedAlternativesOf
 ///////////////////////////////////////////////////////////
-void FCMoveContent(ObjectSet& from_set, ObjectSet& to_set) {
-    to_set.insert(to_set.end(),
-                  std::make_move_iterator(from_set.begin()),
-                  std::make_move_iterator(from_set.end()));
-    from_set.clear();
+namespace {
+    void FCMoveContent(ObjectSet& from_set, ObjectSet& to_set) {
+        to_set.insert(to_set.end(),
+                      std::make_move_iterator(from_set.begin()),
+                      std::make_move_iterator(from_set.end()));
+        from_set.clear();
+    }
 }
 
 OrderedAlternativesOf::OrderedAlternativesOf(

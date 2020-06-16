@@ -204,9 +204,6 @@
     <ClInclude Include="..\..\UI\ResourcePanel.h">
       <Filter>Header Files\UI</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UI\SDLGUI.h">
-      <Filter>Header Files\UI</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\UI\ServerConnectWnd.h">
       <Filter>Header Files\UI</Filter>
     </ClInclude>
@@ -282,9 +279,6 @@
     <ClInclude Include="..\..\util\binreloc.h">
       <Filter>Header Files\util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\util\Directories.h">
-      <Filter>Header Files\util</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\universe\IDAllocator.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
@@ -322,9 +316,6 @@
       <Filter>Header Files\universe</Filter>
     </ClInclude>
     <ClInclude Include="..\..\universe\PopCenter.h">
-      <Filter>Header Files\universe</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\universe\Predicates.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
     <ClInclude Include="..\..\universe\ResourceCenter.h">
@@ -409,6 +400,12 @@
       <Filter>Header Files\UI</Filter>
     </ClInclude>
     <ClInclude Include="StdAfx.h" />
+    <ClInclude Include="..\..\UI\SDLGUI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UI\GovernmentWnd.h">
+      <Filter>Header Files\UI</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\client\human\FreeOrion.ico">
@@ -548,9 +545,6 @@
     <ClCompile Include="..\..\UI\ResourcePanel.cpp">
       <Filter>Source Files\UI</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UI\SDLGUI.cpp">
-      <Filter>Source Files\UI</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\UI\ServerConnectWnd.cpp">
       <Filter>Source Files\UI</Filter>
     </ClCompile>
@@ -618,6 +612,12 @@
       <Filter>Source Files\UI</Filter>
     </ClCompile>
     <ClCompile Include="StdAfx.cpp" />
+    <ClCompile Include="..\..\UI\SDLGUI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\UI\GovernmentWnd.cpp">
+      <Filter>Source Files\UI</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\client\human\FreeOrion.rc">

@@ -80,6 +80,7 @@ public:
 
     bool ZoomToContent(const std::string& name, bool reverse_lookup = false);
     bool ZoomToTech(const std::string& tech_name);                  //!< Opens the technology screen and presents a description of the given technology
+    bool ZoomToPolicy(const std::string& policy_name);              //!< ???
     bool ZoomToBuildingType(const std::string& building_type_name); //!< Opens the production screen and presents a description of the given building type
     bool ZoomToSpecial(const std::string& special_name);            //!< Opens the ??? screen and presents a description of the given special
     bool ZoomToShipHull(const std::string& hull_name);              //!< Opens the design screen and presents a description of the given hull type
@@ -188,6 +189,7 @@ public:
     static std::shared_ptr<GG::Texture> BuildingIcon(const std::string& building_type_name);
     static std::shared_ptr<GG::Texture> CategoryIcon(const std::string& category_name);
     static std::shared_ptr<GG::Texture> TechIcon(const std::string& tech_name);
+    static std::shared_ptr<GG::Texture> PolicyIcon(const std::string& policy_name);
     static std::shared_ptr<GG::Texture> SpecialIcon(const std::string& special_name);
     static std::shared_ptr<GG::Texture> SpeciesIcon(const std::string& species_name);
     static std::shared_ptr<GG::Texture> FieldTexture(const std::string& field_type_name);
@@ -213,14 +215,6 @@ public:
     //!@}
 
 private:
-    typedef std::pair<std::vector<std::shared_ptr<GG::Texture>>,
-                      std::shared_ptr<SmallIntDistType>>    TexturesAndDist;
-    typedef std::map<std::string, TexturesAndDist>          PrefixedTextures;
-
-    TexturesAndDist PrefixedTexturesAndDist(const boost::filesystem::path& dir,
-                                            const std::string& prefix,
-                                            bool mipmap);
-
     void HandleSizeChange(bool fullscreen) const;
     void HandleFullscreenSwitch() const;
 
@@ -232,7 +226,12 @@ private:
     std::shared_ptr<SaveFileDialog>         m_savefile_dialog;
     std::shared_ptr<PasswordEnterWnd>       m_password_enter_wnd;   //!< the authentication window
 
-    PrefixedTextures                        m_prefixed_textures;
+    //!< map key represents a directory and first part of a texture filename.
+    //!< when textures are looked up with GetPrefixedTextures, the specified
+    //!< dir is searched for filenames that start with the prefix. pointers
+    //!< to the Texture objects for these files are stored as the mapped value.
+    std::map<std::string, std::vector<std::shared_ptr<GG::Texture>>>
+                                            m_prefixed_textures;
 
     std::unique_ptr<ShipDesignManager>      m_ship_designs;         //!< ship designs the client knows about, and their ordering in the UI
 

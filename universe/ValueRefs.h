@@ -1,23 +1,23 @@
 #ifndef _ValueRefs_h_
 #define _ValueRefs_h_
 
-#include "ScriptingContext.h"
-#include "ValueRef.h"
-#include "Condition.h"
-#include "Universe.h"
-#include "../util/Export.h"
-#include "../util/i18n.h"
-#include "../util/Random.h"
-#include "../util/CheckSums.h"
-
-#include <boost/algorithm/string/case_conv.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/format.hpp>
-#include <boost/serialization/nvp.hpp>
 
 #include <iterator>
 #include <map>
 #include <set>
+#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/format.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/serialization/nvp.hpp>
+#include "Condition.h"
+#include "ScriptingContext.h"
+#include "Universe.h"
+#include "ValueRef.h"
+#include "../util/CheckSums.h"
+#include "../util/Export.h"
+#include "../util/i18n.h"
+#include "../util/Random.h"
+
 
 namespace CheckSums {
     template <typename T>
@@ -65,10 +65,6 @@ struct FO_COMMON_API Constant final : public ValueRef<T>
 private:
     T           m_value;
     std::string m_top_level_content;    // in the special case that T is std::string and m_value is "CurrentContent", return this instead
-
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
 
 enum ReferenceType : int {
@@ -86,13 +82,25 @@ enum ReferenceType : int {
 template <typename T>
 struct FO_COMMON_API Variable : public ValueRef<T>
 {
-    explicit Variable(ReferenceType ref_type, const std::string& property_name = "",
-                      bool return_immediate_value = false);
-    Variable(ReferenceType ref_type, const std::vector<std::string>& property_name,
+    template <typename S>
+    Variable(ReferenceType ref_type, S&& property_name,
              bool return_immediate_value = false);
+
+    Variable(ReferenceType ref_type, const char* property_name,
+             bool return_immediate_value = false);
+
+    explicit Variable(ReferenceType ref_type,
+             bool return_immediate_value = false);
+
     Variable(ReferenceType ref_type,
-             const boost::optional<std::string>& container_name,
-             const std::string& property_name,
+             boost::optional<std::string>&& container_name,
+             std::string&& property_name,
+             bool return_immediate_value = false);
+
+    Variable(ReferenceType ref_type, std::vector<std::string>&& property_name,
+             bool return_immediate_value = false);
+
+    Variable(ReferenceType ref_type, const std::vector<std::string>& property_name,
              bool return_immediate_value = false);
 
     bool operator==(const ValueRef<T>& rhs) const override;
@@ -112,11 +120,6 @@ protected:
     ReferenceType               m_ref_type = INVALID_REFERENCE_TYPE;
     std::vector<std::string>    m_property_name;
     bool                        m_return_immediate_value = false;
-
-private:
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
 
 /** The variable statistic class.   The value returned by this node is
@@ -167,13 +170,9 @@ protected:
     T ReduceData(const std::map<std::shared_ptr<const UniverseObject>, T>& object_property_values) const;
 
 private:
-    StatisticType                             m_stat_type;
+    StatisticType                         m_stat_type;
     std::unique_ptr<Condition::Condition> m_sampling_condition;
     std::unique_ptr<ValueRef<T>>          m_value_ref;
-
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
 
 /** The complex variable ValueRef class. The value returned by this node
@@ -181,7 +180,16 @@ private:
 template <typename T>
 struct FO_COMMON_API ComplexVariable final : public Variable<T>
 {
-    explicit ComplexVariable(const std::string& variable_name,
+    template<typename S>
+    explicit ComplexVariable(S&& variable_name,
+                             std::unique_ptr<ValueRef<int>>&& int_ref1 = nullptr,
+                             std::unique_ptr<ValueRef<int>>&& int_ref2 = nullptr,
+                             std::unique_ptr<ValueRef<int>>&& int_ref3 = nullptr,
+                             std::unique_ptr<ValueRef<std::string>>&& string_ref1 = nullptr,
+                             std::unique_ptr<ValueRef<std::string>>&& string_ref2 = nullptr,
+                             bool return_immediate_value = false);
+
+    explicit ComplexVariable(const char* variable_name,
                              std::unique_ptr<ValueRef<int>>&& int_ref1 = nullptr,
                              std::unique_ptr<ValueRef<int>>&& int_ref2 = nullptr,
                              std::unique_ptr<ValueRef<int>>&& int_ref3 = nullptr,
@@ -211,11 +219,6 @@ protected:
     std::unique_ptr<ValueRef<int>> m_int_ref3;
     std::unique_ptr<ValueRef<std::string>> m_string_ref1;
     std::unique_ptr<ValueRef<std::string>> m_string_ref2;
-
-private:
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
 
 /** The variable static_cast class.  The value returned by this node is taken
@@ -251,10 +254,6 @@ struct FO_COMMON_API StaticCast final : public Variable<ToType>
 
 private:
     std::unique_ptr<ValueRef<FromType>> m_value_ref;
-
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
 
 /** The variable lexical_cast to string class.  The value returned by this node
@@ -263,7 +262,7 @@ private:
 template <typename FromType>
 struct FO_COMMON_API StringCast final : public Variable<std::string>
 {
-    StringCast(std::unique_ptr<ValueRef<FromType>>&& value_ref);
+    explicit StringCast(std::unique_ptr<ValueRef<FromType>>&& value_ref);
 
     bool operator==(const ValueRef<std::string>& rhs) const override;
     std::string Eval(const ScriptingContext& context) const override;
@@ -282,10 +281,6 @@ struct FO_COMMON_API StringCast final : public Variable<std::string>
 
 private:
     std::unique_ptr<ValueRef<FromType>> m_value_ref;
-
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
 
 /** Looks up a string ValueRef or vector of string ValueRefs, and returns
@@ -311,10 +306,6 @@ struct FO_COMMON_API UserStringLookup final : public Variable<std::string> {
 
 private:
     std::unique_ptr<ValueRef<FromType>> m_value_ref;
-
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
 
 /** Returns the in-game name of the object / empire / etc. with a specified id. */
@@ -349,10 +340,6 @@ struct FO_COMMON_API NameLookup final : public Variable<std::string> {
 private:
     std::unique_ptr<ValueRef<int>> m_value_ref;
     LookupType m_lookup_type;
-
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
 
 enum OpType : int {
@@ -433,17 +420,13 @@ private:
     std::vector<std::unique_ptr<ValueRef<T>>>   m_operands;
     bool                                        m_constant_expr = false;
     T                                           m_cached_const_value = T();
-
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
 
-FO_COMMON_API MeterType     NameToMeter(const std::string& name);
-FO_COMMON_API std::string   MeterToName(MeterType meter);
-FO_COMMON_API std::string   ReconstructName(const std::vector<std::string>& property_name,
-                                            ReferenceType ref_type,
-                                            bool return_immediate_value = false);
+FO_COMMON_API MeterType             NameToMeter(const std::string& name);
+FO_COMMON_API const std::string&    MeterToName(MeterType meter);
+FO_COMMON_API std::string           ReconstructName(const std::vector<std::string>& property_name,
+                                                    ReferenceType ref_type,
+                                                    bool return_immediate_value = false);
 
 FO_COMMON_API std::string FormatedDescriptionPropertyNames(
     ReferenceType ref_type, const std::vector<std::string>& property_names,
@@ -483,17 +466,12 @@ bool ValueRef<T>::operator==(const ValueRef<T>& rhs) const
     return true;
 }
 
-template <typename T>
-template <typename Archive>
-void ValueRef<T>::serialize(Archive& ar, const unsigned int version)
-{}
-
 ///////////////////////////////////////////////////////////
 // Constant                                              //
 ///////////////////////////////////////////////////////////
 template <typename T>
 Constant<T>::Constant(T value) :
-    m_value(value)
+    m_value(std::move(value))
 {}
 
 template <typename T>
@@ -574,49 +552,59 @@ FO_COMMON_API std::string Constant<std::string>::Dump(unsigned short ntabs) cons
 template <>
 FO_COMMON_API std::string Constant<std::string>::Eval(const ScriptingContext& context) const;
 
-template <typename T>
-template <typename Archive>
-void Constant<T>::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(ValueRef)
-        & BOOST_SERIALIZATION_NVP(m_value)
-        & BOOST_SERIALIZATION_NVP(m_top_level_content);
-}
 
 ///////////////////////////////////////////////////////////
 // Variable                                              //
 ///////////////////////////////////////////////////////////
 template <typename T>
-Variable<T>::Variable(ReferenceType ref_type, const std::vector<std::string>& property_name,
+Variable<T>::Variable(ReferenceType ref_type, std::vector<std::string>&& property_name,
                       bool return_immediate_value) :
     m_ref_type(ref_type),
-    m_property_name(property_name.begin(), property_name.end()),
+    m_property_name(std::move(property_name)),
     m_return_immediate_value(return_immediate_value)
 {}
 
 template <typename T>
-Variable<T>::Variable(ReferenceType ref_type, const std::string& property_name,
+Variable<T>::Variable(ReferenceType ref_type, const std::vector<std::string>& property_name,
                       bool return_immediate_value) :
     m_ref_type(ref_type),
-    m_property_name(),
+    m_property_name(property_name),
     m_return_immediate_value(return_immediate_value)
-{
-    m_property_name.push_back(property_name);
-}
+{}
+
+template <typename T>
+Variable<T>::Variable(ReferenceType ref_type, bool return_immediate_value) :
+    m_ref_type(ref_type),
+    m_return_immediate_value(return_immediate_value)
+{}
+
+template <typename T>
+Variable<T>::Variable(ReferenceType ref_type, const char* property_name,
+                      bool return_immediate_value) :
+    m_ref_type(ref_type),
+    m_property_name{1, property_name},
+    m_return_immediate_value(return_immediate_value)
+{}
+
+template <typename T>
+template <typename S>
+Variable<T>::Variable(ReferenceType ref_type, S&& property_name,
+                      bool return_immediate_value) :
+    m_ref_type(ref_type),
+    m_return_immediate_value(return_immediate_value)
+{ m_property_name.emplace_back(std::move(property_name)); }
 
 template <typename T>
 Variable<T>::Variable(ReferenceType ref_type,
-                      const boost::optional<std::string>& container_name,
-                      const std::string& property_name,
+                      boost::optional<std::string>&& container_name,
+                      std::string&& property_name,
                       bool return_immediate_value) :
     m_ref_type(ref_type),
-    m_property_name(),
     m_return_immediate_value(return_immediate_value)
 {
     if (container_name)
-        m_property_name.push_back(*container_name);
-
-    m_property_name.push_back(property_name);
+        m_property_name.emplace_back(std::move(*container_name));
+    m_property_name.emplace_back(std::move(property_name));
 }
 
 template <typename T>
@@ -711,15 +699,6 @@ FO_COMMON_API std::string Variable<std::string>::Eval(const ScriptingContext& co
 template <>
 FO_COMMON_API std::vector<std::string> Variable<std::vector<std::string>>::Eval(const ScriptingContext& context) const;
 
-template <typename T>
-template <typename Archive>
-void Variable<T>::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(ValueRef)
-        & BOOST_SERIALIZATION_NVP(m_ref_type)
-        & BOOST_SERIALIZATION_NVP(m_property_name)
-        & BOOST_SERIALIZATION_NVP(m_return_immediate_value);
-}
 
 ///////////////////////////////////////////////////////////
 // Statistic                                             //
@@ -727,7 +706,7 @@ void Variable<T>::serialize(Archive& ar, const unsigned int version)
 template <typename T>
 Statistic<T>::Statistic(std::unique_ptr<ValueRef<T>>&& value_ref, StatisticType stat_type,
                         std::unique_ptr<Condition::Condition>&& sampling_condition) :
-    Variable<T>(NON_OBJECT_REFERENCE, ""),
+    Variable<T>(NON_OBJECT_REFERENCE),
     m_stat_type(stat_type),
     m_sampling_condition(std::move(sampling_condition)),
     m_value_ref(std::move(value_ref))
@@ -1116,28 +1095,36 @@ T Statistic<T>::ReduceData(const std::map<std::shared_ptr<const UniverseObject>,
     }
 }
 
-template <typename T>
-template <typename Archive>
-void Statistic<T>::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(Variable)
-        & BOOST_SERIALIZATION_NVP(m_stat_type)
-        & BOOST_SERIALIZATION_NVP(m_sampling_condition)
-        & BOOST_SERIALIZATION_NVP(m_value_ref);
-}
 
 ///////////////////////////////////////////////////////////
 // ComplexVariable                                       //
 ///////////////////////////////////////////////////////////
 template <typename T>
-ComplexVariable<T>::ComplexVariable(const std::string& variable_name,
+template <typename S>
+ComplexVariable<T>::ComplexVariable(S&& variable_name,
                                     std::unique_ptr<ValueRef<int>>&& int_ref1,
                                     std::unique_ptr<ValueRef<int>>&& int_ref2,
                                     std::unique_ptr<ValueRef<int>>&& int_ref3,
                                     std::unique_ptr<ValueRef<std::string>>&& string_ref1,
                                     std::unique_ptr<ValueRef<std::string>>&& string_ref2,
                                     bool return_immediate_value) :
-    Variable<T>(NON_OBJECT_REFERENCE, std::vector<std::string>(1, variable_name), return_immediate_value),
+    Variable<T>(NON_OBJECT_REFERENCE, std::forward<S>(variable_name), return_immediate_value),
+    m_int_ref1(std::move(int_ref1)),
+    m_int_ref2(std::move(int_ref2)),
+    m_int_ref3(std::move(int_ref3)),
+    m_string_ref1(std::move(string_ref1)),
+    m_string_ref2(std::move(string_ref2))
+{}
+
+template <typename T>
+ComplexVariable<T>::ComplexVariable(const char* variable_name,
+                                    std::unique_ptr<ValueRef<int>>&& int_ref1,
+                                    std::unique_ptr<ValueRef<int>>&& int_ref2,
+                                    std::unique_ptr<ValueRef<int>>&& int_ref3,
+                                    std::unique_ptr<ValueRef<std::string>>&& string_ref1,
+                                    std::unique_ptr<ValueRef<std::string>>&& string_ref2,
+                                    bool return_immediate_value) :
+    Variable<T>(NON_OBJECT_REFERENCE, variable_name, return_immediate_value),
     m_int_ref1(std::move(int_ref1)),
     m_int_ref2(std::move(int_ref2)),
     m_int_ref3(std::move(int_ref3)),
@@ -1340,6 +1327,9 @@ template <>
 FO_COMMON_API StarType ComplexVariable<StarType>::Eval(const ScriptingContext& context) const;
 
 template <>
+FO_COMMON_API std::vector<std::string> ComplexVariable<std::vector<std::string>>::Eval(const ScriptingContext& context) const;
+
+template <>
 FO_COMMON_API Visibility ComplexVariable<Visibility>::Eval(const ScriptingContext& context) const;
 
 template <>
@@ -1350,6 +1340,9 @@ FO_COMMON_API int ComplexVariable<int>::Eval(const ScriptingContext& context) co
 
 template <>
 FO_COMMON_API std::string ComplexVariable<std::string>::Eval(const ScriptingContext& context) const;
+
+template <>
+FO_COMMON_API std::string ComplexVariable<std::vector<std::string>>::Dump(unsigned short ntabs) const;
 
 template <>
 FO_COMMON_API std::string ComplexVariable<Visibility>::Dump(unsigned short ntabs) const;
@@ -1363,17 +1356,6 @@ FO_COMMON_API std::string ComplexVariable<int>::Dump(unsigned short ntabs) const
 template <>
 FO_COMMON_API std::string ComplexVariable<std::string>::Dump(unsigned short ntabs) const;
 
-template <typename T>
-template <typename Archive>
-void ComplexVariable<T>::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(Variable)
-        & BOOST_SERIALIZATION_NVP(m_int_ref1)
-        & BOOST_SERIALIZATION_NVP(m_int_ref2)
-        & BOOST_SERIALIZATION_NVP(m_int_ref3)
-        & BOOST_SERIALIZATION_NVP(m_string_ref1)
-        & BOOST_SERIALIZATION_NVP(m_string_ref2);
-}
 
 ///////////////////////////////////////////////////////////
 // StaticCast                                            //
@@ -1466,13 +1448,6 @@ unsigned int StaticCast<FromType, ToType>::GetCheckSum() const
     return retval;
 }
 
-template <typename FromType, typename ToType>
-template <typename Archive>
-void StaticCast<FromType, ToType>::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(ValueRef)
-        & BOOST_SERIALIZATION_NVP(m_value_ref);
-}
 
 ///////////////////////////////////////////////////////////
 // StringCast                                            //
@@ -1577,13 +1552,6 @@ void StringCast<FromType>::SetTopLevelContent(const std::string& content_name) {
         m_value_ref->SetTopLevelContent(content_name);
 }
 
-template <typename FromType>
-template <typename Archive>
-void StringCast<FromType>::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(ValueRef)
-        & BOOST_SERIALIZATION_NVP(m_value_ref);
-}
 
 ///////////////////////////////////////////////////////////
 // UserStringLookup                                      //
@@ -1694,24 +1662,6 @@ unsigned int UserStringLookup<FromType>::GetCheckSum() const
     return retval;
 }
 
-template <typename FromType>
-template <typename Archive>
-void UserStringLookup<FromType>::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(ValueRef<std::string>)
-        & BOOST_SERIALIZATION_NVP(m_value_ref);
-}
-
-///////////////////////////////////////////////////////////
-// NameLookup                                            //
-///////////////////////////////////////////////////////////
-template <typename Archive>
-void NameLookup::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(ValueRef<std::string>)
-        & BOOST_SERIALIZATION_NVP(m_value_ref)
-        & BOOST_SERIALIZATION_NVP(m_lookup_type);
-}
 
 ///////////////////////////////////////////////////////////
 // Operation                                             //
@@ -1876,7 +1826,7 @@ T Operation<T>::EvalImpl(const ScriptingContext& context) const
         // select one operand, evaluate it, return result
         if (m_operands.empty())
             return T(-1);   // should be INVALID_T of enum types
-        unsigned int idx = RandSmallInt(0, m_operands.size() - 1);
+        auto idx = RandInt(0, m_operands.size() - 1);
         auto& vr = *std::next(m_operands.begin(), idx);
         if (!vr)
             return T(-1);   // should be INVALID_T of enum types
@@ -2253,16 +2203,6 @@ void Operation<T>::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-template <typename T>
-template <typename Archive>
-void Operation<T>::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(ValueRef)
-        & BOOST_SERIALIZATION_NVP(m_op_type)
-        & BOOST_SERIALIZATION_NVP(m_operands)
-        & BOOST_SERIALIZATION_NVP(m_constant_expr)
-        & BOOST_SERIALIZATION_NVP(m_cached_const_value);
-}
 
 } // namespace ValueRef
 

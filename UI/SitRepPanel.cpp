@@ -73,6 +73,8 @@ namespace {
 
             } else if (link_type == VarText::TECH_TAG) {
                 ClientUI::GetClientUI()->ZoomToTech(data);
+            } else if (link_type == VarText::POLICY_TAG) {
+                ClientUI::GetClientUI()->ZoomToPolicy(data);
             } else if (link_type == VarText::BUILDING_TYPE_TAG) {
                 ClientUI::GetClientUI()->ZoomToBuildingType(data);
             } else if (link_type == VarText::SPECIAL_TAG) {
@@ -241,9 +243,9 @@ namespace {
             GG::X icon_left(spacer.x);
             GG::X text_left(icon_left + GG::X(icon_dim) + sitrep_spacing);
             GG::X text_width(ClientWidth() - text_left - spacer.x);
-            m_link_text = GG::Wnd::Create<SitRepLinkText>(GG::X0, GG::Y0, text_width, m_sitrep_entry.GetText() + " ",
-                                             ClientUI::GetFont(),
-                                             GG::FORMAT_LEFT | GG::FORMAT_VCENTER | GG::FORMAT_WORDBREAK, ClientUI::TextColor());
+            m_link_text = GG::Wnd::Create<SitRepLinkText>(
+                GG::X0, GG::Y0, text_width, m_sitrep_entry.GetText() + " ", ClientUI::GetFont(),
+                GG::FORMAT_LEFT | GG::FORMAT_VCENTER | GG::FORMAT_WORDBREAK, ClientUI::TextColor());
             m_link_text->SetDecorator(VarText::EMPIRE_ID_TAG, new ColorEmpire());
             m_link_text->SetDecorator(TextLinker::BROWSE_PATH_TAG, new PathTypeDecorator());
             AttachChild(m_link_text);

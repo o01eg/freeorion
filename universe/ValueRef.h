@@ -1,10 +1,11 @@
 #ifndef _ValueRef_h_
 #define _ValueRef_h_
 
+
+#include <string>
 #include "ScriptingContext.h"
 #include "../util/Export.h"
 
-#include <string>
 
 namespace ValueRef {
 
@@ -60,11 +61,6 @@ struct FO_COMMON_API ValueRef
 
     virtual unsigned int GetCheckSum() const
     { return 0; }
-
-private:
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
 
 enum StatisticType : int {

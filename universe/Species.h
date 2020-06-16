@@ -2,21 +2,19 @@
 #define _Species_h_
 
 
-#include "EnumsFwd.h"
-#include "../util/Export.h"
-#include "../util/Serialize.h"
-#include "../util/Pending.h"
-
-#include <boost/algorithm/string/case_conv.hpp>
-#include <boost/serialization/nvp.hpp>
-#include <boost/iterator/filter_iterator.hpp>
-#include <boost/optional/optional.hpp>
-
 #include <map>
 #include <memory>
 #include <set>
 #include <string>
 #include <vector>
+#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/iterator/filter_iterator.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/serialization/nvp.hpp>
+#include "EnumsFwd.h"
+#include "../util/Export.h"
+#include "../util/Serialize.h"
+#include "../util/Pending.h"
 
 
 namespace Condition {
@@ -225,9 +223,6 @@ public:
       * free function GetSpecies() instead, mainly to save some typing. */
     const Species*      GetSpecies(const std::string& name) const;
     Species*            GetSpecies(const std::string& name);
-
-    /** returns a unique numeric id for reach species, or -1 for an invalid species name. */
-    int                 GetSpeciesID(const std::string& name) const;
 
     /** iterators for all species */
     iterator            begin() const;

@@ -14,7 +14,6 @@
 #include "../util/Order.h"
 #include "../util/OptionsDB.h"
 #include "../util/ScopedTimer.h"
-#include "../util/Directories.h"
 #include "../Empire/Empire.h"
 #include "../Empire/Government.h"
 #include "../client/human/HumanClientApp.h"
@@ -482,16 +481,7 @@ void PoliciesListBox::Populate() {
 
     /// filter policies by availability and current designation of categories
     // for display
-    auto cats_policies = GroupAvailableDisplayablePolicies(empire);
-
-    // get empire id and location to use for cost and time comparisons
-    int loc_id = INVALID_OBJECT_ID;
-    if (empire) {
-        auto location = Objects().get(empire->CapitalID());
-        loc_id = location ? location->ID() : INVALID_OBJECT_ID;
-    }
-
-    for (auto& cat : cats_policies) {
+    for (const auto& cat : GroupAvailableDisplayablePolicies(empire)) {
         //std::cout << "  cat: " << cat.first << std::endl;
         // take the sorted policies and make UI element rows for the PoliciesListBox
         for (const auto* policy: cat.second) {
@@ -514,8 +504,6 @@ void PoliciesListBox::Populate() {
             control->RightClickedSignal.connect(PoliciesListBox::PolicyRightClickedSignal);
 
             cur_row->push_back(control);
-
-            //std::cout << "PoliciesListBox::Populate created row for policy: " << policy->Name() << std::endl;
         }
     }
     // add any incomplete rows
@@ -533,7 +521,7 @@ void PoliciesListBox::Populate() {
 }
 
 void PoliciesListBox::ShowCategory(const std::string& category, bool refresh_list) {
-    if (m_policy_categories_shown.find(category) == m_policy_categories_shown.end()) {
+    if (!m_policy_categories_shown.count(category)) {
         m_policy_categories_shown.insert(category);
         if (refresh_list)
             Populate();
@@ -542,19 +530,14 @@ void PoliciesListBox::ShowCategory(const std::string& category, bool refresh_lis
 
 void PoliciesListBox::ShowAllCategories(bool refresh_list) {
     auto cats = GetPolicyManager().PolicyCategories();
-    for (const auto& category : cats)
-        m_policy_categories_shown.insert(category);
+    m_policy_categories_shown.insert(cats.begin(), cats.end());
     if (refresh_list)
         Populate();
 }
 
 void PoliciesListBox::HideCategory(const std::string& category, bool refresh_list) {
-    auto it = m_policy_categories_shown.find(category);
-    if (it != m_policy_categories_shown.end()) {
-        m_policy_categories_shown.erase(it);
-        if (refresh_list)
-            Populate();
-    }
+    if (m_policy_categories_shown.erase(category) > 0 && refresh_list)
+        Populate();
 }
 
 void PoliciesListBox::HideAllCategories(bool refresh_list) {
@@ -633,17 +616,9 @@ void GovernmentWnd::PolicyPalette::CompleteConstruction() {
     // class buttons
     for (auto& category : GetPolicyManager().PolicyCategories()) {
         // are there any policies of this class?
-        bool policy_of_this_class_exists = false;
-        for (const auto& entry : GetPolicyManager()) {
-            if (const auto& policy = entry.second) {
-                if (policy->Category() == category) {
-                    policy_of_this_class_exists = true;
-                    break;
-                }
-            }
-        }
-        if (!policy_of_this_class_exists)
-            continue;
+        if (std::none_of(GetPolicyManager().begin(), GetPolicyManager().end(),
+                         [category](auto& e){ return e.second && category == e.second->Category(); }))
+        { continue; }
 
         m_category_buttons[category] = GG::Wnd::Create<CUIStateButton>(
             UserString(boost::lexical_cast<std::string>(category)),

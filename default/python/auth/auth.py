@@ -70,7 +70,6 @@ class AuthProvider:
             exctype, value = sys.exc_info()[:2]
             error("Cann't check player %s: %s %s" % (player_name, exctype, value))
             known_login = True
-
         if not known_login:
             # default list of roles
             return self.default_roles

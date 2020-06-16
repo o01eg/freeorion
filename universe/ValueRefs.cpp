@@ -1012,14 +1012,6 @@ int Variable<int>::Eval(const ScriptingContext& context) const
         return INVALID_DESIGN_ID;
 
     }
-    else if (property_name == "SpeciesID") {
-        if (auto planet = std::dynamic_pointer_cast<const Planet>(object))
-            return GetSpeciesManager().GetSpeciesID(planet->SpeciesName());
-        else if (auto ship = std::dynamic_pointer_cast<const Ship>(object))
-            return GetSpeciesManager().GetSpeciesID(ship->SpeciesName());
-        return -1;
-
-    }
     else if (property_name == "FleetID") {
         if (auto ship = std::dynamic_pointer_cast<const Ship>(object))
             return ship->FleetID();
@@ -1443,8 +1435,6 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         empire_property_string_key = &Empire::ShipPartsOwned;
     if (variable_name == "TurnTechResearched")
         empire_property_string_key = &Empire::ResearchedTechs;
-    if (variable_name == "TurnPolicyAdopted")
-        empire_property_string_key = &Empire::TurnsPoliciesAdopted;
 
     // empire properties indexed by strings
     if (empire_property_string_key) {

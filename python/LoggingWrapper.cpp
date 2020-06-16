@@ -34,6 +34,7 @@ namespace {
 
         // If ss is good, store any partial line of text for the next call to send_to_log.
         if (ss.eof()) {
+            ss.str("");
             ss.clear();
             ss << line;
         }
@@ -41,6 +42,7 @@ namespace {
         // Report any errors
         else if (ss.bad() || ss.fail()) {
             ErrorLogger() << "Logger stream from python experienced an error " << ss.rdstate();
+            ss.str("");
             ss.clear();
         }
     }

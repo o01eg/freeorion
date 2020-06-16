@@ -55,7 +55,6 @@
 #include "../universe/UniverseObjectVisitors.h"
 #include "../universe/UniverseObject.h"
 #include "../universe/Universe.h"
-#include "../util/Directories.h"
 #include "../util/GameRules.h"
 #include "../util/i18n.h"
 #include "../util/Logger.h"
@@ -6655,7 +6654,6 @@ void MapWnd::RefreshInfluenceResourceIndicator() {
     float  expected_stockpile = empire->GetInfluenceQueue().ExpectedNewStockpileAmount();
 
     float  stockpile_plusminus_next_turn = expected_stockpile - stockpile;
-    double total_IP_to_stockpile = expected_stockpile - stockpile + stockpile_used;
 
     m_influence->SetValue(stockpile);
     m_influence->SetValue(stockpile_plusminus_next_turn, 1);

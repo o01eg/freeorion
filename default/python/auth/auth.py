@@ -20,7 +20,6 @@ import urllib.request
 
 import smtplib
 import configparser
-
 # Constants defined by the C++ game engine
 NO_TEAM_ID = -1
 

@@ -1,4 +1,4 @@
-﻿English
+English
 
 # This is the English String Table file for FreeOrion
 #
@@ -5592,8 +5592,14 @@ CATEGORY_GUIDES
 CATEGORY_GAME_CONCEPTS
 *Game Concepts*
 
+DISTORTION_ARTICLE_SHORT_DESC
+Distortion
+
 GROWTH_ARTICLE_SHORT_DESC
 Growth
+
+INDUSTRY_ARTICLE_SHORT_DESC
+Industry
 
 STOCKPILE_ARTICLE_SHORT_DESC
 Stockpile
@@ -5601,8 +5607,14 @@ Stockpile
 OUTPOSTS_ARTICLE_SHORT_DESC
 Outpost
 
+LOGISTICS_ARTICLE_SHORT_DESC
+Logistics
+
 HOMEWORLDS_ARTICLE_SHORT_DESC
 Homeworld
+
+PLANETDRIVE_ARTICLE_SHORT_DESC
+Planet Drive
 
 PRODUCTION_ARTICLE_SHORT_DESC
 Production
@@ -5621,6 +5633,9 @@ Meters
 
 POPULATION_TITLE_SHORT_DESC
 Population
+
+PSYCHIC_ARTICLE_SHORT_DESC
+Psychic
 
 MANAGEMENT_TITLE_SHORT_DESC
 Management
@@ -6015,6 +6030,12 @@ The focus of a planet may grant it bonuses or enable effects. A small penalty ap
 
 A planet will default to the inhabiting species' preferred focus if it has one, otherwise it will default to [[metertype METER_INDUSTRY]].'''
 
+DISTORTION_FOCUS_TITLE
+Spatial Distortion Focus
+
+DISTORTION_FOCUS_TEXT
+Manipulates starlanes leading to the planet slowing the progress of enemy ships by 40 uu per turn. Slow ships may even be forced back to the system at the far end of the starlane. Available after constructing a [[buildingtype BLD_SPATIAL_DISTORT_GEN]].
+
 GROWTH_FOCUS_TITLE
 Growth Focus
 
@@ -6025,17 +6046,45 @@ A planet focused on Growth extends those benefits to other planets connected to 
 
 [[GROWTH_SPECIALS_ENTRY_LIST]]'''
 
+INDUSTRY_FOCUS_TITLE
+Industry Focus
+
+INDUSTRY_FOCUS_TEXT
+Planets focused on Industry will generate more [[metertype METER_INDUSTRY]] will output for their empire, which is used for producing ships and buildings, or may be stockpiled for later use. Industry focus increases output more for higher population planets.
+
 INFLUENCE_FOCUS_TITLE
 Influence Focus
 
 INFLUENCE_FOCUS_TEXT
 Influence isn't implemented yet.
 
+LOGISTICS_FOCUS_TITLE
+Logistics Focus
+
+LOGISTICS_FOCUS_TEXT
+Planets focused on Logistics have their [[metertype METER_SUPPLY]] increased by 3. This extends the planet's empire's supply network from the planet by 3 starlane jumps.
+
+PLANETDRIVE_FOCUS_TITLE
+Planet Drive Focus
+
+PLANETDRIVE_FOCUS_TEXT
+After a [[buildingtype BLD_PLANET_DRIVE]] has been constructed, and a [[buildingtype BLD_PLANET_BEACON]] or [[shippart SP_PLANET_BEACON]] is in an adjacent system, selecting the [[PLANETDRIVE_FOCUS_TITLE]] will move the planet between star systems.
+
 PROTECTION_FOCUS_TITLE
 Protection Focus
 
 PROTECTION_FOCUS_TEXT
 The Protection focus represents a planet wholly focused on defending itself. [[metertype METER_TROOPS]], Planetary [[metertype METER_DEFENSE]], and Planetary [[metertype METER_SHIELD]] are doubled.
+
+PSYCHIC_FOCUS_TITLE
+Psychic Domination Focus
+
+PSYCHIC_FOCUS_TEXT
+'''The [[PSYCHIC_FOCUS_TITLE]] concentrates the mental force of the population to dominate the thoughts of non-telepathic crews of enemy empire ships in the same system.
+
+Each turn, there is a 10% chance of taking control of each ship, unless the enemy empire also posesses the technology [[LRN_PSY_DOM]].
+
+When the Psychic Domination Focus is engaged, it also reduces the chance that [[predefinedshipdesign SM_PSIONIC_SNOWFLAKE]]s will take control of ships controlled by the planet's empire within the system.'''
 
 STOCKPILE_FOCUS_TITLE
 Stockpile Focus
@@ -11260,7 +11309,9 @@ LRN_TIME_MECH
 Temporal Mechanics
 
 LRN_TIME_MECH_DESC
-What are "now", "future" and "past"? The twin paradox of special relativity, or the theoretical "wormhole" in its place, suggest early forms of "time travel". Direct manipulation of spacetime and temporal flux permit these effects to be harnessed and magnified. Temporal incursions cannot perceptibly alter the past of the universe that we perceive. They can, however, compress ages or extend moments to arbitrary durations, to uses limited only by the material supplies provided, and our own patience...
+'''Grants 1 extra military policy slot.
+
+What are "now", "future" and "past"? The twin paradox of special relativity, or the theoretical "wormhole" in its place, suggest early forms of "time travel". Direct manipulation of spacetime and temporal flux permit these effects to be harnessed and magnified. Temporal incursions cannot perceptibly alter the past of the universe that we perceive. They can, however, compress ages or extend moments to arbitrary durations, to uses limited only by the material supplies provided, and our own patience...'''
 
 LRN_NDIM_SUBSPACE
 N-Dimensional Subspace
@@ -11528,6 +11579,8 @@ Sentient Automation
 
 PRO_SENTIENT_AUTOMATION_DESC
 '''Increases [[metertype METER_TARGET_INDUSTRY]] on all planets with the Industry focus by 3.
+
+Grants 1 extra economic policy slot.
 
 The natural evolution of automated factories is achieved by confering to the artificial minds that control such facilities the ability to deduce and decide on their own the best course of action to achieve the goals of their owners, even before they can think about it. This improvement greatly increase the performance of the autonomous production facilities on all worlds that are actively dedicated to industrial production.'''
 
@@ -12060,6 +12113,8 @@ Distributed Thought Computing
 
 LRN_DISTRIB_THOUGHT_DESC
 '''Increases [[metertype METER_TARGET_RESEARCH]] on all planets with any focus by 0.1 per [[metertype METER_POPULATION]].
+
+Grants 1 extra military policy slot.
 
 The average citizen literally wastes his mind away, one of the finest computing devices in the universe. By tapping into the idle brain cycles of a sufficiently large population through a network of simple cybernetic transceivers, the research centers of a world can gain access to cheap and plentiful raw computing power.'''
 
@@ -13297,13 +13352,16 @@ BLD_PLANET_DRIVE_DESC
 
 Due to a lack of UI targeting, either a [[buildingtype BLD_PLANET_BEACON]] or a ship equipped with a [[shippart SP_PLANET_BEACON]] currently required on the other end of the starlane. This building will destroy itself immediately, so that the planet can move to a different target system later.
 
-To use this building, either construct a [[buildingtype BLD_PLANET_BEACON]] in the adjacent destination system or move your ship with a [[shippart SP_PLANET_BEACON]] there, then set the planet to Planet Drive focus. The planet will then be moved to that system. Note the beacon needs to have been in system for a turn: the drive will not work on the turn the building is completed or on the turn the ship arrives. Also note, a [[buildingtype BLD_TRANSFORMER]] can be used to replicate the effects of this building.'''
+To use this building, either construct a [[buildingtype BLD_PLANET_BEACON]] in the adjacent destination system or move a ship with a [[shippart SP_PLANET_BEACON]] there, then set the planet to Planet Drive focus. The planet will then be moved to that system. Note the beacon needs to have been in system for a turn: the drive will not work on the turn the building is completed or on the turn the ship arrives. Also note, a [[buildingtype BLD_TRANSFORMER]] can be used to replicate the effects of this building.
+
+A [[buildingtype BLD_PLANET_BEACON]] can only be constructed in systems with fewer than 7 planets (including Gas Giants and Asteroids). Should an attempt be made to use the [[BLD_PLANET_DRIVE]] to move a planet into a system at capacity, it will safely remain to its Origin system provided an [[buildingtype BLD_LIGHTHOUSE]] is present within 200uu. Otherwise there is a 50% chance of being destroyed in the attempt to move it to the full system.
+'''
 
 BLD_PLANET_BEACON
 Planetary Beacon
 
 BLD_PLANET_BEACON_DESC
-Designates the target for the [[buildingtype BLD_PLANET_DRIVE]]. [[BUILDING_AVAILABLE_ON_OUTPOSTS]].
+Designates the target for the [[buildingtype BLD_PLANET_DRIVE]]. This building can only be constructed in systems with fewer than 7 planets (including Gas Giants and Asteroids). [[BUILDING_AVAILABLE_ON_OUTPOSTS]].
 
 BLD_ART_PLANET
 Artificial Planet

@@ -1,3 +1,10 @@
+freeorion (0.4.10.fo0010+git20200616.e352120ppa2~bionic) bionic; urgency=medium
+
+  * Fix server restart on DoS.
+  * Try to fix asynchronous crash.
+
+ -- O01eg <o01eg@yandex.ru>  Mon, 22 Jun 2020 15:25:37 +0000
+
 freeorion (0.4.10.fo0010+git20200616.e352120ppa1~bionic) bionic; urgency=medium
 
   * Update upstream.

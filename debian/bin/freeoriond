@@ -23,8 +23,8 @@ fi
 LD_LIBRARY_PATH="/usr/lib/freeorion:${LD_LIBRARY_PATH}" \
 /usr/lib/freeorion/freeoriond --setup.game.uid ${GAME_UID} --network.server.turn-timeout.first-turn-time "$(date -u "+%Y-%m-%d 00:00:00" -d "+2 days")"  ${DATAPATH} ${SAVEARGS} "$@"
 EXITST=$?
-if [ ${EXITST} -ne 0 ];
+if [ "${EXITST}" -ne 0 ];
 then
-  # do something on fail
+  echo "Exit status: ${EXITST}"
 fi
-exit ${EXITST}
+exit 11

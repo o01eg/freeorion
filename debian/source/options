@@ -1,0 +1,2 @@
+tar-ignore = "(^|/)(\.git|\.github|\.ci|msvc2017|.*\.png|.*\.ogg)($|/)"
+diff-ignore = "(^|/)(\.git|\.github|\.ci|msvc2017|.*\.png|.*\.ogg)($|/)"

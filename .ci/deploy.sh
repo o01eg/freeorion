@@ -20,7 +20,7 @@ BUILD_DATE=$(echo "${TRAVIS_TAG}" | sed -s 's/^ppa-\([0-9]\{4\}\)-\([0-9]\{2\}\)
 BUILD_PPA=$(echo "${TRAVIS_TAG}" | sed -s 's/^ppa-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.[0-9a-f]\{7\}_\([0-9]\+\).*/\1/')
 
 DIST=$1
-DISTNAME=../freeorion_0.4.9.1+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~${DIST}
+DISTNAME=../freeorion_0.4.10+ppa${BUILD_PPA}~${DIST}
 echo "Uploading package ${DISTNAME}..."
 progress &
 PROGRESSPID=$!

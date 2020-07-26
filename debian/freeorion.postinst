@@ -40,6 +40,8 @@ case "$1" in
 
 	# fix persistent_config.xml
 	chmod 0600 /etc/freeorion/persistent_config.xml
+	chmod 0600 /etc/freeorion/db.txt
+	chmod 0600 /etc/freeorion/mail.cfg
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

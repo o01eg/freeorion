@@ -1,7 +1,6 @@
 #include "Building.h"
 
 #include "BuildingType.h"
-#include "Enums.h"
 #include "UniverseObjectVisitor.h"
 #include "Universe.h"
 #include "../Empire/EmpireManager.h"
@@ -30,7 +29,7 @@ Building* Building::Clone(int empire_id) const {
     if (!(vis >= VIS_BASIC_VISIBILITY && vis <= VIS_FULL_VISIBILITY))
         return nullptr;
 
-    Building* retval = new Building();
+    Building* retval = new Building(Owner(), m_building_type, m_produced_by_empire_id);
     retval->Copy(shared_from_this(), empire_id);
     return retval;
 }

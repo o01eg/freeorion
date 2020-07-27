@@ -10,6 +10,7 @@
 
 #include <GG/Clr.h>
 #include <GG/ClrConstants.h>
+#include <GG/Enum.h>
 
 #include <list>
 #include <set>
@@ -24,15 +25,63 @@ FO_COMMON_API extern const int ALL_EMPIRES;
 FO_COMMON_API extern const int INVALID_GAME_TURN;
 
 
+//! Types of universe shapes during galaxy generation
+GG_ENUM(Shape,
+    INVALID_SHAPE = -1,
+    SPIRAL_2,       ///< a two-armed spiral galaxy
+    SPIRAL_3,       ///< a three-armed spiral galaxy
+    SPIRAL_4,       ///< a four-armed spiral galaxy
+    CLUSTER,        ///< a cluster galaxy
+    ELLIPTICAL,     ///< an elliptical galaxy
+    DISC,           ///< a disc shaped galaxy
+    BOX,            ///< a rectangular shaped galaxy
+    IRREGULAR,      ///< an irregular galaxy
+    RING,           ///< a ring galaxy
+    RANDOM,         ///< a random one of the other shapes
+    GALAXY_SHAPES   ///< the number of shapes in this enum (leave this last)
+)
+
+//! Returns a user readable string for a Shape
+FO_COMMON_API const std::string& TextForGalaxyShape(Shape shape);
+
+
+//! General-use option for galaxy setup picks with "more" or "less" options.
+GG_ENUM(GalaxySetupOption,
+    INVALID_GALAXY_SETUP_OPTION = -1,
+    GALAXY_SETUP_NONE,
+    GALAXY_SETUP_LOW,
+    GALAXY_SETUP_MEDIUM,
+    GALAXY_SETUP_HIGH,
+    GALAXY_SETUP_RANDOM,
+    NUM_GALAXY_SETUP_OPTIONS
+)
+
+//! Returns a user readable string for a GalaxySetupOption
+FO_COMMON_API const std::string& TextForGalaxySetupSetting(GalaxySetupOption gso);
+
+
+//! Levels of AI Aggression during galaxy generation
+GG_ENUM(Aggression,
+    INVALID_AGGRESSION = -1,
+    BEGINNER,
+    TURTLE,         ///< Very Defensive
+    CAUTIOUS,       ///< Somewhat Defensive
+    TYPICAL,        ///< Typical
+    AGGRESSIVE,     ///< Aggressive
+    MANIACAL,       ///< Very Aggressive
+    NUM_AI_AGGRESSION_LEVELS
+)
+
+//! Returns a user readable string for an Aggression
+FO_COMMON_API const std::string& TextForAIAggression(Aggression a);
+
+
 /** The data that represent the galaxy setup for a new game. */
 struct FO_COMMON_API GalaxySetupData {
-    /** \name Structors */ //@{
     GalaxySetupData();
     GalaxySetupData(const GalaxySetupData&) = default;
     GalaxySetupData(GalaxySetupData&& base);
-    //@}
 
-    /** \name Accessors */ //@{
     const std::string&  GetSeed() const;
     int                 GetSize() const;
     Shape               GetShape() const;
@@ -46,12 +95,9 @@ struct FO_COMMON_API GalaxySetupData {
     const std::map<std::string, std::string>&
                         GetGameRules() const;
     const std::string&  GetGameUID() const;
-    //@}
 
-    /** \name Mutators */ //@{
     void                SetSeed(const std::string& seed);
     void                SetGameUID(const std::string& game_uid);
-    //@}
 
     GalaxySetupData& operator=(const GalaxySetupData&) = default;
 
@@ -164,13 +210,11 @@ bool operator!=(const PlayerSetupData& lhs, const PlayerSetupData& rhs);
   * \a m_filename.  Otherwise, the saved game \a m_filename will be loaded
   * instead. */
 struct SinglePlayerSetupData : public GalaxySetupData {
-    /** \name Structors */ //@{
     SinglePlayerSetupData():
         new_game(true),
         filename(),
         players()
     {}
-    //@}
 
     bool                            new_game;
     std::string                     filename;
@@ -179,7 +223,6 @@ struct SinglePlayerSetupData : public GalaxySetupData {
 
 /** The data structure that represents the state of the multiplayer lobby. */
 struct FO_COMMON_API MultiplayerLobbyData : public GalaxySetupData {
-    /** \name Structors */ //@{
     MultiplayerLobbyData() :
         any_can_edit(false),
         new_game(true),
@@ -214,7 +257,6 @@ struct FO_COMMON_API MultiplayerLobbyData : public GalaxySetupData {
         save_game_current_turn(0),
         in_game(false)
     {}
-    //@}
 
     std::string Dump() const;
 
@@ -252,4 +294,4 @@ struct PlayerInfo {
 };
 
 
-#endif // _MultiplayerCommon_h_
+#endif

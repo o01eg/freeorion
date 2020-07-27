@@ -28,29 +28,26 @@ namespace {
 }
 
 
-FieldType::FieldType(const std::string& name, const std::string& description,
+FieldType::FieldType(std::string&& name, std::string&& description,
                      float stealth, const std::set<std::string>& tags,
                      std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
-                     const std::string& graphic) :
-    m_name(name),
-    m_description(description),
+                     std::string&& graphic) :
+    m_name(std::move(name)),
+    m_description(std::move(description)),
     m_stealth(stealth),
-    m_tags(),
-    m_effects(),
-    m_graphic(graphic)
+    m_graphic(std::move(graphic))
 {
     for (const std::string& tag : tags)
-        m_tags.insert(boost::to_upper_copy<std::string>(tag));
+        m_tags.emplace(boost::to_upper_copy<std::string>(tag));
 
     for (auto&& effect : effects)
         m_effects.emplace_back(std::move(effect));
 
     if (m_stealth != 0.0f)
-        m_effects.push_back(IncreaseMeter(METER_STEALTH,    m_stealth));
+        m_effects.emplace_back(IncreaseMeter(METER_STEALTH, m_stealth));
 
-    for (auto& effect : m_effects) {
+    for (auto& effect : m_effects)
         effect->SetTopLevelContent(m_name);
-    }
 }
 
 std::string FieldType::Dump(unsigned short ntabs) const {

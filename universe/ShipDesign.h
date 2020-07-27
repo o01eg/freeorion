@@ -4,7 +4,6 @@
 
 #include <boost/functional/hash.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/serialization/access.hpp>
 #include <boost/uuid/nil_generator.hpp>
 #include <boost/uuid/uuid.hpp>
 #include "EnumsFwd.h"
@@ -19,12 +18,12 @@ FO_COMMON_API extern const int INVALID_GAME_TURN;
 /** ParsedShipDesign holds the results of a parsed ship design which can be
     converted to a ShipDesign. */
 struct FO_COMMON_API ParsedShipDesign {
-    ParsedShipDesign(const std::string& name, const std::string& description,
-                     int designed_on_turn, int designed_by_empire, const std::string& hull,
-                     const std::vector<std::string>& parts,
-                     const std::string& icon, const std::string& model,
+    ParsedShipDesign(std::string&& name, std::string&& description,
+                     int designed_on_turn, int designed_by_empire,
+                     std::string&& hull, std::vector<std::string>&& parts,
+                     std::string&& icon, std::string&& model,
                      bool name_desc_in_stringtable = false, bool monster = false,
-                     const boost::uuids::uuid& uuid = boost::uuids::nil_uuid());
+                     boost::uuids::uuid uuid = boost::uuids::nil_uuid());
 
     std::string                 m_name;
     std::string                 m_description;
@@ -45,12 +44,10 @@ struct FO_COMMON_API ParsedShipDesign {
 
 class FO_COMMON_API ShipDesign {
 public:
-    /** \name Structors */ //@{
-private:
     /** The ShipDesign() constructor constructs invalid designs and is only used by boost
         serialization. */
     ShipDesign();
-public:
+
     /** The public ShipDesign constructor will only construct valid ship
         designs, as long as the ShipHullManager has at least one hull.
 
@@ -71,18 +68,16 @@ public:
         with a empty "" hull.
     */
     ShipDesign(const boost::optional<std::invalid_argument>& should_throw,
-               const std::string& name, const std::string& description,
-               int designed_on_turn, int designed_by_empire, const std::string& hull,
-               const std::vector<std::string>& parts,
-               const std::string& icon, const std::string& model,
+               std::string name, std::string description,
+               int designed_on_turn, int designed_by_empire, std::string hull,
+               std::vector<std::string> parts,
+               std::string icon, std::string model,
                bool name_desc_in_stringtable = false, bool monster = false,
-               const boost::uuids::uuid& uuid = boost::uuids::nil_uuid());
+               boost::uuids::uuid uuid = boost::uuids::nil_uuid());
 
     /** Convert a parsed ship design and do any required verification. */
     ShipDesign(const ParsedShipDesign& design);
-    //@}
 
-    /** \name Accessors */ //@{
     int                             ID() const  { return m_id; }    ///< returns id number of design
     /** returns name of design.  if \a stringtable_lookup is true and the
       * design was constructed specifying name_desc_in_stringtable true,
@@ -165,17 +160,14 @@ public:
     unsigned int                    GetCheckSum() const;
 
     friend FO_COMMON_API bool operator ==(const ShipDesign& first, const ShipDesign& second);
-    //@}
 
     bool                            ProductionLocation(int empire_id, int location_id) const;   ///< returns true iff the empire with ID empire_id can produce this design at the location with location_id
 
-    /** \name Mutators */ //@{
     void                            SetID(int id);                          ///< sets the ID number of the design to \a id .  Should only be used by Universe class when inserting new design into Universe.
     /** Set the UUID. */
     void                            SetUUID(const boost::uuids::uuid& uuid);
     void                            Rename(const std::string& name) { m_name = name; }  ///< renames this design to \a name
     void                            SetMonster(const bool is_monster) {m_is_monster = is_monster; }
-    //@}
 
     /** Return true if \p hull and \p parts would make a valid design. */
     static bool ValidDesign(const std::string& hull, const std::vector<std::string>& parts);
@@ -239,9 +231,8 @@ private:
     std::map<ShipPartClass, int>    m_num_part_classes;
     bool    m_producible = false;
 
-    friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
+    friend void serialize(Archive&, ShipDesign&, unsigned int const);
 };
 
 ///< Returns true if the two designs have the same hull and parts.
@@ -277,7 +268,6 @@ public:
       * the parsed content is consistent without sending it all between
       * clients and server. */
     unsigned int        GetCheckSum() const;
-    //@}
 
     /** Adds designs in this manager to the universe with the design creator
       * left as no empire. */
@@ -339,4 +329,5 @@ FO_COMMON_API std::tuple<
     std::vector<boost::uuids::uuid>>
 LoadShipDesignsAndManifestOrderFromParseResults(PredefinedShipDesignManager::ParsedShipDesignsType& parsed);
 
-#endif // _ShipDesign_h_
+
+#endif

@@ -17,18 +17,12 @@
 
 #include <stdexcept>
 
-using boost::python::object;
-using boost::python::class_;
-using boost::python::import;
-using boost::python::dict;
-using boost::python::list;
-using boost::python::vector_indexing_suite;
-using boost::python::map_indexing_suite;
-
 namespace fs = boost::filesystem;
+namespace py = boost::python;
+
 
 BOOST_PYTHON_MODULE(freeorion) {
-    boost::python::docstring_options doc_options(true, true, false);
+    py::docstring_options doc_options(true, true, false);
 
     FreeOrionPython::WrapGameStateEnums();
     FreeOrionPython::WrapGalaxySetupData();
@@ -38,31 +32,31 @@ BOOST_PYTHON_MODULE(freeorion) {
     FreeOrionPython::WrapConfig();
 
     // STL Containers
-    class_<std::vector<int>>("IntVec")
-        .def(vector_indexing_suite<std::vector<int>>())
+    py::class_<std::vector<int>>("IntVec")
+        .def(py::vector_indexing_suite<std::vector<int>>())
     ;
-    class_<std::vector<std::string>>("StringVec")
-        .def(vector_indexing_suite<std::vector<std::string>>())
+    py::class_<std::vector<std::string>>("StringVec")
+        .def(py::vector_indexing_suite<std::vector<std::string>>())
     ;
 
-    class_<std::map<int, bool>>("IntBoolMap")
-        .def(map_indexing_suite<std::map<int, bool>>())
+    py::class_<std::map<int, bool>>("IntBoolMap")
+        .def(py::map_indexing_suite<std::map<int, bool>>())
     ;
 
     FreeOrionPython::SetWrapper<int>::Wrap("IntSet");
     FreeOrionPython::SetWrapper<std::string>::Wrap("StringSet");
 }
 
-namespace {
-}
 
-bool PythonServer::InitImports() {
+auto PythonServer::InitImports() -> bool
+{
     DebugLogger() << "Initializing server Python imports";
     // Allow the "freeorion" C++ module to be imported within Python code
     return PyImport_AppendInittab("freeorion", &PyInit_freeorion) != -1;
 }
 
-bool PythonServer::InitModules() {
+auto PythonServer::InitModules() -> bool
+{
     DebugLogger() << "Initializing server Python modules";
 
     // Confirm existence of the directory containing the universe generation
@@ -84,7 +78,7 @@ bool PythonServer::InitModules() {
     AddToSysPath(GetPythonTurnEventsDir());
 
     // import universe generator script file
-    m_python_module_turn_events = import("turn_events");
+    m_python_module_turn_events = py::import("turn_events");
 
     // Confirm existence of the directory containing the auth Python scripts
     // and add it to Pythons sys.path to make sure Python will find our scripts
@@ -95,7 +89,7 @@ bool PythonServer::InitModules() {
     AddToSysPath(GetPythonAuthDir());
 
     // import auth script file
-    m_python_module_auth = import("auth");
+    m_python_module_auth = py::import("auth");
 
     // Save AuthProvider instance in auth module's namespace
     m_python_module_auth.attr("__dict__")["auth_provider"] = m_python_module_auth.attr("AuthProvider")();
@@ -103,7 +97,7 @@ bool PythonServer::InitModules() {
     AddToSysPath(GetPythonChatDir());
 
     // import chat script file
-    m_python_module_chat = import("chat");
+    m_python_module_chat = py::import("chat");
 
     // Save ChatProvider instance in chat module's namespace
     m_python_module_chat.attr("__dict__")["chat_history_provider"] = m_python_module_chat.attr("ChatHistoryProvider")();
@@ -112,22 +106,23 @@ bool PythonServer::InitModules() {
     return true;
 }
 
-bool PythonServer::IsRequireAuthOrReturnRoles(const std::string& player_name, bool &result, Networking::AuthRoles& roles) const {
-    boost::python::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
+auto PythonServer::IsRequireAuthOrReturnRoles(const std::string& player_name, bool &result, Networking::AuthRoles& roles) const -> bool
+{
+    py::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
     if (!auth_provider) {
         ErrorLogger() << "Unable to get Python object auth_provider";
         return false;
     }
-    boost::python::object f = auth_provider.attr("is_require_auth_or_return_roles");
+    py::object f = auth_provider.attr("is_require_auth_or_return_roles");
     if (!f) {
         ErrorLogger() << "Unable to call Python method is_require_auth";
         return false;
     }
-    boost::python::object r = f(player_name);
-    boost::python::extract<list> py_roles(r);
+    py::object r = f(player_name);
+    py::extract<py::list> py_roles(r);
     if (py_roles.check()) {
         result = false;
-        boost::python::stl_input_iterator<Networking::RoleType> role_begin(py_roles), role_end;
+        py::stl_input_iterator<Networking::RoleType> role_begin(py_roles), role_end;
         for (auto& it = role_begin; it != role_end; ++ it) {
              roles.SetRole(*it, true);
         }
@@ -137,65 +132,68 @@ bool PythonServer::IsRequireAuthOrReturnRoles(const std::string& player_name, bo
     return true;
 }
 
-bool PythonServer::IsSuccessAuthAndReturnRoles(const std::string& player_name, const std::string& auth, bool &result, Networking::AuthRoles& roles) const {
-    boost::python::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
+auto PythonServer::IsSuccessAuthAndReturnRoles(const std::string& player_name, const std::string& auth, bool &result, Networking::AuthRoles& roles) const -> bool
+{
+    py::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
     if (!auth_provider) {
         ErrorLogger() << "Unable to get Python object auth_provider";
         return false;
     }
-    boost::python::object f = auth_provider.attr("is_success_auth_and_return_roles");
+    py::object f = auth_provider.attr("is_success_auth_and_return_roles");
     if (!f) {
         ErrorLogger() << "Unable to call Python method is_success_auth";
         return false;
     }
-    boost::python::object r = f(player_name, auth);
-    boost::python::extract<list> py_roles(r);
+    py::object r = f(player_name, auth);
+    py::extract<py::list> py_roles(r);
     if (py_roles.check()) {
         result = true;
 
-        boost::python::stl_input_iterator<Networking::RoleType> role_begin(py_roles), role_end;
+        py::stl_input_iterator<Networking::RoleType> role_begin(py_roles), role_end;
         for (auto& it = role_begin; it != role_end; ++ it) {
              roles.SetRole(*it, true);
         }
     } else {
         result = false;
-        DebugLogger() << "Wrong auth data for \"" << player_name << "\": check returns " << boost::python::extract<std::string>(boost::python::str(r))();
+        DebugLogger() << "Wrong auth data for \"" << player_name << "\": check returns " << py::extract<std::string>(py::str(r))();
     }
     return true;
 }
 
-bool PythonServer::FillListPlayers(std::list<PlayerSetupData>& players) const {
-    boost::python::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
+auto PythonServer::FillListPlayers(std::list<PlayerSetupData>& players) const -> bool
+{
+    py::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
     if (!auth_provider) {
         ErrorLogger() << "Unable to get Python object auth_provider";
         return false;
     }
-    boost::python::object f = auth_provider.attr("list_players");
+    py::object f = auth_provider.attr("list_players");
     if (!f) {
         ErrorLogger() << "Unable to call Python method list_players";
         return false;
     }
-    boost::python::object r = f();
-    boost::python::extract<list> py_players(r);
+    py::object r = f();
+    py::extract<py::list> py_players(r);
     if (py_players.check()) {
-        boost::python::stl_input_iterator<PlayerSetupData> players_begin(py_players), players_end;
+        py::stl_input_iterator<PlayerSetupData> players_begin(py_players), players_end;
         for (auto& it = players_begin; it != players_end; ++ it) {
             players.push_back(*it);
         }
     } else {
-        DebugLogger() << "Wrong players list data: check returns " << boost::python::extract<std::string>(boost::python::str(r))();
+        DebugLogger() << "Wrong players list data: check returns " << py::extract<std::string>(py::str(r))();
         return false;
     }
     return true;
 }
 
-bool PythonServer::SendOutboundChatMessage(const std::string& text, const std::string& player_name, bool allow_email) {
-    boost::python::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
+auto PythonServer::SendOutboundChatMessage(const std::string& text, const std::string& player_name, bool allow_email) -> bool
+{
+    py::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
     if (!auth_provider) {
         ErrorLogger() << "Unable to get Python object auth_provider";
         return false;
     }
-    boost::python::object f = auth_provider.attr("send_outbound_chat_message");
+    py::object f = auth_provider.attr("send_outbound_chat_message");
     if (!f) {
         ErrorLogger() << "Unable to call Python method is_success_auth";
         return false;
@@ -203,52 +201,54 @@ bool PythonServer::SendOutboundChatMessage(const std::string& text, const std::s
     return f(text, player_name, allow_email);
 }
 
-bool PythonServer::GetPlayerDelegation(const std::string& player_name, std::list<std::string> &result) const {
-    boost::python::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
+auto PythonServer::GetPlayerDelegation(const std::string& player_name, std::list<std::string> &result) const -> bool
+{
+    py::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
     if (!auth_provider) {
         ErrorLogger() << "Unable to get Python object auth_provider";
         return false;
     }
-    boost::python::object f = auth_provider.attr("get_player_delegation");
+    py::object f = auth_provider.attr("get_player_delegation");
     if (!f) {
         ErrorLogger() << "Unable to call Python method get_player_delegation";
         return false;
     }
-    boost::python::object r = f(player_name);
-    boost::python::extract<list> py_players(r);
+    py::object r = f(player_name);
+    py::extract<py::list> py_players(r);
     if (py_players.check()) {
-        boost::python::stl_input_iterator<std::string> players_begin(py_players), players_end;
+        py::stl_input_iterator<std::string> players_begin(py_players), players_end;
         for (auto& it = players_begin; it != players_end; ++ it) {
             result.push_back(*it);
         }
     } else {
-        DebugLogger() << "Wrong delegated players list data: check returns " << boost::python::extract<std::string>(boost::python::str(r))();
+        DebugLogger() << "Wrong delegated players list data: check returns " << py::extract<std::string>(py::str(r))();
         return false;
     }
     return true;
 }
 
-bool PythonServer::LoadChatHistory(boost::circular_buffer<ChatHistoryEntity>& chat_history) {
-    boost::python::object chat_provider = m_python_module_chat.attr("__dict__")["chat_history_provider"];
+auto PythonServer::LoadChatHistory(boost::circular_buffer<ChatHistoryEntity>& chat_history) -> bool
+{
+    py::object chat_provider = m_python_module_chat.attr("__dict__")["chat_history_provider"];
     if (!chat_provider) {
         ErrorLogger() << "Unable to get Python object chat_history_provider";
         return false;
     }
-    boost::python::object f = chat_provider.attr("load_history");
+    py::object f = chat_provider.attr("load_history");
     if (!f) {
         ErrorLogger() << "Unable to call Python method load_history";
         return false;
     }
-    boost::python::object r = f();
-    boost::python::extract<list> py_history(r);
+    py::object r = f();
+    py::extract<py::list> py_history(r);
     if (py_history.check()) {
-        boost::python::stl_input_iterator<boost::python::tuple> entity_begin(py_history), entity_end;
+        py::stl_input_iterator<py::tuple> entity_begin(py_history), entity_end;
         for (auto& it = entity_begin; it != entity_end; ++ it) {
             ChatHistoryEntity e;
-            e.timestamp = boost::posix_time::from_time_t(boost::python::extract<time_t>((*it)[0]));;
-            e.player_name = boost::python::extract<std::string>((*it)[1]);
-            e.text = boost::python::extract<std::string>((*it)[2]);
-            e.text_color = boost::python::extract<GG::Clr>((*it)[3]);
+            e.timestamp = boost::posix_time::from_time_t(py::extract<time_t>((*it)[0]));;
+            e.player_name = py::extract<std::string>((*it)[1]);
+            e.text = py::extract<std::string>((*it)[2]);
+            e.text_color = py::extract<GG::Clr>((*it)[3]);
             chat_history.push_back(e);
         }
     }
@@ -256,25 +256,27 @@ bool PythonServer::LoadChatHistory(boost::circular_buffer<ChatHistoryEntity>& ch
     return true;
 }
 
-bool PythonServer::PutChatHistoryEntity(const ChatHistoryEntity& chat_history_entity) {
-    boost::python::object chat_provider = m_python_module_chat.attr("__dict__")["chat_history_provider"];
+auto PythonServer::PutChatHistoryEntity(const ChatHistoryEntity& chat_history_entity) -> bool
+{
+    py::object chat_provider = m_python_module_chat.attr("__dict__")["chat_history_provider"];
     if (!chat_provider) {
         ErrorLogger() << "Unable to get Python object chat_history_provider";
         return false;
     }
-    boost::python::object f = chat_provider.attr("put_history_entity");
+    py::object f = chat_provider.attr("put_history_entity");
     if (!f) {
         ErrorLogger() << "Unable to call Python method put_history_entity";
         return false;
     }
 
-    return f(boost::python::long_(to_time_t(chat_history_entity.timestamp)),
+    return f(py::long_(to_time_t(chat_history_entity.timestamp)),
              chat_history_entity.player_name,
              chat_history_entity.text,
              chat_history_entity.text_color);
 }
 
-bool PythonServer::CreateUniverse(std::map<int, PlayerSetupData>& player_setup_data) {
+auto PythonServer::CreateUniverse(std::map<int, PlayerSetupData>& player_setup_data) -> bool
+{
     // Confirm existence of the directory containing the universe generation
     // Python scripts and add it to Pythons sys.path to make sure Python will
     // find our scripts
@@ -285,19 +287,19 @@ bool PythonServer::CreateUniverse(std::map<int, PlayerSetupData>& player_setup_d
     AddToSysPath(GetPythonUniverseGeneratorDir());
 
     // import universe generator script file
-    m_python_module_universe_generator = import("universe_generator");
+    m_python_module_universe_generator = py::import("universe_generator");
 
-    dict py_player_setup_data;
+    py::dict py_player_setup_data;
 
     // the universe generator module should contain an "error_report" function,
     // so set the ErrorReport member function to use it
     SetErrorModule(m_python_module_universe_generator);
 
     for (auto& psd : player_setup_data) {
-        py_player_setup_data[psd.first] = object(psd.second);
+        py_player_setup_data[psd.first] = py::object(psd.second);
     }
 
-    object f = m_python_module_universe_generator.attr("create_universe");
+    py::object f = m_python_module_universe_generator.attr("create_universe");
     if (!f) {
         ErrorLogger() << "Unable to call Python function create_universe ";
         return false;
@@ -306,8 +308,9 @@ bool PythonServer::CreateUniverse(std::map<int, PlayerSetupData>& player_setup_d
     return f(py_player_setup_data);
 }
 
-bool PythonServer::ExecuteTurnEvents() {
-    object f = m_python_module_turn_events.attr("execute_turn_events");
+auto PythonServer::ExecuteTurnEvents() -> bool
+{
+    py::object f = m_python_module_turn_events.attr("execute_turn_events");
     if (!f) {
         ErrorLogger() << "Unable to call Python function execute_turn_events ";
         return false;
@@ -315,14 +318,14 @@ bool PythonServer::ExecuteTurnEvents() {
     return f();
 }
 
-const std::string GetPythonUniverseGeneratorDir()
+auto GetPythonUniverseGeneratorDir() -> const std::string
 { return GetPythonDir() + "/universe_generation"; }
 
-const std::string GetPythonTurnEventsDir()
+auto GetPythonTurnEventsDir() -> const std::string
 { return GetPythonDir() + "/turn_events"; }
 
-const std::string GetPythonAuthDir()
+auto GetPythonAuthDir() -> const std::string
 { return GetPythonDir() + "/auth"; }
 
-const std::string GetPythonChatDir()
+auto GetPythonChatDir() -> const std::string
 { return GetPythonDir() + "/chat"; }

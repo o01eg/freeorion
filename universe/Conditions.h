@@ -9,6 +9,7 @@
 #include "ConditionSource.h"
 #include "Condition.h"
 #include "EnumsFwd.h"
+#include "../Empire/ProductionQueue.h"
 #include "../util/CheckSums.h"
 #include "../util/Export.h"
 
@@ -1461,7 +1462,7 @@ private:
     std::unique_ptr<Condition> m_condition;
     std::string m_desc_stringtable_key;
 };
-} // namespace Condition
+}
 
 
-#endif // _Conditions_h_
+#endif

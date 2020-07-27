@@ -2,8 +2,7 @@
 #define _ShipHull_h_
 
 
-#include <boost/serialization/access.hpp>
-#include <boost/serialization/nvp.hpp>
+#include <GG/Enum.h>
 #include "CommonParams.h"
 #include "../util/Pending.h"
 
@@ -11,50 +10,17 @@
 FO_COMMON_API extern const int INVALID_DESIGN_ID;
 
 
-//! Hull stats.  Used by parser due to limits on number of sub-items per parsed
-//! parsed main item.
-struct ShipHullStats {
-    ShipHullStats() = default;
-
-    ShipHullStats(float fuel_,
-                  float speed_,
-                  float stealth_,
-                  float structure_,
-                  bool no_default_fuel_effects_,
-                  bool no_default_speed_effects_,
-                  bool no_default_stealth_effects_,
-                  bool no_default_structure_effects_) :
-        fuel(fuel_),
-        speed(speed_),
-        stealth(stealth_),
-        structure(structure_),
-        default_fuel_effects(!no_default_fuel_effects_),
-        default_speed_effects(!no_default_speed_effects_),
-        default_stealth_effects(!no_default_stealth_effects_),
-        default_structure_effects(!no_default_structure_effects_)
-    {}
-
-    float   fuel = 0.0f;
-    float   speed = 0.0f;
-    float   stealth = 0.0f;
-    float   structure = 0.0f;
-    bool    default_fuel_effects = true;
-    bool    default_speed_effects = true;
-    bool    default_stealth_effects = true;
-    bool    default_structure_effects = true;
-
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int) {
-        ar  & BOOST_SERIALIZATION_NVP(fuel)
-            & BOOST_SERIALIZATION_NVP(speed)
-            & BOOST_SERIALIZATION_NVP(stealth)
-            & BOOST_SERIALIZATION_NVP(structure)
-            & BOOST_SERIALIZATION_NVP(default_fuel_effects)
-            & BOOST_SERIALIZATION_NVP(default_speed_effects)
-            & BOOST_SERIALIZATION_NVP(default_stealth_effects)
-            & BOOST_SERIALIZATION_NVP(default_structure_effects);
-    }
-};
+//! Types of slots in ShipHull%s
+//! Parts may be restricted to only certain slot types
+GG_ENUM(ShipSlotType,
+    INVALID_SHIP_SLOT_TYPE = -1,
+    //! External slots.  more easily damaged
+    SL_EXTERNAL,
+    //! Internal slots.  more protected, fewer in number
+    SL_INTERNAL,
+    SL_CORE,
+    NUM_SHIP_SLOT_TYPES
+)
 
 
 //! Specification for the hull, or base, on which ship designs are created by
@@ -75,11 +41,13 @@ public:
 
     ShipHull();
 
-    ShipHull(const ShipHullStats& stats,
+    ShipHull(float fuel, float speed, float stealth, float structure,
+             bool default_fuel_effects, bool default_speed_effects,
+             bool default_stealth_effects, bool default_structure_effects,
              CommonParams&& common_params,
-             const MoreCommonParams& more_common_params,
-             const std::vector<Slot>& slots,
-             const std::string& icon, const std::string& graphic);
+             std::string&& name, std::string&& description,
+             std::set<std::string>&& exclusions, std::vector<Slot>&& slots,
+             std::string&& icon, std::string&& graphic);
 
     ~ShipHull();
 
@@ -193,7 +161,10 @@ public:
 
 private:
     void Init(std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
-              const ShipHullStats& stats);
+              bool default_fuel_effects,
+              bool default_speed_effects,
+              bool default_stealth_effects,
+              bool default_structure_effects);
 
     std::string m_name;
     std::string m_description;
@@ -214,35 +185,7 @@ private:
     std::vector<std::shared_ptr<Effect::EffectsGroup>>  m_effects;
     std::string                                         m_graphic;
     std::string                                         m_icon;
-
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
-
-
-template <typename Archive>
-void ShipHull::serialize(Archive& ar, const unsigned int version)
-{
-    ar  & BOOST_SERIALIZATION_NVP(m_name)
-        & BOOST_SERIALIZATION_NVP(m_description)
-        & BOOST_SERIALIZATION_NVP(m_speed)
-        & BOOST_SERIALIZATION_NVP(m_fuel)
-        & BOOST_SERIALIZATION_NVP(m_stealth)
-        & BOOST_SERIALIZATION_NVP(m_structure)
-        & BOOST_SERIALIZATION_NVP(m_production_cost)
-        & BOOST_SERIALIZATION_NVP(m_production_time)
-        & BOOST_SERIALIZATION_NVP(m_producible)
-        & BOOST_SERIALIZATION_NVP(m_slots)
-        & BOOST_SERIALIZATION_NVP(m_tags)
-        & BOOST_SERIALIZATION_NVP(m_production_meter_consumption)
-        & BOOST_SERIALIZATION_NVP(m_production_special_consumption)
-        & BOOST_SERIALIZATION_NVP(m_location)
-        & BOOST_SERIALIZATION_NVP(m_exclusions)
-        & BOOST_SERIALIZATION_NVP(m_effects)
-        & BOOST_SERIALIZATION_NVP(m_graphic)
-        & BOOST_SERIALIZATION_NVP(m_icon);
-}
 
 
 namespace CheckSums {
@@ -308,4 +251,4 @@ FO_COMMON_API auto GetShipHullManager() -> ShipHullManager&;
 FO_COMMON_API auto GetShipHull(const std::string& name) -> const ShipHull*;
 
 
-#endif // _ShipHull_h_
+#endif

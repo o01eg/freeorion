@@ -1,17 +1,18 @@
 #ifndef _Empire_h_
 #define _Empire_h_
 
+
+#include <string>
+#include <GG/Clr.h>
+#include <GG/Enum.h>
+#include "InfluenceQueue.h"
 #include "PopulationPool.h"
 #include "ProductionQueue.h"
 #include "ResearchQueue.h"
-#include "InfluenceQueue.h"
 #include "ResourcePool.h"
-#include "../util/Export.h"
 #include "../universe/Meter.h"
+#include "../util/Export.h"
 
-#include <GG/Clr.h>
-
-#include <string>
 
 struct UnlockableItem;
 class Building;
@@ -25,6 +26,23 @@ FO_COMMON_API extern const int INVALID_DESIGN_ID;
 FO_COMMON_API extern const int INVALID_GAME_TURN;
 FO_COMMON_API extern const int INVALID_OBJECT_ID;
 FO_COMMON_API extern const int ALL_EMPIRES;
+
+
+//! Research status of techs, relating to whether they have been or can be
+//! researched
+GG_ENUM(TechStatus,
+    INVALID_TECH_STATUS = -1,
+    //! Never researchable, or has no researched prerequisites
+    TS_UNRESEARCHABLE,
+    //! Has at least one researched, and at least one unreserached,
+    //! prerequisite
+    TS_HAS_RESEARCHED_PREREQ,
+    //! All prerequisites researched
+    TS_RESEARCHABLE,
+    //! Has been researched
+    TS_COMPLETE,
+    NUM_TECH_STATUSES
+)
 
 
 /** Class to maintain the state of a single empire. In both the client and
@@ -41,12 +59,9 @@ public:
     typedef std::vector<SitRepEntry>::const_iterator    SitRepItr;
     //@}
 
-    /** \name Structors */ //@{
     Empire(const std::string& name, const std::string& player_name, int ID, const GG::Clr& color, bool authenticated);  ///< basic constructor
     ~Empire();
-    //@}
 
-    /** \name Accessors */ //@{
     const std::string&  Name() const;            ///< Returns the Empire's name
     const std::string&  PlayerName() const;      ///< Returns the Empire's player's name
     bool                IsAuthenticated() const; ///< Returns the Empire's player's authentication status
@@ -185,9 +200,7 @@ public:
 
     const PopulationPool&   GetPopulationPool() const;                          ///< Returns PopulationPool
     float                   Population() const;                                 ///< returns total Population of empire
-    //@}
 
-    /** \name Mutators */ //@{
     /** If the object with id \a id is a planet owned by this empire, sets that
       * planet to be this empire's capital, and otherwise does nothing. */
     void SetCapitalID(int id);
@@ -451,7 +464,6 @@ public:
 
     auto BuildingTypesScrapped() const -> const std::map<std::string, int>&
     { return m_building_types_scrapped; }
-    //@}
 
     /** Processes Builditems on queues of empires other than the indicated
       * empires, at the location with id \a location_id and, as appropriate,
@@ -574,4 +586,5 @@ private:
     void serialize(Archive& ar, const unsigned int version);
 };
 
-#endif // _Empire_h_
+
+#endif

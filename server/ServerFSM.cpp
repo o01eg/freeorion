@@ -693,7 +693,7 @@ sc::result Idle::react(const ShutdownServer& msg) {
 
 sc::result Idle::react(const Error& msg) {
     auto fatal = HandleErrorMessage(msg, Server());
-    if (fatal)
+    if (fatal && !Server().IsHostless())
         return transit<ShuttingDownServer>();
     return discard_event();
 }
@@ -1966,7 +1966,7 @@ sc::result MPLobby::react(const Hostless& msg) {
 
 sc::result MPLobby::react(const Error& msg) {
     auto fatal = HandleErrorMessage(msg, Server());
-    if (fatal)
+    if (fatal && !Server().IsHostless())
         return transit<ShuttingDownServer>();
     return discard_event();
 }
@@ -2509,7 +2509,7 @@ sc::result WaitingForMPGameJoiners::react(const ShutdownServer& msg) {
 
 sc::result WaitingForMPGameJoiners::react(const Error& msg) {
     auto fatal = HandleErrorMessage(msg, Server());
-    if (fatal)
+    if (fatal && !Server().IsHostless())
         return transit<ShuttingDownServer>();
     return discard_event();
 }
@@ -2571,7 +2571,7 @@ sc::result PlayingGame::react(const PlayerChat& msg) {
     if (recipients.empty() && sender->GetClientType() != Networking::CLIENT_TYPE_AI_PLAYER)
     {
         GG::Clr text_color(255, 255, 255, 255);
-        if (auto empire = GetEmpire(sender->PlayerID()))
+        if (auto empire = GetEmpire(server.PlayerEmpireID(sender->PlayerID())))
             text_color = empire->Color();
 
         server.PushChatMessage(data, sender->PlayerName(), text_color, timestamp);
@@ -2887,7 +2887,7 @@ sc::result PlayingGame::react(const EliminateSelf& msg) {
 
 sc::result PlayingGame::react(const Error& msg) {
     auto fatal = HandleErrorMessage(msg, Server());
-    if (fatal) {
+    if (fatal && !Server().IsHostless()) {
         DebugLogger(FSM) << "Fatal received.";
         return transit<ShuttingDownServer>();
     }

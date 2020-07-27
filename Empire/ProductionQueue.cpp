@@ -549,38 +549,6 @@ ProductionQueue::Element::Element(ProductionItem item_, int empire_id_,
     uuid(uuid_)
 {}
 
-ProductionQueue::Element::Element(BuildType build_type, std::string name, int empire_id_,
-                                  boost::uuids::uuid uuid_, int ordered_,
-                                  int remaining_, int blocksize_, int location_, bool paused_,
-                                  bool allowed_imperial_stockpile_use_) :
-    item(build_type, name),
-    empire_id(empire_id_),
-    ordered(ordered_),
-    blocksize(blocksize_),
-    remaining(remaining_),
-    location(location_),
-    blocksize_memory(blocksize_),
-    paused(paused_),
-    allowed_imperial_stockpile_use(allowed_imperial_stockpile_use_),
-    uuid(uuid_)
-{}
-
-ProductionQueue::Element::Element(BuildType build_type, int design_id, int empire_id_,
-                                  boost::uuids::uuid uuid_, int ordered_,
-                                  int remaining_, int blocksize_, int location_, bool paused_,
-                                  bool allowed_imperial_stockpile_use_) :
-    item(build_type, design_id),
-    empire_id(empire_id_),
-    ordered(ordered_),
-    blocksize(blocksize_),
-    remaining(remaining_),
-    location(location_),
-    blocksize_memory(blocksize_),
-    paused(paused_),
-    allowed_imperial_stockpile_use(allowed_imperial_stockpile_use_),
-    uuid(uuid_)
-{}
-
 std::string ProductionQueue::Element::Dump() const {
     std::string retval = "ProductionQueue::Element (" + item.Dump() + ") (" +
         std::to_string(blocksize) + ") x" + std::to_string(ordered) + " ";
@@ -904,11 +872,21 @@ void ProductionQueue::Update() {
     ProductionQueueChangedSignal();
 }
 
-void ProductionQueue::push_back(const Element& element)
-{ m_queue.push_back(element); }
+void ProductionQueue::push_back(const Element& element) {
+    if (find(element.uuid) != end()) {
+        ErrorLogger() << "Trying to push back repeated UUID " << element.uuid;
+        throw std::invalid_argument("Repeated use of UUID");
+    }
+    m_queue.push_back(element);
+}
 
-void ProductionQueue::insert(iterator it, const Element& element)
-{ m_queue.insert(it, element); }
+void ProductionQueue::insert(iterator it, const Element& element) {
+    if (find(element.uuid) != end()) {
+        ErrorLogger() << "Trying to insert repeated UUID " << element.uuid;
+        throw std::invalid_argument("Repeated use of UUID");
+    }
+    m_queue.insert(it, element);
+}
 
 void ProductionQueue::erase(int i) {
     if (i < 0 || i >= static_cast<int>(m_queue.size()))

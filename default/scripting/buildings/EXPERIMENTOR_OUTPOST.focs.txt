@@ -83,7 +83,7 @@ BuildingType
             effects = [
                 CreateShip designname = "SM_BLACK_KRAKEN" empire = Source.Owner
                 CreateShip designname = "SM_BLACK_KRAKEN" empire = Source.Owner
-                CreateShip designname = "SM_BLACK_KRAKEN" empire = Source.Owner
+                //CreateShip designname = "SM_BLACK_KRAKEN" empire = Source.Owner
                 GenerateSitRepMessage
                     message = "EFFECT_EXPERIMENT_MONSTERS_LAUNCH"
                     label = "EFFECT_EXPERIMENT_MONSTERS_LAUNCH_LABEL"
@@ -92,7 +92,7 @@ BuildingType
                         tag = "system" data = Source.SystemID
                         tag = "predefinedshipdesign" data = "SM_BLACK_KRAKEN"
                         tag = "species" data = "SP_EXPERIMENTOR"
-                        tag = "rawtext" data = "3"
+                        tag = "rawtext" data = "2"
                     ]
                 [[EXPERIMENTOR_ADD_STARLANE]]
             ]
@@ -128,7 +128,7 @@ BuildingType
             effects = [
                 CreateShip designname = "SM_BLOATED_JUGGERNAUT" empire = Source.Owner
                 CreateShip designname = "SM_BLOATED_JUGGERNAUT" empire = Source.Owner
-                CreateShip designname = "SM_BLOATED_JUGGERNAUT" empire = Source.Owner
+                //CreateShip designname = "SM_BLOATED_JUGGERNAUT" empire = Source.Owner
                 GenerateSitRepMessage
                     message = "EFFECT_EXPERIMENT_MONSTERS_LAUNCH"
                     label = "EFFECT_EXPERIMENT_MONSTERS_LAUNCH_LABEL"
@@ -137,7 +137,7 @@ BuildingType
                         tag = "system" data = Source.SystemID
                         tag = "predefinedshipdesign" data = "SM_BLOATED_JUGGERNAUT"
                         tag = "species" data = "SP_EXPERIMENTOR"
-                        tag = "rawtext" data = "3"
+                        tag = "rawtext" data = "2"
                     ]
                 [[EXPERIMENTOR_ADD_STARLANE]]
             ]
@@ -173,7 +173,7 @@ BuildingType
             effects = [
                 CreateShip designname = "SM_PSIONIC_SNOWFLAKE" empire = Source.Owner
                 CreateShip designname = "SM_PSIONIC_SNOWFLAKE" empire = Source.Owner
-                CreateShip designname = "SM_PSIONIC_SNOWFLAKE" empire = Source.Owner
+                //CreateShip designname = "SM_PSIONIC_SNOWFLAKE" empire = Source.Owner
                 GenerateSitRepMessage
                     message = "EFFECT_EXPERIMENT_MONSTERS_LAUNCH"
                     label = "EFFECT_EXPERIMENT_MONSTERS_LAUNCH_LABEL"
@@ -182,7 +182,7 @@ BuildingType
                         tag = "system" data = Source.SystemID
                         tag = "predefinedshipdesign" data = "SM_PSIONIC_SNOWFLAKE"
                         tag = "species" data = "SP_EXPERIMENTOR"
-                        tag = "rawtext" data = "3"
+                        tag = "rawtext" data = "2"
                     ]
                 [[EXPERIMENTOR_ADD_STARLANE]]
             ]
@@ -237,7 +237,7 @@ EXPERIMENTOR_MONSTER_FREQ_FACTOR
 '''((1 + GalaxyMaxAIAggression) / 5.0)'''
 
 EXPERIMENTOR_SPAWN_BASE_TURN
-'''200'''
+'''250'''
 
 EXPERIMENTOR_SPAWN_AI_AGGRESSION_CHECK
 '''(Statistic If condition = (GalaxyMaxAIAggression <= 2))'''

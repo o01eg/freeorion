@@ -13,7 +13,6 @@
 #include "../util/OptionsDB.h"
 #include "../util/ScopedTimer.h"
 #include "../universe/Effects.h"
-#include "../universe/Enums.h"
 #include "../universe/Tech.h"
 #include "../universe/UnlockableItem.h"
 #include "../universe/ValueRef.h"
@@ -209,12 +208,9 @@ std::shared_ptr<GG::BrowseInfoWnd> TechRowBrowseWnd(const std::string& tech_name
   * categories, statuses and types of techs to show. */
 class TechTreeWnd::TechTreeControls : public CUIWnd {
 public:
-    //! \name Structors //@{
     TechTreeControls(const std::string& config_name = "");
     void CompleteConstruction() override;
-     //@}
 
-    //! \name Mutators //@{
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
 
     void Render() override;
@@ -223,7 +219,6 @@ public:
 
     /** Set checked value of control for TechStatus @p status to @p state */
     void SetTechStatus(TechStatus status, bool state);
-    //@}
 
 private:
     void            DoButtonLayout();
@@ -487,13 +482,10 @@ void TechTreeWnd::TechTreeControls::SetTechStatus(TechStatus status, bool state)
 /** The window that contains the actual tech panels and dependency arcs. */
 class TechTreeWnd::LayoutPanel : public GG::Wnd {
 public:
-    /** \name Structors */ //@{
     LayoutPanel(GG::X w, GG::Y h);
-    //@}
 
     void CompleteConstruction() override;
 
-    /** \name Accessors */ //@{
     GG::Pt ClientLowerRight() const override;
 
     double                  Scale() const;
@@ -503,9 +495,7 @@ public:
     mutable TechTreeWnd::TechClickSignalType    TechSelectedSignal;
     mutable TechTreeWnd::TechClickSignalType    TechDoubleClickedSignal;
     mutable TechTreeWnd::TechSignalType         TechPediaDisplaySignal;
-    //@}
 
-    //! \name Mutators //@{
     void Render() override;
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
 
@@ -528,7 +518,6 @@ public:
     // doing the inverse or same transformation as DoZoom does with gl calls
     GG::Pt ConvertPtScreenToZoomed(const GG::Pt& pt) const;
     GG::Pt ConvertPtZoomedToScreen(const GG::Pt& pt) const;
-    //@}
 
 private:
     class TechPanel;
@@ -1490,18 +1479,13 @@ bool TechTreeWnd::LayoutPanel::TreeZoomOutKeyboard() {
 //////////////////////////////////////////////////
 class TechTreeWnd::TechListBox : public CUIListBox {
 public:
-    /** \name Structors */ //@{
     TechListBox(GG::X w, GG::Y h);
     virtual ~TechListBox();
-    //@}
 
     void CompleteConstruction() override;
 
-    /** \name Accessors */ //@{
     bool TechRowCmp(const GG::ListBox::Row& lhs, const GG::ListBox::Row& rhs, std::size_t column);
-    //@}
 
-    //! \name Mutators //@{
     void    Reset();
     void    Update(bool populate = true);
 
@@ -1511,7 +1495,6 @@ public:
     void    HideAllCategories();
     void    ShowStatus(TechStatus status);
     void    HideStatus(TechStatus status);
-    //@}
 
     mutable TechClickSignalType TechLeftClickedSignal;  ///< emitted when a technology is single-left-clicked
     mutable TechClickSignalType TechDoubleClickedSignal;///< emitted when a technology is double-clicked

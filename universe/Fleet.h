@@ -1,8 +1,6 @@
 #ifndef _Fleet_h_
 #define _Fleet_h_
 
-#include <boost/serialization/access.hpp>
-#include <boost/serialization/version.hpp>
 #include "ObjectMap.h"
 #include "UniverseObject.h"
 #include "../util/Export.h"
@@ -30,7 +28,6 @@ struct MovePathNode {
   * ships that travel together. */
 class FO_COMMON_API Fleet : public UniverseObject {
 public:
-    /** \name Accessors */ //@{
     bool HostileToEmpire(int empire_id) const override;
 
     UniverseObjectType ObjectType() const override;
@@ -107,9 +104,7 @@ public:
      * If in a system and not blockaded, the value is the current system ID. The blockade intent is that you can't
      * break a blockade unless you beat the blockaders (via combat or they retreat).**/
     int ArrivalStarlane() const { return m_arrival_starlane; }
-    //@}
 
-    /** \name Mutators */ //@{
     void Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_id = ALL_EMPIRES) override;
 
     void MovementPhase() override;
@@ -130,7 +125,6 @@ public:
 
     void SetGiveToEmpire(int empire_id);                    ///< marks fleet to be given to empire
     void ClearGiveToEmpire();                               ///< marks fleet not to be given to any empire
-    //@}
 
     /* returns a name for a fleet based on its ships*/
     std::string GenerateFleetName();
@@ -140,11 +134,7 @@ public:
     static const int ETA_OUT_OF_RANGE;                      ///< returned by ETA when fleet can't reach destination due to insufficient fuel capacity and lack of fleet resupply on route
 
 protected:
-    friend class Universe;
     friend class ObjectMap;
-
-    /** \name Structors */ //@{
-    Fleet() {}
 
 public:
     Fleet(const std::string& name, double x, double y, int owner);      ///< general ctor taking name, position and owner id
@@ -158,7 +148,6 @@ public:
 protected:
     /** Returns new copy of this Fleet. */
     Fleet* Clone(int empire_id = ALL_EMPIRES) const override;
-    //@}
 
 private:
     std::set<int>               m_ships;
@@ -183,9 +172,9 @@ private:
     bool                        m_arrived_this_turn = false;
     int                         m_arrival_starlane = INVALID_OBJECT_ID; // see comment for ArrivalStarlane()
 
-    friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
+    friend void serialize(Archive&, Fleet&, unsigned int const);
 };
 
-#endif // _Fleet_h_
+
+#endif

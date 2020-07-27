@@ -7,7 +7,6 @@
 #include "Conditions.h"
 #include "Effect.h"
 #include "Encyclopedia.h"
-#include "Enums.h"
 #include "FieldType.h"
 #include "Field.h"
 #include "FleetPlan.h"
@@ -1190,7 +1189,7 @@ namespace {
             });
         }
     }
-} // namespace
+}
 
 void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsAndCausesVec>& source_effects_targets_causes,
                                     bool only_meter_effects) const

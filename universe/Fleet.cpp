@@ -1,7 +1,6 @@
 #include "Fleet.h"
 
 #include <boost/algorithm/cxx11/all_of.hpp>
-#include "Enums.h"
 #include "Pathfinder.h"
 #include "ShipDesign.h"
 #include "Ship.h"
@@ -77,7 +76,7 @@ namespace {
     }
 }
 
-// static(s)
+
 const int Fleet::ETA_UNKNOWN =      (1 << 30);
 const int Fleet::ETA_OUT_OF_RANGE = (1 << 30) - 1;
 const int Fleet::ETA_NEVER =        (1 << 30) - 2;
@@ -95,7 +94,7 @@ Fleet* Fleet::Clone(int empire_id) const {
     if (!(vis >= VIS_BASIC_VISIBILITY && vis <= VIS_FULL_VISIBILITY))
         return nullptr;
 
-    Fleet* retval = new Fleet();
+    Fleet* retval = new Fleet(m_name, X(), Y(), Owner());
     retval->Copy(shared_from_this(), empire_id);
     return retval;
 }

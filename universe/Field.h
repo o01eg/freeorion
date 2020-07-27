@@ -14,7 +14,6 @@ namespace Effect {
 /** a class representing a region of space */
 class FO_COMMON_API Field : public UniverseObject {
 public:
-    /** \name Accessors */ //@{
     std::set<std::string>   Tags() const override;
     bool                    HasTag(const std::string& name) const override;
 
@@ -35,21 +34,12 @@ public:
     bool                InField(double x, double y) const;
 
     std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const override;
-    //@}
 
-    /** \name Mutators */ //@{
     void Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_id = ALL_EMPIRES) override;
 
     void ResetTargetMaxUnpairedMeters() override;
     void ClampMeters() override;
-    //@}
 
-protected:
-    friend class Universe;
-    /** \name Structors */ //@{
-    Field();
-
-public:
     Field(const std::string& field_type, double x, double y, double radius);
     ~Field();
 
@@ -58,15 +48,13 @@ protected:
 
     /** Returns new copy of this Field. */
     Field* Clone(int empire_id = ALL_EMPIRES) const override;
-    //@}
 
 private:
     std::string m_type_name;
 
-    friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
+    friend void serialize(Archive&, Field&, unsigned int const);
 };
 
 
-#endif // _Field_h_
+#endif

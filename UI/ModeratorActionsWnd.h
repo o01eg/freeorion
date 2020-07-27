@@ -9,29 +9,35 @@
 #include "../universe/EnumsFwd.h"
 
 
+//! Used for tracking what moderator action is set
+GG_ENUM(ModeratorActionSetting,
+    MAS_NoAction,
+    MAS_Destroy,
+    MAS_SetOwner,
+    MAS_AddStarlane,
+    MAS_RemoveStarlane,
+    MAS_CreateSystem,
+    MAS_CreatePlanet
+)
+
+
 class ModeratorActionsWnd : public CUIWnd {
 public:
-    //! \name Structors //!@{
     ModeratorActionsWnd(const std::string& config_name = "");
     void CompleteConstruction() override;
 
     virtual ~ModeratorActionsWnd();
-    //!@}
 
-    /** \name Accessors */ //@{
     ModeratorActionSetting  SelectedAction() const;
     PlanetType              SelectedPlanetType() const;
     PlanetSize              SelectedPlanetSize() const;
     StarType                SelectedStarType() const;
     int                     SelectedEmpire() const;
-    //!@}
 
-    /** \name Mutators */ //@{
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
 
     void            Refresh();
     void            EnableActions(bool enable = true);
-    //!@}
 
     mutable boost::signals2::signal<void ()>           ClosingSignal;
     mutable boost::signals2::signal<void ()>           NoActionSelectedSignal;
@@ -74,4 +80,5 @@ private:
     std::shared_ptr<GG::Button>             m_remove_starlane_button;
 };
 
-#endif // _ModeratorActionsWnd_h_
+
+#endif

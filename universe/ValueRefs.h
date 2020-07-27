@@ -9,7 +9,6 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/serialization/nvp.hpp>
 #include "Condition.h"
 #include "ScriptingContext.h"
 #include "Universe.h"
@@ -2048,6 +2047,7 @@ void Operation<T>::SetTopLevelContent(const std::string& content_name) {
 }
 
 
-} // namespace ValueRef
+}
 
-#endif // _ValueRefs_h_
+
+#endif

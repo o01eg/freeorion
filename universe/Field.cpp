@@ -12,9 +12,6 @@
 /////////////////////////////////////////////////
 // Field                                       //
 /////////////////////////////////////////////////
-Field::Field()
-{}
-
 Field::~Field()
 {}
 
@@ -22,8 +19,7 @@ Field::Field(const std::string& field_type, double x, double y, double radius) :
     UniverseObject("", x, y),
     m_type_name(field_type)
 {
-    const FieldType* type = GetFieldType(m_type_name);
-    if (type)
+    if (const FieldType* type = GetFieldType(m_type_name))
         Rename(UserString(type->Name()));
     else
         Rename(UserString("ENC_FIELD"));
@@ -42,7 +38,7 @@ Field* Field::Clone(int empire_id) const {
     if (!(vis >= VIS_BASIC_VISIBILITY && vis <= VIS_FULL_VISIBILITY))
         return nullptr;
 
-    Field* retval = new Field();
+    Field* retval = new Field(m_type_name, X(), Y(), GetMeter(METER_SIZE)->Current());
     retval->Copy(shared_from_this(), empire_id);
     return retval;
 }

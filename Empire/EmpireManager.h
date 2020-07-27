@@ -4,12 +4,10 @@
 #include "Diplomacy.h"
 #include "../universe/EnumsFwd.h"
 #include "../util/Export.h"
-#include "../util/Serialize.h"
 
 #include <GG/Clr.h>
 
 #include <boost/filesystem.hpp>
-#include <boost/serialization/access.hpp>
 #include <boost/signals2/signal.hpp>
 
 #include <map>
@@ -29,14 +27,11 @@ public:
     /// Const Iterator over Empires
     typedef std::map<int, Empire*>::const_iterator const_iterator;
 
-    /** \name Structors */ //@{
     EmpireManager();
     virtual ~EmpireManager();
 
     const EmpireManager& operator=(EmpireManager& rhs); ///< assignment operator (move semantics)
-    //@}
 
-    /** \name Accessors */ //@{
     /** Returns the empire whose ID is \a ID, or 0 if none exists. */
     const Empire*       GetEmpire(int id) const;
     /** Return the empire source or nullptr if the empire or source doesn't exist.*/
@@ -56,9 +51,7 @@ public:
     const DiplomaticMessage&    GetDiplomaticMessage(int sender_id, int recipient_id) const;
 
     std::string         Dump() const;
-    //@}
 
-    /** \name Mutators */ //@{
     /** Returns the empire whose ID is \a id, or 0 if none exists. */
     Empire*     GetEmpire(int id);
 
@@ -83,7 +76,6 @@ public:
 
     /** Removes and deletes all empires from the manager. */
     void        Clear();
-    //@}
 
     typedef boost::signals2::signal<void (int, int)>  DiploSignalType;
 
@@ -105,15 +97,9 @@ private:
     friend class ClientApp;
     friend class ServerApp;
 
-    friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
+    friend void serialize(Archive&, EmpireManager&, unsigned int const);
 };
-
-extern template FO_COMMON_API void EmpireManager::serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, const unsigned int);
-extern template FO_COMMON_API void EmpireManager::serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, const unsigned int);
-extern template FO_COMMON_API void EmpireManager::serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, const unsigned int);
-extern template FO_COMMON_API void EmpireManager::serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, const unsigned int);
 
 /** The colors that are available for use for empires in the game. */
 FO_COMMON_API const std::vector<GG::Clr>& EmpireColors();
@@ -121,4 +107,5 @@ FO_COMMON_API const std::vector<GG::Clr>& EmpireColors();
 /** Initialize empire colors from \p path */
 FO_COMMON_API void InitEmpireColors(const boost::filesystem::path& path);
 
-#endif // _EmpireManager_h_
+
+#endif

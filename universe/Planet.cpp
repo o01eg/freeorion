@@ -3,7 +3,6 @@
 #include "BuildingType.h"
 #include "Building.h"
 #include "Condition.h"
-#include "Enums.h"
 #include "Fleet.h"
 #include "Ship.h"
 #include "Species.h"
@@ -47,16 +46,6 @@ namespace {
 ////////////////////////////////////////////////////////////
 // Planet
 ////////////////////////////////////////////////////////////
-Planet::Planet() :
-    m_type(PT_TERRAN),
-    m_original_type(PT_TERRAN),
-    m_size(SZ_MEDIUM)
-{
-    //DebugLogger() << "Planet::Planet()";
-    // assumes PopCenter and ResourceCenter don't need to be initialized, due to having been re-created
-    // in functional form by deserialization.  Also assumes planet-specific meters don't need to be re-added.
-}
-
 Planet::Planet(PlanetType type, PlanetSize size) :
     m_type(type),
     m_original_type(type),
@@ -83,7 +72,7 @@ Planet* Planet::Clone(int empire_id) const {
     if (!(vis >= VIS_BASIC_VISIBILITY && vis <= VIS_FULL_VISIBILITY))
         return nullptr;
 
-    Planet* retval = new Planet();
+    Planet* retval = new Planet(m_type, m_size);
     retval->Copy(UniverseObject::shared_from_this(), empire_id);
     return retval;
 }

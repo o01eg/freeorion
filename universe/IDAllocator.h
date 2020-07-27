@@ -5,7 +5,6 @@
 #include <random>
 #include <unordered_map>
 #include <vector>
-#include <boost/serialization/access.hpp>
 #include "../util/Logger.h"
 
 
@@ -108,4 +107,5 @@ private:
     std::mt19937 m_random_generator;
 };
 
-#endif // _IDAllocator_h_
+
+#endif

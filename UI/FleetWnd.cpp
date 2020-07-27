@@ -4,6 +4,7 @@
 #include "SidePanel.h"
 #include "IconTextBrowseWnd.h"
 #include "MeterBrowseWnd.h"
+#include "ModeratorActionsWnd.h"
 #include "ClientUI.h"
 #include "Sound.h"
 #include "../util/i18n.h"
@@ -17,7 +18,6 @@
 #include "../universe/Ship.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/System.h"
-#include "../universe/Enums.h"
 #include "../universe/Pathfinder.h"
 #include "../network/Message.h"
 #include "../Empire/Empire.h"
@@ -605,19 +605,14 @@ namespace {
     /** Shows info about a single ship. */
     class ShipDataPanel : public GG::Control {
     public:
-        /** \name Structors */ //@{
         ShipDataPanel(GG::X w, GG::Y h, int ship_id);
         ~ShipDataPanel();
-        //@}
 
-        //! \name Accessors //@{
         /** Excludes border from the client area. */
         GG::Pt ClientUpperLeft() const override;
         /** Excludes border from the client area. */
         GG::Pt ClientLowerRight() const override;
-        //@}
 
-        //! \name Mutators //@{
         /** Renders black panel background, border with color depending on the
          *current state and a background for the ship's name text. */
         void Render() override;
@@ -629,7 +624,6 @@ namespace {
 
         /** Indicate ship data has changed and needs refresh. */
         void RequireRefresh();
-        //@}
 
     private:
         double StatValue(MeterType stat_name) const;
@@ -2411,12 +2405,14 @@ FleetDetailPanel::FleetDetailPanel(GG::X w, GG::Y h, int fleet_id, bool order_is
         m_ships_lb->AllowDropType(SHIP_DROP_TYPE_STRING);
     }
 
+    namespace ph = boost::placeholders;
+
     m_ships_lb->SelRowsChangedSignal.connect(
-        boost::bind(&FleetDetailPanel::ShipSelectionChanged, this, _1));
+        boost::bind(&FleetDetailPanel::ShipSelectionChanged, this, ph::_1));
     m_ships_lb->RightClickedRowSignal.connect(
-        boost::bind(&FleetDetailPanel::ShipRightClicked, this, _1, _2, _3));
+        boost::bind(&FleetDetailPanel::ShipRightClicked, this, ph::_1, ph::_2, ph::_3));
     GetUniverse().UniverseObjectDeleteSignal.connect(
-        boost::bind(&FleetDetailPanel::UniverseObjectDeleted, this, _1));
+        boost::bind(&FleetDetailPanel::UniverseObjectDeleted, this, ph::_1));
 }
 
 void FleetDetailPanel::CompleteConstruction() {
@@ -2810,6 +2806,8 @@ void FleetWnd::CompleteConstruction() {
 
     // determine fleets to show and populate list
     Refresh();
+
+    using boost::placeholders::_1;
 
     // create drop target
     m_new_fleet_drop_target = GG::Wnd::Create<FleetDataPanel>(GG::X1, ListRowHeight(), m_system_id, true);

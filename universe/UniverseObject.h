@@ -7,9 +7,9 @@
 #include <vector>
 #include <boost/container/flat_map.hpp>
 #include <boost/python/detail/destroy.hpp>
-#include <boost/serialization/access.hpp>
 #include <boost/signals2/optional_last_value.hpp>
 #include <boost/signals2/signal.hpp>
+#include <GG/Enum.h>
 #include "EnumsFwd.h"
 #include "Meter.h"
 #include "../util/blocking_combiner.h"
@@ -31,6 +31,35 @@ FO_COMMON_API extern const int INVALID_OBJECT_ID;
 // The ID number assigned to temporary universe objects
 FO_COMMON_API extern const int TEMPORARY_OBJECT_ID;
 
+
+//! The various major subclasses of UniverseObject
+GG_ENUM(UniverseObjectType,
+    INVALID_UNIVERSE_OBJECT_TYPE = -1,
+    OBJ_BUILDING,
+    OBJ_SHIP,
+    OBJ_FLEET,
+    OBJ_PLANET,
+    OBJ_POP_CENTER,
+    OBJ_PROD_CENTER,
+    OBJ_SYSTEM,
+    OBJ_FIELD,
+    OBJ_FIGHTER,
+    NUM_OBJ_TYPES
+)
+
+//! Degrees of visibility an Empire or UniverseObject can have for an
+//! UniverseObject.  Determines how much information the empire gets about
+//!the (non)visible object.
+GG_ENUM(Visibility,
+    INVALID_VISIBILITY = -1,
+    VIS_NO_VISIBILITY,
+    VIS_BASIC_VISIBILITY,
+    VIS_PARTIAL_VISIBILITY,
+    VIS_FULL_VISIBILITY,
+    NUM_VISIBILITIES
+)
+
+
 /** The abstract base class for all objects in the universe
   * The UniverseObject class itself has an ID number, a name, a position, an ID
   * of the system in which it is, a list of zero or more owners, and other
@@ -51,15 +80,10 @@ public:
     //typedef flat_map<MeterType, Meter, std::less<MeterType>, std::vector<std::pair<MeterType, Meter>>> MeterMap;
     typedef flat_map<MeterType, Meter, std::less<MeterType>> MeterMap;
 
-    /** \name Signal Types */ //@{
     typedef boost::signals2::signal<void (), blocking_combiner<boost::signals2::optional_last_value<void>>> StateChangedSignalType;
-    //@}
 
-    /** \name Slot Types */ //@{
     typedef StateChangedSignalType::slot_type StateChangedSlotType;
-    //@}
 
-    /** \name Accessors */ //@{
     int                         ID() const;                         ///< returns the ID number of this object.  Each object in FreeOrion has a unique ID number.
     const std::string&          Name() const;                       ///< returns the name of this object; some valid objects will have no name
     virtual double              X() const;                          ///< the X-coordinate of this object
@@ -122,9 +146,7 @@ public:
     int                         AgeInTurns() const;                 ///< returns elapsed number of turns between turn object was created and current game turn
 
     mutable StateChangedSignalType StateChangedSignal;              ///< emitted when the UniverseObject is altered in any way
-    //@}
 
-    /** \name Mutators */ //@{
     /** copies data from \a copied_object to this object, limited to only copy
       * data about the copied object that is known to the empire with id
       * \a empire_id (or all data if empire_id is ALL_EMPIRES) */
@@ -185,7 +207,6 @@ public:
         actions during the pop growth/production/research phase of a turn. */
     virtual void    PopGrowthProductionResearchPhase()
     {};
-    //@}
 
     static const double INVALID_POSITION;       ///< the position in x and y at which default-constructed objects are placed
     static const int    INVALID_OBJECT_AGE;     ///< the age returned by UniverseObject::AgeInTurns() if the current turn is INVALID_GAME_TURN, or if the turn on which an object was created is INVALID_GAME_TURN
@@ -195,7 +216,6 @@ protected:
     friend class Universe;
     friend class ObjectMap;
 
-    /** \name Structors */ //@{
     UniverseObject();
     UniverseObject(const std::string name, double x, double y);
 
@@ -210,7 +230,6 @@ protected:
       * by the detection and visibility system.  Caller takes ownership of
       * returned pointee. */
     virtual UniverseObject* Clone(int empire_id = ALL_EMPIRES) const = 0;
-    //@}
 
     void                    AddMeter(MeterType meter_type); ///< inserts a meter into object as the \a meter_type meter.  Should be used by derived classes to add their specialized meters to objects
     void                    Init();                         ///< adds stealth meter
@@ -234,9 +253,8 @@ private:
     MeterMap                                        m_meters;
     int                                             m_created_on_turn = INVALID_GAME_TURN;
 
-    friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
+    friend void serialize(Archive&, UniverseObject&, unsigned int const);
 };
 
 /** A function that returns the correct amount of spacing for an indentation of
@@ -244,4 +262,5 @@ private:
 inline std::string DumpIndent(unsigned short ntabs = 1)
 { return std::string(ntabs * 4 /* conversion to size_t is safe */, ' '); }
 
-#endif // _UniverseObject_h_
+
+#endif

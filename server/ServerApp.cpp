@@ -20,7 +20,6 @@
 #include "../parse/Parse.h"
 #include "../universe/Building.h"
 #include "../universe/Condition.h"
-#include "../universe/Enums.h"
 #include "../universe/Fleet.h"
 #include "../universe/FleetPlan.h"
 #include "../universe/Planet.h"
@@ -860,7 +859,7 @@ void ServerApp::LoadSPGameInit(const std::vector<PlayerSaveGameData>& player_sav
             // In a single player game, the host player is always the human player, so
             // this is just a matter of finding which entry in player_save_game_data was
             // a human player, and assigning that saved player data to the host player ID
-            player_id_to_save_game_data_index.push_back({m_networking.HostPlayerID(), i});
+            player_id_to_save_game_data_index.emplace_back(m_networking.HostPlayerID(), i);
 
         } else if (psgd.client_type == Networking::CLIENT_TYPE_AI_PLAYER) {
             // All saved AI player data, as determined from their client type, is
@@ -873,7 +872,7 @@ void ServerApp::LoadSPGameInit(const std::vector<PlayerSaveGameData>& player_sav
                 // if player is an AI, assign it to this
                 if (player_connection->GetClientType() == Networking::CLIENT_TYPE_AI_PLAYER) {
                     int player_id = player_connection->PlayerID();
-                    player_id_to_save_game_data_index.push_back({player_id, i});
+                    player_id_to_save_game_data_index.emplace_back(player_id, i);
                     break;
                 }
             }
@@ -1991,7 +1990,7 @@ int ServerApp::EffectsProcessingThreads() const
 { return GetOptionsDB().Get<int>("effects.server.threads"); }
 
 void ServerApp::AddEmpireTurn(int empire_id, const PlayerSaveGameData& psgd)
-{ m_turn_sequence[empire_id] = std::make_unique<PlayerSaveGameData>(psgd); }
+{ m_turn_sequence.emplace(empire_id, std::make_unique<PlayerSaveGameData>(psgd)); }
 
 void ServerApp::RemoveEmpireTurn(int empire_id)
 { m_turn_sequence.erase(empire_id); }
@@ -2073,11 +2072,14 @@ bool ServerApp::AllOrdersReceived() {
 namespace {
     /** Returns true if \a empire has been eliminated by the applicable
       * definition of elimination.  As of this writing, elimination means
-      * having no ships and no planets. */
+      * having no ships and no population on planets. */
     bool EmpireEliminated(int empire_id) {
-          return (Objects().find<Planet>(OwnedVisitor(empire_id)).empty() &&  // no planets
-                  Objects().find<Ship>(OwnedVisitor(empire_id)).empty());     // no ship
-      }
+        for (const auto& planet : Objects().find<Planet>(OwnedVisitor(empire_id))) {
+            if (planet->Populated())
+                return false;
+        }
+        return Objects().find<Ship>(OwnedVisitor(empire_id)).empty();     // no ship
+    }
 
     void GetEmpireFleetsAtSystem(std::map<int, std::set<int>>& empire_fleets, int system_id) {
         empire_fleets.clear();
@@ -3206,8 +3208,7 @@ void ServerApp::PreCombatProcessTurns() {
             continue;
         }
         DebugLogger() << "<<= Executing Orders for empire " << empire_orders.first << " =>>";
-        for (const auto& id_and_order : *save_game_data->orders)
-            id_and_order.second->Execute();
+        save_game_data->orders->ApplyOrders();
     }
 
     // clean up orders, which are no longer needed

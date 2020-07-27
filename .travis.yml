@@ -4,29 +4,39 @@ stages:
   - build
   - test
 
-_lint_python_common: &_lint_python_common
-  stage: lint
+_linux_setup_common: &_linux_setup_common
   os: linux
   dist: bionic
-  language: python
-  install:
-    - pip install flake8==3.7.9
-  before_script:
-    - cd default/python
-  script:
-    - flake8
-    - python -m compileall -q .
-
-_build_cpp_common: &_build_cpp_common
-  stage: build
   language: cpp
   cache: ccache
+  before_install:
+    # timeout before Travis kills jobs so that ccache is always at least partially populated
+    - >
+      function cmake {
+          timeout 45m cmake $@
+      }
   install:
-    - mkdir -p $HOME/.ccache;
-    - echo sloppiness = file_macro > $HOME/.ccache/ccache.conf
-    - echo max_size = 200M >> $HOME/.ccache/ccache.conf
-    - ccache --version
-    - ccache --show-stats
+    # The build cache for a full project build currently packs around 340M
+    # in combination wit a bug in ccache before 3.4.2 prematurely cleaned
+    # the cache if it was filled up to 80%.  Therefor raise the cache size
+    # to 500MB
+    - ccache --set-config=max_size=500M --set-config=sloppiness=file_macro
+    - ccache --zero-stats
+    - >
+      sudo apt-get install --assume-yes
+      libboost1.62-all-dev
+      libglew-dev
+      libogg-dev
+      libopenal-dev
+      libsdl2-dev
+      libvorbis-dev
+      cppcheck
+      doxygen
+      python3-pip
+      python3-psycopg2
+    - python3 -m pip install flake8==3.7.9
+    - mkdir -p ~/.config/freeorion/
+    - echo host=localhost user=postgres dbname=freeorion > ~/.config/freeorion/db.txt
   before_script:
     - git remote add -t master -m master upstream https://github.com/freeorion/freeorion.git
     - git fetch upstream
@@ -36,7 +46,7 @@ _build_cpp_common: &_build_cpp_common
   after_success:
     - cmake-local --build . --config Release --target unittest
   before_cache:
-    - ccache --clean
+    - ccache --cleanup
     - ccache --show-stats
 
 _test_python_common: &_test_python_common
@@ -52,11 +62,11 @@ _test_python_common: &_test_python_common
 jobs:
   include:
     - name: Lint AI with Python 3.5
-      <<: *_lint_python_common
-      python: 3.5
-      before_install:
-        - alias pip=/usr/bin/pip3
-        - alias python=/usr/bin/python3
+      <<: *_linux_setup_common
+      stage: lint
+      script:
+        - cmake ..
+        - cmake --build . --target check-pep8
 
     - name: Lint string tables
       stage: lint
@@ -69,11 +79,12 @@ jobs:
         - diff -u default/stringtables/en.txt <(check/st-tool.py format default/stringtables/en.txt) || { echo "String table is not properly formatted"; exit 1; }
 
     - name: Build headless FreeOrion on Ubunutu 18.04 (Bionic)
-      <<: *_build_cpp_common
-      os: linux
-      dist: bionic
+      <<: *_linux_setup_common
+      stage: build
+      env:
+        - CACHE_NAME=linux-headless
+        - CMAKE_BUILD_PARALLEL_LEVEL=2
       services:
-        - docker
         - postgres
       addons:
         - postgres: "9.6"
@@ -81,23 +92,17 @@ jobs:
         - psql -c 'SELECT version();' -U postgres
         - psql -c 'CREATE DATABASE freeorion;' -U postgres
         - psql -U postgres freeorion < ${TRAVIS_BUILD_DIR}/.ci/freeorion.sql
-        - docker pull freeorion/freeorion-travis-build
-        - docker run --name freeorion-psql freeorion/freeorion-travis-build /bin/bash -c "apt-get update --assume-yes && apt-get install --assume-yes python3-psycopg2 && mkdir -p /root/.config/freeorion/ && echo host=localhost user=postgres dbname=freeorion > /root/.config/freeorion/db.txt"
-        - docker commit freeorion-psql freeorion-travis-build-psql
-        # mount ccache dir and set its environment variable
-        # timeout before Travis kills jobs so that ccache is always at least partially populated
-        - >
-          function cmake {
-              docker run -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build freeorion-travis-build-psql timeout 40m /usr/bin/cmake $@
-          }
-        - >
-          function cmake-local {
-              docker run --network="host" -v "${TRAVIS_BUILD_DIR}:/freeorion"  -v "${HOME}/.ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -e CTEST_OUTPUT_ON_FAILURE=1 -w /freeorion/build freeorion-travis-build-psql timeout 40m /usr/bin/cmake $@
-          }
       script:
-        - git merge --no-commit upstream/master
-        - cmake -DBUILD_TESTING=ON -DBUILD_HEADLESS=ON ..
-        - cmake --build . -- -j 2
+        - cmake -DBUILD_HEADLESS=ON -DBUILD_TESTING=ON ..
+        - cmake --build .     
+      services:
+        - postgres
+      addons:
+        - postgres: "9.6"
+      before_install:
+        - psql -c 'SELECT version();' -U postgres
+        - psql -c 'CREATE DATABASE freeorion;' -U postgres
+        - psql -U postgres freeorion < ${TRAVIS_BUILD_DIR}/.ci/freeorion.sql
 
     - name: Unittest AI with Python 3.5
       <<: *_test_python_common

@@ -3,17 +3,35 @@
 
 
 #include <map>
+#include <GG/Enum.h>
 #include "UniverseObject.h"
 #include "../util/Export.h"
 
 
 class Fleet;
+class ObjectMap;
 
 FO_COMMON_API extern const int INVALID_OBJECT_ID;
 namespace {
     const int SYSTEM_ORBITS = 7;
 }
 struct UniverseObjectVisitor;
+
+
+//! Types of stars
+GG_ENUM(StarType,
+    INVALID_STAR_TYPE = -1,
+    STAR_BLUE,
+    STAR_WHITE,
+    STAR_YELLOW,
+    STAR_ORANGE,
+    STAR_RED,
+    STAR_NEUTRON,
+    STAR_BLACK,
+    STAR_NONE,
+    NUM_STAR_TYPES
+)
+
 
 /** contains UniverseObjects and connections to other systems (starlanes and
    wormholes).  All systems are UniversObjects contained within the universe,
@@ -35,7 +53,6 @@ public:
     int SystemID() const override
     { return this->ID(); }
 
-    /** \name Accessors */ //@{
     UniverseObjectType ObjectType() const override;
 
     std::string Dump(unsigned short ntabs = 0) const override;
@@ -98,9 +115,7 @@ public:
     mutable boost::signals2::signal<void (const std::vector<std::shared_ptr<Fleet>>&)> FleetsInsertedSignal;
     /** fleets are removed from system */
     mutable boost::signals2::signal<void (const std::vector<std::shared_ptr<Fleet>>&)> FleetsRemovedSignal;
-    //@}
 
-    /** \name Mutators */ //@{
     void Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_id = ALL_EMPIRES) override;
 
     /** Adding owner to system objects is a no-op. */
@@ -124,14 +139,6 @@ public:
     void SetLastTurnBattleHere(int turn);///< Sets the last turn there was a battle at this system
 
     void SetOverlayTexture(const std::string& texture, double size);
-    //@}
-
-protected:
-    friend class Universe;
-    friend class ObjectMap;
-
-    /** \name Structors */ //@{
-    explicit System();
 
 public:
     System(StarType star, const std::string& name, double x, double y);
@@ -148,7 +155,6 @@ public:
 protected:
     /** Returns new copy of this System. */
     System* Clone(int empire_id = ALL_EMPIRES) const override;
-    //@}
 
 private:
     StarType            m_star;
@@ -165,10 +171,11 @@ private:
     std::string         m_overlay_texture;          // intentionally not serialized; set by local effects
     double              m_overlay_size = 1.0;
 
-    friend class boost::serialization::access;
+    friend ObjectMap;
+
     template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
+    friend void serialize(Archive&, System&, unsigned int const);
 };
 
 
-#endif // _System_h_
+#endif

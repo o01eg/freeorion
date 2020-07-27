@@ -10,7 +10,6 @@
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/numeric.hpp>
 #include "Building.h"
-#include "Enums.h"
 #include "Field.h"
 #include "Fighter.h"
 #include "Fleet.h"
@@ -3048,4 +3047,4 @@ int Operation<int>::EvalImpl(const ScriptingContext& context) const
     throw std::runtime_error("double ValueRef evaluated with an unknown or invalid OpType.");
     return 0;
 }
-} // namespace ValueRef
+}

@@ -21,7 +21,6 @@
 #include "../universe/ShipHull.h"
 #include "../universe/ShipPart.h"
 #include "../universe/Conditions.h"
-#include "../universe/Enums.h"
 #include "../universe/ValueRef.h"
 #include "../client/human/HumanClientApp.h"
 
@@ -613,20 +612,15 @@ namespace {
 //////////////////////////////////////////////////
 class BuildDesignatorWnd::BuildSelector : public CUIWnd {
 public:
-    /** \name Structors */ //@{
     BuildSelector(const std::string& config_name = "");
     void CompleteConstruction() override;
-    //@}
 
-    /** \name Accessors */ //@{
     /** returns set of BulldType shown in this selector */
     const std::set<BuildType>&   GetBuildTypesShown() const;
 
     /** .first -> available items; .second -> unavailable items */
     const std::pair<bool, bool>& GetAvailabilitiesShown() const;
-    //@}
 
-    /** \name Mutators */ //@{
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
 
     /** Sets build location for this selector, which may be used to filter
@@ -652,7 +646,6 @@ public:
       * items are those which have been unlocked for this selector's emipre. */
     void ShowAvailability(bool available, bool refresh_list = true);
     void HideAvailability(bool available, bool refresh_list = true);
-    //@}
 
     mutable boost::signals2::signal<void (const BuildingType*)> DisplayBuildingTypeSignal;
     mutable boost::signals2::signal<void (const ShipDesign*)>   DisplayShipDesignSignal;
@@ -1292,7 +1285,7 @@ void BuildDesignatorWnd::SetBuild(int queue_idx) {
             m_build_selector->DisplayStockpileProjectSignal();
         }
     } else {
-            m_enc_detail_panel->OnIndex();
+        m_enc_detail_panel->OnIndex();
     }
     m_enc_detail_panel->Refresh();
 }

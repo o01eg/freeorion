@@ -151,9 +151,6 @@
     <ClInclude Include="..\..\universe\Tech.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\universe\UniverseObjectVistor.h">
-      <Filter>Header Files\universe</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\universe\Universe.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
@@ -296,6 +293,9 @@
     <ClInclude Include="..\..\universe\ShipHull.h">
       <Filter>Header Files\universe</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\universe\UniverseObjectVisitor.h">
+      <Filter>Header Files\universe</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\network\MessageQueue.cpp">
@@ -332,6 +332,9 @@
       <Filter>Source Files\util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\util\Random.cpp">
+      <Filter>Source Files\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\SerializeCombat.cpp">
       <Filter>Source Files\util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\util\SerializeEmpire.cpp">
@@ -480,9 +483,6 @@
     </ClCompile>
     <ClCompile Include="..\..\network\Message.cpp">
       <Filter>Source Files\network</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\util\EnumText.cpp">
-      <Filter>Source Files\util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\util\SaveGamePreviewUtils.cpp">
       <Filter>Source Files\util</Filter>

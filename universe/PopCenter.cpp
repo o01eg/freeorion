@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include "Enums.h"
 #include "Meter.h"
+#include "UniverseObject.h"
 #include "../util/Logger.h"
 #include "../util/OptionsDB.h"
 
@@ -54,6 +55,9 @@ std::string PopCenter::Dump(unsigned short ntabs) const {
     return os.str();
 }
 
+bool PopCenter::Populated() const
+{ return GetMeter(METER_POPULATION)->Current() >= MINIMUM_POP_CENTER_POPULATION; }
+
 void PopCenter::PopCenterResetTargetMaxUnpairedMeters() {
     GetMeter(METER_TARGET_POPULATION)->ResetCurrent();
     GetMeter(METER_TARGET_HAPPINESS)->ResetCurrent();
@@ -67,7 +71,7 @@ void PopCenter::PopCenterPopGrowthProductionResearchPhase() {
 
     // Should be run after meter update but before a backpropagation, so check current, not initial, meter values
 
-    if (GetMeter(METER_POPULATION)->Current() < MINIMUM_POP_CENTER_POPULATION) {
+    if (!Populated()) {
         // if population falls below threshold, kill off the remainder
         Depopulate();
     }

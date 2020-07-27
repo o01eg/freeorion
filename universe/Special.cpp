@@ -62,17 +62,16 @@ SpecialsManager& GetSpecialsManager() {
 /////////////////////////////////////////////////
 // Special                                     //
 /////////////////////////////////////////////////
-Special::Special(const std::string& name, const std::string& description,
+Special::Special(std::string&& name, std::string&& description,
                  std::unique_ptr<ValueRef::ValueRef<double>>&& stealth,
                  std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
-                 double spawn_rate /*= 1.0*/, int spawn_limit /*= 99999*/,
-                 std::unique_ptr<ValueRef::ValueRef<double>>&& initial_capaicty /*= nullptr*/,
-                 std::unique_ptr<Condition::Condition>&& location /*= nullptr*/,
-                 const std::string& graphic /*= ""*/) :
-    m_name(name),
-    m_description(description),
+                 double spawn_rate, int spawn_limit,
+                 std::unique_ptr<ValueRef::ValueRef<double>>&& initial_capaicty,
+                 std::unique_ptr<Condition::Condition>&& location,
+                 const std::string& graphic) :
+    m_name(std::move(name)),
+    m_description(std::move(description)),
     m_stealth(std::move(stealth)),
-    m_effects(),
     m_spawn_rate(spawn_rate),
     m_spawn_limit(spawn_limit),
     m_initial_capacity(std::move(initial_capaicty)),
@@ -168,8 +167,6 @@ unsigned int Special::GetCheckSum() const {
     CheckSums::CheckSumCombine(retval, m_description);
     CheckSums::CheckSumCombine(retval, m_stealth);
     CheckSums::CheckSumCombine(retval, m_effects);
-    CheckSums::CheckSumCombine(retval, m_spawn_rate);
-    CheckSums::CheckSumCombine(retval, m_spawn_limit);
     CheckSums::CheckSumCombine(retval, m_initial_capacity);
     CheckSums::CheckSumCombine(retval, m_location);
     CheckSums::CheckSumCombine(retval, m_graphic);

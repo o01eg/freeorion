@@ -6,7 +6,6 @@
 #include "TechTreeWnd.h"
 #include "../Empire/Empire.h"
 #include "../universe/Tech.h"
-#include "../universe/Enums.h"
 #include "../util/i18n.h"
 #include "../util/Order.h"
 #include "../util/OptionsDB.h"
@@ -312,9 +311,11 @@ protected:
 
         auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
-        popup->AddMenuItem(GG::MenuItem(UserString("MOVE_UP_QUEUE_ITEM"),   false, false, MoveToTopAction(it)));
-        popup->AddMenuItem(GG::MenuItem(UserString("MOVE_DOWN_QUEUE_ITEM"), false, false, MoveToBottomAction(it)));
-        popup->AddMenuItem(GG::MenuItem(UserString("DELETE_QUEUE_ITEM"),    false, false, DeleteAction(it)));
+        bool disabled = !OrderIssuingEnabled();
+
+        popup->AddMenuItem(GG::MenuItem(UserString("MOVE_UP_QUEUE_ITEM"),   disabled, false, MoveToTopAction(it)));
+        popup->AddMenuItem(GG::MenuItem(UserString("MOVE_DOWN_QUEUE_ITEM"), disabled, false, MoveToBottomAction(it)));
+        popup->AddMenuItem(GG::MenuItem(UserString("DELETE_QUEUE_ITEM"),    disabled, false, DeleteAction(it)));
 
         auto& row = *it;
         QueueRow* queue_row = row ? dynamic_cast<QueueRow*>(row.get()) : nullptr;
@@ -323,9 +324,9 @@ protected:
 
         // pause / resume commands
         if (queue_row->elem.paused) {
-            popup->AddMenuItem(GG::MenuItem(UserString("RESUME"),           false, false, resume_action));
+            popup->AddMenuItem(GG::MenuItem(UserString("RESUME"), disabled, false, resume_action));
         } else {
-            popup->AddMenuItem(GG::MenuItem(UserString("PAUSE"),            false, false, pause_action));
+            popup->AddMenuItem(GG::MenuItem(UserString("PAUSE"),  disabled, false, pause_action));
         }
 
         // pedia lookup
@@ -350,7 +351,6 @@ protected:
 //////////////////////////////////////////////////
 class ResearchQueueWnd : public CUIWnd {
 public:
-    /** \name Structors */ //@{
     ResearchQueueWnd(GG::X x, GG::Y y, GG::X w, GG::Y h) :
         CUIWnd("", x, y, w, h, GG::INTERACTIVE | GG::RESIZABLE | GG::DRAGABLE | GG::ONTOP | PINABLE,
                "research.queue")
@@ -371,9 +371,7 @@ public:
         SaveDefaultedOptions();
         SaveOptions();
     }
-    //@}
 
-    /** \name Mutators */ //@{
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
         GG::Pt sz = Size();
         CUIWnd::SizeMove(ul, lr);
@@ -381,15 +379,14 @@ public:
             DoLayout();
     }
 
-    ResearchQueueListBox*   GetQueueListBox() { return m_queue_lb.get(); }
+    ResearchQueueListBox* GetQueueListBox() { return m_queue_lb.get(); }
 
-    void                SetEmpire(int id) {
+    void SetEmpire(int id) {
         if (const Empire* empire = GetEmpire(id))
             SetName(boost::io::str(FlexibleFormat(UserString("RESEARCH_QUEUE_EMPIRE")) % empire->Name()));
         else
             SetName("");
     }
-    //@}
 
 private:
     void DoLayout() {
@@ -534,20 +531,29 @@ bool ResearchWnd::PediaVisible()
 { return m_tech_tree_wnd->PediaVisible(); }
 
 void ResearchWnd::QueueItemMoved(const GG::ListBox::iterator& row_it, const GG::ListBox::iterator& original_position_it) {
-    if (QueueRow* queue_row = boost::polymorphic_downcast<QueueRow*>(row_it->get())) {
-        int empire_id = HumanClientApp::GetApp()->EmpireID();
+    if (!m_enabled)
+        return;
 
-        // This precorrects the position for a factor in Empire::PlaceTechInQueue
-        auto position = std::distance(m_queue_wnd->GetQueueListBox()->begin(), row_it);
-        auto original_position = std::distance(m_queue_wnd->GetQueueListBox()->begin(), original_position_it);
-        auto orginal_greater = original_position > position;
-        auto corrected_position = position + (orginal_greater ? 0 : 1);
+    auto queue_row = boost::polymorphic_downcast<QueueRow*>(row_it->get());
+    if (!queue_row)
+        return;
 
-        HumanClientApp::GetApp()->Orders().IssueOrder(
-            std::make_shared<ResearchQueueOrder>(empire_id, queue_row->elem.name, static_cast<int>(corrected_position)));
-        if (Empire* empire = GetEmpire(empire_id))
-            empire->UpdateResearchQueue();
-    }
+    // This precorrects the position for a factor in Empire::PlaceTechInQueue
+    int new_position = m_queue_wnd->GetQueueListBox()->IteraterIndex(row_it);
+    int original_position = m_queue_wnd->GetQueueListBox()->IteraterIndex(original_position_it);
+    auto direction = original_position < new_position;
+    int corrected_new_position = new_position + (direction ? 1 : 0);
+
+    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    if (empire_id == ALL_EMPIRES)
+        return;
+
+    HumanClientApp::GetApp()->Orders().IssueOrder(
+        std::make_shared<ResearchQueueOrder>(empire_id, queue_row->elem.name,
+                                                static_cast<int>(corrected_new_position)));
+
+    if (Empire* empire = GetEmpire(empire_id))
+        empire->UpdateResearchQueue();
 }
 
 void ResearchWnd::Sanitize()
@@ -576,7 +582,9 @@ void ResearchWnd::UpdateQueue() {
     m_queue_wnd->SetEmpire(m_empire_shown_id);
 
     QueueListBox* queue_lb = m_queue_wnd->GetQueueListBox();
-    std::size_t first_visible_queue_row = std::distance(queue_lb->begin(), queue_lb->FirstRowShown());
+    auto first_visible_queue_row = m_queue_wnd->GetQueueListBox()->IteraterIndex(queue_lb->FirstRowShown());
+    if (first_visible_queue_row < 0)
+        first_visible_queue_row = 0;
     queue_lb->Clear();
 
     const Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
@@ -590,7 +598,7 @@ void ResearchWnd::UpdateQueue() {
 
     if (!queue_lb->Empty())
         queue_lb->BringRowIntoView(--queue_lb->end());
-    if (first_visible_queue_row < queue_lb->NumRows())
+    if (first_visible_queue_row < static_cast<int>(queue_lb->NumRows()))
         queue_lb->BringRowIntoView(std::next(queue_lb->begin(), first_visible_queue_row));
 }
 
@@ -634,7 +642,7 @@ void ResearchWnd::AddTechsToQueueSlot(const std::vector<std::string>& tech_vec, 
         // (ii) prioritizing a tech by placing it and any not-yet-completed techs, whether currently queued or not,
         // to the front of the queue.  If at some time this routine is desired to be used to move a group of techs from 
         // early positions in the queue to later positions, the below tests would need to change.
-        
+
         // If we're adding to the end of the queue (pos==-1), we'll need to put in a ResearchQueueOrder iff the tech is 
         // not yet in the queue. Otherwise (adding to beginning) we'll need to put in a ResearchQueueOrder if the tech is
         // not yet in the queue or if the tech's current position in the queue is after the desired position.  When 
@@ -656,41 +664,42 @@ void ResearchWnd::AddTechsToQueueSlot(const std::vector<std::string>& tech_vec, 
 }
 
 void ResearchWnd::DeleteQueueItem(GG::ListBox::iterator it) {
-    if (!m_enabled)
+    if (!m_enabled || m_queue_wnd->GetQueueListBox()->IteraterIndex(it) < 0)
         return;
+
     int empire_id = HumanClientApp::GetApp()->EmpireID();
     OrderSet& orders = HumanClientApp::GetApp()->Orders();
-    if (QueueRow* queue_row = boost::polymorphic_downcast<QueueRow*>(it->get()))
+    if (auto queue_row = boost::polymorphic_downcast<QueueRow*>(it->get()))
         orders.IssueOrder(std::make_shared<ResearchQueueOrder>(empire_id, queue_row->elem.name));
-    if (Empire* empire = GetEmpire(empire_id))
+    if (auto empire = GetEmpire(empire_id))
         empire->UpdateResearchQueue();
 }
 
 void ResearchWnd::QueueItemClickedSlot(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
-    if (m_queue_wnd->GetQueueListBox()->DisplayingValidQueueItems()) {
-        if (modkeys & GG::MOD_KEY_CTRL) {
+    if (m_queue_wnd->GetQueueListBox()->IteraterIndex(it) < 0 || !m_queue_wnd->GetQueueListBox()->DisplayingValidQueueItems())
+        return;
+
+    if (modkeys & GG::MOD_KEY_CTRL) {
+        if (m_enabled)
             DeleteQueueItem(it);
-        } else {
-            auto queue_row = boost::polymorphic_downcast<QueueRow*>(it->get());
-            if (!queue_row)
-                return;
+    } else {
+        if (auto queue_row = boost::polymorphic_downcast<QueueRow*>(it->get()))
             ShowTech(queue_row->elem.name, false);
-        }
     }
 }
 
 void ResearchWnd::QueueItemDoubleClickedSlot(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
-    if (m_queue_wnd->GetQueueListBox()->DisplayingValidQueueItems()) {
-        QueueRow* queue_row = boost::polymorphic_downcast<QueueRow*>(it->get());
-        if (!queue_row)
-            return;
+    if (m_queue_wnd->GetQueueListBox()->IteraterIndex(it) < 0 || !m_queue_wnd->GetQueueListBox()->DisplayingValidQueueItems())
+        return;
+
+    if (auto queue_row = boost::polymorphic_downcast<QueueRow*>(it->get()))
         ShowTech(queue_row->elem.name);
-    }
 }
 
 void ResearchWnd::QueueItemPaused(GG::ListBox::iterator it, bool pause) {
-    if (!m_enabled)
+    if (!m_enabled || m_queue_wnd->GetQueueListBox()->IteraterIndex(it) < 0)
         return;
+
     int client_empire_id = HumanClientApp::GetApp()->EmpireID();
     Empire* empire = GetEmpire(client_empire_id);
     if (!empire)
@@ -706,7 +715,7 @@ void ResearchWnd::QueueItemPaused(GG::ListBox::iterator it, bool pause) {
 }
 
 
-void ResearchWnd::EnableOrderIssuing(bool enable/* = true*/) {
+void ResearchWnd::EnableOrderIssuing(bool enable) {
     m_enabled = enable;
     m_queue_wnd->GetQueueListBox()->EnableOrderIssuing(m_enabled);
 }

@@ -157,7 +157,6 @@ public:
     /** Const iterator over all known flags. */
     typedef typename std::set<FlagType>::const_iterator const_iterator;
 
-    /** \name Exceptions */ ///@{
     /** The base class for FlagSpec exceptions. */
     GG_ABSTRACT_EXCEPTION(Exception);
 
@@ -166,12 +165,10 @@ public:
 
     /** Thrown when a string-to-flag conversion is requested for an unknown string. */
     GG_CONCRETE_EXCEPTION(UnknownString, GG::FlagSpec, Exception);
-    //@}
 
     /** Returns the singelton instance of this class. */
     static FlagSpec& instance();
 
-    /** \name Accessors */ ///@{
     /** Returns true iff FlagSpec contains \a flag. */
     bool contains(FlagType flag) const
     { return m_flags.count(flag) != 0; }
@@ -209,25 +206,24 @@ public:
         }
         throw UnknownString("Could not find flag corresponding to unknown string");
     }
-    //@}
 
-    /** \name Mutators */ ///@{
     /** Adds \a flag, with stringification string \a name, to the FlagSpec.
         If \a permanent is true, this flag becomes non-removable.  Alls flags
         added by GG are added as permanent flags.  User-added flags should not
         be added as permanent. */
-    void insert(FlagType flag, const std::string& name, bool permanent = false)
+    template<typename S>
+    void insert(FlagType flag, S&& name, bool permanent = false)
     {
 #ifndef NDEBUG
         std::pair<typename std::set<FlagType>::iterator, bool> result =
 #endif
-        m_flags.insert(flag);
+        m_flags.emplace(flag);
 #ifndef NDEBUG
         assert(result.second);
 #endif
         if (permanent)
-            m_permanent.insert(flag);
-        m_strings[flag] = name;
+            m_permanent.emplace(flag);
+        m_strings.emplace(flag, std::forward<S>(name));
     }
     /** Removes \a flag from the FlagSpec, returning whether the flag was
         actually removed or not.  Permanent flags are not removed.  The
@@ -246,7 +242,6 @@ public:
         }
         return retval;
     }
-    //@}
 
 private:
     FlagSpec() {}
@@ -280,15 +275,12 @@ public:
     // flag types.
     static_assert(is_flag_type<FlagType>::value, "Using Flags without GG_FLAG_TYPE macro");
 
-    /** \name Exceptions */ ///@{
     /** The base class for Flags exceptions. */
     GG_ABSTRACT_EXCEPTION(Exception);
 
     /** Thrown when an unknown flag is used to construct a Flags. */
     GG_CONCRETE_EXCEPTION(UnknownFlag, GG::Flags, Exception);
-    //@}
 
-    /** \name Structors */ ///@{
     Flags() :
         m_flags(0)
     {}
@@ -302,9 +294,7 @@ public:
         if (!FlagSpec<FlagType>::instance().contains(flag))
             throw UnknownFlag("Invalid flag with value " + std::to_string(flag.m_value));
     }
-    //@}
 
-    /** \name Accessors */ ///@{
     /** Conversion to bool, so that a Flags object can be used as a boolean
         test.  It is convertible to true when it contains one or more flags,
         and convertible to false otherwise. */
@@ -321,9 +311,7 @@ public:
         associative containers only; it is otherwise meaningless. */
     bool operator<(Flags<FlagType> rhs) const
     { return m_flags < rhs.m_flags; }
-    //@}
 
-    /** \name Mutators */ ///@{
     /** Performs a bitwise-or of *this and \a rhs, placing the result in *this. */
     Flags<FlagType>& operator|=(Flags<FlagType> rhs)
     {
@@ -342,7 +330,6 @@ public:
         m_flags ^= rhs.m_flags;
         return *this;
     }
-    //@}
 
 private:
     unsigned int m_flags;
@@ -487,6 +474,6 @@ typename std::enable_if<
 operator~(FlagType flag)
 { return ~Flags<FlagType>(flag); }
 
-} // namespace GG
+}
 
 #endif

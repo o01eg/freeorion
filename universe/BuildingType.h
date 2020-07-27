@@ -2,6 +2,7 @@
 #define _BuildingType_h_
 
 
+#include <GG/Enum.h>
 #include "CommonParams.h"
 #include "../util/Export.h"
 #include "../util/Pending.h"
@@ -19,18 +20,29 @@ namespace ValueRef {
 }
 
 
+//! Possible results of a Building being captured by other empires, or an
+//! Planet containing the Building being captured.
+GG_ENUM(CaptureResult,
+    INVALID_CAPTURE_RESULT = -1,
+    //! Building has ownership by original empire(s) removed, and conquering
+    //! empire added
+    CR_CAPTURE,
+    //! Building is destroyed
+    CR_DESTROY,
+    //! Building ownership unchanged: original empire(s) still own object
+    CR_RETAIN
+)
+
+
 //! Class to specify a kind of building.
 //!
 //! Each building type must have a unique @a name string, by which it can be
 //! looked up using GetBuildingType(...).
 class FO_COMMON_API BuildingType {
 public:
-    BuildingType(const std::string& name,
-                 const std::string& description,
-                 CommonParams& common_params,
-                 CaptureResult capture_result,
-                 const std::string& icon);
-
+    BuildingType(std::string&& name, std::string&& description,
+                 CommonParams&& common_params, CaptureResult capture_result,
+                 std::string&& icon);
     ~BuildingType();
 
     //! Returns the unique name for this type of building
@@ -206,4 +218,4 @@ FO_COMMON_API auto GetBuildingTypeManager() -> BuildingTypeManager&;
 FO_COMMON_API auto GetBuildingType(const std::string& name) -> const BuildingType*;
 
 
-#endif // _BuildingType_h_
+#endif

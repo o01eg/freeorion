@@ -19,7 +19,6 @@ class FO_COMMON_API Ship : public UniverseObject {
 public:
     typedef std::map<std::pair<MeterType, std::string>, Meter>          PartMeterMap;
 
-    /** \name Accessors */ //@{
     bool HostileToEmpire(int empire_id) const override;
     std::set<std::string> Tags() const override;
     bool HasTag(const std::string& name) const override;
@@ -85,9 +84,7 @@ public:
     float                       FighterMax() const;
     std::vector<float>          AllWeaponsDamage(float shield_DR = 0.0f, bool include_fighters = true) const;   ///< any nonzero weapons strengths after adjustment versus an enemy with a given shields DR
     std::vector<float>          AllWeaponsMaxDamage(float shield_DR = 0.0f, bool include_fighters = true) const;///< any nonzero weapons strengths, assuming the ship has been refueled recently, after adjustment versus an enemy with a given shields DR
-    //@}
 
-    /** \name Mutators */ //@{
     void            SetFleetID(int fleet_id);                                   ///< sets the ID of the fleet the ship resides in
     void            SetArrivedOnTurn(int turn);
 
@@ -108,15 +105,11 @@ public:
     Meter*          GetPartMeter(MeterType type, const std::string& part_name); ///< returns the requested Meter, or 0 if no such Meter of that type is found in this object
 
     virtual void    SetShipMetersToMax();
-    //@}
 
-protected:
     friend class Universe;
 
-    /** \name Structors */ //@{
     Ship();
 
-public:
     /** Create a ship from an @p empire_id, @p design_id, @p species_name and
         @p production_by_empire_id. */
     Ship(int empire_id, int design_id, const std::string& species_name,
@@ -127,7 +120,6 @@ protected:
 
 public:
     ~Ship() {}
-    //@}
 
 private:
     int             m_design_id = INVALID_DESIGN_ID;
@@ -143,11 +135,11 @@ private:
     int             m_arrived_on_turn = INVALID_GAME_TURN;
     int             m_last_resupplied_on_turn = BEFORE_FIRST_TURN;
 
-    friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
+    friend void serialize(Archive&, Ship&, unsigned int const);
 };
 
 FO_COMMON_API std::string NewMonsterName();
 
-#endif // _Ship_h_
+
+#endif

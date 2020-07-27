@@ -10,10 +10,9 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/serialization/nvp.hpp>
+#include <GG/Enum.h>
 #include "EnumsFwd.h"
 #include "../util/Export.h"
-#include "../util/Serialize.h"
 #include "../util/Pending.h"
 
 
@@ -34,27 +33,18 @@ FO_COMMON_API extern const int ALL_EMPIRES;
   * focus setting is. */
 class FO_COMMON_API FocusType {
 public:
-    /** \name Structors */ //@{
-    FocusType() :
-        m_name(),
-        m_description(),
-        m_location(),
-        m_graphic()
-    {}
-
-    FocusType(const std::string& name, const std::string& description,
+    FocusType() = default;
+    FocusType(std::string& name, std::string& description,
               std::unique_ptr<Condition::Condition>&& location,
-              const std::string& graphic);
+              std::string& graphic);
 
     ~FocusType();
-    //@}
 
-    /** \name Accessors */ //@{
-    const std::string&              Name() const        { return m_name; }          ///< returns the name for this focus type
-    const std::string&              Description() const { return m_description; }   ///< returns a text description of this focus type
-    const Condition::Condition*     Location() const    { return m_location.get(); }///< returns the condition that determines whether an UniverseObject can use this FocusType
-    const std::string&              Graphic() const     { return m_graphic; }       ///< returns the name of the grapic file for this focus type
-    std::string                     Dump(unsigned short ntabs = 0) const;       ///< returns a data file format representation of this object
+    const std::string&          Name() const        { return m_name; }          ///< returns the name for this focus type
+    const std::string&          Description() const { return m_description; }   ///< returns a text description of this focus type
+    const Condition::Condition* Location() const    { return m_location.get(); }///< returns the condition that determines whether an UniverseObject can use this FocusType
+    const std::string&          Graphic() const     { return m_graphic; }       ///< returns the name of the grapic file for this focus type
+    std::string                 Dump(unsigned short ntabs = 0) const;           ///< returns a data file format representation of this object
 
     /** Returns a number, calculated from the contained data, which should be
       * different for different contained data, and must be the same for
@@ -62,46 +52,27 @@ public:
       * and executions of the program and the function. Useful to verify that
       * the parsed content is consistent without sending it all between
       * clients and server. */
-    unsigned int                    GetCheckSum() const;
-    //@}
+    unsigned int GetCheckSum() const;
 
 private:
-    std::string                                     m_name;
-    std::string                                     m_description;
-    std::shared_ptr<const Condition::Condition>     m_location;
-    std::string                                     m_graphic;
+    std::string                                 m_name;
+    std::string                                 m_description;
+    std::shared_ptr<const Condition::Condition> m_location;
+    std::string                                 m_graphic;
 };
 
-/** Used by parser due to limits on number of sub-items per parsed main item. */
-struct SpeciesParams {
-    SpeciesParams()
-    {}
-    SpeciesParams(bool playable_, bool native_, bool can_colonize_, bool can_produce_ships_) :
-        playable(playable_),
-        native(native_),
-        can_colonize(can_colonize_),
-        can_produce_ships(can_produce_ships_)
-    {}
-    bool playable = false;
-    bool native = false;
-    bool can_colonize = false;
-    bool can_produce_ships = false;
-};
 
-/** Used by parser due to limits on number of sub-items per parsed main item. */
-struct SpeciesStrings {
-    SpeciesStrings()
-    {}
-    SpeciesStrings(const std::string& name_, const std::string& desc_,
-                   const std::string& gameplay_desc_) :
-        name(name_),
-        desc(desc_),
-        gameplay_desc(gameplay_desc_)
-    {}
-    std::string name;
-    std::string desc;
-    std::string gameplay_desc;
-};
+//! Environmental suitability of planets for a particular Species
+GG_ENUM(PlanetEnvironment,
+    INVALID_PLANET_ENVIRONMENT = -1,
+    PE_UNINHABITABLE,
+    PE_HOSTILE,
+    PE_POOR,
+    PE_ADEQUATE,
+    PE_GOOD,
+    NUM_PLANET_ENVIRONMENTS
+)
+
 
 /** A predefined type of population that can exist on a PopulationCenter.
   * Species have associated sets of EffectsGroups, and various other 
@@ -110,21 +81,17 @@ struct SpeciesStrings {
   * looked up using GetSpecies(). */
 class FO_COMMON_API Species {
 public:
-    /** \name Structors */ //@{
-    Species(const SpeciesStrings& strings,
-            const std::vector<FocusType>& foci,
-            const std::string& preferred_focus,
-            const std::map<PlanetType, PlanetEnvironment>& planet_environments,
+    Species(std::string&& name, std::string&& desc,
+            std::string&& gameplay_desc, std::vector<FocusType>&& foci,
+            std::string&& preferred_focus,
+            std::map<PlanetType, PlanetEnvironment>&& planet_environments,
             std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
             std::unique_ptr<Condition::Condition>&& combat_targets,
-            const SpeciesParams& params,
-            const std::set<std::string>& tags,
-            const std::string& graphic);
+            bool playable, bool native, bool can_colonize, bool can_produce_ships,
+            const std::set<std::string>& tags, std::string&& graphic);
 
     ~Species();
-    //@}
 
-    /** \name Accessors */ //@{
     const std::string&              Name() const                        { return m_name; }                  ///< returns the unique name for this type of species
     const std::string&              Description() const                 { return m_description; }           ///< returns a text description of this type of species
     /** returns a text description of this type of species */
@@ -163,9 +130,7 @@ public:
       * the parsed content is consistent without sending it all between
       * clients and server. */
     unsigned int                    GetCheckSum() const;
-    //@}
 
-    /** \name Mutators */ //@{
     void AddHomeworld(int homeworld_id);
     void RemoveHomeworld(int homeworld_id);
     void SetHomeworlds(const std::set<int>& homeworld_ids);
@@ -173,10 +138,9 @@ public:
     void SetEmpireOpinion(int empire_id, double opinion);
     void SetOtherSpeciesOpinions(const std::map<std::string, double>& opinions);
     void SetOtherSpeciesOpinion(const std::string& species_name, double opinion);
-    //@}
 
 private:
-    void    Init();
+    void Init();
 
     std::string                             m_name;
     std::string                             m_description;
@@ -218,7 +182,6 @@ public:
     typedef boost::filter_iterator<PlayableSpecies, iterator>   playable_iterator;
     typedef boost::filter_iterator<NativeSpecies, iterator>     native_iterator;
 
-    /** \name Accessors */ //@{
     /** returns the building type with the name \a name; you should use the
       * free function GetSpecies() instead, mainly to save some typing. */
     const Species*      GetSpecies(const std::string& name) const;
@@ -292,9 +255,7 @@ public:
       * the parsed content is consistent without sending it all between
       * clients and server. */
     unsigned int GetCheckSum() const;
-    //@}
 
-    /** \name Mutators */ //@{
     /** sets all species to have no homeworlds.  this is useful when generating
       * a new game, when any homeworlds species had in the previous game should
       * be removed before the new game's homeworlds are added. */
@@ -320,7 +281,6 @@ public:
 
     /** Sets species types to the value of \p future. */
     void SetSpeciesTypes(Pending::Pending<std::pair<SpeciesTypeMap, CensusOrder>>&& future);
-    //@}
 
 private:
     SpeciesManager();
@@ -346,19 +306,9 @@ private:
 
     static SpeciesManager* s_instance;
 
-    friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
+    friend void serialize(Archive&, SpeciesManager&, unsigned int const);
 };
-
-extern template
-FO_COMMON_API void SpeciesManager::serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive& ar, const unsigned int version);
-extern template
-FO_COMMON_API void SpeciesManager::serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive& ar, const unsigned int version);
-extern template
-FO_COMMON_API void SpeciesManager::serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive& ar, const unsigned int version);
-extern template
-FO_COMMON_API void SpeciesManager::serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive& ar, const unsigned int version);
 
 /** returns the singleton species manager */
 FO_COMMON_API SpeciesManager& GetSpeciesManager();
@@ -367,4 +317,5 @@ FO_COMMON_API SpeciesManager& GetSpeciesManager();
   * If no such Species exists, 0 is returned instead. */
 FO_COMMON_API const Species* GetSpecies(const std::string& name);
 
-#endif // _Species_h_
+
+#endif

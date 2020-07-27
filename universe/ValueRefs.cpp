@@ -10,7 +10,6 @@
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/numeric.hpp>
 #include "Building.h"
-#include "Enums.h"
 #include "Field.h"
 #include "Fighter.h"
 #include "Fleet.h"
@@ -2583,7 +2582,12 @@ NameLookup::NameLookup(std::unique_ptr<ValueRef<int>>&& value_ref, LookupType lo
     Variable<std::string>(NON_OBJECT_REFERENCE),
     m_value_ref(std::move(value_ref)),
     m_lookup_type(lookup_type)
-{}
+{
+    m_root_candidate_invariant = !m_value_ref || m_value_ref->RootCandidateInvariant();
+    m_local_candidate_invariant = !m_value_ref || m_value_ref->LocalCandidateInvariant();
+    m_target_invariant = !m_value_ref || m_value_ref->TargetInvariant();
+    m_source_invariant = !m_value_ref || m_value_ref->SourceInvariant();
+}
 
 bool NameLookup::operator==(const ValueRef<std::string>& rhs) const {
     if (&rhs == this)
@@ -2635,18 +2639,6 @@ std::string NameLookup::Eval(const ScriptingContext& context) const {
         return "";
     }
 }
-
-bool NameLookup::RootCandidateInvariant() const
-{ return m_value_ref->RootCandidateInvariant(); }
-
-bool NameLookup::LocalCandidateInvariant() const
-{ return !m_value_ref || m_value_ref->LocalCandidateInvariant(); }
-
-bool NameLookup::TargetInvariant() const
-{ return !m_value_ref || m_value_ref->TargetInvariant(); }
-
-bool NameLookup::SourceInvariant() const
-{ return !m_value_ref || m_value_ref->SourceInvariant(); }
 
 std::string NameLookup::Description() const
 { return m_value_ref->Description(); }
@@ -3055,4 +3047,4 @@ int Operation<int>::EvalImpl(const ScriptingContext& context) const
     throw std::runtime_error("double ValueRef evaluated with an unknown or invalid OpType.");
     return 0;
 }
-} // namespace ValueRef
+}

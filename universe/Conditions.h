@@ -9,6 +9,7 @@
 #include "ConditionSource.h"
 #include "Condition.h"
 #include "EnumsFwd.h"
+#include "../Empire/ProductionQueue.h"
 #include "../util/CheckSums.h"
 #include "../util/Export.h"
 
@@ -50,7 +51,7 @@ enum ContentType : int {
 };
 
 /** Same as ConditionDescription, but returns a string only with conditions that have not been met. */
-FO_COMMON_API std::string ConditionFailedDescription(const std::vector<Condition*>& conditions,
+FO_COMMON_API std::string ConditionFailedDescription(const std::vector<const Condition*>& conditions,
                                                      std::shared_ptr<const UniverseObject> candidate_object = nullptr,
                                                      std::shared_ptr<const UniverseObject> source_object = nullptr);
 
@@ -63,7 +64,7 @@ FO_COMMON_API std::string ConditionFailedDescription(const std::vector<Condition
   * candidate object is provided, the returned string will indicate which
   * subconditions the candidate matches, and indicate if the overall combination
   * of conditions matches the object. */
-FO_COMMON_API std::string ConditionDescription(const std::vector<Condition*>& conditions,
+FO_COMMON_API std::string ConditionDescription(const std::vector<const Condition*>& conditions,
                                                std::shared_ptr<const UniverseObject> candidate_object = nullptr,
                                                std::shared_ptr<const UniverseObject> source_object = nullptr);
 
@@ -1378,7 +1379,7 @@ struct FO_COMMON_API And final : public Condition {
     std::string Description(bool negated = false) const override;
     std::string Dump(unsigned short ntabs = 0) const override;
     void SetTopLevelContent(const std::string& content_name) override;
-    const std::vector<Condition*> Operands() const;
+    std::vector<const Condition*> Operands() const;
     unsigned int GetCheckSum() const override;
 
 private:
@@ -1436,7 +1437,7 @@ struct FO_COMMON_API OrderedAlternativesOf final : public Condition {
     std::string Description(bool negated = false) const override;
     std::string Dump(unsigned short ntabs = 0) const override;
     void SetTopLevelContent(const std::string& content_name) override;
-    const std::vector<Condition*> Operands() const;
+    std::vector<const Condition*> Operands() const;
     unsigned int GetCheckSum() const override;
 
 private:
@@ -1461,7 +1462,7 @@ private:
     std::unique_ptr<Condition> m_condition;
     std::string m_desc_stringtable_key;
 };
-} // namespace Condition
+}
 
 
-#endif // _Conditions_h_
+#endif

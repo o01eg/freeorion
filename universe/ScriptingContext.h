@@ -2,7 +2,6 @@
 #define _ScriptingContext_h_
 
 
-#include <memory>
 #include <boost/any.hpp>
 #include "Universe.h"
 #include "../util/AppInterface.h"
@@ -145,4 +144,5 @@ private:
     const ObjectMap&                        const_objects;
 };
 
-#endif // _ScriptingContext_h_
+
+#endif

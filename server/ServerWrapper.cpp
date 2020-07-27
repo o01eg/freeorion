@@ -21,7 +21,6 @@
 #include "../universe/Pathfinder.h"
 #include "../universe/Universe.h"
 #include "../universe/UnlockableItem.h"
-#include "../universe/Enums.h"
 #include "../universe/ValueRef.h"
 
 #include "../util/Directories.h"
@@ -53,27 +52,7 @@
 #include <sys/param.h>
 #endif
 
-using boost::python::class_;
-using boost::python::def;
-using boost::python::init;
-using boost::python::no_init;
-using boost::noncopyable;
-using boost::python::return_value_policy;
-using boost::python::copy_const_reference;
-using boost::python::reference_existing_object;
-using boost::python::return_by_value;
-using boost::python::return_internal_reference;
-
-using boost::python::object;
-using boost::python::import;
-using boost::python::exec;
-using boost::python::dict;
-using boost::python::list;
-using boost::python::tuple;
-using boost::python::make_tuple;
-using boost::python::extract;
-using boost::python::len;
-using boost::python::long_;
+namespace py = boost::python;
 
 
 FO_COMMON_API extern const int INVALID_DESIGN_ID;
@@ -81,26 +60,10 @@ FO_COMMON_API extern const int INVALID_DESIGN_ID;
 // Helper stuff (classes, functions etc.) exposed to the
 // server side Python scripts
 namespace {
-    // Functions that return various important constants
-    int     AllEmpires()
-    { return ALL_EMPIRES; }
-
-    int     InvalidObjectID()
-    { return INVALID_OBJECT_ID; }
-
-    float   LargeMeterValue()
-    { return Meter::LARGE_VALUE; }
-
-    double  InvalidPosition()
-    { return UniverseObject::INVALID_POSITION; }
-
-    // Wrapper for GetResourceDir
-    object GetResourceDirWrapper()
-    { return object(PathToString(GetResourceDir())); }
-
     // Wrapper for getting empire objects
-    list GetAllEmpires() {
-        list empire_list;
+    auto GetAllEmpires() -> py::list
+    {
+        py::list empire_list;
         for (const auto& entry : Empires())
             empire_list.append(entry.second->EmpireID());
         return empire_list;
@@ -108,7 +71,7 @@ namespace {
 
     // Wrappers for generating sitrep messages
     void GenerateSitRep(int empire_id, const std::string& template_string,
-                        const dict& py_params, const std::string& icon)
+                        const py::dict& py_params, const std::string& icon)
     {
         int sitrep_turn = CurrentTurn() + 1;
 
@@ -116,8 +79,8 @@ namespace {
 
         if (py_params) {
             for (int i = 0; i < len(py_params); i++) {
-                std::string k = extract<std::string>(py_params.keys()[i]);
-                std::string v = extract<std::string>(py_params.values()[i]);
+                std::string k = py::extract<std::string>(py_params.keys()[i]);
+                std::string v = py::extract<std::string>(py_params.values()[i]);
                 params.push_back({k, v});
             }
         }
@@ -137,22 +100,19 @@ namespace {
         }
     }
 
-    void GenerateSitRep1(int empire_id,
-                         const std::string& template_string,
-                         const std::string& icon)
-    { GenerateSitRep(empire_id, template_string, dict(), icon); }
-
     // Wrappers for Species / SpeciesManager class (member) functions
-    object SpeciesPreferredFocus(const std::string& species_name) {
+    auto SpeciesPreferredFocus(const std::string& species_name) -> py::object
+    {
         const Species* species = GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesPreferredFocus: couldn't get species " << species_name;
-            return object("");
+            return py::object("");
         }
-        return object(species->PreferredFocus());
+        return py::object(species->PreferredFocus());
     }
 
-    PlanetEnvironment SpeciesGetPlanetEnvironment(const std::string& species_name, PlanetType planet_type) {
+    auto SpeciesGetPlanetEnvironment(const std::string& species_name, PlanetType planet_type) -> PlanetEnvironment
+    {
         const Species* species = GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesGetPlanetEnvironment: couldn't get species " << species_name;
@@ -161,7 +121,8 @@ namespace {
         return species->GetPlanetEnvironment(planet_type);
     }
 
-    void SpeciesAddHomeworld(const std::string& species_name, int homeworld_id) {
+    void SpeciesAddHomeworld(const std::string& species_name, int homeworld_id)
+    {
         Species* species = SpeciesManager::GetSpeciesManager().GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesAddHomeworld: couldn't get species " << species_name;
@@ -170,7 +131,8 @@ namespace {
         species->AddHomeworld(homeworld_id);
     }
 
-    void SpeciesRemoveHomeworld(const std::string& species_name, int homeworld_id) {
+    void SpeciesRemoveHomeworld(const std::string& species_name, int homeworld_id)
+    {
         Species* species = SpeciesManager::GetSpeciesManager().GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesAddHomeworld: couldn't get species " << species_name;
@@ -179,7 +141,8 @@ namespace {
         species->RemoveHomeworld(homeworld_id);
     }
 
-    bool SpeciesCanColonize(const std::string& species_name) {
+    auto SpeciesCanColonize(const std::string& species_name) -> bool
+    {
         Species* species = SpeciesManager::GetSpeciesManager().GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesCanColonize: couldn't get species " << species_name;
@@ -188,41 +151,45 @@ namespace {
         return species->CanColonize();
     }
 
-    list GetAllSpecies() {
-        list            species_list;
+    auto GetAllSpecies() -> py::list
+    {
+        py::list            species_list;
         for (const auto& entry : GetSpeciesManager()) {
-            species_list.append(object(entry.first));
+            species_list.append(py::object(entry.first));
         }
         return species_list;
     }
 
-    list GetPlayableSpecies() {
-        list            species_list;
+    auto GetPlayableSpecies() -> py::list
+    {
+        py::list            species_list;
         SpeciesManager& species_manager = GetSpeciesManager();
         for (auto it = species_manager.playable_begin();
              it != species_manager.playable_end(); ++it)
-        { species_list.append(object(it->first)); }
+        { species_list.append(py::object(it->first)); }
         return species_list;
     }
 
-    list GetNativeSpecies() {
-        list            species_list;
+    auto GetNativeSpecies() -> py::list
+    {
+        py::list            species_list;
         SpeciesManager& species_manager = GetSpeciesManager();
         for (auto it = species_manager.native_begin();
              it != species_manager.native_end(); ++it)
-        { species_list.append(object(it->first)); }
+        { species_list.append(py::object(it->first)); }
         return species_list;
     }
 
     //Checks the condition against many objects at once.
     //Checking many systems is more efficient because for example monster fleet plans
     //typically uses WithinStarLaneJumps to exclude placement near empires.
-    list FilterIDsWithCondition(const Condition::Condition* cond, const list &obj_ids) {
-        list permitted_ids;
+    auto FilterIDsWithCondition(const Condition::Condition* cond, const py::list &obj_ids) -> py::list
+    {
+        py::list permitted_ids;
 
         Condition::ObjectSet objs;
-        boost::python::stl_input_iterator<int> end;
-        for (boost::python::stl_input_iterator<int> id(obj_ids); id != end; ++id) {
+        py::stl_input_iterator<int> end;
+        for (py::stl_input_iterator<int> id(obj_ids); id != end; ++id) {
             if (auto obj = Objects().get(*id))
                 objs.push_back(obj);
             else
@@ -250,7 +217,8 @@ namespace {
     }
 
     // Wrappers for Specials / SpecialManager functions
-    double SpecialSpawnRate(const std::string special_name) {
+    auto SpecialSpawnRate(const std::string special_name) -> double
+    {
         const Special* special = GetSpecial(special_name);
         if (!special) {
             ErrorLogger() << "SpecialSpawnRate: couldn't get special " << special_name;
@@ -259,7 +227,8 @@ namespace {
         return special->SpawnRate();
     }
 
-    int SpecialSpawnLimit(const std::string special_name) {
+    auto SpecialSpawnLimit(const std::string special_name) -> int
+    {
         const Special* special = GetSpecial(special_name);
         if (!special) {
             ErrorLogger() << "SpecialSpawnLimit: couldn't get special " << special_name;
@@ -268,18 +237,20 @@ namespace {
         return special->SpawnLimit();
     }
 
-    list SpecialLocations(const std::string special_name, const list& object_ids) {
+    auto SpecialLocations(const std::string special_name, const py::list& object_ids) -> py::list
+    {
         // get special and check if it exists
         const Special* special = GetSpecial(special_name);
         if (!special) {
             ErrorLogger() << "SpecialLocation: couldn't get special " << special_name;
-            return list();
+            return py::list();
         }
 
         return FilterIDsWithCondition(special->Location(), object_ids);
     }
 
-    bool SpecialHasLocation(const std::string special_name) {
+    auto SpecialHasLocation(const std::string special_name) -> bool
+    {
         // get special and check if it exists
         const Special* special = GetSpecial(special_name);
         if (!special) {
@@ -289,16 +260,18 @@ namespace {
         return special->Location();
     }
 
-    list GetAllSpecials() {
-        list py_specials;
+    auto GetAllSpecials() -> py::list
+    {
+        py::list py_specials;
         for (const auto& special_name : SpecialNames()) {
-            py_specials.append(object(special_name));
+            py_specials.append(py::object(special_name));
         }
         return py_specials;
     }
 
     // Wrappers for Empire class member functions
-    void EmpireSetName(int empire_id, const std::string& name) {
+    void EmpireSetName(int empire_id, const std::string& name)
+    {
         Empire* empire = GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EmpireSetName: couldn't get empire with ID " << empire_id;
@@ -307,7 +280,8 @@ namespace {
         empire->SetName(name);
     }
 
-    bool EmpireSetHomeworld(int empire_id, int planet_id, const std::string& species_name) {
+    auto EmpireSetHomeworld(int empire_id, int planet_id, const std::string& species_name) -> bool
+    {
         Empire* empire = GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EmpireSetHomeworld: couldn't get empire with ID " << empire_id;
@@ -328,7 +302,8 @@ namespace {
         empire->UnlockItem(item);
     }
 
-    void EmpireAddShipDesign(int empire_id, const std::string& design_name) {
+    void EmpireAddShipDesign(int empire_id, const std::string& design_name)
+    {
         Universe& universe = GetUniverse();
 
         Empire* empire = GetEmpire(empire_id);
@@ -349,22 +324,24 @@ namespace {
     }
 
     // Wrapper for preunlocked items
-    list LoadUnlockableItemList() {
-        list py_items;
+    auto LoadUnlockableItemList() -> py::list
+    {
+        py::list py_items;
         auto& items = GetUniverse().InitiallyUnlockedItems();
         for (const auto& item : items) {
-            py_items.append(object(item));
+            py_items.append(py::object(item));
         }
         return py_items;
     }
 
     // Wrapper for starting buildings
-    list LoadStartingBuildings() {
-        list py_items;
+    auto LoadStartingBuildings() -> py::list
+    {
+        py::list py_items;
         auto& buildings = GetUniverse().InitiallyUnlockedBuildings();
         for (auto building : buildings) {
             if (GetBuildingType(building.name))
-                py_items.append(object(building));
+                py_items.append(py::object(building));
             else
                 ErrorLogger() << "The item " << building.name << " in the starting building list is not a building.";
         }
@@ -372,10 +349,10 @@ namespace {
     }
 
     // Wrappers for ship designs and premade ship designs
-    bool ShipDesignCreate(const std::string& name, const std::string& description,
-                          const std::string& hull, const list& py_parts,
+    auto ShipDesignCreate(const std::string& name, const std::string& description,
+                          const std::string& hull, const py::list& py_parts,
                           const std::string& icon, const std::string& model,
-                          bool monster)
+                          bool monster) -> bool
     {
         Universe& universe = GetUniverse();
         // Check for empty name
@@ -394,7 +371,7 @@ namespace {
         // copy parts list from Python list to C++ vector
         std::vector<std::string> parts;
         for (int i = 0; i < len(py_parts); i++) {
-            parts.push_back(extract<std::string>(py_parts[i]));
+            parts.push_back(py::extract<std::string>(py_parts[i]));
         }
 
         // Create the design and add it to the universe
@@ -417,21 +394,23 @@ namespace {
         return true;
     }
 
-    list ShipDesignGetPremadeList() {
-        list py_ship_designs;
+    auto ShipDesignGetPremadeList() -> py::list
+    {
+        py::list py_ship_designs;
         for (const auto& design : GetPredefinedShipDesignManager().GetOrderedShipDesigns()) {
-            py_ship_designs.append(object(design->Name(false)));
+            py_ship_designs.append(py::object(design->Name(false)));
         }
-        return list(py_ship_designs);
+        return py::list(py_ship_designs);
     }
 
-    list ShipDesignGetMonsterList() {
-        list py_monster_designs;
+    auto ShipDesignGetMonsterList() -> py::list
+    {
+        py::list py_monster_designs;
         const auto& manager = GetPredefinedShipDesignManager();
         for (const auto& monster : manager.GetOrderedMonsterDesigns()) {
-            py_monster_designs.append(object(monster->Name(false)));
+            py_monster_designs.append(py::object(monster->Name(false)));
         }
-        return list(py_monster_designs);
+        return py::list(py_monster_designs);
     }
 
     // Wrappers for starting fleet plans
@@ -442,25 +421,25 @@ namespace {
             m_fleet_plan(std::make_shared<FleetPlan>(*fleet_plan))
         {}
 
-        FleetPlanWrapper(const std::string& fleet_name, const list& py_designs)
+        FleetPlanWrapper(const std::string& fleet_name, const py::list& py_designs)
         {
             std::vector<std::string> designs;
             for (int i = 0; i < len(py_designs); i++) {
-                designs.push_back(extract<std::string>(py_designs[i]));
+                designs.push_back(py::extract<std::string>(py_designs[i]));
             }
             m_fleet_plan = std::make_shared<FleetPlan>(fleet_name, designs, false);
         }
 
         // name accessors
-        object Name()
-        { return object(m_fleet_plan->Name()); }
+        py::object Name()
+        { return py::object(m_fleet_plan->Name()); }
 
-        list ShipDesigns() {
-            list py_designs;
+        py::list ShipDesigns() {
+            py::list py_designs;
             for (const auto& design_name : m_fleet_plan->ShipDesigns()) {
-                py_designs.append(object(design_name));
+                py_designs.append(py::object(design_name));
             }
-            return list(py_designs);
+            return py::list(py_designs);
         }
 
         const FleetPlan& GetFleetPlan()
@@ -471,8 +450,9 @@ namespace {
         std::shared_ptr<FleetPlan> m_fleet_plan;
     };
 
-    list LoadFleetPlanList() {
-        list py_fleet_plans;
+    auto LoadFleetPlanList() -> py::list
+    {
+        py::list py_fleet_plans;
         auto&& fleet_plans = GetUniverse().InitiallyUnlockedFleetPlans();
         for (FleetPlan* fleet_plan : fleet_plans) {
             py_fleet_plans.append(FleetPlanWrapper(fleet_plan));
@@ -488,12 +468,12 @@ namespace {
             m_monster_fleet_plan(std::make_shared<MonsterFleetPlan>(*monster_fleet_plan))
         {}
 
-        MonsterFleetPlanWrapper(const std::string& fleet_name, const list& py_designs,
+        MonsterFleetPlanWrapper(const std::string& fleet_name, const py::list& py_designs,
                                 double spawn_rate, int spawn_limit)
         {
             std::vector<std::string> designs;
             for (int i = 0; i < len(py_designs); i++) {
-                designs.push_back(extract<std::string>(py_designs[i]));
+                designs.push_back(py::extract<std::string>(py_designs[i]));
             }
             m_monster_fleet_plan =
                 std::make_shared<MonsterFleetPlan>(fleet_name, designs, spawn_rate,
@@ -501,15 +481,15 @@ namespace {
         }
 
         // name accessors
-        object Name()
-        { return object(m_monster_fleet_plan->Name()); }
+        py::object Name()
+        { return py::object(m_monster_fleet_plan->Name()); }
 
-        list ShipDesigns() {
-            list py_designs;
+        py::list ShipDesigns() {
+            py::list py_designs;
             for (const auto& design_name : m_monster_fleet_plan->ShipDesigns()) {
-                py_designs.append(object(design_name));
+                py_designs.append(py::object(design_name));
             }
-            return list(py_designs);
+            return py::list(py_designs);
         }
 
         double SpawnRate()
@@ -518,7 +498,7 @@ namespace {
         int SpawnLimit()
         { return m_monster_fleet_plan->SpawnLimit(); }
 
-        list Locations(list systems) {
+        py::list Locations(py::list systems) {
             return FilterIDsWithCondition(m_monster_fleet_plan->Location(), systems);
         }
 
@@ -530,8 +510,9 @@ namespace {
         std::shared_ptr<MonsterFleetPlan> m_monster_fleet_plan;
     };
 
-    list LoadMonsterFleetPlanList() {
-        list py_monster_fleet_plans;
+    auto LoadMonsterFleetPlanList() -> py::list
+    {
+        py::list py_monster_fleet_plans;
         auto&& monster_fleet_plans = GetUniverse().MonsterFleetPlans();
         for (auto* fleet_plan : monster_fleet_plans) {
             py_monster_fleet_plans.append(MonsterFleetPlanWrapper(fleet_plan));
@@ -546,16 +527,18 @@ namespace {
     // avoided.
     //
     // Wrappers for common UniverseObject class member funtions
-    object GetName(int object_id) {
+    auto GetName(int object_id) -> py::object
+    {
         auto obj = Objects().get(object_id);
         if (!obj) {
             ErrorLogger() << "GetName: Couldn't get object with ID " << object_id;
-            return object("");
+            return py::object("");
         }
-        return object(obj->Name());
+        return py::object(obj->Name());
     }
 
-    void SetName(int object_id, const std::string& name) {
+    void SetName(int object_id, const std::string& name)
+    {
         auto obj = Objects().get(object_id);
         if (!obj) {
             ErrorLogger() << "RenameUniverseObject: Couldn't get object with ID " << object_id;
@@ -564,7 +547,8 @@ namespace {
         obj->Rename(name);
     }
 
-    double GetX(int object_id) {
+    auto GetX(int object_id) -> double
+    {
         auto obj = Objects().get(object_id);
         if (!obj) {
             ErrorLogger() << "GetX: Couldn't get object with ID " << object_id;
@@ -573,7 +557,8 @@ namespace {
         return obj->X();
     }
 
-    double GetY(int object_id) {
+    auto GetY(int object_id) -> double
+    {
         auto obj = Objects().get(object_id);
         if (!obj) {
             ErrorLogger() << "GetY: Couldn't get object with ID " << object_id;
@@ -582,17 +567,19 @@ namespace {
         return obj->Y();
     }
 
-    tuple GetPos(int object_id) {
+    auto GetPos(int object_id) -> py::tuple
+    {
         auto obj = Objects().get(object_id);
         if (!obj) {
             ErrorLogger() << "GetPos: Couldn't get object with ID " << object_id;
-            return make_tuple(UniverseObject::INVALID_POSITION,
-                              UniverseObject::INVALID_POSITION);
+            return py::make_tuple(UniverseObject::INVALID_POSITION,
+                                  UniverseObject::INVALID_POSITION);
         }
-        return make_tuple(obj->X(), obj->Y());
+        return py::make_tuple(obj->X(), obj->Y());
     }
 
-    int GetOwner(int object_id) {
+    auto GetOwner(int object_id) -> int
+    {
         auto obj = Objects().get(object_id);
         if (!obj) {
             ErrorLogger() << "GetOwner: Couldn't get object with ID " << object_id;
@@ -601,7 +588,8 @@ namespace {
         return obj->Owner();
     }
 
-    void AddSpecial(int object_id, const std::string special_name) {
+    void AddSpecial(int object_id, const std::string special_name)
+    {
         // get the universe object and check if it exists
         auto obj = Objects().get(object_id);
         if (!obj) {
@@ -620,7 +608,8 @@ namespace {
         obj->AddSpecial(special_name, capacity);
     }
 
-    void RemoveSpecial(int object_id, const std::string special_name) {
+    void RemoveSpecial(int object_id, const std::string special_name)
+    {
         // get the universe object and check if it exists
         auto obj = Objects().get(object_id);
         if (!obj) {
@@ -635,36 +624,26 @@ namespace {
         obj->RemoveSpecial(special_name);
     }
 
-    // Wrappers for Universe class
-    double GetUniverseWidth()
-    { return GetUniverse().UniverseWidth(); }
-
-    void SetUniverseWidth(double width)
-    { GetUniverse().SetUniverseWidth(width); }
-
-    double LinearDistance(int system1_id, int system2_id)
-    { return GetPathfinder()->LinearDistance(system1_id, system2_id); }
-
-    int JumpDistanceBetweenSystems(int system1_id, int system2_id)
-    { return GetPathfinder()->JumpDistanceBetweenSystems(system1_id, system2_id); }
-
-    list GetAllObjects() {
-        list py_all_objects;
+    auto GetAllObjects() -> py::list
+    {
+        py::list py_all_objects;
         for (const auto& object : Objects().all()) {
             py_all_objects.append(object->ID());
         }
         return py_all_objects;
     }
 
-    list GetSystems() {
-        list py_systems;
+    auto GetSystems() -> py::list
+    {
+        py::list py_systems;
         for (const auto& system : Objects().all<System>()) {
             py_systems.append(system->ID());
         }
         return py_systems;
     }
 
-    int CreateSystem(StarType star_type, const std::string& star_name, double x, double y) {
+    auto CreateSystem(StarType star_type, const std::string& star_name, double x, double y) -> int
+    {
         // Check if star type is set to valid value
         if ((star_type == INVALID_STAR_TYPE) || (star_type == NUM_STAR_TYPES)) {
             ErrorLogger() << "CreateSystem : Can't create a system with a star of type " << star_type;
@@ -681,7 +660,8 @@ namespace {
         return system->SystemID();
     }
 
-    int CreatePlanet(PlanetSize size, PlanetType planet_type, int system_id, int orbit, const std::string& name) {
+    auto CreatePlanet(PlanetSize size, PlanetType planet_type, int system_id, int orbit, const std::string& name) -> int
+    {
         auto system = Objects().get<System>(system_id);
 
         // Perform some validity checks
@@ -739,7 +719,8 @@ namespace {
         return planet->ID();
     }
 
-    int CreateBuilding(const std::string& building_type, int planet_id, int empire_id) {
+    auto CreateBuilding(const std::string& building_type, int planet_id, int empire_id) -> int
+    {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "CreateBuilding: couldn't get planet with ID " << planet_id;
@@ -770,7 +751,8 @@ namespace {
         return building->ID();
     }
 
-    int CreateFleet(const std::string& name, int system_id, int empire_id, bool aggressive = false) {
+    auto CreateFleet(const std::string& name, int system_id, int empire_id, bool aggressive = false) -> int
+    {
         // Get system and check if it exists
         auto system = Objects().get<System>(system_id);
         if (!system) {
@@ -800,7 +782,8 @@ namespace {
         return fleet->ID();
     }
 
-    int CreateShip(const std::string& name, const std::string& design_name, const std::string& species, int fleet_id) {
+    auto CreateShip(const std::string& name, const std::string& design_name, const std::string& species, int fleet_id) -> int
+    {
         Universe& universe = GetUniverse();
 
         // check if we got a species name, if yes, check if species exists
@@ -882,14 +865,7 @@ namespace {
         return ship->ID();
     }
 
-    int CreateMonsterFleet(int system_id)
-    { return CreateFleet(UserString("MONSTERS"), system_id, ALL_EMPIRES, true); }
-
-    int CreateMonster(const std::string& design_name, int fleet_id)
-    { return CreateShip(NewMonsterName(), design_name, "", fleet_id); }
-
-    std::shared_ptr<Field> CreateFieldImpl(const std::string& field_type_name,
-                                           double x, double y, double size)
+    auto CreateFieldImpl(const std::string& field_type_name, double x, double y, double size) -> std::shared_ptr<Field>
     {
         // check if a field type with the specified field type name exists and get the field type
         const FieldType* field_type = GetFieldType(field_type_name);
@@ -920,7 +896,8 @@ namespace {
         return field;
     }
 
-    int CreateField(const std::string& field_type_name, double x, double y, double size) {
+    auto CreateField(const std::string& field_type_name, double x, double y, double size) -> int
+    {
         auto field = CreateFieldImpl(field_type_name, x, y, size);
         if (field)
             return field->ID();
@@ -928,7 +905,8 @@ namespace {
             return INVALID_OBJECT_ID;
     }
 
-    int CreateFieldInSystem(const std::string& field_type_name, double size, int system_id) {
+    auto CreateFieldInSystem(const std::string& field_type_name, double size, int system_id) -> int
+    {
         // check if system exists and get system
         auto system = Objects().get<System>(system_id);
         if (!system) {
@@ -944,10 +922,11 @@ namespace {
     }
 
     // Return a list of system ids of universe objects with @p obj_ids.
-    list ObjectsGetSystems(const list& obj_ids) {
-        list py_systems;
-        boost::python::stl_input_iterator<int> end;
-        for (boost::python::stl_input_iterator<int> id(obj_ids);
+    auto ObjectsGetSystems(const py::list& obj_ids) -> py::list
+    {
+        py::list py_systems;
+        py::stl_input_iterator<int> end;
+        for (py::stl_input_iterator<int> id(obj_ids);
              id != end; ++id) {
             if (auto obj = Objects().get(*id)) {
                 py_systems.append(obj->SystemID());
@@ -960,13 +939,14 @@ namespace {
     }
 
     // Return all systems within \p jumps of \p sys_ids
-    list SystemsWithinJumps(size_t jumps, const list& sys_ids) {
-        list py_systems;
-        boost::python::stl_input_iterator<int> end;
+    auto SystemsWithinJumps(size_t jumps, const py::list& sys_ids) -> py::list
+    {
+        py::list py_systems;
+        py::stl_input_iterator<int> end;
 
         std::vector<int> systems;
 
-        for (boost::python::stl_input_iterator<int> id(sys_ids); id != end; ++id) {
+        for (py::stl_input_iterator<int> id(sys_ids); id != end; ++id) {
             systems.push_back(*id);
         }
 
@@ -979,7 +959,8 @@ namespace {
     }
 
     // Wrappers for System class member functions
-    StarType SystemGetStarType(int system_id) {
+    auto SystemGetStarType(int system_id) -> StarType
+    {
         auto system = Objects().get<System>(system_id);
         if (!system) {
             ErrorLogger() << "SystemGetStarType: couldn't get system with ID " << system_id;
@@ -1004,7 +985,8 @@ namespace {
         system->SetStarType(star_type);
     }
 
-    int SystemGetNumOrbits(int system_id) {
+    auto SystemGetNumOrbits(int system_id) -> int
+    {
         auto system = Objects().get<System>(system_id);
         if (!system) {
             ErrorLogger() << "SystemGetNumOrbits : Couldn't get system with ID " << system_id;
@@ -1013,8 +995,9 @@ namespace {
         return system->Orbits();
     }
 
-    list SystemFreeOrbits(int system_id) {
-        list py_orbits;
+    auto SystemFreeOrbits(int system_id) -> py::list
+    {
+        py::list py_orbits;
         auto system = Objects().get<System>(system_id);
         if (!system) {
             ErrorLogger() << "SystemFreeOrbits : Couldn't get system with ID " << system_id;
@@ -1025,7 +1008,8 @@ namespace {
         return py_orbits;
     }
 
-    bool SystemOrbitOccupied(int system_id, int orbit) {
+    auto SystemOrbitOccupied(int system_id, int orbit) -> bool
+    {
         auto system = Objects().get<System>(system_id);
         if (!system) {
             ErrorLogger() << "SystemOrbitOccupied : Couldn't get system with ID " << system_id;
@@ -1034,7 +1018,8 @@ namespace {
         return system->OrbitOccupied(orbit);
     }
 
-    int SystemOrbitOfPlanet(int system_id, int planet_id) {
+    auto SystemOrbitOfPlanet(int system_id, int planet_id) -> int
+    {
         auto system = Objects().get<System>(system_id);
         if (!system) {
             ErrorLogger() << "SystemOrbitOfPlanet : Couldn't get system with ID " << system_id;
@@ -1043,8 +1028,9 @@ namespace {
         return system->OrbitOfPlanet(planet_id);
     }
 
-    list SystemGetPlanets(int system_id) {
-        list py_planets;
+    auto SystemGetPlanets(int system_id) -> py::list
+    {
+        py::list py_planets;
         auto system = Objects().get<System>(system_id);
         if (!system) {
             ErrorLogger() << "SystemGetPlanets : Couldn't get system with ID " << system_id;
@@ -1055,8 +1041,9 @@ namespace {
         return py_planets;
     }
 
-    list SystemGetFleets(int system_id) {
-        list py_fleets;
+    auto SystemGetFleets(int system_id) -> py::list
+    {
+        py::list py_fleets;
         auto system = Objects().get<System>(system_id);
         if (!system) {
             ErrorLogger() << "SystemGetFleets : Couldn't get system with ID " << system_id;
@@ -1067,8 +1054,9 @@ namespace {
         return py_fleets;
     }
 
-    list SystemGetStarlanes(int system_id) {
-        list py_starlanes;
+    auto SystemGetStarlanes(int system_id) -> py::list
+    {
+        py::list py_starlanes;
         // get source system
         auto system = Objects().get<System>(system_id);
         if (!system) {
@@ -1088,7 +1076,8 @@ namespace {
         return py_starlanes;
     }
 
-    void SystemAddStarlane(int from_sys_id, int to_sys_id) {
+    void SystemAddStarlane(int from_sys_id, int to_sys_id)
+    {
         // get source and destination system, check that both exist
         auto from_sys = Objects().get<System>(from_sys_id);
         if (!from_sys) {
@@ -1105,7 +1094,8 @@ namespace {
         to_sys->AddStarlane(from_sys_id);
     }
 
-    void SystemRemoveStarlane(int from_sys_id, int to_sys_id) {
+    void SystemRemoveStarlane(int from_sys_id, int to_sys_id)
+    {
         // get source and destination system, check that both exist
         auto from_sys = Objects().get<System>(from_sys_id);
         if (!from_sys) {
@@ -1123,7 +1113,8 @@ namespace {
     }
 
     // Wrapper for Planet class member functions
-    PlanetType PlanetGetType(int planet_id) {
+    auto PlanetGetType(int planet_id) -> PlanetType
+    {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetGetType: Couldn't get planet with ID " << planet_id;
@@ -1132,7 +1123,8 @@ namespace {
         return planet->Type();
     }
 
-    void PlanetSetType(int planet_id, PlanetType planet_type) {
+    void PlanetSetType(int planet_id, PlanetType planet_type)
+    {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetSetType: Couldn't get planet with ID " << planet_id;
@@ -1150,7 +1142,8 @@ namespace {
             planet->SetSize(SZ_HUGE);
     }
 
-    PlanetSize PlanetGetSize(int planet_id) {
+    auto PlanetGetSize(int planet_id) -> PlanetSize
+    {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetGetSize: Couldn't get planet with ID " << planet_id;
@@ -1159,7 +1152,8 @@ namespace {
         return planet->Size();
     }
 
-    void PlanetSetSize(int planet_id, PlanetSize planet_size) {
+    void PlanetSetSize(int planet_id, PlanetSize planet_size)
+    {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetSetSize: Couldn't get planet with ID " << planet_id;
@@ -1175,16 +1169,18 @@ namespace {
             planet->SetType(PT_BARREN);
     }
 
-    object PlanetGetSpecies(int planet_id) {
+    auto PlanetGetSpecies(int planet_id) -> py::object
+    {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetGetSpecies: Couldn't get planet with ID " << planet_id;
-            return object("");
+            return py::object("");
         }
-        return object(planet->SpeciesName());
+        return py::object(planet->SpeciesName());
     }
 
-    void PlanetSetSpecies(int planet_id, const std::string& species_name) {
+    void PlanetSetSpecies(int planet_id, const std::string& species_name)
+    {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetSetSpecies: Couldn't get planet with ID " << planet_id;
@@ -1193,16 +1189,18 @@ namespace {
         planet->SetSpecies(species_name);
     }
 
-    object PlanetGetFocus(int planet_id) {
+    auto PlanetGetFocus(int planet_id) -> py::object
+    {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetGetFocus: Couldn't get planet with ID " << planet_id;
-            return object("");
+            return py::object("");
         }
-        return object(planet->Focus());
+        return py::object(planet->Focus());
     }
 
-    void PlanetSetFocus(int planet_id, const std::string& focus) {
+    void PlanetSetFocus(int planet_id, const std::string& focus)
+    {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetSetSpecies: Couldn't get planet with ID " << planet_id;
@@ -1211,20 +1209,22 @@ namespace {
         planet->SetFocus(focus);
     }
 
-    list PlanetAvailableFoci(int planet_id) {
-        list py_foci;
+    auto PlanetAvailableFoci(int planet_id) -> py::list
+    {
+        py::list py_foci;
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetAvailableFoci: Couldn't get planet with ID " << planet_id;
             return py_foci;
         }
         for (const std::string& focus : planet->AvailableFoci()) {
-            py_foci.append(object(focus));
+            py_foci.append(py::object(focus));
         }
         return py_foci;
     }
 
-    bool PlanetMakeOutpost(int planet_id, int empire_id) {
+    auto PlanetMakeOutpost(int planet_id, int empire_id) -> bool
+    {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetMakeOutpost: couldn't get planet with ID:" << planet_id;
@@ -1239,7 +1239,8 @@ namespace {
         return planet->Colonize(empire_id, "", 0.0);
     }
 
-    bool PlanetMakeColony(int planet_id, int empire_id, const std::string& species, double population) {
+    auto PlanetMakeColony(int planet_id, int empire_id, const std::string& species, double population) -> bool
+    {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetMakeColony: couldn't get planet with ID:" << planet_id;
@@ -1262,137 +1263,138 @@ namespace {
         return planet->Colonize(empire_id, species, population);
     }
 
-    object PlanetCardinalSuffix(int planet_id) {
+    auto PlanetCardinalSuffix(int planet_id) -> py::object
+    {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetCardinalSuffix: couldn't get planet with ID:" << planet_id;
-            return object(UserString("ERROR"));
+            return py::object(UserString("ERROR"));
         }
 
-        return object(planet->CardinalSuffix());
+        return py::object(planet->CardinalSuffix());
     }
 }
 
 namespace FreeOrionPython {
     void WrapServer() {
-        class_<PlayerSetupData>("PlayerSetupData")
-            .def_readwrite("player_name",        &PlayerSetupData::m_player_name)
-            .def_readwrite("empire_name",        &PlayerSetupData::m_empire_name)
-            .def_readonly("empire_color",        &PlayerSetupData::m_empire_color)
-            .def_readwrite("starting_species",   &PlayerSetupData::m_starting_species_name)
-            .def_readwrite("starting_team",      &PlayerSetupData::m_starting_team);
+        py::class_<PlayerSetupData>("PlayerSetupData")
+            .def_readwrite("player_name",        &PlayerSetupData::player_name)
+            .def_readwrite("empire_name",        &PlayerSetupData::empire_name)
+            .def_readonly("empire_color",        &PlayerSetupData::empire_color)
+            .def_readwrite("starting_species",   &PlayerSetupData::starting_species_name)
+            .def_readwrite("starting_team",      &PlayerSetupData::starting_team);
 
-        class_<FleetPlanWrapper>("FleetPlan", init<const std::string&, const list&>())
+        py::class_<FleetPlanWrapper>("FleetPlan", py::init<const std::string&, const py::list&>())
             .def("name",                        &FleetPlanWrapper::Name)
             .def("ship_designs",                &FleetPlanWrapper::ShipDesigns);
 
-        class_<MonsterFleetPlanWrapper>("MonsterFleetPlan", init<const std::string&, const list&, double, int>())
+        py::class_<MonsterFleetPlanWrapper>("MonsterFleetPlan", py::init<const std::string&, const py::list&, double, int>())
             .def("name",                        &MonsterFleetPlanWrapper::Name)
             .def("ship_designs",                &MonsterFleetPlanWrapper::ShipDesigns)
             .def("spawn_rate",                  &MonsterFleetPlanWrapper::SpawnRate)
             .def("spawn_limit",                 &MonsterFleetPlanWrapper::SpawnLimit)
             .def("locations",                   &MonsterFleetPlanWrapper::Locations);
 
-        def("get_universe",                     GetUniverse,                    return_value_policy<reference_existing_object>());
-        def("get_all_empires",                  GetAllEmpires);
-        def("get_empire",                       GetEmpire,                      return_value_policy<reference_existing_object>());
+        py::def("get_universe",                     GetUniverse,                    py::return_value_policy<py::reference_existing_object>());
+        py::def("get_all_empires",                  GetAllEmpires);
+        py::def("get_empire",                       GetEmpire,                      py::return_value_policy<py::reference_existing_object>());
 
-        def("user_string",                      make_function(&UserString,      return_value_policy<copy_const_reference>()));
-        def("roman_number",                     RomanNumber);
-        def("get_resource_dir",                 GetResourceDirWrapper);
+        py::def("user_string",                      make_function(&UserString,      py::return_value_policy<py::copy_const_reference>()));
+        py::def("roman_number",                     RomanNumber);
+        py::def("get_resource_dir",                 +[]() -> py::object { return py::object(PathToString(GetResourceDir())); });
 
-        def("all_empires",                      AllEmpires);
-        def("invalid_object",                   InvalidObjectID);
-        def("large_meter_value",                LargeMeterValue);
-        def("invalid_position",                 InvalidPosition);
+        py::def("all_empires",                      +[]() -> int { return ALL_EMPIRES; });
+        py::def("invalid_object",                   +[]() -> int { return INVALID_OBJECT_ID; });
+        py::def("large_meter_value",                +[]() -> float { return Meter::LARGE_VALUE; });
+        py::def("invalid_position",                 +[]() -> double { return UniverseObject::INVALID_POSITION; });
 
-        def("get_galaxy_setup_data",            GetGalaxySetupData,             return_value_policy<reference_existing_object>());
-        def("current_turn",                     CurrentTurn);
-        def("generate_sitrep",                  GenerateSitRep);
-        def("generate_sitrep",                  GenerateSitRep1);
-        def("generate_starlanes",               GenerateStarlanes);
+        py::def("get_galaxy_setup_data",            GetGalaxySetupData,             py::return_value_policy<py::reference_existing_object>());
+        py::def("current_turn",                     CurrentTurn);
+        py::def("generate_sitrep",                  GenerateSitRep);
+        py::def("generate_sitrep",                  +[](int empire_id, const std::string& template_string, const std::string& icon) { GenerateSitRep(empire_id, template_string, py::dict(), icon); });
+        py::def("generate_starlanes",               GenerateStarlanes);
 
-        def("species_preferred_focus",          SpeciesPreferredFocus);
-        def("species_get_planet_environment",   SpeciesGetPlanetEnvironment);
-        def("species_add_homeworld",            SpeciesAddHomeworld);
-        def("species_remove_homeworld",         SpeciesRemoveHomeworld);
-        def("species_can_colonize",             SpeciesCanColonize);
-        def("get_all_species",                  GetAllSpecies);
-        def("get_playable_species",             GetPlayableSpecies);
-        def("get_native_species",               GetNativeSpecies);
+        py::def("species_preferred_focus",          SpeciesPreferredFocus);
+        py::def("species_get_planet_environment",   SpeciesGetPlanetEnvironment);
+        py::def("species_add_homeworld",            SpeciesAddHomeworld);
+        py::def("species_remove_homeworld",         SpeciesRemoveHomeworld);
+        py::def("species_can_colonize",             SpeciesCanColonize);
+        py::def("get_all_species",                  GetAllSpecies);
+        py::def("get_playable_species",             GetPlayableSpecies);
+        py::def("get_native_species",               GetNativeSpecies);
 
-        def("special_spawn_rate",               SpecialSpawnRate);
-        def("special_spawn_limit",              SpecialSpawnLimit);
-        def("special_locations",                SpecialLocations);
-        def("special_has_location",             SpecialHasLocation);
-        def("get_all_specials",                 GetAllSpecials);
+        py::def("special_spawn_rate",               SpecialSpawnRate);
+        py::def("special_spawn_limit",              SpecialSpawnLimit);
+        py::def("special_locations",                SpecialLocations);
+        py::def("special_has_location",             SpecialHasLocation);
+        py::def("get_all_specials",                 GetAllSpecials);
 
-        def("empire_set_name",                  EmpireSetName);
-        def("empire_set_homeworld",             EmpireSetHomeworld);
-        def("empire_unlock_item",               EmpireUnlockItem);
-        def("empire_add_ship_design",           EmpireAddShipDesign);
+        py::def("empire_set_name",                  EmpireSetName);
+        py::def("empire_set_homeworld",             EmpireSetHomeworld);
+        py::def("empire_unlock_item",               EmpireUnlockItem);
+        py::def("empire_add_ship_design",           EmpireAddShipDesign);
 
-        def("design_create",                    ShipDesignCreate);
-        def("design_get_premade_list",          ShipDesignGetPremadeList);
-        def("design_get_monster_list",          ShipDesignGetMonsterList);
+        py::def("design_create",                    ShipDesignCreate);
+        py::def("design_get_premade_list",          ShipDesignGetPremadeList);
+        py::def("design_get_monster_list",          ShipDesignGetMonsterList);
 
-        def("load_unlockable_item_list",        LoadUnlockableItemList);
-        def("load_starting_buildings",          LoadStartingBuildings);
-        def("load_fleet_plan_list",             LoadFleetPlanList);
-        def("load_monster_fleet_plan_list",     LoadMonsterFleetPlanList);
+        py::def("load_unlockable_item_list",        LoadUnlockableItemList);
+        py::def("load_starting_buildings",          LoadStartingBuildings);
+        py::def("load_fleet_plan_list",             LoadFleetPlanList);
+        py::def("load_monster_fleet_plan_list",     LoadMonsterFleetPlanList);
 
-        def("get_name",                         GetName);
-        def("set_name",                         SetName);
-        def("get_x",                            GetX);
-        def("get_y",                            GetY);
-        def("get_pos",                          GetPos);
-        def("get_owner",                        GetOwner);
-        def("add_special",                      AddSpecial);
-        def("remove_special",                   RemoveSpecial);
+        py::def("get_name",                         GetName);
+        py::def("set_name",                         SetName);
+        py::def("get_x",                            GetX);
+        py::def("get_y",                            GetY);
+        py::def("get_pos",                          GetPos);
+        py::def("get_owner",                        GetOwner);
+        py::def("add_special",                      AddSpecial);
+        py::def("remove_special",                   RemoveSpecial);
 
-        def("get_universe_width",               GetUniverseWidth);
-        def("set_universe_width",               SetUniverseWidth);
-        def("linear_distance",                  LinearDistance);
-        def("jump_distance",                    JumpDistanceBetweenSystems);
-        def("get_all_objects",                  GetAllObjects);
-        def("get_systems",                      GetSystems);
-        def("create_system",                    CreateSystem);
-        def("create_planet",                    CreatePlanet);
-        def("create_building",                  CreateBuilding);
-        def("create_fleet",                     CreateFleet);
-        def("create_ship",                      CreateShip);
-        def("create_monster_fleet",             CreateMonsterFleet);
-        def("create_monster",                   CreateMonster);
-        def("create_field",                     CreateField);
-        def("create_field_in_system",           CreateFieldInSystem);
+        py::def("get_universe_width",               +[]() -> double { return GetUniverse().UniverseWidth(); });
+        py::def("set_universe_width",               +[](double width) { GetUniverse().SetUniverseWidth(width); });
+        py::def("linear_distance",                  +[](int system1_id, int system2_id) -> double { return GetPathfinder()->LinearDistance(system1_id, system2_id); });
+        py::def("jump_distance",                    +[](int system1_id, int system2_id) -> int { return GetPathfinder()->JumpDistanceBetweenSystems(system1_id, system2_id); });
+        py::def("get_all_objects",                  GetAllObjects);
+        py::def("get_systems",                      GetSystems);
+        py::def("create_system",                    CreateSystem);
+        py::def("create_planet",                    CreatePlanet);
+        py::def("create_building",                  CreateBuilding);
+        py::def("create_fleet",                     CreateFleet);
+        py::def("create_ship",                      CreateShip);
+        py::def("create_monster_fleet",             +[](int system_id) -> int { return CreateFleet(UserString("MONSTERS"), system_id, ALL_EMPIRES, true); });
+        py::def("create_monster",                   +[](const std::string& design_name, int fleet_id) -> int { return CreateShip(NewMonsterName(), design_name, "", fleet_id); });
+        py::def("create_field",                     CreateField);
+        py::def("create_field_in_system",           CreateFieldInSystem);
 
-        def("objs_get_systems",                 ObjectsGetSystems);
+        py::def("objs_get_systems",                 ObjectsGetSystems);
 
-        def("systems_within_jumps_unordered",   SystemsWithinJumps, "Return all systems within ''jumps'' of the systems with ids ''sys_ids''");
+        py::def("systems_within_jumps_unordered",   SystemsWithinJumps, "Return all systems within ''jumps'' of the systems with ids ''sys_ids''");
 
-        def("sys_get_star_type",                SystemGetStarType);
-        def("sys_set_star_type",                SystemSetStarType);
-        def("sys_get_num_orbits",               SystemGetNumOrbits);
-        def("sys_free_orbits",                  SystemFreeOrbits);
-        def("sys_orbit_occupied",               SystemOrbitOccupied);
-        def("sys_orbit_of_planet",              SystemOrbitOfPlanet);
-        def("sys_get_planets",                  SystemGetPlanets);
-        def("sys_get_fleets",                   SystemGetFleets);
-        def("sys_get_starlanes",                SystemGetStarlanes);
-        def("sys_add_starlane",                 SystemAddStarlane);
-        def("sys_remove_starlane",              SystemRemoveStarlane);
+        py::def("sys_get_star_type",                SystemGetStarType);
+        py::def("sys_set_star_type",                SystemSetStarType);
+        py::def("sys_get_num_orbits",               SystemGetNumOrbits);
+        py::def("sys_free_orbits",                  SystemFreeOrbits);
+        py::def("sys_orbit_occupied",               SystemOrbitOccupied);
+        py::def("sys_orbit_of_planet",              SystemOrbitOfPlanet);
+        py::def("sys_get_planets",                  SystemGetPlanets);
+        py::def("sys_get_fleets",                   SystemGetFleets);
+        py::def("sys_get_starlanes",                SystemGetStarlanes);
+        py::def("sys_add_starlane",                 SystemAddStarlane);
+        py::def("sys_remove_starlane",              SystemRemoveStarlane);
 
-        def("planet_get_type",                  PlanetGetType);
-        def("planet_set_type",                  PlanetSetType);
-        def("planet_get_size",                  PlanetGetSize);
-        def("planet_set_size",                  PlanetSetSize);
-        def("planet_get_species",               PlanetGetSpecies);
-        def("planet_set_species",               PlanetSetSpecies);
-        def("planet_get_focus",                 PlanetGetFocus);
-        def("planet_set_focus",                 PlanetSetFocus);
-        def("planet_available_foci",            PlanetAvailableFoci);
-        def("planet_make_outpost",              PlanetMakeOutpost);
-        def("planet_make_colony",               PlanetMakeColony);
-        def("planet_cardinal_suffix",           PlanetCardinalSuffix);
+        py::def("planet_get_type",                  PlanetGetType);
+        py::def("planet_set_type",                  PlanetSetType);
+        py::def("planet_get_size",                  PlanetGetSize);
+        py::def("planet_set_size",                  PlanetSetSize);
+        py::def("planet_get_species",               PlanetGetSpecies);
+        py::def("planet_set_species",               PlanetSetSpecies);
+        py::def("planet_get_focus",                 PlanetGetFocus);
+        py::def("planet_set_focus",                 PlanetSetFocus);
+        py::def("planet_available_foci",            PlanetAvailableFoci);
+        py::def("planet_make_outpost",              PlanetMakeOutpost);
+        py::def("planet_make_colony",               PlanetMakeColony);
+        py::def("planet_cardinal_suffix",           PlanetCardinalSuffix);
     }
 }

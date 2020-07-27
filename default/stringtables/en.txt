@@ -1,4 +1,4 @@
-﻿English
+English
 
 # This is the English String Table file for FreeOrion
 #
@@ -351,7 +351,7 @@ PROJECT_BT_STOCKPILE_SHORT_DESC
 Transfers PP into the imperial stockpile
 
 PROJECT_BT_STOCKPILE_DESC
-'''PP allocated to the transfer project are added to the imperial stockpile. The amount to transfer and how many times the transfer should repeat can be specified.
+'''Production Points (PP) allocated to the transfer project are added to the [[encyclopedia STOCKPILE_TITLE]]. The amount to transfer and how many times the transfer should repeat can be specified.
 
 Only PP that are produced in the same supply-group (and none from the imperial stockpile) are allocated to the stockpile transfer project.
 
@@ -3189,6 +3189,9 @@ Save files
 OPTIONS_SERVER_FOLDER_SAVE
 Server Save files
 
+OPTIONS_FOLDER_CONFIG_LOG
+Config and log files
+
 OPTIONS_LANGUAGE_FILE
 Language files
 
@@ -4397,7 +4400,7 @@ It also allows for some interaction with the [[encyclopedia MAP_WINDOW_ARTICLE_T
 <u>Production Summary panel</u>
 
 (default position: top left)
-The Production Summary panel shows available Production Points.
+The Production Summary panel shows available Production Points (PP).
 If a system is selected, there are two columns shown. The left column shows production points across your entire empire. The right column gives production points for the selected system (but is absent if no system is selected).
 Available Points relates to the PP available for production. The right value are the maximum available production points for the selected system. This may be less than the total available when all of your empire's systems are not [[metertype METER_SUPPLY]] connected.
 Stockpile relates to the PP available for production using the imperial stockpile. Production items are enabled to use PP from the Imperial Stockpile by default and have to be explicitly disabled from doing so.
@@ -5592,8 +5595,14 @@ CATEGORY_GUIDES
 CATEGORY_GAME_CONCEPTS
 *Game Concepts*
 
+DISTORTION_ARTICLE_SHORT_DESC
+Distortion
+
 GROWTH_ARTICLE_SHORT_DESC
 Growth
+
+INDUSTRY_ARTICLE_SHORT_DESC
+Industry
 
 STOCKPILE_ARTICLE_SHORT_DESC
 Stockpile
@@ -5601,8 +5610,14 @@ Stockpile
 OUTPOSTS_ARTICLE_SHORT_DESC
 Outpost
 
+LOGISTICS_ARTICLE_SHORT_DESC
+Logistics
+
 HOMEWORLDS_ARTICLE_SHORT_DESC
 Homeworld
+
+PLANETDRIVE_ARTICLE_SHORT_DESC
+Planet Drive
 
 PRODUCTION_ARTICLE_SHORT_DESC
 Production
@@ -5621,6 +5636,9 @@ Meters
 
 POPULATION_TITLE_SHORT_DESC
 Population
+
+PSYCHIC_ARTICLE_SHORT_DESC
+Psychic
 
 MANAGEMENT_TITLE_SHORT_DESC
 Management
@@ -5652,6 +5670,23 @@ Metabolism
 
 METABOLISM_TEXT
 The Metabolism of [[encyclopedia ENC_SPECIES]] in the galaxy fall into one of the types listed here.
+
+STOCKPILE_TITLE
+Imperial Stockpile
+
+STOCKPILE_TEXT
+'''Most industry is used immediately for producing buildings or ships. An empire can also store Production Points (PP) for later use in the imperial stockpile. Usually PP can only be used for production if the production site is in the supply network where the PP are generated. Contrary to this PP from the imperial stockpile can be used at any owned production site. Only a small amount of PP-no more than the imperial use limit-can be used for production each turn.
+
+There are two ways two store PP in the imperial stockpile:
+* Surplus PP (PP not allocated to anything on the queue) at any other location are automatically transferred to the stockpile. This may trigger a warning.
+* PP explicitly allocated to a [[encyclopedia PROJECT_BT_STOCKPILE]] are also transferred to the stockpile.
+
+The imperial stockpile use limit is the total of the [[metertype METER_STOCKPILE]] of each planet.
+Species stockpile distribution ability, buildings, technologies, and setting the [[encyclopedia STOCKPILE_FOCUS_TITLE]] increase it.
+
+Information about imperial stockpile, the use, and the use limit can be seen in the top of the [[encyclopedia MAP_WINDOW_ARTICLE_TITLE]].
+Details for production can be seen in the [[encyclopedia PRODUCTION_WINDOW_ARTICLE_TITLE]].
+The effects which contribute to the planetary [[metertype METER_STOCKPILE]] can be found in the [[PLANET_PANEL]] in the system overview.'''
 
 PLANET_MANAGEMENT_TITLE
 Planet Management
@@ -5803,7 +5838,7 @@ Industry
 METER_INDUSTRY_VALUE_DESC
 '''Industry represents the production and modification of physical goods. It is needed to produce buildings, space ships and other projects.
 
-The Industry of a planet can be used for any production projects of [[metertype METER_SUPPLY]] line connected planets. Unallocated Industry gets added to the Imperial Stockpile.
+The Industry of a planet can be used for any production projects of [[metertype METER_SUPPLY]] line connected planets. Unallocated Industry gets added to the [[encyclopedia STOCKPILE_TITLE]].
 
 The Target Industry is the stable Industry output level a planet will approach, given the current factors influencing the Industry resources. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, and various other game effects. If these factors change, then the Target Industry value is likely to shift.
 
@@ -5899,21 +5934,21 @@ Supply
 METER_SUPPLY_VALUE_DESC
 '''The supply meter on a planet represents the number of star-lanes supply can extend through. Smaller planets can supply greater distances, large planets reduced distances.
 
-Supply lines are shown by coloring star-lanes with an empire's color. Planets connected by supply lines form a 'Resource Group' and can share physical resources. Production Points created on one planet can be used on any connected planet to build ships or structures.
+Supply lines are shown by coloring star-lanes with an empire's color. Planets connected by supply lines form a 'Resource Group' and can share physical resources. Production Points (PP) created on one planet can be used on any connected planet to build ships or structures.
 
-A set of core supply starlanes for an empire (the set of least-jump starlanes connecting the resource-producing systems of each Resource Group) will have greater thickness than the non-core starlanes. If PP is currently being wasted within a Resource Group, the outer bands of the core starlanes will be a contrasting color.
+A set of core supply starlanes for an empire (the set of least-jump starlanes connecting the resource-producing systems of each Resource Group) will have greater thickness than the non-core starlanes. If PP are currently unused within a Resource Group, the outer bands of the core starlanes will be a contrasting color.
 
 Supply lines can also be used to refill the [[metertype METER_FUEL]] supply of ships.
 
 Supply lines will be obstructed by armed enemy ships belonging to empires with which an empire is at [[encyclopedia WAR_TITLE]]. At the opposite end of the spectrum, empires in an [[encyclopedia ALLIANCE_TITLE]] will share supply lines and all their associated benefits.'''
 
 METER_STOCKPILE_VALUE_LABEL
-Stockpile
+Stockpile Distribution
 
 METER_STOCKPILE_VALUE_DESC
-'''The imperial stockpile capacity indicates an empire's ability to take in excess and to use stockpiled production points. An empire's total stockpiling capacity is the sum of all its planets' stockpile meters plus technology bonus. The total determines how many PP can be taken out of the stockpile each turn to be used for production.
+'''The stockpile distribution meter of a planet represents how much it contributes to the [[encyclopedia STOCKPILE_TITLE]] use limit. The imperial stockpile use limit indicates an empire's ability to use stockpiled Production Points (PP). An empire's stockpile use limit is the sum of all its planets' stockpile distribution meters plus technology bonus. The total determines how many PP can be taken out of the stockpile each turn to be used for production.
 
-Species have various innate levels of stockpiling ability.'''
+Species have various innate levels of stockpile distribution ability.'''
 
 METER_TROOPS_VALUE_LABEL
 Troops
@@ -6015,6 +6050,12 @@ The focus of a planet may grant it bonuses or enable effects. A small penalty ap
 
 A planet will default to the inhabiting species' preferred focus if it has one, otherwise it will default to [[metertype METER_INDUSTRY]].'''
 
+DISTORTION_FOCUS_TITLE
+Spatial Distortion Focus
+
+DISTORTION_FOCUS_TEXT
+Manipulates starlanes leading to the planet slowing the progress of enemy ships by 40 uu per turn. Slow ships may even be forced back to the system at the far end of the starlane. Available after constructing a [[buildingtype BLD_SPATIAL_DISTORT_GEN]].
+
 GROWTH_FOCUS_TITLE
 Growth Focus
 
@@ -6025,11 +6066,29 @@ A planet focused on Growth extends those benefits to other planets connected to 
 
 [[GROWTH_SPECIALS_ENTRY_LIST]]'''
 
+INDUSTRY_FOCUS_TITLE
+Industry Focus
+
+INDUSTRY_FOCUS_TEXT
+Planets focused on Industry will generate more [[metertype METER_INDUSTRY]] will output for their empire, which is used for producing ships and buildings, or may be stockpiled for later use. Industry focus increases output more for higher population planets.
+
 INFLUENCE_FOCUS_TITLE
 Influence Focus
 
 INFLUENCE_FOCUS_TEXT
 Influence isn't implemented yet.
+
+LOGISTICS_FOCUS_TITLE
+Logistics Focus
+
+LOGISTICS_FOCUS_TEXT
+Planets focused on Logistics have their [[metertype METER_SUPPLY]] increased by 3. This extends the planet's empire's supply network from the planet by 3 starlane jumps.
+
+PLANETDRIVE_FOCUS_TITLE
+Planet Drive Focus
+
+PLANETDRIVE_FOCUS_TEXT
+After a [[buildingtype BLD_PLANET_DRIVE]] has been constructed, and a [[buildingtype BLD_PLANET_BEACON]] or [[shippart SP_PLANET_BEACON]] is in an adjacent system, selecting the [[PLANETDRIVE_FOCUS_TITLE]] will move the planet between star systems.
 
 PROTECTION_FOCUS_TITLE
 Protection Focus
@@ -6037,13 +6096,23 @@ Protection Focus
 PROTECTION_FOCUS_TEXT
 The Protection focus represents a planet wholly focused on defending itself. [[metertype METER_TROOPS]], Planetary [[metertype METER_DEFENSE]], and Planetary [[metertype METER_SHIELD]] are doubled.
 
+PSYCHIC_FOCUS_TITLE
+Psychic Domination Focus
+
+PSYCHIC_FOCUS_TEXT
+'''The [[PSYCHIC_FOCUS_TITLE]] concentrates the mental force of the population to dominate the thoughts of non-telepathic crews of enemy empire ships in the same system.
+
+Each turn, there is a 10% chance of taking control of each ship, unless the enemy empire also posesses the technology [[LRN_PSY_DOM]].
+
+When the Psychic Domination Focus is engaged, it also reduces the chance that [[predefinedshipdesign SM_PSIONIC_SNOWFLAKE]]s will take control of ships controlled by the planet's empire within the system.'''
+
 STOCKPILE_FOCUS_TITLE
-Stockpile Focus
+Stockpile Distribution Focus
 
 STOCKPILE_FOCUS_TEXT
-'''The Stockpile focus increases the [[metertype METER_STOCKPILE]] of a planet.
+'''The Stockpile Distribution focus increases the [[metertype METER_STOCKPILE]] of a planet.
 
-A Homeworld focused on Stockpile also helps other planets of the same species and increases the [[metertype METER_STOCKPILE]] there by an additional 0.04 per population.
+A Homeworld focused on Stockpile Distribution also helps other planets of the same species and increases the [[metertype METER_STOCKPILE]] there by an additional 0.04 per population.
 
 [[METER_STOCKPILE_VALUE_DESC]]'''
 
@@ -6203,7 +6272,7 @@ MAP_WINDOW_ARTICLE_TEXT
 
 In the upper left corner is the Turn Button, which reads as "Turn n" (where n is the current turn); left clicking the Turn Button causes the game to advance to the next turn. Immediately to its right is the Auto Advance Toggle; when showing as a double arrow, the game will not auto-advance; if clicked to toggle to circular arcing arrows, the game will autoadvance to the next turn once all other empires have submitted their orders for the turn.
 
-Next are icons showing the player empire total [[metertype METER_INDUSTRY]], total [[metertype METER_RESEARCH]], number of existing ships, and Empire [[encyclopedia DETECTION_TITLE]].
+Next are icons showing the player empire total [[metertype METER_INDUSTRY]], [[metertype METER_STOCKPILE]], total [[metertype METER_RESEARCH]], number of existing ships, and Empire [[encyclopedia DETECTION_TITLE]].
 
 On the right hand side of the control bar are a number of icons for toggling display of other significant UI windows. Tooltips are available for these.'''
 
@@ -7646,6 +7715,12 @@ Opinions of Other Species:
 ##
 ## Encyclopedia articles in Species Types category
 ##
+
+ALL_SPECIES
+All Species
+
+ALL_SPECIES_DESC
+List of all species:
 
 LITHIC_SPECIES_CLASS
 Lithic
@@ -9153,7 +9228,7 @@ Industry
 
 # Focus types
 FOCUS_STOCKPILE
-Stockpile
+Stockpile Distribution
 
 FOCUS_STOCKPILE_DESC
 Allows stockpile techs to boost stockpile withdrawal capacity
@@ -9268,7 +9343,7 @@ Max Supply
 
 # Meter types
 METER_MAX_STOCKPILE
-Max Stockpile
+Max Stockpile Distribution
 
 # Meter types
 METER_MAX_TROOPS
@@ -9328,7 +9403,7 @@ Supply
 
 # Meter types
 METER_STOCKPILE
-Stockpile
+Stockpile Distribution
 
 # Meter types
 METER_TROOPS
@@ -10932,7 +11007,7 @@ PLC_CENTRALIZATION
 Centralization
 
 PLC_CENTRALIZATION_DESC
-Increases resourse output at the capital but reduces supply range and stockpiling.
+Increases resourse output at the capital but reduces supply range and stockpile distribution.
 
 PLC_CENTRALIZATION_SHORT_DESC
 Boosts Capital
@@ -10998,10 +11073,10 @@ PLC_STOCKPILE_LIQUIDATION
 Stockpile Liquidation
 
 PLC_STOCKPILE_LIQUIDATION_DESC
-Doubles stockpiling on stockpile-focused planets.
+Doubles the contribution of stockpile-distribution-focused planets to the [[encyclopedia STOCKPILE_TITLE]] use limit.
 
 PLC_STOCKPILE_LIQUIDATION_SHORT_DESC
-Increases stockpiling
+Increases Stockpile Use Limit
 
 PLC_ALLIED_REPAIR
 Allied Repair
@@ -11260,7 +11335,9 @@ LRN_TIME_MECH
 Temporal Mechanics
 
 LRN_TIME_MECH_DESC
-What are "now", "future" and "past"? The twin paradox of special relativity, or the theoretical "wormhole" in its place, suggest early forms of "time travel". Direct manipulation of spacetime and temporal flux permit these effects to be harnessed and magnified. Temporal incursions cannot perceptibly alter the past of the universe that we perceive. They can, however, compress ages or extend moments to arbitrary durations, to uses limited only by the material supplies provided, and our own patience...
+'''Grants 1 extra military policy slot.
+
+What are "now", "future" and "past"? The twin paradox of special relativity, or the theoretical "wormhole" in its place, suggest early forms of "time travel". Direct manipulation of spacetime and temporal flux permit these effects to be harnessed and magnified. Temporal incursions cannot perceptibly alter the past of the universe that we perceive. They can, however, compress ages or extend moments to arbitrary durations, to uses limited only by the material supplies provided, and our own patience...'''
 
 LRN_NDIM_SUBSPACE
 N-Dimensional Subspace
@@ -11422,10 +11499,10 @@ PRO_PREDICTIVE_STOCKPILING_DESC
 The imperial stockpile service has a fleet for distributing raw materials to places where important projects are predicted to be started.
 This task is difficult as the service has to predict when demand happens, where it happens, what materials and goods are demanded and also who the users will be.
 
-Unused PP will automatically be transferred to the Imperial Production Stockpile.
+Unused Production Points (PP) will automatically be transferred to the [[encyclopedia STOCKPILE_TITLE]]].
 An item on the production queue draws automatically on the Imperial Stockpile if the item has not been explicitly disabled from doing so.
 
-This is the basic technology for the imperial stockpile, which increases the [[metertype METER_STOCKPILE]] of stockpile-focused planets by 1.'''
+This is the basic technology for the imperial stockpile, which increases the [[metertype METER_STOCKPILE]] of stockpile-distribution-focused planets by 1.'''
 
 PRO_GENERIC_SUPPLIES
 Generic Supplies
@@ -11438,7 +11515,7 @@ Reaching this state of sophistication, Generic Supplies can be used to construct
 
 This frees the imperial stockpile service from having to know which goods will be demanded exactly. Predicting the location and amount is enough.
 
-This is an upgrade technology for the imperial stockpile. The [[metertype METER_STOCKPILE]] is increased by 2, plus an additional 0.01 per [[metertype METER_POPULATION]], plus an additional 3 for each stockpiling-focused planet.
+This is an upgrade technology for the [[encyclopedia STOCKPILE_TITLE]]]. The [[metertype METER_STOCKPILE]] is increased by 2, plus an additional 0.01 per [[metertype METER_POPULATION]], plus an additional 3 for each stockpile-distribution-focused planet.
 These improvements are cumulative with that provided by [[tech PRO_PREDICTIVE_STOCKPILING]].'''
 
 PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY
@@ -11448,7 +11525,7 @@ PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY_DESC
 '''Quantum entanglement of factory control rooms allows the operation of machines remotely from other star systems.
 Decoupling workforce and the means of production helps to produce just in time and increases efficiency of the imperial stockpile service.
 
-This is an upgrade technology for the imperial stockpile. The [[metertype METER_STOCKPILE]] is increased by 6 plus an additional 0.02 per [[metertype METER_POPULATION]].
+This is an upgrade technology for the [[encyclopedia STOCKPILE_TITLE]]].. The [[metertype METER_STOCKPILE]] is increased by 6 plus an additional 0.02 per [[metertype METER_POPULATION]].
 These improvements are cumulative with those provided by [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] and [[tech PRO_VOID_PREDICTION]].
 
 This also unlocks the [[buildingtype BLD_STOCKPILING_CENTER]] which additionally increases the [[metertype METER_STOCKPILE]] by 0.1 per [[metertype METER_INDUSTRY]].'''
@@ -11460,7 +11537,7 @@ PRO_VOID_PREDICTION_DESC
 '''While classic prediction always relies on statistical knowledge of the past, studying the chaotic wisdom of the void leads to robust predictions of first-time and freak occurences.
 For the imperial stockpile service, void prediction is the quintessential tool to deliver the right goods even before the need occurs.
 
-This is an upgrade technology for the imperial stockpile. The [[metertype METER_STOCKPILE]] is increased by 0.2 per [[metertype METER_POPULATION]].
+This is an upgrade technology for the [[encyclopedia STOCKPILE_TITLE]]].. The [[metertype METER_STOCKPILE]] is increased by 0.2 per [[metertype METER_POPULATION]].
 These improvements are cumulative with those provided by [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] and [[tech PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY]].'''
 
 PRO_MICROGRAV_MAN
@@ -11528,6 +11605,8 @@ Sentient Automation
 
 PRO_SENTIENT_AUTOMATION_DESC
 '''Increases [[metertype METER_TARGET_INDUSTRY]] on all planets with the Industry focus by 3.
+
+Grants 1 extra economic policy slot.
 
 The natural evolution of automated factories is achieved by confering to the artificial minds that control such facilities the ability to deduce and decide on their own the best course of action to achieve the goals of their owners, even before they can think about it. This improvement greatly increase the performance of the autonomous production facilities on all worlds that are actively dedicated to industrial production.'''
 
@@ -12060,6 +12139,8 @@ Distributed Thought Computing
 
 LRN_DISTRIB_THOUGHT_DESC
 '''Increases [[metertype METER_TARGET_RESEARCH]] on all planets with any focus by 0.1 per [[metertype METER_POPULATION]].
+
+Grants 1 extra military policy slot.
 
 The average citizen literally wastes his mind away, one of the finest computing devices in the universe. By tapping into the idle brain cycles of a sufficiently large population through a network of simple cybernetic transceivers, the research centers of a world can gain access to cheap and plentiful raw computing power.'''
 
@@ -13088,7 +13169,7 @@ BLD_INTERSPECIES_ACADEMY
 Species InterDesign Academy
 
 BLD_INTERSPECIES_ACADEMY_DESC
-'''Increases stockpile extraction on its planet by 10, if that planet has stockpiling focus.
+'''Increases the imperial stockpile use limit by increasing the stockpile use capacity on a planet by 10, if that planet has [[encyclopedia STOCKPILE_FOCUS_TITLE]].
 Increases [[metertype METER_RESEARCH]] on its planet by 5, if that planet has research focus.
 
 Learning to design devices for use by different species is crucial for developing universally usable tools.
@@ -13297,13 +13378,16 @@ BLD_PLANET_DRIVE_DESC
 
 Due to a lack of UI targeting, either a [[buildingtype BLD_PLANET_BEACON]] or a ship equipped with a [[shippart SP_PLANET_BEACON]] currently required on the other end of the starlane. This building will destroy itself immediately, so that the planet can move to a different target system later.
 
-To use this building, either construct a [[buildingtype BLD_PLANET_BEACON]] in the adjacent destination system or move your ship with a [[shippart SP_PLANET_BEACON]] there, then set the planet to Planet Drive focus. The planet will then be moved to that system. Note the beacon needs to have been in system for a turn: the drive will not work on the turn the building is completed or on the turn the ship arrives. Also note, a [[buildingtype BLD_TRANSFORMER]] can be used to replicate the effects of this building.'''
+To use this building, either construct a [[buildingtype BLD_PLANET_BEACON]] in the adjacent destination system or move a ship with a [[shippart SP_PLANET_BEACON]] there, then set the planet to Planet Drive focus. The planet will then be moved to that system. Note the beacon needs to have been in system for a turn: the drive will not work on the turn the building is completed or on the turn the ship arrives. Also note, a [[buildingtype BLD_TRANSFORMER]] can be used to replicate the effects of this building.
+
+A [[buildingtype BLD_PLANET_BEACON]] can only be constructed in systems with fewer than 7 planets (including Gas Giants and Asteroids). Should an attempt be made to use the [[BLD_PLANET_DRIVE]] to move a planet into a system at capacity, it will safely remain to its Origin system provided an [[buildingtype BLD_LIGHTHOUSE]] is present within 200uu. Otherwise there is a 50% chance of being destroyed in the attempt to move it to the full system.
+'''
 
 BLD_PLANET_BEACON
 Planetary Beacon
 
 BLD_PLANET_BEACON_DESC
-Designates the target for the [[buildingtype BLD_PLANET_DRIVE]]. [[BUILDING_AVAILABLE_ON_OUTPOSTS]].
+Designates the target for the [[buildingtype BLD_PLANET_DRIVE]]. This building can only be constructed in systems with fewer than 7 planets (including Gas Giants and Asteroids). [[BUILDING_AVAILABLE_ON_OUTPOSTS]].
 
 BLD_ART_PLANET
 Artificial Planet
@@ -15527,27 +15611,27 @@ ULTIMATE_SUPPLY_LABEL
 # %1% FIXME
 # %2% FIXME
 BAD_STOCKPILE_LABEL
-%2% Bad Stockpiling
+%2% Bad Stockpile Distribution
 
 # %1% FIXME
 # %2% FIXME
 AVERAGE_STOCKPILE_LABEL
-%2% Average Stockpiling
+%2% Average Stockpile Distribution
 
 # %1% FIXME
 # %2% FIXME
 GOOD_STOCKPILE_LABEL
-%2% Good Stockpiling
+%2% Good Stockpile Distribution
 
 # %1% FIXME
 # %2% FIXME
 GREAT_STOCKPILE_LABEL
-%2% Great Stockpiling
+%2% Great Stockpile Distribution
 
 # %1% FIXME
 # %2% FIXME
 ULTIMATE_STOCKPILE_LABEL
-%2% Ultimate Stockpiling
+%2% Ultimate Stockpile Distribution
 
 # %1% FIXME
 # %2% FIXME

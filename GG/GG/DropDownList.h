@@ -72,22 +72,17 @@ public:
     typedef ListBox::iterator iterator;
     typedef ListBox::const_iterator const_iterator;
 
-    /** \name Signal Types */ ///@{
     /** emitted when a new item is selected; will be end() when no item is
       * selected */
     typedef boost::signals2::signal<void (iterator)>   SelChangedSignalType;
 
     /** Signal \a true when drop down opens and false when it closes.*/
     typedef boost::signals2::signal<void (bool)>       DropDownOpenedSignalType;
-    //@}
 
-    /** \name Structors */ ///@{
     /** basic ctor.  DropDownList retains ownership of \a lb, if it is non-null. */
     DropDownList(size_t num_shown_elements, Clr color);
     ~DropDownList();
-    //@}
 
-    /** \name Accessors */ ///@{
     iterator        CurrentItem() const;            ///< returns the currently selected list item (returns end() if none is selected)
     std::size_t     CurrentItemIndex() const;       ///< returns the position of the currently selected list item within the list (returns -1 if none is selected)
 
@@ -141,9 +136,7 @@ public:
     mutable SelChangedSignalType SelChangedWhileDroppedSignal;
 
     DropDownOpenedSignalType DropDownOpenedSignal;
-    //@}
 
-    /** \name Mutators */ ///@{
     void PreRender() override;
     void Render() override;
     /** Resizes the control, ensuring the proper height is maintained based on
@@ -166,11 +159,13 @@ public:
     /** Insertion sorts \a rows into a sorted list, or inserts into an unsorted
         list before \a it. The Rows become the property of this DropDownList. */
     void Insert(const std::vector<std::shared_ptr<Row>>& rows, iterator it);
+    void Insert(std::vector<std::shared_ptr<Row>>&& rows, iterator it);
 
     /** Insertion sorts \a rows into sorted list, or inserts into an unsorted
         list at the end of the list. The Rows become the property of thiis
         DropDownList. */
     void Insert(const std::vector<std::shared_ptr<Row>>& rows);
+    void Insert(std::vector<std::shared_ptr<Row>>&& rows);
 
     std::shared_ptr<Row> Erase(iterator it, bool signal = false); ///< removes and returns \a it from the list, or 0 if no such row exists
     void Clear();                        ///< empties the list
@@ -220,10 +215,8 @@ public:
 
     /** Set the drop down list to only mouse scroll if it is dropped. */
     void SetOnlyMouseScrollWhenDropped(bool enable);
-    //@}
 
 protected:
-    /** \name Mutators */ ///@{
     void LButtonDown(const Pt& pt, Flags<ModKey> mod_keys) override;
     void KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys) override;
     void MouseWheel(const Pt& pt, int move, Flags<ModKey> mod_keys) override;
@@ -234,7 +227,6 @@ protected:
     virtual void RenderDisplayedRow();
 
     GL2DVertexBuffer    m_buffer;
-    //@}
 
 private:
     const ListBox*  LB() const;
@@ -242,6 +234,6 @@ private:
     const std::shared_ptr<ModalListPicker> m_modal_picker;
 };
 
-} // namespace GG
+}
 
 #endif

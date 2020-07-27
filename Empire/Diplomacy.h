@@ -3,14 +3,24 @@
 
 #include <string>
 #include <boost/serialization/access.hpp>
-
-#include "../universe/Enums.h"
+#include <GG/Enum.h>
 #include "../util/Export.h"
+
+
+//! diplomatic statuses
+GG_ENUM(DiplomaticStatus,
+    INVALID_DIPLOMATIC_STATUS = -1,
+    DIPLO_WAR,
+    DIPLO_PEACE,
+    DIPLO_ALLIED,
+    NUM_DIPLO_STATUSES
+)
+
 
 class FO_COMMON_API DiplomaticMessage {
 public:
-    enum DiplomaticMessageType : int {
-        INVALID_DIPLOMATIC_MESSAGE_TYPE = -1,
+    enum class Type : int {
+        INVALID = -1,
         WAR_DECLARATION,
         PEACE_PROPOSAL,
         ACCEPT_PEACE_PROPOSAL,
@@ -22,18 +32,20 @@ public:
     };
 
     DiplomaticMessage();
-    DiplomaticMessage(int sender_empire_id, int recipient_empire_id, DiplomaticMessageType type);
+    DiplomaticMessage(int sender_empire_id, int recipient_empire_id, Type type);
 
-    DiplomaticMessageType   GetType() const { return m_type; }
+    auto GetType() const -> Type
+    { return m_type; }
+
     int                     SenderEmpireID() const { return m_sender_empire; }
     int                     RecipientEmpireID() const { return m_recipient_empire; }
     std::string             Dump() const;
     bool                    IsAllowed() const; ///< Tells if this dimplomatic message allowed by game rules
 
 private:
-    int                     m_sender_empire;
-    int                     m_recipient_empire;
-    DiplomaticMessageType   m_type;
+    int  m_sender_empire;
+    int  m_recipient_empire;
+    Type m_type;
 
     friend class boost::serialization::access;
     template <typename Archive>
@@ -60,4 +72,5 @@ FO_COMMON_API DiplomaticMessage EndAllianceDiplomaticMessage(int sender_empire_i
 FO_COMMON_API DiplomaticMessage CancelDiplomaticMessage(int sender_empire_id, int recipient_empire_id);
 FO_COMMON_API DiplomaticMessage RejectProposalDiplomaticMessage(int sender_empire_id, int recipient_empire_id);
 
-#endif // _Diplomacy_h_
+
+#endif

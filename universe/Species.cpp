@@ -4,8 +4,8 @@
 #include <boost/filesystem/fstream.hpp>
 #include "Conditions.h"
 #include "Effect.h"
-#include "Enums.h"
 #include "PopCenter.h"
+#include "Planet.h"
 #include "Ship.h"
 #include "UniverseObject.h"
 #include "ValueRefs.h"
@@ -20,13 +20,13 @@
 /////////////////////////////////////////////////
 // FocusType                                   //
 /////////////////////////////////////////////////
-FocusType::FocusType(const std::string& name, const std::string& description,
+FocusType::FocusType(std::string& name, std::string& description,
                      std::unique_ptr<Condition::Condition>&& location,
-                     const std::string& graphic) :
-    m_name(name),
-    m_description(description),
+                     std::string& graphic) :
+    m_name(std::move(name)),
+    m_description(std::move(description)),
     m_location(std::move(location)),
-    m_graphic(graphic)
+    m_graphic(std::move(graphic))
 {}
 
 FocusType::~FocusType()
@@ -85,27 +85,26 @@ namespace {
     }
 }
 
-Species::Species(const SpeciesStrings& strings,
-                 const std::vector<FocusType>& foci,
-                 const std::string& preferred_focus,
-                 const std::map<PlanetType, PlanetEnvironment>& planet_environments,
+Species::Species(std::string&& name, std::string&& desc,
+                 std::string&& gameplay_desc, std::vector<FocusType>&& foci,
+                 std::string&& preferred_focus,
+                 std::map<PlanetType, PlanetEnvironment>&& planet_environments,
                  std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
                  std::unique_ptr<Condition::Condition>&& combat_targets,
-                 const SpeciesParams& params,
-                 const std::set<std::string>& tags,
-                 const std::string& graphic) :
-    m_name(strings.name),
-    m_description(strings.desc),
-    m_gameplay_description(strings.gameplay_desc),
-    m_foci(foci),
-    m_preferred_focus(preferred_focus),
-    m_planet_environments(planet_environments),
+                 bool playable, bool native, bool can_colonize, bool can_produce_ships,
+                 const std::set<std::string>& tags, std::string&& graphic) :
+    m_name(std::move(name)),
+    m_description(std::move(desc)),
+    m_gameplay_description(std::move(gameplay_desc)),
+    m_foci(std::move(foci)),
+    m_preferred_focus(std::move(preferred_focus)),
+    m_planet_environments(std::move(planet_environments)),
     m_combat_targets(std::move(combat_targets)),
-    m_playable(params.playable),
-    m_native(params.native),
-    m_can_colonize(params.can_colonize),
-    m_can_produce_ships(params.can_produce_ships),
-    m_graphic(graphic)
+    m_playable(playable),
+    m_native(native),
+    m_can_colonize(can_colonize),
+    m_can_produce_ships(can_produce_ships),
+    m_graphic(std::move(graphic))
 {
     for (auto&& effect : effects)
         m_effects.emplace_back(std::move(effect));
@@ -113,39 +112,38 @@ Species::Species(const SpeciesStrings& strings,
     Init();
 
     for (const std::string& tag : tags)
-        m_tags.insert(boost::to_upper_copy<std::string>(tag));
+        m_tags.emplace(boost::to_upper_copy<std::string>(tag));
 }
 
 Species::~Species()
 {}
 
 void Species::Init() {
-    for (auto& effect : m_effects) {
+    for (auto& effect : m_effects)
         effect->SetTopLevelContent(m_name);
-    }
 
     if (!m_location) {
         // set up a Condition structure to match popcenters that have
         // (not uninhabitable) environment for this species
-        std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetEnvironment>>> environments_vec;
-        environments_vec.push_back(
+
+        std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetEnvironment>>> environments;
+        environments.emplace_back(
             std::make_unique<ValueRef::Constant<PlanetEnvironment>>( ::PE_UNINHABITABLE));
+
         auto this_species_name_ref =
             std::make_unique<ValueRef::Constant<std::string>>(m_name);  // m_name specifies this species
+
         auto enviro_cond = std::unique_ptr<Condition::Condition>(
             std::make_unique<Condition::Not>(
                 std::unique_ptr<Condition::Condition>(
                     std::make_unique<Condition::PlanetEnvironment>(
-                        std::move(environments_vec), std::move(this_species_name_ref)))));
+                        std::move(environments), std::move(this_species_name_ref)))));
 
-        auto type_cond = std::unique_ptr<Condition::Condition>(std::make_unique<Condition::Type>(
-            std::make_unique<ValueRef::Constant<UniverseObjectType>>( ::OBJ_POP_CENTER)));
+        auto type_cond = std::make_unique<Condition::Type>(
+            std::make_unique<ValueRef::Constant<UniverseObjectType>>( ::OBJ_POP_CENTER));
 
-        std::vector<std::unique_ptr<Condition::Condition>> operands;
-        operands.push_back(std::move(enviro_cond));
-        operands.push_back(std::move(type_cond));
-
-        m_location = std::unique_ptr<Condition::Condition>(std::make_unique<Condition::And>(std::move(operands)));
+        m_location = std::unique_ptr<Condition::Condition>(std::make_unique<Condition::And>(
+            std::move(enviro_cond), std::move(type_cond)));
     }
     m_location->SetTopLevelContent(m_name);
 
@@ -266,16 +264,19 @@ PlanetType Species::NextBetterPlanetType(PlanetType initial_planet_type) const {
     if (m_planet_environments.empty())
         return initial_planet_type;
 
-    // determine which environment rating is the best available for this species
+    // determine which environment rating is the best available for this species,
+    // excluding gas giants and asteroids
     PlanetEnvironment best_environment = PE_UNINHABITABLE;
     //std::set<PlanetType> best_types;
     for (const auto& entry : m_planet_environments) {
-        if (entry.second == best_environment) {
-            //best_types.insert(entry.first);
-        } else if (entry.second > best_environment) {
-            best_environment = entry.second;
-            //best_types.clear();
-            //best_types.insert(entry.first);
+        if (entry.first < PT_ASTEROIDS) {
+            if (entry.second == best_environment) {
+                //best_types.insert(entry.first);
+            } else if (entry.second > best_environment) {
+                best_environment = entry.second;
+                //best_types.clear();
+                //best_types.insert(entry.first);
+            }
         }
     }
 

@@ -11,7 +11,6 @@
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/any_range.hpp>
 #include <boost/range/size.hpp>
-#include <boost/serialization/access.hpp>
 #include "../util/Export.h"
 
 
@@ -36,7 +35,6 @@ public:
     template <typename T>
     using container_type = std::map<int, std::shared_ptr<T>>;
 
-    /** \name Structors */ //@{
     ObjectMap();
     ~ObjectMap();
 
@@ -44,9 +42,7 @@ public:
       * returned.  Copies are limited to only duplicate information that the
       * empire with id \a empire_id would know about the copied objects. */
     ObjectMap* Clone(int empire_id = ALL_EMPIRES) const;
-    //@}
 
-    /** \name Accessors */ //@{
     /** Returns the number of objects of the specified class in this ObjectMap. */
     template <typename T = UniverseObject>
     std::size_t size() const;
@@ -125,9 +121,6 @@ public:
     { return m_existing_buildings; }
     const container_type<const UniverseObject>& ExistingFields() const
     { return m_existing_fields; }
-    //@}
-
-    /** \name Mutators */ //@{
 
     /** Copies the contents of the ObjectMap \a copied_map into this ObjectMap.
       * Each object in \a copied_map has information transferred to this map.
@@ -187,7 +180,6 @@ public:
       * contains, and what other objects think they are contained by the first
       * object. */
     void AuditContainment(const std::set<int>& destroyed_object_ids);
-    //@}
 
 private:
     void insertCore(std::shared_ptr<UniverseObject> item, int empire_id = ALL_EMPIRES);
@@ -223,9 +215,8 @@ private:
     container_type<const UniverseObject>  m_existing_buildings;
     container_type<const UniverseObject>  m_existing_fields;
 
-    friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
+    friend void serialize(Archive&, ObjectMap&, unsigned int const);
 };
 
 template <typename T>

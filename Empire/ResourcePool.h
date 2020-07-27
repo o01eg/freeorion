@@ -1,25 +1,42 @@
 #ifndef _ResourcePool_h_
 #define _ResourcePool_h_
 
+
+#include <set>
+#include <vector>
+#include <boost/serialization/nvp.hpp>
+#include <boost/serialization/version.hpp>
+#include <boost/signals2/signal.hpp>
+#include <GG/Enum.h>
 #include "../universe/EnumsFwd.h"
 #include "../util/Export.h"
 
-#include <boost/signals2/signal.hpp>
-#include <boost/serialization/nvp.hpp>
-#include <boost/serialization/version.hpp>
 
-#include <vector>
-#include <set>
+//! Types of resources that Empire%s can produce
+GG_ENUM(ResourceType,
+    INVALID_RESOURCE_TYPE = -1,
+    RE_INDUSTRY,
+    RE_INFLUENCE,
+    RE_RESEARCH,
+    RE_STOCKPILE,
+    NUM_RESOURCE_TYPES
+)
+
+/** Returns the equivalent meter type for the given resource type; if no such
+  * meter type exists, returns INVALID_METER_TYPE. */
+FO_COMMON_API MeterType ResourceToMeter(ResourceType type);
+FO_COMMON_API MeterType ResourceToTargetMeter(ResourceType type);
+
+/** Returns the equivalent resource type for the given meter type; if no such
+  * resource type exists, returns INVALID_RESOURCE_TYPE. */
+FO_COMMON_API ResourceType MeterToResource(MeterType type);
 
 /** The ResourcePool class keeps track of an empire's stockpile and production
   * of a particular resource (eg. research, industry). */
 class FO_COMMON_API ResourcePool {
 public:
-    /** \name Structors */ //@{
     ResourcePool(ResourceType type);
-    //@}
 
-    /** \name Accessors */ //@{
     const std::vector<int>&         ObjectIDs() const;                      ///< returns UniverseObject IDs in this ResourcePool
     float                           Stockpile() const;                      ///< returns current stockpiled amount of resource
 
@@ -37,9 +54,7 @@ public:
     float                           GroupAvailable(int object_id) const;    ///< returns amount of resource available in resource sharing group that contains the object with id \a object_id
 
     std::string                     Dump() const;
-    //@}
 
-    /** \name Mutators */ //@{
     /** emitted after updating production, or called externally to indicate
       * that stockpile and change need to be refreshed. */
     mutable boost::signals2::signal<void ()> ChangedSignal;
@@ -52,7 +67,6 @@ public:
     void        SetStockpile(float d);      ///< sets current sockpiled amount of resource
 
     void        Update();                   ///< recalculates total resource production
-    //@}
 
 private:
     ResourcePool(); ///< default ctor needed for serialization
@@ -72,7 +86,7 @@ private:
 
 BOOST_CLASS_VERSION(ResourcePool, 1)
 
-// template implementations
+
 template <typename Archive>
 void ResourcePool::serialize(Archive& ar, const unsigned int version)
 {
@@ -86,4 +100,5 @@ void ResourcePool::serialize(Archive& ar, const unsigned int version)
     ar  & BOOST_SERIALIZATION_NVP(m_connected_system_groups);
 }
 
-#endif // _ResourcePool_h_
+
+#endif

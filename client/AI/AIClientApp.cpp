@@ -6,7 +6,6 @@
 #include "../../util/LoggerWithOptionsDB.h"
 #include "../../util/OptionsDB.h"
 #include "../../util/Directories.h"
-#include "../../util/Serialize.h"
 #include "../../util/i18n.h"
 #include "../util/AppInterface.h"
 #include "../../network/Message.h"
@@ -286,7 +285,7 @@ void AIClientApp::HandleMessage(const Message& msg) {
             //Max 4         :  0   0   8  17  75   0
             //Max 5         :  0   0   0   8  17  75
 
-            const std::string g_seed = GetGalaxySetupData().m_seed;
+            const std::string g_seed = GetGalaxySetupData().seed;
             const std::string emp_name = GetEmpire(m_empire_id)->Name();
             unsigned int my_seed = 0;
 

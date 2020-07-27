@@ -4,11 +4,9 @@
 #include "i18n.h"
 #include "Directories.h"
 #include "Logger.h"
-#include "EnumText.h"
 #include "Serialize.h"
 #include "Serialize.ipp"
 #include "ScopedTimer.h"
-#include "Version.h"
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -125,68 +123,6 @@ bool SaveGamePreviewData::Valid() const
 void SaveGamePreviewData::SetBinary(bool bin)
 { description = bin ? BIN_SAVE_FILE_DESCRIPTION : XML_SAVE_FILE_DESCRIPTION; }
 
-template <typename Archive>
-void SaveGamePreviewData::serialize(Archive& ar, unsigned int version)
-{
-    if (version >= 2) {
-        if (Archive::is_saving::value) {
-            freeorion_version = FreeOrionVersionString();
-        }
-        ar & BOOST_SERIALIZATION_NVP(description)
-           & BOOST_SERIALIZATION_NVP(freeorion_version);
-        if (version >= 3) {
-            ar & BOOST_SERIALIZATION_NVP(save_format_marker);
-            if (version >= 4) {
-                ar & BOOST_SERIALIZATION_NVP(uncompressed_text_size)
-                   & BOOST_SERIALIZATION_NVP(compressed_text_size);
-            }
-        }
-    }
-    ar & BOOST_SERIALIZATION_NVP(magic_number)
-       & BOOST_SERIALIZATION_NVP(main_player_name);
-    ar & BOOST_SERIALIZATION_NVP(main_player_empire_name)
-       & BOOST_SERIALIZATION_NVP(main_player_empire_colour)
-       & BOOST_SERIALIZATION_NVP(save_time)
-       & BOOST_SERIALIZATION_NVP(current_turn);
-    if (version > 0) {
-        ar & BOOST_SERIALIZATION_NVP(number_of_empires)
-           & BOOST_SERIALIZATION_NVP(number_of_human_players);
-    }
-}
-
-template void SaveGamePreviewData::serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, unsigned int);
-template void SaveGamePreviewData::serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, unsigned int);
-template void SaveGamePreviewData::serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, unsigned int);
-template void SaveGamePreviewData::serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, unsigned int);
-
-
-template <typename Archive>
-void FullPreview::serialize(Archive& ar, unsigned int version)
-{
-    ar & BOOST_SERIALIZATION_NVP(filename)
-       & BOOST_SERIALIZATION_NVP(preview)
-       & BOOST_SERIALIZATION_NVP(galaxy);
-}
-
-template void FullPreview::serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, unsigned int);
-template void FullPreview::serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, unsigned int);
-template void FullPreview::serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, unsigned int);
-template void FullPreview::serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, unsigned int);
-
-
-template<typename Archive>
-void PreviewInformation::serialize(Archive& ar, const unsigned int version)
-{
-    ar & BOOST_SERIALIZATION_NVP(subdirectories)
-       & BOOST_SERIALIZATION_NVP(folder)
-       & BOOST_SERIALIZATION_NVP(previews);
-}
-
-template void PreviewInformation::serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, const unsigned int);
-template void PreviewInformation::serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, const unsigned int);
-template void PreviewInformation::serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, const unsigned int);
-template void PreviewInformation::serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, const unsigned int);
-
 
 bool SaveFileWithValidHeader(const boost::filesystem::path& path) {
     if (!fs::exists(path))
@@ -260,25 +196,25 @@ std::string ColumnInPreview(const FullPreview& full, const std::string& name, bo
     } else if (name == "file") {
         return full.filename;
     } else if (name == "galaxy_size") {
-        return std::to_string(full.galaxy.m_size);
+        return std::to_string(full.galaxy.size);
     } else if (name == "seed") {
-        return full.galaxy.m_seed;
+        return full.galaxy.seed;
     } else if (name == "galaxy_age") {
-        return TextForGalaxySetupSetting(full.galaxy.m_age);
+        return TextForGalaxySetupSetting(full.galaxy.age);
     } else if (name == "monster_freq") {
-        return TextForGalaxySetupSetting(full.galaxy.m_monster_freq);
+        return TextForGalaxySetupSetting(full.galaxy.monster_freq);
     } else if (name == "native_freq") {
-        return TextForGalaxySetupSetting(full.galaxy.m_native_freq);
+        return TextForGalaxySetupSetting(full.galaxy.native_freq);
     } else if (name == "planet_freq") {
-        return TextForGalaxySetupSetting(full.galaxy.m_planet_density);
+        return TextForGalaxySetupSetting(full.galaxy.planet_density);
     } else if (name == "specials_freq") {
-        return TextForGalaxySetupSetting(full.galaxy.m_specials_freq);
+        return TextForGalaxySetupSetting(full.galaxy.specials_freq);
     } else if (name == "starlane_freq") {
-        return TextForGalaxySetupSetting(full.galaxy.m_starlane_freq);
+        return TextForGalaxySetupSetting(full.galaxy.starlane_freq);
     } else if (name == "galaxy_shape") {
-        return TextForGalaxyShape(full.galaxy.m_shape);
+        return TextForGalaxyShape(full.galaxy.shape);
     } else if (name == "ai_aggression") {
-        return TextForAIAggression(full.galaxy.m_ai_aggr);
+        return TextForAIAggression(full.galaxy.ai_aggr);
     } else if (name == "number_of_empires") {
         return std::to_string(full.preview.number_of_empires);
     } else if (name == "number_of_humans") {

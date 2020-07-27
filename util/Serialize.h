@@ -5,11 +5,14 @@
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/xml_iarchive.hpp>
 #include <boost/archive/xml_oarchive.hpp>
+#include <boost/serialization/version.hpp>
 
 #include <map>
 
 #include "Export.h"
 
+class Meter;
+class PopCenter;
 class OrderSet;
 class Universe;
 class UniverseObject;
@@ -50,4 +53,235 @@ void Deserialize(Archive& ia, std::map<int, std::shared_ptr<UniverseObject>>& ob
 template <typename Archive>
 void Deserialize(Archive& ia, OrderSet& order_set);
 
-#endif // _Serialize_h_
+
+struct ChatHistoryEntity;
+
+BOOST_CLASS_VERSION(ChatHistoryEntity, 1);
+
+template <typename Archive>
+void serialize(Archive&, ChatHistoryEntity&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, ChatHistoryEntity&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, ChatHistoryEntity&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, ChatHistoryEntity&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, ChatHistoryEntity&, unsigned int const);
+
+struct CombatLog;
+
+BOOST_CLASS_VERSION(CombatLog, 1);
+
+template <typename Archive>
+void serialize(Archive&, CombatLog&, const unsigned int);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, CombatLog&, const unsigned int);
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, CombatLog&, const unsigned int);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, CombatLog&, const unsigned int);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, CombatLog&, const unsigned int);
+
+
+class CombatLogManager;
+
+template <typename Archive>
+void serialize(Archive&, CombatLogManager&, const unsigned int);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, CombatLogManager&, const unsigned int);
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, CombatLogManager&, const unsigned int);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, CombatLogManager&, const unsigned int);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, CombatLogManager&, const unsigned int);
+
+template <typename Archive>
+void serializeIncompleteLogs(Archive&, CombatLogManager&, const unsigned int);
+
+extern template FO_COMMON_API void serializeIncompleteLogs<freeorion_bin_iarchive>(freeorion_bin_iarchive&, CombatLogManager&, const unsigned int);
+extern template FO_COMMON_API void serializeIncompleteLogs<freeorion_bin_oarchive>(freeorion_bin_oarchive&, CombatLogManager&, const unsigned int);
+extern template FO_COMMON_API void serializeIncompleteLogs<freeorion_xml_iarchive>(freeorion_xml_iarchive&, CombatLogManager&, const unsigned int);
+extern template FO_COMMON_API void serializeIncompleteLogs<freeorion_xml_oarchive>(freeorion_xml_oarchive&, CombatLogManager&, const unsigned int);
+
+
+class EmpireManager;
+
+template <typename Archive>
+void serialize(Archive&, EmpireManager&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, EmpireManager&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, EmpireManager&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, EmpireManager&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, EmpireManager&, unsigned int const);
+
+
+struct GalaxySetupData;
+
+BOOST_CLASS_VERSION(GalaxySetupData, 3);
+
+template <typename Archive>
+void serialize(Archive&, GalaxySetupData&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, GalaxySetupData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, GalaxySetupData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, GalaxySetupData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, GalaxySetupData&, unsigned int const);
+
+
+template <typename Archive>
+void serialize(Archive&, Meter&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, Meter&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, Meter&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, Meter&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, Meter&, unsigned int const);
+
+
+struct MultiplayerLobbyData;
+
+BOOST_CLASS_VERSION(MultiplayerLobbyData, 2);
+
+template <typename Archive>
+void serialize(Archive&, MultiplayerLobbyData&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, MultiplayerLobbyData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, MultiplayerLobbyData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, MultiplayerLobbyData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, MultiplayerLobbyData&, unsigned int const);
+
+
+struct PlayerInfo;
+
+template <typename Archive>
+void serialize(Archive&, PlayerInfo&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, PlayerInfo&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, PlayerInfo&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, PlayerInfo&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, PlayerInfo&, unsigned int const);
+
+
+struct PlayerSaveGameData;
+
+BOOST_CLASS_VERSION(PlayerSaveGameData, 2);
+
+template <typename Archive>
+void serialize(Archive&, PlayerSaveGameData&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, PlayerSaveGameData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, PlayerSaveGameData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, PlayerSaveGameData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, PlayerSaveGameData&, unsigned int const);
+
+
+struct PlayerSaveHeaderData;
+
+template <typename Archive>
+void serialize(Archive&, PlayerSaveHeaderData&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, PlayerSaveHeaderData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, PlayerSaveHeaderData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, PlayerSaveHeaderData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, PlayerSaveHeaderData&, unsigned int const);
+
+
+struct SaveGamePreviewData;
+
+template<typename Archive>
+void serialize(Archive&, SaveGamePreviewData&, unsigned int const);
+
+BOOST_CLASS_VERSION(SaveGamePreviewData, 4);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, SaveGamePreviewData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, SaveGamePreviewData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, SaveGamePreviewData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, SaveGamePreviewData&, unsigned int const);
+
+
+struct PlayerSetupData;
+
+BOOST_CLASS_VERSION(PlayerSetupData, 2);
+
+template <typename Archive>
+void serialize(Archive&, PlayerSetupData&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, PlayerSetupData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, PlayerSetupData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, PlayerSetupData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, PlayerSetupData&, unsigned int const);
+
+
+template <typename Archive>
+void serialize(Archive&, PopCenter&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, PopCenter&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, PopCenter&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, PopCenter&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, PopCenter&, unsigned int const);
+
+
+class PreviewInformation;
+
+template<typename Archive>
+void serialize(Archive&, PreviewInformation&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, PreviewInformation&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, PreviewInformation&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, PreviewInformation&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, PreviewInformation&, unsigned int const);
+
+
+struct SaveGameEmpireData;
+
+BOOST_CLASS_VERSION(SaveGameEmpireData, 2);
+
+template <typename Archive>
+void serialize(Archive&, SaveGameEmpireData&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, SaveGameEmpireData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, SaveGameEmpireData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, SaveGameEmpireData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, SaveGameEmpireData&, unsigned int const);
+
+
+struct SaveGameUIData;
+
+BOOST_CLASS_VERSION(SaveGameUIData, 4);
+
+template <typename Archive>
+void serialize(Archive&, SaveGameUIData&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, SaveGameUIData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, SaveGameUIData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, SaveGameUIData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, SaveGameUIData&, unsigned int const);
+
+
+struct ServerSaveGameData;
+
+template <typename Archive>
+void serialize(Archive&, ServerSaveGameData&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, ServerSaveGameData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, ServerSaveGameData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, ServerSaveGameData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, ServerSaveGameData&, unsigned int const);
+
+
+struct SinglePlayerSetupData;
+
+template <typename Archive>
+void serialize(Archive&, SinglePlayerSetupData&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, SinglePlayerSetupData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, SinglePlayerSetupData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, SinglePlayerSetupData&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, SinglePlayerSetupData&, unsigned int const);
+
+
+class SpeciesManager;
+
+template <typename Archive>
+void serialize(Archive&, SpeciesManager&, unsigned int const);
+
+extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, SpeciesManager&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, SpeciesManager&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, SpeciesManager&, unsigned int const);
+extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, SpeciesManager&, unsigned int const);
+
+
+#endif

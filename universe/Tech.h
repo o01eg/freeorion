@@ -32,48 +32,44 @@ public:
     /** Helper struct for parsing tech definitions */
     struct TechInfo {
         TechInfo();
-        TechInfo(const std::string& name_, const std::string& description_,
-                 const std::string& short_description_, const std::string& category_,
+        TechInfo(std::string& name_, std::string& description_,
+                 std::string& short_description_, std::string& category_,
                  std::unique_ptr<ValueRef::ValueRef<double>>&& research_cost_,
                  std::unique_ptr<ValueRef::ValueRef<int>>&& research_turns_,
                  bool researchable_,
-                 const std::set<std::string>& tags_);
+                 std::set<std::string>& tags_);
         ~TechInfo();
 
-        std::string                     name;
-        std::string                     description;
-        std::string                     short_description;
-        std::string                     category;
+        std::string             name;
+        std::string             description;
+        std::string             short_description;
+        std::string             category;
         std::unique_ptr<ValueRef::ValueRef<double>> research_cost;
         std::unique_ptr<ValueRef::ValueRef<int>>    research_turns;
-        bool                            researchable;
-        std::set<std::string>           tags;
+        bool                    researchable = false;
+        std::set<std::string>   tags;
     };
 
-    /** \name Structors */ //@{
-    Tech(const std::string& name, const std::string& description,
-         const std::string& short_description, const std::string& category,
+    Tech(std::string&& name, std::string&& description,
+         std::string&& short_description, std::string&& category,
          std::unique_ptr<ValueRef::ValueRef<double>>&& research_cost,
          std::unique_ptr<ValueRef::ValueRef<int>>&& research_turns,
-         bool researchable,
-         const std::set<std::string>& tags,
-         const std::vector<std::shared_ptr<Effect::EffectsGroup>>& effects,
-         const std::set<std::string>& prerequisites,
-         const std::vector<UnlockableItem>& unlocked_items,
-         const std::string& graphic);
+         bool researchable, std::set<std::string>&& tags,
+         std::vector<std::shared_ptr<Effect::EffectsGroup>>&& effects,
+         std::set<std::string>&& prerequisites,
+         std::vector<UnlockableItem>&& unlocked_items,
+         std::string&& graphic);
 
     /** basic ctor taking helper struct to reduce number of direct parameters
       * in order to making parsing work. */
-    Tech(TechInfo& tech_info,
+    Tech(TechInfo&& tech_info,
          std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
-         const std::set<std::string>& prerequisites,
-         const std::vector<UnlockableItem>& unlocked_items,
-         const std::string& graphic);
+         std::set<std::string>&& prerequisites,
+         std::vector<UnlockableItem>&& unlocked_items,
+         std::string&& graphic);
 
     ~Tech();
-    //@}
 
-    /** \name Accessors */ //@{
     const std::string&  Name() const                { return m_name; }              //!< returns name of this tech
     const std::string&  Description() const         { return m_description; }       //!< Returns the text description of this tech
     const std::string&  ShortDescription() const    { return m_short_description; } //!< Returns the single-line short text description of this tech
@@ -108,7 +104,6 @@ public:
       * the parsed content is consistent without sending it all between
       * clients and server. */
     unsigned int                    GetCheckSum() const;
-    //@}
 
 private:
     Tech(const Tech&);                  // disabled
@@ -121,7 +116,7 @@ private:
     std::string                     m_category;
     std::unique_ptr<ValueRef::ValueRef<double>> m_research_cost;
     std::unique_ptr<ValueRef::ValueRef<int>>    m_research_turns;
-    bool                            m_researchable;
+    bool                            m_researchable = false;
     std::set<std::string>           m_tags;
     std::vector<std::shared_ptr<Effect::EffectsGroup>> m_effects;
     std::set<std::string>           m_prerequisites;
@@ -135,20 +130,16 @@ private:
 
 /** specifies a category of techs, with associated \a name, \a graphic (icon), and \a colour.*/
 struct FO_COMMON_API TechCategory {
-    TechCategory() :
-        name(""),
-        graphic(""),
-        colour(GG::Clr(255, 255, 255, 255))
-    {}
-    TechCategory(const std::string& name_, const std::string& graphic_,
-                 const GG::Clr& colour_):
-        name(name_),
-        graphic(graphic_),
+    TechCategory() = default;
+    TechCategory(std::string&& name_, std::string&& graphic_,
+                 GG::Clr colour_):
+        name(std::move(name_)),
+        graphic(std::move(graphic_)),
         colour(colour_)
     {}
-    std::string name;       ///< name of category
-    std::string graphic;    ///< icon that represents catetegory
-    GG::Clr     colour;     ///< colour associatied with category
+    std::string name;                       ///< name of category
+    std::string graphic;                    ///< icon that represents catetegory
+    GG::Clr     colour{255, 255, 255, 255}; ///< colour associatied with category
 };
 
 namespace CheckSums {
@@ -191,7 +182,6 @@ public:
     /** iterator that runs over all techs */
     typedef TechContainer::index<NameIndex>::type::const_iterator     iterator;
 
-    /** \name Accessors */ //@{
     /** returns the tech with the name \a name; you should use the free function GetTech() instead */
     const Tech*                     GetTech(const std::string& name) const;
 
@@ -249,7 +239,6 @@ public:
       * the parsed content is consistent without sending it all between
       * clients and server. */
     unsigned int                    GetCheckSum() const;
-    //@}
 
     using TechParseTuple = std::tuple<
         TechManager::TechContainer, // techs_
@@ -309,4 +298,5 @@ FO_COMMON_API const Tech* GetTech(const std::string& name);
 /** returns a pointer to the tech category with the name \a name, or 0 if no such category exists */
 FO_COMMON_API const TechCategory* GetTechCategory(const std::string& name);
 
-#endif // _Tech_h_
+
+#endif

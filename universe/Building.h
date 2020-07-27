@@ -2,6 +2,7 @@
 #define _Building_h_
 
 
+#include <boost/serialization/access.hpp>
 #include "ObjectMap.h"
 #include "UniverseObject.h"
 #include "../util/Export.h"
@@ -10,7 +11,6 @@
 /** A Building UniverseObject type. */
 class FO_COMMON_API Building : public UniverseObject {
 public:
-    /** \name Accessors */ //@{
     bool                    HostileToEmpire(int empire_id) const override;
     std::set<std::string>   Tags() const override;
     bool                    HasTag(const std::string& name) const override;
@@ -26,22 +26,13 @@ public:
     int                     PlanetID() const            { return m_planet_id; }             ///< returns the ID number of the planet this building is on
     int                     ProducedByEmpireID() const  { return m_produced_by_empire_id; } ///< returns the empire ID of the empire that produced this building
     bool                    OrderedScrapped() const     { return m_ordered_scrapped; }
-    //@}
 
-    /** \name Mutators */ //@{
     void Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_id = ALL_EMPIRES) override;
     void SetPlanetID(int planet_id);         ///< sets the planet on which the building is located
     void Reset();                            ///< resets any building state, and removes owners
     void SetOrderedScrapped(bool b = true);  ///< flags building for scrapping
     void ResetTargetMaxUnpairedMeters() override;
-    //@}
 
-protected:
-    friend class Universe;
-    /** \name Structors */ //@{
-    Building() {}
-
-public:
     Building(int empire_id, const std::string& building_type,
              int produced_by_empire_id = ALL_EMPIRES);
 
@@ -54,7 +45,6 @@ public:
 protected:
     /** Returns new copy of this Building. */
     Building* Clone(int empire_id = ALL_EMPIRES) const override;
-    //@}
 
 private:
     std::string m_building_type;
@@ -62,10 +52,9 @@ private:
     bool        m_ordered_scrapped = false;
     int         m_produced_by_empire_id = ALL_EMPIRES;
 
-    friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
+    friend void serialize(Archive&, Building&, unsigned int const);
 };
 
 
-#endif // _Building_h_
+#endif

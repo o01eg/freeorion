@@ -85,6 +85,7 @@
     (Damage)                                    \
     (Data)                                      \
     (Default)                                   \
+    (DefaultFocus)                              \
     (Defense)                                   \
     (Described)                                 \
     (Description)                               \
@@ -100,6 +101,7 @@
     (Detection)                                 \
     (DirectDistanceBetween)                     \
     (Disabled)                                  \
+    (Dislikes)                                  \
     (Distance)                                  \
     (DistanceFromOriginalType)                  \
     (Effects)                                   \
@@ -176,6 +178,9 @@
     (HighestCostEnqueuedTech)                   \
     (HighestCostResearchableTech)               \
     (HighestCostTransferrableTech)              \
+    (HistogramMax)                              \
+    (HistogramMin)                              \
+    (HistogramSpread)                           \
     (Homeworld)                                 \
     (Hostile)                                   \
     (Huge)                                      \
@@ -208,9 +213,11 @@
     (LastTurnBattleHere)                        \
     (LastTurnColonized)                         \
     (LastTurnConquered)                         \
+    (LastTurnMoveOrdered)                       \
     (LastTurnResupplied)                        \
     (LaunchedFrom)                              \
     (LeastHappySpecies)                         \
+    (Likes)                                     \
     (LocalCandidate)                            \
     (Location)                                  \
     (Log)                                       \
@@ -327,7 +334,6 @@
     (Population)                                \
     (PopulationCenter)                          \
     (Position)                                  \
-    (PreferredFocus)                            \
     (Prerequisites)                             \
     (PreviousSystemID)                          \
     (Priority)                                  \
@@ -454,6 +460,7 @@
     (ShortestPath)                              \
     (ShortRange)                                \
     (Shots)                                     \
+    (Sign)                                      \
     (Sin)                                       \
     (Size)                                      \
     (SizeAsDouble)
@@ -476,9 +483,11 @@
     (SpecialCapacity)                           \
     (Species)                                   \
     (SpeciesCensusOrdering)                     \
-    (SpeciesOpinion)                            \
-    (SpeciesPlanetsBombed)                      \
-    (SpeciesColoniesOwned)
+    (SpeciesColoniesOwned)                      \
+    (SpeciesContentOpinion)                     \
+    (SpeciesEmpireOpinion)                      \
+    (SpeciesSpeciesOpinion)                     \
+    (SpeciesPlanetsBombed)
 
 #define TOKEN_SEQ_15                            \
     (SpeciesPlanetsDepoped)                     \
@@ -527,6 +536,7 @@
     (ThisField)                                 \
     (ThisHull)                                  \
     (ThisPart)                                  \
+    (ThisPolicy)                                \
     (ThisTech)                                  \
     (ThisSpecies)                               \
     (ThisSpecial)                               \

@@ -87,23 +87,27 @@ namespace {
 
 Species::Species(std::string&& name, std::string&& desc,
                  std::string&& gameplay_desc, std::vector<FocusType>&& foci,
-                 std::string&& preferred_focus,
+                 std::string&& default_focus,
                  std::map<PlanetType, PlanetEnvironment>&& planet_environments,
                  std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
                  std::unique_ptr<Condition::Condition>&& combat_targets,
                  bool playable, bool native, bool can_colonize, bool can_produce_ships,
-                 const std::set<std::string>& tags, std::string&& graphic) :
+                 const std::set<std::string>& tags,
+                 std::set<std::string>&& likes, std::set<std::string>&& dislikes,
+                 std::string&& graphic) :
     m_name(std::move(name)),
     m_description(std::move(desc)),
     m_gameplay_description(std::move(gameplay_desc)),
     m_foci(std::move(foci)),
-    m_preferred_focus(std::move(preferred_focus)),
+    m_default_focus(std::move(default_focus)),
     m_planet_environments(std::move(planet_environments)),
     m_combat_targets(std::move(combat_targets)),
     m_playable(playable),
     m_native(native),
     m_can_colonize(can_colonize),
     m_can_produce_ships(can_produce_ships),
+    m_likes(std::move(likes)),
+    m_dislikes(std::move(dislikes)),
     m_graphic(std::move(graphic))
 {
     for (auto&& effect : effects)
@@ -349,7 +353,7 @@ unsigned int Species::GetCheckSum() const {
     CheckSums::CheckSumCombine(retval, m_gameplay_description);
     // opinions and homeworlds are per-game specific, so not included in checksum
     CheckSums::CheckSumCombine(retval, m_foci);
-    CheckSums::CheckSumCombine(retval, m_preferred_focus);
+    CheckSums::CheckSumCombine(retval, m_default_focus);
     CheckSums::CheckSumCombine(retval, m_planet_environments);
     CheckSums::CheckSumCombine(retval, m_combat_targets);
     CheckSums::CheckSumCombine(retval, m_effects);

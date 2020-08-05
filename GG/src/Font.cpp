@@ -1,42 +1,11 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
-
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-#include <GG/Font.h>
-
-#include <GG/GUI.h>
-#include <GG/Base.h>
-#include <GG/StyleFactory.h>
-#include <GG/utf8/checked.h>
-#include <GG/GLClientAndServerBuffer.h>
-
-#include <ft2build.h>
-#include FT_FREETYPE_H
-
-#include <boost/format.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/xpressive/xpressive.hpp>
-#include <boost/xpressive/regex_actions.hpp>
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include <cctype>
 #include <cmath>
@@ -44,219 +13,234 @@
 #include <numeric>
 #include <sstream>
 #include <unordered_set>
+#include <boost/format.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/xpressive/regex_actions.hpp>
+#include <boost/xpressive/xpressive.hpp>
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include <GG/Base.h>
+#include <GG/Font.h>
+#include <GG/GLClientAndServerBuffer.h>
+#include <GG/GUI.h>
+#include <GG/StyleFactory.h>
+#include <GG/utf8/checked.h>
+
 
 #define DEBUG_DETERMINELINES 0
 
 namespace GG { namespace detail {
 
-    FTFaceWrapper::FTFaceWrapper()
-    {}
+FTFaceWrapper::FTFaceWrapper()
+{}
 
-    FTFaceWrapper::~FTFaceWrapper()
-    { if (m_face) FT_Done_Face(m_face); }
+FTFaceWrapper::~FTFaceWrapper()
+{ if (m_face) FT_Done_Face(m_face); }
 
 } }
 
 using namespace GG;
 
 namespace {
-    const std::uint32_t WIDE_SPACE = ' ';
-    const std::uint32_t WIDE_NEWLINE = '\n';
-    const std::uint32_t WIDE_CR = '\r';
-    const std::uint32_t WIDE_FF = '\f';
-    const std::uint32_t WIDE_TAB = '\t';
 
-    const std::string ITALIC_TAG = "i";
-    const std::string SHADOW_TAG = "s";
-    const std::string UNDERLINE_TAG = "u";
-    const std::string SUPERSCRIPT_TAG = "sup";
-    const std::string SUBSCRIPT_TAG = "sub";
-    const std::string RGBA_TAG = "rgba";
-    const std::string ALIGN_LEFT_TAG = "left";
-    const std::string ALIGN_CENTER_TAG = "center";
-    const std::string ALIGN_RIGHT_TAG = "right";
-    const std::string PRE_TAG = "pre";
+const std::uint32_t WIDE_SPACE = ' ';
+const std::uint32_t WIDE_NEWLINE = '\n';
+const std::uint32_t WIDE_CR = '\r';
+const std::uint32_t WIDE_FF = '\f';
+const std::uint32_t WIDE_TAB = '\t';
 
-    template <typename T>
-    T NextPowerOfTwo(T input)
+const std::string ITALIC_TAG = "i";
+const std::string SHADOW_TAG = "s";
+const std::string UNDERLINE_TAG = "u";
+const std::string SUPERSCRIPT_TAG = "sup";
+const std::string SUBSCRIPT_TAG = "sub";
+const std::string RGBA_TAG = "rgba";
+const std::string ALIGN_LEFT_TAG = "left";
+const std::string ALIGN_CENTER_TAG = "center";
+const std::string ALIGN_RIGHT_TAG = "right";
+const std::string PRE_TAG = "pre";
+
+template <typename T>
+T NextPowerOfTwo(T input)
+{
+    T value(1);
+    while (value < input)
+        value *= 2;
+    return value;
+}
+
+/** This is used to collect data on the glyphs as they are recorded into buffers, for use in creating Glyph objects at the end
+    of Font's constructor.*/
+struct TempGlyphData
+{
+    TempGlyphData() {}
+    TempGlyphData(const Pt& ul_, const Pt& lr_, Y y_ofs, X lb, X a) :
+        ul(ul_), lr(lr_), y_offset(y_ofs), left_b(lb), adv(a) {}
+    Pt          ul, lr;   ///< area of glyph subtexture within texture
+    Y           y_offset; ///< vertical offset to draw texture (may be negative!)
+    X           left_b;   ///< left bearing (see Glyph)
+    X           adv;      ///< advance of glyph (see Glyph)
+};
+
+/// A two dimensional grid of pixels that expands to
+/// fit any write much like an stl vector, but in 2d.
+template<typename T>
+class Buffer2d
+{
+public:
+    /// Create a new 2D buffer
+    /// \param initial_width Initial width to allocate
+    /// \param initial_height Initial height to allocate
+    /// \param default_value The value to fill empty space with whenever it appears
+    Buffer2d(X initial_width, Y initial_height, const T& default_value):
+        m_capacity_width(initial_width),
+        m_capacity_height(initial_height),
+        m_data(Value(initial_width)*Value(initial_height), default_value),
+        m_current_width(initial_width),
+        m_current_height(initial_height),
+        m_default_value(default_value)
+    {}
+
+    /// Access point \x,\y, expanding the buffer if it does not exist yet
+    T& at(X x, Y y)
     {
-        T value(1);
-        while (value < input)
-            value *= 2;
-        return value;
+        EnsureFit(x, y);
+        return this->get(x,y);
     }
 
-    /** This is used to collect data on the glyphs as they are recorded into buffers, for use in creating Glyph objects at the end
-        of Font's constructor.*/
-    struct TempGlyphData
-    {
-        TempGlyphData() {}
-        TempGlyphData(const Pt& ul_, const Pt& lr_, Y y_ofs, X lb, X a) :
-            ul(ul_), lr(lr_), y_offset(y_ofs), left_b(lb), adv(a) {}
-        Pt          ul, lr;   ///< area of glyph subtexture within texture
-        Y           y_offset; ///< vertical offset to draw texture (may be negative!)
-        X           left_b;   ///< left bearing (see Glyph)
-        X           adv;      ///< advance of glyph (see Glyph)
-    };
+    /// Access point \x, \y without any checks
+    T& get(X x, Y y)
+    { return m_data[Value(m_capacity_width)*Value(y) + Value(x)]; }
 
-    /// A two dimensional grid of pixels that expands to
-    /// fit any write much like an stl vector, but in 2d.
-    template<typename T>
-    class Buffer2d
-    {
-    public:
-        /// Create a new 2D buffer
-        /// \param initial_width Initial width to allocate
-        /// \param initial_height Initial height to allocate
-        /// \param default_value The value to fill empty space with whenever it appears
-        Buffer2d(X initial_width, Y initial_height, const T& default_value):
-            m_capacity_width(initial_width),
-            m_capacity_height(initial_height),
-            m_data(Value(initial_width)*Value(initial_height), default_value),
-            m_current_width(initial_width),
-            m_current_height(initial_height),
-            m_default_value(default_value)
-        {}
+    /// Returns the current highest x the user has requested to exist
+    X CurrentWidth() const
+    { return m_current_width; }
 
-        /// Access point \x,\y, expanding the buffer if it does not exist yet
-        T& at(X x, Y y)
-        {
-            EnsureFit(x, y);
-            return this->get(x,y);
+    /// Returns the current highest y the user has requested to exist
+    Y CurrentHeight() const
+    { return m_capacity_height; }
+
+    /// Returns the actual width of the storage area allocated so far
+    X BufferWidth() const
+    { return m_capacity_width; }
+
+    /// Returns the actual height of the storage area allocated so far
+    Y BufferHeight() const
+    { return m_capacity_height; }
+
+    /// Return a pointer to the storage buffer where the data is kept
+    T* Buffer()
+    { return &*m_data.begin(); }
+
+    /// Returns the size of the storage buffer where the data is kept
+    std::size_t BufferSize() const
+    { return m_data.size(); }
+
+    /// Makes the size of the underlying buffer the smallest power of power of two
+    /// rectangle that can accommodate CurrentWidth() and CurrentHeight()
+    void MakePowerOfTwo()
+    { ResizeCapacity(NextPowerOfTwo(m_current_width), NextPowerOfTwo(m_current_height)); }
+
+private:
+    X m_capacity_width; // How wide the reserved buffer is
+    Y m_capacity_height; // How hight the reserved buffer is
+    std::vector<T> m_data;
+    X m_current_width; // The highest x coordinate written to
+    Y m_current_height; // The highest y coordinate written to
+    const T m_default_value; // The value with which to fill all emerging empty slots in the buffer
+
+    void EnsureFit(X x, Y y)
+    {
+        X new_width = std::max(m_current_width, x + 1); // Zero indexed => width = max_x + 1
+        Y new_height = std::max(m_current_height, y + 1); // Also zero indexed
+        X new_capacity_width = m_capacity_width;
+        Y new_capacity_height = m_capacity_height;
+        while (new_width > new_capacity_width) {
+            new_capacity_width *= 2;
+        }
+        while (new_height > new_capacity_height) {
+            new_capacity_height *= 2;
         }
 
-        /// Access point \x, \y without any checks
-        T& get(X x, Y y)
-        { return m_data[Value(m_capacity_width)*Value(y) + Value(x)]; }
+        ResizeCapacity(new_capacity_width, new_capacity_height);
+        m_current_width = new_width;
+        m_current_height = new_height;
+    }
 
-        /// Returns the current highest x the user has requested to exist
-        X CurrentWidth() const
-        { return m_current_width; }
-
-        /// Returns the current highest y the user has requested to exist
-        Y CurrentHeight() const
-        { return m_capacity_height; }
-
-        /// Returns the actual width of the storage area allocated so far
-        X BufferWidth() const
-        { return m_capacity_width; }
-
-        /// Returns the actual height of the storage area allocated so far
-        Y BufferHeight() const
-        { return m_capacity_height; }
-
-        /// Return a pointer to the storage buffer where the data is kept
-        T* Buffer()
-        { return &*m_data.begin(); }
-
-        /// Returns the size of the storage buffer where the data is kept
-        std::size_t BufferSize() const
-        { return m_data.size(); }
-
-        /// Makes the size of the underlying buffer the smallest power of power of two
-        /// rectangle that can accommodate CurrentWidth() and CurrentHeight()
-        void MakePowerOfTwo()
-        { ResizeCapacity(NextPowerOfTwo(m_current_width), NextPowerOfTwo(m_current_height)); }
-
-    private:
-        X m_capacity_width; // How wide the reserved buffer is
-        Y m_capacity_height; // How hight the reserved buffer is
-        std::vector<T> m_data;
-        X m_current_width; // The highest x coordinate written to
-        Y m_current_height; // The highest y coordinate written to
-        const T m_default_value; // The value with which to fill all emerging empty slots in the buffer
-
-        void EnsureFit(X x, Y y)
-        {
-            X new_width = std::max(m_current_width, x + 1); // Zero indexed => width = max_x + 1
-            Y new_height = std::max(m_current_height, y + 1); // Also zero indexed
-            X new_capacity_width = m_capacity_width;
-            Y new_capacity_height = m_capacity_height;
-            while (new_width > new_capacity_width) {
-                new_capacity_width *= 2;
-            }
-            while (new_height > new_capacity_height) {
-                new_capacity_height *= 2;
-            }
-
-            ResizeCapacity(new_capacity_width, new_capacity_height);
-            m_current_width = new_width;
-            m_current_height = new_height;
-        }
-
-        void ResizeCapacity(X new_capacity_width, Y new_capacity_height)
-        {
-            // If there really was a change, we need to recreate our storage.
-            // This is expensive, but since we double the size every time,
-            // the cost of adding data here in some sane order is amortized constant
-            if (new_capacity_width != m_capacity_width || new_capacity_height != m_capacity_height) {
-                // Create new storage and copy old data. A linear copy won't do, there
-                // will be a new mapping from 2d indexes to 1d memory.
-                std::vector<T> new_data(Value(new_capacity_width)*Value(new_capacity_height), m_default_value);
-                for (Y y_i = Y0; y_i < m_current_height && y_i < new_capacity_height; ++y_i) {
-                    for (X x_i = X0; x_i < m_current_width && x_i < new_capacity_width; ++x_i) {
-                        unsigned pos = Value(new_capacity_width) * Value(y_i) + Value(x_i);
-                        new_data[pos] = get(x_i, y_i);
-                    }
+    void ResizeCapacity(X new_capacity_width, Y new_capacity_height)
+    {
+        // If there really was a change, we need to recreate our storage.
+        // This is expensive, but since we double the size every time,
+        // the cost of adding data here in some sane order is amortized constant
+        if (new_capacity_width != m_capacity_width || new_capacity_height != m_capacity_height) {
+            // Create new storage and copy old data. A linear copy won't do, there
+            // will be a new mapping from 2d indexes to 1d memory.
+            std::vector<T> new_data(Value(new_capacity_width)*Value(new_capacity_height), m_default_value);
+            for (Y y_i = Y0; y_i < m_current_height && y_i < new_capacity_height; ++y_i) {
+                for (X x_i = X0; x_i < m_current_width && x_i < new_capacity_width; ++x_i) {
+                    unsigned pos = Value(new_capacity_width) * Value(y_i) + Value(x_i);
+                    new_data[pos] = get(x_i, y_i);
                 }
-                std::swap(m_data, new_data);
-                m_capacity_width = new_capacity_width;
-                m_capacity_height = new_capacity_height;
             }
-        }
-    };
-
-    struct FTLibraryWrapper
-    {
-        FTLibraryWrapper()
-        {
-            if (!m_library && FT_Init_FreeType(&m_library)) // if no library exists and we can't create one...
-                throw FailedFTLibraryInit("Unable to initialize FreeType font library object");
-        }
-        ~FTLibraryWrapper() { FT_Done_FreeType(m_library); }
-        FT_Library m_library = nullptr;
-    } g_library;
-
-    struct PushSubmatchOntoStackP
-    {
-        typedef void result_type;
-        void operator()(const std::string* str,
-                        std::stack<Font::Substring>& tag_stack,
-                        bool& ignore_tags,
-                        const boost::xpressive::ssub_match& sub) const
-        {
-            tag_stack.push(Font::Substring(*str, sub));
-            if (tag_stack.top() == PRE_TAG)
-                ignore_tags = true;
-        }
-    };
-    const boost::xpressive::function<PushSubmatchOntoStackP>::type PushP = {{}};
-
-    void SetJustification(bool& last_line_of_curr_just, Font::LineData& line_data, Alignment orig_just, Alignment prev_just)
-    {
-        if (last_line_of_curr_just) {
-            line_data.justification = orig_just;
-            last_line_of_curr_just = false;
-        } else {
-            line_data.justification = prev_just;
+            std::swap(m_data, new_data);
+            m_capacity_width = new_capacity_width;
+            m_capacity_height = new_capacity_height;
         }
     }
+};
 
-    const double ITALICS_SLANT_ANGLE = 12; // degrees
-    const double ITALICS_FACTOR = 1.0 / tan((90 - ITALICS_SLANT_ANGLE) * 3.1415926 / 180.0); // factor used to shear glyphs ITALICS_SLANT_ANGLE degrees CW from straight up
+struct FTLibraryWrapper
+{
+    FTLibraryWrapper()
+    {
+        if (!m_library && FT_Init_FreeType(&m_library)) // if no library exists and we can't create one...
+            throw FailedFTLibraryInit("Unable to initialize FreeType font library object");
+    }
+    ~FTLibraryWrapper() { FT_Done_FreeType(m_library); }
+    FT_Library m_library = nullptr;
+} g_library;
 
-    const std::vector<std::pair<std::uint32_t, std::uint32_t>> PRINTABLE_ASCII_ALPHA_RANGES{
-        {0x41, 0x5B},
-        {0x61, 0x7B}};
+struct PushSubmatchOntoStackP
+{
+    typedef void result_type;
+    void operator()(const std::string* str,
+                    std::stack<Font::Substring>& tag_stack,
+                    bool& ignore_tags,
+                    const boost::xpressive::ssub_match& sub) const
+    {
+        tag_stack.push(Font::Substring(*str, sub));
+        if (tag_stack.top() == PRE_TAG)
+            ignore_tags = true;
+    }
+};
+const boost::xpressive::function<PushSubmatchOntoStackP>::type PushP = {{}};
 
-    const std::vector<std::pair<std::uint32_t, std::uint32_t>> PRINTABLE_ASCII_NONALPHA_RANGES{
-        {0x09, 0x0D},
-        {0x20, 0x21},
-        {0x30, 0x3A},
-        {0x21, 0x30},
-        {0x3A, 0x41},
-        {0x5B, 0x61},
-        {0x7B, 0x7F}};
+void SetJustification(bool& last_line_of_curr_just, Font::LineData& line_data, Alignment orig_just, Alignment prev_just)
+{
+    if (last_line_of_curr_just) {
+        line_data.justification = orig_just;
+        last_line_of_curr_just = false;
+    } else {
+        line_data.justification = prev_just;
+    }
+}
+
+const double ITALICS_SLANT_ANGLE = 12; // degrees
+const double ITALICS_FACTOR = 1.0 / tan((90 - ITALICS_SLANT_ANGLE) * 3.1415926 / 180.0); // factor used to shear glyphs ITALICS_SLANT_ANGLE degrees CW from straight up
+
+const std::vector<std::pair<std::uint32_t, std::uint32_t>> PRINTABLE_ASCII_ALPHA_RANGES{
+    {0x41, 0x5B},
+    {0x61, 0x7B}};
+
+const std::vector<std::pair<std::uint32_t, std::uint32_t>> PRINTABLE_ASCII_NONALPHA_RANGES{
+    {0x09, 0x0D},
+    {0x20, 0x21},
+    {0x30, 0x3A},
+    {0x21, 0x30},
+    {0x3A, 0x41},
+    {0x5B, 0x61},
+    {0x7B, 0x7F}};
+
 }
 
 ///////////////////////////////////////
@@ -750,10 +734,7 @@ class Font::TextAndElementsAssembler::Impl
 {
 public:
     Impl(const Font& font) :
-        m_font(font),
-        m_text(),
-        m_text_elements(),
-        m_are_widths_calculated(false)
+        m_font(font)
     {}
 
     /** Return the constructed text.*/
@@ -793,9 +774,9 @@ public:
                 size_t param_begin = m_text.size();
                 size_t param_end = m_text.append(param).size();
 
-                element->params.push_back(Substring(m_text,
-                                                    std::next(m_text.begin(), param_begin),
-                                                    std::next(m_text.begin(), param_end)));
+                element->params.emplace_back(Substring(m_text,
+                                                       std::next(m_text.begin(), param_begin),
+                                                       std::next(m_text.begin(), param_end)));
             }
         }
 
@@ -805,7 +786,7 @@ public:
                                   std::next(m_text.begin(), tag_begin),
                                   std::next(m_text.begin(), tag_end));
 
-        m_text_elements.push_back(element);
+        m_text_elements.emplace_back(std::move(element));
     }
 
     /** Add a close tag iff it exists as a recognized tag.*/
@@ -843,7 +824,7 @@ public:
         element->text = Substring(m_text,
                                   std::next(m_text.begin(), begin),
                                   std::next(m_text.begin(), end));
-        m_text_elements.push_back(element);
+        m_text_elements.emplace_back(std::move(element));
     }
 
     /** Add a white space element.*/
@@ -857,15 +838,14 @@ public:
         element->text = Substring(m_text,
                                   std::next(m_text.begin(), begin),
                                   std::next(m_text.begin(), end));
-        m_text_elements.push_back(element);
+        m_text_elements.emplace_back(std::move(element));
     }
 
     /** Add a newline element.*/
     void AddNewline()
     {
         m_are_widths_calculated = false;
-
-        m_text_elements.push_back(std::make_shared<Font::TextElement>(false, true));
+        m_text_elements.emplace_back(std::make_shared<Font::TextElement>(false, true));
     }
 
     /** Add open color tag.*/
@@ -883,7 +863,7 @@ private:
     const Font& m_font;
     std::string m_text;
     std::vector<std::shared_ptr<TextElement>> m_text_elements;
-    bool m_are_widths_calculated;
+    bool m_are_widths_calculated = false;
 };
 
 
@@ -895,10 +875,10 @@ Font::TextAndElementsAssembler::TextAndElementsAssembler(const Font& font) :
 Font::TextAndElementsAssembler::~TextAndElementsAssembler()
 {}
 
-const std::string& Font::TextAndElementsAssembler::Text()
+const std::string& Font::TextAndElementsAssembler::Text() const
 { return m_impl->Text(); }
 
-const std::vector<std::shared_ptr<Font::TextElement>>& Font::TextAndElementsAssembler::Elements()
+const std::vector<std::shared_ptr<Font::TextElement>>& Font::TextAndElementsAssembler::Elements() const
 { return m_impl->Elements(); }
 
 Font::TextAndElementsAssembler& Font::TextAndElementsAssembler::AddOpenTag(const std::string& tag)
@@ -987,7 +967,7 @@ void Font::RenderState::PushColor(GLubyte r, GLubyte g, GLubyte b, GLubyte a)
     // The same color may end up being stored multiple times, but the cost of deduplication
     // is greater than the cost of just letting it be so.
     color_index_stack.push(used_colors.size());
-    used_colors.push_back(color);
+    used_colors.emplace_back(color);
 }
 
 void Font::RenderState::PopColor()
@@ -1037,12 +1017,10 @@ Font::LineData::CharData::CharData(X extent_, StrSize str_index, StrSize str_siz
     extent(extent_),
     string_index(str_index),
     string_size(str_size),
-    code_point_index(cp_index),
-    tags()
+    code_point_index(cp_index)
 {
-    for (auto tag : tags_) {
-        tags.push_back(std::dynamic_pointer_cast<FormattingTag>(tag));
-    }
+    for (auto tag : tags_)
+        tags.emplace_back(std::dynamic_pointer_cast<FormattingTag>(tag));
 }
 
 
@@ -1082,8 +1060,8 @@ Font::Font() :
     m_space_width(0)
 {}
 
-Font::Font(const std::string& font_filename, unsigned int pts) :
-    m_font_filename(font_filename),
+Font::Font(std::string font_filename, unsigned int pts) :
+    m_font_filename(std::move(font_filename)),
     m_pt_sz(pts),
     m_ascent(0),
     m_descent(0),
@@ -1103,9 +1081,9 @@ Font::Font(const std::string& font_filename, unsigned int pts) :
     }
 }
 
-Font::Font(const std::string& font_filename, unsigned int pts,
+Font::Font(std::string font_filename, unsigned int pts,
            const std::vector<unsigned char>& file_contents) :
-    m_font_filename(font_filename),
+    m_font_filename(std::move(font_filename)),
     m_pt_sz(pts),
     m_ascent(0),
     m_descent(0),
@@ -2274,8 +2252,8 @@ std::shared_ptr<Font> Font::GetDefaultFont(unsigned int pts)
 // class GG::FontManager
 ///////////////////////////////////////
 // FontKey 
-FontManager::FontKey::FontKey(const std::string& str, unsigned int pts) :
-    filename(str),
+FontManager::FontKey::FontKey(std::string str, unsigned int pts) :
+    filename(std::move(str)),
     points(pts)
 {}
 
@@ -2289,28 +2267,28 @@ const std::shared_ptr<Font> FontManager::EMPTY_FONT{std::make_shared<Font>("", 0
 FontManager::FontManager()
 {}
 
-bool FontManager::HasFont(const std::string& font_filename, unsigned int pts) const
-{ return m_rendered_fonts.count(FontKey(font_filename, pts)); }
+bool FontManager::HasFont(std::string font_filename, unsigned int pts) const
+{ return m_rendered_fonts.count(FontKey(std::move(font_filename), pts)); }
 
-std::shared_ptr<Font> FontManager::GetFont(const std::string& font_filename, unsigned int pts)
+std::shared_ptr<Font> FontManager::GetFont(std::string font_filename, unsigned int pts)
 {
     std::vector<UnicodeCharset> v;
     std::vector<UnicodeCharset>::iterator it = v.end();
-    return GetFont(font_filename, pts, it, it);
+    return GetFont(std::move(font_filename), pts, it, it);
 }
 
-std::shared_ptr<Font> FontManager::GetFont(const std::string& font_filename, unsigned int pts,
+std::shared_ptr<Font> FontManager::GetFont(std::string font_filename, unsigned int pts,
                                            const std::vector<unsigned char>& file_contents)
 {
     std::vector<UnicodeCharset> v;
     std::vector<UnicodeCharset>::iterator it = v.end();
-    return GetFont(font_filename, pts, file_contents, it, it);
+    return GetFont(std::move(font_filename), pts, file_contents, it, it);
 }
 
-void FontManager::FreeFont(const std::string& font_filename, unsigned int pts)
+void FontManager::FreeFont(std::string font_filename, unsigned int pts)
 {
-    FontKey key(font_filename, pts);
-    std::map<FontKey, std::shared_ptr<Font>>::iterator it = m_rendered_fonts.find(key);
+    FontKey key(std::move(font_filename), pts);
+    auto it = m_rendered_fonts.find(key);
     if (it != m_rendered_fonts.end())
         m_rendered_fonts.erase(it);
 }

@@ -53,23 +53,29 @@ namespace {
         SpeciesParamsAndStuff(bool playable_, bool native_,
                               bool can_colonize_, bool can_produce_ships_,
                               boost::optional<std::vector<FocusType>>& foci_,
-                              boost::optional<std::string>& preferred_focus_,
-                              std::set<std::string>& tags_) :
+                              boost::optional<std::string>& default_focus_,
+                              std::set<std::string>& tags_,
+                              std::set<std::string>& likes_,
+                              std::set<std::string>& dislikes_) :
             playable(playable_),
             native(native_),
             can_colonize(can_colonize_),
             can_produce_ships(can_produce_ships_),
             foci(std::move(foci_)),
-            preferred_focus(std::move(preferred_focus_)),
-            tags(std::move(tags_))
+            default_focus(std::move(default_focus_)),
+            tags(std::move(tags_)),
+            likes(std::move(likes_)),
+            dislikes(std::move(dislikes_))
         {}
         bool                                    playable = false;
         bool                                    native = false;
         bool                                    can_colonize = false;
         bool                                    can_produce_ships = false;
         boost::optional<std::vector<FocusType>> foci;
-        boost::optional<std::string>            preferred_focus;
+        boost::optional<std::string>            default_focus;
         std::set<std::string>                   tags;
+        std::set<std::string>                   likes;
+        std::set<std::string>                   dislikes;
     };
 
 
@@ -86,7 +92,7 @@ namespace {
         auto species_ptr = std::make_unique<Species>(
             std::move(strings.name), std::move(strings.desc), std::move(strings.gameplay_desc),
             (params.foci ? std::move(*params.foci) : std::vector<FocusType>{}),
-            (params.preferred_focus ? std::move(*params.preferred_focus) : std::string{}),
+            (params.default_focus ? std::move(*params.default_focus) : std::string{}),
             (planet_environments ? std::move(*planet_environments) : std::map<PlanetType, PlanetEnvironment>{}),
             (effects ? std::move(OpenEnvelopes(*effects, pass)) : std::vector<std::unique_ptr<Effect::EffectsGroup>>{}),
             (combat_targets ? std::move((*combat_targets).OpenEnvelope(pass)) : nullptr),
@@ -95,13 +101,49 @@ namespace {
             params.can_colonize,
             params.can_produce_ships,
             params.tags,    // intentionally not moved
+            std::move(params.likes),
+            std::move(params.dislikes),
             std::move(graphic));
 
-        species.insert(std::make_pair(species_ptr->Name(), std::move(species_ptr)));
+        species.emplace(species_ptr->Name(), std::move(species_ptr));
     }
 
     BOOST_PHOENIX_ADAPT_FUNCTION(void, insert_species_, insert_species, 8)
 
+    using likes_rule_type    = parse::detail::rule<std::set<std::string> ()>;
+    using likes_grammar_type = parse::detail::grammar<std::set<std::string> ()>;
+
+    struct likes_grammar : public likes_grammar_type {
+        likes_grammar(const parse::lexer& tok, parse::detail::Labeller& label) :
+            likes_grammar::base_type(start, "likes_grammar"),
+            one_or_more_string_tokens(tok)
+        {
+            start %= -(label(tok.Likes_) >>  one_or_more_string_tokens);
+            start.name("Likes");
+#if DEBUG_PARSERS
+            debug(start);
+#endif
+        }
+
+        likes_rule_type start;
+        parse::detail::single_or_repeated_string<std::set<std::string>> one_or_more_string_tokens;
+    };
+
+    struct dislikes_grammar : public likes_grammar_type {
+        dislikes_grammar(const parse::lexer& tok, parse::detail::Labeller& label) :
+            dislikes_grammar::base_type(start, "dislikes_grammar"),
+            one_or_more_string_tokens(tok)
+        {
+            start %= -(label(tok.Dislikes_) >>  one_or_more_string_tokens);
+            start.name("Dislikes");
+#if DEBUG_PARSERS
+            debug(start);
+#endif
+        }
+
+        likes_rule_type start;
+        parse::detail::single_or_repeated_string<std::set<std::string>> one_or_more_string_tokens;
+    };
 
     using start_rule_payload = std::pair<
         std::map<std::string, std::unique_ptr<Species>>, // species_by_name
@@ -110,13 +152,14 @@ namespace {
     using start_rule_signature = void(start_rule_payload::first_type&);
 
     struct grammar : public parse::detail::grammar<start_rule_signature> {
-        grammar(const parse::lexer& tok,
-                const std::string& filename,
+        grammar(const parse::lexer& tok, const std::string& filename,
                 const parse::text_iterator& first, const parse::text_iterator& last) :
             grammar::base_type(start),
             condition_parser(tok, label),
             string_grammar(tok, label, condition_parser),
             tags_parser(tok, label),
+            likes(tok, label),
+            dislikes(tok, label),
             effects_group_grammar(tok, label, condition_parser, string_grammar),
             one_or_more_foci(focus_type),
             planet_type_rules(tok, label, condition_parser),
@@ -136,6 +179,8 @@ namespace {
             qi::_5_type _5;
             qi::_6_type _6;
             qi::_7_type _7;
+            qi::_8_type _8;
+            qi::_9_type _9;
             qi::_pass_type _pass;
             qi::_r1_type _r1;
             qi::_val_type _val;
@@ -177,8 +222,10 @@ namespace {
                 >    matches_[tok.CanColonize_]     // _4
                 >    tags_parser                    // _5
                 >   -foci                           // _6
-                >   -as_string_[(label(tok.PreferredFocus_) > tok.string )] // _7
-                    ) [ _val = construct<SpeciesParamsAndStuff>(_1, _2, _4, _3, _6, _7, _5) ]
+                >   -as_string_[(label(tok.DefaultFocus_) > tok.string )] // _7
+                >    likes                          // _8
+                >    dislikes                       // _9
+                    ) [ _val = construct<SpeciesParamsAndStuff>(_1, _2, _4, _3, _6, _7, _5, _8, _9) ]
                 ;
 
             species_strings
@@ -240,6 +287,8 @@ namespace {
         const parse::conditions_parser_grammar                     condition_parser;
         const parse::string_parser_grammar                         string_grammar;
         parse::detail::tags_grammar                                tags_parser;
+        likes_grammar                                              likes;
+        dislikes_grammar                                           dislikes;
         parse::effects_group_grammar                               effects_group_grammar;
         foci_rule                                                  foci;
         focus_type_rule                                            focus_type;

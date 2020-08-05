@@ -11,15 +11,19 @@ Species
     foci = [
         [[HAS_INDUSTRY_FOCUS]]
         [[HAS_RESEARCH_FOCUS]]
+        [[HAS_INFLUENCE_FOCUS]]
         [[HAS_GROWTH_FOCUS]]
         [[HAS_ADVANCED_FOCI]]
     ]
 
-    preferredfocus = "FOCUS_RESEARCH"
+    defaultfocus = "FOCUS_RESEARCH"
+    likes = ["PLC_BALANCE" "FOCUS_RESEARCH" "WORLDTREE_SPECIAL" ]
+    dislikes = ["PLC_CENTRALIZATION" "TIDAL_LOCK_SPECIAL" "FOCUS_BIOTERROR" "FOCUS_PROTECTION" "BLD_MILITARY_COMMAND"]
 
     effectsgroups = [
         [[AVERAGE_INDUSTRY]]
         [[AVERAGE_RESEARCH]]
+        [[GOOD_INFLUENCE]]
         [[AVERAGE_STOCKPILE]]
 
         [[AVERAGE_POPULATION]]

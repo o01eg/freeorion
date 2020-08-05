@@ -1,46 +1,32 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
-
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-#include <GG/Layout.h>
-
-#include <GG/ClrConstants.h>
-#include <GG/DrawUtil.h>
-#include <GG/TextControl.h>
-#include <GG/WndEvent.h>
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include <cassert>
 #include <cmath>
+#include <GG/ClrConstants.h>
+#include <GG/DrawUtil.h>
+#include <GG/Layout.h>
+#include <GG/TextControl.h>
+#include <GG/WndEvent.h>
+
 
 using namespace GG;
 
 namespace {
-    unsigned int MinDueToMargin(unsigned int cell_margin, std::size_t num_rows_or_columns, std::size_t row_or_column)
-    {
-        return (row_or_column == 0 || row_or_column == num_rows_or_columns - 1) ?
-            static_cast<unsigned int>(std::ceil(cell_margin / 2.0)) :
-            cell_margin;
-    }
+
+unsigned int MinDueToMargin(unsigned int cell_margin, std::size_t num_rows_or_columns, std::size_t row_or_column)
+{
+    return (row_or_column == 0 || row_or_column == num_rows_or_columns - 1) ?
+        static_cast<unsigned int>(std::ceil(cell_margin / 2.0)) :
+        cell_margin;
+}
+
 }
 
 
@@ -508,10 +494,12 @@ void Layout::Render()
     }
 }
 
-void Layout::Add(std::shared_ptr<Wnd> wnd, std::size_t row, std::size_t column, Flags<Alignment> alignment/* = ALIGN_NONE*/)
-{ Add(std::forward<std::shared_ptr<Wnd>>(wnd), row, column, 1, 1, alignment); }
+void Layout::Add(std::shared_ptr<Wnd> wnd, std::size_t row, std::size_t column,
+                 Flags<Alignment> alignment/* = ALIGN_NONE*/)
+{ Add(std::move(wnd), row, column, 1, 1, alignment); }
 
-void Layout::Add(std::shared_ptr<Wnd> wnd, std::size_t row, std::size_t column, std::size_t num_rows, std::size_t num_columns,
+void Layout::Add(std::shared_ptr<Wnd> wnd, std::size_t row, std::size_t column,
+                 std::size_t num_rows, std::size_t num_columns,
                  Flags<Alignment> alignment/* = ALIGN_NONE*/)
 {
     std::size_t last_row = row + num_rows;
@@ -519,9 +507,9 @@ void Layout::Add(std::shared_ptr<Wnd> wnd, std::size_t row, std::size_t column, 
     assert(row < last_row);
     assert(column < last_column);
     ValidateAlignment(alignment);
-    if (m_cells.size() < last_row || m_cells[0].size() < last_column) {
+    if (m_cells.size() < last_row || m_cells[0].size() < last_column)
         ResizeLayout(std::max(last_row, Rows()), std::max(last_column, Columns()));
-    }
+
     for (std::size_t i = row; i < last_row; ++i) {
         for (std::size_t j = column; j < last_column; ++j) {
             if (m_cells[i][j].lock())
@@ -530,8 +518,9 @@ void Layout::Add(std::shared_ptr<Wnd> wnd, std::size_t row, std::size_t column, 
         }
     }
     if (wnd) {
-        m_wnd_positions[wnd.get()] = WndPosition(row, column, last_row, last_column, alignment, wnd->RelativeUpperLeft(), wnd->Size());
-        AttachChild(std::forward<std::shared_ptr<Wnd>>(wnd));
+        m_wnd_positions[wnd.get()] = WndPosition(row, column, last_row, last_column, alignment,
+                                                 wnd->RelativeUpperLeft(), wnd->Size());
+        AttachChild(std::move(wnd));
     }
     RedoLayout();
 }

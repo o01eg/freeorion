@@ -1,5 +1,6 @@
 #include "ValueRefs.h"
 
+#include <algorithm>
 #include <functional>
 #include <iomanip>
 #include <iterator>
@@ -969,6 +970,8 @@ int Variable<int>::Eval(const ScriptingContext& context) const
         fleet_property = &Fleet::PreviousSystemID;
     else if (property_name == "ArrivalStarlaneID")
         fleet_property = &Fleet::ArrivalStarlane;
+    else if (property_name == "LastTurnMoveOrdered")
+        fleet_property = &Fleet::LastTurnMoveOrdered;
 
     if (fleet_property) {
         if (auto fleet = std::dynamic_pointer_cast<const Fleet>(object))
@@ -1217,7 +1220,7 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
             return planet->Focus();
         return "";
 
-    } else if (property_name == "PreferredFocus") {
+    } else if (property_name == "DefaultFocus") {
         const Species* species = nullptr;
         if (auto planet = std::dynamic_pointer_cast<const Planet>(object)) {
             species = GetSpecies(planet->SpeciesName());
@@ -1225,7 +1228,7 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
             species = GetSpecies(ship->SpeciesName());
         }
         if (species)
-            return species->PreferredFocus();
+            return species->DefaultFocus();
         return "";
 
     }
@@ -1241,53 +1244,13 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
 // Statistic                                             //
 ///////////////////////////////////////////////////////////
 template <>
-double Statistic<double>::Eval(const ScriptingContext& context) const
-{
-    Condition::ObjectSet condition_matches;
-    GetConditionMatches(context, condition_matches, m_sampling_condition.get());
-
-    // these two statistic types don't depend on the object property values,
-    // so can be evaluated without getting those values.
-    if (m_stat_type == COUNT)
-        return static_cast<double>(condition_matches.size());
-    if (m_stat_type == IF)
-        return condition_matches.empty() ? 0.0 : 1.0;
-
-    // evaluate property for each condition-matched object
-    std::map<std::shared_ptr<const UniverseObject>, double> object_property_values;
-    GetObjectPropertyValues(context, condition_matches, object_property_values);
-
-    return ReduceData(object_property_values);
-}
-
-template <>
-int Statistic<int>::Eval(const ScriptingContext& context) const
-{
-    Condition::ObjectSet condition_matches;
-    GetConditionMatches(context, condition_matches, m_sampling_condition.get());
-
-    // these two statistic types don't depend on the object property values,
-    // so can be evaluated without getting those values.
-    if (m_stat_type == COUNT)
-        return static_cast<int>(condition_matches.size());
-    if (m_stat_type == IF)
-        return condition_matches.empty() ? 0 : 1;
-
-    // evaluate property for each condition-matched object
-    std::map<std::shared_ptr<const UniverseObject>, int> object_property_values;
-    GetObjectPropertyValues(context, condition_matches, object_property_values);
-
-    return ReduceData(object_property_values);
-}
-
-template <>
-std::string Statistic<std::string>::Eval(const ScriptingContext& context) const
+std::string Statistic<std::string, std::string>::Eval(const ScriptingContext& context) const
 {
     Condition::ObjectSet condition_matches;
     GetConditionMatches(context, condition_matches, m_sampling_condition.get());
 
     if (condition_matches.empty())
-        return "";
+        return "";  // empty string
 
     // special case for IF statistic... return a non-empty string for true
     if (m_stat_type == IF)
@@ -1298,7 +1261,7 @@ std::string Statistic<std::string>::Eval(const ScriptingContext& context) const
     // the only other statistic that can be computed on non-number property
     // types and that is itself of a non-number type is the most common value
     if (m_stat_type != MODE) {
-        ErrorLogger() << "Statistic<std::string>::Eval has invalid statistic type: "
+        ErrorLogger() << "Statistic<std::string, std::string>::Eval has invalid statistic type: "
                       << m_stat_type;
         return "";
     }
@@ -1307,29 +1270,15 @@ std::string Statistic<std::string>::Eval(const ScriptingContext& context) const
     std::map<std::shared_ptr<const UniverseObject>, std::string> object_property_values;
     GetObjectPropertyValues(context, condition_matches, object_property_values);
 
-    // count number of each result, tracking which has the most occurances
-    std::map<std::string, unsigned int> histogram;
-    auto most_common_property_value_it = histogram.begin();
-    unsigned int max_seen(0);
+    // value that appears the most often
+    std::map<std::string, unsigned int> observed_values;
+    for (auto& entry : object_property_values)
+        observed_values[std::move(entry.second)]++;
 
-    for (const auto& entry : object_property_values) {
-        const std::string& property_value = entry.second;
+    auto max = std::max_element(observed_values.begin(), observed_values.end(),
+                                [](auto p1, auto p2) { return p1.second < p2.second; });
 
-        auto hist_it = histogram.find(property_value);
-        if (hist_it == histogram.end())
-            hist_it = histogram.insert({property_value, 0}).first;
-        unsigned int& num_seen = hist_it->second;
-
-        num_seen++;
-
-        if (num_seen > max_seen) {
-            most_common_property_value_it = hist_it;
-            max_seen = num_seen;
-        }
-    }
-
-    // return result (property value) that occured most frequently
-    return most_common_property_value_it->first;
+    return max->first;
 }
 
 ///////////////////////////////////////////////////////////
@@ -1965,6 +1914,27 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         return GetPathfinder()->ShortestPathDistance(object1_id, object2_id);
 
     }
+    else if (variable_name == "SpeciesContentOpinion") {
+        std::string opinionated_species_name;
+        if (m_string_ref1)
+            opinionated_species_name = m_string_ref1->Eval(context);
+        const auto species = GetSpecies(opinionated_species_name);
+        if (!species)
+            return 0.0;
+
+        std::string liked_or_disliked_content_name;
+        if (m_string_ref2)
+            liked_or_disliked_content_name = m_string_ref2->Eval(context);
+        if (liked_or_disliked_content_name.empty())
+            return 0.0;
+
+        if (species->Likes().count(liked_or_disliked_content_name))
+            return 1.0;
+        else if (species->Dislikes().count(liked_or_disliked_content_name))
+            return -1.0;
+        return 0.0;
+
+    }
     else if (variable_name == "SpeciesEmpireOpinion") {
         int empire_id = ALL_EMPIRES;
         if (m_int_ref1)
@@ -1987,6 +1957,7 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
             rated_species_name = m_string_ref2->Eval(context);
 
         return GetSpeciesManager().SpeciesSpeciesOpinion(opinionated_species_name, rated_species_name);
+
     }
     else if (variable_name == "SpecialCapacity") {
         int object_id = INVALID_OBJECT_ID;
@@ -2003,6 +1974,7 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
             return 0.0;
 
         return object->SpecialCapacity(special_name);
+
     }
     else if (variable_name == "ShipPartMeter") {
         int object_id = INVALID_OBJECT_ID;
@@ -2432,6 +2404,13 @@ std::string ComplexVariable<double>::Dump(unsigned short ntabs) const
             retval += " object = " + m_int_ref2->Dump(ntabs);
 
     }
+    else if (variable_name == "SpeciesContentOpinion") {
+        if (m_string_ref1)
+            retval += " species = " + m_string_ref1->Dump(ntabs);
+        if (m_string_ref2)
+            retval += " name = " + m_string_ref2->Dump(ntabs);
+
+    }
     else if (variable_name == "SpeciesEmpireOpinion") {
         if (m_int_ref1)
             retval += " empire = " + m_int_ref1->Dump(ntabs);
@@ -2685,7 +2664,7 @@ std::string Operation<std::string>::EvalImpl(const ScriptingContext& context) co
         std::set<std::string> vals;
         for (auto& vr : m_operands) {
             if (vr)
-                vals.insert(vr->Eval(context));
+                vals.emplace(vr->Eval(context));
         }
         if (m_op_type == MINIMUM)
             return vals.empty() ? "" : *vals.begin();
@@ -2819,7 +2798,7 @@ double Operation<double>::EvalImpl(const ScriptingContext& context) const
             std::set<double> vals;
             for (auto& vr : m_operands) {
                 if (vr)
-                    vals.insert(vr->Eval(context));
+                    vals.emplace(vr->Eval(context));
             }
             if (m_op_type == MINIMUM)
                 return vals.empty() ? 0.0 : *vals.begin();
@@ -2880,6 +2859,7 @@ double Operation<double>::EvalImpl(const ScriptingContext& context) const
                 else
                     return m_operands[3]->Eval(context);
             }
+            break;
         }
 
         case ROUND_NEAREST:
@@ -2888,6 +2868,12 @@ double Operation<double>::EvalImpl(const ScriptingContext& context) const
             return std::ceil(LHS()->Eval(context)); break;
         case ROUND_DOWN:
             return std::floor(LHS()->Eval(context)); break;
+
+        case SIGN: {
+            auto lhs{LHS()->Eval(context)};
+            return lhs < 0.0 ? -1.0 : lhs > 0.0 ? 1.0 : 0.0;
+            break;
+        }
 
         default:
             break;
@@ -2970,7 +2956,7 @@ int Operation<int>::EvalImpl(const ScriptingContext& context) const
             std::set<int> vals;
             for (auto& vr : m_operands) {
                 if (vr)
-                    vals.insert(vr->Eval(context));
+                    vals.emplace(vr->Eval(context));
             }
             if (m_op_type == MINIMUM)
                 return vals.empty() ? 0 : *vals.begin();
@@ -2997,14 +2983,6 @@ int Operation<int>::EvalImpl(const ScriptingContext& context) const
             if (!vr)
                 return 0;
             return vr->Eval(context);
-            break;
-        }
-
-        case ROUND_NEAREST:
-        case ROUND_UP:
-        case ROUND_DOWN: {
-            // integers don't need to be rounded...
-            return LHS()->Eval(context);
             break;
         }
 
@@ -3039,6 +3017,21 @@ int Operation<int>::EvalImpl(const ScriptingContext& context) const
                 else
                     return m_operands[3]->Eval(context);
             }
+            break;
+        }
+
+        case ROUND_NEAREST:
+        case ROUND_UP:
+        case ROUND_DOWN: {
+            // integers don't need to be rounded...
+            return LHS()->Eval(context);
+            break;
+        }
+
+        case SIGN: {
+            auto lhs{LHS()->Eval(context)};
+            return lhs < 0 ? -1 : lhs > 0 ? 1 : 0;
+            break;
         }
 
         default:    break;

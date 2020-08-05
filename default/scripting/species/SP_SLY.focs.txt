@@ -11,16 +11,20 @@ Species
     foci = [
         [[HAS_INDUSTRY_FOCUS]]
         [[HAS_RESEARCH_FOCUS]]
+        [[HAS_INFLUENCE_FOCUS]]
         [[HAS_GROWTH_FOCUS]]
         [[HAS_ADVANCED_FOCI]]
     ]
 
-    preferredfocus = "FOCUS_INDUSTRY"
+    defaultfocus = "FOCUS_INDUSTRY"
+    likes = ["FOCUS_INDUSTRY"]
+    dislikes = ["BLD_GAS_GIANT_GEN"]
 
     effectsgroups = [
         [[AVERAGE_INDUSTRY]]
         [[GREAT_STOCKPILE]]
         [[BAD_RESEARCH]]
+        [[GOOD_INFLUENCE]]
 
         [[AVERAGE_POPULATION]]
         [[AVERAGE_HAPPINESS]]

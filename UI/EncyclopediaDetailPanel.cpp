@@ -319,18 +319,16 @@ namespace {
             for (const auto& entry : species_manager) {
                 const auto& species = entry.second;
                 if (species->Homeworlds().empty()) {
-                    std::string&& species_entry = LinkTaggedText(VarText::SPECIES_TAG, entry.first) + ":  \n";
-                    species_entry += UserString("NO_HOMEWORLD");
+                    std::string species_entry{LinkTaggedText(VarText::SPECIES_TAG, entry.first) + ":  \n" + UserString("NO_HOMEWORLD")};
                     sorted_entries_list.emplace("⃠⃠" + std::string( "⃠ ") + UserString(entry.first),
-                                                std::make_pair(species_entry, entry.first));
+                                                std::make_pair(std::move(species_entry), entry.first));
                 }
-            } 
+            }
 
         }
         else if (dir_name == "ENC_FIELD_TYPE") {
             for (const auto& entry : GetFieldTypeManager()) {
-                std::string&& custom_category = DetermineCustomCategory(entry.second->Tags());
-                if (custom_category.empty()) {
+                if (DetermineCustomCategory(entry.second->Tags()).empty()) {
                     sorted_entries_list.emplace(UserString(entry.first),
                                                 std::make_pair(LinkTaggedText(VarText::FIELD_TYPE_TAG, entry.first) + "\n",
                                                                entry.first));
@@ -1068,9 +1066,7 @@ namespace {
 
         return retval;
     }
-}
 
-namespace {
     int DefaultLocationForEmpire(int empire_id) {
         const Empire* empire = GetEmpire(empire_id);
         if (!empire) {
@@ -1696,6 +1692,10 @@ namespace {
             detailed_description += "\n\n" + UserString("NO_OWNED_FLEETS_KNOWN");
         }
 
+        // Issued orders this turn
+        unsigned int n = 1;
+        detailed_description += "\n\n" + UserString("ISSUED_ORDERS") + "\n" +
+                                HumanClientApp::GetApp()->Orders().Dump();
 
         // Techs
         auto techs = empire->ResearchedTechs();
@@ -2008,10 +2008,24 @@ namespace {
             detailed_description += UserString("CANNNOT_COLONIZE");
 
         // focus preference
-        if (!species->PreferredFocus().empty()) {
-            detailed_description += "\n\n";
-            detailed_description += UserString("FOCUS_PREFERENCE");
-            detailed_description += UserString(species->PreferredFocus());
+        if (!species->DefaultFocus().empty()) {
+            detailed_description += "\n\n" + UserString("FOCUS_PREFERENCE") + UserString(species->DefaultFocus());
+        }
+
+        // likes
+        if (!species->Likes().empty()) {
+            detailed_description += "\n\n" + UserString("LIKES");
+            int count = 0;
+            for (const auto& s : species->Likes())
+                detailed_description += (count++ == 0 ? "" : ", ") + UserString(s);
+        }
+
+        // dislikes
+        if (!species->Dislikes().empty()) {
+            detailed_description += "\n\n" + UserString("DISLIKES");
+            int count = 0;
+            for (const auto& s : species->Dislikes())
+                detailed_description += (count++ == 0 ? "" : ", ") + UserString(s);
         }
 
         // environmental preferences
@@ -3097,7 +3111,7 @@ void EncyclopediaDetailPanel::RefreshImpl() {
                 // convert formats...
                 std::vector<std::pair<double, double>> line_data_pts;
                 for (const auto& entry : empire_linemap.second)
-                { line_data_pts.push_back({entry.first, entry.second}); }
+                    line_data_pts.emplace_back(entry.first, entry.second);
 
                 m_graph->AddSeries(line_data_pts, empire_clr);
             }
@@ -3125,7 +3139,7 @@ void EncyclopediaDetailPanel::RefreshImpl() {
 
     // Set Text
     if (!name.empty())
-        m_name_text->SetText(name);
+        m_name_text->SetText(std::move(name));
 
     m_summary_text->SetText(str(FlexibleFormat(UserString("ENC_DETAIL_TYPE_STR"))
         % specific_type
@@ -3146,12 +3160,12 @@ void EncyclopediaDetailPanel::RefreshImpl() {
     }
 
     if (!detailed_description.empty())
-        m_description_rich_text->SetText(detailed_description);
+        m_description_rich_text->SetText(std::move(detailed_description));
 
     m_scroll_panel->ScrollTo(GG::Y0);
 }
 
-void EncyclopediaDetailPanel::AddItem(const std::string& type, const std::string& name) {
+void EncyclopediaDetailPanel::AddItem(const std::string& type, std::string name) {
     // if the actual item is not the last one, all aubsequented items are deleted
     if (!m_items.empty()) {
         if (m_items_it->first == type && m_items_it->second == name)
@@ -3165,7 +3179,7 @@ void EncyclopediaDetailPanel::AddItem(const std::string& type, const std::string
         }
     }
 
-    m_items.push_back({type, name});
+    m_items.emplace_back(std::move(type), std::move(name));
     if (m_items.size() == 1)
         m_items_it = m_items.begin();
     else

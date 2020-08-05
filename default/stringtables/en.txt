@@ -1705,7 +1705,7 @@ OPTIONS_DB_UI_PLANET_STATUS_ATTACKED
 %1% was attacked on the previous turn.
 
 OPTIONS_DB_UI_PLANET_STATUS_CONQUERED
-%1% has just been conquered. Happiness will probably be reduced.
+%1% has just been conquered. Stability will probably be reduced.
 
 OPTIONS_DB_UI_PLANET_STATUS_UNHAPPY
 The population on %1% is very unhappy. Neither [[metertype METER_INDUSTRY]] nor [[metertype METER_RESEARCH]] will increase. It can not be used as a source for settlers.
@@ -5047,6 +5047,63 @@ Meters:
 RESEARCHED_TECHS
 '''Researched Techs: '''
 
+ISSUED_ORDERS
+'''Issued Orders: '''
+
+ORDER_UNEXECUTED
+''' - Unexecuted'''
+
+ORDER_RENAME
+Rename ID %1% to %2%
+
+ORDER_FLEET_NEW
+New %3% fleet named %1% with %2% ships
+
+ORDER_FLEET_MOVE
+Fleet Move
+
+ORDER_FLEET_TRANSFER
+Fleet Transfer
+
+ORDER_COLONIZE
+Colonize
+
+ORDER_INVADE
+Invade
+
+ORDER_BOMBARD
+Bombard
+
+ORDER_FOCUS_CHANGE
+Focus Change
+
+ORDER_POLICY_ADOPT
+Adopt Policy
+
+ORDER_POLICY_ABANDON
+Abandon Policy
+
+ORDER_RESEARCH
+Research
+
+ORDER_PRODUCTION
+Production
+
+ORDER_SHIP_DESIGN
+Ship Design
+
+ORDER_SCRAP
+Scrap
+
+ORDER_FLEET_AGGRESSION
+Set Fleet Aggress
+
+ORDER_GIVE_TO_EMPIRE
+Give To Empire
+
+ORDER_FORGET
+Forget
+
 BEFORE_FIRST_TURN
 Before First Turn
 
@@ -5873,12 +5930,12 @@ METER_CONSTRUCTION_VALUE_DESC
 The Target Infrastructure is the stable Infrastructure level a planet will approach, given the current factors influencing the planetary Infrastructure. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, and various other game effects. If these factors change, then the Target Infrastructure value is likely to shift.'''
 
 METER_HAPPINESS_VALUE_LABEL
-Happiness
+Stability
 
 METER_HAPPINESS_VALUE_DESC
-'''The Happiness of a colony's population starts out between 1 and 5 after initial colonization depending on how suitable the planet's [[encyclopedia ENVIRONMENT_TITLE]] is for that species. Happiness is reduced to 0 after invasion and may also be affected by other factors. A minimum Happiness of 5 is necessary for a colony to act as a source of settlers for colonizing other planets. Also [[metertype METER_INDUSTRY]] and [[metertype METER_RESEARCH]] only start growing if Happiness is at least 5.
+'''The Stability of a colony's population starts out between 1 and 5 after initial colonization depending on how suitable the planet's [[encyclopedia ENVIRONMENT_TITLE]] is for that species. Stability is reduced to 0 after invasion and may also be affected by other factors. A minimum Stability of 5 is necessary for a colony to act as a source of settlers for colonizing other planets. Also [[metertype METER_INDUSTRY]] and [[metertype METER_RESEARCH]] only start growing if Stability is at least 5.
 
-The Target Happiness is the stable Happiness level a planet's population will approach, given the current factors influencing the planetary Happiness. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, and various other game effects. If these factors change, then the Target Happiness value is likely to shift.'''
+The Target Stability is the stable Stability level a planet's population will approach, given the current factors influencing the planetary Stability. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, and various other game effects. If these factors change, then the Target Stability value is likely to shift.'''
 
 METER_CAPACITY_VALUE_LABEL
 Stat - Primary
@@ -6048,7 +6105,7 @@ FOCUS_TEXT
 
 The focus of a planet may grant it bonuses or enable effects. A small penalty applies when changing a planets focus, which will diminish over time.
 
-A planet will default to the inhabiting species' preferred focus if it has one, otherwise it will default to [[metertype METER_INDUSTRY]].'''
+A planet will default to the inhabiting species' default focus if it has one, otherwise it will default to [[metertype METER_INDUSTRY]].'''
 
 DISTORTION_FOCUS_TITLE
 Spatial Distortion Focus
@@ -6070,13 +6127,13 @@ INDUSTRY_FOCUS_TITLE
 Industry Focus
 
 INDUSTRY_FOCUS_TEXT
-Planets focused on Industry will generate more [[metertype METER_INDUSTRY]] will output for their empire, which is used for producing ships and buildings, or may be stockpiled for later use. Industry focus increases output more for higher population planets.
+Planets focused on Industry will generate more [[metertype METER_INDUSTRY]] output for their empire, which is used for producing ships and buildings, or may be stockpiled for later use. Industry focus increases output more for higher population planets.
 
 INFLUENCE_FOCUS_TITLE
 Influence Focus
 
 INFLUENCE_FOCUS_TEXT
-Influence isn't implemented yet.
+Planets focused on Influence will generate more [[metertype METER_INFLUENCE]] for their empire, which is used to adopt government policies.
 
 LOGISTICS_FOCUS_TITLE
 Logistics Focus
@@ -6442,7 +6499,7 @@ Orbital Drydock Repair
 ORBITAL_DRYDOCK_REPAIR_TEXT
 '''The [[buildingtype BLD_SHIPYARD_ORBITAL_DRYDOCK]] is considered the best repair facility available, able to restore a ship to pristine condition.
 
-When the planet [[metertype METER_HAPPINESS]] is below 15, repairs at this facility are not as efficient. If the planet drops below 5 happiness, the drydock is not able to perform any repairs that turn.
+When the planet [[metertype METER_HAPPINESS]] is below 15, repairs at this facility are not as efficient. If the planet drops below 5 stability, the drydock is not able to perform any repairs that turn.
 
 Repairs are delayed for one turn for ships just entering the system. Ships need time to dock, and the drydock needs time to prepare both the necessary tooling and the ship itself.
 
@@ -6635,8 +6692,8 @@ Building Type
 FOCUS
 Focus
 
-PREFERRED_FOCUS
-Preferred Focus
+DEFAULT_FOCUS
+Default Focus
 
 AVAILABLE_FOCI
 Available Foci
@@ -6715,6 +6772,9 @@ Last Turn In Battle
 
 LAST_TURN_RESUPPLIED
 Last Turn Resupplied
+
+LAST_TURN_MOVE_ORDERED
+Last Turn Move Ordered
 
 LAST_TURN_COLONIZED
 Last Turn Colonized
@@ -7647,7 +7707,7 @@ BEGINNER_HINT_14
 14: Research [[metertype METER_SUPPLY]] improvements, like the [[tech CON_ORBITAL_CON]], to increase the distance from your systems that your supply lines reach.
 
 BEGINNER_HINT_15
-15: Most species start out with a [[metertype METER_HAPPINESS]] of 0 when you capture their planet, and this will normally increase by 1 per turn. Look out for [[encyclopedia XENOPHOBIC_SPECIES_TITLE]] species though! They don't like being near other species and this will effect the happiness and other values of both them and the other nearby species.
+15: Most species start out with a [[metertype METER_HAPPINESS]] of 0 when their planet is captured, and this will normally increase by 1 per turn. Look out for [[encyclopedia XENOPHOBIC_SPECIES_TITLE]] species though! They don't like being near other species and this will effect the stability and other values of both them and the other nearby species.
 
 BEGINNER_HINT_16
 16: You may want to hold off on researching [[tech LRN_PSIONICS]] until your empire includes a species with [[encyclopedia TELEPATHIC_TITLE]].
@@ -7703,7 +7763,7 @@ ENVIRONMENTAL_PREFERENCES
 [[encyclopedia ENVIRONMENT_TITLE]] Preferences:
 
 FOCUS_PREFERENCE
-'''Preferred [[encyclopedia FOCUS_TITLE]]: '''
+'''Default [[encyclopedia FOCUS_TITLE]]: '''
 
 OPINIONS_OF_EMPIRES
 Opinions of Empires:
@@ -8193,7 +8253,7 @@ Prefer [[PT_OCEAN]] planets.
 
 SP_SSLITH_DESC
 '''Description:
-In its relaxed state, an individual Sslith is essentially a 2.15cm thick rectangular sheet, that's always 132cm long, and between 31 and 53cm wide. Its only appendage is a single tentacle that is used to sense sound and infrared light, it is also used for communication via ultrasound. Sslith are able to flex their bodies into other shapes, an ability originally evolved for the purpose of sliding into the shells of Vreen (a creature that recedes into its shell when it detects danger). Their flexibility allows them to move astonishingly fast in the oceans, by a ripple effect that looks like they are folding themselves through the water. They don't have a central brain, a Sslith's mental capacity is a collection of multiple nodes that are linked together to form a distributed consciousness allowing a Sslith to perform many tasks at once.
+In its relaxed state, an individual Sslith is essentially a 2.15cm thick rectangular sheet, that's always 132 cm long, and between 31 and 53 cm wide. Its only appendage is a single tentacle that is used to sense sound and infrared light, it is also used for communication via ultrasound. Sslith are able to flex their bodies into other shapes, an ability originally evolved for the purpose of sliding into the shells of Vreen (a creature that recedes into its shell when it detects danger). Their flexibility allows them to move astonishingly fast in the oceans, by a ripple effect that looks like they are folding themselves through the water. They don't have a central brain, a Sslith's mental capacity is a collection of multiple nodes that are linked together to form a distributed consciousness allowing a Sslith to perform many tasks at once.
 
 Social Structure:
 The Sslith are organized into groups called Pnacra which serve as independent governmental units. Though there are a few global laws that all Sslith in all Pnacra obey, each Pnacra has it's own rules and laws as to conduct and actions. The Pnacra move around of their own accord, and have no fixed geographic location. If two or more of them meet, then members who are discontented with their present Pnacra can move to another to try out its ways and customs.
@@ -8593,7 +8653,7 @@ Prefer [[PT_TOXIC]] planets.
 
 SP_MISIORLA_DESC
 '''Description:
-A Misiorla is a mollusc with four flexible tentacles and two pairs of four eyes each. Perfectly adapted to their homeworld they were able to swim through seas of acid fluids and float through clouds of thick heavy mists. They were considered to be a fairly mediocre species, barely worth the uplift they were given by a friendly civilization, neither smart nor productive and not talented in any way. That quickly changed when the first Misiorla were given control of a space ship. Word spread like a wildfire through the galaxy about the best combat pilots in the universe. The first Misiorla mercenaries were hired to pilote fighters, the next were given command of cruisers, but their full potential was realized when an outdated battleship manned with only Misiorla single-handily wiped out the whole space fleet of a far superior empire.
+A Misiorla is a mollusc with four flexible tentacles and two pairs of four eyes each. Perfectly adapted to their homeworld they were able to swim through seas of acid fluids and float through clouds of thick heavy mists. They were considered to be a fairly mediocre species, barely worth the uplift they were given by a friendly civilization, neither smart nor productive and not talented in any way. That quickly changed when the first Misiorla were given control of a space ship. Word spread like a wildfire through the galaxy about the best combat pilots in the universe. The first Misiorla mercenaries were hired to pilot fighters, the next were given command of cruisers, but their full potential was realized when an outdated battleship manned with only Misiorla single-handily wiped out the whole space fleet of a far superior empire.
 
 Social Structure:
 The whole life of Misiorlas is wrapped around piloting space vessels. Piloting is their job, it's their sport, it's their love. The society is totally dependend on other species because they become lethargic and unorganized when doing anything else. Misiorla can be hired by almost anyone who offers something interesting to fly and the fuel to do so.
@@ -9222,9 +9282,15 @@ invalid focus type
 FOCUS_GROWTH
 Growth
 
+FOCUS_GROWTH_DESC
+Exports growth resources from this planet
+
 # Focus types
 FOCUS_INDUSTRY
 Industry
+
+FOCUS_INDUSTRY_DESC
+Generates more industry output
 
 # Focus types
 FOCUS_STOCKPILE
@@ -9237,17 +9303,29 @@ Allows stockpile techs to boost stockpile withdrawal capacity
 FOCUS_RESEARCH
 Research
 
+FOCUS_RESEARCH_DESC
+Generates more research output
+
 # Focus types
 FOCUS_INFLUENCE
 Influence
+
+FOCUS_INFLUENCE_DESC
+Generates more influence
 
 # Focus types
 FOCUS_LOGISTICS
 Logistics
 
+FOCUS_LOGISTICS_DESC
+Extends supply lines
+
 # Focus types
 FOCUS_STEALTH
 Stealth
+
+FOCUS_STEALTH_DESC
+Increases planet stealth
 
 # Focus types
 FOCUS_BIOTERROR
@@ -9311,7 +9389,7 @@ Target Infrastructure
 
 # Meter types
 METER_TARGET_HAPPINESS
-Target Happiness
+Target Stability
 
 # Meter types
 METER_MAX_CAPACITY
@@ -9371,7 +9449,7 @@ Infrastructure
 
 # Meter types
 METER_HAPPINESS
-Happiness
+Stability
 
 # Meter types
 METER_CAPACITY
@@ -10091,20 +10169,56 @@ owner's top priority enqueued tech
 DESC_VAR_LASTTURNBATTLEHERE
 last turn a battle occurred here
 
-DESC_COMPLEX
-Complex Variable
-
 DESC_VAR_JUMPSBETWEEN
 starlane jumps between systems containing objects with ids %1% and %2%
 
-DESC_STATISTIC
+DESC_VAR_STATISTIC
 Statistic
+
+DESC_VAR_IF
+0, or 1 if there is any object%2%
 
 DESC_VAR_COUNT
 the number of objects%2%
 
-DESC_VAR_IF
-0, or 1 if there is any object%2%
+DESC_VAR_UNIQUE_COUNT
+the number of unique
+
+DESC_VAR_HISTO_MAX
+the number of the most common%1% of objects%2%
+
+DESC_VAR_HISTO_MIN
+the number of the least common%1% of objects%2%
+
+DESC_VAR_HISTO_SPREAD
+the difference between the numbers of the most common%1% of objects%2%
+
+DESC_VAR_SUM
+the sum%1% of objects%2%
+
+DESC_VAR_MEAN
+the mean%1% of objects%2%
+
+DESC_VAR_RMS
+the root mean square%1% of objects%2%
+
+DESC_VAR_MODE
+the mode%1% of objects%2%
+
+DESC_VAR_MAX
+the max%1% of objects%2%
+
+DESC_VAR_MIN
+the minimum%1% of objects%2%
+
+DESC_VAR_SPREAD
+the spread of%1% of objects%2%
+
+DESC_VAR_STDEV
+the standard deviation of%1% of objects%2%
+
+DESC_VAR_PRODUCT
+the product of%1% of objects%2%
 
 # FOCS variable reference description text.
 # %1% reference type of the FOCS variable.
@@ -11016,7 +11130,7 @@ PLC_COLONIZATION
 Colonization
 
 PLC_COLONIZATION_DESC
-Decreases cost of colonization ship parts.
+Decreases cost of colonization ship parts and give ships with colony parts but no weapons, troops, bombard, or general parts +1 base fuel capacity.
 
 PLC_COLONIZATION_SHORT_DESC
 Discounts Colonization
@@ -11086,6 +11200,110 @@ If two empires are allied, and either has adopted this policy, both will receive
 
 PLC_ALLIED_REPAIR_SHORT_DESC
 Allows allies to repair ships
+
+PLC_BALANCE
+Balance
+
+PLC_BALANCE_DESC
+'''Gives a bonus to the empire's capital's influence output and stability when the distribution of how many planets, which the empire controls and that are using different focus settings, is uniform. For each focus used in the empire, how many planets that use it are counted. If the difference is small between how many planets use the most popular focus and how many use the least popular focus, the bonuses on the capital are larger. The bonuses are also larger when more different focus settings are in use.
+
+Outposts with no focus selected also count as a focus, and may be the most popular focus setting, which may make getting large bonuses difficult.
+
+For example, 6 outposts with no focus, 3 planets with industry focus, and 2 planets with research focus have 3 different focus settings in use and a difference of 6 - 2 = 4 between the number of times the most and least popular focus settings are in use. Using more different focus settings or reducing the difference between the most and least popular settings would give larger bonuses.'''
+
+PLC_BALANCE_SHORT_DESC
+Increases influence and stability when more different foci are used
+
+PLC_ENVIRONMENTALISM
+Environmentalism
+
+PLC_ENVIRONMENTALISM_DESC
+'''Decreases industry and construction of all owned planets. Penalizes further construction, stability, and influence on terraformed planets.
+
+Boosts research, stability, influence, and stealth on non-terraformed populated planets.
+
+Makes terraforming more expensive.'''
+
+PLC_ENVIRONMENTALISM_SHORT_DESC
+Bonuses for not terraforming
+
+PLC_TERRAFORMING
+Terraforming
+
+PLC_TERRAFORMING_DESC
+Decreases the minimum time to produce [[buildingtype BLD_TERRAFORM]] and [[buildingtype BLD_TERRAFORM_REVERT]] projects on planets.
+
+PLC_TERRAFORMING_SHORT_DESC
+Speeds up terraforming
+
+PLC_INDUSTRIALISM
+Industrialism
+
+PLC_INDUSTRIALISM_DESC
+'''Increases industry output of planets by 25% and makes industry-focused planets more stable.
+
+Also makes some production-boosting generation techs cheaper to research.'''
+
+PLC_INDUSTRIALISM_SHORT_DESC
+Improves industry output
+
+PLC_CHECKPOINTS
+Border Checkpoints
+
+PLC_CHECKPOINTS_DESC
+'''Increases imperial detection strength by up to 20 (increasing over time).
+
+Reduces imperial supply networth range and influence generation.'''
+
+PLC_CHECKPOINTS_SHORT_DESC
+Improves Detection / Hinders Supply
+
+PLC_DIVERSITY
+Diversity
+
+PLC_DIVERSITY_DESC
+'''Gives bonuses or penalties to research, stability, and capital influence, dependent on the number of species in the empire.
+
+Gives bigger bonuses or penalities the more above or below 4 species that are present.'''
+
+PLC_DIVERSITY_SHORT_DESC
+Improves research, stability, and Influence
+
+PLC_RESERVE_TANKS
+Reserve Tanks
+
+PLC_RESERVE_TANKS_DESC
+Adds +1 fuel capacity to all ships, but halves their speed when they have less than half of their max fuel left.
+
+PLC_RESERVE_TANKS_SHORT_DESC
+Improves ship fuel economy
+
+PLC_ENGINEERING
+Engineering Corps
+
+PLC_ENGINEERING_DESC
+Reduces the "upkeep" cost of ships by half, so that the cost of producing more ships does not increase as quickly with fleet size, at the cost of 0.1 IP per turn per ship.
+
+PLC_ENGINEERING_SHORT_DESC
+Reduces Fleet Upkeep / Costs Influence
+
+PLC_EXOBOT_PRODUCTIVITY
+Exobot Productivity
+
+PLC_EXOBOT_PRODUCTIVITY_DESC
+Increases effective exobot production output on industry-focused worlds from very bad to just bad.
+
+PLC_EXOBOT_PRODUCTIVITY_SHORT_DESC
+Boosts exobot production
+
+PLC_CONFEDERATION
+Confederation
+
+PLC_CONFEDERATION_DESC
+Planets are organized in a confederacy of independent system, and do not suffer reduce influence if not connected to the capital, but are slightly less stable in general. Ground troops are also boosted slightly.
+
+PLC_CONFEDERATION_SHORT_DESC
+Supports disconnected systems
 
 
 ##
@@ -11753,7 +11971,7 @@ Interstellar Logistics
 SHP_INTSTEL_LOG_DESC
 '''Unlocks the Logistics focus setting, which increases the [[metertype METER_SUPPLY]] of planets by 3.
 
-Increases [[metertype METER_SPEED]] of your ships by 20 when they are within 50 uu of a controlled planet.
+Increases [[metertype METER_SPEED]] of ships by 20 when they are within 50 uu of a controlled planet.
 
 [[COLONY_BUILDING_TIME_DECREASE]]
 
@@ -12185,7 +12403,8 @@ Psychogenic Domination
 
 LRN_PSY_DOM_DESC
 '''Has a 10% chance of taking control of enemy ships with non-telepathic crews in the same system as a planet with domination focus, unless the enemy empire also knows the [[tech LRN_PSY_DOM]]. Domination focus can only be set on planets colonized by telepathic species.
-Reduces the chance that [[predefinedshipdesign SM_PSIONIC_SNOWFLAKE]]s take over your ships.
+
+Reduces the chance that [[predefinedshipdesign SM_PSIONIC_SNOWFLAKE]]s take over ships.
 
 It is difficult to force a conscious individual to submit to the total mental control of another entity against its will. By manipulating the timeframes involved however, the mental force exerted by a population over a period of hours may be brought to bear on a single individual in the span of a few seconds, creating an almost irresistible compulsion to join the unified mind.'''
 
@@ -12731,7 +12950,7 @@ SHP_DEUTERIUM_TANK
 Deuterium Tank
 
 SHP_DEUTERIUM_TANK_DESC
-Small upgrade to each of your [[shippart FU_BASIC_TANK]] ship parts. Increases [[metertype METER_FUEL]] capacity and thereby the number of jumps your ships can do without refueling.
+Small upgrade to each of [[shippart FU_BASIC_TANK]] ship parts. Increases [[metertype METER_FUEL]] capacity and thereby the number of jumps ships can do without refueling.
 
 SHP_DEUTERIUM_TANK_EFFECT
 Tech <i>Deuterium Tank</i>
@@ -12740,7 +12959,7 @@ SHP_ANTIMATTER_TANK
 Antimatter Tank
 
 SHP_ANTIMATTER_TANK_DESC
-Moderate upgrade to each of your [[shippart FU_BASIC_TANK]] ship parts. Increases [[metertype METER_FUEL]] capacity and thereby the number of jumps your ships can do without refueling.
+Moderate upgrade to each of [[shippart FU_BASIC_TANK]] ship parts. Increases [[metertype METER_FUEL]] capacity and thereby the number of jumps ships can do without refueling.
 
 SHP_ANTIMATTER_TANK_EFFECT
 Tech <i>Antimatter Tank</i>
@@ -15264,6 +15483,27 @@ GREAT_RESEARCH_DESC
 ULTIMATE_RESEARCH_DESC
 +++	Ultimate [[metertype METER_RESEARCH]]: 300%
 
+NO_INFLUENCE_DESC
+−−−	No [[metertype METER_INFLUENCE]]
+
+VERY_BAD_INFLUENCE_DESC
+−−	Very bad [[metertype METER_INFLUENCE]]: 50%
+
+BAD_INFLUENCE_DESC
+−	Bad [[metertype METER_INFLUENCE]]: 75%
+
+AVERAGE_INFLUENCE_DESC
+'''	Average [[metertype METER_INFLUENCE]]: 100%'''
+
+GOOD_INFLUENCE_DESC
++	Good [[metertype METER_INFLUENCE]]: 150%
+
+GREAT_INFLUENCE_DESC
+++	Great [[metertype METER_INFLUENCE]]: 200%
+
+ULTIMATE_INFLUENCE_DESC
++++	Ultimate [[metertype METER_INFLUENCE]]: 300%
+
 NO_DEFENSE_TROOPS_DESC
 −−−	No Defensive Ground [[metertype METER_TROOPS]]
 
@@ -15464,6 +15704,36 @@ LIVING_HULL_BASE_FUEL_REGEN_DESC
 ## Accounting labels
 ##
 
+# %1% name of empire
+# %2% name of policy
+LIKES_POLICY_LABEL
+Likes %1% policy %2%
+
+# %1% name of empire
+# %2% name of policy
+DISLIKES_POLICY_LABEL
+Dislikes %1% policy %2%
+
+# %1% name of planet
+# %2% name of building
+LIKES_BUILDING_LABEL
+Likes %1% building %2%
+
+# %1% name of planet
+# %2% name of building
+DISLIKES_BUILDING_LABEL
+Dislikes %1% building %2%
+
+# %1% name of planet
+# %2% name of species on planet
+LIKES_FOCUS_LABEL
+Likes %1% focus
+
+# %1% name of planet
+# %2% name of species on planet
+DISLIKES_FOCUS_LABEL
+Dislikes %1% focus
+
 # %1% FIXME
 STANDARD_CONSTRUCTION_LABEL
 %1% Average [[metertype METER_CONSTRUCTION]]
@@ -15582,6 +15852,36 @@ GREAT_RESEARCH_LABEL
 # %2% FIXME
 ULTIMATE_RESEARCH_LABEL
 %2% Ultimate Research
+
+# %1% FIXME
+# %2% FIXME
+FOCUS_INFLUENCE_LABEL
+%2% Influence Focus
+
+# %1% FIXME
+# %2% FIXME
+VERY_BAD_INFLUENCE_LABEL
+%2% Very Bad Influence
+
+# %1% FIXME
+# %2% FIXME
+BAD_INFLUENCE_LABEL
+%2% Bad Influence
+
+# %1% FIXME
+# %2% FIXME
+GOOD_INFLUENCE_LABEL
+%2% Good Influence
+
+# %1% FIXME
+# %2% FIXME
+GREAT_INFLUENCE_LABEL
+%2% Great Influence
+
+# %1% FIXME
+# %2% FIXME
+ULTIMATE_INFLUENCE_LABEL
+%2% Ultimate Influence
 
 # %1% FIXME
 # %2% FIXME
@@ -15823,7 +16123,13 @@ BASIC_CONTENTEDNESS_LABEL
 General Contentedness
 
 FOCUS_PREFERENCE_LABEL
-Preferred Focus Selected
+Default Focus Selected
+
+LIKES
+'''Likes: '''
+
+DISLIKES
+'''Dislikes: '''
 
 ROBOTIC_INTERFACE_EFFECT
 Robotic crew network
@@ -15847,7 +16153,7 @@ FUEL_EFFICIENCY_TITLE
 Fuel Efficiency
 
 FUEL_REFUEL_EFFICIENCY_TEXT
-'''[[metertype METER_FUEL]] allows ships to travel the starlanes outside of [[metertype METER_SUPPLY]] of your empire. Fuel is consumed for each starlane traversed outside of supply; stopping within [[metertype METER_SUPPLY]] lines will fully refuel a ship. If a ship remains stationary beyond friendly [[metertype METER_SUPPLY]] lines, fuel will slowly regenerate.
+'''[[metertype METER_FUEL]] allows ships to travel the starlanes outside of their empie's [[metertype METER_SUPPLY]]. Fuel is consumed for each starlane traversed outside of supply; stopping within [[metertype METER_SUPPLY]] lines will fully refuel a ship. If a ship remains stationary beyond friendly [[metertype METER_SUPPLY]] lines, fuel will slowly regenerate.
 
 The base fuel capacity of a <encyclopedia ENC_SHIP_DESIGN>Ship Design</encyclopedia> depends on the [[encyclopedia ENC_SHIP_HULL]] used, but it can also be increased using some [[encyclopedia ENC_SHIP_PART]]s.
 

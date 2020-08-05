@@ -11,13 +11,18 @@ Species
     foci = [
         [[HAS_INDUSTRY_FOCUS]]
         [[HAS_RESEARCH_FOCUS]]
+        [[HAS_INFLUENCE_FOCUS]]
         [[HAS_GROWTH_FOCUS]]
         [[HAS_ADVANCED_FOCI]]
     ]
 
+    likes = ["FOCUS_PROTECTION"]
+    dislikes = ["FOCUS_GRWOTH"]
+
     effectsgroups = [
         [[GREAT_INDUSTRY]]
         [[GREAT_RESEARCH]]
+        [[GREAT_INFLUENCE]]
         [[GREAT_STOCKPILE]]
 
         [[GOOD_POPULATION]]

@@ -1,7 +1,7 @@
 BuildingType
     name = "BLD_BLACK_HOLE_POW_GEN"
     description = "BLD_BLACK_HOLE_POW_GEN_DESC"
-    buildcost = 250 * [[BUILDING_COST_MULTIPLIER]]
+    buildcost = 300 * [[BUILDING_COST_MULTIPLIER]] * (1 - 0.5 * Statistic If condition = EmpireHasAdoptedPolicy empire = Source.Owner name = "PLC_INDUSTRIALISM")
     buildtime = 8
     tags = "ORBITAL"
     location = And [
@@ -12,6 +12,8 @@ BuildingType
     ]
     EnqueueLocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
     effectsgroups = [
+        [[SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS]]
+    
         EffectsGroup
             scope = And [
                 PopulationCenter
@@ -29,3 +31,4 @@ BuildingType
 #include "/scripting/common/priorities.macros"
 #include "/scripting/common/enqueue.macros"
 #include "/scripting/common/base_prod.macros"
+#include "/scripting/buildings/buildings.macros"

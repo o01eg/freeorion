@@ -1,39 +1,25 @@
-// -*- C++ -*-
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-/** \file TextControl.h \brief Contains the TextControl class, a control which
-    represents a certain text string in a certain font, justification, etc. */
+//! @file GG/TextControl.h
+//!
+//! Contains the TextControl class, a control which represents a certain text
+//! string in a certain font, justification, etc.
 
 #ifndef _GG_TextControl_h_
 #define _GG_TextControl_h_
 
+
+#include <boost/lexical_cast.hpp>
 #include <GG/ClrConstants.h>
 #include <GG/Control.h>
 #include <GG/Font.h>
-
-#include <boost/lexical_cast.hpp>
 
 
 namespace GG {
@@ -69,8 +55,8 @@ class GG_API TextControl : public Control
 public:
     using Wnd::SetMinSize;
 
-    TextControl(X x, Y y, X w, Y h, const std::string& str,
-                const std::shared_ptr<Font>& font,
+    TextControl(X x, Y y, X w, Y h, std::string str,
+                std::shared_ptr<Font> font,
                 Clr color = CLR_BLACK, Flags<TextFormat> format = FORMAT_NONE,
                 Flags<WndFlag> flags = NO_WND_FLAGS);
 
@@ -80,9 +66,9 @@ public:
      with each other. Font::ExpensiveParseFromTextToTextElements() will not be
      called on \p str.  Hence this constructor is much faster than the first
      constructor.*/
-    TextControl(X x, Y y, X w, Y h, const std::string& str,
-                const std::vector<std::shared_ptr<Font::TextElement>>&text_elements,
-                const std::shared_ptr<Font>& font,
+    TextControl(X x, Y y, X w, Y h, std::string str,
+                std::vector<std::shared_ptr<Font::TextElement>> text_elements,
+                std::shared_ptr<Font> font,
                 Clr color = CLR_BLACK, Flags<TextFormat> format = FORMAT_NONE,
                 Flags<WndFlag> flags = NO_WND_FLAGS);
 
@@ -205,7 +191,7 @@ public:
         window.  If the control was constructed with FORMAT_NOWRAP, calls
         to this function cause the window to be resized to whatever space
         the newly rendered text occupies. */
-    virtual void SetText(const std::string& str);
+    virtual void SetText(std::string str);
 
     /** Sets the text displayed in this control to the \p str \p text_elements
         pair.  This is faster than SetText without \p text_elements.
@@ -217,8 +203,8 @@ public:
         If the \p str and \p text_elements are inconsistent and \p str is shorter than expected
         from examining \p text_elements then it will return without changing the TextControl.
     */
-    virtual void SetText(const std::string& str,
-                         const std::vector<std::shared_ptr<Font::TextElement>>&text_elements);
+    virtual void SetText(std::string str,
+                         std::vector<std::shared_ptr<Font::TextElement>> text_elements);
 
     /** Change TextControl's text to replace the text at templated \p targ_offset with \p new_text.
 
@@ -364,5 +350,6 @@ T GG::TextControl::GetValue() const
 template <typename T>
 void GG::TextControl::operator<<(T t)
 { SetText(boost::lexical_cast<std::string>(t)); }
+
 
 #endif

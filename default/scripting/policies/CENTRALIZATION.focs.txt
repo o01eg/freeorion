@@ -4,7 +4,9 @@ Policy
     short_description = "PLC_CENTRALIZATION_SHORT_DESC"
     category = "ECONOMIC_CATEGORY"
     adoptioncost = 1.0*floor(5 + 0.25 * Statistic Sum value = LocalCandidate.Population condition = And [ Planet OwnedBy empire = Source.Owner ])
-    effectsgroups =
+    effectsgroups = [
+        [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
+        
         EffectsGroup
             scope = And [
                 Capital
@@ -12,12 +14,46 @@ Policy
             ]
             priority = [[DEFAULT_PRIORITY]]
             effects = [
-                SetTargetIndustry value = Value + 2
-                SetTargetResearch value = Value + 2
-                SetTargetConstruction value = Value + 5
-                SetMaxSupply value = Value - 1
+                SetTargetIndustry value = Value + Target.Population * [[INDUSTRY_PER_POP]]
+                SetTargetResearch value = Value + Target.Population * [[RESEARCH_PER_POP]]
+                SetTargetConstruction value = Value + 10
+                SetMaxSupply value = Value - 2
                 SetMaxStockpile value = Value - 2
             ]
+
+        EffectsGroup
+            scope = And [
+                Planet
+                OwnedBy empire = Source.Owner
+                Population low = 0.001
+                Not ResourceSupplyConnected empire = LocalCandidate.Owner condition = And [
+                    Planet
+                    OwnedBy empire = Source.Owner
+                    Capital
+                ]
+            ]
+            priority = [[DEFAULT_PRIORITY]]
+            effects =
+                SetTargetInfluence value = value - 3
+
+        EffectsGroup
+            scope = And [
+                Planet
+                OwnedBy empire = Source.Owner
+                Population low = 0.001
+                ResourceSupplyConnected empire = LocalCandidate.Owner condition = And [
+                    Planet
+                    OwnedBy empire = Source.Owner
+                    Capital
+                ]
+                Not Capital
+            ]
+            priority = [[DEFAULT_PRIORITY]]
+            effects =
+                SetTargetInfluence value = value - min(3, 0.2 * JumpsBetween object = Source.ID object = Target.ID)
+        ]
     graphic = "icons/policies/centralization.png"
 
+#include "/scripting/common/base_prod.macros"
 #include "/scripting/common/priorities.macros"
+#include "/scripting/policies/policies.macros"

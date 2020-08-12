@@ -27,6 +27,7 @@
 #include "../Empire/Empire.h"
 #include "../Empire/Supply.h"
 #include "../util/Logger.h"
+#include "../util/OptionsDB.h"
 #include "../util/Random.h"
 #include "../util/ScopedTimer.h"
 #include "../util/i18n.h"
@@ -39,6 +40,10 @@ FO_COMMON_API extern const int INVALID_DESIGN_ID;
 bool UserStringExists(const std::string& str);
 
 namespace {
+    void AddOptions(OptionsDB& db)
+    { db.Add<bool>("effects.move.test", "", false); }
+    bool temp_bool = RegisterOptions(&AddOptions);
+
     const std::string EMPTY_STRING;
 
     DeclareThreadSafeLogger(conditions);
@@ -134,7 +139,7 @@ namespace {
                 auto flattened_operands = FlattenAndNestedConditions(and_condition->Operands());
                 retval.insert(retval.end(), flattened_operands.begin(), flattened_operands.end());
             } else if (condition) {
-                retval.push_back(condition);
+                retval.emplace_back(condition);
             }
         }
         return retval;
@@ -237,7 +242,7 @@ struct Condition::MatchHelper {
         m_parent_context(parent_context)
     {}
 
-    bool operator()(std::shared_ptr<const UniverseObject> candidate) const
+    bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const
     { return m_this->Match(ScriptingContext(m_parent_context, candidate)); }
 
     const Condition* m_this = nullptr;
@@ -265,10 +270,31 @@ void Condition::Eval(const ScriptingContext& parent_context,
                      Effect::TargetSet& matches, Effect::TargetSet& non_matches,
                      SearchDomain search_domain/* = NON_MATCHES*/) const
 {
-    // reinterpret sets of mutable objects as sets of non-mutable objects.
-    auto& matches_as_objectset = reinterpret_cast<ObjectSet&>(matches);
-    auto& non_matches_as_objectset = reinterpret_cast<ObjectSet&>(non_matches);
-    this->Eval(parent_context, matches_as_objectset, non_matches_as_objectset, search_domain);
+    if (!GetOptionsDB().Get<bool>("effects.move.test")) {
+        // reinterpret sets of mutable objects as sets of non-mutable objects.
+        auto& matches_as_objectset = reinterpret_cast<ObjectSet&>(matches);
+        auto& non_matches_as_objectset = reinterpret_cast<ObjectSet&>(non_matches);
+        this->Eval(parent_context, matches_as_objectset, non_matches_as_objectset, search_domain);
+
+    } else {
+        ObjectSet matches_as_objectset{std::make_move_iterator(matches.begin()),
+                                       std::make_move_iterator(matches.end())};
+        ObjectSet non_matches_as_objectset{std::make_move_iterator(non_matches.begin()),
+                                           std::make_move_iterator(non_matches.end())};
+        matches.clear();
+        non_matches.clear();
+
+        this->Eval(parent_context, matches_as_objectset, non_matches_as_objectset, search_domain);
+
+        std::transform(std::make_move_iterator(matches_as_objectset.begin()),
+                       std::make_move_iterator(matches_as_objectset.end()),
+                       std::back_inserter(matches),
+                       std::const_pointer_cast<UniverseObject, const UniverseObject>);
+        std::transform(std::make_move_iterator(non_matches_as_objectset.begin()),
+                       std::make_move_iterator(non_matches_as_objectset.end()),
+                       std::back_inserter(non_matches),
+                       std::const_pointer_cast<UniverseObject, const UniverseObject>);
+    }
 }
 
 void Condition::Eval(const ScriptingContext& parent_context,
@@ -287,9 +313,23 @@ void Condition::Eval(const ScriptingContext& parent_context,
 void Condition::Eval(const ScriptingContext& parent_context,
                      Effect::TargetSet& matches) const
 {
-    // reinterpret sets of mutable objects as sets of non-mutable objects.
-    auto& matches_as_objectset = reinterpret_cast<ObjectSet&>(matches);
-    this->Eval(parent_context, matches_as_objectset);
+    if (!GetOptionsDB().Get<bool>("effects.move.test")) {
+        // reinterpret sets of mutable objects as sets of non-mutable objects.
+        auto& matches_as_objectset = reinterpret_cast<ObjectSet&>(matches);
+        this->Eval(parent_context, matches_as_objectset);
+
+    } else {
+        ObjectSet matches_as_objectset{std::make_move_iterator(matches.begin()),
+                                       std::make_move_iterator(matches.end())};
+        matches.clear();
+
+        this->Eval(parent_context, matches_as_objectset);
+
+        std::transform(std::make_move_iterator(matches_as_objectset.begin()),
+                       std::make_move_iterator(matches_as_objectset.end()),
+                       std::back_inserter(matches),
+                       std::const_pointer_cast<UniverseObject, const UniverseObject>);
+    }
 }
 
 bool Condition::Eval(const ScriptingContext& parent_context,
@@ -297,8 +337,7 @@ bool Condition::Eval(const ScriptingContext& parent_context,
 {
     if (!candidate)
         return false;
-    ObjectSet non_matches, matches;
-    non_matches.push_back(candidate);
+    ObjectSet non_matches{std::move(candidate)}, matches;
     Eval(parent_context, matches, non_matches);
     return non_matches.empty(); // if candidate has been matched, non_matches will now be empty
 }
@@ -306,8 +345,7 @@ bool Condition::Eval(const ScriptingContext& parent_context,
 bool Condition::Eval(std::shared_ptr<const UniverseObject> candidate) const {
     if (!candidate)
         return false;
-    ObjectSet non_matches, matches;
-    non_matches.push_back(candidate);
+    ObjectSet non_matches{std::move(candidate)}, matches;
     Eval(ScriptingContext(), matches, non_matches);
     return non_matches.empty(); // if candidate has been matched, non_matches will now be empty
 }
@@ -690,7 +728,7 @@ namespace {
         int i = 0;
         for (auto it = from_set.begin(); it != from_set.end(); ++i) {
             if (transfer_flags[i]) {
-                to_set.push_back(*it);
+                to_set.emplace_back(*it);   // TODO: can I std::move ?
                 *it = from_set.back();
                 from_set.pop_back();
             } else {
@@ -724,7 +762,7 @@ namespace {
         std::multimap<float, std::shared_ptr<const UniverseObject>> sort_key_objects;
         for (auto& from : from_set) {
             float sort_value = sort_key->Eval(ScriptingContext(context, from));
-            sort_key_objects.insert({sort_value, from});
+            sort_key_objects.emplace(sort_value, from); // TODO: can I std::move ?
         }
 
         // how many objects to select?
@@ -743,7 +781,7 @@ namespace {
                 if (from_it != from_set.end()) {
                     *from_it = from_set.back();
                     from_set.pop_back();
-                    to_set.push_back(object_to_transfer);
+                    to_set.emplace_back(object_to_transfer);    // TODO: can I std::move ?
                     number_transferred++;
                     if (number_transferred >= number)
                         return;
@@ -761,7 +799,7 @@ namespace {
                 if (from_it != from_set.end()) {
                     *from_it = from_set.back();
                     from_set.pop_back();
-                    to_set.push_back(object_to_transfer);
+                    to_set.emplace_back(object_to_transfer);    // TODO: can I std::move ?
                     number_transferred++;
                     if (number_transferred >= number)
                         return;
@@ -800,7 +838,7 @@ namespace {
                     if (from_it != from_set.end()) {
                         *from_it = from_set.back();
                         from_set.pop_back();
-                        to_set.push_back(object_to_transfer);
+                        to_set.emplace_back(object_to_transfer);    // TODO: can I std::move ?
                         number_transferred++;
                         if (number_transferred >= number)
                             return;
@@ -890,7 +928,7 @@ void SortedNumberOf::Eval(const ScriptingContext& parent_context,
                 // yes; move object to matches
                 *smnt_it = subcondition_matching_non_matches.back();
                 subcondition_matching_non_matches.pop_back();
-                matches.push_back(matched_object);
+                matches.emplace_back(matched_object);   // TODO: can I std::move ?
             }
         }
 
@@ -914,7 +952,7 @@ void SortedNumberOf::Eval(const ScriptingContext& parent_context,
                 // yes; move back into matches
                 *smt_it = subcondition_matching_matches.back();
                 subcondition_matching_matches.pop_back();
-                matches.push_back(matched_object);
+                matches.emplace_back(matched_object);   // TODO: can I std::move ?
             }
         }
 
@@ -1164,7 +1202,7 @@ namespace {
             m_affiliation(affiliation)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -1330,7 +1368,7 @@ std::string EmpireAffiliation::Dump(unsigned short ntabs) const {
 }
 
 bool EmpireAffiliation::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "EmpireAffiliation::Match passed no candidate object";
         return false;
@@ -1390,7 +1428,7 @@ void Source::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_co
                                                ObjectSet& condition_non_targets) const
 {
     if (parent_context.source)
-        condition_non_targets.push_back(parent_context.source);
+        condition_non_targets.emplace_back(parent_context.source);
 }
 
 unsigned int Source::GetCheckSum() const {
@@ -1435,7 +1473,7 @@ void RootCandidate::GetDefaultInitialCandidateObjects(const ScriptingContext& pa
                                                       ObjectSet& condition_non_targets) const
 {
     if (parent_context.condition_root_candidate)
-        condition_non_targets.push_back(parent_context.condition_root_candidate);
+        condition_non_targets.emplace_back(parent_context.condition_root_candidate);
 }
 
 unsigned int RootCandidate::GetCheckSum() const {
@@ -1480,7 +1518,7 @@ void Target::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_co
                                                ObjectSet& condition_non_targets) const
 {
     if (parent_context.effect_target)
-        condition_non_targets.push_back(parent_context.effect_target);
+        condition_non_targets.emplace_back(parent_context.effect_target);
 }
 
 unsigned int Target::GetCheckSum() const {
@@ -1532,7 +1570,7 @@ namespace {
             m_objects(objects)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -1596,7 +1634,7 @@ void Homeworld::Eval(const ScriptingContext& parent_context,
         names.reserve(m_names.size());
         // get all names from valuerefs
         for (auto& name : m_names)
-            names.push_back(name->Eval(parent_context));
+            names.emplace_back(name->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, HomeworldSimpleMatch(names, parent_context.ContextObjects()));
     } else {
         // re-evaluate allowed names for each candidate object
@@ -1639,7 +1677,7 @@ std::string Homeworld::Dump(unsigned short ntabs) const {
 }
 
 bool Homeworld::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "Homeworld::Match passed no candidate object";
         return false;
@@ -1726,7 +1764,7 @@ std::string Capital::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + "Capital\n"; }
 
 bool Capital::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "Capital::Match passed no candidate object";
         return false;
@@ -1778,7 +1816,7 @@ std::string Monster::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + "Monster\n"; }
 
 bool Monster::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "Monster::Match passed no candidate object";
         return false;
@@ -1828,7 +1866,7 @@ std::string Armed::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + "Armed\n"; }
 
 bool Armed::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "Armed::Match passed no candidate object";
         return false;
@@ -1885,7 +1923,7 @@ namespace {
             m_type(type)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -1963,7 +2001,7 @@ std::string Type::Dump(unsigned short ntabs) const {
 }
 
 bool Type::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "Type::Match passed no candidate object";
         return false;
@@ -2072,7 +2110,7 @@ namespace {
             m_names(names)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -2110,10 +2148,10 @@ void Building::Eval(const ScriptingContext& parent_context,
     if (simple_eval_safe) {
         // evaluate names once, and use to check all candidate objects
         std::vector<std::string> names;
+        names.reserve(m_names.size());
         // get all names from valuerefs
-        for (auto& name : m_names) {
-            names.push_back(name->Eval(parent_context));
-        }
+        for (auto& name : m_names)
+            names.emplace_back(name->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, BuildingSimpleMatch(names));
     } else {
         // re-evaluate allowed building types range for each candidate object
@@ -2160,7 +2198,7 @@ void Building::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
 { AddBuildingSet(parent_context.ContextObjects(), condition_non_targets); }
 
 bool Building::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "Building::Match passed no candidate object";
         return false;
@@ -2279,7 +2317,7 @@ namespace {
             m_high_turn(high_turn)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -2399,7 +2437,7 @@ std::string HasSpecial::Dump(unsigned short ntabs) const {
 }
 
 bool HasSpecial::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "HasSpecial::Match passed no candidate object";
         return false;
@@ -2447,8 +2485,8 @@ HasTag::HasTag() :
     HasTag(std::unique_ptr<ValueRef::ValueRef<std::string>>{})
 {}
 
-HasTag::HasTag(const std::string& name) :
-    HasTag(std::make_unique<ValueRef::Constant<std::string>>(name))
+HasTag::HasTag(std::string name) :
+    HasTag(std::make_unique<ValueRef::Constant<std::string>>(std::move(name)))
 {}
 
 HasTag::HasTag(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
@@ -2485,7 +2523,7 @@ namespace {
             m_name(name)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -2542,7 +2580,7 @@ std::string HasTag::Dump(unsigned short ntabs) const {
 }
 
 bool HasTag::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "HasTag::Match passed no candidate object";
         return false;
@@ -2606,7 +2644,7 @@ namespace {
             m_high(high)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
             int turn = candidate->CreationTurn();
@@ -2662,7 +2700,7 @@ std::string CreatedOnTurn::Dump(unsigned short ntabs) const {
 }
 
 bool CreatedOnTurn::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "CreatedOnTurn::Match passed no candidate object";
         return false;
@@ -2732,13 +2770,13 @@ namespace {
             // gather the ids
             for (auto& obj : subcondition_matches) {
                 if (obj)
-                    m_subcondition_matches_ids.push_back(obj->ID());
+                    m_subcondition_matches_ids.emplace_back(obj->ID());
             }
             // sort them
             std::sort(m_subcondition_matches_ids.begin(), m_subcondition_matches_ids.end());
         }
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -2814,11 +2852,11 @@ void Contains::Eval(const ScriptingContext& parent_context,
         if (search_domain == MATCHES && subcondition_matches.empty()) {
             // move to non_matches
             matches.clear();
-            non_matches.push_back(local_context.condition_local_candidate);
+            non_matches.emplace_back(local_context.condition_local_candidate);
         } else if (search_domain == NON_MATCHES && !subcondition_matches.empty()) {
             // move to matches
             non_matches.clear();
-            matches.push_back(local_context.condition_local_candidate);
+            matches.emplace_back(local_context.condition_local_candidate);
         }
 
     } else {
@@ -2857,7 +2895,7 @@ void Contains::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
 }
 
 bool Contains::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "Contains::Match passed no candidate object";
         return false;
@@ -2930,13 +2968,13 @@ namespace {
             // gather the ids
             for (auto& obj : subcondition_matches) {
                 if (obj)
-                    m_subcondition_matches_ids.push_back(obj->ID());
+                    m_subcondition_matches_ids.emplace_back(obj->ID());
             }
             // sort them
             std::sort(m_subcondition_matches_ids.begin(), m_subcondition_matches_ids.end());
         }
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -2946,8 +2984,8 @@ namespace {
             const int candidate_id = candidate->ID();
             const int    system_id = candidate->SystemID();
             const int container_id = candidate->ContainerObjectID();
-            if (   system_id != INVALID_OBJECT_ID &&    system_id != candidate_id) candidate_containers.push_back(   system_id);
-            if (container_id != INVALID_OBJECT_ID && container_id !=    system_id) candidate_containers.push_back(container_id);
+            if (   system_id != INVALID_OBJECT_ID &&    system_id != candidate_id) candidate_containers.emplace_back(   system_id);
+            if (container_id != INVALID_OBJECT_ID && container_id !=    system_id) candidate_containers.emplace_back(container_id);
             // FIXME: currently, direct container and system will do. In the future, we might need a way to retrieve containers of containers
 
             // We need to test whether candidate_containers and m_subcondition_matches_ids have a common element.
@@ -3026,11 +3064,11 @@ void ContainedBy::Eval(const ScriptingContext& parent_context,
         if (search_domain == MATCHES && subcondition_matches.empty()) {
             // move to non_matches
             matches.clear();
-            non_matches.push_back(local_context.condition_local_candidate);
+            non_matches.emplace_back(local_context.condition_local_candidate);
         } else if (search_domain == NON_MATCHES && !subcondition_matches.empty()) {
             // move to matches
             non_matches.clear();
-            matches.push_back(local_context.condition_local_candidate);
+            matches.emplace_back(local_context.condition_local_candidate);
         }
 
     } else {
@@ -3070,7 +3108,7 @@ void ContainedBy::GetDefaultInitialCandidateObjects(const ScriptingContext& pare
 }
 
 bool ContainedBy::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "ContainedBy::Match passed no candidate object";
         return false;
@@ -3138,7 +3176,7 @@ namespace {
             m_system_id(system_id)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
             if (m_system_id == INVALID_OBJECT_ID)
@@ -3229,13 +3267,13 @@ void InOrIsSystem::GetDefaultInitialCandidateObjects(const ScriptingContext& par
 
     // insert all objects that have the specified system id
     condition_non_targets.reserve(sys_objs.size() + 1);
-    std::copy(sys_objs.begin(), sys_objs.end(), std::back_inserter(condition_non_targets));
+    std::copy(sys_objs.begin(), sys_objs.end(), std::back_inserter(condition_non_targets)); // TODO: move
     // also insert system itself
-    condition_non_targets.push_back(system);
+    condition_non_targets.emplace_back(std::move(system));
 }
 
 bool InOrIsSystem::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "InOrIsSystem::Match passed no candidate object";
         return false;
@@ -3290,7 +3328,7 @@ namespace {
             m_planet_id(planet_id)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
             auto building = std::dynamic_pointer_cast<const ::Building>(candidate);
@@ -3385,7 +3423,7 @@ void OnPlanet::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
 }
 
 bool OnPlanet::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "OnPlanet::Match passed no candidate object";
         return false;
@@ -3440,7 +3478,7 @@ namespace {
             m_object_id(object_id)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             return candidate &&
                 m_object_id != INVALID_OBJECT_ID &&
                 candidate->ID() == m_object_id;
@@ -3509,11 +3547,11 @@ void ObjectID::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
         return;
 
     if (auto obj = parent_context.ContextObjects().ExistingObject(object_id))
-        condition_non_targets.push_back(obj);
+        condition_non_targets.emplace_back(std::move(obj));
 }
 
 bool ObjectID::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "ObjectID::Match passed no candidate object";
         return false;
@@ -3573,7 +3611,7 @@ namespace {
             m_objects(objects)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -3612,10 +3650,10 @@ void PlanetType::Eval(const ScriptingContext& parent_context,
     if (simple_eval_safe) {
         // evaluate types once, and use to check all candidate objects
         std::vector< ::PlanetType> types;
+        types.reserve(m_types.size());
         // get all types from valuerefs
-        for (auto& type : m_types) {
-            types.push_back(type->Eval(parent_context));
-        }
+        for (auto& type : m_types)
+            types.emplace_back(type->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, PlanetTypeSimpleMatch(types, parent_context.ContextObjects()));
     } else {
         // re-evaluate contained objects for each candidate object
@@ -3665,7 +3703,7 @@ void PlanetType::GetDefaultInitialCandidateObjects(const ScriptingContext& paren
 }
 
 bool PlanetType::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "PlanetType::Match passed no candidate object";
         return false;
@@ -3738,7 +3776,7 @@ namespace {
             m_objects(objects)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -3780,10 +3818,10 @@ void PlanetSize::Eval(const ScriptingContext& parent_context,
     if (simple_eval_safe) {
         // evaluate types once, and use to check all candidate objects
         std::vector< ::PlanetSize> sizes;
-        // get all types from valuerefs
-        for (auto& size : m_sizes) {
-            sizes.push_back(size->Eval(parent_context));
-        }
+        sizes.reserve(m_sizes.size());
+        // get all types from valuerefs  TODO: could lazy-evaluate m_sizes vs. find all then pass in...?
+        for (auto& size : m_sizes)
+            sizes.emplace_back(size->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, PlanetSizeSimpleMatch(sizes, parent_context.ContextObjects()));
     } else {
         // re-evaluate contained objects for each candidate object
@@ -3833,7 +3871,7 @@ void PlanetSize::GetDefaultInitialCandidateObjects(const ScriptingContext& paren
 }
 
 bool PlanetSize::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "PlanetSize::Match passed no candidate object";
         return false;
@@ -3919,7 +3957,7 @@ namespace {
             m_objects(objects)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -3963,13 +4001,11 @@ void PlanetEnvironment::Eval(const ScriptingContext& parent_context,
     if (simple_eval_safe) {
         // evaluate types once, and use to check all candidate objects
         std::vector< ::PlanetEnvironment> environments;
+        environments.reserve(m_environments.size());
         // get all types from valuerefs
-        for (auto& environment : m_environments) {
-            environments.push_back(environment->Eval(parent_context));
-        }
-        std::string species_name;
-        if (m_species_name)
-            species_name = m_species_name->Eval(parent_context);
+        for (auto& environment : m_environments)
+            environments.emplace_back(environment->Eval(parent_context));
+        std::string species_name{m_species_name ? m_species_name->Eval(parent_context) : ""};
         EvalImpl(matches, non_matches, search_domain, PlanetEnvironmentSimpleMatch(environments, parent_context.ContextObjects(), species_name));
     } else {
         // re-evaluate contained objects for each candidate object
@@ -4031,7 +4067,7 @@ void PlanetEnvironment::GetDefaultInitialCandidateObjects(const ScriptingContext
 }
 
 bool PlanetEnvironment::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "PlanetEnvironment::Match passed no candidate object";
         return false;
@@ -4117,7 +4153,7 @@ namespace {
             m_objects(objects)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -4224,7 +4260,7 @@ void Species::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_c
 }
 
 bool Species::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "Species::Match passed no candidate object";
         return false;
@@ -4386,7 +4422,7 @@ namespace {
             m_low(low),
             m_high(high)
         {}
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -4539,7 +4575,7 @@ std::string Enqueued::Dump(unsigned short ntabs) const {
 }
 
 bool Enqueued::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "Enqueued::Match passed no candidate object";
         return false;
@@ -4621,7 +4657,7 @@ namespace {
             m_objects(objects)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -4662,10 +4698,10 @@ void FocusType::Eval(const ScriptingContext& parent_context,
     if (simple_eval_safe) {
         // evaluate names once, and use to check all candidate objects
         std::vector<std::string> names;
-        // get all names from valuerefs
-        for (auto& name : m_names) {
-            names.push_back(name->Eval(parent_context));
-        }
+        names.reserve(m_names.size());
+        // get all names from valuerefs TODO: could lazy evaluate names rather than evaluating all and passing...
+        for (auto& name : m_names)
+            names.emplace_back(name->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, FocusTypeSimpleMatch(names, parent_context.ContextObjects()));
     } else {
         // re-evaluate allowed building types range for each candidate object
@@ -4708,7 +4744,7 @@ std::string FocusType::Dump(unsigned short ntabs) const {
 }
 
 bool FocusType::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "FocusType::Match passed no candidate object";
         return false;
@@ -4790,7 +4826,7 @@ namespace {
             m_objects(objects)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -4823,10 +4859,10 @@ void StarType::Eval(const ScriptingContext& parent_context,
     if (simple_eval_safe) {
         // evaluate types once, and use to check all candidate objects
         std::vector< ::StarType> types;
+        types.reserve(m_types.size());
         // get all types from valuerefs
-        for (auto& type : m_types) {
-            types.push_back(type->Eval(parent_context));
-        }
+        for (auto& type : m_types)
+            types.emplace_back(type->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, StarTypeSimpleMatch(types, parent_context.ContextObjects()));
     } else {
         // re-evaluate contained objects for each candidate object
@@ -4869,7 +4905,7 @@ std::string StarType::Dump(unsigned short ntabs) const {
 }
 
 bool StarType::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "StarType::Match passed no candidate object";
         return false;
@@ -4933,7 +4969,7 @@ namespace {
             m_name(name)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -4994,7 +5030,7 @@ std::string DesignHasHull::Dump(unsigned short ntabs) const {
 }
 
 bool DesignHasHull::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "DesignHasHull::Match passed no candidate object";
         return false;
@@ -5067,7 +5103,7 @@ namespace {
             m_objects(objects)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -5168,7 +5204,7 @@ std::string DesignHasPart::Dump(unsigned short ntabs) const {
 }
 
 bool DesignHasPart::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "DesignHasPart::Match passed no candidate object";
         return false;
@@ -5250,7 +5286,7 @@ namespace {
             m_part_class(part_class)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -5334,7 +5370,7 @@ std::string DesignHasPartClass::Dump(unsigned short ntabs) const {
 }
 
 bool DesignHasPartClass::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "DesignHasPartClass::Match passed no candidate object";
         return false;
@@ -5406,7 +5442,7 @@ namespace {
             m_name(name)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             auto ship = std::dynamic_pointer_cast<const Ship>(candidate);
             if (!ship)
                 return false;
@@ -5474,7 +5510,7 @@ std::string PredefinedShipDesign::Dump(unsigned short ntabs) const {
 }
 
 bool PredefinedShipDesign::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "PredefinedShipDesign::Match passed no candidate object";
         return false;
@@ -5533,7 +5569,7 @@ namespace {
             m_design_id(design_id)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
             if (m_design_id == INVALID_DESIGN_ID)
@@ -5582,7 +5618,7 @@ std::string NumberedShipDesign::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + "NumberedShipDesign design_id = " + m_design_id->Dump(ntabs); }
 
 bool NumberedShipDesign::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "NumberedShipDesign::Match passed no candidate object";
         return false;
@@ -5636,7 +5672,7 @@ namespace {
             m_empire_id(empire_id)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -5690,7 +5726,7 @@ std::string ProducedByEmpire::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + "ProducedByEmpire empire_id = " + m_empire_id->Dump(ntabs); }
 
 bool ProducedByEmpire::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "ProducedByEmpire::Match passed no candidate object";
         return false;
@@ -5745,7 +5781,7 @@ namespace {
             m_chance(chance)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const
         { return RandZeroToOne() <= m_chance; }
 
         float m_chance;
@@ -5849,7 +5885,7 @@ namespace {
             m_meter_type(meter_type)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -5971,7 +6007,7 @@ std::string MeterValue::Dump(unsigned short ntabs) const {
 }
 
 bool MeterValue::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "MeterValue::Match passed no candidate object";
         return false;
@@ -6047,7 +6083,7 @@ namespace {
             m_meter(meter)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
             auto ship = std::dynamic_pointer_cast<const Ship>(candidate);
@@ -6130,7 +6166,7 @@ std::string ShipPartMeterValue::Dump(unsigned short ntabs) const {
 }
 
 bool ShipPartMeterValue::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "ShipPartMeterValue::Match passed no candidate object";
         return false;
@@ -6285,7 +6321,7 @@ std::string EmpireMeterValue::Dump(unsigned short ntabs) const {
 
 bool EmpireMeterValue::Match(const ScriptingContext& local_context) const {
     int empire_id = ALL_EMPIRES;
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     // if m_empire_id not set, default to candidate object's owner
     if (!m_empire_id && !candidate) {
         ErrorLogger() << "EmpireMeterValue::Match passed no candidate object but expects one due to having no empire id valueref specified and thus wanting to use the local candidate's owner as the empire id";
@@ -6459,7 +6495,7 @@ std::string EmpireStockpileValue::Dump(unsigned short ntabs) const {
 
 bool EmpireStockpileValue::Match(const ScriptingContext& local_context) const {
     int empire_id = ALL_EMPIRES;
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     // if m_empire_id not set, default to candidate object's owner
     if (!m_empire_id && !candidate) {
         ErrorLogger() << "EmpireStockpileValue::Match passed no candidate object but expects one due to having no empire id valueref specified and thus wanting to use the local candidate's owner as the empire id";
@@ -6611,7 +6647,7 @@ std::string EmpireHasAdoptedPolicy::Dump(unsigned short ntabs) const {
 
 bool EmpireHasAdoptedPolicy::Match(const ScriptingContext& local_context) const {
     int empire_id = ALL_EMPIRES;
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     // if m_empire_id not set, default to candidate object's owner
     if (!m_empire_id && !candidate) {
         ErrorLogger() << "EmpireHasAdoptedPolicy::Match passed no candidate object but expects one due to having no empire id valueref specified and thus wanting to use the local candidate's owner as the empire id";
@@ -6701,7 +6737,7 @@ namespace {
             m_name(name)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -6767,7 +6803,7 @@ std::string OwnerHasTech::Dump(unsigned short ntabs) const {
 }
 
 bool OwnerHasTech::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "OwnerHasTech::Match passed no candidate object";
         return false;
@@ -6845,7 +6881,7 @@ namespace {
             m_name(name)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -6896,7 +6932,7 @@ std::string OwnerHasBuildingTypeAvailable::Description(bool negated/* = false*/)
 }
 
 std::string OwnerHasBuildingTypeAvailable::Dump(unsigned short ntabs) const {
-    std::string retval= DumpIndent(ntabs) + "OwnerHasBuildingTypeAvailable";
+    std::string retval = DumpIndent(ntabs) + "OwnerHasBuildingTypeAvailable";
     if (m_empire_id)
         retval += " empire = " + m_empire_id->Dump(ntabs);
     if (m_name)
@@ -6906,7 +6942,7 @@ std::string OwnerHasBuildingTypeAvailable::Dump(unsigned short ntabs) const {
 }
 
 bool OwnerHasBuildingTypeAvailable::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "OwnerHasTech::Match passed no candidate object";
         return false;
@@ -6983,7 +7019,7 @@ namespace {
             m_id(design_id)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -7044,7 +7080,7 @@ std::string OwnerHasShipDesignAvailable::Dump(unsigned short ntabs) const {
 }
 
 bool OwnerHasShipDesignAvailable::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "OwnerHasTech::Match passed no candidate object";
         return false;
@@ -7121,7 +7157,7 @@ namespace {
             m_name(name)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -7180,7 +7216,7 @@ std::string OwnerHasShipPartAvailable::Dump(unsigned short ntabs) const {
 }
 
 bool OwnerHasShipPartAvailable::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "OwnerHasShipPart::Match passed no candidate object";
         return false;
@@ -7245,7 +7281,7 @@ namespace {
             vis_map(vis_map)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -7316,7 +7352,7 @@ std::string VisibleToEmpire::Dump(unsigned short ntabs) const {
 }
 
 bool VisibleToEmpire::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "VisibleToEmpire::Match passed no candidate object";
         return false;
@@ -7382,7 +7418,7 @@ namespace {
             m_distance2(distance*distance)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -7444,7 +7480,7 @@ std::string WithinDistance::Dump(unsigned short ntabs) const {
 }
 
 bool WithinDistance::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "WithinDistance::Match passed no candidate object";
         return false;
@@ -7550,7 +7586,7 @@ std::string WithinStarlaneJumps::Dump(unsigned short ntabs) const {
 }
 
 bool WithinStarlaneJumps::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "WithinStarlaneJumps::Match passed no candidate object";
         return false;
@@ -7863,7 +7899,7 @@ namespace {
             std::copy(dest_systems.begin(), dest_systems.end(), std::inserter(m_destination_systems, m_destination_systems.end()));
         }
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -8005,7 +8041,7 @@ std::string CanAddStarlaneConnection::Dump(unsigned short ntabs) const {
 }
 
 bool CanAddStarlaneConnection::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "CanAddStarlaneConnection::Match passed no candidate object";
         return false;
@@ -8064,7 +8100,7 @@ namespace {
             m_empire_id(empire_id)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -8119,7 +8155,7 @@ std::string ExploredByEmpire::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + "ExploredByEmpire empire_id = " + m_empire_id->Dump(ntabs); }
 
 bool ExploredByEmpire::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "ExploredByEmpire::Match passed no candidate object";
         return false;
@@ -8167,7 +8203,7 @@ std::string Stationary::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + "Stationary\n"; }
 
 bool Stationary::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "Stationary::Match passed no candidate object";
         return false;
@@ -8238,7 +8274,7 @@ std::string Aggressive::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + (m_aggressive ? "Aggressive\n" : "Passive\n"); }
 
 bool Aggressive::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "Aggressive::Match passed no candidate object";
         return false;
@@ -8299,7 +8335,7 @@ namespace {
             m_empire_id(empire_id)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
@@ -8358,7 +8394,7 @@ std::string FleetSupplyableByEmpire::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + "ResupplyableBy empire_id = " + m_empire_id->Dump(ntabs); }
 
 bool FleetSupplyableByEmpire::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "FleetSupplyableByEmpire::Match passed no candidate object";
         return false;
@@ -8426,7 +8462,7 @@ namespace {
             m_objects(objects)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
             if (m_from_objects.empty())
@@ -8515,7 +8551,7 @@ void ResourceSupplyConnectedByEmpire::Eval(const ScriptingContext& parent_contex
 }
 
 bool ResourceSupplyConnectedByEmpire::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "ResourceSupplyConnectedByEmpire::Match passed no candidate object";
         return false;
@@ -8597,7 +8633,7 @@ std::string CanColonize::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + "CanColonize\n"; }
 
 bool CanColonize::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "CanColonize::Match passed no candidate object";
         return false;
@@ -8678,7 +8714,7 @@ std::string CanProduceShips::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + "CanColonize\n"; }
 
 bool CanProduceShips::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "CanProduceShips::Match passed no candidate object";
         return false;
@@ -8766,7 +8802,7 @@ namespace {
             m_by_objects(by_objects)
         {}
 
-        bool operator()(std::shared_ptr<const UniverseObject> candidate) const {
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
             if (m_by_objects.empty())
@@ -8827,7 +8863,7 @@ std::string OrderedBombarded::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + "OrderedBombarded by_object = " + m_by_object_condition->Dump(ntabs); }
 
 bool OrderedBombarded::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "OrderedBombarded::Match passed no candidate object";
         return false;
@@ -9088,7 +9124,7 @@ bool ValueTest::Match(const ScriptingContext& local_context) const {
         return false;
 
     // simple evaluation should have only local-candidate-invariation sub-value-refs
-    // base class evalulation should have defined local candidate
+    // base class evaulation should have defined local candidate
 
     if (m_value_ref1) {
         if (!m_value_ref2)
@@ -9353,7 +9389,7 @@ std::string Location::Dump(unsigned short ntabs) const {
 }
 
 bool Location::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "Location::Match passed no candidate object";
         return false;
@@ -9514,7 +9550,7 @@ std::string CombatTarget::Dump(unsigned short ntabs) const {
 }
 
 bool CombatTarget::Match(const ScriptingContext& local_context) const {
-    auto candidate = local_context.condition_local_candidate;
+    auto& candidate = local_context.condition_local_candidate;
     if (!candidate) {
         ErrorLogger() << "CombatTarget::Match passed no candidate object";
         return false;
@@ -9565,13 +9601,13 @@ And::And(std::unique_ptr<Condition>&& operand1, std::unique_ptr<Condition>&& ope
 {
     // would prefer to initialize the vector m_operands in the initializer list, but this is difficult with non-copyable unique_ptr parameters
     if (operand1)
-        m_operands.push_back(std::move(operand1));
+        m_operands.emplace_back(std::move(operand1));
     if (operand2)
-        m_operands.push_back(std::move(operand2));
+        m_operands.emplace_back(std::move(operand2));
     if (operand3)
-        m_operands.push_back(std::move(operand3));
+        m_operands.emplace_back(std::move(operand3));
     if (operand4)
-        m_operands.push_back(std::move(operand4));
+        m_operands.emplace_back(std::move(operand4));
 
     m_root_candidate_invariant = boost::algorithm::all_of(m_operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(m_operands, [](auto& e){ return !e || e->TargetInvariant(); });
@@ -9753,13 +9789,13 @@ Or::Or(std::unique_ptr<Condition>&& operand1,
 {
     // would prefer to initialize the vector m_operands in the initializer list, but this is difficult with non-copyable unique_ptr parameters
     if (operand1)
-        m_operands.push_back(std::move(operand1));
+        m_operands.emplace_back(std::move(operand1));
     if (operand2)
-        m_operands.push_back(std::move(operand2));
+        m_operands.emplace_back(std::move(operand2));
     if (operand3)
-        m_operands.push_back(std::move(operand3));
+        m_operands.emplace_back(std::move(operand3));
     if (operand4)
-        m_operands.push_back(std::move(operand4));
+        m_operands.emplace_back(std::move(operand4));
 
     m_root_candidate_invariant = boost::algorithm::all_of(m_operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(m_operands, [](auto& e){ return !e || e->TargetInvariant(); });
@@ -9865,7 +9901,9 @@ std::string Or::Description(bool negated/* = false*/) const {
     return values_str;
 }
 
-void Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context, ObjectSet& condition_non_targets) const {
+void Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
+                                           ObjectSet& condition_non_targets) const
+{
     if (m_operands.empty())
         return;
 
@@ -9876,7 +9914,7 @@ void Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_contex
     }
 
     if (parent_context.source && m_operands.size() == 2) {
-        if (/*auto* src_condition =*/ dynamic_cast<const Source*>(m_operands[0].get())) {
+        if (dynamic_cast<const Source*>(m_operands[0].get())) {
             // special case when first of two subconditions is just Source:
             // get the default candidates of the second and add the source if
             // it is not already present.
@@ -9888,7 +9926,7 @@ void Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_contex
             m_operands[1]->GetDefaultInitialCandidateObjects(parent_context, condition_non_targets);
             if (std::find(condition_non_targets.begin(), condition_non_targets.end(), parent_context.source) ==
                 condition_non_targets.end())
-            { condition_non_targets.push_back(parent_context.source); }
+            { condition_non_targets.emplace_back(parent_context.source); }
             return;
         }
     }

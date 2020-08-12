@@ -9,6 +9,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <cstdlib>
+#include <mutex>
 
 #if defined(FREEORION_MACOSX)
 #  include <iostream>
@@ -259,7 +260,6 @@ void InitBinDir(std::string const& argv0)
 #endif
 }
 
-
 void InitDirs(std::string const& argv0)
 {
     if (g_initialized)
@@ -367,7 +367,6 @@ void InitDirs(std::string const& argv0)
     g_initialized = true;
 }
 
-
 auto GetUserConfigDir() -> fs::path const
 {
 #if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32)
@@ -379,7 +378,6 @@ auto GetUserConfigDir() -> fs::path const
     return p;
 #endif
 }
-
 
 auto GetUserDataDir() -> fs::path const
 {
@@ -397,7 +395,6 @@ auto GetUserDataDir() -> fs::path const
     return p;
 #endif
 }
-
 
 auto GetRootDataDir() -> fs::path const
 {
@@ -423,7 +420,6 @@ auto GetRootDataDir() -> fs::path const
 #endif
 }
 
-
 auto GetBinDir() -> fs::path const
 {
 #if defined(FREEORION_MACOSX)
@@ -441,7 +437,6 @@ auto GetBinDir() -> fs::path const
 #endif
 }
 
-
 #if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32)
 auto GetPythonHome() -> fs::path const
 {
@@ -454,7 +449,6 @@ auto GetPythonHome() -> fs::path const
 #endif
 }
 #endif
-
 
 void CompleteXDGMigration()
 {
@@ -469,20 +463,34 @@ void CompleteXDGMigration()
     }
 }
 
+namespace {
+    std::mutex res_dir_mutex;
+    bool init = true;
+    fs::path res_dir;
+
+    void RefreshResDir() {
+        std::lock_guard<std::mutex> res_dir_lock(res_dir_mutex);
+        // if resource dir option has been set, use specified location. otherwise,
+        // use default location
+        res_dir = FilenameToPath(GetOptionsDB().Get<std::string>("resource.path"));
+        if (!fs::exists(res_dir) || !fs::is_directory(res_dir))
+            res_dir = FilenameToPath(GetOptionsDB().GetDefault<std::string>("resource.path"));
+        DebugLogger() << "Refreshed ResDir";
+    }
+}
+
 auto GetResourceDir() -> fs::path const
 {
-    // if resource dir option has been set, use specified location. otherwise,
-    // use default location
-    std::string options_resource_dir = GetOptionsDB().Get<std::string>("resource.path");
-    fs::path dir = FilenameToPath(options_resource_dir);
-    if (fs::exists(dir) && fs::is_directory(dir))
-        return dir;
-
-    dir = GetOptionsDB().GetDefault<std::string>("resource.path");
-    if (!fs::is_directory(dir) || !fs::exists(dir))
-        dir = FilenameToPath(GetOptionsDB().GetDefault<std::string>("resource.path"));
-
-    return dir;
+    std::lock_guard<std::mutex> res_dir_lock(res_dir_mutex);
+    if (init) {
+        init = false;
+        res_dir = FilenameToPath(GetOptionsDB().Get<std::string>("resource.path"));
+        if (!fs::exists(res_dir) || !fs::is_directory(res_dir))
+            res_dir = FilenameToPath(GetOptionsDB().GetDefault<std::string>("resource.path"));
+        GetOptionsDB().OptionChangedSignal("resource.path").connect(&RefreshResDir);
+        TraceLogger() << "Initialized ResDir and connected change signal";
+    }
+    return res_dir;
 }
 
 auto GetConfigPath() -> fs::path const
@@ -542,6 +550,7 @@ auto FilenameToPath(std::string const& path_str) -> fs::path
 #if defined(FREEORION_WIN32)
     // convert UTF-8 directory string to UTF-16
     fs::path::string_type directory_native;
+    directory_native.reserve(path_str.size());
     utf8::utf8to16(path_str.begin(), path_str.end(), std::back_inserter(directory_native));
 #if (BOOST_VERSION >= 106300)
     return fs::path(directory_native).generic_path();
@@ -558,6 +567,7 @@ auto PathToString(fs::path const& path) -> std::string
 #if defined(FREEORION_WIN32)
     fs::path::string_type native_string = path.generic_wstring();
     std::string retval;
+    retval.reserve(native_string.length()); // may be underestimate
     utf8::utf16to8(native_string.begin(), native_string.end(), std::back_inserter(retval));
     return retval;
 #else // defined(FREEORION_WIN32)

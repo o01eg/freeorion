@@ -6317,9 +6317,9 @@ DAMAGE_TITLE
 Damage
 
 DAMAGE_TEXT
-'''Defines the base amount that a weapon will reduce the [[metertype METER_STRUCTURE]] of another ship (or the [[metertype METER_SHIELD]], [[metertype METER_DEFENSE]] and [[metertype METER_CONSTRUCTION]] of a planet), in one combat round (of which there are three in each turn of battle). If a target ship is equipped with [[metertype METER_SHIELD]], the actual damage caused by each hit will be the base damage reduced by the strength rating of the ship's [[metertype METER_SHIELD]].
+'''Defines the base amount that a weapon will reduce the [[metertype METER_STRUCTURE]] of another ship (or the [[metertype METER_SHIELD]], [[metertype METER_DEFENSE]] and [[metertype METER_CONSTRUCTION]] of a planet), in one combat round (of which there are four in each turn of battle). If a target ship is equipped with [[metertype METER_SHIELD]], the actual damage caused by each hit will be the base damage reduced by the strength rating of the ship's [[metertype METER_SHIELD]].
 
-Note: [[encyclopedia FIGHTER_TECHS]] inflict damage ignoring [[metertype METER_SHIELD]] on ships, as fighters fire from within the enemy shields.'''
+Note: [[encyclopedia FIGHTER_TECHS]] inflict damage ignoring [[metertype METER_SHIELD]] on ships, as fighters fire from within the enemy shields. Fighters need one turn for launching so damage estimation takes that into account.'''
 
 MAP_WINDOW_ARTICLE_TITLE
 Map Window
@@ -11305,6 +11305,19 @@ Planets are organized in a confederacy of independent system, and do not suffer 
 PLC_CONFEDERATION_SHORT_DESC
 Supports disconnected systems
 
+PLC_RACIAL_PURITY
+Racial Purity
+
+PLC_RACIAL_PURITY_DESC
+'''Planets with species different from the capital's species have various penalities applied.
+
+Planets with other species have penalties.
+
+Allows [[buildingtype BLD_CONC_CAMP]] to be produced.'''
+
+PLC_RACIAL_PURITY_SHORT_DESC
+Prefers Capital Species
+
 
 ##
 ## Technology categories
@@ -14051,7 +14064,7 @@ SR_WEAPON_1_1_DESC
 
 Upgrading the weapon technology will increase the shot damage.
 
-The weapon's [[encyclopedia DAMAGE_TITLE]] is a combination of the shot damage and any active modifiers. Each mass driver on a ship built by a species with the piloting trait will do an additional 1 damage per piloting level (-1 for Bad Pilots).'''
+The weapon's [[encyclopedia DAMAGE_TITLE]] is a combination of the shot damage and any active modifiers. Each mass driver on a ship built by a species with the piloting trait will do an additional 6 damage per piloting level (-6 for Bad Pilots).'''
 
 SR_WEAPON_2_1
 Laser Weapon
@@ -14061,7 +14074,7 @@ SR_WEAPON_2_1_DESC
 
 Upgrading the weapon technology will increase the shot damage.
 
-The weapon's [[encyclopedia DAMAGE_TITLE]] is a combination of the shot damage and any active modifiers. Each laser weapon on a ship built by a species with the piloting trait will do an additional 2 damage per piloting level (-2 for Bad Pilots). Laser weapon damage can also be enhanced on [[shiphull SH_ORGANIC]] ships with a [[shippart SP_SOLAR_CONCENTRATOR]].'''
+The weapon's [[encyclopedia DAMAGE_TITLE]] is a combination of the shot damage and any active modifiers. Each laser weapon on a ship built by a species with the piloting trait will do an additional 12 damage per piloting level (-12 for Bad Pilots). Laser weapon damage can also be enhanced on [[shiphull SH_ORGANIC]] ships with a [[shippart SP_SOLAR_CONCENTRATOR]].'''
 
 SR_WEAPON_3_1
 Plasma Cannons
@@ -14071,7 +14084,7 @@ SR_WEAPON_3_1_DESC
 
 Upgrading the weapon technology will increase the shot damage.
 
-The weapon's [[encyclopedia DAMAGE_TITLE]] is a combination of the shot damage and any active modifiers. Each plasma cannon on a ship built by a species with the piloting trait will do an additional 3 damage per piloting level (-3 for Bad Pilots).'''
+The weapon's [[encyclopedia DAMAGE_TITLE]] is a combination of the shot damage and any active modifiers. Each plasma cannon on a ship built by a species with the piloting trait will do an additional 18 damage per piloting level (-18 for Bad Pilots).'''
 
 SR_WEAPON_4_1
 Death Ray
@@ -14081,7 +14094,7 @@ SR_WEAPON_4_1_DESC
 
 Upgrading the weapon technology will increase the shot damage.
 
-The weapon's [[encyclopedia DAMAGE_TITLE]] is a combination of the shot damage and any active modifiers. Each death ray on a ship built by a species with the piloting trait will do an additional 5 damage per piloting level (-5 for Bad Pilots).'''
+The weapon's [[encyclopedia DAMAGE_TITLE]] is a combination of the shot damage and any active modifiers. Each death ray on a ship built by a species with the piloting trait will do an additional 30 damage per piloting level (-30 for Bad Pilots).'''
 
 SR_ARC_DISRUPTOR
 Arc Disruptor
@@ -15703,6 +15716,15 @@ LIVING_HULL_BASE_FUEL_REGEN_DESC
 ##
 ## Accounting labels
 ##
+
+COLONY_ADMIN_COSTS_LABEL
+Colony Administration Upkeep
+
+SPECIES_HOMEWORLD_INDEPENDENCE_DESIRE_LABEL
+Homeworld Independence Movement
+
+CAPITAL_DISCONNECTION_LABEL
+Not Connected to Empire Capital
 
 # %1% name of empire
 # %2% name of policy

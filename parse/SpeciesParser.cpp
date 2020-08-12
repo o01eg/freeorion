@@ -94,8 +94,8 @@ namespace {
             (params.foci ? std::move(*params.foci) : std::vector<FocusType>{}),
             (params.default_focus ? std::move(*params.default_focus) : std::string{}),
             (planet_environments ? std::move(*planet_environments) : std::map<PlanetType, PlanetEnvironment>{}),
-            (effects ? std::move(OpenEnvelopes(*effects, pass)) : std::vector<std::unique_ptr<Effect::EffectsGroup>>{}),
-            (combat_targets ? std::move((*combat_targets).OpenEnvelope(pass)) : nullptr),
+            (effects ? OpenEnvelopes(*effects, pass) : std::vector<std::unique_ptr<Effect::EffectsGroup>>{}),
+            (combat_targets ? (*combat_targets).OpenEnvelope(pass) : nullptr),
             params.playable,
             params.native,
             params.can_colonize,
@@ -105,7 +105,8 @@ namespace {
             std::move(params.dislikes),
             std::move(graphic));
 
-        species.emplace(species_ptr->Name(), std::move(species_ptr));
+        auto& species_name{species_ptr->Name()};
+        species.emplace(species_name, std::move(species_ptr));
     }
 
     BOOST_PHOENIX_ADAPT_FUNCTION(void, insert_species_, insert_species, 8)

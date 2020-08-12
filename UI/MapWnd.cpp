@@ -781,13 +781,13 @@ private:
 ////////////////////////////////////////////////////////////
 // MapWndPopup
 ////////////////////////////////////////////////////////////
-MapWndPopup::MapWndPopup(const std::string& t, GG::X default_x, GG::Y default_y, GG::X default_w, GG::Y default_h,
+MapWndPopup::MapWndPopup(std::string t, GG::X default_x, GG::Y default_y, GG::X default_w, GG::Y default_h,
                          GG::Flags<GG::WndFlag> flags, const std::string& config_name) :
-    CUIWnd(t, default_x, default_y, default_w, default_h, flags, config_name)
+    CUIWnd(std::move(t), default_x, default_y, default_w, default_h, flags, config_name)
 {}
 
-MapWndPopup::MapWndPopup(const std::string& t, GG::Flags<GG::WndFlag> flags, const std::string& config_name) :
-    CUIWnd(t, flags, config_name)
+MapWndPopup::MapWndPopup(std::string t, GG::Flags<GG::WndFlag> flags, const std::string& config_name) :
+    CUIWnd(std::move(t), flags, config_name)
 {}
 
 void MapWndPopup::CompleteConstruction() {
@@ -800,8 +800,7 @@ void MapWndPopup::CompleteConstruction() {
             mapwnd->RegisterPopup(std::static_pointer_cast<MapWndPopup>(shared_from_this()));
 }
 
-MapWndPopup::~MapWndPopup()
-{
+MapWndPopup::~MapWndPopup() {
     if (!Visible()) {
         // Make sure it doesn't save visible = 0 to the config (doesn't
         // make sense for windows that are created/destroyed repeatedly),
@@ -844,7 +843,7 @@ LaneEndpoints::LaneEndpoints() :
 ////////////////////////////////////////////////
 struct MapWnd::MovementLineData::Vertex {
     Vertex(double x_, double y_, int eta_, bool show_eta_, bool flag_blockade_ = false, bool flag_supply_block_ = false) :
-    x(x_), y(y_), eta(eta_), show_eta(show_eta_), flag_blockade(flag_blockade_), flag_supply_block(flag_supply_block_)
+        x(x_), y(y_), eta(eta_), show_eta(show_eta_), flag_blockade(flag_blockade_), flag_supply_block(flag_supply_block_)
     {}
     double  x, y;       // apparent in-universe position of a point on move line.  not actual universe positions, but rather where the move line vertices are drawn
     int     eta;        // turns taken to reach point by object travelling along move line
@@ -1022,8 +1021,9 @@ void MapWnd::CompleteConstruction() {
 
     // timeout remain label
     // determine size from the text that will go into label, using a test time string
-    std::string timeout_longest_reasonable = boost::io::str(FlexibleFormat(UserString("MAP_TIMEOUT_HRS_MINS")) % 999 % 59); // minutes part never exceeds 59, turn interval hopefully doesn't exceed month
-    m_timeout_remain = Wnd::Create<CUILabel>(timeout_longest_reasonable);
+    std::string timeout_longest_reasonable =
+        boost::io::str(FlexibleFormat(UserString("MAP_TIMEOUT_HRS_MINS")) % 999 % 59); // minutes part never exceeds 59, turn interval hopefully doesn't exceed month
+    m_timeout_remain = Wnd::Create<CUILabel>(std::move(timeout_longest_reasonable));
     m_timeout_remain->Resize(m_timeout_remain->MinUsableSize());
 
     // FPS indicator
@@ -5852,9 +5852,9 @@ void MapWnd::UniverseObjectDeleted(std::shared_ptr<const UniverseObject> obj) {
         RemoveFleet(fleet->ID());
 }
 
-void MapWnd::RegisterPopup(const std::shared_ptr<MapWndPopup>& popup) {
+void MapWnd::RegisterPopup(std::shared_ptr<MapWndPopup>&& popup) {
     if (popup)
-        m_popups.push_back(std::weak_ptr<MapWndPopup>(popup));
+        m_popups.emplace_back(std::move(popup));
 }
 
 void MapWnd::RemovePopup(MapWndPopup* popup) {
@@ -6832,7 +6832,7 @@ void MapWnd::RefreshPopulationIndicator() {
     m_population->SetValue(empire->GetPopulationPool().Population());
     m_population->ClearBrowseInfoWnd();
 
-    const auto pop_center_ids = empire->GetPopulationPool().PopCenterIDs();
+    const auto& pop_center_ids = empire->GetPopulationPool().PopCenterIDs();
     std::map<std::string, float> population_counts;
     std::map<std::string, float> tag_counts;
     const ObjectMap& objects = Objects();
@@ -6848,15 +6848,15 @@ void MapWnd::RefreshPopulationIndicator() {
         float this_pop = pc->GetMeter(METER_POPULATION)->Initial();
         population_counts[species_name] += this_pop;
         if (const Species* species = GetSpecies(species_name) ) {
-            for (const std::string& tag : species->Tags()) {
+            for (const std::string& tag : species->Tags())
                 tag_counts[tag] += this_pop;
-            }
         }
     }
 
     m_population->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
     m_population->SetBrowseInfoWnd(GG::Wnd::Create<CensusBrowseWnd>(
-        UserString("MAP_POPULATION_DISTRIBUTION"), population_counts, tag_counts, GetSpeciesManager().census_order()));
+        UserString("MAP_POPULATION_DISTRIBUTION"), std::move(population_counts),
+        std::move(tag_counts), GetSpeciesManager().census_order()));
 }
 
 void MapWnd::UpdateSidePanelSystemObjectMetersAndResourcePools() {
@@ -6896,17 +6896,16 @@ bool MapWnd::ZoomToHomeSystem() {
 
 namespace {
     struct CustomRowCmp {
-        bool operator()(const std::pair<std::string, int>& lhs, const std::pair<std::string, int>& rhs) const {
-            return GetLocale("en_US.UTF-8").operator()(lhs.first, rhs.first);    // todo: use .second values to break ties
-        }
+        bool operator()(const std::pair<std::string, int>& lhs,
+                        const std::pair<std::string, int>& rhs) const
+        { return GetLocale("en_US.UTF-8").operator()(lhs.first, rhs.first); } // todo: use .second values to break ties
     };
 
     std::set<std::pair<std::string, int>, CustomRowCmp> GetSystemNamesIDs() {
         // get systems, store alphabetized
         std::set<std::pair<std::string, int>, CustomRowCmp> system_names_ids;
-        for (auto& system : Objects().all<System>()) {
-            system_names_ids.insert({system->Name(), system->ID()});
-        }
+        for (auto& system : Objects().all<System>())
+            system_names_ids.emplace(system->Name(), system->ID());
         return system_names_ids;
     }
 
@@ -6916,14 +6915,14 @@ namespace {
         // get IDs of systems that contain any owned planets
         std::set<int> system_ids;
         for (auto& obj : owned_planets)
-        { system_ids.insert(obj->SystemID()); }
+            system_ids.insert(obj->SystemID());
 
         // store systems, sorted alphabetically
         std::set<std::pair<std::string, int>, CustomRowCmp> system_names_ids;
         for (const auto& sys : Objects().find<System>(system_ids)) {
             if (!sys)
                 continue;
-            system_names_ids.insert({sys->Name(), sys->ID()});
+            system_names_ids.emplace(sys->Name(), sys->ID());
         }
 
         return system_names_ids;
@@ -6940,7 +6939,8 @@ bool MapWnd::ZoomToPrevOwnedSystem() {
     auto it = system_names_ids.rend();
     auto sel_sys = Objects().get<System>(SidePanel::SystemID());
     if (sel_sys) {
-        it = std::find(system_names_ids.rbegin(), system_names_ids.rend(),  std::make_pair(sel_sys->Name(), sel_sys->ID()));
+        it = std::find(system_names_ids.rbegin(), system_names_ids.rend(),
+                       std::make_pair(sel_sys->Name(), sel_sys->ID()));
         if (it != system_names_ids.rend())
             ++it;
     }
@@ -6966,7 +6966,8 @@ bool MapWnd::ZoomToNextOwnedSystem() {
     // find currently selected system in list
     auto sel_sys = Objects().get<System>(SidePanel::SystemID());
     if (sel_sys) {
-        it = std::find(system_names_ids.begin(), system_names_ids.end(), std::make_pair(sel_sys->Name(), sel_sys->ID()));
+        it = std::find(system_names_ids.begin(), system_names_ids.end(),
+                       std::make_pair(sel_sys->Name(), sel_sys->ID()));
         if (it != system_names_ids.end())
             ++it;
     }
@@ -6990,7 +6991,8 @@ bool MapWnd::ZoomToPrevSystem() {
     auto it = system_names_ids.rend();
     auto sel_sys = Objects().get<System>(SidePanel::SystemID());
     if (sel_sys) {
-        it = std::find(system_names_ids.rbegin(), system_names_ids.rend(),  std::make_pair(sel_sys->Name(), sel_sys->ID()));
+        it = std::find(system_names_ids.rbegin(), system_names_ids.rend(),
+                       std::make_pair(sel_sys->Name(), sel_sys->ID()));
         if (it != system_names_ids.rend())
             ++it;
     }
@@ -7015,7 +7017,8 @@ bool MapWnd::ZoomToNextSystem() {
     // find currently selected system in list
     auto sel_sys = Objects().get<System>(SidePanel::SystemID());
     if (sel_sys) {
-        it = std::find(system_names_ids.begin(), system_names_ids.end(), std::make_pair(sel_sys->Name(), sel_sys->ID()));
+        it = std::find(system_names_ids.begin(), system_names_ids.end(),
+                       std::make_pair(sel_sys->Name(), sel_sys->ID()));
         if (it != system_names_ids.end())
             ++it;
     }
@@ -7282,9 +7285,8 @@ void MapWnd::StopFleetExploring(const int fleet_id) {
         fleet->StateChangedSignal();
 }
 
-bool MapWnd::IsFleetExploring(const int fleet_id){
-    return std::count(m_fleets_exploring.begin(), m_fleets_exploring.end(), fleet_id);
-}
+bool MapWnd::IsFleetExploring(const int fleet_id)
+{ return std::count(m_fleets_exploring.begin(), m_fleets_exploring.end(), fleet_id); }
 
 namespace {
     typedef std::set<int> SystemIDListType;
@@ -7305,8 +7307,7 @@ namespace {
 
     /** If @p fleet can determine an eta for @p route */
     bool FleetRouteInRange(const std::shared_ptr<Fleet>& fleet, const RouteListType& route) {
-        std::list<int> route_list;
-        std::copy(route.begin(), route.end(), std::back_inserter(route_list));
+        std::list<int> route_list{route.begin(), route.end()};
 
         auto eta = fleet->ETA(fleet->MovePath(route_list));
         if (eta.first == Fleet::ETA_NEVER || eta.first == Fleet::ETA_UNKNOWN || eta.first == Fleet::ETA_OUT_OF_RANGE)
@@ -7322,13 +7323,9 @@ namespace {
         auto starlanes = empire->KnownStarlanes();
         for (auto system_id : system_ids) {
             auto new_neighboors_it = starlanes.find(system_id);
-            if (new_neighboors_it != starlanes.end()){
-                for (auto neighbor_id : new_neighboors_it->second) {
-                    retval.insert(neighbor_id);
-                }
-            }
+            if (new_neighboors_it != starlanes.end())
+                retval.insert(new_neighboors_it->second.begin(), new_neighboors_it->second.end());
         }
-
         return retval;
     }
 
@@ -7352,7 +7349,7 @@ namespace {
 
         if (!route_distance.first.empty() && route_distance.second > 0.0) {
             RouteListType route(route_distance.first.begin(), route_distance.first.end());
-            return std::make_pair(route_distance.second, route);
+            return std::make_pair(route_distance.second, std::move(route));
         }
 
         return OrderedRouteType();
@@ -7391,8 +7388,8 @@ namespace {
             TraceLogger() << "Deferred priority for system " << destination->Name() << " (" << destination->ID() << ")";
         }
 
-        auto fleet_route = std::make_pair(fleet->ID(), order_route.second);
-        return std::make_pair(order_route.first, fleet_route);
+        auto fleet_route = std::make_pair(fleet->ID(), std::move(order_route.second));
+        return std::make_pair(order_route.first, std::move(fleet_route));
     }
 
     /** Shortest route not exceeding @p max_jumps from @p dest_id to a system with supply as known to @p empire */
@@ -7406,7 +7403,7 @@ namespace {
 
         auto supplyable_systems = GetSupplyManager().FleetSupplyableSystemIDs(empire->EmpireID(), true);
         if (!supplyable_systems.empty()) {
-            TraceLogger() << [supplyable_systems]() {
+            TraceLogger() << [&supplyable_systems]() {
                     std::string msg = "Supplyable systems:";
                     for (auto sys : supplyable_systems)
                         msg.append(" " + std::to_string(sys));
@@ -7418,7 +7415,7 @@ namespace {
 
         for (auto supply_system_id : supplyable_systems) {
             shortest_route = GetShortestRoute(empire->EmpireID(), dest_id, supply_system_id);
-            TraceLogger() << [shortest_route, dest_id]() {
+            TraceLogger() << [&shortest_route, dest_id]() {
                     std::string msg = "Checking supply route from " + std::to_string(dest_id) +
                                       " dist:" + std::to_string(shortest_route.first) + " systems:";
                     for (auto node : shortest_route.second)
@@ -7440,7 +7437,7 @@ namespace {
 
             if (retval.first <= 0.0 || shortest_route.first < retval.first) {
                 TraceLogger() << "Setting " << std::to_string(*shortest_route.second.rbegin()) << " as shortest route";
-                retval = shortest_route;
+                retval = std::move(shortest_route);
             }
         }
 
@@ -7489,10 +7486,10 @@ namespace {
             return OrderedRouteType();
         }
 
-        auto nearest_supply = GetNearestSupplyRoute(empire, fleet->SystemID(), std::trunc(fleet->Fuel()));
-        if (nearest_supply.first > 0.0 && FleetRouteInRange(fleet, nearest_supply.second)) {
+        auto nearest_supply = GetNearestSupplyRoute(empire, fleet->SystemID(),
+                                                    std::trunc(fleet->Fuel()));
+        if (nearest_supply.first > 0.0 && FleetRouteInRange(fleet, nearest_supply.second))
             return nearest_supply;
-        }
 
         return OrderedRouteType();
     }
@@ -7515,7 +7512,7 @@ namespace {
         int max_fleet_jumps = std::trunc(fleet->Fuel());
         if (num_jumps_resupply <= max_fleet_jumps) {
             HumanClientApp::GetApp()->Orders().IssueOrder(
-                    std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.second.rbegin()));
+                std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.second.rbegin()));
         } else {
             TraceLogger() << "Not enough fuel for fleet " << fleet->ID()
                           << " to resupply at system " << *route.second.rbegin();
@@ -7528,10 +7525,10 @@ namespace {
             return true;
         } else {
             TraceLogger() << "Fleet move order failed fleet:" << fleet->ID() << " route:"
-                          << [route]() {
-                                 std::string retval = "";
+                          << [&route]() {
+                                 std::string retval;
                                  for (auto node : route.second)
-                                     retval.append(" " + std::to_string(node));
+                                     retval += " " + std::to_string(node);
                                  return retval;
                              }();
         }
@@ -7652,17 +7649,17 @@ void MapWnd::DispatchFleetsExploring() {
     if (idle_fleets.empty())
         return;
 
-    TraceLogger() << [idle_fleets]() {
+    TraceLogger() << [&idle_fleets]() {
             std::string retval = "MapWnd::DispatchFleetsExploring Idle Exploring Fleet IDs:";
-            for (auto fleet : idle_fleets)
-                retval.append(" " + std::to_string(fleet));
+            for (auto fleet_id : idle_fleets)
+                retval += " " + std::to_string(fleet_id);
             return retval;
         }();
 
     //list all unexplored systems by taking the neighboors of explored systems because ObjectMap does not list them all.
     SystemIDListType candidates_unknown_systems;
     const auto& empire_explored_systems = empire->ExploredSystems();
-    SystemIDListType explored_systems(empire_explored_systems.begin(), empire_explored_systems.end());
+    SystemIDListType explored_systems{empire_explored_systems.begin(), empire_explored_systems.end()};
     candidates_unknown_systems = AddNeighboorsToSet(empire, explored_systems);
     auto neighboors = AddNeighboorsToSet(empire, candidates_unknown_systems);
     candidates_unknown_systems.insert(neighboors.begin(), neighboors.end());
@@ -7674,7 +7671,7 @@ void MapWnd::DispatchFleetsExploring() {
             continue;
         if (!empire->HasExploredSystem(system->ID()) &&
             !systems_being_explored.count(system->ID()))
-        { unexplored_systems.insert(system->ID()); }
+        { unexplored_systems.emplace(system->ID()); }
     }
 
     if (unexplored_systems.empty()) {
@@ -7682,10 +7679,10 @@ void MapWnd::DispatchFleetsExploring() {
         return;
     }
 
-    TraceLogger() << [unexplored_systems]() {
+    TraceLogger() << [&unexplored_systems]() {
             std::string retval = "MapWnd::DispatchFleetsExploring Unknown System IDs:";
-            for (auto system : unexplored_systems)
-                retval.append(" " + std::to_string(system));
+            for (auto system_id : unexplored_systems)
+                retval += " " + std::to_string(system_id);
             return retval;
         }();
 
@@ -7713,26 +7710,26 @@ void MapWnd::DispatchFleetsExploring() {
             auto route = GetOrderedFleetRoute(fleet, unexplored_system);
             if (route.first > 0.0) {
                 ++fleet_route_count[unexplored_system->ID()];
-                fleet_routes.emplace(route);
+                fleet_routes.emplace(std::move(route));
             }
         }
     }
 
     if (!fleet_routes.empty()) {
-        TraceLogger() << [fleet_routes]() {
+        TraceLogger() << [&fleet_routes]() {
                 std::string retval = "MapWnd::DispatchFleetsExploring Explorable Systems:\n\t Priority\tFleet\tDestination";
-                for (auto route : fleet_routes) {
-                    retval.append("\n\t" + std::to_string(route.first) + "\t" + std::to_string(route.second.first) +
-                                  "\t " + std::to_string(route.second.second.empty() ? -1 : *route.second.second.rbegin()));
+                for (const auto& route : fleet_routes) {
+                    retval.append("\n\t" + std::to_string(route.first) + "\t" +
+                                  std::to_string(route.second.first) + "\t " +
+                                  std::to_string(route.second.second.empty() ? -1 : *route.second.second.rbegin()));
                 }
                 return retval;
             }();
     }
 
     // Issue fleet orders
-    for (auto fleet_route : fleet_routes) {
+    for (auto fleet_route : fleet_routes)
         IssueExploringFleetOrders(idle_fleets, systems_being_explored, fleet_route.second);
-    }
 
     // verify fleets have expected destination
     for (SystemFleetMap::iterator system_fleet_it = systems_being_explored.begin();
@@ -7749,15 +7746,15 @@ void MapWnd::DispatchFleetsExploring() {
         WarnLogger() << "Non idle exploring fleet "<< system_fleet_it->second << " has differing destination:"
                      << fleet->FinalDestinationID() << " expected:" << system_fleet_it->first;
 
-        idle_fleets.insert(system_fleet_it->second);
+        idle_fleets.emplace(system_fleet_it->second);
         // systems_being_explored.erase(system_fleet_it);
     }
 
     if (!idle_fleets.empty()) {
-        DebugLogger() << [idle_fleets]() {
+        DebugLogger() << [&idle_fleets]() {
                 std::string retval = "MapWnd::DispatchFleetsExploring Idle exploring fleets after orders:";
                 for (auto fleet_id : idle_fleets)
-                    retval.append(" " + std::to_string(fleet_id));
+                    retval += " " + std::to_string(fleet_id);
                 return retval;
             }();
     }

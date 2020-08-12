@@ -259,8 +259,7 @@ void Wnd::DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
 Pt Wnd::UpperLeft() const
 {
     Pt retval = m_upperleft;
-    auto&& parent = Parent();
-    if (parent)
+    if (auto&& parent = Parent())
         retval += parent->ClientUpperLeft();
     return retval;
 }
@@ -274,8 +273,7 @@ Y Wnd::Top() const
 Pt Wnd::LowerRight() const
 {
     Pt retval = m_lowerright;
-    auto&& parent = Parent();
-    if (parent)
+    if (auto&& parent = Parent())
         retval += parent->ClientUpperLeft();
     return retval;
 }
@@ -366,7 +364,7 @@ std::shared_ptr<Wnd> Wnd::RootParent() const
     auto gparent{parent ? parent->Parent() : nullptr};
     while (gparent) {
         parent = std::move(gparent);
-        gparent = std::move(parent->Parent());
+        gparent = parent->Parent();
     }
     return parent;
 }
@@ -470,8 +468,8 @@ void Wnd::ChildrenDraggedAway(const std::vector<Wnd*>& wnds, const Wnd* destinat
     }
 }
 
-void Wnd::SetName(const std::string& name)
-{ m_name = name; }
+void Wnd::SetName(std::string name)
+{ m_name = std::move(name); }
 
 void Wnd::Hide()
 {
@@ -559,13 +557,15 @@ void Wnd::AttachChild(std::shared_ptr<Wnd> wnd)
         if (auto&& parent = wnd->Parent())
             parent->DetachChild(wnd.get());
 
-        GUI::GetGUI()->Remove(wnd);
-        wnd->SetParent(my_shared);
+        auto this_as_layout = std::dynamic_pointer_cast<Layout>(my_shared);
 
-        if (auto this_as_layout = std::dynamic_pointer_cast<Layout>(my_shared))
+        GUI::GetGUI()->Remove(wnd);
+        wnd->SetParent(std::move(my_shared));
+
+        if (this_as_layout)
             wnd->m_containing_layout = this_as_layout;
 
-        m_children.emplace_back(wnd);
+        m_children.emplace_back(std::move(wnd));
 
     } catch (const std::bad_weak_ptr&) {
         std::cerr << std::endl << "Wnd::AttachChild called either during the constructor "
@@ -588,7 +588,7 @@ void Wnd::MoveChildUp(Wnd* wnd)
                                  [&wnd](const std::shared_ptr<Wnd>& x){ return x.get() == wnd; });
     if (it == m_children.end())
         return;
-    m_children.push_back(*it);
+    m_children.emplace_back(std::move(*it));
     m_children.erase(it);
 }
 
@@ -674,13 +674,14 @@ void Wnd::HorizontalLayout()
 {
     RemoveLayout();
 
+    // TODO: store in vector, sort, then move out of vector when calling layout->Add
     std::multiset<std::shared_ptr<Wnd>, WndHorizontalLess> wnds;
     Pt client_sz = ClientSize();
     for (auto& child : m_children) {
         Pt wnd_ul = child->RelativeUpperLeft(), wnd_lr = child->RelativeLowerRight();
         if (wnd_ul.x < 0 || wnd_ul.y < 0 || client_sz.x < wnd_lr.x || client_sz.y < wnd_lr.y)
             continue;
-        wnds.insert(child);
+        wnds.emplace(child);
     }
 
     auto layout = Wnd::Create<Layout>(X0, Y0, ClientSize().x, ClientSize().y,
@@ -690,22 +691,22 @@ void Wnd::HorizontalLayout()
     AttachChild(layout);
 
     int i = 0;
-    for (const auto& wnd : wnds) {
+    for (auto& wnd : wnds)
         layout->Add(wnd, 0, i++);
-    }
 }
 
 void Wnd::VerticalLayout()
 {
     RemoveLayout();
 
+    // TODO: store in vector, sort, then move out of vector when calling layout->Add
     std::multiset<std::shared_ptr<Wnd>, WndVerticalLess> wnds;
     Pt client_sz = ClientSize();
     for (auto& child : m_children) {
         Pt wnd_ul = child->RelativeUpperLeft(), wnd_lr = child->RelativeLowerRight();
         if (wnd_ul.x < 0 || wnd_ul.y < 0 || client_sz.x < wnd_lr.x || client_sz.y < wnd_lr.y)
             continue;
-        wnds.insert(child);
+        wnds.emplace(child);
     }
 
     auto layout = Wnd::Create<Layout>(X0, Y0, ClientSize().x, ClientSize().y,
@@ -715,9 +716,8 @@ void Wnd::VerticalLayout()
     AttachChild(layout);
 
     int i = 0;
-    for (auto& wnd : wnds) {
+    for (auto& wnd : wnds)
         layout->Add(wnd, i++, 0);
-    }
 }
 
 void Wnd::GridLayout()
@@ -812,12 +812,10 @@ void Wnd::GridLayout()
     // create an actual layout with a more reasonable number of cells from the pixel-grid layout
     std::set<X> unique_lefts;
     std::set<Y> unique_tops;
-    for (const GridLayoutWnd& layout_wnd : grid_layout.get<LayoutLeft>()) {
-        unique_lefts.insert(layout_wnd.ul.x);
-    }
-    for (const GridLayoutWnd& layout_wnd : grid_layout.get<LayoutTop>()) {
-        unique_tops.insert(layout_wnd.ul.y);
-    }
+    for (const GridLayoutWnd& layout_wnd : grid_layout.get<LayoutLeft>())
+        unique_lefts.emplace(layout_wnd.ul.x);
+    for (const GridLayoutWnd& layout_wnd : grid_layout.get<LayoutTop>())
+        unique_tops.emplace(layout_wnd.ul.y);
 
     if (unique_lefts.empty() || unique_tops.empty())
         return;
@@ -946,20 +944,20 @@ void Wnd::SetBrowseModeTime(unsigned int time, std::size_t mode/* = 0*/)
     m_browse_modes[mode].time = time;
 }
 
-void Wnd::SetBrowseInfoWnd(const std::shared_ptr<BrowseInfoWnd>& wnd, std::size_t mode/* = 0*/)
-{ m_browse_modes.at(mode).wnd = wnd; }
+void Wnd::SetBrowseInfoWnd(std::shared_ptr<BrowseInfoWnd> wnd, std::size_t mode/* = 0*/)
+{ m_browse_modes.at(mode).wnd = std::move(wnd); }
 
 void Wnd::ClearBrowseInfoWnd(std::size_t mode/* = 0*/)
 { m_browse_modes.at(mode).wnd.reset(); }
 
-void Wnd::SetBrowseText(const std::string& text, std::size_t mode/* = 0*/)
-{ m_browse_modes.at(mode).text = text; }
+void Wnd::SetBrowseText(std::string text, std::size_t mode/* = 0*/)
+{ m_browse_modes.at(mode).text = std::move(text); }
 
-void Wnd::SetBrowseModes(const std::vector<BrowseInfoMode>& modes)
-{ m_browse_modes = modes; }
+void Wnd::SetBrowseModes(std::vector<BrowseInfoMode> modes)
+{ m_browse_modes = std::move(modes); }
 
-void Wnd::SetStyleFactory(const std::shared_ptr<StyleFactory>& factory)
-{ m_style_factory = factory; }
+void Wnd::SetStyleFactory(std::shared_ptr<StyleFactory> factory)
+{ m_style_factory = std::move(factory); }
 
 unsigned int Wnd::DefaultBrowseTime()
 { return s_default_browse_time; }
@@ -970,8 +968,8 @@ void Wnd::SetDefaultBrowseTime(unsigned int time)
 const std::shared_ptr<BrowseInfoWnd>& Wnd::DefaultBrowseInfoWnd()
 { return s_default_browse_info_wnd; }
 
-void Wnd::SetDefaultBrowseInfoWnd(const std::shared_ptr<BrowseInfoWnd>& browse_info_wnd)
-{ s_default_browse_info_wnd = browse_info_wnd; }
+void Wnd::SetDefaultBrowseInfoWnd(std::shared_ptr<BrowseInfoWnd> browse_info_wnd)
+{ s_default_browse_info_wnd = std::move(browse_info_wnd); }
 
 Wnd::DragDropRenderingState Wnd::GetDragDropRenderingState() const
 {
@@ -1270,5 +1268,5 @@ void Wnd::BeginNonclientClippingImpl()
 void Wnd::EndNonclientClippingImpl()
 { EndStencilClipping(); }
 
-void Wnd::SetParent(const std::shared_ptr<Wnd>& wnd)
-{ m_parent = wnd; }
+void Wnd::SetParent(std::shared_ptr<Wnd> wnd)
+{ m_parent = std::move(wnd); }

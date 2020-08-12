@@ -82,7 +82,7 @@ namespace {
         }
 
         // create new fleet for ship, and put it in new system
-        auto fleet = CreateNewFleet(system->X(), system->Y(), ship);
+        auto fleet = CreateNewFleet(system->X(), system->Y(), std::move(ship));
         system->Insert(fleet);
 
         return fleet;
@@ -104,7 +104,9 @@ namespace {
      * resets the fleet's move route.  Used after a fleet has been moved with
      * the MoveTo effect, as its previous route was assigned based on its
      * previous location, and may not be valid for its new location. */
-    void UpdateFleetRoute(std::shared_ptr<Fleet> fleet, int new_next_system, int new_previous_system, const ObjectMap& objects) {
+    void UpdateFleetRoute(const std::shared_ptr<Fleet>& fleet, int new_next_system,
+                          int new_previous_system, const ObjectMap& objects)
+    {
         if (!fleet) {
             ErrorLogger() << "UpdateFleetRoute passed a null fleet pointer";
             return;
@@ -130,12 +132,13 @@ namespace {
 
         int dest_system = fleet->FinalDestinationID();
 
-        std::pair<std::list<int>, double> route_pair = GetPathfinder()->ShortestPath(start_system, dest_system, fleet->Owner());
+        std::pair<std::list<int>, double> route_pair =
+            GetPathfinder()->ShortestPath(start_system, dest_system, fleet->Owner());
 
         // if shortest path is empty, the route may be impossible or trivial, so just set route to move fleet
         // to the next system that it was just set to move to anyway.
         if (route_pair.first.empty())
-            route_pair.first.push_back(new_next_system);
+            route_pair.first.emplace_back(new_next_system);
 
 
         // set fleet with newly recalculated route
@@ -162,7 +165,8 @@ namespace {
             if (!dupe)
                 return star_name; // no systems have this name yet. use it.
         }
-        return "";  // fallback to empty name.
+        // generate hopefully unique name?
+        return UserString("SYSTEM") + " " + std::to_string(RandInt(objects.size<System>(), objects.size<System>() + 10000));
     }
 }
 
@@ -173,18 +177,18 @@ namespace Effect {
 EffectsGroup::EffectsGroup(std::unique_ptr<Condition::Condition>&& scope,
                            std::unique_ptr<Condition::Condition>&& activation,
                            std::vector<std::unique_ptr<Effect>>&& effects,
-                           const std::string& accounting_label,
-                           const std::string& stacking_group, int priority,
-                           const std::string& description,
-                           const std::string& content_name):
+                           std::string accounting_label,
+                           std::string stacking_group, int priority,
+                           std::string description,
+                           std::string content_name):
     m_scope(std::move(scope)),
     m_activation(std::move(activation)),
-    m_stacking_group(stacking_group),
+    m_stacking_group(std::move(stacking_group)),
     m_effects(std::move(effects)),
-    m_accounting_label(accounting_label),
+    m_accounting_label(std::move(accounting_label)),
     m_priority(priority),
-    m_description(description),
-    m_content_name(content_name)
+    m_description(std::move(description)),
+    m_content_name(std::move(content_name))
 {}
 
 EffectsGroup::~EffectsGroup()
@@ -282,9 +286,8 @@ void EffectsGroup::SetTopLevelContent(const std::string& content_name) {
         m_scope->SetTopLevelContent(content_name);
     if (m_activation)
         m_activation->SetTopLevelContent(content_name);
-    for (auto& effect : m_effects) {
+    for (auto& effect : m_effects)
         effect->SetTopLevelContent(content_name);
-    }
 }
 
 unsigned int EffectsGroup::GetCheckSum() const {
@@ -310,9 +313,8 @@ unsigned int EffectsGroup::GetCheckSum() const {
 std::string Dump(const std::vector<std::shared_ptr<EffectsGroup>>& effects_groups) {
     std::stringstream retval;
 
-    for (auto& effects_group : effects_groups) {
+    for (auto& effects_group : effects_groups)
         retval << "\n" << effects_group->Dump();
-    }
 
     return retval.str();
 }
@@ -1158,12 +1160,12 @@ void SetOwner::Execute(ScriptingContext& context) const {
         // move ship into new fleet
         std::shared_ptr<Fleet> new_fleet;
         if (auto system = context.ContextObjects().get<System>(ship->SystemID()))
-            new_fleet = CreateNewFleet(system, ship, context.ContextObjects());
+            new_fleet = CreateNewFleet(std::move(system), std::move(ship), context.ContextObjects());
         else
-            new_fleet = CreateNewFleet(ship->X(), ship->Y(), ship);
-        if (new_fleet) {
+            new_fleet = CreateNewFleet(ship->X(), ship->Y(), std::move(ship));
+
+        if (new_fleet)
             new_fleet->SetNextAndPreviousSystems(fleet->NextSystemID(), fleet->PreviousSystemID());
-        }
 
         // if old fleet is empty, destroy it.  Don't reassign ownership of fleet
         // in case that would reval something to the recipient that shouldn't be...

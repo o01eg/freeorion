@@ -915,15 +915,11 @@ namespace {
 
         // ship name text.  blank if no ship.
         auto ship = Objects().get<Ship>(m_ship_id);
-        std::string ship_name;
-        if (ship)
-            ship_name = ship->Name();
-
-        if (GetOptionsDB().Get<bool>("ui.name.id.shown")) {
-            ship_name = ship_name + " (" + std::to_string(m_ship_id) + ")";
-        }
-
-        m_ship_name_text = GG::Wnd::Create<CUILabel>(ship_name, GG::FORMAT_LEFT);
+        std::string ship_name{
+            (ship ? ship->Name() : "") +
+            (GetOptionsDB().Get<bool>("ui.name.id.shown") ? " (" + std::to_string(m_ship_id) + ")" : "")
+        };
+        m_ship_name_text = GG::Wnd::Create<CUILabel>(std::move(ship_name), GG::FORMAT_LEFT);
         AttachChild(m_ship_name_text);
 
 
@@ -2719,15 +2715,13 @@ FleetWnd::FleetWnd(const std::vector<int>& fleet_ids, bool order_issuing_enabled
                    GG::Flags<GG::WndFlag> flags/* = INTERACTIVE | DRAGABLE | ONTOP | CLOSABLE | RESIZABLE*/,
                    const std::string& config_name) :
     MapWndPopup("", flags | GG::RESIZABLE, config_name),
+    m_fleet_ids(fleet_ids.begin(), fleet_ids.end()),
     m_order_issuing_enabled(order_issuing_enabled)
 {
-    if (!fleet_ids.empty()) {
-        if (auto fleet = Objects().get<Fleet>(*fleet_ids.begin()))
+    if (!m_fleet_ids.empty()) {
+        if (auto fleet = Objects().get<Fleet>(*m_fleet_ids.begin()))
             m_empire_id = fleet->Owner();
     }
-
-    for (int fleet_id : fleet_ids)
-        m_fleet_ids.insert(fleet_id);
 
     // verify that the selected fleet id is valid.
     if (selected_fleet_id != INVALID_OBJECT_ID &&
@@ -2753,7 +2747,8 @@ FleetWnd::FleetWnd(const std::vector<int>& fleet_ids, bool order_issuing_enabled
                               + GG::Pt(GG::X(allowed_bounding_box_leeway),
                                        GG::Y(allowed_bounding_box_leeway)));
 
-    m_fleet_detail_panel = GG::Wnd::Create<FleetDetailPanel>(GG::X1, GG::Y1, selected_fleet_id, m_order_issuing_enabled);
+    m_fleet_detail_panel = GG::Wnd::Create<FleetDetailPanel>(GG::X1, GG::Y1, selected_fleet_id,
+                                                             m_order_issuing_enabled);
 }
 
 void FleetWnd::CompleteConstruction() {

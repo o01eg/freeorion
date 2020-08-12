@@ -224,27 +224,28 @@ namespace {
         else if (dir_name == "ENC_TECH") {
             std::map<std::string, std::string> userstring_tech_names;
             // sort tech names by user-visible name, so names are shown alphabetically in UI
-            for (const auto& tech_name : GetTechManager().TechNames())
-                userstring_tech_names.emplace(UserString(tech_name), tech_name);
+            for (auto& tech_name : GetTechManager().TechNames()) {
+                auto& us_tech_name{UserString(tech_name)};
+                userstring_tech_names.emplace(us_tech_name, std::move(tech_name));
+            }
 
-            for (const auto& tech_name : userstring_tech_names) {
+            for (auto& tech_name : userstring_tech_names) {
                 std::string&& custom_category = DetermineCustomCategory(GetTech(tech_name.second)->Tags());
                 if (custom_category.empty()) {
                     // already iterating over userstring-looked-up names, so don't need to re-look-up-here
+                    std::string&& tagged_text{LinkTaggedText(VarText::TECH_TAG, tech_name.second) + "\n"};
                     sorted_entries_list.emplace(
                         tech_name.first,
-                        std::make_pair(LinkTaggedText(VarText::TECH_TAG, tech_name.second) + "\n",
-                                       tech_name.second));
+                        std::make_pair(std::move(tagged_text), std::move(tech_name.second)));
                 }
             }
 
         }
         else if (dir_name == "ENC_POLICY") {
-            for (const auto& policy_name : GetPolicyManager().PolicyNames()) {
-                sorted_entries_list.emplace(
-                    policy_name,
-                    std::make_pair(LinkTaggedText(VarText::POLICY_TAG, policy_name) + "\n",
-                                   policy_name));
+            for (auto& policy_name : GetPolicyManager().PolicyNames()) {
+                std::string&& tagged_text{LinkTaggedText(VarText::POLICY_TAG, policy_name) + "\n"};
+                auto&& str_pair{std::make_pair(std::move(tagged_text), policy_name)};
+                sorted_entries_list.emplace(std::move(policy_name), std::move(str_pair));
             }
 
         }
@@ -261,10 +262,12 @@ namespace {
 
         }
         else if (dir_name == "ENC_SPECIAL") {
-            for (std::string special_name : SpecialNames()) {
-                sorted_entries_list.emplace(UserString(special_name),
-                                            std::make_pair(LinkTaggedText(VarText::SPECIAL_TAG, special_name) + "\n",
-                                                           std::move(special_name)));
+            for (std::string& special_name : SpecialNames()) {
+                auto& us_name{UserString(special_name)};
+                std::string&& tagged_text{LinkTaggedText(VarText::SPECIAL_TAG, special_name) + "\n"};
+                sorted_entries_list.emplace(
+                    us_name,
+                    std::make_pair(std::move(tagged_text), std::move(special_name)));
             }
 
         }
@@ -272,8 +275,7 @@ namespace {
             // directory populated with list of links to other articles that list species
         }
         else if (dir_name == "ENC_HOMEWORLDS") {
-            const SpeciesManager& species_manager = GetSpeciesManager();
-            for (const auto& entry : species_manager) {
+            for (const auto& entry : GetSpeciesManager()) {
                 const auto& species = entry.second;
                 std::set<int> known_homeworlds;
                 std::string species_entry = LinkTaggedText(VarText::SPECIES_TAG, entry.first) + " ";
@@ -287,7 +289,9 @@ namespace {
                         if (auto homeworld = Objects().get<Planet>(homeworld_id)) {
                             known_homeworlds.emplace(homeworld_id);
                             // if known, add to beginning
-                            homeworld_info = LinkTaggedIDText(VarText::PLANET_ID_TAG, homeworld_id, homeworld->PublicName(client_empire_id)) + "   " + homeworld_info;
+                            homeworld_info = LinkTaggedIDText(VarText::PLANET_ID_TAG, homeworld_id,
+                                                              homeworld->PublicName(client_empire_id))
+                                + "   " + homeworld_info;
                         } else { 
                             // add to end
                             homeworld_info += UserString("UNKNOWN_PLANET") + "   ";
@@ -304,11 +308,14 @@ namespace {
                 }
                 if (!species_occupied_planets.empty()) {
                     if (species_occupied_planets.size() >= 5) {
-                        species_entry += "  |   " + std::to_string(species_occupied_planets.size()) + " " + UserString("OCCUPIED_PLANETS");
+                        species_entry += "  |   " + std::to_string(species_occupied_planets.size())
+                                      + " " + UserString("OCCUPIED_PLANETS");
                     } else {
                         species_entry += "  |   " + UserString("OCCUPIED_PLANETS") + ":  ";
                         for (auto& planet : species_occupied_planets) {
-                            species_entry += LinkTaggedIDText(VarText::PLANET_ID_TAG, planet->ID(), planet->PublicName(client_empire_id)) + "   ";
+                            species_entry += LinkTaggedIDText(VarText::PLANET_ID_TAG, planet->ID(),
+                                                              planet->PublicName(client_empire_id))
+                                          + "   ";
                         }
                     }
                 }
@@ -316,7 +323,7 @@ namespace {
                                             std::make_pair(species_entry + "\n", entry.first));
             }
             sorted_entries_list.emplace("⃠ ", std::make_pair("\n\n", "  "));
-            for (const auto& entry : species_manager) {
+            for (const auto& entry : GetSpeciesManager()) {
                 const auto& species = entry.second;
                 if (species->Homeworlds().empty()) {
                     std::string species_entry{LinkTaggedText(VarText::SPECIES_TAG, entry.first) + ":  \n" + UserString("NO_HOMEWORLD")};
@@ -539,10 +546,10 @@ namespace {
 
             // Add sorted entries, keyed by human-readable article name, containing (tag, article stringtable key)
             for (auto& entry : dir_entries) {
+                auto&& linked_text{LinkTaggedText(entry.second.first, entry.second.second) + "\n"};
                 sorted_entries_list.emplace(
                     entry.first,
-                    std::make_pair(LinkTaggedText(entry.second.first, entry.second.second) + "\n",
-                                   std::move(entry.second.second)));
+                    std::make_pair(std::move(linked_text), std::move(entry.second.second)));
             }
         }
 
@@ -1056,8 +1063,10 @@ namespace {
             // explicitly exclude textures and input directory itself
             if (category_str_key == "ENC_TEXTURES" || category_str_key == dir_name)
                 continue;
-            retval.emplace(std::make_pair(category_str_key, dir_name), std::make_pair(readable_article_name, link_text));
-            DebugLogger() << "GetSubDirs(" << dir_name << ") storing " << category_str_key << ": " << readable_article_name;
+            retval.emplace(std::make_pair(category_str_key, dir_name),
+                           std::make_pair(readable_article_name, link_text));
+            DebugLogger() << "GetSubDirs(" << dir_name << ") storing "
+                          << category_str_key << ": " << readable_article_name;
 
             // recurse into any sub-sub-directories
             for (auto sub_sub_dir : GetSubDirs(category_str_key, depth))
@@ -2941,15 +2950,15 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
 
     // assemble link text to all pedia entries, indexed by name
     auto articles_from_index_subdirs = GetSubDirs("ENC_INDEX");
-    for (const auto& entry : articles_from_index_subdirs) {
+    for (auto& entry : articles_from_index_subdirs) {
         const auto& article_key = entry.first.first;
         const auto& article_category = entry.first.second;
-        const auto& article_name_link = entry.second;
+        auto& article_name_link = entry.second;
         const auto& article_name = entry.second.first;
 
         // search for exact title matches
         if (boost::iequals(article_name, search_text)) {
-            exact_match_report.emplace(article_name_link);
+            exact_match_report.emplace(std::move(article_name_link));
             continue;
         }
 
@@ -2957,7 +2966,7 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
         // search for full word matches in titles
         for (const std::string& word : words_in_search_text) {
             if (GG::GUI::GetGUI()->ContainsWord(article_name, word)) {
-                word_match_report.emplace(article_name_link);
+                word_match_report.emplace(std::move(article_name_link));
                 listed = true;
                 break;
             }
@@ -2972,7 +2981,7 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
             if (word.size() < 3)
                 continue;
             if (boost::icontains(article_name, word)) {
-                partial_match_report.emplace(article_name_link);
+                partial_match_report.emplace(std::move(article_name_link));
                 listed = true;
                 break;
             }
@@ -2985,7 +2994,7 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
         if (!article_entry.description.empty()) {
             // article present in pedia directly
             if (boost::icontains(UserString(article_entry.description), search_text))
-                article_match_report.emplace(article_name_link);
+                article_match_report.emplace(std::move(article_name_link));
 
         } else {
             // article not in pedia. may be generated by GetRefreshDetailPanelInfo
@@ -3005,12 +3014,12 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
                                       dummyD);
 
             if (boost::icontains(detailed_description, search_text))
-                article_match_report.emplace(article_name_link);
+                article_match_report.emplace(std::move(article_name_link));
         }
     }
 
     // compile list of articles into some dynamically generated search report text
-    std::string match_report = "";
+    std::string match_report;
     if (!exact_match_report.empty()) {
         match_report += "\n" + UserString("ENC_SEARCH_EXACT_MATCHES") + "\n\n";
         for (auto&& match : exact_match_report)

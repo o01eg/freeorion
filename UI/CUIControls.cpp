@@ -59,19 +59,20 @@ namespace {
 ///////////////////////////////////////
 // class CUILabel
 ///////////////////////////////////////
-CUILabel::CUILabel(const std::string& str,
+CUILabel::CUILabel(std::string str,
                    GG::Flags<GG::TextFormat> format/* = GG::FORMAT_NONE*/,
                    GG::Flags<GG::WndFlag> flags/* = GG::NO_WND_FLAGS*/,
                    GG::X x /*= GG::X0*/, GG::Y y /*= GG::Y0*/, GG::X w /*= GG::X1*/, GG::Y h/*= GG::Y1*/) :
-    TextControl(x, y, w, h, str, ClientUI::GetFont(), ClientUI::TextColor(), format, flags)
+    TextControl(x, y, w, h, std::move(str), ClientUI::GetFont(), ClientUI::TextColor(), format, flags)
 {}
 
-CUILabel::CUILabel(const std::string& str,
-                   const std::vector<std::shared_ptr<GG::Font::TextElement>>& text_elements,
+CUILabel::CUILabel(std::string str,
+                   std::vector<std::shared_ptr<GG::Font::TextElement>> text_elements,
                    GG::Flags<GG::TextFormat> format/* = GG::FORMAT_NONE*/,
                    GG::Flags<GG::WndFlag> flags/* = GG::NO_WND_FLAGS*/,
                    GG::X x /*= GG::X0*/, GG::Y y /*= GG::Y0*/, GG::X w /*= GG::X1*/, GG::Y h/*= GG::Y1*/) :
-    TextControl(x, y, w, h, str, text_elements, ClientUI::GetFont(), ClientUI::TextColor(), format, flags)
+    TextControl(x, y, w, h, std::move(str), std::move(text_elements),
+                ClientUI::GetFont(), ClientUI::TextColor(), format, flags)
 {}
 
 void CUILabel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
@@ -90,23 +91,20 @@ namespace {
     const int CUIBUTTON_ANGLE_OFFSET = 5;
 }
 
-CUIButton::CUIButton(const std::string& str) :
-    Button(str, ClientUI::GetFont(), ClientUI::CtrlColor(), ClientUI::TextColor(), GG::INTERACTIVE)
-{
-    LeftClickedSignal.connect(-1,
-        &PlayButtonClickSound);
-}
+CUIButton::CUIButton(std::string str) :
+    Button(std::move(str), ClientUI::GetFont(), ClientUI::CtrlColor(),
+           ClientUI::TextColor(), GG::INTERACTIVE)
+{ LeftClickedSignal.connect(-1, &PlayButtonClickSound); }
 
-CUIButton::CUIButton(const GG::SubTexture& unpressed, const GG::SubTexture& pressed,
-                     const GG::SubTexture& rollover) :
+CUIButton::CUIButton(GG::SubTexture unpressed, GG::SubTexture pressed,
+                     GG::SubTexture rollover) :
     Button("", ClientUI::GetFont(), GG::CLR_WHITE, GG::CLR_ZERO, GG::INTERACTIVE)
 {
     SetColor(GG::CLR_WHITE);
-    SetUnpressedGraphic(unpressed);
-    SetPressedGraphic  (pressed);
-    SetRolloverGraphic (rollover);
-    LeftClickedSignal.connect(-1,
-        &PlayButtonClickSound);
+    SetUnpressedGraphic(std::move(unpressed));
+    SetPressedGraphic  (std::move(pressed));
+    SetRolloverGraphic (std::move(rollover));
+    LeftClickedSignal.connect(-1, &PlayButtonClickSound);
 }
 
 bool CUIButton::InWindow(const GG::Pt& pt) const {
@@ -199,11 +197,11 @@ void CUIButton::RenderUnpressed() {
 ///////////////////////////////////////
 // class SettableInWindowCUIButton
 ///////////////////////////////////////
-SettableInWindowCUIButton::SettableInWindowCUIButton(const GG::SubTexture& unpressed,
-                                                     const GG::SubTexture& pressed,
-                                                     const GG::SubTexture& rollover,
+SettableInWindowCUIButton::SettableInWindowCUIButton(GG::SubTexture unpressed,
+                                                     GG::SubTexture pressed,
+                                                     GG::SubTexture rollover,
                                                      std::function<bool (const SettableInWindowCUIButton*, const GG::Pt&)> in_window_function) :
-    CUIButton(unpressed, pressed, rollover)
+    CUIButton(std::move(unpressed), std::move(pressed), std::move(rollover))
 { m_in_window_func = in_window_function; }
 
 bool SettableInWindowCUIButton::InWindow(const GG::Pt& pt) const {
@@ -510,7 +508,7 @@ void CUILabelButtonRepresenter::Render(const GG::StateButton& button) const {
 CUIIconButtonRepresenter::CUIIconButtonRepresenter(std::shared_ptr<GG::SubTexture> icon,
                                                    const GG::Clr& highlight_clr) :
     m_unchecked_icon(icon),
-    m_checked_icon(icon),
+    m_checked_icon(std::move(icon)),
     m_unchecked_color(highlight_clr),
     m_checked_color(highlight_clr)
 {}
@@ -519,8 +517,8 @@ CUIIconButtonRepresenter::CUIIconButtonRepresenter(std::shared_ptr<GG::SubTextur
                                                    const GG::Clr& unchecked_clr,
                                                    std::shared_ptr<GG::SubTexture> checked_icon,
                                                    const GG::Clr& checked_clr) :
-    m_unchecked_icon(unchecked_icon),
-    m_checked_icon(checked_icon),
+    m_unchecked_icon(std::move(unchecked_icon)),
+    m_checked_icon(std::move(checked_icon)),
     m_unchecked_color(unchecked_clr),
     m_checked_color(checked_clr)
 {}
@@ -571,10 +569,10 @@ void CUIIconButtonRepresenter::Render(const GG::StateButton& button) const {
 ///////////////////////////////////////
 // class CUIStateButton
 ///////////////////////////////////////
-CUIStateButton::CUIStateButton(const std::string& str, GG::Flags<GG::TextFormat> format,
+CUIStateButton::CUIStateButton(std::string str, GG::Flags<GG::TextFormat> format,
                                std::shared_ptr<GG::StateButtonRepresenter> representer) :
-    StateButton(str, ClientUI::GetFont(), format,
-                ClientUI::StateButtonColor(), representer, ClientUI::TextColor())
+    StateButton(std::move(str), ClientUI::GetFont(), format,
+                ClientUI::StateButtonColor(), std::move(representer), ClientUI::TextColor())
 {}
 
 
@@ -880,8 +878,8 @@ void CUIDropDownList::EnableDropArrow()
 ///////////////////////////////////////
 // class CUIEdit
 ///////////////////////////////////////
-CUIEdit::CUIEdit(const std::string& str) :
-    Edit(str, ClientUI::GetFont(), ClientUI::CtrlBorderColor(),
+CUIEdit::CUIEdit(std::string str) :
+    Edit(std::move(str), ClientUI::GetFont(), ClientUI::CtrlBorderColor(),
          ClientUI::TextColor(), ClientUI::CtrlColor())
 {}
 
@@ -1525,13 +1523,13 @@ namespace {
                  ClientUI::SpeciesIcon(species_name));
         };
 
-        SpeciesRow(const std::string& species_name, const std::string& localized_name, const std::string& species_desc,
+        SpeciesRow(std::string species_name, std::string localized_name, std::string species_desc,
                    GG::X w, GG::Y h, std::shared_ptr<GG::Texture> species_icon) :
             GG::ListBox::Row(w, h)
         {
             SetMargin(0);
-            GG::Wnd::SetName(species_name);
-            Init(species_name, localized_name, species_desc, w, h, species_icon);
+            Init(std::move(species_name), std::move(localized_name),
+                 std::move(species_desc), w, h, std::move(species_icon));
         };
 
         void CompleteConstruction() override {
@@ -1546,23 +1544,22 @@ namespace {
             GetLayout()->SetColumnStretch(1, 1.0);
         }
     private:
-        void Init(const std::string& species_name, const std::string& localized_name, const std::string& species_desc,
+        void Init(std::string species_name, std::string localized_name, std::string species_desc,
                   GG::X width, GG::Y height, std::shared_ptr<GG::Texture> species_icon)
         {
-            GG::Wnd::SetName(species_name);
+            GG::Wnd::SetName(std::move(species_name));
             m_icon = GG::Wnd::Create<GG::StaticGraphic>(species_icon, GG::GRAPHIC_FITGRAPHIC| GG::GRAPHIC_PROPSCALE);
             m_icon->Resize(GG::Pt(GG::X(Value(height - 5)), height - 5));
             m_species_label = GG::Wnd::Create<CUILabel>(localized_name, GG::FORMAT_LEFT | GG::FORMAT_VCENTER);
             if (!species_desc.empty()) {
                 SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
-                SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(species_icon, localized_name,
-                                                                     species_desc));
+                SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
+                    std::move(species_icon), std::move(localized_name), std::move(species_desc)));
             }
         }
 
         std::shared_ptr<GG::StaticGraphic> m_icon;
         std::shared_ptr<CUILabel> m_species_label;
-
     };
 }
 
@@ -1632,9 +1629,8 @@ namespace {
                 SetMinSize(GG::Pt(COLOR_SELECTOR_WIDTH - 40, GG::Y(1)));
             }
 
-            void Render() override {
-                GG::FlatRectangle(UpperLeft(), LowerRight(), Color(), GG::CLR_ZERO, 0);
-            }
+            void Render() override
+            { GG::FlatRectangle(UpperLeft(), LowerRight(), Color(), GG::CLR_ZERO, 0); }
         };
 
         ColorRow(const GG::Clr& color, GG::Y h) :
@@ -1662,9 +1658,8 @@ EmpireColorSelector::EmpireColorSelector(GG::Y h) :
 {
     Resize(GG::Pt(COLOR_SELECTOR_WIDTH, h - 8));
 
-    for (const GG::Clr& color : EmpireColors()) {
+    for (const GG::Clr& color : EmpireColors())
         Insert(GG::Wnd::Create<ColorRow>(color, h - 4));
-    }
 
     SelChangedSignal.connect(
         [this](GG::DropDownList::iterator it) {
@@ -1786,14 +1781,14 @@ namespace {
     GG::Y VERTICAL_SECTION_GAP(4);
 }
 
-ResourceInfoPanel::ResourceInfoPanel(const std::string& title, const std::string& point_units_str,
+ResourceInfoPanel::ResourceInfoPanel(std::string title, std::string point_units_str,
                                      const GG::X x, const GG::Y y, const GG::X w, const GG::Y h,
                                      const std::string& config_name) :
     CUIWnd(title, x, y, w, h,
            GG::INTERACTIVE | GG::RESIZABLE | GG::DRAGABLE | GG::ONTOP | PINABLE,
            config_name, false),
-    m_units_str(point_units_str),
-    m_title_str(title),
+    m_units_str(std::move(point_units_str)),
+    m_title_str(std::move(title)),
     m_empire_id(ALL_EMPIRES),
     m_empire_column_label(GG::Wnd::Create<CUILabel>(UserString("EMPIRE"), GG::FORMAT_LEFT)),
     m_local_column_label(GG::Wnd::Create<CUILabel>("", GG::FORMAT_LEFT)),
@@ -1870,10 +1865,7 @@ void ResourceInfoPanel::SetTotalPointsCost(float total_points, float total_cost)
         m_wasted_points->SetTextColor(ClientUI::TextColor());
 
     const Empire* empire = GetEmpire(m_empire_id);
-    std::string empire_name;
-    if (empire)
-        empire_name = empire->Name();
-
+    const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
     SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_INFO_EMPIRE")) % m_title_str % empire_name));
 }
 
@@ -1901,10 +1893,7 @@ void ResourceInfoPanel::SetStockpileCost(float stockpile, float stockpile_use,
 
     TraceLogger() << "SetStockpileCost:  set name";
     const Empire* empire = GetEmpire(m_empire_id);
-    std::string empire_name;
-    if (empire)
-        empire_name = empire->Name();
-
+    const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
     SetName(boost::io::str(FlexibleFormat(UserString("STOCKPILE_INFO_EMPIRE")) % m_title_str % empire_name));
     TraceLogger() << "SetStockpileCost:  done.";
 }
@@ -1931,10 +1920,7 @@ void ResourceInfoPanel::SetLocalPointsCost(float local_points, float local_cost,
         m_local_wasted_points->SetTextColor(ClientUI::TextColor());
 
     const Empire* empire = GetEmpire(m_empire_id);
-    std::string empire_name;
-    if (empire)
-        empire_name = empire->Name();
-
+    const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
     SetName(boost::io::str(FlexibleFormat(
         UserString("PRODUCTION_INFO_AT_LOCATION_TITLE")) % m_title_str % location_name % empire_name));
 
@@ -1947,10 +1933,7 @@ void ResourceInfoPanel::SetEmpireID(int empire_id) {
     m_empire_id = empire_id;
     if (old_empire_id != m_empire_id) {
         const Empire* empire = GetEmpire(m_empire_id);
-        std::string empire_name;
-        if (empire)
-            empire_name = empire->Name();
-
+        const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
         // let a subsequent SetLocalPointsCost call re-set the title to include location info if necessary
         SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_INFO_EMPIRE")) % m_title_str % empire_name));
     }
@@ -1965,10 +1948,7 @@ void ResourceInfoPanel::ClearLocalInfo() {
     DetachChild(m_local_stockpile_use_P_label);
 
     const Empire* empire = GetEmpire(m_empire_id);
-    std::string empire_name;
-    if (empire)
-        empire_name = empire->Name();
-
+    const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
     SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_INFO_EMPIRE")) % m_title_str % empire_name));
 
     m_local_column_label->SetText("");

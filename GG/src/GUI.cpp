@@ -573,10 +573,10 @@ void GUIImpl::HandleMouseButtonRelease(unsigned int mouse_button, const GG::Pt& 
                 std::vector<const Wnd*> unaccepted_wnds;
                 for (auto& drop_wnd : m_drag_drop_wnds) {
                     if (m_drag_drop_wnds_acceptable[drop_wnd.first.get()]) {
-                        accepted_wnds.push_back(std::move(drop_wnd.first));
-                        removed_wnds.push_back(const_cast<Wnd*>(drop_wnd.first.get()));
+                        accepted_wnds.emplace_back(drop_wnd.first);
+                        removed_wnds.emplace_back(const_cast<Wnd*>(drop_wnd.first.get()));
                     } else
-                        unaccepted_wnds.push_back(drop_wnd.first.get());
+                        unaccepted_wnds.emplace_back(drop_wnd.first.get());
                 }
                 // if dragged Wnds came from somehwere, inform originating
                  // Wnd its children are or are not being dragged away
@@ -857,12 +857,12 @@ void GUIImpl::GouvernFPS()
 GUI* GUI::s_gui = nullptr;
 
 // member functions
-GUI::GUI(const std::string& app_name) :
+GUI::GUI(std::string app_name) :
     m_impl(std::make_unique<GUIImpl>())
 {
     assert(!s_gui);
     s_gui = this;
-    m_impl->m_app_name = app_name;
+    m_impl->m_app_name = std::move(app_name);
 }
 
 GUI::~GUI()

@@ -650,12 +650,12 @@ private:
 
     class StringRow : public GG::ListBox::Row {
     public:
-        StringRow(const std::string& text, GG::Y row_height, bool stringtable_lookup = true) :
+        StringRow(std::string text, GG::Y row_height, bool stringtable_lookup = true) :
             GG::ListBox::Row(GG::X1, row_height),
-            m_string(text)
+            m_string(std::move(text))
         {
-            const std::string& label = (text.empty() ? EMPTY_STRING :
-                (stringtable_lookup ? UserString(text) : text));
+            const std::string& label = (m_string.empty() ? EMPTY_STRING :
+                (stringtable_lookup ? UserString(m_string) : m_string));
             m_label = GG::Wnd::Create<CUILabel>(label, GG::FORMAT_LEFT | GG::FORMAT_NOWRAP);
         }
 
@@ -666,7 +666,7 @@ private:
             push_back(m_label);
         }
 
-        const std::string&  Text() const { return m_string; }
+        const std::string& Text() const { return m_string; }
     private:
         std::string m_string;
         std::shared_ptr<CUILabel> m_label;
@@ -1067,7 +1067,7 @@ private:
 ////////////////////////////////////////////////
 class FilterDialog : public CUIWnd {
 public:
-    FilterDialog(const std::map<UniverseObjectType, std::set<VIS_DISPLAY>>& vis_filters,
+    FilterDialog(std::map<UniverseObjectType, std::set<VIS_DISPLAY>> vis_filters,
                  const Condition::Condition* const condition_filter);
 
     void CompleteConstruction() override;
@@ -1099,17 +1099,13 @@ private:
 };
 
 
-FilterDialog::FilterDialog(const std::map<UniverseObjectType,
-                           std::set<VIS_DISPLAY>>& vis_filters,
+FilterDialog::FilterDialog(std::map<UniverseObjectType, std::set<VIS_DISPLAY>> vis_filters,
                            const Condition::Condition* const condition_filter) :
     CUIWnd(UserString("FILTERS"),
            GG::INTERACTIVE | GG::DRAGABLE | GG::MODAL,
            FILTER_OPTIONS_WND_NAME),
-    m_vis_filters(vis_filters)
-{
-    m_condition_widget = GG::Wnd::Create<ConditionWidget>(GG::X(3), GG::Y(3),
-                                                          condition_filter);
-}
+    m_vis_filters(std::move(vis_filters))
+{ m_condition_widget = GG::Wnd::Create<ConditionWidget>(GG::X(3), GG::Y(3), condition_filter); }
 
 void FilterDialog::CompleteConstruction() {
     CUIWnd::CompleteConstruction();
@@ -1529,10 +1525,9 @@ private:
         retval.reserve(NUM_COLUMNS);
 
         for (unsigned int i = 0; i < NUM_COLUMNS; ++i) {
-            std::string col_val = SortKey(i);
-            auto control = GG::Wnd::Create<CUILabel>(col_val, GG::FORMAT_LEFT);
+            auto control = GG::Wnd::Create<CUILabel>(SortKey(i), GG::FORMAT_LEFT);
             control->Resize(GG::Pt(GG::X(GetColumnWidth(i)), ClientHeight()));
-            retval.emplace_back(control);
+            retval.emplace_back(std::move(control));
         }
 
         return retval;

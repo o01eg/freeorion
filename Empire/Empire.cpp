@@ -182,7 +182,7 @@ void Empire::SetCapitalID(int id) {
 
 void Empire::AdoptPolicy(const std::string& name, const std::string& category,
                          bool adopt, int slot)
-{   // todo: add error message if passed empty policy name or category
+{
     if (name.empty()) {
         ErrorLogger() << "Empire::AdoptPolicy given empty policy name";
         return;
@@ -190,8 +190,10 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
 
     if (!adopt) {
         // revoke policy
-        if (m_adopted_policies.count(name))
+        if (m_adopted_policies.count(name)) {
             m_adopted_policies.erase(name);
+            PoliciesChangedSignal();
+        }
         return;
     }
 
@@ -212,6 +214,13 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     if (!policy->Category().empty() && policy->Category() != category) {
         ErrorLogger() << "Empire::AdoptPolicy asked to handle policy " << name << " in category " << category
                       << " but that policy has category " << policy->Category();
+        return;
+    }
+
+    // are there conflicts with other policies or missing prerequisite policies?
+    if (!PolicyPrereqsAndExclusionsOK(name)) {
+        ErrorLogger() << "Empire::AdoptPolicy asked to adopt policy " << name
+                      << " whose prerequisites are not met or which has a conflicting exclusion with already-adopted policies";
         return;
     }
 
@@ -326,6 +335,8 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
                   << m_adopted_policies[name].category << "  in slot "
                   << m_adopted_policies[name].slot_in_category << "  on turn "
                   << m_adopted_policies[name].adoption_turn;
+
+    PoliciesChangedSignal();
 }
 
 void Empire::UpdatePolicies() {
@@ -345,6 +356,8 @@ void Empire::UpdatePolicies() {
         }
     }
 
+    // TODO: Check and handle policy exclusions in this function...
+
     // check that there are enough slots for adopted policies in their current slots
     std::map<std::string, int> total_category_slot_counts = TotalPolicySlots(); // how many slots in each category
     std::set<std::string> categories_needing_rearrangement;                     // which categories have a problem
@@ -354,7 +367,7 @@ void Empire::UpdatePolicies() {
         const auto& slot = policy_pair.second.slot_in_category;
         const auto& slot_count = category_slot_policy_counts[cat][slot]++;
         if (slot_count > 1 || policy_pair.second.slot_in_category >= total_category_slot_counts[cat])
-        { categories_needing_rearrangement.insert(cat); }
+            categories_needing_rearrangement.insert(cat);
     }
 
     // if a category has too many policies or a slot number conflict, rearrange it
@@ -388,6 +401,7 @@ void Empire::UpdatePolicies() {
 
     // update initial adopted policies for next turn
     m_initial_adopted_policies = m_adopted_policies;
+    PoliciesChangedSignal();
 }
 
 bool Empire::PolicyAdopted(const std::string& name) const
@@ -411,7 +425,7 @@ std::vector<std::string> Empire::AdoptedPolicies() const {
     std::vector<std::string> retval;
     retval.reserve(m_adopted_policies.size());
     for (const auto& entry : m_adopted_policies)
-        retval.push_back(entry.first);
+        retval.emplace_back(entry.first);
     return retval;
 }
 
@@ -435,6 +449,42 @@ const std::set<std::string>& Empire::AvailablePolicies() const
 
 bool Empire::PolicyAvailable(const std::string& name) const
 { return m_available_policies.count(name); }
+
+bool Empire::PolicyPrereqsAndExclusionsOK(const std::string& name) const {
+    const Policy* policy_to_adopt = GetPolicy(name);
+    if (!policy_to_adopt)
+        return false;
+
+    // is there an exclusion or prerequisite conflict?
+    for (const auto& already_adopted_policy_name_info : m_adopted_policies) {
+        if (policy_to_adopt->Exclusions().count(already_adopted_policy_name_info.first)) {
+            // policy to be adopted has an exclusion with an already-adopted policy
+            return false;
+        }
+
+        const Policy* already_adopted_policy = GetPolicy(already_adopted_policy_name_info.first);
+        if (!already_adopted_policy) {
+            ErrorLogger() << "Couldn't get already adopted policy: " << already_adopted_policy_name_info.first;
+            continue;
+        }
+        if (already_adopted_policy->Exclusions().count(name)) {
+            // already adopted policy has an exclusion with the policy to be adopted
+            return false;
+        }
+    }
+
+    for (const auto& prereq : policy_to_adopt->Prerequisites()) {
+        auto it = m_adopted_policies.find(prereq);
+        if (it == m_adopted_policies.end())
+            return false;
+        // must have adopted policy at least one turn before, to prevent
+        // same-turn policy swapping to bypass prereqs at no cost
+        if (it->second.adoption_turn >= CurrentTurn())
+            return false;
+    }
+
+    return true;
+}
 
 std::map<std::string, int> Empire::TotalPolicySlots() const {
     std::map<std::string, int> retval;

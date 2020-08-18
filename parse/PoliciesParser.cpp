@@ -25,11 +25,13 @@ namespace {
     const boost::phoenix::function<parse::detail::is_unique> is_unique_;
 
     struct policy_pod {
-        policy_pod(std::string name_,
-                   std::string description_,
-                   std::string short_description_,
-                   std::string category_,
+        policy_pod(std::string& name_,
+                   std::string& description_,
+                   std::string& short_description_,
+                   std::string& category_,
                    const boost::optional<parse::detail::value_ref_payload<double>>& adoption_cost_,
+                   std::set<std::string>& prerequisites_,
+                   std::set<std::string>& exclusions_,
                    const boost::optional<parse::effects_group_payload>& effects_,
                    const std::string& graphic_) :
             name(std::move(name_)),
@@ -37,17 +39,21 @@ namespace {
             short_description(std::move(short_description_)),
             category(std::move(category_)),
             adoption_cost(adoption_cost_),
+            prerequisites(std::move(prerequisites_)),
+            exclusions(std::move(exclusions_)),
             effects(effects_),
             graphic(graphic_)
         {}
 
-        std::string         name;
-        std::string         description;
-        std::string         short_description;
-        std::string         category;
+        std::string             name;
+        std::string             description;
+        std::string             short_description;
+        std::string             category;
+        std::set<std::string>   exclusions;
+        std::set<std::string>   prerequisites;
         const boost::optional<parse::detail::value_ref_payload<double>> adoption_cost;
         const boost::optional<parse::effects_group_payload>&            effects;
-        const std::string&  graphic;
+        const std::string&      graphic;
     };
 
     void insert_policy(PolicyManager::PoliciesTypeMap& policies, policy_pod policy_, bool& pass) {
@@ -57,6 +63,8 @@ namespace {
             std::move(policy_.short_description),
             std::move(policy_.category),
             (policy_.adoption_cost ? policy_.adoption_cost->OpenEnvelope(pass) : nullptr),
+            std::move(policy_.prerequisites),
+            std::move(policy_.exclusions),
             (policy_.effects ? OpenEnvelopes(*policy_.effects, pass) : std::vector<std::unique_ptr<Effect::EffectsGroup>>()),
             policy_.graphic);
 
@@ -65,6 +73,41 @@ namespace {
     }
 
     BOOST_PHOENIX_ADAPT_FUNCTION(void, insert_policy_, insert_policy, 3)
+
+    using stringset_rule_type = parse::detail::rule<std::set<std::string> ()>;
+    using stringset_grammar_type = parse::detail::grammar<std::set<std::string> ()>;
+
+    struct prereqs_grammar : public stringset_grammar_type {
+        prereqs_grammar(const parse::lexer& tok, parse::detail::Labeller& label) :
+            prereqs_grammar::base_type(start, "prereqs_grammar"),
+            one_or_more_string_tokens(tok)
+        {
+            start %= -(label(tok.Prerequisites_) >> one_or_more_string_tokens);
+            start.name("Prerequisites");
+#if DEBUG_PARSERS
+            debug(start);
+#endif
+        }
+
+        stringset_rule_type start;
+        parse::detail::single_or_repeated_string<std::set<std::string>> one_or_more_string_tokens;
+    };
+
+    struct exclusions_grammar : public stringset_grammar_type {
+        exclusions_grammar(const parse::lexer& tok, parse::detail::Labeller& label) :
+            exclusions_grammar::base_type(start, "exclusions_grammar"),
+            one_or_more_string_tokens(tok)
+        {
+            start %= -(label(tok.Exclusions_) >> one_or_more_string_tokens);
+            start.name("Exclusions");
+#if DEBUG_PARSERS
+            debug(start);
+#endif
+        }
+
+        stringset_rule_type start;
+        parse::detail::single_or_repeated_string<std::set<std::string>> one_or_more_string_tokens;
+    };
 
     using start_rule_payload = PolicyManager::PoliciesTypeMap;
     using start_rule_signature = void(start_rule_payload&);
@@ -77,6 +120,8 @@ namespace {
             condition_parser(tok, label),
             string_grammar(tok, label, condition_parser),
             double_rules(tok, label, condition_parser, string_grammar),
+            prerequisites(tok, label),
+            exclusions(tok, label),
             effects_group_grammar(tok, label, condition_parser, string_grammar)
         {
             namespace phoenix = boost::phoenix;
@@ -90,22 +135,27 @@ namespace {
             qi::_6_type _6;
             qi::_7_type _7;
             qi::_8_type _8;
+            qi::_9_type _9;
+            phoenix::actor<boost::spirit::argument<9>> _10; // qi::_10_type is not predefined
             qi::_pass_type _pass;
             qi::_r1_type _r1;
             qi::eps_type eps;
             const boost::phoenix::function<parse::detail::deconstruct_movable> deconstruct_movable_;
 
             policy
-                = (  tok.Policy_
-                >    label(tok.Name_)               > tok.string
-                >    label(tok.Description_)        > tok.string
-                >    label(tok.Short_Description_)  > tok.string
-                >    label(tok.Category_)           > tok.string
-                >    label(tok.AdoptionCost_)       > double_rules.expr
-                >  -(label(tok.EffectsGroups_)      > effects_group_grammar)
-                >    label(tok.Graphic_)            > tok.string)
+                = (  tok.Policy_                                            // _1
+                >    label(tok.Name_)               > tok.string            // _2
+                >    label(tok.Description_)        > tok.string            // _3
+                >    label(tok.Short_Description_)  > tok.string            // _4
+                >    label(tok.Category_)           > tok.string            // _5
+                >    label(tok.AdoptionCost_)       > double_rules.expr     // _6
+                >    prerequisites                                          // _7
+                >    exclusions                                             // _8
+                >  -(label(tok.EffectsGroups_)      > effects_group_grammar)// _9
+                >    label(tok.Graphic_)            > tok.string)           // _10
                 [  _pass = is_unique_(_r1, _1, _2),
-                   insert_policy_(_r1, phoenix::construct<policy_pod>(_2, _3, _4, _5, _6, _7, _8), _pass) ]
+                   insert_policy_(_r1, phoenix::construct<policy_pod>(
+                       _2, _3, _4, _5, _6, _7, _8, _9, _10), _pass) ]
                 ;
 
             start
@@ -113,9 +163,13 @@ namespace {
                 ;
 
             policy.name("Policy");
+            prerequisites.name("Prerequisites");
+            exclusions.name("Exclusions");
 
 #if DEBUG_PARSERS
-            debug(special);
+            debug(policy);
+            debug(prerequisites);
+            debug(exclusions)
 #endif
 
             qi::on_error<qi::fail>(start, parse::report_error(filename, first, last, _1, _2, _3, _4));
@@ -128,6 +182,8 @@ namespace {
         parse::conditions_parser_grammar    condition_parser;
         const parse::string_parser_grammar  string_grammar;
         parse::double_parser_rules          double_rules;
+        prereqs_grammar                     prerequisites;
+        exclusions_grammar                  exclusions;
         parse::effects_group_grammar        effects_group_grammar;
         policy_rule                         policy;
         start_rule                          start;

@@ -2003,7 +2003,7 @@ void MapWnd::RenderSystems() {
                             if (it != colony_count_by_empire_id.end())
                                 it->second++;
                             else
-                                colony_count_by_empire_id.insert({planet->Owner(), 1});
+                                colony_count_by_empire_id.emplace(planet->Owner(), 1);
                         }
 
                         // remember if this system has neutrals
@@ -2016,7 +2016,7 @@ void MapWnd::RenderSystems() {
                             if (it != colony_count_by_empire_id.end())
                                 it->second++;
                             else
-                                colony_count_by_empire_id.insert({ALL_EMPIRES, 1});
+                                colony_count_by_empire_id.emplace(ALL_EMPIRES, 1);
                         }
                     }
 
@@ -2996,12 +2996,9 @@ void MapWnd::InitSystemRenderingBuffers() {
     // be.  This allows us to use one set of texture coords for everything, even
     // though the star-halo textures must be rendered at sizes as much as twice
     // as large as the star-disc textures.
-    for (std::size_t i = 0; i < m_system_icons.size(); ++i) {
-        m_star_texture_coords.store( 1.5,-0.5);
-        m_star_texture_coords.store(-0.5,-0.5);
-        m_star_texture_coords.store(-0.5, 1.5);
-        m_star_texture_coords.store( 1.5, 1.5);
-    }
+    GLfloat tex_coords[4] = {-0.5, -0.5, 1.5, 1.5};
+    for (std::size_t i = 0; i < m_system_icons.size(); ++i)
+        GG::Texture::InitBuffer(m_star_texture_coords, tex_coords);
 
 
     for (const auto& system_icon : m_system_icons) {
@@ -3023,20 +3020,13 @@ void MapWnd::InitSystemRenderingBuffers() {
 
         if (icon->DiscTexture()) {
             auto& core_vertices = m_star_core_quad_vertices[icon->DiscTexture()];
-            core_vertices.store(icon_lr_x,icon_ul_y);
-            core_vertices.store(icon_ul_x,icon_ul_y);
-            core_vertices.store(icon_ul_x,icon_lr_y);
-            core_vertices.store(icon_lr_x,icon_lr_y);
+            GG::Texture::InitBuffer(core_vertices, icon_ul_x, icon_ul_y, icon_lr_x, icon_lr_y);
         }
 
         if (icon->HaloTexture()) {
             auto& halo_vertices = m_star_halo_quad_vertices[icon->HaloTexture()];
-            halo_vertices.store(icon_lr_x,icon_ul_y);
-            halo_vertices.store(icon_ul_x,icon_ul_y);
-            halo_vertices.store(icon_ul_x,icon_lr_y);
-            halo_vertices.store(icon_lr_x,icon_lr_y);
+            GG::Texture::InitBuffer(halo_vertices, icon_ul_x, icon_ul_y, icon_lr_x, icon_lr_y);
         }
-
 
         // add (rotated) gaseous substance around system
         if (auto gas_texture = GetGasTexture()) {
@@ -3095,10 +3085,8 @@ void MapWnd::InitSystemRenderingBuffers() {
             const GLfloat tx_low_y = tex_coord_min_y  + (subtexture_y_index + 0)*(tex_coord_max_y - tex_coord_min_y)/3;
             const GLfloat tx_high_y = tex_coord_min_y + (subtexture_y_index + 1)*(tex_coord_max_y - tex_coord_min_y)/3;
 
-            m_galaxy_gas_texture_coords.store(tx_high_x, tx_low_y);
-            m_galaxy_gas_texture_coords.store(tx_low_x,  tx_low_y);
-            m_galaxy_gas_texture_coords.store(tx_low_x,  tx_high_y);
-            m_galaxy_gas_texture_coords.store(tx_high_x, tx_high_y);
+            GLfloat rot_tex_coords[4] = {tx_low_x, tx_low_y, tx_high_x, tx_high_y};
+            GG::Texture::InitBuffer(m_galaxy_gas_texture_coords, rot_tex_coords);
         }
     }
 
@@ -3260,8 +3248,8 @@ namespace GetPathsThroughSupplyLanes {
         // Initialize with all the terminal points, by adding all
         // terminal points to the queue, and to visited.
         for (int terminal_point : terminal_points) {
-            try_next.push_back(PrevCurrInfo(terminal_point, terminal_point, terminal_point));
-            visited.insert({terminal_point, PathInfo(terminal_point)});
+            try_next.emplace_back(terminal_point, terminal_point, terminal_point);
+            visited.emplace(terminal_point, PathInfo(terminal_point));
         }
 
         // Find all reachable midpoints where paths from two different
@@ -3288,8 +3276,8 @@ namespace GetPathsThroughSupplyLanes {
                 // the same originating terminal point as the current
                 // system.
                 if (previous == visited.end()) {
-                    visited.insert({next, PathInfo(curr.curr, curr.origin)});
-                    try_next.push_back(PrevCurrInfo(curr.curr, next, curr.origin));
+                    visited.emplace(next, PathInfo(curr.curr, curr.origin));
+                    try_next.emplace_back(curr.curr, next, curr.origin);
 
                 // next has an ancester so it was visited. Modify the
                 // older previous to merge paths/create mid points.
@@ -3373,12 +3361,11 @@ namespace {
     // Reimplementation of the boost::hash_range function, embedding
     // boost::hash_combine and using std::hash instead of boost::hash
     struct hash_set {
-        std::size_t operator()(const std::set<int>& set) const
-        {
+        std::size_t operator()(const std::set<int>& set) const {
             std::size_t seed(0);
             std::hash<int> hasher;
 
-            for(auto element : set)
+            for (auto element : set)
                 seed ^= hasher(element) + 0x9e3779b9 + (seed<<6) + (seed>>2);
 
             return seed;
@@ -3480,12 +3467,12 @@ namespace {
         // Convert supply starlanes to non-directional.  This saves half
         // of the lookups.
         GetPathsThroughSupplyLanes::SupplyLaneMMap resource_supply_lanes_undirected;
-        const auto resource_supply_lanes_directed =
+        const auto& resource_supply_lanes_directed =
             GetSupplyManager().SupplyStarlaneTraversals(empire_id);
 
         for (const auto& supply_lane : resource_supply_lanes_directed) {
-            resource_supply_lanes_undirected.insert({supply_lane.first, supply_lane.second});
-            resource_supply_lanes_undirected.insert({supply_lane.second, supply_lane.first});
+            resource_supply_lanes_undirected.emplace(supply_lane.first, supply_lane.second);
+            resource_supply_lanes_undirected.emplace(supply_lane.second, supply_lane.first);
         }
 
         // For each pool of resources find all paths available through
@@ -3504,9 +3491,8 @@ namespace {
             // Convert res_pool_system.second from set<int> to
             // unordered_set<int> to improve lookup speed.
             std::unordered_set<int> terminal_points;
-            for (int system_id : *(res_pool_system.second)) {
+            for (int system_id : *(res_pool_system.second))
                 terminal_points.insert(system_id);
-            }
 
             std::unordered_set<int> paths;
             GetPathsThroughSupplyLanes::GetPathsThroughSupplyLanes(
@@ -3583,8 +3569,8 @@ namespace {
                 // check that this lane isn't already in map / being rendered.
                 if (already_rendered_full_lanes.count({start_system->ID(), dest_system->ID()}))
                     continue;
-                already_rendered_full_lanes.insert({start_system->ID(), dest_system->ID()});
-                already_rendered_full_lanes.insert({dest_system->ID(), start_system->ID()});
+                already_rendered_full_lanes.emplace(start_system->ID(), dest_system->ID());
+                already_rendered_full_lanes.emplace(dest_system->ID(), start_system->ID());
 
 
                 // add vertices for this full-length starlane
@@ -3780,7 +3766,7 @@ namespace {
                         continue;
 
                     // found an empire that has a half lane here, so add it.
-                    rendered_half_starlanes.insert({start_system->ID(), dest_system->ID()});  // inserted as ordered pair, so both directions can have different half-lanes
+                    rendered_half_starlanes.emplace(start_system->ID(), dest_system->ID());  // inserted as ordered pair, so both directions can have different half-lanes
 
                     LaneEndpoints lane_endpoints = StarlaneEndPointsFromSystemPositions(start_system->X(), start_system->Y(), dest_system->X(), dest_system->Y());
                     starlane_vertices.store(lane_endpoints.X1, lane_endpoints.Y1);
@@ -5539,7 +5525,8 @@ std::vector<int> MapWnd::FleetIDsOfFleetButtonsOverlapping(int fleet_id) const {
         // Add all fleets for each overlapping button on the starlane
         for (const auto& test_fb : lane_btns_it->second)
             if (overlaps_fleet_btn(*test_fb))
-                std::copy(test_fb->Fleets().begin(), test_fb->Fleets().end(), std::back_inserter(fleet_ids));
+                std::copy(test_fb->Fleets().begin(), test_fb->Fleets().end(),
+                          std::back_inserter(fleet_ids));
 
         return fleet_ids;
     }
@@ -5559,10 +5546,9 @@ std::vector<int> MapWnd::FleetIDsOfFleetButtonsOverlapping(int fleet_id) const {
                 continue;
 
             // Add all fleets for all fleet buttons to btn_fleet
-            for (const auto& overlapped_fb: fbs) {
-                std::copy(overlapped_fb->Fleets().begin(), overlapped_fb->Fleets().end(),
-                          std::back_inserter(fleet_ids));
-            }
+            for (const auto& overlapped_fb: fbs)
+                fleet_ids.insert(fleet_ids.end(), overlapped_fb->Fleets().begin(),
+                                 overlapped_fb->Fleets().end());
         }
 
         return fleet_ids;

@@ -94,6 +94,7 @@ public:
     /** Returns the set of policies / slots the empire has avaialble. */
     const std::set<std::string>&    AvailablePolicies() const;
     bool                            PolicyAvailable(const std::string& name) const;
+    bool                            PolicyPrereqsAndExclusionsOK(const std::string& name) const;
     std::map<std::string, int>      TotalPolicySlots() const;
     std::map<std::string, int>      EmptyPolicySlots() const;
 
@@ -474,20 +475,21 @@ public:
     static void ConquerProductionQueueItemsAtLocation(int location_id, int empire_id);
 
     mutable boost::signals2::signal<void ()> ShipDesignsChangedSignal;
+    mutable boost::signals2::signal<void ()> PoliciesChangedSignal;
 
 private:
     void Init();
 
-    int                             m_id = ALL_EMPIRES;         ///< Empire's unique numeric id
-    std::string                     m_name;                     ///< Empire's name
-    std::string                     m_player_name;              ///< Empire's Player's name
+    int         m_id = ALL_EMPIRES;         ///< Empire's unique numeric id
+    std::string m_name;                     ///< Empire's name
+    std::string m_player_name;              ///< Empire's Player's name
 
     /** Empire's Player's authentication flag. Set if only player with empire's player's name
         should play this empire. */
-    bool                            m_authenticated;
+    bool        m_authenticated = false;
 
-    GG::Clr                         m_color;                    ///< Empire's color
-    int                             m_capital_id = INVALID_OBJECT_ID;  ///< the ID of the empire's capital planet
+    GG::Clr     m_color;
+    int         m_capital_id = INVALID_OBJECT_ID;  ///< the ID of the empire's capital planet
 
     struct PolicyAdoptionInfo {
         PolicyAdoptionInfo();

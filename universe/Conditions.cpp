@@ -373,7 +373,7 @@ Number::Number(std::unique_ptr<ValueRef::ValueRef<int>>&& low,
     m_high(std::move(high)),
     m_condition(std::move(condition))
 {
-    std::array<const ValueRef::ValueRefBase*, 2> operands = { m_low.get(), m_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_low.get(), m_high.get()}};
     m_root_candidate_invariant =
         m_condition->RootCandidateInvariant() &&
         boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
@@ -525,7 +525,7 @@ Turn::Turn(std::unique_ptr<ValueRef::ValueRef<int>>&& low,
     m_low(std::move(low)),
     m_high(std::move(high))
 {
-    std::array<const ValueRef::ValueRefBase*, 2> operands = { m_low.get(), m_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_low.get(), m_high.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -676,7 +676,7 @@ SortedNumberOf::SortedNumberOf(std::unique_ptr<ValueRef::ValueRef<int>>&& number
     m_sorting_method(sorting_method),
     m_condition(std::move(condition))
 {
-    std::array<const ValueRef::ValueRefBase*, 2> operands = { m_number.get(), m_sort_key.get() };
+    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_number.get(), m_sort_key.get()}};
     m_root_candidate_invariant =
         boost::algorithm::all_of(operands, [](const auto& e) { return !e || e->RootCandidateInvariant(); }) &&
         (!m_condition || m_condition->RootCandidateInvariant());
@@ -816,7 +816,7 @@ namespace {
             // invert histogram to index by number of occurances
             std::multimap<unsigned int, float> inv_histogram;
             for (const auto& entry : histogram)
-                inv_histogram.insert({entry.second, entry.first});
+                inv_histogram.emplace(entry.second, entry.first);
 
             // reverse-loop through inverted histogram to find which sort keys
             // occurred most frequently, and transfer objects with those sort
@@ -1081,8 +1081,8 @@ All::All() :
 }
 
 void All::Eval(const ScriptingContext& parent_context,
-                          ObjectSet& matches, ObjectSet& non_matches,
-                          SearchDomain search_domain/* = NON_MATCHES*/) const
+               ObjectSet& matches, ObjectSet& non_matches,
+               SearchDomain search_domain/* = NON_MATCHES*/) const
 {
     if (search_domain == NON_MATCHES) {
         // move all objects from non_matches to matches
@@ -1574,19 +1574,19 @@ namespace {
             if (!candidate)
                 return false;
 
-            // is it a planet or a building on a planet?
-            auto planet = std::dynamic_pointer_cast<const Planet>(candidate);
-            std::shared_ptr<const ::Building> building;
-            if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
-                planet = m_objects.get<Planet>(building->PlanetID());
-            if (!planet)
+            int planet_id = INVALID_OBJECT_ID;
+            if (candidate->ObjectType() == OBJ_PLANET) {
+                planet_id = candidate->ID();
+            } else if (candidate->ObjectType() == OBJ_BUILDING) {
+                auto* building = static_cast<const ::Building*>(candidate.get());
+                planet_id = building->PlanetID();
+            }
+            if (planet_id == INVALID_OBJECT_ID)
                 return false;
-
-            int planet_id = planet->ID();
-            const SpeciesManager& manager = GetSpeciesManager();
 
             if (m_names.empty()) {
                 // match homeworlds for any species
+                const SpeciesManager& manager = GetSpeciesManager();
                 for (auto species_it = manager.begin(); species_it != manager.end(); ++species_it) {
                     if (const auto& species = species_it->second) {
                         const auto& homeworld_ids = species->Homeworlds();
@@ -1684,14 +1684,16 @@ bool Homeworld::Match(const ScriptingContext& local_context) const {
     }
 
     // is it a planet or a building on a planet?
-    auto planet = std::dynamic_pointer_cast<const Planet>(candidate);
-    std::shared_ptr<const ::Building> building;
-    if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
-        planet = local_context.ContextObjects().get<Planet>(building->PlanetID());
-    if (!planet)
+    int planet_id = INVALID_OBJECT_ID;
+    if (candidate->ObjectType() == OBJ_PLANET) {
+        planet_id = candidate->ID();
+    } else if (candidate->ObjectType() == OBJ_BUILDING) {
+        auto* building = static_cast<const ::Building*>(candidate.get());
+        planet_id = building->PlanetID();
+    }
+    if (planet_id == INVALID_OBJECT_ID)
         return false;
 
-    int planet_id = planet->ID();
     const SpeciesManager& manager = GetSpeciesManager();
 
     if (m_names.empty()) {
@@ -1822,9 +1824,11 @@ bool Monster::Match(const ScriptingContext& local_context) const {
         return false;
     }
 
-    if (auto ship = std::dynamic_pointer_cast<const Ship>(candidate))
+    if (candidate->ObjectType() == OBJ_SHIP) {
+        auto* ship = static_cast<const Ship*>(candidate.get());
         if (ship->IsMonster())
             return true;
+    }
 
     return false;
 }
@@ -1872,9 +1876,11 @@ bool Armed::Match(const ScriptingContext& local_context) const {
         return false;
     }
 
-    if (auto ship = std::dynamic_pointer_cast<const Ship>(candidate))
+    if (candidate->ObjectType() == OBJ_SHIP) {
+        auto* ship = static_cast<const Ship*>(candidate.get());
         if (ship->IsArmed())
             return true;
+    }
 
     return false;
 }
@@ -1938,10 +1944,10 @@ namespace {
                 return candidate->ObjectType() == m_type;
                 break;
             case OBJ_POP_CENTER:
-                return (bool)std::dynamic_pointer_cast<const PopCenter>(candidate);
+                return (bool)dynamic_cast<const PopCenter*>(candidate.get());
                 break;
             case OBJ_PROD_CENTER:
-                return (bool)std::dynamic_pointer_cast<const ResourceCenter>(candidate);
+                return (bool)dynamic_cast<const ResourceCenter*>(candidate.get());
                 break;
             default:
                 break;
@@ -2115,9 +2121,9 @@ namespace {
                 return false;
 
             // is it a building?
-            auto building = std::dynamic_pointer_cast<const ::Building>(candidate);
-            if (!building)
+            if (candidate->ObjectType() != OBJ_BUILDING)
                 return false;
+            auto* building = static_cast<const ::Building*>(candidate.get());
 
             // if no name supplied, match any building
             if (m_names.empty())
@@ -2205,17 +2211,18 @@ bool Building::Match(const ScriptingContext& local_context) const {
     }
 
     // is it a building?
-    auto building = std::dynamic_pointer_cast<const ::Building>(candidate);
-    if (building) {
-        // match any building type?
-        if (m_names.empty())
-            return true;
+    if (candidate->ObjectType() != OBJ_BUILDING)
+        return false;
+    auto* building = static_cast<const ::Building*>(candidate.get());
 
-        // match one of the specified building types
-        for (auto& name : m_names) {
-            if (name->Eval(local_context) == building->BuildingTypeName())
-                return true;
-        }
+    // match any building type?
+    if (m_names.empty())
+        return true;
+
+    // match one of the specified building types
+    for (auto& name : m_names) {
+        if (name->Eval(local_context) == building->BuildingTypeName())
+            return true;
     }
 
     return false;
@@ -2267,8 +2274,8 @@ HasSpecial::HasSpecial(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name,
     m_since_turn_low(std::move(since_turn_low)),
     m_since_turn_high(std::move(since_turn_high))
 {
-    std::array<ValueRef::ValueRefBase*, 3> operands =
-        { m_name.get(), m_since_turn_low.get(), m_since_turn_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 3> operands =
+        {{m_name.get(), m_since_turn_low.get(), m_since_turn_high.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -2282,8 +2289,8 @@ HasSpecial::HasSpecial(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name,
     m_capacity_low(std::move(capacity_low)),
     m_capacity_high(std::move(capacity_high))
 {
-    std::array<ValueRef::ValueRefBase*, 3> operands =
-        { m_name.get(), m_capacity_low.get(), m_capacity_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 3> operands =
+        {{m_name.get(), m_capacity_low.get(), m_capacity_high.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -2617,7 +2624,7 @@ CreatedOnTurn::CreatedOnTurn(std::unique_ptr<ValueRef::ValueRef<int>>&& low,
     m_low(std::move(low)),
     m_high(std::move(high))
 {
-    std::array<ValueRef::ValueRefBase*, 2> operands = { m_low.get(), m_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_low.get(), m_high.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -3331,9 +3338,9 @@ namespace {
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
-            auto building = std::dynamic_pointer_cast<const ::Building>(candidate);
-            if (!building)
+            if (candidate->ObjectType() != OBJ_BUILDING)
                 return false;
+            auto* building = static_cast<const ::Building*>(candidate.get());
 
             if (m_planet_id == INVALID_OBJECT_ID)
                 return building->PlanetID() != INVALID_OBJECT_ID;  // match objects on any planet
@@ -3802,8 +3809,8 @@ namespace {
 }
 
 void PlanetSize::Eval(const ScriptingContext& parent_context,
-                                 ObjectSet& matches, ObjectSet& non_matches,
-                                 SearchDomain search_domain/* = NON_MATCHES*/) const
+                      ObjectSet& matches, ObjectSet& non_matches,
+                      SearchDomain search_domain/* = NON_MATCHES*/) const
 {
     bool simple_eval_safe = parent_context.condition_root_candidate || RootCandidateInvariant();
     if (simple_eval_safe) {
@@ -4147,6 +4154,28 @@ bool Species::operator==(const Condition& rhs) const {
 }
 
 namespace {
+    const std::string& GetCandidateSpecies(const UniverseObject* candidate,
+                                           const ObjectMap& objects)
+    {
+        // is it a population centre?
+        auto obj_type = candidate->ObjectType();
+        if (obj_type == OBJ_PLANET) {
+            auto* pop = static_cast<const ::Planet*>(candidate);
+            return pop->SpeciesName();
+        }
+        else if (obj_type == OBJ_SHIP) {
+            auto* ship = static_cast<const Ship*>(candidate);
+            return ship->SpeciesName();
+        }
+        else if (obj_type == OBJ_BUILDING) {
+            // is it a building on a planet?
+            auto* building = static_cast<const ::Building*>(candidate);
+            if (auto planet = objects.get<Planet>(building->PlanetID()))
+                return planet->SpeciesName();
+        }
+        return EMPTY_STRING;
+    }
+
     struct SpeciesSimpleMatch {
         SpeciesSimpleMatch(const std::vector<std::string>& names, const ObjectMap& objects) :
             m_names(names),
@@ -4157,27 +4186,8 @@ namespace {
             if (!candidate)
                 return false;
 
-            // is it a population centre?
-            if (auto pop = std::dynamic_pointer_cast<const ::PopCenter>(candidate)) {
-                const std::string& species_name = pop->SpeciesName();
-                // if the popcenter has a species and that species is one of those specified...
-                return !species_name.empty() && (m_names.empty() || std::count(m_names.begin(), m_names.end(), species_name));
-            }
-            // is it a ship?
-            if (auto ship = std::dynamic_pointer_cast<const Ship>(candidate)) {
-                // if the ship has a species and that species is one of those specified...
-                const std::string& species_name = ship->SpeciesName();
-                return !species_name.empty() && (m_names.empty() || std::count(m_names.begin(), m_names.end(), species_name));
-            }
-            // is it a building on a planet?
-            if (auto building = std::dynamic_pointer_cast<const ::Building>(candidate)) {
-                auto planet = m_objects.get<Planet>(building->PlanetID());
-                const std::string& species_name = planet->SpeciesName();
-                // if the planet (which IS a popcenter) has a species and that species is one of those specified...
-                return !species_name.empty() && (m_names.empty() || std::count(m_names.begin(), m_names.end(), species_name));
-            }
-
-            return false;
+            auto& species_name{GetCandidateSpecies(candidate.get(), m_objects)};
+            return !species_name.empty() && (m_names.empty() || std::count(m_names.begin(), m_names.end(), species_name));
         }
 
         const std::vector<std::string>& m_names;
@@ -4266,35 +4276,16 @@ bool Species::Match(const ScriptingContext& local_context) const {
         return false;
     }
 
-    // is it a planet or a building on a planet? TODO: factor out
-    auto planet = std::dynamic_pointer_cast<const Planet>(candidate);
-    std::shared_ptr<const ::Building> building;
-    if (!planet && (building = std::dynamic_pointer_cast<const ::Building>(candidate)))
-        planet = local_context.ContextObjects().get<Planet>(building->PlanetID());
-    if (planet) {
-        if (m_names.empty()) {
-            return !planet->SpeciesName().empty();  // match any species name
-        } else {
-            // match only specified species names
-            for (auto& name : m_names) {
-                if (name->Eval(local_context) == planet->SpeciesName())
-                    return true;
-            }
-        }
+    auto& species_name{GetCandidateSpecies(candidate.get(), local_context.ContextObjects())};
+
+    if (m_names.empty())
+        return !species_name.empty();
+
+    for (auto& name : m_names) {
+        if (name->Eval(local_context) == species_name)
+            return true;
     }
-    // is it a ship?
-    auto ship = std::dynamic_pointer_cast<const Ship>(candidate);
-    if (ship) {
-        if (m_names.empty()) {
-            return !ship->SpeciesName().empty();    // match any species name
-        } else {
-            // match only specified species names
-            for (auto& name : m_names) {
-                if (name->Eval(local_context) == ship->SpeciesName())
-                    return true;
-            }
-        }
-    }
+
     return false;
 }
 
@@ -4329,8 +4320,8 @@ Enqueued::Enqueued(std::unique_ptr<ValueRef::ValueRef<int>>&& design_id,
     m_low(std::move(low)),
     m_high(std::move(high))
 {
-    std::array<ValueRef::ValueRefBase*, 4> operands =
-        { m_design_id.get(), m_empire_id.get(), m_low.get(), m_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 4> operands =
+        {{m_design_id.get(), m_empire_id.get(), m_low.get(), m_high.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -4352,8 +4343,8 @@ Enqueued::Enqueued(BuildType build_type,
     m_low(std::move(low)),
     m_high(std::move(high))
 {
-    std::array<ValueRef::ValueRefBase*, 4> operands =
-        { m_name.get(), m_empire_id.get(), m_low.get(), m_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 4> operands =
+        {{m_name.get(), m_empire_id.get(), m_low.get(), m_high.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -4651,6 +4642,24 @@ bool FocusType::operator==(const Condition& rhs) const {
 }
 
 namespace {
+    const std::string& GetCandidateFocus(const UniverseObject* candidate,
+                                         const ObjectMap& objects)
+    {
+        // is it a population centre?
+        auto obj_type = candidate->ObjectType();
+        if (obj_type == OBJ_PLANET) {
+            auto* res = static_cast<const ::Planet*>(candidate);
+            return res->Focus();
+        }
+        else if (obj_type == OBJ_BUILDING) {
+            // is it a building on a planet?
+            auto* building = static_cast<const ::Building*>(candidate);
+            if (auto planet = objects.get<Planet>(building->PlanetID()))
+                return planet->Focus();
+        }
+        return EMPTY_STRING;
+    }
+
     struct FocusTypeSimpleMatch {
         FocusTypeSimpleMatch(const std::vector<std::string>& names, const ObjectMap& objects) :
             m_names(names),
@@ -4661,17 +4670,8 @@ namespace {
             if (!candidate)
                 return false;
 
-            // is it a ResourceCenter or a Building on a Planet (that is a ResourceCenter)
-            auto res_center = std::dynamic_pointer_cast<const ResourceCenter>(candidate);
-            std::shared_ptr<const ::Building> building;
-            if (!res_center && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-                if (auto planet = m_objects.get<Planet>(building->PlanetID()))
-                    res_center = std::dynamic_pointer_cast<const ResourceCenter>(planet);
-            }
-            if (res_center) {
-                return !res_center->Focus().empty() &&
-                    std::count(m_names.begin(), m_names.end(), res_center->Focus());
-            }
+            auto& focus_name{GetCandidateFocus(candidate.get(), m_objects)};
+            return !focus_name.empty() && (m_names.empty() || std::count(m_names.begin(), m_names.end(), focus_name));
 
             return false;
         }
@@ -4750,19 +4750,16 @@ bool FocusType::Match(const ScriptingContext& local_context) const {
         return false;
     }
 
-    // is it a ResourceCenter or a Building on a Planet (that is a ResourceCenter)
-    auto res_center = std::dynamic_pointer_cast<const ResourceCenter>(candidate);
-    std::shared_ptr<const ::Building> building;
-    if (!res_center && (building = std::dynamic_pointer_cast<const ::Building>(candidate))) {
-        if (auto planet = local_context.ContextObjects().get<Planet>(building->PlanetID()))
-            res_center = std::dynamic_pointer_cast<const ResourceCenter>(planet);
+    auto& focus_name{GetCandidateFocus(candidate.get(), local_context.ContextObjects())};
+
+    if (m_names.empty())
+        return !focus_name.empty();
+
+    for (auto& name : m_names) {
+        if (name->Eval(local_context) == focus_name)
+            return true;
     }
-    if (res_center) {
-        for (auto& name : m_names) {
-            if (name->Eval(local_context) == res_center->Focus())
-                return true;
-        }
-    }
+
     return false;
 }
 
@@ -4827,14 +4824,14 @@ namespace {
         {}
 
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
-            if (!candidate)
+            if (!candidate || m_types.empty())
                 return false;
 
-            std::shared_ptr<const System> system = m_objects.get<System>(candidate->SystemID());
-            if (system || (system = std::dynamic_pointer_cast<const System>(candidate)))
-                return !m_types.empty() && std::count(m_types.begin(), m_types.end(), system->GetStarType());
+            auto* system = m_objects.get<System>(candidate->SystemID()).get();
+            if (!system && candidate->ObjectType() == OBJ_SYSTEM)
+                system = static_cast<const System*>(candidate.get());
 
-            return false;
+            return std::count(m_types.begin(), m_types.end(), system->GetStarType());
         }
 
         const std::vector< ::StarType>& m_types;
@@ -4911,12 +4908,12 @@ bool StarType::Match(const ScriptingContext& local_context) const {
         return false;
     }
 
-    std::shared_ptr<const System> system = local_context.ContextObjects().get<System>(candidate->SystemID());
-    if (system || (system = std::dynamic_pointer_cast<const System>(candidate))) {
-        for (auto& type : m_types) {
-            if (type->Eval(local_context) == system->GetStarType())
-                return true;
-        }
+    auto* system = local_context.ContextObjects().get<System>(candidate->SystemID()).get();
+    if (!system && candidate->ObjectType() == OBJ_SYSTEM)
+        system = static_cast<const System*>(candidate.get());
+    for (auto& type : m_types) {
+        if (type->Eval(local_context) == system->GetStarType())
+            return true;
     }
     return false;
 }
@@ -4974,9 +4971,10 @@ namespace {
                 return false;
 
             // is it a ship?
-            auto ship = std::dynamic_pointer_cast<const ::Ship>(candidate);
-            if (!ship)
+            if (candidate->ObjectType() != OBJ_SHIP)
                 return false;
+            auto* ship = static_cast<const ::Ship*>(candidate.get());
+
             // with a valid design?
             const ShipDesign* design = ship->Design();
             if (!design)
@@ -5073,7 +5071,7 @@ DesignHasPart::DesignHasPart(std::unique_ptr<ValueRef::ValueRef<std::string>>&& 
     m_high(std::move(high)),
     m_name(std::move(name))
 {
-    std::array<ValueRef::ValueRefBase*, 3> operands = { m_name.get(), m_low.get(), m_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 3> operands = {{m_name.get(), m_low.get(), m_high.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -5107,15 +5105,13 @@ namespace {
             if (!candidate)
                 return false;
 
-            std::shared_ptr<const Ship> ship = nullptr;
-            if (auto fighter = std::dynamic_pointer_cast<const ::Fighter>(candidate)) {
-                // it is a fighter
-                ship = m_objects.get<Ship>(fighter->LaunchedFrom());
-            } else {
-                ship = std::dynamic_pointer_cast<const ::Ship>(candidate);
+            const Ship* ship = nullptr;
+            if (candidate->ObjectType() == OBJ_FIGHTER) {
+                auto* fighter = static_cast<const ::Fighter*>(candidate.get());
+                ship = m_objects.get<Ship>(fighter->LaunchedFrom()).get();
+            } else if (candidate->ObjectType() == OBJ_SHIP) {
+                ship = static_cast<const ::Ship*>(candidate.get());
             }
-
-            // is it a ship
             if (!ship)
                 return false;
 
@@ -5255,7 +5251,7 @@ DesignHasPartClass::DesignHasPartClass(ShipPartClass part_class,
     m_high(std::move(high)),
     m_class(std::move(part_class))
 {
-    std::array<ValueRef::ValueRefBase*, 2> operands = { m_low.get(), m_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_low.get(), m_high.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -5291,9 +5287,10 @@ namespace {
                 return false;
 
             // is it a ship?
-            auto ship = std::dynamic_pointer_cast<const ::Ship>(candidate);
-            if (!ship)
+            if (candidate->ObjectType() != OBJ_SHIP)
                 return false;
+            auto* ship = static_cast<const ::Ship*>(candidate.get());
+
             // with a valid design?
             const ShipDesign* design = ship->Design();
             if (!design)
@@ -5443,9 +5440,10 @@ namespace {
         {}
 
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
-            auto ship = std::dynamic_pointer_cast<const Ship>(candidate);
-            if (!ship)
+            if (candidate->ObjectType() != OBJ_SHIP)
                 return false;
+            auto* ship = static_cast<const Ship*>(candidate.get());
+
             const ShipDesign* candidate_design = ship->Design();
             if (!candidate_design)
                 return false;
@@ -5574,7 +5572,7 @@ namespace {
                 return false;
             if (m_design_id == INVALID_DESIGN_ID)
                 return false;
-            if (auto ship = std::dynamic_pointer_cast<const Ship>(candidate))
+            if (auto ship = dynamic_cast<const Ship*>(candidate.get()))
                 if (ship->DesignID() == m_design_id)
                     return true;
             return false;
@@ -5676,9 +5674,9 @@ namespace {
             if (!candidate)
                 return false;
 
-            if (auto ship = std::dynamic_pointer_cast<const ::Ship>(candidate))
+            if (auto ship = dynamic_cast<const ::Ship*>(candidate.get()))
                 return ship->ProducedByEmpireID() == m_empire_id;
-            else if (auto building = std::dynamic_pointer_cast<const ::Building>(candidate))
+            else if (auto building = dynamic_cast<const ::Building*>(candidate.get()))
                 return building->ProducedByEmpireID() == m_empire_id;
             return false;
         }
@@ -5854,7 +5852,7 @@ MeterValue::MeterValue(MeterType meter,
     m_low(std::move(low)),
     m_high(std::move(high))
 {
-    std::array<ValueRef::ValueRefBase*, 2> operands = { m_low.get(), m_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_low.get(), m_high.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -6049,7 +6047,7 @@ ShipPartMeterValue::ShipPartMeterValue(std::unique_ptr<ValueRef::ValueRef<std::s
     m_low(std::move(low)),
     m_high(std::move(high))
 {
-    std::array<ValueRef::ValueRefBase*, 3> operands = { m_part_name.get(), m_low.get(), m_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 3> operands = {{m_part_name.get(), m_low.get(), m_high.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -6086,7 +6084,7 @@ namespace {
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
-            auto ship = std::dynamic_pointer_cast<const Ship>(candidate);
+            auto ship = dynamic_cast<const Ship*>(candidate.get());
             if (!ship)
                 return false;
             const Meter* meter = ship->GetPartMeter(m_meter, m_part_name);
@@ -6218,7 +6216,7 @@ EmpireMeterValue::EmpireMeterValue(std::unique_ptr<ValueRef::ValueRef<int>>&& em
     m_low(std::move(low)),
     m_high(std::move(high))
 {
-    std::array<ValueRef::ValueRefBase*, 3> operands = { m_empire_id.get(), m_low.get(), m_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 3> operands = {{m_empire_id.get(), m_low.get(), m_high.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -6399,7 +6397,7 @@ EmpireStockpileValue::EmpireStockpileValue(std::unique_ptr<ValueRef::ValueRef<in
     m_low(std::move(low)),
     m_high(std::move(high))
 {
-    std::array<ValueRef::ValueRefBase*, 3> operands = { m_empire_id.get(), m_low.get(), m_high.get() };
+    std::array<const ValueRef::ValueRefBase*, 3> operands = {{m_empire_id.get(), m_low.get(), m_high.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -6563,7 +6561,7 @@ EmpireHasAdoptedPolicy::EmpireHasAdoptedPolicy(std::unique_ptr<ValueRef::ValueRe
     m_name(std::move(name)),
     m_empire_id(std::move(empire_id))
 {
-    std::array<ValueRef::ValueRefBase*, 2> operands = { m_name.get(), m_empire_id.get() };
+    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_name.get(), m_empire_id.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -6706,7 +6704,7 @@ OwnerHasTech::OwnerHasTech(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
     m_name(std::move(name)),
     m_empire_id(std::move(empire_id))
 {
-    std::array<ValueRef::ValueRefBase*, 2> operands = { m_name.get(), m_empire_id.get() };
+    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_name.get(), m_empire_id.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -6845,7 +6843,7 @@ OwnerHasBuildingTypeAvailable::OwnerHasBuildingTypeAvailable(
     m_name(std::move(name)),
     m_empire_id(std::move(empire_id))
 {
-    std::array<ValueRef::ValueRefBase*, 2> operands = { m_name.get(), m_empire_id.get() };
+    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_name.get(), m_empire_id.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -6984,7 +6982,7 @@ OwnerHasShipDesignAvailable::OwnerHasShipDesignAvailable(
     m_id(std::move(design_id)),
     m_empire_id(std::move(empire_id))
 {
-    std::array<ValueRef::ValueRefBase*, 2> operands = { m_id.get(), m_empire_id.get() };
+    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_id.get(), m_empire_id.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -7122,7 +7120,7 @@ OwnerHasShipPartAvailable::OwnerHasShipPartAvailable(
     m_name(std::move(name)),
     m_empire_id(std::move(empire_id))
 {
-    std::array<ValueRef::ValueRefBase*, 2> operands = { m_empire_id.get(), m_name.get() };
+    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_empire_id.get(), m_name.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });
@@ -7658,9 +7656,9 @@ bool CanAddStarlaneConnection::operator==(const Condition& rhs) const {
 namespace {
     // check if two destination systems, connected to the same origin system
     // would have starlanes too close angularly to eachother
-    bool LanesAngularlyTooClose(std::shared_ptr<const UniverseObject> sys1,
-                                std::shared_ptr<const UniverseObject> lane1_sys2,
-                                std::shared_ptr<const UniverseObject> lane2_sys2)
+    bool LanesAngularlyTooClose(const UniverseObject* sys1,
+                                const UniverseObject* lane1_sys2,
+                                const UniverseObject* lane2_sys2)
     {
         if (!sys1 || !lane1_sys2 || !lane2_sys2)
             return true;
@@ -7700,9 +7698,9 @@ namespace {
     // are to eachother. if the third system is further than the endpoints, than
     // the distance to the line is not considered and the lane is considered
     // acceptable
-    bool ObjectTooCloseToLane(std::shared_ptr<const UniverseObject> lane_end_sys1,
-                              std::shared_ptr<const UniverseObject> lane_end_sys2,
-                              std::shared_ptr<const UniverseObject> obj)
+    bool ObjectTooCloseToLane(const UniverseObject* lane_end_sys1,
+                              const UniverseObject* lane_end_sys2,
+                              const UniverseObject* obj)
     {
         if (!lane_end_sys1 || !lane_end_sys2 || !obj)
             return true;
@@ -7763,10 +7761,10 @@ namespace {
     inline float CrossProduct(float dx1, float dy1, float dx2, float dy2)
     { return dx1*dy2 - dy1*dx2; }
 
-    bool LanesCross(std::shared_ptr<const System> lane1_end_sys1,
-                    std::shared_ptr<const System> lane1_end_sys2,
-                    std::shared_ptr<const System> lane2_end_sys1,
-                    std::shared_ptr<const System> lane2_end_sys2)
+    bool LanesCross(const System* lane1_end_sys1,
+                    const System* lane1_end_sys2,
+                    const System* lane2_end_sys1,
+                    const System* lane2_end_sys2)
     {
         // are all endpoints valid systems?
         if (!lane1_end_sys1 || !lane1_end_sys2 || !lane2_end_sys1 || !lane2_end_sys2)
@@ -7828,8 +7826,8 @@ namespace {
         return true;
     }
 
-    bool LaneCrossesExistingLane(std::shared_ptr<const System> lane_end_sys1,
-                                 std::shared_ptr<const System> lane_end_sys2,
+    bool LaneCrossesExistingLane(const System* lane_end_sys1,
+                                 const System* lane_end_sys2,
                                  const ObjectMap& objects)
     {
         if (!lane_end_sys1 || !lane_end_sys2 || lane_end_sys1 == lane_end_sys2)
@@ -7838,14 +7836,14 @@ namespace {
         // loop over all existing lanes in all systems, checking if a lane
         // beween the specified systems would cross any of the existing lanes
         for (auto& system : objects.all<System>()) {
-            if (system == lane_end_sys1 || system == lane_end_sys2)
+            if (system.get() == lane_end_sys1 || system.get() == lane_end_sys2)
                 continue;
 
             const auto& sys_existing_lanes = system->StarlanesWormholes();
 
             // check all existing lanes of currently-being-checked system
             for (const auto& lane : sys_existing_lanes) {
-                auto lane_end_sys3 = objects.get<System>(lane.first);
+                auto lane_end_sys3 = objects.get<System>(lane.first).get();
                 if (!lane_end_sys3)
                     continue;
                 // don't need to check against existing lanes that include one
@@ -7853,7 +7851,7 @@ namespace {
                 if (lane_end_sys3 == lane_end_sys1 || lane_end_sys3 == lane_end_sys2)
                     continue;
 
-                if (LanesCross(lane_end_sys1, lane_end_sys2, system, lane_end_sys3)) {
+                if (LanesCross(lane_end_sys1, lane_end_sys2, system.get(), lane_end_sys3)) {
                     //TraceLogger() << "... ... ... lane from: " << lane_end_sys1->UniverseObject::Name() << " to: " << lane_end_sys2->UniverseObject::Name()
                     //          << " crosses lane from: " << system->UniverseObject::Name() << " to: " << lane_end_sys3->UniverseObject::Name() << std::endl;
                     return true;
@@ -7864,8 +7862,8 @@ namespace {
         return false;
     }
 
-    bool LaneTooCloseToOtherSystem(std::shared_ptr<const System> lane_end_sys1,
-                                   std::shared_ptr<const System> lane_end_sys2,
+    bool LaneTooCloseToOtherSystem(const System* lane_end_sys1,
+                                   const System* lane_end_sys2,
                                    const ObjectMap& objects)
     {
         if (!lane_end_sys1 || !lane_end_sys2 || lane_end_sys1 == lane_end_sys2)
@@ -7874,10 +7872,10 @@ namespace {
         // loop over all existing systems, checking if each is too close to a
         // lane between the specified lane endpoints
         for (auto& system : objects.all<System>()) {
-            if (system == lane_end_sys1 || system == lane_end_sys2)
+            if (system.get() == lane_end_sys1 || system.get() == lane_end_sys2)
                 continue;
 
-            if (ObjectTooCloseToLane(lane_end_sys1, lane_end_sys2, system))
+            if (ObjectTooCloseToLane(lane_end_sys1, lane_end_sys2, system.get()))
                 return true;
         }
 
@@ -7885,18 +7883,22 @@ namespace {
     }
 
     struct CanAddStarlaneConnectionSimpleMatch {
-        CanAddStarlaneConnectionSimpleMatch(const ObjectSet& destination_objects, const ObjectMap& objects) :
-            m_destination_systems(),
+        CanAddStarlaneConnectionSimpleMatch(const ObjectSet& destination_objects,
+                                            const ObjectMap& objects) :
             m_objects(objects)
         {
-            // get (one of each of) set of systems that are or that contain any
+            // get set of (unique) systems that are or that contain any
             // destination objects
-            std::set<std::shared_ptr<const System>> dest_systems;
+            std::map<int, std::shared_ptr<const System>> dest_systems;
             for (auto& obj : destination_objects) {
                 if (auto sys = m_objects.get<System>(obj->SystemID()))
-                    dest_systems.insert(sys);
+                    dest_systems.emplace(obj->SystemID(), std::move(sys));
             }
-            std::copy(dest_systems.begin(), dest_systems.end(), std::inserter(m_destination_systems, m_destination_systems.end()));
+
+            // move into member storage
+            m_destination_systems.reserve(dest_systems.size());
+            for (auto& id_obj : dest_systems)
+                m_destination_systems.emplace_back(std::move(id_obj.second));
         }
 
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
@@ -7904,9 +7906,9 @@ namespace {
                 return false;
 
             // get system from candidate
-            auto candidate_sys = std::dynamic_pointer_cast<const System>(candidate);
+            auto candidate_sys = dynamic_cast<const System*>(candidate.get());
             if (!candidate_sys)
-                candidate_sys = m_objects.get<System>(candidate->SystemID());
+                candidate_sys = m_objects.get<System>(candidate->SystemID()).get();
             if (!candidate_sys)
                 return false;
 
@@ -7928,13 +7930,15 @@ namespace {
             // present lanes of the candidate system
             //TraceLogger() << "... Checking lanes of candidate system: " << candidate->UniverseObject::Name() << std::endl;
             for (const auto& lane : candidate_sys->StarlanesWormholes()) {
-                auto candidate_existing_lane_end_sys = m_objects.get<System>(lane.first);
+                auto candidate_existing_lane_end_sys = m_objects.get<System>(lane.first).get();
                 if (!candidate_existing_lane_end_sys)
                     continue;
 
                 // check this existing lane against potential lanes to all destination systems
                 for (auto& dest_sys : m_destination_systems) {
-                    if (LanesAngularlyTooClose(candidate_sys, candidate_existing_lane_end_sys, dest_sys)) {
+                    if (LanesAngularlyTooClose(candidate_sys, candidate_existing_lane_end_sys,
+                                               dest_sys.get()))
+                    {
                         //TraceLogger() << " ... ... can't add lane from candidate: " << candidate_sys->UniverseObject::Name() << " to " << dest_sys->UniverseObject::Name() << " due to existing lane to " << candidate_existing_lane_end_sys->UniverseObject::Name() << std::endl;
                         return false;
                     }
@@ -7949,11 +7953,11 @@ namespace {
                 // check this destination system's existing lanes against a lane
                 // to the candidate system
                 for (const auto& dest_lane : dest_sys->StarlanesWormholes()) {
-                    auto dest_lane_end_sys = m_objects.get<System>(dest_lane.first);
+                    auto dest_lane_end_sys = m_objects.get<System>(dest_lane.first).get();
                     if (!dest_lane_end_sys)
                         continue;
 
-                    if (LanesAngularlyTooClose(dest_sys, candidate_sys, dest_lane_end_sys)) {
+                    if (LanesAngularlyTooClose(dest_sys.get(), candidate_sys, dest_lane_end_sys)) {
                         //TraceLogger() << " ... ... can't add lane from candidate: " << candidate_sys->UniverseObject::Name() << " to " << dest_sys->UniverseObject::Name() << " due to existing lane from dest to " << dest_lane_end_sys->UniverseObject::Name() << std::endl;
                         return false;
                     }
@@ -7966,13 +7970,13 @@ namespace {
             for (auto it1 = m_destination_systems.begin();
                  it1 != m_destination_systems.end(); ++it1)
             {
-                auto dest_sys1 = *it1;
+                auto dest_sys1 = it1->get();
 
                 // don't need to check a lane in both directions, so start at one past it1
                 auto it2 = it1;
                 ++it2;
                 for (; it2 != m_destination_systems.end(); ++it2) {
-                    auto dest_sys2 = *it2;
+                    auto dest_sys2 = it2->get();
                     if (LanesAngularlyTooClose(candidate_sys, dest_sys1, dest_sys2)) {
                         //TraceLogger() << " ... ... can't add lane from candidate: " << candidate_sys->UniverseObject::Name() << " to " << dest_sys1->UniverseObject::Name() << " and also to " << dest_sys2->UniverseObject::Name() << std::endl;
                         return false;
@@ -7985,7 +7989,7 @@ namespace {
             // system they are not connected to
             //TraceLogger() << "... Checking proposed lanes for proximity to other systems" <<std::endl;
             for (auto& dest_sys : m_destination_systems) {
-                if (LaneTooCloseToOtherSystem(candidate_sys, dest_sys, m_objects)) {
+                if (LaneTooCloseToOtherSystem(candidate_sys, dest_sys.get(), m_objects)) {
                     //TraceLogger() << " ... ... can't add lane from candidate: " << candidate_sys->Name() << " to " << dest_sys->Name() << " due to proximity to another system." << std::endl;
                     return false;
                 }
@@ -7995,7 +7999,7 @@ namespace {
             // check that there are no lanes already existing that cross the proposed lanes
             //TraceLogger() << "... Checking for potential lanes crossing existing lanes" << std::endl;
             for (auto& dest_sys : m_destination_systems) {
-                if (LaneCrossesExistingLane(candidate_sys, dest_sys, m_objects)) {
+                if (LaneCrossesExistingLane(candidate_sys, dest_sys.get(), m_objects)) {
                     //TraceLogger() << " ... ... can't add lane from candidate: " << candidate_sys->Name() << " to " << dest_sys->Name() << " due to crossing an existing lane." << std::endl;
                     return false;
                 }
@@ -8021,7 +8025,9 @@ void CanAddStarlaneConnection::Eval(const ScriptingContext& parent_context,
         ObjectSet subcondition_matches;
         m_condition->Eval(parent_context, subcondition_matches);
 
-        EvalImpl(matches, non_matches, search_domain, CanAddStarlaneConnectionSimpleMatch(subcondition_matches, parent_context.ContextObjects()));
+        EvalImpl(matches, non_matches, search_domain,
+                 CanAddStarlaneConnectionSimpleMatch(subcondition_matches,
+                                                     parent_context.ContextObjects()));
     } else {
         // re-evaluate contained objects for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -8051,7 +8057,8 @@ bool CanAddStarlaneConnection::Match(const ScriptingContext& local_context) cons
     ObjectSet subcondition_matches;
     m_condition->Eval(local_context, subcondition_matches);
 
-    return CanAddStarlaneConnectionSimpleMatch(subcondition_matches, local_context.ContextObjects())(candidate);
+    return CanAddStarlaneConnectionSimpleMatch(subcondition_matches,
+                                               local_context.ContextObjects())(candidate);
 }
 
 void CanAddStarlaneConnection::SetTopLevelContent(const std::string& content_name) {
@@ -8212,10 +8219,10 @@ bool Stationary::Match(const ScriptingContext& local_context) const {
     // the only objects that can move are fleets and the ships in them.  so,
     // attempt to cast the candidate object to a fleet or ship, and if it's a ship
     // get the fleet of that ship
-    auto fleet = std::dynamic_pointer_cast<const Fleet>(candidate);
+    auto fleet = dynamic_cast<const Fleet*>(candidate.get());
     if (!fleet)
-        if (auto ship = std::dynamic_pointer_cast<const Ship>(candidate))
-            fleet = local_context.ContextObjects().get<Fleet>(ship->FleetID());
+        if (auto ship = dynamic_cast<const Ship*>(candidate.get()))
+            fleet = local_context.ContextObjects().get<Fleet>(ship->FleetID()).get();
 
     if (fleet) {
         // if a fleet is available, it is "moving", or not stationary, if it's
@@ -8283,10 +8290,13 @@ bool Aggressive::Match(const ScriptingContext& local_context) const {
     // the only objects that can be aggressive are fleets and the ships in them.
     // so, attempt to cast the candidate object to a fleet or ship, and if it's
     // a ship get the fleet of that ship
-    auto fleet = std::dynamic_pointer_cast<const Fleet>(candidate);
-    if (!fleet)
-        if (auto ship = std::dynamic_pointer_cast<const Ship>(candidate))
-            fleet = local_context.ContextObjects().get<Fleet>(ship->FleetID());
+    const Fleet* fleet = nullptr;
+    if (candidate->ObjectType() == OBJ_FLEET) {
+        fleet = static_cast<const Fleet*>(candidate.get());
+    } else if (candidate->ObjectType() == OBJ_SHIP) {
+        auto* ship = static_cast<const Ship*>(candidate.get());
+        fleet = local_context.ContextObjects().get<Fleet>(ship->FleetID()).get();
+    }
 
     if (!fleet)
         return false;
@@ -9221,8 +9231,8 @@ unsigned int ValueTest::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 namespace {
     const Condition* GetLocationCondition(ContentType content_type,
-                                              const std::string& name1,
-                                              const std::string& name2)
+                                          const std::string& name1,
+                                          const std::string& name2)
     {
         if (name1.empty())
             return nullptr;
@@ -9291,7 +9301,7 @@ Location::Location(ContentType content_type,
     m_name2(std::move(name2)),
     m_content_type(content_type)
 {
-    std::array<ValueRef::ValueRefBase*, 2> operands = { m_name1.get(), m_name2.get() };
+    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_name1.get(), m_name2.get()}};
     m_root_candidate_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = boost::algorithm::all_of(operands, [](auto& e){ return !e || e->SourceInvariant(); });

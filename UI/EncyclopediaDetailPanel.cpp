@@ -301,10 +301,10 @@ namespace {
                 }
 
                 // occupied planets
-                std::vector<std::shared_ptr<const Planet>> species_occupied_planets;
-                for (auto& planet : Objects().all<Planet>()) {
+                std::vector<const Planet*> species_occupied_planets;
+                for (const auto& planet : Objects().all<Planet>()) {
                     if ((planet->SpeciesName() == entry.first) && !known_homeworlds.count(planet->ID()))
-                        species_occupied_planets.emplace_back(planet);
+                        species_occupied_planets.emplace_back(planet.get());
                 }
                 if (!species_occupied_planets.empty()) {
                     if (species_occupied_planets.size() >= 5) {
@@ -1468,13 +1468,24 @@ namespace {
         if (!unlocked_by_techs.empty()) {
             detailed_description += "\n\n" + UserString("ENC_UNLOCKED_BY");
             for (const auto& tech_name : unlocked_by_techs)
-            { detailed_description += LinkTaggedText(VarText::TECH_TAG, tech_name) + "  "; }
-            detailed_description += "\n\n";
+                detailed_description += LinkTaggedText(VarText::TECH_TAG, tech_name) + "  ";
         }
 
-        if (GetOptionsDB().Get<bool>("resource.effects.description.shown") && !policy->Effects().empty()) {
-            detailed_description += "\n" + Dump(policy->Effects());
+        if (!policy->Prerequisites().empty()) {
+            detailed_description += "\n\n" + UserString("ENC_POICY_PREREQUISITES");
+            for (const auto& policy_name : policy->Prerequisites())
+                detailed_description += LinkTaggedText(VarText::POLICY_TAG, policy_name) + "  ";
         }
+
+        if (!policy->Exclusions().empty()) {
+            detailed_description += "\n\n" + UserString("ENC_POICY_EXCLUSIONS");
+            for (const auto& policy_name : policy->Exclusions())
+                detailed_description += LinkTaggedText(VarText::POLICY_TAG, policy_name) + "  ";
+        }
+
+        if (GetOptionsDB().Get<bool>("resource.effects.description.shown") &&
+            !policy->Effects().empty())
+        { detailed_description += "\n\n" + Dump(policy->Effects()); }
     }
 
     void RefreshDetailPanelBuildingTypeTag( const std::string& item_type, const std::string& item_name,
@@ -2071,6 +2082,7 @@ namespace {
         // occupied planets
         std::vector<std::shared_ptr<const Planet>> species_occupied_planets;
         auto& species_object_populations = GetSpeciesManager().SpeciesObjectPopulations();
+        species_occupied_planets.reserve(species_object_populations.size());
         auto sp_op_it = species_object_populations.find(item_name);
         if (sp_op_it != species_object_populations.end()) {
             const auto& object_pops = sp_op_it->second;
@@ -2082,7 +2094,7 @@ namespace {
                     ErrorLogger() << "SpeciesManager SpeciesObjectPopulations suggested planet had a species, but it doesn't?";
                     continue;
                 }
-                species_occupied_planets.push_back(plt);
+                species_occupied_planets.emplace_back(std::move(plt));
             }
         }
 
@@ -2259,10 +2271,16 @@ namespace {
                                             std::string& specific_type, std::string& detailed_description,
                                             GG::Clr& color)
     {
-        int design_id = boost::lexical_cast<int>(item_name);
-        const ShipDesign* design = GetShipDesign(boost::lexical_cast<int>(item_name));
+        int design_id = INVALID_DESIGN_ID;
+        try {
+            design_id = boost::lexical_cast<int>(item_name);
+        } catch (...) {
+            ErrorLogger() << "RefreshDetailPanelShipDesignTag couldn't convert name to design ID: " << item_name;
+            return;
+        }
+        const ShipDesign* design = GetShipDesign(design_id);
         if (!design) {
-            ErrorLogger() << "EncyclopediaDetailPanel::Refresh couldn't find ShipDesign with id " << item_name;
+            ErrorLogger() << "RefreshDetailPanelShipDesignTag couldn't find ShipDesign with id " << item_name;
             return;
         }
 
@@ -2282,7 +2300,8 @@ namespace {
         float tech_level = boost::algorithm::clamp(CurrentTurn() / 400.0f, 0.0f, 1.0f);
         float typical_shot = 3 + 27 * tech_level;
         float enemy_DR = 20 * tech_level;
-        DebugLogger() << "default enemy stats:: tech_level: " << tech_level << "   DR: " << enemy_DR << "   attack: " << typical_shot;
+        DebugLogger() << "RefreshDetailPanelShipDesignTag default enemy stats:: tech_level: "
+                      << tech_level << "   DR: " << enemy_DR << "   attack: " << typical_shot;
         std::set<float> enemy_shots;
         enemy_shots.insert(typical_shot);
 
@@ -2291,9 +2310,9 @@ namespace {
 
         std::set<std::string> additional_species; // from currently selected planet and fleets, if any
         const auto& map_wnd = ClientUI::GetClientUI()->GetMapWnd();
-        if (const auto planet = Objects().get<Planet>(map_wnd->SelectedPlanetID())) {
+        if (const auto planet = Objects().get<Planet>(map_wnd->SelectedPlanetID()).get()) {
             if (!planet->SpeciesName().empty())
-                additional_species.insert(planet->SpeciesName());
+                additional_species.emplace(planet->SpeciesName());
         }
 
         FleetUIManager& fleet_manager = FleetUIManager::GetFleetUIManager();
@@ -2321,7 +2340,7 @@ namespace {
             chosen_ships.insert(selected_ship);
             if (const auto this_ship = Objects().get<Ship>(selected_ship)) {
                 if (!this_ship->SpeciesName().empty())
-                    additional_species.insert(this_ship->SpeciesName());
+                    additional_species.emplace(this_ship->SpeciesName());
                 if (!this_ship->OwnedBy(client_empire_id)) {
                     enemy_DR = this_ship->GetMeter(METER_MAX_SHIELD)->Initial();
                     DebugLogger() << "Using selected ship for enemy values, DR: " << enemy_DR;
@@ -2342,7 +2361,7 @@ namespace {
         for (const auto& this_ship : Objects().find<Ship>(chosen_ships)) {
             if (!this_ship || !this_ship->SpeciesName().empty())
                 continue;
-            additional_species.insert(this_ship->SpeciesName());
+            additional_species.emplace(this_ship->SpeciesName());
         }
         std::vector<std::string> species_list(additional_species.begin(), additional_species.end());
         detailed_description = GetDetailedDescriptionBase(design);
@@ -2357,8 +2376,8 @@ namespace {
         detailed_description.append(GetDetailedDescriptionStats(temp, design, enemy_DR, enemy_shots, cost));
 
         // apply various species to ship, re-calculating the meter values for each
-        for (const std::string& species_name : species_list) {
-            temp->SetSpecies(species_name);
+        for (std::string& species_name : species_list) {
+            temp->SetSpecies(std::move(species_name));
             GetUniverse().UpdateMeterEstimates(temp->ID());
             temp->Resupply();
             detailed_description.append(GetDetailedDescriptionStats(temp, design, enemy_DR, enemy_shots, cost));
@@ -2370,11 +2389,12 @@ namespace {
 
 
         // ships of this design
-        std::vector<std::shared_ptr<const Ship>> design_ships;
+        std::vector<const Ship*> design_ships;
+        design_ships.reserve(Objects().ExistingShips().size());
         for (const auto& entry : Objects().ExistingShips()) {
-            auto ship = std::dynamic_pointer_cast<const Ship>(entry.second);
+            auto ship = static_cast<const Ship*>(entry.second.get());
             if (ship && ship->DesignID() == design_id)
-                design_ships.push_back(ship);
+                design_ships.emplace_back(ship);
         }
         if (!design_ships.empty()) {
             detailed_description += "\n\n" + UserString("SHIPS_OF_DESIGN");
@@ -2437,7 +2457,7 @@ namespace {
         int selected_ship = fleet_manager.SelectedShipID();
         if (selected_ship != INVALID_OBJECT_ID) {
             chosen_ships.insert(selected_ship);
-            if (const auto this_ship = Objects().get<Ship>(selected_ship)) {
+            if (const auto this_ship = Objects().get<Ship>(selected_ship).get()) {
                 if (!additional_species.empty() && (
                         (this_ship->GetMeter(METER_MAX_SHIELD)->Initial() > 0) ||
                          !this_ship->OwnedBy(client_empire_id)))
@@ -2474,14 +2494,16 @@ namespace {
         // apply empty species for 'Generic' entry
         GetUniverse().UpdateMeterEstimates(temp->ID());
         temp->Resupply();
-        detailed_description.append(GetDetailedDescriptionStats(temp, incomplete_design.get(), enemy_DR, enemy_shots, cost));
+        detailed_description.append(GetDetailedDescriptionStats(temp, incomplete_design.get(),
+                                                                enemy_DR, enemy_shots, cost));
 
         // apply various species to ship, re-calculating the meter values for each
-        for (const std::string& species_name : species_list) {
-            temp->SetSpecies(species_name);
+        for (std::string& species_name : species_list) {
+            temp->SetSpecies(std::move(species_name));
             GetUniverse().UpdateMeterEstimates(temp->ID());
             temp->Resupply();
-            detailed_description.append(GetDetailedDescriptionStats(temp, incomplete_design.get(), enemy_DR, enemy_shots, cost));
+            detailed_description.append(GetDetailedDescriptionStats(temp, incomplete_design.get(),
+                                                                    enemy_DR, enemy_shots, cost));
         }
 
 
@@ -2615,7 +2637,7 @@ namespace {
             float planet_capacity = ((planet_environment == PE_UNINHABITABLE) ?
                                      0.0f : planet.GetMeter(METER_TARGET_POPULATION)->Current()); // want value after temporary meter update, so get current, not initial value of meter
 
-            retval.insert({planet_capacity, {species_name, planet_environment}});
+            retval.emplace(planet_capacity, std::make_pair(species_name, planet_environment));
         }
 
         // restore planet to original state
@@ -3008,6 +3030,7 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
             GG::Clr dummyC;
             std::weak_ptr<const ShipDesign> dummyD;
 
+            std::cout << "cat: " << article_category << "  key: " << article_key << "\n";
             GetRefreshDetailPanelInfo(article_category, article_key,
                                       dummy3, dummy1, dummy2, dummyA, dummyB, dummy4,
                                       dummy5, dummy6, detailed_description, dummyC,
@@ -3119,10 +3142,11 @@ void EncyclopediaDetailPanel::RefreshImpl() {
 
                 // convert formats...
                 std::vector<std::pair<double, double>> line_data_pts;
+                line_data_pts.reserve(empire_linemap.second.size());
                 for (const auto& entry : empire_linemap.second)
                     line_data_pts.emplace_back(entry.first, entry.second);
 
-                m_graph->AddSeries(line_data_pts, empire_clr);
+                m_graph->AddSeries(std::move(line_data_pts), empire_clr);
             }
 
             m_graph->AutoSetRange();

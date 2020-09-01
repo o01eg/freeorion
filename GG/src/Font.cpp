@@ -208,7 +208,7 @@ struct PushSubmatchOntoStackP
                     bool& ignore_tags,
                     const boost::xpressive::ssub_match& sub) const
     {
-        tag_stack.push(Font::Substring(*str, sub));
+        tag_stack.emplace(*str, sub);
         if (tag_stack.top() == PRE_TAG)
             ignore_tags = true;
     }
@@ -774,9 +774,9 @@ public:
                 size_t param_begin = m_text.size();
                 size_t param_end = m_text.append(param).size();
 
-                element->params.emplace_back(Substring(m_text,
-                                                       std::next(m_text.begin(), param_begin),
-                                                       std::next(m_text.begin(), param_end)));
+                element->params.emplace_back(m_text,
+                                             std::next(m_text.begin(), param_begin),
+                                             std::next(m_text.begin(), param_end));
             }
         }
 
@@ -810,7 +810,7 @@ public:
         element->tag_name = Substring(m_text,
                                       std::next(m_text.begin(), tag_name_begin),
                                       std::next(m_text.begin(), tag_name_end));
-        m_text_elements.push_back(element);
+        m_text_elements.emplace_back(std::move(element));
     }
 
     /** Add a text element.  Any whitespace in this text element will be non-breaking.*/
@@ -927,10 +927,6 @@ Font::TextAndElementsAssembler& Font::TextAndElementsAssembler::AddOpenTag(const
 ///////////////////////////////////////
 // class GG::Font::LineData
 ///////////////////////////////////////
-Font::LineData::LineData() :
-    justification(ALIGN_CENTER)
-{}
-
 X Font::LineData::Width() const
 { return char_data.empty() ? X0 : char_data.back().extent; }
 
@@ -940,11 +936,7 @@ bool Font::LineData::Empty() const
 ///////////////////////////////////////
 // class GG::Font::RenderState
 ///////////////////////////////////////
-Font::RenderState::RenderState() :
-    use_italics(0),
-    use_shadow(0),
-    draw_underline(0),
-    super_sub_shift(0)
+Font::RenderState::RenderState()
 {
     // Initialize the color stack with the current color
     GLfloat current[4];
@@ -952,14 +944,8 @@ Font::RenderState::RenderState() :
     PushColor(current[0]*255, current[1]*255, current[2]*255, current[3]*255);
 }
 
-Font::RenderState::RenderState (Clr color):
-    use_italics(0),
-    use_shadow(0),
-    draw_underline(0),
-    super_sub_shift(0)
-{
-    PushColor(color.r, color.g, color.b, color.a);
-}
+Font::RenderState::RenderState(Clr color)
+{ PushColor(color.r, color.g, color.b, color.a); }
 
 void Font::RenderState::PushColor(GLubyte r, GLubyte g, GLubyte b, GLubyte a)
 {
@@ -1000,18 +986,13 @@ Font::RenderCache::RenderCache() :
     underline_colors(new GLRGBAColorBuffer())
 {}
 
-// Must be here for scoped_ptr deleter to work
+// Must be here for unique_ptr deleter to work
 Font::RenderCache::~RenderCache()
 {}
 
 ///////////////////////////////////////
 // class GG::Font::LineData::CharData
 ///////////////////////////////////////
-Font::LineData::CharData::CharData() :
-    extent(0),
-    string_index(0)
-{}
-
 Font::LineData::CharData::CharData(X extent_, StrSize str_index, StrSize str_size, CPSize cp_index,
                                    const std::vector<std::shared_ptr<TextElement>>& tags_) :
     extent(extent_),
@@ -1019,7 +1000,8 @@ Font::LineData::CharData::CharData(X extent_, StrSize str_index, StrSize str_siz
     string_size(str_size),
     code_point_index(cp_index)
 {
-    for (auto tag : tags_)
+    tags.reserve(tags_.size());
+    for (auto& tag : tags_)
         tags.emplace_back(std::dynamic_pointer_cast<FormattingTag>(tag));
 }
 
@@ -1027,14 +1009,8 @@ Font::LineData::CharData::CharData(X extent_, StrSize str_index, StrSize str_siz
 ///////////////////////////////////////
 // struct GG::Font::Glyph
 ///////////////////////////////////////
-Font::Glyph::Glyph() :
-    y_offset(0),
-    left_bearing(0),
-    advance(0),
-    width(0)
-{}
-
-Font::Glyph::Glyph(const std::shared_ptr<Texture>& texture, const Pt& ul, const Pt& lr, Y y_ofs, X lb, X adv) :
+Font::Glyph::Glyph(const std::shared_ptr<Texture>& texture, const Pt& ul, const Pt& lr,
+                   Y y_ofs, X lb, X adv) :
     sub_texture(texture, ul.x, ul.y, lr.x, lr.y),
     y_offset(y_ofs),
     left_bearing(lb),
@@ -1045,33 +1021,9 @@ Font::Glyph::Glyph(const std::shared_ptr<Texture>& texture, const Pt& ul, const 
 ///////////////////////////////////////
 // class GG::Font
 ///////////////////////////////////////
-
-Font::Font() :
-    m_pt_sz(0),
-    m_ascent(0),
-    m_descent(0),
-    m_height(0),
-    m_lineskip(0),
-    m_underline_offset(0.0),
-    m_underline_height(0.0),
-    m_italics_offset(0.0),
-    m_super_sub_offset(0.0),
-    m_shadow_offset(0.0),
-    m_space_width(0)
-{}
-
 Font::Font(std::string font_filename, unsigned int pts) :
     m_font_filename(std::move(font_filename)),
-    m_pt_sz(pts),
-    m_ascent(0),
-    m_descent(0),
-    m_height(0),
-    m_lineskip(0),
-    m_underline_offset(0.0),
-    m_underline_height(0.0),
-    m_italics_offset(0.0),
-    m_shadow_offset(0.0),
-    m_space_width(0)
+    m_pt_sz(pts)
 {
     if (!m_font_filename.empty()) {
         detail::FTFaceWrapper wrapper;
@@ -1084,16 +1036,7 @@ Font::Font(std::string font_filename, unsigned int pts) :
 Font::Font(std::string font_filename, unsigned int pts,
            const std::vector<unsigned char>& file_contents) :
     m_font_filename(std::move(font_filename)),
-    m_pt_sz(pts),
-    m_ascent(0),
-    m_descent(0),
-    m_height(0),
-    m_lineskip(0),
-    m_underline_offset(0.0),
-    m_underline_height(0.0),
-    m_italics_offset(0.0),
-    m_shadow_offset(0.0),
-    m_space_width(0)
+    m_pt_sz(pts)
 {
     assert(!file_contents.empty());
     detail::FTFaceWrapper wrapper;
@@ -1101,9 +1044,6 @@ Font::Font(std::string font_filename, unsigned int pts,
     CheckFace(wrapper.m_face, error);
     Init(wrapper.m_face);
 }
-
-Font::~Font()
-{}
 
 const std::string& Font::FontName() const
 { return m_font_filename; }
@@ -1499,38 +1439,37 @@ std::vector<std::shared_ptr<Font::TextElement>>
                     for (auto nested_it = ++(*it).nested_results().begin();
                          nested_it != (*it).nested_results().end(); ++nested_it)
                     {
-                        element->params.push_back(Substring(text, (*nested_it)[0]));
+                        element->params.emplace_back(text, (*nested_it)[0]);
                     }
                 }
                 element->tag_name = Substring(text, (*it)[tag_name_tag]);
-                text_elements.push_back(element);
+                text_elements.emplace_back(std::move(element));
 
             // Close XML tag
             } else if ((*it)[close_bracket_tag].matched) {
                 auto element = std::make_shared<Font::FormattingTag>(true);
                 element->text = Substring(text, (*it)[0]);
                 element->tag_name = Substring(text, (*it)[tag_name_tag]);
-                text_elements.push_back(element);
+                text_elements.emplace_back(std::move(element));
 
             // Whitespace element
             } else if ((*it)[whitespace_tag].matched) {
                 auto element = std::make_shared<Font::TextElement>(true, false);
                 element->text = Substring(text, (*it)[whitespace_tag]);
-                text_elements.push_back(element);
+                text_elements.emplace_back(element);
 
                 // If the last character of a whitespace element is a line ending then create a
                 // newline TextElement.
                 char last_char = *std::prev(element->text.end());
-                if (last_char == '\n' || last_char == '\f' || last_char == '\r') {
-                    text_elements.push_back(std::make_shared<Font::TextElement>(false, true));
-                }
+                if (last_char == '\n' || last_char == '\f' || last_char == '\r')
+                    text_elements.emplace_back(std::make_shared<Font::TextElement>(false, true));
             }
 
         // Basic text element.
         } else {
             auto element = std::make_shared<Font::TextElement>(false, false);
             element->text = combined_text;
-            text_elements.push_back(element);
+            text_elements.emplace_back(std::move(element));
         }
 
         if (need_increment)
@@ -1561,9 +1500,8 @@ void Font::FillTemplatedText(
         auto text_it = elem->text.begin();
         auto end_it = elem->text.end();
         while (text_it != end_it) {
-
             // Find and set the width of the character glyph.
-            elem->widths.push_back(X0);
+            elem->widths.emplace_back(X0);
             std::uint32_t c = utf8::next(text_it, end_it);
             if (c != WIDE_NEWLINE) {
                 auto it = m_glyphs.find(c);
@@ -1664,7 +1602,7 @@ std::vector<Font::LineData> Font::DetermineLines(
 
     std::vector<Font::LineData> line_data;
     if (!text_elements.empty()) {
-        line_data.push_back(LineData());
+        line_data.emplace_back();
         line_data.back().justification = orig_just;
     }
 
@@ -1677,7 +1615,7 @@ std::vector<Font::LineData> Font::DetermineLines(
     for (const auto& elem : text_elements) {
         // if a newline is explicitly requested, start a new one
         if (elem->Type() == TextElement::NEWLINE) {
-            line_data.push_back(LineData());
+            line_data.emplace_back();
             SetJustification(last_line_of_curr_just,
                              line_data.back(),
                              orig_just,
@@ -1705,7 +1643,7 @@ std::vector<Font::LineData> Font::DetermineLines(
                             // if the space is larger than the line and alone
                             // on the line, let the space overrun this line
                             // and then start a new one
-                            line_data.push_back(LineData());
+                            line_data.emplace_back();
                             x = X0; // reset the x-position to 0
                             SetJustification(last_line_of_curr_just,
                                              line_data.back(),
@@ -1713,14 +1651,14 @@ std::vector<Font::LineData> Font::DetermineLines(
                                              line_data[line_data.size() - 2].justification);
                         } else {
                             // otherwise start a new line and put the space there
-                            line_data.push_back(LineData());
+                            line_data.emplace_back();
                             x = advance;
-                            line_data.back().char_data.push_back(
-                                LineData::CharData(x,
-                                                   original_string_offset + char_index,
-                                                   char_size,
-                                                   code_point_offset,
-                                                   pending_formatting_tags));
+                            line_data.back().char_data.emplace_back(
+                                x,
+                                original_string_offset + char_index,
+                                char_size,
+                                code_point_offset,
+                                pending_formatting_tags);
                             pending_formatting_tags.clear();
                             SetJustification(last_line_of_curr_just,
                                              line_data.back(),
@@ -1729,12 +1667,12 @@ std::vector<Font::LineData> Font::DetermineLines(
                         }
                     } else { // there's room for the space, or we're not using linewrap
                         x += advance;
-                        line_data.back().char_data.push_back(
-                            LineData::CharData(x,
-                                               original_string_offset + char_index,
-                                               char_size,
-                                               code_point_offset,
-                                               pending_formatting_tags));
+                        line_data.back().char_data.emplace_back(
+                            x,
+                            original_string_offset + char_index,
+                            char_size,
+                            code_point_offset,
+                            pending_formatting_tags);
                         pending_formatting_tags.clear();
                     }
                 }
@@ -1745,7 +1683,7 @@ std::vector<Font::LineData> Font::DetermineLines(
                 // if the text "word" overruns this line, and isn't alone on
                 // this line, move it down to the next line
                 if (box_width < x + elem->Width() && x) {
-                    line_data.push_back(LineData());
+                    line_data.emplace_back();
                     x = X0;
                     SetJustification(last_line_of_curr_just,
                                      line_data.back(),
@@ -1760,12 +1698,12 @@ std::vector<Font::LineData> Font::DetermineLines(
                     utf8::next(it, end_it);
                     StrSize char_size = std::distance(elem->text.begin(), it) - char_index;
                     x += elem->widths[j];
-                    line_data.back().char_data.push_back(
-                        LineData::CharData(x,
-                                           original_string_offset + char_index,
-                                           char_size,
-                                           code_point_offset,
-                                           pending_formatting_tags));
+                    line_data.back().char_data.emplace_back(
+                        x,
+                        original_string_offset + char_index,
+                        char_size,
+                        code_point_offset,
+                        pending_formatting_tags);
                     pending_formatting_tags.clear();
                     ++j;
                     ++code_point_offset;
@@ -1781,14 +1719,14 @@ std::vector<Font::LineData> Font::DetermineLines(
                     // if the char overruns this line, and isn't alone on this
                     // line, move it down to the next line
                     if ((format & FORMAT_LINEWRAP) && box_width < x + elem->widths[j] && x) {
-                        line_data.push_back(LineData());
+                        line_data.emplace_back();
                         x = elem->widths[j];
-                        line_data.back().char_data.push_back(
-                            LineData::CharData(x,
-                                               original_string_offset + char_index,
-                                               char_size,
-                                               code_point_offset,
-                                               pending_formatting_tags));
+                        line_data.back().char_data.emplace_back(
+                            x,
+                            original_string_offset + char_index,
+                            char_size,
+                            code_point_offset,
+                            pending_formatting_tags);
                         pending_formatting_tags.clear();
                         SetJustification(last_line_of_curr_just,
                                          line_data.back(),
@@ -1798,12 +1736,12 @@ std::vector<Font::LineData> Font::DetermineLines(
                         // there's room for this char on this line, or there's
                         // no wrapping in use
                         x += elem->widths[j];
-                        line_data.back().char_data.push_back(
-                            LineData::CharData(x,
-                                               original_string_offset + char_index, 
-                                               char_size,
-                                               code_point_offset,
-                                               pending_formatting_tags));
+                        line_data.back().char_data.emplace_back(
+                            x,
+                            original_string_offset + char_index,
+                            char_size,
+                            code_point_offset,
+                            pending_formatting_tags);
                         pending_formatting_tags.clear();
                     }
                     ++j;
@@ -1812,8 +1750,7 @@ std::vector<Font::LineData> Font::DetermineLines(
             }
         } else if (elem->Type() == TextElement::OPEN_TAG) {
             assert(std::dynamic_pointer_cast<FormattingTag>(elem));
-            std::shared_ptr<FormattingTag> elem_as_tag =
-                std::static_pointer_cast<FormattingTag>(elem);
+            auto elem_as_tag = std::static_pointer_cast<FormattingTag>(elem);
             if (elem_as_tag->tag_name == ALIGN_LEFT_TAG)
                 line_data.back().justification = ALIGN_LEFT;
             else if (elem_as_tag->tag_name == ALIGN_CENTER_TAG)
@@ -1821,19 +1758,19 @@ std::vector<Font::LineData> Font::DetermineLines(
             else if (elem_as_tag->tag_name == ALIGN_RIGHT_TAG)
                 line_data.back().justification = ALIGN_RIGHT;
             else if (elem_as_tag->tag_name != PRE_TAG)
-                pending_formatting_tags.push_back(elem);
+                pending_formatting_tags.emplace_back(elem);
             last_line_of_curr_just = false;
             code_point_offset += elem->CodePointSize();
+
         } else if (elem->Type() == TextElement::CLOSE_TAG) {
             assert(std::dynamic_pointer_cast<FormattingTag>(elem));
-            std::shared_ptr<FormattingTag> elem_as_tag =
-                std::static_pointer_cast<FormattingTag>(elem);
+            auto elem_as_tag = std::static_pointer_cast<FormattingTag>(elem);
             if ((elem_as_tag->tag_name == ALIGN_LEFT_TAG && line_data.back().justification == ALIGN_LEFT) ||
                 (elem_as_tag->tag_name == ALIGN_CENTER_TAG && line_data.back().justification == ALIGN_CENTER) ||
                 (elem_as_tag->tag_name == ALIGN_RIGHT_TAG && line_data.back().justification == ALIGN_RIGHT))
                 last_line_of_curr_just = true;
             else if (elem_as_tag->tag_name != PRE_TAG)
-                pending_formatting_tags.push_back(elem);
+                pending_formatting_tags.emplace_back(elem);
             code_point_offset += elem->CodePointSize();
         }
         original_string_offset += elem->StringSize();

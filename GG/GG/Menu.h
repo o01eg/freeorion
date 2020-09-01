@@ -35,20 +35,20 @@ class TextControl;
 */
 struct GG_API MenuItem
 {
-    MenuItem();
-
-    MenuItem(const std::string& str, bool disable, bool check,
-             std::function<void()> selected_on_close_callback = std::function<void()>());
+    MenuItem() = default;
 
     explicit MenuItem(bool separator);
 
-    virtual ~MenuItem();
+    MenuItem(const std::string& str, bool disable, bool check,
+             std::function<void()> selected_on_close_callback = std::function<void()>());
+    MenuItem(std::string&& str, bool disable, bool check,
+             std::function<void()> selected_on_close_callback = std::function<void()>());
 
-    std::string           label;      ///< text shown for this menu item
-    bool                  disabled;   ///< set to true when this menu item is disabled
-    bool                  checked;    ///< set to true when this menu item can be toggled, and is currently on
-    bool                  separator;  ///< set to true to render this menu item as a separator bar, rather than showing its text
-    std::vector<MenuItem> next_level; ///< submenu off of this menu item; may be emtpy
+    std::string           label;            ///< text shown for this menu item
+    bool                  disabled = false; ///< set to true when this menu item is disabled
+    bool                  checked = false;  ///< set to true when this menu item can be toggled, and is currently on
+    bool                  separator = false;///< set to true to render this menu item as a separator bar, rather than showing its text
+    std::vector<MenuItem> next_level;       ///< submenu off of this menu item; may be emtpy
 
     /** A callback to be called if this menu item is selected on close.*/
     std::function<void()> m_selected_on_close_callback;
@@ -66,16 +66,17 @@ class GG_API PopupMenu : public Wnd
 public:
     /** Ctor.  Parameter \a m should contain the desired menu in its
         next_level member. */
-    PopupMenu(X x, Y y, const std::shared_ptr<Font>& font, Clr text_color = CLR_WHITE,
-              Clr border_color = CLR_BLACK, Clr interior_color = CLR_SHADOW, Clr hilite_color = CLR_GRAY);
+    PopupMenu(X x, Y y, const std::shared_ptr<Font>& font,
+              Clr text_color = CLR_WHITE, Clr border_color = CLR_BLACK,
+              Clr interior_color = CLR_SHADOW, Clr hilite_color = CLR_GRAY);
 
     Pt ClientUpperLeft() const override;
 
-    Clr         BorderColor() const;       ///< returns the color used to render the border of the control
-    Clr         InteriorColor() const;     ///< returns the color used to render the interior of the control
-    Clr         TextColor() const;         ///< returns the color used to render menu item text
-    Clr         HiliteColor() const;       ///< returns the color used to indicate a hilited menu item
-    Clr         SelectedTextColor() const; ///< returns the color used to render a hilited menu item's text
+    Clr BorderColor() const;       ///< returns the color used to render the border of the control
+    Clr InteriorColor() const;     ///< returns the color used to render the interior of the control
+    Clr TextColor() const;         ///< returns the color used to render menu item text
+    Clr HiliteColor() const;       ///< returns the color used to indicate a hilited menu item
+    Clr SelectedTextColor() const; ///< returns the color used to render a hilited menu item's text
 
     /** Add \p menu_item to the end of the popup menu and store its callback.*/
     void AddMenuItem(MenuItem&& menu_item);

@@ -62,7 +62,8 @@ namespace {
      * when a ship has been moved by the MoveTo effect separately from the
      * fleet that previously held it.  Also used by CreateShip effect to give
      * the new ship a fleet.  All ships need to be within fleets. */
-    std::shared_ptr<Fleet> CreateNewFleet(std::shared_ptr<System> system, std::shared_ptr<Ship> ship, ObjectMap& objects) {
+    std::shared_ptr<Fleet> CreateNewFleet(std::shared_ptr<System> system, std::shared_ptr<Ship> ship,
+                                          ObjectMap& objects) {
         if (!system || !ship)
             return nullptr;
 
@@ -1066,11 +1067,11 @@ SetSpecies::SetSpecies(std::unique_ptr<ValueRef::ValueRef<std::string>>&& specie
 
 void SetSpecies::Execute(ScriptingContext& context) const {
     if (auto planet = std::dynamic_pointer_cast<Planet>(context.effect_target)) {
-        std::string species_name = m_species_name->Eval(ScriptingContext(context, planet->SpeciesName()));
-        planet->SetSpecies(species_name);
+        std::string&& species_name = m_species_name->Eval(ScriptingContext(context, planet->SpeciesName()));
+        planet->SetSpecies(std::move(species_name));
 
         // ensure non-empty and permissible focus setting for new species
-        std::string initial_focus = planet->Focus();
+        auto& initial_focus = planet->Focus();
         std::vector<std::string> available_foci = planet->AvailableFoci();
 
         // leave current focus unchanged if available.
@@ -1080,13 +1081,9 @@ void SetSpecies::Execute(ScriptingContext& context) const {
             }
         }
 
-        // need to set new focus
-        std::string new_focus;
 
-        const Species* species = GetSpecies(species_name);
-        std::string default_focus;
-        if (species)
-            default_focus = species->DefaultFocus();
+        const Species* species = GetSpecies(planet->SpeciesName());
+        auto& default_focus = species ? species->DefaultFocus() : "";
 
         // chose default focus if available. otherwise use any available focus
         bool default_available = false;
@@ -1098,16 +1095,14 @@ void SetSpecies::Execute(ScriptingContext& context) const {
         }
 
         if (default_available) {
-            new_focus = std::move(default_focus);
+            planet->SetFocus(std::move(default_focus));
         } else if (!available_foci.empty()) {
-            new_focus = *available_foci.begin();
+            planet->SetFocus(*available_foci.begin());
         }
 
-        planet->SetFocus(new_focus);
-
     } else if (auto ship = std::dynamic_pointer_cast<Ship>(context.effect_target)) {
-        std::string species_name = m_species_name->Eval(ScriptingContext(context, ship->SpeciesName()));
-        ship->SetSpecies(species_name);
+        std::string&& species_name = m_species_name->Eval(ScriptingContext(context, ship->SpeciesName()));
+        ship->SetSpecies(std::move(species_name));
     }
 }
 
@@ -1615,7 +1610,8 @@ void CreateShip::Execute(ScriptingContext& context) const {
     //        fleet = ship->FleetID();
     //// etc.
 
-    auto ship = GetUniverse().InsertNew<Ship>(empire_id, design_id, species_name, ALL_EMPIRES);
+    auto ship = GetUniverse().InsertNew<Ship>(empire_id, design_id, std::move(species_name),
+                                              ALL_EMPIRES);
     system->Insert(ship);
 
     if (m_name) {
@@ -1643,7 +1639,7 @@ void CreateShip::Execute(ScriptingContext& context) const {
 
     // apply after-creation effects
     ScriptingContext local_context = context;
-    local_context.effect_target = ship;
+    local_context.effect_target = std::move(ship);
     for (auto& effect : m_effects_to_apply_after) {
         if (!effect)
             continue;
@@ -3204,15 +3200,15 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
 
     // evaluate all parameter valuerefs so they can be substituted into sitrep template
     std::vector<std::pair<std::string, std::string>> parameter_tag_values;
+    parameter_tag_values.reserve(m_message_parameters.size());
     for (const auto& entry : m_message_parameters) {
-        parameter_tag_values.push_back({entry.first, entry.second->Eval(context)});
+        parameter_tag_values.emplace_back(entry.first, entry.second->Eval(context));
 
         // special case for ship designs: make sure sitrep recipient knows about the design
         // so the sitrep won't have errors about unknown designs being referenced
         if (entry.first == VarText::PREDEFINED_DESIGN_TAG) {
-            if (const ShipDesign* design = GetPredefinedShipDesign(entry.second->Eval(context))) {
-                ship_design_ids_to_inform_receipits_of.insert(design->ID());
-            }
+            if (const ShipDesign* design = GetPredefinedShipDesign(entry.second->Eval(context)))
+                ship_design_ids_to_inform_receipits_of.emplace(design->ID());
         }
     }
 
@@ -3309,12 +3305,12 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
         if (!empire)
             continue;
         empire->AddSitRepEntry(CreateSitRep(m_message_string, sitrep_turn, m_icon,
-                                            parameter_tag_values, m_label, m_stringtable_lookup));
+                                            std::move(parameter_tag_values),
+                                            m_label, m_stringtable_lookup));
 
         // also inform of any ship designs recipients should know about
-        for (int design_id : ship_design_ids_to_inform_receipits_of) {
+        for (int design_id : ship_design_ids_to_inform_receipits_of)
             GetUniverse().SetEmpireKnowledgeOfShipDesign(design_id, empire_id);
-        }
     }
 }
 

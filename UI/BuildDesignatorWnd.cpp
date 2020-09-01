@@ -470,7 +470,7 @@ namespace {
                 if (ship_part_names.count(part_name))
                     ship_part_names[part_name]++;
                 else
-                    ship_part_names.insert(std::pair<std::string, int>(part_name, 1));
+                    ship_part_names[part_name] = 1;
             }
 
             for (const auto& part_name_count : ship_part_names) {
@@ -1139,7 +1139,7 @@ void BuildDesignatorWnd::BuildSelector::BuildItemRightClicked(GG::ListBox::itera
         item_name = UserString(item_name);
 
     std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) % item_name);
-    popup->AddMenuItem(GG::MenuItem(popup_label, false, false, pedia_lookup_action));
+    popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false, pedia_lookup_action));
     popup->Run();
 }
 

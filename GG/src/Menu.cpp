@@ -27,16 +27,9 @@ const int BORDER_THICKNESS = 1; // thickness with which to draw menu borders
 ////////////////////////////////////////////////
 // GG::MenuItem
 ////////////////////////////////////////////////
-MenuItem::MenuItem() :
-    MenuItem("", false, false)
-{}
-
 MenuItem::MenuItem(bool separator_) :
     disabled(true),
-    checked(false),
-    separator(true),
-    next_level(),
-    m_selected_on_close_callback{}
+    separator(true)
 {}
 
 MenuItem::MenuItem(const std::string& str, bool disable, bool check,
@@ -44,12 +37,15 @@ MenuItem::MenuItem(const std::string& str, bool disable, bool check,
     label(str),
     disabled(disable),
     checked(check),
-    separator(false),
-    next_level(),
     m_selected_on_close_callback{selected_on_close_callback}
 {}
 
-MenuItem::~MenuItem()
+MenuItem::MenuItem(std::string&& str, bool disable, bool check,
+                   std::function<void()> selected_on_close_callback) :
+    label(std::move(str)),
+    disabled(disable),
+    checked(check),
+    m_selected_on_close_callback{selected_on_close_callback}
 {}
 
 
@@ -57,10 +53,8 @@ MenuItem::~MenuItem()
 // GG::PopupMenu
 ////////////////////////////////////////////////
 namespace {
-
-// distance to leave between edge of PopupMenuClassic contents and the control's border
-const X HORIZONTAL_MARGIN(3);
-
+    // distance to leave between edge of PopupMenuClassic contents and the control's border
+    const X HORIZONTAL_MARGIN(3);
 }
 
 const std::size_t PopupMenu::INVALID_CARET = std::numeric_limits<std::size_t>::max();
@@ -74,7 +68,6 @@ PopupMenu::PopupMenu(X x, Y y, const std::shared_ptr<Font>& font, Clr text_color
     m_text_color(text_color),
     m_hilite_color(hilite_color),
     m_sel_text_color(text_color),
-    m_menu_data(MenuItem()),
     m_caret(1, INVALID_CARET),
     m_origin(x, y)
 {
@@ -104,8 +97,7 @@ Clr PopupMenu::SelectedTextColor() const
 
 void PopupMenu::Render()
 {
-    if (m_menu_data.next_level.size())
-    {
+    if (m_menu_data.next_level.size()) {
         Pt ul = ClientUpperLeft();
 
         const Y INDICATOR_VERTICAL_MARGIN(3);
@@ -264,8 +256,8 @@ void PopupMenu::LDrag(const Pt& pt, const Pt& move, Flags<ModKey> mod_keys)
                 m_open_levels.resize(i + 1);
                 m_caret.resize(i + 1);
                 if (!menu.next_level[row_selected].disabled && menu.next_level[row_selected].next_level.size()) {
-                    m_caret.push_back(INVALID_CARET);
-                    m_open_levels.push_back(Rect());
+                    m_caret.emplace_back(INVALID_CARET);
+                    m_open_levels.emplace_back();
                 }
                 cursor_is_in_menu = true;
             }

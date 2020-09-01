@@ -450,31 +450,31 @@ void HumanClientApp::StartServer() {
     std::vector<std::string> args;
     std::string ai_config = GetOptionsDB().Get<std::string>("ai-config");
     std::string ai_path = GetOptionsDB().Get<std::string>("ai-path");
-    args.push_back("\"" + SERVER_CLIENT_EXE + "\"");
-    args.push_back("--resource.path");
-    args.push_back("\"" + GetOptionsDB().Get<std::string>("resource.path") + "\"");
+    args.emplace_back("\"" + SERVER_CLIENT_EXE + "\"");
+    args.emplace_back("--resource.path");
+    args.emplace_back("\"" + GetOptionsDB().Get<std::string>("resource.path") + "\"");
 
     auto force_log_level = GetOptionsDB().Get<std::string>("log-level");
     if (!force_log_level.empty()) {
-        args.push_back("--log-level");
-        args.push_back(GetOptionsDB().Get<std::string>("log-level"));
+        args.emplace_back("--log-level");
+        args.emplace_back(GetOptionsDB().Get<std::string>("log-level"));
     }
 
     if (ai_path != GetOptionsDB().GetDefaultValueString("ai-path")) {
-        args.push_back("--ai-path");
-        args.push_back(ai_path);
+        args.emplace_back("--ai-path");
+        args.emplace_back(ai_path);
         DebugLogger() << "ai-path set to '" << ai_path << "'";
     }
     if (!ai_config.empty()) {
-        args.push_back("--ai-config");
-        args.push_back(ai_config);
+        args.emplace_back("--ai-config");
+        args.emplace_back(ai_config);
         DebugLogger() << "ai-config set to '" << ai_config << "'";
     } else {
         DebugLogger() << "ai-config not set.";
     }
     if (m_single_player_game) {
-        args.push_back("--singleplayer");
-        args.push_back("--skip-checksum");
+        args.emplace_back("--singleplayer");
+        args.emplace_back("--skip-checksum");
     }
     DebugLogger() << "Launching server process with args: ";
     for (auto arg : args)
@@ -1174,7 +1174,7 @@ namespace {
     boost::optional<std::string> NewestSinglePlayerSavegame() {
         using namespace boost::filesystem;
         try {
-            std::map<std::time_t, path> files_by_write_time;
+            std::multimap<std::time_t, path> files_by_write_time;
 
             auto add_all_savegames_in = [&files_by_write_time](const path& path) {
                 if (!is_directory(path))
@@ -1189,8 +1189,7 @@ namespace {
                     if (file_path.extension() != SP_SAVE_FILE_EXTENSION)
                         continue;
 
-                    std::time_t t = last_write_time(file_path);
-                    files_by_write_time.insert({t, file_path});
+                    files_by_write_time.emplace(last_write_time(file_path), file_path);
                 }
             };
 
@@ -1237,8 +1236,7 @@ namespace {
                     file_path.extension() != MP_SAVE_FILE_EXTENSION)
                 { continue; }
 
-                std::time_t t = last_write_time(file_path);
-                files_by_write_time.insert({t, file_path});
+                files_by_write_time.emplace(last_write_time(file_path), file_path);
             }
 
             //DebugLogger() << "files by write time:";

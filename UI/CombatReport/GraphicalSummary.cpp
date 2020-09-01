@@ -378,7 +378,7 @@ public:
     void MakeBars() {
         for (CombatSummary::ParticipantSummaryPtr unit : m_side_summary.unit_summaries) {
             if (unit->max_health > 0) {
-                m_participant_bars.push_back(GG::Wnd::Create<ParticipantBar>(*unit, m_sizer));
+                m_participant_bars.emplace_back(GG::Wnd::Create<ParticipantBar>(*unit, m_sizer));
                 AttachChild(m_participant_bars.back());
             }
         }
@@ -539,34 +539,34 @@ public:
     {}
 
     void CompleteConstruction() override {
-        m_toggles.push_back(
-            std::make_shared<ToggleData>(UserString("COMBAT_SUMMARY_PARTICIPANT_RELATIVE"),
-                                         UserString("COMBAT_SUMMARY_PARTICIPANT_EQUAL"),
-                                         UserString("COMBAT_SUMMARY_PARTICIPANT_RELATIVE_TIP"),
-                                         UserString("COMBAT_SUMMARY_PARTICIPANT_EQUAL_TIP"),
-                                         TOGGLE_BAR_WIDTH_PROPORTIONAL, &m_sizer,
-                                         std::dynamic_pointer_cast<OptionsBar>(shared_from_this())));
-        m_toggles.push_back(
-            std::make_shared<ToggleData>(UserString("COMBAT_SUMMARY_HEALTH_SMOOTH"),
-                                         UserString("COMBAT_SUMMARY_HEALTH_BAR"),
-                                         UserString("COMBAT_SUMMARY_HEALTH_SMOOTH_TIP"),
-                                         UserString("COMBAT_SUMMARY_HEALTH_BAR_TIP"),
-                                         TOGGLE_BAR_HEALTH_SMOOTH, &m_sizer,
-                                         std::dynamic_pointer_cast<OptionsBar>(shared_from_this())));
-        m_toggles.push_back(
-            std::make_shared<ToggleData>(UserString("COMBAT_SUMMARY_BAR_HEIGHT_PROPORTIONAL"),
-                                         UserString("COMBAT_SUMMARY_BAR_HEIGHT_EQUAL"),
-                                         UserString("COMBAT_SUMMARY_BAR_HEIGHT_PROPORTIONAL_TIP"),
-                                         UserString("COMBAT_SUMMARY_BAR_HEIGHT_EQUAL_TIP"),
-                                         TOGGLE_BAR_HEIGHT_PROPORTIONAL, &m_sizer,
-                                         std::dynamic_pointer_cast<OptionsBar>(shared_from_this())));
-        m_toggles.push_back(
-            std::make_shared<ToggleData>(UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_PROPORTIONAL"),
-                                         UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_EQUAL"),
-                                         UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_PROPORTIONAL_TIP"),
-                                         UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_EQUAL_TIP"),
-                                         TOGGLE_GRAPH_HEIGHT_PROPORTIONAL, &m_sizer,
-                                         std::dynamic_pointer_cast<OptionsBar>(shared_from_this())));
+        m_toggles.emplace_back(std::make_shared<ToggleData>(
+            UserString("COMBAT_SUMMARY_PARTICIPANT_RELATIVE"),
+            UserString("COMBAT_SUMMARY_PARTICIPANT_EQUAL"),
+            UserString("COMBAT_SUMMARY_PARTICIPANT_RELATIVE_TIP"),
+            UserString("COMBAT_SUMMARY_PARTICIPANT_EQUAL_TIP"),
+            TOGGLE_BAR_WIDTH_PROPORTIONAL, &m_sizer,
+            std::static_pointer_cast<OptionsBar>(shared_from_this())));
+        m_toggles.emplace_back(std::make_shared<ToggleData>(
+            UserString("COMBAT_SUMMARY_HEALTH_SMOOTH"),
+            UserString("COMBAT_SUMMARY_HEALTH_BAR"),
+            UserString("COMBAT_SUMMARY_HEALTH_SMOOTH_TIP"),
+            UserString("COMBAT_SUMMARY_HEALTH_BAR_TIP"),
+            TOGGLE_BAR_HEALTH_SMOOTH, &m_sizer,
+            std::static_pointer_cast<OptionsBar>(shared_from_this())));
+        m_toggles.emplace_back(std::make_shared<ToggleData>(
+            UserString("COMBAT_SUMMARY_BAR_HEIGHT_PROPORTIONAL"),
+            UserString("COMBAT_SUMMARY_BAR_HEIGHT_EQUAL"),
+            UserString("COMBAT_SUMMARY_BAR_HEIGHT_PROPORTIONAL_TIP"),
+            UserString("COMBAT_SUMMARY_BAR_HEIGHT_EQUAL_TIP"),
+            TOGGLE_BAR_HEIGHT_PROPORTIONAL, &m_sizer,
+            std::static_pointer_cast<OptionsBar>(shared_from_this())));
+        m_toggles.emplace_back(std::make_shared<ToggleData>(
+            UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_PROPORTIONAL"),
+            UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_EQUAL"),
+            UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_PROPORTIONAL_TIP"),
+            UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_EQUAL_TIP"),
+            TOGGLE_GRAPH_HEIGHT_PROPORTIONAL, &m_sizer,
+            std::static_pointer_cast<OptionsBar>(shared_from_this())));
         DoLayout();
     }
 
@@ -646,7 +646,7 @@ private:
         {
             button = Wnd::Create<CUIButton>("-");
             button->LeftClickedSignal.connect(boost::bind(&ToggleData::Toggle, this));
-            parent_->AttachChild(std::move(button));
+            parent_->AttachChild(button);
             SetValue(GetValue());
         }
     };

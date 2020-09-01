@@ -212,7 +212,7 @@ void GameRulesPanel::CompleteConstruction() {
 std::map<std::string, std::string> GameRulesPanel::GetRulesAsStrings() const {
     std::map<std::string, std::string> retval;
     for (const auto& entry : m_rules)
-        retval.insert(entry);
+        retval.emplace(entry);
     return retval;
 }
 
@@ -407,8 +407,9 @@ namespace {
 
         void CompleteConstruction() override {
             GG::ListBox::Row::CompleteConstruction();
-            auto species_label = GG::Wnd::Create<CUILabel>(UserString(Name()), GG::FORMAT_LEFT | GG::FORMAT_VCENTER);
-            push_back(species_label);
+            auto species_label = GG::Wnd::Create<CUILabel>(UserString(Name()),
+                                                           GG::FORMAT_LEFT | GG::FORMAT_VCENTER);
+            push_back(std::move(species_label));
             SetChildClippingMode(ClipToClient);
         }
     };
@@ -427,8 +428,9 @@ GG::DropDownList* GameRulesPanel::StringRuleWidget(GG::ListBox* page, int indent
 
     if (auto desc_val = std::dynamic_pointer_cast<const DiscreteValidator<std::string>>(validator)) {
         // add rows for all allowed options
-        for (auto& poss : desc_val->m_values)
-            drop->Insert(GG::Wnd::Create<UserStringRow>(poss, drop->Width(), drop->Height() - 4));
+        for (auto& possability : desc_val->m_values)
+            drop->Insert(GG::Wnd::Create<UserStringRow>(possability,
+                                                        drop->Width(), drop->Height() - 4));
     }
     // select a row by default, preferably based on set rule value
     if (!drop->Empty()) {

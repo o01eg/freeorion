@@ -96,13 +96,13 @@ namespace {
             return;
 
         std::stringstream msg;
-        msg << "Freeorion added support for the XDG Base Directory Specification." << std::endl << std::endl
-            << "Configuration files and data were migrated from:" << std::endl
-            << old_path << std::endl << std::endl
-            << "Configuration were files copied to:" << std::endl << config_path << std::endl << std::endl
-            << "Data Files were copied to:" << std::endl << data_path << std::endl << std::endl
-            << "If your save.path option in persistent_config.xml was ~/.config, then you need to update it."
-            << std::endl;
+        msg << "Freeorion added support for the XDG Base Directory Specification.\n\n"
+            << "Configuration files and data were migrated from:\n"
+            << old_path << "\n\n"
+            << "Configuration were files copied to:\n" 
+            << config_path << "\n\n"
+            << "Data Files were copied to:\n" << data_path << "\n\n"
+            << "If your save.path option in persistent_config.xml was ~/.config, then you need to update it.\n";
 
         try {
             fs::create_directories(config_path);
@@ -138,15 +138,17 @@ namespace {
             }
 
             fs::ofstream msg_file(old_path / "MIGRATION.README");
-            msg_file << msg.str() << std::endl
-                     << "You can delete this file it is a one time message." << std::endl << std::endl;
+            msg_file << msg.str() << "\n"
+                     << "You can delete this file it is a one time message.\n\n";
 
         } catch(fs::filesystem_error const & e) {
-            std::cerr << "Error: Unable to migrate files from old config dir" << std::endl
-                      << old_path << std::endl
-                      << " to new XDG specified config dir" << std::endl << config_path << std::endl
-                      << " and data dir" << std::endl << data_path << std::endl
-                      << " because " << e.what()  << std::endl;
+            std::cerr << "Error: Unable to migrate files from old config dir\n"
+                      << old_path << "\n"
+                      << " to new XDG specified config dir\n"
+                      << config_path << "\n"
+                      << " and data dir\n"
+                      << data_path << "\n"
+                      << " because " << e.what() << "\n";
             throw;
         }
 
@@ -158,16 +160,16 @@ namespace {
 auto PathTypeToString(PathType path_type) -> std::string const&
 {
     switch (path_type) {
-        case PATH_BINARY:       return PATH_BINARY_STR;
-        case PATH_RESOURCE:     return PATH_RESOURCE_STR;
-        case PATH_PYTHON:       return PATH_PYTHON_STR;
-        case PATH_DATA_ROOT:    return PATH_DATA_ROOT_STR;
-        case PATH_DATA_USER:    return PATH_DATA_USER_STR;
-        case PATH_CONFIG:       return PATH_CONFIG_STR;
-        case PATH_SAVE:         return PATH_SAVE_STR;
-        case PATH_TEMP:         return PATH_TEMP_STR;
-        case PATH_INVALID:      return PATH_INVALID_STR;
-        default:                return EMPTY_STRING;
+        case PathType::PATH_BINARY:    return PATH_BINARY_STR;
+        case PathType::PATH_RESOURCE:  return PATH_RESOURCE_STR;
+        case PathType::PATH_PYTHON:    return PATH_PYTHON_STR;
+        case PathType::PATH_DATA_ROOT: return PATH_DATA_ROOT_STR;
+        case PathType::PATH_DATA_USER: return PATH_DATA_USER_STR;
+        case PathType::PATH_CONFIG:    return PATH_CONFIG_STR;
+        case PathType::PATH_SAVE:      return PATH_SAVE_STR;
+        case PathType::PATH_TEMP:      return PATH_TEMP_STR;
+        case PathType::PATH_INVALID:   return PATH_INVALID_STR;
+        default:                       return EMPTY_STRING;
     }
 }
 
@@ -176,12 +178,12 @@ auto PathTypeStrings() -> std::vector<std::string> const&
     static std::vector<std::string> path_type_list;
     if (path_type_list.empty()) {
         path_type_list.reserve(10); // should be enough
-        for (auto path_type = PathType(0); path_type < PATH_INVALID;
-             path_type = PathType(path_type + 1))
+        for (auto path_type = PathType(0); path_type < PathType::PATH_INVALID;
+             path_type = PathType(int(path_type) + 1))
         {
             // PATH_PYTHON is only valid for FREEORION_WIN32 or FREEORION_MACOSX
 #if defined(FREEORION_LINUX)
-            if (path_type == PATH_PYTHON)
+            if (path_type == PathType::PATH_PYTHON)
                 continue;
 #endif
             path_type_list.emplace_back(PathTypeToString(path_type));
@@ -663,25 +665,25 @@ auto IsInDir(fs::path const& dir, fs::path const& test_dir) -> bool
 auto GetPath(PathType path_type) -> fs::path
 {
     switch (path_type) {
-    case PATH_BINARY:
+    case PathType::PATH_BINARY:
         return GetBinDir();
-    case PATH_RESOURCE:
+    case PathType::PATH_RESOURCE:
         return GetResourceDir();
-    case PATH_DATA_ROOT:
+    case PathType::PATH_DATA_ROOT:
         return GetRootDataDir();
-    case PATH_DATA_USER:
+    case PathType::PATH_DATA_USER:
         return GetUserDataDir();
-    case PATH_CONFIG:
+    case PathType::PATH_CONFIG:
         return GetUserConfigDir();
-    case PATH_SAVE:
+    case PathType::PATH_SAVE:
         return GetSaveDir();
-    case PATH_TEMP:
+    case PathType::PATH_TEMP:
         return fs::temp_directory_path();
-    case PATH_PYTHON:
+    case PathType::PATH_PYTHON:
 #if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32)
         return GetPythonHome();
 #endif
-    case PATH_INVALID:
+    case PathType::PATH_INVALID:
     default:
         ErrorLogger() << "Invalid path type " << path_type;
         return fs::temp_directory_path();

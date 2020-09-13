@@ -1,3 +1,9 @@
+freeorion (0.4.10.1+ppa1~bionic) bionic; urgency=medium
+
+  * Bug-fix RC1.
+
+ -- O01eg <o01eg@yandex.ru>  Sun, 13 Sep 2020 15:00:06 +0000
+
 freeorion (0.4.10+ppa2~bionic) bionic; urgency=medium
 
   * Stable release.

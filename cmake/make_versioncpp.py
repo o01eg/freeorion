@@ -6,7 +6,7 @@ import sys
 import os
 from string import Template
 from datetime import datetime
-from subprocess import check_output
+from subprocess import check_output, CalledProcessError
 from platform import system
 from glob import glob
 
@@ -123,7 +123,7 @@ if system() == 'Windows':
 if system() == 'Darwin':
     generators.append(Generator('packaging/Info.plist.in', 'packaging/Info.plist'))
 
-version = "0.4.10"
+version = "0.4.10.1"
 branch = ""
 build_no = INVALID_BUILD_NO
 
@@ -136,7 +136,7 @@ try:
     commit = check_output(["git", "show", "--no-show-signature", "-s", "--format=%h", "--abbrev=7", "HEAD"], universal_newlines=True).strip()
     timestamp = float(check_output(["git", "show", "--no-show-signature", "-s", "--format=%ct", "HEAD"], universal_newlines=True).strip())
     build_no = ".".join([datetime.utcfromtimestamp(timestamp).strftime("%Y-%m-%d"), commit])
-except IOError:
+except (IOError, CalledProcessError):
     print("WARNING: git not installed or not setup correctly")
 
 for generator in generators:

@@ -567,9 +567,9 @@ void Wnd::AttachChild(std::shared_ptr<Wnd> wnd)
         m_children.emplace_back(std::move(wnd));
 
     } catch (const std::bad_weak_ptr&) {
-        std::cerr << std::endl << "Wnd::AttachChild called either during the constructor "
-                  << "or after the destructor has run. Not attaching child."
-                  << std::endl << " parent = " << m_name << " child = " << (wnd ? wnd->m_name : "???");
+        std::cerr << "\nWnd::AttachChild called either during the constructor "
+                  << "or after the destructor has run. Not attaching child.\n"
+                  << " parent = " << m_name << " child = " << (wnd ? wnd->m_name : "???");
         // Soft failure:
         // Intentionally do nothing, to create minimal disruption to non-dev
         // players if a dev accidentally puts an AttachChild in its own constructor.
@@ -859,6 +859,25 @@ void Wnd::SetLayout(const std::shared_ptr<Layout>& layout)
     }
     AttachChild(layout);
     m_layout = layout;
+    layout->SizeMove(Pt(), Pt(ClientWidth(), ClientHeight()));
+}
+
+void Wnd::SetLayout(std::shared_ptr<Layout>&& layout)
+{
+    auto&& mm_layout = GetLayout();
+    if (layout == mm_layout || layout == LockAndResetIfExpired(m_containing_layout))
+        throw BadLayout("Wnd::SetLayout() : Attempted to set a Wnd's layout to be its current layout or the layout that contains the Wnd");
+    RemoveLayout();
+    auto children = m_children;
+    DetachChildren();
+    Pt client_sz = ClientSize();
+    for (auto& wnd : children) {
+        Pt wnd_ul = wnd->RelativeUpperLeft(), wnd_lr = wnd->RelativeLowerRight();
+        if (wnd_ul.x < 0 || wnd_ul.y < 0 || client_sz.x < wnd_lr.x || client_sz.y < wnd_lr.y)
+            AttachChild(wnd);
+    }
+    AttachChild(layout);
+    m_layout = std::move(layout);
     layout->SizeMove(Pt(), Pt(ClientWidth(), ClientHeight()));
 }
 

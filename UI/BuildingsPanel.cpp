@@ -127,9 +127,8 @@ void BuildingsPanel::Update() {
             continue;
 
         auto ind = GG::Wnd::Create<BuildingIndicator>(GG::X(indicator_size), object_id);
-        m_building_indicators.push_back(ind);
-
         ind->RightClickedSignal.connect(BuildingRightClickedSignal);
+        m_building_indicators.emplace_back(std::move(ind));
     }
 
     // get in-progress buildings
@@ -151,9 +150,9 @@ void BuildingsPanel::Update() {
         double progress = std::max(0.0f, empire->ProductionStatus(queue_index));
         double turns_completed = progress / std::max(total_cost, 1.0);
         auto ind = GG::Wnd::Create<BuildingIndicator>(GG::X(indicator_size), elem.item.name,
-                                                      turns_completed, total_turns, total_cost, turn_spending);
-
-        m_building_indicators.push_back(ind);
+                                                      turns_completed, total_turns, total_cost,
+                                                      turn_spending);
+        m_building_indicators.emplace_back(std::move(ind));
     }
 }
 
@@ -277,17 +276,17 @@ BuildingIndicator::BuildingIndicator(GG::X w, const std::string& building_type,
     SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
         texture, UserString(building_type), UserString(desc)));
 
-    m_graphic = GG::Wnd::Create<GG::StaticGraphic>(texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+    m_graphic = GG::Wnd::Create<GG::StaticGraphic>(
+        std::move(texture),
+        GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
 
     float next_progress = turn_spending / std::max(1.0, total_cost);
 
-    m_progress_bar = GG::Wnd::Create<MultiTurnProgressBar>(total_turns,
-                                                           turns_completed,
-                                                           next_progress,
-                                                           GG::LightenClr(ClientUI::TechWndProgressBarBackgroundColor()),
-                                                           ClientUI::TechWndProgressBarColor(),
-                                                           GG::LightenClr(ClientUI::ResearchableTechFillColor()));
-
+    m_progress_bar = GG::Wnd::Create<MultiTurnProgressBar>(
+        total_turns, turns_completed, next_progress,
+        GG::LightenClr(ClientUI::TechWndProgressBarBackgroundColor()),
+        ClientUI::TechWndProgressBarColor(),
+        GG::LightenClr(ClientUI::ResearchableTechFillColor()));
 }
 
 void BuildingIndicator::CompleteConstruction() {
@@ -361,7 +360,8 @@ void BuildingIndicator::Refresh() {
 
     if (const BuildingType* type = GetBuildingType(building->BuildingTypeName())) {
         auto texture = ClientUI::BuildingIcon(type->Name());
-        m_graphic = GG::Wnd::Create<GG::StaticGraphic>(texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+        m_graphic = GG::Wnd::Create<GG::StaticGraphic>(
+            texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
         AttachChild(m_graphic);
 
         std::string desc = UserString(type->Description());
@@ -371,12 +371,13 @@ void BuildingIndicator::Refresh() {
             desc += "\n" + Dump(type->Effects());
 
         SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
-            texture, UserString(type->Name()), desc));
+            std::move(texture), UserString(type->Name()), std::move(desc)));
     }
 
     if (building && building->OrderedScrapped()) {
         auto scrap_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "scrapped.png", true);
-        m_scrap_indicator = GG::Wnd::Create<GG::StaticGraphic>(scrap_texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+        m_scrap_indicator = GG::Wnd::Create<GG::StaticGraphic>(
+            std::move(scrap_texture), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
         AttachChild(m_scrap_indicator);
     }
 

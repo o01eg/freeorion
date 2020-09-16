@@ -255,7 +255,7 @@ private:
     bool PanY(GG::Y y = GG::Y(50));
 
     /** Mark all fleet buttons for a refresh. */
-    void RefreshFleetButtons();
+    void RefreshFleetButtons(bool recreate = true);
     /** Removes old / existing and create new fleet buttons. Only called once
       * per render interval.*/
     void DeferredRefreshFleetButtons();
@@ -264,10 +264,10 @@ private:
       * in \p type_fleet_buttons and record the fleet buttons in
       * \p m_fleet_buttons.*/
     template <typename FleetButtonMap, typename FleetsMap>
-    void CreateFleetButtonsOfType (
+    void CreateFleetButtonsOfType(
         FleetButtonMap& type_fleet_buttons,
-        const FleetsMap &fleets_map,
-        const FleetButton::SizeType & fleet_button_size);
+        const FleetsMap& fleets_map,
+        const FleetButton::SizeType& fleet_button_size);
 
     /** Delete all fleet buttons.*/
     void DeleteFleetButtons();
@@ -579,6 +579,7 @@ private:
     std::set<int>                   m_fleets_exploring;
 
     /// indicates that refresh fleet button work should be done before rendering.
+    bool                            m_deferred_recreate_fleet_buttons = false;
     bool                            m_deferred_refresh_fleet_buttons = false;
 
     std::chrono::time_point<std::chrono::high_resolution_clock>

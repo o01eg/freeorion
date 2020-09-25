@@ -1,3 +1,9 @@
+freeorion (0.4.10.1.fo0012+git20200925.39cfe10ppa1~bionic) bionic; urgency=medium
+
+  * New FO0012 game.
+
+ -- O01eg <o01eg@yandex.ru>  Fri, 25 Sep 2020 16:36:26 +0000
+
 freeorion (0.4.10.fo0011+git20200710.f3d403eppa1~bionic) bionic; urgency=medium
 
   * Update upstream.

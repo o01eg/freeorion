@@ -134,8 +134,8 @@ jobs:
           if [ -z "$TRAVIS_TAG" ]; then
             git merge --no-commit upstream/release-v0.4.10
           fi
-        - cmake -DBUILD_TESTING=ON -DBUILD_HEADLESS=ON ..
-        - cmake --build . -- -j 2
+        - cmake-local -DBUILD_TESTING=ON -DBUILD_HEADLESS=ON ..
+        - cmake-local --build . -- -j 2
 
     - name: Unittest AI with Python 3.5
       <<: *_test_python_common

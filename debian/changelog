@@ -1,4 +1,10 @@
-freeorion (0.4.10.1+ppa2~bionic) bionic; urgency=medium
+freeorion (0.4.10.1+ppa3~xenial) xenial; urgency=medium
+
+  * Bug-fix RC3.
+
+ -- O01eg <o01eg@yandex.ru>  Fri, 25 Sep 2020 13:57:22 +0000
+
+freeorion (0.4.10.1+ppa2~groovy) groovy; urgency=medium
 
   * Bug-fix RC2.
 

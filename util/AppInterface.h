@@ -56,12 +56,8 @@ public:
 
     virtual SupplyManager& GetSupplyManager() = 0;
 
-    virtual std::shared_ptr<UniverseObject> GetUniverseObject(int object_id) = 0;
-
     /** Accessor for known objects of specified empire. */
     virtual ObjectMap& EmpireKnownObjects(int empire_id) = 0;
-
-    virtual std::shared_ptr<UniverseObject> EmpireKnownObject(int object_id, int empire_id) = 0;
 
     virtual std::string GetVisibleObjectName(std::shared_ptr<const UniverseObject> object) = 0;
 

@@ -75,18 +75,24 @@ namespace {
             return cores > 0 ? cores : 4;
         };
 
-        db.Add("effects.ui.threads",                UserStringNop("OPTIONS_DB_EFFECTS_THREADS_UI_DESC"),        HardwareThreads(),  RangedValidator<int>(1, 32));
-        db.Add("effects.ai.threads",                UserStringNop("OPTIONS_DB_EFFECTS_THREADS_AI_DESC"),        2,                  RangedValidator<int>(1, 32));
-        db.Add("effects.server.threads",            UserStringNop("OPTIONS_DB_EFFECTS_THREADS_SERVER_DESC"),    HardwareThreads(),  RangedValidator<int>(1, 32));
-        db.Add("effects.accounting.enabled",        UserStringNop("OPTIONS_DB_EFFECT_ACCOUNTING"),              true,               Validator<bool>());
+        db.Add("effects.ui.threads", UserStringNop("OPTIONS_DB_EFFECTS_THREADS_UI_DESC"),
+               HardwareThreads(), RangedValidator<int>(1, 32));
+        db.Add("effects.ai.threads", UserStringNop("OPTIONS_DB_EFFECTS_THREADS_AI_DESC"),
+               2, RangedValidator<int>(1, 32));
+        db.Add("effects.server.threads", UserStringNop("OPTIONS_DB_EFFECTS_THREADS_SERVER_DESC"),
+               HardwareThreads(), RangedValidator<int>(1, 32));
+        db.Add("effects.accounting.enabled", UserStringNop("OPTIONS_DB_EFFECT_ACCOUNTING"),
+               true, Validator<bool>());
     }
     bool temp_bool = RegisterOptions(&AddOptions);
 
     void AddRules(GameRules& rules) {
         // makes all PRNG be reseeded frequently
-        rules.Add<bool>("RULE_RESEED_PRNG_SERVER",  "RULE_RESEED_PRNG_SERVER_DESC",
+        rules.Add<bool>(UserStringNop("RULE_RESEED_PRNG_SERVER"),
+                        UserStringNop("RULE_RESEED_PRNG_SERVER_DESC"),
                         "", true, true);
-        rules.Add<bool>("RULE_STARLANES_EVERYWHERE","RULE_STARLANES_EVERYWHERE_DESC",
+        rules.Add<bool>(UserStringNop("RULE_STARLANES_EVERYWHERE"),
+                        UserStringNop("RULE_STARLANES_EVERYWHERE_DESC"),
                         "TEST", false, true);
     }
     bool temp_bool2 = RegisterGameRules(&AddRules);
@@ -122,8 +128,6 @@ Universe::Universe() :
     m_pathfinder(std::make_shared<Pathfinder>()),
     m_universe_width(1000.0),
     m_inhibit_universe_object_signals(false),
-    m_encoding_empire(ALL_EMPIRES),
-    m_all_objects_visible(false),
     m_object_id_allocator(new IDAllocator(ALL_EMPIRES, std::vector<int>(), INVALID_OBJECT_ID,
                                           TEMPORARY_OBJECT_ID, INVALID_OBJECT_ID)),
     m_design_id_allocator(new IDAllocator(ALL_EMPIRES, std::vector<int>(), INVALID_DESIGN_ID,
@@ -345,7 +349,7 @@ const std::set<int>& Universe::EmpireKnownShipDesignIDs(int empire_id) const {
 }
 
 Visibility Universe::GetObjectVisibilityByEmpire(int object_id, int empire_id) const {
-    if (empire_id == ALL_EMPIRES || GetUniverse().AllObjectsVisible())
+    if (empire_id == ALL_EMPIRES)   // TODO: GameRule for all objects visible
         return Visibility::VIS_FULL_VISIBILITY;
 
     auto empire_it = m_empire_object_visibility.find(empire_id);
@@ -1335,8 +1339,8 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for TECHS";
     std::list<Condition::ObjectSet> tech_sources;   // for each empire, a set with a single source object for all its techs
     // select a source object for each empire and dispatch condition evaluations
-    for (auto& entry : Empires()) {
-        const Empire* empire = entry.second;
+    for (const auto& entry : Empires()) {
+        const auto& empire = entry.second;
         auto source = empire->Source();
         if (!source)
             continue;
@@ -1364,8 +1368,8 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     type_timer.EnterSection("policies");
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for POLICIES";
     std::list<Condition::ObjectSet> policy_sources; // for each empire, a set with a single source object for all its policies
-    for (auto& entry : Empires()) {
-        const Empire* empire = entry.second;
+    for (const auto& entry : Empires()) {
+        const auto& empire = entry.second;
         auto source = empire->Source();
         if (!source)
             continue;
@@ -2337,12 +2341,12 @@ namespace {
     {
         // after setting object visibility, similarly set visibility of objects'
         // specials for each empire
-        for (auto& empire_entry : Empires()) {
+        for (const auto& empire_entry : Empires()) {
             int empire_id = empire_entry.first;
             auto& obj_vis_map = empire_object_visibility[empire_id];
             auto& obj_specials_map = empire_object_visible_specials[empire_id];
 
-            const Empire* empire = empire_entry.second;
+            const auto& empire = empire_entry.second;
             const Meter* detection_meter = empire->GetMeter("METER_DETECTION_STRENGTH");
             if (!detection_meter)
                 continue;
@@ -2441,9 +2445,9 @@ namespace {
 
 void Universe::UpdateEmpireObjectVisibilities() {
     // ensure Universe knows empires have knowledge of designs the empire is specifically remembering
-    for (auto& empire_entry : Empires()) {
+    for (const auto& empire_entry : Empires()) {
         int empire_id = empire_entry.first;
-        const Empire* empire = empire_entry.second;
+        const auto& empire = empire_entry.second;
         if (empire->Eliminated()) {
             m_empire_known_ship_design_ids.erase(empire_id);
         } else {
@@ -2455,7 +2459,7 @@ void Universe::UpdateEmpireObjectVisibilities() {
     m_empire_object_visibility.clear();
     m_empire_object_visible_specials.clear();
 
-    if (m_all_objects_visible) {
+    if (false) {    // TODO: GameRule
         SetAllObjectsVisibleToAllEmpires();
         return;
     }
@@ -2876,9 +2880,6 @@ void Universe::InitializeSystemGraph(int for_empire_id) {
 void Universe::UpdateEmpireVisibilityFilteredSystemGraphs(int empire_id) {
     m_pathfinder->UpdateEmpireVisibilityFilteredSystemGraphs(empire_id);
 }
-
-int& Universe::EncodingEmpire()
-{ return m_encoding_empire; }
 
 double Universe::UniverseWidth() const
 { return m_universe_width; }

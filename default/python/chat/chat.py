@@ -1,4 +1,4 @@
-from logging import info, warn, error
+from logging import info, warning, error
 
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
@@ -35,7 +35,7 @@ class ChatHistoryProvider:
                     break
         except IOError:
             exctype, value = sys.exc_info()[:2]
-            warn("Read RO DSN: %s %s" % (exctype, value))
+            warning("Read RO DSN: %s %s" % (exctype, value))
 
         self.conn = psycopg2.connect(self.dsn)
         self.conn_ro = psycopg2.connect(self.dsn_ro)

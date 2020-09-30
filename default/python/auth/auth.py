@@ -29,7 +29,17 @@ class AuthProvider:
             for line in f:
                 self.dsn = line
                 break
+        self.dsn_ro = self.dsn
+        try:
+            with open(fo.get_user_config_dir() + "/db-ro.txt", "r") as f:
+                for line in f:
+                    self.dsn_ro = line
+                    break
+        except IOError:
+            exctype, value = sys.exc_info()[:2]
+            warn("Read RO DSN: %s %s" % (exctype, value))
         self.conn = psycopg2.connect(self.dsn)
+        self.conn_ro = psycopg2.connect(self.dsn_ro)
         self.roles_symbols = {
             'h': fo.roleType.host, 'm': fo.roleType.clientTypeModerator,
             'p': fo.roleType.clientTypePlayer, 'o': fo.roleType.clientTypeObserver,

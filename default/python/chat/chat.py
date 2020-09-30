@@ -1,4 +1,4 @@
-from logging import info, error
+from logging import info, warn, error
 
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
@@ -27,7 +27,18 @@ class ChatHistoryProvider:
             for line in f:
                 self.dsn = line
                 break
+        self.dsn_ro = self.dsn
+        try:
+            with open(fo.get_user_config_dir() + "/db-ro.txt", "r") as f:
+                for line in f:
+                    self.dsn_ro = line
+                    break
+        except IOError:
+            exctype, value = sys.exc_info()[:2]
+            warn("Read RO DSN: %s %s" % (exctype, value))
+
         self.conn = psycopg2.connect(self.dsn)
+        self.conn_ro = psycopg2.connect(self.dsn_ro)
         info("Chat initialized")
 
     def load_history(self):
@@ -42,8 +53,8 @@ class ChatHistoryProvider:
         # e = (123456789012, "P1", "Test1", c)
         # return [e]
         res = []
-        with self.conn:
-            with self.conn.cursor() as curs:
+        with self.conn_ro:
+            with self.conn_ro.cursor() as curs:
                 curs.execute(""" SELECT date_part('epoch', ts)::int, player_name, text,
                     text_color / 256 / 256 / 256 % 256,
                     text_color / 256 / 256 % 256,

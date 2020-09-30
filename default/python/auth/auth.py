@@ -31,7 +31,17 @@ class AuthProvider:
             for line in f:
                 self.dsn = line
                 break
+        self.dsn_ro = self.dsn
+        try:
+            with open(fo.get_user_config_dir() + "/db-ro.txt", "r") as f:
+                for line in f:
+                    self.dsn_ro = line
+                    break
+        except IOError:
+            exctype, value = sys.exc_info()[:2]
+            warn("Read RO DSN: %s %s" % (exctype, value))
         self.conn = psycopg2.connect(self.dsn)
+        self.conn_ro = psycopg2.connect(self.dsn_ro)
         self.roles_symbols = {
             'h': fo.roleType.host, 'm': fo.roleType.clientTypeModerator,
             'p': fo.roleType.clientTypePlayer, 'o': fo.roleType.clientTypeObserver,
@@ -119,8 +129,8 @@ class AuthProvider:
         info("Loading players for game %s" % fo.get_galaxy_setup_data().gameUID)
         players = []
         try:
-            with self.conn:
-                with self.conn.cursor() as curs:
+            with self.conn_ro:
+                with self.conn_ro.cursor() as curs:
                     curs.execute(""" SELECT u.player_name, MIN(p.species), MIN(p.team_id)
                             FROM auth.users u
                             INNER JOIN auth.contacts c
@@ -143,7 +153,7 @@ class AuthProvider:
                         psd.starting_team = r[2]
                         players.append(psd)
         except psycopg2.InterfaceError:
-            self.conn = psycopg2.connect(self.dsn)
+            self.conn_ro = psycopg2.connect(self.dsn_ro)
             exctype, value = sys.exc_info()[:2]
             error("Cann't load players: %s %s" % (exctype, value))
         return players
@@ -152,8 +162,8 @@ class AuthProvider:
         """ Send message to player """
         subject = "FreeOrion LT %s Notification" % fo.get_galaxy_setup_data().gameUID
         try:
-            with self.conn:
-                with self.conn.cursor() as curs:
+            with self.conn_ro:
+                with self.conn_ro.cursor() as curs:
                     curs.execute("""SELECT c.protocol, c.address
                             FROM auth.users u
                             INNER JOIN auth.contacts c
@@ -201,7 +211,7 @@ class AuthProvider:
                         else:
                             warning("Unsupported protocol %s for %s" % (r[0], player_name))
         except psycopg2.InterfaceError:
-            self.conn = psycopg2.connect(self.dsn)
+            self.conn_ro = psycopg2.connect(self.dsn_ro)
             exctype, value = sys.exc_info()[:2]
             error("Cann't send message: %s %s" % (exctype, value))
             return False
@@ -211,8 +221,8 @@ class AuthProvider:
         """Returns list of players delegated by this player"""
         players = []
         try:
-            with self.conn:
-                with self.conn.cursor() as curs:
+            with self.conn_ro:
+                with self.conn_ro.cursor() as curs:
                     curs.execute("""SELECT player_name
                             FROM games.players p
                             WHERE p.game_uid = %s
@@ -221,7 +231,7 @@ class AuthProvider:
                     for r in curs:
                         players.append(r[0])
         except psycopg2.InterfaceError:
-            self.conn = psycopg2.connect(self.dsn)
+            self.conn_ro = psycopg2.connect(self.dsn_ro)
             exctype, value = sys.exc_info()[:2]
             error("Cann't get delegation info: %s %s" % (exctype, value))
         return players

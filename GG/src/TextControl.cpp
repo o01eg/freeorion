@@ -1,43 +1,29 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
-
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-#include <GG/TextControl.h>
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include <GG/DrawUtil.h>
+#include <GG/TextControl.h>
 #include <GG/utf8/checked.h>
 
 
 using namespace GG;
 
 namespace {
-    const Pt INVALID_USABLE_SIZE(-X1, -Y1);
+
+const Pt INVALID_USABLE_SIZE(-X1, -Y1);
+
 }
 
 ////////////////////////////////////////////////
 // GG::TextControl
 ////////////////////////////////////////////////
-TextControl::TextControl(X x, Y y, X w, Y h, const std::string& str,
+TextControl::TextControl(X x, Y y, X w, Y h, std::string str,
                          const std::shared_ptr<Font>& font, Clr color/* = CLR_BLACK*/,
                          Flags<TextFormat> format/* = FORMAT_NONE*/,
                          Flags<WndFlag> flags/* = NO_WND_FLAGS*/) :
@@ -47,11 +33,11 @@ TextControl::TextControl(X x, Y y, X w, Y h, const std::string& str,
     m_font(font)
 {
     ValidateFormat();
-    SetText(str);
+    SetText(std::move(str));
 }
 
-TextControl::TextControl(X x, Y y, X w, Y h, const std::string& str,
-                         const std::vector<std::shared_ptr<Font::TextElement>>& text_elements,
+TextControl::TextControl(X x, Y y, X w, Y h, std::string str,
+                         std::vector<std::shared_ptr<Font::TextElement>> text_elements,
                          const std::shared_ptr<Font>& font,
                          Clr color /*= CLR_BLACK*/, Flags<TextFormat> format /*= FORMAT_NONE*/,
                          Flags<WndFlag> flags /*= NO_WND_FLAGS*/) :
@@ -61,7 +47,7 @@ TextControl::TextControl(X x, Y y, X w, Y h, const std::string& str,
     m_font(font)
 {
     ValidateFormat();
-    SetText(str, text_elements);
+    SetText(std::move(str), std::move(text_elements));
 }
 
 TextControl::TextControl(const TextControl& that) :
@@ -218,11 +204,11 @@ void TextControl::RefreshCache() {
 void TextControl::PurgeCache()
 { m_render_cache.reset(); }
 
-void TextControl::SetText(const std::string& str)
+void TextControl::SetText(std::string str)
 {
     if (!utf8::is_valid(str.begin(), str.end()))
         return;
-    m_text = str;
+    m_text = std::move(str);
 
     if (!m_font)
         return;
@@ -231,26 +217,24 @@ void TextControl::SetText(const std::string& str)
     RecomputeLineData();
 }
 
-void TextControl::SetText(const std::string& str,
-                          const std::vector<std::shared_ptr<Font::TextElement>>& text_elements)
+void TextControl::SetText(std::string str,
+                          std::vector<std::shared_ptr<Font::TextElement>> text_elements)
 {
     if (!utf8::is_valid(str.begin(), str.end()))
         return;
 
     std::size_t expected_length(0);
-    for (auto& elem : text_elements) {
+    for (auto& elem : text_elements)
         expected_length += elem->text.size();
-    }
 
     if (expected_length > str.size())
         return;
 
-    m_text = str;
+    m_text = std::move(str);
 
-    m_text_elements = text_elements;
-    for (auto& elem : m_text_elements) {
+    m_text_elements = std::move(text_elements);
+    for (auto& elem : m_text_elements)
         elem->Bind(m_text);
-    }
 
     RecomputeLineData();
 }
@@ -286,7 +270,7 @@ const std::shared_ptr<Font>& TextControl::GetFont() const
 void TextControl::SetFont(std::shared_ptr<Font> font)
 {
     m_font = font;
-    SetText(m_text);
+    SetText(std::move(m_text));
 }
 
 void TextControl::SizeMove(const Pt& ul, const Pt& lr)
@@ -329,7 +313,7 @@ void TextControl::SetTextFormat(Flags<TextFormat> format)
     m_format = format;
     ValidateFormat();
     if (m_format != format)
-        SetText(m_text);
+        SetText(std::move(m_text));
 }
 
 void TextControl::SetTextColor(Clr color)
@@ -393,7 +377,7 @@ void TextControl::Insert(std::size_t line, CPSize pos, char c)
     if (!detail::ValidUTFChar<char>()(c))
         return;
     m_text.insert(Value(StringIndexOf(line, pos, m_line_data)), 1, c);
-    SetText(m_text);
+    SetText(std::move(m_text));
 }
 
 void TextControl::Insert(std::size_t line, CPSize pos, const std::string& s)
@@ -401,7 +385,7 @@ void TextControl::Insert(std::size_t line, CPSize pos, const std::string& s)
     if (!utf8::is_valid(s.begin(), s.end()))
         return;
     m_text.insert(Value(StringIndexOf(line, pos, m_line_data)), s);
-    SetText(m_text);
+    SetText(std::move(m_text));
 }
 
 void TextControl::Erase(std::size_t line, CPSize pos, CPSize num/* = CP1*/)
@@ -411,7 +395,7 @@ void TextControl::Erase(std::size_t line, CPSize pos, CPSize num/* = CP1*/)
     if (it == end_it)
         return;
     m_text.erase(it, end_it);
-    SetText(m_text);
+    SetText(std::move(m_text));
 }
 
 void TextControl::Erase(std::size_t line1, CPSize pos1, std::size_t line2, CPSize pos2)
@@ -426,7 +410,7 @@ void TextControl::Erase(std::size_t line1, CPSize pos1, std::size_t line2, CPSiz
     auto it = m_text.begin() + std::min(offset1, offset2);
     auto end_it = m_text.begin() + std::max(offset1, offset2);
     m_text.erase(it, end_it);
-    SetText(m_text);
+    SetText(std::move(m_text));
 }
 
 const std::vector<Font::LineData>& TextControl::GetLineData() const

@@ -1,40 +1,25 @@
-// -*- C++ -*-
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-   
-/** \file GUI.h \brief Contains GUI class, which encapsulates the state and
-    behavior of the entire GG GUI. */
+//! @file GG/GUI.h
+//!
+//! Contains GUI class, which encapsulates the state and behavior of the entire
+//! GG GUI.
 
 #ifndef _GG_GUI_h_
 #define _GG_GUI_h_
 
-#include <GG/Font.h>
-#include <GG/WndEvent.h>
-
-#include <boost/signals2/signal.hpp>
 
 #include <chrono>
+#include <GG/Font.h>
+#include <GG/WndEvent.h>
+#include <boost/signals2/signal.hpp>
 
 
 namespace boost { namespace archive {
@@ -137,7 +122,7 @@ public:
 
     /// These are the only events absolutely necessary for GG to function
     /// properly
-    enum EventType : int {
+    enum class EventType : int {
         IDLE,        ///< nothing has changed since the last message, but the GUI might want to update some things anyway
         KEYPRESS,    ///< a down key press or key repeat, with or without modifiers like Alt, Ctrl, Meta, etc.
         KEYRELEASE,  ///< a key release, with or without modifiers like Alt, Ctrl, Meta, etc.
@@ -433,7 +418,7 @@ public:
     virtual Pt GetDefaultResolution(int display_id) const = 0;
 
 protected:
-    GUI(const std::string& app_name); ///< protected ctor, called by derived classes
+    GUI(std::string app_name);              ///< protected ctor, called by derived classes
 
     void            ProcessBrowseInfo();    ///< determines the current browse info mode, if any
     /** Allow all windows in the z-list to update data before rendering. */
@@ -493,5 +478,6 @@ std::shared_ptr<Font> GUI::GetFont(const std::string& font_filename, unsigned in
 { return GetFontManager().GetFont(font_filename, pts, file_contents, first, last); }
 
 }
+
 
 #endif

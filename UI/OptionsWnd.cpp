@@ -47,7 +47,7 @@ namespace {
     public:
         RowContentsWnd(GG::X w, GG::Y h, std::shared_ptr<Wnd> contents, int indentation_level) :
             Control(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
-            m_contents(std::forward<std::shared_ptr<Wnd>>(contents)),
+            m_contents(std::move(contents)),
             m_indentation_level(indentation_level)
         {}
 
@@ -84,11 +84,11 @@ namespace {
     };
 
     struct BrowseForPathButtonFunctor {
-        BrowseForPathButtonFunctor(const fs::path& path, const std::vector<std::pair<std::string, std::string>>& filters,
+        BrowseForPathButtonFunctor(fs::path path, std::vector<std::pair<std::string, std::string>> filters,
                                    std::shared_ptr<GG::Edit> edit, bool directory, bool return_relative_path) :
-            m_path(path),
-            m_filters(filters),
-            m_edit(std::forward<std::shared_ptr<GG::Edit>>(edit)),
+            m_path(std::move(path)),
+            m_filters(std::move(filters)),
+            m_edit(std::move(edit)),
             m_directory(directory),
             m_return_relative_path(return_relative_path)
         {}
@@ -113,9 +113,9 @@ namespace {
 
         fs::path                                            m_path;
         std::vector<std::pair<std::string, std::string>>    m_filters;
-        std::shared_ptr<GG::Edit>                                           m_edit;
-        bool                                                m_directory;
-        bool                                                m_return_relative_path;
+        std::shared_ptr<GG::Edit>                           m_edit;
+        bool                                                m_directory = false;
+        bool                                                m_return_relative_path = false;
     };
 
     bool ValidStringtableFile(const std::string& file) {
@@ -180,7 +180,7 @@ namespace {
     // Small window that will grab a unique key press.
     class KeyPressCatcher : public GG::Wnd {
         GG::Key                 m_key;
-        std::uint32_t m_code_point;
+        std::uint32_t           m_code_point;
         GG::Flags<GG::ModKey>   m_mods;
 
     public:
@@ -198,7 +198,7 @@ namespace {
             m_code_point = key_code_point;
             m_mods = mod_keys;
             // exit modal loop only if not a modifier
-            if (GG::GGK_LCONTROL > m_key || GG::GGK_RGUI < m_key)
+            if (GG::Key::GGK_LCONTROL > m_key || GG::Key::GGK_RGUI < m_key)
                 m_done = true;
 
             /// @todo Clean up, ie transform LCTRL or RCTRL into CTRL and
@@ -262,7 +262,7 @@ namespace {
             }
 
 
-            m_hscroll =  GG::Wnd::Create<CUIScroll>(GG::HORIZONTAL);
+            m_hscroll =  GG::Wnd::Create<CUIScroll>(GG::Orientation::HORIZONTAL);
             AttachChild(m_hscroll);
 
             namespace ph = boost::placeholders;
@@ -316,17 +316,17 @@ namespace {
     public:
         OptionsListRow(GG::X w, GG::Y h, std::shared_ptr<RowContentsWnd> contents) :
             GG::ListBox::Row(w, h),
-            m_contents(std::forward<std::shared_ptr<RowContentsWnd>>(contents))
+            m_contents(std::move(contents))
         {
-            SetChildClippingMode(ClipToClient);
+            SetChildClippingMode(ChildClippingMode::ClipToClient);
         }
 
         OptionsListRow(GG::X w, GG::Y h, std::shared_ptr<Wnd> contents, int indentation = 0) :
             GG::ListBox::Row(w, h)
         {
-            SetChildClippingMode(ClipToClient);
+            SetChildClippingMode(ChildClippingMode::ClipToClient);
             if (contents)
-                m_contents = GG::Wnd::Create<RowContentsWnd>(w, h, contents, indentation);
+                m_contents = GG::Wnd::Create<RowContentsWnd>(w, h, std::move(contents), indentation);
         }
 
         void CompleteConstruction() override {
@@ -387,10 +387,11 @@ namespace {
 
     /**Create UI controls for a logger level option.*/
     void LoggerLevelOption(GG::ListBox& page, bool is_sink,
-                           const std::string& label, const std::string& option_name)
+                           std::string label, const std::string& option_name)
     {
         // Create the label
-        auto logger_label = GG::Wnd::Create<CUILabel>(label, GG::FORMAT_LEFT | GG::FORMAT_NOWRAP, GG::INTERACTIVE);
+        auto logger_label = GG::Wnd::Create<CUILabel>(
+            std::move(label), GG::FORMAT_LEFT | GG::FORMAT_NOWRAP, GG::INTERACTIVE);
 
         // Create a drop down list for the filtering levels
         auto num_log_levels = 1 + static_cast<std::size_t>(LogLevel::max) - static_cast<std::size_t>(LogLevel::min);
@@ -405,8 +406,8 @@ namespace {
             auto level_name = to_string(static_cast<LogLevel>(ii));
             auto priority_row = GG::Wnd::Create<CUISimpleDropDownListRow>(level_name);
             // use the row's name to store the option value.
-            priority_row->SetName(level_name);
-            drop_list->Insert(priority_row);
+            priority_row->SetName(std::move(level_name));
+            drop_list->Insert(std::move(priority_row));
         }
 
         // Select the current filtering level in the list
@@ -415,7 +416,8 @@ namespace {
             drop_list->Select(selected_level);
 
         // Make a layout with a row etc. for this option
-        auto layout = GG::Wnd::Create<GG::Layout>(GG::X0, GG::Y0, GG::X1, GG::Y1, 1, 2, 0, LAYOUT_MARGIN);
+        auto layout = GG::Wnd::Create<GG::Layout>(GG::X0, GG::Y0, GG::X1, GG::Y1,
+                                                  1, 2, 0, LAYOUT_MARGIN);
         layout->Add(logger_label, 0, 0);
         layout->Add(drop_list,    0, 1, 1, 1, GG::ALIGN_VCENTER);
 
@@ -423,12 +425,13 @@ namespace {
         // row->Resize(GG::Pt(ROW_WIDTH, drop_list->MinUsableSize().y + LAYOUT_MARGIN + drop_list->MaxSize().y + 6));
         row->Resize(GG::Pt(ROW_WIDTH, drop_list->MinUsableSize().y + LAYOUT_MARGIN));
 
-        auto row_wnd = GG::Wnd::Create<RowContentsWnd>(row->Width(), row->Height(), layout, 0);
+        auto row_wnd = GG::Wnd::Create<RowContentsWnd>(row->Width(), row->Height(),
+                                                       std::move(layout), 0);
         row_wnd->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
         row_wnd->SetBrowseText(UserString(GetOptionsDB().GetDescription(option_name)));
-        row->push_back(row_wnd);
+        row->push_back(std::move(row_wnd));
 
-        page.Insert(row);
+        page.Insert(std::move(row));
 
         // Connect to Options DB
         drop_list->SelChangedSignal.connect(
@@ -659,10 +662,12 @@ void OptionsWnd::CompleteConstruction() {
 
     // Colors tab
     current_page = CreatePage(UserString("OPTIONS_PAGE_COLORS"));
-    CreateSectionHeader(current_page, 0,                        UserString("OPTIONS_GENERAL_COLORS"));
-    ColorOption(current_page, 0, "ui.font.color",               UserString("OPTIONS_TEXT_COLOR"));
-    ColorOption(current_page, 0, "ui.font.link.color",          UserString("OPTIONS_DEFAULT_LINK_COLOR"));
-    ColorOption(current_page, 0, "ui.font.link.rollover.color", UserString("OPTIONS_ROLLOVER_LINK_COLOR"));
+    CreateSectionHeader(current_page, 0,                           UserString("OPTIONS_GENERAL_COLORS"));
+    ColorOption(current_page, 0, "ui.font.color",                  UserString("OPTIONS_TEXT_COLOR"));
+    ColorOption(current_page, 0, "ui.font.link.color",             UserString("OPTIONS_DEFAULT_LINK_COLOR"));
+    ColorOption(current_page, 0, "ui.font.link.rollover.color",    UserString("OPTIONS_ROLLOVER_LINK_COLOR"));
+    ColorOption(current_page, 0, "ui.font.tooltip.color",          UserString("OPTIONS_DEFAULT_TOOLTIP_COLOR"));
+    ColorOption(current_page, 0, "ui.font.tooltip.rollover.color", UserString("OPTIONS_ROLLOVER_TOOLTIP_COLOR"));
 
     CreateSectionHeader(current_page, 0,                        UserString("OPTIONS_WINDOW_COLORS"));
     ColorOption(current_page, 0, "ui.window.background.color",  UserString("OPTIONS_FILL_COLOR"));
@@ -708,8 +713,8 @@ void OptionsWnd::CompleteConstruction() {
     BoolOption(current_page, 0, "save.auto.turn.multiplayer.start.enabled", UserString("OPTIONS_DB_AUTOSAVE_MULTIPLAYER_TURN_START"));
     IntOption(current_page,  0, "save.auto.turn.interval", UserString("OPTIONS_AUTOSAVE_TURNS_BETWEEN"));
     IntOption(current_page,  0, "save.auto.file.limit",     UserString("OPTIONS_AUTOSAVE_LIMIT"));
-    BoolOption(current_page, 0, "save.auto.initial.enabled", UserString("OPTIONS_DB_AUTOSAVE_GALAXY_CREATION"));
-    BoolOption(current_page, 0, "save.auto.exit.enabled",   UserString("OPTIONS_DB_AUTOSAVE_GAME_CLOSE"));
+    BoolOption(current_page, 0, "save.auto.initial.enabled", UserString("OPTIONS_AUTOSAVE_GALAXY_CREATION"));
+    BoolOption(current_page, 0, "save.auto.exit.enabled",   UserString("OPTIONS_AUTOSAVE_GAME_CLOSE"));
     PathDisplay(current_page, 0, UserString("OPTIONS_FOLDER_SAVE"), GetUserDataDir());
     m_tabs->SetCurrentWnd(0);
 
@@ -738,8 +743,8 @@ void OptionsWnd::CompleteConstruction() {
     for (const auto& sink : log_file_sinks) {
         const auto& option = std::get<0>(sink);
         const auto& option_label = std::get<1>(sink);
-        const auto&& full_label = str(FlexibleFormat(UserString("OPTIONS_DB_UI_LOGGER_PER_PROCESS_GENERAL")) % option_label);
-        LoggerLevelOption(*current_page, true, full_label, option);
+        const auto full_label = str(FlexibleFormat(UserString("OPTIONS_DB_UI_LOGGER_PER_PROCESS_GENERAL")) % option_label);
+        LoggerLevelOption(*current_page, true, std::move(full_label), option);
     }
 
     const auto log_file_sources = LoggerOptionsLabelsAndLevels(LoggerTypes::named);
@@ -751,15 +756,15 @@ void OptionsWnd::CompleteConstruction() {
 
     // Misc
     current_page = CreatePage(UserString("OPTIONS_PAGE_MISC"));
-    IntOption(current_page, 0, "effects.ui.threads",        UserString("OPTIONS_EFFECTS_THREADS_UI"));
-    IntOption(current_page, 0, "effects.server.threads",    UserString("OPTIONS_EFFECTS_THREADS_SERVER"));
-    IntOption(current_page, 0, "effects.ai.threads",        UserString("OPTIONS_EFFECTS_THREADS_AI"));
-    BoolOption(current_page, 0, "resource.shipdesign.saved.enabled",    UserString("OPTIONS_ADD_SAVED_DESIGNS"));
+    IntOption(current_page, 0, "effects.ui.threads",                UserString("OPTIONS_EFFECTS_THREADS_UI"));
+    IntOption(current_page, 0, "effects.server.threads",            UserString("OPTIONS_EFFECTS_THREADS_SERVER"));
+    IntOption(current_page, 0, "effects.ai.threads",                UserString("OPTIONS_EFFECTS_THREADS_AI"));
+    BoolOption(current_page, 0, "resource.shipdesign.saved.enabled",UserString("OPTIONS_ADD_SAVED_DESIGNS"));
     //BoolOption(current_page, 0, "resource.shipdesign.default.enabled",  UserString("OPTIONS_ADD_DEFAULT_DESIGNS"));   // hidden due to issues with implementation when not enabled preventing designs from being added or recreated
-    BoolOption(current_page, 0, "save.format.binary.enabled",    UserString("OPTIONS_USE_BINARY_SERIALIZATION"));
-    BoolOption(current_page, 0, "save.format.xml.zlib.enabled", UserString("OPTIONS_USE_XML_ZLIB_SERIALIZATION"));
-    BoolOption(current_page, 0, "ui.map.sitrep.invalid.shown", UserString("OPTIONS_VERBOSE_SITREP_DESC"));
-    BoolOption(current_page, 0, "effects.accounting.enabled", UserString("OPTIONS_EFFECT_ACCOUNTING"));
+    BoolOption(current_page, 0, "save.format.binary.enabled",       UserString("OPTIONS_USE_BINARY_SERIALIZATION"));
+    BoolOption(current_page, 0, "save.format.xml.zlib.enabled",     UserString("OPTIONS_USE_XML_ZLIB_SERIALIZATION"));
+    BoolOption(current_page, 0, "ui.map.sitrep.invalid.shown",      UserString("OPTIONS_VERBOSE_SITREP_DESC"));
+    BoolOption(current_page, 0, "effects.accounting.enabled",       UserString("OPTIONS_EFFECT_ACCOUNTING"));
 
     // Create full state config button
     auto all_config_button = GG::Wnd::Create<CUIButton>(UserString("OPTIONS_WRITE_ALL_CONFIG"));
@@ -836,9 +841,10 @@ GG::Rect OptionsWnd::CalculatePosition() const {
 
 GG::ListBox* OptionsWnd::CreatePage(const std::string& name) {
     auto page = GG::Wnd::Create<OptionsList>();
-    m_tabs->AddWnd(page, name);
+    auto* raw_ptr = page.get();
+    m_tabs->AddWnd(std::move(page), name);
     m_tabs->SetCurrentWnd(m_tabs->NumWnds() - 1);
-    return page.get();
+    return raw_ptr;
 }
 
 void OptionsWnd::CreateSectionHeader(GG::ListBox* page, int indentation_level,
@@ -848,18 +854,22 @@ void OptionsWnd::CreateSectionHeader(GG::ListBox* page, int indentation_level,
     auto heading_text = GG::Wnd::Create<CUILabel>(name, GG::FORMAT_LEFT | GG::FORMAT_NOWRAP);
     heading_text->SetFont(ClientUI::GetFont(ClientUI::Pts() * 4 / 3));
 
-    auto row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH, heading_text->MinUsableSize().y + LAYOUT_MARGIN + 6,
-                                               heading_text, indentation_level);
+    auto heading_min_sz_y{heading_text->MinUsableSize().y};
+    auto row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH,
+                                               heading_min_sz_y + LAYOUT_MARGIN + 6,
+                                               std::move(heading_text), indentation_level);
 
     if (!tooltip.empty()) {
         row->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
         row->SetBrowseText(tooltip);
     }
 
-    page->Insert(row);
+    page->Insert(std::move(row));
 }
 
-GG::StateButton* OptionsWnd::BoolOption(GG::ListBox* page, int indentation_level, const std::string& option_name, const std::string& text) {
+GG::StateButton* OptionsWnd::BoolOption(GG::ListBox* page, int indentation_level,
+                                        const std::string& option_name, const std::string& text)
+{
     auto button = GG::Wnd::Create<CUIStateButton>(text, GG::FORMAT_LEFT, std::make_shared<CUICheckBoxRepresenter>());
     auto row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH, button->MinUsableSize().y + LAYOUT_MARGIN + 6,
                                                button, indentation_level);
@@ -877,7 +887,7 @@ namespace {
         std::pair<GG::Key, GG::Flags<GG::ModKey>> kp = KeyPressCatcher::GetKeypress();
 
         // abort of escape was pressed...
-        if (kp.first == GG::GGK_ESCAPE)
+        if (kp.first == GG::Key::GGK_ESCAPE)
             return;
 
         // check if pressed key is different from existing setting...
@@ -954,7 +964,7 @@ GG::Spin<int>* OptionsWnd::IntOption(GG::ListBox* page, int indentation_level, c
     layout->Add(text_control, 0, 1, GG::ALIGN_VCENTER | GG::ALIGN_LEFT);
     layout->SetMinimumColumnWidth(0, SPIN_WIDTH);
     layout->SetColumnStretch(1, 1.0);
-    layout->SetChildClippingMode(ClipToClient);
+    layout->SetChildClippingMode(ChildClippingMode::ClipToClient);
 
     auto row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH, spin->MinUsableSize().y, layout, indentation_level);
     page->Insert(row);
@@ -991,7 +1001,7 @@ GG::Spin<double>* OptionsWnd::DoubleOption(GG::ListBox* page, int indentation_le
     layout->Add(text_control, 0, 1, GG::ALIGN_VCENTER | GG::ALIGN_LEFT);
     layout->SetMinimumColumnWidth(0, SPIN_WIDTH);
     layout->SetColumnStretch(1, 1.0);
-    layout->SetChildClippingMode(ClipToClient);
+    layout->SetChildClippingMode(ChildClippingMode::ClipToClient);
 
     auto row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH, spin->MinUsableSize().y, layout, indentation_level);
     page->Insert(row);
@@ -1007,19 +1017,23 @@ GG::Spin<double>* OptionsWnd::DoubleOption(GG::ListBox* page, int indentation_le
 
 void OptionsWnd::MusicVolumeOption(GG::ListBox* page, int indentation_level, SoundOptionsFeedback &fb) {
     auto row = GG::Wnd::Create<GG::ListBox::Row>();
-    auto button = GG::Wnd::Create<CUIStateButton>(UserString("OPTIONS_MUSIC"), GG::FORMAT_LEFT, std::make_shared<CUICheckBoxRepresenter>());
+    auto button = GG::Wnd::Create<CUIStateButton>(UserString("OPTIONS_MUSIC"), GG::FORMAT_LEFT,
+                                                  std::make_shared<CUICheckBoxRepresenter>());
     button->Resize(button->MinUsableSize());
     button->SetCheck(GetOptionsDB().Get<bool>("audio.music.enabled"));
-    std::shared_ptr<const RangedValidator<int>> validator = std::dynamic_pointer_cast<const RangedValidator<int>>(GetOptionsDB().GetValidator("audio.music.volume"));
+    auto validator = std::dynamic_pointer_cast<const RangedValidator<int>>(
+        GetOptionsDB().GetValidator("audio.music.volume"));
     assert(validator);
-    auto slider = GG::Wnd::Create<CUISlider<int>>(validator->m_min, validator->m_max, GG::HORIZONTAL);
+    auto slider = GG::Wnd::Create<CUISlider<int>>(validator->m_min, validator->m_max,
+                                                  GG::Orientation::HORIZONTAL);
     slider->SlideTo(GetOptionsDB().Get<int>("audio.music.volume"));
     auto layout = GG::Wnd::Create<GG::Layout>(GG::X0, GG::Y0, GG::X1, GG::Y1, 1, 2, 0, 5);
     layout->Add(button, 0, 0);
     layout->Add(slider, 0, 1);
     row->Resize(GG::Pt(ROW_WIDTH, std::max(button->MinUsableSize().y, slider->MinUsableSize().y) + 6));
-    row->push_back(GG::Wnd::Create<RowContentsWnd>(row->Width(), row->Height(), layout, indentation_level));
-    page->Insert(row);
+    row->push_back(GG::Wnd::Create<RowContentsWnd>(row->Width(), row->Height(),
+                                                   std::move(layout), indentation_level));
+    page->Insert(std::move(row));
     button->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
     button->SetBrowseText(UserString(GetOptionsDB().GetDescription("audio.music.enabled")));
     slider->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
@@ -1042,16 +1056,18 @@ void OptionsWnd::VolumeOption(GG::ListBox* page, int indentation_level, const st
     auto button = GG::Wnd::Create<CUIStateButton>(text, GG::FORMAT_LEFT, std::make_shared<CUICheckBoxRepresenter>());
     button->Resize(button->MinUsableSize());
     button->SetCheck(toggle_value);
-    std::shared_ptr<const RangedValidator<int>> validator = std::dynamic_pointer_cast<const RangedValidator<int>>(GetOptionsDB().GetValidator(volume_option_name));
+    auto validator = std::dynamic_pointer_cast<const RangedValidator<int>>(GetOptionsDB().GetValidator(volume_option_name));
     assert(validator);
-    auto slider = GG::Wnd::Create<CUISlider<int>>(validator->m_min, validator->m_max, GG::HORIZONTAL);
+    auto slider = GG::Wnd::Create<CUISlider<int>>(validator->m_min, validator->m_max,
+                                                  GG::Orientation::HORIZONTAL);
     slider->SlideTo(GetOptionsDB().Get<int>(volume_option_name));
     auto layout = GG::Wnd::Create<GG::Layout>(GG::X0, GG::Y0, GG::X1, GG::Y1, 1, 2, 0, 5);
     layout->Add(button, 0, 0);
     layout->Add(slider, 0, 1);
     row->Resize(GG::Pt(ROW_WIDTH, std::max(button->MinUsableSize().y, slider->MinUsableSize().y) + 6));
-    row->push_back(GG::Wnd::Create<RowContentsWnd>(row->Width(), row->Height(), layout, indentation_level));
-    page->Insert(row);
+    row->push_back(GG::Wnd::Create<RowContentsWnd>(row->Width(), row->Height(),
+                                                   std::move(layout), indentation_level));
+    page->Insert(std::move(row));
     button->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
     button->SetBrowseText(UserString(GetOptionsDB().GetDescription(toggle_option_name)));
     slider->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
@@ -1084,8 +1100,9 @@ void OptionsWnd::PathDisplay(GG::ListBox* page, int indentation_level, const std
     layout->SetColumnStretch(0, 0.5);
     layout->SetColumnStretch(1, 1.0);
 
-    auto row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH, layout->Height() + 6, layout, indentation_level);
-    page->Insert(row);
+    auto row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH, layout->Height() + 6, layout,
+                                               indentation_level);
+    page->Insert(std::move(row));
 }
 
 void OptionsWnd::FileOptionImpl(GG::ListBox* page, int indentation_level, const std::string& option_name,
@@ -1116,8 +1133,9 @@ void OptionsWnd::FileOptionImpl(GG::ListBox* page, int indentation_level, const 
     layout->SetColumnStretch(1, 1.0);
     layout->SetColumnStretch(2, 0.0);
 
-    auto row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH, layout->Height() + 6, layout, indentation_level);
-    page->Insert(row);
+    auto row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH, layout->Height() + 6, layout,
+                                               indentation_level);
+    page->Insert(std::move(row));
 
     edit->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
     edit->SetBrowseText(UserString(GetOptionsDB().GetDescription(option_name)));
@@ -1398,7 +1416,7 @@ OptionsWnd::~OptionsWnd()
 void OptionsWnd::KeyPress(GG::Key key, std::uint32_t key_code_point,
                           GG::Flags<GG::ModKey> mod_keys)
 {
-    if (key == GG::GGK_ESCAPE || key == GG::GGK_RETURN || key == GG::GGK_KP_ENTER) // Same behaviour as if "done" was pressed
+    if (key == GG::Key::GGK_ESCAPE || key == GG::Key::GGK_RETURN || key == GG::Key::GGK_KP_ENTER) // Same behaviour as if "done" was pressed
         DoneClicked();
 }
 

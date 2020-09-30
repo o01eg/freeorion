@@ -8,8 +8,9 @@ FO_COMMON_API extern const int ALL_EMPIRES;
 namespace {
     void AddRules(GameRules& rules) {
         // determine if diplomacy allowed
-        rules.Add<std::string>("RULE_DIPLOMACY", "RULE_DIPLOMACY_DESC",
-                               "MULTIPLAYER", "RULE_DIPLOMACY_ALLOWED_FOR_ALL", true,
+        rules.Add<std::string>(UserStringNop("RULE_DIPLOMACY"), UserStringNop("RULE_DIPLOMACY_DESC"),
+                               UserStringNop("MULTIPLAYER"), UserStringNop("RULE_DIPLOMACY_ALLOWED_FOR_ALL"),
+                               true,
                                DiscreteValidator<std::string>(std::set<std::string>({
                                    "RULE_DIPLOMACY_ALLOWED_FOR_ALL",
                                    "RULE_DIPLOMACY_FORBIDDEN_FOR_ALL"
@@ -66,7 +67,7 @@ bool DiplomaticMessage::IsAllowed() const {
 DiplomaticStatusUpdateInfo::DiplomaticStatusUpdateInfo() :
     empire1_id(ALL_EMPIRES),
     empire2_id(ALL_EMPIRES),
-    diplo_status(INVALID_DIPLOMATIC_STATUS)
+    diplo_status(DiplomaticStatus::INVALID_DIPLOMATIC_STATUS)
 {}
 
 DiplomaticStatusUpdateInfo::DiplomaticStatusUpdateInfo(int empire1_id_, int empire2_id_, DiplomaticStatus status) :

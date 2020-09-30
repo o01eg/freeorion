@@ -1,44 +1,28 @@
-// -*- C++ -*-
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-/** \file Wnd.h \brief Contains the Wnd class, upon which all GG GUI elements
-    are based. */
+//! @file GG/Wnd.h
+//!
+//! Contains the Wnd class, upon which all GG GUI elements are based.
 
 #ifndef _GG_Wnd_h_
 #define _GG_Wnd_h_
 
+
+#include <list>
+#include <memory>
+#include <set>
+#include <vector>
+#include <boost/signals2/trackable.hpp>
 #include <GG/Base.h>
 #include <GG/Exception.h>
 #include <GG/Flags.h>
-
-#include <boost/signals2/trackable.hpp>
-
-#include <list>
-#include <set>
-#include <vector>
-#include <memory>
 
 
 namespace GG {
@@ -312,7 +296,7 @@ public:
     typedef std::map<const Wnd*, bool>::iterator DropsAcceptableIter;
 
     /** The modes of child clipping. */
-    enum ChildClippingMode : int {
+    enum class ChildClippingMode : int {
         /** No child clipping is performed. */
         DontClip,
 
@@ -572,7 +556,7 @@ public:
 
     /** Sets a name for this Wnd.  This name is not used by GG in any way; it
         only exists for user convenience. */
-    void SetName(const std::string& name);
+    void SetName(std::string name);
 
     /** Suppresses rendering of this window (and possibly its children) during
         render loop. */
@@ -641,6 +625,7 @@ public:
 
     /** Adds \a wnd to the front of the event filtering chain. */
     void InstallEventFilter(const std::shared_ptr<Wnd>& wnd);
+    void InstallEventFilter(std::shared_ptr<Wnd>&& wnd);
 
     /** Removes \a wnd from the filter chain. */
     void RemoveEventFilter(const std::shared_ptr<Wnd>& wnd);
@@ -663,6 +648,7 @@ public:
     /** Sets \a layout as the layout for the window.  Removes any current
         layout which may exist, and deletes all client-area child windows. */
     void SetLayout(const std::shared_ptr<Layout>& layout);
+    void SetLayout(std::shared_ptr<Layout>&& layout);
 
     /** Removes the window's layout, handing ownership of all its children
         back to the window, with the sizes and positions they had before the
@@ -725,7 +711,7 @@ public:
     /** Sets the Wnd that is used to show browse info about this Wnd in the
         browse info mode \a mode.  \throw std::out_of_range May throw
         std::out_of_range if \a mode is not a valid browse mode. */
-    void SetBrowseInfoWnd(const std::shared_ptr<BrowseInfoWnd>& wnd, std::size_t mode = 0);
+    void SetBrowseInfoWnd(std::shared_ptr<BrowseInfoWnd> wnd, std::size_t mode = 0);
 
     /** Removes the Wnd that is used to show browse info about this Wnd in the
         browse info mode \a mode (but does nothing to the mode itself).
@@ -737,7 +723,7 @@ public:
         specified color and border color which contains the specified text.
         \throw std::out_of_range May throw std::out_of_range if \a mode is not
         a valid browse mode. */
-    void SetBrowseText(const std::string& text, std::size_t mode = 0);
+    void SetBrowseText(std::string text, std::size_t mode = 0);
 
     /** Sets the browse modes for the Wnd, including time cutoffs (in
         milliseconds), the BrowseInfoWnds to be displayed for each browse info
@@ -746,10 +732,10 @@ public:
         corresponding Wnd is shown superimposed over this Wnd and its
         children.  Set the first time cutoff to 0 for immediate browse info
         display. */
-    void SetBrowseModes(const std::vector<BrowseInfoMode>& modes);
+    void SetBrowseModes(std::vector<BrowseInfoMode> modes);
 
     /** Sets the currently-installed style factory. */
-    void SetStyleFactory(const std::shared_ptr<StyleFactory>& factory);
+    void SetStyleFactory(std::shared_ptr<StyleFactory> factory);
 
     /** Returns the single time to place in the browse modes during Wnd
         construction. */
@@ -766,7 +752,7 @@ public:
 
     /** Sets the single BrowseInfoWnd to place in the browse modes during Wnd
         construction. */
-    static void SetDefaultBrowseInfoWnd(const std::shared_ptr<BrowseInfoWnd>& browse_info_wnd);
+    static void SetDefaultBrowseInfoWnd(std::shared_ptr<BrowseInfoWnd> browse_info_wnd);
 
     /** The base class for Wnd exceptions. */
     GG_ABSTRACT_EXCEPTION(Exception);
@@ -786,7 +772,7 @@ protected:
     /** The states a Wnd may be in, with respect to drag-and-drop operations.
         Wnds may wish to consider the current state when rendering to provide
         visual feedback to the user. */
-    enum DragDropRenderingState : int {
+    enum class DragDropRenderingState : int {
         /** No drag-and-drop is taking place at all with this Wnd. */
         NOT_DRAGGED,
 
@@ -991,7 +977,7 @@ protected:
         GetChildClippingMode() is ClipToClientAndWindowSeparately. */
     void EndNonclientClipping();
 
-    virtual void SetParent(const std::shared_ptr<Wnd>& wnd);
+    virtual void SetParent(std::shared_ptr<Wnd> wnd);
 
     /** Modal Wnd's set this to true to stop modal loop. */
     bool m_done = false;
@@ -1003,16 +989,18 @@ private:
     virtual void BeginNonclientClippingImpl();
     virtual void EndNonclientClippingImpl();
 
+protected:
     /** Code common to DetachChild and DetachChildren. */
-    void DetachChildCore(Wnd* wnd);
+    virtual void DetachChildCore(Wnd* wnd);
 
+private:
     /// m_parent may be expired or null if there is no parent.  m_parent will reset itself if expired.
     mutable std::weak_ptr<Wnd>      m_parent;
-    std::string                     m_name = "";                ///< A user-significant name for this Wnd
+    std::string                     m_name;                     ///< A user-significant name for this Wnd
     std::list<std::shared_ptr<Wnd>> m_children;                 ///< List of ptrs to child windows kept in order of decreasing area
     bool                            m_visible = true;
     bool                            m_needs_prerender = false;  ///< Indicates if Wnd needs a PreRender();
-    std::string                     m_drag_drop_data_type = ""; ///< The type of drag-and-drop data this Wnd represents, if any. If empty/blank, indicates that this Wnd cannot be drag-dropped.
+    std::string                     m_drag_drop_data_type;      ///< The type of drag-and-drop data this Wnd represents, if any. If empty/blank, indicates that this Wnd cannot be drag-dropped.
     ChildClippingMode               m_child_clipping_mode;
     bool                            m_non_client_child = false;
     Pt                              m_upperleft;                ///< Upper left point of window
@@ -1051,5 +1039,6 @@ private:
 };
 
 }
+
 
 #endif

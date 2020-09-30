@@ -9,6 +9,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <cstdlib>
+#include <mutex>
 
 #if defined(FREEORION_MACOSX)
 #  include <iostream>
@@ -95,13 +96,13 @@ namespace {
             return;
 
         std::stringstream msg;
-        msg << "Freeorion added support for the XDG Base Directory Specification." << std::endl << std::endl
-            << "Configuration files and data were migrated from:" << std::endl
-            << old_path << std::endl << std::endl
-            << "Configuration were files copied to:" << std::endl << config_path << std::endl << std::endl
-            << "Data Files were copied to:" << std::endl << data_path << std::endl << std::endl
-            << "If your save.path option in persistent_config.xml was ~/.config, then you need to update it."
-            << std::endl;
+        msg << "Freeorion added support for the XDG Base Directory Specification.\n\n"
+            << "Configuration files and data were migrated from:\n"
+            << old_path << "\n\n"
+            << "Configuration were files copied to:\n" 
+            << config_path << "\n\n"
+            << "Data Files were copied to:\n" << data_path << "\n\n"
+            << "If your save.path option in persistent_config.xml was ~/.config, then you need to update it.\n";
 
         try {
             fs::create_directories(config_path);
@@ -137,15 +138,17 @@ namespace {
             }
 
             fs::ofstream msg_file(old_path / "MIGRATION.README");
-            msg_file << msg.str() << std::endl
-                     << "You can delete this file it is a one time message." << std::endl << std::endl;
+            msg_file << msg.str() << "\n"
+                     << "You can delete this file it is a one time message.\n\n";
 
         } catch(fs::filesystem_error const & e) {
-            std::cerr << "Error: Unable to migrate files from old config dir" << std::endl
-                      << old_path << std::endl
-                      << " to new XDG specified config dir" << std::endl << config_path << std::endl
-                      << " and data dir" << std::endl << data_path << std::endl
-                      << " because " << e.what()  << std::endl;
+            std::cerr << "Error: Unable to migrate files from old config dir\n"
+                      << old_path << "\n"
+                      << " to new XDG specified config dir\n"
+                      << config_path << "\n"
+                      << " and data dir\n"
+                      << data_path << "\n"
+                      << " because " << e.what() << "\n";
             throw;
         }
 
@@ -157,16 +160,16 @@ namespace {
 auto PathTypeToString(PathType path_type) -> std::string const&
 {
     switch (path_type) {
-        case PATH_BINARY:       return PATH_BINARY_STR;
-        case PATH_RESOURCE:     return PATH_RESOURCE_STR;
-        case PATH_PYTHON:       return PATH_PYTHON_STR;
-        case PATH_DATA_ROOT:    return PATH_DATA_ROOT_STR;
-        case PATH_DATA_USER:    return PATH_DATA_USER_STR;
-        case PATH_CONFIG:       return PATH_CONFIG_STR;
-        case PATH_SAVE:         return PATH_SAVE_STR;
-        case PATH_TEMP:         return PATH_TEMP_STR;
-        case PATH_INVALID:      return PATH_INVALID_STR;
-        default:                return EMPTY_STRING;
+        case PathType::PATH_BINARY:    return PATH_BINARY_STR;
+        case PathType::PATH_RESOURCE:  return PATH_RESOURCE_STR;
+        case PathType::PATH_PYTHON:    return PATH_PYTHON_STR;
+        case PathType::PATH_DATA_ROOT: return PATH_DATA_ROOT_STR;
+        case PathType::PATH_DATA_USER: return PATH_DATA_USER_STR;
+        case PathType::PATH_CONFIG:    return PATH_CONFIG_STR;
+        case PathType::PATH_SAVE:      return PATH_SAVE_STR;
+        case PathType::PATH_TEMP:      return PATH_TEMP_STR;
+        case PathType::PATH_INVALID:   return PATH_INVALID_STR;
+        default:                       return EMPTY_STRING;
     }
 }
 
@@ -174,13 +177,16 @@ auto PathTypeStrings() -> std::vector<std::string> const&
 {
     static std::vector<std::string> path_type_list;
     if (path_type_list.empty()) {
-        for (auto path_type = PathType(0); path_type < PATH_INVALID; path_type = PathType(path_type + 1)) {
+        path_type_list.reserve(10); // should be enough
+        for (auto path_type = PathType(0); path_type < PathType::PATH_INVALID;
+             path_type = PathType(int(path_type) + 1))
+        {
             // PATH_PYTHON is only valid for FREEORION_WIN32 or FREEORION_MACOSX
 #if defined(FREEORION_LINUX)
-            if (path_type == PATH_PYTHON)
+            if (path_type == PathType::PATH_PYTHON)
                 continue;
 #endif
-            path_type_list.push_back(PathTypeToString(path_type));
+            path_type_list.emplace_back(PathTypeToString(path_type));
         }
     }
     return path_type_list;
@@ -258,7 +264,6 @@ void InitBinDir(std::string const& argv0)
     // no binary directory setup required.
 #endif
 }
-
 
 void InitDirs(std::string const& argv0)
 {
@@ -367,7 +372,6 @@ void InitDirs(std::string const& argv0)
     g_initialized = true;
 }
 
-
 auto GetUserConfigDir() -> fs::path const
 {
 #if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32)
@@ -379,7 +383,6 @@ auto GetUserConfigDir() -> fs::path const
     return p;
 #endif
 }
-
 
 auto GetUserDataDir() -> fs::path const
 {
@@ -397,7 +400,6 @@ auto GetUserDataDir() -> fs::path const
     return p;
 #endif
 }
-
 
 auto GetRootDataDir() -> fs::path const
 {
@@ -423,7 +425,6 @@ auto GetRootDataDir() -> fs::path const
 #endif
 }
 
-
 auto GetBinDir() -> fs::path const
 {
 #if defined(FREEORION_MACOSX)
@@ -441,7 +442,6 @@ auto GetBinDir() -> fs::path const
 #endif
 }
 
-
 #if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32)
 auto GetPythonHome() -> fs::path const
 {
@@ -454,7 +454,6 @@ auto GetPythonHome() -> fs::path const
 #endif
 }
 #endif
-
 
 void CompleteXDGMigration()
 {
@@ -469,20 +468,34 @@ void CompleteXDGMigration()
     }
 }
 
+namespace {
+    std::mutex res_dir_mutex;
+    bool init = true;
+    fs::path res_dir;
+
+    void RefreshResDir() {
+        std::lock_guard<std::mutex> res_dir_lock(res_dir_mutex);
+        // if resource dir option has been set, use specified location. otherwise,
+        // use default location
+        res_dir = FilenameToPath(GetOptionsDB().Get<std::string>("resource.path"));
+        if (!fs::exists(res_dir) || !fs::is_directory(res_dir))
+            res_dir = FilenameToPath(GetOptionsDB().GetDefault<std::string>("resource.path"));
+        DebugLogger() << "Refreshed ResDir";
+    }
+}
+
 auto GetResourceDir() -> fs::path const
 {
-    // if resource dir option has been set, use specified location. otherwise,
-    // use default location
-    std::string options_resource_dir = GetOptionsDB().Get<std::string>("resource.path");
-    fs::path dir = FilenameToPath(options_resource_dir);
-    if (fs::exists(dir) && fs::is_directory(dir))
-        return dir;
-
-    dir = GetOptionsDB().GetDefault<std::string>("resource.path");
-    if (!fs::is_directory(dir) || !fs::exists(dir))
-        dir = FilenameToPath(GetOptionsDB().GetDefault<std::string>("resource.path"));
-
-    return dir;
+    std::lock_guard<std::mutex> res_dir_lock(res_dir_mutex);
+    if (init) {
+        init = false;
+        res_dir = FilenameToPath(GetOptionsDB().Get<std::string>("resource.path"));
+        if (!fs::exists(res_dir) || !fs::is_directory(res_dir))
+            res_dir = FilenameToPath(GetOptionsDB().GetDefault<std::string>("resource.path"));
+        GetOptionsDB().OptionChangedSignal("resource.path").connect(&RefreshResDir);
+        TraceLogger() << "Initialized ResDir and connected change signal";
+    }
+    return res_dir;
 }
 
 auto GetConfigPath() -> fs::path const
@@ -542,6 +555,7 @@ auto FilenameToPath(std::string const& path_str) -> fs::path
 #if defined(FREEORION_WIN32)
     // convert UTF-8 directory string to UTF-16
     fs::path::string_type directory_native;
+    directory_native.reserve(path_str.size());
     utf8::utf8to16(path_str.begin(), path_str.end(), std::back_inserter(directory_native));
 #if (BOOST_VERSION >= 106300)
     return fs::path(directory_native).generic_path();
@@ -558,6 +572,7 @@ auto PathToString(fs::path const& path) -> std::string
 #if defined(FREEORION_WIN32)
     fs::path::string_type native_string = path.generic_wstring();
     std::string retval;
+    retval.reserve(native_string.length()); // may be underestimate
     utf8::utf16to8(native_string.begin(), native_string.end(), std::back_inserter(retval));
     return retval;
 #else // defined(FREEORION_WIN32)
@@ -607,7 +622,7 @@ auto ListDir(const fs::path& path, std::function<bool (const fs::path&)> predica
              dir_it != fs::recursive_directory_iterator(); ++dir_it)
         {
             if (predicate(dir_it->path()))
-                retval.push_back(dir_it->path());
+                retval.emplace_back(dir_it->path());
             else
                 TraceLogger() << "ListDir: Discarding non-matching path: " << PathToString(dir_it->path());
         }
@@ -650,25 +665,25 @@ auto IsInDir(fs::path const& dir, fs::path const& test_dir) -> bool
 auto GetPath(PathType path_type) -> fs::path
 {
     switch (path_type) {
-    case PATH_BINARY:
+    case PathType::PATH_BINARY:
         return GetBinDir();
-    case PATH_RESOURCE:
+    case PathType::PATH_RESOURCE:
         return GetResourceDir();
-    case PATH_DATA_ROOT:
+    case PathType::PATH_DATA_ROOT:
         return GetRootDataDir();
-    case PATH_DATA_USER:
+    case PathType::PATH_DATA_USER:
         return GetUserDataDir();
-    case PATH_CONFIG:
+    case PathType::PATH_CONFIG:
         return GetUserConfigDir();
-    case PATH_SAVE:
+    case PathType::PATH_SAVE:
         return GetSaveDir();
-    case PATH_TEMP:
+    case PathType::PATH_TEMP:
         return fs::temp_directory_path();
-    case PATH_PYTHON:
+    case PathType::PATH_PYTHON:
 #if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32)
         return GetPythonHome();
 #endif
-    case PATH_INVALID:
+    case PathType::PATH_INVALID:
     default:
         ErrorLogger() << "Invalid path type " << path_type;
         return fs::temp_directory_path();

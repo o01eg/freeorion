@@ -95,7 +95,7 @@ LogLevel to_LogLevel(const std::string& text) {
 }
 
 std::unordered_map<std::string, LogLevel> ValidNameToLogLevel() {
-    std::unordered_map<std::string, LogLevel> retval{};
+    std::unordered_map<std::string, LogLevel> retval;
 
     for (int ii = static_cast<int>(LogLevel::min); ii <= static_cast<int>(LogLevel::max); ++ii) {
         auto log_level = static_cast<LogLevel>(ii);
@@ -110,7 +110,7 @@ std::unordered_map<std::string, LogLevel> ValidNameToLogLevel() {
         // Insert the upper case
         std::transform(name.begin(), name.end(), name.begin(),
                        [](const char c) { return std::toupper(c); });
-        retval.emplace(name, log_level);
+        retval.emplace(std::move(name), log_level);
     }
     return retval;
 }
@@ -221,8 +221,9 @@ namespace {
             std::lock_guard<std::mutex> lock(m_mutex);
 
             std::vector<std::string> retval;
+            retval.reserve(m_names_to_front_ends.size());
             for (const auto& name_and_frontend : m_names_to_front_ends)
-                retval.push_back(name_and_frontend.first);
+                retval.emplace_back(name_and_frontend.first);
             return retval;
         }
 

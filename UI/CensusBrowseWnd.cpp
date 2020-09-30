@@ -35,7 +35,8 @@ public:
         m_show_icon(show_icon)
     {
         if (m_show_icon)
-            m_icon = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::SpeciesIcon(name), GG::GRAPHIC_FITGRAPHIC);
+            m_icon = GG::Wnd::Create<GG::StaticGraphic>(
+                ClientUI::SpeciesIcon(name), GG::GRAPHIC_FITGRAPHIC);
 
         m_name = GG::Wnd::Create<CUILabel>(UserString(name), GG::FORMAT_RIGHT);
 
@@ -48,7 +49,7 @@ public:
     void CompleteConstruction() override {
         GG::Control::CompleteConstruction();
 
-        SetChildClippingMode(ClipToClient);
+        SetChildClippingMode(ChildClippingMode::ClipToClient);
 
         if (m_show_icon)
             AttachChild(m_icon);
@@ -119,18 +120,20 @@ private:
     bool                                m_show_icon;
 };
 
-CensusBrowseWnd::CensusBrowseWnd(const std::string& title_text, const std::map<std::string, float>& population_counts,
-                                 const std::map<std::string, float>& tag_counts, const std::vector<std::string>& census_order) :
+CensusBrowseWnd::CensusBrowseWnd(std::string title_text,
+                                 std::map<std::string, float> population_counts,
+                                 std::map<std::string, float> tag_counts,
+                                 std::vector<std::string> census_order) :
     GG::BrowseInfoWnd(GG::X0, GG::Y0, BrowseTextWidth(), GG::Y1),
-    m_title_text(GG::Wnd::Create<CUILabel>(title_text, GG::FORMAT_LEFT)),
+    m_title_text(GG::Wnd::Create<CUILabel>(std::move(title_text), GG::FORMAT_LEFT)),
     m_species_text(GG::Wnd::Create<CUILabel>(UserString("CENSUS_SPECIES_HEADER"), GG::FORMAT_BOTTOM)),
     m_list(GG::Wnd::Create<CUIListBox>()),
     m_tags_text(GG::Wnd::Create<CUILabel>(UserString("CENSUS_TAG_HEADER"), GG::FORMAT_BOTTOM)),
     m_tags_list(GG::Wnd::Create<CUIListBox>()),
     m_offset(GG::X0, ICON_BROWSE_ICON_HEIGHT/2),
-    m_population_counts(population_counts),
-    m_tag_counts(tag_counts),
-    m_census_order(census_order)
+    m_population_counts(std::move(population_counts)),
+    m_tag_counts(std::move(tag_counts)),
+    m_census_order(std::move(census_order))
 {}
 
 void CensusBrowseWnd::CompleteConstruction() {
@@ -162,14 +165,15 @@ void CensusBrowseWnd::CompleteConstruction() {
     // put into multimap to sort by population, ascending
     std::multimap<float, std::string> counts_species;
     for (const auto& entry : m_population_counts)
-    { counts_species.insert({entry.second, entry.first}); }
+        counts_species.emplace(entry.second, entry.first);
     m_population_counts.clear();
 
     // add species rows
     for (auto it = counts_species.rbegin(); it != counts_species.rend(); ++it) {
         auto row = GG::Wnd::Create<GG::ListBox::Row>(m_list->Width(), ROW_HEIGHT);
         row->SetDragDropDataType("Census Species Row");
-        row->push_back(GG::Wnd::Create<CensusRowPanel>(m_list->Width(), ROW_HEIGHT, it->second, it->first, true));
+        row->push_back(GG::Wnd::Create<CensusRowPanel>(m_list->Width(), ROW_HEIGHT,
+                                                       it->second, it->first, true));
         m_list->Insert(row);
         row->Resize(GG::Pt(m_list->Width(), ROW_HEIGHT));
         top += ROW_HEIGHT;

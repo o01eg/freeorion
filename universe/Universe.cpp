@@ -12,6 +12,7 @@
 #include "FleetPlan.h"
 #include "Fleet.h"
 #include "IDAllocator.h"
+#include "NamedValueRefManager.h"
 #include "Pathfinder.h"
 #include "Planet.h"
 #include "ShipDesign.h"
@@ -75,18 +76,24 @@ namespace {
             return cores > 0 ? cores : 4;
         };
 
-        db.Add("effects.ui.threads",                UserStringNop("OPTIONS_DB_EFFECTS_THREADS_UI_DESC"),        HardwareThreads(),  RangedValidator<int>(1, 32));
-        db.Add("effects.ai.threads",                UserStringNop("OPTIONS_DB_EFFECTS_THREADS_AI_DESC"),        2,                  RangedValidator<int>(1, 32));
-        db.Add("effects.server.threads",            UserStringNop("OPTIONS_DB_EFFECTS_THREADS_SERVER_DESC"),    HardwareThreads(),  RangedValidator<int>(1, 32));
-        db.Add("effects.accounting.enabled",        UserStringNop("OPTIONS_DB_EFFECT_ACCOUNTING"),              true,               Validator<bool>());
+        db.Add("effects.ui.threads", UserStringNop("OPTIONS_DB_EFFECTS_THREADS_UI_DESC"),
+               HardwareThreads(), RangedValidator<int>(1, 32));
+        db.Add("effects.ai.threads", UserStringNop("OPTIONS_DB_EFFECTS_THREADS_AI_DESC"),
+               2, RangedValidator<int>(1, 32));
+        db.Add("effects.server.threads", UserStringNop("OPTIONS_DB_EFFECTS_THREADS_SERVER_DESC"),
+               HardwareThreads(), RangedValidator<int>(1, 32));
+        db.Add("effects.accounting.enabled", UserStringNop("OPTIONS_DB_EFFECT_ACCOUNTING"),
+               true, Validator<bool>());
     }
     bool temp_bool = RegisterOptions(&AddOptions);
 
     void AddRules(GameRules& rules) {
         // makes all PRNG be reseeded frequently
-        rules.Add<bool>("RULE_RESEED_PRNG_SERVER",  "RULE_RESEED_PRNG_SERVER_DESC",
+        rules.Add<bool>(UserStringNop("RULE_RESEED_PRNG_SERVER"),
+                        UserStringNop("RULE_RESEED_PRNG_SERVER_DESC"),
                         "", true, true);
-        rules.Add<bool>("RULE_STARLANES_EVERYWHERE","RULE_STARLANES_EVERYWHERE_DESC",
+        rules.Add<bool>(UserStringNop("RULE_STARLANES_EVERYWHERE"),
+                        UserStringNop("RULE_STARLANES_EVERYWHERE_DESC"),
                         "TEST", false, true);
     }
     bool temp_bool2 = RegisterGameRules(&AddRules);
@@ -122,8 +129,6 @@ Universe::Universe() :
     m_pathfinder(std::make_shared<Pathfinder>()),
     m_universe_width(1000.0),
     m_inhibit_universe_object_signals(false),
-    m_encoding_empire(ALL_EMPIRES),
-    m_all_objects_visible(false),
     m_object_id_allocator(new IDAllocator(ALL_EMPIRES, std::vector<int>(), INVALID_OBJECT_ID,
                                           TEMPORARY_OBJECT_ID, INVALID_OBJECT_ID)),
     m_design_id_allocator(new IDAllocator(ALL_EMPIRES, std::vector<int>(), INVALID_DESIGN_ID,
@@ -269,7 +274,7 @@ std::set<int> Universe::EmpireVisibleObjectIDs(int empire_id/* = ALL_EMPIRES*/) 
     for (const auto& obj : m_objects.all()) {
         for (int detector_empire_id : empire_ids) {
             Visibility vis = GetObjectVisibilityByEmpire(obj->ID(), detector_empire_id);
-            if (vis >= VIS_BASIC_VISIBILITY) {
+            if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
                 retval.insert(obj->ID());
                 break;
             }
@@ -345,18 +350,18 @@ const std::set<int>& Universe::EmpireKnownShipDesignIDs(int empire_id) const {
 }
 
 Visibility Universe::GetObjectVisibilityByEmpire(int object_id, int empire_id) const {
-    if (empire_id == ALL_EMPIRES || GetUniverse().AllObjectsVisible())
-        return VIS_FULL_VISIBILITY;
+    if (empire_id == ALL_EMPIRES)   // TODO: GameRule for all objects visible
+        return Visibility::VIS_FULL_VISIBILITY;
 
     auto empire_it = m_empire_object_visibility.find(empire_id);
     if (empire_it == m_empire_object_visibility.end())
-        return VIS_NO_VISIBILITY;
+        return Visibility::VIS_NO_VISIBILITY;
 
     const ObjectVisibilityMap& vis_map = empire_it->second;
 
     auto vis_map_it = vis_map.find(object_id);
     if (vis_map_it == vis_map.end())
-        return VIS_NO_VISIBILITY;
+        return Visibility::VIS_NO_VISIBILITY;
 
     return vis_map_it->second;
 }
@@ -434,7 +439,7 @@ void Universe::InsertIDCore(std::shared_ptr<UniverseObject> obj, int id) {
     }
 
     obj->SetID(id);
-    m_objects.insert(std::forward<std::shared_ptr<UniverseObject>>(obj));
+    m_objects.insert(std::move(obj));
 }
 
 bool Universe::InsertShipDesign(ShipDesign* ship_design) {
@@ -692,7 +697,7 @@ void Universe::InitMeterEstimatesAndDiscrepancies() {
         for (auto& meter_pair : obj->Meters()) {
             MeterType type = meter_pair.first;
             // skip paired active meters, as differences in these are expected and persistent, and not a "discrepancy"
-            if (type >= METER_POPULATION && type <= METER_TROOPS)
+            if (type >= MeterType::METER_POPULATION && type <= MeterType::METER_TROOPS)
                 continue;
             Meter& meter = meter_pair.second;
 
@@ -710,7 +715,8 @@ void Universe::InitMeterEstimatesAndDiscrepancies() {
             meter.AddToCurrent(discrepancy);
 
             // add discrepancy adjustment to meter accounting
-            account_map[type].emplace_back(INVALID_OBJECT_ID, ECT_UNKNOWN_CAUSE, discrepancy, meter.Current());
+            account_map[type].emplace_back(INVALID_OBJECT_ID, EffectsCauseType::ECT_UNKNOWN_CAUSE,
+                                           discrepancy, meter.Current());
 
             TraceLogger(effects) << "... ... " << type << ": " << discrepancy;
         }
@@ -829,7 +835,8 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec, boo
             const auto& meter = meter_pair.second;
             float meter_change = meter.Current() - Meter::DEFAULT_VALUE;
             if (meter_change != 0.0f)
-                account_map[type].emplace_back(INVALID_OBJECT_ID, ECT_INHERENT, meter_change, meter.Current());
+                account_map[type].emplace_back(INVALID_OBJECT_ID, EffectsCauseType::ECT_INHERENT,
+                                               meter_change, meter.Current());
         }
     }
 
@@ -877,7 +884,8 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec, boo
 
                 meter->AddToCurrent(discrepancy);
 
-                account_map[type].emplace_back(INVALID_OBJECT_ID, ECT_UNKNOWN_CAUSE, discrepancy, meter->Current());
+                account_map[type].emplace_back(INVALID_OBJECT_ID, EffectsCauseType::ECT_UNKNOWN_CAUSE,
+                                               discrepancy, meter->Current());
             }
         }
     }
@@ -927,13 +935,18 @@ namespace {
             return;
         bool scope_is_just_source = dynamic_cast<Condition::Source*>(scope);
 
-        auto message{"StoreTargetsAndCausesOfEffectsGroup < " + std::to_string(n) + " >"
-                     + "  cause type: " + boost::lexical_cast<std::string>(effect_cause_type)
-                     + "  specific cause: " + specific_cause_name
-                     + "  sources: " + std::to_string(source_objects.size())
-                     + "  scope: " + boost::algorithm::erase_all_copy(effects_group->Scope()->Dump(), "\n")};
-
-        ScopedTimer timer(message, std::chrono::milliseconds(20));
+        ScopedTimer timer(
+            [
+                n, effect_cause_type, specific_cause_name,
+                sz{source_objects.size()}, effects_group
+            ] () -> std::string
+        {
+            return "StoreTargetsAndCausesOfEffectsGroup < " + std::to_string(n) + " >"
+                + "  cause type: " + boost::lexical_cast<std::string>(effect_cause_type)
+                + "  specific cause: " + specific_cause_name
+                + "  sources: " + std::to_string(sz)
+                + "  scope: " + boost::algorithm::erase_all_copy(effects_group->Scope()->Dump(), "\n");
+        }, std::chrono::milliseconds(10));
 
         source_effects_targets_causes_out.reserve(source_objects.size());
         ScriptingContext source_context(object_map);
@@ -1044,7 +1057,8 @@ namespace {
                     rejected.reserve(source_objects.size());
                     active_sources[i] = source_objects; // copy input source objects set
                     source_context.source = nullptr;
-                    effects_group->Activation()->Eval(source_context, active_sources[i], rejected, Condition::MATCHES);
+                    effects_group->Activation()->Eval(source_context, active_sources[i],
+                                                      rejected, Condition::SearchDomain::MATCHES);
 
                 } else {
                     // need to apply separately to each source object
@@ -1273,7 +1287,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         if (source_objects.empty())
             continue;
 
-        DispatchEffectsGroupScopeEvaluations(ECT_SPECIES, species_name,
+        DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_SPECIES, species_name,
                                              source_objects, species->Effects(),
                                              only_meter_effects,
                                              m_objects, potential_targets,
@@ -1311,7 +1325,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         if (source_objects.empty())
             continue;
 
-        DispatchEffectsGroupScopeEvaluations(ECT_SPECIAL, special_name,
+        DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_SPECIAL, special_name,
                                              source_objects, special->Effects(),
                                              only_meter_effects,
                                              m_objects, potential_targets,
@@ -1326,22 +1340,22 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for TECHS";
     std::list<Condition::ObjectSet> tech_sources;   // for each empire, a set with a single source object for all its techs
     // select a source object for each empire and dispatch condition evaluations
-    for (auto& entry : Empires()) {
-        const Empire* empire = entry.second;
+    for (const auto& entry : Empires()) {
+        const auto& empire = entry.second;
         auto source = empire->Source();
         if (!source)
             continue;
 
         // unlike species and special effectsgroups, all techs for an empire have the same source object
-        tech_sources.emplace_back(Condition::ObjectSet{1U, source});
+        tech_sources.emplace_back(1U, source);
         const auto& source_objects = tech_sources.back();
 
-        for (const auto tech_entry : empire->ResearchedTechs()) {
+        for (const auto& tech_entry : empire->ResearchedTechs()) {
             const std::string& tech_name{tech_entry.first};
             const Tech* tech = GetTech(tech_name);
             if (!tech) continue;
 
-            DispatchEffectsGroupScopeEvaluations(ECT_TECH, tech_name,
+            DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_TECH, tech_name,
                                                  source_objects, tech->Effects(),
                                                  only_meter_effects,
                                                  m_objects, potential_targets,
@@ -1355,21 +1369,21 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     type_timer.EnterSection("policies");
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for POLICIES";
     std::list<Condition::ObjectSet> policy_sources; // for each empire, a set with a single source object for all its policies
-    for (auto& entry : Empires()) {
-        const Empire* empire = entry.second;
+    for (const auto& entry : Empires()) {
+        const auto& empire = entry.second;
         auto source = empire->Source();
         if (!source)
             continue;
 
         // like techs, all policies for an empire have the same source object
-        policy_sources.emplace_back(Condition::ObjectSet{1U, source});
+        policy_sources.emplace_back(1U, source);
         const auto& source_objects = policy_sources.back();
 
         for (const auto& policy_name : empire->AdoptedPolicies()) {
             const Policy* policy = GetPolicy(policy_name);
             if (!policy) continue;
 
-            DispatchEffectsGroupScopeEvaluations(ECT_POLICY, policy_name,
+            DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_POLICY, policy_name,
                                                  source_objects, policy->Effects(),
                                                  only_meter_effects,
                                                  m_objects, potential_targets,
@@ -1384,7 +1398,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for BUILDINGS";
     // determine buildings of each type in a single pass
     std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> buildings_by_type;
-    for (auto& building : m_objects.all<Building>()) {
+    for (const auto& building : m_objects.all<Building>()) {
         if (m_destroyed_object_ids.count(building->ID()))
             continue;
         const std::string& building_type_name = building->BuildingTypeName();
@@ -1407,7 +1421,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         if (source_objects.empty())
             continue;
 
-        DispatchEffectsGroupScopeEvaluations(ECT_BUILDING, building_type_name,
+        DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_BUILDING, building_type_name,
                                              source_objects, building_type->Effects(),
                                              only_meter_effects,
                                              m_objects, potential_targets,
@@ -1426,7 +1440,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> ships_by_ship_hull;
     std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> ships_by_ship_part;
 
-    for (auto& ship : m_objects.all<Ship>()) {
+    for (const auto& ship : m_objects.all<Ship>()) {
         if (m_destroyed_object_ids.count(ship->ID()))
             continue;
         const ShipDesign* ship_design = ship->Design();
@@ -1462,7 +1476,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         if (source_objects.empty())
             continue;
 
-        DispatchEffectsGroupScopeEvaluations(ECT_SHIP_HULL, ship_hull_name,
+        DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_SHIP_HULL, ship_hull_name,
                                              source_objects, ship_hull->Effects(),
                                              only_meter_effects,
                                              m_objects, potential_targets,
@@ -1481,7 +1495,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         if (source_objects.empty())
             continue;
 
-        DispatchEffectsGroupScopeEvaluations(ECT_SHIP_PART, ship_part_name,
+        DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_SHIP_PART, ship_part_name,
                                              source_objects, ship_part->Effects(),
                                              only_meter_effects,
                                              m_objects, potential_targets,
@@ -1496,7 +1510,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for FIELDS";
     // determine fields of each type in a single pass
     std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> fields_by_type;
-    for (auto& field : m_objects.all<Field>()) {
+    for (const auto& field : m_objects.all<Field>()) {
         if (m_destroyed_object_ids.count(field->ID()))
             continue;
         const std::string& field_type_name = field->FieldTypeName();
@@ -1520,7 +1534,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         if (source_objects.empty())
             continue;
 
-        DispatchEffectsGroupScopeEvaluations(ECT_FIELD, field_type_name,
+        DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_FIELD, field_type_name,
                                              source_objects, field_type->Effects(),
                                              only_meter_effects,
                                              m_objects, potential_targets,
@@ -1814,7 +1828,7 @@ void Universe::SetEmpireObjectVisibility(int empire_id, int object_id, Visibilit
 
     // if object not already present, store default value (which may be replaced)
     if (vis_map_it == vis_map.end()) {
-        vis_map[object_id] = VIS_NO_VISIBILITY;
+        vis_map[object_id] = Visibility::VIS_NO_VISIBILITY;
 
         // get iterator pointing at newly-created entry
         vis_map_it = vis_map.find(object_id);
@@ -1825,7 +1839,7 @@ void Universe::SetEmpireObjectVisibility(int empire_id, int object_id, Visibilit
         vis_map_it->second = vis;
 
     // if object is a ship, empire also gets knowledge of its design
-    if (vis >= VIS_PARTIAL_VISIBILITY) {
+    if (vis >= Visibility::VIS_PARTIAL_VISIBILITY) {
         if (auto ship = m_objects.get<Ship>(object_id))
             SetEmpireKnowledgeOfShipDesign(ship->DesignID(), empire_id);
     }
@@ -1857,7 +1871,7 @@ namespace {
                 continue;
 
             // skip objects with no detection range
-            const Meter* detection_meter = obj->GetMeter(METER_DETECTION);
+            const Meter* detection_meter = obj->GetMeter(MeterType::METER_DETECTION);
             if (!detection_meter)
                 continue;
             float object_detection_range = detection_meter->Current();
@@ -1866,9 +1880,9 @@ namespace {
 
             // don't allow moving ships / fleets to give detection
             std::shared_ptr<const Fleet> fleet;
-            if (obj->ObjectType() == OBJ_FLEET) {
+            if (obj->ObjectType() == UniverseObjectType::OBJ_FLEET) {
                 fleet = std::dynamic_pointer_cast<const Fleet>(obj);
-            } else if (obj->ObjectType() == OBJ_SHIP) {
+            } else if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
                 auto ship = std::dynamic_pointer_cast<const Ship>(obj);
                 if (ship)
                     fleet = Objects().get<Fleet>(ship->FleetID());
@@ -1923,7 +1937,7 @@ namespace {
         // filter objects as detectors for this empire or detectable objects
         for (const auto& obj : objects.all())
         {
-            const Meter* stealth_meter = obj->GetMeter(METER_STEALTH);
+            const Meter* stealth_meter = obj->GetMeter(MeterType::METER_STEALTH);
             if (!stealth_meter)
                 continue;
             float object_stealth = stealth_meter->Current();
@@ -2023,9 +2037,9 @@ namespace {
 
             // for each field, try to find a detector position in range for this empire
             for (auto& field : objects.all<Field>()) {
-                if (field->GetMeter(METER_STEALTH)->Current() > detection_strength)
+                if (field->GetMeter(MeterType::METER_STEALTH)->Current() > detection_strength)
                     continue;
-                double field_size = field->GetMeter(METER_SIZE)->Current();
+                double field_size = field->GetMeter(MeterType::METER_SIZE)->Current();
                 const std::pair<double, double> object_pos(field->X(), field->Y());
 
                 // search through detector positions until one is found in range
@@ -2042,7 +2056,7 @@ namespace {
                         continue;   // object out of range
 
                     universe.SetEmpireObjectVisibility(detecting_empire_id, field->ID(),
-                                                       VIS_PARTIAL_VISIBILITY);
+                                                       Visibility::VIS_PARTIAL_VISIBILITY);
                 }
             }
         }
@@ -2084,7 +2098,7 @@ namespace {
             // any are already full vis, in which case do nothing)
             for (int detected_object_id : in_range_detectable_objects) {
                 universe.SetEmpireObjectVisibility(detecting_empire_id, detected_object_id,
-                                                   VIS_PARTIAL_VISIBILITY);
+                                                   Visibility::VIS_PARTIAL_VISIBILITY);
             }
         }
     }
@@ -2095,7 +2109,7 @@ namespace {
         for (const auto& obj : universe.Objects().all()) {
             if (obj->Unowned())
                 continue;
-            universe.SetEmpireObjectVisibility(obj->Owner(), obj->ID(), VIS_FULL_VISIBILITY);
+            universe.SetEmpireObjectVisibility(obj->Owner(), obj->ID(), Visibility::VIS_FULL_VISIBILITY);
         }
     }
 
@@ -2108,7 +2122,7 @@ namespace {
                 if (empire_entry.second->Eliminated())
                     continue;
                 // objects
-                universe.SetEmpireObjectVisibility(empire_entry.first, obj->ID(), VIS_FULL_VISIBILITY);
+                universe.SetEmpireObjectVisibility(empire_entry.first, obj->ID(), Visibility::VIS_FULL_VISIBILITY);
                 // specials on objects
                 for (const auto& special_entry : obj->Specials()) {
                     universe.SetEmpireSpecialVisibility(empire_entry.first, obj->ID(), special_entry.first);
@@ -2135,7 +2149,7 @@ namespace {
             int empire_id = empire_entry.first;
 
             for (int system_id : empire_entry.second) {
-                universe.SetEmpireObjectVisibility(empire_id, system_id, VIS_PARTIAL_VISIBILITY);
+                universe.SetEmpireObjectVisibility(empire_id, system_id, Visibility::VIS_PARTIAL_VISIBILITY);
             }
         }
 
@@ -2153,7 +2167,7 @@ namespace {
                     continue;
                 // ensure planets are at least basicaly visible.  does not
                 // overwrite higher visibility levels
-                universe.SetEmpireObjectVisibility(empire_id, planet_id, VIS_BASIC_VISIBILITY);
+                universe.SetEmpireObjectVisibility(empire_id, planet_id, Visibility::VIS_BASIC_VISIBILITY);
             }
         }
     }
@@ -2168,7 +2182,7 @@ namespace {
                 continue;   // shouldn't be necessary, but I like to be safe...
 
             // check if container object is a fleet, for special case later...
-            bool container_fleet = container_obj->ObjectType() == OBJ_FLEET;
+            bool container_fleet = container_obj->ObjectType() == UniverseObjectType::OBJ_FLEET;
 
             //DebugLogger() << "Container object " << container_obj->Name() << " (" << container_obj->ID() << ")";
 
@@ -2186,7 +2200,7 @@ namespace {
                     auto container_vis_it = vis_map.find(container_obj->ID());
                     // if no entry yet stored for this object, default to not visible
                     if (container_vis_it == vis_map.end()) {
-                        vis_map[container_obj->ID()] = VIS_NO_VISIBILITY;
+                        vis_map[container_obj->ID()] = Visibility::VIS_NO_VISIBILITY;
 
                         // get iterator pointing at newly-created entry
                         container_vis_it = vis_map.find(container_obj->ID());
@@ -2196,9 +2210,9 @@ namespace {
                             // special case for fleets: grant partial visibility if
                             // a contained ship is seen with partial visibility or
                             // higher visibilitly
-                            if (container_vis_it->second >= VIS_PARTIAL_VISIBILITY)
+                            if (container_vis_it->second >= Visibility::VIS_PARTIAL_VISIBILITY)
                                 continue;
-                        } else if (container_vis_it->second >= VIS_BASIC_VISIBILITY) {
+                        } else if (container_vis_it->second >= Visibility::VIS_BASIC_VISIBILITY) {
                             // general case: for non-fleets, having visible
                             // contained object grants basic vis only.  if
                             // container already has this or better for the current
@@ -2215,7 +2229,7 @@ namespace {
                         Visibility contained_obj_vis = contained_vis_it->second;
 
                         // no need to propagate if contained object isn't visible to current empire
-                        if (contained_obj_vis <= VIS_NO_VISIBILITY)
+                        if (contained_obj_vis <= Visibility::VIS_NO_VISIBILITY)
                             continue;
 
                         //DebugLogger() << " ... ... contained object vis: " << contained_obj_vis;
@@ -2224,8 +2238,8 @@ namespace {
                         // container should be at least partially visible, but don't
                         // want to decrease visibility of container if it is already
                         // higher than partially visible
-                        if (container_vis_it->second < VIS_BASIC_VISIBILITY)
-                            container_vis_it->second = VIS_BASIC_VISIBILITY;
+                        if (container_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
+                            container_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
 
                         // special case for fleets: grant partial visibility if
                         // visible contained object is partially or better visible
@@ -2233,9 +2247,9 @@ namespace {
                         // see ships with partial or better visibility (and thus
                         // know the owner of the ships and thus should know the
                         // owners of the fleet)
-                        if (container_fleet && contained_obj_vis >= VIS_PARTIAL_VISIBILITY &&
-                            container_vis_it->second < VIS_PARTIAL_VISIBILITY)
-                        { container_vis_it->second = VIS_PARTIAL_VISIBILITY; }
+                        if (container_fleet && contained_obj_vis >= Visibility::VIS_PARTIAL_VISIBILITY &&
+                            container_vis_it->second < Visibility::VIS_PARTIAL_VISIBILITY)
+                        { container_vis_it->second = Visibility::VIS_PARTIAL_VISIBILITY; }
                     }
                 }   // end for empire visibility entries
             }   // end for contained objects
@@ -2259,7 +2273,7 @@ namespace {
 
                 // skip systems that aren't at least partially visible; they can't propagate visibility along starlanes
                 Visibility system_vis = system_vis_it->second;
-                if (system_vis <= VIS_BASIC_VISIBILITY)
+                if (system_vis <= Visibility::VIS_BASIC_VISIBILITY)
                     continue;
 
                 // get all starlanes emanating from this system, and loop through them
@@ -2275,9 +2289,9 @@ namespace {
                     int lane_end_sys_id = lane.first;
                     auto lane_end_vis_it = vis_map.find(lane_end_sys_id);
                     if (lane_end_vis_it == vis_map.end())
-                        vis_map[lane_end_sys_id] = VIS_BASIC_VISIBILITY;
-                    else if (lane_end_vis_it->second < VIS_BASIC_VISIBILITY)
-                        lane_end_vis_it->second = VIS_BASIC_VISIBILITY;
+                        vis_map[lane_end_sys_id] = Visibility::VIS_BASIC_VISIBILITY;
+                    else if (lane_end_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
+                        lane_end_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
                 }
             }
         }
@@ -2291,7 +2305,7 @@ namespace {
         // moving are at least basically visible, so that the starlane itself can /
         // will be visible
         for (auto& obj : objects.find(MovingFleetVisitor())) {
-            if (obj->Unowned() || obj->SystemID() == INVALID_OBJECT_ID || obj->ObjectType() != OBJ_FLEET)
+            if (obj->Unowned() || obj->SystemID() == INVALID_OBJECT_ID || obj->ObjectType() != UniverseObjectType::OBJ_FLEET)
                 continue;
             auto fleet = std::dynamic_pointer_cast<const Fleet>(obj);
             if (!fleet)
@@ -2306,18 +2320,18 @@ namespace {
 
             auto system_vis_it = vis_map.find(prev);
             if (system_vis_it == vis_map.end()) {
-                vis_map[prev] = VIS_BASIC_VISIBILITY;
+                vis_map[prev] = Visibility::VIS_BASIC_VISIBILITY;
             } else {
-                if (system_vis_it->second < VIS_BASIC_VISIBILITY)
-                    system_vis_it->second = VIS_BASIC_VISIBILITY;
+                if (system_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
+                    system_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
             }
 
             system_vis_it = vis_map.find(next);
             if (system_vis_it == vis_map.end()) {
-                vis_map[next] = VIS_BASIC_VISIBILITY;
+                vis_map[next] = Visibility::VIS_BASIC_VISIBILITY;
             } else {
-                if (system_vis_it->second < VIS_BASIC_VISIBILITY)
-                    system_vis_it->second = VIS_BASIC_VISIBILITY;
+                if (system_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
+                    system_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
             }
         }
     }
@@ -2328,12 +2342,12 @@ namespace {
     {
         // after setting object visibility, similarly set visibility of objects'
         // specials for each empire
-        for (auto& empire_entry : Empires()) {
+        for (const auto& empire_entry : Empires()) {
             int empire_id = empire_entry.first;
             auto& obj_vis_map = empire_object_visibility[empire_id];
             auto& obj_specials_map = empire_object_visible_specials[empire_id];
 
-            const Empire* empire = empire_entry.second;
+            const auto& empire = empire_entry.second;
             const Meter* detection_meter = empire->GetMeter("METER_DETECTION_STRENGTH");
             if (!detection_meter)
                 continue;
@@ -2341,7 +2355,7 @@ namespace {
 
             // every object empire has visibility of might have specials
             for (auto& obj_entry : obj_vis_map) {
-                if (obj_entry.second <= VIS_NO_VISIBILITY)
+                if (obj_entry.second <= Visibility::VIS_NO_VISIBILITY)
                     continue;
 
                 int object_id = obj_entry.first;
@@ -2392,7 +2406,7 @@ namespace {
             auto& obj_vis_map = empire_object_visibility[empire_id];
             auto& obj_specials_map = empire_object_visible_specials[empire_id];
 
-            for (auto allied_empire_id : Empires().GetEmpireIDsWithDiplomaticStatusWithEmpire(empire_id, DIPLO_ALLIED)) {
+            for (auto allied_empire_id : Empires().GetEmpireIDsWithDiplomaticStatusWithEmpire(empire_id, DiplomaticStatus::DIPLO_ALLIED)) {
                 if (empire_id == allied_empire_id) {
                     ErrorLogger() << "ShareVisbilitiesBetweenAllies : Empire apparent allied with itself!";
                     continue;
@@ -2411,7 +2425,7 @@ namespace {
                     auto it = obj_vis_map.find(obj_id);
                     if (it == obj_vis_map.end() || it->second < allied_vis) {
                         obj_vis_map[obj_id] = allied_vis;
-                        if (allied_vis < VIS_PARTIAL_VISIBILITY)
+                        if (allied_vis < Visibility::VIS_PARTIAL_VISIBILITY)
                             continue;
                         if (auto ship = Objects().get<Ship>(obj_id))
                             universe.SetEmpireKnowledgeOfShipDesign(ship->DesignID(), empire_id);
@@ -2432,9 +2446,9 @@ namespace {
 
 void Universe::UpdateEmpireObjectVisibilities() {
     // ensure Universe knows empires have knowledge of designs the empire is specifically remembering
-    for (auto& empire_entry : Empires()) {
+    for (const auto& empire_entry : Empires()) {
         int empire_id = empire_entry.first;
-        const Empire* empire = empire_entry.second;
+        const auto& empire = empire_entry.second;
         if (empire->Eliminated()) {
             m_empire_known_ship_design_ids.erase(empire_id);
         } else {
@@ -2446,7 +2460,7 @@ void Universe::UpdateEmpireObjectVisibilities() {
     m_empire_object_visibility.clear();
     m_empire_object_visible_specials.clear();
 
-    if (m_all_objects_visible) {
+    if (false) {    // TODO: GameRule
         SetAllObjectsVisibleToAllEmpires();
         return;
     }
@@ -2508,7 +2522,7 @@ void Universe::UpdateEmpireLatestKnownObjectsAndVisibilityTurns() {
             if (vis_it == vis_map.end())
                 continue;   // empire can't see current object, so move to next empire
             const Visibility vis = vis_it->second;
-            if (vis <= VIS_NO_VISIBILITY)
+            if (vis <= Visibility::VIS_NO_VISIBILITY)
                 continue;   // empire can't see current object, so move to next empire
 
             // empire can see object.  need to update empire's latest known
@@ -2535,12 +2549,12 @@ void Universe::UpdateEmpireLatestKnownObjectsAndVisibilityTurns() {
             //DebugLogger() << "Empire " << empire_id << " can see object " << object_id << " with vis level " << vis;
 
             // update empire's visibility turn history for current vis, and lesser vis levels
-            if (vis >= VIS_BASIC_VISIBILITY) {
-                vis_turn_map[VIS_BASIC_VISIBILITY] = current_turn;
-                if (vis >= VIS_PARTIAL_VISIBILITY) {
-                    vis_turn_map[VIS_PARTIAL_VISIBILITY] = current_turn;
-                    if (vis >= VIS_FULL_VISIBILITY) {
-                        vis_turn_map[VIS_FULL_VISIBILITY] = current_turn;
+            if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
+                vis_turn_map[Visibility::VIS_BASIC_VISIBILITY] = current_turn;
+                if (vis >= Visibility::VIS_PARTIAL_VISIBILITY) {
+                    vis_turn_map[Visibility::VIS_PARTIAL_VISIBILITY] = current_turn;
+                    if (vis >= Visibility::VIS_FULL_VISIBILITY) {
+                        vis_turn_map[Visibility::VIS_FULL_VISIBILITY] = current_turn;
                     }
                 }
                 //DebugLogger() << " ... Setting empire " << empire_id << " object " << full_object->Name() << " (" << object_id << ") vis " << vis << " (and higher) turn to " << current_turn;
@@ -2611,7 +2625,7 @@ void Universe::UpdateEmpireStaleObjectKnowledge() {
         // entries need to be removed / flagged to indicate this
         for (int object_id : should_still_be_detectable_latest_known_objects) {
             auto vis_it = vis_map.find(object_id);
-            if (vis_it == vis_map.end() || vis_it->second < VIS_BASIC_VISIBILITY) {
+            if (vis_it == vis_map.end() || vis_it->second < Visibility::VIS_BASIC_VISIBILITY) {
                 // object not visible even though the latest known info about it
                 // for this empire suggests it should be.  info is stale.
                 stale_set.insert(object_id);
@@ -2622,7 +2636,7 @@ void Universe::UpdateEmpireStaleObjectKnowledge() {
         // fleets that are not visible and that contain no ships or only stale ships are stale
         for (const auto& fleet : latest_known_objects.all<Fleet>())
         {
-            if (fleet->GetVisibility(empire_id) >= VIS_BASIC_VISIBILITY)
+            if (fleet->GetVisibility(empire_id) >= Visibility::VIS_BASIC_VISIBILITY)
                 continue;
 
             // destroyed? not stale
@@ -2651,7 +2665,7 @@ void Universe::UpdateEmpireStaleObjectKnowledge() {
 
                 // is contained ship visible? If so, fleet is not stale.
                 auto vis_it = vis_map.find(ship->ID());
-                if (vis_it != vis_map.end() && vis_it->second > VIS_NO_VISIBILITY) {
+                if (vis_it != vis_map.end() && vis_it->second > Visibility::VIS_NO_VISIBILITY) {
                     fleet_stale = false;
                     break;
                 }
@@ -2712,7 +2726,7 @@ void Universe::Destroy(int object_id, bool update_destroyed_object_knowers/* = t
         // record empires that know this object has been destroyed
         for (auto& empire_entry : Empires()) {
             int empire_id = empire_entry.first;
-            if (obj->GetVisibility(empire_id) >= VIS_BASIC_VISIBILITY) {
+            if (obj->GetVisibility(empire_id) >= Visibility::VIS_BASIC_VISIBILITY) {
                 SetEmpireKnowledgeOfDestroyedObject(object_id, empire_id);
                 // TODO: Update m_empire_latest_known_objects somehow?
             }
@@ -2815,7 +2829,7 @@ std::set<int> Universe::RecursiveDestroy(int object_id) {
         Destroy(object_id);
         retval.insert(object_id);
 
-    } else if (obj->ObjectType() == OBJ_FIELD) {
+    } else if (obj->ObjectType() == UniverseObjectType::OBJ_FIELD) {
         if (system)
             system->Remove(object_id);
         Destroy(object_id);
@@ -2867,9 +2881,6 @@ void Universe::InitializeSystemGraph(int for_empire_id) {
 void Universe::UpdateEmpireVisibilityFilteredSystemGraphs(int empire_id) {
     m_pathfinder->UpdateEmpireVisibilityFilteredSystemGraphs(empire_id);
 }
-
-int& Universe::EncodingEmpire()
-{ return m_encoding_empire; }
 
 double Universe::UniverseWidth() const
 { return m_universe_width; }
@@ -3051,7 +3062,7 @@ void Universe::GetEmpireObjectVisibilityMap(EmpireObjectVisibilityMap& empire_ob
     empire_object_visibility.clear();
     for (const auto& object : m_objects.all()) {
         Visibility vis = GetObjectVisibilityByEmpire(object->ID(), encoding_empire);
-        if (vis > VIS_NO_VISIBILITY)
+        if (vis > Visibility::VIS_NO_VISIBILITY)
             empire_object_visibility[encoding_empire][object->ID()] = vis;
     }
 }
@@ -3116,6 +3127,7 @@ std::map<std::string, unsigned int> CheckSumContent() {
     checksums["BuildingTypeManager"] = GetBuildingTypeManager().GetCheckSum();
     checksums["Encyclopedia"] = GetEncyclopedia().GetCheckSum();
     checksums["FieldTypeManager"] = GetFieldTypeManager().GetCheckSum();
+    checksums["NamedValueRefManager"] = GetNamedValueRefManager().GetCheckSum();
     checksums["ShipHullManager"] = GetShipHullManager().GetCheckSum();
     checksums["ShipPartManager"] = GetShipPartManager().GetCheckSum();
     checksums["PredefinedShipDesignManager"] = GetPredefinedShipDesignManager().GetCheckSum();

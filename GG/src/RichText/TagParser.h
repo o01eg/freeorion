@@ -1,32 +1,18 @@
-/* GG is a GUI for OpenGL.
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2015 Mitten-O
+//!  Copyright (C) 2016-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   Copyright (C) 2015 Mitten-O
+#ifndef _RichText_TagParser_h_
+#define _RichText_TagParser_h_
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-#ifndef TAGPARSER_H
-#define TAGPARSER_H
 
 #include <GG/RichText/RichText.h>
+
 
 namespace GG {
 
@@ -39,14 +25,12 @@ struct RichTextTag {
     std::string tag_params; //!< The possible parameters of the tag.
     std::string content; //!< The text between the tags.
 
-    RichTextTag(
-        const std::string& tag,
-        const std::string& params_string, //!< The parameters as a string of key value pairs key="value".
-        const std::string& content);
+    //!< The parameters as a string of key value pairs key="value".
+    RichTextTag(std::string tag_, std::string params_string_, std::string content_);
+    RichTextTag(RichTextTag&& rhs) = default;
 
     //! Return the tag as a string that parses back to itself.
     std::string ToString() const;
-
 };
 
 
@@ -57,8 +41,6 @@ struct RichTextTag {
 class TagParser
 {
 public:
-
-
     /**
      * @brief Parses a string of text into a vector of tags.
      *
@@ -70,7 +52,7 @@ public:
      * @return std::vector< RichTextTag > The text inside tags.
      */
     static std::vector<RichTextTag> ParseTags(const std::string& text,
-                                          const std::set<std::string>& known_tags);
+                                              std::set<std::string> known_tags);
 
 };
 

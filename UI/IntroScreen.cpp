@@ -57,7 +57,7 @@ public:
     { m_scroll_offset -= move * 2000; }
 
     void KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override {
-        if (key == GG::GGK_ESCAPE)
+        if (key == GG::Key::GGK_ESCAPE)
             OnExit();
     }
 
@@ -236,9 +236,26 @@ void IntroScreen::CompleteConstruction() {
     m_menu = GG::Wnd::Create<CUIWnd>(UserString("INTRO_WINDOW_TITLE"), GG::X1, GG::Y1,
                                      MAIN_MENU_WIDTH, MAIN_MENU_HEIGHT, GG::ONTOP | GG::INTERACTIVE);
 
-    m_splash = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "splash.png"), GG::GRAPHIC_FITGRAPHIC, GG::INTERACTIVE);
+    auto today = boost::gregorian::day_clock::local_day();
+    if (today.month() == 4 && today.day() == 1) {
+        m_splash = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "splash0104.png"),
+                                                      GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE,
+                                                      GG::INTERACTIVE);
+        m_logo = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "logo0104.png"),
+                                                    GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+    } else {
+        m_splash = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "splash.png"),
+                                                      GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE,
+                                                      GG::INTERACTIVE);
 
-    m_logo = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "logo.png"), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+        auto now{boost::posix_time::second_clock::local_time()};
+        if (now.time_of_day().seconds() == 42)
+            m_logo = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "logo0104.png"),
+                                                        GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+        else
+            m_logo = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "logo.png"),
+                                                        GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+    }
 
     m_version = GG::Wnd::Create<CUILabel>(FreeOrionVersionString(), GG::FORMAT_NOWRAP, GG::INTERACTIVE);
     m_version->MoveTo(GG::Pt(Width() - m_version->Width(), Height() - m_version->Height()));
@@ -390,7 +407,7 @@ void IntroScreen::OnExitGame() {
 }
 
 void IntroScreen::KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) {
-    if (key == GG::GGK_ESCAPE)
+    if (key == GG::Key::GGK_ESCAPE)
         OnExitGame();
 }
 

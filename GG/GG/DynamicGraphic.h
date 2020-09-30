@@ -1,43 +1,29 @@
-// -*- C++ -*-
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2000-2003 Tony Casale.
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-   
-/* This class is based on earlier work with GG by Tony Casale.  Thanks, Tony.*/
-
-/** \file DynamicGraphic.h \brief Contains the DynamicGraphic class, a control
-    that allows display of a slideshow or animated sequence of images. */
+//! @file GG/DynamicGraphic.h
+//!
+//! Contains the DynamicGraphic class, a control that allows display of
+//! a slideshow or animated sequence of images.
 
 #ifndef _GG_DynamicGraphic_h_
 #define _GG_DynamicGraphic_h_
 
+
 #include <GG/Control.h>
 #include <GG/StaticGraphic.h>
-
 #include <boost/signals2/signal.hpp>
 
 
 namespace GG {
+
 class Texture;
 
 /** \brief A control that replays images in sequence, forwards or backwards,
@@ -92,7 +78,7 @@ public:
         specification of a frame size different from the size of the
         DynamicGraphic's size. */
     DynamicGraphic(X x, Y y, X w, Y h, bool loop, X frame_width, Y frame_height, unsigned int margin,
-                   const std::vector<std::shared_ptr<Texture>>& textures,
+                   std::vector<std::shared_ptr<Texture>> textures,
                    Flags<GraphicStyle> style = GRAPHIC_NONE, std::size_t frames = ALL_FRAMES,
                    Flags<WndFlag> flags = NO_WND_FLAGS);
 
@@ -137,7 +123,7 @@ public:
         possible number of frames based on its size and the frame size.
         \throw GG::DynamicGraphic::CannotAddFrame Throws if \a texture is not
         large enough to contain any frames.*/
-    void AddFrames(const std::shared_ptr<Texture>& texture, std::size_t frames = ALL_FRAMES);
+    void AddFrames(std::shared_ptr<Texture> texture, std::size_t frames = ALL_FRAMES);
 
     /** Adds a set of frames from Texture \a texture to the animation.  If \a
         frames == ALL_FRAMES, the Textures are assumed to contain the
@@ -146,21 +132,21 @@ public:
         are assumed to have the maximum number of frames based on their sizes.
         \throw GG::DynamicGraphic::CannotAddFrame Throws if no texture in \a
         textures is large enough to contain any frames.*/
-    void AddFrames(const std::vector<std::shared_ptr<Texture>>& textures, std::size_t frames = ALL_FRAMES);
+    void AddFrames(std::vector<std::shared_ptr<Texture>> textures, std::size_t frames = ALL_FRAMES);
 
-    void  Play();                    ///< starts the animation of the image
-    void  Pause();                   ///< stops playback without adjusting the frame index
-    void  NextFrame();               ///< increments the frame index by 1.  If Looping() == true and the next frame would be be past the last, the first frame is shown.  Pauses playback.
-    void  PrevFrame();               ///< decrements the frame index by 1.  If Looping() == true and the next frame would be be past the first, the last frame is shown.  Pauses playback.
-    void  Stop();                    ///< stops playback and resets the frame index to 0
-    void  Loop(bool b = true);       ///< turns looping of playback on or off
+    void Play();                    ///< starts the animation of the image
+    void Pause();                   ///< stops playback without adjusting the frame index
+    void NextFrame();               ///< increments the frame index by 1.  If Looping() == true and the next frame would be be past the last, the first frame is shown.  Pauses playback.
+    void PrevFrame();               ///< decrements the frame index by 1.  If Looping() == true and the next frame would be be past the first, the last frame is shown.  Pauses playback.
+    void Stop();                    ///< stops playback and resets the frame index to 0
+    void Loop(bool b = true);       ///< turns looping of playback on or off
 
     /** Sets the frames per second playback speed (default is 15.0 FPS).
         Negative rates indicate reverse playback.  \note Calling SetFPS(0.0)
         is equivalent to calling Pause(). */
-    void  SetFPS(double fps);
+    void SetFPS(double fps);
 
-    void  SetFrameIndex(std::size_t idx);    ///< sets the frame index to \a idx ( value is locked to range [0, Frames()] )
+    void SetFrameIndex(std::size_t idx);    ///< sets the frame index to \a idx ( value is locked to range [0, Frames()] )
 
     /** Sets the frame index to the frame nearest time index \a idx, where \a
         idx measures time in ms from the beginning of the animation ( value is
@@ -168,12 +154,12 @@ public:
         the time index may be any value >= 0.0, and values will "wrap" around
         the length of a loop.  If looping is disabled, any time index \a idx
         that is later than Frames() * FPS() is mapped to the last frame. */
-    void  SetTimeIndex(unsigned int time);
+    void SetTimeIndex(unsigned int time);
 
     /** Sets the index of the first frame to be shown during playback ( value
         is locked to range [0, Frames()] ).  \note when playing backwards this
         will be the last frame shown. */
-    void  SetStartFrame(std::size_t idx);
+    void SetStartFrame(std::size_t idx);
 
     /** Sets the index of the last frame to be shown during playback ( value
         is locked to range [0, Frames()] ).  \note when playing backwards this
@@ -198,14 +184,12 @@ public:
 protected:
     struct FrameSet
     {
-        /** The texture with the frames in it. */
-        std::shared_ptr<const Texture> texture;
-
-        std::size_t                      frames;  ///< the number of frames in this texture
+        std::shared_ptr<const Texture> texture; ///< the texture with the frames in it
+        std::size_t frames;                     ///< the number of frames in this texture
     };
 
-    std::size_t FramesInTexture(const Texture* t) const; ///< returns the maximum number of frames that could be stored in \a t given the size of the control and Margin()
-    const std::vector<FrameSet>& Textures() const; ///< returns the shared_ptrs to texture objects with all animation frames
+    std::size_t FramesInTexture(const Texture* t) const;///< returns the maximum number of frames that could be stored in \a t given the size of the control and Margin()
+    const std::vector<FrameSet>& Textures() const;      ///< returns the shared_ptrs to texture objects with all animation frames
 
     std::size_t  CurrentTexture() const;    ///< returns the current Texture being shown (part of it, anyway); INVALID_INDEX if none
     std::size_t  CurrentSubTexture() const; ///< returns the current frame being shown within Texture number CurrTexture(); INVALID_INDEX if none
@@ -221,21 +205,22 @@ private:
 
     std::vector<FrameSet> m_textures; ///< shared_ptrs to texture objects with all animation frames
 
-    double       m_FPS;               ///< current rate of playback in FPS
-    bool         m_playing;           ///< set to true if playback is happening
-    bool         m_looping;           ///< set to true if the playback should start over when it reaches the end
-    std::size_t  m_curr_texture;      ///< the current Texture being shown (part of it, anyway); INVALID_INDEX if none
-    std::size_t  m_curr_subtexture;   ///< the current frame being shown within Texture number \a m_curr_texture; INVALID_INDEX if none
-    std::size_t  m_frames;            ///< the total number of frames in the animation
-    std::size_t  m_curr_frame;        ///< the current absolute frame being shown; INVALID_INDEX if none
-    unsigned int m_first_frame_time;  ///< the time index in ms that the first frame in the sequence was shown during the current playback; INVALID_TIME if none
-    unsigned int m_last_frame_time;   ///< the time index in ms of the most recent frame shown (should be m_curr_frame); INVALID_TIME if none
-    std::size_t  m_first_frame_idx;   ///< the index of the first frame shown during playback, usually 0
-    std::size_t  m_last_frame_idx;    ///< the index of the last frame shown during playback. usually m_frames - 1
+    double       m_FPS = 1.0;           ///< current rate of playback in FPS
+    bool         m_playing = true;      ///< set to true if playback is happening
+    bool         m_looping = false;     ///< set to true if the playback should start over when it reaches the end
+    std::size_t  m_curr_texture = 0;    ///< the current Texture being shown (part of it, anyway); INVALID_INDEX if none
+    std::size_t  m_curr_subtexture = 0; ///< the current frame being shown within Texture number \a m_curr_texture; INVALID_INDEX if none
+    std::size_t  m_frames = 0;          ///< the total number of frames in the animation
+    std::size_t  m_curr_frame = 0;      ///< the current absolute frame being shown; INVALID_INDEX if none
+    unsigned int m_first_frame_time = 0;///< the time index in ms that the first frame in the sequence was shown during the current playback; INVALID_TIME if none
+    unsigned int m_last_frame_time = 0; ///< the time index in ms of the most recent frame shown (should be m_curr_frame); INVALID_TIME if none
+    std::size_t  m_first_frame_idx = 0; ///< the index of the first frame shown during playback, usually 0
+    std::size_t  m_last_frame_idx = 0;  ///< the index of the last frame shown during playback. usually m_frames - 1
 
     Flags<GraphicStyle> m_style;
 };
 
 }
+
 
 #endif

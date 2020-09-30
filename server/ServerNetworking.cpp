@@ -95,22 +95,22 @@ private:
         std::string reply;
         try {
             if (parse::int_free_variable(message)) {
-                auto value_ref = std::make_unique<ValueRef::Variable<int>>(ValueRef::NON_OBJECT_REFERENCE, message);
+                auto value_ref = std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
                 reply = std::to_string(value_ref->Eval(ScriptingContext()));
                 DebugLogger(network) << "DiscoveryServer evaluated expression as integer with result: " << reply;
 
             } else if (parse::double_free_variable(message)) {
-                auto value_ref = std::make_unique<ValueRef::Variable<double>>(ValueRef::NON_OBJECT_REFERENCE, message);
+                auto value_ref = std::make_unique<ValueRef::Variable<double>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
                 reply = std::to_string(value_ref->Eval(ScriptingContext()));
                 DebugLogger(network) << "DiscoveryServer evaluated expression as double with result: " << reply;
 
             } else if (parse::string_free_variable(message)) {
-                auto value_ref = std::make_unique<ValueRef::Variable<std::string>>(ValueRef::NON_OBJECT_REFERENCE, message);
+                auto value_ref = std::make_unique<ValueRef::Variable<std::string>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
                 reply = value_ref->Eval(ScriptingContext());
                 DebugLogger(network) << "DiscoveryServer evaluated expression as string with result: " << reply;
 
             //} else {
-            //    auto value_ref = std::make_unique<ValueRef::Variable<std::vector<std::string>>>(ValueRef::NON_OBJECT_REFERENCE, message);
+            //    auto value_ref = std::make_unique<ValueRef::Variable<std::vector<std::string>>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
             //    auto result = value_ref->Eval(ScriptingContext());
             //    for (auto entry : result)
             //        reply += entry + "\n";
@@ -167,6 +167,26 @@ PlayerConnection::PlayerConnection(boost::asio::io_context& io_context,
     m_disconnected_callback(disconnected_callback)
 {}
 
+namespace {
+    struct AsyncCloseClosure {
+        AsyncCloseClosure(boost::optional<boost::asio::ip::tcp::socket> &&socket, int id) :
+            m_socket(std::move(socket)),
+            m_id(id)
+        {}
+
+        void operator()() {
+            if (m_socket) {
+                TraceLogger(network) << "Asynchronously closing socket for player id " << m_id;
+                m_socket->close();
+                TraceLogger(network) << "Socket closed for player id " << m_id;
+            }
+        }
+    private:
+        boost::optional<boost::asio::ip::tcp::socket> m_socket;
+        const int m_id;
+    };
+}
+
 PlayerConnection::~PlayerConnection() {
     boost::system::error_code error;
     m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, error);
@@ -191,11 +211,7 @@ PlayerConnection::~PlayerConnection() {
         }
     }
 
-    std::thread([socket{std::move(m_socket)}, id{m_ID}] () mutable {
-        TraceLogger(network) << "Asynchronously closing socket for player id " << id;
-        socket->close();
-        TraceLogger(network) << "Socket closed for player id " << id;
-    }).detach();
+    std::thread(AsyncCloseClosure(std::move(m_socket), m_ID)).detach();
 }
 
 bool PlayerConnection::EstablishedPlayer() const
@@ -225,7 +241,7 @@ void PlayerConnection::SendMessage(const Message& message) {
 }
 
 bool PlayerConnection::IsEstablished() const {
-    return (m_ID != INVALID_PLAYER_ID && !m_player_name.empty() && m_client_type != Networking::INVALID_CLIENT_TYPE);
+    return (m_ID != INVALID_PLAYER_ID && !m_player_name.empty() && m_client_type != Networking::ClientType::INVALID_CLIENT_TYPE);
 }
 
 bool PlayerConnection::IsAuthenticated() const {
@@ -244,11 +260,11 @@ void PlayerConnection::AwaitPlayer(Networking::ClientType client_type,
 {
     TraceLogger(network) << "PlayerConnection(@ " << this << ")::AwaitPlayer("
                          << client_type << ", " << client_version_string << ")";
-    if (m_client_type != Networking::INVALID_CLIENT_TYPE) {
+    if (m_client_type != Networking::ClientType::INVALID_CLIENT_TYPE) {
         ErrorLogger(network) << "PlayerConnection::AwaitPlayer attempting to re-await an already awaiting connection.";
         return;
     }
-    if (client_type == Networking::INVALID_CLIENT_TYPE || client_type >= NUM_CLIENT_TYPES) {
+    if (client_type == Networking::ClientType::INVALID_CLIENT_TYPE || client_type >= Networking::ClientType::NUM_CLIENT_TYPES) {
         ErrorLogger(network) << "PlayerConnection::EstablishPlayer passed invalid client type: " << client_type;
         return;
     }
@@ -279,7 +295,9 @@ void PlayerConnection::EstablishPlayer(int id, const std::string& player_name, N
         ErrorLogger(network) << "PlayerConnection::EstablishPlayer attempting to establish a player with an empty name";
         return;
     }
-    if (client_type == Networking::INVALID_CLIENT_TYPE || client_type >= NUM_CLIENT_TYPES) {
+    if (client_type == Networking::ClientType::INVALID_CLIENT_TYPE ||
+        client_type >= Networking::ClientType::NUM_CLIENT_TYPES)
+    {
         ErrorLogger(network) << "PlayerConnection::EstablishPlayer passed invalid client type: " << client_type;
         return;
     }
@@ -291,7 +309,7 @@ void PlayerConnection::EstablishPlayer(int id, const std::string& player_name, N
 
 void PlayerConnection::SetClientType(Networking::ClientType client_type) {
     m_client_type = client_type;
-    if (m_client_type == Networking::INVALID_CLIENT_TYPE)
+    if (m_client_type == Networking::ClientType::INVALID_CLIENT_TYPE)
         ErrorLogger(network) << "PlayerConnection client type set to INVALID_CLIENT_TYPE...?";
 }
 
@@ -339,49 +357,49 @@ PlayerConnectionPtr PlayerConnection::NewConnection(boost::asio::io_context& io_
 namespace {
     std::string MessageTypeName(Message::MessageType type) {
         switch (type) {
-        case Message::UNDEFINED:                return "Undefined";
-        case Message::DEBUG:                    return "Debug";
-        case Message::ERROR_MSG:                return "Error";
-        case Message::HOST_SP_GAME:             return "Host SP Game";
-        case Message::HOST_MP_GAME:             return "Host MP Game";
-        case Message::JOIN_GAME:                return "Join Game";
-        case Message::HOST_ID:                  return "Host ID";
-        case Message::LOBBY_UPDATE:             return "Lobby Update";
-        case Message::LOBBY_EXIT:               return "Lobby Exit";
-        case Message::START_MP_GAME:            return "Start MP Game";
-        case Message::SAVE_GAME_INITIATE:       return "Save Game";
-        case Message::SAVE_GAME_COMPLETE:       return "Save Game";
-        case Message::LOAD_GAME:                return "Load Game";
-        case Message::GAME_START:               return "Game Start";
-        case Message::TURN_UPDATE:              return "Turn Update";
-        case Message::TURN_PARTIAL_UPDATE:      return "Turn Partial Update";
-        case Message::TURN_ORDERS:              return "Turn Orders";
-        case Message::TURN_PROGRESS:            return "Turn Progress";
-        case Message::PLAYER_STATUS:            return "Player Status";
-        case Message::PLAYER_CHAT:              return "Player Chat";
-        case Message::DIPLOMACY:                return "Diplomacy";
-        case Message::DIPLOMATIC_STATUS:        return "Diplomatic Status";
-        case Message::REQUEST_NEW_OBJECT_ID:    return "Request New Object ID";
-        case Message::DISPATCH_NEW_OBJECT_ID:   return "Dispatch New Object ID";
-        case Message::REQUEST_NEW_DESIGN_ID:    return "Request New Design ID";
-        case Message::DISPATCH_NEW_DESIGN_ID:   return "Dispatch New Design ID";
-        case Message::END_GAME:                 return "End Game";
-        case Message::AI_END_GAME_ACK:          return "Acknowledge Shut Down Server";
-        case Message::MODERATOR_ACTION:         return "Moderator Action";
-        case Message::SHUT_DOWN_SERVER:         return "Shut Down Server";
-        case Message::REQUEST_SAVE_PREVIEWS:    return "Request save previews";
-        case Message::DISPATCH_SAVE_PREVIEWS:   return "Dispatch save previews";
-        case Message::REQUEST_COMBAT_LOGS:      return "Request combat logs";
-        case Message::DISPATCH_COMBAT_LOGS:     return "Dispatch combat logs";
-        case Message::LOGGER_CONFIG:            return "Logger config";
-        case Message::CHECKSUM:                 return "Checksum";
-        case Message::AUTH_REQUEST:             return "Authentication request";
-        case Message::AUTH_RESPONSE:            return "Authentication response";
-        case Message::CHAT_HISTORY:             return "Chat history";
-        case Message::SET_AUTH_ROLES:           return "Set authorization roles";
-        case Message::ELIMINATE_SELF:           return "Eliminate self";
-        case Message::UNREADY:                  return "Unready";
-        default:                                return std::string("Unknown Type(") + std::to_string(static_cast<int>(type)) + ")";
+        case Message::MessageType::UNDEFINED:                return "Undefined";
+        case Message::MessageType::DEBUG:                    return "Debug";
+        case Message::MessageType::ERROR_MSG:                return "Error";
+        case Message::MessageType::HOST_SP_GAME:             return "Host SP Game";
+        case Message::MessageType::HOST_MP_GAME:             return "Host MP Game";
+        case Message::MessageType::JOIN_GAME:                return "Join Game";
+        case Message::MessageType::HOST_ID:                  return "Host ID";
+        case Message::MessageType::LOBBY_UPDATE:             return "Lobby Update";
+        case Message::MessageType::LOBBY_EXIT:               return "Lobby Exit";
+        case Message::MessageType::START_MP_GAME:            return "Start MP Game";
+        case Message::MessageType::SAVE_GAME_INITIATE:       return "Save Game";
+        case Message::MessageType::SAVE_GAME_COMPLETE:       return "Save Game";
+        case Message::MessageType::LOAD_GAME:                return "Load Game";
+        case Message::MessageType::GAME_START:               return "Game Start";
+        case Message::MessageType::TURN_UPDATE:              return "Turn Update";
+        case Message::MessageType::TURN_PARTIAL_UPDATE:      return "Turn Partial Update";
+        case Message::MessageType::TURN_ORDERS:              return "Turn Orders";
+        case Message::MessageType::TURN_PROGRESS:            return "Turn Progress";
+        case Message::MessageType::PLAYER_STATUS:            return "Player Status";
+        case Message::MessageType::PLAYER_CHAT:              return "Player Chat";
+        case Message::MessageType::DIPLOMACY:                return "Diplomacy";
+        case Message::MessageType::DIPLOMATIC_STATUS:        return "Diplomatic Status";
+        case Message::MessageType::REQUEST_NEW_OBJECT_ID:    return "Request New Object ID";
+        case Message::MessageType::DISPATCH_NEW_OBJECT_ID:   return "Dispatch New Object ID";
+        case Message::MessageType::REQUEST_NEW_DESIGN_ID:    return "Request New Design ID";
+        case Message::MessageType::DISPATCH_NEW_DESIGN_ID:   return "Dispatch New Design ID";
+        case Message::MessageType::END_GAME:                 return "End Game";
+        case Message::MessageType::AI_END_GAME_ACK:          return "Acknowledge Shut Down Server";
+        case Message::MessageType::MODERATOR_ACTION:         return "Moderator Action";
+        case Message::MessageType::SHUT_DOWN_SERVER:         return "Shut Down Server";
+        case Message::MessageType::REQUEST_SAVE_PREVIEWS:    return "Request save previews";
+        case Message::MessageType::DISPATCH_SAVE_PREVIEWS:   return "Dispatch save previews";
+        case Message::MessageType::REQUEST_COMBAT_LOGS:      return "Request combat logs";
+        case Message::MessageType::DISPATCH_COMBAT_LOGS:     return "Dispatch combat logs";
+        case Message::MessageType::LOGGER_CONFIG:            return "Logger config";
+        case Message::MessageType::CHECKSUM:                 return "Checksum";
+        case Message::MessageType::AUTH_REQUEST:             return "Authentication request";
+        case Message::MessageType::AUTH_RESPONSE:            return "Authentication response";
+        case Message::MessageType::CHAT_HISTORY:             return "Chat history";
+        case Message::MessageType::SET_AUTH_ROLES:           return "Set authorization roles";
+        case Message::MessageType::ELIMINATE_SELF:           return "Eliminate self";
+        case Message::MessageType::UNREADY:                  return "Unready";
+        default:                                             return std::string("Unknown Type(") + std::to_string(static_cast<int>(type)) + ")";
         };
     }
 }
@@ -402,7 +420,7 @@ void PlayerConnection::HandleMessageBodyRead(boost::system::error_code error,
     } else {
         assert(static_cast<int>(bytes_transferred) <= m_incoming_header_buffer[Message::Parts::SIZE]);
         if (static_cast<int>(bytes_transferred) == m_incoming_header_buffer[Message::Parts::SIZE]) {
-            if (m_incoming_message.Type() != Message::REQUEST_NEW_DESIGN_ID) {   // new design id messages ignored due to log spam
+            if (m_incoming_message.Type() != Message::MessageType::REQUEST_NEW_DESIGN_ID) {   // new design id messages ignored due to log spam
                 TraceLogger(network) << "Server received message from player id: " << m_ID
                                      << " of type " << MessageTypeName(m_incoming_message.Type())
                                      << " and size " << m_incoming_message.Size();
@@ -609,7 +627,7 @@ ServerNetworking::const_established_iterator ServerNetworking::established_end()
 
 int ServerNetworking::NewPlayerID() const {
     int biggest_current_player_id(0);
-    for (const PlayerConnectionPtr player : m_player_connections) {
+    for (const PlayerConnectionPtr& player : m_player_connections) {
         int player_id = player->PlayerID();
         if (player_id != INVALID_PLAYER_ID && player_id > biggest_current_player_id)
             biggest_current_player_id = player_id;
@@ -627,8 +645,8 @@ bool ServerNetworking::PlayerIsHost(int player_id) const {
 }
 
 bool ServerNetworking::ModeratorsInGame() const {
-    for (const PlayerConnectionPtr player : m_player_connections) {
-        if (player->GetClientType() == Networking::CLIENT_TYPE_HUMAN_MODERATOR)
+    for (const PlayerConnectionPtr& player : m_player_connections) {
+        if (player->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR)
             return true;
     }
     return false;
@@ -735,13 +753,13 @@ void ServerNetworking::HandleNextEvent() {
 void ServerNetworking::SetHostPlayerID(int host_player_id)
 { m_host_player_id = host_player_id; }
 
-boost::uuids::uuid ServerNetworking::GenerateCookie(const std::string& player_name,
+boost::uuids::uuid ServerNetworking::GenerateCookie(std::string player_name,
                                                     const Networking::AuthRoles& roles,
                                                     bool authenticated)
 {
     boost::uuids::uuid cookie = boost::uuids::random_generator()();
     m_cookies.erase(cookie); // remove previous cookie if exists
-    m_cookies.emplace(cookie, CookieData(player_name,
+    m_cookies.emplace(cookie, CookieData(std::move(player_name),
                                          boost::posix_time::second_clock::local_time() +
                                              boost::posix_time::minutes(GetOptionsDB().Get<int>("network.server.cookies.expire-minutes")),
                                          roles,

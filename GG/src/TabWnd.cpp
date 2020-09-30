@@ -1,47 +1,33 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
-
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-#include <GG/TabWnd.h>
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include <GG/Layout.h>
 #include <GG/StyleFactory.h>
+#include <GG/TabWnd.h>
 #include <GG/WndEvent.h>
 
 
 using namespace GG;
 
 namespace {
-    struct TabChangedEcho
-    {
-        TabChangedEcho(const std::string& name) : m_name(name) {}
-        void operator()(std::size_t index)
-            { std::cerr << "GG SIGNAL : " << m_name << "(index=" << index << ")\n"; }
-        std::string m_name;
-    };
 
-    Y TabHeightFromFont(const std::shared_ptr<Font>& font)
-    { return font->Lineskip() + 10; }
+struct TabChangedEcho
+{
+    TabChangedEcho(std::string name) : m_name(std::move(name)) {}
+    void operator()(std::size_t index)
+        { std::cerr << "GG SIGNAL : " << m_name << "(index=" << index << ")\n"; }
+    std::string m_name;
+};
+
+Y TabHeightFromFont(const std::shared_ptr<Font>& font)
+{ return font->Lineskip() + 10; }
+
 }
 
 ////////////////////////////////////////////////
@@ -84,16 +70,16 @@ std::shared_ptr<Wnd> OverlayWnd::CurrentWnd() const
 std::size_t OverlayWnd::CurrentWndIndex() const
 { return m_current_wnd_index; }
 
-std::size_t OverlayWnd::AddWnd(const std::shared_ptr<Wnd>& wnd)
+std::size_t OverlayWnd::AddWnd(std::shared_ptr<Wnd> wnd)
 {
     std::size_t retval = m_wnds.size();
-    InsertWnd(m_wnds.size(), wnd);
+    InsertWnd(m_wnds.size(), std::move(wnd));
     return retval;
 }
 
-void OverlayWnd::InsertWnd(std::size_t index, const std::shared_ptr<Wnd>& wnd)
+void OverlayWnd::InsertWnd(std::size_t index, std::shared_ptr<Wnd> wnd)
 {
-    m_wnds.insert(m_wnds.begin() + index, wnd);
+    m_wnds.insert(m_wnds.begin() + index, std::move(wnd));
     if (m_current_wnd_index == NO_WND)
         SetCurrentWnd(0);
 }
@@ -171,7 +157,7 @@ void TabWnd::CompleteConstruction()
     layout->SetRowStretch(1, 1.0);
     layout->Add(m_tab_bar, 0, 0);
     layout->Add(m_overlay, 1, 0);
-    SetLayout(layout);
+    SetLayout(std::move(layout));
     m_tab_bar->TabChangedSignal.connect(
         boost::bind(&TabWnd::TabChanged, this, boost::placeholders::_1, true));
 
@@ -200,19 +186,19 @@ Wnd* TabWnd::CurrentWnd() const
 std::size_t TabWnd::CurrentWndIndex() const
 { return m_tab_bar->CurrentTabIndex(); }
 
-std::size_t TabWnd::AddWnd(const std::shared_ptr<Wnd>& wnd, const std::string& name)
+std::size_t TabWnd::AddWnd(std::shared_ptr<Wnd> wnd, std::string name)
 {
     std::size_t retval = m_named_wnds.size();
-    InsertWnd(m_named_wnds.size(), wnd, name);
+    InsertWnd(m_named_wnds.size(), std::move(wnd), std::move(name));
     return retval;
 }
 
-void TabWnd::InsertWnd(std::size_t index, const std::shared_ptr<Wnd>& wnd, const std::string& name)
+void TabWnd::InsertWnd(std::size_t index, std::shared_ptr<Wnd> wnd, std::string name)
 {
     std::size_t old_tab = m_tab_bar->CurrentTabIndex();
     m_named_wnds[name] = wnd.get();
-    m_overlay->InsertWnd(index, wnd);
-    m_tab_bar->InsertTab(index, name);
+    m_overlay->InsertWnd(index, std::move(wnd));
+    m_tab_bar->InsertTab(index, std::move(name));
     GetLayout()->SetMinimumRowHeight(0, m_tab_bar->MinUsableSize().y + 2 * 5);
     if (m_tab_bar->CurrentTabIndex() != old_tab)
         TabChanged(m_tab_bar->CurrentTabIndex(), false);
@@ -268,11 +254,11 @@ TabBar::TabBar(const std::shared_ptr<Font>& font, Clr color, Clr text_color/* = 
 
 void TabBar::CompleteConstruction()
 {
-    SetChildClippingMode(ClipToClient);
+    SetChildClippingMode(ChildClippingMode::ClipToClient);
 
     const auto& style_factory = GetStyleFactory();
 
-    m_tabs = style_factory->NewRadioButtonGroup(HORIZONTAL);
+    m_tabs = style_factory->NewRadioButtonGroup(Orientation::HORIZONTAL);
     m_tabs->ExpandButtons(true);
     m_tabs->ExpandButtonsProportionally(true);
 
@@ -357,19 +343,19 @@ void TabBar::DoLayout()
 void TabBar::Render()
 {}
 
-std::size_t TabBar::AddTab(const std::string& name)
+std::size_t TabBar::AddTab(std::string name)
 {
     std::size_t retval = m_tab_buttons.size();
-    InsertTab(m_tab_buttons.size(), name);
+    InsertTab(m_tab_buttons.size(), std::move(name));
     return retval;
 }
 
-void TabBar::InsertTab(std::size_t index, const std::string& name)
+void TabBar::InsertTab(std::size_t index, std::string name)
 {
     assert(index <= m_tab_buttons.size());
     const auto& style_factory = GetStyleFactory();
     auto button = style_factory->NewTabBarTab(
-        name, m_font, FORMAT_CENTER, Color(), m_text_color);
+        std::move(name), m_font, FORMAT_CENTER, Color(), m_text_color);
     button->InstallEventFilter(shared_from_this());
     m_tab_buttons.insert(m_tab_buttons.begin() + index, button);
     m_tabs->InsertButton(index, m_tab_buttons[index]);
@@ -491,8 +477,8 @@ void TabBar::BringTabIntoView(std::size_t index)
 
 bool TabBar::EventFilter(Wnd* w, const WndEvent& event)
 {
-    if (event.Type() == WndEvent::LButtonDown ||
-        event.Type() == WndEvent::RButtonDown)
+    if (event.Type() == WndEvent::EventType::LButtonDown ||
+        event.Type() == WndEvent::EventType::RButtonDown)
     { MoveChildUp(m_left_right_button_layout.get()); }
     return false;
 }

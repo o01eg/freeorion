@@ -51,6 +51,12 @@ public:
     std::string DecorateRollover(const std::string& path_type, const std::string& content) const override;
 };
 
+class ValueRefDecorator : public LinkDecorator {
+public:
+    std::string Decorate(const std::string& value_ref_name, const std::string& content) const override;
+    std::string DecorateRollover(const std::string& value_ref_name, const std::string& content) const override;
+};
+
 class TextLinker {
 public:
     TextLinker();
@@ -85,7 +91,7 @@ protected:
 
     virtual GG::Pt              TextUpperLeft() const = 0;
     virtual GG::Pt              TextLowerRight() const = 0;
-    virtual void                SetLinkedText(const std::string& str) = 0;
+    virtual void                SetLinkedText(std::string str) = 0;
     virtual const std::string&  RawText() const = 0;    ///< returns text being displayed before any link formatting is added
 
     void FindLinks();                       ///< finds the links in the text, with which to populate m_links.
@@ -158,10 +164,10 @@ public:
         constructed to fit the size of the text (i.e. if the second ctor type
         was used), calls to this function cause the window to be resized to
         whatever space the newly rendered text occupies. */
-    void SetText(const std::string& str) override;
+    void SetText(std::string str) override;
 
 private:
-    void SetLinkedText(const std::string& str) override;
+    void SetLinkedText(std::string str) override;
 
     std::string     m_raw_text;
 };

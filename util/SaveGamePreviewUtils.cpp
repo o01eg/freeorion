@@ -104,17 +104,11 @@ namespace {
     }
 }
 
-
 SaveGamePreviewData::SaveGamePreviewData() :
     magic_number(PREVIEW_PRESENT_MARKER),
-    description(),
     freeorion_version(UserString("UNKNOWN_VALUE_SYMBOL_2")),
     main_player_name(UserString("UNKNOWN_VALUE_SYMBOL_2")),
-    main_player_empire_name(UserString("UNKNOWN_VALUE_SYMBOL_2")),
-    current_turn(-1),
-    number_of_empires(-1),
-    number_of_human_players(-1),
-    save_format_marker("")
+    main_player_empire_name(UserString("UNKNOWN_VALUE_SYMBOL_2"))
 {}
 
 bool SaveGamePreviewData::Valid() const
@@ -226,7 +220,6 @@ std::string ColumnInPreview(const FullPreview& full, const std::string& name, bo
 }
 
 void LoadSaveGamePreviews(const fs::path& orig_path, const std::string& extension, std::vector<FullPreview>& previews) {
-    FullPreview data;
     fs::directory_iterator end_it;
 
     fs::path path = orig_path;
@@ -248,9 +241,10 @@ void LoadSaveGamePreviews(const fs::path& orig_path, const std::string& extensio
     for (fs::directory_iterator it(path); it != end_it; ++it) {
         try {
             if ((it->path().filename().extension() == extension) && !fs::is_directory(it->path())) {
+                FullPreview data;
                 if (LoadSaveGamePreviewData(*it, data)) {
                     // Add preview entry to list
-                    previews.push_back(data);
+                    previews.emplace_back(std::move(data));
                 }
             }
         } catch (const std::exception& e) {

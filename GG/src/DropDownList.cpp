@@ -1,40 +1,22 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-#include <GG/DropDownList.h>
-
+#include <iterator>
+#include <memory>
+#include <boost/optional/optional.hpp>
 #include <GG/DrawUtil.h>
+#include <GG/DropDownList.h>
 #include <GG/GUI.h>
 #include <GG/Layout.h>
 #include <GG/Scroll.h>
 #include <GG/StyleFactory.h>
 #include <GG/WndEvent.h>
-
-#include <boost/optional/optional.hpp>
-
-#include <iterator>
-#include <memory>
 
 
 using namespace GG;
@@ -131,33 +113,35 @@ private:
 };
 
 namespace {
-    struct DropDownListSelChangedEcho
-    {
-        DropDownListSelChangedEcho(const DropDownList& drop_list) :
-            m_drop_list(drop_list)
-        {}
-        void operator()(const DropDownList::iterator& it)
-        {
-            std::cerr << "GG SIGNAL : DropDownList::SelChangedSignal(row="
-                      << m_drop_list.IteratorToIndex(it)
-                      << ")" << std::endl;
-        }
-        const DropDownList& m_drop_list;
-    };
 
-    struct ModalListPickerSelChangedEcho
+struct DropDownListSelChangedEcho
+{
+    DropDownListSelChangedEcho(const DropDownList& drop_list) :
+        m_drop_list(drop_list)
+    {}
+    void operator()(const DropDownList::iterator& it)
     {
-        ModalListPickerSelChangedEcho(ModalListPicker& picker) :
-            m_picker(picker)
-        {}
-        void operator()(const ListBox::iterator& it)
-        {
-            std::cerr << "GG SIGNAL : ModalListPicker::SelChangedSignal(row="
-                      << std::distance(m_picker.LB()->begin(), it)
-                      << ")" << std::endl;
-        }
-        ModalListPicker& m_picker;
-    };
+        std::cerr << "GG SIGNAL : DropDownList::SelChangedSignal(row="
+                    << m_drop_list.IteratorToIndex(it)
+                    << ")" << std::endl;
+    }
+    const DropDownList& m_drop_list;
+};
+
+struct ModalListPickerSelChangedEcho
+{
+    ModalListPickerSelChangedEcho(ModalListPicker& picker) :
+        m_picker(picker)
+    {}
+    void operator()(const ListBox::iterator& it)
+    {
+        std::cerr << "GG SIGNAL : ModalListPicker::SelChangedSignal(row="
+                    << std::distance(m_picker.LB()->begin(), it)
+                    << ")" << std::endl;
+    }
+    ModalListPicker& m_picker;
+};
+
 }
 
 ////////////////////////////////////////////////
@@ -382,37 +366,37 @@ boost::optional<DropDownList::iterator> ModalListPicker::KeyPressCommon(
     if (!numlock_on) {
         // convert keypad keys into corresponding non-number keys
         switch (key) {
-        case GGK_KP0:       key = GGK_INSERT;   break;
-        case GGK_KP1:       key = GGK_END;      break;
-        case GGK_KP2:       key = GGK_DOWN;     break;
-        case GGK_KP3:       key = GGK_PAGEDOWN; break;
-        case GGK_KP4:       key = GGK_LEFT;     break;
-        case GGK_KP5:                           break;
-        case GGK_KP6:       key = GGK_RIGHT;    break;
-        case GGK_KP7:       key = GGK_HOME;     break;
-        case GGK_KP8:       key = GGK_UP;       break;
-        case GGK_KP9:       key = GGK_PAGEUP;   break;
-        case GGK_KP_PERIOD: key = GGK_DELETE;   break;
-        default:                                break;
+        case Key::GGK_KP0:       key = Key::GGK_INSERT;   break;
+        case Key::GGK_KP1:       key = Key::GGK_END;      break;
+        case Key::GGK_KP2:       key = Key::GGK_DOWN;     break;
+        case Key::GGK_KP3:       key = Key::GGK_PAGEDOWN; break;
+        case Key::GGK_KP4:       key = Key::GGK_LEFT;     break;
+        case Key::GGK_KP5:                                break;
+        case Key::GGK_KP6:       key = Key::GGK_RIGHT;    break;
+        case Key::GGK_KP7:       key = Key::GGK_HOME;     break;
+        case Key::GGK_KP8:       key = Key::GGK_UP;       break;
+        case Key::GGK_KP9:       key = Key::GGK_PAGEUP;   break;
+        case Key::GGK_KP_PERIOD: key = Key::GGK_DELETE;   break;
+        default:                                          break;
         }
     }
 
     switch (key) {
-    case GGK_UP: // arrow-up (not numpad arrow)
+    case Key::GGK_UP: // arrow-up (not numpad arrow)
         if (CurrentItem() != LB()->end() && CurrentItem() != LB()->begin()) {
             auto prev_it{std::prev(CurrentItem())};
             LB()->BringRowIntoView(prev_it);
             return prev_it;
         }
         break;
-    case GGK_DOWN: // arrow-down (not numpad arrow)
+    case Key::GGK_DOWN: // arrow-down (not numpad arrow)
         if (CurrentItem() != LB()->end() && CurrentItem() != --LB()->end()) {
             auto next_it(std::next(CurrentItem()));
             LB()->BringRowIntoView(next_it);
             return next_it;
         }
         break;
-    case GGK_PAGEUP: // page up key (not numpad key)
+    case Key::GGK_PAGEUP: // page up key (not numpad key)
         if (!LB()->Empty() && CurrentItem() != LB()->end()) {
             std::size_t i = std::max<std::size_t>(1, m_num_shown_rows - 1);
             auto it = CurrentItem();
@@ -424,7 +408,7 @@ boost::optional<DropDownList::iterator> ModalListPicker::KeyPressCommon(
             return it;
         }
         break;
-    case GGK_PAGEDOWN: // page down key (not numpad key)
+    case Key::GGK_PAGEDOWN: // page down key (not numpad key)
         if (!LB()->Empty()) {
             std::size_t i = std::max<std::size_t>(1, m_num_shown_rows - 1);
             auto it = CurrentItem();
@@ -436,23 +420,23 @@ boost::optional<DropDownList::iterator> ModalListPicker::KeyPressCommon(
             return it;
         }
         break;
-    case GGK_HOME: // home key (not numpad)
+    case Key::GGK_HOME: // home key (not numpad)
         if (!LB()->Empty()) {
             DropDownList::iterator it(LB()->begin());
             LB()->BringRowIntoView(it);
             return it;
         }
         break;
-    case GGK_END: // end key (not numpad)
+    case Key::GGK_END: // end key (not numpad)
         if (!LB()->Empty()) {
             DropDownList::iterator it(--LB()->end());
             LB()->BringRowIntoView(it);
             return it;
         }
         break;
-    case GGK_RETURN:
-    case GGK_KP_ENTER:
-    case GGK_ESCAPE:
+    case Key::GGK_RETURN:
+    case Key::GGK_KP_ENTER:
+    case Key::GGK_ESCAPE:
         EndRun();
         return boost::none;
         break;
@@ -494,12 +478,12 @@ boost::optional<DropDownList::iterator> ModalListPicker::MouseWheelCommon(
     return boost::none;
 }
 
-bool ModalListPicker::EventFilter(GG::Wnd* w, const GG::WndEvent& event) {
+bool ModalListPicker::EventFilter(Wnd* w, const WndEvent& event) {
     if (w != m_lb_wnd.get())
         return false;
 
     switch (event.Type()) {
-    case WndEvent::MouseWheel:
+    case WndEvent::EventType::MouseWheel:
         MouseWheel(event.Point(), -event.WheelMove(), event.ModKeys());
         return true;
     default:

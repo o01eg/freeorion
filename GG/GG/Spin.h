@@ -1,43 +1,29 @@
-// -*- C++ -*-
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-/** \file Spin.h \brief Contains the Spin class template, which provides a
-    spin-box control that allows the user to select a value from a range an
-    arbitrary type (int, double, an enum, etc.). */
+//! @file GG/Spin.h
+//!
+//! Contains the Spin class template, which provides a spin-box control that
+//! allows the user to select a value from a range an arbitrary type (int,
+//! double, an enum, etc.).
 
 #ifndef _GG_Spin_h_
 #define _GG_Spin_h_
 
+
+#include <cmath>
+#include <limits>
 #include <GG/Button.h>
 #include <GG/Edit.h>
 #include <GG/GUI.h>
 #include <GG/StyleFactory.h>
 #include <GG/WndEvent.h>
-
-#include <cmath>
-#include <limits>
 
 
 namespace GG {
@@ -123,7 +109,8 @@ public:
 protected:
     typedef T ValueType;
 
-    enum {BORDER_THICK = 2, PIXEL_MARGIN = 5};
+    const int BORDER_THICK = 2;
+    const int PIXEL_MARGIN = 5;
 
     Button* UpButton() const;   ///< returns a pointer to the Button control used as this control's up button
     Button* DownButton() const; ///< returns a pointer to the Button control used as this control's down button
@@ -143,17 +130,17 @@ private:
     void DecrImpl(bool signal);
     void SetValueImpl(T value, bool signal);
 
-    T          m_value;
-    T          m_step_size;
-    T          m_min_value;
-    T          m_max_value;
+    T m_value;
+    T m_step_size;
+    T m_min_value;
+    T m_max_value;
 
-    bool       m_editable;
+    bool m_editable = false;
 
     std::shared_ptr<Button> m_up_button;
     std::shared_ptr<Button> m_down_button;
 
-    X          m_button_width = GG::X(15);
+    X m_button_width = GG::X(15);
 
     static void ValueChangedEcho(const T& value);
 };
@@ -183,7 +170,6 @@ Spin<T>::Spin(T value, T step, T min, T max, bool edits, const std::shared_ptr<F
 template <typename T>
 void Spin<T>::CompleteConstruction()
 {
-    const auto& style = GetStyleFactory();
     m_edit->InstallEventFilter(shared_from_this());
     m_up_button->InstallEventFilter(shared_from_this());
     m_down_button->InstallEventFilter(shared_from_this());
@@ -371,20 +357,20 @@ void Spin<T>::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_
     }
 
     switch (key) {
-    case GGK_HOME:
+    case Key::GGK_HOME:
         SetValueImpl(m_min_value, true);
         break;
-    case GGK_END:
+    case Key::GGK_END:
         SetValueImpl(m_max_value, true);
         break;
-    case GGK_PAGEUP:
-    case GGK_UP:
-    case GGK_KP_PLUS:
+    case Key::GGK_PAGEUP:
+    case Key::GGK_UP:
+    case Key::GGK_KP_PLUS:
         IncrImpl(true);
         break;
-    case GGK_PAGEDOWN:
-    case GGK_DOWN:
-    case GGK_KP_MINUS:
+    case Key::GGK_PAGEDOWN:
+    case Key::GGK_DOWN:
+    case Key::GGK_KP_MINUS:
         DecrImpl(true);
         break;
     default:
@@ -410,7 +396,7 @@ template <typename T>
 bool Spin<T>::EventFilter(Wnd* w, const WndEvent& event)
 {
     if (w == m_edit.get()) {
-        if (!m_editable && event.Type() == WndEvent::GainingFocus) {
+        if (!m_editable && event.Type() == WndEvent::EventType::GainingFocus) {
             GUI::GetGUI()->SetFocusWnd(shared_from_this());
             return true;
         } else {
@@ -438,14 +424,11 @@ void Spin<T>::ConnectSignals()
 template <typename T>
 void Spin<T>::ValueUpdated(const std::string& val_text)
 {
-    T value;
     try {
-        value = boost::lexical_cast<T>(val_text);
+        SetValueImpl(boost::lexical_cast<T>(val_text), true);
     } catch (boost::bad_lexical_cast) {
         SetValueImpl(m_min_value, true);
-        return;
     }
-    SetValueImpl(value, true);
 }
 
 template <typename T>
@@ -524,5 +507,5 @@ namespace spin_details {
 
 }
 
-#endif
 
+#endif

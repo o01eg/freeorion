@@ -17,10 +17,12 @@
 
 
 namespace {
+    #define UserStringNop(key) key
+
     void AddRules(GameRules& rules) {
         // makes all techs cost 1 RP and take 1 turn to research
-        rules.Add<bool>("RULE_CHEAP_AND_FAST_TECH_RESEARCH",
-                        "RULE_CHEAP_AND_FAST_TECH_RESEARCH_DESC",
+        rules.Add<bool>(UserStringNop("RULE_CHEAP_AND_FAST_TECH_RESEARCH"),
+                        UserStringNop("RULE_CHEAP_AND_FAST_TECH_RESEARCH_DESC"),
                         "", false, true);
     }
     bool temp_bool = RegisterGameRules(&AddRules);
@@ -36,7 +38,7 @@ namespace {
 
         if (!known_techs.count((*it)->Name()) && it != end_it) {
             std::vector<const Tech*> stack;
-            stack.push_back(it->get());
+            stack.emplace_back(it->get());
             while (!stack.empty()) {
                 const Tech* current_tech = stack.back();
                 unsigned int starting_stack_size = stack.size();
@@ -47,7 +49,7 @@ namespace {
                     if (prereq_unknown)
                         all_prereqs_known = false;
                     if (!checked_techs.count(prereq_tech) && prereq_unknown)
-                        stack.push_back(prereq_tech);
+                        stack.emplace_back(prereq_tech);
                 }
                 if (starting_stack_size == stack.size()) {
                     stack.pop_back();
@@ -321,36 +323,38 @@ const TechCategory* TechManager::GetTechCategory(const std::string& name) const 
 std::vector<std::string> TechManager::CategoryNames() const {
     CheckPendingTechs();
     std::vector<std::string> retval;
+    retval.reserve(m_categories.size());
     for (const auto& entry : m_categories)
-        retval.push_back(entry.first);
+        retval.emplace_back(entry.first);
     return retval;
 }
 
 std::vector<std::string> TechManager::TechNames() const {
     CheckPendingTechs();
     std::vector<std::string> retval;
+    retval.reserve(m_techs.size());
     for (const auto& tech : m_techs.get<NameIndex>())
-        retval.push_back(tech->Name());
+        retval.emplace_back(tech->Name());
     return retval;
 }
 
 std::vector<std::string> TechManager::TechNames(const std::string& name) const {
     CheckPendingTechs();
     std::vector<std::string> retval;
-    for (TechManager::category_iterator it = category_begin(name); it != category_end(name); ++it) {
-        retval.push_back((*it)->Name());
-    }
+    retval.reserve(m_techs.size());
+    for (TechManager::category_iterator it = category_begin(name); it != category_end(name); ++it)
+        retval.emplace_back((*it)->Name());
     return retval;
 }
 
 std::vector<const Tech*> TechManager::AllNextTechs(const std::set<std::string>& known_techs) {
     CheckPendingTechs();
     std::vector<const Tech*> retval;
+    retval.reserve(known_techs.size() * 3); // rough guesstimate
     std::set<const Tech*> checked_techs;
     iterator end_it = m_techs.get<NameIndex>().end();
-    for (iterator it = m_techs.get<NameIndex>().begin(); it != end_it; ++it) {
+    for (iterator it = m_techs.get<NameIndex>().begin(); it != end_it; ++it)
         NextTechs(retval, known_techs, checked_techs, it, end_it);
-    }
     return retval;
 }
 
@@ -365,6 +369,7 @@ std::vector<const Tech*> TechManager::NextTechsTowards(const std::set<std::strin
 {
     CheckPendingTechs();
     std::vector<const Tech*> retval;
+    retval.reserve(10); // rough guesstimate
     std::set<const Tech*> checked_techs;
     NextTechs(retval, known_techs, checked_techs, m_techs.get<NameIndex>().find(desired_tech),
               m_techs.get<NameIndex>().end());
@@ -521,7 +526,7 @@ std::string TechManager::FindFirstDependencyCycle() const {
             continue;
 
         std::vector<const Tech*> stack;
-        stack.push_back(tech.get());
+        stack.emplace_back(tech.get());
         while (!stack.empty()) {
             // Examine the tech on top of the stack.  If the tech has no prerequisite techs, or if all
             // of its prerequisite techs have already been checked, pop it off the stack and mark it as
@@ -554,7 +559,7 @@ std::string TechManager::FindFirstDependencyCycle() const {
                     stream << " <-- \"" << prereq_tech->Name() << "\" ... ";
                     return stream.str();
                 } else {
-                    stack.push_back(prereq_tech);
+                    stack.emplace_back(prereq_tech);
                 }
             }
 
@@ -621,47 +626,47 @@ TechManager& TechManager::GetTechManager() {
     return manager;
 }
 
-std::vector<std::string> TechManager::RecursivePrereqs(const std::string& tech_name, int empire_id, bool min_required /*= true*/) const {
-    const Tech* tech = this->GetTech(tech_name);
-    if (!tech)
-        return std::vector<std::string>();
+std::vector<std::string> TechManager::RecursivePrereqs(const std::string& tech_name, int empire_id,
+                                                       bool min_required /*= true*/) const
+{
+    std::vector<std::string> retval;
+    const Tech* initial_tech = this->GetTech(tech_name);
+    if (!initial_tech)
+        return retval;
 
     // compile set of recursive prereqs
-    std::list<std::string> prereqs_list;                    // working list of prereqs as being processed.  may contain duplicates
-    std::set<std::string> prereqs_set;                      // set of (unique) prereqs leading to tech
-    std::multimap<float, std::string> techs_to_add_map;    // indexed and sorted by cost per turn
-
-    // initialize working list with 1st order prereqs
-    std::set<std::string> cur_prereqs = tech->Prerequisites();
-    std::copy(cur_prereqs.begin(), cur_prereqs.end(), std::back_inserter(prereqs_list));
+    std::list<std::string> prereqs_list{initial_tech->Prerequisites().begin(), // working list of prereqs as being processed.  may contain duplicates
+                                        initial_tech->Prerequisites().end()};  // initialized with 1st order prereqs
+    std::set<std::string> prereqs_set;                                         // set of (unique) prereqs leading to tech
+    std::multimap<float, std::string> techs_to_add_map;                        // indexed and sorted by cost per turn
     const Empire* empire = GetEmpire(empire_id);
 
     // traverse list, appending new prereqs to it, and putting unique prereqs into set
-    for (const std::string& cur_name : prereqs_list) {
-        const Tech* cur_tech = this->GetTech(cur_name);
-
+    for (std::string& cur_name : prereqs_list) {
         // check if this tech is already in the map of prereqs.  If so, it has already been processed, and can be skipped.
         if (prereqs_set.count(cur_name))
             continue;
 
         // if this tech is already known and min_required==true, can skip.
-        if (min_required && empire && (empire->GetTechStatus(cur_name) == TS_COMPLETE))
+        if (min_required && empire && (empire->GetTechStatus(cur_name) == TechStatus::TS_COMPLETE))
             continue;
 
         // tech is new, so put it into the set of already-processed prereqs
         prereqs_set.emplace(cur_name);
+
         // and the map of techs, sorted by cost
-        techs_to_add_map.emplace(cur_tech->ResearchCost(empire_id), cur_name);
+        const Tech* cur_tech = this->GetTech(cur_name);
+        techs_to_add_map.emplace(cur_tech->ResearchCost(empire_id), std::move(cur_name));
 
         // get prereqs of new tech, append to list
-        cur_prereqs = cur_tech->Prerequisites();
-        std::copy(cur_prereqs.begin(), cur_prereqs.end(), std::back_inserter(prereqs_list));
+        prereqs_list.insert(prereqs_list.end(), cur_tech->Prerequisites().begin(),
+                            cur_tech->Prerequisites().end());
     }
 
     // extract sorted techs into vector, to be passed to signal...
-    std::vector<std::string> retval;
-    for (const auto& tech_to_add : techs_to_add_map)
-    { retval.push_back(tech_to_add.second); }
+    retval.reserve(techs_to_add_map.size());
+    for (auto& tech_to_add : techs_to_add_map)
+        retval.emplace_back(std::move(tech_to_add.second));
 
     return retval;
 }

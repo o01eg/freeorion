@@ -4,7 +4,10 @@ Policy
     short_description = "PLC_EXPLORATION_SHORT_DESC"
     category = "MILITARY_CATEGORY"
     adoptioncost = 5 + Statistic Count condition = And [Ship OwnedBy empire = Source.Owner]
+    exclusions = [ "PLC_COLONIZATION" ]
     effectsgroups = [
+        [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
+    
         EffectsGroup
             scope = And [
                 Ship
@@ -26,3 +29,6 @@ Policy
             effects = SetSpeed value = Value + 20
     ]
     graphic = "icons/policies/exploration.png"
+
+#include "/scripting/policies/policies.macros"
+#include "/scripting/common/priorities.macros"

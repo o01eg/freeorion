@@ -332,9 +332,9 @@ namespace {
                     }
                 }
             } else {
-                for (int i = STAR_BLUE; i < NUM_STAR_TYPES; ++i) {
-                    light_colors[StarType(i)].resize(4, 1.0);
-                }
+                for (StarType i = StarType::STAR_BLUE; i < StarType::NUM_STAR_TYPES;
+                     i = StarType(int(i) + 1))
+                { light_colors[i].resize(4, 1.0); }
             }
         }
 
@@ -350,10 +350,10 @@ namespace {
         return white;
     }
 
-    void        RenderPlanet(const GG::Pt& center, int diameter, std::shared_ptr<GG::Texture> texture,
-                             std::shared_ptr<GG::Texture> overlay_texture,
-                             double initial_rotation, double RPM, double axial_tilt, double shininess,
-                             StarType star_type)
+    void RenderPlanet(const GG::Pt& center, int diameter, std::shared_ptr<GG::Texture> texture,
+                      std::shared_ptr<GG::Texture> overlay_texture,
+                      double initial_rotation, double RPM, double axial_tilt, double shininess,
+                      StarType star_type)
     {
         glPushAttrib(GL_ENABLE_BIT | GL_PIXEL_MODE_BIT | GL_TEXTURE_BIT | GL_SCISSOR_BIT);
         HumanClientApp::GetApp()->Exit2DMode();
@@ -414,20 +414,20 @@ namespace {
         glPopAttrib();
     }
 
-    int         MaxPlanetDiameter()
+    int MaxPlanetDiameter()
     { return GetOptionsDB().Get<int>("ui.map.sidepanel.planet.diameter.max"); }
 
-    int         PlanetDiameter(PlanetSize size) {
+    int PlanetDiameter(PlanetSize size) {
         double scale = 0.0;
         switch (size) {
-        case SZ_TINY      : scale = 1.0/7.0; break;
-        case SZ_SMALL     : scale = 2.0/7.0; break;
-        case SZ_MEDIUM    : scale = 3.0/7.0; break;
-        case SZ_LARGE     : scale = 4.0/7.0; break;
-        case SZ_HUGE      : scale = 5.0/7.0; break;
-        case SZ_GASGIANT  : scale = 7.0/7.0; break;
-        case SZ_ASTEROIDS : scale = 7.0/7.0; break;
-        default           : scale = 3.0/7.0; break;
+        case PlanetSize::SZ_TINY      : scale = 1.0/7.0; break;
+        case PlanetSize::SZ_SMALL     : scale = 2.0/7.0; break;
+        case PlanetSize::SZ_MEDIUM    : scale = 3.0/7.0; break;
+        case PlanetSize::SZ_LARGE     : scale = 4.0/7.0; break;
+        case PlanetSize::SZ_HUGE      : scale = 5.0/7.0; break;
+        case PlanetSize::SZ_GASGIANT  : scale = 7.0/7.0; break;
+        case PlanetSize::SZ_ASTEROIDS : scale = 7.0/7.0; break;
+        default                       : scale = 3.0/7.0; break;
         }
 
         int MIN_PLANET_DIAMETER = GetOptionsDB().Get<int>("ui.map.sidepanel.planet.diameter.min");
@@ -499,7 +499,7 @@ namespace {
     }
 
     bool ClientPlayerIsModerator()
-    { return HumanClientApp::GetApp()->GetClientType() == Networking::CLIENT_TYPE_HUMAN_MODERATOR; }
+    { return HumanClientApp::GetApp()->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR; }
 }
 
 
@@ -697,7 +697,7 @@ public:
         }
 
         // render fog of war over planet if it's not visible to this client's player
-        if ((m_visibility <= VIS_BASIC_VISIBILITY) && GetOptionsDB().Get<bool>("ui.map.scanlines.shown")) {
+        if ((m_visibility <= Visibility::VIS_BASIC_VISIBILITY) && GetOptionsDB().Get<bool>("ui.map.scanlines.shown")) {
             s_scanline_shader.SetColor(GetOptionsDB().Get<GG::Clr>("ui.map.sidepanel.planet.scanlane.color"));
             s_scanline_shader.RenderCircle(ul, lr);
         }
@@ -870,20 +870,20 @@ namespace {
 
     const std::string EMPTY_STRING;
 
-    const std::string& GetPlanetSizeName(std::shared_ptr<const Planet> planet) {
-        if (planet->Size() == SZ_ASTEROIDS || planet->Size() == SZ_GASGIANT)
+    const std::string& GetPlanetSizeName(const Planet* planet) {
+        if (!planet || planet->Size() == PlanetSize::SZ_ASTEROIDS || planet->Size() == PlanetSize::SZ_GASGIANT)
             return EMPTY_STRING;
         return UserString(boost::lexical_cast<std::string>(planet->Size()));
     }
 
-    const std::string& GetPlanetTypeName(std::shared_ptr<const Planet> planet)
+    const std::string& GetPlanetTypeName(const Planet* planet)
     { return UserString(boost::lexical_cast<std::string>(planet->Type())); }
 
-    const std::string& GetPlanetEnvironmentName(std::shared_ptr<const Planet> planet, const std::string& species_name)
+    const std::string& GetPlanetEnvironmentName(const Planet* planet, const std::string& species_name)
     { return UserString(boost::lexical_cast<std::string>(planet->EnvironmentForSpecies(species_name))); }
 
-    const std::string& GetStarTypeName(std::shared_ptr<const System> system) {
-        if (system->GetStarType() == INVALID_STAR_TYPE)
+    const std::string& GetStarTypeName(const System* system) {
+        if (!system || system->GetStarType() == StarType::INVALID_STAR_TYPE)
             return EMPTY_STRING;
         return UserString(boost::lexical_cast<std::string>(system->GetStarType()));
     }
@@ -920,7 +920,7 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
 
     SetName(UserString("PLANET_PANEL"));
 
-    auto planet = Objects().get<Planet>(m_planet_id);
+    auto planet = Objects().get<Planet>(m_planet_id).get();
     if (!planet) {
         ErrorLogger() << "SidePanel::PlanetPanel::PlanetPanel couldn't get latest known planet with ID " << m_planet_id;
         return;
@@ -936,7 +936,7 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
 
     // need to check all empires for capitals
     for (const auto& entry : Empires()) {
-        const Empire* empire = entry.second;
+        const auto& empire = entry.second;
         if (!empire) {
             ErrorLogger() << "PlanetPanel::PlanetPanel got null empire pointer for id " << entry.first;
             continue;
@@ -948,11 +948,7 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
     }
 
     // determine font based on whether planet is a capital...
-    std::shared_ptr<GG::Font> font;
-    if (capital)
-        font = ClientUI::GetBoldFont(ClientUI::Pts()*4/3);
-    else
-        font = ClientUI::GetFont(ClientUI::Pts()*4/3);
+    auto font{capital ? ClientUI::GetBoldFont(ClientUI::Pts()*4/3) : ClientUI::GetFont(ClientUI::Pts()*4/3)};
 
     GG::X panel_width = Width() - MaxPlanetDiameter() - 2*EDGE_PAD;
 
@@ -1025,7 +1021,7 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
     m_bombard_button->LeftClickedSignal.connect(
         boost::bind(&SidePanel::PlanetPanel::ClickBombard, this));
 
-    SetChildClippingMode(ClipToWindow);
+    SetChildClippingMode(ChildClippingMode::ClipToWindow);
 
     Refresh();
 
@@ -1124,7 +1120,7 @@ void SidePanel::PlanetPanel::RefreshPlanetGraphic() {
     DetachChildAndReset(m_planet_graphic);
     DetachChildAndReset(m_rotating_planet_graphic);
 
-    if (planet->Type() == PT_ASTEROIDS) {
+    if (planet->Type() == PlanetType::PT_ASTEROIDS) {
         const auto& textures = GetAsteroidTextures();
         if (textures.empty())
             return;
@@ -1132,15 +1128,15 @@ void SidePanel::PlanetPanel::RefreshPlanetGraphic() {
         GG::Y texture_height = textures[0]->DefaultHeight();
         GG::Pt planet_image_pos(GG::X(MaxPlanetDiameter() / 2 - texture_width / 2 + 3), GG::Y0);
 
-        m_planet_graphic = GG::Wnd::Create<GG::DynamicGraphic>(planet_image_pos.x, planet_image_pos.y,
-                                                               texture_width, texture_height, true,
-                                                               texture_width, texture_height, 0, textures,
-                                                               GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+        m_planet_graphic = GG::Wnd::Create<GG::DynamicGraphic>(
+            planet_image_pos.x, planet_image_pos.y, texture_width, texture_height,
+            true, texture_width, texture_height, 0, textures,
+            GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
         m_planet_graphic->SetFPS(GetAsteroidsFPS());
         m_planet_graphic->SetFrameIndex(RandInt(0, textures.size() - 1));
         AttachChild(m_planet_graphic);
         m_planet_graphic->Play();
-    } else if (planet->Type() < NUM_PLANET_TYPES) {
+    } else if (planet->Type() < PlanetType::NUM_PLANET_TYPES) {
         int planet_image_sz = PlanetDiameter(planet->Size());
         GG::Pt planet_image_pos(GG::X(MaxPlanetDiameter() / 2 - planet_image_sz / 2 + 3),
                                 GG::Y(MaxPlanetDiameter() / 2 - planet_image_sz / 2));
@@ -1151,26 +1147,25 @@ void SidePanel::PlanetPanel::RefreshPlanetGraphic() {
 }
 
 namespace {
-    bool IsAvailable(std::shared_ptr<const Ship> ship, int system_id, int empire_id) {
+    bool IsAvailable(const Ship* ship, int system_id, int empire_id) {
         if (!ship)
             return false;
-        auto fleet = Objects().get<Fleet>(ship->FleetID());
+        auto fleet = Objects().get<Fleet>(ship->FleetID()).get();
         if (!fleet)
             return false;
         if (ship->SystemID() == system_id &&
             ship->OwnedBy(empire_id) &&
-            ship->GetVisibility(empire_id) >= VIS_PARTIAL_VISIBILITY &&
+            ship->GetVisibility(empire_id) >= Visibility::VIS_PARTIAL_VISIBILITY &&
             ship->OrderedScrapped() == false &&
             fleet->FinalDestinationID() == INVALID_OBJECT_ID)
         { return true; }
         return false;
     }
 
-    bool AvailableToColonize(std::shared_ptr<const Ship> ship, int system_id, int empire_id) {
+    bool AvailableToColonize(const Ship* ship, int system_id, int empire_id) {
         if (!ship)
             return false;
-        auto fleet = Objects().get<Fleet>(ship->FleetID());
-        if (!fleet)
+        if (!Objects().get<Fleet>(ship->FleetID()))
             return false;
         if (IsAvailable(ship, system_id, empire_id) &&
             ship->CanColonize() &&
@@ -1179,11 +1174,10 @@ namespace {
         return false;
     };
 
-    bool AvailableToInvade(std::shared_ptr<const Ship> ship, int system_id, int empire_id) {
+    bool AvailableToInvade(const Ship* ship, int system_id, int empire_id) {
         if (!ship)
             return false;
-        auto fleet = Objects().get<Fleet>(ship->FleetID());
-        if (!fleet)
+        if (!Objects().get<Fleet>(ship->FleetID()))
             return false;
         if (IsAvailable(ship, system_id, empire_id) &&
             ship->HasTroops() &&
@@ -1192,11 +1186,10 @@ namespace {
         return false;
     };
 
-    bool AvailableToBombard(std::shared_ptr<const Ship> ship, int system_id, int empire_id) {
+    bool AvailableToBombard(const Ship* ship, int system_id, int empire_id) {
         if (!ship)
             return false;
-        auto fleet = Objects().get<Fleet>(ship->FleetID());
-        if (!fleet)
+        if (!Objects().get<Fleet>(ship->FleetID()))
             return false;
         if (IsAvailable(ship, system_id, empire_id) &&
             ship->CanBombard() &&
@@ -1211,24 +1204,26 @@ namespace {
      *  the corresponding "CTRL_BOMBARD_ROBOTIC" tag, the ship would be auto-selected to bombard that planet.
      *  If the Ship contains the content tag defined in TAG_BOMBARD_ALWAYS, only that tag will be returned.
      */
-    std::vector<std::string> BombardTagsForShip(std::shared_ptr<const Ship> ship) {
+    std::vector<std::string> BombardTagsForShip(const Ship* ship) {
         std::vector<std::string> retval;
         if (!ship)
             return retval;
-        for (const std::string& tag : ship->Tags()) {
+        auto&& tags{ship->Tags()};
+        retval.reserve(tags.size());
+        for (auto& tag : tags) {
             if (tag == TAG_BOMBARD_ALWAYS) {
                 retval.clear();
-                retval.push_back(tag);
+                retval.emplace_back(tag);
                 break;
             } else if ((tag.length() > TAG_BOMBARD_PREFIX.length()) &&
                        (tag.substr(0, TAG_BOMBARD_PREFIX.length()) == TAG_BOMBARD_PREFIX))
-            { retval.push_back(tag.substr(TAG_BOMBARD_PREFIX.length())); }
+            { retval.emplace_back(tag.substr(TAG_BOMBARD_PREFIX.length())); }
         }
         return retval;
     }
 
-    bool CanColonizePlanetType(std::shared_ptr<const Ship> ship, PlanetType planet_type) {
-        if (!ship || planet_type == INVALID_PLANET_TYPE)
+    bool CanColonizePlanetType(const Ship* ship, PlanetType planet_type) {
+        if (!ship || planet_type == PlanetType::INVALID_PLANET_TYPE)
             return false;
 
         float colony_ship_capacity = 0.0f;
@@ -1241,22 +1236,23 @@ namespace {
         }
 
         if (const Species* colony_ship_species = GetSpecies(ship->SpeciesName())) {
-            PlanetEnvironment planet_env_for_colony_species = colony_ship_species->GetPlanetEnvironment(planet_type);
+            PlanetEnvironment planet_env_for_colony_species =
+                colony_ship_species->GetPlanetEnvironment(planet_type);
 
             // One-Click Colonize planets that are colonizable (even if they are
             // not hospitable), and One-Click Outpost planets that are not
             // colonizable.
             if (colony_ship_capacity > 0.0f) {
-                return planet_env_for_colony_species >= PE_HOSTILE && planet_env_for_colony_species <= PE_GOOD;
+                return planet_env_for_colony_species >= PlanetEnvironment::PE_HOSTILE && planet_env_for_colony_species <= PlanetEnvironment::PE_GOOD;
             } else {
-                return planet_env_for_colony_species < PE_HOSTILE || planet_env_for_colony_species > PE_GOOD;
+                return planet_env_for_colony_species < PlanetEnvironment::PE_HOSTILE || planet_env_for_colony_species > PlanetEnvironment::PE_GOOD;
             }
         }
         return false;
     }
 
-    std::set<std::shared_ptr<const Ship>> ValidSelectedInvasionShips(int system_id) {
-        std::set<std::shared_ptr<const Ship>> retval;
+    std::set<const Ship*> ValidSelectedInvasionShips(int system_id) {
+        std::set<const Ship*> retval;
 
         // if not looking in a valid system, no valid invasion ship can be available
         if (system_id == INVALID_OBJECT_ID)
@@ -1264,15 +1260,20 @@ namespace {
 
         // is there a valid single selected ship in the active FleetWnd?
         for (const auto& ship : GetUniverse().Objects().find<Ship>(
-                FleetUIManager::GetFleetUIManager().SelectedShipIDs()))
-            if (ship->SystemID() == system_id && ship->HasTroops() && ship->OwnedBy(HumanClientApp::GetApp()->EmpireID()))
-                retval.insert(ship);
+            FleetUIManager::GetFleetUIManager().SelectedShipIDs()))
+        {
+            if (ship &&
+                ship->SystemID() == system_id &&
+                ship->HasTroops() &&
+                ship->OwnedBy(HumanClientApp::GetApp()->EmpireID()))
+            { retval.insert(ship.get()); }
+        }
 
         return retval;
     }
 
-    std::set<std::shared_ptr<const Ship>> ValidSelectedBombardShips(int system_id) {
-        std::set<std::shared_ptr<const Ship>> retval;
+    std::set<const Ship*> ValidSelectedBombardShips(int system_id) {
+        std::set<const Ship*> retval;
 
         // if not looking in a valid system, no valid bombard ship can be available
         if (system_id == INVALID_OBJECT_ID)
@@ -1284,14 +1285,14 @@ namespace {
                 continue;
             if (!ship->CanBombard() || !ship->OwnedBy(HumanClientApp::GetApp()->EmpireID()))
                 continue;
-            retval.insert(ship);
+            retval.insert(ship.get());
         }
 
         return retval;
     }
 }
 
-std::shared_ptr<const Ship> ValidSelectedColonyShip(int system_id) {
+const Ship* ValidSelectedColonyShip(int system_id) {
     // if not looking in a valid system, no valid colony ship can be available
     if (system_id == INVALID_OBJECT_ID)
         return nullptr;
@@ -1300,8 +1301,10 @@ std::shared_ptr<const Ship> ValidSelectedColonyShip(int system_id) {
     for (const auto& ship : Objects().find<Ship>(FleetUIManager::GetFleetUIManager().SelectedShipIDs())) {
         if (!ship)
             continue;
-        if (ship->SystemID() == system_id && ship->CanColonize() && ship->OwnedBy(HumanClientApp::GetApp()->EmpireID()))
-            return ship;
+        if (ship->SystemID() == system_id &&
+            ship->CanColonize() &&
+            ship->OwnedBy(HumanClientApp::GetApp()->EmpireID())) 
+        { return ship.get(); }
     }
     return nullptr;
 }
@@ -1310,7 +1313,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
     int empire_id = HumanClientApp::GetApp()->EmpireID();
     if (empire_id == ALL_EMPIRES)
         return INVALID_OBJECT_ID;
-    if (GetUniverse().GetObjectVisibilityByEmpire(target_planet_id, empire_id) < VIS_PARTIAL_VISIBILITY)
+    if (GetUniverse().GetObjectVisibilityByEmpire(target_planet_id, empire_id) < Visibility::VIS_PARTIAL_VISIBILITY)
         return INVALID_OBJECT_ID;
     auto target_planet = Objects().get<Planet>(target_planet_id);
     if (!target_planet)
@@ -1320,7 +1323,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
     if (!system)
         return INVALID_OBJECT_ID;
     // is planet a valid colonization target?
-    if (target_planet->GetMeter(METER_POPULATION)->Initial() > 0.0f ||
+    if (target_planet->GetMeter(MeterType::METER_POPULATION)->Initial() > 0.0f ||
         (!target_planet->Unowned() && !target_planet->OwnedBy(empire_id)))
     { return INVALID_OBJECT_ID; }
 
@@ -1328,17 +1331,17 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
 
     // todo: return vector of ships from system ids using new Objects().find<Ship>(system->FindObjectIDs())
     auto ships = Objects().find<const Ship>(system->ShipIDs());
-    std::vector<std::shared_ptr<const Ship>> capable_and_available_colony_ships;
+    std::vector<const Ship*> capable_and_available_colony_ships;
     capable_and_available_colony_ships.reserve(ships.size());
 
     // get all ships that can colonize and that are free to do so in the
     // specified planet'ssystem and that can colonize the requested planet
     for (auto& ship : ships) {
-        if (!AvailableToColonize(ship, system_id, empire_id))
+        if (!AvailableToColonize(ship.get(), system_id, empire_id))
             continue;
-        if (!CanColonizePlanetType(ship, target_planet_type))
+        if (!CanColonizePlanetType(ship.get(), target_planet_type))
             continue;
-        capable_and_available_colony_ships.push_back(ship);
+        capable_and_available_colony_ships.emplace_back(ship.get());
     }
 
     // simple case early exits: no ships, or just one capable ship
@@ -1349,9 +1352,9 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
 
     // have more than one ship capable and available to colonize.
     // pick the "best" one.
-    std::string orig_species = target_planet->SpeciesName(); //should be just ""
+    auto& orig_species = target_planet->SpeciesName(); //should be just ""
     int orig_owner = target_planet->Owner();
-    float orig_initial_target_pop = target_planet->GetMeter(METER_TARGET_POPULATION)->Initial();
+    float orig_initial_target_pop = target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Initial();
     int best_ship = INVALID_OBJECT_ID;
     float best_capacity = -999;
     bool changed_planet = false;
@@ -1368,33 +1371,32 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
             planet_capacity = pair_it->second;
         } else {
             float colony_ship_capacity = 0.0f;
-            std::string ship_species_name;
             const ShipDesign* design = ship->Design();
             if (!design)
                 continue;
             colony_ship_capacity = design->ColonyCapacity();
             if (colony_ship_capacity > 0.0f ) {
-                ship_species_name = ship->SpeciesName();
+                auto& ship_species_name = ship->SpeciesName();
                 auto spec_pair = std::make_pair(ship_species_name, target_planet_id);
                 auto spec_pair_it = species_colony_projections.find(spec_pair);
                 if (spec_pair_it != species_colony_projections.end()) {
                     planet_capacity = spec_pair_it->second;
                 } else {
                     const Species* species = GetSpecies(ship_species_name);
-                    PlanetEnvironment planet_environment = PE_UNINHABITABLE;
+                    PlanetEnvironment planet_environment = PlanetEnvironment::PE_UNINHABITABLE;
                     if (species)
                         planet_environment = species->GetPlanetEnvironment(target_planet->Type());
-                    if (planet_environment != PE_UNINHABITABLE) {
+                    if (planet_environment != PlanetEnvironment::PE_UNINHABITABLE) {
                         changed_planet = true;
                         target_planet->SetOwner(empire_id);
                         target_planet->SetSpecies(ship_species_name);
-                        target_planet->GetMeter(METER_TARGET_POPULATION)->Reset();
+                        target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
 
                         // temporary meter update with currently set species
                         GetUniverse().UpdateMeterEstimates(target_planet_id);
-                        planet_capacity = target_planet->GetMeter(METER_TARGET_POPULATION)->Current();  // want value after meter update, so check current, not initial value
+                        planet_capacity = target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current();  // want value after meter update, so check current, not initial value
                     }
-                    species_colony_projections[spec_pair] = planet_capacity;
+                    species_colony_projections[std::move(spec_pair)] = planet_capacity;
                 }
             } else {
                 planet_capacity = 0.0f;
@@ -1409,7 +1411,8 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
     if (changed_planet) {
         target_planet->SetOwner(orig_owner);
         target_planet->SetSpecies(orig_species);
-        target_planet->GetMeter(METER_TARGET_POPULATION)->Set(orig_initial_target_pop, orig_initial_target_pop);
+        target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(orig_initial_target_pop,
+                                                              orig_initial_target_pop);
         GetUniverse().UpdateMeterEstimates(target_planet_id);
     }
     GetUniverse().InhibitUniverseObjectSignals(false);
@@ -1417,18 +1420,18 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
     return best_ship;
 }
 
-std::set<std::shared_ptr<const Ship>> AutomaticallyChosenInvasionShips(int target_planet_id) {
-    std::set<std::shared_ptr<const Ship>> retval;
+std::set<const Ship*> AutomaticallyChosenInvasionShips(int target_planet_id) {
+    std::set<const Ship*> retval;
 
     int empire_id = HumanClientApp::GetApp()->EmpireID();
     if (empire_id == ALL_EMPIRES)
         return retval;
 
-    auto target_planet = Objects().get<Planet>(target_planet_id);
+    auto target_planet = Objects().get<Planet>(target_planet_id).get();
     if (!target_planet)
         return retval;
     int system_id = target_planet->SystemID();
-    auto system = Objects().get<System>(system_id);
+    auto system = Objects().get<System>(system_id).get();
     if (!system)
         return retval;
 
@@ -1438,16 +1441,16 @@ std::set<std::shared_ptr<const Ship>> AutomaticallyChosenInvasionShips(int targe
 
 
     // get "just enough" ships that can invade and that are free to do so
-    double defending_troops = target_planet->GetMeter(METER_TROOPS)->Initial();
+    double defending_troops = target_planet->GetMeter(MeterType::METER_TROOPS)->Initial();
 
     double invasion_troops = 0;
-    for (auto& ship : Objects().all<Ship>()) {
-        if (!AvailableToInvade(ship, system_id, empire_id))
+    for (const auto& ship : Objects().all<Ship>()) {
+        if (!AvailableToInvade(ship.get(), system_id, empire_id))
             continue;
 
         invasion_troops += ship->TroopCapacity();
 
-        retval.insert(ship);
+        retval.insert(ship.get());
 
         if (invasion_troops > defending_troops)
             break;
@@ -1459,18 +1462,18 @@ std::set<std::shared_ptr<const Ship>> AutomaticallyChosenInvasionShips(int targe
 /** Returns valid Ship%s capable of bombarding a given Planet.
  * @param target_planet_id ID of Planet to potentially bombard
  */
-std::set<std::shared_ptr<const Ship>> AutomaticallyChosenBombardShips(int target_planet_id) {
-    std::set<std::shared_ptr<const Ship>> retval;
+std::set<const Ship*> AutomaticallyChosenBombardShips(int target_planet_id) {
+    std::set<const Ship*> retval;
 
     int empire_id = HumanClientApp::GetApp()->EmpireID();
     if (empire_id == ALL_EMPIRES)
         return retval;
 
-    auto target_planet = Objects().get<Planet>(target_planet_id);
+    auto target_planet = Objects().get<Planet>(target_planet_id).get();
     if (!target_planet)
         return retval;
     int system_id = target_planet->SystemID();
-    auto system = Objects().get<System>(system_id);
+    auto system = Objects().get<System>(system_id).get();
     if (!system)
         return retval;
 
@@ -1478,15 +1481,16 @@ std::set<std::shared_ptr<const Ship>> AutomaticallyChosenBombardShips(int target
     if (target_planet->OwnedBy(empire_id))
         return retval;
 
-    for (auto& ship : Objects().all<Ship>()) {
+    for (const auto& ship : Objects().all<Ship>()) {
         // owned ship is capable of bombarding a planet in this system
-        if (!AvailableToBombard(ship, system_id, empire_id))
+        if (!AvailableToBombard(ship.get(), system_id, empire_id))
             continue;
 
-        // Select ship if the planet contains a content tag specified by the ship, or ship is tagged to always be selected
-        for (const std::string& tag : BombardTagsForShip(ship)) {
+        // Select ship if the planet contains a content tag specified by the ship,
+        // or ship is tagged to always be selected
+        for (const std::string& tag : BombardTagsForShip(ship.get())) {
             if ((tag == TAG_BOMBARD_ALWAYS) || (target_planet->HasTag(tag))) {
-                retval.insert(ship);
+                retval.insert(ship.get());
                 break;
             }
         }
@@ -1499,7 +1503,7 @@ void SidePanel::PlanetPanel::Refresh() {
     int client_empire_id = HumanClientApp::GetApp()->EmpireID();
     m_planet_connection.disconnect();
 
-    auto planet = Objects().get<Planet>(m_planet_id);
+    auto planet = Objects().get<Planet>(m_planet_id).get();
     if (!planet) {
         DebugLogger() << "PlanetPanel::Refresh couldn't get planet!";
         // clear / hide everything...
@@ -1552,14 +1556,16 @@ void SidePanel::PlanetPanel::Refresh() {
     }
 
     // wrap with formatting tags
-    std::string wrapped_planet_name = planet->Name();
+    std::string wrapped_planet_name;
+    wrapped_planet_name.reserve(planet->Name().length() + 32);  // extra space for wrappings 3*3 + 3*4 + 2 + 1 = 24 + 8 for number
+    wrapped_planet_name = planet->Name();
     if (homeworld)
         wrapped_planet_name = "<i>" + wrapped_planet_name + "</i>";
     if (has_shipyard)
         wrapped_planet_name = "<u>" + wrapped_planet_name + "</u>";
-    if (GetOptionsDB().Get<bool>("ui.name.id.shown")) {
+    if (GetOptionsDB().Get<bool>("ui.name.id.shown"))
         wrapped_planet_name = wrapped_planet_name + " (" + std::to_string(m_planet_id) + ")";
-    }
+ 
 
     // set name
     m_planet_name->SetText("<s>" + wrapped_planet_name + "</s>");
@@ -1580,7 +1586,7 @@ void SidePanel::PlanetPanel::Refresh() {
 
     auto selected_colony_ship = ValidSelectedColonyShip(SidePanel::SystemID());
     if (!selected_colony_ship && FleetUIManager::GetFleetUIManager().SelectedShipIDs().empty())
-        selected_colony_ship = Objects().get<Ship>(AutomaticallyChosenColonyShip(m_planet_id));
+        selected_colony_ship = Objects().get<Ship>(AutomaticallyChosenColonyShip(m_planet_id)).get();
 
     auto invasion_ships = ValidSelectedInvasionShips(SidePanel::SystemID());
     if (invasion_ships.empty()) {
@@ -1594,35 +1600,32 @@ void SidePanel::PlanetPanel::Refresh() {
         bombard_ships.insert(autoselected_bombard_ships.begin(), autoselected_bombard_ships.end());
     }
 
-    std::string colony_ship_species_name;
-    float colony_ship_capacity = 0.0f;
-    if (selected_colony_ship) {
-        colony_ship_species_name = selected_colony_ship->SpeciesName();
-        colony_ship_capacity = selected_colony_ship->ColonyCapacity();
-    }
+    auto& colony_ship_species_name{selected_colony_ship ? selected_colony_ship->SpeciesName() : ""};
+    float colony_ship_capacity{selected_colony_ship ? selected_colony_ship->ColonyCapacity() : 0.0f};
     const Species* colony_ship_species = GetSpecies(colony_ship_species_name);
-    PlanetEnvironment planet_env_for_colony_species = PE_UNINHABITABLE;
+    PlanetEnvironment planet_env_for_colony_species = PlanetEnvironment::PE_UNINHABITABLE;
     if (colony_ship_species)
         planet_env_for_colony_species = colony_ship_species->GetPlanetEnvironment(planet->Type());
 
 
     // calculate truth tables for planet colonization and invasion
-    bool has_owner =        !planet->Unowned();
+    bool has_owner =       !planet->Unowned();
     bool mine =             planet->OwnedBy(client_empire_id);
-    bool populated =        planet->GetMeter(METER_POPULATION)->Initial() > 0.0f;
-    bool habitable =        planet_env_for_colony_species >= PE_HOSTILE && planet_env_for_colony_species <= PE_GOOD;
-    bool visible =          GetUniverse().GetObjectVisibilityByEmpire(m_planet_id, client_empire_id) >= VIS_PARTIAL_VISIBILITY;
-    bool shielded =         planet->GetMeter(METER_SHIELD)->Initial() > 0.0f;
-    bool has_defenses =     planet->GetMeter(METER_MAX_SHIELD)->Initial() > 0.0f ||
-                            planet->GetMeter(METER_MAX_DEFENSE)->Initial() > 0.0f ||
-                            planet->GetMeter(METER_MAX_TROOPS)->Initial() > 0.0f;
+    bool populated =        planet->GetMeter(MeterType::METER_POPULATION)->Initial() > 0.0f;
+    bool habitable =        planet_env_for_colony_species >= PlanetEnvironment::PE_HOSTILE &&
+                            planet_env_for_colony_species <= PlanetEnvironment::PE_GOOD;
+    bool visible =          GetUniverse().GetObjectVisibilityByEmpire(m_planet_id, client_empire_id) >= Visibility::VIS_PARTIAL_VISIBILITY;
+    bool shielded =         planet->GetMeter(MeterType::METER_SHIELD)->Initial() > 0.0f;
+    bool has_defenses =     planet->GetMeter(MeterType::METER_MAX_SHIELD)->Initial() > 0.0f ||
+                            planet->GetMeter(MeterType::METER_MAX_DEFENSE)->Initial() > 0.0f ||
+                            planet->GetMeter(MeterType::METER_MAX_TROOPS)->Initial() > 0.0f;
     bool being_colonized =  planet->IsAboutToBeColonized();
     bool outpostable =                   !populated && (  !has_owner /*&& !shielded*/         ) && visible && !being_colonized;
     bool colonizable =      habitable && !populated && ( (!has_owner /*&& !shielded*/) || mine) && visible && !being_colonized;
     bool can_colonize =     selected_colony_ship && (   (colonizable  && (colony_ship_capacity > 0.0f))
                                                      || (outpostable && (colony_ship_capacity == 0.0f)));
 
-    bool at_war_with_me =   !mine && (populated || (has_owner && Empires().GetDiplomaticStatus(client_empire_id, planet->Owner()) == DIPLO_WAR));
+    bool at_war_with_me =   !mine && (populated || (has_owner && Empires().GetDiplomaticStatus(client_empire_id, planet->Owner()) == DiplomaticStatus::DIPLO_WAR));
 
     bool being_invaded =    planet->IsAboutToBeInvaded();
     bool invadable =        at_war_with_me && !shielded && visible && !being_invaded && !invasion_ships.empty();
@@ -1660,25 +1663,6 @@ void SidePanel::PlanetPanel::Refresh() {
     DetachChild(m_bombard_button);
     DetachChild(m_focus_drop);
 
-    std::string species_name;
-    if (!planet->SpeciesName().empty())
-        species_name = planet->SpeciesName();
-    else if (!colony_ship_species_name.empty())
-        species_name = colony_ship_species_name;
-
-    std::string env_size_text;
-
-    if (species_name.empty())
-        env_size_text = boost::io::str(FlexibleFormat(UserString("PL_TYPE_SIZE"))
-                                       % GetPlanetSizeName(planet)
-                                       % GetPlanetTypeName(planet));
-    else
-        env_size_text = boost::io::str(FlexibleFormat(UserString("PL_TYPE_SIZE_ENV"))
-                                       % GetPlanetSizeName(planet)
-                                       % GetPlanetTypeName(planet)
-                                       % GetPlanetEnvironmentName(planet, species_name)
-                                       % UserString(species_name));
-
 
     if (Disabled() || !(can_colonize || being_colonized || invadable || being_invaded)) {
         // hide everything
@@ -1703,19 +1687,20 @@ void SidePanel::PlanetPanel::Refresh() {
             colony_projections[this_pair] = planet_capacity;
         } else {
             GetUniverse().InhibitUniverseObjectSignals(true);
-            std::string orig_species = planet->SpeciesName(); //should be just ""
+            auto orig_species = planet->SpeciesName(); //want to store by value, not reference. should be just ""
             int orig_owner = planet->Owner();
-            float orig_initial_target_pop = planet->GetMeter(METER_TARGET_POPULATION)->Initial();
+            float orig_initial_target_pop = planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Initial();
             planet->SetOwner(client_empire_id);
-            planet->SetSpecies(colony_ship_species_name);
-            planet->GetMeter(METER_TARGET_POPULATION)->Reset();
+            planet->SetSpecies(colony_ship_species_name);   // const std::string& -> no move
+            planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
 
             // temporary meter updates for curently set species
             GetUniverse().UpdateMeterEstimates(m_planet_id);
-            planet_capacity = ((planet_env_for_colony_species == PE_UNINHABITABLE) ? 0.0 : planet->GetMeter(METER_TARGET_POPULATION)->Current());   // want target pop after meter update, so check current value of meter
+            planet_capacity = ((planet_env_for_colony_species == PlanetEnvironment::PE_UNINHABITABLE) ? 0.0 : planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current());   // want target pop after meter update, so check current value of meter
             planet->SetOwner(orig_owner);
             planet->SetSpecies(orig_species);
-            planet->GetMeter(METER_TARGET_POPULATION)->Set(orig_initial_target_pop, orig_initial_target_pop);
+            planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(
+                orig_initial_target_pop, orig_initial_target_pop);
             GetUniverse().UpdateMeterEstimates(m_planet_id);
 
             colony_projections[this_pair] = planet_capacity;
@@ -1724,22 +1709,24 @@ void SidePanel::PlanetPanel::Refresh() {
 
         std::string colonize_text;
         if (colony_ship_capacity > 0.0f) {
-            std::string initial_pop = DoubleToString(colony_ship_capacity, 2, false);
+            std::string&& initial_pop = DoubleToString(colony_ship_capacity, 2, false);
 
             std::string clr_tag;
             if (planet_capacity < colony_ship_capacity && colony_ship_capacity > 0.0f)
                 clr_tag = GG::RgbaTag(ClientUI::StatDecrColor());
             else if (planet_capacity > colony_ship_capacity && colony_ship_capacity > 0.0f)
                 clr_tag = GG::RgbaTag(ClientUI::StatIncrColor());
-            std::string clr_tag_close = (clr_tag.empty() ? "" : "</rgba>");
-            std::string target_pop = clr_tag + DoubleToString(planet_capacity, 2, false) + clr_tag_close;
+
+            std::string&& clr_tag_close = (clr_tag.empty() ? "" : "</rgba>");
+
+            std::string&& target_pop = clr_tag + DoubleToString(planet_capacity, 2, false) + clr_tag_close;
 
             colonize_text = boost::io::str(FlexibleFormat(UserString("PL_COLONIZE")) % initial_pop % target_pop);
         } else {
             colonize_text = UserString("PL_OUTPOST");
         }
         if (m_colonize_button)
-            m_colonize_button->SetText(colonize_text);
+            m_colonize_button->SetText(std::move(colonize_text));
 
     } else if (being_colonized) {
         // shown colonize cancel button
@@ -1752,16 +1739,16 @@ void SidePanel::PlanetPanel::Refresh() {
         // show invade button
         AttachChild(m_invade_button);
         float invasion_troops = 0.0f;
-        for (auto& invasion_ship : invasion_ships) {
+        for (auto& invasion_ship : invasion_ships)
             invasion_troops += invasion_ship->TroopCapacity();
-        }
+
         std::string invasion_troops_text = DoubleToString(invasion_troops, 3, false);
 
         // adjust defending troops number before passing into DoubleToString to ensure
         // rounding up, as it's better to slightly overestimate defending troops than
         // underestimate, since one needs to drop more droops than there are defenders
         // to capture a planet
-        float defending_troops = planet->GetMeter(METER_TROOPS)->Initial();
+        float defending_troops = planet->GetMeter(MeterType::METER_TROOPS)->Initial();
         float log10_df = floor(std::log10(defending_troops));
         float rounding_adjustment = std::pow(10.0f, log10_df - 2.0f);
         defending_troops += rounding_adjustment;
@@ -1771,7 +1758,7 @@ void SidePanel::PlanetPanel::Refresh() {
                                                    % invasion_troops_text % defending_troops_text);
         // todo: tooltip breaking down which or how many ships are being used to invade, their troop composition / contribution
         if (m_invade_button)
-            m_invade_button->SetText(invasion_text);
+            m_invade_button->SetText(std::move(invasion_text));
 
     } else if (being_invaded) {
         // show invade cancel button
@@ -1793,7 +1780,19 @@ void SidePanel::PlanetPanel::Refresh() {
             m_bombard_button->SetText(UserString("PL_CANCEL_BOMBARD"));
     }
 
-    m_env_size->SetText(env_size_text);
+    const auto& species_name{!planet->SpeciesName().empty() ? planet->SpeciesName() :
+                             !colony_ship_species_name.empty() ? colony_ship_species_name : ""};
+    std::string&& env_size_text{
+        species_name.empty() ?
+            boost::io::str(FlexibleFormat(UserString("PL_TYPE_SIZE"))
+                           % GetPlanetSizeName(planet)
+                           % GetPlanetTypeName(planet)) :
+            boost::io::str(FlexibleFormat(UserString("PL_TYPE_SIZE_ENV"))
+                           % GetPlanetSizeName(planet)
+                           % GetPlanetTypeName(planet)
+                           % GetPlanetEnvironmentName(planet, species_name)
+                           % UserString(species_name))};
+    m_env_size->SetText(std::move(env_size_text));
 
     if (!planet->SpeciesName().empty()) {
         AttachChild(m_focus_drop);
@@ -1804,7 +1803,7 @@ void SidePanel::PlanetPanel::Refresh() {
         m_focus_drop->Clear();
         std::vector<std::shared_ptr<GG::DropDownList::Row>> rows;
         rows.reserve(available_foci.size());
-        for (const std::string& focus_name : available_foci) {
+        for (const auto& focus_name : available_foci) {
             auto texture = ClientUI::GetTexture(
                 ClientUI::ArtDir() / planet->FocusIcon(focus_name), true);
             auto graphic = GG::Wnd::Create<GG::StaticGraphic>(texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
@@ -1817,10 +1816,10 @@ void SidePanel::PlanetPanel::Refresh() {
                 boost::io::str(FlexibleFormat(UserString("RP_FOCUS_TOOLTIP"))
                                % UserString(focus_name)));
 
-            row->push_back(graphic);
-            rows.push_back(row);
+            row->push_back(std::move(graphic));
+            rows.emplace_back(std::move(row));
         }
-        m_focus_drop->Insert(rows);
+        m_focus_drop->Insert(std::move(rows));
 
         // set browse text and select appropriate focus in droplist
         std::string focus_text;
@@ -1830,12 +1829,13 @@ void SidePanel::PlanetPanel::Refresh() {
                     m_focus_drop->Select(i);
                     focus_text = boost::io::str(FlexibleFormat(UserString("RP_FOCUS_TOOLTIP"))
                                                 % UserString(planet->Focus()));
+                    break;
                 }
             }
         } else {
             m_focus_drop->Select(m_focus_drop->end());
         }
-        m_focus_drop->SetBrowseText(focus_text);
+        m_focus_drop->SetBrowseText(std::move(focus_text));
 
         // prevent manipulation for unowned planets
         if (!planet->OwnedBy(client_empire_id))
@@ -1877,7 +1877,7 @@ void SidePanel::PlanetPanel::Refresh() {
         }
 
         // status: very unhappy
-        if ((planet->GetMeter(METER_HAPPINESS)->Current() <= 5) && (planet->GetMeter(METER_POPULATION)->Current() > 0)) {
+        if ((planet->GetMeter(MeterType::METER_HAPPINESS)->Current() <= 5) && (planet->GetMeter(MeterType::METER_POPULATION)->Current() > 0)) {
             planet_status_messages.emplace_back(boost::io::str(FlexibleFormat(
                 UserString("OPTIONS_DB_UI_PLANET_STATUS_UNHAPPY")) % planet->Name()));
             planet_status_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "planet_status_unhappy.png", true);
@@ -1914,15 +1914,15 @@ void SidePanel::PlanetPanel::Refresh() {
         Visibility visibility = GetUniverse().GetObjectVisibilityByEmpire(m_planet_id, client_empire_id);
         auto visibility_turn_map = GetUniverse().GetObjectVisibilityTurnMapByEmpire(m_planet_id, client_empire_id);
         float client_empire_detection_strength = client_empire->GetMeter("METER_DETECTION_STRENGTH")->Current();
-        float apparent_stealth = planet->GetMeter(METER_STEALTH)->Initial();
+        float apparent_stealth = planet->GetMeter(MeterType::METER_STEALTH)->Initial();
 
         std::string visibility_info;
         std::string detection_info;
 
-        if (visibility == VIS_NO_VISIBILITY) {
+        if (visibility == Visibility::VIS_NO_VISIBILITY) {
             visibility_info = UserString("PL_NO_VISIBILITY");
 
-            auto last_turn_visible_it = visibility_turn_map.find(VIS_BASIC_VISIBILITY);
+            auto last_turn_visible_it = visibility_turn_map.find(Visibility::VIS_BASIC_VISIBILITY);
             if (last_turn_visible_it != visibility_turn_map.end() && last_turn_visible_it->second > 0) {
                 visibility_info += "  " + boost::io::str(FlexibleFormat(UserString("PL_LAST_TURN_SEEN")) %
                                                                         std::to_string(last_turn_visible_it->second));
@@ -1934,7 +1934,7 @@ void SidePanel::PlanetPanel::Refresh() {
             }
 
             auto system = Objects().get<System>(planet->SystemID());
-            if (system && system->GetVisibility(client_empire_id) <= VIS_BASIC_VISIBILITY) { // HACK: system is basically visible or less, so we must not be in detection range of the planet.
+            if (system && system->GetVisibility(client_empire_id) <= Visibility::VIS_BASIC_VISIBILITY) { // HACK: system is basically visible or less, so we must not be in detection range of the planet.
                 detection_info = UserString("PL_NOT_IN_RANGE");
             }
             else if (apparent_stealth > client_empire_detection_strength) {
@@ -1950,10 +1950,10 @@ void SidePanel::PlanetPanel::Refresh() {
             std::string info = visibility_info + "\n\n" + detection_info;
             SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(UserString("METER_STEALTH"), info));
         }
-        else if (visibility == VIS_BASIC_VISIBILITY) {
+        else if (visibility == Visibility::VIS_BASIC_VISIBILITY) {
             visibility_info = UserString("PL_BASIC_VISIBILITY");
 
-            auto last_turn_visible_it = visibility_turn_map.find(VIS_PARTIAL_VISIBILITY);
+            auto last_turn_visible_it = visibility_turn_map.find(Visibility::VIS_PARTIAL_VISIBILITY);
             if (last_turn_visible_it != visibility_turn_map.end() && last_turn_visible_it->second > 0) {
                 visibility_info += "  " + boost::io::str(FlexibleFormat(UserString("PL_LAST_TURN_SCANNED")) %
                                                                         std::to_string(last_turn_visible_it->second));
@@ -2063,13 +2063,13 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
     if (system) {
         auto system_objects = Objects().find<const UniverseObject>(system->ObjectIDs());
         for (auto& obj : system_objects) {
-            if (obj->GetVisibility(client_empire_id) < VIS_PARTIAL_VISIBILITY)
+            if (obj->GetVisibility(client_empire_id) < Visibility::VIS_PARTIAL_VISIBILITY)
                 continue;
             if (obj->Owner() == client_empire_id || obj->Unowned())
                 continue;
             if (peaceful_empires_in_system.count(obj->Owner()))
                 continue;
-            if (Empires().GetDiplomaticStatus(client_empire_id, obj->Owner()) < DIPLO_PEACE)
+            if (Empires().GetDiplomaticStatus(client_empire_id, obj->Owner()) < DiplomaticStatus::DIPLO_PEACE)
                 continue;
             peaceful_empires_in_system.insert(obj->Owner());
         }
@@ -2077,7 +2077,7 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
 
 
     const auto& map_wnd = ClientUI::GetClientUI()->GetMapWnd();
-    if (ClientPlayerIsModerator() && map_wnd->GetModeratorActionSetting() != MAS_NoAction) {
+    if (ClientPlayerIsModerator() && map_wnd->GetModeratorActionSetting() != ModeratorActionSetting::MAS_NoAction) {
         RightClickedSignal(planet->ID());  // response handled in MapWnd
         return;
     }
@@ -2125,7 +2125,7 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
             };
             if (!peaceful_empires_in_system.count(recipient_empire_id))
                 continue;
-            give_away_menu.next_level.push_back(GG::MenuItem(entry.second->Name(), false, false, gift_action));
+            give_away_menu.next_level.emplace_back(entry.second->Name(), false, false, gift_action);
         }
         popup->AddMenuItem(std::move(give_away_menu));
 
@@ -2245,7 +2245,7 @@ void SidePanel::PlanetPanel::Select(bool selected) {
 }
 
 namespace {
-    void CancelColonizeInvadeBombardScrapShipOrders(std::shared_ptr<const Ship> ship) {
+    void CancelColonizeInvadeBombardScrapShipOrders(const Ship* ship) {
         if (!ship)
             return;
 
@@ -2309,7 +2309,7 @@ void SidePanel::PlanetPanel::ClickColonize() {
     // been ordered
 
     auto planet = Objects().get<Planet>(m_planet_id);
-    if (!planet || planet->GetMeter(METER_POPULATION)->Initial() != 0.0 || !m_order_issuing_enabled)
+    if (!planet || planet->GetMeter(MeterType::METER_POPULATION)->Initial() != 0.0 || !m_order_issuing_enabled)
         return;
 
     int empire_id = HumanClientApp::GetApp()->EmpireID();
@@ -2327,7 +2327,7 @@ void SidePanel::PlanetPanel::ClickColonize() {
         // find colony ship and order it to colonize
         auto ship = ValidSelectedColonyShip(SidePanel::SystemID());
         if (!ship)
-            ship = Objects().get<Ship>(AutomaticallyChosenColonyShip(m_planet_id));
+            ship = Objects().get<Ship>(AutomaticallyChosenColonyShip(m_planet_id)).get();
 
         if (!ship) {
             ErrorLogger() << "SidePanel::PlanetPanel::ClickColonize valid colony not found!";
@@ -2353,7 +2353,7 @@ void SidePanel::PlanetPanel::ClickInvade() {
     auto planet = Objects().get<Planet>(m_planet_id);
     if (!planet ||
         !m_order_issuing_enabled ||
-        (planet->GetMeter(METER_POPULATION)->Initial() <= 0.0 && planet->Unowned()))
+        (planet->GetMeter(MeterType::METER_POPULATION)->Initial() <= 0.0 && planet->Unowned()))
     { return; }
 
     int empire_id = HumanClientApp::GetApp()->EmpireID();
@@ -2378,7 +2378,7 @@ void SidePanel::PlanetPanel::ClickInvade() {
             invasion_ships.insert(autoselected_invasion_ships.begin(), autoselected_invasion_ships.end());
         }
 
-        for (auto& ship : invasion_ships) {
+        for (const auto* ship : invasion_ships) {
             if (!ship)
                 continue;
 
@@ -2398,7 +2398,7 @@ void SidePanel::PlanetPanel::ClickBombard() {
     auto planet = Objects().get<Planet>(m_planet_id);
     if (!planet ||
         !m_order_issuing_enabled ||
-        (planet->GetMeter(METER_POPULATION)->Initial() <= 0.0 && planet->Unowned()))
+        (planet->GetMeter(MeterType::METER_POPULATION)->Initial() <= 0.0 && planet->Unowned()))
     { return; }
 
     int empire_id = HumanClientApp::GetApp()->EmpireID();
@@ -2412,7 +2412,7 @@ void SidePanel::PlanetPanel::ClickBombard() {
         auto& planet_bombard_orders = it->second;
         // cancel previous bombard orders for this planet
         for (int order_id : planet_bombard_orders)
-        { HumanClientApp::GetApp()->Orders().RescindOrder(order_id); }
+            HumanClientApp::GetApp()->Orders().RescindOrder(order_id);
 
     } else {
         // order selected bombard ships to bombard planet
@@ -2487,11 +2487,11 @@ SidePanel::PlanetPanelContainer::PlanetPanelContainer() :
     Wnd(GG::X0, GG::Y0, GG::X1, GG::Y1, GG::INTERACTIVE),
     m_planet_panels(),
     m_selected_planet_id(INVALID_OBJECT_ID),
-    m_vscroll(GG::Wnd::Create<CUIScroll>(GG::VERTICAL)),
+    m_vscroll(GG::Wnd::Create<CUIScroll>(GG::Orientation::VERTICAL)),
     m_ignore_recursive_resize(false)
 {
     SetName("PlanetPanelContainer");
-    SetChildClippingMode(ClipToClient);
+    SetChildClippingMode(ChildClippingMode::ClipToClient);
 
     namespace ph = boost::placeholders;
 
@@ -2571,7 +2571,7 @@ void SidePanel::PlanetPanelContainer::SetPlanets(const std::vector<int>& planet_
         if (!planet)
             continue;
         int system_id = planet->SystemID();
-        auto system = Objects().get<System>(system_id);
+        auto system = Objects().get<System>(system_id).get();
         if (!system) {
             ErrorLogger() << "PlanetPanelContainer::SetPlanets couldn't find system of planet" << planet->Name();
             continue;
@@ -2584,7 +2584,7 @@ void SidePanel::PlanetPanelContainer::SetPlanets(const std::vector<int>& planet_
         auto planet_panel = GG::Wnd::Create<PlanetPanel>(Width() - m_vscroll->Width(),
                                                          orbit_planet.second, star_type);
         AttachChild(planet_panel);
-        m_planet_panels.push_back(planet_panel);
+        m_planet_panels.emplace_back(std::move(planet_panel));
         m_planet_panels.back()->LeftClickedSignal.connect(
             PlanetClickedSignal);
         m_planet_panels.back()->LeftDoubleClickedSignal.connect(
@@ -2859,7 +2859,8 @@ namespace {
 
             auto total_meter_value = 0.0f;
 
-            auto title_label = GG::Wnd::Create<CUILabel>(UserString(boost::lexical_cast<std::string>(m_meter_type)), GG::FORMAT_RIGHT);
+            auto title_label = GG::Wnd::Create<CUILabel>(
+                UserString(boost::lexical_cast<std::string>(m_meter_type)), GG::FORMAT_RIGHT);
             title_label->MoveTo(GG::Pt(GG::X0, GG::Y0));
             title_label->Resize(GG::Pt(LabelWidth(), row_height));
             title_label->SetFont(ClientUI::GetBoldFont());
@@ -2873,14 +2874,13 @@ namespace {
                 if (planet->Unowned() && planet->SpeciesName().empty())
                     continue;
 
-                const auto name = planet->Name();
-                auto label = GG::Wnd::Create<CUILabel>(name, GG::FORMAT_RIGHT);
+                auto label = GG::Wnd::Create<CUILabel>(planet->Name(), GG::FORMAT_RIGHT);
                 label->MoveTo(GG::Pt(GG::X0, top));
                 label->Resize(GG::Pt(LabelWidth(), row_height));
                 AttachChild(label);
 
                 const auto meter_value = planet->GetMeter(m_meter_type)->Initial();
-                if (m_meter_type == METER_SUPPLY) {
+                if (m_meter_type == MeterType::METER_SUPPLY) {
                     total_meter_value = std::max(total_meter_value, meter_value);
                 } else {
                     total_meter_value += meter_value;
@@ -2890,7 +2890,7 @@ namespace {
                 value->Resize(GG::Pt(ValueWidth(), row_height));
                 AttachChild(value);
 
-                m_labels_and_amounts.emplace_back(label, value);
+                m_labels_and_amounts.emplace_back(std::move(label), std::move(value));
 
                 top += row_height;
             }
@@ -2900,14 +2900,15 @@ namespace {
             title_value->Resize(GG::Pt(ValueWidth(), row_height));
             title_value->SetFont(ClientUI::GetBoldFont());
             AttachChild(title_value);
-            m_labels_and_amounts.emplace_back(title_label, title_value);
+            m_labels_and_amounts.emplace_back(std::move(title_label), std::move(title_value));
 
             Resize(GG::Pt(LabelWidth() + ValueWidth(), top));
         }
     private:
         MeterType m_meter_type;
         int m_system_id;
-        std::vector<std::pair<std::shared_ptr<GG::Label>, std::shared_ptr<GG::Label>>> m_labels_and_amounts;
+        std::vector<std::pair<std::shared_ptr<GG::Label>,
+                    std::shared_ptr<GG::Label>>> m_labels_and_amounts;
     };
 }
 
@@ -3259,7 +3260,7 @@ void SidePanel::RefreshImpl() {
 
     RefreshSystemNames();
 
-    auto system = Objects().get<System>(s_system_id);
+    auto system = Objects().get<System>(s_system_id).get();
     // if no system object, there is nothing to populate with.  early abort.
     if (!system)
         return;
@@ -3269,15 +3270,14 @@ void SidePanel::RefreshImpl() {
         ClientUI::ArtDir() / "stars_sidepanel",
         ClientUI::StarTypeFilePrefixes()[system->GetStarType()],
         s_system_id);
-    std::vector<std::shared_ptr<GG::Texture>> textures;
-    textures.push_back(graphic);
+    std::vector<std::shared_ptr<GG::Texture>> textures{std::move(graphic)};
 
     int graphic_width = Value(Width()) - MaxPlanetDiameter();
     DetachChild(m_star_graphic);
     m_star_graphic = GG::Wnd::Create<GG::DynamicGraphic>(
         GG::X(MaxPlanetDiameter()), GG::Y0, GG::X(graphic_width), GG::Y(graphic_width),
         true, textures[0]->DefaultWidth(), textures[0]->DefaultHeight(),
-        0, textures, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+        0, std::move(textures), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
 
     AttachChild(m_star_graphic);
     MoveChildDown(m_star_graphic);
@@ -3333,24 +3333,24 @@ void SidePanel::RefreshImpl() {
     }
 
     // Resource meters; show only for player planets
-    const std::vector<std::pair<MeterType, MeterType>> resource_meters =
-       {{METER_INDUSTRY, METER_TARGET_INDUSTRY},
-        {METER_RESEARCH, METER_TARGET_RESEARCH},
-        {METER_INFLUENCE,METER_TARGET_INFLUENCE},
-        {METER_STOCKPILE,METER_MAX_STOCKPILE}};
+    const std::vector<std::pair<MeterType, MeterType>> resource_meters =    // TODO: constexpr when possible...
+       {{MeterType::METER_INDUSTRY,  MeterType::METER_TARGET_INDUSTRY},
+        {MeterType::METER_RESEARCH,  MeterType::METER_TARGET_RESEARCH},
+        {MeterType::METER_INFLUENCE, MeterType::METER_TARGET_INFLUENCE},
+        {MeterType::METER_STOCKPILE, MeterType::METER_MAX_STOCKPILE}};
     // general meters; show only if all planets are owned by same empire
-    const std::vector<std::pair<MeterType, MeterType>> general_meters =
-       {{METER_SHIELD,  METER_MAX_SHIELD},
-        {METER_DEFENSE, METER_MAX_DEFENSE},
-        {METER_TROOPS,  METER_MAX_TROOPS},
-        {METER_SUPPLY,  METER_MAX_SUPPLY}};
-    std::vector<std::pair<MeterType, MeterType>> meter_types;
-    if (!player_planets.empty()) {
+    const std::vector<std::pair<MeterType, MeterType>> general_meters =     // TODO: constexpr when possible...
+       {{MeterType::METER_SHIELD,  MeterType::METER_MAX_SHIELD},
+        {MeterType::METER_DEFENSE, MeterType::METER_MAX_DEFENSE},
+        {MeterType::METER_TROOPS,  MeterType::METER_MAX_TROOPS},
+        {MeterType::METER_SUPPLY,  MeterType::METER_MAX_SUPPLY}};
+    std::vector<std::pair<MeterType, MeterType>> meter_types;   // TODO: reserve
+    if (!player_planets.empty())
         meter_types.insert(meter_types.end(), resource_meters.begin(), resource_meters.end());
-    }
-    if (all_planets_share_owner) {
+
+    if (all_planets_share_owner)
         meter_types.insert(meter_types.end(), general_meters.begin(), general_meters.end());
-    }
+
 
     // refresh the system resource summary.
     m_system_resource_summary = GG::Wnd::Create<MultiIconValueIndicator>(

@@ -41,10 +41,59 @@ namespace {
     { map.clear(); }
 
     template <typename T>
-    static void TryInsertIntoMap(ObjectMap::container_type<T>& map, std::shared_ptr<UniverseObject> item)
+    void TryInsertIntoMap(ObjectMap::container_type<T>& map,
+                          std::shared_ptr<UniverseObject> item)
     {
         if (dynamic_cast<T*>(item.get()))
             map[item->ID()] = std::dynamic_pointer_cast<T, UniverseObject>(item);
+    }
+
+    template <>
+    void TryInsertIntoMap(ObjectMap::container_type<Ship>& map,
+                          std::shared_ptr<UniverseObject> item)
+    {
+        if (item && item->ObjectType() == UniverseObjectType::OBJ_SHIP)
+            map[item->ID()] = std::static_pointer_cast<Ship>(item);
+    }
+
+    template <>
+    void TryInsertIntoMap(ObjectMap::container_type<Fleet>& map,
+                          std::shared_ptr<UniverseObject> item)
+    {
+        if (item && item->ObjectType() == UniverseObjectType::OBJ_FLEET)
+            map[item->ID()] = std::static_pointer_cast<Fleet>(item);
+    }
+
+    template <>
+    void TryInsertIntoMap(ObjectMap::container_type<Building>& map,
+                          std::shared_ptr<UniverseObject> item)
+    {
+        if (item && item->ObjectType() == UniverseObjectType::OBJ_BUILDING)
+            map[item->ID()] = std::static_pointer_cast<Building>(item);
+    }
+
+    template <>
+    void TryInsertIntoMap(ObjectMap::container_type<Planet>& map,
+                          std::shared_ptr<UniverseObject> item)
+    {
+        if (item && item->ObjectType() == UniverseObjectType::OBJ_PLANET)
+            map[item->ID()] = std::static_pointer_cast<Planet>(item);
+    }
+
+    template <>
+    void TryInsertIntoMap(ObjectMap::container_type<System>& map,
+                          std::shared_ptr<UniverseObject> item)
+    {
+        if (item && item->ObjectType() == UniverseObjectType::OBJ_SYSTEM)
+            map[item->ID()] = std::static_pointer_cast<System>(item);
+    }
+
+    template <>
+    void TryInsertIntoMap(ObjectMap::container_type<Field>& map,
+                          std::shared_ptr<UniverseObject> item)
+    {
+        if (item && item->ObjectType() == UniverseObjectType::OBJ_FIELD)
+            map[item->ID()] = std::static_pointer_cast<Field>(item);
     }
 
     template <typename T>
@@ -62,7 +111,7 @@ ObjectMap::ObjectMap()
 ObjectMap::~ObjectMap()
 {}
 
-void ObjectMap::Copy(const ObjectMap& copied_map, int empire_id/* = ALL_EMPIRES*/) {
+void ObjectMap::Copy(const ObjectMap& copied_map, int empire_id) {
     if (&copied_map == this)
         return;
 
@@ -80,14 +129,14 @@ void ObjectMap::CopyForSerialize(const ObjectMap& copied_map) {
     m_objects.insert(copied_map.m_objects.begin(), copied_map.m_objects.end());
 }
 
-void ObjectMap::CopyObject(std::shared_ptr<const UniverseObject> source, int empire_id/* = ALL_EMPIRES*/) {
+void ObjectMap::CopyObject(std::shared_ptr<const UniverseObject> source, int empire_id) {
     if (!source)
         return;
 
     int source_id = source->ID();
 
     // can empire see object at all?  if not, skip copying object's info
-    if (GetUniverse().GetObjectVisibilityByEmpire(source_id, empire_id) <= VIS_NO_VISIBILITY)
+    if (GetUniverse().GetObjectVisibilityByEmpire(source_id, empire_id) <= Visibility::VIS_NO_VISIBILITY)
         return;
 
     if (auto destination = this->get(source_id)) {
@@ -112,41 +161,42 @@ int ObjectMap::HighestObjectID() const {
     return m_objects.rbegin()->first;
 }
 
-void ObjectMap::insertCore(std::shared_ptr<UniverseObject> item, int empire_id/* = ALL_EMPIRES*/) {
+void ObjectMap::insertCore(std::shared_ptr<UniverseObject> item, int empire_id) {
+    const auto ID = item ? item->ID() : INVALID_OBJECT_ID;
     FOR_EACH_MAP(TryInsertIntoMap, item);
-    if (item &&
-        !GetUniverse().EmpireKnownDestroyedObjectIDs(empire_id).count(item->ID()))
+
+    if (ID != INVALID_OBJECT_ID &&
+        !GetUniverse().EmpireKnownDestroyedObjectIDs(empire_id).count(ID))
     {
-        auto this_item = this->get(item->ID());
-        m_existing_objects[item->ID()] = this_item;
+        m_existing_objects[ID] = item;
         switch (item->ObjectType()) {
-            case OBJ_BUILDING:
-                m_existing_buildings[item->ID()] = this_item;
+            case UniverseObjectType::OBJ_BUILDING:
+                m_existing_buildings[ID] = std::move(item);
                 break;
-            case OBJ_FIELD:
-                m_existing_fields[item->ID()] = this_item;
+            case UniverseObjectType::OBJ_FIELD:
+                m_existing_fields[ID] = std::move(item);
                 break;
-            case OBJ_FLEET:
-                m_existing_fleets[item->ID()] = this_item;
+            case UniverseObjectType::OBJ_FLEET:
+                m_existing_fleets[ID] = std::move(item);
                 break;
-            case OBJ_PLANET:
-                m_existing_planets[item->ID()] = this_item;
-                m_existing_pop_centers[item->ID()] = this_item;
-                m_existing_resource_centers[item->ID()] = this_item;
+            case UniverseObjectType::OBJ_PLANET:
+                m_existing_planets[ID] = item;
+                m_existing_pop_centers[ID] = item;
+                m_existing_resource_centers[ID] = std::move(item);
                 break;
-            case OBJ_POP_CENTER:
-                m_existing_pop_centers[item->ID()] = this_item;
+            case UniverseObjectType::OBJ_POP_CENTER:
+                m_existing_pop_centers[ID] = std::move(item);
                 break;
-            case OBJ_PROD_CENTER:
-                m_existing_resource_centers[item->ID()] = this_item;
+            case UniverseObjectType::OBJ_PROD_CENTER:
+                m_existing_resource_centers[ID] = std::move(item);
                 break;
-            case OBJ_SHIP:
-                m_existing_ships[item->ID()] = this_item;
+            case UniverseObjectType::OBJ_SHIP:
+                m_existing_ships[ID] = std::move(item);
                 break;
-            case OBJ_SYSTEM:
-                m_existing_systems[item->ID()] = this_item;
+            case UniverseObjectType::OBJ_SYSTEM:
+                m_existing_systems[ID] = std::move(item);
                 break;
-            case OBJ_FIGHTER:
+            case UniverseObjectType::OBJ_FIGHTER:
             default:
                 break;
         }
@@ -191,8 +241,9 @@ void ObjectMap::swap(ObjectMap& rhs) {
 
 std::vector<int> ObjectMap::FindExistingObjectIDs() const {
     std::vector<int> result;
+    result.reserve(m_existing_objects.size());
     for (const auto& entry : m_existing_objects)
-    { result.push_back(entry.first); }
+        result.emplace_back(entry.first);
     return result;
 }
 
@@ -206,33 +257,33 @@ void ObjectMap::UpdateCurrentDestroyedObjects(const std::set<int>& destroyed_obj
         auto this_item = this->get(entry.first);
         m_existing_objects[entry.first] = this_item;
         switch (entry.second->ObjectType()) {
-            case OBJ_BUILDING:
+            case UniverseObjectType::OBJ_BUILDING:
                 m_existing_buildings[entry.first] = this_item;
                 break;
-            case OBJ_FIELD:
+            case UniverseObjectType::OBJ_FIELD:
                 m_existing_fields[entry.first] = this_item;
                 break;
-            case OBJ_FLEET:
+            case UniverseObjectType::OBJ_FLEET:
                 m_existing_fleets[entry.first] = this_item;
                 break;
-            case OBJ_PLANET:
+            case UniverseObjectType::OBJ_PLANET:
                 m_existing_planets[entry.first] = this_item;
                 m_existing_pop_centers[entry.first] = this_item;
                 m_existing_resource_centers[entry.first] = this_item;
                 break;
-            case OBJ_POP_CENTER:
+            case UniverseObjectType::OBJ_POP_CENTER:
                 m_existing_pop_centers[entry.first] = this_item;
                 break;
-            case OBJ_PROD_CENTER:
+            case UniverseObjectType::OBJ_PROD_CENTER:
                 m_existing_resource_centers[entry.first] = this_item;
                 break;
-            case OBJ_SHIP:
+            case UniverseObjectType::OBJ_SHIP:
                 m_existing_ships[entry.first] = this_item;
                 break;
-            case OBJ_SYSTEM:
+            case UniverseObjectType::OBJ_SYSTEM:
                 m_existing_systems[entry.first] = this_item;
                 break;
-            case OBJ_FIGHTER:
+            case UniverseObjectType::OBJ_FIGHTER:
             default:
                 break;
         }
@@ -256,37 +307,37 @@ void ObjectMap::AuditContainment(const std::set<int>& destroyed_object_ids) {
         int sys_id = contained->SystemID();
         int alt_id = contained->ContainerObjectID();    // planet or fleet id for a building or ship, or system id again for a fleet, field, or planet
         UniverseObjectType type = contained->ObjectType();
-        if (type == OBJ_SYSTEM)
+        if (type == UniverseObjectType::OBJ_SYSTEM)
             continue;
 
         // store systems' contained objects
         if (this->get(sys_id)) { // although this is expected to be a system, can't use Object<System> here due to CopyForSerialize not copying the type-specific objects info
             contained_objs[sys_id].insert(contained_id);
 
-            if (type == OBJ_PLANET)
+            if (type == UniverseObjectType::OBJ_PLANET)
                 contained_planets[sys_id].insert(contained_id);
-            else if (type == OBJ_BUILDING)
+            else if (type == UniverseObjectType::OBJ_BUILDING)
                 contained_buildings[sys_id].insert(contained_id);
-            else if (type == OBJ_FLEET)
+            else if (type == UniverseObjectType::OBJ_FLEET)
                 contained_fleets[sys_id].insert(contained_id);
-            else if (type == OBJ_SHIP)
+            else if (type == UniverseObjectType::OBJ_SHIP)
                 contained_ships[sys_id].insert(contained_id);
-            else if (type == OBJ_FIELD)
+            else if (type == UniverseObjectType::OBJ_FIELD)
                 contained_fields[sys_id].insert(contained_id);
         }
 
         // store planets' contained buildings
-        if (type == OBJ_BUILDING && this->get(alt_id))
+        if (type == UniverseObjectType::OBJ_BUILDING && this->get(alt_id))
             contained_buildings[alt_id].insert(contained_id);
 
         // store fleets' contained ships
-        if (type == OBJ_SHIP && this->get(alt_id))
+        if (type == UniverseObjectType::OBJ_SHIP && this->get(alt_id))
             contained_ships[alt_id].insert(contained_id);
     }
 
     // set contained objects of all possible containers
     for (const auto& obj : all()) {
-        if (obj->ObjectType() == OBJ_SYSTEM) {
+        if (obj->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
             auto sys = std::dynamic_pointer_cast<System>(obj);
             if (!sys)
                 continue;
@@ -297,13 +348,13 @@ void ObjectMap::AuditContainment(const std::set<int>& destroyed_object_ids) {
             sys->m_ships =      contained_ships[sys->ID()];
             sys->m_fields =     contained_fields[sys->ID()];
 
-        } else if (obj->ObjectType() == OBJ_PLANET) {
+        } else if (obj->ObjectType() == UniverseObjectType::OBJ_PLANET) {
             auto plt = std::dynamic_pointer_cast<Planet>(obj);
             if (!plt)
                 continue;
             plt->m_buildings =  contained_buildings[plt->ID()];
 
-        } else if (obj->ObjectType() == OBJ_FLEET) {
+        } else if (obj->ObjectType() == UniverseObjectType::OBJ_FLEET) {
             auto flt = std::dynamic_pointer_cast<Fleet>(obj);
             if (!flt)
                 continue;
@@ -320,10 +371,10 @@ void ObjectMap::CopyObjectsToSpecializedMaps() {
 
 std::string ObjectMap::Dump(unsigned short ntabs) const {
     std::ostringstream dump_stream;
-    dump_stream << "ObjectMap contains UniverseObjects: " << std::endl;
+    dump_stream << "ObjectMap contains UniverseObjects: \n";
     for (const auto& obj : all())
-        dump_stream << obj->Dump(ntabs) << std::endl;
-    dump_stream << std::endl;
+        dump_stream << obj->Dump(ntabs) << "\n";
+    dump_stream << "\n";
     return dump_stream.str();
 }
 

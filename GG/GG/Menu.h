@@ -1,39 +1,25 @@
-// -*- C++ -*-
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-/** \file Menu.h \brief Contains the MenuItem class, which represents menu
-    data and the PopupMenu class, which is used to provide immediate
-    context menus. */
+//! @file GG/Menu.h
+//!
+//! Contains the MenuItem class, which represents menu data and the PopupMenu
+//! class, which is used to provide immediate context menus.
 
 #ifndef _GG_Menu_h_
 #define _GG_Menu_h_
 
+
+#include <functional>
 #include <GG/ClrConstants.h>
 #include <GG/Control.h>
 
-#include <functional>
 
 namespace GG {
 
@@ -49,20 +35,20 @@ class TextControl;
 */
 struct GG_API MenuItem
 {
-    MenuItem();
-
-    MenuItem(const std::string& str, bool disable, bool check,
-             std::function<void()> selected_on_close_callback = std::function<void()>());
+    MenuItem() = default;
 
     explicit MenuItem(bool separator);
 
-    virtual ~MenuItem();
+    MenuItem(const std::string& str, bool disable, bool check,
+             std::function<void()> selected_on_close_callback = std::function<void()>());
+    MenuItem(std::string&& str, bool disable, bool check,
+             std::function<void()> selected_on_close_callback = std::function<void()>());
 
-    std::string           label;      ///< text shown for this menu item
-    bool                  disabled;   ///< set to true when this menu item is disabled
-    bool                  checked;    ///< set to true when this menu item can be toggled, and is currently on
-    bool                  separator;  ///< set to true to render this menu item as a separator bar, rather than showing its text
-    std::vector<MenuItem> next_level; ///< submenu off of this menu item; may be emtpy
+    std::string           label;            ///< text shown for this menu item
+    bool                  disabled = false; ///< set to true when this menu item is disabled
+    bool                  checked = false;  ///< set to true when this menu item can be toggled, and is currently on
+    bool                  separator = false;///< set to true to render this menu item as a separator bar, rather than showing its text
+    std::vector<MenuItem> next_level;       ///< submenu off of this menu item; may be emtpy
 
     /** A callback to be called if this menu item is selected on close.*/
     std::function<void()> m_selected_on_close_callback;
@@ -80,16 +66,17 @@ class GG_API PopupMenu : public Wnd
 public:
     /** Ctor.  Parameter \a m should contain the desired menu in its
         next_level member. */
-    PopupMenu(X x, Y y, const std::shared_ptr<Font>& font, Clr text_color = CLR_WHITE,
-              Clr border_color = CLR_BLACK, Clr interior_color = CLR_SHADOW, Clr hilite_color = CLR_GRAY);
+    PopupMenu(X x, Y y, const std::shared_ptr<Font>& font,
+              Clr text_color = CLR_WHITE, Clr border_color = CLR_BLACK,
+              Clr interior_color = CLR_SHADOW, Clr hilite_color = CLR_GRAY);
 
     Pt ClientUpperLeft() const override;
 
-    Clr         BorderColor() const;       ///< returns the color used to render the border of the control
-    Clr         InteriorColor() const;     ///< returns the color used to render the interior of the control
-    Clr         TextColor() const;         ///< returns the color used to render menu item text
-    Clr         HiliteColor() const;       ///< returns the color used to indicate a hilited menu item
-    Clr         SelectedTextColor() const; ///< returns the color used to render a hilited menu item's text
+    Clr BorderColor() const;       ///< returns the color used to render the border of the control
+    Clr InteriorColor() const;     ///< returns the color used to render the interior of the control
+    Clr TextColor() const;         ///< returns the color used to render menu item text
+    Clr HiliteColor() const;       ///< returns the color used to indicate a hilited menu item
+    Clr SelectedTextColor() const; ///< returns the color used to render a hilited menu item's text
 
     /** Add \p menu_item to the end of the popup menu and store its callback.*/
     void AddMenuItem(MenuItem&& menu_item);

@@ -14,6 +14,10 @@
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+int& GlobalSerializationEncodingForEmpire() {
+    static int s_encoding_empire = ALL_EMPIRES;
+    return s_encoding_empire;
+}
 
 template <typename Archive>
 void serialize(Archive& ar, FullPreview& fp, unsigned int const version)
@@ -149,8 +153,8 @@ void serialize(Archive& ar, SaveGameUIData& obj, unsigned int const version)
 
         if (Archive::is_saving::value) {
             // populate temp containers
-            for (auto id_pair_pair : obj.ordered_ship_design_ids_and_obsolete) {
-                ordered_ship_design_ids.push_back(id_pair_pair.first);
+            for (auto& id_pair_pair : obj.ordered_ship_design_ids_and_obsolete) {
+                ordered_ship_design_ids.emplace_back(id_pair_pair.first);
                 if (id_pair_pair.second)
                     ids_obsolete[id_pair_pair.first] = id_pair_pair.second.get();
             }
@@ -173,7 +177,7 @@ void serialize(Archive& ar, SaveGameUIData& obj, unsigned int const version)
                 auto opt_p_i = it == ids_obsolete.end() ?
                     boost::optional<std::pair<bool, int>>() :
                     boost::optional<std::pair<bool, int>>(it->second);
-                obj.ordered_ship_design_ids_and_obsolete.push_back(std::make_pair(id, opt_p_i));
+                obj.ordered_ship_design_ids_and_obsolete.emplace_back(id, opt_p_i);
             }
             TraceLogger() << "SaveGameUIData::serialize design data extracted";
         }

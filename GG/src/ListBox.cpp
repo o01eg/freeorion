@@ -1,44 +1,25 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-#include <GG/ListBox.h>
-
+#include <iterator>
+#include <numeric>
+#include <boost/cast.hpp>
 #include <GG/DeferredLayout.h>
 #include <GG/DrawUtil.h>
 #include <GG/GUI.h>
+#include <GG/ListBox.h>
 #include <GG/Scroll.h>
 #include <GG/StyleFactory.h>
 #include <GG/TextControl.h>
 
-#include <boost/cast.hpp>
-
-#include <iterator>
-#include <numeric>
-
 
 using namespace GG;
-
 
 const int ListBox::DEFAULT_MARGIN(2);
 const X ListBox::DEFAULT_ROW_WIDTH(50);
@@ -46,102 +27,104 @@ const Y ListBox::DEFAULT_ROW_HEIGHT(22);
 const unsigned int ListBox::BORDER_THICK = 2;
 
 namespace {
-    struct ListSignalEcho
+
+struct ListSignalEcho
+{
+    ListSignalEcho(const ListBox& lb, const std::string& name) :
+        m_LB(lb),
+        m_name(name)
+    {}
+
+    void operator()()
+    { std::cerr << "GG SIGNAL : " << m_name << "()" << std::endl; }
+
+    void operator()(const ListBox::SelectionSet& sels)
     {
-        ListSignalEcho(const ListBox& lb, const std::string& name) :
-            m_LB(lb),
-            m_name(name)
-        {}
+        std::cerr << "GG SIGNAL : " << m_name << "(sels=[ ";
 
-        void operator()()
-        { std::cerr << "GG SIGNAL : " << m_name << "()" << std::endl; }
+        for (const auto& sel : sels)
+        { std::cerr << RowIndex(sel) << ' '; }
 
-        void operator()(const ListBox::SelectionSet& sels)
-        {
-            std::cerr << "GG SIGNAL : " << m_name << "(sels=[ ";
-
-            for (const auto& sel : sels)
-            { std::cerr << RowIndex(sel) << ' '; }
-
-            std::cerr << "])" << std::endl;
-        }
-
-        void operator()(ListBox::const_iterator it)
-        { std::cerr << "GG SIGNAL : " << m_name << "(row=" << RowIndex(it) << ")" << std::endl; }
-
-        void operator()(ListBox::const_iterator it, const Pt& pt, const Flags<ModKey>& mod_keys)
-        { std::cerr << "GG SIGNAL : " << m_name << "(row=" << RowIndex(it) << " pt=" << pt << ")" << std::endl; }
-
-        std::size_t RowIndex(ListBox::const_iterator it)
-        { return std::distance(m_LB.begin(), it); }
-
-        const ListBox& m_LB;
-        std::string m_name;
-    };
-
-    const int SCROLL_WIDTH = 14;
-
-    class RowSorter // used to sort rows by a certain column (which may contain some empty cells)
-    {
-    public:
-        RowSorter(const std::function<bool (const ListBox::Row&, const ListBox::Row&, std::size_t)>& cmp,
-                  std::size_t col, bool invert) :
-            m_cmp(cmp),
-            m_sort_col(col),
-            m_invert(invert)
-        {}
-
-        bool operator()(const std::shared_ptr<ListBox::Row>& l, const std::shared_ptr<ListBox::Row>& r)
-        { return m_invert ? m_cmp(*r, *l, m_sort_col) : m_cmp(*l, *r, m_sort_col); }
-        bool operator()(const ListBox::Row* l, const ListBox::Row* r)
-        { return m_invert ? m_cmp(*r, *l, m_sort_col) : m_cmp(*l, *r, m_sort_col); }
-
-    private:
-        std::function<bool (const ListBox::Row&, const ListBox::Row&, std::size_t)> m_cmp;
-        std::size_t m_sort_col;
-        bool m_invert;
-    };
-
-    ListBox::Row* SafeDeref(const ListBox::iterator& it, const ListBox::iterator& end)
-    { return it == end ? nullptr : it->get(); }
-
-    std::shared_ptr<ListBox::Row> IteratorToShared(const ListBox::iterator& it, const ListBox::iterator& end)
-    { return it == end ? std::shared_ptr<ListBox::Row>() : std::shared_ptr<ListBox::Row>(*it); }
-
-    bool RowAboveOrIsRow(ListBox::iterator lhs, ListBox::iterator rhs, ListBox::iterator end)
-    {
-        if (rhs == end)
-            return true;
-        if (lhs == end)
-            return false;
-        if (lhs == rhs)
-            return true;
-        const ListBox::Row* lhs_row = SafeDeref(lhs, end);
-        const ListBox::Row* rhs_row = SafeDeref(rhs, end);
-        if (!rhs_row)
-            return true;
-        if (!lhs_row)
-            return false;
-        return lhs_row->Top() < rhs_row->Top();
+        std::cerr << "])" << std::endl;
     }
 
-    void ResetIfEqual(ListBox::iterator& val, ListBox::iterator other, ListBox::iterator end)
-    {
-        if (val == other)
-            val = end;
-    }
+    void operator()(ListBox::const_iterator it)
+    { std::cerr << "GG SIGNAL : " << m_name << "(row=" << RowIndex(it) << ")" << std::endl; }
 
-    Alignment AlignmentFromStyle(Flags<ListBoxStyle> style)
-    {
-        Alignment retval = ALIGN_NONE;
-        if (style & LIST_LEFT)
-            retval = ALIGN_LEFT;
-        if (style & LIST_CENTER)
-            retval = ALIGN_CENTER;
-        if (style & LIST_RIGHT)
-            retval = ALIGN_RIGHT;
-        return retval;
-    }
+    void operator()(ListBox::const_iterator it, const Pt& pt, const Flags<ModKey>& mod_keys)
+    { std::cerr << "GG SIGNAL : " << m_name << "(row=" << RowIndex(it) << " pt=" << pt << ")" << std::endl; }
+
+    std::size_t RowIndex(ListBox::const_iterator it)
+    { return std::distance(m_LB.begin(), it); }
+
+    const ListBox& m_LB;
+    std::string m_name;
+};
+
+const int SCROLL_WIDTH = 14;
+
+class RowSorter // used to sort rows by a certain column (which may contain some empty cells)
+{
+public:
+    RowSorter(const std::function<bool (const ListBox::Row&, const ListBox::Row&, std::size_t)>& cmp,
+                std::size_t col, bool invert) :
+        m_cmp(cmp),
+        m_sort_col(col),
+        m_invert(invert)
+    {}
+
+    bool operator()(const std::shared_ptr<ListBox::Row>& l, const std::shared_ptr<ListBox::Row>& r)
+    { return m_invert ? m_cmp(*r, *l, m_sort_col) : m_cmp(*l, *r, m_sort_col); }
+    bool operator()(const ListBox::Row* l, const ListBox::Row* r)
+    { return m_invert ? m_cmp(*r, *l, m_sort_col) : m_cmp(*l, *r, m_sort_col); }
+
+private:
+    std::function<bool (const ListBox::Row&, const ListBox::Row&, std::size_t)> m_cmp;
+    std::size_t m_sort_col;
+    bool m_invert;
+};
+
+ListBox::Row* SafeDeref(const ListBox::iterator& it, const ListBox::iterator& end)
+{ return it == end ? nullptr : it->get(); }
+
+std::shared_ptr<ListBox::Row> IteratorToShared(const ListBox::iterator& it, const ListBox::iterator& end)
+{ return it == end ? std::shared_ptr<ListBox::Row>() : std::shared_ptr<ListBox::Row>(*it); }
+
+bool RowAboveOrIsRow(ListBox::iterator lhs, ListBox::iterator rhs, ListBox::iterator end)
+{
+    if (rhs == end)
+        return true;
+    if (lhs == end)
+        return false;
+    if (lhs == rhs)
+        return true;
+    const ListBox::Row* lhs_row = SafeDeref(lhs, end);
+    const ListBox::Row* rhs_row = SafeDeref(rhs, end);
+    if (!rhs_row)
+        return true;
+    if (!lhs_row)
+        return false;
+    return lhs_row->Top() < rhs_row->Top();
+}
+
+void ResetIfEqual(ListBox::iterator& val, ListBox::iterator other, ListBox::iterator end)
+{
+    if (val == other)
+        val = end;
+}
+
+Alignment AlignmentFromStyle(Flags<ListBoxStyle> style)
+{
+    Alignment retval = ALIGN_NONE;
+    if (style & LIST_LEFT)
+        retval = ALIGN_LEFT;
+    if (style & LIST_CENTER)
+        retval = ALIGN_CENTER;
+    if (style & LIST_RIGHT)
+        retval = ALIGN_RIGHT;
+    return retval;
+}
+
 }
 
 ///////////////////////////////////////
@@ -165,36 +148,40 @@ const ListBoxStyle GG::LIST_BROWSEUPDATES   (1 << 12);
 GG_FLAGSPEC_IMPL(ListBoxStyle);
 
 namespace {
-    bool RegisterListBoxStyles()
-    {
-        FlagSpec<ListBoxStyle>& spec = FlagSpec<ListBoxStyle>::instance();
-        spec.insert(LIST_NONE,          "LIST_NONE",            true);
-        spec.insert(LIST_VCENTER,       "LIST_VCENTER",         true);
-        spec.insert(LIST_TOP,           "LIST_TOP",             true);
-        spec.insert(LIST_BOTTOM,        "LIST_BOTTOM",          true);
-        spec.insert(LIST_CENTER,        "LIST_CENTER",          true);
-        spec.insert(LIST_LEFT,          "LIST_LEFT",            true);
-        spec.insert(LIST_RIGHT,         "LIST_RIGHT",           true);
-        spec.insert(LIST_NOSORT,        "LIST_NOSORT",          true);
-        spec.insert(LIST_SORTDESCENDING,"LIST_SORTDESCENDING",  true);
-        spec.insert(LIST_NOSEL,         "LIST_NOSEL",           true);
-        spec.insert(LIST_SINGLESEL,     "LIST_SINGLESEL",       true);
-        spec.insert(LIST_QUICKSEL,      "LIST_QUICKSEL",        true);
-        spec.insert(LIST_USERDELETE,    "LIST_USERDELETE",      true);
-        spec.insert(LIST_BROWSEUPDATES, "LIST_BROWSEUPDATES",   true);
-        return true;
-    }
-    bool dummy = RegisterListBoxStyles();
+
+bool RegisterListBoxStyles()
+{
+    FlagSpec<ListBoxStyle>& spec = FlagSpec<ListBoxStyle>::instance();
+    spec.insert(LIST_NONE,          "LIST_NONE",            true);
+    spec.insert(LIST_VCENTER,       "LIST_VCENTER",         true);
+    spec.insert(LIST_TOP,           "LIST_TOP",             true);
+    spec.insert(LIST_BOTTOM,        "LIST_BOTTOM",          true);
+    spec.insert(LIST_CENTER,        "LIST_CENTER",          true);
+    spec.insert(LIST_LEFT,          "LIST_LEFT",            true);
+    spec.insert(LIST_RIGHT,         "LIST_RIGHT",           true);
+    spec.insert(LIST_NOSORT,        "LIST_NOSORT",          true);
+    spec.insert(LIST_SORTDESCENDING,"LIST_SORTDESCENDING",  true);
+    spec.insert(LIST_NOSEL,         "LIST_NOSEL",           true);
+    spec.insert(LIST_SINGLESEL,     "LIST_SINGLESEL",       true);
+    spec.insert(LIST_QUICKSEL,      "LIST_QUICKSEL",        true);
+    spec.insert(LIST_USERDELETE,    "LIST_USERDELETE",      true);
+    spec.insert(LIST_BROWSEUPDATES, "LIST_BROWSEUPDATES",   true);
+    return true;
+}
+bool dummy = RegisterListBoxStyles();
+
 }
 
 
 namespace {
-    /** Make \p layout at least \p size large*/
-    void ValidateLayoutSize(GG::Layout* layout, std::size_t size)
-    {
-        if (layout->Columns() < size)
-            layout->ResizeLayout(1, size);
-    }
+
+/** Make \p layout at least \p size large*/
+void ValidateLayoutSize(GG::Layout* layout, std::size_t size)
+{
+    if (layout->Columns() < size)
+        layout->ResizeLayout(1, size);
+}
+
 }
 
 ////////////////////////////////////////////////
@@ -264,12 +251,12 @@ void ListBox::Row::GrowWidthsStretchesAlignmentsTo(std::size_t nn) {
 
 void ListBox::Row::push_back(std::shared_ptr<Control> c)
 {
-    m_cells.push_back(c);
+    m_cells.emplace_back(c);    // not moving here due to later use in this function
     GrowWidthsStretchesAlignmentsTo(m_cells.size());
     auto ii = m_cells.size() - 1;
     auto&& layout = GetLayout();
     if (c) {
-        layout->Add(std::forward<std::shared_ptr<Control>>(c), 0, ii, m_row_alignment | m_col_alignments[ii]);
+        layout->Add(std::move(c), 0, ii, m_row_alignment | m_col_alignments[ii]);
         layout->SetMinimumColumnWidth(ii, m_col_widths.back());
         layout->SetColumnStretch(ii, m_col_stretches.back());
     }
@@ -531,7 +518,7 @@ ListBox::ListBox(Clr color, Clr interior/* = CLR_ZERO*/) :
 void ListBox::CompleteConstruction()
 {
     ValidateStyle();
-    SetChildClippingMode(ClipToClient);
+    SetChildClippingMode(ChildClippingMode::ClipToClient);
     m_auto_scroll_timer.Stop();
     m_auto_scroll_timer.Connect(this);
 
@@ -789,6 +776,7 @@ void ListBox::ChildrenDraggedAway(const std::vector<Wnd*>& wnds, const Wnd* dest
     std::vector<std::shared_ptr<Row>> initially_selected_rows;
     if (!(m_style & LIST_NOSEL) && !m_selections.empty()) {
         // save selections...
+        initially_selected_rows.reserve(m_selections.size());
         for (const auto& sel : m_selections)
             initially_selected_rows.emplace_back(*sel);
         m_selections.clear();
@@ -885,8 +873,8 @@ void ListBox::PreRender()
         row->MoveTo(pt);
         pt.y += row->Height();
     }
-
 }
+
 void ListBox::Render()
 {
     // draw beveled rectangle around client area
@@ -1284,12 +1272,12 @@ void ListBox::SetStyle(Flags<ListBoxStyle> s)
     }
 }
 
-void ListBox::SetColHeaders(const std::shared_ptr<Row>& r)
+void ListBox::SetColHeaders(std::shared_ptr<Row> r)
 {
     Y client_height = ClientHeight();
     DetachChildAndReset(m_header_row);
     if (r) {
-        m_header_row = r;
+        m_header_row = std::move(r);
         // if this column header is being added to an empty listbox, the listbox takes on some of the
         // attributes of the header, similar to the insertion of a row into an empty listbox; see Insert()
         if (m_manage_column_props && m_rows.empty() && m_col_widths.empty()) {
@@ -1303,6 +1291,7 @@ void ListBox::SetColHeaders(const std::shared_ptr<Row>& r)
         }
         m_header_row->MoveTo(Pt(X0, -m_header_row->Height()));
         AttachChild(m_header_row);
+
     } else {
         m_header_row = Wnd::Create<Row>();
     }
@@ -1433,7 +1422,7 @@ void ListBox::AllowDropType(const std::string& str)
     // Create the set if necessary
     if (!m_allowed_drop_types)
         m_allowed_drop_types = std::unordered_set<std::string>();
-    m_allowed_drop_types->insert(str);
+    m_allowed_drop_types->emplace(str);
 }
 
 void ListBox::AutoScrollDuringDragDrops(bool auto_scroll)
@@ -1498,13 +1487,13 @@ void ListBox::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_
     if (!Disabled()) {
         bool bring_caret_into_view = true;
         switch (key) {
-        case GGK_SPACE: // space bar (selects item under caret like a mouse click)
+        case Key::GGK_SPACE: // space bar (selects item under caret like a mouse click)
             if (m_caret != m_rows.end()) {
                 m_old_sel_row_selected = m_selections.count(m_caret);
                 ClickAtRow(m_caret, mod_keys);
             }
             break;
-        case GGK_DELETE: // delete key
+        case Key::GGK_DELETE: // delete key
             if (m_style & LIST_USERDELETE) {
                 if (m_style & LIST_NOSEL) {
                     if (m_caret != m_rows.end())
@@ -1524,15 +1513,15 @@ void ListBox::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_
             break;
 
         // vertical scrolling keys
-        case GGK_UP: // arrow-up (not numpad arrow)
+        case Key::GGK_UP: // arrow-up (not numpad arrow)
             if (m_caret != m_rows.end() && m_caret != m_rows.begin())
                 --m_caret;
             break;
-        case GGK_DOWN: // arrow-down (not numpad arrow)
+        case Key::GGK_DOWN: // arrow-down (not numpad arrow)
             if (m_caret != m_rows.end() && m_caret != --m_rows.end())
                 ++m_caret;
             break;
-        case GGK_PAGEUP: // page up key (not numpad key)
+        case Key::GGK_PAGEUP: // page up key (not numpad key)
             if (m_caret != m_rows.end()) {
                 Y space = ClientSize().y;
                 while (m_caret != m_rows.begin() && 0 < (space -= (*std::prev(m_caret))->Height())) {
@@ -1540,7 +1529,7 @@ void ListBox::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_
                 }
             }
             break;
-        case GGK_PAGEDOWN: // page down key (not numpad key)
+        case Key::GGK_PAGEDOWN: // page down key (not numpad key)
             if (m_caret != m_rows.end()) {
                 Y space = ClientSize().y;
                 while (m_caret != --m_rows.end() && 0 < (space -= (*m_caret)->Height())) {
@@ -1548,17 +1537,17 @@ void ListBox::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_
                 }
             }
             break;
-        case GGK_HOME: // home key (not numpad)
+        case Key::GGK_HOME: // home key (not numpad)
             if (m_caret != m_rows.end())
                 m_caret = m_rows.begin();
             break;
-        case GGK_END: // end key (not numpad)
+        case Key::GGK_END: // end key (not numpad)
             if (m_caret != m_rows.end())
                 m_caret = --m_rows.end();
             break;
 
         // horizontal scrolling keys
-        case GGK_LEFT:{ // left key (not numpad key)
+        case Key::GGK_LEFT:{ // left key (not numpad key)
             if (m_first_col_shown == 0)
                 break;
 
@@ -1569,7 +1558,7 @@ void ListBox::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_
             m_hscroll->ScrollTo(Value(new_scroll_offset));
             SignalScroll(*m_hscroll, true);
             break;}
-        case GGK_RIGHT:{ // right key (not numpad)
+        case Key::GGK_RIGHT:{ // right key (not numpad)
             std::size_t num_cols((*m_first_row_shown)->GetLayout()->Children().size());
             if (num_cols <= 1)
                 break;
@@ -1591,7 +1580,7 @@ void ListBox::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_
         }
 
         if (bring_caret_into_view &&
-            key != GGK_SPACE && key != GGK_DELETE && key != GGK_LEFT && key != GGK_RIGHT) {
+            key != Key::GGK_SPACE && key != Key::GGK_DELETE && key != Key::GGK_LEFT && key != Key::GGK_RIGHT) {
             BringCaretIntoView();
         }
     } else {
@@ -1704,7 +1693,7 @@ bool ListBox::EventFilter(Wnd* w, const WndEvent& event)
     Flags<ModKey> mod_keys = event.ModKeys();
 
     switch (event.Type()) {
-    case WndEvent::LButtonDown: {
+    case WndEvent::EventType::LButtonDown: {
         m_old_sel_row = RowUnderPt(pt);
         if (m_old_sel_row != m_rows.end()) {
             m_old_sel_row_selected = m_selections.count(m_old_sel_row);
@@ -1714,12 +1703,12 @@ bool ListBox::EventFilter(Wnd* w, const WndEvent& event)
         break;
     }
 
-    case WndEvent::LButtonUp: {
+    case WndEvent::EventType::LButtonUp: {
         m_old_sel_row = m_rows.end();
         break;
     }
 
-    case WndEvent::LClick: {
+    case WndEvent::EventType::LClick: {
         if (m_old_sel_row != m_rows.end()) {
             iterator sel_row = RowUnderPt(pt);
             if (sel_row == m_old_sel_row) {
@@ -1734,7 +1723,7 @@ bool ListBox::EventFilter(Wnd* w, const WndEvent& event)
         break;
     }
 
-    case WndEvent::LDoubleClick: {
+    case WndEvent::EventType::LDoubleClick: {
         iterator row = RowUnderPt(pt);
         if (row != m_rows.end() && row == m_lclick_row) {
             DoubleClickedRowSignal(row, pt, mod_keys);
@@ -1745,7 +1734,7 @@ bool ListBox::EventFilter(Wnd* w, const WndEvent& event)
         break;
     }
 
-    case WndEvent::RButtonDown: {
+    case WndEvent::EventType::RButtonDown: {
         iterator row = RowUnderPt(pt);
         if (row != m_rows.end())
             m_old_rdown_row = row;
@@ -1754,7 +1743,7 @@ bool ListBox::EventFilter(Wnd* w, const WndEvent& event)
         break;
     }
 
-    case WndEvent::RClick: {
+    case WndEvent::EventType::RClick: {
         iterator row = RowUnderPt(pt);
         if (row != m_rows.end() && row == m_old_rdown_row) {
             m_rclick_row = row;
@@ -1764,7 +1753,7 @@ bool ListBox::EventFilter(Wnd* w, const WndEvent& event)
         break;
     }
 
-    case WndEvent::MouseEnter: {
+    case WndEvent::EventType::MouseEnter: {
         if (m_style & LIST_BROWSEUPDATES) {
             iterator sel_row = RowUnderPt(pt);
             if (sel_row != m_rows.end() && m_last_row_browsed != sel_row)
@@ -1773,10 +1762,10 @@ bool ListBox::EventFilter(Wnd* w, const WndEvent& event)
         break;
     }
 
-    case WndEvent::MouseHere:
+    case WndEvent::EventType::MouseHere:
         break;
 
-    case WndEvent::MouseLeave: {
+    case WndEvent::EventType::MouseLeave: {
         if (m_style & LIST_BROWSEUPDATES) {
             if (m_last_row_browsed != m_rows.end())
                 BrowsedRowSignal(m_last_row_browsed = m_rows.end());
@@ -1784,30 +1773,30 @@ bool ListBox::EventFilter(Wnd* w, const WndEvent& event)
         break;
     }
 
-    case WndEvent::GainingFocus: {
+    case WndEvent::EventType::GainingFocus: {
         if (w == this)
             return false;
         GUI::GetGUI()->SetFocusWnd(shared_from_this());
         break;
     }
 
-    case WndEvent::MouseWheel:
+    case WndEvent::EventType::MouseWheel:
         return false;
 
-    case WndEvent::DragDropEnter:
-    case WndEvent::DragDropHere:
-    case WndEvent::CheckDrops:
-    case WndEvent::DragDropLeave:
-    case WndEvent::DragDroppedOn:
+    case WndEvent::EventType::DragDropEnter:
+    case WndEvent::EventType::DragDropHere:
+    case WndEvent::EventType::CheckDrops:
+    case WndEvent::EventType::DragDropLeave:
+    case WndEvent::EventType::DragDroppedOn:
         if (w == this)
             return false;
         //std::cout << "ListBox::EventFilter of type: " << EventTypeName(event) << std::endl;
         HandleEvent(event);
         break;
 
-    case WndEvent::KeyPress:
-    case WndEvent::KeyRelease:
-    case WndEvent::TimerFiring:
+    case WndEvent::EventType::KeyPress:
+    case WndEvent::EventType::KeyRelease:
+    case WndEvent::EventType::TimerFiring:
         return false;
 
     default:

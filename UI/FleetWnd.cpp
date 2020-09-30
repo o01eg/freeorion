@@ -163,7 +163,7 @@ namespace {
     }
 
     bool ClientPlayerIsModerator()
-    { return HumanClientApp::GetApp()->GetClientType() == Networking::CLIENT_TYPE_HUMAN_MODERATOR; }
+    { return HumanClientApp::GetApp()->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR; }
 
     bool ContainsArmedShips(const std::vector<int>& ship_ids) {
         for (const auto& ship : Objects().find<Ship>(ship_ids)) {
@@ -176,9 +176,9 @@ namespace {
     }
 
     bool AggressionForFleet(NewFleetAggression aggression_mode, const std::vector<int>& ship_ids) {
-        if (aggression_mode == FLEET_AGGRESSIVE)
+        if (aggression_mode == NewFleetAggression::FLEET_AGGRESSIVE)
             return true;
-        if (aggression_mode == FLEET_PASSIVE)
+        if (aggression_mode == NewFleetAggression::FLEET_PASSIVE)
             return false;
         // auto aggression; examine ships to see if any are armed...
         return ContainsArmedShips(ship_ids);
@@ -197,22 +197,22 @@ namespace {
         //       of not at all.
         Sound::TempUISoundDisabler sound_disabler;
 
-        std::set<int> original_fleet_ids;           // ids of fleets from which ships were taken
+        std::set<int> original_fleet_ids; // ids of fleets from which ships were taken
 
         // validate ships in each group, and generate fleet names for those ships
-        std::vector<std::shared_ptr<const Ship>> ships = Objects().find<const Ship>(ship_ids);
+        const auto ships = Objects().find<const Ship>(ship_ids);
         if (ships.empty())
             return;
 
-        std::shared_ptr<const Ship> first_ship = *ships.begin();
-        auto system = Objects().get<System>(first_ship->SystemID());
+        const auto first_ship = (*ships.begin()).get();
+        const auto system = Objects().get<System>(first_ship->SystemID()).get();
         if (!system)
             return;
 
         // validate that ships are in the same system and all owned by this
         // client's empire.
         // also record the fleets from which ships are taken
-        for (auto& ship : ships) {
+        for (const auto& ship : ships) {
              if (ship->SystemID() != system->ID()) {
                  ErrorLogger() << "CreateNewFleetFromShips passed ships with inconsistent system ids";
                  continue;
@@ -227,7 +227,8 @@ namespace {
 
         // create new fleet with ships
         HumanClientApp::GetApp()->Orders().IssueOrder(
-            std::make_shared<NewFleetOrder>(client_empire_id, "", ship_ids, AggressionForFleet(aggression, ship_ids)));
+            std::make_shared<NewFleetOrder>(client_empire_id, "", ship_ids,
+                                            AggressionForFleet(aggression, ship_ids)));
     }
 
     void CreateNewFleetFromShipsWithDesign(const std::set<int>& ship_ids,
@@ -266,13 +267,13 @@ namespace {
 
         // sort ships by ID into container, indexed by design id
         std::map<int, std::vector<int>> designs_ship_ids;
-        for (auto& ship : Objects().find<Ship>(ship_ids))
+        for (const auto& ship : Objects().find<Ship>(ship_ids))
             designs_ship_ids[ship->DesignID()].push_back(ship->ID());
 
         // note that this will cause a UI update for each call to CreateNewFleetFromShips
         // we can re-evaluate this code if it presents a noticable performance problem
         for (const auto& entry : designs_ship_ids)
-        { CreateNewFleetFromShips(entry.second, aggression); }
+            CreateNewFleetFromShips(entry.second, aggression);
     }
 
     void MergeFleetsIntoFleet(int fleet_id) {
@@ -282,13 +283,13 @@ namespace {
         if (client_empire_id == ALL_EMPIRES)
             return;
 
-        auto target_fleet = Objects().get<Fleet>(fleet_id);
+        auto target_fleet = Objects().get<Fleet>(fleet_id).get();
         if (!target_fleet) {
             ErrorLogger() << "MergeFleetsIntoFleet couldn't get a fleet with id " << fleet_id;
             return;
         }
 
-        auto system = Objects().get<System>(target_fleet->SystemID());
+        auto system = Objects().get<System>(target_fleet->SystemID()).get();
         if (!system) {
             ErrorLogger() << "MergeFleetsIntoFleet couldn't get system for the target fleet";
             return;
@@ -301,9 +302,8 @@ namespace {
         std::vector<std::shared_ptr<Fleet>> all_system_fleets(Objects().find<Fleet>(system->FleetIDs()));
         std::vector<int> empire_system_fleet_ids;
         empire_system_fleet_ids.reserve(all_system_fleets.size());
-        std::vector<std::shared_ptr<Fleet>> empire_system_fleets;
-        empire_system_fleets.reserve(all_system_fleets.size());
         std::vector<int> empire_system_ship_ids;
+        empire_system_ship_ids.reserve(all_system_fleets.size());   // probably an underesitmate
 
         for (auto& fleet : all_system_fleets) {
             if (!fleet->OwnedBy(client_empire_id))
@@ -311,11 +311,10 @@ namespace {
             if (fleet->ID() == target_fleet->ID() || fleet->ID() == INVALID_OBJECT_ID)
                 continue;   // no need to do things to target fleet's contents
 
-            empire_system_fleet_ids.push_back(fleet->ID());
-            empire_system_fleets.push_back(fleet);
-
             const std::set<int>& fleet_ships = fleet->ShipIDs();
-            std::copy(fleet_ships.begin(), fleet_ships.end(), std::back_inserter(empire_system_ship_ids));
+            empire_system_ship_ids.insert(empire_system_ship_ids.end(),
+                                          fleet_ships.begin(), fleet_ships.end());
+            empire_system_fleet_ids.push_back(fleet->ID());
         }
 
 
@@ -339,7 +338,7 @@ namespace {
     }
 
     void AddOptions(OptionsDB& db) {
-        db.Add("ui.fleet.aggression", UserStringNop("OPTIONS_DB_FLEET_WND_AGGRESSION"), INVALID_FLEET_AGGRESSION);
+        db.Add("ui.fleet.aggression", UserStringNop("OPTIONS_DB_FLEET_WND_AGGRESSION"), NewFleetAggression::INVALID_FLEET_AGGRESSION);
         db.Add("ui.fleet.scanline.color", UserStringNop("OPTIONS_DB_UI_FLEET_WND_SCANLINE_CLR"), GG::Clr(24, 24, 24, 192));
     }
     bool temp_bool = RegisterOptions(&AddOptions);
@@ -485,9 +484,9 @@ void FleetUIManager::SetActiveFleetWnd(std::shared_ptr<FleetWnd> fleet_wnd) {
     m_active_fleet_wnd = fleet_wnd;
 
     // connect new active FleetWnd selection changed signal
-    m_active_fleet_wnd_signals.push_back(fleet_wnd->SelectedFleetsChangedSignal.connect(
+    m_active_fleet_wnd_signals.emplace_back(fleet_wnd->SelectedFleetsChangedSignal.connect(
         ActiveFleetWndSelectedFleetsChangedSignal));
-    m_active_fleet_wnd_signals.push_back(fleet_wnd->SelectedShipsChangedSignal.connect(
+    m_active_fleet_wnd_signals.emplace_back(fleet_wnd->SelectedShipsChangedSignal.connect(
         ActiveFleetWndSelectedShipsChangedSignal));
 
     ActiveFleetWndChangedSignal();
@@ -538,7 +537,7 @@ void FleetUIManager::FleetWndClosing(FleetWnd* fleet_wnd) {
 void FleetUIManager::FleetWndClicked(std::shared_ptr<FleetWnd> fleet_wnd) {
     if (fleet_wnd == GG::LockAndResetIfExpired(m_active_fleet_wnd))
         return;
-    SetActiveFleetWnd(std::forward<std::shared_ptr<FleetWnd>>(fleet_wnd));
+    SetActiveFleetWnd(std::move(fleet_wnd));
 }
 
 void FleetUIManager::EnableOrderIssuing(bool enable/* = true*/) {
@@ -653,7 +652,7 @@ namespace {
         Control(GG::X0, GG::Y0, w, h, GG::NO_WND_FLAGS),
         m_ship_id(ship_id)
     {
-        SetChildClippingMode(ClipToClient);
+        SetChildClippingMode(ChildClippingMode::ClipToClient);
         RequireRefresh();
     }
 
@@ -740,24 +739,21 @@ namespace {
         if (!ship)
             return;
 
-        std::shared_ptr<GG::Texture> icon;
+        const ShipDesign* design = ship->Design();
+        auto icon{ClientUI::ShipDesignIcon(design ? design->ID() : INVALID_OBJECT_ID)};
 
-        if (const ShipDesign* design = ship->Design())
-            icon = ClientUI::ShipDesignIcon(design->ID());
-        else
-            icon = ClientUI::ShipDesignIcon(INVALID_OBJECT_ID);  // default icon
-
-        m_ship_icon = GG::Wnd::Create<GG::StaticGraphic>(icon, DataPanelIconStyle());
+        m_ship_icon = GG::Wnd::Create<GG::StaticGraphic>(std::move(icon), DataPanelIconStyle());
         m_ship_icon->Resize(GG::Pt(DataPanelIconSpace().x, ClientHeight()));
         AttachChild(m_ship_icon);
 
         // Add the overlay
         auto add_overlay = [this](const std::string& file) {
             if (auto overlay_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / file, true)) {
-                auto overlay = GG::Wnd::Create<GG::StaticGraphic>(overlay_texture, DataPanelIconStyle());
+                auto overlay = GG::Wnd::Create<GG::StaticGraphic>(std::move(overlay_texture),
+                                                                  DataPanelIconStyle());
                 overlay->Resize(GG::Pt(DataPanelIconSpace().x, ClientHeight()));
                 AttachChild(overlay);
-                m_ship_icon_overlays.push_back(overlay);
+                m_ship_icon_overlays.emplace_back(std::move(overlay));
             }
         };
 
@@ -771,11 +767,12 @@ namespace {
             add_overlay("bombarding.png");
 
         int client_empire_id = HumanClientApp::GetApp()->EmpireID();
-        if ((ship->GetVisibility(client_empire_id) < VIS_BASIC_VISIBILITY)
+        if ((ship->GetVisibility(client_empire_id) < Visibility::VIS_BASIC_VISIBILITY)
             && GetOptionsDB().Get<bool>("ui.map.scanlines.shown"))
         {
-            m_scanline_control = GG::Wnd::Create<ScanlineControl>(GG::X0, GG::Y0, m_ship_icon->Width(), m_ship_icon->Height(), true,
-                                                                  GetOptionsDB().Get<GG::Clr>("ui.fleet.scanline.color"));
+            m_scanline_control = GG::Wnd::Create<ScanlineControl>(
+                GG::X0, GG::Y0, m_ship_icon->Width(), m_ship_icon->Height(), true,
+                GetOptionsDB().Get<GG::Clr>("ui.fleet.scanline.color"));
             AttachChild(m_scanline_control);
         }
     }
@@ -790,7 +787,7 @@ namespace {
             // blank text and delete icons
             m_ship_name_text->SetText("");
             DetachChildAndReset(m_design_name_text);
-            for (auto& type_and_icon: m_stat_icons)
+            for (auto& type_and_icon : m_stat_icons)
                 DetachChild(type_and_icon.second);
             m_stat_icons.clear();
             return;
@@ -802,10 +799,9 @@ namespace {
 
         // name and design name update
         const std::string& ship_name = ship->PublicName(empire_id);
-        std::string id_name_part;
-        if (GetOptionsDB().Get<bool>("ui.name.id.shown")) {
-            id_name_part = " (" + std::to_string(m_ship_id) + ")";
-        }
+        std::string id_name_part{GetOptionsDB().Get<bool>("ui.name.id.shown")
+            ? " (" + std::to_string(m_ship_id) + ")"
+            : ""};
         if (!ship->Unowned() && ship_name == UserString("FW_FOREIGN_SHIP")) {
             const Empire* ship_owner_empire = GetEmpire(ship->Owner());
             const std::string& owner_name = (ship_owner_empire ? ship_owner_empire->Name() : UserString("FW_FOREIGN"));
@@ -815,16 +811,15 @@ namespace {
         }
 
         if (m_design_name_text) {
-            std::string design_name = UserString("FW_UNKNOWN_DESIGN_NAME");
-            if (const ShipDesign* design = ship->Design())
-                design_name = design->Name();
-            const std::string& species_name = ship->SpeciesName();
+            const ShipDesign* design = ship->Design();
+            auto& design_name = design ? design->Name() : UserString("FW_UNKNOWN_DESIGN_NAME");
+            auto& species_name = UserString(ship->SpeciesName());
             if (!species_name.empty()) {
                 m_design_name_text->SetText(boost::io::str(FlexibleFormat(UserString("FW_SPECIES_SHIP_DESIGN_LABEL")) %
                                                            design_name %
-                                                           UserString(species_name)));
+                                                           species_name));
             } else {
-                m_design_name_text->SetText(design_name);
+                m_design_name_text->SetText(std::move(design_name));
             }
         }
 
@@ -833,23 +828,23 @@ namespace {
             entry.second->SetValue(StatValue(entry.first));
 
             entry.second->ClearBrowseInfoWnd();
-            if (entry.first == METER_CAPACITY) {  // refers to damage
+            if (entry.first == MeterType::METER_CAPACITY) {  // refers to damage
                 entry.second->SetBrowseInfoWnd(GG::Wnd::Create<ShipDamageBrowseWnd>(
-                                                   m_ship_id, entry.first));
+                                               m_ship_id, entry.first));
 
-            } else if (entry.first == METER_TROOPS) {
+            } else if (entry.first == MeterType::METER_TROOPS) {
                 entry.second->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
                                                    TroopIcon(), UserString("SHIP_TROOPS_TITLE"),
                                                    UserString("SHIP_TROOPS_STAT")));
 
-            } else if (entry.first == METER_SECONDARY_STAT) {
+            } else if (entry.first == MeterType::METER_SECONDARY_STAT) {
                 entry.second->SetBrowseInfoWnd(GG::Wnd::Create<ShipFightersBrowseWnd>(
                                                    m_ship_id, entry.first));
                 entry.second->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.extended.delay"), 1);
                 entry.second->SetBrowseInfoWnd(GG::Wnd::Create<ShipFightersBrowseWnd>(
                                                    m_ship_id, entry.first, true), 1);
 
-            } else if (entry.first == METER_POPULATION) {
+            } else if (entry.first == MeterType::METER_POPULATION) {
                 entry.second->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
                                                    ColonyIcon(), UserString("SHIP_COLONY_TITLE"),
                                                    UserString("SHIP_COLONY_STAT")));
@@ -863,13 +858,13 @@ namespace {
 
     double ShipDataPanel::StatValue(MeterType stat_name) const {
         if (auto ship = Objects().get<Ship>(m_ship_id)) {
-            if (stat_name == METER_CAPACITY)
+            if (stat_name == MeterType::METER_CAPACITY)
                 return ship->TotalWeaponsDamage(0.0f, false);
-            else if (stat_name == METER_TROOPS)
+            else if (stat_name == MeterType::METER_TROOPS)
                 return ship->TroopCapacity();
-            else if (stat_name == METER_SECONDARY_STAT)
+            else if (stat_name == MeterType::METER_SECONDARY_STAT)
                 return ship->FighterCount();
-            else if (stat_name == METER_POPULATION)
+            else if (stat_name == MeterType::METER_POPULATION)
                 return ship->ColonyCapacity();
             else if (ship->UniverseObject::GetMeter(stat_name))
                 return ship->GetMeter(stat_name)->Initial();
@@ -915,15 +910,11 @@ namespace {
 
         // ship name text.  blank if no ship.
         auto ship = Objects().get<Ship>(m_ship_id);
-        std::string ship_name;
-        if (ship)
-            ship_name = ship->Name();
-
-        if (GetOptionsDB().Get<bool>("ui.name.id.shown")) {
-            ship_name = ship_name + " (" + std::to_string(m_ship_id) + ")";
-        }
-
-        m_ship_name_text = GG::Wnd::Create<CUILabel>(ship_name, GG::FORMAT_LEFT);
+        std::string ship_name{
+            (ship ? ship->Name() : "") +
+            (GetOptionsDB().Get<bool>("ui.name.id.shown") ? " (" + std::to_string(m_ship_id) + ")" : "")
+        };
+        m_ship_name_text = GG::Wnd::Create<CUILabel>(std::move(ship_name), GG::FORMAT_LEFT);
         AttachChild(m_ship_name_text);
 
 
@@ -941,45 +932,48 @@ namespace {
 
         std::vector<std::pair<MeterType, std::shared_ptr<GG::Texture>>> meters_icons;
         meters_icons.reserve(13);
-        meters_icons.push_back({METER_STRUCTURE,          ClientUI::MeterIcon(METER_STRUCTURE)});
+        meters_icons.emplace_back(MeterType::METER_STRUCTURE,          ClientUI::MeterIcon(MeterType::METER_STRUCTURE));
         if (ship->IsArmed())
-            meters_icons.push_back({METER_CAPACITY,       DamageIcon()});
+            meters_icons.emplace_back(MeterType::METER_CAPACITY,       DamageIcon());
         if (ship->HasFighters())
-            meters_icons.push_back({METER_SECONDARY_STAT, FightersIcon()});
+            meters_icons.emplace_back(MeterType::METER_SECONDARY_STAT, FightersIcon());
         if (ship->HasTroops())
-            meters_icons.push_back({METER_TROOPS,         TroopIcon()});
+            meters_icons.emplace_back(MeterType::METER_TROOPS,         TroopIcon());
         if (ship->CanColonize())
-            meters_icons.push_back({METER_POPULATION,     ColonyIcon()});
-        if (ship->GetMeter(METER_INDUSTRY)->Initial() > 0.0f)
-            meters_icons.push_back({METER_INDUSTRY,       IndustryIcon()});
-        if (ship->GetMeter(METER_RESEARCH)->Initial() > 0.0f)
-            meters_icons.push_back({METER_RESEARCH,       ResearchIcon()});
-        if (ship->GetMeter(METER_INFLUENCE)->Initial() > 0.0f)
-            meters_icons.push_back({METER_INFLUENCE,      InfluenceIcon()});
+            meters_icons.emplace_back(MeterType::METER_POPULATION,     ColonyIcon());
+        if (ship->GetMeter(MeterType::METER_INDUSTRY)->Initial() != 0.0f)
+            meters_icons.emplace_back(MeterType::METER_INDUSTRY,       IndustryIcon());
+        if (ship->GetMeter(MeterType::METER_RESEARCH)->Initial() != 0.0f)
+            meters_icons.emplace_back(MeterType::METER_RESEARCH,       ResearchIcon());
+        if (ship->GetMeter(MeterType::METER_INFLUENCE)->Initial() != 0.0f)
+            meters_icons.emplace_back(MeterType::METER_INFLUENCE,      InfluenceIcon());
 
-        for (auto& meter : {METER_SHIELD, METER_FUEL, METER_DETECTION,
-                            METER_STEALTH, METER_SPEED})
+        for (auto& meter : {MeterType::METER_SHIELD, MeterType::METER_FUEL,
+                            MeterType::METER_DETECTION, MeterType::METER_STEALTH,
+                            MeterType::METER_SPEED})
         {
-            meters_icons.push_back({meter, ClientUI::MeterIcon(meter)});
+            meters_icons.emplace_back(meter, ClientUI::MeterIcon(meter));
         }
 
         m_stat_icons.reserve(meters_icons.size());
         for (auto& entry : meters_icons) {
             auto icon = GG::Wnd::Create<StatisticIcon>(entry.second, 0, 0, false, StatIconSize().x, StatIconSize().y);
-            m_stat_icons.push_back({entry.first, icon});
-            AttachChild(icon);
-            std::string meter_string = boost::lexical_cast<std::string>(entry.first);
+            m_stat_icons.emplace_back(entry.first, icon);
 
+            std::string meter_string = boost::lexical_cast<std::string>(entry.first);
             icon->RightClickedSignal.connect([meter_string](const GG::Pt& pt) {
                 auto zoom_article_action = [meter_string]() { ClientUI::GetClientUI()->ZoomToMeterTypeArticle(meter_string); };
                 std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) %
                                                                         UserString(meter_string));
 
                 auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
-                popup->AddMenuItem(GG::MenuItem(popup_label, false, false, zoom_article_action));
+                popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false,
+                                                zoom_article_action));
 
                 popup->Run();
             });
+
+            AttachChild(std::move(icon));
         }
 
         // bookkeeping
@@ -1002,7 +996,7 @@ namespace {
             m_ship_id(ship_id)
         {
             SetName("ShipRow");
-            SetChildClippingMode(ClipToClient);
+            SetChildClippingMode(ChildClippingMode::ClipToClient);
             if (Objects().get<Ship>(m_ship_id))
                 SetDragDropDataType(SHIP_DROP_TYPE_STRING);
         }
@@ -1085,7 +1079,7 @@ private:
     const int           m_fleet_id = INVALID_OBJECT_ID;
     int                 m_system_id = INVALID_OBJECT_ID;
     const bool          m_is_new_fleet_drop_target = false;
-    NewFleetAggression  m_new_fleet_aggression = FLEET_PASSIVE;
+    NewFleetAggression  m_new_fleet_aggression = NewFleetAggression::FLEET_PASSIVE;
     bool                m_needs_refresh = true;
 
     boost::signals2::connection                     m_fleet_connection;
@@ -1110,7 +1104,7 @@ FleetDataPanel::FleetDataPanel(GG::X w, GG::Y h, int fleet_id) :
     m_new_fleet_aggression(NewFleetsAggressiveOptionSetting())
 {
     RequireRefresh();
-    SetChildClippingMode(ClipToClient);
+    SetChildClippingMode(ChildClippingMode::ClipToClient);
 }
 
 FleetDataPanel::FleetDataPanel(GG::X w, GG::Y h, int system_id, bool new_fleet_drop_target) :
@@ -1120,7 +1114,7 @@ FleetDataPanel::FleetDataPanel(GG::X w, GG::Y h, int system_id, bool new_fleet_d
     m_new_fleet_aggression(NewFleetsAggressiveOptionSetting())
 {
     RequirePreRender();
-    SetChildClippingMode(ClipToClient);
+    SetChildClippingMode(ChildClippingMode::ClipToClient);
 }
 
 FleetDataPanel::~FleetDataPanel()
@@ -1338,12 +1332,12 @@ void FleetDataPanel::ToggleAggression() {
             std::make_shared<AggressiveOrder>(client_empire_id, m_fleet_id, new_aggression_state));
     } else if (m_is_new_fleet_drop_target) {
         // cycle new fleet aggression
-        if (m_new_fleet_aggression == INVALID_FLEET_AGGRESSION)
-            m_new_fleet_aggression = FLEET_AGGRESSIVE;
-        else if (m_new_fleet_aggression == FLEET_AGGRESSIVE)
-            m_new_fleet_aggression = FLEET_PASSIVE;
+        if (m_new_fleet_aggression == NewFleetAggression::INVALID_FLEET_AGGRESSION)
+            m_new_fleet_aggression = NewFleetAggression::FLEET_AGGRESSIVE;
+        else if (m_new_fleet_aggression == NewFleetAggression::FLEET_AGGRESSIVE)
+            m_new_fleet_aggression = NewFleetAggression::FLEET_PASSIVE;
         else
-            m_new_fleet_aggression = INVALID_FLEET_AGGRESSION;
+            m_new_fleet_aggression = NewFleetAggression::INVALID_FLEET_AGGRESSION;
         SetNewFleetAggressiveOptionSetting(m_new_fleet_aggression);
         UpdateAggressionToggle();
     }
@@ -1362,8 +1356,10 @@ void FleetDataPanel::Refresh() {
         m_fleet_name_text->SetText(UserString("FW_NEW_FLEET_LABEL"));
         m_fleet_destination_text->Clear();
 
-        std::shared_ptr<GG::Texture> new_fleet_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "new_fleet.png", true);
-        m_fleet_icon = GG::Wnd::Create<GG::StaticGraphic>(new_fleet_texture, DataPanelIconStyle());
+        std::shared_ptr<GG::Texture> new_fleet_texture = ClientUI::GetTexture(
+            ClientUI::ArtDir() / "icons" / "buttons" / "new_fleet.png", true);
+        m_fleet_icon = GG::Wnd::Create<GG::StaticGraphic>(
+            std::move(new_fleet_texture), DataPanelIconStyle());
         AttachChild(m_fleet_icon);
 
     } else if (auto fleet = Objects().get<Fleet>(m_fleet_id)) {
@@ -1374,24 +1370,23 @@ void FleetDataPanel::Refresh() {
             const Empire* ship_owner_empire = GetEmpire(fleet->Owner());
             const std::string& owner_name = (ship_owner_empire ? ship_owner_empire->Name() : UserString("FW_FOREIGN"));
             std::string fleet_name = boost::io::str(FlexibleFormat(UserString("FW_EMPIRE_FLEET")) % owner_name);
-            if (GetOptionsDB().Get<bool>("ui.name.id.shown")) {
+            if (GetOptionsDB().Get<bool>("ui.name.id.shown"))
                 fleet_name = fleet_name + " (" + std::to_string(m_fleet_id) + ")";
-            }
-            m_fleet_name_text->SetText(fleet_name);
+            m_fleet_name_text->SetText(std::move(fleet_name));
         } else {
-            if (GetOptionsDB().Get<bool>("ui.name.id.shown")) {
+            if (GetOptionsDB().Get<bool>("ui.name.id.shown"))
                 public_fleet_name = public_fleet_name + " (" + std::to_string(m_fleet_id) + ")";
-            }
-            m_fleet_name_text->SetText(public_fleet_name);
+            m_fleet_name_text->SetText(std::move(public_fleet_name));
         }
         m_fleet_destination_text->SetText(FleetDestinationText(m_fleet_id));
 
         // set icons
-        std::vector<std::shared_ptr<GG::Texture>> icons(FleetHeadIcons(fleet, FleetButton::SizeType::LARGE));
-        icons.push_back(FleetSizeIcon(fleet, FleetButton::SizeType::LARGE));
+        std::vector<std::shared_ptr<GG::Texture>> icons(
+            FleetHeadIcons(fleet.get(), FleetButton::SizeType::LARGE));
+        icons.emplace_back(FleetSizeIcon(fleet.get(), FleetButton::SizeType::LARGE));
         std::vector<GG::Flags<GG::GraphicStyle>> styles(icons.size(), DataPanelIconStyle());
 
-        m_fleet_icon = GG::Wnd::Create<MultiTextureStaticGraphic>(icons, styles);
+        m_fleet_icon = GG::Wnd::Create<MultiTextureStaticGraphic>(std::move(icons), std::move(styles));
         AttachChild(m_fleet_icon);
 
         if (Empire* empire = GetEmpire(fleet->Owner()))
@@ -1406,7 +1401,7 @@ void FleetDataPanel::Refresh() {
             return std::all_of(
                 fleet->ShipIDs().begin(), fleet->ShipIDs().end(),
                 [&pred](const int ship_id) {
-                    const auto& ship = Objects().get<const Ship>(ship_id);
+                    auto ship = Objects().get<const Ship>(ship_id);
                     if (!ship) {
                         WarnLogger() << "Object map is missing ship with expected id " << ship_id;
                         return false;
@@ -1418,10 +1413,11 @@ void FleetDataPanel::Refresh() {
         // Add the overlay
         auto add_overlay = [this](const std::string& file) {
             if (auto overlay_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / file, true)) {
-                auto overlay = GG::Wnd::Create<GG::StaticGraphic>(overlay_texture, DataPanelIconStyle());
+                auto overlay = GG::Wnd::Create<GG::StaticGraphic>(std::move(overlay_texture),
+                                                                  DataPanelIconStyle());
                 overlay->Resize(GG::Pt(DataPanelIconSpace().x, ClientHeight()));
                 AttachChild(overlay);
-                m_fleet_icon_overlays.push_back(overlay);
+                m_fleet_icon_overlays.emplace_back(std::move(overlay));
             }
         };
 
@@ -1431,7 +1427,7 @@ void FleetDataPanel::Refresh() {
             add_overlay("scrapped.png");
         if (all_ships(
                 [](const std::shared_ptr<const Ship>& ship)
-                {return ship->OrderedColonizePlanet() != INVALID_OBJECT_ID; })
+                { return ship->OrderedColonizePlanet() != INVALID_OBJECT_ID; })
            )
         {
             add_overlay("colonizing.png");
@@ -1458,7 +1454,7 @@ void FleetDataPanel::Refresh() {
         if (fleet->OrderedGivenToEmpire() != ALL_EMPIRES && fleet->TravelRoute().empty())
             add_overlay("gifting.png");
 
-        if ((fleet->GetVisibility(client_empire_id) < VIS_BASIC_VISIBILITY)
+        if ((fleet->GetVisibility(client_empire_id) < Visibility::VIS_BASIC_VISIBILITY)
             && GetOptionsDB().Get<bool>("ui.map.scanlines.shown"))
         {
             m_scanline_control = GG::Wnd::Create<ScanlineControl>(GG::X0, GG::Y0, DataPanelIconSpace().x, ClientHeight(), true,
@@ -1479,7 +1475,7 @@ void FleetDataPanel::RefreshStateChangedSignals() {
     for (auto& connection : m_ship_connections)
         connection.disconnect();
 
-    auto fleet = Objects().get<Fleet>(m_fleet_id);
+    auto fleet = Objects().get<Fleet>(m_fleet_id).get();
     if (!fleet)
         return;
 
@@ -1488,7 +1484,7 @@ void FleetDataPanel::RefreshStateChangedSignals() {
 
     m_ship_connections.reserve(fleet->NumShips());
     for (auto& ship : Objects().find<const Ship>(fleet->ShipIDs()))
-        m_ship_connections.push_back(
+        m_ship_connections.emplace_back(
             ship->StateChangedSignal.connect(
                 boost::bind(&FleetDataPanel::RequireRefresh, this)));
 }
@@ -1527,10 +1523,10 @@ void FleetDataPanel::SetStatIconValues() {
             fighters_tally += ship->FighterCount();
             troops_tally += ship->TroopCapacity();
             colony_tally += ship->ColonyCapacity();
-            structure_tally += ship->GetMeter(METER_STRUCTURE)->Initial();
-            shield_tally += ship->GetMeter(METER_SHIELD)->Initial();
-            fuels.push_back(ship->GetMeter(METER_FUEL)->Initial());
-            speeds.push_back(ship->GetMeter(METER_SPEED)->Initial());
+            structure_tally += ship->GetMeter(MeterType::METER_STRUCTURE)->Initial();
+            shield_tally += ship->GetMeter(MeterType::METER_SHIELD)->Initial();
+            fuels.push_back(ship->GetMeter(MeterType::METER_FUEL)->Initial());
+            speeds.push_back(ship->GetMeter(MeterType::METER_SPEED)->Initial());
         }
     }
     if (!fuels.empty())
@@ -1543,64 +1539,64 @@ void FleetDataPanel::SetStatIconValues() {
         const auto& icon = entry.second;
         DetachChild(icon);
         switch (stat_name) {
-        case METER_SIZE:
+        case MeterType::METER_SIZE:
             icon->SetValue(ship_count);
             AttachChild(icon);
             break;
-        case METER_CAPACITY:
+        case MeterType::METER_CAPACITY:
             icon->SetValue(damage_tally);
             if (fleet->HasArmedShips())
                 AttachChild(icon);
             break;
-        case METER_SECONDARY_STAT:
+        case MeterType::METER_SECONDARY_STAT:
             icon->SetValue(fighters_tally);
             if (fleet->HasFighterShips())
                 AttachChild(icon);
             break;
-        case METER_TROOPS:
+        case MeterType::METER_TROOPS:
             icon->SetValue(troops_tally);
             if (fleet->HasTroopShips())
                 AttachChild(icon);
             break;
-        case METER_POPULATION:
+        case MeterType::METER_POPULATION:
             icon->SetValue(colony_tally);
             if (fleet->HasColonyShips())
                 AttachChild(icon);
             break;
-        case METER_INDUSTRY: {
-            const auto resource_output = fleet->ResourceOutput(RE_INDUSTRY);
+        case MeterType::METER_INDUSTRY: {
+            const auto resource_output = fleet->ResourceOutput(ResourceType::RE_INDUSTRY);
             icon->SetValue(resource_output);
-            if (resource_output > 0.0f)
+            if (resource_output != 0.0f)
                 AttachChild(icon);
         }
             break;
-        case METER_RESEARCH: {
-            const auto resource_output = fleet->ResourceOutput(RE_RESEARCH);
+        case MeterType::METER_RESEARCH: {
+            const auto resource_output = fleet->ResourceOutput(ResourceType::RE_RESEARCH);
             icon->SetValue(resource_output);
-            if (resource_output > 0.0f)
+            if (resource_output != 0.0f)
                 AttachChild(icon);
         }
             break;
-        case METER_INFLUENCE: {
-            const auto resource_output = fleet->ResourceOutput(RE_INFLUENCE);
+        case MeterType::METER_INFLUENCE: {
+            const auto resource_output = fleet->ResourceOutput(ResourceType::RE_INFLUENCE);
             icon->SetValue(resource_output);
-            if (resource_output > 0.0f)
+            if (resource_output != 0.0f)
                 AttachChild(icon);
         }
             break;
-        case METER_STRUCTURE:
+        case MeterType::METER_STRUCTURE:
             icon->SetValue(structure_tally);
             AttachChild(icon);
             break;
-        case METER_SHIELD:
+        case MeterType::METER_SHIELD:
             icon->SetValue(shield_tally/ship_count);
             AttachChild(icon);
             break;
-        case METER_FUEL:
+        case MeterType::METER_FUEL:
             icon->SetValue(min_fuel);
             AttachChild(icon);
             break;
-        case METER_SPEED:
+        case MeterType::METER_SPEED:
             icon->SetValue(min_speed);
             AttachChild(icon);
             break;
@@ -1616,24 +1612,24 @@ void FleetDataPanel::UpdateAggressionToggle() {
     int tooltip_delay = GetOptionsDB().Get<int>("ui.tooltip.delay");
     m_aggression_toggle->SetBrowseModeTime(tooltip_delay);
 
-    NewFleetAggression aggression = FLEET_AGGRESSIVE;
+    NewFleetAggression aggression = NewFleetAggression::FLEET_AGGRESSIVE;
 
     if (m_is_new_fleet_drop_target) {
         aggression = m_new_fleet_aggression;
     } else if (auto fleet = Objects().get<Fleet>(m_fleet_id)) {
-        aggression = fleet->Aggressive() ? FLEET_AGGRESSIVE : FLEET_PASSIVE;
+        aggression = fleet->Aggressive() ? NewFleetAggression::FLEET_AGGRESSIVE : NewFleetAggression::FLEET_PASSIVE;
     } else {
         DetachChild(m_aggression_toggle);
         return;
     }
 
-    if (aggression == FLEET_AGGRESSIVE) {
+    if (aggression == NewFleetAggression::FLEET_AGGRESSIVE) {
         m_aggression_toggle->SetUnpressedGraphic(GG::SubTexture(FleetAggressiveIcon()));
         m_aggression_toggle->SetPressedGraphic  (GG::SubTexture(FleetPassiveIcon()));
         m_aggression_toggle->SetRolloverGraphic (GG::SubTexture(FleetAggressiveMouseoverIcon()));
         m_aggression_toggle->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
             FleetAggressiveIcon(), UserString("FW_AGGRESSIVE"), UserString("FW_AGGRESSIVE_DESC")));
-    } else if (aggression == FLEET_PASSIVE) {
+    } else if (aggression == NewFleetAggression::FLEET_PASSIVE) {
         m_aggression_toggle->SetUnpressedGraphic(GG::SubTexture(FleetPassiveIcon()));
         if (m_is_new_fleet_drop_target)
             m_aggression_toggle->SetPressedGraphic  (GG::SubTexture(FleetAutoIcon()));
@@ -1642,7 +1638,7 @@ void FleetDataPanel::UpdateAggressionToggle() {
         m_aggression_toggle->SetRolloverGraphic (GG::SubTexture(FleetPassiveMouseoverIcon()));
         m_aggression_toggle->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
             FleetPassiveIcon(), UserString("FW_PASSIVE"), UserString("FW_PASSIVE_DESC")));
-    } else {    // aggression == INVALID_FLEET_AGGRESSION
+    } else {    // aggression == NewFleetAggression::INVALID_FLEET_AGGRESSION
         m_aggression_toggle->SetUnpressedGraphic(GG::SubTexture(FleetAutoIcon()));
         m_aggression_toggle->SetPressedGraphic  (GG::SubTexture(FleetAggressiveIcon()));
         m_aggression_toggle->SetRolloverGraphic (GG::SubTexture(FleetAutoMouseoverIcon()));
@@ -1709,48 +1705,47 @@ void FleetDataPanel::Init() {
             boost::bind(&FleetDataPanel::ToggleAggression, this));
 
     } else if (auto fleet = Objects().get<Fleet>(m_fleet_id)) {
-        int tooltip_delay = GetOptionsDB().Get<int>("ui.tooltip.delay");
-
-        std::vector<std::tuple<MeterType, std::shared_ptr<GG::Texture>, std::string>> meters_icons_browsetext;
-        meters_icons_browsetext.reserve(12);
-        meters_icons_browsetext.emplace_back(METER_SIZE,            FleetCountIcon(),                       "FW_FLEET_COUNT_SUMMARY");
-        meters_icons_browsetext.emplace_back(METER_CAPACITY,        DamageIcon(),                           "FW_FLEET_DAMAGE_SUMMARY");
-        meters_icons_browsetext.emplace_back(METER_SECONDARY_STAT,  FightersIcon(),                         "FW_FLEET_FIGHTER_SUMMARY");
-        meters_icons_browsetext.emplace_back(METER_TROOPS,          TroopIcon(),                            "FW_FLEET_TROOP_SUMMARY");
-        meters_icons_browsetext.emplace_back(METER_POPULATION,      ColonyIcon(),                           "FW_FLEET_COLONY_SUMMARY");
-        meters_icons_browsetext.emplace_back(METER_INDUSTRY,        IndustryIcon(),                         "FW_FLEET_INDUSTRY_SUMMARY");
-        meters_icons_browsetext.emplace_back(METER_RESEARCH,        ResearchIcon(),                         "FW_FLEET_RESEARCH_SUMMARY");
-        meters_icons_browsetext.emplace_back(METER_INFLUENCE,       InfluenceIcon(),                        "FW_FLEET_INFLUENCE_SUMMARY");
-        meters_icons_browsetext.emplace_back(METER_STRUCTURE,       ClientUI::MeterIcon(METER_STRUCTURE),   "FW_FLEET_STRUCTURE_SUMMARY");
-        meters_icons_browsetext.emplace_back(METER_SHIELD,          ClientUI::MeterIcon(METER_SHIELD),      "FW_FLEET_SHIELD_SUMMARY");
-        meters_icons_browsetext.emplace_back(METER_FUEL,            ClientUI::MeterIcon(METER_FUEL),        "FW_FLEET_FUEL_SUMMARY");
-        meters_icons_browsetext.emplace_back(METER_SPEED,           ClientUI::MeterIcon(METER_SPEED),       "FW_FLEET_SPEED_SUMMARY");
+        std::vector<std::tuple<MeterType, std::shared_ptr<GG::Texture>, std::string>> meters_icons_browsetext{
+            {MeterType::METER_SIZE,           FleetCountIcon(),                                "FW_FLEET_COUNT_SUMMARY"},
+            {MeterType::METER_CAPACITY,       DamageIcon(),                                    "FW_FLEET_DAMAGE_SUMMARY"},
+            {MeterType::METER_SECONDARY_STAT, FightersIcon(),                                  "FW_FLEET_FIGHTER_SUMMARY"},
+            {MeterType::METER_TROOPS,         TroopIcon(),                                     "FW_FLEET_TROOP_SUMMARY"},
+            {MeterType::METER_POPULATION,     ColonyIcon(),                                    "FW_FLEET_COLONY_SUMMARY"},
+            {MeterType::METER_INDUSTRY,       IndustryIcon(),                                  "FW_FLEET_INDUSTRY_SUMMARY"},
+            {MeterType::METER_RESEARCH,       ResearchIcon(),                                  "FW_FLEET_RESEARCH_SUMMARY"},
+            {MeterType::METER_INFLUENCE,      InfluenceIcon(),                                 "FW_FLEET_INFLUENCE_SUMMARY"},
+            {MeterType::METER_STRUCTURE,      ClientUI::MeterIcon(MeterType::METER_STRUCTURE), "FW_FLEET_STRUCTURE_SUMMARY"},
+            {MeterType::METER_SHIELD,         ClientUI::MeterIcon(MeterType::METER_SHIELD),    "FW_FLEET_SHIELD_SUMMARY"},
+            {MeterType::METER_FUEL,           ClientUI::MeterIcon(MeterType::METER_FUEL),      "FW_FLEET_FUEL_SUMMARY"},
+            {MeterType::METER_SPEED,          ClientUI::MeterIcon(MeterType::METER_SPEED),     "FW_FLEET_SPEED_SUMMARY"}};
 
         m_stat_icons.reserve(meters_icons_browsetext.size());
         for (const auto& entry : meters_icons_browsetext) {
-            auto icon = GG::Wnd::Create<StatisticIcon>(std::get<1>(entry), 0, 0, false, StatIconSize().x, StatIconSize().y);
+            auto icon = GG::Wnd::Create<StatisticIcon>(std::move(std::get<1>(entry)), 0, 0, false,
+                                                       StatIconSize().x, StatIconSize().y);
             auto meter_type = std::get<0>(entry);
-            m_stat_icons.push_back({meter_type, icon});
-            icon->SetBrowseModeTime(tooltip_delay);
-            icon->SetBrowseText(UserString(std::get<2>(entry)));
-            icon->RightClickedSignal.connect([meter_type](const GG::Pt& pt){
-                std::string meter_string = boost::lexical_cast<std::string>(meter_type);
+            std::string meter_string = boost::lexical_cast<std::string>(meter_type);
 
+            m_stat_icons.emplace_back(meter_type, icon);
+            icon->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
+                std::get<1>(entry), UserString(meter_string), UserString(std::get<2>(entry))));
+
+            icon->RightClickedSignal.connect([meter_string](const GG::Pt& pt){
                 auto zoom_article_action = [meter_string]() { ClientUI::GetClientUI()->ZoomToMeterTypeArticle(meter_string); };
 
                 auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
                 std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) %
                                                                         UserString(meter_string));
-                popup->AddMenuItem(GG::MenuItem(popup_label, false, false, zoom_article_action));
+                popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false,
+                                                zoom_article_action));
                 popup->Run();
             });
-            AttachChild(icon);
-            icon->SetBrowseModeTime(tooltip_delay);
+            AttachChild(std::move(icon));
         }
 
         int client_empire_id = HumanClientApp::GetApp()->EmpireID();
-        if (fleet->OwnedBy(client_empire_id) || fleet->GetVisibility(client_empire_id) >= VIS_FULL_VISIBILITY) {
+        if (fleet->OwnedBy(client_empire_id) || fleet->GetVisibility(client_empire_id) >= Visibility::VIS_FULL_VISIBILITY) {
             m_aggression_toggle = Wnd::Create<CUIButton>(
                 GG::SubTexture(FleetAggressiveIcon()),
                 GG::SubTexture(FleetPassiveIcon()),
@@ -1792,7 +1787,7 @@ namespace {
             if (Objects().get<Fleet>(fleet_id))
                 SetDragDropDataType(FLEET_DROP_TYPE_STRING);
             SetName("FleetRow");
-            SetChildClippingMode(ClipToClient);
+            SetChildClippingMode(ChildClippingMode::ClipToClient);
         }
 
         void CompleteConstruction() override {
@@ -1886,7 +1881,7 @@ public:
                     ErrorLogger() << "FleetsListBox::AcceptDrops  unable to get fleet row from dropped wnd";
                     continue;
                 }
-                dropped_fleets.push_back(Objects().get<Fleet>(fleet_row->FleetID()));
+                dropped_fleets.emplace_back(Objects().get<Fleet>(fleet_row->FleetID()));
 
             } else if (wnd->DragDropDataType() == SHIP_DROP_TYPE_STRING) {
                 const ShipRow* ship_row = boost::polymorphic_downcast<const ShipRow*>(wnd.get());
@@ -1894,7 +1889,7 @@ public:
                     ErrorLogger() << "FleetsListBox::AcceptDrops  unable to get ship row from dropped wnd";
                     continue;
                 }
-                dropped_ships.push_back(Objects().get<Ship>(ship_row->ShipID()));
+                dropped_ships.emplace_back(Objects().get<Ship>(ship_row->ShipID()));
             }
         }
 
@@ -2214,7 +2209,7 @@ public:
     }
 
     void Refresh() {
-        ScopedTimer timer("ShipsListBox::Refresh");
+        ScopedTimer timer("ShipsListBox::Refresh", true);
 
         auto fleet = Objects().get<Fleet>(m_fleet_id);
         if (!fleet) {
@@ -2246,12 +2241,11 @@ public:
             if (this_client_stale_object_info.count(ship_id))
                 continue;
 
-            auto row = GG::Wnd::Create<ShipRow>(GG::X1, row_size.y, ship_id);
-            rows.push_back(row);
+            rows.emplace_back(GG::Wnd::Create<ShipRow>(GG::X1, row_size.y, ship_id));
         }
         Insert(rows);
         for (auto& row : rows)
-        { row->Resize(row_size); }
+            row->Resize(row_size);
 
         SelRowsChangedSignal(this->Selections());
     }
@@ -2391,7 +2385,7 @@ FleetDetailPanel::FleetDetailPanel(GG::X w, GG::Y h, int fleet_id, bool order_is
     m_order_issuing_enabled(order_issuing_enabled)
 {
     SetName("FleetDetailPanel");
-    SetChildClippingMode(ClipToClient);
+    SetChildClippingMode(ChildClippingMode::ClipToClient);
 
     m_ships_lb = GG::Wnd::Create<ShipsListBox>(m_fleet_id, order_issuing_enabled);
     m_ships_lb->SetHiliteColor(GG::CLR_ZERO);
@@ -2563,7 +2557,9 @@ void FleetDetailPanel::ShipRightClicked(GG::ListBox::iterator it, const GG::Pt& 
     auto fleet = Objects().get<Fleet>(m_fleet_id);
 
     const auto& map_wnd = ClientUI::GetClientUI()->GetMapWnd();
-    if (ClientPlayerIsModerator() && map_wnd->GetModeratorActionSetting() != MAS_NoAction) {
+    if (ClientPlayerIsModerator() &&
+        map_wnd->GetModeratorActionSetting() != ModeratorActionSetting::MAS_NoAction)
+    {
         ShipRightClickedSignal(ship->ID());  // response handled in MapWnd
         return;
     }
@@ -2577,7 +2573,8 @@ void FleetDetailPanel::ShipRightClicked(GG::ListBox::iterator it, const GG::Pt& 
     if (design) {
         std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) % design->Name(true));
         auto zoom_to_design_action = [design]() { ClientUI::GetClientUI()->ZoomToShipDesign(design->ID()); };
-        popup->AddMenuItem(GG::MenuItem(popup_label, false, false, zoom_to_design_action));
+        popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false,
+                                        zoom_to_design_action));
     }
 
     // Rename ship context item
@@ -2669,7 +2666,7 @@ void FleetDetailPanel::ShipRightClicked(GG::ListBox::iterator it, const GG::Pt& 
         auto visibility_turn_map =
             GetUniverse().GetObjectVisibilityTurnMapByEmpire(ship->ID(), client_empire_id);
 
-        auto last_turn_visible_it = visibility_turn_map.find(VIS_BASIC_VISIBILITY);
+        auto last_turn_visible_it = visibility_turn_map.find(Visibility::VIS_BASIC_VISIBILITY);
         if (last_turn_visible_it != visibility_turn_map.end()
             && last_turn_visible_it->second < CurrentTurn())
         {
@@ -2718,15 +2715,13 @@ FleetWnd::FleetWnd(const std::vector<int>& fleet_ids, bool order_issuing_enabled
                    GG::Flags<GG::WndFlag> flags/* = INTERACTIVE | DRAGABLE | ONTOP | CLOSABLE | RESIZABLE*/,
                    const std::string& config_name) :
     MapWndPopup("", flags | GG::RESIZABLE, config_name),
+    m_fleet_ids(fleet_ids.begin(), fleet_ids.end()),
     m_order_issuing_enabled(order_issuing_enabled)
 {
-    if (!fleet_ids.empty()) {
-        if (auto fleet = Objects().get<Fleet>(*fleet_ids.begin()))
+    if (!m_fleet_ids.empty()) {
+        if (auto fleet = Objects().get<Fleet>(*m_fleet_ids.begin()))
             m_empire_id = fleet->Owner();
     }
-
-    for (int fleet_id : fleet_ids)
-        m_fleet_ids.insert(fleet_id);
 
     // verify that the selected fleet id is valid.
     if (selected_fleet_id != INVALID_OBJECT_ID &&
@@ -2752,7 +2747,8 @@ FleetWnd::FleetWnd(const std::vector<int>& fleet_ids, bool order_issuing_enabled
                               + GG::Pt(GG::X(allowed_bounding_box_leeway),
                                        GG::Y(allowed_bounding_box_leeway)));
 
-    m_fleet_detail_panel = GG::Wnd::Create<FleetDetailPanel>(GG::X1, GG::Y1, selected_fleet_id, m_order_issuing_enabled);
+    m_fleet_detail_panel = GG::Wnd::Create<FleetDetailPanel>(GG::X1, GG::Y1, selected_fleet_id,
+                                                             m_order_issuing_enabled);
 }
 
 void FleetWnd::CompleteConstruction() {
@@ -2763,20 +2759,20 @@ void FleetWnd::CompleteConstruction() {
 
     m_stat_icons.reserve(7);
     for (auto entry : {
-            std::make_tuple(METER_SIZE, FleetCountIcon(), UserStringNop("FW_FLEET_COUNT_SUMMARY")),
-            std::make_tuple(METER_CAPACITY, DamageIcon(), UserStringNop("FW_FLEET_DAMAGE_SUMMARY")),
-            std::make_tuple(METER_SECONDARY_STAT, FightersIcon(), UserStringNop("FW_FLEET_FIGHTER_SUMMARY")),
-            std::make_tuple(METER_STRUCTURE, ClientUI::MeterIcon(METER_STRUCTURE), UserStringNop("FW_FLEET_STRUCTURE_SUMMARY")),
-            std::make_tuple(METER_SHIELD, ClientUI::MeterIcon(METER_SHIELD), UserStringNop("FW_FLEET_SHIELD_SUMMARY")),
-            std::make_tuple(METER_TROOPS, TroopIcon(), UserStringNop("FW_FLEET_TROOP_SUMMARY")),
-            std::make_tuple(METER_POPULATION, ColonyIcon(), UserStringNop("FW_FLEET_COLONY_SUMMARY")),
+            std::make_tuple(MeterType::METER_SIZE,          FleetCountIcon(),   UserStringNop("FW_FLEET_COUNT_SUMMARY")),
+            std::make_tuple(MeterType::METER_CAPACITY,      DamageIcon(),       UserStringNop("FW_FLEET_DAMAGE_SUMMARY")),
+            std::make_tuple(MeterType::METER_SECONDARY_STAT,FightersIcon(),     UserStringNop("FW_FLEET_FIGHTER_SUMMARY")),
+            std::make_tuple(MeterType::METER_STRUCTURE,     ClientUI::MeterIcon(MeterType::METER_STRUCTURE),    UserStringNop("FW_FLEET_STRUCTURE_SUMMARY")),
+            std::make_tuple(MeterType::METER_SHIELD,        ClientUI::MeterIcon(MeterType::METER_SHIELD),       UserStringNop("FW_FLEET_SHIELD_SUMMARY")),
+            std::make_tuple(MeterType::METER_TROOPS,        TroopIcon(),        UserStringNop("FW_FLEET_TROOP_SUMMARY")),
+            std::make_tuple(MeterType::METER_POPULATION,    ColonyIcon(),       UserStringNop("FW_FLEET_COLONY_SUMMARY")),
         })
     {
         auto icon = GG::Wnd::Create<StatisticIcon>(std::get<1>(entry), 0, 0, false, StatIconSize().x, StatIconSize().y);
-        m_stat_icons.push_back({std::get<0>(entry), icon});
+        m_stat_icons.emplace_back(std::get<0>(entry), icon);
         icon->SetBrowseModeTime(tooltip_delay);
         icon->SetBrowseText(UserString(std::get<2>(entry)));
-        AttachChild(icon);
+        AttachChild(std::move(icon));
     }
 
     namespace ph = boost::placeholders;
@@ -2881,8 +2877,8 @@ void FleetWnd::SetStatIconValues() {
                 ship_count++;
                 damage_tally += ship->TotalWeaponsDamage(0.0f, false);
                 fighters_tally += ship->FighterCount();
-                structure_tally += ship->GetMeter(METER_STRUCTURE)->Initial();
-                shield_tally += ship->GetMeter(METER_SHIELD)->Initial();
+                structure_tally += ship->GetMeter(MeterType::METER_STRUCTURE)->Initial();
+                shield_tally += ship->GetMeter(MeterType::METER_SHIELD)->Initial();
                 troop_tally += ship->TroopCapacity();
                 colony_tally += ship->ColonyCapacity();
             }
@@ -2891,19 +2887,19 @@ void FleetWnd::SetStatIconValues() {
 
     for (auto& entry : m_stat_icons) {
         MeterType stat_name = entry.first;
-        if (stat_name == METER_SHIELD)
+        if (stat_name == MeterType::METER_SHIELD)
             entry.second->SetValue(shield_tally/ship_count);
-        else if (stat_name == METER_STRUCTURE)
+        else if (stat_name == MeterType::METER_STRUCTURE)
             entry.second->SetValue(structure_tally);
-        else if (stat_name == METER_CAPACITY)
+        else if (stat_name == MeterType::METER_CAPACITY)
             entry.second->SetValue(damage_tally);
-        else if (stat_name == METER_SECONDARY_STAT)
+        else if (stat_name == MeterType::METER_SECONDARY_STAT)
             entry.second->SetValue(fighters_tally);
-        else if (stat_name == METER_POPULATION)
+        else if (stat_name == MeterType::METER_POPULATION)
             entry.second->SetValue(colony_tally);
-        else if (stat_name == METER_SIZE)
+        else if (stat_name == MeterType::METER_SIZE)
             entry.second->SetValue(ship_count);
-        else if (stat_name == METER_TROOPS)
+        else if (stat_name == MeterType::METER_TROOPS)
             entry.second->SetValue(troop_tally);
     }
 }
@@ -2921,7 +2917,7 @@ void FleetWnd::RefreshStateChangedSignals() {
     for (const auto& fleet : Objects().find<Fleet>(m_fleet_ids)) {
         if (!fleet)
             continue;
-        m_fleet_connections.push_back(
+        m_fleet_connections.emplace_back(
             fleet->StateChangedSignal.connect(
                 boost::bind(&FleetWnd::RequireRefresh, this)));
     }
@@ -2968,7 +2964,7 @@ void FleetWnd::Refresh() {
         fleets_bounding_box = CreateOrGrowBox(fleets_that_exist.empty(), fleets_bounding_box, fleet_loc);
 
         fleets_that_exist.insert(fleet->ID());
-        fleet_locations_ids.insert({{fleet->SystemID(), fleet_loc}, fleet->ID()});
+        fleet_locations_ids.emplace(std::make_pair(fleet->SystemID(), fleet_loc), fleet->ID());
     }
 
     auto bounding_box_center = GG::Pt(fleets_bounding_box.MidX(), fleets_bounding_box.MidY());
@@ -2988,7 +2984,7 @@ void FleetWnd::Refresh() {
         // Grow the selected fleets bounding box
         selected_fleets_bounding_box = CreateOrGrowBox(selected_fleet_locations_ids.empty(),
                                                        selected_fleets_bounding_box, fleet_loc);
-        selected_fleet_locations_ids.insert({{fleet->SystemID(), fleet_loc}, fleet->ID()});
+        selected_fleet_locations_ids.emplace(std::make_pair(fleet->SystemID(), fleet_loc), fleet->ID());
     }
     auto selected_bounding_box_center = GG::Pt(selected_fleets_bounding_box.MidX(),
                                                selected_fleets_bounding_box.MidY());
@@ -3023,7 +3019,7 @@ void FleetWnd::Refresh() {
         location = {INVALID_OBJECT_ID, bounding_box_center};
         std::multimap<std::pair<int, GG::Pt>, int> fleets_near_enough;
         for (const auto& loc_and_id: fleet_locations_ids)
-            fleets_near_enough.insert({location, loc_and_id.second});
+            fleets_near_enough.emplace(location, loc_and_id.second);
         fleet_locations_ids.swap(fleets_near_enough);
 
     } else if (!selected_fleet_locations_ids.empty()
@@ -3038,7 +3034,7 @@ void FleetWnd::Refresh() {
         for (const auto& loc_and_id: fleet_locations_ids) {
             const auto& pos = loc_and_id.first.second;
             if (m_bounding_box.Contains(pos))
-                fleets_near_enough.insert({location, loc_and_id.second});
+                fleets_near_enough.emplace(location, loc_and_id.second);
         }
         fleet_locations_ids.swap(fleets_near_enough);
 
@@ -3054,7 +3050,7 @@ void FleetWnd::Refresh() {
     // Use fleets that are at the determined location
     auto flt_at_loc = fleet_locations_ids.equal_range(location);
     for (auto it = flt_at_loc.first; it != flt_at_loc.second; ++it)
-    { m_fleet_ids.insert(it->second); }
+        m_fleet_ids.emplace(it->second);
 
     m_system_id = location.first;
 
@@ -3062,7 +3058,7 @@ void FleetWnd::Refresh() {
         m_new_fleet_drop_target->SetSystemID(m_system_id);
 
     // If the location is a system add in any ships from m_empire_id that are in the system.
-    if (auto system = Objects().get<System>(m_system_id)) {
+    if (auto system = Objects().get<System>(m_system_id).get()) {
         m_fleet_ids.clear();
         // get fleets to show from system, based on required ownership
         for (auto& fleet : Objects().find<Fleet>(system->FleetIDs())) {
@@ -3070,11 +3066,11 @@ void FleetWnd::Refresh() {
 
             // skip known destroyed and stale info objects
             if (this_client_known_destroyed_objects.count(fleet_id) ||
-                    this_client_stale_object_info.count(fleet_id))
-                continue;
+                this_client_stale_object_info.count(fleet_id))
+            { continue; }
 
             if ( ((m_empire_id == ALL_EMPIRES) && (fleet->Unowned())) || fleet->OwnedBy(m_empire_id) )
-                m_fleet_ids.insert(fleet_id);
+                m_fleet_ids.emplace(fleet_id);
         }
     }
 
@@ -3329,7 +3325,7 @@ std::set<int> FleetWnd::SelectedShipIDs() const
 NewFleetAggression FleetWnd::GetNewFleetAggression() const {
     if (m_new_fleet_drop_target)
         return m_new_fleet_drop_target->GetNewFleetAggression();
-    return INVALID_FLEET_AGGRESSION;
+    return NewFleetAggression::INVALID_FLEET_AGGRESSION;
 }
 
 void FleetWnd::FleetSelectionChanged(const GG::ListBox::SelectionSet& rows) {
@@ -3390,10 +3386,10 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
             continue;
 
         // find damaged ships
-        if (ship->GetMeter(METER_STRUCTURE)->Initial() < ship->GetMeter(METER_MAX_STRUCTURE)->Initial())
+        if (ship->GetMeter(MeterType::METER_STRUCTURE)->Initial() < ship->GetMeter(MeterType::METER_MAX_STRUCTURE)->Initial())
             damaged_ship_ids.push_back(ship->ID());
         // find ships with no remaining fuel
-        if (ship->GetMeter(METER_FUEL)->Initial() < 1.0f)
+        if (ship->GetMeter(MeterType::METER_FUEL)->Initial() < 1.0f)
             unfueled_ship_ids.push_back(ship->ID());
         // find ships that can carry fighters but dont have a full complement of them
         if (ship->HasFighters() && ship->FighterCount() < ship->FighterMax())
@@ -3405,14 +3401,14 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
     std::set<int> peaceful_empires_in_system;
     if (system) {
         for (auto& obj : Objects().find<const UniverseObject>(system->ObjectIDs())) {
-            if (obj->GetVisibility(client_empire_id) < VIS_PARTIAL_VISIBILITY)
+            if (obj->GetVisibility(client_empire_id) < Visibility::VIS_PARTIAL_VISIBILITY)
                 continue;
             if (obj->Owner() == client_empire_id || obj->Unowned())
                 continue;
             if (peaceful_empires_in_system.count(obj->Owner()))
                 continue;
-            if (Empires().GetDiplomaticStatus(client_empire_id, obj->Owner()) < DIPLO_PEACE)
-            { continue; }
+            if (Empires().GetDiplomaticStatus(client_empire_id, obj->Owner()) < DiplomaticStatus::DIPLO_PEACE)
+                continue;
             peaceful_empires_in_system.insert(obj->Owner());
         }
     }
@@ -3460,7 +3456,7 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
         && !ClientPlayerIsModerator()
        )
     {
-        NewFleetAggression nfa = fleet->Aggressive() ? FLEET_AGGRESSIVE : FLEET_PASSIVE;
+        NewFleetAggression nfa = fleet->Aggressive() ? NewFleetAggression::FLEET_AGGRESSIVE : NewFleetAggression::FLEET_PASSIVE;
         auto split_damage_action = [&damaged_ship_ids, nfa]() { CreateNewFleetFromShips(damaged_ship_ids, nfa); };
         popup->AddMenuItem(GG::MenuItem(UserString("FW_SPLIT_DAMAGED_FLEET"),     false, false, split_damage_action));
     }
@@ -3475,11 +3471,11 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
        )
     {
         auto split_unfueled_action = [fleet, &unfueled_ship_ids]() {
-            NewFleetAggression nfa = fleet->Aggressive() ? FLEET_AGGRESSIVE : FLEET_PASSIVE;
+            NewFleetAggression nfa = fleet->Aggressive() ? NewFleetAggression::FLEET_AGGRESSIVE : NewFleetAggression::FLEET_PASSIVE;
             CreateNewFleetFromShips(unfueled_ship_ids, nfa);
         };
 
-        popup->AddMenuItem(GG::MenuItem(UserString("FW_SPLIT_UNFUELED_FLEET"),    false, false, split_unfueled_action));
+        popup->AddMenuItem(GG::MenuItem(UserString("FW_SPLIT_UNFUELED_FLEET"), false, false, split_unfueled_action));
     }
 
     // Split ships with not as many fighters as they could contain
@@ -3492,7 +3488,7 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
        )
     {
         auto split_not_full_fighters_action = [fleet, &not_full_fighters_ship_ids]() {
-            NewFleetAggression nfa = fleet->Aggressive() ? FLEET_AGGRESSIVE : FLEET_PASSIVE;
+            NewFleetAggression nfa = fleet->Aggressive() ? NewFleetAggression::FLEET_AGGRESSIVE : NewFleetAggression::FLEET_PASSIVE;
             CreateNewFleetFromShips(not_full_fighters_ship_ids, nfa);
         };
         popup->AddMenuItem(GG::MenuItem(UserString("FW_SPLIT_NOT_FULL_FIGHTERS_FLEET"), false, false, split_not_full_fighters_action));
@@ -3511,7 +3507,7 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
             auto ship_id_it = ship_ids_set.begin();
             ship_ids_set.erase(ship_id_it);
 
-            NewFleetAggression new_aggression_setting = INVALID_FLEET_AGGRESSION;
+            NewFleetAggression new_aggression_setting = NewFleetAggression::INVALID_FLEET_AGGRESSION;
             if (m_new_fleet_drop_target)
                 new_aggression_setting = m_new_fleet_drop_target->GetNewFleetAggression();
 
@@ -3525,7 +3521,7 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
         };
 
         auto split_per_design_action = [this, fleet]() {
-            NewFleetAggression new_aggression_setting = INVALID_FLEET_AGGRESSION;
+            NewFleetAggression new_aggression_setting = NewFleetAggression::INVALID_FLEET_AGGRESSION;
             if (m_new_fleet_drop_target)
                 new_aggression_setting = m_new_fleet_drop_target->GetNewFleetAggression();
 
@@ -3620,7 +3616,7 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
                 HumanClientApp::GetApp()->Orders().IssueOrder(
                     std::make_shared<GiveObjectToEmpireOrder>(client_empire_id, fleet->ID(), recipient_empire_id));
             };
-            give_away_menu.next_level.push_back(GG::MenuItem(entry.second->Name(), false, false, gift_action));
+            give_away_menu.next_level.emplace_back(entry.second->Name(), false, false, gift_action);
         }
         popup->AddMenuItem(std::move(give_away_menu));
 
@@ -3651,7 +3647,7 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
         };
         auto visibility_turn_map =
             GetUniverse().GetObjectVisibilityTurnMapByEmpire(fleet->ID(), client_empire_id);
-        auto last_turn_visible_it = visibility_turn_map.find(VIS_BASIC_VISIBILITY);
+        auto last_turn_visible_it = visibility_turn_map.find(Visibility::VIS_BASIC_VISIBILITY);
         if (last_turn_visible_it != visibility_turn_map.end()
             && last_turn_visible_it->second < CurrentTurn())
         {
@@ -3740,7 +3736,7 @@ void FleetWnd::CreateNewFleetFromDrops(const std::vector<int>& ship_ids) {
     if (ship_ids.empty())
         return;
 
-    NewFleetAggression aggression = INVALID_FLEET_AGGRESSION;
+    NewFleetAggression aggression = NewFleetAggression::INVALID_FLEET_AGGRESSION;
     if (m_new_fleet_drop_target)
         aggression = m_new_fleet_drop_target->GetNewFleetAggression();
 

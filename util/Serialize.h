@@ -11,7 +11,6 @@
 
 #include "Export.h"
 
-class Meter;
 class PopCenter;
 class OrderSet;
 class Universe;
@@ -21,6 +20,13 @@ typedef boost::archive::binary_iarchive freeorion_bin_iarchive;
 typedef boost::archive::binary_oarchive freeorion_bin_oarchive;
 typedef boost::archive::xml_iarchive freeorion_xml_iarchive;
 typedef boost::archive::xml_oarchive freeorion_xml_oarchive;
+
+//! This must be set to the encoding empire's id when serializing various
+//! gamestate information, so that only the relevant info is serialized for the
+//! intended recieipient. This is implemented this way so that we don't need to
+//! write custom boost::serialization classes that implement empire-dependent
+//! visibility.
+FO_COMMON_API int& GlobalSerializationEncodingForEmpire();
 
 //! @warning
 //!     Do not try to serialize types that contain longs, since longs are
@@ -90,15 +96,17 @@ extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_x
 extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, CombatLogManager&, const unsigned int);
 
 template <typename Archive>
-void serializeIncompleteLogs(Archive&, CombatLogManager&, const unsigned int);
+void SerializeIncompleteLogs(Archive&, CombatLogManager&, const unsigned int);
 
-extern template FO_COMMON_API void serializeIncompleteLogs<freeorion_bin_iarchive>(freeorion_bin_iarchive&, CombatLogManager&, const unsigned int);
-extern template FO_COMMON_API void serializeIncompleteLogs<freeorion_bin_oarchive>(freeorion_bin_oarchive&, CombatLogManager&, const unsigned int);
-extern template FO_COMMON_API void serializeIncompleteLogs<freeorion_xml_iarchive>(freeorion_xml_iarchive&, CombatLogManager&, const unsigned int);
-extern template FO_COMMON_API void serializeIncompleteLogs<freeorion_xml_oarchive>(freeorion_xml_oarchive&, CombatLogManager&, const unsigned int);
+extern template FO_COMMON_API void SerializeIncompleteLogs<freeorion_bin_iarchive>(freeorion_bin_iarchive&, CombatLogManager&, const unsigned int);
+extern template FO_COMMON_API void SerializeIncompleteLogs<freeorion_bin_oarchive>(freeorion_bin_oarchive&, CombatLogManager&, const unsigned int);
+extern template FO_COMMON_API void SerializeIncompleteLogs<freeorion_xml_iarchive>(freeorion_xml_iarchive&, CombatLogManager&, const unsigned int);
+extern template FO_COMMON_API void SerializeIncompleteLogs<freeorion_xml_oarchive>(freeorion_xml_oarchive&, CombatLogManager&, const unsigned int);
 
 
 class EmpireManager;
+
+BOOST_CLASS_VERSION(EmpireManager, 1);
 
 template <typename Archive>
 void serialize(Archive&, EmpireManager&, unsigned int const);
@@ -120,15 +128,6 @@ extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_b
 extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, GalaxySetupData&, unsigned int const);
 extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, GalaxySetupData&, unsigned int const);
 extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, GalaxySetupData&, unsigned int const);
-
-
-template <typename Archive>
-void serialize(Archive&, Meter&, unsigned int const);
-
-extern template FO_COMMON_API void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, Meter&, unsigned int const);
-extern template FO_COMMON_API void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, Meter&, unsigned int const);
-extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, Meter&, unsigned int const);
-extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, Meter&, unsigned int const);
 
 
 struct MultiplayerLobbyData;
@@ -214,7 +213,7 @@ extern template FO_COMMON_API void serialize<freeorion_xml_oarchive>(freeorion_x
 extern template FO_COMMON_API void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, PopCenter&, unsigned int const);
 
 
-class PreviewInformation;
+struct PreviewInformation;
 
 template<typename Archive>
 void serialize(Archive&, PreviewInformation&, unsigned int const);

@@ -52,12 +52,12 @@ struct FO_COMMON_API ProductionQueue {
 
         bool EnqueueConditionPassedAt(int location_id) const;
 
-        std::map<std::string, std::map<int, float>> CompletionSpecialConsumption(int location_id) const;// for each special name, what object ids have those special capacities reduced by what amount
-        std::map<MeterType, std::map<int, float>>   CompletionMeterConsumption(int location_id) const;  // for each meter type, what object ids have those meters reduced by what amount
+        std::map<std::string, std::map<int, float>> CompletionSpecialConsumption(int location_id) const;// for each special name, what object ids have those special capacities reduced by what amount for full completion of the production item
+        std::map<MeterType, std::map<int, float>>   CompletionMeterConsumption(int location_id) const;  // for each meter type, what object ids have those meters reduced by what amount for full completion of the production item
 
         std::string Dump() const;
 
-        BuildType   build_type = INVALID_BUILD_TYPE;
+        BuildType   build_type = BuildType::INVALID_BUILD_TYPE;
         // only one of these may be valid, depending on BuildType
         std::string name;
         int         design_id = INVALID_DESIGN_ID;

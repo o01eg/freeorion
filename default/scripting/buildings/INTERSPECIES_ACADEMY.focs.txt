@@ -8,14 +8,7 @@ BuildingType
         Species
         Not Contains Building name = "BLD_INTERSPECIES_ACADEMY"
         OwnedBy empire = Source.Owner
-        Or [
-            Happiness low = 15
-            // The preferred focus happiness bonus helps only a bit
-            And [
-                Focus type = Source.PreferredFocus
-                Happiness low = 19
-            ]
-        ]
+        Happiness low = 15
         Not WithinStarlaneJumps jumps = 3 condition = And [
             System
             Contains And [
@@ -43,6 +36,8 @@ BuildingType
     ]
     EnqueueLocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
     effectsgroups = [
+        [[SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS]]
+    
         // Destroy superfluous academies
         EffectsGroup 
             scope = NumberOf number = 1 condition = And [
@@ -76,6 +71,8 @@ BuildingType
             accountinglabel = "INTERSPECIES_ACADEMY_LABEL"
             priority = [[LATE_PRIORITY]]
             effects = SetMaxStockpile value = Value + 10
+        
+        // Research bonus    
         EffectsGroup
             scope = And [
                 Object id = Source.PlanetID
@@ -88,10 +85,22 @@ BuildingType
             priority = [[LATE_PRIORITY]]
             effects = SetTargetResearch value = Value + 5
             
+        // Influence bonus    
+        EffectsGroup
+            scope = And [
+                Object id = Source.PlanetID
+                Planet
+                Focus type = "FOCUS_INFLUENCE"
+                OwnedBy empire = Source.Owner
+                Species
+            ]
+            accountinglabel = "INTERSPECIES_ACADEMY_LABEL"
+            priority = [[LATE_PRIORITY]]
+            effects = SetTargetInfluence value = Value + 2
     ]
     icon = "icons/building/science-institute.png"
 
 #include "/scripting/common/base_prod.macros"
-
 #include "/scripting/common/enqueue.macros"
 #include "/scripting/common/priorities.macros"
+#include "/scripting/buildings/buildings.macros"

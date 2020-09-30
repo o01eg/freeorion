@@ -25,30 +25,6 @@ BOOST_CLASS_EXPORT(Field)
 BOOST_CLASS_EXPORT(Universe)
 BOOST_CLASS_VERSION(Universe, 1)
 
-
-BOOST_CLASS_VERSION(Meter, 1)
-
-template <typename Archive>
-void serialize(Archive& ar, Meter& m, unsigned int const version)
-{
-    using namespace boost::serialization;
-
-    if (Archive::is_loading::value && version < 1) {
-        ar  & make_nvp("m_current_value", m.m_current_value)
-            & make_nvp("m_initial_value", m.m_initial_value);
-    } else {
-        // use minimum size NVP label to reduce archive size bloat for very-often serialized meter values...
-        ar  & make_nvp("c", m.m_current_value)
-            & make_nvp("i", m.m_initial_value);
-    }
-}
-
-template void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, Meter&, unsigned int const);
-template void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, Meter&, unsigned int const);
-template void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, Meter&, unsigned int const);
-template void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, Meter&, unsigned int const);
-
-
 template <typename Archive>
 void serialize(Archive& ar, PopCenter& p, unsigned int const version)
 {
@@ -111,14 +87,14 @@ void serialize(Archive& ar, Universe& obj, unsigned int const version)
     if (Archive::is_saving::value) {
         DebugLogger() << "Universe::serialize : Getting gamestate data";
         timer.EnterSection("collecting data");
-        obj.GetObjectsToSerialize(              objects,                            obj.m_encoding_empire);
-        obj.GetDestroyedObjectsToSerialize(     destroyed_object_ids,               obj.m_encoding_empire);
-        obj.GetEmpireKnownObjectsToSerialize(   empire_latest_known_objects,        obj.m_encoding_empire);
-        obj.GetEmpireObjectVisibilityMap(       empire_object_visibility,           obj.m_encoding_empire);
-        obj.GetEmpireObjectVisibilityTurnMap(   empire_object_visibility_turns,     obj.m_encoding_empire);
-        obj.GetEmpireKnownDestroyedObjects(     empire_known_destroyed_object_ids,  obj.m_encoding_empire);
-        obj.GetEmpireStaleKnowledgeObjects(     empire_stale_knowledge_object_ids,  obj.m_encoding_empire);
-        obj.GetShipDesignsToSerialize(          ship_designs,                       obj.m_encoding_empire);
+        obj.GetObjectsToSerialize(              objects,                            GlobalSerializationEncodingForEmpire());
+        obj.GetDestroyedObjectsToSerialize(     destroyed_object_ids,               GlobalSerializationEncodingForEmpire());
+        obj.GetEmpireKnownObjectsToSerialize(   empire_latest_known_objects,        GlobalSerializationEncodingForEmpire());
+        obj.GetEmpireObjectVisibilityMap(       empire_object_visibility,           GlobalSerializationEncodingForEmpire());
+        obj.GetEmpireObjectVisibilityTurnMap(   empire_object_visibility_turns,     GlobalSerializationEncodingForEmpire());
+        obj.GetEmpireKnownDestroyedObjects(     empire_known_destroyed_object_ids,  GlobalSerializationEncodingForEmpire());
+        obj.GetEmpireStaleKnowledgeObjects(     empire_stale_knowledge_object_ids,  GlobalSerializationEncodingForEmpire());
+        obj.GetShipDesignsToSerialize(          ship_designs,                       GlobalSerializationEncodingForEmpire());
         timer.EnterSection("");
     }
 
@@ -184,8 +160,8 @@ void serialize(Archive& ar, Universe& obj, unsigned int const version)
     timer.EnterSection("id allocator");
     if (version >= 1) {
         DebugLogger() << "Universe::serialize : " << serializing_label << " id allocator version = " << version;
-        obj.m_object_id_allocator->SerializeForEmpire(ar, version, obj.m_encoding_empire);
-        obj.m_design_id_allocator->SerializeForEmpire(ar, version, obj.m_encoding_empire);
+        obj.m_object_id_allocator->SerializeForEmpire(ar, version, GlobalSerializationEncodingForEmpire());
+        obj.m_design_id_allocator->SerializeForEmpire(ar, version, GlobalSerializationEncodingForEmpire());
     } else {
         if (Archive::is_loading::value) {
             int dummy_last_allocated_object_id;
@@ -208,7 +184,7 @@ void serialize(Archive& ar, Universe& obj, unsigned int const version)
     }
 
     timer.EnterSection("stats");
-    if (Archive::is_saving::value && obj.m_encoding_empire != ALL_EMPIRES && (!GetOptionsDB().Get<bool>("network.server.publish-statistics"))) {
+    if (Archive::is_saving::value && GlobalSerializationEncodingForEmpire() != ALL_EMPIRES && (!GetOptionsDB().Get<bool>("network.server.publish-statistics"))) {
         std::map<std::string, std::map<int, std::map<int, double>>> dummy_stat_records;
         ar  & boost::serialization::make_nvp("m_stat_records", dummy_stat_records);
     } else {
@@ -272,7 +248,7 @@ void serialize(Archive& ar, UniverseObject& o, unsigned int const version)
 
 template <typename Archive>
 void load_construct_data(Archive& ar, System* obj, unsigned int const version)
-{ ::new(obj)System(INVALID_STAR_TYPE, "", 0.0, 0.0); }
+{ ::new(obj)System(StarType::INVALID_STAR_TYPE, "", 0.0, 0.0); }
 
 template <typename Archive>
 void serialize(Archive& ar, System& obj, unsigned int const version)
@@ -316,7 +292,7 @@ void serialize(Archive& ar, Field& obj, unsigned int const version)
 
 template <typename Archive>
 void load_construct_data(Archive& ar, Planet* obj, unsigned int const version)
-{ ::new(obj)Planet(PT_TERRAN, SZ_MEDIUM); }
+{ ::new(obj)Planet(PlanetType::PT_TERRAN, PlanetSize::SZ_MEDIUM); }
 
 template <typename Archive>
 void serialize(Archive& ar, Planet& obj, unsigned int const version)
@@ -398,12 +374,15 @@ void serialize(Archive& ar, Fleet& obj, unsigned int const version)
         double dummy_travel_distance;
         ar & boost::serialization::make_nvp("m_travel_distance", dummy_travel_distance);
     }
+    if (version >= 4) {
+        ar & boost::serialization::make_nvp("m_last_turn_move_ordered", obj.m_last_turn_move_ordered);
+    }
     ar  & make_nvp("m_arrived_this_turn", obj.m_arrived_this_turn)
         & make_nvp("m_arrival_starlane", obj.m_arrival_starlane);
 }
 
 BOOST_CLASS_EXPORT(Fleet)
-BOOST_CLASS_VERSION(Fleet, 3)
+BOOST_CLASS_VERSION(Fleet, 4)
 
 
 template <typename Archive>
@@ -500,11 +479,11 @@ void serialize(Archive& ar, SpeciesManager& sm, unsigned int const version)
     std::map<std::string, std::map<std::string, int>>   species_ships_destroyed;
 
     if (Archive::is_saving::value) {
-        species_homeworlds = sm.GetSpeciesHomeworldsMap(GetUniverse().EncodingEmpire());
-        empire_opinions = sm.GetSpeciesEmpireOpinionsMap(GetUniverse().EncodingEmpire());
-        other_species_opinions = sm.GetSpeciesSpeciesOpinionsMap(GetUniverse().EncodingEmpire());
-        species_object_populations = sm.SpeciesObjectPopulations(GetUniverse().EncodingEmpire());
-        species_ships_destroyed = sm.SpeciesShipsDestroyed(GetUniverse().EncodingEmpire());
+        species_homeworlds = sm.GetSpeciesHomeworldsMap(GlobalSerializationEncodingForEmpire());
+        empire_opinions = sm.GetSpeciesEmpireOpinionsMap(GlobalSerializationEncodingForEmpire());
+        other_species_opinions = sm.GetSpeciesSpeciesOpinionsMap(GlobalSerializationEncodingForEmpire());
+        species_object_populations = sm.SpeciesObjectPopulations(GlobalSerializationEncodingForEmpire());
+        species_ships_destroyed = sm.SpeciesShipsDestroyed(GlobalSerializationEncodingForEmpire());
     }
 
     ar  & BOOST_SERIALIZATION_NVP(species_homeworlds)
@@ -514,9 +493,9 @@ void serialize(Archive& ar, SpeciesManager& sm, unsigned int const version)
         & BOOST_SERIALIZATION_NVP(species_ships_destroyed);
 
     if (Archive::is_loading::value) {
-        sm.SetSpeciesHomeworlds(species_homeworlds);
-        sm.SetSpeciesEmpireOpinions(empire_opinions);
-        sm.SetSpeciesSpeciesOpinions(other_species_opinions);
+        sm.SetSpeciesHomeworlds(std::move(species_homeworlds));
+        sm.SetSpeciesEmpireOpinions(std::move(empire_opinions));
+        sm.SetSpeciesSpeciesOpinions(std::move(other_species_opinions));
         sm.m_species_object_populations = std::move(species_object_populations);
         sm.m_species_species_ships_destroyed = std::move(species_ships_destroyed);
     }

@@ -20,7 +20,7 @@ namespace {
             ErrorLogger() << "ObjectResourceConsumption passed a null object";
             return 0.0;
         }
-        if (resource_type == INVALID_RESOURCE_TYPE) {
+        if (resource_type == ResourceType::INVALID_RESOURCE_TYPE) {
             ErrorLogger() << "ObjectResourceConsumption passed a INVALID_RESOURCE_TYPE";
             return 0.0;
         }
@@ -48,7 +48,7 @@ namespace {
         std::shared_ptr<const Building> building;
 
         switch (resource_type) {
-        case RE_INDUSTRY:
+        case ResourceType::RE_INDUSTRY:
             // PP (equal to mineral and industry) cost of objects on production queue at this object's location
             if (empire) {
                 // add allocated PP for all production items at this location for this empire
@@ -58,8 +58,8 @@ namespace {
 
             } else {
                 // add allocated PP for all production items at this location for all empires
-                for (auto& entry : Empires()) {
-                    empire = entry.second;
+                for (const auto& entry : Empires()) {
+                    empire = entry.second.get();
                     for (const ProductionQueue::Element& elem : empire->GetProductionQueue())
                         if (elem.location == obj->ID())
                             prod_queue_allocation_sum += elem.allocated_pp;
@@ -68,9 +68,9 @@ namespace {
             return prod_queue_allocation_sum;
             break;
 
-        case RE_INFLUENCE:
-        case RE_RESEARCH:
-        case RE_STOCKPILE:
+        case ResourceType::RE_INFLUENCE:
+        case ResourceType::RE_RESEARCH:
+        case ResourceType::RE_STOCKPILE:
             // research/stockpile aren't consumed at a particular location, so none is consumed at any location
         default:
             // for INVALID_RESOURCE_TYPE just return 0.0.  Could throw an exception, I suppose...
@@ -176,7 +176,7 @@ void SystemResourceSummaryBrowseWnd::UpdateProduction(GG::Y& top) {
     m_production_labels_and_amounts.clear();
 
     auto system = Objects().get<System>(m_system_id);
-    if (!system || m_resource_type == INVALID_RESOURCE_TYPE)
+    if (!system || m_resource_type == ResourceType::INVALID_RESOURCE_TYPE)
         return;
 
 
@@ -194,7 +194,7 @@ void SystemResourceSummaryBrowseWnd::UpdateProduction(GG::Y& top) {
         auto rc = std::dynamic_pointer_cast<const ResourceCenter>(obj);
         if (!rc) continue;
 
-        std::string name = obj->Name();
+        auto& name = obj->Name();
         double production = rc->GetMeter(ResourceToMeter(m_resource_type))->Initial();
         m_production += production;
 
@@ -206,12 +206,12 @@ void SystemResourceSummaryBrowseWnd::UpdateProduction(GG::Y& top) {
         label->Resize(GG::Pt(LabelWidth(), row_height));
         AttachChild(label);
 
-        auto value = GG::Wnd::Create<CUILabel>(amount_text);
+        auto value = GG::Wnd::Create<CUILabel>(std::move(amount_text));
         value->MoveTo(GG::Pt(LabelWidth(), top));
         value->Resize(GG::Pt(ValueWidth(), row_height));
         AttachChild(value);
 
-        m_production_labels_and_amounts.push_back({label, value});
+        m_production_labels_and_amounts.emplace_back(std::move(label), std::move(value));
 
         top += row_height;
     }
@@ -229,7 +229,7 @@ void SystemResourceSummaryBrowseWnd::UpdateProduction(GG::Y& top) {
         value->Resize(GG::Pt(ValueWidth(), row_height));
         AttachChild(value);
 
-        m_production_labels_and_amounts.push_back({label, value});
+        m_production_labels_and_amounts.emplace_back(std::move(label), std::move(value));
 
         top += row_height;
     }
@@ -238,13 +238,13 @@ void SystemResourceSummaryBrowseWnd::UpdateProduction(GG::Y& top) {
     // set production label
     std::string resource_text = "";
     switch (m_resource_type) {
-    case RE_INDUSTRY:
+    case ResourceType::RE_INDUSTRY:
         resource_text = UserString("INDUSTRY_PRODUCTION");  break;
-    case RE_RESEARCH:
+    case ResourceType::RE_RESEARCH:
         resource_text = UserString("RESEARCH_PRODUCTION");  break;
-    case RE_INFLUENCE:
+    case ResourceType::RE_INFLUENCE:
         resource_text = UserString("INFLUENCE_PRODUCTION"); break;
-    case RE_STOCKPILE:
+    case ResourceType::RE_STOCKPILE:
         resource_text = UserString("STOCKPILE_GENERATION"); break;
     default:
         resource_text = UserString("UNKNOWN_VALUE_SYMBOL"); break;
@@ -267,7 +267,7 @@ void SystemResourceSummaryBrowseWnd::UpdateAllocation(GG::Y& top) {
     m_allocation_labels_and_amounts.clear();
 
     auto system = Objects().get<System>(m_system_id);
-    if (!system || m_resource_type == INVALID_RESOURCE_TYPE)
+    if (!system || m_resource_type == ResourceType::INVALID_RESOURCE_TYPE)
         return;
 
 
@@ -280,38 +280,32 @@ void SystemResourceSummaryBrowseWnd::UpdateAllocation(GG::Y& top) {
         if (m_empire_id != ALL_EMPIRES && !obj->OwnedBy(m_empire_id))
             continue;   // if m_empire_id == ALL_EMPIRES, display resource production for all empires.  otherwise, skip this resource production if it's not owned by the requested player
 
-
-        std::string name = obj->Name();
-
+        auto& name = obj->Name();
 
         double allocation = ObjectResourceConsumption(obj, m_resource_type, m_empire_id);
-
 
         // don't add summary entries for objects that consume no resource.  (otherwise there would be a loooong pointless list of 0's
         if (allocation <= 0.0) {
             if (allocation < 0.0)
-                ErrorLogger() << "object " << obj->Name() << " is reported having negative " << m_resource_type << " consumption";
+                ErrorLogger() << "object " << name << " is reported having negative " << m_resource_type << " consumption";
             continue;
         }
-
 
         m_allocation += allocation;
 
         std::string amount_text = DoubleToString(allocation, 3, false);
-
 
         auto label = GG::Wnd::Create<CUILabel>(name, GG::FORMAT_RIGHT);
         label->MoveTo(GG::Pt(GG::X0, top));
         label->Resize(GG::Pt(LabelWidth(), row_height));
         AttachChild(label);
 
-
-        auto value = GG::Wnd::Create<CUILabel>(amount_text);
+        auto value = GG::Wnd::Create<CUILabel>(std::move(amount_text));
         value->MoveTo(GG::Pt(LabelWidth(), top));
         value->Resize(GG::Pt(ValueWidth(), row_height));
         AttachChild(value);
 
-        m_allocation_labels_and_amounts.push_back({label, value});
+        m_allocation_labels_and_amounts.emplace_back(std::move(label), std::move(value));
 
         top += row_height;
     }
@@ -329,22 +323,22 @@ void SystemResourceSummaryBrowseWnd::UpdateAllocation(GG::Y& top) {
         value->Resize(GG::Pt(ValueWidth(), row_height));
         AttachChild(value);
 
-        m_allocation_labels_and_amounts.push_back({label, value});
+        m_allocation_labels_and_amounts.emplace_back(std::move(label), std::move(value));
 
         top += row_height;
     }
 
 
     // set consumption / allocation label
-    std::string resource_text = "";
+    std::string resource_text;
     switch (m_resource_type) {
-    case RE_INDUSTRY:
+    case ResourceType::RE_INDUSTRY:
         resource_text = UserString("INDUSTRY_CONSUMPTION"); break;
-    case RE_RESEARCH:
+    case ResourceType::RE_RESEARCH:
         resource_text = UserString("RESEARCH_CONSUMPTION"); break;
-    case RE_INFLUENCE:
+    case ResourceType::RE_INFLUENCE:
         resource_text = UserString("INFLUENCE_CONSUMPTION");break;
-    case RE_STOCKPILE:
+    case ResourceType::RE_STOCKPILE:
         resource_text = UserString("STOCKPILE_USE");        break;
     default:
         resource_text = UserString("UNKNOWN_VALUE_SYMBOL"); break;
@@ -353,9 +347,9 @@ void SystemResourceSummaryBrowseWnd::UpdateAllocation(GG::Y& top) {
     std::string system_allocation_text = DoubleToString(m_allocation, 3, false);
 
     // for research and stockpiling, local allocation makes no sense
-    if (m_resource_type == RE_RESEARCH && m_allocation == 0.0)
+    if (m_resource_type == ResourceType::RE_RESEARCH && m_allocation == 0.0)
         system_allocation_text = UserString("NOT_APPLICABLE");
-    if (m_resource_type == RE_STOCKPILE && m_allocation == 0.0)
+    if (m_resource_type == ResourceType::RE_STOCKPILE && m_allocation == 0.0)
         system_allocation_text = UserString("NOT_APPLICABLE");
 
 
@@ -374,8 +368,8 @@ void SystemResourceSummaryBrowseWnd::UpdateImportExport(GG::Y& top) {
     // check for early exit cases...
     bool abort = false;
     if (m_empire_id == ALL_EMPIRES ||
-        m_resource_type == RE_RESEARCH ||
-        m_resource_type == RE_STOCKPILE)
+        m_resource_type == ResourceType::RE_RESEARCH ||
+        m_resource_type == ResourceType::RE_STOCKPILE)
     {
         // multiple empires have complicated stockpiling which don't make sense to try to display.
         // Research use is nonlocalized, so importing / exporting doesn't make sense to display
@@ -387,15 +381,15 @@ void SystemResourceSummaryBrowseWnd::UpdateImportExport(GG::Y& top) {
     }
 
 
-    std::string label_text = "", amount_text = "";
+    std::string label_text, amount_text;
 
 
     if (!abort) {
         double difference = m_production - m_allocation;
 
         switch (m_resource_type) {
-        case RE_INFLUENCE:
-        case RE_INDUSTRY:
+        case ResourceType::RE_INFLUENCE:
+        case ResourceType::RE_INDUSTRY:
             if (difference > 0.0) {
                 // show surplus
                 label_text = UserString("RESOURCE_EXPORT");
@@ -410,8 +404,8 @@ void SystemResourceSummaryBrowseWnd::UpdateImportExport(GG::Y& top) {
                 amount_text = "";
             }
             break;
-        case RE_RESEARCH:
-        case RE_STOCKPILE:
+        case ResourceType::RE_RESEARCH:
+        case ResourceType::RE_STOCKPILE:
         default:
             // show nothing
             abort = true;
@@ -427,17 +421,17 @@ void SystemResourceSummaryBrowseWnd::UpdateImportExport(GG::Y& top) {
 
 
     // add label and amount.  may be "NOT APPLIABLE" and nothing if aborted above
-    auto label = GG::Wnd::Create<CUILabel>(label_text, GG::FORMAT_RIGHT);
+    auto label = GG::Wnd::Create<CUILabel>(std::move(label_text), GG::FORMAT_RIGHT);
     label->MoveTo(GG::Pt(GG::X0, top));
     label->Resize(GG::Pt(LabelWidth(), row_height));
     AttachChild(label);
 
-    auto value = GG::Wnd::Create<CUILabel>(amount_text);
+    auto value = GG::Wnd::Create<CUILabel>(std::move(amount_text));
     value->MoveTo(GG::Pt(LabelWidth(), top));
     value->Resize(GG::Pt(ValueWidth(), row_height));
     AttachChild(value);
 
-    m_import_export_labels_and_amounts.push_back({label, value});
+    m_import_export_labels_and_amounts.emplace_back(std::move(label), std::move(value));
 
     top += row_height;
 }

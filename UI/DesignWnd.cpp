@@ -75,11 +75,11 @@ namespace {
 
     /** Returns texture with which to render a SlotControl, depending on \a slot_type. */
     std::shared_ptr<GG::Texture> SlotBackgroundTexture(ShipSlotType slot_type) {
-        if (slot_type == SL_EXTERNAL)
+        if (slot_type == ShipSlotType::SL_EXTERNAL)
             return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "ship_parts" / "external_slot.png", true);
-        else if (slot_type == SL_INTERNAL)
+        else if (slot_type == ShipSlotType::SL_INTERNAL)
             return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "ship_parts" / "internal_slot.png", true);
-        else if (slot_type == SL_CORE)
+        else if (slot_type == ShipSlotType::SL_CORE)
             return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "ship_parts" / "core_slot.png", true);
         else
             return ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "missing.png", true);
@@ -90,9 +90,9 @@ namespace {
     //! into.
     std::shared_ptr<GG::Texture> PartBackgroundTexture(const ShipPart* part) {
         if (part) {
-            bool ex = part->CanMountInSlotType(SL_EXTERNAL);
-            bool in = part->CanMountInSlotType(SL_INTERNAL);
-            bool co = part->CanMountInSlotType(SL_CORE);
+            bool ex = part->CanMountInSlotType(ShipSlotType::SL_EXTERNAL);
+            bool in = part->CanMountInSlotType(ShipSlotType::SL_INTERNAL);
+            bool co = part->CanMountInSlotType(ShipSlotType::SL_CORE);
 
             if (ex && in)
                 return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "ship_parts" / "independent_part.png", true);
@@ -110,25 +110,25 @@ namespace {
         if (!part)
             return 0.0f;
         switch (part->Class()) {
-            case PC_DIRECT_WEAPON:
-            case PC_FIGHTER_BAY:
-            case PC_FIGHTER_HANGAR:
-            case PC_SHIELD:
-            case PC_DETECTION:
-            case PC_STEALTH:
-            case PC_FUEL:
-            case PC_COLONY:
-            case PC_ARMOUR:
-            case PC_SPEED:
-            case PC_TROOPS:
-            case PC_RESEARCH:
-            case PC_INDUSTRY:
-            case PC_INFLUENCE:
+            case ShipPartClass::PC_DIRECT_WEAPON:
+            case ShipPartClass::PC_FIGHTER_BAY:
+            case ShipPartClass::PC_FIGHTER_HANGAR:
+            case ShipPartClass::PC_SHIELD:
+            case ShipPartClass::PC_DETECTION:
+            case ShipPartClass::PC_STEALTH:
+            case ShipPartClass::PC_FUEL:
+            case ShipPartClass::PC_COLONY:
+            case ShipPartClass::PC_ARMOUR:
+            case ShipPartClass::PC_SPEED:
+            case ShipPartClass::PC_TROOPS:
+            case ShipPartClass::PC_RESEARCH:
+            case ShipPartClass::PC_INDUSTRY:
+            case ShipPartClass::PC_INFLUENCE:
                 return part->Capacity();
                 break;
-            case PC_GENERAL:
-            case PC_BOMBARD:
-            case PC_PRODUCTION_LOCATION:
+            case ShipPartClass::PC_GENERAL:
+            case ShipPartClass::PC_BOMBARD:
+            case ShipPartClass::PC_PRODUCTION_LOCATION:
             default:
                 return 0.0f;
         }
@@ -143,7 +143,8 @@ namespace {
     boost::filesystem::path SavedDesignsDir() { return GetUserDataDir() / "shipdesigns/"; }
 
     void ReportFileError(const boost::filesystem::path& file) {
-        std::string msg = boost::io::str(FlexibleFormat(UserString("ERROR_UNABLE_TO_WRITE_FILE")) % file);
+        std::string msg = boost::io::str(FlexibleFormat(UserString("ERROR_UNABLE_TO_WRITE_FILE"))
+                                         % PathToString(file));
         ErrorLogger() << msg;
         ClientUI::MessageBox(msg, true);
     }
@@ -171,7 +172,7 @@ namespace {
         return designs_dir_path;
     }
 
-    boost::filesystem::path CreateSaveFileNameForDesign(const ShipDesign& design) {
+    boost::filesystem::path CreateSavePathForDesign(const ShipDesign& design) {
         boost::filesystem::path designs_dir_path = GetDesignsDir();
 
         // Since there is no easy way to guarantee that an arbitrary design name with possibly
@@ -180,7 +181,7 @@ namespace {
         std::string file_name =
             DESIGN_FILENAME_PREFIX + boost::uuids::to_string(design.UUID()) + DESIGN_FILENAME_EXTENSION;
 
-        return boost::filesystem::absolute(PathToString(designs_dir_path / file_name));
+        return boost::filesystem::absolute(designs_dir_path / file_name);
     }
 
 
@@ -568,7 +569,7 @@ namespace {
         const ShipDesign& design,
         std::list<boost::uuids::uuid>::const_iterator next)
     {
-        if (design.UUID() == boost::uuids::uuid{{0}}) {
+        if (design.UUID().is_nil()) {
             ErrorLogger() << "Ship design has a nil UUID for " << design.Name() << ". Not saving.";
             return next;
         }
@@ -576,17 +577,16 @@ namespace {
         CheckPendingDesigns();
         if (m_saved_designs.count(design.UUID())) {
             // UUID already exists so this is a move.  Remove the old UUID location
-            const auto existing_it = std::find(m_ordered_uuids.begin(), m_ordered_uuids.end(), design.UUID());
+            const auto existing_it = std::find(m_ordered_uuids.begin(), m_ordered_uuids.end(),
+                                               design.UUID());
             if (existing_it != m_ordered_uuids.end())
                 m_ordered_uuids.erase(existing_it);
 
         } else {
             // Add the new saved design.
-            std::unique_ptr<ShipDesign> design_copy{std::make_unique<ShipDesign>(design)};
-
-            const auto save_path = CreateSaveFileNameForDesign(design);
-
-            m_saved_designs.insert(std::make_pair(design.UUID(), std::make_pair(std::move(design_copy), save_path)));
+            m_saved_designs.emplace(design.UUID(),
+                                    std::make_pair(std::make_unique<ShipDesign>(design),
+                                                   CreateSavePathForDesign(design)));
             SaveDesign(design.UUID());
         }
 
@@ -596,7 +596,9 @@ namespace {
         return retval;
     }
 
-    bool SavedDesignsManager::MoveBefore(const boost::uuids::uuid& moved_uuid, const boost::uuids::uuid& next_uuid) {
+    bool SavedDesignsManager::MoveBefore(const boost::uuids::uuid& moved_uuid,
+                                         const boost::uuids::uuid& next_uuid)
+    {
         if (moved_uuid == next_uuid)
             return false;
 
@@ -606,7 +608,7 @@ namespace {
             return false;
         }
 
-        if (next_uuid != boost::uuids::uuid{{0}} && !m_saved_designs.count(next_uuid)) {
+        if (!next_uuid.is_nil() && !m_saved_designs.count(next_uuid)) {
             ErrorLogger() << "Unable to move saved design because target design is missing.";
             return false;
         }
@@ -646,9 +648,9 @@ namespace {
     /** Save the design with the original filename or throw out_of_range..*/
     void SavedDesignsManager::SaveDesignConst(const boost::uuids::uuid &uuid) const {
         CheckPendingDesigns();
-        const auto& design_and_filename = m_saved_designs.at(uuid);
+        const auto& design_and_path = m_saved_designs.at(uuid);
 
-        WriteToFile(design_and_filename.second, design_and_filename.first->Dump());
+        WriteToFile(design_and_path.second, design_and_path.first->Dump());
     }
 
 
@@ -942,7 +944,7 @@ namespace {
         design_ids_and_obsoletes.clear();
         for (const auto id : m_ordered_design_ids) {
             try {
-                design_ids_and_obsoletes.push_back({id, m_id_to_obsolete_and_loc.at(id).first});
+                design_ids_and_obsoletes.emplace_back(id, m_id_to_obsolete_and_loc.at(id).first);
             } catch (const std::out_of_range&) {
                 ErrorLogger() << "DisplayedShipDesignManager::Save missing id = " << id;
                 continue;
@@ -950,9 +952,9 @@ namespace {
         }
 
         hulls_and_obsoletes.clear();
-        for (const auto name : m_ordered_hulls) {
+        for (const auto& name : m_ordered_hulls) {
             try {
-               hulls_and_obsoletes.push_back({name, m_hull_to_obsolete_and_loc.at(name).first});
+               hulls_and_obsoletes.emplace_back(name, m_hull_to_obsolete_and_loc.at(name).first);
             } catch (const std::out_of_range&) {
                 ErrorLogger() << "DisplayedShipDesignManager::Save missing hull = " << name;
                 continue;
@@ -1241,7 +1243,8 @@ void PartControl::CompleteConstruction() {
     if (!m_part)
         return;
 
-    m_background = GG::Wnd::Create<GG::StaticGraphic>(PartBackgroundTexture(m_part), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+    m_background = GG::Wnd::Create<GG::StaticGraphic>(
+        PartBackgroundTexture(m_part), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
     m_background->Resize(GG::Pt(SLOT_CONTROL_WIDTH, SLOT_CONTROL_HEIGHT));
     m_background->Show();
     AttachChild(m_background);
@@ -1253,7 +1256,8 @@ void PartControl::CompleteConstruction() {
     GG::Y part_top = (Height() - PART_CONTROL_HEIGHT) / 2;
 
     //DebugLogger() << "PartControl::PartControl this: " << this << " part: " << part << " named: " << (part ? part->Name() : "no part");
-    m_icon = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::PartIcon(m_part->Name()), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+    m_icon = GG::Wnd::Create<GG::StaticGraphic>(
+        ClientUI::PartIcon(m_part->Name()), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
     m_icon->MoveTo(GG::Pt(part_left, part_top));
     m_icon->Resize(GG::Pt(PART_CONTROL_WIDTH, PART_CONTROL_HEIGHT));
     m_icon->Show();
@@ -1653,7 +1657,7 @@ void PartsListBox::Populate() {
             if (already_added.count(part))
                 continue;
             already_added.insert(part);
-            sorted_group.insert({GetMainStat(part), part});
+            sorted_group.emplace(GetMainStat(part), part);
         }
 
         // take the sorted parts and make UI elements (technically rows) for the PartsListBox
@@ -1672,23 +1676,20 @@ void PartsListBox::Populate() {
 
             // make new part control and add to row
             auto control = GG::Wnd::Create<PartControl>(part);
-            control->ClickedSignal.connect(
-                PartsListBox::ShipPartClickedSignal);
-            control->DoubleClickedSignal.connect(
-                PartsListBox::ShipPartDoubleClickedSignal);
-            control->RightClickedSignal.connect(
-                PartsListBox::ShipPartRightClickedSignal);
+            control->ClickedSignal.connect(PartsListBox::ShipPartClickedSignal);
+            control->DoubleClickedSignal.connect(PartsListBox::ShipPartDoubleClickedSignal);
+            control->RightClickedSignal.connect(PartsListBox::ShipPartRightClickedSignal);
 
             auto shown = m_availabilities_state.DisplayedPartAvailability(part->Name());
             if (shown)
                 control->SetAvailability(*shown);
 
-            cur_row->push_back(control);
+            cur_row->push_back(std::move(control));
         }
     }
     // add any incomplete rows
     if (cur_row)
-        Insert(cur_row);
+        Insert(std::move(cur_row));
 
     // keep track of how many columns are present now
     m_previous_num_columns = NUM_COLUMNS;
@@ -1710,8 +1711,10 @@ void PartsListBox::ShowClass(ShipPartClass part_class, bool refresh_list) {
 }
 
 void PartsListBox::ShowAllClasses(bool refresh_list) {
-    for (ShipPartClass part_class = ShipPartClass(0); part_class != NUM_SHIP_PART_CLASSES; part_class = ShipPartClass(part_class + 1))
-        m_part_classes_shown.insert(part_class);
+    for (ShipPartClass part_class = ShipPartClass(0);
+         part_class != ShipPartClass::NUM_SHIP_PART_CLASSES;
+         part_class = ShipPartClass(int(part_class) + 1))
+    { m_part_classes_shown.insert(part_class); }
     if (refresh_list)
         Populate();
 }
@@ -1809,7 +1812,7 @@ DesignWnd::PartPalette::PartPalette(const std::string& config_name) :
 
 void DesignWnd::PartPalette::CompleteConstruction() {
     //TempUISoundDisabler sound_disabler;     // should be redundant with disabler in DesignWnd::DesignWnd.  uncomment if this is not the case
-    SetChildClippingMode(ClipToClient);
+    SetChildClippingMode(ChildClippingMode::ClipToClient);
 
     namespace ph = boost::placeholders;
 
@@ -1826,7 +1829,10 @@ void DesignWnd::PartPalette::CompleteConstruction() {
     const ShipPartManager& part_manager = GetShipPartManager();
 
     // class buttons
-    for (ShipPartClass part_class = ShipPartClass(0); part_class != NUM_SHIP_PART_CLASSES; part_class = ShipPartClass(part_class + 1)) {
+    for (ShipPartClass part_class = ShipPartClass(0);
+         part_class != ShipPartClass::NUM_SHIP_PART_CLASSES;
+         part_class = ShipPartClass(int(part_class) + 1))
+    {
         // are there any parts of this class?
         bool part_of_this_class_exists = false;
         for (const auto& entry : part_manager) {
@@ -2032,7 +2038,7 @@ void DesignWnd::PartPalette::HandleShipPartRightClicked(const ShipPart* part, co
 }
 
 void DesignWnd::PartPalette::ShowClass(ShipPartClass part_class, bool refresh_list) {
-    if (part_class >= ShipPartClass(0) && part_class < NUM_SHIP_PART_CLASSES) {
+    if (part_class >= ShipPartClass(0) && part_class < ShipPartClass::NUM_SHIP_PART_CLASSES) {
         m_parts_list->ShowClass(part_class, refresh_list);
         m_class_buttons[part_class]->SetCheck();
     } else {
@@ -2047,7 +2053,7 @@ void DesignWnd::PartPalette::ShowAllClasses(bool refresh_list) {
 }
 
 void DesignWnd::PartPalette::HideClass(ShipPartClass part_class, bool refresh_list) {
-    if (part_class >= ShipPartClass(0) && part_class < NUM_SHIP_PART_CLASSES) {
+    if (part_class >= ShipPartClass(0) && part_class < ShipPartClass::NUM_SHIP_PART_CLASSES) {
         m_parts_list->HideClass(part_class, refresh_list);
         m_class_buttons[part_class]->SetCheck(false);
     } else {
@@ -2062,7 +2068,7 @@ void DesignWnd::PartPalette::HideAllClasses(bool refresh_list) {
 }
 
 void DesignWnd::PartPalette::ToggleClass(ShipPartClass part_class, bool refresh_list) {
-    if (part_class >= ShipPartClass(0) && part_class < NUM_SHIP_PART_CLASSES) {
+    if (part_class >= ShipPartClass(0) && part_class < ShipPartClass::NUM_SHIP_PART_CLASSES) {
         const auto& classes_shown = m_parts_list->GetClassesShown();
         if (!classes_shown.count(part_class))
             ShowClass(part_class, refresh_list);
@@ -2076,7 +2082,7 @@ void DesignWnd::PartPalette::ToggleClass(ShipPartClass part_class, bool refresh_
 void DesignWnd::PartPalette::ToggleAllClasses(bool refresh_list)
 {
     const auto& classes_shown = m_parts_list->GetClassesShown();
-    if (classes_shown.size() == NUM_SHIP_PART_CLASSES)
+    if (classes_shown.size() == int(ShipPartClass::NUM_SHIP_PART_CLASSES))
         HideAllClasses(refresh_list);
     else
         ShowAllClasses(refresh_list);
@@ -2164,7 +2170,7 @@ public:
 
     class HullAndNamePanel : public GG::Control {
     public:
-        HullAndNamePanel(GG::X w, GG::Y h, const std::string& hull, const std::string& name);
+        HullAndNamePanel(GG::X w, GG::Y h, const std::string& hull, std::string name);
 
         void CompleteConstruction() override;
         void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
@@ -2173,16 +2179,16 @@ public:
         {}
 
         void SetAvailability(const AvailabilityManager::DisplayedAvailabilies& type);
-        void SetDisplayName(const std::string& name);
+        void SetDisplayName(std::string name);
 
     private:
-        std::shared_ptr<GG::StaticGraphic>  m_graphic = nullptr;
-        std::shared_ptr<GG::Label>          m_name = nullptr;
+        std::shared_ptr<GG::StaticGraphic>  m_graphic;
+        std::shared_ptr<GG::Label>          m_name;
     };
 
     class BasesListBoxRow : public CUIListBox::Row {
     public:
-        BasesListBoxRow(GG::X w, GG::Y h, const std::string& hull, const std::string& name);
+        BasesListBoxRow(GG::X w, GG::Y h, const std::string& hull, std::string name);
 
         void CompleteConstruction() override;
         void Render() override;
@@ -2190,16 +2196,16 @@ public:
         void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
 
         virtual void SetAvailability(const AvailabilityManager::DisplayedAvailabilies& type);
-        virtual void SetDisplayName(const std::string& name);
+        virtual void SetDisplayName(std::string name);
 
     private:
-        std::shared_ptr<HullAndNamePanel> m_hull_panel = nullptr;
+        std::shared_ptr<HullAndNamePanel> m_hull_panel;
     };
 
     class HullAndPartsListBoxRow : public BasesListBoxRow {
     public:
-        HullAndPartsListBoxRow(GG::X w, GG::Y h, const std::string& hull,
-                               const std::vector<std::string>& parts);
+        HullAndPartsListBoxRow(GG::X w, GG::Y h, std::string hull,
+                               std::vector<std::string> parts);
         void CompleteConstruction() override;
         const std::string&              Hull() const    { return m_hull_name; }
         const std::vector<std::string>& Parts() const   { return m_parts; }
@@ -2252,15 +2258,17 @@ private:
     boost::signals2::connection m_empire_designs_changed_signal;
 };
 
-BasesListBox::HullAndNamePanel::HullAndNamePanel(GG::X w, GG::Y h, const std::string& hull, const std::string& name) :
+BasesListBox::HullAndNamePanel::HullAndNamePanel(GG::X w, GG::Y h, const std::string& hull,
+                                                 std::string name) :
     GG::Control(GG::X0, GG::Y0, w, h, GG::NO_WND_FLAGS)
 {
-    SetChildClippingMode(ClipToClient);
+    SetChildClippingMode(ChildClippingMode::ClipToClient);
 
     m_graphic = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::HullIcon(hull),
                                                    GG::GRAPHIC_PROPSCALE | GG::GRAPHIC_FITGRAPHIC);
     m_graphic->Resize(GG::Pt(w, h));
-    m_name = GG::Wnd::Create<CUILabel>(name, GG::FORMAT_WORDBREAK | GG::FORMAT_CENTER | GG::FORMAT_TOP);
+    m_name = GG::Wnd::Create<CUILabel>(std::move(name),
+                                       GG::FORMAT_WORDBREAK | GG::FORMAT_CENTER | GG::FORMAT_TOP);
 }
 
 void BasesListBox::HullAndNamePanel::CompleteConstruction() {
@@ -2283,12 +2291,13 @@ void BasesListBox::HullAndNamePanel::SetAvailability(
     m_name->Disable(disabled);
 }
 
-void BasesListBox::HullAndNamePanel::SetDisplayName(const std::string& name) {
-    m_name->SetText(name);
+void BasesListBox::HullAndNamePanel::SetDisplayName(std::string name) {
+    m_name->SetText(std::move(name));
     m_name->Resize(GG::Pt(Width(), m_name->Height()));
 }
 
-BasesListBox::BasesListBoxRow::BasesListBoxRow(GG::X w, GG::Y h, const std::string& hull, const std::string& name) :
+BasesListBox::BasesListBoxRow::BasesListBoxRow(GG::X w, GG::Y h, const std::string& hull,
+                                               std::string name) :
     CUIListBox::Row(w, h)
 {
     SetDragDropDataType(BASES_LIST_BOX_DROP_TYPE);
@@ -2297,7 +2306,7 @@ BasesListBox::BasesListBoxRow::BasesListBoxRow(GG::X w, GG::Y h, const std::stri
         return;
     }
 
-    m_hull_panel = GG::Wnd::Create<HullAndNamePanel>(w, h, hull, name);
+    m_hull_panel = GG::Wnd::Create<HullAndNamePanel>(w, h, hull, std::move(name));
 
     SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
 }
@@ -2340,16 +2349,16 @@ void BasesListBox::BasesListBoxRow::SetAvailability(const AvailabilityManager::D
         m_hull_panel->SetAvailability(type);
 }
 
-void BasesListBox::BasesListBoxRow::SetDisplayName(const std::string& name) {
+void BasesListBox::BasesListBoxRow::SetDisplayName(std::string name) {
     if (m_hull_panel)
-        m_hull_panel->SetDisplayName(name);
+        m_hull_panel->SetDisplayName(std::move(name));
 }
 
-BasesListBox::HullAndPartsListBoxRow::HullAndPartsListBoxRow(GG::X w, GG::Y h, const std::string& hull,
-                                                             const std::vector<std::string>& parts) :
+BasesListBox::HullAndPartsListBoxRow::HullAndPartsListBoxRow(GG::X w, GG::Y h, std::string hull,
+                                                             std::vector<std::string> parts) :
     BasesListBoxRow(w, h, hull, UserString(hull)),
-    m_hull_name(hull),
-    m_parts(parts)
+    m_hull_name(std::move(hull)),
+    m_parts(std::move(parts))
 {}
 
 void BasesListBox::HullAndPartsListBoxRow::CompleteConstruction() {
@@ -2607,7 +2616,7 @@ void EmptyHullsListBox::PopulateCore() {
         }
     }
 
-    for (const auto& hull_name : hulls) {
+    for (auto& hull_name : hulls) {
         const auto& ship_hull =  GetShipHullManager().GetShipHull(hull_name);
 
         if (!ship_hull || !ship_hull->Producible())
@@ -2616,11 +2625,12 @@ void EmptyHullsListBox::PopulateCore() {
         auto shown = AvailabilityState().DisplayedHullAvailability(hull_name);
         if (!shown)
             continue;
-        const std::vector<std::string> empty_parts_vec;
-        auto row = GG::Wnd::Create<HullAndPartsListBoxRow>(row_size.x, row_size.y, hull_name, empty_parts_vec);
+        auto row = GG::Wnd::Create<HullAndPartsListBoxRow>(row_size.x, row_size.y,
+                                                           std::move(hull_name),
+                                                           std::vector<std::string>{});
         row->SetAvailability(*shown);
-        Insert(row);
-        row->Resize(row_size);
+        row->Resize(row_size);  // TODO: should this and following be swapped?
+        Insert(std::move(row));
     }
 }
 
@@ -2749,8 +2759,8 @@ std::shared_ptr<BasesListBox::Row> EmptyHullsListBox::ChildrenDraggedAwayCore(co
 
     const std::string& hull_name = design_row->Hull();
     const auto row_size = ListRowSize();
-    std::vector<std::string> empty_parts_vec;
-    auto row =  GG::Wnd::Create<HullAndPartsListBoxRow>(row_size.x, row_size.y, hull_name, empty_parts_vec);
+    auto row =  GG::Wnd::Create<HullAndPartsListBoxRow>(row_size.x, row_size.y,
+                                                        hull_name, std::vector<std::string>{});
 
     if (auto shown = AvailabilityState().DisplayedHullAvailability(hull_name))
         row->SetAvailability(*shown);
@@ -3032,8 +3042,8 @@ void CompletedDesignsListBox::BaseRightClicked(GG::ListBox::iterator it, const G
 
     DebugLogger() << "BasesListBox::BaseRightClicked on design id : " << design_id;
 
-    if (design->UUID() == boost::uuids::uuid{{0}})
-        ErrorLogger() << "BasesListBox::BaseRightClicked Design UUID is null";
+    if (design->UUID().is_nil())
+        ErrorLogger() << "BasesListBox::BaseRightClicked Design UUID is nil";
 
     // Context menu actions
     const auto& manager = GetDisplayedDesignsManager();
@@ -3051,7 +3061,8 @@ void CompletedDesignsListBox::BaseRightClicked(GG::ListBox::iterator it, const G
     };
 
     auto rename_design_action = [&empire_id, &design_id, design, &design_row]() {
-        auto edit_wnd = GG::Wnd::Create<CUIEditWnd>(GG::X(350), UserString("DESIGN_ENTER_NEW_DESIGN_NAME"), design->Name());
+        auto edit_wnd = GG::Wnd::Create<CUIEditWnd>(
+            GG::X(350), UserString("DESIGN_ENTER_NEW_DESIGN_NAME"), design->Name());
         edit_wnd->Run();
         const std::string& result = edit_wnd->Result();
         if (!result.empty() && result != design->Name()) {
@@ -3074,7 +3085,8 @@ void CompletedDesignsListBox::BaseRightClicked(GG::ListBox::iterator it, const G
     auto save_design_action = [&design]() {
         auto saved_design = *design;
         saved_design.SetUUID(boost::uuids::random_generator()());
-        GetSavedDesignsManager().InsertBefore(saved_design, GetSavedDesignsManager().OrderedDesignUUIDs().begin());
+        GetSavedDesignsManager().InsertBefore(
+            saved_design, GetSavedDesignsManager().OrderedDesignUUIDs().begin());
     };
 
     // toggle the option to add all saved designs at game start.
@@ -3153,7 +3165,7 @@ void SavedDesignsListBox::BaseRightClicked(GG::ListBox::iterator it, const GG::P
     };
 
     auto movetobottom_design_action = [&design, this]() {
-        GetSavedDesignsManager().MoveBefore(design->UUID(), boost::uuids::uuid{{0}});
+        GetSavedDesignsManager().MoveBefore(design->UUID(), boost::uuids::nil_generator()());
         Populate();
     };
 
@@ -3247,7 +3259,7 @@ void SavedDesignsListBox::QueueItemMoved(const GG::ListBox::iterator& row_it,
     const auto insert_before_control = (insert_before_row == end()) ? nullptr :
         boost::polymorphic_downcast<const SavedDesignsListBox::SavedDesignListBoxRow*>(insert_before_row->get());
     const auto& next_uuid = insert_before_control
-        ? insert_before_control->DesignUUID() : boost::uuids::uuid{{0}};
+        ? insert_before_control->DesignUUID() : boost::uuids::nil_generator()();
 
     if (GetSavedDesignsManager().MoveBefore(uuid, next_uuid))
         control->Resize(ListRowSize());
@@ -3574,7 +3586,7 @@ protected:
 
 private:
     bool                                m_highlighted = false;
-    ShipSlotType                        m_slot_type = INVALID_SHIP_SLOT_TYPE;
+    ShipSlotType                        m_slot_type = ShipSlotType::INVALID_SHIP_SLOT_TYPE;
     double                              m_x_position_fraction = 0.4;    //!< position on hull image where slot should be shown, as a fraction of that image's size
     double                              m_y_position_fraction = 0.4;
     std::shared_ptr<PartControl>        m_part_control;
@@ -3595,7 +3607,8 @@ SlotControl::SlotControl(double x, double y, ShipSlotType slot_type) :
 void SlotControl::CompleteConstruction() {
     GG::Control::CompleteConstruction();
 
-    m_background = GG::Wnd::Create<GG::StaticGraphic>(SlotBackgroundTexture(m_slot_type), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+    m_background = GG::Wnd::Create<GG::StaticGraphic>(
+        SlotBackgroundTexture(m_slot_type), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
     m_background->Resize(GG::Pt(SLOT_CONTROL_WIDTH, SLOT_CONTROL_HEIGHT));
     m_background->Show();
     AttachChild(m_background);
@@ -3603,13 +3616,9 @@ void SlotControl::CompleteConstruction() {
     SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
 
     // set up empty slot tool tip
-    std::string title_text;
-    if (m_slot_type == SL_EXTERNAL)
-        title_text = UserString("SL_EXTERNAL");
-    else if (m_slot_type == SL_INTERNAL)
-        title_text = UserString("SL_INTERNAL");
-    else if (m_slot_type == SL_CORE)
-        title_text = UserString("SL_CORE");
+    auto& title_text = (m_slot_type == ShipSlotType::SL_EXTERNAL) ? UserString("SL_EXTERNAL") :
+                       (m_slot_type == ShipSlotType::SL_INTERNAL) ? UserString("SL_INTERNAL") :
+                       (m_slot_type == ShipSlotType::SL_CORE) ? UserString("SL_CORE") : "";
 
     SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
         SlotBackgroundTexture(m_slot_type),
@@ -3623,11 +3632,11 @@ bool SlotControl::EventFilter(GG::Wnd* w, const GG::WndEvent& event) {
         return false;
 
     switch (event.Type()) {
-    case GG::WndEvent::DragDropEnter:
-    case GG::WndEvent::DragDropHere:
-    case GG::WndEvent::CheckDrops:
-    case GG::WndEvent::DragDropLeave:
-    case GG::WndEvent::DragDroppedOn:
+    case GG::WndEvent::EventType::DragDropEnter:
+    case GG::WndEvent::EventType::DragDropHere:
+    case GG::WndEvent::EventType::CheckDrops:
+    case GG::WndEvent::EventType::DragDropLeave:
+    case GG::WndEvent::EventType::DragDroppedOn:
         HandleEvent(event);
         return true;
         break;
@@ -3783,11 +3792,11 @@ void SlotControl::SetPart(const ShipPart* part) {
 
     // set part occupying slot's tool tip to say slot type
     std::string title_text;
-    if (m_slot_type == SL_EXTERNAL)
+    if (m_slot_type == ShipSlotType::SL_EXTERNAL)
         title_text = UserString("SL_EXTERNAL");
-    else if (m_slot_type == SL_INTERNAL)
+    else if (m_slot_type == ShipSlotType::SL_INTERNAL)
         title_text = UserString("SL_INTERNAL");
-    else if (m_slot_type == SL_CORE)
+    else if (m_slot_type == ShipSlotType::SL_CORE)
         title_text = UserString("SL_CORE");
 
     m_part_control->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
@@ -4038,7 +4047,7 @@ DesignWnd::MainPanel::MainPanel(const std::string& config_name) :
 {}
 
 void DesignWnd::MainPanel::CompleteConstruction() {
-    SetChildClippingMode(ClipToClient);
+    SetChildClippingMode(ChildClippingMode::ClipToClient);
 
     m_design_name_label = GG::Wnd::Create<CUILabel>(UserString("DESIGN_WND_DESIGN_NAME"), GG::FORMAT_RIGHT, GG::INTERACTIVE);
     m_design_name = GG::Wnd::Create<CUIEdit>(UserString("DESIGN_NAME_DEFAULT"));
@@ -4296,12 +4305,12 @@ int DesignWnd::MainPanel::FindEmptySlotForPart(const ShipPart* part) {
     if (!part)
         return result;
 
-    if (part->Class() == PC_FIGHTER_HANGAR) {
+    if (part->Class() == ShipPartClass::PC_FIGHTER_HANGAR) {
         // give up if part is a hangar and there is already a hangar of another type
         std::string already_seen_hangar_name;
         for (const auto& slot : m_slots) {
             const ShipPart* part = slot->GetPart();
-            if (!part || part->Class() != PC_FIGHTER_HANGAR)
+            if (!part || part->Class() != ShipPartClass::PC_FIGHTER_HANGAR)
                 continue;
             if (part->Name() != part->Name())
                 return result;
@@ -4332,10 +4341,10 @@ std::pair<int, int> DesignWnd::MainPanel::FindSlotForPartWithSwapping(const Ship
         return {-1, -1};
 
     // check if adding the part would cause the design to have multiple different types of hangar (which is not allowed)
-    if (part->Class() == PC_FIGHTER_HANGAR) {
+    if (part->Class() == ShipPartClass::PC_FIGHTER_HANGAR) {
         for (const auto& slot : m_slots) {
             const ShipPart* existing_part = slot->GetPart();
-            if (!existing_part || existing_part->Class() != PC_FIGHTER_HANGAR)
+            if (!existing_part || existing_part->Class() != ShipPartClass::PC_FIGHTER_HANGAR)
                 continue;
             if (existing_part->Name() != part->Name())
                 return {-1, -1};  // conflict; new part can't be added
@@ -4404,8 +4413,9 @@ void DesignWnd::MainPanel::SetHull(const ShipHull* hull, bool signal) {
     DetachChild(m_background_image);
     m_background_image = nullptr;
     if (m_hull) {
-        std::shared_ptr<GG::Texture> texture = ClientUI::HullTexture(hull->Name());
-        m_background_image = GG::Wnd::Create<GG::StaticGraphic>(texture, GG::GRAPHIC_PROPSCALE | GG::GRAPHIC_FITGRAPHIC);
+        auto texture = ClientUI::HullTexture(hull->Name());
+        m_background_image = GG::Wnd::Create<GG::StaticGraphic>(
+            std::move(texture), GG::GRAPHIC_PROPSCALE | GG::GRAPHIC_FITGRAPHIC);
         AttachChild(m_background_image);
         MoveChildDown(m_background_image);
     }
@@ -4513,8 +4523,7 @@ void DesignWnd::MainPanel::Populate() {
             boost::bind(static_cast<void (DesignWnd::MainPanel::*)(
                 const ShipPart*, unsigned int, bool, bool)>(&DesignWnd::MainPanel::SetPart),
                     this, ph::_1, i, true, ph::_2));
-        slot_control->ShipPartClickedSignal.connect(
-            ShipPartClickedSignal);
+        slot_control->ShipPartClickedSignal.connect(ShipPartClickedSignal);
     }
 }
 
@@ -4635,8 +4644,8 @@ void DesignWnd::MainPanel::DesignChanged() {
 
         // check part exclusions against other parts and hull
         std::set<std::string> already_seen_component_names;
-        already_seen_component_names.insert(m_hull->Name());
-        for (const std::string& part_name : Parts()) {
+        already_seen_component_names.emplace(m_hull->Name());
+        for (std::string& part_name : Parts()) {
             if (m_disabled_by_part_conflict)
                 break;
             const ShipPart* part = GetShipPart(part_name);
@@ -4650,7 +4659,7 @@ void DesignWnd::MainPanel::DesignChanged() {
                     break;
                 }
             }
-            already_seen_component_names.insert(part_name);
+            already_seen_component_names.emplace(std::move(part_name));
         }
 
 
@@ -4898,7 +4907,7 @@ std::pair<int, boost::uuids::uuid> DesignWnd::MainPanel::AddDesign() {
         } else {
             int empire_id = HumanClientApp::GetApp()->EmpireID();
             const Empire* empire = GetEmpire(empire_id);
-            if (!empire) return {INVALID_DESIGN_ID, boost::uuids::uuid{{0}}};
+            if (!empire) return {INVALID_DESIGN_ID, boost::uuids::nil_generator()()};
 
             auto order = std::make_shared<ShipDesignOrder>(empire_id, design);
             HumanClientApp::GetApp()->Orders().IssueOrder(order);
@@ -4917,7 +4926,7 @@ std::pair<int, boost::uuids::uuid> DesignWnd::MainPanel::AddDesign() {
 
     } catch (std::invalid_argument&) {
         ErrorLogger() << "DesignWnd::AddDesign tried to add an invalid ShipDesign";
-        return {INVALID_DESIGN_ID, boost::uuids::uuid{{0}}};
+        return {INVALID_DESIGN_ID, boost::uuids::nil_generator()()};
     }
 }
 
@@ -4991,7 +5000,7 @@ void DesignWnd::CompleteConstruction() {
     GG::Wnd::CompleteConstruction();
 
     Sound::TempUISoundDisabler sound_disabler;
-    SetChildClippingMode(ClipToClient);
+    SetChildClippingMode(ChildClippingMode::ClipToClient);
 
     m_detail_panel = GG::Wnd::Create<EncyclopediaDetailPanel>(GG::ONTOP | GG::INTERACTIVE | GG::DRAGABLE | GG::RESIZABLE | PINABLE, DES_PEDIA_WND_NAME);
     m_main_panel = GG::Wnd::Create<MainPanel>(DES_MAIN_WND_NAME);

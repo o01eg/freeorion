@@ -107,7 +107,7 @@ class BarSizer {
 public:
     typedef std::map<int, CombatSummary> CombatSummaryMap;
 
-    BarSizer( const CombatSummaryMap& combat_summaries , const GG::Pt& available_size):
+    BarSizer(const CombatSummaryMap& combat_summaries , const GG::Pt& available_size):
         m_max_total_max_health(-1.0f),
         m_max_units_on_a_side(-1),
         m_sum_of_max_max_healths(0),
@@ -365,7 +365,9 @@ public:
         m_y_axis_label->SetColor(axis_label_color);
         AttachChild(m_y_axis_label);
 
-        m_dead_label = GG::Wnd::Create<CUILabel>( (boost::format(UserString("COMBAT_DESTROYED_LABEL")) % m_side_summary.DestroyedUnits() ).str(), GG::FORMAT_RIGHT);
+        m_dead_label = GG::Wnd::Create<CUILabel>(
+            (boost::format(UserString("COMBAT_DESTROYED_LABEL")) % m_side_summary.DestroyedUnits()).str(),
+            GG::FORMAT_RIGHT);
         m_dead_label->SetColor(axis_label_color);
         AttachChild(m_dead_label);
 
@@ -376,7 +378,7 @@ public:
     void MakeBars() {
         for (CombatSummary::ParticipantSummaryPtr unit : m_side_summary.unit_summaries) {
             if (unit->max_health > 0) {
-                m_participant_bars.push_back(GG::Wnd::Create<ParticipantBar>(*unit, m_sizer));
+                m_participant_bars.emplace_back(GG::Wnd::Create<ParticipantBar>(*unit, m_sizer));
                 AttachChild(m_participant_bars.back());
             }
         }
@@ -466,7 +468,7 @@ public:
         right_head.x -=  delta_x;
         right_head.y -= delta_y;
 
-        GG::glColor(GG::CLR_WHITE);
+        glColor(GG::CLR_WHITE);
         glLineWidth(2);
         glDisable(GL_TEXTURE_2D);
 
@@ -537,34 +539,34 @@ public:
     {}
 
     void CompleteConstruction() override {
-        m_toggles.push_back(
-            std::make_shared<ToggleData>(UserString("COMBAT_SUMMARY_PARTICIPANT_RELATIVE"),
-                                         UserString("COMBAT_SUMMARY_PARTICIPANT_EQUAL"),
-                                         UserString("COMBAT_SUMMARY_PARTICIPANT_RELATIVE_TIP"),
-                                         UserString("COMBAT_SUMMARY_PARTICIPANT_EQUAL_TIP"),
-                                         TOGGLE_BAR_WIDTH_PROPORTIONAL, &m_sizer,
-                                         std::dynamic_pointer_cast<OptionsBar>(shared_from_this())));
-        m_toggles.push_back(
-            std::make_shared<ToggleData>(UserString("COMBAT_SUMMARY_HEALTH_SMOOTH"),
-                                         UserString("COMBAT_SUMMARY_HEALTH_BAR"),
-                                         UserString("COMBAT_SUMMARY_HEALTH_SMOOTH_TIP"),
-                                         UserString("COMBAT_SUMMARY_HEALTH_BAR_TIP"),
-                                         TOGGLE_BAR_HEALTH_SMOOTH, &m_sizer,
-                                         std::dynamic_pointer_cast<OptionsBar>(shared_from_this())));
-        m_toggles.push_back(
-            std::make_shared<ToggleData>(UserString("COMBAT_SUMMARY_BAR_HEIGHT_PROPORTIONAL"),
-                                         UserString("COMBAT_SUMMARY_BAR_HEIGHT_EQUAL"),
-                                         UserString("COMBAT_SUMMARY_BAR_HEIGHT_PROPORTIONAL_TIP"),
-                                         UserString("COMBAT_SUMMARY_BAR_HEIGHT_EQUAL_TIP"),
-                                         TOGGLE_BAR_HEIGHT_PROPORTIONAL, &m_sizer,
-                                         std::dynamic_pointer_cast<OptionsBar>(shared_from_this())));
-        m_toggles.push_back(
-            std::make_shared<ToggleData>(UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_PROPORTIONAL"),
-                                         UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_EQUAL"),
-                                         UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_PROPORTIONAL_TIP"),
-                                         UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_EQUAL_TIP"),
-                                         TOGGLE_GRAPH_HEIGHT_PROPORTIONAL, &m_sizer,
-                                         std::dynamic_pointer_cast<OptionsBar>(shared_from_this())));
+        m_toggles.emplace_back(std::make_shared<ToggleData>(
+            UserString("COMBAT_SUMMARY_PARTICIPANT_RELATIVE"),
+            UserString("COMBAT_SUMMARY_PARTICIPANT_EQUAL"),
+            UserString("COMBAT_SUMMARY_PARTICIPANT_RELATIVE_TIP"),
+            UserString("COMBAT_SUMMARY_PARTICIPANT_EQUAL_TIP"),
+            TOGGLE_BAR_WIDTH_PROPORTIONAL, &m_sizer,
+            std::static_pointer_cast<OptionsBar>(shared_from_this())));
+        m_toggles.emplace_back(std::make_shared<ToggleData>(
+            UserString("COMBAT_SUMMARY_HEALTH_SMOOTH"),
+            UserString("COMBAT_SUMMARY_HEALTH_BAR"),
+            UserString("COMBAT_SUMMARY_HEALTH_SMOOTH_TIP"),
+            UserString("COMBAT_SUMMARY_HEALTH_BAR_TIP"),
+            TOGGLE_BAR_HEALTH_SMOOTH, &m_sizer,
+            std::static_pointer_cast<OptionsBar>(shared_from_this())));
+        m_toggles.emplace_back(std::make_shared<ToggleData>(
+            UserString("COMBAT_SUMMARY_BAR_HEIGHT_PROPORTIONAL"),
+            UserString("COMBAT_SUMMARY_BAR_HEIGHT_EQUAL"),
+            UserString("COMBAT_SUMMARY_BAR_HEIGHT_PROPORTIONAL_TIP"),
+            UserString("COMBAT_SUMMARY_BAR_HEIGHT_EQUAL_TIP"),
+            TOGGLE_BAR_HEIGHT_PROPORTIONAL, &m_sizer,
+            std::static_pointer_cast<OptionsBar>(shared_from_this())));
+        m_toggles.emplace_back(std::make_shared<ToggleData>(
+            UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_PROPORTIONAL"),
+            UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_EQUAL"),
+            UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_PROPORTIONAL_TIP"),
+            UserString("COMBAT_SUMMARY_GRAPH_HEIGHT_EQUAL_TIP"),
+            TOGGLE_GRAPH_HEIGHT_PROPORTIONAL, &m_sizer,
+            std::static_pointer_cast<OptionsBar>(shared_from_this())));
         DoLayout();
     }
 
@@ -602,15 +604,15 @@ public:
     }
 
 private:
-    std::unique_ptr<BarSizer>&                  m_sizer;
-    std::vector<std::shared_ptr<ToggleData>>    m_toggles;
+    std::unique_ptr<BarSizer>&               m_sizer;
+    std::vector<std::shared_ptr<ToggleData>> m_toggles;
 
     struct ToggleData : public boost::signals2::trackable {
-        std::string label_true;
-        std::string label_false;
-        std::string tip_true;
-        std::string tip_false;
-        std::string option_key;
+        const std::string label_true;
+        const std::string label_false;
+        const std::string tip_true;
+        const std::string tip_false;
+        const std::string option_key;
         std::unique_ptr<BarSizer>* sizer;
         std::weak_ptr<OptionsBar> parent;
         std::shared_ptr<GG::Button> button;
@@ -619,33 +621,40 @@ private:
         { SetValue(!GetValue()); }
 
         void SetValue(bool value) {
-            (**sizer).Set(option_key, value);
-            button->SetText(value?label_true:label_false);
-            button->SetBrowseText(value?tip_true:tip_false);
+            if (sizer) {
+                if (const auto& ptr{*sizer})
+                    ptr->Set(option_key, value);
+            }
+            button->SetText(value ? label_true : label_false);
+            button->SetBrowseText(value ? tip_true : tip_false);
             if (auto locked_parent = parent.lock()) {
                 locked_parent->DoLayout();
                 locked_parent->ChangedSignal();
             }
         }
 
-        bool GetValue() const
-        { return (**sizer).Get(option_key); }
+        bool GetValue() const {
+            if (sizer) {
+                if (const auto& ptr{*sizer})
+                    return ptr->Get(option_key);
+            }
+            return false;
+        }
 
-        ToggleData(const std::string& label_true_, const std::string& label_false_,
-                   const std::string& tip_true_, const std::string& tip_false_,
-                   std::string option_key_,
+        ToggleData(std::string label_true_, std::string label_false_, std::string tip_true_,
+                   std::string tip_false_, std::string option_key_,
                    std::unique_ptr<BarSizer>* sizer_, std::shared_ptr<OptionsBar> parent_) :
-            label_true(label_true_),
-            label_false(label_false_),
-            tip_true(tip_true_),
-            tip_false(tip_false_),
-            option_key(option_key_),
+            label_true(std::move(label_true_)),
+            label_false(std::move(label_false_)),
+            tip_true(std::move(tip_true_)),
+            tip_false(std::move(tip_false_)),
+            option_key(std::move(option_key_)),
             sizer(sizer_),
-            parent(std::forward<std::shared_ptr<OptionsBar>>(parent_))
+            parent(std::move(parent_)),
+            button(Wnd::Create<CUIButton>("-"))
         {
-            button = Wnd::Create<CUIButton>("-");
-            parent_->AttachChild(button);
             button->LeftClickedSignal.connect(boost::bind(&ToggleData::Toggle, this));
+            parent_->AttachChild(button);
             SetValue(GetValue());
         }
     };
@@ -754,7 +763,7 @@ void GraphicalSummaryWnd::MakeSummaries(int log_id) {
 
 void GraphicalSummaryWnd::DeleteSideBars() {
     for (auto& box : m_side_boxes)
-    { DetachChild(box.get()); }
+        DetachChild(box.get());
     m_side_boxes.clear();
 }
 
@@ -767,8 +776,8 @@ void GraphicalSummaryWnd::GenerateGraph() {
         if (summary.second.total_max_health > EPSILON) {
             summary.second.Sort();
             auto box = GG::Wnd::Create<SideBar>(summary.second, *m_sizer);
-            m_side_boxes.push_back(box);
-            AttachChild(box);
+            m_side_boxes.emplace_back(box);
+            AttachChild(std::move(box));
         }
     }
 

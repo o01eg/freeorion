@@ -78,17 +78,18 @@ namespace {
         std::vector<std::pair<std::string, std::string>> params;
 
         if (py_params) {
+            params.reserve(len(py_params));
             for (int i = 0; i < len(py_params); i++) {
                 std::string k = py::extract<std::string>(py_params.keys()[i]);
                 std::string v = py::extract<std::string>(py_params.values()[i]);
-                params.push_back({k, v});
+                params.emplace_back(std::move(k), std::move(v));
             }
         }
 
         if (empire_id == ALL_EMPIRES) {
             for (const auto& entry : Empires()) {
-                entry.second->AddSitRepEntry(CreateSitRep(template_string, sitrep_turn,
-                                                          icon, params));
+                entry.second->AddSitRepEntry(CreateSitRep(
+                    template_string, sitrep_turn, icon, params));  // copy params for each...
             }
         } else {
             Empire* empire = GetEmpire(empire_id);
@@ -96,19 +97,20 @@ namespace {
                 ErrorLogger() << "GenerateSitRep: couldn't get empire with ID " << empire_id;
                 return;
             }
-            empire->AddSitRepEntry(CreateSitRep(template_string, sitrep_turn, icon, params));
+            empire->AddSitRepEntry(CreateSitRep(template_string, sitrep_turn, icon,
+                                                std::move(params)));
         }
     }
 
     // Wrappers for Species / SpeciesManager class (member) functions
-    auto SpeciesPreferredFocus(const std::string& species_name) -> py::object
+    auto SpeciesDefaultFocus(const std::string& species_name) -> py::object
     {
         const Species* species = GetSpecies(species_name);
         if (!species) {
-            ErrorLogger() << "SpeciesPreferredFocus: couldn't get species " << species_name;
+            ErrorLogger() << "SpeciesDefaultFocus: couldn't get species " << species_name;
             return py::object("");
         }
-        return py::object(species->PreferredFocus());
+        return py::object(species->DefaultFocus());
     }
 
     auto SpeciesGetPlanetEnvironment(const std::string& species_name, PlanetType planet_type) -> PlanetEnvironment
@@ -116,7 +118,7 @@ namespace {
         const Species* species = GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesGetPlanetEnvironment: couldn't get species " << species_name;
-            return INVALID_PLANET_ENVIRONMENT;
+            return PlanetEnvironment::INVALID_PLANET_ENVIRONMENT;
         }
         return species->GetPlanetEnvironment(planet_type);
     }
@@ -645,7 +647,7 @@ namespace {
     auto CreateSystem(StarType star_type, const std::string& star_name, double x, double y) -> int
     {
         // Check if star type is set to valid value
-        if ((star_type == INVALID_STAR_TYPE) || (star_type == NUM_STAR_TYPES)) {
+        if ((star_type == StarType::INVALID_STAR_TYPE) || (star_type == StarType::NUM_STAR_TYPES)) {
             ErrorLogger() << "CreateSystem : Can't create a system with a star of type " << star_type;
             return INVALID_OBJECT_ID;
         }
@@ -684,20 +686,20 @@ namespace {
         }
 
         // Check if planet size is set to valid value
-        if ((size < SZ_TINY) || (size > SZ_GASGIANT)) {
+        if ((size < PlanetSize::SZ_TINY) || (size > PlanetSize::SZ_GASGIANT)) {
             ErrorLogger() << "CreatePlanet : Can't create a planet of size " << size;
             return INVALID_OBJECT_ID;
         }
 
         // Check if planet type is set to valid value
-        if ((planet_type < PT_SWAMP) || (planet_type > PT_GASGIANT)) {
+        if ((planet_type < PlanetType::PT_SWAMP) || (planet_type > PlanetType::PT_GASGIANT)) {
             ErrorLogger() << "CreatePlanet : Can't create a planet of type " << planet_type;
             return INVALID_OBJECT_ID;
         }
 
         // Check if planet type and size match
         // if type is gas giant, size must be too, same goes for asteroids
-        if (((planet_type == PT_GASGIANT) && (size != SZ_GASGIANT)) || ((planet_type == PT_ASTEROIDS) && (size != SZ_ASTEROIDS))) {
+        if (((planet_type == PlanetType::PT_GASGIANT) && (size != PlanetSize::SZ_GASGIANT)) || ((planet_type == PlanetType::PT_ASTEROIDS) && (size != PlanetSize::SZ_ASTEROIDS))) {
             ErrorLogger() << "CreatePlanet : Planet of type " << planet_type << " can't have size " << size;
             return INVALID_OBJECT_ID;
         }
@@ -964,14 +966,14 @@ namespace {
         auto system = Objects().get<System>(system_id);
         if (!system) {
             ErrorLogger() << "SystemGetStarType: couldn't get system with ID " << system_id;
-            return INVALID_STAR_TYPE;
+            return StarType::INVALID_STAR_TYPE;
         }
         return system->GetStarType();
     }
 
     void SystemSetStarType(int system_id, StarType star_type) {
         // Check if star type is set to valid value
-        if ((star_type == INVALID_STAR_TYPE) || (star_type == NUM_STAR_TYPES)) {
+        if ((star_type == StarType::INVALID_STAR_TYPE) || (star_type == StarType::NUM_STAR_TYPES)) {
             ErrorLogger() << "SystemSetStarType : Can't create a system with a star of type " << star_type;
             return;
         }
@@ -1118,7 +1120,7 @@ namespace {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetGetType: Couldn't get planet with ID " << planet_id;
-            return INVALID_PLANET_TYPE;
+            return PlanetType::INVALID_PLANET_TYPE;
         }
         return planet->Type();
     }
@@ -1132,14 +1134,14 @@ namespace {
         }
 
         planet->SetType(planet_type);
-        if (planet_type == PT_ASTEROIDS)
-            planet->SetSize(SZ_ASTEROIDS);
-        else if (planet_type == PT_GASGIANT)
-            planet->SetSize(SZ_GASGIANT);
-        else if (planet->Size() == SZ_ASTEROIDS)
-            planet->SetSize(SZ_TINY);
-        else if (planet->Size() == SZ_GASGIANT)
-            planet->SetSize(SZ_HUGE);
+        if (planet_type == PlanetType::PT_ASTEROIDS)
+            planet->SetSize(PlanetSize::SZ_ASTEROIDS);
+        else if (planet_type == PlanetType::PT_GASGIANT)
+            planet->SetSize(PlanetSize::SZ_GASGIANT);
+        else if (planet->Size() == PlanetSize::SZ_ASTEROIDS)
+            planet->SetSize(PlanetSize::SZ_TINY);
+        else if (planet->Size() == PlanetSize::SZ_GASGIANT)
+            planet->SetSize(PlanetSize::SZ_HUGE);
     }
 
     auto PlanetGetSize(int planet_id) -> PlanetSize
@@ -1147,7 +1149,7 @@ namespace {
         auto planet = Objects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetGetSize: Couldn't get planet with ID " << planet_id;
-            return INVALID_PLANET_SIZE;
+            return PlanetSize::INVALID_PLANET_SIZE;
         }
         return planet->Size();
     }
@@ -1161,12 +1163,12 @@ namespace {
         }
 
         planet->SetSize(planet_size);
-        if (planet_size == SZ_ASTEROIDS)
-            planet->SetType(PT_ASTEROIDS);
-        else if (planet_size == SZ_GASGIANT)
-            planet->SetType(PT_GASGIANT);
-        else if ((planet->Type() == PT_ASTEROIDS) || (planet->Type() == PT_GASGIANT))
-            planet->SetType(PT_BARREN);
+        if (planet_size == PlanetSize::SZ_ASTEROIDS)
+            planet->SetType(PlanetType::PT_ASTEROIDS);
+        else if (planet_size == PlanetSize::SZ_GASGIANT)
+            planet->SetType(PlanetType::PT_GASGIANT);
+        else if ((planet->Type() == PlanetType::PT_ASTEROIDS) || (planet->Type() == PlanetType::PT_GASGIANT))
+            planet->SetType(PlanetType::PT_BARREN);
     }
 
     auto PlanetGetSpecies(int planet_id) -> py::object
@@ -1314,7 +1316,7 @@ namespace FreeOrionPython {
         py::def("generate_sitrep",                  +[](int empire_id, const std::string& template_string, const std::string& icon) { GenerateSitRep(empire_id, template_string, py::dict(), icon); });
         py::def("generate_starlanes",               GenerateStarlanes);
 
-        py::def("species_preferred_focus",          SpeciesPreferredFocus);
+        py::def("species_preferred_focus",          SpeciesDefaultFocus);
         py::def("species_get_planet_environment",   SpeciesGetPlanetEnvironment);
         py::def("species_add_homeworld",            SpeciesAddHomeworld);
         py::def("species_remove_homeworld",         SpeciesRemoveHomeworld);

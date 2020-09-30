@@ -49,7 +49,7 @@ void CUI_MinRestoreButton::Render() {
     GG::Pt ul = UpperLeft();
     GG::Pt lr = LowerRight();
     GG::Clr color_to_use = ClientUI::WndInnerBorderColor();
-    if (State() != BN_ROLLOVER)
+    if (State() != ButtonState::BN_ROLLOVER)
         AdjustBrightness(color_to_use, BUTTON_DIMMING_SCALE_FACTOR);
     if (m_mode == Mode::MINIMIZE) {
         // draw a dash to signify the minimize command
@@ -143,7 +143,7 @@ const int CUIWnd::TITLE_OFFSET = 2;
 const int CUIWnd::RESIZE_HASHMARK1_OFFSET = 9;
 const int CUIWnd::RESIZE_HASHMARK2_OFFSET = 4;
 
-CUIWnd::CUIWnd(const std::string& wnd_name,
+CUIWnd::CUIWnd(std::string wnd_name,
                GG::X x, GG::Y y,
                GG::X w, GG::Y h,
                GG::Flags<GG::WndFlag> flags,
@@ -157,14 +157,15 @@ CUIWnd::CUIWnd(const std::string& wnd_name,
     m_drag_offset(-GG::X1, -GG::Y1),
     m_config_name(AddWindowOptions(config_name, x, y, w, h, visible, false, false))
 {
-    SetName(wnd_name);
+    SetName(std::move(wnd_name));
     if (!m_config_name.empty()) {
         // Default position was already supplied
         GetOptionsDB().Set<bool>("ui." + m_config_name + ".initialized", true);
     }
 }
 
-CUIWnd::CUIWnd(const std::string& wnd_name, GG::Flags<GG::WndFlag> flags, const std::string& config_name, bool visible) :
+CUIWnd::CUIWnd(std::string wnd_name, GG::Flags<GG::WndFlag> flags,
+               const std::string& config_name, bool visible) :
     GG::Wnd(INVALID_X, INVALID_Y, GG::X1, GG::Y1, flags & ~GG::RESIZABLE),
     m_resizable(flags & GG::RESIZABLE),
     m_closable(flags & CLOSABLE),
@@ -172,7 +173,7 @@ CUIWnd::CUIWnd(const std::string& wnd_name, GG::Flags<GG::WndFlag> flags, const 
     m_pinable(flags & PINABLE),
     m_drag_offset(-GG::X1, -GG::Y1),
     m_config_name(AddWindowOptions(config_name, INVALID_POS, INVALID_POS, 1, 1, visible, false, false))
-{ SetName(wnd_name); }
+{ SetName(std::move(wnd_name)); }
 
 void CUIWnd::CompleteConstruction() {
     GG::Wnd::CompleteConstruction();
@@ -183,7 +184,7 @@ void CUIWnd::CompleteConstruction() {
 
 void CUIWnd::Init() {
     InitButtons();
-    SetChildClippingMode(ClipToClientAndWindowSeparately);
+    SetChildClippingMode(ChildClippingMode::ClipToClientAndWindowSeparately);
 
     if (!m_config_name.empty()) {
         LoadOptions();
@@ -613,7 +614,7 @@ void CUIWnd::InitBuffers() {
 
     m_vertex_buffer.createServerBuffer();
 
-    //TraceLogger() << "CUIWnd vertex buffer final size: " << previous_buffer_size << std::endl;
+    //TraceLogger() << "CUIWnd vertex buffer final size: " << previous_buffer_size << "\n";
 }
 
 void CUIWnd::Hide() {
@@ -793,13 +794,13 @@ void CUIWnd::LoadOptions() {
     m_config_save = true;
 }
 
-const std::string CUIWnd::AddWindowOptions(const std::string& config_name,
-                                           int left, int top,
-                                           int width, int height,
-                                           bool visible, bool pinned, bool minimized)
+std::string CUIWnd::AddWindowOptions(const std::string& config_name,
+                                     int left, int top,
+                                     int width, int height,
+                                     bool visible, bool pinned, bool minimized)
 {
     OptionsDB& db = GetOptionsDB();
-    std::string new_name = "";
+    std::string new_name;
 
     if (db.OptionExists("ui." + config_name + ".fullscreen.left")) {
         // If the option has already been added, a window was previously created with this name...
@@ -829,17 +830,17 @@ const std::string CUIWnd::AddWindowOptions(const std::string& config_name,
         const int max_width_plus_one = HumanClientApp::MaximumPossibleWidth() + 1;
         const int max_height_plus_one = HumanClientApp::MaximumPossibleHeight() + 1;
 
-        db.Add<bool>("ui." + config_name + ".initialized",      UserStringNop("OPTIONS_DB_UI_WINDOWS_EXISTS"),          false,      Validator<bool>(),              false);
+        db.Add<bool>("ui." + config_name + ".initialized",      UserStringNop("OPTIONS_DB_UI_WINDOWS_EXISTS"),          false,      Validator<bool>(), false);
 
-        db.Add<int> ("ui." + config_name + ".fullscreen.left", UserStringNop("OPTIONS_DB_UI_WINDOWS_LEFT"), left, OrValidator<int>(RangedValidator<int>(0, max_width_plus_one), DiscreteValidator<int>(INVALID_POS)));
-        db.Add<int> ("ui." + config_name + ".fullscreen.top", UserStringNop("OPTIONS_DB_UI_WINDOWS_TOP"), top, OrValidator<int>(RangedValidator<int>(0, max_height_plus_one), DiscreteValidator<int>(INVALID_POS)));
-        db.Add<int> ("ui." + config_name + ".windowed.left", UserStringNop("OPTIONS_DB_UI_WINDOWS_LEFT_WINDOWED"), left, OrValidator<int>(RangedValidator<int>(0, max_width_plus_one), DiscreteValidator<int>(INVALID_POS)));
-        db.Add<int> ("ui." + config_name + ".windowed.top", UserStringNop("OPTIONS_DB_UI_WINDOWS_TOP_WINDOWED"), top, OrValidator<int>(RangedValidator<int>(0, max_height_plus_one), DiscreteValidator<int>(INVALID_POS)));
+        db.Add<int> ("ui." + config_name + ".fullscreen.left",  UserStringNop("OPTIONS_DB_UI_WINDOWS_LEFT"),            left,       OrValidator<int>(RangedValidator<int>(0, max_width_plus_one),   DiscreteValidator<int>(INVALID_POS)));
+        db.Add<int> ("ui." + config_name + ".fullscreen.top",   UserStringNop("OPTIONS_DB_UI_WINDOWS_TOP"),             top,        OrValidator<int>(RangedValidator<int>(0, max_height_plus_one),  DiscreteValidator<int>(INVALID_POS)));
+        db.Add<int> ("ui." + config_name + ".windowed.left",    UserStringNop("OPTIONS_DB_UI_WINDOWS_LEFT_WINDOWED"),   left,       OrValidator<int>(RangedValidator<int>(0, max_width_plus_one),   DiscreteValidator<int>(INVALID_POS)));
+        db.Add<int> ("ui." + config_name + ".windowed.top",     UserStringNop("OPTIONS_DB_UI_WINDOWS_TOP_WINDOWED"),    top,        OrValidator<int>(RangedValidator<int>(0, max_height_plus_one),  DiscreteValidator<int>(INVALID_POS)));
 
-        db.Add<int> ("ui." + config_name + ".fullscreen.width", UserStringNop("OPTIONS_DB_UI_WINDOWS_WIDTH"), width, RangedValidator<int>(0, max_width_plus_one));
-        db.Add<int> ("ui." + config_name + ".fullscreen.height", UserStringNop("OPTIONS_DB_UI_WINDOWS_HEIGHT"), height, RangedValidator<int>(0, max_height_plus_one));
-        db.Add<int> ("ui." + config_name + ".windowed.width", UserStringNop("OPTIONS_DB_UI_WINDOWS_WIDTH_WINDOWED"), width, RangedValidator<int>(0, max_width_plus_one));
-        db.Add<int> ("ui." + config_name + ".windowed.height", UserStringNop("OPTIONS_DB_UI_WINDOWS_HEIGHT_WINDOWED"), height, RangedValidator<int>(0, max_height_plus_one));
+        db.Add<int> ("ui." + config_name + ".fullscreen.width", UserStringNop("OPTIONS_DB_UI_WINDOWS_WIDTH"),           width,      RangedValidator<int>(0, max_width_plus_one));
+        db.Add<int> ("ui." + config_name + ".fullscreen.height",UserStringNop("OPTIONS_DB_UI_WINDOWS_HEIGHT"),          height,     RangedValidator<int>(0, max_height_plus_one));
+        db.Add<int> ("ui." + config_name + ".windowed.width",   UserStringNop("OPTIONS_DB_UI_WINDOWS_WIDTH_WINDOWED"),  width,      RangedValidator<int>(0, max_width_plus_one));
+        db.Add<int> ("ui." + config_name + ".windowed.height",  UserStringNop("OPTIONS_DB_UI_WINDOWS_HEIGHT_WINDOWED"), height,     RangedValidator<int>(0, max_height_plus_one));
 
         db.Add<bool>("ui." + config_name + ".visible",          UserStringNop("OPTIONS_DB_UI_WINDOWS_VISIBLE"),         visible,    Validator<bool>());
         db.Add<bool>("ui." + config_name + ".pinned",           UserStringNop("OPTIONS_DB_UI_WINDOWS_PINNED"),          pinned,     Validator<bool>());
@@ -851,10 +852,10 @@ const std::string CUIWnd::AddWindowOptions(const std::string& config_name,
     return new_name;
 }
 
-const std::string CUIWnd::AddWindowOptions(const std::string& config_name,
-                                           GG::X left, GG::Y top,
-                                           GG::X width, GG::Y height,
-                                           bool visible, bool pinned, bool minimized)
+std::string CUIWnd::AddWindowOptions(const std::string& config_name,
+                                     GG::X left, GG::Y top,
+                                     GG::X width, GG::Y height,
+                                     bool visible, bool pinned, bool minimized)
 {
     return AddWindowOptions(config_name,
                             Value(left), Value(top),
@@ -911,8 +912,8 @@ void CUIWnd::InvalidateUnusedOptions() {
     db.Commit();
 }
 
-void CUIWnd::SetParent(const std::shared_ptr<GG::Wnd>& wnd) {
-    GG::Wnd::SetParent(wnd);
+void CUIWnd::SetParent(std::shared_ptr<GG::Wnd> wnd) {
+    GG::Wnd::SetParent(std::move(wnd));
     m_vertex_buffer.clear();    // force buffer re-init on next Render call, so background is properly positioned for new parent-relative position
 }
 
@@ -922,10 +923,11 @@ void CUIWnd::SetParent(const std::shared_ptr<GG::Wnd>& wnd) {
 const GG::X CUIEditWnd::BUTTON_WIDTH(75);
 const int CUIEditWnd::CONTROL_MARGIN = 5;
 
-CUIEditWnd::CUIEditWnd(GG::X w, const std::string& prompt_text, const std::string& edit_text, GG::Flags<GG::WndFlag> flags/* = Wnd::MODAL*/) :
-    CUIWnd(prompt_text, GG::X0, GG::Y0, w, GG::Y1, flags)
+CUIEditWnd::CUIEditWnd(GG::X w, std::string prompt_text, std::string edit_text,
+                       GG::Flags<GG::WndFlag> flags/* = Wnd::MODAL*/) :
+    CUIWnd(std::move(prompt_text), GG::X0, GG::Y0, w, GG::Y1, flags)
 {
-    m_edit = GG::Wnd::Create<CUIEdit>(edit_text);
+    m_edit = GG::Wnd::Create<CUIEdit>(std::move(edit_text));
 }
 
 void CUIEditWnd::CompleteConstruction() {
@@ -961,10 +963,12 @@ void CUIEditWnd::CompleteConstruction() {
 void CUIEditWnd::ModalInit()
 { GG::GUI::GetGUI()->SetFocusWnd(m_edit); }
 
-void CUIEditWnd::KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) {
+void CUIEditWnd::KeyPress(GG::Key key, std::uint32_t key_code_point,
+                          GG::Flags<GG::ModKey> mod_keys)
+{
     switch (key) {
-    case GG::GGK_RETURN: if (!m_ok_bn->Disabled()) OkClicked(); break;
-    case GG::GGK_ESCAPE: CloseClicked(); break;
+    case GG::Key::GGK_RETURN: if (!m_ok_bn->Disabled()) OkClicked(); break;
+    case GG::Key::GGK_ESCAPE: CloseClicked(); break;
     default: break;
     }
 }

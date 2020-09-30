@@ -39,13 +39,13 @@ public:
 
     /** DecorateLinkText creates a CUILinkTextMultiEdit using \a text and attaches it to handlers
         \a and_flags are anded to the default flags. */
-    std::shared_ptr<LinkText> DecorateLinkText(const std::string& text);
+    std::shared_ptr<LinkText> DecorateLinkText(std::string text);
 
     /** Fill \p new_logs with pointers to the flat log contents of \p
         event using the pre-calculated \p details.*/
     void PopulateWithFlatLogs(
         GG::X w, int viewing_empire_id, std::vector<std::shared_ptr<GG::Wnd>>& new_logs,
-        ConstCombatEventPtr& event, std::string& details);
+        ConstCombatEventPtr& event, std::string&& details);
 
     // Returns either a simple LinkText for a simple log or a CombatLogAccordionPanel for a complex log
     std::vector<std::shared_ptr<GG::Wnd>> MakeCombatLogPanel(
@@ -66,18 +66,18 @@ namespace {
         static const std::string EMPTY_STRING("");
 
         switch (obj_type) {
-        case OBJ_SHIP:
+        case UniverseObjectType::OBJ_SHIP:
             return VarText::SHIP_ID_TAG;
-        case OBJ_FLEET:
+        case UniverseObjectType::OBJ_FLEET:
             return VarText::FLEET_ID_TAG;
-        case OBJ_PLANET:
+        case UniverseObjectType::OBJ_PLANET:
             return VarText::PLANET_ID_TAG;
-        case OBJ_BUILDING:
+        case UniverseObjectType::OBJ_BUILDING:
             return VarText::BUILDING_ID_TAG;
-        case OBJ_SYSTEM:
+        case UniverseObjectType::OBJ_SYSTEM:
             return VarText::SYSTEM_ID_TAG;
-        case OBJ_FIELD:
-        case OBJ_FIGHTER:
+        case UniverseObjectType::OBJ_FIELD:
+        case UniverseObjectType::OBJ_FIGHTER:
         default:
             return EMPTY_STRING;
         }
@@ -129,7 +129,7 @@ namespace {
     { return object->ObjectType() == UniverseObjectType::OBJ_SHIP; }
 
     bool HasPopulation(std::shared_ptr<UniverseObject> object) {
-        const auto* m = object->GetMeter(METER_POPULATION);
+        const auto* m = object->GetMeter(MeterType::METER_POPULATION);
         return m && m->Initial() > 0.0f;
     }
 
@@ -269,18 +269,16 @@ namespace {
     void CombatLogAccordionPanel::ToggleExpansion() {
         bool new_collapsed = !IsCollapsed();
         if (new_collapsed) {
-            for (auto& wnd : details) {
+            for (auto& wnd : details)
                 GetLayout()->Remove(wnd.get());
-            }
         } else {
             if (details.empty()) {
                 std::string detail_text = event->CombatLogDetails(viewing_empire_id);
-                log.PopulateWithFlatLogs(Width(), viewing_empire_id, details, event, detail_text);
+                log.PopulateWithFlatLogs(Width(), viewing_empire_id, details, event, std::move(detail_text));
             }
 
-            for (auto& wnd : details) {
+            for (auto& wnd : details)
                 GetLayout()->Add(wnd, GetLayout()->Rows(), 0);
-            }
         }
         SetCollapsed(new_collapsed);
     }
@@ -419,8 +417,7 @@ namespace {
             GG::Wnd & parent, GG::X x, GG::Y y, const std::string& str,
             const std::shared_ptr<GG::Font>& font, GG::Clr color = GG::CLR_BLACK) :
             LinkText(x, y, UserString("ELLIPSIS"), font, color),
-            m_text(new std::string(str)),
-            m_signals()
+            m_text(new std::string(str))
         {
             // Register for signals that might bring the text into view
             if (const auto* log = FindParentOfType<CombatLogWnd>(&parent)) {
@@ -487,9 +484,9 @@ namespace {
 
 }
 
-std::shared_ptr<LinkText> CombatLogWnd::Impl::DecorateLinkText(const std::string& text) {
+std::shared_ptr<LinkText> CombatLogWnd::Impl::DecorateLinkText(std::string text) {
     auto links = GG::Wnd::Create<LazyScrollerLinkText>(m_wnd, GG::X0, GG::Y0,
-                                                       text, m_font, GG::CLR_WHITE);
+                                                       std::move(text), m_font, GG::CLR_WHITE);
 
     links->SetTextFormat(m_text_format_flags);
 
@@ -510,10 +507,10 @@ std::shared_ptr<LinkText> CombatLogWnd::Impl::DecorateLinkText(const std::string
     event using the pre-calculated \p details.*/
 void CombatLogWnd::Impl::PopulateWithFlatLogs(GG::X w, int viewing_empire_id,
                                               std::vector<std::shared_ptr<GG::Wnd>>& new_logs,
-                                              ConstCombatEventPtr& event, std::string& details)
+                                              ConstCombatEventPtr& event, std::string&& details)
 {
     if (!details.empty())
-        new_logs.push_back(DecorateLinkText(details));
+        new_logs.emplace_back(DecorateLinkText(std::move(details)));
 
     if (!event->AreSubEventsEmpty(viewing_empire_id)) {
         for (auto& sub_event : event->SubEvents(viewing_empire_id)) {
@@ -534,21 +531,21 @@ std::vector<std::shared_ptr<GG::Wnd>> CombatLogWnd::Impl::MakeCombatLogPanel(
     // details and sub events.
 
     if (!event->FlattenSubEvents() && !event->AreSubEventsEmpty(viewing_empire_id) ) {
-        new_logs.push_back(GG::Wnd::Create<CombatLogAccordionPanel>(w, *this, viewing_empire_id, event));
+        new_logs.emplace_back(GG::Wnd::Create<CombatLogAccordionPanel>(w, *this, viewing_empire_id, event));
         return new_logs;
     }
 
     if (!event->FlattenSubEvents() && !event->AreDetailsEmpty(viewing_empire_id)) {
-        new_logs.push_back(GG::Wnd::Create<CombatLogAccordionPanel>(w, *this, viewing_empire_id, event));
+        new_logs.emplace_back(GG::Wnd::Create<CombatLogAccordionPanel>(w, *this, viewing_empire_id, event));
         return new_logs;
     }
 
     std::string title = event->CombatLogDescription(viewing_empire_id);
     if (!(event->FlattenSubEvents() && title.empty()))
-        new_logs.push_back(DecorateLinkText(title));
+        new_logs.emplace_back(DecorateLinkText(title));
 
     std::string details = event->CombatLogDetails(viewing_empire_id);
-    PopulateWithFlatLogs(w, viewing_empire_id, new_logs, event, details);
+    PopulateWithFlatLogs(w, viewing_empire_id, new_logs, event, std::move(details));
 
     return new_logs;
 }
@@ -560,7 +557,7 @@ void CombatLogWnd::Impl::AddRow(std::shared_ptr<GG::Wnd> wnd) {
 }
 
 void CombatLogWnd::Impl::SetFont(std::shared_ptr<GG::Font> font)
-{ m_font = font; }
+{ m_font = std::move(font); }
 
 void CombatLogWnd::Impl::SetLog(int log_id) {
     boost::optional<const CombatLog&> log = GetCombatLog(log_id);
@@ -634,7 +631,7 @@ CombatLogWnd::~CombatLogWnd()
 {}
 
 void CombatLogWnd::SetFont(std::shared_ptr<GG::Font> font)
-{ m_impl->SetFont(font); }
+{ m_impl->SetFont(std::move(font)); }
 
 void CombatLogWnd::SetLog(int log_id)
 { m_impl->SetLog(log_id); }

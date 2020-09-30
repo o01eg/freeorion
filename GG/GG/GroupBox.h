@@ -1,33 +1,20 @@
-// -*- C++ -*-
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-/** \file GroupBox.h \brief Contains the GroupBox class, a simple,
-    noninteractive box with an optional label. */
+//! @file GG/GroupBox.h
+//!
+//! Contains the GroupBox class, a simple, noninteractive box with an optional
+//! label.
 
 #ifndef _GG_GroupBox_h_
 #define _GG_GroupBox_h_
+
 
 #include <GG/ClrConstants.h>
 #include <GG/Wnd.h>
@@ -43,7 +30,7 @@ class GG_API GroupBox : public Wnd
 {
 public:
     /** Height is determined from the font and point size used. */
-    GroupBox(X x, Y y, X w, Y h, const std::string& label, const std::shared_ptr<Font>& font, Clr color,
+    GroupBox(X x, Y y, X w, Y h, std::string label, const std::shared_ptr<Font>& font, Clr color,
              Clr text_color = CLR_BLACK, Clr interior = CLR_ZERO, Flags<WndFlag> flags = NO_WND_FLAGS);
     void CompleteConstruction() override;
 
@@ -68,7 +55,7 @@ public:
         anything about how GG Wnd client areas work. */
     void SetClientCornersEqualToBoxCorners(bool b);
 
-    virtual void SetText(const std::string& str);
+    virtual void SetText(std::string str);
 
 protected:
     GroupBox();
@@ -90,5 +77,6 @@ private:
 };
 
 }
+
 
 #endif

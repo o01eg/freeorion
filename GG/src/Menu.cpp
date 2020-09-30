@@ -1,31 +1,15 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-#include <GG/Menu.h>
-
-#include <GG/GUI.h>
 #include <GG/DrawUtil.h>
+#include <GG/GUI.h>
+#include <GG/Menu.h>
 #include <GG/StyleFactory.h>
 #include <GG/TextControl.h>
 #include <GG/WndEvent.h>
@@ -34,23 +18,18 @@
 using namespace GG;
 
 namespace {
-    const int BORDER_THICKNESS = 1; // thickness with which to draw menu borders
+
+const int BORDER_THICKNESS = 1; // thickness with which to draw menu borders
+
 }
 
 
 ////////////////////////////////////////////////
 // GG::MenuItem
 ////////////////////////////////////////////////
-MenuItem::MenuItem() :
-    MenuItem("", false, false)
-{}
-
 MenuItem::MenuItem(bool separator_) :
     disabled(true),
-    checked(false),
-    separator(true),
-    next_level(),
-    m_selected_on_close_callback{}
+    separator(true)
 {}
 
 MenuItem::MenuItem(const std::string& str, bool disable, bool check,
@@ -58,12 +37,15 @@ MenuItem::MenuItem(const std::string& str, bool disable, bool check,
     label(str),
     disabled(disable),
     checked(check),
-    separator(false),
-    next_level(),
     m_selected_on_close_callback{selected_on_close_callback}
 {}
 
-MenuItem::~MenuItem()
+MenuItem::MenuItem(std::string&& str, bool disable, bool check,
+                   std::function<void()> selected_on_close_callback) :
+    label(std::move(str)),
+    disabled(disable),
+    checked(check),
+    m_selected_on_close_callback{selected_on_close_callback}
 {}
 
 
@@ -86,7 +68,6 @@ PopupMenu::PopupMenu(X x, Y y, const std::shared_ptr<Font>& font, Clr text_color
     m_text_color(text_color),
     m_hilite_color(hilite_color),
     m_sel_text_color(text_color),
-    m_menu_data(MenuItem()),
     m_caret(1, INVALID_CARET),
     m_origin(x, y)
 {
@@ -94,9 +75,7 @@ PopupMenu::PopupMenu(X x, Y y, const std::shared_ptr<Font>& font, Clr text_color
 }
 
 void PopupMenu::AddMenuItem(MenuItem&& menu_item)
-{
-    m_menu_data.next_level.push_back(std::forward<MenuItem>(menu_item));
-}
+{ m_menu_data.next_level.emplace_back(std::move(menu_item)); }
 
 Pt PopupMenu::ClientUpperLeft() const
 { return m_origin; }
@@ -118,8 +97,7 @@ Clr PopupMenu::SelectedTextColor() const
 
 void PopupMenu::Render()
 {
-    if (m_menu_data.next_level.size())
-    {
+    if (m_menu_data.next_level.size()) {
         Pt ul = ClientUpperLeft();
 
         const Y INDICATOR_VERTICAL_MARGIN(3);
@@ -278,8 +256,8 @@ void PopupMenu::LDrag(const Pt& pt, const Pt& move, Flags<ModKey> mod_keys)
                 m_open_levels.resize(i + 1);
                 m_caret.resize(i + 1);
                 if (!menu.next_level[row_selected].disabled && menu.next_level[row_selected].next_level.size()) {
-                    m_caret.push_back(INVALID_CARET);
-                    m_open_levels.push_back(Rect());
+                    m_caret.emplace_back(INVALID_CARET);
+                    m_open_levels.emplace_back();
                 }
                 cursor_is_in_menu = true;
             }

@@ -199,7 +199,7 @@ public:
 
     void ResetEmpireShown();                     //!< auto-resets the shown empire in any contained Wnds, to the current client's empire (if any)
 
-    void RegisterPopup(const std::shared_ptr<MapWndPopup>& popup);  //!< registers a MapWndPopup, which can be cleaned up with a call to DeleteAllPopups( )
+    void RegisterPopup(std::shared_ptr<MapWndPopup>&& popup);   //!< registers a MapWndPopup, which can be cleaned up with a call to DeleteAllPopups( )
     void RemovePopup(MapWndPopup* popup);        //!< removes a MapWndPopup from the list cleaned up on a call to DeleteAllPopups( )
     void Sanitize();                             //!< sanitizes the MapWnd after a game
     void ResetTimeoutClock(int timeout);         //!< start count down \a timeout seconds
@@ -255,7 +255,7 @@ private:
     bool PanY(GG::Y y = GG::Y(50));
 
     /** Mark all fleet buttons for a refresh. */
-    void RefreshFleetButtons();
+    void RefreshFleetButtons(bool recreate = true);
     /** Removes old / existing and create new fleet buttons. Only called once
       * per render interval.*/
     void DeferredRefreshFleetButtons();
@@ -264,10 +264,10 @@ private:
       * in \p type_fleet_buttons and record the fleet buttons in
       * \p m_fleet_buttons.*/
     template <typename FleetButtonMap, typename FleetsMap>
-    void CreateFleetButtonsOfType (
+    void CreateFleetButtonsOfType(
         FleetButtonMap& type_fleet_buttons,
-        const FleetsMap &fleets_map,
-        const FleetButton::SizeType & fleet_button_size);
+        const FleetsMap& fleets_map,
+        const FleetButton::SizeType& fleet_button_size);
 
     /** Delete all fleet buttons.*/
     void DeleteFleetButtons();
@@ -579,6 +579,7 @@ private:
     std::set<int>                   m_fleets_exploring;
 
     /// indicates that refresh fleet button work should be done before rendering.
+    bool                            m_deferred_recreate_fleet_buttons = false;
     bool                            m_deferred_refresh_fleet_buttons = false;
 
     std::chrono::time_point<std::chrono::high_resolution_clock>
@@ -594,10 +595,10 @@ private:
 /** Derive any window from this class to have it managed by MapWnd. */
 class MapWndPopup : public CUIWnd {
 public:
-    MapWndPopup(const std::string& t, GG::X default_x, GG::Y default_y, GG::X default_w, GG::Y default_h,
+    MapWndPopup(std::string t, GG::X default_x, GG::Y default_y, GG::X default_w, GG::Y default_h,
                 GG::Flags<GG::WndFlag> flags, const std::string& config_name = "");
 
-    MapWndPopup(const std::string& t, GG::Flags<GG::WndFlag> flags, const std::string& config_name = "");
+    MapWndPopup(std::string t, GG::Flags<GG::WndFlag> flags, const std::string& config_name = "");
 
     void CompleteConstruction() override;
 

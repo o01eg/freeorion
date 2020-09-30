@@ -46,13 +46,10 @@ const EmpireManager& ClientApp::Empires() const
 { return m_empires; }
 
 Empire* ClientApp::GetEmpire(int empire_id)
-{ return m_empires.GetEmpire(empire_id); }
+{ return m_empires.GetEmpire(empire_id).get(); }
 
 SupplyManager& ClientApp::GetSupplyManager()
 { return m_supply_manager; }
-
-std::shared_ptr<UniverseObject> ClientApp::GetUniverseObject(int object_id)
-{ return GetUniverse().Objects().get(object_id); }
 
 ObjectMap& ClientApp::EmpireKnownObjects(int empire_id) {
     // observers and moderators should have accurate info about what each empire knows
@@ -63,9 +60,6 @@ ObjectMap& ClientApp::EmpireKnownObjects(int empire_id) {
     // own version of the universe, and should use that
     return m_universe.Objects();
 }
-
-std::shared_ptr<UniverseObject> ClientApp::EmpireKnownObject(int object_id, int empire_id)
-{ return EmpireKnownObjects(empire_id).get(object_id); }
 
 const OrderSet& ClientApp::Orders() const
 { return m_orders; }
@@ -85,11 +79,11 @@ Networking::ClientType ClientApp::GetEmpireClientType(int empire_id) const
 
 Networking::ClientType ClientApp::GetPlayerClientType(int player_id) const {
     if (player_id == Networking::INVALID_PLAYER_ID)
-        return Networking::INVALID_CLIENT_TYPE;
+        return Networking::ClientType::INVALID_CLIENT_TYPE;
     auto it = m_player_info.find(player_id);
     if (it != m_player_info.end())
         return it->second.client_type;
-    return Networking::INVALID_CLIENT_TYPE;
+    return Networking::ClientType::INVALID_CLIENT_TYPE;
 }
 
 Networking::ClientType ClientApp::GetClientType() const
@@ -102,8 +96,8 @@ std::map<int, PlayerInfo>& ClientApp::Players()
 { return m_player_info; }
 
 void ClientApp::SetEmpireStatus(int empire_id, Message::PlayerStatus status) {
-    if (auto* empire = m_empires.GetEmpire(empire_id))
-        empire->SetReady(status == Message::WAITING);
+    if (auto empire = m_empires.GetEmpire(empire_id))
+        empire->SetReady(status == Message::PlayerStatus::WAITING);
 }
 
 void ClientApp::StartTurn(const SaveGameUIData& ui_data)

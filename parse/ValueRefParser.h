@@ -5,6 +5,7 @@
 #include "MovableEnvelope.h"
 
 #include "../universe/ValueRefs.h"
+#include "../universe/NamedValueRefManager.h"
 #include "../universe/EnumsFwd.h"
 
 #include <boost/spirit/include/qi.hpp>
@@ -67,7 +68,7 @@ namespace parse { namespace detail {
     };
 
     template <typename T>
-    using statistic_payload = MovableEnvelope<ValueRef::Statistic<T>>;
+    using statistic_payload = MovableEnvelope<ValueRef::ValueRef<T>>;
     template <typename T>
     using statistic_signature = statistic_payload<T> ();
     template <typename T>
@@ -75,7 +76,8 @@ namespace parse { namespace detail {
         statistic_signature<T>,
         boost::spirit::qi::locals<
             value_ref_payload<T>,
-            ValueRef::StatisticType
+            ValueRef::StatisticType,
+            value_ref_payload<std::string>
             >
         >;
 
@@ -95,13 +97,15 @@ namespace parse { namespace detail {
         arithmetic_rules(const std::string& type_name,
                          const parse::lexer& tok,
                          Labeller& label,
-                         const condition_parser_grammar& condition_parser);
+                         const condition_parser_grammar& condition_parser,
+                         const value_ref_grammar<std::string>& string_grammar);
 
         parse::statistic_enum_grammar   statistic_type_enum;
         expression_rule<T>              functional_expr;
         expression_rule<T>              exponential_expr;
         expression_rule<T>              multiplicative_expr;
         expression_rule<T>              additive_expr;
+        detail::value_ref_rule<T>       named_lookup_expr;
         detail::value_ref_rule<T>       primary_expr;
         detail::value_ref_rule<T>       statistic_value_ref_expr;
         statistic_rule<T>               statistic_collection_expr;
@@ -160,7 +164,7 @@ namespace parse { namespace detail {
         boost::spirit::qi::_val_type _val;
         boost::spirit::qi::omit_type omit_;
         const boost::phoenix::function<construct_movable> construct_movable_;
-        const boost::phoenix::function<deconstruct_movable> deconstruct_movable_;
+        //const boost::phoenix::function<deconstruct_movable> deconstruct_movable_;
 
         unwrapped_bound_variable
             = (
@@ -188,6 +192,20 @@ namespace parse { namespace detail {
             |   unwrapped_bound_variable [ _val = _1 ]
             ;
     }
+
+    template <typename T>
+    void open_and_register_as_string(std::string& nameref, ::parse::detail::MovableEnvelope<ValueRef::ValueRef<T>>& obj, bool& pass)
+    {
+        if (obj.IsEmptiedEnvelope()) {
+            ErrorLogger() <<
+                "The parser attempted to extract the unique_ptr from a MovableEnvelope more than once - while looking at a valueref envelope for use in ValueRef registration ";
+            pass = false;
+            return;
+        }
+        ::RegisterValueRef<T>(nameref, obj.OpenEnvelope(pass));
+    }
+
+    BOOST_PHOENIX_ADAPT_FUNCTION(void, open_and_register_as_string_, open_and_register_as_string, 3)
 }}
 
 namespace parse {
@@ -247,7 +265,8 @@ namespace parse {
             const detail::condition_parser_grammar& condition_parser,
             const detail::value_ref_grammar<std::string>& string_grammar);
         detail::simple_int_parser_rules simple_int_rules;
-        int_complex_parser_grammar int_complex_grammar;
+        int_complex_parser_grammar      int_complex_grammar;
+        detail::value_ref_rule<int>     named_int_valueref;
     };
 
     struct double_complex_parser_grammar : public detail::complex_variable_grammar<double> {
@@ -262,7 +281,7 @@ namespace parse {
         detail::complex_variable_rule<double>   empire_meter_value;
         detail::complex_variable_rule<double>   direct_distance;
         detail::complex_variable_rule<double>   shortest_path;
-        detail::rule<detail::value_ref_payload<std::string>()> species_opinion;
+        detail::complex_variable_rule<double>   species_content_opinion;
         detail::complex_variable_rule<double>   species_empire_opinion;
         detail::complex_variable_rule<double>   species_species_opinion;
         detail::complex_variable_rule<double>   special_capacity;
@@ -289,6 +308,7 @@ namespace parse {
         detail::value_ref_rule<double>      int_free_variable_cast;
         detail::value_ref_rule<double>      int_statistic_cast;
         detail::value_ref_rule<double>      int_complex_variable_cast;
+        detail::value_ref_rule<double>      named_real_valueref;
     };
 
     struct castable_as_int_parser_rules {

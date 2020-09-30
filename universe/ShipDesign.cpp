@@ -24,8 +24,8 @@ extern FO_COMMON_API const int INVALID_DESIGN_ID = -1;
 namespace {
     void AddRules(GameRules& rules) {
         // makes all ships cost 1 PP and take 1 turn to produce
-        rules.Add<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION",
-                        "RULE_CHEAP_AND_FAST_SHIP_PRODUCTION_DESC",
+        rules.Add<bool>(UserStringNop("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION"),
+                        UserStringNop("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION_DESC"),
                         "", false, true);
     }
     bool temp_bool = RegisterGameRules(&AddRules);
@@ -242,7 +242,7 @@ bool ShipDesign::CanColonize() const {
         if (part_name.empty())
             continue;
         if (const ShipPart* part = GetShipPart(part_name))
-            if (part->Class() == PC_COLONY)
+            if (part->Class() == ShipPartClass::PC_COLONY)
                 return true;
     }
     return false;
@@ -254,7 +254,7 @@ float ShipDesign::Defense() const {
     const ShipPartManager& part_manager = GetShipPartManager();
     for (const std::string& part_name : Parts()) {
         const ShipPart* part = part_manager.GetShipPart(part_name);
-        if (part && (part->Class() == PC_SHIELD || part->Class() == PC_ARMOUR))
+        if (part && (part->Class() == ShipPartClass::PC_SHIELD || part->Class() == ShipPartClass::PC_ARMOUR))
             total_defense += part->Capacity();
     }
     return total_defense;
@@ -280,13 +280,13 @@ float ShipDesign::AdjustedAttack(float shield) const {
         ShipPartClass part_class = part->Class();
 
         // direct weapon and fighter-related parts all handled differently...
-        if (part_class == PC_DIRECT_WEAPON) {
+        if (part_class == ShipPartClass::PC_DIRECT_WEAPON) {
             float part_attack = part->Capacity();
             if (part_attack > shield)
                 direct_attack += (part_attack - shield)*part->SecondaryStat();  // here, secondary stat is number of shots per round
-        } else if (part_class == PC_FIGHTER_HANGAR) {
+        } else if (part_class == ShipPartClass::PC_FIGHTER_HANGAR) {
             available_fighters = part->Capacity();                              // stacked meter
-        } else if (part_class == PC_FIGHTER_BAY) {
+        } else if (part_class == ShipPartClass::PC_FIGHTER_BAY) {
             fighter_launch_capacity += part->Capacity();
             fighter_damage = part->SecondaryStat();                             // here, secondary stat is fighter damage per shot
         }
@@ -325,9 +325,10 @@ std::vector<std::string> ShipDesign::Parts(ShipSlotType slot_type) const {
         return retval;
 
     // add to output vector each part that is in a slot of the indicated ShipSlotType
+    retval.reserve(m_parts.size());
     for (unsigned int i = 0; i < m_parts.size(); ++i)
         if (slots[i].type == slot_type)
-            retval.push_back(m_parts[i]);
+            retval.emplace_back(m_parts[i]);
 
     return retval;
 }
@@ -340,8 +341,8 @@ std::vector<std::string> ShipDesign::Weapons() const {
         if (!part)
             continue;
         ShipPartClass part_class = part->Class();
-        if (part_class == PC_DIRECT_WEAPON || part_class == PC_FIGHTER_BAY)
-        { retval.push_back(part_name); }
+        if (part_class == ShipPartClass::PC_DIRECT_WEAPON || part_class == ShipPartClass::PC_FIGHTER_BAY)
+            retval.emplace_back(part_name);
     }
     return retval;
 }
@@ -559,15 +560,15 @@ void ShipDesign::ForceValidDesignOrThrow(const boost::optional<std::invalid_argu
 
     bool no_hull_available = force_valid->first.empty();
     if (no_hull_available)
-        ss << "ShipDesign has no valid hull and there are no other hulls available." << std::endl;
+        ss << "ShipDesign has no valid hull and there are no other hulls available.\n";
 
-    ss << "Invalid ShipDesign:" << std::endl;
-    ss << Dump() << std::endl;
+    ss << "Invalid ShipDesign:\n";
+    ss << Dump() << "\n";
 
     std::tie(m_hull, m_parts) = *force_valid;
 
-    ss << "ShipDesign was made valid as:" << std::endl;
-    ss << Dump() << std::endl;
+    ss << "ShipDesign was made valid as:\n";
+    ss << Dump() << "\n";
 
     if (no_hull_available)
         ErrorLogger() << ss.str();
@@ -616,58 +617,58 @@ void ShipDesign::BuildStatCaches() {
         ShipPartClass part_class = part->Class();
 
         switch (part_class) {
-        case PC_DIRECT_WEAPON:
+        case ShipPartClass::PC_DIRECT_WEAPON:
             m_has_direct_weapons = true;
             if (part->Capacity() > 0.0f)
                 m_is_armed = true;
             break;
-        case PC_FIGHTER_BAY:
+        case ShipPartClass::PC_FIGHTER_BAY:
             has_fighter_bays = true;
             if (part->Capacity() >= 1.0f)
                 can_launch_fighters = true;
             break;
-        case PC_FIGHTER_HANGAR:
+        case ShipPartClass::PC_FIGHTER_HANGAR:
             has_fighter_hangars = true;
             if (part->SecondaryStat() > 0.0f && part->Capacity() >= 1.0f)
                 has_armed_fighters = true;
             break;
-        case PC_COLONY:
+        case ShipPartClass::PC_COLONY:
             m_colony_capacity += part->Capacity();
             break;
-        case PC_TROOPS:
+        case ShipPartClass::PC_TROOPS:
             m_troop_capacity += part->Capacity();
             break;
-        case PC_STEALTH:
+        case ShipPartClass::PC_STEALTH:
             m_stealth += part->Capacity();
             break;
-        case PC_SPEED:
+        case ShipPartClass::PC_SPEED:
             m_speed += part->Capacity();
             break;
-        case PC_SHIELD:
+        case ShipPartClass::PC_SHIELD:
             m_shields += part->Capacity();
             break;
-        case PC_FUEL:
+        case ShipPartClass::PC_FUEL:
             m_fuel += part->Capacity();
             break;
-        case PC_ARMOUR:
+        case ShipPartClass::PC_ARMOUR:
             m_structure += part->Capacity();
             break;
-        case PC_DETECTION:
+        case ShipPartClass::PC_DETECTION:
             m_detection += part->Capacity();
             break;
-        case PC_BOMBARD:
+        case ShipPartClass::PC_BOMBARD:
             m_can_bombard = true;
             break;
-        case PC_RESEARCH:
+        case ShipPartClass::PC_RESEARCH:
             m_research_generation += part->Capacity();
             break;
-        case PC_INDUSTRY:
+        case ShipPartClass::PC_INDUSTRY:
             m_industry_generation += part->Capacity();
             break;
-        case PC_INFLUENCE:
+        case ShipPartClass::PC_INFLUENCE:
             m_influence_generation += part->Capacity();
             break;
-        case PC_PRODUCTION_LOCATION:
+        case ShipPartClass::PC_PRODUCTION_LOCATION:
             m_is_production_location = true;
             break;
         default:
@@ -677,8 +678,9 @@ void ShipDesign::BuildStatCaches() {
         m_is_armed = m_is_armed || (can_launch_fighters && has_armed_fighters);
 
         m_num_ship_parts[part_name]++;
-        if (part_class > INVALID_SHIP_PART_CLASS && part_class < NUM_SHIP_PART_CLASSES)
-            m_num_part_classes[part_class]++;
+        if (part_class > ShipPartClass::INVALID_SHIP_PART_CLASS &&
+            part_class < ShipPartClass::NUM_SHIP_PART_CLASSES)
+        { m_num_part_classes[part_class]++; }
     }
 }
 
@@ -821,16 +823,18 @@ PredefinedShipDesignManager& PredefinedShipDesignManager::GetPredefinedShipDesig
 std::vector<const ShipDesign*> PredefinedShipDesignManager::GetOrderedShipDesigns() const {
     CheckPendingDesignsTypes();
     std::vector<const ShipDesign*> retval;
+    retval.reserve(m_ship_ordering.size());
     for (const auto& uuid : m_ship_ordering)
-        retval.push_back(m_designs.at(uuid).get());
+        retval.emplace_back(m_designs.at(uuid).get());
     return retval;
 }
 
 std::vector<const ShipDesign*> PredefinedShipDesignManager::GetOrderedMonsterDesigns() const {
     CheckPendingDesignsTypes();
     std::vector<const ShipDesign*> retval;
+    retval.reserve(m_monster_ordering.size());
     for (const auto& uuid : m_monster_ordering)
-        retval.push_back(m_designs.at(uuid).get());
+        retval.emplace_back(m_designs.at(uuid).get());
     return retval;
 }
 
@@ -905,8 +909,9 @@ namespace {
                 continue;
             }
 
-            name_to_uuid.insert({design->Name(), design->UUID()});
-            designs[design->UUID()] = std::move(design);
+            auto uuid = design->UUID();
+            name_to_uuid.emplace(design->Name(), uuid);
+            designs.emplace(std::move(uuid), std::move(design));
         }
     }
 
@@ -971,16 +976,16 @@ LoadShipDesignsAndManifestOrderFromParseResults(
     std::unordered_map<boost::uuids::uuid,
                        std::pair<std::unique_ptr<ShipDesign>,
                                  boost::filesystem::path>,
-                       boost::hash<boost::uuids::uuid>>  saved_designs;
+                       boost::hash<boost::uuids::uuid>> saved_designs;
 
     auto& designs_and_paths = designs_paths_and_ordering.first;
     auto& disk_ordering = designs_paths_and_ordering.second;
 
-    for (auto&& design_and_path : designs_and_paths) {
+    for (auto& design_and_path : designs_and_paths) {
         auto design = std::make_unique<ShipDesign>(*design_and_path.first);
 
         // If the UUID is nil this is a legacy design that needs a new UUID
-        if(design->UUID() == boost::uuids::uuid{{0}}) {
+        if (design->UUID().is_nil()) {
             design->SetUUID(boost::uuids::random_generator()());
             DebugLogger() << "Converted legacy ship design file by adding  UUID " << design->UUID()
                           << " for name " << design->Name();
@@ -988,7 +993,7 @@ LoadShipDesignsAndManifestOrderFromParseResults(
 
         // Make sure the design is an out of universe object
         // This should not be needed.
-        if(design->ID() != INVALID_OBJECT_ID) {
+        if (design->ID() != INVALID_OBJECT_ID) {
             design->SetID(INVALID_OBJECT_ID);
             ErrorLogger() << "Loaded ship design has an id implying it is in an ObjectMap for UUID "
                           << design->UUID() << " for name " << design->Name();
@@ -998,7 +1003,7 @@ LoadShipDesignsAndManifestOrderFromParseResults(
             TraceLogger() << "Added saved design UUID " << design->UUID()
                           << " with name " << design->Name();
             auto uuid = design->UUID();
-            saved_designs[uuid] = std::make_pair(std::move(design), design_and_path.second);
+            saved_designs.emplace(std::move(uuid), std::make_pair(std::move(design), design_and_path.second));
         } else {
             WarnLogger() << "Duplicate ship design UUID " << design->UUID()
                          << " found for ship design " << design->Name()
@@ -1008,10 +1013,11 @@ LoadShipDesignsAndManifestOrderFromParseResults(
 
     // Verify that all UUIDs in ordering exist
     std::vector<boost::uuids::uuid> ordering;
+    ordering.reserve(disk_ordering.size());
     bool ship_manifest_inconsistent = false;
-    for (auto& uuid: disk_ordering) {
+    for (auto& uuid : disk_ordering) {
         // Skip the nil UUID.
-        if(uuid == boost::uuids::uuid{{0}})
+        if (uuid.is_nil())
             continue;
 
         if (!saved_designs.count(uuid)) {
@@ -1020,7 +1026,7 @@ LoadShipDesignsAndManifestOrderFromParseResults(
             ship_manifest_inconsistent = true;
             continue;
         }
-        ordering.push_back(uuid);
+        ordering.emplace_back(uuid);
     }
 
     // Verify that every design in saved_designs is in ordering.
@@ -1029,20 +1035,20 @@ LoadShipDesignsAndManifestOrderFromParseResults(
         std::unordered_set<boost::uuids::uuid, boost::hash<boost::uuids::uuid>>
             uuids_in_ordering{ordering.begin(), ordering.end()};
         std::map<std::string, boost::uuids::uuid> missing_uuids_sorted_by_name;
-        for (auto& uuid_to_design_and_filename: saved_designs) {
+        for (auto& uuid_to_design_and_filename : saved_designs) {
             if (uuids_in_ordering.count(uuid_to_design_and_filename.first))
                 continue;
             ship_manifest_inconsistent = true;
-            missing_uuids_sorted_by_name.insert(
-                std::make_pair(uuid_to_design_and_filename.second.first->Name(),
-                               uuid_to_design_and_filename.first));
+            missing_uuids_sorted_by_name.emplace(
+                uuid_to_design_and_filename.second.first->Name(),
+                uuid_to_design_and_filename.first);
         }
 
         for (auto& name_and_uuid: missing_uuids_sorted_by_name) {
             WarnLogger() << "Missing ship design " << name_and_uuid.second
                          << " called " << name_and_uuid.first
                          << " added to the manifest.";
-            ordering.push_back(name_and_uuid.second);
+            ordering.emplace_back(name_and_uuid.second);
         }
     }
 

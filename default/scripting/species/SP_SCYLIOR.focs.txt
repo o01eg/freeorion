@@ -12,15 +12,18 @@ Species
     foci = [
         [[HAS_INDUSTRY_FOCUS]]
         [[HAS_RESEARCH_FOCUS]]
+        [[HAS_INFLUENCE_FOCUS]]
         [[HAS_GROWTH_FOCUS]]
         [[HAS_ADVANCED_FOCI]]
     ]
 
-    preferredfocus = "FOCUS_RESEARCH"
+    defaultfocus = "FOCUS_RESEARCH"
+    likes = ["FOCUS_RESEARCH"]
 
     effectsgroups = [
         [[AVERAGE_INDUSTRY]]
         [[GREAT_RESEARCH]]
+        [[GOOD_INFLUENCE]]
         [[AVERAGE_STOCKPILE]]
 
         [[GOOD_POPULATION]]

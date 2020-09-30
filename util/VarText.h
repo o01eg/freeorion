@@ -80,7 +80,7 @@ public:
     //!
     //! @param  template_string  @see #m_template_string.
     //! @param  stringtable_lookup  @see #m_stringtable_lookup_flag
-    explicit VarText(const std::string& template_string, bool stringtable_lookup = true);
+    explicit VarText(std::string template_string, bool stringtable_lookup = true);
 
     //! Return the text generated after substituting all variables.
     const std::string& GetText() const;
@@ -103,9 +103,9 @@ public:
     //!
     //! @param  template_string  @see #m_template_string.
     //! @param  stringtable_lookup  @see #m_stringtable_lookup_flag
-    void SetTemplateString(const std::string& template_string, bool stringtable_lookup = true);
+    void SetTemplateString(std::string template_string, bool stringtable_lookup = true);
 
-    //! Assign @p data to a given @p tag.
+    //! Assign @p data to a given @p tag. Overwrites / replaces data of existing tags.
     //!
     //! The @p data should match @p tag as listed in
     //!   @ref variable_tags "Variable tags".
@@ -115,6 +115,26 @@ public:
     //! @param  data
     //!     Data value of the #m_variables set.
     void AddVariable(const std::string& tag, const std::string& data);
+
+    //! Assign @p data to a given @p tag. Overwrites / replaces data of existing tags.
+    //!
+    //! The @p data should match @p tag as listed in
+    //!   @ref variable_tags "Variable tags".
+    //!
+    //! @param  tag
+    //!     Tag of the #m_variables set, may be labled.
+    //! @param  data
+    //!     Data value of the #m_variables set.
+    void AddVariable(const std::string& tag, std::string&& data);
+
+    //! Assign @p data as tags. Does not overwrite or replace data of existing tags.
+    //!
+    //! The @p data should match tags as listed in
+    //!   @ref variable_tags "Variable tags".
+    //!
+    //! @param  data
+    //!     Tag and Data values of the #m_variables set.
+    void AddVariables(std::vector<std::pair<std::string, std::string>>&& data);
 
     //! @name  Variable tags
     //! @anchor variable_tags
@@ -166,6 +186,8 @@ public:
     static const std::string FIELD_TYPE_TAG;
     //! Variable value is a predefined MeterType string representation.
     static const std::string METER_TYPE_TAG;
+    //! Variable value is the name of a registed ValueRef.
+    static const std::string FOCS_VALUE_TAG;
 
     //! @}
 

@@ -12,7 +12,7 @@
 
 
 namespace {
-    const float EPSILON = 0.01f;
+    //const float EPSILON = 0.01f;
 
     //void AddRules(GameRules& rules)
     //{}
@@ -116,8 +116,8 @@ void InfluenceQueue::Update() {
 
     ScopedTimer update_timer("InfluenceQueue::Update");
 
-    float available_IP = empire->ResourceOutput(RE_INFLUENCE);
-    float stockpiled_IP = empire->ResourceStockpile(RE_INFLUENCE);
+    float available_IP = empire->ResourceOutput(ResourceType::RE_INFLUENCE);
+    float stockpiled_IP = empire->ResourceStockpile(ResourceType::RE_INFLUENCE);
 
     float spending_on_policy_adoption_ip = 0.0f;
     for (auto policy_turn : empire->TurnsPoliciesAdopted()) {
@@ -135,7 +135,8 @@ void InfluenceQueue::Update() {
 
     m_expected_new_stockpile_amount = stockpiled_IP + available_IP - m_total_IPs_spent;
 
-    DebugLogger() << "InfluenceQueue::Update : available IP: " << available_IP << "  stockpiled: " << stockpiled_IP << "  new expected: " << m_expected_new_stockpile_amount << std::endl;
+    DebugLogger() << "InfluenceQueue::Update : available IP: " << available_IP << "  stockpiled: "
+                  << stockpiled_IP << "  new expected: " << m_expected_new_stockpile_amount << "\n";
 
     //// cache Influence item costs and times
     //// initialize Influence queue item completion status to 'never'
@@ -144,7 +145,7 @@ void InfluenceQueue::Update() {
 
     //DebugLogger() << "InfluenceQueue::Update: Projections took "
     //              << ((sim_time_end - sim_time_start).total_microseconds()) << " microseconds with "
-    //              << empire->ResourceOutput(RE_INFLUENCE) << " influence output";
+    //              << empire->ResourceOutput(ResourceType::RE_INFLUENCE) << " influence output";
     InfluenceQueueChangedSignal();
 }
 

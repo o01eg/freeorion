@@ -129,16 +129,6 @@ public:
      */
     Networking::ClientType GetPlayerClientType(int player_id) const override;
 
-    /** @brief Return the ::UniverseObject associated with @a object_id
-     *
-     * @param object_id An object identifier
-     *
-     * @return A pointer to the ::UniverseObject associated with @a object_id.
-     *      When there is no matching object or the client does not know of the
-     *      object existence the pointer may be nullptr.
-     */
-    std::shared_ptr<UniverseObject> GetUniverseObject(int object_id) override;
-
     /** @brief Return the for this client visible name of @a object
      *
      * @param object The object to obtain the name from.
@@ -191,18 +181,6 @@ public:
      */
     ObjectMap& EmpireKnownObjects(int empire_id) override;
 
-    /** @brief Return the UniverseObject @a object_id if known by @a empire_id
-     *
-     * @param object_id An UniverseObject identifier.
-     * @param empire_id An empire identifier.
-     *
-     * @return A pointer to the UniverseObject, that is identified by
-     *      @a object_id and known by the ::Empire identified by @a empire_id.
-     *      If there is no such object or if that object is not known to the
-     *      empire a nullptr is returned.
-     */
-    std::shared_ptr<UniverseObject> EmpireKnownObject(int object_id, int empire_id) override;
-
     /** @brief Set the identifier of the ::Empire controlled by this client to
      *      @a empire_id
      *
@@ -215,10 +193,6 @@ public:
      * @param turn The new turn number of this client.
      */
     void SetCurrentTurn(int turn);
-
-    /** @brief Handle the turn update.
-     */
-    virtual void HandleTurnUpdate() {}
 
     /** @brief Set the Message::PlayerStatus @a status for @a empire_id
      *

@@ -59,7 +59,7 @@ namespace {
     {
         auto tech_ptr = std::make_unique<Tech>(
             std::move(*tech_info.OpenEnvelope(pass)),
-            (effects ? std::move(parse::detail::OpenEnvelopes(*effects, pass)) : std::vector<std::unique_ptr<Effect::EffectsGroup>>{}),
+            (effects ? parse::detail::OpenEnvelopes(*effects, pass) : std::vector<std::unique_ptr<Effect::EffectsGroup>>{}),
             (prerequisites ? std::move(*prerequisites) : std::set<std::string>{}),
             (unlocked_items ? std::move(*unlocked_items) : std::vector<UnlockableItem>{}),
             (graphic ? std::move(*graphic) : std::string{}));
@@ -75,8 +75,8 @@ namespace {
     void insert_category(std::map<std::string, std::unique_ptr<TechCategory>>& categories,
                          std::string& name, std::string& graphic, const GG::Clr& color)
     {
-        auto category_ptr = std::make_unique<TechCategory>(std::move(name), std::move(graphic), color);
-        categories.emplace(category_ptr->name, std::move(category_ptr));
+        auto category_ptr = std::make_unique<TechCategory>(name, std::move(graphic), color);
+        categories.emplace(std::move(name), std::move(category_ptr));
     }
 
     BOOST_PHOENIX_ADAPT_FUNCTION(void, insert_category_, insert_category, 4)

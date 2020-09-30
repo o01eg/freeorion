@@ -15,7 +15,7 @@ class ScanlineControl;
 /** represents one or more fleets of an empire at a location on the map. */
 class FleetButton : public GG::Button {
 public:
-    enum class SizeType {
+    enum class SizeType : int {
         NONE,
         TINY,
         SMALL,
@@ -23,10 +23,12 @@ public:
         LARGE
     };
 
-    FleetButton(const std::vector<int>& fleet_IDs, SizeType size_type = SizeType::LARGE);
-    FleetButton(int fleet_id, SizeType size_type = SizeType::LARGE);
+    FleetButton(std::vector<int> fleet_IDs, SizeType size_type);
+    FleetButton(int fleet_id, SizeType size_type);
     void CompleteConstruction() override;
     virtual ~FleetButton();
+
+    void Refresh(SizeType size_type);
 
     /** Returns true if \a pt is within or over the button. */
     bool InWindow(const GG::Pt& pt) const override;
@@ -52,6 +54,7 @@ private:
     void LayoutIcons();
 
     std::vector<int>                                m_fleets;   ///< the fleets represented by this button
+    SizeType                                        m_size = SizeType::NONE;
     std::vector<std::shared_ptr<GG::StaticGraphic>> m_icons;
     std::shared_ptr<RotatingGraphic>                m_selection_indicator;
     std::shared_ptr<ScanlineControl>                m_scanline_control;
@@ -60,13 +63,15 @@ private:
 };
 
 /* returns head icon for passed fleet at passed icon size */
-std::vector<std::shared_ptr<GG::Texture>> FleetHeadIcons(std::shared_ptr<const Fleet>, FleetButton::SizeType size_type);
+std::vector<std::shared_ptr<GG::Texture>> FleetHeadIcons(const Fleet* fleet,
+                                                         FleetButton::SizeType size_type);
 
 /* returns head icon for passed fleets at passed icon size */
-std::vector<std::shared_ptr<GG::Texture>> FleetHeadIcons(const std::vector<std::shared_ptr<const Fleet>>& fleets, FleetButton::SizeType size_type);
+std::vector<std::shared_ptr<GG::Texture>> FleetHeadIcons(const std::vector<const Fleet*>& fleets,
+                                                         FleetButton::SizeType size_type);
 
 /* returns size icon for passed fleet at passed icon size */
-std::shared_ptr<GG::Texture> FleetSizeIcon(std::shared_ptr<const Fleet> fleet, FleetButton::SizeType size_type);
+std::shared_ptr<GG::Texture> FleetSizeIcon(const Fleet* fleet, FleetButton::SizeType size_type);
 
 /* returns head icon for passed fleet size at passed icon size */
 std::shared_ptr<GG::Texture> FleetSizeIcon(unsigned int fleet_size, FleetButton::SizeType size_type);

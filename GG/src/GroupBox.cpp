@@ -1,31 +1,15 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-#include <GG/GroupBox.h>
-
-#include <GG/GUI.h>
 #include <GG/DrawUtil.h>
+#include <GG/GroupBox.h>
+#include <GG/GUI.h>
 #include <GG/StyleFactory.h>
 #include <GG/TextControl.h>
 
@@ -33,8 +17,10 @@
 using namespace GG;
 
 namespace {
-    Y TopOfFrame(bool label, const std::shared_ptr<Font>& font)
-    { return label ? font->Lineskip() / 2 - 1 : Y0; }
+
+Y TopOfFrame(bool label, const std::shared_ptr<Font>& font)
+{ return label ? font->Lineskip() / 2 - 1 : Y0; }
+
 }
 
 ////////////////////////////////////////////////
@@ -47,14 +33,15 @@ const int GroupBox::PIXEL_MARGIN = 4;
 GroupBox::GroupBox()
 {}
 
-GroupBox::GroupBox(X x, Y y, X w, Y h, const std::string& label, const std::shared_ptr<Font>& font,
+GroupBox::GroupBox(X x, Y y, X w, Y h, std::string label, const std::shared_ptr<Font>& font,
                    Clr color, Clr text_color/* = CLR_BLACK*/, Clr interior/* = CLR_ZERO*/,
                    Flags<WndFlag> flags/* = NO_WND_FLAGS*/) :
     m_color(color),
     m_text_color(text_color),
     m_int_color(interior),
     m_font(font),
-    m_label(label.empty() ? nullptr : GUI::GetGUI()->GetStyleFactory()->NewTextControl(label, m_font, m_text_color, FORMAT_LEFT | FORMAT_TOP))
+    m_label(label.empty() ? nullptr : GUI::GetGUI()->GetStyleFactory()->NewTextControl(
+        std::move(label), m_font, m_text_color, FORMAT_LEFT | FORMAT_TOP))
 {}
 
 void GroupBox::CompleteConstruction()
@@ -159,10 +146,10 @@ void GroupBox::SetClientCornersEqualToBoxCorners(bool b)
     }
 }
 
-void GroupBox::SetText(const std::string& str)
+void GroupBox::SetText(std::string str)
 {
     if (!str.empty()) {
-        m_label = GUI::GetGUI()->GetStyleFactory()->NewTextControl(str, m_font, m_text_color);
+        m_label = GUI::GetGUI()->GetStyleFactory()->NewTextControl(std::move(str), m_font, m_text_color);
         m_label->MoveTo(Pt(X(FRAME_THICK + PIXEL_MARGIN), Y0));
         m_label->Resize(Pt(X1, m_font->Lineskip()));
     }

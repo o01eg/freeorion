@@ -351,7 +351,7 @@ PROJECT_BT_STOCKPILE_SHORT_DESC
 Transfère les PP vers le stock impérial
 
 PROJECT_BT_STOCKPILE_DESC
-'''Les PP alloués au projet de Transfert Stock sont ajoutés au Stock Impérial. La quantité à transférer et le nombre de répétitions du transfert peuvent être spécifiés.
+'''Les Points de Production (PP) alloués au projet de Transfert Stock sont ajoutés au [[encyclopedia STOCKPILE_TITLE]]. La quantité à transférer et le nombre de répétitions du transfert peuvent être spécifiés.
 
 Seuls les PP produits au sein du même Groupe Ressource (soit aucun du Stock Impérial) sont alloués au projet de Transfert Stock.
 
@@ -1705,7 +1705,7 @@ OPTIONS_DB_UI_PLANET_STATUS_ATTACKED
 La planète %1% a été attaquée au tour précédent.
 
 OPTIONS_DB_UI_PLANET_STATUS_CONQUERED
-La planète %1% vient d'être conquise. Le Bonheur sera probablement réduit.
+La planète %1% vient d'être conquise. La Stabilité sera probablement réduite.
 
 OPTIONS_DB_UI_PLANET_STATUS_UNHAPPY
 La Population sur la planète %1% est très mécontente. Ni l'[[metertype METER_INDUSTRY]] ni la [[metertype METER_RESEARCH]] n'augmenteront. Cette population ne peut entreprendre aucune colonisation.
@@ -3189,6 +3189,9 @@ Fichiers de sauvegarde
 OPTIONS_SERVER_FOLDER_SAVE
 Fichiers de sauvegarde Serveur
 
+OPTIONS_FOLDER_CONFIG_LOG
+Fichiers Configuration et Journal
+
 OPTIONS_LANGUAGE_FILE
 Fichiers de langue
 
@@ -3212,6 +3215,12 @@ Affichage des rapports d'erreurs
 
 OPTIONS_SHOW_IDS_AFTER_NAMES
 IDs après noms
+
+OPTIONS_AUTOSAVE_GAME_CLOSE
+Active la sauvegarde automatique en abandonnant ou quittant une partie
+
+OPTIONS_AUTOSAVE_GALAXY_CREATION
+Active la sauvegarde automatique après la création de la galaxie
 
 OPTIONS_EFFECT_ACCOUNTING
 Comptabilité des effets
@@ -4397,7 +4406,7 @@ La Fenêtre Production permet d'interagir directement avec la carte de la  [[enc
 <u>Panneau Récapitulation de Production</u>
 
 (position par défaut: en haut à gauche)
-Le panneau "Récapitulation de Production" affiche les Points de Production disponibles.
+Le panneau "Récapitulation de Production" affiche les Points de Production (PP) disponibles.
 Si un système est sélectionné, deux colonnes sont visibles. La colonne de gauche correspond aux points de production à travers tout l'empire. La colonne de droite affiche les points de production pour le système sélectionné (absente si aucun système n'est sélectionné).
 "Points disponibles" fait référence aux PP disponibles pour la Production. La valeur de droite correspond au maximum de points disponibles pour le système sélectionné. Cette valeur peut être inférieure au total disponible lorsque tous les systèmes de votre empire ne sont pas reliés par lignes d'[[metertype METER_SUPPLY]].
 Le Stock correspond aux PP disponibles pour la Production, et provenant du Stock Impérial. Les Projets de Production sont autorisés à puiser par défaut dans le Stock Impérial, excepté si son usage a été individuellement bloqué pour un projet.
@@ -4996,6 +5005,12 @@ Stratégies
 ENC_POLICY_DESC
 Effets d'amélioration ou situationnels pouvant être appliqués par les empires.
 
+ENC_POICY_EXCLUSIONS
+'''Ne peut pas être appliqué avec : '''
+
+ENC_POICY_PREREQUISITES
+'''Ne peut pas être appliqué sans : '''
+
 ENC_SPECIAL
 Particularité
 
@@ -5043,6 +5058,63 @@ Indicateurs :
 
 RESEARCHED_TECHS
 '''Technologies recherchées : '''
+
+ISSUED_ORDERS
+'''Ordres émis: '''
+
+ORDER_UNEXECUTED
+''' - Non-exécuté'''
+
+ORDER_RENAME
+Renommer ID %1% en %2%
+
+ORDER_FLEET_NEW
+Nouvelle flotte %3% nommée %1% avec %2% astronefs
+
+ORDER_FLEET_MOVE
+Déplacement Flotte
+
+ORDER_FLEET_TRANSFER
+Transfert Flotte
+
+ORDER_COLONIZE
+Coloniser
+
+ORDER_INVADE
+Envahir
+
+ORDER_BOMBARD
+Bombarder
+
+ORDER_FOCUS_CHANGE
+Changement Focus
+
+ORDER_POLICY_ADOPT
+Appliquer Stratégie
+
+ORDER_POLICY_ABANDON
+Abandonner Stratégie
+
+ORDER_RESEARCH
+Recherche
+
+ORDER_PRODUCTION  # translated
+Production
+
+ORDER_SHIP_DESIGN
+Conception Astronef
+
+ORDER_SCRAP
+Démanteler
+
+ORDER_FLEET_AGGRESSION
+Définir Agressivité Flotte
+
+ORDER_GIVE_TO_EMPIRE
+Offrir à un Empire
+
+ORDER_FORGET
+Oublier
 
 BEFORE_FIRST_TURN
 Avant Tour initial
@@ -5312,13 +5384,10 @@ ENC_SDD_BAY
 [[METER_CAPACITY]] [[encyclopedia PC_FIGHTER_BAY]]
 
 ENC_UNLOCKED_BY
-'''<u>Débloqué par tech. :</u>
-
-'''
+'''Débloqué par : '''
 
 ENC_UNLOCKS
-'''<u>Débloque :</u>
-
+'''Débloque : 
 '''
 
 ENC_SHIP_PART_CAN_MOUNT_IN_SLOT_TYPES
@@ -5668,6 +5737,23 @@ Métabolisme
 METABOLISM_TEXT
 Les différents types de métabolisme des [[encyclopedia ENC_SPECIES]]s peuplant la galaxie sont listés ci-dessous.
 
+STOCKPILE_TITLE
+Stock Impérial
+
+STOCKPILE_TEXT
+'''La capacité industrielle est utilisée immédiatemment pour produire structures et astronefs. Un empire peut également accumuler les Points de Production (PP) dans le stock impérial en vue d'une utilisation ultérieure. Généralement, les PP peuvent être utilisés pour la production seulement si le lieu de production se trouve dans le réseau d'approvisionnement au sein duquel les PP sont générés. Cependant, les PP issus du stock impérial peuvent être utilisés par n'importe quel site de production appartenant à l'empire. Seule une quantité définie de ces PP -ne dépassant pas la limite d'usage impériale- peut être utilisée chaque tour pour la production.
+
+Il existe deux manières d'ajouter des PP au stock impérial:
+* les PP en excédent (PP non-alloués dans la file d'attente de production) de tout site de production sont automatiquement transférés vers le stock. Cela déclenche une alerte.
+* les PP explicitement alloués à un projet de [[encyclopedia PROJECT_BT_STOCKPILE]] sont également envoyés vers le stock.
+
+La limite d'usage du stock impérial est égale au total des indicateurs [[metertype METER_STOCKPILE]] de chaque planète.
+Les prédispositions de certaines espèces en distribution du stock, certaines structures ou technologies, ainsi que l'utilisation du [[encyclopedia STOCKPILE_FOCUS_TITLE]], permettent d'augmenter cette limite.
+
+Les informations au sujet du stock impérial, son usage, ainsi que sa limite d'usage, peuvent être consultées dans la partie supérieure de la [[encyclopedia MAP_WINDOW_ARTICLE_TITLE]].
+Les détails de production peuvent être consultés dans la [[encyclopedia PRODUCTION_WINDOW_ARTICLE_TITLE]].
+Les effets contribuant à la [[metertype METER_STOCKPILE]] d'une planète sont consultables via le [[PLANET_PANEL]] dans la vue d'ensemble d'un système.'''
+
 PLANET_MANAGEMENT_TITLE
 Gestion Planétaire
 
@@ -5818,7 +5904,7 @@ Industrie
 METER_INDUSTRY_VALUE_DESC
 '''L'Industrie, mesurée en Points de Production (PP), représente la capacité de production et de transformation de biens matériels de l'ensemble des planètes de l'empire. Elle est nécessaire pour la construction des structures, des astronefs et tout autre projet.
 
-L'Industrie d'une planète peut participer à tout projet lancé sur les planètes qui lui sont reliées par lignes d'[[metertype METER_SUPPLY]] de l'empire. L'Industrie n'étant affectée à aucun projet durant un tour est ajoutée au Stock Impérial.
+L'Industrie d'une planète peut participer à tout projet lancé sur les planètes qui lui sont reliées par lignes d'[[metertype METER_SUPPLY]] de l'empire. L'Industrie n'étant affectée à aucun projet durant un tour est ajoutée au [[encyclopedia STOCKPILE_TITLE]].
 
 La Projection Industrie est le niveau optimal de capacité en Industrie qu'une planète tend à approcher, compte tenu des différents facteurs influençant les ressources en Industrie. Sa valeur est liée aux <encyclopedia ENC_BUILDING_TYPE>Types de Structures</encyclopedia> bâtis sur la planète, aux [[encyclopedia ENC_TECH]] recherchées par l'empire, aux <encyclopedia ENC_SPECIAL>Particularités</encyclopedia> liées à la planète, ainsi que divers effets de jeu. Si ces facteurs changent, alors la valeur de Projection Industrie est susceptible de fluctuer à son tour.
 
@@ -5853,12 +5939,12 @@ METER_CONSTRUCTION_VALUE_DESC
 La Projection Infrastructure est le niveau optimal d'Infrastructure qu'une planète tend à approcher, compte tenu des différents facteurs influençant l'Infrastructure planétaire. Sa valeur est liée aux <encyclopedia ENC_BUILDING_TYPE>Types de Structures</encyclopedia> bâtis sur la planète, aux [[encyclopedia ENC_TECH]] recherchées par l'empire, aux <encyclopedia ENC_SPECIAL>Particularités</encyclopedia> liées à la planète, ainsi que divers effets de jeu. Si ces facteurs changent, alors la valeur de Projection Infrastructure est susceptible de fluctuer à son tour.'''
 
 METER_HAPPINESS_VALUE_LABEL
-Bonheur
+Stabilité
 
 METER_HAPPINESS_VALUE_DESC
-'''Le Bonheur de la [[metertype METER_POPULATION]] d'une colonie débute entre 1 et 5 suite à la colonisation initiale, et dépend de l'adaptation de l'[[encyclopedia ENC_SPECIES]] à l'[[encyclopedia ENVIRONMENT_TITLE]] de la planète. Le Bonheur est réduit à 0 suite à une invasion, et peut également dépendre d'autres facteurs. Un Bonheur minimum de 5 est requis pour qu'une colonie puisse entreprendre la colonisation d'autres planètes. L'[[metertype METER_INDUSTRY]] et la [[metertype METER_RESEARCH]] ne commenceront à croître que si le Bonheur est au moins égal à 5.
+'''La Stabilité de la [[metertype METER_POPULATION]] d'une colonie débute entre 1 et 5 suite à la colonisation initiale, et dépend de l'adaptation de l'[[encyclopedia ENC_SPECIES]] à l'[[encyclopedia ENVIRONMENT_TITLE]] de la planète. La Stabilité est réduite à 0 suite à une invasion, et peut également dépendre d'autres facteurs. Une Stabilité minimum de 5 est requise pour qu'une colonie puisse entreprendre la colonisation d'autres planètes. L'[[metertype METER_INDUSTRY]] et la [[metertype METER_RESEARCH]] ne commenceront à croître que si la Stabilité est au moins égale à 5.
 
-La Projection Bonheur est le niveau optimal de Bonheur que la Population d'une planète tend à approcher, compte tenu des différents facteurs influençant le Bonheur planétaire. Sa valeur est liée aux <encyclopedia ENC_BUILDING_TYPE>Types de Structures</encyclopedia> bâtis sur la planète, aux [[encyclopedia ENC_TECH]] recherchées par l'empire, aux <encyclopedia ENC_SPECIAL>Particularités</encyclopedia> liées à la planète, ainsi que divers effets de jeu. Si ces facteurs changent, alors la valeur de Projection Bonheur est susceptible de fluctuer à son tour.'''
+La Projection Stabilité est le niveau optimal de Stabilité que la Population d'une planète tend à approcher, compte tenu des différents facteurs influençant la Stabilité planétaire. Sa valeur est liée aux <encyclopedia ENC_BUILDING_TYPE>Types de Structures</encyclopedia> bâtis sur la planète, aux [[encyclopedia ENC_TECH]] recherchées par l'empire, aux <encyclopedia ENC_SPECIAL>Particularités</encyclopedia> liées à la planète, ainsi que divers effets de jeu. Si ces facteurs changent, alors la valeur de Projection Stabilité est susceptible de fluctuer à son tour.'''
 
 METER_CAPACITY_VALUE_LABEL
 Stat - Primaire
@@ -5914,21 +6000,21 @@ Approvisionnement
 METER_SUPPLY_VALUE_DESC
 '''L'indicateur d'approvisionnement d'une planète représente le nombre de Voies spatiales sur lesquelles l'approvisionnement peut être distribué. Les petites planètes peuvent déployer l'approvisionnement sur de grandes distances mais peu de lignes, tandis que les grandes planètes peuvent approvisionner davantage de lignes mais sur de moins grandes distances.
 
-Les lignes d'approvisionnement sont représentées par les Voies spatiales aux couleurs de l'empire. Les planètes reliées par ces lignes forment un "Groupe Ressource" et peuvent échanger des ressources matérielles. La capacité de Production (ou Points de Production) d'une planète peut être utilisée par toute autre planète de l'empire qui lui est reliée, afin de construire astronefs ou structures.
+Les lignes d'approvisionnement sont représentées par les Voies spatiales aux couleurs de l'empire. Les planètes reliées par ces lignes forment un "Groupe Ressource" et peuvent échanger des ressources matérielles. La capacité de Production (ou Points de Production, PP) d'une planète peut être utilisée par toute autre planète de l'empire qui lui est reliée, afin de construire astronefs ou structures.
 
-Les Voies spatiales d'approvisionnement essentielles d'un empire (les lignes les plus directes reliant les systèmes producteurs de ressources de chaque Groupe Ressource) auront une épaisseur plus importante que les Voies spatiales non-essentielles. Si les PP sont gaspillés au sein d'un Groupe Ressource, les bandes extérieures des Voies Spatiales auront une couleur spécifique.
+Les Voies spatiales d'approvisionnement essentielles d'un empire (les lignes les plus directes reliant les systèmes producteurs de ressources de chaque Groupe Ressource) auront une épaisseur plus importante que les Voies spatiales non-essentielles. Si les PP ne sont pas utilisés au sein d'un Groupe Ressource, les bandes extérieures des Voies spatiales auront une couleur spécifique.
 
 Les lignes d'approvisionnement peuvent également servir à ravitailler en [[metertype METER_FUEL]] les astronefs.
 
 Les lignes d'approvisionnement seront bloquées par les astronefs ennemis armés appartenant aux empires avec lesquels l'empire est en [[encyclopedia WAR_TITLE]]. À l'opposé du spectre diplomatique, les empires sous traité d'[[encyclopedia ALLIANCE_TITLE]] partageront leurs lignes d'approvisionnement ainsi que tous les bénéfices y étant associés.'''
 
 METER_STOCKPILE_VALUE_LABEL
-Stock
+Distribution Stock
 
 METER_STOCKPILE_VALUE_DESC
-'''La capacité du Stock Impérial indique la compétence d'un empire à gérer les surplus de production et à utiliser les points de production stockés. Le Stock total d'un empire correspond à la somme des indicateurs Stock de toutes les planètes de l'empire, plus les éventuels bonus de technologie. Ce total détermine combien de PP peuvent être puisés dans le Stock à chaque tour afin d'être utilisés pour la production.
+'''L'indicateur Distribution Stock d'une planète représente pour quelle valeur la planète contribue à la limite d'usage du [[encyclopedia STOCKPILE_TITLE]]. La limite d'usage du Stock Impérial indique la compétence d'un empire à utiliser les Points de Production (PP) stockés. La limite d'usage du Stock pour un empire correspond à la somme des indicateurs de Distribution Stock de toutes les planètes de l'empire, plus les éventuels bonus de technologie. Ce total détermine combien de PP peuvent être puisés dans le Stock à chaque tour afin d'être utilisés pour la production.
 
-La compétence de gestion du Stock varie selon les espèces.'''
+La compétence de Distribution du Stock varie selon les espèces.'''
 
 METER_TROOPS_VALUE_LABEL
 Infanterie
@@ -6028,7 +6114,7 @@ FOCUS_TEXT
 
 Le Focus d'une planète peut procurer un bonus ou engendrer certains effets sur celle-ci. Une faible pénalité est appliquée à chaque fois que le Focus d'une planète est modifié, sa valeur diminuant avec le temps.
 
-Une planète sera réglée par défaut sur le Focus favori de l'espèce la peuplant (si cette dernière en possède un), ou sinon par défaut sur le Focus [[metertype METER_INDUSTRY]].'''
+Une planète sera réglée par défaut sur le Focus par défaut de l'espèce la peuplant (si cette dernière en possède un), ou sinon par défaut sur le Focus [[metertype METER_INDUSTRY]].'''
 
 DISTORTION_FOCUS_TITLE
 Focus Distortion Spatiale
@@ -6040,7 +6126,7 @@ GROWTH_FOCUS_TITLE
 Focus Croissance
 
 GROWTH_FOCUS_TEXT
-'''Privilégier la Croissance signifie exporter des matériaux et substances rares afin d'accroître la [[metertype METER_TARGET_POPULATION]] d'une planète. Cela n'est possible que dans certains cas : sur quelques Planètes Natales et sur des planètes présentant une Particularité de Croissance pouvant être exportée.
+'''Privilégier la Croissance signifie exporter des matériaux et substances rares afin d'accroître la [[metertype METER_TARGET_POPULATION]] d'une planète. Cela n'est possible que dans certains cas: sur quelques Planètes Natales et sur des planètes présentant une Particularité de Croissance pouvant être exportée.
 
 Une planète privilégiant la Croissance propage ces bénéfices aux autres planètes lui étant reliées par lignes d'[[metertype METER_SUPPLY]], à condition que les espèces peuplant ces autres planètes soient du type adéquat, c'est-à-dire qu'une Planète Natale privilégiant la Croissance favorise seulement les autres planètes peuplées par la même espèce, tandis que les Particularités de Croissance (et le Focus Croissance en corrélation) ne sont bénéfiques qu'aux espèces ayant le même type de [[encyclopedia METABOLISM_TITLE]]. Les bénéfices des différents types applicables de Focus Croissance s'additionnent, mais plusieurs sources d'un même type spécifique de Focus Croissance ne s'additionnent pas.
 
@@ -6056,7 +6142,7 @@ INFLUENCE_FOCUS_TITLE
 Focus Influence
 
 INFLUENCE_FOCUS_TEXT
-L'Influence n'est pas encore implémentée.
+Les planètes de l'empire en Focus Influence améliorent leur capacité d'[[metertype METER_INFLUENCE]], utilisée pour appliquer des stratégies gouvernementales.
 
 LOGISTICS_FOCUS_TITLE
 Focus Logistique
@@ -6087,12 +6173,12 @@ PSYCHIC_FOCUS_TEXT
 Lorsque le Focus Domination Psychique est activé, réduit par ailleurs la chance qu'un [[predefinedshipdesign SM_PSIONIC_SNOWFLAKE]] prenne le contrôle des astronefs de l'empire se trouvant dans le même système.'''
 
 STOCKPILE_FOCUS_TITLE
-Focus Stock
+Focus Distribution Stock
 
 STOCKPILE_FOCUS_TEXT
-'''Le Focus Stock augmente le [[metertype METER_STOCKPILE]] d'une planète.
+'''Le Focus Distribution Stock augmente la [[metertype METER_STOCKPILE]] d'une planète.
 
-Une Planète Natale privilégiant le Stock favorise également les autres planètes peuplées par la même espèce, en y augmentant le [[metertype METER_STOCKPILE]] de 0.04 par [[metertype METER_POPULATION]].
+Une Planète Natale privilégiant la Distribution Stock favorise également les autres planètes peuplées par la même espèce, en y augmentant la [[metertype METER_STOCKPILE]] de 0.04 par [[metertype METER_POPULATION]].
 
 [[METER_STOCKPILE_VALUE_DESC]]'''
 
@@ -6240,9 +6326,9 @@ DAMAGE_TITLE
 Dommages
 
 DAMAGE_TEXT
-'''Définit la valeur de base qu'un armement d'astronef ôtera à la [[metertype METER_STRUCTURE]] d'un autre astronef (ou aux [[metertype METER_SHIELD]], à la [[metertype METER_DEFENSE]] et à l'[[metertype METER_CONSTRUCTION]] d'une planète), en une passe de combat (pour un total de trois passes par tour). Si l'astronef ciblé est équipé de [[metertype METER_SHIELD]], les dommages causés par chaque tir seront égaux à cette valeur de base moins la valeur de solidité des [[metertype METER_SHIELD]] de l'astronef.
+'''Définit la valeur de base qu'un armement d'astronef ôtera à la [[metertype METER_STRUCTURE]] d'un autre astronef (ou aux [[metertype METER_SHIELD]], à la [[metertype METER_DEFENSE]] et à l'[[metertype METER_CONSTRUCTION]] d'une planète), en une passe de combat (pour un total de quatre passes par tour). Si l'astronef ciblé est équipé de [[metertype METER_SHIELD]], les dommages causés par chaque tir seront égaux à cette valeur de base moins la valeur de solidité des [[metertype METER_SHIELD]] de l'astronef.
 
-Note: les [[encyclopedia FIGHTER_TECHS]] infligent des dommages n'étant pas minorés par les [[metertype METER_SHIELD]] d'astronef, les Chasseurs faisant feu une fois à l'intérieur de la zone de protection fournie par les Boucliers.'''
+Note: les [[encyclopedia FIGHTER_TECHS]] infligent des dommages n'étant pas minorés par les [[metertype METER_SHIELD]] d'astronef, les Chasseurs faisant feu une fois à l'intérieur de la zone de protection fournie par les Boucliers. Les Chasseurs nécessitant un tour pour être lancés, l'estimation des dommages est calculée en conséquence.'''
 
 MAP_WINDOW_ARTICLE_TITLE
 Fenêtre Carte
@@ -6252,7 +6338,7 @@ MAP_WINDOW_ARTICLE_TEXT
 
 Dans le coin supérieur gauche se trouve le Bouton Tour, indiquant "Tour n" (n étant le numéro du tour en cours); un clic-gauche sur le Bouton Tour permet de faire avancer la partie d'un tour. Immédiatement à droite se trouve le bouton d'Avance Automatique; lorsque ce dernier affiche une icône double flèche, la partie n'avancera pas automatiquement; un clic modifie l'icône en flèches circulaires et la partie avancera automatiquement au tour suivant une fois que tous les empires auront donné leurs ordres pour le tour en cours.
 
-Les icônes suivantes désignent pour l'empire du joueur le total de l'[[metertype METER_INDUSTRY]], de la [[metertype METER_RESEARCH]], le nombre d'astronefs existants, et la [[encyclopedia DETECTION_TITLE]] de l'empire.
+Les icônes suivantes désignent pour l'empire du joueur le total de l'[[metertype METER_INDUSTRY]], de la [[metertype METER_STOCKPILE]], de la [[metertype METER_RESEARCH]], le nombre d'astronefs existants, et la [[encyclopedia DETECTION_TITLE]] de l'empire.
 
 Sur le côté droit de la barre de contrôle se trouvent les icônes permettant d'afficher/cacher les autres fenêtres importantes de l'interface. Des infobulles sont disponibles pour ces dernières.'''
 
@@ -6422,7 +6508,7 @@ Réparation en Cale Sèche
 ORBITAL_DRYDOCK_REPAIR_TEXT
 '''La [[buildingtype BLD_SHIPYARD_ORBITAL_DRYDOCK]] est considérée comme la meilleure structure de réparation, capable de remettre à neuf tout astronef endommagé.
 
-Lorsque que l'indicateur [[metertype METER_HAPPINESS]] d'une planète est inférieur à 15, les réparations effectuées via une Cale Sèche Orbitale seront moins efficaces. Si l'indicateur Bonheur chute au-dessous de 5, aucune réparation ne pourra y être entreprise pour le tour en cours.
+Lorsque que l'indicateur [[metertype METER_HAPPINESS]] d'une planète est inférieur à 15, les réparations effectuées via une Cale Sèche Orbitale seront moins efficaces. Si l'indicateur Stabilité chute au-dessous de 5, aucune réparation ne pourra y être entreprise pour le tour en cours.
 
 Les réparations sont différées d'un tour pour les astronefs pénétrant tout juste dans un système. En effet, la manœuvre d'accostage d'un astronef ainsi que la préparation des outils et pièces nécessaires à la réparation nécessitent un certain temps.
 
@@ -6615,11 +6701,11 @@ Type de Structure
 FOCUS  # translated
 Focus
 
-PREFERRED_FOCUS
-Focus favori
+DEFAULT_FOCUS
+Focus par défaut
 
 AVAILABLE_FOCI
-Foci disponibles
+Focus disponibles
 
 PARTS
 Équipements
@@ -6695,6 +6781,9 @@ Dern. Tour Bataille
 
 LAST_TURN_RESUPPLIED
 Dern. Tour Approvisionnement
+
+LAST_TURN_MOVE_ORDERED
+Dern. Tour Ordre Déplacement
 
 LAST_TURN_COLONIZED
 Dern. Tour Colonisation
@@ -7155,7 +7244,7 @@ SITREP_FOREIGN_FLEET_ARRIVED_AT_DESTINATION_LABEL
 Flotte étrangère arrivée à destination
 
 SITREP_POP_THRESHOLD
-Sur %planet% : la colonie a atteint la taille et le [[metertype METER_HAPPINESS]] prérequis pour entreprendre la colonisation d'autres planètes. L'[[metertype METER_INDUSTRY]] et la [[metertype METER_RESEARCH]] peuvent commencer à croître.
+Sur %planet% : la colonie a atteint la taille et la [[metertype METER_HAPPINESS]] prérequise pour entreprendre la colonisation d'autres planètes. L'[[metertype METER_INDUSTRY]] et la [[metertype METER_RESEARCH]] peuvent commencer à croître.
 
 SITREP_POP_THRESHOLD_LABEL
 Seuil de Colonisation
@@ -7627,7 +7716,7 @@ BEGINNER_HINT_14
 14: Recherchez les technologies améliorant l'[[metertype METER_SUPPLY]], telle la [[tech CON_ORBITAL_CON]], afin d'accroître la distance que vos lignes d'approvisonnement peuvent atteindre à partir de vos systèmes.
 
 BEGINNER_HINT_15
-15: La plupart des espèces se retrouvent avec un indicateur [[metertype METER_HAPPINESS]] de 0 lorsque vous capturez leur planète, puis ce dernier augmente normalement de 1 à chaque tour. Faites cependant attention aux espèces [[encyclopedia XENOPHOBIC_SPECIES_TITLE]]s! Elles n'apprécient guère la proximité d'autres espèces et cela aura un effet négatif sur le Bonheur ainsi que d'autres indicateurs, à la fois pour l'espèce xénophobe et les autres espèces à proximité.
+15: La plupart des espèces se retrouvent avec un indicateur [[metertype METER_HAPPINESS]] de 0 lorsque leur planète est capturée, puis ce dernier augmente normalement de 1 à chaque tour. Faites cependant attention aux espèces [[encyclopedia XENOPHOBIC_SPECIES_TITLE]]s! Elles n'apprécient guère la proximité d'autres espèces et cela aura un effet négatif sur la Stabilité ainsi que d'autres indicateurs, à la fois pour l'espèce xénophobe et les autres espèces à proximité.
 
 BEGINNER_HINT_16
 16: Il est plus judicieux de ne pas développer la technologie [[tech LRN_PSIONICS]] tant que votre empire n'abrite pas une espèce maîtrisant la [[encyclopedia TELEPATHIC_TITLE]].
@@ -7683,7 +7772,7 @@ ENVIRONMENTAL_PREFERENCES
 Adaptabilité [[encyclopedia ENVIRONMENT_TITLE]] Planète :
 
 FOCUS_PREFERENCE
-'''[[encyclopedia FOCUS_TITLE]] favori : '''
+'''[[encyclopedia FOCUS_TITLE]] par défaut : '''
 
 OPINIONS_OF_EMPIRES
 Opinions des Empires :
@@ -9202,13 +9291,19 @@ Type de Focus invalide
 FOCUS_GROWTH
 Croissance
 
+FOCUS_GROWTH_DESC
+Exporte les ressources de croissance de cette planète
+
 # Focus types
 FOCUS_INDUSTRY
 Industrie
 
+FOCUS_INDUSTRY_DESC
+Genère plus de capacité industrielle
+
 # Focus types
 FOCUS_STOCKPILE
-Stock
+Distribution Stock
 
 FOCUS_STOCKPILE_DESC
 Permet aux technologies de stockage d'augmenter la capacité d'usage du stock
@@ -9217,17 +9312,29 @@ Permet aux technologies de stockage d'augmenter la capacité d'usage du stock
 FOCUS_RESEARCH
 Recherche
 
+FOCUS_RESEARCH_DESC
+Genère plus de capacité de recherche
+
 # Focus types
 FOCUS_INFLUENCE  # translated
 Influence
+
+FOCUS_INFLUENCE_DESC
+Genère plus d'influence
 
 # Focus types
 FOCUS_LOGISTICS
 Logistique
 
+FOCUS_LOGISTICS_DESC
+Étend les lignes d'approvisionnement
+
 # Focus types
 FOCUS_STEALTH
 Furtivité
+
+FOCUS_STEALTH_DESC
+Augmente la furtivité planétaire
 
 # Focus types
 FOCUS_BIOTERROR
@@ -9291,7 +9398,7 @@ Projection Infrastructure
 
 # Meter types
 METER_TARGET_HAPPINESS
-Projection Bonheur
+Projection Stabilité
 
 # Meter types
 METER_MAX_CAPACITY
@@ -9323,7 +9430,7 @@ Max Approvisionnement
 
 # Meter types
 METER_MAX_STOCKPILE
-Max Stock
+Max Distribution Stock
 
 # Meter types
 METER_MAX_TROOPS
@@ -9351,7 +9458,7 @@ Infrastructure
 
 # Meter types
 METER_HAPPINESS
-Bonheur
+Stabilité
 
 # Meter types
 METER_CAPACITY
@@ -9383,7 +9490,7 @@ Approvisionnement
 
 # Meter types
 METER_STOCKPILE
-Stock
+Distribution Stock
 
 # Meter types
 METER_TROOPS
@@ -10071,20 +10178,56 @@ technologie prioritaire
 DESC_VAR_LASTTURNBATTLEHERE
 dernier tour où une bataille s'est déroulée ici
 
-DESC_COMPLEX
-Variable Complexe
-
 DESC_VAR_JUMPSBETWEEN
 voies spatiales entre les systèmes contenant les objets avec les ids %1% et %2%
 
-DESC_STATISTIC
+DESC_VAR_STATISTIC
 Statistique
+
+DESC_VAR_IF
+0, ou 1 s'il existe tout objet%2%
 
 DESC_VAR_COUNT
 le nombre d'objets%2%
 
-DESC_VAR_IF
-0, ou 1 s'il existe tout objet%2%
+DESC_VAR_UNIQUE_COUNT
+le nombre d'unique
+
+DESC_VAR_HISTO_MAX
+le nombre des plus communs%1% des objets%2%
+
+DESC_VAR_HISTO_MIN
+le nombre des moins communs%1% des objets%2%
+
+DESC_VAR_HISTO_SPREAD
+la différence entre les nombres des plus communs%1% des objets%2%
+
+DESC_VAR_SUM
+la somme%1% des objets%2%
+
+DESC_VAR_MEAN
+la moyenne%1% des objets%2%
+
+DESC_VAR_RMS
+la racine carrée moyenne%1% des objets%2%
+
+DESC_VAR_MODE
+le mode%1% des objets%2%
+
+DESC_VAR_MAX
+le max%1% des objets%2%
+
+DESC_VAR_MIN
+le minimum%1% des objets%2%
+
+DESC_VAR_SPREAD
+la dispersion de%1% des objets%2%
+
+DESC_VAR_STDEV
+l'écart-type de%1% des objets%2%
+
+DESC_VAR_PRODUCT
+le produit de%1% des objets%2%
 
 # FOCS variable reference description text.
 # %1% reference type of the FOCS variable.
@@ -10987,7 +11130,7 @@ PLC_CENTRALIZATION
 Centralisation
 
 PLC_CENTRALIZATION_DESC
-Augmente la production de ressources dans la Capitale mais diminue la portée de l'Approvisionnement et l'usage du Stock.
+Augmente la production de ressources dans la Capitale mais diminue la portée de l'Approvisionnement et la Distribution du Stock.
 
 PLC_CENTRALIZATION_SHORT_DESC
 Favorise la Capitale
@@ -10996,7 +11139,7 @@ PLC_COLONIZATION
 Colonisation
 
 PLC_COLONIZATION_DESC
-Diminue le coût des équipements de colonisation pour astronefs.
+Diminue le coût des équipements de colonisation pour astronefs et augmente de 1 la capacité de base en Carburant des astronefs avec équipements de colonisation mais sans Armement, Infanterie, Bombardement, ou Équipements Généraux.
 
 PLC_COLONIZATION_SHORT_DESC
 Remise de prix sur la colonisation
@@ -11014,7 +11157,7 @@ PLC_EXPLORATION  # translated
 Exploration
 
 PLC_EXPLORATION_DESC
-'''Améliore la Vitesse pour les astronefs non-armés et sans Chasseur, Bouclier, Blindage, Infanterie, Module de Colonisation, Bombardement, Recherche, Industrie, Influence, Production, et autres équipements généraux.
+'''Améliore la Vitesse pour les astronefs non-armés et sans Chasseur, Bouclier, Blindage, Infanterie, Module de Colonisation, Bombardement, Recherche, Industrie, Influence, Production, ou Équipements Généraux.
 
 Les équipements de Détection, Carburant, et Motorisation sont autorisés.'''
 
@@ -11053,10 +11196,10 @@ PLC_STOCKPILE_LIQUIDATION
 Liquidation des Stocks
 
 PLC_STOCKPILE_LIQUIDATION_DESC
-Double l'usage du Stock sur les planètes en Focus Stock.
+Double la contribution des planètes en [[encyclopedia STOCKPILE_FOCUS_TITLE]] pour la limite d'usage du [[encyclopedia STOCKPILE_TITLE]].
 
 PLC_STOCKPILE_LIQUIDATION_SHORT_DESC
-Augmente l'usage du Stock
+Augmente la limite d'usage du Stock
 
 PLC_ALLIED_REPAIR
 Réparation Alliée
@@ -11066,6 +11209,133 @@ Si deux empires sont alliés, et que l'un ou l'autre applique cette stratégie, 
 
 PLC_ALLIED_REPAIR_SHORT_DESC
 Permet aux alliés la réparation mutuelle des astronefs
+
+PLC_BALANCE
+Équilibre
+
+PLC_BALANCE_DESC
+'''Accorde un bonus d'Influence et de Stabilité à la Capitale impériale selon l'uniformité du nombre de planètes de l'empire utilisant différents réglages de focus. Pour chaque focus utilisé dans l'empire, le nombre de planètes les utilisant est compté. Si la différence est faible entre le nombre de planètes utilisant le focus le plus populaire et le nombre de celles utilisant le focus le moins populaire, les bonus pour la Capitale sont plus importants. Les bonus sont également plus élevés lorsque plusieurs focus différents sont utilisés.
+
+Les Avant-Postes sans focus défini comptent également comme un focus, ce dernier pouvant alors représenter le réglage de focus le plus populaire, rendant par conséquent difficile l'obtention de bonus élevés.
+
+Par exemple, 6 avant-postes sans focus, 3 planètes en focus Industrie, et 2 planètes en focus Recherche: 3 différents réglages de focus sont utilisés et une différence de 6 - 2 = 4 entre le nombre de fois que sont utilisés les focus les plus et les moins populaires. Utiliser davantage de focus différents ou réduire la différence entre les réglages de focus les plus et les moins populaires, octroiraient des bonus plus importants.'''
+
+PLC_BALANCE_SHORT_DESC
+Augmente l'Influence et la Stabilité lorsque davantage de focus différents sont utilisés
+
+PLC_ENVIRONMENTALISM
+Environnementalisme
+
+PLC_ENVIRONMENTALISM_DESC
+'''Diminue l'Industrie et l'Infrastructure de toutes les planètes de l'empire. Pénalise l'Infrastructure, la Stabilité, et l'Influence sur les planètes terraformées.
+
+Augmente la Recherche, la Stabilité, l'Influence, et la Furtivité sur les planètes non-terraformées et habitées.
+
+Rend la Terraformation plus coûteuse.'''
+
+PLC_ENVIRONMENTALISM_SHORT_DESC
+Bonus pour ne pas terraformer
+
+PLC_TERRAFORMING
+Terraformation
+
+PLC_TERRAFORMING_DESC
+Diminue le temps minimum nécessaire pour mener à bien les projets [[buildingtype BLD_TERRAFORM]] et [[buildingtype BLD_TERRAFORM_REVERT]] sur une planète.
+
+PLC_TERRAFORMING_SHORT_DESC
+Accélère la terraformation
+
+PLC_INDUSTRIALISM
+Industrialisme
+
+PLC_INDUSTRIALISM_DESC
+'''Augmente la capacité d'Industrie des planètes de 25% et rend les planètes en Focus Industrie plus stables.
+
+Diminue le coût de recherche de certaines technologies de Génération améliorant la production.'''
+
+PLC_INDUSTRIALISM_SHORT_DESC
+Améliore la capacité industrielle
+
+PLC_CHECKPOINTS
+Postes-Frontières
+
+PLC_CHECKPOINTS_DESC
+'''Augmente de 20 la Capacité de Détection de l'empire (progressivement).
+
+Réduit la portée de l'Approvisionnement impérial et la génération d'Influence.'''
+
+PLC_CHECKPOINTS_SHORT_DESC
+Améliore la Détection / Entrave l'Approvisionnement
+
+PLC_DIVERSITY
+Diversité
+
+PLC_DIVERSITY_DESC
+'''Accorde des bonus ou des pénalités à la Recherche, la Stabilité, et à l'Influence de la Capitale, selon le nombre d'espèces au sein de l'empire.
+
+La valeur des bonus ou des pénalités est d'autant plus importante que le nombre d'espèces présentes est supérieur ou inférieur à 4.'''
+
+PLC_DIVERSITY_SHORT_DESC
+Améliore la Recherche, la Stabilité, et l'Influence
+
+PLC_RESERVE_TANKS
+Carburant en réserve
+
+PLC_RESERVE_TANKS_DESC
+Ajoute +1 en capacité de Carburant à tous les astronefs, mais divise par deux leur vitesse lorsque les astronefs disposent de moins de la moitié de leur capacité maximum en Carburant.
+
+PLC_RESERVE_TANKS_SHORT_DESC
+Améliore l'économie en Carburant des astronefs
+
+PLC_ENGINEERING
+Corps d'Ingénieurs
+
+PLC_ENGINEERING_DESC
+Réduit de moitié les coûts "d'entretien" des astronefs, de manière à ce que le coût induit par la production d'astronefs supplémentaires n'augmente pas aussi rapidement en fonction de la taille de la flotte, mais cela au prix de 0.1 PI par tour et par astronefs.
+
+PLC_ENGINEERING_SHORT_DESC
+Réduit le coût d'Entretien des Flottes / Consomme de l'Influence
+
+PLC_EXOBOT_PRODUCTIVITY
+Productivité Exobot
+
+PLC_EXOBOT_PRODUCTIVITY_DESC
+Augmente l'efficacité de Production des Exobots sur les planètes en Focus Industrie de "Très Mauvais" à seulement "Mauvais".
+
+PLC_EXOBOT_PRODUCTIVITY_SHORT_DESC
+Accroît la Production des Exobots
+
+PLC_CONFEDERATION
+Confédération
+
+PLC_CONFEDERATION_DESC
+Les planètes sont organisées en un système indépendant confédéré, et ne pâtissent pas d'une Influence réduite si non-connectées à la Capitale, mais sont légèrement moins stables en général. L'Infanterie de ces planètes est également légèrement renforcée.
+
+PLC_CONFEDERATION_SHORT_DESC
+Soutient les systèmes déconnectés
+
+PLC_RACIAL_PURITY
+Pureté Raciale
+
+PLC_RACIAL_PURITY_DESC
+'''Les planètes abritant des espèces différentes de celle dirigeant la Capitale sont soumises à diverses pénalités.
+
+Les planètes peuplées par d'autres espèces subissent des pénalités.
+
+Permet la construction de [[buildingtype BLD_CONC_CAMP]].'''
+
+PLC_RACIAL_PURITY_SHORT_DESC
+Favorise l'espèce de la Capitale
+
+PLC_DIVINE_AUTHORITY
+Autorité Divine
+
+PLC_DIVINE_AUTHORITY_DESC
+'''
+'''
+
+PLC_DIVINE_AUTHORITY_SHORT_DESC
+Augmente la Stabilité et l'Influence, mais entrave la Recherche
 
 
 ##
@@ -11391,7 +11661,7 @@ GRO_LIFECYCLE_MAN
 Manipulation du Cycle de Vie
 
 GRO_LIFECYCLE_MAN_DESC
-'''En plus du nouvel équipement d'astronef disponible, cette technologie augmente à 3 la [[metertype METER_POPULATION]] des nouvelles colonies fondées à l'aide des <encyclopedia ENC_BUILDING_TYPE>structures</encyclopedia> de colonisation.
+'''Cette technologie augmente à 3 la [[metertype METER_POPULATION]] des nouvelles colonies fondées à l'aide des <encyclopedia ENC_BUILDING_TYPE>structures</encyclopedia> de colonisation.
 
 Grâce aux manipulations chimiques et cryogéniques, les processus vitaux peuvent être interrompus de façon provisoire. Dans cet état, les organismes sont conservés indéfiniment, ne consomment aucune ressource et ne nécessitent qu'un très petit (non-vital) espace de stockage. À l'aide de cette technique, les colons peuvent voyager d'une manière bien plus efficace, tandis que sont grandement accrus le nombre initial de colons au sein d'une nouvelle colonie ainsi que la capacité d'accueil des astronefs de colonisation.
 
@@ -11479,10 +11749,10 @@ PRO_PREDICTIVE_STOCKPILING_DESC
 Le service de Stock Impérial dispose d'une flotte acheminant les matériaux bruts vers des lieux où l'on prévoit que d'importants projets puissent être entrepris.
 Cette tâche s'avère difficile étant donné que le service doit présager du moment où la demande sera stipulée, de l'endroit, des matériaux et biens qui seront requis, et de leurs utilisateurs.
 
-Les PP inutilisés sont transférés automatiquement au Stock Impérial de Production.
+Les Points de Production (PP) inutilisés sont transférés automatiquement vers le [[encyclopedia STOCKPILE_TITLE]].
 Un projet de la file d'attente de Production puise automatiquement dans le Stock Impérial si son usage n'a pas été explicitement bloqué pour le projet en question.
 
-Il s'agit donc de la technologie de base du Stock Impérial, augmentant de 1 le [[metertype METER_STOCKPILE]] des planètes réglées sur le [[encyclopedia STOCKPILE_FOCUS_TITLE]].'''
+Il s'agit donc de la technologie de base du Stock Impérial, augmentant de 1 la [[metertype METER_STOCKPILE]] des planètes réglées sur le [[encyclopedia STOCKPILE_FOCUS_TITLE]].'''
 
 PRO_GENERIC_SUPPLIES
 Stocks Génériques
@@ -11495,7 +11765,7 @@ En atteignant ce degré de sophistication, les Stocks Génériques peuvent être
 
 Cela exempte le service du Stock Impérial de connaître à l'avance quels biens seront exactement demandés. Prévoir le lieu de la demande et les quantités s'avère désormais suffisant.
 
-Il s'agit donc d'une technologie d'amélioration du Stock Impérial. Le [[metertype METER_STOCKPILE]] augmente de 2, plus un supplément de 0.01 par [[metertype METER_POPULATION]], plus un supplément de 3 pour chaque planète réglée sur le [[encyclopedia STOCKPILE_FOCUS_TITLE]].
+Il s'agit donc d'une technologie d'amélioration du [[encyclopedia STOCKPILE_TITLE]]. Le [[metertype METER_STOCKPILE]] augmente de 2, plus un supplément de 0.01 par [[metertype METER_POPULATION]], plus un supplément de 3 pour chaque planète réglée sur le [[encyclopedia STOCKPILE_FOCUS_TITLE]].
 Ces améliorations sont cumulables avec le bonus de la technologie [[tech PRO_PREDICTIVE_STOCKPILING]].'''
 
 PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY
@@ -11505,10 +11775,10 @@ PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY_DESC
 '''L'intrication quantique des salles de contrôle permet de manœuvrer des machines industrielles à distance à partir d'autres systèmes stellaires.
 Dissocier le personnel et les moyens de production favorise un procédé optimal de conception et augmente l'efficience du service de Stock Impérial.
 
-Il s'agit donc d'une technologie d'amélioration du Stock Impérial. Le [[metertype METER_STOCKPILE]] augmente de 6, plus un supplément de 0.02 par [[metertype METER_POPULATION]].
+Il s'agit donc d'une technologie d'amélioration du [[encyclopedia STOCKPILE_TITLE]]. La [[metertype METER_STOCKPILE]] augmente de 6, plus un supplément de 0.02 par [[metertype METER_POPULATION]].
 Ces améliorations sont cumulables avec les bonus des technologies [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] et [[tech PRO_VOID_PREDICTION]].
 
-Débloque également la structure [[buildingtype BLD_STOCKPILING_CENTER]], augmentant additionnellement le [[metertype METER_STOCKPILE]] de 0.1 par [[metertype METER_INDUSTRY]].'''
+Débloque également la structure [[buildingtype BLD_STOCKPILING_CENTER]], augmentant additionnellement la [[metertype METER_STOCKPILE]] de 0.1 par [[metertype METER_INDUSTRY]].'''
 
 PRO_VOID_PREDICTION
 Prédiction du Vide
@@ -11517,7 +11787,7 @@ PRO_VOID_PREDICTION_DESC
 '''Tandis que les prédictions classiques se basent invariablement sur la connaissance statistique des faits passés, l'étude de la mémoire chaotique du Vide mène à de solides prédictions de faits pourtant initiaux ou étranges.
 Pour le service du Stock Impérial, la Prédiction du Vide est l'instrument par excellence permettant de fournir les bons matériaux avant même que le besoin ne se manifeste.
 
-Il s'agit donc d'une technologie d'amélioration du Stock Impérial. Le [[metertype METER_STOCKPILE]] augmente de 0.2 par [[metertype METER_POPULATION]].
+Il s'agit donc d'une technologie d'amélioration du [[encyclopedia STOCKPILE_TITLE]]. La [[metertype METER_STOCKPILE]] augmente de 0.2 par [[metertype METER_POPULATION]].
 Ces améliorations sont cumulables avec les bonus des technologies [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] et [[tech PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY]].'''
 
 PRO_MICROGRAV_MAN
@@ -11661,7 +11931,7 @@ CON_FRC_ENRG_STRC
 Structures Synergiques
 
 CON_FRC_ENRG_STRC_DESC
-'''Accroît la progression des indicateurs de ressources et d'infrastructure inférieurs à la valeur projetée de 3 par tour, et la diminution des indicateurs de ressources supérieurs à la valeur projetée de 5 par tour. L'[[metertype METER_INDUSTRY]] et la [[metertype METER_RESEARCH]] n'augmentent que si le [[metertype METER_HAPPINESS]] est au moins égal à 5.
+'''Accroît la progression des indicateurs de ressources et d'infrastructure inférieurs à la valeur projetée de 3 par tour, et la diminution des indicateurs de ressources supérieurs à la valeur projetée de 5 par tour. L'[[metertype METER_INDUSTRY]] et la [[metertype METER_RESEARCH]] n'augmentent que si la [[metertype METER_HAPPINESS]] est au moins égale à 5.
 
 La flexibilité et la versatilité des structures synergiques permettent de redéfinir plus facilement le rôle des infrastructures des colonies en vue de nouvelles applications, augmentant ainsi la rapidité et le taux d'une modification de Focus.
 
@@ -12165,6 +12435,7 @@ Domination Psychique
 
 LRN_PSY_DOM_DESC
 '''A 10% de chance de prendre le contrôle des astronefs ennemis avec équipages non-télépathiques, et se trouvant dans le même système qu'une planète en Focus Domination, à moins que l'empire ennemi ne maîtrise également la [[tech LRN_PSY_DOM]]. Le Focus Domination ne peut être activé que sur une planète colonisée par une espèce télépathique.
+
 Réduit la probabilité de prise de contrôle d'un astronef par un [[predefinedshipdesign SM_PSIONIC_SNOWFLAKE]].
 
 Il est difficile de soumettre un individu conscient à un contrôle mental total par une entité étrangère, et ce contre son gré. En manipulant cependant les durées de soumission, la force mentale accumulée par une population sur plusieurs heures peut être canalisée sur un unique individu durant quelques secondes, engendrant ainsi une compulsion quasi-irrésistible de se joindre à l'esprit unifié.'''
@@ -13149,18 +13420,18 @@ BLD_INTERSPECIES_ACADEMY
 Académie InterDesign d'Espèce
 
 BLD_INTERSPECIES_ACADEMY_DESC
-'''Augmente le Stock de 10 sur la planète, si cette dernière est réglée sur le Focus Stock.
+'''Augmente la limite d'usage du Stock Impérial conjointement à l'augmentation de la capacité d'usage du Stock de 10 sur la planète, si cette dernière est réglée sur le [[encyclopedia STOCKPILE_FOCUS_TITLE]].
 Augmente la [[metertype METER_RESEARCH]] de 5 sur la planète, si cette dernière est réglée sur le Focus Recherche.
 
 Apprendre à concevoir des dispositifs utilisables par différentes espèces est crucial afin de développer des outils universellement exploitables.
 
-Chaque empire peut abriter une académie sur une à six planètes peuplées par différentes espèces. Pour accueillir une académie, le [[metertype METER_HAPPINESS]] de la [[metertype METER_POPULATION]] sur la planète doit être élevé et cette dernière doit se trouver à plus de trois Voies spatiales de l'académie existante la plus proche.'''
+Chaque empire peut abriter une académie sur une à six planètes peuplées par différentes espèces. Pour accueillir une académie, la [[metertype METER_HAPPINESS]] de la [[metertype METER_POPULATION]] sur la planète doit être élevée et cette dernière doit se trouver à plus de trois Voies spatiales de l'académie existante la plus proche.'''
 
 BLD_STOCKPILING_CENTER
 Centre d'Intrication Impériale
 
 BLD_STOCKPILING_CENTER_DESC
-'''Augmente le [[metertype METER_STOCKPILE]] de 0.1 par [[metertype METER_INDUSTRY]].
+'''Augmente la [[metertype METER_STOCKPILE]] de 0.1 par [[metertype METER_INDUSTRY]].
 
 Au lieu de recourir à l'implantation classique d'infastructures associant le lieu de production et la main d'œuvre planétaire, un noyau central peut permettre la connexion entre n'importe quelle infrastructure et main d'œuvre disponible. Cela engendre une très grande flexibilité des lieux de production.'''
 
@@ -13812,7 +14083,7 @@ SR_WEAPON_1_1_DESC
 
 Améliorer la technologie de cet armement augmentera la valeur des dommages par tir.
 
-Les [[encyclopedia DAMAGE_TITLE]] de cet armement combinent la valeur des dommages par tir et celle de tout modificateur actif. Chaque Canon Mitrailleur monté sur un astronef construit par une espèce présentant l'attribut "Pilotes", infligera des dommages additionnels de 1 par rang de Pilotes (-1 pour "Mauvais Pilotes").'''
+Les [[encyclopedia DAMAGE_TITLE]] de cet armement combinent la valeur des dommages par tir et celle de tout modificateur actif. Chaque Canon Mitrailleur monté sur un astronef construit par une espèce présentant l'attribut "Pilotes", infligera des dommages additionnels de 6 par rang de Pilotes (-6 pour "Mauvais Pilotes").'''
 
 SR_WEAPON_2_1
 Canon Laser
@@ -13822,7 +14093,7 @@ SR_WEAPON_2_1_DESC
 
 Améliorer la technologie de cet armement augmentera la valeur des dommages par tir.
 
-Les [[encyclopedia DAMAGE_TITLE]] de cet armement combinent la valeur des dommages par tir et celle de tout modificateur actif. Chaque Canon Laser monté sur un astronef construit par une espèce présentant l'attribut "Pilotes", infligera des dommages additionnels de 2 par rang de Pilotes (-2 pour "Mauvais Pilotes"). Les dommages du Canon Laser peuvent également être améliorés sur les astronefs dotés d'une [[shiphull SH_ORGANIC]] couplée à un [[shippart SP_SOLAR_CONCENTRATOR]].'''
+Les [[encyclopedia DAMAGE_TITLE]] de cet armement combinent la valeur des dommages par tir et celle de tout modificateur actif. Chaque Canon Laser monté sur un astronef construit par une espèce présentant l'attribut "Pilotes", infligera des dommages additionnels de 12 par rang de Pilotes (-12 pour "Mauvais Pilotes"). Les dommages du Canon Laser peuvent également être améliorés sur les astronefs dotés d'une [[shiphull SH_ORGANIC]] couplée à un [[shippart SP_SOLAR_CONCENTRATOR]].'''
 
 SR_WEAPON_3_1
 Canon Plasma
@@ -13832,7 +14103,7 @@ SR_WEAPON_3_1_DESC
 
 Améliorer la technologie de cet armement augmentera la valeur des dommages par tir.
 
-Les [[encyclopedia DAMAGE_TITLE]] de cet armement combinent la valeur des dommages par tir et celle de tout modificateur actif. Chaque Canon Plasma monté sur un astronef construit par une espèce présentant l'attribut "Pilotes", infligera des dommages additionnels de 3 par rang de Pilotes (-3 pour "Mauvais Pilotes").'''
+Les [[encyclopedia DAMAGE_TITLE]] de cet armement combinent la valeur des dommages par tir et celle de tout modificateur actif. Chaque Canon Plasma monté sur un astronef construit par une espèce présentant l'attribut "Pilotes", infligera des dommages additionnels de 18 par rang de Pilotes (-18 pour "Mauvais Pilotes").'''
 
 SR_WEAPON_4_1
 Rayon Gamma
@@ -13842,7 +14113,7 @@ SR_WEAPON_4_1_DESC
 
 Améliorer la technologie de cet armement augmentera la valeur des dommages par tir.
 
-Les [[encyclopedia DAMAGE_TITLE]] de cet armement combinent la valeur des dommages par tir et celle de tout modificateur actif. Chaque Rayon Gamma monté sur un astronef construit par une espèce présentant l'attribut "Pilotes", infligera des dommages additionnels de 5 par rang de Pilotes (-5 pour "Mauvais Pilotes").'''
+Les [[encyclopedia DAMAGE_TITLE]] de cet armement combinent la valeur des dommages par tir et celle de tout modificateur actif. Chaque Rayon Gamma monté sur un astronef construit par une espèce présentant l'attribut "Pilotes", infligera des dommages additionnels de 30 par rang de Pilotes (-30 pour "Mauvais Pilotes").'''
 
 SR_ARC_DISRUPTOR
 Perturbateur Électro-Conducteur
@@ -14667,7 +14938,7 @@ Sa [[metertype METER_STEALTH]] est très élevée de même que son [[metertype M
 
 Bon potentiel comme astronef rapide et puissant pour le piratage commercial, l'attaque furtive ou la reconnaissance.
 
-Cette coque vivante régénère rapidement sa [[metertype METER_STRUCTURE]] lorsqu'elle n'est pas engagée dans un combat, regagnant sa valeur actuelle de Résistance à chaque tour, tant qu'elle ne participe pas à une bataille ou un blocus. Cela signifie que si l'astronef dispose encore au moins de la moitié de sa Résistance, il sera complètement réparé en un tour. D'autre part, cette coque régénère son [[metertype METER_FUEL]] de 0.2 par tour.
+Cette coque vivante régénère rapidement sa [[metertype METER_STRUCTURE]], regagnant sa valeur actuelle de Résistance à chaque tour (même lorsqu'elle est engagée dans un combat). Cela signifie que si l'astronef dispose encore au moins de la moitié de sa Résistance, il sera complètement réparé au tour suivant. D'autre part, cette coque régénère son [[metertype METER_FUEL]] de 0.2 par tour.
 
 [[BLD_SHIPYARD_BASE_ORG_ORB_INC_ORG_CELL_GRO_CHAMB_REQUIRED]]
 '''
@@ -15119,7 +15390,7 @@ COLONY_SHIP_PARTS_MIN_POP
 Toutes les classes d'astronefs colonisateurs requièrent de leur planète d'origine une [[metertype METER_POPULATION]] supérieure ou égale à 3.
 
 COLONY_SHIP_PARTS_UPKEEP_COST
-Le coût de cet équipement augmente à mesure que l'empire s'étend en raison des coûts de gestion plus élevés d'un vaste empire.
+Le coût de cet équipement augmente à mesure que l'empire s'étend en raison des coûts d'entretien plus élevés pour un vaste empire.
 
 TROOP_POD_OPERATION_TEXT
 '''  * Les troupes d'infanterie ne peuvent être utilisées que pour une seule invasion.
@@ -15244,6 +15515,27 @@ GREAT_RESEARCH_DESC
 ULTIMATE_RESEARCH_DESC
 +++	Parfait en [[metertype METER_RESEARCH]] : 300%
 
+NO_INFLUENCE_DESC
+−−−	Pas d'[[metertype METER_INFLUENCE]]
+
+VERY_BAD_INFLUENCE_DESC
+−−	Très Mauvais en [[metertype METER_INFLUENCE]]: 50%
+
+BAD_INFLUENCE_DESC
+−	Mauvais en [[metertype METER_INFLUENCE]]: 75%
+
+AVERAGE_INFLUENCE_DESC
+'''	Normal en [[metertype METER_INFLUENCE]]: 100%'''
+
+GOOD_INFLUENCE_DESC
++	Bon en [[metertype METER_INFLUENCE]]: 150%
+
+GREAT_INFLUENCE_DESC
+++	Excellent en [[metertype METER_INFLUENCE]]: 200%
+
+ULTIMATE_INFLUENCE_DESC
++++	Parfait en [[metertype METER_INFLUENCE]]: 300%
+
 NO_DEFENSE_TROOPS_DESC
 −−−	Pas d'[[metertype METER_TROOPS]] défensive
 
@@ -15354,7 +15646,7 @@ ULTIMATE_SUPPLY_DESC
 ++	Parfait en [[metertype METER_SUPPLY]] : +3
 
 NO_STOCKPILE_DESC
-−−	Aucun [[metertype METER_STOCKPILE]]
+−−	Aucune [[metertype METER_STOCKPILE]]
 
 BAD_STOCKPILE_DESC
 −	Mauvais en [[metertype METER_STOCKPILE]] : +0.01 par [[metertype METER_POPULATION]]
@@ -15443,6 +15735,45 @@ LIVING_HULL_BASE_FUEL_REGEN_DESC
 ##
 ## Accounting labels
 ##
+
+COLONY_ADMIN_COSTS_LABEL
+Frais d'Administration Coloniale
+
+SPECIES_HOMEWORLD_INDEPENDENCE_DESIRE_LABEL
+Mouvement Indépendantiste Planète Natale
+
+CAPITAL_DISCONNECTION_LABEL
+Non connecté à la Capitale d'Empire
+
+# %1% name of empire
+# %2% name of policy
+LIKES_POLICY_LABEL
+Aime la Stratégie %2% de %1%
+
+# %1% name of empire
+# %2% name of policy
+DISLIKES_POLICY_LABEL
+N'aime pas la Stratégie %2% de %1%
+
+# %1% name of planet
+# %2% name of building
+LIKES_BUILDING_LABEL
+Aime la structure %2% sur %1%
+
+# %1% name of planet
+# %2% name of building
+DISLIKES_BUILDING_LABEL
+N'aime pas la structure %2% sur %1%
+
+# %1% name of planet
+# %2% name of species on planet
+LIKES_FOCUS_LABEL
+Aime le Focus sur %1%
+
+# %1% name of planet
+# %2% name of species on planet
+DISLIKES_FOCUS_LABEL
+N'aime pas le Focus sur %1%
 
 # %1% FIXME
 STANDARD_CONSTRUCTION_LABEL
@@ -15565,6 +15896,36 @@ ULTIMATE_RESEARCH_LABEL
 
 # %1% FIXME
 # %2% FIXME
+FOCUS_INFLUENCE_LABEL
+%2% Focus Influence
+
+# %1% FIXME
+# %2% FIXME
+VERY_BAD_INFLUENCE_LABEL
+%2% Très Mauvais en Influence
+
+# %1% FIXME
+# %2% FIXME
+BAD_INFLUENCE_LABEL
+%2% Mauvais en Influence
+
+# %1% FIXME
+# %2% FIXME
+GOOD_INFLUENCE_LABEL
+%2% Bon en Influence
+
+# %1% FIXME
+# %2% FIXME
+GREAT_INFLUENCE_LABEL
+%2% Excellent en Influence
+
+# %1% FIXME
+# %2% FIXME
+ULTIMATE_INFLUENCE_LABEL
+%2% Parfait en Influence
+
+# %1% FIXME
+# %2% FIXME
 VERY_BAD_SUPPLY_LABEL
 %2% Très Mauvais en Approvisionnement
 
@@ -15591,27 +15952,27 @@ ULTIMATE_SUPPLY_LABEL
 # %1% FIXME
 # %2% FIXME
 BAD_STOCKPILE_LABEL
-%2% Mauvais en Stock
+%2% Mauvais en Distribution Stock
 
 # %1% FIXME
 # %2% FIXME
 AVERAGE_STOCKPILE_LABEL
-%2% Normal en Stock
+%2% Normal en Distribution Stock
 
 # %1% FIXME
 # %2% FIXME
 GOOD_STOCKPILE_LABEL
-%2% Bon en Stock
+%2% Bon en Distribution Stock
 
 # %1% FIXME
 # %2% FIXME
 GREAT_STOCKPILE_LABEL
-%2% Excellent en Stock
+%2% Excellent en Distribution Stock
 
 # %1% FIXME
 # %2% FIXME
 ULTIMATE_STOCKPILE_LABEL
-%2% Parfait en Stock
+%2% Parfait en Distribution Stock
 
 # %1% FIXME
 # %2% FIXME
@@ -15803,7 +16164,13 @@ BASIC_CONTENTEDNESS_LABEL
 Satisfaction générale
 
 FOCUS_PREFERENCE_LABEL
-Focus favori activé
+Focus par défaut activé
+
+LIKES
+'''Aime: '''
+
+DISLIKES
+'''N'aime pas: '''
 
 ROBOTIC_INTERFACE_EFFECT
 Réseau d'équipage robotique

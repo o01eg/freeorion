@@ -48,7 +48,7 @@ namespace {
 // Free Functions
 /////////////////////////////////////////////
 bool RegisterOptions(OptionsDBFn function) {
-    OptionsRegistry().push_back(function);
+    OptionsRegistry().emplace_back(function);
     return true;
 }
 
@@ -274,23 +274,23 @@ namespace {
         boost::char_separator<char> separator { " \t", "\n" };
         boost::tokenizer<boost::char_separator<char>> tokens { text, separator };
 
-        std::vector<std::string> lines { "" };
+        std::vector<std::string> lines{""};
         for (const auto& token : tokens) {
             if (token == "\n") 
-                lines.push_back("");
+                lines.emplace_back();
             else if (widths.second < lines.back().size() + token.size() + indents.second)
-                lines.push_back(token + " ");
+                lines.emplace_back(token + " ");
             else if (!token.empty())
                 lines.back().append(token + " ");
         }
 
-        std::string indent { std::string(indents.second, ' ') };
+        std::string indent(indents.second, ' ');
         std::stringstream retval;
         auto first_line = std::move(lines.front());
-        retval << std::string(indents.first, ' ') << first_line << std::endl;
-        for (auto line : lines)
+        retval << std::string(indents.first, ' ') << first_line << "\n";
+        for (auto& line : lines)
             if (!line.empty())
-                retval << indent << line << std::endl;
+                retval << indent << line << "\n";
 
         return retval.str();
     }
@@ -372,7 +372,7 @@ std::unordered_map<std::string, std::set<std::string>> OptionsDB::OptionsBySecti
             continue;
 
         if (total_it->second > 1) {
-            options_by_section["root"].emplace(root_name);
+            options_by_section["root"].emplace(std::move(root_name));
         } else if (section_it.first != "misc" &&
                    section_it.first != "root" &&
                    !m_sections.count(section_it.first))
@@ -434,7 +434,7 @@ void OptionsDB::GetUsage(std::ostream& os, const std::string& command_line, bool
         name_col_width += 5;
 
         if (!section_list.empty())
-            os << UserString("COMMAND_LINE_SECTIONS") << ":" << std::endl;
+            os << UserString("COMMAND_LINE_SECTIONS") << ":\n";
 
         auto indents = std::make_pair(2, name_col_width + 4);
         auto widths = std::make_pair(TERMINAL_LINE_WIDTH - name_col_width, TERMINAL_LINE_WIDTH);
@@ -459,7 +459,7 @@ void OptionsDB::GetUsage(std::ostream& os, const std::string& command_line, bool
 
         // add empty line between groups and options
         if (!section_list.empty() && !print_misc_section)
-            os << std::endl;
+            os << "\n";
     }
 
 
@@ -484,7 +484,7 @@ void OptionsDB::GetUsage(std::ostream& os, const std::string& command_line, bool
             option_list.emplace(command_line);
 
         if (!option_list.empty())
-            os << UserString("COMMAND_LINE_OPTIONS") << ":" << std::endl;
+            os << UserString("COMMAND_LINE_OPTIONS") << ":\n";
 
         for (const auto& option_name : option_list) {
             auto option_it = m_options.find(option_name);
@@ -492,9 +492,9 @@ void OptionsDB::GetUsage(std::ostream& os, const std::string& command_line, bool
                 continue;
 
             if (command_line == "raw") {
-                os << option_name << ", " << option_it->second.description << "," << std::endl;
+                os << option_name << ", " << option_it->second.description << ",\n";
                 if (option_it->second.short_name)
-                    os << option_it->second.short_name << ", " << option_it->second.description << "," << std::endl;
+                    os << option_it->second.short_name << ", " << option_it->second.description << ",\n";
             } else {
                 // option name(s)
                 if (option_it->second.short_name)
@@ -504,22 +504,22 @@ void OptionsDB::GetUsage(std::ostream& os, const std::string& command_line, bool
 
                 // option description
                 if (!option_it->second.description.empty())
-                    os << std::endl << SplitText(UserString(option_it->second.description), {5, 7});
+                    os << "\n" << SplitText(UserString(option_it->second.description), {5, 7});
                 else
-                    os << std::endl;
+                    os << "\n";
 
                 // option default value
                 if (option_it->second.validator) {
                     auto validator_str = UserString("COMMAND_LINE_DEFAULT") + ": " + option_it->second.DefaultValueToString();
                     os << SplitText(validator_str, {5, 7}, {TERMINAL_LINE_WIDTH - validator_str.size(), 77});
                 }
-                os << std::endl;
+                os << "\n";
             }
         }
 
         if (section_list.empty() && option_list.empty()) {
-            os << UserString("COMMAND_LINE_NOT_FOUND") << ": " << command_line << std::endl << std::endl;
-            os << UserString("COMMAND_LINE_USAGE") << std::endl;
+            os << UserString("COMMAND_LINE_NOT_FOUND") << ": " << command_line << "\n\n";
+            os << UserString("COMMAND_LINE_USAGE") << "\n";
         }
     }
 
@@ -531,7 +531,7 @@ void OptionsDB::GetXML(XMLDoc& doc, bool non_default_only, bool include_version)
     doc = XMLDoc();
 
     std::vector<XMLElement*> elem_stack;
-    elem_stack.push_back(&doc.root_node);
+    elem_stack.emplace_back(&doc.root_node);
 
     for (const auto& option : m_options) {
         if (!option.second.storable)
@@ -589,13 +589,13 @@ void OptionsDB::GetXML(XMLDoc& doc, bool non_default_only, bool include_version)
             std::string::size_type pos = 0;
             while ((pos = section_name.find('.', last_pos)) != std::string::npos) {
                 XMLElement temp(section_name.substr(last_pos, pos - last_pos));
-                elem_stack.back()->children.push_back(temp);
-                elem_stack.push_back(&elem_stack.back()->Child(temp.Tag()));
+                elem_stack.back()->children.emplace_back(temp);
+                elem_stack.emplace_back(&elem_stack.back()->Child(temp.Tag()));
                 last_pos = pos + 1;
             }
             XMLElement temp(section_name.substr(last_pos));
-            elem_stack.back()->children.push_back(temp);
-            elem_stack.push_back(&elem_stack.back()->Child(temp.Tag()));
+            elem_stack.back()->children.emplace_back(temp);
+            elem_stack.emplace_back(&elem_stack.back()->Child(temp.Tag()));
         }
 
         XMLElement temp(name);
@@ -605,8 +605,8 @@ void OptionsDB::GetXML(XMLDoc& doc, bool non_default_only, bool include_version)
             if (!boost::any_cast<bool>(option.second.value))
                 continue;
         }
-        elem_stack.back()->children.push_back(temp);
-        elem_stack.push_back(&elem_stack.back()->Child(temp.Tag()));
+        elem_stack.back()->children.emplace_back(temp);
+        elem_stack.emplace_back(&elem_stack.back()->Child(temp.Tag()));
     }
 }
 
@@ -877,7 +877,8 @@ std::vector<std::string> StringToList(const std::string& input_string) {
     typedef boost::tokenizer<boost::char_separator<char>> Tokenizer;
     boost::char_separator<char> separator(",");
     Tokenizer tokens(input_string, separator);
-    for (const auto& token : tokens)
-        retval.push_back(token);
+    retval.reserve(std::distance(tokens.begin(), tokens.end()));
+    for (auto& token : tokens)
+        retval.emplace_back(token);
     return retval;
 }

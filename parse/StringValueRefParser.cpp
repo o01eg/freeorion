@@ -43,7 +43,7 @@ namespace parse {
             |    tok.BuildingType_
             |    tok.FieldType_
             |    tok.Focus_
-            |    tok.PreferredFocus_
+            |    tok.DefaultFocus_
             |    tok.Hull_
             ;
 
@@ -54,6 +54,7 @@ namespace parse {
                 |   tok.ThisField_
                 |   tok.ThisHull_
                 |   tok.ThisPart_   // various aliases for this reference in scripts, allowing scripter to use their preference
+                |   tok.ThisPolicy_
                 |   tok.ThisTech_
                 |   tok.ThisSpecies_
                 |   tok.ThisSpecial_
@@ -61,8 +62,8 @@ namespace parse {
             ;
 
         free_variable
-            =   tok.Value_          [ _val = construct_movable_(new_<ValueRef::Variable<std::string>>(ValueRef::EFFECT_TARGET_VALUE_REFERENCE)) ]
-            |   tok.GalaxySeed_     [ _val = construct_movable_(new_<ValueRef::Variable<std::string>>(ValueRef::NON_OBJECT_REFERENCE, _1)) ]
+            =   tok.Value_          [ _val = construct_movable_(new_<ValueRef::Variable<std::string>>(ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE)) ]
+            |   tok.GalaxySeed_     [ _val = construct_movable_(new_<ValueRef::Variable<std::string>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, _1)) ]
             ;
 
         variable_scope_rule = detail::variable_scope(tok);
@@ -83,9 +84,9 @@ namespace parse {
             =   (
                 (
                     (
-                        tok.OneOf_  [ _c = ValueRef::RANDOM_PICK ]
-                    |   tok.Min_    [ _c = ValueRef::MINIMUM ]
-                    |   tok.Max_    [ _c = ValueRef::MAXIMUM ]
+                        tok.OneOf_  [ _c = ValueRef::OpType::RANDOM_PICK ]
+                    |   tok.Min_    [ _c = ValueRef::OpType::MINIMUM ]
+                    |   tok.Max_    [ _c = ValueRef::OpType::MAXIMUM ]
                     )
                     > (     '('  >   expr [ push_back(_d, _1) ]
                         > *(','  >   expr [ push_back(_d, _1) ] ) > ')' )
@@ -106,14 +107,14 @@ namespace parse {
             (
                 (
                     function_expr [ _a = _1 ]
-                    >>  lit('+') [ _c = ValueRef::PLUS ]
+                    >>  lit('+') [ _c = ValueRef::OpType::PLUS ]
                     >>  function_expr [ _b = construct_movable_(new_<ValueRef::Operation<std::string>>(_c, deconstruct_movable_(_a, _pass), deconstruct_movable_(_1, _pass))) ]
                     [ _val = _b ]
                 )
                 |   (
                     function_expr [ push_back(_d, _1) ]     // template string
                     >>+('%' >   function_expr [ push_back(_d, _1) ] )   // must have at least one sub-string
-                    [ _val = construct_movable_(new_<ValueRef::Operation<std::string>>(ValueRef::SUBSTITUTION, deconstruct_movable_vector_(_d, _pass))) ]
+                    [ _val = construct_movable_(new_<ValueRef::Operation<std::string>>(ValueRef::OpType::SUBSTITUTION, deconstruct_movable_vector_(_d, _pass))) ]
                 )
                 |   (
                     function_expr [ _val = _1 ]

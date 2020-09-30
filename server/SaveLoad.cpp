@@ -59,10 +59,10 @@ namespace {
             // If there are human players, the first of them should be the main player
             short humans = 0;
             for (const PlayerSaveGameData& psgd : player_save_game_data) {
-                if (psgd.client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER) {
-                    if (player->client_type != Networking::CLIENT_TYPE_HUMAN_PLAYER &&
-                       player->client_type != Networking::CLIENT_TYPE_HUMAN_OBSERVER &&
-                       player->client_type != Networking::CLIENT_TYPE_HUMAN_MODERATOR)
+                if (psgd.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER) {
+                    if (player->client_type != Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER &&
+                       player->client_type != Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER &&
+                       player->client_type != Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR)
                     {
                         player = &psgd;
                     }
@@ -108,7 +108,7 @@ int SaveGame(const std::string& filename, const ServerSaveGameData& server_save_
     bool use_binary = GetOptionsDB().Get<bool>("save.format.binary.enabled");
     bool use_zlib_for_zml = GetOptionsDB().Get<bool>("save.format.xml.zlib.enabled");
     DebugLogger() << "SaveGame(" << (use_binary ? "binary" : (use_zlib_for_zml ? "zlib-xml" : "raw-xml")) << ") filename: " << filename;
-    GetUniverse().EncodingEmpire() = ALL_EMPIRES;
+    GlobalSerializationEncodingForEmpire() = ALL_EMPIRES;
 
     DebugLogger() << "Compiling save empire and preview data";
     timer.EnterSection("compiling data");
@@ -120,8 +120,9 @@ int SaveGame(const std::string& filename, const ServerSaveGameData& server_save_
 
     // reinterpret save game data as header data for uncompressed header
     std::vector<PlayerSaveHeaderData> player_save_header_data;
+    player_save_header_data.reserve(player_save_game_data.size());
     for (const PlayerSaveGameData& psgd : player_save_game_data)
-    { player_save_header_data.push_back(psgd); }
+        player_save_header_data.push_back(psgd);
 
 
     int bytes_written = 0;
@@ -333,9 +334,9 @@ void LoadGame(const std::string& filename, ServerSaveGameData& server_save_game_
 
     // player notifications
     if (ServerApp* server = ServerApp::GetApp())
-        server->Networking().SendMessageAll(TurnProgressMessage(Message::LOADING_GAME));
+        server->Networking().SendMessageAll(TurnProgressMessage(Message::TurnProgressPhase::LOADING_GAME));
 
-    GetUniverse().EncodingEmpire() = ALL_EMPIRES;
+    GlobalSerializationEncodingForEmpire() = ALL_EMPIRES;
 
     std::map<int, SaveGameEmpireData>   ignored_save_game_empire_data;
     SaveGamePreviewData                 ignored_save_preview_data;

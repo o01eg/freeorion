@@ -45,26 +45,27 @@ void PopulationPanel::CompleteConstruction() {
     }
 
     // small meter indicators - for use when panel is collapsed
-    m_meter_stats.push_back({
-        METER_POPULATION,
+    m_meter_stats.emplace_back(
+        MeterType::METER_POPULATION,
         GG::Wnd::Create<StatisticIcon>(ClientUI::SpeciesIcon(pop->SpeciesName()),
-                                       pop->GetMeter(METER_POPULATION)->Initial(), 3, false,
-                                       MeterIconSize().x, MeterIconSize().y)});
-    m_meter_stats.push_back({
-        METER_HAPPINESS,
-        GG::Wnd::Create<StatisticIcon>(ClientUI::MeterIcon(METER_HAPPINESS),
-                                       pop->GetMeter(METER_HAPPINESS)->Initial(), 3, false,
-                                       MeterIconSize().x, MeterIconSize().y)});
-    m_meter_stats.push_back({
-        METER_CONSTRUCTION,
-        GG::Wnd::Create<StatisticIcon>(ClientUI::MeterIcon(METER_CONSTRUCTION),
-                                       pop->GetMeter(METER_CONSTRUCTION)->Initial(), 3, false,
-                                       MeterIconSize().x, MeterIconSize().y)});
+                                       pop->GetMeter(MeterType::METER_POPULATION)->Initial(), 3, false,
+                                       MeterIconSize().x, MeterIconSize().y));
+    m_meter_stats.emplace_back(
+        MeterType::METER_HAPPINESS,
+        GG::Wnd::Create<StatisticIcon>(ClientUI::MeterIcon(MeterType::METER_HAPPINESS),
+                                       pop->GetMeter(MeterType::METER_HAPPINESS)->Initial(), 3, false,
+                                       MeterIconSize().x, MeterIconSize().y));
+    m_meter_stats.emplace_back(
+        MeterType::METER_CONSTRUCTION,
+        GG::Wnd::Create<StatisticIcon>(ClientUI::MeterIcon(MeterType::METER_CONSTRUCTION),
+                                       pop->GetMeter(MeterType::METER_CONSTRUCTION)->Initial(), 3, false,
+                                       MeterIconSize().x, MeterIconSize().y));
 
     // meter and production indicators
     std::vector<std::pair<MeterType, MeterType>> meters;
+    meters.reserve(m_meter_stats.size());
 
-    for (auto& meter_stat : m_meter_stats) {
+    for (const auto& meter_stat : m_meter_stats) {
         MeterType meter_type = meter_stat.first;
 
         meter_stat.second->RightClickedSignal.connect([this, meter_type](const GG::Pt& pt) {
@@ -72,30 +73,32 @@ void PopulationPanel::CompleteConstruction() {
 
             auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
             auto pc = Objects().get<PopCenter>(m_popcenter_id);
-            if (meter_type == METER_POPULATION && pc) {
+            if (meter_type == MeterType::METER_POPULATION && pc) {
                 std::string species_name = pc->SpeciesName();
                 if (!species_name.empty()) {
                     auto zoom_species_action = [species_name]() { ClientUI::GetClientUI()->ZoomToSpecies(species_name); };
                     std::string species_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) %
                                                                               UserString(species_name));
-                    popup->AddMenuItem(GG::MenuItem(species_label, false, false, zoom_species_action));
+                    popup->AddMenuItem(GG::MenuItem(std::move(species_label), false, false,
+                                                    zoom_species_action));
                 }
             }
 
             auto pedia_meter_type_action = [meter_string]() { ClientUI::GetClientUI()->ZoomToMeterTypeArticle(meter_string); };
             std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) %
                                                                     UserString(meter_string));
-            popup->AddMenuItem(GG::MenuItem(popup_label, false, false, pedia_meter_type_action));
+            popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false,
+                                            pedia_meter_type_action));
 
             popup->Run();
         });
         AttachChild(meter_stat.second);
-        meters.push_back({meter_stat.first, AssociatedMeterType(meter_stat.first)});
+        meters.emplace_back(meter_stat.first, AssociatedMeterType(meter_stat.first));
     }
 
     // attach and show meter bars and large resource indicators
-    m_multi_icon_value_indicator =  GG::Wnd::Create<MultiIconValueIndicator>(Width() - 2*EDGE_PAD,   m_popcenter_id, meters);
-    m_multi_meter_status_bar =      GG::Wnd::Create<MultiMeterStatusBar>(Width() - 2*EDGE_PAD,       m_popcenter_id, meters);
+    m_multi_icon_value_indicator = GG::Wnd::Create<MultiIconValueIndicator>(Width() - 2*EDGE_PAD, m_popcenter_id, meters);
+    m_multi_meter_status_bar =     GG::Wnd::Create<MultiMeterStatusBar>(Width() - 2*EDGE_PAD,     m_popcenter_id, meters);
 
     // determine if this panel has been created yet.
     std::map<int, bool>::iterator it = s_expanded_map.find(m_popcenter_id);

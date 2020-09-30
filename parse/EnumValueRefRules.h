@@ -32,6 +32,7 @@ namespace parse {
         variable_rule<T> unwrapped_bound_variable_expr;
         variable_rule<T> value_wrapped_bound_variable_expr;
         expression_rule<T> functional_expr;
+        value_ref_rule<T> named_lookup_expr;
         value_ref_rule<T> primary_expr;
         value_ref_rule<T> statistic_sub_value_ref;
         statistic_rule<T> statistic_expr;
@@ -84,11 +85,12 @@ namespace parse {
 
         boost::spirit::qi::_1_type _1;
         boost::spirit::qi::_2_type _2;
+        boost::spirit::qi::_4_type _4;
         boost::spirit::qi::_val_type _val;
         boost::spirit::qi::_pass_type _pass;
         boost::spirit::qi::lit_type lit;
         const boost::phoenix::function<construct_movable> construct_movable_;
-        const boost::phoenix::function<deconstruct_movable> deconstruct_movable_;
+        //const boost::phoenix::function<deconstruct_movable> deconstruct_movable_;
         const boost::phoenix::function<deconstruct_movable_vector> deconstruct_movable_vector_;
 
         constant_expr
@@ -110,13 +112,23 @@ namespace parse {
             ;
 
         selection_operator
-            =   tok.OneOf_  [ _val = ValueRef::RANDOM_PICK ]
-            |   tok.Min_    [ _val = ValueRef::MINIMUM ]
-            |   tok.Max_    [ _val = ValueRef::MAXIMUM ];
+            =   tok.OneOf_  [ _val = ValueRef::OpType::RANDOM_PICK ]
+            |   tok.Min_    [ _val = ValueRef::OpType::MINIMUM ]
+            |   tok.Max_    [ _val = ValueRef::OpType::MAXIMUM ];
 
         selection_expr
             = (selection_operator > '(' > (expr % ',') > ')')
             [ _val = construct_movable_(new_<ValueRef::Operation<T>>(_1, deconstruct_movable_vector_(_2, _pass))) ];
+
+        named_lookup_expr
+          =   (
+                   tok.Named_ >> tok.Value_ >> tok.Lookup_
+                >> label(tok.Name_)
+                >> tok.string
+              ) [
+                     _val = construct_movable_(new_<ValueRef::NamedRef<T>>(_4))
+              ]
+            ;
 
         functional_expr %=  selection_expr | primary_expr;
 
@@ -133,6 +145,7 @@ namespace parse {
             |   free_variable_expr
             |   statistic_expr
             |   complex_expr
+            |   named_lookup_expr
             ;
 
 #if DEBUG_VALUEREF_PARSERS
@@ -144,6 +157,7 @@ namespace parse {
         debug(statistic_value_ref_expr);
         debug(statistic_expr);
         debug(functional_expr);
+        debug(named_lookup_expr);
         debug(primary_expr);
         debug(expr);
 #endif
@@ -155,6 +169,7 @@ namespace parse {
         bound_variable_expr.name(type_name + " variable");
         statistic_sub_value_ref.name(type_name + " statistic subvalue");
         statistic_expr.name(type_name + " statistic");
+        named_lookup_expr.name(type_name + " named valueref");
         primary_expr.name(type_name + " expression");
         expr.name(type_name + " expression");
     }

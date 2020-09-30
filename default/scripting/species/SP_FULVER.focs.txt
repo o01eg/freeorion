@@ -17,15 +17,18 @@ Species
     foci = [
         [[HAS_INDUSTRY_FOCUS]]
         [[HAS_RESEARCH_FOCUS]]
+        [[HAS_INFLUENCE_FOCUS]]
         [[HAS_GROWTH_FOCUS]]
         [[HAS_ADVANCED_FOCI]]
     ]
 
-    preferredfocus = "FOCUS_STOCKPILE"
+    defaultfocus = "FOCUS_STOCKPILE"
+    likes = ["FOCUS_STOCKPILE" "PLC_STOCKPILE_LIQUIDATION"]
 
     effectsgroups = [
         [[AVERAGE_INDUSTRY]]
         [[BAD_RESEARCH]]
+        [[AVERAGE_INFLUENCE]]
         [[GOOD_STOCKPILE]]
 
         [[AVERAGE_POPULATION]]

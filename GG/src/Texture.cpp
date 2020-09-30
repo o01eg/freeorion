@@ -1,40 +1,21 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-#include <GG/Texture.h>
-
-#include <GG/GLClientAndServerBuffer.h>
 #include <GG/Config.h>
-#include <GG/utf8/checked.h>
-
+#include <iomanip>
+#include <iostream>
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/gil/extension/dynamic_image/any_image.hpp>
 #if GG_HAVE_LIBTIFF
 # include <boost/gil/extension/io/tiff_dynamic_io.hpp>
 #endif
-#include <boost/algorithm/string/case_conv.hpp>
-
 #if GG_HAVE_LIBPNG
 # if GIGI_CONFIG_USE_OLD_IMPLEMENTATION_OF_GIL_PNG_IO
 #  include "gilext/io/png_dynamic_io.hpp"
@@ -43,13 +24,14 @@
 #  include <boost/gil/extension/io/png.hpp>
 # endif
 #endif
-
-#include <iostream>
-#include <iomanip>
-
-#if BOOST_VERSION >= 107000
+#if BOOST_VERSION >= 107400
+#include <boost/variant2/variant.hpp>
+#elif BOOST_VERSION >= 107000
 #include <boost/variant/get.hpp>
 #endif
+#include <GG/GLClientAndServerBuffer.h>
+#include <GG/Texture.h>
+#include <GG/utf8/checked.h>
 
 
 using namespace GG;
@@ -63,6 +45,7 @@ namespace {
             value *= 2;
         return value;
     }
+
 }
 
 ///////////////////////////////////////
@@ -113,46 +96,21 @@ X Texture::DefaultWidth() const
 Y Texture::DefaultHeight() const
 { return m_default_height; }
 
-void Texture::OrthoBlit(const Pt& pt1, const Pt& pt2,
-                        const GLfloat* tex_coords/* = 0*/) const
+void Texture::Blit(const GL2DVertexBuffer& vertex_buffer,
+                   const GLTexCoordBuffer& tex_coord_buffer,
+                   bool render_scaled) const
 {
     if (m_opengl_id == 0)
         return;
 
-    if (!tex_coords) // use default texture coords when not given any others
-        tex_coords = m_tex_coords;
-
     // HACK! This code ensures that unscaled textures are reproduced exactly, even
     // though they theoretically should be even when using non-GL_NEAREST* scaling.
-    bool render_scaled = (pt2.x - pt1.x) != m_default_width || (pt2.y - pt1.y) != m_default_height;
     bool need_min_filter_change = !render_scaled && m_min_filter != GL_NEAREST;
     bool need_mag_filter_change = !render_scaled && m_mag_filter != GL_NEAREST;
     if (need_min_filter_change)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     if (need_mag_filter_change)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-    // render texture
-    GL2DVertexBuffer vertex_buffer;
-    vertex_buffer.reserve(4);
-    vertex_buffer.store(pt2.x, pt1.y);
-    vertex_buffer.store(pt1.x, pt1.y);
-    vertex_buffer.store(pt2.x, pt2.y);
-    vertex_buffer.store(pt1.x, pt2.y);
-
-    GLTexCoordBuffer tex_coord_buffer;
-    tex_coord_buffer.reserve(4);
-    if (tex_coords) {
-        tex_coord_buffer.store(tex_coords[2], tex_coords[1]);
-        tex_coord_buffer.store(tex_coords[0], tex_coords[1]);
-        tex_coord_buffer.store(tex_coords[2], tex_coords[3]);
-        tex_coord_buffer.store(tex_coords[0], tex_coords[3]);
-    } else {
-        tex_coord_buffer.store(1.0f, 0.0f);
-        tex_coord_buffer.store(0.0f, 0.0f);
-        tex_coord_buffer.store(1.0f, 1.0f);
-        tex_coord_buffer.store(0.0f, 1.0f);
-    }
 
     glPushAttrib(GL_ENABLE_BIT);
     glEnable(GL_TEXTURE_2D);
@@ -165,10 +123,7 @@ void Texture::OrthoBlit(const Pt& pt1, const Pt& pt2,
     glBindTexture(GL_TEXTURE_2D, m_opengl_id);
     vertex_buffer.activate();
     tex_coord_buffer.activate();
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, vertex_buffer.size());
-
-    //glDisableClientState(GL_VERTEX_ARRAY);
-    //glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    glDrawArrays(GL_QUADS, 0, vertex_buffer.size());
 
     if (need_min_filter_change)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, m_min_filter);
@@ -178,6 +133,55 @@ void Texture::OrthoBlit(const Pt& pt1, const Pt& pt2,
     glPopClientAttrib();
 
     glPopAttrib();
+}
+
+void Texture::OrthoBlit(const Pt& pt1, const Pt& pt2,
+                        const GLfloat* tex_coords/* = 0*/) const
+{
+    if (m_opengl_id == 0)
+        return;
+
+    bool render_scaled = (pt2.x - pt1.x) != m_default_width || (pt2.y - pt1.y) != m_default_height;
+
+    GL2DVertexBuffer vertex_buffer;
+    vertex_buffer.reserve(4);
+    GLTexCoordBuffer tex_coord_buffer;
+    tex_coord_buffer.reserve(4);
+    InitBuffer(vertex_buffer, pt1, pt2);
+    InitBuffer(tex_coord_buffer, tex_coords ? tex_coords : m_tex_coords);   // use default texture coords when not given any others
+
+    Blit(vertex_buffer, tex_coord_buffer, render_scaled);
+}
+
+void Texture::InitBuffer(GL2DVertexBuffer& vertex_buffer, const Pt& pt1, const Pt& pt2)
+{
+    vertex_buffer.store(pt2.x, pt1.y);
+    vertex_buffer.store(pt1.x, pt1.y);
+    vertex_buffer.store(pt1.x, pt2.y);
+    vertex_buffer.store(pt2.x, pt2.y);
+}
+
+void Texture::InitBuffer(GL2DVertexBuffer& vertex_buffer, float x1, float y1, float x2, float y2)
+{
+    vertex_buffer.store(x2, y1);
+    vertex_buffer.store(x1, y1);
+    vertex_buffer.store(x1, y2);
+    vertex_buffer.store(x2, y2);
+}
+
+void Texture::InitBuffer(GLTexCoordBuffer& tex_coord_buffer, const GLfloat* tex_coords)
+{
+    if (tex_coords) {
+        tex_coord_buffer.store(tex_coords[2], tex_coords[1]);
+        tex_coord_buffer.store(tex_coords[0], tex_coords[1]);
+        tex_coord_buffer.store(tex_coords[0], tex_coords[3]);
+        tex_coord_buffer.store(tex_coords[2], tex_coords[3]);
+    } else {
+        tex_coord_buffer.store(1.0, 0.0);
+        tex_coord_buffer.store(0.0, 0.0);
+        tex_coord_buffer.store(0.0, 1.0);
+        tex_coord_buffer.store(1.0, 1.0);
+    }
 }
 
 void Texture::OrthoBlit(const Pt& pt) const
@@ -214,18 +218,24 @@ void Texture::Load(const boost::filesystem::path& path, bool mipmap/* = false*/)
     static_assert(sizeof(gil::rgb8_pixel_t) == 3, "rgb8 pixel type does not match expected type size");
     static_assert(sizeof(gil::rgba8_pixel_t) == 4, "rgba8 pixel type does not match expected type size");
 
-#ifdef BOOST_GIL_USES_MP11
-    typedef boost::mp11::mp_list<
+#if BOOST_VERSION >= 107400
+    typedef gil::any_image<gil::gray8_image_t,
+        gil::gray_alpha8_image_t,
+        gil::rgb8_image_t,
+        gil::rgba8_image_t> ImageType;
 #else
+# ifdef BOOST_GIL_USES_MP11
+    typedef boost::mp11::mp_list<
+# else
     typedef boost::mpl::vector4<
-#endif
+# endif
         gil::gray8_image_t,
         gil::gray_alpha8_image_t,
         gil::rgb8_image_t,
         gil::rgba8_image_t
     > ImageTypes;
     typedef gil::any_image<ImageTypes> ImageType;
-
+#endif
     if (!fs::exists(path))
         throw BadFile("Texture file \"" + filename + "\" does not exist");
     if (!fs::is_regular_file(path))
@@ -272,7 +282,14 @@ void Texture::Load(const boost::filesystem::path& path, bool mipmap/* = false*/)
     m_default_height = Y(image.height());
     m_type = GL_UNSIGNED_BYTE;
 
-#if BOOST_VERSION >= 107000
+#if BOOST_VERSION >= 107400
+#define IF_IMAGE_TYPE_IS(image_prefix)                                  \
+    if (boost::variant2::get_if<image_prefix ## _image_t>(&image)) {    \
+        m_bytes_pp = sizeof(image_prefix ## _pixel_t);                  \
+        image_data = interleaved_view_get_raw_data(                     \
+            const_view(boost::variant2::get<image_prefix ## _image_t>(image))); \
+    }
+#elif BOOST_VERSION >= 107000
 #define IF_IMAGE_TYPE_IS(image_prefix)                                  \
     if (boost::get<image_prefix ## _image_t>(&image)) {                 \
         m_bytes_pp = sizeof(image_prefix ## _pixel_t);                  \
@@ -444,37 +461,29 @@ unsigned char* Texture::GetRawBytes()
 ///////////////////////////////////////
 // class GG::SubTexture
 ///////////////////////////////////////
-SubTexture::SubTexture() :
-    m_width(0),
-    m_height(0),
-    m_tex_coords()
-{}
-
-SubTexture::SubTexture(const std::shared_ptr<const Texture>& texture, X x1, Y y1, X x2, Y y2) :
-    m_texture(texture),
+SubTexture::SubTexture(std::shared_ptr<const Texture> texture, X x1, Y y1, X x2, Y y2) :
+    m_texture(std::move(texture)),
     m_width(x2 - x1),
-    m_height(y2 - y1),
-    m_tex_coords()
+    m_height(y2 - y1)
 {
     if (!m_texture) throw BadTexture("Attempted to contruct subtexture from invalid texture");
     if (x2 < x1 || y2 < y1) throw InvalidTextureCoordinates("Attempted to contruct subtexture from invalid coordinates");
 
-    m_tex_coords[0] = Value(x1 * 1.0 / texture->Width());
-    m_tex_coords[1] = Value(y1 * 1.0 / texture->Height());
-    m_tex_coords[2] = Value(x2 * 1.0 / texture->Width());
-    m_tex_coords[3] = Value(y2 * 1.0 / texture->Height());
+    m_tex_coords[0] = Value(x1 * 1.0 / m_texture->Width());
+    m_tex_coords[1] = Value(y1 * 1.0 / m_texture->Height());
+    m_tex_coords[2] = Value(x2 * 1.0 / m_texture->Width());
+    m_tex_coords[3] = Value(y2 * 1.0 / m_texture->Height());
 }
 
-SubTexture::SubTexture(const std::shared_ptr<const Texture>& texture) :
-    m_texture(texture),
+SubTexture::SubTexture(std::shared_ptr<const Texture> texture) :
+    m_texture(std::move(texture)),
     m_width(GG::X1),
-    m_height(GG::Y1),
-    m_tex_coords()
+    m_height(GG::Y1)
 {
     if (!m_texture) throw BadTexture("Attempted to contruct subtexture from invalid texture");
 
-    m_width = texture->Width();
-    m_height = texture->Height();
+    m_width = m_texture->Width();
+    m_height = m_texture->Height();
 
     m_tex_coords[0] = 0.0f;
     m_tex_coords[1] = 0.0f;
@@ -488,10 +497,24 @@ SubTexture::~SubTexture()
 SubTexture::SubTexture(const SubTexture& rhs)
 { *this = rhs; }
 
-const SubTexture& SubTexture::operator=(const SubTexture& rhs)
+SubTexture& SubTexture::operator=(const SubTexture& rhs)
 {
     if (this != &rhs) {
         m_texture = rhs.m_texture;
+        m_width = rhs.m_width;
+        m_height = rhs.m_height;
+        m_tex_coords[0] = rhs.m_tex_coords[0];
+        m_tex_coords[1] = rhs.m_tex_coords[1];
+        m_tex_coords[2] = rhs.m_tex_coords[2];
+        m_tex_coords[3] = rhs.m_tex_coords[3];
+    }
+    return *this;
+}
+
+SubTexture& SubTexture::operator=(SubTexture&& rhs) noexcept
+{
+    if (this != &rhs) {
+        m_texture = std::move(rhs.m_texture);
         m_width = rhs.m_width;
         m_height = rhs.m_height;
         m_tex_coords[0] = rhs.m_tex_coords[0];

@@ -83,12 +83,14 @@ class FO_COMMON_API Species {
 public:
     Species(std::string&& name, std::string&& desc,
             std::string&& gameplay_desc, std::vector<FocusType>&& foci,
-            std::string&& preferred_focus,
+            std::string&& default_focus,
             std::map<PlanetType, PlanetEnvironment>&& planet_environments,
             std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
             std::unique_ptr<Condition::Condition>&& combat_targets,
             bool playable, bool native, bool can_colonize, bool can_produce_ships,
-            const std::set<std::string>& tags, std::string&& graphic);
+            const std::set<std::string>& tags,
+            std::set<std::string>&& likes, std::set<std::string>&& dislikes,
+            std::string&& graphic);
 
     ~Species();
 
@@ -106,7 +108,7 @@ public:
 
     std::string                     Dump(unsigned short ntabs = 0) const;                                   ///< returns a data file format representation of this object
     const std::vector<FocusType>&   Foci() const                        { return m_foci; }                  ///< returns the focus types this species can use
-    const std::string&              PreferredFocus() const              { return m_preferred_focus; }       ///< returns the name of the planetary focus this species prefers. Default for new colonies and may affect happiness if on a different focus?
+    const std::string&              DefaultFocus() const                { return m_default_focus; }       ///< returns the name of the planetary focus this species prefers. Default for new colonies and may affect happiness if on a different focus?
     const std::map<PlanetType, PlanetEnvironment>& PlanetEnvironments() const { return m_planet_environments; } ///< returns a map from PlanetType to the PlanetEnvironment this Species has on that PlanetType
     PlanetEnvironment               GetPlanetEnvironment(PlanetType planet_type) const;                     ///< returns the PlanetEnvironment this species has on PlanetType \a planet_type
     PlanetType                      NextBetterPlanetType(PlanetType initial_planet_type) const;             ///< returns the next better PlanetType for this species from the \a initial_planet_type specified
@@ -121,6 +123,8 @@ public:
     bool                            CanColonize() const     { return m_can_colonize; }      ///< returns whether this species can colonize planets
     bool                            CanProduceShips() const { return m_can_produce_ships; } ///< returns whether this species can produce ships
     const std::set<std::string>&    Tags() const            { return m_tags; }
+    const std::set<std::string>&    Likes() const           { return m_likes; }
+    const std::set<std::string>&    Dislikes() const        { return m_dislikes; }
     const std::string&              Graphic() const         { return m_graphic; }           ///< returns the name of the grapic file for this species
 
     /** Returns a number, calculated from the contained data, which should be
@@ -151,7 +155,7 @@ private:
     std::map<std::string, double>           m_other_species_opinions;   // positive/negative rating of how this species views other species in the game
 
     std::vector<FocusType>                  m_foci;
-    std::string                             m_preferred_focus;
+    std::string                             m_default_focus;
     std::map<PlanetType, PlanetEnvironment> m_planet_environments;
 
     std::vector<std::shared_ptr<Effect::EffectsGroup>>  m_effects;
@@ -163,6 +167,8 @@ private:
     bool                                    m_can_colonize;
     bool                                    m_can_produce_ships;
     std::set<std::string>                   m_tags;
+    std::set<std::string>                   m_likes;
+    std::set<std::string>                   m_dislikes;
     std::string                             m_graphic;
 };
 
@@ -263,13 +269,15 @@ public:
 
     /** sets the opinions of species (indexed by name string) of empires (indexed
       * by id) as a double-valued number. */
-    void SetSpeciesEmpireOpinions(const std::map<std::string, std::map<int, float>>& species_empire_opinions);
+    void SetSpeciesEmpireOpinions(std::map<std::string, std::map<int, float>>&& species_empire_opinions);
     void SetSpeciesEmpireOpinion(const std::string& species_name, int empire_id, float opinion);
 
     /** sets the opinions of species (indexed by name string) of other species
       * (indexed by name string) as a double-valued number. */
-    void SetSpeciesSpeciesOpinions(const std::map<std::string, std::map<std::string, float>>& species_species_opinions);
-    void SetSpeciesSpeciesOpinion(const std::string& opinionated_species, const std::string& rated_species, float opinion);
+    void SetSpeciesSpeciesOpinions(std::map<std::string,
+                                   std::map<std::string, float>>&& species_species_opinions);
+    void SetSpeciesSpeciesOpinion(const std::string& opinionated_species,
+                                  const std::string& rated_species, float opinion);
 
     /** clears all species opinion data */
     void ClearSpeciesOpinions();
@@ -287,7 +295,7 @@ private:
 
     /** sets the homeworld ids of species in this SpeciesManager to those
       * specified in \a species_homeworld_ids */
-    void SetSpeciesHomeworlds(const std::map<std::string, std::set<int>>& species_homeworld_ids);
+    void SetSpeciesHomeworlds(std::map<std::string, std::set<int>>&& species_homeworld_ids);
 
     /** Assigns any m_pending_types to m_species. */
     void CheckPendingSpeciesTypes() const;

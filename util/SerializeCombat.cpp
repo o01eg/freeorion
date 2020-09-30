@@ -360,7 +360,7 @@ template void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, CombatL
 
 
 template <typename Archive>
-void serializeIncompleteLogs(Archive& ar, CombatLogManager& obj, const unsigned int version)
+void SerializeIncompleteLogs(Archive& ar, CombatLogManager& obj, const unsigned int version)
 {
     using namespace boost::serialization;
 
@@ -374,7 +374,52 @@ void serializeIncompleteLogs(Archive& ar, CombatLogManager& obj, const unsigned 
             obj.m_incomplete_logs.insert(old_latest_log_id);
 }
 
-template void serializeIncompleteLogs<freeorion_bin_oarchive>(freeorion_bin_oarchive&, CombatLogManager&, unsigned int const);
-template void serializeIncompleteLogs<freeorion_bin_iarchive>(freeorion_bin_iarchive&, CombatLogManager&, unsigned int const);
-template void serializeIncompleteLogs<freeorion_xml_oarchive>(freeorion_xml_oarchive&, CombatLogManager&, unsigned int const);
-template void serializeIncompleteLogs<freeorion_xml_iarchive>(freeorion_xml_iarchive&, CombatLogManager&, unsigned int const);
+template void SerializeIncompleteLogs<freeorion_bin_oarchive>(freeorion_bin_oarchive&, CombatLogManager&, unsigned int const);
+template void SerializeIncompleteLogs<freeorion_bin_iarchive>(freeorion_bin_iarchive&, CombatLogManager&, unsigned int const);
+template void SerializeIncompleteLogs<freeorion_xml_oarchive>(freeorion_xml_oarchive&, CombatLogManager&, unsigned int const);
+template void SerializeIncompleteLogs<freeorion_xml_iarchive>(freeorion_xml_iarchive&, CombatLogManager&, unsigned int const);
+
+
+template <typename Archive>
+void serialize(Archive & ar, CombatInfo& obj, const unsigned int version)
+{
+    using namespace boost::serialization;
+
+    std::set<int>                       filtered_empire_ids;
+    ObjectMap                           filtered_objects;
+    std::set<int>                       filtered_damaged_object_ids;
+    std::set<int>                       filtered_destroyed_object_ids;
+    std::map<int, std::set<int>>        filtered_destroyed_object_knowers;
+    Universe::EmpireObjectVisibilityMap filtered_empire_object_visibility;
+    std::vector<CombatEventPtr>         filtered_combat_events;
+
+    if (Archive::is_saving::value) {
+        obj.GetEmpireIdsToSerialize(             filtered_empire_ids,               GlobalSerializationEncodingForEmpire());
+        obj.GetObjectsToSerialize(               filtered_objects,                  GlobalSerializationEncodingForEmpire());
+        obj.GetDamagedObjectsToSerialize(        filtered_damaged_object_ids,       GlobalSerializationEncodingForEmpire());
+        obj.GetDestroyedObjectsToSerialize(      filtered_destroyed_object_ids,     GlobalSerializationEncodingForEmpire());
+        obj.GetDestroyedObjectKnowersToSerialize(filtered_destroyed_object_knowers, GlobalSerializationEncodingForEmpire());
+        obj.GetEmpireObjectVisibilityToSerialize(filtered_empire_object_visibility, GlobalSerializationEncodingForEmpire());
+        obj.GetCombatEventsToSerialize(          filtered_combat_events,            GlobalSerializationEncodingForEmpire());
+    }
+
+    ar  & make_nvp("turn", obj.turn)
+        & make_nvp("system_id", obj.system_id)
+        & BOOST_SERIALIZATION_NVP(filtered_empire_ids)
+        & BOOST_SERIALIZATION_NVP(filtered_objects)
+        & BOOST_SERIALIZATION_NVP(filtered_damaged_object_ids)
+        & BOOST_SERIALIZATION_NVP(filtered_destroyed_object_ids)
+        & BOOST_SERIALIZATION_NVP(filtered_destroyed_object_knowers)
+        & BOOST_SERIALIZATION_NVP(filtered_empire_object_visibility)
+        & BOOST_SERIALIZATION_NVP(filtered_combat_events);
+
+    if (Archive::is_loading::value) {
+        obj.empire_ids.swap(              filtered_empire_ids);
+        obj.objects.swap(                 filtered_objects);
+        obj.damaged_object_ids.swap(      filtered_damaged_object_ids);
+        obj.destroyed_object_ids.swap(    filtered_destroyed_object_ids);
+        obj.destroyed_object_knowers.swap(filtered_destroyed_object_knowers);
+        obj.empire_object_visibility.swap(filtered_empire_object_visibility);
+        obj.combat_events.swap(           filtered_combat_events);
+    }
+}

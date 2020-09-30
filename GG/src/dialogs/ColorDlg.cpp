@@ -1,29 +1,13 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
-
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include <GG/dialogs/ColorDlg.h>
-
 #include <GG/Font.h>
 #include <GG/GLClientAndServerBuffer.h>
 #include <GG/GUI.h>
@@ -36,100 +20,102 @@
 using namespace GG;
 
 namespace {
-    const double EPSILON = 0.0001;
 
-    HSVClr Convert(const Clr& color)
-    {
-        HSVClr retval;
-        retval.a = color.a;
-        double r = (color.r / 255.0), g = (color.g / 255.0), b = (color.b / 255.0);
+const double EPSILON = 0.0001;
 
-        double min_channel = std::min(r, std::min(g, b));
-        double max_channel = std::max(r, std::max(g, b));
-        double channel_range = max_channel - min_channel;
+HSVClr Convert(const Clr& color)
+{
+    HSVClr retval;
+    retval.a = color.a;
+    double r = (color.r / 255.0), g = (color.g / 255.0), b = (color.b / 255.0);
 
-        retval.v = max_channel;
+    double min_channel = std::min(r, std::min(g, b));
+    double max_channel = std::max(r, std::max(g, b));
+    double channel_range = max_channel - min_channel;
 
-        if (max_channel < EPSILON) {
+    retval.v = max_channel;
+
+    if (max_channel < EPSILON) {
+        retval.h = 0.0;
+        retval.s = 0.0;
+    } else {
+        retval.s = channel_range / max_channel;
+
+        if (channel_range) {
+            double delta_r = (((max_channel - r) / 6.0) + (channel_range / 2.0)) / channel_range;
+            double delta_g = (((max_channel - g) / 6.0) + (channel_range / 2.0)) / channel_range;
+            double delta_b = (((max_channel - b) / 6.0) + (channel_range / 2.0)) / channel_range;
+
+            if (r == max_channel)
+                retval.h = delta_b - delta_g;
+            else if (g == max_channel)
+                retval.h = (1.0 / 3.0) + delta_r - delta_b;
+            else if (b == max_channel)
+                retval.h = (2.0 / 3.0) + delta_g - delta_r;
+
+            if (retval.h < 0.0)
+                retval.h += 1.0;
+            if (1.0 < retval.h)
+                retval.h -= 1.0;
+        } else {
             retval.h = 0.0;
-            retval.s = 0.0;
-        } else {
-            retval.s = channel_range / max_channel;
-
-            if (channel_range) {
-                double delta_r = (((max_channel - r) / 6.0) + (channel_range / 2.0)) / channel_range;
-                double delta_g = (((max_channel - g) / 6.0) + (channel_range / 2.0)) / channel_range;
-                double delta_b = (((max_channel - b) / 6.0) + (channel_range / 2.0)) / channel_range;
-
-                if (r == max_channel)
-                    retval.h = delta_b - delta_g;
-                else if (g == max_channel)
-                    retval.h = (1.0 / 3.0) + delta_r - delta_b;
-                else if (b == max_channel)
-                    retval.h = (2.0 / 3.0) + delta_g - delta_r;
-
-                if (retval.h < 0.0)
-                    retval.h += 1.0;
-                if (1.0 < retval.h)
-                    retval.h -= 1.0;
-            } else {
-                retval.h = 0.0;
-            }
         }
-        return retval;
     }
+    return retval;
+}
 
-    Clr Convert(const HSVClr& hsv_color)
-    {
-        Clr retval;
-        retval.a = hsv_color.a;
+Clr Convert(const HSVClr& hsv_color)
+{
+    Clr retval;
+    retval.a = hsv_color.a;
 
-        if (hsv_color.s < EPSILON) {
+    if (hsv_color.s < EPSILON) {
+        retval.r = static_cast<GLubyte>(hsv_color.v * 255);
+        retval.g = static_cast<GLubyte>(hsv_color.v * 255);
+        retval.b = static_cast<GLubyte>(hsv_color.v * 255);
+    } else {
+        double tmph = hsv_color.h * 6.0;
+        int tmpi = static_cast<int>(tmph);
+        double tmp1 = hsv_color.v * (1 - hsv_color.s);
+        double tmp2 = hsv_color.v * (1 - hsv_color.s * (tmph - tmpi));
+        double tmp3 = hsv_color.v * (1 - hsv_color.s * (1 - (tmph - tmpi)));
+        switch (tmpi) {
+        case 0:
             retval.r = static_cast<GLubyte>(hsv_color.v * 255);
+            retval.g = static_cast<GLubyte>(tmp3 * 255);
+            retval.b = static_cast<GLubyte>(tmp1 * 255);
+            break;
+        case 1:
+            retval.r = static_cast<GLubyte>(tmp2 * 255);
             retval.g = static_cast<GLubyte>(hsv_color.v * 255);
+            retval.b = static_cast<GLubyte>(tmp1 * 255);
+            break;
+        case 2:
+            retval.r = static_cast<GLubyte>(tmp1 * 255);
+            retval.g = static_cast<GLubyte>(hsv_color.v * 255);
+            retval.b = static_cast<GLubyte>(tmp3 * 255);
+            break;
+        case 3:
+            retval.r = static_cast<GLubyte>(tmp1 * 255);
+            retval.g = static_cast<GLubyte>(tmp2 * 255);
             retval.b = static_cast<GLubyte>(hsv_color.v * 255);
-        } else {
-            double tmph = hsv_color.h * 6.0;
-            int tmpi = static_cast<int>(tmph);
-            double tmp1 = hsv_color.v * (1 - hsv_color.s);
-            double tmp2 = hsv_color.v * (1 - hsv_color.s * (tmph - tmpi));
-            double tmp3 = hsv_color.v * (1 - hsv_color.s * (1 - (tmph - tmpi)));
-            switch (tmpi) {
-            case 0:
-                retval.r = static_cast<GLubyte>(hsv_color.v * 255);
-                retval.g = static_cast<GLubyte>(tmp3 * 255);
-                retval.b = static_cast<GLubyte>(tmp1 * 255);
-                break;
-            case 1:
-                retval.r = static_cast<GLubyte>(tmp2 * 255);
-                retval.g = static_cast<GLubyte>(hsv_color.v * 255);
-                retval.b = static_cast<GLubyte>(tmp1 * 255);
-                break;
-            case 2:
-                retval.r = static_cast<GLubyte>(tmp1 * 255);
-                retval.g = static_cast<GLubyte>(hsv_color.v * 255);
-                retval.b = static_cast<GLubyte>(tmp3 * 255);
-                break;
-            case 3:
-                retval.r = static_cast<GLubyte>(tmp1 * 255);
-                retval.g = static_cast<GLubyte>(tmp2 * 255);
-                retval.b = static_cast<GLubyte>(hsv_color.v * 255);
-                break;
-            case 4:
-                retval.r = static_cast<GLubyte>(tmp3 * 255);
-                retval.g = static_cast<GLubyte>(tmp1 * 255);
-                retval.b = static_cast<GLubyte>(hsv_color.v * 255);
-                break;
-            default:
-                retval.r = static_cast<GLubyte>(hsv_color.v * 255);
-                retval.g = static_cast<GLubyte>(tmp1 * 255);
-                retval.b = static_cast<GLubyte>(tmp2 * 255);
-                break;
-            }
+            break;
+        case 4:
+            retval.r = static_cast<GLubyte>(tmp3 * 255);
+            retval.g = static_cast<GLubyte>(tmp1 * 255);
+            retval.b = static_cast<GLubyte>(hsv_color.v * 255);
+            break;
+        default:
+            retval.r = static_cast<GLubyte>(hsv_color.v * 255);
+            retval.g = static_cast<GLubyte>(tmp1 * 255);
+            retval.b = static_cast<GLubyte>(tmp2 * 255);
+            break;
         }
-
-        return retval;
     }
+
+    return retval;
+}
+
 }
 
 
@@ -484,6 +470,10 @@ void ColorDlg::ColorDisplay::Render()
 }
 
 
+namespace {
+    enum : size_t {R, G, B, A, H, S, V};
+}
+
 std::vector<Clr> ColorDlg::s_custom_colors;
 const std::size_t ColorDlg::INVALID_COLOR_BUTTON = std::numeric_limits<std::size_t>::max();
 
@@ -509,9 +499,8 @@ ColorDlg::ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<Font>& fo
                             GG::CLR_BLUE,       GG::CLR_DARK_BLUE,  GG::CLR_TEAL,       GG::CLR_CYAN,       GG::CLR_GREEN,
                             GG::CLR_DARK_GREEN, GG::CLR_OLIVE,      GG::CLR_YELLOW,     GG::CLR_ORANGE};
 
-        for (unsigned int i = s_custom_colors.size(); i < COLOR_BUTTON_ROWS * COLOR_BUTTON_COLS; ++i) {
+        for (unsigned int i = s_custom_colors.size(); i < COLOR_BUTTON_ROWS * COLOR_BUTTON_COLS; ++i)
             s_custom_colors.push_back(CLR_GRAY);
-        }
     }
 
     m_hue_saturation_picker = Wnd::Create<HueSaturationPicker>(X(10), Y(10), X(300), Y(300));
@@ -520,21 +509,25 @@ ColorDlg::ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<Font>& fo
     m_value_picker->SetHueSaturation(m_current_color.h, m_current_color.s);
     m_value_picker->SetValue(m_current_color.v);
     const int HUE_SATURATION_PICKER_SIZE = 200;
-    m_pickers_layout = Wnd::Create<Layout>(X0, Y0, X(HUE_SATURATION_PICKER_SIZE + 30), Y(HUE_SATURATION_PICKER_SIZE),
+    m_pickers_layout = Wnd::Create<Layout>(X0, Y0, X(HUE_SATURATION_PICKER_SIZE + 30),
+                                           Y(HUE_SATURATION_PICKER_SIZE),
                                            1, 2, 0, 5);
     m_pickers_layout->SetColumnStretch(0, 1);
     m_pickers_layout->SetMinimumColumnWidth(1, X(24));
     m_pickers_layout->Add(m_hue_saturation_picker, 0, 0);
     m_pickers_layout->Add(m_value_picker, 0, 1);
 
-    m_color_squares_layout = Wnd::Create<Layout>(X0, m_pickers_layout->Bottom() + 5, m_pickers_layout->Width(), Y(40),
+    m_color_squares_layout = Wnd::Create<Layout>(X0, m_pickers_layout->Bottom() + 5,
+                                                 m_pickers_layout->Width(), Y(40),
                                                  1, 1, 0, 4);
     m_new_color_square = Wnd::Create<ColorDisplay>(color);
     if (m_original_color_specified) {
-        m_new_color_square_text = style->NewTextControl(style->Translate("New"), font, m_text_color, FORMAT_RIGHT);
+        m_new_color_square_text = style->NewTextControl(style->Translate("New"), font,
+                                                        m_text_color, FORMAT_RIGHT);
         m_color_squares_layout->Add(m_new_color_square_text, 0, 0);
         m_color_squares_layout->Add(m_new_color_square, 0, 1);
-        m_old_color_square_text = style->NewTextControl(style->Translate("Old"), font, m_text_color, FORMAT_RIGHT);
+        m_old_color_square_text = style->NewTextControl(style->Translate("Old"), font,
+                                                        m_text_color, FORMAT_RIGHT);
         m_color_squares_layout->Add(m_old_color_square_text, 1, 0);
         m_old_color_square = Wnd::Create<ColorDisplay>(m_original_color);
         m_color_squares_layout->Add(m_old_color_square, 1, 1);
@@ -544,17 +537,19 @@ ColorDlg::ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<Font>& fo
         m_color_squares_layout->Add(m_new_color_square, 0, 0);
     }
 
-    m_color_buttons_layout = Wnd::Create<Layout>(X0, m_color_squares_layout->Bottom() + 5, m_pickers_layout->Width(), Y(80),
+    m_color_buttons_layout = Wnd::Create<Layout>(X0, m_color_squares_layout->Bottom() + 5,
+                                                 m_pickers_layout->Width(), Y(80),
                                                  COLOR_BUTTON_ROWS, COLOR_BUTTON_COLS, 0, 4);
     for (int i = 0; i < COLOR_BUTTON_ROWS; ++i) {
         for (int j = 0; j < COLOR_BUTTON_COLS; ++j) {
-            m_color_buttons.push_back(Wnd::Create<ColorButton>(m_color));
+            m_color_buttons.emplace_back(Wnd::Create<ColorButton>(m_color));
             m_color_buttons.back()->SetRepresentedColor(s_custom_colors[i * COLOR_BUTTON_COLS + j]);
             m_color_buttons_layout->Add(m_color_buttons.back(), i, j);
         }
     }
 
-    m_sliders_ok_cancel_layout = Wnd::Create<Layout>(m_pickers_layout->Right() + 5, Y0, X(150), Y((25 + 5) * 8 - 5),
+    m_sliders_ok_cancel_layout = Wnd::Create<Layout>(m_pickers_layout->Right() + 5, Y0,
+                                                     X(150), Y((25 + 5) * 8 - 5),
                                                      9, 3, 0, 5);
     m_sliders_ok_cancel_layout->SetMinimumColumnWidth(0, X(15));
     m_sliders_ok_cancel_layout->SetMinimumColumnWidth(1, X(30));
@@ -562,7 +557,7 @@ ColorDlg::ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<Font>& fo
 
     int row = 0;
 
-    for (auto entry : {
+    for (auto& entry : {
             std::make_tuple(static_cast<int>(color.r), 0, 255, "R:"),
             std::make_tuple(static_cast<int>(color.g), 0, 255, "G:"),
             std::make_tuple(static_cast<int>(color.b), 0, 255, "B:"),
@@ -572,17 +567,18 @@ ColorDlg::ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<Font>& fo
             std::make_tuple(static_cast<int>(m_current_color.v * 255), 0, 255, "V:")
         })
     {
-        auto color_value = std::get<0>(entry);
-        auto color_min   = std::get<1>(entry);
-        auto color_max   = std::get<2>(entry);
-        auto color_label = std::get<3>(entry);
+        auto& color_value = std::get<0>(entry);
+        auto& color_min =   std::get<1>(entry);
+        auto& color_max =   std::get<2>(entry);
+        auto& color_label = std::get<3>(entry);
 
-        m_slider_labels.push_back(style->NewTextControl(style->Translate(color_label), font, m_text_color, FORMAT_RIGHT));
+        m_slider_labels.emplace_back(style->NewTextControl(style->Translate(color_label), font,
+                                                           m_text_color, FORMAT_RIGHT));
         m_sliders_ok_cancel_layout->Add(m_slider_labels.back(), row, 0);
-        m_slider_values.push_back(style->NewTextControl(std::to_string(color_value),
-                                                        font, m_text_color, FORMAT_LEFT));
+        m_slider_values.emplace_back(style->NewTextControl(std::to_string(color_value),
+                                                           font, m_text_color, FORMAT_LEFT));
         m_sliders_ok_cancel_layout->Add(m_slider_values.back(), row, 1);
-        m_sliders.push_back(style->NewIntSlider(color_min, color_max, HORIZONTAL, m_color, 10));
+        m_sliders.emplace_back(style->NewIntSlider(color_min, color_max, Orientation::HORIZONTAL, m_color, 10));
         m_sliders.back()->SlideTo(color_value);
         m_sliders_ok_cancel_layout->Add(m_sliders.back(), row, 2);
 
@@ -652,9 +648,9 @@ void ColorDlg::Render()
 
 void ColorDlg::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys)
 {
-    if (key == GGK_RETURN || key == GGK_KP_ENTER)
+    if (key == Key::GGK_RETURN || key == Key::GGK_KP_ENTER)
         OkClicked();
-    else if (key == GGK_ESCAPE)
+    else if (key == Key::GGK_ESCAPE)
         CancelClicked();
 }
 
@@ -796,4 +792,3 @@ void ColorDlg::CancelClicked()
     m_current_color = Convert(m_original_color);
     m_done = true;
 }
-

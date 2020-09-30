@@ -30,13 +30,13 @@
 /** a FreeOrion Label control */
 class CUILabel : public GG::TextControl {
 public:
-    CUILabel(const std::string& str,
+    CUILabel(std::string str,
              GG::Flags<GG::TextFormat> format = GG::FORMAT_NONE,
              GG::Flags<GG::WndFlag> flags = GG::NO_WND_FLAGS,
              GG::X x = GG::X0, GG::Y y = GG::Y0, GG::X w = GG::X1, GG::Y h = GG::Y1);
 
-    CUILabel(const std::string& str,
-             const std::vector<std::shared_ptr<GG::Font::TextElement>>& text_elements,
+    CUILabel(std::string str,
+             std::vector<std::shared_ptr<GG::Font::TextElement>> text_elements,
              GG::Flags<GG::TextFormat> format = GG::FORMAT_NONE,
              GG::Flags<GG::WndFlag> flags = GG::NO_WND_FLAGS,
              GG::X x = GG::X0, GG::Y y = GG::Y0, GG::X w = GG::X1, GG::Y h = GG::Y1);
@@ -47,9 +47,9 @@ public:
 /** a FreeOrion Button control */
 class CUIButton : public GG::Button {
 public:
-    CUIButton(const std::string& str);
+    CUIButton(std::string str);
 
-    CUIButton(const GG::SubTexture& unpressed, const GG::SubTexture& pressed, const GG::SubTexture& rollover);
+    CUIButton(GG::SubTexture unpressed, GG::SubTexture pressed, GG::SubTexture rollover);
 
     GG::Pt MinUsableSize() const override;
 
@@ -67,12 +67,13 @@ protected:
 
 class SettableInWindowCUIButton : public CUIButton {
 public:
-    SettableInWindowCUIButton(const GG::SubTexture& unpressed, const GG::SubTexture& pressed, const GG::SubTexture& rollover, std::function<bool (const SettableInWindowCUIButton*, const GG::Pt&)> in_window_function);
+    SettableInWindowCUIButton(GG::SubTexture unpressed, GG::SubTexture pressed, GG::SubTexture rollover,
+                              std::function<bool (const SettableInWindowCUIButton*, const GG::Pt&)> in_window_function);
 
     bool InWindow(const GG::Pt& pt) const override;
 
 private:
-    std::function<bool (const SettableInWindowCUIButton*, const GG::Pt&)>    m_in_window_func;
+    std::function<bool (const SettableInWindowCUIButton*, const GG::Pt&)> m_in_window_func;
 };
 
 /** a FreeOrion triangular arrow button */
@@ -166,15 +167,16 @@ public:
 private:
     std::shared_ptr<GG::SubTexture> m_unchecked_icon;
     std::shared_ptr<GG::SubTexture> m_checked_icon;
-    GG::Clr                             m_unchecked_color;
-    GG::Clr                             m_checked_color;
+    GG::Clr                         m_unchecked_color;
+    GG::Clr                         m_checked_color;
 };
 
 
 /** a FreeOrion StateButton control */
 class CUIStateButton : public GG::StateButton {
 public:
-    CUIStateButton(const std::string& str, GG::Flags<GG::TextFormat> format, std::shared_ptr<GG::StateButtonRepresenter> representer);
+    CUIStateButton(std::string str, GG::Flags<GG::TextFormat> format,
+                   std::shared_ptr<GG::StateButtonRepresenter> representer);
 
 };
 
@@ -266,7 +268,7 @@ private:
 /** a FreeOrion Edit control */
 class CUIEdit : public GG::Edit {
 public:
-    explicit CUIEdit(const std::string& str);
+    explicit CUIEdit(std::string str);
 
     void CompleteConstruction() override;
 
@@ -292,12 +294,12 @@ private:
   * placeholder. Useful for password entry.*/
 class CensoredCUIEdit : public CUIEdit {
 public:
-    explicit CensoredCUIEdit(const std::string& str, char display_placeholder = '*');
+    explicit CensoredCUIEdit(std::string str, char display_placeholder = '*');
 
     const std::string& RawText() const;
 
     void RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void SetText(const std::string& str) override;
+    void SetText(std::string str) override;
     void AcceptPastedText(const std::string& text) override;
 
 protected:
@@ -306,13 +308,13 @@ protected:
 private:
     void ClearSelected();
 
-    std::string m_raw_text = "";
+    std::string m_raw_text;
 };
 
 /** a FreeOrion MultiEdit control */
 class CUIMultiEdit : public GG::MultiEdit {
 public:
-    explicit CUIMultiEdit(const std::string& str,
+    explicit CUIMultiEdit(std::string str,
                           GG::Flags<GG::MultiEditStyle> style = GG::MULTI_LINEWRAP);
     void CompleteConstruction() override;
 
@@ -323,7 +325,7 @@ public:
 /** a FreeOrion MultiEdit control that parses its text and makes links within clickable */
 class CUILinkTextMultiEdit : public CUIMultiEdit, public TextLinker {
 public:
-    CUILinkTextMultiEdit(const std::string& str, GG::Flags<GG::MultiEditStyle> style = GG::MULTI_LINEWRAP);
+    CUILinkTextMultiEdit(std::string str, GG::Flags<GG::MultiEditStyle> style = GG::MULTI_LINEWRAP);
     void CompleteConstruction() override;
 
     const std::vector<GG::Font::LineData>& GetLineData() const override;
@@ -345,19 +347,19 @@ public:
         constructed to fit the size of the text (i.e. if the second ctor type
         was used), calls to this function cause the window to be resized to
         whatever space the newly rendered text occupies. */
-    void SetText(const std::string& str) override;
+    void SetText(std::string str) override;
 
 private:
-    void SetLinkedText(const std::string& str) override;
+    void SetLinkedText(std::string str) override;
 
-    bool            m_already_setting_text_so_dont_link;
-    std::string     m_raw_text;
+    bool        m_already_setting_text_so_dont_link = false;
+    std::string m_raw_text;
 };
 
 /** A simple GG::ListBox::Row subclass designed for use in text-only drop-down
   * lists, such as the ones used in the game setup dialogs. */
 struct CUISimpleDropDownListRow : public GG::ListBox::Row {
-    CUISimpleDropDownListRow(const std::string& row_text, GG::Y row_height = DEFAULT_ROW_HEIGHT);
+    CUISimpleDropDownListRow(std::string row_text, GG::Y row_height = DEFAULT_ROW_HEIGHT);
     void CompleteConstruction() override;
     static const GG::Y DEFAULT_ROW_HEIGHT;
 private:
@@ -376,10 +378,10 @@ private:
   */
 class StatisticIcon : public GG::Control {
 public:
-    StatisticIcon(const std::shared_ptr<GG::Texture> texture,
+    StatisticIcon(std::shared_ptr<GG::Texture> texture,
                   GG::X w = GG::X1, GG::Y h = GG::Y1); ///< initialized with no value (just an icon)
 
-    StatisticIcon(const std::shared_ptr<GG::Texture> texture,
+    StatisticIcon(std::shared_ptr<GG::Texture> texture,
                   double value, int digits, bool showsign,
                   GG::X w = GG::X1, GG::Y h = GG::Y1); ///< initializes with one value
 
@@ -490,7 +492,7 @@ private:
     screens. */
 class ResourceInfoPanel : public CUIWnd {
 public:
-    ResourceInfoPanel(const std::string& title, const std::string& point_units_str,
+    ResourceInfoPanel(std::string title, std::string point_units_str,
                       const GG::X x, const GG::Y y, const GG::X w, const GG::Y h,
                       const std::string& config_name);
     void    CompleteConstruction() override;
@@ -595,6 +597,8 @@ public:
       * associated styles use the style GRAPHIC_CENTER. */
     MultiTextureStaticGraphic(const std::vector<std::shared_ptr<GG::Texture>>& textures,
                               const std::vector<GG::Flags<GG::GraphicStyle>>& styles = std::vector<GG::Flags<GG::GraphicStyle>>());
+    MultiTextureStaticGraphic(std::vector<std::shared_ptr<GG::Texture>>&& textures,
+                              std::vector<GG::Flags<GG::GraphicStyle>>&& styles = std::vector<GG::Flags<GG::GraphicStyle>>());
 
     /** creates a MultiTextureStaticGraphic from multiple pre-existing SubTextures which are rendered back-to-front in the
       * order they are specified in \a subtextures with GraphicStyles specified in the same-indexed value of \a styles.
@@ -626,23 +630,25 @@ private:
   * and/or at a continuous angular rate. */
 class RotatingGraphic : public GG::StaticGraphic {
 public:
-    RotatingGraphic(const std::shared_ptr<GG::Texture>& texture, GG::Flags<GG::GraphicStyle> style = GG::GRAPHIC_NONE,
+    RotatingGraphic(std::shared_ptr<GG::Texture> texture,
+                    GG::Flags<GG::GraphicStyle> style = GG::GRAPHIC_NONE,
                     GG::Flags<GG::WndFlag> flags = GG::NO_WND_FLAGS);
 
     void Render() override;
 
-    void            SetRPM(float rpm)               { m_rpm = std::max(-3600.0f, std::min(3600.0f, rpm)); }
-    void            SetPhaseOffset(float degrees)   { m_phase_offset = degrees; }
+    void SetRPM(float rpm)               { m_rpm = std::max(-3600.0f, std::min(3600.0f, rpm)); }
+    void SetPhaseOffset(float degrees)   { m_phase_offset = degrees; }
 
 private:
-    float   m_rpm;
-    float   m_phase_offset;
+    float m_rpm = 20.0f;
+    float m_phase_offset = 0.0f;
 };
 
 /** Renders scanlines over its area. */
 class ScanlineControl : public GG::Control {
 public:
-    ScanlineControl(GG::X x, GG::Y y, GG::X w, GG::Y h, bool square = false, GG::Clr clr = GG::CLR_BLACK);
+    ScanlineControl(GG::X x, GG::Y y, GG::X w, GG::Y h, bool square = false,
+                    GG::Clr clr = GG::CLR_BLACK);
 
     /** Changes the color used to draw the scanlines. */
     void Render() override;
@@ -651,7 +657,7 @@ public:
     { m_color = clr; };
 
 private:
-    bool m_square;
+    bool m_square = false;
     GG::Clr m_color;
 };
 

@@ -185,21 +185,15 @@ private:
 };
 
 // member functions
-SDLGUI::SDLGUI(int w/* = 1024*/, int h/* = 768*/, bool calc_FPS/* = false*/,
-               const std::string& app_name/* = "GG"*/,
-               int x, int y, bool fullscreen, bool fake_mode_change) :
-    GUI(app_name),
+SDLGUI::SDLGUI(int w, int h, bool calc_FPS, std::string app_name, int x, int y,
+               bool fullscreen, bool fake_mode_change) :
+    GUI(std::move(app_name)),
     m_app_width(w),
     m_app_height(h),
     m_initial_x(x),
     m_initial_y(y),
     m_fullscreen(fullscreen),
-    m_fake_mode_change(fake_mode_change),
-    m_display_id(0),
-    m_window(nullptr),
-    m_gl_context(nullptr),
-    m_done(false),
-    m_framebuffer(nullptr)
+    m_fake_mode_change(fake_mode_change)
 {
     SDLInit();
 }
@@ -364,8 +358,8 @@ void SDLGUI::HandleSystemEvents() {
     SDL_Event event;
     while (0 < SDL_PollEvent(&event)) {
         bool send_to_gg = false;
-        EventType gg_event = MOUSEMOVE;
-        Key key = GGK_NONE;
+        EventType gg_event = EventType::MOUSEMOVE;
+        Key key = Key::GGK_NONE;
         std::uint32_t key_code_point = 0;
         Flags<ModKey> mod_keys = GetSDLModKeys();
         // In GiGi some events contain mouse position info,
@@ -383,7 +377,7 @@ void SDLGUI::HandleSystemEvents() {
             send_to_gg = true;
             key = static_cast<Key>(event.key.keysym.scancode);
             key_code_point = event.key.keysym.sym;
-            gg_event = (event.type == SDL_KEYDOWN) ? KEYPRESS : KEYRELEASE;
+            gg_event = (event.type == SDL_KEYDOWN) ? EventType::KEYPRESS : EventType::KEYRELEASE;
             break;
 
         case SDL_TEXTINPUT:
@@ -392,15 +386,15 @@ void SDLGUI::HandleSystemEvents() {
 
         case SDL_MOUSEMOTION:
             send_to_gg = true;
-            gg_event = MOUSEMOVE;
+            gg_event = EventType::MOUSEMOVE;
             break;
 
         case SDL_MOUSEBUTTONDOWN:
             send_to_gg = true;
             switch (event.button.button) {
-                case SDL_BUTTON_LEFT:      gg_event = LPRESS; break;
-                case SDL_BUTTON_MIDDLE:    gg_event = MPRESS; break;
-                case SDL_BUTTON_RIGHT:     gg_event = RPRESS; break;
+                case SDL_BUTTON_LEFT:   gg_event = EventType::LPRESS; break;
+                case SDL_BUTTON_MIDDLE: gg_event = EventType::MPRESS; break;
+                case SDL_BUTTON_RIGHT:  gg_event = EventType::RPRESS; break;
             }
             mod_keys = GetSDLModKeys();
             break;
@@ -408,16 +402,16 @@ void SDLGUI::HandleSystemEvents() {
         case SDL_MOUSEBUTTONUP:
             send_to_gg = true;
             switch (event.button.button) {
-                case SDL_BUTTON_LEFT:   gg_event = LRELEASE; break;
-                case SDL_BUTTON_MIDDLE: gg_event = MRELEASE; break;
-                case SDL_BUTTON_RIGHT:  gg_event = RRELEASE; break;
+                case SDL_BUTTON_LEFT:   gg_event = EventType::LRELEASE; break;
+                case SDL_BUTTON_MIDDLE: gg_event = EventType::MRELEASE; break;
+                case SDL_BUTTON_RIGHT:  gg_event = EventType::RRELEASE; break;
             }
             mod_keys = GetSDLModKeys();
             break;
 
         case SDL_MOUSEWHEEL:
             send_to_gg = true;
-            gg_event = MOUSEWHEEL;
+            gg_event = EventType::MOUSEWHEEL;
             mouse_rel = Pt(X(event.wheel.x), Y(event.wheel.y));
             mod_keys = GetSDLModKeys();
             break;
@@ -639,7 +633,7 @@ void SDLGUI::RelayTextInput(const SDL_TextInputEvent& text, GG::Pt mouse_pos) {
 
     // pass each utf-8 character as a separate event
     while (current != last) {
-        HandleGGEvent(TEXTINPUT, GGK_NONE, utf8::next(current, last), Flags<ModKey>(),
+        HandleGGEvent(EventType::TEXTINPUT, Key::GGK_NONE, utf8::next(current, last), Flags<ModKey>(),
                       mouse_pos, Pt(X0, Y0), &text_string);
     }
 }

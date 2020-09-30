@@ -95,7 +95,7 @@ namespace {
             m_empire_id(empire_id),
             m_location_id(location_id)
         {
-            SetChildClippingMode(ClipToClient);
+            SetChildClippingMode(ChildClippingMode::ClipToClient);
         }
 
         /** Renders panel background and border. */
@@ -152,13 +152,13 @@ namespace {
             std::vector<const Condition::Condition*>    location_conditions;
 
             switch (m_item.build_type) {
-            case BT_BUILDING: {
+            case BuildType::BT_BUILDING: {
                 texture = ClientUI::BuildingIcon(m_item.name);
                 desc_text = UserString("BT_BUILDING");
                 name_text = UserString(m_item.name);
                 break;
             }
-            case BT_SHIP: {
+            case BuildType::BT_SHIP: {
                 texture = ClientUI::ShipDesignIcon(m_item.design_id);
                 desc_text = UserString("BT_SHIP");
                 const ShipDesign* design = GetShipDesign(m_item.design_id);
@@ -166,8 +166,8 @@ namespace {
                     name_text = design->Name(true);
                 break;
             }
-            case BT_STOCKPILE: {
-                texture = ClientUI::MeterIcon(METER_STOCKPILE);
+            case BuildType::BT_STOCKPILE: {
+                texture = ClientUI::MeterIcon(MeterType::METER_STOCKPILE);
                 desc_text = UserString("BT_STOCKPILE");
                 name_text = UserString(m_item.name);
                 break;
@@ -184,10 +184,10 @@ namespace {
             // cost / turn, and minimum production turns
             if (empire) {
                 // from industry output
-                local_pp_output = empire->GetResourcePool(RE_INDUSTRY)->GroupAvailable(m_location_id);
+                local_pp_output = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->GroupAvailable(m_location_id);
 
                 // from stockpile
-                stockpile = empire->GetResourcePool(RE_INDUSTRY)->Stockpile();
+                stockpile = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->Stockpile();
                 stockpile_limit_per_turn = empire->GetProductionQueue().StockpileCapacity();
 
                 std::pair<double, int> cost_time = empire->ProductionCostAndTime(m_item, m_location_id);
@@ -196,8 +196,9 @@ namespace {
                 float total_cost = static_cast<float>(cost_time.first);
                 int minimum_production_time = cost_time.second;
 
-                int production_time = ProductionTurns(total_cost, minimum_production_time, local_pp_output,
-                                                      stockpile, stockpile_limit_per_turn);
+                int production_time = ProductionTurns(total_cost, minimum_production_time,
+                                                      local_pp_output, stockpile,
+                                                      stockpile_limit_per_turn);
 
                 if (production_time >= MAX_PRODUCTION_TURNS)
                     time_text = std::to_string(MAX_PRODUCTION_TURNS) + "+";
@@ -205,11 +206,12 @@ namespace {
                     time_text = std::to_string(production_time);
             }
 
-            m_icon = GG::Wnd::Create<GG::StaticGraphic>(texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
-            m_name = GG::Wnd::Create<CUILabel>(name_text, GG::FORMAT_LEFT);
+            m_icon = GG::Wnd::Create<GG::StaticGraphic>(
+                std::move(texture), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+            m_name = GG::Wnd::Create<CUILabel>(std::move(name_text), GG::FORMAT_LEFT);
             //m_cost = GG::Wnd::Create<CUILabel>(cost_text);
-            m_time = GG::Wnd::Create<CUILabel>(time_text);
-            m_desc = GG::Wnd::Create<CUILabel>(desc_text, GG::FORMAT_LEFT);
+            m_time = GG::Wnd::Create<CUILabel>(std::move(time_text));
+            m_desc = GG::Wnd::Create<CUILabel>(std::move(desc_text), GG::FORMAT_LEFT);
 
             AttachChild(m_icon);
             AttachChild(m_name);
@@ -310,10 +312,10 @@ namespace {
         float stockpile_limit_per_turn = 0.0f;
         if (const auto* empire = GetEmpire(empire_id)) {
             // from industry output
-            local_pp_output = empire->GetResourcePool(RE_INDUSTRY)->GroupAvailable(candidate_object_id);
+            local_pp_output = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->GroupAvailable(candidate_object_id);
 
             // from stockpile
-            stockpile = empire->GetResourcePool(RE_INDUSTRY)->Stockpile();
+            stockpile = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->Stockpile();
             stockpile_limit_per_turn = empire->GetProductionQueue().StockpileCapacity();
         }
 
@@ -323,7 +325,7 @@ namespace {
             candidate_name += " (" + std::to_string(candidate_object_id) + ")";
 
         // production item is a building
-        if (item.build_type == BT_BUILDING) {
+        if (item.build_type == BuildType::BT_BUILDING) {
             const BuildingType* building_type = GetBuildingType(item.name);
             if (!building_type)
                 return nullptr;
@@ -399,7 +401,7 @@ namespace {
         }
 
         // production item is a ship
-        if (item.build_type == BT_SHIP) {
+        if (item.build_type == BuildType::BT_SHIP) {
             const ShipDesign* design = GetShipDesign(item.design_id);
             if (!design)
                 return nullptr;
@@ -468,7 +470,7 @@ namespace {
                 if (ship_part_names.count(part_name))
                     ship_part_names[part_name]++;
                 else
-                    ship_part_names.insert(std::pair<std::string, int>(part_name, 1));
+                    ship_part_names[part_name] = 1;
             }
 
             for (const auto& part_name_count : ship_part_names) {
@@ -499,7 +501,7 @@ namespace {
         }
 
         // production item is a stockpiling project
-        if (item.build_type == BT_STOCKPILE) {
+        if (item.build_type == BuildType::BT_STOCKPILE) {
             // create title, description, production time and cost
             const std::string& title = UserString(item.name);
             std::string main_text = UserString("PROJECT_BT_STOCKPILE_DESC");
@@ -508,7 +510,7 @@ namespace {
 
             // create tooltip
             return GG::Wnd::Create<IconTextBrowseWnd>(
-                ClientUI::MeterIcon(METER_STOCKPILE), title, main_text);
+                ClientUI::MeterIcon(MeterType::METER_STOCKPILE), title, main_text);
         }
 
         // other production item (?)
@@ -530,9 +532,9 @@ namespace {
             SetName("ProductionItemRow");
             SetMargin(0);
             SetRowAlignment(GG::ALIGN_NONE);
-            SetChildClippingMode(ClipToClient);
+            SetChildClippingMode(ChildClippingMode::ClipToClient);
 
-            if (m_item.build_type == BT_SHIP) {
+            if (m_item.build_type == BuildType::BT_SHIP) {
                 SetDragDropDataType(std::to_string(m_item.design_id));
             } else {
                 SetDragDropDataType(m_item.name);
@@ -702,19 +704,23 @@ BuildDesignatorWnd::BuildSelector::BuildSelector(const std::string& config_name)
 
 void BuildDesignatorWnd::BuildSelector::CompleteConstruction() {
     // create build type toggle buttons (ship, building, all)
-    m_build_type_buttons[BT_BUILDING] = GG::Wnd::Create<CUIStateButton>(
-        UserString("PRODUCTION_WND_CATEGORY_BT_BUILDING"), GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
-    AttachChild(m_build_type_buttons[BT_BUILDING]);
-    m_build_type_buttons[BT_SHIP] = GG::Wnd::Create<CUIStateButton>(
-        UserString("PRODUCTION_WND_CATEGORY_BT_SHIP"), GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
-    AttachChild(m_build_type_buttons[BT_SHIP]);
+    m_build_type_buttons[BuildType::BT_BUILDING] = GG::Wnd::Create<CUIStateButton>(
+        UserString("PRODUCTION_WND_CATEGORY_BT_BUILDING"),
+        GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
+    AttachChild(m_build_type_buttons[BuildType::BT_BUILDING]);
+    m_build_type_buttons[BuildType::BT_SHIP] = GG::Wnd::Create<CUIStateButton>(
+        UserString("PRODUCTION_WND_CATEGORY_BT_SHIP"),
+        GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
+    AttachChild(m_build_type_buttons[BuildType::BT_SHIP]);
 
     // create availability toggle buttons (available, not available)
     m_availability_buttons.push_back(GG::Wnd::Create<CUIStateButton>(
-        UserString("PRODUCTION_WND_AVAILABILITY_AVAILABLE"), GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>()));
+        UserString("PRODUCTION_WND_AVAILABILITY_AVAILABLE"),
+        GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>()));
     AttachChild(m_availability_buttons.back());
     m_availability_buttons.push_back(GG::Wnd::Create<CUIStateButton>(
-        UserString("PRODUCTION_WND_AVAILABILITY_UNAVAILABLE"), GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>()));
+        UserString("PRODUCTION_WND_AVAILABILITY_UNAVAILABLE"),
+        GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>()));
     AttachChild(m_availability_buttons.back());
 
     namespace ph = boost::placeholders;
@@ -766,13 +772,13 @@ void BuildDesignatorWnd::BuildSelector::DoLayout() {
     GG::X button_width = ClientWidth() / num_buttons;
     GG::Y button_height(ClientUI::Pts()*4/3);
 
-    m_build_type_buttons[BT_BUILDING]->SizeMove(GG::Pt(x, GG::Y0), GG::Pt(x + button_width, button_height));
+    m_build_type_buttons[BuildType::BT_BUILDING]->SizeMove(GG::Pt(x, GG::Y0), GG::Pt(x + button_width, button_height));
     x += button_width;
-    m_build_type_buttons[BT_SHIP]->SizeMove(    GG::Pt(x, GG::Y0), GG::Pt(x + button_width, button_height));
+    m_build_type_buttons[BuildType::BT_SHIP]->SizeMove(    GG::Pt(x, GG::Y0), GG::Pt(x + button_width, button_height));
     x += button_width;
-    m_availability_buttons[0]->SizeMove(        GG::Pt(x, GG::Y0), GG::Pt(x + button_width, button_height));
+    m_availability_buttons[0]->SizeMove(                   GG::Pt(x, GG::Y0), GG::Pt(x + button_width, button_height));
     x += button_width;
-    m_availability_buttons[1]->SizeMove(        GG::Pt(x, GG::Y0), GG::Pt(x + button_width, button_height));
+    m_availability_buttons[1]->SizeMove(                   GG::Pt(x, GG::Y0), GG::Pt(x + button_width, button_height));
     x += button_width;
 
     m_buildable_items->SizeMove(GG::Pt(GG::X0, button_height),
@@ -794,7 +800,7 @@ void BuildDesignatorWnd::BuildSelector::SetBuildLocation(int location_id, bool r
     }
 }
 
-void BuildDesignatorWnd::BuildSelector::SetEmpireID(int empire_id/* = ALL_EMPIRES*/, bool refresh_list/* = true*/) {
+void BuildDesignatorWnd::BuildSelector::SetEmpireID(int empire_id, bool refresh_list) {
     if (empire_id == m_empire_id)
         return;
 
@@ -807,13 +813,13 @@ void BuildDesignatorWnd::BuildSelector::SetEmpireID(int empire_id/* = ALL_EMPIRE
         m_empire_ship_designs_changed_signal.disconnect();
         if (const Empire* empire = GetEmpire(m_empire_id))
             m_empire_ship_designs_changed_signal = empire->ShipDesignsChangedSignal.connect(
-                                                    boost::bind(&BuildDesignatorWnd::BuildSelector::Refresh, this),
-                                                    boost::signals2::at_front);
+                boost::bind(&BuildDesignatorWnd::BuildSelector::Refresh, this),
+                boost::signals2::at_front);
     }
 }
 
 void BuildDesignatorWnd::BuildSelector::Refresh() {
-    ScopedTimer timer("BuildDesignatorWnd::BuildSelector::Refresh()");
+    ScopedTimer timer("BuildDesignatorWnd::BuildSelector::Refresh()", true);
     if (auto prod_loc = Objects().get(this->m_production_location))
         this->SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_WND_BUILD_ITEMS_TITLE_LOCATION")) % prod_loc->Name()));
     else
@@ -845,9 +851,9 @@ void BuildDesignatorWnd::BuildSelector::HideType(BuildType type, bool refresh_li
 }
 
 void BuildDesignatorWnd::BuildSelector::ShowAllTypes(bool refresh_list) {
-    m_build_types_shown.insert(BT_BUILDING);
-    m_build_types_shown.insert(BT_SHIP);
-    m_build_types_shown.insert(BT_STOCKPILE);
+    m_build_types_shown.insert(BuildType::BT_BUILDING);
+    m_build_types_shown.insert(BuildType::BT_SHIP);
+    m_build_types_shown.insert(BuildType::BT_STOCKPILE);
     if (refresh_list)
         Refresh();
 }
@@ -891,7 +897,7 @@ void BuildDesignatorWnd::BuildSelector::HideAvailability(bool available, bool re
 }
 
 bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_type) {
-    if (build_type != BT_STOCKPILE)
+    if (build_type != BuildType::BT_STOCKPILE)
         throw std::invalid_argument("BuildableItemVisible was passed an invalid build type without id");
 
     const Empire* empire = GetEmpire(m_empire_id);
@@ -904,7 +910,7 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
 bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_type,
                                                              const std::string& name)
 {
-    if (build_type != BT_BUILDING)
+    if (build_type != BuildType::BT_BUILDING)
         throw std::invalid_argument("BuildableItemVisible was passed an invalid build type with a name");
 
     if (!m_build_types_shown.count(build_type))
@@ -920,8 +926,8 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
 
     // check that item is both enqueuable and producible, since most buildings currently have
     // nonselective EnqueueLocation conditions
-    bool enqueuable_here = empire->EnqueuableItem(BT_BUILDING, name, m_production_location) &&
-                           empire->ProducibleItem(BT_BUILDING, name, m_production_location);
+    bool enqueuable_here = empire->EnqueuableItem(BuildType::BT_BUILDING, name, m_production_location) &&
+                           empire->ProducibleItem(BuildType::BT_BUILDING, name, m_production_location);
 
     if (enqueuable_here)
         return m_availabilities_shown.first;
@@ -930,7 +936,7 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
 }
 
 bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_type, int design_id) {
-    if (build_type != BT_SHIP)
+    if (build_type != BuildType::BT_SHIP)
         throw std::invalid_argument("BuildableItemVisible was passed an invalid build type with an id");
 
     if (!m_build_types_shown.count(build_type))
@@ -944,7 +950,7 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
     if (!empire)
         return true;
 
-    bool producible_here = empire->ProducibleItem(BT_SHIP, design_id, m_production_location);
+    bool producible_here = empire->ProducibleItem(BuildType::BT_SHIP, design_id, m_production_location);
 
     if (producible_here)
         return m_availabilities_shown.first;
@@ -969,48 +975,41 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
     const GG::Pt row_size = m_buildable_items->ListRowSize();
 
     // populate list with fixed projects
-    if (BuildableItemVisible(BT_STOCKPILE)) {
+    if (BuildableItemVisible(BuildType::BT_STOCKPILE)) {
         auto stockpile_row = GG::Wnd::Create<ProductionItemRow>(
-            row_size.x, row_size.y, ProductionQueue::ProductionItem(BT_STOCKPILE), m_empire_id, m_production_location);
-        m_buildable_items->Insert(stockpile_row);
-
-        // resize inserted rows and record first row to show
-        for (auto& row : *m_buildable_items) {
-            row->Resize(row_size);
-        }
+            row_size.x, row_size.y, ProductionQueue::ProductionItem(BuildType::BT_STOCKPILE),
+            m_empire_id, m_production_location);
+        m_buildable_items->Insert(std::move(stockpile_row));
     }
 
     // populate list with building types
     //DebugLogger() << "BuildDesignatorWnd::BuildSelector::PopulateList() : Adding Buildings ";
-    if (m_build_types_shown.count(BT_BUILDING)) {
+    if (m_build_types_shown.count(BuildType::BT_BUILDING)) {
         BuildingTypeManager& manager = GetBuildingTypeManager();
         // craete and insert rows...
         std::vector<std::shared_ptr<GG::ListBox::Row>> rows;
         rows.reserve(std::distance(manager.begin(), manager.end()));
         for (const auto& entry : manager) {
-            const std::string name = entry.first;
-            if (!BuildableItemVisible(BT_BUILDING, name))
+            auto& name = entry.first;
+            if (!BuildableItemVisible(BuildType::BT_BUILDING, name))
                 continue;
-            auto item_row = GG::Wnd::Create<ProductionItemRow>(row_size.x, row_size.y,
-                                                               ProductionQueue::ProductionItem(BT_BUILDING, name),
-                                                               m_empire_id, m_production_location);
-            rows.push_back(item_row);
+            auto item_row = GG::Wnd::Create<ProductionItemRow>(
+                row_size.x, row_size.y, ProductionQueue::ProductionItem(BuildType::BT_BUILDING, name),
+                m_empire_id, m_production_location);
+            rows.emplace_back(std::move(item_row));
         }
-        m_buildable_items->Insert(rows);
-        // resize inserted rows and record first row to show
-        for (auto& row : *m_buildable_items) {
-            row->Resize(row_size);
-        }
+        m_buildable_items->Insert(std::move(rows));
     }
 
     // populate with ship designs
     //DebugLogger() << "BuildDesignatorWnd::BuildSelector::PopulateList() : Adding ship designs";
-    if (m_build_types_shown.count(BT_SHIP)) {
+    if (m_build_types_shown.count(BuildType::BT_SHIP)) {
         // get ids of designs to show... for specific empire, or for all empires
         std::vector<int> design_ids;
         if (empire) {
             design_ids = ClientUI::GetClientUI()->GetShipDesignManager()->DisplayedDesigns()->OrderedIDs();
         } else {
+            design_ids.reserve(GetUniverse().NumShipDesigns());
             for (auto it = GetUniverse().beginShipDesigns();
                  it != GetUniverse().endShipDesigns(); ++it)
             { design_ids.push_back(it->first); }
@@ -1020,23 +1019,23 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
         std::vector<std::shared_ptr<GG::ListBox::Row>> rows;
         rows.reserve(design_ids.size());
         for (int ship_design_id : design_ids) {
-            if (!BuildableItemVisible(BT_SHIP, ship_design_id))
+            if (!BuildableItemVisible(BuildType::BT_SHIP, ship_design_id))
                 continue;
             const ShipDesign* ship_design = GetShipDesign(ship_design_id);
             if (!ship_design)
                 continue;
             auto item_row = GG::Wnd::Create<ProductionItemRow>(
                 row_size.x, row_size.y, 
-                ProductionQueue::ProductionItem(BT_SHIP, ship_design_id),
+                ProductionQueue::ProductionItem(BuildType::BT_SHIP, ship_design_id),
                 m_empire_id, m_production_location);
-            rows.push_back(item_row);
+            rows.emplace_back(std::move(item_row));
         }
-        m_buildable_items->Insert(rows);
-        // resize inserted rows and record first row to show
-        for (auto& row : *m_buildable_items) {
-            row->Resize(row_size);
-        }
+        m_buildable_items->Insert(std::move(rows));
     }
+
+    // resize inserted rows and record first row to show
+    for (auto& row : *m_buildable_items)
+        row->Resize(row_size);
 
     // Restore the list scroll state
     // If we were at the top stay at the top
@@ -1067,7 +1066,7 @@ void BuildDesignatorWnd::BuildSelector::BuildItemLeftClicked(GG::ListBox::iterat
 
     BuildType build_type = item.build_type;
 
-    if (build_type == BT_BUILDING) {
+    if (build_type == BuildType::BT_BUILDING) {
         const BuildingType* building_type = GetBuildingType(item.name);
         if (!building_type) {
             ErrorLogger() << "BuildDesignatorWnd::BuildSelector::BuildItemSelected unable to get building type: " << item.name;
@@ -1075,7 +1074,7 @@ void BuildDesignatorWnd::BuildSelector::BuildItemLeftClicked(GG::ListBox::iterat
         }
         DisplayBuildingTypeSignal(building_type);
 
-    } else if (build_type == BT_SHIP) {
+    } else if (build_type == BuildType::BT_SHIP) {
         const ShipDesign* design = GetShipDesign(item.design_id);
         if (!design) {
             ErrorLogger() << "BuildDesignatorWnd::BuildSelector::BuildItemSelected unable to find design with id " << item.design_id;
@@ -1083,7 +1082,7 @@ void BuildDesignatorWnd::BuildSelector::BuildItemLeftClicked(GG::ListBox::iterat
         }
         DisplayShipDesignSignal(design);
 
-    } else if (build_type == BT_STOCKPILE) {
+    } else if (build_type == BuildType::BT_STOCKPILE) {
         DisplayStockpileProjectSignal();
     }
 }
@@ -1108,11 +1107,11 @@ void BuildDesignatorWnd::BuildSelector::BuildItemRightClicked(GG::ListBox::itera
     const ProductionQueue::ProductionItem& item = item_row->Item();
 
     std::string item_name = "";
-    if (item.build_type == BT_BUILDING) {
+    if (item.build_type == BuildType::BT_BUILDING) {
         item_name = item.name;
-    } else if (item.build_type == BT_SHIP) {
+    } else if (item.build_type == BuildType::BT_SHIP) {
         item_name = GetShipDesign(item.design_id)->Name(false);
-    } else if (item.build_type == BT_STOCKPILE) {
+    } else if (item.build_type == BuildType::BT_STOCKPILE) {
         item_name = UserStringNop("PROJECT_BT_STOCKPILE");
     } else {
         ErrorLogger() << "Invalid build type (" << item.build_type << ") for item";
@@ -1137,7 +1136,7 @@ void BuildDesignatorWnd::BuildSelector::BuildItemRightClicked(GG::ListBox::itera
         item_name = UserString(item_name);
 
     std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) % item_name);
-    popup->AddMenuItem(GG::MenuItem(popup_label, false, false, pedia_lookup_action));
+    popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false, pedia_lookup_action));
     popup->Run();
 }
 
@@ -1187,10 +1186,10 @@ void BuildDesignatorWnd::CompleteConstruction() {
     SidePanel::SystemSelectedSignal.connect(SystemSelectedSignal);
 
     // connect build type button clicks to update display
-    m_build_selector->m_build_type_buttons[BT_BUILDING]->CheckedSignal.connect(
-        boost::bind(&BuildDesignatorWnd::ToggleType, this, BT_BUILDING, true));
-    m_build_selector->m_build_type_buttons[BT_SHIP]->CheckedSignal.connect(
-        boost::bind(&BuildDesignatorWnd::ToggleType, this, BT_SHIP, true));
+    m_build_selector->m_build_type_buttons[BuildType::BT_BUILDING]->CheckedSignal.connect(
+        boost::bind(&BuildDesignatorWnd::ToggleType, this, BuildType::BT_BUILDING, true));
+    m_build_selector->m_build_type_buttons[BuildType::BT_SHIP]->CheckedSignal.connect(
+        boost::bind(&BuildDesignatorWnd::ToggleType, this, BuildType::BT_SHIP, true));
 
     // connect availability button clicks to update display
     // available items
@@ -1273,15 +1272,15 @@ void BuildDesignatorWnd::SetBuild(int queue_idx) {
     const ProductionQueue& queue = empire->GetProductionQueue();
     if (0 <= queue_idx && queue_idx < static_cast<int>(queue.size())) {
         BuildType buildType = queue[queue_idx].item.build_type;
-        if (buildType == BT_BUILDING) {
+        if (buildType == BuildType::BT_BUILDING) {
             const BuildingType* building_type = GetBuildingType(queue[queue_idx].item.name);
             assert(building_type);
             m_build_selector->DisplayBuildingTypeSignal(building_type);
-        } else if (buildType == BT_SHIP) {
+        } else if (buildType == BuildType::BT_SHIP) {
             const ShipDesign* design = GetShipDesign(queue[queue_idx].item.design_id);
             assert(design);
             m_build_selector->DisplayShipDesignSignal(design);
-        } else if (buildType == BT_STOCKPILE) {
+        } else if (buildType == BuildType::BT_STOCKPILE) {
             m_build_selector->DisplayStockpileProjectSignal();
         }
     } else {
@@ -1357,10 +1356,10 @@ void BuildDesignatorWnd::Clear() {
 }
 
 void BuildDesignatorWnd::ShowType(BuildType type, bool refresh_list) {
-    if (type == BT_BUILDING || type == BT_SHIP) {
+    if (type == BuildType::BT_BUILDING || type == BuildType::BT_SHIP) {
         m_build_selector->ShowType(type, refresh_list);
         m_build_selector->m_build_type_buttons[type]->SetCheck();
-    } else if (type == BT_STOCKPILE) {
+    } else if (type == BuildType::BT_STOCKPILE) {
         m_build_selector->ShowType(type, refresh_list);
     } else {
         ErrorLogger() << "BuildDesignatorWnd::ShowType(" << type << ")";
@@ -1370,16 +1369,16 @@ void BuildDesignatorWnd::ShowType(BuildType type, bool refresh_list) {
 
 void BuildDesignatorWnd::ShowAllTypes(bool refresh_list) {
     m_build_selector->ShowAllTypes(refresh_list);
-    m_build_selector->m_build_type_buttons[BT_BUILDING]->SetCheck();
-    m_build_selector->m_build_type_buttons[BT_SHIP]->SetCheck();
+    m_build_selector->m_build_type_buttons[BuildType::BT_BUILDING]->SetCheck();
+    m_build_selector->m_build_type_buttons[BuildType::BT_SHIP]->SetCheck();
 }
 
 void BuildDesignatorWnd::HideType(BuildType type, bool refresh_list) {
     DebugLogger() << "BuildDesignatorWnd::HideType(" << type << ")";
-    if (type == BT_BUILDING || type == BT_SHIP) {
+    if (type == BuildType::BT_BUILDING || type == BuildType::BT_SHIP) {
         m_build_selector->HideType(type, refresh_list);
         m_build_selector->m_build_type_buttons[type]->SetCheck(false);
-    } else if (type == BT_STOCKPILE) {
+    } else if (type == BuildType::BT_STOCKPILE) {
         m_build_selector->HideType(type, refresh_list);
     } else {
         throw std::invalid_argument("BuildDesignatorWnd::HideType was passed an invalid BuildType");
@@ -1388,12 +1387,12 @@ void BuildDesignatorWnd::HideType(BuildType type, bool refresh_list) {
 
 void BuildDesignatorWnd::HideAllTypes(bool refresh_list) {
     m_build_selector->HideAllTypes(refresh_list);
-    m_build_selector->m_build_type_buttons[BT_BUILDING]->SetCheck(false);
-    m_build_selector->m_build_type_buttons[BT_SHIP]->SetCheck(false);
+    m_build_selector->m_build_type_buttons[BuildType::BT_BUILDING]->SetCheck(false);
+    m_build_selector->m_build_type_buttons[BuildType::BT_SHIP]->SetCheck(false);
 }
 
 void BuildDesignatorWnd::ToggleType(BuildType type, bool refresh_list) {
-    if (type == BT_BUILDING || type == BT_SHIP) {
+    if (type == BuildType::BT_BUILDING || type == BuildType::BT_SHIP) {
         const std::set<BuildType>& types_shown = m_build_selector->GetBuildTypesShown();
         if (!types_shown.count(type))
             ShowType(type, refresh_list);
@@ -1406,7 +1405,7 @@ void BuildDesignatorWnd::ToggleType(BuildType type, bool refresh_list) {
 
 void BuildDesignatorWnd::ToggleAllTypes(bool refresh_list) {
     const std::set<BuildType>& types_shown = m_build_selector->GetBuildTypesShown();
-    if (types_shown.size() == NUM_BUILD_TYPES - 1)  // -1 because there are no buttons for BuildType::BT_NOT_BUILDING
+    if (types_shown.size() == int(BuildType::NUM_BUILD_TYPES) - 1)  // -1 because there are no buttons for BuildType::BT_NOT_BUILDING
         HideAllTypes(refresh_list);
     else
         ShowAllTypes(refresh_list);
@@ -1560,7 +1559,7 @@ void BuildDesignatorWnd::SelectDefaultPlanet() {
         if (!m_side_panel->PlanetSelectable(planet_id))
             continue;
 
-        double planet_pop = planet->GetMeter(METER_POPULATION)->Initial();
+        double planet_pop = planet->GetMeter(MeterType::METER_POPULATION)->Initial();
         if (planet_pop > best_planet_pop) {
             // found new planet to pick
             //found_planet = true;

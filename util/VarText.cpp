@@ -1,5 +1,6 @@
 #include "VarText.h"
 
+#include "../universe/ValueRefs.h"
 #include "../universe/Universe.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/System.h"
@@ -31,6 +32,7 @@ const Species*      GetSpecies(const std::string& name);
 const FieldType*    GetFieldType(const std::string& name);
 const ShipHull*     GetShipHull(const std::string& name);
 const ShipPart*     GetShipPart(const std::string& name);
+ValueRef::ValueRefBase* const  GetValueRefBase(const std::string& name);
 
 namespace {
     //! Return @p content surrounded by the given @p tags.
@@ -85,11 +87,11 @@ namespace {
     boost::optional<std::string> MeterTypeString(const std::string& data) {
         boost::optional<std::string> retval = boost::none;
         // validate data
-        MeterType meter_type = INVALID_METER_TYPE;
+        MeterType meter_type = MeterType::INVALID_METER_TYPE;
         std::istringstream data_ss(data);
         data_ss >> meter_type;
 
-        if (meter_type > INVALID_METER_TYPE && meter_type < NUM_METER_TYPES) {
+        if (meter_type > MeterType::INVALID_METER_TYPE && meter_type < MeterType::NUM_METER_TYPES) {
             retval = boost::lexical_cast<std::string>(meter_type);
             if (UserStringExists(*retval))
                 retval = WithTags(UserString(*retval), VarText::METER_TYPE_TAG, *retval);
@@ -172,6 +174,12 @@ namespace {
             {VarText::PREDEFINED_DESIGN_TAG, PredefinedShipDesignString},
             {VarText::EMPIRE_ID_TAG, [](const std::string& data)
                 { return IDString<Empire, GetEmpire>(data, VarText::EMPIRE_ID_TAG); }},
+            {VarText::FOCS_VALUE_TAG, [](const std::string& data) -> boost::optional<std::string>
+             { const ValueRef::ValueRefBase* vr = GetValueRefBase(data);
+               if (vr) {
+                   return WithTags(UserString(data), VarText::FOCS_VALUE_TAG, vr->EvalAsString());
+               } else
+                   return WithTags(data, VarText::FOCS_VALUE_TAG, UserString("UNKNOWN_VALUE_REF_NAME")); }},
         };
 
         return substitute_map;
@@ -235,6 +243,8 @@ const std::string VarText::EMPIRE_ID_TAG = "empire";
 const std::string VarText::DESIGN_ID_TAG = "shipdesign";
 const std::string VarText::PREDEFINED_DESIGN_TAG = "predefinedshipdesign";
 
+const std::string VarText::FOCS_VALUE_TAG = "value";
+
 const std::string VarText::TECH_TAG = "tech";
 const std::string VarText::POLICY_TAG = "policy";
 const std::string VarText::BUILDING_TYPE_TAG = "buildingtype";
@@ -249,8 +259,8 @@ const std::string VarText::METER_TYPE_TAG = "metertype";
 VarText::VarText()
 {}
 
-VarText::VarText(const std::string& template_string, bool stringtable_lookup/* = true*/) :
-    m_template_string(template_string),
+VarText::VarText(std::string template_string, bool stringtable_lookup) :
+    m_template_string(std::move(template_string)),
     m_stringtable_lookup_flag(stringtable_lookup)
 {}
 
@@ -266,20 +276,29 @@ bool VarText::Validate() const {
     return m_validated;
 }
 
-void VarText::SetTemplateString(const std::string& template_string, bool stringtable_lookup/* = true*/) {
-    m_template_string = template_string;
+void VarText::SetTemplateString(std::string template_string, bool stringtable_lookup) {
+    m_template_string = std::move(template_string);
     m_stringtable_lookup_flag = stringtable_lookup;
 }
 
 std::vector<std::string> VarText::GetVariableTags() const {
     std::vector<std::string> retval;
+    retval.reserve(m_variables.size());
     for (const auto& variable : m_variables)
-        retval.push_back(variable.first);
+        retval.emplace_back(variable.first);
     return retval;
 }
 
 void VarText::AddVariable(const std::string& tag, const std::string& data)
 { m_variables[tag] = data; }
+
+void VarText::AddVariable(const std::string& tag, std::string&& data)
+{ m_variables[tag] = std::move(data); }
+
+void VarText::AddVariables(std::vector<std::pair<std::string, std::string>>&& data) {
+    for (auto& dat : data)
+        m_variables.emplace(std::move(dat));
+}
 
 void VarText::GenerateVarText() const {
     // generate a string complete with substituted variables and hyperlinks

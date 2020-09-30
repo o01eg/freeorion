@@ -4,4 +4,11 @@ Policy
     short_description = "PLC_POPULATION_SHORT_DESC"
     category = "SOCIAL_CATEGORY"
     adoptioncost = floor(5 + 0.25 * Statistic Sum value = LocalCandidate.Population condition = And [ Planet OwnedBy empire = Source.Owner ])
+    exclusions = [ "PLC_NO_GROWTH" ]
+    effectsgroups = [
+        [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
+    ]
     graphic = "icons/focus/growth.png"
+
+#include "/scripting/policies/policies.macros"
+#include "/scripting/common/priorities.macros"

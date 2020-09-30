@@ -4,11 +4,14 @@ BuildingType
     buildcost = 300 * [[BUILDING_COST_MULTIPLIER]]
     buildtime = 3
     location = AND [
+        Planet
         Not Contains Building name = "BLD_ENCLAVE_VOID"
         OwnedBy empire = Source.Owner
     ]
     EnqueueLocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
     effectsgroups = [
+        [[SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS]]
+    
         EffectsGroup
             scope = And [
                 PopulationCenter
@@ -24,3 +27,4 @@ BuildingType
 #include "/scripting/common/enqueue.macros"
 #include "/scripting/common/priorities.macros"
 #include "/scripting/common/base_prod.macros"
+#include "/scripting/buildings/buildings.macros"

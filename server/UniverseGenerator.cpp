@@ -788,8 +788,8 @@ void SetActiveMetersToTargetMaxCurrentValues(ObjectMap& object_map) {
 
 void SetNativePopulationValues(ObjectMap& object_map) {
     for (const auto& object : object_map.all()) {
-        Meter* meter = object->GetMeter(METER_POPULATION);
-        Meter* targetmax_meter = object->GetMeter(METER_TARGET_POPULATION);
+        Meter* meter = object->GetMeter(MeterType::METER_POPULATION);
+        Meter* targetmax_meter = object->GetMeter(MeterType::METER_TARGET_POPULATION);
         // only applies to unowned planets
         if (meter && targetmax_meter && object->Unowned()) {
             double r = RandZeroToOne();
@@ -834,15 +834,15 @@ bool SetEmpireHomeworld(Empire* empire, int planet_id, std::string species_name)
         home_planet->SetType(preferred_planet_type);
         home_planet->SetOriginalType(preferred_planet_type);
         // set planet size according to planet type
-        if (preferred_planet_type == PT_ASTEROIDS)
-            home_planet->SetSize(SZ_ASTEROIDS);
-        else if (preferred_planet_type == PT_GASGIANT)
-            home_planet->SetSize(SZ_GASGIANT);
+        if (preferred_planet_type == PlanetType::PT_ASTEROIDS)
+            home_planet->SetSize(PlanetSize::SZ_ASTEROIDS);
+        else if (preferred_planet_type == PlanetType::PT_GASGIANT)
+            home_planet->SetSize(PlanetSize::SZ_GASGIANT);
         else
-            home_planet->SetSize(SZ_MEDIUM);
+            home_planet->SetSize(PlanetSize::SZ_MEDIUM);
     }
 
-    home_planet->Colonize(empire->EmpireID(), species_name, Meter::LARGE_VALUE);
+    home_planet->Colonize(empire->EmpireID(), std::move(species_name), Meter::LARGE_VALUE);
     species->AddHomeworld(home_planet->ID());
     empire->SetCapitalID(home_planet->ID());
     empire->AddExploredSystem(home_planet->SystemID());
@@ -864,8 +864,8 @@ void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data) {
         if (empire_id == ALL_EMPIRES)
             ErrorLogger() << "InitEmpires empire id (" << empire_id << ") is invalid";
 
-        std::string player_name =   entry.second.player_name;
-        GG::Clr     empire_colour = entry.second.empire_color;
+        const auto& player_name =   entry.second.player_name;
+        auto        empire_colour = entry.second.empire_color;
         bool        authenticated = entry.second.authenticated;
 
         // validate or generate empire colour
@@ -875,15 +875,17 @@ void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data) {
             colors.erase(color_it);
 
         // if no colour already set, do so automatically
-        if (empire_colour == GG::Clr(0, 0, 0, 0)) {
+        if (empire_colour == GG::CLR_ZERO) {
             if (!colors.empty()) {
                 // take next colour from list
                 empire_colour = colors[0];
                 colors.erase(colors.begin());
             } else {
                 // as a last resort, make up a colour
-                empire_colour = GG::FloatClr(static_cast<float>(RandZeroToOne()), static_cast<float>(RandZeroToOne()),
-                                             static_cast<float>(RandZeroToOne()), 1.0f);
+                empire_colour = GG::FloatClr(static_cast<float>(RandZeroToOne()),
+                                             static_cast<float>(RandZeroToOne()),
+                                             static_cast<float>(RandZeroToOne()),
+                                             1.0f);
             }
         }
 
@@ -894,7 +896,8 @@ void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data) {
                       << " for player: " << player_name << " in team: " << entry.second.starting_team;
 
         // create new Empire object through empire manager
-        Empires().CreateEmpire(empire_id, empire_name, player_name, empire_colour, authenticated);
+        Empires().CreateEmpire(empire_id, std::move(empire_name), player_name,
+                               empire_colour, authenticated);
     }
 
     Empires().ResetDiplomacy();
@@ -910,7 +913,7 @@ void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data) {
             if (entry.second.starting_team != other_entry.second.starting_team)
                 continue;
 
-            Empires().SetDiplomaticStatus(entry.first, other_entry.first, DIPLO_ALLIED);
+            Empires().SetDiplomaticStatus(entry.first, other_entry.first, DiplomaticStatus::DIPLO_ALLIED);
         }
     }
 }

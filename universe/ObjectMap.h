@@ -9,6 +9,7 @@
 #include <type_traits>
 #include <vector>
 #include <boost/range/adaptor/map.hpp>
+#include <boost/range/algorithm/count_if.hpp>
 #include <boost/range/any_range.hpp>
 #include <boost/range/size.hpp>
 #include "../util/Export.h"
@@ -82,6 +83,18 @@ public:
     template <typename T = UniverseObject>
     std::vector<std::shared_ptr<T>> find(const UniverseObjectVisitor& visitor);
 
+    /** Returns IDs of all the objects that match \a visitor */
+    template <typename T = UniverseObject>
+    std::vector<int> findIDs(const UniverseObjectVisitor& visitor) const;
+
+    /** Returns how many objects match \a visitor */
+    template <typename T = UniverseObject>
+    int count(const UniverseObjectVisitor& visitor) const;
+
+    /** Returns true iff any object matches \a visitor */
+    template <typename T = UniverseObject>
+    bool check_if_any(const UniverseObjectVisitor& visitor) const;
+
     /** Returns all the objects of type T */
     template <typename T = UniverseObject>
     boost::select_second_const_range<container_type<T>> all() const
@@ -154,8 +167,9 @@ public:
     /** Adds object \a obj to the map under its ID, if it is a valid object.
       * If there already was an object in the map with the id \a id then
       * that object will be removed. */
-    template <typename T>
-    void insert(std::shared_ptr<T> obj, int empire_id = ALL_EMPIRES);
+    template <typename T,
+              typename std::enable_if<std::is_base_of<UniverseObject, T>::value>::type* = nullptr>
+    void insert(std::shared_ptr<T> item, int empire_id = ALL_EMPIRES);
 
     /** Removes object with id \a id from map, and returns that object, if
       * there was an object under that ID in the map.  If no such object
@@ -220,7 +234,8 @@ private:
 };
 
 template <typename T>
-std::shared_ptr<const T> ObjectMap::get(int id) const {
+std::shared_ptr<const T> ObjectMap::get(int id) const
+{
     auto it = Map<typename std::remove_const<T>::type>().find(id);
     return std::shared_ptr<const T>(
         it != Map<typename std::remove_const<T>::type>().end()
@@ -229,7 +244,8 @@ std::shared_ptr<const T> ObjectMap::get(int id) const {
 }
 
 template <typename T>
-std::shared_ptr<T> ObjectMap::get(int id) {
+std::shared_ptr<T> ObjectMap::get(int id)
+{
     auto it = Map<typename std::remove_const<T>::type>().find(id);
     return std::shared_ptr<T>(
         it != Map<typename std::remove_const<T>::type>().end()
@@ -238,64 +254,107 @@ std::shared_ptr<T> ObjectMap::get(int id) {
 }
 
 template <typename T>
-std::vector<std::shared_ptr<const T>> ObjectMap::find(const id_range& object_ids) const {
+std::vector<std::shared_ptr<const T>> ObjectMap::find(const id_range& object_ids) const
+{
     std::vector<std::shared_ptr<const T>> retval;
     retval.reserve(boost::size(object_ids));
     typedef typename std::remove_const<T>::type mutableT;
     for (int object_id : object_ids) {
         auto map_it = Map<mutableT>().find(object_id);
         if (map_it != Map<mutableT>().end())
-            retval.push_back(std::shared_ptr<const T>(map_it->second));
+            retval.emplace_back(map_it->second);
     }
     return retval;
 }
 
 template <typename T>
-std::vector<std::shared_ptr<T>> ObjectMap::find(const id_range& object_ids) {
+std::vector<std::shared_ptr<T>> ObjectMap::find(const id_range& object_ids)
+{
     std::vector<std::shared_ptr<T>> retval;
     retval.reserve(boost::size(object_ids));
     typedef typename std::remove_const<T>::type mutableT;
     for (int object_id : object_ids) {
         auto map_it = Map<mutableT>().find(object_id);
         if (map_it != Map<mutableT>().end())
-            retval.push_back(std::shared_ptr<T>(map_it->second));
+            retval.emplace_back(map_it->second);
     }
     return retval;
 }
 
 template <typename T>
-std::vector<std::shared_ptr<const T>> ObjectMap::find(const UniverseObjectVisitor& visitor) const {
+std::vector<std::shared_ptr<const T>> ObjectMap::find(const UniverseObjectVisitor& visitor) const
+{
     std::vector<std::shared_ptr<const T>> result;
     typedef typename std::remove_const<T>::type mutableT;
     result.reserve(size<mutableT>());
-    for (auto entry : Map<mutableT>()) {
+    for (const auto& entry : Map<mutableT>()) {
         if (entry.second->Accept(visitor))
-            result.push_back(entry.second);
+            result.emplace_back(entry.second);
     }
     return result;
 }
 
 template <typename T>
-std::vector<std::shared_ptr<T>> ObjectMap::find(const UniverseObjectVisitor& visitor) {
+std::vector<std::shared_ptr<T>> ObjectMap::find(const UniverseObjectVisitor& visitor)
+{
     std::vector<std::shared_ptr<T>> result;
     typedef typename std::remove_const<T>::type mutableT;
     result.reserve(size<mutableT>());
     for (const auto& entry : Map<mutableT>()) {
         if (entry.second->Accept(visitor))
-            result.push_back(entry.second);
+            result.emplace_back(entry.second);
     }
     return result;
+}
+
+template <typename T>
+std::vector<int> ObjectMap::findIDs(const UniverseObjectVisitor& visitor) const
+{
+    std::vector<int> result;
+    typedef typename std::remove_const<T>::type mutableT;
+    result.reserve(size<mutableT>());
+    for (const auto& entry : Map<mutableT>()) {
+        if (entry.second->Accept(visitor))
+            result.emplace_back(entry.first);
+    }
+    return result;
+}
+
+template <typename T>
+int ObjectMap::count(const UniverseObjectVisitor& visitor) const
+{
+    typedef typename std::remove_const<T>::type mutableT;
+    // TODO: use std::count_if when switching to C++17
+    return boost::range::count_if(Map<mutableT>(),
+                                  [&visitor](const auto& entry) { return entry.second->Accept(visitor); });
+    /*
+    int retval = 0;
+    for (const auto& entry : Map<mutableT>())
+        retval += (entry.second->Accept(visitor) ? 1 : 0);
+    return retval;
+    */
+}
+
+/** Returns true iff no objects match \a visitor */
+template <typename T>
+bool ObjectMap::check_if_any(const UniverseObjectVisitor& visitor) const
+{
+    typedef typename std::remove_const<T>::type mutableT;
+    return std::any_of(Map<mutableT>().begin(), Map<mutableT>().end(),
+                       [&visitor](const auto& entry) { return entry.second->Accept(visitor); });
 }
 
 template <typename T>
 std::size_t ObjectMap::size() const
 { return Map<typename std::remove_const<T>::type>().size(); }
 
-template <typename T>
-void ObjectMap::insert(std::shared_ptr<T> item, int empire_id /* = ALL_EMPIRES */) {
+template <typename T,
+          typename std::enable_if<std::is_base_of<UniverseObject, T>::value>::type*>
+void ObjectMap::insert(std::shared_ptr<T> item, int empire_id)
+{
     if (!item)
         return;
-    insertCore(std::dynamic_pointer_cast<UniverseObject>(item), empire_id);
+    insertCore(std::move(item), empire_id);
 }
 
 // template specializations

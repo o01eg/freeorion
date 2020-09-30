@@ -1,33 +1,19 @@
-// -*- C++ -*-
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2006 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2006 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-   
-/** \file TabWnd.h \brief Contains the TabWnd class, which encapsulates a set
-    of tabbed windows. */
+//! @file GG/TabWnd.h
+//!
+//! Contains the TabWnd class, which encapsulates a set of tabbed windows.
 
 #ifndef _GG_TabWnd_h_
 #define _GG_TabWnd_h_
+
 
 #include <GG/Button.h>
 
@@ -65,13 +51,13 @@ public:
     /** Adds \a wnd to the sequence of Wnds in this OverlayWnd, with name \a name.
         \a name can be used later to remove the Wnd (\a name is not checked
         for uniqueness).  Returns the index at which \a wnd is placed. */
-    std::size_t AddWnd(const std::shared_ptr<Wnd>& wnd);
+    std::size_t AddWnd(std::shared_ptr<Wnd> wnd);
 
     /** Adds \a wnd to the sequence of Wnds in this OverlayWnd, inserting it at
         the \a index location within the sequence.  \a name can be used later
         to remove the Wnd (\a name is not checked for uniqueness).  Not range
         checked. */
-    void InsertWnd(std::size_t index, const std::shared_ptr<Wnd>& wnd);
+    void InsertWnd(std::size_t index, std::shared_ptr<Wnd> wnd);
 
     /** Removes and returns the Wnd at index \a index from the sequence of
         Wnds in this OverlayWnd, or 0 if there is no Wnd at that index. */
@@ -128,13 +114,13 @@ public:
     /** Adds \a wnd to the sequence of Wnds in this TabWnd, with name \a name.
         \a name can be used later to remove the Wnd (\a name is not checked
         for uniqueness).  Returns the index at which \a wnd is placed. */
-    std::size_t     AddWnd(const std::shared_ptr<Wnd>& wnd, const std::string& name);
+    std::size_t     AddWnd(std::shared_ptr<Wnd> wnd, std::string name);
 
     /** Adds \a wnd to the sequence of Wnds in this TabWnd, inserting it at
         the \a index location within the sequence.  \a name can be used later
         to remove the Wnd (\a name is not checked for uniqueness).  Not range
         checked. */
-    void            InsertWnd(std::size_t index, const std::shared_ptr<Wnd>& wnd, const std::string& name);
+    void            InsertWnd(std::size_t index, std::shared_ptr<Wnd> wnd, std::string name);
 
     /** Removes and returns the first Wnd previously added witht he name \a
         name from the sequence of Wnds in this TabWnd, or 0 if no such Wnd is
@@ -208,13 +194,13 @@ public:
     /** Adds a tab called \a name to the sequence of tabs in this TabBar.  \a
         name can be used later to remove the tab (\a name is not checked for
         uniqueness).  Returns the index at which the tab is placed. */
-    std::size_t AddTab(const std::string& name);
+    std::size_t AddTab(std::string name);
 
     /** Adds tab to the sequence of tabs in this TabBar, inserting it at the
         \a index location within the sequence.  \a name can be used later to
         remove the tab (\a name is not checked for uniqueness).  Not range
         checked. */
-    void InsertTab(std::size_t index, const std::string& name);
+    void InsertTab(std::size_t index, std::string name);
 
     /** Removes the first tab previously added witht he name \a name from the
         sequence of tab in this TabBar. */
@@ -266,5 +252,6 @@ private:
 };
 
 }
+
 
 #endif

@@ -49,7 +49,7 @@ namespace {
         auto fleet = universe.InsertNew<Fleet>("", x, y, ship->Owner());
 
         fleet->Rename(fleet->GenerateFleetName());
-        fleet->GetMeter(METER_STEALTH)->SetCurrent(Meter::LARGE_VALUE);
+        fleet->GetMeter(MeterType::METER_STEALTH)->SetCurrent(Meter::LARGE_VALUE);
 
         fleet->AddShips({ship->ID()});
         ship->SetFleetID(fleet->ID());
@@ -62,7 +62,8 @@ namespace {
      * when a ship has been moved by the MoveTo effect separately from the
      * fleet that previously held it.  Also used by CreateShip effect to give
      * the new ship a fleet.  All ships need to be within fleets. */
-    std::shared_ptr<Fleet> CreateNewFleet(std::shared_ptr<System> system, std::shared_ptr<Ship> ship, ObjectMap& objects) {
+    std::shared_ptr<Fleet> CreateNewFleet(std::shared_ptr<System> system, std::shared_ptr<Ship> ship,
+                                          ObjectMap& objects) {
         if (!system || !ship)
             return nullptr;
 
@@ -82,7 +83,7 @@ namespace {
         }
 
         // create new fleet for ship, and put it in new system
-        auto fleet = CreateNewFleet(system->X(), system->Y(), ship);
+        auto fleet = CreateNewFleet(system->X(), system->Y(), std::move(ship));
         system->Insert(fleet);
 
         return fleet;
@@ -104,7 +105,9 @@ namespace {
      * resets the fleet's move route.  Used after a fleet has been moved with
      * the MoveTo effect, as its previous route was assigned based on its
      * previous location, and may not be valid for its new location. */
-    void UpdateFleetRoute(std::shared_ptr<Fleet> fleet, int new_next_system, int new_previous_system, const ObjectMap& objects) {
+    void UpdateFleetRoute(const std::shared_ptr<Fleet>& fleet, int new_next_system,
+                          int new_previous_system, const ObjectMap& objects)
+    {
         if (!fleet) {
             ErrorLogger() << "UpdateFleetRoute passed a null fleet pointer";
             return;
@@ -130,12 +133,13 @@ namespace {
 
         int dest_system = fleet->FinalDestinationID();
 
-        std::pair<std::list<int>, double> route_pair = GetPathfinder()->ShortestPath(start_system, dest_system, fleet->Owner());
+        std::pair<std::list<int>, double> route_pair =
+            GetPathfinder()->ShortestPath(start_system, dest_system, fleet->Owner());
 
         // if shortest path is empty, the route may be impossible or trivial, so just set route to move fleet
         // to the next system that it was just set to move to anyway.
         if (route_pair.first.empty())
-            route_pair.first.push_back(new_next_system);
+            route_pair.first.emplace_back(new_next_system);
 
 
         // set fleet with newly recalculated route
@@ -162,7 +166,8 @@ namespace {
             if (!dupe)
                 return star_name; // no systems have this name yet. use it.
         }
-        return "";  // fallback to empty name.
+        // generate hopefully unique name?
+        return UserString("SYSTEM") + " " + std::to_string(RandInt(objects.size<System>(), objects.size<System>() + 10000));
     }
 }
 
@@ -173,18 +178,18 @@ namespace Effect {
 EffectsGroup::EffectsGroup(std::unique_ptr<Condition::Condition>&& scope,
                            std::unique_ptr<Condition::Condition>&& activation,
                            std::vector<std::unique_ptr<Effect>>&& effects,
-                           const std::string& accounting_label,
-                           const std::string& stacking_group, int priority,
-                           const std::string& description,
-                           const std::string& content_name):
+                           std::string accounting_label,
+                           std::string stacking_group, int priority,
+                           std::string description,
+                           std::string content_name):
     m_scope(std::move(scope)),
     m_activation(std::move(activation)),
-    m_stacking_group(stacking_group),
+    m_stacking_group(std::move(stacking_group)),
     m_effects(std::move(effects)),
-    m_accounting_label(accounting_label),
+    m_accounting_label(std::move(accounting_label)),
     m_priority(priority),
-    m_description(description),
-    m_content_name(content_name)
+    m_description(std::move(description)),
+    m_content_name(std::move(content_name))
 {}
 
 EffectsGroup::~EffectsGroup()
@@ -282,9 +287,8 @@ void EffectsGroup::SetTopLevelContent(const std::string& content_name) {
         m_scope->SetTopLevelContent(content_name);
     if (m_activation)
         m_activation->SetTopLevelContent(content_name);
-    for (auto& effect : m_effects) {
+    for (auto& effect : m_effects)
         effect->SetTopLevelContent(content_name);
-    }
 }
 
 unsigned int EffectsGroup::GetCheckSum() const {
@@ -310,9 +314,8 @@ unsigned int EffectsGroup::GetCheckSum() const {
 std::string Dump(const std::vector<std::shared_ptr<EffectsGroup>>& effects_groups) {
     std::stringstream retval;
 
-    for (auto& effects_group : effects_groups) {
+    for (auto& effects_group : effects_groups)
         retval << "\n" << effects_group->Dump();
-    }
 
     return retval.str();
 }
@@ -459,7 +462,7 @@ void SetMeter::Execute(ScriptingContext& context,
             info.running_meter_total = meter->Current();
 
             // add accounting for this effect to end of vector
-            (*accounting_map)[target->ID()][m_meter].push_back(info);
+            (*accounting_map)[target->ID()][m_meter].emplace_back(info);    // not moving as local is reused
         }
     }
 
@@ -495,9 +498,9 @@ void SetMeter::Execute(ScriptingContext& context, const TargetSet& targets) cons
         // RHS should be target-invariant, so safe to evaluate once and use for
         // all target objects
         float increment = 0.0f;
-        if (op->GetOpType() == ValueRef::PLUS) {
+        if (op->GetOpType() == ValueRef::OpType::PLUS) {
             increment = op->RHS()->Eval(context);
-        } else if (op->GetOpType() == ValueRef::MINUS) {
+        } else if (op->GetOpType() == ValueRef::OpType::MINUS) {
             increment = -op->RHS()->Eval(context);
         } else {
             ErrorLogger() << "SetMeter::Execute got invalid increment optype (not PLUS or MINUS). Reverting to standard execute.";
@@ -521,47 +524,47 @@ void SetMeter::Execute(ScriptingContext& context, const TargetSet& targets) cons
 std::string SetMeter::Dump(unsigned short ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Set";
     switch (m_meter) {
-    case METER_TARGET_POPULATION:   retval += "TargetPopulation"; break;
-    case METER_TARGET_INDUSTRY:     retval += "TargetIndustry"; break;
-    case METER_TARGET_RESEARCH:     retval += "TargetResearch"; break;
-    case METER_TARGET_INFLUENCE:    retval += "TargetInfluence"; break;
-    case METER_TARGET_CONSTRUCTION: retval += "TargetConstruction"; break;
-    case METER_TARGET_HAPPINESS:    retval += "TargetHappiness"; break;
+    case MeterType::METER_TARGET_POPULATION:   retval += "TargetPopulation"; break;
+    case MeterType::METER_TARGET_INDUSTRY:     retval += "TargetIndustry"; break;
+    case MeterType::METER_TARGET_RESEARCH:     retval += "TargetResearch"; break;
+    case MeterType::METER_TARGET_INFLUENCE:    retval += "TargetInfluence"; break;
+    case MeterType::METER_TARGET_CONSTRUCTION: retval += "TargetConstruction"; break;
+    case MeterType::METER_TARGET_HAPPINESS:    retval += "TargetHappiness"; break;
 
-    case METER_MAX_CAPACITY:        retval += "MaxCapacity"; break;
+    case MeterType::METER_MAX_CAPACITY:        retval += "MaxCapacity"; break;
 
-    case METER_MAX_FUEL:            retval += "MaxFuel"; break;
-    case METER_MAX_SHIELD:          retval += "MaxShield"; break;
-    case METER_MAX_STRUCTURE:       retval += "MaxStructure"; break;
-    case METER_MAX_DEFENSE:         retval += "MaxDefense"; break;
-    case METER_MAX_SUPPLY:          retval += "MaxSupply"; break;
-    case METER_MAX_STOCKPILE:       retval += "MaxStockpile"; break;
-    case METER_MAX_TROOPS:          retval += "MaxTroops"; break;
+    case MeterType::METER_MAX_FUEL:            retval += "MaxFuel"; break;
+    case MeterType::METER_MAX_SHIELD:          retval += "MaxShield"; break;
+    case MeterType::METER_MAX_STRUCTURE:       retval += "MaxStructure"; break;
+    case MeterType::METER_MAX_DEFENSE:         retval += "MaxDefense"; break;
+    case MeterType::METER_MAX_SUPPLY:          retval += "MaxSupply"; break;
+    case MeterType::METER_MAX_STOCKPILE:       retval += "MaxStockpile"; break;
+    case MeterType::METER_MAX_TROOPS:          retval += "MaxTroops"; break;
 
-    case METER_POPULATION:          retval += "Population"; break;
-    case METER_INDUSTRY:            retval += "Industry"; break;
-    case METER_RESEARCH:            retval += "Research"; break;
-    case METER_INFLUENCE:           retval += "Influence"; break;
-    case METER_CONSTRUCTION:        retval += "Construction"; break;
-    case METER_HAPPINESS:           retval += "Happiness"; break;
+    case MeterType::METER_POPULATION:          retval += "Population"; break;
+    case MeterType::METER_INDUSTRY:            retval += "Industry"; break;
+    case MeterType::METER_RESEARCH:            retval += "Research"; break;
+    case MeterType::METER_INFLUENCE:           retval += "Influence"; break;
+    case MeterType::METER_CONSTRUCTION:        retval += "Construction"; break;
+    case MeterType::METER_HAPPINESS:           retval += "Happiness"; break;
 
-    case METER_CAPACITY:            retval += "Capacity"; break;
+    case MeterType::METER_CAPACITY:            retval += "Capacity"; break;
 
-    case METER_FUEL:                retval += "Fuel"; break;
-    case METER_SHIELD:              retval += "Shield"; break;
-    case METER_STRUCTURE:           retval += "Structure"; break;
-    case METER_DEFENSE:             retval += "Defense"; break;
-    case METER_SUPPLY:              retval += "Supply"; break;
-    case METER_STOCKPILE:           retval += "Stockpile"; break;
-    case METER_TROOPS:              retval += "Troops"; break;
+    case MeterType::METER_FUEL:                retval += "Fuel"; break;
+    case MeterType::METER_SHIELD:              retval += "Shield"; break;
+    case MeterType::METER_STRUCTURE:           retval += "Structure"; break;
+    case MeterType::METER_DEFENSE:             retval += "Defense"; break;
+    case MeterType::METER_SUPPLY:              retval += "Supply"; break;
+    case MeterType::METER_STOCKPILE:           retval += "Stockpile"; break;
+    case MeterType::METER_TROOPS:              retval += "Troops"; break;
 
-    case METER_REBEL_TROOPS:        retval += "RebelTroops"; break;
-    case METER_SIZE:                retval += "Size"; break;
-    case METER_STEALTH:             retval += "Stealth"; break;
-    case METER_DETECTION:           retval += "Detection"; break;
-    case METER_SPEED:               retval += "Speed"; break;
+    case MeterType::METER_REBEL_TROOPS:        retval += "RebelTroops"; break;
+    case MeterType::METER_SIZE:                retval += "Size"; break;
+    case MeterType::METER_STEALTH:             retval += "Stealth"; break;
+    case MeterType::METER_DETECTION:           retval += "Detection"; break;
+    case MeterType::METER_SPEED:               retval += "Speed"; break;
 
-    default:                        retval += "?"; break;
+    default:                                   retval += "?"; break;
     }
     retval += " value = " + m_value->Dump(ntabs) + "\n";
     return retval;
@@ -672,7 +675,7 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
         // meter value does not depend on target, so handle with single ValueRef evaluation
         float val = m_value->Eval(context);
         for (auto& target : targets) {
-            if (target->ObjectType() != OBJ_SHIP)
+            if (target->ObjectType() != UniverseObjectType::OBJ_SHIP)
                 continue;
             auto ship = std::dynamic_pointer_cast<Ship>(target);
             if (!ship)
@@ -696,9 +699,9 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
         // RHS should be target-invariant, so safe to evaluate once and use for
         // all target objects
         float increment = 0.0f;
-        if (op->GetOpType() == ValueRef::PLUS) {
+        if (op->GetOpType() == ValueRef::OpType::PLUS) {
             increment = op->RHS()->Eval(context);
-        } else if (op->GetOpType() == ValueRef::MINUS) {
+        } else if (op->GetOpType() == ValueRef::OpType::MINUS) {
             increment = -op->RHS()->Eval(context);
         } else {
             ErrorLogger() << "SetShipPartMeter::Execute got invalid increment optype (not PLUS or MINUS). Reverting to standard execute.";
@@ -709,7 +712,7 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
         //DebugLogger() << "simple increment: " << increment;
         // increment all target meters...
         for (auto& target : targets) {
-            if (target->ObjectType() != OBJ_SHIP)
+            if (target->ObjectType() != UniverseObjectType::OBJ_SHIP)
                 continue;
             auto ship = std::dynamic_pointer_cast<Ship>(target);
             if (!ship)
@@ -729,11 +732,11 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
 std::string SetShipPartMeter::Dump(unsigned short ntabs) const {
     std::string retval = DumpIndent(ntabs);
     switch (m_meter) {
-        case METER_CAPACITY:            retval += "SetCapacity";        break;
-        case METER_MAX_CAPACITY:        retval += "SetMaxCapacity";     break;
-        case METER_SECONDARY_STAT:      retval += "SetSecondaryStat";   break;
-        case METER_MAX_SECONDARY_STAT:  retval += "SetMaxSecondaryStat";break;
-        default:                retval += "Set???";         break;
+        case MeterType::METER_CAPACITY:            retval += "SetCapacity";        break;
+        case MeterType::METER_MAX_CAPACITY:        retval += "SetMaxCapacity";     break;
+        case MeterType::METER_SECONDARY_STAT:      retval += "SetSecondaryStat";   break;
+        case MeterType::METER_MAX_SECONDARY_STAT:  retval += "SetMaxSecondaryStat";break;
+        default:                                   retval += "Set???";         break;
     }
 
     if (m_part_name)
@@ -768,7 +771,8 @@ unsigned int SetShipPartMeter::GetCheckSum() const {
 // SetEmpireMeter                                        //
 ///////////////////////////////////////////////////////////
 SetEmpireMeter::SetEmpireMeter(std::string& meter, std::unique_ptr<ValueRef::ValueRef<double>>&& value) :
-    m_empire_id(std::make_unique<ValueRef::Variable<int>>(ValueRef::EFFECT_TARGET_REFERENCE, "Owner")),
+    m_empire_id(std::make_unique<ValueRef::Variable<int>>(
+        ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Owner")),
     m_meter(std::move(meter)),
     m_value(std::move(value))
 {}
@@ -874,7 +878,8 @@ unsigned int SetEmpireMeter::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 SetEmpireStockpile::SetEmpireStockpile(ResourceType stockpile,
                                        std::unique_ptr<ValueRef::ValueRef<double>>&& value) :
-    m_empire_id(std::make_unique<ValueRef::Variable<int>>(ValueRef::EFFECT_TARGET_REFERENCE, "Owner")),
+    m_empire_id(std::make_unique<ValueRef::Variable<int>>(
+        ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Owner")),
     m_stockpile(stockpile),
     m_value(std::move(value))
 {}
@@ -903,9 +908,11 @@ void SetEmpireStockpile::Execute(ScriptingContext& context) const {
 std::string SetEmpireStockpile::Dump(unsigned short ntabs) const {
     std::string retval = DumpIndent(ntabs);
     switch (m_stockpile) {
-        // TODO: Support for other resource stockpiles?
-    case RE_INDUSTRY:   retval += "SetEmpireStockpile"; break;
-    default:            retval += "?"; break;
+    // TODO: Support for other resource stockpiles?
+    case ResourceType::RE_INDUSTRY:  retval += "SetEmpireStockpile"; break;
+    case ResourceType::RE_INFLUENCE: retval += "SetEmpireStockpile"; break;
+    case ResourceType::RE_RESEARCH:  retval += "SetEmpireStockpile"; break;
+    default:                         retval += "?"; break;
     }
     retval += " empire = " + m_empire_id->Dump(ntabs) + " value = " + m_value->Dump(ntabs) + "\n";
     return retval;
@@ -935,7 +942,8 @@ unsigned int SetEmpireStockpile::GetCheckSum() const {
 // SetEmpireCapital                                      //
 ///////////////////////////////////////////////////////////
 SetEmpireCapital::SetEmpireCapital() :
-    m_empire_id(std::make_unique<ValueRef::Variable<int>>(ValueRef::EFFECT_TARGET_REFERENCE, "Owner"))
+    m_empire_id(std::make_unique<ValueRef::Variable<int>>(
+        ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Owner"))
 {}
 
 SetEmpireCapital::SetEmpireCapital(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id) :
@@ -986,14 +994,14 @@ void SetPlanetType::Execute(ScriptingContext& context) const {
     if (auto p = std::dynamic_pointer_cast<Planet>(context.effect_target)) {
         PlanetType type = m_type->Eval(ScriptingContext(context, p->Type()));
         p->SetType(type);
-        if (type == PT_ASTEROIDS)
-            p->SetSize(SZ_ASTEROIDS);
-        else if (type == PT_GASGIANT)
-            p->SetSize(SZ_GASGIANT);
-        else if (p->Size() == SZ_ASTEROIDS)
-            p->SetSize(SZ_TINY);
-        else if (p->Size() == SZ_GASGIANT)
-            p->SetSize(SZ_HUGE);
+        if (type == PlanetType::PT_ASTEROIDS)
+            p->SetSize(PlanetSize::SZ_ASTEROIDS);
+        else if (type == PlanetType::PT_GASGIANT)
+            p->SetSize(PlanetSize::SZ_GASGIANT);
+        else if (p->Size() == PlanetSize::SZ_ASTEROIDS)
+            p->SetSize(PlanetSize::SZ_TINY);
+        else if (p->Size() == PlanetSize::SZ_GASGIANT)
+            p->SetSize(PlanetSize::SZ_HUGE);
     }
 }
 
@@ -1027,12 +1035,12 @@ void SetPlanetSize::Execute(ScriptingContext& context) const {
     if (auto p = std::dynamic_pointer_cast<Planet>(context.effect_target)) {
         PlanetSize size = m_size->Eval(ScriptingContext(context, p->Size()));
         p->SetSize(size);
-        if (size == SZ_ASTEROIDS)
-            p->SetType(PT_ASTEROIDS);
-        else if (size == SZ_GASGIANT)
-            p->SetType(PT_GASGIANT);
-        else if (p->Type() == PT_ASTEROIDS || p->Type() == PT_GASGIANT)
-            p->SetType(PT_BARREN);
+        if (size == PlanetSize::SZ_ASTEROIDS)
+            p->SetType(PlanetType::PT_ASTEROIDS);
+        else if (size == PlanetSize::SZ_GASGIANT)
+            p->SetType(PlanetType::PT_GASGIANT);
+        else if (p->Type() == PlanetType::PT_ASTEROIDS || p->Type() == PlanetType::PT_GASGIANT)
+            p->SetType(PlanetType::PT_BARREN);
     }
 }
 
@@ -1064,11 +1072,11 @@ SetSpecies::SetSpecies(std::unique_ptr<ValueRef::ValueRef<std::string>>&& specie
 
 void SetSpecies::Execute(ScriptingContext& context) const {
     if (auto planet = std::dynamic_pointer_cast<Planet>(context.effect_target)) {
-        std::string species_name = m_species_name->Eval(ScriptingContext(context, planet->SpeciesName()));
-        planet->SetSpecies(species_name);
+        std::string&& species_name = m_species_name->Eval(ScriptingContext(context, planet->SpeciesName()));
+        planet->SetSpecies(std::move(species_name));
 
         // ensure non-empty and permissible focus setting for new species
-        std::string initial_focus = planet->Focus();
+        auto& initial_focus = planet->Focus();
         std::vector<std::string> available_foci = planet->AvailableFoci();
 
         // leave current focus unchanged if available.
@@ -1078,34 +1086,28 @@ void SetSpecies::Execute(ScriptingContext& context) const {
             }
         }
 
-        // need to set new focus
-        std::string new_focus;
 
-        const Species* species = GetSpecies(species_name);
-        std::string preferred_focus;
-        if (species)
-            preferred_focus = species->PreferredFocus();
+        const Species* species = GetSpecies(planet->SpeciesName());
+        auto& default_focus = species ? species->DefaultFocus() : "";
 
-        // chose preferred focus if available. otherwise use any available focus
-        bool preferred_available = false;
+        // chose default focus if available. otherwise use any available focus
+        bool default_available = false;
         for (const std::string& available_focus : available_foci) {
-            if (available_focus == preferred_focus) {
-                preferred_available = true;
+            if (available_focus == default_focus) {
+                default_available = true;
                 break;
             }
         }
 
-        if (preferred_available) {
-            new_focus = std::move(preferred_focus);
+        if (default_available) {
+            planet->SetFocus(std::move(default_focus));
         } else if (!available_foci.empty()) {
-            new_focus = *available_foci.begin();
+            planet->SetFocus(*available_foci.begin());
         }
 
-        planet->SetFocus(new_focus);
-
     } else if (auto ship = std::dynamic_pointer_cast<Ship>(context.effect_target)) {
-        std::string species_name = m_species_name->Eval(ScriptingContext(context, ship->SpeciesName()));
-        ship->SetSpecies(species_name);
+        std::string&& species_name = m_species_name->Eval(ScriptingContext(context, ship->SpeciesName()));
+        ship->SetSpecies(std::move(species_name));
     }
 }
 
@@ -1158,12 +1160,12 @@ void SetOwner::Execute(ScriptingContext& context) const {
         // move ship into new fleet
         std::shared_ptr<Fleet> new_fleet;
         if (auto system = context.ContextObjects().get<System>(ship->SystemID()))
-            new_fleet = CreateNewFleet(system, ship, context.ContextObjects());
+            new_fleet = CreateNewFleet(std::move(system), std::move(ship), context.ContextObjects());
         else
-            new_fleet = CreateNewFleet(ship->X(), ship->Y(), ship);
-        if (new_fleet) {
+            new_fleet = CreateNewFleet(ship->X(), ship->Y(), std::move(ship));
+
+        if (new_fleet)
             new_fleet->SetNextAndPreviousSystems(fleet->NextSystemID(), fleet->PreviousSystemID());
-        }
 
         // if old fleet is empty, destroy it.  Don't reassign ownership of fleet
         // in case that would reval something to the recipient that shouldn't be...
@@ -1331,8 +1333,8 @@ void CreatePlanet::Execute(ScriptingContext& context) const {
         return;
     }
 
-    PlanetSize target_size = INVALID_PLANET_SIZE;
-    PlanetType target_type = INVALID_PLANET_TYPE;
+    PlanetSize target_size = PlanetSize::INVALID_PLANET_SIZE;
+    PlanetType target_type = PlanetType::INVALID_PLANET_TYPE;
     if (auto location_planet = std::dynamic_pointer_cast<const Planet>(context.effect_target)) {
         target_size = location_planet->Size();
         target_type = location_planet->Type();
@@ -1340,7 +1342,7 @@ void CreatePlanet::Execute(ScriptingContext& context) const {
 
     PlanetSize size = m_size->Eval(ScriptingContext(context, target_size));
     PlanetType type = m_type->Eval(ScriptingContext(context, target_type));
-    if (size == INVALID_PLANET_SIZE || type == INVALID_PLANET_TYPE) {
+    if (size == PlanetSize::INVALID_PLANET_SIZE || type == PlanetType::INVALID_PLANET_TYPE) {
         ErrorLogger() << "CreatePlanet::Execute got invalid size or type of planet to create...";
         return;
     }
@@ -1613,7 +1615,8 @@ void CreateShip::Execute(ScriptingContext& context) const {
     //        fleet = ship->FleetID();
     //// etc.
 
-    auto ship = GetUniverse().InsertNew<Ship>(empire_id, design_id, species_name, ALL_EMPIRES);
+    auto ship = GetUniverse().InsertNew<Ship>(empire_id, design_id, std::move(species_name),
+                                              ALL_EMPIRES);
     system->Insert(ship);
 
     if (m_name) {
@@ -1641,7 +1644,7 @@ void CreateShip::Execute(ScriptingContext& context) const {
 
     // apply after-creation effects
     ScriptingContext local_context = context;
-    local_context.effect_target = ship;
+    local_context.effect_target = std::move(ship);
     for (auto& effect : m_effects_to_apply_after) {
         if (!effect)
             continue;
@@ -1879,11 +1882,11 @@ CreateSystem::CreateSystem(std::unique_ptr<ValueRef::ValueRef<double>>&& x,
 
 void CreateSystem::Execute(ScriptingContext& context) const {
     // pick a star type
-    StarType star_type = STAR_NONE;
+    StarType star_type = StarType::STAR_NONE;
     if (m_type) {
         star_type = m_type->Eval(context);
     } else {
-        int max_type_idx = int(NUM_STAR_TYPES) - 1;
+        int max_type_idx = int(StarType::NUM_STAR_TYPES) - 1;
         int type_idx = RandInt(0, max_type_idx);
         star_type = StarType(type_idx);
     }
@@ -2170,9 +2173,9 @@ void RemoveStarlanes::Execute(ScriptingContext& context) const {
         ErrorLogger() << "AddStarlanes::Execute passed no target object";
         return;
     }
-    auto target_system = std::dynamic_pointer_cast<System>(context.effect_target);
+    auto target_system = dynamic_cast<System*>(context.effect_target.get());
     if (!target_system)
-        target_system = context.ContextObjects().get<System>(context.effect_target->SystemID());
+        target_system = context.ContextObjects().get<System>(context.effect_target->SystemID()).get();
     if (!target_system)
         return; // nothing to do!
 
@@ -2188,14 +2191,14 @@ void RemoveStarlanes::Execute(ScriptingContext& context) const {
         return; // nothing to do!
 
     // get systems containing at least one endpoint object
-    std::set<std::shared_ptr<System>> endpoint_systems;
+    std::set<System*> endpoint_systems;
     for (auto& endpoint_object : endpoint_objects) {
-        auto endpoint_system = std::dynamic_pointer_cast<const System>(endpoint_object);
+        auto endpoint_system = dynamic_cast<const System*>(endpoint_object.get());
         if (!endpoint_system)
-            endpoint_system = context.ContextObjects().get<System>(endpoint_object->SystemID());
+            endpoint_system = context.ContextObjects().get<System>(endpoint_object->SystemID()).get();
         if (!endpoint_system)
             continue;
-        endpoint_systems.insert(std::const_pointer_cast<System>(endpoint_system));
+        endpoint_systems.insert(const_cast<System*>(endpoint_system));
     }
 
     // remove starlanes from target to endpoint systems
@@ -2509,7 +2512,7 @@ void MoveTo::Execute(ScriptingContext& context) const {
         // and related objects into system
         system->MoveTo(destination);
 
-        if (destination->ObjectType() == OBJ_FIELD)
+        if (destination->ObjectType() == UniverseObjectType::OBJ_FIELD)
             system->Insert(destination);
 
         // find fleets / ships at destination location and insert into system
@@ -3017,7 +3020,7 @@ SetEmpireTechProgress::SetEmpireTechProgress(std::unique_ptr<ValueRef::ValueRef<
     m_empire_id(
         empire_id
         ? std::move(empire_id)
-        : std::make_unique<ValueRef::Variable<int>>(ValueRef::EFFECT_TARGET_REFERENCE, "Owner"))
+        : std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Owner"))
 {}
 
 void SetEmpireTechProgress::Execute(ScriptingContext& context) const {
@@ -3086,7 +3089,7 @@ GiveEmpireTech::GiveEmpireTech(std::unique_ptr<ValueRef::ValueRef<std::string>>&
     m_empire_id(std::move(empire_id))
 {
     if (!m_empire_id)
-        m_empire_id.reset(new ValueRef::Variable<int>(ValueRef::EFFECT_TARGET_REFERENCE, "Owner"));
+        m_empire_id.reset(new ValueRef::Variable<int>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Owner"));
 }
 
 void GiveEmpireTech::Execute(ScriptingContext& context) const {
@@ -3202,68 +3205,68 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
 
     // evaluate all parameter valuerefs so they can be substituted into sitrep template
     std::vector<std::pair<std::string, std::string>> parameter_tag_values;
+    parameter_tag_values.reserve(m_message_parameters.size());
     for (const auto& entry : m_message_parameters) {
-        parameter_tag_values.push_back({entry.first, entry.second->Eval(context)});
+        parameter_tag_values.emplace_back(entry.first, entry.second->Eval(context));
 
         // special case for ship designs: make sure sitrep recipient knows about the design
         // so the sitrep won't have errors about unknown designs being referenced
         if (entry.first == VarText::PREDEFINED_DESIGN_TAG) {
-            if (const ShipDesign* design = GetPredefinedShipDesign(entry.second->Eval(context))) {
-                ship_design_ids_to_inform_receipits_of.insert(design->ID());
-            }
+            if (const ShipDesign* design = GetPredefinedShipDesign(entry.second->Eval(context)))
+                ship_design_ids_to_inform_receipits_of.emplace(design->ID());
         }
     }
 
     // whom to send to?
     std::set<int> recipient_empire_ids;
     switch (m_affiliation) {
-    case AFFIL_SELF: {
+    case EmpireAffiliationType::AFFIL_SELF: {
         // add just specified empire
         if (recipient_id != ALL_EMPIRES)
             recipient_empire_ids.insert(recipient_id);
         break;
     }
 
-    case AFFIL_ALLY: {
+    case EmpireAffiliationType::AFFIL_ALLY: {
         // add allies of specified empire
         for (auto& empire_id : Empires()) {
             if (empire_id.first == recipient_id || recipient_id == ALL_EMPIRES)
                 continue;
 
             DiplomaticStatus status = Empires().GetDiplomaticStatus(recipient_id, empire_id.first);
-            if (status >= DIPLO_ALLIED)
+            if (status >= DiplomaticStatus::DIPLO_ALLIED)
                 recipient_empire_ids.insert(empire_id.first);
         }
         break;
     }
 
-    case AFFIL_PEACE: {
+    case EmpireAffiliationType::AFFIL_PEACE: {
         // add empires at peace with the specified empire
         for (auto& empire_id : Empires()) {
             if (empire_id.first == recipient_id || recipient_id == ALL_EMPIRES)
                 continue;
 
             DiplomaticStatus status = Empires().GetDiplomaticStatus(recipient_id, empire_id.first);
-            if (status == DIPLO_PEACE)
+            if (status == DiplomaticStatus::DIPLO_PEACE)
                 recipient_empire_ids.insert(empire_id.first);
         }
         break;
     }
 
-    case AFFIL_ENEMY: {
+    case EmpireAffiliationType::AFFIL_ENEMY: {
         // add enemies of specified empire
         for (auto& empire_id : Empires()) {
             if (empire_id.first == recipient_id || recipient_id == ALL_EMPIRES)
                 continue;
 
             DiplomaticStatus status = Empires().GetDiplomaticStatus(recipient_id, empire_id.first);
-            if (status == DIPLO_WAR)
+            if (status == DiplomaticStatus::DIPLO_WAR)
                 recipient_empire_ids.insert(empire_id.first);
         }
         break;
     }
 
-    case AFFIL_CAN_SEE: {
+    case EmpireAffiliationType::AFFIL_CAN_SEE: {
         // evaluate condition
         Condition::ObjectSet condition_matches;
         if (m_condition)
@@ -3273,7 +3276,7 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
         for (auto& empire_entry : Empires()) {
             int empire_id = empire_entry.first;
             for (auto& object : condition_matches) {
-                if (object->GetVisibility(empire_id) >= VIS_BASIC_VISIBILITY) {
+                if (object->GetVisibility(empire_id) >= Visibility::VIS_BASIC_VISIBILITY) {
                     recipient_empire_ids.insert(empire_id);
                     break;
                 }
@@ -3282,15 +3285,15 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
         break;
     }
 
-    case AFFIL_NONE:
+    case EmpireAffiliationType::AFFIL_NONE:
         // add no empires
         break;
 
-    case AFFIL_HUMAN:
+    case EmpireAffiliationType::AFFIL_HUMAN:
         // todo: implement this separately, though not high priority since it
         // probably doesn't matter if AIs get an extra sitrep message meant for
         // human eyes
-    case AFFIL_ANY:
+    case EmpireAffiliationType::AFFIL_ANY:
     default: {
         // add all empires
         for (auto& empire_entry : Empires())
@@ -3307,12 +3310,12 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
         if (!empire)
             continue;
         empire->AddSitRepEntry(CreateSitRep(m_message_string, sitrep_turn, m_icon,
-                                            parameter_tag_values, m_label, m_stringtable_lookup));
+                                            parameter_tag_values,   // copy tag values for each
+                                            m_label, m_stringtable_lookup));
 
         // also inform of any ship designs recipients should know about
-        for (int design_id : ship_design_ids_to_inform_receipits_of) {
+        for (int design_id : ship_design_ids_to_inform_receipits_of)
             GetUniverse().SetEmpireKnowledgeOfShipDesign(design_id, empire_id);
-        }
     }
 }
 
@@ -3335,14 +3338,14 @@ std::string GenerateSitRepMessage::Dump(unsigned short ntabs) const {
 
     retval += DumpIndent(ntabs+1) + "affiliation = ";
     switch (m_affiliation) {
-    case AFFIL_SELF:    retval += "TheEmpire";  break;
-    case AFFIL_ENEMY:   retval += "EnemyOf";    break;
-    case AFFIL_PEACE:   retval += "PeaceWith";  break;
-    case AFFIL_ALLY:    retval += "AllyOf";     break;
-    case AFFIL_ANY:     retval += "AnyEmpire";  break;
-    case AFFIL_CAN_SEE: retval += "CanSee";     break;
-    case AFFIL_HUMAN:   retval += "Human";      break;
-    default:            retval += "?";          break;
+    case EmpireAffiliationType::AFFIL_SELF:    retval += "TheEmpire";  break;
+    case EmpireAffiliationType::AFFIL_ENEMY:   retval += "EnemyOf";    break;
+    case EmpireAffiliationType::AFFIL_PEACE:   retval += "PeaceWith";  break;
+    case EmpireAffiliationType::AFFIL_ALLY:    retval += "AllyOf";     break;
+    case EmpireAffiliationType::AFFIL_ANY:     retval += "AnyEmpire";  break;
+    case EmpireAffiliationType::AFFIL_CAN_SEE: retval += "CanSee";     break;
+    case EmpireAffiliationType::AFFIL_HUMAN:   retval += "Human";      break;
+    default:                                   retval += "?";          break;
     }
 
     if (m_recipient_empire_id)
@@ -3497,61 +3500,61 @@ void SetVisibility::Execute(ScriptingContext& context) const {
     // whom to set visbility for?
     std::set<int> empire_ids;
     switch (m_affiliation) {
-    case AFFIL_SELF: {
+    case EmpireAffiliationType::AFFIL_SELF: {
         // add just specified empire
         if (empire_id != ALL_EMPIRES)
             empire_ids.insert(empire_id);
         break;
     }
 
-    case AFFIL_ALLY: {
+    case EmpireAffiliationType::AFFIL_ALLY: {
         // add allies of specified empire
         for (const auto& empire_entry : Empires()) {
             if (empire_entry.first == empire_id || empire_id == ALL_EMPIRES)
                 continue;
 
             DiplomaticStatus status = Empires().GetDiplomaticStatus(empire_id, empire_entry.first);
-            if (status >= DIPLO_ALLIED)
+            if (status >= DiplomaticStatus::DIPLO_ALLIED)
                 empire_ids.insert(empire_entry.first);
         }
         break;
     }
 
-    case AFFIL_PEACE: {
+    case EmpireAffiliationType::AFFIL_PEACE: {
         // add empires at peace with the specified empire
         for (const auto& empire_entry : Empires()) {
             if (empire_entry.first == empire_id || empire_id == ALL_EMPIRES)
                 continue;
 
             DiplomaticStatus status = Empires().GetDiplomaticStatus(empire_id, empire_entry.first);
-            if (status == DIPLO_PEACE)
+            if (status == DiplomaticStatus::DIPLO_PEACE)
                 empire_ids.insert(empire_entry.first);
         }
         break;
     }
 
-    case AFFIL_ENEMY: {
+    case EmpireAffiliationType::AFFIL_ENEMY: {
         // add enemies of specified empire
         for (const auto& empire_entry : Empires()) {
             if (empire_entry.first == empire_id || empire_id == ALL_EMPIRES)
                 continue;
 
             DiplomaticStatus status = Empires().GetDiplomaticStatus(empire_id, empire_entry.first);
-            if (status == DIPLO_WAR)
+            if (status == DiplomaticStatus::DIPLO_WAR)
                 empire_ids.insert(empire_entry.first);
         }
         break;
     }
 
-    case AFFIL_CAN_SEE:
+    case EmpireAffiliationType::AFFIL_CAN_SEE:
         // unsupported so far...
-    case AFFIL_HUMAN:
+    case EmpireAffiliationType::AFFIL_HUMAN:
         // unsupported so far...
-    case AFFIL_NONE:
+    case EmpireAffiliationType::AFFIL_NONE:
         // add no empires
         break;
 
-    case AFFIL_ANY:
+    case EmpireAffiliationType::AFFIL_ANY:
     default: {
         // add all empires
         for (const auto& empire_entry : Empires())
@@ -3567,9 +3570,8 @@ void SetVisibility::Execute(ScriptingContext& context) const {
     } else {
         Condition::ObjectSet condition_matches;
         m_condition->Eval(context, condition_matches);
-        for (auto& object : condition_matches) {
+        for (auto& object : condition_matches)
             object_ids.insert(object->ID());
-        }
     }
 
     int source_id = INVALID_OBJECT_ID;
@@ -3592,14 +3594,14 @@ std::string SetVisibility::Dump(unsigned short ntabs) const {
 
     retval += DumpIndent(ntabs) + "SetVisibility affiliation = ";
     switch (m_affiliation) {
-    case AFFIL_SELF:    retval += "TheEmpire";  break;
-    case AFFIL_ENEMY:   retval += "EnemyOf";    break;
-    case AFFIL_PEACE:   retval += "PeaceWith";  break;
-    case AFFIL_ALLY:    retval += "AllyOf";     break;
-    case AFFIL_ANY:     retval += "AnyEmpire";  break;
-    case AFFIL_CAN_SEE: retval += "CanSee";     break;
-    case AFFIL_HUMAN:   retval += "Human";      break;
-    default:            retval += "?";          break;
+    case EmpireAffiliationType::AFFIL_SELF:    retval += "TheEmpire";  break;
+    case EmpireAffiliationType::AFFIL_ENEMY:   retval += "EnemyOf";    break;
+    case EmpireAffiliationType::AFFIL_PEACE:   retval += "PeaceWith";  break;
+    case EmpireAffiliationType::AFFIL_ALLY:    retval += "AllyOf";     break;
+    case EmpireAffiliationType::AFFIL_ANY:     retval += "AnyEmpire";  break;
+    case EmpireAffiliationType::AFFIL_CAN_SEE: retval += "CanSee";     break;
+    case EmpireAffiliationType::AFFIL_HUMAN:   retval += "Human";      break;
+    default:                                   retval += "?";          break;
     }
 
     if (m_empire_id)
@@ -3680,7 +3682,7 @@ void Conditional::Execute(ScriptingContext& context, const TargetSet& targets) c
     TargetSet non_matches;
     non_matches.reserve(matches.size());
     if (m_target_condition)
-        m_target_condition->Eval(context, matches, non_matches, Condition::MATCHES);
+        m_target_condition->Eval(context, matches, non_matches, Condition::SearchDomain::MATCHES);
 
     if (!matches.empty() && !m_true_effects.empty()) {
         for (auto& effect : m_true_effects) {
@@ -3713,7 +3715,7 @@ void Conditional::Execute(ScriptingContext& context,
     non_matches.reserve(matches.size());
 
     if (m_target_condition)
-        m_target_condition->Eval(context, matches, non_matches, Condition::MATCHES);
+        m_target_condition->Eval(context, matches, non_matches, Condition::SearchDomain::MATCHES);
 
 
     // execute true and false effects to target matches and non-matches respectively

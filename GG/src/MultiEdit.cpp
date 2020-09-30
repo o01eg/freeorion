@@ -1,31 +1,15 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
-
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-#include <GG/MultiEdit.h>
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include <GG/DrawUtil.h>
 #include <GG/GUI.h>
+#include <GG/MultiEdit.h>
 #include <GG/Scroll.h>
 #include <GG/StyleFactory.h>
 #include <GG/utf8/checked.h>
@@ -35,16 +19,18 @@
 using namespace GG;
 
 namespace {
-    bool LineEndsWithEndlineCharacter(const std::vector<Font::LineData>& lines,
-                                      std::size_t line,
-                                      const std::string& original_string)
-    {
-        assert(line < lines.size());
-        if (lines[line].Empty())
-            return false;
-        else
-            return original_string[Value(lines[line].char_data.back().string_index)] == '\n';
-    }
+
+bool LineEndsWithEndlineCharacter(const std::vector<Font::LineData>& lines,
+                                    std::size_t line,
+                                    const std::string& original_string)
+{
+    assert(line < lines.size());
+    if (lines[line].Empty())
+        return false;
+    else
+        return original_string[Value(lines[line].char_data.back().string_index)] == '\n';
+}
+
 }
 
 ///////////////////////////////////////
@@ -68,26 +54,28 @@ const MultiEditStyle GG::MULTI_NO_HSCROLL       (1 << 12);
 GG_FLAGSPEC_IMPL(MultiEditStyle);
 
 namespace {
-    bool RegisterMultiEditStyles()
-    {
-        FlagSpec<MultiEditStyle>& spec = FlagSpec<MultiEditStyle>::instance();
-        spec.insert(MULTI_NONE,             "MULTI_NONE",           true);
-        spec.insert(MULTI_WORDBREAK,        "MULTI_WORDBREAK",      true);
-        spec.insert(MULTI_LINEWRAP,         "MULTI_LINEWRAP",       true);
-        spec.insert(MULTI_VCENTER,          "MULTI_VCENTER",        true);
-        spec.insert(MULTI_TOP,              "MULTI_TOP",            true);
-        spec.insert(MULTI_BOTTOM,           "MULTI_BOTTOM",         true);
-        spec.insert(MULTI_CENTER,           "MULTI_CENTER",         true);
-        spec.insert(MULTI_LEFT,             "MULTI_LEFT",           true);
-        spec.insert(MULTI_RIGHT,            "MULTI_RIGHT",          true);
-        spec.insert(MULTI_READ_ONLY,        "MULTI_READ_ONLY",      true);
-        spec.insert(MULTI_TERMINAL_STYLE,   "MULTI_TERMINAL_STYLE", true);
-        spec.insert(MULTI_INTEGRAL_HEIGHT,  "MULTI_INTEGRAL_HEIGHT",true);
-        spec.insert(MULTI_NO_VSCROLL,       "MULTI_NO_VSCROLL",     true);
-        spec.insert(MULTI_NO_HSCROLL,       "MULTI_NO_HSCROLL",     true);
-        return true;
-    }
-    bool dummy = RegisterMultiEditStyles();
+
+bool RegisterMultiEditStyles()
+{
+    FlagSpec<MultiEditStyle>& spec = FlagSpec<MultiEditStyle>::instance();
+    spec.insert(MULTI_NONE,             "MULTI_NONE",           true);
+    spec.insert(MULTI_WORDBREAK,        "MULTI_WORDBREAK",      true);
+    spec.insert(MULTI_LINEWRAP,         "MULTI_LINEWRAP",       true);
+    spec.insert(MULTI_VCENTER,          "MULTI_VCENTER",        true);
+    spec.insert(MULTI_TOP,              "MULTI_TOP",            true);
+    spec.insert(MULTI_BOTTOM,           "MULTI_BOTTOM",         true);
+    spec.insert(MULTI_CENTER,           "MULTI_CENTER",         true);
+    spec.insert(MULTI_LEFT,             "MULTI_LEFT",           true);
+    spec.insert(MULTI_RIGHT,            "MULTI_RIGHT",          true);
+    spec.insert(MULTI_READ_ONLY,        "MULTI_READ_ONLY",      true);
+    spec.insert(MULTI_TERMINAL_STYLE,   "MULTI_TERMINAL_STYLE", true);
+    spec.insert(MULTI_INTEGRAL_HEIGHT,  "MULTI_INTEGRAL_HEIGHT",true);
+    spec.insert(MULTI_NO_VSCROLL,       "MULTI_NO_VSCROLL",     true);
+    spec.insert(MULTI_NO_HSCROLL,       "MULTI_NO_HSCROLL",     true);
+    return true;
+}
+bool dummy = RegisterMultiEditStyles();
+
 }
 
 const Flags<MultiEditStyle> GG::MULTI_NO_SCROLL (MULTI_NO_VSCROLL | MULTI_NO_HSCROLL);
@@ -101,9 +89,10 @@ const std::size_t MultiEdit::ALL_LINES = std::numeric_limits<std::size_t>::max()
 const unsigned int MultiEdit::SCROLL_WIDTH = 14;
 const unsigned int MultiEdit::BORDER_THICK = 2;
 
-MultiEdit::MultiEdit(const std::string& str, const std::shared_ptr<Font>& font, Clr color,
-                     Flags<MultiEditStyle> style/* = MULTI_LINEWRAP*/, Clr text_color/* = CLR_BLACK*/, Clr interior/* = CLR_ZERO*/) :
-    Edit(str, font, color, text_color, interior),
+MultiEdit::MultiEdit(std::string str, const std::shared_ptr<Font>& font, Clr color,
+                     Flags<MultiEditStyle> style/* = MULTI_LINEWRAP*/,
+                     Clr text_color/* = CLR_BLACK*/, Clr interior/* = CLR_ZERO*/) :
+    Edit(std::move(str), font, color, text_color, interior),
     m_style(style),
     m_cursor_begin(0, CP0),
     m_cursor_end(0, CP0),
@@ -290,13 +279,13 @@ void MultiEdit::DeselectAll()
     this->m_cursor_pos = {cursor_pos, cursor_pos};
 }
 
-void MultiEdit::SetText(const std::string& str)
+void MultiEdit::SetText(std::string str)
 {
     if (!utf8::is_valid(str.begin(), str.end()))
         return;
 
     if (m_preserve_text_position_on_next_set_text) {
-        TextControl::SetText(str);
+        TextControl::SetText(std::move(str));
     } else {
         bool scroll_to_end = (m_style & MULTI_TERMINAL_STYLE) &&
             (!m_vscroll || m_vscroll->ScrollRange().second - m_vscroll->PosnRange().second <= 1);
@@ -305,7 +294,7 @@ void MultiEdit::SetText(const std::string& str)
         Pt cl_sz = ClientSize();
         Flags<TextFormat> format = GetTextFormat();
         if (m_max_lines_history == ALL_LINES) {
-            TextControl::SetText(str);
+            TextControl::SetText(std::move(str));
         } else {
             auto text_elements = GetFont()->ExpensiveParseFromTextToTextElements(str, format);
             auto lines = GetFont()->DetermineLines(str, format, cl_sz.x, text_elements);
@@ -346,7 +335,7 @@ void MultiEdit::SetText(const std::string& str)
                     }
                 }
             } else {
-                TextControl::SetText(str);
+                TextControl::SetText(std::move(str));
             }
         }
 
@@ -693,13 +682,15 @@ std::pair<std::size_t, CPSize> MultiEdit::LowCursorPos() const
 }
 
 namespace {
-    struct InRange
-    {
-        InRange(CPSize value) : m_value(value) {}
-        bool operator()(const std::pair<CPSize, CPSize>& p) const
-        { return p.first < m_value && m_value < p.second; }
-        const CPSize m_value;
-    };
+
+struct InRange
+{
+    InRange(CPSize value) : m_value(value) {}
+    bool operator()(const std::pair<CPSize, CPSize>& p) const
+    { return p.first < m_value && m_value < p.second; }
+    const CPSize m_value;
+};
+
 }
 
 std::pair<CPSize, CPSize> MultiEdit::GetDoubleButtonDownWordIndices(CPSize char_index)
@@ -833,24 +824,24 @@ void MultiEdit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mo
     if (!numlock_on) {
         // convert keypad keys into corresponding non-number keys
         switch (key) {
-        case GGK_KP0:       key = GGK_INSERT;   break;
-        case GGK_KP1:       key = GGK_END;      break;
-        case GGK_KP2:       key = GGK_DOWN;     break;
-        case GGK_KP3:       key = GGK_PAGEDOWN; break;
-        case GGK_KP4:       key = GGK_LEFT;     break;
-        case GGK_KP5:                           break;
-        case GGK_KP6:       key = GGK_RIGHT;    break;
-        case GGK_KP7:       key = GGK_HOME;     break;
-        case GGK_KP8:       key = GGK_UP;       break;
-        case GGK_KP9:       key = GGK_PAGEUP;   break;
-        case GGK_KP_PERIOD: key = GGK_DELETE;   break;
-        default:                                break;
+        case Key::GGK_KP0:       key = Key::GGK_INSERT;   break;
+        case Key::GGK_KP1:       key = Key::GGK_END;      break;
+        case Key::GGK_KP2:       key = Key::GGK_DOWN;     break;
+        case Key::GGK_KP3:       key = Key::GGK_PAGEDOWN; break;
+        case Key::GGK_KP4:       key = Key::GGK_LEFT;     break;
+        case Key::GGK_KP5:                                break;
+        case Key::GGK_KP6:       key = Key::GGK_RIGHT;    break;
+        case Key::GGK_KP7:       key = Key::GGK_HOME;     break;
+        case Key::GGK_KP8:       key = Key::GGK_UP;       break;
+        case Key::GGK_KP9:       key = Key::GGK_PAGEUP;   break;
+        case Key::GGK_KP_PERIOD: key = Key::GGK_DELETE;   break;
+        default:                                          break;
         }
     }
 
     switch (key) {
-    case GGK_RETURN:
-    case GGK_KP_ENTER: {
+    case Key::GGK_RETURN:
+    case Key::GGK_KP_ENTER: {
         if (MultiSelected())
             ClearSelected();
         Insert(m_cursor_end.first, m_cursor_end.second, '\n');
@@ -871,7 +862,7 @@ void MultiEdit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mo
         break;
     }
 
-    case GGK_LEFT: {
+    case Key::GGK_LEFT: {
         if (MultiSelected() && !shift_down) {
             m_cursor_begin = m_cursor_end = LowCursorPos();
         } else if (0 < m_cursor_end.second) {
@@ -892,7 +883,7 @@ void MultiEdit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mo
         break;
     }
 
-    case GGK_RIGHT: {
+    case Key::GGK_RIGHT: {
         if (MultiSelected() && !shift_down) {
             m_cursor_begin = m_cursor_end = HighCursorPos();
         } else if (!GetLineData().empty() && m_cursor_end.second <
@@ -909,7 +900,7 @@ void MultiEdit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mo
         break;
     }
 
-    case GGK_UP: {
+    case Key::GGK_UP: {
         if (MultiSelected() && !shift_down) {
             m_cursor_begin = m_cursor_end = LowCursorPos();
         } else if (0 < m_cursor_end.first) {
@@ -923,7 +914,7 @@ void MultiEdit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mo
         break;
     }
 
-    case GGK_DOWN: {
+    case Key::GGK_DOWN: {
         if (MultiSelected() && !shift_down) {
             m_cursor_begin = m_cursor_end = HighCursorPos();
         } else if (!GetLineData().empty() && m_cursor_end.first < GetLineData().size() - 1) {
@@ -937,7 +928,7 @@ void MultiEdit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mo
         break;
     }
 
-    case GGK_HOME: {
+    case Key::GGK_HOME: {
         m_cursor_end.second = CP0;
         if (ctrl_down)
             m_cursor_end.first = 0;
@@ -946,7 +937,7 @@ void MultiEdit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mo
         break;
     }
 
-    case GGK_END: {
+    case Key::GGK_END: {
         m_cursor_end.second = CPSize(GetLineData()[m_cursor_end.first].char_data.size());
         if (LineEndsWithEndlineCharacter(GetLineData(), m_cursor_end.first, Text()))
             --m_cursor_end.second;
@@ -955,7 +946,7 @@ void MultiEdit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mo
         break;
     }
 
-    case GGK_PAGEUP: {
+    case Key::GGK_PAGEUP: {
         if (m_vscroll) {
             m_vscroll->ScrollPageDecr();
             SignalScroll(*m_vscroll, true);
@@ -968,7 +959,7 @@ void MultiEdit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mo
         break;
     }
 
-    case GGK_PAGEDOWN: {
+    case Key::GGK_PAGEDOWN: {
         if (m_vscroll) {
             m_vscroll->ScrollPageIncr();
             SignalScroll(*m_vscroll, true);
@@ -986,7 +977,7 @@ void MultiEdit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mo
         break;
     }
 
-    case GGK_BACKSPACE: {
+    case Key::GGK_BACKSPACE: {
         if (MultiSelected()) {
             ClearSelected();
             emit_signal = true;
@@ -1006,7 +997,7 @@ void MultiEdit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mo
         break;
     }
 
-    case GGK_DELETE: {
+    case Key::GGK_DELETE: {
         if (MultiSelected()) {
             ClearSelected();
             emit_signal = true;

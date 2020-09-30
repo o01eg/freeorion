@@ -176,10 +176,19 @@ void Empire::serialize(Archive& ar, const unsigned int version)
         & BOOST_SERIALIZATION_NVP(m_eliminated)
         & BOOST_SERIALIZATION_NVP(m_victories);
 
-    bool visible = GetUniverse().AllObjectsVisible() ||
-        GetUniverse().EncodingEmpire() == ALL_EMPIRES ||
-        m_id == GetUniverse().EncodingEmpire();
-    bool allied_visible = visible || Empires().GetDiplomaticStatus(m_id, GetUniverse().EncodingEmpire()) == DIPLO_ALLIED;
+
+    auto encoding_empire = GlobalSerializationEncodingForEmpire();
+    bool visible =
+        (ALL_EMPIRES == encoding_empire) ||
+        (m_id == encoding_empire); // TODO: GameRule for all objects visible
+    bool allied_visible = visible ||
+        Empires().GetDiplomaticStatus(m_id, GlobalSerializationEncodingForEmpire()) ==
+            DiplomaticStatus::DIPLO_ALLIED;
+
+    TraceLogger() << "serializing empire " << m_id << ": " << m_name;
+    TraceLogger() << "encoding empire: " << encoding_empire;
+    TraceLogger() << std::string(visible ? "visible" : "NOT visible") << "  /  "
+                  << std::string(allied_visible ? "allied visible" : "NOT allied visible");
 
     if (Archive::is_loading::value && version < 1) {
         // adapt set to map
@@ -237,6 +246,7 @@ void Empire::serialize(Archive& ar, const unsigned int version)
         & BOOST_SERIALIZATION_NVP(m_preserved_system_exit_lanes);
 
     if (visible) {
+        try {
         ar  & boost::serialization::make_nvp("m_ship_designs", m_known_ship_designs);
         ar  & BOOST_SERIALIZATION_NVP(m_sitrep_entries)
             & BOOST_SERIALIZATION_NVP(m_resource_pools)
@@ -271,6 +281,9 @@ void Empire::serialize(Archive& ar, const unsigned int version)
 
             & BOOST_SERIALIZATION_NVP(m_building_types_produced)
             & BOOST_SERIALIZATION_NVP(m_building_types_scrapped);
+        } catch (...) {
+            ErrorLogger() << "Empire::serialize failed to (de)serialize stuff for visible empire";
+        }
     }
 
     if (Archive::is_loading::value && version < 3) {
@@ -284,6 +297,8 @@ void Empire::serialize(Archive& ar, const unsigned int version)
     } else {
         ar  & BOOST_SERIALIZATION_NVP(m_ready);
     }
+
+    TraceLogger() << "DONE serializing empire " << m_id << ": " << m_name;
 }
 
 BOOST_CLASS_VERSION(Empire, 4)
@@ -302,7 +317,9 @@ namespace {
 template <typename Archive>
 void serialize(Archive& ar, EmpireManager& em, unsigned int const version)
 {
-    using namespace boost::serialization;
+    using boost::serialization::make_nvp;
+
+    TraceLogger() << "Serializing EmpireManager encoding empire: " << GlobalSerializationEncodingForEmpire();
 
     if (Archive::is_loading::value) {
         em.Clear();    // clean up any existing dynamically allocated contents before replacing containers with deserialized data
@@ -310,22 +327,39 @@ void serialize(Archive& ar, EmpireManager& em, unsigned int const version)
 
     std::map<std::pair<int, int>, DiplomaticMessage> messages;
     if (Archive::is_saving::value)
-        em.GetDiplomaticMessagesToSerialize(messages, GetUniverse().EncodingEmpire());
+        em.GetDiplomaticMessagesToSerialize(messages, GlobalSerializationEncodingForEmpire());
 
-    ar  & make_nvp("m_empire_map", em.m_empire_map)
-        & make_nvp("m_empire_diplomatic_statuses", em.m_empire_diplomatic_statuses)
-        & BOOST_SERIALIZATION_NVP(messages);
+    TraceLogger() << "EmpireManager version : " << version;
+    if (Archive::is_loading::value && version < 1) {
+        std::map<int, Empire*> empire_raw_ptr_map;
+        ar  & make_nvp("m_empire_map", empire_raw_ptr_map);
+        TraceLogger() << "EmpireManager deserialized " << empire_raw_ptr_map.size() << " raw pointer empires:";
+        for (const auto& entry : empire_raw_ptr_map)
+            TraceLogger() << entry.second->Name() << " (" << entry.first << ")";
+
+        for (const auto& entry : empire_raw_ptr_map)
+            em.m_empire_map[entry.first] = std::shared_ptr<Empire>(entry.second);
+        TraceLogger() << "EmpireManager put raw pointers into shared_ptr";
+    } else {
+        ar  & make_nvp("m_empire_map", em.m_empire_map);
+    }
+    TraceLogger() << "EmpireManager serialized " << em.m_empire_map.size() << " empires";
+    ar  & make_nvp("m_empire_diplomatic_statuses", em.m_empire_diplomatic_statuses);
+    ar  & BOOST_SERIALIZATION_NVP(messages);
 
     if (Archive::is_loading::value) {
+        for (const auto& entry : em.m_empire_map)
+            em.m_const_empire_map.emplace(entry.first, entry.second);
+
         em.m_diplomatic_messages = std::move(messages);
 
         // erase invalid empire diplomatic statuses
         std::vector<std::pair<int, int>> to_erase;
         for (auto r : em.m_empire_diplomatic_statuses) {
-            auto e1 = r.first.first;
-            auto e2 = r.first.second;
+            const auto& e1 = r.first.first;
+            const auto& e2 = r.first.second;
             if (em.m_empire_map.count(e1) < 1 || em.m_empire_map.count(e2) < 1) {
-                to_erase.push_back({e1, e2});
+                to_erase.emplace_back(e1, e2);
                 ErrorLogger() << "Erased invalid diplomatic status between empires " << e1 << " and " << e2;
             }
         }
@@ -333,14 +367,13 @@ void serialize(Archive& ar, EmpireManager& em, unsigned int const version)
             em.m_empire_diplomatic_statuses.erase(p);
 
         // add missing empire diplomatic statuses
-        for (auto e1 : em.m_empire_map) {
-            for (auto e2 : em.m_empire_map) {
+        for (const auto& e1 : em.m_empire_map) {
+            for (const auto& e2 : em.m_empire_map) {
                 if (e1.first >= e2.first)
                     continue;
                 auto dk = DiploKey(e1.first, e2.first);
-                if (em.m_empire_diplomatic_statuses.count(dk) < 1)
-                {
-                    em.m_empire_diplomatic_statuses[dk] = DIPLO_WAR;
+                if (em.m_empire_diplomatic_statuses.count(dk) < 1) {
+                    em.m_empire_diplomatic_statuses[dk] = DiplomaticStatus::DIPLO_WAR;
                     ErrorLogger() << "Added missing diplomatic status (default WAR) between empires " << e1.first << " and " << e2.first;
                 }
             }

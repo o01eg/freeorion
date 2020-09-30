@@ -1,10 +1,19 @@
-// -*- C++ -*-
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2011 Rainer Kupke
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
+
 #ifndef _GLClientAndServerBuffer_h_
 #define _GLClientAndServerBuffer_h_
 
-#include <GG/Base.h>
 
 #include <vector>
+#include <GG/Base.h>
+
 
 namespace GG {
 
@@ -14,7 +23,7 @@ namespace GG {
 class GG_API GLBufferBase
 {
 public:
-    GLBufferBase();
+    GLBufferBase() = default;
 
     /** Required to automatically drop server buffer in case of delete. */
     virtual ~GLBufferBase();
@@ -27,7 +36,7 @@ protected:
     // drops the server buffer if one exists
     void dropServerBuffer();
 
-    GLuint      b_name;
+    GLuint b_name = 0;
 };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -65,8 +74,8 @@ public:
 
 protected:
     std::vector<vtype>  b_data;
-    std::size_t         b_size;
-    std::size_t         b_elements_per_item;
+    std::size_t         b_size = 0;
+    std::size_t         b_elements_per_item = 0;
 
     // used in derived classes to activate the buffer
     // implementations should use glBindBuffer, gl...Pointer if
@@ -133,5 +142,6 @@ public:
 };
 
 }
+
 
 #endif

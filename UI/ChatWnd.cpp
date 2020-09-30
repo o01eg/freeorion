@@ -113,14 +113,14 @@ void MessageWndEdit::KeyPress(GG::Key key, std::uint32_t key_code_point,
                               GG::Flags<GG::ModKey> mod_keys)
 {
     switch (key) {
-    case GG::GGK_RETURN:
-    case GG::GGK_KP_ENTER:
+    case GG::Key::GGK_RETURN:
+    case GG::Key::GGK_KP_ENTER:
         TextEnteredSignal();
         break;
-    case GG::GGK_UP:
+    case GG::Key::GGK_UP:
         UpPressedSignal();
         break;
-    case GG::GGK_DOWN:
+    case GG::Key::GGK_DOWN:
         DownPressedSignal();
         break;
     default:
@@ -132,55 +132,55 @@ void MessageWndEdit::KeyPress(GG::Key key, std::uint32_t key_code_point,
 void MessageWndEdit::FindGameWords() {
      // add player and empire names
     for (auto& entry : Empires()) {
-        m_game_words.insert(entry.second->Name());
-        m_game_words.insert(entry.second->PlayerName());
+        m_game_words.emplace(entry.second->Name());
+        m_game_words.emplace(entry.second->PlayerName());
     }
     // add system names
     for (auto& system : GetUniverse().Objects().all<System>()) {
         if (!system->Name().empty())
-            m_game_words.insert(system->Name());
+            m_game_words.emplace(system->Name());
     }
      // add ship names
     for (auto& ship : GetUniverse().Objects().all<Ship>()) {
         if (!ship->Name().empty())
-            m_game_words.insert(ship->Name());
+            m_game_words.emplace(ship->Name());
     }
      // add ship design names
 
     for (const auto& design : GetPredefinedShipDesignManager().GetOrderedShipDesigns()) {
         if (!design->Name().empty())
-            m_game_words.insert(UserString(design->Name()));
+            m_game_words.emplace(UserString(design->Name()));
     }
      // add specials names
     for (const std::string& special_name : SpecialNames()) {
         if (!special_name.empty())
-            m_game_words.insert(UserString(special_name));
+            m_game_words.emplace(UserString(special_name));
     }
      // add species names
     for (const auto& entry : GetSpeciesManager()) {
         if (!entry.second->Name().empty())
-            m_game_words.insert(UserString(entry.second->Name()));
+            m_game_words.emplace(UserString(entry.second->Name()));
     }
      // add techs names
     for (const std::string& tech_name : GetTechManager().TechNames()) {
         if (!tech_name.empty())
-            m_game_words.insert(UserString(tech_name));
+            m_game_words.emplace(UserString(tech_name));
     }
     // add building type names
     for (const auto& entry : GetBuildingTypeManager()) {
         if (!entry.second->Name().empty())
-            m_game_words.insert(UserString(entry.second->Name()));
+            m_game_words.emplace(UserString(entry.second->Name()));
     }
     // add ship hulls
     for (const auto& design : GetPredefinedShipDesignManager().GetOrderedShipDesigns()) {
         if (!design->Hull().empty())
-            m_game_words.insert(UserString(design->Hull()));
+            m_game_words.emplace(UserString(design->Hull()));
     }
     // add ship parts
     for (const auto& design : GetPredefinedShipDesignManager().GetOrderedShipDesigns()) {
         for (const std::string& part_name : design->Parts()) {
             if (!part_name.empty())
-                m_game_words.insert(UserString(part_name));
+                m_game_words.emplace(UserString(part_name));
         }
     }
  }
@@ -201,8 +201,8 @@ bool MessageWndEdit::AutoComplete() {
             // and replace it with the next choice
             full_line = full_line.substr(0, full_line.size() - (m_last_game_word.size() + 1));
             full_line.insert(full_line.size(), next_word + " ");
-            this->SetText(full_line);
             GG::CPSize move_cursor_to = full_line.size() + GG::CP1;
+            this->SetText(std::move(full_line));
             this->SelectRange(move_cursor_to, move_cursor_to);
             m_last_game_word = next_word;
             m_last_line_read = this->Text();
@@ -232,7 +232,7 @@ bool MessageWndEdit::AutoComplete() {
             for (const std::string& word : m_game_words) {
                 if (boost::iequals(word, partial_word)) { // if there's an exact match, just add a space
                     full_line.insert(Value(cursor_pos.first), " ");
-                    this->SetText(full_line);
+                    this->SetText(std::move(full_line));
                     this->SelectRange(cursor_pos.first + 1, cursor_pos.first + 1);
                     exact_match = true;
                     break;
@@ -261,9 +261,9 @@ bool MessageWndEdit::CompleteWord(const std::set<std::string>& names, const std:
     for (const std::string& temp_game_word : names) {
         if (temp_game_word.size() >= partial_word.size()) {
             // Add all possible word choices for repeated tab
-            std::string game_word_partial = temp_game_word.substr(0, partial_word.size());
+            std::string&& game_word_partial = temp_game_word.substr(0, partial_word.size());
             if (!game_word_partial.empty() && boost::iequals(game_word_partial, partial_word))
-                m_auto_complete_choices.push_back(temp_game_word);
+                m_auto_complete_choices.emplace_back(temp_game_word);
         }
     }
 
@@ -272,15 +272,16 @@ bool MessageWndEdit::CompleteWord(const std::set<std::string>& names, const std:
 
     // Grab first autocomplete choice
     game_word = m_auto_complete_choices.at(m_repeated_tab_count++);
-    m_last_game_word = game_word;
+    m_last_game_word = std::move(game_word);
 
     // Remove the partial_word from the line
     // and replace it with the properly formated game word
     full_line = full_line.substr(0, full_line.size() - partial_word.size());
-    full_line.insert(full_line.size(), game_word + " ");
-    this->SetText(full_line);
+    full_line.insert(full_line.size(), m_last_game_word + " ");
+    auto line_sz = full_line.size();
+    this->SetText(std::move(full_line));
     m_last_line_read = this->Text();
-    GG::CPSize move_cursor_to = full_line.size() + GG::CP1;
+    GG::CPSize move_cursor_to = line_sz + GG::CP1;
     this->SelectRange(move_cursor_to, move_cursor_to);
     return true;
 }
@@ -405,34 +406,34 @@ void MessageWnd::HandlePlayerChatMessage(const std::string& text,
 void MessageWnd::HandleTurnPhaseUpdate(Message::TurnProgressPhase phase_id, bool prefixed /*= false*/) {
     std::string phase_str;
     switch (phase_id) {
-    case Message::FLEET_MOVEMENT:
+    case Message::TurnProgressPhase::FLEET_MOVEMENT:
         phase_str = UserString("TURN_PROGRESS_PHASE_FLEET_MOVEMENT");
         break;
-    case Message::COMBAT:
+    case Message::TurnProgressPhase::COMBAT:
         phase_str = UserString("TURN_PROGRESS_PHASE_COMBAT");
         break;
-    case Message::EMPIRE_PRODUCTION:
+    case Message::TurnProgressPhase::EMPIRE_PRODUCTION:
         phase_str = UserString("TURN_PROGRESS_PHASE_EMPIRE_GROWTH");
         break;
-    case Message::WAITING_FOR_PLAYERS:
+    case Message::TurnProgressPhase::WAITING_FOR_PLAYERS:
         phase_str = UserString("TURN_PROGRESS_PHASE_WAITING");
         break;
-    case Message::PROCESSING_ORDERS:
+    case Message::TurnProgressPhase::PROCESSING_ORDERS:
         phase_str = UserString("TURN_PROGRESS_PHASE_ORDERS");
         break;
-    case Message::COLONIZE_AND_SCRAP:
+    case Message::TurnProgressPhase::COLONIZE_AND_SCRAP:
         phase_str = UserString("TURN_PROGRESS_COLONIZE_AND_SCRAP");
         break;
-    case Message::DOWNLOADING:
+    case Message::TurnProgressPhase::DOWNLOADING:
         phase_str = UserString("TURN_PROGRESS_PHASE_DOWNLOADING");
         break;
-    case Message::LOADING_GAME:
+    case Message::TurnProgressPhase::LOADING_GAME:
         phase_str = UserString("TURN_PROGRESS_PHASE_LOADING_GAME");
         break;
-    case Message::GENERATING_UNIVERSE:
+    case Message::TurnProgressPhase::GENERATING_UNIVERSE:
         phase_str = UserString("TURN_PROGRESS_PHASE_GENERATING_UNIVERSE");
         break;
-    case Message::STARTING_AIS:
+    case Message::TurnProgressPhase::STARTING_AIS:
         phase_str = UserString("TURN_PROGRESS_STARTING_AIS");
         break;
     default:
@@ -476,15 +477,15 @@ void MessageWnd::HandleDiplomaticStatusChange(int empire1_id, int empire2_id) {
     std::string empire2_str = GG::RgbaTag(empire2->Color()) + empire2->Name() + "</rgba>";
 
     switch (status) {
-    case DIPLO_WAR:
+    case DiplomaticStatus::DIPLO_WAR:
         text = boost::str(FlexibleFormat(UserString("MESSAGES_WAR_DECLARATION"))
                    % empire1_str % empire2_str);
         break;
-    case DIPLO_PEACE:
+    case DiplomaticStatus::DIPLO_PEACE:
         text = boost::str(FlexibleFormat(UserString("MESSAGES_PEACE_TREATY"))
                    % empire1_str % empire2_str);
         break;
-    case DIPLO_ALLIED:
+    case DiplomaticStatus::DIPLO_ALLIED:
         text = boost::str(FlexibleFormat(UserString("MESSAGES_ALLIANCE"))
                    % empire1_str % empire2_str);
         break;

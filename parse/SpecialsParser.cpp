@@ -49,15 +49,16 @@ namespace {
     {
         auto special_ptr = std::make_unique<Special>(
             std::move(name), std::move(description),
-            (stealth ? std::move(stealth->OpenEnvelope(pass)) : nullptr),
-            (effects ? std::move(OpenEnvelopes(*effects, pass)) : std::vector<std::unique_ptr<Effect::EffectsGroup>>{}),
+            (stealth ? stealth->OpenEnvelope(pass) : nullptr),
+            (effects ? OpenEnvelopes(*effects, pass) : std::vector<std::unique_ptr<Effect::EffectsGroup>>{}),
             (special_pod.spawn_rate ? *special_pod.spawn_rate : 1.0),
             (special_pod.spawn_limit ? *special_pod.spawn_limit : 9999),
-            (initial_capacity ? std::move(initial_capacity->OpenEnvelope(pass)) : nullptr),
-            (location ? std::move(location->OpenEnvelope(pass)) : nullptr),
+            (initial_capacity ? initial_capacity->OpenEnvelope(pass) : nullptr),
+            (location ? location->OpenEnvelope(pass) : nullptr),
             special_pod.graphic);
 
-        specials.emplace(special_ptr->Name(), std::move(special_ptr));
+        auto& special_name{special_ptr->Name()};
+        specials.emplace(special_name, std::move(special_ptr));
     }
 
     BOOST_PHOENIX_ADAPT_FUNCTION(void, insert_special_, insert_special, 9)
@@ -93,7 +94,7 @@ namespace {
             qi::_pass_type _pass;
             qi::_r1_type _r1;
             qi::eps_type eps;
-            const boost::phoenix::function<parse::detail::deconstruct_movable> deconstruct_movable_;
+            //const boost::phoenix::function<parse::detail::deconstruct_movable> deconstruct_movable_;
 
             special
                 = (  tok.Special_

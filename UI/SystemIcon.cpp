@@ -163,7 +163,7 @@ OwnerColoredSystemName::OwnerColoredSystemName(int system_id, int font_size,
 
         // is planet populated by neutral species
         if (!has_neutrals) {
-            if (planet->Unowned() && !planet->SpeciesName().empty() && planet->GetMeter(METER_POPULATION)->Initial() > 0.0f)
+            if (planet->Unowned() && !planet->SpeciesName().empty() && planet->GetMeter(MeterType::METER_POPULATION)->Initial() > 0.0f)
                 has_neutrals = true;
         }
 
@@ -242,9 +242,7 @@ void OwnerColoredSystemName::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
 ////////////////////////////////////////////////
 SystemIcon::SystemIcon(GG::X x, GG::Y y, GG::X w, int system_id) :
     GG::Control(x, y, w, GG::Y(Value(w)), GG::INTERACTIVE),
-    m_system_id(system_id),
-    m_selected(false),
-    m_showing_name(false)
+    m_system_id(system_id)
 {}
 
 void SystemIcon::CompleteConstruction() {
@@ -274,44 +272,43 @@ void SystemIcon::CompleteConstruction() {
     m_tiny_graphic->Hide();
 
     // selection indicator graphic
-    const std::shared_ptr<GG::Texture>& texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "system_selection" / "system_selection2.png", true);
-
-    GG::X texture_width = texture->DefaultWidth();
-    GG::Y texture_height = texture->DefaultHeight();
-    m_selection_indicator = GG::Wnd::Create<RotatingGraphic>(texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+    auto texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "system_selection" / "system_selection2.png", true);
+    GG::Pt sz{texture->DefaultWidth(), texture->DefaultHeight()};
+    m_selection_indicator = GG::Wnd::Create<RotatingGraphic>(
+        std::move(texture), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
     m_selection_indicator->SetRPM(ClientUI::SystemSelectionIndicatorRPM());
     AttachChild(m_selection_indicator);
-    m_selection_indicator->Resize(GG::Pt(texture_width, texture_height));
+    m_selection_indicator->Resize(sz);
 
     // tiny selection indicator graphic
-    const std::shared_ptr<GG::Texture>& tiny_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "system_selection_tiny" / "system_selection_tiny2.png", true);
-    texture_width = tiny_texture->DefaultWidth();
-    texture_height = tiny_texture->DefaultHeight();
-    m_tiny_selection_indicator = GG::Wnd::Create<RotatingGraphic>(tiny_texture, GG::GRAPHIC_NONE);
+    texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "system_selection_tiny" / "system_selection_tiny2.png", true);
+    sz = {texture->DefaultWidth(), texture->DefaultHeight()};
+    m_tiny_selection_indicator = GG::Wnd::Create<RotatingGraphic>(
+        std::move(texture), GG::GRAPHIC_NONE);
     m_tiny_selection_indicator->SetRPM(ClientUI::SystemSelectionIndicatorRPM());
     AttachChild(m_tiny_selection_indicator);
-    m_tiny_selection_indicator->Resize(GG::Pt(texture_width, texture_height));
+    m_tiny_selection_indicator->Resize(sz);
 
     // mouseover indicator graphic
-    const std::shared_ptr<GG::Texture> mouseover_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "system_mouseover.png");
-    texture_width = mouseover_texture->DefaultWidth();
-    texture_height = mouseover_texture->DefaultHeight();
-    m_mouseover_indicator = GG::Wnd::Create<GG::StaticGraphic>(mouseover_texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
-    m_mouseover_indicator->Resize(GG::Pt(texture_width, texture_height));
+    texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "system_mouseover.png");
+    sz = {texture->DefaultWidth(), texture->DefaultHeight()};
+    m_mouseover_indicator = GG::Wnd::Create<GG::StaticGraphic>(
+        std::move(texture), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+    m_mouseover_indicator->Resize(sz);
 
     // unexplored mouseover indicator graphic
-    std::shared_ptr<GG::Texture> unexplored_mouseover_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "system_mouseover_unexplored.png");
-    texture_width = unexplored_mouseover_texture->DefaultWidth();
-    texture_height = unexplored_mouseover_texture->DefaultHeight();
-    m_mouseover_unexplored_indicator = GG::Wnd::Create<GG::StaticGraphic>(unexplored_mouseover_texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
-    m_mouseover_unexplored_indicator->Resize(GG::Pt(texture_width, texture_height));
+    texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "system_mouseover_unexplored.png");
+    sz = {texture->DefaultWidth(), texture->DefaultHeight()};
+    m_mouseover_unexplored_indicator = GG::Wnd::Create<GG::StaticGraphic>(
+        std::move(texture), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+    m_mouseover_unexplored_indicator->Resize(sz);
 
     // tiny mouseover indicator graphic
-    std::shared_ptr<GG::Texture> tiny_mouseover_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "system_mouseover_tiny.png");
-    texture_width = tiny_mouseover_texture->DefaultWidth();
-    texture_height = tiny_mouseover_texture->DefaultHeight();
-    m_tiny_mouseover_indicator = GG::Wnd::Create<GG::StaticGraphic>(tiny_mouseover_texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
-    m_tiny_mouseover_indicator->Resize(GG::Pt(texture_width, texture_height));
+    texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "system_mouseover_tiny.png");
+    sz = {texture->DefaultWidth(), texture->DefaultHeight()};
+    m_tiny_mouseover_indicator = GG::Wnd::Create<GG::StaticGraphic>(
+        std::move(texture), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+    m_tiny_mouseover_indicator->Resize(sz);
 
     Refresh();
 }
@@ -601,8 +598,15 @@ void SystemIcon::MouseEnter(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
     }
 
     // show system name if not by default
-    if (!m_showing_name)
-        AttachChild(m_colored_name);
+    if (!m_showing_name) {
+        // get font size
+        int name_pts = ClientUI::Pts();
+        if (auto map_wnd = ClientUI::GetClientUI()->GetMapWnd())
+            name_pts = map_wnd->SystemNamePts();
+        auto it = m_colored_names.find(name_pts);
+        if (it != m_colored_names.end())
+            AttachChild(it->second);
+    }
 
     PlaySystemIconRolloverSound();
 
@@ -619,8 +623,10 @@ void SystemIcon::MouseLeave() {
         DetachChild(m_tiny_mouseover_indicator);
 
     // hide name if not showing by default
-    if (!m_showing_name)
-        DetachChild(m_colored_name);
+    if (!m_showing_name) {
+        for (auto& pts_name_ptr : m_colored_names)
+            DetachChild(pts_name_ptr.second);
+    }
 
     MouseLeavingSignal(m_system_id);
 }
@@ -647,24 +653,30 @@ void SystemIcon::Refresh() {
     SetName(name);   // sets GG::Control name.  doesn't affect displayed system name
 
 
+    // get font size
+    int name_pts = ClientUI::Pts();
+    if (auto map_wnd = ClientUI::GetClientUI()->GetMapWnd())
+        name_pts = map_wnd->SystemNamePts();
+
     // remove existing system name control
-    DetachChildAndReset(m_colored_name);
+    for (auto& pts_name_ptrs : m_colored_names) {
+        if (!m_showing_name || name.empty() || pts_name_ptrs.first != name_pts)
+            DetachChild(pts_name_ptrs.second);
+    }
 
     // create new system name control
-    if (!name.empty()) {
-        // get font size
-        int name_pts = ClientUI::Pts();
-        if (const auto& map_wnd = ClientUI::GetClientUI()->GetMapWnd()) {
-            name_pts = map_wnd->SystemNamePts();
+    if (m_showing_name && !name.empty()) {
+        // create and position
+        auto it = m_colored_names.find(name_pts);
+        if (it == m_colored_names.end()) {
+            it = m_colored_names.emplace(name_pts,
+                                         GG::Wnd::Create<OwnerColoredSystemName>(
+                                            m_system_id, name_pts, true)).first;
         }
 
-        // create and position
-        m_colored_name = GG::Wnd::Create<OwnerColoredSystemName>(m_system_id, name_pts, true);
-        PositionSystemName();
-
-        // attach if appropriate, to display
-        if (m_showing_name)
-            AttachChild(m_colored_name);
+        PositionSystemName(name_pts);
+        if (it->second->Parent().get() != this)
+            AttachChild(it->second);
     }
 
     if (system && !system->OverlayTexture().empty())
@@ -677,23 +689,35 @@ void SystemIcon::Refresh() {
 
 void SystemIcon::ShowName() {
     m_showing_name = true;
-    if (!m_colored_name)
+
+    // get font size
+    int name_pts = ClientUI::Pts();
+    if (auto map_wnd = ClientUI::GetClientUI()->GetMapWnd())
+        name_pts = map_wnd->SystemNamePts();
+
+    auto it = m_colored_names.find(name_pts);
+    if (it == m_colored_names.end())
         Refresh();
     else
-        AttachChild(m_colored_name);
+        AttachChild(it->second);
 }
 
 void SystemIcon::HideName() {
     m_showing_name = false;
-    DetachChild(m_colored_name);
+    for (auto& pts_name_ptr : m_colored_names)
+        DetachChild(pts_name_ptr.second);
 }
 
-void SystemIcon::PositionSystemName() {
-    if (m_colored_name) {
-        GG::X name_left = ( Width()  - m_colored_name->Width()                                      )/2;
-        GG::Y name_top =  ( Height() + GG::Y(EnclosingCircleDiameter()*2) - m_colored_name->Height())/2;
-        m_colored_name->MoveTo(GG::Pt(name_left, name_top));
-    }
+void SystemIcon::PositionSystemName(int pts) {
+    auto it = m_colored_names.find(pts);
+    if (it == m_colored_names.end())
+        return;
+    auto& name = *it;
+    if (!name.second)
+        return;
+    GG::X name_left = ( Width() - name.second->Width()                                        )/2;
+    GG::Y name_top =  ( Height() + GG::Y(EnclosingCircleDiameter()*2) - name.second->Height() )/2;
+    name.second->MoveTo(GG::Pt(name_left, name_top));
 }
 
 bool SystemIcon::InWindow(const GG::Pt& pt) const {

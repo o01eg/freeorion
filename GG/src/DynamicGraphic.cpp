@@ -1,51 +1,35 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
-
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-/* This class is based on earlier work with GG by Tony Casale.  Thanks, Tony.*/
-
-#include <GG/DynamicGraphic.h>
-
-#include <GG/ClrConstants.h>
-#include <GG/DrawUtil.h>
-#include <GG/GUI.h>
-#include <GG/Texture.h>
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2000-2003 Tony Casale.
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include <cmath>
+#include <GG/ClrConstants.h>
+#include <GG/DrawUtil.h>
+#include <GG/DynamicGraphic.h>
+#include <GG/GUI.h>
+#include <GG/Texture.h>
 
 
 using namespace GG;
 
 namespace {
-    struct SignalEcho
-    {
-        SignalEcho(const std::string& name) : m_name(name) {}
-        void operator()(std::size_t index)
-        { std::cerr << "GG SIGNAL : " << m_name << "(index=" << index << ")" << std::endl; }
-        std::string m_name;
-    };
 
-    const double DEFAULT_FPS = 15.0;
+struct SignalEcho
+{
+    SignalEcho(const std::string& name) : m_name(name) {}
+    void operator()(std::size_t index)
+    { std::cerr << "GG SIGNAL : " << m_name << "(index=" << index << ")" << std::endl; }
+    std::string m_name;
+};
+
+const double DEFAULT_FPS = 15.0;
+
 }
 
 const std::size_t DynamicGraphic::ALL_FRAMES = std::numeric_limits<std::size_t>::max();
@@ -53,7 +37,7 @@ const std::size_t DynamicGraphic::INVALID_INDEX = std::numeric_limits<std::size_
 const unsigned int DynamicGraphic::INVALID_TIME = std::numeric_limits<unsigned int>::max();
 
 DynamicGraphic::DynamicGraphic(X x, Y y, X w, Y h, bool loop, X frame_width, Y frame_height,
-                               unsigned int margin, const std::vector<std::shared_ptr<Texture>>& textures,
+                               unsigned int margin, std::vector<std::shared_ptr<Texture>> textures,
                                Flags<GraphicStyle> style/* = GRAPHIC_NONE*/, std::size_t frames/* = ALL_FRAMES*/,
                                Flags<WndFlag> flags/* = Flags<WndFlags>()*/) :
     Control(x, y, w, h, flags),
@@ -61,20 +45,14 @@ DynamicGraphic::DynamicGraphic(X x, Y y, X w, Y h, bool loop, X frame_width, Y f
     m_frame_width(frame_width),
     m_frame_height(frame_height),
     m_FPS(DEFAULT_FPS),
-    m_playing(true),
     m_looping(loop),
-    m_curr_texture(0),
-    m_curr_subtexture(0),
-    m_frames(0),
-    m_curr_frame(0),
     m_first_frame_time(INVALID_TIME),
     m_last_frame_time(INVALID_TIME),
-    m_first_frame_idx(0),
     m_style(style)
 {
     ValidateStyle();
     SetColor(CLR_WHITE);
-    AddFrames(textures, frames);
+    AddFrames(std::move(textures), frames);
     m_last_frame_idx = m_frames - 1;
 
     if (INSTRUMENT_ALL_SIGNALS) {
@@ -236,31 +214,30 @@ void DynamicGraphic::AddFrames(const Texture* texture, std::size_t frames/* = AL
     FrameSet fs;
     fs.texture.reset(texture);
     fs.frames = std::min(frames_in_texture, std::max(frames, static_cast<std::size_t>(1)));
-    m_textures.push_back(fs);
     m_frames += fs.frames;
+    m_textures.emplace_back(std::move(fs));
 }
 
-void DynamicGraphic::AddFrames(const std::shared_ptr<Texture>& texture, std::size_t frames/* = ALL_FRAMES*/)
+void DynamicGraphic::AddFrames(std::shared_ptr<Texture> texture, std::size_t frames/* = ALL_FRAMES*/)
 {
     std::size_t frames_in_texture = FramesInTexture(texture.get());
     if (!frames_in_texture)
         throw CannotAddFrame("DynamicGraphic::AddFrames : attempted to add frames from a Texture too small for even one frame");
 
     FrameSet fs;
-    fs.texture = texture;
+    fs.texture = std::move(texture);
     fs.frames = std::min(frames_in_texture, std::max(frames, static_cast<std::size_t>(1)));
-    m_textures.push_back(fs);
     m_frames += fs.frames;
+    m_textures.emplace_back(std::move(fs));
 }
 
-void DynamicGraphic::AddFrames(const std::vector<std::shared_ptr<Texture>>& textures, std::size_t frames/* = ALL_FRAMES*/)
+void DynamicGraphic::AddFrames(std::vector<std::shared_ptr<Texture>> textures, std::size_t frames/* = ALL_FRAMES*/)
 {
     if (!textures.empty()) {
         std::size_t old_frames = m_frames;
-        for (std::size_t i = 0; i < textures.size() - 1; ++i) {
-            AddFrames(textures[i], ALL_FRAMES);
-        }
-        AddFrames(textures.back(), m_frames - old_frames);
+        for (std::size_t i = 0; i < textures.size() - 1; ++i)
+            AddFrames(std::move(textures[i]), ALL_FRAMES);
+        AddFrames(std::move(textures.back()), m_frames - old_frames);
     }
 }
 

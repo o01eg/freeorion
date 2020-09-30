@@ -53,13 +53,13 @@ void MilitaryPanel::CompleteConstruction() {
     std::vector<std::pair<MeterType, MeterType>> meters;
 
     // small meter indicators - for use when panel is collapsed
-    for (MeterType meter : {METER_SHIELD, METER_DEFENSE, METER_TROOPS, METER_DETECTION, METER_STEALTH}) {
+    for (MeterType meter : {MeterType::METER_SHIELD, MeterType::METER_DEFENSE, MeterType::METER_TROOPS, MeterType::METER_DETECTION, MeterType::METER_STEALTH}) {
         auto stat = GG::Wnd::Create<StatisticIcon>(
             ClientUI::MeterIcon(meter), obj->GetMeter(meter)->Initial(),
             3, false, MeterIconSize().x, MeterIconSize().y);
         AttachChild(stat);
-        m_meter_stats.push_back({meter, stat});
-        meters.push_back({meter, AssociatedMeterType(meter)});
+        m_meter_stats.emplace_back(meter, stat);
+        meters.emplace_back(meter, AssociatedMeterType(meter));
         stat->RightClickedSignal.connect([meter](const GG::Pt& pt) {
             std::string meter_string = boost::lexical_cast<std::string>(meter);
 
@@ -68,7 +68,7 @@ void MilitaryPanel::CompleteConstruction() {
             auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
             std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) %
                                                                     UserString(meter_string));
-            popup->AddMenuItem(GG::MenuItem(popup_label, false, false, zoom_action));
+            popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false, zoom_action));
             popup->Run();
         });
     }

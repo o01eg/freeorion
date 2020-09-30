@@ -1,40 +1,26 @@
-// -*- C++ -*-
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-/** \file Button.h \brief Contains the Button push-button control class; the
-    StateButton control class, which represents check boxes and radio buttons;
-    and the RadioButtonGroup control class, which allows multiple radio
-    buttons to be combined into a single control. */
+//! @file GG/Button.h
+//!
+//! Contains the Button push-button control class; the StateButton control
+//! class, which represents check boxes and radio buttons; and the
+//! RadioButtonGroup control class, which allows multiple radio buttons to be
+//! combined into a single control.
 
 #ifndef _GG_Button_h_
 #define _GG_Button_h_
 
-#include <GG/ClrConstants.h>
-#include <GG/TextControl.h>
-#include <GG/Enum.h>
 
+#include <GG/ClrConstants.h>
+#include <GG/Enum.h>
+#include <GG/TextControl.h>
 #include <boost/signals2/signal.hpp>
 
 
@@ -60,7 +46,7 @@ public:
     /** Emitted when the button is clicked by the user */
     typedef boost::signals2::signal<void ()> ClickedSignalType;
 
-    Button(const std::string& str, const std::shared_ptr<Font>& font, Clr color,
+    Button(std::string str, const std::shared_ptr<Font>& font, Clr color,
            Clr text_color = CLR_BLACK, Flags<WndFlag> flags = INTERACTIVE);
     void CompleteConstruction() override;
 
@@ -93,10 +79,10 @@ public:
     /** Sets button state programmatically \see ButtonState */
     void SetState(ButtonState state);
 
-    void SetText(const std::string& text);          ///< Sets the text to be used as the button label
-    void SetUnpressedGraphic(const SubTexture& st); ///< Sets the SubTexture to be used as the image of the button when unpressed
-    void SetPressedGraphic(const SubTexture& st);   ///< Sets the SubTexture to be used as the image of the button when pressed
-    void SetRolloverGraphic(const SubTexture& st);  ///< Sets the SubTexture to be used as the image of the button when it contains the cursor, but is not pressed
+    void SetText(std::string text);             ///< Sets the text to be used as the button label
+    void SetUnpressedGraphic(SubTexture st);    ///< Sets the SubTexture to be used as the image of the button when unpressed
+    void SetPressedGraphic(SubTexture st);      ///< Sets the SubTexture to be used as the image of the button when pressed
+    void SetRolloverGraphic(SubTexture st);     ///< Sets the SubTexture to be used as the image of the button when it contains the cursor, but is not pressed
 
 protected:
     void LButtonDown(const Pt& pt, Flags<ModKey> mod_keys) override;
@@ -123,10 +109,10 @@ protected:
 private:
     void RenderDefault();     ///< This just draws the default unadorned square-and-rectangle button
 
-    ButtonState    m_state;             ///< Button is always in exactly one of the ButtonState states above
-    SubTexture     m_unpressed_graphic; ///< Graphic used to display button when it's unpressed
-    SubTexture     m_pressed_graphic;   ///< Graphic used to display button when it's depressed
-    SubTexture     m_rollover_graphic;  ///< Graphic used to display button when it's under the mouse and not pressed
+    ButtonState    m_state = ButtonState::BN_UNPRESSED; ///< Button is always in exactly one of the ButtonState states above
+    SubTexture     m_unpressed_graphic;                 ///< Graphic used to display button when it's unpressed
+    SubTexture     m_pressed_graphic;                   ///< Graphic used to display button when it's depressed
+    SubTexture     m_rollover_graphic;                  ///< Graphic used to display button when it's under the mouse and not pressed
 };
 
 
@@ -158,7 +144,7 @@ public:
         unchecked status is indicated by the bool parameter */
     typedef boost::signals2::signal<void (bool)> CheckedSignalType;
 
-    StateButton(const std::string& str, const std::shared_ptr<Font>& font, Flags<TextFormat> format,
+    StateButton(std::string str, const std::shared_ptr<Font>& font, Flags<TextFormat> format,
                 Clr color, std::shared_ptr<StateButtonRepresenter> representer, Clr text_color = CLR_BLACK); ///< Ctor
     void CompleteConstruction() override;
 
@@ -212,6 +198,8 @@ private:
 class GG_API StateButtonRepresenter
 {
 public:
+    virtual ~StateButtonRepresenter() = default;
+
     /** \brief Render the given state button according to its state.
 
         \param button The StateButton instance to render.
@@ -405,7 +393,7 @@ protected:
         RadioButtonGroup. */
     struct GG_API ButtonSlot
     {
-        ButtonSlot(std::shared_ptr<StateButton>& button_);
+        ButtonSlot(std::shared_ptr<StateButton> button_);
 
         std::shared_ptr<StateButton> button;
 
@@ -428,5 +416,6 @@ private:
 };
 
 }
+
 
 #endif

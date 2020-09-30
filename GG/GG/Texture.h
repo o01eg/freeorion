@@ -1,42 +1,31 @@
-// -*- C++ -*-
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-/** \file Texture.h \brief Contains the Texture class, which encapsulates an
-    OpenGL texture object; the SubTexture class, which represents a portion of
-    an OpenGL texture object; and the TextureManager class, which provides
-    GUI-wide management of Texture objects. */
+//! @file GG/Texture.h
+//!
+//! Contains the Texture class, which encapsulates an OpenGL texture object;
+//! the SubTexture class, which represents a portion of an OpenGL texture
+//! object; and the TextureManager class, which provides GUI-wide management
+//! of Texture objects.
 
 #ifndef _GG_Texture_h_
 #define _GG_Texture_h_
 
+
+#include <boost/filesystem/path.hpp>
 #include <GG/Base.h>
 #include <GG/Exception.h>
 
-#include <boost/filesystem/path.hpp>
 
 namespace GG {
+    class GL2DVertexBuffer;
+    class GLTexCoordBuffer;
 
 /** \brief This class encapsulates an OpenGL texture object.
 
@@ -85,6 +74,17 @@ public:
     /** Blit any portion of texture to any place on screen, scaling as
         necessary*/
     void OrthoBlit(const Pt& pt1, const Pt& pt2, const GLfloat* tex_coords = nullptr) const;
+    void Blit(const GL2DVertexBuffer& vertex_buffer, const GLTexCoordBuffer& tex_coord_buffer,
+              bool render_scaled = true) const;
+
+    /** Fill \a vertex_buffer and with vertex data for the quad spanning between
+        \a pt1 and \a pt2 */
+    static void InitBuffer(GL2DVertexBuffer& vertex_buffer, const Pt& pt1, const Pt& pt2);
+    static void InitBuffer(GL2DVertexBuffer& vertex_buffer, float x1, float y1, float x2, float y2);
+
+    /** Fill \a tex_coord_buff with texture coordinate data for the texture
+      * coords specified by \a tex_coords */
+    static void InitBuffer(GLTexCoordBuffer& tex_coord_buffer, const GLfloat* tex_coords = 0);
 
     /** Blit default portion of texture unscaled to \a pt (upper left
         corner)*/
@@ -101,7 +101,7 @@ public:
         subclass if the texture creation fails in one of the specified
         ways. */
     void Init(X width, Y height, const unsigned char* image, GLenum format, GLenum type,
-              unsigned bytes_per_pixel, bool mipmap = false);
+              unsigned int bytes_per_pixel, bool mipmap = false);
 
     void SetFilters(GLenum min, GLenum mag);  ///< sets the opengl min/mag filter modes associated with opengl texture m_opengl_id
     void Clear();  ///< frees the opengl texture object associated with this object
@@ -152,22 +152,22 @@ private:
 class GG_API SubTexture
 {
 public:
-    SubTexture();
+    SubTexture() = default;
 
     /** Creates a SubTexture from a GG::Texture and coordinates into it.
         \throw GG::SubTexture::BadTexture Throws if the given Texture is null.
         \throw GG::SubTexture::InvalidTextureCoordinates Throws if the texture
         coordinates are not well formed.*/
-    SubTexture(const std::shared_ptr<const Texture>& texture, X x1, Y y1, X x2, Y y2);
+    SubTexture(std::shared_ptr<const Texture> texture, X x1, Y y1, X x2, Y y2);
 
     /** Creates a SubTexture from a GG::Texture and uses coordinates to cover
         the whole texture.
         \throw GG::SubTexture::BadTexture Throws if the given Texture is null.*/
-    SubTexture(const std::shared_ptr<const Texture>& texture);
-
+    SubTexture(std::shared_ptr<const Texture> texture);
     SubTexture(const SubTexture& rhs);
 
-    const SubTexture& operator=(const SubTexture& rhs);
+    SubTexture& operator=(const SubTexture& rhs);
+    SubTexture& operator=(SubTexture&& rhs) noexcept;
 
     virtual ~SubTexture();
 
@@ -201,8 +201,8 @@ public:
 private:
     /** shared_ptr to texture object with entire image. */
     std::shared_ptr<const Texture>  m_texture;
-    X                               m_width;
-    Y                               m_height;
+    X                               m_width = GG::X0;
+    Y                               m_height = GG::Y0;
     GLfloat                         m_tex_coords[4];    ///< position of element within containing texture 
 };
 
@@ -261,5 +261,6 @@ private:
 GG_API TextureManager& GetTextureManager();
 
 }
+
 
 #endif

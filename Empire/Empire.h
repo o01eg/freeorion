@@ -59,7 +59,8 @@ public:
     typedef std::vector<SitRepEntry>::const_iterator    SitRepItr;
     //@}
 
-    Empire(const std::string& name, const std::string& player_name, int ID, const GG::Clr& color, bool authenticated);  ///< basic constructor
+    Empire(std::string name, std::string player_name, int ID,
+           const GG::Clr& color, bool authenticated);
     ~Empire();
 
     const std::string&  Name() const;            ///< Returns the Empire's name
@@ -69,9 +70,9 @@ public:
     const GG::Clr&      Color() const;           ///< Returns the Empire's color
     int                 CapitalID() const;       ///< Returns the numeric ID of the empire's capital
 
-    /** Return an object id that is owned by the empire or INVALID_OBJECT_ID. */
+    /** Returns an object id that is owned by the empire or INVALID_OBJECT_ID. */
     int                 SourceID() const;
-    /** Return an object that is owned by the empire, or null.*/
+    /** Returns an object that is owned by the empire, or null.*/
     std::shared_ptr<const UniverseObject> Source() const;
 
     std::string         Dump() const;
@@ -93,6 +94,7 @@ public:
     /** Returns the set of policies / slots the empire has avaialble. */
     const std::set<std::string>&    AvailablePolicies() const;
     bool                            PolicyAvailable(const std::string& name) const;
+    bool                            PolicyPrereqsAndExclusionsOK(const std::string& name) const;
     std::map<std::string, int>      TotalPolicySlots() const;
     std::map<std::string, int>      EmptyPolicySlots() const;
 
@@ -286,14 +288,9 @@ public:
     void Win(const std::string& reason);             ///< Marks this empire as having won for this reason, and sends the appropriate sitreps
     void SetReady(bool ready);                       ///< Marks this empire with readiness status
 
-    /** Inserts the a pointer to given SitRep entry into the empire's sitrep list.
-     *  \warning When you call this method, you are transferring ownership
-     *  of the entry object to the Empire.
-     *  The object pointed to by 'entry' will be deallocated when
-     *  the empire's sitrep is cleared.  Be careful you do not have any
-     *  references to SitRepEntries lying around when this happens.
-     *  You \a must pass in a dynamically allocated sitrep entry */
+    /** Inserts the given SitRep entry into the empire's sitrep list. */
     void AddSitRepEntry(const SitRepEntry& entry);
+    void AddSitRepEntry(SitRepEntry&& entry);
     void ClearSitRep();                              ///< Clears all sitrep entries
 
     void RemoveTech(const std::string& name);        ///< Removes the given Tech from the empire's list
@@ -473,20 +470,21 @@ public:
     static void ConquerProductionQueueItemsAtLocation(int location_id, int empire_id);
 
     mutable boost::signals2::signal<void ()> ShipDesignsChangedSignal;
+    mutable boost::signals2::signal<void ()> PoliciesChangedSignal;
 
 private:
     void Init();
 
-    int                             m_id = ALL_EMPIRES;         ///< Empire's unique numeric id
-    std::string                     m_name;                     ///< Empire's name
-    std::string                     m_player_name;              ///< Empire's Player's name
+    int         m_id = ALL_EMPIRES;         ///< Empire's unique numeric id
+    std::string m_name;                     ///< Empire's name
+    std::string m_player_name;              ///< Empire's Player's name
 
     /** Empire's Player's authentication flag. Set if only player with empire's player's name
         should play this empire. */
-    bool                            m_authenticated;
+    bool        m_authenticated = false;
 
-    GG::Clr                         m_color;                    ///< Empire's color
-    int                             m_capital_id = INVALID_OBJECT_ID;  ///< the ID of the empire's capital planet
+    GG::Clr     m_color;
+    int         m_capital_id = INVALID_OBJECT_ID;  ///< the ID of the empire's capital planet
 
     struct PolicyAdoptionInfo {
         PolicyAdoptionInfo();

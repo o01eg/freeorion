@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <functional>
 
 #include "Export.h"
 
@@ -21,6 +22,7 @@ public:
     explicit ScopedTimer(std::string timed_name = "", bool enable_output = false,
                          std::chrono::microseconds threshold = std::chrono::milliseconds(1));
     ScopedTimer(std::string timed_name, std::chrono::microseconds threshold);
+    ScopedTimer(std::function<std::string ()> output_text_fn, std::chrono::microseconds threshold);
     ~ScopedTimer();
 
     void restart();

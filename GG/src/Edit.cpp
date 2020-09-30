@@ -1,30 +1,14 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
-
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
-#include <GG/Edit.h>
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include <GG/DrawUtil.h>
+#include <GG/Edit.h>
 #include <GG/GUI.h>
 #include <GG/utf8/checked.h>
 #include <GG/WndEvent.h>
@@ -33,24 +17,26 @@
 using namespace GG;
 
 namespace {
-    struct EditedEcho
-    {
-        EditedEcho(const std::string& name) : m_name(name) {}
-        void operator()(const std::string& str)
-        { std::cerr << "GG SIGNAL : " << m_name << "(str=" << str << ")" << std::endl; }
-        std::string m_name;
-    };
 
-    struct InRange
-    {
-        InRange(CPSize value) : m_value(value) {}
-        bool operator()(const std::pair<CPSize, CPSize>& p) const
-        { return p.first < m_value && m_value < p.second; }
-        const CPSize m_value;
-    };
+struct EditedEcho
+{
+    EditedEcho(const std::string& name) : m_name(name) {}
+    void operator()(const std::string& str)
+    { std::cerr << "GG SIGNAL : " << m_name << "(str=" << str << ")" << std::endl; }
+    std::string m_name;
+};
 
-    Y HeightFromFont(const std::shared_ptr<Font>& font, unsigned int pixel_margin)
-    {  return font->Height() + 2 * static_cast<int>(pixel_margin); }
+struct InRange
+{
+    InRange(CPSize value) : m_value(value) {}
+    bool operator()(const std::pair<CPSize, CPSize>& p) const
+    { return p.first < m_value && m_value < p.second; }
+    const CPSize m_value;
+};
+
+Y HeightFromFont(const std::shared_ptr<Font>& font, unsigned int pixel_margin)
+{  return font->Height() + 2 * static_cast<int>(pixel_margin); }
+
 }
 
 ////////////////////////////////////////////////
@@ -59,9 +45,9 @@ namespace {
 // static(s)
 const int Edit::PIXEL_MARGIN = 5;
 
-Edit::Edit(const std::string& str, const std::shared_ptr<Font>& font, Clr color,
+Edit::Edit(std::string str, const std::shared_ptr<Font>& font, Clr color,
            Clr text_color/* = CLR_BLACK*/, Clr interior/* = CLR_ZERO*/) :
-    TextControl(X0, Y0, X1, HeightFromFont(font, PIXEL_MARGIN), str, font, text_color,
+    TextControl(X0, Y0, X1, HeightFromFont(font, PIXEL_MARGIN), std::move(str), font, text_color,
                 FORMAT_LEFT | FORMAT_IGNORETAGS, INTERACTIVE | REPEAT_KEY_PRESS),
     m_cursor_pos(CP0, CP0),
     m_last_button_down_time(0),
@@ -217,9 +203,9 @@ void Edit::SelectRange(CPSize from, CPSize to)
     AdjustView();
 }
 
-void Edit::SetText(const std::string& str)
+void Edit::SetText(std::string str)
 {
-    TextControl::SetText(str);
+    TextControl::SetText(std::move(str));
     m_cursor_pos.second = m_cursor_pos.first; // eliminate any hiliting
 
     // make sure the change in text did not make the cursor or view position invalid
@@ -430,30 +416,30 @@ void Edit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_key
     if (!numlock_on) {
         // convert keypad keys into corresponding non-number keys
         switch (key) {
-        case GGK_KP0:       key = GGK_INSERT;   break;
-        case GGK_KP1:       key = GGK_END;      break;
-        case GGK_KP2:       key = GGK_DOWN;     break;
-        case GGK_KP3:       key = GGK_PAGEDOWN; break;
-        case GGK_KP4:       key = GGK_LEFT;     break;
-        case GGK_KP5:                           break;
-        case GGK_KP6:       key = GGK_RIGHT;    break;
-        case GGK_KP7:       key = GGK_HOME;     break;
-        case GGK_KP8:       key = GGK_UP;       break;
-        case GGK_KP9:       key = GGK_PAGEUP;   break;
-        case GGK_KP_PERIOD: key = GGK_DELETE;   break;
-        default:                                break;
+        case Key::GGK_KP0:       key = Key::GGK_INSERT;   break;
+        case Key::GGK_KP1:       key = Key::GGK_END;      break;
+        case Key::GGK_KP2:       key = Key::GGK_DOWN;     break;
+        case Key::GGK_KP3:       key = Key::GGK_PAGEDOWN; break;
+        case Key::GGK_KP4:       key = Key::GGK_LEFT;     break;
+        case Key::GGK_KP5:                                break;
+        case Key::GGK_KP6:       key = Key::GGK_RIGHT;    break;
+        case Key::GGK_KP7:       key = Key::GGK_HOME;     break;
+        case Key::GGK_KP8:       key = Key::GGK_UP;       break;
+        case Key::GGK_KP9:       key = Key::GGK_PAGEUP;   break;
+        case Key::GGK_KP_PERIOD: key = Key::GGK_DELETE;   break;
+        default:                                          break;
         }
     }
 
     switch (key) {
-    case GGK_HOME:
+    case Key::GGK_HOME:
         m_first_char_shown = CP0;
         if (shift_down)
             m_cursor_pos.second = CP0;
         else
             m_cursor_pos.second = m_cursor_pos.first = CP0;
         break;
-    case GGK_LEFT:
+    case Key::GGK_LEFT:
         if (MultiSelected() && !shift_down) {
             if (!ctrl_down)
                 m_cursor_pos.second = m_cursor_pos.first = std::min(m_cursor_pos.first, m_cursor_pos.second);
@@ -476,7 +462,7 @@ void Edit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_key
         }
         AdjustView();
         break;
-    case GGK_RIGHT:
+    case Key::GGK_RIGHT:
         if (MultiSelected() && !shift_down) {
             if (!ctrl_down)
                 m_cursor_pos.second = m_cursor_pos.first = std::max(m_cursor_pos.first, m_cursor_pos.second);
@@ -498,14 +484,14 @@ void Edit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_key
         }
         AdjustView();
         break;
-    case GGK_END:
+    case Key::GGK_END:
         if (shift_down)
             m_cursor_pos.second = Length();
         else
             m_cursor_pos.second = m_cursor_pos.first = Length();
         AdjustView();
         break;
-    case GGK_BACKSPACE:
+    case Key::GGK_BACKSPACE:
         if (MultiSelected()) {
             ClearSelected();
             emit_signal = true;
@@ -516,7 +502,7 @@ void Edit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_key
         }
         AdjustView();
         break;
-    case GGK_DELETE:
+    case Key::GGK_DELETE:
         if (MultiSelected()) {
             ClearSelected();
             emit_signal = true;
@@ -526,8 +512,8 @@ void Edit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_key
         }
         AdjustView();
         break;
-    case GGK_RETURN:
-    case GGK_KP_ENTER:
+    case Key::GGK_RETURN:
+    case Key::GGK_KP_ENTER:
         FocusUpdateSignal(Text());
         TextControl::KeyPress(key, key_code_point, mod_keys);
         m_recently_edited = false;

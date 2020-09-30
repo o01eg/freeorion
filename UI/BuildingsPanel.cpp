@@ -44,7 +44,7 @@ namespace {
     }
 
     bool ClientPlayerIsModerator()
-    { return HumanClientApp::GetApp()->GetClientType() == Networking::CLIENT_TYPE_HUMAN_MODERATOR; }
+    { return HumanClientApp::GetApp()->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR; }
 }
 
 BuildingsPanel::BuildingsPanel(GG::X w, int columns, int planet_id) :
@@ -127,9 +127,8 @@ void BuildingsPanel::Update() {
             continue;
 
         auto ind = GG::Wnd::Create<BuildingIndicator>(GG::X(indicator_size), object_id);
-        m_building_indicators.push_back(ind);
-
         ind->RightClickedSignal.connect(BuildingRightClickedSignal);
+        m_building_indicators.emplace_back(std::move(ind));
     }
 
     // get in-progress buildings
@@ -140,8 +139,8 @@ void BuildingsPanel::Update() {
     int queue_index = -1;
     for (const auto& elem : empire->GetProductionQueue()) {
         ++queue_index;
-        if (elem.item.build_type != BT_BUILDING) continue;  // don't show in-progress ships in BuildingsPanel...
-        if (elem.location != m_planet_id) continue;         // don't show buildings located elsewhere
+        if (elem.item.build_type != BuildType::BT_BUILDING) continue;   // don't show in-progress ships in BuildingsPanel...
+        if (elem.location != m_planet_id) continue;                     // don't show buildings located elsewhere
 
         double total_cost;
         int total_turns;
@@ -151,9 +150,9 @@ void BuildingsPanel::Update() {
         double progress = std::max(0.0f, empire->ProductionStatus(queue_index));
         double turns_completed = progress / std::max(total_cost, 1.0);
         auto ind = GG::Wnd::Create<BuildingIndicator>(GG::X(indicator_size), elem.item.name,
-                                                      turns_completed, total_turns, total_cost, turn_spending);
-
-        m_building_indicators.push_back(ind);
+                                                      turns_completed, total_turns, total_cost,
+                                                      turn_spending);
+        m_building_indicators.emplace_back(std::move(ind));
     }
 }
 
@@ -277,17 +276,17 @@ BuildingIndicator::BuildingIndicator(GG::X w, const std::string& building_type,
     SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
         texture, UserString(building_type), UserString(desc)));
 
-    m_graphic = GG::Wnd::Create<GG::StaticGraphic>(texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+    m_graphic = GG::Wnd::Create<GG::StaticGraphic>(
+        std::move(texture),
+        GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
 
     float next_progress = turn_spending / std::max(1.0, total_cost);
 
-    m_progress_bar = GG::Wnd::Create<MultiTurnProgressBar>(total_turns,
-                                                           turns_completed,
-                                                           next_progress,
-                                                           GG::LightenClr(ClientUI::TechWndProgressBarBackgroundColor()),
-                                                           ClientUI::TechWndProgressBarColor(),
-                                                           GG::LightenClr(ClientUI::ResearchableTechFillColor()));
-
+    m_progress_bar = GG::Wnd::Create<MultiTurnProgressBar>(
+        total_turns, turns_completed, next_progress,
+        GG::LightenClr(ClientUI::TechWndProgressBarBackgroundColor()),
+        ClientUI::TechWndProgressBarColor(),
+        GG::LightenClr(ClientUI::ResearchableTechFillColor()));
 }
 
 void BuildingIndicator::CompleteConstruction() {
@@ -316,7 +315,7 @@ void BuildingIndicator::Render() {
         return;
     if (m_building_id == INVALID_OBJECT_ID)
         return;
-    if (GetUniverse().GetObjectVisibilityByEmpire(m_building_id, empire_id) >= VIS_BASIC_VISIBILITY)
+    if (GetUniverse().GetObjectVisibilityByEmpire(m_building_id, empire_id) >= Visibility::VIS_BASIC_VISIBILITY)
         return;
 
     s_scanline_shader.StartUsing();
@@ -361,22 +360,24 @@ void BuildingIndicator::Refresh() {
 
     if (const BuildingType* type = GetBuildingType(building->BuildingTypeName())) {
         auto texture = ClientUI::BuildingIcon(type->Name());
-        m_graphic = GG::Wnd::Create<GG::StaticGraphic>(texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+        m_graphic = GG::Wnd::Create<GG::StaticGraphic>(
+            texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
         AttachChild(m_graphic);
 
         std::string desc = UserString(type->Description());
-        if (building->GetMeter(METER_STEALTH))
-            desc = UserString("METER_STEALTH") + boost::io::str(boost::format(": %3.1f\n\n") % building->GetMeter(METER_STEALTH)->Current()) + desc;
+        if (building->GetMeter(MeterType::METER_STEALTH))
+            desc = UserString("METER_STEALTH") + boost::io::str(boost::format(": %3.1f\n\n") % building->GetMeter(MeterType::METER_STEALTH)->Current()) + desc;
         if (GetOptionsDB().Get<bool>("resource.effects.description.shown") && !type->Effects().empty())
             desc += "\n" + Dump(type->Effects());
 
         SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
-            texture, UserString(type->Name()), desc));
+            std::move(texture), UserString(type->Name()), std::move(desc)));
     }
 
     if (building && building->OrderedScrapped()) {
         auto scrap_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "scrapped.png", true);
-        m_scrap_indicator = GG::Wnd::Create<GG::StaticGraphic>(scrap_texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+        m_scrap_indicator = GG::Wnd::Create<GG::StaticGraphic>(
+            std::move(scrap_texture), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
         AttachChild(m_scrap_indicator);
     }
 
@@ -405,13 +406,17 @@ void BuildingIndicator::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
         return;
 
     const auto& map_wnd = ClientUI::GetClientUI()->GetMapWnd();
-    if (ClientPlayerIsModerator() && map_wnd->GetModeratorActionSetting() != MAS_NoAction) {
+    if (ClientPlayerIsModerator() &&
+        map_wnd->GetModeratorActionSetting() != ModeratorActionSetting::MAS_NoAction)
+    {
         RightClickedSignal(m_building_id);  // response handled in MapWnd
         return;
     }
 
-    auto scrap_building_action = [this, empire_id]()
-    { HumanClientApp::GetApp()->Orders().IssueOrder(std::make_shared<ScrapOrder>(empire_id, m_building_id)); };
+    auto scrap_building_action = [this, empire_id]() {
+        HumanClientApp::GetApp()->Orders().IssueOrder(
+        std::make_shared<ScrapOrder>(empire_id, m_building_id));
+    };
 
     auto un_scrap_building_action = [building]() {
         // find order to scrap this building, and recind it
@@ -440,7 +445,8 @@ void BuildingIndicator::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
             ClientUI::GetClientUI()->ZoomToBuildingType(building_type);
         };
         std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) % UserString(building_type));
-        popup->AddMenuItem(GG::MenuItem(popup_label, false, false, pedia_lookup_building_type_action));
+        popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false,
+                                        pedia_lookup_building_type_action));
     }
 
     popup->Run();

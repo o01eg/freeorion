@@ -1,37 +1,20 @@
-/* GG is a GUI for OpenGL.
-   Copyright (C) 2003-2008 T. Zachary Laine
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
-   This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public License
-   as published by the Free Software Foundation; either version 2.1
-   of the License, or (at your option) any later version.
-   
-   This library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-    
-   You should have received a copy of the GNU Lesser General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA
-
-   If you do not wish to comply with the terms of the LGPL please
-   contact the author as other terms are available for a fee.
-    
-   Zach Laine
-   whatwasthataddress@gmail.com */
-
+#include <tuple>
 #include <GG/BrowseInfoWnd.h>
-
-#include <GG/GUI.h>
 #include <GG/DrawUtil.h>
 #include <GG/Font.h>
+#include <GG/GUI.h>
 #include <GG/Layout.h>
 #include <GG/StyleFactory.h>
 #include <GG/TextControl.h>
-
-#include <tuple>
 
 
 using namespace GG;
@@ -132,19 +115,19 @@ unsigned int TextBoxBrowseInfoWnd::BorderWidth() const
 unsigned int TextBoxBrowseInfoWnd::TextMargin() const
 { return GetLayout()->BorderMargin(); }
 
-void TextBoxBrowseInfoWnd::SetText(const std::string& str)
+void TextBoxBrowseInfoWnd::SetText(std::string str)
 {
     unsigned int margins = 2 * TextMargin();
-
+    bool str_empty = str.empty();
     Flags<TextFormat> fmt = GetTextFormat();
     auto text_elements = m_font->ExpensiveParseFromTextToTextElements(str, fmt);
     auto lines = m_font->DetermineLines(str, fmt, m_preferred_width - X(margins),
                                         text_elements);
     Pt extent = m_font->TextExtent(lines);
     SetMinSize(extent + Pt(X(margins), Y(margins)));
-    m_text_control->SetText(str);
+    m_text_control->SetText(std::move(str));
     Resize(extent + Pt(X(margins), Y0));
-    if (str.empty())
+    if (str_empty)
         Hide();
     else
         Show();

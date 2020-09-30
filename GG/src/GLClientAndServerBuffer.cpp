@@ -1,23 +1,20 @@
-/*
- *  GLClientAndServerBuffer.cpp
- *  FreeOrion
- *
- *  Created by Rainer Kupke on 06.02.11.
- *  Copyright 2011. All rights reserved.
- *
- */
+//! GiGi - A GUI for OpenGL
+//!
+//!  Copyright (C) 2011 Rainer Kupke
+//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!
+//! Released under the GNU Lesser General Public License 2.1 or later.
+//! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
+//! SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include <GG/GLClientAndServerBuffer.h>
 
-namespace GG {
+
+using namespace GG;
 
 ///////////////////////////////////////////////////////////////////////////
 // GLBufferBase
 ///////////////////////////////////////////////////////////////////////////
-GLBufferBase::GLBufferBase() :
-    b_name(0)
-{}
-
 GLBufferBase::~GLBufferBase()
 { dropServerBuffer(); }
 
@@ -45,8 +42,6 @@ void GLBufferBase::harmonizeBufferType(GLBufferBase& other)
 template <typename vtype>
 GLClientAndServerBufferBase<vtype>::GLClientAndServerBufferBase(std::size_t elementsPerItem) :
     GLBufferBase(),
-    b_data(),
-    b_size(0),
     b_elements_per_item(elementsPerItem)
 {}
 
@@ -65,35 +60,35 @@ void GLClientAndServerBufferBase<vtype>::reserve(std::size_t num_items)
 template <typename vtype>
 void GLClientAndServerBufferBase<vtype>::store(vtype item)
 {
-    b_data.push_back(item);
-    b_size=b_data.size() / b_elements_per_item;
+    b_data.emplace_back(item);
+    b_size = b_data.size() / b_elements_per_item;
 }
 
 template <typename vtype>
 void GLClientAndServerBufferBase<vtype>::store(vtype item1, vtype item2)
 {
-    b_data.push_back(item1);
-    b_data.push_back(item2);
-    b_size=b_data.size() / b_elements_per_item;
+    b_data.emplace_back(item1);
+    b_data.emplace_back(item2);
+    b_size = b_data.size() / b_elements_per_item;
 }
 
 template <typename vtype>
 void GLClientAndServerBufferBase<vtype>::store(vtype item1, vtype item2, vtype item3)
 {
-    b_data.push_back(item1);
-    b_data.push_back(item2);
-    b_data.push_back(item3);
-    b_size=b_data.size() / b_elements_per_item;
+    b_data.emplace_back(item1);
+    b_data.emplace_back(item2);
+    b_data.emplace_back(item3);
+    b_size = b_data.size() / b_elements_per_item;
 }
 
 template <typename vtype>
 void GLClientAndServerBufferBase<vtype>::store(vtype item1, vtype item2, vtype item3, vtype item4)
 {
-    b_data.push_back(item1);
-    b_data.push_back(item2);
-    b_data.push_back(item3);
-    b_data.push_back(item4);
-    b_size=b_data.size() / b_elements_per_item;
+    b_data.emplace_back(item1);
+    b_data.emplace_back(item2);
+    b_data.emplace_back(item3);
+    b_data.emplace_back(item4);
+    b_size = b_data.size() / b_elements_per_item;
 }
 
 template <typename vtype>
@@ -121,10 +116,10 @@ void GLClientAndServerBufferBase<vtype>::clear()
 ///////////////////////////////////////////////////////////////////////////
 // GLRGBAColorBuffer
 ///////////////////////////////////////////////////////////////////////////
-template class GLClientAndServerBufferBase<unsigned char>;
+template class GG::GLClientAndServerBufferBase<unsigned char>;
 
 GLRGBAColorBuffer::GLRGBAColorBuffer() :
-GLClientAndServerBufferBase<unsigned char>(4)
+    GLClientAndServerBufferBase<unsigned char>(4)
 {}
 
 void GLRGBAColorBuffer::store(const Clr& color)
@@ -144,7 +139,7 @@ void GLRGBAColorBuffer::activate() const
 ///////////////////////////////////////////////////////////////////////////
 // GL2DVertexBuffer
 ///////////////////////////////////////////////////////////////////////////
-template class GLClientAndServerBufferBase<float>;
+template class GG::GLClientAndServerBufferBase<float>;
 
 GL2DVertexBuffer::GL2DVertexBuffer() :
     GLClientAndServerBufferBase<float>(2)
@@ -225,6 +220,9 @@ GLNormalBuffer::GLNormalBuffer() :
     GLClientAndServerBufferBase<float>(3)
 {}
 
+void GLNormalBuffer::store(float x, float y, float z)
+{ GLClientAndServerBufferBase::store(x, y, z); }
+
 void GLNormalBuffer::activate() const
 {
     if (b_name) {
@@ -234,6 +232,4 @@ void GLNormalBuffer::activate() const
     } else {
         glNormalPointer(GL_FLOAT, 0, b_data.empty() ? nullptr: &b_data[0]);
     }
-}
-
 }

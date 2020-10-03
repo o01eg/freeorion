@@ -367,3 +367,11 @@ END
 $$ LANGUAGE plpgsql;
 ```
 
+# Share chat between servers (2020-10-03)
+
+Choose one server where chat will remain alive
+
+```sql
+ALTER TABLE chat_history ADD COLUMN server_id INT NOT NULL DEFAULT 1;
+```
+

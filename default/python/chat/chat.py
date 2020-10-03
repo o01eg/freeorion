@@ -16,6 +16,8 @@ psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
 import urllib.request
 
+SERVER_ID = 1
+
 
 class ChatHistoryProvider:
     def __init__(self):
@@ -63,10 +65,11 @@ class ChatHistoryProvider:
                     FROM (
                         SELECT *
                         FROM chat_history
+                        WHERE server_id = %d
                         ORDER BY ts DESC
                         LIMIT 500
                     ) d
-                    ORDER BY ts""")
+                    ORDER BY ts""", (SERVER_ID,))
                 for r in curs:
                     c = fo.GGColor(r[3], r[4], r[5], r[6])
                     e = (r[0], r[1], r[2], c)
@@ -91,9 +94,14 @@ class ChatHistoryProvider:
             try:
                 with self.conn:
                     with self.conn.cursor() as curs:
-                        curs.execute(""" INSERT INTO chat_history (ts, player_name, text, text_color)
-                                     VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s)""",
-                                     (timestamp, player_name, text, 256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a))
+                        curs.execute(""" INSERT INTO chat_history (ts, player_name, text,
+                                     text_color, server_id)
+                                     VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s, %d)""",
+                                     (timestamp,
+                                      player_name,
+                                      text,
+                                      256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a,
+                                      SERVER_ID))
                         saved = True
                 try:
                     if not (player_name == ""):

@@ -32,46 +32,6 @@
 namespace py = boost::python;
 
 
-#if defined(_MSC_VER)
-#  if (_MSC_VER == 1900)
-namespace boost {
-
-template<>
-auto get_pointer(const volatile UniverseObject* p) -> const volatile UniverseObject*
-{ return p; }
-
-template<>
-auto get_pointer(const volatile Fleet* p) -> const volatile Fleet*
-{ return p; }
-
-template<>
-auto get_pointer(const volatile Ship* p) -> const volatile Ship*
-{ return p; }
-
-template<>
-auto get_pointer(const volatile Planet* p) -> const volatile Planet*
-{ return p; }
-
-template<>
-auto get_pointer(const volatile System* p) -> const volatile System*
-{ return p; }
-
-template<>
-auto get_pointer(const volatile Field* p) -> const volatile Field*
-{ return p; }
-
-template<>
-auto get_pointer(const volatile Building* p) -> const volatile Building*
-{ return p; }
-
-template<>
-auto get_pointer<const volatile Universe>(const volatile Universe* p) -> const volatile Universe*
-{ return p; }
-
-}
-#  endif
-#endif
-
 namespace {
     template<typename T>
     auto ObjectIDs(const Universe& universe) -> std::vector<int>
@@ -90,6 +50,15 @@ namespace {
         for (const FocusType& focus : species.Foci())
             retval.emplace_back(focus.Name());
         return retval;
+    }
+
+    auto SpeciesHomeworlds(const Species& species) -> std::set<int>
+    {
+        const auto& species_homeworlds{GetSpeciesManager().GetSpeciesHomeworldsMap()};
+        auto it = species_homeworlds.find(species.Name());
+        if (it == species_homeworlds.end())
+            return {};
+        return it->second;
     }
 
     void UpdateMetersWrapper(const Universe& universe, const py::object& objIter)
@@ -715,7 +684,7 @@ namespace FreeOrionPython {
         py::class_<Species, boost::noncopyable>("species", py::no_init)
             .add_property("name",               make_function(&Species::Name,           py::return_value_policy<py::copy_const_reference>()))
             .add_property("description",        make_function(&Species::Description,    py::return_value_policy<py::copy_const_reference>()))
-            .add_property("homeworlds",         make_function(&Species::Homeworlds,     py::return_value_policy<py::copy_const_reference>()))
+            .add_property("homeworlds",         &SpeciesHomeworlds)
             .add_property("foci",               &SpeciesFoci)
             .add_property("preferredFocus",     make_function(&Species::DefaultFocus,   py::return_value_policy<py::copy_const_reference>()))
             .add_property("canColonize",        make_function(&Species::CanColonize,    py::return_value_policy<py::return_by_value>()))
@@ -725,7 +694,7 @@ namespace FreeOrionPython {
             .def("getPlanetEnvironment",        &Species::GetPlanetEnvironment)
             .def("dump",                        &Species::Dump,                         py::return_value_policy<py::return_by_value>(), "Returns string with debug information, use '0' as argument.")
         ;
-        py::def("getSpecies",                       &GetSpecies,                            py::return_value_policy<py::reference_existing_object>(), "Returns the species (Species) with the indicated name (string).");
+        py::def("getSpecies",                   &GetSpecies,                            py::return_value_policy<py::reference_existing_object>(), "Returns the species (Species) with the indicated name (string).");
     }
 
     void WrapGalaxySetupData() {

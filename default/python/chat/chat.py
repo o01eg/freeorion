@@ -58,14 +58,14 @@ class ChatHistoryProvider:
         with self.conn_ro:
             with self.conn_ro.cursor() as curs:
                 curs.execute(""" SELECT date_part('epoch', ts)::int, player_name, text,
-                    text_color / 256 / 256 / 256 % 256,
-                    text_color / 256 / 256 % 256,
-                    text_color / 256 % 256,
-                    text_color % 256
+                    text_color / 256 / 256 / 256 %% 256,
+                    text_color / 256 / 256 %% 256,
+                    text_color / 256 %% 256,
+                    text_color %% 256
                     FROM (
                         SELECT *
                         FROM chat_history
-                        WHERE server_id = %d
+                        WHERE server_id = %s
                         ORDER BY ts DESC
                         LIMIT 500
                     ) d

@@ -125,27 +125,27 @@ namespace {
 
     void SpeciesAddHomeworld(const std::string& species_name, int homeworld_id)
     {
-        Species* species = SpeciesManager::GetSpeciesManager().GetSpecies(species_name);
+        Species* species = GetSpeciesManager().GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesAddHomeworld: couldn't get species " << species_name;
             return;
         }
-        species->AddHomeworld(homeworld_id);
+        GetSpeciesManager().AddSpeciesHomeworld(species_name, homeworld_id);
     }
 
     void SpeciesRemoveHomeworld(const std::string& species_name, int homeworld_id)
     {
-        Species* species = SpeciesManager::GetSpeciesManager().GetSpecies(species_name);
+        Species* species = GetSpeciesManager().GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesAddHomeworld: couldn't get species " << species_name;
             return;
         }
-        species->RemoveHomeworld(homeworld_id);
+        GetSpeciesManager().RemoveSpeciesHomeworld(species_name, homeworld_id);
     }
 
     auto SpeciesCanColonize(const std::string& species_name) -> bool
     {
-        Species* species = SpeciesManager::GetSpeciesManager().GetSpecies(species_name);
+        Species* species = GetSpeciesManager().GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesCanColonize: couldn't get species " << species_name;
             return false;

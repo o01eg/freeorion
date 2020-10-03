@@ -16,10 +16,13 @@ import psycopg2.extensions
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
+import urllib.request
+
+import smtplib
+import configparser
+
 # Constants defined by the C++ game engine
 NO_TEAM_ID = -1
-
-import urllib.request
 
 
 class AuthProvider:
@@ -46,6 +49,8 @@ class AuthProvider:
             'g': fo.roleType.galaxySetup
         }
         self.default_roles = [fo.roleType.galaxySetup, fo.roleType.clientTypePlayer]
+        self.mailconf = configparser.ConfigParser()
+        self.mailconf.read(fo.get_user_config_dir() + "/mail.cfg")
         info("Auth initialized")
 
     def __parse_roles(self, roles_str):
@@ -70,9 +75,27 @@ class AuthProvider:
                     for r in curs:
                         known_login = True
                         if r[0] == "xmpp":
-                            req = urllib.request.Request("http://localhost:8083/", ("%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp)).encode())
-                            req.add_header("X-XMPP-To", r[1])
-                            urllib.request.urlopen(req).read()
+                            try:
+                                req = urllib.request.Request("http://localhost:8083/", ("%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp)).encode())
+                                req.add_header("X-XMPP-To", r[1])
+                                urllib.request.urlopen(req).read()
+                                info("OTP was send to %s via XMPP" % player_name)
+                            except Exception:
+                                exctype, value = sys.exc_info()[:2]
+                                error("Cann't send xmpp message to %s: %s %s" % (player_name, exctype, value))
+                        elif r[0] == "email":
+                            try:
+                                server = smtplib.SMTP_SSL(self.mailconf.get('mail', 'server'), 465)
+                                server.ehlo()
+                                server.login(self.mailconf.get('mail', 'login'), self.mailconf.get('mail', 'passwd'))
+                                server.sendmail(self.mailconf.get('mail', 'from'), r[1], """From:
+                                        %s\r\nTo: %s\r\nSubject: FreeOrion OTP\r\n\r\nPassword %s
+                                        for player %s""" % (self.mailconf.get('mail', 'from'), r[1], otp, player_name))
+                                server.close()
+                                info("OTP was send to %s via email" % player_name)
+                            except Exception:
+                                exctype, value = sys.exc_info()[:2]
+                                error("Cann't send email to %s: %s %s" % (player_name, exctype, value))
                         else:
                             warning("Unsupported protocol %s for %s" % (r[0], player_name))
         except psycopg2.InterfaceError:

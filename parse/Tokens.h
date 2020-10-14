@@ -221,6 +221,7 @@
     (LocalCandidate)                            \
     (Location)                                  \
     (Log)                                       \
+    (Lookup)                                    \
     (Low)                                       \
     (LowestCostEnqueuedTech)                    \
     (LowestCostResearchableTech)                \
@@ -261,6 +262,7 @@
     (MoveTo)                                    \
     (MoveTowards)                               \
     (Name)                                      \
+    (Named)                                     \
     (Native)                                    \
     (NearestSystemID)                           \
     (Neutron)                                   \
@@ -406,6 +408,7 @@
     (SetMaxStructure)                           \
     (SetMaxSupply)                              \
     (SetMaxTroops)                              \
+    (SetObstructive)                            \
     (SetOverlayTexture)                         \
     (SetOwner)                                  \
     (SetPassive)                                \

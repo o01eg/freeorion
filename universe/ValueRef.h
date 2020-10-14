@@ -1,10 +1,9 @@
 #ifndef _ValueRef_h_
 #define _ValueRef_h_
 
-
 #include "ScriptingContext.h"
 #include "../util/Export.h"
-
+#include <type_traits>
 
 namespace ValueRef {
 
@@ -14,14 +13,16 @@ struct FO_COMMON_API ValueRefBase {
     ValueRefBase() = default;
     virtual ~ValueRefBase() = default;
 
-    bool RootCandidateInvariant() const  { return m_root_candidate_invariant; }
-    bool LocalCandidateInvariant() const { return m_local_candidate_invariant; }
-    bool TargetInvariant() const         { return m_target_invariant; }
-    bool SourceInvariant() const         { return m_source_invariant; }
-    virtual bool SimpleIncrement() const { return false; }
-    virtual bool ConstantExpr() const    { return false; }
+    virtual bool RootCandidateInvariant() const  { return m_root_candidate_invariant; }
+    virtual bool LocalCandidateInvariant() const { return m_local_candidate_invariant; }
+    virtual bool TargetInvariant() const         { return m_target_invariant; }
+    virtual bool SourceInvariant() const         { return m_source_invariant; }
+    virtual bool SimpleIncrement() const         { return false; }
+    virtual bool ConstantExpr() const            { return false; }
 
+    std::string InvariancePattern() const;
     virtual std::string Description() const = 0;                    //! Returns a user-readable text description of this ValueRef
+    virtual std::string EvalAsString() const = 0;                   //! Returns a textual representation of the evaluation result  with an empty/default context
     virtual std::string Dump(unsigned short ntabs = 0) const = 0;   //! Returns a textual representation that should be parseable to recreate this ValueRef
 
     virtual void SetTopLevelContent(const std::string& content_name) {}
@@ -34,6 +35,26 @@ protected:
     bool m_target_invariant = false;
     bool m_source_invariant = false;
 };
+
+template<typename T, typename std::enable_if<std::is_arithmetic<T>::value, T>::type* = nullptr>
+std::string FlexibleToString(T&& t)
+{ return std::to_string(t); }
+
+template<typename T, typename std::enable_if<std::is_enum<T>::value, T>::type* = nullptr>
+std::string FlexibleToString(T&& t)
+{ return std::to_string(static_cast<typename std::underlying_type<T>::type>(t)); }
+
+inline std::string FlexibleToString(std::string&& t)
+{ return std::move(t); }
+
+template<typename T, typename std::enable_if<std::is_same<T, std::vector<std::string>>::value, T>::type* = nullptr>
+std::string FlexibleToString(T&& t)
+{
+    std::string s;
+    for (auto&& piece : t) s += piece;
+    return s;
+}
+
 
 //! The base class for all ValueRef classes returning type T. This class
 //! provides the public interface for a ValueRef expression tree.
@@ -58,6 +79,13 @@ struct FO_COMMON_API ValueRef : public ValueRefBase
       * to objects such as the source, effect target, or condition candidates
       * that exist in the tree. */
     virtual T Eval(const ScriptingContext& context) const = 0;
+
+    /** Evaluates the expression tree with an empty context and retuns the
+      * a string representation of the result value iff the result type is
+      * supported (currently std::string, int, float, double, enum).
+      * See ValueRefs.cpp for specialisation implementations. */
+    std::string EvalAsString() const final
+    { return FlexibleToString(Eval()); }
 };
 
 enum StatisticType : int {
@@ -83,5 +111,4 @@ enum StatisticType : int {
 
 }
 
-
-#endif
+#endif // _ValueRef_h_

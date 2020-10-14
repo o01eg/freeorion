@@ -1149,8 +1149,12 @@ void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems,
             continue; //known to be destroyed so can't affect supply, important just in case being updated on client side
         }
 
-        TraceLogger(supply) << "Fleet " << fleet->ID() << " is in system " << system_id << " with next system " << fleet->NextSystemID() << " and is owned by " << fleet->Owner() << " armed: " << fleet->HasArmedShips() << " and agressive: " << fleet->Aggressive();
-        if (fleet->HasArmedShips() && fleet->Aggressive()) {
+        TraceLogger(supply) << "Fleet " << fleet->ID() << " is in system " << system_id
+                            << " with next system " << fleet->NextSystemID()
+                            << " and is owned by " << fleet->Owner()
+                            << " armed: " << fleet->HasArmedShips()
+                            << " and obstructive: " << fleet->Obstructive();
+        if (fleet->HasArmedShips() && fleet->Obstructive()) {
             if (fleet->OwnedBy(m_id)) {
                 if (fleet->NextSystemID() == INVALID_OBJECT_ID || fleet->NextSystemID() == fleet->SystemID()) {
                     systems_containing_friendly_fleets.insert(system_id);
@@ -2451,7 +2455,7 @@ void Empire::CheckProductionProgress() {
 
                 // create a single fleet for combat ships and individual
                 // fleets for non-combat ships
-                bool individual_fleets = !((*ships.begin())->IsArmed()
+                bool individual_fleets = !(   (*ships.begin())->IsArmed()
                                            || (*ships.begin())->HasFighters()
                                            || (*ships.begin())->CanHaveTroops()
                                            || (*ships.begin())->CanBombard());
@@ -2497,7 +2501,9 @@ void Empire::CheckProductionProgress() {
                 for (auto& next_fleet : fleets) {
                     // rename fleet, given its id and the ship that is in it
                     next_fleet->Rename(next_fleet->GenerateFleetName());
-                    next_fleet->SetAggressive(next_fleet->HasArmedShips());
+                    FleetAggression new_aggr = next_fleet->HasArmedShips() ?
+                        FleetAggression::FLEET_OBSTRUCTIVE : FleetAggression::FLEET_PASSIVE;
+                    next_fleet->SetAggression(new_aggr);
 
                     if (rally_point_id != INVALID_OBJECT_ID) {
                         if (Objects().get<System>(rally_point_id)) {

@@ -125,27 +125,27 @@ namespace {
 
     void SpeciesAddHomeworld(const std::string& species_name, int homeworld_id)
     {
-        Species* species = SpeciesManager::GetSpeciesManager().GetSpecies(species_name);
+        Species* species = GetSpeciesManager().GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesAddHomeworld: couldn't get species " << species_name;
             return;
         }
-        species->AddHomeworld(homeworld_id);
+        GetSpeciesManager().AddSpeciesHomeworld(species_name, homeworld_id);
     }
 
     void SpeciesRemoveHomeworld(const std::string& species_name, int homeworld_id)
     {
-        Species* species = SpeciesManager::GetSpeciesManager().GetSpecies(species_name);
+        Species* species = GetSpeciesManager().GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesAddHomeworld: couldn't get species " << species_name;
             return;
         }
-        species->RemoveHomeworld(homeworld_id);
+        GetSpeciesManager().RemoveSpeciesHomeworld(species_name, homeworld_id);
     }
 
     auto SpeciesCanColonize(const std::string& species_name) -> bool
     {
-        Species* species = SpeciesManager::GetSpeciesManager().GetSpecies(species_name);
+        Species* species = GetSpeciesManager().GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesCanColonize: couldn't get species " << species_name;
             return false;
@@ -474,9 +474,9 @@ namespace {
                                 double spawn_rate, int spawn_limit)
         {
             std::vector<std::string> designs;
-            for (int i = 0; i < len(py_designs); i++) {
+            for (int i = 0; i < len(py_designs); i++)
                 designs.push_back(py::extract<std::string>(py_designs[i]));
-            }
+
             m_monster_fleet_plan =
                 std::make_shared<MonsterFleetPlan>(fleet_name, designs, spawn_rate,
                                                    spawn_limit, nullptr, false);
@@ -516,9 +516,9 @@ namespace {
     {
         py::list py_monster_fleet_plans;
         auto&& monster_fleet_plans = GetUniverse().MonsterFleetPlans();
-        for (auto* fleet_plan : monster_fleet_plans) {
+        for (auto* fleet_plan : monster_fleet_plans)
             py_monster_fleet_plans.append(MonsterFleetPlanWrapper(fleet_plan));
-        }
+
         return py_monster_fleet_plans;
     }
 
@@ -778,7 +778,7 @@ namespace {
             fleet->Rename(UserString("OBJ_FLEET") + " " + std::to_string(fleet->ID()));
         }
 
-        fleet->SetAggressive(aggressive);
+        fleet->SetAggression(aggressive ? FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_PASSIVE);
 
         // return fleet ID
         return fleet->ID();

@@ -1,5 +1,6 @@
 #include "VarText.h"
 
+#include "../universe/ValueRefs.h"
 #include "../universe/Universe.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/System.h"
@@ -27,10 +28,11 @@ const Tech*         GetTech(const std::string& name);
 const Policy*       GetPolicy(const std::string& name);
 const BuildingType* GetBuildingType(const std::string& name);
 const Special*      GetSpecial(const std::string& name);
-const Species*      GetSpecies(const std::string& name);
+const Species*      GetSpeciesConst(const std::string& name) { return GetSpecies(name); }
 const FieldType*    GetFieldType(const std::string& name);
 const ShipHull*     GetShipHull(const std::string& name);
 const ShipPart*     GetShipPart(const std::string& name);
+ValueRef::ValueRefBase* const  GetValueRefBase(const std::string& name);
 
 namespace {
     //! Return @p content surrounded by the given @p tags.
@@ -122,7 +124,7 @@ namespace {
     //! Interprets value of data as a name.
     //! Returns translation of name, if Get says
     //! that a thing by that name exists, otherwise boost::none.
-    template <typename T,const T* (*GetByName)(const std::string&)>
+    template <typename T, const T* (*GetByName)(const std::string&)>
     boost::optional<std::string> NameString(const std::string& data, const std::string& tag) {
         if (!GetByName(data))
             return boost::none;
@@ -163,7 +165,7 @@ namespace {
             {VarText::SPECIAL_TAG, [](const std::string& data)
                 { return NameString<Special, GetSpecial>(data, VarText::SPECIAL_TAG); }},
             {VarText::SPECIES_TAG, [](const std::string& data)
-                { return NameString<Species, GetSpecies>(data, VarText::SPECIES_TAG); }},
+                { return NameString<Species, GetSpeciesConst>(data, VarText::SPECIES_TAG); }},
             {VarText::FIELD_TYPE_TAG, [](const std::string& data)
                 { return NameString<FieldType, GetFieldType>(data, VarText::FIELD_TYPE_TAG); }},
             {VarText::METER_TYPE_TAG, MeterTypeString},
@@ -172,6 +174,12 @@ namespace {
             {VarText::PREDEFINED_DESIGN_TAG, PredefinedShipDesignString},
             {VarText::EMPIRE_ID_TAG, [](const std::string& data)
                 { return IDString<Empire, GetEmpire>(data, VarText::EMPIRE_ID_TAG); }},
+            {VarText::FOCS_VALUE_TAG, [](const std::string& data) -> boost::optional<std::string>
+             { const ValueRef::ValueRefBase* vr = GetValueRefBase(data);
+               if (vr) {
+                   return WithTags(UserString(data), VarText::FOCS_VALUE_TAG, vr->EvalAsString());
+               } else
+                   return WithTags(data, VarText::FOCS_VALUE_TAG, UserString("UNKNOWN_VALUE_REF_NAME")); }},
         };
 
         return substitute_map;
@@ -234,6 +242,8 @@ const std::string VarText::COMBAT_ID_TAG = "combat";
 const std::string VarText::EMPIRE_ID_TAG = "empire";
 const std::string VarText::DESIGN_ID_TAG = "shipdesign";
 const std::string VarText::PREDEFINED_DESIGN_TAG = "predefinedshipdesign";
+
+const std::string VarText::FOCS_VALUE_TAG = "value";
 
 const std::string VarText::TECH_TAG = "tech";
 const std::string VarText::POLICY_TAG = "policy";

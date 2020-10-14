@@ -812,7 +812,7 @@ bool SetEmpireHomeworld(Empire* empire, int planet_id, std::string species_name)
                   << " (planet " <<  home_planet->ID() << ") to be home system for empire " << empire->EmpireID();
 
     // get species, check if it exists
-    Species* species = GetSpeciesManager().GetSpecies(species_name);
+    Species* species = GetSpecies(species_name);
     if (!species) {
         ErrorLogger() << "SetEmpireHomeworld: couldn't get species \""
                       << species_name << "\" to set with homeworld id " << home_planet->ID();
@@ -820,7 +820,7 @@ bool SetEmpireHomeworld(Empire* empire, int planet_id, std::string species_name)
     }
 
     // set homeword's planet type to the preferred type for this species
-    const std::map<PlanetType, PlanetEnvironment>& spte = species->PlanetEnvironments();
+    const auto& spte = species->PlanetEnvironments();
     if (!spte.empty()) {
         // invert map from planet type to environments to map from
         // environments to type, sorted by environment
@@ -842,8 +842,9 @@ bool SetEmpireHomeworld(Empire* empire, int planet_id, std::string species_name)
             home_planet->SetSize(PlanetSize::SZ_MEDIUM);
     }
 
-    home_planet->Colonize(empire->EmpireID(), std::move(species_name), Meter::LARGE_VALUE);
-    species->AddHomeworld(home_planet->ID());
+    home_planet->Colonize(empire->EmpireID(), species_name, Meter::LARGE_VALUE);
+    GetSpeciesManager().AddSpeciesHomeworld(std::move(species_name), home_planet->ID());
+
     empire->SetCapitalID(home_planet->ID());
     empire->AddExploredSystem(home_planet->SystemID());
 

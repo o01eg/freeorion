@@ -1117,6 +1117,10 @@ Cheap and Fast Ships
 RULE_CHEAP_AND_FAST_SHIP_PRODUCTION_DESC
 Ships cost 1 PP and take 1 turn to produce.
 
+# value ref description
+NUM_COMBAT_ROUNDS
+per combat
+
 RULE_NUM_COMBAT_ROUNDS
 Combat Rounds
 
@@ -3858,16 +3862,22 @@ FW_FLEET_ETA_OUT_OF_RANGE
 Out of Range
 
 FW_AGGRESSIVE
-Control System
+[[FLEET_AGGRESSIVE]]
 
 FW_AGGRESSIVE_DESC
-Fleet blockades enemy empires and initiates battles with any enemies in the system.
+Fleet initiates combat with enemy fleets and blocks their passage through its system.
+
+FW_OBSTRUCTIVE
+[[FLEET_OBSTRUCTIVE]]
+
+FW_OBSTRUCTIVE_DESC
+Fleet blocks enemy fleet passage through its system but does not initiate combat. It may still participate in combats initiated by other empires or fleets, however.
 
 FW_PASSIVE
-Hide
+[[FLEET_PASSIVE]]
 
 FW_PASSIVE_DESC
-Fleet will attempt to stay hidden; it will not blockade or initiate battle.
+Fleet will attempt to stay hidden; it will not blockade enemy fleet passage or initiate combat. It may still participate in combats initiated by other empires or fleets, however.
 
 FW_AUTO
 Automatic Aggression Selection
@@ -5019,6 +5029,15 @@ OBJECTS_WITH_SPECIAL
 
 ENC_BUILDING_TYPE
 Building Type
+
+ENC_NAMED_VALUE_REF
+[Test - Named Value Refs]
+
+ENC_NAMED_VALUE_REF_DESC
+'''Some value calculations get named so the resulting values can be used in the pedia or by the AI empires. This is often used to present values which depend on game rules.
+
+The following values show the name, the registration type (int/real/any), the calculated value, (the calculation), 'the stringtable description for the calculation', and the invariance pattern.
+'''
 
 ENC_SPECIES
 Species
@@ -6326,7 +6345,7 @@ DAMAGE_TITLE
 Damage
 
 DAMAGE_TEXT
-'''Defines the base amount that a weapon will reduce the [[metertype METER_STRUCTURE]] of another ship (or the [[metertype METER_SHIELD]], [[metertype METER_DEFENSE]] and [[metertype METER_CONSTRUCTION]] of a planet), in one combat round (of which there are four in each turn of battle). If a target ship is equipped with [[metertype METER_SHIELD]], the actual damage caused by each hit will be the base damage reduced by the strength rating of the ship's [[metertype METER_SHIELD]].
+'''Defines the base amount that a weapon will reduce the [[metertype METER_STRUCTURE]] of another ship (or the [[metertype METER_SHIELD]], [[metertype METER_DEFENSE]] and [[metertype METER_CONSTRUCTION]] of a planet), in one combat round (of which there are [[value NUM_COMBAT_ROUNDS]]). If a target ship is equipped with [[metertype METER_SHIELD]], the actual damage caused by each hit will be the base damage reduced by the strength rating of the ship's [[metertype METER_SHIELD]].
 
 Note: [[encyclopedia FIGHTER_TECHS]] inflict damage ignoring [[metertype METER_SHIELD]] on ships, as fighters fire from within the enemy shields. Fighters need one turn for launching so damage estimation takes that into account.'''
 
@@ -7790,6 +7809,18 @@ All Species
 
 ALL_SPECIES_DESC
 List of all species:
+
+NATIVE_SPECIES
+Native Species
+
+NATIVE_SPECIES_DESC
+List of native species:
+
+PLAYABLE_SPECIES
+Playable Species
+
+PLAYABLE_SPECIES_DESC
+List of playable species:
 
 LITHIC_SPECIES_CLASS
 Lithic
@@ -9354,23 +9385,43 @@ Stargate Receive
 FOCUS_STARGATE_RECEIVE_DESC
 Open the Stargate to ships being sent from elsewhere
 
+# Focus types
 FOCUS_PLANET_DRIVE
 Planet Drive
 
+# Focus types
 FOCUS_DISTORTION
 Spatial Distortion
 
+# Focus types
 FOCUS_PROTECTION
 Protection
 
 FOCUS_PROTECTION_DESC
 Increases shields, defenses and troops.
 
+# Focus types
 FOCUS_DOMINATION
 Psychic Domination
 
 FOCUS_DOMINATION_DESC
 Psychically controls enemy ships.
+
+# Fleet aggressions
+INVALID_FLEET_AGGRESSION
+Unknown Fleet Aggression
+
+# Fleet aggressions
+FLEET_AGGRESSIVE
+Initiate Combat
+
+# Fleet aggressions
+FLEET_OBSTRUCTIVE
+Obstruct Passage
+
+# Fleet aggressions
+FLEET_PASSIVE
+Hide
 
 # Meter types
 INVALID_METER_TYPE
@@ -12603,9 +12654,13 @@ SHP_REINFORCED_HULL
 Reinforced Hull
 
 SHP_REINFORCED_HULL_DESC
-'''Increases max [[metertype METER_STRUCTURE]] of all ships by 40.
+'''Increases max [[metertype METER_STRUCTURE]] of all ships by [[value SHP_REINFORCED_HULL_BONUS]].
 
 Standard ship hulls are designed and constructed with advanced microgravity architectural techniques and highly resistant materials. However, the limitations of physical matter impose a severe limitation on the strength of hulls. By enhancing the hull with structural integrity fields, a sizable increase in strength can be obtained.'''
+
+# value ref description
+SHP_REINFORCED_HULL_BONUS
+''''''
 
 SHP_BASIC_DAM_CONT
 Basic Damage Control
@@ -12979,22 +13034,30 @@ SHP_SINGULARITY_ENGINE_CORE_DESC
 A smaller cousin of the [[buildingtype BLD_HYPER_DAM]] outfitted for ships, the Singularity Engine Core drastically boosts power generation. Increases [[metertype METER_SPEED]] by 80.'''
 
 SHP_DEUTERIUM_TANK
-Deuterium Tank
+Deuterium Fuel
 
 SHP_DEUTERIUM_TANK_DESC
-Small upgrade to each of [[shippart FU_BASIC_TANK]] ship parts. Increases [[metertype METER_FUEL]] capacity and thereby the number of jumps ships can do without refueling.
+Small upgrade to each of [[shippart FU_BASIC_TANK]] ship parts. Increases [[metertype METER_FUEL]] capacity by [[value SHP_DEUTERIUM_TANK_EFFECT_MULT]]  and thereby the number of jumps ships can do without refueling.
 
 SHP_DEUTERIUM_TANK_EFFECT
-Tech <i>Deuterium Tank</i>
+Tech <i>Deuterium Fuel</i>
+
+# value ref description
+SHP_DEUTERIUM_TANK_EFFECT_MULT
+per tank part
 
 SHP_ANTIMATTER_TANK
-Antimatter Tank
+Antimatter Fuel
 
 SHP_ANTIMATTER_TANK_DESC
-Moderate upgrade to each of [[shippart FU_BASIC_TANK]] ship parts. Increases [[metertype METER_FUEL]] capacity and thereby the number of jumps ships can do without refueling.
+Moderate upgrade to each of [[shippart FU_BASIC_TANK]] ship parts. Increases [[metertype METER_FUEL]] capacity by [[value SHP_ANTIMATTER_TANK_EFFECT_MULT]] and thereby the number of jumps ships can do without refueling.
 
 SHP_ANTIMATTER_TANK_EFFECT
-Tech <i>Antimatter Tank</i>
+Tech <i>Antimatter Fuel</i>
+
+# value ref description
+SHP_ANTIMATTER_TANK_EFFECT_MULT
+per tank part
 
 SHP_ZERO_POINT
 Zero-Point Fuel Generator
@@ -14322,7 +14385,10 @@ FU_BASIC_TANK
 Extra Fuel Tank
 
 FU_BASIC_TANK_DESC
-Increases [[metertype METER_FUEL]] capacity, allowing additional jumps depending on [[encyclopedia FUEL_EFFICIENCY_TITLE]]. Later technologies further increase the number of additional jumps per tank.
+'''Increases [[metertype METER_FUEL]] capacity, allowing additional jumps depending on [[encyclopedia FUEL_EFFICIENCY_TITLE]]. Later technologies further increase the number of additional jumps per tank.
+Fuel boosts from tech for a hull with average fuel efficiency:
+- [[tech SHP_DEUTERIUM_TANK]]: [[value SHP_DEUTERIUM_TANK_EFFECT_MULT]]
+- [[tech SHP_ANTIMATTER_TANK]]: [[value SHP_ANTIMATTER_TANK_EFFECT_MULT]].'''
 
 FU_ZERO_FUEL
 Zero-Point Fuel Generator

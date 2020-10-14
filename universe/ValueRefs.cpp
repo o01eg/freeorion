@@ -10,6 +10,7 @@
 #include <boost/range/adaptors.hpp>
 #include <boost/range/numeric.hpp>
 #include "Building.h"
+#include "Enums.h"
 #include "Field.h"
 #include "Fighter.h"
 #include "Fleet.h"
@@ -248,6 +249,12 @@ namespace {
 }
 
 namespace ValueRef {
+std::string ValueRefBase::InvariancePattern() const {
+    return std::string(RootCandidateInvariant()?"R":"r") + (LocalCandidateInvariant()?"L":"l")
+        + (SourceInvariant()?"S":"s") + (TargetInvariant()?"T":"t")
+        + (SimpleIncrement()?"I":"i") + (ConstantExpr()?"C":"c");
+}
+
 MeterType NameToMeter(const std::string& name) {
     MeterType retval = MeterType::INVALID_METER_TYPE;
     auto it = GetMeterNameMap().find(name);
@@ -555,6 +562,17 @@ std::string Constant<std::string>::Eval(const ScriptingContext& context) const
     if (m_value == "CurrentContent")
         return m_top_level_content;
     return m_value;
+}
+
+template <>
+void Constant<std::string>::SetTopLevelContent(const std::string& content_name)
+{
+    if (m_value == "CurrentContent" && content_name == "THERE_IS_NO_TOP_LEVEL_CONTENT")
+        ErrorLogger() << "Constant<std::string>::SetTopLevelContent()  Scripted Content illegal. Trying to set THERE_IS_NO_TOP_LEVEL_CONTENT for CurrentContent (maybe you tried to use CurrentContent in named_values.focs.txt)";
+    if (!m_top_level_content.empty()) // expected to happen if this value ref is part of a non-named-in-the-middle named value ref 
+        DebugLogger() << "Constant<std::string>::SetTopLevelContent()  Skip overwriting top level content from '" << m_top_level_content << "' to '" << content_name << "'";
+    else
+        m_top_level_content = content_name;
 }
 
 ///////////////////////////////////////////////////////////
@@ -2443,6 +2461,11 @@ std::string ComplexVariable<int>::Dump(unsigned short ntabs) const
     const std::string& variable_name = m_property_name.back();
     std::string retval = variable_name;
     // todo: implement like <double> case
+    if (variable_name == "GameRule") {
+        if (m_string_ref1)
+            retval += " name = " + m_string_ref1->Dump(ntabs);
+    }
+
     return retval;
 }
 
@@ -2452,6 +2475,11 @@ std::string ComplexVariable<std::string>::Dump(unsigned short ntabs) const
     const std::string& variable_name = m_property_name.back();
     std::string retval = variable_name;
     // todo: implement like <double> case
+    if (variable_name == "GameRule") {
+        if (m_string_ref1)
+            retval += " name = " + m_string_ref1->Dump(ntabs);
+    }
+
     return retval;
 }
 
@@ -2461,6 +2489,11 @@ std::string ComplexVariable<std::vector<std::string>>::Dump(unsigned short ntabs
     const std::string& variable_name = m_property_name.back();
     std::string retval = variable_name;
     // todo: implement like <double> case
+    if (variable_name == "GameRule") {
+        if (m_string_ref1)
+            retval += " name = " + m_string_ref1->Dump(ntabs);
+    }
+
     return retval;
 }
 
@@ -3036,4 +3069,4 @@ int Operation<int>::EvalImpl(const ScriptingContext& context) const
     throw std::runtime_error("double ValueRef evaluated with an unknown or invalid OpType.");
     return 0;
 }
-}
+} // namespace ValueRef

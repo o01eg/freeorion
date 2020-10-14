@@ -90,7 +90,8 @@ public:
             bool playable, bool native, bool can_colonize, bool can_produce_ships,
             const std::set<std::string>& tags,
             std::set<std::string>&& likes, std::set<std::string>&& dislikes,
-            std::string&& graphic);
+            std::string&& graphic,
+            double spawn_rate = 1.0, int spawn_limit = 99999);
 
     ~Species();
 
@@ -98,10 +99,6 @@ public:
     const std::string&              Description() const                 { return m_description; }           ///< returns a text description of this type of species
     /** returns a text description of this type of species */
     std::string                     GameplayDescription() const;
-
-    const std::set<int>&                    Homeworlds() const          { return m_homeworlds; }            ///< returns the ids of objects that are homeworlds for this species
-    const std::map<int, double>&            EmpireOpinions() const      { return m_empire_opinions; }       ///< returns the positive/negative opinions of this species about empires
-    const std::map<std::string, double>&    OtherSpeciesOpinions() const{ return m_other_species_opinions; }///< returns the positive/negative opinions of this species about other species
 
     const Condition::Condition*     Location() const                    { return m_location.get(); }        ///< returns the condition determining what planets on which this species may spawn
     const Condition::Condition*     CombatTargets() const               { return m_combat_targets.get(); }  ///< returns the condition for possible targets. may be nullptr if no condition was specified.
@@ -118,6 +115,8 @@ public:
     const std::vector<std::shared_ptr<Effect::EffectsGroup>>& Effects() const
     { return m_effects; }
 
+    float                           SpawnRate() const       { return m_spawn_rate; }
+    int                             SpawnLimit() const      { return m_spawn_limit; }
     bool                            Playable() const        { return m_playable; }          ///< returns whether this species is a suitable starting species for players
     bool                            Native() const          { return m_native; }            ///< returns whether this species is a suitable native species (for non player-controlled planets)
     bool                            CanColonize() const     { return m_can_colonize; }      ///< returns whether this species can colonize planets
@@ -135,24 +134,12 @@ public:
       * clients and server. */
     unsigned int                    GetCheckSum() const;
 
-    void AddHomeworld(int homeworld_id);
-    void RemoveHomeworld(int homeworld_id);
-    void SetHomeworlds(const std::set<int>& homeworld_ids);
-    void SetEmpireOpinions(const std::map<int, double>& opinions);
-    void SetEmpireOpinion(int empire_id, double opinion);
-    void SetOtherSpeciesOpinions(const std::map<std::string, double>& opinions);
-    void SetOtherSpeciesOpinion(const std::string& species_name, double opinion);
-
 private:
     void Init();
 
     std::string                             m_name;
     std::string                             m_description;
     std::string                             m_gameplay_description;
-
-    std::set<int>                           m_homeworlds;
-    std::map<int, double>                   m_empire_opinions;          // positive/negative rating of how this species views empires in the game
-    std::map<std::string, double>           m_other_species_opinions;   // positive/negative rating of how this species views other species in the game
 
     std::vector<FocusType>                  m_foci;
     std::string                             m_default_focus;
@@ -162,10 +149,13 @@ private:
     std::unique_ptr<Condition::Condition>               m_location;
     std::unique_ptr<Condition::Condition>               m_combat_targets;
 
-    bool                                    m_playable;
-    bool                                    m_native;
-    bool                                    m_can_colonize;
-    bool                                    m_can_produce_ships;
+    bool                                    m_playable = true;
+    bool                                    m_native = true;
+    bool                                    m_can_colonize = true;
+    bool                                    m_can_produce_ships = true;
+    float                                   m_spawn_rate = 1.0;
+    int                                     m_spawn_limit = 99999;
+
     std::set<std::string>                   m_tags;
     std::set<std::string>                   m_likes;
     std::set<std::string>                   m_dislikes;
@@ -185,8 +175,10 @@ public:
     using SpeciesTypeMap = std::map<std::string, std::unique_ptr<Species>>;
     using CensusOrder = std::vector<std::string>;
     using iterator = SpeciesTypeMap::const_iterator;
-    typedef boost::filter_iterator<PlayableSpecies, iterator>   playable_iterator;
-    typedef boost::filter_iterator<NativeSpecies, iterator>     native_iterator;
+    typedef boost::filter_iterator<PlayableSpecies, iterator> playable_iterator;
+    typedef boost::filter_iterator<NativeSpecies, iterator>   native_iterator;
+
+    SpeciesManager() = default;
 
     /** returns the building type with the name \a name; you should use the
       * free function GetSpecies() instead, mainly to save some typing. */
@@ -250,10 +242,6 @@ public:
     float SpeciesSpeciesOpinion(const std::string& opinionated_species_name,
                                 const std::string& rated_species_name) const;
 
-    /** returns the instance of this singleton class; you should use the free
-      * function GetSpeciesManager() instead */
-    static SpeciesManager&  GetSpeciesManager();
-
     /** Returns a number, calculated from the contained data, which should be
       * different for different contained data, and must be the same for
       * the same contained data, and must be the same on different platforms
@@ -261,11 +249,6 @@ public:
       * the parsed content is consistent without sending it all between
       * clients and server. */
     unsigned int GetCheckSum() const;
-
-    /** sets all species to have no homeworlds.  this is useful when generating
-      * a new game, when any homeworlds species had in the previous game should
-      * be removed before the new game's homeworlds are added. */
-    void ClearSpeciesHomeworlds();
 
     /** sets the opinions of species (indexed by name string) of empires (indexed
       * by id) as a double-valued number. */
@@ -278,9 +261,11 @@ public:
                                    std::map<std::string, float>>&& species_species_opinions);
     void SetSpeciesSpeciesOpinion(const std::string& opinionated_species,
                                   const std::string& rated_species, float opinion);
-
-    /** clears all species opinion data */
     void ClearSpeciesOpinions();
+
+    void AddSpeciesHomeworld(std::string species, int homeworld_id);
+    void RemoveSpeciesHomeworld(const std::string& species, int homeworld_id);
+    void ClearSpeciesHomeworlds();
 
     void UpdatePopulationCounter();
 
@@ -291,39 +276,21 @@ public:
     void SetSpeciesTypes(Pending::Pending<std::pair<SpeciesTypeMap, CensusOrder>>&& future);
 
 private:
-    SpeciesManager();
-
     /** sets the homeworld ids of species in this SpeciesManager to those
       * specified in \a species_homeworld_ids */
     void SetSpeciesHomeworlds(std::map<std::string, std::set<int>>&& species_homeworld_ids);
 
     /** Assigns any m_pending_types to m_species. */
-    void CheckPendingSpeciesTypes() const;
+    static void CheckPendingSpeciesTypes();
 
-    /** Future types being parsed by parser.  mutable so that it can
-        be assigned to m_species_types when completed.*/
-    mutable boost::optional<Pending::Pending<std::pair<SpeciesTypeMap, CensusOrder>>> m_pending_types = boost::none;
-
-    mutable SpeciesTypeMap                              m_species;
-    mutable CensusOrder                                 m_census_order;
+    std::map<std::string, std::set<int>>                m_species_homeworlds;
     std::map<std::string, std::map<int, float>>         m_species_empire_opinions;
     std::map<std::string, std::map<std::string, float>> m_species_species_opinions;
-
     std::map<std::string, std::map<int, float>>         m_species_object_populations;
     std::map<std::string, std::map<std::string, int>>   m_species_species_ships_destroyed;
-
-    static SpeciesManager* s_instance;
 
     template <typename Archive>
     friend void serialize(Archive&, SpeciesManager&, unsigned int const);
 };
-
-/** returns the singleton species manager */
-FO_COMMON_API SpeciesManager& GetSpeciesManager();
-
-/** Returns the Species object used to represent species of type \a name.
-  * If no such Species exists, 0 is returned instead. */
-FO_COMMON_API const Species* GetSpecies(const std::string& name);
-
 
 #endif

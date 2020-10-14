@@ -30,6 +30,7 @@
 #include "../universe/Field.h"
 #include "../universe/FieldType.h"
 #include "../universe/Fleet.h"
+#include "../universe/NamedValueRefManager.h"
 #include "../universe/Planet.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/Ship.h"
@@ -145,7 +146,7 @@ namespace {
             "ENC_METER_TYPE",   "ENC_EMPIRE",       "ENC_SHIP_DESIGN",  "ENC_SHIP",
             "ENC_MONSTER",      "ENC_MONSTER_TYPE", "ENC_FLEET",        "ENC_PLANET",
             "ENC_BUILDING",     "ENC_SYSTEM",       "ENC_FIELD",        "ENC_GRAPH",
-            "ENC_GALAXY_SETUP", "ENC_GAME_RULES"};
+            "ENC_GALAXY_SETUP", "ENC_GAME_RULES",   "ENC_NAMED_VALUE_REF"};
         //  "ENC_HOMEWORLDS" omitted due to weird formatting of article titles
         return dir_names;
     }
@@ -275,17 +276,22 @@ namespace {
             // directory populated with list of links to other articles that list species
         }
         else if (dir_name == "ENC_HOMEWORLDS") {
+            const auto homeworlds{GetSpeciesManager().GetSpeciesHomeworldsMap()};
+
             for (const auto& entry : GetSpeciesManager()) {
                 const auto& species = entry.second;
                 std::set<int> known_homeworlds;
                 std::string species_entry = LinkTaggedText(VarText::SPECIES_TAG, entry.first) + " ";
+
+
                 // homeworld
-                if (species->Homeworlds().empty()) {
+                if (!homeworlds.count(entry.first) || homeworlds.at(entry.first).empty()) {
                     continue;
                 } else {
+                    const auto& this_species_homeworlds = homeworlds.at(entry.first);
                     std::string homeworld_info;
-                    species_entry += "(" + std::to_string(species->Homeworlds().size()) + "):  ";
-                    for (int homeworld_id : species->Homeworlds()) {
+                    species_entry += "(" + std::to_string(this_species_homeworlds.size()) + "):  ";
+                    for (int homeworld_id : this_species_homeworlds) {
                         if (auto homeworld = Objects().get<Planet>(homeworld_id)) {
                             known_homeworlds.emplace(homeworld_id);
                             // if known, add to beginning
@@ -325,7 +331,7 @@ namespace {
             sorted_entries_list.emplace("⃠ ", std::make_pair("\n\n", "  "));
             for (const auto& entry : GetSpeciesManager()) {
                 const auto& species = entry.second;
-                if (species->Homeworlds().empty()) {
+                if (!homeworlds.count(entry.first) || homeworlds.at(entry.first).empty()) {
                     std::string species_entry{LinkTaggedText(VarText::SPECIES_TAG, entry.first) + ":  \n" + UserString("NO_HOMEWORLD")};
                     sorted_entries_list.emplace("⃠⃠" + std::string( "⃠ ") + UserString(entry.first),
                                                 std::make_pair(std::move(species_entry), entry.first));
@@ -498,6 +504,21 @@ namespace {
             //for (auto str : GetStringTable().
 
         }
+        else if  (dir_name == "ENC_NAMED_VALUE_REF")
+        {
+            sorted_entries_list.emplace("ENC_NAMED_VALUE_REF_DESC", std::make_pair(UserString("ENC_NAMED_VALUE_REF_DESC") + "\n\n", dir_name));
+
+            for (const auto& entry : GetNamedValueRefManager().GetItems()) {
+                auto& vref = entry.second.get();
+                std::string pre = dynamic_cast<ValueRef::ValueRef<int>*>(&vref)? " int " : (dynamic_cast<ValueRef::ValueRef<double>*>(&vref)?" real ":" any ");
+
+                sorted_entries_list.emplace(
+                    entry.first,
+                    std::make_pair(entry.first + pre + LinkTaggedPresetText(VarText::FOCS_VALUE_TAG, entry.first, vref.Description()) +
+                                   " '" + UserString(entry.first) + "' " + vref.InvariancePattern() + "\n", dir_name));
+            }
+
+        }
         else {
             // Any content definitions (FOCS files) that define a pedia category
             // should have their pedia article added to this category.
@@ -532,10 +553,15 @@ namespace {
 
             // species
             for (const auto& entry : GetSpeciesManager())
-                if (dir_name == "ALL_SPECIES" || DetermineCustomCategory(entry.second->Tags()) == dir_name)
+                if (dir_name == "ALL_SPECIES" ||
+                    (dir_name == "NATIVE_SPECIES" && entry.second->Native()) ||
+                    (dir_name == "PLAYABLE_SPECIES" && entry.second->Playable()) ||
+                    DetermineCustomCategory(entry.second->Tags()) == dir_name)
+                {
                     dir_entries.emplace(
                         UserString(entry.first),
                         std::make_pair(VarText::SPECIES_TAG, entry.first));
+                }
 
             // field types
             for (const auto& entry : GetFieldTypeManager())
@@ -1575,6 +1601,7 @@ namespace {
 
         // objects that have special
         std::vector<std::shared_ptr<const UniverseObject>> objects_with_special;
+        objects_with_special.reserve(Objects().size());
         for (const auto& obj : Objects().all())
             if (obj->Specials().count(item_name))
                 objects_with_special.push_back(obj);
@@ -1582,21 +1609,20 @@ namespace {
         if (!objects_with_special.empty()) {
             detailed_description += "\n\n" + UserString("OBJECTS_WITH_SPECIAL");
             for (auto& obj : objects_with_special) {
-                if (auto ship = std::dynamic_pointer_cast<const Ship>(obj))
-                    detailed_description += LinkTaggedIDText(VarText::SHIP_ID_TAG, ship->ID(), ship->PublicName(client_empire_id)) + "  ";
+                const auto& TEXT_TAG = [&obj]() {
+                    switch (obj->ObjectType()) {
+                    case UniverseObjectType::OBJ_SHIP:      return VarText::SHIP_ID_TAG;    break;
+                    case UniverseObjectType::OBJ_FLEET:     return VarText::FLEET_ID_TAG;   break;
+                    case UniverseObjectType::OBJ_PLANET:    return VarText::PLANET_ID_TAG;  break;
+                    case UniverseObjectType::OBJ_BUILDING:  return VarText::BUILDING_ID_TAG;break;
+                    case UniverseObjectType::OBJ_SYSTEM:    return VarText::SYSTEM_ID_TAG;  break;
+                    default:                                return EMPTY_STRING;
+                    }
+                }();
 
-                else if (auto fleet = std::dynamic_pointer_cast<const Fleet>(obj))
-                    detailed_description += LinkTaggedIDText(VarText::FLEET_ID_TAG, fleet->ID(), fleet->PublicName(client_empire_id)) + "  ";
-
-                else if (auto planet = std::dynamic_pointer_cast<const Planet>(obj))
-                    detailed_description += LinkTaggedIDText(VarText::PLANET_ID_TAG, planet->ID(), planet->PublicName(client_empire_id)) + "  ";
-
-                else if (auto building = std::dynamic_pointer_cast<const Building>(obj))
-                    detailed_description += LinkTaggedIDText(VarText::BUILDING_ID_TAG, building->ID(), building->PublicName(client_empire_id)) + "  ";
-
-                else if (auto system = std::dynamic_pointer_cast<const System>(obj))
-                    detailed_description += LinkTaggedIDText(VarText::SYSTEM_ID_TAG, system->ID(), system->PublicName(client_empire_id)) + "  ";
-
+                if (!TEXT_TAG.empty())
+                    detailed_description += LinkTaggedIDText(
+                        TEXT_TAG, obj->ID(), obj->PublicName(client_empire_id)) + "  ";
                 else
                     detailed_description += obj->PublicName(client_empire_id) + "  ";
             }
@@ -2068,11 +2094,12 @@ namespace {
 
         // homeworld
         detailed_description += "\n";
-        if (species->Homeworlds().empty()) {
+        auto homeworlds = GetSpeciesManager().GetSpeciesHomeworldsMap();
+        if (!homeworlds.count(species->Name()) || homeworlds.at(species->Name()).empty()) {
             detailed_description += UserString("NO_HOMEWORLD") + "\n";
         } else {
             detailed_description += UserString("HOMEWORLD") + "\n";
-            for (int hw_id : species->Homeworlds()) {
+            for (int hw_id : homeworlds.at(species->Name())) {
                 if (auto homeworld = Objects().get<Planet>(hw_id))
                     detailed_description += LinkTaggedIDText(VarText::PLANET_ID_TAG, hw_id,
                                                              homeworld->PublicName(client_empire_id)) + "\n";

@@ -5,6 +5,7 @@ target_sources(freeorioncommon
         ${CMAKE_CURRENT_LIST_DIR}/blocking_combiner.h
         ${CMAKE_CURRENT_LIST_DIR}/CheckSums.h
         ${CMAKE_CURRENT_LIST_DIR}/Directories.h
+        ${CMAKE_CURRENT_LIST_DIR}/Enum.h
         ${CMAKE_CURRENT_LIST_DIR}/i18n.h
         ${CMAKE_CURRENT_LIST_DIR}/Logger.h
         ${CMAKE_CURRENT_LIST_DIR}/LoggerWithOptionsDB.h
@@ -57,17 +58,21 @@ target_sources(freeorioncommon
         $<$<NOT:$<PLATFORM_ID:Windows>>:${CMAKE_CURRENT_LIST_DIR}/binreloc.c>
 )
 
-target_sources(freeoriond
-    PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/DependencyVersions.cpp
-)
+if(BUILD_SERVER)
+    target_sources(freeoriond
+        PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/DependencyVersions.cpp
+    )
+endif()
 
-target_sources(freeorionca
-    PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/DependencyVersions.cpp
-)
+if(BUILD_AI)
+    target_sources(freeorionca
+        PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/DependencyVersions.cpp
+    )
+endif()
 
-if(NOT BUILD_HEADLESS)
+if(BUILD_CLIENT_GG)
     target_sources(freeorion
         PRIVATE
             ${CMAKE_CURRENT_LIST_DIR}/DependencyVersions.cpp

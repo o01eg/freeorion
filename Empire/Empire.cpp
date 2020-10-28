@@ -68,7 +68,7 @@ Empire::Empire() :
 { Init(); }
 
 Empire::Empire(std::string name, std::string player_name,
-               int empire_id, const GG::Clr& color, bool authenticated) :
+               int empire_id, const EmpireColor& color, bool authenticated) :
     m_id(empire_id),
     m_name(std::move(name)),
     m_player_name(std::move(player_name)),
@@ -113,7 +113,7 @@ bool Empire::IsAuthenticated() const
 int Empire::EmpireID() const
 { return m_id; }
 
-const GG::Clr& Empire::Color() const
+const EmpireColor& Empire::Color() const
 { return m_color; }
 
 int Empire::CapitalID() const
@@ -2502,7 +2502,7 @@ void Empire::CheckProductionProgress() {
                     // rename fleet, given its id and the ship that is in it
                     next_fleet->Rename(next_fleet->GenerateFleetName());
                     FleetAggression new_aggr = next_fleet->HasArmedShips() ?
-                        FleetAggression::FLEET_OBSTRUCTIVE : FleetAggression::FLEET_PASSIVE;
+                        FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_PASSIVE;
                     next_fleet->SetAggression(new_aggr);
 
                     if (rally_point_id != INVALID_OBJECT_ID) {
@@ -2544,7 +2544,7 @@ void Empire::CheckInfluenceProgress() {
     m_resource_pools[ResourceType::RE_INFLUENCE]->SetStockpile(new_stockpile);
 }
 
-void Empire::SetColor(const GG::Clr& color)
+void Empire::SetColor(const EmpireColor& color)
 { m_color = color; }
 
 void Empire::SetName(const std::string& name)

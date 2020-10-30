@@ -93,7 +93,7 @@ jobs:
         - psql -c 'CREATE DATABASE freeorion;' -U postgres
         - psql -U postgres freeorion < ${TRAVIS_BUILD_DIR}/.ci/freeorion.sql
       script:
-        - cmake -DBUILD_HEADLESS=ON -DBUILD_TESTING=ON ..
+        - cmake -DBUILD_CLIENT_GG=OFF -DBUILD_TESTING=ON ..
         - cmake --build .     
       services:
         - postgres

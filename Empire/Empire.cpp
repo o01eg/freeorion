@@ -68,7 +68,7 @@ Empire::Empire() :
 { Init(); }
 
 Empire::Empire(std::string name, std::string player_name,
-               int empire_id, const GG::Clr& color, bool authenticated) :
+               int empire_id, const EmpireColor& color, bool authenticated) :
     m_id(empire_id),
     m_name(std::move(name)),
     m_player_name(std::move(player_name)),
@@ -113,7 +113,7 @@ bool Empire::IsAuthenticated() const
 int Empire::EmpireID() const
 { return m_id; }
 
-const GG::Clr& Empire::Color() const
+const EmpireColor& Empire::Color() const
 { return m_color; }
 
 int Empire::CapitalID() const
@@ -1149,8 +1149,12 @@ void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems,
             continue; //known to be destroyed so can't affect supply, important just in case being updated on client side
         }
 
-        TraceLogger(supply) << "Fleet " << fleet->ID() << " is in system " << system_id << " with next system " << fleet->NextSystemID() << " and is owned by " << fleet->Owner() << " armed: " << fleet->HasArmedShips() << " and agressive: " << fleet->Aggressive();
-        if (fleet->HasArmedShips() && fleet->Aggressive()) {
+        TraceLogger(supply) << "Fleet " << fleet->ID() << " is in system " << system_id
+                            << " with next system " << fleet->NextSystemID()
+                            << " and is owned by " << fleet->Owner()
+                            << " armed: " << fleet->HasArmedShips()
+                            << " and obstructive: " << fleet->Obstructive();
+        if (fleet->HasArmedShips() && fleet->Obstructive()) {
             if (fleet->OwnedBy(m_id)) {
                 if (fleet->NextSystemID() == INVALID_OBJECT_ID || fleet->NextSystemID() == fleet->SystemID()) {
                     systems_containing_friendly_fleets.insert(system_id);
@@ -2451,7 +2455,7 @@ void Empire::CheckProductionProgress() {
 
                 // create a single fleet for combat ships and individual
                 // fleets for non-combat ships
-                bool individual_fleets = !((*ships.begin())->IsArmed()
+                bool individual_fleets = !(   (*ships.begin())->IsArmed()
                                            || (*ships.begin())->HasFighters()
                                            || (*ships.begin())->CanHaveTroops()
                                            || (*ships.begin())->CanBombard());
@@ -2497,7 +2501,9 @@ void Empire::CheckProductionProgress() {
                 for (auto& next_fleet : fleets) {
                     // rename fleet, given its id and the ship that is in it
                     next_fleet->Rename(next_fleet->GenerateFleetName());
-                    next_fleet->SetAggressive(next_fleet->HasArmedShips());
+                    FleetAggression new_aggr = next_fleet->HasArmedShips() ?
+                        FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_PASSIVE;
+                    next_fleet->SetAggression(new_aggr);
 
                     if (rally_point_id != INVALID_OBJECT_ID) {
                         if (Objects().get<System>(rally_point_id)) {
@@ -2538,7 +2544,7 @@ void Empire::CheckInfluenceProgress() {
     m_resource_pools[ResourceType::RE_INFLUENCE]->SetStockpile(new_stockpile);
 }
 
-void Empire::SetColor(const GG::Clr& color)
+void Empire::SetColor(const EmpireColor& color)
 { m_color = color; }
 
 void Empire::SetName(const std::string& name)

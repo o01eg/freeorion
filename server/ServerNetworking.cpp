@@ -6,6 +6,7 @@
 #include "../universe/ValueRefs.h"
 #include "../parse/Parse.h"
 
+#include <boost/algorithm/string/trim.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/asio/high_resolution_timer.hpp>
 #include <boost/uuid/nil_generator.hpp>
@@ -431,7 +432,7 @@ void PlayerConnection::HandleMessageBodyRead(boost::system::error_code error,
             } else {
                 EventSignal(boost::bind(m_nonplayer_message_callback, m_incoming_message, shared_from_this()));
             }
-            m_incoming_message = Message();
+            m_incoming_message.Reset();
             AsyncReadMessage();
         }
     }

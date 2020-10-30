@@ -1,6 +1,7 @@
 #include "ServerApp.h"
 
 #include <ctime>
+#include <stdexcept>
 #include <thread>
 #include <boost/date_time/posix_time/time_formatters.hpp>
 #include <boost/filesystem/exception.hpp>
@@ -109,6 +110,12 @@ ServerApp::ServerApp() :
     m_galaxy_setup_data.native_freq = GetOptionsDB().Get<GalaxySetupOption>("setup.native.frequency");
     m_galaxy_setup_data.ai_aggr = GetOptionsDB().Get<Aggression>("setup.ai.aggression");
     m_galaxy_setup_data.game_uid = GetOptionsDB().Get<std::string>("setup.game.uid");
+
+    // Initialize Python before FSM initialization
+    // to be able use it for parsing
+    InitializePython();
+    if (!m_python_server.IsPythonRunning())
+        throw std::runtime_error("Python not initialized");
 
     // Start parsing content before FSM initialization
     // to have data initialized before autostart execution
@@ -1030,7 +1037,7 @@ void ServerApp::LoadChatHistory() {
 
 void ServerApp::PushChatMessage(const std::string& text,
                                 const std::string& player_name,
-                                GG::Clr text_color,
+                                std::array<unsigned char, 4> text_color,
                                 const boost::posix_time::ptime& timestamp)
 {
     ChatHistoryEntity chat{timestamp, player_name, text, text_color};
@@ -2733,10 +2740,10 @@ namespace {
                 continue;
             }
 
-            // find which empires have aggressive armed ships in system
+            // find which empires have obstructive armed ships in system
             std::set<int> empires_with_armed_ships_in_system;
             for (auto& fleet : Objects().find<const Fleet>(system->FleetIDs())) {
-                if (fleet->Aggressive() && fleet->HasArmedShips())
+                if (fleet->Obstructive() && fleet->HasArmedShips())
                     empires_with_armed_ships_in_system.insert(fleet->Owner());  // may include ALL_EMPIRES, which is fine; this makes monsters prevent colonization
             }
 
@@ -3369,16 +3376,16 @@ void ServerApp::UpdateMonsterTravelRestrictions() {
         bool empires_present = false;
         bool unrestricted_empires_present = false;
         std::vector<std::shared_ptr<Fleet>> monsters;
-        for (const auto& fleet : m_universe.Objects().find<Fleet>(system->FleetIDs())) {
+        for (auto&& fleet : m_universe.Objects().find<Fleet>(system->FleetIDs())) {
             // will not require visibility for empires to block clearing of monster travel restrictions
             // unrestricted lane access (i.e, (fleet->ArrivalStarlane() == system->ID()) ) is used as a proxy for
             // order of arrival -- if an enemy has unrestricted lane access and you don't, they must have arrived
             // before you, or be in cahoots with someone who did.
             bool unrestricted = ((fleet->ArrivalStarlane() == system->ID())
-                                 && fleet->Aggressive()
+                                 && fleet->Obstructive()
                                  && fleet->HasArmedShips());
             if (fleet->Unowned()) {
-                monsters.push_back(fleet);
+                monsters.push_back(std::move(fleet));
                 if (unrestricted)
                     unrestricted_monsters_present = true;
             } else {
@@ -3390,16 +3397,14 @@ void ServerApp::UpdateMonsterTravelRestrictions() {
 
         // Prevent monsters from leaving any empire blockade.
         if (unrestricted_empires_present) {
-            for (auto &monster_fleet : monsters) {
+            for (auto& monster_fleet : monsters)
                 monster_fleet->SetArrivalStarlane(INVALID_OBJECT_ID);
-            }
         }
 
         // Break monster blockade after combat.
         if (empires_present && unrestricted_monsters_present) {
-            for (auto &monster_fleet : monsters) {
+            for (auto& monster_fleet : monsters)
                 monster_fleet->SetArrivalStarlane(INVALID_OBJECT_ID);
-            }
         }
     }
 }

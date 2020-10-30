@@ -3,13 +3,12 @@
 
 
 #include <string>
-#include <GG/Clr.h>
-#include <GG/Enum.h>
 #include "InfluenceQueue.h"
 #include "PopulationPool.h"
 #include "ProductionQueue.h"
 #include "ResearchQueue.h"
 #include "ResourcePool.h"
+#include "../universe/EnumsFwd.h"
 #include "../universe/Meter.h"
 #include "../util/Export.h"
 
@@ -28,20 +27,24 @@ FO_COMMON_API extern const int INVALID_OBJECT_ID;
 FO_COMMON_API extern const int ALL_EMPIRES;
 
 
+typedef std::array<unsigned char, 4> EmpireColor;
+
+
 //! Research status of techs, relating to whether they have been or can be
 //! researched
-GG_ENUM(TechStatus,
-    INVALID_TECH_STATUS = -1,
+FO_ENUM(
+    (TechStatus),
+    ((INVALID_TECH_STATUS, -1))
     //! Never researchable, or has no researched prerequisites
-    TS_UNRESEARCHABLE,
+    ((TS_UNRESEARCHABLE))
     //! Has at least one researched, and at least one unreserached,
     //! prerequisite
-    TS_HAS_RESEARCHED_PREREQ,
+    ((TS_HAS_RESEARCHED_PREREQ))
     //! All prerequisites researched
-    TS_RESEARCHABLE,
+    ((TS_RESEARCHABLE))
     //! Has been researched
-    TS_COMPLETE,
-    NUM_TECH_STATUSES
+    ((TS_COMPLETE))
+    ((NUM_TECH_STATUSES))
 )
 
 
@@ -60,14 +63,14 @@ public:
     //@}
 
     Empire(std::string name, std::string player_name, int ID,
-           const GG::Clr& color, bool authenticated);
+           const EmpireColor& color, bool authenticated);
     ~Empire();
 
     const std::string&  Name() const;            ///< Returns the Empire's name
     const std::string&  PlayerName() const;      ///< Returns the Empire's player's name
     bool                IsAuthenticated() const; ///< Returns the Empire's player's authentication status
     int                 EmpireID() const;        ///< Returns the Empire's unique numeric ID
-    const GG::Clr&      Color() const;           ///< Returns the Empire's color
+    const EmpireColor&  Color() const;           ///< Returns the Empire's color
     int                 CapitalID() const;       ///< Returns the numeric ID of the empire's capital
 
     /** Returns an object id that is owned by the empire or INVALID_OBJECT_ID. */
@@ -344,7 +347,7 @@ public:
       * stockpile to account for influence production and expenditures.*/
     void CheckInfluenceProgress();
 
-    void SetColor(const GG::Clr& color);                 ///< Mutator for empire color
+    void SetColor(const EmpireColor& color);                 ///< Mutator for empire color
     void SetName(const std::string& name);               ///< Mutator for empire name
     void SetPlayerName(const std::string& player_name);  ///< Mutator for empire's player name
 
@@ -483,7 +486,7 @@ private:
         should play this empire. */
     bool        m_authenticated = false;
 
-    GG::Clr     m_color;
+    EmpireColor m_color;
     int         m_capital_id = INVALID_OBJECT_ID;  ///< the ID of the empire's capital planet
 
     struct PolicyAdoptionInfo {

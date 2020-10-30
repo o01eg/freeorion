@@ -126,7 +126,7 @@ void Fleet::Copy(std::shared_ptr<const UniverseObject> copied_object, int empire
         m_arrival_starlane =              copied_fleet->m_arrival_starlane;
 
         if (vis >= Visibility::VIS_PARTIAL_VISIBILITY) {
-            m_aggressive =                copied_fleet->m_aggressive;
+            m_aggression =                copied_fleet->m_aggression;
             if (Unowned())
                 m_name =                  copied_fleet->m_name;
 
@@ -162,7 +162,7 @@ UniverseObjectType Fleet::ObjectType() const
 std::string Fleet::Dump(unsigned short ntabs) const {
     std::stringstream os;
     os << UniverseObject::Dump(ntabs);
-    os << ( m_aggressive ? " agressive" : " passive")
+    os << " aggression: " << m_aggression
        << " cur system: " << SystemID()
        << " moving to: " << FinalDestinationID()
        << " prev system: " << m_prev_system
@@ -796,10 +796,10 @@ void Fleet::SetRoute(const std::list<int>& route) {
     StateChangedSignal();
 }
 
-void Fleet::SetAggressive(bool aggressive/* = true*/) {
-    if (aggressive == m_aggressive)
+void Fleet::SetAggression(FleetAggression aggression) {
+    if (m_aggression == aggression)
         return;
-    m_aggressive = aggressive;
+    m_aggression = aggression;
     StateChangedSignal();
 }
 
@@ -1287,8 +1287,8 @@ bool Fleet::BlockadedAtSystem(int start_system_id, int dest_system_id) const {
                       Empires().GetDiplomaticStatus(this->Owner(), fleet->Owner()) == DiplomaticStatus::DIPLO_WAR;
         if (!at_war)
             continue;
-        bool aggressive = (fleet->Aggressive() || fleet->Unowned());
-        if (!aggressive)
+        bool obstructive = (fleet->Obstructive() || fleet->Unowned());
+        if (!obstructive)
             continue;
         // Newly created ships/monsters are not allowed to block other fleet movement since they have not even
         // potentially gone through a combat round at the present location.  Potential sources for such new ships are
@@ -1304,7 +1304,6 @@ bool Fleet::BlockadedAtSystem(int start_system_id, int dest_system_id) const {
 
         // don't exit early here, because blockade may yet be thwarted by ownership & presence check above
         can_be_blockaded = true;
-
     }
 
     return can_be_blockaded;

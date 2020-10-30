@@ -2,6 +2,7 @@
 
 #include "AIClientApp.h"
 #include "../ClientNetworking.h"
+#include "../../universe/Fleet.h"
 #include "../../universe/Planet.h"
 #include "../../universe/ShipDesign.h"
 #include "../../universe/Tech.h"
@@ -234,10 +235,11 @@ namespace {
     {
         std::vector<int> ship_ids{ship_id};
         auto app = ClientApp::GetApp();
-        if (!NewFleetOrder::Check(app->EmpireID(), fleet_name, ship_ids, false))
+        if (!NewFleetOrder::Check(app->EmpireID(), fleet_name, ship_ids, FleetAggression::FLEET_OBSTRUCTIVE))
             return 0;
 
-        auto order = std::make_shared<NewFleetOrder>(app->EmpireID(), fleet_name, ship_ids, false);
+        auto order = std::make_shared<NewFleetOrder>(app->EmpireID(), fleet_name, ship_ids,
+                                                     FleetAggression::FLEET_OBSTRUCTIVE);
         app->Orders().IssueOrder(order);
 
         return order->FleetID();
@@ -710,7 +712,7 @@ namespace FreeOrionPython {
                 +[](int ship_id, int planet_id) -> int { return Issue<BombardOrder>(ship_id, planet_id); });
 
         py::def("issueAggressionOrder",
-                +[](int object_id, bool aggressive) -> int { return Issue<AggressiveOrder>(object_id, aggressive); });
+                +[](int object_id, bool aggressive) -> int { return Issue<AggressiveOrder>(object_id, aggressive ? FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_PASSIVE); });
 
         py::def("issueGiveObjectToEmpireOrder",
                 +[](int object_id, int recipient_id) -> int { return Issue<GiveObjectToEmpireOrder>(object_id, recipient_id); });

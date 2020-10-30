@@ -10,8 +10,8 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/optional/optional.hpp>
-#include <GG/Enum.h>
 #include "EnumsFwd.h"
+#include "../util/Enum.h"
 #include "../util/Export.h"
 #include "../util/Pending.h"
 
@@ -24,6 +24,19 @@ namespace Effect {
 }
 
 FO_COMMON_API extern const int ALL_EMPIRES;
+
+//! Environmental suitability of planets for a particular Species
+FO_ENUM(
+    (PlanetEnvironment),
+    ((INVALID_PLANET_ENVIRONMENT, -1))
+    ((PE_UNINHABITABLE))
+    ((PE_HOSTILE))
+    ((PE_POOR))
+    ((PE_ADEQUATE))
+    ((PE_GOOD))
+    ((NUM_PLANET_ENVIRONMENTS))
+)
+
 
 /** A setting that a ResourceCenter can be assigned to influence what it
   * produces.  Doesn't directly affect the ResourceCenter, but effectsgroups
@@ -62,20 +75,8 @@ private:
 };
 
 
-//! Environmental suitability of planets for a particular Species
-GG_ENUM(PlanetEnvironment,
-    INVALID_PLANET_ENVIRONMENT = -1,
-    PE_UNINHABITABLE,
-    PE_HOSTILE,
-    PE_POOR,
-    PE_ADEQUATE,
-    PE_GOOD,
-    NUM_PLANET_ENVIRONMENTS
-)
-
-
 /** A predefined type of population that can exist on a PopulationCenter.
-  * Species have associated sets of EffectsGroups, and various other 
+  * Species have associated sets of EffectsGroups, and various other
   * properties that affect how the object on which they reside functions.
   * Each kind of Species must have a \a unique name string, by which it can be
   * looked up using GetSpecies(). */
@@ -90,7 +91,8 @@ public:
             bool playable, bool native, bool can_colonize, bool can_produce_ships,
             const std::set<std::string>& tags,
             std::set<std::string>&& likes, std::set<std::string>&& dislikes,
-            std::string&& graphic);
+            std::string&& graphic,
+            double spawn_rate = 1.0, int spawn_limit = 99999);
 
     ~Species();
 
@@ -114,6 +116,8 @@ public:
     const std::vector<std::shared_ptr<Effect::EffectsGroup>>& Effects() const
     { return m_effects; }
 
+    float                           SpawnRate() const       { return m_spawn_rate; }
+    int                             SpawnLimit() const      { return m_spawn_limit; }
     bool                            Playable() const        { return m_playable; }          ///< returns whether this species is a suitable starting species for players
     bool                            Native() const          { return m_native; }            ///< returns whether this species is a suitable native species (for non player-controlled planets)
     bool                            CanColonize() const     { return m_can_colonize; }      ///< returns whether this species can colonize planets
@@ -146,10 +150,13 @@ private:
     std::unique_ptr<Condition::Condition>               m_location;
     std::unique_ptr<Condition::Condition>               m_combat_targets;
 
-    bool                                    m_playable;
-    bool                                    m_native;
-    bool                                    m_can_colonize;
-    bool                                    m_can_produce_ships;
+    bool                                    m_playable = true;
+    bool                                    m_native = true;
+    bool                                    m_can_colonize = true;
+    bool                                    m_can_produce_ships = true;
+    float                                   m_spawn_rate = 1.0;
+    int                                     m_spawn_limit = 99999;
+
     std::set<std::string>                   m_tags;
     std::set<std::string>                   m_likes;
     std::set<std::string>                   m_dislikes;

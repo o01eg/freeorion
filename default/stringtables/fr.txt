@@ -1117,6 +1117,10 @@ Astronefs gratuits et immédiats
 RULE_CHEAP_AND_FAST_SHIP_PRODUCTION_DESC
 Les astronefs coûtent seulement 1 PP et 1 tour de production.
 
+# value ref description
+NUM_COMBAT_ROUNDS
+par combat
+
 RULE_NUM_COMBAT_ROUNDS
 Passes de Combat
 
@@ -3858,16 +3862,22 @@ FW_FLEET_ETA_OUT_OF_RANGE
 Hors de portée
 
 FW_AGGRESSIVE
-Agression
+[[FLEET_AGGRESSIVE]]
 
 FW_AGGRESSIVE_DESC
-La Flotte assure le blocus des systèmes ennemis et engage le combat contre tout ennemi tentant d'entrer dans un système de l'empire.
+La Flotte engage le combat contre les flottes ennemies et bloque leur passage à travers le système.
+
+FW_OBSTRUCTIVE
+[[FLEET_OBSTRUCTIVE]]
+
+FW_OBSTRUCTIVE_DESC
+La Flotte bloque le passage des flottes ennemies à travers le système mais n'engage pas le combat. Elle peut toutefois prendre part aux combats engagés par d'autres empires ou flottes.
 
 FW_PASSIVE
-Passivité
+[[FLEET_PASSIVE]]
 
 FW_PASSIVE_DESC
-La Flotte tente de passer inaperçue dans un système ennemi et n'engage aucun combat dans un système de l'empire.
+La Flotte tente de passer inaperçue. Elle ne bloquera pas le passage des flottes ennemies et n'engagera aucun combat. Elle peut toutefois prendre part aux combats engagés par d'autres empires ou flottes.
 
 FW_AUTO
 Stratégie d'attaque automatique
@@ -5019,6 +5029,15 @@ OBJECTS_WITH_SPECIAL
 
 ENC_BUILDING_TYPE
 Type de Structures
+
+ENC_NAMED_VALUE_REF
+[Test - Références nommées de Valeur]
+
+ENC_NAMED_VALUE_REF_DESC
+'''Certains calculs de valeur sont nommés afin que les valeurs résultantes puissent êtres utilisées dans l'Encyclopédie ou par les empires dirigés par l'IA. Cela permet de se référer à des valeurs qui dépendent des règles de la partie.
+
+Les valeurs suivantes indiquent le nom, le type d'enregistrement (int/real/any), la valeur calculée, (le calcul), 'la description du calcul dans le fichier langue', et le modèle d'invariance.
+'''
 
 ENC_SPECIES
 Espèce
@@ -6326,7 +6345,7 @@ DAMAGE_TITLE
 Dommages
 
 DAMAGE_TEXT
-'''Définit la valeur de base qu'un armement d'astronef ôtera à la [[metertype METER_STRUCTURE]] d'un autre astronef (ou aux [[metertype METER_SHIELD]], à la [[metertype METER_DEFENSE]] et à l'[[metertype METER_CONSTRUCTION]] d'une planète), en une passe de combat (pour un total de quatre passes par tour). Si l'astronef ciblé est équipé de [[metertype METER_SHIELD]], les dommages causés par chaque tir seront égaux à cette valeur de base moins la valeur de solidité des [[metertype METER_SHIELD]] de l'astronef.
+'''Définit la valeur de base qu'un armement d'astronef ôtera à la [[metertype METER_STRUCTURE]] d'un autre astronef (ou aux [[metertype METER_SHIELD]], à la [[metertype METER_DEFENSE]] et à l'[[metertype METER_CONSTRUCTION]] d'une planète), en une passe de combat (pour un total de [[value NUM_COMBAT_ROUNDS]]). Si l'astronef ciblé est équipé de [[metertype METER_SHIELD]], les dommages causés par chaque tir seront égaux à cette valeur de base moins la valeur de solidité des [[metertype METER_SHIELD]] de l'astronef.
 
 Note: les [[encyclopedia FIGHTER_TECHS]] infligent des dommages n'étant pas minorés par les [[metertype METER_SHIELD]] d'astronef, les Chasseurs faisant feu une fois à l'intérieur de la zone de protection fournie par les Boucliers. Les Chasseurs nécessitant un tour pour être lancés, l'estimation des dommages est calculée en conséquence.'''
 
@@ -7790,6 +7809,18 @@ Toutes les Espèces
 
 ALL_SPECIES_DESC
 Liste de toutes les espèces:
+
+NATIVE_SPECIES
+Espèces Indigènes
+
+NATIVE_SPECIES_DESC
+Liste des espèces indigènes:
+
+PLAYABLE_SPECIES
+Espèces Jouables
+
+PLAYABLE_SPECIES_DESC
+Liste des espèces jouables:
 
 LITHIC_SPECIES_CLASS
 Lithique
@@ -9354,23 +9385,43 @@ Réception Stargate
 FOCUS_STARGATE_RECEIVE_DESC
 Active le Stargate de réception d'astronefs envoyés depuis un autre système de l'empire
 
+# Focus types
 FOCUS_PLANET_DRIVE
 Navigation Planétaire
 
+# Focus types
 FOCUS_DISTORTION
 Distortion Spatiale
 
+# Focus types
 FOCUS_PROTECTION  # translated
 Protection
 
 FOCUS_PROTECTION_DESC
 Augmente boucliers, défense et infanterie.
 
+# Focus types
 FOCUS_DOMINATION
 Domination Psychique
 
 FOCUS_DOMINATION_DESC
 Contrôle psychique des astronefs ennemis.
+
+# Fleet aggressions
+INVALID_FLEET_AGGRESSION
+Agression flotte inconnue
+
+# Fleet aggressions
+FLEET_AGGRESSIVE
+Engager Combat
+
+# Fleet aggressions
+FLEET_OBSTRUCTIVE
+Bloquer Passage
+
+# Fleet aggressions
+FLEET_PASSIVE
+Passivité
 
 # Meter types
 INVALID_METER_TYPE
@@ -12603,9 +12654,13 @@ SHP_REINFORCED_HULL
 Coques Renforcées
 
 SHP_REINFORCED_HULL_DESC
-'''Augmente de 40 la [[metertype METER_STRUCTURE]] max de tous les astronefs.
+'''Augmente de [[value SHP_REINFORCED_HULL_BONUS]] la [[metertype METER_STRUCTURE]] max de tous les astronefs.
 
 Les coques standards d'astronef sont conçues à l'aide de techniques avancées d'architecture en microgravité et fabriquées à partir de matériaux hautement résistants. Cependant, les contraintes inhérentes de la matière physique limitent la résistance maximale des coques. En modifiant l'intégrité structurelle d'une coque à l'aide de champs moléculaires améliorés, une augmentation considérable de sa résistance peut être obtenue.'''
+
+# value ref description
+SHP_REINFORCED_HULL_BONUS
+''''''
 
 SHP_BASIC_DAM_CONT
 Contrôle Basique des Dégâts
@@ -12979,22 +13034,30 @@ SHP_SINGULARITY_ENGINE_CORE_DESC
 Dispositif dérivé de la structure [[buildingtype BLD_HYPER_DAM]] et miniaturisé pour les astronefs, le Noyau de Motorisation à Singularité accroît considérablement la génération d'énergie. Augmente de 80 la [[metertype METER_SPEED]].'''
 
 SHP_DEUTERIUM_TANK
-Réservoir de Deutérium
+Carburant Deutérium
 
 SHP_DEUTERIUM_TANK_DESC
-Légère amélioration de chaque [[shippart FU_BASIC_TANK]] d'un astronef. Augmente la capacité en [[metertype METER_FUEL]] d'un astronef et par conséquent le nombre maximum de Voies spatiales pouvant être parcourues avant de devoir ravitailler en carburant.
+Légère amélioration de chaque [[shippart FU_BASIC_TANK]] d'un astronef. Augmente la capacité en [[metertype METER_FUEL]] de [[value SHP_DEUTERIUM_TANK_EFFECT_MULT]] et par conséquent le nombre maximum de Voies spatiales pouvant être parcourues avant de devoir ravitailler.
 
 SHP_DEUTERIUM_TANK_EFFECT
-Technologie Réservoir de Deutérium
+Technologie <i>Carburant Deutérium</i>
+
+# value ref description
+SHP_DEUTERIUM_TANK_EFFECT_MULT
+par réservoir
 
 SHP_ANTIMATTER_TANK
-Réservoir d'Anti-Matière
+Carburant Anti-Matière
 
 SHP_ANTIMATTER_TANK_DESC
-Notable amélioration de chaque [[shippart FU_BASIC_TANK]] d'un astronef. Augmente la capacité en [[metertype METER_FUEL]] d'un astronef et par conséquent le nombre maximum de Voies spatiales pouvant être parcourues avant de devoir ravitailler en carburant.
+Notable amélioration de chaque [[shippart FU_BASIC_TANK]] d'un astronef. Augmente la capacité en [[metertype METER_FUEL]] de [[value SHP_ANTIMATTER_TANK_EFFECT_MULT]] et par conséquent le nombre maximum de Voies spatiales pouvant être parcourues avant de devoir ravitailler.
 
 SHP_ANTIMATTER_TANK_EFFECT
-Technologie Réservoir d'Anti-Matière
+Technologie <i>Carburant Anti-Matière</i>
+
+# value ref description
+SHP_ANTIMATTER_TANK_EFFECT_MULT
+par réservoir
 
 SHP_ZERO_POINT
 Générateur Zero-Point de Carburant
@@ -14322,7 +14385,10 @@ FU_BASIC_TANK
 Réservoir Additionnel de Carburant
 
 FU_BASIC_TANK_DESC
-Augmente la capacité en [[metertype METER_FUEL]] d'un astronef, permettant des voyages supplémentaires sur les Voies spatiales en fonction du [[encyclopedia FUEL_EFFICIENCY_TITLE]]. Des technologies plus avancées augmenteront le nombre de voyages supplémentaires pour chaque réservoir de carburant équipant un astronef.
+'''Augmente la capacité en [[metertype METER_FUEL]] d'un astronef, permettant des voyages supplémentaires sur les Voies spatiales en fonction du [[encyclopedia FUEL_EFFICIENCY_TITLE]]. Des technologies plus avancées augmenteront le nombre de voyages supplémentaires pour chaque réservoir de carburant équipant un astronef.
+Bonus en Carburant selon les technologies correspondantes pour une coque affichant un Rendement Carburant normal:
+- [[tech SHP_DEUTERIUM_TANK]]: [[value SHP_DEUTERIUM_TANK_EFFECT_MULT]]
+- [[tech SHP_ANTIMATTER_TANK]]: [[value SHP_ANTIMATTER_TANK_EFFECT_MULT]].'''
 
 FU_ZERO_FUEL
 Générateur Zero-Point de Carburant

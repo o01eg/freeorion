@@ -1,6 +1,7 @@
 #include "../universe/BuildingType.h"
 #include "../universe/Effect.h"
 #include "../universe/Enums.h"
+#include "../universe/Fleet.h"
 #include "../universe/Planet.h"
 #include "../universe/ShipHull.h"
 #include "../universe/ShipPart.h"
@@ -75,11 +76,13 @@ namespace FreeOrionPython {
             .value("researchable",      TechStatus::TS_RESEARCHABLE)
             .value("complete",          TechStatus::TS_COMPLETE)
         ;
-        py::enum_<BuildType>("buildType")
-            .value("building",          BuildType::BT_BUILDING)
-            .value("ship",              BuildType::BT_SHIP)
-            .value("stockpile",         BuildType::BT_STOCKPILE)
-        ;
+        DebugLogger() << "WrapGameStateEnums: Wrap BuildType enum";
+        auto buildType = py::enum_<BuildType>("buildType");
+        for (const auto& p : IterateEnum(EnumIterator<BuildType>{})) {
+            DebugLogger() << "WrapGameStateEnums: Wrap BuildType enum " << &p;
+            buildType.value(p.second, p.first);
+        }
+        DebugLogger() << "WrapGameStateEnums: BuildType enum wrapped";
         py::enum_<ResourceType>("resourceType")
             .value("industry",          ResourceType::RE_INDUSTRY)
             .value("influence",         ResourceType::RE_INFLUENCE)
@@ -130,6 +133,11 @@ namespace FreeOrionPython {
             .value("stealth",           MeterType::METER_STEALTH)
             .value("detection",         MeterType::METER_DETECTION)
             .value("speed",             MeterType::METER_SPEED)
+        ;
+        py::enum_<FleetAggression>("fleetAggression")
+            .value("passive",           FleetAggression::FLEET_PASSIVE)
+            .value("obstructive",       FleetAggression::FLEET_OBSTRUCTIVE)
+            .value("aggressive",        FleetAggression::FLEET_AGGRESSIVE)
         ;
         py::enum_<DiplomaticStatus>("diplomaticStatus")
             .value("war",               DiplomaticStatus::DIPLO_WAR)

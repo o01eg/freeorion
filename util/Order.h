@@ -27,16 +27,14 @@ class ShipDesign;
   * the colonize button, she is locked in to this decision. */
 class FO_COMMON_API Order {
 public:
-    Order()
-    {}
+    Order() = default;
 
     /** ctor taking the ID of the Empire issuing the order. */
     Order(int empire) :
         m_empire(empire)
     {}
 
-    virtual ~Order()
-    {}
+    virtual ~Order() = default;
 
     virtual std::string Dump() const { return ""; }
 
@@ -45,7 +43,7 @@ public:
 
     /** Returns true iff this order has been executed (a second execution
       * indicates server-side execution). */
-    bool Executed() const;
+    bool Executed() const { return m_executed; }
 
     /** Executes the order on the Universe and Empires.
      *
@@ -73,7 +71,7 @@ protected:
 
 private:
     virtual void ExecuteImpl() const = 0;
-    virtual bool UndoImpl() const;
+    virtual bool UndoImpl() const { return false; }
 
     int m_empire = ALL_EMPIRES;
 
@@ -136,9 +134,12 @@ private:
     Only one of system or position will be used to place the new fleet.*/
 class FO_COMMON_API NewFleetOrder : public Order {
 public:
-    NewFleetOrder(int empire, const std::string& fleet_name,
-                  const std::vector<int>& ship_ids,
-                  bool aggressive);
+    NewFleetOrder(int empire, std::string fleet_name,
+                  std::vector<int> ship_ids,
+                  bool aggressive, bool passive = false);
+    NewFleetOrder(int empire, std::string fleet_name,
+                  std::vector<int> ship_ids,
+                  FleetAggression aggression);
 
     std::string Dump() const override;
 
@@ -151,10 +152,13 @@ public:
     const std::vector<int>& ShipIDs() const
     { return m_ship_ids; }
 
-    bool Aggressive() const
-    { return m_aggressive; }
+    bool Aggressive() const;
 
-    static bool Check(int empire, const std::string& fleet_name, const std::vector<int>& ship_ids, bool aggressive);
+    FleetAggression Aggression() const
+    { return m_aggression; }
+
+    static bool Check(int empire, const std::string& fleet_name,
+                      const std::vector<int>& ship_ids, FleetAggression aggression);
 private:
     NewFleetOrder() = default;
 
@@ -172,7 +176,7 @@ private:
     /** m_fleet_id is mutable because ExecuteImpl generates the fleet id. */
     mutable int m_fleet_id = INVALID_OBJECT_ID;
     std::vector<int> m_ship_ids;
-    bool m_aggressive = false;
+    FleetAggression m_aggression;
 
     friend class boost::serialization::access;
     template <typename Archive>
@@ -701,7 +705,7 @@ private:
   * controlled by an empire. */
 class FO_COMMON_API AggressiveOrder : public Order {
 public:
-    AggressiveOrder(int empire, int object_id, bool aggression = true);
+    AggressiveOrder(int empire, int object_id, FleetAggression aggression);
 
     std::string Dump() const override;
 
@@ -710,10 +714,9 @@ public:
     { return m_object_id; }
 
     /** Returns aggression state to set object to. */
-    bool Aggression() const
-    { return m_aggression; }
+    FleetAggression Aggression() const { return m_aggression; }
 
-    static bool Check(int empire_id, int object_id, bool aggression);
+    static bool Check(int empire_id, int object_id, FleetAggression aggression);
 
 private:
     AggressiveOrder() = default;
@@ -729,7 +732,7 @@ private:
     void ExecuteImpl() const override;
 
     int m_object_id = INVALID_OBJECT_ID;
-    bool m_aggression = false;
+    FleetAggression m_aggression;
 
     friend class boost::serialization::access;
     template <typename Archive>

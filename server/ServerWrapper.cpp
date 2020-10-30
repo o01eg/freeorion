@@ -474,9 +474,9 @@ namespace {
                                 double spawn_rate, int spawn_limit)
         {
             std::vector<std::string> designs;
-            for (int i = 0; i < len(py_designs); i++) {
+            for (int i = 0; i < len(py_designs); i++)
                 designs.push_back(py::extract<std::string>(py_designs[i]));
-            }
+
             m_monster_fleet_plan =
                 std::make_shared<MonsterFleetPlan>(fleet_name, designs, spawn_rate,
                                                    spawn_limit, nullptr, false);
@@ -516,9 +516,9 @@ namespace {
     {
         py::list py_monster_fleet_plans;
         auto&& monster_fleet_plans = GetUniverse().MonsterFleetPlans();
-        for (auto* fleet_plan : monster_fleet_plans) {
+        for (auto* fleet_plan : monster_fleet_plans)
             py_monster_fleet_plans.append(MonsterFleetPlanWrapper(fleet_plan));
-        }
+
         return py_monster_fleet_plans;
     }
 
@@ -778,7 +778,7 @@ namespace {
             fleet->Rename(UserString("OBJ_FLEET") + " " + std::to_string(fleet->ID()));
         }
 
-        fleet->SetAggressive(aggressive);
+        fleet->SetAggression(aggressive ? FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_PASSIVE);
 
         // return fleet ID
         return fleet->ID();
@@ -1275,6 +1275,16 @@ namespace {
 
         return py::object(planet->CardinalSuffix());
     }
+
+    auto PlayerEmpireColor(const PlayerSetupData* psd) -> py::tuple
+    {
+        EmpireColor color = psd->empire_color;
+        return py::make_tuple(
+            std::get<0>(color),
+            std::get<1>(color),
+            std::get<2>(color),
+            std::get<3>(color));
+    }
 }
 
 namespace FreeOrionPython {
@@ -1282,7 +1292,7 @@ namespace FreeOrionPython {
         py::class_<PlayerSetupData>("PlayerSetupData")
             .def_readwrite("player_name",        &PlayerSetupData::player_name)
             .def_readwrite("empire_name",        &PlayerSetupData::empire_name)
-            .def_readonly("empire_color",        &PlayerSetupData::empire_color)
+            .add_property("empire_color",        PlayerEmpireColor)
             .def_readwrite("starting_species",   &PlayerSetupData::starting_species_name)
             .def_readwrite("starting_team",      &PlayerSetupData::starting_team);
 

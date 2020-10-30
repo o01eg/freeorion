@@ -1170,10 +1170,8 @@ struct FO_COMMON_API Aggressive final : public Condition {
     bool operator==(const Condition& rhs) const override;
     std::string Description(bool negated = false) const override;
     std::string Dump(unsigned short ntabs = 0) const override;
-    void SetTopLevelContent(const std::string& content_name) override
-    {}
-    bool GetAggressive() const
-    { return m_aggressive; }
+    void SetTopLevelContent(const std::string& content_name) override {}
+    bool GetAggressive() const { return m_aggressive; }
     unsigned int GetCheckSum() const override;
 
 private:
@@ -1425,7 +1423,7 @@ private:
     std::unique_ptr<Condition> m_operand;
 };
 
-/** Tests conditions in \a operands in order, to find the first condition that 
+/** Tests conditions in \a operands in order, to find the first condition that
   * matches at least one candidate object. Matches all objects that match that
   * condaition, ignoring any conditions listed later. If no candidate matches
   * any of the conditions, it matches nothing. */

@@ -53,7 +53,10 @@ namespace {
 
         fleet->AddShips({ship->ID()});
         ship->SetFleetID(fleet->ID());
-        fleet->SetAggressive(fleet->HasArmedShips());
+
+        FleetAggression new_aggr = fleet->HasArmedShips() ?
+            FleetAggression::FLEET_OBSTRUCTIVE : FleetAggression::FLEET_PASSIVE;
+        fleet->SetAggression(new_aggr);
 
         return fleet;
     }
@@ -2943,8 +2946,8 @@ unsigned int SetDestination::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // SetAggression                                         //
 ///////////////////////////////////////////////////////////
-SetAggression::SetAggression(bool aggressive) :
-    m_aggressive(aggressive)
+SetAggression::SetAggression(FleetAggression aggression) :
+    m_aggression(aggression)
 {}
 
 void SetAggression::Execute(ScriptingContext& context) const {
@@ -2960,17 +2963,25 @@ void SetAggression::Execute(ScriptingContext& context) const {
         return;
     }
 
-    target_fleet->SetAggressive(m_aggressive);
+    target_fleet->SetAggression(m_aggression);
 }
 
-std::string SetAggression::Dump(unsigned short ntabs) const
-{ return DumpIndent(ntabs) + (m_aggressive ? "SetAggressive" : "SetPassive") + "\n"; }
+std::string SetAggression::Dump(unsigned short ntabs) const {
+    return DumpIndent(ntabs) + [aggr{this->m_aggression}]() {
+        switch(aggr) {
+        case FleetAggression::FLEET_AGGRESSIVE:  return "SetAggressive";  break;
+        case FleetAggression::FLEET_OBSTRUCTIVE: return "SetObstructive"; break;
+        case FleetAggression::FLEET_PASSIVE:     return "SetPassive";     break;
+        default:                                 return "Set???";         break;
+        }
+    }();
+}
 
 unsigned int SetAggression::GetCheckSum() const {
     unsigned int retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetAggression");
-    CheckSums::CheckSumCombine(retval, m_aggressive);
+    CheckSums::CheckSumCombine(retval, m_aggression);
 
     TraceLogger() << "GetCheckSum(SetAggression): retval: " << retval;
     return retval;

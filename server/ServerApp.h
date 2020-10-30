@@ -210,7 +210,7 @@ public:
 
     void PushChatMessage(const std::string& text,
                          const std::string& player_name,
-                         GG::Clr text_color,
+                         std::array<unsigned char, 4> text_color,
                          const boost::posix_time::ptime& timestamp);
 
     void SendOutboundChatMessage(const std::string& text, const std::string& player_name, bool allow_email);
@@ -219,8 +219,8 @@ public:
 private:
     void    Run();          ///< initializes app state, then executes main event handler/render loop (Poll())
 
-    /** Initialize the python engine if not already running. Return true on success. */
-    void InitializePython();
+    /** Initialize the python engine if not already running.*/
+    void    InitializePython();
 
     /** Called when server process receive termination signal */
     void    SignalHandler(const boost::system::error_code& error, int signal_number);

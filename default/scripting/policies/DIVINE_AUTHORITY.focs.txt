@@ -16,14 +16,15 @@ Policy
             OwnedBy empire = Source.Owner
             Population low = 0.001
         ]
-        priority = [[DEFAULT_PRIORITY]]
         effects = [
-            SetTargetHappiness value = Value + 4
-            SetTargetResearch value = Value - 5
-            SetTargetInfluence value = Value + 1
+            SetTargetHappiness value = Value
+                + (NamedReal name = "PLC_DIVINE_AUTHORITY_TARGET_HAPPINESS_FLAT" value = 4)
+            SetTargetResearch value = Value
+                + (NamedReal name = "PLC_DIVINE_AUTHORITY_TARGET_RESEARCH_FLAT" value = -5)
+            SetTargetInfluence value = Value
+                + (NamedReal name = "PLC_DIVINE_AUTHORITY_TARGET_INFLUENCE_FLAT" value = 1)
         ]
     ]
     graphic = "icons/policies/confederation.png"
 
-#include "/scripting/common/priorities.macros"
 #include "/scripting/policies/policies.macros"

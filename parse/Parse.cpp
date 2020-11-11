@@ -388,6 +388,7 @@ namespace parse {
         } else {
             retval =  (token >> '=');
         }
+        retval.name(token.definition());    // so that parse errors will log "expected LABEL_TEXT here"
         return retval;
     }
 
@@ -402,7 +403,7 @@ namespace parse {
 
         start %=
             -(
-                label(tok.Tags_)
+                label(tok.tags_)
                 >>  one_or_more_string_tokens
             )
             ;
@@ -479,8 +480,8 @@ namespace parse {
 
         start
             =  ( omit_[tok.Item_]
-            >    label(tok.Type_) > unlockable_item_type_enum
-            >    label(tok.Name_) > tok.string
+            >    label(tok.type_) > unlockable_item_type_enum
+            >    label(tok.name_) > tok.string
                ) [ _val = construct<UnlockableItem>(_1, _2) ]
             ;
 

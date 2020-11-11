@@ -39,7 +39,7 @@ NamedValueRefManager::NamedValueRefManager() {
     if (s_instance)
         throw std::runtime_error("Attempted to create more than one NamedValueRefManager.");
 
-    // Only update the global pointer on sucessful construction.
+    // Only update the global pointer on successful construction.
     InfoLogger() << "NamedValueRefManager::NameValueRefManager constructs singleton " << this;
     s_instance = this;
 }
@@ -47,8 +47,10 @@ NamedValueRefManager::NamedValueRefManager() {
 namespace {
 // helper function for NamedValueRefManager::GetValueRef
 template <typename V>
-V* const GetValueRefImpl(std::map<NamedValueRefManager::key_type, std::unique_ptr<V>>& registry, const std::string& label, const std::string& name) /*const*/ {
-    DebugLogger() << "NamedValueRefManager::GetValueRef look for registered " << label << " valueref for \"" << name << '"';
+V* const GetValueRefImpl(std::map<NamedValueRefManager::key_type, std::unique_ptr<V>>& registry,
+                         const std::string& label, const std::string& name) /*const*/
+{
+    TraceLogger() << "NamedValueRefManager::GetValueRef look for registered " << label << " valueref for \"" << name << '"';
     TraceLogger() << "Number of registered " << label << " ValueRefs: " << registry.size();
     const auto it = registry.find(name);
     if (it != registry.end())
@@ -91,10 +93,9 @@ ValueRef::ValueRefBase* const NamedValueRefManager::GetValueRefBase(const std::s
 }
 
 NamedValueRefManager& NamedValueRefManager::GetNamedValueRefManager() {
-    DebugLogger() << "NamedValueRefManager::GetNamedValueRefManager starts (check the thread)";
-    
+    TraceLogger() << "NamedValueRefManager::GetNamedValueRefManager starts (check the thread)";
     static NamedValueRefManager manager; // function local 
-    InfoLogger() << "NamedValueRefManager::GetNamedValueRefManager at " << &manager;
+    TraceLogger() << "NamedValueRefManager::GetNamedValueRefManager at " << &manager;
     return manager;
 }
 
@@ -129,44 +130,49 @@ NamedValueRefManager::any_container_type  NamedValueRefManager::GetItems() const
 namespace {
 /** helper function for NamedValueRefManager::RegisterValueRef */
 template <typename R, typename VR>
-void RegisterValueRefImpl(R& container, std::mutex& mutex, const std::string& label, std::string&& valueref_name, std::unique_ptr<VR>&& vref) {
+void RegisterValueRefImpl(R& container, std::mutex& mutex, const std::string& label,
+                          std::string&& valueref_name, std::unique_ptr<VR>&& vref)
+{
     InfoLogger() << "Register " << label << " valueref for " << valueref_name << ": " << vref->Description();
     if (container.count(valueref_name)>0) {
-        DebugLogger() << "Skip registration for already registered " << label << " valueref for " << valueref_name;
-        DebugLogger() << "Number of registered " << label << " ValueRefs: " << container.size();
+        TraceLogger() << "Skip registration for already registered " << label << " valueref for " << valueref_name;
+        TraceLogger() << "Number of registered " << label << " ValueRefs: " << container.size();
         return;
     }
     const std::lock_guard<std::mutex> lock(mutex);
-    if (!(vref->RootCandidateInvariant() && vref->LocalCandidateInvariant() && vref->TargetInvariant() && vref->SourceInvariant()))
-            ErrorLogger() << "Currently only invariant value refs can be named. " << valueref_name;
+    if (!(vref->RootCandidateInvariant() && vref->LocalCandidateInvariant() &&
+         vref->TargetInvariant() && vref->SourceInvariant()))
+    { ErrorLogger() << "Currently only invariant value refs can be named. " << valueref_name; }
     container.emplace(std::move(valueref_name), std::move(vref));
-    DebugLogger() << "Number of registered " << label << " ValueRefs: " << container.size();
+    TraceLogger() << "Number of registered " << label << " ValueRefs: " << container.size();
 }
 }
 
 template <typename T>
-void NamedValueRefManager::RegisterValueRef(std::string&& valueref_name, std::unique_ptr<ValueRef::ValueRef<T>>&& vref) {
-    RegisterValueRefImpl(m_value_refs, m_value_refs_mutex, "generic", std::move(valueref_name), std::move(vref));
-}
+void NamedValueRefManager::RegisterValueRef(std::string&& valueref_name,
+                                            std::unique_ptr<ValueRef::ValueRef<T>>&& vref)
+{ RegisterValueRefImpl(m_value_refs, m_value_refs_mutex, "generic", std::move(valueref_name), std::move(vref)); }
 
 // specialisation for registering to the ValueRef<int> registry
 template <>
-void NamedValueRefManager::RegisterValueRef(std::string&& valueref_name, std::unique_ptr<ValueRef::ValueRef<int>>&& vref) {
-    RegisterValueRefImpl(m_value_refs_int, m_value_refs_int_mutex, "int", std::move(valueref_name), std::move(vref));
-}
+void NamedValueRefManager::RegisterValueRef(std::string&& valueref_name,
+                                            std::unique_ptr<ValueRef::ValueRef<int>>&& vref)
+{ RegisterValueRefImpl(m_value_refs_int, m_value_refs_int_mutex, "int", std::move(valueref_name), std::move(vref)); }
 
 // specialisation for registering to the ValueRef<double> registry
 template <>
-void NamedValueRefManager::RegisterValueRef(std::string&& valueref_name, std::unique_ptr<ValueRef::ValueRef<double>>&& vref) {
-    RegisterValueRefImpl(m_value_refs_double, m_value_refs_double_mutex, "double", std::move(valueref_name), std::move(vref));
+void NamedValueRefManager::RegisterValueRef(std::string&& valueref_name,
+                                            std::unique_ptr<ValueRef::ValueRef<double>>&& vref)
+{
+    RegisterValueRefImpl(m_value_refs_double, m_value_refs_double_mutex, "double",
+                         std::move(valueref_name), std::move(vref));
 }
 
 NamedValueRefManager& GetNamedValueRefManager()
 { return NamedValueRefManager::GetNamedValueRefManager(); }
 
-ValueRef::ValueRefBase* const GetValueRefBase(const std::string& name)
-{
-    DebugLogger() << "NamedValueRefManager::GetValueRefBase look for registered valueref for \"" << name << '"';
+ValueRef::ValueRefBase* const GetValueRefBase(const std::string& name) {
+    TraceLogger() << "NamedValueRefManager::GetValueRefBase look for registered valueref for \"" << name << '"';
     auto* vref = GetNamedValueRefManager().GetValueRefBase(name);
     if (vref)
         return vref;
@@ -200,9 +206,9 @@ template void RegisterValueRef(std::string name, std::unique_ptr<ValueRef::Value
 namespace ValueRef {
 template <typename T>
 NamedRef<T>::NamedRef(std::string value_ref_name) :
-    m_value_ref_name(value_ref_name)
+    m_value_ref_name(std::move(value_ref_name))
 {
-    DebugLogger() << "ctor(NamedRef<T>): " << typeid(*this).name() << " value_ref_name: " << m_value_ref_name;
+    TraceLogger() << "ctor(NamedRef<T>): " << typeid(*this).name() << " value_ref_name: " << m_value_ref_name;
 }
 
 template <typename T>
@@ -261,7 +267,7 @@ void NamedRef<T>::SetTopLevelContent(const std::string& content_name)
 template <typename T>
 const ValueRef<T>* NamedRef<T>::GetValueRef() const
 {
-    DebugLogger() << "NamedRef<T>::GetValueRef() look for registered valueref for \"" << m_value_ref_name << '"';
+    TraceLogger() << "NamedRef<T>::GetValueRef() look for registered valueref for \"" << m_value_ref_name << '"';
     return ::GetValueRef<T>(m_value_ref_name);
 }
 
@@ -279,7 +285,7 @@ unsigned int NamedRef<T>::GetCheckSum() const
 template <typename T>
 T NamedRef<T>::Eval(const ScriptingContext& context) const
 {
-    DebugLogger() << "NamedRef<" << typeid(T).name() << ">::Eval()";
+    TraceLogger() << "NamedRef<" << typeid(T).name() << ">::Eval()";
     const ValueRef<T>* value_ref = ::GetValueRef<T>(m_value_ref_name);
     if (!value_ref) {
         ErrorLogger() << "NamedRef<" << typeid(T).name() << ">::Eval did not find " << m_value_ref_name;

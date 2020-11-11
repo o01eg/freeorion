@@ -45,16 +45,6 @@ jobs:
         script: bash .ci/deploy.sh bionic
         on:
           tags: true
-    - name: Deploy PPA Eoan 19.10
-      <<: *_build_ppa_common
-      script:
-        - .ci/script.sh eoan
-      deploy:
-        provider: script
-        skip_cleanup: true
-        script: bash .ci/deploy.sh eoan
-        on:
-          tags: true
     - name: Deploy PPA Focal 20.04
       <<: *_build_ppa_common
       script:

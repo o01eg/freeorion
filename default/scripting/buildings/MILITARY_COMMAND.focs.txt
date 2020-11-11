@@ -1,7 +1,7 @@
 BuildingType
     name = "BLD_MILITARY_COMMAND"
     description = "BLD_MILITARY_COMMAND_DESC"
-    captureresult = destroy
+    captureresult = Destroy
     buildcost = 80 * [[BUILDING_COST_MULTIPLIER]]
     buildtime = 6
     location = And [
@@ -14,7 +14,7 @@ BuildingType
             OwnedBy empire = Source.Owner
         ]
     ]
-    EnqueueLocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
+    enqueuelocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS]]
     
@@ -34,7 +34,7 @@ BuildingType
                 OwnedBy empire = Source.ProducedByEmpireID
             ]
             accountinglabel = "BLD_MILITARY_COMMAND"
-            priority = [[VERY_EARLY_PRIORITY]]
+            priority = [[TARGET_EARLY_BEFORE_SCALING_PRIORITY]]
             effects = [
                 SetMaxDefense value = Value + 5
                 SetMaxTroops value = Value + 6

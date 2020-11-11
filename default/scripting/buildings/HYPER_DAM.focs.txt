@@ -10,7 +10,7 @@ BuildingType
         OwnedBy empire = Source.Owner
         TargetPopulation low = 1
     ]
-    EnqueueLocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
+    enqueuelocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS]]
     
@@ -20,14 +20,16 @@ BuildingType
                 Focus type = "FOCUS_INDUSTRY"
                 OwnedBy empire = Source.Owner
                 ResourceSupplyConnected empire = Source.Owner condition = Source
-                Not ResourceSupplyConnected empire = Source.Owner Condition = And [
+                Not ResourceSupplyConnected empire = Source.Owner condition = And [
                     Building name = "BLD_BLACK_HOLE_POW_GEN" 
                     OwnedBy empire = Source.Owner
                 ]
             ]
             stackinggroup = "BLD_HYPER_DAM_BONUS"
-            priority = [[VERY_LATE_PRIORITY]]
-            effects = SetTargetIndustry value = Value + Target.Population * 1.0 * [[INDUSTRY_PER_POP]]
+            priority = [[TARGET_AFTER_2ND_SCALING_PRIORITY]]
+            effects = SetTargetIndustry value = Value + Target.Population
+                        * (NamedReal name = "BLD_HYPER_DAM_TARGET_INDUSTRY_PERPOP"
+                                     value = 1.0 * [[INDUSTRY_PER_POP]])
 
         EffectsGroup
             scope = And [
@@ -36,14 +38,15 @@ BuildingType
                 ResourceSupplyConnected empire = Source.Owner condition = Source
                 Not Star type = BlackHole
                 Focus type = "FOCUS_INDUSTRY"
-                Not ResourceSupplyConnected empire = Source.Owner Condition = And [
+                Not ResourceSupplyConnected empire = Source.Owner condition = And [
                     Building name = "BLD_BLACK_HOLE_POW_GEN" 
                     OwnedBy empire = Source.Owner
                 ]
             ]
             stackinggroup = "BLD_HYPER_DAM_MALUS"
             priority = [[TARGET_POPULATION_AFTER_SCALING_PRIORITY]]
-            effects = SetTargetPopulation value = Value - Target.HabitableSize
+            effects = SetTargetPopulation value = Value + Target.HabitableSize
+                        * (NamedReal name = "BLD_HYPER_DAM_TARGET_POPULATION_PERSIZE" value = -1)
     ]
     icon = "icons/building/blackhole.png"
 

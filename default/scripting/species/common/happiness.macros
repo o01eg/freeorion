@@ -22,9 +22,9 @@ AVERAGE_HAPPINESS
                 (LocalCandidate.LastTurnColonized = CurrentTurn)
             ]
             effects = SetHappiness value = max(Value,
-                1*(Statistic If Condition = And [Target Planet environment = Poor]) +
-                2*(Statistic If Condition = And [Target Planet environment = Adequate]) +
-                4*(Statistic If Condition = And [Target Planet environment = Good]))
+                1*(Statistic If condition = And [Target Planet environment = Poor]) +
+                2*(Statistic If condition = And [Target Planet environment = Adequate]) +
+                4*(Statistic If condition = And [Target Planet environment = Good]))
 
         EffectsGroup
             scope = Source
@@ -66,7 +66,7 @@ AVERAGE_HAPPINESS
             scope = Source
             activation = Contains Building name = "BLD_CONC_CAMP"
             accountinglabel = "CONCENTRATION_CAMPS_LABEL"
-            priority = [[VERY_LATE_PRIORITY]]
+            priority = [[AFTER_ALL_TARGET_MAX_METERS_PRIORITY]]
             effects = [ 
                     SetHappiness value = 0
                     SetTargetHappiness value = 0

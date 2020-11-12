@@ -162,7 +162,7 @@ class AuthProvider:
         random.shuffle(teams)
         for p in players:
             p.starting_team = teams.pop()
-            
+
         return players
 
     def send_outbound_chat_message(self, text, player_name, allow_email):

@@ -159,10 +159,10 @@ class AuthProvider:
             error("Cann't load players: %s %s" % (exctype, value))
 
         # random teams assignment
-        #teams = [1 for _ in range(len(players) // 2)] + [2 for _ in range(len(players) // 2)]
-        #random.shuffle(teams)
-        #for p in players:
-        #    p.starting_team = teams.pop()
+        # teams = [1 for _ in range(len(players) // 2)] + [2 for _ in range(len(players) // 2)]
+        # random.shuffle(teams)
+        # for p in players:
+        #     p.starting_team = teams.pop()
 
         return players
 

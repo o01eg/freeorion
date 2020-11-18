@@ -96,7 +96,7 @@ class ChatHistoryProvider:
                     with self.conn.cursor() as curs:
                         curs.execute(""" INSERT INTO chat_history (ts, player_name, text,
                                      text_color, server_id)
-                                     VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s, %d)""",
+                                     VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s, %s)""",
                                      (timestamp,
                                       player_name,
                                       text,

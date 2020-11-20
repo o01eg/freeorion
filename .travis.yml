@@ -126,6 +126,11 @@ jobs:
       stage: build
       os: osx
       osx_image: xcode9.4
+      addons:
+        homebrew:
+          packages:
+            - ccache
+          update: true
       language: cpp
       compiler: clang
       cache: ccache
@@ -140,7 +145,6 @@ jobs:
               /usr/local/bin/gtimeout 40m /usr/local/bin/cmake $@
           }
       install:
-        - brew install ccache
         - ccache --set-config=max_size=500M --set-config=sloppiness=file_macro
         - ccache --zero-stats
       before_script:

@@ -65,4 +65,14 @@ jobs:
         script: bash .ci/deploy.sh groovy
         on:
           tags: true
+    - name: Deploy PPA Hirsute 21.04
+      <<: *_build_ppa_common
+      script:
+        - .ci/script.sh hirsute
+      deploy:
+        provider: script
+        skip_cleanup: true
+        script: bash .ci/deploy.sh hirsute
+        on:
+          tags: true
 

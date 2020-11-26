@@ -7,6 +7,7 @@
 
 #include "../util/Directories.h"
 #include "../util/GameRules.h"
+#include "../util/i18n.h"
 #include "../util/OptionsDB.h"
 #include "../util/Version.h"
 #include "../universe/System.h"
@@ -14,8 +15,11 @@
 #include "../combat/CombatLogManager.h"
 
 #include "GodotClientApp.h"
+#include "GodotI18n.h"
 #include "OptionsDB.h"
 #include "GodotSystem.h"
+
+#include <TranslationServer.hpp>
 
 using namespace godot;
 
@@ -187,6 +191,15 @@ void GDFreeOrion::_init() {
 
     // initialize any variables here
     app = std::make_unique<GodotClientApp>();
+
+    // initialize godot i18n
+    String locale = String(Language().c_str());
+    GodotI18n *i18n = GodotI18n::_new();
+    i18n->set_locale(locale);
+    Ref<Translation> ref = Ref<Translation>::__internal_constructor(i18n);
+    TranslationServer::get_singleton()->add_translation(ref);
+    TranslationServer::get_singleton()->set_locale(locale);
+
     optionsDB = godot::OptionsDB::_new();
     networking = GodotNetworking::_new();
 

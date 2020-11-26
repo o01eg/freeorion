@@ -18,6 +18,9 @@ func _ready():
     $Node.connect("start_game", self, "_on_Node_start_game")
     var systems: int = $Node.optionsDB._get_option_int("setup.star.count")
     print("Systems from optionsDB ", systems)
+    print("Locales ", TranslationServer.get_loaded_locales())
+    print("Current locale ", TranslationServer.get_locale())
+    print("Check translation ", tr("SD_COLONY_SHIP"))
 
 
 func _on_QuitBtn_pressed():

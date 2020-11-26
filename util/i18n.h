@@ -29,7 +29,7 @@ FO_COMMON_API void FlushLoadedStringTables();
 #define UserStringNop(key) key
 
 /** Returns the language of the StringTable currently in use */
-const std::string& Language();
+FO_COMMON_API const std::string& Language();
 
 /** Wraps boost::format such that it won't crash if passed the wrong number of arguments */
 FO_COMMON_API boost::format FlexibleFormat(const std::string& string_to_format);

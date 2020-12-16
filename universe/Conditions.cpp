@@ -179,7 +179,9 @@ std::string ConditionFailedDescription(const std::vector<const Condition*>& cond
     std::string retval;
 
     // test candidate against all input conditions, and store descriptions of each
-    for (const auto& result : ConditionDescriptionAndTest(conditions, ScriptingContext(source_object), candidate_object)) {
+    for (const auto& result : ConditionDescriptionAndTest(
+        conditions, ScriptingContext(std::move(source_object)), std::move(candidate_object)))
+    {
         if (!result.second)
              retval += UserString("FAILED") + " <rgba 255 0 0 255>" + result.first +"</rgba>\n";
     }
@@ -199,7 +201,8 @@ std::string ConditionDescription(const std::vector<const Condition*>& conditions
 
     // test candidate against all input conditions, and store descriptions of each
     auto condition_description_and_test_results =
-        ConditionDescriptionAndTest(conditions, ScriptingContext(source_object), candidate_object);
+        ConditionDescriptionAndTest(conditions, ScriptingContext(std::move(source_object)), std::move(candidate_object));
+
     bool all_conditions_match_candidate = true, at_least_one_condition_matches_candidate = false;
     for (const auto& result : condition_description_and_test_results) {
         all_conditions_match_candidate = all_conditions_match_candidate && result.second;
@@ -4239,7 +4242,7 @@ std::string Species::Description(bool negated/* = false*/) const {
 std::string Species::Dump(unsigned short ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Species";
     if (m_names.empty()) {
-        // do nothing else
+        retval += "\n";
     } else if (m_names.size() == 1) {
         retval += " name = " + m_names[0]->Dump(ntabs) + "\n";
     } else {
@@ -7563,7 +7566,8 @@ void WithinStarlaneJumps::Eval(const ScriptingContext& parent_context,
         int jump_limit = m_jumps->Eval(parent_context);
         ObjectSet &from_set(search_domain == SearchDomain::MATCHES ? matches : non_matches);
 
-        std::tie(matches, non_matches) = GetPathfinder()->WithinJumpsOfOthers(jump_limit, from_set, subcondition_matches);
+        std::tie(matches, non_matches) = GetPathfinder()->WithinJumpsOfOthers(
+            jump_limit, parent_context.ContextObjects(), from_set, subcondition_matches);
 
     } else {
         // re-evaluate contained objects for each candidate object
@@ -7609,7 +7613,8 @@ bool WithinStarlaneJumps::Match(const ScriptingContext& local_context) const {
     ObjectSet near_objs;
 
     std::tie(near_objs, std::ignore) =
-        GetPathfinder()->WithinJumpsOfOthers(jump_limit, candidate_set, subcondition_matches);
+        GetPathfinder()->WithinJumpsOfOthers(jump_limit, local_context.ContextObjects(),
+                                             candidate_set, subcondition_matches);
     return !near_objs.empty();
 }
 

@@ -157,7 +157,8 @@ namespace {
         subcategorization is something like a tech category (eg. growth). */
     void GetSortedPediaDirEntires(
         const std::string& dir_name,
-        std::multimap<std::string, std::pair<std::string, std::string>>& sorted_entries_list)
+        std::multimap<std::string, std::pair<std::string, std::string>>& sorted_entries_list,
+        bool exclude_custom_categories_from_dir_name = true)
     {
         ScopedTimer subdir_timer("GetSortedPediaDirEntires(" + dir_name + ")",
                                  true, std::chrono::milliseconds(20));
@@ -200,8 +201,7 @@ namespace {
         }
         else if (dir_name == "ENC_SHIP_PART") {
             for (const auto& entry : GetShipPartManager()) {
-                std::string&& custom_category = DetermineCustomCategory(entry.second->Tags());
-                if (custom_category.empty()) {
+                if (!exclude_custom_categories_from_dir_name || DetermineCustomCategory(entry.second->Tags()).empty()) {
                     sorted_entries_list.emplace(
                         UserString(entry.first),
                         std::make_pair(LinkTaggedText(VarText::SHIP_PART_TAG, entry.first) + "\n",
@@ -212,8 +212,7 @@ namespace {
         }
         else if (dir_name == "ENC_SHIP_HULL") {
             for (const auto& entry : GetShipHullManager()) {
-                std::string&& custom_category = DetermineCustomCategory(entry.second->Tags());
-                if (custom_category.empty()) {
+                if (!exclude_custom_categories_from_dir_name || DetermineCustomCategory(entry.second->Tags()).empty()) {
                     sorted_entries_list.emplace(
                         UserString(entry.first),
                         std::make_pair(LinkTaggedText(VarText::SHIP_HULL_TAG, entry.first) + "\n",
@@ -226,13 +225,15 @@ namespace {
             std::map<std::string, std::string> userstring_tech_names;
             // sort tech names by user-visible name, so names are shown alphabetically in UI
             for (auto& tech_name : GetTechManager().TechNames()) {
-                auto& us_tech_name{UserString(tech_name)};
-                userstring_tech_names.emplace(us_tech_name, std::move(tech_name));
+                auto& us_name{UserString(tech_name)};   // line before moving from tech_name to avoid order of evaluation issues
+                userstring_tech_names.emplace(us_name, std::move(tech_name));
             }
 
+            // second loop over alphabetically sorted names...
             for (auto& tech_name : userstring_tech_names) {
-                std::string&& custom_category = DetermineCustomCategory(GetTech(tech_name.second)->Tags());
-                if (custom_category.empty()) {
+                if (!exclude_custom_categories_from_dir_name ||
+                    DetermineCustomCategory(GetTech(tech_name.second)->Tags()).empty())
+                {
                     // already iterating over userstring-looked-up names, so don't need to re-look-up-here
                     std::string&& tagged_text{LinkTaggedText(VarText::TECH_TAG, tech_name.second) + "\n"};
                     sorted_entries_list.emplace(
@@ -245,15 +246,16 @@ namespace {
         else if (dir_name == "ENC_POLICY") {
             for (auto& policy_name : GetPolicyManager().PolicyNames()) {
                 std::string&& tagged_text{LinkTaggedText(VarText::POLICY_TAG, policy_name) + "\n"};
-                auto&& str_pair{std::make_pair(std::move(tagged_text), policy_name)};
-                sorted_entries_list.emplace(std::move(policy_name), std::move(str_pair));
+                auto& us_name{UserString(policy_name)}; // line before to avoid order of evaluation issues when moving from policy_name
+                sorted_entries_list.emplace(
+                    us_name,
+                    std::make_pair(std::move(tagged_text), std::move(policy_name)));
             }
 
         }
         else if (dir_name == "ENC_BUILDING_TYPE") {
             for (const auto& entry : GetBuildingTypeManager()) {
-                std::string custom_category = DetermineCustomCategory(entry.second->Tags());
-                if (custom_category.empty()) {
+                if (!exclude_custom_categories_from_dir_name || DetermineCustomCategory(entry.second->Tags()).empty()) {
                     sorted_entries_list.emplace(
                         UserString(entry.first),
                         std::make_pair(LinkTaggedText(VarText::BUILDING_TYPE_TAG, entry.first) + "\n",
@@ -264,8 +266,8 @@ namespace {
         }
         else if (dir_name == "ENC_SPECIAL") {
             for (std::string& special_name : SpecialNames()) {
-                auto& us_name{UserString(special_name)};
                 std::string&& tagged_text{LinkTaggedText(VarText::SPECIAL_TAG, special_name) + "\n"};
+                auto& us_name{UserString(special_name)};    // line before to avoid order of operations issues when moving from special_name
                 sorted_entries_list.emplace(
                     us_name,
                     std::make_pair(std::move(tagged_text), std::move(special_name)));
@@ -274,6 +276,15 @@ namespace {
         }
         else if (dir_name == "ENC_SPECIES") {
             // directory populated with list of links to other articles that list species
+            if (!exclude_custom_categories_from_dir_name) {
+                for (const auto& entry : GetSpeciesManager()) {
+                    sorted_entries_list.emplace(
+                        UserString(entry.first),
+                        std::make_pair(LinkTaggedText(VarText::SPECIES_TAG, entry.first) + "\n",
+                                       entry.first));
+                }
+            }
+
         }
         else if (dir_name == "ENC_HOMEWORLDS") {
             const auto homeworlds{GetSpeciesManager().GetSpeciesHomeworldsMap()};
@@ -341,7 +352,7 @@ namespace {
         }
         else if (dir_name == "ENC_FIELD_TYPE") {
             for (const auto& entry : GetFieldTypeManager()) {
-                if (DetermineCustomCategory(entry.second->Tags()).empty()) {
+                if (!exclude_custom_categories_from_dir_name || DetermineCustomCategory(entry.second->Tags()).empty()) {
                     sorted_entries_list.emplace(UserString(entry.first),
                                                 std::make_pair(LinkTaggedText(VarText::FIELD_TYPE_TAG, entry.first) + "\n",
                                                                entry.first));
@@ -1062,9 +1073,9 @@ namespace {
       * sub-directories. Returns a map from
       * (category_str_key, dir_name) to (readable_article_name, link_text) */
     std::map<std::pair<std::string, std::string>, std::pair<std::string, std::string>>
-        GetSubDirs(const std::string& dir_name, int depth = 0)
+        GetSubDirs(const std::string& dir_name, bool exclude_custom_categories_from_dir_name = true, int depth = 0)
     {
-        ScopedTimer subdir_timer("GetSubDirs(" + dir_name + ", " + std::to_string(depth) + ")",
+        ScopedTimer subdir_timer("GetSubDirs(" + dir_name + ", " + std::to_string(exclude_custom_categories_from_dir_name) + ", " + std::to_string(depth) + ")",
                                  true, std::chrono::milliseconds(500));
 
         depth++;
@@ -1078,25 +1089,28 @@ namespace {
 
         // map from (human readable article name) to (article-link-tag-text, article name stringtable key)
         std::multimap<std::string, std::pair<std::string, std::string>> sorted_entries;
-        GetSortedPediaDirEntires(dir_name, sorted_entries);
+        GetSortedPediaDirEntires(dir_name, sorted_entries, exclude_custom_categories_from_dir_name);
 
 
         for (auto& entry : sorted_entries) {
             const std::string& readable_article_name = entry.first;
-            const std::string& link_text = entry.second.first;
-            const std::string& category_str_key = entry.second.second;
+            std::string& link_text = entry.second.first;
+            std::string& category_str_key = entry.second.second;
 
             // explicitly exclude textures and input directory itself
             if (category_str_key == "ENC_TEXTURES" || category_str_key == dir_name)
                 continue;
-            retval.emplace(std::make_pair(category_str_key, dir_name),
-                           std::make_pair(readable_article_name, link_text));
+
+            // recurse into any sub-sub-directories
+            auto&& temp = GetSubDirs(category_str_key, exclude_custom_categories_from_dir_name, depth);
+
             DebugLogger() << "GetSubDirs(" << dir_name << ") storing "
                           << category_str_key << ": " << readable_article_name;
 
-            // recurse into any sub-sub-directories
-            for (auto sub_sub_dir : GetSubDirs(category_str_key, depth))
-                retval.emplace(sub_sub_dir);
+            retval.emplace(std::make_pair(std::move(category_str_key), dir_name),
+                           std::make_pair(readable_article_name, std::move(link_text)));
+
+            retval.insert(std::make_move_iterator(temp.begin()), std::make_move_iterator(temp.end())); // TODO: use C++17 map::merge
         }
 
         return retval;
@@ -3000,10 +3014,9 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
     bool search_desc = GetOptionsDB().Get<bool>("ui.pedia.search.articles.enabled");
 
     // assemble link text to all pedia entries, indexed by name
-    auto articles_from_index_subdirs = GetSubDirs("ENC_INDEX");
-    for (auto& entry : articles_from_index_subdirs) {
+    for (auto& entry : GetSubDirs("ENC_INDEX", false, 0)) {
         const auto& article_key = entry.first.first;
-        const auto& article_category = entry.first.second;
+        const auto& article_directory = entry.first.second;
         auto& article_name_link = entry.second;
         const auto& article_name = entry.second.first;
 
@@ -3032,7 +3045,7 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
             if (word.size() < 3)
                 continue;
             if (boost::icontains(article_name, word)) {
-                partial_match_report.emplace(std::move(article_name_link));
+                partial_match_report.insert(std::move(article_name_link));
                 listed = true;
                 break;
             }
@@ -3041,7 +3054,7 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
             continue;
 
         // search for matches within article text
-        const auto& article_entry = GetEncyclopedia().GetArticleByCategoryAndKey(article_category, article_key);
+        const auto& article_entry = GetEncyclopedia().GetArticleByCategoryAndKey(article_directory, article_key);
         if (!article_entry.description.empty()) {
             // article present in pedia directly
             if (boost::icontains(UserString(article_entry.description), search_text))
@@ -3060,7 +3073,7 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
             std::weak_ptr<const ShipDesign> dummyD;
 
             //std::cout << "cat: " << article_category << "  key: " << article_key << "\n";
-            GetRefreshDetailPanelInfo(article_category, article_key,
+            GetRefreshDetailPanelInfo(article_directory, article_key,
                                       dummy3, dummy1, dummy2, dummyA, dummyB, dummy4,
                                       dummy5, dummy6, detailed_description, dummyC,
                                       dummyD);

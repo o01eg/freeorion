@@ -357,6 +357,10 @@ namespace {
     { return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "fleet_obstructive.png"); }
     std::shared_ptr<GG::Texture> FleetObstructiveMouseoverIcon()
     { return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "fleet_obstructive_mouseover.png"); }
+    std::shared_ptr<GG::Texture> FleetDefensiveIcon()
+    { return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "fleet_defensive.png"); }
+    std::shared_ptr<GG::Texture> FleetDefensiveMouseoverIcon()
+    { return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "fleet_defensive_mouseover.png"); }
     std::shared_ptr<GG::Texture> FleetPassiveIcon()
     { return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "fleet_passive.png"); }
     std::shared_ptr<GG::Texture> FleetPassiveMouseoverIcon()
@@ -1081,7 +1085,7 @@ private:
     const int           m_fleet_id = INVALID_OBJECT_ID;
     int                 m_system_id = INVALID_OBJECT_ID;
     const bool          m_is_new_fleet_drop_target = false;
-    FleetAggression     m_new_fleet_aggression = FleetAggression::FLEET_PASSIVE;
+    FleetAggression     m_new_fleet_aggression = FleetAggression::FLEET_DEFENSIVE;
     bool                m_needs_refresh = true;
 
     boost::signals2::connection                     m_fleet_connection;
@@ -1329,10 +1333,11 @@ void FleetDataPanel::ToggleAggression() {
 
         FleetAggression new_aggression_state = [old_aggression{fleet->Aggression()}]() {
             switch (old_aggression) {
-            case FleetAggression::FLEET_PASSIVE:        return FleetAggression::FLEET_OBSTRUCTIVE;  break;
+            case FleetAggression::FLEET_PASSIVE:        return FleetAggression::FLEET_DEFENSIVE;    break;
+            case FleetAggression::FLEET_DEFENSIVE:      return FleetAggression::FLEET_OBSTRUCTIVE;  break;
             case FleetAggression::FLEET_OBSTRUCTIVE:    return FleetAggression::FLEET_AGGRESSIVE;   break;
-            case FleetAggression::FLEET_AGGRESSIVE:
-            default:                                    return FleetAggression::FLEET_PASSIVE;      break;
+            case FleetAggression::FLEET_AGGRESSIVE:     return FleetAggression::FLEET_PASSIVE;      break;
+            default:                                    return FleetAggression::FLEET_DEFENSIVE;    break;
             }
         }();
 
@@ -1348,7 +1353,8 @@ void FleetDataPanel::ToggleAggression() {
         m_new_fleet_aggression = [old_aggression{m_new_fleet_aggression}]() {
             switch (old_aggression) {
             case FleetAggression::FLEET_AGGRESSIVE:         return FleetAggression::FLEET_OBSTRUCTIVE;          break;
-            case FleetAggression::FLEET_OBSTRUCTIVE:        return FleetAggression::FLEET_PASSIVE;              break;
+            case FleetAggression::FLEET_OBSTRUCTIVE:        return FleetAggression::FLEET_DEFENSIVE;            break;
+            case FleetAggression::FLEET_DEFENSIVE:          return FleetAggression::FLEET_PASSIVE;              break;
             case FleetAggression::FLEET_PASSIVE:            return FleetAggression::INVALID_FLEET_AGGRESSION;   break;
             case FleetAggression::INVALID_FLEET_AGGRESSION:
             default:                                        return FleetAggression::FLEET_AGGRESSIVE;           break;
@@ -1653,6 +1659,13 @@ void FleetDataPanel::UpdateAggressionToggle() {
         m_aggression_toggle->SetRolloverGraphic(GG::SubTexture(FleetObstructiveMouseoverIcon()));
         m_aggression_toggle->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
             FleetObstructiveIcon(), UserString("FW_OBSTRUCTIVE"), UserString("FW_OBSTRUCTIVE_DESC")));
+
+    } else if (aggression == FleetAggression::FLEET_DEFENSIVE) {
+        m_aggression_toggle->SetUnpressedGraphic(GG::SubTexture(FleetDefensiveIcon()));
+        m_aggression_toggle->SetPressedGraphic(GG::SubTexture(FleetDefensiveIcon()));
+        m_aggression_toggle->SetRolloverGraphic(GG::SubTexture(FleetDefensiveMouseoverIcon()));
+        m_aggression_toggle->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
+            FleetDefensiveIcon(), UserString("FW_DEFENSIVE"), UserString("FW_DEFENSIVE_DESC")));
 
     } else if (aggression == FleetAggression::FLEET_PASSIVE) {
         m_aggression_toggle->SetUnpressedGraphic(GG::SubTexture(FleetPassiveIcon()));
@@ -3706,13 +3719,13 @@ int FleetWnd::FleetInRow(GG::ListBox::iterator it) const {
 }
 
 namespace {
-    std::string SystemNameNearestToFleet(int client_empire_id, int fleet_id) {
-        auto fleet = Objects().get<Fleet>(fleet_id);
+    std::string SystemNameNearestToFleet(int client_empire_id, int fleet_id, const ObjectMap& objects) {
+        auto fleet = objects.get<Fleet>(fleet_id);
         if (!fleet)
             return "";
 
-        int nearest_system_id(GetPathfinder()->NearestSystemTo(fleet->X(), fleet->Y()));
-        if (auto system = Objects().get<System>(nearest_system_id))
+        int nearest_system_id(GetPathfinder()->NearestSystemTo(fleet->X(), fleet->Y(), objects));
+        if (auto system = objects.get<System>(nearest_system_id))
             return system->ApparentName(client_empire_id);
         return "";
     }
@@ -3738,7 +3751,7 @@ std::string FleetWnd::TitleText() const {
                                  sys_name));
     }
 
-    const std::string sys_name = SystemNameNearestToFleet(client_empire_id, *m_fleet_ids.begin());
+    const std::string sys_name = SystemNameNearestToFleet(client_empire_id, *m_fleet_ids.begin(), Objects());
     if (!sys_name.empty()) {
         return (empire
                 ? boost::io::str(FlexibleFormat(UserString("FW_EMPIRE_FLEETS_NEAR_SYSTEM")) %

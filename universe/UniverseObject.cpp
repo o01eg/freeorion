@@ -26,16 +26,16 @@ UniverseObject::UniverseObject() :
         GetUniverse().UniverseObjectSignalsInhibited())),
     m_x(INVALID_POSITION),
     m_y(INVALID_POSITION),
-    m_created_on_turn(CurrentTurn() )
+    m_created_on_turn(CurrentTurn())
 {}
 
-UniverseObject::UniverseObject(const std::string name, double x, double y) :
+UniverseObject::UniverseObject(std::string name, double x, double y) :
     StateChangedSignal(blocking_combiner<boost::signals2::optional_last_value<void>>(
         GetUniverse().UniverseObjectSignalsInhibited())),
-    m_name(name),
+    m_name(std::move(name)),
     m_x(x),
     m_y(y),
-    m_created_on_turn(CurrentTurn() )
+    m_created_on_turn(CurrentTurn())
 {}
 
 UniverseObject::~UniverseObject()
@@ -183,7 +183,7 @@ std::string UniverseObject::Dump(unsigned short ntabs) const {
             os << "  at: " << sys_name;
     } else {
         os << "  at: (" << this->X() << ", " << this->Y() << ")";
-        int near_id = GetPathfinder()->NearestSystemTo(this->X(), this->Y());
+        int near_id = GetPathfinder()->NearestSystemTo(this->X(), this->Y(), Objects());
         auto near_system = Objects().get<System>(near_id);
         if (near_system) {
             const std::string& sys_name = near_system->Name();

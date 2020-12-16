@@ -1118,12 +1118,6 @@ RULE_CHEAP_AND_FAST_SHIP_PRODUCTION_DESC
 Ships cost 1 PP and take 1 turn to produce.
 
 # value ref description
-NUM_COMBAT_ROUNDS
-per combat
-
-NUM_COMBAT_ROUNDS_FIGHTERS
-per combat
-
 RULE_NUM_COMBAT_ROUNDS
 Combat Rounds
 
@@ -3876,11 +3870,17 @@ FW_OBSTRUCTIVE
 FW_OBSTRUCTIVE_DESC
 Fleet blocks enemy fleet passage through its system but does not initiate combat. It may still participate in combats initiated by other empires or fleets, however.
 
+FW_DEFENSIVE
+[[FLEET_DEFENSIVE]]
+
+FW_DEFENSIVE_DESC
+Fleet will attempt to stay hidden unless combat occurs; it will not blockade enemy fleet passage or initiate combat. It may still participate in combats initiated by other empires or fleets, however.
+
 FW_PASSIVE
 [[FLEET_PASSIVE]]
 
 FW_PASSIVE_DESC
-Fleet will attempt to stay hidden; it will not blockade enemy fleet passage or initiate combat. It may still participate in combats initiated by other empires or fleets, however.
+Fleet will attempt to stay hidden; it will not blockade enemy fleet passage or initiate combat, and will not fire its weapons or launch fighters during combat, even if attacked by other empires during that combat.
 
 FW_AUTO
 Automatic Aggression Selection
@@ -8084,6 +8084,7 @@ SP_LAENFA_GAMEPLAY_DESC
 '''<img src="species/preview/laenfa.png"></img>
 Sneaky, telepathic, sentient vines.
 Prefer [[PT_OCEAN]] planets.
+Ships regenerate 1 fuel per turn at white stars, and 2 fuel per turn a blue stars.
 [[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]]
 '''
 
@@ -8109,7 +8110,7 @@ SP_SLY_DESC
 '''Description:
 The Sly live in gas giants. The gas giants are so foreign to most species in the universe that, for most of their history, they have been overlooked.
 Not being able to build devices, they couldn't leave their homeworld. Recently, they were able to obtain necessary equipment and technology for spacefaring from traders in exchange for their knowledge of history.
-On the right diet, Sly excrete refined fuel. When in system with a gas giant, a Sly-crewed ship will regenerate fuel.
+On the right diet, Sly excrete refined fuel. When in system with a gas giant, a Sly-crewed ship will regenerate fuel. When in a system with a planet populated by friendly Sly, Sly-crewed ships will be refueled and repaired, as if they were in a friendly supply network with [[tech SHP_FLEET_REPAIR]].
 
 Social Structure:
 The Sly are very long-lived and keep the songs alive in which the whole cultural knowledge is encoded. They are very open and curious towards the galaxy and the other species they are now finally able to encounter.
@@ -8815,9 +8816,6 @@ ANCIENT_RUINS_DEPLETED_SPECIAL_DESC
 
 This planet holds the ruins of an unknown, advanced ancient race. A valuable discovery has already been made here.'''
 
-ANCIENT_RUINS_TARGET_RESEARCH_PERPOP
-per population
-
 ANCIENT_RUINS_SPECIAL
 Ancient Ruins
 
@@ -8897,12 +8895,6 @@ TIDAL_LOCK_SPECIAL_DESC
 
 This planet is tidally locked with the star it orbits. Its day and year are the same duration, and one half of the planet is perpetually day, the other perpetually night. Population growth is hampered, though industrial capacity benefits from the locally stable surface conditions.'''
 
-TIDAL_LOCK_TARGET_POPULATION_PERSIZE
-per planet size
-
-TIDAL_LOCK_TARGET_INDUSTRY_PERPOP
-per population
-
 TEMPORAL_ANOMALY_SPECIAL
 Temporal Anomaly
 
@@ -8911,12 +8903,6 @@ TEMPORAL_ANOMALY_SPECIAL_DESC
 
 The flow of time on this planet is gravely disturbed. Seemingly random local occurences of increases and decreases of the pace of time, induces grave disarrangement in any living being. A social or productive life is nearly impossible. Extreme adaptability and precaution is needed to establish a colony on this planet.
 On the other hand the temporal anomaly has a huge potential for scientific experiments beyond what is possible on normal planets.'''
-
-TEMPORAL_ANOMALY_TARGET_RESEARCH_PERPOP
-per population
-
-TEMPORAL_ANOMALY_TARGET_POPULATION_PERSIZE
-per planet size
 
 RESONANT_MOON_SPECIAL
 Resonant Moon
@@ -8934,9 +8920,6 @@ COMPUTRONIUM_SPECIAL_DESC
 
 Left by some vanished civilization, the entire moon - from surface to core - is a computing device of awesome power. It can complete the most complicated simulations and equations faster than they can be entered.'''
 
-COMPUTRONIUM_TARGET_RESEARCH_PERPOP
-per population
-
 HONEYCOMB_SPECIAL
 Honeycomb
 
@@ -8944,9 +8927,6 @@ HONEYCOMB_SPECIAL_DESC
 '''When a planet with a Honeycomb is focused on [[metertype METER_INDUSTRY]], all industry focused [[metertype METER_SUPPLY]] connected planets gain [[value HONEYCOMB_TARGET_INDUSTRY_PERPOP]] [[metertype METER_TARGET_INDUSTRY]] per [[metertype METER_POPULATION]].
 
 The Honeycomb is a planet that was prepared as a stash by the Builders in ancient times. Almost all other planets in surrounding systems were stripped of valuable materials and then dismantled. The materials were sorted and stored separately in gigantic tubes embedded into the planets crust. The sprectrum ranges from rare and valuable elementals to hard to produce molecules and a vast array of energy sources. What the Builders wanted to create with this treasure or why they didn't use it in the end, is unclear.'''
-
-HONEYCOMB_TARGET_INDUSTRY_PERPOP
-per population
 
 PHILOSOPHER_SPECIAL
 Philosopher Planet
@@ -9449,8 +9429,12 @@ FLEET_OBSTRUCTIVE
 Obstruct Passage
 
 # Fleet aggressions
+FLEET_DEFENSIVE
+Defensive Hide
+
+# Fleet aggressions
 FLEET_PASSIVE
-Hide
+Passive Hide
 
 # Meter types
 INVALID_METER_TYPE
@@ -11220,15 +11204,6 @@ However, it also reduces [[metertype METER_SUPPLY]] range ([[value PLC_CENTRALIZ
 
 Logistics of the whole empire are focused into boosting the capital's production, by diverting there most of the social and material resources. This causes some resentment in the colonies, which increases [[metertype METER_INFLUENCE]] costs.'''
 
-PLC_CENTRALIZATION_TARGET_RESEARCH_PERPOP
-per population
-
-PLC_CENTRALIZATION_TARGET_INDUSTRY_PERPOP
-per population
-
-PLC_CENTRALIZATION_TARGET_INFLUENCE_PERJUMP
-per jump
-
 PLC_CENTRALIZATION_SHORT_DESC
 Boosts Capital
 
@@ -11409,7 +11384,7 @@ PLC_CONFEDERATION_DESC
 '''Planets of the empire are organized in a confederacy of independent systems. Colonies do not suffer reduced influence if not connected to the capital, and get a boost to ground troops, but are slightly less stable in general.
 
 Increases max [[metertype METER_TROOPS]] by [[value PLC_CONFEDERATION_MAX_TROOPS_FLAT]] but reduces [[metertype METER_TARGET_HAPPINESS]] ([[value PLC_CONFEDERATION_TARGET_HAPPINESS_FLAT]]) in all planets.
-Increases [[metertype METER_TARGET_INFLUENCE]] on colonies disconnected from the capital by [[value SUPPLY_DISCONNECTED_INFLUENCE_FLAT]].'''
+Increases [[metertype METER_TARGET_INFLUENCE]] on colonies disconnected from the capital by [[value PLC_CONFEDERATION_SUPPLY_DISCONNECTED_INFLUENCE_FLAT]].'''
 
 PLC_CONFEDERATION_SHORT_DESC
 Supports disconnected systems
@@ -11437,6 +11412,15 @@ The empire is governed by a teocracy which claims to hold the Gods authority. Th
 
 PLC_DIVINE_AUTHORITY_SHORT_DESC
 Boosts stability and influence, but impairs research
+
+PLC_NATIVE_APPROPRIATION
+Native Appropriation
+
+PLC_NATIVE_APPROPRIATION_DESC
+Increasess research on research-focused planets in systems that also contain unowned native-populated planets.
+
+PLC_NATIVE_APPROPRIATION_SHORT_DESC
+Boosts Research
 
 
 ##
@@ -11609,9 +11593,6 @@ LRN_ALGO_ELEGANCE_DESC
 
 With greater and greater difficulty of data analysis problems, traditional measures of algorithm performance become less useful due to the limitations of irreducible complexity. At this stage, other measures of algorithm form and function become significant; aesthetically and metaphorically, the elegance of the solution must be optimized.'''
 
-LRN_ALGO_ELEGANCE_TARGET_RESEARCH_PERPOP
-per population
-
 LRN_TRANSLING_THT
 Translinguistics
 
@@ -11683,6 +11664,8 @@ Mind of the Void
 LRN_MIND_VOID_DESC
 '''Unlocks [[policy PLC_DESIGN_SIMPLICITY]]
 
+Grants 1 social policy slot.
+
 We are not alone in the cosmos... but why should the search be so limited? Many cultures have myths, legends or fervent belief in a higher consciousness. Whether a loving or malevolent God, or a detached observer, it is clear that something, perhaps the universe itself on some level, is alive, aware, watching.'''
 
 LRN_TIME_MECH
@@ -11716,9 +11699,6 @@ LRN_QUANT_NET_DESC
 A massive, empire-wide data network able to transfer information instantaneously between any two places, rather than via the lengthy and indirect path of starlanes. This advancement greatly facilitates research throughout the empire.
 
 Every particle is inextricably connected on the quantum level to every particle with which it has previously interacted. Older mechanistic ideas about cause and effect do not apply on this level, and particles can "communicate" instantaneously across vast distances. When a thorough understanding of this phenomena is acquired, selective small-scale action-at-a-distance between any two points can be achieved instantaneously and outdated relativistic speed limits no longer apply to the transfer of information.'''
-
-LRN_QUANT_NET_TARGET_RESEARCH_PERPOP
-per population
 
 LRN_COLLAPSER
 Black Hole Collapser
@@ -11836,12 +11816,6 @@ While transforming an entire population into beings of pure energy would be impr
 
 The ultimate stage of physical development is to transcend the physical altogether. Without bodies, individuals and society may move, grow and exist freely, unhindered by unnecessary physical limitations and inefficient metabolic processes that waste energy supporting homeostasis.'''
 
-GRO_ENERGY_META_TARGET_INDUSTRY_PERPOP
-per population
-
-GRO_ENERGY_META_TARGET_RESEARCH_PERPOP
-per population
-
 PRO_TRANS_DESIGN
 Transcendent Design
 
@@ -11901,7 +11875,9 @@ PRO_VOID_PREDICTION_DESC
 For the imperial stockpile service, void prediction is the quintessential tool to deliver the right goods even before the need occurs.
 
 This is an upgrade technology for the [[encyclopedia STOCKPILE_TITLE]]. The [[metertype METER_STOCKPILE]] is increased by 0.2 per [[metertype METER_POPULATION]].
-These improvements are cumulative with those provided by [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] and [[tech PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY]].'''
+These improvements are cumulative with those provided by [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] and [[tech PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY]].
+
+Also grants 1 economic policy slot.'''
 
 PRO_MICROGRAV_MAN
 Microgravity Industry
@@ -11923,9 +11899,6 @@ Robots designed to fulfill nearly any job, in fields as wide ranging as electron
 
 Although high level design and initial facility setup still require active supervision, the elimination of operators from the actual production process eliminates many bottlenecks. Robots work continuously and have much greater tolerance for hazardous environmental conditions in the factory, and do not require additional habitable space off-site. Robots perform their assigned tasks flawlessly, or at least as well as they are instructed.'''
 
-PRO_ROBOTIC_PROD_TARGET_INDUSTRY_PERPOP
-per population
-
 PRO_EXOBOTS
 Exobots
 
@@ -11941,9 +11914,6 @@ PRO_FUSION_GEN_DESC
 Fusion plants, while expensive to produce and maintain, easily pay for themselves on industrialized worlds with ever increasing power demands. Reliance on old fission based nuclear plants will gradually become a thing of the past.
 
 Explosive or uncontrolled thermonuclear reactions are comparatively simple to cause at scales ranging from small tactical warheads to supergiant stellar furnaces. Controllable, stable and practical power generation from the reaction is somewhat more difficult. The process remains attractive, however, due to the near-limitless supply of fuel and potential for emissions-free operation.'''
-
-PRO_FUSION_GEN_TARGET_INDUSTRY_PERPOP
-per population
 
 PRO_NANOTECH_PROD
 Nanotech Production
@@ -12473,9 +12443,6 @@ Increases max [[metertype METER_TROOPS]] on all planets by [[value CYBORG_MAX_TR
 
 A highly versatile fusion of organism and machine, capable of adapting to a tremendous variety of circumstances. Spontaneous generation of specialized organs and mechanically enhanced strength permit cyborgs to exist with ease in nearly any environment.'''
 
-CYBORG_MAX_TROOPS_PERPOP
-per population
-
 GRO_GAIA_TRANS
 Gaia Transformation
 
@@ -12514,34 +12481,18 @@ LRN_DISTRIB_THOUGHT_DESC
 
 Grants 1 extra military policy slot.
 
-The average citizen literally wastes his mind away, one of the finest computing devices in the universe. By tapping into the idle brain cycles of a sufficiently large population through a network of simple cybernetic transceivers, the research centers of a world can gain access to cheap and plentiful raw computing power.'''
-
-LRN_DISTRIB_THOUGHT_TARGET_RESEARCH_PERPOP
-per population
+The average citizen literally wastes their mind away, one of the finest computing devices in the universe. By tapping into the idle brain cycles of a sufficiently large population through a network of simple cybernetic transceivers, the research centers of a world can gain access to cheap and plentiful raw computing power.'''
 
 LRN_STELLAR_TOMOGRAPHY
 Stellar Tomography
 
 LRN_STELLAR_TOMOGRAPHY_DESC
-'''Increases [[metertype METER_TARGET_RESEARCH]] on planets with the Research focus, per [[metertype METER_POPULATION]] and depending on the star type:
-* [[STAR_BLACK]] (x[[value LRN_STELLAR_TOMO_BLACK_TARGET_RESEARCH_PERPOP]])
-* [[STAR_NEUTRON]] (x[[value LRN_STELLAR_TOMO_NEUTRON_TARGET_RESEARCH_PERPOP]])
-* [[STAR_BLUE]] or [[STAR_WHITE]] (x[[value LRN_STELLAR_TOMO_BRIGHT_TARGET_RESEARCH_PERPOP]])
-* [[STAR_YELLOW]], [[STAR_ORANGE]] or [[STAR_RED]] (x[[value LRN_STELLAR_TOMO_DIME_TARGET_RESEARCH_PERPOP]])
+'''Increases [[metertype METER_TARGET_RESEARCH]] on planets with the Research focus, depending on the star type and number of planets with research focus in the system:
+* [[STAR_BLACK]] (+[[value LRN_STELLAR_TOMO_BLACK_TARGET_RESEARCH_PERPLANET]])
+* [[STAR_NEUTRON]] (+[[value LRN_STELLAR_TOMO_NEUTRON_TARGET_RESEARCH_PERPLANET]])
+* [[STAR_BLUE]], [[STAR_WHITE]], [[STAR_YELLOW]], [[STAR_ORANGE]] or [[STAR_RED]] (+[[value LRN_STELLAR_TOMO_NORMAL_STAR_TARGET_RESEARCH_PERPLANET]])
 
 A network of specialized satellites can use tomographic methods to reconstruct the activities occurring deep within a star. These otherwise costly-to-produce conditions are ideal for a variety of research endeavors, with larger benefits for more exotic star types.'''
-
-LRN_STELLAR_TOMO_BLACK_TARGET_RESEARCH_PERPOP
-per population
-
-LRN_STELLAR_TOMO_NEUTRON_TARGET_RESEARCH_PERPOP
-per population
-
-LRN_STELLAR_TOMO_BRIGHT_TARGET_RESEARCH_PERPOP
-per population
-
-LRN_STELLAR_TOMO_DIME_TARGET_RESEARCH_PERPOP
-per population
 
 LRN_SPATIAL_DISTORT_GEN
 Spatial Distortion
@@ -12700,9 +12651,6 @@ DEF_ROOT_DEFENSE_DESC
 
 The concept of 'self defense' is at the root of many avenues of technological advance.'''
 
-BASIC_DEFENSE_TROOPS_MAX_TROOPS_PERPOP
-per population
-
 DEF_GARRISON_1
 Planetary Bunker Complex
 
@@ -12715,9 +12663,6 @@ Defensive Militia Training
 DEF_GARRISON_2_DESC
 Increases max [[metertype METER_TROOPS]] on all planets by [[value GARRISON_2_MAX_TROOPS_PERPOP]] per [[metertype METER_POPULATION]] (modified by species defensive trait), and causes troops to regenerate by an additional [[value GARRISON_2_TROOPREGEN_FLAT]] per turn.
 
-GARRISON_2_MAX_TROOPS_PERPOP
-per population
-
 DEF_GARRISON_3
 Planetary Fortification Network
 
@@ -12729,9 +12674,6 @@ Planetary Guard Brigades
 
 DEF_GARRISON_4_DESC
 Increases max [[metertype METER_TROOPS]] on all planets by [[value GARRISON_4_MAX_TROOPS_PERPOP]] per [[metertype METER_POPULATION]] (modified by species defensive trait), and causes troops to regenerate by an additional [[value GARRISON_4_TROOPREGEN_FLAT]] per turn in addition to that from [[DEF_GARRISON_3]] and [[DEF_GARRISON_2]].
-
-GARRISON_4_MAX_TROOPS_PERPOP
-per population
 
 DEF_PLANET_CLOAK
 Planetary Cloaking Device
@@ -13134,9 +13076,6 @@ SHP_DEUTERIUM_TANK_EFFECT
 Tech <i>Deuterium Fuel</i>
 
 # value ref description
-SHP_DEUTERIUM_TANK_EFFECT_MULT
-per tank part
-
 SHP_ANTIMATTER_TANK
 Antimatter Fuel
 
@@ -13147,9 +13086,6 @@ SHP_ANTIMATTER_TANK_EFFECT
 Tech <i>Antimatter Fuel</i>
 
 # value ref description
-SHP_ANTIMATTER_TANK_EFFECT_MULT
-per tank part
-
 SHP_ZERO_POINT
 Zero-Point Fuel Generator
 
@@ -13264,7 +13200,9 @@ SHP_SENT_HULL
 Sentient Hull
 
 SHP_SENT_HULL_DESC
-This self-aware flagship has powerful analytical abilities and a tremendous memory capacity, which allow it to direct friendly vessels and provide them with useful information and subtle tactical cues in combat.
+'''This self-aware flagship has powerful analytical abilities and a tremendous memory capacity, which allow it to direct friendly vessels and provide them with useful information and subtle tactical cues in combat.
+
+Empires that control at least one ship with this hull also receive an extra military policy slot.'''
 
 SHP_BIOINTERCEPTOR
 Biointerceptors
@@ -13396,9 +13334,6 @@ BLD_CULTURE_ARCHIVES_DESC
 '''Increases [[metertype METER_TARGET_RESEARCH]] by [[value BLD_CULTURE_ARCHIVES_TARGET_RESEARCH_FLAT]] and [[metertype METER_TARGET_INDUSTRY]] by [[value BLD_CULTURE_ARCHIVES_TARGET_INDUSTRY_PERPOP]] per [[metertype METER_POPULATION]].
 
 Stores the sum accumulated knowledge from thousands of years of life on this planet, improving many aspects of planetary productivity.'''
-
-BLD_CULTURE_ARCHIVES_TARGET_INDUSTRY_PERPOP
-per population
 
 BLD_CULTURE_LIBRARY
 Cultural Library
@@ -13573,15 +13508,6 @@ BLD_INDUSTRY_CENTER_DESC
 
 [[tech PRO_INDUSTRY_CENTER_III]] refinement further increases the bonus to [[value BLD_INDUSTRY_CENTER_3_TARGET_INDUSTRY_PERPOP]] per population.'''
 
-BLD_INDUSTRY_CENTER_1_TARGET_INDUSTRY_PERPOP
-per population
-
-BLD_INDUSTRY_CENTER_2_TARGET_INDUSTRY_PERPOP
-per population
-
-BLD_INDUSTRY_CENTER_3_TARGET_INDUSTRY_PERPOP
-per population
-
 BLD_INTERSPECIES_ACADEMY
 Species InterDesign Academy
 
@@ -13647,12 +13573,6 @@ BLD_COLLECTIVE_NET_DESC
 
 By transferring the mind into cyberspace, thousands of minds can act as one, solving problems and making breakthroughs that no single mind could.'''
 
-BLD_COLLECTIVE_NET_TARGET_INDUSTRY_PERPOP
-per population
-
-BLD_COLLECTIVE_NET_TARGET_RESEARCH_PERPOP
-per population
-
 BLD_GATEWAY_VOID
 Gateway to the Void
 
@@ -13669,9 +13589,6 @@ BLD_ENCLAVE_VOID_DESC
 Multiple copies do not stack.
 
 The population of an entire planet is genetically attuned to the Void Mind and dedicated to channeling its wisdom to the empire. The denizens of the Void Enclave are regarded as priests, channels of higher thinking and wisdom. In all matters of importance to the empire, their advice is sought after. Emissaries from the Enclave can even be sent to assist in the empire's research projects.'''
-
-BLD_ENCLAVE_VOID_TARGET_RESEARCH_PERPOP
-per population
 
 BLD_ART_BLACK_HOLE
 Artificial Black Hole
@@ -13694,13 +13611,7 @@ BLD_HYPER_DAM_DESC
 
 A tear in the fabric of the universe, safely controlled and harnessed. Each planet may construct its own hyperspatial dams, but a single control center is required to ensure that the space-time continuum is not torn apart by the stresses. Additionally, all planets who use hyperspatial dams experience health problems, unless they are orbiting a [[STAR_BLACK]].
 
-NB: This building does nothing for planets that are connected to a [[buildingtype BLD_BLACK_HOLE_POW_GEN]], but can be useful for empires unable to establish such a device.'''
-
-BLD_HYPER_DAM_TARGET_INDUSTRY_PERPOP
-per population
-
-BLD_HYPER_DAM_TARGET_POPULATION_PERSIZE
-per planet size
+This building does nothing for planets that are connected to a [[buildingtype BLD_BLACK_HOLE_POW_GEN]], but can be useful for empires unable to establish such a device.'''
 
 BLD_SOL_ACCEL
 Solar Accelerator
@@ -13714,20 +13625,11 @@ Solar Orbital Generator
 BLD_SOL_ORB_GEN_DESC
 '''Increases [[metertype METER_TARGET_INDUSTRY]] on [[metertype METER_SUPPLY]] line connected planets, per [[metertype METER_POPULATION]] and depending on the star type:
 * [[STAR_BLUE]] or [[STAR_WHITE]] (x[[value BLD_SOL_ORB_GEN_BRIGHT_TARGET_INDUSTRY_PERPOP]])
-* [[STAR_YELLOW]] or [[STAR_ORANGE]] (x[[BLD_SOL_ORB_GEN_NORMAL_TARGET_INDUSTRY_PERPOP]])
+* [[STAR_YELLOW]] or [[STAR_ORANGE]] (x[[value BLD_SOL_ORB_GEN_NORMAL_TARGET_INDUSTRY_PERPOP]])
 * [[STAR_RED]] (x[[value BLD_SOL_ORB_GEN_DIM_TARGET_INDUSTRY_PERPOP]])
 [[NO_STACK_SUPPLY_CONNECTION_TEXT]] The best bonus applies.
 
 A power generator in low solar orbit designed to tap directly into the star's energy. Since different star types produce different amounts of energy, the system-wide industry bonus is dependent on star type. [[BUILDING_AVAILABLE_ON_OUTPOSTS]].'''
-
-BLD_SOL_ORB_GEN_BRIGHT_TARGET_INDUSTRY_PERPOP
-per population
-
-BLD_SOL_ORB_GEN_NORMAL_TARGET_INDUSTRY_PERPOP
-per population
-
-BLD_SOL_ORB_GEN_DIM_TARGET_INDUSTRY_PERPOP
-per population
 
 BLD_CLONING_CENTER
 Cloning Center
@@ -13795,9 +13697,6 @@ If removed, leaves a [[buildingtype BLD_CONC_CAMP_REMNANT]] for several more tur
 
 Ridding a planet of an undesirable species allows the introduction of a more suited species. By creating a planet-wide network of concentration camps designed to work the citizens to death, this goal can be achieved quickly and efficiently.'''
 
-BLD_CONC_CAMP_TARGET_INDUSTRY_PERPOP
-per population
-
 BLD_CONC_CAMP_REMNANT
 Concentration Camp Remnants
 
@@ -13813,16 +13712,13 @@ BLD_BLACK_HOLE_POW_GEN_DESC
 
 [[BUILDING_AVAILABLE_ON_OUTPOSTS]], but must be in a [[STAR_BLACK]] system.'''
 
-BLD_BLACK_HOLE_POW_GEN_TARGET_INDUSTRY_PERPOP
-per population
-
 BLD_PLANET_DRIVE
 Planetary Starlane Drive
 
 BLD_PLANET_DRIVE_DESC
 '''Allows a planet to move between star systems. An [[buildingtype BLD_LIGHTHOUSE]] is required within 200 uu of the target system to allow the planet to proceed safely. Otherwise, the planet will have a 50% chance of being destroyed in transit. This is a hazardous journey even if the planet survives however, and only half the [[metertype METER_POPULATION]] of a planet will live even with support from the Interstellar Lighthouse. [[BUILDING_AVAILABLE_ON_OUTPOSTS]], but cannot be used unless the planet is colonised.
 
-Due to a lack of UI targeting, either a [[buildingtype BLD_PLANET_BEACON]] or a ship equipped with a [[shippart SP_PLANET_BEACON]] currently required on the other end of the starlane. This building will destroy itself immediately, so that the planet can move to a different target system later.
+Either a [[buildingtype BLD_PLANET_BEACON]] or a ship equipped with a [[shippart SP_PLANET_BEACON]] is required on the other end of the starlane. This building will destroy itself immediately, so that the planet can move to a different target system later.
 
 To use this building, either construct a [[buildingtype BLD_PLANET_BEACON]] in the adjacent destination system or move a ship with a [[shippart SP_PLANET_BEACON]] there, then set the planet to Planet Drive focus. The planet will then be moved to that system. Note the beacon needs to have been in system for a turn: the drive will not work on the turn the building is completed or on the turn the ship arrives. Also note, a [[buildingtype BLD_TRANSFORMER]] can be used to replicate the effects of this building.
 
@@ -15152,7 +15048,9 @@ Organic Growth: Starts with 12 [[metertype METER_STRUCTURE]], grows an additiona
 
 [[LIVING_HULL_AUTO_REGEN]]
 
-[[BLD_SHIPYARD_BASE_ORG_ORB_INC_ORG_XENO_FAC_ORG_CELL_GRO_CHAMB_REQUIRED]]'''
+[[BLD_SHIPYARD_BASE_ORG_ORB_INC_ORG_XENO_FAC_ORG_CELL_GRO_CHAMB_REQUIRED]]
+
+Empires that control at least one ship with this hull also receive an extra military policy slot.'''
 
 SH_COMPRESSED_ENERGY
 Compressed Energy Hull

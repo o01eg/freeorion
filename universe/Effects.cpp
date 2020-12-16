@@ -58,7 +58,7 @@ namespace {
 
         // if aggression specified, use that, otherwise get from whether ship is armed
         FleetAggression new_aggr = aggression == FleetAggression::INVALID_FLEET_AGGRESSION ?
-            (ship->IsArmed() ? FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_PASSIVE) :
+            (ship->IsArmed() ? FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_DEFENSIVE) :
             (aggression);
         fleet->SetAggression(new_aggr);
 
@@ -142,7 +142,7 @@ namespace {
         int dest_system = fleet->FinalDestinationID();
 
         std::pair<std::list<int>, double> route_pair =
-            GetPathfinder()->ShortestPath(start_system, dest_system, fleet->Owner());
+            GetPathfinder()->ShortestPath(start_system, dest_system, fleet->Owner(), objects);
 
         // if shortest path is empty, the route may be impossible or trivial, so just set route to move fleet
         // to the next system that it was just set to move to anyway.
@@ -2924,7 +2924,8 @@ void SetDestination::Execute(ScriptingContext& context) const {
         return;
 
     // find shortest path for fleet's owner
-    std::pair<std::list<int>, double> short_path = universe.GetPathfinder()->ShortestPath(start_system_id, destination_system_id, target_fleet->Owner());
+    std::pair<std::list<int>, double> short_path = universe.GetPathfinder()->ShortestPath(
+        start_system_id, destination_system_id, target_fleet->Owner(), context.ContextObjects());
     const std::list<int>& route_list = short_path.first;
 
     // reject empty move paths (no path exists).
@@ -2990,6 +2991,7 @@ std::string SetAggression::Dump(unsigned short ntabs) const {
         switch(aggr) {
         case FleetAggression::FLEET_AGGRESSIVE:  return "SetAggressive";  break;
         case FleetAggression::FLEET_OBSTRUCTIVE: return "SetObstructive"; break;
+        case FleetAggression::FLEET_DEFENSIVE:   return "SetDefensive";   break;
         case FleetAggression::FLEET_PASSIVE:     return "SetPassive";     break;
         default:                                 return "Set???";         break;
         }

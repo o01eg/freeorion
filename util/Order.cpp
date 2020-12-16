@@ -120,9 +120,10 @@ void RenameOrder::ExecuteImpl() const {
 ////////////////////////////////////////////////
 NewFleetOrder::NewFleetOrder(int empire, std::string fleet_name,
                              std::vector<int> ship_ids,
-                             bool aggressive, bool passive) :
+                             bool aggressive, bool passive, bool defensive) :
     NewFleetOrder(empire, std::move(fleet_name), std::move(ship_ids),
                   aggressive ? FleetAggression::FLEET_AGGRESSIVE :
+                  defensive ? FleetAggression::FLEET_DEFENSIVE :
                   passive ? FleetAggression::FLEET_PASSIVE :
                   FleetAggression::FLEET_OBSTRUCTIVE)
 {}
@@ -147,6 +148,7 @@ std::string NewFleetOrder::Dump() const {
     const std::string& aggression_text =
         m_aggression == FleetAggression::FLEET_AGGRESSIVE ? UserString("FLEET_AGGRESSIVE") :
         m_aggression == FleetAggression::FLEET_OBSTRUCTIVE ? UserString("FLEET_OBSTRUCTIVE") :
+        m_aggression == FleetAggression::FLEET_DEFENSIVE ? UserString("FLEET_DEFENSIVE") :
         m_aggression == FleetAggression::FLEET_PASSIVE ? UserString("FLEET_PASSIVE") :
         UserString("INVALID_FLEET_AGGRESSION");
 
@@ -304,7 +306,7 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
     if (append && !fleet->TravelRoute().empty())
         start_system = fleet->TravelRoute().back();
 
-    auto short_path = GetPathfinder()->ShortestPath(start_system, m_dest_system, EmpireID());
+    auto short_path = GetPathfinder()->ShortestPath(start_system, m_dest_system, EmpireID(), Objects());
     if (short_path.first.empty()) {
         ErrorLogger() << "FleetMoveOrder generated empty shortest path between system " << start_system
                       << " and " << m_dest_system << " for empire " << EmpireID() << " with fleet " << fleet_id;

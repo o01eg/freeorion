@@ -1220,6 +1220,20 @@ Starlanes Everywhere
 RULE_STARLANES_EVERYWHERE_DESC
 Starlanes are generated between every pair of systems, regardless of geometry. Lanes may still be removed during a game, however. Lanes are also not rendered on the galaxy map.
 
+RULE_ALL_OBJECTS_VISIBLE
+All Objects Visible
+
+RULE_ALL_OBJECTS_VISIBLE_DESC
+All systems, planets, buildings, fleets, ships, and fields can be detected by all empires at at least partial visibility.
+
+RULE_UNSEEN_STEALTHY_PLANETS_INVISIBLE
+Undetectable Stealthy Planets
+
+RULE_UNSEEN_STEALTHY_PLANETS_INVISIBLE_DESC
+'''<u>If On</u>: Planets that have more stealth than an empire's detection strength cannot be detected by that empire just by having an object in the same system, unless that empire has previously detected that planet.
+
+<u>If Off</u>: Planets that have more stealth than an empire's detection strength are detectable by that empire if the empire owns another object in the same system.'''
+
 RULE_HABITABLE_SIZE_TINY
 Tiny planets Habitable size
 
@@ -11381,10 +11395,12 @@ PLC_CONFEDERATION
 Confederation
 
 PLC_CONFEDERATION_DESC
-'''Planets of the empire are organized in a confederacy of independent systems. Colonies do not suffer reduced influence if not connected to the capital, and get a boost to ground troops, but are slightly less stable in general.
+'''Planets of the empire are organized in a confederacy of independent systems.
 
-Increases max [[metertype METER_TROOPS]] by [[value PLC_CONFEDERATION_MAX_TROOPS_FLAT]] but reduces [[metertype METER_TARGET_HAPPINESS]] ([[value PLC_CONFEDERATION_TARGET_HAPPINESS_FLAT]]) in all planets.
-Increases [[metertype METER_TARGET_INFLUENCE]] on colonies disconnected from the capital by [[value PLC_CONFEDERATION_SUPPLY_DISCONNECTED_INFLUENCE_FLAT]].'''
+• Increases [[metertype METER_TARGET_INFLUENCE]] on colonies disconnected from the capital by [[value PLC_CONFEDERATION_SUPPLY_DISCONNECTED_INFLUENCE_FLAT]]
+• Increases [[metertype METER_TARGET_HAPPINESS]] on colonies disconnected from the capital and regional administrative centres by [[value DISCONNECTED_FROM_CAPITAL_AND_REGIONAL_ADMIN_STABILITY_PENALTY]]
+• Reduces [[metertype METER_TARGET_HAPPINESS]] ([[value PLC_CONFEDERATION_TARGET_HAPPINESS_FLAT]]) on all planets
+• Increases max [[metertype METER_TROOPS]] by [[value PLC_CONFEDERATION_MAX_TROOPS_FLAT]]'''
 
 PLC_CONFEDERATION_SHORT_DESC
 Supports disconnected systems
@@ -11417,9 +11433,18 @@ PLC_NATIVE_APPROPRIATION
 Native Appropriation
 
 PLC_NATIVE_APPROPRIATION_DESC
-Increasess research on research-focused planets in systems that also contain unowned native-populated planets.
+Increasess [[metertype METER_TARGET_RESEARCH]] on research-focused planets in systems that also contain unowned native-populated planets.
 
 PLC_NATIVE_APPROPRIATION_SHORT_DESC
+Boosts Research
+
+PLC_ALGORITHMIC_RESEARCH
+Algorithmic Research
+
+PLC_ALGORITHMIC_RESEARCH_DESC
+Increases [[metertype METER_TARGET_RESEARCH]] on research-focused planets by [[value LRN_ALGO_RESEARCH_TARGET_RESEARCH_PERCONSTRUCTION]] per the lesser of [[metertype METER_POPULATION]] or [[metertype METER_CONSTRUCTION]].
+
+PLC_ALGORITHMIC_RESEARCH_SHORT_DESC
 Boosts Research
 
 
@@ -11589,9 +11614,7 @@ LRN_ALGO_ELEGANCE
 Algorithmic Elegance
 
 LRN_ALGO_ELEGANCE_DESC
-'''Increases [[metertype METER_TARGET_RESEARCH]] on all Research focused planets by [[value LRN_ALGO_ELEGANCE_TARGET_RESEARCH_PERPOP]] per [[metertype METER_POPULATION]].
-
-With greater and greater difficulty of data analysis problems, traditional measures of algorithm performance become less useful due to the limitations of irreducible complexity. At this stage, other measures of algorithm form and function become significant; aesthetically and metaphorically, the elegance of the solution must be optimized.'''
+With greater reliance on data analytics, traditional measures of algorithm performance become less useful due to the limitations of irreducible complexity. At this stage, other measures of algorithm form and function become significant; aesthetically and metaphorically, the elegance of the solution must be optimized.
 
 LRN_TRANSLING_THT
 Translinguistics
@@ -11616,14 +11639,6 @@ LRN_NASCENT_AI_DESC
 While traditional computers have nearly unfathomable intelligence and computational abilities, they lack the essential qualities of self-awareness, consciousness or sentience. While these traits remain elusive, reasonable facsimiles may be produced. These investigations open new avenues of research into cognitive sciences and novel metaparadigms.
 
 Nascent AIs can input all data discovered by active researchers into a single automatic data processing network, data can be analyzed and new data obtained by an entirely automated research facility. Each planet can contain such structures regardless of the population's occupations, giving a bonus to research on all worlds.'''
-
-LRN_ARTIF_MINDS
-Artificial Minds
-
-LRN_ARTIF_MINDS_DESC
-'''Increases [[metertype METER_TARGET_RESEARCH]] on all Research focused planets by [[value LRN_ARTIF_MINDS_TARGET_RESEARCH_FLAT]].
-
-Artificial minds are the epitome of the research on cognitive sciences. These are not facsimiles of self-awareness, consciousness or sentience, but the true attainment of such qualities within an artificial being. This sentient devices can expand on their own the limits of science and research, identifying by themselves new ways of data processing and deduction of knowledge. Each planet can contain such structures, if properly maintained and assisted by researchers.'''
 
 LRN_XENOARCH
 Xenoarchaeology
@@ -12030,7 +12045,7 @@ CON_CONTGRAV_ARCH
 Gravitic Architecture
 
 CON_CONTGRAV_ARCH_DESC
-'''Increases the [[metertype METER_SUPPLY]] line range of all colonies and outposts by 1.
+'''Increases the [[metertype METER_SUPPLY]] line range by 1 of colonies set to Logistics focus.
 
 By installing a massive null gravity generator at a planet's core, it becomes possible to turn a planet's gravity on or off like a light switch, but in a narrow well. The planet's industry then gains all the benefits of low-G and zero-G, but without the drawbacks. Reverse gravity wells can also be created, making space launches cost practically nothing.
 
@@ -12040,11 +12055,9 @@ CON_GAL_INFRA
 Galactic Infrastructure
 
 CON_GAL_INFRA_DESC
-'''Increases the [[metertype METER_SUPPLY]] line range of all colonies and outposts by 1.
+'''The consistent and effective transportation of resources over large interstellar distances requires laborious planning, and is complicated by numerous factors such as the presence of space monsters, enemy empires and dangerous interstellar phenomena. By utilizing integrated galactic infrastructure, the fluid deployment of resources between advanced and developing colonies can be achieved, and solutions can be found to particularly troubling logistical problems.
 
-The consistent and effective transportation of resources over large interstellar distances requires laborious planning, and is complicated by numerous factors such as the presence of space monsters, enemy empires and dangerous interstellar phenomena. By utilizing integrated galactic infrastructure, the fluid deployment of resources between advanced and developing colonies can be achieved, and solutions can be found to particularly troubling logistical problems.
-
-Integration and development of the infrastructures on highly productive worlds into a unified galaxy-spanning network is one of the greatest logistical effort conceivable. When completed, such a system functionally unifies the worlds of which it is composed. Integrated transportation, housing, maintenance, and construction tools may be fluidly deployed wherever needed to optimally alter resource allocations or adjust to changes.'''
+Integration and development of regional administration into a unified galaxy-spanning network is one of the greatest logistical effort conceivable.'''
 
 CON_ART_HEAVENLY
 Artificial Heavenly Bodies
@@ -12477,7 +12490,7 @@ LRN_DISTRIB_THOUGHT
 Distributed Thought Computing
 
 LRN_DISTRIB_THOUGHT_DESC
-'''Increases [[metertype METER_TARGET_RESEARCH]] on all planets with any focus by [[value LRN_DISTRIB_THOUGHT_TARGET_RESEARCH_PERPOP]] per [[metertype METER_POPULATION]].
+'''Increases [[metertype METER_TARGET_RESEARCH]] on all planets with research focus, dependent on the distance from the planet to the furthest-away ship owned by its empire.
 
 Grants 1 extra military policy slot.
 
@@ -13277,13 +13290,21 @@ SHP_CHAOS_WAVE_DESC
 Unlocks the [[shippart SP_CHAOS_WAVE]] ship part, [[SHIP_WEAPON_QUICKLY_REDUCE]] [[ENEMY_PLANET_ANY_POP]].
 
 SPY_PLANET_STEALTH_MOD
-Planet Stealth Modifier
+Stealth Modifiers
 
 SPY_PLANET_STEALTH_MOD_DESC
-Increases the natural [[metertype METER_STEALTH]] of all planets to 5, so that there isn't a clash between detection and stealth values.
+'''Increases the natural [[metertype METER_STEALTH]] of all planets by 5.
+
+Reduces the stealth of ships when they are in the same system with more than [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] ships of the same empire.'''
 
 BASIC_PLANET_STEALTH
 Universal Basic Stealth
+
+FLEET_UNSTEALTHINESS
+Fleet Unstealthiness
+
+FLEET_UNSTEALTHY_SHIPS_THRESHOLD
+Number of ships in a system owned by the same empire, above which ships receive a stealth penalty
 
 
 ##
@@ -13355,13 +13376,25 @@ BLD_IMPERIAL_PALACE
 Imperial Palace
 
 BLD_IMPERIAL_PALACE_DESC
-'''Increases [[metertype METER_SUPPLY]] line range by [[value BLD_IMPERIAL_PALACE_MAX_SUPPLY_FLAT]], [[metertype METER_TARGET_INFLUENCE]] by [[value BLD_IMPERIAL_PALACE_TARGET_INFLUENCE_FLAT]], [[metertype METER_TARGET_CONSTRUCTION]] by [[value BLD_IMPERIAL_PALACE_TARGET_CONSTRUCTION_FLAT]], [[metertype METER_DEFENSE]] by [[value BLD_IMPERIAL_PALACE_MAX_DEFENSE_FLAT], and [[metertype METER_TROOPS]] by [[value BLD_IMPERIAL_PALACE_MAX_TROOPS_FLAT]] of the planet it is built on.
+'''On the planet it is built on, increases:
+• [[metertype METER_SUPPLY]] line range by [[value BLD_IMPERIAL_PALACE_MAX_SUPPLY_FLAT]]
+• [[metertype METER_TARGET_INFLUENCE]] by [[value BLD_IMPERIAL_PALACE_TARGET_INFLUENCE_FLAT]]
+• [[metertype METER_TARGET_CONSTRUCTION]] by [[value BLD_IMPERIAL_PALACE_TARGET_CONSTRUCTION_FLAT]]
+• [[metertype METER_TARGET_HAPPINESS]] by [[value BLD_IMPERIAL_PALACE_TARGET_HAPPINESS_FLAT]]
+• [[metertype METER_DEFENSE]] by [[value BLD_IMPERIAL_PALACE_MAX_DEFENSE_FLAT]]
+• [[metertype METER_TROOPS]] by [[value BLD_IMPERIAL_PALACE_MAX_TROOPS_FLAT]]
 
 Grants 1 economic policy slot.
 
 Sets the owner's Capital for the empire.
 
 Represents imperial power and prestige and functions as a center of control for the empire's holdings.'''
+
+BLD_REGIONAL_ADMIN
+Imperial Regional Administration
+
+BLD_REGIONAL_ADMIN_DESC
+Acts like an [[buildingtype BLD_IMPERIAL_PALACE]] / imperial capital for purposes of distance-dependent planet stability.
 
 BLD_MILITARY_COMMAND
 Military Command
@@ -16195,6 +16228,18 @@ Homeworld
 
 CAPITAL_LABEL
 Capital
+
+CAPITAL_CONNECTION_LABEL
+Good Capital Supply Connection
+
+CAPITAL_POOR_CONNECTION_LABEL
+Weak Capital Supply Connection
+
+IMPERIAL_PALACE_SPECIES_HAPPINESS
+Imperial Capital Species
+
+SELF_RELIANCE
+Self-Reliance
 
 BLD_STOCKPILING_CENTER_LABEL
 Imperial Entanglement Center

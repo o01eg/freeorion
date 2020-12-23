@@ -27,7 +27,7 @@ Species
         [[GOOD_INFLUENCE]]
 
         [[AVERAGE_POPULATION]]
-        [[AVERAGE_HAPPINESS]]
+        [[INDEPENDENT_HAPPINESS]]
         [[VERY_BAD_SUPPLY]]
         [[GREAT_DEFENSE_TROOPS]]
         [[BAD_OFFENSE_TROOPS]]

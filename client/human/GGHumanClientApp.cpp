@@ -208,7 +208,7 @@ std::string GGHumanClientApp::EncodeServerAddressOption(const std::string& serve
 
 GGHumanClientApp::GGHumanClientApp(int width, int height, bool calculate_fps, std::string name,
                                int x, int y, bool fullscreen, bool fake_mode_change) :
-    ClientApp(),
+    HumanClientApp(),
     SDLGUI(width, height, calculate_fps, std::move(name), x, y, fullscreen, fake_mode_change)
 {
 #ifdef ENABLE_CRASH_BACKTRACE

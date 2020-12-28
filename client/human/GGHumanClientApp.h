@@ -1,7 +1,7 @@
 #ifndef _GGHumanClientApp_h_
 #define _GGHumanClientApp_h_
 
-#include "../ClientApp.h"
+#include "../HumanClientApp.h"
 #include "../../util/Process.h"
 #include "../../UI/SDLGUI.h"
 #include "../../UI/ClientUI.h"
@@ -18,7 +18,7 @@ struct PreviewInformation;
 
 /** the application framework class for the human player FreeOrion client. */
 class GGHumanClientApp :
-    public ClientApp,
+    public HumanClientApp,
     public SDLGUI
 {
 public:

@@ -1,9 +1,9 @@
 #ifndef _ClientAppFixture_h_
 #define _ClientAppFixture_h_
 
-#include "client/ClientApp.h"
+#include "client/HumanClientApp.h"
 
-class ClientAppFixture : public ClientApp {
+class ClientAppFixture : public HumanClientApp {
 public:
     ClientAppFixture();
 

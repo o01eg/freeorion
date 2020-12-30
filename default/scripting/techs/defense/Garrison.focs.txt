@@ -99,6 +99,7 @@ Tech
     researchturns = 9
     tags = [ "PEDIA_DEFENSE_CATEGORY" ]
     prerequisites = "DEF_GARRISON_3"
+    unlock = Item type = Policy name = "PLC_MARTIAL_LAW"
     effectsgroups = [
         EffectsGroup
             scope = And [
@@ -120,7 +121,7 @@ Tech
             stackinggroup = "GARRISON_4_TROOPS_STACK"
             accountinglabel = "DEF_GARRISON_4"
             effects = SetMaxTroops value = Value + Target.Population *
-                (NamedReal name = "GARRISON_4_MAX_TROOPS_FLAT" value = 3 * [[TROOPS_PER_POP]])
+                (NamedReal name = "GARRISON_4_MAX_TROOPS_PERPOP" value = 3 * [[TROOPS_PER_POP]])
     ]
     graphic = "icons/tech/troops.png"
 

@@ -6,6 +6,9 @@
 #include "Enum.h"
 #include "Export.h"
 
+#if defined(FREEORION_ANDROID)
+#  include <jni.h>
+#endif
 
 //! Types of root directories
 FO_ENUM(
@@ -113,6 +116,11 @@ FO_COMMON_API auto GetBinDir() -> boost::filesystem::path const;
 FO_COMMON_API auto GetPythonHome() -> boost::filesystem::path const;
 #endif
 
+#if defined(FREEORION_ANDROID)
+//! Sets android environment to access directories
+FO_COMMON_API void SetAndroidEnvironment(JNIEnv* env, jobject activity);
+#endif
+
 //! Returns the full path to the configfile.
 FO_COMMON_API auto GetConfigPath() -> boost::filesystem::path const;
 
@@ -161,4 +169,7 @@ FO_COMMON_API auto GetPath(std::string const& path_string) -> boost::filesystem:
 
 //! Returns true iff path exists and is a regular file
 FO_COMMON_API auto IsExistingFile(boost::filesystem::path const& path) -> bool;
+
+//! Reads text file content from @p path and returs true if success
+FO_COMMON_API auto ReadFile(boost::filesystem::path const& path, std::string& file_contents) -> bool;
 #endif

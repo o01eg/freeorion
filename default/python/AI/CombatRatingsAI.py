@@ -1,5 +1,4 @@
 from collections import Counter
-from functools import reduce
 from logging import warning, error
 
 import freeOrionAIInterface as fo
@@ -9,7 +8,7 @@ from EnumsAI import MissionType
 from freeorion_tools import dict_to_tuple, tuple_to_dict, cache_for_current_turn
 from ShipDesignAI import get_ship_part
 from AIDependencies import INVALID_ID, CombatTarget
-
+from freeorion_tools import combine_ratings
 
 _issued_errors = []
 
@@ -27,15 +26,15 @@ def get_allowed_targets(partname: str) -> int:
 
 
 @cache_for_current_turn
-def get_empire_standard_fighter():
-    """Get the current empire standard fighter stats, i.e. the most common shiptype within the empire.
+def get_empire_standard_military_ship_stats():
+    """Get the current empire standard military ship stats, i.e. the most common ship type within the empire.
 
-    :return: Stats of most common fighter in the empire
+    :return: Stats of most common military ship in the empire
     :rtype: ShipCombatStats
     """
     stats_dict = Counter()
     for fleet_id in FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.MILITARY):
-        ship_stats = FleetCombatStats(fleet_id, consider_refuel=True).get_ship_combat_stats()
+        ship_stats = FleetCombatStats(fleet_id, max_stats=True).get_ship_combat_stats()
         stats_dict.update(ship_stats)
 
     most_commons = stats_dict.most_common(1)
@@ -145,9 +144,9 @@ class ShipCombatStats:
         def __str__(self):
             return str(self.get_stats())
 
-    def __init__(self, ship_id=INVALID_ID, consider_refuel=False, stats=None):
+    def __init__(self, ship_id=INVALID_ID, max_stats=False, stats=None):
         self.__ship_id = ship_id
-        self._consider_refuel = consider_refuel
+        self._max_stats = max_stats
         if stats:
             self._basic_stats = self.BasicStats(*stats[0:3])  # TODO: Should probably determine size dynamically
             self._fighter_stats = self.FighterStats(*stats[3:6])
@@ -173,7 +172,7 @@ class ShipCombatStats:
         if not ship:
             return  # TODO: Add some estimate for stealthed ships
 
-        if self._consider_refuel:
+        if self._max_stats:
             structure = ship.initialMeterValue(fo.meterType.maxStructure)
             shields = ship.initialMeterValue(fo.meterType.maxShield)
         else:
@@ -189,7 +188,7 @@ class ShipCombatStats:
         damage_vs_planets = 0
         design = ship.design
         if design and (ship.isArmed or ship.hasFighters):
-            meter_choice = fo.meterType.maxCapacity if self._consider_refuel else fo.meterType.capacity
+            meter_choice = fo.meterType.maxCapacity if self._max_stats else fo.meterType.capacity
             for partname in design.parts:
                 if not partname:
                     continue
@@ -270,19 +269,11 @@ class ShipCombatStats:
         # The fighter rating calculations are heavily based upon the enemy stats.
         # So, for now, we compare at least against a certain standard enemy.
         enemy_stats = enemy_stats or get_aistate().get_standard_enemy()
-
         my_attacks, my_structure, my_shields = self.get_basic_stats()
         # e_avg_attack = 1
         if enemy_stats:
             e_attacks, e_structure, e_shields = enemy_stats.get_basic_stats()
-            if e_attacks:
-                # e_num_attacks = sum(n for n in e_attacks.values())
-                e_total_attack = sum(n*dmg for dmg, n in e_attacks.items())
-                # e_avg_attack = e_total_attack / e_num_attacks
-                e_net_attack = sum(n*max(dmg - my_shields, .001) for dmg, n in e_attacks.items())
-                e_net_attack = max(e_net_attack, .1*e_total_attack)
-                shield_factor = e_total_attack / e_net_attack
-                my_structure *= max(1, shield_factor)
+            my_structure *= self.__calculate_shield_factor(e_attacks, my_shields)
             my_total_attack = sum(n*max(dmg - e_shields, .001) for dmg, n in my_attacks.items())
         else:
             my_total_attack = sum(n*dmg for dmg, n in my_attacks.items())
@@ -290,12 +281,29 @@ class ShipCombatStats:
 
         if ignore_fighters:
             return _rating()
-
         my_total_attack += self.estimate_fighter_damage()
 
         # TODO: Consider enemy fighters
 
         return _rating()
+
+    def __calculate_shield_factor(self, e_attacks: dict, my_shields: float) -> float:
+        """
+        Calculates shield factor based on enemy attacks and our shields.
+
+        It is possible to have e_attacks with number attacks == 0,
+        in that case we consider that there is an issue with the enemy stats and we jut set value to 1.0.
+        """
+        if not e_attacks:
+            return 1.0
+        e_total_attack = sum(n * dmg for dmg, n in e_attacks.items())
+        if e_total_attack:
+            e_net_attack = sum(n * max(dmg - my_shields, .001) for dmg, n in e_attacks.items())
+            e_net_attack = max(e_net_attack, .1 * e_total_attack)
+            shield_factor = e_total_attack / e_net_attack
+            return max(1.0, shield_factor)
+        else:
+            return 1.0
 
     def estimate_fighter_damage(self):
         capacity, launch_rate, fighter_damage = self.get_fighter_stats()
@@ -337,9 +345,9 @@ class ShipCombatStats:
 
 class FleetCombatStats:
     """Stores combat related stats of the fleet."""
-    def __init__(self, fleet_id=INVALID_ID, consider_refuel=False):
+    def __init__(self, fleet_id=INVALID_ID, max_stats=False):
         self.__fleet_id = fleet_id
-        self._consider_refuel = consider_refuel
+        self._max_stats = max_stats
         self.__ship_stats = []
         self.__get_stats_from_fleet()
 
@@ -367,10 +375,10 @@ class FleetCombatStats:
         :return: Rating of the fleet
         :rtype: float
         """
-        return combine_ratings_list([x.get_rating(enemy_stats, ignore_fighters) for x in self.__ship_stats])
+        return combine_ratings(x.get_rating(enemy_stats, ignore_fighters) for x in self.__ship_stats)
 
     def get_rating_vs_planets(self):
-        return combine_ratings_list([x.get_rating_vs_planets() for x in self.__ship_stats])
+        return combine_ratings(x.get_rating_vs_planets() for x in self.__ship_stats)
 
     def __get_stats_from_fleet(self):
         """Calculate fleet combat stats (i.e. the stats of all its ships)."""
@@ -379,7 +387,7 @@ class FleetCombatStats:
         if not fleet:
             return
         for ship_id in fleet.shipIDs:
-            self.__ship_stats.append(ShipCombatStats(ship_id, self._consider_refuel))
+            self.__ship_stats.append(ShipCombatStats(ship_id, self._max_stats))
 
 
 def get_fleet_rating(fleet_id, enemy_stats=None):
@@ -392,15 +400,15 @@ def get_fleet_rating(fleet_id, enemy_stats=None):
     :return: Rating
     :rtype: float
     """
-    return FleetCombatStats(fleet_id, consider_refuel=False).get_rating(enemy_stats)
+    return FleetCombatStats(fleet_id, max_stats=False).get_rating(enemy_stats)
 
 
 def get_fleet_rating_against_planets(fleet_id):
-    return FleetCombatStats(fleet_id, consider_refuel=False).get_rating_vs_planets()
+    return FleetCombatStats(fleet_id, max_stats=False).get_rating_vs_planets()
 
 
 def get_ship_rating(ship_id, enemy_stats=None):
-    return ShipCombatStats(ship_id, consider_refuel=False).get_rating(enemy_stats)
+    return ShipCombatStats(ship_id, max_stats=False).get_rating(enemy_stats)
 
 
 def weight_attack_troops(troops, grade):
@@ -419,55 +427,6 @@ def weight_shields(shields, grade):
     """Re-weights shields based on species defense bonus."""
     offset = {'NO': 0, 'BAD': 0, '': 0, 'GOOD': 1.0, 'GREAT': 0, 'ULTIMATE': 0}.get(grade, 0)
     return shields + offset
-
-
-def combine_ratings(rating1, rating2):
-    """ Combines two combat ratings to a total rating.
-
-    The formula takes into account the fact that the combined strength of two ships is more than the
-    sum of its individual ratings. Basic idea as follows:
-
-    We use the following definitions
-
-    r: rating
-    a: attack
-    s: structure
-
-    where we take into account effective values after accounting for e.g. shields effects.
-
-    We generally define the rating of a ship as
-    r_i = a_i*s_i                                                                   (1)
-
-    A natural extension for the combined rating of two ships is
-    r_tot = (a_1+a_2)*(s_1+s_2)                                                     (2)
-
-    Assuming         a_i approx s_i                                                 (3)
-    It follows that  a_i approx sqrt(r_i) approx s_i                                (4)
-    And thus         r_tot = (sqrt(r_1)+sqrt(r_2))^2 = r1 + r2 + 2*sqrt(r1*r2)      (5)
-
-    Note that this function has commutative and associative properties.
-
-    :param rating1:
-    :type rating1: float
-    :param rating2:
-    :type rating2: float
-    :return: combined rating
-    :rtype: float
-    """
-    return rating1 + rating2 + 2 * (rating1 * rating2)**0.5
-
-
-def combine_ratings_list(ratings_list):
-    """ Combine ratings in the list.
-
-    Repetitively calls combine_ratings() until finished.
-
-    :param ratings_list: list of ratings to be combined
-    :type ratings_list: list
-    :return: combined rating
-    :rtype: float
-    """
-    return reduce(combine_ratings, ratings_list, 0)
 
 
 def rating_needed(target, current=0):

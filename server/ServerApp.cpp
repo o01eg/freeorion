@@ -2099,28 +2099,32 @@ namespace {
     /** Returns true if \a empire has been eliminated by the applicable
       * definition of elimination.  As of this writing, elimination means
       * having no ships and no population on planets. */
-    bool EmpireEliminated(int empire_id) {
+    bool EmpireEliminated(int empire_id, const ObjectMap& objects = Objects()) {
         // are there any populated planets? if so, not eliminated
         // are there any ships? if so, not eliminated
-        return !Objects().check_if_any<Planet>(PopulatedOwnedVisitor(empire_id)) &&
-               !Objects().check_if_any<Ship>(OwnedVisitor(empire_id));
+        return !objects.check_if_any<Planet>(PopulatedOwnedVisitor(empire_id)) &&
+               !objects.check_if_any<Ship>(OwnedVisitor(empire_id));
     }
 
-    void GetEmpireFleetsAtSystem(std::map<int, std::set<int>>& empire_fleets, int system_id) {
+    void GetEmpireFleetsAtSystem(std::map<int, std::set<int>>& empire_fleets, int system_id,
+                                 const ObjectMap& objects = Objects())
+    {
         empire_fleets.clear();
-        auto system = Objects().get<System>(system_id);
+        auto system = objects.get<System>(system_id);
         if (!system)
             return;
-        for (auto& fleet : Objects().find<const Fleet>(system->FleetIDs()))
+        for (auto& fleet : objects.find<const Fleet>(system->FleetIDs()))
             empire_fleets[fleet->Owner()].emplace(fleet->ID());
     }
 
-    void GetEmpirePlanetsAtSystem(std::map<int, std::set<int>>& empire_planets, int system_id) {
+    void GetEmpirePlanetsAtSystem(std::map<int, std::set<int>>& empire_planets, int system_id,
+                                  const ObjectMap& objects = Objects())
+    {
         empire_planets.clear();
-        auto system = Objects().get<System>(system_id);
+        auto system = objects.get<System>(system_id);
         if (!system)
             return;
-        for (auto& planet : Objects().find<const Planet>(system->PlanetIDs())) {
+        for (auto& planet : objects.find<const Planet>(system->PlanetIDs())) {
             if (!planet->Unowned())
                 empire_planets[planet->Owner()].emplace(planet->ID());
             else if (planet->GetMeter(MeterType::METER_POPULATION)->Initial() > 0.0f)
@@ -2128,28 +2132,38 @@ namespace {
         }
     }
 
-    void GetFleetsVisibleToEmpireAtSystem(std::set<int>& visible_fleets,
-                                          int empire_id, int system_id)
+    void GetFleetsVisibleToEmpireAtSystem(std::set<int>& visible_fleets, int empire_id, int system_id,
+                                          const ObjectMap& objects = Objects(),
+                                          const EmpireManager& empires = Empires(),
+                                          const Universe::EmpireObjectVisibilityMap& vis_map =
+                                              GetUniverse().GetEmpireObjectVisibility())
     {
         visible_fleets.clear();
-        auto system = Objects().get<System>(system_id);
+        auto system = objects.get<System>(system_id);
         if (!system)
             return; // no such system
         const auto& fleet_ids = system->FleetIDs();
         if (fleet_ids.empty())
             return; // no fleets to be seen
-        if (empire_id != ALL_EMPIRES && !GetEmpire(empire_id))
+        if (empire_id != ALL_EMPIRES && !empires.GetEmpire(empire_id))
             return; // no such empire
 
         TraceLogger(combat) << "\t** GetFleetsVisibleToEmpire " << empire_id << " at system " << system->Name();
         // for visible fleets by an empire, check visibility of fleets by that empire
         if (empire_id != ALL_EMPIRES) {
-            for (const auto& fleet : Objects().find<Fleet>(fleet_ids)) {
+            for (const auto& fleet : objects.find<Fleet>(fleet_ids)) {
                 if (!fleet)
                     continue;
                 if (fleet->OwnedBy(empire_id))
                     continue;   // don't care about fleets owned by the same empire for determining combat conditions
-                Visibility fleet_vis = GetUniverse().GetObjectVisibilityByEmpire(fleet->ID(), empire_id);
+
+                Visibility fleet_vis = Visibility::VIS_NO_VISIBILITY;
+                auto emp_it = vis_map.find(empire_id);
+                if (emp_it != vis_map.end()) {
+                    auto obj_it = emp_it->second.find(fleet->ID());
+                    if (obj_it != emp_it->second.end())
+                        fleet_vis = obj_it->second;
+                }
                 TraceLogger(combat) << "\t\tfleet (" << fleet->ID() << ") has visibility rank " << fleet_vis;
                 if (fleet_vis >= Visibility::VIS_BASIC_VISIBILITY)
                     visible_fleets.emplace(fleet->ID());
@@ -2163,7 +2177,7 @@ namespace {
 
         // get best monster detection strength here.  Use monster detection meters for this...
         float monster_detection_strength_here = 0.0f;
-        for (const auto& ship : Objects().find<Ship>(system->ShipIDs())) {
+        for (const auto& ship : objects.find<Ship>(system->ShipIDs())) {
             if (!ship || !ship->Unowned())  // only want unowned / monster ships
                 continue;
             if (ship->GetMeter(MeterType::METER_DETECTION)->Initial() > monster_detection_strength_here)
@@ -2171,7 +2185,7 @@ namespace {
         }
 
         // test each ship in each fleet for visibility by best monster detection here
-        for (const auto& fleet : Objects().find<Fleet>(fleet_ids)) {
+        for (const auto& fleet : objects.find<Fleet>(fleet_ids)) {
             if (!fleet)
                 continue;
             if (fleet->Unowned()) {
@@ -2179,7 +2193,7 @@ namespace {
                 continue;
             }
 
-            for (const auto& ship : Objects().find<Ship>(fleet->ShipIDs())) {
+            for (const auto& ship : objects.find<Ship>(fleet->ShipIDs())) {
                 if (!ship)
                     continue;
                 // if a ship is low enough stealth, its fleet can be seen by monsters
@@ -2191,9 +2205,7 @@ namespace {
         }
     }
 
-    void GetPlanetsVisibleToEmpireAtSystem(std::set<int>& visible_planets,
-                                           int empire_id, int system_id)
-    {
+    void GetPlanetsVisibleToEmpireAtSystem(std::set<int>& visible_planets, int empire_id, int system_id) {
         visible_planets.clear();
         auto system = Objects().get<System>(system_id);
         if (!system)
@@ -2391,7 +2403,10 @@ namespace {
         // necessary information about that combat in combats
         for (const auto& sys : GetUniverse().Objects().all<System>()) {
             if (CombatConditionsInSystem(sys->ID()))
-                combats.emplace_back(sys->ID(), CurrentTurn());
+                combats.emplace_back(sys->ID(), CurrentTurn(), GetUniverse().GetEmpireObjectVisibility(),
+                                     Objects(), Empires().GetEmpires(),
+                                     GetUniverse().GetEmpireObjectVisibilityTurnMap(),
+                                     Empires().GetDiplomaticStatuses());
         }
     }
 
@@ -2407,16 +2422,16 @@ namespace {
 
     /** Takes contents of CombatInfo struct and puts it into the universe.
       * Used to store results of combat in main universe. */
-    void DisseminateSystemCombatInfo(const std::vector<CombatInfo>& combats) {
-        Universe& universe = GetUniverse();
-
-        // as of this writing, pointers to objects are inserted into combat
-        // ObjectMap, and these pointers refer to the main gamestate objects
-        // therefore, copying the combat result state back into the main
-        // gamestate object map isn't necessary, as these objects have already
-        // been updated by the combat processing. similarly, standard
-        // visibility updating will transfer the results to empires' known
-        // gamestate ObjectMaps.
+    void DisseminateSystemCombatInfo(const std::vector<CombatInfo>& combats, Universe& universe) {
+        // As of this writing, pointers to objects are inserted into the combat
+        // ObjectMap, and these pointers still refer to the main gamestate
+        // objects. Thus, copying the objects in the main gamestate are already
+        // modified by the combat, and don't need to be copied from the combat
+        // ObjectMap. However, the changes to object visibility during combat
+        // are stored separately, and do need to be copied back to the main
+        // gamestate. Standard visibility updating will then transfer the 
+        // modified objects / combat results to empires' known gamestate
+        // ObjectMaps.
         for (const CombatInfo& combat_info : combats) {
             // update visibilities from combat, in case anything was revealed
             // by shooting during combat
@@ -2424,8 +2439,7 @@ namespace {
                 for (const auto& object_vis : empire_vis.second) {
                     if (object_vis.first < 0)
                         continue;   // temporary fighter IDs
-                    if (object_vis.second > GetUniverse().GetObjectVisibilityByEmpire(object_vis.first, empire_vis.first))
-                        universe.SetEmpireObjectVisibility(empire_vis.first, object_vis.first, object_vis.second);
+                    universe.SetEmpireObjectVisibility(empire_vis.first, object_vis.first, object_vis.second);  // does not lower visibility
                 }
             }
 
@@ -2449,7 +2463,7 @@ namespace {
 
                     // record if empire should be informed of potential fleet
                     // destruction (which is checked later)
-                    if (auto ship = Objects().get<Ship>(object_id)) {
+                    if (auto ship = universe.Objects().get<Ship>(object_id)) {
                         if (ship->FleetID() != INVALID_OBJECT_ID)
                             empires_to_update_of_fleet_destruction[ship->FleetID()].emplace(empire_id);
                     }
@@ -2484,12 +2498,12 @@ namespace {
 
             // update system ownership after combat.  may be necessary if the
             // combat caused planets to change ownership.
-            if (auto system = Objects().get<System>(combat_info.system_id)) {
+            if (auto system = universe.Objects().get<System>(combat_info.system_id)) {
                 // ensure all participants get updates on system.  this ensures
                 // that an empire who lose all objects in the system still
                 // knows about a change in system ownership
                 for (int empire_id : combat_info.empire_ids)
-                { universe.EmpireKnownObjects(empire_id).CopyObject(system, ALL_EMPIRES); }
+                    universe.EmpireKnownObjects(empire_id).CopyObject(system, ALL_EMPIRES);
             }
         }
     }
@@ -2523,8 +2537,8 @@ namespace {
                     //} else {
                     //    DebugLogger() << "Object not known to empire";
                     //}
-                    empire->AddSitRepEntry(CreateCombatDestroyedObjectSitRep(dest_obj_id, combat_info.system_id,
-                                                                             empire_id));
+                    empire->AddSitRepEntry(CreateCombatDestroyedObjectSitRep(
+                        dest_obj_id, combat_info.system_id, empire_id));
                 }
             }
 
@@ -2575,7 +2589,8 @@ namespace {
                     TraceLogger() << "Kill event: " << event->DebugString();
                 }
             }
-            DebugLogger() << "Combat combat_info system: " << combat_info.system_id  << "  Total Kill Events: " << events_that_killed.size();
+            DebugLogger() << "Combat combat_info system: " << combat_info.system_id
+                          << "  Total Kill Events: " << events_that_killed.size();
 
 
             // If a ship was attacked multiple times during a combat in which it dies, it will get
@@ -2595,9 +2610,11 @@ namespace {
                     continue;
                 Empire* target_empire = GetEmpire(target_ship->Owner());
 
-                DebugLogger() << "Attacker " << attacker->Name() << " (id: " << attacker->ID() << "  empire: " << attacker_empire_id << ")  attacks "
+                DebugLogger() << "Attacker " << attacker->Name() << " (id: " << attacker->ID()
+                              << "  empire: " << attacker_empire_id << ")  attacks "
                               << target_ship->Name() << " (id: " << target_ship->ID() << "  empire: "
-                              << (target_empire ? std::to_string(target_empire->EmpireID()) : "(unowned)") << "  species: " << target_ship->SpeciesName() << ")";
+                              << (target_empire ? std::to_string(target_empire->EmpireID()) : "(unowned)")
+                              << "  species: " << target_ship->SpeciesName() << ")";
 
                 if (attacker_empire)
                     attacker_empire->RecordShipShotDown(*target_ship);
@@ -3357,11 +3374,11 @@ void ServerApp::ProcessCombats() {
     // loop through assembled combat infos, handling each combat to update the
     // various systems' CombatInfo structs
     for (CombatInfo& combat_info : combats) {
-        if (auto system = combat_info.GetSystem())
-            system->SetLastTurnBattleHere(CurrentTurn());
-
         auto combat_system = combat_info.GetSystem();
-        DebugLogger(combat) << "Processing combat at " << (combat_system ? combat_system->Name() : "(No System)");
+        if (combat_system)
+            combat_system->SetLastTurnBattleHere(CurrentTurn());
+
+        DebugLogger(combat) << "Processing combat at " << (combat_system ? combat_system->Name() : "(No System id: " + std::to_string(combat_info.system_id) + ")");
         TraceLogger(combat) << combat_info.objects.Dump();
 
         AutoResolveCombat(combat_info);
@@ -3371,7 +3388,7 @@ void ServerApp::ProcessCombats() {
 
     UpdateEmpireCombatDestructionInfo(combats);
 
-    DisseminateSystemCombatInfo(combats);
+    DisseminateSystemCombatInfo(combats, m_universe);
     // update visibilities with any new info gleaned during combat
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
     // update stale object info based on any mid- combat glimpses

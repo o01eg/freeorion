@@ -6,6 +6,7 @@
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/nvp.hpp>
 #include <boost/uuid/uuid.hpp>
+#include <boost/uuid/nil_generator.hpp>
 #include "Export.h"
 #include "../Empire/Empire.h"
 #include "../universe/EnumsFwd.h"
@@ -572,7 +573,8 @@ private:
     int                             m_new_blocksize = INVALID_QUANTITY;
     int                             m_new_index = INVALID_INDEX;
     int                             m_rally_point_id = INVALID_OBJECT_ID;
-    boost::uuids::uuid              m_uuid, m_uuid2;
+    boost::uuids::uuid              m_uuid = boost::uuids::nil_uuid();
+    boost::uuids::uuid              m_uuid2 = boost::uuids::nil_uuid();
     ProdQueueOrderAction            m_action = ProdQueueOrderAction::INVALID_PROD_QUEUE_ACTION;
 
     static const int INVALID_INDEX = -500;

@@ -146,7 +146,8 @@ namespace {
             "ENC_METER_TYPE",   "ENC_EMPIRE",       "ENC_SHIP_DESIGN",  "ENC_SHIP",
             "ENC_MONSTER",      "ENC_MONSTER_TYPE", "ENC_FLEET",        "ENC_PLANET",
             "ENC_BUILDING",     "ENC_SYSTEM",       "ENC_FIELD",        "ENC_GRAPH",
-            "ENC_GALAXY_SETUP", "ENC_GAME_RULES",   "ENC_NAMED_VALUE_REF"};
+            "ENC_GALAXY_SETUP", "ENC_GAME_RULES",   "ENC_NAMED_VALUE_REF",
+            "ENC_STRINGS"};
         //  "ENC_HOMEWORLDS" omitted due to weird formatting of article titles
         return dir_names;
     }
@@ -509,8 +510,9 @@ namespace {
 
         }
         else if (dir_name == "ENC_STRINGS") {
-            // TODO: show all stringable keys and values
-            //for (auto str : GetStringTable().
+            // show all stringable keys and values
+            for (auto& str : AllStringtableEntries())
+                sorted_entries_list.emplace(str.first, std::make_pair(str.first + ": " + str.second + "\n", str.first));
 
         }
         else if  (dir_name == "ENC_NAMED_VALUE_REF") {
@@ -1566,14 +1568,18 @@ namespace {
             }
         }
         if (GetOptionsDB().Get<bool>("resource.effects.description.shown")) {
+            if (!building_type->ProductionCostTimeLocationInvariant()) {
+                auto& cost_template{UserString("PRODUCTION_WND_TOOLTIP_PROD_COST")};
+                auto& time_template{UserString("PRODUCTION_WND_TOOLTIP_PROD_TIME_MINIMUM")};
+
+                if (building_type->Cost() && !building_type->Cost()->ConstantExpr())
+                    detailed_description += "\n\n" + str(FlexibleFormat(cost_template) % building_type->Cost()->Dump());
+                if (building_type->Time() && !building_type->Time()->ConstantExpr())
+                    detailed_description += "\n\n" + str(FlexibleFormat(time_template) % building_type->Time()->Dump());
+            }
+
             // TODO: Consider using UserString instead of hard-coded english text here...
             // Not a high priority as it's mainly inteded for debugging.
-            if (!building_type->ProductionCostTimeLocationInvariant()) {
-                if (building_type->Cost() && !building_type->Cost()->ConstantExpr())
-                    detailed_description += "\n\nProduction Cost:\n" + building_type->Cost()->Dump();
-                if (building_type->Time() && !building_type->Time()->ConstantExpr())
-                    detailed_description += "\n\n Production Time:\n" + building_type->Time()->Dump();
-            }
             if (building_type->EnqueueLocation())
                 detailed_description += "\n\nEnqueue Requirement:\n" + building_type->EnqueueLocation()->Dump();
             if (building_type->Location())

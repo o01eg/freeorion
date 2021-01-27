@@ -1416,6 +1416,33 @@ namespace {
                                  combat_state.combat_info.empires,
                                  combat_state.combat_info.diplo_statuses);
         context.combat_bout = combat_state.combat_info.bout;
+        TraceLogger(combat) << "Set up context in ShootAllWeapons: objects: " << context.objects.size()
+                            << "  const objects: " << context.const_objects.size()
+                            << "  visible objects: empires: " << context.empire_object_vis.size() << "  see: "
+                            << [atk_id{attacker->ID()}, objs{context.const_objects}, eov{context.empire_object_vis}]()
+        {
+            std::stringstream ss;
+
+            for (auto& [empire_id, obj_vis] : eov) {
+                ss << "Empire " << empire_id << " sees: ";
+                for (auto& [obj_id, vis] : obj_vis) {
+                    if (vis > Visibility::VIS_NO_VISIBILITY)
+                        ss << obj_id << "  ";
+                }
+                ss << "\n";
+            }
+
+            return ss.str();
+        }()
+                            << "  empires: " << context.empires.size()
+                            << "  diplostatus: " << [ds{context.diplo_statuses}]()
+        {
+            std::stringstream ss;
+            for (auto& s : ds)
+                ss << "(" << s.first.first << ", " << s.first.second << "): " << s.second << "    ";
+            return ss.str();
+        }();
+
 
         for (const PartAttackInfo& weapon : weapons) {
             // skip non-direct-fire weapons (as only direct fire weapons can "shoot").
@@ -1432,21 +1459,26 @@ namespace {
                 DebugLogger(combat) << "Weapon has no targeting condition?? Should have been set when initializing PartAttackInfo";
                 continue;
             }
-            TraceLogger(combat) << "Weapon targeting condition: " << weapon.combat_targets->Dump();
 
 
             Condition::ObjectSet targets, rejected_targets;
             AddAllObjectsSet(combat_state.combat_info.objects, targets);
 
             // apply species targeting condition and then weapon targeting condition
+            TraceLogger(combat) << "Species targeting condition: " << species_targetting_condition->Dump();
             species_targetting_condition->Eval(context, targets, rejected_targets, Condition::SearchDomain::MATCHES);
-            weapon.combat_targets->Eval(context, targets, rejected_targets, Condition::SearchDomain::MATCHES);
-
-
             if (targets.empty()) {
-                DebugLogger(combat) << "No objects matched targeting condition!";
+                DebugLogger(combat) << "No objects matched species targeting condition!";
                 continue;
             }
+
+            TraceLogger(combat) << "Weapon targeting condition: " << weapon.combat_targets->Dump();
+            weapon.combat_targets->Eval(context, targets, rejected_targets, Condition::SearchDomain::MATCHES);
+            if (targets.empty()) {
+                DebugLogger(combat) << "No objects matched species and weapon targeting condition!";
+                continue;
+            }
+
             DebugLogger(combat) << targets.size() << " objects matched targeting condition";
             for (const auto& match : targets)
                 TraceLogger(combat) << " ... " << match->Name() << " (" << match->ID() << ")";
@@ -1645,20 +1677,20 @@ namespace {
             ships_fighters_to_add_back[fighter->LaunchedFrom()]++;
         }
         DebugLogger() << "Fighters left at end of combat:";
-        for (auto ship_fighter_count_pair : ships_fighters_to_add_back)
-            DebugLogger() << " ... from ship id " << ship_fighter_count_pair.first << " : " << ship_fighter_count_pair.second;
+        for (auto [ship_id, fighter_count] : ships_fighters_to_add_back)
+            DebugLogger() << " ... from ship id " << ship_id << " : " << fighter_count;
 
 
         DebugLogger() << "Returning fighters to ships:";
-        for (auto& entry : ships_fighters_to_add_back) {
-            auto ship = combat_info.objects.get<Ship>(entry.first);
+        for (auto [ship_id, fighter_count] : ships_fighters_to_add_back) {
+            auto ship = combat_info.objects.get<Ship>(ship_id);
             if (!ship) {
-                ErrorLogger(combat) << "Couldn't get ship with id " << entry.first << " for fighter to return to...";
+                ErrorLogger(combat) << "Couldn't get ship with id " << ship_id << " for fighter to return to...";
                 continue;
             }
-            IncreaseStoredFighterCount(ship, entry.second);
+            IncreaseStoredFighterCount(ship, fighter_count);
             // launching negative ships indicates recovery of them
-            CombatEventPtr launch_event = std::make_shared<FighterLaunchEvent>(bout, entry.first, ship->Owner(), -entry.second);
+            CombatEventPtr launch_event = std::make_shared<FighterLaunchEvent>(bout, ship_id, ship->Owner(), -fighter_count);
             launches_event->AddEvent(launch_event);
         }
     }

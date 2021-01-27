@@ -287,9 +287,10 @@ std::vector<std::shared_ptr<const T>> ObjectMap::find(const UniverseObjectVisito
     std::vector<std::shared_ptr<const T>> result;
     typedef typename std::remove_const<T>::type mutableT;
     result.reserve(size<mutableT>());
-    for (const auto& entry : Map<mutableT>()) {
-        if (entry.second->Accept(visitor))
-            result.emplace_back(entry.second);
+    for ([[maybe_unused]] auto& [ignored_id, obj] : Map<mutableT>()) {
+        (void)ignored_id; // suppress unused variable warning
+        if (obj->Accept(visitor))
+            result.push_back(obj);
     }
     return result;
 }
@@ -300,9 +301,10 @@ std::vector<std::shared_ptr<T>> ObjectMap::find(const UniverseObjectVisitor& vis
     std::vector<std::shared_ptr<T>> result;
     typedef typename std::remove_const<T>::type mutableT;
     result.reserve(size<mutableT>());
-    for (const auto& entry : Map<mutableT>()) {
-        if (entry.second->Accept(visitor))
-            result.emplace_back(entry.second);
+    for ([[maybe_unused]] auto& [ignored_id, obj] : Map<mutableT>()) {
+        (void)ignored_id; // suppress unused variable warning
+        if (obj->Accept(visitor))
+            result.push_back(obj);
     }
     return result;
 }
@@ -313,9 +315,9 @@ std::vector<int> ObjectMap::findIDs(const UniverseObjectVisitor& visitor) const
     std::vector<int> result;
     typedef typename std::remove_const<T>::type mutableT;
     result.reserve(size<mutableT>());
-    for (const auto& entry : Map<mutableT>()) {
-        if (entry.second->Accept(visitor))
-            result.emplace_back(entry.first);
+    for (const auto& [id, obj] : Map<mutableT>()) {
+        if (obj->Accept(visitor))
+            result.push_back(id);
     }
     return result;
 }

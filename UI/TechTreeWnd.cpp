@@ -226,13 +226,13 @@ private:
     /** These values are determined when doing button layout, and stored.
       * They are later used when rendering separator lines between the groups
       * of buttons */
-    int m_buttons_per_row;              // number of buttons that can fit into available horizontal space
+    int m_buttons_per_row = 1;          // number of buttons that can fit into available horizontal space
     GG::X m_col_offset;                 // horizontal distance between each column of buttons
     GG::Y m_row_offset;                 // vertical distance between each row of buttons
 
     /** These values are used for rendering separator lines between groups of buttons */
-    static const int BUTTON_SEPARATION; // vertical or horizontal sepration between adjacent buttons
-    static const int UPPER_LEFT_PAD;    // offset of buttons' position from top left of controls box
+    static constexpr int BUTTON_SEPARATION = 2; // vertical or horizontal sepration between adjacent buttons
+    static constexpr int UPPER_LEFT_PAD = 2;    // offset of buttons' position from top left of controls box
 
     // TODO: replace all the above stored information with a vector of pairs of GG::Pt (or perhaps GG::Rect)
     // This will contain the start and end points of all separator lines that need to be drawn.  This will be
@@ -247,15 +247,12 @@ private:
     friend class TechTreeWnd;               // so TechTreeWnd can access buttons
 };
 
-const int TechTreeWnd::TechTreeControls::BUTTON_SEPARATION = 2;
-const int TechTreeWnd::TechTreeControls::UPPER_LEFT_PAD = 2;
-
 TechTreeWnd::TechTreeControls::TechTreeControls(const std::string& config_name) :
     CUIWnd(UserString("TECH_DISPLAY"), GG::INTERACTIVE | GG::DRAGABLE | GG::RESIZABLE | GG::ONTOP, config_name)
 {}
 
 void TechTreeWnd::TechTreeControls::CompleteConstruction() {
-   const int tooltip_delay = GetOptionsDB().Get<int>("ui.tooltip.delay");
+    const int tooltip_delay = GetOptionsDB().Get<int>("ui.tooltip.delay");
     const boost::filesystem::path icon_dir = ClientUI::ArtDir() / "icons" / "tech" / "controls";
 
     // create a button for each tech category...
@@ -1532,8 +1529,8 @@ private:
 
     private:
         std::string m_tech;
-        GG::Clr m_background_color;
-        bool m_enqueued;
+        GG::Clr m_background_color = {{0, 0, 0, 128}};
+        bool m_enqueued = false;
     };
 
     void Populate(bool update = true);
@@ -1546,7 +1543,7 @@ private:
     std::set<TechStatus>                                        m_tech_statuses_shown;
     std::unordered_map<std::string, std::shared_ptr<TechRow>>   m_tech_row_cache;
     std::shared_ptr<GG::ListBox::Row>                           m_header_row;
-    size_t                                                      m_previous_sort_col;
+    size_t                                                      m_previous_sort_col = 0;
 };
 
 void TechTreeWnd::TechListBox::TechRow::Render() {

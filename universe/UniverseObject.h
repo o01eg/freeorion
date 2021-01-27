@@ -29,7 +29,7 @@ FO_COMMON_API extern const int INVALID_GAME_TURN;
 FO_COMMON_API extern const int INVALID_OBJECT_ID;
 
 // The ID number assigned to temporary universe objects
-FO_COMMON_API extern const int TEMPORARY_OBJECT_ID;
+constexpr int TEMPORARY_OBJECT_ID = -2;
 
 
 //! The various major subclasses of UniverseObject
@@ -155,7 +155,7 @@ public:
     virtual void    Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_id) = 0;
 
     void            SetID(int id);                      ///< sets the ID number of the object to \a id
-    void            Rename(const std::string& name);    ///< renames this object to \a name
+    void            Rename(const std::string& name);    ///< renames this object to \a name     // TODO: by-value + move instead of const reference
 
     /** moves this object by relative displacements x and y. */
     void            Move(double x, double y);
@@ -183,7 +183,7 @@ public:
     void            SetSystem(int sys);                     ///< assigns this object to a System.  does not actually move object in universe
     virtual void    AddSpecial(const std::string& name, float capacity = 0.0f); ///< adds the Special \a name to this object, if it is not already present
     virtual void    RemoveSpecial(const std::string& name); ///< removes the Special \a name from this object, if it is already present
-    void            SetSpecialCapacity(const std::string& name, float capacity);
+    void            SetSpecialCapacity(const std::string& name, float capacity);    // TODO: pass name by value with move?
 
     /** Sets current value of max, target and unpaired meters in in this
       * UniverseObject to Meter::DEFAULT_VALUE.  This should be done before any
@@ -205,9 +205,9 @@ public:
     virtual void    PopGrowthProductionResearchPhase()
     {};
 
-    static const double INVALID_POSITION;       ///< the position in x and y at which default-constructed objects are placed
-    static const int    INVALID_OBJECT_AGE;     ///< the age returned by UniverseObject::AgeInTurns() if the current turn is INVALID_GAME_TURN, or if the turn on which an object was created is INVALID_GAME_TURN
-    static const int    SINCE_BEFORE_TIME_AGE;  ///< the age returned by UniverseObject::AgeInTurns() if an object was created on turn BEFORE_FIRST_TURN
+    static constexpr double INVALID_POSITION = -100000.0;           ///< the position in x and y at which default-constructed objects are placed
+    static constexpr int    INVALID_OBJECT_AGE = -(1 << 30) - 1;;   ///< the age returned by UniverseObject::AgeInTurns() if the current turn is INVALID_GAME_TURN, or if the turn on which an object was created is INVALID_GAME_TURN
+    static constexpr int    SINCE_BEFORE_TIME_AGE = (1 << 30) + 1;  ///< the age returned by UniverseObject::AgeInTurns() if an object was created on turn BEFORE_FIRST_TURN
 
 protected:
     friend class Universe;
@@ -242,8 +242,8 @@ private:
     MeterMap                CensoredMeters(Visibility vis) const;   ///< returns set of meters of this object that are censored based on the specified Visibility \a vis
 
     int                                             m_id = INVALID_OBJECT_ID;
-    double                                          m_x;
-    double                                          m_y;
+    double                                          m_x = INVALID_POSITION;
+    double                                          m_y = INVALID_POSITION;
     int                                             m_owner_empire_id = ALL_EMPIRES;
     int                                             m_system_id = INVALID_OBJECT_ID;
     std::map<std::string, std::pair<int, float>>    m_specials; // map from special name to pair of (turn added, capacity)

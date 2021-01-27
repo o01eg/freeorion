@@ -177,7 +177,7 @@ private:
     /** m_fleet_id is mutable because ExecuteImpl generates the fleet id. */
     mutable int m_fleet_id = INVALID_OBJECT_ID;
     std::vector<int> m_ship_ids;
-    FleetAggression m_aggression;
+    FleetAggression m_aggression{0};
 
     friend class boost::serialization::access;
     template <typename Archive>
@@ -515,10 +515,10 @@ private:
     bool m_remove = false;
     int m_pause = INVALID_PAUSE_RESUME;
 
-    static const int INVALID_INDEX = -500;
-    static const int PAUSE = 1;
-    static const int RESUME = 2;
-    static const int INVALID_PAUSE_RESUME = -1;
+    static constexpr int INVALID_INDEX = -500;
+    static constexpr int PAUSE = 1;
+    static constexpr int RESUME = 2;
+    static constexpr int INVALID_PAUSE_RESUME = -1;
 
     friend class boost::serialization::access;
     template <typename Archive>
@@ -577,8 +577,8 @@ private:
     boost::uuids::uuid              m_uuid2 = boost::uuids::nil_uuid();
     ProdQueueOrderAction            m_action = ProdQueueOrderAction::INVALID_PROD_QUEUE_ACTION;
 
-    static const int INVALID_INDEX = -500;
-    static const int INVALID_QUANTITY = -1000;
+    static constexpr int INVALID_INDEX = -500;
+    static constexpr int INVALID_QUANTITY = -1000;
 
     friend class boost::serialization::access;
     template <typename Archive>

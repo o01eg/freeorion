@@ -80,7 +80,7 @@ namespace {
 
     struct PlanetAtmosphereData {
         struct Atmosphere {
-            Atmosphere() {}
+            Atmosphere() = default;
             Atmosphere(const XMLElement& elem) {
                 if (elem.Tag() != "Atmosphere")
                     throw std::invalid_argument("Attempted to construct an Atmosphere from an XMLElement that had a tag other than \"Atmosphere\"");
@@ -90,17 +90,16 @@ namespace {
             }
 
             std::string filename;
-            int         alpha;
+            int         alpha = 128;
         };
 
-        PlanetAtmosphereData() {}
+        PlanetAtmosphereData() = default;
         PlanetAtmosphereData(const XMLElement& elem) {
             if (elem.Tag() != "PlanetAtmosphereData")
                 throw std::invalid_argument("Attempted to construct a PlanetAtmosphereData from an XMLElement that had a tag other than \"PlanetAtmosphereData\"");
             planet_filename = elem.attributes.at("planet_filename");
-            for (const XMLElement& atmosphere : elem.Child("atmospheres").children) {
+            for (const XMLElement& atmosphere : elem.Child("atmospheres").children)
                 atmospheres.push_back(Atmosphere(atmosphere));
-            }
         }
 
         std::string             planet_filename; ///< the filename of the planet image that this atmosphere image data goes with
@@ -745,19 +744,19 @@ public:
     }
 
 private:
-    int                             m_planet_id;
-    double                          m_rpm;
-    int                             m_diameter;
-    double                          m_axial_tilt;
-    Visibility                      m_visibility;
+    int                             m_planet_id = INVALID_OBJECT_ID;
+    double                          m_rpm = 1.0;
+    int                             m_diameter = 1;
+    double                          m_axial_tilt = 0.0;
+    Visibility                      m_visibility = Visibility::VIS_BASIC_VISIBILITY;
     std::shared_ptr<GG::Texture>    m_surface_texture;
-    double                          m_shininess;
+    double                          m_shininess = 0.0;
     std::shared_ptr<GG::Texture>    m_overlay_texture;
     std::shared_ptr<GG::Texture>    m_atmosphere_texture;
-    int                             m_atmosphere_alpha;
+    int                             m_atmosphere_alpha = 1;
     GG::Rect                        m_atmosphere_planet_rect;
-    double                          m_initial_rotation;
-    StarType                        m_star_type;
+    double                          m_initial_rotation = 0.0;
+    StarType                        m_star_type = StarType::STAR_WHITE;
 
     static ScanlineRenderer         s_scanline_shader;
 };
@@ -895,7 +894,7 @@ namespace {
 // SidePanel::PlanetPanel
 ////////////////////////////////////////////////
 namespace {
-    static const bool SHOW_ALL_PLANET_PANELS = false;   //!< toggles whether to show population, resource, military and building info panels on planet panels that this player doesn't control
+    constexpr bool SHOW_ALL_PLANET_PANELS = false;   //!< toggles whether to show population, resource, military and building info panels on planet panels that this player doesn't control
 
     /** How big we want meter icons with respect to the current UI font size.
       * Meters should scale along font size, but not below the size for the
@@ -1393,7 +1392,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
                         target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
 
                         // temporary meter update with currently set species
-                        GetUniverse().UpdateMeterEstimates(target_planet_id);
+                        GetUniverse().UpdateMeterEstimates(target_planet_id, Empires());
                         planet_capacity = target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current();  // want value after meter update, so check current, not initial value
                     }
                     species_colony_projections[std::move(spec_pair)] = planet_capacity;
@@ -1413,7 +1412,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
         target_planet->SetSpecies(orig_species);
         target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(orig_initial_target_pop,
                                                               orig_initial_target_pop);
-        GetUniverse().UpdateMeterEstimates(target_planet_id);
+        GetUniverse().UpdateMeterEstimates(target_planet_id, Empires());
     }
     GetUniverse().InhibitUniverseObjectSignals(false);
 
@@ -1693,13 +1692,13 @@ void SidePanel::PlanetPanel::Refresh() {
             planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
 
             // temporary meter updates for curently set species
-            GetUniverse().UpdateMeterEstimates(m_planet_id);
+            GetUniverse().UpdateMeterEstimates(m_planet_id, Empires());
             planet_capacity = ((planet_env_for_colony_species == PlanetEnvironment::PE_UNINHABITABLE) ? 0.0 : planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current());   // want target pop after meter update, so check current value of meter
             planet->SetOwner(orig_owner);
             planet->SetSpecies(orig_species);
             planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(
                 orig_initial_target_pop, orig_initial_target_pop);
-            GetUniverse().UpdateMeterEstimates(m_planet_id);
+            GetUniverse().UpdateMeterEstimates(m_planet_id, Empires());
 
             colony_projections[this_pair] = planet_capacity;
             GetUniverse().InhibitUniverseObjectSignals(false);
@@ -2179,7 +2178,7 @@ void SidePanel::PlanetPanel::Render() {
     GG::Clr border_colour = (m_selected ? m_empire_colour : ClientUI::WndOuterBorderColor());
 
 
-    static const int OFFSET = 15;   // size of corners cut off sticky-out bit of background around planet render
+    static constexpr int OFFSET = 15;   // size of corners cut off sticky-out bit of background around planet render
 
     GG::GL2DVertexBuffer verts;
     verts.reserve(12);
@@ -2225,7 +2224,7 @@ void SidePanel::PlanetPanel::Render() {
     glLineWidth(1.0f);
 
     // disable greyover
-    static const GG::Clr HALF_GREY(128, 128, 128, 128);
+    constexpr GG::Clr HALF_GREY(128, 128, 128, 128);
     if (Disabled()) {
         glColor(HALF_GREY);
         glDrawArrays(GL_TRIANGLE_FAN, 4, verts.size() - 4);
@@ -2845,9 +2844,9 @@ namespace {
 
         void UpdateImpl(std::size_t mode, const GG::Wnd* target) override {
             const GG::Y row_height(RowHeight());
-            for (const auto& label_pair : m_labels_and_amounts) {
-                DetachChild(label_pair.first);
-                DetachChild(label_pair.second);
+            for (const auto& [first, second] : m_labels_and_amounts) {
+                DetachChild(first);
+                DetachChild(second);
             }
             m_labels_and_amounts.clear();
 
@@ -2906,7 +2905,7 @@ namespace {
         MeterType m_meter_type;
         int m_system_id;
         std::vector<std::pair<std::shared_ptr<GG::Label>,
-                    std::shared_ptr<GG::Label>>> m_labels_and_amounts;
+                              std::shared_ptr<GG::Label>>> m_labels_and_amounts;
     };
 }
 

@@ -331,7 +331,7 @@ bool ShipPart::ProductionCostTimeLocationInvariant() const {
     return true;
 }
 
-float ShipPart::ProductionCost(int empire_id, int location_id, int in_design_id) const {
+float ShipPart::ProductionCost(int empire_id, int location_id, int in_design_id) const {    // TODO: pass in ScriptingContext
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_cost)
         return 1.0f;
 
@@ -350,11 +350,11 @@ float ShipPart::ProductionCost(int empire_id, int location_id, int in_design_id)
     if (!source && !m_production_cost->SourceInvariant())
         return ARBITRARY_LARGE_COST;
 
-    ScriptingContext context(source, location, in_design_id);
+    ScriptingContext context(std::move(source), std::move(location), in_design_id);
     return static_cast<float>(m_production_cost->Eval(context));
 }
 
-int ShipPart::ProductionTime(int empire_id, int location_id, int in_design_id) const {
+int ShipPart::ProductionTime(int empire_id, int location_id, int in_design_id) const {  // TODO: pass in ScriptingContext
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_time)
         return 1;
 
@@ -373,7 +373,7 @@ int ShipPart::ProductionTime(int empire_id, int location_id, int in_design_id) c
     if (!source && !m_production_time->SourceInvariant())
         return ARBITRARY_LARGE_TURNS;
 
-    ScriptingContext context(source, location, in_design_id);
+    ScriptingContext context(std::move(source), std::move(location), in_design_id);
     return m_production_time->Eval(context);
 }
 
@@ -455,13 +455,11 @@ void ShipPartManager::CheckPendingShipParts() const {
     Pending::SwapPending(m_pending_ship_parts, m_parts);
 
     TraceLogger() << [this]() {
-            std::string retval("Part Types:");
-            for (const auto& pair : m_parts) {
-                const auto& part = pair.second;
-                retval.append("\n\t" + part->Name() + " class: " + boost::lexical_cast<std::string>(part->Class()));
-            }
-            return retval;
-        }();
+        std::string retval("Part Types:");
+        for (const auto& [part_name, part] : m_parts)
+            retval.append("\n\t" + part_name + " class: " + boost::lexical_cast<std::string>(part->Class()));
+        return retval;
+    }();
 }
 
 ShipPartManager& GetShipPartManager()

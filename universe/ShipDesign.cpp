@@ -17,7 +17,7 @@
 #include "../util/i18n.h"
 
 
-extern FO_COMMON_API const int INVALID_DESIGN_ID = -1;
+const int INVALID_DESIGN_ID = -1;
 
 //using boost::io::str;
 
@@ -111,8 +111,7 @@ ParsedShipDesign::ParsedShipDesign(
 ////////////////////////////////////////////////
 // ShipDesign
 ////////////////////////////////////////////////
-ShipDesign::ShipDesign() :
-    m_uuid(boost::uuids::nil_generator()())
+ShipDesign::ShipDesign()
 {}
 
 ShipDesign::ShipDesign(const boost::optional<std::invalid_argument>& should_throw,
@@ -155,9 +154,8 @@ const std::string& ShipDesign::Name(bool stringtable_lookup /* = true */) const 
 }
 
 void ShipDesign::SetName(const std::string& name) {
-    if (!name.empty() && !m_name.empty()) {
+    if (!name.empty() && !m_name.empty())
         m_name = name;
-    }
 }
 
 void ShipDesign::SetUUID(const boost::uuids::uuid& uuid)
@@ -354,15 +352,15 @@ int ShipDesign::PartCount() const {
     return count;
 }
 
-bool ShipDesign::ProductionLocation(int empire_id, int location_id) const {
-    Empire* empire = GetEmpire(empire_id);
+bool ShipDesign::ProductionLocation(int empire_id, int location_id) const { // TODO: pass in ScriptingContext
+    Empire* empire = GetEmpire(empire_id); // TODO: get from context
     if (!empire) {
         DebugLogger() << "ShipDesign::ProductionLocation: Unable to get pointer to empire " << empire_id;
         return false;
     }
 
     // must own the production location...
-    auto location = Objects().get(location_id);
+    auto location = Objects().get(location_id); // TODO: get from context
     if (!location) {
         WarnLogger() << "ShipDesign::ProductionLocation unable to get location object with id " << location_id;
         return false;

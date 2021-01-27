@@ -778,13 +778,13 @@ namespace {
         if (sorting_method == SortingMethod::SORT_MIN) {
             // move (number) objects with smallest sort key (at start of map)
             // from the from_set into the to_set.
-            for (const auto& entry : sort_key_objects) {
-                auto object_to_transfer = entry.second;
+            for ([[maybe_unused]] auto& [ignored_float, object_to_transfer] : sort_key_objects) {
+                (void)ignored_float;    // quiet unused variable warning
                 auto from_it = std::find(from_set.begin(), from_set.end(), object_to_transfer);
                 if (from_it != from_set.end()) {
                     *from_it = from_set.back();
                     from_set.pop_back();
-                    to_set.emplace_back(object_to_transfer);    // TODO: can I std::move ?
+                    to_set.push_back(std::move(object_to_transfer));
                     number_transferred++;
                     if (number_transferred >= number)
                         return;
@@ -812,14 +812,15 @@ namespace {
         } else if (sorting_method == SortingMethod::SORT_MODE) {
             // compile histogram of of number of times each sort key occurs
             std::map<float, unsigned int> histogram;
-            for (const auto& entry : sort_key_objects) {
-                histogram[entry.first]++;
+            for ([[maybe_unused]] auto& [key, ignored_object] : sort_key_objects) {
+                (void)ignored_object;
+                histogram[key]++;
             }
 
             // invert histogram to index by number of occurances
             std::multimap<unsigned int, float> inv_histogram;
-            for (const auto& entry : histogram)
-                inv_histogram.emplace(entry.second, entry.first);
+            for (const auto& [key, count] : histogram)
+                inv_histogram.emplace(count, key);
 
             // reverse-loop through inverted histogram to find which sort keys
             // occurred most frequently, and transfer objects with those sort
@@ -841,7 +842,7 @@ namespace {
                     if (from_it != from_set.end()) {
                         *from_it = from_set.back();
                         from_set.pop_back();
-                        to_set.emplace_back(object_to_transfer);    // TODO: can I std::move ?
+                        to_set.push_back(object_to_transfer);    // TODO: can I std::move ?
                         number_transferred++;
                         if (number_transferred >= number)
                             return;
@@ -1158,6 +1159,43 @@ unsigned int None::GetCheckSum() const {
     CheckSums::CheckSumCombine(retval, "Condition::None");
 
     TraceLogger() << "GetCheckSum(None): retval: " << retval;
+    return retval;
+}
+
+///////////////////////////////////////////////////////////
+// NoOp                                                  //
+///////////////////////////////////////////////////////////
+NoOp::NoOp() :
+    Condition()
+{
+    m_root_candidate_invariant = true;
+    m_target_invariant = true;
+    m_source_invariant = true;
+}
+
+void NoOp::Eval(const ScriptingContext& parent_context,
+                ObjectSet& matches, ObjectSet& non_matches,
+                SearchDomain search_domain/* = SearchDomain::NON_MATCHES*/) const
+{
+    // does not modify input ObjectSets
+    DebugLogger() << "NoOp::Eval(" << matches.size() << " input matches, " << non_matches.size() << " input non-matches)";
+}
+
+bool NoOp::operator==(const Condition& rhs) const
+{ return Condition::operator==(rhs); }
+
+std::string NoOp::Description(bool negated/* = false*/) const
+{ return UserString("DESC_NOOP"); }
+
+std::string NoOp::Dump(unsigned short ntabs) const
+{ return DumpIndent(ntabs) + "NoOp\n"; }
+
+unsigned int NoOp::GetCheckSum() const {
+    unsigned int retval{0};
+
+    CheckSums::CheckSumCombine(retval, "Condition::NoOp");
+
+    TraceLogger(conditions) << "GetCheckSum(NoOp): retval: " << retval;
     return retval;
 }
 
@@ -1593,8 +1631,10 @@ namespace {
 
             if (m_names.empty()) {
                 // match homeworlds for any species
-                for (const auto& entry : GetSpeciesManager().GetSpeciesHomeworldsMap()) {   // TODO: put species info in ScriptingContext
-                    if (entry.second.count(planet_id))
+                for ([[maybe_unused]] auto& [ignored_name, ids] : GetSpeciesManager().GetSpeciesHomeworldsMap()) {
+                    // TODO: put species info in ScriptingContext
+                    (void)ignored_name; // quieting unused variable warning
+                    if (ids.count(planet_id))
                         return true;
                 }
 
@@ -1771,9 +1811,11 @@ bool Capital::Match(const ScriptingContext& local_context) const {
 
     // check if any empire's capital's ID is that candidate object's id.
     // if it is, the candidate object is a capital.
-    for (const auto& entry : local_context.empires)
-        if (entry.second->CapitalID() == candidate_id)
+    for ([[maybe_unused]] auto& [ignored_id, empire] : local_context.empires) {
+        (void)ignored_id;
+        if (empire->CapitalID() == candidate_id)
             return true;
+    }
     return false;
 }
 
@@ -7314,8 +7356,10 @@ namespace {
         {}
 
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
-            if (!candidate || m_empire_id == ALL_EMPIRES)
+            if (!candidate)
                 return false;
+            if (m_empire_id == ALL_EMPIRES)
+                return true;
             if (m_vis == Visibility::VIS_NO_VISIBILITY)
                 return true;
 

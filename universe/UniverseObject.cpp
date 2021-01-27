@@ -13,19 +13,11 @@
 #include "../util/Logger.h"
 #include "../util/i18n.h"
 
-
-const int INVALID_OBJECT_ID      = -1;
-const int TEMPORARY_OBJECT_ID    = -2;
-
-const double    UniverseObject::INVALID_POSITION  = -100000.0;
-const int       UniverseObject::INVALID_OBJECT_AGE = -(1 << 30) - 1;  // using big negative number to allow for potential negative object ages, which might be useful in the event of time travel.
-const int       UniverseObject::SINCE_BEFORE_TIME_AGE = (1 << 30) + 1;
+const int INVALID_OBJECT_ID = -1;
 
 UniverseObject::UniverseObject() :
     StateChangedSignal(blocking_combiner<boost::signals2::optional_last_value<void>>(
         GetUniverse().UniverseObjectSignalsInhibited())),
-    m_x(INVALID_POSITION),
-    m_y(INVALID_POSITION),
     m_created_on_turn(CurrentTurn())
 {}
 
@@ -284,7 +276,7 @@ void UniverseObject::Rename(const std::string& name) {
 void UniverseObject::Move(double x, double y)
 { MoveTo(m_x + x, m_y + y); }
 
-void UniverseObject::MoveTo(int object_id)
+void UniverseObject::MoveTo(int object_id)  // TODO: pass ObjectMap and use
 { MoveTo(Objects().get(object_id)); }
 
 void UniverseObject::MoveTo(std::shared_ptr<UniverseObject> object) {

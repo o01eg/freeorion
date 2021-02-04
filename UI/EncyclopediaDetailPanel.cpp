@@ -184,12 +184,13 @@ namespace {
                                    str));
             }
 
-            for (const auto& [category_name, article_vec] : encyclopedia.Articles()) {
+            for ([[maybe_unused]] auto& [category_name, article_vec] : encyclopedia.Articles()) {
                 // Do not add sub-categories
                 const EncyclopediaArticle& article = encyclopedia.GetArticleByKey(category_name);
                 // No article found or specifically a top-level category
                 if (!article.category.empty() && article.category != "ENC_INDEX")
                     continue;
+                (void)article_vec; // quiet unused variable warning
 
                 sorted_entries_list.emplace(
                     UserString(category_name),
@@ -3046,7 +3047,6 @@ namespace {
             return;
         }
 
-        bool listed = false;
         // search for full word matches in titles
         for (const std::string& word : words_in_search_text) {
             if (GG::GUI::GetGUI()->ContainsWord(article_name, word)) {
@@ -3207,6 +3207,11 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
 
     if (match_report.empty())
         match_report = UserString("ENC_SEARCH_NOTHING_FOUND");
+
+    auto duration = timer.Elapsed();
+    auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+    match_report += "\n\n" + boost::io::str(FlexibleFormat(UserString("ENC_SEARCH_TOOK"))
+                                            % search_text % (std::to_string(duration_ms) + " ms"));
 
     AddItem(TEXT_SEARCH_RESULTS, match_report);
 }

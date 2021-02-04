@@ -1,6 +1,6 @@
 from logging import error
 import re
-
+from typing import Iterable, List, Tuple
 
 normalization_dict = {
     'empire': 'empire_object',
@@ -31,7 +31,6 @@ normalization_dict = {
     'resPool': 'res_pool',
     'researchQueueElement': 'research_queue_element',
     'shipSlotType': 'ship_slot_type',
-    'sitrep': 'sitrep_object',
     'IntIntMap': 'int_int_map',
     'IntPairVec': 'int_pair_list',
     'IntSet': 'int_set',
@@ -64,6 +63,7 @@ normalization_dict = {
     'special': 'special',
     'IntFltMap': 'int_flt_map',
     'ruleType': 'rule_type',
+    'influenceQueueElement': 'influence_queue_element'
 }
 
 
@@ -73,7 +73,7 @@ def normalize_name(tp):
         return provided_name
 
     if argument_type not in normalization_dict:
-        error("Can't find proper name for: %s\n" % argument_type)
+        error("Can't find proper name for: %s, please add it to name mapping \n" % argument_type)
         normalization_dict[argument_type] = 'arg'
     return normalization_dict[argument_type]
 
@@ -110,18 +110,21 @@ def parse_name(txt):
     return [x[0] for x in args], return_type
 
 
-def merge_args(name, raw_arg_types, is_class):
+def _get_duplicated_arguments_message(name, raw_arg_types) -> Iterable[str]:
+    yield ""
+    yield "Cannot merge different set of arguments for a callable: %s" % name
+    args = (', '.join('%s:%s' % (name, tp) for tp, name in arg_set) for arg_set in raw_arg_types)
+    yield from ("   %s:  %s" % (i, args_line) for i, args_line in enumerate(args, start=1))
+    yield ""
+
+
+def merge_args(name: str, raw_arg_types: List[tuple], is_class: bool) -> Tuple[List[str], List[Tuple[str, str]]]:
     """
     Merge multiple set of arguments together.
 
     Single argument set is used as is.
     If we have two unique argument sets, and on of them is empty, use keywords.
     In other cases log error and use first one.
-
-    :param str name:
-    :param list[tuple] raw_arg_types:
-    :param bool is_class:
-    :rtype: (list[str], list[(str, str)])
     """
     # If wrapper define functions that have same name, and same arguments but different return types,
     # it will come here with len(arg_types) >= 2, where all arguments set are the same.
@@ -138,9 +141,9 @@ def merge_args(name, raw_arg_types, is_class):
         names, types = get_argument_names(next(filter(None, arg_types)), is_class)  # pylint: disable=filter-builtin-not-iterating
         use_keyword = True
     else:
-        error('[%s] Cannot merge, use first argument group from:\n    %s\n',
-              name,
-              '\n    '.join(', '.join('(%s)%s' % (tp, name) for tp, name in arg_set) for arg_set in raw_arg_types))
+
+        error("\n".join(_get_duplicated_arguments_message(name, raw_arg_types)))
+
         names, types = get_argument_names(raw_arg_types[0], is_class)
         use_keyword = False
     return ['%s=None' % arg_name for arg_name in names] if use_keyword else names, list(zip(names, types))

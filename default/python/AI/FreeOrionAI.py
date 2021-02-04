@@ -33,7 +33,6 @@ import ProductionAI
 import ResearchAI
 import ResourcesAI
 import TechsListsAI
-import turn_state
 from aistate_interface import create_new_aistate, load_aistate, get_aistate
 from AIDependencies import INVALID_ID
 from freeorion_tools import AITimer
@@ -157,8 +156,6 @@ def resumeLoadedGame(saved_state_string):  # pylint: disable=invalid-name
                   " than in the original session. The error raised was: %s"
                   % e, exc_info=True)
     _pre_game_start(fo.getEmpire().empireID, aistate)
-
-    debug('Size of already issued orders: ' + str(fo.getOrders().size))
 
 
 @error_handler
@@ -329,7 +326,6 @@ def generateOrders():  # pylint: disable=invalid-name
                            '%s (%s): [[%s]]' % (empire.name, get_trait_name_aggression(aistate.character), greet))
 
     aistate.prepare_for_new_turn()
-    turn_state.state.update()
     debug("Calling AI Modules")
     # call AI modules
     action_list = [ColonisationAI.survey_universe,
@@ -355,8 +351,6 @@ def generateOrders():  # pylint: disable=invalid-name
             error("Exception %s while trying to %s" % (e, action.__name__), exc_info=True)
     main_timer.stop_print_and_clear()
     turn_timer.stop_print_and_clear()
-
-    debug('Size of issued orders: ' + str(fo.getOrders().size))
 
     turn_timer.start("Server_Processing")
 

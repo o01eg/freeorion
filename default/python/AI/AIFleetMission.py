@@ -13,10 +13,10 @@ import MilitaryAI
 import InvasionAI
 import CombatRatingsAI
 from aistate_interface import get_aistate
-from target import TargetSystem, TargetFleet, TargetPlanet
+from target import Target, TargetSystem, TargetFleet, TargetPlanet
 from EnumsAI import MissionType
 from AIDependencies import INVALID_ID
-from freeorion_tools import combine_ratings, get_partial_visibility_turn, assertion_fails
+from freeorion_tools import combine_ratings, get_fleet_position, get_partial_visibility_turn, assertion_fails
 
 ORDERS_FOR_MISSION = {
     MissionType.EXPLORATION: OrderPause,
@@ -56,7 +56,7 @@ class AIFleetMission:
     :type target: target.Target | None
     """
 
-    def __init__(self, fleet_id):
+    def __init__(self, fleet_id: int):
         self.orders = []
         self.fleet = TargetFleet(fleet_id)
         self.type = None
@@ -88,12 +88,9 @@ class AIFleetMission:
 
         return retval
 
-    def set_target(self, mission_type, target):
+    def set_target(self, mission_type: MissionType, target: Target):
         """
         Set mission and target for this fleet.
-
-        :type mission_type: MissionType
-        :type target: target.Target
         """
         if self.type == mission_type and self.target == target:
             return
@@ -108,13 +105,9 @@ class AIFleetMission:
         self.target = None
         self.type = None
 
-    def has_target(self, mission_type, target):
+    def has_target(self, mission_type: MissionType, target: Target) -> bool:
         """
         Check if fleet has specified mission_type and target.
-
-        :type mission_type: MissionType
-        :type target: target.Target
-        :rtype: bool
         """
         return self.type == mission_type and self.target == target
 
@@ -122,23 +115,18 @@ class AIFleetMission:
         """Clear this fleets orders but do not clear mission and target."""
         self.orders = []
 
-    def _get_fleet_order_from_target(self, mission_type, target):
+    def _get_fleet_order_from_target(self, mission_type: MissionType, target: Target) -> AIFleetOrder:
         """
         Get a fleet order according to mission type and target.
-
-        :type mission_type: MissionType
-        :type target: target.Target
-        :rtype: AIFleetOrder
         """
         fleet_target = TargetFleet(self.fleet.id)
         return ORDERS_FOR_MISSION[mission_type](fleet_target, target)
 
-    def check_mergers(self, context=""):
+    def check_mergers(self, context: str = ""):
         """
         Merge local fleets with same mission into this fleet.
 
         :param context: Context of the function call for logging purposes
-        :type context: str
         """
         debug("Considering to merge %s", self.__str__())
         if self.type not in MERGEABLE_MISSION_TYPES:
@@ -183,7 +171,7 @@ class AIFleetMission:
                 continue
             FleetUtilsAI.merge_fleet_a_into_b(fid, fleet_id, context="Order %s of mission %s" % (context, self))
 
-    def _is_valid_fleet_mission_target(self, mission_type, target):
+    def _is_valid_fleet_mission_target(self, mission_type: MissionType, target: Target):
         if not target:
             return False
         if mission_type == MissionType.EXPLORATION:
@@ -230,7 +218,7 @@ class AIFleetMission:
             self.target = None
             self.type = None
 
-    def _check_abort_mission(self, fleet_order):
+    def _check_abort_mission(self, fleet_order: AIFleetOrder):
         """ checks if current mission (targeting a planet) should be aborted"""
         planet_stealthed = False
         target_is_planet = fleet_order.target and isinstance(fleet_order.target, TargetPlanet)
@@ -332,17 +320,14 @@ class AIFleetMission:
         self.set_target(MissionType.INVASION, target)
         self.generate_fleet_orders()
 
-    def need_to_pause_movement(self, last_move_target_id, new_move_order):
+    def need_to_pause_movement(self, last_move_target_id: int, new_move_order: OrderMove) -> bool:
         """
         When a fleet has consecutive move orders, assesses whether something about the interim destination warrants
         forcing a stop (such as a military fleet choosing to engage with an enemy fleet about to enter the same system,
         or it may provide a good vantage point to view current status of next system in path). Assessments about whether
         the new destination is suitable to move to are (currently) separately made by OrderMove.can_issue_order()
         :param last_move_target_id:
-        :type last_move_target_id: int
         :param new_move_order:
-        :type new_move_order: OrderMove
-        :rtype: bool
         """
         fleet = self.fleet.get_object()
         # don't try skipping over more than one System
@@ -638,7 +623,6 @@ class AIFleetMission:
         # TODO: priority
         self.clear_fleet_orders()
         system_id = fleet.systemID
-        start_sys_id = [fleet.nextSystemID, system_id][system_id >= 0]
         # if fleet doesn't have any mission,
         # then repair if needed or resupply if is current location not in supplyable system
         empire = fo.getEmpire()
@@ -648,13 +632,13 @@ class AIFleetMission:
                                                      AIstate.outpostTargetedSystemIDs +
                                                      AIstate.invasionTargetedSystemIDs)):
             if self._need_repair():
-                repair_fleet_order = MoveUtilsAI.get_repair_fleet_order(self.fleet, start_sys_id)
+                repair_fleet_order = MoveUtilsAI.get_repair_fleet_order(self.fleet)
                 if repair_fleet_order and repair_fleet_order.is_valid():
                     self.orders.append(repair_fleet_order)
             cur_fighter_capacity, max_fighter_capacity = FleetUtilsAI.get_fighter_capacity_of_fleet(fleet_id)
             if (fleet.fuel < fleet.maxFuel or cur_fighter_capacity < max_fighter_capacity
-                    and self.get_location_target().id not in fleet_supplyable_system_ids):
-                resupply_fleet_order = MoveUtilsAI.get_resupply_fleet_order(self.fleet, self.get_location_target())
+                    and get_fleet_position(self.fleet.id) not in fleet_supplyable_system_ids):
+                resupply_fleet_order = MoveUtilsAI.get_resupply_fleet_order(self.fleet)
                 if resupply_fleet_order.is_valid():
                     self.orders.append(resupply_fleet_order)
             return  # no targets
@@ -677,7 +661,7 @@ class AIFleetMission:
                                                             else system_to_visit)
             self.orders.append(fleet_order)
 
-    def _need_repair(self, repair_limit=0.70):
+    def _need_repair(self, repair_limit: float = 0.70) -> bool:
         """Check if fleet needs to be repaired.
 
          If the fleet is already at a system where it can be repaired, stay there until fully repaired.
@@ -685,9 +669,7 @@ class AIFleetMission:
          For military fleets, there is a special evaluation called, cf. *MilitaryAI.avail_mil_needing_repair()*
 
          :param repair_limit: percentage of health below which the fleet is sent to repair
-         :type repair_limit: float
          :return: True if fleet needs repair
-         :rtype: bool
         """
         # TODO: More complex evaluation if fleet needs repair (consider self-repair, distance, threat, mission...)
         fleet_id = self.fleet.id
@@ -705,15 +687,9 @@ class AIFleetMission:
         ships_cur_health, ships_max_health = FleetUtilsAI.get_current_and_max_structure(fleet_id)
         return ships_cur_health < repair_limit * ships_max_health
 
-    def get_location_target(self):
-        """system AITarget where fleet is or will be"""
+    def get_location_target(self) -> TargetSystem:
         # TODO add parameter turn
-        fleet = fo.getUniverse().getFleet(self.fleet.id)
-        system_id = fleet.systemID
-        if system_id >= 0:
-            return TargetSystem(system_id)
-        else:  # in starlane, so return next system
-            return TargetSystem(fleet.nextSystemID)
+        return TargetSystem(get_fleet_position(self.fleet.id))
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.fleet == other.target

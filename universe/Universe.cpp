@@ -1399,9 +1399,10 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         tech_sources.emplace_back(1U, source);
         const auto& source_objects = tech_sources.back();
 
-        for (const auto& [tech_name, researched_turn] : empire->ResearchedTechs()) {
+        for ([[maybe_unused]] auto& [tech_name, researched_turn] : empire->ResearchedTechs()) {
             const Tech* tech = GetTech(tech_name);
             if (!tech) continue;
+            (void)researched_turn;  // quiet unused variable warning
 
             DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_TECH, tech_name,
                                                  source_objects, tech->Effects(),
@@ -1418,6 +1419,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for POLICIES";
     std::list<Condition::ObjectSet> policy_sources; // for each empire, a set with a single source object for all its policies
     for (const auto& [empire_id, empire] : Empires()) {
+        (void)empire_id;    // quiet unused varianle warning
         auto source = empire->Source();
         if (!source)
             continue;

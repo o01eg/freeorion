@@ -3,6 +3,7 @@ from collections import Counter, OrderedDict as odict
 from logging import error, info, warning, debug
 from operator import itemgetter
 from time import time
+from typing import Dict, List, Optional, Tuple
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
 from CombatRatingsAI import ShipCombatStats
@@ -390,13 +391,12 @@ class AIstate:
         defense = min(max_defense, init_defense + sighting_age * defense_regen)
         return {'overall': defense * (defense + shields), 'attack': defense, 'health': (defense + shields)}
 
-    def assess_enemy_supply(self):
+    def assess_enemy_supply(self) -> Tuple[Dict[int, List[int]], Dict[int,  List[int]]]:
         """
         Assesses where enemy empires have Supply
         :return: a tuple of 2 dicts, each of which is keyed by system id, and each of which is a list of empire ids
         1st dict -- enemies that actually have supply at this system
         2nd dict -- enemies that have supply within 2 jumps from this system (if they clear obstructions)
-        :rtype: (dict[int, list[int]], dict[int, list[int]])
         """
         enemy_ids = [_id for _id in fo.allEmpireIDs() if _id != fo.empireID()]
         actual_supply = {}
@@ -610,12 +610,12 @@ class AIstate:
                 debug("In system %s: Ignoring lost fleets since known threats could cause it.", system)
                 lost_fleet_rating = 0
 
-            # TODO use sitrep combat info rather than estimating stealthed enemies by fleets lost to them
             # TODO also only consider past stealthed fleet threat to still be present if the system is still obstructed
             # TODO: track visibility across turns in order to distinguish the blip of visibility in (losing) combat,
             #       which FO currently treats as being for the previous turn,
             #       partially superseding the previous visibility for that turn
 
+            # Estimating stealthed enemies by fleets lost to them
             if not partial_vis_turn == current_turn:
                 sys_status.setdefault('local_fleet_threats', set())
                 sys_status['currently_visible'] = False
@@ -740,10 +740,9 @@ class AIstate:
             threat_fleets.update(sys_status.get('local_fleet_threats', []))
         return threat, max_threat, myrating, threat_fleets
 
-    def get_fleet_mission(self, fleet_id):
+    def get_fleet_mission(self, fleet_id: int) -> Optional[AIFleetMission.AIFleetMission]:
         """
         Returns AIFleetMission with fleetID.
-        :rtype: AIFleetMission.AIFleetMission
         """
         if fleet_id in self.__aiMissionsByFleetID:
             return self.__aiMissionsByFleetID[fleet_id]

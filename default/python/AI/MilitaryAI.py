@@ -15,7 +15,10 @@ from CombatRatingsAI import get_ship_combat_stats, rating_difference
 from EnumsAI import MissionType
 from freeorion_tools import cache_by_turn_persistent, combine_ratings
 from target import TargetSystem
-from turn_state import state
+from turn_state import (
+    get_distance_to_enemy_supply, get_owned_planets, get_owned_planets_in_system,
+    get_systems_by_supply_tier,
+)
 
 MinThreat = 10  # the minimum threat level that will be ascribed to an unknown threat capable of killing scouts
 _military_allocations = []
@@ -51,7 +54,7 @@ def cur_best_mil_ship_rating(include_designs=False):
     return max(best_rating, 0.001)
 
 
-def get_preferred_max_military_portion_for_single_battle():
+def get_preferred_max_military_portion_for_single_battle() -> float:
     """
     Determine and return the preferred max portion of military to be allocated to a single battle.
 
@@ -62,7 +65,6 @@ def get_preferred_max_military_portion_for_single_battle():
     parallel as opposed to single battlefronts against heavily defended positions.
 
     :return: a number in range (0:1] for preferred max portion of military to be allocated to a single battle
-    :rtype: float
     """
     # TODO: this is a roughcut first pass, needs plenty of refinement
     if fo.currentTurn() < 40:
@@ -268,7 +270,7 @@ class Allocator:
         if ratio < 1:
             self._handle_not_enough_resources(ratio)
 
-    def _calculate_threat(self):
+    def _calculate_threat(self) -> float:
         """
         Calculate the required military rating in the system.
 
@@ -283,11 +285,10 @@ class Allocator:
         mission can be successful.
 
         :return: Equivalent military rating required in the system
-        :rtype: float
         """
         raise NotImplementedError
 
-    def _minimum_allocation(self, threat):
+    def _minimum_allocation(self, threat: float) -> float:
         """
         Calculate the minimum allocation for the system.
 
@@ -299,14 +300,13 @@ class Allocator:
         Subclasses may choose to override this method and
         implement a different logic.
 
-        :param float threat: threat as calculated by _calculate_threat()
-        :rtype: float
+        :param threat: threat as calculated by _calculate_threat()
         """
         return CombatRatingsAI.rating_needed(
             self._min_alloc_factor * threat,
             self.assigned_rating)
 
-    def _maximum_allocation(self, threat):
+    def _maximum_allocation(self, threat: float) -> float:
         """
         Calculate the maximum allocation for the system.
 
@@ -317,9 +317,6 @@ class Allocator:
 
         Subclasses may choose to override this method and
         implement a different logic.
-
-        :param float threat:
-        :rtype: float
         """
         return CombatRatingsAI.rating_needed(
                 self._max_alloc_factor * threat,
@@ -330,15 +327,13 @@ class Allocator:
             self.safety_factor * self._planet_threat(),
             self.assigned_rating_vs_planets)
 
-    def _take_any(self):
+    def _take_any(self) -> bool:
         """
         If true, forces smaller than the minimum allocation are accepted.
-
-        :rtype: bool
         """
         raise NotImplementedError
 
-    def _handle_not_enough_resources(self, ratio):
+    def _handle_not_enough_resources(self, ratio: float):
         """Called if minimum allocation is larget than available resources.
 
         High priority subclasses are expected to throw a ReleaseMilitaryException
@@ -346,7 +341,7 @@ class Allocator:
         release of all military resources so they can be reassigned to higher
         priority targets.
 
-        :param float ratio: ratio of available resources to minimum allocation
+        :param ratio: ratio of available resources to minimum allocation
         """
         if ratio < self._military_reset_ratio and self._allocation_helper.try_reset:
             raise ReleaseMilitaryException
@@ -607,8 +602,7 @@ def get_system_planetary_threat(sys_id):
     return get_aistate().systemStatus.get(sys_id, {}).get('planetThreat', 0.)
 
 
-def enemy_rating():
-    """:rtype: float"""
+def enemy_rating() -> float:
     return get_aistate().empire_standard_enemy_rating
 
 
@@ -757,7 +751,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
         # TODO blockade enemy systems
 
         # interior systems
-        targetable_ids = set(state.get_systems_by_supply_tier(0))
+        targetable_ids = set(get_systems_by_supply_tier(0))
         current_mil_systems = [sid for sid, _, _, _, _ in allocation_helper.allocations]
         interior_targets1 = targetable_ids.difference(current_mil_systems)
         interior_targets = [sid for sid in interior_targets1 if (
@@ -910,7 +904,7 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
             fleet_mission.clear_target()
             if sys_id in set(AIstate.colonyTargetedSystemIDs + AIstate.outpostTargetedSystemIDs + AIstate.invasionTargetedSystemIDs):
                 mission_type = MissionType.SECURE
-            elif state.get_empire_planets_by_system(sys_id):
+            elif get_owned_planets_in_system(sys_id):
                 mission_type = MissionType.PROTECT_REGION
             else:
                 mission_type = MissionType.MILITARY
@@ -950,13 +944,13 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
                 elif get_system_jump2_threat(_sys_id):
                     weight = 1
                 else:
-                    weight = 1 / max(.5, float(state.get_distance_to_enemy_supply(_sys_id)))**1.25
+                    weight = 1 / max(.5, float(get_distance_to_enemy_supply(_sys_id)))**1.25
                 return float(weight) / (jump_distance+1)
 
             for fid in avail_mil_fleet_ids:
                 fleet = universe.getFleet(fid)
                 FleetUtilsAI.get_fleet_system(fleet)
-                systems = state.get_empire_planets_by_system().keys()
+                systems = get_owned_planets().keys()
                 if not systems:
                     continue
                 sys_id = max(systems, key=lambda x: system_score(fid, x))
@@ -972,24 +966,22 @@ def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, 
 
 
 @cache_by_turn_persistent
-def get_tot_mil_rating():
+def get_tot_mil_rating() -> float:
     """
     Give an assessment of total military rating considering all fleets as if distributed to separate systems.
 
     :return: a military rating value
-    :rtype: float
     """
     return sum(CombatRatingsAI.get_fleet_rating(fleet_id)
                for fleet_id in FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.MILITARY))
 
 
 @cache_by_turn_persistent
-def get_concentrated_tot_mil_rating():
+def get_concentrated_tot_mil_rating() -> float:
     """
     Give an assessment of total military rating as if all fleets were merged into a single mega-fleet.
 
     :return: a military rating value
-    :rtype: float
     """
     return combine_ratings(
         CombatRatingsAI.get_fleet_rating(fleet_id) for fleet_id in

@@ -150,25 +150,26 @@ NamedValueRefManager::any_container_type  NamedValueRefManager::GetItems() const
 }
 
 namespace {
-/** helper function for NamedValueRefManager::RegisterValueRef */
-template <typename R, typename VR>
-void RegisterValueRefImpl(R& container, std::mutex& mutex, const std::string& label,
-                          std::string&& valueref_name, std::unique_ptr<VR>&& vref)
-{
-    InfoLogger() << "Register " << label << " valueref for " << valueref_name << ": " << vref->Description();
-    if (container.count(valueref_name)>0) {
-        TraceLogger() << "Skip registration for already registered " << label << " valueref for " << valueref_name;
+    /** helper function for NamedValueRefManager::RegisterValueRef */
+    template <typename R, typename VR>
+    void RegisterValueRefImpl(R& container, std::mutex& mutex, const std::string& label,
+                              std::string&& valueref_name, std::unique_ptr<VR>&& vref)
+    {
+        TraceLogger() << "Register " << label << " valueref for " << valueref_name << ": " << vref->Description();
+        if (container.count(valueref_name) > 0) {
+            TraceLogger() << "Skip registration for already registered " << label << " valueref for " << valueref_name;
+            TraceLogger() << "Number of registered " << label << " ValueRefs: " << container.size();
+            return;
+        }
+        TraceLogger() << "RegisterValueRefImpl Check invariances for info. Then add the value ref in a thread safe way.";
+        std::scoped_lock lock(mutex);
+        if (!(vref->RootCandidateInvariant() && vref->LocalCandidateInvariant() &&
+             vref->TargetInvariant() && vref->SourceInvariant()))
+        { ErrorLogger() << "Currently only invariant value refs can be named. " << valueref_name; }
+
+        container.emplace(std::move(valueref_name), std::move(vref));
         TraceLogger() << "Number of registered " << label << " ValueRefs: " << container.size();
-        return;
     }
-    TraceLogger() << "RegisterValueRefImpl Check invariances for info. Then add the value ref in a thread safe way.";
-    const std::lock_guard<std::mutex> lock(mutex);
-    if (!(vref->RootCandidateInvariant() && vref->LocalCandidateInvariant() &&
-         vref->TargetInvariant() && vref->SourceInvariant()))
-    { ErrorLogger() << "Currently only invariant value refs can be named. " << valueref_name; }
-    container.emplace(std::move(valueref_name), std::move(vref));
-    TraceLogger() << "Number of registered " << label << " ValueRefs: " << container.size();
-}
 }
 
 template <typename T>
@@ -326,14 +327,14 @@ template <typename T>
 void NamedRef<T>::SetTopLevelContent(const std::string& content_name)
 {
     if (m_is_lookup_only) {
-        DebugLogger() << "Ignored call of SetTopLevelContent(" << content_name
-                     << ") on a Lookup NamedRef for value ref " << m_value_ref_name;
+        TraceLogger() << "Ignored call of SetTopLevelContent(" << content_name
+                      << ") on a Lookup NamedRef for value ref " << m_value_ref_name;
         return;
     }
     // only supposed to work for named-in-the-middle-case, SetTopLevelContent checks that
-    if ( GetValueRef() )
+    if (GetValueRef()) {
         const_cast<ValueRef<T>*>(GetValueRef())->SetTopLevelContent(content_name);
-    else {
+    } else {
         const char* named_ref_kind = ( content_name == "THERE_IS_NO_TOP_LEVEL_CONTENT" ? "top-level" : "named-in-the-middle" );
         ErrorLogger() << "Unexpected call of SetTopLevelContent(" << content_name
                       << ") on a " << named_ref_kind

@@ -375,3 +375,25 @@ Choose one server where chat will remain alive
 ALTER TABLE chat_history ADD COLUMN server_id INT NOT NULL DEFAULT 1;
 ```
 
+# Add allowed client type for user in the game (2021-02-14)
+
+In each game client could participate a different role.
+
+```sql
+CREATE TYPE auth.client_types AS ENUM ('p', 'o', 'm');
+
+ALTER TABLE games.players ADD COLUMN client_type auth.client_types NOT NULL DEFAULT 'p';
+```
+
+# Add static passwords for future web interface
+
+Add static passwords which could be set via protected with HTTPS web interface.
+
+```sql
+ALTER TABLE auth.users ADD COLUMN web_password TEXT NULL;
+
+ALTER TABLE auth.users ADD COLUMN game_password TEXT NULL;
+```
+
+The first is for web interface itself. The second for game client and should be changed frequently.
+

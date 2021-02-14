@@ -106,13 +106,17 @@ class AuthProvider:
     def is_success_auth_and_return_roles(self, player_name, auth):
         """Return False if passowrd doesn't match or list of roles for authenticated player"""
         authenticated = False
+        roles = self.default_roles
         try:
             with self.conn:
                 with self.conn.cursor() as curs:
-                    curs.execute(""" SELECT auth.check_otp(%s, %s) """,
-                                 (player_name, auth))
+                    curs.execute(""" SELECT * FROM auth.check_otp(%s, %s, %s) """,
+                                 (player_name, auth, fo.get_galaxy_setup_data().gameUID))
                     for r in curs:
                         authenticated = not not r[0]
+                        role = self.default_roles.get(r[1])
+                        if role is not None:
+                            roles = [role]
                         info("Player %s was accepted %r" % (player_name, authenticated))
         except psycopg2.InterfaceError:
             self.conn = psycopg2.connect(self.dsn)
@@ -120,7 +124,7 @@ class AuthProvider:
             error("Cann't check OTP %s: %s %s" % (player_name, exctype, value))
 
         if authenticated:
-            return self.default_roles
+            return roles
         else:
             return False
 
@@ -142,6 +146,7 @@ class AuthProvider:
                             WHERE c.is_active
                             AND c.delete_ts IS NULL
                             AND p.is_confirmed
+                            AND p.client_type = 'p'
                             AND g.game_uid = %s
                             GROUP BY u.player_name """,
                                  (fo.get_galaxy_setup_data().gameUID,))

@@ -397,3 +397,27 @@ ALTER TABLE auth.users ADD COLUMN game_password TEXT NULL;
 
 The first is for web interface itself. The second for game client and should be changed frequently.
 
+# Get available roles after authentication
+
+```sql
+DROP FUNCTION auth.check_otp(player_name_param CITEXT, otp CHAR(6));
+
+CREATE FUNCTION auth.check_otp(player_name_param CITEXT, otp CHAR(6), game_uid_param VARCHAR(20))
+RETURNS TABLE (
+ authenticated BOOLEAN,
+ client_type auth.client_types) AS
+$$
+ BEGIN
+  CREATE TEMP TABLE tmp_cnts ON COMMIT DROP AS
+  WITH hashed_otp AS (DELETE FROM auth.otp WHERE otp.player_name = player_name_param RETURNING otp.otp)
+  SELECT (TABLE hashed_otp) IS NOT NULL AND (TABLE hashed_otp) = crypt(otp, (TABLE hashed_otp));
+
+  RETURN QUERY SELECT t.*, p.client_type
+  FROM tmp_cnts t
+  CROSS JOIN games.players p
+  WHERE p.player_name = player_name_param
+  AND p.game_uid = game_uid_param;
+ END
+$$ LANGUAGE plpgsql;
+```
+

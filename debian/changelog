@@ -1,3 +1,10 @@
+freeorion (0.4.10.1.fo0015+git20200925.39cfe10ppa1~bionic) bionic; urgency=medium
+
+  * New FO0015 game.
+  * Add client type support.
+
+ -- O01eg <o01eg@yandex.ru>  Mon, 15 Feb 2021 09:23:49 +0000
+
 freeorion (0.4.10.1.fo0014+git20200925.39cfe10ppa1~bionic) bionic; urgency=medium
 
   * New FO0014 game.

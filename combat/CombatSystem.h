@@ -3,34 +3,47 @@
 
 #include "../universe/Universe.h"
 #include "../universe/ScriptingContext.h"
-#include "../util/AppInterface.h"
 #include "CombatEvent.h"
 
 
-/** Contains information about the state of a combat before or after the combat
-  * occurs. */
-struct CombatInfo : public ScriptingCombatInfo {
+/** Contains information about the state of a combat before or after the combat occurs. */
+struct CombatInfo {
 public:
     CombatInfo() = default;
-    CombatInfo(int system_id_, int turn_);  ///< ctor taking system id where combat occurs and game turn on which combat occurs
+    CombatInfo(int system_id_, int turn_,
+               Universe& universe_,
+               const EmpireManager& empires_,
+               const GalaxySetupData& galaxy_setup_data_,
+               const SpeciesManager& species_,
+               const SupplyManager& supply_);
+    // TODO: Constructor taking ObjectMap override?
 
-    /** Returns System object in this CombatInfo's objects if one exists with
-        id system_id. */
+    /** Returns System object in this CombatInfo's objects if one exists with id system_id. */
     std::shared_ptr<const System> GetSystem() const;
 
-    /** Returns System object in this CombatInfo's objects if one exists with
-        id system_id. */
+    /** Returns System object in this CombatInfo's objects if one exists with id system_id. */
     std::shared_ptr<System> GetSystem();
 
-    int                                 turn = INVALID_GAME_TURN;       ///< main game turn
-    int                                 system_id = INVALID_OBJECT_ID;  ///< ID of system where combat is occurring (could be INVALID_OBJECT_ID ?)
-    std::set<int>                       empire_ids;                     ///< IDs of empires involved in combat
-    std::set<int>                       damaged_object_ids;             ///< ids of objects damaged during this battle
-    std::set<int>                       destroyed_object_ids;           ///< ids of objects destroyed during this battle
-    std::map<int, std::set<int>>        destroyed_object_knowers;       ///< indexed by empire ID, the set of ids of objects the empire knows were destroyed during the combat
-    std::vector<CombatEventPtr>         combat_events;                  ///< list of combat attack events that occur in combat
+    const Universe&                                universe{GetUniverse()}; // universe in which combat occurs, used for general info getting, but not object state info
+    const EmpireManager::const_container_type&     empires{const_cast<const EmpireManager&>(::Empires()).GetEmpires()}; // map from ID to empires, may include empires not actually participating in this combat
+    const Universe::EmpireObjectVisibilityTurnMap& empire_object_vis_turns{GetUniverse().GetEmpireObjectVisibilityTurnMap()};
+    const EmpireManager::DiploStatusMap&           diplo_statuses{Empires().GetDiplomaticStatuses()};
+    const GalaxySetupData&                         galaxy_setup_data{GetGalaxySetupData()};
+    const SpeciesManager&                          species{GetSpeciesManager()};
+    const SupplyManager&                           supply{GetSupplyManager()};
 
-    float   GetMonsterDetection() const;
+    std::unique_ptr<ObjectMap>          objects;                       ///< actual state of objects relevant to combat, filtered and copied for system where combat occurs, not necessarily consistent with contents of universe's ObjectMap
+    Universe::EmpireObjectVisibilityMap empire_object_visibility;      ///< indexed by empire id and object id, the visibility level the empire has of each object.  may be increased during battle
+    int                                 bout = 0;                      ///< current combat bout, used with CombatBout ValueRef for implementing bout dependent targeting. First combat bout is 1
+    int                                 turn = INVALID_GAME_TURN;      ///< main game turn
+    int                                 system_id = INVALID_OBJECT_ID; ///< ID of system where combat is occurring (could be INVALID_OBJECT_ID ?)
+    std::set<int>                       empire_ids;                    ///< IDs of empires involved in combat
+    std::set<int>                       damaged_object_ids;            ///< ids of objects damaged during this battle
+    std::set<int>                       destroyed_object_ids;          ///< ids of objects destroyed during this battle
+    std::map<int, std::set<int>>        destroyed_object_knowers;      ///< indexed by empire ID, the set of ids of objects the empire knows were destroyed during the combat
+    std::vector<CombatEventPtr>         combat_events;                 ///< list of combat attack events that occur in combat
+
+    float GetMonsterDetection() const;
 
 private:
     void    GetEmpireIdsToSerialize(             std::set<int>&                         filtered_empire_ids,                int encoding_empire) const;

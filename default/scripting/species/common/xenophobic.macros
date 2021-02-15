@@ -14,7 +14,7 @@ XENOPHOBIC_SELF
                 Number low = 1 condition = And [
                     PopulationCenter
                     OwnedBy empire = RootCandidate.Owner
-                    Not OR [ 
+                    Not Or [ 
                         Species name = RootCandidate.Species
                         Species name = "SP_EXOBOT"
                     ]
@@ -25,23 +25,24 @@ XENOPHOBIC_SELF
             ]
             stackinggroup = "XENOPHOBIC_LABEL_SELF"
             accountinglabel = "XENOPHOBIC_LABEL_SELF"
-            priority = [[LATE_PRIORITY]]
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
             effects = [ 
-                SetTargetIndustry value = Value * 0.9
-                SetTargetResearch value = Value * 0.9
-                SetTargetHappiness value = Value - (
-                    Statistic Count condition = And [
+                SetTargetIndustry value = Value
+                    * (NamedReal name = "XENOPHOBIC_SELF_TARGET_INDUSTRY_SCALING" value = 0.9)
+                SetTargetResearch value = Value
+                    * (NamedReal name = "XENOPHOBIC_SELF_TARGET_RESEARCH_SCALING" value = 0.9)
+                SetTargetHappiness value = Value
+                    + (Statistic Count condition = And [
                         PopulationCenter
                         OwnedBy empire = Source.Owner
-                        Not OR [ 
+                        Not Or [ 
                             Species name = Source.Species
                             Species name = "SP_EXOBOT"
                         ]
                         Not Population high = 0
                         Not Contains Building name = "BLD_CONC_CAMP"
                         WithinStarlaneJumps jumps = 5 condition = Source
-                    ]
-                )
+                    ]) * (NamedReal name = "XENOPHOBIC_SELF_TARGET_HAPPINESS_COUNT" value = 1.0)
             ]
 
         // Give a pop malus for self-sustaining xenophobic species based on the number of nearby planets with other species
@@ -64,7 +65,7 @@ XENOPHOBIC_SELFSUSTAINING_QUALIFYING_PLANET_COUNT
 '''
 Statistic Count condition = And [
                     PopulationCenter
-                    Not OR [
+                    Not Or [
                         Species name = Source.Species
                         Species name = "SP_EXOBOT"
                     ]
@@ -83,7 +84,7 @@ XENOPHOBIC_OTHER
             scope = And [
                 PopulationCenter
                 OwnedBy empire = Source.Owner
-                Not OR [ 
+                Not Or [ 
                     Species name = Source.Species
                     Species name = "SP_EXOBOT"
                 ]
@@ -94,6 +95,8 @@ XENOPHOBIC_OTHER
             activation = PopulationCenter
             stackinggroup = "XENOPHOBIC_LABEL_@1@_OTHER"
             accountinglabel = "XENOPHOBIC_LABEL_@1@_OTHER"
-            priority = [[LATE_PRIORITY]]
-            effects = SetTargetIndustry value = Value - Target.Population * 0.1
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
+            effects = SetTargetIndustry value = Value + Target.Population
+                        * (NamedReal name = "XENOPHOBIC_OTHER_TARGET_INDUSTRY_PERPOP"
+                                     value = -0.5 * [[INDUSTRY_PER_POP]])
 '''

@@ -6,6 +6,7 @@
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/nvp.hpp>
 #include <boost/uuid/uuid.hpp>
+#include <boost/uuid/nil_generator.hpp>
 #include "Export.h"
 #include "../Empire/Empire.h"
 #include "../universe/EnumsFwd.h"
@@ -136,7 +137,7 @@ class FO_COMMON_API NewFleetOrder : public Order {
 public:
     NewFleetOrder(int empire, std::string fleet_name,
                   std::vector<int> ship_ids,
-                  bool aggressive, bool passive = false);
+                  bool aggressive, bool passive = false, bool defensive = false);
     NewFleetOrder(int empire, std::string fleet_name,
                   std::vector<int> ship_ids,
                   FleetAggression aggression);
@@ -176,7 +177,7 @@ private:
     /** m_fleet_id is mutable because ExecuteImpl generates the fleet id. */
     mutable int m_fleet_id = INVALID_OBJECT_ID;
     std::vector<int> m_ship_ids;
-    FleetAggression m_aggression;
+    FleetAggression m_aggression{0};
 
     friend class boost::serialization::access;
     template <typename Archive>
@@ -514,10 +515,10 @@ private:
     bool m_remove = false;
     int m_pause = INVALID_PAUSE_RESUME;
 
-    static const int INVALID_INDEX = -500;
-    static const int PAUSE = 1;
-    static const int RESUME = 2;
-    static const int INVALID_PAUSE_RESUME = -1;
+    static constexpr int INVALID_INDEX = -500;
+    static constexpr int PAUSE = 1;
+    static constexpr int RESUME = 2;
+    static constexpr int INVALID_PAUSE_RESUME = -1;
 
     friend class boost::serialization::access;
     template <typename Archive>
@@ -572,11 +573,12 @@ private:
     int                             m_new_blocksize = INVALID_QUANTITY;
     int                             m_new_index = INVALID_INDEX;
     int                             m_rally_point_id = INVALID_OBJECT_ID;
-    boost::uuids::uuid              m_uuid, m_uuid2;
+    boost::uuids::uuid              m_uuid = boost::uuids::nil_uuid();
+    boost::uuids::uuid              m_uuid2 = boost::uuids::nil_uuid();
     ProdQueueOrderAction            m_action = ProdQueueOrderAction::INVALID_PROD_QUEUE_ACTION;
 
-    static const int INVALID_INDEX = -500;
-    static const int INVALID_QUANTITY = -1000;
+    static constexpr int INVALID_INDEX = -500;
+    static constexpr int INVALID_QUANTITY = -1000;
 
     friend class boost::serialization::access;
     template <typename Archive>

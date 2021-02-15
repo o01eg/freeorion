@@ -10,7 +10,7 @@ BuildingType
         OwnedBy empire = Source.Owner
         Star type = BlackHole
     ]
-    EnqueueLocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
+    enqueuelocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS]]
     
@@ -19,12 +19,15 @@ BuildingType
                 PopulationCenter
                 Focus type = "FOCUS_INDUSTRY"
                 OwnedBy empire = Source.Owner
+                Happiness low = 0
                 ResourceSupplyConnected empire = Source.Owner condition = Source
             ]
             activation = Star type = BlackHole
             stackinggroup = "BLD_BLACK_HOLE_POW_GEN_PRIMARY_EFFECT"
-            priority = [[LATE_PRIORITY]]
-            effects = SetTargetIndustry value = Value + Target.Population * 1.0 * [[INDUSTRY_PER_POP]]
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
+            effects = SetTargetIndustry value = Value + Target.Population
+                        * (NamedReal name = "BLD_BLACK_HOLE_POW_GEN_TARGET_INDUSTRY_PERPOP"
+                                     value = 1.0 * [[INDUSTRY_PER_POP]])
     ]
     icon = "icons/building/blackhole.png"
 

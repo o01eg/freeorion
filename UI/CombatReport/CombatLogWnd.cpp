@@ -7,7 +7,7 @@
 
 #include "../LinkText.h"
 
-#include "../../client/human/HumanClientApp.h"
+#include "../../client/human/GGHumanClientApp.h"
 #include "../../combat/CombatLogManager.h"
 #include "../../universe/System.h"
 #include "../../universe/UniverseObject.h"
@@ -20,6 +20,9 @@
 
 namespace {
     DeclareThreadSafeLogger(combat_log);
+
+    /// The number of pixels to leave between the text and the frame.
+    constexpr int MARGIN = 5;
 }
 
 class CombatLogWnd::Impl {
@@ -63,7 +66,7 @@ public:
 namespace {
     // TODO: Function adapted from CombatEvents.cpp, will need to be extracted to a common library
     const std::string& LinkTag(UniverseObjectType obj_type) {
-        static const std::string EMPTY_STRING("");
+        static const std::string EMPTY_STRING;
 
         switch (obj_type) {
         case UniverseObjectType::OBJ_SHIP:
@@ -125,16 +128,16 @@ namespace {
         return forces;
     }
 
-    bool IsShip(std::shared_ptr<UniverseObject> object)
+    bool IsShip(const std::shared_ptr<UniverseObject>& object)
     { return object->ObjectType() == UniverseObjectType::OBJ_SHIP; }
 
-    bool HasPopulation(std::shared_ptr<UniverseObject> object) {
+    bool HasPopulation(const std::shared_ptr<UniverseObject>& object) {
         const auto* m = object->GetMeter(MeterType::METER_POPULATION);
         return m && m->Initial() > 0.0f;
     }
 
     std::string EmpireIdToText(int empire_id) {
-        if (const Empire* empire = GetEmpire(empire_id))
+        if (const auto empire = GetEmpire(empire_id))
             return GG::RgbaTag(empire->Color()) + "<" + VarText::EMPIRE_ID_TAG + " " +
                    std::to_string(empire->EmpireID()) + ">" + empire->Name() + "</" +
                    VarText::EMPIRE_ID_TAG + ">" + "</rgba>";
@@ -158,8 +161,9 @@ namespace {
         bool operator()(const std::shared_ptr<UniverseObject>& lhs,
                         const std::shared_ptr<UniverseObject>& rhs)
         {
-            const auto& lhs_public_name = lhs->PublicName(viewing_empire_id);
-            const auto& rhs_public_name = rhs->PublicName(viewing_empire_id);
+            const ObjectMap& objects = Objects();
+            const auto& lhs_public_name = lhs->PublicName(viewing_empire_id, objects);
+            const auto& rhs_public_name = rhs->PublicName(viewing_empire_id, objects);
             if (lhs_public_name != rhs_public_name) {
 #if defined(FREEORION_MACOSX)
                 // Collate on OSX seemingly ignores greek characters, resulting in sort order: X α
@@ -185,6 +189,7 @@ namespace {
         const std::string& category_delimiter = "\n-\n")
     {
         std::stringstream ss;
+        const ObjectMap& objects = Objects();
 
         bool first_category = true;
         for (const auto& category : forces) {
@@ -201,7 +206,7 @@ namespace {
                     first_in_category = false;
                 else
                     ss << delimiter;
-                ss << WrapWithTagAndId(object->PublicName(viewing_empire_id),
+                ss << WrapWithTagAndId(object->PublicName(viewing_empire_id, objects),
                                        LinkTag(object->ObjectType()), object->ID());
             }
         }
@@ -235,7 +240,7 @@ namespace {
         std::vector<std::shared_ptr<GG::Wnd>>   details;
 
         // distance between expansion symbol and text
-        static const unsigned int BORDER_MARGIN = 5;
+        static constexpr unsigned int BORDER_MARGIN = 5;
     };
 
     CombatLogAccordionPanel::CombatLogAccordionPanel(GG::X w, CombatLogWnd::Impl& log_,
@@ -244,8 +249,7 @@ namespace {
         log(log_),
         viewing_empire_id(viewing_empire_id_),
         event(event_),
-        title(log.DecorateLinkText(event->CombatLogDescription(viewing_empire_id))),
-        details()
+        title(log.DecorateLinkText(event->CombatLogDescription(viewing_empire_id, GetUniverse().Objects())))
     {}
 
     void CombatLogAccordionPanel::CompleteConstruction() {
@@ -308,7 +312,7 @@ namespace {
         std::vector<std::vector<std::shared_ptr<UniverseObject>>> forces;
 
         // distance between expansion symbol and text
-        static const unsigned int BORDER_MARGIN = 5;
+        static constexpr unsigned int BORDER_MARGIN = 5;
     };
 
     EmpireForcesAccordionPanel::EmpireForcesAccordionPanel(GG::X w,
@@ -540,7 +544,7 @@ std::vector<std::shared_ptr<GG::Wnd>> CombatLogWnd::Impl::MakeCombatLogPanel(
         return new_logs;
     }
 
-    std::string title = event->CombatLogDescription(viewing_empire_id);
+    std::string title = event->CombatLogDescription(viewing_empire_id, GetUniverse().Objects());
     if (!(event->FlattenSubEvents() && title.empty()))
         new_logs.emplace_back(DecorateLinkText(title));
 
@@ -574,11 +578,12 @@ void CombatLogWnd::Impl::SetLog(int log_id) {
                                                      );
     m_wnd.SetLayout(layout);
 
-    int client_empire_id = HumanClientApp::GetApp()->EmpireID();
+    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const ObjectMap& objects = Objects();
 
     // Write Header text
-    auto system = Objects().get<System>(log->system_id);
-    const std::string& sys_name = (system ? system->PublicName(client_empire_id) : UserString("ERROR"));
+    auto system = objects.get<System>(log->system_id);
+    const std::string& sys_name = (system ? system->PublicName(client_empire_id, objects) : UserString("ERROR"));
     DebugLogger(combat_log) << "Showing combat log #" << log_id << " at " << sys_name << " (" << log->system_id
                             << ") with " << log->combat_events.size() << " events";
 
@@ -605,7 +610,7 @@ void CombatLogWnd::Impl::SetLog(int log_id) {
 
     // Write Logs
     for (CombatEventPtr event : log->combat_events) {
-        DebugLogger(combat_log) << "event debug info: " << event->DebugString();
+        DebugLogger(combat_log) << "event debug info: " << event->DebugString(objects);
         for (auto&& wnd : MakeCombatLogPanel(m_font->SpaceWidth()*10, client_empire_id, event))
             AddRow(std::move(wnd));
     }

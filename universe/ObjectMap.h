@@ -9,7 +9,6 @@
 #include <type_traits>
 #include <vector>
 #include <boost/range/adaptor/map.hpp>
-#include <boost/range/algorithm/count_if.hpp>
 #include <boost/range/any_range.hpp>
 #include <boost/range/size.hpp>
 #include "../util/Export.h"
@@ -181,9 +180,8 @@ public:
     /** Empties map, removing shared ownership by this map of all
       * previously contained objects. */
     void clear();
-
-    /** Swaps the contents of *this with \a rhs. */
-    void swap(ObjectMap& rhs);
+    ///** Swaps the contents of *this with \a rhs. */
+    //void swap(ObjectMap& rhs);
 
     /** */
     void UpdateCurrentDestroyedObjects(const std::set<int>& destroyed_object_ids);
@@ -287,9 +285,10 @@ std::vector<std::shared_ptr<const T>> ObjectMap::find(const UniverseObjectVisito
     std::vector<std::shared_ptr<const T>> result;
     typedef typename std::remove_const<T>::type mutableT;
     result.reserve(size<mutableT>());
-    for (const auto& entry : Map<mutableT>()) {
-        if (entry.second->Accept(visitor))
-            result.emplace_back(entry.second);
+    for ([[maybe_unused]] auto& [ignored_id, obj] : Map<mutableT>()) {
+        (void)ignored_id; // suppress unused variable warning
+        if (obj->Accept(visitor))
+            result.push_back(obj);
     }
     return result;
 }
@@ -300,9 +299,10 @@ std::vector<std::shared_ptr<T>> ObjectMap::find(const UniverseObjectVisitor& vis
     std::vector<std::shared_ptr<T>> result;
     typedef typename std::remove_const<T>::type mutableT;
     result.reserve(size<mutableT>());
-    for (const auto& entry : Map<mutableT>()) {
-        if (entry.second->Accept(visitor))
-            result.emplace_back(entry.second);
+    for ([[maybe_unused]] auto& [ignored_id, obj] : Map<mutableT>()) {
+        (void)ignored_id; // suppress unused variable warning
+        if (obj->Accept(visitor))
+            result.push_back(obj);
     }
     return result;
 }
@@ -313,9 +313,9 @@ std::vector<int> ObjectMap::findIDs(const UniverseObjectVisitor& visitor) const
     std::vector<int> result;
     typedef typename std::remove_const<T>::type mutableT;
     result.reserve(size<mutableT>());
-    for (const auto& entry : Map<mutableT>()) {
-        if (entry.second->Accept(visitor))
-            result.emplace_back(entry.first);
+    for (const auto& [id, obj] : Map<mutableT>()) {
+        if (obj->Accept(visitor))
+            result.push_back(id);
     }
     return result;
 }
@@ -324,15 +324,8 @@ template <typename T>
 int ObjectMap::count(const UniverseObjectVisitor& visitor) const
 {
     typedef typename std::remove_const<T>::type mutableT;
-    // TODO: use std::count_if when switching to C++17
-    return boost::range::count_if(Map<mutableT>(),
-                                  [&visitor](const auto& entry) { return entry.second->Accept(visitor); });
-    /*
-    int retval = 0;
-    for (const auto& entry : Map<mutableT>())
-        retval += (entry.second->Accept(visitor) ? 1 : 0);
-    return retval;
-    */
+    return std::count_if(Map<mutableT>(),
+                         [&visitor](const auto& entry) { return entry.second->Accept(visitor); });
 }
 
 /** Returns true iff no objects match \a visitor */

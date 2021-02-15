@@ -2,6 +2,7 @@
 #define _Empire_h_
 
 
+#include <array>
 #include <string>
 #include "InfluenceQueue.h"
 #include "PopulationPool.h"
@@ -10,17 +11,15 @@
 #include "ResourcePool.h"
 #include "../universe/EnumsFwd.h"
 #include "../universe/Meter.h"
+#include "../util/AppInterface.h"
 #include "../util/Export.h"
 
 
 struct UnlockableItem;
-class Building;
-class Planet;
-class Ship;
 class ShipDesign;
 class SitRepEntry;
 class ResourcePool;
-class UniverseObject;
+
 FO_COMMON_API extern const int INVALID_DESIGN_ID;
 FO_COMMON_API extern const int INVALID_GAME_TURN;
 FO_COMMON_API extern const int INVALID_OBJECT_ID;
@@ -76,7 +75,7 @@ public:
     /** Returns an object id that is owned by the empire or INVALID_OBJECT_ID. */
     int                 SourceID() const;
     /** Returns an object that is owned by the empire, or null.*/
-    std::shared_ptr<const UniverseObject> Source() const;
+    std::shared_ptr<const UniverseObject> Source(const ObjectMap& objects = Objects()) const;
 
     std::string         Dump() const;
 
@@ -101,7 +100,8 @@ public:
     std::map<std::string, int>      TotalPolicySlots() const;
     std::map<std::string, int>      EmptyPolicySlots() const;
 
-    /** Returns the set of Tech names available to this empire. */
+    /** Returns the set of Tech names available to this empire and the turns on
+      * which they were researched. */
     const std::map<std::string, int>&   ResearchedTechs() const;
 
     /** Returns the set of BuildingType names availble to this empire. */
@@ -149,19 +149,21 @@ public:
 
     float       ProductionStatus(int i) const;                          ///< Returns the PPs spent towards item \a i in the build queue if it has partial progress, -1.0 if there is no such index in the production queue.
 
-    /** Returns the total cost per item (blocksize 1) and the minimum number of
-      * turns required to produce the indicated item, or (-1.0, -1) if the item
-      * is unknown, unavailable, or invalid. */
-    std::pair<float, int>   ProductionCostAndTime(const ProductionQueue::Element& element) const;
-    std::pair<float, int>   ProductionCostAndTime(const ProductionQueue::ProductionItem& item, int location_id) const;
+    /** Return true iff this empire can produce the specified item at the specified location. */
+    bool                    ProducibleItem(BuildType build_type, int location,
+                                           const ScriptingContext& context = ScriptingContext()) const;
+    bool                    ProducibleItem(BuildType build_type, const std::string& name, int location,
+                                           const ScriptingContext& context = ScriptingContext()) const;
+    bool                    ProducibleItem(BuildType build_type, int design_id, int location,
+                                           const ScriptingContext& context = ScriptingContext()) const;
+    bool                    ProducibleItem(const ProductionQueue::ProductionItem& item, int location,
+                                           const ScriptingContext& context = ScriptingContext()) const;
 
-    bool                    ProducibleItem(BuildType build_type, int location) const;  ///< Returns true iff this empire can produce the specified item at the specified location.
-    bool                    ProducibleItem(BuildType build_type, const std::string& name, int location) const;  ///< Returns true iff this empire can produce the specified item at the specified location.
-    bool                    ProducibleItem(BuildType build_type, int design_id, int location) const;            ///< Returns true iff this empire can produce the specified item at the specified location.
-    bool                    ProducibleItem(const ProductionQueue::ProductionItem& item, int location) const;    ///< Returns true iff this empire can produce the specified item at the specified location.
-
-    bool                    EnqueuableItem(BuildType build_type, const std::string& name, int location) const;  ///< Returns true iff this empire can enqueue the specified item at the specified location.
-    bool                    EnqueuableItem(const ProductionQueue::ProductionItem& item, int location) const;    ///< Returns true iff this empire can enqueue the specified item at the specified location.
+    /** Return true iff this empire can enqueue the specified item at the specified location. */
+    bool                    EnqueuableItem(BuildType build_type, const std::string& name, int location,
+                                           const ScriptingContext& context = ScriptingContext()) const;
+    bool                    EnqueuableItem(const ProductionQueue::ProductionItem& item, int location,
+                                           const ScriptingContext& context = ScriptingContext()) const;
 
     bool                    HasExploredSystem(int ID) const;                            ///< returns  true if the given item is in the appropriate list, false if it is not.
 
@@ -208,12 +210,13 @@ public:
 
     /** If the object with id \a id is a planet owned by this empire, sets that
       * planet to be this empire's capital, and otherwise does nothing. */
-    void SetCapitalID(int id);
+    void SetCapitalID(int id, const ObjectMap& objects = Objects());
 
     /** Adopts the specified policy, assuming its conditions are met. Revokes
       * the policy if \a adopt is false; */
     void AdoptPolicy(const std::string& name, const std::string& category,
-                     bool adopt = true, int slot = -1);
+                     bool adopt = true, int slot = -1,
+                     const ObjectMap& objects = Objects());
 
     /** Checks that all policy adoption conditions are met, removing any that
       * are not allowed. Also copies adopted policies to initial adopted
@@ -287,9 +290,12 @@ public:
     int AddShipDesign(ShipDesign* ship_design);     ///< inserts given ShipDesign into the Universe, adds the design's id to the Empire's set of ids, and returns the new design's id, which is INVALID_OBJECT_ID on failure.  If successful, universe takes ownership of passed ShipDesign.
 
     std::string NewShipName();                              ///< generates a random ship name, appending II, III, etc., to it if it has been used before by this empire
-    void Eliminate();                                ///< Marks empire as eliminated and cleans up empire after it is eliminated.  Queues are cleared, capital is reset, and other state info not relevant to an eliminated empire is cleared
-    void Win(const std::string& reason);             ///< Marks this empire as having won for this reason, and sends the appropriate sitreps
+    void Eliminate(EmpireManager& empires = Empires());         ///< Marks empire as eliminated and cleans up empire after it is eliminated.  Queues are cleared, capital is reset, and other state info not relevant to an eliminated empire is cleared
+    /** Marks this empire as having won for this reason, and sends the appropriate sitreps */
+    void Win(const std::string& reason, EmpireManager& empires = Empires());
     void SetReady(bool ready);                       ///< Marks this empire with readiness status
+    void AutoTurnSetReady();                         ///< Decreases auto-turn counter and set empire ready if not expired or set unready
+    void SetAutoTurn(int turns_count);               ///< Set auto-turn counter
 
     /** Inserts the given SitRep entry into the empire's sitrep list. */
     void AddSitRepEntry(const SitRepEntry& entry);
@@ -315,21 +321,25 @@ public:
     /** Calculates ranges that systems can send fleet and resource supplies,
       * using the specified st of \a known_objects as the source for supply-
       * producing objects and systems through which it can be propagated. */
-    void UpdateSystemSupplyRanges(const std::set<int>& known_objects);
+    void UpdateSystemSupplyRanges(const std::set<int>& known_objects, const ObjectMap& objects = Objects());
     /** Calculates ranges that systems can send fleet and resource supplies. */
-    void UpdateSystemSupplyRanges();
+    void UpdateSystemSupplyRanges(const Universe& universe = GetUniverse());
     /** Calculates systems that can propagate supply (fleet or resource) using
       * the specified set of \a known_systems */
-    void UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems, bool precombat=false);
+    void UpdateSupplyUnobstructedSystems(const ScriptingContext& context, const std::set<int>& known_systems,
+                                         bool precombat = false);
     /** Calculates systems that can propagate supply using this empire's own /
       * internal list of explored systems. */
-    void UpdateSupplyUnobstructedSystems(bool precombat=false);
-    /** Updates fleet ArrivalStarlane to flag fleets of this empire that are not blockaded post-combat
-     *  must be done after *all* noneliminated empires have updated their unobstructed systems* */
-    void UpdateUnobstructedFleets();
-    /** Records, in a list of pending updates, the start_system exit lane to the specified destination as accessible to this empire*/
+    void UpdateSupplyUnobstructedSystems(const ScriptingContext& context, bool precombat = false);
+    /** Updates fleet ArrivalStarlane to flag fleets of this empire that are not
+      * blockaded post-combat must be done after *all* noneliminated empires
+      * have updated their unobstructed systems */
+    void UpdateUnobstructedFleets(ObjectMap& objects, const std::set<int>& known_destroyed_objects);
+    /** Records, in a list of pending updates, the start_system exit lane to the
+      * specified destination as accessible to this empire*/
     void RecordPendingLaneUpdate(int start_system_id, int dest_system_id);
-    /** Processes all the pending lane access updates.  This is managed as a two step process to avoid order-of-processing issues. */
+    /** Processes all the pending lane access updates.  This is managed as a two
+      * step process to avoid order-of-processing issues. */
     void UpdatePreservedLanes();
 
     /** Checks for production projects that have been completed, and places them
@@ -338,10 +348,12 @@ public:
       * the production queue (which determines how much PP each project receives
       * but does not actually spend them).  This function spends the PP, removes
       * complete items from the queue and creates the results in the universe. */
-    void CheckProductionProgress();
+    void CheckProductionProgress(ScriptingContext& context);
+
     /** Checks for tech projects that have been completed, and returns a vector
       * of the techs that should be added to the known techs list. */
     std::vector<std::string> CheckResearchProgress();
+
     /** Eventually : Will check for social projects that have been completed and
       * / or process ongoing social projects, and update the empire's influence
       * stockpile to account for influence production and expenditures.*/
@@ -356,7 +368,7 @@ public:
     /** Determines ResourceCenters that can provide resources for this empire and sets
       * the supply groups used for each ResourcePool as appropriate for each resource.
       * call UpdateResourceSupply before calling this. */
-    void InitResourcePools();
+    void InitResourcePools(const ObjectMap& objects = Objects());
 
     /** Resets production of resources and calculates allocated resources (on
       * each item in queues and overall) for each resource by calling
@@ -384,7 +396,7 @@ public:
     /** Resets empire meters. */
     void ResetMeters();
 
-    void UpdateOwnedObjectCounters();
+    void UpdateOwnedObjectCounters(const ObjectMap& objects = Objects());
 
     void SetAuthenticated(bool authenticated = true);
 
@@ -486,7 +498,7 @@ private:
         should play this empire. */
     bool        m_authenticated = false;
 
-    EmpireColor m_color;
+    EmpireColor m_color = {{128, 255, 255, 255}};
     int         m_capital_id = INVALID_OBJECT_ID;  ///< the ID of the empire's capital planet
 
     struct PolicyAdoptionInfo {
@@ -580,6 +592,7 @@ private:
     std::map<int, std::set<int>>    m_preserved_system_exit_lanes;  ///< for each system known to this empire, the set of exit lanes preserved for fleet travel even if otherwise blockaded
     std::map<int, std::set<int>>    m_pending_system_exit_lanes;    ///< pending updates to m_preserved_system_exit_lanes
     bool                            m_ready = false;                ///< readiness status of empire
+    int                             m_auto_turn_count = 0;          ///< auto-turn counter value
 
     friend class boost::serialization::access;
     Empire();

@@ -7,13 +7,13 @@ BuildingType
         Planet
         OwnedBy empire = Source.Owner
         Not Contains Building name = "BLD_NEST_ERADICATOR"
-	Or [
+        Or [
             HasSpecial name = "JUGGERNAUT_NEST_SPECIAL"
             HasSpecial name = "KRAKEN_NEST_SPECIAL"
             HasSpecial name = "SNOWFLAKE_NEST_SPECIAL"
-	]
+        ]
     ]
-    EnqueueLocation = Not Enqueued type = Building name = "BLD_NEST_ERADICATOR"
+    enqueuelocation = Not Enqueued type = Building name = "BLD_NEST_ERADICATOR"
     effectsgroups = [
         [[EG_NEST_REMOVAL(JUGGERNAUT)]]
         [[EG_NEST_REMOVAL(KRAKEN)]]
@@ -34,7 +34,6 @@ EG_NEST_REMOVAL
                 HasSpecial name = "@1@_NEST_SPECIAL"
             ]
             stackinggroup = "@1@_NEST_STACK"  // groups with @1@_NEST_SPECIAL
-            priority = [[EARLY_PRIORITY]]
             effects = [
                 RemoveSpecial name = "@1@_NEST_SPECIAL"
                 GenerateSitRepMessage
@@ -47,4 +46,4 @@ EG_NEST_REMOVAL
 '''
 
 #include "/scripting/common/base_prod.macros"
-#include "/scripting/common/priorities.macros"
+

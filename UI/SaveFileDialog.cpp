@@ -3,7 +3,7 @@
 #include "ClientUI.h"
 #include "CUIControls.h"
 #include "OptionsWnd.h"
-#include "../client/human/HumanClientApp.h"
+#include "../client/human/GGHumanClientApp.h"
 #include "../network/Networking.h"
 #include "../util/Directories.h"
 #include "../util/i18n.h"
@@ -252,14 +252,13 @@ private:
 
     static GG::X ComputeFixedWidth(const std::string& title, const std::string& wide_as,
                                    GG::X max_width) {
-        std::shared_ptr<GG::Font> font = ClientUI::GetFont();
+        auto font = ClientUI::GetFont();
         // We need to maintain the fixed sizes since the base list box messes them
         std::vector<GG::Font::LineData> lines;
         GG::Flags<GG::TextFormat> fmt = GG::FORMAT_NONE;
 
         //TODO cache this resulting extent
-        std::vector<std::shared_ptr<GG::Font::TextElement>> text_elements =
-            font->ExpensiveParseFromTextToTextElements(wide_as, fmt);
+        auto text_elements = font->ExpensiveParseFromTextToTextElements(wide_as, fmt);
         lines = font->DetermineLines(wide_as, fmt, max_width, text_elements);
         GG::Pt extent1 = font->TextExtent(lines);
 
@@ -346,7 +345,7 @@ public:
 protected:
     std::string m_filename;
     std::shared_ptr<std::vector<SaveFileColumn>> m_columns;
-    bool m_initialized;
+    bool m_initialized = false;
 };
 
 class SaveFileHeaderRow: public SaveFileRow {
@@ -650,7 +649,7 @@ void SaveFileDialog::Init() {
 
     m_name_edit = GG::Wnd::Create<CUIEdit>("");
     if (m_extension != MP_SAVE_FILE_EXTENSION && m_extension != SP_SAVE_FILE_EXTENSION) {
-        std::string savefile_ext = HumanClientApp::GetApp()->SinglePlayerGame() ? SP_SAVE_FILE_EXTENSION : MP_SAVE_FILE_EXTENSION;
+        std::string savefile_ext = GGHumanClientApp::GetApp()->SinglePlayerGame() ? SP_SAVE_FILE_EXTENSION : MP_SAVE_FILE_EXTENSION;
         DebugLogger() << "SaveFileDialog passed invalid extension " << m_extension << ", changing to " << savefile_ext;
         m_extension = savefile_ext;
     }
@@ -916,7 +915,7 @@ void SaveFileDialog::UpdatePreviewList() {
     if (!m_server_previews) {
         SetPreviewList(FilenameToPath(GetDirPath()));
     } else {
-        HumanClientApp::GetApp()->RequestSavePreviews(GetDirPath());
+        GGHumanClientApp::GetApp()->RequestSavePreviews(GetDirPath());
     }
 }
 

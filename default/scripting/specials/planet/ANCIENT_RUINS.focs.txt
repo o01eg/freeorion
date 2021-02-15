@@ -33,7 +33,7 @@ Special
 
         EffectsGroup
             scope = Source
-            activation = AND [
+            activation = And [
                 Turn high = 0
                 Random probability = 0.9
                 (GalaxyMaxAIAggression >= 1)
@@ -46,8 +46,8 @@ Special
                 Source
                 Focus type = "FOCUS_RESEARCH"
             ]
-            priority = [[EARLY_PRIORITY]]
-            effects = SetTargetResearch value = Value + Target.Population * 5 * [[RESEARCH_PER_POP]]
+            effects = SetTargetResearch value = Value + Target.Population
+                        * NamedRealLookup name = "ANCIENT_RUINS_TARGET_RESEARCH_PERPOP"
 
         EffectsGroup
             scope = Source
@@ -281,5 +281,3 @@ Special
     graphic = "icons/specials_huge/ancient_ruins.png"
 
 #include "/scripting/common/base_prod.macros"
-
-#include "/scripting/common/priorities.macros"

@@ -27,7 +27,7 @@
 #include "SystemIcon.h"
 #include "SystemResourceSummaryBrowseWnd.h"
 #include "TextBrowseWnd.h"
-#include "../client/human/HumanClientApp.h"
+#include "../client/human/GGHumanClientApp.h"
 #include "../Empire/Empire.h"
 #include "../universe/Building.h"
 #include "../universe/Fleet.h"
@@ -80,7 +80,7 @@ namespace {
 
     struct PlanetAtmosphereData {
         struct Atmosphere {
-            Atmosphere() {}
+            Atmosphere() = default;
             Atmosphere(const XMLElement& elem) {
                 if (elem.Tag() != "Atmosphere")
                     throw std::invalid_argument("Attempted to construct an Atmosphere from an XMLElement that had a tag other than \"Atmosphere\"");
@@ -90,17 +90,16 @@ namespace {
             }
 
             std::string filename;
-            int         alpha;
+            int         alpha = 128;
         };
 
-        PlanetAtmosphereData() {}
+        PlanetAtmosphereData() = default;
         PlanetAtmosphereData(const XMLElement& elem) {
             if (elem.Tag() != "PlanetAtmosphereData")
                 throw std::invalid_argument("Attempted to construct a PlanetAtmosphereData from an XMLElement that had a tag other than \"PlanetAtmosphereData\"");
             planet_filename = elem.attributes.at("planet_filename");
-            for (const XMLElement& atmosphere : elem.Child("atmospheres").children) {
+            for (const XMLElement& atmosphere : elem.Child("atmospheres").children)
                 atmospheres.push_back(Atmosphere(atmosphere));
-            }
         }
 
         std::string             planet_filename; ///< the filename of the planet image that this atmosphere image data goes with
@@ -356,7 +355,7 @@ namespace {
                       StarType star_type)
     {
         glPushAttrib(GL_ENABLE_BIT | GL_PIXEL_MODE_BIT | GL_TEXTURE_BIT | GL_SCISSOR_BIT);
-        HumanClientApp::GetApp()->Exit2DMode();
+        GGHumanClientApp::GetApp()->Exit2DMode();
 
         // slide the texture coords to simulate a rotating axis
         glMatrixMode(GL_TEXTURE);
@@ -365,9 +364,9 @@ namespace {
 
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        glOrtho(0.0, Value(HumanClientApp::GetApp()->AppWidth()),
-                Value(HumanClientApp::GetApp()->AppHeight()), 0.0,
-                0.0, Value(HumanClientApp::GetApp()->AppWidth()));
+        glOrtho(0.0, Value(GGHumanClientApp::GetApp()->AppWidth()),
+                Value(GGHumanClientApp::GetApp()->AppHeight()), 0.0,
+                0.0, Value(GGHumanClientApp::GetApp()->AppWidth()));
 
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
@@ -410,7 +409,7 @@ namespace {
         glLoadIdentity();
         glMatrixMode(GL_MODELVIEW);
 
-        HumanClientApp::GetApp()->Enter2DMode();
+        GGHumanClientApp::GetApp()->Enter2DMode();
         glPopAttrib();
     }
 
@@ -499,7 +498,7 @@ namespace {
     }
 
     bool ClientPlayerIsModerator()
-    { return HumanClientApp::GetApp()->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR; }
+    { return GGHumanClientApp::GetApp()->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR; }
 }
 
 
@@ -715,7 +714,7 @@ public:
         m_rpm = 1.0 / period;
         m_diameter = PlanetDiameter(planet->Size());
         m_axial_tilt = std::max(-30.0, std::min(static_cast<double>(planet->AxialTilt()), 60.0));
-        m_visibility = GetUniverse().GetObjectVisibilityByEmpire(m_planet_id, HumanClientApp::GetApp()->EmpireID());
+        m_visibility = GetUniverse().GetObjectVisibilityByEmpire(m_planet_id, GGHumanClientApp::GetApp()->EmpireID());
 
         const std::string texture_filename;
         const auto& planet_data = GetRotatingPlanetData();
@@ -745,19 +744,19 @@ public:
     }
 
 private:
-    int                             m_planet_id;
-    double                          m_rpm;
-    int                             m_diameter;
-    double                          m_axial_tilt;
-    Visibility                      m_visibility;
+    int                             m_planet_id = INVALID_OBJECT_ID;
+    double                          m_rpm = 1.0;
+    int                             m_diameter = 1;
+    double                          m_axial_tilt = 0.0;
+    Visibility                      m_visibility = Visibility::VIS_BASIC_VISIBILITY;
     std::shared_ptr<GG::Texture>    m_surface_texture;
-    double                          m_shininess;
+    double                          m_shininess = 0.0;
     std::shared_ptr<GG::Texture>    m_overlay_texture;
     std::shared_ptr<GG::Texture>    m_atmosphere_texture;
-    int                             m_atmosphere_alpha;
+    int                             m_atmosphere_alpha = 1;
     GG::Rect                        m_atmosphere_planet_rect;
-    double                          m_initial_rotation;
-    StarType                        m_star_type;
+    double                          m_initial_rotation = 0.0;
+    StarType                        m_star_type = StarType::STAR_WHITE;
 
     static ScanlineRenderer         s_scanline_shader;
 };
@@ -840,16 +839,16 @@ class SidePanel::SystemNameDropDownList : public CUIDropDownList {
             if (!m_order_issuing_enabled)
                 return;
 
-            if (!RenameOrder::Check(HumanClientApp::GetApp()->EmpireID(), system->ID(), edit_wnd->Result()))
+            if (!RenameOrder::Check(GGHumanClientApp::GetApp()->EmpireID(), system->ID(), edit_wnd->Result()))
                 return;
 
-            HumanClientApp::GetApp()->Orders().IssueOrder(
-                std::make_shared<RenameOrder>(HumanClientApp::GetApp()->EmpireID(), system->ID(), edit_wnd->Result()));
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(
+                std::make_shared<RenameOrder>(GGHumanClientApp::GetApp()->EmpireID(), system->ID(), edit_wnd->Result()));
             if (SidePanel* side_panel = dynamic_cast<SidePanel*>(Parent().get()))
                 side_panel->Refresh();
         };
 
-        if (m_order_issuing_enabled && system->OwnedBy(HumanClientApp::GetApp()->EmpireID()))
+        if (m_order_issuing_enabled && system->OwnedBy(GGHumanClientApp::GetApp()->EmpireID()))
             popup->AddMenuItem(GG::MenuItem(UserString("SP_RENAME_SYSTEM"), false, false, rename_action));
 
         popup->Run();
@@ -895,7 +894,7 @@ namespace {
 // SidePanel::PlanetPanel
 ////////////////////////////////////////////////
 namespace {
-    static const bool SHOW_ALL_PLANET_PANELS = false;   //!< toggles whether to show population, resource, military and building info panels on planet panels that this player doesn't control
+    constexpr bool SHOW_ALL_PLANET_PANELS = false;   //!< toggles whether to show population, resource, military and building info panels on planet panels that this player doesn't control
 
     /** How big we want meter icons with respect to the current UI font size.
       * Meters should scale along font size, but not below the size for the
@@ -1265,7 +1264,7 @@ namespace {
             if (ship &&
                 ship->SystemID() == system_id &&
                 ship->HasTroops() &&
-                ship->OwnedBy(HumanClientApp::GetApp()->EmpireID()))
+                ship->OwnedBy(GGHumanClientApp::GetApp()->EmpireID()))
             { retval.insert(ship.get()); }
         }
 
@@ -1283,7 +1282,7 @@ namespace {
         for (const auto& ship : Objects().find<Ship>(FleetUIManager::GetFleetUIManager().SelectedShipIDs())) {
             if (!ship || ship->SystemID() != system_id)
                 continue;
-            if (!ship->CanBombard() || !ship->OwnedBy(HumanClientApp::GetApp()->EmpireID()))
+            if (!ship->CanBombard() || !ship->OwnedBy(GGHumanClientApp::GetApp()->EmpireID()))
                 continue;
             retval.insert(ship.get());
         }
@@ -1303,14 +1302,14 @@ const Ship* ValidSelectedColonyShip(int system_id) {
             continue;
         if (ship->SystemID() == system_id &&
             ship->CanColonize() &&
-            ship->OwnedBy(HumanClientApp::GetApp()->EmpireID())) 
+            ship->OwnedBy(GGHumanClientApp::GetApp()->EmpireID())) 
         { return ship.get(); }
     }
     return nullptr;
 }
 
 int AutomaticallyChosenColonyShip(int target_planet_id) {
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     if (empire_id == ALL_EMPIRES)
         return INVALID_OBJECT_ID;
     if (GetUniverse().GetObjectVisibilityByEmpire(target_planet_id, empire_id) < Visibility::VIS_PARTIAL_VISIBILITY)
@@ -1393,7 +1392,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
                         target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
 
                         // temporary meter update with currently set species
-                        GetUniverse().UpdateMeterEstimates(target_planet_id);
+                        GetUniverse().UpdateMeterEstimates(target_planet_id, Empires());
                         planet_capacity = target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current();  // want value after meter update, so check current, not initial value
                     }
                     species_colony_projections[std::move(spec_pair)] = planet_capacity;
@@ -1413,7 +1412,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
         target_planet->SetSpecies(orig_species);
         target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(orig_initial_target_pop,
                                                               orig_initial_target_pop);
-        GetUniverse().UpdateMeterEstimates(target_planet_id);
+        GetUniverse().UpdateMeterEstimates(target_planet_id, Empires());
     }
     GetUniverse().InhibitUniverseObjectSignals(false);
 
@@ -1423,7 +1422,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
 std::set<const Ship*> AutomaticallyChosenInvasionShips(int target_planet_id) {
     std::set<const Ship*> retval;
 
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     if (empire_id == ALL_EMPIRES)
         return retval;
 
@@ -1465,7 +1464,7 @@ std::set<const Ship*> AutomaticallyChosenInvasionShips(int target_planet_id) {
 std::set<const Ship*> AutomaticallyChosenBombardShips(int target_planet_id) {
     std::set<const Ship*> retval;
 
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     if (empire_id == ALL_EMPIRES)
         return retval;
 
@@ -1500,7 +1499,7 @@ std::set<const Ship*> AutomaticallyChosenBombardShips(int target_planet_id) {
 }
 
 void SidePanel::PlanetPanel::Refresh() {
-    int client_empire_id = HumanClientApp::GetApp()->EmpireID();
+    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
     m_planet_connection.disconnect();
 
     auto planet = Objects().get<Planet>(m_planet_id).get();
@@ -1693,13 +1692,13 @@ void SidePanel::PlanetPanel::Refresh() {
             planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
 
             // temporary meter updates for curently set species
-            GetUniverse().UpdateMeterEstimates(m_planet_id);
+            GetUniverse().UpdateMeterEstimates(m_planet_id, Empires());
             planet_capacity = ((planet_env_for_colony_species == PlanetEnvironment::PE_UNINHABITABLE) ? 0.0 : planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current());   // want target pop after meter update, so check current value of meter
             planet->SetOwner(orig_owner);
             planet->SetSpecies(orig_species);
             planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(
                 orig_initial_target_pop, orig_initial_target_pop);
-            GetUniverse().UpdateMeterEstimates(m_planet_id);
+            GetUniverse().UpdateMeterEstimates(m_planet_id, Empires());
 
             colony_projections[this_pair] = planet_capacity;
             GetUniverse().InhibitUniverseObjectSignals(false);
@@ -1994,13 +1993,13 @@ void SidePanel::PlanetPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
 
 void SidePanel::PlanetPanel::SetFocus(const std::string& focus) {
     auto planet = Objects().get<Planet>(m_planet_id);
-    if (!planet || !planet->OwnedBy(HumanClientApp::GetApp()->EmpireID()))
+    if (!planet || !planet->OwnedBy(GGHumanClientApp::GetApp()->EmpireID()))
         return;
     // todo: if focus is already equal to planet's focus, return early.
     colony_projections.clear();// in case new or old focus was Growth (important that be cleared BEFORE Order is issued)
     species_colony_projections.clear();
-    HumanClientApp::GetApp()->Orders().IssueOrder(
-        std::make_shared<ChangeFocusOrder>(HumanClientApp::GetApp()->EmpireID(), planet->ID(), focus));
+    GGHumanClientApp::GetApp()->Orders().IssueOrder(
+        std::make_shared<ChangeFocusOrder>(GGHumanClientApp::GetApp()->EmpireID(), planet->ID(), focus));
 }
 
 bool SidePanel::PlanetPanel::InWindow(const GG::Pt& pt) const {
@@ -2047,7 +2046,7 @@ void SidePanel::PlanetPanel::LDoubleClick(const GG::Pt& pt, GG::Flags<GG::ModKey
 }
 
 void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
-    int client_empire_id = HumanClientApp::GetApp()->EmpireID();
+    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
     auto planet = Objects().get<Planet>(m_planet_id);
     if (!planet)
@@ -2082,7 +2081,7 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
 
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
-    if (planet->OwnedBy(HumanClientApp::GetApp()->EmpireID()) && m_order_issuing_enabled
+    if (planet->OwnedBy(GGHumanClientApp::GetApp()->EmpireID()) && m_order_issuing_enabled
         && m_planet_name->InClient(pt))
     {
         auto rename_action = [this, planet]() { // rename planet
@@ -2092,11 +2091,11 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
             if (!m_order_issuing_enabled)
                 return;
 
-            if (!RenameOrder::Check(HumanClientApp::GetApp()->EmpireID(), planet->ID(), edit_wnd->Result()))
+            if (!RenameOrder::Check(GGHumanClientApp::GetApp()->EmpireID(), planet->ID(), edit_wnd->Result()))
                 return;
 
-            HumanClientApp::GetApp()->Orders().IssueOrder(
-                std::make_shared<RenameOrder>(HumanClientApp::GetApp()->EmpireID(), planet->ID(), edit_wnd->Result()));
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(
+                std::make_shared<RenameOrder>(GGHumanClientApp::GetApp()->EmpireID(), planet->ID(), edit_wnd->Result()));
             Refresh();
         };
         popup->AddMenuItem(GG::MenuItem(UserString("SP_RENAME_PLANET"), false, false, rename_action));
@@ -2117,7 +2116,7 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
         for (auto& entry : Empires()) {
             int recipient_empire_id = entry.first;
             auto gift_action = [recipient_empire_id, client_empire_id, planet]() {
-                HumanClientApp::GetApp()->Orders().IssueOrder(
+                GGHumanClientApp::GetApp()->Orders().IssueOrder(
                     std::make_shared<GiveObjectToEmpireOrder>(
                         client_empire_id, planet->ID(), recipient_empire_id));
             };
@@ -2129,13 +2128,13 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
 
         if (planet->OrderedGivenToEmpire() != ALL_EMPIRES) {
             auto ungift_action = [planet]() { // cancel give away order for this fleet
-                const OrderSet orders = HumanClientApp::GetApp()->Orders();
+                const OrderSet orders = GGHumanClientApp::GetApp()->Orders();
                 for (const auto& id_and_order : orders) {
                     if (auto order = std::dynamic_pointer_cast<
                         GiveObjectToEmpireOrder>(id_and_order.second))
                     {
                         if (order->ObjectID() == planet->ID()) {
-                            HumanClientApp::GetApp()->Orders().RescindOrder(id_and_order.first);
+                            GGHumanClientApp::GetApp()->Orders().RescindOrder(id_and_order.first);
                             // could break here, but won't to ensure there are no problems with doubled orders
                         }
                     }
@@ -2179,7 +2178,7 @@ void SidePanel::PlanetPanel::Render() {
     GG::Clr border_colour = (m_selected ? m_empire_colour : ClientUI::WndOuterBorderColor());
 
 
-    static const int OFFSET = 15;   // size of corners cut off sticky-out bit of background around planet render
+    static constexpr int OFFSET = 15;   // size of corners cut off sticky-out bit of background around planet render
 
     GG::GL2DVertexBuffer verts;
     verts.reserve(12);
@@ -2225,7 +2224,7 @@ void SidePanel::PlanetPanel::Render() {
     glLineWidth(1.0f);
 
     // disable greyover
-    static const GG::Clr HALF_GREY(128, 128, 128, 128);
+    constexpr GG::Clr HALF_GREY(128, 128, 128, 128);
     if (Disabled()) {
         glColor(HALF_GREY);
         glDrawArrays(GL_TRIANGLE_FAN, 4, verts.size() - 4);
@@ -2257,7 +2256,7 @@ namespace {
             for (const auto& id_and_order : orders) {
                 if (auto order = std::dynamic_pointer_cast<ColonizeOrder>(id_and_order.second)) {
                     if (order->ShipID() == ship->ID()) {
-                        HumanClientApp::GetApp()->Orders().RescindOrder(id_and_order.first);
+                        GGHumanClientApp::GetApp()->Orders().RescindOrder(id_and_order.first);
                         // could break here, but won't to ensure there are no problems with doubled orders
                     }
                 }
@@ -2269,7 +2268,7 @@ namespace {
             for (const auto& id_and_order : orders) {
                if (auto order = std::dynamic_pointer_cast<InvadeOrder>(id_and_order.second)) {
                     if (order->ShipID() == ship->ID()) {
-                        HumanClientApp::GetApp()->Orders().RescindOrder(id_and_order.first);
+                        GGHumanClientApp::GetApp()->Orders().RescindOrder(id_and_order.first);
                         // could break here, but won't to ensure there are no problems with doubled orders
                     }
                 }
@@ -2281,7 +2280,7 @@ namespace {
             for (const auto& id_and_order : orders) {
                 if (auto order = std::dynamic_pointer_cast<ScrapOrder>(id_and_order.second)) {
                     if (order->ObjectID() == ship->ID()) {
-                        HumanClientApp::GetApp()->Orders().RescindOrder(id_and_order.first);
+                        GGHumanClientApp::GetApp()->Orders().RescindOrder(id_and_order.first);
                         // could break here, but won't to ensure there are no problems with doubled orders
                     }
                 }
@@ -2293,7 +2292,7 @@ namespace {
             for (const auto& id_and_order : orders) {
                if (auto order = std::dynamic_pointer_cast<BombardOrder>(id_and_order.second)) {
                     if (order->ShipID() == ship->ID()) {
-                        HumanClientApp::GetApp()->Orders().RescindOrder(id_and_order.first);
+                        GGHumanClientApp::GetApp()->Orders().RescindOrder(id_and_order.first);
                         // could break here, but won't to ensure there are no problems with doubled orders
                     }
                 }
@@ -2310,7 +2309,7 @@ void SidePanel::PlanetPanel::ClickColonize() {
     if (!planet || planet->GetMeter(MeterType::METER_POPULATION)->Initial() != 0.0 || !m_order_issuing_enabled)
         return;
 
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     if (empire_id == ALL_EMPIRES)
         return;
 
@@ -2319,7 +2318,7 @@ void SidePanel::PlanetPanel::ClickColonize() {
 
     if (it != pending_colonization_orders.end()) {
         // cancel previous colonization order for planet
-        HumanClientApp::GetApp()->Orders().RescindOrder(it->second);
+        GGHumanClientApp::GetApp()->Orders().RescindOrder(it->second);
 
     } else {
         // find colony ship and order it to colonize
@@ -2338,7 +2337,7 @@ void SidePanel::PlanetPanel::ClickColonize() {
 
         CancelColonizeInvadeBombardScrapShipOrders(ship);
 
-        HumanClientApp::GetApp()->Orders().IssueOrder(
+        GGHumanClientApp::GetApp()->Orders().IssueOrder(
             std::make_shared<ColonizeOrder>(empire_id, ship->ID(), m_planet_id));
     }
     OrderButtonChangedSignal(m_planet_id);
@@ -2354,7 +2353,7 @@ void SidePanel::PlanetPanel::ClickInvade() {
         (planet->GetMeter(MeterType::METER_POPULATION)->Initial() <= 0.0 && planet->Unowned()))
     { return; }
 
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     if (empire_id == ALL_EMPIRES)
         return;
 
@@ -2365,7 +2364,7 @@ void SidePanel::PlanetPanel::ClickInvade() {
         auto& planet_invade_orders = it->second;
         // cancel previous invasion orders for this planet
         for (int order_id : planet_invade_orders)
-        { HumanClientApp::GetApp()->Orders().RescindOrder(order_id); }
+        { GGHumanClientApp::GetApp()->Orders().RescindOrder(order_id); }
 
     } else {
         // order selected invasion ships to invade planet
@@ -2382,7 +2381,7 @@ void SidePanel::PlanetPanel::ClickInvade() {
 
             CancelColonizeInvadeBombardScrapShipOrders(ship);
 
-            HumanClientApp::GetApp()->Orders().IssueOrder(
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<InvadeOrder>(empire_id, ship->ID(), m_planet_id));
         }
     }
@@ -2399,7 +2398,7 @@ void SidePanel::PlanetPanel::ClickBombard() {
         (planet->GetMeter(MeterType::METER_POPULATION)->Initial() <= 0.0 && planet->Unowned()))
     { return; }
 
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     if (empire_id == ALL_EMPIRES)
         return;
 
@@ -2410,7 +2409,7 @@ void SidePanel::PlanetPanel::ClickBombard() {
         auto& planet_bombard_orders = it->second;
         // cancel previous bombard orders for this planet
         for (int order_id : planet_bombard_orders)
-            HumanClientApp::GetApp()->Orders().RescindOrder(order_id);
+            GGHumanClientApp::GetApp()->Orders().RescindOrder(order_id);
 
     } else {
         // order selected bombard ships to bombard planet
@@ -2427,7 +2426,7 @@ void SidePanel::PlanetPanel::ClickBombard() {
 
             CancelColonizeInvadeBombardScrapShipOrders(ship);
 
-            HumanClientApp::GetApp()->Orders().IssueOrder(
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<BombardOrder>(empire_id, ship->ID(), m_planet_id));
         }
     }
@@ -2472,7 +2471,7 @@ void SidePanel::PlanetPanel::EnableOrderIssuing(bool enable/* = true*/) {
     m_buildings_panel->EnableOrderIssuing(enable);
 
     auto obj = Objects().get(m_planet_id);
-    if (!enable || !obj || !obj->OwnedBy(HumanClientApp::GetApp()->EmpireID()))
+    if (!enable || !obj || !obj->OwnedBy(GGHumanClientApp::GetApp()->EmpireID()))
         m_focus_drop->Disable();
     else
         m_focus_drop->Disable(false);
@@ -2726,7 +2725,7 @@ void SidePanel::PlanetPanelContainer::SelectPlanet(int planet_id) {
         }
 
         // send order changes could be made on other planets
-        HumanClientApp::GetApp()->SendPartialOrders();
+        GGHumanClientApp::GetApp()->SendPartialOrders();
     }
 }
 
@@ -2845,9 +2844,9 @@ namespace {
 
         void UpdateImpl(std::size_t mode, const GG::Wnd* target) override {
             const GG::Y row_height(RowHeight());
-            for (const auto& label_pair : m_labels_and_amounts) {
-                DetachChild(label_pair.first);
-                DetachChild(label_pair.second);
+            for (const auto& [first, second] : m_labels_and_amounts) {
+                DetachChild(first);
+                DetachChild(second);
             }
             m_labels_and_amounts.clear();
 
@@ -2906,7 +2905,7 @@ namespace {
         MeterType m_meter_type;
         int m_system_id;
         std::vector<std::pair<std::shared_ptr<GG::Label>,
-                    std::shared_ptr<GG::Label>>> m_labels_and_amounts;
+                              std::shared_ptr<GG::Label>>> m_labels_and_amounts;
     };
 }
 
@@ -3288,7 +3287,7 @@ void SidePanel::RefreshImpl() {
     // configure selection of planet panels in panel container
     std::shared_ptr<UniverseObjectVisitor> vistor;
     if (m_selection_enabled) {
-        int empire_id = HumanClientApp::GetApp()->EmpireID();
+        int empire_id = GGHumanClientApp::GetApp()->EmpireID();
         if (empire_id != ALL_EMPIRES)
             vistor = std::make_shared<OwnedVisitor>(empire_id);
     }
@@ -3305,7 +3304,7 @@ void SidePanel::RefreshImpl() {
     // populate system resource summary
 
     // for getting just the planets owned by player's empire
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     // If all planets are owned by the same empire, then we show the Shields/Defense/Troops/Supply;
     // regardless, if there are any planets owned by the player in the system, we show
     // Production/Research/Influnce.
@@ -3331,21 +3330,22 @@ void SidePanel::RefreshImpl() {
     }
 
     // Resource meters; show only for player planets
-    const std::vector<std::pair<MeterType, MeterType>> resource_meters =    // TODO: constexpr when possible...
-       {{MeterType::METER_INDUSTRY,  MeterType::METER_TARGET_INDUSTRY},
-        {MeterType::METER_RESEARCH,  MeterType::METER_TARGET_RESEARCH},
-        {MeterType::METER_INFLUENCE, MeterType::METER_TARGET_INFLUENCE},
-        {MeterType::METER_STOCKPILE, MeterType::METER_MAX_STOCKPILE}};
+    constexpr std::array<std::pair<MeterType, MeterType>, 4> resource_meters =
+        {{{MeterType::METER_INDUSTRY,  MeterType::METER_TARGET_INDUSTRY},
+          {MeterType::METER_RESEARCH,  MeterType::METER_TARGET_RESEARCH},
+          {MeterType::METER_INFLUENCE, MeterType::METER_TARGET_INFLUENCE},
+          {MeterType::METER_STOCKPILE, MeterType::METER_MAX_STOCKPILE}}};
     // general meters; show only if all planets are owned by same empire
-    const std::vector<std::pair<MeterType, MeterType>> general_meters =     // TODO: constexpr when possible...
-       {{MeterType::METER_SHIELD,  MeterType::METER_MAX_SHIELD},
-        {MeterType::METER_DEFENSE, MeterType::METER_MAX_DEFENSE},
-        {MeterType::METER_TROOPS,  MeterType::METER_MAX_TROOPS},
-        {MeterType::METER_SUPPLY,  MeterType::METER_MAX_SUPPLY}};
-    std::vector<std::pair<MeterType, MeterType>> meter_types;   // TODO: reserve
+    constexpr std::array<std::pair<MeterType, MeterType>, 4> general_meters =
+        {{{MeterType::METER_SHIELD,  MeterType::METER_MAX_SHIELD},
+          {MeterType::METER_DEFENSE, MeterType::METER_MAX_DEFENSE},
+          {MeterType::METER_TROOPS,  MeterType::METER_MAX_TROOPS},
+          {MeterType::METER_SUPPLY,  MeterType::METER_MAX_SUPPLY}}};
+
+    std::vector<std::pair<MeterType, MeterType>> meter_types;
+    meter_types.reserve(8);
     if (!player_planets.empty())
         meter_types.insert(meter_types.end(), resource_meters.begin(), resource_meters.end());
-
     if (all_planets_share_owner)
         meter_types.insert(meter_types.end(), general_meters.begin(), general_meters.end());
 
@@ -3354,7 +3354,7 @@ void SidePanel::RefreshImpl() {
     m_system_resource_summary = GG::Wnd::Create<MultiIconValueIndicator>(
         Width() - MaxPlanetDiameter() - 8,
         all_planets_share_owner ? all_planets : player_planets,
-        meter_types);
+        std::move(meter_types));
     m_system_resource_summary->MoveTo(GG::Pt(GG::X(MaxPlanetDiameter() + 4),
                                              140 - m_system_resource_summary->Height()));
     AttachChild(m_system_resource_summary);
@@ -3536,7 +3536,7 @@ bool SidePanel::PlanetSelectable(int planet_id) const {
 
     // Find a selection visitor and apply it to planet
     std::shared_ptr<UniverseObjectVisitor> selectable_visitor;
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     if (empire_id != ALL_EMPIRES)
         selectable_visitor = std::make_shared<OwnedVisitor>(empire_id);
 

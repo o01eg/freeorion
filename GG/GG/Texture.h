@@ -21,6 +21,7 @@
 #include <boost/filesystem/path.hpp>
 #include <GG/Base.h>
 #include <GG/Exception.h>
+#include <mutex>
 
 
 namespace GG {
@@ -203,7 +204,7 @@ private:
     std::shared_ptr<const Texture>  m_texture;
     X                               m_width = GG::X0;
     Y                               m_height = GG::Y0;
-    GLfloat                         m_tex_coords[4];    ///< position of element within containing texture 
+    GLfloat                         m_tex_coords[4] = {0.0f, 0.0f, 1.0f, 1.0f}; ///< position of element within containing texture 
 };
 
 /** \brief A singleton that loads and stores textures for use by GG.
@@ -217,19 +218,19 @@ private:
 class GG_API TextureManager
 {
 public:
-    const std::map<std::string, std::shared_ptr<Texture>>& Textures() const;
+    std::map<std::string, std::shared_ptr<const Texture>> Textures() const;
 
     /** Stores a pre-existing GG::Texture in the manager's texture pool, and
         returns a shared_ptr to it. \warning Calling code <b>must not</b>
         delete \a texture; \a texture becomes the property of the manager,
         which will eventually delete it. */
-    std::shared_ptr<Texture> StoreTexture(Texture* texture, const std::string& texture_name);
+    std::shared_ptr<Texture> StoreTexture(Texture* texture, std::string texture_name);
 
     /** Stores a pre-existing GG::Texture in the manager's texture pool, and
         returns a shared_ptr to it. \warning Calling code <b>must not</b>
         delete \a texture; \a texture becomes the property of the manager,
         which will eventually delete it. */
-    std::shared_ptr<Texture> StoreTexture(const std::shared_ptr<Texture>& texture, const std::string& texture_name);
+    std::shared_ptr<Texture> StoreTexture(std::shared_ptr<Texture> texture, std::string texture_name);
 
     /** Returns a shared_ptr to the texture created from image file \a path.
         If the texture is not present in the manager's pool, it will be loaded
@@ -253,6 +254,8 @@ private:
     /** Indexed by string, not path, because some textures may be stored by a
         name and not loaded from a path. */
     std::map<std::string, std::shared_ptr<Texture>> m_textures;
+
+    mutable std::mutex m_texture_access_guard;
 
     friend GG_API TextureManager& GetTextureManager();
 };

@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
 
 cmake_policy(SET CMP0042 NEW)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_HOME_DIRECTORY}/cmake ${CMAKE_HOME_DIRECTORY}/GG/cmake)
-set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9 CACHE STRING "Set the minimum OSX deployment target version")
+set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12 CACHE STRING "Set the minimum OSX deployment target version")
 set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING "Set the architecture the universal binaries for OSX should be built for")
 
 IF(CMAKE_GENERATOR STREQUAL "Xcode")
@@ -37,7 +37,7 @@ include(UseCodeCoverage)
 include(TargetDependencies)
 
 set(FreeOrion_VERSION 0.4.10+)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -193,6 +193,8 @@ set_property(DIRECTORY APPEND
         $<$<PLATFORM_ID:Linux>:FREEORION_LINUX>
         $<$<PLATFORM_ID:FreeBSD>:FREEORION_FREEBSD>
         $<$<PLATFORM_ID:OpenBSD>:FREEORION_OPENBSD>
+        $<$<PLATFORM_ID:Haiku>:FREEORION_HAIKU>
+        $<$<PLATFORM_ID:Android>:FREEORION_ANDROID>
 )
 
 if(WIN32 AND MSVC AND NOT (MSVC_VERSION LESS 1900)) # _MSC_VER >= 1900
@@ -210,7 +212,7 @@ if(WIN32 AND MSVC)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /NODEFAULTLIB:LIBCMT")
 endif()
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT ANDROID)
     add_definitions(-DENABLE_BINRELOC -DBINPATH=\"${CMAKE_INSTALL_FULL_BINDIR}\" -DSHAREPATH=\"${CMAKE_INSTALL_FULL_DATADIR}\")
 endif()
 
@@ -260,6 +262,13 @@ endif()
 if(APPLE)
     find_library(CORE_FOUNDATION_LIBRARY CoreFoundation)
     find_library(ICONV_LIBRARY iconv)
+endif()
+
+if(ANDROID)
+    find_library(ICUI18N_LIBRARY icui18n) # Symbol _ZTIN6icu_6210DateFormatE
+    find_library(ICUUC_LIBRARY icuuc) # Symbol _ZN6icu_6213UnicodeStringD1Ev
+    find_library(ICUDATA_LIBRARY icudata) # Symbol icudt62_dat
+    find_library(ICONV_LIBRARY iconv) # Symbol libiconv_open
 endif()
 
 if(BUILD_TESTING)
@@ -327,12 +336,12 @@ if(Apple)
     )
 endif()
 
-if(NOT WIN32)
+if(NOT WIN32 AND NOT ANDROID)
     add_library(freeorioncommon "")
 endif()
 
 
-if(WIN32)
+if(WIN32 OR ANDROID)
     add_library(freeorioncommon STATIC "")
 
     set_property(TARGET freeorioncommon
@@ -356,7 +365,7 @@ endif()
 
 target_compile_definitions(freeorioncommon
     PUBLIC
-        -DBOOST_ALL_DYN_LINK
+        $<$<NOT:$<PLATFORM_ID:Android>>:BOOST_ALL_DYN_LINK>
     PRIVATE
         -DFREEORION_BUILD_COMMON
         -DFREEORION_PYTHON_VERSION=\"${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}\"
@@ -366,16 +375,19 @@ target_link_libraries(freeorioncommon
     PUBLIC
         Boost::boost
         Boost::disable_autolinking
-        Boost::dynamic_linking
+        $<$<NOT:$<PLATFORM_ID:Android>>:Boost::dynamic_linking>
     INTERFACE
         Boost::filesystem
         Boost::iostreams
         Boost::locale
-        Boost::log
         Boost::log_setup
+        Boost::log
         Boost::thread
         Boost::serialization
         ZLIB::ZLIB
+        ${ICUI18N_LIBRARY}
+        ${ICUUC_LIBRARY}
+        ${ICUDATA_LIBRARY}
     PRIVATE
         ${CORE_FOUNDATION_LIBRARY}
 )
@@ -387,6 +399,10 @@ if(WIN32 AND ${Boost_VERSION} GREATER 106699) # boost >= 1.67
         PRIVATE
             ${BCRYPT_LIBRARY}
     )
+endif()
+
+if(CMAKE_SYSTEM_NAME MATCHES "Haiku")
+	target_link_libraries(freeorioncommon PUBLIC network)
 endif()
 
 add_dependencies(freeorioncommon freeorionversion)
@@ -433,17 +449,17 @@ target_compile_options(freeorionparseobj
 
 target_compile_definitions(freeorionparseobj
     PUBLIC
-        -DBOOST_ALL_DYN_LINK
+        $<$<NOT:$<PLATFORM_ID:Android>>:BOOST_ALL_DYN_LINK>
     PRIVATE
         -DNDEBUG
         -DFREEORION_BUILD_PARSE
 )
 
-if(NOT WIN32)
+if(NOT WIN32 AND NOT ANDROID)
     add_library(freeorionparse $<TARGET_OBJECTS:freeorionparseobj>)
 endif()
 
-if(WIN32)
+if(WIN32 OR ANDROID)
     add_library(freeorionparse STATIC $<TARGET_OBJECTS:freeorionparseobj>)
 
     set_property(TARGET freeorionparse
@@ -728,7 +744,7 @@ if(UNIX AND BUILD_CLIENT_GG)
     )
 endif()
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT ANDROID)
     install(
         TARGETS
             freeorioncommon

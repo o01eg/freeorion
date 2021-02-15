@@ -20,6 +20,8 @@ using boost::container::flat_map;
 
 class System;
 class SitRepEntry;
+class EmpireManager;
+class ObjectMap;
 struct UniverseObjectVisitor;
 FO_COMMON_API extern const int ALL_EMPIRES;
 FO_COMMON_API extern const int INVALID_GAME_TURN;
@@ -29,7 +31,7 @@ FO_COMMON_API extern const int INVALID_GAME_TURN;
 FO_COMMON_API extern const int INVALID_OBJECT_ID;
 
 // The ID number assigned to temporary universe objects
-FO_COMMON_API extern const int TEMPORARY_OBJECT_ID;
+constexpr int TEMPORARY_OBJECT_ID = -2;
 
 
 //! The various major subclasses of UniverseObject
@@ -95,7 +97,7 @@ public:
     bool                        Unowned() const;                    ///< returns true iff there are no owners of this object
     bool                        OwnedBy(int empire) const;          ///< returns true iff the empire with id \a empire owns this object; unowned objects always return false;
     /** Object owner is at war with empire @p empire_id */
-    virtual bool                HostileToEmpire(int empire_id) const;
+    virtual bool                HostileToEmpire(int empire_id, const EmpireManager& empires) const;
 
     virtual int                 SystemID() const;                   ///< returns the ID number of the system in which this object can be found, or INVALID_OBJECT_ID if the object is not within any system
 
@@ -139,7 +141,7 @@ public:
     Visibility                  GetVisibility(int empire_id) const; ///< returns the visibility status of this universe object relative to the input empire.
 
     /** Returns the name of this objectas it appears to empire \a empire_id .*/
-    virtual const std::string&  PublicName(int empire_id) const;
+    virtual const std::string&  PublicName(int empire_id, const ObjectMap& objects) const;
 
     /** Accepts a visitor object \see UniverseObjectVisitor */
     virtual std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const;
@@ -155,17 +157,14 @@ public:
     virtual void    Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_id) = 0;
 
     void            SetID(int id);                      ///< sets the ID number of the object to \a id
-    void            Rename(const std::string& name);    ///< renames this object to \a name
+    void            Rename(const std::string& name);    ///< renames this object to \a name     // TODO: by-value + move instead of const reference
 
     /** moves this object by relative displacements x and y. */
     void            Move(double x, double y);
 
-    /** calls MoveTo(std::shared_ptr<const UniverseObject>) with the object
-        pointed to by \a object_id. */
-    void            MoveTo(int object_id);
-
     /** moves this object to exact map coordinates of specified \a object. */
-    void            MoveTo(std::shared_ptr<UniverseObject> object);
+    void            MoveTo(const std::shared_ptr<const UniverseObject>& object);
+    void            MoveTo(const std::shared_ptr<UniverseObject>& object);
 
     /** moves this object to map coordinates (x, y). */
     void            MoveTo(double x, double y);
@@ -183,12 +182,7 @@ public:
     void            SetSystem(int sys);                     ///< assigns this object to a System.  does not actually move object in universe
     virtual void    AddSpecial(const std::string& name, float capacity = 0.0f); ///< adds the Special \a name to this object, if it is not already present
     virtual void    RemoveSpecial(const std::string& name); ///< removes the Special \a name from this object, if it is already present
-    void            SetSpecialCapacity(const std::string& name, float capacity);
-
-    /** Performs the movement that this object is responsible for this object's
-      * actions during the movement phase of a turn. */
-    virtual void    MovementPhase()
-    {};
+    void            SetSpecialCapacity(const std::string& name, float capacity);    // TODO: pass name by value with move?
 
     /** Sets current value of max, target and unpaired meters in in this
       * UniverseObject to Meter::DEFAULT_VALUE.  This should be done before any
@@ -210,16 +204,16 @@ public:
     virtual void    PopGrowthProductionResearchPhase()
     {};
 
-    static const double INVALID_POSITION;       ///< the position in x and y at which default-constructed objects are placed
-    static const int    INVALID_OBJECT_AGE;     ///< the age returned by UniverseObject::AgeInTurns() if the current turn is INVALID_GAME_TURN, or if the turn on which an object was created is INVALID_GAME_TURN
-    static const int    SINCE_BEFORE_TIME_AGE;  ///< the age returned by UniverseObject::AgeInTurns() if an object was created on turn BEFORE_FIRST_TURN
+    static constexpr double INVALID_POSITION = -100000.0;           ///< the position in x and y at which default-constructed objects are placed
+    static constexpr int    INVALID_OBJECT_AGE = -(1 << 30) - 1;;   ///< the age returned by UniverseObject::AgeInTurns() if the current turn is INVALID_GAME_TURN, or if the turn on which an object was created is INVALID_GAME_TURN
+    static constexpr int    SINCE_BEFORE_TIME_AGE = (1 << 30) + 1;  ///< the age returned by UniverseObject::AgeInTurns() if an object was created on turn BEFORE_FIRST_TURN
 
 protected:
     friend class Universe;
     friend class ObjectMap;
 
     UniverseObject();
-    UniverseObject(const std::string name, double x, double y);
+    UniverseObject(std::string name, double x, double y);
 
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);
 
@@ -247,8 +241,8 @@ private:
     MeterMap                CensoredMeters(Visibility vis) const;   ///< returns set of meters of this object that are censored based on the specified Visibility \a vis
 
     int                                             m_id = INVALID_OBJECT_ID;
-    double                                          m_x;
-    double                                          m_y;
+    double                                          m_x = INVALID_POSITION;
+    double                                          m_y = INVALID_POSITION;
     int                                             m_owner_empire_id = ALL_EMPIRES;
     int                                             m_system_id = INVALID_OBJECT_ID;
     std::map<std::string, std::pair<int, float>>    m_specials; // map from special name to pair of (turn added, capacity)

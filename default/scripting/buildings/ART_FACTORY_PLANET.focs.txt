@@ -13,14 +13,14 @@ BuildingType
         OwnerHasTech name = "PRO_EXOBOTS"
         Population high = 0
     ]
-    EnqueueLocation = [[ENQUEUE_ARTIFICIAL_PLANET_EXCLUSION]]
+    enqueuelocation = [[ENQUEUE_ARTIFICIAL_PLANET_EXCLUSION]]
     effectsgroups = [
         EffectsGroup
             scope = And [
                 Object id = Source.PlanetID
                 Planet
             ]
-            priority = [[EARLY_POPULATION_OVERRIDE_PRIORITY]]
+            priority = [[POPULATION_OVERRIDE_PRIORITY]]
             effects = [
                 SetPlanetType type = Barren
                 SetSpecies name = "SP_EXOBOT"

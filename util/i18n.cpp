@@ -115,7 +115,7 @@ namespace {
     // get currently set stringtable filename option value, or the default value
     // if the currenty value is empty
     std::string GetStringTableFileName() {
-        std::lock_guard<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
+        std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
         // initialize option value and default on first call
         if (!stringtable_filename_init)
             InitStringtableFileName();
@@ -128,7 +128,7 @@ namespace {
     }
 
     const StringTable& GetStringTable(boost::filesystem::path stringtable_path) {
-        std::lock_guard<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
+        std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
 
         if (!stringtable_filename_init)
             InitStringtableFileName();
@@ -196,19 +196,27 @@ std::locale GetLocale(const std::string& name) {
 }
 
 void FlushLoadedStringTables() {
-    std::lock_guard<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
+    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
     stringtables.clear();
 }
 
+const std::map<std::string, std::string>& AllStringtableEntries(bool default_table) {
+    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
+    if (default_table)
+        return GetDevDefaultStringTable().AllStrings();
+    else
+        return GetStringTable().AllStrings();
+}
+
 const std::string& UserString(const std::string& str) {
-    std::lock_guard<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
+    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
     if (GetStringTable().StringExists(str))
         return GetStringTable()[str];
     return GetDevDefaultStringTable()[str];
 }
 
 std::vector<std::string> UserStringList(const std::string& key) {
-    std::lock_guard<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
+    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
     std::vector<std::string> result;
     std::istringstream template_stream(UserString(key));
     std::string item;
@@ -218,7 +226,7 @@ std::vector<std::string> UserStringList(const std::string& key) {
 }
 
 bool UserStringExists(const std::string& str) {
-    std::lock_guard<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
+    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
     return GetStringTable().StringExists(str) || GetDevDefaultStringTable().StringExists(str);
 }
 
@@ -236,26 +244,26 @@ boost::format FlexibleFormat(const std::string &string_to_format) {
 }
 
 const std::string& Language() {
-    std::lock_guard<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
+    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
     return GetStringTable().Language();
 }
 
 std::string RomanNumber(unsigned int n) {
     //letter pattern (N) and the associated values (V)
-    static const std::string  N[] = { "M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
-    static const unsigned int V[] = {1000,  900, 500,  400, 100,   90,  50,   40,  10,    9,   5,    4,   1};
-    unsigned int remainder = n; //remainder of the number to be written
-    int i = 0;                  //pattern index
-    std::string retval = "";;
-    if (n == 0) return "";      //the romans didn't know there is a zero, read a book about history of the zero if you want to know more
-                                //Roman numbers are written using patterns, you chosse the highest pattern lower that the number
-                                //write it down, and substract it's value until you reach zero.
+    static const std::string N[] = { "M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
+    constexpr unsigned int V[] =   {1000,  900, 500,  400, 100,   90,  50,   40,  10,    9,   5,    4,   1};
+    unsigned int remainder = n; // remainder of the number to be written
+    int i = 0;                  // pattern index
+    if (n == 0) return "";      // the romans didn't know there is a zero, read a book about history of the zero if you want to know more
+                                // Roman numbers are written using patterns, you chosse the highest pattern lower that the number
+                                // write it down, and substract it's value until you reach zero.
 
     // safety check to avoid very long loops
     if (n > 10000)
         return "!";
 
     //we start with the highest pattern and reduce the size every time it doesn't fit
+    std::string retval;
     while (remainder > 0) {
         //check if number is larger than the actual pattern value
         if (remainder >= V[i]) {

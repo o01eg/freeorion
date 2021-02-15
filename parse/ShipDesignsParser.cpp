@@ -43,7 +43,7 @@ namespace {
     bool is_valid_uuid(const std::string& uuid_string) {
         try {
             boost::lexical_cast<boost::uuids::uuid>(uuid_string);
-        } catch (boost::bad_lexical_cast&) {
+        } catch (const boost::bad_lexical_cast&) {
             ErrorLogger() << uuid_string << " is not a valid UUID.  A valid UUID looks like 01234567-89ab-cdef-0123-456789abcdef";
             return false;
         }
@@ -57,7 +57,7 @@ namespace {
     boost::uuids::uuid parse_uuid(const std::string& uuid_string) {
         try {
             return boost::lexical_cast<boost::uuids::uuid>(uuid_string);
-        } catch (boost::bad_lexical_cast&) {
+        } catch (const boost::bad_lexical_cast&) {
             // This should never happen because the previous is_valid should short circuit.
             ErrorLogger() << uuid_string << " is not a valid UUID.  A valid UUID looks like 01234567-89ab-cdef-0123-456789abcdef";
             return boost::uuids::nil_generator()();
@@ -102,27 +102,27 @@ namespace {
 
             design_prefix
                 =    tok.ShipDesign_
-                >    label(tok.Name_) > tok.string [ _r1 = _1 ]
-                >    ((label(tok.UUID_)
+                >    label(tok.name_) > tok.string [ _r1 = _1 ]
+                >    ((label(tok.uuid_)
                        > tok.string [_pass = is_valid_uuid_(_1),  _r5 = parse_uuid_(_1) ])
                       | eps [ _r5 = boost::uuids::nil_generator()() ]
                      )
-                >    label(tok.Description_) > tok.string [ _r2 = _1 ]
+                >    label(tok.description_) > tok.string [ _r2 = _1 ]
                 > (
                      tok.NoStringtableLookup_ [ _r4 = false ]
                     | eps [ _r4 = true ]
                   )
-                >    label(tok.Hull_)        > tok.string [ _r3 = _1 ]
+                >    label(tok.hull_)        > tok.string [ _r3 = _1 ]
                 ;
 
             design
                 =    design_prefix(_a, _b, _c, _f, _g)
-                >    label(tok.Parts_)
+                >    label(tok.parts_)
                 >    one_or_more_string_tokens [ _d = _1 ]
                 >   -(
-                        label(tok.Icon_)     > tok.string [ _e = _1 ]
+                        label(tok.icon_)     > tok.string [ _e = _1 ]
                      )
-                >    label(tok.Model_)       > tok.string
+                >    label(tok.model_)       > tok.string
                 [ insert_ship_design_(_r1, _a, _b, _c, _d, _e, _1, _f, _g) ]
                 ;
 
@@ -187,7 +187,7 @@ namespace {
 
             design_manifest
                 =    tok.ShipDesignOrdering_
-                >    *(label(tok.UUID_)       > tok.string [ push_back(_r1, parse_uuid_(_1)) ])
+                >    *(label(tok.uuid_)       > tok.string [ push_back(_r1, parse_uuid_(_1)) ])
                 ;
 
             start

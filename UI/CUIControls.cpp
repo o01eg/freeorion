@@ -6,7 +6,7 @@
 #include "IconTextBrowseWnd.h"
 #include "Sound.h"
 #include "Hotkeys.h"
-#include "../client/human/HumanClientApp.h"
+#include "../client/human/GGHumanClientApp.h"
 #include "../util/i18n.h"
 #include "../util/Logger.h"
 #include "../util/OptionsDB.h"
@@ -1357,7 +1357,7 @@ void StatisticIcon::PreRender() {
 }
 
 double StatisticIcon::GetValue(size_t index) const {
-    if (index < 0 || index >= m_values.size()) {
+    if (index < 0u || index >= m_values.size()) {
         ErrorLogger() << "StatisticIcon::GetValue passed index out of range index:" << index;
         return 0.0;
     }
@@ -1365,7 +1365,7 @@ double StatisticIcon::GetValue(size_t index) const {
 }
 
 void StatisticIcon::SetValue(double value, size_t index) {
-    if (index < 0 || index > 1) {
+    if (index < 0u || index > 1u) {
         ErrorLogger() << "StatisticIcon::SetValue passed index out of range index:" << index;
         return;
     }
@@ -1520,7 +1520,7 @@ void CUIToolBar::Render() {
 // class SpeciesSelector
 ///////////////////////////////////////
 namespace {
-    static const std::string EMPTY_STRING("");
+    static const std::string EMPTY_STRING;
 
     // row type used in the SpeciesSelector
     struct SpeciesRow : public GG::ListBox::Row {

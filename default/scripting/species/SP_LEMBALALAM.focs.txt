@@ -60,7 +60,7 @@ Species
             scope = Source
             activation = And [
                 Planet
-                Not Planet environment = [ uninhabitable ]
+                Not Planet environment = [ Uninhabitable ]
             ]
             priority = [[TARGET_POPULATION_OVERRIDE_PRIORITY]]
             effects =
@@ -74,7 +74,7 @@ Species
                 Planet
             ]
             activation = Turn high = 1
-            priority = [[EARLY_POPULATION_OVERRIDE_PRIORITY]]
+            priority = [[POPULATION_OVERRIDE_PRIORITY]]
             effects = SetPopulation value = Target.TargetPopulation
 
         // Give techs to empire

@@ -22,7 +22,7 @@
 #include "../universe/ShipPart.h"
 #include "../universe/Conditions.h"
 #include "../universe/ValueRef.h"
-#include "../client/human/HumanClientApp.h"
+#include "../client/human/GGHumanClientApp.h"
 
 #include <GG/Layout.h>
 #include <GG/StaticGraphic.h>
@@ -190,11 +190,7 @@ namespace {
                 stockpile = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->Stockpile();
                 stockpile_limit_per_turn = empire->GetProductionQueue().StockpileCapacity();
 
-                std::pair<double, int> cost_time = empire->ProductionCostAndTime(m_item, m_location_id);
-                //cost_text = DoubleToString(cost_time.first, 3, false);
-
-                float total_cost = static_cast<float>(cost_time.first);
-                int minimum_production_time = cost_time.second;
+                auto [total_cost, minimum_production_time] = m_item.ProductionCostAndTime(m_empire_id, m_location_id);
 
                 int production_time = ProductionTurns(total_cost, minimum_production_time,
                                                       local_pp_output, stockpile,
@@ -306,6 +302,8 @@ namespace {
     std::shared_ptr<GG::BrowseInfoWnd> ProductionItemRowBrowseWnd(const ProductionQueue::ProductionItem& item,
                                                                   int candidate_object_id, int empire_id)
     {
+        ScopedTimer("ProductionItemRowBrowseWnd: " + item.name);
+
         // get available PP for empire at candidate location
         float local_pp_output = 0.0f;
         float stockpile = 0.0f;
@@ -533,6 +531,8 @@ namespace {
             SetMargin(0);
             SetRowAlignment(GG::ALIGN_NONE);
             SetChildClippingMode(ChildClippingMode::ClipToClient);
+
+            ScopedTimer("ProductionItemRow: " + item.name);
 
             if (m_item.build_type == BuildType::BT_SHIP) {
                 SetDragDropDataType(std::to_string(m_item.design_id));
@@ -963,6 +963,8 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
     if (!empire)
         return;
 
+    SectionedScopedTimer timer("BuildDesignatorWnd::BuildSelector::PopulateList");
+
     // Capture the list scroll state
     // Try to preserve the same queue context with completely new queue items
     std::size_t initial_offset_from_begin = std::distance(m_buildable_items->begin(), m_buildable_items->FirstRowShown());
@@ -974,6 +976,7 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
     auto default_font = ClientUI::GetFont();
     const GG::Pt row_size = m_buildable_items->ListRowSize();
 
+    timer.EnterSection("fixed projects");
     // populate list with fixed projects
     if (BuildableItemVisible(BuildType::BT_STOCKPILE)) {
         auto stockpile_row = GG::Wnd::Create<ProductionItemRow>(
@@ -986,13 +989,14 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
     //DebugLogger() << "BuildDesignatorWnd::BuildSelector::PopulateList() : Adding Buildings ";
     if (m_build_types_shown.count(BuildType::BT_BUILDING)) {
         BuildingTypeManager& manager = GetBuildingTypeManager();
-        // craete and insert rows...
+        // create and insert rows...
         std::vector<std::shared_ptr<GG::ListBox::Row>> rows;
         rows.reserve(std::distance(manager.begin(), manager.end()));
-        for (const auto& entry : manager) {
-            auto& name = entry.first;
+        for (const auto& [name, ignored_type] : manager) {
+            (void)ignored_type; // quiet unused variable warning
             if (!BuildableItemVisible(BuildType::BT_BUILDING, name))
                 continue;
+            timer.EnterSection(name);
             auto item_row = GG::Wnd::Create<ProductionItemRow>(
                 row_size.x, row_size.y, ProductionQueue::ProductionItem(BuildType::BT_BUILDING, name),
                 m_empire_id, m_production_location);
@@ -1024,6 +1028,7 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
             const ShipDesign* ship_design = GetShipDesign(ship_design_id);
             if (!ship_design)
                 continue;
+            timer.EnterSection(ship_design->Name());
             auto item_row = GG::Wnd::Create<ProductionItemRow>(
                 row_size.x, row_size.y, 
                 ProductionQueue::ProductionItem(BuildType::BT_SHIP, ship_design_id),
@@ -1033,6 +1038,7 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
         m_buildable_items->Insert(std::move(rows));
     }
 
+    timer.EnterSection("end bits");
     // resize inserted rows and record first row to show
     for (auto& row : *m_buildable_items)
         row->Resize(row_size);
@@ -1160,7 +1166,7 @@ void BuildDesignatorWnd::CompleteConstruction() {
     m_side_panel = GG::Wnd::Create<SidePanel>(PROD_SIDEPANEL_WND_NAME);
     m_build_selector = GG::Wnd::Create<BuildSelector>(PROD_SELECTOR_WND_NAME);
     InitializeWindows();
-    HumanClientApp::GetApp()->RepositionWindowsSignal.connect(
+    GGHumanClientApp::GetApp()->RepositionWindowsSignal.connect(
         boost::bind(&BuildDesignatorWnd::InitializeWindows, this));
 
     m_side_panel->EnableSelection();
@@ -1239,7 +1245,7 @@ void BuildDesignatorWnd::CenterOnBuild(int queue_idx, bool open) {
 
     const ObjectMap& objects = GetUniverse().Objects();
 
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const Empire* empire = GetEmpire(empire_id);
     if (!empire) {
         ErrorLogger() << "BuildDesignatorWnd::CenterOnBuild couldn't get empire with id " << empire_id;
@@ -1255,7 +1261,7 @@ void BuildDesignatorWnd::CenterOnBuild(int queue_idx, bool open) {
             auto&& map = ClientUI::GetClientUI()->GetMapWnd();
             map->CenterOnObject(system_id);
             if (open) {
-                HumanClientApp::GetApp()->GetClientUI().GetMapWnd()->SelectSystem(system_id);
+                GGHumanClientApp::GetApp()->GetClientUI().GetMapWnd()->SelectSystem(system_id);
                 SelectPlanet(location_id);
             }
         }
@@ -1263,7 +1269,7 @@ void BuildDesignatorWnd::CenterOnBuild(int queue_idx, bool open) {
 }
 
 void BuildDesignatorWnd::SetBuild(int queue_idx) {
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const Empire* empire = GetEmpire(empire_id);
     if (!empire) {
         ErrorLogger() << "BuildDesignatorWnd::SetBuild couldn't get empire with id " << empire_id;
@@ -1310,7 +1316,7 @@ void BuildDesignatorWnd::SelectPlanet(int planet_id) {
 }
 
 void BuildDesignatorWnd::Refresh() {
-    m_build_selector->SetEmpireID(HumanClientApp::GetApp()->EmpireID(), false);
+    m_build_selector->SetEmpireID(GGHumanClientApp::GetApp()->EmpireID(), false);
     Update();
 }
 
@@ -1503,7 +1509,7 @@ int BuildDesignatorWnd::BuildLocation() const
 void BuildDesignatorWnd::BuildItemRequested(const ProductionQueue::ProductionItem& item,
                                             int num_to_build, int pos)
 {
-    const Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (empire && empire->EnqueuableItem(item, BuildLocation()))
         AddBuildToQueueSignal(item, num_to_build, BuildLocation(), pos);
 }

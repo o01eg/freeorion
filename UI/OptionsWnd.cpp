@@ -1,6 +1,6 @@
 #include "OptionsWnd.h"
 
-#include "../client/human/HumanClientApp.h"
+#include "../client/human/GGHumanClientApp.h"
 #include "../util/Directories.h"
 #include "../util/i18n.h"
 #include "../util/Logger.h"
@@ -179,14 +179,14 @@ namespace {
 
     // Small window that will grab a unique key press.
     class KeyPressCatcher : public GG::Wnd {
-        GG::Key                 m_key;
-        std::uint32_t           m_code_point;
+        GG::Key                 m_key{GG::Key::GGK_NONE};
+        std::uint32_t           m_code_point{0};
         GG::Flags<GG::ModKey>   m_mods;
 
     public:
         KeyPressCatcher() :
             Wnd(GG::X0, GG::Y0, GG::X0, GG::Y0, GG::Flags<GG::WndFlag>(GG::MODAL))
-        {};
+        {}
 
         void Render() override
         {}
@@ -440,7 +440,7 @@ namespace {
                     return;
                 const auto dropdown_row = dynamic_cast<CUISimpleDropDownListRow* const>(it->get());
                 const auto& option_value = dropdown_row->Name();
-                HumanClientApp::GetApp()->ChangeLoggerThreshold(option_name, to_LogLevel(option_value));
+                GGHumanClientApp::GetApp()->ChangeLoggerThreshold(option_name, to_LogLevel(option_value));
             });
     }
 }
@@ -537,7 +537,7 @@ void OptionsWnd::CompleteConstruction() {
         window_reset_button, 0);
     current_page->Insert(row);
     window_reset_button->LeftClickedSignal.connect(
-        HumanClientApp::GetApp()->RepositionWindowsSignal);
+        GGHumanClientApp::GetApp()->RepositionWindowsSignal);
 
     FileOption(current_page, 0, "resource.stringtable.path",    UserString("OPTIONS_LANGUAGE"),
                GetRootDataDir() / "default" / "stringtables",
@@ -935,25 +935,30 @@ void OptionsWnd::HotkeyOption(GG::ListBox* page, int indentation_level, const st
     auto row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH, std::max(button->MinUsableSize().y, text_control->MinUsableSize().y) + 6,
                                                layout, indentation_level);
 
-    button->LeftClickedSignal.connect(boost::bind(HandleSetHotkeyOption, hotkey_name, button.get()));
-    button->RightClickedSignal.connect(boost::bind(HandleResetHotkeyOption, hotkey_name, button.get()));
+    button->LeftClickedSignal.connect(boost::bind(HandleSetHotkeyOption, std::ref(hotkey_name), button.get()));
+    button->RightClickedSignal.connect(boost::bind(HandleResetHotkeyOption, std::ref(hotkey_name), button.get()));
 
     page->Insert(row);
 }
 
-GG::Spin<int>* OptionsWnd::IntOption(GG::ListBox* page, int indentation_level, const std::string& option_name, const std::string& text) {
+GG::Spin<int>* OptionsWnd::IntOption(GG::ListBox* page, int indentation_level,
+                                     const std::string& option_name, const std::string& text)
+{
     auto text_control = GG::Wnd::Create<CUILabel>(text, GG::FORMAT_LEFT | GG::FORMAT_NOWRAP, GG::INTERACTIVE);
     std::shared_ptr<const ValidatorBase> validator = GetOptionsDB().GetValidator(option_name);
     std::shared_ptr<GG::Spin<int>> spin;
     int value = GetOptionsDB().Get<int>(option_name);
-    if (std::shared_ptr<const RangedValidator<int>> ranged_validator = std::dynamic_pointer_cast<const RangedValidator<int>>(validator))
+
+    if (auto ranged_validator = std::dynamic_pointer_cast<const RangedValidator<int>>(validator))
         spin = GG::Wnd::Create<CUISpin<int>>(value, 1, ranged_validator->m_min, ranged_validator->m_max, true);
-    else if (std::shared_ptr<const StepValidator<int>> step_validator = std::dynamic_pointer_cast<const StepValidator<int>>(validator))
+    else if (auto step_validator = std::dynamic_pointer_cast<const StepValidator<int>>(validator))
         spin = GG::Wnd::Create<CUISpin<int>>(value, step_validator->m_step_size, -1000000, 1000000, true);
-    else if (std::shared_ptr<const RangedStepValidator<int>> ranged_step_validator = std::dynamic_pointer_cast<const RangedStepValidator<int>>(validator))
-        spin = GG::Wnd::Create<CUISpin<int>>(value, ranged_step_validator->m_step_size, ranged_step_validator->m_min, ranged_step_validator->m_max, true);
-    else if (std::shared_ptr<const Validator<int>> int_validator = std::dynamic_pointer_cast<const Validator<int>>(validator))
+    else if (auto ranged_step_validator = std::dynamic_pointer_cast<const RangedStepValidator<int>>(validator))
+        spin = GG::Wnd::Create<CUISpin<int>>(value, ranged_step_validator->m_step_size, ranged_step_validator->m_min,
+                                             ranged_step_validator->m_max, true);
+    else if (auto int_validator = std::dynamic_pointer_cast<const Validator<int>>(validator))
         spin = GG::Wnd::Create<CUISpin<int>>(value, 1, -1000000, 1000000, true);
+
     if (!spin) {
         ErrorLogger() << "Unable to create IntOption spin";
         return nullptr;
@@ -978,19 +983,24 @@ GG::Spin<int>* OptionsWnd::IntOption(GG::ListBox* page, int indentation_level, c
     return spin.get();
 }
 
-GG::Spin<double>* OptionsWnd::DoubleOption(GG::ListBox* page, int indentation_level, const std::string& option_name, const std::string& text) {
+GG::Spin<double>* OptionsWnd::DoubleOption(GG::ListBox* page, int indentation_level,
+                                           const std::string& option_name, const std::string& text)
+{
     auto text_control = GG::Wnd::Create<CUILabel>(text, GG::FORMAT_LEFT | GG::FORMAT_NOWRAP, GG::INTERACTIVE);
     std::shared_ptr<const ValidatorBase> validator = GetOptionsDB().GetValidator(option_name);
     std::shared_ptr<GG::Spin<double>> spin;
     double value = GetOptionsDB().Get<double>(option_name);
-    if (std::shared_ptr<const RangedValidator<double>> ranged_validator = std::dynamic_pointer_cast<const RangedValidator<double>>(validator))
+
+    if (auto ranged_validator = std::dynamic_pointer_cast<const RangedValidator<double>>(validator))
         spin = GG::Wnd::Create<CUISpin<double>>(value, 1, ranged_validator->m_min, ranged_validator->m_max, true);
-    else if (std::shared_ptr<const StepValidator<double>> step_validator = std::dynamic_pointer_cast<const StepValidator<double>>(validator))
+    else if (auto step_validator = std::dynamic_pointer_cast<const StepValidator<double>>(validator))
         spin = GG::Wnd::Create<CUISpin<double>>(value, step_validator->m_step_size, -1000000, 1000000, true);
-    else if (std::shared_ptr<const RangedStepValidator<double>> ranged_step_validator = std::dynamic_pointer_cast<const RangedStepValidator<double>>(validator))
-        spin = GG::Wnd::Create<CUISpin<double>>(value, ranged_step_validator->m_step_size, ranged_step_validator->m_min, ranged_step_validator->m_max, true);
-    else if (std::shared_ptr<const Validator<double>> double_validator = std::dynamic_pointer_cast<const Validator<double>>(validator))
+    else if (auto ranged_step_validator = std::dynamic_pointer_cast<const RangedStepValidator<double>>(validator))
+        spin = GG::Wnd::Create<CUISpin<double>>(value, ranged_step_validator->m_step_size,
+                                                ranged_step_validator->m_min, ranged_step_validator->m_max, true);
+    else if (auto double_validator = std::dynamic_pointer_cast<const Validator<double>>(validator))
         spin = GG::Wnd::Create<CUISpin<double>>(value, 1, -1000000, 1000000, true);
+
     if (!spin) {
         ErrorLogger() << "Unable to create DoubleOption spin";
         return nullptr;
@@ -1015,7 +1025,7 @@ GG::Spin<double>* OptionsWnd::DoubleOption(GG::ListBox* page, int indentation_le
     return spin.get();
 }
 
-void OptionsWnd::MusicVolumeOption(GG::ListBox* page, int indentation_level, SoundOptionsFeedback &fb) {
+void OptionsWnd::MusicVolumeOption(GG::ListBox* page, int indentation_level, SoundOptionsFeedback& fb) {
     auto row = GG::Wnd::Create<GG::ListBox::Row>();
     auto button = GG::Wnd::Create<CUIStateButton>(UserString("OPTIONS_MUSIC"), GG::FORMAT_LEFT,
                                                   std::make_shared<CUICheckBoxRepresenter>());
@@ -1342,7 +1352,7 @@ void OptionsWnd::ResolutionOption(GG::ListBox* page, int indentation_level) {
                                           apply_button, indentation_level);
     page->Insert(row);
     apply_button->LeftClickedSignal.connect(
-        boost::bind(&HumanClientApp::Reinitialize, HumanClientApp::GetApp()));
+        boost::bind(&GGHumanClientApp::Reinitialize, GGHumanClientApp::GetApp()));
 
     drop_list->SelChangedSignal.connect(
         [drop_list](GG::ListBox::iterator it) {
@@ -1392,15 +1402,13 @@ namespace {
 
     std::map<std::string, std::set<std::string>> HotkeysBySection() {
         std::map<std::string, std::set<std::string>> retval;
-        for (const auto& entry : Hotkey::DefinedHotkeys()) {
+        for (auto& entry : Hotkey::DefinedHotkeys())
             retval[ValidSectionForHotkey(entry)].insert(entry);
-        }
         return retval;
     }
 }
 
 void OptionsWnd::HotkeysPage() {
-
     GG::ListBox* page = CreatePage(UserString("OPTIONS_PAGE_HOTKEYS"));
     for (const auto& class_hotkeys : HotkeysBySection()) {
         CreateSectionHeader(page, 0, UserString(class_hotkeys.first));
@@ -1470,10 +1478,10 @@ void OptionsWnd::SoundOptionsFeedback::UISoundsVolumeSlid(int pos, int low, int 
 }
 
 void OptionsWnd::SoundOptionsFeedback::SetMusicButton(std::shared_ptr<GG::StateButton> button)
-{ m_music_button = button; }
+{ m_music_button = std::move(button); }
 
 void OptionsWnd::SoundOptionsFeedback::SetEffectsButton(std::shared_ptr<GG::StateButton> button)
-{ m_effects_button = button; }
+{ m_effects_button = std::move(button); }
 
 void OptionsWnd::SoundOptionsFeedback::SoundInitializationFailure(Sound::InitializationFailureException const &e) {
     GetOptionsDB().Set("audio.effects.enabled", false);

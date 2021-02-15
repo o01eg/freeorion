@@ -8,12 +8,12 @@ BuildingType
         ((GameRule name = "RULE_ENABLE_SUPER_TESTER") > 0)
     ]
     effectsgroups = [
-        Effectsgroup
+        EffectsGroup
         scope = And [
             Object id = Source.PlanetID
             Planet
         ]
-        priority = [[EARLY_POPULATION_OVERRIDE_PRIORITY]]
+        priority = [[POPULATION_OVERRIDE_PRIORITY]]
         effects = [
             SetSpecies name = "SP_SUPER_TEST"
             SetPopulation value = max(Target.Population, 1)

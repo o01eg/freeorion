@@ -120,9 +120,10 @@ void RenameOrder::ExecuteImpl() const {
 ////////////////////////////////////////////////
 NewFleetOrder::NewFleetOrder(int empire, std::string fleet_name,
                              std::vector<int> ship_ids,
-                             bool aggressive, bool passive) :
+                             bool aggressive, bool passive, bool defensive) :
     NewFleetOrder(empire, std::move(fleet_name), std::move(ship_ids),
                   aggressive ? FleetAggression::FLEET_AGGRESSIVE :
+                  defensive ? FleetAggression::FLEET_DEFENSIVE :
                   passive ? FleetAggression::FLEET_PASSIVE :
                   FleetAggression::FLEET_OBSTRUCTIVE)
 {}
@@ -147,6 +148,7 @@ std::string NewFleetOrder::Dump() const {
     const std::string& aggression_text =
         m_aggression == FleetAggression::FLEET_AGGRESSIVE ? UserString("FLEET_AGGRESSIVE") :
         m_aggression == FleetAggression::FLEET_OBSTRUCTIVE ? UserString("FLEET_OBSTRUCTIVE") :
+        m_aggression == FleetAggression::FLEET_DEFENSIVE ? UserString("FLEET_DEFENSIVE") :
         m_aggression == FleetAggression::FLEET_PASSIVE ? UserString("FLEET_PASSIVE") :
         UserString("INVALID_FLEET_AGGRESSION");
 
@@ -161,7 +163,7 @@ bool NewFleetOrder::Check(int empire, const std::string& fleet_name, const std::
                           FleetAggression aggression)
 {
     if (ship_ids.empty()) {
-        ErrorLogger() << "Empire attempted to create a new fleet without ships";
+        ErrorLogger() << "Empire " << empire << " attempted to create a new fleet (" << fleet_name << ") without ships";
         return false;
     }
 
@@ -170,15 +172,18 @@ bool NewFleetOrder::Check(int empire, const std::string& fleet_name, const std::
     for (const auto& ship : Objects().find<Ship>(ship_ids)) {
         // verify that empire is not trying to take ships from somebody else's fleet
         if (!ship) {
-            ErrorLogger() << "Empire attempted to create a new fleet with an invalid ship";
+            ErrorLogger() << "Empire " << empire << " attempted to create a new fleet (" << fleet_name
+                          << ") with an invalid ship";
             return false;
         }
         if (!ship->OwnedBy(empire)) {
-            ErrorLogger() << "Empire attempted to create a new fleet with ships from another's fleet.";
+            ErrorLogger() << "Empire " << empire << " attempted to create a new fleet (" << fleet_name
+                          << ") with ships from another's (" << ship->Owner() << ") fleet.";
             return false;
         }
         if (ship->SystemID() == INVALID_OBJECT_ID) {
-            ErrorLogger() << "Empire to create a new fleet with traveling ships.";
+            ErrorLogger() << "Empire " << empire << " attempted to create a new fleet (" << fleet_name
+                          << ") with ship (" << ship->ID() << ") not in a system";
             return false;
         }
 
@@ -186,18 +191,22 @@ bool NewFleetOrder::Check(int empire, const std::string& fleet_name, const std::
             system_id = ship->SystemID();
 
         if (ship->SystemID() != system_id) {
-            ErrorLogger() << "Empire attempted to make a new fleet from ship in the wrong system";
+            ErrorLogger() << "Empire " << empire << " attempted to make a new fleet (" << fleet_name
+                          << ") from ship (" << ship->ID() << ") in the wrong system (" << ship->SystemID()
+                          << " not " << system_id << ")";
             return false;
         }
     }
 
     if (system_id == INVALID_OBJECT_ID) {
-        ErrorLogger() << "Empire attempted to create a new fleet outside a system";
+        ErrorLogger() << "Empire " << empire << " attempted to create a new fleet (" << fleet_name
+                      << ") outside a system";
         return false;
     }
     auto system = Objects().get<System>(system_id);
     if (!system) {
-        ErrorLogger() << "Empire attempted to create a new fleet in a nonexistant system";
+        ErrorLogger() << "Empire " << empire << " attempted to create a new fleet (" << fleet_name
+                      << ") in a nonexistant system (" << system_id << ")";
         return false;
     }
 
@@ -262,7 +271,7 @@ void NewFleetOrder::ExecuteImpl() const {
     fleet->SetMoveOrderedTurn(ordered_moved_turn);
 
     if (m_fleet_name.empty())
-        fleet->Rename(fleet->GenerateFleetName());
+        fleet->Rename(fleet->GenerateFleetName(Objects()));
 
     GetUniverse().InhibitUniverseObjectSignals(false);
 
@@ -296,7 +305,7 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
     if (!Check(empire_id, fleet_id, dest_system_id))
         return;
 
-    auto fleet = Objects().get<Fleet>(FleetID());
+    auto fleet = GetUniverse().Objects().get<Fleet>(FleetID()); // TODO: Get from passed-in stuff
 
     int start_system = fleet->SystemID();
     if (start_system == INVALID_OBJECT_ID)
@@ -304,7 +313,7 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
     if (append && !fleet->TravelRoute().empty())
         start_system = fleet->TravelRoute().back();
 
-    auto short_path = GetPathfinder()->ShortestPath(start_system, m_dest_system, EmpireID());
+    auto short_path = GetUniverse().GetPathfinder()->ShortestPath(start_system, m_dest_system, EmpireID(), Objects()); // TODO: Get PathFinder from passed-in stuff
     if (short_path.first.empty()) {
         ErrorLogger() << "FleetMoveOrder generated empty shortest path between system " << start_system
                       << " and " << m_dest_system << " for empire " << EmpireID() << " with fleet " << fleet_id;
@@ -397,14 +406,14 @@ void FleetMoveOrder::ExecuteImpl() const {
     }
 
     // check destination validity: disallow movement that's out of range
-    auto eta = fleet->ETA(fleet->MovePath(route_list));
+    auto eta = fleet->ETA(fleet->MovePath(route_list, false, ScriptingContext()));
     if (eta.first == Fleet::ETA_NEVER || eta.first == Fleet::ETA_OUT_OF_RANGE) {
         DebugLogger() << "FleetMoveOrder::ExecuteImpl rejected out of range move order";
         return;
     }
 
     try {
-        fleet->SetRoute(route_list);
+        fleet->SetRoute(route_list, Objects());
         fleet->SetMoveOrderedTurn(CurrentTurn());
         // todo: set last turn ordered moved
     } catch (const std::exception& e) {
@@ -547,12 +556,14 @@ std::string ColonizeOrder::Dump() const {
 bool ColonizeOrder::Check(int empire_id, int ship_id, int planet_id) {
     auto ship = Objects().get<Ship>(ship_id);
     if (!ship) {
-        ErrorLogger() << "ColonizeOrder::Check() : passed an invalid ship_id " << ship_id;
+        ErrorLogger() << "ColonizeOrder::Check() : empire " << empire_id
+                      << " passed an invalid ship_id: " << ship_id;
         return false;
     }
     auto fleet = Objects().get<Fleet>(ship->FleetID());
     if (!fleet) {
-        ErrorLogger() << "ColonizeOrder::Check() : ship with passed ship_id has invalid fleet_id";
+        ErrorLogger() << "ColonizeOrder::Check() : empire " << empire_id
+                      << " passed ship (" << ship_id << ") with an invalid fleet_id: " << ship->FleetID();
         return false;
     }
 
@@ -974,7 +985,7 @@ void PolicyOrder::ExecuteImpl() const {
     else
         DebugLogger() << "PolicyOrder revoke " << m_policy_name << " from category " << m_category
                       << " in slot " << m_slot;
-    empire->AdoptPolicy(m_policy_name, m_category, m_adopt, m_slot);
+    empire->AdoptPolicy(m_policy_name, m_category, m_adopt, m_slot, Objects());
 }
 
 ////////////////////////////////////////////////
@@ -1034,7 +1045,6 @@ ProductionQueueOrder::ProductionQueueOrder(ProdQueueOrderAction action, int empi
     m_new_quantity(number),
     m_new_index(pos),
     m_uuid(boost::uuids::random_generator()()),
-    m_uuid2(boost::uuids::nil_generator()()),
     m_action(action)
 {
     if (action != ProdQueueOrderAction::PLACE_IN_QUEUE)
@@ -1045,7 +1055,6 @@ ProductionQueueOrder::ProductionQueueOrder(ProdQueueOrderAction action, int empi
                                            boost::uuids::uuid uuid, int num1, int num2) :
     Order(empire),
     m_uuid(uuid),
-    m_uuid2(boost::uuids::nil_generator()()),
     m_action(action)
 {
     switch(m_action) {
@@ -1064,6 +1073,7 @@ ProductionQueueOrder::ProductionQueueOrder(ProdQueueOrderAction action, int empi
         break;
     case ProdQueueOrderAction::MOVE_ITEM_TO_INDEX:
         m_new_index = num1;
+        break;
     case ProdQueueOrderAction::SET_RALLY_POINT:
         m_rally_point_id = num1;
         break;

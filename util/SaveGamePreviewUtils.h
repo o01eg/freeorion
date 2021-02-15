@@ -19,15 +19,15 @@ struct FO_COMMON_API SaveGamePreviewData {
     bool Valid() const;         /// Checks that this is a valid preview
     void SetBinary(bool bin = true);         /// Sets the description string appropriate for a binary or XML save file header
 
-    static const short  PREVIEW_PRESENT_MARKER = 0xDA;  /// A marker for the presence of the header
-    short               magic_number;                   /// This should always contain PREVIEW_PRESENT_MARKER
+    static constexpr short  PREVIEW_PRESENT_MARKER = 0xDA;          /// A marker for the presence of the header
+    short                   magic_number = PREVIEW_PRESENT_MARKER;  /// This should always contain PREVIEW_PRESENT_MARKER
 
     std::string         description;                    /// Bit of text explaining what this file contains as human-readable text
     std::string         freeorion_version;              /// By what version of FreeOrion was this save generated
 
     std::string         main_player_name;               /// The name of the hosting player, or the single human player in single player games
     std::string         main_player_empire_name;        /// The name of the empire of the main player
-    std::array<unsigned char, 4> main_player_empire_colour;      /// The colour of the empire of the main player
+    std::array<unsigned char, 4> main_player_empire_colour = {{192, 192, 255, 255}};/// The colour of the empire of the main player
     int                 current_turn = -1;              /// The turn the game as saved one
     std::string         save_time;                      /// The time the game was saved as ISO 8601 YYYY-MM-DD"T"HH:MM:SS±HH:MM or Z
     short               number_of_empires = -1;         /// The number of empires in the game

@@ -64,9 +64,9 @@ void System::Copy(std::shared_ptr<const UniverseObject> copied_object, int empir
 
     int copied_object_id = copied_object->ID();
     Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(copied_object_id, empire_id);
-    std::set<std::string> visible_specials = GetUniverse().GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
+    auto visible_specials = GetUniverse().GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
 
-    UniverseObject::Copy(copied_object, vis, visible_specials);
+    UniverseObject::Copy(std::move(copied_object), vis, visible_specials);
 
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
         // add any visible lanes, without removing existing entries
@@ -192,7 +192,7 @@ const std::string& System::ApparentName(int empire_id, bool blank_unexplored_and
     static const std::string EMPTY_STRING;
 
     if (empire_id == ALL_EMPIRES)
-        return this->PublicName(empire_id);
+        return this->PublicName(empire_id, Objects()); // TODO: pass Universe into this function
 
     // has the indicated empire ever detected this system?
     const auto& vtm = GetUniverse().GetObjectVisibilityTurnMapByEmpire(this->ID(), empire_id);
@@ -210,7 +210,7 @@ const std::string& System::ApparentName(int empire_id, bool blank_unexplored_and
         // determine if there are any planets in the system
         for (const auto& entry : Objects().ExistingPlanets()) {
             if (entry.second->SystemID() == this->ID())
-                return this->PublicName(empire_id);
+                return this->PublicName(empire_id, Objects());
         }
         if (blank_unexplored_and_none) {
             //DebugLogger() << "System::ApparentName No-Star System (" << ID() << "), returning name "<< EMPTY_STRING;
@@ -220,7 +220,7 @@ const std::string& System::ApparentName(int empire_id, bool blank_unexplored_and
         return UserString("EMPTY_SPACE");
     }
 
-    return this->PublicName(empire_id);
+    return this->PublicName(empire_id, Objects()); // todo get Objects from inputs
 }
 
 StarType System::NextOlderStarType() const {
@@ -367,7 +367,7 @@ void System::Insert(std::shared_ptr<UniverseObject> obj, int orbit/* = -1*/) {
     switch (obj->ObjectType()) {
     case UniverseObjectType::OBJ_SHIP: {
         m_ships.insert(obj->ID());
-        if (std::shared_ptr<Ship> ship = std::dynamic_pointer_cast<Ship>(obj))
+        if (auto ship = std::dynamic_pointer_cast<Ship>(obj))
             ship->SetArrivedOnTurn(CurrentTurn());
         break;
     }

@@ -12,8 +12,8 @@ Hull
         Slot type = External position = (0.95, 0.65)
         Slot type = Internal position = (0.50, 0.30)
     ]
-    buildCost = 1
-    buildTime = 1
+    buildcost = 1
+    buildtime = 1
     Unproducible
     tags = [ "PEDIA_HULL_MONSTER_JUGGERNAUT" ]
     location = All
@@ -48,16 +48,12 @@ Hull
         [[MONSTER_SHIELD_REGENERATION]]
 
         EffectsGroup
-            scope = And [
-                Source
-                ContainedBy And [
-                    System 
-                    Contains Planet type = Asteroids
-                ]
-            ]
+            scope = Source
             activation = And [
-                Turn low = max(30, LocalCandidate.LastTurnActiveInBattle + 1)
-                Random probability = LocalCandidate.Age*0.01 - 0.1
+                InSystem
+                Turn low = max(30, Source.LastTurnActiveInBattle + 1)
+                ContainedBy Contains Planet type = Asteroids
+                Random probability = Source.Age*0.01 - 0.1
             ]
             effects = [
                 CreateShip designname = "SM_JUGGERNAUT_2" empire = Source.Owner

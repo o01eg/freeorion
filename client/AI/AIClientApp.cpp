@@ -178,7 +178,7 @@ void AIClientApp::ConnectToServer() {
 }
 
 void AIClientApp::StartPythonAI() {
-    m_AI.reset(new PythonAI());
+    m_AI = std::make_unique<PythonAI>();
     if (!(m_AI.get())->Initialize()) {
         HandlePythonAICrash();
         throw std::runtime_error("PythonAI failed to initialize.");
@@ -195,7 +195,6 @@ void AIClientApp::HandlePythonAICrash() {
     Networking().SendMessage(
         ErrorMessage(str(FlexibleFormat(UserString("ERROR_PYTHON_AI_CRASHED")) % PlayerName()) , true));
 }
-
 
 void AIClientApp::HandleMessage(const Message& msg) {
     //DebugLogger() << "AIClientApp::HandleMessage " << msg.Type();
@@ -249,14 +248,15 @@ void AIClientApp::HandleMessage(const Message& msg) {
 
         ExtractGameStartMessageData(msg,                     single_player_game,     m_empire_id,
                                     m_current_turn,          m_empires,              m_universe,
-                                    GetSpeciesManager(),     GetCombatLogManager(),  GetSupplyManager(),
+                                    m_species_manager,       GetCombatLogManager(),  m_supply_manager,
                                     m_player_info,           m_orders,               loaded_game_data,
                                     ui_data_available,       ui_data,                state_string_available,
                                     save_state_string,       m_galaxy_setup_data);
 
         DebugLogger() << "Extracted GameStart message for turn: " << m_current_turn << " with empire: " << m_empire_id;
 
-        GetUniverse().InitializeSystemGraph(m_empire_id);
+        m_universe.InitializeSystemGraph(m_empires, m_universe.Objects());
+        m_universe.UpdateEmpireVisibilityFilteredSystemGraphsWithMainObjectMap(m_empires);
 
         DebugLogger() << "Message::GAME_START loaded_game_data: " << loaded_game_data;
         if (loaded_game_data) {
@@ -335,7 +335,8 @@ void AIClientApp::HandleMessage(const Message& msg) {
                                      m_empires,               m_universe,         GetSpeciesManager(),
                                      GetCombatLogManager(),   GetSupplyManager(), m_player_info);
         //DebugLogger() << "AIClientApp::HandleMessage : generating orders";
-        GetUniverse().InitializeSystemGraph(m_empire_id);
+        m_universe.InitializeSystemGraph(m_empires, m_universe.Objects());
+        m_universe.UpdateEmpireVisibilityFilteredSystemGraphsWithMainObjectMap(m_empires);
         m_AI->GenerateOrders();
         //DebugLogger() << "AIClientApp::HandleMessage : done handling turn update message";
         break;

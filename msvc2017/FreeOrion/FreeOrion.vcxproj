@@ -124,7 +124,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <ForcedIncludeFiles>StdAfx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -172,7 +172,7 @@
     <ClInclude Include="..\..\client\ClientFSMEvents.h" />
     <ClInclude Include="..\..\client\ClientNetworking.h" />
     <ClInclude Include="..\..\client\human\chmain.h" />
-    <ClInclude Include="..\..\client\human\HumanClientApp.h" />
+    <ClInclude Include="..\..\client\human\GGHumanClientApp.h" />
     <ClInclude Include="..\..\client\human\HumanClientFSM.h" />
     <ClInclude Include="..\..\Empire\Empire.h" />
     <ClInclude Include="..\..\Empire\ResearchQueue.h" />
@@ -279,6 +279,7 @@
     <ClInclude Include="..\..\util\OrderSet.h" />
     <ClInclude Include="..\..\util\Process.h" />
     <ClInclude Include="..\..\util\Random.h" />
+    <ClInclude Include="..\..\util\SaveGamePreviewUtils.h" />
     <ClInclude Include="..\..\util\SitRepEntry.h" />
     <ClInclude Include="..\..\util\VarText.h" />
     <ClInclude Include="..\..\util\Version.h" />
@@ -293,7 +294,7 @@
     <ClCompile Include="..\..\client\ClientFSMEvents.cpp" />
     <ClCompile Include="..\..\client\ClientNetworking.cpp" />
     <ClCompile Include="..\..\client\human\chmain.cpp" />
-    <ClCompile Include="..\..\client\human\HumanClientApp.cpp" />
+    <ClCompile Include="..\..\client\human\GGHumanClientApp.cpp" />
     <ClCompile Include="..\..\client\human\HumanClientFSM.cpp" />
     <ClCompile Include="..\..\UI\About.cpp" />
     <ClCompile Include="..\..\UI\AccordionPanel.cpp" />

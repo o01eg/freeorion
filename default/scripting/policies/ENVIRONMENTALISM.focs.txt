@@ -3,7 +3,8 @@ Policy
     description = "PLC_ENVIRONMENTALISM_DESC"
     short_description = "PLC_ENVIRONMENTALISM_SHORT_DESC"
     category = "ECONOMIC_CATEGORY"
-    adoptioncost = 1.0*floor(5 + 0.25 * Statistic Sum value = LocalCandidate.Population condition = And [ Planet OwnedBy empire = Source.Owner ])
+    adoptioncost = 1.0 * floor(5 + 0.25 * Statistic Sum value = LocalCandidate.Population
+                                          condition = And [ Planet OwnedBy empire = Source.Owner ])
     exclusions = [ "PLC_TERRAFORMING" ]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
@@ -15,12 +16,14 @@ Policy
                 Not Planet type = GasGiant
                 Not Planet type = Asteroids
             ]
-            priority = [[LATE_PRIORITY]]
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
             effects = [
-                SetTargetIndustry value = Value - 5
-                SetTargetConstruction value = Value - 10
+                SetTargetIndustry value = Value
+                    + (NamedReal name = "PLC_ENVIRONMENTALISM_TARGET_INDUSTRY_FLAT" value = -5)
+                SetTargetConstruction value = Value
+                    + (NamedReal name = "PLC_ENVIRONMENTALISM_TARGET_CONSTRUCTION_FLAT" value = -10)
             ]
-        
+
         EffectsGroup
             scope = And [
                 Planet
@@ -29,13 +32,17 @@ Policy
                 Not Planet type = Asteroids
                 Not Planet type = LocalCandidate.OriginalType
             ]
-            priority = [[LATE_PRIORITY]]
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
             effects = [
-                SetTargetConstruction value = Value - 20
-                SetTargetHappiness value = Value - 10
-                SetTargetInfluence value = Value - 5
+                SetTargetConstruction value = Value
+                    + (NamedReal name = "PLC_ENVIRONMENTALISM_TARGET_CONSTRUCTION_TERRAFORMED_FLAT" 
+                                 value = -20)
+                SetTargetHappiness value = Value
+                    + (NamedReal name = "PLC_ENVIRONMENTALISM_TARGET_HAPPINESS_FLAT" value = -10)
+                SetTargetInfluence value = Value
+                    + (NamedReal name = "PLC_ENVIRONMENTALISM_TARGET_INFLUENCE_FLAT" value = -5)
             ]
-            
+
         EffectsGroup
             scope = And [
                 Planet
@@ -45,12 +52,19 @@ Policy
                 Planet type = LocalCandidate.OriginalType
                 Population low = 0.001
             ]
-            priority = [[LATE_PRIORITY]]
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
             effects = [
-                SetTargetHappiness value = Value + 10
-                SetTargetInfluence value = Value + 2
-                SetTargetResearch value = Value + 3
-                SetStealth value = Value + 10
+                SetTargetHappiness value = Value
+                    + (NamedReal name = "PLC_ENVIRONMENTALISM_TARGET_HAPPINESS_ORIGINAL_FLAT"
+                                 value = 10)
+                SetTargetInfluence value = Value
+                    + (NamedReal name = "PLC_ENVIRONMENTALISM_TARGET_INFLUENCE_ORIGINAL_FLAT"
+                                 value = 2)
+                SetTargetResearch value = Value
+                    + (NamedReal name = "PLC_ENVIRONMENTALISM_TARGET_RESEARCH_ORIGINAL_FLAT"
+                                 value = 3)
+                SetStealth value = Value
+                    + (NamedReal name = "PLC_ENVIRONMENTALISM_STEALTH_ORIGINAL_FLAT" value = 10)
             ]            
     ]
     graphic = "icons/policies/environmentalism.png"

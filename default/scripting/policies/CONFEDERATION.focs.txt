@@ -3,11 +3,12 @@ Policy
     description = "PLC_CONFEDERATION_DESC"
     short_description = "PLC_CONFEDERATION_SHORT_DESC"
     category = "SOCIAL_CATEGORY"
-    adoptioncost = 1.0*floor(5 + 0.25 * Statistic Sum value = LocalCandidate.Population condition = And [ Planet OwnedBy empire = Source.Owner ])
+    adoptioncost = 1.0 * floor(5 + 0.25 * Statistic Sum value = LocalCandidate.Population
+                                           condition = And [ Planet OwnedBy empire = Source.Owner ])
     exclusions = [ "PLC_CENTRALIZATION" ]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
-    
+
         // compensates for species influence effect that reduces influence when not supply connected to capital
         EffectsGroup
             scope = And [
@@ -16,24 +17,37 @@ Policy
                 Population low = 0.001
                 Not ResourceSupplyConnected empire = LocalCandidate.Owner condition = Source
             ]
-            priority = [[DEFAULT_PRIORITY]]
-            effects = 
-                SetTargetInfluence value = value + 1
+            effects = SetTargetInfluence value = Value
+                        + (NamedReal name = "PLC_CONFEDERATION_SUPPLY_DISCONNECTED_INFLUENCE_FLAT" value = [[SUPPLY_DISCONNECTED_INFLUENCE_MALUS]])
 
         // makes all planets less stable
         EffectsGroup
-        scope = And [
-            Planet
-            OwnedBy empire = Source.Owner
-            Population low = 0.001
-        ]
-        priority = [[DEFAULT_PRIORITY]]
-        effects = [
-            SetTargetHappiness value = Value - 1
-            SetMaxTroops value = Value + 5
-        ]
+            scope = And [
+                Planet
+                OwnedBy empire = Source.Owner
+                Population low = 0.001
+            ]
+            effects = [
+                SetTargetHappiness value = Value 
+                    + (NamedReal name = "PLC_CONFEDERATION_TARGET_HAPPINESS_FLAT" value = -1)
+                SetMaxTroops value = Value
+                    + (NamedReal name = "PLC_CONFEDERATION_MAX_TROOPS_FLAT" value = 5)
+            ]
+
+        // compensates for supply disconnection stability penalty
+        EffectsGroup
+            scope = And [
+                Planet
+                OwnedBy empire = Source.Owner
+                Not ResourceSupplyConnected empire = Source.Owner condition = And [
+                    Or [Capital Building name = "BLD_REGIONAL_ADMIN"]
+                    OwnedBy empire = Source.Owner
+                ]
+                Not Capital
+            ]
+            effects = SetTargetHappiness value = Value + (NamedRealLookup name = "DISCONNECTED_FROM_CAPITAL_AND_REGIONAL_ADMIN_STABILITY_PENALTY")
     ]
     graphic = "icons/policies/confederation.png"
 
-#include "/scripting/common/priorities.macros"
 #include "/scripting/policies/policies.macros"
+#include "/scripting/common/misc.macros"

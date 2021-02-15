@@ -174,7 +174,7 @@ void Empire::serialize(Archive& ar, const unsigned int version)
     if (Archive::is_loading::value && version < 5) {
         CompatColor old_color;
         ar & boost::serialization::make_nvp("m_color", old_color);
-        m_color = {old_color.r, old_color.g, old_color.b, old_color.a};
+        m_color = {{old_color.r, old_color.g, old_color.b, old_color.a}};
     } else {
         ar & BOOST_SERIALIZATION_NVP(m_color);
     }
@@ -187,7 +187,7 @@ void Empire::serialize(Archive& ar, const unsigned int version)
     auto encoding_empire = GlobalSerializationEncodingForEmpire();
     bool visible =
         (ALL_EMPIRES == encoding_empire) ||
-        (m_id == encoding_empire); // TODO: GameRule for all objects visible
+        (m_id == encoding_empire); // TODO: GameRule for all empire info known to other empires
     bool allied_visible = visible ||
         Empires().GetDiplomaticStatus(m_id, GlobalSerializationEncodingForEmpire()) ==
             DiplomaticStatus::DIPLO_ALLIED;
@@ -305,10 +305,16 @@ void Empire::serialize(Archive& ar, const unsigned int version)
         ar  & BOOST_SERIALIZATION_NVP(m_ready);
     }
 
+    if (Archive::is_loading::value && version < 5) {
+        m_auto_turn_count = 0;
+    } else {
+        ar  & BOOST_SERIALIZATION_NVP(m_auto_turn_count);
+    }
+
     TraceLogger() << "DONE serializing empire " << m_id << ": " << m_name;
 }
 
-BOOST_CLASS_VERSION(Empire, 5)
+BOOST_CLASS_VERSION(Empire, 6)
 
 template void Empire::serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, const unsigned int);
 template void Empire::serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, const unsigned int);
@@ -347,11 +353,17 @@ void serialize(Archive& ar, EmpireManager& em, unsigned int const version)
         for (const auto& entry : empire_raw_ptr_map)
             em.m_empire_map[entry.first] = std::shared_ptr<Empire>(entry.second);
         TraceLogger() << "EmpireManager put raw pointers into shared_ptr";
-    } else {
+
+    } else if (Archive::is_loading::value && version < 2) {
         ar  & make_nvp("m_empire_map", em.m_empire_map);
+        TraceLogger() << "EmpireManager serialized " << em.m_empire_map.size() << " empires";
+        ar  & make_nvp("m_empire_diplomatic_statuses", em.m_empire_diplomatic_statuses);
+
+    } else {
+        ar  & make_nvp("m_empire_diplomatic_statuses", em.m_empire_diplomatic_statuses);
+        ar  & make_nvp("m_empire_map", em.m_empire_map);
+        TraceLogger() << "EmpireManager serialized " << em.m_empire_map.size() << " empires";
     }
-    TraceLogger() << "EmpireManager serialized " << em.m_empire_map.size() << " empires";
-    ar  & make_nvp("m_empire_diplomatic_statuses", em.m_empire_diplomatic_statuses);
     ar  & BOOST_SERIALIZATION_NVP(messages);
 
     if (Archive::is_loading::value) {

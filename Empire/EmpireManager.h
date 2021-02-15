@@ -3,6 +3,7 @@
 
 #include "Diplomacy.h"
 #include "../universe/EnumsFwd.h"
+#include "../util/AppInterface.h"
 #include "../util/Export.h"
 
 #include <boost/filesystem.hpp>
@@ -24,17 +25,21 @@ public:
     using const_container_type = std::map<int, std::shared_ptr<const Empire>>;
     using const_iterator = const_container_type::const_iterator;
 
+    using DiploStatusMap = std::map<std::pair<int, int>, DiplomaticStatus>;
+
     EmpireManager() = default;
     EmpireManager& operator=(EmpireManager&& other) noexcept;
     virtual ~EmpireManager();
 
+    const const_container_type&           GetEmpires() const;
     std::shared_ptr<const Empire>         GetEmpire(int id) const;  //!< Returns the empire whose ID is \a id, or nullptr if none exist
     const std::string&                    GetEmpireName(int id) const;
-    std::shared_ptr<const UniverseObject> GetSource(int id) const;  //!< Return the empire source or nullptr if the empire or source doesn't exist
+    std::shared_ptr<const UniverseObject> GetSource(int id, const ObjectMap& objects = Objects()) const;  //!< Return the empire source or nullptr if the empire or source doesn't exist
 
     int                         NumEmpires() const;
     int                         NumEliminatedEmpires() const;
 
+    const DiploStatusMap&       GetDiplomaticStatuses() const;
     DiplomaticStatus            GetDiplomaticStatus(int empire1, int empire2) const;
     std::set<int>               GetEmpireIDsWithDiplomaticStatusWithEmpire(int empire_id,
                                                                            DiplomaticStatus diplo_status) const;
@@ -44,6 +49,7 @@ public:
     std::string                 Dump() const;
 
     std::shared_ptr<Empire>     GetEmpire(int id);  //!< Returns the empire whose ID is \a id, or nullptr if none exist
+    const container_type&       GetEmpires();
 
     const_iterator begin() const;
     const_iterator end() const;
@@ -84,7 +90,7 @@ private:
 
     container_type                                   m_empire_map;
     const_container_type                             m_const_empire_map;
-    std::map<std::pair<int, int>, DiplomaticStatus>  m_empire_diplomatic_statuses;
+    DiploStatusMap                                   m_empire_diplomatic_statuses;
     std::map<std::pair<int, int>, DiplomaticMessage> m_diplomatic_messages;
 
     friend class ClientApp;

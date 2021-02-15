@@ -63,12 +63,12 @@ namespace parse {
         const boost::phoenix::function<deconstruct_movable> deconstruct_movable_;
 
         statistic
-            =  ( (omit_[tok.Statistic_] >>  omit_[tok.Mode_])
-                 >   label(tok.Value_)     >     value_ref
-                 >   label(tok.Condition_) >     condition_parser)
+            =  (    (omit_[tok.Statistic_] >>  omit_[tok.Mode_])
+                 >   label(tok.value_)     >     value_ref
+                 >   label(tok.condition_) >     condition_parser)
             [ _val = construct_movable_(new_<ValueRef::Statistic<T>>(
                 deconstruct_movable_(_1, _pass),
-                ValueRef::MODE,
+                ValueRef::StatisticType::MODE,
                 deconstruct_movable_(_2, _pass))) ]
             ;
     }
@@ -123,11 +123,9 @@ namespace parse {
         named_lookup_expr
           =   (
                    tok.Named_ >> tok.Value_ >> tok.Lookup_
-                >> label(tok.Name_)
+                >> label(tok.name_)
                 >> tok.string
-              ) [
-                     _val = construct_movable_(new_<ValueRef::NamedRef<T>>(_4))
-              ]
+              ) [ _val = construct_movable_(new_<ValueRef::NamedRef<T>>(_4)) ]
             ;
 
         functional_expr %=  selection_expr | primary_expr;
@@ -213,7 +211,7 @@ namespace parse {
     struct visibility_complex_parser_grammar : public complex_variable_grammar<Visibility> {
         visibility_complex_parser_grammar(const lexer& tok, Labeller& label);
 
-        simple_int_parser_rules  simple_int_rules;
+        simple_int_parser_rules           simple_int_rules;
         complex_variable_rule<Visibility> empire_object_visibility;
         complex_variable_rule<Visibility> start;
     };

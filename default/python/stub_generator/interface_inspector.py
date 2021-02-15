@@ -1,6 +1,7 @@
 import os
 from inspect import getdoc, isroutine
 from logging import warning, error, debug
+from typing import Any
 
 from stub_generator.constants import TYPE, NAME, ATTRS, DOC, PARENTS, CLASS_NAME, ENUM_PAIRS
 
@@ -33,7 +34,15 @@ def _getmembers(obj, predicate=None):
         except AttributeError:
             continue
         except Exception as e:
-            error('Error in "%s.%s" with error: %s' % (obj.__class__.__name__, key, e))
+            message = [
+                "-" * 20,
+                'Error in "%s.%s" with error' % (obj.__class__.__name__, key),
+                "..." * 20,
+                "Error info:",
+                str(e),
+                "..." * 20,
+            ]
+            error('\n'.join(message))
             continue
         if not predicate or predicate(value):
             results.append((key, value))
@@ -41,7 +50,7 @@ def _getmembers(obj, predicate=None):
     return results
 
 
-def _inspect_instance(instance):
+def _inspect_instance(instance, location):
     parents = instance.__class__.mro()[1:-2]
     parent_attrs = sum((dir(parent) for parent in instance.__class__.mro()[1:]), [])
 
@@ -49,7 +58,8 @@ def _inspect_instance(instance):
         CLASS_NAME: instance.__class__.__name__,
         TYPE: 'instance',
         ATTRS: {},
-        PARENTS: [str(parent.__name__) for parent in parents]
+        PARENTS: [str(parent.__name__) for parent in parents],
+        "location": location,
     }
     for attr_name, member in _getmembers(instance):
         if attr_name not in parent_attrs + ['__module__']:
@@ -86,7 +96,7 @@ def _inspect_type(name, obj):
     return {
         TYPE: "enum",
         NAME: name,
-        ENUM_PAIRS: [(v, k) for k, v in obj.names.items()],
+        ENUM_PAIRS: [(v.numerator, k) for k, v in obj.names.items()],
     }
 
 
@@ -96,8 +106,18 @@ _SWITCHER = {
     "<class 'Boost.Python.function'>": _inspect_boost_function,
 }
 
-_NAMES_TO_IGNORE = {'__doc__', '__package__', '__name__', 'INVALID_GAME_TURN', 'to_str', '__loader__', }
+_NAMES_TO_IGNORE = {'__doc__', '__package__', '__name__', 'INVALID_GAME_TURN', 'to_str', '__loader__', '__spec__'}
 _INVALID_CLASSES = {"method"}
+
+
+def is_built_in(instance: Any) -> bool:
+    """
+    Return is instance is one of built in type.
+
+    Inherited classes from built in return False.
+    """
+    built_in_types = {str, float, int, tuple, tuple, list, dict, set}
+    return type(instance) in built_in_types
 
 
 def get_module_info(obj, instances, dump=False):
@@ -112,16 +132,19 @@ def get_module_info(obj, instances, dump=False):
         else:
             warning("Unknown: '%s' of type '%s': %s" % (name, type(member), member))
 
-    for i, instance in enumerate(instances, start=2):
-        if isinstance(instance, (str, float, int)):
-            warning("Argument number %s(counting start from 1) is builtin python instance: (%s) %s", i, type(instance), instance)
+    for location, instance in instances:
+        if is_built_in(instance):
+            warning("Argument at %s is builtin python instance: (%s) %s", location, type(instance), instance)
             continue
         if instance.__class__.__name__ in _INVALID_CLASSES:
-            warning("Argument number %s(counting start from 1) is not allowed: (%s) %s", i, type(instance),
+            warning("Argument at %s is not allowed: (%s) %s", location, type(instance),
                     instance)
             continue
         try:
-            data.append(_inspect_instance(instance))
+
+            # TODO add isntances location some where
+
+            data.append((_inspect_instance(instance, location)))
         except Exception as e:
             error("Error inspecting: '%s' with '%s': %s", type(instance), type(e), e, exc_info=True)
     if dump:

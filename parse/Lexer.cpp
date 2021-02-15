@@ -24,11 +24,6 @@ namespace {
 
 using namespace parse;
 
-const char* lexer::bool_regex = "(?i:true|false)";
-const char* lexer::int_regex = "\\d+";
-const char* lexer::double_regex = "\\d+\\.\\d*|\\d*\\.\\d+";
-const char* lexer::string_regex = "\\\"[^\\\"]*\\\"";
-
 lexer::lexer() :
     inline_comment("\\/\\*[^*]*\\*+([^/*][^*]*\\*+)*\\/"),
     end_of_line_comment("\\/\\/.*$"),
@@ -38,7 +33,7 @@ lexer::lexer() :
     double_(double_regex),
     string(string_regex),
 
-#define DEFINE_TOKEN(r, _, name) BOOST_PP_CAT(name, _)("(?i:" BOOST_PP_STRINGIZE(name) ")"),
+#define DEFINE_TOKEN(r, _, name) BOOST_PP_CAT(name, _)("(?-i:" BOOST_PP_STRINGIZE(name) ")"),
     BOOST_PP_SEQ_FOR_EACH(DEFINE_TOKEN, _, TOKEN_SEQ_1)
     BOOST_PP_SEQ_FOR_EACH(DEFINE_TOKEN, _, TOKEN_SEQ_2)
     BOOST_PP_SEQ_FOR_EACH(DEFINE_TOKEN, _, TOKEN_SEQ_3)

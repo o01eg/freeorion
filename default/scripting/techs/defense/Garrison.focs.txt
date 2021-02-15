@@ -14,8 +14,10 @@ Tech
                 OwnedBy empire = Source.Owner
             ]
             stackinggroup = "GARRISON_1_TROOPS_STACK"
-            priority = [[LATE_PRIORITY]]
-            effects = SetMaxTroops value = Value + 10 accountinglabel = "DEF_GARRISON_1"
+            accountinglabel = "DEF_GARRISON_1"
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
+            effects = SetMaxTroops value = Value
+                        + (NamedReal name = "GARRISON_1_MAX_TROOPS_FLAT" value = 6)
     ]
     graphic = "icons/tech/troops.png"
 
@@ -34,9 +36,12 @@ Tech
             scope = And [
                 Planet
                 OwnedBy empire = Source.Owner
-                (LocalCandidate.LastTurnAttackedByShip   < CurrentTurn)
+                (LocalCandidate.LastTurnConquered < CurrentTurn)
+                (LocalCandidate.LastTurnAttackedByShip < CurrentTurn)
             ]
-            effects = SetTroops value = Value + 1
+            priority = [[AFTER_ALL_TARGET_MAX_METERS_PRIORITY]]
+            effects = SetTroops value = min(Value(Target.MaxTroops),
+                                            Value + (NamedReal name = "GARRISON_2_TROOPREGEN_FLAT" value = 1))
 
         EffectsGroup
             scope = And [
@@ -45,8 +50,9 @@ Tech
                 Population low = 0.01
             ]
             stackinggroup = "GARRISON_2_TROOPS_STACK"
-            priority = [[EARLY_PRIORITY]]
-            effects = SetMaxTroops value = Value + Target.Population * 2 * [[TROOPS_PER_POP]] accountinglabel = "DEF_GARRISON_2"
+            accountinglabel = "DEF_GARRISON_2"
+            effects = SetMaxTroops value = Value + Target.Population
+                        * (NamedReal name = "GARRISON_2_MAXTROOPS_FLAT" value = 2 * [[TROOPS_PER_POP]])
     ]
     graphic = "icons/tech/troops.png"
 
@@ -64,9 +70,12 @@ Tech
             scope = And [
                 Planet
                 OwnedBy empire = Source.Owner
-                (LocalCandidate.LastTurnAttackedByShip   < CurrentTurn)
+                (LocalCandidate.LastTurnConquered < CurrentTurn)
+                (LocalCandidate.LastTurnAttackedByShip < CurrentTurn)
             ]
-            effects = SetTroops value = Value + 2
+            priority = [[AFTER_ALL_TARGET_MAX_METERS_PRIORITY]]
+            effects = SetTroops value = min(Value(Target.MaxTroops),
+                                            Value + (NamedReal name = "GARRISON_3_TROOPREGEN_FLAT" value = 2))
 
         EffectsGroup
             scope = And [
@@ -74,8 +83,10 @@ Tech
                 OwnedBy empire = Source.Owner
             ]
             stackinggroup = "GARRISON_3_TROOPS_STACK"
-            priority = [[LATE_PRIORITY]]
-            effects = SetMaxTroops value = Value + 16 accountinglabel = "DEF_GARRISON_3"
+            accountinglabel = "DEF_GARRISON_3"
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
+            effects = SetMaxTroops value = Value
+                        + (NamedReal name = "GARRISON_3_MAX_TROOPS_FLAT" value = 18)
     ]
     graphic = "icons/tech/troops.png"
 
@@ -88,14 +99,18 @@ Tech
     researchturns = 9
     tags = [ "PEDIA_DEFENSE_CATEGORY" ]
     prerequisites = "DEF_GARRISON_3"
+    unlock = Item type = Policy name = "PLC_MARTIAL_LAW"
     effectsgroups = [
         EffectsGroup
             scope = And [
                 Planet
                 OwnedBy empire = Source.Owner
-                (LocalCandidate.LastTurnAttackedByShip   < CurrentTurn)
+                (LocalCandidate.LastTurnConquered < CurrentTurn)
+                (LocalCandidate.LastTurnAttackedByShip < CurrentTurn)
             ]
-            effects = SetTroops value = Value + 3
+            priority = [[AFTER_ALL_TARGET_MAX_METERS_PRIORITY]]
+            effects = SetTroops value = min(Value(Target.MaxTroops),
+                                            Value + (NamedReal name = "GARRISON_4_TROOPREGEN_FLAT" value = 3))
 
         EffectsGroup
             scope = And [
@@ -104,13 +119,11 @@ Tech
                 Population low = 0.01
             ]
             stackinggroup = "GARRISON_4_TROOPS_STACK"
-            priority = [[EARLY_PRIORITY]]
-            effects = SetMaxTroops value = Value + Target.Population * 2 * [[TROOPS_PER_POP]] accountinglabel = "DEF_GARRISON_4"
+            accountinglabel = "DEF_GARRISON_4"
+            effects = SetMaxTroops value = Value + Target.Population *
+                (NamedReal name = "GARRISON_4_MAX_TROOPS_PERPOP" value = 3 * [[TROOPS_PER_POP]])
     ]
     graphic = "icons/tech/troops.png"
 
-#include "../techs.macros"
-
 #include "/scripting/common/base_prod.macros"
-
 #include "/scripting/common/priorities.macros"

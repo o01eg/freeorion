@@ -9,7 +9,7 @@ BuildingType
         OwnedBy empire = Source.Owner
         TargetPopulation low = 1
     ]
-    EnqueueLocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
+    enqueuelocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS]]
     
@@ -17,16 +17,18 @@ BuildingType
             scope = And [
                 PopulationCenter
                 OwnedBy empire = Source.Owner
-                ResourceSupplyConnected empire = Source.Owner condition = Source
+                Happiness low = 0
                 Focus type = "FOCUS_INDUSTRY"
+                ResourceSupplyConnected empire = Source.Owner condition = Source
             ]
             activation = And [
                 OwnerHasTech name = "PRO_INDUSTRY_CENTER_I"
                 Not OwnerHasTech name = "PRO_INDUSTRY_CENTER_II"
             ]
             stackinggroup = "INDUSTRY_CENTER_STACK"
-            priority = [[EARLY_PRIORITY]]
-            effects = SetTargetIndustry value = Value + Target.Population * 0.25 * [[INDUSTRY_PER_POP]]
+            effects = SetTargetIndustry value = Value + Target.Population
+                        * (NamedReal name = "BLD_INDUSTRY_CENTER_1_TARGET_INDUSTRY_PERPOP"
+                                     value = 0.25 * [[INDUSTRY_PER_POP]])
 
         EffectsGroup
             scope = And [
@@ -40,8 +42,9 @@ BuildingType
                 Not OwnerHasTech name = "PRO_INDUSTRY_CENTER_III"
             ]
             stackinggroup = "INDUSTRY_CENTER_STACK"
-            priority = [[EARLY_PRIORITY]]
-            effects = SetTargetIndustry value = Value + Target.Population * 0.5 * [[INDUSTRY_PER_POP]]
+            effects = SetTargetIndustry value = Value + Target.Population
+                        * (NamedReal name = "BLD_INDUSTRY_CENTER_2_TARGET_INDUSTRY_PERPOP"
+                                     value = 0.5 * [[INDUSTRY_PER_POP]])
 
         EffectsGroup
             scope = And [
@@ -52,12 +55,12 @@ BuildingType
             ]
             activation = OwnerHasTech name = "PRO_INDUSTRY_CENTER_III"
             stackinggroup = "INDUSTRY_CENTER_STACK"
-            priority = [[EARLY_PRIORITY]]
-            effects = SetTargetIndustry value = Value + Target.Population * 0.75 * [[INDUSTRY_PER_POP]]
+            effects = SetTargetIndustry value = Value + Target.Population
+                        * (NamedReal name = "BLD_INDUSTRY_CENTER_3_TARGET_INDUSTRY_PERPOP"
+                                     value = 0.75 * [[INDUSTRY_PER_POP]])
     ]
     icon = "icons/tech/industrial_centre_ii.png"
 
 #include "/scripting/common/enqueue.macros"
-#include "/scripting/common/priorities.macros"
 #include "/scripting/common/base_prod.macros"
 #include "/scripting/buildings/buildings.macros"

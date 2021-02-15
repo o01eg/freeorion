@@ -1,18 +1,14 @@
 # This Python file uses the following encoding: utf-8
-from collections.abc import Mapping
-from io import StringIO
-
-import cProfile
 import logging
-import pstats
 import re
 import traceback
+from collections.abc import Mapping
 from functools import wraps
-from logging import debug, error
-from aistate_interface import get_aistate
-from common.configure_logging import FOLogFormatter
+from logging import debug, error, warning
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
+from aistate_interface import get_aistate
+from common.configure_logging import FOLogFormatter
 
 # color wrappers for chat:
 RED = '<rgba 255 0 0 255>%s</rgba>'
@@ -235,31 +231,11 @@ def tuple_to_dict(tup):
             return {}
 
 
-def profile(func):
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        pr = cProfile.Profile()
-        pr.enable()
-        retval = func(*args, **kwargs)
-        pr.disable()
-        s = StringIO()
-        sortby = 'cumulative'
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
-        debug(s.getvalue())
-        return retval
-
-    return wrapper
-
-
 @cache_for_current_turn
-def get_partial_visibility_turn(obj_id):
+def get_partial_visibility_turn(obj_id: int) -> int:
     """Return the last turn an object had at least partial visibility.
 
-    :type obj_id: int
     :return: Last turn an object had at least partial visibility, -9999 if never
-    :rtype: int
     """
     visibility_turns_map = fo.getUniverse().getVisibilityTurnsMap(obj_id, fo.empireID())
     return visibility_turns_map.get(fo.visibility.partial, -9999)
@@ -407,3 +383,19 @@ def get_species_tag_grade(species_name, tag_type):
         return ""
 
     return get_ai_tag_grade(species.tags, tag_type)
+
+
+@cache_for_session
+def get_ship_part(part_name: str):
+    """Return the shipPart object (fo.getShipPart(part_name)) of the given part_name.
+
+    As the function in late game may be called some thousand times, the results are cached.
+    """
+    if not part_name:
+        return None
+
+    part_type = fo.getShipPart(part_name)
+    if not part_type:
+        warning("Could not find part %s" % part_name)
+
+    return part_type

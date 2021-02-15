@@ -23,7 +23,7 @@ BASIC_POPULATION
                 Planet
                 (LocalCandidate.LastTurnConquered < CurrentTurn)
             ]
-            priority = [[EARLY_FIRST_NATURAL_POPULATION_PRIORITY]]
+            priority = [[POPULATION_FIRST_PRIORITY]]
             effects = SetPopulation value =
                 (Statistic If condition = (Value < Target.TargetPopulation) *
                     min(Target.TargetPopulation, Value + Value*[[GROWTH_RATE_FACTOR]]*
@@ -117,7 +117,7 @@ ENVIRONMENT_MODIFIER
 
 HOMEWORLD_BONUS_POPULATION
 '''     EffectsGroup
-            scope = AND [
+            scope = And [
                 Source
                 Homeworld name = Source.Species
             ]
@@ -152,7 +152,7 @@ SELF_SUSTAINING_BONUS
 '''     EffectsGroup
             scope = Source
             activation = And [
-                Planet
+                Planet environment = Good
                 HasTag name = "SELF_SUSTAINING"
             ]
             accountinglabel = "SELF_SUSTAINING_LABEL"
@@ -163,21 +163,21 @@ SELF_SUSTAINING_BONUS
 PHOTOTROPHIC_BONUS
 '''     EffectsGroup
             scope = Contains Source
-            activation = AND [
+            activation = And [
                 Planet
-                OR [
+                Or [
                     OwnedBy affiliation = AnyEmpire
                     Star type = [BlackHole NoStar] // Natives are allowed to have bright or dim stars
                 ]
                 HasTag name = "PHOTOTROPHIC"
                 Turn high = 0
-                NOT Star type = [Orange]
+                Not Star type = [Orange]
             ]
             effects = SetStarType type = Yellow // start with a normal star to be balanced
  
         EffectsGroup
             scope = Source
-            activation = AND [
+            activation = And [
                 Planet
                 HasTag name = "PHOTOTROPHIC"
                 Star type = [Blue]
@@ -189,7 +189,7 @@ PHOTOTROPHIC_BONUS
 
         EffectsGroup
             scope = Source
-            activation = AND [
+            activation = And [
                 Planet
                 HasTag name = "PHOTOTROPHIC"
                 Star type = [White]
@@ -201,7 +201,7 @@ PHOTOTROPHIC_BONUS
 
         EffectsGroup
             scope = Source
-            activation = AND [
+            activation = And [
                 Planet
                 HasTag name = "PHOTOTROPHIC"
                 Star type = [Red Neutron]
@@ -212,7 +212,7 @@ PHOTOTROPHIC_BONUS
 
         EffectsGroup
             scope = Source
-            activation = AND [
+            activation = And [
                 Planet
                 HasTag name = "PHOTOTROPHIC"
                 Star type = [BlackHole NoStar]
@@ -246,6 +246,7 @@ LIFECYCLE_MANIP_POPULATION_EFFECTS
                 Not OwnerHasTech name = "GRO_LIFECYCLE_MAN"
                 Turn low = LocalCandidate.CreationTurn + 1 high = LocalCandidate.CreationTurn + 1
             ]
+            priority = [[POPULATION_DEFAULT_PRIORITY]]
             effects = [
                 SetSpecies name = @1@
                 SetPopulation value = 1
@@ -260,6 +261,7 @@ LIFECYCLE_MANIP_POPULATION_EFFECTS
                 OwnerHasTech name = "GRO_LIFECYCLE_MAN"
                 Turn low = LocalCandidate.CreationTurn + 1 high = LocalCandidate.CreationTurn + 1
             ]
+            priority = [[POPULATION_DEFAULT_PRIORITY]]
             effects = [
                 SetSpecies name = @1@
                 SetPopulation value = [[MIN_RECOLONIZING_SIZE]]

@@ -4,7 +4,7 @@
 #include "CUIControls.h"
 #include "CUISpin.h"
 #include "FleetButton.h"
-#include "../client/human/HumanClientApp.h"
+#include "../client/human/GGHumanClientApp.h"
 #include "../client/ClientNetworking.h"
 #include "../util/i18n.h"
 #include "../util/Logger.h"
@@ -91,8 +91,8 @@ namespace {
         return std::make_unique<ValueRef::Operation<T>>(  // evaluates and returns value_ref if contained Statistic returns a non-empty string
             ValueRef::OpType::TIMES,
             std::make_unique<ValueRef::Statistic<T>>(     // returns non-empty string if the source object matches the object type condition
-                nullptr,                                    // property value value ref not used for IF statistic
-                ValueRef::IF,
+                nullptr,                                  // property value value ref not used for IF statistic
+                ValueRef::StatisticType::IF,
                 std::make_unique<Condition::And>(         // want this statistic to return true only if the source object has the specified object type, if there exists any object of that type in the universe
                     std::make_unique<Condition::Source>(),
                     ConditionForObjectTypes(object_types)
@@ -391,6 +391,9 @@ namespace {
     std::map<std::string, std::string> object_list_cond_description_map;
 
     const std::string& ConditionClassName(const Condition::Condition* const condition) {
+        if (!condition)
+            return EMPTY_STRING;
+
         if (dynamic_cast<const Condition::All* const>(condition))
             return ALL_CONDITION;
         else if (dynamic_cast<const Condition::EmpireAffiliation* const>(condition))
@@ -1511,20 +1514,20 @@ private:
             AttachChild(m_dot);
         }
 
-        auto obj = Objects().get(m_object_id);
-        auto textures = ObjectTextures(obj);
+        auto textures = ObjectTextures(Objects().get(m_object_id));
+        auto tx_size = textures.size();
 
         m_icon = GG::Wnd::Create<MultiTextureStaticGraphic>(
-            textures, std::vector<GG::Flags<GG::GraphicStyle>>(textures.size(), style));
+            std::move(textures), std::vector<GG::Flags<GG::GraphicStyle>>(tx_size, style));
         AttachChild(m_icon);
 
         for (auto& control : m_controls)
-        { DetachChild(control); }
+            DetachChild(control);
         m_controls.clear();
 
         for (auto& control : GetControls()) {
-            m_controls.emplace_back(control);
-            AttachChild(control);
+            m_controls.push_back(control);
+            AttachChild(std::move(control));
         }
 
         RequirePreRender();
@@ -1537,7 +1540,7 @@ private:
         for (unsigned int i = 0; i < NUM_COLUMNS; ++i) {
             auto control = GG::Wnd::Create<CUILabel>(SortKey(i), GG::FORMAT_LEFT);
             control->Resize(GG::Pt(GG::X(GetColumnWidth(i)), ClientHeight()));
-            retval.emplace_back(std::move(control));
+            retval.push_back(std::move(control));
         }
 
         return retval;
@@ -1975,7 +1978,7 @@ public:
             return false;
 
         int object_id = obj->ID();
-        int client_empire_id = HumanClientApp::GetApp()->EmpireID();
+        int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
         UniverseObjectType type = obj->ObjectType();
 
         if (GetUniverse().EmpireKnownDestroyedObjectIDs(client_empire_id).count(object_id))
@@ -2511,7 +2514,7 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
     int object_id = ObjectInRow(it);
     if (object_id == INVALID_OBJECT_ID)
         return;
-    HumanClientApp* app = HumanClientApp::GetApp();
+    GGHumanClientApp* app = GGHumanClientApp::GetApp();
     ClientNetworking& net = app->Networking();
     bool moderator = false;
     if (app->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR)

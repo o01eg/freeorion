@@ -6,6 +6,7 @@
 #include "EnumValueRefRules.h"
 
 #include "MovableEnvelope.h"
+#include "../universe/NamedValueRefManager.h"
 #include "../universe/ValueRefs.h"
 #include "../universe/ValueRef.h"
 #include "../util/Directories.h"
@@ -36,14 +37,14 @@ namespace parse {
         // Note: Other parsers might also register value refs, so the normal pending mechanism does not suffice.
         //       So we do not collect the value refs in the given named_refs reference but register directly.
         std::unique_ptr<ValueRef::ValueRef<T>> vref = ref_envelope.OpenEnvelope(pass);
-        // Log an error if CurrentContent is used
+        // Signal to log an error if CurrentContent is used
         vref->SetTopLevelContent("THERE_IS_NO_TOP_LEVEL_CONTENT");
         ::RegisterValueRef<T>(name, std::move(vref));
     }
 
     BOOST_PHOENIX_ADAPT_FUNCTION(void, insert_named_ref_, insert_named_ref, 4)
 
-    using start_rule_payload = std::map<std::string, std::unique_ptr<ValueRef::ValueRefBase>>;
+    using start_rule_payload = NamedValueRefManager::NamedValueRefParseMap;
     using start_rule_signature = void(start_rule_payload&);
 
     struct grammar : public parse::detail::grammar<start_rule_signature> {
@@ -73,19 +74,19 @@ namespace parse {
             named_ref
                =
                     ( omit_[tok.Named_]   >> tok.Integer_
-                   > label(tok.Name_) > tok.string
-                   > label(tok.Value_) >  qi::as<parse::detail::MovableEnvelope<ValueRef::ValueRef<int>>>()[int_rules.expr]
+                   > label(tok.name_) > tok.string
+                   > label(tok.value_) >  qi::as<parse::detail::MovableEnvelope<ValueRef::ValueRef<int>>>()[int_rules.expr]
                     ) [ insert_named_ref_(_r1, _2, _3, _pass) ]
                     |
                     ( omit_[tok.Named_]   >> tok.Real_
-                   > label(tok.Name_) > tok.string
-                   > label(tok.Value_) >  qi::as<parse::detail::MovableEnvelope<ValueRef::ValueRef<double>>>()[double_rules.expr]
+                   > label(tok.name_) > tok.string
+                   > label(tok.value_) >  qi::as<parse::detail::MovableEnvelope<ValueRef::ValueRef<double>>>()[double_rules.expr]
                     ) [ insert_named_ref_(_r1, _2, _3, _pass) ]
                     |
-                    ( omit_[tok.Named_]  >> tok.PlanetType_ > label(tok.Name_) > tok.string > label(tok.Value_) > planet_type_rules.expr
+                    ( omit_[tok.Named_]  >> tok.planettype_ > label(tok.name_) > tok.string > label(tok.value_) > planet_type_rules.expr
                     ) [ insert_named_ref_(_r1, _2, _3, _pass) ]
                     |
-                    ( omit_[tok.Named_]  >> tok.Environment_ > label(tok.Name_) > tok.string > label(tok.Value_) >  planet_environment_rules.expr
+                    ( omit_[tok.Named_]  >> tok.environment_ > label(tok.name_) > tok.string > label(tok.value_) >  planet_environment_rules.expr
                     ) [ insert_named_ref_(_r1, _2, _3, _pass) ] 
                 ;
 

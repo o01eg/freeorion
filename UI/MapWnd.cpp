@@ -40,7 +40,7 @@
 #include "SystemIcon.h"
 #include "TextBrowseWnd.h"
 #include "../client/ClientNetworking.h"
-#include "../client/human/HumanClientApp.h"
+#include "../client/human/GGHumanClientApp.h"
 #include "../Empire/Empire.h"
 #include "../network/Message.h"
 #include "../universe/Field.h"
@@ -256,7 +256,7 @@ namespace {
     boost::optional<std::pair<double, double>> ScreenPosOnStarlane(double X, double Y, int lane_start_sys_id, int lane_end_sys_id, const LaneEndpoints& screen_lane_endpoints) {
         // get endpoints of lane in universe.  may be different because on-
         // screen lanes are drawn between system circles, not system centres
-        int empire_id = HumanClientApp::GetApp()->EmpireID();
+        int empire_id = GGHumanClientApp::GetApp()->EmpireID();
         auto prev = EmpireKnownObjects(empire_id).get(lane_start_sys_id);
         auto next = EmpireKnownObjects(empire_id).get(lane_end_sys_id);
         if (!next || !prev) {
@@ -280,19 +280,19 @@ namespace {
     { return pt.x >= left && pt.y >= top && pt.x < right && pt.y < bottom; } //pt >= ul && pt < lr;
 
     GG::X AppWidth() {
-        if (HumanClientApp* app = HumanClientApp::GetApp())
+        if (GGHumanClientApp* app = GGHumanClientApp::GetApp())
             return app->AppWidth();
         return GG::X0;
     }
 
     GG::Y AppHeight() {
-        if (HumanClientApp* app = HumanClientApp::GetApp())
+        if (GGHumanClientApp* app = GGHumanClientApp::GetApp())
             return app->AppHeight();
         return GG::Y0;
     }
 
     bool ClientPlayerIsModerator()
-    { return HumanClientApp::GetApp()->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR; }
+    { return GGHumanClientApp::GetApp()->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR; }
 
     void PlayTurnButtonClickSound()
     { Sound::GetSound().PlaySound(GetOptionsDB().Get<std::string>("ui.button.turn.press.sound.path"), true); }
@@ -672,8 +672,8 @@ public:
         for (const auto& fleet : Objects().find<Fleet>(fleet_ids)) {
             if (!fleet)
                 continue;
-            if (fleet->Speed() > 20)
-                fixed_distances.insert(fleet->Speed());
+            if (fleet->Speed(Objects()) > 20)
+                fixed_distances.insert(fleet->Speed(Objects()));
             for (const auto& ship : Objects().find<Ship>(fleet->ShipIDs())) {
                 if (!ship)
                     continue;
@@ -1478,7 +1478,7 @@ void MapWnd::CompleteConstruction() {
         }
     }
 
-    HumanClientApp::GetApp()->RepositionWindowsSignal.connect(
+    GGHumanClientApp::GetApp()->RepositionWindowsSignal.connect(
         boost::bind(&MapWnd::InitializeWindows, this));
 
     // research window
@@ -1813,7 +1813,7 @@ void MapWnd::RenderFields() {
 
     // if any, render scanlines over not-visible fields
     if (!m_field_scanline_circles.empty()
-        && HumanClientApp::GetApp()->EmpireID() != ALL_EMPIRES
+        && GGHumanClientApp::GetApp()->EmpireID() != ALL_EMPIRES
         && GetOptionsDB().Get<bool>("ui.map.scanlines.shown"))
     {
         glDisableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -1895,7 +1895,7 @@ void MapWnd::RenderSystemOverlays() {
 
 void MapWnd::RenderSystems() {
     const float HALO_SCALE_FACTOR = static_cast<float>(SystemHaloScaleFactor());
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
     glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
     glEnableClientState(GL_VERTEX_ARRAY);
@@ -1991,7 +1991,7 @@ void MapWnd::RenderSystems() {
                     bool has_empire_planet = false;
                     bool has_neutrals = false;
                     std::map<int, int> colony_count_by_empire_id;
-                    const std::set<int>& known_destroyed_object_ids = GetUniverse().EmpireKnownDestroyedObjectIDs(HumanClientApp::GetApp()->EmpireID());
+                    const std::set<int>& known_destroyed_object_ids = GetUniverse().EmpireKnownDestroyedObjectIDs(GGHumanClientApp::GetApp()->EmpireID());
 
                     for (auto& planet : Objects().find<const Planet>(system->PlanetIDs())) {
                         if (known_destroyed_object_ids.count(planet->ID()) > 0)
@@ -2449,7 +2449,7 @@ void MapWnd::RegisterWindows() {
     // TODO: move these wnds into a GG::Wnd and call parent_wnd->Show(false) to
     //       hide all windows instead of unregistering them all.
     // Actually register these CUIWnds so that the Visible() ones are rendered.
-    if (HumanClientApp* app = HumanClientApp::GetApp()) {
+    if (GGHumanClientApp* app = GGHumanClientApp::GetApp()) {
         app->Register(m_sitrep_panel);
         app->Register(m_object_list_wnd);
         app->Register(m_pedia_panel);
@@ -2464,7 +2464,7 @@ void MapWnd::RegisterWindows() {
 void MapWnd::RemoveWindows() {
     // Hide windows by unregistering them which works regardless of their
     // m_visible attribute.
-    if (HumanClientApp* app = HumanClientApp::GetApp()) {
+    if (GGHumanClientApp* app = GGHumanClientApp::GetApp()) {
         app->Remove(m_sitrep_panel);
         app->Remove(m_object_list_wnd);
         app->Remove(m_pedia_panel);
@@ -2529,7 +2529,7 @@ void MapWnd::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
     if (ClientPlayerIsModerator()) {
         // only supported action on empty map location at present is creating a system
         if (m_moderator_wnd->SelectedAction() == ModeratorActionSetting::MAS_CreateSystem) {
-            ClientNetworking& net = HumanClientApp::GetApp()->Networking();
+            ClientNetworking& net = GGHumanClientApp::GetApp()->Networking();
             auto u_pos = this->UniversePositionFromScreenCoords(pt);
             StarType star_type = m_moderator_wnd->SelectedStarType();
             net.SendMessage(ModeratorActionMessage(
@@ -2602,10 +2602,10 @@ void MapWnd::KeyRelease(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG:
 void MapWnd::EnableOrderIssuing(bool enable/* = true*/) {
     // disallow order enabling if this client does not have an empire
     // and is not a moderator
-    HumanClientApp* app = HumanClientApp::GetApp();
+    GGHumanClientApp* app = GGHumanClientApp::GetApp();
     bool moderator = false;
     bool observer = false;
-    m_btn_turn->Disable(HumanClientApp::GetApp()->SinglePlayerGame() && !enable);
+    m_btn_turn->Disable(GGHumanClientApp::GetApp()->SinglePlayerGame() && !enable);
     if (!app) {
         enable = false;
         m_btn_turn->Disable(true);
@@ -2623,7 +2623,7 @@ void MapWnd::EnableOrderIssuing(bool enable/* = true*/) {
     m_ready_turn = !enable;
 
     std::string button_label;
-    if (!moderator && !observer && m_ready_turn && !HumanClientApp::GetApp()->SinglePlayerGame()) {
+    if (!moderator && !observer && m_ready_turn && !GGHumanClientApp::GetApp()->SinglePlayerGame()) {
         // multiplayer game with a participating player who has sent orders
         button_label = UserString("MAP_BTN_TURN_UNREADY");
     } else {
@@ -2649,32 +2649,31 @@ void MapWnd::InitTurn() {
     //DebugLogger() << GetSupplyManager().Dump();
 
     Universe& universe = GetUniverse();
-    ObjectMap& objects = Objects();
+    ObjectMap& objects = universe.Objects(); // TODO: Get from universe directly
+    EmpireManager& empires = Empires();
 
     TraceLogger(effects) << "MapWnd::InitTurn initial:";
     for (auto obj : objects.all())
         TraceLogger(effects) << obj->Dump();
 
-    timer.EnterSection("system graph");
-    // FIXME: this is actually only needed when there was no mid-turn update
-    universe.InitializeSystemGraph(HumanClientApp::GetApp()->EmpireID());
-
     timer.EnterSection("meter estimates");
     // update effect accounting and meter estimates
-    universe.InitMeterEstimatesAndDiscrepancies();
+    universe.InitMeterEstimatesAndDiscrepancies(empires);
 
+    timer.EnterSection("orders");
     // if we've just loaded the game there may be some unexecuted orders, we
     // should reapply them now, so they are reflected in the UI, but do not
     // influence current meters or their discrepancies for this turn
-    HumanClientApp::GetApp()->Orders().ApplyOrders();
+    GGHumanClientApp::GetApp()->Orders().ApplyOrders();
 
+    timer.EnterSection("meter estimates");
     // redo meter estimates with unowned planets marked as owned by player, so accurate predictions of planet
     // population is available for currently uncolonized planets
-    GetUniverse().UpdateMeterEstimates();
+    GetUniverse().UpdateMeterEstimates(empires);
 
-    GetUniverse().ApplyAppearanceEffects();
+    GetUniverse().ApplyAppearanceEffects(empires);
 
-    timer.EnterSection("rendering");
+    timer.EnterSection("init rendering");
     // set up system icons, starlanes, galaxy gas rendering
     InitTurnRendering();
 
@@ -2764,7 +2763,7 @@ void MapWnd::InitTurn() {
     // empire is recreated each turn based on turn update from server, so
     // connections of signals emitted from the empire must be remade each turn
     // (unlike connections to signals from the sidepanel)
-    Empire* this_client_empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+    Empire* this_client_empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (this_client_empire) {
         this_client_empire->GetResourcePool(ResourceType::RE_INFLUENCE)->ChangedSignal.connect(
             boost::bind(&MapWnd::RefreshInfluenceResourceIndicator, this));
@@ -2790,7 +2789,7 @@ void MapWnd::InitTurn() {
 
 
     timer.EnterSection("update resource pools");
-    for (auto& entry : Empires())
+    for (auto& entry : empires)
         entry.second->UpdateResourcePools();
 
     timer.EnterSection("refresh government");
@@ -2835,7 +2834,7 @@ void MapWnd::InitTurn() {
     DispatchFleetsExploring();
 
     timer.EnterSection("enable observers");
-    HumanClientApp* app = HumanClientApp::GetApp();
+    GGHumanClientApp* app = GGHumanClientApp::GetApp();
     if (app->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR) {
         // this client is a moderator
         m_btn_moderator->Disable(false);
@@ -2861,7 +2860,8 @@ void MapWnd::MidTurnUpdate() {
     DebugLogger() << "MapWnd::MidTurnUpdate";
     ScopedTimer timer("MapWnd::MidTurnUpdate", true);
 
-    GetUniverse().InitializeSystemGraph(HumanClientApp::GetApp()->EmpireID());
+    GetUniverse().InitializeSystemGraph(Empires(), Objects());
+    GetUniverse().UpdateEmpireVisibilityFilteredSystemGraphsWithMainObjectMap(Empires());
 
     // set up system icons, starlanes, galaxy gas rendering
     InitTurnRendering();
@@ -2894,7 +2894,7 @@ void MapWnd::InitTurnRendering() {
     m_fleet_lines.clear();
     ClearProjectedFleetMovementLines();
 
-    int client_empire_id = HumanClientApp::GetApp()->EmpireID();
+    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const auto& this_client_known_destroyed_objects = GetUniverse().EmpireKnownDestroyedObjectIDs(client_empire_id);
     const auto& this_client_stale_object_info = GetUniverse().EmpireStaleKnowledgeObjectIDs(client_empire_id);
     const ObjectMap& objects = Objects();
@@ -3517,7 +3517,7 @@ namespace {
                                GG::GLRGBAColorBuffer& starlane_colors)
     {
         const auto& this_client_known_destroyed_objects =
-            GetUniverse().EmpireKnownDestroyedObjectIDs(HumanClientApp::GetApp()->EmpireID());
+            GetUniverse().EmpireKnownDestroyedObjectIDs(GGHumanClientApp::GetApp()->EmpireID());
         const GG::Clr UNOWNED_LANE_COLOUR = GetOptionsDB().Get<GG::Clr>("ui.map.starlane.color");
 
         std::set<std::pair<int, int>> already_rendered_full_lanes;
@@ -3615,7 +3615,7 @@ namespace {
                            member_to_core, under_alloc_res_grp_core_members);
 
         const std::set<int>& this_client_known_destroyed_objects =
-            GetUniverse().EmpireKnownDestroyedObjectIDs(HumanClientApp::GetApp()->EmpireID());
+            GetUniverse().EmpireKnownDestroyedObjectIDs(GGHumanClientApp::GetApp()->EmpireID());
         //unused variable const GG::Clr UNOWNED_LANE_COLOUR = GetOptionsDB().Get<GG::Clr>("ui.map.starlane.color");
 
 
@@ -3695,7 +3695,7 @@ namespace {
             return;
 
         const auto& this_client_known_destroyed_objects =
-            GetUniverse().EmpireKnownDestroyedObjectIDs(HumanClientApp::GetApp()->EmpireID());
+            GetUniverse().EmpireKnownDestroyedObjectIDs(GGHumanClientApp::GetApp()->EmpireID());
 
 
         for (const auto& id_icon : sys_icons) {
@@ -3774,7 +3774,7 @@ namespace {
         std::map<std::pair<int, int>, LaneEndpoints> retval;
 
         const std::set<int>& this_client_known_destroyed_objects =
-            GetUniverse().EmpireKnownDestroyedObjectIDs(HumanClientApp::GetApp()->EmpireID());
+            GetUniverse().EmpireKnownDestroyedObjectIDs(GGHumanClientApp::GetApp()->EmpireID());
 
         for (auto const& id_icon : sys_icons) {
             int system_id = id_icon.first;
@@ -3833,10 +3833,10 @@ void MapWnd::InitStarlaneRenderingBuffers() {
 
     // add vertices and colours to lane rendering buffers
     PrepFullLanesToRender(m_system_icons, m_starlane_vertices, m_starlane_colors);
-    PrepResourceConnectionLanesToRender(m_system_icons, HumanClientApp::GetApp()->EmpireID(),
+    PrepResourceConnectionLanesToRender(m_system_icons, GGHumanClientApp::GetApp()->EmpireID(),
                                         rendered_half_starlanes,
                                         m_RC_starlane_vertices, m_RC_starlane_colors);
-    PrepObstructedLaneTraversalsToRender(m_system_icons, HumanClientApp::GetApp()->EmpireID(),
+    PrepObstructedLaneTraversalsToRender(m_system_icons, GGHumanClientApp::GetApp()->EmpireID(),
                                          rendered_half_starlanes,
                                          m_starlane_vertices, m_starlane_colors);
 
@@ -3864,7 +3864,7 @@ void MapWnd::InitFieldRenderingBuffers() {
     ClearFieldRenderingBuffers();
 
     const Universe& universe = GetUniverse();
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
 
     for (auto& field_icon : m_field_icons) {
@@ -3973,7 +3973,7 @@ void MapWnd::InitVisibilityRadiiRenderingBuffers() {
 
     ClearVisibilityRadiiRenderingBuffers();
 
-    int client_empire_id = HumanClientApp::GetApp()->EmpireID();
+    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
     const auto& stale_object_ids = GetUniverse().EmpireStaleKnowledgeObjectIDs(client_empire_id);
 
@@ -4364,7 +4364,7 @@ void MapWnd::SelectSystem(int system_id) {
 
     if (system) {
         // ensure meter estimates are up to date, particularly for which ship is selected
-        GetUniverse().UpdateMeterEstimates(system_id, true);
+        GetUniverse().UpdateMeterEstimates(system_id, Empires(), true);
     }
 
 
@@ -4535,17 +4535,22 @@ void MapWnd::SetFleetMovementLine(int fleet_id) {
     const Empire* empire = GetEmpire(fleet->Owner());
     if (empire)
         line_colour = empire->Color();
-    else if (fleet->Unowned() && fleet->HasMonsters())
+    else if (fleet->Unowned() && fleet->HasMonsters(Objects()))
         line_colour = GG::CLR_RED;
+
+    const ScriptingContext context;
 
     // create and store line
     auto route(fleet->TravelRoute());
-    auto path = fleet->MovePath(route, true);
+    auto path = fleet->MovePath(route, true, context);
     auto route_it = route.begin();
     if (!route.empty() && (++route_it) != route.end()) {
         //DebugLogger() << "MapWnd::SetFleetMovementLine fleet id " << fleet_id<<" checking for blockade at system "<< route.front() <<
         //    " with m_arrival_lane "<< fleet->ArrivalStarlane()<<" and next destination "<<*route_it;
-        if (fleet->SystemID() == route.front() && fleet->BlockadedAtSystem(route.front(), *route_it)) { //adjust ETAs if necessary
+        if (fleet->SystemID() == route.front() &&
+            fleet->BlockadedAtSystem(route.front(), *route_it, context))
+        {
+            //adjust ETAs if necessary
             //if (!route.empty() && fleet->SystemID()==route.front() && (++(path.begin()))->post_blockade) {
             //DebugLogger() << "MapWnd::SetFleetMovementLine fleet id " << fleet_id<<" blockaded at system "<< route.front() <<
             //    " with m_arrival_lane "<< fleet->ArrivalStarlane()<<" and next destination "<<*route_it;
@@ -4569,18 +4574,20 @@ void MapWnd::SetProjectedFleetMovementLine(int fleet_id, const std::list<int>& t
     if (fleet_id == INVALID_OBJECT_ID)
         return;
 
+    const ScriptingContext context;
+
     // ensure passed fleet exists
-    auto fleet = Objects().get<Fleet>(fleet_id);
+    auto fleet = context.ContextObjects().get<Fleet>(fleet_id);
     if (!fleet) {
         ErrorLogger() << "MapWnd::SetProjectedFleetMovementLine was passed invalid fleet id " << fleet_id;
         return;
     }
 
     //std::cout << "creating projected fleet movement line for fleet at (" << fleet->X() << ", " << fleet->Y() << ")" << std::endl;
-    const Empire* empire = GetEmpire(fleet->Owner());
+    auto empire = context.GetEmpire(fleet->Owner());
 
     // get move path to show.  if there isn't one, show nothing
-    auto path = fleet->MovePath(travel_route, true);
+    auto path = fleet->MovePath(travel_route, true, context);
 
 
 
@@ -4593,7 +4600,10 @@ void MapWnd::SetProjectedFleetMovementLine(int fleet_id, const std::list<int>& t
 
     auto route_it = travel_route.begin();
     if (!travel_route.empty() && (++route_it) != travel_route.end()) {
-        if (fleet->SystemID() == travel_route.front() && fleet->BlockadedAtSystem(travel_route.front(), *route_it)) { //adjust ETAs if necessary
+        if (fleet->SystemID() == travel_route.front() &&
+            fleet->BlockadedAtSystem(travel_route.front(), *route_it, context))
+        {
+            //adjust ETAs if necessary
             //if (!route.empty() && fleet->SystemID()==route.front() && (++(path.begin()))->post_blockade) {
             //DebugLogger() << "MapWnd::SetFleetMovementLine fleet id " << fleet_id<<" blockaded at system "<< route.front() <<
             //" with m_arrival_lane "<< fleet->ArrivalStarlane()<<" and next destination "<<*route_it;
@@ -4651,9 +4661,9 @@ void MapWnd::ForgetObject(int id) {
         }
     }
 
-    int client_empire_id = HumanClientApp::GetApp()->EmpireID();
+    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
-    HumanClientApp::GetApp()->Orders().IssueOrder(
+    GGHumanClientApp::GetApp()->Orders().IssueOrder(
         std::make_shared<ForgetOrder>(client_empire_id, obj->ID()));
 
     // Client changes for immediate effect
@@ -4948,7 +4958,7 @@ void MapWnd::DeferredRefreshFleetButtons() {
     // determine fleets that need buttons so that fleets at the same location can
     // be grouped by empire owner and buttons created
 
-    int client_empire_id = HumanClientApp::GetApp()->EmpireID();
+    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const auto& this_client_known_destroyed_objects =
         GetUniverse().EmpireKnownDestroyedObjectIDs(client_empire_id);
     const auto& this_client_stale_object_info =
@@ -5252,7 +5262,7 @@ void MapWnd::CorrectMapPosition(GG::Pt& move_to_pt) {
 void MapWnd::FieldRightClicked(int field_id) {
     if (ClientPlayerIsModerator()) {
         ModeratorActionSetting mas = m_moderator_wnd->SelectedAction();
-        ClientNetworking& net = HumanClientApp::GetApp()->Networking();
+        ClientNetworking& net = GGHumanClientApp::GetApp()->Networking();
 
         if (mas == ModeratorActionSetting::MAS_Destroy) {
             net.SendMessage(ModeratorActionMessage(Moderator::DestroyUniverseObject(field_id)));
@@ -5278,7 +5288,7 @@ void MapWnd::SystemLeftClicked(int system_id) {
 void MapWnd::SystemRightClicked(int system_id, GG::Flags<GG::ModKey> mod_keys) {
     if (ClientPlayerIsModerator()) {
         ModeratorActionSetting mas = m_moderator_wnd->SelectedAction();
-        ClientNetworking& net = HumanClientApp::GetApp()->Networking();
+        ClientNetworking& net = GGHumanClientApp::GetApp()->Networking();
 
         if (mas == ModeratorActionSetting::MAS_Destroy) {
             net.SendMessage(ModeratorActionMessage(
@@ -5366,7 +5376,7 @@ void MapWnd::PlanetRightClicked(int planet_id) {
         return;
 
     ModeratorActionSetting mas = m_moderator_wnd->SelectedAction();
-    ClientNetworking& net = HumanClientApp::GetApp()->Networking();
+    ClientNetworking& net = GGHumanClientApp::GetApp()->Networking();
 
     if (mas == ModeratorActionSetting::MAS_Destroy) {
         net.SendMessage(ModeratorActionMessage(
@@ -5385,7 +5395,7 @@ void MapWnd::BuildingRightClicked(int building_id) {
         return;
 
     ModeratorActionSetting mas = m_moderator_wnd->SelectedAction();
-    ClientNetworking& net = HumanClientApp::GetApp()->Networking();
+    ClientNetworking& net = GGHumanClientApp::GetApp()->Networking();
 
     if (mas == ModeratorActionSetting::MAS_Destroy) {
         net.SendMessage(ModeratorActionMessage(
@@ -5419,11 +5429,12 @@ void MapWnd::PlotFleetMovement(int system_id, bool execute_move, bool append) {
     else
         TraceLogger() << "PlotfleetMovement";
 
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     auto fleet_ids = FleetUIManager::GetFleetUIManager().ActiveFleetWnd()->SelectedFleetIDs();
+    const ObjectMap& objects = Objects();
 
     // apply to all selected this-player-owned fleets in currently-active FleetWnd
-    for (const auto& fleet : Objects().find<Fleet>(fleet_ids)) {
+    for (const auto& fleet : objects.find<Fleet>(fleet_ids)) {
         if (!fleet)
             continue;
 
@@ -5447,7 +5458,7 @@ void MapWnd::PlotFleetMovement(int system_id, bool execute_move, bool append) {
             start_system = fleet->NextSystemID();
 
         // get path to destination...
-        std::list<int> route = GetPathfinder()->ShortestPath(start_system, system_id, empire_id).first;
+        std::list<int> route = GetUniverse().GetPathfinder()->ShortestPath(start_system, system_id, empire_id, objects).first;
         // Prepend a non-empty old_route to the beginning of route.
         if (append && !fleet->TravelRoute().empty()) {
             std::list<int> old_route(fleet->TravelRoute());
@@ -5458,9 +5469,9 @@ void MapWnd::PlotFleetMovement(int system_id, bool execute_move, bool append) {
         // disallow "offroad" (direct non-starlane non-wormhole) travel
         if (route.size() == 2 && *route.begin() != *route.rbegin()) {
             int begin_id = *route.begin();
-            auto begin_sys = Objects().get<System>(begin_id);
+            auto begin_sys = objects.get<System>(begin_id);
             int end_id = *route.rbegin();
-            auto end_sys = Objects().get<System>(end_id);
+            auto end_sys = objects.get<System>(end_id);
 
             if (!begin_sys->HasStarlaneTo(end_id) && !begin_sys->HasWormholeTo(end_id) &&
                 !end_sys->HasStarlaneTo(begin_id) && !end_sys->HasWormholeTo(begin_id))
@@ -5471,7 +5482,7 @@ void MapWnd::PlotFleetMovement(int system_id, bool execute_move, bool append) {
 
         // if actually ordering fleet movement, not just prospectively previewing, ... do so
         if (execute_move && !route.empty()){
-            HumanClientApp::GetApp()->Orders().IssueOrder(
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<FleetMoveOrder>(empire_id, fleet->ID(), system_id, append));
             StopFleetExploring(fleet->ID());
         }
@@ -5494,7 +5505,7 @@ std::vector<int> MapWnd::FleetIDsOfFleetButtonsOverlapping(int fleet_id) const {
     const auto& it = m_fleet_buttons.find(fleet_id);
     if (it == m_fleet_buttons.end()) {
         // Log that a FleetButton could not be found for the requested fleet, and include when the fleet was last seen
-        int empire_id = HumanClientApp::GetApp()->EmpireID();
+        int empire_id = GGHumanClientApp::GetApp()->EmpireID();
         auto vis_turn_map = GetUniverse().GetObjectVisibilityTurnMapByEmpire(fleet_id, empire_id);
         int vis_turn = -1;
         if (vis_turn_map.find(Visibility::VIS_BASIC_VISIBILITY) != vis_turn_map.end())
@@ -5672,7 +5683,7 @@ void MapWnd::FleetButtonRightClicked(const FleetButton* fleet_btn) {
         return;
 
     // if fleetbutton holds currently not visible fleets, offer to dismiss them
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     std::vector<int> sensor_ghosts;
 
     // find sensor ghosts
@@ -5724,7 +5735,7 @@ void MapWnd::FleetsRightClicked(const std::vector<int>& fleet_ids) {
         return;
 
     ModeratorActionSetting mas = m_moderator_wnd->SelectedAction();
-    ClientNetworking& net = HumanClientApp::GetApp()->Networking();
+    ClientNetworking& net = GGHumanClientApp::GetApp()->Networking();
 
     if (mas == ModeratorActionSetting::MAS_Destroy) {
         for (int fleet_id : fleet_ids) {
@@ -5755,7 +5766,7 @@ void MapWnd::ShipsRightClicked(const std::vector<int>& ship_ids) {
         return;
 
     ModeratorActionSetting mas = m_moderator_wnd->SelectedAction();
-    ClientNetworking& net = HumanClientApp::GetApp()->Networking();
+    ClientNetworking& net = GGHumanClientApp::GetApp()->Networking();
 
     if (mas == ModeratorActionSetting::MAS_Destroy) {
         for (int ship_id : ship_ids) {
@@ -5860,8 +5871,8 @@ void MapWnd::RemovePopup(MapWndPopup* popup) {
 }
 
 void MapWnd::ResetEmpireShown() {
-    m_production_wnd->SetEmpireShown(HumanClientApp::GetApp()->EmpireID());
-    m_research_wnd->SetEmpireShown(HumanClientApp::GetApp()->EmpireID());
+    m_production_wnd->SetEmpireShown(GGHumanClientApp::GetApp()->EmpireID());
+    m_research_wnd->SetEmpireShown(GGHumanClientApp::GetApp()->EmpireID());
     // TODO: Design?
 }
 
@@ -6060,7 +6071,7 @@ bool MapWnd::ReturnToMap() {
 
 bool MapWnd::EndTurn() {
     if (m_ready_turn) {
-        HumanClientApp::GetApp()->UnreadyTurn();
+        GGHumanClientApp::GetApp()->UnreadyTurn();
     } else {
         ClientUI* cui = ClientUI::GetClientUI();
         if (!cui) {
@@ -6069,7 +6080,7 @@ bool MapWnd::EndTurn() {
         }
         SaveGameUIData ui_data;
         cui->GetSaveGameUIData(ui_data);
-        HumanClientApp::GetApp()->StartTurn(ui_data);
+        GGHumanClientApp::GetApp()->StartTurn(ui_data);
     }
     return true;
 }
@@ -6384,7 +6395,7 @@ void MapWnd::RestoreSidePanel() {
     if (m_sidepanel_open_before_showing_other)
         ReselectLastSystem();
     // send order changes could be made in research, production or other windows
-    HumanClientApp::GetApp()->SendPartialOrders();
+    GGHumanClientApp::GetApp()->SendPartialOrders();
 }
 
 void MapWnd::ShowResearch() {
@@ -6453,7 +6464,7 @@ void MapWnd::ShowProduction() {
     // if no system is currently shown in sidepanel, default to this empire's
     // home system (ie. where the capital is)
     if (SidePanel::SystemID() == INVALID_OBJECT_ID) {
-        if (const Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID()))
+        if (const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID()))
             if (auto obj = Objects().get(empire->CapitalID()))
                 SelectSystem(obj->SystemID());
     } else {
@@ -6610,7 +6621,7 @@ bool MapWnd::KeyboardZoomOut() {
 }
 
 void MapWnd::RefreshTurnButtonTooltip() {
-    auto app = HumanClientApp::GetApp();
+    auto app = GGHumanClientApp::GetApp();
     std::string btn_turn_tooltip;
 
     if (!m_ready_turn) {
@@ -6632,7 +6643,7 @@ void MapWnd::RefreshTurnButtonTooltip() {
 }
 
 void MapWnd::RefreshInfluenceResourceIndicator() {
-    Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+    Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (!empire) {
         m_influence->SetValue(0.0);
         return;
@@ -6660,7 +6671,7 @@ void MapWnd::RefreshInfluenceResourceIndicator() {
 }
 
 void MapWnd::RefreshFleetResourceIndicator() {
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     Empire* empire = GetEmpire(empire_id);
     if (!empire) {
         m_fleet->SetValue(0.0);
@@ -6683,7 +6694,7 @@ void MapWnd::RefreshFleetResourceIndicator() {
 }
 
 void MapWnd::RefreshResearchResourceIndicator() {
-    const Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (!empire) {
         m_research->SetValue(0.0);
         m_research_wasted->Hide();
@@ -6721,7 +6732,7 @@ void MapWnd::RefreshResearchResourceIndicator() {
 }
 
 void MapWnd::RefreshDetectionIndicator() {
-    const Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (!empire)
         return;
     m_detection->SetValue(empire->GetMeter("METER_DETECTION_STRENGTH")->Current());
@@ -6732,7 +6743,7 @@ void MapWnd::RefreshDetectionIndicator() {
 }
 
 void MapWnd::RefreshIndustryResourceIndicator() {
-    const Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (!empire) {
         m_industry->SetValue(0.0);
         m_industry_wasted->Hide();
@@ -6816,7 +6827,7 @@ void MapWnd::RefreshIndustryResourceIndicator() {
 }
 
 void MapWnd::RefreshPopulationIndicator() {
-    Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+    Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (!empire) {
         m_population->SetValue(0.0);
         return;
@@ -6852,13 +6863,13 @@ void MapWnd::RefreshPopulationIndicator() {
 }
 
 void MapWnd::UpdateSidePanelSystemObjectMetersAndResourcePools() {
-    GetUniverse().UpdateMeterEstimates(SidePanel::SystemID(), true);
+    GetUniverse().UpdateMeterEstimates(SidePanel::SystemID(), Empires(), true);
     UpdateEmpireResourcePools();
 }
 
 void MapWnd::UpdateEmpireResourcePools() {
     //std::cout << "MapWnd::UpdateEmpireResourcePools" << std::endl;
-    Empire *empire = GetEmpire( HumanClientApp::GetApp()->EmpireID() );
+    Empire *empire = GetEmpire( GGHumanClientApp::GetApp()->EmpireID() );
     /* Recalculate stockpile, available, production, predicted change of
      * resources.  When resource pools update, they emit ChangeSignal, which is
      * connected to MapWnd::Refresh???ResourceIndicator, which updates the
@@ -6870,7 +6881,7 @@ void MapWnd::UpdateEmpireResourcePools() {
 }
 
 bool MapWnd::ZoomToHomeSystem() {
-    const Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (!empire)
         return false;
     int home_id = empire->CapitalID();
@@ -6922,7 +6933,7 @@ namespace {
 
 bool MapWnd::ZoomToPrevOwnedSystem() {
     // get planets owned by client's player, sorted alphabetically
-    auto system_names_ids = GetOwnedSystemNamesIDs(HumanClientApp::GetApp()->EmpireID());
+    auto system_names_ids = GetOwnedSystemNamesIDs(GGHumanClientApp::GetApp()->EmpireID());
     if (system_names_ids.empty())
         return false;
 
@@ -6948,7 +6959,7 @@ bool MapWnd::ZoomToPrevOwnedSystem() {
 
 bool MapWnd::ZoomToNextOwnedSystem() {
     // get planets owned by client's player, sorted alphabetically
-    auto system_names_ids = GetOwnedSystemNamesIDs(HumanClientApp::GetApp()->EmpireID());
+    auto system_names_ids = GetOwnedSystemNamesIDs(GGHumanClientApp::GetApp()->EmpireID());
     if (system_names_ids.empty())
         return false;
 
@@ -7026,7 +7037,7 @@ bool MapWnd::ZoomToNextSystem() {
 
 bool MapWnd::ZoomToPrevIdleFleet() {
     auto vec = GetUniverse().Objects().findIDs<Fleet>(
-        StationaryFleetVisitor(HumanClientApp::GetApp()->EmpireID()));
+        StationaryFleetVisitor(GGHumanClientApp::GetApp()->EmpireID()));
     auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
     const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
     if (it != vec.begin())
@@ -7047,7 +7058,7 @@ bool MapWnd::ZoomToPrevIdleFleet() {
 
 bool MapWnd::ZoomToNextIdleFleet() {
     auto vec = GetUniverse().Objects().findIDs<Fleet>(
-        StationaryFleetVisitor(HumanClientApp::GetApp()->EmpireID()));
+        StationaryFleetVisitor(GGHumanClientApp::GetApp()->EmpireID()));
     auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
     const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
     if (it != vec.end())
@@ -7065,7 +7076,7 @@ bool MapWnd::ZoomToNextIdleFleet() {
 }
 
 bool MapWnd::ZoomToPrevFleet() {
-    auto vec = GetUniverse().Objects().findIDs<Fleet>(OwnedVisitor(HumanClientApp::GetApp()->EmpireID()));
+    auto vec = GetUniverse().Objects().findIDs<Fleet>(OwnedVisitor(GGHumanClientApp::GetApp()->EmpireID()));
     auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
     const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
     if (it != vec.begin())
@@ -7086,7 +7097,7 @@ bool MapWnd::ZoomToPrevFleet() {
 
 bool MapWnd::ZoomToNextFleet() {
     auto vec = GetUniverse().Objects().findIDs<Fleet>(
-        OwnedVisitor(HumanClientApp::GetApp()->EmpireID()));
+        OwnedVisitor(GGHumanClientApp::GetApp()->EmpireID()));
     auto it = std::find_if(vec.begin(), vec.end(),
         [cur_id{this->m_current_fleet_id}](int o_id){ return o_id == cur_id; });
     auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
@@ -7105,7 +7116,7 @@ bool MapWnd::ZoomToNextFleet() {
 }
 
 bool MapWnd::ZoomToSystemWithWastedPP() {
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const Empire* empire = GetEmpire(empire_id);
     if (!empire)
         return false;
@@ -7300,7 +7311,7 @@ namespace {
     bool FleetRouteInRange(const std::shared_ptr<Fleet>& fleet, const RouteListType& route) {
         std::list<int> route_list{route.begin(), route.end()};
 
-        auto eta = fleet->ETA(fleet->MovePath(route_list));
+        auto eta = fleet->ETA(fleet->MovePath(route_list, false, ScriptingContext()));
         if (eta.first == Fleet::ETA_NEVER || eta.first == Fleet::ETA_UNKNOWN || eta.first == Fleet::ETA_OUT_OF_RANGE)
             return false;
 
@@ -7322,8 +7333,10 @@ namespace {
 
     /** Get the shortest suitable route from @p start_id to @p destination_id as known to @p empire_id */
     OrderedRouteType GetShortestRoute(int empire_id, int start_id, int destination_id) {
-        auto start_system = Objects().get<System>(start_id);
-        auto dest_system = Objects().get<System>(destination_id);
+        const ObjectMap& objects = Objects();
+        const EmpireManager& empires = Empires();
+        auto start_system = objects.get<System>(start_id);
+        auto dest_system = objects.get<System>(destination_id);
         if (!start_system || !dest_system) {
             WarnLogger() << "Invalid start or destination system";
             return OrderedRouteType();
@@ -7334,9 +7347,9 @@ namespace {
         std::pair<std::list<int>, double> route_distance;
 
         if (ignore_hostile)
-            route_distance = GetPathfinder()->ShortestPath(start_id, destination_id, empire_id);
+            route_distance = GetUniverse().GetPathfinder()->ShortestPath(start_id, destination_id, empire_id, objects);
         else
-            route_distance = GetPathfinder()->ShortestPath(start_id, destination_id, empire_id, fleet_pred);
+            route_distance = GetUniverse().GetPathfinder()->ShortestPath(start_id, destination_id, empire_id, fleet_pred, empires, objects);
 
         if (!route_distance.first.empty() && route_distance.second > 0.0) {
             RouteListType route(route_distance.first.begin(), route_distance.first.end());
@@ -7354,7 +7367,7 @@ namespace {
             WarnLogger() << "Invalid fleet or system";
             return OrderedFleetRouteType();
         }
-        if ((fleet->Fuel() < 1.0f) || !fleet->MovePath().empty()) {
+        if ((fleet->Fuel(Objects()) < 1.0f) || !fleet->MovePath().empty()) {
             WarnLogger() << "Fleet has no fuel or non-empty move path";
             return OrderedFleetRouteType();
         }
@@ -7447,7 +7460,7 @@ namespace {
             return false;
         }
 
-        int max_jumps = std::trunc(fleet->Fuel());
+        int max_jumps = std::trunc(fleet->Fuel(Objects()));
         if (max_jumps < 1) {
             TraceLogger() << "Not enough fuel " << std::to_string(max_jumps)
                           << " to move fleet " << std::to_string(fleet->ID());
@@ -7478,7 +7491,7 @@ namespace {
         }
 
         auto nearest_supply = GetNearestSupplyRoute(empire, fleet->SystemID(),
-                                                    std::trunc(fleet->Fuel()));
+                                                    std::trunc(fleet->Fuel(Objects())));
         if (nearest_supply.first > 0.0 && FleetRouteInRange(fleet, nearest_supply.second))
             return nearest_supply;
 
@@ -7500,9 +7513,9 @@ namespace {
         }
 
         auto num_jumps_resupply = JumpsForRoute(route.second);
-        int max_fleet_jumps = std::trunc(fleet->Fuel());
+        int max_fleet_jumps = std::trunc(fleet->Fuel(Objects()));
         if (num_jumps_resupply <= max_fleet_jumps) {
-            HumanClientApp::GetApp()->Orders().IssueOrder(
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.second.rbegin()));
         } else {
             TraceLogger() << "Not enough fuel for fleet " << fleet->ID()
@@ -7539,7 +7552,7 @@ namespace {
             return false;
         }
 
-        HumanClientApp::GetApp()->Orders().IssueOrder(
+        GGHumanClientApp::GetApp()->Orders().IssueOrder(
             std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.rbegin()));
         if (fleet->FinalDestinationID() == *route.rbegin()) {
             TraceLogger() << "Sending fleet " << fleet->ID() << " to explore system " << *route.rbegin();
@@ -7584,13 +7597,13 @@ namespace {
             return;
         }
 
-        if (std::trunc(fleet->Fuel()) < 1) {  // wait for fuel
+        if (std::trunc(fleet->Fuel(Objects())) < 1) {  // wait for fuel
             TraceLogger() << "Not enough fuel to move fleet " << std::to_string(fleet->ID());
             return;
         }
 
         // Determine if fleet should refuel
-        if (fleet->Fuel() < fleet->MaxFuel() &&
+        if (fleet->Fuel(Objects()) < fleet->MaxFuel(Objects()) &&
             !CanResupplyAfterDestination(fleet, route))
         {
             if (IssueFleetResupplyOrder(fleet)) {
@@ -7609,8 +7622,8 @@ namespace {
 };
 
 void MapWnd::DispatchFleetsExploring() {
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
-    const Empire *empire = GetEmpire(empire_id);
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const Empire *empire = GetEmpire(empire_id);    // TODO: shared_ptr
     if (!empire) {
         WarnLogger() << "Invalid empire";
         return;
@@ -7630,7 +7643,7 @@ void MapWnd::DispatchFleetsExploring() {
         if (destroyed_objects.count(fleet->ID())) {
             m_fleets_exploring.erase(fleet->ID()); //this fleet can't explore anymore
         } else {
-             if (fleet->MovePath().empty())
+             if (fleet->MovePath(false, ScriptingContext()).empty())
                 idle_fleets.insert(fleet->ID());
             else
                 systems_being_explored.emplace(fleet->FinalDestinationID(), fleet->ID());
@@ -7695,7 +7708,7 @@ void MapWnd::DispatchFleetsExploring() {
                 WarnLogger() << "Invalid fleet " << fleet_id;
                 continue;
             }
-            if (fleet->Fuel() < 1.0f)
+            if (fleet->Fuel(Objects()) < 1.0f)
                 continue;
 
             auto route = GetOrderedFleetRoute(fleet, unexplored_system);

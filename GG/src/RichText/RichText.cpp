@@ -126,7 +126,7 @@ void ExtractParameters(const std::string& params_string,
             // Pass space.
             pass_space(it, end);
         }
-    } catch (std::exception& ex) {
+    } catch (const std::exception& ex) {
         // Store error in special parameter.
         tag_params["GG_ERROR"] = ex.what();
     }
@@ -163,10 +163,6 @@ public:
       */
     void SetPadding(int pixels);
     void SizeMove(Pt ul, Pt lr);
-
-    // Get the set of keys from a map.
-    template <typename T, typename V>
-    std::set<T> MapKeys(const std::map<T, V>& arg_map);
 
     // Set the mapping from tags to factories that should be used to generate blocks from them.
     void SetBlockFactoryMap(std::shared_ptr<RichText::BLOCK_FACTORY_MAP> block_factory_map)
@@ -243,14 +239,18 @@ void RichTextPrivate::SizeMove(Pt ul, Pt lr)
         DoLayout();
 }
 
-// Get the set of keys from a map.
-template <typename T, typename V>
-std::set<T> RichTextPrivate::MapKeys(const std::map<T, V>& arg_map)
-{
-    std::set<T> keys;
-    for (const auto& pair : arg_map)
-        keys.emplace(pair.first);
-    return keys;
+namespace {
+    // Get the set of keys from a map.
+    template <typename T, typename V>
+    std::set<T> MapKeys(const std::map<T, V>& arg_map)
+    {
+        std::set<T> keys;
+        for ([[maybe_unused]] auto& [key, val] : arg_map) {
+            (void)val;  // quiet unused varianle warning
+            keys.insert(key);
+        }
+        return keys;
+    }
 }
 
 // Parses content into tags.

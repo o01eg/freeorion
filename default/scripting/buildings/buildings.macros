@@ -1,13 +1,17 @@
 // sets stability (happiness) on planets in empire that has adopted the policy this macro effect is added to, if those planets' species like or dislike the policy
 
+POLICY_LIKE_DISLIKE_SCALING
+'''(1.0 + (Statistic If condition = EmpireHasAdoptedPolicy empire = Target.Owner name = "PLC_LIBERTY")
+    - 0.5*(Statistic If condition = EmpireHasAdoptedPolicy empire = Target.Owner name = "PLC_CONFORMANCE"))'''
+
 STABILITY_PER_LIKED_OR_DISLIKED_BUILDING_ON_PLANET
-'''4'''
+'''4 * [[POLICY_LIKE_DISLIKE_SCALING]]'''
 
 STABILITY_PER_LIKED_OR_DISLIKED_BUILDING_IN_SYSTEM
-'''1'''
+'''1 * [[POLICY_LIKE_DISLIKE_SCALING]]'''
 
 STABILITY_PER_LIKED_OR_DISLIKED_BUILDING_IN_EMPIRE
-'''0.5'''
+'''0.6 * [[POLICY_LIKE_DISLIKE_SCALING]]'''
 
 SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
 '''
@@ -19,7 +23,6 @@ SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
                 (SpeciesContentOpinion species = LocalCandidate.Species name = ThisBuilding > 0)
             ]
             accountinglabel = "LIKES_BUILDING_LABEL"
-            // priority = [[DEFAULT_PRIORITY]]  // want to avoid needing to include the priorities-defining macro in all policies...
             effects =
                 SetTargetHappiness value = Value + [[STABILITY_PER_LIKED_OR_DISLIKED_BUILDING_ON_PLANET]] * SpeciesContentOpinion species = Target.Species name = ThisBuilding
 
@@ -31,7 +34,6 @@ SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
                 (SpeciesContentOpinion species = LocalCandidate.Species name = ThisBuilding < 0)
             ]
             accountinglabel = "DISLIKES_BUILDING_LABEL"
-            // priority = [[DEFAULT_PRIORITY]]  // want to avoid needing to include the priorities-defining macro in all policies...
             effects =
                 SetTargetHappiness value = Value + [[STABILITY_PER_LIKED_OR_DISLIKED_BUILDING_ON_PLANET]] * SpeciesContentOpinion species = Target.Species name = ThisBuilding
                 
@@ -45,7 +47,6 @@ SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
                 (SpeciesContentOpinion species = LocalCandidate.Species name = ThisBuilding < 0)
             ]
             accountinglabel = "DISLIKES_BUILDING_LABEL"
-            // priority = [[DEFAULT_PRIORITY]]  // want to avoid needing to include the priorities-defining macro in all policies...
             effects =
                 SetTargetHappiness value = Value + [[STABILITY_PER_LIKED_OR_DISLIKED_BUILDING_IN_SYSTEM]] * SpeciesContentOpinion species = Target.Species name = ThisBuilding
 
@@ -59,7 +60,6 @@ SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
                 (SpeciesContentOpinion species = LocalCandidate.Species name = ThisBuilding > 0)
             ]
             accountinglabel = "LIKES_BUILDING_LABEL"
-            // priority = [[DEFAULT_PRIORITY]]  // want to avoid needing to include the priorities-defining macro in all policies...
             effects =
                 SetTargetHappiness value = Value + [[STABILITY_PER_LIKED_OR_DISLIKED_BUILDING_IN_SYSTEM]] * SpeciesContentOpinion species = Target.Species name = ThisBuilding
 
@@ -73,7 +73,6 @@ SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
                 (SpeciesContentOpinion species = LocalCandidate.Species name = ThisBuilding > 0)
             ]
             accountinglabel = "LIKES_BUILDING_LABEL"
-            // priority = [[DEFAULT_PRIORITY]]  // want to avoid needing to include the priorities-defining macro in all policies...
             effects =
                 SetTargetHappiness value = Value + [[STABILITY_PER_LIKED_OR_DISLIKED_BUILDING_IN_EMPIRE]] * SpeciesContentOpinion species = Target.Species name = ThisBuilding
 
@@ -87,7 +86,6 @@ SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
                 (SpeciesContentOpinion species = LocalCandidate.Species name = ThisBuilding < 0)
             ]
             accountinglabel = "DISLIKES_BUILDING_LABEL"
-            // priority = [[DEFAULT_PRIORITY]]  // want to avoid needing to include the priorities-defining macro in all policies...
             effects =
                 SetTargetHappiness value = Value + [[STABILITY_PER_LIKED_OR_DISLIKED_BUILDING_IN_EMPIRE]] * SpeciesContentOpinion species = Target.Species name = ThisBuilding
 

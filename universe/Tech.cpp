@@ -243,11 +243,11 @@ float Tech::ResearchCost(int empire_id) const {
         if (m_research_cost->SourceInvariant())
             return m_research_cost->Eval();
 
-        auto source = Empires().GetSource(empire_id);
+        auto source = Empires().GetSource(empire_id);   // TODO: pass ScriptingContext and use here
         if (!source)
             return ARBITRARY_LARGE_COST;
 
-        return m_research_cost->Eval(ScriptingContext(source));
+        return m_research_cost->Eval(ScriptingContext(std::move(source)));
     }
 }
 
@@ -270,11 +270,11 @@ int Tech::ResearchTime(int empire_id) const {
         return ARBITRARY_LARGE_TURNS;
 
     } else {
-        auto source = Empires().GetSource(empire_id);
+        auto source = Empires().GetSource(empire_id);   // TODO: pass ScriptingContext and use here
         if (!source && !m_research_turns->SourceInvariant())
             return ARBITRARY_LARGE_TURNS;
 
-        return m_research_turns->Eval(ScriptingContext(source));
+        return m_research_turns->Eval(ScriptingContext(std::move(source)));
     }
 }
 

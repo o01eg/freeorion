@@ -3,6 +3,8 @@
 
 
 #include "CommonParams.h"
+#include "ScriptingContext.h"
+#include "../util/AppInterface.h"
 #include "../util/Enum.h"
 #include "../util/Export.h"
 #include "../util/Pending.h"
@@ -63,15 +65,18 @@ public:
 
     //! Returns the number of production points required to build this building
     //! at this location by this empire
-    auto ProductionCost(int empire_id, int location_id) const -> float;
+    auto ProductionCost(int empire_id, int location_id,
+                        const ScriptingContext& context = ScriptingContext()) const -> float;
 
     //! Returns the maximum number of production points per turn that can be
     //! spend on this building
-    auto PerTurnCost(int empire_id, int location_id) const -> float;
+    auto PerTurnCost(int empire_id, int location_id,
+                     const ScriptingContext& context = ScriptingContext()) const -> float;
 
     //! Returns the number of turns required to build this building at this
     //! location by this empire
-    auto ProductionTime(int empire_id, int location_id) const -> int;
+    auto ProductionTime(int empire_id, int location_id,
+                        const ScriptingContext& context = ScriptingContext()) const -> int;
 
     //! Returns the ValueRef that determines ProductionCost()
     auto Cost() const -> const ValueRef::ValueRef<double>*
@@ -120,12 +125,12 @@ public:
 
     //! Returns true iff the empire with ID empire_id can produce this building
     //! at the location with location_id
-    auto ProductionLocation(int empire_id, int location_id) const -> bool;
+    auto ProductionLocation(int empire_id, int location_id, const ScriptingContext& context) const -> bool;
 
     //! Returns true iff the empire with ID empire_id meets the requirements of
     //! the EnqueueLocation() UI filter method for this building at the
     //! location with location_id
-    auto EnqueueLocation(int empire_id, int location_id) const -> bool;
+    auto EnqueueLocation(int empire_id, int location_id, const ScriptingContext& context) const -> bool;
 
     //! Returns CaptureResult for empire with ID @p to_empire_id capturing from
     //! empire with IDs @p from_empire_id the planet (or other UniverseObject)

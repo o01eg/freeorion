@@ -166,6 +166,19 @@ struct FO_COMMON_API None final : public Condition {
     unsigned int GetCheckSum() const override;
 };
 
+/** Does not modify the input ObjectSets. */
+struct FO_COMMON_API NoOp final : public Condition {
+    NoOp();
+    bool operator==(const Condition& rhs) const override;
+    void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
+              ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
+    std::string Description(bool negated = false) const override;
+    std::string Dump(unsigned short ntabs = 0) const override;
+    void SetTopLevelContent(const std::string& content_name) override
+    {}
+    unsigned int GetCheckSum() const override;
+};
+
 /** Matches all objects that are owned (if \a exclusive == false) or only owned
   * (if \a exclusive == true) by an empire that has affilitation type
   * \a affilitation with Empire \a empire_id. */
@@ -1043,6 +1056,9 @@ private:
 /** Matches all objects that are visible to the Empire with id \a empire_id */
 struct FO_COMMON_API VisibleToEmpire final : public Condition {
     explicit VisibleToEmpire(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id);
+    VisibleToEmpire(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
+                    std::unique_ptr<ValueRef::ValueRef<int>>&& since_turn,
+                    std::unique_ptr<ValueRef::ValueRef<Visibility>>&& vis);
 
     bool operator==(const Condition& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
@@ -1056,6 +1072,8 @@ private:
     bool Match(const ScriptingContext& local_context) const override;
 
     std::unique_ptr<ValueRef::ValueRef<int>> m_empire_id;
+    std::unique_ptr<ValueRef::ValueRef<int>> m_since_turn;
+    std::unique_ptr<ValueRef::ValueRef<Visibility>> m_vis;
 };
 
 /** Matches all objects that are within \a distance units of at least one

@@ -17,7 +17,7 @@
 #include "../util/i18n.h"
 
 
-extern FO_COMMON_API const int INVALID_DESIGN_ID = -1;
+const int INVALID_DESIGN_ID = -1;
 
 //using boost::io::str;
 
@@ -111,8 +111,7 @@ ParsedShipDesign::ParsedShipDesign(
 ////////////////////////////////////////////////
 // ShipDesign
 ////////////////////////////////////////////////
-ShipDesign::ShipDesign() :
-    m_uuid(boost::uuids::nil_generator()())
+ShipDesign::ShipDesign()
 {}
 
 ShipDesign::ShipDesign(const boost::optional<std::invalid_argument>& should_throw,
@@ -155,9 +154,8 @@ const std::string& ShipDesign::Name(bool stringtable_lookup /* = true */) const 
 }
 
 void ShipDesign::SetName(const std::string& name) {
-    if (!name.empty() && !m_name.empty()) {
+    if (!name.empty() && !m_name.empty())
         m_name = name;
-    }
 }
 
 void ShipDesign::SetUUID(const boost::uuids::uuid& uuid)
@@ -199,12 +197,12 @@ float ShipDesign::ProductionCost(int empire_id, int location_id) const {
 
     float cost_accumulator = 0.0f;
     if (const ShipHull* hull = GetShipHull(m_hull))
-        cost_accumulator += hull->ProductionCost(empire_id, location_id, m_id);
+        cost_accumulator += hull->ProductionCost(empire_id, location_id, ScriptingContext(), m_id);
 
     int part_count = 0;
     for (const std::string& part_name : m_parts) {
         if (const ShipPart* part = GetShipPart(part_name)) {
-            cost_accumulator += part->ProductionCost(empire_id, location_id, m_id);
+            cost_accumulator += part->ProductionCost(empire_id, location_id, /*ScriptingContext(),*/ m_id);
             part_count++;
         }
     }
@@ -295,7 +293,7 @@ float ShipDesign::AdjustedAttack(float shield) const {
     int fighter_shots = std::min(available_fighters, fighter_launch_capacity);  // how many fighters launched in bout 1
     available_fighters -= fighter_shots;
     int launched_fighters = fighter_shots;
-    int num_bouts = GetGameRules().Get<int>("RULE_NUM_COMBAT_ROUNDS");
+    int num_bouts = GetGameRules().Get<int>("RULE_NUM_COMBAT_ROUNDS"); // TODO: get from ScriptingContext?
     int remaining_bouts = num_bouts - 2;  // no attack for first round, second round already added
     while (remaining_bouts > 0) {
         int fighters_launched_this_bout = std::min(available_fighters, fighter_launch_capacity);
@@ -354,15 +352,15 @@ int ShipDesign::PartCount() const {
     return count;
 }
 
-bool ShipDesign::ProductionLocation(int empire_id, int location_id) const {
-    Empire* empire = GetEmpire(empire_id);
+bool ShipDesign::ProductionLocation(int empire_id, int location_id) const { // TODO: pass in ScriptingContext
+    Empire* empire = GetEmpire(empire_id); // TODO: get from context
     if (!empire) {
         DebugLogger() << "ShipDesign::ProductionLocation: Unable to get pointer to empire " << empire_id;
         return false;
     }
 
     // must own the production location...
-    auto location = Objects().get(location_id);
+    auto location = Objects().get(location_id); // TODO: get from context
     if (!location) {
         WarnLogger() << "ShipDesign::ProductionLocation unable to get location object with id " << location_id;
         return false;

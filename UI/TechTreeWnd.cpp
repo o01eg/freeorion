@@ -7,7 +7,7 @@
 #include "Sound.h"
 #include "IconTextBrowseWnd.h"
 #include "EncyclopediaDetailPanel.h"
-#include "../client/human/HumanClientApp.h"
+#include "../client/human/GGHumanClientApp.h"
 #include "../util/i18n.h"
 #include "../util/Logger.h"
 #include "../util/OptionsDB.h"
@@ -67,21 +67,35 @@ namespace {
     }
     bool temp_bool = RegisterOptions(&AddOptions);
 
-    GG::X   TechPanelWidth()
+    GG::X TechPanelWidth()
     { return GG::X(ClientUI::Pts()*38); }
-    GG::Y   TechPanelHeight()
+    GG::Y TechPanelHeight()
     { return GG::Y(ClientUI::Pts()*6); }
 
-    const double ZOOM_STEP_SIZE = 1.12;
-    const double MIN_SCALE = std::pow(ZOOM_STEP_SIZE, -25.0);
-    const double MAX_SCALE = std::pow(ZOOM_STEP_SIZE, 10.0);
-    const double INITIAL_SCALE = std::pow(ZOOM_STEP_SIZE, -5.0);
+    constexpr double ConstExprPow(double base, int pow) {
+        bool invert_at_end = false;
+        if (pow == 0) {
+            return 1.0;
+        } else if (pow < 0) {
+            invert_at_end = true;
+            pow = -pow;
+        }
+        double retval = base;
+        while (--pow)
+            retval *= base;
+        return invert_at_end ? 1.0/retval : retval;
+    }
 
-    const double PI = 3.1415926535897932384626433;
+    constexpr double ZOOM_STEP_SIZE = 1.12;
+    constexpr double MIN_SCALE = ConstExprPow(ZOOM_STEP_SIZE, -25);
+    constexpr double MAX_SCALE = ConstExprPow(ZOOM_STEP_SIZE, 10);
+    constexpr double INITIAL_SCALE = ConstExprPow(ZOOM_STEP_SIZE, -5);
 
-    bool    TechVisible(const std::string& tech_name,
-                        const std::set<std::string>& categories_shown,
-                        const std::set<TechStatus>& statuses_shown)
+    constexpr double PI = 3.1415926535897932384626433;
+
+    bool TechVisible(const std::string& tech_name,
+                     const std::set<std::string>& categories_shown,
+                     const std::set<TechStatus>& statuses_shown)
     {
         const Tech* tech = GetTech(tech_name);
         if (!tech)
@@ -96,7 +110,7 @@ namespace {
             return false;
 
         // check tech status
-        const Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+        const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
         if (!empire)
             return true;    // if no empire, techs have no status, so just return true
         if (!statuses_shown.count(empire->GetTechStatus(tech_name)))
@@ -226,13 +240,13 @@ private:
     /** These values are determined when doing button layout, and stored.
       * They are later used when rendering separator lines between the groups
       * of buttons */
-    int m_buttons_per_row;              // number of buttons that can fit into available horizontal space
+    int m_buttons_per_row = 1;          // number of buttons that can fit into available horizontal space
     GG::X m_col_offset;                 // horizontal distance between each column of buttons
     GG::Y m_row_offset;                 // vertical distance between each row of buttons
 
     /** These values are used for rendering separator lines between groups of buttons */
-    static const int BUTTON_SEPARATION; // vertical or horizontal sepration between adjacent buttons
-    static const int UPPER_LEFT_PAD;    // offset of buttons' position from top left of controls box
+    static constexpr int BUTTON_SEPARATION = 2; // vertical or horizontal sepration between adjacent buttons
+    static constexpr int UPPER_LEFT_PAD = 2;    // offset of buttons' position from top left of controls box
 
     // TODO: replace all the above stored information with a vector of pairs of GG::Pt (or perhaps GG::Rect)
     // This will contain the start and end points of all separator lines that need to be drawn.  This will be
@@ -247,15 +261,12 @@ private:
     friend class TechTreeWnd;               // so TechTreeWnd can access buttons
 };
 
-const int TechTreeWnd::TechTreeControls::BUTTON_SEPARATION = 2;
-const int TechTreeWnd::TechTreeControls::UPPER_LEFT_PAD = 2;
-
 TechTreeWnd::TechTreeControls::TechTreeControls(const std::string& config_name) :
     CUIWnd(UserString("TECH_DISPLAY"), GG::INTERACTIVE | GG::DRAGABLE | GG::RESIZABLE | GG::ONTOP, config_name)
 {}
 
 void TechTreeWnd::TechTreeControls::CompleteConstruction() {
-   const int tooltip_delay = GetOptionsDB().Get<int>("ui.tooltip.delay");
+    const int tooltip_delay = GetOptionsDB().Get<int>("ui.tooltip.delay");
     const boost::filesystem::path icon_dir = ClientUI::ArtDir() / "icons" / "tech" / "controls";
 
     // create a button for each tech category...
@@ -742,7 +753,7 @@ void TechTreeWnd::LayoutPanel::TechPanel::PreRender() {
         m_name_label->SizeMove(text_ul, text_ul + text_size);
 
         // show cost and duration for unresearched techs
-        const Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+        const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
         if (empire) {
             if (empire->TechResearched(m_tech_name))
                 m_cost_and_duration_label->Hide();
@@ -920,7 +931,7 @@ void TechTreeWnd::LayoutPanel::TechPanel::Select(bool select)
 void TechTreeWnd::LayoutPanel::TechPanel::Update() {
     Select(m_layout_panel->m_selected_tech_name == m_tech_name);
 
-    int client_empire_id = HumanClientApp::GetApp()->EmpireID();
+    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
     if (const Empire* empire = GetEmpire(client_empire_id)) {
         m_status = empire->GetTechStatus(m_tech_name);
@@ -1532,8 +1543,8 @@ private:
 
     private:
         std::string m_tech;
-        GG::Clr m_background_color;
-        bool m_enqueued;
+        GG::Clr m_background_color = {{0, 0, 0, 128}};
+        bool m_enqueued = false;
     };
 
     void Populate(bool update = true);
@@ -1546,7 +1557,7 @@ private:
     std::set<TechStatus>                                        m_tech_statuses_shown;
     std::unordered_map<std::string, std::shared_ptr<TechRow>>   m_tech_row_cache;
     std::shared_ptr<GG::ListBox::Row>                           m_header_row;
-    size_t                                                      m_previous_sort_col;
+    size_t                                                      m_previous_sort_col = 0;
 };
 
 void TechTreeWnd::TechListBox::TechRow::Render() {
@@ -1633,14 +1644,14 @@ void TechTreeWnd::TechListBox::TechRow::CompleteConstruction() {
     text->SetChildClippingMode(ChildClippingMode::ClipToWindow);
     push_back(text);
 
-    std::string cost_str = std::to_string(std::lround(this_row_tech->ResearchCost(HumanClientApp::GetApp()->EmpireID())));
+    std::string cost_str = std::to_string(std::lround(this_row_tech->ResearchCost(GGHumanClientApp::GetApp()->EmpireID())));
     text = GG::Wnd::Create<CUILabel>(cost_str + just_pad + just_pad, GG::FORMAT_RIGHT);
     text->SetResetMinSize(false);
     text->ClipText(true);
     text->SetChildClippingMode(ChildClippingMode::ClipToWindow);
     push_back(text);
 
-    std::string time_str = std::to_string(this_row_tech->ResearchTime(HumanClientApp::GetApp()->EmpireID()));
+    std::string time_str = std::to_string(this_row_tech->ResearchTime(GGHumanClientApp::GetApp()->EmpireID()));
     text = GG::Wnd::Create<CUILabel>(time_str + just_pad + just_pad, GG::FORMAT_RIGHT);
     text->SetResetMinSize(false);
     text->ClipText(true);
@@ -1666,7 +1677,7 @@ void TechTreeWnd::TechListBox::TechRow::Update() {
     // TODO replace string padding with new TextFormat flag
     std::string just_pad = "    ";
 
-    auto client_empire_id = HumanClientApp::GetApp()->EmpireID();
+    auto client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
     auto empire = GetEmpire(client_empire_id);
 
     std::string cost_str = std::to_string(std::lround(this_row_tech->ResearchCost(client_empire_id)));
@@ -1947,7 +1958,7 @@ void TechTreeWnd::TechListBox::TechLeftClicked(GG::ListBox::iterator it, const G
 void TechTreeWnd::TechListBox::TechRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
     if ((*it)->Disabled())
         return;
-    const Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (!empire)
         return;
 
@@ -2030,7 +2041,7 @@ void TechTreeWnd::CompleteConstruction() {
         m_tech_tree_controls->SaveDefaultedOptions();
     }
 
-    HumanClientApp::GetApp()->RepositionWindowsSignal.connect(
+    GGHumanClientApp::GetApp()->RepositionWindowsSignal.connect(
         boost::bind(&TechTreeWnd::InitializeWindows, this));
 
     AttachChild(m_enc_detail_panel);
@@ -2241,7 +2252,7 @@ void TechTreeWnd::CenterOnTech(const std::string& tech_name) {
     // ensure tech exists and is visible
     const Tech* tech = ::GetTech(tech_name);
     if (!tech) return;
-    const Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (empire)
         SetTechStatus(empire->GetTechStatus(tech_name), true);
     ShowCategory(tech->Category());
@@ -2300,7 +2311,7 @@ void TechTreeWnd::AddTechToResearchQueue(const std::string& tech_name,
 {
     const Tech* tech = GetTech(tech_name);
     if (!tech) return;
-    const Empire* empire = GetEmpire(HumanClientApp::GetApp()->EmpireID());
+    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     TechStatus tech_status = TechStatus::TS_UNRESEARCHABLE;
     if (empire)
         tech_status = empire->GetTechStatus(tech_name);
@@ -2321,7 +2332,7 @@ void TechTreeWnd::AddTechToResearchQueue(const std::string& tech_name,
 
     // if tech can't yet be researched, add any prerequisites it requires (recursively) and then add it
     TechManager& manager = GetTechManager();
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     std::vector<std::string> tech_vec = manager.RecursivePrereqs(tech_name, empire_id);
     tech_vec.emplace_back(tech_name);
     AddTechsToQueueSignal(tech_vec, queue_pos);

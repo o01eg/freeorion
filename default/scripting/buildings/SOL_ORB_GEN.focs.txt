@@ -4,12 +4,12 @@ BuildingType
     buildcost = 75 * [[BUILDING_COST_MULTIPLIER]]
     buildtime = 6
     tags = "ORBITAL"
-    location = AND [
+    location = And [
         Not Contains Building name = "BLD_SOL_ORB_GEN"
         OwnedBy empire = Source.Owner
         Not Star type = [Neutron BlackHole NoStar]
         ]
-    EnqueueLocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
+    enqueuelocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS]]
     
@@ -18,18 +18,22 @@ BuildingType
                 PopulationCenter
                 Focus type = "FOCUS_INDUSTRY"
                 OwnedBy empire = Source.Owner
+                Happiness low = 0
                 ResourceSupplyConnected empire = Source.Owner condition = Source
             ]
             activation = Star type = [Blue White]
             stackinggroup = "BLD_SOL_ORB_GEN_EFFECT"
-            priority = [[VERY_LATE_PRIORITY]]
-            effects = SetTargetIndustry value = Value + Target.Population * 0.75 * [[INDUSTRY_PER_POP]]
+            priority = [[TARGET_AFTER_2ND_SCALING_PRIORITY]]
+            effects = SetTargetIndustry value = Value + Target.Population
+                        * (NamedReal name = "BLD_SOL_ORB_GEN_BRIGHT_TARGET_INDUSTRY_PERPOP"
+                                     value = 0.75 * [[INDUSTRY_PER_POP]])
 
         EffectsGroup
             scope = And [
                 PopulationCenter
                 Focus type = "FOCUS_INDUSTRY"
                 OwnedBy empire = Source.Owner
+                Happiness low = 0
                 ResourceSupplyConnected empire = Source.Owner condition = Source
             ]
             activation = And [
@@ -41,14 +45,17 @@ BuildingType
                 ]
             ]
             stackinggroup = "BLD_SOL_ORB_GEN_EFFECT"
-            priority = [[VERY_LATE_PRIORITY]]
-            effects = SetTargetIndustry value = Value + Target.Population * 0.5 * [[INDUSTRY_PER_POP]]
+            priority = [[TARGET_AFTER_2ND_SCALING_PRIORITY]]
+            effects = SetTargetIndustry value = Value + Target.Population
+                        * (NamedReal name = "BLD_SOL_ORB_GEN_NORMAL_TARGET_INDUSTRY_PERPOP"
+                                     value = 0.5 * [[INDUSTRY_PER_POP]])
 
         EffectsGroup
             scope = And [
                 PopulationCenter
                 Focus type = "FOCUS_INDUSTRY"
                 OwnedBy empire = Source.Owner
+                Happiness low = 0
                 ResourceSupplyConnected empire = Source.Owner condition = Source
             ]
             activation = And [
@@ -60,8 +67,10 @@ BuildingType
                 ]
             ]
             stackinggroup = "BLD_SOL_ORB_GEN_EFFECT"
-            priority = [[VERY_LATE_PRIORITY]]
-            effects = SetTargetIndustry value = Value + Target.Population * 0.25 * [[INDUSTRY_PER_POP]]
+            priority = [[TARGET_AFTER_2ND_SCALING_PRIORITY]]
+            effects = SetTargetIndustry value = Value + Target.Population
+                        * (NamedReal name = "BLD_SOL_ORB_GEN_DIM_TARGET_INDUSTRY_PERPOP"
+                                     value = 0.25 * [[INDUSTRY_PER_POP]])
     ]
     icon = "icons/building/miniature_sun.png"
 

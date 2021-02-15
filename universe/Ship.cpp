@@ -104,7 +104,7 @@ void Ship::Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_
     Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(copied_object_id, empire_id);
     auto visible_specials = GetUniverse().GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
 
-    UniverseObject::Copy(copied_object, vis, visible_specials);;
+    UniverseObject::Copy(std::move(copied_object), vis, visible_specials);;
 
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
         if (this->m_fleet_id != copied_ship->m_fleet_id) {
@@ -137,12 +137,11 @@ void Ship::Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_
     }
 }
 
-bool Ship::HostileToEmpire(int empire_id) const
-{
+bool Ship::HostileToEmpire(int empire_id, const EmpireManager& empires) const {
     if (OwnedBy(empire_id))
         return false;
     return empire_id == ALL_EMPIRES || Unowned() ||
-           Empires().GetDiplomaticStatus(Owner(), empire_id) == DiplomaticStatus::DIPLO_WAR;
+        empires.GetDiplomaticStatus(Owner(), empire_id) == DiplomaticStatus::DIPLO_WAR;
 }
 
 std::set<std::string> Ship::Tags() const {
@@ -322,7 +321,7 @@ bool Ship::CanHaveTroops() const {
     return design ? design->HasTroops() : false;
 }
 
-const std::string& Ship::PublicName(int empire_id) const {
+const std::string& Ship::PublicName(int empire_id, const ObjectMap&) const {
     // Disclose real ship name only to fleet owners. Rationale: a player who
     // doesn't know the design for a particular ship can easily guess it if the
     // ship's name is "Scout"

@@ -57,8 +57,6 @@ namespace {
     };
 }
 
-CombatParticipantState::CombatParticipantState() {}
-
 CombatParticipantState::CombatParticipantState(const UniverseObject& object)
 { FillState(*this, object); }
 
@@ -69,14 +67,13 @@ CombatLog::CombatLog(const CombatInfo& combat_info) :
     turn(combat_info.turn),
     system_id(combat_info.system_id),
     empire_ids(combat_info.empire_ids),
-    object_ids(),
     damaged_object_ids(combat_info.damaged_object_ids),
     destroyed_object_ids(combat_info.destroyed_object_ids),
     combat_events(combat_info.combat_events)
 {
     // compile all remaining and destroyed objects' ids
     object_ids = combat_info.destroyed_object_ids;
-    for (const auto& obj : combat_info.objects.all()) {
+    for (const auto& obj : combat_info.objects->all()) {
         object_ids.insert(obj->ID());
         participant_states[obj->ID()] = CombatParticipantState(*obj);
     }

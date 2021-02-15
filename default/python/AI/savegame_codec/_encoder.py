@@ -20,34 +20,30 @@ import base64
 import collections
 import json
 import zlib
+from typing import Any
 
 import EnumsAI
-from freeorion_tools import profile
-
 from ._definitions import (CanNotSaveGameException, ENUM_PREFIX, FALSE, FLOAT_PREFIX, INT_PREFIX, NONE, PLACEHOLDER,
                            SET_PREFIX, TRUE, TUPLE_PREFIX, trusted_classes, )
 
 
-@profile
 def build_savegame_string() -> bytes:
     """Encode the AIstate and compress the resulting string with zlib.
 
     To decode the string, first call zlib.decompress() on it.
 
     :return: compressed savegame string
-    :rtype: str
     """
     from aistate_interface import get_aistate
     savegame_string = encode(get_aistate())
     return base64.b64encode(zlib.compress(savegame_string.encode('utf-8')))
 
 
-def encode(o):
+def encode(o: Any) -> str:
     """Encode the passed object as json-based string.
 
     :param o: object to be encoded
     :return: String representation of the object state
-    :rtype: str
     """
     o_type = type(o)
 

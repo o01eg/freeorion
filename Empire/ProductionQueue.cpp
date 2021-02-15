@@ -320,9 +320,6 @@ namespace {
 }
 
 
-ProductionQueue::ProductionItem::ProductionItem()
-{}
-
 ProductionQueue::ProductionItem::ProductionItem(BuildType build_type_) :
     build_type(build_type_)
 {
@@ -366,15 +363,40 @@ bool ProductionQueue::ProductionItem::CostIsProductionLocationInvariant() const 
     return false;
 }
 
-bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id) const {
+std::pair<float, int> ProductionQueue::ProductionItem::ProductionCostAndTime(
+    int empire_id, int location_id, const ScriptingContext& context) const
+{
+    if (build_type == BuildType::BT_BUILDING) {
+        const BuildingType* type = GetBuildingType(name);
+        if (!type)
+            return {-1.0, -1};
+        return {type->ProductionCost(empire_id, location_id, context),
+                type->ProductionTime(empire_id, location_id, context)};
+
+    } else if (build_type == BuildType::BT_SHIP) {
+        const ShipDesign* design = GetShipDesign(design_id);
+        if (design)
+            return {design->ProductionCost(empire_id, location_id),
+                    design->ProductionTime(empire_id, location_id)};
+        return {-1.0, -1};
+
+    } else if (build_type == BuildType::BT_STOCKPILE) {
+        return {1.0, 1};
+    }
+    ErrorLogger() << "Empire::ProductionCostAndTime was passed a ProductionItem with an invalid BuildType";
+    return {-1.0, -1};
+}
+
+bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id) const { // TODO: Pass ScriptingContext...
     switch (build_type) {
     case BuildType::BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
-            auto location_obj = Objects().get(location_id);
             auto c = bt->EnqueueLocation();
             if (!c)
                 return true;
-            return c->Eval(ScriptingContext(location_obj), location_obj);
+            auto location_obj = Objects().get(location_id);
+            const ScriptingContext context(location_obj);
+            return c->Eval(context, std::move(location_obj));
         }
         return true;
         break;
@@ -400,14 +422,14 @@ bool ProductionQueue::ProductionItem::operator<(const ProductionItem& rhs) const
 }
 
 std::map<std::string, std::map<int, float>>
-ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id) const {
+ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id) const {  // TODO: pass ScriptingContext
     std::map<std::string, std::map<int, float>> retval;
 
     switch (build_type) {
     case BuildType::BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
             auto location_obj = Objects().get(location_id);
-            ScriptingContext context(location_obj);
+            ScriptingContext context(location_obj); // non-const but should be OK as only passed below to function taking const ScriptingContext&
 
             for (const auto& psc : bt->ProductionSpecialConsumption()) {
                 if (!psc.second.first)
@@ -433,7 +455,7 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id) c
     case BuildType::BT_SHIP: {
         if (const ShipDesign* sd = GetShipDesign(design_id)) {
             auto location_obj = Objects().get(location_id);
-            ScriptingContext context(location_obj);
+            const ScriptingContext context(location_obj);
 
             if (const ShipHull* ship_hull = GetShipHull(sd->Hull())) {
                 for (const auto& psc : ship_hull->ProductionSpecialConsumption()) {
@@ -466,14 +488,14 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id) c
 }
 
 std::map<MeterType, std::map<int, float>>
-ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id) const {
+ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id) const { // TODO: pass ScriptingContext in
     std::map<MeterType, std::map<int, float>> retval;
 
     switch (build_type) {
     case BuildType::BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
             auto obj = Objects().get(location_id);
-            ScriptingContext context(obj);
+            const ScriptingContext context(obj);
 
             for (const auto& pmc : bt->ProductionMeterConsumption()) {
                 if (!pmc.second.first)
@@ -486,7 +508,7 @@ ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id) con
     case BuildType::BT_SHIP: {
         if (const ShipDesign* sd = GetShipDesign(design_id)) {
             auto obj = Objects().get(location_id);
-            ScriptingContext context(obj);
+            const ScriptingContext context(obj);
 
             if (const ShipHull* ship_hull = GetShipHull(sd->Hull())) {
                 for (const auto& pmc : ship_hull->ProductionMeterConsumption()) {
@@ -531,10 +553,6 @@ std::string ProductionQueue::ProductionItem::Dump() const {
 //////////////////////////////
 // ProductionQueue::Element //
 //////////////////////////////
-ProductionQueue::Element::Element() :
-     uuid(boost::uuids::nil_generator()())
-{}
-
 ProductionQueue::Element::Element(ProductionItem item_, int empire_id_,
                                   boost::uuids::uuid uuid_, int ordered_,
                                   int remaining_, int blocksize_, int location_, bool paused_,
@@ -550,6 +568,9 @@ ProductionQueue::Element::Element(ProductionItem item_, int empire_id_,
     allowed_imperial_stockpile_use(allowed_imperial_stockpile_use_),
     uuid(uuid_)
 {}
+
+std::pair<float, int> ProductionQueue::Element::ProductionCostAndTime(const ScriptingContext& context) const
+{ return item.ProductionCostAndTime(empire_id, location, context); }
 
 std::string ProductionQueue::Element::Dump() const {
     std::string retval = "ProductionQueue::Element (" + item.Dump() + ") (" +
@@ -573,7 +594,7 @@ float ProductionQueue::TotalPPsSpent() const {
     // add up allocated PP from all resource sharing object groups
     float retval = 0.0f;
     for (const auto& entry : m_object_group_allocated_pp)
-    { retval += entry.second; }
+        retval += entry.second;
     return retval;
 }
 
@@ -691,7 +712,8 @@ void ProductionQueue::Update() {
         return;
     }
 
-    ScopedTimer update_timer("ProductionQueue::Update");
+    SectionedScopedTimer update_timer("ProductionQueue::Update");
+    update_timer.EnterSection("Get PP");
 
     auto industry_resource_pool = empire->GetResourcePool(ResourceType::RE_INDUSTRY);
     auto available_pp = AvailablePP(industry_resource_pool);
@@ -701,6 +723,7 @@ void ProductionQueue::Update() {
     float available_stockpile = std::min(pp_in_stockpile, stockpile_limit);
     TraceLogger() << "========= available_stockpile: " << available_stockpile << " ========";
 
+    update_timer.EnterSection("Queue Items -> Res Groups");
     // determine which resource sharing group each queue item is located in
     std::vector<std::set<int>> queue_element_groups;
     for (const auto& element : m_queue) {
@@ -708,9 +731,7 @@ void ProductionQueue::Update() {
         int location_id = element.location;
 
         // search through groups to find object
-        for (auto groups_it = available_pp.begin();
-             true; ++groups_it)
-        {
+        for (auto groups_it = available_pp.begin(); true; ++groups_it) {
             if (groups_it == available_pp.end()) {
                 // didn't find a group containing this object, so add an empty group as this element's queue element group
                 queue_element_groups.emplace_back();
@@ -728,6 +749,7 @@ void ProductionQueue::Update() {
         }
     }
 
+    update_timer.EnterSection("Cacheing Costs");
     // cache producibility, and production item costs and times
     // initialize production queue item completion status to 'never'
     std::map<std::pair<ProductionQueue::ProductionItem, int>,
@@ -740,7 +762,7 @@ void ProductionQueue::Update() {
         std::pair<ProductionQueue::ProductionItem, int> key(elem.item, location_id);
 
         if (!queue_item_costs_and_times.count(key))
-            queue_item_costs_and_times[key] = empire->ProductionCostAndTime(elem);
+            queue_item_costs_and_times[key] = elem.ProductionCostAndTime();
 
         elem.turns_left_to_next_item = -1;
         elem.turns_left_to_completion = -1;
@@ -752,6 +774,7 @@ void ProductionQueue::Update() {
     for (unsigned int i = 0; i < sim_queue_original_indices.size(); ++i)
         sim_queue_original_indices[i] = i;
 
+    update_timer.EnterSection("Set Spending");
     // allocate pp to queue elements, returning updated available pp and updated
     // allocated pp for each group of resource sharing objects
     float project_transfer_to_stockpile = SetProdQueueElementSpending(
@@ -777,6 +800,7 @@ void ProductionQueue::Update() {
     }
 
     if (!simulate_future) {
+        update_timer.EnterSection("Signal and Finish");
         DebugLogger() << "not enough PP to be worth simulating future turns production.  marking everything as never complete";
         ProductionQueueChangedSignal();
         return;
@@ -789,6 +813,7 @@ void ProductionQueue::Update() {
     const float TOO_LONG_TIME = 0.5f;   // max time in seconds to spend simulating queue
 
 
+    update_timer.EnterSection("Remove Unproducible");
     // remove from simulated queue any paused items and items that can't be built due to not
     // meeting their location conditions; can't feasibly re-check
     // buildability each projected turn as this would require creating a simulated
@@ -818,6 +843,7 @@ void ProductionQueue::Update() {
     std::map<std::set<int>, float>  allocated_stockpile_pp;
     int dummy_int = 0;
 
+    update_timer.EnterSection("Looping over Turns");
     for (int sim_turn = 1; sim_turn <= TOO_MANY_TURNS; sim_turn ++) {
         long sim_time_until_now = (boost::posix_time::ptime(boost::posix_time::microsec_clock::local_time()) - sim_time_start).total_microseconds();
         if ((sim_time_until_now * 1e-6) >= TOO_LONG_TIME)

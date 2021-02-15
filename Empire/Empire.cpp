@@ -124,17 +124,17 @@ int Empire::SourceID() const {
     return good_source ? good_source->ID() : INVALID_OBJECT_ID;
 }
 
-std::shared_ptr<const UniverseObject> Empire::Source() const {
+std::shared_ptr<const UniverseObject> Empire::Source(const ObjectMap& objects) const {
     if (m_eliminated)
         return nullptr;
 
     // Use the current source if valid
-    auto valid_current_source = Objects().get(m_source_id);
+    auto valid_current_source = objects.get(m_source_id);
     if (valid_current_source && valid_current_source->OwnedBy(m_id))
         return valid_current_source;
 
     // Try the capital
-    auto capital_as_source = Objects().get(m_capital_id);
+    auto capital_as_source = objects.get(m_capital_id);
     if (capital_as_source && capital_as_source->OwnedBy(m_id)) {
         m_source_id = m_capital_id;
         return capital_as_source;
@@ -142,7 +142,7 @@ std::shared_ptr<const UniverseObject> Empire::Source() const {
 
     // Find any object owned by the empire
     // TODO determine if ExistingObjects() is faster and acceptable
-    for (const auto& obj : Objects().all()) {
+    for (const auto& obj : objects.all()) {
         if (obj->OwnedBy(m_id)) {
             m_source_id = obj->ID();
             return obj;
@@ -165,7 +165,7 @@ std::string Empire::Dump() const {
     return retval;
 }
 
-void Empire::SetCapitalID(int id) {
+void Empire::SetCapitalID(int id, const ObjectMap& objects) {
     m_capital_id = INVALID_OBJECT_ID;
     m_source_id = INVALID_OBJECT_ID;
 
@@ -173,17 +173,17 @@ void Empire::SetCapitalID(int id) {
         return;
 
     // Verify that the capital exists and is owned by the empire
-    auto possible_capital = Objects().ExistingObject(id);
+    auto possible_capital = objects.ExistingObject(id);
     if (possible_capital && possible_capital->OwnedBy(m_id))
         m_capital_id = id;
 
-    auto possible_source = Objects().get(id);
+    auto possible_source = objects.get(id);
     if (possible_source && possible_source->OwnedBy(m_id))
         m_source_id = id;
 }
 
 void Empire::AdoptPolicy(const std::string& name, const std::string& category,
-                         bool adopt, int slot)
+                         bool adopt, int slot, const ObjectMap& objects)
 {
     if (name.empty()) {
         ErrorLogger() << "Empire::AdoptPolicy given empty policy name";
@@ -238,8 +238,9 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
             ErrorLogger() << "Empire::AdoptPolicy couldn't find policy named " << policy_entry.first << " that was supposedly already adopted this turn (" << CurrentTurn() << ")";
             continue;
         }
-        DebugLogger() << "Empire::AdoptPolicy : Already adopted policy this turn: " << policy_entry.first << " with cost " << pre_adptd_policy->AdoptionCost(m_id);
-        other_this_turn_adopted_policies_cost += pre_adptd_policy->AdoptionCost(m_id);
+        DebugLogger() << "Empire::AdoptPolicy : Already adopted policy this turn: " << policy_entry.first
+                      << " with cost " << pre_adptd_policy->AdoptionCost(m_id, objects);
+        other_this_turn_adopted_policies_cost += pre_adptd_policy->AdoptionCost(m_id, objects);
     }
     DebugLogger() << "Empire::AdoptPolicy : Combined already adopted policies this turn cost " << other_this_turn_adopted_policies_cost;
 
@@ -247,7 +248,8 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     // if it was adopted at the start of this turn, it doens't cost anything to re-adopt this turn.
     double adoption_cost = 0.0;
     if (m_initial_adopted_policies.find(name) == m_initial_adopted_policies.end())
-        adoption_cost = policy->AdoptionCost(m_id);
+        adoption_cost = policy->AdoptionCost(m_id, objects);
+
     double total_this_turn_policy_adoption_cost = adoption_cost + other_this_turn_adopted_policies_cost;
     double available_ip = ResourceStockpile(ResourceType::RE_INFLUENCE);
     DebugLogger() << "Empire::AdoptPolicy : Want to adopt policy " << name << " with cost to (re)adopt this turn " << adoption_cost
@@ -255,10 +257,12 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
                   << " and have " << available_ip << " IP available";
 
     if (available_ip < total_this_turn_policy_adoption_cost) {
-        ErrorLogger() << "Empire::AdoptPolicy insufficient ip: " << available_ip << " / " << total_this_turn_policy_adoption_cost << " to adopt additional policy this turn";
+        ErrorLogger() << "Empire::AdoptPolicy insufficient ip: " << available_ip
+                      << " / " << total_this_turn_policy_adoption_cost << " to adopt additional policy this turn";
         return;
     }
-    DebugLogger() << "Empire::AdoptPolicy sufficient IP: " << available_ip << " / " << total_this_turn_policy_adoption_cost << " to adopt additional policy this turn";
+    DebugLogger() << "Empire::AdoptPolicy sufficient IP: " << available_ip
+                  << " / " << total_this_turn_policy_adoption_cost << " to adopt additional policy this turn";
 
     // check that policy is not already adopted
     if (m_adopted_policies.count(name)) {
@@ -785,43 +789,17 @@ float Empire::ProductionStatus(int i) const {
     if (0 > i || i >= static_cast<int>(m_production_queue.size()))
         return -1.0f;
     float item_progress = m_production_queue[i].progress;
-    float item_cost;
-    int item_time;
-    std::tie(item_cost, item_time) = this->ProductionCostAndTime(m_production_queue[i]);
+    [[maybe_unused]] auto [item_cost, item_time] = m_production_queue[i].ProductionCostAndTime(); // TODO: pass and use ScriptingContext
+    (void)item_time; // quiet unused variable warning
     return item_progress * item_cost * m_production_queue[i].blocksize;
-}
-
-std::pair<float, int> Empire::ProductionCostAndTime(const ProductionQueue::Element& element) const
-{ return ProductionCostAndTime(element.item, element.location); }
-
-std::pair<float, int> Empire::ProductionCostAndTime(const ProductionQueue::ProductionItem& item,
-                                                    int location_id) const
-{
-    if (item.build_type == BuildType::BT_BUILDING) {
-        const BuildingType* type = GetBuildingType(item.name);
-        if (!type)
-            return std::make_pair(-1.0, -1);
-        return std::make_pair(type->ProductionCost(m_id, location_id),
-                              type->ProductionTime(m_id, location_id));
-
-    } else if (item.build_type == BuildType::BT_SHIP) {
-        const ShipDesign* design = GetShipDesign(item.design_id);
-        if (design)
-            return std::make_pair(design->ProductionCost(m_id, location_id),
-                                  design->ProductionTime(m_id, location_id));
-        return std::make_pair(-1.0, -1);
-
-    } else if (item.build_type == BuildType::BT_STOCKPILE) {
-        return std::make_pair(1.0, 1);
-    }
-    ErrorLogger() << "Empire::ProductionCostAndTime was passed a ProductionItem with an invalid BuildType";
-    return std::make_pair(-1.0, -1);
 }
 
 bool Empire::HasExploredSystem(int ID) const
 { return m_explored_systems.count(ID); }
 
-bool Empire::ProducibleItem(BuildType build_type, int location_id) const {
+bool Empire::ProducibleItem(BuildType build_type, int location_id,
+                            const ScriptingContext& context) const
+{
     if (build_type == BuildType::BT_SHIP)
         throw std::invalid_argument("Empire::ProducibleItem was passed BuildType BT_SHIP with no further parameters, but ship designs are tracked by number");
 
@@ -832,7 +810,7 @@ bool Empire::ProducibleItem(BuildType build_type, int location_id) const {
         return false;
 
     // must own the production location...
-    auto location = Objects().get(location_id);
+    auto location = context.ContextObjects().get(location_id);
     if (!location) {
         WarnLogger() << "Empire::ProducibleItem for BT_STOCKPILE unable to get location object with id " << location_id;
         return false;
@@ -851,10 +829,11 @@ bool Empire::ProducibleItem(BuildType build_type, int location_id) const {
         ErrorLogger() << "Empire::ProducibleItem was passed an invalid BuildType";
         return false;
     }
-
 }
 
-bool Empire::ProducibleItem(BuildType build_type, const std::string& name, int location) const {
+bool Empire::ProducibleItem(BuildType build_type, const std::string& name, int location,
+                            const ScriptingContext& context) const
+{
     // special case to check for ships being passed with names, not design ids
     if (build_type == BuildType::BT_SHIP)
         throw std::invalid_argument("Empire::ProducibleItem was passed BuildType BT_SHIP with a name, but ship designs are tracked by number");
@@ -869,13 +848,13 @@ bool Empire::ProducibleItem(BuildType build_type, const std::string& name, int l
     if (!building_type || !building_type->Producible())
         return false;
 
-    auto build_location = Objects().get(location);
+    auto build_location = context.ContextObjects().get(location);
     if (!build_location)
         return false;
 
     if (build_type == BuildType::BT_BUILDING) {
         // specified location must be a valid production location for that building type
-        return building_type->ProductionLocation(m_id, location);
+        return building_type->ProductionLocation(m_id, location, context);
 
     } else {
         ErrorLogger() << "Empire::ProducibleItem was passed an invalid BuildType";
@@ -883,7 +862,9 @@ bool Empire::ProducibleItem(BuildType build_type, const std::string& name, int l
     }
 }
 
-bool Empire::ProducibleItem(BuildType build_type, int design_id, int location) const {
+bool Empire::ProducibleItem(BuildType build_type, int design_id, int location,
+                            const ScriptingContext& context) const
+{
     // special case to check for buildings being passed with ids, not names
     if (build_type == BuildType::BT_BUILDING)
         throw std::invalid_argument("Empire::ProducibleItem was passed BuildType BT_BUILDING with a design id number, but buildings are tracked by name");
@@ -899,7 +880,7 @@ bool Empire::ProducibleItem(BuildType build_type, int design_id, int location) c
     if (!ship_design || !ship_design->Producible())
         return false;
 
-    auto build_location = Objects().get(location);
+    auto build_location = context.ContextObjects().get(location);
     if (!build_location) return false;
 
     if (build_type == BuildType::BT_SHIP) {
@@ -912,19 +893,23 @@ bool Empire::ProducibleItem(BuildType build_type, int design_id, int location) c
     }
 }
 
-bool Empire::ProducibleItem(const ProductionQueue::ProductionItem& item, int location) const {
+bool Empire::ProducibleItem(const ProductionQueue::ProductionItem& item, int location,
+                            const ScriptingContext& context) const
+{
     if (item.build_type == BuildType::BT_BUILDING)
-        return ProducibleItem(item.build_type, item.name, location);
+        return ProducibleItem(item.build_type, item.name, location, context);
     else if (item.build_type == BuildType::BT_SHIP)
-        return ProducibleItem(item.build_type, item.design_id, location);
+        return ProducibleItem(item.build_type, item.design_id, location, context);
     else if (item.build_type == BuildType::BT_STOCKPILE)
-        return ProducibleItem(item.build_type, location);
+        return ProducibleItem(item.build_type, location, context);
     else
         throw std::invalid_argument("Empire::ProducibleItem was passed a ProductionItem with an invalid BuildType");
     return false;
 }
 
-bool Empire::EnqueuableItem(BuildType build_type, const std::string& name, int location) const {
+bool Empire::EnqueuableItem(BuildType build_type, const std::string& name,
+                            int location, const ScriptingContext& context) const
+{
     if (build_type != BuildType::BT_BUILDING)
         return false;
 
@@ -932,21 +917,23 @@ bool Empire::EnqueuableItem(BuildType build_type, const std::string& name, int l
     if (!building_type || !building_type->Producible())
         return false;
 
-    auto build_location = Objects().get(location);
+    auto build_location = context.ContextObjects().get(location);
     if (!build_location)
         return false;
 
     // specified location must be a valid production location for that building type
-    return building_type->EnqueueLocation(m_id, location);
+    return building_type->EnqueueLocation(m_id, location, context);
 }
 
-bool Empire::EnqueuableItem(const ProductionQueue::ProductionItem& item, int location) const {
+bool Empire::EnqueuableItem(const ProductionQueue::ProductionItem& item, int location,
+                            const ScriptingContext& context) const
+{
     if (item.build_type == BuildType::BT_BUILDING)
-        return EnqueuableItem(item.build_type, item.name, location);
+        return EnqueuableItem(item.build_type, item.name, location, context);
     else if (item.build_type == BuildType::BT_SHIP)      // ships don't have a distinction between enqueuable and producible
-        return ProducibleItem(item.build_type, item.design_id, location);
+        return ProducibleItem(item.build_type, item.design_id, location, context);
     else if (item.build_type == BuildType::BT_STOCKPILE) // stockpile does not have a distinction between enqueuable and producible
-        return ProducibleItem(item.build_type, location);
+        return ProducibleItem(item.build_type, location, context);
     else
         throw std::invalid_argument("Empire::ProducibleItem was passed a ProductionItem with an invalid BuildType");
     return false;
@@ -962,14 +949,13 @@ int Empire::NumSitRepEntries(int turn/* = INVALID_GAME_TURN*/) const {
     return count;
 }
 
-bool Empire::Eliminated() const {
-    return m_eliminated;
-}
+bool Empire::Eliminated() const
+{ return m_eliminated; }
 
-void Empire::Eliminate() {
+void Empire::Eliminate(EmpireManager& empires) {
     m_eliminated = true;
 
-    for (auto& entry : Empires())
+    for (auto& entry : empires)
         entry.second->AddSitRepEntry(CreateEmpireEliminatedSitRep(EmpireID()));
 
     // some Empire data not cleared when eliminating since it might be useful
@@ -1000,13 +986,12 @@ void Empire::Eliminate() {
     m_supply_unobstructed_systems.clear();
 }
 
-bool Empire::Won() const {
-    return !m_victories.empty();
-}
+bool Empire::Won() const
+{ return !m_victories.empty(); }
 
-void Empire::Win(const std::string& reason) {
+void Empire::Win(const std::string& reason, EmpireManager& empires) {
     if (m_victories.insert(reason).second) {
-        for (auto& entry : Empires())
+        for (auto& entry : empires)
             entry.second->AddSitRepEntry(CreateVictorySitRep(reason, EmpireID()));
     }
 }
@@ -1017,18 +1002,28 @@ bool Empire::Ready() const
 void Empire::SetReady(bool ready)
 { m_ready = ready; }
 
-void Empire::UpdateSystemSupplyRanges(const std::set<int>& known_objects) {
-    //std::cout << "Empire::UpdateSystemSupplyRanges() for empire " << this->Name() << std::endl;
+void Empire::AutoTurnSetReady() {
+    if (m_auto_turn_count > 0) {
+        m_auto_turn_count --;
+    }
+    SetReady(m_auto_turn_count != 0);
+}
+
+void Empire::SetAutoTurn(int turns_count)
+{ m_auto_turn_count = turns_count; }
+
+void Empire::UpdateSystemSupplyRanges(const std::set<int>& known_objects, const ObjectMap& objects) {
+    TraceLogger(supply) << "Empire::UpdateSystemSupplyRanges() for empire " << this->Name();
     m_supply_system_ranges.clear();
 
     // as of this writing, only planets can generate supply propagation
     std::vector<const UniverseObject*> owned_planets;
     owned_planets.reserve(known_objects.size());
-    for (auto& planet: Objects().find<Planet>(known_objects)) {
+    for (auto& planet: objects.find<Planet>(known_objects)) {
         if (!planet)
             continue;
         if (planet->OwnedBy(this->EmpireID()))
-            owned_planets.emplace_back(planet.get());
+            owned_planets.push_back(planet.get());
     }
 
     //std::cout << "... empire owns " << owned_planets.size() << " planets" << std::endl;
@@ -1055,9 +1050,8 @@ void Empire::UpdateSystemSupplyRanges(const std::set<int>& known_objects) {
     }
 }
 
-void Empire::UpdateSystemSupplyRanges() {
-    const Universe& universe = GetUniverse();
-    const ObjectMap& empire_known_objects = EmpireKnownObjects(this->EmpireID());
+void Empire::UpdateSystemSupplyRanges(const Universe& universe) {
+    const ObjectMap& empire_known_objects = universe.EmpireKnownObjects(this->EmpireID());
 
     // get ids of objects partially or better visible to this empire.
     const std::set<int>& known_destroyed_objects = universe.EmpireKnownDestroyedObjectIDs(this->EmpireID());
@@ -1068,18 +1062,15 @@ void Empire::UpdateSystemSupplyRanges() {
     for (const auto& obj : empire_known_objects.all())
         if (!known_destroyed_objects.count(obj->ID()))
             known_objects_set.emplace(obj->ID());
-    UpdateSystemSupplyRanges(known_objects_set);
+    UpdateSystemSupplyRanges(known_objects_set, empire_known_objects);
 }
 
-void Empire::UpdateUnobstructedFleets() {
-    const std::set<int>& known_destroyed_objects =
-        GetUniverse().EmpireKnownDestroyedObjectIDs(this->EmpireID());
-
-    for (const auto& system : Objects().find<System>(m_supply_unobstructed_systems)) {
+void Empire::UpdateUnobstructedFleets(ObjectMap& objects, const std::set<int>& known_destroyed_objects) {
+    for (const auto& system : objects.find<System>(m_supply_unobstructed_systems)) {
         if (!system)
             continue;
 
-        for (auto& fleet : Objects().find<Fleet>(system->FleetIDs())) {
+        for (auto& fleet : objects.find<Fleet>(system->FleetIDs())) {
             if (known_destroyed_objects.count(fleet->ID()))
                 continue;
             if (fleet->OwnedBy(m_id))
@@ -1088,8 +1079,8 @@ void Empire::UpdateUnobstructedFleets() {
     }
 }
 
-void Empire::UpdateSupplyUnobstructedSystems(bool precombat /*=false*/) {
-    Universe& universe = GetUniverse();
+void Empire::UpdateSupplyUnobstructedSystems(const ScriptingContext& context, bool precombat /*=false*/) {
+    const Universe& universe = context.ContextUniverse();
 
     // get ids of systems partially or better visible to this empire.
     // TODO: make a UniverseObjectVisitor for objects visible to an empire at a specified visibility or greater
@@ -1098,30 +1089,33 @@ void Empire::UpdateSupplyUnobstructedSystems(bool precombat /*=false*/) {
     std::set<int> known_systems_set;
 
     // exclude systems known to have been destroyed (or rather, include ones that aren't known to be destroyed)
-    for (const auto& sys : EmpireKnownObjects(this->EmpireID()).all<System>())
+    for (const auto& sys : universe.EmpireKnownObjects(this->EmpireID()).all<System>())
         if (!known_destroyed_objects.count(sys->ID()))
             known_systems_set.emplace(sys->ID());
-    UpdateSupplyUnobstructedSystems(known_systems_set, precombat);
+    UpdateSupplyUnobstructedSystems(context, known_systems_set, precombat);
 }
 
-void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems, bool precombat /*=false*/) {
+void Empire::UpdateSupplyUnobstructedSystems(const ScriptingContext& context,
+                                             const std::set<int>& known_systems,
+                                             bool precombat)
+{
     TraceLogger(supply) << "UpdateSupplyUnobstructedSystems (allowing supply propagation) for empire " << m_id;
     m_supply_unobstructed_systems.clear();
 
     // get systems with historically at least partial visibility
     std::set<int> systems_with_at_least_partial_visibility_at_some_point;
     for (int system_id : known_systems) {
-        const auto& vis_turns = GetUniverse().GetObjectVisibilityTurnMapByEmpire(system_id, m_id);
+        const auto& vis_turns = context.ContextUniverse().GetObjectVisibilityTurnMapByEmpire(system_id, m_id);
         if (vis_turns.count(Visibility::VIS_PARTIAL_VISIBILITY))
             systems_with_at_least_partial_visibility_at_some_point.emplace(system_id);
     }
 
     // get all fleets, or just those visible to this client's empire
-    const auto& known_destroyed_objects = GetUniverse().EmpireKnownDestroyedObjectIDs(this->EmpireID());
+    const auto& known_destroyed_objects = context.ContextUniverse().EmpireKnownDestroyedObjectIDs(this->EmpireID());
 
     // get empire supply ranges
     std::map<int, std::map<int, float>> empire_system_supply_ranges;
-    for (const auto& entry : Empires()) {
+    for (const auto& entry : context.Empires()) {
         const auto& empire = entry.second;
         empire_system_supply_ranges[entry.first] = empire->SystemSupplyRanges();
     }
@@ -1141,7 +1135,7 @@ void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems,
     std::set<int> unrestricted_friendly_systems;
     std::set<int> systems_containing_obstructing_objects;
     std::set<int> unrestricted_obstruction_systems;
-    for (auto& fleet : GetUniverse().Objects().all<Fleet>()) {
+    for (auto& fleet : context.ContextObjects().all<Fleet>()) {
         int system_id = fleet->SystemID();
         if (system_id == INVALID_OBJECT_ID) {
             continue;   // not in a system, so can't affect system obstruction
@@ -1152,9 +1146,9 @@ void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems,
         TraceLogger(supply) << "Fleet " << fleet->ID() << " is in system " << system_id
                             << " with next system " << fleet->NextSystemID()
                             << " and is owned by " << fleet->Owner()
-                            << " armed: " << fleet->HasArmedShips()
+                            << " armed: " << fleet->HasArmedShips(context.ContextObjects())
                             << " and obstructive: " << fleet->Obstructive();
-        if (fleet->HasArmedShips() && fleet->Obstructive()) {
+        if (fleet->HasArmedShips(context.ContextObjects()) && fleet->Obstructive()) {
             if (fleet->OwnedBy(m_id)) {
                 if (fleet->NextSystemID() == INVALID_OBJECT_ID || fleet->NextSystemID() == fleet->SystemID()) {
                     systems_containing_friendly_fleets.insert(system_id);
@@ -1165,7 +1159,8 @@ void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems,
                 }
             } else if (fleet->NextSystemID() == INVALID_OBJECT_ID || fleet->NextSystemID() == fleet->SystemID()) {
                 int fleet_owner = fleet->Owner();
-                bool fleet_at_war = fleet_owner == ALL_EMPIRES || Empires().GetDiplomaticStatus(m_id, fleet_owner) == DiplomaticStatus::DIPLO_WAR;
+                bool fleet_at_war = fleet_owner == ALL_EMPIRES ||
+                                    context.ContextDiploStatus(m_id, fleet_owner) == DiplomaticStatus::DIPLO_WAR;
                 // newly created ships are not allowed to block supply since they have not even potentially gone
                 // through a combat round at the present location.  Potential sources for such new ships are monsters
                 // created via Effect.  (Ships/fleets constructed by empires are currently created at a later stage of
@@ -1211,7 +1206,7 @@ void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems,
 
 
     // check each potential supplyable system for whether it can propagate supply.
-    for (const auto& sys : Objects().find<System>(known_systems)) {
+    for (const auto& sys : context.ContextObjects().find<System>(known_systems)) {
         if (!sys)
             continue;
 
@@ -2107,13 +2102,11 @@ std::vector<std::string> Empire::CheckResearchProgress() {
     return to_erase_from_queue_and_grant_next_turn;
 }
 
-void Empire::CheckProductionProgress() {
+void Empire::CheckProductionProgress(ScriptingContext& context) {
     DebugLogger() << "========Empire::CheckProductionProgress=======";
     // following commented line should be redundant, as previous call to
     // UpdateResourcePools should have generated necessary info
     // m_production_queue.Update();
-
-    Universe& universe = GetUniverse();
 
     std::map<int, std::vector<std::shared_ptr<Ship>>> system_new_ships;
     std::map<int, int> new_ship_rally_point_ids;
@@ -2128,13 +2121,14 @@ void Empire::CheckProductionProgress() {
     // cost and result in it not being finished that turn.
     std::map<std::pair<ProductionQueue::ProductionItem, int>, std::pair<float, int>>
         queue_item_costs_and_times;
+
     for (auto& elem : m_production_queue) {
         // for items that don't depend on location, only store cost/time once
         int location_id = (elem.item.CostIsProductionLocationInvariant() ? INVALID_OBJECT_ID : elem.location);
         auto key = std::make_pair(elem.item, location_id);
 
         if (!queue_item_costs_and_times.count(key))
-            queue_item_costs_and_times[key] = ProductionCostAndTime(elem);
+            queue_item_costs_and_times[key] = elem.ProductionCostAndTime(context);
     }
 
     //for (auto& entry : queue_item_costs_and_times)
@@ -2192,12 +2186,14 @@ void Empire::CheckProductionProgress() {
                 build_description = "unknown build type";
         }
 
-        auto build_location = Objects().get(elem.location);
-        if (!build_location || (elem.item.build_type == BuildType::BT_BUILDING && build_location->ObjectType() != UniverseObjectType::OBJ_PLANET)) {
+        auto build_location = context.ContextObjects().get(elem.location);
+        if (!build_location || (elem.item.build_type == BuildType::BT_BUILDING &&
+                                build_location->ObjectType() != UniverseObjectType::OBJ_PLANET))
+        {
             ErrorLogger() << "Couldn't get valid build location for completed " << build_description;
             continue;
         }
-        auto system = Objects().get<System>(build_location->SystemID());
+        auto system = context.ContextObjects().get<System>(build_location->SystemID());
         // TODO: account for shipyards and/or other ship production
         // sites that are in interstellar space, if needed
         if (!system) {
@@ -2208,7 +2204,7 @@ void Empire::CheckProductionProgress() {
         // check location condition before each item is created, so
         // that items being produced can prevent subsequent
         // completions on the same turn from going through
-        if (!this->ProducibleItem(elem.item, elem.location)) {
+        if (!this->ProducibleItem(elem.item, elem.location, context)) {
             DebugLogger() << "Location test failed for " << build_description << " at location " << build_location->Name();
             continue;
         }
@@ -2221,12 +2217,12 @@ void Empire::CheckProductionProgress() {
 
         // only if consumed resources are available, then item can be completd
         bool consumption_impossible = false;
-        std::map<std::string, std::map<int, float>> sc = elem.item.CompletionSpecialConsumption(elem.location);
+        std::map<std::string, std::map<int, float>> sc = elem.item.CompletionSpecialConsumption(elem.location); // TODO: pass context
         for (auto& special_type : sc) {
             if (consumption_impossible)
                 break;
             for (auto& special_meter : special_type.second) {
-                auto obj = Objects().get(special_meter.first);
+                auto obj = context.ContextObjects().get(special_meter.first);
                 float capacity = obj ? obj->SpecialCapacity(special_type.first) : 0.0f;
                 if (capacity < special_meter.second * elem.blocksize) {
                     consumption_impossible = true;
@@ -2234,12 +2230,12 @@ void Empire::CheckProductionProgress() {
                 }
             }
         }
-        auto mc = elem.item.CompletionMeterConsumption(elem.location);
+        auto mc = elem.item.CompletionMeterConsumption(elem.location); // TODO: pass context
         for (auto& meter_type : mc) {
             if (consumption_impossible)
                 break;
             for (auto& object_meter : meter_type.second) {
-                auto obj = Objects().get(object_meter.first);
+                auto obj = context.ContextObjects().get(object_meter.first);
                 const Meter* meter = obj ? obj->GetMeter(meter_type.first) : nullptr;
                 if (!meter || meter->Current() < object_meter.second * elem.blocksize) {
                     consumption_impossible = true;
@@ -2270,7 +2266,7 @@ void Empire::CheckProductionProgress() {
         // consume the item's special and meter consumption
         for (auto& special_type : sc) {
             for (auto& special_meter : special_type.second) {
-                auto obj = Objects().get(special_meter.first);
+                auto obj = context.ContextObjects().get(special_meter.first);
                 if (!obj)
                     continue;
                 if (!obj->HasSpecial(special_type.first))
@@ -2282,7 +2278,7 @@ void Empire::CheckProductionProgress() {
         }
         for (auto& meter_type : mc) {
             for (const auto& object_meter : meter_type.second) {
-                auto obj = Objects().get(object_meter.first);
+                auto obj = context.ContextObjects().get(object_meter.first);
                 if (!obj)
                     continue;
                 Meter*meter = obj->GetMeter(meter_type.first);
@@ -2299,10 +2295,10 @@ void Empire::CheckProductionProgress() {
         // create actual thing(s) being produced
         switch (elem.item.build_type) {
         case BuildType::BT_BUILDING: {
-            auto planet = Objects().get<Planet>(elem.location);
+            auto planet = context.ContextObjects().get<Planet>(elem.location);
 
             // create new building
-            auto building = universe.InsertNew<Building>(m_id, elem.item.name, m_id);
+            auto building = context.ContextUniverse().InsertNew<Building>(m_id, elem.item.name, m_id);
             planet->AddBuilding(building->ID());
             building->SetPlanetID(planet->ID());
             system->Insert(building);
@@ -2332,7 +2328,7 @@ void Empire::CheckProductionProgress() {
                 species_name = location_pop_center->SpeciesName();
             else if (auto location_ship = std::dynamic_pointer_cast<const Ship>(build_location))
                 species_name = location_ship->SpeciesName();
-            else if (auto capital_planet = Objects().get<Planet>(this->CapitalID()))
+            else if (auto capital_planet = context.ContextObjects().get<Planet>(this->CapitalID()))
                 species_name = capital_planet->SpeciesName();
             // else give up...
             if (species_name.empty()) {
@@ -2352,7 +2348,7 @@ void Empire::CheckProductionProgress() {
 
             for (int count = 0; count < elem.blocksize; count++) {
                 // create ship
-                ship = universe.InsertNew<Ship>(m_id, elem.item.design_id, species_name, m_id);
+                ship = context.ContextUniverse().InsertNew<Ship>(m_id, elem.item.design_id, species_name, m_id);
                 system->Insert(ship);
 
                 // record ship production in empire stats
@@ -2415,7 +2411,7 @@ void Empire::CheckProductionProgress() {
 
     // create fleets for new ships and put ships into fleets
     for (auto& entry : system_new_ships) {
-        auto system = Objects().get<System>(entry.first);
+        auto system = context.ContextObjects().get<System>(entry.first);
         if (!system) {
             ErrorLogger() << "Couldn't get system with id " << entry.first << " for creating new fleets for newly produced ships";
             continue;
@@ -2464,7 +2460,7 @@ void Empire::CheckProductionProgress() {
                 std::shared_ptr<Fleet> fleet;
 
                 if (!individual_fleets) {
-                    fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(), m_id);
+                    fleet = context.ContextUniverse().InsertNew<Fleet>("", system->X(), system->Y(), m_id);
 
                     system->Insert(fleet);
                     // set prev system to prevent conflicts with CalculateRouteTo used for
@@ -2480,7 +2476,7 @@ void Empire::CheckProductionProgress() {
 
                 for (auto& ship : ships) {
                     if (individual_fleets) {
-                        fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(), m_id);
+                        fleet = context.ContextUniverse().InsertNew<Fleet>("", system->X(), system->Y(), m_id);
 
                         system->Insert(fleet);
                         // set prev system to prevent conflicts with CalculateRouteTo used for
@@ -2491,26 +2487,26 @@ void Empire::CheckProductionProgress() {
                         // set invalid arrival starlane so that fleet won't necessarily be free from blockades
                         fleet->SetArrivalStarlane(INVALID_OBJECT_ID);
 
-                        fleets.emplace_back(fleet);
+                        fleets.push_back(fleet);
                     }
-                    ship_ids.emplace_back(ship->ID());
+                    ship_ids.push_back(ship->ID());
                     fleet->AddShips({ship->ID()});
                     ship->SetFleetID(fleet->ID());
                 }
 
                 for (auto& next_fleet : fleets) {
                     // rename fleet, given its id and the ship that is in it
-                    next_fleet->Rename(next_fleet->GenerateFleetName());
-                    FleetAggression new_aggr = next_fleet->HasArmedShips() ?
-                        FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_PASSIVE;
+                    next_fleet->Rename(next_fleet->GenerateFleetName(context.ContextObjects()));
+                    FleetAggression new_aggr = next_fleet->HasArmedShips(context.ContextObjects()) ?
+                        FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_DEFENSIVE;
                     next_fleet->SetAggression(new_aggr);
 
                     if (rally_point_id != INVALID_OBJECT_ID) {
-                        if (Objects().get<System>(rally_point_id)) {
-                            next_fleet->CalculateRouteTo(rally_point_id);
-                        } else if (auto rally_obj = Objects().get(rally_point_id)) {
-                            if (Objects().get<System>(rally_obj->SystemID()))
-                                next_fleet->CalculateRouteTo(rally_obj->SystemID());
+                        if (context.ContextObjects().get<System>(rally_point_id)) {
+                            next_fleet->CalculateRouteTo(rally_point_id, context.ContextUniverse());
+                        } else if (auto rally_obj = context.ContextObjects().get(rally_point_id)) {
+                            if (context.ContextObjects().get<System>(rally_obj->SystemID()))
+                                next_fleet->CalculateRouteTo(rally_obj->SystemID(), context.ContextUniverse());
                         } else {
                             ErrorLogger() << "Unable to find system to route to with rally point id: " << rally_point_id;
                         }
@@ -2553,16 +2549,16 @@ void Empire::SetName(const std::string& name)
 void Empire::SetPlayerName(const std::string& player_name)
 { m_player_name = player_name; }
 
-void Empire::InitResourcePools() {
+void Empire::InitResourcePools(const ObjectMap& objects) {
     // get this empire's owned resource centers and ships (which can both produce resources)
     std::vector<int> res_centers;
-    res_centers.reserve(Objects().ExistingResourceCenters().size());
-    for (const auto& entry : Objects().ExistingResourceCenters()) {
+    res_centers.reserve(objects.ExistingResourceCenters().size());
+    for (const auto& entry : objects.ExistingResourceCenters()) {
         if (!entry.second->OwnedBy(m_id))
             continue;
         res_centers.push_back(entry.first);
     }
-    for (const auto& entry : Objects().ExistingShips()) {
+    for (const auto& entry : objects.ExistingShips()) {
         if (!entry.second->OwnedBy(m_id))
             continue;
         res_centers.push_back(entry.first);
@@ -2573,8 +2569,8 @@ void Empire::InitResourcePools() {
 
     // get this empire's owned population centers
     std::vector<int> pop_centers;
-    pop_centers.reserve(Objects().ExistingPopCenters().size());
-    for (const auto& entry : Objects().ExistingPopCenters()) {
+    pop_centers.reserve(objects.ExistingPopCenters().size());
+    for (const auto& entry : objects.ExistingPopCenters()) {
         if (entry.second->OwnedBy(m_id))
             pop_centers.push_back(entry.first);
     }
@@ -2587,7 +2583,7 @@ void Empire::InitResourcePools() {
     // set non-blockadeable resource pools to share resources between all systems
     std::set<std::set<int>> sets_set;
     std::set<int> all_systems_set;
-    for (const auto& entry : Objects().ExistingSystems())
+    for (const auto& entry : objects.ExistingSystems())
         all_systems_set.insert(entry.first);
     sets_set.insert(all_systems_set);
     m_resource_pools[ResourceType::RE_RESEARCH]->SetConnectedSupplyGroups(sets_set);
@@ -2628,16 +2624,15 @@ void Empire::UpdatePopulationGrowth()
 { m_population_pool.Update(); }
 
 void Empire::ResetMeters() {
-    for (auto& entry : m_meters) {
+    for (auto& entry : m_meters)
         entry.second.ResetCurrent();
-    }
 }
 
-void Empire::UpdateOwnedObjectCounters() {
+void Empire::UpdateOwnedObjectCounters(const ObjectMap& objects) {
     // ships of each species and design
     m_species_ships_owned.clear();
     m_ship_designs_owned.clear();
-    for (const auto& entry : Objects().ExistingShips()) {
+    for (const auto& entry : objects.ExistingShips()) {
         if (!entry.second->OwnedBy(this->EmpireID()))
             continue;
         auto ship = std::dynamic_pointer_cast<const Ship>(entry.second);
@@ -2653,9 +2648,8 @@ void Empire::UpdateOwnedObjectCounters() {
     for (const auto& elem : m_production_queue) {
         ProductionQueue::ProductionItem item = elem.item;
 
-        if ((item.build_type == BuildType::BT_SHIP) && (elem.progress > 0.0f)) {
+        if ((item.build_type == BuildType::BT_SHIP) && (elem.progress > 0.0f))
             m_ship_designs_in_production[item.design_id] += elem.blocksize;
-        }
     }
 
     // update ship part counts
@@ -2678,7 +2672,7 @@ void Empire::UpdateOwnedObjectCounters() {
     // colonies of each species, and unspecified outposts
     m_species_colonies_owned.clear();
     m_outposts_owned = 0;
-    for (const auto& entry : Objects().ExistingPlanets()) {
+    for (const auto& entry : objects.ExistingPlanets()) {
         if (!entry.second->OwnedBy(this->EmpireID()))
             continue;
         auto planet = std::dynamic_pointer_cast<const Planet>(entry.second);
@@ -2692,7 +2686,7 @@ void Empire::UpdateOwnedObjectCounters() {
 
     // buildings of each type
     m_building_types_owned.clear();
-    for (const auto& entry : Objects().ExistingBuildings()) {
+    for (const auto& entry : objects.ExistingBuildings()) {
         if (!entry.second->OwnedBy(this->EmpireID()))
             continue;
         auto building = std::dynamic_pointer_cast<const Building>(entry.second);
@@ -2711,7 +2705,7 @@ int Empire::TotalShipsOwned() const {
     //  ship that has no species...)
     int counter = 0;
     for (const auto& entry : m_ship_designs_owned)
-    { counter += entry.second; }
+        counter += entry.second;
     return counter;
 }
 
@@ -2731,17 +2725,14 @@ void Empire::RecordShipScrapped(const Ship& ship) {
     m_species_ships_scrapped[ship.SpeciesName()]++;
 }
 
-void Empire::RecordBuildingScrapped(const Building& building) {
-    m_building_types_scrapped[building.BuildingTypeName()]++;
-}
+void Empire::RecordBuildingScrapped(const Building& building)
+{ m_building_types_scrapped[building.BuildingTypeName()]++; }
 
-void Empire::RecordPlanetInvaded(const Planet& planet) {
-    m_species_planets_invaded[planet.SpeciesName()]++;
-}
+void Empire::RecordPlanetInvaded(const Planet& planet)
+{ m_species_planets_invaded[planet.SpeciesName()]++; }
 
-void Empire::RecordPlanetDepopulated(const Planet& planet) {
-    m_species_planets_depoped[planet.SpeciesName()]++;
-}
+void Empire::RecordPlanetDepopulated(const Planet& planet)
+{ m_species_planets_depoped[planet.SpeciesName()]++; }
 
 int Empire::TotalShipPartsOwned() const {
     // sum counts of all ship parts owned by this empire
@@ -2757,6 +2748,6 @@ int Empire::TotalBuildingsOwned() const {
     // sum up counts for each building type owned by this empire
     int counter = 0;
     for (const auto& entry : m_building_types_owned)
-    { counter += entry.second; }
+        counter += entry.second;
     return counter;
 }

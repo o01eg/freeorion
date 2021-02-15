@@ -49,6 +49,10 @@ namespace parse { namespace detail {
             =   tok.None_ [ _val = construct_movable_(new_<Condition::None>()) ]
             ;
 
+        noop
+            =   tok.NoOp_ [ _val = construct_movable_(new_<Condition::NoOp>()) ]
+            ;
+
         source
             =   tok.Source_ [ _val = construct_movable_(new_<Condition::Source>()) ]
             ;
@@ -93,14 +97,14 @@ namespace parse { namespace detail {
 
         owned_by_1
             =   (   tok.OwnedBy_
-                 >> label(tok.Empire_)
+                 >> label(tok.empire_)
                 ) > int_rules.expr
             [ _val = construct_movable_(new_<Condition::EmpireAffiliation>(deconstruct_movable_(_1, _pass))) ]
             ;
 
         owned_by_2
             =   tok.OwnedBy_
-            >>  label(tok.Affiliation_) >> tok.AnyEmpire_
+            >>  label(tok.affiliation_) >> tok.AnyEmpire_
             [ _val = construct_movable_(new_<Condition::EmpireAffiliation>( EmpireAffiliationType::AFFIL_ANY )) ]
             ;
 
@@ -116,8 +120,8 @@ namespace parse { namespace detail {
 
         owned_by_5
             =  ((omit_[tok.OwnedBy_]
-                 >>  label(tok.Affiliation_) >> empire_affiliation_type_enum
-                 >>  label(tok.Empire_)    ) >  int_rules.expr)
+                 >>  label(tok.affiliation_) >> empire_affiliation_type_enum
+                 >>  label(tok.empire_)    ) >  int_rules.expr)
             [ _val = construct_movable_(new_<Condition::EmpireAffiliation>(deconstruct_movable_(_2, _pass), _1)) ]
             ;
 
@@ -151,14 +155,15 @@ namespace parse { namespace detail {
 
         described
             = ( omit_[tok.Described_]
-                > label(tok.Description_) > tok.string
-                > label(tok.Condition_) > condition_parser)
+                > label(tok.description_) > tok.string
+                > label(tok.condition_) > condition_parser)
             [ _val = construct_movable_( new_<Condition::Described>(deconstruct_movable_(_2, _pass), _1)) ]
             ;
 
         start
             %=  all
             |   none
+            |   noop
             |   source
             |   root_candidate
             |   target

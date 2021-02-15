@@ -778,7 +778,7 @@ namespace {
             fleet->Rename(UserString("OBJ_FLEET") + " " + std::to_string(fleet->ID()));
         }
 
-        fleet->SetAggression(aggressive ? FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_PASSIVE);
+        fleet->SetAggression(aggressive ? FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_DEFENSIVE);
 
         // return fleet ID
         return fleet->ID();
@@ -912,7 +912,7 @@ namespace {
         // check if system exists and get system
         auto system = Objects().get<System>(system_id);
         if (!system) {
-            ErrorLogger() << "CreateFieldInSystem: couldn't get system with ID" << system_id;
+            ErrorLogger() << "CreateFieldInSystem: couldn't get system with ID " << system_id;
             return INVALID_OBJECT_ID;
         }
         // create the field with the coordinates of the system
@@ -952,7 +952,7 @@ namespace {
             systems.push_back(*id);
         }
 
-        auto systems_in_vicinity = GetPathfinder()->WithinJumps(jumps, systems);
+        auto systems_in_vicinity = GetUniverse().GetPathfinder()->WithinJumps(jumps, systems);
 
         for (auto system_id : systems_in_vicinity) {
             py_systems.append(system_id);
@@ -1366,8 +1366,8 @@ namespace FreeOrionPython {
 
         py::def("get_universe_width",               +[]() -> double { return GetUniverse().UniverseWidth(); });
         py::def("set_universe_width",               +[](double width) { GetUniverse().SetUniverseWidth(width); });
-        py::def("linear_distance",                  +[](int system1_id, int system2_id) -> double { return GetPathfinder()->LinearDistance(system1_id, system2_id); });
-        py::def("jump_distance",                    +[](int system1_id, int system2_id) -> int { return GetPathfinder()->JumpDistanceBetweenSystems(system1_id, system2_id); });
+        py::def("linear_distance",                  +[](int system1_id, int system2_id) -> double { return GetUniverse().GetPathfinder()->LinearDistance(system1_id, system2_id, Objects()); });
+        py::def("jump_distance",                    +[](int system1_id, int system2_id) -> int { return GetUniverse().GetPathfinder()->JumpDistanceBetweenSystems(system1_id, system2_id); });
         py::def("get_all_objects",                  GetAllObjects);
         py::def("get_systems",                      GetSystems);
         py::def("create_system",                    CreateSystem);

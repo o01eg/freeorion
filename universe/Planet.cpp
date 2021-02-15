@@ -90,7 +90,7 @@ void Planet::Copy(std::shared_ptr<const UniverseObject> copied_object, int empir
     Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(copied_object_id, empire_id);
     auto visible_specials = GetUniverse().GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
 
-    UniverseObject::Copy(copied_object, vis, visible_specials);
+    UniverseObject::Copy(std::move(copied_object), vis, visible_specials);
     PopCenter::Copy(copied_planet, vis);
     ResourceCenter::Copy(copied_planet, vis);
 
@@ -128,8 +128,7 @@ void Planet::Copy(std::shared_ptr<const UniverseObject> copied_object, int empir
     }
 }
 
-bool Planet::HostileToEmpire(int empire_id) const
-{
+bool Planet::HostileToEmpire(int empire_id, const EmpireManager& empires) const {
     if (OwnedBy(empire_id))
         return false;
 
@@ -143,7 +142,7 @@ bool Planet::HostileToEmpire(int empire_id) const
         return pop_meter && (pop_meter->Current() != 0.0f);
 
     // both empires are normal empires
-    return Empires().GetDiplomaticStatus(Owner(), empire_id) == DiplomaticStatus::DIPLO_WAR;
+    return empires.GetDiplomaticStatus(Owner(), empire_id) == DiplomaticStatus::DIPLO_WAR;
 }
 
 std::set<std::string> Planet::Tags() const {
@@ -501,18 +500,18 @@ bool Planet::Contains(int object_id) const
 bool Planet::ContainedBy(int object_id) const
 { return object_id != INVALID_OBJECT_ID && this->SystemID() == object_id; }
 
-std::vector<std::string> Planet::AvailableFoci() const {
+std::vector<std::string> Planet::AvailableFoci() const {    // TODO: pass ScriptingContext
     std::vector<std::string> retval;
     auto this_planet = std::dynamic_pointer_cast<const Planet>(UniverseObject::shared_from_this());
     if (!this_planet)
         return retval;
-    ScriptingContext context(this_planet);
+    const ScriptingContext context(this_planet);
     if (const auto* species = GetSpecies(this_planet->SpeciesName())) {
         retval.reserve(species->Foci().size());
         for (const auto& focus_type : species->Foci()) {
             if (const auto* location = focus_type.Location()) {
                 if (location->Eval(context, this_planet))
-                    retval.emplace_back(focus_type.Name());
+                    retval.push_back(focus_type.Name());
             }
         }
     }

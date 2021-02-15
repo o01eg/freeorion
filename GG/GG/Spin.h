@@ -109,8 +109,8 @@ public:
 protected:
     typedef T ValueType;
 
-    const int BORDER_THICK = 2;
-    const int PIXEL_MARGIN = 5;
+    static constexpr int BORDER_THICK = 2;
+    static constexpr int PIXEL_MARGIN = 5;
 
     Button* UpButton() const;   ///< returns a pointer to the Button control used as this control's up button
     Button* DownButton() const; ///< returns a pointer to the Button control used as this control's down button
@@ -426,7 +426,7 @@ void Spin<T>::ValueUpdated(const std::string& val_text)
 {
     try {
         SetValueImpl(boost::lexical_cast<T>(val_text), true);
-    } catch (boost::bad_lexical_cast) {
+    } catch (const boost::bad_lexical_cast&) {
         SetValueImpl(m_min_value, true);
     }
 }

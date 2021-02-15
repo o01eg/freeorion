@@ -32,24 +32,24 @@ Special
                 Not Species
                 Not HasSpecial
                 WithinStarlaneJumps jumps = 2 condition = Source
-                Not ContainedBy Contains OR [
+                Not ContainedBy Contains Or [
                     Design name = "SM_EXP_OUTPOST"
                     Building name = "BLD_EXPERIMENTOR_OUTPOST"
                 ]
             ]
             activation = Turn high = 0
             stackinggroup = "GAME_START_MOD_STACK"
-            priority = [[VERY_EARLY_PRIORITY]]
+            priority = [[BEFORE_ANYTHING_ELSE_PRIORITY]]
             effects = [
-                SetPlanetSize planetsize = asteroids
-                SetPlanetType type = asteroids
+                SetPlanetSize planetsize = Asteroids
+                SetPlanetType type = Asteroids
             ]
 
         EffectsGroup
             scope = Source
             activation = Turn high = 0
             stackinggroup = "GAME_START_MOD_STACK"
-            priority = [[VERY_EARLY_PRIORITY]]
+            priority = [[BEFORE_ANYTHING_ELSE_PRIORITY]]
             effects = [
                 SetPlanetSize planetsize = Huge
                 SetPlanetType type = Barren
@@ -64,15 +64,15 @@ Special
             ]
             activation = Focus type = "FOCUS_INDUSTRY"
             stackinggroup = "HONEYCOMB_STACK"
-            priority = [[VERY_LATE_PRIORITY]]
-            effects = SetTargetIndustry value = Value + Target.Population * 0.5 * [[INDUSTRY_PER_POP]]
+            priority = [[TARGET_AFTER_2ND_SCALING_PRIORITY]]
+            effects = SetTargetIndustry value = Value + Target.Population
+                        * (NamedReal name = "HONEYCOMB_TARGET_INDUSTRY_PERPOP"
+                                     value = 0.5 * [[INDUSTRY_PER_POP]])
 
         [[CHANCE_OF_GUARD_2]]
     ]
     graphic = "icons/specials_huge/honeycomb.png"
 
 #include "monster_guard.macros"
-
 #include "/scripting/common/base_prod.macros"
-
 #include "/scripting/common/priorities.macros"

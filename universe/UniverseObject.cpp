@@ -13,29 +13,21 @@
 #include "../util/Logger.h"
 #include "../util/i18n.h"
 
-
-const int INVALID_OBJECT_ID      = -1;
-const int TEMPORARY_OBJECT_ID    = -2;
-
-const double    UniverseObject::INVALID_POSITION  = -100000.0;
-const int       UniverseObject::INVALID_OBJECT_AGE = -(1 << 30) - 1;  // using big negative number to allow for potential negative object ages, which might be useful in the event of time travel.
-const int       UniverseObject::SINCE_BEFORE_TIME_AGE = (1 << 30) + 1;
+const int INVALID_OBJECT_ID = -1;
 
 UniverseObject::UniverseObject() :
     StateChangedSignal(blocking_combiner<boost::signals2::optional_last_value<void>>(
         GetUniverse().UniverseObjectSignalsInhibited())),
-    m_x(INVALID_POSITION),
-    m_y(INVALID_POSITION),
-    m_created_on_turn(CurrentTurn() )
+    m_created_on_turn(CurrentTurn())
 {}
 
-UniverseObject::UniverseObject(const std::string name, double x, double y) :
+UniverseObject::UniverseObject(std::string name, double x, double y) :
     StateChangedSignal(blocking_combiner<boost::signals2::optional_last_value<void>>(
         GetUniverse().UniverseObjectSignalsInhibited())),
-    m_name(name),
+    m_name(std::move(name)),
     m_x(x),
     m_y(y),
-    m_created_on_turn(CurrentTurn() )
+    m_created_on_turn(CurrentTurn())
 {}
 
 UniverseObject::~UniverseObject()
@@ -183,7 +175,7 @@ std::string UniverseObject::Dump(unsigned short ntabs) const {
             os << "  at: " << sys_name;
     } else {
         os << "  at: (" << this->X() << ", " << this->Y() << ")";
-        int near_id = GetPathfinder()->NearestSystemTo(this->X(), this->Y());
+        int near_id = GetUniverse().GetPathfinder()->NearestSystemTo(this->X(), this->Y(), Objects()); // Get Objects() and PathFinder from passed in stuff?
         auto near_system = Objects().get<System>(near_id);
         if (near_system) {
             const std::string& sys_name = near_system->Name();
@@ -259,13 +251,13 @@ bool UniverseObject::Unowned() const
 bool UniverseObject::OwnedBy(int empire) const
 { return empire != ALL_EMPIRES && empire == Owner(); }
 
-bool UniverseObject::HostileToEmpire(int empire_id) const
+bool UniverseObject::HostileToEmpire(int, const EmpireManager&) const
 { return false; }
 
 Visibility UniverseObject::GetVisibility(int empire_id) const
 { return GetUniverse().GetObjectVisibilityByEmpire(this->ID(), empire_id); }
 
-const std::string& UniverseObject::PublicName(int empire_id) const
+const std::string& UniverseObject::PublicName(int, const ObjectMap&) const
 { return m_name; }
 
 std::shared_ptr<UniverseObject> UniverseObject::Accept(const UniverseObjectVisitor& visitor) const
@@ -284,10 +276,15 @@ void UniverseObject::Rename(const std::string& name) {
 void UniverseObject::Move(double x, double y)
 { MoveTo(m_x + x, m_y + y); }
 
-void UniverseObject::MoveTo(int object_id)
-{ MoveTo(Objects().get(object_id)); }
+void UniverseObject::MoveTo(const std::shared_ptr<const UniverseObject>& object) {
+    if (!object) {
+        ErrorLogger() << "UniverseObject::MoveTo : attempted to move to a null object.";
+        return;
+    }
+    MoveTo(object->X(), object->Y());
+}
 
-void UniverseObject::MoveTo(std::shared_ptr<UniverseObject> object) {
+void UniverseObject::MoveTo(const std::shared_ptr<UniverseObject>& object) {
     if (!object) {
         ErrorLogger() << "UniverseObject::MoveTo : attempted to move to a null object.";
         return;

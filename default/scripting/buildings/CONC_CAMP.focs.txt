@@ -3,13 +3,13 @@ BuildingType
     description = "BLD_CONC_CAMP_DESC"
     buildcost = 5 * [[BUILDING_COST_MULTIPLIER]]
     buildtime = 1
-    location = AND [
+    location = And [
         Not Contains Building name = "BLD_CONC_CAMP"
         OwnedBy empire = Source.Owner
         EmpireHasAdoptedPolicy empire = Source.Owner name = "PLC_RACIAL_PURITY"
         Population low = 3
     ]
-    EnqueueLocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
+    enqueuelocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS]]
     
@@ -22,8 +22,11 @@ BuildingType
                 PopulationCenter
                 OwnedBy empire = Source.Owner
             ]
-            priority = [[LATE_PRIORITY]]
-            effects = SetTargetIndustry value = Value + Target.Population * 10 * [[INDUSTRY_PER_POP]]
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
+            effects = SetTargetIndustry value = Value + Target.Population
+                        * (NamedReal name = "BLD_CONC_CAMP_TARGET_INDUSTRY_PERPOP"
+                                     value = 3.75 * [[INDUSTRY_PER_POP]])
+
         EffectsGroup
             scope = And [
                 Object id = Source.PlanetID
@@ -39,12 +42,13 @@ BuildingType
                 ]
             ]
             effects = AddSpecial name = "CONC_CAMP_MASTER_SPECIAL"
+
         EffectsGroup
             scope = Source
-            activation =    ContainedBy And [
-                                Object id = Source.PlanetID
-                                Population high = 0
-                            ]
+            activation = ContainedBy And [
+                Object id = Source.PlanetID
+                Population high = 0
+            ]
             effects = [
                 Destroy
                 GenerateSitRepMessage
@@ -53,7 +57,8 @@ BuildingType
                     icon = "icons/building/concentration-camp.png"
                     parameters = tag = "planet" data = Source.PlanetID
                     empire = Source.Owner
-                ]
+            ]
+
         EffectsGroup
             scope = And [
                 Object id = Source.PlanetID
@@ -66,9 +71,11 @@ BuildingType
             ]
             priority = [[CONCENTRATION_CAMP_PRIORITY]]
             effects = [
-                SetPopulation value = min(Value, Target.Population - 3)
+                SetPopulation value = min(Value, Target.Population + (NamedReal
+                                                 name = "BLD_CONC_CAMP_POPULATION_FLAT" value = -3))
                 SetIndustry value = Target.TargetIndustry
             ]
+
         EffectsGroup
             scope = Source
             activation = Or [

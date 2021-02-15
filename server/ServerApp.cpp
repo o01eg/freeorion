@@ -419,6 +419,7 @@ void ServerApp::HandleMessage(const Message& msg, PlayerConnectionPtr player_con
     case Message::MessageType::DIPLOMACY:                m_fsm->process_event(Diplomacy(msg, player_connection));        break;
     case Message::MessageType::MODERATOR_ACTION:         m_fsm->process_event(ModeratorAct(msg, player_connection));     break;
     case Message::MessageType::ELIMINATE_SELF:           m_fsm->process_event(EliminateSelf(msg, player_connection));    break;
+    case Message::MessageType::AUTO_TURN:                m_fsm->process_event(AutoTurn(msg, player_connection));         break;
 
     case Message::MessageType::ERROR_MSG:
     case Message::MessageType::DEBUG:                    break;
@@ -641,28 +642,30 @@ void ServerApp::NewMPGameInit(const MultiplayerLobbyData& multiplayer_lobby_data
         SendNewGameStartMessages();
 }
 
-void UpdateEmpireSupply(bool precombat=false) {
-    EmpireManager& empires = Empires();
+namespace {
+    void UpdateEmpireSupply(const ScriptingContext& context, EmpireManager& empires,
+                            SupplyManager& supply, bool precombat = false)
+    {
+        // Determine initial supply distribution and exchanging and resource pools for empires
+        for ([[maybe_unused]] auto& [ignored_id, empire] : empires) {
+            (void)ignored_id; // quiet unused variable warning
+            if (empire->Eliminated())
+                continue;   // skip eliminated empires.  presumably this shouldn't be an issue when initializing a new game, but apparently I thought this was worth checking for...
 
-    // Determine initial supply distribution and exchanging and resource pools for empires
-    for (auto& entry : empires) {
-        auto& empire = entry.second;
-        if (empire->Eliminated())
-            continue;   // skip eliminated empires.  presumably this shouldn't be an issue when initializing a new game, but apparently I thought this was worth checking for...
+            empire->UpdateSupplyUnobstructedSystems(context, precombat); // determines which systems can propagate fleet and resource (same for both)
+            empire->UpdateSystemSupplyRanges();                          // sets range systems can propagate fleet and resourse supply (separately)
+        }
 
-        empire->UpdateSupplyUnobstructedSystems(precombat); // determines which systems can propagate fleet and resource (same for both)
-        empire->UpdateSystemSupplyRanges();                 // sets range systems can propagate fleet and resourse supply (separately)
-    }
+        supply.Update();
 
-    GetSupplyManager().Update();
+        for ([[maybe_unused]] auto& [ignored_id, empire] : empires) {
+            (void)ignored_id; // quiet unused variable warning
+            if (empire->Eliminated())
+                continue;
 
-    for (auto& entry : empires) {
-        auto& empire = entry.second;
-        if (empire->Eliminated())
-            continue;
-
-        empire->InitResourcePools();                // determines population centers and resource centers of empire, tells resource pools the centers and groups of systems that can share resources (note that being able to share resources doesn't mean a system produces resources)
-        empire->UpdateResourcePools();              // determines how much of each resources is available in each resource sharing group
+            empire->InitResourcePools();   // determines population centers and resource centers of empire, tells resource pools the centers and groups of systems that can share resources (note that being able to share resources doesn't mean a system produces resources)
+            empire->UpdateResourcePools(); // determines how much of each resources is available in each resource sharing group
+        }
     }
 }
 
@@ -717,7 +720,7 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
     // after all game initialization stuff has been created, set current turn to 0 and apply only GenerateSitRep Effects
     // so that a set of SitReps intended as the player's initial greeting will be segregated
     m_current_turn = 0;
-    m_universe.ApplyGenerateSitRepEffects();
+    m_universe.ApplyGenerateSitRepEffects(m_empires);
 
     //can set current turn to 1 for start of game
     m_current_turn = 1;
@@ -725,16 +728,15 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
     // record empires for each active player. Note: active_empire_id_setup_data
     // contains only data of players who control an empire; observers and
     // moderators are not included.
-    for (const auto& player_id_and_setup : active_empire_id_setup_data) {
-        int empire_id = player_id_and_setup.first;
-        if (player_id_and_setup.second.player_id != Networking::INVALID_PLAYER_ID)
-            m_player_empire_ids[player_id_and_setup.second.player_id] = empire_id;
+    for (auto& [empire_id, player_setup_data] : active_empire_id_setup_data) {
+        if (player_setup_data.player_id != Networking::INVALID_PLAYER_ID)
+            m_player_empire_ids[player_setup_data.player_id] = empire_id;
 
         // add empires to turn processing
-        if (auto *empire = GetEmpire(empire_id)) {
-            AddEmpireTurn(empire_id, PlayerSaveGameData(player_id_and_setup.second.player_name, empire_id,
+        if (auto empire = m_empires.GetEmpire(empire_id)) {
+            AddEmpireTurn(empire_id, PlayerSaveGameData(player_setup_data.player_name, empire_id,
                                                         nullptr, nullptr, std::string(),
-                                                        player_id_and_setup.second.client_type));
+                                                        player_setup_data.client_type));
             empire->SetReady(false);
         }
     }
@@ -744,12 +746,12 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
 
     // initialize empire owned object counters
-    EmpireManager& empires = Empires();
-    for (auto& entry : empires)
+    for (auto& entry : m_empires)
         entry.second->UpdateOwnedObjectCounters();
 
-    UpdateEmpireSupply();
-    m_universe.UpdateStatRecords();
+    UpdateEmpireSupply(ScriptingContext{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager},
+                       m_empires, m_supply_manager);
+    m_universe.UpdateStatRecords(m_empires);
 }
 
 bool ServerApp::NewGameInitVerifyJoiners(const std::vector<PlayerSetupData>& player_setup_data) {
@@ -838,7 +840,7 @@ void ServerApp::SendNewGameStartMessages() {
 
     // send new game start messages
     DebugLogger() << "SendGameStartMessages: Sending GameStartMessages to players";
-    for (auto player_connection_it = m_networking.established_begin();
+    for (auto player_connection_it = m_networking.established_begin();  // can't easily use range for loop due to non-standard begin and end
          player_connection_it != m_networking.established_end(); ++player_connection_it)
     {
         const PlayerConnectionPtr player_connection = *player_connection_it;
@@ -981,13 +983,14 @@ void ServerApp::UpdateCombatLogs(const Message& msg, PlayerConnectionPtr player_
 
     // Compose a vector of the requested ids and logs
     std::vector<std::pair<int, const CombatLog>> logs;
+    logs.reserve(ids.size());
     for (auto it = ids.begin(); it != ids.end(); ++it) {
-        boost::optional<const CombatLog&> log = GetCombatLogManager().GetLog(*it);
+        auto log = GetCombatLogManager().GetLog(*it);
         if (!log) {
             ErrorLogger() << "UpdateCombatLogs can't fetch log with id = "<< *it << " ... skipping.";
             continue;
         }
-        logs.push_back({*it, *log});
+        logs.emplace_back(*it, *log);
     }
 
     // Return them to the client
@@ -1064,8 +1067,8 @@ void ServerApp::PushChatMessage(const std::string& text,
 
     if (!success) {
         ErrorLogger() << "Python scripted chat failed.";
-        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
-                                                                      false));
+        ServerApp::GetApp()->Networking().SendMessageAll(
+            ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
     }
 }
 
@@ -1186,7 +1189,7 @@ namespace {
         // safety check: setup data has valid empire assigned
         if (psd.save_game_empire_id == ALL_EMPIRES) {
             ErrorLogger() << "ServerApp::LoadMPGameInit got player setup data for AI player "
-                                    << "with no empire assigned...";
+                          << "with no empire assigned...";
             return;
         }
 
@@ -1198,8 +1201,8 @@ namespace {
         }
 
         DebugLogger() << "ServerApp::LoadMPGameInit matched player named " << psd.player_name
-                               << " to setup data player id " << player_id
-                               << " with setup data empire id " << psd.save_game_empire_id;
+                      << " to setup data player id " << player_id
+                      << " with setup data empire id " << psd.save_game_empire_id;
 
         // determine and store save game data index for this player
         int index = VectorIndexForPlayerSaveGameDataForEmpireID(player_save_game_data, psd.save_game_empire_id);
@@ -1207,7 +1210,7 @@ namespace {
             player_id_to_save_game_data_index.push_back({player_id, index});
         } else {
             ErrorLogger() << "ServerApp::LoadMPGameInit couldn't find save game data for "
-                                   << "human player with assigned empire id: " << psd.save_game_empire_id;
+                          << "human player with assigned empire id: " << psd.save_game_empire_id;
         }
     }
 }
@@ -1294,9 +1297,8 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
         {
             ErrorLogger() << "ServerApp::LoadGameInit found player connection with unsupported client type.";
         }
-        if (player_connection->PlayerName().empty()) {
+        if (player_connection->PlayerName().empty())
             ErrorLogger() << "ServerApp::LoadGameInit found player connection with empty name!";
-        }
     }
 
 
@@ -1356,15 +1358,14 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
         m_player_empire_ids[player_id] = empire_id;
 
         // set actual authentication status
-        if (Empire* empire = GetEmpire(empire_id)) {
+        if (auto empire = m_empires.GetEmpire(empire_id))
             empire->SetAuthenticated(player_connection->IsAuthenticated());
-        }
     }
 
     for (const auto& psgd : player_save_game_data) {
         int empire_id = psgd.empire_id;
         // add empires to turn processing, and restore saved orders and UI data or save state data
-        if (Empire* empire = GetEmpire(empire_id)) {
+        if (auto empire = m_empires.GetEmpire(empire_id)) {
             if (!empire->Eliminated())
                 AddEmpireTurn(empire_id, psgd);
         } else {
@@ -1375,9 +1376,11 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
 
     // the Universe's system graphs for each empire aren't stored when saving
     // so need to be reinitialized when loading based on the gamestate
-    m_universe.InitializeSystemGraph();
+    m_universe.InitializeSystemGraph(m_empires, m_universe.Objects());
+    m_universe.UpdateEmpireVisibilityFilteredSystemGraphsWithOwnObjectMaps(m_empires);
 
-    UpdateEmpireSupply(true);  // precombat type supply update
+    UpdateEmpireSupply(ScriptingContext{m_universe, m_empires, m_galaxy_setup_data, m_species_manager,m_supply_manager},
+                       m_empires, m_supply_manager, true);  // precombat supply update
 
     std::map<int, PlayerInfo> player_info_map = GetPlayerInfoMap();
 
@@ -1397,15 +1400,13 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
         if (save_data_it != player_id_save_game_data.end()) {
             psgd = save_data_it->second;
         }
-        if (!psgd.orders) {
+        if (!psgd.orders)
             psgd.orders.reset(new OrderSet());    // need an empty order set pointed to for serialization in case no data is loaded but the game start message wants orders to send
-        }
 
         // get empire ID for player. safety check on it.
         int empire_id = PlayerEmpireID(player_id);
-        if (empire_id != psgd.empire_id) {
+        if (empire_id != psgd.empire_id)
             ErrorLogger() << "LoadGameInit got inconsistent empire ids between player save game data and result of PlayerEmpireID";
-        }
 
         // Revoke readiness only for online players so they can redo orders for the current turn.
         // Without doing it, server would immediatly advance the turn because saves are made when
@@ -1435,7 +1436,7 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
             player_connection->SendMessage(GameStartMessage(m_single_player_game, empire_id,
                                                             m_current_turn, m_empires, m_universe,
                                                             GetSpeciesManager(), GetCombatLogManager(),
-                                                            GetSupplyManager(),  player_info_map, *orders,
+                                                            GetSupplyManager(), player_info_map, *orders,
                                                             psgd.ui_data.get(), m_galaxy_setup_data,
                                                             use_binary_serialization));
 
@@ -1455,8 +1456,6 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
 }
 
 void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_data) {
-    Universe& universe = GetUniverse();
-
     // Set game UID. Needs to be done first so we can use ClockSeed to
     // prevent reproducible UIDs.
     ClockSeed();
@@ -1490,21 +1489,21 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
     DebugLogger() << "GenerateUniverse with seed: " << seed;
 
     // Reset the universe object for a new universe
-    universe.Clear();
+    m_universe.Clear();
     GetSpeciesManager().ClearSpeciesHomeworlds();
 
     // Reset the object id manager for the new empires.
     std::vector<int> empire_ids(player_setup_data.size());
     std::transform(player_setup_data.begin(), player_setup_data.end(), empire_ids.begin(),
                    [](const std::pair<int,PlayerSetupData> ii) { return ii.first; });
-    universe.ResetAllIDAllocation(empire_ids);
+    m_universe.ResetAllIDAllocation(empire_ids);
 
     // Add predefined ship designs to universe
     GetPredefinedShipDesignManager().AddShipDesignsToUniverse();
     // Initialize empire objects for each player
     InitEmpires(player_setup_data);
 
-    bool success(false);
+    bool success{false};
     try {
         // Set Python current work directory to directory containing
         // the universe generation Python scripts
@@ -1529,39 +1528,39 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
     DebugLogger() << "Applying first turn effects and updating meters";
 
     // Apply effects for 1st turn.
-    universe.ApplyAllEffectsAndUpdateMeters(false);
+    m_universe.ApplyAllEffectsAndUpdateMeters(m_empires, false);
 
-    TraceLogger(effects) << "After First turn meter effect applying: " << universe.Objects().Dump();
+    TraceLogger(effects) << "After First turn meter effect applying: " << m_universe.Objects().Dump();
     // Set active meters to targets or maxes after first meter effects application
-    SetActiveMetersToTargetMaxCurrentValues(universe.Objects());
+    SetActiveMetersToTargetMaxCurrentValues(m_universe.Objects());
 
-    universe.UpdateMeterEstimates();
-    universe.BackPropagateObjectMeters();
-    SetActiveMetersToTargetMaxCurrentValues(universe.Objects());
-    universe.BackPropagateObjectMeters();
+    m_universe.UpdateMeterEstimates(m_empires);
+    m_universe.BackPropagateObjectMeters();
+    SetActiveMetersToTargetMaxCurrentValues(m_universe.Objects());
+    m_universe.BackPropagateObjectMeters();
 
-    TraceLogger(effects) << "After First active set to target/max: " << universe.Objects().Dump();
+    TraceLogger(effects) << "After First active set to target/max: " << m_universe.Objects().Dump();
 
-    universe.BackPropagateObjectMeters();
-    Empires().BackPropagateMeters();
+    m_universe.BackPropagateObjectMeters();
+    m_empires.BackPropagateMeters();
 
     DebugLogger() << "Re-applying first turn meter effects and updating meters";
 
     // Re-apply meter effects, so that results depending on meter values can be
     // re-checked after initial setting of those meter values
-    universe.ApplyMeterEffectsAndUpdateMeters(false);
+    m_universe.ApplyMeterEffectsAndUpdateMeters(m_empires, false);
     // Re-set active meters to targets after re-application of effects
-    SetActiveMetersToTargetMaxCurrentValues(universe.Objects());
+    SetActiveMetersToTargetMaxCurrentValues(m_universe.Objects());
     // Set the population of unowned planets to a random fraction of their target values.
-    SetNativePopulationValues(universe.Objects());
+    SetNativePopulationValues(m_universe.Objects());
 
-    universe.BackPropagateObjectMeters();
-    Empires().BackPropagateMeters();
+    m_universe.BackPropagateObjectMeters();
+    m_empires.BackPropagateMeters();
 
     TraceLogger() << "!!!!!!!!!!!!!!!!!!! After setting active meters to targets";
-    TraceLogger() << universe.Objects().Dump();
+    TraceLogger() << m_universe.Objects().Dump();
 
-    universe.UpdateEmpireObjectVisibilities();
+    m_universe.UpdateEmpireObjectVisibilities(m_empires);
 }
 
 void ServerApp::ExecuteScriptedTurnEvents() {
@@ -1809,7 +1808,7 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
     }
 
     // test for colonies count
-    auto planets = Objects().find<Planet>(OwnedVisitor(empire_id));
+    auto planets = m_universe.Objects().find<Planet>(OwnedVisitor(empire_id));
     if (planets.size() > static_cast<size_t>(GetGameRules().Get<int>("RULE_CONCEDE_COLONIES_THRESHOLD"))) {
         player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_CONCEDE_EXCEED_COLONIES"), false));
         return false;
@@ -1819,19 +1818,18 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
     empire->Eliminate();
 
     // destroy owned ships
-    for (auto& obj : Objects().find<Ship>(OwnedVisitor(empire_id))) {
+    for (auto& obj : m_universe.Objects().find<Ship>(OwnedVisitor(empire_id))) {
         obj->SetOwner(ALL_EMPIRES);
         GetUniverse().RecursiveDestroy(obj->ID());
     }
     // destroy owned buildings
-    for (auto& obj : Objects().find<Building>(OwnedVisitor(empire_id))) {
+    for (auto& obj : m_universe.Objects().find<Building>(OwnedVisitor(empire_id))) {
         obj->SetOwner(ALL_EMPIRES);
         GetUniverse().RecursiveDestroy(obj->ID());
     }
     // unclaim owned planets
-    for (const auto& planet : planets) {
+    for (const auto& planet : planets)
         planet->Reset();
-    }
 
     // Don't wait for turn
     RemoveEmpireTurn(empire_id);
@@ -2012,7 +2010,7 @@ void ServerApp::ClearEmpireTurnOrders() {
         }
     }
     for (auto& empire : Empires()) {
-        empire.second->SetReady(false);
+        empire.second->AutoTurnSetReady();
     }
 }
 
@@ -2078,32 +2076,50 @@ bool ServerApp::AllOrdersReceived() {
 }
 
 namespace {
+    struct PopulatedOwnedVisitor : public UniverseObjectVisitor {
+        PopulatedOwnedVisitor(int empire_id = ALL_EMPIRES) :
+            m_empire_id(empire_id)
+        {}
+        virtual ~PopulatedOwnedVisitor() = default;
+        auto Visit(const std::shared_ptr<Planet>& obj) const -> std::shared_ptr<UniverseObject> override
+        {
+            return (obj
+                    && obj->OwnedBy(m_empire_id)
+                    && obj->Populated())
+                ? obj : nullptr;
+        }
+        const int m_empire_id;
+    };
+
     /** Returns true if \a empire has been eliminated by the applicable
       * definition of elimination.  As of this writing, elimination means
       * having no ships and no population on planets. */
-    bool EmpireEliminated(int empire_id) {
-        for (const auto& planet : Objects().find<Planet>(OwnedVisitor(empire_id))) {
-            if (planet->Populated())
-                return false;
-        }
-        return Objects().find<Ship>(OwnedVisitor(empire_id)).empty();     // no ship
+    bool EmpireEliminated(int empire_id, const ObjectMap& objects = Objects()) {
+        // are there any populated planets? if so, not eliminated
+        // are there any ships? if so, not eliminated
+        return !objects.check_if_any<Planet>(PopulatedOwnedVisitor(empire_id)) &&
+               !objects.check_if_any<Ship>(OwnedVisitor(empire_id));
     }
 
-    void GetEmpireFleetsAtSystem(std::map<int, std::set<int>>& empire_fleets, int system_id) {
+    void GetEmpireFleetsAtSystem(std::map<int, std::set<int>>& empire_fleets, int system_id,
+                                 const ObjectMap& objects = Objects())
+    {
         empire_fleets.clear();
-        auto system = Objects().get<System>(system_id);
+        auto system = objects.get<System>(system_id);
         if (!system)
             return;
-        for (auto& fleet : Objects().find<const Fleet>(system->FleetIDs()))
+        for (auto& fleet : objects.find<const Fleet>(system->FleetIDs()))
             empire_fleets[fleet->Owner()].emplace(fleet->ID());
     }
 
-    void GetEmpirePlanetsAtSystem(std::map<int, std::set<int>>& empire_planets, int system_id) {
+    void GetEmpirePlanetsAtSystem(std::map<int, std::set<int>>& empire_planets, int system_id,
+                                  const ObjectMap& objects = Objects())
+    {
         empire_planets.clear();
-        auto system = Objects().get<System>(system_id);
+        auto system = objects.get<System>(system_id);
         if (!system)
             return;
-        for (auto& planet : Objects().find<const Planet>(system->PlanetIDs())) {
+        for (auto& planet : objects.find<const Planet>(system->PlanetIDs())) {
             if (!planet->Unowned())
                 empire_planets[planet->Owner()].emplace(planet->ID());
             else if (planet->GetMeter(MeterType::METER_POPULATION)->Initial() > 0.0f)
@@ -2111,28 +2127,38 @@ namespace {
         }
     }
 
-    void GetFleetsVisibleToEmpireAtSystem(std::set<int>& visible_fleets,
-                                          int empire_id, int system_id)
+    void GetFleetsVisibleToEmpireAtSystem(std::set<int>& visible_fleets, int empire_id, int system_id,
+                                          const ObjectMap& objects = Objects(),
+                                          const EmpireManager& empires = Empires(),
+                                          const Universe::EmpireObjectVisibilityMap& vis_map =
+                                              GetUniverse().GetEmpireObjectVisibility())
     {
         visible_fleets.clear();
-        auto system = Objects().get<System>(system_id);
+        auto system = objects.get<System>(system_id);
         if (!system)
             return; // no such system
         const auto& fleet_ids = system->FleetIDs();
         if (fleet_ids.empty())
             return; // no fleets to be seen
-        if (empire_id != ALL_EMPIRES && !GetEmpire(empire_id))
+        if (empire_id != ALL_EMPIRES && !empires.GetEmpire(empire_id))
             return; // no such empire
 
         TraceLogger(combat) << "\t** GetFleetsVisibleToEmpire " << empire_id << " at system " << system->Name();
         // for visible fleets by an empire, check visibility of fleets by that empire
         if (empire_id != ALL_EMPIRES) {
-            for (const auto& fleet : Objects().find<Fleet>(fleet_ids)) {
+            for (const auto& fleet : objects.find<Fleet>(fleet_ids)) {
                 if (!fleet)
                     continue;
                 if (fleet->OwnedBy(empire_id))
                     continue;   // don't care about fleets owned by the same empire for determining combat conditions
-                Visibility fleet_vis = GetUniverse().GetObjectVisibilityByEmpire(fleet->ID(), empire_id);
+
+                Visibility fleet_vis = Visibility::VIS_NO_VISIBILITY;
+                auto emp_it = vis_map.find(empire_id);
+                if (emp_it != vis_map.end()) {
+                    auto obj_it = emp_it->second.find(fleet->ID());
+                    if (obj_it != emp_it->second.end())
+                        fleet_vis = obj_it->second;
+                }
                 TraceLogger(combat) << "\t\tfleet (" << fleet->ID() << ") has visibility rank " << fleet_vis;
                 if (fleet_vis >= Visibility::VIS_BASIC_VISIBILITY)
                     visible_fleets.emplace(fleet->ID());
@@ -2146,7 +2172,7 @@ namespace {
 
         // get best monster detection strength here.  Use monster detection meters for this...
         float monster_detection_strength_here = 0.0f;
-        for (const auto& ship : Objects().find<Ship>(system->ShipIDs())) {
+        for (const auto& ship : objects.find<Ship>(system->ShipIDs())) {
             if (!ship || !ship->Unowned())  // only want unowned / monster ships
                 continue;
             if (ship->GetMeter(MeterType::METER_DETECTION)->Initial() > monster_detection_strength_here)
@@ -2154,7 +2180,7 @@ namespace {
         }
 
         // test each ship in each fleet for visibility by best monster detection here
-        for (const auto& fleet : Objects().find<Fleet>(fleet_ids)) {
+        for (const auto& fleet : objects.find<Fleet>(fleet_ids)) {
             if (!fleet)
                 continue;
             if (fleet->Unowned()) {
@@ -2162,7 +2188,7 @@ namespace {
                 continue;
             }
 
-            for (const auto& ship : Objects().find<Ship>(fleet->ShipIDs())) {
+            for (const auto& ship : objects.find<Ship>(fleet->ShipIDs())) {
                 if (!ship)
                     continue;
                 // if a ship is low enough stealth, its fleet can be seen by monsters
@@ -2174,9 +2200,7 @@ namespace {
         }
     }
 
-    void GetPlanetsVisibleToEmpireAtSystem(std::set<int>& visible_planets,
-                                           int empire_id, int system_id)
-    {
+    void GetPlanetsVisibleToEmpireAtSystem(std::set<int>& visible_planets, int empire_id, int system_id) {
         visible_planets.clear();
         auto system = Objects().get<System>(system_id);
         if (!system)
@@ -2230,7 +2254,7 @@ namespace {
 
     /** Returns true iff there is an appropriate combination of objects in the
       * system with id \a system_id for a combat to occur. */
-    bool CombatConditionsInSystem(int system_id) {
+    bool CombatConditionsInSystem(int system_id, const ObjectMap& objects) {
         // combats occur if:
         // 1) empires A and B are at war, and
         // 2) a) empires A and B both have fleets in a system, or
@@ -2248,18 +2272,18 @@ namespace {
         if (empire_fleets_here.empty())
             return false;
 
-        auto this_system = Objects().get<System>(system_id);
+        auto this_system = objects.get<System>(system_id);
         DebugLogger(combat) << "CombatConditionsInSystem() for system (" << system_id << ") " << this_system->Name();
         // which empires have aggressive ships here? (including monsters as id ALL_EMPIRES)
         std::set<int> empires_with_aggressive_fleets_here;
         for (auto& empire_fleets : empire_fleets_here) {
             int empire_id = empire_fleets.first;
-            for (const auto& fleet : Objects().find<Fleet>(empire_fleets.second)) {
+            for (const auto& fleet : objects.find<Fleet>(empire_fleets.second)) {
                 if (!fleet)
                     continue;
                 // an unarmed Monster will not trigger combat
                 if (  (fleet->Aggressive() || fleet->Unowned())  &&
-                      (fleet->HasArmedShips() || !fleet->Unowned())  )
+                      (fleet->HasArmedShips(objects) || !fleet->Unowned())  )
                 {
                     if (!empires_with_aggressive_fleets_here.count(empire_id))
                         DebugLogger(combat) << "\t Empire " << empire_id << " has at least one aggressive fleet present";
@@ -2321,7 +2345,7 @@ namespace {
             GetPlanetsVisibleToEmpireAtSystem(aggressive_empire_visible_planets, aggressive_empire_id, system_id);
 
             // is any planet owned by an empire at war with aggressive empire?
-            for (const auto& planet : Objects().find<Planet>(aggressive_empire_visible_planets)) {
+            for (const auto& planet : objects.find<Planet>(aggressive_empire_visible_planets)) {
                 if (!planet)
                     continue;
                 int visible_planet_empire_id = planet->Owner();
@@ -2348,7 +2372,7 @@ namespace {
             GetFleetsVisibleToEmpireAtSystem(aggressive_empire_visible_fleets, aggressive_empire_id, system_id);
 
             // is any fleet owned by an empire at war with aggressive empire?
-            for (const auto& fleet : Objects().find<Fleet>(aggressive_empire_visible_fleets)) {
+            for (const auto& fleet : objects.find<Fleet>(aggressive_empire_visible_fleets)) {
                 if (!fleet)
                     continue;
                 int visible_fleet_empire_id = fleet->Owner();
@@ -2368,13 +2392,20 @@ namespace {
 
     /** Clears and refills \a combats with CombatInfo structs for
       * every system where a combat should occur this turn. */
-    void AssembleSystemCombatInfo(std::vector<CombatInfo>& combats) {
+    void AssembleSystemCombatInfo(std::vector<CombatInfo>& combats,
+                                  Universe& universe,
+                                  const EmpireManager& empires,
+                                  const GalaxySetupData& setup_data,
+                                  const SpeciesManager& species,
+                                  const SupplyManager& supply)
+    {
         combats.clear();
         // for each system, find if a combat will occur in it, and if so, assemble
         // necessary information about that combat in combats
-        for (const auto& sys : GetUniverse().Objects().all<System>()) {
-            if (CombatConditionsInSystem(sys->ID()))
-                combats.emplace_back(sys->ID(), CurrentTurn());
+        for (const auto& sys : universe.Objects().all<System>()) {
+            if (CombatConditionsInSystem(sys->ID(), universe.Objects()))
+                combats.emplace_back(sys->ID(), CurrentTurn(), universe,
+                                     empires, setup_data, species, supply);
         }
     }
 
@@ -2383,23 +2414,23 @@ namespace {
       * updating after combat. */
     void BackProjectSystemCombatInfoObjectMeters(std::vector<CombatInfo>& combats) {
         for (CombatInfo& combat : combats) {
-            for (const auto& object : combat.objects.all())
+            for (const auto& object : combat.objects->all())
                 object->BackPropagateMeters();
         }
     }
 
     /** Takes contents of CombatInfo struct and puts it into the universe.
       * Used to store results of combat in main universe. */
-    void DisseminateSystemCombatInfo(const std::vector<CombatInfo>& combats) {
-        Universe& universe = GetUniverse();
-
-        // as of this writing, pointers to objects are inserted into combat
-        // ObjectMap, and these pointers refer to the main gamestate objects
-        // therefore, copying the combat result state back into the main
-        // gamestate object map isn't necessary, as these objects have already
-        // been updated by the combat processing. similarly, standard
-        // visibility updating will transfer the results to empires' known
-        // gamestate ObjectMaps.
+    void DisseminateSystemCombatInfo(const std::vector<CombatInfo>& combats, Universe& universe) {
+        // As of this writing, pointers to objects are inserted into the combat
+        // ObjectMap, and these pointers still refer to the main gamestate
+        // objects. Thus, copying the objects in the main gamestate are already
+        // modified by the combat, and don't need to be copied from the combat
+        // ObjectMap. However, the changes to object visibility during combat
+        // are stored separately, and do need to be copied back to the main
+        // gamestate. Standard visibility updating will then transfer the 
+        // modified objects / combat results to empires' known gamestate
+        // ObjectMaps.
         for (const CombatInfo& combat_info : combats) {
             // update visibilities from combat, in case anything was revealed
             // by shooting during combat
@@ -2407,8 +2438,7 @@ namespace {
                 for (const auto& object_vis : empire_vis.second) {
                     if (object_vis.first < 0)
                         continue;   // temporary fighter IDs
-                    if (object_vis.second > GetUniverse().GetObjectVisibilityByEmpire(object_vis.first, empire_vis.first))
-                        universe.SetEmpireObjectVisibility(empire_vis.first, object_vis.first, object_vis.second);
+                    universe.SetEmpireObjectVisibility(empire_vis.first, object_vis.first, object_vis.second);  // does not lower visibility
                 }
             }
 
@@ -2432,7 +2462,7 @@ namespace {
 
                     // record if empire should be informed of potential fleet
                     // destruction (which is checked later)
-                    if (auto ship = Objects().get<Ship>(object_id)) {
+                    if (auto ship = universe.Objects().get<Ship>(object_id)) {
                         if (ship->FleetID() != INVALID_OBJECT_ID)
                             empires_to_update_of_fleet_destruction[ship->FleetID()].emplace(empire_id);
                     }
@@ -2467,12 +2497,12 @@ namespace {
 
             // update system ownership after combat.  may be necessary if the
             // combat caused planets to change ownership.
-            if (auto system = Objects().get<System>(combat_info.system_id)) {
+            if (auto system = universe.Objects().get<System>(combat_info.system_id)) {
                 // ensure all participants get updates on system.  this ensures
                 // that an empire who lose all objects in the system still
                 // knows about a change in system ownership
                 for (int empire_id : combat_info.empire_ids)
-                { universe.EmpireKnownObjects(empire_id).CopyObject(system, ALL_EMPIRES); }
+                    universe.EmpireKnownObjects(empire_id).CopyObject(system, ALL_EMPIRES);
             }
         }
     }
@@ -2506,8 +2536,8 @@ namespace {
                     //} else {
                     //    DebugLogger() << "Object not known to empire";
                     //}
-                    empire->AddSitRepEntry(CreateCombatDestroyedObjectSitRep(dest_obj_id, combat_info.system_id,
-                                                                             empire_id));
+                    empire->AddSitRepEntry(CreateCombatDestroyedObjectSitRep(
+                        dest_obj_id, combat_info.system_id, empire_id));
                 }
             }
 
@@ -2534,7 +2564,7 @@ namespace {
     }
 
     /** Records info in Empires about what they destroyed or had destroyed during combat. */
-    void UpdateEmpireCombatDestructionInfo(const std::vector<CombatInfo>& combats) {
+    void UpdateEmpireCombatDestructionInfo(const std::vector<CombatInfo>& combats, const ObjectMap& objects) {
         for (const CombatInfo& combat_info : combats) {
             std::vector<ConstCombatEventPtr> flat_events;
             for (auto event : combat_info.combat_events) {
@@ -2555,10 +2585,11 @@ namespace {
                 auto fire_event = std::dynamic_pointer_cast<const WeaponFireEvent>(event);
                 if (fire_event && combat_info.destroyed_object_ids.count(fire_event->target_id)) {
                     events_that_killed.push_back(fire_event);
-                    TraceLogger() << "Kill event: " << event->DebugString();
+                    TraceLogger() << "Kill event: " << event->DebugString(objects);
                 }
             }
-            DebugLogger() << "Combat combat_info system: " << combat_info.system_id  << "  Total Kill Events: " << events_that_killed.size();
+            DebugLogger() << "Combat combat_info system: " << combat_info.system_id
+                          << "  Total Kill Events: " << events_that_killed.size();
 
 
             // If a ship was attacked multiple times during a combat in which it dies, it will get
@@ -2578,9 +2609,11 @@ namespace {
                     continue;
                 Empire* target_empire = GetEmpire(target_ship->Owner());
 
-                DebugLogger() << "Attacker " << attacker->Name() << " (id: " << attacker->ID() << "  empire: " << attacker_empire_id << ")  attacks "
+                DebugLogger() << "Attacker " << attacker->Name() << " (id: " << attacker->ID()
+                              << "  empire: " << attacker_empire_id << ")  attacks "
                               << target_ship->Name() << " (id: " << target_ship->ID() << "  empire: "
-                              << (target_empire ? std::to_string(target_empire->EmpireID()) : "(unowned)") << "  species: " << target_ship->SpeciesName() << ")";
+                              << (target_empire ? std::to_string(target_empire->EmpireID()) : "(unowned)")
+                              << "  species: " << target_ship->SpeciesName() << ")";
 
                 if (attacker_empire)
                     attacker_empire->RecordShipShotDown(*target_ship);
@@ -2615,8 +2648,10 @@ namespace {
     }
 
     /** Does colonization, with safety checks */
-    bool ColonizePlanet(int ship_id, int planet_id) {
-        auto ship = Objects().get<Ship>(ship_id);
+    bool ColonizePlanet(int ship_id, int planet_id, Universe& universe) {
+        auto& objects = universe.Objects();
+
+        auto ship = objects.get<Ship>(ship_id);
         if (!ship) {
             ErrorLogger() << "ColonizePlanet couldn't get ship with id " << ship_id;
             return false;
@@ -2660,30 +2695,32 @@ namespace {
         auto system = Objects().get<System>(ship->SystemID());
 
         // destroy colonizing ship, and its fleet if now empty
-        auto fleet = Objects().get<Fleet>(ship->FleetID());
+        auto fleet = objects.get<Fleet>(ship->FleetID());
         if (fleet) {
             fleet->RemoveShips({ship->ID()});
             if (fleet->Empty()) {
                 if (system)
                     system->Remove(fleet->ID());
-                GetUniverse().Destroy(fleet->ID());
+                universe.Destroy(fleet->ID());
             }
         }
 
         if (system)
             system->Remove(ship->ID());
-        GetUniverse().RecursiveDestroy(ship->ID()); // does not count as a loss of a ship for the species / empire
+        universe.RecursiveDestroy(ship->ID()); // does not count as a loss of a ship for the species / empire
 
         return true;
     }
 
     /** Determines which ships ordered to colonize planet succeed, does
       * appropriate colonization, and cleans up after colonization orders */
-    void HandleColonization() {
+    void HandleColonization(Universe& universe, EmpireManager& empires) {
+        auto& objects = universe.Objects();
+
         // collect, for each planet, what ships have been ordered to colonize it
         std::map<int, std::map<int, std::set<int>>> planet_empire_colonization_ship_ids; // map from planet ID to map from empire ID to set of ship IDs
 
-        for (auto& ship : GetUniverse().Objects().all<Ship>()) {
+        for (auto& ship : objects.all<Ship>()) {
             if (ship->Unowned())
                 continue;
             int owner_empire_id = ship->Owner();
@@ -2697,7 +2734,7 @@ namespace {
 
             ship->SetColonizePlanet(INVALID_OBJECT_ID); // reset so failed colonization doesn't leave ship with hanging colonization order set
 
-            auto planet = Objects().get<Planet>(colonize_planet_id);
+            auto planet = objects.get<Planet>(colonize_planet_id);
             if (!planet)
                 continue;
 
@@ -2728,13 +2765,13 @@ namespace {
             int colonizing_ship_id = *empire_ships_colonizing.begin();
 
             int planet_id = planet_colonization.first;
-            auto planet = Objects().get<Planet>(planet_id);
+            auto planet = objects.get<Planet>(planet_id);
             if (!planet) {
                 ErrorLogger() << "HandleColonization couldn't get planet with id " << planet_id;
                 continue;
             }
             int system_id = planet->SystemID();
-            auto system = Objects().get<System>(system_id);
+            auto system = objects.get<System>(system_id);
             if (!system) {
                 ErrorLogger() << "HandleColonization couldn't get system with id " << system_id;
                 continue;
@@ -2742,8 +2779,8 @@ namespace {
 
             // find which empires have obstructive armed ships in system
             std::set<int> empires_with_armed_ships_in_system;
-            for (auto& fleet : Objects().find<const Fleet>(system->FleetIDs())) {
-                if (fleet->Obstructive() && fleet->HasArmedShips())
+            for (auto& fleet : objects.find<const Fleet>(system->FleetIDs())) {
+                if (fleet->Obstructive() && fleet->HasArmedShips(objects))
                     empires_with_armed_ships_in_system.insert(fleet->Owner());  // may include ALL_EMPIRES, which is fine; this makes monsters prevent colonization
             }
 
@@ -2753,7 +2790,7 @@ namespace {
                 if (armed_ship_empire_id == colonizing_empire_id)
                     continue;
                 if (armed_ship_empire_id == ALL_EMPIRES ||
-                    Empires().GetDiplomaticStatus(colonizing_empire_id, armed_ship_empire_id) == DiplomaticStatus::DIPLO_WAR)
+                    empires.GetDiplomaticStatus(colonizing_empire_id, armed_ship_empire_id) == DiplomaticStatus::DIPLO_WAR)
                 {
                     colonize_blocked = true;
                     break;
@@ -2764,7 +2801,7 @@ namespace {
                 continue;
 
             // before actual colonization, which deletes the colony ship, store ship info for later use with sitrep generation
-            auto ship = Objects().get<Ship>(colonizing_ship_id);
+            auto ship = objects.get<Ship>(colonizing_ship_id);
             if (!ship)
                 ErrorLogger() << "HandleColonization couldn't get ship with id " << colonizing_ship_id;
             const auto& species_name = ship ? ship->SpeciesName() : "";
@@ -2772,14 +2809,14 @@ namespace {
 
 
             // do colonization
-            if (!ColonizePlanet(colonizing_ship_id, planet_id))
+            if (!ColonizePlanet(colonizing_ship_id, planet_id, universe))
                 continue;   // skip sitrep if colonization failed
 
             // record successful colonization
             newly_colonize_planet_ids.push_back(planet_id);
 
             // sitrep about colonization / outposting
-            Empire* empire = GetEmpire(colonizing_empire_id);
+            auto empire = empires.GetEmpire(colonizing_empire_id);
             if (!empire) {
                 ErrorLogger() << "HandleColonization couldn't get empire with id " << colonizing_empire_id;
             } else {
@@ -2957,14 +2994,14 @@ namespace {
                     planet->Conquer(ALL_EMPIRES);
                     DebugLogger() << "Independents conquer planet";
                     for (const auto& empire_troops : empires_troops)
-                    { DebugLogger() << " empire: " << empire_troops.first << ": " << empire_troops.second; }
+                        DebugLogger() << " empire: " << empire_troops.first << ": " << empire_troops.second;
 
                     // TODO: planet lost to rebels sitrep
                 } else {
-                    // defender held theh planet
+                    // defender held thh planet
                     DebugLogger() << "Defender holds planet";
                     for (const auto& empire_troops : empires_troops)
-                    { DebugLogger() << " empire: " << empire_troops.first << ": " << empire_troops.second; }
+                        DebugLogger() << " empire: " << empire_troops.first << ": " << empire_troops.second;
                 }
 
                 // regardless of whether battle resulted in conquering, it did
@@ -2975,9 +3012,9 @@ namespace {
             } else {
                 // no troops left?
                 if (Meter* meter = planet->GetMeter(MeterType::METER_TROOPS))
-                    meter->SetCurrent(0.0);
+                    meter->SetCurrent(0.0f);
                 if (Meter* meter = planet->GetMeter(MeterType::METER_REBEL_TROOPS))
-                    meter->SetCurrent(0.0);
+                    meter->SetCurrent(0.0f);
             }
 
             planet->BackPropagateMeters();
@@ -2986,7 +3023,7 @@ namespace {
             if (planet_initial_owner_id != ALL_EMPIRES && planet_initial_owner_id != planet->Owner()) {
                 // get empire's knowledge of object
                 ObjectMap& empire_latest_known_objects = EmpireKnownObjects(planet_initial_owner_id);
-                empire_latest_known_objects.CopyObject(planet, planet_initial_owner_id);
+                empire_latest_known_objects.CopyObject(std::move(planet), planet_initial_owner_id);
             }
         }
     }
@@ -3163,9 +3200,11 @@ namespace {
 
     /** Check validity of adopted policies, overwrite initial adopted
       * policies with those currently adopted, update adopted turns counters. */
-    void UpdateEmpirePolicies() {
-        for (auto id_empire_pair : Empires())
-            id_empire_pair.second->UpdatePolicies();
+    void UpdateEmpirePolicies(EmpireManager& empires) {
+        for ([[maybe_unused]] auto& [empire_id, empire] : empires) {
+            (void)empire_id;    // quieting unused variable warning
+            empire->UpdatePolicies();
+        }
     }
 
     /** Deletes empty fleets. */
@@ -3178,8 +3217,7 @@ namespace {
         }
 
         for (auto& fleet : empty_fleets) {
-            auto sys = Objects().get<System>(fleet->SystemID());
-            if (sys)
+            if (auto sys = Objects().get<System>(fleet->SystemID()))
                 sys->Remove(fleet->ID());
 
             GetUniverse().RecursiveDestroy(fleet->ID());
@@ -3191,7 +3229,7 @@ void ServerApp::PreCombatProcessTurns() {
     ScopedTimer timer("ServerApp::PreCombatProcessTurns", true);
 
     m_universe.ResetAllObjectMeters(false, true);   // revert current meter values to initial values prior to update after incrementing turn number during previous post-combat turn processing.
-    m_universe.UpdateEmpireVisibilityFilteredSystemGraphs();
+    m_universe.UpdateEmpireVisibilityFilteredSystemGraphsWithOwnObjectMaps(Empires());
 
     DebugLogger() << "ServerApp::ProcessTurns executing orders";
 
@@ -3226,7 +3264,7 @@ void ServerApp::PreCombatProcessTurns() {
     // validate adopted policies, and update Empire Policy history
     // actual policy adoption and influence consumption occurrs during order
     // execution above
-    UpdateEmpirePolicies();
+    UpdateEmpirePolicies(m_empires);
 
     // clean up empty fleets that empires didn't order deleted
     CleanEmptyFleets();
@@ -3242,7 +3280,7 @@ void ServerApp::PreCombatProcessTurns() {
     m_networking.SendMessageAll(TurnProgressMessage(Message::TurnProgressPhase::COLONIZE_AND_SCRAP));
 
     DebugLogger() << "ServerApp::ProcessTurns colonization";
-    HandleColonization();
+    HandleColonization(m_universe, m_empires);
 
     DebugLogger() << "ServerApp::ProcessTurns invasion";
     HandleInvasion();
@@ -3258,17 +3296,19 @@ void ServerApp::PreCombatProcessTurns() {
     // player notifications
     m_networking.SendMessageAll(TurnProgressMessage(Message::TurnProgressPhase::FLEET_MOVEMENT));
 
+    ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager};
+
     // Update system-obstruction after orders, colonization, invasion, gifting, scrapping
-    for (auto& entry : Empires()) {
+    for (auto& entry : m_empires) {
         auto& empire = entry.second;
         if (empire->Eliminated())
             continue;
-        empire->UpdateSupplyUnobstructedSystems(true);
+        empire->UpdateSupplyUnobstructedSystems(context, true);
     }
 
 
     // fleet movement
-    auto fleets = Objects().all<Fleet>();
+    auto fleets = m_universe.Objects().all<Fleet>();
     for (auto& fleet : fleets) {
         if (fleet)
             fleet->ClearArrivalFlag();
@@ -3277,18 +3317,18 @@ void ServerApp::PreCombatProcessTurns() {
     // blockade them before they move
     for (auto& fleet : fleets) {
         if (fleet && fleet->Unowned())
-            fleet->MovementPhase();
+            fleet->MovementPhase(context);
     }
     for (auto& fleet : fleets) {
         // save for possible SitRep generation after moving...
         if (fleet && !fleet->Unowned())
-            fleet->MovementPhase();
+            fleet->MovementPhase(context);
     }
 
     // post-movement visibility update
-    m_universe.UpdateEmpireObjectVisibilities();
+    m_universe.UpdateEmpireObjectVisibilities(m_empires);
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
-    m_universe.UpdateEmpireStaleObjectKnowledge();
+    m_universe.UpdateEmpireStaleObjectKnowledge(m_empires);
 
     // SitReps for fleets having arrived at destinations
     for (auto& fleet : fleets) {
@@ -3335,31 +3375,31 @@ void ServerApp::ProcessCombats() {
 
 
     // collect data about locations where combat is to occur
-    AssembleSystemCombatInfo(combats);
+    AssembleSystemCombatInfo(combats, m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager);
 
     // loop through assembled combat infos, handling each combat to update the
     // various systems' CombatInfo structs
     for (CombatInfo& combat_info : combats) {
-        if (auto system = combat_info.GetSystem())
-            system->SetLastTurnBattleHere(CurrentTurn());
-
         auto combat_system = combat_info.GetSystem();
-        DebugLogger(combat) << "Processing combat at " << (combat_system ? combat_system->Name() : "(No System)");
-        TraceLogger(combat) << combat_info.objects.Dump();
+        if (combat_system)
+            combat_system->SetLastTurnBattleHere(CurrentTurn());
+
+        DebugLogger(combat) << "Processing combat at " << (combat_system ? combat_system->Name() : "(No System id: " + std::to_string(combat_info.system_id) + ")");
+        TraceLogger(combat) << combat_info.objects->Dump();
 
         AutoResolveCombat(combat_info);
     }
 
     BackProjectSystemCombatInfoObjectMeters(combats);
 
-    UpdateEmpireCombatDestructionInfo(combats);
+    UpdateEmpireCombatDestructionInfo(combats, m_universe.Objects());
 
-    DisseminateSystemCombatInfo(combats);
+    DisseminateSystemCombatInfo(combats, m_universe);
     // update visibilities with any new info gleaned during combat
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
     // update stale object info based on any mid- combat glimpses
     // before visibility is totally recalculated in the post combat processing
-    m_universe.UpdateEmpireStaleObjectKnowledge();
+    m_universe.UpdateEmpireStaleObjectKnowledge(m_empires);
 
     CreateCombatSitReps(combats);
 }
@@ -3383,7 +3423,7 @@ void ServerApp::UpdateMonsterTravelRestrictions() {
             // before you, or be in cahoots with someone who did.
             bool unrestricted = ((fleet->ArrivalStarlane() == system->ID())
                                  && fleet->Obstructive()
-                                 && fleet->HasArmedShips());
+                                 && fleet->HasArmedShips(m_universe.Objects()));
             if (fleet->Unowned()) {
                 monsters.push_back(std::move(fleet));
                 if (unrestricted)
@@ -3412,18 +3452,15 @@ void ServerApp::UpdateMonsterTravelRestrictions() {
 void ServerApp::PostCombatProcessTurns() {
     ScopedTimer timer("ServerApp::PostCombatProcessTurns", true);
 
-    EmpireManager& empires = Empires();
-    ObjectMap& objects = m_universe.Objects();
-
     // post-combat visibility update
-    m_universe.UpdateEmpireObjectVisibilities();
+    m_universe.UpdateEmpireObjectVisibilities(Empires());
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
 
 
     // check for loss of empire capitals
-    for (auto& entry : empires) {
+    for (auto& entry : m_empires) {
         int capital_id = entry.second->CapitalID();
-        if (auto capital = Objects().get(capital_id)) {
+        if (auto capital = m_universe.Objects().get(capital_id)) {
             if (!capital->OwnedBy(entry.first))
                 entry.second->SetCapitalID(INVALID_OBJECT_ID);
         } else {
@@ -3439,62 +3476,65 @@ void ServerApp::PostCombatProcessTurns() {
     DebugLogger() << "ServerApp::PostCombatProcessTurns effects and meter updates";
 
     TraceLogger(effects) << "!!!!!!! BEFORE TURN PROCESSING EFFECTS APPLICATION";
-    TraceLogger(effects) << objects.Dump();
+    TraceLogger(effects) << m_universe.Objects().Dump();
 
     // execute all effects and update meters prior to production, research, etc.
     if (GetGameRules().Get<bool>("RULE_RESEED_PRNG_SERVER")) {
         static boost::hash<std::string> pcpt_string_hash;
         Seed(static_cast<unsigned int>(CurrentTurn()) + pcpt_string_hash(m_galaxy_setup_data.seed));
     }
-    m_universe.ApplyAllEffectsAndUpdateMeters(false);
+    m_universe.ApplyAllEffectsAndUpdateMeters(m_empires, false);
 
     // regenerate system connectivity graph after executing effects, which may
     // have added or removed starlanes.
-    m_universe.InitializeSystemGraph();
+    m_universe.InitializeSystemGraph(m_empires, m_universe.Objects());
+    m_universe.UpdateEmpireVisibilityFilteredSystemGraphsWithOwnObjectMaps(m_empires);
 
     TraceLogger(effects) << "!!!!!!! AFTER TURN PROCESSING EFFECTS APPLICATION";
-    TraceLogger(effects) << objects.Dump();
+    TraceLogger(effects) << m_universe.Objects().Dump();
 
     DebugLogger() << "ServerApp::PostCombatProcessTurns empire resources updates";
 
     // now that we've had combat and applied Effects, update visibilities again, prior
     //  to updating system obstructions below.
-    m_universe.UpdateEmpireObjectVisibilities();
+    m_universe.UpdateEmpireObjectVisibilities(m_empires);
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
 
-    UpdateEmpireSupply();
+    UpdateEmpireSupply(ScriptingContext{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager},
+                       m_empires, m_supply_manager);
 
     // Update fleet travel restrictions (monsters and empire fleets)
     UpdateMonsterTravelRestrictions();
-    for (auto& entry : empires) {
-        if (!entry.second->Eliminated()) {
-            auto& empire = entry.second;
+    for (auto& [empire_id, empire] : m_empires) {
+        if (!empire->Eliminated()) {
             empire->UpdatePreservedLanes();
-            empire->UpdateUnobstructedFleets();     // must be done after *all* noneliminated empires have updated their unobstructed systems
+            empire->UpdateUnobstructedFleets(
+                m_universe.Objects(), m_universe.EmpireKnownDestroyedObjectIDs(empire_id)); // must be done after *all* noneliminated empires have updated their unobstructed systems
         }
     }
 
     TraceLogger(effects) << "!!!!!!! AFTER UPDATING RESOURCE POOLS AND SUPPLY STUFF";
-    TraceLogger(effects) << objects.Dump();
+    TraceLogger(effects) << m_universe.Objects().Dump();
 
     DebugLogger() << "ServerApp::PostCombatProcessTurns queue progress checking";
 
     // Consume distributed resources to planets and on queues, create new
     // objects for completed production and give techs to empires that have
     // researched them
-    for (auto& entry : empires) {
-        auto& empire = entry.second;
+    for ([[maybe_unused]] auto& [empire_id, empire] : m_empires) {
+        (void)empire_id;    // unused variable warning
         if (empire->Eliminated())
             continue;   // skip eliminated empires
 
         for (const auto& tech : empire->CheckResearchProgress())
             empire->AddNewlyResearchedTechToGrantAtStartOfNextTurn(tech);
-        empire->CheckProductionProgress();
+        ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager};
+        empire->CheckProductionProgress(context);
         empire->CheckInfluenceProgress();
     }
 
     TraceLogger(effects) << "!!!!!!! AFTER CHECKING QUEUE AND RESOURCE PROGRESS";
-    TraceLogger(effects) << objects.Dump();
+    TraceLogger(effects) << m_universe.Objects().Dump();
 
     // execute turn events implemented as Python scripts
     ExecuteScriptedTurnEvents();
@@ -3503,28 +3543,28 @@ void ServerApp::PostCombatProcessTurns() {
     // UniverseObjects will have effects applied to them this turn, allowing
     // (for example) ships to have max fuel meters greater than 0 on the turn
     // they are created.
-    m_universe.ApplyMeterEffectsAndUpdateMeters(false);
+    m_universe.ApplyMeterEffectsAndUpdateMeters(m_empires, false);
 
     TraceLogger(effects) << "!!!!!!! AFTER UPDATING METERS OF ALL OBJECTS";
-    TraceLogger(effects) << objects.Dump();
+    TraceLogger(effects) << m_universe.Objects().Dump();
 
     // Planet depopulation, some in-C++ meter modifications
-    for (const auto& obj : objects.all()) {
+    for (const auto& obj : m_universe.Objects().all()) {
         obj->PopGrowthProductionResearchPhase();
         obj->ClampMeters();  // ensures no meters are over MAX.  probably redundant with ClampMeters() in Universe::ApplyMeterEffectsAndUpdateMeters()
     }
 
     TraceLogger(effects) << "!!!!!!!!!!!!!!!!!!!!!!AFTER GROWTH AND CLAMPING";
-    TraceLogger(effects) << objects.Dump();
+    TraceLogger(effects) << m_universe.Objects().Dump();
 
     // store initial values of meters for this turn.
     m_universe.BackPropagateObjectMeters();
-    empires.BackPropagateMeters();
+    m_empires.BackPropagateMeters();
 
     // check for loss of empire capitals
-    for (auto& entry : empires) {
+    for (auto& entry : m_empires) {
         int capital_id = entry.second->CapitalID();
-        if (auto capital = Objects().get(capital_id)) {
+        if (auto capital = m_universe.Objects().get(capital_id)) {
             if (!capital->OwnedBy(entry.first))
                 entry.second->SetCapitalID(INVALID_OBJECT_ID);
         } else {
@@ -3541,15 +3581,15 @@ void ServerApp::PostCombatProcessTurns() {
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
 
     // post-production and meter-effects visibility update
-    m_universe.UpdateEmpireObjectVisibilities();
+    m_universe.UpdateEmpireObjectVisibilities(m_empires);
 
-    m_universe.UpdateEmpireStaleObjectKnowledge();
+    m_universe.UpdateEmpireStaleObjectKnowledge(m_empires);
 
     // update empire-visibility filtered graphs after visiblity update
-    m_universe.UpdateEmpireVisibilityFilteredSystemGraphs();
+    m_universe.UpdateEmpireVisibilityFilteredSystemGraphsWithOwnObjectMaps(Empires());
 
     TraceLogger(effects) << "!!!!!!!!!!!!!!!!!!!!!!AFTER TURN PROCESSING POP GROWTH PRODCUTION RESEARCH";
-    TraceLogger(effects) << objects.Dump();
+    TraceLogger(effects) << m_universe.Objects().Dump();
 
     // this has to be here for the sitreps it creates to be in the right turn
     CheckForEmpireElimination();
@@ -3561,40 +3601,43 @@ void ServerApp::PostCombatProcessTurns() {
 
 
     // new turn visibility update
-    m_universe.UpdateEmpireObjectVisibilities();
+    m_universe.UpdateEmpireObjectVisibilities(m_empires);
 
 
     DebugLogger() << "ServerApp::PostCombatProcessTurns applying Newly Added Techs";
     // apply new techs
-    for (auto& entry : empires) {
-        auto& empire = entry.second;
+    for ([[maybe_unused]] auto& [ignored_id, empire] : m_empires) {
+        (void)ignored_id;   // quiet unused variable warning
         if (empire && !empire->Eliminated())
             empire->ApplyNewTechs();
     }
 
 
     TraceLogger(effects) << "ServerApp::PostCombatProcessTurns Before Final Meter Estimate Update: ";
-    TraceLogger(effects) << objects.Dump();
+    TraceLogger(effects) << m_universe.Objects().Dump();
 
 
     // redo meter estimates to hopefully be consistent with what happens in clients
-    m_universe.UpdateMeterEstimates(false);
+    m_universe.UpdateMeterEstimates(m_empires, false);
 
     TraceLogger(effects) << "ServerApp::PostCombatProcessTurns After Final Meter Estimate Update: ";
-    TraceLogger(effects) << objects.Dump();
+    TraceLogger(effects) << m_universe.Objects().Dump();
 
 
     // Re-determine supply distribution and exchanging and resource pools for empires
-    UpdateEmpireSupply(true);
+    UpdateEmpireSupply(ScriptingContext{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager},
+                       m_empires, m_supply_manager, true);
 
     // copy latest visible gamestate to each empire's known object state
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
 
 
     // misc. other updates and records
-    m_universe.UpdateStatRecords();
-    for (auto& entry : empires)
-        entry.second->UpdateOwnedObjectCounters();
+    m_universe.UpdateStatRecords(m_empires);
+    for ([[maybe_unused]] auto& [ignored_empire_id, empire] : m_empires) {
+        (void)ignored_empire_id;    // quiet unused variable warning
+        empire->UpdateOwnedObjectCounters();
+    }
     GetSpeciesManager().UpdatePopulationCounter();
 
 
@@ -3625,7 +3668,7 @@ void ServerApp::PostCombatProcessTurns() {
     {
         PlayerConnectionPtr player = *player_it;
         int empire_id = PlayerEmpireID(player->PlayerID());
-        const Empire* empire = GetEmpire(empire_id);
+        auto empire = m_empires.GetEmpire(empire_id);
         if (empire ||
             player->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR ||
             player->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER)
@@ -3648,7 +3691,7 @@ void ServerApp::CheckForEmpireElimination() {
     for (auto& entry : Empires()) {
         if (entry.second->Eliminated())
             continue;   // don't double-eliminate an empire
-        else if (EmpireEliminated(entry.first)) {
+        else if (EmpireEliminated(entry.first, m_universe.Objects())) {
             entry.second->Eliminate();
             RemoveEmpireTurn(entry.first);
         } else {

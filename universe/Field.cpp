@@ -54,13 +54,13 @@ void Field::Copy(std::shared_ptr<const UniverseObject> copied_object, int empire
 
     int copied_object_id = copied_object->ID();
     Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(copied_object_id, empire_id);
-    std::set<std::string> visible_specials = GetUniverse().GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
+    auto visible_specials = GetUniverse().GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
 
-    UniverseObject::Copy(copied_object, vis, visible_specials);
+    UniverseObject::Copy(std::move(copied_object), vis, visible_specials);
 
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
-        this->m_name =                      copied_field->m_name;
-        this->m_type_name =                 copied_field->m_type_name;
+        this->m_name =      copied_field->m_name;
+        this->m_type_name = copied_field->m_type_name;
     }
 }
 
@@ -87,7 +87,7 @@ std::string Field::Dump(unsigned short ntabs) const {
     return os.str();
 }
 
-const std::string& Field::PublicName(int empire_id) const {
+const std::string& Field::PublicName(int empire_id, const ObjectMap&) const {
     // always just return name since fields (as of this writing) don't have owners
     return UserString(m_type_name);
 }

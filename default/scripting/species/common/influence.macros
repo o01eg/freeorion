@@ -1,27 +1,36 @@
 
 BASE_INFLUENCE_COSTS
-'''EffectsGroup      // colonies consume influence
+'''EffectsGroup      // colonies consume influence, proportional to how many planets the empire controls
             scope = Source
-            activation = Planet
-            accountinglabel = "COLONY_ADMIN_COSTS_LABEL"
-            priority = [[DEFAULT_PRIORITY]]
-            effects = SetTargetInfluence value = Value - 1
-            
-        EffectsGroup      // species homeworlds consume more influence
-            scope = source
             activation = And [
                 Planet
+                Not Unowned
+                Not Capital
+            ]
+            stackinggroup = "IMPERIAL_PALACE_MANY_PLANETS_INFLUENCE_PENALTY"
+            accountinglabel = "COLONY_ADMIN_COSTS_LABEL"
+            effects = SetTargetInfluence value = Value - (NamedReal name = "OLONY_ADMIN_COSTS_PER_PLANET" value = 0.2) *
+                Statistic Count condition = And [
+                    Planet
+                    OwnedBy empire = Source.Owner
+                ]
+
+        EffectsGroup      // species homeworlds consume more influence
+            scope = Source
+            activation = And [
+                Planet
+                Not Unowned
                 Not Capital
                 Homeworld name = LocalCandidate.Species
             ]
             accountinglabel = "SPECIES_HOMEWORLD_INDEPENDENCE_DESIRE_LABEL"
-            priority = [[DEFAULT_PRIORITY]]
             effects = SetTargetInfluence value = Value - 1
 
         EffectsGroup      // colonies consume more influence if not supply connected to empire's capital
             scope = Source
             activation = And [
                 Planet
+                Not Unowned
                 Not ResourceSupplyConnected empire = LocalCandidate.Owner condition = And [
                     Planet
                     OwnedBy empire = Source.Owner
@@ -29,18 +38,20 @@ BASE_INFLUENCE_COSTS
                 ]
             ]
             accountinglabel = "CAPITAL_DISCONNECTION_LABEL"
-            priority = [[DEFAULT_PRIORITY]]
-            effects = SetTargetInfluence value = Value - 1
+            effects = SetTargetInfluence value = Value
+                        - NamedReal name = "SUPPLY_DISCONNECTED_INFLUENCE_MALUS"
+                                    value = [[SUPPLY_DISCONNECTED_INFLUENCE_MALUS]]
 
         EffectsGroup      // gives human bonuses when AI Aggression set to Beginner
             scope = Source
             activation = And [
                 Planet
+                Not Unowned
                 Human     // human player, not human species
                 (GalaxyMaxAIAggression = 0)
             ]
             accountinglabel = "DIFFICULTY"
-            priority = [[LATE_PRIORITY]]
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
             effects = SetTargetInfluence value = Value + 1
 '''
 
@@ -57,7 +68,7 @@ BASIC_INFLUENCE
                 Focus type = "FOCUS_INFLUENCE"
             ]
             accountinglabel = "FOCUS_INFLUENCE_LABEL"
-            priority = [[EARLY_PRIORITY]]
+            priority = [[TARGET_EARLY_BEFORE_SCALING_PRIORITY]]
             effects = SetTargetInfluence value = Value + 4
 [[BASE_INFLUENCE_COSTS]]
 '''
@@ -73,7 +84,6 @@ VERY_BAD_INFLUENCE
                 Focus type = "FOCUS_INFLUENCE"
             ]
             accountinglabel = "VERY_BAD_INFLUENCE_LABEL"
-            priority = [[DEFAULT_PRIORITY]]
             effects = SetTargetInfluence value = Value*[[VERY_BAD_MULTIPLIER]]
 '''
 
@@ -88,7 +98,6 @@ BAD_INFLUENCE
                 Focus type = "FOCUS_INFLUENCE"
             ]
             accountinglabel = "BAD_INFLUENCE_LABEL"
-            priority = [[DEFAULT_PRIORITY]]
             effects = SetTargetInfluence value = Value*[[BAD_MULTIPLIER]]
 '''
 
@@ -107,7 +116,6 @@ GOOD_INFLUENCE
                 Focus type = "FOCUS_INFLUENCE"
             ]
             accountinglabel = "GOOD_INFLUENCE_LABEL"
-            priority = [[DEFAULT_PRIORITY]]
             effects = SetTargetInfluence value = Value*[[GOOD_MULTIPLIER]]
 '''
 
@@ -122,7 +130,6 @@ GREAT_INFLUENCE
                 Focus type = "FOCUS_INFLUENCE"
             ]
             accountinglabel = "GREAT_INFLUENCE_LABEL"
-            priority = [[DEFAULT_PRIORITY]]
             effects = SetTargetInfluence value = Value*[[GREAT_MULTIPLIER]]
 '''
 
@@ -137,6 +144,7 @@ ULTIMATE_INFLUENCE
                 Focus type = "FOCUS_INFLUENCE"
             ]
             accountinglabel = "ULTIMATE_INFLUENCE_LABEL"
-            priority = [[DEFAULT_PRIORITY]]
             effects = SetTargetInfluence value = Value*[[ULTIMATE_MULTIPLIER]]
 '''
+
+#include "/scripting/common/misc.macros"

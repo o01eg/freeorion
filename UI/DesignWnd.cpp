@@ -16,7 +16,7 @@
 #include "../util/ScopedTimer.h"
 #include "../util/Directories.h"
 #include "../Empire/Empire.h"
-#include "../client/human/HumanClientApp.h"
+#include "../client/human/GGHumanClientApp.h"
 #include "../universe/ConditionAll.h"
 #include "../universe/UniverseObject.h"
 #include "../universe/ShipDesign.h"
@@ -378,7 +378,7 @@ namespace {
         new_current_design.SetUUID(boost::uuids::random_generator()());
 
         auto order = std::make_shared<ShipDesignOrder>(empire_id, new_current_design);
-        HumanClientApp::GetApp()->Orders().IssueOrder(order);
+        GGHumanClientApp::GetApp()->Orders().IssueOrder(order);
 
         auto& current_manager = GetDisplayedDesignsManager();
         const auto& all_ids = current_manager.AllOrderedIDs();
@@ -399,13 +399,13 @@ namespace {
             return;
         }
 
-        const auto empire_id = HumanClientApp::GetApp()->EmpireID();
+        const auto empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
         manager.SetObsolete(design_id, obsolete);
 
         if (obsolete) {
             // make empire forget on the server
-            HumanClientApp::GetApp()->Orders().IssueOrder(
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<ShipDesignOrder>(empire_id, design_id, true));
         } else {
             const auto design = GetShipDesign(design_id);
@@ -416,7 +416,7 @@ namespace {
             }
 
             //make known to empire on server
-            HumanClientApp::GetApp()->Orders().IssueOrder(
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<ShipDesignOrder>(empire_id, design_id));
         }
     }
@@ -425,10 +425,10 @@ namespace {
     void DeleteFromDisplayedDesigns(const int design_id) {
         auto& manager = GetDisplayedDesignsManager();
 
-        const auto empire_id = HumanClientApp::GetApp()->EmpireID();
+        const auto empire_id = GGHumanClientApp::GetApp()->EmpireID();
         const auto maybe_obsolete = manager.IsObsolete(design_id);  // purpose of this obsolescence check is unclear... author didn't comment
         if (maybe_obsolete && !*maybe_obsolete)
-            HumanClientApp::GetApp()->Orders().IssueOrder(          // erase design id order : empire should forget this design
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(          // erase design id order : empire should forget this design
                 std::make_shared<ShipDesignOrder>(empire_id, design_id, true));
         manager.Remove(design_id);
     }
@@ -529,7 +529,7 @@ namespace {
 
         // If requested on the first turn copy all of the saved designs to the client empire.
         if (GetOptionsDB().Get<bool>("resource.shipdesign.saved.enabled")) {
-            const auto empire_id = HumanClientApp::GetApp()->EmpireID();
+            const auto empire_id = GGHumanClientApp::GetApp()->EmpireID();
             TraceLogger() << "Adding saved designs to empire.";
             // assume the saved designs are preferred by the user: add them to the front.
             // note that this also ensures correct ordering.
@@ -1042,7 +1042,7 @@ namespace {
 
     boost::optional<AvailabilityManager::DisplayedAvailabilies>
     AvailabilityManager::DisplayedDesignAvailability(const ShipDesign& design) const {
-        int empire_id = HumanClientApp::GetApp()->EmpireID();
+        int empire_id = GGHumanClientApp::GetApp()->EmpireID();
         const Empire* empire = GetEmpire(empire_id);  // may be nullptr
         bool available = empire ? empire->ShipDesignAvailable(design) : true;
 
@@ -1055,7 +1055,7 @@ namespace {
 
     boost::optional<AvailabilityManager::DisplayedAvailabilies>
     AvailabilityManager::DisplayedHullAvailability(const std::string& id) const {
-        int empire_id = HumanClientApp::GetApp()->EmpireID();
+        int empire_id = GGHumanClientApp::GetApp()->EmpireID();
         const Empire* empire = GetEmpire(empire_id);  // may be nullptr
         bool available = empire ? empire->ShipHullAvailable(id) : true;
 
@@ -1067,7 +1067,7 @@ namespace {
 
     boost::optional<AvailabilityManager::DisplayedAvailabilies>
     AvailabilityManager::DisplayedPartAvailability(const std::string& id) const {
-        int empire_id = HumanClientApp::GetApp()->EmpireID();
+        int empire_id = GGHumanClientApp::GetApp()->EmpireID();
         const Empire* empire = GetEmpire(empire_id);  // may be nullptr
         bool available = empire ? empire->ShipPartAvailable(id) : true;
 
@@ -1079,10 +1079,7 @@ namespace {
 
     boost::optional<AvailabilityManager::DisplayedAvailabilies>
     AvailabilityManager::DisplayedXAvailability(bool available, bool obsolete) const {
-        // TODO: C++17, Replace with structured binding auto [a, b, c] = m_availabilities;
-        const bool showing_obsolete = std::get<Availability::Obsolete>(m_availabilities);
-        const bool showing_available = std::get<Availability::Available>(m_availabilities);
-        const bool showing_future = std::get<Availability::Future>(m_availabilities);
+        const auto& [showing_obsolete, showing_available, showing_future] = m_availabilities;
 
         auto show = (
             (showing_obsolete && obsolete && showing_available && available)
@@ -1159,7 +1156,7 @@ void ShipDesignManager::StartGame(int empire_id, bool is_new_game) {
         DebugLogger() << "Remove default designs from empire";
         const auto ids = empire->ShipDesigns();
         for (const auto design_id : ids) {
-            HumanClientApp::GetApp()->Orders().IssueOrder(
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<ShipDesignOrder>(empire_id, design_id, true));
         }
     }
@@ -1451,8 +1448,7 @@ PartGroupsType PartsListBox::GroupAvailableDisplayableParts(const Empire* empire
     PartGroupsType part_groups;
 
     // loop through all possible parts
-    for (const auto& entry : GetShipPartManager()) {
-        const auto& part = entry.second;
+    for (const auto& [part_name, part] : GetShipPartManager()) {
         if (!part->Producible())
             continue;
 
@@ -1462,7 +1458,7 @@ PartGroupsType PartsListBox::GroupAvailableDisplayableParts(const Empire* empire
             continue;   // part of this class is not requested to be shown
 
         // Check if part satisfies availability and obsolecense
-        auto shown = m_availabilities_state.DisplayedPartAvailability(part->Name());
+        auto shown = m_availabilities_state.DisplayedPartAvailability(part_name);
         if (!shown)
             continue;
 
@@ -1599,7 +1595,7 @@ void PartsListBox::Populate() {
     const GG::X TOTAL_WIDTH = ClientWidth() - ClientUI::ScrollWidth();
     const int NUM_COLUMNS = std::max(1, Value(TOTAL_WIDTH / (SLOT_CONTROL_WIDTH + GG::X(PAD))));
 
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const Empire* empire = GetEmpire(empire_id);  // may be nullptr
 
     int cur_col = NUM_COLUMNS;
@@ -1835,45 +1831,49 @@ void DesignWnd::PartPalette::CompleteConstruction() {
     {
         // are there any parts of this class?
         bool part_of_this_class_exists = false;
-        for (const auto& entry : part_manager) {
-            if (const auto& part = entry.second) {
-                if (part->Class() == part_class) {
-                    part_of_this_class_exists = true;
-                    break;
-                }
+        for ([[maybe_unused]] auto& [ignored_part_name, part] : part_manager) {
+            (void)ignored_part_name;
+            if (part && part->Class() == part_class) {
+                part_of_this_class_exists = true;
+                break;
             }
         }
         if (!part_of_this_class_exists)
             continue;
 
-        m_class_buttons[part_class] = GG::Wnd::Create<CUIStateButton>(UserString(boost::lexical_cast<std::string>(part_class)), GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
+        m_class_buttons[part_class] = GG::Wnd::Create<CUIStateButton>(
+            UserString(boost::lexical_cast<std::string>(part_class)), GG::FORMAT_CENTER,
+            std::make_shared<CUILabelButtonRepresenter>());
         AttachChild(m_class_buttons[part_class]);
         m_class_buttons[part_class]->CheckedSignal.connect(
             boost::bind(&DesignWnd::PartPalette::ToggleClass, this, part_class, true));
     }
 
+
     // availability buttons
-    // TODO: C++17, Collect and replace with structured binding auto [a, b, c] = m_availabilities;
-    auto& m_obsolete_button = std::get<Availability::Obsolete>(m_availabilities_buttons);
-    m_obsolete_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_AVAILABILITY_OBSOLETE"), GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
-    AttachChild(m_obsolete_button);
-    m_obsolete_button->CheckedSignal.connect(
+    auto& [obsolete_button, available_button, unavailable_button] = m_availabilities_buttons;
+
+    obsolete_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_AVAILABILITY_OBSOLETE"),
+                                                      GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
+    AttachChild(obsolete_button);
+    obsolete_button->CheckedSignal.connect(
         boost::bind(&DesignWnd::PartPalette::ToggleAvailability, this, Availability::Obsolete));
-    m_obsolete_button->SetCheck(m_availabilities_state.GetAvailability(Availability::Obsolete));
+    obsolete_button->SetCheck(m_availabilities_state.GetAvailability(Availability::Obsolete));
 
-    auto& m_available_button = std::get<Availability::Available>(m_availabilities_buttons);
-    m_available_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_AVAILABILITY_AVAILABLE"), GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
-    AttachChild(m_available_button);
-    m_available_button->CheckedSignal.connect(
+    available_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_AVAILABILITY_AVAILABLE"),
+                                                       GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
+    AttachChild(available_button);
+    available_button->CheckedSignal.connect(
         boost::bind(&DesignWnd::PartPalette::ToggleAvailability, this, Availability::Available));
-    m_available_button->SetCheck(m_availabilities_state.GetAvailability(Availability::Available));
+    available_button->SetCheck(m_availabilities_state.GetAvailability(Availability::Available));
 
-    auto& m_unavailable_button = std::get<Availability::Future>(m_availabilities_buttons);
-    m_unavailable_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_AVAILABILITY_UNAVAILABLE"), GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
-    AttachChild(m_unavailable_button);
-    m_unavailable_button->CheckedSignal.connect(
+    unavailable_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_AVAILABILITY_UNAVAILABLE"),
+                                                         GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
+    AttachChild(unavailable_button);
+    unavailable_button->CheckedSignal.connect(
         boost::bind(&DesignWnd::PartPalette::ToggleAvailability, this, Availability::Future));
-    m_unavailable_button->SetCheck(m_availabilities_state.GetAvailability(Availability::Future));
+    unavailable_button->SetCheck(m_availabilities_state.GetAvailability(Availability::Future));
+
 
     // superfluous parts button
     m_superfluous_parts_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_REDUNDANT"), GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
@@ -1940,14 +1940,15 @@ void DesignWnd::PartPalette::DoLayout() {
     // place class buttons
     int col = NUM_CLASS_BUTTONS_PER_ROW;
     int row = -1;
-    for (auto& entry : m_class_buttons) {
+    for ([[maybe_unused]] auto& [ignored, button] : m_class_buttons) {
+        (void)ignored;  // quiet unused variable warnings
         if (col >= NUM_CLASS_BUTTONS_PER_ROW) {
             col = 0;
             ++row;
         }
         GG::Pt ul(BUTTON_EDGE_PAD + col*COL_OFFSET, BUTTON_EDGE_PAD + row*ROW_OFFSET);
         GG::Pt lr = ul + GG::Pt(BUTTON_WIDTH, BUTTON_HEIGHT);
-        entry.second->SizeMove(ul, lr);
+        button->SizeMove(ul, lr);
         ++col;
     }
 
@@ -1986,14 +1987,10 @@ void DesignWnd::PartPalette::DoLayout() {
         };
 
     //place availability buttons
-    // TODO: C++17, Replace with structured binding auto [a, b, c] = m_availabilities;
-    auto& m_obsolete_button = std::get<Availability::Obsolete>(m_availabilities_buttons);
-    auto& m_available_button = std::get<Availability::Available>(m_availabilities_buttons);
-    auto& m_unavailable_button = std::get<Availability::Future>(m_availabilities_buttons);
-
-    place_avail_button_adjacent(m_obsolete_button.get());
-    place_avail_button_adjacent(m_available_button.get());
-    place_avail_button_adjacent(m_unavailable_button.get());
+    auto& [obsolete_button, available_button, unavailable_button] = m_availabilities_buttons;
+    place_avail_button_adjacent(obsolete_button.get());
+    place_avail_button_adjacent(available_button.get());
+    place_avail_button_adjacent(unavailable_button.get());
 }
 
 void DesignWnd::PartPalette::HandleShipPartClicked(const ShipPart* part, GG::Flags<GG::ModKey> modkeys) {
@@ -2024,7 +2021,7 @@ void DesignWnd::PartPalette::HandleShipPartRightClicked(const ShipPart* part, co
     // create popup menu with a commands in it
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
-    const auto empire_id = HumanClientApp::GetApp()->EmpireID();
+    const auto empire_id = GGHumanClientApp::GetApp()->EmpireID();
     if (empire_id != ALL_EMPIRES)
         popup->AddMenuItem(GG::MenuItem(
                                (is_obsolete
@@ -2048,8 +2045,10 @@ void DesignWnd::PartPalette::ShowClass(ShipPartClass part_class, bool refresh_li
 
 void DesignWnd::PartPalette::ShowAllClasses(bool refresh_list) {
     m_parts_list->ShowAllClasses(refresh_list);
-    for (auto& entry : m_class_buttons)
-        entry.second->SetCheck();
+    for ([[maybe_unused]] auto& [ignored, button] : m_class_buttons) {
+        (void)ignored;  // quiet unused variable warnings
+        button->SetCheck();
+    }
 }
 
 void DesignWnd::PartPalette::HideClass(ShipPartClass part_class, bool refresh_list) {
@@ -2063,8 +2062,10 @@ void DesignWnd::PartPalette::HideClass(ShipPartClass part_class, bool refresh_li
 
 void DesignWnd::PartPalette::HideAllClasses(bool refresh_list) {
     m_parts_list->HideAllClasses(refresh_list);
-    for (auto& entry : m_class_buttons)
-        entry.second->SetCheck(false);
+    for ([[maybe_unused]] auto& [ignored, button] : m_class_buttons) {
+        (void)ignored;  // quiet unused variable warnings
+        button->SetCheck(false);
+    }
 }
 
 void DesignWnd::PartPalette::ToggleClass(ShipPartClass part_class, bool refresh_list) {
@@ -3066,7 +3067,7 @@ void CompletedDesignsListBox::BaseRightClicked(GG::ListBox::iterator it, const G
         edit_wnd->Run();
         const std::string& result = edit_wnd->Result();
         if (!result.empty() && result != design->Name()) {
-            HumanClientApp::GetApp()->Orders().IssueOrder(
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<ShipDesignOrder>(empire_id, design_id, result));
             design_row->SetDisplayName(design->Name());
         }
@@ -3365,30 +3366,29 @@ DesignWnd::BaseSelector::BaseSelector(const std::string& config_name) :
 {}
 
 void DesignWnd::BaseSelector::CompleteConstruction() {
-    // TODO: C++17, Collect and replace with structured binding auto [a, b, c] = m_availabilities;
-    auto& m_obsolete_button = std::get<Availability::Obsolete>(m_availabilities_buttons);
-    m_obsolete_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_AVAILABILITY_OBSOLETE"),
-                                                        GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
-    AttachChild(m_obsolete_button);
-    m_obsolete_button->CheckedSignal.connect(
+    auto& [obsolete_button, available_button, unavailable_button] = m_availabilities_buttons;
+
+    obsolete_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_AVAILABILITY_OBSOLETE"),
+                                                      GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
+    AttachChild(obsolete_button);
+    obsolete_button->CheckedSignal.connect(
         boost::bind(&DesignWnd::BaseSelector::ToggleAvailability, this, Availability::Obsolete));
-    m_obsolete_button->SetCheck(m_availabilities_state.GetAvailability(Availability::Obsolete));
+    obsolete_button->SetCheck(m_availabilities_state.GetAvailability(Availability::Obsolete));
 
-    auto& m_available_button = std::get<Availability::Available>(m_availabilities_buttons);
-    m_available_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_AVAILABILITY_AVAILABLE"),
-                                                         GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
-    AttachChild(m_available_button);
-    m_available_button->CheckedSignal.connect(
+    available_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_AVAILABILITY_AVAILABLE"),
+                                                       GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
+    AttachChild(available_button);
+    available_button->CheckedSignal.connect(
         boost::bind(&DesignWnd::BaseSelector::ToggleAvailability, this, Availability::Available));
-    m_available_button->SetCheck(m_availabilities_state.GetAvailability(Availability::Available));
+    available_button->SetCheck(m_availabilities_state.GetAvailability(Availability::Available));
 
-    auto& m_unavailable_button = std::get<Availability::Future>(m_availabilities_buttons);
-    m_unavailable_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_AVAILABILITY_UNAVAILABLE"),
-                                                           GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
-    AttachChild(m_unavailable_button);
-    m_unavailable_button->CheckedSignal.connect(
+    unavailable_button = GG::Wnd::Create<CUIStateButton>(UserString("PRODUCTION_WND_AVAILABILITY_UNAVAILABLE"),
+                                                         GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
+    AttachChild(unavailable_button);
+    unavailable_button->CheckedSignal.connect(
         boost::bind(&DesignWnd::BaseSelector::ToggleAvailability, this, Availability::Future));
-    m_unavailable_button->SetCheck(m_availabilities_state.GetAvailability(Availability::Future));
+    unavailable_button->SetCheck(m_availabilities_state.GetAvailability(Availability::Future));
+
 
     m_tabs = GG::Wnd::Create<GG::TabWnd>(GG::X(5), GG::Y(2), GG::X(10), GG::Y(10), ClientUI::GetFont(),
                                          ClientUI::WndColor(), ClientUI::TextColor());
@@ -3445,7 +3445,7 @@ void DesignWnd::BaseSelector::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
 void DesignWnd::BaseSelector::Reset() {
     ScopedTimer scoped_timer("BaseSelector::Reset");
 
-    const int empire_id = HumanClientApp::GetApp()->EmpireID();
+    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     SetEmpireShown(empire_id, false);
 
     if (auto base_box = dynamic_cast<BasesListBox*>(m_tabs->CurrentWnd()))
@@ -3519,16 +3519,12 @@ void DesignWnd::BaseSelector::DoLayout() {
     GG::Y top(TOP_PAD);
     GG::X left(LEFT_PAD);
 
-    // TODO: C++17, Replace with structured binding auto [a, b, c] = m_availabilities;
-    auto& m_obsolete_button = std::get<Availability::Obsolete>(m_availabilities_buttons);
-    auto& m_available_button = std::get<Availability::Available>(m_availabilities_buttons);
-    auto& m_unavailable_button = std::get<Availability::Future>(m_availabilities_buttons);
-
-    m_obsolete_button->SizeMove(GG::Pt(left, top), GG::Pt(left + BUTTON_WIDTH, top + BUTTON_HEIGHT));
+    auto& [obsolete_button, available_button, unavailable_button] = m_availabilities_buttons;
+    obsolete_button->SizeMove(GG::Pt(left, top), GG::Pt(left + BUTTON_WIDTH, top + BUTTON_HEIGHT));
     left = left + BUTTON_WIDTH + BUTTON_SEPARATION;
-    m_available_button->SizeMove(GG::Pt(left, top), GG::Pt(left + BUTTON_WIDTH, top + BUTTON_HEIGHT));
+    available_button->SizeMove(GG::Pt(left, top), GG::Pt(left + BUTTON_WIDTH, top + BUTTON_HEIGHT));
     left = left + BUTTON_WIDTH + BUTTON_SEPARATION;
-    m_unavailable_button->SizeMove(GG::Pt(left, top), GG::Pt(left + BUTTON_WIDTH, top + BUTTON_HEIGHT));
+    unavailable_button->SizeMove(GG::Pt(left, top), GG::Pt(left + BUTTON_WIDTH, top + BUTTON_HEIGHT));
     left = LEFT_PAD;
     top = top + BUTTON_HEIGHT + BUTTON_SEPARATION;
 
@@ -4181,7 +4177,7 @@ boost::optional<int> DesignWnd::MainPanel::GetReplacedDesignID() const
 { return m_replaced_design_id; }
 
 boost::optional<const ShipDesign*> DesignWnd::MainPanel::CurrentDesignIsRegistered() {
-    int empire_id = HumanClientApp::GetApp()->EmpireID();
+    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const auto empire = GetEmpire(empire_id);
     if (!empire) {
         ErrorLogger() << "DesignWnd::MainPanel::CurrentDesignIsRegistered couldn't get the current empire.";
@@ -4589,7 +4585,7 @@ void DesignWnd::MainPanel::DesignChanged() {
     m_replace_button->ClearBrowseInfoWnd();
     m_confirm_button->ClearBrowseInfoWnd();
 
-    int client_empire_id = HumanClientApp::GetApp()->EmpireID();
+    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
     m_disabled_by_name = false;
     m_disabled_by_part_conflict = false;
 
@@ -4905,12 +4901,12 @@ std::pair<int, boost::uuids::uuid> DesignWnd::MainPanel::AddDesign() {
 
         // Otherwise insert into current empire designs
         } else {
-            int empire_id = HumanClientApp::GetApp()->EmpireID();
+            int empire_id = GGHumanClientApp::GetApp()->EmpireID();
             const Empire* empire = GetEmpire(empire_id);
             if (!empire) return {INVALID_DESIGN_ID, boost::uuids::nil_generator()()};
 
             auto order = std::make_shared<ShipDesignOrder>(empire_id, design);
-            HumanClientApp::GetApp()->Orders().IssueOrder(order);
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(order);
             new_design_id = order->DesignID();
 
             auto& manager = GetDisplayedDesignsManager();
@@ -4924,7 +4920,7 @@ std::pair<int, boost::uuids::uuid> DesignWnd::MainPanel::AddDesign() {
 
         return std::make_pair(new_design_id, new_uuid);
 
-    } catch (std::invalid_argument&) {
+    } catch (const std::invalid_argument&) {
         ErrorLogger() << "DesignWnd::AddDesign tried to add an invalid ShipDesign";
         return {INVALID_DESIGN_ID, boost::uuids::nil_generator()()};
     }
@@ -4958,7 +4954,7 @@ void DesignWnd::MainPanel::ReplaceDesign() {
         const auto existing_design = CurrentDesignIsRegistered();
         if (current_maybe_design || existing_design) {
             auto& manager = GetDisplayedDesignsManager();
-            int empire_id = HumanClientApp::GetApp()->EmpireID();
+            int empire_id = GGHumanClientApp::GetApp()->EmpireID();
             int replaced_id = (*(current_maybe_design ? current_maybe_design : existing_design))->ID();
 
             if (new_design_id == INVALID_DESIGN_ID) return;
@@ -4967,7 +4963,7 @@ void DesignWnd::MainPanel::ReplaceDesign() {
             const auto maybe_obsolete = manager.IsObsolete(replaced_id);
             bool is_obsolete = maybe_obsolete && *maybe_obsolete;
             if (!is_obsolete)
-                HumanClientApp::GetApp()->Orders().IssueOrder(
+                GGHumanClientApp::GetApp()->Orders().IssueOrder(
                     std::make_shared<ShipDesignOrder>(empire_id, replaced_id, true));
 
             // Replace the old id in the manager.
@@ -5007,7 +5003,7 @@ void DesignWnd::CompleteConstruction() {
     m_part_palette = GG::Wnd::Create<PartPalette>(DES_PART_PALETTE_WND_NAME);
     m_base_selector = GG::Wnd::Create<BaseSelector>(DES_BASE_SELECTOR_WND_NAME);
     InitializeWindows();
-    HumanClientApp::GetApp()->RepositionWindowsSignal.connect(
+    GGHumanClientApp::GetApp()->RepositionWindowsSignal.connect(
         boost::bind(&DesignWnd::InitializeWindows, this));
 
     AttachChild(m_detail_panel);

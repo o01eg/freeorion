@@ -736,9 +736,8 @@ void GenerateStarlanes(int max_jumps_between_systems, int max_starlane_length) {
 
         // attempt removing lanes, but don't do so if it would make the systems
         // the lane connects too far apart
-        for (auto& sys_lanes_pair : potential_system_lanes) {
-            auto sys1_id = sys_lanes_pair.first;
-            for (auto& sys2_id : sys_lanes_pair.second) {
+        for (const auto& [sys1_id, sys1_lanes] : potential_system_lanes) {
+            for (auto& sys2_id : sys1_lanes) {
                 // TODO: skip cases where sys2 < sys1 since these should already
                 //       have been handled by previous loop iterations, since
                 //       all lanes should exist in both directions
@@ -764,7 +763,7 @@ void GenerateStarlanes(int max_jumps_between_systems, int max_starlane_length) {
     }
 
     DebugLogger() << "Initializing System Graph";
-    GetUniverse().InitializeSystemGraph();
+    GetUniverse().InitializeSystemGraph(Empires(), Objects());
 }
 
 void SetActiveMetersToTargetMaxCurrentValues(ObjectMap& object_map) {
@@ -875,7 +874,7 @@ void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data) {
         if (color_it != colors.end())
             colors.erase(color_it);
 
-        constexpr EmpireColor CLR_ZERO{0, 0, 0, 0};
+        constexpr EmpireColor CLR_ZERO{{0, 0, 0, 0}};
 
         // if no colour already set, do so automatically
         if (empire_colour == CLR_ZERO) {
@@ -885,10 +884,10 @@ void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data) {
                 colors.erase(colors.begin());
             } else {
                 // as a last resort, make up a colour
-                empire_colour = {static_cast<unsigned char>(RandInt(0, 255)),
-                                 static_cast<unsigned char>(RandInt(0, 255)),
-                                 static_cast<unsigned char>(RandInt(0, 255)),
-                                 255};
+                empire_colour = {{static_cast<unsigned char>(RandInt(0, 255)),
+                                  static_cast<unsigned char>(RandInt(0, 255)),
+                                  static_cast<unsigned char>(RandInt(0, 255)),
+                                  255}};
             }
         }
 

@@ -7,7 +7,7 @@ Special
     location = And [
         Planet
         Not Planet type = [Asteroids GasGiant Inferno]
-        Not Planet size = [tiny huge]
+        Not Planet size = [Tiny Huge]
         Not WithinStarlaneJumps jumps = 2 condition = And [
             System
             Contains And [
@@ -20,7 +20,7 @@ Special
         EffectsGroup
             scope = Source
             accountinglabel = "WORLDTREE_LABEL"
-            priority = [[LATE_PRIORITY]]
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
             effects = [
                 SetDetection value = Value + 10
                 SetMaxSupply value = Value + 1

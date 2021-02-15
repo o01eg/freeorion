@@ -195,27 +195,6 @@ namespace parse {
         //DebugLogger() << "after macro substitution text: " << text;
     }
 
-    bool read_file(const boost::filesystem::path& path, std::string& file_contents) {
-        boost::filesystem::ifstream ifs(path);
-        if (!ifs)
-            return false;
-
-        // skip byte order mark (BOM)
-        for (int BOM : {0xEF, 0xBB, 0xBF}) {
-            if (BOM != ifs.get()) {
-                // no header set stream back to start of file
-                ifs.seekg(0, std::ios::beg);
-                // and continue
-                break;
-            }
-        }
-
-        std::getline(ifs, file_contents, '\0');
-
-        // no problems?
-        return true;
-    }
-
     const sregex FILENAME_TEXT = -+_;   // any character, one or more times, not greedy
     const sregex FILENAME_INSERTION = bol >> "#include" >> *space >> "\"" >> (s1 = FILENAME_TEXT) >> "\"" >> *space >> _n;
 
@@ -298,7 +277,7 @@ namespace parse {
                 for (const boost::filesystem::path& file : match_list) {
                     if (files_included.insert(boost::filesystem::canonical(file)).second) {
                         std::string new_text;
-                        if (read_file(file, new_text)) {
+                        if (ReadFile(file, new_text)) {
                             new_text.append("\n");
                             dir_text.append(new_text);
                         } else {
@@ -309,7 +288,7 @@ namespace parse {
                 text = regex_replace(text, INCL_ONCE_SEARCH, dir_text, regex_constants::format_first_only);
             } else if (files_included.insert(boost::filesystem::canonical(match_path)).second) {
                 std::string file_content;
-                if (read_file(match_path, file_content)) {
+                if (ReadFile(match_path, file_content)) {
                     file_content.append("\n");
                     process_include_substitutions(file_content, match_path.parent_path(), files_included);
                     text = regex_replace(text, INCL_ONCE_SEARCH, file_content, regex_constants::format_first_only);
@@ -388,6 +367,7 @@ namespace parse {
         } else {
             retval =  (token >> '=');
         }
+        retval.name(token.definition());    // so that parse errors will log "expected LABEL_TEXT here"
         return retval;
     }
 
@@ -402,7 +382,7 @@ namespace parse {
 
         start %=
             -(
-                label(tok.Tags_)
+                label(tok.tags_)
                 >>  one_or_more_string_tokens
             )
             ;
@@ -421,7 +401,7 @@ namespace parse {
         unsigned char g,
         unsigned char b,
         unsigned char a)
-    { return {r, g, b, a}; }
+    { return {{r, g, b, a}}; }
 
     BOOST_PHOENIX_ADAPT_FUNCTION(ColorType, construct_color_, construct_color, 4)
 
@@ -479,8 +459,8 @@ namespace parse {
 
         start
             =  ( omit_[tok.Item_]
-            >    label(tok.Type_) > unlockable_item_type_enum
-            >    label(tok.Name_) > tok.string
+            >    label(tok.type_) > unlockable_item_type_enum
+            >    label(tok.name_) > tok.string
                ) [ _val = construct<UnlockableItem>(_1, _2) ]
             ;
 
@@ -507,7 +487,7 @@ namespace parse {
     {
         filename = path.string();
 
-        bool read_success = read_file(path, file_contents);
+        bool read_success = ReadFile(path, file_contents);
         if (!read_success) {
             ErrorLogger() << "Unable to open data file " << filename;
             return;

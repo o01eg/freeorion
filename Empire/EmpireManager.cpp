@@ -30,14 +30,17 @@ EmpireManager& EmpireManager::operator=(EmpireManager&& other) noexcept {
 EmpireManager::~EmpireManager()
 {}
 
+const EmpireManager::const_container_type& EmpireManager::GetEmpires() const
+{ return m_const_empire_map; }
+
 std::shared_ptr<const Empire> EmpireManager::GetEmpire(int id) const {
     auto it = m_const_empire_map.find(id);
     return it == m_const_empire_map.end() ? nullptr : it->second;
 }
 
-std::shared_ptr<const UniverseObject> EmpireManager::GetSource(int id) const {
+std::shared_ptr<const UniverseObject> EmpireManager::GetSource(int id, const ObjectMap& objects) const {
     auto it = m_const_empire_map.find(id);
-    return it != m_const_empire_map.end() ? it->second->Source() : nullptr;
+    return it != m_const_empire_map.end() ? it->second->Source(objects) : nullptr;
 }
 
 const std::string& EmpireManager::GetEmpireName(int id) const {
@@ -94,6 +97,9 @@ std::string EmpireManager::DumpDiplomacy() const {
     return retval;
 }
 
+const EmpireManager::container_type& EmpireManager::GetEmpires()
+{ return m_empire_map; }
+
 std::shared_ptr<Empire> EmpireManager::GetEmpire(int id) {
     iterator it = m_empire_map.find(id);
     return it == end() ? nullptr : it->second;
@@ -147,6 +153,9 @@ void EmpireManager::Clear() {
     m_empire_map.clear();
     m_empire_diplomatic_statuses.clear();
 }
+
+const EmpireManager::DiploStatusMap& EmpireManager::GetDiplomaticStatuses() const
+{ return m_empire_diplomatic_statuses; }
 
 DiplomaticStatus EmpireManager::GetDiplomaticStatus(int empire1, int empire2) const {
     if (empire1 == ALL_EMPIRES || empire2 == ALL_EMPIRES || empire1 == empire2)
@@ -385,7 +394,7 @@ inline EmpireColor HexClr(const std::string& hex_colour)
     if ((hex_colour.size() == 7 || hex_colour.size() == 9) &&
             '#' == iss.get() && !(iss >> std::hex >> rgba).fail())
     {
-        EmpireColor retval = EmpireColor{0, 0, 0, 255};
+        EmpireColor retval = EmpireColor{{0, 0, 0, 255}};
 
         if (hex_colour.size() == 7) {
             std::get<0>(retval) = (rgba >> 16) & 0xFF;
@@ -433,8 +442,8 @@ void InitEmpireColors(const boost::filesystem::path& path) {
 const std::vector<EmpireColor>& EmpireColors() {
     auto& colors = EmpireColorsNonConst();
     if (colors.empty()) {
-        colors = {  {  0, 255,   0, 255},    {  0,   0, 255, 255},    {255,   0,   0, 255},
-                    {  0, 255, 255, 255},    {255, 255,   0, 255},    {255,   0, 255, 255}};
+        colors = {{{ 0, 255,   0, 255}}, {{  0,   0, 255, 255}}, {{255,   0,   0, 255}},
+                 {{ 0, 255, 255, 255}},  {{255, 255,   0, 255}}, {{255,   0, 255, 255}}};
     }
     return colors;
 }

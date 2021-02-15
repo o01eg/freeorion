@@ -114,7 +114,7 @@ class AuthProvider:
                                  (player_name, auth, fo.get_galaxy_setup_data().gameUID))
                     for r in curs:
                         authenticated = not not r[0]
-                        role = self.default_roles.get(r[1])
+                        role = self.roles_symbols.get(r[1])
                         if role is not None:
                             roles = [role]
                         info("Player %s was accepted %r" % (player_name, authenticated))

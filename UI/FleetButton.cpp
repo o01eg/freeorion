@@ -176,7 +176,7 @@ void FleetButton::Refresh(SizeType size_type) {
     for (const auto& fleet : fleets) {
         if (fleet) {
             num_ships += fleet->NumShips();
-            if (!m_fleet_blockaded && fleet->Blockaded())
+            if (!m_fleet_blockaded && fleet->Blockaded(ScriptingContext{}))
                 m_fleet_blockaded = true;
         }
     }
@@ -302,6 +302,8 @@ void FleetButton::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
 }
 
 void FleetButton::LayoutIcons() {
+    const ScriptingContext context;
+
     GG::Pt middle = GG::Pt(Width() / 2, Height() / 2);
     for (auto& graphic : m_icons) {
         GG::SubTexture subtexture = graphic->GetTexture();
@@ -321,21 +323,21 @@ void FleetButton::LayoutIcons() {
 
     // refresh fleet button tooltip
     if (m_fleet_blockaded) {
-        std::shared_ptr<Fleet> fleet;
+        std::shared_ptr<const Fleet> fleet;
         std::string available_exits;
         int available_exits_count = 0;
 
         if (!m_fleets.empty())
             // can just pick first fleet because all fleets in system should have same exits
-            fleet = Objects().get<Fleet>(*m_fleets.begin());
+            fleet = context.ContextObjects().get<Fleet>(*m_fleets.begin());
         else
             return;
 
-        for (const auto& target_system_id : Objects().get<System>(fleet->SystemID())->StarlanesWormholes()) {
-            if (fleet->BlockadedAtSystem(fleet->SystemID(), target_system_id.first))
+        for (const auto& target_system_id : context.ContextObjects().get<System>(fleet->SystemID())->StarlanesWormholes()) {
+            if (fleet->BlockadedAtSystem(fleet->SystemID(), target_system_id.first, context))
                 continue;
 
-            if (auto target_system = Objects().get<System>(target_system_id.first).get()) {
+            if (auto target_system = context.ContextObjects().get<System>(target_system_id.first)) {
                 available_exits += "\n" + target_system->ApparentName(GGHumanClientApp::GetApp()->EmpireID());
                 available_exits_count++;
             }
@@ -434,11 +436,11 @@ std::vector<std::shared_ptr<GG::Texture>> FleetHeadIcons(
         if (!fleet)
             continue;
 
-        hasColonyShips  = hasColonyShips  || fleet->HasColonyShips();
-        hasOutpostShips = hasOutpostShips || fleet->HasOutpostShips();
-        hasTroopShips   = hasTroopShips   || fleet->HasTroopShips();
-        hasMonsters     = hasMonsters     || fleet->HasMonsters();
-        hasArmedShips   = hasArmedShips   || fleet->HasArmedShips() || fleet->HasFighterShips();
+        hasColonyShips  = hasColonyShips  || fleet->HasColonyShips(Objects());
+        hasOutpostShips = hasOutpostShips || fleet->HasOutpostShips(Objects());
+        hasTroopShips   = hasTroopShips   || fleet->HasTroopShips(Objects());
+        hasMonsters     = hasMonsters     || fleet->HasMonsters(Objects());
+        hasArmedShips   = hasArmedShips   || fleet->HasArmedShips(Objects()) || fleet->HasFighterShips(Objects());
     }
 
     // get file name main part depending on type of fleet

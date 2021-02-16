@@ -86,7 +86,7 @@ namespace {
     /// Returns UserString("ENC_COMBAT_UNKNOWN_OBJECT") if object_id is not found.
     std::string PublicNameLink(int empire_id, int object_id, const ObjectMap& objects) {
         if (auto object = objects.get(object_id)) {
-            const auto& name = object->PublicName(empire_id);
+            const auto& name = object->PublicName(empire_id, objects);
             const auto& tag = LinkTag(object->ObjectType());
             return WrapWithTagAndId(name, tag, object_id);
         } else {
@@ -646,9 +646,7 @@ std::string FightersDestroyedEvent::CombatLogDescription(int viewing_empire_id, 
         [&ss, &num_events_remaining, &events_to_show, &viewing_empire_id, &objects]
         (boost::optional<int> show_empire_id)
     {
-            int count;
-            int target_empire_id;
-            for (const auto& [target_empire_id, count] : events_to_show) {
+            for (auto& [target_empire_id, count] : events_to_show) {
                 // Skip if this is not the particular attacker requested
                 if (show_empire_id && *show_empire_id != target_empire_id)
                     continue;

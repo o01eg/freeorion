@@ -128,8 +128,7 @@ void Planet::Copy(std::shared_ptr<const UniverseObject> copied_object, int empir
     }
 }
 
-bool Planet::HostileToEmpire(int empire_id) const
-{
+bool Planet::HostileToEmpire(int empire_id, const EmpireManager& empires) const {
     if (OwnedBy(empire_id))
         return false;
 
@@ -143,7 +142,7 @@ bool Planet::HostileToEmpire(int empire_id) const
         return pop_meter && (pop_meter->Current() != 0.0f);
 
     // both empires are normal empires
-    return Empires().GetDiplomaticStatus(Owner(), empire_id) == DiplomaticStatus::DIPLO_WAR;
+    return empires.GetDiplomaticStatus(Owner(), empire_id) == DiplomaticStatus::DIPLO_WAR;
 }
 
 std::set<std::string> Planet::Tags() const {
@@ -506,7 +505,7 @@ std::vector<std::string> Planet::AvailableFoci() const {    // TODO: pass Script
     auto this_planet = std::dynamic_pointer_cast<const Planet>(UniverseObject::shared_from_this());
     if (!this_planet)
         return retval;
-    ScriptingContext context(this_planet);
+    const ScriptingContext context(this_planet);
     if (const auto* species = GetSpecies(this_planet->SpeciesName())) {
         retval.reserve(species->Foci().size());
         for (const auto& focus_type : species->Foci()) {

@@ -672,8 +672,8 @@ public:
         for (const auto& fleet : Objects().find<Fleet>(fleet_ids)) {
             if (!fleet)
                 continue;
-            if (fleet->Speed() > 20)
-                fixed_distances.insert(fleet->Speed());
+            if (fleet->Speed(Objects()) > 20)
+                fixed_distances.insert(fleet->Speed(Objects()));
             for (const auto& ship : Objects().find<Ship>(fleet->ShipIDs())) {
                 if (!ship)
                     continue;
@@ -2649,33 +2649,31 @@ void MapWnd::InitTurn() {
     //DebugLogger() << GetSupplyManager().Dump();
 
     Universe& universe = GetUniverse();
-    ObjectMap& objects = Objects();
+    ObjectMap& objects = universe.Objects(); // TODO: Get from universe directly
+    EmpireManager& empires = Empires();
 
     TraceLogger(effects) << "MapWnd::InitTurn initial:";
     for (auto obj : objects.all())
         TraceLogger(effects) << obj->Dump();
 
-    timer.EnterSection("system graph");
-    // FIXME: this is actually only needed when there was no mid-turn update
-    universe.InitializeSystemGraph(Empires(), objects);
-    universe.UpdateEmpireVisibilityFilteredSystemGraphsWithMainObjectMap(Empires());
-
     timer.EnterSection("meter estimates");
     // update effect accounting and meter estimates
-    universe.InitMeterEstimatesAndDiscrepancies(Empires());
+    universe.InitMeterEstimatesAndDiscrepancies(empires);
 
+    timer.EnterSection("orders");
     // if we've just loaded the game there may be some unexecuted orders, we
     // should reapply them now, so they are reflected in the UI, but do not
     // influence current meters or their discrepancies for this turn
     GGHumanClientApp::GetApp()->Orders().ApplyOrders();
 
+    timer.EnterSection("meter estimates");
     // redo meter estimates with unowned planets marked as owned by player, so accurate predictions of planet
     // population is available for currently uncolonized planets
-    GetUniverse().UpdateMeterEstimates(Empires());
+    GetUniverse().UpdateMeterEstimates(empires);
 
-    GetUniverse().ApplyAppearanceEffects(Empires());
+    GetUniverse().ApplyAppearanceEffects(empires);
 
-    timer.EnterSection("rendering");
+    timer.EnterSection("init rendering");
     // set up system icons, starlanes, galaxy gas rendering
     InitTurnRendering();
 
@@ -2791,7 +2789,7 @@ void MapWnd::InitTurn() {
 
 
     timer.EnterSection("update resource pools");
-    for (auto& entry : Empires())
+    for (auto& entry : empires)
         entry.second->UpdateResourcePools();
 
     timer.EnterSection("refresh government");
@@ -4537,17 +4535,22 @@ void MapWnd::SetFleetMovementLine(int fleet_id) {
     const Empire* empire = GetEmpire(fleet->Owner());
     if (empire)
         line_colour = empire->Color();
-    else if (fleet->Unowned() && fleet->HasMonsters())
+    else if (fleet->Unowned() && fleet->HasMonsters(Objects()))
         line_colour = GG::CLR_RED;
+
+    const ScriptingContext context;
 
     // create and store line
     auto route(fleet->TravelRoute());
-    auto path = fleet->MovePath(route, true, ScriptingContext());
+    auto path = fleet->MovePath(route, true, context);
     auto route_it = route.begin();
     if (!route.empty() && (++route_it) != route.end()) {
         //DebugLogger() << "MapWnd::SetFleetMovementLine fleet id " << fleet_id<<" checking for blockade at system "<< route.front() <<
         //    " with m_arrival_lane "<< fleet->ArrivalStarlane()<<" and next destination "<<*route_it;
-        if (fleet->SystemID() == route.front() && fleet->BlockadedAtSystem(route.front(), *route_it)) { //adjust ETAs if necessary
+        if (fleet->SystemID() == route.front() &&
+            fleet->BlockadedAtSystem(route.front(), *route_it, context))
+        {
+            //adjust ETAs if necessary
             //if (!route.empty() && fleet->SystemID()==route.front() && (++(path.begin()))->post_blockade) {
             //DebugLogger() << "MapWnd::SetFleetMovementLine fleet id " << fleet_id<<" blockaded at system "<< route.front() <<
             //    " with m_arrival_lane "<< fleet->ArrivalStarlane()<<" and next destination "<<*route_it;
@@ -4571,18 +4574,20 @@ void MapWnd::SetProjectedFleetMovementLine(int fleet_id, const std::list<int>& t
     if (fleet_id == INVALID_OBJECT_ID)
         return;
 
+    const ScriptingContext context;
+
     // ensure passed fleet exists
-    auto fleet = Objects().get<Fleet>(fleet_id);
+    auto fleet = context.ContextObjects().get<Fleet>(fleet_id);
     if (!fleet) {
         ErrorLogger() << "MapWnd::SetProjectedFleetMovementLine was passed invalid fleet id " << fleet_id;
         return;
     }
 
     //std::cout << "creating projected fleet movement line for fleet at (" << fleet->X() << ", " << fleet->Y() << ")" << std::endl;
-    const Empire* empire = GetEmpire(fleet->Owner());
+    auto empire = context.GetEmpire(fleet->Owner());
 
     // get move path to show.  if there isn't one, show nothing
-    auto path = fleet->MovePath(travel_route, true, ScriptingContext());
+    auto path = fleet->MovePath(travel_route, true, context);
 
 
 
@@ -4595,7 +4600,10 @@ void MapWnd::SetProjectedFleetMovementLine(int fleet_id, const std::list<int>& t
 
     auto route_it = travel_route.begin();
     if (!travel_route.empty() && (++route_it) != travel_route.end()) {
-        if (fleet->SystemID() == travel_route.front() && fleet->BlockadedAtSystem(travel_route.front(), *route_it)) { //adjust ETAs if necessary
+        if (fleet->SystemID() == travel_route.front() &&
+            fleet->BlockadedAtSystem(travel_route.front(), *route_it, context))
+        {
+            //adjust ETAs if necessary
             //if (!route.empty() && fleet->SystemID()==route.front() && (++(path.begin()))->post_blockade) {
             //DebugLogger() << "MapWnd::SetFleetMovementLine fleet id " << fleet_id<<" blockaded at system "<< route.front() <<
             //" with m_arrival_lane "<< fleet->ArrivalStarlane()<<" and next destination "<<*route_it;
@@ -7359,7 +7367,7 @@ namespace {
             WarnLogger() << "Invalid fleet or system";
             return OrderedFleetRouteType();
         }
-        if ((fleet->Fuel() < 1.0f) || !fleet->MovePath().empty()) {
+        if ((fleet->Fuel(Objects()) < 1.0f) || !fleet->MovePath().empty()) {
             WarnLogger() << "Fleet has no fuel or non-empty move path";
             return OrderedFleetRouteType();
         }
@@ -7452,7 +7460,7 @@ namespace {
             return false;
         }
 
-        int max_jumps = std::trunc(fleet->Fuel());
+        int max_jumps = std::trunc(fleet->Fuel(Objects()));
         if (max_jumps < 1) {
             TraceLogger() << "Not enough fuel " << std::to_string(max_jumps)
                           << " to move fleet " << std::to_string(fleet->ID());
@@ -7483,7 +7491,7 @@ namespace {
         }
 
         auto nearest_supply = GetNearestSupplyRoute(empire, fleet->SystemID(),
-                                                    std::trunc(fleet->Fuel()));
+                                                    std::trunc(fleet->Fuel(Objects())));
         if (nearest_supply.first > 0.0 && FleetRouteInRange(fleet, nearest_supply.second))
             return nearest_supply;
 
@@ -7505,7 +7513,7 @@ namespace {
         }
 
         auto num_jumps_resupply = JumpsForRoute(route.second);
-        int max_fleet_jumps = std::trunc(fleet->Fuel());
+        int max_fleet_jumps = std::trunc(fleet->Fuel(Objects()));
         if (num_jumps_resupply <= max_fleet_jumps) {
             GGHumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<FleetMoveOrder>(fleet->Owner(), fleet->ID(), *route.second.rbegin()));
@@ -7589,13 +7597,13 @@ namespace {
             return;
         }
 
-        if (std::trunc(fleet->Fuel()) < 1) {  // wait for fuel
+        if (std::trunc(fleet->Fuel(Objects())) < 1) {  // wait for fuel
             TraceLogger() << "Not enough fuel to move fleet " << std::to_string(fleet->ID());
             return;
         }
 
         // Determine if fleet should refuel
-        if (fleet->Fuel() < fleet->MaxFuel() &&
+        if (fleet->Fuel(Objects()) < fleet->MaxFuel(Objects()) &&
             !CanResupplyAfterDestination(fleet, route))
         {
             if (IssueFleetResupplyOrder(fleet)) {
@@ -7700,7 +7708,7 @@ void MapWnd::DispatchFleetsExploring() {
                 WarnLogger() << "Invalid fleet " << fleet_id;
                 continue;
             }
-            if (fleet->Fuel() < 1.0f)
+            if (fleet->Fuel(Objects()) < 1.0f)
                 continue;
 
             auto route = GetOrderedFleetRoute(fleet, unexplored_system);

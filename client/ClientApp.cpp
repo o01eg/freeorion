@@ -13,7 +13,7 @@
 
 ClientApp::ClientApp() :
     IApp(),
-    m_networking(new ClientNetworking()),
+    m_networking(std::make_shared<ClientNetworking>()),
     m_empire_id(ALL_EMPIRES),
     m_current_turn(INVALID_GAME_TURN)
 {}
@@ -139,7 +139,7 @@ std::string ClientApp::GetVisibleObjectName(std::shared_ptr<const UniverseObject
         return std::string();
     }
 
-    std::string name_text = object->PublicName(m_empire_id);
+    std::string name_text = object->PublicName(m_empire_id, m_universe.Objects());
     if (auto system = std::dynamic_pointer_cast<const System>(object))
         name_text = system->ApparentName(m_empire_id);
 

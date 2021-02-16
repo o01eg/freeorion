@@ -293,7 +293,7 @@ float ShipDesign::AdjustedAttack(float shield) const {
     int fighter_shots = std::min(available_fighters, fighter_launch_capacity);  // how many fighters launched in bout 1
     available_fighters -= fighter_shots;
     int launched_fighters = fighter_shots;
-    int num_bouts = GetGameRules().Get<int>("RULE_NUM_COMBAT_ROUNDS");
+    int num_bouts = GetGameRules().Get<int>("RULE_NUM_COMBAT_ROUNDS"); // TODO: get from ScriptingContext?
     int remaining_bouts = num_bouts - 2;  // no attack for first round, second round already added
     while (remaining_bouts > 0) {
         int fighters_launched_this_bout = std::min(available_fighters, fighter_launch_capacity);
@@ -396,11 +396,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id) const { // T
         return false;
     }
     // evaluate using location as the source, as it should be an object owned by this empire.
-    ScriptingContext location_as_source_context(location, location, Objects(),
-                                                GetUniverse().GetEmpireObjectVisibility(),
-                                                GetUniverse().GetEmpireObjectVisibilityTurnMap(),
-                                                Empires().GetEmpires(),
-                                                Empires().GetDiplomaticStatuses());
+    ScriptingContext location_as_source_context(location, location);
     if (!hull->Location()->Eval(location_as_source_context, location))
         return false;
 

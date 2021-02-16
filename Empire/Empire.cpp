@@ -797,7 +797,9 @@ float Empire::ProductionStatus(int i) const {
 bool Empire::HasExploredSystem(int ID) const
 { return m_explored_systems.count(ID); }
 
-bool Empire::ProducibleItem(BuildType build_type, int location_id, const ObjectMap& objects) const {
+bool Empire::ProducibleItem(BuildType build_type, int location_id,
+                            const ScriptingContext& context) const
+{
     if (build_type == BuildType::BT_SHIP)
         throw std::invalid_argument("Empire::ProducibleItem was passed BuildType BT_SHIP with no further parameters, but ship designs are tracked by number");
 
@@ -808,7 +810,7 @@ bool Empire::ProducibleItem(BuildType build_type, int location_id, const ObjectM
         return false;
 
     // must own the production location...
-    auto location = objects.get(location_id);
+    auto location = context.ContextObjects().get(location_id);
     if (!location) {
         WarnLogger() << "Empire::ProducibleItem for BT_STOCKPILE unable to get location object with id " << location_id;
         return false;
@@ -829,7 +831,9 @@ bool Empire::ProducibleItem(BuildType build_type, int location_id, const ObjectM
     }
 }
 
-bool Empire::ProducibleItem(BuildType build_type, const std::string& name, int location, const ObjectMap& objects) const {
+bool Empire::ProducibleItem(BuildType build_type, const std::string& name, int location,
+                            const ScriptingContext& context) const
+{
     // special case to check for ships being passed with names, not design ids
     if (build_type == BuildType::BT_SHIP)
         throw std::invalid_argument("Empire::ProducibleItem was passed BuildType BT_SHIP with a name, but ship designs are tracked by number");
@@ -844,13 +848,13 @@ bool Empire::ProducibleItem(BuildType build_type, const std::string& name, int l
     if (!building_type || !building_type->Producible())
         return false;
 
-    auto build_location = objects.get(location);
+    auto build_location = context.ContextObjects().get(location);
     if (!build_location)
         return false;
 
     if (build_type == BuildType::BT_BUILDING) {
         // specified location must be a valid production location for that building type
-        return building_type->ProductionLocation(m_id, location);
+        return building_type->ProductionLocation(m_id, location, context);
 
     } else {
         ErrorLogger() << "Empire::ProducibleItem was passed an invalid BuildType";
@@ -858,7 +862,9 @@ bool Empire::ProducibleItem(BuildType build_type, const std::string& name, int l
     }
 }
 
-bool Empire::ProducibleItem(BuildType build_type, int design_id, int location, const ObjectMap& objects) const {
+bool Empire::ProducibleItem(BuildType build_type, int design_id, int location,
+                            const ScriptingContext& context) const
+{
     // special case to check for buildings being passed with ids, not names
     if (build_type == BuildType::BT_BUILDING)
         throw std::invalid_argument("Empire::ProducibleItem was passed BuildType BT_BUILDING with a design id number, but buildings are tracked by name");
@@ -874,7 +880,7 @@ bool Empire::ProducibleItem(BuildType build_type, int design_id, int location, c
     if (!ship_design || !ship_design->Producible())
         return false;
 
-    auto build_location = objects.get(location);
+    auto build_location = context.ContextObjects().get(location);
     if (!build_location) return false;
 
     if (build_type == BuildType::BT_SHIP) {
@@ -887,20 +893,22 @@ bool Empire::ProducibleItem(BuildType build_type, int design_id, int location, c
     }
 }
 
-bool Empire::ProducibleItem(const ProductionQueue::ProductionItem& item, int location, const ObjectMap& objects) const {
+bool Empire::ProducibleItem(const ProductionQueue::ProductionItem& item, int location,
+                            const ScriptingContext& context) const
+{
     if (item.build_type == BuildType::BT_BUILDING)
-        return ProducibleItem(item.build_type, item.name, location, objects);
+        return ProducibleItem(item.build_type, item.name, location, context);
     else if (item.build_type == BuildType::BT_SHIP)
-        return ProducibleItem(item.build_type, item.design_id, location, objects);
+        return ProducibleItem(item.build_type, item.design_id, location, context);
     else if (item.build_type == BuildType::BT_STOCKPILE)
-        return ProducibleItem(item.build_type, location, objects);
+        return ProducibleItem(item.build_type, location, context);
     else
         throw std::invalid_argument("Empire::ProducibleItem was passed a ProductionItem with an invalid BuildType");
     return false;
 }
 
 bool Empire::EnqueuableItem(BuildType build_type, const std::string& name,
-                            int location, const ObjectMap& objects) const
+                            int location, const ScriptingContext& context) const
 {
     if (build_type != BuildType::BT_BUILDING)
         return false;
@@ -909,23 +917,23 @@ bool Empire::EnqueuableItem(BuildType build_type, const std::string& name,
     if (!building_type || !building_type->Producible())
         return false;
 
-    auto build_location = objects.get(location);
+    auto build_location = context.ContextObjects().get(location);
     if (!build_location)
         return false;
 
     // specified location must be a valid production location for that building type
-    return building_type->EnqueueLocation(m_id, location);
+    return building_type->EnqueueLocation(m_id, location, context);
 }
 
 bool Empire::EnqueuableItem(const ProductionQueue::ProductionItem& item, int location,
-                            const ObjectMap& objects) const
+                            const ScriptingContext& context) const
 {
     if (item.build_type == BuildType::BT_BUILDING)
-        return EnqueuableItem(item.build_type, item.name, location, objects);
+        return EnqueuableItem(item.build_type, item.name, location, context);
     else if (item.build_type == BuildType::BT_SHIP)      // ships don't have a distinction between enqueuable and producible
-        return ProducibleItem(item.build_type, item.design_id, location, objects);
+        return ProducibleItem(item.build_type, item.design_id, location, context);
     else if (item.build_type == BuildType::BT_STOCKPILE) // stockpile does not have a distinction between enqueuable and producible
-        return ProducibleItem(item.build_type, location, objects);
+        return ProducibleItem(item.build_type, location, context);
     else
         throw std::invalid_argument("Empire::ProducibleItem was passed a ProductionItem with an invalid BuildType");
     return false;
@@ -1071,8 +1079,8 @@ void Empire::UpdateUnobstructedFleets(ObjectMap& objects, const std::set<int>& k
     }
 }
 
-void Empire::UpdateSupplyUnobstructedSystems(bool precombat /*=false*/) {
-    Universe& universe = GetUniverse();
+void Empire::UpdateSupplyUnobstructedSystems(const ScriptingContext& context, bool precombat /*=false*/) {
+    const Universe& universe = context.ContextUniverse();
 
     // get ids of systems partially or better visible to this empire.
     // TODO: make a UniverseObjectVisitor for objects visible to an empire at a specified visibility or greater
@@ -1081,30 +1089,33 @@ void Empire::UpdateSupplyUnobstructedSystems(bool precombat /*=false*/) {
     std::set<int> known_systems_set;
 
     // exclude systems known to have been destroyed (or rather, include ones that aren't known to be destroyed)
-    for (const auto& sys : EmpireKnownObjects(this->EmpireID()).all<System>())
+    for (const auto& sys : universe.EmpireKnownObjects(this->EmpireID()).all<System>())
         if (!known_destroyed_objects.count(sys->ID()))
             known_systems_set.emplace(sys->ID());
-    UpdateSupplyUnobstructedSystems(known_systems_set, precombat);
+    UpdateSupplyUnobstructedSystems(context, known_systems_set, precombat);
 }
 
-void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems, bool precombat) {  // TODO: pass and use ScriptingContext
+void Empire::UpdateSupplyUnobstructedSystems(const ScriptingContext& context,
+                                             const std::set<int>& known_systems,
+                                             bool precombat)
+{
     TraceLogger(supply) << "UpdateSupplyUnobstructedSystems (allowing supply propagation) for empire " << m_id;
     m_supply_unobstructed_systems.clear();
 
     // get systems with historically at least partial visibility
     std::set<int> systems_with_at_least_partial_visibility_at_some_point;
     for (int system_id : known_systems) {
-        const auto& vis_turns = GetUniverse().GetObjectVisibilityTurnMapByEmpire(system_id, m_id);
+        const auto& vis_turns = context.ContextUniverse().GetObjectVisibilityTurnMapByEmpire(system_id, m_id);
         if (vis_turns.count(Visibility::VIS_PARTIAL_VISIBILITY))
             systems_with_at_least_partial_visibility_at_some_point.emplace(system_id);
     }
 
     // get all fleets, or just those visible to this client's empire
-    const auto& known_destroyed_objects = GetUniverse().EmpireKnownDestroyedObjectIDs(this->EmpireID());
+    const auto& known_destroyed_objects = context.ContextUniverse().EmpireKnownDestroyedObjectIDs(this->EmpireID());
 
     // get empire supply ranges
     std::map<int, std::map<int, float>> empire_system_supply_ranges;
-    for (const auto& entry : Empires()) {
+    for (const auto& entry : context.Empires()) {
         const auto& empire = entry.second;
         empire_system_supply_ranges[entry.first] = empire->SystemSupplyRanges();
     }
@@ -1124,7 +1135,7 @@ void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems,
     std::set<int> unrestricted_friendly_systems;
     std::set<int> systems_containing_obstructing_objects;
     std::set<int> unrestricted_obstruction_systems;
-    for (auto& fleet : GetUniverse().Objects().all<Fleet>()) {
+    for (auto& fleet : context.ContextObjects().all<Fleet>()) {
         int system_id = fleet->SystemID();
         if (system_id == INVALID_OBJECT_ID) {
             continue;   // not in a system, so can't affect system obstruction
@@ -1135,9 +1146,9 @@ void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems,
         TraceLogger(supply) << "Fleet " << fleet->ID() << " is in system " << system_id
                             << " with next system " << fleet->NextSystemID()
                             << " and is owned by " << fleet->Owner()
-                            << " armed: " << fleet->HasArmedShips()
+                            << " armed: " << fleet->HasArmedShips(context.ContextObjects())
                             << " and obstructive: " << fleet->Obstructive();
-        if (fleet->HasArmedShips() && fleet->Obstructive()) {
+        if (fleet->HasArmedShips(context.ContextObjects()) && fleet->Obstructive()) {
             if (fleet->OwnedBy(m_id)) {
                 if (fleet->NextSystemID() == INVALID_OBJECT_ID || fleet->NextSystemID() == fleet->SystemID()) {
                     systems_containing_friendly_fleets.insert(system_id);
@@ -1148,7 +1159,8 @@ void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems,
                 }
             } else if (fleet->NextSystemID() == INVALID_OBJECT_ID || fleet->NextSystemID() == fleet->SystemID()) {
                 int fleet_owner = fleet->Owner();
-                bool fleet_at_war = fleet_owner == ALL_EMPIRES || Empires().GetDiplomaticStatus(m_id, fleet_owner) == DiplomaticStatus::DIPLO_WAR;
+                bool fleet_at_war = fleet_owner == ALL_EMPIRES ||
+                                    context.ContextDiploStatus(m_id, fleet_owner) == DiplomaticStatus::DIPLO_WAR;
                 // newly created ships are not allowed to block supply since they have not even potentially gone
                 // through a combat round at the present location.  Potential sources for such new ships are monsters
                 // created via Effect.  (Ships/fleets constructed by empires are currently created at a later stage of
@@ -1194,7 +1206,7 @@ void Empire::UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems,
 
 
     // check each potential supplyable system for whether it can propagate supply.
-    for (const auto& sys : Objects().find<System>(known_systems)) {
+    for (const auto& sys : context.ContextObjects().find<System>(known_systems)) {
         if (!sys)
             continue;
 
@@ -2090,13 +2102,11 @@ std::vector<std::string> Empire::CheckResearchProgress() {
     return to_erase_from_queue_and_grant_next_turn;
 }
 
-void Empire::CheckProductionProgress(Universe& universe) {  // or pass full ScriptingContext?
+void Empire::CheckProductionProgress(ScriptingContext& context) {
     DebugLogger() << "========Empire::CheckProductionProgress=======";
     // following commented line should be redundant, as previous call to
     // UpdateResourcePools should have generated necessary info
     // m_production_queue.Update();
-
-    ObjectMap& objects = universe.Objects();
 
     std::map<int, std::vector<std::shared_ptr<Ship>>> system_new_ships;
     std::map<int, int> new_ship_rally_point_ids;
@@ -2111,10 +2121,6 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
     // cost and result in it not being finished that turn.
     std::map<std::pair<ProductionQueue::ProductionItem, int>, std::pair<float, int>>
         queue_item_costs_and_times;
-
-    ScriptingContext context{objects,
-                             universe.GetEmpireObjectVisibility(),
-                             universe.GetEmpireObjectVisibilityTurnMap()};  // Pass and use EmpireManager?
 
     for (auto& elem : m_production_queue) {
         // for items that don't depend on location, only store cost/time once
@@ -2180,14 +2186,14 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
                 build_description = "unknown build type";
         }
 
-        auto build_location = objects.get(elem.location);
+        auto build_location = context.ContextObjects().get(elem.location);
         if (!build_location || (elem.item.build_type == BuildType::BT_BUILDING &&
                                 build_location->ObjectType() != UniverseObjectType::OBJ_PLANET))
         {
             ErrorLogger() << "Couldn't get valid build location for completed " << build_description;
             continue;
         }
-        auto system = objects.get<System>(build_location->SystemID());
+        auto system = context.ContextObjects().get<System>(build_location->SystemID());
         // TODO: account for shipyards and/or other ship production
         // sites that are in interstellar space, if needed
         if (!system) {
@@ -2198,7 +2204,7 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
         // check location condition before each item is created, so
         // that items being produced can prevent subsequent
         // completions on the same turn from going through
-        if (!this->ProducibleItem(elem.item, elem.location)) {
+        if (!this->ProducibleItem(elem.item, elem.location, context)) {
             DebugLogger() << "Location test failed for " << build_description << " at location " << build_location->Name();
             continue;
         }
@@ -2211,12 +2217,12 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
 
         // only if consumed resources are available, then item can be completd
         bool consumption_impossible = false;
-        std::map<std::string, std::map<int, float>> sc = elem.item.CompletionSpecialConsumption(elem.location);
+        std::map<std::string, std::map<int, float>> sc = elem.item.CompletionSpecialConsumption(elem.location); // TODO: pass context
         for (auto& special_type : sc) {
             if (consumption_impossible)
                 break;
             for (auto& special_meter : special_type.second) {
-                auto obj = objects.get(special_meter.first);
+                auto obj = context.ContextObjects().get(special_meter.first);
                 float capacity = obj ? obj->SpecialCapacity(special_type.first) : 0.0f;
                 if (capacity < special_meter.second * elem.blocksize) {
                     consumption_impossible = true;
@@ -2224,12 +2230,12 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
                 }
             }
         }
-        auto mc = elem.item.CompletionMeterConsumption(elem.location);
+        auto mc = elem.item.CompletionMeterConsumption(elem.location); // TODO: pass context
         for (auto& meter_type : mc) {
             if (consumption_impossible)
                 break;
             for (auto& object_meter : meter_type.second) {
-                auto obj = objects.get(object_meter.first);
+                auto obj = context.ContextObjects().get(object_meter.first);
                 const Meter* meter = obj ? obj->GetMeter(meter_type.first) : nullptr;
                 if (!meter || meter->Current() < object_meter.second * elem.blocksize) {
                     consumption_impossible = true;
@@ -2260,7 +2266,7 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
         // consume the item's special and meter consumption
         for (auto& special_type : sc) {
             for (auto& special_meter : special_type.second) {
-                auto obj = objects.get(special_meter.first);
+                auto obj = context.ContextObjects().get(special_meter.first);
                 if (!obj)
                     continue;
                 if (!obj->HasSpecial(special_type.first))
@@ -2272,7 +2278,7 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
         }
         for (auto& meter_type : mc) {
             for (const auto& object_meter : meter_type.second) {
-                auto obj = objects.get(object_meter.first);
+                auto obj = context.ContextObjects().get(object_meter.first);
                 if (!obj)
                     continue;
                 Meter*meter = obj->GetMeter(meter_type.first);
@@ -2289,10 +2295,10 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
         // create actual thing(s) being produced
         switch (elem.item.build_type) {
         case BuildType::BT_BUILDING: {
-            auto planet = objects.get<Planet>(elem.location);
+            auto planet = context.ContextObjects().get<Planet>(elem.location);
 
             // create new building
-            auto building = universe.InsertNew<Building>(m_id, elem.item.name, m_id);
+            auto building = context.ContextUniverse().InsertNew<Building>(m_id, elem.item.name, m_id);
             planet->AddBuilding(building->ID());
             building->SetPlanetID(planet->ID());
             system->Insert(building);
@@ -2322,7 +2328,7 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
                 species_name = location_pop_center->SpeciesName();
             else if (auto location_ship = std::dynamic_pointer_cast<const Ship>(build_location))
                 species_name = location_ship->SpeciesName();
-            else if (auto capital_planet = objects.get<Planet>(this->CapitalID()))
+            else if (auto capital_planet = context.ContextObjects().get<Planet>(this->CapitalID()))
                 species_name = capital_planet->SpeciesName();
             // else give up...
             if (species_name.empty()) {
@@ -2342,7 +2348,7 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
 
             for (int count = 0; count < elem.blocksize; count++) {
                 // create ship
-                ship = universe.InsertNew<Ship>(m_id, elem.item.design_id, species_name, m_id);
+                ship = context.ContextUniverse().InsertNew<Ship>(m_id, elem.item.design_id, species_name, m_id);
                 system->Insert(ship);
 
                 // record ship production in empire stats
@@ -2405,7 +2411,7 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
 
     // create fleets for new ships and put ships into fleets
     for (auto& entry : system_new_ships) {
-        auto system = objects.get<System>(entry.first);
+        auto system = context.ContextObjects().get<System>(entry.first);
         if (!system) {
             ErrorLogger() << "Couldn't get system with id " << entry.first << " for creating new fleets for newly produced ships";
             continue;
@@ -2454,7 +2460,7 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
                 std::shared_ptr<Fleet> fleet;
 
                 if (!individual_fleets) {
-                    fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(), m_id);
+                    fleet = context.ContextUniverse().InsertNew<Fleet>("", system->X(), system->Y(), m_id);
 
                     system->Insert(fleet);
                     // set prev system to prevent conflicts with CalculateRouteTo used for
@@ -2470,7 +2476,7 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
 
                 for (auto& ship : ships) {
                     if (individual_fleets) {
-                        fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(), m_id);
+                        fleet = context.ContextUniverse().InsertNew<Fleet>("", system->X(), system->Y(), m_id);
 
                         system->Insert(fleet);
                         // set prev system to prevent conflicts with CalculateRouteTo used for
@@ -2481,26 +2487,26 @@ void Empire::CheckProductionProgress(Universe& universe) {  // or pass full Scri
                         // set invalid arrival starlane so that fleet won't necessarily be free from blockades
                         fleet->SetArrivalStarlane(INVALID_OBJECT_ID);
 
-                        fleets.emplace_back(fleet);
+                        fleets.push_back(fleet);
                     }
-                    ship_ids.emplace_back(ship->ID());
+                    ship_ids.push_back(ship->ID());
                     fleet->AddShips({ship->ID()});
                     ship->SetFleetID(fleet->ID());
                 }
 
                 for (auto& next_fleet : fleets) {
                     // rename fleet, given its id and the ship that is in it
-                    next_fleet->Rename(next_fleet->GenerateFleetName());
-                    FleetAggression new_aggr = next_fleet->HasArmedShips() ?
+                    next_fleet->Rename(next_fleet->GenerateFleetName(context.ContextObjects()));
+                    FleetAggression new_aggr = next_fleet->HasArmedShips(context.ContextObjects()) ?
                         FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_DEFENSIVE;
                     next_fleet->SetAggression(new_aggr);
 
                     if (rally_point_id != INVALID_OBJECT_ID) {
-                        if (objects.get<System>(rally_point_id)) {
-                            next_fleet->CalculateRouteTo(rally_point_id);
-                        } else if (auto rally_obj = objects.get(rally_point_id)) {
-                            if (objects.get<System>(rally_obj->SystemID()))
-                                next_fleet->CalculateRouteTo(rally_obj->SystemID());
+                        if (context.ContextObjects().get<System>(rally_point_id)) {
+                            next_fleet->CalculateRouteTo(rally_point_id, context.ContextUniverse());
+                        } else if (auto rally_obj = context.ContextObjects().get(rally_point_id)) {
+                            if (context.ContextObjects().get<System>(rally_obj->SystemID()))
+                                next_fleet->CalculateRouteTo(rally_obj->SystemID(), context.ContextUniverse());
                         } else {
                             ErrorLogger() << "Unable to find system to route to with rally point id: " << rally_point_id;
                         }

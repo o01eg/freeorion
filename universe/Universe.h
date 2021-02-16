@@ -108,8 +108,8 @@ public:
 
 
     /** Returns objects in this Universe. */
-    const ObjectMap&        Objects() const { return m_objects; }
-    ObjectMap&              Objects()       { return m_objects; }
+    const ObjectMap&        Objects() const { return *m_objects; }
+    ObjectMap&              Objects()       { return *m_objects; }
 
     /** Returns latest known state of objects for the Empire with
       * id \a empire_id or the true / complete state of all objects in this
@@ -184,7 +184,7 @@ public:
     /** Returns map, indexed by object id, to map, indexed by MeterType,
       * to vector of EffectAccountInfo for the meter, in order effects
       * were applied to the meter. */
-    const Effect::AccountingMap& GetEffectAccountingMap() const {return m_effect_accounting_map;}
+    const Effect::AccountingMap& GetEffectAccountingMap() const { return m_effect_accounting_map; }
 
     const std::map<std::string, std::map<int, std::map<int, double>>>&
     GetStatRecords() const { return m_stat_records; }
@@ -355,7 +355,7 @@ public:
       * is true, and (re)enables UniverseObjectSignals if \a inhibit is false. */
     void InhibitUniverseObjectSignals(bool inhibit = true);
 
-    void UpdateStatRecords();
+    void UpdateStatRecords(EmpireManager& empires);
 
     /** Returns true if UniverseOjbectSignals are inhibited, false otherwise. */
     const bool& UniverseObjectSignalsInhibited();
@@ -455,7 +455,7 @@ private:
     /** Clears \a source_effects_targets_causes, and then populates with all
       * EffectsGroups and their targets in the known universe. */
     void GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsAndCausesVec>& source_effects_targets_causes,
-                              EmpireManager& empires,
+                              const EmpireManager& empires,
                               bool only_meter_effects = false) const;
 
     /** Removes entries in \a source_effects_targets_causes about effects groups acting
@@ -464,7 +464,7 @@ private:
       * \a target_objects is empty then default target candidates will be used. */
     void GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsAndCausesVec>& source_effects_targets_causes,
                               const std::vector<int>& target_objects,
-                              EmpireManager& empires,
+                              const EmpireManager& empires,
                               bool only_meter_effects = false) const;
 
     void ResetObjectMeters(const std::vector<std::shared_ptr<UniverseObject>>& objects,
@@ -489,7 +489,7 @@ private:
       * vector is passed, it will instead update all existing objects. */
     void UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec, EmpireManager& empires, bool do_accounting);
 
-    ObjectMap                       m_objects;                          ///< map from object id to UniverseObjects in the universe.  for the server: all of them, up to date and true information about object is stored;  for clients, only limited information based on what the client knows about is sent.
+    std::unique_ptr<ObjectMap>      m_objects;                          ///< map from object id to UniverseObjects in the universe.  for the server: all of them, up to date and true information about object is stored;  for clients, only limited information based on what the client knows about is sent.
     EmpireObjectMap                 m_empire_latest_known_objects;      ///< map from empire id to (map from object id to latest known information about each object by that empire)
 
     std::set<int>                   m_destroyed_object_ids;             ///< all ids of objects that have been destroyed (on server) or that a player knows were destroyed (on clients)

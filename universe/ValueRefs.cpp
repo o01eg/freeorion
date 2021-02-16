@@ -33,6 +33,18 @@
 #include "../util/MultiplayerCommon.h"
 #include "../util/Random.h"
 
+#if BOOST_VERSION >= 106500
+// define needed on Windows due to conflict with windows.h and std::min and std::max
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+// define needed in GCC
+#  ifndef _GNU_SOURCE
+#    define _GNU_SOURCE
+#  endif
+
+#  include <boost/stacktrace.hpp>
+#endif
 
 std::string DoubleToString(double val, int digits, bool always_show_sign);
 bool UserStringExists(const std::string& str);
@@ -40,17 +52,22 @@ bool UserStringExists(const std::string& str);
 FO_COMMON_API extern const int INVALID_DESIGN_ID;
 
 namespace {
+    auto StackTrace() {
+#if BOOST_VERSION >= 106500
+        std::stringstream ss;
+        ss << "stacktrace:\n" << boost::stacktrace::stacktrace();
+        return ss.str();
+#else
+        return "";
+#endif
+    }
+
     std::shared_ptr<const UniverseObject> FollowReference(
         std::vector<std::string>::const_iterator first,
         std::vector<std::string>::const_iterator last,
         ValueRef::ReferenceType ref_type,
         const ScriptingContext& context)
     {
-        //DebugLogger() << "FollowReference: source: " << (context.source ? context.source->Name() : "0")
-        //              << " target: " << (context.effect_target ? context.effect_target->Name() : "0")
-        //              << " local c: " << (context.condition_local_candidate ? context.condition_local_candidate->Name() : "0")
-        //              << " root c: " << (context.condition_root_candidate ? context.condition_root_candidate->Name() : "0");
-
         std::shared_ptr<const UniverseObject> obj;
         switch (ref_type) {
         case ValueRef::ReferenceType::NON_OBJECT_REFERENCE:                return context.condition_local_candidate;   break;
@@ -70,7 +87,19 @@ namespace {
             case ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE:
             default:                                                           type_string = "LocalCandidate"; break;
             }
-            ErrorLogger() << "FollowReference : top level object (" << type_string << ") not defined in scripting context";
+            ErrorLogger() << "FollowReference : top level object (" << type_string << ") not defined in scripting context. "
+                          << "  strings: " << [it=first, last]() mutable -> std::string
+                            {
+                                std::string retval;
+                                for (; it != last; ++it)
+                                    retval += *it + " ";
+                                return retval;
+                            }()
+                          << " source: " << (context.source ? context.source->Name() : "0")
+                          << " target: " << (context.effect_target ? context.effect_target->Name() : "0")
+                          << " local c: " << (context.condition_local_candidate ? context.condition_local_candidate->Name() : "0")
+                          << " root c: " << (context.condition_root_candidate ? context.condition_root_candidate->Name() : "0")
+                          << "  " << StackTrace();
             return nullptr;
         }
 
@@ -263,9 +292,9 @@ MeterType NameToMeter(const std::string& name) {
 }
 
 const std::string& MeterToName(MeterType meter) {
-    for (const auto& entry : GetMeterNameMap()) {
-        if (entry.second == meter)
-            return entry.first;
+    for (auto& [name, type] : GetMeterNameMap()) {
+        if (type == meter)
+            return name;
     }
     return EMPTY_STRING;
 }
@@ -786,12 +815,12 @@ double Variable<double>::Eval(const ScriptingContext& context) const
     const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     if (m_ref_type == ReferenceType::NON_OBJECT_REFERENCE) {
-        if ((property_name == "UniverseCentreX") |
+        if ((property_name == "UniverseCentreX") ||
             (property_name == "UniverseCentreY"))
         {
-            return GetUniverse().UniverseWidth() / 2;
+            return context.ContextUniverse().UniverseWidth() / 2;   // TODO: get Universe from ScriptingContext
         } else if (property_name == "UniverseWidth") {
-            return GetUniverse().UniverseWidth();
+            return context.ContextUniverse().UniverseWidth();
         }
 
         // add more non-object reference double functions here
@@ -843,11 +872,11 @@ double Variable<double>::Eval(const ScriptingContext& context) const
         return context.combat_bout;
 
     } else if (property_name == "CurrentTurn") {
-        return CurrentTurn();
+        return context.current_turn;
 
     } else if (property_name == "Attack") {
         if (auto fleet = std::dynamic_pointer_cast<const Fleet>(object))
-            return fleet->Damage();
+            return fleet->Damage(context.ContextObjects());
         if (auto ship = std::dynamic_pointer_cast<const Ship>(object))
             return ship->TotalWeaponsDamage();
         if (auto fighter = std::dynamic_pointer_cast<const Fighter>(object))
@@ -855,14 +884,14 @@ double Variable<double>::Eval(const ScriptingContext& context) const
         return 0.0;
 
     } else if (property_name == "PropagatedSupplyRange") {
-        const auto& ranges = GetSupplyManager().PropagatedSupplyRanges();
+        const auto& ranges = GetSupplyManager().PropagatedSupplyRanges();   // TODO: Get from Context..
         auto range_it = ranges.find(object->SystemID());
         if (range_it == ranges.end())
             return 0.0;
         return range_it->second;
 
     } else if (property_name == "PropagatedSupplyDistance") {
-        const auto& ranges = GetSupplyManager().PropagatedSupplyDistances();
+        const auto& ranges = GetSupplyManager().PropagatedSupplyDistances(); // TODO: get from context
         auto range_it = ranges.find(object->SystemID());
         if (range_it == ranges.end())
             return 0.0;
@@ -885,7 +914,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
         if (property_name == "CombatBout")
             return context.combat_bout;
         if (property_name == "CurrentTurn")
-            return CurrentTurn();
+            return context.current_turn;
         if (property_name == "GalaxySize")
             return context.galaxy_setup_data.GetSize();
         if (property_name == "GalaxyShape")
@@ -946,7 +975,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
 
     }
     else if (property_name == "SupplyingEmpire") {
-        return GetSupplyManager().EmpireThatCanSupplyAt(object->SystemID());
+        return GetSupplyManager().EmpireThatCanSupplyAt(object->SystemID()); // TODO: Get SupplyManager from Context
     }
     else if (property_name == "ID") {
         return object->ID();
@@ -1436,8 +1465,10 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
                 return boost::accumulate(empire->ShipPartClassOwned() | filtered(key_filter) | map_values, 0);
 
             int sum = 0;
-            for (const auto& empire_entry : context.empires)
-                sum += boost::accumulate(empire_entry.second->ShipPartClassOwned() | filtered(key_filter) | map_values, 0);
+            for ([[maybe_unused]] auto& [ignored_id, empire] : context.Empires()) {
+                (void)ignored_id; // quiet unused variable warning
+                sum += boost::accumulate(empire->ShipPartClassOwned() | filtered(key_filter) | map_values, 0);
+            }
             return sum;
         }
 
@@ -1445,8 +1476,10 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             return boost::accumulate(empire_property_string_key(*empire) | filtered(key_filter) | map_values, 0);
 
         int sum = 0;
-        for (const auto& empire_entry : context.empires)
-            sum += boost::accumulate(empire_property_string_key(*(empire_entry.second)) | filtered(key_filter) | map_values, 0);
+        for ([[maybe_unused]] auto& [ignored_id, empire] : context.Empires()) {
+            (void)ignored_id; // quiet unused variable warning
+            sum += boost::accumulate(empire_property_string_key(*empire) | filtered(key_filter) | map_values, 0);
+        }
         return sum;
     }
 
@@ -1507,8 +1540,10 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             return boost::accumulate(empire_property_int_key(*empire) | filtered(key_filter) | map_values, 0);
 
         int sum = 0;
-        for (const auto& empire_entry : context.empires)
-            sum += boost::accumulate(empire_property_int_key(*(empire_entry.second)) | filtered(key_filter) | map_values, 0);
+        for ([[maybe_unused]] auto& [ignored_id, empire] : context.Empires()) {
+            (void)ignored_id; // quiet unused variable warning
+            sum += boost::accumulate(empire_property_int_key(*empire) | filtered(key_filter) | map_values, 0);
+        }
         return sum;
     }
 
@@ -1531,7 +1566,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         auto GetRawPtr = [](const auto& smart_ptr){ return smart_ptr.get(); };
 
         if (!empire) {
-            return boost::accumulate(context.empires | map_values | transformed(GetRawPtr) |
+            return boost::accumulate(context.Empires() | map_values | transformed(GetRawPtr) |
                                      transformed(empire_property), 0);
         }
 
@@ -1645,7 +1680,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         if (m_int_ref2)
             object2_id = m_int_ref2->Eval(context);
 
-        int retval = GetUniverse().GetPathfinder()->JumpDistanceBetweenObjects(object1_id, object2_id, context.ContextObjects()); // TODO: Get PathFinder from ScriptingContext
+        int retval = context.ContextUniverse().GetPathfinder()->JumpDistanceBetweenObjects(
+            object1_id, object2_id, context.ContextObjects());
         if (retval == INT_MAX)
             return -1;
         return retval;
@@ -1665,7 +1701,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         //if (m_int_ref3)
         //    empire_id = m_int_ref3->Eval(context);
 
-        int retval = GetUniverse().GetPathfinder()->JumpDistanceBetweenObjects(object1_id, object2_id, context.ContextObjects()); // TODO: Get PathFinder from ScriptingContext
+        int retval = context.ContextUniverse().GetPathfinder()->JumpDistanceBetweenObjects(
+            object1_id, object2_id, context.ContextObjects());
         if (retval == INT_MAX)
             return -1;
         return retval;
@@ -1803,8 +1840,10 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
             return boost::accumulate(empire_property(*empire) | filtered(key_filter) | map_values, 0.0f);
 
         float sum = 0.0f;
-        for (const auto& empire_entry : context.empires)
-            sum += boost::accumulate(empire_property(*(empire_entry.second)) | filtered(key_filter) | map_values, 0.0f);
+        for ([[maybe_unused]] auto& [unused_id, loop_empire] : context.Empires()) {
+            (void)unused_id; // quiet unused variable warning
+            sum += boost::accumulate(empire_property(*loop_empire) | filtered(key_filter) | map_values, 0.0f);
+        }
         return sum;
     }
 

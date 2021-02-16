@@ -48,7 +48,7 @@ namespace {
 
         auto fleet = GetUniverse().InsertNew<Fleet>("", x, y, ship->Owner());   // TODO: Avoid GetUniverse call by extending ScriptingContext?
 
-        fleet->Rename(fleet->GenerateFleetName());
+        fleet->Rename(fleet->GenerateFleetName(Objects()));
         fleet->GetMeter(MeterType::METER_STEALTH)->SetCurrent(Meter::LARGE_VALUE);
 
         fleet->AddShips({ship->ID()});
@@ -150,7 +150,7 @@ namespace {
 
         // set fleet with newly recalculated route
         try {
-            fleet->SetRoute(route_pair.first);
+            fleet->SetRoute(route_pair.first, objects);
         } catch (const std::exception& e) {
             ErrorLogger() << "Caught exception updating fleet route in effect code: " << e.what();
         }
@@ -1230,7 +1230,7 @@ void SetSpeciesEmpireOpinion::Execute(ScriptingContext& context) const {
     if (species_name.empty())
         return;
 
-    double initial_opinion = GetSpeciesManager().SpeciesEmpireOpinion(species_name, empire_id);
+    double initial_opinion = GetSpeciesManager().SpeciesEmpireOpinion(species_name, empire_id); // TODO: get SpeciesManager from ScriptingContext
     double opinion = m_opinion->Eval(ScriptingContext(context, initial_opinion));
 
     GetSpeciesManager().SetSpeciesEmpireOpinion(species_name, empire_id, opinion);
@@ -2924,7 +2924,7 @@ void SetDestination::Execute(ScriptingContext& context) const {
         return;
 
     try {
-        target_fleet->SetRoute(route_list);
+        target_fleet->SetRoute(route_list, context.ContextObjects());
     } catch (const std::exception& e) {
         ErrorLogger() << "Caught exception in Effect::SetDestination setting fleet route: " << e.what();
     }
@@ -3247,39 +3247,42 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
 
     case EmpireAffiliationType::AFFIL_ALLY: {
         // add allies of specified empire
-        for (auto& empire_id : context.empires) {
-            if (empire_id.first == recipient_id || recipient_id == ALL_EMPIRES)
+        for ([[maybe_unused]] auto& [empire_id, ignored_empire] : context.Empires()) {
+            (void)ignored_empire; // quiet unused variable warnings
+            if (empire_id == recipient_id || recipient_id == ALL_EMPIRES)
                 continue;
 
-            DiplomaticStatus status = context.ContextDiploStatus(recipient_id, empire_id.first);
+            DiplomaticStatus status = context.ContextDiploStatus(recipient_id, empire_id);
             if (status >= DiplomaticStatus::DIPLO_ALLIED)
-                recipient_empire_ids.insert(empire_id.first);
+                recipient_empire_ids.insert(empire_id);
         }
         break;
     }
 
     case EmpireAffiliationType::AFFIL_PEACE: {
         // add empires at peace with the specified empire
-        for (auto& empire_id : context.empires) {
-            if (empire_id.first == recipient_id || recipient_id == ALL_EMPIRES)
+        for ([[maybe_unused]] auto& [empire_id, ignored_empire] : context.Empires()) {
+            (void)ignored_empire;
+            if (empire_id == recipient_id || recipient_id == ALL_EMPIRES)
                 continue;
 
-            DiplomaticStatus status = context.ContextDiploStatus(recipient_id, empire_id.first);
+            DiplomaticStatus status = context.ContextDiploStatus(recipient_id, empire_id);
             if (status == DiplomaticStatus::DIPLO_PEACE)
-                recipient_empire_ids.insert(empire_id.first);
+                recipient_empire_ids.insert(empire_id);
         }
         break;
     }
 
     case EmpireAffiliationType::AFFIL_ENEMY: {
         // add enemies of specified empire
-        for (auto& empire_id : context.empires) {
-            if (empire_id.first == recipient_id || recipient_id == ALL_EMPIRES)
+        for ([[maybe_unused]] auto& [empire_id, unused_empire] : context.Empires()) {
+            (void)unused_empire; // quiet unused variable warning
+            if (empire_id == recipient_id || recipient_id == ALL_EMPIRES)
                 continue;
 
-            DiplomaticStatus status = context.ContextDiploStatus(recipient_id, empire_id.first);
+            DiplomaticStatus status = context.ContextDiploStatus(recipient_id, empire_id);
             if (status == DiplomaticStatus::DIPLO_WAR)
-                recipient_empire_ids.insert(empire_id.first);
+                recipient_empire_ids.insert(empire_id);
         }
         break;
     }
@@ -3291,8 +3294,8 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
             m_condition->Eval(context, condition_matches);
 
         // add empires that can see any condition-matching object
-        for (auto& empire_entry : context.empires) {
-            int empire_id = empire_entry.first;
+        for ([[maybe_unused]] auto& [empire_id, unused_empire] : context.Empires()) {
+            (void)unused_empire;
             for (auto& object : condition_matches) {
                 if (object->GetVisibility(empire_id) >= Visibility::VIS_BASIC_VISIBILITY) { // TODO use context visibility
                     recipient_empire_ids.insert(empire_id);
@@ -3314,13 +3317,15 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
     case EmpireAffiliationType::AFFIL_ANY:
     default: {
         // add all empires
-        for (auto& empire_entry : context.empires)
-            recipient_empire_ids.insert(empire_entry.first);
+        for ([[maybe_unused]] auto& [empire_id, unused_empire] : context.Empires()) {
+            (void)unused_empire; // quiet unused variable warning
+            recipient_empire_ids.insert(empire_id);
+        }
         break;
     }
     }
 
-    int sitrep_turn = CurrentTurn() + 1;
+    int sitrep_turn = context.current_turn + 1;
 
     // send to recipient empires
     for (int empire_id : recipient_empire_ids) {
@@ -3527,39 +3532,42 @@ void SetVisibility::Execute(ScriptingContext& context) const {
 
     case EmpireAffiliationType::AFFIL_ALLY: {
         // add allies of specified empire
-        for (const auto& empire_entry : context.empires) {
-            if (empire_entry.first == empire_id || empire_id == ALL_EMPIRES)
+        for ([[maybe_unused]] auto& [loop_empire_id, unused_empire] : context.Empires()) {
+            (void)unused_empire; // quiet unused variable warning
+            if (loop_empire_id == empire_id || empire_id == ALL_EMPIRES)
                 continue;
 
-            DiplomaticStatus status = context.ContextDiploStatus(empire_id, empire_entry.first);
+            DiplomaticStatus status = context.ContextDiploStatus(empire_id, loop_empire_id);
             if (status >= DiplomaticStatus::DIPLO_ALLIED)
-                empire_ids.insert(empire_entry.first);
+                empire_ids.insert(loop_empire_id);
         }
         break;
     }
 
     case EmpireAffiliationType::AFFIL_PEACE: {
         // add empires at peace with the specified empire
-        for (const auto& empire_entry : context.empires) {
-            if (empire_entry.first == empire_id || empire_id == ALL_EMPIRES)
+        for ([[maybe_unused]] auto& [loop_empire_id, unused_empire] : context.Empires()) {
+            (void)unused_empire; // quiet unused variable warning
+            if (loop_empire_id == empire_id || empire_id == ALL_EMPIRES)
                 continue;
 
-            DiplomaticStatus status = context.ContextDiploStatus(empire_id, empire_entry.first);
+            DiplomaticStatus status = context.ContextDiploStatus(empire_id, loop_empire_id);
             if (status == DiplomaticStatus::DIPLO_PEACE)
-                empire_ids.insert(empire_entry.first);
+                empire_ids.insert(loop_empire_id);
         }
         break;
     }
 
     case EmpireAffiliationType::AFFIL_ENEMY: {
         // add enemies of specified empire
-        for (const auto& empire_entry : context.empires) {
-            if (empire_entry.first == empire_id || empire_id == ALL_EMPIRES)
+        for ([[maybe_unused]] auto& [loop_empire_id, unused_empire] : context.Empires()) {
+            (void)unused_empire; // quiet unused variable warning
+            if (loop_empire_id == empire_id || empire_id == ALL_EMPIRES)
                 continue;
 
-            DiplomaticStatus status = context.ContextDiploStatus(empire_id, empire_entry.first);
+            DiplomaticStatus status = context.ContextDiploStatus(empire_id, loop_empire_id);
             if (status == DiplomaticStatus::DIPLO_WAR)
-                empire_ids.insert(empire_entry.first);
+                empire_ids.insert(loop_empire_id);
         }
         break;
     }
@@ -3575,8 +3583,10 @@ void SetVisibility::Execute(ScriptingContext& context) const {
     case EmpireAffiliationType::AFFIL_ANY:
     default: {
         // add all empires
-        for (const auto& empire_entry : context.empires)
-            empire_ids.insert(empire_entry.first);
+        for ([[maybe_unused]] auto& [loop_empire_id, unused_empire] : context.Empires()) {
+            (void)unused_empire; // quiet unused variable warning
+            empire_ids.insert(loop_empire_id);
+        }
         break;
     }
     }

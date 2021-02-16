@@ -151,19 +151,19 @@ public:
 
     /** Return true iff this empire can produce the specified item at the specified location. */
     bool                    ProducibleItem(BuildType build_type, int location,
-                                           const ObjectMap& objects = Objects()) const;
+                                           const ScriptingContext& context = ScriptingContext()) const;
     bool                    ProducibleItem(BuildType build_type, const std::string& name, int location,
-                                           const ObjectMap& objects = Objects()) const;
+                                           const ScriptingContext& context = ScriptingContext()) const;
     bool                    ProducibleItem(BuildType build_type, int design_id, int location,
-                                           const ObjectMap& objects = Objects()) const;
+                                           const ScriptingContext& context = ScriptingContext()) const;
     bool                    ProducibleItem(const ProductionQueue::ProductionItem& item, int location,
-                                           const ObjectMap& objects = Objects()) const;
+                                           const ScriptingContext& context = ScriptingContext()) const;
 
     /** Return true iff this empire can enqueue the specified item at the specified location. */
     bool                    EnqueuableItem(BuildType build_type, const std::string& name, int location,
-                                           const ObjectMap& objects = Objects()) const;
+                                           const ScriptingContext& context = ScriptingContext()) const;
     bool                    EnqueuableItem(const ProductionQueue::ProductionItem& item, int location,
-                                           const ObjectMap& objects = Objects()) const;
+                                           const ScriptingContext& context = ScriptingContext()) const;
 
     bool                    HasExploredSystem(int ID) const;                            ///< returns  true if the given item is in the appropriate list, false if it is not.
 
@@ -326,10 +326,11 @@ public:
     void UpdateSystemSupplyRanges(const Universe& universe = GetUniverse());
     /** Calculates systems that can propagate supply (fleet or resource) using
       * the specified set of \a known_systems */
-    void UpdateSupplyUnobstructedSystems(const std::set<int>& known_systems, bool precombat=false);
+    void UpdateSupplyUnobstructedSystems(const ScriptingContext& context, const std::set<int>& known_systems,
+                                         bool precombat = false);
     /** Calculates systems that can propagate supply using this empire's own /
       * internal list of explored systems. */
-    void UpdateSupplyUnobstructedSystems(bool precombat=false);
+    void UpdateSupplyUnobstructedSystems(const ScriptingContext& context, bool precombat = false);
     /** Updates fleet ArrivalStarlane to flag fleets of this empire that are not
       * blockaded post-combat must be done after *all* noneliminated empires
       * have updated their unobstructed systems */
@@ -347,10 +348,12 @@ public:
       * the production queue (which determines how much PP each project receives
       * but does not actually spend them).  This function spends the PP, removes
       * complete items from the queue and creates the results in the universe. */
-    void CheckProductionProgress(Universe& universe = GetUniverse());
+    void CheckProductionProgress(ScriptingContext& context);
+
     /** Checks for tech projects that have been completed, and returns a vector
       * of the techs that should be added to the known techs list. */
     std::vector<std::string> CheckResearchProgress();
+
     /** Eventually : Will check for social projects that have been completed and
       * / or process ongoing social projects, and update the empire's influence
       * stockpile to account for influence production and expenditures.*/

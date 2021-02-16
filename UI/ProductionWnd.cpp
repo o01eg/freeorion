@@ -248,10 +248,10 @@ namespace {
 
             item_name = UserString(elem.item.name);
             //available = empire->BuildingTypeAvailable(elem.item.name);
-            location_ok = building_type->ProductionLocation(elem.empire_id, elem.location);
+            location_ok = building_type->ProductionLocation(elem.empire_id, elem.location, ScriptingContext());
             //min_turns = building_type->ProductionTime(elem.empire_id, elem.location);
-            total_cost = building_type->ProductionCost(elem.empire_id, elem.location);
-            max_allocation = building_type->PerTurnCost(elem.empire_id, elem.location);
+            total_cost = building_type->ProductionCost(elem.empire_id, elem.location, ScriptingContext());
+            max_allocation = building_type->PerTurnCost(elem.empire_id, elem.location, ScriptingContext());
             icon = ClientUI::BuildingIcon(elem.item.name);
 
         } else if (elem.item.build_type == BuildType::BT_SHIP) {
@@ -732,9 +732,10 @@ namespace {
             if (build_type == BuildType::BT_SHIP) {
                 // for ships, add a set rally point command
                 if (auto system = Objects().get<System>(SidePanel::SystemID())) {
-                    std::string rally_prompt = boost::io::str(FlexibleFormat(UserString("RALLY_QUEUE_ITEM")) % system->PublicName(GGHumanClientApp::GetApp()->EmpireID()));
-                    popup->AddMenuItem(GG::MenuItem(std::move(rally_prompt), disabled, false,
-                                                    rally_to_action));
+                    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+                    std::string rally_prompt = boost::io::str(FlexibleFormat(UserString("RALLY_QUEUE_ITEM"))
+                                                              % system->PublicName(empire_id, Objects()));
+                    popup->AddMenuItem(GG::MenuItem(std::move(rally_prompt), disabled, false, rally_to_action));
                 }
             }
 

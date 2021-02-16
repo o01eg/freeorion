@@ -3479,6 +3479,11 @@ sc::result ProcessingTurn::react(const ProcessTurn& u) {
         }
     }
 
+    // open statistics if the game ended
+    if (server.IsHaveWinner()) {
+        GetOptionsDB().Set<bool>("network.server.publish-statistics", true);
+    }
+
     if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.enabled")) {
         PlayerConnectionPtr dummy_connection = nullptr;
         post_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(server.CurrentTurn())), dummy_connection));

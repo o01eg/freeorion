@@ -445,7 +445,7 @@ void SetMeter::Execute(ScriptingContext& context,
         info.cause_type =     effect_cause.cause_type;
         info.specific_cause = effect_cause.specific_cause;
         info.custom_label =   (m_accounting_label.empty() ? effect_cause.custom_label : m_accounting_label);
-        info.source_id =      context.source->ID();
+        info.source_id =      context.source ? context.source->ID() : INVALID_OBJECT_ID;
 
         // process each target separately in order to do effect accounting for each
         for (auto& target : targets) {
@@ -468,7 +468,7 @@ void SetMeter::Execute(ScriptingContext& context,
             info.running_meter_total = meter->Current();
 
             // add accounting for this effect to end of vector
-            (*accounting_map)[target->ID()][m_meter].emplace_back(info);    // not moving as local is reused
+            (*accounting_map)[target->ID()][m_meter].push_back(info); // not moving as local is reused
         }
     }
 
@@ -1230,10 +1230,10 @@ void SetSpeciesEmpireOpinion::Execute(ScriptingContext& context) const {
     if (species_name.empty())
         return;
 
-    double initial_opinion = GetSpeciesManager().SpeciesEmpireOpinion(species_name, empire_id); // TODO: get SpeciesManager from ScriptingContext
+    double initial_opinion = context.species.SpeciesEmpireOpinion(species_name, empire_id); // TODO: get SpeciesManager from ScriptingContext
     double opinion = m_opinion->Eval(ScriptingContext(context, initial_opinion));
 
-    GetSpeciesManager().SetSpeciesEmpireOpinion(species_name, empire_id, opinion);
+    context.species.SetSpeciesEmpireOpinion(species_name, empire_id, opinion);
 }
 
 std::string SetSpeciesEmpireOpinion::Dump(unsigned short ntabs) const
@@ -1288,10 +1288,10 @@ void SetSpeciesSpeciesOpinion::Execute(ScriptingContext& context) const {
     if (rated_species_name.empty())
         return;
 
-    float initial_opinion = GetSpeciesManager().SpeciesSpeciesOpinion(opinionated_species_name, rated_species_name);
+    float initial_opinion = context.species.SpeciesSpeciesOpinion(opinionated_species_name, rated_species_name);
     float opinion = m_opinion->Eval(ScriptingContext(context, initial_opinion));
 
-    GetSpeciesManager().SetSpeciesSpeciesOpinion(opinionated_species_name, rated_species_name, opinion);
+    context.species.SetSpeciesSpeciesOpinion(opinionated_species_name, rated_species_name, opinion);
 }
 
 std::string SetSpeciesSpeciesOpinion::Dump(unsigned short ntabs) const

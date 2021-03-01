@@ -18,7 +18,7 @@ endif
 endif
 
 %:
-	dh $@ --max-parallel=$(MAX) --with python2
+	dh $@ --max-parallel=$(MAX) --with python3
 
 override_dh_auto_configure:
 	dh_auto_configure -- \
@@ -45,10 +45,10 @@ override_dh_install:
 		debian/freeorion-data/usr/share/games/freeorion/default/COPYING \
 		debian/freeorion-data/usr/share/games/freeorion/default/data/fonts/LICENSE.*
 
-override_dh_python2:
-	dh_python2 -pfreeorion-data /usr/share/games
+override_dh_python3:
+	dh_python3 -pfreeorion-data /usr/share/games
 
 get-orig-source:
-	wget https://github.com/freeorion/freeorion/releases/download/v0.4.8/FreeOrion_v0.4.8_2018-08-23.26f16b0_Source.tar.gz
+	wget https://github.com/freeorion/freeorion/releases/download/v0.4.10.1/FreeOrion_v0.4.10.1_2020-09-25.39cfe10_Source.tar.gz
 
 

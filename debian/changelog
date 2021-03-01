@@ -1,38 +1,43 @@
-freeorion (0.4.8-3ubuntu5) focal; urgency=medium
+freeorion (0.4.10.1-1build2) hirsute; urgency=medium
 
-  * No-change rebuild for icu soname change.
+  * No-change rebuild for boost soname change.
 
- -- Matthias Klose <doko@ubuntu.com>  Thu, 05 Mar 2020 08:51:32 +0100
+ -- Matthias Klose <doko@ubuntu.com>  Sat, 12 Dec 2020 13:06:26 +0100
 
-freeorion (0.4.8-3ubuntu4) focal; urgency=medium
+freeorion (0.4.10.1-1build1) hirsute; urgency=medium
 
-  * No-change rebuild for icu soname change.
+  * No-change rebuild to build with python3.9 as default.
 
- -- Matthias Klose <doko@ubuntu.com>  Tue, 03 Mar 2020 21:21:00 +0100
+ -- Matthias Klose <doko@ubuntu.com>  Wed, 25 Nov 2020 14:46:57 +0100
 
-freeorion (0.4.8-3ubuntu3) focal; urgency=medium
+freeorion (0.4.10.1-1) unstable; urgency=medium
 
-  * Use boost1.67 for boost-python2.
+  * New upstream version 0.4.10.1.
 
- -- Dimitri John Ledkov <xnox@ubuntu.com>  Mon, 17 Feb 2020 20:03:52 +0000
+ -- Markus Koschany <apo@debian.org>  Sun, 11 Oct 2020 15:44:38 +0200
 
-freeorion (0.4.8-3ubuntu2) focal; urgency=medium
+freeorion (0.4.10-1) unstable; urgency=medium
 
-  * No-change rebuild with fixed binutils on arm64.
+  * New upstream version 0.4.10.
 
- -- Matthias Klose <doko@ubuntu.com>  Mon, 10 Feb 2020 08:22:52 +0100
+ -- Markus Koschany <apo@debian.org>  Fri, 31 Jul 2020 13:33:50 +0200
 
-freeorion (0.4.8-3ubuntu1) focal; urgency=medium
+freeorion (0.4.10~RC1-1) unstable; urgency=medium
 
-  * Build-depend on python2.
+  * New upstream version 0.4.10~RC1.
+    - Support Python 3 now. (Closes: #936557)
+  * Switch to debhelper-compat = 13.
 
- -- Matthias Klose <doko@ubuntu.com>  Mon, 13 Jan 2020 15:38:58 +0100
+ -- Markus Koschany <apo@debian.org>  Wed, 22 Jul 2020 22:46:38 +0200
 
-freeorion (0.4.8-3build1) focal; urgency=medium
+freeorion (0.4.9-1) unstable; urgency=medium
 
-  * No-change rebuild to generate dependencies on python2.
+  * New upstream version 0.4.9.
+  * Switch to debhelper-compat = 12.
+  * Declare compliance with Debian Policy 4.5.0.
+  * Drop all patches. Fixed upstream.
 
- -- Matthias Klose <doko@ubuntu.com>  Tue, 17 Dec 2019 12:33:22 +0000
+ -- Markus Koschany <apo@debian.org>  Sun, 16 Feb 2020 22:27:14 +0100
 
 freeorion (0.4.8-3) unstable; urgency=medium
 

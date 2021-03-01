@@ -1,8 +1,7 @@
 Source: freeorion
 Section: games
 Priority: optional
-Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
-XSBC-Original-Maintainer: Debian Games Team <pkg-games-devel@lists.alioth.debian.org>
+Maintainer: Debian Games Team <pkg-games-devel@lists.alioth.debian.org>
 Uploaders:
  Markus Koschany <apo@debian.org>
 Build-Depends:
@@ -23,11 +22,11 @@ Build-Depends:
  libtiff-dev,
  libvorbis-dev,
  pkg-config,
- python2
-Standards-Version: 4.2.1
+ python3
+Standards-Version: 4.5.0
 Homepage: http://www.freeorion.org
-Vcs-Git: https://anonscm.debian.org/git/pkg-games/freeorion.git
-Vcs-Browser: https://anonscm.debian.org/cgit/pkg-games/freeorion.git
+Vcs-Git: https://salsa.debian.org/games-team/freeorion.git
+Vcs-Browser: https://salsa.debian.org/games-team/freeorion
 
 Package: freeorion
 Architecture: linux-any
@@ -54,7 +53,7 @@ Depends:
  fonts-dejavu,
  fonts-roboto-unhinted,
  ${misc:Depends},
- ${python:Depends}
+ ${python3:Depends}
 Suggests:
  freeorion
 Description: turn-based space empire and galactic conquest game -- data

@@ -22,7 +22,8 @@ endif
 
 override_dh_auto_configure:
 	cd $(CURDIR)/godot-cpp && cmake \
-		-DCMAKE_BUILD_TYPE=$(TYPE)
+		-DCMAKE_BUILD_TYPE=Release
+	cd $(CURDIR)/godot-cpp && cmake --build . -j $(MAX)
 	dh_auto_configure -- \
 		-DGODOT_CPP_ROOT=$(CURDIR)/godot-cpp \
 		-DBUILD_CLIENT_GODOT=ON \
@@ -31,10 +32,6 @@ override_dh_auto_configure:
 		-DLIB_SUFFIX=/freeorion \
 		-DCMAKE_VERBOSE_MAKEFILE=ON \
 		-DCMAKE_BUILD_TYPE=$(TYPE)
-
-override_dh_auto_build:
-	cd $(CURDIR)/godot-cpp && dh_auto_build
-	dh_auto_build
 
 #workaround for 'dpkg-shlibdeps: error: couldn't find library libGiGi*.so'
 override_dh_shlibdeps:
@@ -47,6 +44,7 @@ override_dh_missing:
 	dh_missing --fail-missing
 
 override_dh_install:
+	godot3 --path godot/client --export "pck" freeorion.pck
 	dh_install
 	find debian -type d -empty -delete -printf 'removed %p\n'
 	$(RM) -v debian/freeorion-data/usr/share/games/freeorion/default/LICENSE* \

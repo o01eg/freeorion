@@ -1,4 +1,5 @@
 debian/bin/*                                usr/games
+freeorion.pck                               usr/share/games
 usr/bin/*                                   usr/lib/freeorion
 usr/lib/*/freeorion
 usr/share/applications

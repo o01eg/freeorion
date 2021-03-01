@@ -1,0 +1,54 @@
+#!/usr/bin/make -f
+#export DH_VERBOSE=1
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+export CCACHE_DIR=$(CURDIR)/ccache
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+MAX  := 2
+TYPE := RelWithDebInfo
+
+ifeq (32,$(DEB_HOST_ARCH_BITS))
+ifeq (,$(filter $(DEB_HOST_ARCH), i386))
+	MAX  := 1
+	TYPE := Release
+	export DEB_CFLAGS_MAINT_APPEND = -g1
+	export DEB_CXXFLAGS_MAINT_APPEND = -g1
+endif
+endif
+
+%:
+	dh $@ --max-parallel=$(MAX) --with python2
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DBUILD_DOCUMENTATION=off \
+		-DBUILD_TUTORIALS=off \
+		-DLIB_SUFFIX=/freeorion \
+		-DCMAKE_VERBOSE_MAKEFILE=ON \
+		-DCMAKE_BUILD_TYPE=$(TYPE)
+
+#workaround for 'dpkg-shlibdeps: error: couldn't find library libGiGi*.so'
+override_dh_shlibdeps:
+	LD_LIBRARY_PATH="$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/freeorion:$(LD_LIBRARY_PATH)" dh_shlibdeps
+
+override_dh_installchangelogs:
+	dh_installchangelogs ChangeLog.md
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+override_dh_install:
+	dh_install
+	find debian -type d -empty -delete -printf 'removed %p\n'
+	$(RM) -v debian/freeorion-data/usr/share/games/freeorion/default/LICENSE* \
+		debian/freeorion-data/usr/share/games/freeorion/default/COPYING \
+		debian/freeorion-data/usr/share/games/freeorion/default/data/fonts/LICENSE.*
+
+override_dh_python2:
+	dh_python2 -pfreeorion-data /usr/share/games
+
+get-orig-source:
+	wget https://github.com/freeorion/freeorion/releases/download/v0.4.8/FreeOrion_v0.4.8_2018-08-23.26f16b0_Source.tar.gz
+
+

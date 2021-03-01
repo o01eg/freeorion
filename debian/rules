@@ -21,12 +21,20 @@ endif
 	dh $@ --max-parallel=$(MAX) --with python3
 
 override_dh_auto_configure:
+	cd $(CURDIR)/godot-cpp && cmake \
+		-DCMAKE_BUILD_TYPE=$(TYPE)
 	dh_auto_configure -- \
+		-DGODOT_CPP_ROOT=$(CURDIR)/godot-cpp \
+		-DBUILD_CLIENT_GODOT=ON \
 		-DBUILD_DOCUMENTATION=off \
 		-DBUILD_TUTORIALS=off \
 		-DLIB_SUFFIX=/freeorion \
 		-DCMAKE_VERBOSE_MAKEFILE=ON \
 		-DCMAKE_BUILD_TYPE=$(TYPE)
+
+override_dh_auto_build:
+	cd $(CURDIR)/godot-cpp && dh_auto_build
+	dh_auto_build
 
 #workaround for 'dpkg-shlibdeps: error: couldn't find library libGiGi*.so'
 override_dh_shlibdeps:

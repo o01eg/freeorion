@@ -1,3 +1,15 @@
+freeorion (0.4.10.999+1SNAPSHOT20210301ppa2~focal) focal; urgency=medium
+
+  * Remove ccache
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Tue, 02 Mar 2021 18:43:43 +0000
+
+freeorion (0.4.10.999+1SNAPSHOT20210301ppa1~focal) focal; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Tue, 02 Mar 2021 17:33:26 +0000
+
 freeorion (0.4.10.1-1build2) hirsute; urgency=medium
 
   * No-change rebuild for boost soname change.

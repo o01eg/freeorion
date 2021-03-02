@@ -44,7 +44,7 @@ override_dh_missing:
 	dh_missing --fail-missing
 
 override_dh_install:
-	godot3 --path godot/client --export "pck" freeorion.pck
+	godot3-server --path godot/client --export "Linux/X11" freeorion.pck
 	dh_install
 	find debian -type d -empty -delete -printf 'removed %p\n'
 	$(RM) -v debian/freeorion-data/usr/share/games/freeorion/default/LICENSE* \

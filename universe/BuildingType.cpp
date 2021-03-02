@@ -11,6 +11,14 @@
 #include "Effect.h"
 #include "ValueRef.h"
 
+#define CHECK_COND_VREF_MEMBER(m_ptr) { if (m_ptr == rhs.m_ptr) {           \
+                                            /* check next member */         \
+                                        } else if (!m_ptr || !rhs.m_ptr) {  \
+                                            return false;                   \
+                                        } else {                            \
+                                            if (*m_ptr != *(rhs.m_ptr))     \
+                                                return false;               \
+                                        }   }
 
 namespace {
     #define UserStringNop(key) key
@@ -41,7 +49,7 @@ BuildingType::BuildingType(std::string&& name, std::string&& description,
     m_icon(std::move(icon))
 {
     for (auto&& effect : common_params.effects)
-        m_effects.emplace_back(std::move(effect));
+        m_effects.push_back(std::move(effect));
     for (const std::string& tag : common_params.tags)
         m_tags.emplace(boost::to_upper_copy<std::string>(tag));
     Init();
@@ -49,6 +57,90 @@ BuildingType::BuildingType(std::string&& name, std::string&& description,
 
 BuildingType::~BuildingType()
 {}
+
+bool BuildingType::operator==(const BuildingType& rhs) const {
+    if (&rhs == this)
+        return true;
+
+    if (m_name != rhs.m_name ||
+        m_description != rhs.m_description ||
+        m_producible != rhs.m_producible ||
+        m_capture_result != rhs.m_capture_result ||
+        m_tags != rhs.m_tags ||
+        m_icon != rhs.m_icon)
+    { return false; }
+
+    CHECK_COND_VREF_MEMBER(m_production_cost)
+    CHECK_COND_VREF_MEMBER(m_production_time)
+    CHECK_COND_VREF_MEMBER(m_location)
+    CHECK_COND_VREF_MEMBER(m_enqueue_location)
+
+    if (m_effects.size() != rhs.m_effects.size())
+        return false;
+    try {
+        for (std::size_t idx = 0; idx < m_effects.size(); ++idx) {
+            const auto& my_op = m_effects.at(idx);
+            const auto& rhs_op = rhs.m_effects.at(idx);
+
+            if (my_op == rhs_op) // could both be nullptr
+                continue;
+            if (!my_op || !rhs_op)
+                return false;
+            if (*my_op != *rhs_op)
+                return false;
+        }
+    } catch (...) {
+        return false;
+    }
+
+    if (m_production_meter_consumption.size() != rhs.m_production_meter_consumption.size())
+        return false;
+    try {
+        for (auto& [meter_type, my_refs_cond_pair] : m_production_meter_consumption) {
+            auto& [my_ref, my_cond] = my_refs_cond_pair;
+            const auto& rhs_refs_cond_pair{rhs.m_production_meter_consumption.at(meter_type)};
+            auto& [rhs_ref, rhs_cond] = rhs_refs_cond_pair;
+
+            if (!my_ref && !rhs_ref && !my_cond && !rhs_cond)
+                continue;
+            if ((my_ref && !rhs_ref) || (!my_ref && rhs_ref))
+                return false;
+            if (*my_ref != *rhs_ref)
+                return false;
+            if ((my_cond && !rhs_cond) || (!my_cond && rhs_cond))
+                return false;
+            if (*my_cond != *rhs_cond)
+                return false;
+        }
+    } catch (...) {
+        return false;
+    }
+
+    if (m_production_meter_consumption.size() != rhs.m_production_meter_consumption.size())
+        return false;
+    try {
+        for (auto& [meter_type, my_refs_cond_pair] : m_production_special_consumption) {
+            auto& [my_ref, my_cond] = my_refs_cond_pair;
+            const auto& rhs_refs_cond_pair{rhs.m_production_special_consumption.at(meter_type)};
+            auto& [rhs_ref, rhs_cond] = rhs_refs_cond_pair;
+
+            if (!my_ref && !rhs_ref && !my_cond && !rhs_cond)
+                continue;
+            if ((my_ref && !rhs_ref) || (!my_ref && rhs_ref))
+                return false;
+            if (*my_ref != *rhs_ref)
+                return false;
+            if ((my_cond && !rhs_cond) || (!my_cond && rhs_cond))
+                return false;
+            if (*my_cond != *rhs_cond)
+                return false;
+        }
+    } catch (...) {
+        return false;
+    }
+
+    return true;
+}
 
 void BuildingType::Init() {
     if (m_production_cost)
@@ -169,7 +261,7 @@ int BuildingType::ProductionTime(int empire_id, int location_id,
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_BUILDING_PRODUCTION") || !m_production_time)
         return 1;
 
-    ScopedTimer timer("BuildingType::ProductionTime: " + m_name, true);
+    ScopedTimer timer("BuildingType::ProductionTime: " + m_name, true, std::chrono::milliseconds(20));
 
     if (m_production_time->ConstantExpr())
         return m_production_time->Eval();
@@ -210,7 +302,8 @@ bool BuildingType::ProductionLocation(int empire_id, int location_id, const Scri
     if (!source)
         return false;
 
-    return m_location->Eval(ScriptingContext(std::move(source), context), std::move(location));
+    ScriptingContext source_context{std::move(source), context};
+    return m_location->Eval(source_context, std::move(location));
 }
 
 bool BuildingType::EnqueueLocation(int empire_id, int location_id, const ScriptingContext& context) const {
@@ -226,7 +319,8 @@ bool BuildingType::EnqueueLocation(int empire_id, int location_id, const Scripti
     if (!source)
         return false;
 
-    return m_enqueue_location->Eval(ScriptingContext(std::move(source), context), std::move(location));
+    ScriptingContext source_context{std::move(source), context};
+    return m_enqueue_location->Eval(source_context, std::move(location));
 }
 
 unsigned int BuildingType::GetCheckSum() const {

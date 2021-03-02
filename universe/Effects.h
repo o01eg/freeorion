@@ -21,7 +21,7 @@ namespace Effect {
   * execution without modifying the gamestate. */
 class FO_COMMON_API NoOp final : public Effect {
 public:
-    NoOp();
+    NoOp() = default;
 
     void            Execute(ScriptingContext& context) const override;
     std::string     Dump(unsigned short ntabs = 0) const override;
@@ -38,6 +38,8 @@ public:
     SetMeter(MeterType meter,
              std::unique_ptr<ValueRef::ValueRef<double>>&& value,
              boost::optional<std::string> accounting_label = boost::none);
+
+    bool operator==(const Effect& rhs) const override;
 
     void Execute(ScriptingContext& context) const override;
 
@@ -79,6 +81,8 @@ public:
                      std::unique_ptr<ValueRef::ValueRef<std::string>>&& part_name,
                      std::unique_ptr<ValueRef::ValueRef<double>>&& value);
 
+    bool operator==(const Effect& rhs) const override;
+
     void Execute(ScriptingContext& context) const override;
     void Execute(ScriptingContext& context, const TargetSet& targets) const override;
     void Execute(ScriptingContext& context,
@@ -113,6 +117,8 @@ public:
     SetEmpireMeter(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id, std::string& meter,
                    std::unique_ptr<ValueRef::ValueRef<double>>&& value);
 
+    bool operator==(const Effect& rhs) const override;
+
     void Execute(ScriptingContext& context) const override;
     void Execute(ScriptingContext& context, const TargetSet& targets) const override;
     void Execute(ScriptingContext& context,
@@ -146,6 +152,8 @@ public:
                        ResourceType stockpile,
                        std::unique_ptr<ValueRef::ValueRef<double>>&& value);
 
+    bool operator==(const Effect& rhs) const override;
+
     void Execute(ScriptingContext& context) const override;
     std::string Dump(unsigned short ntabs = 0) const override;
     void SetTopLevelContent(const std::string& content_name) override;
@@ -162,8 +170,10 @@ private:
   * the effect does nothing. */
 class FO_COMMON_API SetEmpireCapital final : public Effect {
 public:
-    explicit SetEmpireCapital();
+    SetEmpireCapital();
     explicit SetEmpireCapital(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id);
+
+    bool operator==(const Effect& rhs) const override;
 
     void            Execute(ScriptingContext& context) const override;
     std::string     Dump(unsigned short ntabs = 0) const override;
@@ -412,7 +422,7 @@ private:
   * other effects are present when they execute. */
 class FO_COMMON_API Destroy final : public Effect {
 public:
-    Destroy();
+    Destroy() = default;
 
     void Execute(ScriptingContext& context) const override;
     std::string Dump(unsigned short ntabs = 0) const override;

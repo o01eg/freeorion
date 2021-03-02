@@ -53,56 +53,56 @@ namespace {
     void AddAllObjectsSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingObjects().size());
         for (const auto& obj : objects.ExistingObjects())
-            condition_non_targets.emplace_back(obj.second);
+            condition_non_targets.push_back(obj.second);
         // in my tests, this range for loop with emplace_back was about 5% faster than std::transform with std::back_inserter and a lambda returning the .second of the map entries
     }
 
     void AddBuildingSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingBuildings().size());
         for (const auto& obj : objects.ExistingBuildings())
-            condition_non_targets.emplace_back(obj.second);
+            condition_non_targets.push_back(obj.second);
     }
 
     void AddFieldSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingFields().size());
         for (const auto& obj : objects.ExistingFields())
-            condition_non_targets.emplace_back(obj.second);
+            condition_non_targets.push_back(obj.second);
     }
 
     void AddFleetSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingFleets().size());
         for (const auto& obj : objects.ExistingFleets())
-            condition_non_targets.emplace_back(obj.second);
+            condition_non_targets.push_back(obj.second);
     }
 
     void AddPlanetSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingPlanets().size());
         for (const auto& obj : objects.ExistingPlanets())
-            condition_non_targets.emplace_back(obj.second);
+            condition_non_targets.push_back(obj.second);
     }
 
     void AddPopCenterSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingPopCenters().size());
         for (const auto& obj : objects.ExistingPopCenters())
-            condition_non_targets.emplace_back(obj.second);
+            condition_non_targets.push_back(obj.second);
     }
 
     void AddResCenterSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingResourceCenters().size());
         for (const auto& obj : objects.ExistingResourceCenters())
-            condition_non_targets.emplace_back(obj.second);
+            condition_non_targets.push_back(obj.second);
     }
 
     void AddShipSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingShips().size());
         for (const auto& obj : objects.ExistingShips())
-            condition_non_targets.emplace_back(obj.second);
+            condition_non_targets.push_back(obj.second);
     }
 
     void AddSystemSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
         condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingSystems().size());
         for (const auto& obj : objects.ExistingSystems())
-            condition_non_targets.emplace_back(obj.second);
+            condition_non_targets.push_back(obj.second);
     }
 
     /** Used by 4-parameter Condition::Eval function, and some of its
@@ -179,9 +179,8 @@ std::string ConditionFailedDescription(const std::vector<const Condition*>& cond
     std::string retval;
 
     // test candidate against all input conditions, and store descriptions of each
-    for (const auto& result : ConditionDescriptionAndTest(
-        conditions, ScriptingContext(std::move(source_object)), std::move(candidate_object)))
-    {
+    ScriptingContext context{std::move(source_object)};
+    for (const auto& result : ConditionDescriptionAndTest(conditions, context, std::move(candidate_object))) {
         if (!result.second)
              retval += UserString("FAILED") + " <rgba 255 0 0 255>" + result.first +"</rgba>\n";
     }
@@ -200,8 +199,9 @@ std::string ConditionDescription(const std::vector<const Condition*>& conditions
         return UserString("NONE");
 
     // test candidate against all input conditions, and store descriptions of each
+    ScriptingContext context{std::move(source_object)};
     auto condition_description_and_test_results =
-        ConditionDescriptionAndTest(conditions, ScriptingContext(std::move(source_object)), std::move(candidate_object));
+        ConditionDescriptionAndTest(conditions, context, std::move(candidate_object));
 
     bool all_conditions_match_candidate = true, at_least_one_condition_matches_candidate = false;
     for (const auto& result : condition_description_and_test_results) {
@@ -245,8 +245,10 @@ struct Condition::MatchHelper {
         m_parent_context(parent_context)
     {}
 
-    bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const
-    { return m_this->Match(ScriptingContext(m_parent_context, candidate)); }
+    bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
+        ScriptingContext context{m_parent_context, candidate};
+        return m_this->Match(context);
+    }
 
     const Condition* m_this = nullptr;
     const ScriptingContext& m_parent_context;
@@ -349,7 +351,9 @@ bool Condition::Eval(std::shared_ptr<const UniverseObject> candidate) const {
     if (!candidate)
         return false;
     ObjectSet non_matches{std::move(candidate)}, matches;
-    Eval(ScriptingContext{}, matches, non_matches);
+
+    ScriptingContext context; // TODO: pass in and use instead of creating?
+    Eval(context, matches, non_matches);
     return non_matches.empty(); // if candidate has been matched, non_matches will now be empty
 }
 
@@ -764,7 +768,8 @@ namespace {
         // get sort key values for all objects in from_set, and sort by inserting into map
         std::multimap<float, std::shared_ptr<const UniverseObject>> sort_key_objects;
         for (auto& from : from_set) {
-            float sort_value = sort_key->Eval(ScriptingContext(context, from));
+            ScriptingContext source_context{context, from};
+            float sort_value = sort_key->Eval(source_context);
             sort_key_objects.emplace(sort_value, from);
         }
 
@@ -1681,7 +1686,7 @@ void Homeworld::Eval(const ScriptingContext& parent_context,
         names.reserve(m_names.size());
         // get all names from valuerefs
         for (auto& name : m_names)
-            names.emplace_back(name->Eval(parent_context));
+            names.push_back(name->Eval(parent_context));
         HomeworldSimpleMatch hsm{std::move(names), parent_context.ContextObjects(), parent_context.species};
         EvalImpl(matches, non_matches, search_domain, hsm);
     } else {
@@ -9929,7 +9934,7 @@ unsigned int And::GetCheckSum() const {
 std::vector<const Condition*> And::Operands() const {
     std::vector<const Condition*> retval;
     retval.reserve(m_operands.size());
-    std::transform(m_operands.begin(), m_operands.end(), retval.begin(),
+    std::transform(m_operands.begin(), m_operands.end(), std::back_inserter(retval),
                    [](const std::unique_ptr<Condition>& xx) {return xx.get();});
     return retval;
 }
@@ -10393,7 +10398,7 @@ unsigned int OrderedAlternativesOf::GetCheckSum() const {
 std::vector<const Condition*> OrderedAlternativesOf::Operands() const {
     std::vector<const Condition*> retval;
     retval.reserve(m_operands.size());
-    std::transform(m_operands.begin(), m_operands.end(), retval.begin(),
+    std::transform(m_operands.begin(), m_operands.end(), std::back_inserter(retval),
                    [](const std::unique_ptr<Condition>& xx) {return xx.get();});
     return retval;
 }

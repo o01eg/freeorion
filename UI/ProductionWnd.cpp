@@ -246,12 +246,13 @@ namespace {
                 return nullptr;
             main_text += UserString("OBJ_BUILDING") + "\n";
 
+            ScriptingContext context;
             item_name = UserString(elem.item.name);
             //available = empire->BuildingTypeAvailable(elem.item.name);
-            location_ok = building_type->ProductionLocation(elem.empire_id, elem.location, ScriptingContext{});
+            location_ok = building_type->ProductionLocation(elem.empire_id, elem.location, context);
             //min_turns = building_type->ProductionTime(elem.empire_id, elem.location);
-            total_cost = building_type->ProductionCost(elem.empire_id, elem.location, ScriptingContext{});
-            max_allocation = building_type->PerTurnCost(elem.empire_id, elem.location, ScriptingContext{});
+            total_cost = building_type->ProductionCost(elem.empire_id, elem.location, context);
+            max_allocation = building_type->PerTurnCost(elem.empire_id, elem.location, context);
             icon = ClientUI::BuildingIcon(elem.item.name);
 
         } else if (elem.item.build_type == BuildType::BT_SHIP) {
@@ -336,8 +337,10 @@ namespace {
             auto [total_cost, minimum_turns] = elem.ProductionCostAndTime();
             total_cost *= elem.blocksize;
 
-            const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
-            float pp_accumulated = empire ? empire->ProductionStatus(queue_index) : 0.0f; // returns as PP
+            const ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(),
+                                           GetSpeciesManager(), GetSupplyManager()};
+            auto empire = context.GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
+            float pp_accumulated = empire ? empire->ProductionStatus(queue_index, context) : 0.0f; // returns as PP
             if (pp_accumulated == -1.0f)
                 pp_accumulated = 0.0f;
 
@@ -714,7 +717,9 @@ namespace {
             if (queue_row) {
                 ProductionQueue::Element elem = queue_row->elem;
                 remaining = elem.remaining;
-                location_passes = elem.item.EnqueueConditionPassedAt(elem.location);
+                ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(),
+                                         GetSpeciesManager(), GetSupplyManager()};
+                location_passes = elem.item.EnqueueConditionPassedAt(elem.location, context);
             }
 
             // Check if build type is ok. If not bail out. Note that DeleteAction does make sense in this case.

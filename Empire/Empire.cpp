@@ -785,11 +785,11 @@ const ProductionQueue& Empire::GetProductionQueue() const
 const InfluenceQueue& Empire::GetInfluenceQueue() const
 { return m_influence_queue; }
 
-float Empire::ProductionStatus(int i) const {
+float Empire::ProductionStatus(int i, const ScriptingContext& context) const {
     if (0 > i || i >= static_cast<int>(m_production_queue.size()))
         return -1.0f;
     float item_progress = m_production_queue[i].progress;
-    [[maybe_unused]] auto [item_cost, item_time] = m_production_queue[i].ProductionCostAndTime(); // TODO: pass and use ScriptingContext
+    [[maybe_unused]] auto [item_cost, item_time] = m_production_queue[i].ProductionCostAndTime(context);
     (void)item_time; // quiet unused variable warning
     return item_progress * item_cost * m_production_queue[i].blocksize;
 }
@@ -2217,7 +2217,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
 
         // only if consumed resources are available, then item can be completd
         bool consumption_impossible = false;
-        std::map<std::string, std::map<int, float>> sc = elem.item.CompletionSpecialConsumption(elem.location); // TODO: pass context
+        auto sc = elem.item.CompletionSpecialConsumption(elem.location, context);
         for (auto& special_type : sc) {
             if (consumption_impossible)
                 break;
@@ -2230,7 +2230,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 }
             }
         }
-        auto mc = elem.item.CompletionMeterConsumption(elem.location); // TODO: pass context
+        auto mc = elem.item.CompletionMeterConsumption(elem.location, context);
         for (auto& meter_type : mc) {
             if (consumption_impossible)
                 break;
@@ -2376,7 +2376,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 ship->Rename(NewShipName());
 
                 // store ships to put into fleets later
-                system_new_ships[system->ID()].emplace_back(ship);
+                system_new_ships[system->ID()].push_back(ship);
 
                 // store ship rally points
                 if (elem.rally_point_id != INVALID_OBJECT_ID)

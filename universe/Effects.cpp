@@ -35,6 +35,16 @@ using boost::io::str;
 
 FO_COMMON_API extern const int INVALID_DESIGN_ID;
 
+#define CHECK_COND_VREF_MEMBER(m_ptr) { if (m_ptr == rhs_.m_ptr) {              \
+                                            /* check next member */             \
+                                        } else if (!m_ptr || !rhs_.m_ptr) {     \
+                                            return false;                       \
+                                        } else {                                \
+                                            if (*m_ptr != *(rhs_.m_ptr))        \
+                                                return false;                   \
+                                        }   }
+
+
 namespace {
     /** creates a new fleet at a specified \a x and \a y location within the
      * Universe, and and inserts \a ship into it.  Used when a ship has been
@@ -201,6 +211,57 @@ EffectsGroup::EffectsGroup(std::unique_ptr<Condition::Condition>&& scope,
 EffectsGroup::~EffectsGroup()
 {}
 
+bool EffectsGroup::operator==(const EffectsGroup& rhs) const {
+    if (&rhs == this)
+        return true;
+
+    if (m_stacking_group != rhs.m_stacking_group ||
+        m_description != rhs.m_description ||
+        m_accounting_label != rhs.m_accounting_label ||
+        m_description != rhs.m_description ||
+        m_content_name != rhs.m_content_name ||
+        m_priority != rhs.m_priority)
+    { return false; }
+
+    if (m_scope == rhs.m_scope) { // could be nullptr
+        // check next member
+    } else if (!m_scope || !rhs.m_scope) {
+        return false;
+    } else {
+        if (*m_scope != *(rhs.m_scope))
+            return false;
+    }
+
+    if (m_activation == rhs.m_activation) { // could be nullptr
+        // check next member
+    } else if (!m_activation || !rhs.m_activation) {
+        return false;
+    } else {
+        if (*m_activation != *(rhs.m_activation))
+            return false;
+    }
+
+    if (m_effects.size() != rhs.m_effects.size())
+        return false;
+    try {
+        for (std::size_t idx = 0; idx < m_effects.size(); ++idx) {
+            const auto& my_op = m_effects.at(idx);
+            const auto& rhs_op = rhs.m_effects.at(idx);
+
+            if (my_op == rhs_op)
+                continue;
+            if (!my_op || !rhs_op)
+                return false;
+            if (*my_op != *rhs_op)
+                return false;
+        }
+    } catch (...) {
+        return false;
+    }
+
+    return true;
+}
+
 void EffectsGroup::Execute(ScriptingContext& context,
                            const TargetsAndCause& targets_cause,
                            AccountingMap* accounting_map,
@@ -227,9 +288,10 @@ void EffectsGroup::Execute(ScriptingContext& context,
     }
 }
 
-const std::vector<Effect*>  EffectsGroup::EffectsList() const {
-    std::vector<Effect*> retval(m_effects.size());
-    std::transform(m_effects.begin(), m_effects.end(), retval.begin(),
+const std::vector<Effect*> EffectsGroup::EffectsList() const {
+    std::vector<Effect*> retval;
+    retval.reserve(m_effects.size());
+    std::transform(m_effects.begin(), m_effects.end(), std::back_inserter(retval),
                    [](const std::unique_ptr<Effect>& xx) {return xx.get();});
     return retval;
 }
@@ -333,6 +395,16 @@ std::string Dump(const std::vector<std::shared_ptr<EffectsGroup>>& effects_group
 Effect::~Effect()
 {}
 
+bool Effect::operator==(const Effect& rhs) const {
+    if (this == &rhs)
+        return true;
+
+    if (typeid(*this) != typeid(rhs))
+        return false;
+
+    return true;
+}
+
 void Effect::Execute(ScriptingContext& context,
                      const TargetSet& targets,
                      AccountingMap* accounting_map,
@@ -377,9 +449,6 @@ unsigned int Effect::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // NoOp                                                  //
 ///////////////////////////////////////////////////////////
-NoOp::NoOp()
-{}
-
 void NoOp::Execute(ScriptingContext& context) const
 {}
 
@@ -409,13 +478,30 @@ SetMeter::SetMeter(MeterType meter,
         m_accounting_label = std::move(*accounting_label);
 }
 
+bool SetMeter::operator==(const Effect& rhs) const {
+    if (this == &rhs)
+        return true;
+    if (typeid(*this) != typeid(rhs))
+        return false;
+
+    const SetMeter& rhs_ = static_cast<const SetMeter&>(rhs);
+
+    if (m_meter != rhs_.m_meter ||
+        m_accounting_label != rhs_.m_accounting_label)
+    { return false; }
+
+    CHECK_COND_VREF_MEMBER(m_value)
+
+    return true;
+}
+
 void SetMeter::Execute(ScriptingContext& context) const {
     if (!context.effect_target) return;
     Meter* m = context.effect_target->GetMeter(m_meter);
     if (!m) return;
 
-    float val = m_value->Eval(ScriptingContext(context, m->Current()));
-    m->SetCurrent(val);
+    ScriptingContext meter_context{context, m->Current()};
+    m->SetCurrent(m_value->Eval(meter_context));
 }
 
 void SetMeter::Execute(ScriptingContext& context,
@@ -460,8 +546,8 @@ void SetMeter::Execute(ScriptingContext& context,
             info.running_meter_total =  meter->Current();
 
             // actually execute effect to modify meter
-            float val = m_value->Eval(ScriptingContext(context, target, meter->Current()));
-            meter->SetCurrent(val);
+            ScriptingContext target_meter_context{context, target, meter->Current()};
+            meter->SetCurrent(m_value->Eval(target_meter_context));
 
             // update for meter change and new total
             info.meter_change = meter->Current() - info.running_meter_total;
@@ -605,6 +691,23 @@ SetShipPartMeter::SetShipPartMeter(MeterType meter,
     m_value(std::move(value))
 {}
 
+bool SetShipPartMeter::operator==(const Effect& rhs) const {
+    if (this == &rhs)
+        return true;
+    if (typeid(*this) != typeid(rhs))
+        return false;
+
+    const SetShipPartMeter& rhs_ = static_cast<const SetShipPartMeter&>(rhs);
+
+    if (m_meter != rhs_.m_meter)
+        return false;
+
+    CHECK_COND_VREF_MEMBER(m_part_name)
+    CHECK_COND_VREF_MEMBER(m_value)
+
+    return true;
+}
+
 void SetShipPartMeter::Execute(ScriptingContext& context) const {
     if (!context.effect_target) {
         DebugLogger() << "SetShipPartMeter::Execute passed null target pointer";
@@ -630,7 +733,8 @@ void SetShipPartMeter::Execute(ScriptingContext& context) const {
     if (!meter)
         return;
 
-    double val = m_value->Eval(ScriptingContext(context, meter->Current()));
+    ScriptingContext meter_current_context{context, meter->Current()};
+    double val = m_value->Eval(meter_current_context);
     meter->SetCurrent(val);
 }
 
@@ -790,6 +894,23 @@ SetEmpireMeter::SetEmpireMeter(std::unique_ptr<ValueRef::ValueRef<int>>&& empire
     m_value(std::move(value))
 {}
 
+bool SetEmpireMeter::operator==(const Effect& rhs) const {
+    if (this == &rhs)
+        return true;
+    if (typeid(*this) != typeid(rhs))
+        return false;
+
+    const SetEmpireMeter& rhs_ = static_cast<const SetEmpireMeter&>(rhs);
+
+    if (m_meter != rhs_.m_meter)
+        return false;
+
+    CHECK_COND_VREF_MEMBER(m_empire_id)
+    CHECK_COND_VREF_MEMBER(m_value)
+
+    return true;
+}
+
 void SetEmpireMeter::Execute(ScriptingContext& context) const {
     if (!context.effect_target) {
         DebugLogger() << "SetEmpireMeter::Execute passed null target pointer";
@@ -813,9 +934,8 @@ void SetEmpireMeter::Execute(ScriptingContext& context) const {
         return;
     }
 
-    double&& value = m_value->Eval(ScriptingContext(context, meter->Current()));
-
-    meter->SetCurrent(value);
+    ScriptingContext meter_context{context, meter->Current()};
+    meter->SetCurrent(m_value->Eval(meter_context));
 }
 
 void SetEmpireMeter::Execute(ScriptingContext& context,
@@ -898,6 +1018,23 @@ SetEmpireStockpile::SetEmpireStockpile(std::unique_ptr<ValueRef::ValueRef<int>>&
     m_value(std::move(value))
 {}
 
+bool SetEmpireStockpile::operator==(const Effect& rhs) const {
+    if (this == &rhs)
+        return true;
+    if (typeid(*this) != typeid(rhs))
+        return false;
+
+    const SetEmpireStockpile& rhs_ = static_cast<const SetEmpireStockpile&>(rhs);
+
+    if (m_stockpile != rhs_.m_stockpile)
+        return false;
+
+    CHECK_COND_VREF_MEMBER(m_empire_id)
+    CHECK_COND_VREF_MEMBER(m_value)
+
+    return true;
+}
+
 void SetEmpireStockpile::Execute(ScriptingContext& context) const {
     int empire_id = m_empire_id->Eval(context);
 
@@ -907,8 +1044,8 @@ void SetEmpireStockpile::Execute(ScriptingContext& context) const {
         return;
     }
 
-    double value = m_value->Eval(ScriptingContext(context, empire->ResourceStockpile(m_stockpile)));
-    empire->SetResourceStockpile(m_stockpile, value);
+    ScriptingContext stockpile_context{context, empire->ResourceStockpile(m_stockpile)};
+    empire->SetResourceStockpile(m_stockpile, m_value->Eval(stockpile_context));
 }
 
 std::string SetEmpireStockpile::Dump(unsigned short ntabs) const {
@@ -956,6 +1093,19 @@ SetEmpireCapital::SetEmpireCapital(std::unique_ptr<ValueRef::ValueRef<int>>&& em
     m_empire_id(std::move(empire_id))
 {}
 
+bool SetEmpireCapital::operator==(const Effect& rhs) const {
+    if (this == &rhs)
+        return true;
+    if (typeid(*this) != typeid(rhs))
+        return false;
+
+    const SetEmpireCapital& rhs_ = static_cast<const SetEmpireCapital&>(rhs);
+
+    CHECK_COND_VREF_MEMBER(m_empire_id)
+
+    return true;
+}
+
 void SetEmpireCapital::Execute(ScriptingContext& context) const {
     int empire_id = m_empire_id->Eval(context);
 
@@ -998,7 +1148,8 @@ SetPlanetType::SetPlanetType(std::unique_ptr<ValueRef::ValueRef<PlanetType>>&& t
 
 void SetPlanetType::Execute(ScriptingContext& context) const {
     if (auto p = std::dynamic_pointer_cast<Planet>(context.effect_target)) {
-        PlanetType type = m_type->Eval(ScriptingContext(context, p->Type()));
+        ScriptingContext type_context{context, p->Type()};
+        PlanetType type = m_type->Eval(type_context);
         p->SetType(type);
         if (type == PlanetType::PT_ASTEROIDS)
             p->SetSize(PlanetSize::SZ_ASTEROIDS);
@@ -1039,7 +1190,8 @@ SetPlanetSize::SetPlanetSize(std::unique_ptr<ValueRef::ValueRef<PlanetSize>>&& s
 
 void SetPlanetSize::Execute(ScriptingContext& context) const {
     if (auto p = std::dynamic_pointer_cast<Planet>(context.effect_target)) {
-        PlanetSize size = m_size->Eval(ScriptingContext(context, p->Size()));
+        ScriptingContext size_context{context, p->Size()};
+        PlanetSize size = m_size->Eval(size_context);
         p->SetSize(size);
         if (size == PlanetSize::SZ_ASTEROIDS)
             p->SetType(PlanetType::PT_ASTEROIDS);
@@ -1078,8 +1230,8 @@ SetSpecies::SetSpecies(std::unique_ptr<ValueRef::ValueRef<std::string>>&& specie
 
 void SetSpecies::Execute(ScriptingContext& context) const {
     if (auto planet = std::dynamic_pointer_cast<Planet>(context.effect_target)) {
-        std::string&& species_name = m_species_name->Eval(ScriptingContext(context, planet->SpeciesName()));
-        planet->SetSpecies(std::move(species_name));
+        ScriptingContext name_context{context, planet->SpeciesName()};
+        planet->SetSpecies(m_species_name->Eval(name_context));
 
         // ensure non-empty and permissible focus setting for new species
         auto& initial_focus = planet->Focus();
@@ -1112,8 +1264,8 @@ void SetSpecies::Execute(ScriptingContext& context) const {
         }
 
     } else if (auto ship = std::dynamic_pointer_cast<Ship>(context.effect_target)) {
-        std::string&& species_name = m_species_name->Eval(ScriptingContext(context, ship->SpeciesName()));
-        ship->SetSpecies(std::move(species_name));
+        ScriptingContext name_context{context, ship->SpeciesName()};
+        ship->SetSpecies(m_species_name->Eval(name_context));
     }
 }
 
@@ -1148,7 +1300,8 @@ void SetOwner::Execute(ScriptingContext& context) const {
         return;
     int initial_owner = context.effect_target->Owner();
 
-    int empire_id = m_empire_id->Eval(ScriptingContext(context, initial_owner));
+    ScriptingContext owner_context{context, initial_owner};
+    int empire_id = m_empire_id->Eval(owner_context);
     if (initial_owner == empire_id)
         return;
 
@@ -1230,8 +1383,9 @@ void SetSpeciesEmpireOpinion::Execute(ScriptingContext& context) const {
     if (species_name.empty())
         return;
 
-    double initial_opinion = context.species.SpeciesEmpireOpinion(species_name, empire_id); // TODO: get SpeciesManager from ScriptingContext
-    double opinion = m_opinion->Eval(ScriptingContext(context, initial_opinion));
+    double initial_opinion = context.species.SpeciesEmpireOpinion(species_name, empire_id);
+    ScriptingContext opinion_context{context, initial_opinion};
+    double opinion = m_opinion->Eval(opinion_context);
 
     context.species.SetSpeciesEmpireOpinion(species_name, empire_id, opinion);
 }
@@ -1289,7 +1443,8 @@ void SetSpeciesSpeciesOpinion::Execute(ScriptingContext& context) const {
         return;
 
     float initial_opinion = context.species.SpeciesSpeciesOpinion(opinionated_species_name, rated_species_name);
-    float opinion = m_opinion->Eval(ScriptingContext(context, initial_opinion));
+    ScriptingContext opinion_context{context, initial_opinion};
+    float opinion = m_opinion->Eval(opinion_context);
 
     context.species.SetSpeciesSpeciesOpinion(opinionated_species_name, rated_species_name, opinion);
 }
@@ -1350,8 +1505,10 @@ void CreatePlanet::Execute(ScriptingContext& context) const {
         target_type = location_planet->Type();
     }
 
-    PlanetSize size = m_size->Eval(ScriptingContext(context, target_size));
-    PlanetType type = m_type->Eval(ScriptingContext(context, target_type));
+    ScriptingContext size_context{context, target_size};
+    PlanetSize size = m_size->Eval(size_context);
+    ScriptingContext type_context{context, target_type};
+    PlanetType type = m_type->Eval(type_context);
     if (size == PlanetSize::INVALID_PLANET_SIZE || type == PlanetType::INVALID_PLANET_TYPE) {
         ErrorLogger() << "CreatePlanet::Execute got invalid size or type of planet to create...";
         return;
@@ -1972,9 +2129,6 @@ unsigned int CreateSystem::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // Destroy                                               //
 ///////////////////////////////////////////////////////////
-Destroy::Destroy()
-{}
-
 void Destroy::Execute(ScriptingContext& context) const {
     if (!context.effect_target) {
         ErrorLogger() << "Destroy::Execute passed no target object";
@@ -2024,7 +2178,11 @@ void AddSpecial::Execute(ScriptingContext& context) const {
     std::string name = (m_name ? m_name->Eval(context) : "");
 
     float initial_capacity = context.effect_target->SpecialCapacity(name);  // returns 0.0f if no such special yet present
-    float capacity = (m_capacity ? m_capacity->Eval(ScriptingContext(context, initial_capacity)) : initial_capacity);
+    float capacity = initial_capacity;
+    if (m_capacity) {
+        ScriptingContext capacity_context{context, initial_capacity};
+        capacity = m_capacity->Eval(capacity_context);
+    }
 
     context.effect_target->SetSpecialCapacity(name, capacity);
 }
@@ -2240,10 +2398,12 @@ void SetStarType::Execute(ScriptingContext& context) const {
         ErrorLogger() << "SetStarType::Execute given no target object";
         return;
     }
-    if (auto s = std::dynamic_pointer_cast<System>(context.effect_target))
-        s->SetStarType(m_type->Eval(ScriptingContext(context, s->GetStarType())));
-    else
+    if (auto s = std::dynamic_pointer_cast<System>(context.effect_target)) {
+        ScriptingContext type_context{context, s->GetStarType()};
+        s->SetStarType(m_type->Eval(type_context));
+    } else {
         ErrorLogger() << "SetStarType::Execute given a non-system target";
+    }
 }
 
 std::string SetStarType::Dump(unsigned short ntabs) const
@@ -2585,10 +2745,14 @@ void MoveInOrbit::Execute(ScriptingContext& context) const {
     auto target = context.effect_target;
 
     double focus_x = 0.0, focus_y = 0.0, speed = 1.0;
-    if (m_focus_x)
-        focus_x = m_focus_x->Eval(ScriptingContext(context, target->X()));
-    if (m_focus_y)
-        focus_y = m_focus_y->Eval(ScriptingContext(context, target->Y()));
+    if (m_focus_x) {
+        ScriptingContext x_context{context, target->X()};
+        focus_x = m_focus_x->Eval(x_context);
+    }
+    if (m_focus_y) {
+        ScriptingContext y_context{context, target->Y()};
+        focus_y = m_focus_y->Eval(y_context);
+    }
     if (m_speed)
         speed = m_speed->Eval(context);
     if (speed == 0.0)
@@ -2598,7 +2762,7 @@ void MoveInOrbit::Execute(ScriptingContext& context) const {
         m_focal_point_condition->Eval(context, matches);
         if (matches.empty())
             return;
-        std::shared_ptr<const UniverseObject> focus_object = *matches.begin();
+        auto focus_object = *matches.begin();
         focus_x = focus_object->X();
         focus_y = focus_object->Y();
     }
@@ -2729,10 +2893,14 @@ void MoveTowards::Execute(ScriptingContext& context) const {
     auto target = context.effect_target;
 
     double dest_x = 0.0, dest_y = 0.0, speed = 1.0;
-    if (m_dest_x)
-        dest_x = m_dest_x->Eval(ScriptingContext(context, target->X()));
-    if (m_dest_y)
-        dest_y = m_dest_y->Eval(ScriptingContext(context, target->Y()));
+    if (m_dest_x) {
+        ScriptingContext x_context{context, target->X()};
+        dest_x = m_dest_x->Eval(x_context);
+    }
+    if (m_dest_y) {
+        ScriptingContext y_context{context, target->Y()};
+        dest_y = m_dest_y->Eval(y_context);
+    }
     if (m_speed)
         speed = m_speed->Eval(context);
     if (speed == 0.0)
@@ -3060,9 +3228,8 @@ void SetEmpireTechProgress::Execute(ScriptingContext& context) const {
         return;
     }
 
-    float initial_progress = empire->ResearchProgress(tech_name);
-    double value = m_research_progress->Eval(ScriptingContext(context, initial_progress));
-    empire->SetTechResearchProgress(tech_name, value);
+    ScriptingContext progress_context{context, empire->ResearchProgress(tech_name)};
+    empire->SetTechResearchProgress(tech_name, m_research_progress->Eval(progress_context));
 }
 
 std::string SetEmpireTechProgress::Dump(unsigned short ntabs) const {
@@ -3408,8 +3575,9 @@ unsigned int GenerateSitRepMessage::GetCheckSum() const {
 
 std::vector<std::pair<std::string, ValueRef::ValueRef<std::string>*>>
 GenerateSitRepMessage::MessageParameters() const {
-    std::vector<std::pair<std::string, ValueRef::ValueRef<std::string>*>> retval(m_message_parameters.size());
-    std::transform(m_message_parameters.begin(), m_message_parameters.end(), retval.begin(),
+    std::vector<std::pair<std::string, ValueRef::ValueRef<std::string>*>> retval;
+    retval.reserve(m_message_parameters.size());
+    std::transform(m_message_parameters.begin(), m_message_parameters.end(), std::back_inserter(retval),
                    [](const std::pair<std::string, std::unique_ptr<ValueRef::ValueRef<std::string>>>& xx) {
                        return std::make_pair(xx.first, xx.second.get());
                    });

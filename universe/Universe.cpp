@@ -115,6 +115,9 @@ namespace {
         rules.Add<bool>(UserStringNop("RULE_UNSEEN_STEALTHY_PLANETS_INVISIBLE"),
                         UserStringNop("RULE_UNSEEN_STEALTHY_PLANETS_INVISIBLE_DESC"),
                         "TEST", false, true);
+        rules.Add<bool>(UserStringNop("RULE_ALL_SYSTEMS_VISIBLE"),
+                        UserStringNop("RULE_ALL_SYSTEMS_VISIBLE_DESC"),
+                        "TEST", false, true);
     }
     bool temp_bool2 = RegisterGameRules(&AddRules);
 
@@ -1656,13 +1659,9 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
 
 
     // within each priority group, execute effects in dispatch order
-    for (auto& priority_group : source_effects_targets_causes) {
-        //int priority = priority_group.first;
-        Effect::SourcesEffectsTargetsAndCausesVec& setc{priority_group.second};
+    for (auto& [priority, setc] : source_effects_targets_causes) {
+        (void)priority; // quiet unused variable warning
 
-        // construct a source context, which is updated for each entry in sources-effects-targets.
-        // execute each effectsgroup on its target set
-        ScriptingContext source_context{const_cast<const ScriptingContext&>(context)};
         for (auto& [sourced_effects_group, targets_and_cause] : setc) {
             Effect::TargetSet& target_set{targets_and_cause.target_set};
 
@@ -1710,7 +1709,10 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
                                  << " " << effects_group->AccountingLabel() << " " << effects_group->StackingGroup() << ")";
 
             // execute Effects in the EffectsGroup
-            source_context.source = source_context.ContextObjects().get(sourced_effects_group.source_object_id);
+            auto source = context.ContextObjects().get(sourced_effects_group.source_object_id);
+            if (!source)
+                WarnLogger() << "No source found for ID: " << sourced_effects_group.source_object_id;
+            ScriptingContext source_context(std::move(source), context);
             effects_group->Execute(source_context,
                                    targets_and_cause,
                                    update_effect_accounting ? &m_effect_accounting_map : nullptr,
@@ -2180,6 +2182,17 @@ namespace {
         }
     }
 
+    /** sets all systems basically visible to all empires */
+    void SetAllSystemsBasicallyVisibleToAllEmpires(Universe& universe) {
+        for (const auto& obj : universe.Objects().all<System>()) {
+            for (auto& empire_entry : Empires()) {
+                if (empire_entry.second->Eliminated())
+                    continue;
+                universe.SetEmpireObjectVisibility(empire_entry.first, obj->ID(), Visibility::VIS_BASIC_VISIBILITY);
+            }
+        }
+    }
+
     /** sets planets that an empire has at some time had visibility of, which
       * are also in system where an empire owns an object, to be basically
       * visible, and those systems to be partially visible */
@@ -2520,6 +2533,8 @@ void Universe::UpdateEmpireObjectVisibilities(EmpireManager& empires) {
     if (GetGameRules().Get<bool>("RULE_ALL_OBJECTS_VISIBLE")) {
         SetAllObjectsVisibleToAllEmpires(*this);
         return;
+    } else if (GetGameRules().Get<bool>("RULE_ALL_SYSTEMS_VISIBLE")) {
+        SetAllSystemsBasicallyVisibleToAllEmpires(*this);
     }
 
     SetEmpireOwnedObjectVisibilities(*this);
@@ -2543,7 +2558,8 @@ void Universe::UpdateEmpireObjectVisibilities(EmpireManager& empires) {
 
     SetTravelledStarlaneEndpointsVisible(*m_objects, m_empire_object_visibility);
 
-    SetEmpireSpecialVisibilities(ScriptingContext{*this, empires}, m_empire_object_visibility, m_empire_object_visible_specials);
+    ScriptingContext context{*this, empires};
+    SetEmpireSpecialVisibilities(context, m_empire_object_visibility, m_empire_object_visible_specials);
 
     ShareVisbilitiesBetweenAllies(*this, empires, m_empire_object_visibility, m_empire_object_visible_specials);
 }
@@ -2969,15 +2985,14 @@ void Universe::UpdateStatRecords(EmpireManager& empires) {
             if (value_ref->SourceInvariant()) {
                 stat_records[empire_id][current_turn] = value_ref->Eval();
             } else if (empire_source) {
-                stat_records[empire_id][current_turn] = value_ref->Eval(ScriptingContext(empire_source, context));
+                ScriptingContext source_context{empire_source, context};
+                stat_records[empire_id][current_turn] = value_ref->Eval(source_context);
             }
         }
     }
 }
 
-void Universe::GetShipDesignsToSerialize(ShipDesignMap& designs_to_serialize,
-                                         int encoding_empire) const
-{
+void Universe::GetShipDesignsToSerialize(ShipDesignMap& designs_to_serialize, int encoding_empire) const {
     if (encoding_empire == ALL_EMPIRES) {
         designs_to_serialize = m_ship_designs;
     } else {

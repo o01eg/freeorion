@@ -46,7 +46,11 @@ public:
     BuildingType(std::string&& name, std::string&& description,
                  CommonParams&& common_params, CaptureResult capture_result,
                  std::string&& icon);
-    ~BuildingType();
+    ~BuildingType(); // needed due to forward-declared Condition held in unique_ptr
+
+    bool operator==(const BuildingType& rhs) const;
+    bool operator!=(const BuildingType& rhs) const
+    { return !(*this == rhs); }
 
     //! Returns the unique name for this type of building
     auto Name() const -> const std::string&

@@ -87,9 +87,10 @@ struct FO_COMMON_API Variable : public ValueRef<T>
     explicit Variable(ReferenceType ref_type,
              bool return_immediate_value = false);
 
+    template <typename S>
     Variable(ReferenceType ref_type,
              boost::optional<std::string>&& container_name,
-             std::string&& property_name,
+             S&& property_name,
              bool return_immediate_value = false);
 
     Variable(ReferenceType ref_type, std::vector<std::string>&& property_name,
@@ -429,6 +430,7 @@ bool ValueRef<T>::operator==(const ValueRef<T>& rhs) const
         return true;
     if (typeid(rhs) != typeid(*this))
         return false;
+
     return true;
 }
 
@@ -565,24 +567,25 @@ Variable<T>::Variable(ReferenceType ref_type, S&& property_name,
                       bool return_immediate_value) :
     ValueRef<T>(),
     m_ref_type(ref_type),
+    m_property_name{std::forward<S>(property_name)},
     m_return_immediate_value(return_immediate_value)
 {
-    m_property_name.emplace_back(std::move(property_name));
     InitInvariants();
 }
 
 template <typename T>
+template <typename S>
 Variable<T>::Variable(ReferenceType ref_type,
                       boost::optional<std::string>&& container_name,
-                      std::string&& property_name,
+                      S&& property_name,
                       bool return_immediate_value) :
     ValueRef<T>(),
     m_ref_type(ref_type),
     m_return_immediate_value(return_immediate_value)
 {
     if (container_name)
-        m_property_name.emplace_back(std::move(*container_name));
-    m_property_name.emplace_back(std::move(property_name));
+        m_property_name.push_back(std::move(*container_name));
+    m_property_name.push_back(std::forward<S>(property_name));
 
     InitInvariants();
 }
@@ -710,16 +713,21 @@ bool Statistic<T, V>::operator==(const ValueRef<T>& rhs) const
 
     if (m_stat_type != rhs_.m_stat_type)
         return false;
-    if (this->m_value_ref != rhs_.m_value_ref)
+
+    if (m_value_ref == rhs_.m_value_ref) { // both unique_ptr could be nullptr
+        // check next member
+    } else if (!m_value_ref || !rhs_.m_value_ref) {
         return false;
+    } else if (*m_value_ref != *(rhs_.m_value_ref)) {
+        return false;
+    }
 
     if (m_sampling_condition == rhs_.m_sampling_condition) {
         // check next member
     } else if (!m_sampling_condition || !rhs_.m_sampling_condition) {
         return false;
-    } else {
-        if (*m_sampling_condition != *(rhs_.m_sampling_condition))
-            return false;
+    } else if (*m_sampling_condition != *(rhs_.m_sampling_condition)) {
+        return false;
     }
 
     return true;
@@ -1745,17 +1753,25 @@ bool Operation<T>::operator==(const ValueRef<T>& rhs) const
         return false;
     const Operation<T>& rhs_ = static_cast<const Operation<T>&>(rhs);
 
-    if (m_operands == rhs_.m_operands)
-        return true;
-
+    if (m_op_type != rhs_.m_op_type)
+        return false;
     if (m_operands.size() != rhs_.m_operands.size())
         return false;
 
-    for (unsigned int i = 0; i < m_operands.size(); ++i) {
-        if (m_operands[i] != rhs_.m_operands[i])
-            return false;
-        if (m_operands[i] && *(m_operands[i]) != *(rhs_.m_operands[i]))
-            return false;
+    try {
+        for (std::size_t idx = 0; idx < m_operands.size(); ++idx) {
+            const auto& my_op = m_operands.at(idx);
+            const auto& rhs_op = rhs_.m_operands.at(idx);
+
+            if (my_op == rhs_op)
+                continue;
+            if (!my_op || !rhs_op)
+                return false;
+            if (*my_op != *rhs_op)
+                return false;
+        }
+    } catch (...) {
+        return false;
     }
 
     // should be redundant...
@@ -1774,7 +1790,11 @@ const ValueRef<T>* Operation<T>::LHS() const
 {
     if (m_operands.empty())
         return nullptr;
-    return m_operands[0].get();
+    try {
+        return m_operands.at(0).get();
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 template <typename T>
@@ -1782,14 +1802,19 @@ const ValueRef<T>* Operation<T>::RHS() const
 {
     if (m_operands.size() < 2)
         return nullptr;
-    return m_operands[1].get();
+    try {
+        return m_operands.at(1).get();
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 template <typename T>
 const std::vector<ValueRef<T>*> Operation<T>::Operands() const
 {
-    std::vector<ValueRef<T>*> retval(m_operands.size());
-    std::transform(m_operands.begin(), m_operands.end(), retval.begin(),
+    std::vector<ValueRef<T>*> retval;
+    retval.reserve(m_operands.size());
+    std::transform(m_operands.begin(), m_operands.end(), std::back_inserter(retval),
                    [](const auto& xx){ return xx.get(); });
     return retval;
 }

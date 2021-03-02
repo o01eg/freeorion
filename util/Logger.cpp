@@ -108,7 +108,7 @@ std::unordered_map<std::string, LogLevel> ValidNameToLogLevel() {
         retval.emplace(name, log_level);
 
         // Insert the upper case
-        std::transform(name.begin(), name.end(), name.begin(),
+        std::transform(name.begin(), name.end(), name.begin(), // in-place replacement
                        [](const char c) { return std::toupper(c); });
         retval.emplace(std::move(name), log_level);
     }
@@ -343,7 +343,8 @@ void SetLoggerThreshold(const std::string& source, LogLevel threshold) {
 void InitLoggingSystem(const std::string& log_file, const std::string& _unnamed_logger_identifier) {
     auto& unnamed_logger_identifier = LocalUnnamedLoggerIdentifier();
     unnamed_logger_identifier = _unnamed_logger_identifier;
-    std::transform(unnamed_logger_identifier.begin(), unnamed_logger_identifier.end(), unnamed_logger_identifier.begin(),
+    std::transform(unnamed_logger_identifier.begin(), unnamed_logger_identifier.end(),
+                   unnamed_logger_identifier.begin(), // in-place replacement
                    [](const char c) { return std::tolower(c); });
 
     // Register LogLevel so that the formatters will be found.
@@ -373,8 +374,10 @@ void InitLoggingSystem(const std::string& log_file, const std::string& _unnamed_
     GetLoggersToSinkFrontEnds().ConfigureFrontEnds(file_sink_backend);
 
     // Print setup message.
+    char mbstr[100] = {};
     auto date_time = std::time(nullptr);
-    InfoLogger(log) << "Logger initialized at " << std::ctime(&date_time);
+    std::strftime(mbstr, sizeof(mbstr), "%c", std::localtime(&date_time)); // %c writes standard date and time string, e.g. Sun Oct 17 04:41:13 2010 (locale dependent)
+    InfoLogger(log) << "Logger initialized at " << mbstr;
 }
 
 void ShutdownLoggingSystemFileSink() {

@@ -9,16 +9,16 @@ reloadable=true
 
 Android.armeabi-v7a="res://bin/android.armeabi-v7a.32/libfreeoriongodot.so"
 OSX.64="res://bin/libfreeoriongodot.dylib"
-X11.64="res://bin/linux.64/libfreeoriongodot.so"
-X11.32="res://bin/linux.32/libfreeoriongodot.so"
-Server.64="res://bin/linux.64/libfreeoriongodot.so"
-Server.32="res://bin/linux.32/libfreeoriongodot.so"
+X11.64="/usr/lib/x86_64-linux-gnu/freeorion/libfreeoriongodot.so"
+X11.32="/usr/lib/i386-linux-gnu/freeorion/libfreeoriongodot.so"
+Server.64="/usr/lib/x86_64-linux-gnu/freeorion/libfreeoriongodot.so"
+Server.32="/usr/lib/i386-linux-gnu/freeorion/libfreeoriongodot.so"
 
 [dependencies]
 
 Android.armeabi-v7a=[ "res://bin/android.armeabi-v7a.32/libiconv.so" ]
 OSX.64=[ "res://bin/libfreeorioncommon.dylib", "res://bin/libfreeorionparse.dylib" ]
-X11.64=[ ]
-X11.32=[ ]
-Server.64=[ ]
-Server.32=[ ]
+X11.64=[ "/usr/lib/x86_64-linux-gnu/freeorion/libfreeorioncommon.so", "/usr/lib/x86_64-linux-gnu/freeorion/libfreeorionparse.so" ]
+X11.32=[ "/usr/lib/i386-linux-gnu/freeorion/libfreeorioncommon.so", "/usr/lib/i386-linux-gnu/freeorion/libfreeorionparse.so" ]
+Server.64=[ "/usr/lib/x86_64-linux-gnu/freeorion/libfreeorioncommon.so", "/usr/lib/x86_64-linux-gnu/freeorion/libfreeorionparse.so" ]
+Server.32=[ "/usr/lib/i386-linux-gnu/freeorion/libfreeorioncommon.so", "/usr/lib/i386-linux-gnu/freeorion/libfreeorionparse.so" ]

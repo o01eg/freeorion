@@ -1,3 +1,9 @@
+freeorion (0.4.10.999+1SNAPSHOT20210301ppa3~focal) focal; urgency=medium
+
+  * Try to use absolute path for FreeOrion libraries
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Wed, 03 Mar 2021 08:46:30 +0000
+
 freeorion (0.4.10.999+1SNAPSHOT20210301ppa2~focal) focal; urgency=medium
 
   * Remove ccache

@@ -1890,10 +1890,6 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     std::list<std::string> delegation = GetPlayerDelegation(lower_player_name);
     DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Get delegates of size " << delegation.size();
     if (target_empire_id == ALL_EMPIRES) {
-        if (!delegation.empty()) {
-            DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Player should choose between delegates.";
-            return ALL_EMPIRES;
-        }
         // search empire by player name
         for (auto e : Empires()) {
             if (boost::algorithm::to_lower_copy(e.second->PlayerName()) == lower_player_name) {
@@ -1901,6 +1897,19 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
                 empire = e.second;
                 break;
             }
+        }
+        // Assign player to empire if he doesn't have own empire and delegates signle
+        if (delegation.size() == 1 && empire == nullptr) {
+            for (auto e : Empires()) {
+                if (boost::algorithm::to_lower_copy(e.second->PlayerName()) == boost::algorithm::to_lower_copy(delegation.front())) {
+                    empire_id = e.first;
+                    empire = e.second;
+                    break;
+                }
+            }
+        } else if (!delegation.empty()) {
+            DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Player should choose between delegates.";
+            return ALL_EMPIRES;
         }
     } else {
         // use provided empire and test if it's player himself or one of delegated

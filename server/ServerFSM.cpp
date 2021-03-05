@@ -2732,7 +2732,9 @@ void PlayingGame::EstablishPlayer(const PlayerConnectionPtr& player_connection,
             {
                 // send playing game
                 server.AddObserverPlayerIntoGame(player_connection);
-            } else if (client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER) {
+            } else if (client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER ||
+                       client_type == Networking::CLIENT_TYPE_AI_PLAYER)
+            {
                 // previous connection was dropped
                 // set empire link to new connection by name
                 // send playing game
@@ -2781,7 +2783,7 @@ sc::result PlayingGame::react(const JoinGame& msg) {
         if (authenticated)
             player_connection->SetAuthenticated();
     } else {
-        if (server.IsAuthRequiredOrFillRoles(player_name, roles)) {
+        if (client_type != Networking::CLIENT_TYPE_AI_PLAYER && server.IsAuthRequiredOrFillRoles(player_name, roles)) {
             // send authentication request
             player_connection->AwaitPlayer(client_type, client_version_string);
             player_connection->SendMessage(AuthRequestMessage(player_name, "PLAIN-TEXT"));
@@ -2791,8 +2793,10 @@ sc::result PlayingGame::react(const JoinGame& msg) {
         std::string original_player_name = player_name;
         // Remove AI prefix to distinguish Human from AI.
         std::string ai_prefix = UserString("AI_PLAYER") + "_";
-        while (player_name.compare(0, ai_prefix.size(), ai_prefix) == 0)
-            player_name.erase(0, ai_prefix.size());
+        if (client_type != Networking::CLIENT_TYPE_AI_PLAYER) {
+            while (player_name.compare(0, ai_prefix.size(), ai_prefix) == 0)
+                player_name.erase(0, ai_prefix.size());
+        }
         if (player_name.empty())
             player_name = "_";
 

@@ -1,3 +1,9 @@
+freeorion (0.4.10.999+1SNAPSHOT20210301ppa3-1) UNRELEASED; urgency=medium
+
+  * Change for Devuan Testing Chimaera
+
+ -- O01eg <o01eg@yandex.ru>  Sat, 06 Mar 2021 18:26:51 +0300
+
 freeorion (0.4.10.999+1SNAPSHOT20210301ppa3~focal) focal; urgency=medium
 
   * Try to use absolute path for FreeOrion libraries

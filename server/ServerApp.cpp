@@ -281,7 +281,7 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
         }
 
         args[player_pos] = player_name;
-        m_ai_client_processes.push_back(Process(AI_CLIENT_EXE, args));
+        m_ai_client_processes.insert_or_assign(player_name, Process(AI_CLIENT_EXE, args));
 
         DebugLogger() << "done starting AI " << player_name;
     }
@@ -375,8 +375,8 @@ void ServerApp::CleanupAIs() {
 
     DebugLogger() << "ServerApp::CleanupAIs() killing " << m_ai_client_processes.size() << " AI clients.";
     try {
-        for (Process& process : m_ai_client_processes)
-        { process.Kill(); }
+        for (auto& process : m_ai_client_processes)
+        { process.second.Kill(); }
     } catch (...) {
         ErrorLogger() << "ServerApp::CleanupAIs() exception while killing processes";
     }
@@ -385,8 +385,8 @@ void ServerApp::CleanupAIs() {
 }
 
 void ServerApp::SetAIsProcessPriorityToLow(bool set_to_low) {
-    for (Process& process : m_ai_client_processes) {
-        if(!(process.SetLowPriority(set_to_low))) {
+    for (auto& process : m_ai_client_processes) {
+        if(!(process.second.SetLowPriority(set_to_low))) {
             if (set_to_low)
                 ErrorLogger() << "ServerApp::SetAIsProcessPriorityToLow : failed to lower priority for AI process";
             else
@@ -3660,6 +3660,18 @@ void ServerApp::CheckForEmpireElimination() {
         else if (EmpireEliminated(entry.first)) {
             entry.second->Eliminate();
             RemoveEmpireTurn(entry.first);
+            const int player_id = EmpirePlayerID(entry.first);
+            DebugLogger() << "ServerApp::CheckForEmpireElimination empire #" << entry.first << " " << entry.second->Name() << " of player #" << player_id << " eliminated";
+            auto player_it = m_networking.GetPlayer(player_id);
+            if (player_it != m_networking.established_end() &&
+                (*player_it)->GetClientType() == Networking::CLIENT_TYPE_AI_PLAYER)
+            {
+                auto it = m_ai_client_processes.find((*player_it)->PlayerName());
+                if (it != m_ai_client_processes.end()) {
+                    it->second.Kill();
+                    m_ai_client_processes.erase(it);
+                }
+            }
         } else {
             surviving_empires.insert(entry.second);
             // empires could be controlled only by connected AI client, connected human client, or

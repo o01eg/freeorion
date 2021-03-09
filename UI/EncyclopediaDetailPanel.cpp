@@ -56,13 +56,14 @@
 #  include <boost/asio/thread_pool.hpp>
 #  include <boost/asio/post.hpp>
 #else
-namespace boost { namespace asio {
+namespace boost::asio {
+    // dummy implementation of thread_pool and post that just immediately executes the passed-in function
     struct thread_pool {
         thread_pool(int) {}
         void join() {}
     };
-    void post(thread_pool, std::function<void()> func) { func(); }
- } }
+    void post(const thread_pool&, std::function<void()> func) { func(); }
+}
 #endif
 
 using boost::io::str;
@@ -672,8 +673,8 @@ void EncyclopediaDetailPanel::CompleteConstruction() {
     const int PTS = ClientUI::Pts();
     const int NAME_PTS = PTS*3/2;
     const int SUMMARY_PTS = PTS*4/3;
-    const GG::X CONTROL_WIDTH(54);
-    const GG::Y CONTROL_HEIGHT(74);
+    constexpr GG::X CONTROL_WIDTH{54};
+    constexpr GG::Y CONTROL_HEIGHT{74};
     const GG::Pt PALETTE_MIN_SIZE{GG::X{CONTROL_WIDTH + 70}, GG::Y{CONTROL_HEIGHT + 70}};
 
     m_name_text =    GG::Wnd::Create<CUILabel>("");

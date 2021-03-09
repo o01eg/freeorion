@@ -53,13 +53,6 @@ namespace ValueRef {
     struct ValueRef;
 }
 
-#if defined(_MSC_VER)
-#  if (_MSC_VER == 1900)
-namespace boost {
-    FO_COMMON_API const volatile Universe* get_pointer(const volatile Universe* p);
-}
-#  endif
-#endif
 
 /** The Universe class contains the majority of FreeOrion gamestate: All the
   * UniverseObjects in a game, and (of less importance) all ShipDesigns in a
@@ -406,12 +399,12 @@ public:
     /** Set fleets unlocked before turn 1 from \p future.*/
     void SetInitiallyUnlockedFleetPlans(Pending::Pending<std::vector<std::unique_ptr<FleetPlan>>>&& future);
     /** Fleets unlocked before turn 1.*/
-    const std::vector<FleetPlan*> InitiallyUnlockedFleetPlans() const;
+    std::vector<const FleetPlan*> InitiallyUnlockedFleetPlans() const;
 
     /** Set items unlocked before turn 1 from \p future..*/
     void SetMonsterFleetPlans(Pending::Pending<std::vector<std::unique_ptr<MonsterFleetPlan>>>&& future);
     /** Items unlocked before turn 1.*/
-    const std::vector<MonsterFleetPlan*> MonsterFleetPlans() const;
+    std::vector<const MonsterFleetPlan*> MonsterFleetPlans() const;
 
     /** Set the empire stats from \p future. */
     using EmpireStatsMap = std::map<std::string, std::unique_ptr<ValueRef::ValueRef<double>>>;

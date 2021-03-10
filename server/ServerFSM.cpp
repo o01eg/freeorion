@@ -1187,7 +1187,7 @@ sc::result MPLobby::react(const JoinGame& msg) {
         if (authenticated)
             player_connection->SetAuthenticated();
     } else {
-        const bool relaxed_auth = player_connection->IsLocalConnection() && client_type != Networking::CLIENT_TYPE_AI_PLAYER;
+        const bool relaxed_auth = player_connection->IsLocalConnection() && client_type == Networking::CLIENT_TYPE_AI_PLAYER;
         if (!relaxed_auth && server.IsAuthRequiredOrFillRoles(player_name, roles)) {
             // send authentication request
             player_connection->AwaitPlayer(client_type, client_version_string);
@@ -2809,7 +2809,7 @@ sc::result PlayingGame::react(const JoinGame& msg) {
         if (authenticated)
             player_connection->SetAuthenticated();
     } else {
-        const bool relaxed_auth = player_connection->IsLocalConnection() && client_type != Networking::CLIENT_TYPE_AI_PLAYER;
+        const bool relaxed_auth = player_connection->IsLocalConnection() && client_type == Networking::CLIENT_TYPE_AI_PLAYER;
         if (!relaxed_auth && server.IsAuthRequiredOrFillRoles(player_name, roles)) {
             // send authentication request
             player_connection->AwaitPlayer(client_type, client_version_string);

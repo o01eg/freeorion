@@ -3340,6 +3340,33 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
                 server.SendOutboundChatMessage((boost::format("Hello, %s. New turn %d started") % empire.second->PlayerName() % (server.CurrentTurn()+1)).str(), empire.second->PlayerName(), GetOptionsDB().Get<bool>("network.server.allow-email.new-turn"));
             }
         }
+        // list players who missed turn
+        std::set<int> last_empires_id = server.LastNotReadyEmpires();
+        std::string last_player_names{"Slowpokes:\n"};
+        bool has_slowpokes = false;
+        for (int last_empire_id : last_empires_id) {
+            const Empire* empire = server.GetEmpire(last_empire_id);
+            if (empire != nullptr &&
+                !empire->Eliminated() &&
+                server.GetEmpireClientType(empire->EmpireID()) == Networking::ClientType::INVALID_CLIENT_TYPE)
+            {
+                const auto& player_name = empire->PlayerName();
+                last_player_names += player_name;
+                last_player_names += '\n';
+                has_slowpokes = true;
+            }
+        }
+        if (has_slowpokes) {
+            std::thread([last_player_names] {
+                std::vector<std::string> args{"/usr/bin/curl",
+                    "http://localhost:8083/",
+                    "-H", "X-XMPP-Muc: smac",
+                    "-d", last_player_names};
+                Process sendxmpp = Process("/usr/bin/curl", args);
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+            }).detach();
+        }
+
         post_event(ProcessTurn());
         return transit<ProcessingTurn>();
     }

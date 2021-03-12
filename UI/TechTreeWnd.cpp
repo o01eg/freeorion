@@ -368,7 +368,7 @@ void TechTreeWnd::TechTreeControls::DoButtonLayout() {
     m_row_offset = BUTTON_HEIGHT + BUTTON_SEPARATION;   // vertical distance between each row of buttons
     m_buttons_per_row = std::max(Value(USABLE_WIDTH / (m_col_offset)), 1);
 
-    const int NUM_NON_CATEGORY_BUTTONS = 6;  //  ALL, Locked, Partial, Unlocked, Complete, ViewType
+    constexpr int NUM_NON_CATEGORY_BUTTONS = 6;  //  ALL, Locked, Partial, Unlocked, Complete, ViewType
 
     // place category buttons: fill each row completely before starting next row
     int row = 0, col = -1;
@@ -727,7 +727,7 @@ bool TechTreeWnd::LayoutPanel::TechPanel::InWindow(const GG::Pt& pt) const {
 void TechTreeWnd::LayoutPanel::TechPanel::PreRender() {
     GG::Wnd::PreRender();
 
-    const int PAD = 8;
+    constexpr int PAD = 8;
     GG::X text_left(GG::X(Value(TechPanelHeight())) + PAD);
     GG::Y text_top(0);
     GG::X text_width(TechPanelWidth() - text_left);
@@ -777,7 +777,7 @@ void TechTreeWnd::LayoutPanel::TechPanel::PreRender() {
 }
 
 void TechTreeWnd::LayoutPanel::TechPanel::Render() {
-    const int PAD = 8;
+    constexpr int PAD = 8;
     GG::X text_left(GG::X(Value(TechPanelHeight())) + PAD);
     GG::Y text_top(0);
     GG::X text_width(TechPanelWidth() - text_left);
@@ -964,7 +964,7 @@ void TechTreeWnd::LayoutPanel::TechPanel::Update() {
         }
 
         if (m_unlock_icons.empty()) {
-            const int PAD = 8;
+            constexpr int PAD = 8;
             GG::X icon_left(GG::X(Value(TechPanelHeight())) + PAD*3/2);
             GG::Y icon_height = TechPanelHeight()/2;
             GG::X icon_width = GG::X(Value(icon_height));
@@ -1619,7 +1619,6 @@ TechTreeWnd::TechListBox::TechRow::TechRow(GG::X w, const std::string& tech_name
 { SetDragDropDataType("TechListBox::TechRow"); }
 
 void TechTreeWnd::TechListBox::TechRow::CompleteConstruction() {
-
     CUIListBox::Row::CompleteConstruction();
 
     const Tech* this_row_tech = ::GetTech(m_tech);
@@ -1627,7 +1626,7 @@ void TechTreeWnd::TechListBox::TechRow::CompleteConstruction() {
         return;
 
     std::vector<GG::X> col_widths = ColWidths(Width());
-    const GG::X GRAPHIC_WIDTH =   col_widths[0];
+    const GG::X GRAPHIC_WIDTH = col_widths[0];
     const GG::Y ICON_HEIGHT(std::min(Value(Height()) - 12, std::max(ClientUI::Pts(), Value(GRAPHIC_WIDTH) - 6)));
     // TODO replace string padding with new TextFormat flag
     std::string just_pad = "    ";
@@ -1636,38 +1635,38 @@ void TechTreeWnd::TechListBox::TechRow::CompleteConstruction() {
                                                       GG::GRAPHIC_VCENTER | GG::GRAPHIC_CENTER | GG::GRAPHIC_PROPSCALE | GG::GRAPHIC_FITGRAPHIC);
     graphic->Resize(GG::Pt(GRAPHIC_WIDTH, ICON_HEIGHT));
     graphic->SetColor(ClientUI::CategoryColor(this_row_tech->Category()));
-    push_back(graphic);
+    push_back(std::move(graphic));
 
     auto text = GG::Wnd::Create<CUILabel>(just_pad + UserString(m_tech), GG::FORMAT_LEFT);
     text->SetResetMinSize(false);
     text->ClipText(true);
     text->SetChildClippingMode(ChildClippingMode::ClipToWindow);
-    push_back(text);
+    push_back(std::move(text));
 
     std::string cost_str = std::to_string(std::lround(this_row_tech->ResearchCost(GGHumanClientApp::GetApp()->EmpireID())));
     text = GG::Wnd::Create<CUILabel>(cost_str + just_pad + just_pad, GG::FORMAT_RIGHT);
     text->SetResetMinSize(false);
     text->ClipText(true);
     text->SetChildClippingMode(ChildClippingMode::ClipToWindow);
-    push_back(text);
+    push_back(std::move(text));
 
     std::string time_str = std::to_string(this_row_tech->ResearchTime(GGHumanClientApp::GetApp()->EmpireID()));
     text = GG::Wnd::Create<CUILabel>(time_str + just_pad + just_pad, GG::FORMAT_RIGHT);
     text->SetResetMinSize(false);
     text->ClipText(true);
     text->SetChildClippingMode(ChildClippingMode::ClipToWindow);
-    push_back(text);
+    push_back(std::move(text));
 
     text = GG::Wnd::Create<CUILabel>(just_pad + UserString(this_row_tech->Category()), GG::FORMAT_LEFT);
     text->SetResetMinSize(false);
     text->ClipText(true);
     text->SetChildClippingMode(ChildClippingMode::ClipToWindow);
-    push_back(text);
+    push_back(std::move(text));
 
     text = GG::Wnd::Create<CUILabel>(just_pad + UserString(this_row_tech->ShortDescription()), GG::FORMAT_LEFT);
     text->ClipText(true);
     text->SetChildClippingMode(ChildClippingMode::ClipToWindow);
-    push_back(text);
+    push_back(std::move(text));
 }
 
 void TechTreeWnd::TechListBox::TechRow::Update() {

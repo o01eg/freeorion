@@ -308,11 +308,24 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
         if (player_connection->GetClientType() == Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
             // AI could safely disconnect only if empire was eliminated
             const Empire* empire = GetEmpire(m_server.PlayerEmpireID(id));
-            if (empire && !empire->Eliminated()) {
-                must_quit = true;
-                // AI abnormally disconnected during a regular game
-                ErrorLogger(FSM) << "AI Player #" << id << ", named \""
-                                 << player_connection->PlayerName() << "\"quit before empire was eliminated.";
+            if (empire) {
+                if (!empire->Eliminated()) {
+                    must_quit = true;
+                    // AI abnormally disconnected during a regular game
+                    ErrorLogger(FSM) << "AI Player #" << id << ", named \""
+                                     << player_connection->PlayerName() << "\" quit before empire #"
+                                     << empire->EmpireID() << " "
+                                     << empire->Name() << " of player "
+                                     << empire->PlayerName() << " was eliminated.";
+                } else {
+                    InfoLogger(FSM) << "AI Player #" << id << ", named \""
+                                    << player_connection->PlayerName() << "\" killed after empire #"
+                                    << empire->EmpireID() << " "
+                                    << empire->Name() << " of player "
+                                    << empire->PlayerName() << " was eliminated.";
+                    // detach player from empire
+                    m_server.DropPlayerEmpireLink(id);
+                }
             }
         } else if (player_connection->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER) {
             const Empire* empire = GetEmpire(m_server.PlayerEmpireID(id));
@@ -518,6 +531,11 @@ bool ServerFSM::EstablishPlayer(const PlayerConnectionPtr& player_connection,
     }
 
     if (client_type == Networking::ClientType::INVALID_CLIENT_TYPE) {
+        InfoLogger() << "ServerFSM::EstablishPlayer player " << player_name
+                     << " has client type " << client_type
+                     << " version string: " << client_version_string
+                     << " and roles: " << roles.Text()
+                     << " and is to be disconnected due to the invalid client type";
         player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_CLIENT_TYPE_NOT_ALLOWED"), true));
         to_disconnect.push_back(player_connection);
     } else {
@@ -1188,7 +1206,8 @@ sc::result MPLobby::react(const JoinGame& msg) {
         if (authenticated)
             player_connection->SetAuthenticated();
     } else {
-        if (client_type != Networking::ClientType::CLIENT_TYPE_AI_PLAYER && server.IsAuthRequiredOrFillRoles(player_name, roles)) {
+        const bool relaxed_auth = player_connection->IsLocalConnection() && client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER;
+        if (!relaxed_auth && server.IsAuthRequiredOrFillRoles(player_name, roles)) {
             // send authentication request
             player_connection->AwaitPlayer(client_type, client_version_string);
             player_connection->SendMessage(AuthRequestMessage(player_name, "PLAIN-TEXT"));
@@ -1217,7 +1236,7 @@ sc::result MPLobby::react(const JoinGame& msg) {
         {
             collision = false;
             roles.Clear();
-            if (!server.IsAvailableName(new_player_name) || server.IsAuthRequiredOrFillRoles(new_player_name, roles)) {
+            if (!server.IsAvailableName(new_player_name) || (!relaxed_auth && server.IsAuthRequiredOrFillRoles(new_player_name, roles))) {
                 collision = true;
             } else {
                 for (auto& plr : m_lobby_data->players) {
@@ -2398,6 +2417,11 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
                 client_type = Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR;
             else {
                 player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_CLIENT_TYPE_NOT_ALLOWED"), true));
+                InfoLogger() << "WaitingForMPGameJoiners::react(const JoinGame& msg) player " << player_name
+                             << " has client type " << client_type
+                             << " version string: " << client_version_string
+                             << " and roles: " << roles.Text()
+                             << " and is to be disconnected due to the invalid client type";
                 server.Networking().Disconnect(player_connection);
                 return discard_event();
             }
@@ -2465,6 +2489,10 @@ sc::result WaitingForMPGameJoiners::react(const AuthResponse& msg) {
                 client_type = Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR;
             else {
                 player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_CLIENT_TYPE_NOT_ALLOWED"), true));
+                InfoLogger() << "WaitingForMPGameJoiners::react(const AuthResponse& msg) player " << player_name
+                             << " has client type " << client_type
+                             << " and roles: " << roles.Text()
+                             << " and is to be disconnected due to the invalid client type";
                 server.Networking().Disconnect(player_connection);
                 return discard_event();
             }
@@ -2757,7 +2785,8 @@ void PlayingGame::EstablishPlayer(const PlayerConnectionPtr& player_connection,
             {
                 // send playing game
                 server.AddObserverPlayerIntoGame(player_connection);
-            } else if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER) {
+            } else if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER ||
+                       client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
                 // previous connection was dropped
                 // set empire link to new connection by name
                 // send playing game
@@ -2806,7 +2835,8 @@ sc::result PlayingGame::react(const JoinGame& msg) {
         if (authenticated)
             player_connection->SetAuthenticated();
     } else {
-        if (server.IsAuthRequiredOrFillRoles(player_name, roles)) {
+        const bool relaxed_auth = player_connection->IsLocalConnection() && client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER;
+        if (!relaxed_auth && server.IsAuthRequiredOrFillRoles(player_name, roles)) {
             // send authentication request
             player_connection->AwaitPlayer(client_type, client_version_string);
             player_connection->SendMessage(AuthRequestMessage(player_name, "PLAIN-TEXT"));
@@ -2816,8 +2846,10 @@ sc::result PlayingGame::react(const JoinGame& msg) {
         std::string original_player_name = player_name;
         // Remove AI prefix to distinguish Human from AI.
         std::string ai_prefix = UserString("AI_PLAYER") + "_";
-        while (player_name.compare(0, ai_prefix.size(), ai_prefix) == 0)
-            player_name.erase(0, ai_prefix.size());
+        if (client_type != Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
+            while (player_name.compare(0, ai_prefix.size(), ai_prefix) == 0)
+                player_name.erase(0, ai_prefix.size());
+        }
         if (player_name.empty())
             player_name = "_";
 
@@ -2830,7 +2862,7 @@ sc::result PlayingGame::react(const JoinGame& msg) {
         {
             collision = false;
             roles.Clear();
-            if (!server.IsAvailableName(new_player_name) || server.IsAuthRequiredOrFillRoles(new_player_name, roles)) {
+            if (!server.IsAvailableName(new_player_name) || (!relaxed_auth && server.IsAuthRequiredOrFillRoles(new_player_name, roles))) {
                 collision = true;
             } else {
                 for (auto& plr : server.Empires() ) {
@@ -3582,8 +3614,8 @@ sc::result ShuttingDownServer::react(const CheckEndConditions& u) {
         DebugLogger(FSM) << "All " << server.m_ai_client_processes.size() << " AIs acknowledged shutdown request.";
 
         // Free the processes so that they can complete their shutdown.
-        for (Process& process : server.m_ai_client_processes)
-        { process.Free(); }
+        for (auto& process : server.m_ai_client_processes)
+            process.second.Free();
 
         post_event(DisconnectClients());
     }

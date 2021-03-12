@@ -48,7 +48,7 @@ namespace {
     bool g_initialized = false;
     fs::path bin_dir = fs::initial_path();
 
-    const std::string EMPTY_STRING = "";
+    const std::string EMPTY_STRING;
     const std::string PATH_BINARY_STR = "PATH_BINARY";
     const std::string PATH_RESOURCE_STR = "PATH_RESOURCE";
     const std::string PATH_DATA_ROOT_STR = "PATH_DATA_ROOT";
@@ -630,8 +630,9 @@ auto FilenameTimestamp() -> std::string
     std::replace(retval.begin(), retval.end(), ' ', '_');
     std::replace(retval.begin(), retval.end(), ':', '-');
 
-    // filter non-filename-safe characters that are valid single-byte UTF-8 characters, in case the default locale for this system has weird chars in the time-date format
-    auto do_remove = [](char c) -> bool { return !std::isalnum(c) && c <= 127 && c != '_' && c != '-'; };
+    // filter non-filename-safe characters that are valid single-byte UTF-8 characters,
+    // in case the default locale for this system has weird chars in the time-date format
+    auto do_remove = [](char c) -> bool { return !std::isalnum(c) && c != '_' && c != '-'; };
     retval.erase(std::remove_if(retval.begin(), retval.end(), do_remove), retval.end());
     TraceLogger() << "Filename filtered timestamp: " << retval;
 

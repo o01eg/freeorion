@@ -26,9 +26,8 @@
 
 
 namespace {
-    const float EPSILON = 0.01f;
+    constexpr float EPSILON = 0.01f;
     const std::string EMPTY_STRING;
-    const int INVALID_SLOT_INDEX = -1;
 
     std::vector<std::pair<std::string, std::string>> PolicyCategoriesSlotsMeters() {
         std::vector<std::pair<std::string, std::string>> retval;
@@ -36,27 +35,13 @@ namespace {
         // derive meters from PolicyManager parsed policies' categories
         for (auto& cat : GetPolicyManager().PolicyCategories()) {
             std::string&& slots_string{cat + "_NUM_POLICY_SLOTS"};
-            retval.emplace_back(std::move(cat), std::move(slots_string));
+            retval.emplace_back(cat, std::move(slots_string));
         }
         return retval;
     }
 
     DeclareThreadSafeLogger(supply);
 }
-
-////////////////////////////////
-// Empire::PolicyAdoptionInfo //
-////////////////////////////////
-Empire::PolicyAdoptionInfo::PolicyAdoptionInfo() :
-    PolicyAdoptionInfo(INVALID_GAME_TURN, EMPTY_STRING, INVALID_SLOT_INDEX)
-{}
-
-Empire::PolicyAdoptionInfo::PolicyAdoptionInfo(int turn, const std::string& cat, int slot) :
-    adoption_turn(turn),
-    category(cat),
-    slot_in_category(slot)
-{}
-
 
 ////////////
 // Empire //
@@ -785,11 +770,11 @@ const ProductionQueue& Empire::GetProductionQueue() const
 const InfluenceQueue& Empire::GetInfluenceQueue() const
 { return m_influence_queue; }
 
-float Empire::ProductionStatus(int i) const {
+float Empire::ProductionStatus(int i, const ScriptingContext& context) const {
     if (0 > i || i >= static_cast<int>(m_production_queue.size()))
         return -1.0f;
     float item_progress = m_production_queue[i].progress;
-    [[maybe_unused]] auto [item_cost, item_time] = m_production_queue[i].ProductionCostAndTime(); // TODO: pass and use ScriptingContext
+    [[maybe_unused]] auto [item_cost, item_time] = m_production_queue[i].ProductionCostAndTime(context);
     (void)item_time; // quiet unused variable warning
     return item_progress * item_cost * m_production_queue[i].blocksize;
 }
@@ -1284,7 +1269,7 @@ const std::map<int, float>& Empire::SystemSupplyRanges() const
 const std::set<int>& Empire::SupplyUnobstructedSystems() const
 { return m_supply_unobstructed_systems; }
 
-const bool Empire::PreservedLaneTravel(int start_system_id, int dest_system_id) const {
+bool Empire::PreservedLaneTravel(int start_system_id, int dest_system_id) const {
     auto find_it = m_preserved_system_exit_lanes.find(start_system_id);
     return find_it != m_preserved_system_exit_lanes.end()
             && find_it->second.count(dest_system_id);
@@ -2217,7 +2202,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
 
         // only if consumed resources are available, then item can be completd
         bool consumption_impossible = false;
-        std::map<std::string, std::map<int, float>> sc = elem.item.CompletionSpecialConsumption(elem.location); // TODO: pass context
+        auto sc = elem.item.CompletionSpecialConsumption(elem.location, context);
         for (auto& special_type : sc) {
             if (consumption_impossible)
                 break;
@@ -2230,7 +2215,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 }
             }
         }
-        auto mc = elem.item.CompletionMeterConsumption(elem.location); // TODO: pass context
+        auto mc = elem.item.CompletionMeterConsumption(elem.location, context);
         for (auto& meter_type : mc) {
             if (consumption_impossible)
                 break;
@@ -2376,7 +2361,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 ship->Rename(NewShipName());
 
                 // store ships to put into fleets later
-                system_new_ships[system->ID()].emplace_back(ship);
+                system_new_ships[system->ID()].push_back(ship);
 
                 // store ship rally points
                 if (elem.rally_point_id != INVALID_OBJECT_ID)

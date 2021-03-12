@@ -1,10 +1,11 @@
 # This Python file uses the following encoding: utf-8
-import logging
+import inspect
+import pprint
 import re
 import traceback
 from collections.abc import Mapping
 from functools import wraps
-from logging import debug, error, warning
+from logging import debug, error, ERROR, getLogger, Handler, warning
 
 import freeOrionAIInterface as fo  # pylint: disable=import-error
 from aistate_interface import get_aistate
@@ -103,7 +104,7 @@ def ppstring(foo):
         return str(foo)
 
 
-class ConsoleLogHandler(logging.Handler):
+class ConsoleLogHandler(Handler):
     """A log handler to send errors to the console. """
     def emit(self, record):
         """Emit a record.
@@ -131,9 +132,9 @@ console_handler.setFormatter(
     FOLogFormatter(RED % ('%s : %%(filename)s:%%(funcName)s():%%(lineno)d  - %%(message)s'
                           % fo.userString('AI_ERROR_MSG'))))
 
-console_handler.setLevel(logging.ERROR)
+console_handler.setLevel(ERROR)
 
-logging.getLogger().addHandler(console_handler)
+getLogger().addHandler(console_handler)
 
 
 def remove_tags(message):
@@ -317,11 +318,11 @@ class LogLevelSwitcher:
         self.old_log_level = 0
 
     def __enter__(self):
-        self.old_log_level = logging.getLogger().level
-        logging.getLogger().setLevel(self.target_log_level)
+        self.old_log_level = getLogger().level
+        getLogger().setLevel(self.target_log_level)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        logging.getLogger().setLevel(self.old_log_level)
+        getLogger().setLevel(self.old_log_level)
 
 
 def with_log_level(log_level):
@@ -349,28 +350,31 @@ def with_log_level(log_level):
     return decorator
 
 
-def assertion_fails(cond, msg="", logger=logging.error):
+def assertion_fails(cond: bool, msg: str = "") -> bool:
     """
     Check if condition fails and if so, log a traceback but raise no Exception.
 
+    Return False is condition True and True if condition is False.
+
     This is a useful functions for generic sanity checks and may be used to
     replace manual error logging with more context provided by the traceback.
-
-    :param bool cond: condition to be asserted
-    :param str msg: additional info to be logged
-    :param func logger: may be used to override default log level (error)
-    :return: True if assertion failed, otherwise false.
     """
     if cond:
         return False
 
     if msg:
-        header = "Assertion failed: %s." % msg
+        header = "AI raised a warning: %s. See more detailed description in logs." % msg
     else:
-        header = "Assertion failed!"
+        header = "AI raised a warning. See more detailed description in logs."
+
+    warning("\n===")
+    error(header)
     stack = traceback.extract_stack()[:-1]  # do not log this function
-    logger("%s Traceback (most recent call last): %s", header,
-           ''.join(traceback.format_list(stack)))
+    warning("Stack trace (most recent call last): %s", ''.join(traceback.format_list(stack)))
+    frame = inspect.currentframe().f_back
+    local_vars = pprint.pformat(frame.f_locals)
+    warning("Locals inside the {}\n{}".format(frame.f_code.co_name, local_vars))
+    warning("===\n")
     return True
 
 

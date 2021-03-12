@@ -95,24 +95,25 @@ private:
         DebugLogger(network) << "DiscoveryServer evaluating FOCS expression: " << message;
         std::string reply;
         try {
+            ScriptingContext context;
             if (parse::int_free_variable(message)) {
                 auto value_ref = std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
-                reply = std::to_string(value_ref->Eval(ScriptingContext()));
+                reply = std::to_string(value_ref->Eval(context));
                 DebugLogger(network) << "DiscoveryServer evaluated expression as integer with result: " << reply;
 
             } else if (parse::double_free_variable(message)) {
                 auto value_ref = std::make_unique<ValueRef::Variable<double>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
-                reply = std::to_string(value_ref->Eval(ScriptingContext()));
+                reply = std::to_string(value_ref->Eval(context));
                 DebugLogger(network) << "DiscoveryServer evaluated expression as double with result: " << reply;
 
             } else if (parse::string_free_variable(message)) {
                 auto value_ref = std::make_unique<ValueRef::Variable<std::string>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
-                reply = value_ref->Eval(ScriptingContext());
+                reply = value_ref->Eval(context);
                 DebugLogger(network) << "DiscoveryServer evaluated expression as string with result: " << reply;
 
             //} else {
             //    auto value_ref = std::make_unique<ValueRef::Variable<std::vector<std::string>>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
-            //    auto result = value_ref->Eval(ScriptingContext());
+            //    auto result = value_ref->Eval(context);
             //    for (auto entry : result)
             //        reply += entry + "\n";
             //    DebugLogger(network) << "DiscoveryServer evaluated expression as string vector with result: " << reply;
@@ -488,8 +489,8 @@ void PlayerConnection::HandleMessageHeaderRead(boost::system::error_code error,
             {
                 ErrorLogger(network) << "PlayerConnection::HandleMessageHeaderRead(): "
                                      << "too big message " << msg_size << " bytes ";
-                boost::system::error_code error;
-                m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, error);
+                boost::system::error_code ignored_error;
+                m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_error);
                 m_socket->close();
                 return;
             }
@@ -499,8 +500,8 @@ void PlayerConnection::HandleMessageHeaderRead(boost::system::error_code error,
                 ErrorLogger(network) << "PlayerConnection::HandleMessageHeaderRead(): "
                                      << "caught exception resizing message buffer to size "
                                      << msg_size << " : " << e.what();
-                boost::system::error_code error;
-                m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, error);
+                boost::system::error_code ignored_error;
+                m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_error);
                 m_socket->close();
                 return;
             }

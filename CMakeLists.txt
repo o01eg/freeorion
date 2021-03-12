@@ -47,6 +47,7 @@ option(BUILD_TESTING "Build the testing tree." OFF)
 option(BUILD_CLIENT_GG "Build GiGi client" ON)
 option(BUILD_SERVER "Build server" ON)
 option(BUILD_AI "Build AI" ON)
+option(BUILD_PARSERS "Build parsers" ON)
 
 if(BUILD_TESTING)
     message( STATUS "Building Tests")
@@ -55,7 +56,7 @@ if(BUILD_TESTING)
 
     if(NOT TARGET unittest)
         add_custom_target(unittest
-            COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure --build-config $<CONFIG>
+            COMMAND ${CMAKE_CTEST_COMMAND} --verbose --output-on-failure --build-config $<CONFIG>
             COMMENT "Run tests for ${CMAKE_PROJECT_NAME}"
         )
     endif()

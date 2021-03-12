@@ -65,14 +65,14 @@
 
 
 namespace {
-    const double    ZOOM_STEP_SIZE = std::pow(2.0, 1.0/4.0);
-    const double    ZOOM_IN_MAX_STEPS = 12.0;
-    const double    ZOOM_IN_MIN_STEPS = -10.0;//-7.0;   // negative zoom steps indicates zooming out
-    const double    ZOOM_MAX = std::pow(ZOOM_STEP_SIZE, ZOOM_IN_MAX_STEPS);
-    const double    ZOOM_MIN = std::pow(ZOOM_STEP_SIZE, ZOOM_IN_MIN_STEPS);
+    const double     ZOOM_STEP_SIZE = std::pow(2.0, 1.0/4.0);
+    constexpr double ZOOM_IN_MAX_STEPS = 12.0;
+    constexpr double ZOOM_IN_MIN_STEPS = -10.0;//-7.0;   // negative zoom steps indicates zooming out
+    const double     ZOOM_MAX = std::pow(ZOOM_STEP_SIZE, ZOOM_IN_MAX_STEPS);
+    const double     ZOOM_MIN = std::pow(ZOOM_STEP_SIZE, ZOOM_IN_MIN_STEPS);
 
-    const GG::X     SITREP_PANEL_WIDTH(400);
-    const GG::Y     SITREP_PANEL_HEIGHT(200);
+    constexpr GG::X  SITREP_PANEL_WIDTH{400};
+    constexpr GG::Y  SITREP_PANEL_HEIGHT{200};
 
     const std::string SITREP_WND_NAME = "map.sitrep";
     const std::string MAP_PEDIA_WND_NAME = "map.pedia";
@@ -82,20 +82,20 @@ namespace {
     const std::string MAP_SIDEPANEL_WND_NAME = "map.sidepanel";
     const std::string GOVERNMENT_WND_NAME = "map.government";
 
-    const GG::Y ZOOM_SLIDER_HEIGHT(200);
-    const GG::Y SCALE_LINE_HEIGHT(20);
-    const GG::X SCALE_LINE_MAX_WIDTH(240);
-    const int   MIN_SYSTEM_NAME_SIZE = 10;
-    const int   LAYOUT_MARGIN = 5;
-    const GG::Y TOOLBAR_HEIGHT(32);
+    constexpr GG::Y ZOOM_SLIDER_HEIGHT{200};
+    constexpr GG::Y SCALE_LINE_HEIGHT{20};
+    constexpr GG::X SCALE_LINE_MAX_WIDTH{240};
+    constexpr int   MIN_SYSTEM_NAME_SIZE = 10;
+    constexpr int   LAYOUT_MARGIN = 5;
+    constexpr GG::Y TOOLBAR_HEIGHT{32};
 
     constexpr double TWO_PI = 2.0*3.1415926536;
 
-    const GG::X ICON_SINGLE_WIDTH(40);
-    const GG::X ICON_DUAL_WIDTH(64);
-    const GG::X ICON_WIDTH(24);
-    const GG::Pt ICON_SIZE{GG::X{24}, GG::Y{24}};
-    const GG::Pt MENU_ICON_SIZE{GG::X{32}, GG::Y{32}};
+    constexpr GG::X ICON_SINGLE_WIDTH{40};
+    constexpr GG::X ICON_DUAL_WIDTH{64};
+    constexpr GG::X ICON_WIDTH{24};
+    constexpr GG::Pt ICON_SIZE{GG::X{24}, GG::Y{24}};
+    constexpr GG::Pt MENU_ICON_SIZE{GG::X{32}, GG::Y{32}};
 
 
     DeclareThreadSafeLogger(effects);
@@ -387,7 +387,7 @@ namespace {
 
         void DoLayout() {
             const GG::Y row_height{ClientUI::Pts()};
-            const GG::Y offset{32};
+            constexpr GG::Y offset{32};
             const GG::X descr_width{m_col_widths.at(0) - (m_margin * 2)};
             const GG::X value_width{m_col_widths.at(1) - (m_margin * 3)};
 
@@ -1993,7 +1993,7 @@ void MapWnd::RenderSystems() {
                     std::map<int, int> colony_count_by_empire_id;
                     const std::set<int>& known_destroyed_object_ids = GetUniverse().EmpireKnownDestroyedObjectIDs(GGHumanClientApp::GetApp()->EmpireID());
 
-                    for (auto& planet : Objects().find<const Planet>(system->PlanetIDs())) {
+                    for (const auto& planet : Objects().find<const Planet>(system->PlanetIDs())) {
                         if (known_destroyed_object_ids.count(planet->ID()) > 0)
                             continue;
 
@@ -2001,7 +2001,7 @@ void MapWnd::RenderSystems() {
                         if (!planet->Unowned()) {
                             has_empire_planet = true;
 
-                            std::map<int, int>::iterator it = colony_count_by_empire_id.find(planet->Owner()) ;
+                            auto it = colony_count_by_empire_id.find(planet->Owner()) ;
                             if (it != colony_count_by_empire_id.end())
                                 it->second++;
                             else
@@ -2029,8 +2029,9 @@ void MapWnd::RenderSystems() {
                             glColor(empire->Color());
                         else
                             ErrorLogger() << "MapWnd::RenderSystems(): could not load empire with id " << supply_empire_id;
-                    } else
+                    } else {
                         glColor(GetOptionsDB().Get<GG::Clr>("ui.map.starlane.color"));
+                    }
 
                     glLineWidth(outer_circle_width);
                     CircleArc(circle_ul, circle_lr, 0.0, TWO_PI, false);
@@ -2055,19 +2056,24 @@ void MapWnd::RenderSystems() {
                     int colonised_planets = 0;
                     int position = 0;
 
-                    for (std::pair<int, int> it : colony_count_by_empire_id)
-                        colonised_planets += it.second;
+                    for (auto& [empire_id, colony_count] : colony_count_by_empire_id) {
+                        (void)empire_id; // quiet unused variable warning
+                        colonised_planets += colony_count;
+                    }
 
-                    float segment = static_cast<float>(TWO_PI) / colonised_planets;
+                    const double segment = TWO_PI / std::max(colonised_planets, 1);
 
-                    for (std::pair<int, int> it : colony_count_by_empire_id) {
-                        if (const Empire* empire = GetEmpire(it.first))
+                    for (auto& [empire_id, colony_count] : colony_count_by_empire_id) {
+                        if (const Empire* empire = GetEmpire(empire_id))
                             glColor(empire->Color());
                         else
                             glColor(ClientUI::TextColor());
 
-                        CircleArc(inner_circle_ul, inner_circle_lr, position * segment, (it.second + position) * segment, false);
-                        position += it.second;
+                        CircleArc(inner_circle_ul,
+                                  inner_circle_lr,
+                                  position * segment,
+                                  (colony_count + position) * segment, false);
+                        position += colony_count;
                     }
                 }
             }
@@ -2648,9 +2654,11 @@ void MapWnd::InitTurn() {
 
     //DebugLogger() << GetSupplyManager().Dump();
 
-    Universe& universe = GetUniverse();
-    ObjectMap& objects = universe.Objects(); // TODO: Get from universe directly
     EmpireManager& empires = Empires();
+    Universe& universe = GetUniverse();
+    ObjectMap& objects = universe.Objects();
+    ScriptingContext context{universe, empires, GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
+
 
     TraceLogger(effects) << "MapWnd::InitTurn initial:";
     for (auto obj : objects.all())
@@ -2658,20 +2666,20 @@ void MapWnd::InitTurn() {
 
     timer.EnterSection("meter estimates");
     // update effect accounting and meter estimates
-    universe.InitMeterEstimatesAndDiscrepancies(empires);
+    universe.InitMeterEstimatesAndDiscrepancies(context);
 
     timer.EnterSection("orders");
     // if we've just loaded the game there may be some unexecuted orders, we
     // should reapply them now, so they are reflected in the UI, but do not
     // influence current meters or their discrepancies for this turn
-    GGHumanClientApp::GetApp()->Orders().ApplyOrders();
+    GGHumanClientApp::GetApp()->Orders().ApplyOrders(); // TODO: pass Universe?
 
     timer.EnterSection("meter estimates");
     // redo meter estimates with unowned planets marked as owned by player, so accurate predictions of planet
     // population is available for currently uncolonized planets
-    GetUniverse().UpdateMeterEstimates(empires);
+    GetUniverse().UpdateMeterEstimates(context);
 
-    GetUniverse().ApplyAppearanceEffects(empires);
+    GetUniverse().ApplyAppearanceEffects(context);
 
     timer.EnterSection("init rendering");
     // set up system icons, starlanes, galaxy gas rendering
@@ -2708,7 +2716,7 @@ void MapWnd::InitTurn() {
 
     // connect fleet change signals to update fleet movement lines, so that ordering
     // fleets to move updates their displayed path and rearranges fleet buttons (if necessary)
-    for (const auto& fleet : Objects().all<Fleet>()) {
+    for (const auto& fleet : objects.all<Fleet>()) {
         m_fleet_state_change_signals[fleet->ID()] = fleet->StateChangedSignal.connect(
             boost::bind(&MapWnd::RefreshFleetButtons, this, true));
     }
@@ -2763,7 +2771,7 @@ void MapWnd::InitTurn() {
     // empire is recreated each turn based on turn update from server, so
     // connections of signals emitted from the empire must be remade each turn
     // (unlike connections to signals from the sidepanel)
-    Empire* this_client_empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
+    auto this_client_empire = empires.GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (this_client_empire) {
         this_client_empire->GetResourcePool(ResourceType::RE_INFLUENCE)->ChangedSignal.connect(
             boost::bind(&MapWnd::RefreshInfluenceResourceIndicator, this));
@@ -4364,7 +4372,8 @@ void MapWnd::SelectSystem(int system_id) {
 
     if (system) {
         // ensure meter estimates are up to date, particularly for which ship is selected
-        GetUniverse().UpdateMeterEstimates(system_id, Empires(), true);
+        ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
+        GetUniverse().UpdateMeterEstimates(system_id, context, true);
     }
 
 
@@ -6863,7 +6872,8 @@ void MapWnd::RefreshPopulationIndicator() {
 }
 
 void MapWnd::UpdateSidePanelSystemObjectMetersAndResourcePools() {
-    GetUniverse().UpdateMeterEstimates(SidePanel::SystemID(), Empires(), true);
+    ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
+    GetUniverse().UpdateMeterEstimates(SidePanel::SystemID(), context, true);
     UpdateEmpireResourcePools();
 }
 
@@ -7311,7 +7321,8 @@ namespace {
     bool FleetRouteInRange(const std::shared_ptr<Fleet>& fleet, const RouteListType& route) {
         std::list<int> route_list{route.begin(), route.end()};
 
-        auto eta = fleet->ETA(fleet->MovePath(route_list, false, ScriptingContext()));
+        ScriptingContext context;
+        auto eta = fleet->ETA(fleet->MovePath(route_list, false, context));
         if (eta.first == Fleet::ETA_NEVER || eta.first == Fleet::ETA_UNKNOWN || eta.first == Fleet::ETA_OUT_OF_RANGE)
             return false;
 
@@ -7643,7 +7654,8 @@ void MapWnd::DispatchFleetsExploring() {
         if (destroyed_objects.count(fleet->ID())) {
             m_fleets_exploring.erase(fleet->ID()); //this fleet can't explore anymore
         } else {
-             if (fleet->MovePath(false, ScriptingContext()).empty())
+            ScriptingContext context;
+            if (fleet->MovePath(false, context).empty())
                 idle_fleets.insert(fleet->ID());
             else
                 systems_being_explored.emplace(fleet->FinalDestinationID(), fleet->ID());

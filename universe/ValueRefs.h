@@ -57,6 +57,11 @@ struct FO_COMMON_API Constant final : public ValueRef<T>
     T Value() const;
     unsigned int GetCheckSum() const override;
 
+    std::unique_ptr<ValueRef<T>> Clone() const override {
+        auto retval = std::make_unique<Constant>(m_value);
+        retval->m_top_level_content = m_top_level_content;
+        return retval;
+    }
 private:
     T           m_value;
     std::string m_top_level_content;    // in the special case that T is std::string and m_value is "CurrentContent", return this instead
@@ -87,9 +92,10 @@ struct FO_COMMON_API Variable : public ValueRef<T>
     explicit Variable(ReferenceType ref_type,
              bool return_immediate_value = false);
 
+    template <typename S>
     Variable(ReferenceType ref_type,
              boost::optional<std::string>&& container_name,
-             std::string&& property_name,
+             S&& property_name,
              bool return_immediate_value = false);
 
     Variable(ReferenceType ref_type, std::vector<std::string>&& property_name,
@@ -106,6 +112,9 @@ struct FO_COMMON_API Variable : public ValueRef<T>
     const std::vector<std::string>& PropertyName() const;
     bool ReturnImmediateValue() const;
     unsigned int GetCheckSum() const override;
+
+    std::unique_ptr<ValueRef<T>> Clone() const override
+    { return std::make_unique<Variable<T>>(m_ref_type, m_property_name, m_return_immediate_value); }
 
 protected:
     void InitInvariants();
@@ -143,6 +152,12 @@ struct FO_COMMON_API Statistic final : public Variable<T>
     { return m_value_ref.get(); }
 
     unsigned int GetCheckSum() const override;
+
+    std::unique_ptr<ValueRef<T>> Clone() const override {
+        return std::make_unique<Statistic<T, V>>(CloneUnique(m_value_ref),
+                                                 m_stat_type,
+                                                 CloneUnique(m_sampling_condition));
+    }
 
 protected:
     /** Gets the set of objects in the Universe that match the sampling condition. */
@@ -183,6 +198,8 @@ struct FO_COMMON_API ComplexVariable final : public Variable<T>
                              std::unique_ptr<ValueRef<std::string>>&& string_ref2 = nullptr,
                              bool return_immediate_value = false);
 
+    explicit ComplexVariable(const ComplexVariable<T>& rhs);
+
     bool operator==(const ValueRef<T>& rhs) const override;
     T Eval(const ScriptingContext& context) const override;
     std::string Description() const override;
@@ -194,6 +211,9 @@ struct FO_COMMON_API ComplexVariable final : public Variable<T>
     const ValueRef<std::string>* StringRef1() const;
     const ValueRef<std::string>* StringRef2() const;
     unsigned int GetCheckSum() const override;
+
+    std::unique_ptr<ValueRef<T>> Clone() const override
+    { return std::make_unique<ComplexVariable<T>>(*this); }
 
 protected:
     void InitInvariants();
@@ -232,6 +252,9 @@ struct FO_COMMON_API StaticCast final : public Variable<ToType>
 
     unsigned int GetCheckSum() const override;
 
+    std::unique_ptr<ValueRef<ToType>> Clone() const override
+    { return std::make_unique<StaticCast<FromType, ToType>>(CloneUnique(m_value_ref)); }
+
 private:
     std::unique_ptr<ValueRef<FromType>> m_value_ref;
 };
@@ -255,6 +278,9 @@ struct FO_COMMON_API StringCast final : public Variable<std::string>
 
     unsigned int GetCheckSum() const override;
 
+    std::unique_ptr<ValueRef<std::string>> Clone() const override
+    { return std::make_unique<StringCast<FromType>>(CloneUnique(m_value_ref)); }
+
 private:
     std::unique_ptr<ValueRef<FromType>> m_value_ref;
 };
@@ -275,6 +301,9 @@ struct FO_COMMON_API UserStringLookup final : public Variable<std::string> {
     { return m_value_ref; }
 
     unsigned int GetCheckSum() const override;
+
+    std::unique_ptr<ValueRef<std::string>> Clone() const override
+    { return std::make_unique<UserStringLookup<FromType>>(CloneUnique(m_value_ref)); }
 
 private:
     std::unique_ptr<ValueRef<FromType>> m_value_ref;
@@ -304,6 +333,9 @@ struct FO_COMMON_API NameLookup final : public Variable<std::string> {
     { return m_lookup_type; }
 
     unsigned int GetCheckSum() const override;
+
+    std::unique_ptr<ValueRef<std::string>> Clone() const override
+    { return std::make_unique<NameLookup>(CloneUnique(m_value_ref), m_lookup_type); }
 
 private:
     std::unique_ptr<ValueRef<int>> m_value_ref;
@@ -356,6 +388,8 @@ struct FO_COMMON_API Operation final : public ValueRef<T>
     /* N-ary operation ctor. */
     Operation(OpType op_type, std::vector<std::unique_ptr<ValueRef<T>>>&& operands);
 
+    Operation(const Operation<T>& rhs);
+
     bool operator==(const ValueRef<T>& rhs) const override;
     T Eval(const ScriptingContext& context) const override;
     bool SimpleIncrement() const override { return m_simple_increment; }
@@ -375,6 +409,9 @@ struct FO_COMMON_API Operation final : public ValueRef<T>
     const std::vector<ValueRef<T>*> Operands() const;
 
     unsigned int GetCheckSum() const override;
+
+    std::unique_ptr<ValueRef<T>> Clone() const override
+    { return std::make_unique<Operation<T>>(*this); }
 
 private:
     void    InitConstInvariants();
@@ -429,6 +466,7 @@ bool ValueRef<T>::operator==(const ValueRef<T>& rhs) const
         return true;
     if (typeid(rhs) != typeid(*this))
         return false;
+
     return true;
 }
 
@@ -565,24 +603,23 @@ Variable<T>::Variable(ReferenceType ref_type, S&& property_name,
                       bool return_immediate_value) :
     ValueRef<T>(),
     m_ref_type(ref_type),
+    m_property_name{std::forward<S>(property_name)},
     m_return_immediate_value(return_immediate_value)
-{
-    m_property_name.emplace_back(std::move(property_name));
-    InitInvariants();
-}
+{ InitInvariants(); }
 
 template <typename T>
+template <typename S>
 Variable<T>::Variable(ReferenceType ref_type,
                       boost::optional<std::string>&& container_name,
-                      std::string&& property_name,
+                      S&& property_name,
                       bool return_immediate_value) :
     ValueRef<T>(),
     m_ref_type(ref_type),
     m_return_immediate_value(return_immediate_value)
 {
     if (container_name)
-        m_property_name.emplace_back(std::move(*container_name));
-    m_property_name.emplace_back(std::move(property_name));
+        m_property_name.push_back(std::move(*container_name));
+    m_property_name.push_back(std::forward<S>(property_name));
 
     InitInvariants();
 }
@@ -710,16 +747,21 @@ bool Statistic<T, V>::operator==(const ValueRef<T>& rhs) const
 
     if (m_stat_type != rhs_.m_stat_type)
         return false;
-    if (this->m_value_ref != rhs_.m_value_ref)
+
+    if (m_value_ref == rhs_.m_value_ref) { // both unique_ptr could be nullptr
+        // check next member
+    } else if (!m_value_ref || !rhs_.m_value_ref) {
         return false;
+    } else if (*m_value_ref != *(rhs_.m_value_ref)) {
+        return false;
+    }
 
     if (m_sampling_condition == rhs_.m_sampling_condition) {
         // check next member
     } else if (!m_sampling_condition || !rhs_.m_sampling_condition) {
         return false;
-    } else {
-        if (*m_sampling_condition != *(rhs_.m_sampling_condition))
-            return false;
+    } else if (*m_sampling_condition != *(rhs_.m_sampling_condition)) {
+        return false;
     }
 
     return true;
@@ -1177,6 +1219,21 @@ ComplexVariable<T>::ComplexVariable(const char* variable_name,
     m_string_ref1(std::move(string_ref1)),
     m_string_ref2(std::move(string_ref2))
 { InitInvariants(); }
+
+template <typename T>
+ComplexVariable<T>::ComplexVariable(const ComplexVariable<T>& rhs) :
+    Variable<T>(rhs.m_ref_type, rhs.m_property_name, rhs.m_return_immediate_value),
+    m_int_ref1(CloneUnique(rhs.m_int_ref1)),
+    m_int_ref2(CloneUnique(rhs.m_int_ref2)),
+    m_int_ref3(CloneUnique(rhs.m_int_ref3)),
+    m_string_ref1(CloneUnique(rhs.m_string_ref1)),
+    m_string_ref2(CloneUnique(rhs.m_string_ref2))
+{
+    this->m_root_candidate_invariant = rhs.m_root_candidate_invariant;
+    this->m_local_candidate_invariant = rhs.m_local_candidate_invariant;
+    this->m_target_invariant = rhs.m_target_invariant;
+    this->m_source_invariant = rhs.m_source_invariant;
+}
 
 template <typename T>
 void ComplexVariable<T>::InitInvariants()
@@ -1682,6 +1739,20 @@ Operation<T>::Operation(OpType op_type, std::vector<std::unique_ptr<ValueRef<T>>
 }
 
 template <typename T>
+Operation<T>::Operation(const Operation<T>& rhs) :
+    m_op_type(rhs.m_op_type),
+    m_operands(CloneUnique(rhs.m_operands)),
+    m_constant_expr(rhs.m_constant_expr),
+    m_simple_increment(rhs.m_simple_increment),
+    m_cached_const_value(rhs.m_cached_const_value)
+{
+    this->m_root_candidate_invariant = rhs.m_root_candidate_invariant;
+    this->m_local_candidate_invariant = rhs.m_local_candidate_invariant;
+    this->m_target_invariant = rhs.m_target_invariant;
+    this->m_source_invariant = rhs.m_source_invariant;
+}
+
+template <typename T>
 void Operation<T>::InitConstInvariants()
 {
     if (m_op_type == OpType::RANDOM_UNIFORM || m_op_type == OpType::RANDOM_PICK) {
@@ -1733,7 +1804,7 @@ void Operation<T>::CacheConstValue()
 {
     if (!m_constant_expr)
         return;
-    m_cached_const_value = this->EvalImpl(ScriptingContext());
+    m_cached_const_value = this->EvalImpl(ScriptingContext{});
 }
 
 template <typename T>
@@ -1745,17 +1816,25 @@ bool Operation<T>::operator==(const ValueRef<T>& rhs) const
         return false;
     const Operation<T>& rhs_ = static_cast<const Operation<T>&>(rhs);
 
-    if (m_operands == rhs_.m_operands)
-        return true;
-
+    if (m_op_type != rhs_.m_op_type)
+        return false;
     if (m_operands.size() != rhs_.m_operands.size())
         return false;
 
-    for (unsigned int i = 0; i < m_operands.size(); ++i) {
-        if (m_operands[i] != rhs_.m_operands[i])
-            return false;
-        if (m_operands[i] && *(m_operands[i]) != *(rhs_.m_operands[i]))
-            return false;
+    try {
+        for (std::size_t idx = 0; idx < m_operands.size(); ++idx) {
+            const auto& my_op = m_operands.at(idx);
+            const auto& rhs_op = rhs_.m_operands.at(idx);
+
+            if (my_op == rhs_op)
+                continue;
+            if (!my_op || !rhs_op)
+                return false;
+            if (*my_op != *rhs_op)
+                return false;
+        }
+    } catch (...) {
+        return false;
     }
 
     // should be redundant...
@@ -1774,7 +1853,11 @@ const ValueRef<T>* Operation<T>::LHS() const
 {
     if (m_operands.empty())
         return nullptr;
-    return m_operands[0].get();
+    try {
+        return m_operands.at(0).get();
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 template <typename T>
@@ -1782,14 +1865,19 @@ const ValueRef<T>* Operation<T>::RHS() const
 {
     if (m_operands.size() < 2)
         return nullptr;
-    return m_operands[1].get();
+    try {
+        return m_operands.at(1).get();
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 template <typename T>
 const std::vector<ValueRef<T>*> Operation<T>::Operands() const
 {
-    std::vector<ValueRef<T>*> retval(m_operands.size());
-    std::transform(m_operands.begin(), m_operands.end(), retval.begin(),
+    std::vector<ValueRef<T>*> retval;
+    retval.reserve(m_operands.size());
+    std::transform(m_operands.begin(), m_operands.end(), std::back_inserter(retval),
                    [](const auto& xx){ return xx.get(); });
     return retval;
 }

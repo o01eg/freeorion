@@ -346,7 +346,7 @@ namespace {
         return GetValueRefByName(column_ref_name);
     }
 
-    const int DATA_PANEL_BORDER = 1;
+    constexpr int DATA_PANEL_BORDER = 1;
 
     enum class VIS_DISPLAY : int { SHOW_VISIBLE, SHOW_PREVIOUSLY_VISIBLE, SHOW_DESTROYED };
 
@@ -463,7 +463,9 @@ namespace {
 ////////////////////////////////////////////////
 // ConditionWidget
 ////////////////////////////////////////////////
-const GG::X CONDITION_WIDGET_WIDTH(380);
+namespace {
+    constexpr GG::X CONDITION_WIDGET_WIDTH{380};
+}
 
 class ConditionWidget : public GG::Control {
 public:
@@ -1355,7 +1357,7 @@ namespace {
         return retval;
     }
 
-    const GG::X PAD(3);
+    constexpr GG::X PAD{3};
 }
 
 ////////////////////////////////////////////////
@@ -2544,9 +2546,9 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
     if (!obj)
         return;
 
-    const int MENUITEM_SET_FOCUS_BASE = 20;
-    const int MENUITEM_SET_SHIP_BASE = 50;
-    const int MENUITEM_SET_BUILDING_BASE = 250;
+    constexpr int MENUITEM_SET_FOCUS_BASE = 20;
+    constexpr int MENUITEM_SET_SHIP_BASE = 50;
+    constexpr int MENUITEM_SET_BUILDING_BASE = 250;
     int menuitem_id = MENUITEM_SET_FOCUS_BASE;
     int ship_menuitem_id = MENUITEM_SET_SHIP_BASE;
     int bld_menuitem_id = MENUITEM_SET_BUILDING_BASE;

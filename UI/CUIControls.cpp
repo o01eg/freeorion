@@ -88,7 +88,7 @@ void CUILabel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
 // class CUIButton
 ///////////////////////////////////////
 namespace {
-    const int CUIBUTTON_ANGLE_OFFSET = 5;
+    constexpr int CUIBUTTON_ANGLE_OFFSET = 5;
 }
 
 CUIButton::CUIButton(std::string str) :
@@ -123,8 +123,8 @@ void CUIButton::MouseHere(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
 
 GG::Pt CUIButton::MinUsableSize() const {
     GG::Pt result = GG::Button::MinUsableSize();
-    const int CUIBUTTON_HPADDING = 10;
-    const int CUIBUTTON_VPADDING = 3;
+    constexpr int CUIBUTTON_HPADDING = 10;
+    constexpr int CUIBUTTON_VPADDING = 3;
 
     result.x += CUIBUTTON_HPADDING * 2;
     result.y += CUIBUTTON_VPADDING * 2;
@@ -290,7 +290,7 @@ void CUICheckBoxRepresenter::Render(const GG::StateButton& button) const {
         AdjustBrightness(border_color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
     }
 
-    const int MARGIN = 3;
+    constexpr int MARGIN = 3;
     FlatRectangle(bn_ul, bn_lr, GG::CLR_ZERO, border_color_to_use, 1);
     if (button.Checked()) {
         GG::Clr inside_color = color_to_use;
@@ -390,7 +390,7 @@ void CUIRadioRepresenter::Render(const GG::StateButton& button) const {
         AdjustBrightness(border_color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
     }
 
-    const int MARGIN = 2;
+    constexpr int MARGIN = 2;
     FlatCircle(bn_ul, bn_lr, GG::CLR_ZERO, border_color_to_use, 1);
     if (button.Checked()) {
         GG::Clr inside_color = color_to_use;
@@ -441,7 +441,7 @@ void CUITabRepresenter::Render(const GG::StateButton& button) const {
                              GG::StateButton::ButtonState::BN_ROLLOVER == button.State()))
     { AdjustBrightness(border_color_to_use, 100); }
 
-    const int UNCHECKED_OFFSET = 4;
+    constexpr int UNCHECKED_OFFSET = 4;
 
     if (!button.Checked()) {
         ul.y += UNCHECKED_OFFSET;
@@ -543,8 +543,8 @@ void CUIIconButtonRepresenter::Render(const GG::StateButton& button) const {
     GG::Clr bg_clr(ClientUI::CtrlColor());
     GG::Clr border_clr(button.Disabled() ? DisabledColor(ClientUI::CtrlBorderColor()) : ClientUI::CtrlBorderColor());
 
-    const int BORDER_THICKNESS = 1;
-    const int ICON_SIZE_REDUCE = BORDER_THICKNESS * 2;
+    constexpr int BORDER_THICKNESS = 1;
+    constexpr int ICON_SIZE_REDUCE = BORDER_THICKNESS * 2;
 
     GG::Pt icon_ul = button.UpperLeft();
     GG::Pt icon_lr = button.LowerRight();
@@ -663,7 +663,7 @@ void CUIScroll::ScrollTab::Render() {
         AdjustBrightness(border_color,     100);
     }
 
-    const int CUISCROLL_ANGLE_OFFSET = 3;
+    constexpr int CUISCROLL_ANGLE_OFFSET = 3;
 
     AngledCornerRectangle(ul, lr, background_color, border_color, CUISCROLL_ANGLE_OFFSET, 1);
 }
@@ -765,7 +765,7 @@ void CUIListBox::Render() {
 // class CUIDropDownList
 ///////////////////////////////////////
 namespace {
-    const int CUIDROPDOWNLIST_ANGLE_OFFSET = 5;
+    constexpr int CUIDROPDOWNLIST_ANGLE_OFFSET = 5;
 }
 
 CUIDropDownList::CUIDropDownList(size_t num_shown_elements) :
@@ -1291,11 +1291,7 @@ void CUILinkTextMultiEdit::SetLinkedText(std::string str) {
 ///////////////////////////////////////
 // class CUISimpleDropDownListRow
 ///////////////////////////////////////
-// static(s)
-const GG::Y CUISimpleDropDownListRow::DEFAULT_ROW_HEIGHT(22);
-
-CUISimpleDropDownListRow::CUISimpleDropDownListRow(std::string row_text,
-                                                   GG::Y row_height/* = DEFAULT_ROW_HEIGHT*/) :
+CUISimpleDropDownListRow::CUISimpleDropDownListRow(std::string row_text, GG::Y row_height) :
     GG::ListBox::Row(GG::X1, row_height),
     m_row_label(GG::Wnd::Create<CUILabel>(std::move(row_text), GG::FORMAT_LEFT | GG::FORMAT_NOWRAP))
 {}
@@ -1310,7 +1306,7 @@ void CUISimpleDropDownListRow::CompleteConstruction() {
 // class StatisticIcon
 ///////////////////////////////////////
 namespace {
-    const int STAT_ICON_PAD = 2;    // horizontal or vertical space between icon and label
+    constexpr int STAT_ICON_PAD = 2;    // horizontal or vertical space between icon and label
 }
 
 StatisticIcon::StatisticIcon(std::shared_ptr<GG::Texture> texture,
@@ -1520,7 +1516,7 @@ void CUIToolBar::Render() {
 // class SpeciesSelector
 ///////////////////////////////////////
 namespace {
-    static const std::string EMPTY_STRING;
+    const std::string EMPTY_STRING;
 
     // row type used in the SpeciesSelector
     struct SpeciesRow : public GG::ListBox::Row {
@@ -1632,7 +1628,7 @@ const std::string& SpeciesSelector::CurrentSpeciesName() const {
 // class EmpireColorSelector
 ///////////////////////////////////////
 namespace {
-    const GG::X COLOR_SELECTOR_WIDTH(75);
+    constexpr GG::X COLOR_SELECTOR_WIDTH{75};
 
     // row type used in the EmpireColorSelector
     struct ColorRow : public GG::ListBox::Row {
@@ -1641,7 +1637,7 @@ namespace {
                 GG::Control(GG::X0, GG::Y0, COLOR_SELECTOR_WIDTH - 40, h, GG::NO_WND_FLAGS)
             {
                 SetColor(color);
-                SetMinSize(GG::Pt(COLOR_SELECTOR_WIDTH - 40, GG::Y(1)));
+                SetMinSize(GG::Pt(COLOR_SELECTOR_WIDTH - 40, GG::Y1));
             }
 
             void Render() override
@@ -1995,11 +1991,11 @@ void ResourceInfoPanel::Clear() {
 
 void ResourceInfoPanel::DoLayout() {
     const int STAT_TEXT_PTS = ClientUI::Pts();
-    const int CENTERLINE_GAP = 4;
+    constexpr int CENTERLINE_GAP = 4;
     const GG::X LABEL_TEXT_WIDTH = (Width() - 4 - CENTERLINE_GAP) * 7 / 16 ;
     const GG::X VALUE_TEXT_WIDTH = ((Width() - 4 - CENTERLINE_GAP) - LABEL_TEXT_WIDTH) / 2;
 
-    const GG::X LEFT_TEXT_X(0);
+    constexpr GG::X LEFT_TEXT_X{0};
     const GG::X RIGHT_TEXT_X = LEFT_TEXT_X + LABEL_TEXT_WIDTH + 8 + CENTERLINE_GAP;
     const GG::X P_LABEL_X = RIGHT_TEXT_X + 40;
     const GG::X DOUBLE_LEFT_TEXT_X = P_LABEL_X + 30 + 4;
@@ -2011,7 +2007,7 @@ void ResourceInfoPanel::DoLayout() {
     const GG::Pt VALUE_TEXT_SIZE(VALUE_TEXT_WIDTH, GG::Y(STAT_TEXT_PTS + 4));
     const GG::Pt P_LABEL_SIZE(Width() - 7 - DOUBLE_P_LABEL_X, GG::Y(STAT_TEXT_PTS + 4));
 
-    GG::Y row_offset(4);
+    GG::Y row_offset{4};
 
     // first row: column labels
     m_empire_column_label->MoveTo(GG::Pt(RIGHT_TEXT_X, row_offset));

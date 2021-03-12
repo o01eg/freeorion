@@ -70,6 +70,10 @@ public:
 
     ~Tech();
 
+    bool operator==(const Tech& rhs) const;
+    bool operator!=(const Tech& rhs) const
+    { return !(*this == rhs); }
+
     const std::string&  Name() const                { return m_name; }              //!< returns name of this tech
     const std::string&  Description() const         { return m_description; }       //!< Returns the text description of this tech
     const std::string&  ShortDescription() const    { return m_short_description; } //!< Returns the single-line short text description of this tech
@@ -95,6 +99,9 @@ public:
     const std::vector<UnlockableItem>&    UnlockedItems() const
     { return m_unlocked_items; }
 
+    const ValueRef::ValueRef<double>* ResearchCostRef() const { return m_research_cost.get(); } //!< return value ref of research cost
+    const ValueRef::ValueRef<int>*    ResearchTurnsRef() const { return m_research_turns.get(); } //!< return value ref of research turns
+
     const std::set<std::string>&    UnlockedTechs() const { return m_unlocked_techs; }  //!< returns the set of names of all techs for which this one is a prerequisite
 
     /** Returns a number, calculated from the contained data, which should be
@@ -106,8 +113,8 @@ public:
     unsigned int                    GetCheckSum() const;
 
 private:
-    Tech(const Tech&);                  // disabled
-    const Tech& operator=(const Tech&); // disabled
+    Tech(const Tech&) = delete;
+    Tech& operator=(const Tech&) = delete;
     void Init();
 
     std::string                     m_name;

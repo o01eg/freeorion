@@ -79,7 +79,8 @@ namespace {
         return 0.0;
     }
 
-    const int       EDGE_PAD(3);
+    constexpr int EDGE_PAD(3);
+
     GG::X LabelWidth()
     { return GG::X(ClientUI::Pts()*18); }
 
@@ -236,7 +237,7 @@ void SystemResourceSummaryBrowseWnd::UpdateProduction(GG::Y& top) {
 
 
     // set production label
-    std::string resource_text = "";
+    std::string resource_text;
     switch (m_resource_type) {
     case ResourceType::RE_INDUSTRY:
         resource_text = UserString("INDUSTRY_PRODUCTION");  break;

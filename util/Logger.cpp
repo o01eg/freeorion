@@ -22,7 +22,11 @@
 
 #include <boost/optional.hpp>
 
-#include <ctime>
+#ifdef _MSC_VER
+#  include <ctime>
+#else
+#  include <time.h>
+#endif
 #include <mutex>
 #include <regex>
 #include <unordered_map>
@@ -108,7 +112,7 @@ std::unordered_map<std::string, LogLevel> ValidNameToLogLevel() {
         retval.emplace(name, log_level);
 
         // Insert the upper case
-        std::transform(name.begin(), name.end(), name.begin(),
+        std::transform(name.begin(), name.end(), name.begin(), // in-place replacement
                        [](const char c) { return std::toupper(c); });
         retval.emplace(std::move(name), log_level);
     }
@@ -342,7 +346,8 @@ void SetLoggerThreshold(const std::string& source, LogLevel threshold) {
 void InitLoggingSystem(const std::string& log_file, const std::string& _unnamed_logger_identifier) {
     auto& unnamed_logger_identifier = LocalUnnamedLoggerIdentifier();
     unnamed_logger_identifier = _unnamed_logger_identifier;
-    std::transform(unnamed_logger_identifier.begin(), unnamed_logger_identifier.end(), unnamed_logger_identifier.begin(),
+    std::transform(unnamed_logger_identifier.begin(), unnamed_logger_identifier.end(),
+                   unnamed_logger_identifier.begin(), // in-place replacement
                    [](const char c) { return std::tolower(c); });
 
     // Register LogLevel so that the formatters will be found.
@@ -371,9 +376,24 @@ void InitLoggingSystem(const std::string& log_file, const std::string& _unnamed_
     // Create sink front ends for all previously created loggers.
     GetLoggersToSinkFrontEnds().ConfigureFrontEnds(file_sink_backend);
 
-    // Print setup message.
-    auto date_time = std::time(nullptr);
-    InfoLogger(log) << "Logger initialized at " << std::ctime(&date_time);
+    {
+        // Log setup message with timestamp. Doing all the following because it
+        // correctly handles time zones with daylight saving time adjustment for
+        // me, but the simpler-to-use boost equivalents for formatting time are
+        // off by 1 hour. Also can't use just std::datetime because it is not
+        // always implemented thread-safe.
+        auto date_time = std::time(nullptr);
+        std::tm temp_tm;
+        #ifdef _MSC_VER
+            localtime_s(&temp_tm, &date_time);
+        #else
+            localtime_r(&date_time, &temp_tm);
+        #endif
+
+        char time_as_string_buf[100] = {};
+        std::strftime(time_as_string_buf, sizeof(time_as_string_buf), "%c", &temp_tm);
+        InfoLogger(log) << "Logger initialized at " << time_as_string_buf;
+    }
 }
 
 void ShutdownLoggingSystemFileSink() {

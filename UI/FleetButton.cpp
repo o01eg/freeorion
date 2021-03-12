@@ -176,7 +176,8 @@ void FleetButton::Refresh(SizeType size_type) {
     for (const auto& fleet : fleets) {
         if (fleet) {
             num_ships += fleet->NumShips();
-            if (!m_fleet_blockaded && fleet->Blockaded(ScriptingContext{}))
+            ScriptingContext context;
+            if (!m_fleet_blockaded && fleet->Blockaded(context))
                 m_fleet_blockaded = true;
         }
     }

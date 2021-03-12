@@ -36,21 +36,21 @@
 FO_COMMON_API extern const int INVALID_DESIGN_ID;
 
 namespace {
-    const GG::Pt        DataPanelIconSpace()
+    const GG::Pt DataPanelIconSpace()
     { return GG::Pt(GG::X(ClientUI::Pts()*3), GG::Y(ClientUI::Pts()*2.5)); }
-    GG::X               FLEET_WND_WIDTH = GG::X(360);
-    GG::Y               FLEET_WND_HEIGHT = GG::Y(400);
+    constexpr GG::X FLEET_WND_WIDTH = GG::X(360);
+    constexpr GG::Y FLEET_WND_HEIGHT = GG::Y(400);
 
     // how should ship and fleet icons be scaled and/or positioned in the reserved space
     const GG::Flags<GG::GraphicStyle>   DataPanelIconStyle()
     { return GG::GRAPHIC_CENTER | GG::GRAPHIC_VCENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE; }
 
-    const GG::X         DATA_PANEL_TEXT_PAD = GG::X(4); // padding on the left and right of fleet/ship description
-    const int           DATA_PANEL_BORDER = 1;          // how thick should the border around ship or fleet panel be
-    const int           PAD = 4;
-    const std::string   SHIP_DROP_TYPE_STRING = "FleetWnd ShipRow";
-    const std::string   FLEET_DROP_TYPE_STRING = "FleetWnd FleetRow";
-    const std::string   FLEET_WND_NAME = "map.fleet";
+    constexpr GG::X   DATA_PANEL_TEXT_PAD{4}; // padding on the left and right of fleet/ship description
+    constexpr int     DATA_PANEL_BORDER = 1;  // how thick should the border around ship or fleet panel be
+    constexpr int     PAD = 4;
+    const std::string SHIP_DROP_TYPE_STRING = "FleetWnd ShipRow";
+    const std::string FLEET_DROP_TYPE_STRING = "FleetWnd FleetRow";
+    const std::string FLEET_WND_NAME = "map.fleet";
 
     GG::Y LabelHeight()
     { return GG::Y(ClientUI::Pts()*3/2); }
@@ -443,7 +443,7 @@ std::shared_ptr<FleetWnd> FleetUIManager::NewFleetWnd(
     int selected_fleet_id/* = INVALID_OBJECT_ID*/,
     GG::Flags<GG::WndFlag> flags/* = GG::INTERACTIVE | GG::DRAGABLE | GG::ONTOP | CLOSABLE | GG::RESIZABLE*/)
 {
-    std::string config_name = "";
+    std::string config_name;
     if (!GetOptionsDB().Get<bool>("ui.fleet.multiple.enabled")) {
         CloseAll();
         // Only write to OptionsDB if in single fleet window mode.
@@ -819,7 +819,7 @@ namespace {
 
         if (m_design_name_text) {
             const ShipDesign* design = ship->Design();
-            auto& design_name = design ? design->Name() : UserString("FW_UNKNOWN_DESIGN_NAME");
+            const auto& design_name = design ? design->Name() : UserString("FW_UNKNOWN_DESIGN_NAME");
             if (!ship->SpeciesName().empty()) {
                 m_design_name_text->SetText(boost::io::str(FlexibleFormat(UserString("FW_SPECIES_SHIP_DESIGN_LABEL")) %
                                                            design_name %
@@ -830,34 +830,31 @@ namespace {
         }
 
         // update stat icon values and browse wnds
-        for (auto& entry : m_stat_icons) {
-            entry.second->SetValue(StatValue(entry.first));
+        for (auto& [meter_type, icon] : m_stat_icons) {
+            icon->SetValue(StatValue(meter_type));
 
-            entry.second->ClearBrowseInfoWnd();
-            if (entry.first == MeterType::METER_CAPACITY) {  // refers to damage
-                entry.second->SetBrowseInfoWnd(GG::Wnd::Create<ShipDamageBrowseWnd>(
-                                               m_ship_id, entry.first));
+            icon->ClearBrowseInfoWnd();
+            if (meter_type == MeterType::METER_CAPACITY) {  // refers to damage
+                icon->SetBrowseInfoWnd(GG::Wnd::Create<ShipDamageBrowseWnd>(m_ship_id, meter_type));
 
-            } else if (entry.first == MeterType::METER_TROOPS) {
-                entry.second->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
-                                                   TroopIcon(), UserString("SHIP_TROOPS_TITLE"),
-                                                   UserString("SHIP_TROOPS_STAT")));
+            } else if (meter_type == MeterType::METER_TROOPS) {
+                icon->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
+                    TroopIcon(), UserString("SHIP_TROOPS_TITLE"),
+                    UserString("SHIP_TROOPS_STAT")));
 
-            } else if (entry.first == MeterType::METER_SECONDARY_STAT) {
-                entry.second->SetBrowseInfoWnd(GG::Wnd::Create<ShipFightersBrowseWnd>(
-                                                   m_ship_id, entry.first));
-                entry.second->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.extended.delay"), 1);
-                entry.second->SetBrowseInfoWnd(GG::Wnd::Create<ShipFightersBrowseWnd>(
-                                                   m_ship_id, entry.first, true), 1);
+            } else if (meter_type == MeterType::METER_SECONDARY_STAT) {
+                icon->SetBrowseInfoWnd(GG::Wnd::Create<ShipFightersBrowseWnd>(m_ship_id, meter_type));
+                icon->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.extended.delay"), 1);
+                icon->SetBrowseInfoWnd(GG::Wnd::Create<ShipFightersBrowseWnd>(m_ship_id, meter_type, true), 1);
 
-            } else if (entry.first == MeterType::METER_POPULATION) {
-                entry.second->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
-                                                   ColonyIcon(), UserString("SHIP_COLONY_TITLE"),
-                                                   UserString("SHIP_COLONY_STAT")));
+            } else if (meter_type == MeterType::METER_POPULATION) {
+                icon->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
+                    ColonyIcon(), UserString("SHIP_COLONY_TITLE"),
+                    UserString("SHIP_COLONY_STAT")));
 
             } else {
-                entry.second->SetBrowseInfoWnd(GG::Wnd::Create<MeterBrowseWnd>(
-                                                   m_ship_id, entry.first, AssociatedMeterType(entry.first)));
+                icon->SetBrowseInfoWnd(GG::Wnd::Create<MeterBrowseWnd>(
+                    m_ship_id, meter_type, AssociatedMeterType(meter_type)));
             }
         }
     }
@@ -1401,7 +1398,8 @@ void FleetDataPanel::Refresh() {
                 public_fleet_name = public_fleet_name + " (" + std::to_string(m_fleet_id) + ")";
             m_fleet_name_text->SetText(std::move(public_fleet_name));
         }
-        m_fleet_destination_text->SetText(FleetDestinationText(m_fleet_id, ScriptingContext()));
+        ScriptingContext context;
+        m_fleet_destination_text->SetText(FleetDestinationText(m_fleet_id, context));
 
         // set icons
         std::vector<std::shared_ptr<GG::Texture>> icons{
@@ -3155,7 +3153,7 @@ void FleetWnd::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
 
 void FleetWnd::DoLayout() {
     const GG::X TOTAL_WIDTH(ClientWidth());
-    const GG::X LEFT(GG::X0);
+    constexpr GG::X LEFT{0};
     const GG::X RIGHT(TOTAL_WIDTH);
 
     const GG::Y TOTAL_HEIGHT(ClientHeight());

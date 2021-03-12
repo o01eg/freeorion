@@ -455,7 +455,7 @@ BeveledCheckBoxRepresenter::BeveledCheckBoxRepresenter(Clr interior/* = CLR_ZERO
 
 void BeveledCheckBoxRepresenter::Render(const GG::StateButton& button) const
 {
-    const int BEVEL = 2;
+    constexpr int BEVEL = 2;
 
     // draw button
     Pt cl_ul = button.ClientUpperLeft();
@@ -491,7 +491,7 @@ BeveledRadioRepresenter::BeveledRadioRepresenter(Clr interior/* = CLR_ZERO*/):
 
 void BeveledRadioRepresenter::Render(const GG::StateButton& button) const
 {
-    const int BEVEL = 2;
+    constexpr int BEVEL = 2;
 
     // draw button
     Pt cl_ul = button.ClientUpperLeft();
@@ -526,7 +526,7 @@ Pt BeveledTabRepresenter::MinUsableSize(const StateButton& button) const
 ////////////////////////////////////////////////
 void BeveledTabRepresenter::Render(const StateButton& button) const
 {
-    const int BEVEL = 2;
+    constexpr int BEVEL = 2;
 
     // draw button
     Pt cl_ul = button.ClientUpperLeft();
@@ -557,10 +557,6 @@ void BeveledTabRepresenter::Render(const StateButton& button) const
 RadioButtonGroup::ButtonSlot::ButtonSlot(std::shared_ptr<StateButton> button_) :
     button(std::move(button_))
 {}
-
-// RadioButtonGroup
-// static(s)
-const std::size_t RadioButtonGroup::NO_BUTTON = std::numeric_limits<std::size_t>::max();
 
 RadioButtonGroup::RadioButtonGroup(Orientation orientation) :
     Control(X0, Y0, X1, Y1),
@@ -814,8 +810,7 @@ void RadioButtonGroup::SetCheckImpl(std::size_t index, bool signal)
 
 void RadioButtonGroup::Reconnect()
 {
-    for (ButtonSlot& button_slot : m_button_slots) {
+    for (ButtonSlot& button_slot : m_button_slots)
         button_slot.connection.disconnect();
-    }
     ConnectSignals();
 }

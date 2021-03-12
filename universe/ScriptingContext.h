@@ -15,7 +15,10 @@ struct ScriptingContext {
         UniverseObjectType, Visibility, std::string, std::vector<std::string>
     > CurrentValueVariant;
 
-    ScriptingContext() = default;
+    ScriptingContext() :
+        ScriptingContext(GetUniverse(), ::Empires(), GetGalaxySetupData(),
+                         GetSpeciesManager(), GetSupplyManager())
+    {}
 
     ScriptingContext(const ScriptingContext& parent_context,
                      std::shared_ptr<const UniverseObject> condition_local_candidate_) :
@@ -43,7 +46,15 @@ struct ScriptingContext {
     {}
 
     ScriptingContext(std::shared_ptr<const UniverseObject> source_) :
-        source(std::move(source_))
+        source(           std::move(source_)),
+        galaxy_setup_data(GetGalaxySetupData()),
+        species(          GetSpeciesManager()),
+        supply(           GetSupplyManager()),
+        universe(         &GetUniverse()),
+        const_universe(   GetUniverse()),
+        empires(          &(::Empires().GetEmpires())),
+        const_empires(    const_cast<const EmpireManager&>(::Empires()).GetEmpires()),
+        diplo_statuses(   ::Empires().GetDiplomaticStatuses())
     {}
 
     ScriptingContext(std::shared_ptr<const UniverseObject> source_,
@@ -119,12 +130,20 @@ struct ScriptingContext {
     ScriptingContext(std::shared_ptr<const UniverseObject> source_,
                      std::shared_ptr<UniverseObject> target_) :
         source(std::move(source_)),
-        effect_target(std::move(target_))
+        effect_target(std::move(target_)),
+        galaxy_setup_data(GetGalaxySetupData()),
+        species(          GetSpeciesManager()),
+        supply(           GetSupplyManager()),
+        universe(         &GetUniverse()),
+        const_universe(   GetUniverse()),
+        empires(          &(::Empires().GetEmpires())),
+        const_empires(    const_cast<const EmpireManager&>(::Empires()).GetEmpires()),
+        diplo_statuses(   ::Empires().GetDiplomaticStatuses())
     {}
 
     ScriptingContext(Universe& universe, EmpireManager& empires_,
                      const GalaxySetupData& galaxy_setup_data_ = GetGalaxySetupData(),
-                     const SpeciesManager& species_ = GetSpeciesManager(),
+                     SpeciesManager& species_ = GetSpeciesManager(),
                      const SupplyManager& supply_ = GetSupplyManager()) :
         galaxy_setup_data(galaxy_setup_data_),
         species(          species_),
@@ -146,11 +165,11 @@ struct ScriptingContext {
         source(        std::move(source_)),
         effect_target( std::move(target_)),
         current_value( current_value_),
-        universe(       nullptr),
-        const_universe( universe),
-        empires(        nullptr),
-        const_empires(  empires_.GetEmpires()),
-        diplo_statuses( empires_.GetDiplomaticStatuses())
+        universe(      nullptr),
+        const_universe(universe),
+        empires(       nullptr),
+        const_empires( empires_.GetEmpires()),
+        diplo_statuses(empires_.GetDiplomaticStatuses())
     {}
 
 
@@ -222,7 +241,7 @@ struct ScriptingContext {
     int                                            combat_bout = 0;
     int                                            current_turn = CurrentTurn();
     const GalaxySetupData&                         galaxy_setup_data{GetGalaxySetupData()};
-    const SpeciesManager&                          species{GetSpeciesManager()};
+    SpeciesManager&                                species{GetSpeciesManager()};
     const SupplyManager&                           supply{GetSupplyManager()};
 private: // Universe and ObjectMap getters select one of these based on constness
     Universe*                                      universe = nullptr;

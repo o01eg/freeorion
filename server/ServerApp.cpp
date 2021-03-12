@@ -284,7 +284,7 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
         }
 
         args[player_pos] = player_name;
-        m_ai_client_processes.push_back(Process(AI_CLIENT_EXE, args));
+        m_ai_client_processes.insert_or_assign(player_name, Process(AI_CLIENT_EXE, args));
 
         DebugLogger() << "done starting AI " << player_name;
     }
@@ -378,8 +378,8 @@ void ServerApp::CleanupAIs() {
 
     DebugLogger() << "ServerApp::CleanupAIs() killing " << m_ai_client_processes.size() << " AI clients.";
     try {
-        for (Process& process : m_ai_client_processes)
-        { process.Kill(); }
+        for (auto& process : m_ai_client_processes)
+        { process.second.Kill(); }
     } catch (...) {
         ErrorLogger() << "ServerApp::CleanupAIs() exception while killing processes";
     }
@@ -388,8 +388,8 @@ void ServerApp::CleanupAIs() {
 }
 
 void ServerApp::SetAIsProcessPriorityToLow(bool set_to_low) {
-    for (Process& process : m_ai_client_processes) {
-        if(!(process.SetLowPriority(set_to_low))) {
+    for (auto& process : m_ai_client_processes) {
+        if(!(process.second.SetLowPriority(set_to_low))) {
             if (set_to_low)
                 ErrorLogger() << "ServerApp::SetAIsProcessPriorityToLow : failed to lower priority for AI process";
             else
@@ -720,7 +720,8 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
     // after all game initialization stuff has been created, set current turn to 0 and apply only GenerateSitRep Effects
     // so that a set of SitReps intended as the player's initial greeting will be segregated
     m_current_turn = 0;
-    m_universe.ApplyGenerateSitRepEffects(m_empires);
+    ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager};
+    m_universe.ApplyGenerateSitRepEffects(context);
 
     //can set current turn to 1 for start of game
     m_current_turn = 1;
@@ -749,8 +750,7 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
     for (auto& entry : m_empires)
         entry.second->UpdateOwnedObjectCounters();
 
-    UpdateEmpireSupply(ScriptingContext{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager},
-                       m_empires, m_supply_manager);
+    UpdateEmpireSupply(context, m_empires, m_supply_manager);
     m_universe.UpdateStatRecords(m_empires);
 }
 
@@ -1405,8 +1405,8 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
     m_universe.InitializeSystemGraph(m_empires, m_universe.Objects());
     m_universe.UpdateEmpireVisibilityFilteredSystemGraphsWithOwnObjectMaps(m_empires);
 
-    UpdateEmpireSupply(ScriptingContext{m_universe, m_empires, m_galaxy_setup_data, m_species_manager,m_supply_manager},
-                       m_empires, m_supply_manager, true);  // precombat supply update
+    ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data, m_species_manager,m_supply_manager};
+    UpdateEmpireSupply(context, m_empires, m_supply_manager, true);  // precombat supply update
 
     std::map<int, PlayerInfo> player_info_map = GetPlayerInfoMap();
 
@@ -1486,20 +1486,20 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
     // prevent reproducible UIDs.
     ClockSeed();
     if (GetOptionsDB().Get<std::string>("setup.game.uid").empty())
-        GetGalaxySetupData().SetGameUID(boost::uuids::to_string(boost::uuids::random_generator()()));
+        m_galaxy_setup_data.SetGameUID(boost::uuids::to_string(boost::uuids::random_generator()()));
 
     // Initialize RNG with provided seed to get reproducible universes
     int seed = 0;
     try {
-        seed = boost::lexical_cast<unsigned int>(GetGalaxySetupData().seed);
+        seed = boost::lexical_cast<unsigned int>(m_galaxy_setup_data.seed);
     } catch (...) {
         try {
             boost::hash<std::string> string_hash;
-            std::size_t h = string_hash(GetGalaxySetupData().seed);
+            std::size_t h = string_hash(m_galaxy_setup_data.seed);
             seed = static_cast<unsigned int>(h);
         } catch (...) {}
     }
-    if (GetGalaxySetupData().GetSeed().empty() || GetGalaxySetupData().GetSeed() == "RANDOM") {
+    if (m_galaxy_setup_data.GetSeed().empty() || m_galaxy_setup_data.GetSeed() == "RANDOM") {
         //ClockSeed();
         // replicate ClockSeed code here so can log the seed used
         boost::posix_time::ptime ltime = boost::posix_time::microsec_clock::local_time();
@@ -1509,23 +1509,23 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
         DebugLogger() << "GenerateUniverse using clock for seed:" << new_seed;
         seed = static_cast<unsigned int>(h);
         // store seed in galaxy setup data
-        ServerApp::GetApp()->GetGalaxySetupData().SetSeed(std::to_string(seed));
+        m_galaxy_setup_data.SetSeed(std::to_string(seed));
     }
     Seed(seed);
     DebugLogger() << "GenerateUniverse with seed: " << seed;
 
     // Reset the universe object for a new universe
     m_universe.Clear();
-    GetSpeciesManager().ClearSpeciesHomeworlds();
+    m_species_manager.ClearSpeciesHomeworlds();
 
     // Reset the object id manager for the new empires.
     std::vector<int> empire_ids(player_setup_data.size());
     std::transform(player_setup_data.begin(), player_setup_data.end(), empire_ids.begin(),
-                   [](const std::pair<int,PlayerSetupData> ii) { return ii.first; });
+                   [](const auto& ii) { return ii.first; });
     m_universe.ResetAllIDAllocation(empire_ids);
 
     // Add predefined ship designs to universe
-    GetPredefinedShipDesignManager().AddShipDesignsToUniverse();
+    GetPredefinedShipDesignManager().AddShipDesignsToUniverse(); // TODO: pass in m_universe
     // Initialize empire objects for each player
     InitEmpires(player_setup_data);
 
@@ -1548,19 +1548,21 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
     if (!success)
         ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_UNIVERSE_GENERATION_ERRORS"), false));
 
-    for (auto& empire : Empires())
+    for (auto& empire : m_empires)
         empire.second->ApplyNewTechs();
 
     DebugLogger() << "Applying first turn effects and updating meters";
 
+    ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager};
+
     // Apply effects for 1st turn.
-    m_universe.ApplyAllEffectsAndUpdateMeters(m_empires, false);
+    m_universe.ApplyAllEffectsAndUpdateMeters(context, false);
 
     TraceLogger(effects) << "After First turn meter effect applying: " << m_universe.Objects().Dump();
     // Set active meters to targets or maxes after first meter effects application
     SetActiveMetersToTargetMaxCurrentValues(m_universe.Objects());
 
-    m_universe.UpdateMeterEstimates(m_empires);
+    m_universe.UpdateMeterEstimates(context);
     m_universe.BackPropagateObjectMeters();
     SetActiveMetersToTargetMaxCurrentValues(m_universe.Objects());
     m_universe.BackPropagateObjectMeters();
@@ -1574,7 +1576,7 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
 
     // Re-apply meter effects, so that results depending on meter values can be
     // re-checked after initial setting of those meter values
-    m_universe.ApplyMeterEffectsAndUpdateMeters(m_empires, false);
+    m_universe.ApplyMeterEffectsAndUpdateMeters(context, false);
     // Re-set active meters to targets after re-application of effects
     SetActiveMetersToTargetMaxCurrentValues(m_universe.Objects());
     // Set the population of unowned planets to a random fraction of their target values.
@@ -1888,10 +1890,6 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     std::list<std::string> delegation = GetPlayerDelegation(lower_player_name);
     DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Get delegates of size " << delegation.size();
     if (target_empire_id == ALL_EMPIRES) {
-        if (!delegation.empty()) {
-            DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Player should choose between delegates.";
-            return ALL_EMPIRES;
-        }
         // search empire by player name
         for (auto& e : Empires()) {
             if (boost::algorithm::to_lower_copy(e.second->PlayerName()) == lower_player_name) {
@@ -1899,6 +1897,20 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
                 empire = e.second;
                 break;
             }
+        }
+        // Assign player to empire if he doesn't have own empire and delegates signle
+        if (delegation.size() == 1 && empire == nullptr) {
+            for (auto e : Empires()) {
+                if (boost::algorithm::to_lower_copy(e.second->PlayerName()) == boost::algorithm::to_lower_copy(delegation.front())) {
+                    empire_id = e.first;
+                    empire = e.second;
+                    break;
+                }
+            }
+        }
+        if (!delegation.empty()) {
+            DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Player should choose between delegates.";
+            return ALL_EMPIRES;
         }
     } else {
         // use provided empire and test if it's player himself or one of delegated
@@ -1945,6 +1957,30 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     // make a link to new connection
     m_player_empire_ids[player_connection->PlayerID()] = empire_id;
     empire->SetAuthenticated(player_connection->IsAuthenticated());
+
+    // drop previous connection to that empire
+    int previous_player_id = EmpirePlayerID(empire_id);
+    if (previous_player_id != Networking::INVALID_PLAYER_ID) {
+        WarnLogger() << "ServerApp::AddPlayerIntoGame empire " << empire_id
+                     << " previous player " << previous_player_id
+                     << " was kicked.";
+        DropPlayerEmpireLink(previous_player_id);
+        auto previous_it = m_networking.GetPlayer(previous_player_id);
+        if (previous_it != m_networking.established_end()) {
+            const Networking::ClientType previous_client_type = (*previous_it)->GetClientType();
+            const std::string previous_player_name = (*previous_it)->PlayerName();
+            m_networking.Disconnect(previous_player_id);
+            if (previous_client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
+                auto it = m_ai_client_processes.find(previous_player_name);
+                if (it != m_ai_client_processes.end()) {
+                    it->second.Kill();
+                    m_ai_client_processes.erase(it);
+                }
+            }
+        }
+    }
+
+    InfoLogger() << "ServerApp::AddPlayerIntoGame empire " << empire_id << " connected to " << player_connection->PlayerID();
 
     const OrderSet dummy;
     const OrderSet& orders = orders_it->second && orders_it->second->orders ? *(orders_it->second->orders) : dummy;
@@ -2469,7 +2505,7 @@ namespace {
                                   Universe& universe,
                                   const EmpireManager& empires,
                                   const GalaxySetupData& setup_data,
-                                  const SpeciesManager& species,
+                                  SpeciesManager& species,
                                   const SupplyManager& supply)
     {
         combats.clear();
@@ -2501,7 +2537,7 @@ namespace {
         // modified by the combat, and don't need to be copied from the combat
         // ObjectMap. However, the changes to object visibility during combat
         // are stored separately, and do need to be copied back to the main
-        // gamestate. Standard visibility updating will then transfer the 
+        // gamestate. Standard visibility updating will then transfer the
         // modified objects / combat results to empires' known gamestate
         // ObjectMaps.
         for (const CombatInfo& combat_info : combats) {
@@ -3551,12 +3587,14 @@ void ServerApp::PostCombatProcessTurns() {
     TraceLogger(effects) << "!!!!!!! BEFORE TURN PROCESSING EFFECTS APPLICATION";
     TraceLogger(effects) << m_universe.Objects().Dump();
 
+    ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager};
+
     // execute all effects and update meters prior to production, research, etc.
     if (GetGameRules().Get<bool>("RULE_RESEED_PRNG_SERVER")) {
         static boost::hash<std::string> pcpt_string_hash;
         Seed(static_cast<unsigned int>(CurrentTurn()) + pcpt_string_hash(m_galaxy_setup_data.seed));
     }
-    m_universe.ApplyAllEffectsAndUpdateMeters(m_empires, false);
+    m_universe.ApplyAllEffectsAndUpdateMeters(context, false);
 
     // regenerate system connectivity graph after executing effects, which may
     // have added or removed starlanes.
@@ -3573,8 +3611,7 @@ void ServerApp::PostCombatProcessTurns() {
     m_universe.UpdateEmpireObjectVisibilities(m_empires);
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
 
-    UpdateEmpireSupply(ScriptingContext{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager},
-                       m_empires, m_supply_manager);
+    UpdateEmpireSupply(context, m_empires, m_supply_manager);
 
     // Update fleet travel restrictions (monsters and empire fleets)
     UpdateMonsterTravelRestrictions();
@@ -3601,7 +3638,6 @@ void ServerApp::PostCombatProcessTurns() {
 
         for (const auto& tech : empire->CheckResearchProgress())
             empire->AddNewlyResearchedTechToGrantAtStartOfNextTurn(tech);
-        ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager};
         empire->CheckProductionProgress(context);
         empire->CheckInfluenceProgress();
     }
@@ -3616,7 +3652,7 @@ void ServerApp::PostCombatProcessTurns() {
     // UniverseObjects will have effects applied to them this turn, allowing
     // (for example) ships to have max fuel meters greater than 0 on the turn
     // they are created.
-    m_universe.ApplyMeterEffectsAndUpdateMeters(m_empires, false);
+    m_universe.ApplyMeterEffectsAndUpdateMeters(context, false);
 
     TraceLogger(effects) << "!!!!!!! AFTER UPDATING METERS OF ALL OBJECTS";
     TraceLogger(effects) << m_universe.Objects().Dump();
@@ -3691,15 +3727,14 @@ void ServerApp::PostCombatProcessTurns() {
 
 
     // redo meter estimates to hopefully be consistent with what happens in clients
-    m_universe.UpdateMeterEstimates(m_empires, false);
+    m_universe.UpdateMeterEstimates(context, false);
 
     TraceLogger(effects) << "ServerApp::PostCombatProcessTurns After Final Meter Estimate Update: ";
     TraceLogger(effects) << m_universe.Objects().Dump();
 
 
     // Re-determine supply distribution and exchanging and resource pools for empires
-    UpdateEmpireSupply(ScriptingContext{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager},
-                       m_empires, m_supply_manager, true);
+    UpdateEmpireSupply(context, m_empires, m_supply_manager, true);
 
     // copy latest visible gamestate to each empire's known object state
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
@@ -3767,6 +3802,18 @@ void ServerApp::CheckForEmpireElimination() {
         else if (EmpireEliminated(entry.first, m_universe.Objects())) {
             entry.second->Eliminate();
             RemoveEmpireTurn(entry.first);
+            const int player_id = EmpirePlayerID(entry.first);
+            DebugLogger() << "ServerApp::CheckForEmpireElimination empire #" << entry.first << " " << entry.second->Name() << " of player #" << player_id << " eliminated";
+            auto player_it = m_networking.GetPlayer(player_id);
+            if (player_it != m_networking.established_end() &&
+                (*player_it)->GetClientType() == Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
+            {
+                auto it = m_ai_client_processes.find((*player_it)->PlayerName());
+                if (it != m_ai_client_processes.end()) {
+                    it->second.Kill();
+                    m_ai_client_processes.erase(it);
+                }
+            }
         } else {
             surviving_empires.emplace(entry.second);
             // empires could be controlled only by connected AI client, connected human client, or

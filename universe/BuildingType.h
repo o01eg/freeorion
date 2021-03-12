@@ -46,7 +46,11 @@ public:
     BuildingType(std::string&& name, std::string&& description,
                  CommonParams&& common_params, CaptureResult capture_result,
                  std::string&& icon);
-    ~BuildingType();
+    ~BuildingType(); // needed due to forward-declared Condition held in unique_ptr
+
+    bool operator==(const BuildingType& rhs) const;
+    bool operator!=(const BuildingType& rhs) const
+    { return !(*this == rhs); }
 
     //! Returns the unique name for this type of building
     auto Name() const -> const std::string&
@@ -66,17 +70,17 @@ public:
     //! Returns the number of production points required to build this building
     //! at this location by this empire
     auto ProductionCost(int empire_id, int location_id,
-                        const ScriptingContext& context = ScriptingContext()) const -> float;
+                        const ScriptingContext& context = ScriptingContext{}) const -> float;
 
     //! Returns the maximum number of production points per turn that can be
     //! spend on this building
     auto PerTurnCost(int empire_id, int location_id,
-                     const ScriptingContext& context = ScriptingContext()) const -> float;
+                     const ScriptingContext& context = ScriptingContext{}) const -> float;
 
     //! Returns the number of turns required to build this building at this
     //! location by this empire
     auto ProductionTime(int empire_id, int location_id,
-                        const ScriptingContext& context = ScriptingContext()) const -> int;
+                        const ScriptingContext& context = ScriptingContext{}) const -> int;
 
     //! Returns the ValueRef that determines ProductionCost()
     auto Cost() const -> const ValueRef::ValueRef<double>*

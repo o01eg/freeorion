@@ -55,14 +55,16 @@ struct FO_COMMON_API ProductionQueue {
           * turns required to produce the indicated item, or (-1.0, -1) if the item
           * is unknown, unavailable, or invalid. */
         std::pair<float, int> ProductionCostAndTime(int empire_id, int location_id,
-                                                    const ScriptingContext& context = ScriptingContext()) const;
+                                                    const ScriptingContext& context = ScriptingContext{}) const;
 
         bool operator<(const ProductionItem& rhs) const;
 
-        bool EnqueueConditionPassedAt(int location_id) const;
+        bool EnqueueConditionPassedAt(int location_id, const ScriptingContext& context) const;
 
-        std::map<std::string, std::map<int, float>> CompletionSpecialConsumption(int location_id) const;// for each special name, what object ids have those special capacities reduced by what amount for full completion of the production item
-        std::map<MeterType, std::map<int, float>>   CompletionMeterConsumption(int location_id) const;  // for each meter type, what object ids have those meters reduced by what amount for full completion of the production item
+        std::map<std::string, std::map<int, float>> CompletionSpecialConsumption(
+            int location_id, const ScriptingContext& context) const; // for each special name, what object ids have those special capacities reduced by what amount for full completion of the production item
+        std::map<MeterType, std::map<int, float>>   CompletionMeterConsumption(
+            int location_id, const ScriptingContext& context) const;  // for each meter type, what object ids have those meters reduced by what amount for full completion of the production item
 
         std::string Dump() const;
 
@@ -90,7 +92,7 @@ struct FO_COMMON_API ProductionQueue {
         /** Returns the total cost per item (blocksize 1) and the minimum number of
           * turns required to produce the indicated item, or (-1.0, -1) if the item
           * is unknown, unavailable, or invalid. */
-        std::pair<float, int> ProductionCostAndTime(const ScriptingContext& context = ScriptingContext()) const;
+        std::pair<float, int> ProductionCostAndTime(const ScriptingContext& context = ScriptingContext{}) const;
 
 
         ProductionItem      item;

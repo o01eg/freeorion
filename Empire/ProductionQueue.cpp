@@ -387,16 +387,16 @@ std::pair<float, int> ProductionQueue::ProductionItem::ProductionCostAndTime(
     return {-1.0, -1};
 }
 
-bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id) const { // TODO: Pass ScriptingContext...
+bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id, const ScriptingContext& context) const {
     switch (build_type) {
     case BuildType::BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
             auto c = bt->EnqueueLocation();
             if (!c)
                 return true;
-            auto location_obj = Objects().get(location_id);
-            const ScriptingContext context(location_obj);
-            return c->Eval(context, std::move(location_obj));
+            auto location_obj = context.ContextObjects().get(location_id);
+            const ScriptingContext location_context(location_obj, context);
+            return c->Eval(location_context, std::move(location_obj));
         }
         return true;
         break;
@@ -422,14 +422,14 @@ bool ProductionQueue::ProductionItem::operator<(const ProductionItem& rhs) const
 }
 
 std::map<std::string, std::map<int, float>>
-ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id) const {  // TODO: pass ScriptingContext
+ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id, const ScriptingContext& context) const {
     std::map<std::string, std::map<int, float>> retval;
 
     switch (build_type) {
     case BuildType::BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
-            auto location_obj = Objects().get(location_id);
-            ScriptingContext context(location_obj); // non-const but should be OK as only passed below to function taking const ScriptingContext&
+            auto location_obj = context.ContextObjects().get(location_id);
+            ScriptingContext location_target_context(location_obj, context); // non-const but should be OK as only passed below to function taking const ScriptingContext&
 
             for (const auto& psc : bt->ProductionSpecialConsumption()) {
                 if (!psc.second.first)
@@ -438,15 +438,15 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id) c
                 // if a condition selecting where to take resources from was specified, use it.
                 // Otherwise take from the production location
                 if (psc.second.second) {
-                    psc.second.second->Eval(context, matches);
+                    psc.second.second->Eval(location_target_context, matches);
                 } else {
-                    matches.emplace_back(location_obj);
+                    matches.push_back(location_obj);
                 }
 
                 // determine how much to take from each matched object
                 for (auto& object : matches) {
-                    context.effect_target = std::const_pointer_cast<UniverseObject>(object);
-                    retval[psc.first][object->ID()] += psc.second.first->Eval(context);
+                    location_target_context.effect_target = std::const_pointer_cast<UniverseObject>(object); // call to ValueRef cannot modify the pointed-to object
+                    retval[psc.first][object->ID()] += psc.second.first->Eval(location_target_context);
                 }
             }
         }
@@ -454,14 +454,14 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id) c
     }
     case BuildType::BT_SHIP: {
         if (const ShipDesign* sd = GetShipDesign(design_id)) {
-            auto location_obj = Objects().get(location_id);
-            const ScriptingContext context(location_obj);
+            auto location_obj = context.ContextObjects().get(location_id);
+            const ScriptingContext location_target_context(location_obj, context);
 
             if (const ShipHull* ship_hull = GetShipHull(sd->Hull())) {
                 for (const auto& psc : ship_hull->ProductionSpecialConsumption()) {
                     if (!psc.second.first)
                         continue;
-                    retval[psc.first][location_id] += psc.second.first->Eval(context);
+                    retval[psc.first][location_id] += psc.second.first->Eval(location_target_context);
                 }
             }
 
@@ -472,7 +472,7 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id) c
                 for (const auto& psc : part->ProductionSpecialConsumption()) {
                     if (!psc.second.first)
                         continue;
-                    retval[psc.first][location_id] += psc.second.first->Eval(context);
+                    retval[psc.first][location_id] += psc.second.first->Eval(location_target_context);
                 }
             }
         }
@@ -488,33 +488,30 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id) c
 }
 
 std::map<MeterType, std::map<int, float>>
-ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id) const { // TODO: pass ScriptingContext in
+ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id, const ScriptingContext& context) const {
     std::map<MeterType, std::map<int, float>> retval;
+
+    auto obj = context.ContextObjects().get(location_id);
+    const ScriptingContext location_context(obj, context);
 
     switch (build_type) {
     case BuildType::BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
-            auto obj = Objects().get(location_id);
-            const ScriptingContext context(obj);
-
             for (const auto& pmc : bt->ProductionMeterConsumption()) {
                 if (!pmc.second.first)
                     continue;
-                retval[pmc.first][location_id] = pmc.second.first->Eval(context);
+                retval[pmc.first][location_id] = pmc.second.first->Eval(location_context);
             }
         }
         break;
     }
     case BuildType::BT_SHIP: {
         if (const ShipDesign* sd = GetShipDesign(design_id)) {
-            auto obj = Objects().get(location_id);
-            const ScriptingContext context(obj);
-
             if (const ShipHull* ship_hull = GetShipHull(sd->Hull())) {
                 for (const auto& pmc : ship_hull->ProductionMeterConsumption()) {
                     if (!pmc.second.first)
                         continue;
-                    retval[pmc.first][location_id] += pmc.second.first->Eval(context);
+                    retval[pmc.first][location_id] += pmc.second.first->Eval(location_context);
                 }
             }
 
@@ -525,7 +522,7 @@ ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id) con
                 for (const auto& pmc : pt->ProductionMeterConsumption()) {
                     if (!pmc.second.first)
                         continue;
-                    retval[pmc.first][location_id] += pmc.second.first->Eval(context);
+                    retval[pmc.first][location_id] += pmc.second.first->Eval(location_context);
                 }
             }
         }
@@ -759,7 +756,7 @@ void ProductionQueue::Update() {
         is_producible.push_back(empire->ProducibleItem(elem.item, elem.location));
         // for items that don't depend on location, only store cost/time once
         int location_id = (elem.item.CostIsProductionLocationInvariant() ? INVALID_OBJECT_ID : elem.location);
-        std::pair<ProductionQueue::ProductionItem, int> key(elem.item, location_id);
+        auto key = std::pair{elem.item, location_id};
 
         if (!queue_item_costs_and_times.count(key))
             queue_item_costs_and_times[key] = elem.ProductionCostAndTime();
@@ -809,8 +806,8 @@ void ProductionQueue::Update() {
     // there are enough PP available in at least one group to make it worthwhile to simulate the future.
     DebugLogger() << "ProductionQueue::Update: Simulating future turns of production queue";
 
-    const int TOO_MANY_TURNS = 500;     // stop counting turns to completion after this long, to prevent seemingly endless loops
-    const float TOO_LONG_TIME = 0.5f;   // max time in seconds to spend simulating queue
+    constexpr int TOO_MANY_TURNS = 500;   // stop counting turns to completion after this long, to prevent seemingly endless loops
+    constexpr float TOO_LONG_TIME = 0.5f; // max time in seconds to spend simulating queue
 
 
     update_timer.EnterSection("Remove Unproducible");

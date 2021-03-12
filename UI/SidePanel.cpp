@@ -48,16 +48,16 @@
 class RotatingPlanetControl;
 
 namespace {
-    const int       EDGE_PAD(3);
-    std::map<std::pair<int,int>,float>          colony_projections;
-    std::map<std::pair<std::string,int>,float>  species_colony_projections;
+    constexpr int EDGE_PAD(3);
+    std::map<std::pair<int, int>, float>         colony_projections;
+    std::map<std::pair<std::string, int>, float> species_colony_projections;
 
     /** @content_tag{CTRL_ALWAYS_BOMBARD} Select this ship during automatic ship selection for bombard, regardless of any tags **/
     const std::string TAG_BOMBARD_ALWAYS = "CTRL_ALWAYS_BOMBARD";
     /** @content_tag{CTRL_BOMBARD_} Prefix tag allowing automatic ship selection for bombard, must post-fix a valid planet tag **/
     const std::string TAG_BOMBARD_PREFIX = "CTRL_BOMBARD_";
 
-    void        PlaySidePanelOpenSound()
+    void PlaySidePanelOpenSound()
     { Sound::GetSound().PlaySound(GetOptionsDB().Get<std::string>("ui.map.sidepanel.open.sound.path"), true); }
 
     struct RotatingPlanetData {
@@ -106,10 +106,10 @@ namespace {
         std::vector<Atmosphere> atmospheres;     ///< the filenames of the atmosphere images suitable for use with this planet image
     };
 
-    const std::map<PlanetType, std::vector<RotatingPlanetData>>&    GetRotatingPlanetData() {
-        ScopedTimer timer("GetRotatingPlanetData", true);
+    const std::map<PlanetType, std::vector<RotatingPlanetData>>& GetRotatingPlanetData() {
         static std::map<PlanetType, std::vector<RotatingPlanetData>> data;
         if (data.empty()) {
+            ScopedTimer timer("GetRotatingPlanetData initialization", true);
             XMLDoc doc;
             try {
                 boost::filesystem::ifstream ifs(ClientUI::ArtDir() / "planets" / "planets.xml");
@@ -136,7 +136,7 @@ namespace {
         return data;
     }
 
-    const std::map<std::string, PlanetAtmosphereData>&              GetPlanetAtmosphereData() {
+    const std::map<std::string, PlanetAtmosphereData>& GetPlanetAtmosphereData() {
         static std::map<std::string, PlanetAtmosphereData> data;
         if (data.empty()) {
             XMLDoc doc;
@@ -158,7 +158,7 @@ namespace {
         return data;
     }
 
-    double      GetAsteroidsFPS() {
+    double GetAsteroidsFPS() {
         static double retval = -1.0;
         if (retval == -1.0) {
             XMLDoc doc;
@@ -176,7 +176,7 @@ namespace {
         return retval;
     }
 
-    double      GetRotatingPlanetAmbientIntensity() {
+    double GetRotatingPlanetAmbientIntensity() {
         static double retval = -1.0;
 
         if (retval == -1.0) {
@@ -196,7 +196,7 @@ namespace {
         return retval;
     }
 
-    double      GetRotatingPlanetDiffuseIntensity() {
+    double GetRotatingPlanetDiffuseIntensity() {
         static double retval = -1.0;
 
         if (retval == -1.0) {
@@ -227,11 +227,10 @@ namespace {
         };
 
         static bool usphere_initialized = false;
-        static std::array<PolarCoordinate, 30 + 1> azimuth;
-        static std::array<PolarCoordinate, 30 + 1> elevation;
+        static std::array<PolarCoordinate, 30 + 1> azimuth = {};
+        static std::array<PolarCoordinate, 30 + 1> elevation = {};
 
-        if (!usphere_initialized)
-        {
+        if (!usphere_initialized) {
             // calculate azimuth on unit sphere along equator
             for (auto longitude : boost::irange<size_t>(0, azimuth.size())) {
                 float phi = 2 * M_PI * longitude / (azimuth.size() - 1);
@@ -254,9 +253,9 @@ namespace {
             usphere_initialized = true;
         }
 
-        if (texture) {
+        if (texture)
             glBindTexture(GL_TEXTURE_2D, texture->OpenGLId());
-        }
+
 
         // commented out shininess rendering because it wasn't working properly.
         // it just appeared as a white blob, seemingly at the poles of the planet (but possibly not?)
@@ -276,19 +275,29 @@ namespace {
         for (auto latitude : boost::irange<size_t>(0, elevation.size() - 1)) {
             glBegin(GL_QUAD_STRIP);
             for (auto longitude : boost::irange<size_t>(0, azimuth.size())) {
-                glNormal3f(azimuth[longitude].sin * elevation[latitude+1].sin         , azimuth[longitude].cos * elevation[latitude+1].sin         , elevation[latitude+1].cos);
-                glTexCoord2f(1 - (float) longitude / (azimuth.size() - 1), 1 - (float) (latitude+1) / (elevation.size() - 1));
-                glVertex3f(azimuth[longitude].sin * elevation[latitude+1].sin * radius, azimuth[longitude].cos * elevation[latitude+1].sin * radius, elevation[latitude+1].cos * radius);
+                glNormal3f(azimuth[longitude].sin * elevation[latitude+1].sin,
+                           azimuth[longitude].cos * elevation[latitude+1].sin,
+                           elevation[latitude+1].cos);
+                glTexCoord2f(1 - (float)(longitude) / (azimuth.size() - 1),
+                             1 - (float)(latitude+1) / (elevation.size() - 1));
+                glVertex3f(azimuth[longitude].sin * elevation[latitude+1].sin * radius,
+                           azimuth[longitude].cos * elevation[latitude+1].sin * radius,
+                           elevation[latitude+1].cos * radius);
 
-                glNormal3f(azimuth[longitude].sin * elevation[latitude].sin         , azimuth[longitude].cos * elevation[latitude].sin         , elevation[latitude].cos);
-                glTexCoord2f(1 - (float) longitude / (azimuth.size() - 1), 1 - (float) latitude / (elevation.size() - 1));
-                glVertex3f(azimuth[longitude].sin * elevation[latitude].sin * radius, azimuth[longitude].cos * elevation[latitude].sin * radius, elevation[latitude].cos * radius);
+                glNormal3f(azimuth[longitude].sin * elevation[latitude].sin,
+                           azimuth[longitude].cos * elevation[latitude].sin,
+                           elevation[latitude].cos);
+                glTexCoord2f(1 - (float)(longitude) / (azimuth.size() - 1),
+                             1 - (float)(latitude) / (elevation.size() - 1));
+                glVertex3f(azimuth[longitude].sin * elevation[latitude].sin * radius,
+                           azimuth[longitude].cos * elevation[latitude].sin * radius,
+                           elevation[latitude].cos * radius);
             }
             glEnd();
         }
     }
 
-    GLfloat*    GetLightPosition() {
+    GLfloat* GetLightPosition() {
         static GLfloat retval[] = {0.0, 0.0, 0.0, 0.0};
 
         if (retval[0] == 0.0 && retval[1] == 0.0 && retval[2] == 0.0) {
@@ -1358,6 +1367,8 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
     float best_capacity = -999;
     bool changed_planet = false;
 
+    ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
+
     GetUniverse().InhibitUniverseObjectSignals(true);
     for (auto& ship : capable_and_available_colony_ships) {
         if (!ship)
@@ -1392,7 +1403,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
                         target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
 
                         // temporary meter update with currently set species
-                        GetUniverse().UpdateMeterEstimates(target_planet_id, Empires());
+                        GetUniverse().UpdateMeterEstimates(target_planet_id, context);
                         planet_capacity = target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current();  // want value after meter update, so check current, not initial value
                     }
                     species_colony_projections[std::move(spec_pair)] = planet_capacity;
@@ -1411,8 +1422,8 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
         target_planet->SetOwner(orig_owner);
         target_planet->SetSpecies(orig_species);
         target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(orig_initial_target_pop,
-                                                              orig_initial_target_pop);
-        GetUniverse().UpdateMeterEstimates(target_planet_id, Empires());
+                                                                         orig_initial_target_pop);
+        GetUniverse().UpdateMeterEstimates(target_planet_id, context);
     }
     GetUniverse().InhibitUniverseObjectSignals(false);
 
@@ -1666,6 +1677,9 @@ void SidePanel::PlanetPanel::Refresh() {
     }
 
     if (can_colonize) {
+        ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(),
+                                 GetSpeciesManager(), GetSupplyManager()};
+
         // show colonize button; in case the chosen colony ship is not actually
         // selected, but has been chosen by AutomaticallyChosenColonyShip,
         // determine what population capacity to put on the conolnize buttone by
@@ -1692,13 +1706,13 @@ void SidePanel::PlanetPanel::Refresh() {
             planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
 
             // temporary meter updates for curently set species
-            GetUniverse().UpdateMeterEstimates(m_planet_id, Empires());
+            GetUniverse().UpdateMeterEstimates(m_planet_id, context);
             planet_capacity = ((planet_env_for_colony_species == PlanetEnvironment::PE_UNINHABITABLE) ? 0.0 : planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current());   // want target pop after meter update, so check current value of meter
             planet->SetOwner(orig_owner);
             planet->SetSpecies(orig_species);
             planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(
                 orig_initial_target_pop, orig_initial_target_pop);
-            GetUniverse().UpdateMeterEstimates(m_planet_id, Empires());
+            GetUniverse().UpdateMeterEstimates(m_planet_id, context);
 
             colony_projections[this_pair] = planet_capacity;
             GetUniverse().InhibitUniverseObjectSignals(false);

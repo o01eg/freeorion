@@ -37,11 +37,14 @@ public:
             type(slot_type), x(x_), y(y_)
         {}
 
+        bool operator==(const Slot& rhs) const
+        { return type == rhs.type && x == rhs.x && y == rhs.y; }
+
         ShipSlotType type = ShipSlotType::INVALID_SHIP_SLOT_TYPE;
         double x = 0.5, y = 0.5;
     };
 
-    ShipHull();
+    ShipHull() = default;
 
     ShipHull(float fuel, float speed, float stealth, float structure,
              bool default_fuel_effects, bool default_speed_effects,
@@ -52,6 +55,10 @@ public:
              std::string&& icon, std::string&& graphic);
 
     ~ShipHull();
+
+    bool operator==(const ShipHull& rhs) const;
+    bool operator!=(const ShipHull& rhs) const
+    { return !(*this == rhs); }
 
     //! Returns name of hull
     auto Name() const -> const std::string&
@@ -97,11 +104,11 @@ public:
     auto ProductionCostTimeLocationInvariant() const -> bool;
 
     //! Returns the number of production points required to produce this hull
-    auto ProductionCost(int empire_id, int location_id, const ScriptingContext& parent_context = ScriptingContext(),
+    auto ProductionCost(int empire_id, int location_id, const ScriptingContext& parent_context = ScriptingContext{},
                         int in_design_id = INVALID_DESIGN_ID) const -> float;
 
     //! Returns the number of turns required to produce this hull
-    auto ProductionTime(int empire_id, int location_id, const ScriptingContext& parent_context = ScriptingContext(),
+    auto ProductionTime(int empire_id, int location_id, const ScriptingContext& parent_context = ScriptingContext{},
                         int in_design_id = INVALID_DESIGN_ID) const -> int;
 
     //! Returns whether this hull type is producible by players and appears on

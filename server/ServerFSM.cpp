@@ -2772,7 +2772,7 @@ void PlayingGame::EstablishPlayer(const PlayerConnectionPtr& player_connection,
             {
                 // send playing game
                 server.AddObserverPlayerIntoGame(player_connection);
-            } else if (client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER) {
+            } else if (client_type == Networking::CLIENT_TYPE_HUMAN_PLAYER ||
                        client_type == Networking::CLIENT_TYPE_AI_PLAYER) {
                 // previous connection was dropped
                 // set empire link to new connection by name

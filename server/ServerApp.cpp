@@ -281,7 +281,7 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
         }
 
         args[player_pos] = player_name;
-        m_ai_client_processes.insert_or_assign(player_name, Process(AI_CLIENT_EXE, args));
+        m_ai_client_processes.insert(std::make_pair(player_name, Process(AI_CLIENT_EXE, args)));
 
         DebugLogger() << "done starting AI " << player_name;
     }
@@ -1941,6 +1941,10 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
             const std::string previous_player_name = (*previous_it)->PlayerName();
             m_networking.Disconnect(previous_player_id);
             if (previous_client_type == Networking::CLIENT_TYPE_AI_PLAYER) {
+                // change empire's player so after reload the player still could connect
+                // to the empire
+                empire->SetPlayerName(player_connection->PlayerName());
+                // kill unneeded AI process
                 auto it = m_ai_client_processes.find(previous_player_name);
                 if (it != m_ai_client_processes.end()) {
                     it->second.Kill();

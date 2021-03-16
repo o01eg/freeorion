@@ -51,12 +51,13 @@ namespace {
      * moved by the MoveTo effect separately from the fleet that previously
      * held it.  All ships need to be within fleets. */
     std::shared_ptr<Fleet> CreateNewFleet(double x, double y, std::shared_ptr<Ship> ship,
+                                          Universe& universe,
                                           FleetAggression aggression = FleetAggression::INVALID_FLEET_AGGRESSION)
     {
         if (!ship)
             return nullptr;
 
-        auto fleet = GetUniverse().InsertNew<Fleet>("", x, y, ship->Owner());   // TODO: Avoid GetUniverse call by extending ScriptingContext?
+        auto fleet = universe.InsertNew<Fleet>("", x, y, ship->Owner());
 
         fleet->Rename(fleet->GenerateFleetName(Objects()));
         fleet->GetMeter(MeterType::METER_STEALTH)->SetCurrent(Meter::LARGE_VALUE);
@@ -78,7 +79,7 @@ namespace {
      * fleet that previously held it.  Also used by CreateShip effect to give
      * the new ship a fleet.  All ships need to be within fleets. */
     std::shared_ptr<Fleet> CreateNewFleet(std::shared_ptr<System> system, std::shared_ptr<Ship> ship,
-                                          ObjectMap& objects,
+                                          Universe& universe,
                                           FleetAggression aggression = FleetAggression::INVALID_FLEET_AGGRESSION)
     {
         if (!system || !ship)
@@ -86,7 +87,7 @@ namespace {
 
         // remove ship from old fleet / system, put into new system if necessary
         if (ship->SystemID() != system->ID()) {
-            if (auto old_system = objects.get<System>(ship->SystemID())) {
+            if (auto old_system = universe.Objects().get<System>(ship->SystemID())) {
                 old_system->Remove(ship->ID());
                 ship->SetSystem(INVALID_OBJECT_ID);
             }
@@ -94,12 +95,12 @@ namespace {
         }
 
         if (ship->FleetID() != INVALID_OBJECT_ID) {
-            if (auto old_fleet = objects.get<Fleet>(ship->FleetID()))
+            if (auto old_fleet = universe.Objects().get<Fleet>(ship->FleetID()))
                 old_fleet->RemoveShips({ship->ID()});
         }
 
         // create new fleet for ship, and put it in new system
-        auto fleet = CreateNewFleet(system->X(), system->Y(), std::move(ship), aggression);
+        auto fleet = CreateNewFleet(system->X(), system->Y(), std::move(ship), universe, aggression);
         system->Insert(fleet);
 
         return fleet;
@@ -122,12 +123,14 @@ namespace {
      * the MoveTo effect, as its previous route was assigned based on its
      * previous location, and may not be valid for its new location. */
     void UpdateFleetRoute(const std::shared_ptr<Fleet>& fleet, int new_next_system,
-                          int new_previous_system, const ObjectMap& objects)
+                          int new_previous_system, const ScriptingContext& context)
     {
         if (!fleet) {
             ErrorLogger() << "UpdateFleetRoute passed a null fleet pointer";
             return;
         }
+
+        const ObjectMap& objects = context.ContextObjects();
 
         auto next_system = objects.get<System>(new_next_system);
         if (!next_system) {
@@ -149,8 +152,8 @@ namespace {
 
         int dest_system = fleet->FinalDestinationID();
 
-        std::pair<std::list<int>, double> route_pair =  // TODO: Get PathFinder from ScrptingContext
-            GetUniverse().GetPathfinder()->ShortestPath(start_system, dest_system, fleet->Owner(), objects);
+        std::pair<std::list<int>, double> route_pair =
+            context.ContextUniverse().GetPathfinder()->ShortestPath(start_system, dest_system, fleet->Owner(), objects);
 
         // if shortest path is empty, the route may be impossible or trivial, so just set route to move fleet
         // to the next system that it was just set to move to anyway.
@@ -464,6 +467,9 @@ unsigned int NoOp::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> NoOp::Clone() const
+{ return std::make_unique<NoOp>(); }
+
 
 ///////////////////////////////////////////////////////////
 // SetMeter                                              //
@@ -679,6 +685,12 @@ unsigned int SetMeter::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> SetMeter::Clone() const {
+    return std::make_unique<SetMeter>(m_meter,
+                                      ValueRef::CloneUnique(m_value),
+                                      m_accounting_label);
+}
+
 
 ///////////////////////////////////////////////////////////
 // SetShipPartMeter                                      //
@@ -876,6 +888,12 @@ unsigned int SetShipPartMeter::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> SetShipPartMeter::Clone() const {
+    return std::make_unique<SetShipPartMeter>(m_meter,
+                                              ValueRef::CloneUnique(m_part_name),
+                                              ValueRef::CloneUnique(m_value));
+}
+
 
 ///////////////////////////////////////////////////////////
 // SetEmpireMeter                                        //
@@ -998,6 +1016,13 @@ unsigned int SetEmpireMeter::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> SetEmpireMeter::Clone() const {
+    auto meter = m_meter;
+    return std::make_unique<SetEmpireMeter>(ValueRef::CloneUnique(m_empire_id),
+                                            meter,
+                                            ValueRef::CloneUnique(m_value));
+}
+
 
 ///////////////////////////////////////////////////////////
 // SetEmpireStockpile                                    //
@@ -1080,6 +1105,12 @@ unsigned int SetEmpireStockpile::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> SetEmpireStockpile::Clone() const {
+    return std::make_unique<SetEmpireStockpile>(ValueRef::CloneUnique(m_empire_id),
+                                                m_stockpile,
+                                                ValueRef::CloneUnique(m_value));
+}
+
 
 ///////////////////////////////////////////////////////////
 // SetEmpireCapital                                      //
@@ -1138,6 +1169,9 @@ unsigned int SetEmpireCapital::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> SetEmpireCapital::Clone() const
+{ return std::make_unique<SetEmpireCapital>(ValueRef::CloneUnique(m_empire_id)); }
+
 
 ///////////////////////////////////////////////////////////
 // SetPlanetType                                         //
@@ -1180,6 +1214,9 @@ unsigned int SetPlanetType::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> SetPlanetType::Clone() const
+{ return std::make_unique<SetPlanetType>(ValueRef::CloneUnique(m_type)); }
+
 
 ///////////////////////////////////////////////////////////
 // SetPlanetSize                                         //
@@ -1219,6 +1256,9 @@ unsigned int SetPlanetSize::GetCheckSum() const {
     TraceLogger() << "GetCheckSum(SetPlanetSize): retval: " << retval;
     return retval;
 }
+
+std::unique_ptr<Effect> SetPlanetSize::Clone() const
+{ return std::make_unique<SetPlanetSize>(ValueRef::CloneUnique(m_size)); }
 
 
 ///////////////////////////////////////////////////////////
@@ -1287,6 +1327,9 @@ unsigned int SetSpecies::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> SetSpecies::Clone() const
+{ return std::make_unique<SetSpecies>(ValueRef::CloneUnique(m_species_name)); }
+
 
 ///////////////////////////////////////////////////////////
 // SetOwner                                              //
@@ -1319,13 +1362,14 @@ void SetOwner::Execute(ScriptingContext& context) const {
         // if ship is armed use old fleet's aggression. otherwise use auto-determined aggression
         auto aggr = ship->IsArmed() ? old_fleet->Aggression() : FleetAggression::INVALID_FLEET_AGGRESSION;
 
+        Universe& universe = owner_context.ContextUniverse();
 
         // move ship into new fleet
         std::shared_ptr<Fleet> new_fleet;
-        if (auto system = context.ContextObjects().get<System>(ship->SystemID()))
-            new_fleet = CreateNewFleet(std::move(system), std::move(ship), context.ContextObjects(), aggr);
+        if (auto system = owner_context.ContextObjects().get<System>(ship->SystemID()))
+            new_fleet = CreateNewFleet(std::move(system), std::move(ship), universe, aggr);
         else
-            new_fleet = CreateNewFleet(ship->X(), ship->Y(), std::move(ship), aggr);
+            new_fleet = CreateNewFleet(ship->X(), ship->Y(), std::move(ship), universe, aggr);
 
         if (new_fleet)
             new_fleet->SetNextAndPreviousSystems(old_fleet->NextSystemID(), old_fleet->PreviousSystemID());
@@ -1333,7 +1377,7 @@ void SetOwner::Execute(ScriptingContext& context) const {
         // if old fleet is empty, destroy it.  Don't reassign ownership of fleet
         // in case that would reval something to the recipient that shouldn't be...
         if (old_fleet->Empty())
-            GetUniverse().EffectDestroy(old_fleet->ID(), INVALID_OBJECT_ID); // no particular source destroyed the fleet in this case
+            universe.EffectDestroy(old_fleet->ID(), INVALID_OBJECT_ID); // no particular source destroyed the fleet in this case
     }
 }
 
@@ -1354,6 +1398,9 @@ unsigned int SetOwner::GetCheckSum() const {
     TraceLogger() << "GetCheckSum(SetOwner): retval: " << retval;
     return retval;
 }
+
+std::unique_ptr<Effect> SetOwner::Clone() const
+{ return std::make_unique<SetOwner>(ValueRef::CloneUnique(m_empire_id)); }
 
 
 ///////////////////////////////////////////////////////////
@@ -1414,6 +1461,12 @@ unsigned int SetSpeciesEmpireOpinion::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> SetSpeciesEmpireOpinion::Clone() const {
+    return std::make_unique<SetSpeciesEmpireOpinion>(ValueRef::CloneUnique(m_species_name),
+                                                     ValueRef::CloneUnique(m_empire_id),
+                                                     ValueRef::CloneUnique(m_opinion));
+}
+
 
 ///////////////////////////////////////////////////////////
 // SetSpeciesSpeciesOpinion                              //
@@ -1471,6 +1524,12 @@ unsigned int SetSpeciesSpeciesOpinion::GetCheckSum() const {
 
     TraceLogger() << "GetCheckSum(SetSpeciesSpeciesOpinion): retval: " << retval;
     return retval;
+}
+
+std::unique_ptr<Effect> SetSpeciesSpeciesOpinion::Clone() const {
+    return std::make_unique<SetSpeciesSpeciesOpinion>(ValueRef::CloneUnique(m_opinionated_species_name),
+                                                      ValueRef::CloneUnique(m_rated_species_name),
+                                                      ValueRef::CloneUnique(m_opinion));
 }
 
 
@@ -1585,6 +1644,12 @@ unsigned int CreatePlanet::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> CreatePlanet::Clone() const {
+    return std::make_unique<CreatePlanet>(ValueRef::CloneUnique(m_type),
+                                          ValueRef::CloneUnique(m_size),
+                                          ValueRef::CloneUnique(m_name),
+                                          ValueRef::CloneUnique(m_effects_to_apply_after));
+}
 
 ///////////////////////////////////////////////////////////
 // CreateBuilding                                        //
@@ -1686,6 +1751,12 @@ unsigned int CreateBuilding::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> CreateBuilding::Clone() const {
+    return std::make_unique<CreateBuilding>(ValueRef::CloneUnique(m_building_type_name),
+                                            ValueRef::CloneUnique(m_name),
+                                            ValueRef::CloneUnique(m_effects_to_apply_after));
+}
+
 
 ///////////////////////////////////////////////////////////
 // CreateShip                                            //
@@ -1729,13 +1800,13 @@ void CreateShip::Execute(ScriptingContext& context) const {
     int design_id = INVALID_DESIGN_ID;
     if (m_design_id) {
         design_id = m_design_id->Eval(context);
-        if (!GetShipDesign(design_id)) {
+        if (!context.ContextUniverse().GetShipDesign(design_id)) {
             ErrorLogger() << "CreateShip::Execute couldn't get ship design with id: " << design_id;
             return;
         }
     } else if (m_design_name) {
         std::string design_name = m_design_name->Eval(context);
-        const ShipDesign* ship_design = GetPredefinedShipDesign(design_name);
+        const ShipDesign* ship_design = context.ContextUniverse().GetGenericShipDesign(design_name);
         if (!ship_design) {
             ErrorLogger() << "CreateShip::Execute couldn't get predefined ship design with name " << m_design_name->Dump();
             return;
@@ -1778,8 +1849,8 @@ void CreateShip::Execute(ScriptingContext& context) const {
     //        fleet = ship->FleetID();
     //// etc.
 
-    auto ship = GetUniverse().InsertNew<Ship>(empire_id, design_id, std::move(species_name),    // TODO: Avoid GetUniverse() call by including more in ScriptingContext
-                                              ALL_EMPIRES);
+    auto ship = context.ContextUniverse().InsertNew<Ship>(
+        empire_id, design_id, std::move(species_name), ALL_EMPIRES);
     system->Insert(ship);
 
     if (m_name) {
@@ -1803,7 +1874,7 @@ void CreateShip::Execute(ScriptingContext& context) const {
 
     GetUniverse().SetEmpireKnowledgeOfShipDesign(design_id, empire_id);
 
-    CreateNewFleet(std::move(system), ship, context.ContextObjects());
+    CreateNewFleet(std::move(system), ship, context.ContextUniverse());
 
     // apply after-creation effects
     ScriptingContext local_context{context, std::move(ship), ScriptingContext::CurrentValueVariant()};
@@ -1860,6 +1931,16 @@ unsigned int CreateShip::GetCheckSum() const {
     CheckSums::CheckSumCombine(retval, m_effects_to_apply_after);
 
     TraceLogger() << "GetCheckSum(CreateShip): retval: " << retval;
+    return retval;
+}
+
+std::unique_ptr<Effect> CreateShip::Clone() const {
+    auto retval = std::make_unique<CreateShip>(ValueRef::CloneUnique(m_design_name),
+                                               ValueRef::CloneUnique(m_empire_id),
+                                               ValueRef::CloneUnique(m_species_name),
+                                               ValueRef::CloneUnique(m_name),
+                                               ValueRef::CloneUnique(m_effects_to_apply_after));
+    retval->m_design_id = ValueRef::CloneUnique(m_design_id);
     return retval;
 }
 
@@ -2009,6 +2090,14 @@ unsigned int CreateField::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> CreateField::Clone() const {
+    return std::make_unique<CreateField>(ValueRef::CloneUnique(m_field_type_name),
+                                         ValueRef::CloneUnique(m_x),
+                                         ValueRef::CloneUnique(m_y),
+                                         ValueRef::CloneUnique(m_size),
+                                         ValueRef::CloneUnique(m_name),
+                                         ValueRef::CloneUnique(m_effects_to_apply_after));
+}
 
 ///////////////////////////////////////////////////////////
 // CreateSystem                                          //
@@ -2125,6 +2214,14 @@ unsigned int CreateSystem::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> CreateSystem::Clone() const {
+    return std::make_unique<CreateSystem>(ValueRef::CloneUnique(m_type),
+                                          ValueRef::CloneUnique(m_x),
+                                          ValueRef::CloneUnique(m_y),
+                                          ValueRef::CloneUnique(m_name),
+                                          ValueRef::CloneUnique(m_effects_to_apply_after));
+}
+
 
 ///////////////////////////////////////////////////////////
 // Destroy                                               //
@@ -2153,6 +2250,9 @@ unsigned int Destroy::GetCheckSum() const {
     TraceLogger() << "GetCheckSum(Destroy): retval: " << retval;
     return retval;
 }
+
+std::unique_ptr<Effect> Destroy::Clone() const
+{ return std::make_unique<Destroy>(); }
 
 
 ///////////////////////////////////////////////////////////
@@ -2210,6 +2310,11 @@ unsigned int AddSpecial::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> AddSpecial::Clone() const {
+    return std::make_unique<AddSpecial>(ValueRef::CloneUnique(m_name),
+                                        ValueRef::CloneUnique(m_capacity));
+}
+
 
 ///////////////////////////////////////////////////////////
 // RemoveSpecial                                         //
@@ -2250,6 +2355,9 @@ unsigned int RemoveSpecial::GetCheckSum() const {
     TraceLogger() << "GetCheckSum(RemoveSpecial): retval: " << retval;
     return retval;
 }
+
+std::unique_ptr<Effect> RemoveSpecial::Clone() const
+{ return std::make_unique<RemoveSpecial>(ValueRef::CloneUnique(m_name)); }
 
 
 ///////////////////////////////////////////////////////////
@@ -2316,6 +2424,9 @@ unsigned int AddStarlanes::GetCheckSum() const {
     TraceLogger() << "GetCheckSum(AddStarlanes): retval: " << retval;
     return retval;
 }
+
+std::unique_ptr<Effect> AddStarlanes::Clone() const
+{ return std::make_unique<AddStarlanes>(ValueRef::CloneUnique(m_other_lane_endpoint_condition)); }
 
 
 ///////////////////////////////////////////////////////////
@@ -2385,6 +2496,9 @@ unsigned int RemoveStarlanes::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> RemoveStarlanes::Clone() const
+{ return std::make_unique<RemoveStarlanes>(ValueRef::CloneUnique(m_other_lane_endpoint_condition)); }
+
 
 ///////////////////////////////////////////////////////////
 // SetStarType                                           //
@@ -2423,6 +2537,9 @@ unsigned int SetStarType::GetCheckSum() const {
     TraceLogger() << "GetCheckSum(SetStarType): retval: " << retval;
     return retval;
 }
+
+std::unique_ptr<Effect> SetStarType::Clone() const
+{ return std::make_unique<SetStarType>(ValueRef::CloneUnique(m_type)); }
 
 
 ///////////////////////////////////////////////////////////
@@ -2473,7 +2590,7 @@ void MoveTo::Execute(ScriptingContext& context) const {
                 }
 
                 ExploreSystem(dest_system->ID(), fleet, context);
-                UpdateFleetRoute(fleet, INVALID_OBJECT_ID, INVALID_OBJECT_ID, context.ContextObjects());  // inserted into dest_system, so next and previous systems are invalid objects
+                UpdateFleetRoute(fleet, INVALID_OBJECT_ID, INVALID_OBJECT_ID, context);  // inserted into dest_system, so next and previous systems are invalid objects
             }
 
             // if old and new systems are the same, and destination is that
@@ -2513,7 +2630,7 @@ void MoveTo::Execute(ScriptingContext& context) const {
                 if (auto dest_ship = std::dynamic_pointer_cast<const Ship>(destination))
                     dest_fleet = context.ContextObjects().get<Fleet>(dest_ship->FleetID());
             if (dest_fleet) {
-                UpdateFleetRoute(fleet, dest_fleet->NextSystemID(), dest_fleet->PreviousSystemID(), context.ContextObjects());
+                UpdateFleetRoute(fleet, dest_fleet->NextSystemID(), dest_fleet->PreviousSystemID(), context);
 
             } else {
                 // TODO: need to do something else to get updated previous/next
@@ -2587,11 +2704,11 @@ void MoveTo::Execute(ScriptingContext& context) const {
             auto aggr = old_fleet && ship->IsArmed() ? old_fleet->Aggression() : FleetAggression::INVALID_FLEET_AGGRESSION;
 
             if (auto dest_system = context.ContextObjects().get<System>(dest_sys_id)) {
-                CreateNewFleet(std::move(dest_system), ship, context.ContextObjects(), aggr); // creates new fleet, inserts fleet into system and ship into fleet
+                CreateNewFleet(std::move(dest_system), ship, context.ContextUniverse(), aggr); // creates new fleet, inserts fleet into system and ship into fleet
                 ExploreSystem(dest_sys_id, ship, context);
 
             } else {
-                CreateNewFleet(destination->X(), destination->Y(), std::move(ship), aggr);    // creates new fleet and inserts ship into fleet
+                CreateNewFleet(destination->X(), destination->Y(), std::move(ship), context.ContextUniverse(), aggr); // creates new fleet and inserts ship into fleet
             }
         }
 
@@ -2719,6 +2836,9 @@ unsigned int MoveTo::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> MoveTo::Clone() const
+{ return std::make_unique<MoveTo>(ValueRef::CloneUnique(m_location_condition)); }
+
 
 ///////////////////////////////////////////////////////////
 // MoveInOrbit                                           //
@@ -2795,7 +2915,7 @@ void MoveInOrbit::Execute(ScriptingContext& context) const {
             old_sys->Remove(fleet->ID());
         fleet->SetSystem(INVALID_OBJECT_ID);
         fleet->MoveTo(new_x, new_y);
-        UpdateFleetRoute(fleet, INVALID_OBJECT_ID, INVALID_OBJECT_ID, context.ContextObjects());
+        UpdateFleetRoute(fleet, INVALID_OBJECT_ID, INVALID_OBJECT_ID, context);
 
         for (auto& ship : context.ContextObjects().find<Ship>(fleet->ShipIDs())) {
             if (old_sys)
@@ -2822,7 +2942,7 @@ void MoveInOrbit::Execute(ScriptingContext& context) const {
         ship->SetFleetID(INVALID_OBJECT_ID);
         ship->MoveTo(new_x, new_y);
 
-        CreateNewFleet(new_x, new_y, ship); // creates new fleet and inserts ship into fleet
+        CreateNewFleet(new_x, new_y, ship, context.ContextUniverse()); // creates new fleet and inserts ship into fleet
         return;
 
     } else if (auto field = std::dynamic_pointer_cast<Field>(target)) {
@@ -2864,6 +2984,14 @@ unsigned int MoveInOrbit::GetCheckSum() const {
     CheckSums::CheckSumCombine(retval, m_focus_y);
 
     TraceLogger() << "GetCheckSum(MoveInOrbit): retval: " << retval;
+    return retval;
+}
+
+std::unique_ptr<Effect> MoveInOrbit::Clone() const {
+    auto retval = std::make_unique<MoveInOrbit>(ValueRef::CloneUnique(m_speed),
+                                                ValueRef::CloneUnique(m_focus_x),
+                                                ValueRef::CloneUnique(m_focus_y));
+    retval->m_focal_point_condition = ValueRef::CloneUnique(m_focal_point_condition);
     return retval;
 }
 
@@ -2961,7 +3089,7 @@ void MoveTowards::Execute(ScriptingContext& context) const {
         }
 
         // todo: is fleet now close enough to fall into a system?
-        UpdateFleetRoute(fleet, INVALID_OBJECT_ID, INVALID_OBJECT_ID, context.ContextObjects());
+        UpdateFleetRoute(fleet, INVALID_OBJECT_ID, INVALID_OBJECT_ID, context);
 
     } else if (auto ship = std::dynamic_pointer_cast<Ship>(target)) {
         auto old_sys = context.ContextObjects().get<System>(ship->SystemID());
@@ -2980,7 +3108,7 @@ void MoveTowards::Execute(ScriptingContext& context) const {
         // if ship is armed use old fleet's aggression. otherwise use auto-determined aggression
         auto aggr = ship->IsArmed() ? old_fleet_aggr : FleetAggression::INVALID_FLEET_AGGRESSION;
 
-        CreateNewFleet(new_x, new_y, ship, aggr); // creates new fleet and inserts ship into fleet
+        CreateNewFleet(new_x, new_y, ship, context.ContextUniverse(), aggr); // creates new fleet and inserts ship into fleet
         if (old_fleet && old_fleet->Empty()) {
             if (old_sys)
                 old_sys->Remove(old_fleet->ID());
@@ -3031,6 +3159,14 @@ unsigned int MoveTowards::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> MoveTowards::Clone() const {
+    auto retval = std::make_unique<MoveTowards>(ValueRef::CloneUnique(m_speed),
+                                                ValueRef::CloneUnique(m_dest_x),
+                                                ValueRef::CloneUnique(m_dest_y));
+    retval->m_dest_condition = ValueRef::CloneUnique(m_dest_condition);
+    return retval;
+}
+
 
 ///////////////////////////////////////////////////////////
 // SetDestination                                        //
@@ -3078,9 +3214,9 @@ void SetDestination::Execute(ScriptingContext& context) const {
         return;
 
     // find shortest path for fleet's owner
-    std::pair<std::list<int>, double> short_path = GetUniverse().GetPathfinder()->ShortestPath(  // TODO: Get PathFinder from ScriptingContext
+    auto [route_list, ignored_length] = context.ContextUniverse().GetPathfinder()->ShortestPath(
         start_system_id, destination_system_id, target_fleet->Owner(), context.ContextObjects());
-    const std::list<int>& route_list = short_path.first;
+    (void)ignored_length; // suppress ignored variable warning
 
     // reject empty move paths (no path exists).
     if (route_list.empty())
@@ -3115,6 +3251,9 @@ unsigned int SetDestination::GetCheckSum() const {
     TraceLogger() << "GetCheckSum(SetDestination): retval: " << retval;
     return retval;
 }
+
+std::unique_ptr<Effect> SetDestination::Clone() const
+{ return std::make_unique<SetDestination>(ValueRef::CloneUnique(m_location_condition)); }
 
 
 ///////////////////////////////////////////////////////////
@@ -3162,6 +3301,9 @@ unsigned int SetAggression::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> SetAggression::Clone() const
+{ return std::make_unique<SetAggression>(m_aggression); }
+
 
 ///////////////////////////////////////////////////////////
 // Victory                                               //
@@ -3192,6 +3334,11 @@ unsigned int Victory::GetCheckSum() const {
 
     TraceLogger() << "GetCheckSum(Victory): retval: " << retval;
     return retval;
+}
+
+std::unique_ptr<Effect> Victory::Clone() const {
+    auto reason_string = m_reason_string;
+    return std::make_unique<Victory>(reason_string);
 }
 
 
@@ -3264,6 +3411,12 @@ unsigned int SetEmpireTechProgress::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> SetEmpireTechProgress::Clone() const {
+    return std::make_unique<SetEmpireTechProgress>(ValueRef::CloneUnique(m_tech_name),
+                                                   ValueRef::CloneUnique(m_research_progress),
+                                                   ValueRef::CloneUnique(m_empire_id));
+}
+
 
 ///////////////////////////////////////////////////////////
 // GiveEmpireTech                                        //
@@ -3325,6 +3478,11 @@ unsigned int GiveEmpireTech::GetCheckSum() const {
 
     TraceLogger() << "GetCheckSum(GiveEmpireTech): retval: " << retval;
     return retval;
+}
+
+std::unique_ptr<Effect> GiveEmpireTech::Clone() const {
+    return std::make_unique<GiveEmpireTech>(ValueRef::CloneUnique(m_tech_name),
+                                            ValueRef::CloneUnique(m_empire_id));
 }
 
 
@@ -3391,14 +3549,15 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
     // evaluate all parameter valuerefs so they can be substituted into sitrep template
     std::vector<std::pair<std::string, std::string>> parameter_tag_values;
     parameter_tag_values.reserve(m_message_parameters.size());
-    for (const auto& entry : m_message_parameters) {
-        parameter_tag_values.emplace_back(entry.first, entry.second->Eval(context));
+    for (auto& [param_tag, param_ref] : m_message_parameters) {
+        auto param_val = param_ref->Eval(context);
+        parameter_tag_values.emplace_back(param_tag, param_val);
 
         // special case for ship designs: make sure sitrep recipient knows about the design
         // so the sitrep won't have errors about unknown designs being referenced
-        if (entry.first == VarText::PREDEFINED_DESIGN_TAG) {
-            if (const ShipDesign* design = GetPredefinedShipDesign(entry.second->Eval(context)))
-                ship_design_ids_to_inform_receipits_of.emplace(design->ID());
+        if (param_tag == VarText::PREDEFINED_DESIGN_TAG) {
+            if (const ShipDesign* design = context.ContextUniverse().GetGenericShipDesign(param_val))
+                ship_design_ids_to_inform_receipits_of.insert(design->ID());
         }
     }
 
@@ -3505,7 +3664,7 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
 
         // also inform of any ship designs recipients should know about
         for (int design_id : ship_design_ids_to_inform_receipits_of)
-            GetUniverse().SetEmpireKnowledgeOfShipDesign(design_id, empire_id); // TODO: put gamestate into ScriptingContext
+            context.ContextUniverse().SetEmpireKnowledgeOfShipDesign(design_id, empire_id);
     }
 }
 
@@ -3573,14 +3732,23 @@ unsigned int GenerateSitRepMessage::GetCheckSum() const {
     return retval;
 }
 
-std::vector<std::pair<std::string, ValueRef::ValueRef<std::string>*>>
+std::vector<std::pair<std::string, const ValueRef::ValueRef<std::string>*>>
 GenerateSitRepMessage::MessageParameters() const {
-    std::vector<std::pair<std::string, ValueRef::ValueRef<std::string>*>> retval;
+    std::vector<std::pair<std::string, const ValueRef::ValueRef<std::string>*>> retval;
     retval.reserve(m_message_parameters.size());
     std::transform(m_message_parameters.begin(), m_message_parameters.end(), std::back_inserter(retval),
-                   [](const std::pair<std::string, std::unique_ptr<ValueRef::ValueRef<std::string>>>& xx) {
-                       return std::make_pair(xx.first, xx.second.get());
-                   });
+                   [](const auto& xx) { return std::pair(xx.first, xx.second.get()); });
+    return retval;
+}
+
+std::unique_ptr<Effect> GenerateSitRepMessage::Clone() const {
+    auto message_string = m_message_string;
+    auto icon = m_icon;
+    auto retval = std::make_unique<GenerateSitRepMessage>(
+        message_string, icon, ValueRef::CloneUnique(m_message_parameters),
+        ValueRef::CloneUnique(m_recipient_empire_id), m_affiliation,
+        m_label, m_stringtable_lookup);
+    retval->m_condition = ValueRef::CloneUnique(m_condition);
     return retval;
 }
 
@@ -3633,6 +3801,12 @@ unsigned int SetOverlayTexture::GetCheckSum() const {
     return retval;
 }
 
+std::unique_ptr<Effect> SetOverlayTexture::Clone() const {
+    auto texture = m_texture;
+    return std::make_unique<SetOverlayTexture>(texture,
+                                               ValueRef::CloneUnique(m_size));
+}
+
 
 ///////////////////////////////////////////////////////////
 // SetTexture                                            //
@@ -3659,6 +3833,11 @@ unsigned int SetTexture::GetCheckSum() const {
 
     TraceLogger() << "GetCheckSum(SetTexture): retval: " << retval;
     return retval;
+}
+
+std::unique_ptr<Effect> SetTexture::Clone() const {
+    auto texture = m_texture;
+    return std::make_unique<SetTexture>(texture);
 }
 
 
@@ -3833,6 +4012,13 @@ unsigned int SetVisibility::GetCheckSum() const {
 
     TraceLogger() << "GetCheckSum(SetVisibility): retval: " << retval;
     return retval;
+}
+
+std::unique_ptr<Effect> SetVisibility::Clone() const {
+    return std::make_unique<SetVisibility>(ValueRef::CloneUnique(m_vis),
+                                           m_affiliation,
+                                           ValueRef::CloneUnique(m_empire_id),
+                                           ValueRef::CloneUnique(m_condition));
 }
 
 
@@ -4026,6 +4212,12 @@ unsigned int Conditional::GetCheckSum() const {
 
     TraceLogger() << "GetCheckSum(Conditional): retval: " << retval;
     return retval;
+}
+
+std::unique_ptr<Effect> Conditional::Clone() const {
+    return std::make_unique<Conditional>(ValueRef::CloneUnique(m_target_condition),
+                                         ValueRef::CloneUnique(m_true_effects),
+                                         ValueRef::CloneUnique(m_false_effects));
 }
 
 }

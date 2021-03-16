@@ -20,10 +20,10 @@
 
 
 namespace {
-    const int sitrep_row_margin(1);
-    const int sitrep_edge_to_outline_spacing(2);
-    const int sitrep_edge_to_content_spacing(sitrep_edge_to_outline_spacing + 1 + 2);
-    const int sitrep_spacing(2);
+    constexpr int sitrep_row_margin(1);
+    constexpr int sitrep_edge_to_outline_spacing(2);
+    constexpr int sitrep_edge_to_content_spacing(sitrep_edge_to_outline_spacing + 1 + 2);
+    constexpr int sitrep_spacing(2);
 
     /** Adds options related to SitRepPanel to Options DB. */
     void AddOptions(OptionsDB& db) {
@@ -68,7 +68,7 @@ namespace {
             } else if (link_type == VarText::DESIGN_ID_TAG) {
                 ClientUI::GetClientUI()->ZoomToShipDesign(lexical_cast<int>(data));
             } else if (link_type == VarText::PREDEFINED_DESIGN_TAG) {
-                if (const ShipDesign* design = GetPredefinedShipDesign(data))
+                if (const ShipDesign* design = GetUniverse().GetGenericShipDesign(data))
                     ClientUI::GetClientUI()->ZoomToShipDesign(design->ID());
 
             } else if (link_type == VarText::TECH_TAG) {

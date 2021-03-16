@@ -37,7 +37,7 @@ std::vector<std::string> SpecialNames();
 namespace {
     using id_range = boost::any_range<int, boost::forward_traversal_tag>;
 
-    const unsigned int NUM_COLUMNS(12u);
+    constexpr unsigned int NUM_COLUMNS(12u);
 
     void AddOptions(OptionsDB& db) {
         std::vector<std::pair<std::string, int>> default_columns_widths = {
@@ -346,7 +346,7 @@ namespace {
         return GetValueRefByName(column_ref_name);
     }
 
-    const int DATA_PANEL_BORDER = 1;
+    constexpr int DATA_PANEL_BORDER = 1;
 
     enum class VIS_DISPLAY : int { SHOW_VISIBLE, SHOW_PREVIOUSLY_VISIBLE, SHOW_DESTROYED };
 
@@ -2546,9 +2546,9 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
     if (!obj)
         return;
 
-    const int MENUITEM_SET_FOCUS_BASE = 20;
-    const int MENUITEM_SET_SHIP_BASE = 50;
-    const int MENUITEM_SET_BUILDING_BASE = 250;
+    constexpr int MENUITEM_SET_FOCUS_BASE = 20;
+    constexpr int MENUITEM_SET_SHIP_BASE = 50;
+    constexpr int MENUITEM_SET_BUILDING_BASE = 250;
     int menuitem_id = MENUITEM_SET_FOCUS_BASE;
     int ship_menuitem_id = MENUITEM_SET_SHIP_BASE;
     int bld_menuitem_id = MENUITEM_SET_BUILDING_BASE;
@@ -2643,7 +2643,7 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
             auto produce_ship_action_bottom = std::bind(produce_ship_action, -1);
 
             std::stringstream out;
-            out << GetShipDesign(design_it->first)->Name() << " (" << design_it->second << ")";
+            out << GetUniverse().GetShipDesign(design_it->first)->Name() << " (" << design_it->second << ")";
             ship_menu_item_top.next_level.emplace_back(out.str(), false, false, produce_ship_action_top);
             ship_menu_item.next_level.emplace_back(out.str(), false, false, produce_ship_action_bottom);
         }

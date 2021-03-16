@@ -2,6 +2,8 @@
 
 #include "ClientAppFixture.h"
 #include "Empire/Empire.h"
+#include "universe/Planet.h"
+#include "universe/UniverseObjectVisitors.h"
 #include "util/Directories.h"
 #include "util/Process.h"
 #include "util/SitRepEntry.h"
@@ -141,9 +143,11 @@ BOOST_AUTO_TEST_CASE(hostless_server) {
 
         BOOST_REQUIRE(ConnectToServer("localhost"));
 
+        BOOST_TEST_MESSAGE("Joining game...");
         JoinGame();
         boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
         start_time = boost::posix_time::microsec_clock::local_time();
+        BOOST_TEST_MESSAGE("Waiting for lobby update...");
         while (!m_lobby_updated) {
             BOOST_REQUIRE(ProcessMessages(start_time, MAX_WAITING_SEC));
         }
@@ -153,18 +157,21 @@ BOOST_AUTO_TEST_CASE(hostless_server) {
             // if first game lobby should be empty
             BOOST_REQUIRE_EQUAL(GetLobbyAICount(), 0);
 
+            BOOST_TEST_MESSAGE("Filling lobby with " << num_AIs << "AIs.");
             // fill lobby with AIs
             for (unsigned int ai_i = 1; ai_i <= num_AIs; ++ai_i) {
                 PlayerSetupData ai_plr;
                 ai_plr.client_type = Networking::ClientType::CLIENT_TYPE_AI_PLAYER;
-                m_lobby_data.players.push_back({Networking::INVALID_PLAYER_ID, ai_plr});
+                m_lobby_data.players.emplace_back(Networking::INVALID_PLAYER_ID, ai_plr);
                 // publish changes
                 UpdateLobby();
                 start_time = boost::posix_time::microsec_clock::local_time();
+                BOOST_TEST_MESSAGE("Waiting for lobby update after adding AI " << ai_i);
                 while (!m_lobby_updated) {
                     BOOST_REQUIRE(ProcessMessages(start_time, MAX_WAITING_SEC));
                 }
             }
+            BOOST_TEST_MESSAGE("Lobby filling done.");
         }
         // after filling first game there should be corrent number of AIs
         // and other game should retain number of AIs from previous game
@@ -199,11 +206,13 @@ BOOST_AUTO_TEST_CASE(hostless_server) {
             m_turn_done = false;
             m_ai_waiting = m_ai_empires;
 
-            BOOST_TEST_MESSAGE("Turn done. Waiting server for update...");
+            BOOST_TEST_MESSAGE("Turn done. Waiting server for update... " << m_current_turn);
             start_time = boost::posix_time::microsec_clock::local_time();
             while (!m_turn_done) {
                 BOOST_REQUIRE(ProcessMessages(start_time, MAX_WAITING_SEC));
             }
+
+            BOOST_TEST_MESSAGE("Turn updated " << m_current_turn);
 
             // output sitreps
             const auto& my_empire = m_empires.GetEmpire(m_empire_id);
@@ -212,6 +221,21 @@ BOOST_AUTO_TEST_CASE(hostless_server) {
                 if (sitrep_it->GetTurn() == m_current_turn) {
                     BOOST_TEST_MESSAGE("Sitrep: " << sitrep_it->Dump());
                 }
+            }
+
+            if (m_current_turn == 2) {
+                // check home planet meters
+                bool found_planet = false;
+                for (const auto& planet : Objects().find<Planet>(OwnedVisitor(m_empire_id))) {
+                    BOOST_REQUIRE_LT(0.0, planet->GetMeter(MeterType::METER_POPULATION)->Current());
+                    BOOST_TEST_MESSAGE("Population: " << planet->GetMeter(MeterType::METER_POPULATION)->Current());
+                    BOOST_REQUIRE_LT(0.0, planet->GetMeter(MeterType::METER_INDUSTRY)->Current());
+                    BOOST_TEST_MESSAGE("Industry: " << planet->GetMeter(MeterType::METER_INDUSTRY)->Current());
+                    BOOST_REQUIRE_LT(0.0, planet->GetMeter(MeterType::METER_RESEARCH)->Current());
+                    BOOST_TEST_MESSAGE("Research: " << planet->GetMeter(MeterType::METER_RESEARCH)->Current());
+                    found_planet = true;
+                }
+                BOOST_REQUIRE(found_planet);
             }
 
             if (my_empire->Eliminated()) {
@@ -244,7 +268,7 @@ BOOST_AUTO_TEST_CASE(hostless_server) {
     }
 
     if (launch_server && server) {
-        BOOST_REQUIRE(server->Terminate());
+        BOOST_WARN(server->Terminate());
     }
 }
 

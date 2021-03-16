@@ -284,7 +284,7 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
         }
 
         args[player_pos] = player_name;
-        m_ai_client_processes.push_back(Process(AI_CLIENT_EXE, args));
+        m_ai_client_processes.insert_or_assign(player_name, Process(AI_CLIENT_EXE, args));
 
         DebugLogger() << "done starting AI " << player_name;
     }
@@ -378,8 +378,8 @@ void ServerApp::CleanupAIs() {
 
     DebugLogger() << "ServerApp::CleanupAIs() killing " << m_ai_client_processes.size() << " AI clients.";
     try {
-        for (Process& process : m_ai_client_processes)
-        { process.Kill(); }
+        for (auto& process : m_ai_client_processes)
+        { process.second.Kill(); }
     } catch (...) {
         ErrorLogger() << "ServerApp::CleanupAIs() exception while killing processes";
     }
@@ -388,8 +388,8 @@ void ServerApp::CleanupAIs() {
 }
 
 void ServerApp::SetAIsProcessPriorityToLow(bool set_to_low) {
-    for (Process& process : m_ai_client_processes) {
-        if(!(process.SetLowPriority(set_to_low))) {
+    for (auto& process : m_ai_client_processes) {
+        if(!(process.second.SetLowPriority(set_to_low))) {
             if (set_to_low)
                 ErrorLogger() << "ServerApp::SetAIsProcessPriorityToLow : failed to lower priority for AI process";
             else
@@ -1858,6 +1858,15 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     std::shared_ptr<Empire> empire;
     int empire_id = ALL_EMPIRES;
     std::list<std::string> delegation = GetPlayerDelegation(player_connection->PlayerName());
+    if (GetOptionsDB().Get<bool>("network.server.take-over-ai")) {
+        for (auto& e : Empires()) {
+            if (!e.second->Eliminated() &&
+                GetEmpireClientType(e.first) == Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
+            {
+                delegation.push_back(e.second->PlayerName());
+            }
+        }
+    }
     if (target_empire_id == ALL_EMPIRES) {
         // search empire by player name
         for (auto& e : Empires()) {
@@ -1918,6 +1927,34 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     // make a link to new connection
     m_player_empire_ids[player_connection->PlayerID()] = empire_id;
     empire->SetAuthenticated(player_connection->IsAuthenticated());
+
+    // drop previous connection to that empire
+    int previous_player_id = EmpirePlayerID(empire_id);
+    if (previous_player_id != Networking::INVALID_PLAYER_ID) {
+        WarnLogger() << "ServerApp::AddPlayerIntoGame empire " << empire_id
+                     << " previous player " << previous_player_id
+                     << " was kicked.";
+        DropPlayerEmpireLink(previous_player_id);
+        auto previous_it = m_networking.GetPlayer(previous_player_id);
+        if (previous_it != m_networking.established_end()) {
+            const Networking::ClientType previous_client_type = (*previous_it)->GetClientType();
+            const std::string previous_player_name = (*previous_it)->PlayerName();
+            m_networking.Disconnect(previous_player_id);
+            if (previous_client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
+                // change empire's player so after reload the player still could connect
+                // to the empire
+                empire->SetPlayerName(player_connection->PlayerName());
+                // kill unneeded AI process
+                auto it = m_ai_client_processes.find(previous_player_name);
+                if (it != m_ai_client_processes.end()) {
+                    it->second.Kill();
+                    m_ai_client_processes.erase(it);
+                }
+            }
+        }
+    }
+
+    InfoLogger() << "ServerApp::AddPlayerIntoGame empire " << empire_id << " connected to " << player_connection->PlayerID();
 
     const OrderSet dummy;
     const OrderSet& orders = orders_it->second && orders_it->second->orders ? *(orders_it->second->orders) : dummy;
@@ -2850,7 +2887,7 @@ namespace {
 
         std::multimap<double, int> inverted_empires_troops;
         for (const auto& entry : empires_troops)
-            inverted_empires_troops.insert({entry.second, entry.first});
+            inverted_empires_troops.emplace(entry.second, entry.first);
 
         // everyone but victor loses all troops.  victor's troops remaining are
         // what the victor started with minus what the second-largest troop
@@ -3707,6 +3744,18 @@ void ServerApp::CheckForEmpireElimination() {
         else if (EmpireEliminated(entry.first, m_universe.Objects())) {
             entry.second->Eliminate();
             RemoveEmpireTurn(entry.first);
+            const int player_id = EmpirePlayerID(entry.first);
+            DebugLogger() << "ServerApp::CheckForEmpireElimination empire #" << entry.first << " " << entry.second->Name() << " of player #" << player_id << " eliminated";
+            auto player_it = m_networking.GetPlayer(player_id);
+            if (player_it != m_networking.established_end() &&
+                (*player_it)->GetClientType() == Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
+            {
+                auto it = m_ai_client_processes.find((*player_it)->PlayerName());
+                if (it != m_ai_client_processes.end()) {
+                    it->second.Kill();
+                    m_ai_client_processes.erase(it);
+                }
+            }
         } else {
             surviving_empires.emplace(entry.second);
             // empires could be controlled only by connected AI client, connected human client, or

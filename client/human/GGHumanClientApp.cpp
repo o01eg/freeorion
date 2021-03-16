@@ -119,12 +119,12 @@ namespace {
     /** These options can only be validated after the graphics system (SDL) is initialized,
         so that display size can be detected
      */
-    const int DEFAULT_WIDTH = 1024;
-    const int DEFAULT_HEIGHT = 768;
-    const int DEFAULT_LEFT = static_cast<int>(SDL_WINDOWPOS_CENTERED);
-    const int DEFAULT_TOP = 50;
-    const int MIN_WIDTH = 800;
-    const int MIN_HEIGHT = 600;
+    constexpr int DEFAULT_WIDTH = 1024;
+    constexpr int DEFAULT_HEIGHT = 768;
+    constexpr int DEFAULT_LEFT = static_cast<int>(SDL_WINDOWPOS_CENTERED);
+    constexpr int DEFAULT_TOP = 50;
+    constexpr int MIN_WIDTH = 800;
+    constexpr int MIN_HEIGHT = 600;
 
     /** Sets the default and current values for the string option @p option_name to @p option_value if initially empty */
     void SetEmptyStringDefaultOption(const std::string& option_name, const std::string& option_value) {
@@ -1027,7 +1027,7 @@ void GGHumanClientApp::HandleMessage(Message&& msg) {
     }
 }
 
-void GGHumanClientApp::UpdateCombatLogs(const Message& msg){
+void GGHumanClientApp::UpdateCombatLogs(const Message& msg) {
     ScopedTimer timer("GGHumanClientApp::UpdateCombatLogs");
 
     // Unpack the combat logs from the message
@@ -1172,18 +1172,17 @@ void GGHumanClientApp::StartGame(bool is_new_game) {
         map_wnd->ResetEmpireShown();
 
     ClientUI::GetClientUI()->GetShipDesignManager()->StartGame(EmpireID(), is_new_game);
-
-    UpdateCombatLogManager();
 }
 
 void GGHumanClientApp::UpdateCombatLogManager() {
-    boost::optional<std::vector<int>> incomplete_ids = GetCombatLogManager().IncompleteLogIDs();
+    auto incomplete_ids = GetCombatLogManager().IncompleteLogIDs();
     if (incomplete_ids) {
         for (auto it = incomplete_ids->begin(); it != incomplete_ids->end();) {
             // request at most 50 logs per message to avoid trying to allocate too much space to send all at once
             std::vector<int> a_few_log_ids;
             for (unsigned int count = 0; count < 50 && it != incomplete_ids->end(); ++it, ++count)
                 a_few_log_ids.push_back(*it);
+            DebugLogger() << "Requesting " << a_few_log_ids.size() << " combat logs from server";
             m_networking->SendMessage(RequestCombatLogsMessage(a_few_log_ids));
         }
     }

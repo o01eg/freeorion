@@ -53,7 +53,7 @@ namespace {
                 nameText = boost::io::str(FlexibleFormat(UserString("PRODUCTION_QUEUE_MULTIPLES")) % quantity);
             else
                 nameText = boost::io::str(FlexibleFormat(UserString("PRODUCTION_QUEUE_REPETITIONS")) % quantity);
-            //nameText += GetShipDesign(designID)->Name();
+            //nameText += GetUniverse().GetShipDesign(designID)->Name();
             m_text = GG::Wnd::Create<CUILabel>(nameText, GG::FORMAT_TOP | GG::FORMAT_LEFT | GG::FORMAT_NOWRAP);
             m_text->SetTextColor(txtClr);
             m_text->OffsetMove(GG::Pt(GG::X0, GG::Y(-3)));
@@ -256,7 +256,7 @@ namespace {
             icon = ClientUI::BuildingIcon(elem.item.name);
 
         } else if (elem.item.build_type == BuildType::BT_SHIP) {
-            const ShipDesign* design = GetShipDesign(elem.item.design_id);
+            const ShipDesign* design = GetUniverse().GetShipDesign(elem.item.design_id);
             if (!design)
                 return nullptr;
             main_text += UserString("OBJ_SHIP") + "\n";
@@ -323,9 +323,9 @@ namespace {
     //////////////////////////////////////////////////
     // QueueRow
     //////////////////////////////////////////////////
-    const int MARGIN = 2;
-    const GG::X X_MARGIN = GG::X(MARGIN);
-    const GG::Y Y_MARGIN = GG::Y(MARGIN);
+    constexpr int MARGIN = 2;
+    constexpr GG::X X_MARGIN = GG::X(MARGIN);
+    constexpr GG::Y Y_MARGIN = GG::Y(MARGIN);
 
     struct QueueRow : GG::ListBox::Row {
         QueueRow(GG::X w, const ProductionQueue::Element& elem_, int queue_index_) :
@@ -426,7 +426,7 @@ namespace {
             name_text = UserString(elem.item.name);
         } else if (elem.item.build_type == BuildType::BT_SHIP) {
             graphic = ClientUI::ShipDesignIcon(elem.item.design_id);
-            const ShipDesign* design = GetShipDesign(elem.item.design_id);
+            const ShipDesign* design = GetUniverse().GetShipDesign(elem.item.design_id);
             if (design)
                 name_text = design->Name();
             else
@@ -645,7 +645,7 @@ namespace {
     }
 
     void QueueProductionItemPanel::Draw(GG::Clr clr, bool fill) {
-        const int CORNER_RADIUS = 7;
+        constexpr int CORNER_RADIUS = 7;
         glColor(clr);
         GG::Pt LINE_WIDTH(GG::X(3), GG::Y0);
         PartlyRoundedRect(UpperLeft(), LowerRight() - LINE_WIDTH, CORNER_RADIUS, true, false, true, false, fill);
@@ -772,7 +772,7 @@ namespace {
                 item_name = queue_row->elem.item.name;
                 break;
             case BuildType::BT_SHIP:
-                item_name = GetShipDesign(queue_row->elem.item.design_id)->Name(false);
+                item_name = GetUniverse().GetShipDesign(queue_row->elem.item.design_id)->Name(false);
                 break;
             default:
                 break;

@@ -48,9 +48,9 @@
 class RotatingPlanetControl;
 
 namespace {
-    const int EDGE_PAD(3);
-    std::map<std::pair<int,int>,float>          colony_projections;
-    std::map<std::pair<std::string,int>,float>  species_colony_projections;
+    constexpr int EDGE_PAD(3);
+    std::map<std::pair<int, int>, float>         colony_projections;
+    std::map<std::pair<std::string, int>, float> species_colony_projections;
 
     /** @content_tag{CTRL_ALWAYS_BOMBARD} Select this ship during automatic ship selection for bombard, regardless of any tags **/
     const std::string TAG_BOMBARD_ALWAYS = "CTRL_ALWAYS_BOMBARD";
@@ -275,23 +275,23 @@ namespace {
         for (auto latitude : boost::irange<size_t>(0, elevation.size() - 1)) {
             glBegin(GL_QUAD_STRIP);
             for (auto longitude : boost::irange<size_t>(0, azimuth.size())) {
-                glNormal3f(static_cast<GLfloat>(azimuth[longitude].sin * elevation[latitude+1].sin),
-                           static_cast<GLfloat>(azimuth[longitude].cos * elevation[latitude+1].sin),
-                           static_cast<GLfloat>(elevation[latitude+1].cos));
-                glTexCoord2f(1 - static_cast<GLfloat>(longitude / (azimuth.size() - 1)),
-                             1 - static_cast<GLfloat>((latitude+1) / (elevation.size() - 1)));
-                glVertex3f(static_cast<GLfloat>(azimuth[longitude].sin * elevation[latitude+1].sin * radius),
-                           static_cast<GLfloat>(azimuth[longitude].cos * elevation[latitude+1].sin * radius),
-                           static_cast<GLfloat>(elevation[latitude+1].cos * radius));
+                glNormal3f(azimuth[longitude].sin * elevation[latitude+1].sin,
+                           azimuth[longitude].cos * elevation[latitude+1].sin,
+                           elevation[latitude+1].cos);
+                glTexCoord2f(1 - (float)(longitude) / (azimuth.size() - 1),
+                             1 - (float)(latitude+1) / (elevation.size() - 1));
+                glVertex3f(azimuth[longitude].sin * elevation[latitude+1].sin * radius,
+                           azimuth[longitude].cos * elevation[latitude+1].sin * radius,
+                           elevation[latitude+1].cos * radius);
 
-                glNormal3f(static_cast<GLfloat>(azimuth[longitude].sin * elevation[latitude].sin),
-                           static_cast<GLfloat>(azimuth[longitude].cos * elevation[latitude].sin),
-                           static_cast<GLfloat>(elevation[latitude].cos));
-                glTexCoord2f(1 - static_cast<GLfloat>(longitude / (azimuth.size() - 1)),
-                             1 - static_cast<GLfloat>(latitude / (elevation.size() - 1)));
-                glVertex3f(static_cast<GLfloat>(azimuth[longitude].sin * elevation[latitude].sin * radius),
-                           static_cast<GLfloat>(azimuth[longitude].cos * elevation[latitude].sin * radius),
-                           static_cast<GLfloat>(elevation[latitude].cos * radius));
+                glNormal3f(azimuth[longitude].sin * elevation[latitude].sin,
+                           azimuth[longitude].cos * elevation[latitude].sin,
+                           elevation[latitude].cos);
+                glTexCoord2f(1 - (float)(longitude) / (azimuth.size() - 1),
+                             1 - (float)(latitude) / (elevation.size() - 1));
+                glVertex3f(azimuth[longitude].sin * elevation[latitude].sin * radius,
+                           azimuth[longitude].cos * elevation[latitude].sin * radius,
+                           elevation[latitude].cos * radius);
             }
             glEnd();
         }
@@ -2587,7 +2587,7 @@ void SidePanel::PlanetPanelContainer::SetPlanets(const std::vector<int>& planet_
             ErrorLogger() << "PlanetPanelContainer::SetPlanets couldn't find system of planet" << planet->Name();
             continue;
         }
-        orbits_planets.insert({system->OrbitOfPlanet(planet->ID()), planet->ID()});
+        orbits_planets.emplace(system->OrbitOfPlanet(planet->ID()), planet->ID());
     }
 
     // create new panels and connect their signals
@@ -3232,7 +3232,7 @@ void SidePanel::RefreshSystemNames() {
     for (auto& system : Objects().all<System>()) {
         // Skip rows for systems that aren't known to this client, except the selected system
         if (!system->Name().empty() || system->ID() == s_system_id)
-            sorted_systems.insert({system->Name(), system->ID()});
+            sorted_systems.emplace(system->Name(), system->ID());
     }
 
     auto system_name_font(ClientUI::GetBoldFont(SystemNameFontSize()));

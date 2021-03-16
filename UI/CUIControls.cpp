@@ -88,7 +88,7 @@ void CUILabel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
 // class CUIButton
 ///////////////////////////////////////
 namespace {
-    const int CUIBUTTON_ANGLE_OFFSET = 5;
+    constexpr int CUIBUTTON_ANGLE_OFFSET = 5;
 }
 
 CUIButton::CUIButton(std::string str) :
@@ -113,18 +113,16 @@ bool CUIButton::InWindow(const GG::Pt& pt) const {
     return InAngledCornerRect(pt, ul, lr, CUIBUTTON_ANGLE_OFFSET);
 }
 
-void CUIButton::MouseHere(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
-    if (!Disabled()) {
-        if (State() != ButtonState::BN_ROLLOVER)
-            PlayButtonRolloverSound();
-        SetState(ButtonState::BN_ROLLOVER);
-    }
+void CUIButton::MouseEnter(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+    Button::MouseEnter(pt, mod_keys);
+    if (!Disabled())
+         PlayButtonRolloverSound();
 }
 
 GG::Pt CUIButton::MinUsableSize() const {
     GG::Pt result = GG::Button::MinUsableSize();
-    const int CUIBUTTON_HPADDING = 10;
-    const int CUIBUTTON_VPADDING = 3;
+    constexpr int CUIBUTTON_HPADDING = 10;
+    constexpr int CUIBUTTON_VPADDING = 3;
 
     result.x += CUIBUTTON_HPADDING * 2;
     result.y += CUIBUTTON_VPADDING * 2;
@@ -290,7 +288,7 @@ void CUICheckBoxRepresenter::Render(const GG::StateButton& button) const {
         AdjustBrightness(border_color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
     }
 
-    const int MARGIN = 3;
+    constexpr int MARGIN = 3;
     FlatRectangle(bn_ul, bn_lr, GG::CLR_ZERO, border_color_to_use, 1);
     if (button.Checked()) {
         GG::Clr inside_color = color_to_use;
@@ -390,7 +388,7 @@ void CUIRadioRepresenter::Render(const GG::StateButton& button) const {
         AdjustBrightness(border_color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
     }
 
-    const int MARGIN = 2;
+    constexpr int MARGIN = 2;
     FlatCircle(bn_ul, bn_lr, GG::CLR_ZERO, border_color_to_use, 1);
     if (button.Checked()) {
         GG::Clr inside_color = color_to_use;
@@ -441,7 +439,7 @@ void CUITabRepresenter::Render(const GG::StateButton& button) const {
                              GG::StateButton::ButtonState::BN_ROLLOVER == button.State()))
     { AdjustBrightness(border_color_to_use, 100); }
 
-    const int UNCHECKED_OFFSET = 4;
+    constexpr int UNCHECKED_OFFSET = 4;
 
     if (!button.Checked()) {
         ul.y += UNCHECKED_OFFSET;
@@ -543,8 +541,8 @@ void CUIIconButtonRepresenter::Render(const GG::StateButton& button) const {
     GG::Clr bg_clr(ClientUI::CtrlColor());
     GG::Clr border_clr(button.Disabled() ? DisabledColor(ClientUI::CtrlBorderColor()) : ClientUI::CtrlBorderColor());
 
-    const int BORDER_THICKNESS = 1;
-    const int ICON_SIZE_REDUCE = BORDER_THICKNESS * 2;
+    constexpr int BORDER_THICKNESS = 1;
+    constexpr int ICON_SIZE_REDUCE = BORDER_THICKNESS * 2;
 
     GG::Pt icon_ul = button.UpperLeft();
     GG::Pt icon_lr = button.LowerRight();
@@ -663,7 +661,7 @@ void CUIScroll::ScrollTab::Render() {
         AdjustBrightness(border_color,     100);
     }
 
-    const int CUISCROLL_ANGLE_OFFSET = 3;
+    constexpr int CUISCROLL_ANGLE_OFFSET = 3;
 
     AngledCornerRectangle(ul, lr, background_color, border_color, CUISCROLL_ANGLE_OFFSET, 1);
 }
@@ -765,7 +763,7 @@ void CUIListBox::Render() {
 // class CUIDropDownList
 ///////////////////////////////////////
 namespace {
-    const int CUIDROPDOWNLIST_ANGLE_OFFSET = 5;
+    constexpr int CUIDROPDOWNLIST_ANGLE_OFFSET = 5;
 }
 
 CUIDropDownList::CUIDropDownList(size_t num_shown_elements) :
@@ -1306,7 +1304,7 @@ void CUISimpleDropDownListRow::CompleteConstruction() {
 // class StatisticIcon
 ///////////////////////////////////////
 namespace {
-    const int STAT_ICON_PAD = 2;    // horizontal or vertical space between icon and label
+    constexpr int STAT_ICON_PAD = 2;    // horizontal or vertical space between icon and label
 }
 
 StatisticIcon::StatisticIcon(std::shared_ptr<GG::Texture> texture,

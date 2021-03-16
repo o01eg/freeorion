@@ -368,7 +368,7 @@ void TechTreeWnd::TechTreeControls::DoButtonLayout() {
     m_row_offset = BUTTON_HEIGHT + BUTTON_SEPARATION;   // vertical distance between each row of buttons
     m_buttons_per_row = std::max(Value(USABLE_WIDTH / (m_col_offset)), 1);
 
-    const int NUM_NON_CATEGORY_BUTTONS = 6;  //  ALL, Locked, Partial, Unlocked, Complete, ViewType
+    constexpr int NUM_NON_CATEGORY_BUTTONS = 6;  //  ALL, Locked, Partial, Unlocked, Complete, ViewType
 
     // place category buttons: fill each row completely before starting next row
     int row = 0, col = -1;
@@ -727,7 +727,7 @@ bool TechTreeWnd::LayoutPanel::TechPanel::InWindow(const GG::Pt& pt) const {
 void TechTreeWnd::LayoutPanel::TechPanel::PreRender() {
     GG::Wnd::PreRender();
 
-    const int PAD = 8;
+    constexpr int PAD = 8;
     GG::X text_left(GG::X(Value(TechPanelHeight())) + PAD);
     GG::Y text_top(0);
     GG::X text_width(TechPanelWidth() - text_left);
@@ -777,7 +777,7 @@ void TechTreeWnd::LayoutPanel::TechPanel::PreRender() {
 }
 
 void TechTreeWnd::LayoutPanel::TechPanel::Render() {
-    const int PAD = 8;
+    constexpr int PAD = 8;
     GG::X text_left(GG::X(Value(TechPanelHeight())) + PAD);
     GG::Y text_top(0);
     GG::X text_width(TechPanelWidth() - text_left);
@@ -964,7 +964,7 @@ void TechTreeWnd::LayoutPanel::TechPanel::Update() {
         }
 
         if (m_unlock_icons.empty()) {
-            const int PAD = 8;
+            constexpr int PAD = 8;
             GG::X icon_left(GG::X(Value(TechPanelHeight())) + PAD*3/2);
             GG::Y icon_height = TechPanelHeight()/2;
             GG::X icon_width = GG::X(Value(icon_height));
@@ -1724,9 +1724,7 @@ void TechTreeWnd::TechListBox::ToggleSortCol(unsigned int col) {
 
 TechTreeWnd::TechListBox::TechListBox(GG::X w, GG::Y h) :
     CUIListBox()
-{
-    Resize(GG::Pt(w, h));
-}
+{ Resize(GG::Pt(w, h)); }
 
 void TechTreeWnd::TechListBox::CompleteConstruction() {
     CUIListBox::CompleteConstruction();
@@ -1743,8 +1741,8 @@ void TechTreeWnd::TechListBox::CompleteConstruction() {
 
     // show all categories...
     m_categories_shown.clear();
-    for (const std::string& category_name : GetTechManager().CategoryNames())
-        m_categories_shown.insert(category_name);
+    for (auto& category_name : GetTechManager().CategoryNames())
+        m_categories_shown.insert(std::move(category_name));
 
     // show all statuses except unreasearchable
     m_tech_statuses_shown.clear();
@@ -1890,11 +1888,9 @@ void TechTreeWnd::TechListBox::Populate(bool update /* = true*/) {
     ScopedTimer creation_timer;
 
     // Skip lookup check when starting with empty cache
-    bool new_cache = m_tech_row_cache.empty();
-    for (const auto& tech : GetTechManager()) {
-        if (new_cache || !m_tech_row_cache.count(tech->Name()))
-            m_tech_row_cache.emplace(tech->Name(), GG::Wnd::Create<TechRow>(row_width, tech->Name()));
-    }
+
+    for (const auto& tech : GetTechManager())
+        m_tech_row_cache.emplace(tech->Name(), GG::Wnd::Create<TechRow>(row_width, tech->Name()));
 
     DebugLogger() << "Tech List Box Populating Done,  Creation time = " << creation_timer.DurationString();
 
@@ -1910,16 +1906,16 @@ void TechTreeWnd::TechListBox::ShowCategory(const std::string& category) {
 }
 
 void TechTreeWnd::TechListBox::ShowAllCategories() {
-    const std::vector<std::string> all_cats = GetTechManager().CategoryNames();
+    std::vector<std::string> all_cats = GetTechManager().CategoryNames();
     if (all_cats.size() == m_categories_shown.size())
         return;
-    for (const std::string& category_name : all_cats)
-        m_categories_shown.insert(category_name);
+    for (std::string& category_name : all_cats)
+        m_categories_shown.insert(std::move(category_name));
     Populate();
 }
 
 void TechTreeWnd::TechListBox::HideCategory(const std::string& category) {
-    std::set<std::string>::iterator it = m_categories_shown.find(category);
+    auto it = m_categories_shown.find(category);
     if (it != m_categories_shown.end()) {
         m_categories_shown.erase(it);
         Populate();

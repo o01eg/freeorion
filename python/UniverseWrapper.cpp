@@ -40,7 +40,7 @@ namespace {
         std::vector<int> result;
         result.reserve(universe.Objects().size<T>());
         for (const auto& obj : universe.Objects().all<T>())
-            result.emplace_back(obj->ID());
+            result.push_back(obj->ID());
         return result;
     }
 
@@ -49,7 +49,7 @@ namespace {
         std::vector<std::string> retval;
         retval.reserve(species.Foci().size());
         for (const FocusType& focus : species.Foci())
-            retval.emplace_back(focus.Name());
+            retval.push_back(focus.Name());
         return retval;
     }
 
@@ -115,7 +115,7 @@ namespace {
         std::vector<std::string> retval;
         retval.reserve(object.Specials().size());
         for (const auto& special : object.Specials())
-            retval.emplace_back(special.first);
+            retval.push_back(special.first);
         return retval;
     }
 
@@ -528,9 +528,12 @@ namespace FreeOrionPython {
                 " that can't accept that type of part, and contain only hulls"
                 " and parts that exist (and may also need to contain the"
                 " correct number of parts - this needs to be verified).");
-        py::def("getShipDesign",                    &GetShipDesign,                             py::return_value_policy<py::reference_existing_object>(), "Returns the ship design (ShipDesign) with the indicated id number (int).");
-        py::def("getPredefinedShipDesign",          &GetPredefinedShipDesign,                   py::return_value_policy<py::reference_existing_object>(), "Returns the ship design (ShipDesign) with the indicated name (string).");
-
+        py::def("getShipDesign",                +[](int id) -> const ShipDesign* { return GetUniverse().GetShipDesign(id); },
+                py::return_value_policy<py::reference_existing_object>(),
+                "Returns the ship design (ShipDesign) with the indicated id number (int).");
+        py::def("getPredefinedShipDesign",      +[](const std::string& name) -> const ShipDesign* { return GetUniverse().GetGenericShipDesign(name); },
+                py::return_value_policy<py::reference_existing_object>(),
+                "Returns the ship design (ShipDesign) with the indicated name (string).");
 
         py::class_<ShipPart, boost::noncopyable>("shipPart", py::no_init)
             .add_property("name",               make_function(&ShipPart::Name,              py::return_value_policy<py::copy_const_reference>()))

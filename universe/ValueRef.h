@@ -118,16 +118,24 @@ FO_ENUM(
 )
 
 template<typename T>
-[[nodiscard]] inline std::unique_ptr<T> CloneUnique(const std::unique_ptr<T>& ptr) {
-    return ptr ? ptr->Clone() : nullptr;
-}
+[[nodiscard]] inline std::unique_ptr<T> CloneUnique(const std::unique_ptr<T>& ptr)
+{ return ptr ? ptr->Clone() : nullptr; }
 
 template<typename T>
 [[nodiscard]] inline std::vector<std::unique_ptr<T>> CloneUnique(const std::vector<std::unique_ptr<T>>& vec) {
     std::vector<std::unique_ptr<T>> retval;
     retval.reserve(vec.size());
-    for (const auto& val : vec) {
+    for (const auto& val : vec)
         retval.push_back(CloneUnique(val));
+    return retval;
+}
+
+template<typename T>
+[[nodiscard]] inline std::vector<std::pair<std::string, std::unique_ptr<T>>> CloneUnique(const std::vector<std::pair<std::string, std::unique_ptr<T>>>& vec) {
+    std::vector<std::pair<std::string, std::unique_ptr<T>>> retval;
+    retval.reserve(vec.size());
+    for (const auto& val : vec) {
+        retval.emplace_back(val.first, CloneUnique(val.second));
     }
     return retval;
 }

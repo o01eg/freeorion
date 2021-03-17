@@ -1,3 +1,13 @@
+freeorion (0.4.10.1-2) unstable; urgency=medium
+
+  * Open statistics when the game is finished.
+  * Allow AI to delegate player.
+  * Kill AI process of eliminated empire.
+  * Kick out other players controls same empire.
+  * Add option to allow human player to take over any AI.
+
+ -- O01eg <o01eg@yandex.ru>  Wed, 17 Mar 2021 08:22:54 +0000
+
 freeorion (0.4.10.1-1) unstable; urgency=medium
 
   * Bug-fix release

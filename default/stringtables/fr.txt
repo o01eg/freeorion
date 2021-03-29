@@ -642,7 +642,7 @@ SM_TREE
 Forêt Dyson
 
 SM_TREE_DESC
-Une Forêt Dyson est composée de nombreux "arbres" spatiaux à branches filamenteuses. Ces arbres se multiplient et s'organisent en bulle autour de leur étoile hôte. Les Forêts Dyson constituent un risque pour la navigation interstellaire et s'étendent au fil du temps, devenant de plus en plus difficiles à éradiquer. Si elles ne sont pas détruites, ces forêts relâchent périodiquement des graines le long des Voies spatiales afin de coloniser d'autres systèmes stellaires. Une graine de [[SM_TREE]] est répertoriée sous l'appellation de [[predefinedshipdesign SM_FLOATER]], et peut s'avérer difficile à détecter.
+Une Forêt Dyson est composée de nombreux "arbres" spatiaux à branches filamenteuses. Ces arbres se multiplient et s'organisent en bulle autour de leur étoile hôte. Les Forêts Dyson constituent un risque pour la navigation interstellaire et s'étendent au fil du temps, devenant de plus en plus difficiles à éradiquer. Si elles ne sont pas détruites, ces forêts relâchent périodiquement des graines le long des Voies spatiales afin de coloniser d'autres systèmes stellaires. Une graine de [[SM_TREE]] est répertoriée sous l'appellation de [[predefinedshipdesign SM_FLOATER]], et peut s'avérer difficile à détecter. Lorsqu'une Forêt Dyson s'étend, des nids de Krill Spatial commencent souvent à se former entre les arbres.
 
 SM_FLOATER
 Flotteur
@@ -861,7 +861,7 @@ FLD_ION_STORM
 Tempête Ionique
 
 FLD_ION_STORM_DESC
-Vortex magnétique de particules relativistes chargées, pouvant perturber les capteurs et masquer tout objet s'y trouvant. Tout objet au sein de la tempête voit sa [[metertype METER_STEALTH]] augmenter de 40, mais son [[metertype METER_DETECTION]] diminuer de 40.
+Vortex magnétique de particules relativistes chargées, pouvant perturber les capteurs et masquer tout objet se trouvant dans son périmètre. Tout objet au sein de la tempête voit sa [[metertype METER_STEALTH]] augmenter de 40, mais son [[metertype METER_DETECTION]] diminuer de 40.
 
 FLD_MOLECULAR_CLOUD
 Nuage Moléculaire
@@ -1123,6 +1123,12 @@ Passes de Combat
 
 RULE_NUM_COMBAT_ROUNDS_DESC
 Nombre de passes de combat se déroulant à chaque tour.
+
+RULE_FIRST_COMBAT_ROUND_IN_CLOSE_TARGETING_RANGE
+Passe de Combat pour Ciblage Courte Portée
+
+RULE_FIRST_COMBAT_ROUND_IN_CLOSE_TARGETING_RANGE_DESC
+La première passe de combat durant laquelle l'armement de courte portée est apte à faire feu sur les cibles ennemies.
 
 RULE_AGGRESSIVE_SHIPS_COMBAT_VISIBLE
 Visibilité astronefs en mode Agression
@@ -1509,6 +1515,9 @@ Limite de taille en octets des messages client.
 OPTIONS_DB_DROP_EMPIRE_READY
 Annuler la lecture du statut de l'empire en rejoignant une partie en cours.
 
+OPTIONS_DB_TAKE_OVER_AI
+Option de serveur permettant aux joueurs humains de prendre le contrôle des empires dirigés par l'IA.
+
 OPTIONS_DB_UI_MAIN_MENU_X
 Position horizontale du centre du menu principal de l'écran d'introduction, en pourcentage de la largeur totale de la fenêtre de jeu ou du plein écran.
 
@@ -1758,17 +1767,23 @@ Affiche un calque différent de survol de souris pour les systèmes encore non-e
 OPTIONS_DB_UI_SYSTEM_NAME_UNOWNED_COLOR
 Définit la couleur sur la carte galactique des noms des systèmes stellaires qu'aucun empire ne contrôle.
 
+OPTIONS_DB_UI_BIG_FLEET_BUTTON_MIN_ZOOM
+Fixe le niveau minimal de zoom auquel apparaissent les icônes de grande taille des flottes sur la carte galactique.
+
 OPTIONS_DB_UI_MEDIUM_FLEET_BUTTON_MIN_ZOOM
-Fixe le niveau minimal de zoom auquel les icônes de taille moyenne des flottes apparaissent sur la carte galactique.
+Fixe le niveau minimal de zoom auquel apparaissent les icônes de taille moyenne des flottes sur la carte galactique.
 
 OPTIONS_DB_UI_SMALL_FLEET_BUTTON_MIN_ZOOM
-Fixe le niveau minimal de zoom auquel les icônes de petite taille des flottes apparaissent sur la carte galactique.
+Fixe le niveau minimal de zoom auquel apparaissent les icônes de petite taille des flottes sur la carte galactique.
 
 OPTIONS_DB_UI_TINY_FLEET_BUTTON_MIN_ZOOM
-Fixe le niveau minimal de zoom auquel les icônes de taille minimum des flottes apparaissent sur la carte galactique. À un niveau de zoom inférieur, aucune icône de flotte n'est visible sur la carte galactique.
+Fixe le niveau minimal de zoom auquel apparaissent les icônes de taille minimum des flottes sur la carte galactique. À un niveau de zoom inférieur, aucune icône de flotte n'est visible sur la carte galactique.
 
 OPTIONS_DB_UI_FLEET_SELECTION_INDICATOR_SIZE
 Fixe la taille sur la carte galactique de l'indicateur de sélection d'une flotte, relativement à la taille des icônes de flotte.
+
+OPTIONS_DB_UI_FLEET_BUTTON_SIZE
+Fixe la taille relative des boutons de flotte.
 
 OPTIONS_DB_UI_FLEET_WND_SCANLINE_CLR
 Définit la couleur des rayures horizontales (brouillard de guerre) sur les astronefs/flottes non-visibles dans la Fenêtre Flottes.
@@ -1789,10 +1804,10 @@ OPTIONS_DB_UI_SYSTEM_TINY_ICON_SIZE_THRESHOLD
 Fixe la taille des icônes de système stellaire au-dessous de laquelle les icônes minimales de taille fixe seront affichées.
 
 OPTIONS_DB_UI_TOOLTIP_DELAY
-Fixe le délai d'apparition dans l'interface utilisateur des bulles d'information, en millisecondes.
+Fixe le délai d'apparition dans l'interface utilisateur des infobulles, en millisecondes.
 
 OPTIONS_DB_UI_TOOLTIP_LONG_DELAY
-Fixe le délai d'apparition dans l'interface utilisateur des bulles d'information alternatives, en millisecondes.
+Fixe le délai d'apparition dans l'interface utilisateur des infobulles alternatives, en millisecondes.
 
 OPTIONS_DB_UI_ENC_SEARCH_ARTICLE
 Lors d'une recherche dans l'Encyclopédie, vérifier les correspondances dans le contenu des articles. La recherche sera plus lente, mais peut retourner davantage de résultats.
@@ -1893,7 +1908,7 @@ OPTIONS_DB_GAMESETUP_PLANET_DENSITY
 OPTIONS_DB_GAMESETUP_STARLANE_FREQUENCY
 '''Le nombre de Voies spatiales dans la galaxie.
 
-Si réglé sur Bas, la plupart des systèmes disposeront d'une à deux voies spatiales. Si réglé sur Haut, la plupart des systèmes seront reliés entre eux dans un périmètre de 120uu.'''
+Si réglé sur Bas, la plupart des systèmes disposeront d'une à deux voies spatiales. Si réglé sur Haut, la plupart des systèmes seront reliés entre eux dans un périmètre de 120 uu.'''
 
 OPTIONS_DB_GAMESETUP_SPECIALS_FREQUENCY
 '''La proportion des planètes et systèmes présentant une Particularité.
@@ -2955,8 +2970,14 @@ Zoom minimal petite icône d'une flotte
 OPTIONS_UI_MEDIUM_FLEET_BUTTON_MIN_ZOOM
 Zoom minimal icône moyenne d'une flotte
 
+OPTIONS_UI_BIG_FLEET_BUTTON_MIN_ZOOM
+Zoom minimal grande icône d'une flotte
+
 OPTIONS_UI_FLEET_SELECTION_INDICATOR_SIZE
-Taille relative du sélecteur de flottes
+Taille relative sélecteur de flottes
+
+OPTIONS_UI_FLEET_BUTTON_SIZE
+Taille relative bouton de flottes
 
 OPTIONS_GALAXY_MAP_GENERAL
 Général
@@ -3122,6 +3143,12 @@ Liens
 
 OPTIONS_ROLLOVER_LINK_COLOR
 Survol des liens
+
+OPTIONS_DEFAULT_TOOLTIP_COLOR
+Infobulles par défaut
+
+OPTIONS_ROLLOVER_TOOLTIP_COLOR
+Survol infobulles
 
 OPTIONS_HIGHLIGHT_COLOR
 Surbrillance de sélection
@@ -4457,7 +4484,7 @@ Les objets peuvent être ajoutés à la File d'Attente de Production comme Comma
 Pour chaque objet, une colonne indique le coût total et le temps minimum de production.
 Les PP maximum pouvant être alloués à une Commande de Production correspondent à la formule: (coût / temps) x quantité.
 Exemple: la production d'un objet d'un coût total de 30 PP et un temps minimum de 3 tours pourra progresser de 10 PP par objet, par tour.
-Les objets indisponibles, si affichés, permettront par un survol de souris d'accéder à une bulle d'information listant en rouge les raisons pour lesquelles ils ne peuvent pas être produits par l'empire.
+Les objets indisponibles, si affichés, permettront par un survol de souris d'accéder à une infobulle listant en rouge les raisons pour lesquelles ils ne peuvent pas être produits par l'empire.
 
 <u>Panneau File d'Attente de Production</u>
 
@@ -6109,7 +6136,7 @@ METER_DETECTION_VALUE_LABEL
 Champ de Détection
 
 METER_DETECTION_VALUE_DESC
-'''L'indicateur 'Champ de Détection' indique, en nombre d'uus, la portée des capteurs. Un empire ne peut voir que les objets ayant une [[metertype METER_STEALTH]] inférieure ou égale à sa [[encyclopedia DETECTION_TITLE]], et qui se trouvent dans le Champ de Détection d'un astronef ou d'une planète qu'il contrôle.
+'''L'indicateur 'Champ de Détection' indique, en nombre d'uus (unité universelle), la portée des capteurs. Un empire ne peut voir que les objets ayant une [[metertype METER_STEALTH]] inférieure ou égale à sa [[encyclopedia DETECTION_TITLE]], et qui se trouvent dans le Champ de Détection d'un astronef ou d'une planète qu'il contrôle.
 
 Les astronefs et les planètes ont un indicateur 'Champ de Détection'. Dans le Menu d'Options, le réglage 'Cercles de détection' permet d'afficher sur la carte galactique les zones circulaires (en uu) figurant les Champs de Détection. Afin de faciliter la mesure de ce qui se trouve à l'intérieur d'un Champ de Détection, le réglage 'Barre d'échelle des distances' permet d'afficher l'échelle de la carte (en uu) tandis que le réglage 'Cercle d'échelle des distances' permet de figurer la même distance que la barre d'échelle lorsqu'un système stellaire est sélectionné. Ces deux indicateurs d'échelle s'adaptent au niveau de zoom sur la carte et peuvent être activés/désactivés via des raccourcis claviers.
 
@@ -6177,7 +6204,7 @@ DISTORTION_FOCUS_TITLE
 Focus Distortion Spatiale
 
 DISTORTION_FOCUS_TEXT
-Manipule les Voies spatiales menant à la planète, ralentissant la progression des astronefs ennemis de 40uu par tour. Les astronefs les plus lents peuvent même être repoussés à l'extrémité opposée de la Voie spatiale empruntée. Disponible après avoir construit un [[buildingtype BLD_SPATIAL_DISTORT_GEN]].
+Manipule les Voies spatiales menant à la planète, ralentissant la progression des astronefs ennemis de 40 uu par tour. Les astronefs les plus lents peuvent même être repoussés à l'extrémité opposée de la Voie spatiale empruntée. Disponible après avoir construit un [[buildingtype BLD_SPATIAL_DISTORT_GEN]].
 
 GROWTH_FOCUS_TITLE
 Focus Croissance
@@ -6554,7 +6581,7 @@ Rechercher et débloquer de nouveaux objets
 
 RESEARCH_TECH_GUIDE_TEXT
 '''Compléter la [[metertype METER_RESEARCH]] d'une technologie débloquant un objet donnera uniquement à l'empire la connaissance des modalités de production de cet objet. La production effective d'un objet peut être soumise à d'autres conditions, tel l'accès à certaines ressources.
-Si un objet a été débloqué mais ne peut pas être produit, les conditions additionnelles de production peuvent être consultées en affichant la bulle d'aide de l'objet en question dans la liste de la Fenêtre Production (survol souris + filtre "[[PRODUCTION_WND_AVAILABILITY_UNAVAILABLE]]" activé).
+Si un objet a été débloqué mais ne peut pas être produit, les conditions additionnelles de production peuvent être consultées en affichant l'infobulle de l'objet en question dans la liste de la Fenêtre Production (survol souris + filtre "[[PRODUCTION_WND_AVAILABILITY_UNAVAILABLE]]" activé).
 
 En général, la disponibilité ou l'activation des objets débloqués par la [[METER_RESEARCH]] des différentes [[encyclopedia ENC_TECH]] ne nécessite pas de connection aux lignes d'[[metertype METER_SUPPLY]] (par exemple une structure ou une amélioration d'un indicateur planétaire). Toutefois, si une technologie améliorant un équipement d'astronef est recherchée puis assimilée (par exemple un armement), les astronefs déjà existants doivent se trouver dans une zone d'approvisionnement, être stationnaires et pas en situation de combat, afin de pouvoir recevoir l'amélioration à tout moment.'''
 
@@ -9020,7 +9047,7 @@ Tête Empalée
 HEAD_ON_A_SPIKE_SPECIAL_DESC
 '''La tête d'un ancien empereur est empalée à la vue de tous, inspirant une profonde terreur aux ennemis de l'empire.
 
-Toutes les flottes n'appartenant pas à l'empire, qu'elles soient ennemies ou alliées, se trouvant dans une zone de 100uu, verront leurs [[metertype METER_SHIELD]], [[metertype METER_STRUCTURE]] et puissance de feu légèrement affaiblis.
+Toutes les flottes n'appartenant pas à l'empire, qu'elles soient ennemies ou alliées, se trouvant dans un périmètre de 100 uu, verront leurs [[metertype METER_SHIELD]], [[metertype METER_STRUCTURE]] et puissance de feu légèrement affaiblis.
 '''
 
 HEAD_ON_A_SPIKE_SPECIAL_EFFECT
@@ -11260,7 +11287,9 @@ Toutefois, réduit également la portée de l'[[metertype METER_SUPPLY]] ([[valu
 • Les colonies connectées par lignes d'[[metertype METER_SUPPLY]] subissent une pénalité de [[value PLC_CENTRALIZATION_TARGET_INFLUENCE_PERJUMP]] par Voies spatiales les séparant de la Capitale, plafonnée à [[value PLC_CENTRALIZATION_TARGET_INFLUENCE_MAX]].
 • Les colonies non-connectées par lignes d'[[metertype METER_SUPPLY]] à la Capitale subissent la pénalité maximale ([[value PLC_CENTRALIZATION_TARGET_INFLUENCE_MAX]]).
 
-La logistique de l'ensemble de l'empire vise à accroître la production de la Capitale, en y déroutant l'essentiel des ressources matérielles et sociales. Cela provoque un certain ressentiment dans les colonies, augmentant par conséquent les coûts d'[[metertype METER_INFLUENCE]].'''
+La logistique de l'ensemble de l'empire vise à accroître la production de la Capitale, en y déroutant l'essentiel des ressources matérielles et sociales. Cela provoque un certain ressentiment dans les colonies, augmentant par conséquent les coûts d'[[metertype METER_INFLUENCE]].
+
+Le coût des équipements de colonisation pour astronefs augmente également de 50%.'''
 
 PLC_CENTRALIZATION_SHORT_DESC
 Favorise la Capitale
@@ -11544,6 +11573,48 @@ Augmente l'impact des préférences d'une espèce (aime ou n'aime pas) sur la St
 
 PLC_LIBERTY_SHORT_DESC
 Augmente les effets des opinions d'une espèce
+
+PLC_TRAFFIC_CONTROL
+Gestion du Trafic
+
+PLC_TRAFFIC_CONTROL_DESC
+Augmente de 20 la [[metertype METER_SPEED]] des astronefs lorsque ces derniers se trouvent à moins de 50 uu d'une planète appartenant à l'empire.
+
+PLC_TRAFFIC_CONTROL_SHORT_DESC
+Vitesse des astronefs à proximité des planètes de l'empire
+
+PLC_PLANETARY_INFRA
+Infrastructure Planétaire
+
+PLC_PLANETARY_INFRA_DESC
+'''Octroie 2 choix supplémentaires de Stratégie économique.
+
+Augmente de 5 la [[metertype METER_TARGET_CONSTRUCTION]] des planètes habitées.'''
+
+PLC_PLANETARY_INFRA_SHORT_DESC
+Octroie des choix de Stratégie
+
+PLC_SYSTEM_INFRA
+Infrastructure Systémique
+
+PLC_SYSTEM_INFRA_DESC
+'''Octroie 2 choix supplémentaires de Stratégie économique.
+
+Augmente de 5 la [[metertype METER_TARGET_CONSTRUCTION]] des planètes habitées au sein des systèmes abritant au moins 2 planètes appartenant à l'empire appliquant cette Stratégie.'''
+
+PLC_SYSTEM_INFRA_SHORT_DESC
+Octroie des choix de Stratégie
+
+PLC_INTERSTELLAR_INFRA
+Infrastructure Interstellaire
+
+PLC_INTERSTELLAR_INFRA_DESC
+'''Octroie 2 choix supplémentaires de Stratégie économique.
+
+Augmente de 5 la [[metertype METER_TARGET_CONSTRUCTION]] des planètes habitées étant connectées aux ressources d'approvisionnement de planètes situées dans d'autres systèmes, et appartenant à l'empire appliquant cette stratégie.'''
+
+PLC_INTERSTELLAR_INFRA_SHORT_DESC
+Octroie des choix de Stratégie
 
 
 ##
@@ -12104,8 +12175,7 @@ Psychologie Architecturale
 CON_ARCH_PSYCH_DESC
 '''La forme d'une structure ou la configuration d'un espace habité ne se définissent pas seulement par les limitations physiques des matériaux qui les composent. L'influence psychologique des habitants, ou d'observateurs extérieurs, peut avoir une incidence bien plus importante sur la réussite et la fonctionnalité d'un design, que la simple robustesse de ses murs ou la profonde solidité de ses fondations.
 
-Octroie 1 choix supplémentaire de Stratégie sociale.
-'''
+Octroie 1 choix supplémentaire de Stratégie sociale.'''
 
 CON_ORGANIC_STRC
 Structures Organiques
@@ -12146,14 +12216,6 @@ CON_CONTGRAV_ARCH_DESC
 L'installation d'un générateur de gravité nulle au cœur d'une planète rend possible le contrôle binaire "marche/arrêt" de la gravité planétaire, mais seulement sur une zone limitée. L'industrie planétaire profite alors des nombreux bénéfices de la faible gravité et de la gravité zéro (low-G et zero-G), mais sans ses inconvénients. Une gravité inversée peut être également générée, rendant les coûts des lancements spatiaux quasiment inexistants.
 
 Le contrôle total de l'orientation et de la puissance des forces gravitationnelles s'exerçant sur ou à l'intérieur d'une structure, permet l'émergence de designs jouissant simultanément de la liberté de l'impesanteur et de la nécessité de définir les directions haut et bas. La structure elle-même, et l'environnement qu'elle fournit, peut prendre n'importe quelle forme dans l'espace, s'étirant sur de grandes distances, formant une boucle sur elle-même, et effectuant des interconnections à volonté. Simultanément, les environnements internes à ces structures reproduisent les mêmes modifications et adaptations, et peuvent présenter quelques similitudes ou être entièrements différents d'une zone adjacente à une autre. Une telle souplesse rend possible de nouveaux designs innovants et fonctionnels pour la société, l'industrie et bien d'autres domaines.'''
-
-CON_GAL_INFRA
-Infrastructure Galactique
-
-CON_GAL_INFRA_DESC
-'''Le transport efficace et fiable des ressources sur des distances interstellaires requiert une planification fastidieuse, complexifiée par de nombreux facteurs tels que la présence de monstres spatiaux, d'empires ennemis et de dangereux phénomènes astrophysiques. L'utilisation d'une infrastructure galactique intégrée permet un déploiement fluide des ressources entre les colonies avancées et émergentes, tandis que des solutions peuvent être appliquées aux problèmes de logistique particulièrement contraignants.
-
-Le développement et l'intégration de l'administration régionale au sein d'un réseau galactique d'envergure et unifié est un des plus grands progrès imaginables en matière de logistique.'''
 
 CON_ART_HEAVENLY
 Astres Artificiels
@@ -12200,8 +12262,6 @@ Logistique Interstellaire
 
 SHP_INTSTEL_LOG_DESC
 '''Débloque le Focus Logistique, augmentant l'[[metertype METER_SUPPLY]] de 3 sur toutes les planètes.
-
-Augmente de 20 la [[metertype METER_SPEED]] de tous les astronefs lorsque ces derniers se trouvent à moins de 50 uu d'une planète appartenant à l'empire.
 
 [[COLONY_BUILDING_TIME_DECREASE]]
 
@@ -12362,7 +12422,7 @@ SHP_KRILL_SPAWN
 Génération de Krill
 
 SHP_KRILL_SPAWN_DESC
-Débloque l'équipement [[shippart SP_KRILL_SPAWNER]] pour les astronefs, qui provoque l'apparition de krill sauvage dans les systèmes abritant des Ceintures d'Astéroïdes.
+Débloque l'équipement [[shippart SP_KRILL_SPAWNER]] pour les astronefs, qui provoque l'apparition de Krill Spatial dans les systèmes abritant des Ceintures d'Astéroïdes.
 
 SPY_ROOT_DECEPTION
 Tromperie
@@ -13622,7 +13682,7 @@ BLD_LIGHTHOUSE
 Phare Interstellaire
 
 BLD_LIGHTHOUSE_DESC
-Diminue de 30 la [[metertype METER_STEALTH]] de tous les objets situés dans le même système et augmente de 20 la [[metertype METER_SPEED]] des astronefs alliés se trouvant dans un périmètre de 50 uu au début du tour. [[BUILDING_AVAILABLE_ON_OUTPOSTS]] et peut rendre optimale l'utilisation d'un [[buildingtype BLD_PLANET_DRIVE]].
+Diminue de 30 la [[metertype METER_STEALTH]] de tous les objets situés dans le même système et augmente de 20 la [[metertype METER_SPEED]] des astronefs alliés se trouvant à moins de 50 uu au début du tour. [[BUILDING_AVAILABLE_ON_OUTPOSTS]] et peut rendre optimale l'utilisation d'un [[buildingtype BLD_PLANET_DRIVE]].
 
 BLD_SCANNING_FACILITY
 Complexe de Détection
@@ -13857,7 +13917,7 @@ Une [[buildingtype BLD_PLANET_BEACON]] ou bien un astronef équipé d'une [[ship
 
 Pour utiliser le Navigateur Planétaire, une [[buildingtype BLD_PLANET_BEACON]] doit être construite dans le système adjacent de destination, ou bien un astronef équipé d'une [[shippart SP_PLANET_BEACON]] doit s'y trouver, tandis que la planète migrante doit être réglée sur le Focus Navigation Planétaire, afin qu'elle se dirige vers le système de destination. Il est à noter que la balise doit se trouver dans le système de destination depuis au moins un tour: le Navigateur ne fonctionnera donc pas durant le tour où sa construction est achevée, ou durant lequel un astronef équipé du dispositif arrive dans le système de destination. D'autre part, un [[buildingtype BLD_TRANSFORMER]] est en mesure de reproduire les effets d'un Navigateur Planétaire.
 
-Une [[buildingtype BLD_PLANET_BEACON]] ne peut être construite qu'au sein de systèmes abritant moins de 7 planètes (Géantes Gazeuses et Astéroides compris). Si le [[BLD_PLANET_DRIVE]] est utilisé pour déplacer une planète vers un système dépassant cette limite, la planète restera saine et sauve dans son système d'origine à condition qu'un [[buildingtype BLD_LIGHTHOUSE]] soit présent à une distance de 200uu au plus. Dans le cas contraire, la planète a 50% de chance d'être détruite en tentant d'atteindre le système de destination déjà complet.
+Une [[buildingtype BLD_PLANET_BEACON]] ne peut être construite qu'au sein de systèmes abritant moins de 7 planètes (Géantes Gazeuses et Astéroides compris). Si le [[BLD_PLANET_DRIVE]] est utilisé pour déplacer une planète vers un système dépassant cette limite, la planète restera saine et sauve dans son système d'origine à condition qu'un [[buildingtype BLD_LIGHTHOUSE]] soit présent à une distance de 200 uu au plus. Dans le cas contraire, la planète a 50% de chance d'être détruite en tentant d'atteindre le système de destination déjà complet.
 '''
 
 BLD_PLANET_BEACON
@@ -13920,7 +13980,7 @@ BLD_SPATIAL_DISTORT_GEN
 Générateur de Distortion Spatiale
 
 BLD_SPATIAL_DISTORT_GEN_DESC
-Manipule les propriétés dimensionnelles des Voies spatiales attenantes. Tout astronef ennemi se dirigeant vers le système abritant cette structure sera repoussé à une distance de 40uu sur la même route qu'il a emprunté, tant que l'astronef en question ne parcourt pas la distance suffisante pour compléter son voyage et ainsi atteindre le système visé. Le Générateur s'active si la planète sur laquelle il est construit est réglée sur le Focus Distortion Spatiale.
+Manipule les propriétés dimensionnelles des Voies spatiales attenantes. Tout astronef ennemi se dirigeant vers le système abritant cette structure sera repoussé à une distance de 40 uu sur la même route qu'il a emprunté, tant que l'astronef en question ne parcourt pas la distance suffisante pour compléter son voyage et ainsi atteindre le système visé. Le Générateur s'active si la planète sur laquelle il est construit est réglée sur le Focus Distortion Spatiale.
 
 BLD_STARGATE  # translated
 Stargate
@@ -14359,23 +14419,45 @@ Canon Anti-Matière
 SR_SPINAL_ANTIMATTER_DESC
 Un gigantesque canon automatique propulsant de lourdes charges explosives faites d'anti-matière. Attaque astronefs et planètes.
 
+SR_GRAV_PULSE
+Pulsar Graviton
+
+SR_GRAV_PULSE_DESC
+'''Décharge gravitonique endommageant l'intégrité de la coque de chaque cible se trouvant dans le rayon de déflagration. Bien que très efficace contre les chasseurs pris dans la déflagration, celle-ci ne cause que des dommages mineurs aux astronefs et défenses planétaires.
+
+La décharge gravitonique inflige des [[encyclopedia DAMAGE_TITLE]] une seule fois par combat, lors de la 2ème passe de combat.'''
+
 SR_JAWS
 Mâchoires
 
 SR_JAWS_DESC
-Mâchoires provenant d'un monstre spatial et en mesure d'endommager les astronefs. Les monstres spatiaux de très grande taille sont même capables de dévorer des flottes entières.
+'''Mâchoires provenant d'un monstre spatial et en mesure d'endommager les astronefs et les planètes. Les monstres spatiaux de très grande taille sont même capables de dévorer des flottes entières.
+
+Les Mâchoires peuvent infliger des [[encyclopedia DAMAGE_TITLE]] à partir de la passe de combat [[value FIRST_COMBAT_ROUND_IN_CLOSE_TARGETING_RANGE]], les cibles étant trop éloignées durant les premières passes de combat.'''
 
 SR_SPINES
 Épines
 
 SR_SPINES_DESC
-Épines provenant d'un monstre spatial, à l'aide desquelles une frappe puissante peut sérieusement endommager un astronef.
+'''Épines provenant d'un monstre spatial, lesquelles avec une frappe puissante peuvent sérieusement endommager un astronef.
+
+Les Épines infligent des [[encyclopedia DAMAGE_TITLE]] à partir de la passe de combat [[value FIRST_COMBAT_ROUND_IN_CLOSE_TARGETING_RANGE]], les cibles étant trop éloignées durant les premières passes de combat.'''
 
 SR_TENTACLE
 Tentacule
 
 SR_TENTACLE_DESC
-Tentacule provenant d'un Kraken et en mesure d'endommager les astronefs.
+'''Tentacule de Kraken, dont la fonction première est d'endommager les astronefs. Peut également attaquer les chasseurs et les planètes.
+
+Les Tentacules peuvent infliger des [[encyclopedia DAMAGE_TITLE]] aux astronefs à partir de la passe de combat [[value FIRST_COMBAT_ROUND_IN_CLOSE_TARGETING_RANGE]], les cibles étant trop éloignées durant les premières passes de combat. Les Tentacules commencent à détruire les chasseurs lorsque ceux-ci arrivent à portée durant la 2ème passe de combat. Les Tentacules attaquent les chasseurs et planètes seulement si nul autre astronef ne peut être ciblé.'''
+
+SR_THRASHING_BODY
+Corps Broyeur
+
+SR_THRASHING_BODY_DESC
+'''Corps provenant d'un monstre spatial, se déplaçant à très grande vitesse et réduisant en miettes les chasseurs et astronefs de faible résistance se trouvant sur son chemin.
+
+Un Corps Broyeur peut infliger des [[encyclopedia DAMAGE_TITLE]] à partir de la passe de combat [[value FIRST_COMBAT_ROUND_IN_CLOSE_TARGETING_RANGE]], les cibles étant trop éloignées durant les premières passes de combat.'''
 
 SR_PLASMA_DISCHARGE
 Décharge Plasma

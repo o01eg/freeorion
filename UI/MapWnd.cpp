@@ -163,7 +163,8 @@ namespace {
 
         db.Add("ui.map.fleet.button.tiny.zoom.threshold",   UserStringNop("OPTIONS_DB_UI_TINY_FLEET_BUTTON_MIN_ZOOM"),          0.8,                            RangedStepValidator<double>(0.1, 0.1, 4.0));
         db.Add("ui.map.fleet.button.small.zoom.threshold",  UserStringNop("OPTIONS_DB_UI_SMALL_FLEET_BUTTON_MIN_ZOOM"),         1.50,                           RangedStepValidator<double>(0.1, 0.1, 4.0));
-        db.Add("ui.map.fleet.button.medium.zoom.threshold", UserStringNop("OPTIONS_DB_UI_MEDIUM_FLEET_BUTTON_MIN_ZOOM"),        4.00,                           RangedStepValidator<double>(0.1, 0.1, 4.0));
+        db.Add("ui.map.fleet.button.medium.zoom.threshold", UserStringNop("OPTIONS_DB_UI_MEDIUM_FLEET_BUTTON_MIN_ZOOM"),        3.00,                           RangedStepValidator<double>(0.1, 0.1, 8.0));
+        db.Add("ui.map.fleet.button.big.zoom.threshold",    UserStringNop("OPTIONS_DB_UI_BIG_FLEET_BUTTON_MIN_ZOOM"),           6.00,                           RangedStepValidator<double>(0.1, 0.1, 8.0));
 
         db.Add("ui.map.detection.range.opacity",            UserStringNop("OPTIONS_DB_GALAXY_MAP_DETECTION_RANGE_OPACITY"),     3,                              RangedValidator<int>(0, 8));
 
@@ -549,7 +550,7 @@ namespace {
                 GG::Y height{ ClientUI::Pts() };
                 // center format for title label
                 m_ship_design_labels.emplace_back(
-                    GG::Wnd::Create<CUILabel>(GetShipDesign(entry.first)->Name(),
+                    GG::Wnd::Create<CUILabel>(GetUniverse().GetShipDesign(entry.first)->Name(),
                         GG::FORMAT_RIGHT,
                         GG::NO_WND_FLAGS, GG::X0, GG::Y0,
                         m_col_widths.at(0) - (m_margin * 2), height
@@ -5115,7 +5116,10 @@ double MapWnd::SystemHaloScaleFactor() const
 
 FleetButton::SizeType MapWnd::FleetButtonSizeType() const {
     // no SizeType::LARGE as these icons are too big for the map.  (they can be used in the FleetWnd, however)
-    if      (ZoomFactor() > ClientUI::MediumFleetButtonZoomThreshold())
+    if      (ZoomFactor() > ClientUI::BigFleetButtonZoomThreshold())
+        return FleetButton::SizeType::LARGE;
+
+    else if (ZoomFactor() > ClientUI::MediumFleetButtonZoomThreshold())
         return FleetButton::SizeType::MEDIUM;
 
     else if (ZoomFactor() > ClientUI::SmallFleetButtonZoomThreshold())

@@ -1522,8 +1522,10 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
     if (!success)
         ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_UNIVERSE_GENERATION_ERRORS"), false));
 
-    for (auto& empire : m_empires)
+    for (auto& empire : m_empires) {
         empire.second->ApplyNewTechs();
+        empire.second->ApplyPolicies();
+    }
 
     DebugLogger() << "Applying first turn effects and updating meters";
 
@@ -1858,6 +1860,15 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     std::shared_ptr<Empire> empire;
     int empire_id = ALL_EMPIRES;
     std::list<std::string> delegation = GetPlayerDelegation(player_connection->PlayerName());
+    if (GetOptionsDB().Get<bool>("network.server.take-over-ai")) {
+        for (auto& e : Empires()) {
+            if (!e.second->Eliminated() &&
+                GetEmpireClientType(e.first) == Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
+            {
+                delegation.push_back(e.second->PlayerName());
+            }
+        }
+    }
     if (target_empire_id == ALL_EMPIRES) {
         // search empire by player name
         for (auto& e : Empires()) {
@@ -1932,6 +1943,10 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
             const std::string previous_player_name = (*previous_it)->PlayerName();
             m_networking.Disconnect(previous_player_id);
             if (previous_client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
+                // change empire's player so after reload the player still could connect
+                // to the empire
+                empire->SetPlayerName(player_connection->PlayerName());
+                // kill unneeded AI process
                 auto it = m_ai_client_processes.find(previous_player_name);
                 if (it != m_ai_client_processes.end()) {
                     it->second.Kill();
@@ -2874,7 +2889,7 @@ namespace {
 
         std::multimap<double, int> inverted_empires_troops;
         for (const auto& entry : empires_troops)
-            inverted_empires_troops.insert({entry.second, entry.first});
+            inverted_empires_troops.emplace(entry.second, entry.first);
 
         // everyone but victor loses all troops.  victor's troops remaining are
         // what the victor started with minus what the second-largest troop
@@ -3646,8 +3661,10 @@ void ServerApp::PostCombatProcessTurns() {
     // apply new techs
     for ([[maybe_unused]] auto& [ignored_id, empire] : m_empires) {
         (void)ignored_id;   // quiet unused variable warning
-        if (empire && !empire->Eliminated())
+        if (empire && !empire->Eliminated()) {
             empire->ApplyNewTechs();
+            empire->ApplyPolicies();
+        }
     }
 
 

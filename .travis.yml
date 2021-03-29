@@ -61,7 +61,7 @@ _test_python_common: &_test_python_common
 
 jobs:
   include:
-    - name: Lint AI with Python 3.5
+    - name: Lint AI with Python 3.6
       <<: *_linux_setup_common
       stage: lint
       script:
@@ -73,7 +73,7 @@ jobs:
       os: linux
       dist: bionic
       language: python
-      python: 3.5
+      python: 3.6
       script:
         - ./check/st-tool.py check --reference default/stringtables/en.txt default/stringtables/*.txt
         - diff -u default/stringtables/en.txt <(check/st-tool.py format default/stringtables/en.txt) || { echo "String table is not properly formatted"; exit 1; }
@@ -95,23 +95,15 @@ jobs:
       script:
         - cmake -DBUILD_CLIENT_GG=OFF -DBUILD_TESTING=ON ..
         - cmake --build .     
-      services:
-        - postgres
-      addons:
-        - postgres: "9.6"
-      before_install:
-        - psql -c 'SELECT version();' -U postgres
-        - psql -c 'CREATE DATABASE freeorion;' -U postgres
-        - psql -U postgres freeorion < ${TRAVIS_BUILD_DIR}/.ci/freeorion.sql
 
-    - name: Unittest AI with Python 3.5
+    - name: Unittest AI with Python 3.6
       <<: *_test_python_common
-      python: 3.5
+      python: 3.6
       before_install:
         - alias pip=/usr/bin/pip3
 
-    - name: Unittest AI with Python 3.8
+    - name: Unittest AI with Python 3.9
       <<: *_test_python_common
-      python: 3.8
+      python: 3.9
       before_install:
         - alias pip=/usr/bin/pip3

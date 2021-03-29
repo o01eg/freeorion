@@ -727,7 +727,7 @@ std::set<int> Empire::AvailableShipDesigns() const {
 }
 
 bool Empire::ShipDesignAvailable(int ship_design_id) const {
-    const ShipDesign* design = GetShipDesign(ship_design_id);
+    const ShipDesign* design = GetUniverse().GetShipDesign(ship_design_id); // TODO get from ScriptingContext
     return design ? ShipDesignAvailable(*design) : false;
 }
 
@@ -861,7 +861,7 @@ bool Empire::ProducibleItem(BuildType build_type, int design_id, int location,
         return false;
 
     // design must be known to this empire
-    const ShipDesign* ship_design = GetShipDesign(design_id);
+    const ShipDesign* ship_design = context.ContextUniverse().GetShipDesign(design_id);
     if (!ship_design || !ship_design->Producible())
         return false;
 
@@ -1327,12 +1327,11 @@ const std::map<int, std::set<int>> Empire::VisibleStarlanes() const {
             continue;
 
         // get system's visible lanes for this empire
-        for (auto& lane : sys->VisibleStarlanesWormholes(m_id)) {
-            if (lane.second)
+        for (auto& [other_end_id, is_wormhole] : sys->VisibleStarlanesWormholes(m_id)) {
+            if (is_wormhole)
                 continue;   // is a wormhole, not a starlane
-            int end_id = lane.first;
-            retval[start_id].emplace(end_id);
-            retval[end_id].emplace(start_id);
+            retval[start_id].insert(other_end_id);
+            retval[other_end_id].insert(start_id);
         }
     }
 
@@ -1722,7 +1721,7 @@ void Empire::AddNewlyResearchedTechToGrantAtStartOfNextTurn(const std::string& n
 }
 
 void Empire::ApplyNewTechs() {
-    for (auto new_tech : m_newly_researched_techs) {
+    for (const auto& new_tech : m_newly_researched_techs) {
         const Tech* tech = GetTech(new_tech);
         if (!tech) {
             ErrorLogger() << "Empire::ApplyNewTech has an invalid entry in m_newly_researched_techs: " << new_tech;
@@ -1753,7 +1752,22 @@ void Empire::AddPolicy(const std::string& name) {
     }
 }
 
-void Empire::UnlockItem(const UnlockableItem& item) {
+void Empire::ApplyPolicies() {
+    for (auto& [policy_name, adoption_info] : m_adopted_policies) {
+        if (adoption_info.adoption_turn >= CurrentTurn())
+            continue; // policy unlock take effect one turn after adoption
+
+        const Policy* policy = GetPolicy(policy_name);
+        if (!policy) {
+            ErrorLogger() << "Empire::ApplyPolicies couldn't find policy with name  " << policy_name;
+            continue;
+        }
+        for (const UnlockableItem& item : policy->UnlockedItems())
+            UnlockItem(item);
+    }
+}
+
+void Empire::UnlockItem(const UnlockableItem& item) { // TODO: pass Universe
     switch (item.type) {
     case UnlockableItemType::UIT_BUILDING:
         AddBuildingType(item.name);
@@ -1765,7 +1779,7 @@ void Empire::UnlockItem(const UnlockableItem& item) {
         AddShipHull(item.name);
         break;
     case UnlockableItemType::UIT_SHIP_DESIGN:
-        AddShipDesign(GetPredefinedShipDesignManager().GetDesignID(item.name));
+        AddShipDesign(GetPredefinedShipDesignManager().GetDesignID(item.name), GetUniverse());
         break;
     case UnlockableItemType::UIT_TECH:
         AddNewlyResearchedTechToGrantAtStartOfNextTurn(item.name);
@@ -1837,7 +1851,7 @@ std::string Empire::NewShipName() {
     return retval;
 }
 
-void Empire::AddShipDesign(int ship_design_id, int next_design_id) {
+void Empire::AddShipDesign(int ship_design_id, const Universe& universe, int next_design_id) {
     /* Check if design id is valid.  That is, check that it corresponds to an
      * existing shipdesign in the universe.  On clients, this means that this
      * empire knows about this ship design and the server consequently sent the
@@ -1848,11 +1862,11 @@ void Empire::AddShipDesign(int ship_design_id, int next_design_id) {
     if (ship_design_id == next_design_id)
         return;
 
-    const ShipDesign* ship_design = GetUniverse().GetShipDesign(ship_design_id);
+    const ShipDesign* ship_design = universe.GetShipDesign(ship_design_id);
     if (ship_design) {  // don't check if design is producible; adding a ship design is useful for more than just producing it
         // design is valid, so just add the id to empire's set of ids that it knows about
         if (!m_known_ship_designs.count(ship_design_id)) {
-            m_known_ship_designs.emplace(ship_design_id);
+            m_known_ship_designs.insert(ship_design_id);
 
             ShipDesignsChangedSignal();
 
@@ -1865,8 +1879,7 @@ void Empire::AddShipDesign(int ship_design_id, int next_design_id) {
     }
 }
 
-int Empire::AddShipDesign(ShipDesign* ship_design) {
-    Universe& universe = GetUniverse();
+int Empire::AddShipDesign(ShipDesign* ship_design, Universe& universe) {
     /* check if there already exists this same design in the universe.  On clients, this checks whether this empire
        knows of this exact design and is trying to re-add it.  On the server, this checks whether this exact design
        exists at all yet */
@@ -1874,7 +1887,7 @@ int Empire::AddShipDesign(ShipDesign* ship_design) {
         if (ship_design == it->second) {
             // ship design is already present in universe.  just need to add it to the empire's set of ship designs
             int ship_design_id = it->first;
-            AddShipDesign(ship_design_id);
+            AddShipDesign(ship_design_id, universe);
             return ship_design_id;
         }
     }
@@ -1887,7 +1900,7 @@ int Empire::AddShipDesign(ShipDesign* ship_design) {
     }
 
     auto new_design_id = ship_design->ID();
-    AddShipDesign(new_design_id);
+    AddShipDesign(new_design_id, universe);
 
     return new_design_id;
 }
@@ -1902,10 +1915,10 @@ void Empire::RemoveShipDesign(int ship_design_id) {
 }
 
 void Empire::AddSitRepEntry(const SitRepEntry& entry)
-{ m_sitrep_entries.emplace_back(entry); }
+{ m_sitrep_entries.push_back(entry); }
 
 void Empire::AddSitRepEntry(SitRepEntry&& entry)
-{ m_sitrep_entries.emplace_back(std::move(entry)); }
+{ m_sitrep_entries.push_back(std::move(entry)); }
 
 void Empire::RemoveTech(const std::string& name)
 { m_techs.erase(name); }
@@ -2318,7 +2331,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
             // else give up...
             if (species_name.empty()) {
                 // only really a problem for colony ships, which need to have a species to function
-                const auto* design = GetShipDesign(elem.item.design_id);
+                const auto* design = context.ContextUniverse().GetShipDesign(elem.item.design_id);
                 if (!design) {
                     ErrorLogger() << "Couldn't get ShipDesign with id: " << elem.item.design_id;
                     break;
@@ -2354,7 +2367,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 // everything that is traced with an associated max meter.
                 ship->SetShipMetersToMax();
                 // set ship speed so that it can be affected by non-zero speed checks
-                if (auto* design = GetShipDesign(elem.item.design_id))
+                if (auto* design = context.ContextUniverse().GetShipDesign(elem.item.design_id))
                     ship->GetMeter(MeterType::METER_SPEED)->Set(design->Speed(), design->Speed());
                 ship->BackPropagateMeters();
 
@@ -2641,7 +2654,7 @@ void Empire::UpdateOwnedObjectCounters(const ObjectMap& objects) {
     m_ship_parts_owned.clear();
     m_ship_part_class_owned.clear();
     for (const auto& design_count : m_ship_designs_owned) {
-        const ShipDesign* design = GetShipDesign(design_count.first);
+        const ShipDesign* design = GetUniverse().GetShipDesign(design_count.first); // TODO: pass in universe
         if (!design)
             continue;
 

@@ -71,6 +71,7 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
         GetOptionsDB().Add<int>("network.server.client-message-size.max",               UserStringNop("OPTIONS_DB_CLIENT_MESSAGE_SIZE_MAX"),    0);
         GetOptionsDB().Add<bool>("network.server.allow-email.new-turn",                 UserStringNop("OPTIONS_DB_ALLOW_EMAIL_NEW_TURN"),       true);
         GetOptionsDB().Add<bool>("network.server.drop-empire-ready",                    UserStringNop("OPTIONS_DB_DROP_EMPIRE_READY"),          true);
+        GetOptionsDB().Add<bool>("network.server.take-over-ai",                         UserStringNop("OPTIONS_DB_TAKE_OVER_AI"),               false);
 
         // if config.xml and persistent_config.xml are present, read and set options entries
         GetOptionsDB().SetFromFile(GetConfigPath(), FreeOrionVersionString());

@@ -255,10 +255,10 @@ namespace {
                 ;
 
             species_strings
-                =  ( tok.Species_
-                >    label(tok.name_)                   > tok.string
-                >    label(tok.description_)            > tok.string
-                >    label(tok.gameplay_description_)   > tok.string
+                =  ( tok.Species_                                       // _1
+                >    label(tok.name_)                   > tok.string    // _2
+                >    label(tok.description_)            > tok.string    // _3
+                >    label(tok.gameplay_description_)   > tok.string    // _4
                    ) [ _pass = is_unique_(_r1, _1, _2),
                        _val = construct<SpeciesStrings>(_2, _3, _4) ]
                 ;
@@ -388,8 +388,8 @@ namespace {
 namespace parse {
     start_rule_payload species(const boost::filesystem::path& path) {
         const lexer lexer;
-        start_rule_payload::first_type species_;
-        start_rule_payload::second_type ordering;
+        start_rule_payload retval;
+        auto& [species_, ordering] = retval;
 
         boost::filesystem::path manifest_file;
 
@@ -415,6 +415,6 @@ namespace parse {
             }
         }
 
-        return {std::move(species_), ordering};
+        return retval;
     }
 }

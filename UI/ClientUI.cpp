@@ -120,6 +120,7 @@ GG::Clr     ClientUI::SystemNameTextColor()             { return GetOptionsDB().
 double      ClientUI::TinyFleetButtonZoomThreshold()    { return GetOptionsDB().Get<double>("ui.map.fleet.button.tiny.zoom.threshold"); }
 double      ClientUI::SmallFleetButtonZoomThreshold()   { return GetOptionsDB().Get<double>("ui.map.fleet.button.small.zoom.threshold"); }
 double      ClientUI::MediumFleetButtonZoomThreshold()  { return GetOptionsDB().Get<double>("ui.map.fleet.button.medium.zoom.threshold"); }
+double      ClientUI::BigFleetButtonZoomThreshold()     { return GetOptionsDB().Get<double>("ui.map.fleet.button.big.zoom.threshold"); }
 
 bool        ClientUI::DisplayTimestamp()                { return GetOptionsDB().Get<bool>("ui.map.messages.timestamp.shown"); }
 
@@ -344,7 +345,7 @@ std::shared_ptr<GG::Texture> ClientUI::HullIcon(const std::string& hull_name) {
 }
 
 std::shared_ptr<GG::Texture> ClientUI::ShipDesignIcon(int design_id) {
-    if (const ShipDesign* design = GetShipDesign(design_id)) {
+    if (const ShipDesign* design = GetUniverse().GetShipDesign(design_id)) {
         const std::string& icon_name = design->Icon();
         if (icon_name.empty())
             return ClientUI::HullIcon(design->Hull());
@@ -984,7 +985,7 @@ bool ClientUI::ZoomToFieldType(const std::string& field_type_name) {
 }
 
 bool ClientUI::ZoomToShipDesign(int design_id) {
-    if (!GetShipDesign(design_id))
+    if (!GetUniverse().GetShipDesign(design_id))
         return false;
     GetMapWnd()->ShowShipDesign(design_id);
     return true;

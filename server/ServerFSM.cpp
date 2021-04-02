@@ -2935,7 +2935,7 @@ sc::result PlayingGame::react(const LobbyUpdate& msg) {
         if (player.first == sender->PlayerID() && player.second.m_save_game_empire_id != ALL_EMPIRES) {
             int empire_id = server.AddPlayerIntoGame(sender, player.second.m_save_game_empire_id);
             if (empire_id != ALL_EMPIRES) {
-                context<ServerFSM>().UpdateIngameLobby();
+                server.m_fsm->UpdateIngameLobby();
                 return discard_event();
             }
         }

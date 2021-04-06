@@ -6,7 +6,7 @@ Species
 
     CanColonize
 
-    tags = [ "ROBOTIC" "NO_INDUSTRY" "BAD_RESEARCH" "BAD_WEAPONS" "GREAT_SUPPLY" "PEDIA_ROBOTIC_SPECIES_CLASS" ]
+    tags = [ "ROBOTIC" "ARTISTIC" "NO_INDUSTRY" "BAD_RESEARCH" "BAD_WEAPONS" "GREAT_SUPPLY" "PEDIA_ROBOTIC_SPECIES_CLASS" ]
 
     foci = [
         /*[[HAS_INDUSTRY_FOCUS]]*/
@@ -17,7 +17,7 @@ Species
     ]
 
     defaultfocus = "FOCUS_RESEARCH"
-    likes = ["FOCUS_RESEARCH"]
+    likes = ["FOCUS_RESEARCH" "MIMETIC_ALLOY_SPECIAL" "SHIMMER_SILK_SPECIAL"]
 
     effectsgroups = [
         [[NO_INDUSTRY]]

@@ -25,6 +25,9 @@
 #include <boost/cast.hpp>
 #include <boost/algorithm/string.hpp>
 
+using boost::placeholders::_1;
+using boost::placeholders::_2;
+
 struct Availability {
     // duplicated from DesignWnd
     enum class Enum {
@@ -157,9 +160,8 @@ namespace {
 
         return boost::none;
     }
-}
 
-namespace {
+
     //////////////////////////
     //    PolicyBroseWnd    //
     //////////////////////////
@@ -190,6 +192,8 @@ namespace {
             ClientUI::PolicyIcon(policy_name), UserString(policy_name), main_text);
     }
 }
+
+
 //////////////////////////////////////////////////
 // PolicyControl                                //
 //////////////////////////////////////////////////
@@ -365,8 +369,7 @@ void PoliciesListBox::PoliciesListBoxRow::ChildrenDraggedAway(
         return;
 
     auto new_policy_control = GG::Wnd::Create<PolicyControl>(policy_type);
-    const auto parent = dynamic_cast<const PoliciesListBox*>(Parent().get());
-    if (parent) {
+    if (auto parent = std::dynamic_pointer_cast<const PoliciesListBox>(Parent())) {
         new_policy_control->ClickedSignal.connect(parent->PolicyClickedSignal);
         new_policy_control->DoubleClickedSignal.connect(parent->PolicyDoubleClickedSignal);
         new_policy_control->RightClickedSignal.connect(parent->PolicyRightClickedSignal);
@@ -415,7 +418,7 @@ void PoliciesListBox::AcceptDrops(const GG::Pt& pt,
     if (wnds.empty())
         return;
 
-    auto* control = boost::polymorphic_downcast<const PolicyControl*>(wnds.begin()->get());
+    auto control = std::dynamic_pointer_cast<const PolicyControl>(*wnds.begin());
     const Policy* policy_type = control ? control->GetPolicy() : nullptr;
     if (!policy_type)
         return;
@@ -428,8 +431,8 @@ PoliciesListBox::GroupAvailableDisplayablePolicies(const Empire* empire) const {
     std::map<std::string, std::vector<const Policy*>> policies_categorized;
 
     // loop through all possible policies
-    for (const auto& entry : GetPolicyManager()) {
-        const auto& policy = entry.second;
+    for (auto& [policy_name, policy] : GetPolicyManager()) {
+        (void)policy_name; // quiet warning
         const auto& category = policy->Category();
 
         // check whether this policy should be shown in list
@@ -439,7 +442,7 @@ PoliciesListBox::GroupAvailableDisplayablePolicies(const Empire* empire) const {
         // Check if part satisfies availability
         auto shown = m_availabilities_state.DisplayedPolicyAvailability(policy.get());
         if (shown)
-            policies_categorized[category].emplace_back(policy.get());
+            policies_categorized[category].push_back(policy.get());
     }
     return policies_categorized;
 }
@@ -469,11 +472,10 @@ void PoliciesListBox::Populate() {
 
     // filter policies by availability and current designation of categories
     // for display
-    for (const auto& cat : GroupAvailableDisplayablePolicies(empire)) {
-        //std::cout << "  cat: " << cat.first << std::endl;
+    for (auto& [category_name, policies_vec] : GroupAvailableDisplayablePolicies(empire)) {
+        (void)category_name; // quiet warning
         // take the sorted policies and make UI element rows for the PoliciesListBox
-        for (const auto* policy: cat.second) {
-            //std::cout << "   ... policy: " << policy->Name() << std::endl;
+        for (const auto policy : policies_vec) {
             // check if current row is full, and make a new row if necessary
             if (cur_col >= NUM_COLUMNS) {
                 if (cur_row)
@@ -503,8 +505,7 @@ void PoliciesListBox::Populate() {
 
     // If there are no policies add a prompt to suggest a solution.
     if (num_policies == 0)
-        Insert(GG::Wnd::Create<PromptRow>(TOTAL_WIDTH,
-                                          UserString("ALL_AVAILABILITY_FILTERS_BLOCKING_PROMPT")),
+        Insert(GG::Wnd::Create<PromptRow>(TOTAL_WIDTH, UserString("ALL_AVAILABILITY_FILTERS_BLOCKING_PROMPT")),
                begin(), false);
 }
 
@@ -534,8 +535,6 @@ void PoliciesListBox::HideAllCategories(bool refresh_list) {
         Populate();
 }
 
-using boost::placeholders::_1;
-using boost::placeholders::_2;
 
 //////////////////////////////////////////////////
 // GovernmentWnd::PolicyPalette                 //
@@ -1108,6 +1107,7 @@ void PoliciesListBox::DropsAcceptable(DropsAcceptableIter first, DropsAcceptable
     }
 }
 
+
 //////////////////////////////////////////////////
 // GovernmentWnd::MainPanel                     //
 //////////////////////////////////////////////////
@@ -1148,7 +1148,6 @@ private:
     int FindEmptySlotForPolicy(const Policy* policy) const;
 
     std::vector<std::shared_ptr<PolicySlotControl>> m_slots;
-    std::shared_ptr<GG::StaticGraphic>              m_background_image;
     std::shared_ptr<GG::Button>                     m_clear_button;
 };
 
@@ -1176,7 +1175,7 @@ std::vector<std::string> GovernmentWnd::MainPanel::Policies() const {
     for (const auto& slot : m_slots) {
         const Policy* policy_type = slot->GetPolicy();
         if (policy_type)
-            retval.emplace_back(policy_type->Name());
+            retval.push_back(policy_type->Name());
         else
             retval.emplace_back();
     }
@@ -1343,7 +1342,7 @@ void GovernmentWnd::MainPanel::Populate() {
         const std::string& category_name = cat_slot.first;
         int category_index = cat_slot.second;
         auto slot_control = GG::Wnd::Create<PolicySlotControl>(category_name, category_index, n);
-        m_slots.emplace_back(slot_control);
+        m_slots.push_back(slot_control);
         AttachChild(slot_control);
 
         // assign policy controls to slots that correspond to adopted policies
@@ -1366,8 +1365,6 @@ void GovernmentWnd::MainPanel::Populate() {
 }
 
 void GovernmentWnd::MainPanel::DoLayout() {
-    // position labels and text edit boxes for name and description and buttons to clear and confirm design
-
     const int PTS = ClientUI::Pts();
     const GG::X PTS_WIDE(PTS / 2);           // guess at how wide per character the font needs
     const GG::Y BUTTON_HEIGHT(PTS * 2);
@@ -1379,24 +1376,17 @@ void GovernmentWnd::MainPanel::DoLayout() {
     GG::Pt ul = lr - GG::Pt(BUTTON_WIDTH, BUTTON_HEIGHT);
     m_clear_button->SizeMove(ul, lr);
 
+    if (m_slots.empty())
+        return;
+
     // place background image of government
-    ul.x = GG::X0;
-    ul.y = GG::Y0;
+    ul = m_slots.front()->Size() * 5/4;
     GG::Rect background_rect = GG::Rect(ul, ClientLowerRight());
 
-    if (m_background_image) {
-        GG::Pt bg_ul = background_rect.UpperLeft();
-        GG::Pt bg_lr = ClientSize();
-        m_background_image->SizeMove(bg_ul, bg_lr);
-        background_rect = m_background_image->RenderedArea();
-    }
-
-    // place slot controls over image of hull
+    // arrange policy slots
     int count = 0;
     for (auto& slot : m_slots) {
-        count++;
-        ul.x = (count + 1)*slot->Width() * 5/4;
-        ul.y = (count/5 + 1)*slot->Height() * 5/4;
+        ul += {slot->Width()*5/4, GG::Y0};
         slot->MoveTo(ul);
     }
 }
@@ -1471,7 +1461,7 @@ void GovernmentWnd::Refresh() {
 }
 
 void GovernmentWnd::DoLayout() {
-    const GG::Pt palette_ul(GG::X0, GG::Y0);
+    constexpr GG::Pt palette_ul(GG::X0, GG::Y0);
     const GG::Pt palette_lr(palette_ul + GG::Pt(ClientWidth(), ClientHeight() / 2));
 
     const GG::Pt main_ul(palette_ul + GG::Pt(GG::X0, ClientHeight() / 2));
@@ -1481,7 +1471,7 @@ void GovernmentWnd::DoLayout() {
     m_policy_palette->SizeMove(palette_ul, palette_lr);
 }
 
-void GovernmentWnd::EnableOrderIssuing(bool enable/* = true*/)
+void GovernmentWnd::EnableOrderIssuing(bool enable)
 {}
 
 void GovernmentWnd::CloseClicked()

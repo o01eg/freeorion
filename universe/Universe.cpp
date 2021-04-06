@@ -55,15 +55,11 @@ namespace boost::asio {
 }
 #endif
 
-FO_COMMON_API extern const int INVALID_DESIGN_ID;
-
 namespace {
     DeclareThreadSafeLogger(effects);
     DeclareThreadSafeLogger(conditions);
-}
 
-namespace {
-    const bool ENABLE_VISIBILITY_EMPIRE_MEMORY = true;      // toggles using memory with visibility, so that empires retain knowledge of objects viewed on previous turns
+    constexpr bool ENABLE_VISIBILITY_EMPIRE_MEMORY = true; // toggles using memory with visibility, so that empires retain knowledge of objects viewed on previous turns
 
     void AddOptions(OptionsDB& db) {
         auto HardwareThreads = []() -> int {
@@ -105,7 +101,7 @@ namespace {
 
     // the effective distance for ships travelling along a wormhole, for
     // determining how much of their speed is consumed by the jump
-    // unused variable const double    WORMHOLE_TRAVEL_DISTANCE = 0.1;
+    // unused variable consexprt double WORMHOLE_TRAVEL_DISTANCE = 0.1;
 
     template <typename Key, typename Value>
     struct constant_property
@@ -122,9 +118,6 @@ namespace boost {
     template <typename Key, typename Value>
     const Value& get(const constant_property<Key, Value>& pmap, const Key&) { return pmap.m_value; }
 }
-
-
-extern FO_COMMON_API const int ALL_EMPIRES = -1;
 
 /////////////////////////////////////////////
 // class Universe
@@ -1694,8 +1687,10 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
             if (target_set.empty())
                 continue;
 
-            TraceLogger(effects) << "\n\n * * * * * * * * * * * (new effects group log entry)(" << effects_group->TopLevelContent()
-                                 << " " << effects_group->AccountingLabel() << " " << effects_group->StackingGroup() << ")";
+            TraceLogger(effects) << "\n\n * * * * * * * * * * * (new effects group log entry)("
+                                 << " content: " << effects_group->TopLevelContent()
+                                 << "  acc.label: " << effects_group->AccountingLabel()
+                                 << "  stack grp: " << effects_group->StackingGroup() << " )";
 
             // execute Effects in the EffectsGroup
             auto source = context.ContextObjects().get(sourced_effects_group.source_object_id);
@@ -2353,7 +2348,6 @@ namespace {
                 }
             }
         }
-
     }
 
     void SetTravelledStarlaneEndpointsVisible(const ObjectMap& objects,
@@ -2377,20 +2371,16 @@ namespace {
             auto& vis_map = empire_object_visibility[fleet->Owner()];
 
             auto system_vis_it = vis_map.find(prev);
-            if (system_vis_it == vis_map.end()) {
+            if (system_vis_it == vis_map.end())
                 vis_map[prev] = Visibility::VIS_BASIC_VISIBILITY;
-            } else {
-                if (system_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
-                    system_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
-            }
+            else if (system_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
+                system_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
 
             system_vis_it = vis_map.find(next);
-            if (system_vis_it == vis_map.end()) {
+            if (system_vis_it == vis_map.end())
                 vis_map[next] = Visibility::VIS_BASIC_VISIBILITY;
-            } else {
-                if (system_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
-                    system_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
-            }
+            else if (system_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
+                system_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
         }
     }
 
@@ -3025,7 +3015,7 @@ void Universe::GetObjectsToSerialize(ObjectMap& objects, int encoding_empire) co
         // streamlined option
         objects.CopyForSerialize(*m_objects);
 
-    } else if (!ENABLE_VISIBILITY_EMPIRE_MEMORY) {
+    } else if constexpr (!ENABLE_VISIBILITY_EMPIRE_MEMORY) {
         // if encoding without memory, copy all info visible to specified empire
         objects.Copy(*m_objects, encoding_empire);
 
@@ -3080,7 +3070,7 @@ void Universe::GetEmpireKnownObjectsToSerialize(EmpireObjectMap& empire_latest_k
 
     empire_latest_known_objects.clear();
 
-    if (!ENABLE_VISIBILITY_EMPIRE_MEMORY)
+    if constexpr (!ENABLE_VISIBILITY_EMPIRE_MEMORY)
         return;
 
     if (encoding_empire == ALL_EMPIRES) {

@@ -586,7 +586,7 @@ void ServerApp::NewMPGameInit(const MultiplayerLobbyData& multiplayer_lobby_data
                 {
                     PlayerSetupData new_psd = psd;
                     new_psd.player_id = player_id;
-                    psds.emplace_back(std::move(new_psd));
+                    psds.push_back(std::move(new_psd));
                     found_matched_id_connection = true;
                     break;
                 }
@@ -620,7 +620,7 @@ void ServerApp::NewMPGameInit(const MultiplayerLobbyData& multiplayer_lobby_data
                     int player_id = player_connection->PlayerID();
                     PlayerSetupData new_psd = psd;
                     new_psd.player_id = player_id;
-                    psds.emplace_back(std::move(new_psd));
+                    psds.push_back(std::move(new_psd));
                     found_matched_name_connection = true;
                     break;
                 }
@@ -1926,12 +1926,13 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
         return ALL_EMPIRES;
     }
 
+    int previous_player_id = EmpirePlayerID(empire_id);
+
     // make a link to new connection
     m_player_empire_ids[player_connection->PlayerID()] = empire_id;
     empire->SetAuthenticated(player_connection->IsAuthenticated());
 
     // drop previous connection to that empire
-    int previous_player_id = EmpirePlayerID(empire_id);
     if (previous_player_id != Networking::INVALID_PLAYER_ID) {
         WarnLogger() << "ServerApp::AddPlayerIntoGame empire " << empire_id
                      << " previous player " << previous_player_id

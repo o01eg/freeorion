@@ -33,8 +33,6 @@ namespace {
 
 using boost::io::str;
 
-FO_COMMON_API extern const int INVALID_DESIGN_ID;
-
 #define CHECK_COND_VREF_MEMBER(m_ptr) { if (m_ptr == rhs_.m_ptr) {              \
                                             /* check next member */             \
                                         } else if (!m_ptr || !rhs_.m_ptr) {     \
@@ -453,7 +451,7 @@ unsigned int Effect::GetCheckSum() const {
 // NoOp                                                  //
 ///////////////////////////////////////////////////////////
 void NoOp::Execute(ScriptingContext& context) const
-{}
+{ TraceLogger() << "Effect::NoOp::Execute: src: " << context.source << "  tgt: " << context.effect_target; }
 
 std::string NoOp::Dump(unsigned short ntabs) const
 { return DumpIndent(ntabs) + "NoOp\n"; }

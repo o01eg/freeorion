@@ -6,7 +6,7 @@ Species
     CanProduceShips
     CanColonize
 
-    tags = [ "ORGANIC" "TELEPATHIC" "BAD_INDUSTRY" "AVERAGE_SUPPLY" "BAD_ATTACKTROOPS" "PEDIA_ORGANIC_SPECIES_CLASS" ]
+    tags = [ "ORGANIC" "TELEPATHIC" "ARTISTIC" "BAD_INDUSTRY" "AVERAGE_SUPPLY" "BAD_ATTACKTROOPS" "PEDIA_ORGANIC_SPECIES_CLASS" ]
 
     foci = [
         [[HAS_INDUSTRY_FOCUS]]
@@ -17,7 +17,7 @@ Species
     ]
 
     defaultfocus = "FOCUS_RESEARCH"
-    likes = ["FOCUS_RESEARCH"]
+    likes = ["FOCUS_RESEARCH" "FRACTAL_GEODES_SPECIAL" "MIMETIC_ALLOY_SPECIAL"]
 
     effectsgroups = [
         [[BAD_INDUSTRY]]

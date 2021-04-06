@@ -2,7 +2,7 @@ Special
     name = "ECCENTRIC_ORBIT_SPECIAL"
     description = "ECCENTRIC_ORBIT_SPECIAL_DESC"
     stealth = 0
-    spawnrate = 1.0
+    spawnrate = 0.2
     spawnlimit = 9999
     location = And [
         Planet
@@ -12,7 +12,10 @@ Special
     effectsgroups =
         EffectsGroup
             scope = Source
-            activation = Not Population high = 0
+            activation = And [
+                Not Population high = 0
+                Happiness low = 12
+            ]
             priority = [[TARGET_AFTER_SCALING_PRIORITY]]
             effects = [
                 SetTargetResearch value = Value + (NamedReal name = "ECCENTRIC_ORBIT_TARGET_RESEARCH_FLAT" value = 3)

@@ -38,8 +38,8 @@ namespace {
     { db.Add("ui." + PROD_PEDIA_WND_NAME + ".hidden.enabled", UserStringNop("OPTIONS_DB_PRODUCTION_PEDIA_HIDDEN"), false); }
     bool temp_bool = RegisterOptions(&AddOptions);
 
-    const int MAX_PRODUCTION_TURNS = 200;
-    const float EPSILON = 0.001f;
+    constexpr int MAX_PRODUCTION_TURNS = 200;
+    constexpr float EPSILON = 0.001f;
 
     int ProductionTurns(float total_cost, int minimum_production_time, float local_pp_output,
                         float stockpile, float stockpile_limit_per_turn)
@@ -998,7 +998,7 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
             auto item_row = GG::Wnd::Create<ProductionItemRow>(
                 row_size.x, row_size.y, ProductionQueue::ProductionItem(BuildType::BT_BUILDING, name),
                 m_empire_id, m_production_location);
-            rows.emplace_back(std::move(item_row));
+            rows.push_back(std::move(item_row));
         }
         m_buildable_items->Insert(std::move(rows));
     }
@@ -1031,7 +1031,7 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
                 row_size.x, row_size.y, 
                 ProductionQueue::ProductionItem(BuildType::BT_SHIP, ship_design_id),
                 m_empire_id, m_production_location);
-            rows.emplace_back(std::move(item_row));
+            rows.push_back(std::move(item_row));
         }
         m_buildable_items->Insert(std::move(rows));
     }

@@ -7,7 +7,7 @@ Species
     CanProduceShips
     CanColonize
 
-    tags = [ "ORGANIC" "GREAT_RESEARCH" "GOOD_POPULATION" "BAD_SUPPLY" "PEDIA_ORGANIC_SPECIES_CLASS" ]
+    tags = [ "ORGANIC" "ARTISTIC" "GREAT_RESEARCH" "GOOD_POPULATION" "BAD_SUPPLY" "PEDIA_ORGANIC_SPECIES_CLASS" ]
 
     foci = [
         [[HAS_INDUSTRY_FOCUS]]
@@ -18,7 +18,7 @@ Species
     ]
 
     defaultfocus = "FOCUS_RESEARCH"
-    likes = ["FOCUS_RESEARCH"]
+    likes = ["FOCUS_RESEARCH" "SHIMMER_SILK_SPECIAL" "FRACTAL_GEODES_SPECIAL" ]
 
     effectsgroups = [
         [[AVERAGE_INDUSTRY]]

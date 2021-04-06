@@ -1246,6 +1246,14 @@ RULE_UNSEEN_STEALTHY_PLANETS_INVISIBLE_DESC
 
 <u>If Off</u>: Planets that have more stealth than an empire's detection strength are detectable by that empire if the empire owns another object in the same system.'''
 
+RULE_BASIC_VIS_SYSTEM_INFO_SHOWN
+Basic System Info Visible
+
+RULE_BASIC_VIS_SYSTEM_INFO_SHOWN_DESC
+'''<u>If On</u>: Systems that are detected by an empire at only basic visibility have their name and star type revealed to that empire.
+
+<u>If Off</u>: Basic level visible systems that have never been detected at higher visiblity have unknown name and star type.'''
+
 RULE_HABITABLE_SIZE_TINY
 Tiny planets Habitable size
 
@@ -1501,7 +1509,7 @@ OPTIONS_DB_PUBLISH_SEED
 Enable sending galaxy seed to the player.
 
 OPTIONS_DB_FIRST_TURN_TIME
-Absolute time point in format "2019-01-20 11:59:59" in UTC. If empty, first turn advance will happen after expiring interval. Requires fixed interval to be enabled.
+Absolute time point in format "2019-01-20 11:59:59" in UTC. If empty, first turn advance will happen after expiring interval.
 
 OPTIONS_DB_TIMEOUT_INTERVAL
 Maximum interval in seconds between turn automatic advances. If 0, turn advances by timeout are disabled, and turns will only advance once all players have ended their turn. Automatic turn advance is also disabled after any player has won the game.
@@ -4901,11 +4909,17 @@ Production Output
 RP_OUTPUT
 Research Output
 
+IP_OUTPUT
+Net Influence Output
+
 PLANET_COUNT
 Planets
 
 COLONIES_COUNT
 Colonies
+
+POLICIES_ADOPTED
+Policies Adopted
 
 BATTLESHIP_COUNT
 Armed Ships
@@ -5483,10 +5497,12 @@ ENC_TECH_DETAIL_UNLOCKED_ITEM_STR
 '''
 
 # %1% category of the technology.
-# %2% UNUSED
-# %3% short description of the technology.
 ENC_TECH_DETAIL_TYPE_STR
-%3%
+%1% Tech -
+
+# %1% category of the policy.
+ENC_POLICY_DETAIL_TYPE_STR
+%1% Policy -
 
 # %1% object, technology or other content that should be looked up in the
 #     encyclopedia.
@@ -8324,7 +8340,7 @@ Industrious Flying Monkeys.
 
 SP_PHINNERT_DESC
 '''Description:
-Phinnerts are tree-dwelling mammals with size varying from 1 to 2 meters tall. They have long arms, with a wingspan of about twice their height. They have hairy, retractable flaps of skin that stretch from wrist to ankle and allow for fully functional flight in low gravity. They are very agile fliers and can catch flying bug-like creatures with a fully prehensile nose appendage. Like bats they can use echo-location, this sense is not highly developed though.
+Phinnerts are tree-dwelling mammals with size varying from 1 to 2 meters tall. They have long arms, with a wingspan of about twice their height. They have hairy, retractable flaps of skin that stretch from wrist to ankle and allow for fully functional flight in low gravity. They are very agile fliers and can catch flying bug-like creatures with a fully prehensile nose appendage. Like bats they can use echo-location, although this sense is not highly developed.
 
 Social Structure:
 Life is much shorter for Phinnerts than for most other sentient life, owing to the many dangers of the swamp. All Phinnerts are generally treated as extended family by each other and grudges do not last long. There is no central authority, there's only a vague hierarchy. The balance of power can change very quickly with the high mortality rate. Society is far less individualistic, and more focused on the group.
@@ -8345,7 +8361,7 @@ Prefer [[PT_RADIATED]] planets.
 
 SP_REPLICON_DESC
 '''Description:
-The Replicons look like a 3m tall robotic spider with wings. The wings are actually highly efficient solar panels that fold out to a relatively large area, the 'abdomen' is actually the 'industrial processing center' where replacement parts and new Replicons are forged.
+The Replicons look like a 3 m tall robotic spider with wings. The wings are actually highly efficient solar panels that fold out to a relatively large area, the 'abdomen' is actually the 'industrial processing center' where replacement parts and new Replicons are forged.
 
 Social Structure:
 Replicons have a relatively primitive social structure. They have a planetary government, because a few feudal lords discovered space travel as a convenient way of attacking people really far away. Their government is effectively feudal, due to some unusual effects that allowed them to reach space flight before achieving the nationstate/industrial revolution stage of development. Because of the wide variety of self-replicating machines on Cisarruj, most needs that are met by industry on other worlds are met by 'agriculture' or 'breeding' by Replicons. They end up without any actual 'Industrial Base' or even much of an understanding of technology other than what various 'natural' parts and products can be used for. This means that their society is highly illiterate, most people passing on knowledge that their pappies taught them on how to skin a "creature's" titanium coat, just enough so that it could grow it back or how much uranium ore to feed a reprocessing reactor if it was giving bad aluminum. Most things that normal 'developed' societies would expect are only present in the lord's estates, the remainder of society looks like something out of a post-apocalyptic novel.
@@ -9202,6 +9218,51 @@ Native Elerium
 
 ELERIUM_SPECIAL_DESC
 This planet has a rich natural deposit of pure elerium, boosting production or Lithic growth significantly.
+
+SUCCULENT_BARNACLES_SPECIAL
+Succulent Barnacles
+
+SUCCULENT_BARNACLES_SPECIAL_DESC
+The planet hosts a colony of succulent barnacles that can be harvested and exported.
+
+SUCCULENT_BARNACLES_SPECIAL_IMPORTS
+Imported [[SUCCULENT_BARNACLES_SPECIAL]]
+
+FRACTAL_GEODES_SPECIAL
+Fractal Geodes
+
+FRACTAL_GEODES_SPECIAL_DESC
+The planet is scattered with irridescent fractal geodes that can be collected and exported.
+
+FRACTAL_GEODES_SPECIAL_IMPORTS
+Imported [[FRACTAL_GEODES_SPECIAL]]
+
+SHIMMER_SILK_SPECIAL
+Shimmer Silk
+
+SHIMMER_SILK_SPECIAL_SPECIAL_DESC
+This planet extrudes sheets of delicate and shimmering silk-like material that can be collected and exported.
+
+SHIMMER_SILK_SPECIAL_IMPORTS
+Imported [[SHIMMER_SILK_SPECIAL]]
+
+SPARK_FOSSILS_SPECIAL
+Spark Fossils
+
+SPARK_FOSSILS_SPECIAL_DESC
+This planet's outer crust is spotted with clear crystal fossilized creatures that sparkle with electric discharges when touched, and which can be extracted and exported.
+
+SPARK_FOSSILS_SPECIAL_IMPORTS
+Imported [[SPARK_FOSSILS_SPECIAL]]
+
+MIMETIC_ALLOY_SPECIAL
+Mimetic Alloy
+
+MIMETIC_ALLOY_SPECIAL_DESC
+This planet has pools of mimetic alloy on its surface, which morphs to resemble the shape of an object placed nearby, and which may be bottled and exported.
+
+MIMETIC_ALLOY_SPECIAL_IMPORTS
+Imported [[MIMETIC_ALLOY_SPECIAL]]
 
 
 ##
@@ -11615,6 +11676,24 @@ Increases [[metertype METER_TARGET_CONSTRUCTION]] by 5 on populated planets that
 
 PLC_INTERSTELLAR_INFRA_SHORT_DESC
 Grants policy slots
+
+PLC_CAPITAL_MARKETS
+Capital Markets
+
+PLC_CAPITAL_MARKETS_DESC
+Planets with a luxury resource special and that is set to influence focus will export the resource to supply-connected planets, boosting the stability of planets with species that like the resource.
+
+PLC_CAPITAL_MARKETS_SHORT_DESC
+Boosts stability with resource export
+
+PLC_ARTISAN_WORKSHOPS
+Artisan Workshops
+
+PLC_ARTISAN_WORKSHOPS_DESC
+Planets with [[ARTISTIC]] species that are set to influence focus will generate influence and will export aesthetically pleasing crafts to planets in their system, boosting the stability of those planets.
+
+PLC_ARTISAN_WORKSHOPS_SHORT_DESC
+Artistic species produce luxuries
 
 
 ##
@@ -16058,6 +16137,9 @@ Homeworld Independence Movement
 CAPITAL_DISCONNECTION_LABEL
 Not Connected to Empire Capital
 
+ARTISAN_APPRECIATION
+Likes Influence-Focused Artistic Species In System
+
 # %1% name of empire
 # %2% name of policy
 LIKES_POLICY_LABEL
@@ -16079,14 +16161,29 @@ DISLIKES_BUILDING_LABEL
 Dislikes %1% building %2%
 
 # %1% name of planet
-# %2% name of species on planet
+# %2% name of species on planet (not the focus!)
 LIKES_FOCUS_LABEL
 Likes %1% focus
 
 # %1% name of planet
-# %2% name of species on planet
+# %2% name of species on planet (not the focus!)
 DISLIKES_FOCUS_LABEL
 Dislikes %1% focus
+
+# %1% name of planet
+# %2% name of special
+LIKES_SPECIAL_LABEL
+Likes %1% %2%
+
+# %1% name of planet
+# %2% name of special
+DISLIKES_SPECIAL_LABEL
+Dislikes %1% %2%
+
+# %1% name of planet
+# %2% name of species on planet
+FOCUS_PROTECTION_LABEL
+%2% Protection Focus
 
 # %1% FIXME
 STANDARD_CONSTRUCTION_LABEL
@@ -16467,9 +16564,6 @@ Good Vision
 EXCELLENT_VISION_LABEL
 Excellent Vision
 
-FOCUS_PROTECTION_LABEL
-Protection Focus
-
 GASEOUS_LABEL
 Gas Giant Environment
 
@@ -16586,6 +16680,9 @@ Antiquated
 
 STYLISH
 Stylish
+
+ARTISTIC
+Artistic
 
 ORGANIC
 Organic
@@ -20456,5 +20553,5 @@ MONSTER_NAMES
 [[SHIP_NAME_UNSORTED_MYTHOLOGY]]
 [[SHIP_NAME_DEVS]]'''
 
-#include "../content_specific_parameters.txt"
-#include "../customizations/common_user_customizations.txt"
+#include "content_specific_parameters.txt"
+#include "common_user_customizations.txt"

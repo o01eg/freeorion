@@ -231,6 +231,9 @@ find_package(Threads)
 find_package(PythonInterp ${MINIMUM_PYTHON_VERSION} REQUIRED)
 if(BUILD_AI OR BUILD_SERVER)
     find_package(PythonLibs ${MINIMUM_PYTHON_VERSION} REQUIRED)
+    message(STATUS "Python library version detected ${PYTHONLIBS_VERSION_STRING}")
+    string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\..*" "\\1\\2" Boost_PYTHON_SUFFIX "${PYTHONLIBS_VERSION_STRING}")
+    message(STATUS "Boost python version ${Boost_PYTHON_SUFFIX}")
 endif()
 find_package(Boost ${MINIMUM_BOOST_VERSION}
     COMPONENTS
@@ -245,8 +248,12 @@ find_package(Boost ${MINIMUM_BOOST_VERSION}
     REQUIRED)
 
 if(BUILD_AI OR BUILD_SERVER)
-    find_package(Boost COMPONENTS python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR} REQUIRED)
-    set(Boost_PYTHON_SUFFIX "${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}")
+    find_package(Boost OPTIONAL_COMPONENTS python${Boost_PYTHON_SUFFIX})
+    if(NOT Boost_PYTHON${Boost_PYTHON_SUFFIX}_FOUND)
+        # try some strange boost installations
+        string(SUBSTRING "${Boost_PYTHON_SUFFIX}" 0 1 Boost_PYTHON_SUFFIX)
+        find_package(Boost COMPONENTS python${Boost_PYTHON_SUFFIX} REQUIRED)
+    endif()
 endif()
 
 find_package(ZLIB REQUIRED)
@@ -270,6 +277,8 @@ if(ANDROID)
     find_library(ICUUC_LIBRARY icuuc) # Symbol _ZN6icu_6213UnicodeStringD1Ev
     find_library(ICUDATA_LIBRARY icudata) # Symbol icudt62_dat
     find_library(ICONV_LIBRARY iconv) # Symbol libiconv_open
+    find_library(ANDROID_LIBRARY android) # Asset Manager
+    find_library(LOG_LIBRARY log) # Android logging
 endif()
 
 if(BUILD_TESTING)
@@ -321,6 +330,7 @@ add_custom_target(freeorionversion
     "${CMAKE_SOURCE_DIR}/cmake/make_versioncpp.py"
     "${CMAKE_SOURCE_DIR}"
     "CMake"
+    "${Boost_PYTHON_SUFFIX}"
 )
 
 set_source_files_properties(
@@ -389,6 +399,8 @@ target_link_libraries(freeorioncommon
         ${ICUI18N_LIBRARY}
         ${ICUUC_LIBRARY}
         ${ICUDATA_LIBRARY}
+        ${ANDROID_LIBRARY}
+        ${LOG_LIBRARY}
     PRIVATE
         ${CORE_FOUNDATION_LIBRARY}
 )

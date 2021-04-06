@@ -103,7 +103,7 @@ void Check(Pt ul, Pt lr, Clr color1, Clr color2, Clr color3)
                           { 0.8f, -0.4f}, { 0.6f, -0.4f}, { 0.8f, -0.8f}};
 
     glPushMatrix();
-    const float sf = 1.25f;                                                     // scale factor to make the check look right
+    constexpr float sf = 1.25f;                                                 // scale factor to make the check look right
     glTranslatef(Value(ul.x + wd / 2.0f), Value(ul.y + ht / 2.0f * sf), 0.0f);  // move origin to the center of the rectangle
     glScalef(Value(wd / 2.0f * sf), Value(ht / 2.0f * sf), 1.0f);               // map the range [-1,1] to the rectangle in both directions
 
@@ -156,7 +156,7 @@ void XMark(Pt ul, Pt lr, Clr color1, Clr color2, Clr color3)
                           { 0.0f, -0.2f}, { 0.0f,  0.0f}};
 
     glPushMatrix();
-    const float sf = 1.75f;                                                 // scale factor; the check wasn't the right size as drawn originally
+    constexpr float sf = 1.75f;                                             // scale factor; the check wasn't the right size as drawn originally
     glTranslatef(Value(ul.x + wd / 2.0f), Value(ul.y + ht / 2.0f), 0.0f);   // move origin to the center of the rectangle
     glScalef(Value(wd / 2.0f * sf), Value(ht / 2.0f * sf), 1.0f);           // map the range [-1,1] to the rectangle in both directions
 
@@ -545,7 +545,7 @@ void glColor(const Clr& clr)
 Clr GG::DisabledColor(Clr clr)
 {
     Clr retval = clr;
-    const double gray_factor = 0.75; // amount to move clr in the direction of gray
+    constexpr double gray_factor = 0.75; // amount to move clr in the direction of gray
     retval.r = static_cast<int>(retval.r + (CLR_GRAY.r - retval.r) * gray_factor);
     retval.g = static_cast<int>(retval.g + (CLR_GRAY.g - retval.g) * gray_factor);
     retval.b = static_cast<int>(retval.b + (CLR_GRAY.b - retval.b) * gray_factor);

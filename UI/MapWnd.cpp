@@ -355,7 +355,7 @@ namespace {
 
         void Render() override {
             const GG::Y row_height{ClientUI::Pts() + (m_margin * 2)};
-            const GG::Y offset{32};
+            constexpr GG::Y offset{32};
             const GG::Clr& BG_CLR = ClientUI::WndColor();
             const GG::Clr& BORDER_CLR = ClientUI::WndOuterBorderColor();
             const GG::Pt& UL = GG::Pt(UpperLeft().x, UpperLeft().y + offset);
@@ -1360,8 +1360,8 @@ void MapWnd::CompleteConstruction() {
     m_scale_line->Hide();
 
     // Zoom slider
-    const int ZOOM_SLIDER_MIN = static_cast<int>(ZOOM_IN_MIN_STEPS),
-              ZOOM_SLIDER_MAX = static_cast<int>(ZOOM_IN_MAX_STEPS);
+    constexpr int ZOOM_SLIDER_MIN = static_cast<int>(ZOOM_IN_MIN_STEPS),
+                  ZOOM_SLIDER_MAX = static_cast<int>(ZOOM_IN_MAX_STEPS);
     m_zoom_slider = GG::Wnd::Create<CUISlider<double>>(ZOOM_SLIDER_MIN, ZOOM_SLIDER_MAX,
                                                        GG::Orientation::VERTICAL,
                                                        GG::INTERACTIVE | GG::ONTOP);
@@ -1578,8 +1578,8 @@ void MapWnd::InitializeWindows() {
     const GG::Pt moderator_wh(SITREP_PANEL_WIDTH, SITREP_PANEL_HEIGHT);
 
     // Combat report
-    const GG::Pt combat_log_ul(GG::X(150), GG::Y(50));
-    const GG::Pt combat_log_wh(GG::X(400), GG::Y(300));
+    constexpr GG::Pt combat_log_ul(GG::X(150), GG::Y(50));
+    constexpr GG::Pt combat_log_wh(GG::X(400), GG::Y(300));
 
     // government window
     const GG::Pt gov_ul(GG::X0, m_scale_line->Bottom() + m_scale_line->Height() + GG::Y(LAYOUT_MARGIN*2));
@@ -2142,7 +2142,7 @@ void MapWnd::RenderStarlanes(GG::GL2DVertexBuffer& vertices, GG::GLRGBAColorBuff
 namespace {
     GG::GL2DVertexBuffer dot_vertices_buffer;
     GG::GLTexCoordBuffer dot_star_texture_coords;
-    const unsigned int BUFFER_CAPACITY(512);    // should be long enough for most plausible fleet move lines
+    constexpr unsigned int BUFFER_CAPACITY(512); // should be long enough for most plausible fleet move lines
 
     std::shared_ptr<GG::Texture> MoveLineDotTexture() {
         auto retval = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "move_line_dot.png");
@@ -2314,7 +2314,7 @@ void MapWnd::RenderMovementLineETAIndicators(const MapWnd::MovementLineData& mov
         return; // nothing to draw.
 
 
-    const double MARKER_HALF_SIZE = 9;
+    constexpr double MARKER_HALF_SIZE = 9;
     const int MARKER_PTS = ClientUI::Pts();
     auto font = ClientUI::GetBoldFont(MARKER_PTS);
     auto flags = GG::FORMAT_CENTER | GG::FORMAT_VCENTER;
@@ -4065,7 +4065,7 @@ void MapWnd::InitVisibilityRadiiRenderingBuffers() {
     }
 
 
-    const GG::Pt BORDER_INSET(GG::X(1.0f), GG::Y(1.0f));
+    constexpr GG::Pt BORDER_INSET(GG::X(1.0f), GG::Y(1.0f));
 
     // loop over colours / empires, adding a batch of triangles to buffers for
     // each's visibilty circles and outlines
@@ -5104,10 +5104,10 @@ int MapWnd::SystemIconSize() const
 { return static_cast<int>(ClientUI::SystemIconSize() * ZoomFactor()); }
 
 int MapWnd::SystemNamePts() const {
-    const int       SYSTEM_NAME_MINIMUM_PTS = 6;    // limit to absolute minimum point size
-    const double    MAX_NAME_ZOOM_FACTOR = 1.5;     // limit to relative max above standard UI font size
-    const double    NAME_ZOOM_FACTOR = std::min(MAX_NAME_ZOOM_FACTOR, ZoomFactor());
-    const int       ZOOMED_PTS = static_cast<int>(ClientUI::Pts() * NAME_ZOOM_FACTOR);
+    constexpr int    SYSTEM_NAME_MINIMUM_PTS = 6;    // limit to absolute minimum point size
+    constexpr double MAX_NAME_ZOOM_FACTOR = 1.5;     // limit to relative max above standard UI font size
+    const double     NAME_ZOOM_FACTOR = std::min(MAX_NAME_ZOOM_FACTOR, ZoomFactor());
+    const int        ZOOMED_PTS = static_cast<int>(ClientUI::Pts() * NAME_ZOOM_FACTOR);
     return std::max(ZOOMED_PTS, SYSTEM_NAME_MINIMUM_PTS);
 }
 

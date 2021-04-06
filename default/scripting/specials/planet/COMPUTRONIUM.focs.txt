@@ -2,7 +2,7 @@ Special
     name = "COMPUTRONIUM_SPECIAL"
     description = "COMPUTRONIUM_SPECIAL_DESC"
     stealth = 0
-    spawnrate = 1.0
+    spawnrate = 0.2
     spawnlimit = 9999
     location = And [
         Planet
@@ -25,6 +25,7 @@ Special
                 Planet
                 Focus type = "FOCUS_RESEARCH"
                 OwnedBy empire = Source.Owner
+                Happiness low = 18
             ]
             activation = Focus type = "FOCUS_RESEARCH"
             stackinggroup = "COMPUTRONIUM_STACK"

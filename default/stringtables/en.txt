@@ -1427,6 +1427,9 @@ Toggles whether to show the zoom slider on galaxy map.
 OPTIONS_DB_UI_GALAXY_MAP_POPUP
 Toggles whether to show a right-click popup menu on the galaxy map.
 
+OPTIONS_DB_UI_GALAXY_MAP_LOCK
+Toggles whether galaxy map scrolling and zooming are disabled.
+
 OPTIONS_DB_UI_HIDE_MAP_PANELS
 Toggles whether the sitrep, pedia etc. panels are temporarily hidden when opening the production window and reopened when closing the production window.
 
@@ -3022,6 +3025,9 @@ Galaxy map pop-up menu
 
 OPTIONS_UI_HIDE_MAP_PANELS
 Hide map panels in production view
+
+OPTIONS_UI_LOCK_MAP
+Lock map zoom and panning
 
 OPTIONS_STARLANES
 Starlanes
@@ -5094,6 +5100,12 @@ Special
 OBJECTS_WITH_SPECIAL
 '''Objects with Special: '''
 
+SPECIES_THAT_LIKE
+'''Species that like: '''
+
+SPECIES_THAT_DISLIKE
+'''Species that dislike: '''
+
 ENC_BUILDING_TYPE
 Building Type
 
@@ -6387,6 +6399,12 @@ XENOPHOBIC_SPECIES_TEXT
 
 Xenophobic species start with [[tech CON_CONC_CAMP]].'''
 
+ARTISTIC_SPECIES_TITLE
+Artistic Trait
+
+ARTISTIC_SPECIES_TRAIT_TEXT
+Artistic species produce artistic works when their empire has adopted [[policy PLC_ARTISAN_WORKSHOPS]], which generates influence. Additionally, when set to influence focus, other planets with artistic species in the same system are more stable.
+
 FLEET_UPKEEP_TITLE
 Fleet Upkeep
 
@@ -7270,6 +7288,12 @@ SITREP_PLANET_CAPTURED
 SITREP_PLANET_CAPTURED_LABEL
 Planet Captured
 
+SITREP_PLANET_CAPTURED_NEUTRALS
+%planet% became indepdent from %empire%
+
+SITREP_PLANET_CAPTURED_NEUTRALS_LABEL
+Planet Becomes Independent
+
 SITREP_PLANET_DEPOPULATED
 The population of %planet% has died out entirely!
 
@@ -7302,6 +7326,12 @@ Outpost on %planet% was abandoned.  %rawtext%.
 
 SITREP_OUTPOST_ABADONED_LABEL
 Outpost Abandoned
+
+SITREP_COLONY_INDEPENDENT
+On %planet%: The %species% colony became independent.
+
+SITREP_COLONY_INDEPENDENT_LABEL
+Colony Independence
 
 SITREP_NEW_COLONY_ESTABLISHED
 On %planet%: A new %species% colony has been established.
@@ -8862,6 +8892,30 @@ SP_SUPER_TEST_DESC
 ##
 ## Specials
 ##
+
+INDEPENDENT_COLONY_SHIELD_SPECIAL
+Independent Planetary Shield
+
+INDEPENDENT_COLONY_SHIELD_SPECIAL_DESC
+This ensures that the [[metertype METER_MAX_SHIELD]] of this planet is at least as high as the special's capacity as long as the planet is independent and populated. Gets removed on invasion or depopulation.
+
+INDEPENDENT_COLONY_DEFENSE_SPECIAL
+Independent Planetary Defense
+
+INDEPENDENT_COLONY_DEFENSE_SPECIAL_DESC
+This ensures that the [[metertype METER_MAX_DEFENSE]] of this planet is at least as high as the special's capacity as long as the planet is independent and populated. Gets removed on invasion or depopulation.
+
+INDEPENDENT_COLONY_TROOPS_SPECIAL
+Independent Planetary Troops
+
+INDEPENDENT_COLONY_TROOPS_SPECIAL_DESC
+This ensures that the [[metertype METER_MAX_TROOPS]] of this planet is at least as high as the special's capacity as long as the planet is independent and populated. Gets removed on invasion or depopulation.
+
+INDEPENDENT_COLONY_POPULATION_SPECIAL
+Independent Population
+
+INDEPENDENT_COLONY_POPULATION_SPECIAL_DESC
+This ensures that the [[metertype METER_TARGET_POPULATION]] of this planet is at least as high as the special's capacity as long as the planet is independent and populated. Gets removed on invasion or depopulation.
 
 MODERATE_TECH_NATIVES_SPECIAL
 Moderate Tech Natives
@@ -13575,6 +13629,12 @@ Evacuate Planet
 BLD_EVACUATION_DESC
 Remove [[metertype METER_POPULATION]] from this planet over several turns according to an [[encyclopedia EVACUATION_TITLE]]. If a suitable alternate planets are available, with the same species and sufficient extra capacity, Population will move there.
 
+BLD_COLONY_INDEPENDENCE_DECREE
+Planet Independence Decree
+
+BLD_COLONY_INDEPENDENCE_DECREE_DESC
+Grant freedom to the colony on this planet. The independent colony retains its old [[metertype METER_TARGET_POPULATION]], [[metertype METER_MAX_SHIELD]], [[metertype METER_MAX_DEFENSE]] and [[metertype METER_MAX_TROOPS]]. The building gets used up in the process.
+
 BLD_ABANDON_OUTPOST
 Abandon Outpost
 
@@ -16233,6 +16293,16 @@ Tidally Locked Rotation
 
 HOMEWORLD_LABEL
 Homeworld
+
+# %1% name of planet
+# %2% name of species on planet
+INSTABILITY_REBELLION
+Rioting from %1% Instability
+
+# %1% name of planet
+# %2% name of species on planet
+PARTISANS_REBELLION
+%2% Partisans from Influence Debt
 
 # %1% FIXME
 # %2% FIXME

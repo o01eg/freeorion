@@ -1359,6 +1359,20 @@ namespace {
                 detailed_description += LinkTaggedText(VarText::POLICY_TAG, policy_name) + "  ";
         }
 
+        // species that like / dislike part
+        auto species_that_like = GetSpeciesManager().SpeciesThatLike(item_name);
+        auto species_that_dislike = GetSpeciesManager().SpeciesThatDislike(item_name);
+        if (!species_that_like.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_LIKE");
+            for (auto& name : species_that_like)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+        if (!species_that_dislike.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_DISLIKE");
+            for (auto& name : species_that_dislike)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+
         if (GetOptionsDB().Get<bool>("resource.effects.description.shown")) {
             detailed_description += "\n\n";
             if (part->Location())
@@ -1441,6 +1455,20 @@ namespace {
             detailed_description += "\n\n" + UserString("ENC_UNLOCKED_BY");
             for (const auto& policy_name : unlocked_by_policies)
                 detailed_description += LinkTaggedText(VarText::POLICY_TAG, policy_name) + "  ";
+        }
+
+        // species that like / dislike hull
+        auto species_that_like = GetSpeciesManager().SpeciesThatLike(item_name);
+        auto species_that_dislike = GetSpeciesManager().SpeciesThatDislike(item_name);
+        if (!species_that_like.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_LIKE");
+            for (auto& name : species_that_like)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+        if (!species_that_dislike.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_DISLIKE");
+            for (auto& name : species_that_dislike)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
         }
 
         if (GetOptionsDB().Get<bool>("resource.effects.description.shown")) {
@@ -1609,6 +1637,20 @@ namespace {
                 detailed_description += LinkTaggedText(VarText::POLICY_TAG, policy_name) + "  ";
         }
 
+        // species that like / dislike policy
+        auto species_that_like = GetSpeciesManager().SpeciesThatLike(item_name);
+        auto species_that_dislike = GetSpeciesManager().SpeciesThatDislike(item_name);
+        if (!species_that_like.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_LIKE");
+            for (auto& name : species_that_like)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+        if (!species_that_dislike.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_DISLIKE");
+            for (auto& name : species_that_dislike)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+
         if (GetOptionsDB().Get<bool>("resource.effects.description.shown") &&
             !policy->Effects().empty())
         { detailed_description += "\n\n" + Dump(policy->Effects()); }
@@ -1673,6 +1715,20 @@ namespace {
                 detailed_description += LinkTaggedText(VarText::POLICY_TAG, policy_name) + "  ";
         }
 
+        // species that like / dislike building type
+        auto species_that_like = GetSpeciesManager().SpeciesThatLike(item_name);
+        auto species_that_dislike = GetSpeciesManager().SpeciesThatDislike(item_name);
+        if (!species_that_like.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_LIKE");
+            for (auto& name : species_that_like)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+        if (!species_that_dislike.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_DISLIKE");
+            for (auto& name : species_that_dislike)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+
         if (GetOptionsDB().Get<bool>("resource.effects.description.shown")) {
             if (!building_type->ProductionCostTimeLocationInvariant()) {
                 auto& cost_template{UserString("PRODUCTION_WND_TOOLTIP_PROD_COST")};
@@ -1719,6 +1775,7 @@ namespace {
             general_type = UserString("ENC_SPECIAL");
         }
 
+
         // objects that have special
         std::vector<std::shared_ptr<const UniverseObject>> objects_with_special;
         objects_with_special.reserve(objects.size());
@@ -1748,6 +1805,22 @@ namespace {
             }
             detailed_description += "\n";
         }
+
+
+        // species that like / dislike special
+        auto species_that_like = GetSpeciesManager().SpeciesThatLike(item_name);
+        auto species_that_dislike = GetSpeciesManager().SpeciesThatDislike(item_name);
+        if (!species_that_like.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_LIKE");
+            for (auto& name : species_that_like)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+        if (!species_that_dislike.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_DISLIKE");
+            for (auto& name : species_that_dislike)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+
 
         if (GetOptionsDB().Get<bool>("resource.effects.description.shown")) {
             if (special->Location())
@@ -2288,6 +2361,20 @@ namespace {
             }
         }
 
+        // species that like / dislike other species
+        auto species_that_like = GetSpeciesManager().SpeciesThatLike(item_name);
+        auto species_that_dislike = GetSpeciesManager().SpeciesThatDislike(item_name);
+        if (!species_that_like.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_LIKE");
+            for (auto& name : species_that_like)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+        if (!species_that_dislike.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_DISLIKE");
+            for (auto& name : species_that_dislike)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+
         // Long description
         detailed_description += "\n" + UserString(species->Description());
 
@@ -2317,6 +2404,22 @@ namespace {
         }
 
         detailed_description += UserString(field_type->Description());
+
+
+        // species that like / dislike field
+        auto species_that_like = GetSpeciesManager().SpeciesThatLike(item_name);
+        auto species_that_dislike = GetSpeciesManager().SpeciesThatDislike(item_name);
+        if (!species_that_like.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_LIKE");
+            for (auto& name : species_that_like)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+        if (!species_that_dislike.empty()) {
+            detailed_description += "\n\n" + UserString("SPECIES_THAT_DISLIKE");
+            for (auto& name : species_that_dislike)
+                detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
+        }
+
 
         if (GetOptionsDB().Get<bool>("resource.effects.description.shown")) {
             if (!field_type->Effects().empty())

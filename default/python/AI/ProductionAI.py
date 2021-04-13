@@ -1128,15 +1128,6 @@ def generate_production_orders():
     debug("  Wasted Production Points: %s", wasted_pp)  # TODO: add resource group analysis
     avail_pp = total_pp - total_pp_spent - 0.0001
 
-    debug('')
-    if False:
-        debug("Possible ship designs to build:")
-        if homeworld:
-            for ship_design_id in empire.availableShipDesigns:
-                design = fo.getShipDesign(ship_design_id)
-                debug("    %s cost: %s  time: %s", design.name, design.productionCost(empire.empireID, homeworld.id),
-                      design.productionTime(empire.empireID, homeworld.id))
-    debug('')
     production_queue = empire.productionQueue
     queued_colony_ships = {}
     queued_outpost_ships = 0
@@ -1288,7 +1279,11 @@ def generate_production_orders():
             species_map.setdefault(this_spec, []).append(loc)
         colony_build_choices = []
         for pid, (score, this_spec) in aistate.colonisablePlanetIDs.items():
-            colony_build_choices.extend(int(math.ceil(score))*[pid_ for pid_ in species_map.get(this_spec, []) if pid_ in planet_set])
+            # add planets multiple times to emulate choice with weight
+            weight = int(math.ceil(score))
+            planets_for_colonization = [pid_ for pid_ in species_map.get(this_spec, []) if pid_ in planet_set]
+            weighted_planets = weight * planets_for_colonization
+            colony_build_choices.extend(weighted_planets)
 
         local_priorities = {}
         local_priorities.update(filtered_priorities)

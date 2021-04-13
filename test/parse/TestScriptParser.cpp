@@ -20,7 +20,7 @@
 BOOST_FIXTURE_TEST_SUITE(TestScriptParser, ParserAppFixture)
 
 BOOST_AUTO_TEST_CASE(parse_game_rules) {
-    Pending::Pending<GameRules> game_rules_p = Pending::StartParsing(parse::game_rules, m_scripting_dir / "game_rules.focs.txt");
+    Pending::Pending<GameRules> game_rules_p = Pending::StartAsyncParsing(parse::game_rules, m_scripting_dir / "game_rules.focs.txt");
     auto game_rules = *Pending::WaitForPendingUnlocked(std::move(game_rules_p));
     BOOST_REQUIRE(!game_rules.Empty());
     BOOST_REQUIRE(game_rules.RuleExists("RULE_HABITABLE_SIZE_MEDIUM"));
@@ -28,7 +28,7 @@ BOOST_AUTO_TEST_CASE(parse_game_rules) {
 }
 
 BOOST_AUTO_TEST_CASE(parse_techs) {
-    Pending::Pending<TechManager::TechParseTuple> techs_p = Pending::StartParsing(parse::techs<TechManager::TechParseTuple>, m_scripting_dir / "techs");
+    Pending::Pending<TechManager::TechParseTuple> techs_p = Pending::StartAsyncParsing(parse::techs<TechManager::TechParseTuple>, m_scripting_dir / "techs");
     auto [techs, tech_categories, categories_seen] = *Pending::WaitForPendingUnlocked(std::move(techs_p));
     BOOST_REQUIRE(!techs.empty());
     BOOST_REQUIRE(!tech_categories.empty());
@@ -190,6 +190,23 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
     BOOST_REQUIRE_EQUAL(2, techs.size());
     BOOST_REQUIRE_EQUAL(9, tech_categories.size());
     BOOST_REQUIRE_EQUAL(2, categories_seen.size());
+}
+
+BOOST_AUTO_TEST_CASE(parse_techs_full) {
+    auto scripting_dir = boost::filesystem::system_complete(GetBinDir() / "default/scripting");
+    BOOST_REQUIRE(scripting_dir.is_absolute());
+    BOOST_REQUIRE(boost::filesystem::exists(scripting_dir));
+    BOOST_REQUIRE(boost::filesystem::is_directory(scripting_dir));
+
+    Pending::Pending<TechManager::TechParseTuple> techs_p = Pending::StartAsyncParsing(parse::techs<TechManager::TechParseTuple>, scripting_dir / "techs");
+    auto [techs, tech_categories, categories_seen] = *Pending::WaitForPendingUnlocked(std::move(techs_p));
+    BOOST_REQUIRE(!techs.empty());
+    BOOST_REQUIRE(!tech_categories.empty());
+    BOOST_REQUIRE(!categories_seen.empty());
+
+    BOOST_REQUIRE_EQUAL(207, techs.size());
+    BOOST_REQUIRE_EQUAL(9, tech_categories.size());
+    BOOST_REQUIRE_EQUAL(9, categories_seen.size());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

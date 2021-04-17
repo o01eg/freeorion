@@ -60,5 +60,9 @@ jobs:
           pushd build
           cpack -C Release -G NSIS
       - name: Upload installer
-        run: |
-          Get-ChildItem
+        uses: actions/upload-artifact@v2
+        with:
+          name: freeorion-win32-build
+          path: build/FreeOrion-*-win32.exe
+          if-no-files-found: error
+          retention-days: 14

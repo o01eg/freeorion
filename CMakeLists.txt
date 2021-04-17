@@ -992,6 +992,63 @@ if(WIN32)
     )
 endif()
 
+if(WIN32 AND BUILD_CLIENT_GG)
+    install(
+        TARGETS
+	    freeorion
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        BUNDLE DESTINATION .
+        RESOURCE
+    )
+endif()
+
+if(WIN32)
+    if(BUILD_SERVER)
+        install(
+            TARGETS
+                freeoriond
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+            BUNDLE DESTINATION .
+        )
+    endif()
+
+    if(BUILD_AI)
+        install(
+            TARGETS
+                freeorionca
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+            BUNDLE DESTINATION .
+        )
+    endif()
+
+    if(BUILD_CLIENT_GODOT)
+        install(
+            TARGETS
+                freeoriongodot
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+            BUNDLE DESTINATION .
+        )
+    endif()
+
+    if(BUILD_CLIENT_GG)
+        install(
+            DIRECTORY default/
+            DESTINATION ${CMAKE_INSTALL_BINDIR}/default
+            PATTERN "*~" EXCLUDE
+            PATTERN "*.pyc" EXCLUDE
+        )
+    else()
+        install(
+            DIRECTORY default/
+            DESTINATION ${CMAKE_INSTALL_BINDIR}/default
+            PATTERN "*~" EXCLUDE
+            PATTERN "*.pyc" EXCLUDE
+            PATTERN "*.png" EXCLUDE
+            PATTERN "*.ogg" EXCLUDE
+        )
+    endif()
+endif()
+
 set(CPACK_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
 set(CPACK_PACKAGE_VERSION ${FreeOrion_VERSION})
 set(CPACK_PACKAGE_VENDOR "FreeOrion Community")
@@ -1012,6 +1069,8 @@ else()
 endif()
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${PACKAGE_FILE_SYSTEM_NAME}")
 set(CPACK_MONOLITHIC_INSTALL ON)
+set(CPACK_PACKAGE_EXECUTABLES "freeorion;FreeOrion")
+set(CPACK_CREATE_DESKTOP_LINKS "freeorion")
 
 # NSIS-specific settings
 set(CPACK_NSIS_COMPRESSOR bzip2)

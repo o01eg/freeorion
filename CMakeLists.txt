@@ -982,14 +982,11 @@ if(WIN32)
         boost_system.dll
         boost_thread.dll
         glew32.dll
-        libexpat.dll
         libogg.dll
-        libpng13.dll
+        libpng16.dll
         libvorbis.dll
         libvorbisfile.dll
         python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}.dll
-        wrap_oal.dll
-        z.dll
         zlib1.dll
         DESTINATION ${CMAKE_INSTALL_BINDIR}
     )

@@ -118,7 +118,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND (MODE STREQUAL "DATA_LINK"))
 
     get_filename_component(TARGET_NAME "${SOURCE_PATH}" NAME)
 
-    message(STATUS "Link from ${DESTINATION}/${TARGET_NAME} to ${SOURCE_PATH}")
+    message(STATUS "Link from dest ${DESTINATION} target ${TARGET_NAME} to source ${SOURCE_PATH}")
 
     if("${DESTINATION}/${TARGET_NAME}" STREQUAL "${SOURCE_PATH}")
         return()
@@ -129,7 +129,13 @@ if(CMAKE_SCRIPT_MODE_FILE AND (MODE STREQUAL "DATA_LINK"))
     endif()
 
     if(WIN32)
-        execute_process(COMMAND mklink /J "${DESTINATION}" "${SOURCE_PATH}"
+        file(TO_NATIVE_PATH "${DESTINATION}/${TARGET_NAME}" NATIVE_TARGET_PATH)
+        file(TO_NATIVE_PATH "${SOURCE_PATH}" NATIVE_SOURCE_PATH)
+
+        message(STATUS "Executing mklink /J ${NATIVE_TARGET_PATH} ${NATIVE_SOURCE_PATH} at ${DESTINATION}")
+
+        execute_process(COMMAND mklink /J "${NATIVE_TARGET_PATH}" "${NATIVE_SOURCE_PATH}"
+            WORKING_DIRECTORY "${DESTINATION}"
             RESULT_VARIABLE MKLINK_RESULT
             OUTPUT_VARIABLE MKLINK_OUTPUT
             ERROR_VARIABLE MKLINK_ERROR

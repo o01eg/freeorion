@@ -681,8 +681,8 @@ if(BUILD_CLIENT_GODOT)
 
         include(ExternalProject)
         ExternalProject_Add(godotcpp
-            GIT_REPOSITORY https://github.com/godotengine/godot-cpp
-            GIT_TAG d7c55b1ab2606253e94db5ed3caf75f90a47d03c
+            GIT_REPOSITORY https://github.com/object71/godot-cpp
+            GIT_TAG 0ad827f7a2d6becbbfe0eae5c02b271486b35632
             SOURCE_DIR ${CMAKE_BINARY_DIR}/godot-cpp
             BINARY_DIR ${CMAKE_BINARY_DIR}/godot-cpp-build
             CMAKE_ARGS

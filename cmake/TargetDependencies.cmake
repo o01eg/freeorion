@@ -78,6 +78,8 @@ function(TARGET_DEPENDENT_DATA_SYMLINK_TO_BUILD TARGET SOURCE_PATH)
         if(NOT IS_DIRECTORY "${SOURCE_PATH}")
             message(FATAL_ERROR "`target_dependent_data_symlink_to_build`: Source path must point to a directory.")
         endif()
+
+        message(STATUS "Use link from ${TARGET} to ${SOURCE_PATH}")
     endif()
 
     get_property(SCRIPT GLOBAL PROPERTY _TARGET_DEPENDENCIES_SCRIPT)
@@ -116,6 +118,8 @@ if(CMAKE_SCRIPT_MODE_FILE AND (MODE STREQUAL "DATA_LINK"))
 
     get_filename_component(TARGET_NAME "${SOURCE_PATH}" NAME)
 
+    message(STATUS "Link from ${DESTINATION}/${TARGET_NAME} to ${SOURCE_PATH}")
+
     if("${DESTINATION}/${TARGET_NAME}" STREQUAL "${SOURCE_PATH}")
         return()
     elseif(IS_SYMLINK "${DESTINATION}/${TARGET_NAME}")
@@ -125,7 +129,13 @@ if(CMAKE_SCRIPT_MODE_FILE AND (MODE STREQUAL "DATA_LINK"))
     endif()
 
     if(WIN32)
-        execute_process(COMMAND mklink /J "${DESTINATION}" "${SOURCE_PATH}")
+        execute_process(COMMAND mklink /J "${DESTINATION}" "${SOURCE_PATH}"
+            RESULT_VARIABLE MKLINK_RESULT
+            OUTPUT_VARIABLE MKLINK_OUTPUT
+            ERROR_VARIABLE MKLINK_ERROR
+            ENCODING AUTO
+        )
+        message(STATUS "Mklink result ${MKLINK_RESULT} output ${MKLINK_OUTPUT} error ${MKLINK_ERROR}")
     else()
         execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink "${SOURCE_PATH}" "${DESTINATION}/${TARGET_NAME}")
     endif()

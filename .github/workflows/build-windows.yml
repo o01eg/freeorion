@@ -55,6 +55,8 @@ jobs:
         run: |
           pushd build
           cmake --build . --config "Release" -- /maxcpucount /property:BuildInParallel=true /property:CL_MPCount=2 /verbosity:minimal
+          ls ../godot/client/bin/
+          ls Release
       - name: Generate installer
         run: |
           pushd build

@@ -844,6 +844,19 @@ if(BUILD_CLIENT_GODOT)
     endif()
 endif()
 
+if(WIN32 AND BUILD_CLIENT_GODOT AND BUILD_SERVER)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(GODOT_FILE "Godot_v3.2.3-stable_win64.exe")
+    else()
+        set(GODOT_FILE "Godot_v3.2.3-stable_win32.exe")
+    endif()
+    file(DOWNLOAD "https://downloads.tuxfamily.org/godotengine/3.2.3/${GODOT_FILE}.zip" "${CMAKE_BINARY_DIR}/${GODOT_FILE}.zip")
+    add_custom_command(TARGET freeoriond POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E tar xf "${CMAKE_BINARY_DIR}/${GODOT_FILE}.zip" --format=zip WORKING_DIRECTORY $<TARGET_FILE_DIR:freeoriond>
+    )
+endif()
+
+
 ##
 ## Recurse into sources.
 ##

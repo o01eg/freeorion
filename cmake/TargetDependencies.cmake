@@ -129,18 +129,19 @@ if(CMAKE_SCRIPT_MODE_FILE AND (MODE STREQUAL "DATA_LINK"))
     endif()
 
     if(WIN32)
-        file(TO_NATIVE_PATH "${DESTINATION}/${TARGET_NAME}" NATIVE_TARGET_PATH)
+        file(TO_NATIVE_PATH "${DESTINATION}" NATIVE_DESTINATION)
         file(TO_NATIVE_PATH "${SOURCE_PATH}" NATIVE_SOURCE_PATH)
 
-        message(STATUS "Executing mklink /J ${NATIVE_TARGET_PATH} ${NATIVE_SOURCE_PATH} at ${DESTINATION}")
+        message(STATUS "Executing cmd /C mklink /J ${TARGET_NAME} ${NATIVE_SOURCE_PATH} at ${NATIVE_DESTINATION}")
 
-        execute_process(COMMAND mklink /J "${NATIVE_TARGET_PATH}" "${NATIVE_SOURCE_PATH}"
-            WORKING_DIRECTORY "${DESTINATION}"
+        execute_process(COMMAND cmd /C mklink /J "${TARGET_NAME}" "${NATIVE_SOURCE_PATH}"
+            WORKING_DIRECTORY "${NATIVE_DESTINATION}"
             RESULT_VARIABLE MKLINK_RESULT
             OUTPUT_VARIABLE MKLINK_OUTPUT
             ERROR_VARIABLE MKLINK_ERROR
             ENCODING AUTO
         )
+
         message(STATUS "Mklink result ${MKLINK_RESULT} output ${MKLINK_OUTPUT} error ${MKLINK_ERROR}")
     else()
         execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink "${SOURCE_PATH}" "${DESTINATION}/${TARGET_NAME}")

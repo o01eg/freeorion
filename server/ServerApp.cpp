@@ -2686,17 +2686,17 @@ namespace {
     }
 
     /** Records info in Empires about where they invaded. */
-    void UpdateEmpireInvasionInfo(const std::map<int, std::map<int, double>>& planet_empire_invasion_troops) {
-        for (const auto& planet_empire_troops : planet_empire_invasion_troops) {
-            int planet_id = planet_empire_troops.first;
-            auto planet = Objects().get<Planet>(planet_id);
-            if (!planet)
-                continue;
-            if (planet->SpeciesName().empty())
+    void UpdateEmpireInvasionInfo(const std::map<int, std::map<int, double>>& planet_empire_invasion_troops,
+                                  EmpireManager& empires, const ObjectMap& objects)
+    {
+        for (auto& [planet_id, empire_troops] : planet_empire_invasion_troops) {
+            auto planet = objects.get<Planet>(planet_id);
+            if (!planet || planet->SpeciesName().empty())
                 continue;
 
-            for (const auto& empire_troops : planet_empire_troops.second) {
-                Empire* invader_empire = GetEmpire(empire_troops.first);
+            for (auto& [invader_empire_id, troops] : empire_troops) {
+                (void)troops; // quiet warning
+                auto invader_empire = empires.GetEmpire(invader_empire_id);
                 if (!invader_empire)
                     continue;
                 invader_empire->RecordPlanetInvaded(*planet);
@@ -2885,63 +2885,6 @@ namespace {
         }
     }
 
-    /** Given initial set of ground forces on planet, determine ground forces on
-      * planet after a turn of ground combat. */
-    void ResolveGroundCombat(std::map<int, double>& empires_troops, const EmpireManager& empires) {
-        if (empires_troops.empty() || empires_troops.size() == 1)
-            return;
-
-        // give bonuses for allied ground combat, so allies can effectively fight together
-        auto effective_empires_troops = empires_troops;
-        for (auto& [empire1_id, troop1_count] : empires_troops) {
-            for (auto& [empire2_id, troop2_count] : empires_troops) {
-                if (empire1_id == empire2_id)
-                    continue;
-                auto diplo_status = empires.GetDiplomaticStatus(empire1_id, empire2_id);
-                if (diplo_status == DiplomaticStatus::DIPLO_ALLIED)
-                    effective_empires_troops[empire1_id] += troop2_count;
-            }
-        }
-
-
-        // find effective troops and ID of victor...
-        std::multimap<double, int> inverted_empires_troops;
-        for (const auto& entry : effective_empires_troops)
-            inverted_empires_troops.emplace(entry.second, entry.first);
-
-        int victor_id;
-        float victor_effective_troops;
-        std::tie(victor_effective_troops, victor_id) = *inverted_empires_troops.rbegin();
-
-
-        // victor has effective troops reduced by the effective troop count of
-        // the strongest enemy combatant (allied and at-peace co-combatants are
-        // ignored for this reduction)
-        float highest_loser_enemy_effective_troops = 0.0f;
-        for (auto highest_loser_it = inverted_empires_troops.rbegin();
-             highest_loser_it != inverted_empires_troops.rend(); ++highest_loser_it)
-        {
-            const auto& [loser_effective_troops, loser_id] = *highest_loser_it;
-            if (loser_id == victor_id)
-                continue;
-            auto diplo_status = empires.GetDiplomaticStatus(victor_id, loser_id);
-            if (diplo_status >= DiplomaticStatus::DIPLO_PEACE)
-                continue;
-            // found a suitable loser combatant
-            highest_loser_enemy_effective_troops = loser_effective_troops;
-            break;
-        }
-
-        victor_effective_troops -= highest_loser_enemy_effective_troops;
-        float victor_starting_troops = empires_troops[victor_id];
-
-        // every other combatant loses all troops
-        empires_troops.clear();
-
-        // final victor troops can't be more than they started with
-        empires_troops[victor_id] = std::min(victor_effective_troops, victor_starting_troops);
-    }
-
     /** Determines which ships ordered to invade planets, does invasion and
       * ground combat resolution */
     void HandleInvasion(EmpireManager& empires, Universe& universe) {
@@ -2998,61 +2941,44 @@ namespace {
         }
 
         // store invasion info in empires
-        UpdateEmpireInvasionInfo(planet_empire_troops);
+        UpdateEmpireInvasionInfo(planet_empire_troops, empires, objects);
 
-        // check each planet for other troops, such as due to empire troops, native troops, or rebel troops
-        for (auto& planet : objects.all<Planet>()) {
-            if (!planet) {
-                ErrorLogger() << "HandleInvasion couldn't get planet";
-                continue;
-            }
-            if (planet->GetMeter(MeterType::METER_TROOPS)->Initial() > 0.0f) {
-                // empires may have garrisons on planets
-                planet_empire_troops[planet->ID()][planet->Owner()] += planet->GetMeter(MeterType::METER_TROOPS)->Initial() + 0.0001;    // small bonus to ensure ties are won by initial owner
-            }
-            if (!planet->Unowned() && planet->GetMeter(MeterType::METER_REBEL_TROOPS)->Initial() > 0.0f) {
-                // rebels may be present on empire-owned planets
-                planet_empire_troops[planet->ID()][ALL_EMPIRES] += planet->GetMeter(MeterType::METER_REBEL_TROOPS)->Initial();
-            }
+        // check each planet invading or other troops, such as due to empire troops, native troops, or rebel troops
+        for (const auto& planet : objects.all<Planet>()) {
+            auto empire_forces = planet->EmpireGroundCombatForces();
+            if (!empire_forces.empty())
+                planet_empire_troops[planet->ID()].insert(empire_forces.begin(), empire_forces.end());
         }
 
         // process each planet's ground combats
-        for (auto& planet_combat : planet_empire_troops) {
-            int planet_id = planet_combat.first;
-            auto planet = objects.get<Planet>(planet_id);
-            std::set<int> all_involved_empires;
-            int planet_initial_owner_id = planet->Owner();
-
-            auto& empires_troops = planet_combat.second;
+        for (auto& [planet_id, empires_troops] : planet_empire_troops) {
             if (empires_troops.empty())
                 continue;
-            else if (empires_troops.size() == 1) {
+
+            auto planet = objects.get<Planet>(planet_id);
+            std::set<int> all_involved_empires;
+            for (auto& [empire_id, ignored]: empires_troops) {
+                (void)ignored; // quiet warning
+                if (empire_id != ALL_EMPIRES)
+                    all_involved_empires.insert(empire_id);
+            }
+            int planet_initial_owner_id = planet->Owner();
+            if (planet_initial_owner_id != ALL_EMPIRES)
+                all_involved_empires.insert(planet_initial_owner_id);
+
+
+            if (empires_troops.size() == 1) {
                 int empire_with_troops_id = empires_troops.begin()->first;
                 if (planet->Unowned() && empire_with_troops_id == ALL_EMPIRES)
-                    continue;
-
-                if (planet->OwnedBy(empire_with_troops_id)) {
+                    continue;   // if troops are neutral and planet is unowned, not a combat.
+                if (planet->OwnedBy(empire_with_troops_id))
                     continue;   // if troops all belong to planet owner, not a combat.
 
-                } else {
-                    //DebugLogger() << "Ground combat on " << planet->Name() << " was unopposed";
-                    if (planet_initial_owner_id != ALL_EMPIRES)
-                        all_involved_empires.insert(planet_initial_owner_id);
-                    if (empire_with_troops_id != ALL_EMPIRES)
-                        all_involved_empires.insert(empire_with_troops_id);
-                }
             } else {
                 DebugLogger() << "Ground combat troops on " << planet->Name() << " :";
                 for (const auto& empire_troops : empires_troops)
                     DebugLogger() << " ... empire: " << empire_troops.first << " : " << empire_troops.second;
-
-                // create sitreps for all empires involved in battle
-                for (const auto& empire_troops : empires_troops) {
-                    if (empire_troops.first != ALL_EMPIRES)
-                        all_involved_empires.insert(empire_troops.first);
-                }
-
-                ResolveGroundCombat(empires_troops, empires);
+                Planet::ResolveGroundCombat(empires_troops, empires.GetDiplomaticStatuses());
             }
 
             for (int empire_id : all_involved_empires) {
@@ -3060,7 +2986,8 @@ namespace {
                     empire->AddSitRepEntry(CreateGroundCombatSitRep(planet_id, EnemyId(empire_id, all_involved_empires)));
             }
 
-            // who won?
+
+            // process post-combat cleanup...
             if (empires_troops.size() == 1) {
                 int victor_id = empires_troops.begin()->first;
                 // single empire was victorious.  conquer planet if appropriate...
@@ -3076,8 +3003,8 @@ namespace {
                     }
 
                     DebugLogger() << "Empire conquers planet";
-                    for (const auto& empire_troops : empires_troops)
-                        DebugLogger() << " empire: " << empire_troops.first << ": " << empire_troops.second;
+                    for (auto& [empire_with_post_battle_troops_id, troop_count] : empires_troops)
+                        DebugLogger() << " empire: " << empire_with_post_battle_troops_id << ": " << troop_count;
 
 
                 } else if (!planet->Unowned() && victor_id == ALL_EMPIRES) {
@@ -3096,8 +3023,8 @@ namespace {
                 } else {
                     // defender held the planet
                     DebugLogger() << "Defender holds planet";
-                    for (const auto& empire_troops : empires_troops)
-                        DebugLogger() << " empire: " << empire_troops.first << ": " << empire_troops.second;
+                    for (auto& [empire_with_post_battle_troops_id, troop_count] : empires_troops)
+                        DebugLogger() << " empire: " << empire_with_post_battle_troops_id << ": " << troop_count;
                 }
 
                 // regardless of whether battle resulted in conquering, it did
@@ -3118,7 +3045,7 @@ namespace {
             // knowledge update to ensure previous owner of planet knows who owns it now?
             if (planet_initial_owner_id != ALL_EMPIRES && planet_initial_owner_id != planet->Owner()) {
                 // get empire's knowledge of object
-                ObjectMap& empire_latest_known_objects = EmpireKnownObjects(planet_initial_owner_id);
+                ObjectMap& empire_latest_known_objects = universe.EmpireKnownObjects(planet_initial_owner_id);
                 empire_latest_known_objects.CopyObject(std::move(planet), planet_initial_owner_id);
             }
         }

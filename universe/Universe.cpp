@@ -296,9 +296,9 @@ std::set<int> Universe::EmpireVisibleObjectIDs(int empire_id, const EmpireManage
     if (empire_id != ALL_EMPIRES) {
         empire_ids.insert(empire_id);
     } else {
-        for ([[maybe_unused]] auto& [empire_id, empire] : empires) {
+        for ([[maybe_unused]] auto& [loop_empire_id, empire] : empires) {
             (void)empire;   // quieting unused variable warning
-            empire_ids.insert(empire_id);
+            empire_ids.insert(loop_empire_id);
         }
     }
 
@@ -872,13 +872,31 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec,
         account_map.clear();    // remove any old accounting info. this should be redundant here.
         account_map.reserve(meters.size());
 
-        for (auto& meter_pair : meters) {
-            MeterType type = meter_pair.first;
-            const auto& meter = meter_pair.second;
+        for (auto& [type, meter] : meters) {
+            (void)type; // quiet warning
             float meter_change = meter.Current() - Meter::DEFAULT_VALUE;
             if (meter_change != 0.0f)
                 account_map[type].emplace_back(INVALID_OBJECT_ID, EffectsCauseType::ECT_INHERENT,
                                                meter_change, meter.Current());
+        }
+
+        // account for ground combat in troop meter adjustments
+        if (obj->ObjectType() == UniverseObjectType::OBJ_PLANET) {
+            if (auto planet = static_cast<Planet*>(obj.get())) {
+                if (auto meter = planet->GetMeter(MeterType::METER_TROOPS)) {
+                    float pre_value = meter->Current();
+
+                    auto empires_troops = planet->EmpireGroundCombatForces();
+                    Planet::ResolveGroundCombat(empires_troops, context.diplo_statuses);
+                    meter->SetCurrent(empires_troops[obj->Owner()]);
+
+                    float meter_change = meter->Current() - pre_value;
+                    if (meter_change != 0.0f)
+                        account_map[MeterType::METER_TROOPS].emplace_back(
+                            INVALID_OBJECT_ID, EffectsCauseType::ECT_UNKNOWN_CAUSE,
+                            meter_change, meter->Current());
+                }
+            }
         }
     }
 
@@ -1987,9 +2005,9 @@ namespace {
             // detected by the empire if the empire has a detector in range.
             // being detectable by an empire requires the object to have
             // low enough stealth (0 or below the empire's detection strength)
-            for (const auto& [empire_id, detection_strength] : empire_detection_strengths) {
-                if (object_stealth <= detection_strength || object_stealth <= 0.0f || obj->OwnedBy(empire_id))
-                    retval[empire_id][object_pos].emplace_back(obj->ID());
+            for (const auto& [loop_empire_id, detection_strength] : empire_detection_strengths) {
+                if (object_stealth <= detection_strength || object_stealth <= 0.0f || obj->OwnedBy(loop_empire_id))
+                    retval[loop_empire_id][object_pos].push_back(obj->ID());
             }
         }
         return retval;

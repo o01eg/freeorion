@@ -23,6 +23,14 @@ message(STATUS "Build type CMAKE_BUILD_TYPE set to ${CMAKE_BUILD_TYPE}")
 include(UseCompilerCache)
 find_compiler_cache(PROGRAM ccache)
 
+get_cmake_property(vars CACHE_VARIABLES)
+foreach(var ${vars})
+  get_property(currentHelpString CACHE "${var}" PROPERTY HELPSTRING)
+    if("${currentHelpString}" MATCHES "No help, variable specified on the command line." OR "${currentHelpString}" STREQUAL "")
+        list(APPEND CL_ARGS "-D${var}=${${var}}")
+    endif()
+endforeach()
+
 
 ##
 ## Global project configuration
@@ -45,9 +53,12 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 option(BUILD_SHARED_LIBS "Build project as shared libraries." ON)
 option(BUILD_TESTING "Build the testing tree." OFF)
 option(BUILD_CLIENT_GG "Build GiGi client" ON)
+option(BUILD_CLIENT_GODOT "Build Godot client (experimental)" OFF)
 option(BUILD_SERVER "Build server" ON)
 option(BUILD_AI "Build AI" ON)
 option(BUILD_PARSERS "Build parsers" ON)
+
+set(GODOT_CPP_ROOT "" CACHE STRING "Path to Godot CPP libraries (empty to build internally)" FORCE)
 
 if(BUILD_TESTING)
     message( STATUS "Building Tests")
@@ -229,12 +240,10 @@ set(MINIMUM_BOOST_VERSION 1.60.0)
 
 find_package(Threads)
 find_package(PythonInterp ${MINIMUM_PYTHON_VERSION} REQUIRED)
-if(BUILD_AI OR BUILD_SERVER)
-    find_package(PythonLibs ${MINIMUM_PYTHON_VERSION} REQUIRED)
-    message(STATUS "Python library version detected ${PYTHONLIBS_VERSION_STRING}")
-    string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\..*" "\\1\\2" Boost_PYTHON_SUFFIX "${PYTHONLIBS_VERSION_STRING}")
-    message(STATUS "Boost python version ${Boost_PYTHON_SUFFIX}")
-endif()
+find_package(PythonLibs ${MINIMUM_PYTHON_VERSION} REQUIRED)
+message(STATUS "Python library version detected ${PYTHONLIBS_VERSION_STRING}")
+string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\..*" "\\1\\2" Boost_PYTHON_SUFFIX "${PYTHONLIBS_VERSION_STRING}")
+message(STATUS "Boost python version ${Boost_PYTHON_SUFFIX}")
 find_package(Boost ${MINIMUM_BOOST_VERSION}
     COMPONENTS
         filesystem
@@ -379,7 +388,11 @@ target_compile_definitions(freeorioncommon
         $<$<NOT:$<PLATFORM_ID:Android>>:BOOST_ALL_DYN_LINK>
     PRIVATE
         -DFREEORION_BUILD_COMMON
-        -DFREEORION_PYTHON_VERSION=\"${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}\"
+)
+
+target_include_directories(freeorioncommon SYSTEM
+    PUBLIC
+        ${PYTHON_INCLUDE_PATH}
 )
 
 target_link_libraries(freeorioncommon
@@ -399,20 +412,15 @@ target_link_libraries(freeorioncommon
         ${ICUI18N_LIBRARY}
         ${ICUUC_LIBRARY}
         ${ICUDATA_LIBRARY}
+        ${PYTHON_LIBRARIES}
         ${ANDROID_LIBRARY}
         ${LOG_LIBRARY}
     PRIVATE
+        # boost::uuid requires the bcrypt Windows API on Windows since boost 1.67
+        # see https://github.com/boostorg/uuid/issues/68
+        $<$<AND:$<PLATFORM_ID:Windows>,$<VERSION_GREATER:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.66>>:bcrypt>
         ${CORE_FOUNDATION_LIBRARY}
 )
-
-if(WIN32 AND ${Boost_VERSION} GREATER 106699) # boost >= 1.67
-    # fix https://github.com/boostorg/uuid/issues/68
-    find_library(BCRYPT_LIBRARY bcrypt)
-    target_link_libraries(freeorioncommon
-        PRIVATE
-            ${BCRYPT_LIBRARY}
-    )
-endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Haiku")
 	target_link_libraries(freeorioncommon PUBLIC network)
@@ -462,6 +470,7 @@ target_compile_options(freeorionparseobj
 
 target_compile_definitions(freeorionparseobj
     PUBLIC
+        BOOST_ALL_NO_LIB
         $<$<NOT:$<PLATFORM_ID:Android>>:BOOST_ALL_DYN_LINK>
     PRIVATE
         -DNDEBUG
@@ -525,17 +534,11 @@ if(BUILD_SERVER)
             -DFREEORION_BUILD_SERVER
     )
     
-    target_include_directories(freeoriond SYSTEM
-        PRIVATE
-            ${PYTHON_INCLUDE_PATH}
-    )
-    
     target_link_libraries(freeoriond
         PRIVATE
             freeorioncommon
             freeorionparse
             Boost::python${Boost_PYTHON_SUFFIX}
-            ${PYTHON_LIBRARIES}
     )
     
     target_dependencies_copy_to_build(freeoriond)
@@ -557,16 +560,10 @@ if(BUILD_AI)
             -DFREEORION_BUILD_AI
     )
     
-    target_include_directories(freeorionca SYSTEM
-        PRIVATE
-            ${PYTHON_INCLUDE_PATH}
-    )
-    
     target_link_libraries(freeorionca
         freeorioncommon
         freeorionparse
         Boost::python${Boost_PYTHON_SUFFIX}
-        ${PYTHON_LIBRARIES}
     )
     
     target_dependencies_copy_to_build(freeorionca)
@@ -623,6 +620,8 @@ if(BUILD_CLIENT_GG)
                 MACOSX_BUNDLE TRUE
                 MACOSX_BUNDLE_BUNDLE_NAME "${PROJECT_NAME}"
                 MACOSX_BUNDLE_INFO_PLIST "${PROJECT_SOURCE_DIR}/packaging/Info.plist"
+                XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
+                XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
                 RESOURCE "${PROJECT_SOURCE_DIR}/client/human/main.xib"
         )
     endif()
@@ -656,6 +655,97 @@ if(BUILD_CLIENT_GG)
 
     target_dependencies_copy_to_build(freeorion)
     target_dependent_data_symlink_to_build(freeorion ${PROJECT_SOURCE_DIR}/default)
+endif()
+
+if(BUILD_CLIENT_GODOT)
+    add_library(freeoriongodot SHARED "")
+
+    if(CMAKE_BUILD_TYPE MATCHES Debug)
+        set(GODOT_CPP_BUILD_TYPE Debug)
+    else()
+        set(GODOT_CPP_BUILD_TYPE Release)
+    endif()
+
+    if(NOT GODOT_CPP_ROOT)
+        set(GODOT_CPP_ROOT_BUILT "${CMAKE_BINARY_DIR}/godot-cpp")
+        set(GODOT_CPP_GEN_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/godot-cpp-build/include/gen")
+
+        include(ExternalProject)
+        ExternalProject_Add(godotcpp
+            GIT_REPOSITORY https://github.com/godotengine/godot-cpp
+            GIT_TAG d7c55b1ab2606253e94db5ed3caf75f90a47d03c
+            SOURCE_DIR ${CMAKE_BINARY_DIR}/godot-cpp
+            BINARY_DIR ${CMAKE_BINARY_DIR}/godot-cpp-build
+            CMAKE_ARGS
+                -G ${CMAKE_GENERATOR}
+                -D CMAKE_BUILD_TYPE=${GODOT_CPP_BUILD_TYPE}
+                -D CMAKE_CONFIGURATION_TYPES=${GODOT_CPP_BUILD_TYPE}
+                -D CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+                -D PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}
+                ${CL_ARGS}
+            INSTALL_COMMAND ""
+        )
+
+        add_dependencies(freeoriongodot godotcpp)
+    else()
+        set(GODOT_CPP_ROOT_BUILT "${GODOT_CPP_ROOT}")
+        set(GODOT_CPP_GEN_INCLUDE_DIRS "${GODOT_CPP_ROOT_BUILT}/include/gen")
+    endif()
+    message(STATUS "Godot C++ root ${GODOT_CPP_ROOT_BUILT}")
+
+    # ToDo: remove after fix Godot headers https://github.com/godotengine/godot_headers/pull/81
+    set_target_properties(freeoriongodot PROPERTIES CXX_VISIBILITY_PRESET default)
+
+    target_compile_definitions(freeoriongodot
+        PRIVATE
+            -DFREEORION_BUILD_HUMAN_GODOT
+    )
+
+    target_include_directories(freeoriongodot SYSTEM
+        PRIVATE
+            ${GODOT_CPP_ROOT_BUILT}/include
+            ${GODOT_CPP_ROOT_BUILT}/include/core
+            ${GODOT_CPP_GEN_INCLUDE_DIRS}
+            ${GODOT_CPP_ROOT_BUILT}/godot-headers
+    )
+
+    # Create the correct name (godot.os.build_type.system_bits)
+    # Synchronized with godot-cpp's CMakeLists.txt
+
+    set(BITS 32)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(BITS 64)
+    endif(CMAKE_SIZEOF_VOID_P EQUAL 8)
+
+    string(TOLOWER ${CMAKE_SYSTEM_NAME} SYSTEM_NAME)
+    string(TOLOWER ${GODOT_CPP_BUILD_TYPE} BUILD_TYPE)
+
+    if(ANDROID)
+        # Added the android abi after system name
+        set(SYSTEM_NAME ${SYSTEM_NAME}.${ANDROID_ABI})
+    endif()
+
+    if(CMAKE_VERSION VERSION_GREATER "3.13")
+        target_link_directories(freeoriongodot
+            PRIVATE
+                ${GODOT_CPP_ROOT_BUILT}/bin/
+        )
+        target_link_libraries(freeoriongodot
+            godot-cpp.${SYSTEM_NAME}.${BUILD_TYPE}$<$<NOT:$<PLATFORM_ID:Android>>:.${BITS}>
+        )
+    else()
+        target_link_libraries(freeoriongodot
+            ${GODOT_CPP_ROOT_BUILT}/bin/libgodot-cpp.${SYSTEM_NAME}.${BUILD_TYPE}$<$<NOT:$<PLATFORM_ID:Android>>:.${BITS}>.a
+        )
+    endif()
+
+    target_link_libraries(freeoriongodot
+        freeorioncommon
+        freeorionparse
+        ${ICONV_LIBRARY}
+    )
+
+    target_dependencies_copy_to_build(freeoriongodot)
 endif()
 
 if(WIN32 AND BUILD_CLIENT_GG)
@@ -717,11 +807,33 @@ if(APPLE AND BUILD_CLIENT_GG)
 endif()
 
 
+if(BUILD_CLIENT_GODOT)
+    add_custom_command(TARGET freeoriongodot POST_BUILD
+        COMMAND
+           ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/godot/client/bin/${SYSTEM_NAME}.${BITS}
+        COMMAND
+           ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeoriongodot>" "${CMAKE_SOURCE_DIR}/godot/client/bin/${SYSTEM_NAME}.${BITS}"
+    )
+    if(ANDROID)
+        add_custom_command(TARGET freeoriongodot POST_BUILD
+            COMMAND
+                ${CMAKE_COMMAND} -E copy_if_different "${ICONV_LIBRARY}" "${CMAKE_SOURCE_DIR}/godot/client/bin/${SYSTEM_NAME}.${BITS}"
+        )
+    else()
+        add_custom_command(TARGET freeoriongodot POST_BUILD
+            COMMAND
+                ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeorioncommon>" "${CMAKE_SOURCE_DIR}/godot/client/bin/${SYSTEM_NAME}.${BITS}"
+            COMMAND
+                ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeorionparse>" "${CMAKE_SOURCE_DIR}/godot/client/bin/${SYSTEM_NAME}.${BITS}"
+        )
+    endif()
+endif()
+
 ##
 ## Recurse into sources.
 ##
 
-if(BUILD_AI OR BUILD_CLIENT_GG)
+if(BUILD_AI OR BUILD_CLIENT_GG OR BUILD_CLIENT_GODOT)
     add_subdirectory(client)
 endif()
 add_subdirectory(combat)

@@ -1,44 +1,16 @@
-name: "Ubuntu"
+name: "PPA Godot"
 
 on:
   push:
-    paths-ignore:
-      - 'msvc*/**'
-      - 'check/**'
-      - 'doc/**'
-      - 'packaging/**'
-      - 'snap/**'
-      - '*.md'
-  pull_request:
-    paths-ignore:
-      - 'msvc*/**'
-      - 'check/**'
-      - 'doc/**'
-      - 'packaging/**'
-      - 'snap/**'
-      - '*.md'
+    tags:
+      - ppa-godot-*
 
 jobs:
   build-ubuntu:
-    name: ${{ matrix.os }} Build FreeOrion GG=${{ matrix.client-gg }} Godot=${{ matrix.client-godot }} compiler ${{ matrix.compiler }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-18.04]
-        client-gg: ['ON', 'OFF']
-        client-godot: ['OFF']
-        compiler: [gcc]
-        include:
-          - os: ubuntu-20.04
-            client-gg: 'ON'
-            client-godot: 'OFF'
-            compiler: clang
-          - os: ubuntu-20.04
-            client-gg: 'ON'
-            client-godot: 'ON'
-            compiler: gcc
+    name: Upload PPA Godot
+    runs-on: ubuntu-20.04
     env:
-      CACHE_NAME: linux
+      super_secret_password=${{ secrets.super_secret_password }}
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
@@ -46,65 +18,27 @@ jobs:
         id: build-ubuntu-install-cache-id
         with:
           path: ${{ runner.temp }}/cache-build-linux-install
-          key: build-${{ matrix.os }}-install-cache-key-v1.0
+          key: build-ubuntu-20.04-install-cache-key-v1.0-ppa
       - uses: airvzxf/cache-anything-new-action@v1.0
         with:
-          script: '${{ matrix.os }}-install-build.sh'
+          script: 'ubuntu-20.04-install-build.sh'
           is_cached: ${{ steps.build-ubuntu-install-cache-id.outputs.cache-hit }}
           cache: ${{ runner.temp }}/cache-build-linux-install
           snapshot: '/'
           exclude: '/boot /data /dev /mnt /proc /run /sys'
-      - name: Prepare ccache timestamp
-        id: build-ubuntu-ccache-timestamp
-        shell: cmake -P {0}
+      - name: Prepare
+      - run: |
+          bash .ci/before_script.sh
+          python cmake/make_versioncpp.py . CMake
+      - name: Focal 20.04
         run: |
-          string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
-          message("::set-output name=timestamp::${current_date}")
-      - name: Cache files with ccache
-        uses: actions/cache@v1.1.0
-        with:
-          path: ${{ runner.temp }}/ccache
-          key: build-${{ matrix.os }}-${{ matrix.compiler }}-ccache-${{ steps.build-linux-ccache-timestamp.outputs.timestamp }}
-          restore-keys: |
-            build-${{ matrix.os }}-${{ matrix.compiler }}-ccache-
-      - name: Show ccache statistics before build
-        env:
-          CCACHE_DIR: ${{ runner.temp }}/ccache
+          bash .ci/script.sh focal
+          bash .ci/deploy.sh focal
+      - name: Groovy 20.10
         run: |
-          ccache --show-stats || true
-      - name: Build directory
-        run: mkdir build
-      - name: Configure for gcc
-        if: ${{ matrix.compiler == 'gcc' }}
-        env:
-          CCACHE_DIR: ${{ runner.temp }}/ccache
+          bash .ci/script.sh groovy
+          bash .ci/deploy.sh groovy
+      - name: Hirsute 21.04
         run: |
-          cd build
-          cmake -DBUILD_TESTING=ON -DBUILD_CLIENT_GG=${{ matrix.client-gg }} -DBUILD_CLIENT_GODOT=${{ matrix.client-godot }} ..
-      - name: Configure for clang
-        if: ${{ matrix.compiler == 'clang' }}
-        env:
-          CCACHE_DIR: ${{ runner.temp }}/ccache
-          CXXFLAGS: '-I/usr/include/SDL2 -I/usr/include/x86_64-linux-gnu/SDL2/ -I/usr/include/x86_64-linux-gnu/'
-          CFLAGS: '-I/usr/include/SDL2 -I/usr/include/x86_64-linux-gnu/SDL2/ -I/usr/include/x86_64-linux-gnu/'
-          CC: clang
-          CXX: clang++
-        run: |
-          cd build
-          cmake -DBUILD_TESTING=ON -DBUILD_CLIENT_GG=${{ matrix.client-gg }} -DBUILD_CLIENT_GODOT=${{ matrix.client-godot }} ..
-      - name: Build
-        env:
-          CCACHE_DIR: ${{ runner.temp }}/ccache
-          CMAKE_BUILD_PARALLEL_LEVEL: 2
-        run: |
-          cd build
-          cmake --build .
-      - name: Show ccache statistics after build
-        env:
-          CCACHE_DIR: ${{ runner.temp }}/ccache
-        run: |
-          ccache --show-stats || true
-      - name: Run C++ unit tests
-        run: |
-          cd build
-          cmake --build . --config Release --target unittest || echo Failure
+          bash .ci/script.sh hirsute
+          bash .ci/deploy.sh hirsute

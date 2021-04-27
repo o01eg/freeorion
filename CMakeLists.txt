@@ -58,7 +58,7 @@ option(BUILD_SERVER "Build server" ON)
 option(BUILD_AI "Build AI" ON)
 option(BUILD_PARSERS "Build parsers" ON)
 
-set(GODOT_CPP_ROOT "" CACHE STRING "Path to Godot CPP libraries (empty to build internally)" FORCE)
+set(GODOT_CPP_ROOT "" CACHE PATH "Path to Godot CPP libraries (empty to build internally)")
 
 if(BUILD_TESTING)
     message( STATUS "Building Tests")
@@ -256,13 +256,11 @@ find_package(Boost ${MINIMUM_BOOST_VERSION}
         thread
     REQUIRED)
 
-if(BUILD_AI OR BUILD_SERVER)
-    find_package(Boost OPTIONAL_COMPONENTS python${Boost_PYTHON_SUFFIX})
-    if(NOT Boost_PYTHON${Boost_PYTHON_SUFFIX}_FOUND)
-        # try some strange boost installations
-        string(SUBSTRING "${Boost_PYTHON_SUFFIX}" 0 1 Boost_PYTHON_SUFFIX)
-        find_package(Boost COMPONENTS python${Boost_PYTHON_SUFFIX} REQUIRED)
-    endif()
+find_package(Boost OPTIONAL_COMPONENTS python${Boost_PYTHON_SUFFIX})
+if(NOT Boost_PYTHON${Boost_PYTHON_SUFFIX}_FOUND)
+    # try some strange boost installations
+    string(SUBSTRING "${Boost_PYTHON_SUFFIX}" 0 1 Boost_PYTHON_SUFFIX)
+    find_package(Boost COMPONENTS python${Boost_PYTHON_SUFFIX} REQUIRED)
 endif()
 
 find_package(ZLIB REQUIRED)
@@ -406,6 +404,7 @@ target_link_libraries(freeorioncommon
         Boost::locale
         Boost::log_setup
         Boost::log
+        Boost::python${Boost_PYTHON_SUFFIX}
         Boost::thread
         Boost::serialization
         ZLIB::ZLIB
@@ -442,6 +441,7 @@ target_compile_definitions(freeorionparseobj
 target_include_directories(freeorionparseobj
     PUBLIC
         $<TARGET_PROPERTY:Boost::boost,INTERFACE_INCLUDE_DIRECTORIES>
+        ${PYTHON_INCLUDE_PATH}
 )
 
 set_property(TARGET freeorionparseobj
@@ -533,12 +533,11 @@ if(BUILD_SERVER)
         PRIVATE
             -DFREEORION_BUILD_SERVER
     )
-    
+
     target_link_libraries(freeoriond
         PRIVATE
             freeorioncommon
             freeorionparse
-            Boost::python${Boost_PYTHON_SUFFIX}
     )
     
     target_dependencies_copy_to_build(freeoriond)
@@ -561,9 +560,9 @@ if(BUILD_AI)
     )
     
     target_link_libraries(freeorionca
-        freeorioncommon
-        freeorionparse
-        Boost::python${Boost_PYTHON_SUFFIX}
+        PRIVATE
+            freeorioncommon
+            freeorionparse
     )
     
     target_dependencies_copy_to_build(freeorionca)
@@ -806,25 +805,17 @@ if(APPLE AND BUILD_CLIENT_GG)
     )
 endif()
 
-
 if(BUILD_CLIENT_GODOT)
     add_custom_command(TARGET freeoriongodot POST_BUILD
         COMMAND
-           ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/godot/client/bin/${SYSTEM_NAME}.${BITS}
+           ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}
         COMMAND
-           ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeoriongodot>" "${CMAKE_SOURCE_DIR}/godot/client/bin/${SYSTEM_NAME}.${BITS}"
+           ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeoriongodot>" "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}"
     )
     if(ANDROID)
         add_custom_command(TARGET freeoriongodot POST_BUILD
             COMMAND
-                ${CMAKE_COMMAND} -E copy_if_different "${ICONV_LIBRARY}" "${CMAKE_SOURCE_DIR}/godot/client/bin/${SYSTEM_NAME}.${BITS}"
-        )
-    else()
-        add_custom_command(TARGET freeoriongodot POST_BUILD
-            COMMAND
-                ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeorioncommon>" "${CMAKE_SOURCE_DIR}/godot/client/bin/${SYSTEM_NAME}.${BITS}"
-            COMMAND
-                ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeorionparse>" "${CMAKE_SOURCE_DIR}/godot/client/bin/${SYSTEM_NAME}.${BITS}"
+                ${CMAKE_COMMAND} -E copy_if_different "${ICONV_LIBRARY}" "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}"
         )
     endif()
 endif()
@@ -901,6 +892,15 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
             FILES
             ${CMAKE_SOURCE_DIR}/packaging/org.freeorion.FreeOrion.desktop
             DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
+        )
+    endif()
+
+    if(BUILD_CLIENT_GODOT)
+        install(
+            TARGETS
+                freeoriongodot
+            LIBRARY DESTINATION ${FreeOrion_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         )
     endif()
 

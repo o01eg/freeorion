@@ -1,6 +1,20 @@
 name: "Snapcraft build"
 
-on: [push, pull_request]
+on:
+  push:
+    paths-ignore:
+      - 'msvc*/**'
+      - 'check/**'
+      - 'doc/**'
+      - 'packaging/**'
+      - '*.md'
+  pull_request:
+    paths-ignore:
+      - 'msvc*/**'
+      - 'check/**'
+      - 'doc/**'
+      - 'packaging/**'
+      - '*.md'
 
 jobs:
   build:
@@ -18,7 +32,7 @@ jobs:
       run: |
         sudo apt install -y mesa-utils libgl1-mesa-dri libglx-mesa0
     - name: Test freeorion launch
-      uses: GabrielBB/xvfb-action@v1.4
+      uses: GabrielBB/xvfb-action@v1.5
       with:
         run: /bin/bash .github/snap-xvfb-launch.sh
 

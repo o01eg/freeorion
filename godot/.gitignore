@@ -1,0 +1,10 @@
+*.*~
+
+*.apk
+
+/bin/
+/.import/
+/export/
+
+/default
+

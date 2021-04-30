@@ -421,3 +421,14 @@ $$
 $$ LANGUAGE plpgsql;
 ```
 
+# Allow NULL roles without game
+
+```sql
+CREATE FUNCTION auth.check_otp(player_name_param CITEXT, otp CHAR(6))
+RETURNS BOOLEAN AS
+$$
+  WITH hashed_otp AS (DELETE FROM auth.otp WHERE otp.player_name = player_name_param RETURNING otp.otp)
+  SELECT (TABLE hashed_otp) IS NOT NULL AND (TABLE hashed_otp) = crypt(otp, (TABLE hashed_otp));
+$$ LANGUAGE sql VOLATILE;
+```
+

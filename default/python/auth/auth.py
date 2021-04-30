@@ -114,8 +114,8 @@ class AuthProvider:
         try:
             with self.conn:
                 with self.conn.cursor() as curs:
-                    curs.execute(""" SELECT * FROM auth.check_otp(%s, %s, %s) """,
-                                 (player_name, auth, fo.get_galaxy_setup_data().gameUID))
+                    curs.execute(""" SELECT * FROM auth.check_otp(%s, %s) """,
+                                 (player_name, auth))
                     for r in curs:
                         authenticated = not not r[0]
                         info("Player %s was accepted %r" % (player_name, authenticated))

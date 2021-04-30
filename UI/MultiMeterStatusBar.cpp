@@ -67,31 +67,25 @@ namespace {
         //Influence GG::Clr(255, 0, 255, 255);
     }
 
-    const int       EDGE_PAD(3);
-
-    const int       BAR_PAD(1);
-    const GG::Y     BAR_HEIGHT(10);
-
-    const double    MULTI_METER_STATUS_BAR_DISPLAYED_METER_RANGE_INCREMENT = 100.0;
+    constexpr int    EDGE_PAD(3);
+    constexpr int    BAR_PAD(1);
+    constexpr GG::Y  BAR_HEIGHT(10);
+    constexpr double MULTI_METER_STATUS_BAR_DISPLAYED_METER_RANGE_INCREMENT = 100.0;
 }
 
 MultiMeterStatusBar::MultiMeterStatusBar(GG::X w, int object_id, const std::vector<std::pair<MeterType, MeterType>>& meter_types) :
     GG::Wnd(GG::X0, GG::Y0, w, GG::Y1, GG::INTERACTIVE),
     m_bar_shading_texture(ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "meter_bar_shading.png")),
     m_meter_types(meter_types),
-    m_initial_values(),
-    m_projected_values(),
-    m_target_max_values(),
-    m_object_id(object_id),
-    m_bar_colours()
+    m_object_id(object_id)
 {
     SetName("MultiMeterStatusBar");
     Update();
 }
 
 void MultiMeterStatusBar::Render() {
-    GG::Clr DARY_GREY = GG::Clr(44, 44, 44, 255);
-    GG::Clr HALF_GREY = GG::Clr(128, 128, 128, 128);
+    constexpr GG::Clr DARY_GREY = GG::Clr(44, 44, 44, 255);
+    constexpr GG::Clr HALF_GREY = GG::Clr(128, 128, 128, 128);
 
     GG::Pt ul = UpperLeft();
     GG::Pt lr = LowerRight();
@@ -124,9 +118,9 @@ void MultiMeterStatusBar::Render() {
             largest_value = m_target_max_values[i];
     }
 
-    double num_full_increments =
+    const double num_full_increments =
         std::ceil(largest_value / MULTI_METER_STATUS_BAR_DISPLAYED_METER_RANGE_INCREMENT);
-    double MULTI_METER_STATUS_BAR_DISPLAYED_METER_RANGE =
+    const double MULTI_METER_STATUS_BAR_DISPLAYED_METER_RANGE =
         num_full_increments * MULTI_METER_STATUS_BAR_DISPLAYED_METER_RANGE_INCREMENT;
 
     // lines for 20, 40, 60, 80 etc.

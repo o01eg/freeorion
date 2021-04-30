@@ -19,6 +19,7 @@ FO_ENUM(
     ((PATH_DATA_ROOT))
     ((PATH_DATA_USER))
     ((PATH_CONFIG))
+    ((PATH_CACHE))
     ((PATH_SAVE))
     ((PATH_TEMP))
     ((PATH_INVALID))
@@ -62,6 +63,21 @@ FO_COMMON_API void InitDirs(std::string const& argv0);
 //! * If the directory does not exist, it will be created.
 //! * This directory can be considered writable!
 FO_COMMON_API auto GetUserConfigDir() -> boost::filesystem::path const;
+
+//! Returns the directory where FreeOrion store user cache files.
+//!
+//! This covers:
+//! * cached files
+//!
+//! Defaults to:
+//! * Windows: Path to `%appdata%`\FreeOrion`.
+//! * MacOS: Path to `${HOME}/Library/FreeOrion`.
+//! * UNIX-like: Follows XDG Base Dir spec; Path to `${XDG_CACHE_HOME}/freeorion`.
+//!
+//! @note
+//! * If the directory does not exist, it will be created.
+//! * This directory can be considered writable!
+FO_COMMON_API auto GetUserCacheDir() -> boost::filesystem::path const;
 
 //! Returns the directory where FreeOrion stores user specific data.
 //!
@@ -119,6 +135,9 @@ FO_COMMON_API auto GetPythonHome() -> boost::filesystem::path const;
 #if defined(FREEORION_ANDROID)
 //! Sets android environment to access directories
 FO_COMMON_API void SetAndroidEnvironment(JNIEnv* env, jobject activity);
+
+//! Gets locale language from android anvironment
+FO_COMMON_API std::string GetAndroidLang();
 #endif
 
 //! Returns the full path to the configfile.
@@ -140,8 +159,10 @@ FO_COMMON_API auto GetServerSaveDir() -> boost::filesystem::path const;
 //! Returns an utf-8 encoded string from the given filesystem path.
 FO_COMMON_API auto PathToString(boost::filesystem::path const& path) -> std::string;
 
+#if !defined(FREEORION_ANDROID)
 //! Returns current timestamp in a form that can be used in file names
 FO_COMMON_API auto FilenameTimestamp() -> std::string;
+#endif
 
 //! Returns the path to @p to, as it appears from @p from.
 FO_COMMON_API auto RelativePath(boost::filesystem::path const& from, boost::filesystem::path const& to) -> boost::filesystem::path;
@@ -149,6 +170,10 @@ FO_COMMON_API auto RelativePath(boost::filesystem::path const& from, boost::file
 //! Returns true if the given @p path referrs to a FO content script and false
 //! otherwise.
 FO_COMMON_API auto IsFOCScript(boost::filesystem::path const& path) -> bool;
+
+//! Returns true if the given @p path referrs to a FO content Python script and false
+//! otherwise.
+FO_COMMON_API auto IsFOCPyScript(boost::filesystem::path const& path) -> bool;
 
 //! Returns a vector of pathes within @p path including a recursive search
 //! though sub-dirs.
@@ -169,6 +194,9 @@ FO_COMMON_API auto GetPath(std::string const& path_string) -> boost::filesystem:
 
 //! Returns true iff path exists and is a regular file
 FO_COMMON_API auto IsExistingFile(boost::filesystem::path const& path) -> bool;
+
+//! Returns true iff path exists and is a directory
+FO_COMMON_API auto IsExistingDir(boost::filesystem::path const& path) -> bool;
 
 //! Reads text file content from @p path and returs true if success
 FO_COMMON_API auto ReadFile(boost::filesystem::path const& path, std::string& file_contents) -> bool;

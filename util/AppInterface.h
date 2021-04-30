@@ -21,6 +21,7 @@ class Ship;
 class Fleet;
 class Building;
 class Field;
+class PythonParser;
 struct GalaxySetupData;
 
 class FO_COMMON_API IApp {
@@ -48,8 +49,14 @@ public:
     //! known universe of this application.
     virtual Universe& GetUniverse() = 0;
 
-    /** Start parsing universe object types on a separate thread. */
-    virtual void StartBackgroundParsing();
+    /** Launches asynchronous parsing of game content, then starts
+      * additional content parsing in the calling thread. \a barrier is
+      * unblocked when the asynchronous parsing of named value refs is
+      * completed, but the synchronous parsing of in the calling thread
+      * or the other asynchronous parsing may still be ongoing
+      * at that time.
+      * Requires \a python to be initialized. */
+    virtual void StartBackgroundParsing(const PythonParser& python, std::promise<void>&& barrier);
 
     /** Returns the set of known Empires for this application. */
     virtual EmpireManager& Empires() = 0;
@@ -154,13 +161,5 @@ inline Networking::ClientType GetPlayerClientType(int player_id)
 
 inline int EffectsProcessingThreads()
 { return IApp::GetApp()->EffectsProcessingThreads(); }
-
-
-// sentinel values returned by CurrentTurn().  Can't be an enum since
-// CurrentGameTurn() needs to return an integer game turn number
-FO_COMMON_API extern const int INVALID_GAME_TURN;     ///< returned by CurrentGameTurn if a game is not currently in progress or being set up.
-FO_COMMON_API extern const int BEFORE_FIRST_TURN;     ///< returned by CurrentGameTurn if the galaxy is currently being set up
-FO_COMMON_API extern const int IMPOSSIBLY_LARGE_TURN; ///< a number that's almost assuredly larger than any real turn number that might come up
-
 
 #endif

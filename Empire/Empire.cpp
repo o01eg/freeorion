@@ -489,7 +489,7 @@ std::map<std::string, int> Empire::TotalPolicySlots() const {
             ErrorLogger() << "Empire doesn't have policy category slot meter with name: " << cat_meter_pair.second;
             continue;
         }
-        retval[std::move(cat_meter_pair.first)] = it->second.Initial();
+        retval[std::move(cat_meter_pair.first)] = static_cast<int>(it->second.Initial());
     }
     return retval;
 }
@@ -890,7 +890,6 @@ bool Empire::ProducibleItem(const ProductionQueue::ProductionItem& item, int loc
         return ProducibleItem(item.build_type, location, context);
     else
         throw std::invalid_argument("Empire::ProducibleItem was passed a ProductionItem with an invalid BuildType");
-    return false;
 }
 
 bool Empire::EnqueuableItem(BuildType build_type, const std::string& name,
@@ -922,7 +921,6 @@ bool Empire::EnqueuableItem(const ProductionQueue::ProductionItem& item, int loc
         return ProducibleItem(item.build_type, location, context);
     else
         throw std::invalid_argument("Empire::ProducibleItem was passed a ProductionItem with an invalid BuildType");
-    return false;
 }
 
 int Empire::NumSitRepEntries(int turn/* = INVALID_GAME_TURN*/) const {

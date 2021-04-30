@@ -23,6 +23,7 @@
 #include "../../util/GameRules.h"
 #include "../../util/OptionsDB.h"
 #include "../../util/Process.h"
+#include "../../util/PythonCommon.h"
 #include "../../util/SaveGamePreviewUtils.h"
 #include "../../util/SitRepEntry.h"
 #include "../../util/Directories.h"
@@ -33,6 +34,7 @@
 #include "../../Empire/Empire.h"
 #include "../../combat/CombatLogManager.h"
 #include "../../parse/Parse.h"
+#include "../../parse/PythonParser.h"
 
 #include <GG/BrowseInfoWnd.h>
 #include <GG/dialogs/ThreeButtonDlg.h>
@@ -351,7 +353,16 @@ GGHumanClientApp::GGHumanClientApp(int width, int height, bool calculate_fps, st
     m_fsm->initiate();
 
     // Start parsing content
-    StartBackgroundParsing();
+    std::promise<void> barrier;
+    std::future<void> barrier_future = barrier.get_future();
+    std::thread background([this] (auto b) {
+        DebugLogger() << "Started background parser thread";
+        PythonCommon python;
+        python.Initialize();
+        StartBackgroundParsing(PythonParser(python, GetResourceDir() / "scripting"), std::move(b));
+    }, std::move(barrier));
+    background.detach();
+    barrier_future.wait();
     GetOptionsDB().OptionChangedSignal("resource.path").connect(
         boost::bind(&GGHumanClientApp::HandleResoureDirChange, this));
 }
@@ -400,16 +411,6 @@ bool GGHumanClientApp::CanSaveNow() const {
 void GGHumanClientApp::SetSinglePlayerGame(bool sp/* = true*/)
 { m_single_player_game = sp; }
 
-namespace {
-    std::string ServerClientExe() {
-#ifdef FREEORION_WIN32
-        return PathToString(GetBinDir() / "freeoriond.exe");
-#else
-        return (GetBinDir() / "freeoriond").string();
-#endif
-    }
-}
-
 #ifdef FREEORION_MACOSX
 #include <stdlib.h>
 #endif
@@ -436,7 +437,7 @@ void GGHumanClientApp::StartServer() {
         throw LocalServerAlreadyRunningException();
     }
 
-    std::string SERVER_CLIENT_EXE = ServerClientExe();
+    std::string SERVER_CLIENT_EXE = GetOptionsDB().Get<std::string>("misc.server-local-binary.path");
     DebugLogger() << "GGHumanClientApp::StartServer: " << SERVER_CLIENT_EXE;
 
 #ifdef FREEORION_MACOSX
@@ -451,31 +452,31 @@ void GGHumanClientApp::StartServer() {
     std::vector<std::string> args;
     std::string ai_config = GetOptionsDB().Get<std::string>("ai-config");
     std::string ai_path = GetOptionsDB().Get<std::string>("ai-path");
-    args.emplace_back("\"" + SERVER_CLIENT_EXE + "\"");
-    args.emplace_back("--resource.path");
-    args.emplace_back("\"" + GetOptionsDB().Get<std::string>("resource.path") + "\"");
+    args.push_back("\"" + SERVER_CLIENT_EXE + "\"");
+    args.push_back("--resource.path");
+    args.push_back("\"" + GetOptionsDB().Get<std::string>("resource.path") + "\"");
 
     auto force_log_level = GetOptionsDB().Get<std::string>("log-level");
     if (!force_log_level.empty()) {
-        args.emplace_back("--log-level");
-        args.emplace_back(GetOptionsDB().Get<std::string>("log-level"));
+        args.push_back("--log-level");
+        args.push_back(GetOptionsDB().Get<std::string>("log-level"));
     }
 
     if (ai_path != GetOptionsDB().GetDefaultValueString("ai-path")) {
-        args.emplace_back("--ai-path");
-        args.emplace_back(ai_path);
+        args.push_back("--ai-path");
+        args.push_back(ai_path);
         DebugLogger() << "ai-path set to '" << ai_path << "'";
     }
     if (!ai_config.empty()) {
-        args.emplace_back("--ai-config");
-        args.emplace_back(ai_config);
+        args.push_back("--ai-config");
+        args.push_back(ai_config);
         DebugLogger() << "ai-config set to '" << ai_config << "'";
     } else {
         DebugLogger() << "ai-config not set.";
     }
     if (m_single_player_game) {
-        args.emplace_back("--singleplayer");
-        args.emplace_back("--skip-checksum");
+        args.push_back("--singleplayer");
+        args.push_back("--skip-checksum");
     }
     DebugLogger() << "Launching server process with args: ";
     for (auto arg : args)
@@ -1548,7 +1549,16 @@ void GGHumanClientApp::UpdateFPSLimit() {
 void GGHumanClientApp::HandleResoureDirChange() {
     if (!m_game_started) {
         DebugLogger() << "Resource directory changed.  Reparsing universe ...";
-        StartBackgroundParsing();
+        std::promise<void> barrier;
+        std::future<void> barrier_future = barrier.get_future();
+        std::thread background([this] (auto b) {
+            DebugLogger() << "Started background parser thread";
+            PythonCommon python;
+            python.Initialize();
+            StartBackgroundParsing(PythonParser(python, GetResourceDir() / "scripting"), std::move(b));
+        }, std::move(barrier));
+        background.detach();
+        barrier_future.wait();
     } else {
         WarnLogger() << "Resource directory changes will take effect on application restart.";
     }

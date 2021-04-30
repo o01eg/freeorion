@@ -17,6 +17,7 @@ target_sources(freeorioncommon
         ${CMAKE_CURRENT_LIST_DIR}/OrderSet.h
         ${CMAKE_CURRENT_LIST_DIR}/Pending.h
         ${CMAKE_CURRENT_LIST_DIR}/Process.h
+        ${CMAKE_CURRENT_LIST_DIR}/PythonCommon.h
         ${CMAKE_CURRENT_LIST_DIR}/Random.h
         ${CMAKE_CURRENT_LIST_DIR}/SaveGamePreviewUtils.h
         ${CMAKE_CURRENT_LIST_DIR}/ScopedTimer.h
@@ -41,6 +42,7 @@ target_sources(freeorioncommon
         ${CMAKE_CURRENT_LIST_DIR}/Order.cpp
         ${CMAKE_CURRENT_LIST_DIR}/OrderSet.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Process.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/PythonCommon.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Random.cpp
         ${CMAKE_CURRENT_LIST_DIR}/SaveGamePreviewUtils.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ScopedTimer.cpp
@@ -74,6 +76,13 @@ endif()
 
 if(BUILD_CLIENT_GG)
     target_sources(freeorion
+        PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/DependencyVersions.cpp
+    )
+endif()
+
+if(BUILD_CLIENT_GODOT)
+    target_sources(freeoriongodot
         PRIVATE
             ${CMAKE_CURRENT_LIST_DIR}/DependencyVersions.cpp
     )

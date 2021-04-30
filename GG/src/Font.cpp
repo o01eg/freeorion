@@ -225,7 +225,7 @@ void SetJustification(bool& last_line_of_curr_just, Font::LineData& line_data, A
     }
 }
 
-const double ITALICS_SLANT_ANGLE = 12; // degrees
+constexpr double ITALICS_SLANT_ANGLE = 12; // degrees
 const double ITALICS_FACTOR = 1.0 / tan((90 - ITALICS_SLANT_ANGLE) * 3.1415926 / 180.0); // factor used to shear glyphs ITALICS_SLANT_ANGLE degrees CW from straight up
 
 const std::vector<std::pair<std::uint32_t, std::uint32_t>> PRINTABLE_ASCII_ALPHA_RANGES{
@@ -1258,11 +1258,15 @@ std::string Font::StripTags(const std::string& text, bool strip_unpaired_tags)
         sub_match<std::string::const_iterator> const* text_match;
         sub_match<std::string::const_iterator> const* whitespace_match;
 
-        if ((text_match = &(*it)[text_tag]) && (text_match->matched))
+        text_match = &(*it)[text_tag];
+        if (text_match  && (text_match->matched)) {
             retval << Substring(text, *text_match);
 
-        else if ((whitespace_match = &(*it)[whitespace_tag]) && whitespace_match->matched)
-            retval << Substring(text, *whitespace_match);
+        } else {
+            whitespace_match = &(*it)[whitespace_tag];
+            if (whitespace_match && whitespace_match->matched)
+                retval << Substring(text, *whitespace_match);
+        }
     }
 
     return retval.str();

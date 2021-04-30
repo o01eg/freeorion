@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <string>
 
 class Order;
 
@@ -92,7 +93,7 @@ template <typename Archive>
 void OrderSet::serialize(Archive& ar, const unsigned int version)
 {
     ar  & BOOST_SERIALIZATION_NVP(m_orders);
-    if (Archive::is_loading::value) {
+    if constexpr (Archive::is_loading::value) {
         m_last_added_orders.clear();
         m_last_deleted_orders.clear();
     }

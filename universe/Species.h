@@ -10,6 +10,7 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/optional/optional.hpp>
+#include "ConstantsFwd.h"
 #include "EnumsFwd.h"
 #include "../util/Enum.h"
 #include "../util/Export.h"
@@ -22,8 +23,6 @@ namespace Condition {
 namespace Effect {
     class EffectsGroup;
 }
-
-FO_COMMON_API extern const int ALL_EMPIRES;
 
 //! Environmental suitability of planets for a particular Species
 FO_ENUM(
@@ -241,6 +240,9 @@ public:
       * such opinion yet recorded. */
     float SpeciesSpeciesOpinion(const std::string& opinionated_species_name,
                                 const std::string& rated_species_name) const;
+
+    std::vector<std::string> SpeciesThatLike(const std::string& content_name) const;
+    std::vector<std::string> SpeciesThatDislike(const std::string& content_name) const;
 
     /** Returns a number, calculated from the contained data, which should be
       * different for different contained data, and must be the same for

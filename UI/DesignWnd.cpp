@@ -40,8 +40,6 @@
 #include <unordered_map>
 #include <functional>
 
-FO_COMMON_API extern const int INVALID_DESIGN_ID;
-
 struct Availability {
     // Declaring an enum inside a struct makes the syntax when using the enum 
     // with tuples simpler, without polluting the global namespace with 3
@@ -445,7 +443,7 @@ namespace {
     std::vector<int> SavedDesignsManager::OrderedIDs() const {
         CheckPendingDesigns();
         std::vector<int> retval;
-        for (const auto uuid: m_ordered_uuids) {
+        for (const auto& uuid : m_ordered_uuids) {
             const auto& it = m_saved_designs.find(uuid);
             if (it == m_saved_designs.end())
                 continue;
@@ -560,7 +558,7 @@ namespace {
 
         std::stringstream ss;
         ss << DESIGN_MANIFEST_PREFIX << "\n";
-        for (const auto uuid: m_ordered_uuids)
+        for (const auto& uuid : m_ordered_uuids)
             ss << "    uuid = \"" << uuid << "\"\n";
         WriteToFile(file, ss.str());
     }
@@ -3832,7 +3830,7 @@ public:
 
     /** I18nString stores a string that might be in the stringtable. */
     class I18nString {
-        public:
+    public:
         I18nString (bool is_in_stringtable, const std::string& text) :
             m_is_in_stringtable(is_in_stringtable), m_text(text)
         {}
@@ -3851,7 +3849,7 @@ public:
         bool IsInStringtable() const
         { return m_is_in_stringtable; }
 
-        private:
+    private:
         const bool m_is_in_stringtable;
         const std::string m_text;
     };

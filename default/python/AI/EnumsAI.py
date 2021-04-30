@@ -10,40 +10,43 @@ class EnumItem(int):
         obj.enum_name = enum_name
         return obj
 
-    def __str__(self):
+    def __repr__(self):
         return "%s.%s" % (self.enum_name, self.name)
+
+    def __str__(self):
+        return repr(self)
 
 
 class EnumMeta(type):
     @staticmethod
     def __new__(cls, name, bases, attrs):
-        super_new = super(EnumMeta, cls).__new__
-        parents = [b for b in bases if isinstance(b, EnumMeta)]
-        if not parents:
-            return super_new(cls, name, bases, attrs)
+        """
+        Modify class on creation.
 
+        Assign all attributes which are int as EnumItem.
+        """
         for k, v in attrs.items():
             if not k.startswith('_') and isinstance(v, int):
                 attrs[k] = EnumItem(v, k, name)
-        return super_new(cls, name, bases, attrs)
+        return super(EnumMeta, cls).__new__(cls, name, bases, attrs)
 
 
 class Enum(metaclass=EnumMeta):
-    @classmethod
-    def range(cls, start, end):
-        result = []
-        current_range = range(start, end)
-        for key in dir(cls):
-            if not key.startswith('_'):
-                value = getattr(cls, key)
-                if isinstance(value, EnumItem) and value in current_range:
-                    result.append(value)
-        return sorted(result)
+    """
+    Implementation of the Enum object.
+
+    Each item is represented as EnumItem enherited from `int`.
+    Basically it is `int` with `name` and `enum_name`.
+    """
 
     @classmethod
     def has_item(cls, item: EnumItem) -> bool:
         """Return True if specified item is a member of the enum."""
-        return hasattr(cls, item.name) and isinstance(getattr(cls, item.name), EnumItem)
+        return (
+                isinstance(getattr(cls, item.name), EnumItem)
+                and cls.__name__ == item.enum_name
+                and hasattr(cls, item.name)
+        )
 
 
 class PriorityType(Enum):
@@ -72,11 +75,25 @@ class PriorityType(Enum):
 
 
 def get_priority_resource_types():
-    return PriorityType.range(1, 6)
+    return [
+        PriorityType.RESOURCE_GROWTH,
+        PriorityType.RESOURCE_PRODUCTION,
+        PriorityType.RESOURCE_RESEARCH,
+        PriorityType.RESOURCE_TRADE,
+        PriorityType.RESOURCE_CONSTRUCTION,
+    ]
 
 
 def get_priority_production_types():
-    return PriorityType.range(6, 12)
+    return [
+        PriorityType.PRODUCTION_EXPLORATION,
+        PriorityType.PRODUCTION_OUTPOST,
+        PriorityType.PRODUCTION_COLONISATION,
+        PriorityType.PRODUCTION_INVASION,
+        PriorityType.PRODUCTION_MILITARY,
+        PriorityType.PRODUCTION_BUILDINGS,
+
+    ]
 
 
 class MissionType(Enum):

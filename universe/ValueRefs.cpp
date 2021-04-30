@@ -49,8 +49,6 @@
 std::string DoubleToString(double val, int digits, bool always_show_sign);
 bool UserStringExists(const std::string& str);
 
-FO_COMMON_API extern const int INVALID_DESIGN_ID;
-
 namespace {
     auto StackTrace() {
 #if BOOST_VERSION >= 106500
@@ -1400,31 +1398,31 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
 
     if (variable_name == "BuildingTypesOwned")
         empire_property_string_key = &Empire::BuildingTypesOwned;
-    if (variable_name == "BuildingTypesProduced")
+    else if (variable_name == "BuildingTypesProduced")
         empire_property_string_key = &Empire::BuildingTypesProduced;
-    if (variable_name == "BuildingTypesScrapped")
+    else if (variable_name == "BuildingTypesScrapped")
         empire_property_string_key = &Empire::BuildingTypesScrapped;
-    if (variable_name == "SpeciesColoniesOwned")
+    else if (variable_name == "SpeciesColoniesOwned")
         empire_property_string_key = &Empire::SpeciesColoniesOwned;
-    if (variable_name == "SpeciesPlanetsBombed")
+    else if (variable_name == "SpeciesPlanetsBombed")
         empire_property_string_key = &Empire::SpeciesPlanetsBombed;
-    if (variable_name == "SpeciesPlanetsDepoped")
+    else if (variable_name == "SpeciesPlanetsDepoped")
         empire_property_string_key = &Empire::SpeciesPlanetsDepoped;
-    if (variable_name == "SpeciesPlanetsInvaded")
+    else if (variable_name == "SpeciesPlanetsInvaded")
         empire_property_string_key = &Empire::SpeciesPlanetsInvaded;
-    if (variable_name == "SpeciesShipsDestroyed")
+    else if (variable_name == "SpeciesShipsDestroyed")
         empire_property_string_key = &Empire::SpeciesShipsDestroyed;
-    if (variable_name == "SpeciesShipsLost")
+    else if (variable_name == "SpeciesShipsLost")
         empire_property_string_key = &Empire::SpeciesShipsLost;
-    if (variable_name == "SpeciesShipsOwned")
+    else if (variable_name == "SpeciesShipsOwned")
         empire_property_string_key = &Empire::SpeciesShipsOwned;
-    if (variable_name == "SpeciesShipsProduced")
+    else if (variable_name == "SpeciesShipsProduced")
         empire_property_string_key = &Empire::SpeciesShipsProduced;
-    if (variable_name == "SpeciesShipsScrapped")
+    else if (variable_name == "SpeciesShipsScrapped")
         empire_property_string_key = &Empire::SpeciesShipsScrapped;
-    if (variable_name == "ShipPartsOwned")
+    else if (variable_name == "ShipPartsOwned")
         empire_property_string_key = &Empire::ShipPartsOwned;
-    if (variable_name == "TurnTechResearched")
+    else if (variable_name == "TurnTechResearched")
         empire_property_string_key = &Empire::ResearchedTechs;
 
     // empire properties indexed by strings
@@ -1459,15 +1457,15 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
                 key_int >= int(ShipPartClass::NUM_SHIP_PART_CLASSES))
             { return 0; }
 
-            auto key_filter = [part_class = ShipPartClass(key_int)](const std::map<ShipPartClass, int>::value_type& e){ return e.first == part_class; };
+            auto key_filter_class = [part_class = ShipPartClass(key_int)](const std::map<ShipPartClass, int>::value_type& e){ return e.first == part_class; };
 
             if (empire)
-                return boost::accumulate(empire->ShipPartClassOwned() | filtered(key_filter) | map_values, 0);
+                return boost::accumulate(empire->ShipPartClassOwned() | filtered(key_filter_class) | map_values, 0);
 
             int sum = 0;
-            for ([[maybe_unused]] auto& [ignored_id, empire] : context.Empires()) {
+            for ([[maybe_unused]] auto& [ignored_id, loop_empire] : context.Empires()) {
                 (void)ignored_id; // quiet unused variable warning
-                sum += boost::accumulate(empire->ShipPartClassOwned() | filtered(key_filter) | map_values, 0);
+                sum += boost::accumulate(loop_empire->ShipPartClassOwned() | filtered(key_filter_class) | map_values, 0);
             }
             return sum;
         }
@@ -1476,9 +1474,9 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             return boost::accumulate(empire_property_string_key(*empire) | filtered(key_filter) | map_values, 0);
 
         int sum = 0;
-        for ([[maybe_unused]] auto& [ignored_id, empire] : context.Empires()) {
+        for ([[maybe_unused]] auto& [ignored_id, loop_empire] : context.Empires()) {
             (void)ignored_id; // quiet unused variable warning
-            sum += boost::accumulate(empire_property_string_key(*empire) | filtered(key_filter) | map_values, 0);
+            sum += boost::accumulate(empire_property_string_key(*loop_empire) | filtered(key_filter) | map_values, 0);
         }
         return sum;
     }
@@ -1487,17 +1485,17 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
 
     if (variable_name == "EmpireShipsDestroyed")
         empire_property_int_key = &Empire::EmpireShipsDestroyed;
-    if (variable_name == "ShipDesignsDestroyed")
+    else if (variable_name == "ShipDesignsDestroyed")
         empire_property_int_key = &Empire::ShipDesignsDestroyed;
-    if (variable_name == "ShipDesignsLost")
+    else if (variable_name == "ShipDesignsLost")
         empire_property_int_key = &Empire::ShipDesignsLost;
-    if (variable_name == "ShipDesignsOwned")
+    else if (variable_name == "ShipDesignsOwned")
         empire_property_int_key = &Empire::ShipDesignsOwned;
-    if (variable_name == "ShipDesignsInProduction")
+    else if (variable_name == "ShipDesignsInProduction")
         empire_property_int_key = &Empire::ShipDesignsInProduction;
-    if (variable_name == "ShipDesignsProduced")
+    else if (variable_name == "ShipDesignsProduced")
         empire_property_int_key = &Empire::ShipDesignsProduced;
-    if (variable_name == "ShipDesignsScrapped")
+    else if (variable_name == "ShipDesignsScrapped")
         empire_property_int_key = &Empire::ShipDesignsScrapped;
 
     // empire properties indexed by integers
@@ -1540,9 +1538,9 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             return boost::accumulate(empire_property_int_key(*empire) | filtered(key_filter) | map_values, 0);
 
         int sum = 0;
-        for ([[maybe_unused]] auto& [ignored_id, empire] : context.Empires()) {
+        for ([[maybe_unused]] auto& [ignored_id, loop_empire] : context.Empires()) {
             (void)ignored_id; // quiet unused variable warning
-            sum += boost::accumulate(empire_property_int_key(*empire) | filtered(key_filter) | map_values, 0);
+            sum += boost::accumulate(empire_property_int_key(*loop_empire) | filtered(key_filter) | map_values, 0);
         }
         return sum;
     }
@@ -1776,6 +1774,42 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
 
         return empire->TurnPolicyAdopted(policy_name);
     }
+    else if (variable_name == "NumPoliciesAdopted") {
+        int empire_id = ALL_EMPIRES;
+        if (m_int_ref1) {
+            empire_id = m_int_ref1->Eval(context);
+            if (empire_id == ALL_EMPIRES)
+                return 0;
+        }
+        auto empire = context.GetEmpire(empire_id);
+        if (!empire)
+            return 0;
+
+        std::string policy_category_name;
+        if (m_string_ref1)
+            policy_category_name = m_string_ref1->Eval();
+
+        int count = 0;
+        if (policy_category_name.empty()) {
+            for (auto& p : empire->AdoptedPolicies()) {
+                if (!p.empty())
+                    ++count;
+            }
+            return count;
+
+        } else {
+            for (auto& [cat_name, policy_names_turns] : empire->CategoriesSlotsPoliciesAdopted()) {
+                if (cat_name == policy_category_name) {
+                    for (auto& [ignored_turn, policy_name] : policy_names_turns) {
+                        (void)ignored_turn;
+                        if (!policy_name.empty())
+                            ++count;
+                    }
+                }
+            }
+            return count;
+        }
+    }
 
     return 0;
 }
@@ -1809,16 +1843,16 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
     }
 
     // empire properties indexed by integers
-    std::function<const std::map<int, float>& (const Empire&)> empire_property{nullptr};
+    std::function<const std::map<int, float>& (const Empire&)> empire_property_int_key{nullptr};
 
     if (variable_name == "PropagatedSystemSupplyRange")
-        empire_property = [](const Empire& empire){ return GetSupplyManager().PropagatedSupplyRanges(empire.EmpireID()); };
+        empire_property_int_key = [](const Empire& empire){ return GetSupplyManager().PropagatedSupplyRanges(empire.EmpireID()); };
     if (variable_name == "SystemSupplyRange")
-        empire_property = &Empire::SystemSupplyRanges;
+        empire_property_int_key = &Empire::SystemSupplyRanges;
     if (variable_name == "PropagatedSystemSupplyDistance")
-        empire_property = [](const Empire& empire){ return GetSupplyManager().PropagatedSupplyDistances(empire.EmpireID()); };
+        empire_property_int_key = [](const Empire& empire){ return GetSupplyManager().PropagatedSupplyDistances(empire.EmpireID()); };
 
-    if (empire_property) {
+    if (empire_property_int_key) {
         using namespace boost::adaptors;
 
         std::shared_ptr<const Empire> empire;
@@ -1837,15 +1871,54 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
             key_filter = [k = m_int_ref2->Eval(context)](auto e){ return k == e.first; };
 
         if (empire)
-            return boost::accumulate(empire_property(*empire) | filtered(key_filter) | map_values, 0.0f);
+            return boost::accumulate(empire_property_int_key(*empire) | filtered(key_filter) | map_values, 0.0f);
 
         float sum = 0.0f;
         for ([[maybe_unused]] auto& [unused_id, loop_empire] : context.Empires()) {
             (void)unused_id; // quiet unused variable warning
-            sum += boost::accumulate(empire_property(*loop_empire) | filtered(key_filter) | map_values, 0.0f);
+            sum += boost::accumulate(empire_property_int_key(*loop_empire) | filtered(key_filter) | map_values, 0.0f);
         }
         return sum;
     }
+
+
+    if (variable_name == "EmpireStockpile") {
+        std::shared_ptr<const Empire> empire;
+        if (m_int_ref1) {
+            int empire_id = m_int_ref1->Eval(context);
+            if (empire_id == ALL_EMPIRES)
+                return 0;
+            empire = context.GetEmpire(empire_id);
+            if (!empire)
+                return 0;
+        }
+
+        ResourceType res_type = ResourceType::INVALID_RESOURCE_TYPE;
+        if (m_string_ref1) {
+            std::string res_name = m_string_ref1->Eval(context);
+            if (res_name == "Influence")
+                res_type = ResourceType::RE_INFLUENCE;
+            else if (res_name == "Industry")
+                res_type = ResourceType::RE_INDUSTRY;
+        }
+        if (res_type == ResourceType::INVALID_RESOURCE_TYPE)
+            return 0;
+
+        std::function<int (const Empire*)> empire_property{nullptr};
+
+        empire_property = boost::bind(&Empire::ResourceStockpile, boost::placeholders::_1, res_type);
+
+        using namespace boost::adaptors;
+        auto GetRawPtr = [](const auto& smart_ptr){ return smart_ptr.get(); };
+
+        if (!empire) {
+            return boost::accumulate(context.Empires() | map_values | transformed(GetRawPtr) |
+                                     transformed(empire_property), 0);
+        }
+
+        return empire_property(empire.get());
+    }
+
 
     // non-empire properties
     if (variable_name == "GameRule") {

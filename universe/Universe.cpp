@@ -55,15 +55,11 @@ namespace boost::asio {
 }
 #endif
 
-FO_COMMON_API extern const int INVALID_DESIGN_ID;
-
 namespace {
     DeclareThreadSafeLogger(effects);
     DeclareThreadSafeLogger(conditions);
-}
 
-namespace {
-    const bool ENABLE_VISIBILITY_EMPIRE_MEMORY = true;      // toggles using memory with visibility, so that empires retain knowledge of objects viewed on previous turns
+    constexpr bool ENABLE_VISIBILITY_EMPIRE_MEMORY = true; // toggles using memory with visibility, so that empires retain knowledge of objects viewed on previous turns
 
     void AddOptions(OptionsDB& db) {
         auto HardwareThreads = []() -> int {
@@ -105,7 +101,7 @@ namespace {
 
     // the effective distance for ships travelling along a wormhole, for
     // determining how much of their speed is consumed by the jump
-    // unused variable const double    WORMHOLE_TRAVEL_DISTANCE = 0.1;
+    // unused variable consexprt double WORMHOLE_TRAVEL_DISTANCE = 0.1;
 
     template <typename Key, typename Value>
     struct constant_property
@@ -122,9 +118,6 @@ namespace boost {
     template <typename Key, typename Value>
     const Value& get(const constant_property<Key, Value>& pmap, const Key&) { return pmap.m_value; }
 }
-
-
-extern FO_COMMON_API const int ALL_EMPIRES = -1;
 
 /////////////////////////////////////////////
 // class Universe
@@ -303,9 +296,9 @@ std::set<int> Universe::EmpireVisibleObjectIDs(int empire_id, const EmpireManage
     if (empire_id != ALL_EMPIRES) {
         empire_ids.insert(empire_id);
     } else {
-        for ([[maybe_unused]] auto& [empire_id, empire] : empires) {
+        for ([[maybe_unused]] auto& [loop_empire_id, empire] : empires) {
             (void)empire;   // quieting unused variable warning
-            empire_ids.insert(empire_id);
+            empire_ids.insert(loop_empire_id);
         }
     }
 
@@ -879,13 +872,31 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec,
         account_map.clear();    // remove any old accounting info. this should be redundant here.
         account_map.reserve(meters.size());
 
-        for (auto& meter_pair : meters) {
-            MeterType type = meter_pair.first;
-            const auto& meter = meter_pair.second;
+        for (auto& [type, meter] : meters) {
+            (void)type; // quiet warning
             float meter_change = meter.Current() - Meter::DEFAULT_VALUE;
             if (meter_change != 0.0f)
                 account_map[type].emplace_back(INVALID_OBJECT_ID, EffectsCauseType::ECT_INHERENT,
                                                meter_change, meter.Current());
+        }
+
+        // account for ground combat in troop meter adjustments
+        if (obj->ObjectType() == UniverseObjectType::OBJ_PLANET) {
+            if (auto planet = static_cast<Planet*>(obj.get())) {
+                if (auto meter = planet->GetMeter(MeterType::METER_TROOPS)) {
+                    float pre_value = meter->Current();
+
+                    auto empires_troops = planet->EmpireGroundCombatForces();
+                    Planet::ResolveGroundCombat(empires_troops, context.diplo_statuses);
+                    meter->SetCurrent(empires_troops[obj->Owner()]);
+
+                    float meter_change = meter->Current() - pre_value;
+                    if (meter_change != 0.0f)
+                        account_map[MeterType::METER_TROOPS].emplace_back(
+                            INVALID_OBJECT_ID, EffectsCauseType::ECT_UNKNOWN_CAUSE,
+                            meter_change, meter->Current());
+                }
+            }
         }
     }
 
@@ -1694,8 +1705,10 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
             if (target_set.empty())
                 continue;
 
-            TraceLogger(effects) << "\n\n * * * * * * * * * * * (new effects group log entry)(" << effects_group->TopLevelContent()
-                                 << " " << effects_group->AccountingLabel() << " " << effects_group->StackingGroup() << ")";
+            TraceLogger(effects) << "\n\n * * * * * * * * * * * (new effects group log entry)("
+                                 << " content: " << effects_group->TopLevelContent()
+                                 << "  acc.label: " << effects_group->AccountingLabel()
+                                 << "  stack grp: " << effects_group->StackingGroup() << " )";
 
             // execute Effects in the EffectsGroup
             auto source = context.ContextObjects().get(sourced_effects_group.source_object_id);
@@ -1992,9 +2005,9 @@ namespace {
             // detected by the empire if the empire has a detector in range.
             // being detectable by an empire requires the object to have
             // low enough stealth (0 or below the empire's detection strength)
-            for (const auto& [empire_id, detection_strength] : empire_detection_strengths) {
-                if (object_stealth <= detection_strength || object_stealth <= 0.0f || obj->OwnedBy(empire_id))
-                    retval[empire_id][object_pos].emplace_back(obj->ID());
+            for (const auto& [loop_empire_id, detection_strength] : empire_detection_strengths) {
+                if (object_stealth <= detection_strength || object_stealth <= 0.0f || obj->OwnedBy(loop_empire_id))
+                    retval[loop_empire_id][object_pos].push_back(obj->ID());
             }
         }
         return retval;
@@ -2353,7 +2366,6 @@ namespace {
                 }
             }
         }
-
     }
 
     void SetTravelledStarlaneEndpointsVisible(const ObjectMap& objects,
@@ -2377,20 +2389,16 @@ namespace {
             auto& vis_map = empire_object_visibility[fleet->Owner()];
 
             auto system_vis_it = vis_map.find(prev);
-            if (system_vis_it == vis_map.end()) {
+            if (system_vis_it == vis_map.end())
                 vis_map[prev] = Visibility::VIS_BASIC_VISIBILITY;
-            } else {
-                if (system_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
-                    system_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
-            }
+            else if (system_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
+                system_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
 
             system_vis_it = vis_map.find(next);
-            if (system_vis_it == vis_map.end()) {
+            if (system_vis_it == vis_map.end())
                 vis_map[next] = Visibility::VIS_BASIC_VISIBILITY;
-            } else {
-                if (system_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
-                    system_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
-            }
+            else if (system_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
+                system_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
         }
     }
 
@@ -3025,7 +3033,7 @@ void Universe::GetObjectsToSerialize(ObjectMap& objects, int encoding_empire) co
         // streamlined option
         objects.CopyForSerialize(*m_objects);
 
-    } else if (!ENABLE_VISIBILITY_EMPIRE_MEMORY) {
+    } else if constexpr (!ENABLE_VISIBILITY_EMPIRE_MEMORY) {
         // if encoding without memory, copy all info visible to specified empire
         objects.Copy(*m_objects, encoding_empire);
 
@@ -3080,7 +3088,7 @@ void Universe::GetEmpireKnownObjectsToSerialize(EmpireObjectMap& empire_latest_k
 
     empire_latest_known_objects.clear();
 
-    if (!ENABLE_VISIBILITY_EMPIRE_MEMORY)
+    if constexpr (!ENABLE_VISIBILITY_EMPIRE_MEMORY)
         return;
 
     if (encoding_empire == ALL_EMPIRES) {

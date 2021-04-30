@@ -2277,7 +2277,7 @@ WaitingForMPGameJoiners::WaitingForMPGameJoiners(my_context c) :
     m_expected_ai_player_names.clear();
 
     for (std::pair<int, PlayerSetupData>& psd : m_lobby_data->players) {
-        player_setup_data.emplace_back(psd.second);
+        player_setup_data.push_back(psd.second);
         if (psd.second.client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
             m_expected_ai_player_names.emplace(psd.second.player_name);
     }
@@ -3036,7 +3036,7 @@ sc::result PlayingGame::react(const LobbyUpdate& msg) {
         if (player.first == sender->PlayerID() && player.second.save_game_empire_id != ALL_EMPIRES) {
             int empire_id = server.AddPlayerIntoGame(sender, player.second.save_game_empire_id);
             if (empire_id != ALL_EMPIRES) {
-                context<ServerFSM>().UpdateIngameLobby();
+                server.m_fsm->UpdateIngameLobby();
                 return discard_event();
             }
         }
@@ -3095,8 +3095,10 @@ WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
 
     auto& playing_game = context<PlayingGame>();
 
-    // reset turn timer if there no fixed interval
-    if (!GetOptionsDB().Get<bool>("network.server.turn-timeout.fixed-interval")) {
+    // reset turn timer if there no fixed interval and no first turn time set
+    if (!GetOptionsDB().Get<bool>("network.server.turn-timeout.fixed-interval")
+        && GetOptionsDB().Get<std::string>("network.server.turn-timeout.first-turn-time").empty())
+    {
         playing_game.m_turn_timeout.cancel();
         if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0 && !Server().IsHaveWinner()) {
             playing_game.m_turn_timeout.expires_from_now(boost::posix_time::seconds(GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval")));
@@ -3104,6 +3106,9 @@ WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
                                                                &playing_game,
                                                                boost::asio::placeholders::error));
         }
+    } else {
+        // Cleanup time of first turn so it won't be applied second time
+        GetOptionsDB().Set<std::string>("network.server.turn-timeout.first-turn-time", "");
     }
 
     if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0 && !Server().IsHaveWinner()) {

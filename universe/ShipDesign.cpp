@@ -17,10 +17,6 @@
 #include "../util/i18n.h"
 
 
-const int INVALID_DESIGN_ID = -1;
-
-//using boost::io::str;
-
 namespace {
     void AddRules(GameRules& rules) {
         // makes all ships cost 1 PP and take 1 turn to produce
@@ -31,7 +27,7 @@ namespace {
     bool temp_bool = RegisterGameRules(&AddRules);
 
     const std::string EMPTY_STRING;
-    const float ARBITRARY_LARGE_COST = 999999.9f;
+    constexpr float ARBITRARY_LARGE_COST = 999999.9f;
 
     bool DesignsTheSame(const ShipDesign& one, const ShipDesign& two) {
         return (
@@ -553,9 +549,6 @@ void ShipDesign::ForceValidDesignOrThrow(const boost::optional<std::invalid_argu
     bool no_hull_available = force_valid->first.empty();
     if (no_hull_available)
         ss << "ShipDesign has no valid hull and there are no other hulls available.\n";
-
-    ss << "Invalid ShipDesign:\n";
-    ss << Dump() << "\n";
 
     std::tie(m_hull, m_parts) = *force_valid;
 

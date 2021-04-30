@@ -35,8 +35,6 @@
 
 using boost::io::str;
 
-FO_COMMON_API extern const int INVALID_DESIGN_ID;
-
 bool UserStringExists(const std::string& str);
 
 namespace {
@@ -139,7 +137,7 @@ namespace {
                 auto flattened_operands = FlattenAndNestedConditions(and_condition->Operands());
                 retval.insert(retval.end(), flattened_operands.begin(), flattened_operands.end());
             } else if (condition) {
-                retval.emplace_back(condition);
+                retval.push_back(condition);
             }
         }
         return retval;
@@ -948,7 +946,7 @@ void SortedNumberOf::Eval(const ScriptingContext& parent_context,
                 // yes; move object to matches
                 *smnt_it = subcondition_matching_non_matches.back();
                 subcondition_matching_non_matches.pop_back();
-                matches.emplace_back(matched_object);   // TODO: can I std::move ?
+                matches.push_back(matched_object);   // TODO: can I std::move ?
             }
         }
 
@@ -972,7 +970,7 @@ void SortedNumberOf::Eval(const ScriptingContext& parent_context,
                 // yes; move back into matches
                 *smt_it = subcondition_matching_matches.back();
                 subcondition_matching_matches.pop_back();
-                matches.emplace_back(matched_object);   // TODO: can I std::move ?
+                matches.push_back(matched_object);   // TODO: can I std::move ?
             }
         }
 
@@ -1510,7 +1508,7 @@ void Source::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_co
                                                ObjectSet& condition_non_targets) const
 {
     if (parent_context.source)
-        condition_non_targets.emplace_back(parent_context.source);
+        condition_non_targets.push_back(parent_context.source);
 }
 
 unsigned int Source::GetCheckSum() const {
@@ -1558,7 +1556,7 @@ void RootCandidate::GetDefaultInitialCandidateObjects(const ScriptingContext& pa
                                                       ObjectSet& condition_non_targets) const
 {
     if (parent_context.condition_root_candidate)
-        condition_non_targets.emplace_back(parent_context.condition_root_candidate);
+        condition_non_targets.push_back(parent_context.condition_root_candidate);
 }
 
 unsigned int RootCandidate::GetCheckSum() const {
@@ -1606,7 +1604,7 @@ void Target::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_co
                                                ObjectSet& condition_non_targets) const
 {
     if (parent_context.effect_target)
-        condition_non_targets.emplace_back(parent_context.effect_target);
+        condition_non_targets.push_back(parent_context.effect_target);
 }
 
 unsigned int Target::GetCheckSum() const {
@@ -2261,7 +2259,7 @@ void Building::Eval(const ScriptingContext& parent_context,
         names.reserve(m_names.size());
         // get all names from valuerefs
         for (auto& name : m_names)
-            names.emplace_back(name->Eval(parent_context));
+            names.push_back(name->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, BuildingSimpleMatch(names));
     } else {
         // re-evaluate allowed building types range for each candidate object
@@ -2904,7 +2902,7 @@ namespace {
             // gather the ids
             for (auto& obj : subcondition_matches) {
                 if (obj)
-                    m_subcondition_matches_ids.emplace_back(obj->ID());
+                    m_subcondition_matches_ids.push_back(obj->ID());
             }
             // sort them
             std::sort(m_subcondition_matches_ids.begin(), m_subcondition_matches_ids.end());
@@ -2986,11 +2984,11 @@ void Contains::Eval(const ScriptingContext& parent_context,
         if (search_domain == SearchDomain::MATCHES && subcondition_matches.empty()) {
             // move to non_matches
             matches.clear();
-            non_matches.emplace_back(local_context.condition_local_candidate);
+            non_matches.push_back(local_context.condition_local_candidate);
         } else if (search_domain == SearchDomain::NON_MATCHES && !subcondition_matches.empty()) {
             // move to matches
             non_matches.clear();
-            matches.emplace_back(local_context.condition_local_candidate);
+            matches.push_back(local_context.condition_local_candidate);
         }
 
     } else {
@@ -3105,7 +3103,7 @@ namespace {
             // gather the ids
             for (auto& obj : subcondition_matches) {
                 if (obj)
-                    m_subcondition_matches_ids.emplace_back(obj->ID());
+                    m_subcondition_matches_ids.push_back(obj->ID());
             }
             // sort them
             std::sort(m_subcondition_matches_ids.begin(), m_subcondition_matches_ids.end());
@@ -3121,8 +3119,8 @@ namespace {
             const int candidate_id = candidate->ID();
             const int    system_id = candidate->SystemID();
             const int container_id = candidate->ContainerObjectID();
-            if (   system_id != INVALID_OBJECT_ID &&    system_id != candidate_id) candidate_containers.emplace_back(   system_id);
-            if (container_id != INVALID_OBJECT_ID && container_id !=    system_id) candidate_containers.emplace_back(container_id);
+            if (   system_id != INVALID_OBJECT_ID &&    system_id != candidate_id) candidate_containers.push_back(   system_id);
+            if (container_id != INVALID_OBJECT_ID && container_id !=    system_id) candidate_containers.push_back(container_id);
             // FIXME: currently, direct container and system will do. In the future, we might need a way to retrieve containers of containers
 
             // We need to test whether candidate_containers and m_subcondition_matches_ids have a common element.
@@ -3201,11 +3199,11 @@ void ContainedBy::Eval(const ScriptingContext& parent_context,
         if (search_domain == SearchDomain::MATCHES && subcondition_matches.empty()) {
             // move to non_matches
             matches.clear();
-            non_matches.emplace_back(local_context.condition_local_candidate);
+            non_matches.push_back(local_context.condition_local_candidate);
         } else if (search_domain == SearchDomain::NON_MATCHES && !subcondition_matches.empty()) {
             // move to matches
             non_matches.clear();
-            matches.emplace_back(local_context.condition_local_candidate);
+            matches.push_back(local_context.condition_local_candidate);
         }
 
     } else {
@@ -3411,7 +3409,7 @@ void InOrIsSystem::GetDefaultInitialCandidateObjects(const ScriptingContext& par
               std::make_move_iterator(sys_objs.end()),
               std::back_inserter(condition_non_targets));
     // also insert system itself
-    condition_non_targets.emplace_back(std::move(system));
+    condition_non_targets.push_back(std::move(system));
 }
 
 bool InOrIsSystem::Match(const ScriptingContext& local_context) const {
@@ -3695,7 +3693,7 @@ void ObjectID::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
         return;
 
     if (auto obj = parent_context.ContextObjects().ExistingObject(object_id))
-        condition_non_targets.emplace_back(std::move(obj));
+        condition_non_targets.push_back(std::move(obj));
 }
 
 bool ObjectID::Match(const ScriptingContext& local_context) const {
@@ -3804,7 +3802,7 @@ void PlanetType::Eval(const ScriptingContext& parent_context,
         types.reserve(m_types.size());
         // get all types from valuerefs
         for (auto& type : m_types)
-            types.emplace_back(type->Eval(parent_context));
+            types.push_back(type->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, PlanetTypeSimpleMatch(types, parent_context.ContextObjects()));
     } else {
         // re-evaluate contained objects for each candidate object
@@ -3975,7 +3973,7 @@ void PlanetSize::Eval(const ScriptingContext& parent_context,
         sizes.reserve(m_sizes.size());
         // get all types from valuerefs  TODO: could lazy-evaluate m_sizes vs. find all then pass in...?
         for (auto& size : m_sizes)
-            sizes.emplace_back(size->Eval(parent_context));
+            sizes.push_back(size->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, PlanetSizeSimpleMatch(sizes, parent_context.ContextObjects()));
     } else {
         // re-evaluate contained objects for each candidate object
@@ -4161,7 +4159,7 @@ void PlanetEnvironment::Eval(const ScriptingContext& parent_context,
         environments.reserve(m_environments.size());
         // get all types from valuerefs
         for (auto& environment : m_environments)
-            environments.emplace_back(environment->Eval(parent_context));
+            environments.push_back(environment->Eval(parent_context));
         std::string species_name{m_species_name ? m_species_name->Eval(parent_context) : ""};
         EvalImpl(matches, non_matches, search_domain, PlanetEnvironmentSimpleMatch(environments, parent_context.ContextObjects(), species_name));
     } else {
@@ -4370,7 +4368,7 @@ void Species::Eval(const ScriptingContext& parent_context,
         names.reserve(m_names.size());
         // get all names from valuerefs
         for (auto& name : m_names)
-            names.emplace_back(name->Eval(parent_context));
+            names.push_back(name->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, SpeciesSimpleMatch(names, parent_context.ContextObjects()));
     } else {
         // re-evaluate allowed building types range for each candidate object
@@ -4876,7 +4874,7 @@ void FocusType::Eval(const ScriptingContext& parent_context,
         names.reserve(m_names.size());
         // get all names from valuerefs TODO: could lazy evaluate names rather than evaluating all and passing...
         for (auto& name : m_names)
-            names.emplace_back(name->Eval(parent_context));
+            names.push_back(name->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, FocusTypeSimpleMatch(names, parent_context.ContextObjects()));
     } else {
         // re-evaluate allowed building types range for each candidate object
@@ -5040,7 +5038,7 @@ void StarType::Eval(const ScriptingContext& parent_context,
         types.reserve(m_types.size());
         // get all types from valuerefs
         for (auto& type : m_types)
-            types.emplace_back(type->Eval(parent_context));
+            types.push_back(type->Eval(parent_context));
         EvalImpl(matches, non_matches, search_domain, StarTypeSimpleMatch(types, parent_context.ContextObjects()));
     } else {
         // re-evaluate contained objects for each candidate object
@@ -5935,7 +5933,7 @@ std::string ProducedByEmpire::Description(bool negated/* = false*/) const {
 }
 
 std::string ProducedByEmpire::Dump(unsigned short ntabs) const
-{ return DumpIndent(ntabs) + "ProducedByEmpire empire_id = " + m_empire_id->Dump(ntabs); }
+{ return DumpIndent(ntabs) + "ProducedByEmpire empire = " + m_empire_id->Dump(ntabs); }
 
 bool ProducedByEmpire::Match(const ScriptingContext& local_context) const {
     auto& candidate = local_context.condition_local_candidate;
@@ -8067,8 +8065,8 @@ namespace {
         dy2 /= mag;
 
 
-        const float MAX_LANE_DOT_PRODUCT = 0.87f;   // magic limit adjusted to allow no more than 12 starlanes from a system
-                                                    // arccos(0.87) = 0.515594 rad = 29.5 degrees
+        constexpr float MAX_LANE_DOT_PRODUCT = 0.87f; // magic limit adjusted to allow no more than 12 starlanes from a system
+                                                      // arccos(0.87) = 0.515594 rad = 29.5 degrees
 
         float dp = (dx1 * dx2) + (dy1 * dy2);
         //TraceLogger() << "systems: " << sys1->UniverseObject::Name() << "  " << lane1_sys2->UniverseObject::Name() << "  " << lane2_sys2->UniverseObject::Name() << "  dp: " << dp << "\n";
@@ -8136,7 +8134,7 @@ namespace {
         // d = |1O| cos(a) = (1O).(12) / |12|
         // d = -(O1).(12 / |12|)
 
-        const float MIN_PERP_DIST = 20; // magic limit, in units of universe units (uu)
+        constexpr float MIN_PERP_DIST = 20; // magic limit, in units of universe units (uu)
 
         float perp_dist = std::abs(v_o1_x*v_12_x + v_o1_y*v_12_y);
 
@@ -8282,7 +8280,7 @@ namespace {
             // move into member storage
             m_destination_systems.reserve(dest_systems.size());
             for (auto& id_obj : dest_systems)
-                m_destination_systems.emplace_back(std::move(id_obj.second));
+                m_destination_systems.push_back(std::move(id_obj.second));
         }
 
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
@@ -10053,13 +10051,13 @@ And::And(std::unique_ptr<Condition>&& operand1, std::unique_ptr<Condition>&& ope
 {
     // would prefer to initialize the vector m_operands in the initializer list, but this is difficult with non-copyable unique_ptr parameters
     if (operand1)
-        m_operands.emplace_back(std::move(operand1));
+        m_operands.push_back(std::move(operand1));
     if (operand2)
-        m_operands.emplace_back(std::move(operand2));
+        m_operands.push_back(std::move(operand2));
     if (operand3)
-        m_operands.emplace_back(std::move(operand3));
+        m_operands.push_back(std::move(operand3));
     if (operand4)
-        m_operands.emplace_back(std::move(operand4));
+        m_operands.push_back(std::move(operand4));
 
     m_root_candidate_invariant = boost::algorithm::all_of(m_operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(m_operands, [](auto& e){ return !e || e->TargetInvariant(); });
@@ -10245,13 +10243,13 @@ Or::Or(std::unique_ptr<Condition>&& operand1,
 {
     // would prefer to initialize the vector m_operands in the initializer list, but this is difficult with non-copyable unique_ptr parameters
     if (operand1)
-        m_operands.emplace_back(std::move(operand1));
+        m_operands.push_back(std::move(operand1));
     if (operand2)
-        m_operands.emplace_back(std::move(operand2));
+        m_operands.push_back(std::move(operand2));
     if (operand3)
-        m_operands.emplace_back(std::move(operand3));
+        m_operands.push_back(std::move(operand3));
     if (operand4)
-        m_operands.emplace_back(std::move(operand4));
+        m_operands.push_back(std::move(operand4));
 
     m_root_candidate_invariant = boost::algorithm::all_of(m_operands, [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = boost::algorithm::all_of(m_operands, [](auto& e){ return !e || e->TargetInvariant(); });
@@ -10382,7 +10380,7 @@ void Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_contex
             m_operands[1]->GetDefaultInitialCandidateObjects(parent_context, condition_non_targets);
             if (std::find(condition_non_targets.begin(), condition_non_targets.end(), parent_context.source) ==
                 condition_non_targets.end())
-            { condition_non_targets.emplace_back(parent_context.source); }
+            { condition_non_targets.push_back(parent_context.source); }
             return;
         }
     }

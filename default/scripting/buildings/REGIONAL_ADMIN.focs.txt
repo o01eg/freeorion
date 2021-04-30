@@ -9,15 +9,25 @@ BuildingType
         OwnedBy empire = Source.Owner
         Not Contains Building name = "BLD_IMPERIAL_PALACE"
         Not Contains Building name = "BLD_REGIONAL_ADMIN"
-        TargetPopulation low = 1
-        Happiness low = 5
-        Not WithinStarlaneJumps jumps = 5 condition = Or [
-            Building name = "BLD_IMPERIAL_PALACE"
-            Building name = "BLD_REGIONAL_ADMIN"
+        Not WithinStarlaneJumps jumps = 5 condition = And [
+            Or [
+                Building name = "BLD_IMPERIAL_PALACE"
+                Building name = "BLD_REGIONAL_ADMIN"
+            ]
+            OwnedBy empire = Source.Owner
         ]
     ]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS]]
+
+        // destroy self if somehow acquired by different empire than built this...
+        EffectsGroup
+            scope = Source
+            activation = And [
+                Not Unowned
+                Not ProducedByEmpire empire = Source.Owner
+            ]
+            effects = Destroy
     ]
     icon = "icons/building/regional_administration.png"
 

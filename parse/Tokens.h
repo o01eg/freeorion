@@ -54,7 +54,6 @@
     (Capture)                                   \
     (captureresult)                             \
     (category)                                  \
-    (Category)                                  \
     (ceil)                                      \
     (class)                                     \
     (ClockwiseNextPlanetType)                   \
@@ -301,8 +300,9 @@
     (number)                                    \
     (Number)                                    \
     (NumberOf)                                  \
+    (NumPoliciesAdopted)                        \
     (NumShips)                                  \
-    (NumStarlanes)                              \
+    (NumStarlanes)
 
 #define TOKEN_SEQ_8                             \
     (object)                                    \
@@ -390,6 +390,7 @@
     (Researchable)                              \
     (researchcost)                              \
     (researchturns)                             \
+    (resource)                                  \
     (ResourceSupplyConnected)                   \
     (ResupplyableBy)                            \
     (Retain)                                    \
@@ -520,7 +521,7 @@
     (SpeciesShipsProduced)                      \
     (SpeciesShipsScrapped)                      \
     (speed)                                     \
-    (Speed)                                 \
+    (Speed)                                     \
     (Spread)                                    \
     (stackinggroup)                             \
     (Star)                                      \

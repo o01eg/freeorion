@@ -113,16 +113,16 @@ std::string Policy::Dump(unsigned short ntabs) const {
 }
 
 float Policy::AdoptionCost(int empire_id, const ObjectMap& objects) const {
-    const auto arbitrary_large_number = 999999.9f;
+    constexpr auto arbitrary_large_number = 999999.9f;
 
     if (GetGameRules().Get<bool>("RULE_CHEAP_POLICIES") || !m_adoption_cost) {
-        return 1.0;
+        return 1.0f;
 
     } else if (m_adoption_cost->ConstantExpr()) {
-        return m_adoption_cost->Eval();
+        return static_cast<float>(m_adoption_cost->Eval());
 
     } else if (m_adoption_cost->SourceInvariant()) {
-        return m_adoption_cost->Eval();
+        return static_cast<float>(m_adoption_cost->Eval());
 
     } else if (empire_id == ALL_EMPIRES) {
         return arbitrary_large_number;
@@ -133,7 +133,7 @@ float Policy::AdoptionCost(int empire_id, const ObjectMap& objects) const {
             return arbitrary_large_number;
 
         const ScriptingContext context(std::move(source));
-        return m_adoption_cost->Eval(context);
+        return static_cast<float>(m_adoption_cost->Eval(context));
     }
 }
 

@@ -21,7 +21,7 @@ using namespace GG;
 
 namespace {
 
-const double EPSILON = 0.0001;
+constexpr double EPSILON = 0.0001;
 
 HSVClr Convert(const Clr& color)
 {
@@ -189,7 +189,7 @@ void HueSaturationPicker::Render()
                       static_cast<Y>(ul.y + size.y * (1.0 - m_saturation)));
     glColor(CLR_SHADOW);
 
-    const float GAP(3.0f);
+    constexpr float GAP(3.0f);
 
     GL2DVertexBuffer lines_verts;
     lines_verts.reserve(16);
@@ -403,7 +403,7 @@ ColorDlg::ColorDisplay::ColorDisplay(Clr color) :
 void ColorDlg::ColorDisplay::Render()
 {
     Pt ul = UpperLeft(), lr = LowerRight();
-    const int SQUARE_SIZE = 7;
+    constexpr int SQUARE_SIZE = 7;
 
     GL2DVertexBuffer    vert_buf;
     GLRGBAColorBuffer   colour_buf;
@@ -541,7 +541,7 @@ ColorDlg::ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<Font>& fo
                                                  COLOR_BUTTON_ROWS, COLOR_BUTTON_COLS, 0, 4);
     for (int i = 0; i < COLOR_BUTTON_ROWS; ++i) {
         for (int j = 0; j < COLOR_BUTTON_COLS; ++j) {
-            m_color_buttons.emplace_back(Wnd::Create<ColorButton>(m_color));
+            m_color_buttons.push_back(Wnd::Create<ColorButton>(m_color));
             m_color_buttons.back()->SetRepresentedColor(s_custom_colors[i * COLOR_BUTTON_COLS + j]);
             m_color_buttons_layout->Add(m_color_buttons.back(), i, j);
         }
@@ -566,13 +566,13 @@ ColorDlg::ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<Font>& fo
             std::make_tuple(static_cast<int>(m_current_color.v * 255), 0, 255, "V:")
         })
     {
-        m_slider_labels.emplace_back(style->NewTextControl(style->Translate(color_label), font,
-                                                           m_text_color, FORMAT_RIGHT));
+        m_slider_labels.push_back(style->NewTextControl(style->Translate(color_label), font,
+                                                        m_text_color, FORMAT_RIGHT));
         m_sliders_ok_cancel_layout->Add(m_slider_labels.back(), row, 0);
-        m_slider_values.emplace_back(style->NewTextControl(std::to_string(color_value),
-                                                           font, m_text_color, FORMAT_LEFT));
+        m_slider_values.push_back(style->NewTextControl(std::to_string(color_value),
+                                                        font, m_text_color, FORMAT_LEFT));
         m_sliders_ok_cancel_layout->Add(m_slider_values.back(), row, 1);
-        m_sliders.emplace_back(style->NewIntSlider(color_min, color_max, Orientation::HORIZONTAL, m_color, 10));
+        m_sliders.push_back(style->NewIntSlider(color_min, color_max, Orientation::HORIZONTAL, m_color, 10));
         m_sliders.back()->SlideTo(color_value);
         m_sliders_ok_cancel_layout->Add(m_sliders.back(), row, 2);
 

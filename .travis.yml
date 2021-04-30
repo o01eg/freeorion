@@ -67,6 +67,8 @@ jobs:
       script:
         - cmake ..
         - cmake --build . --target check-pep8
+        - cmake --build . --target check-pep8-focs
+        - cmake --build . --target check-pep8-focs-test
 
     - name: Lint string tables
       stage: lint
@@ -75,7 +77,7 @@ jobs:
       language: python
       python: 3.6
       script:
-        - ./check/st-tool.py check --reference default/stringtables/en.txt default/stringtables/*.txt
+        - ./check/st-tool.py check --reference default/stringtables/en.txt default/stringtables/??.txt
         - diff -u default/stringtables/en.txt <(check/st-tool.py format default/stringtables/en.txt) || { echo "String table is not properly formatted"; exit 1; }
 
     - name: Build headless FreeOrion on Ubunutu 18.04 (Bionic)
@@ -96,6 +98,15 @@ jobs:
         - cmake -DBUILD_CLIENT_GG=OFF -DBUILD_TESTING=ON ..
         - cmake --build .     
 
+    - name: Build Godot FreeOrion on Ubunutu 18.04 (Bionic)
+      <<: *_linux_setup_common
+      stage: build
+      env:
+        - CACHE_NAME=linux-godot
+        - CMAKE_BUILD_PARALLEL_LEVEL=2
+      script:
+        - cmake -DBUILD_CLIENT_GG=OFF -DBUILD_CLIENT_GODOT=ON -DBUILD_TESTING=ON ..
+        - cmake --build .
     - name: Unittest AI with Python 3.6
       <<: *_test_python_common
       python: 3.6

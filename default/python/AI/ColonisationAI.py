@@ -5,6 +5,7 @@ from typing import List
 import AIDependencies
 import AIstate
 import EspionageAI
+import ExplorationAI
 import FleetUtilsAI
 import freeOrionAIInterface as fo  # pylint: disable=import-error
 import InvasionAI
@@ -162,8 +163,9 @@ def calc_max_pop(planet, species, detail):
         detail.append("Gaia_PSM_late(3)")
 
     if "SELF_SUSTAINING" in tag_list:
-        base_pop_not_modified_by_species += 3
-        detail.append("SelfSustaining_PSM_late(3)")
+        if planet_env == fo.planetEnvironment.good:
+            base_pop_not_modified_by_species += 3
+            detail.append("SelfSustaining_PSM_late(3)")
 
     applicable_boosts = set()
     for this_tag in [tag for tag in tag_list if tag in AIDependencies.metabolismBoostMap]:
@@ -362,16 +364,6 @@ def survey_universe():
             set_medium_pilot_rating(rating_list[0])
         else:
             set_medium_pilot_rating(rating_list[1 + int(len(rating_list) // 5)])
-    # the idea behind this was to note systems that the empire has claimed-- either has a current colony or has targeted
-    # for making/invading a colony
-    # claimedStars = {}
-    # for sType in AIstate.empireStars:
-    # claimedStars[sType] = list( AIstate.empireStars[sType] )
-    # for sysID in set( AIstate.colonyTargetedSystemIDs + AIstate.outpostTargetedSystemIDs):
-    # tSys = universe.getSystem(sysID)
-    # if not tSys: continue
-    # claimedStars.setdefault( tSys.starType, []).append(sysID)
-    # get_aistate().misc['claimedStars'] = claimedStars
     colonization_timer.stop()
 
 
@@ -1280,6 +1272,12 @@ def send_colony_ships(colony_fleet_ids, evaluated_planets, mission_type):
                 universe.getSystem(sys_id), aistate.systemStatus[sys_id]['monsterThreat']))
             already_targeted.append(planet_id)
             continue
+
+        # make sure not to run into stationary guards
+        if ExplorationAI.system_could_have_unknown_stationary_guard(sys_id):
+            ExplorationAI.request_emergency_exploration(sys_id)
+            continue
+
         this_spec = target[1][1]
         found_fleets = []
         try:

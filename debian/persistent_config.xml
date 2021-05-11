@@ -14,14 +14,14 @@
  <setup>
   <ai>
    <player>
-    <count>0</count>
+    <count>1</count> <!-- Disable -->
    </player>
   </ai>
   <monster>
-    <frequency>GALAXY_SETUP_NONE</frequency>
+    <frequency>GALAXY_SETUP_LOW</frequency>
   </monster>
   <native>
-    <frequency>GALAXY_SETUP_NONE</frequency>
+    <frequency>GALAXY_SETUP_LOW</frequency>
   </native>
   <specials>
     <frequency>GALAXY_SETUP_LOW</frequency>
@@ -30,14 +30,16 @@
     <density>GALAXY_SETUP_MEDIUM</density>
   </planet>
   <galaxy>
-    <shape>CLUSTER</shape>
+   <shape>BOX</shape>
+   <age>GALAXY_SETUP_MEDIUM</age>
   </galaxy>
   <seed>RANDOM</seed>
   <star>
-   <count>26</count>
+   <count>40</count>
   </star>
   <rules>
    <RULE_ENABLE_SUPER_TESTER>0</RULE_ENABLE_SUPER_TESTER>
+   <RULE_ENABLE_EXPERIMENTORS>0</RULE_ENABLE_EXPERIMENTORS>
    <RULE_THRESHOLD_HUMAN_PLAYER_WIN>1</RULE_THRESHOLD_HUMAN_PLAYER_WIN>
    <RULE_ONLY_ALLIANCE_WIN>1</RULE_ONLY_ALLIANCE_WIN>
    <RULE_ALLOW_CONCEDE>1</RULE_ALLOW_CONCEDE>
@@ -50,8 +52,14 @@
    <RULE_TECH_COST_FACTOR>1.0</RULE_TECH_COST_FACTOR>
    <!--<RULE_DIPLOMACY>RULE_DIPLOMACY_FORBIDDEN_FOR_ALL</RULE_DIPLOMACY>-->
    <RULE_ENABLE_ALLIED_REPAIR>1</RULE_ENABLE_ALLIED_REPAIR>
+   <RULE_SINGULARITY_COST_FACTOR>0.1</RULE_SINGULARITY_COST_FACTOR>
+   <RULE_NUM_COMBAT_ROUNDS>4</RULE_NUM_COMBAT_ROUNDS>
+   <RULE_SHIP_STRUCTURE_FACTOR>8</RULE_SHIP_STRUCTURE_FACTOR>
+   <RULE_SHIP_WEAPON_DAMAGE_FACTOR>6</RULE_SHIP_WEAPON_DAMAGE_FACTOR>
+   <RULE_FIGHTER_DAMAGE_FACTOR>6</RULE_FIGHTER_DAMAGE_FACTOR>
    <server-locked>
     <RULE_ENABLE_SUPER_TESTER>1</RULE_ENABLE_SUPER_TESTER>
+    <RULE_ENABLE_EXPERIMENTORS>1</RULE_ENABLE_EXPERIMENTORS>
     <RULE_THRESHOLD_HUMAN_PLAYER_WIN>1</RULE_THRESHOLD_HUMAN_PLAYER_WIN>
     <RULE_ONLY_ALLIANCE_WIN>1</RULE_ONLY_ALLIANCE_WIN>
     <RULE_ALLOW_CONCEDE>1</RULE_ALLOW_CONCEDE>
@@ -64,16 +72,21 @@
     <RULE_TECH_COST_FACTOR>1</RULE_TECH_COST_FACTOR>
     <RULE_DIPLOMACY>1</RULE_DIPLOMACY>
     <RULE_ENABLE_ALLIED_REPAIR>1</RULE_ENABLE_ALLIED_REPAIR>
+    <RULE_SINGULARITY_COST_FACTOR>1</RULE_SINGULARITY_COST_FACTOR>
+    <RULE_NUM_COMBAT_ROUNDS>1</RULE_NUM_COMBAT_ROUNDS>
+    <RULE_SHIP_STRUCTURE_FACTOR>1</RULE_SHIP_STRUCTURE_FACTOR>
+    <RULE_SHIP_WEAPON_DAMAGE_FACTOR>1</RULE_SHIP_WEAPON_DAMAGE_FACTOR>
+    <RULE_FIGHTER_DAMAGE_FACTOR>1</RULE_FIGHTER_DAMAGE_FACTOR>
    </server-locked>
   </rules>
  </setup>
  <network>
   <server>
    <ai>
-    <max>0</max>
+    <max>1</max> <!-- Disable -->
    </ai>
    <allow-email>
-     <new-turn>0</new-turn>
+    <new-turn>0</new-turn> <!-- Enable -->
    </allow-email>
    <human>
     <min>3</min>
@@ -84,8 +97,8 @@
    <unconn-human-empire-players>
     <max>0</max>
    </unconn-human-empire-players>
-   <publish-statistics>0</publish-statistics>
-   <publish-seed>0</publish-seed>
+   <publish-statistics>1</publish-statistics>
+   <publish-seed>1</publish-seed>
    <drop-empire-ready>0</drop-empire-ready>
    <cookies>
     <expire-minutes>2160</expire-minutes>

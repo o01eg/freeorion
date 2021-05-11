@@ -9,7 +9,7 @@ pwd
 
 DATAPATH="--resource.path /usr/share/games/freeorion/default"
 
-GAME_UID=FO0015
+GAME_UID=FO0016
 
 SAVEFILE=`ls -t /var/lib/freeorion/save/${GAME_UID}/*.mps | head -n1`
 
@@ -20,8 +20,10 @@ else
   SAVEARGS="-q"
 fi
 
+FIRST_TURN_ARGS="" # --network.server.turn-timeout.first-turn-time "$(date -u "+%Y-%m-%d 00:00:00" -d "+2 days")"
+
 LD_LIBRARY_PATH="/usr/lib/freeorion:${LD_LIBRARY_PATH}" \
-/usr/lib/freeorion/freeoriond --setup.game.uid ${GAME_UID} --network.server.turn-timeout.first-turn-time "$(date -u "+%Y-%m-%d 00:00:00" -d "+2 days")"  ${DATAPATH} ${SAVEARGS} "$@"
+/usr/lib/freeorion/freeoriond --setup.game.uid ${GAME_UID} ${FIRST_TURN_ARGS} ${DATAPATH} ${SAVEARGS} "$@"
 EXITST=$?
 if [ "${EXITST}" -ne 0 ];
 then

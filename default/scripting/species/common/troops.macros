@@ -33,7 +33,7 @@ UNSTABLE_REBEL_TROOPS
             ]
             accountinglabel = "PARTISANS_REBELLION"
             priority = [[TARGET_EARLY_BEFORE_SCALING_PRIORITY]]
-            effects = SetRebelTroops value = Value + abs( Target.Population * 0.1 * EmpireStockpile empire = Source.Owner resource = Influence )^0.5
+            effects = SetTargetHappiness value = Value - 0.1 * abs(EmpireStockpile empire = Source.Owner resource = Influence)^0.5
             
         EffectsGroup
             scope = Source
@@ -219,6 +219,7 @@ PROTECTION_FOCUS_TROOPS
             Planet
             Focus type = "FOCUS_PROTECTION"
             (LocalCandidate.LastTurnConquered < CurrentTurn)
+            (LocalCandidate.LastTurnAttackedByShip < CurrentTurn)
         ]
         accountinglabel = "FOCUS_PROTECTION_LABEL"
         priority = [[AFTER_ALL_TARGET_MAX_METERS_PRIORITY]]

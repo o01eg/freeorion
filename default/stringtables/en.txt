@@ -1190,6 +1190,12 @@ Tech Cost Scaling
 RULE_TECH_COST_FACTOR_DESC
 Adjusts costs of tech
 
+RULE_SINGULARITY_COST_FACTOR
+[[LRN_TRANSCEND]] Cost Scaling
+
+RULE_SINGULARITY_COST_FACTOR_DESC
+Adjusts costs of [[LRN_TRANSCEND]] tech
+
 RULE_ENABLE_EXPERIMENTORS
 Enable Experimentors
 
@@ -11754,6 +11760,24 @@ Planets with [[ARTISTIC]] species that are set to influence focus will generate 
 
 PLC_ARTISAN_WORKSHOPS_SHORT_DESC
 Artistic species produce luxuries
+
+PLC_BOOTSTRAPPING
+Colonial Bootstrapping
+
+PLC_BOOTSTRAPPING_DESC
+Increases the growth rate of industry, research, and influence meters, and boosts stability on colonies with population less than 6.
+
+PLC_BOOTSTRAPPING_SHORT_DESC
+Boosts small colonies
+
+PLC_PROPAGANDA
+Propaganda Broadcasts
+
+PLC_PROPAGANDA_DESC
+Increases imperial capital influence by [[value PROPAGANDA_INFLUENCE_FLAT]].
+
+PLC_PROPAGANDA_SHORT_DESC
+Increases capital influence
 
 
 ##

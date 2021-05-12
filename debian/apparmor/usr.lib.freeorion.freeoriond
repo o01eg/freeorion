@@ -21,6 +21,7 @@
   /etc/host.conf r,
   /etc/resolv.conf r,
   /etc/gai.conf r,
+  /etc/ssl/openssl.cnf r,
   /run/resolvconf/resolv.conf r,
   /run/postgresql/* rw,
   /usr/lib/freeorion/freeorionca Px,

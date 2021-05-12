@@ -100,7 +100,7 @@ class ChatHistoryProvider:
                                      (timestamp,
                                       player_name,
                                       text,
-                                      256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a,
+                                      256 * (256 * (256 * text_color[0] + text_color[1]) + text_color[2]) + text_color[3],
                                       SERVER_ID))
                         saved = True
                 try:

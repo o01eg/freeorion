@@ -71,7 +71,7 @@ class ChatHistoryProvider:
                     ) d
                     ORDER BY ts""", (SERVER_ID,))
                 for r in curs:
-                    c = fo.GGColor(r[3], r[4], r[5], r[6])
+                    c = (r[3], r[4], r[5], r[6])
                     e = (r[0], r[1], r[2], c)
                     res.append(e)
         return res

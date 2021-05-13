@@ -15,6 +15,17 @@
 #include <boost/thread/thread.hpp>
 #include <boost/test/unit_test.hpp>
 
+namespace {
+    void AddOptions(OptionsDB& db) {
+#ifdef FREEORION_WIN32
+        db.Add<std::string>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),        PathToString(GetBinDir() / "freeoriond.exe"));
+#else
+        db.Add<std::string>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),        PathToString(GetBinDir() / "freeoriond"));
+#endif
+    }
+    bool temp_bool = RegisterOptions(AddOptions);
+}
+
 ClientAppFixture::ClientAppFixture() :
     m_game_started(false),
     m_cookie(boost::uuids::nil_uuid())
@@ -26,12 +37,6 @@ ClientAppFixture::ClientAppFixture() :
     InitLoggingSystem((GetUserDataDir() / "test.log").string(), "Test");
 #endif
     //InitLoggingOptionsDBSystem();
-
-#ifdef FREEORION_WIN32
-    GetOptionsDB().Add<std::string>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),        PathToString(GetBinDir() / "freeoriond.exe"));
-#else
-    GetOptionsDB().Add<std::string>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),        PathToString(GetBinDir() / "freeoriond"));
-#endif
 
     InfoLogger() << FreeOrionVersionString();
     DebugLogger() << "Test client initialized";

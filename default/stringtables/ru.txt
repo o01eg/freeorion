@@ -1891,7 +1891,7 @@ OPTIONS_DB_SECTION_NETWORK
 Сервер и сеть
 
 OPTIONS_DB_SECTION_RAW
-All options with only raw description keys
+Необработанные аргументы
 
 OPTIONS_DB_SECTION_SAVE
 Сохранение игры
@@ -5286,7 +5286,7 @@ SELF_SUSTAINING_SPECIES_TEXT
 Самоподдерживающиеся виды могут быть энергетическими или кристаллическими существами или чем-то более иноземным. Их объединяет то, что они не нуждаются в питании, поэтому их МАКС численность населения очень высока. Несмотря на то, что у них отсутствуют факторы роста, их МАКС численность населения равна значению вида, который снабжен всеми тремя [[encyclopedia GROWTH_FOCUS_TITLE]] факторами
 
 GASEOUS_SPECIES_TITLE
-Gaseous Metabolism
+Газовый метаболизм
 
 TELEPATHIC_TITLE
 Телепатия
@@ -5532,7 +5532,7 @@ ORBITAL_DRYDOCK_REPAIR_TEXT
 Любой бой в системе нарушит ремонт на этом ходу'''
 
 CONFIG_GUIDE_TITLE
-Configuration Guide
+Инструкция по настройке
 
 ##
 ## Turn progress

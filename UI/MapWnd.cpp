@@ -176,6 +176,9 @@ namespace {
 
         db.Add("ui.map.sidepanel.width",                    UserStringNop("OPTIONS_DB_UI_SIDEPANEL_WIDTH"),                     512,                            Validator<int>());
 
+        db.Add("ui.map.sidepanel.meter-refresh",            UserStringNop("OPTIONS_DB_UI_SIDEPANEL_OPEN_METER_UPDATE"),         true,                           Validator<bool>());
+        db.Add("ui.map.object-changed.meter-refresh",       UserStringNop("OPTIONS_DB_UI_OBJECT_CHANGED_METER_UPDATE"),         true,                           Validator<bool>());
+
         // Register hotkey names/default values for the context "map".
         Hotkey::AddHotkey("ui.map.open",                    UserStringNop("HOTKEY_MAP_RETURN_TO_MAP"),                          GG::Key::GGK_ESCAPE);
         Hotkey::AddHotkey("ui.turn.end",                    UserStringNop("HOTKEY_MAP_END_TURN"),                               GG::Key::GGK_RETURN,            GG::MOD_KEY_CTRL);
@@ -1398,8 +1401,13 @@ void MapWnd::CompleteConstruction() {
     // useful since most ResourceCenter changes will be due to focus
     // changes on the sidepanel, and most differences in meter estimates
     // and resource pools due to this will be in the same system
-    SidePanel::ResourceCenterChangedSignal.connect(
-        boost::bind(&MapWnd::UpdateSidePanelSystemObjectMetersAndResourcePools, this));
+    SidePanel::ResourceCenterChangedSignal.connect([this](){
+        if (GetOptionsDB().Get<bool>("ui.map.object-changed.meter-refresh")) {
+            ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
+            context.ContextUniverse().UpdateMeterEstimates(context);
+            UpdateEmpireResourcePools();
+        }
+    });
 
     // situation report window
     m_sitrep_panel = GG::Wnd::Create<SitRepPanel>(SITREP_WND_NAME);
@@ -2681,10 +2689,7 @@ void MapWnd::InitTurn() {
     GGHumanClientApp::GetApp()->Orders().ApplyOrders(); // TODO: pass Universe?
 
     timer.EnterSection("meter estimates");
-    // redo meter estimates with unowned planets marked as owned by player, so accurate predictions of planet
-    // population is available for currently uncolonized planets
     GetUniverse().UpdateMeterEstimates(context);
-
     GetUniverse().ApplyAppearanceEffects(context);
 
     timer.EnterSection("init rendering");
@@ -4371,7 +4376,6 @@ void MapWnd::ReselectLastSystem() {
 }
 
 void MapWnd::SelectSystem(int system_id) {
-    //std::cout << "MapWnd::SelectSystem(" << system_id << ")" << std::endl;
     auto system = Objects().get<System>(system_id);
     if (!system && system_id != INVALID_OBJECT_ID) {
         ErrorLogger() << "MapWnd::SelectSystem couldn't find system with id " << system_id << " so is selected no system instead";
@@ -4379,10 +4383,10 @@ void MapWnd::SelectSystem(int system_id) {
     }
 
 
-    if (system) {
+    if (system && GetOptionsDB().Get<bool>("ui.map.sidepanel.meter-refresh")) {
         // ensure meter estimates are up to date, particularly for which ship is selected
         ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
-        GetUniverse().UpdateMeterEstimates(system_id, context, true);
+        GetUniverse().UpdateMeterEstimates(system->ID(), context, true);
     }
 
 
@@ -4500,7 +4504,9 @@ void MapWnd::SelectFleet(std::shared_ptr<Fleet> fleet) {
     // if there isn't a FleetWnd for this fleet open, need to open one
     if (!fleet_wnd) {
         // Add any overlapping fleet buttons for moving or offroad fleets.
-        const auto wnd_fleet_ids = FleetIDsOfFleetButtonsOverlapping(fleet->ID());
+        auto wnd_fleet_ids = FleetIDsOfFleetButtonsOverlapping(fleet->ID());
+        if (wnd_fleet_ids.empty())
+            wnd_fleet_ids.push_back(fleet->ID());
 
         // A leeway, scaled to the button size, around a group of moving fleets so the fleetwnd
         // tracks moving fleets together
@@ -4942,7 +4948,7 @@ namespace {
 
     /** If the \p fleet has a valid destination and it not on a starlane, return true*/
     bool IsOffRoad(const std::shared_ptr<const Fleet>& fleet)
-    { return (IsMoving(fleet) && !IsOnStarlane(fleet)); }
+    { return (fleet->SystemID() == INVALID_OBJECT_ID && !IsOnStarlane(fleet)); }
 }
 
 void MapWnd::RefreshFleetButtons(bool recreate) {
@@ -5073,7 +5079,7 @@ void MapWnd::CreateFleetButtonsOfType(FleetButtonMap& type_fleet_buttons,
             auto fb = GG::Wnd::Create<FleetButton>(std::move(ids_in_cluster), fleet_button_size);
 
             // store per type of fleet button.
-            type_fleet_buttons[key].emplace(fb);
+            type_fleet_buttons[key].insert(fb);
 
             // store FleetButton for fleets in current cluster
             for (int fleet_id : fb->Fleets())
@@ -5859,6 +5865,11 @@ void MapWnd::RefreshFleetButtonSelectionIndicators() {
 
     for (auto& moving_fleet_button : m_moving_fleet_buttons) {
         for (auto& button : moving_fleet_button.second)
+            button->SetSelected(false);
+    }
+
+    for (auto& offroad_fleet_button : m_offroad_fleet_buttons) {
+        for (auto& button : offroad_fleet_button.second)
             button->SetSelected(false);
     }
 
@@ -6888,15 +6899,11 @@ void MapWnd::RefreshPopulationIndicator() {
         std::move(tag_counts), GetSpeciesManager().census_order()));
 }
 
-void MapWnd::UpdateSidePanelSystemObjectMetersAndResourcePools() {
-    ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
-    GetUniverse().UpdateMeterEstimates(SidePanel::SystemID(), context, true);
-    UpdateEmpireResourcePools();
-}
-
 void MapWnd::UpdateEmpireResourcePools() {
-    //std::cout << "MapWnd::UpdateEmpireResourcePools" << std::endl;
-    Empire *empire = GetEmpire( GGHumanClientApp::GetApp()->EmpireID() );
+    auto empire = Empires().GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
+    if (!empire)
+        return;
+
     /* Recalculate stockpile, available, production, predicted change of
      * resources.  When resource pools update, they emit ChangeSignal, which is
      * connected to MapWnd::Refresh???ResourceIndicator, which updates the

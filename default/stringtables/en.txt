@@ -2102,6 +2102,12 @@ Specifies number of threads to use in effects processing for the AI players. Mor
 OPTIONS_DB_EFFECTS_THREADS_SERVER_DESC
 Specifies number of threads to use in effects processing on the server. More than one thread may lead to unpredictable crashes.
 
+OPTIONS_DB_UI_SIDEPANEL_OPEN_METER_UPDATE
+Run a meter / effects update when opening the sidepanel to a new system. May cause a short UI hang while processing.
+
+OPTIONS_DB_UI_OBJECT_CHANGED_METER_UPDATE
+Run a meter / effects update when an object's state changes. May cause a short UI hang while processing after order issuing.
+
 OPTIONS_DB_AUTO_QUIT
 Automatically quits once any turns specified by --auto-advance-n-turns are completed (defaults to zero), useful for various testing particularly with --quickstart or --load.
 
@@ -3307,6 +3313,12 @@ Effects processing threads (AIs)
 
 OPTIONS_EFFECTS_THREADS_SERVER
 Effects processing threads (server)
+
+OPTIONS_UI_SIDEPANEL_OPEN_METER_UPDATE
+System sidepanel open meter update
+
+OPTIONS_UI_OBJECT_CHANGED_METER_UPDATE
+Object changed meter update
 
 OPTIONS_DB_UI_EFFECTS_MOVE_TEST
 Test / internal engine switch: Use pointer moves, not casts of containers of pointers, when evaluating conditions.
@@ -8202,7 +8214,7 @@ Prefer [[PT_TOXIC]] planets.
 
 SP_DERTHREAN_DESC
 '''Description:
-The Derthrean consciousness represents a half parasitic, half symbiotic relationship of viruses living in the bodies of plants. The virus has no intelligence and without the virus, the plant is but an empty shell yet together, their neural synapses are compatible and form a reasonable being. Although the virus brings awareness to the plant, the virus is also toxic to its nervous system, inflicting great amounts of pain, slowly destroying the plant as the virus spawns and in the end, killing it. This means that the greater the intelligence of a Derthrean, the more pain he endures.
+The Derthrean consciousness represents a half parasitic, half symbiotic relationship of viruses living in the bodies of plants. The virus has no intelligence and without the virus, the plant is but an empty shell. Yet together, their neural synapses are compatible and form a complete being. Although the virus brings awareness to the plant, the virus is also toxic to its nervous system, inflicting great amounts of pain, slowly destroying the plant as the virus replicates, and, in the end, killing it. Consequently, the greater the intelligence of a Derthrean, the more pain it endures.
 
 Social Structure:
 The Derthrean are a sharply divided race, split by the legacy of their forebears into castes. They are born into a caste, they mate in their caste, and they die as a member of a caste. Because the breeding has been so isolated throughout the millennia, there are even physical varieties in different castes. The castes are divided as follows: the most benevolent Priest caste, the Worker caste, the Grower caste, the Provider caste, the Scholar caste and the most despised of all, the Warrior caste. Religion plays a fundamental role in their society. Each Derthrean is a pacifist and lives to please their Goddess, in hopes of relieving the terrible burden of pain and earning forgiveness for the betrayal and bloodlust of their ancestors.
@@ -11535,7 +11547,7 @@ PLC_INDUSTRIALISM
 Industrialism
 
 PLC_INDUSTRIALISM_DESC
-'''Industry-focused planets get a boost to [[metertype METER_TARGET_INDUSTRY]] (x[[value PLC_INDUSTRIALISM_TARGET_INDUSTRY_SCALING]]) and a bonus of [[value PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT]] to [[metertype METER_HAPPINESS]].
+'''Industry-focused planets get a boost to [[metertype METER_TARGET_INDUSTRY]] of [[value PLC_INDUSTRIALISM_TARGET_INDUSTRY_PERCENT]]% and a bonus of [[value PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT]] to [[metertype METER_HAPPINESS]].
 
 Also makes some production-boosting generation techs cheaper to research.'''
 
@@ -11633,7 +11645,7 @@ PLC_NATIVE_APPROPRIATION
 Native Appropriation
 
 PLC_NATIVE_APPROPRIATION_DESC
-Increasess [[metertype METER_TARGET_RESEARCH]] on research-focused planets in systems that also contain unowned native-populated planets.
+Increasess [[metertype METER_TARGET_RESEARCH]] by [[value PLC_NATIVE_APPROPRIATION_RESEARCH_PERPLANET]] on research-focused planets in systems that also contain unowned native-populated planets.
 
 PLC_NATIVE_APPROPRIATION_SHORT_DESC
 Boosts Research
@@ -12993,7 +13005,7 @@ DEF_GARRISON_2
 Defensive Militia Training
 
 DEF_GARRISON_2_DESC
-Increases max [[metertype METER_TROOPS]] on all planets by [[value GARRISON_2_MAX_TROOPS_PERPOP]] per [[metertype METER_POPULATION]] (modified by species defensive trait), and causes troops to regenerate by an additional [[value GARRISON_2_TROOPREGEN_FLAT]] per turn.
+Increases max [[metertype METER_TROOPS]] on all planets by [[value GARRISON_2_MAXTROOPS_PERPOP]] per [[metertype METER_POPULATION]] (modified by species defensive trait), and causes troops to regenerate by an additional [[value GARRISON_2_TROOPREGEN_FLAT]] per turn.
 
 DEF_GARRISON_3
 Planetary Fortification Network

@@ -12,6 +12,11 @@ from math import sin, cos, pi
 import freeorion as fo
 from universe_tables import MONSTER_FREQUENCY
 
+import psycopg2
+import psycopg2.extensions
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
+
 import urllib.request
 
 
@@ -27,6 +32,23 @@ def execute_turn_events():
     except Exception:
         exctype, value = sys.exc_info()[:2]
         error("Cann't send chat notification: %s %s" % (exctype, value))
+
+    try:
+        dsn = ""
+        with open(fo.get_user_config_dir() + "/db.txt", "r") as f:
+            for line in f:
+                dsn = line
+                break
+        conn = psycopg2.connect(dsn)
+        with conn:
+            with conn.cursor() as curs:
+                curs.execute("""INSERT INTO games.turns(game_uid, turn, turn_ts) VALUES(%s, %s,
+                        NOW()::timestamp)
+                                ON CONFLICT (game_uid, turn) DO UPDATE SET turn_ts = EXCLUDED.txt""",
+                             (fo.get_galaxy_setup_data().gameUID, fo.current_turn()))
+    except Exception:
+        exctype, value = sys.exc_info()[:2]
+        error("Cann't update turn time: %s %s" % (exctype, value))
 
     # creating fields
     systems = fo.get_systems()

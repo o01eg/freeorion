@@ -1,3 +1,9 @@
+freeorion (0.4.10.9999.fo0016+git20210510.4f04bdcppa2~focal) focal; urgency=medium
+
+  * Save turn timestamps
+
+ -- O01eg <o01eg@yandex.ru>  Thu, 20 May 2021 09:26:26 +0000
+
 freeorion (0.4.10.9999.fo0016+git20210510.4f04bdcppa1~focal) focal; urgency=medium
 
   * FO0016

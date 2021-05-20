@@ -44,7 +44,8 @@ def execute_turn_events():
             with conn.cursor() as curs:
                 curs.execute("""INSERT INTO games.turns(game_uid, turn, turn_ts) VALUES(%s, %s,
                         NOW()::timestamp)
-                                ON CONFLICT (game_uid, turn) DO UPDATE SET turn_ts = EXCLUDED.txt""",
+                                ON CONFLICT (game_uid, turn) DO UPDATE SET turn_ts =
+                                EXCLUDED.turn_ts""",
                              (fo.get_galaxy_setup_data().gameUID, fo.current_turn()))
     except Exception:
         exctype, value = sys.exc_info()[:2]

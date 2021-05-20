@@ -1,11 +1,19 @@
+from logging import error
+
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
 # Logging is redirected before other imports so that import errors appear in log files.
 redirect_logging_to_freeorion_logger()
 
+import sys
 import random
 
 import freeorion as fo
+
+import psycopg2
+import psycopg2.extensions
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
 from starnames import name_star_systems
 from galaxy import calc_star_system_positions
@@ -197,6 +205,24 @@ def create_universe(psd_map):
     print("############################################################")
     universe_statistics.log_systems()
     universe_statistics.log_planets()
+
+    try:
+        dsn = ""
+        with open(fo.get_user_config_dir() + "/db.txt", "r") as f:
+            for line in f:
+                dsn = line
+                break
+        conn = psycopg2.connect(dsn)
+        with conn:
+            with conn.cursor() as curs:
+                curs.execute("""INSERT INTO games.turns(game_uid, turn, turn_ts) VALUES(%s, 0,
+                        NOW()::timestamp)
+                                ON CONFLICT (game_uid, turn) DO UPDATE SET turn_ts =
+                                EXCLUDED.turn_ts""",
+                             (fo.get_galaxy_setup_data().gameUID,))
+    except Exception:
+        exctype, value = sys.exc_info()[:2]
+        error("Cann't update turn time: %s %s" % (exctype, value))
 
     if error_list:
         print("Python Universe Generator completed with errors")

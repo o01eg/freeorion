@@ -432,3 +432,14 @@ $$
 $$ LANGUAGE sql VOLATILE;
 ```
 
+# Add table to store turn time
+
+```sql
+CREATE TABLE games.turns (
+ game_uid VARCHAR(20) REFERENCES games.games(game_uid),
+ turn INT NOT NULL,
+ turn_ts TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+ CONSTRAINT pk_turns PRIMARY KEY (game_uid, turn)
+);
+GRANT SELECT, INSERT, UPDATE ON games.turns TO freeorion;
+```

@@ -15,7 +15,7 @@ sed -i "s/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.[0-9a-f]\{7\}\]/${BUILD_REV}\]/" uti
 DIST=$1
 DISTNAME=../freeorion_0.4.10.999+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~${DIST}
 echo "Building package ${DISTNAME}..."
-sed -i "1,+1{s/bionic\|disco\|eoan\|focal\|groovy\|hirsute/${DIST}/g}" debian/changelog  || end_with_error "Cann't set distribution"
+sed -i "1,+1{s/bionic\|disco\|eoan\|focal\|groovy\|hirsute\|impish/${DIST}/g}" debian/changelog  || end_with_error "Cann't set distribution"
 XZ_OPT=-9 tar --xz -cf ${DISTNAME}.orig.tar.xz --exclude .git --exclude .ci --exclude .github --exclude msvc2017 --exclude msvc2019 .  || end_with_error "Cann't make archive"
 debuild -S -sa || end_with_error "Cann't make package"
 

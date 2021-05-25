@@ -1925,7 +1925,7 @@ OPTIONS_DB_GAMESETUP_PLANET_DENSITY
 OPTIONS_DB_GAMESETUP_STARLANE_FREQUENCY
 '''The number of starlanes in the galaxy.
 
-When set to Low, most systems will typically have one or two starlanes. When set to High, most systems will have starlanes linking them to most nearby systems within 120uu.'''
+When set to Low, most systems will typically have one or two starlanes. When set to High, most systems will have starlanes linking them to most nearby systems within 120 uu.'''
 
 OPTIONS_DB_GAMESETUP_SPECIALS_FREQUENCY
 '''The proportion of planets and systems containing Special Features.
@@ -6878,6 +6878,9 @@ Age
 TURNS_SINCE_FOCUS_CHANGE
 Turns Since Focus Change
 
+TURNS_SINCE_COLONIZATION
+Turns Since Colonization
+
 SUPPLY_RANGE
 Supply Range
 
@@ -9141,7 +9144,7 @@ Head on a Spike
 HEAD_ON_A_SPIKE_SPECIAL_DESC
 '''The head of the former emperor rests on a spike for all to see, striking fear in the hearts of the current empire's foes.
 
-Non-empire ships, both enemies and allies, within 100uu will have slightly reduced [[metertype METER_SHIELD]], [[metertype METER_STRUCTURE]] and weapons.
+Non-empire ships, both enemies and allies, within 100 uu will have slightly reduced [[metertype METER_SHIELD]], [[metertype METER_STRUCTURE]] and weapons.
 '''
 
 HEAD_ON_A_SPIKE_SPECIAL_EFFECT
@@ -11690,7 +11693,7 @@ PLC_DREAM_RECURSION
 Dream Recursion
 
 PLC_DREAM_RECURSION_DESC
-Increases [[metertype METER_TARGET_HAPPINESS]] on populated planets by however much is needed to reach [[value PLC_INDOCTRINATION_STRENGTH_MAX]] and reduces each planet's [[metertype METER_INFLUENCE]] by the same amount as its [[metertype METER_TARGET_HAPPINESS]] is increased.
+Increases [[metertype METER_TARGET_HAPPINESS]] on populated planets by however much is needed to reach [[value PLC_INDOCTRINATION_STRENGTH_BASE]] and reduces each planet's [[metertype METER_INFLUENCE]] by the same amount as its [[metertype METER_TARGET_HAPPINESS]] is increased. The limit of [[metertype METER_TARGET_HAPPINESS]] is increased by [[value PLC_INDOCTRINATION_STRENGTH_PER_COLLECTIVE_NET]] for each [[buildingtype BLD_COLLECTIVE_NET]] controlled by the empire that has adopted this policy.
 
 PLC_DREAM_RECURSION_SHORT_DESC
 Targeted stability boost
@@ -11737,7 +11740,7 @@ PLC_SYSTEM_INFRA
 System Infrastructure
 
 PLC_SYSTEM_INFRA_DESC
-'''Grants 2 additional economic policy slots.
+'''Grants 1 additional economic policy slot.
 
 Increases [[metertype METER_TARGET_CONSTRUCTION]] by 5 on populated planets in systems with at least 2 planets owned by the empire that adopted this policy.'''
 
@@ -11777,7 +11780,10 @@ PLC_BOOTSTRAPPING
 Colonial Bootstrapping
 
 PLC_BOOTSTRAPPING_DESC
-Increases the growth rate of industry, research, and influence meters, and boosts stability on colonies with population less than 6.
+'''• Increases the growth rate of industry, research, and influence meters, and boosts stability on colonies with population less than [[value PLC_BOOTSTRAPPING_MAX_POP]].
+• Increases stability of planets that were colonized in the last [[value PLC_BOOTSTRAPPING_MAX_TURNS]] turns, decreasing over time.
+
+New colonies often benefit from programs that supprt their early development and the dedication of the colonists to establishing their new home.'''
 
 PLC_BOOTSTRAPPING_SHORT_DESC
 Boosts small colonies
@@ -11790,6 +11796,30 @@ Increases imperial capital influence by [[value PROPAGANDA_INFLUENCE_FLAT]].
 
 PLC_PROPAGANDA_SHORT_DESC
 Increases capital influence
+
+PLC_AUGMENTATION
+Augmentation
+
+PLC_AUGMENTATION_DESC
+'''• Increases the [[metertype METER_TARGET_POPULATION]] on [[PE_HOSTILE]] planets by planet size: ([[SZ_TINY]] +2) ([[SZ_SMALL]] +4) ([[SZ_MEDIUM]] +6) ([[SZ_LARGE]] +8) ([[SZ_HUGE]] +10).
+• Increases max [[metertype METER_TROOPS]] on all planets by [[value CYBORG_MAX_TROOPS_PERPOP]] per [[metertype METER_POPULATION]].
+• Increases or decreases population growth, dependent on whether a planet's infrastructure is above or below [[value AUGMENTATION_FULL_GROWTH_INFRASTRUCTURE_REQUIREMENT]].
+
+Cyborgification produces a versatile fusion of the organic, inorganic and machine-based life that is capable of adapting rapidly to changing circumstances. Spontaneous generation of specialized organs, mechanisms, and environmental adaptation allows cyborgs to exist and thrive in nearly any environment.'''
+
+PLC_AUGMENTATION_SHORT_DESC
+Various planet boosts
+
+PLC_ISOLATION
+Isolation
+
+PLC_ISOLATION_DESC
+'''• Increases stability on colonies that are further than [[value PLC_ISOLATION_THRESHOLD_DISTANCE]] uu from another populated planet.
+• Decreases stability on colonies that are closer than [[value PLC_ISOLATION_THRESHOLD_DISTANCE]] uu from another populated planet.
+• Increases stealth of colonies by [[value PLC_ISOLATION_STEALTH]].'''
+
+PLC_ISOLATION_SHORT_DESC
+Boosts isolated planets
 
 
 ##
@@ -12021,9 +12051,7 @@ LRN_MIND_VOID
 Mind of the Void
 
 LRN_MIND_VOID_DESC
-'''Grants 1 social policy slot.
-
-We are not alone in the cosmos... but why should the search be so limited? Many cultures have myths, legends or fervent belief in a higher consciousness. Whether a loving or malevolent God, or a detached observer, it is clear that something, perhaps the universe itself on some level, is alive, aware, watching.'''
+'''We are not alone in the cosmos... but why should the search be so limited? Many cultures have myths, legends or fervent belief in a higher consciousness. Whether a loving or malevolent God, or a detached observer, it is clear that something, perhaps the universe itself on some level, is alive, aware, watching.'''
 
 LRN_TIME_MECH
 Temporal Mechanics
@@ -12232,9 +12260,7 @@ PRO_VOID_PREDICTION_DESC
 For the imperial stockpile service, void prediction is the quintessential tool to deliver the right goods even before the need occurs.
 
 This is an upgrade technology for the [[encyclopedia STOCKPILE_TITLE]]. The [[metertype METER_STOCKPILE]] is increased by 0.2 per [[metertype METER_POPULATION]].
-These improvements are cumulative with those provided by [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] and [[tech PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY]].
-
-Also grants 1 economic policy slot.'''
+These improvements are cumulative with those provided by [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] and [[tech PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY]].'''
 
 PRO_MICROGRAV_MAN
 Microgravity Industry
@@ -12777,15 +12803,6 @@ A research center created to safely develop the most dangerous of biological wea
 
 GRO_REMOTE_TERRAFORM_SHORT_DESC
 Allows remote terraforming
-
-GRO_CYBORG
-Cyborgs
-
-GRO_CYBORG_DESC
-'''Increases the [[metertype METER_TARGET_POPULATION]] on [[PE_HOSTILE]] planets by planet size: ([[SZ_TINY]] +2) ([[SZ_SMALL]] +4) ([[SZ_MEDIUM]] +6) ([[SZ_LARGE]] +8) ([[SZ_HUGE]] +10).
-Increases max [[metertype METER_TROOPS]] on all planets by [[value CYBORG_MAX_TROOPS_PERPOP]] per [[metertype METER_POPULATION]].
-
-A highly versatile fusion of organism and machine, capable of adapting to a tremendous variety of circumstances. Spontaneous generation of specialized organs and mechanically enhanced strength permit cyborgs to exist with ease in nearly any environment.'''
 
 GRO_GAIA_TRANS
 Gaia Transformation
@@ -13863,7 +13880,7 @@ BLD_LIGHTHOUSE
 Interstellar Lighthouse
 
 BLD_LIGHTHOUSE_DESC
-Decreases the [[metertype METER_STEALTH]] of all objects in the same system by 30 and increases the [[metertype METER_SPEED]] of friendly ships that start the turn within 50uu by 20 for that turn. [[BUILDING_AVAILABLE_ON_OUTPOSTS]] and may facilitate use of a [[buildingtype BLD_PLANET_DRIVE]].
+Decreases the [[metertype METER_STEALTH]] of all objects in the same system by 30 and increases the [[metertype METER_SPEED]] of friendly ships that start the turn within 50 uu by 20 for that turn. [[BUILDING_AVAILABLE_ON_OUTPOSTS]] and may facilitate use of a [[buildingtype BLD_PLANET_DRIVE]].
 
 BLD_SCANNING_FACILITY
 Scanning Facility
@@ -13944,8 +13961,9 @@ BLD_COLLECTIVE_NET
 Collective Thought Network
 
 BLD_COLLECTIVE_NET_DESC
-'''Increases [[metertype METER_TARGET_INDUSTRY]] on planets with the Industry focus by [[value BLD_COLLECTIVE_NET_TARGET_INDUSTRY_PERPOP]] per [[metertype METER_POPULATION]], and [[metertype METER_TARGET_RESEARCH]] on Planets with the Research focus by [[value BLD_COLLECTIVE_NET_TARGET_RESEARCH_PERPOP]] per [[metertype METER_POPULATION]]. Starlane travel within 200 uu will disrupt this building's effectiveness and eliminate these bonuses.
+'''• Increases [[metertype METER_TARGET_INDUSTRY]] on planets with the Industry focus by [[value BLD_COLLECTIVE_NET_TARGET_INDUSTRY_PERPOP]] per [[metertype METER_POPULATION]], and [[metertype METER_TARGET_RESEARCH]] on Planets with the Research focus by [[value BLD_COLLECTIVE_NET_TARGET_RESEARCH_PERPOP]] per [[metertype METER_POPULATION]]. Starlane travel within 200 uu will disrupt this building's effectiveness and eliminate these bonuses.
 [[NO_STACK_SUPPLY_CONNECTION_TEXT]]
+• Increases the maximum stability reached by [[policy PLC_DREAM_RECURSION]] by [[value PLC_INDOCTRINATION_STRENGTH_PER_COLLECTIVE_NET]].
 
 By transferring the mind into cyberspace, thousands of minds can act as one, solving problems and making breakthroughs that no single mind could.'''
 
@@ -14098,7 +14116,7 @@ Either a [[buildingtype BLD_PLANET_BEACON]] or a ship equipped with a [[shippart
 
 To use this building, either construct a [[buildingtype BLD_PLANET_BEACON]] in the adjacent destination system or move a ship with a [[shippart SP_PLANET_BEACON]] there, then set the planet to Planet Drive focus. The planet will then be moved to that system. Note the beacon needs to have been in system for a turn: the drive will not work on the turn the building is completed or on the turn the ship arrives. Also note, a [[buildingtype BLD_TRANSFORMER]] can be used to replicate the effects of this building.
 
-A [[buildingtype BLD_PLANET_BEACON]] can only be constructed in systems with fewer than 7 planets (including Gas Giants and Asteroids). Should an attempt be made to use the [[BLD_PLANET_DRIVE]] to move a planet into a system at capacity, it will safely remain to its Origin system provided an [[buildingtype BLD_LIGHTHOUSE]] is present within 200uu. Otherwise there is a 50% chance of being destroyed in the attempt to move it to the full system.
+A [[buildingtype BLD_PLANET_BEACON]] can only be constructed in systems with fewer than 7 planets (including Gas Giants and Asteroids). Should an attempt be made to use the [[BLD_PLANET_DRIVE]] to move a planet into a system at capacity, it will safely remain to its Origin system provided an [[buildingtype BLD_LIGHTHOUSE]] is present within 200 uu. Otherwise there is a 50% chance of being destroyed in the attempt to move it to the full system.
 '''
 
 BLD_PLANET_BEACON
@@ -14161,7 +14179,7 @@ BLD_SPATIAL_DISTORT_GEN
 Spatial Distortion Generator
 
 BLD_SPATIAL_DISTORT_GEN_DESC
-Manipulates the dimensional properties of adjacent starlanes. Enemy ships moving towards the system containing this building will be pushed back 40uu the way they came after they have moved as long as they have not completed their journey and arrived in system. This is activated with the Spatial Distortion focus.
+Manipulates the dimensional properties of adjacent starlanes. Enemy ships moving towards the system containing this building will be pushed back 40 uu the way they came after they have moved as long as they have not completed their journey and arrived in system. This is activated with the Spatial Distortion focus.
 
 BLD_STARGATE
 Stargate
@@ -14196,7 +14214,17 @@ BLD_XENORESURRECTION_LAB
 Xenoresurrection Lab
 
 BLD_XENORESURRECTION_LAB_DESC
-The Xenoresurrection Lab restores living samples of extinct species, allowing colonization of [[metertype METER_SUPPLY]] connected planets with the extinct species found in [[special ANCIENT_RUINS_SPECIAL]]. It can only be built on planets where the excavations of [[special ANCIENT_RUINS_SPECIAL]] have found well preserved bodies of an extinct species.
+Restores living samples of extinct species, allowing colonization of [[metertype METER_SUPPLY]] connected planets with the extinct species found in [[special ANCIENT_RUINS_SPECIAL]]. The lab can only be built on planets where the excavations of [[special ANCIENT_RUINS_SPECIAL]] have found well preserved bodies of an extinct species.
+
+BLD_TRANSLATOR
+Nearly-Universal Translator
+
+BLD_TRANSLATOR_DESC
+'''Grants 1 social policy slot.
+
+Increases influence output on its planet, when that planet is set to influence focus, by [[value TRANSLATOR_PER_SPECIES_INFLUENCE]] per unique species on planets controlled by the empire that owns this building.
+
+Production cost decreases when more unique species are visible to the producing empire.'''
 
 BLD_COLONY_BASE
 Colony Base

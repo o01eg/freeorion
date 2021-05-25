@@ -716,18 +716,18 @@ bool Empire::BuildingTypeAvailable(const std::string& name) const
 const std::set<int>& Empire::ShipDesigns() const
 { return m_known_ship_designs; }
 
-std::set<int> Empire::AvailableShipDesigns() const {
+std::set<int> Empire::AvailableShipDesigns(const Universe& universe) const {
     // create new map containing all ship designs that are available
     std::set<int> retval;
     for (int design_id : m_known_ship_designs) {
-        if (ShipDesignAvailable(design_id))
-            retval.emplace(design_id);
+        if (ShipDesignAvailable(design_id, universe))
+            retval.insert(design_id);
     }
     return retval;
 }
 
-bool Empire::ShipDesignAvailable(int ship_design_id) const {
-    const ShipDesign* design = GetUniverse().GetShipDesign(ship_design_id); // TODO get from ScriptingContext
+bool Empire::ShipDesignAvailable(int ship_design_id, const Universe& universe) const {
+    const ShipDesign* design = universe.GetShipDesign(ship_design_id);
     return design ? ShipDesignAvailable(*design) : false;
 }
 
@@ -857,7 +857,7 @@ bool Empire::ProducibleItem(BuildType build_type, int design_id, int location,
     if (build_type == BuildType::BT_STOCKPILE)
         throw std::invalid_argument("Empire::ProducibleItem was passed BuildType BT_STOCKPILE with a design id, but the stockpile does not need an identification");
 
-    if (build_type == BuildType::BT_SHIP && !ShipDesignAvailable(design_id))
+    if (build_type == BuildType::BT_SHIP && !ShipDesignAvailable(design_id, context.ContextUniverse()))
         return false;
 
     // design must be known to this empire
@@ -1276,16 +1276,14 @@ bool Empire::PreservedLaneTravel(int start_system_id, int dest_system_id) const 
 const std::set<int>& Empire::ExploredSystems() const
 { return m_explored_systems; }
 
-const std::map<int, std::set<int>> Empire::KnownStarlanes() const {
+std::map<int, std::set<int>> Empire::KnownStarlanes(const Universe& universe) const {
     // compile starlanes leading into or out of each system
     std::map<int, std::set<int>> retval;
 
-    const Universe& universe = GetUniverse();
     TraceLogger(supply) << "Empire::KnownStarlanes for empire " << m_id;
 
-    const std::set<int>& known_destroyed_objects = universe.EmpireKnownDestroyedObjectIDs(this->EmpireID());
-    for (const auto& sys : Objects().all<System>())
-    {
+    auto& known_destroyed_objects = universe.EmpireKnownDestroyedObjectIDs(this->EmpireID());
+    for (const auto& sys : Objects().all<System>()) {
         int start_id = sys->ID();
         TraceLogger(supply) << "system " << start_id << " has up to " << sys->StarlanesWormholes().size() << " lanes / wormholes";
 
@@ -1300,8 +1298,8 @@ const std::map<int, std::set<int>> Empire::KnownStarlanes() const {
             bool is_wormhole = lane.second;
             if (is_wormhole || known_destroyed_objects.count(end_id))
                 continue;   // is a wormhole, not a starlane, or is connected to a known destroyed system
-            retval[start_id].emplace(end_id);
-            retval[end_id].emplace(start_id);
+            retval[start_id].insert(end_id);
+            retval[end_id].insert(start_id);
         }
 
         TraceLogger(supply) << "system " << start_id << " had " << retval[start_id].size() << " known lanes";
@@ -1311,10 +1309,9 @@ const std::map<int, std::set<int>> Empire::KnownStarlanes() const {
     return retval;
 }
 
-const std::map<int, std::set<int>> Empire::VisibleStarlanes() const {
+std::map<int, std::set<int>> Empire::VisibleStarlanes(const Universe& universe) const {
     std::map<int, std::set<int>> retval;   // compile starlanes leading into or out of each system
 
-    const Universe& universe = GetUniverse();
     const ObjectMap& objects = universe.Objects();
 
     for (const auto& sys : objects.all<System>()) {
@@ -1456,7 +1453,7 @@ void Empire::SetTechResearchProgress(const std::string& name, float progress) {
     // don't just give tech to empire, as another effect might reduce its progress before end of turn
 }
 
-const unsigned int MAX_PROD_QUEUE_SIZE = 500;
+constexpr unsigned int MAX_PROD_QUEUE_SIZE = 500;
 
 void Empire::PlaceProductionOnQueue(const ProductionQueue::ProductionItem& item,
                                     boost::uuids::uuid uuid, int number,

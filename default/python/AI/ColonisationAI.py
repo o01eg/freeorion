@@ -18,6 +18,8 @@ from AIDependencies import (
     Tags,
 )
 from aistate_interface import get_aistate
+from colonization import rate_piloting_tag
+from colonization.planet_supply import get_planet_supply, update_planet_supply
 from common.print_utils import Bool, Float, Sequence, Table, Text
 from EnumsAI import EmpireProductionTypes, FocusType, MissionType, PriorityType, ShipRoleType
 from freeorion_tools import (
@@ -43,7 +45,6 @@ empire_shipyards = {}
 available_growth_specials = {}
 active_growth_specials = {}
 empire_metabolisms = {}
-planet_supply_cache = {}  # includes system supply
 all_colony_opportunities = {}
 
 pilot_ratings = {}
@@ -225,21 +226,6 @@ def galaxy_is_sparse():
     return ((setup_data.monsterFrequency <= fo.galaxySetupOption.low) and
             ((avg_empire_systems >= 40) or
              ((avg_empire_systems >= 35) and (setup_data.shape != fo.galaxyShape.elliptical))))
-
-
-@cache_for_session
-def rate_piloting_tag(species_name):
-    grades = {'NO': 1e-8, 'BAD': 0.75, 'GOOD': GOOD_PILOT_RATING, 'GREAT': GREAT_PILOT_RATING,
-              'ULTIMATE': ULT_PILOT_RATING}
-    return grades.get(get_species_tag_grade(species_name, Tags.WEAPONS), 1.0)
-
-
-def rate_planetary_piloting(pid):
-    universe = fo.getUniverse()
-    planet = universe.getPlanet(pid)
-    if not planet:
-        return 0.0
-    return rate_piloting_tag(planet.speciesName)
 
 
 @cache_by_turn_persistent  # helpful to cache history to debug AI supply progress
@@ -457,7 +443,7 @@ def get_colony_fleets():
     evaluated_outpost_planets = assign_colonisation_values(evaluated_outpost_planet_ids, MissionType.OUTPOST, None)
     # if outposted planet would be in supply range, let outpost value be best of outpost value or colonization value
     for pid in set(evaluated_outpost_planets).intersection(evaluated_colony_planets):
-        if planet_supply_cache.get(pid, -99) >= 0:
+        if get_planet_supply(pid, -99) >= 0:
             evaluated_outpost_planets[pid] = (
                 max(evaluated_colony_planets[pid][0], evaluated_outpost_planets[pid][0]), '')
 
@@ -701,7 +687,7 @@ def evaluate_planet(planet_id, mission_type, spec_name, detail=None, empire_rese
     planet_supply += supply_tag_mod
     planet_supply = max(planet_supply, 0)  # planets can't have negative supply
     if planet.speciesName == spec_name:
-        planet_supply_cache[planet_id] = planet_supply + sys_supply
+        update_planet_supply(planet_id, planet_supply + sys_supply)
 
     threat_factor = determine_colony_threat_factor(planet_id, spec_name, existing_presence)
 

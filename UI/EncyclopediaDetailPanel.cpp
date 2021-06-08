@@ -1232,16 +1232,11 @@ namespace {
             return;
         }
         else if (item_name == "ENC_GAME_RULES") {
-            const GameRules& rules = GetGameRules();
-
-            for (auto& rule : rules) {
-                if (rule.second.ValueIsDefault()) {
-                    detailed_description += UserString(rule.first) + " : "
-                                         + rule.second.ValueToString() + "\n";
-                } else {
-                    detailed_description += "<u>" + UserString(rule.first) + " : "
-                                         + rule.second.ValueToString() + "</u>\n";
-                }
+            for (auto& [rule_name, rule] : GetGameRules()) {
+                if (rule.ValueIsDefault())
+                    detailed_description += UserString(rule_name) + " : " + rule.ValueToString() + "\n";
+                else
+                    detailed_description += "<u>" + UserString(rule_name) + " : " + rule.ValueToString() + "</u>\n";
             }
             return;
         }
@@ -2834,11 +2829,16 @@ namespace {
             // Add extinct species if their tech is known
             // Extinct species and enabling tech should have an EXTINCT tag
             if (species_tags.count(TAG_EXTINCT)) {
-                for (const auto& tech : empire->ResearchedTechs()) {
+                for (auto& [tech_name, turn_researched] : empire->ResearchedTechs()) {
                     // Check for presence of tags in tech
-                    const auto& tech_tags = GetTech(tech.first)->Tags();
-                    if (tech_tags.count(species_str) && tech_tags.count(TAG_EXTINCT))
-                    {
+                    auto tech = GetTech(tech_name);
+                    if (!tech) {
+                        ErrorLogger() << "ReportedSpeciesForPlanet couldn't get tech " << tech_name
+                                      << " (researched on turn " << turn_researched << ")";
+                        continue;
+                    }
+                    const auto& tech_tags = tech->Tags();
+                    if (tech_tags.count(species_str) && tech_tags.count(TAG_EXTINCT)) {
                         // Add the species and exit loop
                         retval.insert(species_str);
                         break;

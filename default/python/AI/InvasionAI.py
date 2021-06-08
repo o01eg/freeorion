@@ -1,9 +1,7 @@
+import freeOrionAIInterface as fo
 import math
 from logging import debug, info, warning
 
-import freeOrionAIInterface as fo
-
-from aistate_interface import get_aistate
 import AIDependencies
 import AIstate
 import ColonisationAI
@@ -13,9 +11,15 @@ import FleetUtilsAI
 import MilitaryAI
 import PlanetUtilsAI
 from AIDependencies import INVALID_ID, Tags
+from aistate_interface import get_aistate
+from common.print_utils import Number, Table, Text
 from EnumsAI import MissionType, PriorityType
-from common.print_utils import Table, Text, Float
-from freeorion_tools import tech_is_complete, AITimer, get_partial_visibility_turn, get_species_tag_grade
+from freeorion_tools import (
+    get_partial_visibility_turn,
+    get_species_tag_grade,
+    tech_is_complete,
+)
+from freeorion_tools.timers import AITimer
 from target import TargetPlanet, TargetSystem
 from turn_state import get_colonized_planets_in_system
 from turn_state.design import get_best_ship_info
@@ -215,18 +219,23 @@ def get_invasion_fleets():
     sorted_planets.sort(key=lambda x: x[1], reverse=True)
     sorted_planets = [(pid, pscore % 10000, ptroops) for pid, pscore, ptroops in sorted_planets]
 
-    invasion_table = Table([Text('Planet'), Float('Score'), Text('Species'), Float('Troops')],
-                           table_name="Potential Targets for Invasion Turn %d" % fo.currentTurn())
+    invasion_table = Table(
+        Text('Planet'),
+        Number('Score'),
+        Text('Species'),
+        Number('Troops'),
+        table_name="Potential Targets for Invasion Turn %d" % fo.currentTurn(),
+    )
 
     for pid, pscore, ptroops in sorted_planets:
         planet = universe.getPlanet(pid)
-        invasion_table.add_row([
+        invasion_table.add_row(
             planet,
             pscore,
             planet and planet.speciesName or "unknown",
             ptroops
-        ])
-    info(invasion_table)
+        )
+    invasion_table.print_table(info)
 
     sorted_planets = [x for x in sorted_planets if x[1] > 0]
     # export opponent planets for other AI modules

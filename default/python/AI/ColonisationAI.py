@@ -1,3 +1,4 @@
+import freeOrionAIInterface as fo
 from logging import debug, error, info, warning
 from operator import itemgetter
 from typing import List
@@ -7,32 +8,61 @@ import AIstate
 import EspionageAI
 import ExplorationAI
 import FleetUtilsAI
-import freeOrionAIInterface as fo  # pylint: disable=import-error
 import InvasionAI
 import MilitaryAI
 import PlanetUtilsAI
 import PriorityAI
 from AIDependencies import (
-    INVALID_ID, OUTPOSTING_TECH, POP_CONST_MOD_MAP,
-    POP_SIZE_MOD_MAP_MODIFIED_BY_SPECIES, POP_SIZE_MOD_MAP_NOT_MODIFIED_BY_SPECIES,
+    INVALID_ID,
+    OUTPOSTING_TECH,
+    POP_CONST_MOD_MAP,
+    POP_SIZE_MOD_MAP_MODIFIED_BY_SPECIES,
+    POP_SIZE_MOD_MAP_NOT_MODIFIED_BY_SPECIES,
     Tags,
 )
 from aistate_interface import get_aistate
-from colonization import rate_piloting_tag
+from colonization import get_nest_rating, rate_piloting_tag, special_is_nest
 from colonization.planet_supply import get_planet_supply, update_planet_supply
-from common.print_utils import Bool, Float, Sequence, Table, Text
-from EnumsAI import EmpireProductionTypes, FocusType, MissionType, PriorityType, ShipRoleType
-from freeorion_tools import (
-    AITimer, cache_by_turn_persistent, cache_for_current_turn, cache_for_session, get_partial_visibility_turn,
-    get_species_tag_grade, tech_is_complete,
+from common.print_utils import Bool, Number, Sequence, Table, Text
+from EnumsAI import (
+    EmpireProductionTypes,
+    FocusType,
+    MissionType,
+    PriorityType,
+    ShipRoleType,
 )
-from ShipDesignAI import get_ship_part
+from freeorion_tools import (
+    get_partial_visibility_turn,
+    get_ship_part,
+    get_species_tag_grade,
+    tech_is_complete,
+)
+from freeorion_tools.caching import (
+    cache_by_turn_persistent,
+    cache_for_current_turn,
+    cache_for_session,
+)
+from freeorion_tools.timers import AITimer
 from target import TargetPlanet
 from turn_state import (
-    best_pilot_rating, get_colonized_planets_in_system, get_empire_outposts, get_empire_planets_by_species,
-    get_inhabited_planets, get_number_of_colonies, get_owned_planets, get_owned_planets_in_system, get_system_supply,
-    get_unowned_empty_planets, have_computronium, population_with_industry_focus, population_with_research_focus,
-    set_best_pilot_rating, set_have_asteroids, set_have_gas_giant, set_have_nest, set_medium_pilot_rating,
+    best_pilot_rating,
+    get_colonized_planets_in_system,
+    get_empire_outposts,
+    get_empire_planets_by_species,
+    get_inhabited_planets,
+    get_number_of_colonies,
+    get_owned_planets,
+    get_owned_planets_in_system,
+    get_system_supply,
+    get_unowned_empty_planets,
+    have_computronium,
+    population_with_industry_focus,
+    population_with_research_focus,
+    set_best_pilot_rating,
+    set_have_asteroids,
+    set_have_gas_giant,
+    set_have_nest,
+    set_medium_pilot_rating,
 )
 from turn_state.design import get_best_ship_info
 
@@ -51,13 +81,6 @@ pilot_ratings = {}
 colony_status = {}
 facilities_by_species_grade = {}
 system_facilities = {}
-
-
-NEST_VAL_MAP = {
-    "SNOWFLAKE_NEST_SPECIAL": 15,
-    "KRAKEN_NEST_SPECIAL": 40,
-    "JUGGERNAUT_NEST_SPECIAL": 80,
-}
 
 AVG_PILOT_RATING = 2.0
 GOOD_PILOT_RATING = 4.0
@@ -317,7 +340,7 @@ def survey_universe():
                         this_facility_dict.setdefault("planets", set()).add(pid)
 
                 for special in planet.specials:
-                    if special in NEST_VAL_MAP:
+                    if special_is_nest(special):
                         set_have_nest()
                     if special in AIDependencies.metabolismBoosts:
                         available_growth_specials.setdefault(special, []).append(pid)
@@ -799,8 +822,7 @@ def evaluate_planet(planet_id, mission_type, spec_name, detail=None, empire_rese
 
         for special in planet_specials:
             if "_NEST_" in special:
-                nest_val = NEST_VAL_MAP.get(special,
-                                            5) * discount_multiplier  # get an outpost on the nest quick
+                nest_val = get_nest_rating(special, 5.0) * discount_multiplier  # get an outpost on the nest quick
                 retval += nest_val
                 detail.append("%s %.1f" % (special, nest_val))
             elif special == "FORTRESS_SPECIAL":
@@ -1287,20 +1309,29 @@ def _print_empire_species_roster():
     grade_map = {"ULTIMATE": "+++", "GREAT": "++", "GOOD": "+", "AVERAGE": "o", "BAD": "-", "NO": "---"}
     grade_tags = {Tags.INDUSTRY: "Ind.", Tags.RESEARCH: "Res.", Tags.POPULATION: "Pop.",
                   Tags.SUPPLY: "Supply", Tags.WEAPONS: "Pilots", Tags.ATTACKTROOPS: "Troops"}
-    header = [Text('species'), Sequence('Planets'), Bool('Colonizer'), Text('Shipyards')]
-    header.extend(Text(v) for v in grade_tags.values())
-    header.append(Sequence('Tags'))
-    species_table = Table(header, table_name="Empire species roster Turn %d" % fo.currentTurn())
+
+    species_table = Table(
+        Text('species'),
+        Sequence('Planets'),
+        Bool('Colonizer'),
+        Text('Shipyards'),
+        *[Text(v) for v in grade_tags.values()],
+        Sequence('Tags'),
+        table_name="Empire species roster Turn %d" % fo.currentTurn(),
+    )
     for species_name, planet_ids in get_empire_planets_by_species().items():
         species_tags = fo.getSpecies(species_name).tags
         is_colonizer = species_name in empire_colonizers
         number_of_shipyards = len(empire_ship_builders.get(species_name, []))
-        this_row = [species_name, planet_ids, is_colonizer, number_of_shipyards]
-        this_row.extend(grade_map.get(get_species_tag_grade(species_name, tag).upper(), "o") for tag in grade_tags)
-        this_row.append([tag for tag in species_tags if not any(s in tag for s in grade_tags) and 'PEDIA' not in tag])
-        species_table.add_row(this_row)
-    print()
-    info(species_table)
+        species_table.add_row(
+            species_name,
+            planet_ids,
+            is_colonizer,
+            number_of_shipyards,
+            *[grade_map.get(get_species_tag_grade(species_name, tag).upper(), "o") for tag in grade_tags],
+            [tag for tag in species_tags if not any(s in tag for s in grade_tags) and 'PEDIA' not in tag],
+        )
+    species_table.print_table(info)
 
 
 def _print_outpost_candidate_table(candidates, show_detail=False):
@@ -1327,7 +1358,7 @@ def __print_candidate_table(candidates, mission, show_detail=False):
         def get_first_column_value(x):
             return round(x[0], 2), x[1]
     elif mission == 'Outposts':
-        first_column = Float('Score')
+        first_column = Number('Score')
         get_first_column_value = itemgetter(0)
     else:
         warning("__print_candidate_table(%s, %s): Invalid mission type" % (candidates, mission))
@@ -1335,7 +1366,7 @@ def __print_candidate_table(candidates, mission, show_detail=False):
     columns = [first_column, Text('Planet'), Text('System'), Sequence('Specials')]
     if show_detail:
         columns.append(Sequence('Detail'))
-    candidate_table = Table(columns,
+    candidate_table = Table(*columns,
                             table_name='Potential Targets for %s in Turn %d' % (mission, fo.currentTurn()))
     for planet_id, score_tuple in candidates:
         if score_tuple[0] > 0.5:
@@ -1347,8 +1378,8 @@ def __print_candidate_table(candidates, mission, show_detail=False):
                        ]
             if show_detail:
                 entries.append(score_tuple[-1])
-            candidate_table.add_row(entries)
-    info(candidate_table)
+            candidate_table.add_row(*entries)
+    candidate_table.print_table(info)
 
 
 class OrbitalColonizationPlan:

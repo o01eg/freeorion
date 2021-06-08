@@ -7,19 +7,21 @@ and finally the targeted ratio of research/production. Each decision on a planet
 transfers the planet from the raw list to the baked list, until all planets
 have their future focus decided.
 """
+
 # Note: The algorithm is not stable with respect to pid order.  i.e. Two empire with
 #       exactly the same colonies, but different pids may make different choices.
-from logging import info, warning, debug
+import freeOrionAIInterface as fo
+from logging import debug, info, warning
 from operator import itemgetter
 
-import freeOrionAIInterface as fo  # pylint: disable=import-error
-from aistate_interface import get_aistate
-from EnumsAI import PriorityType, get_priority_resource_types, FocusType
-import PlanetUtilsAI
-import ColonisationAI
 import AIDependencies
+import ColonisationAI
+import PlanetUtilsAI
+from aistate_interface import get_aistate
 from common.print_utils import Table, Text
-from freeorion_tools import combine_ratings, tech_is_complete, AITimer
+from EnumsAI import FocusType, PriorityType, get_priority_resource_types
+from freeorion_tools import combine_ratings, tech_is_complete
+from freeorion_tools.timers import AITimer
 
 resource_timer = AITimer('timer_bucket')
 
@@ -271,29 +273,30 @@ class Reporter:
         # what is the focus of available resource centers?
         debug('')
         warnings = {}
-        foci_table = Table([
-                Text('Planet'),
-                Text('Size'),
-                Text('Type'),
-                Text('Focus'),
-                Text('Species'),
-                Text('Pop')
-            ], table_name="Planetary Foci Overview Turn %d" % fo.currentTurn())
+        foci_table = Table(
+            Text('Planet'),
+            Text('Size'),
+            Text('Type'),
+            Text('Focus'),
+            Text('Species'),
+            Text('Pop'),
+            table_name="Planetary Foci Overview Turn %d" % fo.currentTurn(),
+        )
         for pid in empire_planet_ids:
             planet = universe.getPlanet(pid)
             population = planet.currentMeterValue(fo.meterType.population)
             max_population = planet.currentMeterValue(fo.meterType.targetPopulation)
             if max_population < 1 and population > 0:
                 warnings[planet.name] = (population, max_population)
-            foci_table.add_row([
+            foci_table.add_row(
                 planet,
                 planet.size,
                 planet.type,
                 "_".join(str(planet.focus).split("_")[1:])[:8],
                 planet.speciesName,
-                "%.1f/%.1f" % (population, max_population)
-            ])
-        info(foci_table)
+                "%.1f/%.1f" % (population, max_population),
+            )
+        foci_table.print_table(info)
         debug("Empire Totals:\nPopulation: %5d \nProduction: %5d\nResearch: %5d\n",
               empire.population(), empire.productionPoints, empire.resourceProduction(fo.resourceType.research))
         for name, (cp, mp) in warnings.items():

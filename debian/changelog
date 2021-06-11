@@ -1,3 +1,9 @@
+freeorion (0.4.10.9999.fo0016+git20210510.4f04bdcppa3~focal) UNRELEASED; urgency=medium
+
+  * Fix sitrep
+
+ -- O01eg <o01eg@yandex.ru>  Fri, 11 Jun 2021 11:50:58 +0000
+
 freeorion (0.4.10.9999.fo0016+git20210510.4f04bdcppa2~focal) focal; urgency=medium
 
   * Save turn timestamps

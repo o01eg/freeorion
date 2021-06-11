@@ -2674,19 +2674,23 @@ namespace {
             for (int damaged_object_id : combat_info.damaged_object_ids) {
                 //DebugLogger() << "Checking object " << damaged_object_id << " for damaged sitrep";
                 // is object destroyed? If so, don't need a damage sitrep
-                if (combat_info.destroyed_object_ids.count(damaged_object_id))
-                    //DebugLogger() << "Object is destroyed and doesn't need a sitrep.";
+                if (combat_info.destroyed_object_ids.count(damaged_object_id)) {
+                    //DebugLogger() << " ... Object is destroyed and doesn't need a sitrep.";
                     continue;
+                }
                 // which empires know about this object?
-                for (const auto& empire_ok : combat_info.empire_object_visibility) {
+                for (auto& [viewing_empire_id, empire_known_objects] : combat_info.empire_object_visibility) {
                     // does this empire know about this object?
-                    const auto& empire_known_objects = empire_ok.second;
-                    if (!empire_known_objects.count(damaged_object_id))
+                    auto damaged_obj_it = empire_known_objects.find(damaged_object_id);
+                    if (damaged_obj_it == empire_known_objects.end())
                         continue;
-                    int empire_id = empire_ok.first;
-                    if (auto empire = GetEmpire(empire_id))
+                    //DebugLogger() << " ... Empire " << viewing_empire_id << " has visibility " << damaged_obj_it->second << " of object " << damaged_object_id;
+                    if (damaged_obj_it->second < Visibility::VIS_BASIC_VISIBILITY)
+                        continue;
+
+                    if (auto empire = GetEmpire(viewing_empire_id))
                         empire->AddSitRepEntry(CreateCombatDamagedObjectSitRep(
-                            damaged_object_id, combat_info.system_id, empire_id));
+                            damaged_object_id, combat_info.system_id, viewing_empire_id));
                 }
             }
         }
@@ -2696,13 +2700,13 @@ namespace {
     void UpdateEmpireCombatDestructionInfo(const std::vector<CombatInfo>& combats, const ObjectMap& objects) {
         for (const CombatInfo& combat_info : combats) {
             std::vector<ConstCombatEventPtr> flat_events;
-            for (auto event : combat_info.combat_events) {
+            for (auto& event : combat_info.combat_events) {
                 flat_events.push_back(event);
-                for (auto event2 : event->SubEvents(ALL_EMPIRES)) {
+                for (auto& event2 : event->SubEvents(ALL_EMPIRES)) {
                     flat_events.push_back(event2);
-                    for (auto event3 : event2->SubEvents(ALL_EMPIRES)) {
+                    for (auto& event3 : event2->SubEvents(ALL_EMPIRES)) {
                         flat_events.push_back(event3);
-                        for (auto event4 : event3->SubEvents(ALL_EMPIRES))
+                        for (auto& event4 : event3->SubEvents(ALL_EMPIRES))
                             flat_events.push_back(event4);
                     }
                 }

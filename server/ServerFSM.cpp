@@ -2554,6 +2554,8 @@ PlayingGame::PlayingGame(my_context c) :
     if (!GetOptionsDB().Get<std::string>("network.server.turn-timeout.first-turn-time").empty()) {
         // Set first turn advance to absolute time point
         try {
+            InfoLogger(FSM) << "(ServerFSM) PlayingGame: Set turn timeout at: "
+                            << GetOptionsDB().Get<std::string>("network.server.turn-timeout.first-turn-time");
             m_turn_timeout.expires_at(boost::posix_time::time_from_string(GetOptionsDB().Get<std::string>("network.server.turn-timeout.first-turn-time")));
             m_turn_timeout.async_wait(boost::bind(&PlayingGame::TurnTimedoutHandler,
                                                   this,
@@ -2566,6 +2568,8 @@ PlayingGame::PlayingGame(my_context c) :
     }
 
     if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0 && !Server().IsHaveWinner()) {
+        InfoLogger(FSM) << "(ServerFSM) PlayingGame: Set turn timeout after: "
+                        << GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval");
         // Set turn advance after time interval
         m_turn_timeout.expires_from_now(boost::posix_time::seconds(GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval")));
         m_turn_timeout.async_wait(boost::bind(&PlayingGame::TurnTimedoutHandler,
@@ -2766,6 +2770,8 @@ void PlayingGame::EstablishPlayer(const PlayerConnectionPtr& player_connection,
 
             // send timeout data
             if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0 && !Server().IsHaveWinner()) {
+                DebugLogger(FSM) << "Notify player about turn timeout: "
+                                 << GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval");
                 auto remaining = m_turn_timeout.expires_from_now();
                 player_connection->SendMessage(TurnTimeoutMessage(remaining.total_seconds()));
             } else {
@@ -3070,6 +3076,7 @@ WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
     {
         playing_game.m_turn_timeout.cancel();
         if (GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval") > 0 && !Server().IsHaveWinner()) {
+            InfoLogger(FSM) << "Reset remaining timeout";
             playing_game.m_turn_timeout.expires_from_now(boost::posix_time::seconds(GetOptionsDB().Get<int>("network.server.turn-timeout.max-interval")));
             playing_game.m_turn_timeout.async_wait(boost::bind(&PlayingGame::TurnTimedoutHandler,
                                                                &playing_game,

@@ -14,8 +14,8 @@ Policy
                 OwnedBy empire = Source.Owner
             ]
             effects = [
-                SetTargetInfluence value = Value 
-                   + (NamedReal name = "PLC_CHECKPOINTS_TARGET_INFLUENCE_FLAT" value = -2)
+                SetTargetInfluence value = Value
+                   + (NamedReal name = "PLC_CHECKPOINTS_TARGET_INFLUENCE_FLAT" value = -0.5)
                 SetMaxSupply value = Value 
                    + (NamedReal name = "PLC_CHECKPOINTS_MAX_SUPPLY_FLAT" value = -1)
             ]
@@ -29,7 +29,7 @@ Policy
                 empire = Source.Owner
                 meter = "METER_DETECTION_STRENGTH"
                 value = Value + min((NamedReal name = "PLC_CHECKPOINTS_DETECTION_STRENGTH_MAX" value = 20.0),
-                                    CurrentTurn - TurnPolicyAdopted empire = Source.Owner name = "PLC_CHECKPOINTS")
+                                    TurnsSincePolicyAdopted empire = Source.Owner name = ThisPolicy)
     ]
     graphic = "icons/policies/checkpoints.png"
 

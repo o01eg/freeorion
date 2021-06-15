@@ -226,12 +226,15 @@ namespace {
 
         }
         else if (dir_name == "ENC_TECH") {
-            std::map<std::string, std::string> userstring_tech_names;
             // sort tech names by user-visible name, so names are shown alphabetically in UI
-            for (auto& tech_name : GetTechManager().TechNames()) {
-                auto& us_name{UserString(tech_name)};   // line before moving from tech_name to avoid order of evaluation issues
-                userstring_tech_names.emplace(us_name, std::move(tech_name));
+            auto tech_names{GetTechManager().TechNames()};
+            std::vector<std::pair<std::string, std::string>> userstring_tech_names;
+            userstring_tech_names.reserve(tech_names.size());
+            for (auto& tech_name : tech_names) {
+                auto& us_name{UserString(tech_name)};   // use tech_name on line before moving from tech_name to avoid order of evaluation issues
+                userstring_tech_names.emplace_back(us_name, std::move(tech_name));
             }
+            std::sort(userstring_tech_names.begin(), userstring_tech_names.end());
 
             // second loop over alphabetically sorted names...
             for (auto& [us_name, tech_name] : userstring_tech_names) {
@@ -242,7 +245,7 @@ namespace {
                     std::string&& tagged_text{LinkTaggedText(VarText::TECH_TAG, tech_name) + "\n"};
                     sorted_entries_list.emplace(
                         std::move(us_name),
-                        std::make_pair(std::move(tagged_text), std::move(tech_name)));
+                        std::pair(std::move(tagged_text), std::move(tech_name)));
                 }
             }
 
@@ -1866,15 +1869,18 @@ namespace {
         // Policies
         auto policies = empire->AdoptedPolicies();
         if (!policies.empty()) {
-            detailed_description += "\n" + UserString("ADOPTED_POLICIES");
-            for (const auto& policy_name : policies) {
-                detailed_description += "\n";
-                std::string turn_text;
+            // re-sort by adoption turn
+            std::multimap<int, std::string&> turns_policies_adopted;
+            for (auto& policy_name : policies) {
                 int turn = empire->TurnPolicyAdopted(policy_name);
-                if (turn == BEFORE_FIRST_TURN)
-                    turn_text = UserString("BEFORE_FIRST_TURN");
-                else
-                    turn_text = UserString("TURN") + " " + std::to_string(turn);
+                turns_policies_adopted.emplace(turn, policy_name);
+            }
+
+            detailed_description += "\n" + UserString("ADOPTED_POLICIES");
+            for (auto& [adoption_turn, policy_name] : turns_policies_adopted) {
+                detailed_description += "\n";
+                std::string turn_text{adoption_turn == BEFORE_FIRST_TURN ? UserString("BEFORE_FIRST_TURN") :
+                    (UserString("TURN") + " " + std::to_string(adoption_turn))};
                 detailed_description += LinkTaggedText(VarText::POLICY_TAG, policy_name)
                                      + " : " + turn_text;
             }
@@ -3569,7 +3575,7 @@ void EncyclopediaDetailPanel::AddItem(const std::string& type, std::string name)
         }
     }
 
-    m_items.emplace_back(std::move(type), std::move(name));
+    m_items.emplace_back(type, std::move(name));
     if (m_items.size() == 1)
         m_items_it = m_items.begin();
     else

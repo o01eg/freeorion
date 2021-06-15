@@ -2581,21 +2581,14 @@ namespace {
             }
 
             // sitreps about destroyed objects
-            for (const auto& empire_kdos : combat_info.destroyed_object_knowers) {
-                int empire_id = empire_kdos.first;
-                Empire* empire = GetEmpire(empire_id);
+            for (auto& [knowing_empire_id, known_destroyed_object_ids] : combat_info.destroyed_object_knowers) {
+                Empire* empire = GetEmpire(knowing_empire_id);
                 if (!empire)
                     continue;
 
-                for (int dest_obj_id : empire_kdos.second) {
-                    //DebugLogger() << "Creating destroyed object sitrep for empire " << empire_id << " and object " << dest_obj_id;
-                    //if (auto obj = EmpireKnownObjects(empire_id).get(dest_obj_id)) {
-                    //    DebugLogger() << "Object known to empire: " << obj->Dump();
-                    //} else {
-                    //    DebugLogger() << "Object not known to empire";
-                    //}
+                for (int dest_obj_id : known_destroyed_object_ids) {
                     empire->AddSitRepEntry(CreateCombatDestroyedObjectSitRep(
-                        dest_obj_id, combat_info.system_id, empire_id));
+                        dest_obj_id, combat_info.system_id, knowing_empire_id));
                 }
             }
 
@@ -2603,47 +2596,62 @@ namespace {
             for (int damaged_object_id : combat_info.damaged_object_ids) {
                 //DebugLogger() << "Checking object " << damaged_object_id << " for damaged sitrep";
                 // is object destroyed? If so, don't need a damage sitrep
-                if (combat_info.destroyed_object_ids.count(damaged_object_id))
-                    //DebugLogger() << "Object is destroyed and doesn't need a sitrep.";
+                if (combat_info.destroyed_object_ids.count(damaged_object_id)) {
+                    //DebugLogger() << " ... Object is destroyed and doesn't need a sitrep.";
                     continue;
+                }
                 // which empires know about this object?
-                for (const auto& empire_ok : combat_info.empire_object_visibility) {
+                for (auto& [viewing_empire_id, empire_known_objects] : combat_info.empire_object_visibility) {
                     // does this empire know about this object?
-                    const auto& empire_known_objects = empire_ok.second;
-                    if (!empire_known_objects.count(damaged_object_id))
+                    auto damaged_obj_it = empire_known_objects.find(damaged_object_id);
+                    if (damaged_obj_it == empire_known_objects.end())
                         continue;
-                    int empire_id = empire_ok.first;
-                    if (auto empire = GetEmpire(empire_id))
+                    //DebugLogger() << " ... Empire " << viewing_empire_id << " has visibility " << damaged_obj_it->second << " of object " << damaged_object_id;
+                    if (damaged_obj_it->second < Visibility::VIS_BASIC_VISIBILITY)
+                        continue;
+
+                    if (auto empire = GetEmpire(viewing_empire_id))
                         empire->AddSitRepEntry(CreateCombatDamagedObjectSitRep(
-                            damaged_object_id, combat_info.system_id, empire_id));
+                            damaged_object_id, combat_info.system_id, viewing_empire_id));
                 }
             }
         }
     }
 
+    /** De-nests sub-events into a single layer list of events */
+    std::vector<ConstCombatEventPtr> FlattenEvents(const std::vector<CombatEventPtr>& events1) {
+        std::vector<ConstCombatEventPtr> flat_events{events1.begin(), events1.end()}; // copy top-level input events
+
+        // copy nested sub-events of top-level events
+        for (const auto& event1 : events1) {                        // can't modify the input events pointers
+            auto events2{event1->SubEvents(ALL_EMPIRES)};           // makes movable pointers to event1's sub-events
+
+            for (auto& event2 : events2) {
+                auto events3{event2->SubEvents(ALL_EMPIRES)};       // makes movable pointers to event2's sub-events
+                flat_events.push_back(std::move(event2));           // can move the pointers to events2 = event1's sub-events
+
+                for (auto& event3 : events3) {
+                    auto events4{event3->SubEvents(ALL_EMPIRES)};   // makes movable pointers to event3's sub-events
+                    flat_events.push_back(std::move(event3));       // can move the pointers to events3 = event2's sub-events
+
+                    for (auto& event4 : events4)
+                        flat_events.push_back(std::move(event4));   // can move the pointers to events4 = event3's sub-events
+                }
+            }
+        }
+
+        return flat_events;
+    }
+
     /** Records info in Empires about what they destroyed or had destroyed during combat. */
     void UpdateEmpireCombatDestructionInfo(const std::vector<CombatInfo>& combats, const ObjectMap& objects) {
         for (const CombatInfo& combat_info : combats) {
-            std::vector<ConstCombatEventPtr> flat_events;
-            for (auto event : combat_info.combat_events) {
-                flat_events.push_back(event);
-                for (auto event2 : event->SubEvents(ALL_EMPIRES)) {
-                    flat_events.push_back(event2);
-                    for (auto event3 : event2->SubEvents(ALL_EMPIRES)) {
-                        flat_events.push_back(event3);
-                        for (auto event4 : event3->SubEvents(ALL_EMPIRES))
-                            flat_events.push_back(event4);
-                    }
-                }
-            }
-
-
             std::vector<WeaponFireEvent::ConstWeaponFireEventPtr> events_that_killed;
-            for (auto event : flat_events) {
-                auto fire_event = std::dynamic_pointer_cast<const WeaponFireEvent>(event);
+            for (auto& event : FlattenEvents(combat_info.combat_events)) { // TODO: could do the filtering in the call function and avoid some moves later...
+                auto fire_event = std::dynamic_pointer_cast<const WeaponFireEvent>(std::move(event));
                 if (fire_event && combat_info.destroyed_object_ids.count(fire_event->target_id)) {
-                    events_that_killed.push_back(fire_event);
-                    TraceLogger() << "Kill event: " << event->DebugString(objects);
+                    TraceLogger() << "Kill event: " << fire_event->DebugString(objects);
+                    events_that_killed.push_back(std::move(fire_event));
                 }
             }
             DebugLogger() << "Combat combat_info system: " << combat_info.system_id
@@ -2662,7 +2670,7 @@ namespace {
                 int attacker_empire_id = attacker->Owner();
                 Empire* attacker_empire = GetEmpire(attacker_empire_id);
 
-                auto target_ship = Objects().get<Ship>(attack_event->target_id);
+                auto target_ship = objects.get<Ship>(attack_event->target_id);
                 if (!target_ship)
                     continue;
                 Empire* target_empire = GetEmpire(target_ship->Owner());
@@ -2714,7 +2722,7 @@ namespace {
             ErrorLogger() << "ColonizePlanet couldn't get ship with id " << ship_id;
             return false;
         }
-        auto planet = Objects().get<Planet>(planet_id);
+        auto planet = objects.get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "ColonizePlanet couldn't get planet with id " << planet_id;
             return false;
@@ -2750,7 +2758,7 @@ namespace {
             return false;
         }
 
-        auto system = Objects().get<System>(ship->SystemID());
+        auto system = objects.get<System>(ship->SystemID());
 
         // destroy colonizing ship, and its fleet if now empty
         auto fleet = objects.get<Fleet>(ship->FleetID());
@@ -3155,8 +3163,10 @@ namespace {
     /** Destroys suitable objects that have been ordered scrapped.*/
     void HandleScrapping() {
         std::vector<std::shared_ptr<Ship>> scrapped_ships;
+        Universe& universe{GetUniverse()};
+        ObjectMap& objects{universe.Objects()};
 
-        for (auto& ship : Objects().all<Ship>()) {
+        for (auto& ship : objects.all<Ship>()) {
             if (ship->OrderedScrapped())
                 scrapped_ships.push_back(ship);
         }
@@ -3164,17 +3174,17 @@ namespace {
         for (auto& ship : scrapped_ships) {
             DebugLogger() << "... ship: " << ship->ID() << " ordered scrapped";
 
-            auto system = Objects().get<System>(ship->SystemID());
+            auto system = objects.get<System>(ship->SystemID());
             if (system)
                 system->Remove(ship->ID());
 
-            auto fleet = Objects().get<Fleet>(ship->FleetID());
+            auto fleet = objects.get<Fleet>(ship->FleetID());
             if (fleet) {
                 fleet->RemoveShips({ship->ID()});
                 if (fleet->Empty()) {
                     //scrapped_object_ids.push_back(fleet->ID());
                     system->Remove(fleet->ID());
-                    GetUniverse().Destroy(fleet->ID());
+                    universe.Destroy(fleet->ID());
                 }
             }
 
@@ -3184,21 +3194,21 @@ namespace {
                 scrapping_empire->RecordShipScrapped(*ship);
 
             //scrapped_object_ids.push_back(ship->ID());
-            GetUniverse().Destroy(ship->ID());
+            universe.Destroy(ship->ID());
         }
 
         std::vector<std::shared_ptr<Building>> scrapped_buildings;
 
-        for (auto& building : Objects().all<Building>()) {
+        for (auto& building : objects.all<Building>()) {
             if (building->OrderedScrapped())
                 scrapped_buildings.push_back(building);
         }
 
         for (auto& building : scrapped_buildings) {
-            if (auto planet = Objects().get<Planet>(building->PlanetID()))
+            if (auto planet = objects.get<Planet>(building->PlanetID()))
                 planet->RemoveBuilding(building->ID());
 
-            if (auto system = Objects().get<System>(building->SystemID()))
+            if (auto system = objects.get<System>(building->SystemID()))
                 system->Remove(building->ID());
 
             // record scrapping in empire stats
@@ -3207,7 +3217,7 @@ namespace {
                 scrapping_empire->RecordBuildingScrapped(*building);
 
             //scrapped_object_ids.push_back(building->ID());
-            GetUniverse().Destroy(building->ID());
+            universe.Destroy(building->ID());
         }
     }
 
@@ -3232,27 +3242,29 @@ namespace {
 
     /** Check validity of adopted policies, overwrite initial adopted
       * policies with those currently adopted, update adopted turns counters. */
-    void UpdateEmpirePolicies(EmpireManager& empires) {
+    void UpdateEmpirePolicies(EmpireManager& empires, bool update_cumulative_adoption_time = false) {
         for ([[maybe_unused]] auto& [empire_id, empire] : empires) {
             (void)empire_id;    // quieting unused variable warning
-            empire->UpdatePolicies();
+            empire->UpdatePolicies(update_cumulative_adoption_time);
         }
     }
 
     /** Deletes empty fleets. */
     void CleanEmptyFleets() {
         std::vector<std::shared_ptr<Fleet>> empty_fleets;
+        Universe& universe{GetUniverse()};
+        ObjectMap& objects{universe.Objects()};
 
-        for (auto& fleet : Objects().all<Fleet>()) {
+        for (auto& fleet : objects.all<Fleet>()) {
             if (fleet->Empty())
                 empty_fleets.push_back(fleet);
         }
 
         for (auto& fleet : empty_fleets) {
-            if (auto sys = Objects().get<System>(fleet->SystemID()))
+            if (auto sys = objects.get<System>(fleet->SystemID()))
                 sys->Remove(fleet->ID());
 
-            GetUniverse().RecursiveDestroy(fleet->ID());
+            universe.RecursiveDestroy(fleet->ID());
         }
     }
 }
@@ -3261,7 +3273,7 @@ void ServerApp::PreCombatProcessTurns() {
     ScopedTimer timer("ServerApp::PreCombatProcessTurns", true);
 
     m_universe.ResetAllObjectMeters(false, true);   // revert current meter values to initial values prior to update after incrementing turn number during previous post-combat turn processing.
-    m_universe.UpdateEmpireVisibilityFilteredSystemGraphsWithOwnObjectMaps(Empires());
+    m_universe.UpdateEmpireVisibilityFilteredSystemGraphsWithOwnObjectMaps(m_empires);
 
     DebugLogger() << "ServerApp::ProcessTurns executing orders";
 
@@ -3295,7 +3307,7 @@ void ServerApp::PreCombatProcessTurns() {
     // validate adopted policies, and update Empire Policy history
     // actual policy adoption and influence consumption occurrs during order
     // execution above
-    UpdateEmpirePolicies(m_empires);
+    UpdateEmpirePolicies(m_empires, false);
 
     // clean up empty fleets that empires didn't order deleted
     CleanEmptyFleets();
@@ -3367,11 +3379,10 @@ void ServerApp::PreCombatProcessTurns() {
         if (!fleet || !fleet->ArrivedThisTurn())
             continue;
         // sitreps for all empires that can see fleet at new location
-        for (auto& entry : Empires()) {
-            if (fleet->GetVisibility(entry.first) >= Visibility::VIS_BASIC_VISIBILITY)
-                entry.second->AddSitRepEntry(
-                    CreateFleetArrivedAtDestinationSitRep(fleet->SystemID(), fleet->ID(),
-                                                          entry.first));
+        for (auto& [empire_id, empire] : m_empires) {
+            if (fleet->GetVisibility(empire_id) >= Visibility::VIS_BASIC_VISIBILITY)
+                empire->AddSitRepEntry(
+                    CreateFleetArrivedAtDestinationSitRep(fleet->SystemID(), fleet->ID(), empire_id));
         }
     }
 
@@ -3385,8 +3396,7 @@ void ServerApp::PreCombatProcessTurns() {
     {
         auto player = *player_it;
         int empire_id = PlayerEmpireID(player->PlayerID());
-        const Empire* empire = GetEmpire(empire_id);
-        if (empire ||
+        if (m_empires.GetEmpire(empire_id) ||
             player->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR ||
             player->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER)
         {
@@ -3647,7 +3657,7 @@ void ServerApp::PostCombatProcessTurns() {
 
 
     // do another policy update before final meter update to be consistent with what clients calculate...
-    UpdateEmpirePolicies(m_empires);
+    UpdateEmpirePolicies(m_empires, true);
 
 
     TraceLogger(effects) << "ServerApp::PostCombatProcessTurns Before Final Meter Estimate Update: ";

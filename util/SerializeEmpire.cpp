@@ -225,6 +225,15 @@ void Empire::serialize(Archive& ar, const unsigned int version)
         }
     }
 
+    if (Archive::is_loading::value && version < 7) {
+        m_policy_adoption_current_duration.clear();
+        for (auto& [policy_name, adoption_info] : m_adopted_policies)
+            m_policy_adoption_current_duration[policy_name] = CurrentTurn() - adoption_info.adoption_turn;
+    } else {
+        ar  & BOOST_SERIALIZATION_NVP(m_policy_adoption_current_duration);
+    }
+
+
     ar  & BOOST_SERIALIZATION_NVP(m_meters);
     if (Archive::is_saving::value && !allied_visible) {
         // don't send what other empires building and researching
@@ -262,10 +271,19 @@ void Empire::serialize(Archive& ar, const unsigned int version)
         ar  & boost::serialization::make_nvp("m_ship_designs", m_known_ship_designs);
         ar  & BOOST_SERIALIZATION_NVP(m_sitrep_entries)
             & BOOST_SERIALIZATION_NVP(m_resource_pools)
-            & BOOST_SERIALIZATION_NVP(m_population_pool)
+            & BOOST_SERIALIZATION_NVP(m_population_pool);
 
-            & BOOST_SERIALIZATION_NVP(m_explored_systems)
-            & BOOST_SERIALIZATION_NVP(m_ship_names_used)
+        if (Archive::is_loading::value && version < 8) {
+            std::set<int> explored_system_ids;
+            ar  & boost::serialization::make_nvp("m_explored_systems", explored_system_ids);
+            m_explored_systems.clear();
+            for (auto id : explored_system_ids)
+                m_explored_systems.emplace(id, 0);
+        } else {
+            ar  & BOOST_SERIALIZATION_NVP(m_explored_systems);
+        }
+
+        ar  & BOOST_SERIALIZATION_NVP(m_ship_names_used)
 
             & BOOST_SERIALIZATION_NVP(m_species_ships_owned)
             & BOOST_SERIALIZATION_NVP(m_ship_designs_owned)
@@ -319,7 +337,7 @@ void Empire::serialize(Archive& ar, const unsigned int version)
     TraceLogger() << "DONE serializing empire " << m_id << ": " << m_name;
 }
 
-BOOST_CLASS_VERSION(Empire, 6)
+BOOST_CLASS_VERSION(Empire, 8)
 
 template void Empire::serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, const unsigned int);
 template void Empire::serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, const unsigned int);

@@ -14,6 +14,7 @@
 namespace {
     const std::string DEFAULT_FILENAME = "en.txt";
     const std::string ERROR_STRING = "ERROR: ";
+    const std::string EMPTY_STRING;
 }
 
 
@@ -21,16 +22,21 @@ StringTable::StringTable():
     m_filename(DEFAULT_FILENAME)
 { Load(); }
 
-StringTable::StringTable(const std::string& filename, std::shared_ptr<const StringTable> fallback):
-    m_filename(filename)
+StringTable::StringTable(std::string filename, std::shared_ptr<const StringTable> fallback):
+    m_filename(std::move(filename))
 { Load(fallback); }
-
-StringTable::~StringTable()
-{}
 
 bool StringTable::StringExists(const std::string& key) const {
     std::scoped_lock lock(m_mutex);
-    return m_strings.count(key);
+    return m_strings.find(key) != m_strings.end();
+}
+
+std::pair<bool, const std::string&> StringTable::CheckGet(const std::string& key) const {
+    std::scoped_lock lock(m_mutex);
+
+    auto it = m_strings.find(key);
+    bool found_string = it != m_strings.end();
+    return {found_string, found_string ? it->second : EMPTY_STRING};
 }
 
 const std::string& StringTable::operator[] (const std::string& key) const {

@@ -1400,6 +1400,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
 {
     const std::string& variable_name = m_property_name.back();
 
+
+    // empire properties indexed by strings
     std::function<const std::map<std::string, int>& (const Empire&)> empire_property_string_key{nullptr};
 
     if (variable_name == "BuildingTypesOwned")
@@ -1430,8 +1432,11 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         empire_property_string_key = &Empire::ShipPartsOwned;
     else if (variable_name == "TurnTechResearched")
         empire_property_string_key = &Empire::ResearchedTechs;
+    else if (variable_name == "TurnsSincePolicyAdopted")
+        empire_property_string_key = &Empire::PolicyCurrentAdoptedDurations;
+    else if (variable_name == "CumulativeTurnsPolicyAdopted")
+        empire_property_string_key = &Empire::PolicyTotalAdoptedDurations;
 
-    // empire properties indexed by strings
     if (empire_property_string_key) {
         using namespace boost::adaptors;
 
@@ -1487,6 +1492,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         return sum;
     }
 
+
+    // empire properties indexed by integers
     std::function<const std::map<int, int>& (const Empire&)> empire_property_int_key{nullptr};
 
     if (variable_name == "EmpireShipsDestroyed")
@@ -1503,8 +1510,9 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         empire_property_int_key = &Empire::ShipDesignsProduced;
     else if (variable_name == "ShipDesignsScrapped")
         empire_property_int_key = &Empire::ShipDesignsScrapped;
+    else if (variable_name == "TurnSystemExplored")
+        empire_property_int_key = &Empire::TurnsSystemsExplored;
 
-    // empire properties indexed by integers
     if (empire_property_int_key) {
         using namespace boost::adaptors;
 
@@ -1551,6 +1559,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         return sum;
     }
 
+
     // unindexed empire proprties
     if (variable_name == "OutpostsOwned") {
         std::shared_ptr<const Empire> empire;
@@ -1576,6 +1585,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
 
         return empire_property(empire.get());
     }
+
 
     // non-empire properties
     if (variable_name == "GameRule") {
@@ -1761,7 +1771,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         return object->SpecialAddedOnTurn(special_name);
 
     }
-    else if (variable_name == "TurnPolicyAdopted") {
+    else if (variable_name == "TurnPolicyAdopted") { // returns by value, so can't assign &Empire::TurnsPoliciesAdopted to empire_property_string_key above
         if (!m_string_ref1)
             return 0;
         std::string policy_name = m_string_ref1->Eval();
@@ -1780,7 +1790,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
 
         return empire->TurnPolicyAdopted(policy_name);
     }
-    else if (variable_name == "NumPoliciesAdopted") {
+    else if (variable_name == "NumPoliciesAdopted") { // similar to a string-keyed empire property, but does specialized lookups of adopted policy info
         int empire_id = ALL_EMPIRES;
         if (m_int_ref1) {
             empire_id = m_int_ref1->Eval(context);
@@ -2624,21 +2634,37 @@ std::string StringCast<double>::Eval(const ScriptingContext& context) const
 {
     if (!m_value_ref)
         return "";
-    double temp = m_value_ref->Eval(context);
+
+    auto raw_ref = m_value_ref.get();
+    if (!raw_ref)
+        return "";
+
+    double result = raw_ref->Eval(context);
+
+    auto int_ref = dynamic_cast<Variable<double>*>(raw_ref);
+    if (!int_ref)
+        return std::to_string(result);
 
     // special case for a few sub-value-refs to help with UI representation
-    if (Variable<double>* int_var = dynamic_cast<Variable<double>*>(m_value_ref.get())) {
-        if (int_var->PropertyName().back() == "X" || int_var->PropertyName().back() == "Y") {
-            if (temp == UniverseObject::INVALID_POSITION)
-                return UserString("INVALID_POSITION");
+    const auto& property = int_ref->PropertyName();
+    if (property.empty())
+        return std::to_string(result);
 
-            std::stringstream ss;
-            ss << std::setprecision(6) << temp;
-            return ss.str();
-        }
+    const auto& end_of_property = property.back();
+    if (end_of_property.empty())
+        return std::to_string(result);
+
+    // special case for a few sub-value-refs to help with UI representation
+    if (end_of_property == "X" || end_of_property == "Y") {
+        if (result == UniverseObject::INVALID_POSITION)
+            return UserString("INVALID_POSITION");
+
+        std::stringstream ss;
+        ss << std::setprecision(6) << result;
+        return ss.str();
     }
 
-    return DoubleToString(temp, 3, false);
+    return DoubleToString(result, 3, false);
 }
 
 template <>
@@ -2646,22 +2672,37 @@ std::string StringCast<int>::Eval(const ScriptingContext& context) const
 {
     if (!m_value_ref)
         return "";
-    int temp = m_value_ref->Eval(context);
+
+    auto raw_ref = m_value_ref.get();
+    if (!raw_ref)
+        return "";
+
+    int result = raw_ref->Eval(context);
+
+    auto int_ref = dynamic_cast<Variable<int>*>(raw_ref);
+    if (!int_ref)
+        return std::to_string(result);
 
     // special case for a few sub-value-refs to help with UI representation
-    if (auto int_var = dynamic_cast<Variable<int>*>(m_value_ref.get())) {
-        if (int_var->PropertyName().back() == "ETA") {
-            if (temp == Fleet::ETA_UNKNOWN) {
-                return UserString("FW_FLEET_ETA_UNKNOWN");
-            } else if (temp == Fleet::ETA_NEVER) {
-                return UserString("FW_FLEET_ETA_NEVER");
-            } else if (temp == Fleet::ETA_OUT_OF_RANGE) {
-                return UserString("FW_FLEET_ETA_OUT_OF_RANGE");
-            }
+    const auto& property = int_ref->PropertyName();
+    if (property.empty())
+        return std::to_string(result);
+
+    const auto& end_of_property = property.back();
+    if (end_of_property.empty())
+        return std::to_string(result);
+
+    if (end_of_property == "ETA") {
+        if (result == Fleet::ETA_UNKNOWN) {
+            return UserString("FW_FLEET_ETA_UNKNOWN");
+        } else if (result == Fleet::ETA_NEVER) {
+            return UserString("FW_FLEET_ETA_NEVER");
+        } else if (result == Fleet::ETA_OUT_OF_RANGE) {
+            return UserString("FW_FLEET_ETA_OUT_OF_RANGE");
         }
     }
 
-    return std::to_string(temp);
+    return std::to_string(result);
 }
 
 template <>
@@ -2673,6 +2714,7 @@ std::string StringCast<std::vector<std::string>>::Eval(const ScriptingContext& c
 
     // concatenate strings into one big string
     std::string retval;
+    retval.reserve(16 * temp.size()); // rough guesstimate to avoid reallocations
     for (auto str : temp)
         retval += str + " ";
     return retval;

@@ -79,6 +79,7 @@
     (CreateShip)                                \
     (CreateSystem)                              \
     (CreationTurn)                              \
+    (CumulativeTurnsPolicyAdopted)              \
     (CurrentContent)                            \
     (CurrentTurn)
 
@@ -317,6 +318,7 @@
     (Or)                                        \
     (Orange)                                    \
     (Orbit)                                     \
+    (OrderedAlternativesOf)                     \
     (OrderedBombardedBy)                        \
     (OriginalType)                              \
     (OutpostsOwned)                             \
@@ -572,7 +574,6 @@
     (TopPriorityEnqueuedTech)                   \
     (TopPriorityResearchableTech)               \
     (TopPriorityTransferrableTech)              \
-    (OrderedAlternativesOf)                     \
     (Toxic)                                     \
     (Trade)
 
@@ -584,6 +585,8 @@
     (TurnPolicyAdopted)                         \
     (TurnsSinceColonization)                    \
     (TurnsSinceFocusChange)                     \
+    (TurnsSincePolicyAdopted)                   \
+    (TurnSystemExplored)                        \
     (TurnTechResearched)                        \
     (type)                                      \
     (Uninhabitable)                             \

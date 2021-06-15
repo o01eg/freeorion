@@ -213,15 +213,15 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     // also adopting any other policies that were first adopted this turn
     // add up all other policy adoption costs for this turn
     double other_this_turn_adopted_policies_cost = 0.0;
-    for (const auto& policy_entry : m_adopted_policies) {
-        if (policy_entry.second.adoption_turn != CurrentTurn())
+    for (auto& [policy_name, adoption_info] : m_adopted_policies) {
+        if (adoption_info.adoption_turn != CurrentTurn())
             continue;
-        auto pre_adptd_policy = GetPolicy(policy_entry.first);
+        auto pre_adptd_policy = GetPolicy(policy_name);
         if (!pre_adptd_policy) {
-            ErrorLogger() << "Empire::AdoptPolicy couldn't find policy named " << policy_entry.first << " that was supposedly already adopted this turn (" << CurrentTurn() << ")";
+            ErrorLogger() << "Empire::AdoptPolicy couldn't find policy named " << policy_name << " that was supposedly already adopted this turn (" << CurrentTurn() << ")";
             continue;
         }
-        DebugLogger() << "Empire::AdoptPolicy : Already adopted policy this turn: " << policy_entry.first
+        DebugLogger() << "Empire::AdoptPolicy : Already adopted policy this turn: " << policy_name
                       << " with cost " << pre_adptd_policy->AdoptionCost(m_id, objects);
         other_this_turn_adopted_policies_cost += pre_adptd_policy->AdoptionCost(m_id, objects);
     }
@@ -269,28 +269,38 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
 
     // collect already-adopted policies in category
     std::map<int, std::string> adopted_policies_in_category_map;
-    for (const auto& policy_entry : m_adopted_policies) {
-        if (policy_entry.second.category != category)
+    for (auto& [policy_name, adoption_info] : m_adopted_policies) {
+        if (adoption_info.category != category)
             continue;
-        if (policy_entry.second.slot_in_category >= total_slots_in_category) {
+        if (adoption_info.slot_in_category >= total_slots_in_category) {
             ErrorLogger() << "Empire::AdoptPolicy found adopted policy: "
-                          << policy_entry.first << "  in category: " << category
-                          << "  in slot: " << policy_entry.second.slot_in_category
+                          << policy_name << "  in category: " << category
+                          << "  in slot: " << adoption_info.slot_in_category
                           << "  which is higher than max slot in category: "
                           << (total_slots_in_category - 1);
         }
-        if (slot != INVALID_SLOT_INDEX && policy_entry.second.slot_in_category == slot) {
+        if (slot != INVALID_SLOT_INDEX && adoption_info.slot_in_category == slot) {
             ErrorLogger() << "Empire::AdoptPolicy found adopted policy: "
-                          << policy_entry.first << "  in category: " << category
+                          << policy_name << "  in category: " << category
                           << "  in slot: " << slot
                           << "  so cannot adopt another policy in that slot";
             return;
         }
 
-        adopted_policies_in_category_map[policy_entry.second.slot_in_category] = policy_entry.first;
+        adopted_policies_in_category_map[adoption_info.slot_in_category] = policy_name;
     }
-    // convert to vector;
-    std::vector<std::string> adopted_policies_in_category;
+    // convert to vector
+    std::vector<std::string> adopted_policies_in_category(total_slots_in_category, "");
+    for (auto& [adopted_policy_slot, adopted_policy_name] : adopted_policies_in_category_map) {
+        if (adopted_policy_slot < 0 || adopted_policy_slot >= static_cast<int>(adopted_policies_in_category.size())) {
+            ErrorLogger() << "AdoptPolicy somehow got slot " << adopted_policy_slot << " of adopted policy " << adopted_policy_name
+                          << " outside the suitable range with total slots size: " << adopted_policies_in_category.size();
+            continue;
+        }
+        adopted_policies_in_category[adopted_policy_slot] = std::move(adopted_policy_name);
+    }
+
+
 
     // if no particular slot was specified, try to find a suitable slot in category
     if (slot == INVALID_SLOT_INDEX) {
@@ -328,7 +338,7 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     PoliciesChangedSignal();
 }
 
-void Empire::UpdatePolicies() {
+void Empire::UpdatePolicies(bool update_cumulative_adoption_time) {
     // remove any unrecognized policies and uncategorized policies
     auto policies_temp = m_adopted_policies;
     for (auto& [policy_name, adoption_info] : policies_temp) {
@@ -390,9 +400,12 @@ void Empire::UpdatePolicies() {
     }
 
     // update counters of how many turns each policy has been adopted
+    m_policy_adoption_current_duration.clear();
     for (auto& [policy_name, adoption_info] : m_adopted_policies) {
-        (void)adoption_info; // quiet warning
-        m_policy_adoption_total_duration[policy_name]++;  // assumes default initialization to 0
+        m_policy_adoption_current_duration[policy_name] = CurrentTurn() - adoption_info.adoption_turn;
+
+        if (update_cumulative_adoption_time)
+            m_policy_adoption_total_duration[policy_name]++;  // assumes default initialization to 0
     }
 
     // update initial adopted policies for next turn
@@ -404,10 +417,24 @@ bool Empire::PolicyAdopted(const std::string& name) const
 { return m_adopted_policies.count(name); }
 
 int Empire::TurnPolicyAdopted(const std::string& name) const {
-    if (!PolicyAdopted(name))
-        return INVALID_GAME_TURN;
     auto it = m_adopted_policies.find(name);
+    if (it == m_adopted_policies.end())
+        return INVALID_GAME_TURN;
     return it->second.adoption_turn;
+}
+
+int Empire::CurrentTurnsPolicyHasBeenAdopted(const std::string& name) const {
+    auto it = m_policy_adoption_current_duration.find(name);
+    if (it == m_policy_adoption_current_duration.end())
+        return 0;
+    return it->second;
+}
+
+int Empire::CumulativeTurnsPolicyHasBeenAdopted(const std::string& name) const {
+    auto it = m_policy_adoption_total_duration.find(name);
+    if (it == m_policy_adoption_total_duration.end())
+        return 0;
+    return it->second;
 }
 
 int Empire::SlotPolicyAdoptedIn(const std::string& name) const {
@@ -439,6 +466,12 @@ std::map<std::string, int> Empire::TurnsPoliciesAdopted() const {
         retval.emplace_hint(retval.end(), policy_name, adoption_info.adoption_turn);
     return retval;
 }
+
+const std::map<std::string, int>& Empire::PolicyTotalAdoptedDurations() const
+{ return m_policy_adoption_total_duration; }
+
+const std::map<std::string, int>& Empire::PolicyCurrentAdoptedDurations() const
+{ return m_policy_adoption_current_duration; }
 
 const std::set<std::string>& Empire::AvailablePolicies() const
 { return m_available_policies; }
@@ -1279,8 +1312,19 @@ bool Empire::PreservedLaneTravel(int start_system_id, int dest_system_id) const 
             && find_it->second.count(dest_system_id);
 }
 
-const std::set<int>& Empire::ExploredSystems() const
-{ return m_explored_systems; }
+std::set<int> Empire::ExploredSystems() const {
+    std::set<int> retval;
+    for (const auto& entry : m_explored_systems)
+        retval.insert(entry.first);
+    return retval;
+}
+
+int Empire::TurnSystemExplored(int system_id) const {
+    auto it = m_explored_systems.find(system_id);
+    if (it == m_explored_systems.end())
+        return INVALID_GAME_TURN;
+    return it->second;
+}
 
 std::map<int, std::set<int>> Empire::KnownStarlanes(const Universe& universe) const {
     // compile starlanes leading into or out of each system
@@ -1829,9 +1873,9 @@ void Empire::AddShipHull(const std::string& name) {
     AddSitRepEntry(CreateShipHullUnlockedSitRep(name));
 }
 
-void Empire::AddExploredSystem(int ID) {
+void Empire::AddExploredSystem(int ID, int turn) {
     if (Objects().get<System>(ID))
-        m_explored_systems.insert(ID);
+        m_explored_systems.emplace(ID, turn);
     else
         ErrorLogger() << "Empire::AddExploredSystem given an invalid system id: " << ID;
 }

@@ -113,7 +113,7 @@ namespace {
         if (!target_object || target_object->Unowned())
             return;
         if (auto empire = context.GetEmpire(target_object->Owner()))
-            empire->AddExploredSystem(system_id);
+            empire->AddExploredSystem(system_id, context.current_turn);
     }
 
     /** Resets the previous and next systems of \a fleet and recalcultes /
@@ -3184,8 +3184,7 @@ void SetDestination::Execute(ScriptingContext& context) const {
 
     auto target_fleet = std::dynamic_pointer_cast<Fleet>(context.effect_target);
     if (!target_fleet) {
-        ErrorLogger() << "SetDestination::Execute acting on non-fleet target:";
-        context.effect_target->Dump();
+        ErrorLogger() << "SetDestination::Execute acting on non-fleet target:" << context.effect_target->Dump();
         return;
     }
 
@@ -3272,8 +3271,7 @@ void SetAggression::Execute(ScriptingContext& context) const {
 
     auto target_fleet = std::dynamic_pointer_cast<Fleet>(context.effect_target);
     if (!target_fleet) {
-        ErrorLogger() << "SetAggression::Execute acting on non-fleet target:";
-        context.effect_target->Dump();
+        ErrorLogger() << "SetAggression::Execute acting on non-fleet target:" << context.effect_target->Dump();
         return;
     }
 
@@ -3575,15 +3573,18 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
     std::vector<std::pair<std::string, std::string>> parameter_tag_values;
     parameter_tag_values.reserve(m_message_parameters.size());
     for (auto& [param_tag, param_ref] : m_message_parameters) {
-        auto param_val = param_ref->Eval(context);
-        parameter_tag_values.emplace_back(param_tag, param_val);
+        if (!param_ref)
+            ErrorLogger() << "GenerateSitRepMessage::Execute got null parameter reference for tag: " << param_tag;
 
+        std::string param_val{param_ref ? param_ref->Eval(context) : std::string()};
         // special case for ship designs: make sure sitrep recipient knows about the design
         // so the sitrep won't have errors about unknown designs being referenced
         if (param_tag == VarText::PREDEFINED_DESIGN_TAG) {
             if (const ShipDesign* design = context.ContextUniverse().GetGenericShipDesign(param_val))
                 ship_design_ids_to_inform_receipits_of.insert(design->ID());
         }
+
+        parameter_tag_values.emplace_back(param_tag, std::move(param_val));
     }
 
     // whom to send to?

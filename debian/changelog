@@ -1,4 +1,10 @@
-freeorion (0.4.10.999+1SNAPSHOT20210607ppa1~bionic) bionic; urgency=medium
+freeorion (0.4.10.999+1SNAPSHOT20210614ppa1~bionic) bionic; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg <o01eg@yandex.ru>  Tue, 15 Jun 2021 18:26:10 +0000
+
+freeorion (0.4.10.999+1SNAPSHOT20210607ppa1~impish) impish; urgency=medium
 
   * Update upstream.
 

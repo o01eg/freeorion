@@ -133,9 +133,9 @@ public:
     //! @param  fallback
     //!     A StringTable that should be used look up unknown translation
     //!     entries.
-    StringTable(const std::string& filename, std::shared_ptr<const StringTable> fallback = nullptr);
+    explicit StringTable(std::string filename, std::shared_ptr<const StringTable> fallback = nullptr);
 
-    ~StringTable();
+    ~StringTable() = default;
 
     //! Returns a translation for @p key.
     //!
@@ -145,7 +145,7 @@ public:
     //! @return
     //!     The translation for @p key or S_ERROR_STRING if no translation was
     //!     found.
-    const std::string& operator[] (const std::string& key) const;
+    [[nodiscard]] const std::string& operator[] (const std::string& key) const;
 
     //! Returns if a translation for @p key exists.
     //!
@@ -154,17 +154,27 @@ public:
     //!
     //! @return
     //!     True iff a translation with that key exists, false otherwise.
-    bool StringExists(const std::string& key) const;
+    [[nodiscard]] bool StringExists(const std::string& key) const;
+
+    //! Returns if a translation for @p key exists and what that translation is, if it exists
+    //!
+    //! @param key
+    //!     The identifying key of a translation entry.
+    //!
+    //! @return
+    //!     pair containing true iff a translation with that key exists, false otherwise, and
+    //!                     reference to the translation or to an emptry string if no translation exists
+    [[nodiscard]] std::pair<bool, const std::string&> CheckGet(const std::string& key) const;
 
     //! Returns the native language name of this StringTable.
-    inline const std::string& Language() const
+    [[nodiscard]] const std::string& Language() const
     { return m_language; }
 
     //! Returns the translation file name this StringTable was loaded from.
-    inline const std::string& Filename() const
+    [[nodiscard]] const std::string& Filename() const
     { return m_filename; }
 
-    inline const std::map<std::string, std::string>& AllStrings() const
+    [[nodiscard]] const std::map<std::string, std::string>& AllStrings() const
     { return m_strings; }
 
 private:

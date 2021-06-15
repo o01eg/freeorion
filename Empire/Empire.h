@@ -74,19 +74,23 @@ public:
 
     [[nodiscard]] bool                     PolicyAdopted(const std::string& name) const;
     [[nodiscard]] int                      TurnPolicyAdopted(const std::string& name) const;
+    [[nodiscard]] int                      CurrentTurnsPolicyHasBeenAdopted(const std::string& name) const;
+    [[nodiscard]] int                      CumulativeTurnsPolicyHasBeenAdopted(const std::string& name) const;
+
     [[nodiscard]] int                      SlotPolicyAdoptedIn(const std::string& name) const;
     [[nodiscard]] std::vector<std::string> AdoptedPolicies() const;
 
     /** For each category, returns the slots in which policies have been adopted
       * and what policy is in that slot. */
-    [[nodiscard]] std::map<std::string, std::map<int, std::string>>
-                                    CategoriesSlotsPoliciesAdopted() const;
+    [[nodiscard]] std::map<std::string, std::map<int, std::string>> CategoriesSlotsPoliciesAdopted() const;
 
-    /** Returns the policies the empire has adopted and the categories
-      * in which they were adopted. */
-    [[nodiscard]] std::map<std::string, int>    TurnsPoliciesAdopted() const;
+    /** Returns the policies the empire has adopted and turns on which they were adopted. */
+    [[nodiscard]] std::map<std::string, int>        TurnsPoliciesAdopted() const;
+    [[nodiscard]] const std::map<std::string, int>& PolicyTotalAdoptedDurations() const;
+    [[nodiscard]] const std::map<std::string, int>& PolicyCurrentAdoptedDurations() const;
+
     /** Returns the set of policies / slots the empire has avaialble. */
-    [[nodiscard]]  const std::set<std::string>& AvailablePolicies() const;
+    [[nodiscard]] const std::set<std::string>&  AvailablePolicies() const;
     [[nodiscard]] bool                          PolicyAvailable(const std::string& name) const;
     [[nodiscard]] bool                          PolicyPrereqsAndExclusionsOK(const std::string& name) const;
     [[nodiscard]] std::map<std::string, int>    TotalPolicySlots() const;
@@ -180,7 +184,8 @@ public:
      * is determined in Empire::UpdateSupplyUnobstructedSystems(). */
     [[nodiscard]] bool                         PreservedLaneTravel(int start_system_id, int dest_system_id) const;
 
-    [[nodiscard]] const std::set<int>&         ExploredSystems() const;     ///< returns set of ids of systems that this empire has explored
+    [[nodiscard]] std::set<int>                ExploredSystems() const;     ///< returns set of ids of systems that this empire has explored
+    [[nodiscard]] int                          TurnSystemExplored(int system_id) const;
     [[nodiscard]] std::map<int, std::set<int>> KnownStarlanes(const Universe& universe) const;     ///< returns map from system id (start) to set of system ids (endpoints) of all starlanes known to this empire
     [[nodiscard]] std::map<int, std::set<int>> VisibleStarlanes(const Universe& universe) const;   ///< returns map from system id (start) to set of system ids (endpoints) of all starlanes visible to this empire this turn
 
@@ -212,7 +217,7 @@ public:
     /** Checks that all policy adoption conditions are met, removing any that
       * are not allowed. Also copies adopted policies to initial adopted
       * policies. Updates how many turns each policy has (ever) been adopted. */
-    void UpdatePolicies();
+    void UpdatePolicies(bool update_cumulative_adoption_time);
 
     /** Returns the meter with the indicated \a name if it exists, or nullptr. */
     Meter* GetMeter(const std::string& name);
@@ -267,7 +272,7 @@ public:
     //! list of available items.
     void UnlockItem(const UnlockableItem& item);
 
-    void AddBuildingType(const std::string& name);   ///< Inserts the given BuildingType into the Empire's list of available BuldingTypes.
+    void AddBuildingType(const std::string& name);  ///< Inserts the given BuildingType into the Empire's list of available BuldingTypes.
     //! Inserts the given ShipPart into the Empire's list of available ShipPart%s.
     void AddShipPart(const std::string& name);
 
@@ -275,7 +280,7 @@ public:
     //! ShipHull%s.
     void AddShipHull(const std::string& name);
 
-    void AddExploredSystem(int ID);                  ///< Inserts the given ID into the Empire's list of explored systems.
+    void AddExploredSystem(int ID, int turn);       ///< Inserts the given ID into the Empire's list of explored systems.
 
     /** inserts given design id into the empire's set of designs in front of next design */
     void AddShipDesign(int ship_design_id, const Universe& universe, int next_design_id = INVALID_DESIGN_ID);
@@ -469,6 +474,9 @@ public:
     auto BuildingTypesScrapped() const -> const std::map<std::string, int>&
     { return m_building_types_scrapped; }
 
+    auto TurnsSystemsExplored() const -> const std::map<int, int>&
+    { return m_explored_systems; }
+
     /** Processes Builditems on queues of empires other than the indicated
       * empires, at the location with id \a location_id and, as appropriate,
       * adds them to the build queue of the indicated empires (if it is an
@@ -516,6 +524,7 @@ private:
     std::map<std::string, PolicyAdoptionInfo>
                                     m_initial_adopted_policies;         ///< adopted policies at start of turn
     std::map<std::string, int>      m_policy_adoption_total_duration;   ///< how many turns each policy has been adopted over the course of the game by this empire
+    std::map<std::string, int>      m_policy_adoption_current_duration; ///< how many turns each currently-adopted policy has been adopted since it was last adopted. somewhat redundant with adoption_turn in AdoptionInfo, but seems necessary to avoid off-by-one issues between client and server
     std::set<std::string>           m_available_policies;               ///< names of unlocked policies
 
 
@@ -543,7 +552,7 @@ private:
     //! List of acquired ship ShipHull referenced by name.
     std::set<std::string>           m_available_ship_hulls;
 
-    std::set<int>                   m_explored_systems;         ///< systems explored by this empire
+    std::map<int, int>              m_explored_systems;         ///< systems explored by this empire and the turn on which they were explored
     std::set<int>                   m_known_ship_designs;       ///< ids of ship designs in the universe that this empire knows about
 
     std::vector<SitRepEntry>        m_sitrep_entries;           ///< The Empire's sitrep entries

@@ -64,6 +64,7 @@ class AuthProvider:
 
     def is_require_auth_or_return_roles(self, player_name):
         """Returns True if player should be authenticated or list of roles for anonymous players"""
+           or list of roles for anonymous players"""
         otp = "%0.5d" % random.randint(999, 99999)
         try:
             with self.conn:

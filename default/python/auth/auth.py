@@ -63,9 +63,10 @@ class AuthProvider:
         return roles
 
     def is_require_auth_or_return_roles(self, player_name):
-        """Returns True if player should be authenticated or list of roles for anonymous players"""
+        """Returns True if player should be authenticated or list of roles for anonymous players
            or list of roles for anonymous players"""
         otp = "%0.5d" % random.randint(999, 99999)
+        sent_otp = False
         try:
             with self.conn:
                 with self.conn.cursor() as curs:
@@ -78,6 +79,7 @@ class AuthProvider:
                                 req.add_header("X-XMPP-To", r[1])
                                 urllib.request.urlopen(req).read()
                                 info("OTP was send to %s via XMPP" % player_name)
+                                sent_otp = True
                             except Exception:
                                 exctype, value = sys.exc_info()[:2]
                                 error("Cann't send xmpp message to %s: %s %s" % (player_name, exctype, value))
@@ -91,6 +93,7 @@ class AuthProvider:
                                         for player %s""" % (self.mailconf.get('mail', 'from'), r[1], otp, player_name))
                                 server.close()
                                 info("OTP was send to %s via email" % player_name)
+                                sent_otp = True
                             except Exception:
                                 exctype, value = sys.exc_info()[:2]
                                 error("Cann't send email to %s: %s %s" % (player_name, exctype, value))
@@ -102,7 +105,7 @@ class AuthProvider:
             error("Cann't check player %s: %s %s" % (player_name, exctype, value))
 
         # in longturn games always require authorization
-        return True
+        return sent_otp
 
     def is_success_auth_and_return_roles(self, player_name, auth):
         """Return False if passowrd doesn't match or list of roles for authenticated player"""

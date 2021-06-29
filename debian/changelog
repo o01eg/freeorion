@@ -1,3 +1,9 @@
+freeorion (0.4.10.999+1SNAPSHOT20210629ppa1~bionic) bionic; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Tue, 29 Jun 2021 20:15:30 +0300
+
 freeorion (0.4.10.999+1SNAPSHOT20210614ppa1~bionic) bionic; urgency=medium
 
   * Update upstream.

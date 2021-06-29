@@ -1,13 +1,14 @@
 import freeOrionAIInterface as fo
 import math
 from logging import debug, error, warning
-from typing import List, Set, Tuple, Union
+from typing import List, Sequence, Set, Tuple, Union
 
 import AIDependencies
 import MoveUtilsAI
 from AIDependencies import INVALID_ID
 from aistate_interface import get_aistate
 from CombatRatingsAI import get_fleet_rating, get_ship_combat_stats, rating_needed
+from common.fo_typing import PlanetId
 from EnumsAI import MissionType, ShipRoleType
 from freeorion_tools import assertion_fails, combine_ratings
 from ShipDesignAI import get_ship_part
@@ -51,7 +52,7 @@ def count_troops_in_fleet(fleet_id: int) -> float:
     return fleet_troop_capacity
 
 
-def get_targeted_planet_ids(planet_ids: List[int], mission_type: MissionType) -> List[int]:
+def get_targeted_planet_ids(planet_ids: Sequence[PlanetId], mission_type: MissionType) -> List[PlanetId]:
     """Find the planets that are targets of the specified mission type.
 
     :param planet_ids: planets to be queried

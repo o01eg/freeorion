@@ -202,28 +202,11 @@ void Empire::serialize(Archive& ar, const unsigned int version)
                       << std::string(allied_visible ? "allied visible" : "NOT allied visible");
     }
 
-    if (Archive::is_loading::value && version < 1) {
-        // adapt set to map
-        std::set<std::string> temp_stringset;
-        ar  & boost::serialization::make_nvp("m_techs", temp_stringset);
-        m_techs.clear();
-        for (auto& entry : temp_stringset)
-            m_techs[entry] = BEFORE_FIRST_TURN;
-    } else {
-        ar  & BOOST_SERIALIZATION_NVP(m_techs);
-
-        if (Archive::is_loading::value && version < 4) {
-            m_adopted_policies.clear();
-            m_initial_adopted_policies.clear();
-            m_available_policies.clear();
-            m_policy_adoption_total_duration.clear();
-        } else {
-            ar  & BOOST_SERIALIZATION_NVP(m_adopted_policies)
-                & BOOST_SERIALIZATION_NVP(m_initial_adopted_policies)
-                & BOOST_SERIALIZATION_NVP(m_available_policies)
-                & BOOST_SERIALIZATION_NVP(m_policy_adoption_total_duration);
-        }
-    }
+    ar  & BOOST_SERIALIZATION_NVP(m_techs)
+        & BOOST_SERIALIZATION_NVP(m_adopted_policies)
+        & BOOST_SERIALIZATION_NVP(m_initial_adopted_policies)
+        & BOOST_SERIALIZATION_NVP(m_available_policies)
+        & BOOST_SERIALIZATION_NVP(m_policy_adoption_total_duration);
 
     if (Archive::is_loading::value && version < 7) {
         m_policy_adoption_current_duration.clear();
@@ -291,9 +274,15 @@ void Empire::serialize(Archive& ar, const unsigned int version)
             & BOOST_SERIALIZATION_NVP(m_ship_part_class_owned)
             & BOOST_SERIALIZATION_NVP(m_species_colonies_owned)
             & BOOST_SERIALIZATION_NVP(m_outposts_owned)
-            & BOOST_SERIALIZATION_NVP(m_building_types_owned)
+            & BOOST_SERIALIZATION_NVP(m_building_types_owned);
 
-            & BOOST_SERIALIZATION_NVP(m_empire_ships_destroyed)
+        if (Archive::is_loading::value && version < 9) {
+            m_ships_destroyed.clear();
+        } else {
+            ar  & BOOST_SERIALIZATION_NVP(m_ships_destroyed);
+        }
+
+        ar  & BOOST_SERIALIZATION_NVP(m_empire_ships_destroyed)
             & BOOST_SERIALIZATION_NVP(m_ship_designs_destroyed)
             & BOOST_SERIALIZATION_NVP(m_species_ships_destroyed)
             & BOOST_SERIALIZATION_NVP(m_species_planets_invaded)
@@ -337,7 +326,7 @@ void Empire::serialize(Archive& ar, const unsigned int version)
     TraceLogger() << "DONE serializing empire " << m_id << ": " << m_name;
 }
 
-BOOST_CLASS_VERSION(Empire, 8)
+BOOST_CLASS_VERSION(Empire, 9)
 
 template void Empire::serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, const unsigned int);
 template void Empire::serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, const unsigned int);
@@ -357,9 +346,8 @@ void serialize(Archive& ar, EmpireManager& em, unsigned int const version)
 
     TraceLogger() << "Serializing EmpireManager encoding empire: " << GlobalSerializationEncodingForEmpire();
 
-    if constexpr (Archive::is_loading::value) {
+    if constexpr (Archive::is_loading::value)
         em.Clear();    // clean up any existing dynamically allocated contents before replacing containers with deserialized data
-    }
 
     std::map<std::pair<int, int>, DiplomaticMessage> messages;
     if constexpr (Archive::is_saving::value)

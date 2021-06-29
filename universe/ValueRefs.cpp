@@ -931,20 +931,8 @@ int Variable<int>::Eval(const ScriptingContext& context) const
             return static_cast<int>(context.galaxy_setup_data.GetNativeFreq());
         if (property_name == "GalaxyMaxAIAggression")
             return static_cast<int>(context.galaxy_setup_data.GetAggression());
-
-        // non-object values passed by abuse of context.current_value
-        if (property_name == "UsedInDesignID") {
-            // check if an int was passed as the current_value, as would be
-            // done when evaluating a ValueRef for the cost or production
-            // time of a part or hull in a ship design. this should be the id
-            // of the design.
-            try {
-                return boost::get<int>(context.current_value);
-            } catch (...) {
-                ErrorLogger() << "Variable<int>::Eval could get ship design id for property: " << TraceReference(m_property_name, m_ref_type, context);
-            }
-            return 0;
-        }
+        if (property_name == "UsedInDesignID")
+            return context.in_design_id;
 
         // add more non-object reference int functions here
 
@@ -2157,7 +2145,7 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
 }
 
 namespace {
-    std::vector<std::string> TechsResearchedByEmpire(int empire_id, const ScriptingContext& context) {
+    [[nodiscard]] std::vector<std::string> TechsResearchedByEmpire(int empire_id, const ScriptingContext& context) {
         auto empire = context.GetEmpire(empire_id);
         if (!empire) return {};
 
@@ -2165,11 +2153,11 @@ namespace {
         return {researched_techs_range.begin(), researched_techs_range.end()};
     }
 
-    std::vector<std::string> TechsResearchableByEmpire(int empire_id, const ScriptingContext& context) {
-        auto empire = context.GetEmpire(empire_id);
-        if (!empire) return {};
-
+    [[nodiscard]] std::vector<std::string> TechsResearchableByEmpire(int empire_id, const ScriptingContext& context) {
         std::vector<std::string> retval;
+        auto empire = context.GetEmpire(empire_id);
+        if (!empire) return retval;
+
         retval.reserve(GetTechManager().size());
         for (const auto& tech : GetTechManager()) {
             if (tech && empire->ResearchableTech(tech->Name()))
@@ -2178,8 +2166,8 @@ namespace {
         return retval;
     }
 
-    std::vector<std::string> TransferrableTechs(int sender_empire_id, int receipient_empire_id,
-                                                const ScriptingContext& context)
+    [[nodiscard]] std::vector<std::string> TransferrableTechs(int sender_empire_id, int receipient_empire_id,
+                                                              const ScriptingContext& context)
     {
         std::vector<std::string> sender_researched_techs = TechsResearchedByEmpire(sender_empire_id, context);
         std::vector<std::string> recepient_researchable = TechsResearchableByEmpire(receipient_empire_id, context);
@@ -2715,7 +2703,7 @@ std::string StringCast<std::vector<std::string>>::Eval(const ScriptingContext& c
     // concatenate strings into one big string
     std::string retval;
     retval.reserve(16 * temp.size()); // rough guesstimate to avoid reallocations
-    for (auto str : temp)
+    for (const auto& str : temp)
         retval += str + " ";
     return retval;
 }
@@ -2966,6 +2954,15 @@ double Operation<double>::EvalImpl(const ScriptingContext& context) const
             break;
         }
 
+        case OpType::NOOP: {
+            DebugLogger() << "ValueRef::Operation<double>::NoOp::EvalImpl";
+            auto retval = LHS()->Eval(context);
+            DebugLogger() << "ValueRef::Operation<double>::NoOp::EvalImpl. Sub-Expression returned: " << retval
+                          << " from: " << LHS()->Dump();
+            return retval;
+            break;
+        }
+
         case OpType::ABS:
             return std::abs(LHS()->Eval(context)); break;
 
@@ -3113,6 +3110,15 @@ int Operation<int>::EvalImpl(const ScriptingContext& context) const
                 ErrorLogger() << "Error evaluating exponentiation ValueRef::Operation";
                 return 0;
             }
+            break;
+        }
+
+        case OpType::NOOP: {
+            DebugLogger() << "ValueRef::Operation<int>::NoOp::EvalImpl";
+            auto retval = LHS()->Eval(context);
+            DebugLogger() << "ValueRef::Operation<int>::NoOp::EvalImpl. Sub-Expression returned: " << retval
+                          << " from: " << LHS()->Dump();
+            return retval;
             break;
         }
 

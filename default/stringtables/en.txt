@@ -3822,6 +3822,12 @@ Change
 TT_BREAKDOWN_SUMMARY
 %1%: %2%
 
+# %1% the number bouts per battle
+# %2% the total estimate of structure damage
+# %3% the total estimate of destroyed fighters
+TT_DAMAGE_BREAKDOWN_SUMMARY
+Totals for %1% bout battle, Structure Damage: %2% / Fighters Destroyed: %3%
+
 TT_INHERENT
 Inherent
 
@@ -4057,7 +4063,10 @@ FW_ROGUE_SHIP
 Rogue Ship
 
 SHIP_DAMAGE_STAT_TITLE
-Damage
+Structural Damage
+
+SHIP_DESTRUCTION_STAT_TITLE
+Destroyed Fighters
 
 SHIP_TROOPS_TITLE
 Troops
@@ -4099,7 +4108,10 @@ FW_FLEET_STRUCTURE_SUMMARY
 Fleet Structure - Equal to the total structure of ships in the fleet.
 
 FW_FLEET_DAMAGE_SUMMARY
-Fleet Damage - Equal to the total direct fire damage of ships in the fleet.
+Structural Damage by Fleet - Equal to the total maximum structural damage done by ships and fighters in the fleet.
+
+FW_FLEET_DESTROY_SUMMARY
+Fighter Destruction by Fleet - Equal to the total maximum of fighters destroyed by ships and fighters in the fleet.
 
 FW_FLEET_FIGHTER_SUMMARY
 Fleet Fighters - Equal to the total fighters in the fleet.
@@ -5506,7 +5518,7 @@ Parts: %3%
 ENC_SHIP_DESIGN_DESCRIPTION_STATS_STR
 '''
 For [[encyclopedia ENC_SPECIES]]: %1%
-Total [[encyclopedia DAMAGE_TITLE]]: %2%    [[PC_DIRECT_WEAPON]] Shots: %3%
+Total Structure [[encyclopedia DAMAGE_TITLE]]: %2%    Total Fighter Destruction: %3%
 [[metertype METER_STRUCTURE]]: %4%    [[metertype METER_SHIELD]]: %5%
 [[metertype METER_DETECTION]]: %6%    [[metertype METER_STEALTH]]: %7%
 [[metertype METER_SPEED]]: %8%    [[metertype METER_FUEL]] [[METER_CAPACITY]]: %9%
@@ -6871,6 +6883,12 @@ Hull
 
 ATTACK
 Total Weapon Damage
+
+DAMAGE_STRUCTURE_PER_BATTLE
+Total Structure Damage per Battle
+
+DESTROY_FIGHTERS_PER_BATTLE
+Number of Destroyed Fighters per Battle
 
 PRODUCTION_COST
 Production Cost
@@ -9004,6 +9022,7 @@ Ancient Ruins (Excavated)
 
 ANCIENT_RUINS_DEPLETED_SPECIAL_DESC
 '''Increases [[metertype METER_TARGET_RESEARCH]] on this planet by [[value ANCIENT_RUINS_TARGET_RESEARCH_PERPOP]] per [[metertype METER_POPULATION]] when Focus is set to Research.
+The effect requires a stability of [[value ANCIENT_RUINS_MIN_STABILITY]].
 
 This planet holds the ruins of an unknown, advanced ancient race. A valuable discovery has already been made here.'''
 
@@ -9011,7 +9030,8 @@ ANCIENT_RUINS_SPECIAL
 Ancient Ruins
 
 ANCIENT_RUINS_SPECIAL_DESCRIPTION
-'''Increases [[metertype METER_TARGET_RESEARCH]] on this planet by 1 per [[metertype METER_POPULATION]] when Focus is set to Research.
+'''Increases [[metertype METER_TARGET_RESEARCH]] on this planet by [[value ANCIENT_RUINS_TARGET_RESEARCH_PERPOP]] per [[metertype METER_POPULATION]] when Focus is set to Research.
+The effect requires a stability of [[value ANCIENT_RUINS_MIN_STABILITY]].
 
 This planet holds the ruins of an unknown, advanced ancient race. The first empire with the tech [[tech LRN_XENOARCH]] to possess this planet receives one free advanced tech or uncovers a powerful building or ship. There's also a good chance that well preserved bodies of an extinct species will be found.'''
 
@@ -11575,7 +11595,10 @@ PLC_TERRAFORMING
 Terraforming
 
 PLC_TERRAFORMING_DESC
-Decreases the minimum time to produce [[buildingtype BLD_TERRAFORM]] and [[buildingtype BLD_TERRAFORM_REVERT]] projects on planets.
+'''• Decreases the minimum time to produce [[buildingtype BLD_TERRAFORM]] and [[buildingtype BLD_TERRAFORM_REVERT]] projects on planets.
+• Boosts [[metertype METER_TARGET_HAPPINESS]] on terraformed planets by [[value PLC_TERRAFORMING_TARGET_HAPPINESS_ORIGINAL_FLAT]] per step they have been terraformed away from their original planet type
+• Boosts [[metertype METER_TARGET_INFLUENCE]] on planets set to influence focus by [[value PLC_TERRAFORMING__TARGET_INFLUENCE_ORIGINAL_FLAT]] per step they have been terraformed away from their original planet type
+• Boosts [[metertype METER_TARGET_RESEARCH]] on planets set to research focus by the square root of [[metertype METER_POPULATION]] times [[value PLC_TERRAFORMING_TARGET_RESEARCH_SCALING]] per step they have been terraformed away from their original planet type'''
 
 PLC_TERRAFORMING_SHORT_DESC
 Speeds up terraforming
@@ -11619,7 +11642,7 @@ PLC_DIVERSITY_DESC
 '''Gives bonuses or penalties to research, stability, and capital influence, dependent on the number of species in the empire.
 The research bonus requires a stability of [[value PLC_DIVERSITY_MIN_STABILITY]].
 
-All bonuses or penalties are [value PLC_DIVERSITY_SCALING]] per species above or below 4 species that are present.'''
+All bonuses or penalties are [[value PLC_DIVERSITY_SCALING]] per species above or below 4 species that are present.'''
 
 PLC_DIVERSITY_SHORT_DESC
 Improves research, stability, and Influence
@@ -11683,6 +11706,7 @@ Divine Authority
 
 PLC_DIVINE_AUTHORITY_DESC
 '''Increases [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_DIVINE_AUTHORITY_TARGET_HAPPINESS_FLAT]] and [[metertype METER_TARGET_INFLUENCE]] by [[value PLC_DIVINE_AUTHORITY_TARGET_INFLUENCE_FLAT]], but reduces [[metertype METER_TARGET_RESEARCH]] ([[value PLC_DIVINE_AUTHORITY_TARGET_RESEARCH_FLAT]]).
+The influence bonus requires a stability of [[value PLC_DIVINE_AUTHORITY_MIN_STABILITY]].
 
 The empire is ruled by a theocracy which claims deific authority. They assert omnipotence and infallibility, and inspire the empire with the belief that they are the chosen people. Religious extremism is promoted in the population, boosting confidence in government decree and stabilizing society, but critical thinking and evidence-based science is hampered.'''
 
@@ -11697,6 +11721,15 @@ Increasess [[metertype METER_TARGET_RESEARCH]] by [[value PLC_NATIVE_APPROPRIATI
 
 PLC_NATIVE_APPROPRIATION_SHORT_DESC
 Boosts Research
+
+PLC_THE_HUNT
+The Hunt
+
+PLC_THE_HUNT_DESC
+Boosts [[metertype METER_TARGET_HAPPINESS]], [[metertype METER_TARGET_INFLUENCE]], and [[metertype METER_MAX_TROOPS]] of planets in systems that also contain an unowned populated planet, with no [[metertype METER_SHIELD]] or [[metertype METER_DEFENSE]], and with a species other than the species on the benefiting planet or on the the imperial capital.
+
+PLC_THE_HUNT_SHORT_DESC
+Hunting Natives Gives Boosts
 
 PLC_ALGORITHMIC_RESEARCH
 Algorithmic Research
@@ -11892,6 +11925,15 @@ Every turn a system is newly explored, the ships in that system generate a total
 
 PLC_EXPLORATION_RESEARCH_SHORT_DESC
 Exploration Gives Research
+
+PLC_FLANKING
+Flanking
+
+PLC_FLANKING_DESC
+In systems where the empire that adopted this policy has more stationary armed ships than there are enemy ships present, that empire's weapons will do [[value PLC_FLANKING_DAMAGE_BOOST]] additional structural damage per shot.
+
+PLC_FLANKING_SHORT_DESC
+Boosts Ship Damage
 
 
 ##
@@ -13993,7 +14035,7 @@ Species InterDesign Academy
 
 BLD_INTERSPECIES_ACADEMY_DESC
 '''Increases the imperial stockpile use limit by increasing the stockpile use capacity on this planet by [[value BLD_INTERSPECIES_ACADEMY_MAX_STOCKPILE_FLAT]] when it has [[encyclopedia STOCKPILE_FOCUS_TITLE]], [[metertype METER_TARGET_RESEARCH]] by [[value BLD_INTERSPECIES_ACADEMY_TARGET_RESEARCH_FLAT]] when it has [[encyclopedia RESEARCH_FOCUS_TITLE]], or [[metertype METER_TARGET_INFLUENCE]] by [[value BLD_INTERSPECIES_ACADEMY_TARGET_INFLUENCE_FLAT]] when it has [[encyclopedia INFLUENCE_FOCUS_TITLE]]
-The research bonus requires a stability of [[value BLD_INTERSPECIES_ACADEMY_MIN_STABILITY]].
+The research bonus requires a stability of [[value BLD_INTERSPECIES_ACADEMY_MIN_STABILITY_RESEARCH]].
 
 Learning to design devices for use by different species is crucial for developing universally usable tools.
 

@@ -167,8 +167,11 @@ void Empire::SetCapitalID(int id, const ObjectMap& objects) {
 void Empire::AdoptPolicy(const std::string& name, const std::string& category,
                          bool adopt, int slot, const ObjectMap& objects)
 {
-    if (name.empty()) {
-        ErrorLogger() << "Empire::AdoptPolicy given empty policy name";
+    if (adopt && name.empty()) {
+        ErrorLogger() << "Empire::AdoptPolicy asked to adopt empty policy name in category " << category << " slot " << slot;
+        return;
+    } else if (name.empty()) {
+        ErrorLogger() << "Empire::AdoptPolicy asked to de-adopt empty policy name";
         return;
     }
 
@@ -177,6 +180,7 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
         if (m_adopted_policies.count(name)) {
             m_adopted_policies.erase(name);
             PoliciesChangedSignal();
+
         }
         return;
     }
@@ -1167,9 +1171,9 @@ void Empire::UpdateSupplyUnobstructedSystems(const ScriptingContext& context,
         TraceLogger(supply) << "Fleet " << fleet->ID() << " is in system " << system_id
                             << " with next system " << fleet->NextSystemID()
                             << " and is owned by " << fleet->Owner()
-                            << " armed: " << fleet->HasArmedShips(context.ContextObjects())
+                            << " can damage ships: " << fleet->CanDamageShips(context.ContextObjects())
                             << " and obstructive: " << fleet->Obstructive();
-        if (fleet->HasArmedShips(context.ContextObjects()) && fleet->Obstructive()) {
+        if (fleet->CanDamageShips(context.ContextObjects()) && fleet->Obstructive()) {
             if (fleet->OwnedBy(m_id)) {
                 if (fleet->NextSystemID() == INVALID_OBJECT_ID || fleet->NextSystemID() == fleet->SystemID()) {
                     systems_containing_friendly_fleets.insert(system_id);

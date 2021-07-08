@@ -88,6 +88,16 @@ func _on_GameSetupDlg_cancel():
 func _on_MultiplayerSetup_ok():
 	$Popup.hide()
 	$Popup.remove_child(multiplayer_setup_dlg)
+	
+	var connected: bool = $FreeOrion.is_server_connected()
+	if connected:
+		print("Already connected")
+	else:
+		print("Connecting to ", multiplayer_setup_dlg.server_name)
+		if $FreeOrion.connect_to_server(multiplayer_setup_dlg.server_name):
+			$FreeOrion.join_game(multiplayer_setup_dlg.player_name, multiplayer_setup_dlg.client_type)
+		else:
+			print("Not connected to ", multiplayer_setup_dlg.server_name)
 
 
 func _on_MultiplayerSetup_cancel():
@@ -98,8 +108,8 @@ func _on_MultiplayerSetup_cancel():
 func _on_AuthSetupDlg_ok():
 	$Popup.hide()
 	$Popup.remove_child(auth_password_setup_dlg)
-	# ToDo: send password
-	print("Send password from auth dialog")
+
+	$FreeOrion.auth_response(auth_password_setup_dlg.player_name, auth_password_setup_dlg.password)
 
 
 func _on_AuthSetupDlg_cancel():
@@ -118,4 +128,5 @@ func _on_FreeOrion_auth_request(player_name, _auth):
 
 func _on_FreeOrion_start_game(_is_new_game):
 	global.freeorion = $FreeOrion
+	print("Start the game")
 	get_tree().change_scene("res://GalaxyMap.tscn")

@@ -48,16 +48,6 @@ from freeorion_tools.timers import AITimer
 main_timer = AITimer('timer', write_log=True)
 turn_timer = AITimer('bucket', write_log=True)
 
-using_statprof = False
-try:
-    import statprof
-
-    # statprof.start()
-    # using_statprof = True
-except ImportError:
-    pass
-
-
 user_dir = fo.getUserDataDir()
 debug("Path to folder for user specific data: %s" % user_dir)
 debug('Python paths %s' % sys.path)
@@ -297,12 +287,24 @@ def generateOrders():  # pylint: disable=invalid-name
     debug("***************************************************************************")
     debug("*******  Log info for AI progress chart script. Do not modify.   **********")
     debug("Generating Orders")
-    debug("EmpireID: {empire.empireID}"
-          " Name: {empire.name}_{empire.empireID}_pid:{p_id}_{p_name}RIdx_{res_idx}_{aggression}"
-          " Turn: {turn}".format(empire=empire, p_id=fo.playerID(), p_name=fo.playerName(),
-                                 res_idx=ResearchAI.get_research_index(), turn=turn,
-                                 aggression=aggression_name.capitalize()))
-    debug("EmpireColors: {0.colour[0]} {0.colour[1]} {0.colour[2]} {0.colour[3]}".format(empire))
+
+    name_parts = (
+        empire.name,
+        empire.empireID,
+        "pid",
+        fo.playerID(),
+        fo.playerName(),
+        "RIdx",
+        ResearchAI.get_research_index(),
+        aggression_name.capitalize(),
+    )
+    empire_name = '_'.join(
+        str(part) for part in name_parts
+    )
+
+    debug(f"EmpireID: {empire.empireID} Name: {empire_name} Turn: {turn}")
+
+    debug(f"EmpireColors: {empire.colour}")
     if planet:
         debug("CapitalID: " + str(planet_id) + " Name: " + planet.name + " Species: " + planet.speciesName)
     else:
@@ -360,14 +362,6 @@ def generateOrders():  # pylint: disable=invalid-name
     turn_timer.start("Server_Processing")
 
     aistate.last_turn_played = fo.currentTurn()
-
-    if using_statprof:
-        try:
-            statprof.stop()
-            statprof.display()
-            statprof.start()
-        except:  # noqa: E722
-            pass
 
 
 init_handlers(fo.getOptionsDBOptionStr("ai-config"), fo.getAIDir())

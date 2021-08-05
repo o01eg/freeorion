@@ -13,22 +13,6 @@ from glob import glob
 
 INVALID_BUILD_NO = "???"
 
-required_boost_libraries = [
-    "boost_chrono",
-    "boost_date_time",
-    "boost_filesystem",
-    "boost_iostreams",
-    "boost_locale",
-    "boost_log",
-    "boost_log_setup",
-    "boost_python%d%d" % (sys.version_info.major, sys.version_info.minor),
-    "boost_regex",
-    "boost_serialization",
-    "boost_signals",
-    "boost_system",
-    "boost_thread",
-]
-
 
 class Generator(object):
     def __init__(self, infile, outfile):
@@ -105,13 +89,34 @@ class NsisInstScriptGenerator(Generator):
                 FreeOrion_PYTHON_VERSION="")
 
 
-if 3 != len(sys.argv):
+if len(sys.argv) not in (3, 4):
     print("ERROR: invalid parameters.")
-    print("make_versioncpp.py <project rootdir> <build system name>")
+    print("make_versioncpp.py <project rootdir> <build system name> [<boost python suffix>]")
     quit()
 
 os.chdir(sys.argv[1])
 build_sys = sys.argv[2]
+if 4 == len(sys.argv):
+    boost_python_suffix = sys.argv[3]
+else:
+    boost_python_suffix = "%d%d" % (sys.version_info.major, sys.version_info.minor)
+
+required_boost_libraries = [
+    "boost_chrono",
+    "boost_date_time",
+    "boost_filesystem",
+    "boost_iostreams",
+    "boost_locale",
+    "boost_log",
+    "boost_log_setup",
+    "boost_python%s" % boost_python_suffix,
+    "boost_regex",
+    "boost_serialization",
+    "boost_signals",
+    "boost_system",
+    "boost_thread",
+]
+
 
 # A list of tuples containing generators
 generators = [
@@ -123,7 +128,7 @@ if system() == 'Windows':
 if system() == 'Darwin':
     generators.append(Generator('packaging/Info.plist.in', 'packaging/Info.plist'))
 
-version = "0.4.10.1"
+version = "0.4.10.2"
 branch = ""
 build_no = INVALID_BUILD_NO
 

@@ -903,13 +903,13 @@ FLD_NANITE_SWARM
 Nanite Swarm
 
 FLD_NANITE_SWARM_DESC
-A swarm of ancient robotic particles that attach themselves to ship hulls, repairing ship [[metertype METER_STRUCTURE]] by [[value FLD_NANITE_SWARM_STRUCTURE_FLAT]] per turn. Harvesting of particles allows to increase [[metertype METER_INDUSTRY]] by [[value FLD_NANITE_SWARM_TARGET_INDUSTRY_FLAT]] per turn and ship within the swarm.
+A swarm of ancient nanorobots that attach themselves to and attempts to repair the hulls of ships within the swarm. Ship [[metertype METER_STRUCTURE]] increases by [[value FLD_NANITE_SWARM_STRUCTURE_FLAT]] per turn, spread equally over ships within the swarm.
 
 FLD_METEOR_BLIZZARD
 Meteor Blizzard
 
 FLD_METEOR_BLIZZARD_DESC
-Mystical and mysterious appearance of meteors. Generates one [[metertype METER_RESEARCH]] per ship due to scientific examination of the phenomenon.
+Anomalously self-attracting conglomeration of meteors. Generates [[metertype METER_RESEARCH]] on ships within as they observe the phenomenon.
 
 FLD_VOID_RIFT
 Void Rift
@@ -6452,7 +6452,7 @@ ARTISTIC_SPECIES_TITLE
 Artistic Trait
 
 ARTISTIC_SPECIES_TRAIT_TEXT
-Artistic species produce artistic works when their empire has adopted [[policy PLC_ARTISAN_WORKSHOPS]], which generates influence. Additionally, when set to influence focus, other planets with artistic species in the same system are more stable.
+Artistic species produce artistic works when their empire has adopted [[policy PLC_ARTISAN_WORKSHOPS]], which generates influence. Additionally, other planets with different artistic species in the same system are more stable.
 
 FLEET_UPKEEP_TITLE
 Fleet Upkeep
@@ -11497,6 +11497,24 @@ Logistics of the whole empire are focused into boosting the capital's production
 PLC_CENTRALIZATION_SHORT_DESC
 Boosts Capital
 
+PLC_METROPOLES
+Metropoles
+
+PLC_METROPOLES_DESC
+'''Boosts the output of the [[value METROPOLES_PLANET_LIMIT]] highest-population planets in the empire, regardless of focus:
+• Increases [[metertype METER_TARGET_RESEARCH]] by [[value METROPOLES_TARGET_RESEARCH_PERPOP]] per [[metertype METER_POPULATION]].
+• Increases [[metertype METER_TARGET_INDUSTRY]] by [[value METROPOLES_TARGET_INDUSTRY_PERPOP]] per population.
+• Increases [[metertype METER_TARGET_CONSTRUCTION]] by [[value METROPOLES_TARGET_CONSTRUCTION_FLAT]].
+• Increases [[metertype METER_MAX_SUPPLY]] by [[value METROPOLES_MAX_SUPPLY_FLAT]].
+but also has a penalty:
+• Decreases [[metertype METER_MAX_SUPPLY]] by [[value METROPOLES_MAX_STOCKPILE_FLAT]].
+
+Additionally, other populated planets (with lower than the highest population planets) have a penalty applied:
+• Decreases [[metertype METER_TARGET_HAPPINESS]] by [[value METROPOLES_STABILITY_PENALTY]].'''
+
+PLC_METROPOLES_SHORT_DESC
+Boosts Largest-Population Planets
+
 PLC_COLONIZATION
 Colonization
 
@@ -11779,7 +11797,8 @@ PLC_INDOCTRINATION
 Indoctrination
 
 PLC_INDOCTRINATION_DESC
-Increases [[metertype METER_TARGET_HAPPINESS]] on planets over time. The bonus grows up to [[value PLC_INDOCTRINATION_STRENGTH_MAX]] as the policy remains adopted for more turns.
+'''• Increases [[metertype METER_TARGET_HAPPINESS]] on planets over time. The bonus grows up to [[value PLC_INDOCTRINATION_STRENGTH_MAX]] as the policy remains adopted for more turns.
+• Increases [[metertype METER_TARGET_INFLUENCE]] of the capital or planets with a [[buildingtype BLD_REGIONAL_ADMIN]] that have Influence focus by [[value PLC_INDOCTRINATION_INFLUENCE_FLAT]].'''
 
 PLC_INDOCTRINATION_SHORT_DESC
 Increases stability over time
@@ -11819,8 +11838,8 @@ PLC_CONFORMANCE
 Conformance
 
 PLC_CONFORMANCE_DESC
-'''Reduces the impact of species likes and dislikes on planet stability.
-Additionally it increases [[metertype METER_TARGET_CONSTRUCTION]] by [[value PLC_CONFORMANCE_INFRASTRUCTURE_BONUS_FLAT]] and [[metertype METER_STOCKPILE]] by [[value PLC_CONFORMANCE_STOCKPILING_BONUS_FLAT]], but descreases [[metertype METER_TARGET_RESEARCH]] by [[value PLC_CONFORMANCE_RESEARCH_PENALTY_FLAT]] on all planets with a stability of at least [[value PLC_CONFORMANCE_MIN_STABILITY]].'''
+'''• Reduces the impact of species likes and dislikes on planet stability due to buildings and policies.
+• Increases [[metertype METER_TARGET_CONSTRUCTION]] by [[value PLC_CONFORMANCE_INFRASTRUCTURE_BONUS_FLAT]] and [[metertype METER_STOCKPILE]] by [[value PLC_CONFORMANCE_STOCKPILING_BONUS_FLAT]], but descreases [[metertype METER_TARGET_RESEARCH]] by [[value PLC_CONFORMANCE_RESEARCH_PENALTY_FLAT]] on all planets with a stability of at least [[value PLC_CONFORMANCE_MIN_STABILITY]].'''
 
 PLC_CONFORMANCE_SHORT_DESC
 Reduces species opinion effects
@@ -11829,8 +11848,8 @@ PLC_LIBERTY
 Liberty
 
 PLC_LIBERTY_DESC
-'''Increases the impact of species likes and dislikes on planet stability.
-Additionally it increases [[metertype METER_TARGET_RESEARCH]] by [[value PLC_LIBERTY_RESEARCH_BONUS_FLAT]] and decreases [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_LIBERTY_STABILITY_PENALTY_FLAT]] on all planets with a stability of at least [[value PLC_LIBERTY_MIN_STABILITY]].'''
+'''• Increases the impact of species likes and dislikes on planet stability due to buildings and policies.
+• Increases [[metertype METER_TARGET_RESEARCH]] by [[value PLC_LIBERTY_RESEARCH_BONUS_FLAT]] and decreases [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_LIBERTY_STABILITY_PENALTY_FLAT]] on all planets with a stability of at least [[value PLC_LIBERTY_MIN_STABILITY]].'''
 
 PLC_LIBERTY_SHORT_DESC
 Increases species opinion effects
@@ -14398,7 +14417,7 @@ Nearly-Universal Translator
 BLD_TRANSLATOR_DESC
 '''Grants 1 social policy slot.
 
-Increases influence output on its planet, when that planet is set to influence focus, by [[value TRANSLATOR_PER_SPECIES_INFLUENCE]] per unique species on planets controlled by the empire that owns this building.
+Increases influence output on its planet, when that planet is set to influence focus, by [[value TRANSLATOR_PER_SPECIES_INFLUENCE]] times the square root of the number of unique species on planets controlled by the empire that owns this building.
 
 Production cost decreases when more unique species are visible to the producing empire.'''
 

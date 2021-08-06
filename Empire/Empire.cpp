@@ -1285,13 +1285,12 @@ void Empire::UpdateSupplyUnobstructedSystems(const ScriptingContext& context,
     }
 }
 
-void Empire::RecordPendingLaneUpdate(int start_system_id, int dest_system_id) {
-    if (!m_supply_unobstructed_systems.count(start_system_id))
+void Empire::RecordPendingLaneUpdate(int start_system_id, int dest_system_id, const ObjectMap& objects) {
+    if (!m_supply_unobstructed_systems.count(start_system_id)) {
         m_pending_system_exit_lanes[start_system_id].insert(dest_system_id);
-    else { // if the system is unobstructed, mark all its lanes as avilable
-        for (const auto& lane : Objects().get<System>(start_system_id)->StarlanesWormholes()) {
+    } else { // if the system is unobstructed, mark all its lanes as avilable
+        for (const auto& lane : objects.get<System>(start_system_id)->StarlanesWormholes())
             m_pending_system_exit_lanes[start_system_id].insert(lane.first); // will add both starlanes and wormholes
-        }
     }
 }
 
@@ -2168,7 +2167,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
 
     for (auto& elem : m_production_queue) {
         // for items that don't depend on location, only store cost/time once
-        int location_id = (elem.item.CostIsProductionLocationInvariant() ? INVALID_OBJECT_ID : elem.location);
+        int location_id = (elem.item.CostIsProductionLocationInvariant(context.ContextUniverse()) ? INVALID_OBJECT_ID : elem.location);
         auto key = std::make_pair(elem.item, location_id);
 
         if (!queue_item_costs_and_times.count(key))
@@ -2190,7 +2189,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
         int build_turns;
 
         // for items that don't depend on location, only store cost/time once
-        int location_id = (elem.item.CostIsProductionLocationInvariant() ? INVALID_OBJECT_ID : elem.location);
+        int location_id = (elem.item.CostIsProductionLocationInvariant(context.ContextUniverse()) ? INVALID_OBJECT_ID : elem.location);
         std::pair<ProductionQueue::ProductionItem, int> key(elem.item, location_id);
 
         std::tie(item_cost, build_turns) = queue_item_costs_and_times[key];

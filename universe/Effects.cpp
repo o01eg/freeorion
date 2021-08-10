@@ -113,7 +113,7 @@ namespace {
         if (!target_object || target_object->Unowned())
             return;
         if (auto empire = context.GetEmpire(target_object->Owner()))
-            empire->AddExploredSystem(system_id, context.current_turn);
+            empire->AddExploredSystem(system_id, context.current_turn, context.ContextObjects());
     }
 
     /** Resets the previous and next systems of \a fleet and recalcultes /
@@ -1142,7 +1142,7 @@ void SetEmpireCapital::Execute(ScriptingContext& context) const {
     if (!planet)
         return;
 
-    empire->SetCapitalID(planet->ID());
+    empire->SetCapitalID(planet->ID(), context.ContextObjects());
 }
 
 std::string SetEmpireCapital::Dump(unsigned short ntabs) const

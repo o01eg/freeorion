@@ -11501,15 +11501,15 @@ PLC_METROPOLES
 Metropoles
 
 PLC_METROPOLES_DESC
-'''Boosts the output of the [[value METROPOLES_PLANET_LIMIT]] highest-population planets in the empire, regardless of focus:
+'''Boosts the output of up to [[value METROPOLES_PLANET_LIMIT]] planets with population of at least [[value METROPOLES_MINIMUM_POPULATION]]. The highest-[[metertype METER_POPULATION]] of the qualified planets will receive, regardless of focus:
 • Increases [[metertype METER_TARGET_RESEARCH]] by [[value METROPOLES_TARGET_RESEARCH_PERPOP]] per [[metertype METER_POPULATION]].
 • Increases [[metertype METER_TARGET_INDUSTRY]] by [[value METROPOLES_TARGET_INDUSTRY_PERPOP]] per population.
 • Increases [[metertype METER_TARGET_CONSTRUCTION]] by [[value METROPOLES_TARGET_CONSTRUCTION_FLAT]].
 • Increases [[metertype METER_MAX_SUPPLY]] by [[value METROPOLES_MAX_SUPPLY_FLAT]].
 but also has a penalty:
-• Decreases [[metertype METER_MAX_SUPPLY]] by [[value METROPOLES_MAX_STOCKPILE_FLAT]].
+• Decreases [[metertype METER_MAX_STOCKPILE]] by [[value METROPOLES_MAX_STOCKPILE_FLAT]].
 
-Additionally, other populated planets (with lower than the highest population planets) have a penalty applied:
+Additionally, other populated planets (with lower than the highest population planets, including all with less than [[value METROPOLES_MINIMUM_POPULATION]] [[metertype METER_POPULATION]]) have a penalty applied:
 • Decreases [[metertype METER_TARGET_HAPPINESS]] by [[value METROPOLES_STABILITY_PENALTY]].'''
 
 PLC_METROPOLES_SHORT_DESC
@@ -11548,7 +11548,8 @@ PLC_MARINE_RECRUITMENT
 Marine Recruitment
 
 PLC_MARINE_RECRUITMENT_DESC
-Reduces the cost of ground troop ship parts by 50%.
+'''• Reduces the cost of ground troop ship parts by 50%.
+• Increases planet troop regeneration rate by [[value PLC_MARINE_RECRUITMENT_TROOP_GROWTH_FLAT]].'''
 
 PLC_MARINE_RECRUITMENT_SHORT_DESC
 Reduces Ground Troop Cost
@@ -11797,7 +11798,7 @@ PLC_INDOCTRINATION
 Indoctrination
 
 PLC_INDOCTRINATION_DESC
-'''• Increases [[metertype METER_TARGET_HAPPINESS]] on planets over time. The bonus grows up to [[value PLC_INDOCTRINATION_STRENGTH_MAX]] as the policy remains adopted for more turns.
+'''• Increases [[metertype METER_TARGET_HAPPINESS]] on planets over time. The bonus grows by [[value PLC_INDOCTRINATION_PER_TURN]] per turn, up to a maximum of [[value PLC_INDOCTRINATION_STRENGTH_MAX]]. Conquered planets start with zero, settled planets get the current maximum.
 • Increases [[metertype METER_TARGET_INFLUENCE]] of the capital or planets with a [[buildingtype BLD_REGIONAL_ADMIN]] that have Influence focus by [[value PLC_INDOCTRINATION_INFLUENCE_FLAT]].'''
 
 PLC_INDOCTRINATION_SHORT_DESC
@@ -11807,7 +11808,9 @@ PLC_MARTIAL_LAW
 Martial Law
 
 PLC_MARTIAL_LAW_DESC
-Increases populated planets' [[metertype METER_TARGET_HAPPINESS]] and decreases [[metertype METER_TARGET_RESEARCH]] by [[value PLC_MARTIAL_LAW_STABILITY_PER_TROOPS]] per [[metertype METER_MAX_TROOPS]] on planets. Also decreases populated planets' supply range by [[value PLC_MARTIAL_LAW_SUPPLY_PENALTY]].
+'''• Decreases populated planets' supply range by [[value PLC_MARTIAL_LAW_SUPPLY_PENALTY]]
+• Increases populated planets' [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_MARTIAL_LAW_STABILITY_PER_TROOPS]] per [[metertype METER_MAX_TROOPS]]
+• Decreases populated planets' [[metertype METER_TARGET_RESEARCH]] by [[value PLC_MARTIAL_LAW_STABILITY_PER_TROOPS]] per [[metertype METER_MAX_TROOPS]]'''
 
 PLC_MARTIAL_LAW_SHORT_DESC
 Increases stability with troops
@@ -11839,7 +11842,12 @@ Conformance
 
 PLC_CONFORMANCE_DESC
 '''• Reduces the impact of species likes and dislikes on planet stability due to buildings and policies.
-• Increases [[metertype METER_TARGET_CONSTRUCTION]] by [[value PLC_CONFORMANCE_INFRASTRUCTURE_BONUS_FLAT]] and [[metertype METER_STOCKPILE]] by [[value PLC_CONFORMANCE_STOCKPILING_BONUS_FLAT]], but descreases [[metertype METER_TARGET_RESEARCH]] by [[value PLC_CONFORMANCE_RESEARCH_PENALTY_FLAT]] on all planets with a stability of at least [[value PLC_CONFORMANCE_MIN_STABILITY]].'''
+• Descreases [[metertype METER_TARGET_RESEARCH]] by [[value PLC_CONFORMANCE_RESEARCH_PENALTY_FLAT]] on all planets 
+• Increases [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_CONFORMANCE_STABILITY_BONUS_FLAT]]
+
+On planets with a stability of at least [[value PLC_CONFORMANCE_MIN_STABILITY]]:
+• Increases [[metertype METER_TARGET_CONSTRUCTION]] by [[value PLC_CONFORMANCE_INFRASTRUCTURE_BONUS_FLAT]]
+• Increases [[metertype METER_STOCKPILE]] by [[value PLC_CONFORMANCE_STOCKPILING_BONUS_FLAT]]'''
 
 PLC_CONFORMANCE_SHORT_DESC
 Reduces species opinion effects
@@ -11964,11 +11972,19 @@ Bureaucracy
 
 PLC_BUREAUCRACY_DESC
 '''• Increases an empire's populated planet stability by [[value PLC_BUREAUCRACY_STABILITY_FLAT]], as long as the empire has enough [[buildingtype BLD_REGIONAL_ADMIN]]. An additional [[buildingtype BLD_REGIONAL_ADMIN]] is required per [[value BUREACRACY_ADMINS_NEEDED_TURN_SCALING]] turns this policy has been adopted.
-• Changing planet focus reduces that planet's [[metertype METER_INFLUENCE]] by [[value BUREAUCRACY_FOCUS_CHANGE_PENALTY]].
-'''
+• Changing planet focus reduces that planet's [[metertype METER_INFLUENCE]] by [[value BUREAUCRACY_FOCUS_CHANGE_PENALTY]].'''
 
 PLC_BUREAUCRACY_SHORT_DESC
 Boosts stability
+
+PLC_NECESSITY
+Necessity
+
+PLC_NECESSITY_DESC
+Increases [[metertype METER_TARGET_RESEARCH]] of planets with [[metertype METER_HAPPINESS]] less than [[value PLC_NECESSITY_MAX_STABILITY]] by the square root of the product of population and how far [[metertype METER_HAPPINESS]] is below [[value PLC_NECESSITY_MAX_STABILITY]].
+
+PLC_NECESSITY_SHORT_DESC
+Boosts Unstable Planet Research
 
 PLC_EXPLORATION_RESEARCH
 Exploration Research
@@ -12360,13 +12376,16 @@ GRO_TRANSORG_SENT
 Trans-Organic Sentience
 
 GRO_TRANSORG_SENT_DESC
-Sentience as we know it is always observed as being inextricably tied to biological life. By grasping the true nature and origin of sentience itself, it would be possible to create conscious entities that could not possibly be classified as life as we know it.
+'''• Increases the rate of growth or decay of [[metertype METER_INFLUENCE]] by [[value GRO_TRANSORG_INFLUENCE_RATE]] / turn towards [[metertype METER_TARGET_INFLUENCE]].
+
+Sentience is inextricably tied to life, but with a fundamental understanding of its nature, it should be possible to create conscious entities that could not possibly be classified as life.'''
 
 GRO_ENERGY_META
 Pure-Energy Metabolism
 
 GRO_ENERGY_META_DESC
 '''Increases max [[metertype METER_FUEL]] on all ships by 1 (before scaling by [[encyclopedia FUEL_EFFICIENCY_TITLE]]), max [[metertype METER_DEFENSE]] on all planets by [[value GRO_ENERGY_META_MAX_DEFENSE_FLAT]], max [[metertype METER_SHIELD]] on all planets by [[value GRO_ENERGY_META_MAX_SHIELD_FLAT]], [[metertype METER_TARGET_INDUSTRY]] on all planets with the Industry focus by [[value GRO_ENERGY_META_TARGET_INDUSTRY_PERPOP]] per [[metertype METER_POPULATION]], and [[metertype METER_TARGET_RESEARCH]] on all planets with the Research focus by [[value GRO_ENERGY_META_TARGET_RESEARCH_PERPOP]] per [[metertype METER_POPULATION]].
+Industry and research bonus require a stability of [[value GRO_ENERGY_META_MIN_STABILITY]].
 
 While transforming an entire population into beings of pure energy would be impractical, certain tasks are better suited to individuals able to manifest themselves non-corporeally. Ship's crews for example, would no longer have to waste space with crew quarters or rations storage. Beings with greater energy channeling abilities would be able to enhance planetary shields and defense, and resource production would be generally enhanced.
 
@@ -13027,9 +13046,9 @@ Stellar Tomography
 
 LRN_STELLAR_TOMOGRAPHY_DESC
 '''Increases [[metertype METER_TARGET_RESEARCH]] on planets with the Research focus, depending on the star type and number of planets with research focus in the system:
-• [[STAR_BLACK]] (+[[value LRN_STELLAR_TOMO_BLACK_TARGET_RESEARCH_PERPLANET]])
-• [[STAR_NEUTRON]] (+[[value LRN_STELLAR_TOMO_NEUTRON_TARGET_RESEARCH_PERPLANET]])
-• [[STAR_BLUE]], [[STAR_WHITE]], [[STAR_YELLOW]], [[STAR_ORANGE]] or [[STAR_RED]] (+[[value LRN_STELLAR_TOMO_NORMAL_STAR_TARGET_RESEARCH_PERPLANET]])
+• [[STAR_BLACK]] (+[[value LRN_STELLAR_TOMO_BLACK_TARGET_RESEARCH_PERPLANET]] x number of planets)
+• [[STAR_NEUTRON]] (+[[value LRN_STELLAR_TOMO_NEUTRON_TARGET_RESEARCH_PERPLANET]] x number of planets)
+• [[STAR_BLUE]], [[STAR_WHITE]], [[STAR_YELLOW]], [[STAR_ORANGE]] or [[STAR_RED]] (+[[value LRN_STELLAR_TOMO_NORMAL_STAR_TARGET_RESEARCH_PERPLANET]] x number of planets)
 
 A network of specialized satellites can use tomographic methods to reconstruct the activities occurring deep within a star. These otherwise costly-to-produce conditions are ideal for a variety of research endeavors, with larger benefits for more exotic star types.'''
 
@@ -14037,7 +14056,7 @@ BLD_SHIPYARD_ENRG_COMP_DESC
 
 Requiring a high energy star to siphon energy from, it can only be built at a system with a [[STAR_BLUE]], [[STAR_WHITE]] or [[STAR_BLACK]] star type.
 
-A highly specialized shipyard designed to create and mount parts on large bundles of densely compressed energy. This is a fragile process, and this shipyard will explode mightily if it takes more than a very small amount of [[encyclopedia DAMAGE_TITLE]].'''
+A highly specialized shipyard designed to create and mount parts on large bundles of densely compressed energy.'''
 
 BLD_SHIPYARD_ENRG_SOLAR
 Solar Containment Unit

@@ -101,11 +101,6 @@ const EmpireColor& Empire::Color() const
 int Empire::CapitalID() const
 { return m_capital_id; }
 
-int Empire::SourceID() const {
-    auto good_source = Source();
-    return good_source ? good_source->ID() : INVALID_OBJECT_ID;
-}
-
 std::shared_ptr<const UniverseObject> Empire::Source(const ObjectMap& objects) const {
     if (m_eliminated)
         return nullptr;
@@ -165,7 +160,7 @@ void Empire::SetCapitalID(int id, const ObjectMap& objects) {
 }
 
 void Empire::AdoptPolicy(const std::string& name, const std::string& category,
-                         bool adopt, int slot, const ObjectMap& objects)
+                         const ObjectMap& objects, bool adopt, int slot)
 {
     if (adopt && name.empty()) {
         ErrorLogger() << "Empire::AdoptPolicy asked to adopt empty policy name in category " << category << " slot " << slot;
@@ -1335,7 +1330,7 @@ std::map<int, std::set<int>> Empire::KnownStarlanes(const Universe& universe) co
     TraceLogger(supply) << "Empire::KnownStarlanes for empire " << m_id;
 
     auto& known_destroyed_objects = universe.EmpireKnownDestroyedObjectIDs(this->EmpireID());
-    for (const auto& sys : Objects().all<System>()) {
+    for (const auto& sys : universe.Objects().all<System>()) {
         int start_id = sys->ID();
         TraceLogger(supply) << "system " << start_id << " has up to " << sys->StarlanesWormholes().size() << " lanes / wormholes";
 
@@ -1875,8 +1870,8 @@ void Empire::AddShipHull(const std::string& name) {
     AddSitRepEntry(CreateShipHullUnlockedSitRep(name));
 }
 
-void Empire::AddExploredSystem(int ID, int turn) {
-    if (Objects().get<System>(ID))
+void Empire::AddExploredSystem(int ID, int turn, const ObjectMap& objects) {
+    if (objects.get<System>(ID))
         m_explored_systems.emplace(ID, turn);
     else
         ErrorLogger() << "Empire::AddExploredSystem given an invalid system id: " << ID;

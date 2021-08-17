@@ -489,18 +489,19 @@ void Number::Eval(const ScriptingContext& parent_context,
 }
 
 bool Number::Match(const ScriptingContext& local_context) const {
-    // get acceptable range of subcondition matches for candidate
-    int low = (m_low ? std::max(0, m_low->Eval(local_context)) : 0);
-    int high = (m_high ? std::min(m_high->Eval(local_context), INT_MAX) : INT_MAX);
-
     // get set of all UniverseObjects that satisfy m_condition
     ObjectSet condition_matches;
     m_condition->Eval(local_context, condition_matches);
 
     // compare number of objects that satisfy m_condition to the acceptable range of such objects
     int matched = condition_matches.size();
-    bool in_range = (low <= matched && matched <= high);
-    return in_range;
+
+    // get acceptable range of subcondition matches for candidate
+    int low = (m_low ? std::max(0, m_low->Eval(local_context)) : 0);
+    if (low > matched)
+        return false;
+    int high = (m_high ? std::min(m_high->Eval(local_context), INT_MAX) : INT_MAX);
+    return matched <= high;
 }
 
 void Number::SetTopLevelContent(const std::string& content_name) {
@@ -648,10 +649,12 @@ std::string Turn::Dump(unsigned short ntabs) const {
 }
 
 bool Turn::Match(const ScriptingContext& local_context) const {
-    int low =  (m_low ?  std::max(BEFORE_FIRST_TURN,           m_low->Eval(local_context)) : BEFORE_FIRST_TURN);
-    int high = (m_high ? std::min(m_high->Eval(local_context), IMPOSSIBLY_LARGE_TURN) :      IMPOSSIBLY_LARGE_TURN);
     int turn = local_context.current_turn;
-    return (low <= turn && turn <= high);
+    int low =  (m_low ?  std::max(BEFORE_FIRST_TURN,           m_low->Eval(local_context)) : BEFORE_FIRST_TURN);
+    if (low > turn)
+        return false;
+    int high = (m_high ? std::min(m_high->Eval(local_context), IMPOSSIBLY_LARGE_TURN) :      IMPOSSIBLY_LARGE_TURN);
+    return turn <= high;
 }
 
 void Turn::SetTopLevelContent(const std::string& content_name) {
@@ -1277,6 +1280,29 @@ namespace {
             m_context(context)
         {}
 
+        EmpireAffiliationSimpleMatch(EmpireAffiliationType affiliation,
+                                     const ScriptingContext& context) :
+            m_affiliation(affiliation),
+            m_context(context)
+        {}
+
+        // is it necessary to evaluate and pass in a non-default empire id?
+        static bool AffiliationTypeUsesEmpireID(EmpireAffiliationType affiliation) {
+            switch (affiliation) {
+            case EmpireAffiliationType::AFFIL_SELF:
+            case EmpireAffiliationType::AFFIL_ENEMY:
+            case EmpireAffiliationType::AFFIL_PEACE:
+            case EmpireAffiliationType::AFFIL_ALLY:
+                return true;
+            case EmpireAffiliationType::AFFIL_ANY:
+            case EmpireAffiliationType::AFFIL_NONE:
+            case EmpireAffiliationType::AFFIL_CAN_SEE: // TODO: update once implemented below
+            case EmpireAffiliationType::AFFIL_HUMAN:
+            default:
+                return false;
+            }
+        }
+
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
@@ -1325,8 +1351,7 @@ namespace {
                 break;
 
             case EmpireAffiliationType::AFFIL_CAN_SEE: {
-                // todo...
-                return false;
+                return false; // TODO
                 break;
             }
 
@@ -1345,7 +1370,7 @@ namespace {
             }
         }
 
-        int m_empire_id;
+        int m_empire_id = ALL_EMPIRES;
         EmpireAffiliationType m_affiliation;
         const ScriptingContext& m_context;
     };
@@ -1450,10 +1475,12 @@ bool EmpireAffiliation::Match(const ScriptingContext& local_context) const {
         ErrorLogger() << "EmpireAffiliation::Match passed no candidate object";
         return false;
     }
-
-    int empire_id = m_empire_id ? m_empire_id->Eval(local_context) : ALL_EMPIRES;
-
-    return EmpireAffiliationSimpleMatch(empire_id, m_affiliation, local_context)(candidate);
+    if (EmpireAffiliationSimpleMatch::AffiliationTypeUsesEmpireID(m_affiliation) && m_empire_id) {
+        int empire_id = m_empire_id->Eval(local_context);
+        return EmpireAffiliationSimpleMatch(empire_id, m_affiliation, local_context)(candidate);
+    } else {
+        return EmpireAffiliationSimpleMatch(m_affiliation, local_context)(candidate);
+    }
 }
 
 void EmpireAffiliation::SetTopLevelContent(const std::string& content_name) {
@@ -3001,9 +3028,12 @@ bool CreatedOnTurn::Match(const ScriptingContext& local_context) const {
         ErrorLogger() << "CreatedOnTurn::Match passed no candidate object";
         return false;
     }
+    int turn = candidate->CreationTurn();
     int low = (m_low ? std::max(0, m_low->Eval(local_context)) : BEFORE_FIRST_TURN);
+    if (low > turn)
+        return false;
     int high = (m_high ? std::min(m_high->Eval(local_context), IMPOSSIBLY_LARGE_TURN) : IMPOSSIBLY_LARGE_TURN);
-    return CreatedOnTurnSimpleMatch(low, high)(candidate);
+    return turn <= high;
 }
 
 void CreatedOnTurn::SetTopLevelContent(const std::string& content_name) {
@@ -3351,13 +3381,13 @@ void ContainedBy::Eval(const ScriptingContext& parent_context,
             parent_context, search_domain == SearchDomain::MATCHES ? *matches.begin() : *non_matches.begin()};
 
         // initialize subcondition candidates from local candidate's containers
-        const ObjectMap& objects = parent_context.ContextObjects();
         std::set<int> container_object_ids;
         if (local_context.condition_local_candidate->ContainerObjectID() != INVALID_OBJECT_ID)
             container_object_ids.insert(local_context.condition_local_candidate->ContainerObjectID());
         if (local_context.condition_local_candidate->SystemID() != INVALID_OBJECT_ID)
             container_object_ids.insert(local_context.condition_local_candidate->SystemID());
 
+        const ObjectMap& objects = parent_context.ContextObjects();
         ObjectSet subcondition_matches = objects.find(container_object_ids);
 
         // apply subcondition to candidates

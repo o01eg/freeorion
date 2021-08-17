@@ -1,7 +1,7 @@
 BuildingType
     name = "BLD_BLACK_HOLE_POW_GEN"
     description = "BLD_BLACK_HOLE_POW_GEN_DESC"
-    buildcost = 300 * [[BUILDING_COST_MULTIPLIER]] * (1 - 0.25 * Statistic If condition = EmpireHasAdoptedPolicy empire = Source.Owner name = "PLC_INDUSTRIALISM")
+    buildcost = 300 * [[BUILDING_COST_MULTIPLIER]] * (1 - 0.25 * Statistic If condition = And [Source EmpireHasAdoptedPolicy empire = Source.Owner name = "PLC_INDUSTRIALISM"])
     buildtime = 8
     tags = "ORBITAL"
     location = And [
@@ -16,7 +16,7 @@ BuildingType
     
         EffectsGroup
             scope = And [
-                PopulationCenter
+                Planet
                 Focus type = "FOCUS_INDUSTRY"
                 OwnedBy empire = Source.Owner
                 Happiness low = (NamedReal name = "BLD_BLACK_HOLE_POW_GEN_MIN_STABILITY" value = 20)

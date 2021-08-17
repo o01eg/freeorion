@@ -11,6 +11,8 @@ Hull
     buildtime = 2
     tags = [ "ROBOTIC_HULL" "PEDIA_HULL_LINE_ROBOTIC" "GREAT_FUEL_EFFICIENCY" ]
     location = And [
+        Planet
+        OwnedBy empire = Source.Owner
         Contains And [
             Building name = "BLD_SHIPYARD_BASE"
             OwnedBy empire = Source.Owner
@@ -19,7 +21,6 @@ Hull
             Building name = "BLD_SHIPYARD_ORBITAL_DRYDOCK"
             OwnedBy empire = Source.Owner
         ]
-        OwnedBy empire = Source.Owner
     ]
     effectsgroups = [
         EffectsGroup
@@ -33,10 +34,10 @@ Hull
             activation = Not Aggressive
             accountinglabel = "SPATIAL_FLUX_BONUS"
             effects = SetStealth value = Value + 10 +
-                (10 * Statistic If condition = OwnerHasTech name = "SPY_STEALTH_PART_1" ) +
-                (10 * Statistic If condition = OwnerHasTech name = "SPY_STEALTH_PART_2" ) +
-                (10 * Statistic If condition = OwnerHasTech name = "SPY_STEALTH_PART_3" ) +
-                (10 * Statistic If condition = OwnerHasTech name = "SPY_STEALTH_4" )
+                (10 * Statistic If condition = And [ Source OwnerHasTech name = "SPY_STEALTH_PART_1" ]) +
+                (10 * Statistic If condition = And [ Source OwnerHasTech name = "SPY_STEALTH_PART_2" ]) +
+                (10 * Statistic If condition = And [ Source OwnerHasTech name = "SPY_STEALTH_PART_3" ]) +
+                (10 * Statistic If condition = And [ Source OwnerHasTech name = "SPY_STEALTH_4" ])
 
         [[GREAT_FUEL_EFFICIENCY]]
         [[ADD_HULL_FUEL_TO_MAX_FUEL_METER]]

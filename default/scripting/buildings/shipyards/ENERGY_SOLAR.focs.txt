@@ -6,6 +6,7 @@ BuildingType
     tags = "ORBITAL"
     location = And [
         Planet
+        OwnedBy empire = Source.Owner
         Not Contains Building name = "BLD_SHIPYARD_ENRG_SOLAR"
         [[LOCATION_ALLOW_ENQUEUE_IF_PREREQ_ENQUEUED(BLD_SHIPYARD_BASE)]]
         [[LOCATION_ALLOW_BUILD_IF_PREREQ_ENQUEUED(BLD_SHIPYARD_ENRG_COMP)]]
@@ -13,15 +14,16 @@ BuildingType
             Star type = BlackHole
             Enqueued type = Building name = "BLD_ART_BLACK_HOLE"
             ContainedBy And [
+                Object id = RootCandidate.SystemID
                 Star type = Red
                 Contains And [
+                    InSystem id = RootCandidate.SystemID
                     Planet
                     OwnedBy empire = Source.Owner
                     Enqueued type = Building name = "BLD_ART_BLACK_HOLE"
                 ]
             ]
         ]
-        OwnedBy empire = Source.Owner
     ]
     enqueuelocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
     icon = "icons/building/shipyard-16.png"

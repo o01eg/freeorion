@@ -410,6 +410,13 @@ void OptionsDB::GetUsage(std::ostream& os, const std::string& command_line, bool
             options_by_section.erase("root");
     }
 
+    if (command_line.empty()) {
+        if (UserStringExists("COMMAND_LINE_HELP_GENERAL_DESCRIPTION"))
+            os << UserString("COMMAND_LINE_HELP_GENERAL_DESCRIPTION") << "\n";
+        else
+            os << "\nFreeOrion is a 4X Space Strategy game.\n\n";
+    }
+
     // print description of command_line arg as section
     if (command_line == "all") {
         os << UserString("OPTIONS_DB_SECTION_ALL") << " ";

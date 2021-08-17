@@ -23,7 +23,7 @@ BuildingType
                 Happiness low = 0
             ]
             activation = ContainedBy And [
-                Planet
+                Object id = Source.PlanetID
                 Contains Building name = "BLD_CULTURE_ARCHIVES"
             ]
             priority = [[TARGET_AFTER_2ND_SCALING_PRIORITY]]

@@ -1337,6 +1337,22 @@ All Forbidden
 ## Command-line and options database entries
 ##
 
+COMMAND_LINE_HELP_GENERAL_DESCRIPTION
+'''FreeOrion is a 4X Space Strategy game.
+
+Command-line switches and options may be specified to adjust how the program runs.
+
+These are grouped, and can be listed by running the binary and passing the "-h" or "--help" switches, followed by the name of an option group.
+
+For example, to output network-related options:
+freeorion --help network
+
+Options may have an abbreviated switch form, like "-h" instead of "--help".
+
+Options that do not have an abbreviated form expect a parameter to be passed after their name to set that option to the passed value, like:
+freeorion --network.discovery.port 123
+'''
+
 COMMAND_LINE_NOT_FOUND
 No options or sections found matching
 
@@ -8168,6 +8184,8 @@ SP_TRITH_GAMEPLAY_DESC
 Bereaved xenophobic telepaths.
 Prefer [[PT_RADIATED]] planets.
 [[encyclopedia SELF_SUSTAINING_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]], [[encyclopedia XENOPHOBIC_SPECIES_TITLE]]
+
+Empires with Trith on their capital planet have [[policy PLC_RACIAL_PURITY]] unlocked.
 '''
 
 SP_TRITH_DESC
@@ -11908,10 +11926,20 @@ PLC_CAPITAL_MARKETS
 Capital Markets
 
 PLC_CAPITAL_MARKETS_DESC
-Planets with a luxury resource special and that is set to influence focus will export the resource to supply-connected planets, boosting the stability of planets with species that like the resource.
+'''• Planets with a luxury resource special and that are set to influence focus will export the resource to supply-connected planets. This boosts the stability of planets with species that like the resource by [[value SPECIAL_CAPITAL_MARKETS_STABILITY_FOCUS_BONUS]].
+• Increases the rate of growth or decay of [[metertype METER_INFLUENCE]] by [[value PLC_CAPITAL_MARKETS_INFLUENCE_RATE]] / turn towards [[metertype METER_TARGET_INFLUENCE]].'''
 
 PLC_CAPITAL_MARKETS_SHORT_DESC
 Boosts stability with resource export
+
+PLC_BLACK_MARKET
+Black Markets
+
+PLC_BLACK_MARKET_DESC
+Planets with stability of [[value PLC_BLACK_MARKET_MAX_STABILITY]] or less and that are set to influence focus will have [[metertype METER_TARGET_INFLUENCE]] increased by [[value SPECIAL_BLACK_MARKET_INFLUENCE_FOCUS_BONUS]] for each supply connected planet with a luxury resource special that the influence-focused planet's population likes.
+
+PLC_BLACK_MARKET_SHORT_DESC
+Boosts Influence with resources
 
 PLC_ARTISAN_WORKSHOPS
 Artisan Workshops
@@ -12003,6 +12031,17 @@ In systems where the empire that adopted this policy has more stationary armed s
 
 PLC_FLANKING_SHORT_DESC
 Boosts Ship Damage
+
+PLC_CHARGE
+Charge
+
+PLC_CHARGE_DESC
+'''For armed ships with at least [[value PLC_CHARGE_MINIMUM_SPEED]] [[metertype METER_SPEED]]:
+• Weapon damage is increased by [[value PLC_CHARGE_DAMAGE_BOOST]]
+• [[metertype METER_MAX_SHIELD]] is reduced by [[value PLC_CHARGE_SHIELD_REDUCTION]] '''
+
+PLC_CHARGE_SHORT_DESC
+Boosts Fast Ship Damage
 
 
 ##
@@ -12596,11 +12635,11 @@ CON_FRC_ENRG_STRC
 Force-Energy Structures
 
 CON_FRC_ENRG_STRC_DESC
-'''Increases the growth of resource and infrastructure meters below target value to 3 per turn, and the decay of resource meters above target value to 5 per turn. [[metertype METER_INDUSTRY]] and [[metertype METER_RESEARCH]] grow only if [[metertype METER_HAPPINESS]] is at least 5.
+'''Increases the growth and decay of [[metertype METER_INDUSTRY]], [[metertype METER_RESEARCH]], [[metertype METER_CONSTRUCTION]], and [[metertype METER_STOCKPILE]] twoards their target or max values by [[value FORCE_ENERGY_RATE_INCREASE]] per turn.
 
 The flexibility and versatility of force-energy structures permits a colonies buildings to be more easily re-tooled to suit new purposes, increasing the rate at which focus changes can take effect.
 
-When forces and energy can be manipulated as desired to provide the same functionality as solid surfaces, there is no essential need to have physical materials enclosing the occupants of a building. Structures composed entirely of energy have many advantages, including simple reconfiguration, resilience, portability and novel design possibilities.'''
+When forces and energy can be manipulated adaptively to provide the same functionality as solid surfaces, there is no need for physical materials enclosing the occupants of a building. Structures composed entirely of energy have many advantages, including rapid reconfiguration, resilience, portability, and novel design possibilities.'''
 
 CON_CONTGRAV_ARCH
 Gravitic Architecture

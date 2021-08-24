@@ -347,16 +347,6 @@ bool Condition::Eval(const ScriptingContext& parent_context,
     return non_matches.empty(); // if candidate has been matched, non_matches will now be empty
 }
 
-bool Condition::Eval(std::shared_ptr<const UniverseObject> candidate) const {
-    if (!candidate)
-        return false;
-    ObjectSet non_matches{std::move(candidate)}, matches;
-
-    ScriptingContext context; // TODO: pass in and use instead of creating?
-    Eval(context, matches, non_matches);
-    return non_matches.empty(); // if candidate has been matched, non_matches will now be empty
-}
-
 void Condition::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                   ObjectSet& condition_non_targets) const
 { AddAllObjectsSet(parent_context.ContextObjects(), condition_non_targets); }
@@ -1873,6 +1863,38 @@ Capital::Capital() :
 bool Capital::operator==(const Condition& rhs) const
 { return Condition::operator==(rhs); }
 
+namespace {
+    struct CapitalSimpleMatch {
+        CapitalSimpleMatch(const EmpireManager::const_container_type& empires) :
+            m_capital_ids{[empires]() -> std::vector<int> {
+                // collect capitals of all empires
+                std::vector<int> retval;
+                retval.reserve(empires.size());
+                for (auto& [empire_id, empire] : empires) {
+                    (void)empire_id;
+                    auto id = empire->CapitalID();
+                    if (id != INVALID_OBJECT_ID)
+                        retval.push_back(id);
+                }
+                return retval;
+            }()}
+        {}
+
+        bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
+            if (!candidate)
+                return false;
+            return std::find(m_capital_ids.begin(), m_capital_ids.end(), candidate->ID()) != m_capital_ids.end();
+        }
+
+        const std::vector<int> m_capital_ids;
+    };
+}
+
+void Capital::Eval(const ScriptingContext& parent_context,
+                   ObjectSet& matches, ObjectSet& non_matches,
+                   SearchDomain search_domain) const
+{ EvalImpl(matches, non_matches, search_domain, CapitalSimpleMatch{parent_context.Empires()}); }
+
 std::string Capital::Description(bool negated/* = false*/) const {
     return (!negated)
         ? UserString("DESC_CAPITAL")
@@ -1902,7 +1924,27 @@ bool Capital::Match(const ScriptingContext& local_context) const {
 
 void Capital::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                 ObjectSet& condition_non_targets) const
-{ AddPlanetSet(parent_context.ContextObjects(), condition_non_targets); }
+{
+    if constexpr(false) {
+        auto capital_ids{[empires{parent_context.Empires()}]() -> std::set<int> {
+            // collect capitals of all empires
+            std::set<int> retval;
+            for (auto& [empire_id, empire] : empires) {
+                (void)empire_id;
+                auto id = empire->CapitalID();
+                if (id != INVALID_OBJECT_ID)
+                    retval.insert(id);
+            }
+            return retval;
+        }()};
+
+        condition_non_targets.reserve(condition_non_targets.size() + capital_ids.size());
+        for (auto& obj : parent_context.ContextObjects().find(capital_ids))
+            condition_non_targets.push_back(std::move(obj));
+    } else {
+        AddPlanetSet(parent_context.ContextObjects(), condition_non_targets);
+    }
+}
 
 unsigned int Capital::GetCheckSum() const {
     unsigned int retval{0};
@@ -10318,9 +10360,13 @@ void And::Eval(const ScriptingContext& parent_context, ObjectSet& matches,
         return ss.str();
     };
 
-    TraceLogger(conditions) << "And::Eval searching " << (search_domain == SearchDomain::MATCHES ? "matches" : "non_matches")
-                            << " with input matches (" << matches.size() << "): " << ObjList(matches)
-                            << " and input non_matches(" << non_matches.size() << "): " << ObjList(non_matches);
+    TraceLogger(conditions) << [&]() {
+        std::stringstream ss;
+        ss << "And::Eval searching " << (search_domain == SearchDomain::MATCHES ? "matches" : "non_matches")
+           << " with input matches (" << matches.size() << "): " << ObjList(matches)
+           << " and input non_matches(" << non_matches.size() << "): " << ObjList(non_matches);
+        return ss.str();
+    }();
 
     if (search_domain == SearchDomain::NON_MATCHES) {
         ObjectSet partly_checked_non_matches;
@@ -10329,15 +10375,25 @@ void And::Eval(const ScriptingContext& parent_context, ObjectSet& matches,
         // move items in non_matches set that pass first operand condition into
         // partly_checked_non_matches set
         m_operands[0]->Eval(parent_context, partly_checked_non_matches, non_matches, SearchDomain::NON_MATCHES);
-        TraceLogger(conditions) << "Subcondition: " << m_operands[0]->Dump()
-                                <<"\npartly_checked_non_matches (" << partly_checked_non_matches.size() << "): " << ObjList(partly_checked_non_matches);
+        TraceLogger(conditions) << [&]() {
+            std::stringstream ss;
+            ss << "Subcondition: " << m_operands[0]->Dump()
+               <<"\npartly_checked_non_matches (" << partly_checked_non_matches.size() << "): "
+               << ObjList(partly_checked_non_matches);
+            return ss.str();
+        }();
 
         // move items that don't pass one of the other conditions back to non_matches
         for (unsigned int i = 1; i < m_operands.size(); ++i) {
             if (partly_checked_non_matches.empty()) break;
             m_operands[i]->Eval(parent_context, partly_checked_non_matches, non_matches, SearchDomain::MATCHES);
-            TraceLogger(conditions) << "Subcondition: " << m_operands[i]->Dump()
-                                    <<"\npartly_checked_non_matches (" << partly_checked_non_matches.size() << "): " << ObjList(partly_checked_non_matches);
+            TraceLogger(conditions) << [&]() {
+                std::stringstream ss;
+                ss << "Subcondition: " << m_operands[i]->Dump()
+                   <<"\npartly_checked_non_matches (" << partly_checked_non_matches.size() << "): "
+                   << ObjList(partly_checked_non_matches);
+                return ss.str();
+            }();
         }
 
         // merge items that passed all operand conditions into matches

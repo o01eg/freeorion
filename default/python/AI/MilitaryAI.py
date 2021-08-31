@@ -27,6 +27,7 @@ from turn_state import (
     get_systems_by_supply_tier,
 )
 from turn_state.design import cur_best_military_design_rating
+from universe.system_network import systems_connected
 
 MinThreat = 10  # the minimum threat level that will be ascribed to an unknown threat capable of killing scouts
 _military_allocations = []
@@ -821,7 +822,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
         # border protections
         visible_system_ids = aistate.visInteriorSystemIDs | aistate.visBorderSystemIDs
         accessible_system_ids = (
-            [sys_id for sys_id in visible_system_ids if universe.systemsConnected(sys_id, home_system_id, empire_id)]
+            [sys_id for sys_id in visible_system_ids if systems_connected(sys_id, home_system_id)]
             if home_system_id != INVALID_ID
             else []
         )
@@ -1057,8 +1058,9 @@ def get_tot_mil_rating() -> float:
 
     :return: a military rating value
     """
-    return sum(
-        get_fleet_rating(fleet_id) for fleet_id in FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.MILITARY)
+    return round(
+        sum(get_fleet_rating(fleet_id) for fleet_id in FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.MILITARY)),
+        0,
     )
 
 
@@ -1069,8 +1071,11 @@ def get_concentrated_tot_mil_rating() -> float:
 
     :return: a military rating value
     """
-    return combine_ratings(
-        get_fleet_rating(fleet_id) for fleet_id in FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.MILITARY)
+    return round(
+        combine_ratings(
+            get_fleet_rating(fleet_id) for fleet_id in FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.MILITARY)
+        ),
+        0,
     )
 
 

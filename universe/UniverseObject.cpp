@@ -40,8 +40,8 @@ void UniverseObject::Copy(std::shared_ptr<const UniverseObject> copied_object,
     }
 
     auto censored_meters = copied_object->CensoredMeters(vis);
-    for (const auto& entry : copied_object->m_meters) {
-        MeterType type = entry.first;
+    for (auto& [type, copied_meter] : copied_object->m_meters) {
+        (void)copied_meter;
 
         // get existing meter in this object, or create a default one
         auto m_meter_it = m_meters.find(type);
@@ -252,7 +252,7 @@ bool UniverseObject::HostileToEmpire(int, const EmpireManager&) const
 Visibility UniverseObject::GetVisibility(int empire_id) const
 { return GetUniverse().GetObjectVisibilityByEmpire(this->ID(), empire_id); }
 
-const std::string& UniverseObject::PublicName(int, const ObjectMap&) const
+const std::string& UniverseObject::PublicName(int, const Universe&) const
 { return m_name; }
 
 std::shared_ptr<UniverseObject> UniverseObject::Accept(const UniverseObjectVisitor& visitor) const

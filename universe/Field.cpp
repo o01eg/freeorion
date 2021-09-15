@@ -35,9 +35,9 @@ Field* Field::Clone(Universe& universe, int empire_id) const {
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
 
-    Field* retval = new Field(m_type_name, X(), Y(), GetMeter(MeterType::METER_SIZE)->Current());
+    auto retval = std::make_unique<Field>();
     retval->Copy(shared_from_this(), universe, empire_id);
-    return retval;
+    return retval.release();
 }
 
 void Field::Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& universe, int empire_id) {
@@ -84,7 +84,7 @@ std::string Field::Dump(unsigned short ntabs) const {
     return os.str();
 }
 
-const std::string& Field::PublicName(int empire_id, const ObjectMap&) const {
+const std::string& Field::PublicName(int empire_id, const Universe&) const {
     // always just return name since fields (as of this writing) don't have owners
     return UserString(m_type_name);
 }

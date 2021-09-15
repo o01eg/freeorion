@@ -480,27 +480,30 @@ namespace {
             if (m_empire_id == ALL_EMPIRES)
                 return;
 
-            const auto& destroyed_objects = GetUniverse().EmpireKnownDestroyedObjectIDs(m_empire_id);
+            const Universe& universe = GetUniverse();
+            const SpeciesManager& sm = GetSpeciesManager();
+
+            const auto& destroyed_objects = universe.EmpireKnownDestroyedObjectIDs(m_empire_id);
             for (auto& ship : Objects().all<Ship>()) {
                 if (!ship->OwnedBy(m_empire_id) || destroyed_objects.count(ship->ID()))
                     continue;
                 m_values[FLEET_DETAIL_SHIP_COUNT]++;
 
-                if (ship->IsArmed())
+                if (ship->IsArmed(universe))
                     m_values[FLEET_DETAIL_ARMED_COUNT]++;
                 else
                     m_values[FLEET_DETAIL_UNARMED_COUNT]++;
 
-                if (ship->CanColonize())
+                if (ship->CanColonize(universe, sm))
                     m_values[FLEET_DETAIL_COLONY_COUNT]++;
 
-                if (ship->HasTroops())
+                if (ship->HasTroops(universe))
                     m_values[FLEET_DETAIL_TROOP_COUNT]++;
 
-                if (ship->HasFighters())
+                if (ship->HasFighters(universe))
                     m_values[FLEET_DETAIL_CARRIER_COUNT]++;
 
-                const ShipDesign* design = ship->Design();
+                const ShipDesign* design = universe.GetShipDesign(ship->DesignID());
                 if (!design)
                     continue;
                 m_ship_design_counts[design->ID()]++;
@@ -2876,7 +2879,7 @@ void MapWnd::InitTurn() {
 
 void MapWnd::MidTurnUpdate() {
     DebugLogger() << "MapWnd::MidTurnUpdate";
-    ScopedTimer timer("MapWnd::MidTurnUpdate", true);
+    ScopedTimer timer("MapWnd::MidTurnUpdate");
 
     GetUniverse().InitializeSystemGraph(Empires(), Objects());
     GetUniverse().UpdateEmpireVisibilityFilteredSystemGraphsWithMainObjectMap(Empires());
@@ -2896,7 +2899,7 @@ void MapWnd::MidTurnUpdate() {
 
 void MapWnd::InitTurnRendering() {
     DebugLogger() << "MapWnd::InitTurnRendering";
-    ScopedTimer timer("MapWnd::InitTurnRendering", true);
+    ScopedTimer timer("MapWnd::InitTurnRendering");
 
     using boost::placeholders::_1;
     using boost::placeholders::_2;
@@ -3006,7 +3009,7 @@ void MapWnd::InitTurnRendering() {
 
 void MapWnd::InitSystemRenderingBuffers() {
     DebugLogger() << "MapWnd::InitSystemRenderingBuffers";
-    ScopedTimer timer("MapWnd::InitSystemRenderingBuffers", true);
+    ScopedTimer timer("MapWnd::InitSystemRenderingBuffers");
 
     // clear out all the old buffers
     ClearSystemRenderingBuffers();
@@ -4558,7 +4561,7 @@ void MapWnd::SetFleetMovementLine(int fleet_id) {
     const Empire* empire = GetEmpire(fleet->Owner());
     if (empire)
         line_colour = empire->Color();
-    else if (fleet->Unowned() && fleet->HasMonsters(Objects()))
+    else if (fleet->Unowned() && fleet->HasMonsters(GetUniverse()))
         line_colour = GG::CLR_RED;
 
     const ScriptingContext context;

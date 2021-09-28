@@ -1593,7 +1593,7 @@ void CreatePlanet::Execute(ScriptingContext& context) const {
     } else {
         name_str = str(FlexibleFormat(UserString("NEW_PLANET_NAME")) % system->Name() % planet->CardinalSuffix());
     }
-    planet->Rename(name_str);
+    planet->Rename(std::move(name_str));
 
     // apply after-creation effects
     ScriptingContext local_context{context, std::move(planet), ScriptingContext::CurrentValueVariant()};
@@ -1704,7 +1704,7 @@ void CreateBuilding::Execute(ScriptingContext& context) const {
         std::string name_str = m_name->Eval(context);
         if (m_name->ConstantExpr() && UserStringExists(name_str))
             name_str = UserString(name_str);
-        building->Rename(name_str);
+        building->Rename(std::move(name_str));
     }
 
     // apply after-creation effects
@@ -1855,7 +1855,7 @@ void CreateShip::Execute(ScriptingContext& context) const {
         std::string name_str = m_name->Eval(context);
         if (m_name->ConstantExpr() && UserStringExists(name_str))
             name_str = UserString(name_str);
-        ship->Rename(name_str);
+        ship->Rename(std::move(name_str));
     } else if (ship->IsMonster(context.ContextUniverse())) {
         ship->Rename(NewMonsterName());
     } else if (empire) {
@@ -1873,7 +1873,7 @@ void CreateShip::Execute(ScriptingContext& context) const {
 
     ship->BackPropagateMeters();
 
-    GetUniverse().SetEmpireKnowledgeOfShipDesign(design_id, empire_id);
+    context.ContextUniverse().SetEmpireKnowledgeOfShipDesign(design_id, empire_id);
 
     CreateNewFleet(std::move(system), ship, context.ContextUniverse(), context.species);
 
@@ -2032,7 +2032,7 @@ void CreateField::Execute(ScriptingContext& context) const {
     } else {
         name_str = UserString(field_type->Name());
     }
-    field->Rename(name_str);
+    field->Rename(std::move(name_str));
 
     // apply after-creation effects
     ScriptingContext local_context{context, std::move(field), ScriptingContext::CurrentValueVariant()};
@@ -2237,7 +2237,7 @@ void Destroy::Execute(ScriptingContext& context) const {
     if (context.source)
         source_id = context.source->ID();
 
-    GetUniverse().EffectDestroy(context.effect_target->ID(), source_id);
+    context.ContextUniverse().EffectDestroy(context.effect_target->ID(), source_id);
 }
 
 std::string Destroy::Dump(unsigned short ntabs) const
@@ -2556,7 +2556,7 @@ void MoveTo::Execute(ScriptingContext& context) const {
         return;
     }
 
-    Universe& universe = GetUniverse();
+    Universe& universe = context.ContextUniverse();
 
     Condition::ObjectSet valid_locations;
     // apply location condition to determine valid location to move target to
@@ -3652,9 +3652,10 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
         for ([[maybe_unused]] auto& [empire_id, unused_empire] : context.Empires()) {
             (void)unused_empire;
             for (auto& object : condition_matches) {
-                if (object->GetVisibility(empire_id) >= Visibility::VIS_BASIC_VISIBILITY) { // TODO use context visibility
+                auto vis = object->GetVisibility(empire_id, context.empire_object_vis);
+                if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
                     recipient_empire_ids.insert(empire_id);
-                    break;
+                    break; // can move to the next empire, since this one has seen a matching object
                 }
             }
         }
@@ -3988,7 +3989,7 @@ void SetVisibility::Execute(ScriptingContext& context) const {
         for (int obj_id : object_ids) {
             // store source object id and ValueRef to evaluate to determine
             // what visibility level to set at time of application
-            GetUniverse().SetEffectDerivedVisibility(emp_id, obj_id, source_id, m_vis.get());   // TODO: include in ScriptingContext
+            context.ContextUniverse().SetEffectDerivedVisibility(emp_id, obj_id, source_id, m_vis.get());
         }
     }
 }

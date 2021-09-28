@@ -4795,6 +4795,7 @@ bool Enqueued::operator==(const Condition& rhs) const {
 
 namespace {
     int NumberOnQueue(const ProductionQueue& queue, BuildType build_type, const int location_id,
+                      const Universe& universe,
                       const std::string& name = "", int design_id = INVALID_DESIGN_ID)
     {
         int retval = 0;
@@ -4815,7 +4816,7 @@ namespace {
                         continue;
                 } else if (!name.empty()) {
                     // ... or accept design by predefined name
-                    const ShipDesign* design = GetUniverse().GetShipDesign(element.item.design_id);   // TODO: put ship design info in ScriptingContext
+                    const ShipDesign* design = universe.GetShipDesign(element.item.design_id);
                     if (!design || name != design->Name(false))
                         continue;
                 }
@@ -4847,14 +4848,16 @@ namespace {
                 for ([[maybe_unused]] auto& [ignored_empire_id, empire] : m_context.Empires()) {
                     (void)ignored_empire_id; // quiet unused variable warning
                     count += NumberOnQueue(empire->GetProductionQueue(), m_build_type,
-                                           candidate->ID(), m_name, m_design_id);
+                                           candidate->ID(), m_context.ContextUniverse(),
+                                           m_name, m_design_id);
                 }
 
             } else {
                 auto empire = m_context.GetEmpire(m_empire_id);
                 if (!empire) return false;
                 count = NumberOnQueue(empire->GetProductionQueue(), m_build_type,
-                                      candidate->ID(), m_name, m_design_id);
+                                      candidate->ID(), m_context.ContextUniverse(),
+                                      m_name, m_design_id);
             }
 
             return (m_low <= count && count <= m_high);
@@ -5896,14 +5899,16 @@ bool PredefinedShipDesign::operator==(const Condition& rhs) const {
 
 namespace {
     struct PredefinedShipDesignSimpleMatch {
-        PredefinedShipDesignSimpleMatch() :
+        PredefinedShipDesignSimpleMatch(const Universe& u) :
             m_any_predef_design_ok(true),
-            m_name(EMPTY_STRING)
+            m_name(EMPTY_STRING),
+            m_u(u)
         {}
 
-        PredefinedShipDesignSimpleMatch(const std::string& name) :
+        PredefinedShipDesignSimpleMatch(const std::string& name, const Universe& u) :
             m_any_predef_design_ok(false),
-            m_name(name)
+            m_name(name),
+            m_u(u)
         {}
 
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
@@ -5911,7 +5916,7 @@ namespace {
                 return false;
             auto* ship = static_cast<const Ship*>(candidate.get());
 
-            const ShipDesign* candidate_design = GetUniverse().GetShipDesign(ship->DesignID()); // TODO: Put ship designs in ScriptingContext
+            const ShipDesign* candidate_design = m_u.GetShipDesign(ship->DesignID());
             if (!candidate_design)
                 return false;
 
@@ -5929,6 +5934,7 @@ namespace {
 
         bool               m_any_predef_design_ok;
         const std::string& m_name;
+        const Universe&    m_u;
     };
 }
 
@@ -5942,10 +5948,12 @@ void PredefinedShipDesign::Eval(const ScriptingContext& parent_context,
         // testing each candidate to see if its design is predefined or is a
         // particular named predefined design
         if (!m_name) {
-            EvalImpl(matches, non_matches, search_domain, PredefinedShipDesignSimpleMatch());
+            EvalImpl(matches, non_matches, search_domain,
+                     PredefinedShipDesignSimpleMatch(parent_context.ContextUniverse()));
         } else {
             std::string name = m_name->Eval(parent_context);
-            EvalImpl(matches, non_matches, search_domain, PredefinedShipDesignSimpleMatch(name));
+            EvalImpl(matches, non_matches, search_domain,
+                     PredefinedShipDesignSimpleMatch(name, parent_context.ContextUniverse()));
         }
     } else {
         // re-evaluate allowed turn range for each candidate object
@@ -5982,10 +5990,10 @@ bool PredefinedShipDesign::Match(const ScriptingContext& local_context) const {
     }
 
     if (!m_name)
-        return PredefinedShipDesignSimpleMatch()(candidate);
+        return PredefinedShipDesignSimpleMatch(local_context.ContextUniverse())(candidate);
 
     std::string name = m_name->Eval(local_context);
-    return PredefinedShipDesignSimpleMatch(name)(candidate);
+    return PredefinedShipDesignSimpleMatch(name, local_context.ContextUniverse())(candidate);
 }
 
 void PredefinedShipDesign::SetTopLevelContent(const std::string& content_name) {

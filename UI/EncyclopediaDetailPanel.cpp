@@ -9,6 +9,7 @@
 #include <GG/ScrollPanel.h>
 #include <GG/StaticGraphic.h>
 #include <GG/Texture.h>
+#include <GG/utf8/checked.h>
 #include "CUIControls.h"
 #include "CUILinkTextBlock.h"
 #include "DesignWnd.h"
@@ -52,7 +53,6 @@
 #include "../util/ScopedTimer.h"
 #include "../util/ThreadPool.h"
 #include "../util/VarText.h"
-
 
 using boost::io::str;
 
@@ -172,12 +172,14 @@ namespace {
                 if (str == "ENC_INDEX")
                     continue;
                 sorted_entries_list.emplace(
-                    UserString(str), std::pair{LinkTaggedText(TextLinker::ENCYCLOPEDIA_TAG, str) + "\n", str});
+                    UserString(str),
+                    std::pair{LinkTaggedText(TextLinker::ENCYCLOPEDIA_TAG, str).append("\n"), str});
             }
 
-            for (const std::string& str : {"ENC_TEXTURES", "ENC_HOMEWORLDS"}) {
+            for (auto str : {"ENC_TEXTURES", "ENC_HOMEWORLDS"}) {
                 sorted_entries_list.emplace(
-                    UserString(str), std::pair{LinkTaggedText(TextLinker::ENCYCLOPEDIA_TAG, str) + "\n", str});
+                    UserString(str),
+                    std::pair{LinkTaggedText(TextLinker::ENCYCLOPEDIA_TAG, str).append("\n"), str});
             }
 
             for ([[maybe_unused]] auto& [category_name, article_vec] : encyclopedia.Articles()) {
@@ -190,7 +192,7 @@ namespace {
 
                 sorted_entries_list.emplace(
                     UserString(category_name),
-                    std::pair{LinkTaggedText(TextLinker::ENCYCLOPEDIA_TAG, category_name) + "\n", category_name});
+                    std::pair{LinkTaggedText(TextLinker::ENCYCLOPEDIA_TAG, category_name).append("\n"), category_name});
             }
 
         }
@@ -199,7 +201,7 @@ namespace {
                 if (!exclude_custom_categories_from_dir_name || DetermineCustomCategory(part->Tags()).empty()) {
                     sorted_entries_list.emplace(
                         UserString(part_name),
-                        std::pair{LinkTaggedText(VarText::SHIP_PART_TAG, part_name) + "\n", part_name});
+                        std::pair{LinkTaggedText(VarText::SHIP_PART_TAG, part_name).append("\n"), part_name});
                 }
             }
 
@@ -209,7 +211,7 @@ namespace {
                 if (!exclude_custom_categories_from_dir_name || DetermineCustomCategory(hull->Tags()).empty()) {
                     sorted_entries_list.emplace(
                         UserString(hull_name),
-                        std::pair{LinkTaggedText(VarText::SHIP_HULL_TAG, hull_name) + "\n", hull_name});
+                        std::pair{LinkTaggedText(VarText::SHIP_HULL_TAG, hull_name).append("\n"), hull_name});
                 }
             }
 
@@ -231,7 +233,7 @@ namespace {
                     DetermineCustomCategory(GetTech(tech_name)->Tags()).empty())
                 {
                     // already iterating over userstring-looked-up names, so don't need to re-look-up-here
-                    std::string&& tagged_text{LinkTaggedText(VarText::TECH_TAG, tech_name) + "\n"};
+                    std::string tagged_text{LinkTaggedText(VarText::TECH_TAG, tech_name).append("\n")};
                     sorted_entries_list.emplace(
                         std::move(us_name),
                         std::pair(std::move(tagged_text), std::move(tech_name)));
@@ -241,7 +243,7 @@ namespace {
         }
         else if (dir_name == "ENC_POLICY") {
             for (auto& policy_name : GetPolicyManager().PolicyNames()) {
-                std::string&& tagged_text{LinkTaggedText(VarText::POLICY_TAG, policy_name) + "\n"};
+                std::string tagged_text{LinkTaggedText(VarText::POLICY_TAG, policy_name).append("\n")};
                 auto& us_name{UserString(policy_name)}; // line before to avoid order of evaluation issues when moving from policy_name
                 sorted_entries_list.emplace(
                     us_name,
@@ -254,14 +256,14 @@ namespace {
                 if (!exclude_custom_categories_from_dir_name || DetermineCustomCategory(building_type->Tags()).empty()) {
                     sorted_entries_list.emplace(
                         UserString(building_name),
-                        std::pair{LinkTaggedText(VarText::BUILDING_TYPE_TAG, building_name) + "\n", building_name});
+                        std::pair{LinkTaggedText(VarText::BUILDING_TYPE_TAG, building_name).append("\n"), building_name});
                 }
             }
 
         }
         else if (dir_name == "ENC_SPECIAL") {
             for (std::string& special_name : SpecialNames()) {
-                std::string&& tagged_text{LinkTaggedText(VarText::SPECIAL_TAG, special_name) + "\n"};
+                std::string tagged_text{LinkTaggedText(VarText::SPECIAL_TAG, special_name).append("\n")};
                 auto& us_name{UserString(special_name)};    // line before to avoid order of operations issues when moving from special_name
                 sorted_entries_list.emplace(
                     us_name,
@@ -276,7 +278,7 @@ namespace {
                     (void)species; // quiet warning
                     sorted_entries_list.emplace(
                         UserString(species_name),
-                        std::pair{LinkTaggedText(VarText::SPECIES_TAG, species_name) + "\n", species_name});
+                        std::pair{LinkTaggedText(VarText::SPECIES_TAG, species_name).append("\n"), species_name});
                 }
             }
 
@@ -286,7 +288,7 @@ namespace {
 
             for (const auto& entry : GetSpeciesManager()) {
                 std::set<int> known_homeworlds;
-                std::string species_entry = LinkTaggedText(VarText::SPECIES_TAG, entry.first) + " ";
+                std::string species_entry = LinkTaggedText(VarText::SPECIES_TAG, entry.first).append(" ");
 
 
                 // homeworld
@@ -331,14 +333,14 @@ namespace {
                     }
                 }
                 sorted_entries_list.emplace(UserString(entry.first),
-                                            std::make_pair(species_entry + "\n", entry.first));
+                                            std::pair{species_entry.append("\n"), entry.first});
             }
-            sorted_entries_list.emplace("⃠ ", std::make_pair("\n\n", "  "));
+            sorted_entries_list.emplace("⃠ ", std::pair{"\n\n", "  "});
             for (const auto& entry : GetSpeciesManager()) {
                 if (!homeworlds.count(entry.first) || homeworlds.at(entry.first).empty()) {
                     std::string species_entry{LinkTaggedText(VarText::SPECIES_TAG, entry.first) + ":  \n" + UserString("NO_HOMEWORLD")};
                     sorted_entries_list.emplace("⃠⃠" + std::string( "⃠ ") + UserString(entry.first),
-                                                std::make_pair(std::move(species_entry), entry.first));
+                                                std::pair{std::move(species_entry), entry.first});
                 }
             }
 
@@ -346,9 +348,9 @@ namespace {
         else if (dir_name == "ENC_FIELD_TYPE") {
             for (const auto& entry : GetFieldTypeManager()) {
                 if (!exclude_custom_categories_from_dir_name || DetermineCustomCategory(entry.second->Tags()).empty()) {
-                    sorted_entries_list.emplace(UserString(entry.first),
-                                                std::make_pair(LinkTaggedText(VarText::FIELD_TYPE_TAG, entry.first) + "\n",
-                                                               entry.first));
+                    sorted_entries_list.emplace(
+                        UserString(entry.first),
+                        std::pair{LinkTaggedText(VarText::FIELD_TYPE_TAG, entry.first).append("\n"), entry.first});
                 }
             }
 
@@ -365,9 +367,10 @@ namespace {
         }
         else if (dir_name == "ENC_EMPIRE") {
             for (const auto& [id, empire] : Empires()) {
-                sorted_entries_list.emplace(empire->Name(),
-                                            std::make_pair(LinkTaggedIDText(VarText::EMPIRE_ID_TAG, id, empire->Name()) + "\n",
-                                                           std::to_string(id)));
+                sorted_entries_list.emplace(
+                    empire->Name(),
+                    std::pair{LinkTaggedIDText(VarText::EMPIRE_ID_TAG, id, empire->Name()).append("\n"),
+                              std::to_string(id)});
             }
 
         }
@@ -378,8 +381,8 @@ namespace {
                     continue;
                 sorted_entries_list.emplace(
                     design->Name(),
-                    std::make_pair(LinkTaggedIDText(VarText::DESIGN_ID_TAG, design_id, design->Name()) + "\n",
-                                   std::to_string(design_id)));
+                    std::pair{LinkTaggedIDText(VarText::DESIGN_ID_TAG, design_id, design->Name()).append("\n"),
+                              std::to_string(design_id)});
             }
 
         }
@@ -388,8 +391,8 @@ namespace {
                 const std::string& ship_name = ship->PublicName(client_empire_id, universe);
                 sorted_entries_list.emplace(
                     ship_name,
-                    std::make_pair(LinkTaggedIDText(VarText::SHIP_ID_TAG, ship->ID(), ship_name) + "  ",
-                                   std::to_string(ship->ID())));
+                    std::pair{LinkTaggedIDText(VarText::SHIP_ID_TAG, ship->ID(), ship_name).append("  "),
+                              std::to_string(ship->ID())});
             }
 
         }
@@ -400,8 +403,8 @@ namespace {
                 const std::string& ship_name = ship->PublicName(client_empire_id, universe);
                 sorted_entries_list.emplace(
                     ship_name,
-                    std::make_pair(LinkTaggedIDText(VarText::SHIP_ID_TAG, ship->ID(), ship_name) + "  ",
-                                   std::to_string(ship->ID())));
+                    std::pair{LinkTaggedIDText(VarText::SHIP_ID_TAG, ship->ID(), ship_name).append("  "),
+                              std::to_string(ship->ID())});
             }
 
         }
@@ -411,8 +414,8 @@ namespace {
                 if (design->IsMonster())
                     sorted_entries_list.emplace(
                         design->Name(),
-                        std::make_pair(LinkTaggedIDText(VarText::DESIGN_ID_TAG, design_id, design->Name()) + "\n",
-                                       std::to_string(design_id)));
+                        std::pair{LinkTaggedIDText(VarText::DESIGN_ID_TAG, design_id, design->Name()).append("\n"),
+                                  std::to_string(design_id)});
             }
 
         }
@@ -421,8 +424,8 @@ namespace {
                 const std::string& flt_name = fleet->PublicName(client_empire_id, universe);
                 sorted_entries_list.emplace(
                     flt_name,
-                    std::make_pair(LinkTaggedIDText(VarText::FLEET_ID_TAG, fleet->ID(), flt_name) + "  ",
-                                   std::to_string(fleet->ID())));
+                    std::pair{LinkTaggedIDText(VarText::FLEET_ID_TAG, fleet->ID(), flt_name).append("  "),
+                              std::to_string(fleet->ID())});
             }
 
         }
@@ -431,8 +434,8 @@ namespace {
                 const std::string& plt_name = planet->PublicName(client_empire_id, universe);
                 sorted_entries_list.emplace(
                     plt_name,
-                    std::make_pair(LinkTaggedIDText(VarText::PLANET_ID_TAG, planet->ID(), plt_name) + "  ",
-                                   std::to_string(planet->ID())));
+                    std::pair{LinkTaggedIDText(VarText::PLANET_ID_TAG, planet->ID(), plt_name).append("  "),
+                              std::to_string(planet->ID())});
             }
 
         }
@@ -441,18 +444,18 @@ namespace {
                 const std::string& bld_name = building->PublicName(client_empire_id, universe);
                 sorted_entries_list.emplace(
                     bld_name,
-                    std::make_pair(LinkTaggedIDText(VarText::BUILDING_ID_TAG, building->ID(), bld_name) + "  ",
-                                   std::to_string(building->ID())));
+                    std::pair{LinkTaggedIDText(VarText::BUILDING_ID_TAG, building->ID(), bld_name).append("  "),
+                              std::to_string(building->ID())});
             }
 
         }
         else if (dir_name == "ENC_SYSTEM") {
             for (auto& system : objects.all<System>()) {
-                const std::string& sys_name = system->ApparentName(client_empire_id);
+                const std::string& sys_name = system->ApparentName(client_empire_id, universe);
                 sorted_entries_list.emplace(
                     sys_name,
-                    std::make_pair(LinkTaggedIDText(VarText::SYSTEM_ID_TAG, system->ID(), sys_name) + "  ",
-                                   std::to_string(system->ID())));
+                    std::pair{LinkTaggedIDText(VarText::SYSTEM_ID_TAG, system->ID(), sys_name).append("  "),
+                              std::to_string(system->ID())});
             }
 
         }
@@ -461,8 +464,8 @@ namespace {
                 const std::string& field_name = field->Name();
                 sorted_entries_list.emplace(
                     field_name,
-                    std::make_pair(LinkTaggedIDText(VarText::FIELD_ID_TAG, field->ID(), field_name) + "  ",
-                                   std::to_string(field->ID())));
+                    std::pair{LinkTaggedIDText(VarText::FIELD_ID_TAG, field->ID(), field_name).append("  "),
+                              std::to_string(field->ID())});
             }
 
         }
@@ -470,8 +473,8 @@ namespace {
             for (const auto& stat_record : universe.GetStatRecords()) {
                 sorted_entries_list.emplace(
                     UserString(stat_record.first),
-                    std::make_pair(LinkTaggedText(TextLinker::GRAPH_TAG, stat_record.first) + "\n",
-                                   stat_record.first));
+                    std::pair{LinkTaggedText(TextLinker::GRAPH_TAG, stat_record.first).append("\n"),
+                              stat_record.first});
             }
 
         }
@@ -485,7 +488,7 @@ namespace {
                      tex_name);
                  sorted_entries_list.emplace(
                      tex_name,
-                     std::pair(std::move(texture_info_str), tex_name));
+                     std::pair{std::move(texture_info_str), tex_name});
              }
 
              for (auto& [tex_name, tex] : GG::GetVectorTextureManager().Textures()) {
@@ -1494,22 +1497,19 @@ namespace {
 
         if (!unlocked_items.empty()) {
             for (const UnlockableItem& item : unlocked_items) {
-                std::string TAG;
-                switch (item.type) {
-                case UnlockableItemType::UIT_BUILDING:    TAG = VarText::BUILDING_TYPE_TAG;     break;
-                case UnlockableItemType::UIT_SHIP_PART:   TAG = VarText::SHIP_PART_TAG;         break;
-                case UnlockableItemType::UIT_SHIP_HULL:   TAG = VarText::SHIP_HULL_TAG;         break;
-                case UnlockableItemType::UIT_SHIP_DESIGN: TAG = VarText::PREDEFINED_DESIGN_TAG; break;
-                case UnlockableItemType::UIT_TECH:        TAG = VarText::TECH_TAG;              break;
-                case UnlockableItemType::UIT_POLICY:      TAG = VarText::POLICY_TAG;            break;
-                default: break;
-                }
+                auto& TAG = [type{item.type}]() -> const std::string& {
+                    switch (type) {
+                    case UnlockableItemType::UIT_BUILDING:    return VarText::BUILDING_TYPE_TAG;     break;
+                    case UnlockableItemType::UIT_SHIP_PART:   return VarText::SHIP_PART_TAG;         break;
+                    case UnlockableItemType::UIT_SHIP_HULL:   return VarText::SHIP_HULL_TAG;         break;
+                    case UnlockableItemType::UIT_SHIP_DESIGN: return VarText::PREDEFINED_DESIGN_TAG; break;
+                    case UnlockableItemType::UIT_TECH:        return VarText::TECH_TAG;              break;
+                    case UnlockableItemType::UIT_POLICY:      return VarText::POLICY_TAG;            break;
+                    default:                                  return EMPTY_STRING;
+                    }
+                }();
 
-                std::string link_text;
-                if (!TAG.empty())
-                    link_text = LinkTaggedText(TAG, item.name);
-                else
-                    link_text = UserString(item.name);
+                std::string link_text = TAG.empty() ? UserString(item.name) : LinkTaggedText(TAG, item.name);
 
                 detailed_description += str(FlexibleFormat(UserString("ENC_TECH_DETAIL_UNLOCKED_ITEM_STR"))
                     % UserString(boost::lexical_cast<std::string>(item.type))
@@ -1900,7 +1900,7 @@ namespace {
                 auto&& fleet_link = LinkTaggedIDText(VarText::FLEET_ID_TAG, obj->ID(),
                                                      obj->PublicName(client_empire_id, universe));
                 if (auto system = objects.get<System>(obj->SystemID()).get()) {
-                    auto& sys_name = system->ApparentName(client_empire_id);
+                    auto& sys_name = system->ApparentName(client_empire_id, universe);
                     auto&& system_link = LinkTaggedIDText(VarText::SYSTEM_ID_TAG, system->ID(), sys_name);
                     detailed_description += str(FlexibleFormat(UserString("OWNED_FLEET_AT_SYSTEM"))
                                             % fleet_link % system_link);
@@ -2470,6 +2470,7 @@ namespace {
         // use the current meter values here, not initial, as this is used
         // within a loop that sets the species, updates meter, then checks
         // meter values for display
+        const Universe& universe = GetUniverse();
 
         auto& species = ship->SpeciesName().empty() ? "Generic" : UserString(ship->SpeciesName());
         float structure = ship->GetMeter(MeterType::METER_MAX_STRUCTURE)->Current();
@@ -2489,11 +2490,11 @@ namespace {
             % ship->GetMeter(MeterType::METER_STEALTH)->Current()
             % ship->GetMeter(MeterType::METER_SPEED)->Current()
             % ship->GetMeter(MeterType::METER_MAX_FUEL)->Current()
-            % ship->SumCurrentPartMeterValuesForPartClass(MeterType::METER_CAPACITY, ShipPartClass::PC_COLONY)
-            % ship->SumCurrentPartMeterValuesForPartClass(MeterType::METER_CAPACITY, ShipPartClass::PC_TROOPS)
+            % ship->SumCurrentPartMeterValuesForPartClass(MeterType::METER_CAPACITY, ShipPartClass::PC_COLONY, universe)
+            % ship->SumCurrentPartMeterValuesForPartClass(MeterType::METER_CAPACITY, ShipPartClass::PC_TROOPS, universe)
             % ship->FighterMax()
-            % (attack - ship->TotalWeaponsShipDamage(0.0f, false)) // FIXME TotalWeaponsFighterDamage 
-            % ship->SumCurrentPartMeterValuesForPartClass(MeterType::METER_MAX_CAPACITY, ShipPartClass::PC_FIGHTER_BAY)
+            % (attack - ship->TotalWeaponsShipDamage(0.0f, false)) // FIXME TotalWeaponsFighterDamage
+            % ship->SumCurrentPartMeterValuesForPartClass(MeterType::METER_MAX_CAPACITY, ShipPartClass::PC_FIGHTER_BAY, universe)
             % strength
             % (strength / cost)
             % typical_shot
@@ -2516,15 +2517,16 @@ namespace {
             ErrorLogger() << "RefreshDetailPanelShipDesignTag couldn't convert name to design ID: " << item_name;
             return;
         }
-        const ShipDesign* design = GetUniverse().GetShipDesign(design_id);
+        int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+        Universe& universe = GetUniverse();
+        ObjectMap& objects = universe.Objects();
+
+        const ShipDesign* design = universe.GetShipDesign(design_id);
         if (!design) {
             ErrorLogger() << "RefreshDetailPanelShipDesignTag couldn't find ShipDesign with id " << item_name;
             return;
         }
 
-        int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-        Universe& universe = GetUniverse();
-        ObjectMap& objects = universe.Objects();
 
         universe.InhibitUniverseObjectSignals(true);
 
@@ -2588,7 +2590,7 @@ namespace {
                     enemy_DR = this_ship->GetMeter(MeterType::METER_MAX_SHIELD)->Initial();
                     DebugLogger() << "Using selected ship for enemy values, DR: " << enemy_DR;
                     enemy_shots.clear();
-                    auto this_damage = this_ship->AllWeaponsMaxShipDamage(); // FIXME FighterDamage
+                    auto this_damage = this_ship->AllWeaponsMaxShipDamage(universe); // FIXME FighterDamage
                     for (float shot : this_damage)
                         DebugLogger() << "Weapons Dmg " << shot;
                     enemy_shots.insert(this_damage.begin(), this_damage.end());
@@ -2677,7 +2679,7 @@ namespace {
         EmpireManager& empires = Empires();
         ScriptingContext context{universe, empires, GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
 
-        GetUniverse().InhibitUniverseObjectSignals(true);
+        universe.InhibitUniverseObjectSignals(true);
 
 
         // incomplete design.  not yet in game universe; being created on design screen
@@ -2695,7 +2697,7 @@ namespace {
         cost_units = UserString("ENC_PP");
 
 
-        GetUniverse().InsertShipDesignID(new ShipDesign(*incomplete_design), client_empire_id, TEMPORARY_OBJECT_ID);
+        universe.InsertShipDesignID(new ShipDesign(*incomplete_design), client_empire_id, TEMPORARY_OBJECT_ID);
         detailed_description = GetDetailedDescriptionBase(incomplete_design.get());
 
         float tech_level = boost::algorithm::clamp(CurrentTurn() / 400.0f, 0.0f, 1.0f);
@@ -2723,7 +2725,7 @@ namespace {
                     enemy_DR = this_ship->GetMeter(MeterType::METER_MAX_SHIELD)->Initial();
                     DebugLogger() << "Using selected ship for enemy values, DR: " << enemy_DR;
                     enemy_shots.clear();
-                    auto this_damage = this_ship->AllWeaponsMaxShipDamage(); // FIXME MaxFighterDamage
+                    auto this_damage = this_ship->AllWeaponsMaxShipDamage(universe); // FIXME: MaxFighterDamage
                     for (float shot : this_damage)
                         DebugLogger() << "Weapons Dmg " << shot;
                     enemy_shots.insert(this_damage.begin(), this_damage.end());
@@ -2804,8 +2806,8 @@ namespace {
         }
     }
 
-    std::unordered_set<std::string> ReportedSpeciesForPlanet(Planet& planet) {
-        std::unordered_set<std::string> retval;
+    std::vector<std::string_view> ReportedSpeciesForPlanet(Planet& planet) {
+        std::vector<std::string_view> retval;
 
         const ObjectMap& objects = Objects();
         const SpeciesManager& species_manager = GetSpeciesManager();
@@ -2821,13 +2823,12 @@ namespace {
         // Collect species colonizing/environment hospitality information
         // start by building roster-- any species tagged as 'ALWAYS_REPORT' plus any species
         // represented in this empire's PopCenters
-        for (const auto& entry : species_manager) { // TODO: [[]]
-            if (!entry.second)
+        for (auto& [species_str, species] : species_manager) {
+            if (!species)
                 continue;
-            const std::string& species_str = entry.first;
-            const auto& species_tags = entry.second->Tags();
+            const auto& species_tags = species->Tags();
             if (species_tags.count(TAG_ALWAYS_REPORT)) {
-                retval.insert(species_str);
+                retval.push_back(species_str);
                 continue;
             }
             // Add extinct species if their tech is known
@@ -2844,7 +2845,7 @@ namespace {
                     const auto& tech_tags = tech->Tags();
                     if (tech_tags.count(species_str) && tech_tags.count(TAG_EXTINCT)) {
                         // Add the species and exit loop
-                        retval.insert(species_str);
+                        retval.push_back(species_str);
                         break;
                     }
                 }
@@ -2856,7 +2857,7 @@ namespace {
                 continue;
 
             const std::string& species_name = pop_center->SpeciesName();
-            if (species_name.empty())
+            if (species_name.empty() || std::find(retval.begin(), retval.end(), species_name) != retval.end())
                 continue;
 
             const Species* species = species_manager.GetSpecies(species_name);
@@ -2868,18 +2869,19 @@ namespace {
             // their own planet allows comparison vs other races, which might
             // be better suited to this planet. 
             if (species->CanColonize() || species_name == planet_current_species)
-                retval.insert(species_name);
+                retval.push_back(species_name);
         }
 
         return retval;
     }
 
-    std::multimap<float, std::pair<std::string, PlanetEnvironment>>
-        SpeciesEnvByTargetPop(std::shared_ptr<Planet>& planet, const std::unordered_set<std::string>& species_names)
+    std::multimap<float, std::pair<std::string_view, PlanetEnvironment>>
+        SpeciesEnvByTargetPop(const std::shared_ptr<Planet>& planet,
+                              const std::vector<std::string_view>& species_names)
     {
-        std::multimap<float, std::pair<std::string, PlanetEnvironment>> retval;
+        std::multimap<float, std::pair<std::string_view, PlanetEnvironment>> retval;
 
-        if (species_names.empty())
+        if (species_names.empty() || !planet)
             return retval;
 
         // store original state of planet
@@ -2902,7 +2904,7 @@ namespace {
             // NOTE: Overridding current or initial value of MeterType::METER_TARGET_POPULATION prior to update
             //       results in incorrect estimates for at least effects with a min target population of 0
             try {
-                planet->SetSpecies(species_name);
+                planet->SetSpecies(std::string{species_name});
                 planet->SetOwner(empire_id);
                 universe.ApplyMeterEffectsAndUpdateMeters(planet_id_vec, context, false);
             } catch (const std::exception& e) {
@@ -2953,11 +2955,17 @@ namespace {
         auto font = ClientUI::GetFont();
 
 #if defined(__cpp_lib_char8_t)
-        std::u8string hair_space_chars{u8"\u200A"};
-        std::string hair_space_str{hair_space_chars.begin(), hair_space_chars.end()};
+        constexpr std::u8string_view hair_space_chars{u8"\u200A"};
+        static const std::string hair_space_str{hair_space_chars.begin(), hair_space_chars.end()};
+        DebugLogger() << "HairSpaceExtext with __cpp_lib_char8_t defined";
 #else
-        constexpr auto hair_space_str{ u8"\u200A"};
+        constexpr std::string_view hair_space_chars{u8"\u200A"};
+        static const std::string hair_space_str{hair_space_chars};
+        DebugLogger() << "HairSpaceExtext without __cpp_lib_char8_t defined";
 #endif
+        DebugLogger() << "hair_space_str: " << hair_space_str << " valid UTF8?: "
+                      << utf8::is_valid(hair_space_str.begin(), hair_space_str.end());
+
         try {
             auto elems = font->ExpensiveParseFromTextToTextElements(hair_space_str, format);
             auto lines = font->DetermineLines(hair_space_str, format, GG::X(1 << 15), elems);
@@ -2968,10 +2976,10 @@ namespace {
         return retval;
     }
 
-    std::unordered_map<std::string, std::string> SpeciesSuitabilityColumn1(
-        const std::unordered_set<std::string>& species_names)
+    std::unordered_map<std::string_view, std::string> SpeciesSuitabilityColumn1(
+        const std::vector<std::string_view>& species_names)
     {
-        std::unordered_map<std::string, std::string> retval;
+        std::unordered_map<std::string_view, std::string> retval;
         auto font = ClientUI::GetFont();
 
         for (const auto& species_name : species_names) {
@@ -2985,8 +2993,8 @@ namespace {
 
         // determine widest column, storing extents of each row for later alignment
         GG::Flags<GG::TextFormat> format = GG::FORMAT_NONE;
-        GG::X longest_width { 0 };
-        std::unordered_map<std::string, GG::Pt> column1_species_extents;
+        GG::X longest_width{0};
+        std::unordered_map<std::string_view, GG::Pt> column1_species_extents;
         for (auto& [species_name, formatted_col1] : retval) {
             std::vector<std::shared_ptr<GG::Font::TextElement>> text_elements;
             try {
@@ -3016,7 +3024,7 @@ namespace {
             constexpr auto hair_space_str{u8"\u200A"};
 #endif
 
-            for (auto& it : retval) {
+            for (auto& it : retval) { // TODO [[]]
                 if (column1_species_extents.count(it.first) != 1) {
                     ErrorLogger() << "No column1 extent stored for " << it.first;
                     continue;
@@ -3083,6 +3091,8 @@ namespace {
                                           std::string& specific_type, std::string& detailed_description,
                                           GG::Clr& color)
     {
+        ScopedTimer suitability_timer{"RefreshDetailPanelSuitabilityTag"};
+
         general_type = UserString("SP_PLANET_SUITABILITY");
 
         Universe& universe = GetUniverse();
@@ -3107,9 +3117,9 @@ namespace {
         try {
             name = planet->PublicName(planet_id, universe);
 
-            auto species_names = ReportedSpeciesForPlanet(*planet);
-            auto target_population_species = SpeciesEnvByTargetPop(planet, species_names);
-            auto species_suitability_column1 = SpeciesSuitabilityColumn1(species_names);
+            const auto species_names = ReportedSpeciesForPlanet(*planet);
+            const auto target_population_species = SpeciesEnvByTargetPop(planet, species_names);
+            const auto species_suitability_column1 = SpeciesSuitabilityColumn1(species_names);
 
             bool positive_header_placed = false;
             bool negative_header_placed = false;
@@ -3287,7 +3297,7 @@ namespace {
         }
     }
 
-    void SearchPediaArticlesForWords(       std::string article_key,
+    void SearchPediaArticleForWords(        std::string article_key,
                                             std::string article_directory,
                                             std::pair<std::string, std::string> article_name_link,
                                             std::pair<std::string, std::string>& exact_match,
@@ -3433,14 +3443,14 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
                 idx,
                 search_desc
             ]() mutable {
-                SearchPediaArticlesForWords(article_key,
-                                            article_dir,
-                                            std::move(article_name_link),
-                                            emr, wmr, pmr, amr,
-                                            search_text,
-                                            words_in_search_text,
-                                            idx,
-                                            search_desc);
+                SearchPediaArticleForWords(article_key,
+                                           article_dir,
+                                           std::move(article_name_link),
+                                           emr, wmr, pmr, amr,
+                                           search_text,
+                                           words_in_search_text,
+                                           idx,
+                                           search_desc);
             });
     }
 

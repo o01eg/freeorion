@@ -24,6 +24,7 @@ class SitRepEntry;
 class EmpireManager;
 class ObjectMap;
 class Universe;
+class ScriptingContext;
 struct UniverseObjectVisitor;
 
 // The ID number assigned to temporary universe objects
@@ -129,12 +130,14 @@ public:
        this UniverseObject. */
     [[nodiscard]] virtual bool                ContainedBy(int object_id) const;
 
-    [[nodiscard]] std::set<int> VisibleContainedObjectIDs(int empire_id) const; ///< returns the subset of contained object IDs that is visible to empire with id \a empire_id
+    [[nodiscard]] std::set<int>               VisibleContainedObjectIDs(int empire_id) const; ///< returns the subset of contained object IDs that is visible to empire with id \a empire_id
 
     [[nodiscard]] const MeterMap&             Meters() const { return m_meters; }             ///< returns this UniverseObject's meters
     [[nodiscard]] const Meter*                GetMeter(MeterType type) const;                 ///< returns the requested Meter, or 0 if no such Meter of that type is found in this object
 
-    [[nodiscard]] Visibility                  GetVisibility(int empire_id) const; ///< returns the visibility status of this universe object relative to the input empire.
+    using EmpireIDtoObjectIDtoVisMap = std::map<int, std::map<int, Visibility>>; // duplicates Universe::EmpireObjectVisibilityMap
+    [[nodiscard]] Visibility                  GetVisibility(int empire_id, const EmpireIDtoObjectIDtoVisMap& v) const;
+    [[nodiscard]] Visibility                  GetVisibility(int empire_id, const Universe& u) const;
 
     /** Returns the name of this objectas it appears to empire \a empire_id .*/
     [[nodiscard]] virtual const std::string&  PublicName(int empire_id, const Universe& universe) const;
@@ -152,8 +155,8 @@ public:
       * \a empire_id (or all data if empire_id is ALL_EMPIRES) */
     virtual void    Copy(std::shared_ptr<const UniverseObject> copied_object, Universe&, int empire_id) = 0;
 
-    void            SetID(int id);                      ///< sets the ID number of the object to \a id
-    void            Rename(const std::string& name);    ///< renames this object to \a name     // TODO: by-value + move instead of const reference
+    void            SetID(int id);              ///< sets the ID number of the object to \a id
+    void            Rename(std::string name);   ///< renames this object to \a name
 
     /** moves this object by relative displacements x and y. */
     void            Move(double x, double y);
@@ -204,6 +207,14 @@ public:
     static constexpr int    INVALID_OBJECT_AGE = -(1 << 30) - 1;;   ///< the age returned by UniverseObject::AgeInTurns() if the current turn is INVALID_GAME_TURN, or if the turn on which an object was created is INVALID_GAME_TURN
     static constexpr int    SINCE_BEFORE_TIME_AGE = (1 << 30) + 1;  ///< the age returned by UniverseObject::AgeInTurns() if an object was created on turn BEFORE_FIRST_TURN
 
+    virtual ~UniverseObject() = default;
+
+    /** returns new copy of this UniverseObject, limited to only copy data that
+      * is visible to the empire with the specified \a empire_id as determined
+      * by the detection and visibility system.  Caller takes ownership of
+      * returned pointee. */
+    [[nodiscard]] virtual UniverseObject* Clone(Universe& universe, int empire_id = ALL_EMPIRES) const = 0;
+
 protected:
     friend class Universe;
     friend class ObjectMap;
@@ -212,16 +223,6 @@ protected:
     UniverseObject(std::string name, double x, double y);
 
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);
-
-public:
-    virtual ~UniverseObject() = default;
-
-protected:
-    /** returns new copy of this UniverseObject, limited to only copy data that
-      * is visible to the empire with the specified \a empire_id as determined
-      * by the detection and visibility system.  Caller takes ownership of
-      * returned pointee. */
-    [[nodiscard]] virtual UniverseObject* Clone(Universe& universe, int empire_id = ALL_EMPIRES) const = 0;
 
     void AddMeter(MeterType meter_type); ///< inserts a meter into object as the \a meter_type meter.  Should be used by derived classes to add their specialized meters to objects
     void Init();                         ///< adds stealth meter

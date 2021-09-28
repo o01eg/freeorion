@@ -136,7 +136,7 @@ public:
     void AddBuilding(int building_id);      ///< adds the building to the planet
     bool RemoveBuilding(int building_id);   ///< removes the building from the planet; returns false if no such building was found
 
-    void Conquer(int conquerer, EmpireManager& empires, ObjectMap& objects);    ///< Called during combat when a planet changes hands
+    void Conquer(int conquerer, EmpireManager& empires, Universe& universe);    ///< Called during combat when a planet changes hands
     bool Colonize(int empire_id, std::string species_name, double population);  ///< Called during colonization handling to do the actual colonizing
     void SetIsAboutToBeColonized(bool b);   ///< Called during colonization when a planet is about to be colonized
     void ResetIsAboutToBeColonized();       ///< Called after colonization, to reset the number of prospective colonizers to 0
@@ -161,17 +161,14 @@ public:
     Planet(PlanetType type, PlanetSize size);
     Planet() = default;
 
+    /** returns new copy of this Planet. */
+    [[nodiscard]] Planet* Clone(Universe& universe, int empire_id = ALL_EMPIRES) const override;
+
 private:
     friend class ObjectMap;
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);
 
-    /** returns new copy of this Planet. */
-    [[nodiscard]] Planet* Clone(Universe& universe, int empire_id = ALL_EMPIRES) const override;
-
     void Init();
-
-    [[nodiscard]] Visibility GetVisibility(int empire_id) const override
-    { return UniverseObject::GetVisibility(empire_id); }
 
     void AddMeter(MeterType meter_type) override
     { UniverseObject::AddMeter(meter_type); }

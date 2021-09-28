@@ -172,7 +172,7 @@ namespace {
         retval += " | ";
 
         auto first = property_name.begin();
-        auto last = property_name.end();
+        const auto last = property_name.end();
         while (first != last) {
             std::string property_name_part = *first;
             retval += " " + property_name_part + " ";
@@ -1086,7 +1086,8 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     else if (property_name == "NearestSystemID") {
         if (object->SystemID() != INVALID_OBJECT_ID)
             return object->SystemID();
-        return GetUniverse().GetPathfinder()->NearestSystemTo(object->X(), object->Y(), context.ContextObjects());  // TODO: Get PathFinder from ScriptingContext
+        return context.ContextUniverse().GetPathfinder()->NearestSystemTo(
+            object->X(), object->Y(), context.ContextObjects());
 
     }
     else if (property_name == "NumShips") {
@@ -1488,7 +1489,13 @@ Visibility ComplexVariable<Visibility>::Eval(const ScriptingContext& context) co
                 return Visibility::VIS_NO_VISIBILITY;
         }
 
-        return GetUniverse().GetObjectVisibilityByEmpire(object_id, empire_id);
+        auto empire_it = context.empire_object_vis.find(empire_id);
+        if (empire_it == context.empire_object_vis.end())
+            return Visibility::VIS_NO_VISIBILITY;
+        auto obj_it = empire_it->second.find(object_id);
+        if (obj_it == empire_it->second.end())
+            return Visibility::VIS_NO_VISIBILITY;
+        return obj_it->second;
     }
 
     return Visibility::INVALID_VISIBILITY;
@@ -2155,7 +2162,8 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         if (m_int_ref2)
             object2_id = m_int_ref2->Eval(context);
 
-        return GetUniverse().GetPathfinder()->ShortestPathDistance(object1_id, object2_id, context.ContextObjects()); // TODO: Get PathFinder from ScriptingContext
+        return context.ContextUniverse().GetPathfinder()->ShortestPathDistance(
+            object1_id, object2_id, context.ContextObjects());
 
     }
     else if (variable_name == "SpeciesContentOpinion") {
@@ -2840,7 +2848,7 @@ std::string UserStringLookup<std::vector<std::string>>::Eval(const ScriptingCont
     if (ref_vals.empty())
         return "";
     std::string retval;
-    for (auto val : ref_vals) {
+    for (auto& val : ref_vals) {
         if (val.empty() || !UserStringExists(val))
             continue;
         retval += UserString(val) + " ";

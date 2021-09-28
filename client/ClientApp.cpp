@@ -54,7 +54,7 @@ SpeciesManager& ClientApp::GetSpeciesManager()
 const SpeciesManager& ClientApp::GetSpeciesManager() const
 { return m_species_manager; }
 
-Species* ClientApp::GetSpecies(const std::string& name)
+const Species* ClientApp::GetSpecies(const std::string& name)
 { return m_species_manager.GetSpecies(name); }
 
 SupplyManager& ClientApp::GetSupplyManager()
@@ -141,7 +141,7 @@ std::string ClientApp::GetVisibleObjectName(std::shared_ptr<const UniverseObject
 
     std::string name_text;
     if (auto system = std::dynamic_pointer_cast<const System>(object))
-        name_text = system->ApparentName(m_empire_id);
+        name_text = system->ApparentName(m_empire_id, m_universe);
     else
         name_text = object->PublicName(m_empire_id, m_universe);
 

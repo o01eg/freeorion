@@ -54,11 +54,11 @@ Empire::Empire(std::string name, std::string player_name,
     m_id(empire_id),
     m_name(std::move(name)),
     m_player_name(std::move(player_name)),
-    m_authenticated(authenticated),
     m_color(color),
     m_research_queue(m_id),
     m_production_queue(m_id),
-    m_influence_queue(m_id)
+    m_influence_queue(m_id),
+    m_authenticated(authenticated)
 {
     DebugLogger() << "Empire::Empire(" << m_name << ", " << m_player_name
                   << ", " << empire_id << ", colour)";
@@ -1296,11 +1296,9 @@ void Empire::RecordPendingLaneUpdate(int start_system_id, int dest_system_id, co
 }
 
 void Empire::UpdatePreservedLanes() {
-    for (auto& system : m_pending_system_exit_lanes) {
-        m_preserved_system_exit_lanes[system.first].insert(system.second.begin(), system.second.end());
-        system.second.clear();
-    }
-    m_pending_system_exit_lanes.clear(); // TODO: consider: not really necessary, & may be more efficient to not clear.
+    for (auto& system : m_pending_system_exit_lanes)
+        m_preserved_system_exit_lanes[system.first].merge(system.second); //insert(system.second.begin(), system.second.end());
+    m_pending_system_exit_lanes.clear();
 }
 
 const std::map<int, float>& Empire::SystemSupplyRanges() const
@@ -1375,7 +1373,7 @@ std::map<int, std::set<int>> Empire::VisibleStarlanes(const Universe& universe) 
             continue;
 
         // get system's visible lanes for this empire
-        for (auto& [other_end_id, is_wormhole] : sys->VisibleStarlanesWormholes(m_id)) {
+        for (auto& [other_end_id, is_wormhole] : sys->VisibleStarlanesWormholes(m_id, universe)) {
             if (is_wormhole)
                 continue;   // is a wormhole, not a starlane
             retval[start_id].insert(other_end_id);

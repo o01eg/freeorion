@@ -189,7 +189,7 @@ const std::string& Fleet::PublicName(int empire_id, const Universe& universe) co
         return UserString("FW_FOREIGN_FLEET");
     else if (Unowned() && HasMonsters(universe))
         return UserString("MONSTERS");
-    else if (Unowned() && GetVisibility(empire_id) > Visibility::VIS_NO_VISIBILITY)
+    else if (Unowned() && GetVisibility(empire_id, universe) > Visibility::VIS_NO_VISIBILITY)
         return UserString("FW_ROGUE_FLEET");
     else
         return UserString("OBJ_FLEET");
@@ -700,7 +700,7 @@ bool Fleet::HasColonyShips(const Universe& universe) const {
 bool Fleet::HasOutpostShips(const Universe& universe) const {
     auto isX = [&universe](const std::shared_ptr<const Ship>& ship) {
         if (const auto design = universe.GetShipDesign(ship->DesignID()))
-            if (design->ColonyCapacity() == 0.0f)
+            if (design->CanColonize() && design->ColonyCapacity() == 0.0f)
                 return true;
         return false;
     };
@@ -1250,8 +1250,7 @@ bool Fleet::BlockadedAtSystem(int start_system_id, int dest_system_id,
 
     auto empire = context.GetEmpire(this->Owner());
     if (empire) {
-        auto unobstructed_systems = empire->SupplyUnobstructedSystems();
-        if (unobstructed_systems.count(start_system_id))
+        if (empire->SupplyUnobstructedSystems().count(start_system_id))
             return false;
         if (empire->PreservedLaneTravel(start_system_id, dest_system_id)) {
             return false;
@@ -1417,7 +1416,7 @@ std::string Fleet::GenerateFleetName(const Universe& u, const SpeciesManager& sm
     // todo: rewrite with a lambda and store in a const string& to avoid copies...
     std::string fleet_name_key = UserStringNop("NEW_FLEET_NAME");
 
-    auto IsCombatShip = [&u, &sm](const auto& ship)
+    auto IsCombatShip = [&u](const auto& ship)
     { return ship.IsArmed(u) || ship.HasFighters(u) || ship.CanHaveTroops(u) || ship.CanBombard(u); };
 
     if (boost::algorithm::all_of(ships, [&u](const auto& ship){ return ship->IsMonster(u); }))

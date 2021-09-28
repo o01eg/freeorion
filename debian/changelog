@@ -1,3 +1,9 @@
+freeorion (0.4.10.9999.fo0017+git20210927.f3abe16ppa1~focal) focal; urgency=medium
+
+  * Update upstream.
+
+ -- O01eg <o01eg@yandex.ru>  Tue, 28 Sep 2021 13:56:14 +0000
+
 freeorion (0.4.10.9999.fo0017+git20210923.1104239ppa1~focal) focal; urgency=medium
 
   * FO0017

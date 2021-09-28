@@ -73,7 +73,7 @@ public:
     [[nodiscard]] float                       InitialPartMeterValue(MeterType type, const std::string& part_name) const;  ///< returns this turn's initial value for the specified part meter \a type for the specified part name
 
     /** Returns sum of current value for part meter @p type of all parts with ShipPartClass @p part_class */
-    [[nodiscard]] float                       SumCurrentPartMeterValuesForPartClass(MeterType type, ShipPartClass part_class) const;
+    [[nodiscard]] float                       SumCurrentPartMeterValuesForPartClass(MeterType type, ShipPartClass part_class, const Universe& universe) const;
 
     [[nodiscard]] float                       WeaponPartFighterDamage(const ShipPart* part, const ScriptingContext& context) const; ///< versus fighter enemies
     [[nodiscard]] float                       WeaponPartShipDamage(const ShipPart* part, const ScriptingContext& context) const; ///< versus an enemy context.effect_target ship with a given shields meter
@@ -88,7 +88,7 @@ public:
     [[nodiscard]] std::vector<float>          AllWeaponsShipDamage(float shield_DR = 0.0f, bool include_fighters = true) const;
     /** returns any nonzero weapons strengths after adjustment versus an enemy with a given @p shield_DR shield rating,
       * assuming the ship has been resupplied recently (i.e. this uses Max*Meters) */
-    [[nodiscard]] std::vector<float>          AllWeaponsMaxShipDamage(float shield_DR = 0.0f, bool include_fighters = true) const;
+    [[nodiscard]] std::vector<float>          AllWeaponsMaxShipDamage(const Universe& universe, float shield_DR = 0.0f, bool include_fighters = true) const;
 
     void            SetFleetID(int fleet_id);                                   ///< sets the ID of the fleet the ship resides in
     void            SetArrivedOnTurn(int turn);

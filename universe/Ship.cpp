@@ -91,7 +91,7 @@ Ship::Ship(int empire_id, int design_id, std::string species_name, int produced_
 }
 
 Ship* Ship::Clone(Universe& universe, int empire_id) const {
-    Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(this->ID(), empire_id);
+    Visibility vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
@@ -344,7 +344,7 @@ const std::string& Ship::PublicName(int empire_id, const Universe& universe) con
         return UserString("SM_MONSTER");
     else if (!Unowned())
         return UserString("FW_FOREIGN_SHIP");
-    else if (Unowned()/* && GetVisibility(empire_id) > Visibility::VIS_NO_VISIBILITY*/)
+    else if (Unowned() && GetVisibility(empire_id, universe) > Visibility::VIS_NO_VISIBILITY)
         return UserString("FW_ROGUE_SHIP");
     else
         return UserString("OBJ_SHIP");
@@ -387,10 +387,12 @@ float Ship::InitialPartMeterValue(MeterType type, const std::string& part_name) 
     return 0.0f;
 }
 
-float Ship::SumCurrentPartMeterValuesForPartClass(MeterType type, ShipPartClass part_class) const {
+float Ship::SumCurrentPartMeterValuesForPartClass(MeterType type, ShipPartClass part_class,
+                                                  const Universe& universe) const
+{
     float retval = 0.0f;
 
-    const ShipDesign* design = GetUniverse().GetShipDesign(m_design_id); // TODO: pass in ScriptingContext
+    const ShipDesign* design = universe.GetShipDesign(m_design_id);
     if (!design)
         return retval;
 
@@ -509,10 +511,10 @@ std::vector<float> Ship::AllWeaponsFighterDamage(bool launch_fighters) const
 std::vector<float> Ship::AllWeaponsShipDamage(float shield_DR, bool launch_fighters) const
 { return Combat::WeaponDamageImpl(std::static_pointer_cast<const Ship>(shared_from_this()), shield_DR, false, launch_fighters, true); }
 
-std::vector<float> Ship::AllWeaponsMaxShipDamage(float shield_DR, bool launch_fighters) const {
+std::vector<float> Ship::AllWeaponsMaxShipDamage(const Universe& universe, float shield_DR, bool launch_fighters) const {
     std::vector<float> retval;
 
-    const ShipDesign* design = GetUniverse().GetShipDesign(m_design_id); // TODO: pass in Scriptingcontext
+    const ShipDesign* design = universe.GetShipDesign(m_design_id);
     if (!design)
         return retval;
 

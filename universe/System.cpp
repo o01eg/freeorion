@@ -39,7 +39,7 @@ System::System(StarType star, const std::string& name, double x, double y) :
 }
 
 System* System::Clone(Universe& universe, int empire_id) const {
-    Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(this->ID(), empire_id);
+    Visibility vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
@@ -71,7 +71,7 @@ void System::Copy(std::shared_ptr<const UniverseObject> copied_object, Universe&
         }
 
         // add any visible lanes, without removing existing entries
-        std::map<int, bool> visible_lanes_holes = copied_system->VisibleStarlanesWormholes(empire_id);
+        std::map<int, bool> visible_lanes_holes = copied_system->VisibleStarlanesWormholes(empire_id, universe);
         for (const auto& entry : visible_lanes_holes)
             this->m_starlanes_wormholes[entry.first] = entry.second;
 
@@ -189,14 +189,15 @@ std::string System::Dump(unsigned short ntabs) const {
     return os.str();
 }
 
-const std::string& System::ApparentName(int empire_id, bool blank_unexplored_and_none/* = false*/) const {
+const std::string& System::ApparentName(int empire_id, const Universe& u,
+                                        bool blank_unexplored_and_none) const
+{
     static const std::string EMPTY_STRING;
 
-    const Universe& u = GetUniverse();
     const ObjectMap& o = u.Objects();
 
     if (empire_id == ALL_EMPIRES)
-        return this->PublicName(empire_id, u); // TODO: pass Universe into this function
+        return this->PublicName(empire_id, u);
 
     // has the indicated empire ever detected this system?
     const auto& vtm = u.GetObjectVisibilityTurnMapByEmpire(this->ID(), empire_id);
@@ -518,14 +519,11 @@ std::set<int> System::FreeOrbits() const {
 const std::map<int, bool>& System::StarlanesWormholes() const
 { return m_starlanes_wormholes; }
 
-std::map<int, bool> System::VisibleStarlanesWormholes(int empire_id) const {
+std::map<int, bool> System::VisibleStarlanesWormholes(int empire_id, const Universe& universe) const {
     if (empire_id == ALL_EMPIRES)
         return m_starlanes_wormholes;
 
-    const Universe& universe = GetUniverse(); // TODO: pass in
     const ObjectMap& objects = universe.Objects();
-
-
     Visibility this_system_vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     //visible starlanes are:

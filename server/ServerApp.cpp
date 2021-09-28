@@ -316,7 +316,7 @@ SupplyManager& ServerApp::GetSupplyManager()
 SpeciesManager& ServerApp::GetSpeciesManager()
 { return m_species_manager; }
 
-Species* ServerApp::GetSpecies(const std::string& name)
+const Species* ServerApp::GetSpecies(const std::string& name)
 { return m_species_manager.GetSpecies(name); }
 
 ObjectMap& ServerApp::EmpireKnownObjects(int empire_id)
@@ -1869,12 +1869,12 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
     // destroy owned ships
     for (auto& obj : m_universe.Objects().find<Ship>(OwnedVisitor(empire_id))) {
         obj->SetOwner(ALL_EMPIRES);
-        GetUniverse().RecursiveDestroy(obj->ID());
+        m_universe.RecursiveDestroy(obj->ID());
     }
     // destroy owned buildings
     for (auto& obj : m_universe.Objects().find<Building>(OwnedVisitor(empire_id))) {
         obj->SetOwner(ALL_EMPIRES);
-        GetUniverse().RecursiveDestroy(obj->ID());
+        m_universe.RecursiveDestroy(obj->ID());
     }
     // unclaim owned planets
     for (const auto& planet : planets)
@@ -3099,7 +3099,7 @@ namespace {
                 // if planet is unowned and victor is an empire, or if planet is
                 // owned by an empire that is not the victor, conquer it
                 if ((victor_id != ALL_EMPIRES) && (planet->Unowned() || !planet->OwnedBy(victor_id))) {
-                    planet->Conquer(victor_id, empires, objects);
+                    planet->Conquer(victor_id, empires, universe);
 
                     // create planet conquered sitrep for all involved empires
                     for (int empire_id : all_involved_empires) {
@@ -3114,7 +3114,7 @@ namespace {
 
                 } else if (!planet->Unowned() && victor_id == ALL_EMPIRES) {
                     int previous_owner_id = planet->Owner();
-                    planet->Conquer(ALL_EMPIRES, empires, objects);
+                    planet->Conquer(ALL_EMPIRES, empires, universe);
                     DebugLogger() << "Independents conquer planet";
                     for (const auto& empire_troops : empires_troops)
                         DebugLogger() << " empire: " << empire_troops.first << ": " << empire_troops.second;
@@ -3257,9 +3257,8 @@ namespace {
     }
 
     /** Destroys suitable objects that have been ordered scrapped.*/
-    void HandleScrapping() {
+    void HandleScrapping(Universe& universe, EmpireManager& empires) {
         std::vector<std::shared_ptr<Ship>> scrapped_ships;
-        Universe& universe{GetUniverse()};
         ObjectMap& objects{universe.Objects()};
 
         for (auto& ship : objects.all<Ship>()) {
@@ -3285,7 +3284,7 @@ namespace {
             }
 
             // record scrapping in empire stats
-            Empire* scrapping_empire = GetEmpire(ship->Owner());
+            auto scrapping_empire = empires.GetEmpire(ship->Owner());
             if (scrapping_empire)
                 scrapping_empire->RecordShipScrapped(*ship);
 
@@ -3308,7 +3307,7 @@ namespace {
                 system->Remove(building->ID());
 
             // record scrapping in empire stats
-            Empire* scrapping_empire = GetEmpire(building->Owner());
+            auto scrapping_empire = empires.GetEmpire(building->Owner());
             if (scrapping_empire)
                 scrapping_empire->RecordBuildingScrapped(*building);
 
@@ -3319,10 +3318,10 @@ namespace {
 
     /** Removes bombardment state info from objects. Actual effects of
       * bombardment are handled during */
-    void CleanUpBombardmentStateInfo() { // TODO pass in ObjectMap
-        for (auto& ship : GetUniverse().Objects().all<Ship>())
+    void CleanUpBombardmentStateInfo(ObjectMap& objects) {
+        for (auto& ship : objects.all<Ship>())
             ship->ClearBombardPlanet();
-        for (auto& planet : GetUniverse().Objects().all<Planet>()) {
+        for (auto& planet : objects.all<Planet>()) {
             if (planet->IsAboutToBeBombarded()) {
                 //DebugLogger() << "CleanUpBombardmentStateInfo: " << planet->Name() << " was about to be bombarded";
                 planet->ResetIsAboutToBeBombarded();
@@ -3378,7 +3377,7 @@ void ServerApp::PreCombatProcessTurns() {
 
     // clear bombardment state before executing orders, so result after is only
     // determined by what orders set.
-    CleanUpBombardmentStateInfo();
+    CleanUpBombardmentStateInfo(m_universe.Objects());
 
     // execute orders
     for (auto& [orders_empire_id, save_game_data] : m_turn_sequence) {
@@ -3429,7 +3428,7 @@ void ServerApp::PreCombatProcessTurns() {
     HandleGifting(m_empires, m_universe.Objects());
 
     DebugLogger() << "ServerApp::ProcessTurns scrapping";
-    HandleScrapping();
+    HandleScrapping(m_universe, m_empires);
 
 
     DebugLogger() << "ServerApp::ProcessTurns movement";
@@ -3477,7 +3476,7 @@ void ServerApp::PreCombatProcessTurns() {
             continue;
         // sitreps for all empires that can see fleet at new location
         for (auto& [empire_id, empire] : m_empires) {
-            if (fleet->GetVisibility(empire_id) >= Visibility::VIS_BASIC_VISIBILITY)
+            if (fleet->GetVisibility(empire_id, m_universe) >= Visibility::VIS_BASIC_VISIBILITY)
                 empire->AddSitRepEntry(
                     CreateFleetArrivedAtDestinationSitRep(fleet->SystemID(), fleet->ID(), empire_id));
 

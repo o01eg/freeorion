@@ -106,7 +106,7 @@ namespace {
             const auto [eta_final, eta_next] = fleet->ETA(context);
 
             // name of final destination
-            std::string dest_name = dest_sys->ApparentName(client_empire_id);
+            std::string dest_name = dest_sys->ApparentName(client_empire_id, context.ContextUniverse());
             if (GetOptionsDB().Get<bool>("ui.name.id.shown"))
                 dest_name += " (" + std::to_string(dest_sys->ID()) + ")";
 
@@ -146,7 +146,7 @@ namespace {
             }
 
         } else if (cur_sys) {
-            std::string cur_system_name = cur_sys->ApparentName(client_empire_id);
+            std::string cur_system_name = cur_sys->ApparentName(client_empire_id, context.ContextUniverse());
             if (GetOptionsDB().Get<bool>("ui.name.id.shown")) {
                 cur_system_name = cur_system_name + " (" + std::to_string(cur_sys->ID()) + ")";
             }
@@ -739,11 +739,14 @@ namespace {
         m_ship_icon_overlays.clear();
         DetachChildAndReset(m_scanline_control);
 
-        auto ship = Objects().get<Ship>(m_ship_id);
+        const Universe& universe = GetUniverse();
+        const ObjectMap& objects = universe.Objects();
+
+        auto ship = objects.get<Ship>(m_ship_id);
         if (!ship)
             return;
 
-        const ShipDesign* design = GetUniverse().GetShipDesign(ship->DesignID());
+        const ShipDesign* design = universe.GetShipDesign(ship->DesignID());
         auto icon{ClientUI::ShipDesignIcon(design ? design->ID() : INVALID_OBJECT_ID)};
 
         m_ship_icon = GG::Wnd::Create<GG::StaticGraphic>(std::move(icon), DataPanelIconStyle());
@@ -771,7 +774,7 @@ namespace {
             add_overlay("bombarding.png");
 
         int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-        if ((ship->GetVisibility(client_empire_id) < Visibility::VIS_BASIC_VISIBILITY)
+        if ((ship->GetVisibility(client_empire_id, universe) < Visibility::VIS_BASIC_VISIBILITY)
             && GetOptionsDB().Get<bool>("ui.map.scanlines.shown"))
         {
             m_scanline_control = GG::Wnd::Create<ScanlineControl>(
@@ -1483,7 +1486,7 @@ void FleetDataPanel::Refresh() {
         if (fleet->OrderedGivenToEmpire() != ALL_EMPIRES && fleet->TravelRoute().empty())
             add_overlay("gifting.png");
 
-        if ((fleet->GetVisibility(client_empire_id) < Visibility::VIS_BASIC_VISIBILITY)
+        if ((fleet->GetVisibility(client_empire_id, u) < Visibility::VIS_BASIC_VISIBILITY)
             && GetOptionsDB().Get<bool>("ui.map.scanlines.shown"))
         {
             m_scanline_control = GG::Wnd::Create<ScanlineControl>(GG::X0, GG::Y0, DataPanelIconSpace().x, ClientHeight(), true,
@@ -1755,7 +1758,7 @@ void FleetDataPanel::Init() {
             boost::bind(&FleetDataPanel::ToggleAggression, this));
 
     } else if (auto fleet = Objects().get<Fleet>(m_fleet_id)) {
-        std::vector<std::tuple<MeterType, std::shared_ptr<GG::Texture>, std::string>> meters_icons_browsetext{
+        std::vector<std::tuple<MeterType, std::shared_ptr<GG::Texture>, const char*>> meters_icons_browsetext{
             {MeterType::METER_SIZE,           FleetCountIcon(),                                "FW_FLEET_COUNT_SUMMARY"},
             {MeterType::METER_CAPACITY,       DamageIcon(),                                    "FW_FLEET_DAMAGE_SUMMARY"},
             {MeterType::METER_MAX_CAPACITY,   DestroyIcon(), /* number of destroyed fighters */"FW_FLEET_DESTROY_SUMMARY"},
@@ -1795,7 +1798,8 @@ void FleetDataPanel::Init() {
         }
 
         int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-        if (fleet->OwnedBy(client_empire_id) || fleet->GetVisibility(client_empire_id) >= Visibility::VIS_FULL_VISIBILITY) {
+        const Universe& u = GetUniverse();
+        if (fleet->OwnedBy(client_empire_id) || fleet->GetVisibility(client_empire_id, u) >= Visibility::VIS_FULL_VISIBILITY) {
             m_aggression_toggle = Wnd::Create<CUIButton>(
                 GG::SubTexture(FleetAggressiveIcon()),
                 GG::SubTexture(FleetPassiveIcon()),
@@ -3460,7 +3464,7 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, con
     std::set<int> peaceful_empires_in_system;
     if (system) {
         for (auto& obj : o.find<const UniverseObject>(system->ObjectIDs())) {
-            if (obj->GetVisibility(client_empire_id) < Visibility::VIS_PARTIAL_VISIBILITY)
+            if (obj->GetVisibility(client_empire_id, u) < Visibility::VIS_PARTIAL_VISIBILITY)
                 continue;
             if (obj->Owner() == client_empire_id || obj->Unowned())
                 continue;
@@ -3737,14 +3741,15 @@ int FleetWnd::FleetInRow(GG::ListBox::iterator it) const {
 }
 
 namespace {
-    std::string SystemNameNearestToFleet(int client_empire_id, int fleet_id, const ObjectMap& objects) {
+    std::string SystemNameNearestToFleet(int client_empire_id, int fleet_id, const Universe& u) {
+        const ObjectMap& objects{u.Objects()};
         auto fleet = objects.get<Fleet>(fleet_id);
         if (!fleet)
             return "";
 
-        int nearest_system_id(GetUniverse().GetPathfinder()->NearestSystemTo(fleet->X(), fleet->Y(), objects));
+        int nearest_system_id(u.GetPathfinder()->NearestSystemTo(fleet->X(), fleet->Y(), objects));
         if (auto system = objects.get<System>(nearest_system_id))
-            return system->ApparentName(client_empire_id);
+            return system->ApparentName(client_empire_id, u);
         return "";
     }
 }
@@ -3753,15 +3758,18 @@ std::string FleetWnd::TitleText() const {
     // if no fleets available, default to indicating no fleets
     if (m_fleet_ids.empty())
         return UserString("FW_NO_FLEET");
+    const Universe& u{GetUniverse()};
+    const ObjectMap& objects{u.Objects()};
+    const EmpireManager& empires{Empires()};
 
     int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
     // at least one fleet is available, so show appropriate title this
     // FleetWnd's empire and system
-    const Empire* empire = GetEmpire(m_empire_id);
+    auto empire = empires.GetEmpire(m_empire_id);
 
-    if (auto system = Objects().get<System>(m_system_id)) {
-        const std::string& sys_name = system->ApparentName(client_empire_id);
+    if (auto system = objects.get<System>(m_system_id)) {
+        const std::string& sys_name = system->ApparentName(client_empire_id, u);
         return (empire
                 ? boost::io::str(FlexibleFormat(UserString("FW_EMPIRE_FLEETS_AT_SYSTEM")) %
                                  empire->Name() % sys_name)
@@ -3769,7 +3777,7 @@ std::string FleetWnd::TitleText() const {
                                  sys_name));
     }
 
-    const std::string sys_name = SystemNameNearestToFleet(client_empire_id, *m_fleet_ids.begin(), Objects());
+    std::string sys_name = SystemNameNearestToFleet(client_empire_id, *m_fleet_ids.begin(), u);
     if (!sys_name.empty()) {
         return (empire
                 ? boost::io::str(FlexibleFormat(UserString("FW_EMPIRE_FLEETS_NEAR_SYSTEM")) %

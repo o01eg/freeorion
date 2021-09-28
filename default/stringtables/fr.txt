@@ -532,13 +532,13 @@ SD_COLONY_SHIP
 Colon Galactique
 
 SD_COLONY_SHIP_DESC
-Astronef non-armé [[SHIPDESIGN_MILLIONS_COLONIZATION_CAPACITY]]. [[MIN_POPULATION_THREE_REQUIRED]], et disposant d'un [[buildingtype BLD_SHIPYARD_BASE]].
+Astronef non-armé [[SHIPDESIGN_MILLIONS_COLONIZATION_CAPACITY]]. [[MIN_POPULATION_REQUIRED]], et disposant d'un [[buildingtype BLD_SHIPYARD_BASE]].
 
 SD_CRYONIC_COLONY_SHIP
 Colon Galactique Cryogenic
 
 SD_CRYONIC_COLONY_SHIP_DESC
-Astronef non-armé [[SHIPDESIGN_MANY_MILLIONS_COLONIZATION_CAPACITY]]. [[MIN_POPULATION_THREE_REQUIRED]], et disposant d'un [[buildingtype BLD_SHIPYARD_BASE]].
+Astronef non-armé [[SHIPDESIGN_MANY_MILLIONS_COLONIZATION_CAPACITY]]. [[MIN_POPULATION_REQUIRED]], et disposant d'un [[buildingtype BLD_SHIPYARD_BASE]].
 
 SD_OUTPOST_SHIP
 Bâtisseur Galactique
@@ -556,13 +556,13 @@ SD_COLONY_BASE
 Colon Stellaire
 
 SD_COLONY_BASE_DESC
-Astronef non-armé pouvant créer une [[SHIPDESIGN_COLONIZATION_CAPACITY_SAME_SYSTEM]]. [[MIN_POPULATION_THREE_REQUIRED]]. [[SHIPDESIGN_NO_TRAVEL]]
+Astronef non-armé pouvant créer une [[SHIPDESIGN_COLONIZATION_CAPACITY_SAME_SYSTEM]]. [[MIN_POPULATION_REQUIRED]]. [[SHIPDESIGN_NO_TRAVEL]]
 
 SD_CRYONIC_COLONY_BASE
 Colon Stellaire Cryogenic
 
 SD_CRYONIC_COLONY_BASE_DESC
-Astronef non-armé pouvant créer une large [[SHIPDESIGN_COLONIZATION_CAPACITY_SAME_SYSTEM]]. [[MIN_POPULATION_THREE_REQUIRED]]. [[SHIPDESIGN_NO_TRAVEL]]
+Astronef non-armé pouvant créer une large [[SHIPDESIGN_COLONIZATION_CAPACITY_SAME_SYSTEM]]. [[MIN_POPULATION_REQUIRED]]. [[SHIPDESIGN_NO_TRAVEL]]
 
 SD_OUTPOST_BASE
 Bâtisseur Stellaire
@@ -903,13 +903,13 @@ FLD_NANITE_SWARM
 Essaim Nanorobotique
 
 FLD_NANITE_SWARM_DESC
-Un essaim composé d'anciennes particules nanorobotiques se fixant automatiquement aux coques des astronefs, et restaurant la [[metertype METER_STRUCTURE]] d'un astronef de [[value FLD_NANITE_SWARM_STRUCTURE_FLAT]] par tour. La récolte de ces particules permet d'augmenter l'[[metertype METER_INDUSTRY]] de [[value FLD_NANITE_SWARM_TARGET_INDUSTRY_FLAT]] par tour et par astronef se trouvant dans l'essaim.
+Un essaim composé d'anciens nanorobots se fixant automatiquement aux coques des astronefs et tentant de les réparer. La [[metertype METER_STRUCTURE]] d'un astronef augmente d'une valeur de [[value FLD_NANITE_SWARM_STRUCTURE_FLAT]] par tour, répartie de manière égale entre chaque astronef se trouvant dans l'essaim.
 
 FLD_METEOR_BLIZZARD
 Blizzard Météoritique
 
 FLD_METEOR_BLIZZARD_DESC
-Apparition mystérieuse et mystique de météores. Génère une unité de [[metertype METER_RESEARCH]] par astronef du fait de l'observation scientifique du phénomène.
+Conglomération anormale de météores à forte attraction. Génère de la [[metertype METER_RESEARCH]] pour tous les astronefs étant pris dans le blizzard et pouvant observer le phénomène.
 
 FLD_VOID_RIFT
 Faille du Vide
@@ -1190,6 +1190,12 @@ Ajustement Coût des Technologies
 RULE_TECH_COST_FACTOR_DESC
 Définit les coûts des technologies
 
+RULE_SINGULARITY_COST_FACTOR
+Variation coût [[LRN_TRANSCEND]]
+
+RULE_SINGULARITY_COST_FACTOR_DESC
+Ajuste les coûts des technologies de [[LRN_TRANSCEND]]
+
 RULE_ENABLE_EXPERIMENTORS
 Activer Expérimentateurs
 
@@ -1230,7 +1236,7 @@ RULE_ALL_OBJECTS_VISIBLE
 Tous les Objets visibles
 
 RULE_ALL_OBJECTS_VISIBLE_DESC
-Tous les systèmes, planètes, structures, flottes, astronefs, et régions interstellaires peuvent être détectés par les empires à au moins un niveau de visibilité partielle.
+Tous les systèmes, planètes, structures, flottes, astronefs, et milieux interstellaires peuvent être détectés par les empires à au moins un niveau de visibilité partielle.
 
 RULE_ALL_SYSTEMS_VISIBLE
 Tous les Systèmes visibles
@@ -1330,6 +1336,22 @@ Toutes interdites
 ##
 ## Command-line and options database entries
 ##
+
+COMMAND_LINE_HELP_GENERAL_DESCRIPTION
+'''FreeOrion est un jeu de Stratégie Spatiale 4X.
+
+Des options et paramètres en ligne de commande peuvent être spécifiés pour définir la façon dont le programme fonctionne.
+
+Ceux-ci sont groupés et peuvent être listés en démarrant le fichier binaire avec le paramètre "-h" ou "--help", suivi du nom du groupe d'options.
+
+Par exemple, pour afficher les options relatives au réseau:
+freeorion --help network
+
+Les options peuvent avoir un paramètre sous forme abrégée, comme "-h" au lieu de "--help".
+
+Les options n'ayant pas de forme abrégée doivent avoir un paramètre appliqué après leur nom, pour définir cette option selon la valeur indiquée, comme:
+freeorion --network.discovery.port 123
+'''
 
 COMMAND_LINE_NOT_FOUND
 Aucune option ou section correspondante trouvée
@@ -2095,6 +2117,12 @@ Spécifie le nombre de threads simultanés pour le rendu des effets concernant l
 
 OPTIONS_DB_EFFECTS_THREADS_SERVER_DESC
 Spécifie le nombre de threads simultanés pour le rendu des effets côté serveur. Plus d'un thread peut mener à des plantages inopinés.
+
+OPTIONS_DB_UI_SIDEPANEL_OPEN_METER_UPDATE
+Effectue une mise à jour des indicateurs / effets lors de l'ouverture du panneau latéral dans un nouveau système. Peut causer un court ralentissement de l'interface utilisateur durant le processus.
+
+OPTIONS_DB_UI_OBJECT_CHANGED_METER_UPDATE
+Effectue une mise à jour des indicateurs / effets lorsque l'état d'un objet change. Peut causer un court ralentissement de l'interface utilisateur durant le processus une fois l'ordre émis.
 
 OPTIONS_DB_AUTO_QUIT
 Quitter automatiquement une fois au tour spécifié par --auto-advance-n-turns (valeur défaut à zéro), utile pour le débogage notamment avec --quickstart ou --load.
@@ -3302,6 +3330,12 @@ Threads de rendu d'effets (IAs)
 OPTIONS_EFFECTS_THREADS_SERVER
 Threads de rendu d'effets (serveur)
 
+OPTIONS_UI_SIDEPANEL_OPEN_METER_UPDATE
+Mise à jour indicateurs quand ouverture panneau latéral
+
+OPTIONS_UI_OBJECT_CHANGED_METER_UPDATE
+Mise à jour indicateurs quand changement d'un objet
+
 OPTIONS_DB_UI_EFFECTS_MOVE_TEST
 Test / modificateur moteur interne: Utilise des redirections de pointeurs, au lieu d'appels de conteneurs de pointeurs, lors de l'évaluation des conditions.
 
@@ -3804,6 +3838,12 @@ TT_CHANGE
 TT_BREAKDOWN_SUMMARY
 %1% : %2%
 
+# %1% the number bouts per battle
+# %2% the total estimate of structure damage
+# %3% the total estimate of destroyed fighters
+TT_DAMAGE_BREAKDOWN_SUMMARY
+Totaux pour un combat de %1% passes, Dommages: %2% / Chasseurs détruits: %3%
+
 TT_INHERENT
 Inhérent
 
@@ -4041,6 +4081,9 @@ Astronef Pirate
 SHIP_DAMAGE_STAT_TITLE
 Dommages
 
+SHIP_DESTRUCTION_STAT_TITLE
+Chasseurs détruits
+
 SHIP_TROOPS_TITLE
 Infanterie
 
@@ -4081,7 +4124,10 @@ FW_FLEET_STRUCTURE_SUMMARY
 Résistance Flotte - Égal à la somme des résistances des astronefs composant la Flotte.
 
 FW_FLEET_DAMAGE_SUMMARY
-Dommages Flotte - Égal à la somme des dommages directement infligés par les astronefs composant la Flotte.
+Dommages Flotte - Égal à la somme des dommages maximum infligés par les astronefs et chasseurs composant la Flotte.
+
+FW_FLEET_DESTROY_SUMMARY
+Destruction Chasseurs par Flotte - Égal à la somme des chasseurs détruits par les astronefs et chasseurs composant la Flotte.
 
 FW_FLEET_FIGHTER_SUMMARY
 Chasseurs Flotte - Égal au nombre total de chasseurs au sein de la Flotte.
@@ -4337,10 +4383,19 @@ Description
 ##
 
 POLICY_LOCKED
-Politique indisponible
+Politique indisponible mais demanderait %1% PI pour être appliquée.
 
 POLICY_ADOPTABLE_COST
 Politique applicable pour %1% PI
+
+POLICY_ADOPTED
+Politique appliquée. Aurait requis %1% PI si appliquée présentement.
+
+POLICY_ADOPTION_TIMES_CURRENT_AND_TOTAL
+Politique appliquée depuis %1% tours actuellement et %2% tours au total.
+
+POLICY_ADOPTION_TIME_TOTAL
+Politique non appliquée actuellement. A été appliquée pendant %2% tours au total.
 
 
 ##
@@ -4474,15 +4529,15 @@ Fenêtre Production
 PRODUCTION_WINDOW_ARTICLE_TEXT
 '''La Fenêtre Production est l'interface principale permettant l'utilisation des Points de Production (PP).
 Il est possible d'y accéder:
-*  Par une touche de raccourci (défaut: CTRL + P)
-*  En double-cliquant sur une planète
-*  En cliquant sur l'une des icônes Production en haut de la  [[MAP_WINDOW_ARTICLE_TITLE]] <img src="icons/buttons/production.png"></img>
+• Par une touche de raccourci (défaut: CTRL + P)
+• En double-cliquant sur une planète
+• En cliquant sur l'une des icônes Production en haut de la  [[MAP_WINDOW_ARTICLE_TITLE]] <img src="icons/buttons/production.png"></img>
 
 La Fenêtre Production est composée de différents panneaux:
-*  Récapitulation de Production
-*  Projets de Production
-*  File d'Attente de Production
-*  Panneau latéral Système (sur la droite)
+• Récapitulation de Production
+• Projets de Production
+• File d'Attente de Production
+• Panneau latéral Système (sur la droite)
 La Fenêtre Production permet d'interagir directement avec la carte de la  [[encyclopedia MAP_WINDOW_ARTICLE_TITLE]], principalement pour sélectionner un autre système.
 
 
@@ -5134,7 +5189,7 @@ ENC_SPECIES_DESC
 Chaque espèce est classifiée selon son [[encyclopedia METABOLISM_TITLE]].
 
 ENC_FIELD_TYPE
-Type de Régions
+Type de Milieux
 
 ENC_SHIP_DESIGN
 [Partie - Modèle Astronef]
@@ -5337,7 +5392,7 @@ ENC_SYSTEM
 [Partie - Systèmes]
 
 ENC_FIELD
-[Partie - Régions]
+[Partie - Milieux]
 
 ENC_HOMEWORLDS
 [Partie - Planètes Natales]
@@ -5479,7 +5534,7 @@ Coque : %2%
 ENC_SHIP_DESIGN_DESCRIPTION_STATS_STR
 '''
 Pour [[encyclopedia ENC_SPECIES]] : %1%
-Total [[encyclopedia DAMAGE_TITLE]] : %2%    Tirs [[PC_DIRECT_WEAPON]] : %3%
+Total [[encyclopedia DAMAGE_TITLE]] : %2%    Total Destruction Chasseurs : %3%
 [[metertype METER_STRUCTURE]] : %4%    [[metertype METER_SHIELD]] : %5%
 [[metertype METER_DETECTION]] : %6%    [[metertype METER_STEALTH]] : %7%
 [[metertype METER_SPEED]] : %8%    [[METER_CAPACITY]] [[metertype METER_FUEL]] : %9%
@@ -5618,10 +5673,14 @@ La planète %2% a été mise en déroute
 ENC_COMBAT_DESTROYED_STR
 L'astronef %2% a été détruit
 
-# %1% unused
+# %1% number of items in list
 # %2% name of empire
 ENC_COMBAT_INITIAL_STEALTH_LIST
 L'empire %2% ne peut pas initialement détecter :
+
+# %1% number of items in list
+ENC_COMBAT_NEUTRAL_INITIAL_STEALTH_LIST
+Les forces [[NEUTRAL]]s ne peuvent pas initialement détecter :
 
 # %1 link to the attacking unit
 # %2 link to the defending unit.
@@ -5858,8 +5917,8 @@ STOCKPILE_TEXT
 '''La capacité industrielle est utilisée immédiatemment pour produire structures et astronefs. Un empire peut également accumuler les Points de Production (PP) dans le stock impérial en vue d'une utilisation ultérieure. Généralement, les PP peuvent être utilisés pour la production seulement si le lieu de production se trouve dans le réseau d'approvisionnement au sein duquel les PP sont générés. Cependant, les PP issus du stock impérial peuvent être utilisés par n'importe quel site de production appartenant à l'empire. Seule une quantité définie de ces PP -ne dépassant pas la limite d'usage impériale- peut être utilisée chaque tour pour la production.
 
 Il existe deux manières d'ajouter des PP au stock impérial:
-* les PP en excédent (PP non-alloués dans la file d'attente de production) de tout site de production sont automatiquement transférés vers le stock. Cela déclenche une alerte.
-* les PP explicitement alloués à un projet de [[encyclopedia PROJECT_BT_STOCKPILE]] sont également envoyés vers le stock.
+• les PP en excédent (PP non-alloués dans la file d'attente de production) de tout site de production sont automatiquement transférés vers le stock. Cela déclenche une alerte.
+• les PP explicitement alloués à un projet de [[encyclopedia PROJECT_BT_STOCKPILE]] sont également envoyés vers le stock.
 
 La limite d'usage du stock impérial est égale au total des indicateurs [[metertype METER_STOCKPILE]] de chaque planète.
 Les prédispositions de certaines espèces en distribution du stock, certaines structures ou technologies, ainsi que l'utilisation du [[encyclopedia STOCKPILE_FOCUS_TITLE]], permettent d'augmenter cette limite.
@@ -6005,11 +6064,11 @@ METER_POPULATION_VALUE_LABEL  # translated
 Population
 
 METER_POPULATION_VALUE_DESC
-'''La Population représente la taille d'une colonie sur une planète. Sa valeur maximale dépend de l'[[encyclopedia ENC_SPECIES]] et de son adaptation à l'[[encyclopedia ENVIRONMENT_TITLE]] d'une planète. Plusieurs bonus de capacité en [[metertype METER_INDUSTRY]] et en [[metertype METER_RESEARCH]] sont liés à la taille de la Population: plus la Population est importante, plus les bonus sont élevés.
+'''La Population représente la taille actuelle d'une colonie sur une planète. Plusieurs bonus de capacité en [[metertype METER_INDUSTRY]] et en [[metertype METER_RESEARCH]] sont liés à la taille de la Population: plus la Population est importante, plus les bonus sont élevés.
 
-Une Population supérieure ou égale à 3 et un [[metertype METER_HAPPINESS]] minimum de 5 sont requis pour qu'une colonie puisse lancer la colonisation d'autres planètes. Un astronef colonisateur est peuplé de Colons, leur nombre étant déterminé par la capacité de [[encyclopedia PC_COLONY]] du modèle d'astronef. Lors de la colonisation d'une planète, le nombre de Colons à bord de l'astronef constituera la Population de départ sur une planète nouvellement colonisée.
+La Projection Population est la taille optimale de Population qu'une planète tend à approcher, compte tenu des différents facteurs influençant la Population planétaire. Sa valeur dépend de l'[[encyclopedia ENC_SPECIES]] et de son adaptation à l'[[encyclopedia ENVIRONMENT_TITLE]] d'une planète. Cette valeur est également liée aux <encyclopedia ENC_BUILDING_TYPE>Types de Structures</encyclopedia> bâtis sur la planète, aux [[encyclopedia ENC_TECH]] recherchées par l'empire, aux <encyclopedia ENC_SPECIAL>Particularités</encyclopedia> liées à la planète, ainsi que divers effets de jeu. Si ces facteurs changent, alors la valeur de Projection Population est susceptible de fluctuer à son tour.
 
-La Projection Population est la valeur optimale de Population qu'une planète tend à approcher, compte tenu des différents facteurs influençant la Population planétaire. Sa valeur est liée aux <encyclopedia ENC_BUILDING_TYPE>Types de Structures</encyclopedia> bâtis sur la planète, aux [[encyclopedia ENC_TECH]] recherchées par l'empire, aux <encyclopedia ENC_SPECIAL>Particularités</encyclopedia> liées à la planète, ainsi que divers effets de jeu. Si ces facteurs changent, alors la valeur de Projection Population est susceptible de fluctuer à son tour.
+Une Population supérieure ou égale à [[value MIN_COLONY_SIZE]] et une [[metertype METER_HAPPINESS]] minimum de [[value MIN_COLONY_HAPPINESS]] sont requis pour qu'une colonie puisse lancer la colonisation d'autres planètes. Un astronef colonisateur est peuplé de Colons, leur nombre étant déterminé par la capacité de [[encyclopedia PC_COLONY]] du modèle d'astronef. Lors de la colonisation d'une planète, le nombre de Colons à bord de l'astronef constituera la Population de départ sur la planète nouvellement colonisée.
 '''
 
 METER_INDUSTRY_VALUE_LABEL
@@ -6097,7 +6156,7 @@ Boucliers d'astronefs: les [[encyclopedia DAMAGE_TITLE]] infligés par chaque ti
 
 Boucliers planétaires: Agit comme une sorte d'armure. La solidité d'un bouclier planétaire s'amenuise après chaque tir encaissé jusqu'à que celle-ci soit réduite à néant, les tirs suivants passant alors au travers et endommageant les structures planétaires (en premier lieu les structures de [[metertype METER_DEFENSE]], puis dans un second temps l'[[metertype METER_CONSTRUCTION]] dans son ensemble). Les Boucliers planétaires se regénèrent après chaque tour à un certain taux, ce dernier pouvant varier selon les technologies maîtrisées.
 
-Une différence supplémentaire réside dans le fait que les boucliers d'astronefs peuvent partiellement ou entièrement être neutralisés par un type de région interstellaire tel qu'un [[fieldtype FLD_MOLECULAR_CLOUD]].
+Une différence supplémentaire réside dans le fait que les boucliers d'astronefs peuvent partiellement ou entièrement être neutralisés par un type de milieu interstellaire tel qu'un [[fieldtype FLD_MOLECULAR_CLOUD]].
 '''
 
 METER_STRUCTURE_VALUE_LABEL
@@ -6369,15 +6428,15 @@ PHOTOTROPHIC_SPECIES_TEXT
 
 Influence sur la Population:
 
-* Étoile [[STAR_BLUE]]: ([[SZ_TINY]] +3) ([[SZ_SMALL]] +6) ([[SZ_MEDIUM]] +9) ([[SZ_LARGE]] +12) ([[SZ_HUGE]] +15)
+• Étoile [[STAR_BLUE]]: ([[SZ_TINY]] +3) ([[SZ_SMALL]] +6) ([[SZ_MEDIUM]] +9) ([[SZ_LARGE]] +12) ([[SZ_HUGE]] +15)
 
-* Étoile [[STAR_WHITE]]: ([[SZ_TINY]] +1.5) ([[SZ_SMALL]] +3) ([[SZ_MEDIUM]] +4.5) ([[SZ_LARGE]] +6) ([[SZ_HUGE]] +7.5)
+• Étoile [[STAR_WHITE]]: ([[SZ_TINY]] +1.5) ([[SZ_SMALL]] +3) ([[SZ_MEDIUM]] +4.5) ([[SZ_LARGE]] +6) ([[SZ_HUGE]] +7.5)
 
-* Étoile [[STAR_YELLOW]], Étoile [[STAR_ORANGE]]: (Aucune influence)
+• Étoile [[STAR_YELLOW]], Étoile [[STAR_ORANGE]]: (Aucune influence)
 
-* Étoile [[STAR_RED]], Étoile [[STAR_NEUTRON]]: ([[SZ_TINY]] -1) ([[SZ_SMALL]] -2) ([[SZ_MEDIUM]] -3) ([[SZ_LARGE]] -4) ([[SZ_HUGE]] -5)
+• Étoile [[STAR_RED]], Étoile [[STAR_NEUTRON]]: ([[SZ_TINY]] -1) ([[SZ_SMALL]] -2) ([[SZ_MEDIUM]] -3) ([[SZ_LARGE]] -4) ([[SZ_HUGE]] -5)
 
-* [[STAR_BLACK]], [[STAR_NONE]]: ([[SZ_TINY]] -10) ([[SZ_SMALL]] -20) ([[SZ_MEDIUM]] -30) ([[SZ_LARGE]] -40) ([[SZ_HUGE]] -50)'''
+• [[STAR_BLACK]], [[STAR_NONE]]: ([[SZ_TINY]] -10) ([[SZ_SMALL]] -20) ([[SZ_MEDIUM]] -30) ([[SZ_LARGE]] -40) ([[SZ_HUGE]] -50)'''
 
 SELF_SUSTAINING_SPECIES_TITLE
 Métabolisme Autosuffisant
@@ -6409,7 +6468,7 @@ ARTISTIC_SPECIES_TITLE
 Attribut Artistique
 
 ARTISTIC_SPECIES_TRAIT_TEXT
-Les espèces artistiques réalisent des travaux d'ordre artistique lorsque leur empire applique la Politique [[policy PLC_ARTISAN_WORKSHOPS]], laquelle génère de l'[[metertype METER_INFLUENCE]]. De plus, les autres planètes dans le même système, peuplées d'espèces artistiques et réglées sur le Focus Influence, jouiront d'une meilleure [[metertype METER_HAPPINESS]].
+Les espèces artistiques réalisent des travaux d'ordre artistique lorsque leur empire applique la Politique [[policy PLC_ARTISAN_WORKSHOPS]], laquelle génère de l'[[metertype METER_INFLUENCE]]. De plus, les autres planètes situées dans le même système et peuplées d'espèces artistiques différentes, jouiront d'une meilleure [[metertype METER_HAPPINESS]].
 
 FLEET_UPKEEP_TITLE
 Entretien des Flottes
@@ -6536,10 +6595,10 @@ show-fleet-eta : Active/Désactive l'Estimation du Temps d'Arrivée d'une flotte
 '''
 
 FIELDS_TITLE
-Régions Interstellaires
+Milieux Interstellaires
 
 FIELDS_TEXT
-Il existe plus d'un Type de Régions interstellaires, ayant chacun une apparence diffuse et différente. Un clic-droit sur l'un de ces objets à partir de la [[encyclopedia MAP_WINDOW_ARTICLE_TITLE]] affiche une petite vignette identifiant son type et un lien vers l'Encyclopédie afin d'en découvrir la nature.
+Il existe plus d'un Type de Milieux interstellaires, ayant chacun une apparence diffuse et différente. Un clic-droit sur l'un de ces objets à partir de la [[encyclopedia MAP_WINDOW_ARTICLE_TITLE]] affiche une petite vignette identifiant son type et un lien vers l'Encyclopédie afin d'en découvrir la nature.
 
 
 ##
@@ -6845,6 +6904,12 @@ Coque
 ATTACK
 Dommages Totaux Armement
 
+DAMAGE_STRUCTURE_PER_BATTLE
+Total Dommages par Combat
+
+DESTROY_FIGHTERS_PER_BATTLE
+Nombre Chasseurs Détruits par Combat
+
 PRODUCTION_COST
 Coût Production
 
@@ -6859,6 +6924,9 @@ AGE
 
 TURNS_SINCE_FOCUS_CHANGE
 Tours depuis Modif. Focus
+
+TURNS_SINCE_COLONIZATION
+Tours depuis Colonisation
 
 SUPPLY_RANGE
 Portée Approvisionnement
@@ -6892,6 +6960,9 @@ ID Modèle
 
 FINAL_DEST
 Système Destination Finale
+
+PREV_TO_FINAL_DEST
+Système Préc. vers Destination Finale
 
 NEXT_SYSTEM
 Système Suiv.
@@ -7166,7 +7237,7 @@ SITREP_BUILDING_TYPE_UNLOCKED_LABEL
 Structure débloquée
 
 SITREP_WEAPONS_UPGRADED
-Tous les armements %shippart% des astronefs à portée d'approvisionnement ont été améliorés par la technologie %tech%. Les armements améliorés infligent des dommages supplémentaires de %rawtext:dam% par tir.
+Tous les armements %shippart% des astronefs à portée d'approvisionnement ont été améliorés par la technologie %tech%. Les armements améliorés infligent des dommages additionnels de %rawtext:dam% par tir.
 
 SITREP_WEAPONS_UPGRADED_LABEL
 Amélioration technologique Armement
@@ -7410,6 +7481,12 @@ Les astronomes ont observé une nouvelle supernova ayant détruit la totalité d
 
 SITREP_NOVA_DETECTED_LABEL
 Supernova détectée
+
+SITREP_BUREAUCRACY_STOPPED
+Le développement exponentiel de la [[policy PLC_BUREAUCRACY]] a paralysé son fonctionnement en raison d'un manque de structures administratives. Le nombre total de structures d'[[buildingtype BLD_REGIONAL_ADMIN]] et [[buildingtype BLD_IMPERIAL_PALACE]] possédées par l'empire s'élève actuellement à %rawtext:havebuildings%, mais %rawtext:needbuildings% sont nécessaires pour améliorer la Stabilité planétaire de [[value PLC_BUREAUCRACY_STABILITY_FLAT]]. La [[policy PLC_BUREAUCRACY]] requiert une structure administrative supplémentaire tous les [[value BUREACRACY_ADMINS_NEEDED_TURN_SCALING]] tours.
+
+SITREP_BUREAUCRACY_STOPPED_LABEL
+Paralysie Bureaucratique
 
 EFFECT_EXPERIMENT_MONSTERS_LAUNCH
 ALERTE : il semble que %rawtext% %predefinedshipdesign% aient été repérés dans le système %system%, rôdant près de l'Avant-Poste %species%!
@@ -7728,6 +7805,12 @@ La capitale de l'empire %empire% est tombée.
 
 HEAD_ON_A_SPIKE_MESSAGE_LABEL
 Capitale d'Empire capturée
+
+SITREP_FIELD_RESEARCH_LABEL
+Recherche d'exploration
+
+SITREP_FIELD_RESEARCH
+Dans %system% : l'exploration a généré de la Recherche.
 
 CUSTOM_SITREP_INTRODUCTION
 Réception briefing initial du Rapport de Situation. Conformément à la directive du %tech%, l'ensemble des agents impériaux collectent toutes les informations importantes et les transmettent vers le système %system%, afin que ces dernières soient compilées en Rapports de Situation (Sitreps). Ces Sitreps informent de tout événement important et notifient également toute situation spécifique définie ou sélectionnée au préalable par le commandement impérial.
@@ -8101,6 +8184,8 @@ SP_TRITH_GAMEPLAY_DESC
 Télépathes xénophobes tourmentés.
 Préfèrent les Planètes [[PT_RADIATED]]s.
 [[encyclopedia SELF_SUSTAINING_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]], [[encyclopedia XENOPHOBIC_SPECIES_TITLE]]
+
+La Politique [[policy PLC_RACIAL_PURITY]] est disponible par défaut pour les empires dont la Capitale est peuplée par des Trith.
 '''
 
 SP_TRITH_DESC
@@ -8196,7 +8281,7 @@ Préfèrent les Planètes [[PT_TOXIC]]s.
 
 SP_DERTHREAN_DESC
 '''Description:
-L'entité Derthrean est un virus vivant à l'intérieur d'une plante, dans une relation mi-parasitaire, mi-symbiotique. Le virus en lui-même n'est pas doué d'intelligence tandis que sans lui, la plante n'est qu'une coquille vide. Pourtant, des synapses neuronales se développent et s'associent pour créer un organisme doué de raison. Bien que le virus procure une conscience à la plante, il s'avère toxique pour son système nerveux, infligeant des douleurs indicibles à son hôte, l'affaiblissant de plus en plus à mesure qu'elle grandit et finissant par tuer la plante elle-même. Cette physiologie particulière signifie que plus un Derthrean est intelligent, plus grande est la douleur continuelle qu'il endure.
+L'entité Derthrean est un virus vivant à l'intérieur d'une plante, dans une relation mi-parasitaire, mi-symbiotique. Le virus en lui-même n'est pas doué d'intelligence tandis que sans lui, la plante n'est qu'une coquille vide. Pourtant, leurs synapses neuronales s'associent pour créer un organisme complet. Bien que le virus procure une conscience à la plante, il s'avère toxique pour son système nerveux, infligeant des douleurs indicibles à son hôte, l'affaiblissant de plus en plus à mesure qu'il se réplique, et finissant par tuer la plante elle-même. Par conséquent, plus un Derthrean est intelligent, plus grande est la douleur qu'il endure.
 
 Structure sociale:
 Les Derthrean ont une organisation sociale très segmentée, se divisant en castes créées par leurs ancêtres. Ils naissent dans une caste, ils se reproduisent dans leur caste, et meurent comme membre de cette caste. Du fait du faible brassage ethnique sur des millénaires, les traits physiques ont fini par être propres à chaque caste. Celles-ci sont divisées comme suit: la plus respectée de toutes, la caste des Prêtres, la caste des Ouvriers, la caste des Agriculteurs, la caste des Pourvoyeurs, la caste des Savants, et la plus méprisée de toutes, la caste des Guerriers. La religion joue un rôle fondamental dans leur société. Chaque Derthrean est profondément pacifiste, et vit pour satisfaire leur Déesse, dans l'espoir d'être libéré de ce fardeau de douleur et d'être pardonné pour la brutalité et la fourberie de leurs ancêtres.
@@ -8523,7 +8608,7 @@ SP_RAAAGH_DESC
 '''Les Raaagh sont des organismes bipèdes à fourrure mesurant 1.5 mètre de hauteur. Le corps est penché vers l'avant à 45 degrés, laissant libres leurs mâchoires acérées et leurs membres antérieurs munis de griffes, afin de combattre, capturer des proies ou construire. Leurs oreilles triangulaires et leur iris en forme de fente leur donnent une apparence féline. Ovipares, les Raaagh pondent une moyenne de douze œufs. Après l'éclosion, peu de soins et d'attention sont portés aux petits. Ces derniers doivent survivre par leurs propres moyens, entrant en compétition avec leurs jeunes semblables pour trouver un abri ou dérober de la nourriture. Après trois années, un seul jeune Raaagh parvient généralement à survivre, ce dernier commençant alors à développer l'aptitude au langage. Cela active soudainement l'instinct parental des adultes, et le jeune rescapé est alors élevé avec attention comme membre de la Tribu.
 
 Comportement:
-La territorialité extrême est le trait comportemental le plus distinctif chez les Raaagh- régissant leur vie quotidienne et imprégnant toute leur culture. Ce caractère marqué dénote leur préférence pour ce qui est familier et connu. Leur curiosité est très peu développée, ce qui explique leur technologie très peu avancée.
+La territorialité extrême est le trait comportemental le plus distinctif chez les Raaagh, régissant leur vie quotidienne et imprégnant toute leur culture. Ce caractère marqué dénote leur préférence pour ce qui est familier et connu. Leur curiosité est très peu développée, ce qui explique leur technologie très peu avancée.
 
 Planète Natale:
 La planète natale des Raaagh est de type terrestre. Les surfaces terrestres et océaniques sont réparties d'une manière plus ou moins égale, mais le plus grand des continents ne recouvre que 4% de la surface planétaire. Cette profusion de petits continents et de grandes îles renforcent d'autant plus leur attitude territoriale.
@@ -8962,6 +9047,7 @@ Ruines Ancestrales (Exhumées)
 
 ANCIENT_RUINS_DEPLETED_SPECIAL_DESC
 '''Augmente la [[metertype METER_TARGET_RESEARCH]] sur cette planète de [[value ANCIENT_RUINS_TARGET_RESEARCH_PERPOP]] par [[metertype METER_POPULATION]], si le Focus Recherche est sélectionné.
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value ANCIENT_RUINS_MIN_STABILITY]].
 
 Cette planète abrite les ruines d'une puissante civilisation ancestrale et oubliée... Mais une découverte de grande valeur y a déjà eu lieu.'''
 
@@ -8969,7 +9055,8 @@ ANCIENT_RUINS_SPECIAL
 Ruines Ancestrales
 
 ANCIENT_RUINS_SPECIAL_DESCRIPTION
-'''Augmente la [[metertype METER_TARGET_RESEARCH]] sur cette planète de 1 par [[metertype METER_POPULATION]], si le Focus Recherche est sélectionné.
+'''Augmente la [[metertype METER_TARGET_RESEARCH]] sur cette planète de [[value ANCIENT_RUINS_TARGET_RESEARCH_PERPOP]] par [[metertype METER_POPULATION]], si le Focus Recherche est sélectionné.
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value ANCIENT_RUINS_MIN_STABILITY]].
 
 Cette planète abrite les ruines d'une puissante civilisation ancestrale et oubliée... Le premier empire prenant pied sur la planète et maîtrisant la [[tech LRN_XENOARCH]], acquiert gratuitement la maîtrise d'une technologie avancée, ou bien découvre une structure ou un astronef aux puissantes caractéristiques. La découverte de corps parfaitement conservés d'une espèce éteinte est également envisageable.'''
 
@@ -9033,6 +9120,7 @@ Orbite Excentrissime
 
 ECCENTRIC_ORBIT_SPECIAL_DESC
 '''Augmente de [[value ECCENTRIC_ORBIT_TARGET_RESEARCH_FLAT]] la [[metertype METER_TARGET_RESEARCH]], mais réduit l'[[metertype METER_SUPPLY]] ([[value ECCENTRIC_ORBIT_MAX_SUPPLY_FLAT]]).
+Le bonus de Recherche requiert une [[metertype METER_HAPPINESS]] de [[value ECCENTRIC_ORBIT_MIN_STABILITY]].
 
 L'orbite de la planète autour de son étoile est très excentrique: la distance de son aphélie est un très grand multiple de la distance de son périhélie. L'intensité de l'ensoleillement varie ainsi énormément au cours de l'année. Ces conditions variables ralentissent la gestion de l'approvisionnement sur la planète, mais s'avèrent un terrain exaltant pour la recherche scientifique.'''
 
@@ -9049,6 +9137,7 @@ Anomalie Temporelle
 
 TEMPORAL_ANOMALY_SPECIAL_DESC
 '''Augmente la [[metertype METER_TARGET_RESEARCH]] sur cette planète de [[value TEMPORAL_ANOMALY_TARGET_RESEARCH_PERPOP]] par [[metertype METER_POPULATION]] si le Focus [[metertype METER_RESEARCH]] est activé. Pénalise la [[metertype METER_TARGET_POPULATION]] (quel que soit le Focus) de [[value TEMPORAL_ANOMALY_TARGET_POPULATION_PERSIZE]] par la taille de la planète ([[SZ_TINY]] -5, [[SZ_SMALL]] -10, [[SZ_MEDIUM]] -15, [[SZ_LARGE]] -20, [[SZ_HUGE]] -25).
+Le bonus de Recherche requiert une [[metertype METER_HAPPINESS]] de [[value TEMPORAL_ANOMALY_MIN_STABILITY]].
 
 L'écoulement du temps sur cette planète est fortement perturbé. Des événements apparemment aléatoires provoquent soit une accélération soit un ralentissement de la vitesse du temps, troublant profondément le rythme biologique de tout être vivant et rendant quasiment impossible toute organisation sociale et productive. Une adaptabilité extrême et de grandes précautions sont requises afin d'établir une colonie sur cette planète.
 Cependant, une anomalie temporelle présente un fort potentiel pour la recherche scientifique, bien au-delà de ce qu'il est possible d'entreprendre sur les planètes conventionnelles.'''
@@ -9066,6 +9155,7 @@ Lune Ordinatrice
 
 COMPUTRONIUM_SPECIAL_DESC
 '''Lorsqu'une Lune Ordinatrice orbite autour d'une planète en [[encyclopedia RESEARCH_FOCUS_TITLE]], toutes les planètes de l'empire réglées sur le même Focus améliorent leur [[metertype METER_TARGET_RESEARCH]] de [[value COMPUTRONIUM_TARGET_RESEARCH_PERPOP]] par [[metertype METER_POPULATION]].
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value COMPUTRONIUM_MIN_STABILITY]].
 
 Abandonnée par une civilisation dont le souvenir s'est effacé avec le temps, cette lune est en réalité un ordinateur d'une puissance de calcul inouïe. Elle peut effectuer des simulations et résoudre les équations les plus complexes en moins de temps qu'il ne faut pour les lui proposer.'''
 
@@ -9082,6 +9172,7 @@ Planète Métaphysique
 
 PHILOSOPHER_SPECIAL_DESC
 '''Aussi longtemps que la Planète Métaphysique demeure inhabitée, toutes les planètes habitées du même système stellaire voient leur [[metertype METER_TARGET_RESEARCH]] augmenter de [[value PHILOSOPHER_TARGET_RESEARCH_FLAT]]. La [[metertype METER_TARGET_CONSTRUCTION]] d'une colonie installée sur une Planète Métaphysique est réduite ([[value PHILOSOPHER_TARGET_CONSTRUCTION_FLAT]]).
+Le bonus de Recherche requiert une [[metertype METER_HAPPINESS]] de [[value PHILOSOPHER_MIN_STABILITY]].
 
 L'unique et dernier représentant d'une espèce vagabonde de taille planétaire a trouvé sa dernière demeure près de cette étoile, autour de laquelle il orbite comme une planète normale. Âgé de milliers d'années, il a perdu l'envie et la capacité de voyager et se consacre désormais à la méditation sur tous les mystères de l'univers qu'il a rencontré au cours de sa longue existence. Déroutant et légèrement perturbé, il refuse de communiquer avec quiconque n'étant ni de sa taille ni de sa forme, ne laissant pas aux savants d'autres choix que de l'interroger via la voix de la planète sur laquelle ils résident. Sans surprise, coloniser la Planète Métaphysique la perturbe gravement et provoque un mutisme profond. La construction à sa surface s'avère difficile, comme il pouvait l'être présumé sur une entité vivante.'''
 
@@ -9367,7 +9458,7 @@ Système
 
 # Universe object types
 OBJ_FIELD
-Région
+Milieu
 
 # Universe object types
 OBJ_FIGHTER
@@ -10658,6 +10749,14 @@ DESC_BUILDING
 DESC_BUILDING_NOT
 ''' n'étant pas une structure %1%'''
 
+# %1% name of a field type.
+DESC_FIELD
+''' étant un milieu %1%'''
+
+# %1% name of a field type.
+DESC_FIELD_NOT
+''' n'étant pas un milieu %1%'''
+
 # %1% name of the special the object should have.
 DESC_SPECIAL
 ''' présentant la Particularité %1%'''
@@ -11404,16 +11503,35 @@ PLC_CENTRALIZATION_DESC
 • Augmente la [[metertype METER_TARGET_RESEARCH]] de [[value PLC_CENTRALIZATION_TARGET_RESEARCH_PERPOP]] par [[metertype METER_POPULATION]].
 • Augmente la [[metertype METER_TARGET_INDUSTRY]] de [[value PLC_CENTRALIZATION_TARGET_INDUSTRY_PERPOP]] par Population.
 • Augmente la [[metertype METER_TARGET_CONSTRUCTION]] de [[value PLC_CENTRALIZATION_TARGET_CONSTRUCTION_FLAT]].
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value PLC_CENTRALIZATION_MIN_STABILITY]].
+
 Toutefois, réduit également la portée de l'[[metertype METER_SUPPLY]] ([[value PLC_CENTRALIZATION_MAX_SUPPLY_FLAT]]) ainsi que la [[metertype METER_STOCKPILE]] ([[value PLC_CENTRALIZATION_MAX_STOCKPILE_FLAT]]), et augmente le coût d'[[metertype METER_INFLUENCE]] des colonies de l'empire:
 • Les colonies connectées par lignes d'[[metertype METER_SUPPLY]] subissent une pénalité de [[value PLC_CENTRALIZATION_TARGET_INFLUENCE_PERJUMP]] par Voies spatiales les séparant de la Capitale, plafonnée à [[value PLC_CENTRALIZATION_TARGET_INFLUENCE_MAX]].
 • Les colonies non-connectées par lignes d'[[metertype METER_SUPPLY]] à la Capitale subissent la pénalité maximale ([[value PLC_CENTRALIZATION_TARGET_INFLUENCE_MAX]]).
+Le coût des équipements de colonisation pour astronefs augmente également de 50%.
 
-La logistique de l'ensemble de l'empire vise à accroître la production de la Capitale, en y déroutant l'essentiel des ressources matérielles et sociales. Cela provoque un certain ressentiment dans les colonies, augmentant par conséquent les coûts d'[[metertype METER_INFLUENCE]].
-
-Le coût des équipements de colonisation pour astronefs augmente également de 50%.'''
+La logistique de l'ensemble de l'empire vise à accroître la production de la Capitale, en y déroutant l'essentiel des ressources matérielles et sociales. Cela provoque un certain ressentiment dans les colonies, augmentant par conséquent les coûts d'[[metertype METER_INFLUENCE]].'''
 
 PLC_CENTRALIZATION_SHORT_DESC
 Favorise la Capitale
+
+PLC_METROPOLES
+Métropoles
+
+PLC_METROPOLES_DESC
+'''Améliore le rendement pour un maximum de [[value METROPOLES_PLANET_LIMIT]] planètes dont la Population est supérieure ou égale à [[value METROPOLES_MINIMUM_POPULATION]]. Les planètes éligibles avec la [[metertype METER_POPULATION]] la plus importante recevront les bonus suivants, indépendamment de leur Focus:
+• Augmente la [[metertype METER_TARGET_RESEARCH]] de [[value METROPOLES_TARGET_RESEARCH_PERPOP]] par [[metertype METER_POPULATION]].
+• Augmente la [[metertype METER_TARGET_INDUSTRY]] de [[value METROPOLES_TARGET_INDUSTRY_PERPOP]] par Population.
+• Augmente la [[metertype METER_TARGET_CONSTRUCTION]] de [[value METROPOLES_TARGET_CONSTRUCTION_FLAT]].
+• Augmente l'indicateur [[metertype METER_MAX_SUPPLY]] de [[value METROPOLES_MAX_SUPPLY_FLAT]].
+mais subiront également la pénalité suivante:
+• Diminue l'indicateur [[metertype METER_MAX_STOCKPILE]] de [[value METROPOLES_MAX_STOCKPILE_FLAT]].
+
+Par ailleurs, les autres planètes habitées (celles éligibles mais dont la Population est moindre parmi les planètes les plus fortement peuplées, ainsi que toutes les autres planètes n'atteignant pas une [[metertype METER_POPULATION]] de [[value METROPOLES_MINIMUM_POPULATION]]) subiront la pénalité suivante:
+• Diminue la [[metertype METER_TARGET_HAPPINESS]] de [[value METROPOLES_STABILITY_PENALTY]].'''
+
+PLC_METROPOLES_SHORT_DESC
+Favorise les planètes à forte Population
 
 PLC_COLONIZATION
 Colonisation
@@ -11448,7 +11566,8 @@ PLC_MARINE_RECRUITMENT
 Recrutement de Troupes
 
 PLC_MARINE_RECRUITMENT_DESC
-Diminue de 50% le coût des équipements d'Infanterie pour astronefs.
+'''• Diminue de 50% le coût des équipements d'Infanterie pour astronefs.
+• Augmente le taux de régénération de l'Infanterie planétaire de [[value PLC_MARINE_RECRUITMENT_TROOP_GROWTH_FLAT]].'''
 
 PLC_MARINE_RECRUITMENT_SHORT_DESC
 Diminue le coût de l'Infanterie
@@ -11520,7 +11639,10 @@ PLC_TERRAFORMING
 Terraformation
 
 PLC_TERRAFORMING_DESC
-Diminue le temps minimum nécessaire pour mener à bien les projets [[buildingtype BLD_TERRAFORM]] et [[buildingtype BLD_TERRAFORM_REVERT]] sur une planète.
+'''• Diminue le temps minimum nécessaire pour mener à bien les projets [[buildingtype BLD_TERRAFORM]] et [[buildingtype BLD_TERRAFORM_REVERT]] sur une planète.
+• Améliore la [[metertype METER_TARGET_HAPPINESS]] sur les planètes terraformées de [[value PLC_TERRAFORMING_TARGET_HAPPINESS_ORIGINAL_FLAT]] par palier les séparant de leur type planétaire d'origine après terraformation.
+• Améliore la [[metertype METER_TARGET_INFLUENCE]] sur les planètes en Focus Influence de [[value PLC_TERRAFORMING__TARGET_INFLUENCE_ORIGINAL_FLAT]] par palier les séparant de leur type planétaire d'origine après terraformation.
+• Améliore la [[metertype METER_TARGET_RESEARCH]] sur les planètes en Focus Recherche de la racine carrée de la [[metertype METER_POPULATION]] x [[value PLC_TERRAFORMING_TARGET_RESEARCH_SCALING]] par palier les séparant de leur type planétaire d'origine après terraformation.'''
 
 PLC_TERRAFORMING_SHORT_DESC
 Accélère la terraformation
@@ -11529,12 +11651,22 @@ PLC_INDUSTRIALISM
 Industrialisme
 
 PLC_INDUSTRIALISM_DESC
-'''Les planètes en Focus Industrie améliorent leur [[metertype METER_TARGET_INDUSTRY]] (x[[value PLC_INDUSTRIALISM_TARGET_INDUSTRY_SCALING]]) et leur [[metertype METER_HAPPINESS]] augmente de [[value PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT]].
+'''Les planètes en Focus Industrie améliorent leur [[metertype METER_TARGET_INDUSTRY]] de [[value PLC_INDUSTRIALISM_TARGET_INDUSTRY_PERCENT]]% et leur [[metertype METER_HAPPINESS]] augmente de [[value PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT]].
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value PLC_INDUSTRIALISM_MIN_STABILITY]].
 
 Diminue le coût de recherche de certaines technologies de Génération améliorant la production.'''
 
 PLC_INDUSTRIALISM_SHORT_DESC
 Améliore la capacité industrielle
+
+PLC_TECHNOCRACY
+Technocratie
+
+PLC_TECHNOCRACY_DESC
+Les planètes en Focus Recherche améliorent leur [[metertype METER_TARGET_RESEARCH]] de [[value PLC_INDUSTRIALISM_TARGET_INDUSTRY_PERCENT]]% et reçoivent un bonus de [[value PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT]] en [[metertype METER_HAPPINESS]].
+
+PLC_TECHNOCRACY_SHORT_DESC
+Améliore la capacité en Recherche
 
 PLC_CHECKPOINTS
 Postes-Frontières
@@ -11551,9 +11683,10 @@ PLC_DIVERSITY
 Diversité
 
 PLC_DIVERSITY_DESC
-'''Accorde des bonus ou des pénalités à la Recherche, la Stabilité, et à l'Influence de la Capitale, selon le nombre d'espèces au sein de l'empire.
+'''Accorde des bonus ou des pénalités à la Recherche, la Stabilité, et à l'Influence de la Capitale, selon le nombre d'espèces présentes au sein de l'empire.
+Le bonus de Recherche requiert une [[metertype METER_HAPPINESS]] de [[value PLC_DIVERSITY_MIN_STABILITY]].
 
-La valeur des bonus ou des pénalités est d'autant plus importante que le nombre d'espèces présentes est supérieur ou inférieur à 4.'''
+La valeur de tous les bonus ou pénalités est de [[value PLC_DIVERSITY_SCALING]] par espèce, et sera d'autant plus importante que le nombre d'espèces présentes dans l'empire est supérieur ou inférieur à 4.'''
 
 PLC_DIVERSITY_SHORT_DESC
 Améliore la Recherche, la Stabilité, et l'Influence
@@ -11617,6 +11750,7 @@ Autorité Divine
 
 PLC_DIVINE_AUTHORITY_DESC
 '''Augmente la [[metertype METER_TARGET_HAPPINESS]] de [[value PLC_DIVINE_AUTHORITY_TARGET_HAPPINESS_FLAT]] et la [[metertype METER_TARGET_INFLUENCE]] de [[value PLC_DIVINE_AUTHORITY_TARGET_INFLUENCE_FLAT]], mais diminue la [[metertype METER_TARGET_RESEARCH]] ([[value PLC_DIVINE_AUTHORITY_TARGET_RESEARCH_FLAT]]).
+Le bonus d'Influence requiert une [[metertype METER_HAPPINESS]] de [[value PLC_DIVINE_AUTHORITY_MIN_STABILITY]].
 
 L'empire est dirigé par une théocratie qui prétend détenir l'autorité des dieux eux-mêmes. Ses dirigeants se revendiquent comme omnipotents et infaillibles, inspirant à tout l'empire la croyance qu'ils représentent le peuple élu. L'extrémisme religieux est encouragé au sein de la population, ce qui renforce la confiance envers les décisions gouvernementales, tout en stabilisant la société. La pensée critique et la science par l'expérience s'en trouvent par conséquent fortement entravées.'''
 
@@ -11627,16 +11761,53 @@ PLC_NATIVE_APPROPRIATION
 Appropriation Indigène
 
 PLC_NATIVE_APPROPRIATION_DESC
-Augmente la [[metertype METER_TARGET_RESEARCH]] sur les planètes en Focus Recherche au sein des systèmes abritant également des planètes indigènes non-colonisées par l'empire.
+Augmente la [[metertype METER_TARGET_RESEARCH]] de [[value PLC_NATIVE_APPROPRIATION_RESEARCH_PERPLANET]] sur les planètes en Focus Recherche au sein des systèmes abritant également des planètes indigènes non-colonisées par l'empire.
 
 PLC_NATIVE_APPROPRIATION_SHORT_DESC
 Améliore la Recherche
+
+PLC_VASSALIZATION
+Vassalisation
+
+PLC_VASSALIZATION_DESC
+Augmente la [[metertype METER_TARGET_INFLUENCE]] des planètes en Focus Influence au sein des systèmes abritant des planètes non-colonisées, dont l'espèce est différente de celle peuplant la Capitale de l'empire et la planète bénéficiaire, de [[value PLC_VASSALIZATION_INFLUENCE_SCALING]] multiplié par la racine carrée du total de la Population sur ces planètes non-colonisées.
+
+PLC_VASSALIZATION_SHORT_DESC
+Les planètes neutres améliorent l'Influence
+
+PLC_COLONIALISM
+Colonialisme
+
+PLC_COLONIALISM_DESC
+Augmente la [[metertype METER_TARGET_INDUSTRY]] des planètes en Focus Industrie de la capacité en Industrie des planètes neutres à proximité. Les planètes neutres contributrices doivent être reliées par lignes d'[[metertype METER_SUPPLY]] à la planète bénéficiaire, se trouver au plus à 3 Voies spatiales, et être non-colonisées. Plusieurs planètes bénéficiaires se partageront l'Industrie prélevée de manière égale.
+
+PLC_COLONIALISM_SHORT_DESC
+Collecte l'Industrie des planètes neutres
+
+PLC_FEUDALISM
+Féodalisme
+
+PLC_FEUDALISM_DESC
+Augmente la [[metertype METER_TARGET_INDUSTRY]] des planètes en Focus Industrie au sein des systèmes abritant des planètes non-colonisées et peuplées de la même espèce, de [[value PLC_FEUDALISM_DESC_INDUSTRY_SCALING]] multiplié par la racine carrée du total de la Population sur ces planètes non-colonisées.
+
+PLC_FEUDALISM_SHORT_DESC
+Les planètes neutres améliorent l'Industrie
+
+PLC_THE_HUNT
+La Chasse
+
+PLC_THE_HUNT_DESC
+Améliore la [[metertype METER_TARGET_HAPPINESS]], la [[metertype METER_TARGET_INFLUENCE]], et l'indicateur [[metertype METER_MAX_TROOPS]] des planètes au sein des systèmes abritant également une planète habitée non-colonisée, n'ayant pas de [[metertype METER_SHIELD]] ni de [[metertype METER_DEFENSE]], et dont l'espèce est différente de celle peuplant la planète bénéficiaire ou la Capitale impériale.
+
+PLC_THE_HUNT_SHORT_DESC
+Chasser les espèces indigènes octroie diverses améliorations
 
 PLC_ALGORITHMIC_RESEARCH
 Recherche Algorithmique
 
 PLC_ALGORITHMIC_RESEARCH_DESC
-Augmente la [[metertype METER_TARGET_RESEARCH]] sur les planètes en Focus Recherche de [[value LRN_ALGO_RESEARCH_TARGET_RESEARCH_PERCONSTRUCTION]] par la valeur la plus faible entre la [[metertype METER_POPULATION]] ou l'[[metertype METER_CONSTRUCTION]].
+'''Augmente la [[metertype METER_TARGET_RESEARCH]] sur les planètes en Focus Recherche de [[value LRN_ALGO_RESEARCH_TARGET_RESEARCH_PERCONSTRUCTION]] par la valeur la plus faible entre la [[metertype METER_POPULATION]] ou l'[[metertype METER_CONSTRUCTION]].
+Cet effet requiert une [[metertype METER_HAPPINESS]] of [[value LRN_ALGO_RESEARCH_MIN_STABILITY]].'''
 
 PLC_ALGORITHMIC_RESEARCH_SHORT_DESC
 Améliore la Recherche
@@ -11645,7 +11816,8 @@ PLC_INDOCTRINATION
 Endoctrinement
 
 PLC_INDOCTRINATION_DESC
-Augmente progressivement la [[metertype METER_TARGET_HAPPINESS]] des planètes. Le bonus croît jusqu'à [[value PLC_INDOCTRINATION_STRENGTH_MAX]] tant que la Politique est appliquée pour plusieurs tours.
+'''• Augmente progressivement la [[metertype METER_TARGET_HAPPINESS]] des planètes. Le bonus croît de [[value PLC_INDOCTRINATION_PER_TURN]] par tour, jusqu'à un maximum de [[value PLC_INDOCTRINATION_STRENGTH_MAX]]. Les planètes fraîchement conquises démarre à zéro, les planètes déjà colonisées obtiennent le bonus maximum actuel.
+• Augmente la [[metertype METER_TARGET_INFLUENCE]] de la Capitale ou des planètes hébergeant une structure d'[[buildingtype BLD_REGIONAL_ADMIN]], et en Focus Influence, de [[value PLC_INDOCTRINATION_INFLUENCE_FLAT]].'''
 
 PLC_INDOCTRINATION_SHORT_DESC
 Augmente la Stabilité progressivement
@@ -11654,7 +11826,9 @@ PLC_MARTIAL_LAW
 Loi Martiale
 
 PLC_MARTIAL_LAW_DESC
-Augmente la [[metertype METER_TARGET_HAPPINESS]] des planètes habitées et diminue la [[metertype METER_TARGET_RESEARCH]] de [[value PLC_MARTIAL_LAW_STABILITY_PER_TROOPS]] par la valeur de l'indicateur [[metertype METER_MAX_TROOPS]] des planètes. Réduit également la portée de l'[[metertype METER_SUPPLY]] des planètes habitées de [[value PLC_MARTIAL_LAW_SUPPLY_PENALTY]].
+'''• Diminue la portée de l'[[metertype METER_SUPPLY]] des planètes habitées de [[value PLC_MARTIAL_LAW_SUPPLY_PENALTY]].
+• Augmente la [[metertype METER_TARGET_HAPPINESS]] des planètes habitées de [[value PLC_MARTIAL_LAW_STABILITY_PER_TROOPS]] par la valeur de l'indicateur [[metertype METER_MAX_TROOPS]].
+• Diminue la [[metertype METER_TARGET_RESEARCH]] des planètes habitées de [[value PLC_MARTIAL_LAW_STABILITY_PER_TROOPS]] par la valeur de l'indicateur [[metertype METER_MAX_TROOPS]].'''
 
 PLC_MARTIAL_LAW_SHORT_DESC
 Augmente la Stabilité à l'aide de l'Infanterie
@@ -11663,7 +11837,9 @@ PLC_TERROR_SUPPRESSION
 Suppression du Terrorisme
 
 PLC_TERROR_SUPPRESSION_DESC
-Augmente la [[metertype METER_TARGET_HAPPINESS]] des planètes habitées de [[value PLC_TERROR_SUPPRESSION_TARGET_STABILITY_SCALE]] par le nombre d'astronefs présents dans le système et appartenant à l'empire, armés, et dont l'équipage est de la même espèce que celle peuplant la Capitale impériale. Ces astronefs coûtent [[value PLC_TERROR_SUPPRESSION_SHIP_INFLUENCE_FLAT]] en [[metertype METER_INFLUENCE]].
+'''• Augmente la [[metertype METER_TARGET_HAPPINESS]] des planètes habitées de [[value PLC_TERROR_SUPPRESSION_TARGET_STABILITY_SCALE]] par le nombre d'astronefs présents dans le système et appartenant à l'empire, armés, et dont l'équipage est de la même espèce que celle peuplant la Capitale impériale.
+• Diminue l'[[metertype METER_REBEL_TROOPS]] sur ces planètes de [[value PLC_TERROR_SUPPRESSION_REBEL_REDUCTION_SCALE]] par astronef.
+• Ces astronefs coûtent [[value PLC_TERROR_SUPPRESSION_SHIP_INFLUENCE_FLAT]] en [[metertype METER_INFLUENCE]].'''
 
 PLC_TERROR_SUPPRESSION_SHORT_DESC
 Augmente la Stabilité à l'aide d'astronefs armés
@@ -11672,7 +11848,9 @@ PLC_DREAM_RECURSION
 Récursivité Imaginaire
 
 PLC_DREAM_RECURSION_DESC
-Augmente la [[metertype METER_TARGET_HAPPINESS]] des planètes habitées de la valeur nécessaire pour atteindre [[value PLC_INDOCTRINATION_STRENGTH_MAX]] et réduit l'[[metertype METER_INFLUENCE]] de chaque planète de la même valeur que leur [[metertype METER_TARGET_HAPPINESS]] est augmentée.
+'''Augmente la [[metertype METER_TARGET_HAPPINESS]] des planètes habitées de la valeur nécessaire pour atteindre [[value PLC_INDOCTRINATION_STRENGTH_BASE]]. Cette limite est augmentée de [[value PLC_INDOCTRINATION_STRENGTH_PER_COLLECTIVE_NET]] pour chaque structure [[buildingtype BLD_COLLECTIVE_NET]] contrôlée par l'empire appliquant cette Politique.
+
+Réduit l'[[metertype METER_INFLUENCE]] de chaque planète de la racine carrée de la valeur augmentant leur [[metertype METER_TARGET_HAPPINESS]].'''
 
 PLC_DREAM_RECURSION_SHORT_DESC
 Augmentation ciblée de la Stabilité
@@ -11681,7 +11859,13 @@ PLC_CONFORMANCE
 Conformité
 
 PLC_CONFORMANCE_DESC
-Réduit l'impact des préférences d'une espèce (aime ou n'aime pas) sur la Stabilité planétaire.
+'''• Réduit l'impact des préférences d'une espèce (aime ou n'aime pas telles structures ou Politiques) sur la [[metertype METER_HAPPINESS]] planétaire.
+• Diminue la [[metertype METER_TARGET_RESEARCH]] de [[value PLC_CONFORMANCE_RESEARCH_PENALTY_FLAT]] sur toutes les planètes. 
+• Augmente la [[metertype METER_TARGET_HAPPINESS]] de [[value PLC_CONFORMANCE_STABILITY_BONUS_FLAT]].
+
+Sur toutes les planètes dont la [[metertype METER_HAPPINESS]] est supérieure ou égale à [[value PLC_CONFORMANCE_MIN_STABILITY]]:
+• Augmente la [[metertype METER_TARGET_CONSTRUCTION]] de [[value PLC_CONFORMANCE_INFRASTRUCTURE_BONUS_FLAT]].
+• Augmente la [[metertype METER_STOCKPILE]] de [[value PLC_CONFORMANCE_STOCKPILING_BONUS_FLAT]].'''
 
 PLC_CONFORMANCE_SHORT_DESC
 Réduit les effets des opinions d'une espèce
@@ -11690,7 +11874,8 @@ PLC_LIBERTY
 Liberté
 
 PLC_LIBERTY_DESC
-Augmente l'impact des préférences d'une espèce (aime ou n'aime pas) sur la Stabilité planétaire.
+'''• Augmente l'impact des préférences d'une espèce (aime ou n'aime pas telles structures ou Politiques) sur la [[metertype METER_HAPPINESS]] planétaire.
+• Sur toutes les planètes dont la [[metertype METER_HAPPINESS]] est supérieure ou égale à [[value PLC_LIBERTY_MIN_STABILITY]], augmente la [[metertype METER_TARGET_RESEARCH]] de [[value PLC_LIBERTY_RESEARCH_BONUS_FLAT]] et diminue la [[metertype METER_TARGET_HAPPINESS]] de [[value PLC_LIBERTY_STABILITY_PENALTY_FLAT]].'''
 
 PLC_LIBERTY_SHORT_DESC
 Augmente les effets des opinions d'une espèce
@@ -11719,7 +11904,7 @@ PLC_SYSTEM_INFRA
 Infrastructure Systémique
 
 PLC_SYSTEM_INFRA_DESC
-'''Octroie 2 choix supplémentaires de Politique économique.
+'''Octroie 1 choix supplémentaire de Politique économique.
 
 Augmente de 5 la [[metertype METER_TARGET_CONSTRUCTION]] des planètes habitées au sein des systèmes abritant au moins 2 planètes appartenant à l'empire qui applique cette Politique.'''
 
@@ -11741,10 +11926,20 @@ PLC_CAPITAL_MARKETS
 Marchés Capitaux
 
 PLC_CAPITAL_MARKETS_DESC
-Les planètes disposant d'une Particularité de ressources de luxe et réglées sur le Focus Influence, exporteront cette ressource vers les planètes reliées par lignes d'[[metertype METER_SUPPLY]], améliorant la [[metertype METER_HAPPINESS]] des planètes peuplées d'espèces appréciant cette ressource.
+'''• Les planètes disposant d'une Particularité de ressources de luxe et réglées sur le Focus Influence, exporteront cette ressource vers les planètes reliées par lignes d'[[metertype METER_SUPPLY]]. Cela améliore de [[value SPECIAL_CAPITAL_MARKETS_STABILITY_FOCUS_BONUS]] la [[metertype METER_HAPPINESS]] des planètes peuplées d'espèces appréciant cette ressource.
+• Augmente le taux de progression ou de régression de l'[[metertype METER_INFLUENCE]] de [[value PLC_CAPITAL_MARKETS_INFLUENCE_RATE]] / tour pour atteindre la valeur de la [[metertype METER_TARGET_INFLUENCE]].'''
 
 PLC_CAPITAL_MARKETS_SHORT_DESC
 Améliore la Stabilité via l'export de ressources
+
+PLC_BLACK_MARKET
+Marchés Noirs
+
+PLC_BLACK_MARKET_DESC
+La [[metertype METER_TARGET_INFLUENCE]] des planètes avec une [[metertype METER_HAPPINESS]] de [[value PLC_BLACK_MARKET_MAX_STABILITY]] ou moins, et étant réglées sur le Focus Influence, augmentera de [[value SPECIAL_BLACK_MARKET_INFLUENCE_FOCUS_BONUS]] pour chaque planète reliées par ligne d'[[metertype METER_SUPPLY]] et disposant d'une Particularité de ressources de luxe, qu'apprécie la population de la planète en Focus Influence.
+
+PLC_BLACK_MARKET_SHORT_DESC
+Améliore l'Influence selon les ressources
 
 PLC_ARTISAN_WORKSHOPS
 Ateliers Artisanaux
@@ -11759,7 +11954,10 @@ PLC_BOOTSTRAPPING
 Planification Coloniale
 
 PLC_BOOTSTRAPPING_DESC
-Augmente le taux de croissance des indicateurs Industrie, Recherche, et Influence, et améliore la Stabilité des colonies dont la Population est inférieure à 6.
+'''• Augmente le taux de progression des indicateurs Industrie, Recherche, et Influence, et améliore la Stabilité des colonies dont la Population est inférieure à [[value PLC_BOOTSTRAPPING_MAX_POP]].
+• Augmente la [[metertype METER_TARGET_HAPPINESS]] des planètes ayant été colonisées durant les [[value PLC_BOOTSTRAPPING_MAX_TURNS]] derniers tours, puis diminue progressivement.
+
+Les nouvelles colonies bénéficient souvent de programmes visant à soutenir leur développement initial et les efforts des colons pour fonder leur nouvel habitat.'''
 
 PLC_BOOTSTRAPPING_SHORT_DESC
 Améliore les colonies de petite taille
@@ -11772,6 +11970,78 @@ Augmente l'Influence de la Capitale de [[value PROPAGANDA_INFLUENCE_FLAT]].
 
 PLC_PROPAGANDA_SHORT_DESC
 Augmente l'Influence de la Capitale
+
+PLC_AUGMENTATION  # translated
+Augmentation
+
+PLC_AUGMENTATION_DESC
+'''• Augmente la [[metertype METER_TARGET_POPULATION]] des planètes [[PE_HOSTILE]]s selon leur taille: ([[SZ_TINY]] +2) ([[SZ_SMALL]] +4) ([[SZ_MEDIUM]] +6) ([[SZ_LARGE]] +8) ([[SZ_HUGE]] +10).
+• Augmente l'[[metertype METER_TROOPS]] max sur toutes les planètes de [[value CYBORG_MAX_TROOPS_PERPOP]] par [[metertype METER_POPULATION]].
+• Augmente ou diminue le taux de croissance de la Population, selon que l'[[metertype METER_CONSTRUCTION]] de la planète est supérieure ou inférieure à [[value AUGMENTATION_FULL_GROWTH_INFRASTRUCTURE_REQUIREMENT]].
+
+La cyborgification engendre la fusion hautement polyvalente d'organismes vivants, de corps inorganiques et de machines, capable de s'adapter rapidement aux circonstances changeantes. La génération spontanée d'organes spécialisés, de mécanismes, et d'une adaptabilité environnementale, permet aux cyborgs d'évoluer et de prospérer dans quasiment tous les types d'environnement.'''
+
+PLC_AUGMENTATION_SHORT_DESC
+Améliorations planétaires diverses
+
+PLC_ISOLATION  # translated
+Isolation
+
+PLC_ISOLATION_DESC
+'''• Augmente la [[metertype METER_TARGET_HAPPINESS]] des colonies situées à plus de [[value PLC_ISOLATION_THRESHOLD_DISTANCE]] uu d'une autre planète habitée.
+• Diminue la [[metertype METER_TARGET_HAPPINESS]] des colonies situées à moins de [[value PLC_ISOLATION_THRESHOLD_DISTANCE]] uu d'une autre planète habitée.
+• Augmente la [[metertype METER_STEALTH]] des colonies de [[value PLC_ISOLATION_STEALTH]].'''
+
+PLC_ISOLATION_SHORT_DESC
+Améliore les planètes isolées
+
+PLC_BUREAUCRACY
+Bureaucratie
+
+PLC_BUREAUCRACY_DESC
+'''• Augmente la [[metertype METER_TARGET_HAPPINESS]] d'une planète habitée et appartenant à l'empire de [[value PLC_BUREAUCRACY_STABILITY_FLAT]], tant que l'empire dispose de suffisamment de structures d'[[buildingtype BLD_REGIONAL_ADMIN]]. Une structure supplémentaire d'[[buildingtype BLD_REGIONAL_ADMIN]] est requise tous les [[value BUREACRACY_ADMINS_NEEDED_TURN_SCALING]] tours à partir de l'application de cette Politique.
+• Modifier le Focus planétaire réduit l'[[metertype METER_INFLUENCE]] de cette planète de [[value BUREAUCRACY_FOCUS_CHANGE_PENALTY]].'''
+
+PLC_BUREAUCRACY_SHORT_DESC
+Améliore la Stabilité
+
+PLC_NECESSITY
+Nécessité
+
+PLC_NECESSITY_DESC
+Augmente la [[metertype METER_TARGET_RESEARCH]] des planètes dont la [[metertype METER_HAPPINESS]] est inférieure à [[value PLC_NECESSITY_MAX_STABILITY]], de la racine carrée du produit entre la Population et de combien la [[metertype METER_HAPPINESS]] est inférieure à [[value PLC_NECESSITY_MAX_STABILITY]].
+
+PLC_NECESSITY_SHORT_DESC
+Améliore la Recherche des planètes à faible Stabilité
+
+PLC_EXPLORATION_RESEARCH
+Recherche d'Exploration
+
+PLC_EXPLORATION_RESEARCH_DESC
+Pour chaque tour durant lequel un système est nouvellement exploré, les astronefs présents dans ce système génèrent un total de [[value EXPLORATION_RESEARCH_BONUS_TOTAL]] PR.
+
+PLC_EXPLORATION_RESEARCH_SHORT_DESC
+L'exploration octroie de la Recherche
+
+PLC_FLANKING
+Encerclement
+
+PLC_FLANKING_DESC
+Dans les systèmes où l'empire appliquant cette Politique dispose d'astronefs armés stationnaires plus nombreux que les astronefs ennemis présents, l'armement de cet empire infligera [[value PLC_FLANKING_DAMAGE_BOOST]] dommages additionnels par tir.
+
+PLC_FLANKING_SHORT_DESC
+Améliore les dommages infligés par les astronefs
+
+PLC_CHARGE  # translated
+Charge
+
+PLC_CHARGE_DESC
+'''Pour les astronefs armés ayant une [[metertype METER_SPEED]] supérieure ou égale à [[value PLC_CHARGE_MINIMUM_SPEED]] :
+• Les [[encyclopedia DAMAGE_TITLE]] infligés par l'armement augmentent de [[value PLC_CHARGE_DAMAGE_BOOST]].
+• L'indicateur [[metertype METER_MAX_SHIELD]] diminue de [[value PLC_CHARGE_SHIELD_REDUCTION]].'''
+
+PLC_CHARGE_SHORT_DESC
+Améliore les dommages des astronefs rapides
 
 
 ##
@@ -11961,6 +12231,7 @@ Intelligences Artificielles
 
 LRN_NASCENT_AI_DESC
 '''Augmente la [[metertype METER_TARGET_RESEARCH]] de [[value LRN_NASCENT_AI_TARGET_RESEARCH_FLAT]] sur toutes les planètes.
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value LRN_NASCENT_AI_MIN_STABILITY]].
 
 Alors que les ordinateurs traditionnels ont des capacités de calcul presque infinies, ils leur manquent cependant une qualité essentielle: la conscience. Bien que la définition complète du concept de conscience reste insaisissable, cette qualité peut être toutefois synthétisée et reproduite de manière plutôt convaincante. Ces recherches peuvent ouvrir de nouvelles voies en matière de sciences cognitives et de métaparadigmes.
 
@@ -12034,6 +12305,7 @@ Réseau Quantique
 
 LRN_QUANT_NET_DESC
 '''Augmente la [[metertype METER_TARGET_RESEARCH]] de [[value LRN_QUANT_NET_TARGET_RESEARCH_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes en Focus Recherche.
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value LRN_QUANT_NET_MIN_STABILITY]].
 
 Un réseau massif de donnés, à l'échelle de l'empire, capable de transférer instantanément des informations entre deux lieux, plutôt que par le système lent et indirect des voies spatiales. Ce progrès facilite grandement la Recherche dans tout l'empire.
 
@@ -12143,13 +12415,16 @@ GRO_TRANSORG_SENT
 Sentience Trans-Organique
 
 GRO_TRANSORG_SENT_DESC
-La sentience telle que nous la connaissons a toujours été inextricablement liée à la vie biologique. En comprenant la vraie nature et l'origine de la sentience elle-même, il deviendrait alors possible de créer des entités conscientes qui ne pourraient être cataloguées en tant que vie biologique telle que nous la connaissons.
+'''• Augmente le taux de progression ou de régression de l'[[metertype METER_INFLUENCE]] de [[value GRO_TRANSORG_INFLUENCE_RATE]] / tour pour atteindre la valeur de la [[metertype METER_TARGET_INFLUENCE]].
+
+La sentience est inextricablement liée à la vie, mais avec une compréhension fondamentale de sa nature, il deviendrait alors possible de créer des entités conscientes qui ne pourraient être cataloguées en tant que vie.'''
 
 GRO_ENERGY_META
 Métabolisme d'Énergie Pure
 
 GRO_ENERGY_META_DESC
 '''Augmente le [[metertype METER_FUEL]] max de 1 sur tous les astronefs (avant mise à l'échelle selon le [[encyclopedia FUEL_EFFICIENCY_TITLE]]), la [[metertype METER_DEFENSE]] max de [[value GRO_ENERGY_META_MAX_DEFENSE_FLAT]] sur toutes les planètes, les [[metertype METER_SHIELD]] max de [[value GRO_ENERGY_META_MAX_SHIELD_FLAT]] sur toutes les planètes, la [[metertype METER_TARGET_INDUSTRY]] de [[value GRO_ENERGY_META_TARGET_INDUSTRY_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes en Focus Industrie, et la [[metertype METER_TARGET_RESEARCH]] de [[value GRO_ENERGY_META_TARGET_RESEARCH_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes en Focus Recherche.
+Le bonus d'Industrie et de Recherche requièrent une [[metertype METER_HAPPINESS]] de [[value GRO_ENERGY_META_MIN_STABILITY]].
 
 Tandis que la transformation d'une population entière en êtres de pure énergie s'avérerait peu pertinente, certaines tâches conviennent mieux à des individus dénués de corporalité. L'équipage d'un astronef par exemple, n'aurait plus besoin d'optimiser l'espace disponible pour les quartiers d'équipage ou le stockage des rations. Des êtres dotés d'une capacité de canalisation de l'énergie seraient en mesure d'améliorer les défenses et boucliers planétaires, ainsi que la production de ressources.
 
@@ -12214,15 +12489,14 @@ PRO_VOID_PREDICTION_DESC
 Pour le service du Stock Impérial, la Prédiction du Vide est l'instrument par excellence permettant de fournir les bons matériaux avant même que le besoin ne se manifeste.
 
 Il s'agit donc d'une technologie d'amélioration du [[encyclopedia STOCKPILE_TITLE]]. La [[metertype METER_STOCKPILE]] augmente de 0.2 par [[metertype METER_POPULATION]].
-Ces améliorations sont cumulables avec les bonus des technologies [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] et [[tech PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY]].
-
-Octroie également 1 choix de Politique économique.'''
+Ces améliorations sont cumulables avec les bonus des technologies [[tech PRO_PREDICTIVE_STOCKPILING]], [[tech PRO_GENERIC_SUPPLIES]] et [[tech PRO_INTERSTELLAR_ENTANGLEMENT_FACTORY]].'''
 
 PRO_MICROGRAV_MAN
 Production en Microgravité
 
 PRO_MICROGRAV_MAN_DESC
 '''Augmente la [[metertype METER_TARGET_INDUSTRY]] de [[value PRO_MICROGRAV_MAN_TARGET_INDUSTRY_FLAT]] sur toutes les colonies en Focus Industrie situées dans des systèmes abritant des colonies ou avant-postes sur une Ceinture d'Astéroïdes. Plusieurs Ceintures d'Astéroïdes n'engendrent pas de bénéfices additionnels.
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value PRO_MICROGRAV_MAN_MIN_STABILITY]].
 
 L'extraction de ressources minières sur des planétoïdes implique de nombreux challenges mais aussi de réelles opportunités en comparaison d'une exploitation planétaire classique. Ne disposant pas de la masse nécessaire pour la liquéfaction et la différenciation, les astéroïdes permettent un accès bien plus aisé à certains éléments lourds, tandis que l'absence de gravité rend l'extraction en vue d'une utilisation directe dans l'espace bien plus efficace. Par contre, la taille généralement limitée des astéroïdes requiert des infrastructures d'extraction auto-suffisantes et d'une grande mobilité. Par conséquent, les défis relatifs à un environnement en microgravité doivent être surmontés, nécessitant une refonte totale des méthodes traditionnelles.
 
@@ -12233,6 +12507,7 @@ Production Robotisée
 
 PRO_ROBOTIC_PROD_DESC
 '''Augmente la [[metertype METER_TARGET_INDUSTRY]] de [[value PRO_ROBOTIC_PROD_TARGET_INDUSTRY_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes en Focus Industrie.
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value PRO_ROBOTIC_PROD_MIN_STABILITY]].
 
 Robots conçus pour effectuer n'importe quelle tâche, de l'électronique microscopique à la construction à grande échelle, améliorant ainsi considérablement la performance des mondes privilégiant l'industrie.
 
@@ -12249,6 +12524,7 @@ Génération par Fusion
 
 PRO_FUSION_GEN_DESC
 '''Augmente la [[metertype METER_TARGET_INDUSTRY]] de [[value PRO_FUSION_GEN_TARGET_INDUSTRY_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes en Focus Industrie.
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value PRO_FUSION_GEN_MIN_STABILITY]].
 
 Les réacteurs de fusion nucléaire, bien que coûteux à produire et à entretenir, s'avèrent rentables pour les mondes industrialisés à forte consommation énergétique. La dépendance aux réacteurs basés sur la fission nucléaire deviendra peu à peu une relique du passé.
 
@@ -12273,6 +12549,7 @@ Automates Adaptatifs
 
 PRO_ADAPTIVE_AUTOMATION_DESC
 '''Augmente la [[metertype METER_TARGET_INDUSTRY]] de [[value PRO_ADAPTIVE_AUTO_TARGET_INDUSTRY_FLAT]] sur toutes les planètes.
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value PRO_ADAPTIVE_AUTO_MIN_STABILITY]].
 
 En concevant des usines automatisées ne nécessitant aucune supervision directe, il devient alors possible d'accroître la production industrielle via un processus totalement autonome. Ces usines peuvent être construites et entretenues sur n'importe quelle planète, quel que soit son Focus, engendrant un bonus industriel dans tout l'empire.
 
@@ -12358,11 +12635,11 @@ CON_FRC_ENRG_STRC
 Structures Synergiques
 
 CON_FRC_ENRG_STRC_DESC
-'''Accroît la progression des indicateurs de ressources et d'infrastructure inférieurs à la valeur projetée de 3 par tour, et la diminution des indicateurs de ressources supérieurs à la valeur projetée de 5 par tour. L'[[metertype METER_INDUSTRY]] et la [[metertype METER_RESEARCH]] n'augmentent que si la [[metertype METER_HAPPINESS]] est au moins égale à 5.
+'''Augmente le taux de progression ou de régression de l'[[metertype METER_INDUSTRY]], de la [[metertype METER_RESEARCH]], de l'[[metertype METER_CONSTRUCTION]], et de la [[metertype METER_STOCKPILE]] pour atteindre leur Projection ou leur valeur maximum, de [[value FORCE_ENERGY_RATE_INCREASE]] par tour.
 
 La flexibilité et la versatilité des structures synergiques permettent de redéfinir plus facilement le rôle des infrastructures des colonies en vue de nouvelles applications, augmentant ainsi la rapidité et le taux d'une modification de Focus.
 
-Quand les forces et les énergies peuvent être manipulées à volonté afin de remplir les mêmes fonctions que des objets solides, les matériaux physiques ne sont plus nécessaires dans la conception infrastructurelle. Des structures composées entièrement d'énergie présentent de nombreux avantages, tels que la reconfiguration simplifiée, l'adaptation et la résistance, la mobilité ainsi que de nouvelles possibilités de design.'''
+Quand les forces et les énergies peuvent être manipulées de manière adaptée afin de remplir les mêmes fonctions que des objets solides, les matériaux physiques ne sont plus nécessaires dans la conception infrastructurelle. Des structures composées entièrement d'énergie présentent de nombreux avantages, tels que la reconfiguration rapide, l'adaptation et la résistance, la mobilité, ainsi que de nouvelles possibilités de design.'''
 
 CON_CONTGRAV_ARCH
 Architecture Gravitationnelle
@@ -12760,15 +13037,6 @@ Un centre de recherche créé pour développer le plus terrifiant des armements 
 GRO_REMOTE_TERRAFORM_SHORT_DESC
 Permet la terraformation à distance
 
-GRO_CYBORG  # translated
-Cyborgs
-
-GRO_CYBORG_DESC
-'''Accroît la [[metertype METER_TARGET_POPULATION]] des Planètes [[PE_HOSTILE]]s selon leur taille: ([[SZ_TINY]] +2) ([[SZ_SMALL]] +4) ([[SZ_MEDIUM]] +6) ([[SZ_LARGE]] +8) ([[SZ_HUGE]] +10).
-Accroît l'[[metertype METER_TROOPS]] max de [[value CYBORG_MAX_TROOPS_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes.
-
-Une fusion hautement polyvalente d'un organisme vivant et d'une machine, capable de s'adapter à un nombre considérable de situations. La génération spontanée d'organes spécialisés ainsi qu'une force bio-mécanique fortement accrue permettent aux cyborgs d'évoluer avec aisance dans quasiment tous les types d'environnement.'''
-
 GRO_GAIA_TRANS
 Transformation Gaia
 
@@ -12803,7 +13071,10 @@ LRN_DISTRIB_THOUGHT
 Centralisation Cérébrale
 
 LRN_DISTRIB_THOUGHT_DESC
-'''Augmente la [[metertype METER_TARGET_RESEARCH]] sur toutes les planètes en Focus Recherche, en fonction de la distance entre la planète et l'astronef de l'empire le plus éloigné.
+'''Augmente la [[metertype METER_TARGET_RESEARCH]] sur toutes les planètes en Focus Recherche, en fonction de la distance entre la planète et l'autre planète la plus éloignée également en Focus Recherche et appartenant au même empire. La Recherche est augmentée de la valeur la plus faible entre:
+• [[value DISTRIB_THOUGH_RESEARCH_SCALING]] x la racine carrée de la distance en uu de la planète la plus éloignée, en Focus Recherche et appartenant à l'empire
+• L'[[metertype METER_CONSTRUCTION]] de la planète la plus éloignée x [[value DISTRIB_THOUGH_INFRA_LIMIT_SCALING]]
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value LRN_DISTRIB_THOUGHT_MIN_STABILITY]].
 
 Octroie 1 choix supplémentaire de Politique militaire.
 
@@ -12814,9 +13085,9 @@ Tomographie Stellaire
 
 LRN_STELLAR_TOMOGRAPHY_DESC
 '''Augmente la [[metertype METER_TARGET_RESEARCH]] des planètes réglées sur le Focus Recherche, selon le type d'étoile et le nombre de planètes en Focus Recherche au sein du même système:
-* [[STAR_BLACK]] (+[[value LRN_STELLAR_TOMO_BLACK_TARGET_RESEARCH_PERPLANET]])
-* [[STAR_NEUTRON]] (+[[value LRN_STELLAR_TOMO_NEUTRON_TARGET_RESEARCH_PERPLANET]])
-* [[STAR_BLUE]], [[STAR_WHITE]], [[STAR_YELLOW]], [[STAR_ORANGE]] ou [[STAR_RED]] (+[[value LRN_STELLAR_TOMO_NORMAL_STAR_TARGET_RESEARCH_PERPLANET]])
+• [[STAR_BLACK]] (+[[value LRN_STELLAR_TOMO_BLACK_TARGET_RESEARCH_PERPLANET]] x le nombre de planètes)
+• [[STAR_NEUTRON]] (+[[value LRN_STELLAR_TOMO_NEUTRON_TARGET_RESEARCH_PERPLANET]] x le nombre de planètes)
+• [[STAR_BLUE]], [[STAR_WHITE]], [[STAR_YELLOW]], [[STAR_ORANGE]] ou [[STAR_RED]] (+[[value LRN_STELLAR_TOMO_NORMAL_STAR_TARGET_RESEARCH_PERPLANET]] x le nombre de planètes)
 
 Un réseau de satellites spécialisés peut utiliser des méthodes tomographiques pour cartographier et reconstituer les différentes activités se produisant dans les profondeurs d'une étoile. Ces conditions expérimentales, habituellement coûteuses à mettre en place, sont ici idéales pour une multitude de projets de recherche, les plus grands bénéfices scientifiques découlant de l'étude des types d'étoiles les plus exotiques.'''
 
@@ -12987,7 +13258,7 @@ DEF_GARRISON_2
 Milice Planétaire Défensive
 
 DEF_GARRISON_2_DESC
-Augmente l'[[metertype METER_TROOPS]] max de [[value GARRISON_2_MAX_TROOPS_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes de l'empire (variable selon les caractéristiques défensives de l'espèce), et régénère l'Infanterie d'un bonus de [[value GARRISON_2_TROOPREGEN_FLAT]] par tour.
+Augmente l'[[metertype METER_TROOPS]] max de [[value GARRISON_2_MAXTROOPS_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes de l'empire (variable selon les caractéristiques défensives de l'espèce), et régénère l'Infanterie d'un bonus de [[value GARRISON_2_TROOPREGEN_FLAT]] par tour.
 
 DEF_GARRISON_3
 Réseau Fortication Planétaire
@@ -13678,6 +13949,7 @@ Archives Culturelles
 
 BLD_CULTURE_ARCHIVES_DESC
 '''Augmente la [[metertype METER_TARGET_RESEARCH]] de [[value BLD_CULTURE_ARCHIVES_TARGET_RESEARCH_FLAT]], ainsi que la [[metertype METER_TARGET_INDUSTRY]] de [[value BLD_CULTURE_ARCHIVES_TARGET_INDUSTRY_PERPOP]] par [[metertype METER_POPULATION]].
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value BLD_CULTURE_ARCHIVES_MIN_STABILITY]].
 
 Abrite le savoir accumulé durant des milliers d'années d'existence sur cette planète, améliorant différents aspects de la productivité planétaire.'''
 
@@ -13686,6 +13958,7 @@ Bibliothèque Culturelle
 
 BLD_CULTURE_LIBRARY_DESC
 '''Augmente la [[metertype METER_TARGET_RESEARCH]] de [[value BLD_CULTURE_LIBRARY_TARGET_RESEARCH_FLAT]].
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value BLD_CULTURE_LIBRARY_MIN_STABILITY]].
 
 Abrite le savoir accumulé durant des milliers d'années d'existence sur cette planète, octroyant ainsi un bonus à la Recherche. Cette structure sera détruite si la [[metertype METER_POPULATION]] planétaire est réduite à zéro.'''
 
@@ -13725,7 +13998,8 @@ BLD_MILITARY_COMMAND
 Commandement Militaire
 
 BLD_MILITARY_COMMAND_DESC
-Fournit un choix de Politique militaire.
+'''• Octroie un choix de Politique militaire.
+• Octroie un choix supplémentaire de Politique militaire si l'empire a détruit au moins 5 astronefs.'''
 
 BLD_SUPER_TEST
 Invasion Super-Testeurs
@@ -13821,7 +14095,7 @@ BLD_SHIPYARD_ENRG_COMP_DESC
 
 En raison de l'important apport d'énergie nécessaire, ne peut être construit qu'au sein d'un système abritant une Étoile [[STAR_BLUE]], [[STAR_WHITE]] ou un [[STAR_BLACK]].
 
-Une structure hautement spécialisée conçue pour créer et assembler des coques constituées de grandes quantités d'énergie fortement compressées. S'agissant d'un processus délicat, le compresseur serait détruit dans une puissante explosion s'il venait à encaisser davantage qu'une infime quantité de [[encyclopedia DAMAGE_TITLE]].'''
+Une structure hautement spécialisée conçue pour créer et assembler des coques constituées de grandes quantités d'énergie fortement compressées.'''
 
 BLD_SHIPYARD_ENRG_SOLAR
 Unité de Confinement Solaire
@@ -13837,7 +14111,7 @@ BLD_BIOTERROR_PROJECTOR
 Base Bioterroriste
 
 BLD_BIOTERROR_PROJECTOR_DESC
-'''Donne accès au Focus Bioterrorisme à la planète sur laquelle est construite la Base Bioterroriste. Cela a pour effet de réduire de 2 par tour la [[metertype METER_POPULATION]] des planètes ennemies, seulement si ces dernières sont distantes de quatre Voies spatiales ou moins et si l'empire ennemi ne dispose pas d'une [[buildingtype BLD_GENOME_BANK]].
+'''Donne accès au Focus Bioterrorisme à la planète sur laquelle est construite la Base Bioterroriste. Cela a pour effet de réduire de 2 par tour la [[metertype METER_POPULATION]] des planètes ennemies, seulement si ces dernières sont distantes au plus de 4 Voies spatiales et si l'empire ennemi ne dispose pas d'une [[buildingtype BLD_GENOME_BANK]].
 
 Cette base clandestine d'armements biologiques provoque des ravages sur les planètes ennemies à proximité, en réduisant progressivement la Population de ces dernières jusqu'à extermination totale. Cependant, de telles activités n'étant pas approuvées par les lois galactiques, cette structure ne peut être construite que sur une planète autour de laquelle orbite une [[special RESONANT_MOON_SPECIAL]], et s'avère sans effets si l'empire ennemi dispose d'une Banque du Génome. [[BUILDING_AVAILABLE_ON_OUTPOSTS]], si une Lune Synchrone orbite également autour de ce dernier.'''
 
@@ -13860,21 +14134,23 @@ Centre Industriel
 
 BLD_INDUSTRY_CENTER_DESC
 '''Accorde initialement à la [[metertype METER_TARGET_INDUSTRY]] un bonus de [[value BLD_INDUSTRY_CENTER_1_TARGET_INDUSTRY_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes lui étant reliées par ligne d'[[metertype METER_SUPPLY]] et étant réglées sur le Focus Industrie.
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value BLD_INDUSTRY_CENTER_1_MIN_STABILITY]].
 [[NO_STACK_SUPPLY_CONNECTION_TEXT]]
 
-L'amélioration [[tech PRO_INDUSTRY_CENTER_II]] augmente le bonus à [[value BLD_INDUSTRY_CENTER_2_TARGET_INDUSTRY_PERPOP]] par Population.
+L'amélioration [[tech PRO_INDUSTRY_CENTER_II]] augmente le bonus à [[value BLD_INDUSTRY_CENTER_2_TARGET_INDUSTRY_PERPOP]] par Population, nécessitant une [[metertype METER_HAPPINESS]] de [[value BLD_INDUSTRY_CENTER_2_MIN_STABILITY]].
 
-L'amélioration [[tech PRO_INDUSTRY_CENTER_III]] augmente à nouveau le bonus à [[value BLD_INDUSTRY_CENTER_3_TARGET_INDUSTRY_PERPOP]] par Population.'''
+L'amélioration [[tech PRO_INDUSTRY_CENTER_III]] augmente à nouveau le bonus à [[value BLD_INDUSTRY_CENTER_3_TARGET_INDUSTRY_PERPOP]] par Population, nécessitant une [[metertype METER_HAPPINESS]] de [[value BLD_INDUSTRY_CENTER_3_MIN_STABILITY]].'''
 
 BLD_INTERSPECIES_ACADEMY
 Académie InterDesign d'Espèce
 
 BLD_INTERSPECIES_ACADEMY_DESC
 '''Accroît la limite d'usage du Stock Impérial en augmentant la capacité d'usage du Stock de [[value BLD_INTERSPECIES_ACADEMY_MAX_STOCKPILE_FLAT]] sur cette planète, si celle-ci est en [[encyclopedia STOCKPILE_FOCUS_TITLE]], la [[metertype METER_TARGET_RESEARCH]] de [[value BLD_INTERSPECIES_ACADEMY_TARGET_RESEARCH_FLAT]] si le [[encyclopedia RESEARCH_FOCUS_TITLE]] est activé, ou la [[metertype METER_TARGET_INFLUENCE]] de [[value BLD_INTERSPECIES_ACADEMY_TARGET_INFLUENCE_FLAT]] si le [[encyclopedia INFLUENCE_FOCUS_TITLE]] est activé.
+Le bonus de Recherche requiert une [[metertype METER_HAPPINESS]] de [[value BLD_INTERSPECIES_ACADEMY_MIN_STABILITY_RESEARCH]].
 
 Apprendre à concevoir des dispositifs utilisables par différentes espèces est crucial afin de développer des outils universellement exploitables.
 
-Chaque empire peut abriter une académie sur une à six planètes peuplées par différentes espèces. Pour accueillir une académie, la [[metertype METER_HAPPINESS]] de la [[metertype METER_POPULATION]] sur la planète doit être élevée et cette dernière doit se trouver à plus de trois Voies spatiales de l'académie existante la plus proche.'''
+Chaque empire peut abriter une académie sur une à six planètes peuplées par différentes espèces. Pour bâtir une académie, la [[metertype METER_HAPPINESS]] planétaire doit être d'au moins [[value BLD_INTERSPECIES_ACADEMY_MIN_STABILITY_BUILD]], et la planète doit se trouver à plus de trois Voies spatiales de l'académie existante la plus proche.'''
 
 BLD_STOCKPILING_CENTER
 Centre d'Intrication Impériale
@@ -13926,10 +14202,12 @@ BLD_COLLECTIVE_NET
 Réseau de Pensée Collective
 
 BLD_COLLECTIVE_NET_DESC
-'''Augmente la [[metertype METER_TARGET_INDUSTRY]] de [[value BLD_COLLECTIVE_NET_TARGET_INDUSTRY_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes en Focus Industrie, et la [[metertype METER_TARGET_RESEARCH]] de [[value BLD_COLLECTIVE_NET_TARGET_RESEARCH_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes en Focus Recherche. Tout voyage sur Voies spatiales dans un périmètre de 200 uu affaiblira l'efficacité de cette structure et supprimera tout bonus.
+'''• Augmente la [[metertype METER_TARGET_INDUSTRY]] de [[value BLD_COLLECTIVE_NET_TARGET_INDUSTRY_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes en Focus Industrie, et la [[metertype METER_TARGET_RESEARCH]] de [[value BLD_COLLECTIVE_NET_TARGET_RESEARCH_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes en Focus Recherche. Tout voyage sur Voies spatiales dans un périmètre de 200 uu affaiblira l'efficacité de cette structure et supprimera tout bonus.
+Ces effets requièrent une [[metertype METER_HAPPINESS]] de [[value BLD_COLLECTIVE_NET_MIN_STABILITY]].
 [[NO_STACK_SUPPLY_CONNECTION_TEXT]]
+• Augmente de [[value PLC_INDOCTRINATION_STRENGTH_PER_COLLECTIVE_NET]] la [[metertype METER_TARGET_HAPPINESS]] maximum atteinte via la Politique [[policy PLC_DREAM_RECURSION]].
 
-En transférant l'esprit dans le cyberespace, des milliers d'esprits peuvent agir comme un seul, résolvant des problèmes et faisant des découvertes qui s'avéreraient hors de portée pour un unique esprit, aussi brillant soit-il.'''
+En transférant l'esprit dans le cyberespace, des milliers d'esprits peuvent ainsi agir en tant qu'un seul, résolvant des problèmes et accomplissant des découvertes qui s'avéreraient hors de portée pour un unique esprit isolé, aussi brillant soit-il.'''
 
 BLD_GATEWAY_VOID
 Portail du Vide
@@ -13944,6 +14222,7 @@ Enclave Du Vide
 
 BLD_ENCLAVE_VOID_DESC
 '''Augmente la [[metertype METER_TARGET_RESEARCH]] de [[value BLD_ENCLAVE_VOID_TARGET_RESEARCH_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes en Focus Recherche.
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value BLD_ENCLAVE_VOID_MIN_STABILITY]].
 Les bonus de plusieurs exemplaires ne s'additionnent pas.
 
 La population entière d'une planète est modifiée génétiquement afin de l'harmoniser avec l'Esprit du Vide, et ainsi diffuser sa sagesse dans tout l'empire. Les habitants de l'Enclave du Vide sont considérés comme des prêtres, prophètes d'une pensée supérieure et d'un savoir suprême. Dans tous les domaines de grande importance pour la bonne marche de l'empire, leurs conseils et avis s'avèrent d'une grande valeur. Des émissaires de l'Enclave peuvent donc prendre part à tout projet impérial de Recherche et apporter ainsi une aide précieuse.'''
@@ -13960,11 +14239,18 @@ Inverseur de Trou Noir
 BLD_BLACK_HOLE_COLLAPSER_DESC
 Génère une [[fieldtype FLD_SUBSPACE_RIFT]] d'un rayon de 100 uu dont l'origine se situe à l'emplacement de la structure.
 
+BLD_FIELD_REPELLOR
+Répulseur de Milieux Interstellaires
+
+BLD_FIELD_REPELLOR_DESC
+Repousse les milieux interstellaires mobiles (ceux n'étant pas dans un système) loin de leur emplacement actuel.
+
 BLD_HYPER_DAM
 Barrage Hyperspatial
 
 BLD_HYPER_DAM_DESC
 '''Pour les planètes non-reliées à un [[buildingtype BLD_BLACK_HOLE_POW_GEN]], augmente la [[metertype METER_TARGET_INDUSTRY]] de [[value BLD_HYPER_DAM_TARGET_INDUSTRY_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes reliées par lignes d'[[metertype METER_SUPPLY]] et réglées sur le Focus Industrie, mais la [[metertype METER_TARGET_POPULATION]] de ces planètes est réduite ([[value BLD_HYPER_DAM_TARGET_POPULATION_PERSIZE]] par la taille de la planète: [[SZ_TINY]] -1, [[SZ_SMALL]] -2, [[SZ_MEDIUM]] -3, [[SZ_LARGE]] -4, [[SZ_HUGE]] -5).
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value BLD_HYPER_DAM_MIN_STABILITY]].
 [[NO_STACK_SUPPLY_CONNECTION_TEXT]]
 
 Une déchirure dans le tissu de l'univers, contrôlée et manipulée en toute sécurité. Chaque planète peut construire son propre barrage hyperspatial, mais un seul centre de contrôle est requis pour s'assurer que le continuum de l'espace-temps n'est pas endommagé. Par contre, toutes les planètes ayant recours à un barrage hyperspatial voient leur population souffrir de différents problèmes de santé, à moins que les planètes en question n'orbitent autour d'un [[STAR_BLACK]].
@@ -13982,9 +14268,10 @@ Générateur Orbital Solaire
 
 BLD_SOL_ORB_GEN_DESC
 '''Augmente la [[metertype METER_TARGET_INDUSTRY]] sur toutes les planètes lui étant reliées par ligne d'[[metertype METER_SUPPLY]], par [[metertype METER_POPULATION]] et selon le type d'étoile:
-* [[STAR_BLUE]] ou [[STAR_WHITE]] (x[[value BLD_SOL_ORB_GEN_BRIGHT_TARGET_INDUSTRY_PERPOP]])
-* [[STAR_YELLOW]] ou [[STAR_ORANGE]] (x[[value BLD_SOL_ORB_GEN_NORMAL_TARGET_INDUSTRY_PERPOP]])
-* [[STAR_RED]] (x[[value BLD_SOL_ORB_GEN_DIM_TARGET_INDUSTRY_PERPOP]])
+• [[STAR_BLUE]] ou [[STAR_WHITE]] (x[[value BLD_SOL_ORB_GEN_BRIGHT_TARGET_INDUSTRY_PERPOP]])
+• [[STAR_YELLOW]] ou [[STAR_ORANGE]] (x[[value BLD_SOL_ORB_GEN_NORMAL_TARGET_INDUSTRY_PERPOP]])
+• [[STAR_RED]] (x[[value BLD_SOL_ORB_GEN_DIM_TARGET_INDUSTRY_PERPOP]])
+Ces effets requièrent une [[metertype METER_HAPPINESS]] de [[value BLD_SOL_ORB_GEN_MIN_STABILITY]].
 [[NO_STACK_SUPPLY_CONNECTION_TEXT]] Le meilleur bonus s'applique.
 
 Un puissant générateur situé en orbite stellaire basse, conçu pour puiser directement l'énergie d'une étoile. Étant donné que différents types d'étoiles produisent différentes quantités d'énergie, le bonus industriel à l'échelle du système est tributaire du type d'étoile. [[BUILDING_AVAILABLE_ON_OUTPOSTS]].'''
@@ -14066,6 +14353,7 @@ Générateur de Singularité
 
 BLD_BLACK_HOLE_POW_GEN_DESC
 '''Augmente la [[metertype METER_TARGET_INDUSTRY]] de [[value BLD_BLACK_HOLE_POW_GEN_TARGET_INDUSTRY_PERPOP]] par [[metertype METER_POPULATION]] sur toutes les planètes lui étant reliées par ligne d'[[metertype METER_SUPPLY]] et étant réglées sur le Focus Industrie.
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value BLD_BLACK_HOLE_POW_GEN_MIN_STABILITY]].
 [[NO_STACK_SUPPLY_CONNECTION_TEXT]]
 
 [[BUILDING_AVAILABLE_ON_OUTPOSTS]], mais doit se trouver dans un système abritant un [[STAR_BLACK]].'''
@@ -14158,6 +14446,7 @@ Convertisseur de Géante Gazeuse
 
 BLD_GAS_GIANT_GEN_DESC
 '''Cette structure ne peut être construite que sur une [[PT_GASGIANT]]. Elle fournit un bonus de [[value BLD_GAS_GIANT_GEN_OUTPOST_TARGET_INDUSTRY_FLAT]] à la [[metertype METER_TARGET_INDUSTRY]] sur les planètes du même système réglées sur le Focus Industrie. Si le [[BLD_GAS_GIANT_GEN]] est construit sur une [[PT_GASGIANT]] inhabitée, le bonus de [[metertype METER_TARGET_INDUSTRY]] n'est que de [[value BLD_GAS_GIANT_GEN_COLONY_TARGET_INDUSTRY_FLAT]].
+Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value BLD_GAS_GIANT_GEN_MIN_STABILITY]].
 Les bonus de plusieurs exemplaires dans le même système ne s'additionnent pas.
 
 Un puissant générateur conçu pour puiser l'énergie des Géantes Gazeuses.'''
@@ -14178,13 +14467,23 @@ BLD_XENORESURRECTION_LAB
 Laboratoire de Xénorésurrection
 
 BLD_XENORESURRECTION_LAB_DESC
-Le Laboratoire de Xénorésurrection répare et recompose les échantillons organiques d'une espèce éteinte, permettant ainsi la colonisation de planètes reliées par lignes d'[[metertype METER_SUPPLY]] par une espèce éteinte découverte au sein de [[special ANCIENT_RUINS_SPECIAL]]. Ne peut être construit que sur les planètes où les fouilles de [[special ANCIENT_RUINS_SPECIAL]] ont révélé les corps parfaitement conservés d'une espèce éteinte.
+Répare et recompose les échantillons organiques d'une espèce éteinte, permettant ainsi la colonisation de planètes reliées par lignes d'[[metertype METER_SUPPLY]] par une espèce éteinte découverte au sein de [[special ANCIENT_RUINS_SPECIAL]]. Le laboratoire ne peut être construit que sur les planètes où les fouilles de [[special ANCIENT_RUINS_SPECIAL]] ont révélé les corps parfaitement conservés d'une espèce éteinte.
+
+BLD_TRANSLATOR
+Traducteur Quasi-Universel
+
+BLD_TRANSLATOR_DESC
+'''Octroie 1 choix de Politique sociale.
+
+Augmente la capacité en Influence d'une planète, lorsque celle-ci est réglée sur le Focus Influence, de [[value TRANSLATOR_PER_SPECIES_INFLUENCE]] multiplié par la racine carrée du nombre d'espèces uniques sur les planètes contrôlées par l'empire possédant cette structure.
+
+Le coût de production diminue à mesure qu'augmente le nombre d'espèces uniques visibles par l'empire producteur de la structure.'''
 
 BLD_COLONY_BASE
 Colonisateur Stellaire
 
 BLD_COLONY_BASE_DESC
-Crée un astronef [[predefinedshipdesign SD_COLONY_BASE]] permettant de coloniser une autre planète du même système stellaire. [[MIN_POPULATION_THREE_REQUIRED]].
+Crée un astronef [[predefinedshipdesign SD_COLONY_BASE]] permettant de coloniser une autre planète du même système stellaire. [[MIN_POPULATION_REQUIRED]].
 
 BLD_EXPERIMENTOR_OUTPOST
 Avant-Poste Expérimentateur
@@ -15804,8 +16103,8 @@ Ne peut être construit qu'en un lieu disposant d'un [[buildingtype BLD_SHIPYARD
 BLD_SHIPYARD_BASE_ORG_ORB_INC_ORG_XENO_FAC_REQUIRED
 Ne peut être construit qu'en un lieu disposant d'un [[buildingtype BLD_SHIPYARD_BASE]], d'un [[buildingtype BLD_SHIPYARD_ORG_ORB_INC]], et d'une [[buildingtype BLD_SHIPYARD_ORG_XENO_FAC]].
 
-MIN_POPULATION_THREE_REQUIRED
-Ne peut être construit qu'en un lieu dont la [[metertype METER_POPULATION]] est supérieure ou égale à 3
+MIN_POPULATION_REQUIRED
+Ne peut être construit qu'en un lieu dont la [[metertype METER_POPULATION]] est supérieure ou égale à [[value MIN_COLONY_SIZE]]
 
 BLD_SHIPYARD_BASE_ORG_ORB_INC_ORG_CELL_GRO_CHAMB_REQUIRED
 Ne peut être construit qu'en un lieu disposant d'un [[buildingtype BLD_SHIPYARD_BASE]], d'un [[buildingtype BLD_SHIPYARD_ORG_ORB_INC]], et d'une [[buildingtype BLD_SHIPYARD_ORG_CELL_GRO_CHAMB]].
@@ -15871,8 +16170,8 @@ COLONY_SHIP_PARTS_UPKEEP_COST
 Le coût de cet équipement augmente à mesure que l'empire s'étend en raison des coûts d'entretien plus élevés pour un vaste empire.
 
 TROOP_POD_OPERATION_TEXT
-'''  * Les troupes d'infanterie ne peuvent être utilisées que pour une seule invasion.
-  * Les astronefs transportant des troupes d'infanterie pendant une invasion sont destinés à des atterrissages rapides et dangereux, les rendant inutilisables par la suite.'''
+'''  • Les troupes d'infanterie ne peuvent être utilisées que pour une seule invasion.
+  • Les astronefs transportant des troupes d'infanterie pendant une invasion sont destinés à des atterrissages rapides et dangereux, les rendant inutilisables par la suite.'''
 
 SHIP_WEAPON_GRADUALLY_REDUCE
 permettant aux astronefs de réduire progressivement
@@ -16013,6 +16312,21 @@ GREAT_INFLUENCE_DESC
 
 ULTIMATE_INFLUENCE_DESC
 +++	Parfait en [[metertype METER_INFLUENCE]] : 300%
+
+BAD_HAPPINESS_DESC
+−	Mauvais en [[metertype METER_HAPPINESS]]: -5
+
+AVERAGE_HAPPINESS_DESC
+'''	Normal en [[metertype METER_HAPPINESS]]: +0'''
+
+GOOD_HAPPINESS_DESC
++	Bon en [[metertype METER_HAPPINESS]]: +5
+
+GREAT_HAPPINESS_DESC
+++	Excellent en [[metertype METER_HAPPINESS]]: +10
+
+ULTIMATE_HAPPINESS_DESC
++++	Parfait en [[metertype METER_HAPPINESS]]: +15
 
 NO_DEFENSE_TROOPS_DESC
 −−−	Pas d'[[metertype METER_TROOPS]] défensive
@@ -16434,6 +16748,26 @@ GREAT_INFLUENCE_LABEL
 # %2% FIXME
 ULTIMATE_INFLUENCE_LABEL
 %2% Parfait en Influence
+
+# %1% FIXME
+# %2% FIXME
+BAD_HAPPINESS_LABEL
+%2% Mauvais en Stabilité
+
+# %1% FIXME
+# %2% FIXME
+GOOD_HAPPINESS_LABEL
+%2% Bon en Stabilité
+
+# %1% FIXME
+# %2% FIXME
+GREAT_HAPPINESS_LABEL
+%2% Excellent en Stabilité
+
+# %1% FIXME
+# %2% FIXME
+ULTIMATE_HAPPINESS_LABEL
+%2% Parfait en Stabilité
 
 # %1% FIXME
 # %2% FIXME

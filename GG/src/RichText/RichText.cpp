@@ -322,7 +322,7 @@ void RichText::CompleteConstruction() {
     m_self->CompleteConstruction();
 }
 
-RichText::~RichText() {}
+RichText::~RichText() = default;
 
 void RichText::SetText(const std::string& str) { m_self->SetText(str); }
 
@@ -345,7 +345,7 @@ std::shared_ptr<RichText::BLOCK_FACTORY_MAP>& RichText::DefaultBlockFactoryMap()
 }
 
 int RichText::RegisterDefaultBlock(const std::string& tag,
-                                    std::shared_ptr<IBlockControlFactory>&& factory)
+                                   std::shared_ptr<IBlockControlFactory>&& factory)
 {
     Font::RegisterKnownTag(tag);
     (*DefaultBlockFactoryMap()) [tag] = std::move(factory);

@@ -20,11 +20,26 @@ import base64
 import collections
 import json
 import zlib
+from enum import IntEnum
 from typing import Any
 
-import EnumsAI
-from ._definitions import (CanNotSaveGameException, ENUM_PREFIX, FALSE, FLOAT_PREFIX, INT_PREFIX, NONE, PLACEHOLDER,
-                           SET_PREFIX, TRUE, TUPLE_PREFIX, trusted_classes, )
+from ._definitions import (
+    ENUM_PREFIX,
+    FALSE,
+    FLOAT_PREFIX,
+    INT_PREFIX,
+    NONE,
+    PLACEHOLDER,
+    SET_PREFIX,
+    TRUE,
+    TUPLE_PREFIX,
+    CanNotSaveGameException,
+    trusted_classes,
+)
+
+
+def _encode_with_prefix(prefix, value):
+    return f'"{prefix}{value}"'
 
 
 def build_savegame_string() -> bytes:
@@ -35,8 +50,9 @@ def build_savegame_string() -> bytes:
     :return: compressed savegame string
     """
     from aistate_interface import get_aistate
+
     savegame_string = encode(get_aistate())
-    return base64.b64encode(zlib.compress(savegame_string.encode('utf-8')))
+    return base64.b64encode(zlib.compress(savegame_string.encode("utf-8")))
 
 
 def encode(o: Any) -> str:
@@ -52,8 +68,9 @@ def encode(o: Any) -> str:
     try:
         encoder = _encoder_table[o_type]
     except KeyError:
-        if issubclass(o_type, EnumsAI.EnumItem):
-            return '"%s%s"' % (ENUM_PREFIX, str(o))
+        if issubclass(o_type, IntEnum):
+            return _encode_with_prefix(ENUM_PREFIX, f"{o.__class__.__name__}.{o.name}")
+
         else:
             return _encode_object(o)
     else:
@@ -74,19 +91,19 @@ def _encode_str(o):
 
 
 def _encode_none(o):
-    return '"%s"' % NONE
+    return _encode_with_prefix(NONE, "")
 
 
 def _encode_int(o):
-    return '"%s%s"' % (INT_PREFIX, str(o))
+    return _encode_with_prefix(INT_PREFIX, str(o))
 
 
 def _encode_float(o):
-    return '"%s%s"' % (FLOAT_PREFIX, repr(o))
+    return _encode_with_prefix(FLOAT_PREFIX, repr(o))
 
 
 def _encode_bool(o):
-    return '"%s"' % (TRUE if o else FALSE)
+    return _encode_with_prefix(TRUE, "") if o else _encode_with_prefix(FALSE, "")
 
 
 def _encode_object(obj):
@@ -109,29 +126,28 @@ def _encode_object(obj):
         value = getstate()
 
     # encode information about class
-    value.update({'__class__': obj.__class__.__name__,
-                  '__module__': obj.__class__.__module__})
+    value.update({"__class__": obj.__class__.__name__, "__module__": obj.__class__.__module__})
     return _encode_dict(value)
 
 
 def _encode_list(o):
     """Get a string representation of a list with its encoded content."""
-    return "[%s]" % (', '.join([encode(v) for v in o]))
+    return "[%s]" % (", ".join([encode(v) for v in o]))
 
 
 def _encode_tuple(o):
     """Get a string representation of a tuple with its encoded content."""
-    return '"%s(%s)"' % (TUPLE_PREFIX, _encode_list(list(o)).replace('"', PLACEHOLDER))
+    return _encode_with_prefix(TUPLE_PREFIX, "(%s)" % (_encode_list(list(o)).replace('"', PLACEHOLDER)))
 
 
 def _encode_set(o):
     """Get a string representation of a set with its encoded content."""
-    return '"%s(%s)"' % (SET_PREFIX, _encode_list(list(o)).replace('"', PLACEHOLDER))
+    return _encode_with_prefix(SET_PREFIX, "(%s)" % (_encode_list(list(o)).replace('"', PLACEHOLDER)))
 
 
 def _encode_dict(o):
     """Get a string representation of a dict with its encoded content."""
-    return "{%s}" % (', '.join(['%s: %s' % (encode(k), encode(v)) for k, v in o.items()]))
+    return "{%s}" % (", ".join(["%s: %s" % (encode(k), encode(v)) for k, v in o.items()]))
 
 
 _encoder_table = {

@@ -30,47 +30,45 @@ GameRules& GetGameRules() {
 
 
 /////////////////////////////////////////////////////
+// GameRule
+/////////////////////////////////////////////////////
+GameRule::GameRule(Type type_, std::string name_, boost::any value_,
+                   boost::any default_value_, std::string description_,
+                   std::unique_ptr<ValidatorBase>&& validator_, bool engine_internal_,
+                   std::string category_) :
+    OptionsDB::Option(static_cast<char>(0), std::move(name_), std::move(value_),
+                      std::move(default_value_), std::move(description_),
+                      std::move(validator_), engine_internal_, false, true, "setup.rules"),
+    type(type_),
+    category(std::move(category_))
+{}
+
+
+/////////////////////////////////////////////////////
 // GameRules
 /////////////////////////////////////////////////////
-GameRules::Rule::Rule() :
-    OptionsDB::Option()
-{}
-
-GameRules::Rule::Rule(Type type_, const std::string& name_, const boost::any& value_,
-                      const boost::any& default_value_, const std::string& description_,
-                      const ValidatorBase *validator_, bool engine_internal_,
-                      const std::string& category_) :
-    OptionsDB::Option(static_cast<char>(0), name_, value_, default_value_,
-                      description_, validator_, engine_internal_, false, true, "setup.rules"),
-    type(type_),
-    category(category_)
-{}
-
-GameRules::GameRules()
-{}
-
-bool GameRules::Empty() const {
+bool GameRules::Empty() {
     CheckPendingGameRules();
     return m_game_rules.empty();
 }
 
-std::unordered_map<std::string, GameRules::Rule>::const_iterator GameRules::begin() const {
+std::unordered_map<std::string, GameRule>::const_iterator GameRules::begin() {
     CheckPendingGameRules();
     return m_game_rules.begin();
 }
 
-std::unordered_map<std::string, GameRules::Rule>::const_iterator GameRules::end() const {
+std::unordered_map<std::string, GameRule>::const_iterator GameRules::end() {
     CheckPendingGameRules();
     return m_game_rules.end();
 }
 
-bool GameRules::RuleExists(const std::string& name) const {
+bool GameRules::RuleExists(const std::string& name) {
     CheckPendingGameRules();
     return m_game_rules.count(name);
 }
 
-bool GameRules::RuleExists(const std::string& name, Type type) const {
-    if (type == Type::INVALID)
+bool GameRules::RuleExists(const std::string& name, GameRule::Type type) {
+    if (type == GameRule::Type::INVALID)
         return false;
     CheckPendingGameRules();
     auto rule_it = m_game_rules.find(name);
@@ -79,15 +77,15 @@ bool GameRules::RuleExists(const std::string& name, Type type) const {
     return rule_it->second.type == type;
 }
 
-GameRules::Type GameRules::GetType(const std::string& name) const {
+GameRule::Type GameRules::GetType(const std::string& name) {
     CheckPendingGameRules();
     auto rule_it = m_game_rules.find(name);
     if (rule_it == m_game_rules.end())
-        return Type::INVALID;
+        return GameRule::Type::INVALID;
     return rule_it->second.type;
 }
 
-bool GameRules::RuleIsInternal(const std::string& name) const {
+bool GameRules::RuleIsInternal(const std::string& name) {
     CheckPendingGameRules();
     auto rule_it = m_game_rules.find(name);
     if (rule_it == m_game_rules.end())
@@ -95,7 +93,7 @@ bool GameRules::RuleIsInternal(const std::string& name) const {
     return rule_it->second.IsInternal();
 }
 
-const std::string& GameRules::GetDescription(const std::string& rule_name) const {
+const std::string& GameRules::GetDescription(const std::string& rule_name) {
     CheckPendingGameRules();
     auto it = m_game_rules.find(rule_name);
     if (it == m_game_rules.end())
@@ -103,12 +101,12 @@ const std::string& GameRules::GetDescription(const std::string& rule_name) const
     return it->second.description;
 }
 
-std::shared_ptr<const ValidatorBase> GameRules::GetValidator(const std::string& rule_name) const {
+const ValidatorBase* GameRules::GetValidator(const std::string& rule_name) {
     CheckPendingGameRules();
     auto it = m_game_rules.find(rule_name);
     if (it == m_game_rules.end())
         throw std::runtime_error(("GameRules::GetValidator(): No option called \"" + rule_name + "\" could be found.").c_str());
-    return it->second.validator;
+    return it->second.validator.get();
 }
 
 void GameRules::ClearExternalRules() {
@@ -129,7 +127,7 @@ void GameRules::ResetToDefaults() {
         it.second.SetToDefault();
 }
 
-std::map<std::string, std::string> GameRules::GetRulesAsStrings() const {
+std::map<std::string, std::string> GameRules::GetRulesAsStrings() {
     CheckPendingGameRules();
     std::map<std::string, std::string> retval;
     for (auto& [rule_name, rule_value] : m_game_rules)
@@ -137,8 +135,45 @@ std::map<std::string, std::string> GameRules::GetRulesAsStrings() const {
     return retval;
 }
 
-void GameRules::Add(Pending::Pending<GameRules>&& future)
+void GameRules::Add(Pending::Pending<GameRulesTypeMap>&& future)
 { m_pending_rules = std::move(future); }
+
+namespace {
+    template <typename T>
+    void CheckValidatorAndAddRuleOption(GameRule& rule)
+    {
+        if (!rule.validator)
+            rule.validator = std::make_unique<Validator<T>>();
+        auto option_name = "setup.rules." + rule.name;
+        if (!GetOptionsDB().OptionExists(option_name))
+            GetOptionsDB().Add<T>(std::move(option_name), rule.description,
+                                  boost::any_cast<T>(rule.default_value),
+                                  rule.validator->Clone());
+    }
+}
+
+void GameRules::Add(GameRule&& rule) {
+    auto name{rule.name};
+
+    auto it = m_game_rules.find(name);
+    if (it != m_game_rules.end())
+        throw std::runtime_error("GameRules::Add<>() : GameRule " + name + " was added twice.");
+
+    if (!GetOptionsDB().OptionExists("setup.rules.server-locked." + name))
+        GetOptionsDB().Add<bool>("setup.rules.server-locked." + name, rule.description, false);
+
+    switch (rule.type) {
+    case GameRule::Type::TOGGLE:    CheckValidatorAndAddRuleOption<bool>(rule);         break;
+    case GameRule::Type::INT:       CheckValidatorAndAddRuleOption<int>(rule);          break;
+    case GameRule::Type::DOUBLE:    CheckValidatorAndAddRuleOption<double>(rule);       break;
+    case GameRule::Type::STRING:    CheckValidatorAndAddRuleOption<std::string>(rule);  break;
+    default: {
+        ErrorLogger() << "GameRules::Add(GameRule&&) unknown rule type. Skipping.";
+        return;
+    }
+    }
+    m_game_rules.insert_or_assign(std::move(name), std::move(rule));
+}
 
 void GameRules::SetFromStrings(const std::map<std::string, std::string>& names_values) {
     CheckPendingGameRules();
@@ -168,21 +203,24 @@ void GameRules::SetFromStrings(const std::map<std::string, std::string>& names_v
         DebugLogger() << "  " << name << " : " << value.ValueToString();
 }
 
-void GameRules::CheckPendingGameRules() const {
+void GameRules::CheckPendingGameRules() {
     if (!m_pending_rules)
         return;
 
-    auto parsed = Pending::WaitForPending(m_pending_rules);
-    if (!parsed)
+    auto parsed_new_rules = Pending::WaitForPending(m_pending_rules);
+    if (!parsed_new_rules)
         return;
 
-    auto new_rules = std::move(*parsed);
-    for (auto& [name, value] : new_rules) {
+    for (auto& [name, game_rule] : *parsed_new_rules) {
         if (m_game_rules.count(name)) {
-            ErrorLogger() << "GameRules::Add<>() : Rule " << name << " was added twice. Skipping ...";
+            ErrorLogger() << "GameRules::Add<>() : GameRule " << name << " was added twice. Skipping ...";
             continue;
         }
-        m_game_rules[name] = value;
+        if (!game_rule.validator) {
+            ErrorLogger() << "GameRules::Add<>() : GameRule " << name << " has no validator. Skipping ...";
+            continue;
+        }
+        Add(std::move(game_rule));
     }
 
     DebugLogger() << "Registered and Parsed Game Rules:";

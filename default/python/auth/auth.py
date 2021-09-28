@@ -1,25 +1,25 @@
-from logging import warning, info, error
+from logging import error, info, warning
 
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
 # Logging is redirected before other imports so that import errors appear in log files.
 redirect_logging_to_freeorion_logger()
 
-import sys
-
-import random
 
 import freeorion as fo
+import random
+import sys
 
 import psycopg2
 import psycopg2.extensions
+
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
+import configparser
+import smtplib
 import urllib.request
 
-import smtplib
-import configparser
 # Constants defined by the C++ game engine
 NO_TEAM_ID = -1
 
@@ -43,13 +43,16 @@ class AuthProvider:
         self.conn = psycopg2.connect(self.dsn)
         self.conn_ro = psycopg2.connect(self.dsn_ro)
         self.roles_symbols = {
-            'h': fo.roleType.host, 'm': fo.roleType.clientTypeModerator,
-            'p': fo.roleType.clientTypePlayer, 'o': fo.roleType.clientTypeObserver,
-            'g': fo.roleType.galaxySetup
+            "h": fo.roleType.host,
+            "m": fo.roleType.clientTypeModerator,
+            "p": fo.roleType.clientTypePlayer,
+            "o": fo.roleType.clientTypeObserver,
+            "g": fo.roleType.galaxySetup,
         }
         self.default_roles = [fo.roleType.clientTypePlayer]
         self.mailconf = configparser.ConfigParser()
         self.mailconf.read(fo.get_user_config_dir() + "/mail.cfg")
+
         info("Auth initialized")
 
     def __parse_roles(self, roles_str):
@@ -64,18 +67,25 @@ class AuthProvider:
 
     def is_require_auth_or_return_roles(self, player_name):
         """Returns True if player should be authenticated or list of roles for anonymous players
-           or list of roles for anonymous players"""
+        or list of roles for anonymous players"""
         otp = "%0.5d" % random.randint(999, 99999)
         sent_otp = False
         try:
             with self.conn:
                 with self.conn.cursor() as curs:
-                    curs.execute(""" SELECT * FROM auth.check_contact(%s, %s, %s) """,
-                                 (player_name, otp, fo.get_galaxy_setup_data().gameUID))
+                    curs.execute(
+                        """ SELECT * FROM auth.check_contact(%s, %s, %s) """,
+                        (player_name, otp, fo.get_galaxy_setup_data().gameUID),
+                    )
                     for r in curs:
                         if r[0] == "xmpp":
                             try:
-                                req = urllib.request.Request("http://localhost:8083/", ("%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp)).encode())
+                                req = urllib.request.Request(
+                                    "http://localhost:8083/",
+                                    (
+                                        "%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp)
+                                    ).encode(),
+                                )
                                 req.add_header("X-XMPP-To", r[1])
                                 urllib.request.urlopen(req).read()
                                 info("OTP was send to %s via XMPP" % player_name)
@@ -85,12 +95,17 @@ class AuthProvider:
                                 error("Cann't send xmpp message to %s: %s %s" % (player_name, exctype, value))
                         elif r[0] == "email":
                             try:
-                                server = smtplib.SMTP_SSL(self.mailconf.get('mail', 'server'), 465)
+                                server = smtplib.SMTP_SSL(self.mailconf.get("mail", "server"), 465)
                                 server.ehlo()
-                                server.login(self.mailconf.get('mail', 'login'), self.mailconf.get('mail', 'passwd'))
-                                server.sendmail(self.mailconf.get('mail', 'from'), r[1], """From:
+                                server.login(self.mailconf.get("mail", "login"), self.mailconf.get("mail", "passwd"))
+                                server.sendmail(
+                                    self.mailconf.get("mail", "from"),
+                                    r[1],
+                                    """From:
                                         %s\r\nTo: %s\r\nSubject: FreeOrion OTP\r\n\r\nPassword %s
-                                        for player %s""" % (self.mailconf.get('mail', 'from'), r[1], otp, player_name))
+                                        for player %s"""
+                                    % (self.mailconf.get("mail", "from"), r[1], otp, player_name),
+                                )
                                 server.close()
                                 info("OTP was send to %s via email" % player_name)
                                 sent_otp = True
@@ -114,8 +129,10 @@ class AuthProvider:
         try:
             with self.conn:
                 with self.conn.cursor() as curs:
-                    curs.execute(""" SELECT * FROM auth.check_otp(%s, %s, %s) """,
-                                 (player_name, auth, fo.get_galaxy_setup_data().gameUID))
+                    curs.execute(
+                        """ SELECT * FROM auth.check_otp(%s, %s, %s) """,
+                        (player_name, auth, fo.get_galaxy_setup_data().gameUID),
+                    )
                     for r in curs:
                         authenticated = not not r[0]
                         role = self.roles_symbols.get(r[1])
@@ -139,7 +156,8 @@ class AuthProvider:
         try:
             with self.conn_ro:
                 with self.conn_ro.cursor() as curs:
-                    curs.execute(""" SELECT u.player_name, MIN(p.species), MIN(p.team_id)
+                    curs.execute(
+                        """ SELECT u.player_name, MIN(p.species), MIN(p.team_id)
                             FROM auth.users u
                             INNER JOIN auth.contacts c
                             ON c.player_name = u.player_name
@@ -153,7 +171,8 @@ class AuthProvider:
                             AND p.client_type = 'p'
                             AND g.game_uid = %s
                             GROUP BY u.player_name """,
-                                 (fo.get_galaxy_setup_data().gameUID,))
+                        (fo.get_galaxy_setup_data().gameUID,),
+                    )
                     for r in curs:
                         psd = fo.PlayerSetupData()
                         psd.player_name = r[0]
@@ -168,12 +187,13 @@ class AuthProvider:
         return players
 
     def send_outbound_chat_message(self, text, player_name, allow_email):
-        """ Send message to player """
+        """Send message to player"""
         subject = "FreeOrion LT %s Notification" % fo.get_galaxy_setup_data().gameUID
         try:
             with self.conn_ro:
                 with self.conn_ro.cursor() as curs:
-                    curs.execute("""SELECT c.protocol, c.address
+                    curs.execute(
+                        """SELECT c.protocol, c.address
                             FROM auth.users u
                             INNER JOIN auth.contacts c
                             ON c.player_name = u.player_name
@@ -193,11 +213,14 @@ class AuthProvider:
                             AND c.is_active
                             AND c.delete_ts IS NULL
                             """,
-                                 (player_name, player_name, fo.get_galaxy_setup_data().gameUID))
+                        (player_name, player_name, fo.get_galaxy_setup_data().gameUID),
+                    )
                     for r in curs:
                         if r[0] == "xmpp":
                             try:
-                                req = urllib.request.Request("http://localhost:8083/", ("%s\r\n%s" % (subject, text)).encode())
+                                req = urllib.request.Request(
+                                    "http://localhost:8083/", ("%s\r\n%s" % (subject, text)).encode()
+                                )
                                 req.add_header("X-XMPP-To", r[1])
                                 urllib.request.urlopen(req).read()
                                 info("Message was send to %s via XMPP" % player_name)
@@ -206,12 +229,17 @@ class AuthProvider:
                                 error("Cann't send xmpp message to %s: %s %s" % (player_name, exctype, value))
                         elif r[0] == "email" and allow_email:
                             try:
-                                server = smtplib.SMTP_SSL(self.mailconf.get('mail', 'server'), 465)
+                                server = smtplib.SMTP_SSL(self.mailconf.get("mail", "server"), 465)
                                 server.ehlo()
-                                server.login(self.mailconf.get('mail', 'login'), self.mailconf.get('mail', 'passwd'))
-                                server.sendmail(self.mailconf.get('mail', 'from'), r[1], """From:
+                                server.login(self.mailconf.get("mail", "login"), self.mailconf.get("mail", "passwd"))
+                                server.sendmail(
+                                    self.mailconf.get("mail", "from"),
+                                    r[1],
+                                    """From:
                                         %s\r\nTo: %s\r\nSubject: %s\r\n\r\n
-                                        %s""" % (self.mailconf.get('mail', 'from'), r[1], subject, text))
+                                        %s"""
+                                    % (self.mailconf.get("mail", "from"), r[1], subject, text),
+                                )
                                 server.close()
                                 info("Message was send to %s via email" % player_name)
                             except Exception:
@@ -232,11 +260,13 @@ class AuthProvider:
         try:
             with self.conn_ro:
                 with self.conn_ro.cursor() as curs:
-                    curs.execute("""SELECT player_name
+                    curs.execute(
+                        """SELECT player_name
                             FROM games.players p
                             WHERE p.game_uid = %s
                             AND p.delegate_name = %s """,
-                                 (fo.get_galaxy_setup_data().gameUID, player_name))
+                        (fo.get_galaxy_setup_data().gameUID, player_name),
+                    )
                     for r in curs:
                         players.append(r[0])
         except psycopg2.InterfaceError:

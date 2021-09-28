@@ -209,7 +209,7 @@ std::string GGHumanClientApp::EncodeServerAddressOption(const std::string& serve
 }
 
 GGHumanClientApp::GGHumanClientApp(int width, int height, bool calculate_fps, std::string name,
-                               int x, int y, bool fullscreen, bool fake_mode_change) :
+                                   int x, int y, bool fullscreen, bool fake_mode_change) :
     ClientApp(),
     SDLGUI(width, height, calculate_fps, std::move(name), x, y, fullscreen, fake_mode_change)
 {
@@ -355,7 +355,7 @@ GGHumanClientApp::GGHumanClientApp(int width, int height, bool calculate_fps, st
     // Start parsing content
     std::promise<void> barrier;
     std::future<void> barrier_future = barrier.get_future();
-    std::thread background([this] (auto b) {
+    std::thread background([this](auto b){
         DebugLogger() << "Started background parser thread";
         PythonCommon python;
         python.Initialize();
@@ -1279,7 +1279,7 @@ namespace {
     }
 
     boost::filesystem::path CreateNewAutosaveFilePath(int client_empire_id, bool is_single_player) {
-        const char* legal_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-";
+        constexpr const char* legal_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-";
 
         // get empire name, filtered for filename acceptability
         const Empire* empire = GetEmpire(client_empire_id);
@@ -1570,7 +1570,7 @@ void GGHumanClientApp::DisconnectedFromServer() {
 }
 
 GGHumanClientApp* GGHumanClientApp::GetApp()
-{ return dynamic_cast<GGHumanClientApp*>(GG::GUI::GetGUI()); }
+{ return static_cast<GGHumanClientApp*>(GG::GUI::GetGUI()); }
 
 void GGHumanClientApp::Initialize()
 {}

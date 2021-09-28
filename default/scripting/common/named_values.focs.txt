@@ -6,6 +6,8 @@
 
 NamedReal name = "ANCIENT_RUINS_TARGET_RESEARCH_PERPOP" value = (5 * [[RESEARCH_PER_POP]])
 
+NamedReal name = "ANCIENT_RUINS_MIN_STABILITY" value = 12
+
 NamedReal name = "IMPERIAL_GARRISON_MAX_TROOPS_FLAT" value = 6
 
 NamedReal name = "SHP_REINFORCED_HULL_BONUS" value = (5 * [[SHIP_STRUCTURE_FACTOR]]) 
@@ -15,6 +17,15 @@ NamedInteger name = "NUM_COMBAT_ROUNDS" value = (GameRule name = "RULE_NUM_COMBA
 NamedInteger name = "NUM_COMBAT_ROUNDS_FIGHTERS" value = (GameRule name = "RULE_NUM_COMBAT_ROUNDS") - 1
 
 NamedInteger name = "FIRST_COMBAT_ROUND_IN_CLOSE_TARGETING_RANGE" value = (GameRule name = "RULE_FIRST_COMBAT_ROUND_IN_CLOSE_TARGETING_RANGE")
+
+NamedReal name = "AUGMENTATION_FULL_GROWTH_INFRASTRUCTURE_REQUIREMENT" value = 40.0
+
+// For calculation we mostly need a real value
+NamedReal name = "NUM_REAL_COMBAT_ROUNDS_IN_CLOSE_TARGETING_RANGE" value = (GameRule name = "RULE_NUM_COMBAT_ROUNDS") - (GameRule name = "RULE_FIRST_COMBAT_ROUND_IN_CLOSE_TARGETING_RANGE") + 1
+
+NamedInteger name = "MIN_COLONY_SIZE" value = [[MIN_RECOLONIZING_SIZE]]
+
+NamedInteger name = "MIN_COLONY_HAPPINESS" value = [[MIN_RECOLONIZING_HAPPINESS]]
 
 #include "/scripting/common/misc.macros"
 #include "/scripting/common/base_prod.macros"

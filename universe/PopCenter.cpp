@@ -18,12 +18,6 @@ PopCenter::PopCenter(const std::string& species_name) :
     m_species_name(species_name)
 {}
 
-PopCenter::PopCenter()
-{}
-
-PopCenter::~PopCenter()
-{}
-
 void PopCenter::Copy(std::shared_ptr<const PopCenter> copied_object, Visibility vis) {
     if (copied_object.get() == this)
         return;
@@ -33,7 +27,7 @@ void PopCenter::Copy(std::shared_ptr<const PopCenter> copied_object, Visibility 
     }
 
     if (vis >= Visibility::VIS_PARTIAL_VISIBILITY) {
-        this->m_species_name =      copied_object->m_species_name;
+        this->m_species_name = copied_object->m_species_name;
     }
 }
 

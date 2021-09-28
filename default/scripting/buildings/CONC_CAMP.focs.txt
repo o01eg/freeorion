@@ -4,8 +4,9 @@ BuildingType
     buildcost = 5 * [[BUILDING_COST_MULTIPLIER]]
     buildtime = 1
     location = And [
-        Not Contains Building name = "BLD_CONC_CAMP"
+        Planet
         OwnedBy empire = Source.Owner
+        Not Contains Building name = "BLD_CONC_CAMP"
         EmpireHasAdoptedPolicy empire = Source.Owner name = "PLC_RACIAL_PURITY"
         Population low = 3
     ]
@@ -19,7 +20,8 @@ BuildingType
                 Planet
             ]
             activation = ContainedBy And [
-                PopulationCenter
+                Object id = Source.PlanetID
+                Planet
                 OwnedBy empire = Source.Owner
             ]
             priority = [[TARGET_AFTER_SCALING_PRIORITY]]
@@ -35,7 +37,7 @@ BuildingType
             activation = Or [
                 Not EmpireHasAdoptedPolicy empire = Source.Owner name = "PLC_RACIAL_PURITY"
                 ContainedBy And [
-                    PopulationCenter
+                    Object id = Source.PlanetID
                     OwnedBy empire = Source.Owner
                     Population low = 0.0001
                     Not HasSpecial name = "CONC_CAMP_MASTER_SPECIAL"
@@ -65,7 +67,7 @@ BuildingType
                 Planet
             ]
             activation = ContainedBy And [
-                PopulationCenter
+                Object id = Source.PlanetID
                 OwnedBy empire = Source.Owner
                 HasSpecial name = "CONC_CAMP_MASTER_SPECIAL"
             ]

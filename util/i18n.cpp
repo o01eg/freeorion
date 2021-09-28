@@ -11,9 +11,9 @@
 #include <mutex>
 
 namespace {
-    std::map<std::string, std::shared_ptr<const StringTable>>  stringtables;
-    std::recursive_mutex                                       stringtable_access_mutex;
-    bool                                                       stringtable_filename_init = false;
+    std::map<std::string, std::shared_ptr<const StringTable>> stringtables;
+    std::recursive_mutex                                      stringtable_access_mutex;
+    bool                                                      stringtable_filename_init = false;
 
     // fallback stringtable to look up key in if entry is not found in currently configured stringtable
     boost::filesystem::path DevDefaultEnglishStringtablePath()
@@ -57,7 +57,7 @@ namespace {
         }
 
         if (!IsExistingFile(default_stringtable_path))
-            ErrorLogger() << "Default english stringtable file also not presennt!!: " << PathToString(default_stringtable_path);
+            ErrorLogger() << "Default english stringtable file also not present !!!: " << PathToString(default_stringtable_path);
 
         DebugLogger() << "GetDefaultStringTableFileName returning: " << PathToString(default_stringtable_path);
         return default_stringtable_path;
@@ -156,7 +156,7 @@ namespace {
         // if not already loaded, load, store, and return,
         // using default stringtable for fallback expansion lookups
         auto table = std::make_shared<StringTable>(stringtable_filename, default_stringtable_it->second);
-        stringtables[stringtable_filename] = table;
+        stringtables[stringtable_filename] = table; // TODO: emplace?
 
         return *table;
     }
@@ -206,7 +206,7 @@ void FlushLoadedStringTables() {
     stringtables.clear();
 }
 
-const std::map<std::string, std::string>& AllStringtableEntries(bool default_table) {
+const std::map<std::string, std::string, std::less<>>& AllStringtableEntries(bool default_table) {
     std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
     if (default_table)
         return GetDevDefaultStringTable().AllStrings();
@@ -216,18 +216,37 @@ const std::map<std::string, std::string>& AllStringtableEntries(bool default_tab
 
 const std::string& UserString(const std::string& str) {
     std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
-    if (GetStringTable().StringExists(str))
-        return GetStringTable()[str];
+    const auto& [string_found, string_value] = GetStringTable().CheckGet(str);
+    if (string_found)
+        return string_value;
+    return GetDevDefaultStringTable()[str];
+}
+
+const std::string& UserString(const std::string_view str) {
+    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
+    const auto& [string_found, string_value] = GetStringTable().CheckGet(str);
+    if (string_found)
+        return string_value;
+    return GetDevDefaultStringTable()[str];
+}
+
+const std::string& UserString(const char* str) {
+    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
+    const auto& [string_found, string_value] = GetStringTable().CheckGet(str);
+    if (string_found)
+        return string_value;
     return GetDevDefaultStringTable()[str];
 }
 
 std::vector<std::string> UserStringList(const std::string& key) {
     std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
     std::vector<std::string> result;
+    result.reserve(20); // rough guesstimate
     std::istringstream template_stream(UserString(key));
+    // split big string into newline-separated substrings strings
     std::string item;
     while (std::getline(template_stream, item))
-        result.emplace_back(std::move(item));
+        result.push_back(std::move(item));
     return result;
 }
 

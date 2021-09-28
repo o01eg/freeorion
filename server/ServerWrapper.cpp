@@ -286,12 +286,13 @@ namespace {
 
     auto EmpireSetHomeworld(int empire_id, int planet_id, const std::string& species_name) -> bool
     {
-        Empire* empire = GetEmpire(empire_id);
+        ScriptingContext context;
+        auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EmpireSetHomeworld: couldn't get empire with ID " << empire_id;
             return false;
         }
-        return SetEmpireHomeworld(empire, planet_id, species_name);
+        return SetEmpireHomeworld(empire.get(), planet_id, species_name, context);
     }
 
     void EmpireUnlockItem(int empire_id, UnlockableItemType item_type,
@@ -774,7 +775,7 @@ namespace {
             fleet->Rename(UserString("OBJ_FLEET") + " " + std::to_string(fleet->ID()));
         }
 
-        fleet->SetAggression(aggressive ? FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_DEFENSIVE);
+        fleet->SetAggression(aggressive ? FleetDefaults::FLEET_DEFAULT_ARMED : FleetDefaults::FLEET_DEFAULT_UNARMED);
 
         // return fleet ID
         return fleet->ID();
@@ -1303,11 +1304,17 @@ namespace FreeOrionPython {
             .def("spawn_limit",                 &MonsterFleetPlanWrapper::SpawnLimit)
             .def("locations",                   &MonsterFleetPlanWrapper::Locations);
 
-        py::def("get_universe",                     GetUniverse,                    py::return_value_policy<py::reference_existing_object>());
-        py::def("get_all_empires",                  GetAllEmpires);
-        py::def("get_empire",                       GetEmpire,                      py::return_value_policy<py::reference_existing_object>());
+        py::def("get_universe",                 GetUniverse,                    py::return_value_policy<py::reference_existing_object>());
+        py::def("get_all_empires",              GetAllEmpires);
+        py::def("get_empire",                   GetEmpire,                      py::return_value_policy<py::reference_existing_object>());
 
-        py::def("user_string",                      make_function(&UserString,      py::return_value_policy<py::copy_const_reference>()));
+        py::def("userString",
+                +[](const std::string& key) -> const std::string& { return UserString(key); },
+                py::return_value_policy<py::copy_const_reference>());
+        py::def("userStringExists",
+                +[](const std::string& key) -> bool { return UserStringExists(key); });
+        //py::def("userStringList",               &GetUserStringList); // could be copied from AIWrapper
+
         py::def("roman_number",                     RomanNumber);
         py::def("get_resource_dir",                 +[]() -> py::object { return py::object(PathToString(GetResourceDir())); });
 

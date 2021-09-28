@@ -3,13 +3,13 @@ Policy
     description = "PLC_INDOCTRINATION_DESC"
     short_description = "PLC_INDOCTRINATION_SHORT_DESC"
     category = "SOCIAL_CATEGORY"
-    adoptioncost = 10
+    adoptioncost = floor(2.0 * [[POPULATION_OWNED_BY_EMPIRE]]^0.5)
     prerequisites = [ "PLC_PROPAGANDA" "PLC_CONFORMANCE" ]
     exclusions = [ "PLC_LIBERTY" "PLC_DIVERSITY" ]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
 
-        // makes planets more stable over time at cost of influence
+        // makes all planets more stable over time at the cost of influence
         EffectsGroup
         scope = And [
             Planet
@@ -19,11 +19,31 @@ Policy
         effects = [
             SetTargetHappiness value = Value + 
                 min((NamedReal name = "PLC_INDOCTRINATION_STRENGTH_MAX" value = 10.0),
-                    (CurrentTurn - TurnPolicyAdopted empire = Source.Owner name = "PLC_INDOCTRINATION") / 4.0)
+                    (Target.TurnsSinceLastConquered != 0 ?
+                     min(Target.TurnsSinceLastConquered,
+                         TurnsSincePolicyAdopted empire = Source.Owner name = ThisPolicy) :
+                     TurnsSincePolicyAdopted empire = Source.Owner name = ThisPolicy) *
+                     (NamedReal name = "PLC_INDOCTRINATION_PER_TURN" value = 0.25))
+            SetTargetInfluence value = Value - 1.0
+        ]
 
-            SetTargetInfluence value = Value - 4.0
+        // boosts influence of influence-focused planets
+        // TODO: Consider restricting this effect to also having the Palace or a Reg. Adm. center.
+        EffectsGroup
+        scope = And [
+            Planet
+            OwnedBy empire = Source.Owner
+            Species
+            Focus type = "FOCUS_INFLUENCE"
+            Or [Capital Contains Building name = "BLD_REGIONAL_ADMIN"]
+        ]
+        priority = [[TARGET_SCALING_PRIORITY]]
+        effects = [
+            SetTargetInfluence value = Value + 
+                (NamedReal name = "PLC_INDOCTRINATION_INFLUENCE_FLAT" value = 5.0)
         ]
     ]
     graphic = "icons/policies/indoctrination.png"
 
 #include "/scripting/policies/policies.macros"
+#include "/scripting/common/priorities.macros"

@@ -8,13 +8,13 @@ BuildingType
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS]]
     
-        EffectsGroup          // These bonuses given to anyone
+        EffectsGroup
             scope = And [
                 Object id = Source.PlanetID
                 Planet
                 Not Population high = 0
                 OwnedBy empire = Source.Owner
-                Happiness low = 5
+                Happiness low = (NamedReal name = "BLD_CULTURE_ARCHIVES_MIN_STABILITY" value = 5)
             ]
             priority = [[TARGET_AFTER_2ND_SCALING_PRIORITY]]
             effects = [
@@ -25,24 +25,6 @@ BuildingType
                                  value = 2.5 * [[INDUSTRY_PER_POP]])
             ]
 
-        EffectsGroup
-            scope = And [
-                Object id = Source.PlanetID
-                Planet
-                OwnedBy empire = Source.Owner
-                Not HasSpecial name = "HEAD_ON_A_SPIKE_SPECIAL"
-            ]
-            activation = Not ProducedByEmpire empire = Source.Owner
-            effects = [
-                AddSpecial name = "HEAD_ON_A_SPIKE_SPECIAL"
-                GenerateSitRepMessage
-                    message = "HEAD_ON_A_SPIKE_MESSAGE"
-                    label = "HEAD_ON_A_SPIKE_MESSAGE_LABEL"
-                    icon = "icons/sitrep/empire_eliminated.png"
-                    parameters = [
-                        tag = "empire" data = Source.ProducedByEmpireID
-                    ]
-            ]
     ]
     icon = "icons/building/archive.png"
 

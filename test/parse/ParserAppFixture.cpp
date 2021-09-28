@@ -15,12 +15,14 @@ ParserAppFixture::ParserAppFixture() {
     BOOST_REQUIRE(m_scripting_dir.is_absolute());
     BOOST_REQUIRE(fs::exists(m_scripting_dir));
     BOOST_REQUIRE(fs::is_directory(m_scripting_dir));
+
+    GetOptionsDB().Set<std::string>("resource.path", PathToString(GetBinDir() / "default"));
 }
 
 int ParserAppFixture::CurrentTurn() const
 { return INVALID_GAME_TURN; }
 
-Universe& ParserAppFixture::GetUniverse()
+Universe& ParserAppFixture::GetUniverse() noexcept
 { return m_universe; }
 
 const GalaxySetupData& ParserAppFixture::GetGalaxySetupData() const

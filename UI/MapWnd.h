@@ -56,17 +56,14 @@ struct LaneEndpoints {
 class MapWnd : public GG::Wnd {
 public:
     MapWnd();
-
-    ~MapWnd();
-
     void CompleteConstruction() override;
 
     GG::Pt ClientUpperLeft() const override;
 
-    double                      ZoomFactor() const;
-    int                         SystemIconSize() const;
-    int                         SystemNamePts() const;
-    double                      SystemHaloScaleFactor() const;
+    double ZoomFactor() const;
+    int    SystemIconSize() const;
+    int    SystemNamePts() const;
+    double SystemHaloScaleFactor() const;
 
     /** returns what size type (tiny, small, large) fleet buttons on this map
       * are shown at */
@@ -220,9 +217,6 @@ private:
     void RefreshPopulationIndicator();
     void RefreshDetectionIndicator();
 
-    /** update meter estimates for objects contained within the current system
-      * shown in the sidepanel, or all objects if there is no system shown */
-    void UpdateSidePanelSystemObjectMetersAndResourcePools();
     /** recalculates production and predicted changes of player's empire's
       * resource and population pools */
     void UpdateEmpireResourcePools();
@@ -235,6 +229,7 @@ private:
         MovementLineData(const std::list<MovePathNode>& path_,
                          const std::map<std::pair<int, int>, LaneEndpoints>& lane_end_points_map,
                          GG::Clr colour_ = GG::CLR_WHITE, int empireID = ALL_EMPIRES);
+        ~MovementLineData();
 
         std::list<MovePathNode> path;       // raw path data from which line rendering is determined
         GG::Clr                 colour;     // colour of line

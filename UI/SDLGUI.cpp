@@ -428,15 +428,14 @@ void SDLGUI::HandleSystemEvents() {
                     }
                     // If faking resolution change, we need to listen to this event
                     // to size the buffer correctly for the screen.
-                    if (m_fullscreen && m_fake_mode_change) {
+                    if (m_fullscreen && m_fake_mode_change)
                         ResetFramebuffer();
-                    }
+                    [[fallthrough]]; // not sure if this is inteded to be a fall through to the next case, but it seems plausible...
                 case SDL_WINDOWEVENT_RESIZED:
                     // Alt-tabbing and other things give dubious resize events while in fullscreen mode.
                     // ignore them
-                    if (!m_fullscreen) {
+                    if (!m_fullscreen)
                         WindowResizedSignal(X(event.window.data1), Y(event.window.data2));
-                    }
                     break;
                 case SDL_WINDOWEVENT_FOCUS_GAINED:
                     FocusChangedSignal(true);
@@ -459,7 +458,7 @@ void SDLGUI::HandleSystemEvents() {
         }
 
         if (send_to_gg)
-            HandleGGEvent(gg_event, key, key_code_point, mod_keys, mouse_pos, mouse_rel);
+            HandleGGEvent(gg_event, key, key_code_point, mod_keys, mouse_pos, mouse_rel, std::string());
         else
             HandleNonGGEvent(event);
     }
@@ -624,18 +623,12 @@ int SDLGUI::MaximumPossibleHeight()
 { return MaximumPossibleDimension(false); }
 
 void SDLGUI::RelayTextInput(const SDL_TextInputEvent& text, GG::Pt mouse_pos) {
-    const char *current = text.text;
-    const char *last = current;
-    // text is zero terminated, find the end
-    while (*last)
-    { ++last; }
-    std::string text_string(current, last);
-
-    // pass each utf-8 character as a separate event
-    while (current != last) {
-        HandleGGEvent(EventType::TEXTINPUT, Key::GGK_NONE, utf8::next(current, last), Flags<ModKey>(),
-                      mouse_pos, Pt(X0, Y0), &text_string);
-    }
+    const char* current = text.text;
+    const char* end = current + SDL_TEXTEDITINGEVENT_TEXT_SIZE;
+    while (current != end && *current)
+        ++current;
+    HandleGGEvent(EventType::TEXTINPUT, Key::GGK_NONE, 0u, Flags<ModKey>(), mouse_pos, Pt(X0, Y0),
+                  std::string(text.text, current));
 }
 
 void SDLGUI::ResetFramebuffer() {

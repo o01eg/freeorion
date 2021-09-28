@@ -228,30 +228,20 @@ void SetJustification(bool& last_line_of_curr_just, Font::LineData& line_data, A
 constexpr double ITALICS_SLANT_ANGLE = 12; // degrees
 const double ITALICS_FACTOR = 1.0 / tan((90 - ITALICS_SLANT_ANGLE) * 3.1415926 / 180.0); // factor used to shear glyphs ITALICS_SLANT_ANGLE degrees CW from straight up
 
-const std::vector<std::pair<std::uint32_t, std::uint32_t>> PRINTABLE_ASCII_ALPHA_RANGES{
+constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 2> PRINTABLE_ASCII_ALPHA_RANGES{{
     {0x41, 0x5B},
-    {0x61, 0x7B}};
+    {0x61, 0x7B}}};
 
-const std::vector<std::pair<std::uint32_t, std::uint32_t>> PRINTABLE_ASCII_NONALPHA_RANGES{
+constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 7> PRINTABLE_ASCII_NONALPHA_RANGES{{
     {0x09, 0x0D},
     {0x20, 0x21},
     {0x30, 0x3A},
     {0x21, 0x30},
     {0x3A, 0x41},
     {0x5B, 0x61},
-    {0x7B, 0x7F}};
+    {0x7B, 0x7F}}};
 
 }
-
-///////////////////////////////////////
-// Constants
-///////////////////////////////////////
-const StrSize GG::S0(0);
-const StrSize GG::S1(1);
-const StrSize GG::INVALID_STR_SIZE(std::numeric_limits<std::size_t>::max());
-const CPSize GG::CP0(0);
-const CPSize GG::CP1(1);
-const CPSize GG::INVALID_CP_SIZE(std::numeric_limits<std::size_t>::max());
 
 
 ///////////////////////////////////////
@@ -273,18 +263,6 @@ std::string GG::RgbaTag(const Clr& c)
 ///////////////////////////////////////
 // TextFormat
 ///////////////////////////////////////
-const TextFormat GG::FORMAT_NONE         (0);
-const TextFormat GG::FORMAT_VCENTER      (1 << 0);
-const TextFormat GG::FORMAT_TOP          (1 << 1);
-const TextFormat GG::FORMAT_BOTTOM       (1 << 2);
-const TextFormat GG::FORMAT_CENTER       (1 << 3);
-const TextFormat GG::FORMAT_LEFT         (1 << 4);
-const TextFormat GG::FORMAT_RIGHT        (1 << 5);
-const TextFormat GG::FORMAT_NOWRAP       (1 << 6);
-const TextFormat GG::FORMAT_WORDBREAK    (1 << 7);
-const TextFormat GG::FORMAT_LINEWRAP     (1 << 8);
-const TextFormat GG::FORMAT_IGNORETAGS   (1 << 9);
-
 GG_FLAGSPEC_IMPL(TextFormat);
 
 namespace {
@@ -651,19 +629,9 @@ namespace {
 ///////////////////////////////////////
 // class GG::Font::TextElement
 ///////////////////////////////////////
-Font::TextElement::TextElement() :
-    whitespace(false),
-    newline(false),
-    cached_width(-X1)
-{}
-
 Font::TextElement::TextElement(bool ws, bool nl) :
     whitespace(ws),
-    newline(nl),
-    cached_width(-X1)
-{}
-
-Font::TextElement::~TextElement()
+    newline(nl)
 {}
 
 void Font::TextElement::Bind(const std::string& whole_text)
@@ -684,7 +652,6 @@ StrSize Font::TextElement::StringSize() const
 
 CPSize Font::TextElement::CodePointSize() const
 { return CPSize(widths.size()); }
-
 
 bool Font::TextElement::operator==(const TextElement &rhs) const
 {
@@ -872,8 +839,7 @@ Font::TextAndElementsAssembler::TextAndElementsAssembler(const Font& font) :
 {}
 
 // Required because Impl is defined here
-Font::TextAndElementsAssembler::~TextAndElementsAssembler()
-{}
+Font::TextAndElementsAssembler::~TextAndElementsAssembler() = default;
 
 const std::string& Font::TextAndElementsAssembler::Text() const
 { return m_impl->Text(); }
@@ -977,18 +943,15 @@ bool Font::RenderState::ColorsEmpty() const
 // class GG::Font::RenderCache
 ///////////////////////////////////////
 
-// Must be here for scoped_ptr deleter to work
 Font::RenderCache::RenderCache() :
-    vertices(new GL2DVertexBuffer()),
-    coordinates(new GLTexCoordBuffer()),
-    colors(new GLRGBAColorBuffer()),
-    underline_vertices(new GL2DVertexBuffer()),
-    underline_colors(new GLRGBAColorBuffer())
+    vertices(std::make_unique<GL2DVertexBuffer>()),
+    coordinates(std::make_unique<GLTexCoordBuffer>()),
+    colors(std::make_unique<GLRGBAColorBuffer>()),
+    underline_vertices(std::make_unique<GL2DVertexBuffer>()),
+    underline_colors(std::make_unique<GLRGBAColorBuffer>())
 {}
 
-// Must be here for unique_ptr deleter to work
-Font::RenderCache::~RenderCache()
-{}
+Font::RenderCache::~RenderCache() = default;
 
 ///////////////////////////////////////
 // class GG::Font::LineData::CharData
@@ -1812,10 +1775,8 @@ void Font::Init(FT_Face& face)
 {
     FT_Fixed scale;
 
-    if (!m_pt_sz) {
-        throw InvalidPointSize("Attempted to create font \"" + m_font_filename +
-                               "\" with 0 point size");
-    }
+    if (!m_pt_sz)
+        throw InvalidPointSize("Attempted to create font \"" + m_font_filename + "\" with 0 point size");
 
     // Set the character size and use default 72 DPI
     if (FT_Set_Char_Size(face, 0, m_pt_sz * 64, 0, 0)) // if error is returned
@@ -1830,9 +1791,9 @@ void Font::Init(FT_Face& face)
     // underline info
     m_underline_offset = std::floor(FT_MulFix(face->underline_position, scale) / 64.0);
     m_underline_height = std::ceil(FT_MulFix(face->underline_thickness, scale) / 64.0);
-    if (m_underline_height < 1.0) {
+    if (m_underline_height < 1.0)
         m_underline_height = 1.0;
-    }
+
     // italics info
     m_italics_offset = Value(ITALICS_FACTOR * m_height / 2.0);
     // shadow info
@@ -1882,9 +1843,8 @@ void Font::Init(FT_Face& face)
         for (std::uint32_t c = low; c < high; ++c) {
             if (!temp_glyph_data.count(c) && GenerateGlyph(face, c)) {
                 const FT_Bitmap& glyph_bitmap = face->glyph->bitmap;
-                if ((glyph_bitmap.width > TEX_MAX_SIZE) | (glyph_bitmap.rows > TEX_MAX_SIZE)) {
+                if ((glyph_bitmap.width > TEX_MAX_SIZE) || (glyph_bitmap.rows > TEX_MAX_SIZE))
                     ThrowBadGlyph("GG::Font::Init : Glyph too large for buffer'%1%'", c); // catch broken fonts
-                }
 
                 if (Value(x) + glyph_bitmap.width >= TEX_MAX_SIZE) { // start a new row of glyph images
                     if (x > max_x) max_x = x;
@@ -1895,9 +1855,8 @@ void Font::Init(FT_Face& face)
                     // We cannot make the texture any larger. The font does not fit.
                     ThrowBadGlyph("GG::Font::Init : Face too large for buffer. First glyph to no longer fit: '%1%'", c);
                 }
-                if (y + Y(glyph_bitmap.rows) > max_y) {
+                if (y + Y(glyph_bitmap.rows) > max_y)
                     max_y = y + Y(glyph_bitmap.rows + 1); //Leave a one pixel gap between glyphs
-                }
 
                 std::uint8_t*  src_start = glyph_bitmap.buffer;
                 // Resize buffer to fit new data
@@ -1937,8 +1896,10 @@ void Font::Init(FT_Face& face)
                     (unsigned char*)buffer.Buffer(), GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, 2);
 
     // create Glyph objects from temp glyph data
-    for (const auto& glyph_data : temp_glyph_data)
-        m_glyphs[glyph_data.first] = Glyph(m_texture, glyph_data.second.ul, glyph_data.second.lr, glyph_data.second.y_offset, glyph_data.second.left_b, glyph_data.second.adv);
+    for (const auto& glyph_data : temp_glyph_data) {
+        m_glyphs[glyph_data.first] = Glyph(m_texture, glyph_data.second.ul, glyph_data.second.lr,
+                                           glyph_data.second.y_offset, glyph_data.second.left_b, glyph_data.second.adv);
+    }
 
     // record the width of the space character
     auto glyph_it = m_glyphs.find(WIDE_SPACE);

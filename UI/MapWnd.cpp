@@ -176,6 +176,9 @@ namespace {
 
         db.Add("ui.map.sidepanel.width",                    UserStringNop("OPTIONS_DB_UI_SIDEPANEL_WIDTH"),                     512,                            Validator<int>());
 
+        db.Add("ui.map.sidepanel.meter-refresh",            UserStringNop("OPTIONS_DB_UI_SIDEPANEL_OPEN_METER_UPDATE"),         true,                           Validator<bool>());
+        db.Add("ui.map.object-changed.meter-refresh",       UserStringNop("OPTIONS_DB_UI_OBJECT_CHANGED_METER_UPDATE"),         true,                           Validator<bool>());
+
         // Register hotkey names/default values for the context "map".
         Hotkey::AddHotkey("ui.map.open",                    UserStringNop("HOTKEY_MAP_RETURN_TO_MAP"),                          GG::Key::GGK_ESCAPE);
         Hotkey::AddHotkey("ui.turn.end",                    UserStringNop("HOTKEY_MAP_END_TURN"),                               GG::Key::GGK_RETURN,            GG::MOD_KEY_CTRL);
@@ -477,27 +480,30 @@ namespace {
             if (m_empire_id == ALL_EMPIRES)
                 return;
 
-            const auto& destroyed_objects = GetUniverse().EmpireKnownDestroyedObjectIDs(m_empire_id);
+            const Universe& universe = GetUniverse();
+            const SpeciesManager& sm = GetSpeciesManager();
+
+            const auto& destroyed_objects = universe.EmpireKnownDestroyedObjectIDs(m_empire_id);
             for (auto& ship : Objects().all<Ship>()) {
                 if (!ship->OwnedBy(m_empire_id) || destroyed_objects.count(ship->ID()))
                     continue;
                 m_values[FLEET_DETAIL_SHIP_COUNT]++;
 
-                if (ship->IsArmed())
+                if (ship->IsArmed(universe))
                     m_values[FLEET_DETAIL_ARMED_COUNT]++;
                 else
                     m_values[FLEET_DETAIL_UNARMED_COUNT]++;
 
-                if (ship->CanColonize())
+                if (ship->CanColonize(universe, sm))
                     m_values[FLEET_DETAIL_COLONY_COUNT]++;
 
-                if (ship->HasTroops())
+                if (ship->HasTroops(universe))
                     m_values[FLEET_DETAIL_TROOP_COUNT]++;
 
-                if (ship->HasFighters())
+                if (ship->HasFighters(universe))
                     m_values[FLEET_DETAIL_CARRIER_COUNT]++;
 
-                const ShipDesign* design = ship->Design();
+                const ShipDesign* design = universe.GetShipDesign(ship->DesignID());
                 if (!design)
                     continue;
                 m_ship_design_counts[design->ID()]++;
@@ -862,6 +868,8 @@ MapWnd::MovementLineData::MovementLineData() :
     path(),
     colour(GG::CLR_ZERO)
 {}
+
+MapWnd::MovementLineData::~MovementLineData() = default;
 
 MapWnd::MovementLineData::MovementLineData(const std::list<MovePathNode>& path_,
                                            const std::map<std::pair<int, int>, LaneEndpoints>& lane_end_points_map,
@@ -1398,8 +1406,13 @@ void MapWnd::CompleteConstruction() {
     // useful since most ResourceCenter changes will be due to focus
     // changes on the sidepanel, and most differences in meter estimates
     // and resource pools due to this will be in the same system
-    SidePanel::ResourceCenterChangedSignal.connect(
-        boost::bind(&MapWnd::UpdateSidePanelSystemObjectMetersAndResourcePools, this));
+    SidePanel::ResourceCenterChangedSignal.connect([this](){
+        if (GetOptionsDB().Get<bool>("ui.map.object-changed.meter-refresh")) {
+            ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
+            context.ContextUniverse().UpdateMeterEstimates(context);
+            UpdateEmpireResourcePools();
+        }
+    });
 
     // situation report window
     m_sitrep_panel = GG::Wnd::Create<SitRepPanel>(SITREP_WND_NAME);
@@ -1522,9 +1535,6 @@ void MapWnd::CompleteConstruction() {
     m_timeout_clock.Stop();
     m_timeout_clock.Connect(this);
 }
-
-MapWnd::~MapWnd()
-{}
 
 void MapWnd::DoLayout() {
     m_toolbar->Resize(GG::Pt(AppWidth(), TOOLBAR_HEIGHT));
@@ -2681,10 +2691,7 @@ void MapWnd::InitTurn() {
     GGHumanClientApp::GetApp()->Orders().ApplyOrders(); // TODO: pass Universe?
 
     timer.EnterSection("meter estimates");
-    // redo meter estimates with unowned planets marked as owned by player, so accurate predictions of planet
-    // population is available for currently uncolonized planets
     GetUniverse().UpdateMeterEstimates(context);
-
     GetUniverse().ApplyAppearanceEffects(context);
 
     timer.EnterSection("init rendering");
@@ -2872,7 +2879,7 @@ void MapWnd::InitTurn() {
 
 void MapWnd::MidTurnUpdate() {
     DebugLogger() << "MapWnd::MidTurnUpdate";
-    ScopedTimer timer("MapWnd::MidTurnUpdate", true);
+    ScopedTimer timer("MapWnd::MidTurnUpdate");
 
     GetUniverse().InitializeSystemGraph(Empires(), Objects());
     GetUniverse().UpdateEmpireVisibilityFilteredSystemGraphsWithMainObjectMap(Empires());
@@ -2892,7 +2899,7 @@ void MapWnd::MidTurnUpdate() {
 
 void MapWnd::InitTurnRendering() {
     DebugLogger() << "MapWnd::InitTurnRendering";
-    ScopedTimer timer("MapWnd::InitTurnRendering", true);
+    ScopedTimer timer("MapWnd::InitTurnRendering");
 
     using boost::placeholders::_1;
     using boost::placeholders::_2;
@@ -3002,7 +3009,7 @@ void MapWnd::InitTurnRendering() {
 
 void MapWnd::InitSystemRenderingBuffers() {
     DebugLogger() << "MapWnd::InitSystemRenderingBuffers";
-    ScopedTimer timer("MapWnd::InitSystemRenderingBuffers", true);
+    ScopedTimer timer("MapWnd::InitSystemRenderingBuffers");
 
     // clear out all the old buffers
     ClearSystemRenderingBuffers();
@@ -3434,7 +3441,10 @@ namespace {
 
         const ProductionQueue& queue = empire->GetProductionQueue();
         const auto& allocated_pp(queue.AllocatedPP());
-        const auto available_pp(empire->GetResourcePool(ResourceType::RE_INDUSTRY)->Output());
+        auto industry_pool{empire->GetResourcePool(ResourceType::RE_INDUSTRY)};
+        if (!industry_pool)
+            return;
+        const auto& available_pp(industry_pool->Output());
         // For each industry set,
         // add all planet's systems to res_pool_systems[industry set]
         for (const auto& available_pp_group : available_pp) {
@@ -3508,7 +3518,7 @@ namespace {
             }
         }
 
-        // Take note of all systems of under allocated resource groups.
+        // Take note of all systems of under-allocated resource groups.
         for (const auto& available_pp_group : available_pp) {
             float group_pp = available_pp_group.second;
             if (group_pp < 1e-4f)
@@ -4371,7 +4381,6 @@ void MapWnd::ReselectLastSystem() {
 }
 
 void MapWnd::SelectSystem(int system_id) {
-    //std::cout << "MapWnd::SelectSystem(" << system_id << ")" << std::endl;
     auto system = Objects().get<System>(system_id);
     if (!system && system_id != INVALID_OBJECT_ID) {
         ErrorLogger() << "MapWnd::SelectSystem couldn't find system with id " << system_id << " so is selected no system instead";
@@ -4379,10 +4388,10 @@ void MapWnd::SelectSystem(int system_id) {
     }
 
 
-    if (system) {
+    if (system && GetOptionsDB().Get<bool>("ui.map.sidepanel.meter-refresh")) {
         // ensure meter estimates are up to date, particularly for which ship is selected
         ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
-        GetUniverse().UpdateMeterEstimates(system_id, context, true);
+        GetUniverse().UpdateMeterEstimates(context, true);
     }
 
 
@@ -4448,7 +4457,7 @@ void MapWnd::ReselectLastFleet() {
     // search through stored selected fleets' ids and remove ids of missing fleets
     std::set<int> missing_fleets;
     for (const auto& fleet : objects.find<Fleet>(m_selected_fleet_ids)) {
-        if (!fleet)
+        if (fleet)
             missing_fleets.insert(fleet->ID());
     }
     for (int fleet_id : missing_fleets)
@@ -4500,7 +4509,9 @@ void MapWnd::SelectFleet(std::shared_ptr<Fleet> fleet) {
     // if there isn't a FleetWnd for this fleet open, need to open one
     if (!fleet_wnd) {
         // Add any overlapping fleet buttons for moving or offroad fleets.
-        const auto wnd_fleet_ids = FleetIDsOfFleetButtonsOverlapping(fleet->ID());
+        auto wnd_fleet_ids = FleetIDsOfFleetButtonsOverlapping(fleet->ID());
+        if (wnd_fleet_ids.empty())
+            wnd_fleet_ids.push_back(fleet->ID());
 
         // A leeway, scaled to the button size, around a group of moving fleets so the fleetwnd
         // tracks moving fleets together
@@ -4553,7 +4564,7 @@ void MapWnd::SetFleetMovementLine(int fleet_id) {
     const Empire* empire = GetEmpire(fleet->Owner());
     if (empire)
         line_colour = empire->Color();
-    else if (fleet->Unowned() && fleet->HasMonsters(Objects()))
+    else if (fleet->Unowned() && fleet->HasMonsters(GetUniverse()))
         line_colour = GG::CLR_RED;
 
     const ScriptingContext context;
@@ -4942,7 +4953,7 @@ namespace {
 
     /** If the \p fleet has a valid destination and it not on a starlane, return true*/
     bool IsOffRoad(const std::shared_ptr<const Fleet>& fleet)
-    { return (IsMoving(fleet) && !IsOnStarlane(fleet)); }
+    { return (fleet->SystemID() == INVALID_OBJECT_ID && !IsOnStarlane(fleet)); }
 }
 
 void MapWnd::RefreshFleetButtons(bool recreate) {
@@ -5073,7 +5084,7 @@ void MapWnd::CreateFleetButtonsOfType(FleetButtonMap& type_fleet_buttons,
             auto fb = GG::Wnd::Create<FleetButton>(std::move(ids_in_cluster), fleet_button_size);
 
             // store per type of fleet button.
-            type_fleet_buttons[key].emplace(fb);
+            type_fleet_buttons[key].insert(fb);
 
             // store FleetButton for fleets in current cluster
             for (int fleet_id : fb->Fleets())
@@ -5859,6 +5870,11 @@ void MapWnd::RefreshFleetButtonSelectionIndicators() {
 
     for (auto& moving_fleet_button : m_moving_fleet_buttons) {
         for (auto& button : moving_fleet_button.second)
+            button->SetSelected(false);
+    }
+
+    for (auto& offroad_fleet_button : m_offroad_fleet_buttons) {
+        for (auto& button : offroad_fleet_button.second)
             button->SetSelected(false);
     }
 
@@ -6888,15 +6904,11 @@ void MapWnd::RefreshPopulationIndicator() {
         std::move(tag_counts), GetSpeciesManager().census_order()));
 }
 
-void MapWnd::UpdateSidePanelSystemObjectMetersAndResourcePools() {
-    ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
-    GetUniverse().UpdateMeterEstimates(SidePanel::SystemID(), context, true);
-    UpdateEmpireResourcePools();
-}
-
 void MapWnd::UpdateEmpireResourcePools() {
-    //std::cout << "MapWnd::UpdateEmpireResourcePools" << std::endl;
-    Empire *empire = GetEmpire( GGHumanClientApp::GetApp()->EmpireID() );
+    auto empire = Empires().GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
+    if (!empire)
+        return;
+
     /* Recalculate stockpile, available, production, predicted change of
      * resources.  When resource pools update, they emit ChangeSignal, which is
      * connected to MapWnd::Refresh???ResourceIndicator, which updates the
@@ -7348,9 +7360,9 @@ namespace {
 
     //helper function for DispatchFleetsExploring
     //return the set of all systems ID with a starlane connecting them to a system in set
-    SystemIDListType AddNeighboorsToSet(const Empire *empire, const SystemIDListType& system_ids){
+    SystemIDListType AddNeighboorsToSet(const Empire *empire, const SystemIDListType& system_ids) {
         SystemIDListType retval;
-        auto starlanes = empire->KnownStarlanes();
+        auto starlanes = empire->KnownStarlanes(GetUniverse());
         for (auto system_id : system_ids) {
             auto new_neighboors_it = starlanes.find(system_id);
             if (new_neighboors_it != starlanes.end())
@@ -7691,8 +7703,7 @@ void MapWnd::DispatchFleetsExploring() {
 
     //list all unexplored systems by taking the neighboors of explored systems because ObjectMap does not list them all.
     SystemIDListType candidates_unknown_systems;
-    const auto& empire_explored_systems = empire->ExploredSystems();
-    SystemIDListType explored_systems{empire_explored_systems.begin(), empire_explored_systems.end()};
+    SystemIDListType explored_systems{empire->ExploredSystems()};
     candidates_unknown_systems = AddNeighboorsToSet(empire, explored_systems);
     auto neighboors = AddNeighboorsToSet(empire, candidates_unknown_systems);
     candidates_unknown_systems.insert(neighboors.begin(), neighboors.end());

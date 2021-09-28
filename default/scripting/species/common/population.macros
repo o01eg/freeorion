@@ -2,8 +2,10 @@
 GROWTH_RATE_FACTOR
 '''
 0.005 *
-(1 - (Statistic If condition = And [Target EmpireHasAdoptedPolicy name = "PLC_NO_GROWTH"])) *    // no growth with no-growth policy
-(1 + 0.5*(Statistic If condition = And [Target EmpireHasAdoptedPolicy name = "PLC_POPULATION"])) // +50% growth with population policy
+(1 - (Statistic If condition = And [Target EmpireHasAdoptedPolicy name = "PLC_NO_GROWTH"])) *       // no growth with no-growth policy
+(1 + 0.5*(Statistic If condition = And [Target EmpireHasAdoptedPolicy name = "PLC_POPULATION"])) *  // +50% growth with population policy
+(1 + (Statistic If condition = And [Target EmpireHasAdoptedPolicy name = "PLC_AUGMENTATION"]) *     // slower growth with augmentation on low-infrastructure planets
+      min(1.2, max(0.5, Target.Construction / (NamedRealLookup name = "AUGMENTATION_FULL_GROWTH_INFRASTRUCTURE_REQUIREMENT"))))
 '''
 
 BASIC_POPULATION
@@ -25,10 +27,10 @@ BASIC_POPULATION
             ]
             priority = [[POPULATION_FIRST_PRIORITY]]
             effects = SetPopulation value =
-                (Statistic If condition = (Value < Target.TargetPopulation) *
+                (Statistic If condition = And [ Target (Value < Target.TargetPopulation)] *
                     min(Target.TargetPopulation, Value + Value*[[GROWTH_RATE_FACTOR]]*
                                                                (Target.TargetPopulation + 1 - Value)))
-              + (Statistic If condition = (Value >= Target.TargetPopulation) *
+              + (Statistic If condition = And [ Target (Value >= Target.TargetPopulation)] *
                     max(Target.TargetPopulation, Value - 0.1*(Value - Target.TargetPopulation)))
 
         // Since all species have the same advanced focus effects and

@@ -38,6 +38,7 @@ parse::detail::simple_int_parser_rules::simple_int_parser_rules(const parse::lex
         |   tok.NextSystemID_
         |   tok.NearestSystemID_
         |   tok.PreviousSystemID_
+        |   tok.PreviousToFinalDestinationID_
         |   tok.NumShips_
         |   tok.NumStarlanes_
         |   tok.LastTurnActiveInBattle_
@@ -48,7 +49,9 @@ parse::detail::simple_int_parser_rules::simple_int_parser_rules(const parse::lex
         |   tok.LastTurnMoveOrdered_
         |   tok.LastTurnResupplied_
         |   tok.Orbit_
+        |   tok.TurnsSinceColonization_
         |   tok.TurnsSinceFocusChange_
+        |   tok.TurnsSinceLastConquered_
         |   tok.ETA_
         |   tok.LaunchedFrom_
         ;
@@ -128,6 +131,7 @@ parse::int_arithmetic_rules::int_arithmetic_rules(
     qi::_val_type _val;
     qi::_pass_type _pass;
     const boost::phoenix::function<detail::construct_movable> construct_movable_;
+    const boost::phoenix::function<detail::deconstruct_movable> deconstruct_movable_;
     const parse::detail::value_ref_rule<int>& simple = simple_int_rules.simple;
 
     statistic_value_ref_expr
@@ -149,6 +153,15 @@ parse::int_arithmetic_rules::int_arithmetic_rules(
           ]
         ;
 
+    total_fighter_shots
+        = ( tok.TotalFighterShots_
+            > -( label(tok.carrier_) > primary_expr )
+            > -( label(tok.condition_) > condition_parser )
+          ) [
+            _val =  construct_movable_(new_<ValueRef::TotalFighterShots>(deconstruct_movable_(_2, _pass), deconstruct_movable_(_3, _pass)))
+          ]
+        ;
+
     primary_expr
         =   '(' >> expr >> ')'
         |   simple
@@ -156,9 +169,11 @@ parse::int_arithmetic_rules::int_arithmetic_rules(
         |   named_lookup_expr
         |   int_complex_grammar
         |   named_int_valueref
+        |   total_fighter_shots
         ;
 
     named_int_valueref.name("named int valueref");
+    total_fighter_shots.name("TotalFighterShots valueref");
 }
 
 namespace parse {

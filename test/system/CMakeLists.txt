@@ -64,4 +64,3 @@ foreach(_TEST ${FO_TEST_GAME})
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
 endforeach()
-

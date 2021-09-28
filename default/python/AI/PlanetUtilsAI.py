@@ -1,11 +1,13 @@
-from logging import error, debug
-from typing import Iterable, List, Union
+import freeOrionAIInterface as fo
+from logging import debug, error
+from typing import Iterable, List, Sequence, Union
 
-import freeOrionAIInterface as fo  # pylint: disable=import-error
-import ColonisationAI
 from AIDependencies import INVALID_ID
-
+from common.fo_typing import PlanetId, SystemId
+from empire.colony_builders import get_colony_builders
+from empire.ship_builders import get_ship_builders
 from freeorion_tools import ppstring
+from freeorion_tools.caching import cache_for_current_turn
 
 
 def safe_name(univ_object):
@@ -24,22 +26,22 @@ def sys_name_ids(sys_ids: Iterable[int]) -> str:
     return ppstring([str(universe.getSystem(sys_id)) for sys_id in sys_ids])
 
 
-def planet_string(planet_ids: Union[int, List[int]]) -> str:
+def planet_string(planet_ids: Union[PlanetId, List[PlanetId]]) -> str:
     """
-    Get a string representation of the passed planets
-    :param planet_ids: list of planet ids or single id
+    Get a string representation of the passed planets.
     """
 
     def _safe_planet_name(planet_id):
         planet = fo.getUniverse().getPlanet(planet_id)
-        return fo.to_str('P', planet_id, (planet and planet.name) or "?")
+        return fo.to_str("P", planet_id, (planet and planet.name) or "?")
 
     if isinstance(planet_ids, int):
         return _safe_planet_name(planet_ids)
     return ppstring([_safe_planet_name(pid) for pid in planet_ids])
 
 
-def get_capital() -> int:
+@cache_for_current_turn
+def get_capital() -> PlanetId:
     """
     Return current empire capital id.
 
@@ -55,8 +57,10 @@ def get_capital() -> int:
         if homeworld.owner == empire_id:
             return capital_id
         else:
-            debug("Nominal Capitol %s does not appear to be owned by empire %d %s" % (
-                homeworld.name, empire_id, empire.name))
+            debug(
+                "Nominal Capitol %s does not appear to be owned by empire %d %s"
+                % (homeworld.name, empire_id, empire.name)
+            )
     empire_owned_planet_ids = get_owned_planets_by_empire(universe.planetIDs)
     peopled_planets = get_populated_planet_ids(empire_owned_planet_ids)
     if not peopled_planets:
@@ -65,7 +69,7 @@ def get_capital() -> int:
         else:
             return INVALID_ID
     try:
-        for spec_list in [ColonisationAI.empire_colonizers, ColonisationAI.empire_ship_builders, None]:
+        for spec_list in [get_colony_builders(), get_ship_builders(), None]:
             population_id_pairs = []
             for planet_id in peopled_planets:
                 planet = universe.getPlanet(planet_id)
@@ -117,17 +121,19 @@ def get_owned_planets_by_empire(planet_ids):
     for pid in planet_ids:
         planet = universe.getPlanet(pid)
         # even if our universe says we own it, if we can't see it we must have lost it
-        if (planet and not planet.unowned and planet.ownedBy(empire_id)
-                and universe.getVisibility(pid, empire_id) >= fo.visibility.partial):
+        if (
+            planet
+            and not planet.unowned
+            and planet.ownedBy(empire_id)
+            and universe.getVisibility(pid, empire_id) >= fo.visibility.partial
+        ):
             result.append(pid)
     return result
 
 
-def get_all_owned_planet_ids(planet_ids):
+def get_all_owned_planet_ids(planet_ids: Sequence[PlanetId]) -> Sequence[PlanetId]:
     """
     Return list of all owned and populated planet_ids.
-    :param planet_ids:
-    :return: list of planet_ids
     """
     # TODO: remove after refactoring in invasionAI
     # this function result used only to filter out unpopulated planets,
@@ -143,7 +149,7 @@ def get_all_owned_planet_ids(planet_ids):
     return result
 
 
-def get_populated_planet_ids(planet_ids):
+def get_populated_planet_ids(planet_ids: Sequence[PlanetId]) -> Sequence[PlanetId]:
     """
     Filter planets with population.
     :param planet_ids: list of planets ids
@@ -153,11 +159,9 @@ def get_populated_planet_ids(planet_ids):
     return [pid for pid in planet_ids if universe.getPlanet(pid).initialMeterValue(fo.meterType.population) > 0]
 
 
-def get_systems(planet_ids):
+def get_systems(planet_ids: Sequence[PlanetId]) -> Sequence[SystemId]:
     """
-    Return list of systems containing planet_ids
-    :param planet_ids: list of planet ids
-    :return: list of system ids
+    Return list of systems containing planet_ids.
     """
     # TODO discuss change return type to set
     universe = fo.getUniverse()

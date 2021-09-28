@@ -38,34 +38,18 @@ System::System(StarType star, const std::string& name, double x, double y) :
     UniverseObject::Init();
 }
 
-System::System(StarType star, const std::map<int, bool>& lanes_and_holes,
-               const std::string& name, double x, double y) :
-    UniverseObject(name, x, y),
-    m_star(star),
-    m_starlanes_wormholes(lanes_and_holes)
-{
-    if (m_star < StarType::INVALID_STAR_TYPE || StarType::NUM_STAR_TYPES < m_star)
-        m_star = StarType::INVALID_STAR_TYPE;
-
-    m_orbits.assign(SYSTEM_ORBITS, INVALID_OBJECT_ID);
-
-    SetSystem(ID());
-
-    UniverseObject::Init();
-}
-
-System* System::Clone(int empire_id) const {
+System* System::Clone(Universe& universe, int empire_id) const {
     Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
 
-    System* retval = new System(StarType::INVALID_STAR_TYPE, "", X(), Y());
-    retval->Copy(shared_from_this(), empire_id);
-    return retval;
+    auto retval = std::make_unique<System>();
+    retval->Copy(shared_from_this(), universe, empire_id);
+    return retval.release();
 }
 
-void System::Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_id) {
+void System::Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& universe, int empire_id) {
     if (copied_object.get() == this)
         return;
     std::shared_ptr<const System> copied_system = std::dynamic_pointer_cast<const System>(copied_object);
@@ -75,10 +59,10 @@ void System::Copy(std::shared_ptr<const UniverseObject> copied_object, int empir
     }
 
     int copied_object_id = copied_object->ID();
-    Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(copied_object_id, empire_id);
-    auto visible_specials = GetUniverse().GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
+    Visibility vis = universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
+    auto visible_specials = universe.GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
 
-    UniverseObject::Copy(std::move(copied_object), vis, visible_specials);
+    UniverseObject::Copy(std::move(copied_object), vis, visible_specials, universe);
 
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
         if (GetGameRules().Get<bool>("RULE_BASIC_VIS_SYSTEM_INFO_SHOWN")) {
@@ -208,11 +192,14 @@ std::string System::Dump(unsigned short ntabs) const {
 const std::string& System::ApparentName(int empire_id, bool blank_unexplored_and_none/* = false*/) const {
     static const std::string EMPTY_STRING;
 
+    const Universe& u = GetUniverse();
+    const ObjectMap& o = u.Objects();
+
     if (empire_id == ALL_EMPIRES)
-        return this->PublicName(empire_id, Objects()); // TODO: pass Universe into this function
+        return this->PublicName(empire_id, u); // TODO: pass Universe into this function
 
     // has the indicated empire ever detected this system?
-    const auto& vtm = GetUniverse().GetObjectVisibilityTurnMapByEmpire(this->ID(), empire_id);
+    const auto& vtm = u.GetObjectVisibilityTurnMapByEmpire(this->ID(), empire_id);
     if (!vtm.count(Visibility::VIS_PARTIAL_VISIBILITY)) {
         if (blank_unexplored_and_none)
             return EMPTY_STRING;
@@ -225,9 +212,9 @@ const std::string& System::ApparentName(int empire_id, bool blank_unexplored_and
 
     if (m_star == StarType::STAR_NONE) {
         // determine if there are any planets in the system
-        for (const auto& entry : Objects().ExistingPlanets()) {
+        for (const auto& entry : o.ExistingPlanets()) {
             if (entry.second->SystemID() == this->ID())
-                return this->PublicName(empire_id, Objects());
+                return this->PublicName(empire_id, u);
         }
         if (blank_unexplored_and_none) {
             //DebugLogger() << "System::ApparentName No-Star System (" << ID() << "), returning name "<< EMPTY_STRING;
@@ -237,7 +224,7 @@ const std::string& System::ApparentName(int empire_id, bool blank_unexplored_and
         return UserString("EMPTY_SPACE");
     }
 
-    return this->PublicName(empire_id, Objects()); // todo get Objects from inputs
+    return this->PublicName(empire_id, u); // todo get Objects from inputs
 }
 
 StarType System::NextOlderStarType() const {
@@ -535,7 +522,7 @@ std::map<int, bool> System::VisibleStarlanesWormholes(int empire_id) const {
     if (empire_id == ALL_EMPIRES)
         return m_starlanes_wormholes;
 
-    const Universe& universe = GetUniverse();
+    const Universe& universe = GetUniverse(); // TODO: pass in
     const ObjectMap& objects = universe.Objects();
 
 

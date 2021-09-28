@@ -28,11 +28,9 @@ UniverseObject::UniverseObject(std::string name, double x, double y) :
     m_created_on_turn(CurrentTurn())
 {}
 
-UniverseObject::~UniverseObject()
-{}
-
 void UniverseObject::Copy(std::shared_ptr<const UniverseObject> copied_object,
-                          Visibility vis, const std::set<std::string>& visible_specials)
+                          Visibility vis, const std::set<std::string>& visible_specials,
+                          const Universe&)
 {
     if (copied_object.get() == this)
         return;
@@ -42,8 +40,8 @@ void UniverseObject::Copy(std::shared_ptr<const UniverseObject> copied_object,
     }
 
     auto censored_meters = copied_object->CensoredMeters(vis);
-    for (const auto& entry : copied_object->m_meters) {
-        MeterType type = entry.first;
+    for (auto& [type, copied_meter] : copied_object->m_meters) {
+        (void)copied_meter;
 
         // get existing meter in this object, or create a default one
         auto m_meter_it = m_meters.find(type);
@@ -89,9 +87,8 @@ void UniverseObject::Copy(std::shared_ptr<const UniverseObject> copied_object,
             this->m_owner_empire_id =   copied_object->m_owner_empire_id;
             this->m_created_on_turn =   copied_object->m_created_on_turn;
 
-            if (vis >= Visibility::VIS_FULL_VISIBILITY) {
+            if (vis >= Visibility::VIS_FULL_VISIBILITY)
                 this->m_name =          copied_object->m_name;
-            }
         }
     }
 }
@@ -212,7 +209,7 @@ const std::set<int>& UniverseObject::ContainedObjectIDs() const
 
 std::set<int> UniverseObject::VisibleContainedObjectIDs(int empire_id) const {
     std::set<int> retval;
-    const Universe& universe = GetUniverse();
+    const Universe& universe = GetUniverse(); // TODO: pass in
     for (int object_id : ContainedObjectIDs()) {
         if (universe.GetObjectVisibilityByEmpire(object_id, empire_id) >= Visibility::VIS_BASIC_VISIBILITY)
             retval.insert(object_id);
@@ -255,7 +252,7 @@ bool UniverseObject::HostileToEmpire(int, const EmpireManager&) const
 Visibility UniverseObject::GetVisibility(int empire_id) const
 { return GetUniverse().GetObjectVisibilityByEmpire(this->ID(), empire_id); }
 
-const std::string& UniverseObject::PublicName(int, const ObjectMap&) const
+const std::string& UniverseObject::PublicName(int, const Universe&) const
 { return m_name; }
 
 std::shared_ptr<UniverseObject> UniverseObject::Accept(const UniverseObjectVisitor& visitor) const
@@ -319,7 +316,7 @@ void UniverseObject::SetOwner(int id) {
     }
     /* TODO: if changing object ownership gives an the new owner an
      * observer in, or ownership of a previoiusly unexplored system, then need
-     * to call empire->AddExploredSystem(system_id); */
+     * to call empire->AddExploredSystem(system_id, CurrentTurn(), context.ContextObjects()); */
 }
 
 void UniverseObject::SetSystem(int sys) {

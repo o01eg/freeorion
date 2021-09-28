@@ -1,19 +1,20 @@
+import freeOrionAIInterface as fo
 from logging import warning
 from typing import Optional
 
-import freeOrionAIInterface as fo  # pylint: disable=import-error
 from AIDependencies import INVALID_ID
+from common.fo_typing import FleetId, ObjectId, PlanetId, SystemId
 
 
 class Target:
     """
     Stores information about AI target - its id and type.
-    :type id: int
     """
-    object_name = 'target'
 
-    def __init__(self, target_id):
-        self.id = target_id
+    object_name = "target"
+    id: ObjectId
+
+    def __init__(self):
         if not self:
             warning("Target is invalid %s" % self)
 
@@ -45,7 +46,11 @@ class Target:
 
 
 class TargetPlanet(Target):
-    object_name = 'planet'
+    object_name = "planet"
+
+    def __init__(self, target_id: PlanetId):
+        self.id: PlanetId = target_id
+        super().__init__()
 
     def get_system(self) -> Optional["TargetSystem"]:
         """
@@ -63,7 +68,11 @@ class TargetPlanet(Target):
 
 
 class TargetSystem(Target):
-    object_name = 'system'
+    object_name = "system"
+
+    def __init__(self, target_id: SystemId):
+        self.id: SystemId = target_id
+        super().__init__()
 
     def get_system(self) -> "TargetSystem":
         """
@@ -76,7 +85,11 @@ class TargetSystem(Target):
 
 
 class TargetFleet(Target):
-    object_name = 'fleet'
+    object_name = "fleet"
+
+    def __init__(self, target_id: FleetId):
+        self.id: FleetId = target_id
+        super().__init__()
 
     def get_current_system_id(self):
         """

@@ -75,8 +75,8 @@ int         ClientUI::TitlePts()                { return GetOptionsDB().Get<int>
 GG::Clr     ClientUI::TextColor()               { return GetOptionsDB().Get<GG::Clr>("ui.font.color"); }
 GG::Clr     ClientUI::DefaultLinkColor()        { return GetOptionsDB().Get<GG::Clr>("ui.font.link.color"); }
 GG::Clr     ClientUI::RolloverLinkColor()       { return GetOptionsDB().Get<GG::Clr>("ui.font.link.rollover.color"); }
-GG::Clr     ClientUI::DefaultTooltipColor()        { return GetOptionsDB().Get<GG::Clr>("ui.font.tooltip.color"); }
-GG::Clr     ClientUI::RolloverTooltipColor()       { return GetOptionsDB().Get<GG::Clr>("ui.font.tooltip.rollover.color"); }
+GG::Clr     ClientUI::DefaultTooltipColor()     { return GetOptionsDB().Get<GG::Clr>("ui.font.tooltip.color"); }
+GG::Clr     ClientUI::RolloverTooltipColor()    { return GetOptionsDB().Get<GG::Clr>("ui.font.tooltip.rollover.color"); }
 
 
 GG::Clr     ClientUI::WndColor()                { return GetOptionsDB().Get<GG::Clr>("ui.window.background.color"); }
@@ -467,7 +467,7 @@ namespace {
                 std::set<GG::UnicodeCharset> default_stringtable_charsets = GG::UnicodeCharsetsToRender(stringtable_str);
                 DebugLogger() << "loading " << default_stringtable_charsets.size() << " charsets for default stringtable characters";
 
-                stringtable_charsets.insert(default_stringtable_charsets.begin(), default_stringtable_charsets.end());
+                stringtable_charsets.merge(default_stringtable_charsets); // insert(default_stringtable_charsets.begin(), default_stringtable_charsets.end());
                 DebugLogger() << "combined stringtable charsets have " << stringtable_charsets.size() << " charsets";
             }
 
@@ -847,9 +847,8 @@ bool ClientUI::ZoomToBuilding(int id) {
 }
 
 bool ClientUI::ZoomToField(int id) {
-    //if (auto field = Objects().get<Field>(id)) {
-    //  // TODO: implement this
-    //}
+    if (auto field = Objects().get<Field>(id))
+        GetMapWnd()->CenterOnObject(id);
     return false;
 }
 

@@ -13,21 +13,72 @@ import time
 import urllib.parse
 import urllib.request
 import webbrowser
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict, namedtuple
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Iterator
 
-STRING_TABLE_KEY_PATTERN = r'^[A-Z0-9_]+$'
+STRING_TABLE_KEY_PATTERN = re.compile(r"^[A-Z0-9_]+$")
 # Provides the named capture groups 'ref_type' and 'key'
-INTERNAL_REFERENCE_PATTERN = r'\[\[(?P<ref_type>(?:(?:encyclopedia|(?:building|field|meter)type|predefinedshipdesign|ship(?:hull|part)|special|species|tech|policy|value) )?)(?P<key>{})\]\]'
-OPTIONAL_REF_TYPES = [ "value" ];
-# Provides the named capture groups 'sha', 'old_line', 'new_line' and 'range'
-GIT_BLAME_INCREMENTAL_PATTERN = r'^(?P<sha>[0-9a-f]{40}) (?P<old_line>[1-9][0-9]*) (?P<new_line>[1-9][0-9]*)(?P<range> [1-9][0-9]*)?$'
+INTERNAL_REFERENCE_PATTERN_TEMPLATE = r"\[\[(?P<ref_type>(?:(?:encyclopedia|(?:building|field|meter)type|predefinedshipdesign|ship(?:hull|part)|special|species|tech|policy|value) )?)(?P<key>{})\]\]"
+OPTIONAL_REF_TYPES = ["value"]
+
+
+def _get_brackets(text) -> Iterator[str]:
+    has = False
+    prev = ""
+    for char in text:
+        if char in "[]":
+            if has:
+                has = False
+                if prev == char:
+                    yield char
+            else:
+                has = True
+                prev = char
+        else:
+            has = False
+
+
+def check_balanced_reference(text: str) -> bool:
+    """
+    Check if reference [[XXX]] has balanced syntax.
+
+    >>> check_balanced_reference("no reference")
+    True
+
+    >>> check_balanced_reference("[[valid reference]]")
+    True
+
+    >>> check_balanced_reference("[[unbalanced left]")
+    False
+
+    >>> check_balanced_reference("[unbalanced right]]")
+    False
+
+    >>> check_balanced_reference("[[ multiple with ]] [[ not closed")
+    False
+
+    >>> check_balanced_reference("[[ [[ reference ]] in reference ]]")
+    False
+    """
+    braces = _get_brackets(text)
+    is_open = False
+    for b in braces:
+        if b == "[":
+            if is_open:
+                return False
+            is_open = True
+        else:
+            if not is_open:
+                return False
+            is_open = False
+    return not is_open
 
 
 class StringTableEntry(object):
     def __init__(self, key, keyline, value, notes, value_times):
-        if not re.match(STRING_TABLE_KEY_PATTERN, key):
-            raise ValueError("Key doesn't match expected format [A-Z0-9_]+, was '{}'".format(key))
+        if not STRING_TABLE_KEY_PATTERN.match(key):
+            raise ValueError(f"Key doesn't match expected format [A-Z0-9_]+, was '{key}'")
         self.key = key
         self.keyline = keyline
         self.value = value
@@ -37,23 +88,22 @@ class StringTableEntry(object):
     def __str__(self):
         result = ""
         for note in self.notes:
-            result += '# ' + note + "\n"
+            result += "# " + note + "\n"
         if self.value is not None:
             result += self.key + "\n"
-            if not self.value or '\n' in self.value or re.search(r'^\s', self.value) or re.search(r'\s$', self.value):
+            if not self.value or "\n" in self.value or re.search(r"^\s", self.value) or re.search(r"\s$", self.value):
                 result += "'''" + self.value + "'''" + "\n"
             else:
                 result += self.value + "\n"
         else:
             result += "#*" + self.key + "\n"
             for e in self.value_times:
-                result += "#* <not translated {}>\n".format(
-                    datetime.datetime.fromtimestamp(e).isoformat(sep=' '))
+                result += f"#* <not translated {datetime.datetime.fromtimestamp(e).isoformat(sep=' ')}>\n"
 
         return result
 
     def __repr__(self):
-        return "StringTableEntry(key={}, keyline={}, value={})".format(self.key, self.keyline, self.value)
+        return f"StringTableEntry(key={self.key}, keyline={self.keyline}, value={self.value})"
 
 
 class StringTable(object):
@@ -68,14 +118,10 @@ class StringTable(object):
         for entry in self._entries:
             if isinstance(entry, StringTableEntry):
                 if entry.key in self._ientries:
-                    msg = "{fpath}:{fline}: Duplicate key '{key}', previously defined on line {pline}"
-                    msg = msg.format(**{
-                        'fpath': self.fpath,
-                        'fline': entry.keyline,
-                        'key': entry.key,
-                        'pline': self._ientries[entry.key].keyline,
-                    })
-                    raise ValueError(msg)
+                    raise ValueError(
+                        f"{self.fpath}:{entry.keyline}:"
+                        f" Duplicate key '{entry.key}', previously defined on line {self._ientries[entry.key].keyline}"
+                    )
                 self._ientries[entry.key] = entry
 
     def __getitem__(self, key):
@@ -85,7 +131,7 @@ class StringTable(object):
         return key in self._ientries
 
     def __iter__(self):
-        return self._ientries.iteritems()
+        return iter(self._ientries)
 
     def __len__(self):
         return len(self._ientries)
@@ -121,22 +167,61 @@ class StringTable(object):
             result += "\n"
 
         for include in self.includes:
-            result += "#include \"" + include + "\"\n"
+            result += '#include "' + include + '"\n'
 
         return result
 
     def __repr__(self):
-        return "StringTable(fpath={}, language={}, entries={})".format(
-            self.fpath, self.language, self.entries)
+        return "StringTable(fpath={}, language={}, entries={})".format(self.fpath, self.language, self.entries)
 
     def items(self):
         return self._entries
 
-    def keys(self):
-        return self._ientries.keys()
+    @staticmethod
+    def set_author(fpath, entries, blames):
+        blame_cmd = ["git", "blame", "--incremental", fpath]
+        git_blame = subprocess.check_output(blame_cmd)
+        git_blame = git_blame.decode("utf-8", "strict")
+        git_blame = git_blame.splitlines(True)
+
+        value_times = {}
+        author_time = None
+        line = None
+        line_range = None
+
+        # Provides the named capture groups 'sha', 'old_line', 'new_line' and 'range'
+        GIT_BLAME_INCREMENTAL_PATTERN = re.compile(
+            r"^(?P<sha>[0-9a-f]{40}) (?P<old_line>[1-9][0-9]*) (?P<new_line>[1-9][0-9]*)(?P<range> [1-9][0-9]*)?$"
+        )
+
+        for line_blame in git_blame:
+            match = GIT_BLAME_INCREMENTAL_PATTERN.match(line_blame)
+            if match:
+                line = int(match["new_line"])
+                line_range = int(match["range"])
+            if line_blame.startswith("author-time "):
+                author_time = int(line_blame.strip().split(" ")[1])
+            if line_blame.startswith("filename "):
+                for line in range(line, line + line_range):
+                    if line not in blames:
+                        continue
+                    line_times = value_times.get(blames[line], [])
+                    line_times.append(author_time)
+                    value_times[blames[line]] = line_times
+
+        for entry in entries:
+            if isinstance(entry, StringTableEntry):
+                if not entry.value:
+                    # ignore untranslated entries
+                    continue
+                if entry.key not in value_times or len(value_times[entry.key]) != len(entry.value_times):
+                    raise RuntimeError(
+                        "{}: git blame did not collect any matching author times for key {}".format(fpath, entry.key)
+                    )
+                entry.value_times = value_times[entry.key]
 
     @staticmethod
-    def from_file(fhandle):
+    def from_file(fhandle, with_blame=True):
         fpath = fhandle.name
 
         is_quoted = False
@@ -173,7 +258,9 @@ class StringTable(object):
                     notes = []
                 if untranslated_key:
                     try:
-                        entries.append(StringTableEntry(untranslated_key, untranslated_keyline, None, notes, untranslated_lines))
+                        entries.append(
+                            StringTableEntry(untranslated_key, untranslated_keyline, None, notes, untranslated_lines)
+                        )
                     except ValueError as e:
                         raise ValueError("{}:{}: {}".format(fpath, keyline, str(e)))
                     untranslated_key = None
@@ -183,18 +270,18 @@ class StringTable(object):
                 vline_start = vline_end = fline
                 continue
 
-            if not is_quoted and line.startswith('#'):
+            if not is_quoted and line.startswith("#"):
                 # discard comments when not in quoted value
-                if line.startswith('#include'):
+                if line.startswith("#include"):
                     includes.append(line[8:].strip()[1:-1].strip())
-                if line.startswith('##'):
+                if line.startswith("##"):
                     section.append(line[3:].rstrip())
-                elif line.startswith('#*') and not untranslated_key:
+                elif line.startswith("#*") and not untranslated_key:
                     untranslated_key = line[2:].strip()
                     untranslated_keyline = fline
-                elif line.startswith('#*'):
+                elif line.startswith("#*"):
                     untranslated_lines.append(0)
-                elif line.startswith('#'):
+                elif line.startswith("#"):
                     notes.append(line[2:].rstrip())
                 vline_start = vline_end = fline
                 continue
@@ -218,7 +305,9 @@ class StringTable(object):
                     notes = []
                 if untranslated_key:
                     try:
-                        entries.append(StringTableEntry(untranslated_key, untranslated_keyline, None, notes, untranslated_lines))
+                        entries.append(
+                            StringTableEntry(untranslated_key, untranslated_keyline, None, notes, untranslated_lines)
+                        )
                     except ValueError as e:
                         raise ValueError("{}:{}: {}".format(fpath, keyline, str(e)))
                     untranslated_key = None
@@ -250,12 +339,12 @@ class StringTable(object):
                 vline_end = fline
 
             # extract value or concatenate quoted value
-            value = (value if value else '') + line
+            value = (value if value else "") + line
 
             if not is_quoted and key is not None and value is not None:
                 # consume collected string table entry
                 try:
-                    value_range = ({line: key for line in range(vline_start, vline_end + 1)})
+                    value_range = {line: key for line in range(vline_start, vline_end + 1)}
                     entries.append(StringTableEntry(key, keyline, value, notes, [0] * len(value_range)))
                     blames.update(value_range)
                 except ValueError as e:
@@ -273,66 +362,38 @@ class StringTable(object):
                 vline_end = fline
                 continue
 
-            raise ValueError("{}:{}: Impossible parser state; last valid line: {}".format(fpath, vline_start, line))
+            raise ValueError(f"{fpath}:{vline_start}: Impossible parser state; last valid line: {line}")
 
         if key:
-            raise ValueError("{}:{}: Key '{}' without value".format(fpath, vline_start, key))
+            raise ValueError(f"{fpath}:{vline_start}: Key '{key}' without value")
 
         if is_quoted:
-            raise ValueError("{}:{}: Quotes not closed for key '{}'".format(fpath, vline_start, key))
+            raise ValueError(f"{fpath}:{vline_start}: Quotes not closed for key '{key}'")
 
-        blame_cmd = ['git', 'blame', '--incremental', fpath]
-        git_blame = subprocess.check_output(blame_cmd)
-        git_blame = git_blame.decode('utf-8', 'strict')
-        git_blame = git_blame.splitlines(True)
-
-        value_times = {}
-        author_time = None
-        line = None
-        line_range = None
-
-        for line_blame in git_blame:
-            match = re.match(GIT_BLAME_INCREMENTAL_PATTERN, line_blame)
-            if match:
-                line = int(match['new_line'])
-                line_range = int(match['range'])
-            if line_blame.startswith('author-time '):
-                author_time = int(line_blame.strip().split(' ')[1])
-            if line_blame.startswith('filename '):
-                for line in range(line, line + line_range):
-                    if line not in blames:
-                        continue
-                    line_times = value_times.get(blames[line], [])
-                    line_times.append(author_time)
-                    value_times[blames[line]] = line_times
-
-        for entry in entries:
-            if isinstance(entry, StringTableEntry):
-                if not entry.value:
-                    # ignore untranslated entries
-                    continue
-                if entry.key not in value_times or len(value_times[entry.key]) != len(entry.value_times):
-                    raise RuntimeError("{}: git blame did not collect any matching author times for key {}".format(fpath, entry.key))
-                entry.value_times = value_times[entry.key]
-
+        if with_blame:
+            StringTable.set_author(fpath, entries, blames)
         return StringTable(fpath, language, fnotes, includes, entries)
 
     @staticmethod
     def statistic(left, right):
-        STStatistic = namedtuple('STStatistic', [
-            'left',
-            'left_only',
-            'left_older',
-            'left_pure_reference',
-            'right',
-            'right_only',
-            'right_older',
-            'right_pure_reference',
-            'untranslated',
-            'identical',
-            'layout_mismatch'])
+        STStatistic = namedtuple(
+            "STStatistic",
+            [
+                "left",
+                "left_only",
+                "left_older",
+                "left_pure_reference",
+                "right",
+                "right_only",
+                "right_older",
+                "right_pure_reference",
+                "untranslated",
+                "identical",
+                "layout_mismatch",
+            ],
+        )
 
-        all_keys = set(left.keys()).union(right.keys())
+        all_keys = set(left).union(right)
 
         untranslated = set()
         identical = set()
@@ -355,11 +416,19 @@ class StringTable(object):
                     continue
                 if left[key].value == right[key].value:
                     identical.add(key)
-                if (left[key].value.startswith('[[') and 2 == left[key].value.count('[') and
-                        left[key].value.endswith(']]') and 2 == left[key].value.count(']')):
+                if (
+                    left[key].value.startswith("[[")
+                    and 2 == left[key].value.count("[")
+                    and left[key].value.endswith("]]")
+                    and 2 == left[key].value.count("]")
+                ):
                     left_pure_reference.add(key)
-                if (right[key].value.startswith('[[') and 2 == right[key].value.count('[') and
-                        right[key].value.endswith(']]') and 2 == right[key].value.count(']')):
+                if (
+                    right[key].value.startswith("[[")
+                    and 2 == right[key].value.count("[")
+                    and right[key].value.endswith("]]")
+                    and 2 == right[key].value.count("]")
+                ):
                     right_pure_reference.add(key)
                 if len(left[key].value_times) != len(right[key].value_times):
                     layout_mismatch.add(key)
@@ -371,12 +440,18 @@ class StringTable(object):
                     left_older.add(key)
 
         return STStatistic(
-            left=left, left_only=left_only, left_older=left_older,
-            right=right, right_only=right_only, right_older=right_older,
+            left=left,
+            left_only=left_only,
+            left_older=left_older,
+            right=right,
+            right_only=right_only,
+            right_older=right_older,
             left_pure_reference=left_pure_reference,
             right_pure_reference=right_pure_reference,
-            untranslated=untranslated, identical=identical,
-            layout_mismatch=layout_mismatch)
+            untranslated=untranslated,
+            identical=identical,
+            layout_mismatch=layout_mismatch,
+        )
 
     @staticmethod
     def sync(reference, source):
@@ -386,21 +461,19 @@ class StringTable(object):
             if isinstance(item, StringTableEntry):
                 if item.key in source:
                     source_item = source[item.key]
-                    entries.append(StringTableEntry(
-                        item.key,
-                        item.keyline,
-                        source_item.value if source_item.value != item.value else None,
-                        item.notes,
-                        source_item.value_times
-                    ))
+                    entries.append(
+                        StringTableEntry(
+                            item.key,
+                            item.keyline,
+                            source_item.value if source_item.value != item.value else None,
+                            item.notes,
+                            source_item.value_times,
+                        )
+                    )
                 else:
-                    entries.append(StringTableEntry(
-                        item.key,
-                        item.keyline,
-                        None,
-                        item.notes,
-                        [0] * len(item.value_times)
-                    ))
+                    entries.append(
+                        StringTableEntry(item.key, item.keyline, None, item.notes, [0] * len(item.value_times))
+                    )
             else:
                 entries.append(item)
 
@@ -408,7 +481,7 @@ class StringTable(object):
 
 
 class EditServerHandler(BaseHTTPRequestHandler):
-    body = '''
+    body = """
 <html>
     <head>
         <title>Editing {source}</title>
@@ -621,25 +694,27 @@ class EditServerHandler(BaseHTTPRequestHandler):
         </table>
     </body>
 </html>
-    '''
+    """
 
-    entry = '''
+    entry = """
 <tbody class="entry status-{status}" id="{key}">
     <tr><th colspan="2">{key}</th></tr>
     <tr class="notes"><td colspan="2">{notes}</td></tr>
     <tr><td class="source">{source}</td><td class="translation" data-id="{key}">{translation}</td></tr>
 </tbody>
-    '''
+    """
 
     def do_GET(self):
         parsed_path = urllib.parse.urlparse(self.path)
 
-        if parsed_path.path == '/':
+        if parsed_path.path == "/":
             return self.GET_stringtable()
-        elif parsed_path.path == '/jquery.js':
-            return self.GET_url('https://code.jquery.com/jquery-3.4.1.min.js')
-        elif parsed_path.path == '/jeditable.jquery.js':
-            return self.GET_url('https://raw.githubusercontent.com/NicolasCARPi/jquery_jeditable/2.0.14/dist/jquery.jeditable.min.js')
+        elif parsed_path.path == "/jquery.js":
+            return self.GET_url("https://code.jquery.com/jquery-3.4.1.min.js")
+        elif parsed_path.path == "/jeditable.jquery.js":
+            return self.GET_url(
+                "https://raw.githubusercontent.com/NicolasCARPi/jquery_jeditable/2.0.14/dist/jquery.jeditable.min.js"
+            )
         else:
             self.send_response(404)
             self.end_headers()
@@ -647,11 +722,11 @@ class EditServerHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed_path = urllib.parse.urlparse(self.path)
 
-        if parsed_path.path == '/update':
+        if parsed_path.path == "/update":
             return self.POST_entry()
-        if parsed_path.path == '/save':
+        if parsed_path.path == "/save":
             return self.POST_save()
-        if parsed_path.path == '/shutdown':
+        if parsed_path.path == "/shutdown":
             # The http.server.HttpServer states, that the shutdown function
             # needs to be called outside of the thread, which processes the
             # handler, to avoid deadlock.
@@ -663,7 +738,7 @@ class EditServerHandler(BaseHTTPRequestHandler):
     def GET_url(self, url):
         response = urllib.request.urlopen(url)
         self.send_response(response.getcode())
-        self.send_header('Content-Type', response.info()['Content-Type'])
+        self.send_header("Content-Type", response.info()["Content-Type"])
         self.end_headers()
 
         for chunk in response:
@@ -671,111 +746,110 @@ class EditServerHandler(BaseHTTPRequestHandler):
 
     def GET_stringtable(self):
         self.send_response(200)
-        self.send_header('Content-Type', 'text/html ; charset=utf-8')
+        self.send_header("Content-Type", "text/html ; charset=utf-8")
         self.end_headers()
 
         entries = []
 
         stat = StringTable.statistic(self.server.reference_st, self.server.source_st)
 
-        for key in self.server.reference_st.keys():
+        for key in self.server.reference_st:
             source = self.server.reference_st[key].value
             source = html.escape(source)
 
-            translation = self.server.source_st[key].value if key in self.server.source_st else ''
+            translation = self.server.source_st[key].value if key in self.server.source_st else ""
 
-            status = 'recent'
+            status = "recent"
             if key not in stat.left_older:
-                status = 'stale'
+                status = "stale"
             if not translation:
-                status = 'untranslated'
+                status = "untranslated"
 
-            translation = translation if translation else ''
+            translation = translation if translation else ""
             translation = html.escape(translation)
 
             notes = self.server.reference_st[key].notes
-            notes = '\n'.join(notes)
+            notes = "\n".join(notes)
             notes = html.escape(notes)
 
-            entries.append(EditServerHandler.entry.format(
-                key=key,
-                source=source,
-                translation=translation,
-                notes=notes,
-                status=status
-            ))
+            entries.append(
+                EditServerHandler.entry.format(
+                    key=key, source=source, translation=translation, notes=notes, status=status
+                )
+            )
 
-        self.wfile.write(EditServerHandler.body.format(
-            source=self.server.source_st.fpath,
-            language=self.server.source_st.language,
-            entries=''.join(entries)
-        ).encode('utf-8'))
+        self.wfile.write(
+            EditServerHandler.body.format(
+                source=self.server.source_st.fpath, language=self.server.source_st.language, entries="".join(entries)
+            ).encode("utf-8")
+        )
 
     def POST_error(self, message):
         self.send_response(500)
-        self.send_header('Content-Type', 'application/json')
+        self.send_header("Content-Type", "application/json")
         self.end_headers()
 
-        self.wfile.write(json.dumps(
-            {'code': 500, 'message': message}).encode('utf-8'))
+        self.wfile.write(json.dumps({"code": 500, "message": message}).encode("utf-8"))
 
     def POST_save(self):
         self.send_response(200)
-        self.send_header('Content-Type', 'text/plain ; charset=utf-8')
-        self.send_header('Content-Disposition', 'attachment; filename="{}"'.format(os.path.basename(self.server.source_st.fpath)))
+        self.send_header("Content-Type", "text/plain ; charset=utf-8")
+        self.send_header(
+            "Content-Disposition", 'attachment; filename="{}"'.format(os.path.basename(self.server.source_st.fpath))
+        )
         self.end_headers()
 
-        self.wfile.write(str(self.server.source_st).encode('utf-8'))
+        self.wfile.write(str(self.server.source_st).encode("utf-8"))
 
     def POST_entry(self):
         try:
-            content_length = int(self.headers.get('Content-Length', '0'))
+            content_length = int(self.headers.get("Content-Length", "0"))
             body = self.rfile.read(content_length)
             request = json.loads(body)
-            if 'id' not in request or 'value' not in request:
+            if "id" not in request or "value" not in request:
                 raise ValueError("Some of the expected json keys are missing")
         except ValueError:
             self.POST_error("Browser didn't send a save request")
             raise
 
-        if request['id'] not in self.server.reference_st:
-            self.POST_error("No entry with key {}".format(request['id']))
+        if request["id"] not in self.server.reference_st:
+            self.POST_error(f"No entry with key {request['id']}")
 
-        entry = self.server.source_st[request['id']]
-        rentry = self.server.reference_st[request['id']]
+        entry = self.server.source_st[request["id"]]
+        rentry = self.server.reference_st[request["id"]]
 
-        if entry.value != request['value']:
-            if request['value'] and rentry.value != request['value']:
-                entry.value = request['value']
+        if entry.value != request["value"]:
+            if request["value"] and rentry.value != request["value"]:
+                entry.value = request["value"]
             else:
                 entry.value = None
             if entry.value:
-                entry.value_times = [int(time.time())] * len(entry.value.split('\n'))
+                entry.value_times = [int(time.time())] * len(entry.value.split("\n"))
             else:
                 entry.value_times = rentry.value_times
 
         self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
+        self.send_header("Content-Type", "application/json")
         self.end_headers()
 
-        status = 'recent'
-        if max(self.server.reference_st[request['id']].value_times) > min(entry.value_times):
-            status = 'stale'
+        status = "recent"
+        if max(self.server.reference_st[request["id"]].value_times) > min(entry.value_times):
+            status = "stale"
         if not entry.value:
-            status = 'untranslated'
+            status = "untranslated"
 
         response = {
-            'id': request['id'],
-            'status': status,
+            "id": request["id"],
+            "status": status,
         }
 
-        self.wfile.write(json.dumps(response).encode('utf-8'))
+        self.wfile.write(json.dumps(response).encode("utf-8"))
 
 
 def format_action(args):
     source_st = StringTable.from_file(args.source)
 
-    print(source_st, end='')
+    print(source_st, end="")
 
     return 0
 
@@ -786,30 +860,31 @@ def sync_action(args):
 
     out_st = StringTable.sync(reference_st, source_st)
 
-    print(out_st, end='')
+    print(out_st, end="")
 
     return 0
 
 
 def rename_key_action(args):
-    if not re.match(STRING_TABLE_KEY_PATTERN, args.old_key):
-        raise ValueError("The given old key '{}' is not a valid name".format(args.old_key))
+    if not STRING_TABLE_KEY_PATTERN.match(args.old_key):
+        raise ValueError(f"The given old key '{args.old_key}' is not a valid name")
 
-    if not re.match(STRING_TABLE_KEY_PATTERN, args.new_key):
-        raise ValueError("The given new key '{}' is not a valid name".format(args.new_key))
+    if not STRING_TABLE_KEY_PATTERN.match(args.new_key):
+        raise ValueError(f"The given new key '{args.new_key}' is not a valid name")
 
     source_st = StringTable.from_file(args.source)
 
-    for key in source_st.keys():
+    for key in source_st:
         entry = source_st[key]
         entry.value = re.sub(
-            INTERNAL_REFERENCE_PATTERN.format(re.escape(args.old_key)),
-            r'[[\1' + args.new_key + ']]',
-            entry.value)
+            INTERNAL_REFERENCE_PATTERN_TEMPLATE.format(re.escape(args.old_key)),
+            r"[[\1" + args.new_key + "]]",
+            entry.value,
+        )
         if entry.key == args.old_key:
             entry.key = args.new_key
 
-    print(source_st, end='')
+    print(source_st, end="")
 
     return 0
 
@@ -820,10 +895,10 @@ def edit_action(args):
 
     source_st = StringTable.sync(reference_st, source_st)
 
-    server = HTTPServer(('localhost', 8080), EditServerHandler)
+    server = HTTPServer(("localhost", 8080), EditServerHandler)
     server.reference_st = reference_st
     server.source_st = source_st
-    webbrowser.open('http://localhost:8080/')
+    webbrowser.open("http://localhost:8080/")
     server.serve_forever()
 
     return 0
@@ -833,23 +908,52 @@ def check_action(args):
     exit_code = 0
     reference_st = None
     if args.reference:
-        reference_st = StringTable.from_file(args.reference)
+        reference_st = StringTable.from_file(args.reference, with_blame=False)
     for source in args.sources:
-        source_st = StringTable.from_file(source)
+        source_st = StringTable.from_file(source, with_blame=False)
 
-        for key in source_st.keys():
+        references = set()
+        for key in source_st:
             entry = source_st[key]
 
             if entry.value:
-                for match in re.finditer(INTERNAL_REFERENCE_PATTERN.format('.*?'), entry.value):
-                    match_key = match['key']
-                    if not (match_key in source_st.keys() or (reference_st and match_key in reference_st.keys())):
-                        if match['ref_type'].strip() in OPTIONAL_REF_TYPES:
-                            print("{}:{}: Optional referenced key '{}' in value of '{}' was not found. Reference was [[{}{}]].".format(source_st.fpath, entry.keyline, match_key, entry.key, match['ref_type'], match_key))
+                if not check_balanced_reference(entry.value):
+                    print(f"{source_st.fpath}:{entry.key}: Unbalanced brackets: '{entry.value}'")
+                    exit_code = 1
+
+                for match in re.finditer(INTERNAL_REFERENCE_PATTERN_TEMPLATE.format(".*?"), entry.value):
+                    reference_key = match["key"]
+                    references.add(reference_key)
+                    if reference_key not in source_st:
+
+                        if match["ref_type"].strip() in OPTIONAL_REF_TYPES:
                             continue
-                        print("{}:{}: Referenced key '{}' in value of '{}' was not found.".format(source_st.fpath, entry.keyline, match_key, entry.key))
+
+                        print(
+                            f"{source_st.fpath}:{entry.keyline}: Referenced key '{reference_key}' in value of '{entry.key}' was not found."
+                        )
                         exit_code = 1
 
+        exit_code += _check_key_usage(source_st, reference_st, references)
+    return exit_code
+
+
+def _check_key_usage(source_st, reference_st, references):
+    exit_code = 0
+
+    def check_key_is_used(key_under_check):
+        if not reference_st:
+            return True
+        if key_under_check in reference_st:
+            return True
+        if key_under_check in references:
+            return True
+        return False
+
+    for key in source_st:
+        if not check_key_is_used(key):
+            print(f"{source_st.fpath}:{source_st[key].keyline}: {key} is not used")
+            exit_code = 1
     return exit_code
 
 
@@ -861,66 +965,80 @@ def compare_action(args):
     comp = StringTable.statistic(reference_st, source_st)
 
     if not args.summary_only:
-        for key in source_st.keys():
+        for key in source_st:
             if key in comp.right_only:
-                print("{}:{}: Key '{}' is not in reference file {}".format(comp.right.fpath, comp.right[key].keyline, key, comp.left.fpath))
+                print(
+                    f"{comp.right.fpath}:{comp.right[key].keyline}: Key '{key}' is not in reference file {comp.left.fpath}"
+                )
                 exit_code = 1
 
             if key in comp.left_pure_reference:
-                print("{}:{}: Key '{}' contains translation for pure reference in reference file value {}:{}".format(comp.right.fpath, comp.right[key].keyline, key, comp.left.fpath, comp.left[key].keyline))
+                print(
+                    f"{comp.right.fpath}:{comp.right[key].keyline}:"
+                    f" Key '{key}' contains translation for pure reference in reference file"
+                    f" value {comp.left.fpath}:{comp.left[key].keyline}"
+                )
                 exit_code = 1
 
             if key in comp.layout_mismatch:
-                print("{}:{}: Value of key '{}' layout does not match that of reference file value {}:{}".format(comp.right.fpath, comp.right[key].keyline, key, comp.left.fpath, comp.left[key].keyline))
+                print(
+                    f"{comp.right.fpath}:{comp.right[key].keyline}:"
+                    f" Value of key '{key}' layout does not match that of reference file"
+                    f" value {comp.left.fpath}:{comp.left[key].keyline}"
+                )
                 exit_code = 1
 
             if key in comp.right_older:
-                print("{}:{}: Value of key '{}' is older than reference file value {}:{}".format(comp.right.fpath, comp.right[key].keyline, key, comp.left.fpath, comp.left[key].keyline))
+                print(
+                    f"{comp.right.fpath}:{comp.right[key].keyline}:"
+                    f" Value of key '{key}' is older than reference file"
+                    f" value {comp.left.fpath}:{comp.left[key].keyline}"
+                )
                 exit_code = 1
 
             if key in comp.untranslated:
-                print("{}:{}: Value of key '{}' has no translation compared to reference file {}:{}".format(comp.right.fpath, comp.right[key].keyline, key, comp.left.fpath, comp.left[key].keyline))
+                print(
+                    f"{comp.right.fpath}:{comp.right[key].keyline}:"
+                    f" Value of key '{key}' has no translation compared to reference file"
+                    f" {comp.left.fpath}:{comp.left[key].keyline}"
+                )
                 exit_code = 1
 
             if key in comp.identical:
-                print("{}:{}: Value of key '{}' is identical to reference file {}:{}".format(comp.right.fpath, comp.right[key].keyline, key, comp.left.fpath, comp.left[key].keyline))
-                exit_code = 1
+                print(
+                    f"{comp.right.fpath}:{comp.right[key].keyline}:"
+                    f" Value of key '{key}' is identical to reference file"
+                    f" {comp.left.fpath}:{comp.left[key].keyline}"
+                )
+            exit_code = 1
 
-    print("""
-Summary comparing '{}' against '{}':
-    Keys matching - {}/{} ({:3.1f}%)
-    Keys not in reference - {}
-    Value is reference - {}
-    Values layout mismatch - {}
-    Values older than reference - {}
-    Values untranslated - {}
-    Values same as reference - {}
-""".strip().format(
-        comp.right.fpath,
-        comp.left.fpath,
-        len(comp.right) - len(comp.right_only),
-        len(comp.left),
-        100.0 * (len(comp.right) - len(comp.right_only)) / len(comp.left),
-        len(comp.right_only),
-        len(comp.left_pure_reference),
-        len(comp.layout_mismatch),
-        len(comp.right_older),
-        len(comp.untranslated),
-        len(comp.identical)))
-
+    print(
+        f"""
+Summary comparing '{comp.right.fpath}' against '{comp.left.fpath}':
+    Keys matching - {len(comp.right) - len(comp.right_only)}/{len(comp.left)} ({100.0 * (len(comp.right) - len(comp.right_only)) / len(comp.left):3.1f}%)
+    Keys not in reference - {len(comp.right_only)}
+    Value is reference - {len(comp.left_pure_reference)}
+    Values layout mismatch - {len(comp.layout_mismatch)}
+    Values older than reference - {len(comp.right_older)}
+    Values untranslated - {len(comp.untranslated)}
+    Values same as reference - {len(comp.identical)}
+""".strip()
+    )
     return exit_code
 
 
 if __name__ == "__main__":
     root_parser = argparse.ArgumentParser(description="Verify and modify string tables")
     verb_parsers = root_parser.add_subparsers(
-        title="verbs", description="For more details run `{} <verb> --help`.".format(root_parser.prog),
+        title="verbs",
+        description=f"For more details run `{root_parser.prog} <verb> --help`.",
     )
 
     format_parser = verb_parsers.add_parser(
-        'format',
+        "format",
         help="format a string table and exit",
-        description=textwrap.dedent("""\
+        description=textwrap.dedent(
+            """\
         Pretty prints a given string table onto the standard output.
 
         Formatting a string tables makes sure that:
@@ -935,17 +1053,23 @@ if __name__ == "__main__":
         * Section titles are prefixed with a block comment (prefix '##').
         * Section titles have two leading whitespaces and one trailing
           whitespace.
-        """),
-        formatter_class=argparse.RawTextHelpFormatter)
+        """
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     format_parser.set_defaults(action=format_action)
     format_parser.add_argument(
-        'source', metavar='SOURCE', help="string table to format",
-        type=argparse.FileType(encoding='utf-8', errors='strict'))
+        "source",
+        metavar="SOURCE",
+        help="string table to format",
+        type=argparse.FileType(encoding="utf-8", errors="strict"),
+    )
 
     sync_parser = verb_parsers.add_parser(
-        'sync',
+        "sync",
         help="synchronize two string tables and exit",
-        description=textwrap.dedent("""\
+        description=textwrap.dedent(
+            """\
         Synchronizes two string tables by copying over translation entry key,
         notes, section titles and includes from the reference into the source,
         while preserving existing translation values, language name and file notes
@@ -955,86 +1079,130 @@ if __name__ == "__main__":
         discarded.
 
         The resulting string table is printed out to standard output.
-        """),
-        formatter_class=argparse.RawTextHelpFormatter)
+        """
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     sync_parser.set_defaults(action=sync_action)
     sync_parser.add_argument(
-        'reference', metavar='REFERENCE', help="reference string table",
-        type=argparse.FileType(encoding='utf-8', errors='strict'))
+        "reference",
+        metavar="REFERENCE",
+        help="reference string table",
+        type=argparse.FileType(encoding="utf-8", errors="strict"),
+    )
     sync_parser.add_argument(
-        'source', metavar='SOURCE', help="string table to sync",
-        type=argparse.FileType(encoding='utf-8', errors='strict'))
+        "source",
+        metavar="SOURCE",
+        help="string table to sync",
+        type=argparse.FileType(encoding="utf-8", errors="strict"),
+    )
 
     rename_key_parser = verb_parsers.add_parser(
-        'rename-key',
+        "rename-key",
         help="rename all occurences of a key within a stringtable and exit",
-        description=textwrap.dedent("""\
+        description=textwrap.dedent(
+            """\
         Replace all occurances of a translation entry key within the given key,
         including internal references.
 
         The resulting string table is printed out to standard output.
-        """),
-        formatter_class=argparse.RawTextHelpFormatter)
+        """
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     rename_key_parser.set_defaults(action=rename_key_action)
     rename_key_parser.add_argument(
-        'source', metavar='SOURCE', help="string table to rename old key within",
-        type=argparse.FileType(encoding='utf-8', errors='strict'))
-    rename_key_parser.add_argument('old_key', metavar='OLD_KEY', help="key to rename")
-    rename_key_parser.add_argument('new_key', metavar='NEW_KEY', help="new key name")
+        "source",
+        metavar="SOURCE",
+        help="string table to rename old key within",
+        type=argparse.FileType(encoding="utf-8", errors="strict"),
+    )
+    rename_key_parser.add_argument("old_key", metavar="OLD_KEY", help="key to rename")
+    rename_key_parser.add_argument("new_key", metavar="NEW_KEY", help="new key name")
 
     edit_parser = verb_parsers.add_parser(
-        'edit',
+        "edit",
         help="edit a stringtable and exit",
-        description=textwrap.dedent("""\
+        description=textwrap.dedent(
+            """\
         Starts a web server and a web browser to provide an interactive editor.
 
         Use ^C to exit the web server.  The string table will not be saved, so
         download it before exiting the web server or closing the browser.
-        """),
-        formatter_class=argparse.RawTextHelpFormatter)
+        """
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     edit_parser.set_defaults(action=edit_action)
     edit_parser.add_argument(
-        'reference', metavar='REFERENCE', help="reference string table",
-        type=argparse.FileType(encoding='utf-8', errors='strict'))
+        "reference",
+        metavar="REFERENCE",
+        help="reference string table",
+        type=argparse.FileType(encoding="utf-8", errors="strict"),
+    )
     edit_parser.add_argument(
-        'source', metavar='SOURCE', help="string table to edit",
-        type=argparse.FileType(encoding='utf-8', errors='strict'))
+        "source",
+        metavar="SOURCE",
+        help="string table to edit",
+        type=argparse.FileType(encoding="utf-8", errors="strict"),
+    )
 
     check_parser = verb_parsers.add_parser(
-        'check',
+        "check",
         help="check a stringtable for consistency and exit",
-        description=textwrap.dedent("""\
+        description=textwrap.dedent(
+            """\
         Check if all references within translation entries are provided by the source or
         or the reference string table.
-        """),
-        formatter_class=argparse.RawTextHelpFormatter)
+        """
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     check_parser.set_defaults(action=check_action)
     check_parser.add_argument(
-        '-r', '--reference', metavar='REFERENCE', help="reference string table",
-        type=argparse.FileType(encoding='utf-8', errors='strict'))
+        "-r",
+        "--reference",
+        metavar="REFERENCE",
+        help="reference string table",
+        type=argparse.FileType(encoding="utf-8", errors="strict"),
+    )
     check_parser.add_argument(
-        'sources', metavar='SOURCES', help="string tables to check",
-        nargs='+',
-        type=argparse.FileType(encoding='utf-8', errors='strict'))
+        "sources",
+        metavar="SOURCES",
+        help="string tables to check",
+        nargs="+",
+        type=argparse.FileType(encoding="utf-8", errors="strict"),
+    )
 
     compare_parser = verb_parsers.add_parser(
-        'compare',
+        "compare",
         help="compare two string tables and exit",
-        description=textwrap.dedent("""\
+        description=textwrap.dedent(
+            """\
         Compare two string tables and point out differences between them.
-        """),
-        formatter_class=argparse.RawTextHelpFormatter)
+        """
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     compare_parser.set_defaults(action=compare_action)
-    compare_parser.add_argument('-s', '--summary-only', help="print only a summary of differences", action='store_true', dest='summary_only')
     compare_parser.add_argument(
-        'reference', metavar='REFERENCE', help="reference string table",
-        type=argparse.FileType(encoding='utf-8', errors='strict'))
+        "-s", "--summary-only", help="print only a summary of differences", action="store_true", dest="summary_only"
+    )
     compare_parser.add_argument(
-        'source', metavar='SOURCE', help="string table to compare",
-        type=argparse.FileType(encoding='utf-8', errors='strict'))
+        "reference",
+        metavar="REFERENCE",
+        help="reference string table",
+        type=argparse.FileType(encoding="utf-8", errors="strict"),
+    )
+    compare_parser.add_argument(
+        "source",
+        metavar="SOURCE",
+        help="string table to compare",
+        type=argparse.FileType(encoding="utf-8", errors="strict"),
+    )
 
     args = root_parser.parse_args()
-    if 'action' not in args:
+    if "action" not in args:
         root_parser.print_usage()
         root_parser.exit()
     sys.exit(args.action(args))

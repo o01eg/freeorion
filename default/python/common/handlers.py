@@ -1,10 +1,10 @@
-import sys
-from traceback import print_exc
-from shlex import split
 import os
+import sys
 from logging import error
+from shlex import split
+from traceback import print_exc
 
-from common.option_tools import get_option_dict, HANDLERS
+from common.option_tools import HANDLERS, get_option_dict
 
 
 def init_handlers(config_str, search_dir):
@@ -26,7 +26,7 @@ def init_handlers(config_str, search_dir):
         elif not os.path.dirname(handler):
             module_path = os.path.dirname(config_str)
         else:
-            module_path = os.path.join(search_dir, '..', os.path.dirname(handler))
+            module_path = os.path.join(search_dir, "..", os.path.dirname(handler))
         sys.path.insert(0, module_path)
         try:
             __import__(module)

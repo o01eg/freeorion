@@ -66,18 +66,18 @@ Planet::Planet(PlanetType type, PlanetSize size) :
         m_rotational_period = -m_rotational_period;
 }
 
-Planet* Planet::Clone(int empire_id) const {
+Planet* Planet::Clone(Universe& universe, int empire_id) const {
     Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
 
-    Planet* retval = new Planet(m_type, m_size);
-    retval->Copy(UniverseObject::shared_from_this(), empire_id);
-    return retval;
+    auto retval = std::make_unique<Planet>();
+    retval->Copy(UniverseObject::shared_from_this(), universe, empire_id);
+    return retval.release();
 }
 
-void Planet::Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_id) {
+void Planet::Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& universe, int empire_id) {
     if (copied_object.get() == this)
         return;
     auto copied_planet = std::dynamic_pointer_cast<const Planet>(copied_object);
@@ -90,7 +90,7 @@ void Planet::Copy(std::shared_ptr<const UniverseObject> copied_object, int empir
     Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(copied_object_id, empire_id);
     auto visible_specials = GetUniverse().GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
 
-    UniverseObject::Copy(std::move(copied_object), vis, visible_specials);
+    UniverseObject::Copy(std::move(copied_object), vis, visible_specials, universe);
     PopCenter::Copy(copied_planet, vis);
     ResourceCenter::Copy(copied_planet, vis);
 
@@ -194,7 +194,7 @@ std::string Planet::Dump(unsigned short ntabs) const {
 }
 
 int Planet::HabitableSize() const {
-    const auto& gr = GetGameRules();
+    auto& gr = GetGameRules();
     switch (m_size) {
     case PlanetSize::SZ_GASGIANT:  return gr.Get<int>("RULE_HABITABLE_SIZE_GASGIANT");   break;
     case PlanetSize::SZ_HUGE:      return gr.Get<int>("RULE_HABITABLE_SIZE_HUGE");   break;
@@ -505,7 +505,7 @@ std::vector<std::string> Planet::AvailableFoci() const {    // TODO: pass Script
     auto this_planet = std::dynamic_pointer_cast<const Planet>(UniverseObject::shared_from_this());
     if (!this_planet)
         return retval;
-    const ScriptingContext context(this_planet);
+    const ScriptingContext context{this_planet};
     if (const auto* species = GetSpecies(this_planet->SpeciesName())) {
         retval.reserve(species->Foci().size());
         for (const auto& focus_type : species->Foci()) {
@@ -540,6 +540,24 @@ std::map<int, double> Planet::EmpireGroundCombatForces() const {
         empire_troops[ALL_EMPIRES] += GetMeter(MeterType::METER_REBEL_TROOPS)->Initial();
     }
     return empire_troops;
+}
+
+int Planet::TurnsSinceColonization() const {
+    if (m_turn_last_colonized == INVALID_GAME_TURN)
+        return 0;
+    int current_turn = CurrentTurn();
+    if (current_turn == INVALID_GAME_TURN)
+        return 0;
+    return current_turn - m_turn_last_colonized;
+}
+
+int Planet::TurnsSinceLastConquered() const {
+    if (m_turn_last_conquered == INVALID_GAME_TURN)
+        return 0;
+    int current_turn = CurrentTurn();
+    if (current_turn == INVALID_GAME_TURN)
+        return 0;
+    return current_turn - m_turn_last_conquered;
 }
 
 void Planet::SetType(PlanetType type) {
@@ -636,14 +654,14 @@ void Planet::Depopulate() {
     ClearFocus();
 }
 
-void Planet::Conquer(int conquerer) {
+void Planet::Conquer(int conquerer, EmpireManager& empires, ObjectMap& objects) {
     m_turn_last_conquered = CurrentTurn();
 
     // deal with things on production queue located at this planet
-    Empire::ConquerProductionQueueItemsAtLocation(ID(), conquerer);
+    Empire::ConquerProductionQueueItemsAtLocation(ID(), conquerer, empires);
 
     // deal with UniverseObjects (eg. buildings) located on this planet
-    for (auto& building : Objects().find<Building>(m_buildings)) {
+    for (auto& building : objects.find<Building>(m_buildings)) {
         const BuildingType* type = GetBuildingType(building->BuildingTypeName());
 
         // determine what to do with building of this type...
@@ -656,7 +674,7 @@ void Planet::Conquer(int conquerer) {
             // destroy object
             //DebugLogger() << "Planet::Conquer destroying object: " << building->Name();
             this->RemoveBuilding(building->ID());
-            if (auto system = Objects().get<System>(this->SystemID()))
+            if (auto system = objects.get<System>(this->SystemID()))
                 system->Remove(building->ID());
             GetUniverse().Destroy(building->ID());
         } else if (cap_result == CaptureResult::CR_RETAIN) {

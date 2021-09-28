@@ -17,9 +17,11 @@ FO_COMMON_API std::locale GetLocale(const std::string& name = std::string(""));
 
 /** Returns a language-specific string for the key-string \a str */
 FO_COMMON_API const std::string& UserString(const std::string& str);
+FO_COMMON_API const std::string& UserString(const std::string_view str);
+FO_COMMON_API const std::string& UserString(const char* str);
 
 /** Returns all entries in current stringtable */
-FO_COMMON_API const std::map<std::string, std::string>& AllStringtableEntries(bool default_table = false);
+FO_COMMON_API const std::map<std::string, std::string, std::less<>>& AllStringtableEntries(bool default_table = false);
 
 /** Returns a language-specific vector of strings for given @a key. */
 FO_COMMON_API std::vector<std::string> UserStringList(const std::string& key);
@@ -136,11 +138,11 @@ boost::format FlexibleFormatList(
 template<typename T1, typename T2>
 boost::format FlexibleFormatList(const T2& header_words, const T1& words)
 {
-    return FlexibleFormatList(header_words, words
-                              , UserString("FORMAT_LIST_DEFAULT_PLURAL_HEADER")
-                              , UserString("FORMAT_LIST_DEFAULT_SINGLE_HEADER")
-                              , UserString("FORMAT_LIST_DEFAULT_EMPTY_HEADER")
-                              , UserString("FORMAT_LIST_DEFAULT_DUAL_HEADER"));
+    return FlexibleFormatList(header_words, words,
+                              UserString("FORMAT_LIST_DEFAULT_PLURAL_HEADER"),
+                              UserString("FORMAT_LIST_DEFAULT_SINGLE_HEADER"),
+                              UserString("FORMAT_LIST_DEFAULT_EMPTY_HEADER"),
+                              UserString("FORMAT_LIST_DEFAULT_DUAL_HEADER"));
 }
 
 template<typename T1, typename T2>

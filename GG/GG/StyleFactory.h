@@ -56,9 +56,7 @@ struct UnicodeCharset;
 class GG_API StyleFactory
 {
 public:
-    StyleFactory();
-
-    virtual ~StyleFactory();
+    virtual ~StyleFactory() = default;
 
     /** Returns the default font for this style, in the size \a pts,
         supporting all printable ASCII characters. */

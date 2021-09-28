@@ -179,7 +179,7 @@ namespace {
     }
 
     bool ValidExecutableBinary(const std::string& file) {
-                // putting this in try-catch block prevents crash with error output along the lines of:
+        // putting this in try-catch block prevents crash with error output along the lines of:
         // main() caught exception(std::exception): boost::filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
             fs::path path = FilenameToPath(file);
@@ -749,12 +749,12 @@ void OptionsWnd::CompleteConstruction() {
     DirectoryOption(current_page, 0, "save.path",                       UserString("OPTIONS_FOLDER_SAVE"),          GetUserDataDir());
     DirectoryOption(current_page, 0, "save.server.path",                UserString("OPTIONS_SERVER_FOLDER_SAVE"),   GetUserDataDir());
     PathDisplay(    current_page, 0,                                    UserString("OPTIONS_FOLDER_CONFIG_LOG"),    GetUserConfigDir());
-    FileOption(     current_page, 0, "misc.server-local-binary.path",   UserString("OPTIONS_SERVER_EXE"),           GetBinDir()
+    FileOption(     current_page, 0, "misc.server-local-binary.path",   UserString("OPTIONS_SERVER_EXE"),           GetBinDir(),
 #ifdef FREEORION_WIN32
-                  , {std::string("misc.server-local-binary.path"), "*" + EXE_FILE_SUFFIX});
-#else
-                    );
+                    {std::string("misc.server-local-binary.path"), "*" + EXE_FILE_SUFFIX},
 #endif
+                    ValidExecutableBinary);
+
     m_tabs->SetCurrentWnd(0);
 
 
@@ -785,6 +785,9 @@ void OptionsWnd::CompleteConstruction() {
     IntOption(current_page, 0, "effects.ui.threads",                UserString("OPTIONS_EFFECTS_THREADS_UI"));
     IntOption(current_page, 0, "effects.server.threads",            UserString("OPTIONS_EFFECTS_THREADS_SERVER"));
     IntOption(current_page, 0, "effects.ai.threads",                UserString("OPTIONS_EFFECTS_THREADS_AI"));
+    BoolOption(current_page, 0, "ui.map.sidepanel.meter-refresh",   UserString("OPTIONS_UI_SIDEPANEL_OPEN_METER_UPDATE"));
+    BoolOption(current_page,0,"ui.map.object-changed.meter-refresh",UserString("OPTIONS_UI_OBJECT_CHANGED_METER_UPDATE"));
+
     BoolOption(current_page, 0, "resource.shipdesign.saved.enabled",UserString("OPTIONS_ADD_SAVED_DESIGNS"));
     //BoolOption(current_page, 0, "resource.shipdesign.default.enabled",  UserString("OPTIONS_ADD_DEFAULT_DESIGNS"));   // hidden due to issues with implementation when not enabled preventing designs from being added or recreated
     BoolOption(current_page, 0, "save.format.binary.enabled",       UserString("OPTIONS_USE_BINARY_SERIALIZATION"));
@@ -972,18 +975,21 @@ GG::Spin<int>* OptionsWnd::IntOption(GG::ListBox* page, int indentation_level,
                                      const std::string& option_name, const std::string& text)
 {
     auto text_control = GG::Wnd::Create<CUILabel>(text, GG::FORMAT_LEFT | GG::FORMAT_NOWRAP, GG::INTERACTIVE);
-    std::shared_ptr<const ValidatorBase> validator = GetOptionsDB().GetValidator(option_name);
+    auto validator = GetOptionsDB().GetValidator(option_name);
     std::shared_ptr<GG::Spin<int>> spin;
     int value = GetOptionsDB().Get<int>(option_name);
 
-    if (auto ranged_validator = std::dynamic_pointer_cast<const RangedValidator<int>>(validator))
+    if (auto ranged_validator = dynamic_cast<const RangedValidator<int>*>(validator))
         spin = GG::Wnd::Create<CUISpin<int>>(value, 1, ranged_validator->m_min, ranged_validator->m_max, true);
-    else if (auto step_validator = std::dynamic_pointer_cast<const StepValidator<int>>(validator))
+
+    else if (auto step_validator = dynamic_cast<const StepValidator<int>*>(validator))
         spin = GG::Wnd::Create<CUISpin<int>>(value, step_validator->m_step_size, -1000000, 1000000, true);
-    else if (auto ranged_step_validator = std::dynamic_pointer_cast<const RangedStepValidator<int>>(validator))
+
+    else if (auto ranged_step_validator = dynamic_cast<const RangedStepValidator<int>*>(validator))
         spin = GG::Wnd::Create<CUISpin<int>>(value, ranged_step_validator->m_step_size, ranged_step_validator->m_min,
                                              ranged_step_validator->m_max, true);
-    else if (auto int_validator = std::dynamic_pointer_cast<const Validator<int>>(validator))
+
+    else //if (auto int_validator = dynamic_cast<const Validator<int>*>(validator))
         spin = GG::Wnd::Create<CUISpin<int>>(value, 1, -1000000, 1000000, true);
 
     if (!spin) {
@@ -1014,19 +1020,22 @@ GG::Spin<double>* OptionsWnd::DoubleOption(GG::ListBox* page, int indentation_le
                                            const std::string& option_name, const std::string& text)
 {
     auto text_control = GG::Wnd::Create<CUILabel>(text, GG::FORMAT_LEFT | GG::FORMAT_NOWRAP, GG::INTERACTIVE);
-    std::shared_ptr<const ValidatorBase> validator = GetOptionsDB().GetValidator(option_name);
+    auto validator = GetOptionsDB().GetValidator(option_name);
     std::shared_ptr<GG::Spin<double>> spin;
     double value = GetOptionsDB().Get<double>(option_name);
 
-    if (auto ranged_validator = std::dynamic_pointer_cast<const RangedValidator<double>>(validator))
+    if (auto ranged_validator = dynamic_cast<const RangedValidator<double>*>(validator))
         spin = GG::Wnd::Create<CUISpin<double>>(value, 1, ranged_validator->m_min, ranged_validator->m_max, true);
-    else if (auto step_validator = std::dynamic_pointer_cast<const StepValidator<double>>(validator))
+
+    else if (auto step_validator = dynamic_cast<const StepValidator<double>*>(validator))
         spin = GG::Wnd::Create<CUISpin<double>>(value, step_validator->m_step_size, -1000000, 1000000, true);
-    else if (auto ranged_step_validator = std::dynamic_pointer_cast<const RangedStepValidator<double>>(validator))
+
+    else if (auto ranged_step_validator = dynamic_cast<const RangedStepValidator<double>*>(validator))
         spin = GG::Wnd::Create<CUISpin<double>>(value, ranged_step_validator->m_step_size,
                                                 ranged_step_validator->m_min, ranged_step_validator->m_max, true);
-    else if (auto double_validator = std::dynamic_pointer_cast<const Validator<double>>(validator))
-        spin = GG::Wnd::Create<CUISpin<double>>(value, 1, -1000000, 1000000, true);
+
+    else //if (auto double_validator = dynamic_cast<const Validator<double>*>(validator))
+        spin = GG::Wnd::Create<CUISpin<double>>(value, 1, -1000000.0, 1000000.0, true);
 
     if (!spin) {
         ErrorLogger() << "Unable to create DoubleOption spin";
@@ -1058,11 +1067,10 @@ void OptionsWnd::MusicVolumeOption(GG::ListBox* page, int indentation_level, Sou
                                                   std::make_shared<CUICheckBoxRepresenter>());
     button->Resize(button->MinUsableSize());
     button->SetCheck(GetOptionsDB().Get<bool>("audio.music.enabled"));
-    auto validator = std::dynamic_pointer_cast<const RangedValidator<int>>(
-        GetOptionsDB().GetValidator("audio.music.volume"));
+    auto validator = dynamic_cast<const RangedValidator<int>*>(GetOptionsDB().GetValidator("audio.music.volume"));
     assert(validator);
-    auto slider = GG::Wnd::Create<CUISlider<int>>(validator->m_min, validator->m_max,
-                                                  GG::Orientation::HORIZONTAL);
+
+    auto slider = GG::Wnd::Create<CUISlider<int>>(validator->m_min, validator->m_max, GG::Orientation::HORIZONTAL);
     slider->SlideTo(GetOptionsDB().Get<int>("audio.music.volume"));
     auto layout = GG::Wnd::Create<GG::Layout>(GG::X0, GG::Y0, GG::X1, GG::Y1, 1, 2, 0, 5);
     layout->Add(button, 0, 0);
@@ -1093,7 +1101,7 @@ void OptionsWnd::VolumeOption(GG::ListBox* page, int indentation_level, const st
     auto button = GG::Wnd::Create<CUIStateButton>(text, GG::FORMAT_LEFT, std::make_shared<CUICheckBoxRepresenter>());
     button->Resize(button->MinUsableSize());
     button->SetCheck(toggle_value);
-    auto validator = std::dynamic_pointer_cast<const RangedValidator<int>>(GetOptionsDB().GetValidator(volume_option_name));
+    auto validator = dynamic_cast<const RangedValidator<int>*>(GetOptionsDB().GetValidator(volume_option_name));
     assert(validator);
     auto slider = GG::Wnd::Create<CUISlider<int>>(validator->m_min, validator->m_max,
                                                   GG::Orientation::HORIZONTAL);
@@ -1260,28 +1268,16 @@ void OptionsWnd::FontOption(GG::ListBox* page, int indentation_level, const std:
 }
 
 void OptionsWnd::ResolutionOption(GG::ListBox* page, int indentation_level) {
-    std::shared_ptr<const RangedValidator<int>> width_validator =
-        std::dynamic_pointer_cast<const RangedValidator<int>>(
-            GetOptionsDB().GetValidator("video.fullscreen.width"));
-    std::shared_ptr<const RangedValidator<int>> height_validator =
-        std::dynamic_pointer_cast<const RangedValidator<int>>(
-            GetOptionsDB().GetValidator("video.fullscreen.height"));
-    std::shared_ptr<const RangedValidator<int>> windowed_width_validator =
-        std::dynamic_pointer_cast<const RangedValidator<int>>(
-            GetOptionsDB().GetValidator("video.windowed.width"));
-    std::shared_ptr<const RangedValidator<int>> windowed_height_validator =
-        std::dynamic_pointer_cast<const RangedValidator<int>>(
-            GetOptionsDB().GetValidator("video.windowed.height"));
-    std::shared_ptr<const RangedValidator<int>> windowed_left_validator =
-        std::dynamic_pointer_cast<const RangedValidator<int>>(
-            GetOptionsDB().GetValidator("video.windowed.left"));
-    std::shared_ptr<const RangedValidator<int>> windowed_top_validator =
-        std::dynamic_pointer_cast<const RangedValidator<int>>(
-            GetOptionsDB().GetValidator("video.windowed.top"));
+    //auto width_validator = dynamic_cast<const RangedValidator<int>*>(GetOptionsDB().GetValidator("video.fullscreen.width"));
+    //auto height_validator = dynamic_cast<const RangedValidator<int>*>(GetOptionsDB().GetValidator("video.fullscreen.height"));
+    //auto windowed_width_validator = dynamic_cast<const RangedValidator<int>*>(GetOptionsDB().GetValidator("video.windowed.width"));
+    //auto windowed_height_validator = dynamic_cast<const RangedValidator<int>*>(GetOptionsDB().GetValidator("video.windowed.height"));
+    //auto windowed_left_validator = dynamic_cast<const RangedValidator<int>*>(GetOptionsDB().GetValidator("video.windowed.left"));
+    //auto windowed_top_validator = dynamic_cast<const RangedValidator<int>*>(GetOptionsDB().GetValidator("video.windowed.top"));
 
     // compile list of resolutions available on this system
 
-    std::vector<std::string> resolutions = GG::GUI::GetGUI()->GetSupportedResolutions();
+    auto resolutions = GG::GUI::GetGUI()->GetSupportedResolutions();
 
     // find text representation of current fullscreen resolution selection
     int width = GetOptionsDB().Get<int>("video.fullscreen.width");
@@ -1298,7 +1294,8 @@ void OptionsWnd::ResolutionOption(GG::ListBox* page, int indentation_level) {
 
 
     // drop list and label
-    auto drop_list_label = GG::Wnd::Create<CUILabel>(UserString("OPTIONS_VIDEO_MODE"), GG::FORMAT_LEFT | GG::FORMAT_NOWRAP, GG::INTERACTIVE);
+    auto drop_list_label = GG::Wnd::Create<CUILabel>(UserString("OPTIONS_VIDEO_MODE"),
+                                                     GG::FORMAT_LEFT | GG::FORMAT_NOWRAP, GG::INTERACTIVE);
     drop_list_label->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
     drop_list_label->SetBrowseText(UserString("OPTIONS_VIDEO_MODE_LIST_DESCRIPTION"));
 
@@ -1446,9 +1443,6 @@ void OptionsWnd::HotkeysPage() {
     }
     m_tabs->SetCurrentWnd(0);
 }
-
-OptionsWnd::~OptionsWnd()
-{}
 
 void OptionsWnd::KeyPress(GG::Key key, std::uint32_t key_code_point,
                           GG::Flags<GG::ModKey> mod_keys)

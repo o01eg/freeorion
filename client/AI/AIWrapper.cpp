@@ -104,11 +104,11 @@ namespace {
      */
     auto PlayerEmpireID(int player_id) -> int
     {
-        for (auto& entry : AIClientApp::GetApp()->Players()) {
-            if (entry.first == player_id)
-                return entry.second.empire_id;
-        }
-        return ALL_EMPIRES; // default invalid value
+        const auto& players = AIClientApp::GetApp()->Players();
+        auto it = players.find(player_id);
+        if (it == players.end())
+            return ALL_EMPIRES; // default invalid value
+        return it->second.empire_id;
     }
 
     /** @brief Return all empire identifiers that are in game
@@ -117,9 +117,12 @@ namespace {
      */
     auto AllEmpireIDs() -> std::vector<int>
     {
+        const auto& players = AIClientApp::GetApp()->Players();
         std::vector<int> empire_ids;
-        for (auto& entry : AIClientApp::GetApp()->Players()) {
-            auto empire_id = entry.second.empire_id;
+        empire_ids.reserve(players.size());
+        for (auto& [player_id, player_info] : players) {
+            (void)player_id; // quiet warning
+            auto empire_id = player_info.empire_id;
             if (empire_id != ALL_EMPIRES)
                 empire_ids.push_back(empire_id);
         }
@@ -338,8 +341,10 @@ namespace {
 
     auto IssueEnqueueBuildingProductionOrder(const std::string& item_name, int location_id) -> int
     {
+        const EmpireManager& empires{Empires()}; // TODO: pass in equivalent
+
         int empire_id = AIClientApp::GetApp()->EmpireID();
-        Empire* empire = AIClientApp::GetApp()->GetEmpire(empire_id);
+        auto empire = empires.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "IssueEnqueueBuildingProductionOrder : couldn't get empire with id " << empire_id;
             return 0;
@@ -366,8 +371,11 @@ namespace {
 
     auto IssueEnqueueShipProductionOrder(int design_id, int location_id) -> int
     {
+        const Universe& universe{GetUniverse()}; // TODO: pass in
+        const EmpireManager& empires{Empires()}; // TODO: pass in equivalent
+
         int empire_id = AIClientApp::GetApp()->EmpireID();
-        Empire* empire = AIClientApp::GetApp()->GetEmpire(empire_id);
+        auto empire = empires.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "IssueEnqueueShipProductionOrder : couldn't get empire with id " << empire_id;
             return 0;
@@ -378,7 +386,7 @@ namespace {
             return 0;
         }
 
-        auto item = ProductionQueue::ProductionItem(BuildType::BT_SHIP, design_id);
+        auto item = ProductionQueue::ProductionItem(BuildType::BT_SHIP, design_id, universe);
 
         AIClientApp::GetApp()->Orders().IssueOrder(
             std::make_shared<ProductionQueueOrder>(ProductionQueueOrder::ProdQueueOrderAction::PLACE_IN_QUEUE,
@@ -746,8 +754,11 @@ namespace FreeOrionPython {
         py::def("setSaveStateString",       SetStaticSaveStateString,       "Sets the save state string (string). This is a persistant storage space for the AI script to retain state information when the game is saved and reloaded. Any AI state information to be saved should be stored in a single string (likely using Python's pickle module) and stored using this function when the prepareForSave() Python function is called.");
         py::def("getSaveStateString",       GetStaticSaveStateString,       py::return_value_policy<py::copy_const_reference>(), "Returns the previously-saved state string (string). Can be used to retrieve the last-set save state string at any time, although this string is also passed to the resumeLoadedGame(savedStateString) Python function when a game is loaded, so this function isn't necessary to use if resumeLoadedGame stores the passed string. ");
 
-        py::def("userString",               make_function(&UserString,      py::return_value_policy<py::copy_const_reference>()));
-        py::def("userStringExists",         make_function(&UserStringExists,py::return_value_policy<py::return_by_value>()));
+        py::def("userString",
+                +[](const std::string& key) -> const std::string& { return UserString(key); },
+                py::return_value_policy<py::copy_const_reference>());
+        py::def("userStringExists",
+                +[](const std::string& key) -> bool { return UserStringExists(key); });
         py::def("userStringList",           &GetUserStringList);
 
         py::def("getGalaxySetupData",

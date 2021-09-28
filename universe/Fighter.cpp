@@ -10,11 +10,6 @@ namespace {
     static const std::string EMPTY_STRING;
 }
 
-Fighter::Fighter() :
-    UniverseObject(),
-    m_species_name{EMPTY_STRING}
-{}
-
 Fighter::Fighter(int empire_id, int launched_from_id, const std::string& species_name,
                  float damage, const ::Condition::Condition* combat_targets) :
     UniverseObject(),
@@ -67,22 +62,22 @@ std::string Fighter::Dump(unsigned short ntabs) const {
 std::shared_ptr<UniverseObject> Fighter::Accept(const UniverseObjectVisitor& visitor) const
 { return visitor.Visit(std::const_pointer_cast<Fighter>(std::static_pointer_cast<const Fighter>(shared_from_this()))); }
 
-Fighter* Fighter::Clone(int empire_id) const {
-    Fighter* retval = new Fighter();
-    retval->Copy(shared_from_this(), empire_id);
-    return retval;
+Fighter* Fighter::Clone(Universe& universe, int empire_id) const {
+    auto retval = std::make_unique<Fighter>();
+    retval->Copy(shared_from_this(), universe, empire_id);
+    return retval.release();
 }
 
-void Fighter::Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_id) {
+void Fighter::Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& universe, int empire_id) {
     if (copied_object.get() == this)
         return;
-    std::shared_ptr<const Fighter> copied_fighter = std::dynamic_pointer_cast<const Fighter>(copied_object);
+    auto copied_fighter = std::dynamic_pointer_cast<const Fighter>(copied_object);
     if (!copied_fighter) {
         ErrorLogger() << "Fighter::Copy passed an object that wasn't a Fighter";
         return;
     }
 
-    UniverseObject::Copy(copied_object, Visibility::VIS_FULL_VISIBILITY, std::set<std::string>());
+    UniverseObject::Copy(copied_object, Visibility::VIS_FULL_VISIBILITY, std::set<std::string>(), universe);
 
     this->m_damage = copied_fighter->m_damage;
     this->m_destroyed = copied_fighter->m_destroyed;

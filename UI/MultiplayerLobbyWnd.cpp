@@ -580,8 +580,6 @@ namespace {
     constexpr GG::X     GALAXY_SETUP_PANEL_WIDTH(250);
     constexpr GG::Y     GALAXY_SETUP_PANEL_HEIGHT(340);
     constexpr int       GALAXY_SETUP_PANEL_MARGIN = 45;
-    constexpr GG::Y     SAVED_GAMES_LIST_ROW_HEIGHT(22);
-    constexpr GG::Y     SAVED_GAMES_LIST_DROP_HEIGHT(10 * Value(SAVED_GAMES_LIST_ROW_HEIGHT));
     constexpr GG::X     CHAT_WIDTH(350);
     GG::Pt              g_preview_ul;
     constexpr int       PREVIEW_WIDTH = 248;
@@ -799,7 +797,7 @@ void MultiPlayerLobbyWnd::ChatMessage(int player_id, const boost::posix_time::pt
         }
     } else {
         // It's a server message. Don't set player name.
-        player_name = "";
+        player_name.clear();
     }
 
     m_chat_wnd->HandlePlayerChatMessage(msg, player_name, text_color, timestamp, GGHumanClientApp::GetApp()->PlayerID(), false);  // no pm messages for MP lobby yet

@@ -1,8 +1,8 @@
 #include "MeterBrowseWnd.h"
 
 #include "../util/i18n.h"
-#include "../util/Logger.h"
 #include "../util/GameRules.h"
+#include "../util/Logger.h"
 #include "../universe/Building.h"
 #include "../universe/Effect.h"
 #include "../universe/Planet.h"
@@ -12,6 +12,7 @@
 #include "../universe/ShipPart.h"
 #include "../universe/UniverseObject.h"
 #include "../Empire/Empire.h"
+#include "../combat/CombatDamage.h"
 #include "../client/human/GGHumanClientApp.h"
 #include "ClientUI.h"
 #include "CUIDrawUtil.h"
@@ -327,8 +328,11 @@ void MeterBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
     if (!maybe_info_vec)
         return;
 
+    // helpers for combining building effects into a single line
+    std::vector<std::string> combined_names;
     // add label-value pairs for each alteration recorded for this meter
-    for (const auto& info : *maybe_info_vec) {
+    for (auto it = maybe_info_vec->begin(); it != maybe_info_vec->end(); ++it) {
+        auto info = *it;
         auto source = Objects().get(info.source_id);
 
         std::string text;
@@ -354,6 +358,41 @@ void MeterBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
             if (const auto& building = std::dynamic_pointer_cast<const Building>(source))
                 if (const auto& planet = Objects().get<Planet>(building->PlanetID()))
                     name = planet->Name();
+            // Some effects are triggered by every building in the own empire.
+            // To avoid excessive effect lists, we combine identical effects.
+            // This changes e.g.
+            // Likes <own planet> building Interstellar Lighthouse +4.00
+            //    Likes <other 1> building Interstellar Lighthouse +0.71
+            //    Likes <other 2> building Interstellar Lighthouse +0.71
+            // to
+            // Likes <own planet> building Interstellar Lighthouse +4.00
+            //          Likes 2 x building Interstellar Lighthouse +1.41
+            // There is one line per effect strength and it shows the
+            // number of buildings involved and the summed effect of
+            // all those buildings.
+            auto next = it + 1;
+            if (next != maybe_info_vec->end() &&
+                next->cause_type == info.cause_type &&
+                // better not compare floats with ==
+                std::fabs(next->meter_change - info.meter_change) < 0.001 &&
+                next->specific_cause == info.specific_cause)
+            {
+                // Combined with next, if next exists, is also a building,
+                // meter change and building type (specific_cause) are the same.
+                combined_names.emplace_back(std::move(name));
+                continue;
+            }
+            if (!combined_names.empty())
+            {
+                // This is the last of a list of identical effects. Replace name
+                // by number of planets and multiply meter_change with the number.
+                combined_names.emplace_back(std::move(name));
+                name = std::to_string(combined_names.size()) + " x";
+                info.meter_change *= combined_names.size();
+                // TBD: add way to unfold the number to see the list of planets
+                // stored in combined_names (or replace combined_names by an int)
+                combined_names.clear();
+            }
             const std::string& label_template = (info.custom_label.empty()
                 ? UserString("TT_BUILDING")
                 : UserString(info.custom_label));
@@ -501,15 +540,15 @@ void ShipDamageBrowseWnd::UpdateSummary() {
         return;
 
     // unpaired meter total for breakdown summary
-    float breakdown_total = ship->TotalWeaponsDamage(0.0f, false);
-    std::string breakdown_meter_name = UserString("SHIP_DAMAGE_STAT_TITLE");
-
-
+    float total_structure_damage = ship->TotalWeaponsShipDamage(0.0f, false);
+    float total_fighters_destroyed = ship->TotalWeaponsFighterDamage(false);
+    int num_bouts = GetGameRules().Get<int>("RULE_NUM_COMBAT_ROUNDS");
     // set accounting breakdown total / summary
     if (m_meter_title)
-        m_meter_title->SetText(boost::io::str(FlexibleFormat(UserString("TT_BREAKDOWN_SUMMARY")) %
-                                              breakdown_meter_name %
-                                              DoubleToString(breakdown_total, 3, false)));
+        m_meter_title->SetText(boost::io::str(FlexibleFormat(UserString("TT_DAMAGE_BREAKDOWN_SUMMARY")) %
+                                              num_bouts %
+                                              DoubleToString(total_structure_damage, 3, false) %
+                                              (int)total_fighters_destroyed));
 }
 
 void ShipDamageBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
@@ -544,18 +583,20 @@ void ShipDamageBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
             continue;
 
         // get the attack power for each weapon part
-        float part_attack = ship->CurrentPartMeterValue(MeterType::METER_CAPACITY, part_name) *
-                            ship->CurrentPartMeterValue(MeterType::METER_SECONDARY_STAT, part_name);
+        const ScriptingContext context{ship};
+        float part_attack = ship->WeaponPartShipDamage(part, context);
+        float part_fighters_shot = ship->WeaponPartFighterDamage(part, context);
+
         auto text = boost::io::str(FlexibleFormat(label_template) % name % UserString(part_name));
 
         auto label = GG::Wnd::Create<CUILabel>(std::move(text), GG::FORMAT_RIGHT);
         label->MoveTo(GG::Pt(GG::X0, top));
-        label->Resize(GG::Pt(MeterBrowseLabelWidth(), m_row_height));
+        label->Resize(GG::Pt(MeterBrowseLabelWidth() - MeterBrowseValueWidth(), m_row_height));
         AttachChild(label);
 
-        auto value = GG::Wnd::Create<CUILabel>(ColouredNumber(part_attack));
-        value->MoveTo(GG::Pt(MeterBrowseLabelWidth(), top));
-        value->Resize(GG::Pt(MeterBrowseValueWidth(), m_row_height));
+        auto value = GG::Wnd::Create<CUILabel>(ColouredNumber(part_attack) + " / " + ColouredNumber(part_fighters_shot, 0));
+        value->MoveTo(GG::Pt(MeterBrowseLabelWidth() - MeterBrowseValueWidth(), top));
+        value->Resize(GG::Pt(2*MeterBrowseValueWidth(), m_row_height));
         AttachChild(value);
         m_effect_labels_and_values.emplace_back(std::move(label), std::move(value));
 
@@ -703,51 +744,6 @@ void ShipFightersBrowseWnd::UpdateSummary() {
                                               DoubleToString(breakdown_total, 3, false)));
 }
 
-namespace {
-    /** Container for return values of ResolveFighterBouts */
-    struct FighterBoutInfo {
-        struct StateQty {
-            int         docked;
-            int         attacking;
-            int         launched;       // transitioning between docked and attacking
-        };
-        float           damage;
-        float           total_damage;   // damage from all previous bouts, including this bout
-        StateQty        qty;
-    };
-
-    /** Populate fighter state quantities and damages for each combat round until @p limit_to_bout */
-    std::map<int, FighterBoutInfo> ResolveFighterBouts(int bay_capacity, int current_docked,
-                                                       float fighter_damage, int limit_to_bout = -1)
-    {
-        std::map<int, FighterBoutInfo> retval;
-        const int NUM_BOUTS = GetGameRules().Get<int>("RULE_NUM_COMBAT_ROUNDS");
-        int target_bout = limit_to_bout < 1 ? NUM_BOUTS : limit_to_bout;
-        for (int bout = 1; bout <= target_bout; ++bout) {
-            // init current fighters
-            if (bout == 1) {
-                retval[bout].qty.docked = current_docked;
-                retval[bout].qty.attacking = 0;
-                retval[bout].qty.launched = 0;
-            } else {
-                retval[bout].qty = retval[bout - 1].qty;
-                retval[bout].qty.attacking += retval[bout].qty.launched;
-                retval[bout].qty.launched = 0;
-                retval[bout].total_damage = retval[bout - 1].total_damage;
-            }
-            // calc damage this bout, apply to total
-            retval[bout].damage = retval[bout].qty.attacking * fighter_damage;
-            retval[bout].total_damage += retval[bout].damage;
-            // launch fighters
-            if (bout < NUM_BOUTS) {
-                retval[bout].qty.launched = std::min(bay_capacity, retval[bout].qty.docked);
-                retval[bout].qty.docked -= retval[bout].qty.launched;
-            }
-        }
-        return retval;
-    }
-}
-
 void ShipFightersBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
     // clear existing labels
     for (unsigned int i = 0; i < m_effect_labels_and_values.size(); ++i) {
@@ -787,7 +783,7 @@ void ShipFightersBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
     int hangar_current_fighters = 0;
     int hangar_total_capacity = 0;
     int bay_total_capacity = 0;
-
+    const Condition::Condition* combat_targets = nullptr;
     // populate values from hangars and bays
     for (std::string part_name : parts) {
         const ShipPart* part = GetShipPart(part_name);
@@ -806,6 +802,7 @@ void ShipFightersBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
         } else if (part_class == ShipPartClass::PC_FIGHTER_HANGAR) {
             if (hangar_part.first.empty()) {
                 hangar_part.first = part_name;
+                combat_targets = part->CombatTargets();
             } else if (hangar_part.first != part_name) {
                 ErrorLogger() << "Ship " << ship->ID() << "contains different hangar parts: "
                               << hangar_part.first << ", " << part_name;
@@ -855,11 +852,11 @@ void ShipFightersBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
 
     if (!m_show_all_bouts) {
         // Show damage for first wave (2nd combat round)
-        std::map<int, FighterBoutInfo> bout_info = ResolveFighterBouts(
-            bay_total_capacity, hangar_current_fighters, fighter_damage, 2);
-        FighterBoutInfo first_wave = bout_info.rbegin()->second;
-        GG::Clr highlight_clr = bout_info[1].qty.launched < bay_total_capacity ? HANGAR_COLOR : BAY_COLOR;
-        std::string launch_text = ColouredInt(first_wave.qty.attacking, false, highlight_clr);
+        std::map<int, Combat::FighterBoutInfo> bout_info = Combat::ResolveFighterBouts(
+            std::static_pointer_cast<const Ship>(ship), combat_targets, bay_total_capacity, hangar_current_fighters, fighter_damage, 2);
+        Combat::FighterBoutInfo first_wave = bout_info.rbegin()->second;
+        GG::Clr highlight_clr = bout_info[1].launched < bay_total_capacity ? HANGAR_COLOR : BAY_COLOR;
+        std::string launch_text = ColouredInt(first_wave.attacking, false, highlight_clr);
         std::string damage_label_text = boost::io::str(FlexibleFormat(UserString("TT_FIGHTER_DAMAGE"))
                                                        % launch_text % fighter_damage_text);
         // damage formula label
@@ -918,9 +915,9 @@ void ShipFightersBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
         // Damage summary labels
         // TODO Add list of effects on hangar(fighter) damage
 
-        std::map<int, FighterBoutInfo> bout_info = ResolveFighterBouts(
-            bay_total_capacity, hangar_current_fighters, fighter_damage);
-        const FighterBoutInfo& last_bout = bout_info.rbegin()->second;
+        std::map<int, Combat::FighterBoutInfo> bout_info = Combat::ResolveFighterBouts(
+            ship, combat_targets, bay_total_capacity, hangar_current_fighters, fighter_damage);
+        const Combat::FighterBoutInfo& last_bout = bout_info.rbegin()->second;
 
         // damage summary text
         auto& damage_total_text = UserString("SHIP_FIGHTERS_DAMAGE_TOTAL");
@@ -948,7 +945,7 @@ void ShipFightersBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
         GG::X left = GG::X0;
         int previous_docked = hangar_current_fighters;
         for (auto& current_bout : bout_info) {
-            const FighterBoutInfo& bout = current_bout.second;
+            const Combat::FighterBoutInfo& bout = current_bout.second;
             // combat round label
             std::string bout_text = boost::io::str(FlexibleFormat(UserString("TT_COMBAT_ROUND"))
                                                    % IntToString(current_bout.first));
@@ -960,7 +957,7 @@ void ShipFightersBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
 
             // damage formula label
             std::string formula_label_text = boost::io::str(FlexibleFormat(UserString("TT_FIGHTER_DAMAGE"))
-                                                            % IntToString(bout.qty.attacking)
+                                                            % IntToString(bout.attacking)
                                                             % fighter_damage_text);
             auto formula_label = GG::Wnd::Create<CUILabel>(std::move(formula_label_text), GG::FORMAT_RIGHT);
             formula_label->MoveTo(GG::Pt(left, top));
@@ -986,9 +983,9 @@ void ShipFightersBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
             AttachChild(launch_label);
             left += (LABEL_WIDTH / 2) + EDGE_PAD + EDGE_PAD;
 
-            GG::Clr launch_clr = bout.qty.launched < bay_total_capacity ? HANGAR_COLOR : BAY_COLOR;
+            GG::Clr launch_clr = bout.launched < bay_total_capacity ? HANGAR_COLOR : BAY_COLOR;
             std::string launch_text = boost::io::str(FlexibleFormat(UserString("TT_N_OF_N"))
-                                                     % ColouredInt(bout.qty.launched, false, launch_clr)
+                                                     % ColouredInt(bout.launched, false, launch_clr)
                                                      % ColouredInt(previous_docked, false, HANGAR_COLOR));
             auto launch_value = GG::Wnd::Create<CUILabel>(std::move(launch_text), GG::FORMAT_RIGHT);
             launch_value->MoveTo(GG::Pt(left, top));
@@ -998,7 +995,7 @@ void ShipFightersBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
 
             top += m_row_height;
             left = GG::X0;
-            previous_docked = bout.qty.docked;
+            previous_docked = bout.docked;
         }
     }
 }

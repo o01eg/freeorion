@@ -29,8 +29,7 @@ FocusType::FocusType(std::string& name, std::string& description,
     m_graphic(std::move(graphic))
 {}
 
-FocusType::~FocusType()
-{}
+FocusType::~FocusType() = default;
 
 std::string FocusType::Dump(unsigned short ntabs) const {
     std::string retval = DumpIndent(ntabs) + "FocusType\n";
@@ -114,16 +113,15 @@ Species::Species(std::string&& name, std::string&& desc,
     m_graphic(std::move(graphic))
 {
     for (auto&& effect : effects)
-        m_effects.emplace_back(std::move(effect));
+        m_effects.push_back(std::move(effect));
 
     Init();
 
     for (const std::string& tag : tags)
-        m_tags.emplace(boost::to_upper_copy<std::string>(tag));
+        m_tags.insert(boost::to_upper_copy<std::string>(tag));
 }
 
-Species::~Species()
-{}
+Species::~Species() = default;
 
 void Species::Init() {
     for (auto& effect : m_effects)
@@ -134,7 +132,7 @@ void Species::Init() {
         // (not uninhabitable) environment for this species
 
         std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetEnvironment>>> environments;
-        environments.emplace_back(
+        environments.push_back(
             std::make_unique<ValueRef::Constant<PlanetEnvironment>>(PlanetEnvironment::PE_UNINHABITABLE));
 
         auto this_species_name_ref =
@@ -588,11 +586,18 @@ void SpeciesManager::UpdatePopulationCounter() {
     }
 }
 
-std::map<std::string, std::map<int, float>>& SpeciesManager::SpeciesObjectPopulations(int encoding_empire)
+const std::map<std::string, std::map<int, float>>& SpeciesManager::SpeciesObjectPopulations(int) const
 { return m_species_object_populations; }
 
-std::map<std::string, std::map<std::string, int>>& SpeciesManager::SpeciesShipsDestroyed(int encoding_empire)
+const std::map<std::string, std::map<std::string, int>>& SpeciesManager::SpeciesShipsDestroyed(int) const
 { return m_species_species_ships_destroyed; }
+
+void SpeciesManager::SetSpeciesObjectPopulations(std::map<std::string, std::map<int, float>> sop)
+{ m_species_object_populations = std::move(sop); }
+
+void SpeciesManager::SetSpeciesShipsDestroyed(std::map<std::string, std::map<std::string, int>> ssd)
+{ m_species_species_ships_destroyed = std::move(ssd); }
+
 
 unsigned int SpeciesManager::GetCheckSum() const {
     CheckPendingSpeciesTypes();

@@ -1,12 +1,18 @@
 #include "Ship.h"
 
+#include "Condition.h"
+#include "Conditions.h"
+#include "Fighter.h"
 #include "Fleet.h"
+#include "ScriptingContext.h"
 #include "ShipDesign.h"
 #include "ShipHull.h"
 #include "ShipPart.h"
 #include "Species.h"
 #include "UniverseObjectVisitor.h"
 #include "Universe.h"
+#include "ValueRef.h"
+#include "../combat/CombatDamage.h"
 #include "../Empire/EmpireManager.h"
 #include "../Empire/Empire.h"
 #include "../util/AppInterface.h"
@@ -17,17 +23,21 @@
 
 
 Ship::Ship(int empire_id, int design_id, std::string species_name, int produced_by_empire_id) :
-    m_design_id(design_id),
     m_species_name(std::move(species_name)),
+    m_design_id(design_id),
     m_produced_by_empire_id(produced_by_empire_id),
     m_arrived_on_turn(CurrentTurn()),
     m_last_resupplied_on_turn(CurrentTurn())
 {
-    if (!GetUniverse().GetShipDesign(design_id)) // TODO: pass in ScriptingContext
+    const Universe& universe = GetUniverse();
+    const ShipDesign* design = universe.GetShipDesign(design_id);
+
+    if (!design_id) // TODO: pass in ScriptingContext
         throw std::invalid_argument("Attempted to construct a Ship with an invalid design id");
 
     if (!m_species_name.empty() && !GetSpecies(m_species_name))
         DebugLogger() << "Ship created with invalid species name: " << m_species_name;
+
 
     SetOwner(empire_id);
 
@@ -48,7 +58,7 @@ Ship::Ship(int empire_id, int design_id, std::string species_name, int produced_
     AddMeter(MeterType::METER_TARGET_INFLUENCE);
     AddMeter(MeterType::METER_INFLUENCE);
 
-    for (const std::string& part_name : Design()->Parts()) {
+    for (const std::string& part_name : design->Parts()) { // TODO: pass in Universe with context...?
         if (!part_name.empty()) {
             const ShipPart* part = GetShipPart(part_name);
             if (!part) {
@@ -66,8 +76,8 @@ Ship::Ship(int empire_id, int design_id, std::string species_name, int produced_
             case ShipPartClass::PC_FIGHTER_HANGAR: {   // capacity is how many fighters contained, secondary stat is damage per fighter attack
                 m_part_meters[{MeterType::METER_SECONDARY_STAT, part_name}];
                 m_part_meters[{MeterType::METER_MAX_SECONDARY_STAT, part_name}];
-                // intentionally no break here
             }
+            [[fallthrough]];
             case ShipPartClass::PC_FIGHTER_BAY: {      // capacity is how many fighters launched per combat round
                 m_part_meters[{MeterType::METER_CAPACITY, part_name}];
                 m_part_meters[{MeterType::METER_MAX_CAPACITY, part_name}];
@@ -80,18 +90,18 @@ Ship::Ship(int empire_id, int design_id, std::string species_name, int produced_
     }
 }
 
-Ship* Ship::Clone(int empire_id) const {
+Ship* Ship::Clone(Universe& universe, int empire_id) const {
     Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
 
-    Ship* retval = new Ship();
-    retval->Copy(shared_from_this(), empire_id);
-    return retval;
+    auto retval = std::make_unique<Ship>();
+    retval->Copy(shared_from_this(), universe, empire_id);
+    return retval.release();
 }
 
-void Ship::Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_id) {
+void Ship::Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& universe, int empire_id) {
     if (copied_object.get() == this)
         return;
     auto copied_ship = std::dynamic_pointer_cast<const Ship>(copied_object);
@@ -101,15 +111,15 @@ void Ship::Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_
     }
 
     int copied_object_id = copied_object->ID();
-    Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(copied_object_id, empire_id);
-    auto visible_specials = GetUniverse().GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
+    Visibility vis = universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
+    auto visible_specials = universe.GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
 
-    UniverseObject::Copy(std::move(copied_object), vis, visible_specials);;
+    UniverseObject::Copy(std::move(copied_object), vis, visible_specials, universe);
 
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
         if (this->m_fleet_id != copied_ship->m_fleet_id) {
             // as with other containers, removal from the old container is triggered by the contained Object; removal from System is handled by UniverseObject::Copy
-            if (auto old_fleet = Objects().get<Fleet>(this->m_fleet_id))
+            if (auto old_fleet = universe.Objects().get<Fleet>(this->m_fleet_id))
                 old_fleet->RemoveShips({this->ID()});
             this->m_fleet_id = copied_ship->m_fleet_id; // as with other containers (Systems), actual insertion into fleet ships set is handled by the fleet
         }
@@ -160,9 +170,8 @@ std::set<std::string> Ship::Tags() const {
         return retval;
 
     for (const std::string& part_name : parts) {
-        if (const ShipPart* part = GetShipPart(part_name)) {
+        if (const ShipPart* part = GetShipPart(part_name))
             retval.insert(part->Tags().begin(), part->Tags().end());
-        }
     }
 
     return retval;
@@ -221,59 +230,60 @@ std::string Ship::Dump(unsigned short ntabs) const {
     return os.str();
 }
 
-const ShipDesign* Ship::Design() const
-{ return GetUniverse().GetShipDesign(m_design_id); } // TODO: pass in ScriptingContext
-
-bool Ship::IsMonster() const { // TODO: pass in ScriptingContext
-    const ShipDesign* design = Design();
-    if (design)
+bool Ship::IsMonster(const Universe& universe) const {
+    if (const ShipDesign* design = universe.GetShipDesign(m_design_id))
         return design->IsMonster();
     else
         return false;
 }
 
-bool Ship::IsArmed() const {
-    if (TotalWeaponsDamage(0.0f, false) > 0.0f)
-        return true;    // has non-fighter weapons
-    if (HasFighters() && (TotalWeaponsDamage(0.0f, true) > 0.0f))
-        return true;    // has no non-fighter weapons but has launchable fighters that do damage
-    return false;
+bool Ship::CanDamageShips(float target_shields) const
+{ return TotalWeaponsShipDamage(target_shields, true) > 0.0f; }
+
+bool Ship::CanDestroyFighters() const
+{ return TotalWeaponsFighterDamage(true) > 0.0f; }
+
+bool Ship::IsArmed(const Universe& universe) const {
+    if (HasFighters(universe) && ((TotalWeaponsShipDamage(0.0f, true) > 0.0f) || (TotalWeaponsFighterDamage(true) > 0.0f)))
+        return true;
+    else
+        return ((TotalWeaponsShipDamage(0.0f, false) > 0.0f) || (TotalWeaponsFighterDamage(false) > 0.0f));
 }
 
-bool Ship::HasFighters() const {
-    const ShipDesign* design = Design();
+bool Ship::HasFighters(const Universe& universe) const {
+    const ShipDesign* design = universe.GetShipDesign(m_design_id);
     if (!design || !design->HasFighters())  // ensures ship has ability to launch fighters
         return false;
     return FighterCount() >= 1.0f;          // ensures ship currently has fighters to launch
 }
 
-bool Ship::CanColonize() const {
+bool Ship::CanColonize(const Universe& universe, const SpeciesManager& sm) const {
     if (m_species_name.empty())
         return false;
-    const Species* species = GetSpecies(m_species_name);
+    const Species* species = sm.GetSpecies(m_species_name);
     if (!species)
         return false;
     if (!species->CanColonize())
         return false;
-    const ShipDesign* design = this->Design();
+    const ShipDesign* design = universe.GetShipDesign(m_design_id);
     return design && design->CanColonize(); // use design->CanColonize because zero-capacity colony ships still count as outpost ships, can "can colonize" as far as order / the UI are concerned
 }
 
-bool Ship::HasTroops() const
-{ return this->TroopCapacity() > 0.0f; }
+bool Ship::HasTroops(const Universe& universe) const
+{ return this->TroopCapacity(universe) > 0.0f; }
 
-bool Ship::CanBombard() const {
-    const ShipDesign* design = Design();
+bool Ship::CanBombard(const Universe& universe) const {
+    const ShipDesign* design = universe.GetShipDesign(m_design_id);
     return design && design->CanBombard();
 }
 
 float Ship::Speed() const
 { return GetMeter(MeterType::METER_SPEED)->Initial(); }
 
-float Ship::ColonyCapacity() const {
+float Ship::ColonyCapacity(const Universe& universe) const {
     float retval = 0.0f;
     // find which colony parts are present in design (one copy of name for each instance of a part, allowing duplicate names to appear)
-    const ShipDesign* design = Design();
+    const ShipDesign* design = universe.GetShipDesign(m_design_id);
     if (!design)
         return retval;
 
@@ -293,10 +303,10 @@ float Ship::ColonyCapacity() const {
     return retval;
 }
 
-float Ship::TroopCapacity() const {
+float Ship::TroopCapacity(const Universe& universe) const {
     float retval = 0.0f;
     // find which troop parts are present in design (one copy of name for each instance of a part, allowing duplicate names to appear)
-    const ShipDesign* design = Design();
+    const ShipDesign* design = universe.GetShipDesign(m_design_id);
     if (!design)
         return retval;
 
@@ -316,26 +326,36 @@ float Ship::TroopCapacity() const {
     return retval;
 }
 
-bool Ship::CanHaveTroops() const {
-    const ShipDesign* design = Design();
+bool Ship::CanHaveTroops(const Universe& universe) const {
+    const ShipDesign* design = universe.GetShipDesign(m_design_id);
     return design ? design->HasTroops() : false;
 }
 
-const std::string& Ship::PublicName(int empire_id, const ObjectMap&) const {
+const std::string& Ship::PublicName(int empire_id, const Universe& universe) const {
     // Disclose real ship name only to fleet owners. Rationale: a player who
     // doesn't know the design for a particular ship can easily guess it if the
     // ship's name is "Scout"
     // An exception is made for unowned monsters.
-    if (empire_id == ALL_EMPIRES || OwnedBy(empire_id) || (IsMonster() && Owner() == ALL_EMPIRES))  // TODO: GameRule for all objects visible
+    if (empire_id == ALL_EMPIRES || OwnedBy(empire_id) || (IsMonster(universe) && Unowned()))  // TODO: Check / apply GameRule for all objects visible?
         return Name();
-    const ShipDesign* design = Design();
-    if (design)
+    if (const ShipDesign* design = universe.GetShipDesign(m_design_id))
         return design->Name();
-    else if (IsMonster())
+    else if (IsMonster(universe))
         return UserString("SM_MONSTER");
     else if (!Unowned())
         return UserString("FW_FOREIGN_SHIP");
-    else if (Unowned() && GetVisibility(empire_id) > Visibility::VIS_NO_VISIBILITY)
+    else if (Unowned()/* && GetVisibility(empire_id) > Visibility::VIS_NO_VISIBILITY*/)
+        return UserString("FW_ROGUE_SHIP");
+    else
+        return UserString("OBJ_SHIP");
+}
+
+const std::string& Ship::PublicName(int empire_id) const {
+    if (empire_id == ALL_EMPIRES || OwnedBy(empire_id))
+        return Name();
+    else if (!Unowned())
+        return UserString("FW_FOREIGN_SHIP");
+    else if (Unowned())
         return UserString("FW_ROGUE_SHIP");
     else
         return UserString("OBJ_SHIP");
@@ -427,103 +447,76 @@ float Ship::FighterMax() const {
     return retval;
 }
 
-float Ship::TotalWeaponsDamage(float shield_DR, bool include_fighters) const {
+
+float Ship::WeaponPartFighterDamage(const ShipPart* part, const ScriptingContext& context) const {
+    if (!part || (part->Class() != ShipPartClass::PC_DIRECT_WEAPON))
+        return 0.0f;
+
+    // usually a weapon part destroys one fighter per shot, but that can be overridden
+    if (part->TotalFighterDamage()) {
+        return part->TotalFighterDamage()->Eval(context);
+    } else {
+        int num_bouts_with_fighter_targets = GetGameRules().Get<int>("RULE_NUM_COMBAT_ROUNDS") - 1;
+        return  CurrentPartMeterValue(MeterType::METER_SECONDARY_STAT, part->Name()) * num_bouts_with_fighter_targets;  // used within loop that updates meters, so need current, not initial values
+    }
+}
+
+float Ship::WeaponPartShipDamage(const ShipPart* part, const ScriptingContext& context) const {
+    if (!part || (part->Class() != ShipPartClass::PC_DIRECT_WEAPON))
+        return 0.0f;
+
+    // usually a weapon part does damage*shots ship damage, but that can be overridden
+    if (part->TotalShipDamage()) {
+        return part->TotalShipDamage()->Eval(context);
+    } else {
+        float part_attack = CurrentPartMeterValue(MeterType::METER_CAPACITY, part->Name());  // used within loop that updates meters, so need current, not initial values
+        float part_shots = CurrentPartMeterValue(MeterType::METER_SECONDARY_STAT, part->Name());
+        float target_shield = 0.0f;
+        if (context.effect_target) {
+            const Ship* target = static_cast<const Ship*>(context.effect_target.get());
+            target_shield = target->GetMeter(MeterType::METER_SHIELD)->Current();
+        }
+        if (part_attack > target_shield) {
+            int num_bouts = GetGameRules().Get<int>("RULE_NUM_COMBAT_ROUNDS");
+            return (part_attack - target_shield) * part_shots * num_bouts;
+        } else {
+            return 0.0f;
+        }
+    }
+}
+
+float Ship::TotalWeaponsFighterDamage(bool launch_fighters) const {
+    // sum up all individual weapons' attack strengths
+    float total_shots = 0.0f;
+    auto all_weapons_shots = AllWeaponsFighterDamage(launch_fighters);
+    for (float shots : all_weapons_shots)
+        total_shots += shots;
+    return total_shots;
+}
+
+float Ship::TotalWeaponsShipDamage(float shield_DR, bool launch_fighters) const {
     // sum up all individual weapons' attack strengths
     float total_attack = 0.0f;
-    auto all_weapons_damage = AllWeaponsDamage(shield_DR, include_fighters);
+    auto all_weapons_damage = AllWeaponsShipDamage(shield_DR, launch_fighters);
     for (float attack : all_weapons_damage)
         total_attack += attack;
     return total_attack;
 }
 
-namespace {
-    std::vector<float> WeaponDamageImpl(const Ship* ship, const ShipDesign* design,
-                                        float DR, bool max, bool include_fighters)
-    {
-        std::vector<float> retval;
+std::vector<float> Ship::AllWeaponsFighterDamage(bool launch_fighters) const
+{ return Combat::WeaponDamageImpl(std::static_pointer_cast<const Ship>(shared_from_this()), /*target_shield_DR*/0, /*max meters*/false, launch_fighters, /*target_ships*/false); }
 
-        if (!ship || !design)
-            return retval;
-        const std::vector<std::string>& parts = design->Parts();
-        if (parts.empty())
-            return retval;
+std::vector<float> Ship::AllWeaponsShipDamage(float shield_DR, bool launch_fighters) const
+{ return Combat::WeaponDamageImpl(std::static_pointer_cast<const Ship>(shared_from_this()), shield_DR, false, launch_fighters, true); }
 
-        MeterType METER = max ? MeterType::METER_MAX_CAPACITY : MeterType::METER_CAPACITY;
-        MeterType SECONDARY_METER = max ? MeterType::METER_MAX_SECONDARY_STAT : MeterType::METER_SECONDARY_STAT;
-
-        float fighter_damage = 0.0f;
-        int fighter_launch_capacity = 0;
-        int available_fighters = 0;
-
-        retval.reserve(parts.size() + 1);
-        // for each weapon part, get its damage meter value
-        for (const auto& part_name : parts) {
-            const ShipPart* part = GetShipPart(part_name);
-            if (!part)
-                continue;
-            ShipPartClass part_class = part->Class();
-
-            // get the attack power for each weapon part.
-            if (part_class == ShipPartClass::PC_DIRECT_WEAPON) {
-                float part_attack = ship->CurrentPartMeterValue(METER, part_name);  // used within loop that updates meters, so need current, not initial values
-                float part_shots = ship->CurrentPartMeterValue(SECONDARY_METER, part_name);
-                if (part_attack > DR)
-                    retval.emplace_back((part_attack - DR)*part_shots);
-
-            } else if (part_class == ShipPartClass::PC_FIGHTER_BAY && include_fighters) {
-                // launch capacity determined by capacity of bay
-                fighter_launch_capacity += static_cast<int>(ship->CurrentPartMeterValue(METER, part_name));
-
-            } else if (part_class == ShipPartClass::PC_FIGHTER_HANGAR && include_fighters) {
-                // attack strength of a ship's fighters determined by the hangar...
-                fighter_damage = ship->CurrentPartMeterValue(SECONDARY_METER, part_name);  // assuming all hangars have the same damage...
-                available_fighters = std::max(0, static_cast<int>(ship->CurrentPartMeterValue(METER, part_name)));  // stacked meter
-            }
-        }
-
-        if (!include_fighters || fighter_damage <= 0.0f || available_fighters <= 0 || fighter_launch_capacity <= 0)
-            return retval;
-
-        int fighter_shots = std::min(available_fighters, fighter_launch_capacity);  // how many fighters launched in bout 1
-        available_fighters -= fighter_shots;
-        int launched_fighters = fighter_shots;
-        int num_bouts = GetGameRules().Get<int>("RULE_NUM_COMBAT_ROUNDS");
-        int remaining_bouts = num_bouts - 2;  // no attack for first round, second round already added
-        while (remaining_bouts > 0) {
-            int fighters_launched_this_bout = std::min(available_fighters, fighter_launch_capacity);
-            available_fighters -= fighters_launched_this_bout;
-            launched_fighters += fighters_launched_this_bout;
-            fighter_shots += launched_fighters;
-            --remaining_bouts;
-        }
-
-        // how much damage does a fighter shot do?
-        fighter_damage = std::max(0.0f, fighter_damage);
-
-        retval.emplace_back(fighter_damage * fighter_shots / num_bouts); // divide by bouts because fighter calculation is for a full combat, but direct firefor one attack
-
-        return retval;
-    }
-}
-
-std::vector<float> Ship::AllWeaponsDamage(float shield_DR, bool include_fighters) const {
-    std::vector<float> retval;
-
-    const ShipDesign* design = GetUniverse().GetShipDesign(m_design_id); // TODO: pass in ScriptingContext
-    if (!design)
-        return retval;
-
-    return WeaponDamageImpl(this, design, shield_DR, false, include_fighters);
-}
-
-std::vector<float> Ship::AllWeaponsMaxDamage(float shield_DR , bool include_fighters) const {
+std::vector<float> Ship::AllWeaponsMaxShipDamage(float shield_DR, bool launch_fighters) const {
     std::vector<float> retval;
 
     const ShipDesign* design = GetUniverse().GetShipDesign(m_design_id); // TODO: pass in Scriptingcontext
     if (!design)
         return retval;
 
-    return WeaponDamageImpl(this, design, shield_DR, true, include_fighters);
+    return Combat::WeaponDamageImpl(std::static_pointer_cast<const Ship>(shared_from_this()), shield_DR, true, launch_fighters);
 }
 
 void Ship::SetFleetID(int fleet_id) {

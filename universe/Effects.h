@@ -23,12 +23,12 @@ class FO_COMMON_API NoOp final : public Effect {
 public:
     NoOp() = default;
 
-    void            Execute(ScriptingContext& context) const override;
-    std::string     Dump(unsigned short ntabs = 0) const override;
-    void            SetTopLevelContent(const std::string& content_name) override {}
-    unsigned int    GetCheckSum() const override;
+    void                       Execute(ScriptingContext& context) const override;
+    [[nodiscard]] std::string  Dump(unsigned short ntabs = 0) const override;
+    void                       SetTopLevelContent(const std::string& content_name) override {}
+    [[nodiscard]] unsigned int GetCheckSum() const override;
 
-    std::unique_ptr<Effect> Clone() const override;
+    [[nodiscard]] std::unique_ptr<Effect> Clone() const override;
 };
 
 /** Sets the meter of the given kind to \a value.  The max value of the meter
@@ -697,10 +697,11 @@ private:
     std::unique_ptr<ValueRef::ValueRef<int>>            m_empire_id;
 };
 
-class FO_COMMON_API GiveEmpireTech final : public Effect {
+class FO_COMMON_API GiveEmpireContent final : public Effect {
 public:
-    explicit GiveEmpireTech(std::unique_ptr<ValueRef::ValueRef<std::string>>&& tech_name,
-                            std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id = nullptr);
+    explicit GiveEmpireContent(std::unique_ptr<ValueRef::ValueRef<std::string>>&& tech_name,
+                               UnlockableItemType unlock_type,
+                               std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id = nullptr);
 
     void            Execute(ScriptingContext& context) const override;
     std::string     Dump(unsigned short ntabs = 0) const override;
@@ -710,8 +711,9 @@ public:
     std::unique_ptr<Effect> Clone() const override;
 
 private:
-    std::unique_ptr<ValueRef::ValueRef<std::string>>    m_tech_name;
-    std::unique_ptr<ValueRef::ValueRef<int>>            m_empire_id;
+    std::unique_ptr<ValueRef::ValueRef<std::string>> m_content_name;
+    UnlockableItemType                               m_unlock_type;
+    std::unique_ptr<ValueRef::ValueRef<int>>         m_empire_id;
 };
 
 /** Generates a sitrep message for the empire with id \a recipient_empire_id.

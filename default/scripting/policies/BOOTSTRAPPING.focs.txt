@@ -3,22 +3,29 @@ Policy
     description = "PLC_BOOTSTRAPPING_DESC"
     short_description = "PLC_BOOTSTRAPPING_SHORT_DESC"
     category = "ECONOMIC_CATEGORY"
-    adoptioncost = 1.0 * floor(2 + 2 * Statistic Count
-                                           condition = And [ Planet Species OwnedBy empire = Source.Owner ])
+    adoptioncost = floor(5.0 * [[PLANETS_OWNED_BY_EMPIRE]]^0.5)
+    exclusions = [ "PLC_ISOLATION" ]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
 
         EffectsGroup
             scope = And [
                 Species
-                Population high = 6
+                Population high = (NamedReal name = "PLC_BOOTSTRAPPING_MAX_POP" value = 10.0)
                 OwnedBy empire = Source.Owner
             ]
             effects = [
                 SetIndustry value = min(Target.TargetIndustry, Value + 1.0)
                 SetResearch value = min(Target.TargetResearch, Value + 1.0)
                 SetInfluence value = min(Target.TargetInfluence, Value + 1.0)
-                SetTargetHappiness value = Value + 2
+
+                // increase target stability by 10 on first turn, decreasing each turn to 0 at turn 20
+                SetTargetHappiness value = Value + 
+                    0.5 * max(0.0, (NamedReal name = "PLC_BOOTSTRAPPING_MAX_TURNS" value = 20.0) - Target.TurnsSinceColonization)
+
+                // increase stability growth rate
+                SetHappiness value = Value + min(abs(Value(Target.TargetHappiness) - Value), 1) *
+                    (Statistic If condition = And [ Target (Value < Value(Target.TargetHappiness))])
             ]
     ]
     graphic = "icons/policies/boot.png"

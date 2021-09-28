@@ -3,26 +3,35 @@ Policy
     description = "PLC_CONFORMANCE_DESC"
     short_description = "PLC_CONFORMANCE_SHORT_DESC"
     category = "SOCIAL_CATEGORY"
-    adoptioncost = 5 + floor(Statistic Sum value = LocalCandidate.Population
-                                           condition = And [ Planet OwnedBy empire = Source.Owner ])
+    adoptioncost = floor(2.0 * [[POPULATION_OWNED_BY_EMPIRE]]^0.5)
     exclusions = [ "PLC_LIBERTY" "PLC_DIVERSITY" ]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
 
         // used in setting stability adjustments for species likes / dislikes
 
-        // reduces research but boosts infrastructure and stockpiling
+        // reduces research but boosts infrastructure and stockpiling and stability
         EffectsGroup
         scope = And [
             Planet
             OwnedBy empire = Source.Owner
             Species
-            Happiness low = 4
+            Happiness low = (NamedReal name = "PLC_CONFORMANCE_MIN_STABILITY" value = 4)
         ]
         effects = [
-            SetTargetResearch value = Value - (NamedReal name = "PLC_CONFORMANCE_RESEARCH_PENALTY_FLAT" value = 2.0)
             SetTargetConstruction value = Value + (NamedReal name = "PLC_CONFORMANCE_INFRASTRUCTURE_BONUS_FLAT" value = 5.0)
             SetMaxStockpile value = Value + (NamedReal name = "PLC_CONFORMANCE_STOCKPILING_BONUS_FLAT" value = 1.0)
+        ]
+
+        EffectsGroup
+        scope = And [
+            Planet
+            OwnedBy empire = Source.Owner
+            Species
+        ]
+        effects = [
+            SetTargetHappiness value = Value + (NamedReal name = "PLC_CONFORMANCE_STABILITY_BONUS_FLAT" value = 2.0)
+            SetTargetResearch value = Value - (NamedReal name = "PLC_CONFORMANCE_RESEARCH_PENALTY_FLAT" value = 2.0)
         ]
     ]
     graphic = "icons/policies/conformance.png"

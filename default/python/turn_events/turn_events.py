@@ -1,19 +1,19 @@
-from logging import info, error
+from logging import error, info
 
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
 # Logging is redirected before other imports so that import errors appear in log files.
 redirect_logging_to_freeorion_logger()
 
-import sys
-from random import random, uniform, choice
-from math import sin, cos, pi
-
 import freeorion as fo
-from universe_tables import MONSTER_FREQUENCY
+import sys
+from math import cos, pi, sin
+from random import choice, random, uniform
 
 import psycopg2
 import psycopg2.extensions
+from universe_tables import MONSTER_FREQUENCY
+
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
@@ -24,8 +24,10 @@ def execute_turn_events():
     print("Executing turn events for turn", fo.current_turn())
 
     try:
-        req = urllib.request.Request("http://localhost:8083/",
-                                     ("%s: Turn %d has come to an end." % (fo.get_galaxy_setup_data().gameUID, fo.current_turn())).encode())
+        req = urllib.request.Request(
+            "http://localhost:8083/",
+            ("%s: Turn %d has come to an end." % (fo.get_galaxy_setup_data().gameUID, fo.current_turn())).encode(),
+        )
         req.add_header("X-XMPP-Muc", "smac")
         urllib.request.urlopen(req).read()
         info("Chat notification was send via XMPP")
@@ -42,11 +44,13 @@ def execute_turn_events():
         conn = psycopg2.connect(dsn)
         with conn:
             with conn.cursor() as curs:
-                curs.execute("""INSERT INTO games.turns(game_uid, turn, turn_ts) VALUES(%s, %s,
+                curs.execute(
+                    """INSERT INTO games.turns(game_uid, turn, turn_ts) VALUES(%s, %s,
                         NOW()::timestamp)
                                 ON CONFLICT (game_uid, turn) DO UPDATE SET turn_ts =
                                 EXCLUDED.turn_ts""",
-                             (fo.get_galaxy_setup_data().gameUID, fo.current_turn()))
+                    (fo.get_galaxy_setup_data().gameUID, fo.current_turn()),
+                )
     except Exception:
         exctype, value = sys.exc_info()[:2]
         error("Cann't update turn time: %s %s" % (exctype, value))
@@ -54,13 +58,7 @@ def execute_turn_events():
     # creating fields
     systems = fo.get_systems()
     radius = fo.get_universe_width() / 2.0
-    field_types = [
-        "FLD_MOLECULAR_CLOUD",
-        "FLD_ION_STORM",
-        "FLD_NANITE_SWARM",
-        "FLD_METEOR_BLIZZARD",
-        "FLD_VOID_RIFT"
-    ]
+    field_types = ["FLD_MOLECULAR_CLOUD", "FLD_ION_STORM", "FLD_NANITE_SWARM", "FLD_METEOR_BLIZZARD", "FLD_VOID_RIFT"]
 
     if random() < max(0.00015 * radius, 0.03):
         field_type = choice(field_types)

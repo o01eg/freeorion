@@ -32,9 +32,8 @@ class Texture;
 class GG_API Cursor
 {
 public:
-    Cursor();
-
-    virtual ~Cursor();
+    Cursor() = default;
+    virtual ~Cursor() = default;
 
     /** Renders the cursor at the specified location.  Subclasses should take
         care to ensure that the cursor's "hotspot" is rendered at \a pt. */
@@ -56,10 +55,10 @@ public:
     TextureCursor(std::shared_ptr<Texture> texture, const Pt& hotspot = Pt());
 
     /** Returns the texture used to render this TextureCursor. */
-    const std::shared_ptr<Texture>& GetTexture() const;
+    [[nodiscard]] const std::shared_ptr<Texture>& GetTexture() const;
 
     /** Returns the position within Texture() of the cursor hotspot. */
-    const Pt& Hotspot() const;
+    [[nodiscard]] const Pt& Hotspot() const;
 
     void Render(const Pt& pt) override;
 

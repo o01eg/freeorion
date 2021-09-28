@@ -2,6 +2,7 @@
 #define _ValueRefManager_h_
 
 #include <map>
+#include <thread>
 #include "ValueRef.h"
 
 FO_COMMON_API const std::string& UserString(const std::string& str);
@@ -234,8 +235,13 @@ public:
 private:
     NamedValueRefManager();
 
+#ifdef __clang__
+    template <typename T>
+    friend struct ValueRef::NamedRef; // for SetTopLevelContent
+#else
     template <typename T>
     friend void ValueRef::NamedRef<T>::SetTopLevelContent(const std::string& content_name);
+#endif
 
     // getter of mutable ValueRef<T>* that can be modified within SetTopLevelContext functions
     template <typename T>

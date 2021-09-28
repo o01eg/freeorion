@@ -219,22 +219,25 @@ void NewFleetOrder::ExecuteImpl() const {
     if (!Check(EmpireID(), m_fleet_name, m_ship_ids, m_aggression))
         return;
 
+    Universe& u = GetUniverse();
+    ObjectMap& o = u.Objects();
+    const SpeciesManager& sm = GetSpeciesManager();
+
     GetUniverse().InhibitUniverseObjectSignals(true);
 
     // validate specified ships
-    auto validated_ships = Objects().find<Ship>(m_ship_ids);
+    auto validated_ships = o.find<Ship>(m_ship_ids);
 
     int system_id = validated_ships[0]->SystemID();
-    auto system = Objects().get<System>(system_id);
+    auto system = o.get<System>(system_id);
 
     std::shared_ptr<Fleet> fleet;
     if (m_fleet_id == INVALID_OBJECT_ID) {
         // create fleet
-        fleet = GetUniverse().InsertNew<Fleet>(m_fleet_name, system->X(), system->Y(), EmpireID());
+        fleet = u.InsertNew<Fleet>(m_fleet_name, system->X(), system->Y(), EmpireID());
         m_fleet_id = fleet->ID();
     } else {
-        fleet = GetUniverse().InsertByEmpireWithID<Fleet>(
-            EmpireID(), m_fleet_id, m_fleet_name, system->X(), system->Y(), EmpireID());
+        fleet = u.InsertByEmpireWithID<Fleet>(EmpireID(), m_fleet_id, m_fleet_name, system->X(), system->Y(), EmpireID());
     }
 
     if (!fleet) {
@@ -246,13 +249,13 @@ void NewFleetOrder::ExecuteImpl() const {
     fleet->SetAggression(m_aggression);
 
     // an ID is provided to ensure consistancy between server and client universes
-    GetUniverse().SetEmpireObjectVisibility(EmpireID(), fleet->ID(), Visibility::VIS_FULL_VISIBILITY);
+    u.SetEmpireObjectVisibility(EmpireID(), fleet->ID(), Visibility::VIS_FULL_VISIBILITY);
 
     system->Insert(fleet);
 
     // new fleet will get same m_arrival_starlane as fleet of the first ship in the list.
     auto first_ship = validated_ships[0];
-    auto first_fleet = Objects().get<Fleet>(first_ship->FleetID());
+    auto first_fleet = o.get<Fleet>(first_ship->FleetID());
     if (first_fleet)
         fleet->SetArrivalStarlane(first_fleet->ArrivalStarlane());
 
@@ -260,7 +263,7 @@ void NewFleetOrder::ExecuteImpl() const {
     int ordered_moved_turn = BEFORE_FIRST_TURN;
     // remove ships from old fleet(s) and add to new
     for (auto& ship : validated_ships) {
-        if (auto old_fleet = Objects().get<Fleet>(ship->FleetID())) {
+        if (auto old_fleet = o.get<Fleet>(ship->FleetID())) {
             ordered_moved_turn = std::max(ordered_moved_turn, old_fleet->LastTurnMoveOrdered());
             old_fleet->RemoveShips({ship->ID()});
             modified_fleets.emplace(std::move(old_fleet));
@@ -271,9 +274,9 @@ void NewFleetOrder::ExecuteImpl() const {
     fleet->SetMoveOrderedTurn(ordered_moved_turn);
 
     if (m_fleet_name.empty())
-        fleet->Rename(fleet->GenerateFleetName(Objects()));
+        fleet->Rename(fleet->GenerateFleetName(u, sm));
 
-    GetUniverse().InhibitUniverseObjectSignals(false);
+    u.InhibitUniverseObjectSignals(false);
 
     std::vector<std::shared_ptr<Fleet>> created_fleets{fleet};
     system->FleetsInsertedSignal(created_fleets);
@@ -281,13 +284,13 @@ void NewFleetOrder::ExecuteImpl() const {
 
     // Signal changed state of modified fleets and remove any empty fleets.
     for (auto& modified_fleet : modified_fleets) {
-        if (!modified_fleet->Empty())
+        if (!modified_fleet->Empty()) {
             modified_fleet->StateChangedSignal();
-        else {
-            if (auto modified_fleet_system = Objects().get<System>(modified_fleet->SystemID()))
+        } else {
+            if (auto modified_fleet_system = o.get<System>(modified_fleet->SystemID()))
                 modified_fleet_system->Remove(modified_fleet->ID());
 
-            GetUniverse().Destroy(modified_fleet->ID());
+            u.Destroy(modified_fleet->ID());
         }
     }
 }
@@ -367,16 +370,18 @@ void FleetMoveOrder::ExecuteImpl() const { // TODO: pass in ScriptingContext?
         return;
 
     // convert list of ids to list of System
-    std::list<int> route_list;
-
     auto fleet = Objects().get<Fleet>(FleetID());
+    if (!fleet) {
+        ErrorLogger() << "FleetMoveOrder::ExecuteImpl couldn't get fleet with ID: " << m_fleet;
+        return;
+    }
+    using RouteListT = std::remove_const_t<std::remove_reference_t<decltype(fleet->TravelRoute())>>;
+    RouteListT fleet_travel_route{m_append ? fleet->TravelRoute() : RouteListT{}};
 
-    if (m_append && !fleet->TravelRoute().empty()) {
-        route_list = fleet->TravelRoute();      // copy existing route
-
+    if (m_append && !fleet_travel_route.empty()) {
         DebugLogger() << "FleetMoveOrder::ExecuteImpl appending initial" << [&]() {
             std::stringstream ss;
-            for (int waypoint : route_list)
+            for (int waypoint : fleet_travel_route)
                 ss << " " << waypoint;
             return ss.str();
         }() << "  with" << [&]() {
@@ -385,36 +390,36 @@ void FleetMoveOrder::ExecuteImpl() const { // TODO: pass in ScriptingContext?
                 ss << " " << waypoint;
             return ss.str();
         }();
-
-        route_list.erase(--route_list.end());   // remove last item as it should be the first in the appended route
+        fleet_travel_route.pop_back(); // remove last item as it should be the first in the appended route
     }
 
-    std::copy(m_route.begin(), m_route.end(), std::back_inserter(route_list));
-    DebugLogger() << [fleet, route_list]() {
+    std::copy(m_route.begin(), m_route.end(), std::back_inserter(fleet_travel_route));
+    DebugLogger() << [&fleet, &fleet_travel_route]() {
         std::stringstream ss;
         ss << "FleetMoveOrder::ExecuteImpl Setting route of fleet " << fleet->ID() << " at system " << fleet->SystemID() << " to: ";
-        if (route_list.empty())
+        if (fleet_travel_route.empty())
             return std::string("[empty route]");
-        for (int waypoint : route_list)
+        for (int waypoint : fleet_travel_route)
             ss << " " << std::to_string(waypoint);
         return ss.str();
     }();
 
-    if (route_list.front() == fleet->SystemID()) {
-        DebugLogger() << "FleetMoveOrder::ExecuteImpl given route that starts with fleet " << fleet->ID() << "'s current system (" << route_list.front() << "); removing it";
-        route_list.pop_front();
+    if (!fleet_travel_route.empty() && fleet_travel_route.front() == fleet->SystemID()) {
+        DebugLogger() << "FleetMoveOrder::ExecuteImpl given route that starts with fleet " << fleet->ID()
+                      << "'s current system (" << fleet_travel_route.front() << "); removing it";
+        fleet_travel_route.pop_front();
     }
 
     // check destination validity: disallow movement that's out of range
     ScriptingContext context;
-    auto eta = fleet->ETA(fleet->MovePath(route_list, false, context));
+    auto eta = fleet->ETA(fleet->MovePath(fleet_travel_route, false, context));
     if (eta.first == Fleet::ETA_NEVER || eta.first == Fleet::ETA_OUT_OF_RANGE) {
         DebugLogger() << "FleetMoveOrder::ExecuteImpl rejected out of range move order";
         return;
     }
 
     try {
-        fleet->SetRoute(route_list, Objects());
+        fleet->SetRoute(fleet_travel_route, Objects());
         fleet->SetMoveOrderedTurn(CurrentTurn());
         // todo: set last turn ordered moved
     } catch (const std::exception& e) {
@@ -550,18 +555,21 @@ ColonizeOrder::ColonizeOrder(int empire, int ship, int planet) :
         return;
 }
 
-std::string ColonizeOrder::Dump() const {
-    return UserString("ORDER_COLONIZE");
-}
+std::string ColonizeOrder::Dump() const
+{ return UserString("ORDER_COLONIZE"); }
 
 bool ColonizeOrder::Check(int empire_id, int ship_id, int planet_id) {
-    auto ship = Objects().get<Ship>(ship_id);
+    const Universe& u = GetUniverse();
+    const ObjectMap& o = u.Objects();
+    const SpeciesManager& sm = GetSpeciesManager();
+
+    auto ship = o.get<Ship>(ship_id);
     if (!ship) {
         ErrorLogger() << "ColonizeOrder::Check() : empire " << empire_id
                       << " passed an invalid ship_id: " << ship_id;
         return false;
     }
-    auto fleet = Objects().get<Fleet>(ship->FleetID());
+    auto fleet = o.get<Fleet>(ship->FleetID());
     if (!fleet) {
         ErrorLogger() << "ColonizeOrder::Check() : empire " << empire_id
                       << " passed ship (" << ship_id << ") with an invalid fleet_id: " << ship->FleetID();
@@ -577,13 +585,13 @@ bool ColonizeOrder::Check(int empire_id, int ship_id, int planet_id) {
         return false;
     }
 
-    if (!ship->CanColonize()) { // verifies that species exists and can colonize and that ship can colonize
+    if (!ship->CanColonize(u, sm)) { // verifies that species exists and can colonize and that ship can colonize
         ErrorLogger() << "ColonizeOrder::Check() : got ship that can't colonize";
         return false;
     }
 
-    auto planet = Objects().get<Planet>(planet_id);
-    float colonist_capacity = ship->ColonyCapacity();
+    auto planet = o.get<Planet>(planet_id);
+    float colonist_capacity = ship->ColonyCapacity(u);
     if (!planet) {
         ErrorLogger() << "ColonizeOrder::Check() : couldn't get planet with id " << planet_id;
         return false;
@@ -600,7 +608,7 @@ bool ColonizeOrder::Check(int empire_id, int ship_id, int planet_id) {
         ErrorLogger() << "ColonizeOrder::Check() : given planet that is already owned by empire and colony ship with zero capcity";
         return false;
     }
-    if (GetUniverse().GetObjectVisibilityByEmpire(planet_id, empire_id) < Visibility::VIS_PARTIAL_VISIBILITY) {
+    if (u.GetObjectVisibilityByEmpire(planet_id, empire_id) < Visibility::VIS_PARTIAL_VISIBILITY) {
         ErrorLogger() << "ColonizeOrder::Check() : given planet that empire has insufficient visibility of";
         return false;
     }
@@ -692,6 +700,10 @@ std::string InvadeOrder::Dump() const {
 }
 
 bool InvadeOrder::Check(int empire_id, int ship_id, int planet_id) {
+    const Universe& u = GetUniverse();
+    const ObjectMap& o = u.Objects();
+    const EmpireManager& e = Empires();
+
     // make sure ship_id is a ship...
     auto ship = Objects().get<Ship>(ship_id);
     if (!ship) {
@@ -703,13 +715,13 @@ bool InvadeOrder::Check(int empire_id, int ship_id, int planet_id) {
         ErrorLogger() << "IssueInvadeOrder : empire does not own passed ship";
         return false;
     }
-    if (!ship->HasTroops()) {
+    if (!ship->HasTroops(u)) {
         ErrorLogger() << "InvadeOrder::ExecuteImpl got ship that can't invade";
         return false;
     }
 
     // get fleet of ship
-    auto fleet = Objects().get<Fleet>(ship->FleetID());
+    auto fleet = o.get<Fleet>(ship->FleetID());
     if (!fleet) {
         ErrorLogger() << "IssueInvadeOrder : ship with passed ship_id has invalid fleet_id";
         return false;
@@ -721,7 +733,7 @@ bool InvadeOrder::Check(int empire_id, int ship_id, int planet_id) {
         return false;
     }
 
-    auto planet = Objects().get<Planet>(planet_id);
+    auto planet = o.get<Planet>(planet_id);
     if (!planet) {
         ErrorLogger() << "InvadeOrder::ExecuteImpl couldn't get planet with id " << planet_id;
         return false;
@@ -732,7 +744,7 @@ bool InvadeOrder::Check(int empire_id, int ship_id, int planet_id) {
         return false;
     }
 
-    if (GetUniverse().GetObjectVisibilityByEmpire(planet_id, empire_id) < Visibility::VIS_BASIC_VISIBILITY) {
+    if (u.GetObjectVisibilityByEmpire(planet_id, empire_id) < Visibility::VIS_BASIC_VISIBILITY) {
         ErrorLogger() << "InvadeOrder::ExecuteImpl given planet that empire reportedly has insufficient visibility of, but will be allowed to proceed pending investigation";
         return false;
     }
@@ -752,7 +764,7 @@ bool InvadeOrder::Check(int empire_id, int ship_id, int planet_id) {
         return false;
     }
 
-    if (!planet->Unowned() && Empires().GetDiplomaticStatus(planet->Owner(), empire_id) != DiplomaticStatus::DIPLO_WAR) {
+    if (!planet->Unowned() && e.GetDiplomaticStatus(planet->Owner(), empire_id) != DiplomaticStatus::DIPLO_WAR) {
         ErrorLogger() << "InvadeOrder::ExecuteImpl given planet owned by an empire not at war with order-issuing empire";
         return false;
     }
@@ -822,12 +834,16 @@ std::string BombardOrder::Dump() const {
 }
 
 bool BombardOrder::Check(int empire_id, int ship_id, int planet_id) {
-    auto ship = Objects().get<Ship>(ship_id);
+    const Universe& universe = GetUniverse();
+    const ObjectMap& objects = universe.Objects();
+    const EmpireManager& empires = Empires();
+    
+    auto ship = objects.get<Ship>(ship_id);
     if (!ship) {
         ErrorLogger() << "BombardOrder::ExecuteImpl couldn't get ship with id " << ship_id;
         return false;
     }
-    if (!ship->CanBombard()) {
+    if (!ship->CanBombard(universe)) {
         ErrorLogger() << "BombardOrder::ExecuteImpl got ship that can't bombard";
         return false;
     }
@@ -836,7 +852,7 @@ bool BombardOrder::Check(int empire_id, int ship_id, int planet_id) {
         return false;
     }
 
-    auto planet = Objects().get<Planet>(planet_id);
+    auto planet = objects.get<Planet>(planet_id);
     if (!planet) {
         ErrorLogger() << "BombardOrder::ExecuteImpl couldn't get planet with id " << planet_id;
         return false;
@@ -845,11 +861,11 @@ bool BombardOrder::Check(int empire_id, int ship_id, int planet_id) {
         ErrorLogger() << "BombardOrder::ExecuteImpl given planet that is already owned by the order-issuing empire";
         return false;
     }
-    if (!planet->Unowned() && Empires().GetDiplomaticStatus(planet->Owner(), empire_id) != DiplomaticStatus::DIPLO_WAR) {
+    if (!planet->Unowned() && empires.GetDiplomaticStatus(planet->Owner(), empire_id) != DiplomaticStatus::DIPLO_WAR) {
         ErrorLogger() << "BombardOrder::ExecuteImpl given planet owned by an empire not at war with order-issuing empire";
         return false;
     }
-    if (GetUniverse().GetObjectVisibilityByEmpire(planet_id, empire_id) < Visibility::VIS_BASIC_VISIBILITY) {
+    if (universe.GetObjectVisibilityByEmpire(planet_id, empire_id) < Visibility::VIS_BASIC_VISIBILITY) {
         ErrorLogger() << "BombardOrder::ExecuteImpl given planet that empire reportedly has insufficient visibility of, but will be allowed to proceed pending investigation";
     }
 
@@ -978,7 +994,7 @@ std::string PolicyOrder::Dump() const {
     return m_adopt ? UserString("ORDER_POLICY_ADOPT") : UserString("ORDER_POLICY_ABANDON");
 }
 
-void PolicyOrder::ExecuteImpl() const {
+void PolicyOrder::ExecuteImpl() const { // TODO: pass in ObjectMap
     auto empire = GetValidatedEmpire();
     if (m_adopt)
         DebugLogger() << "PolicyOrder adopt " << m_policy_name << " in category " << m_category
@@ -986,7 +1002,7 @@ void PolicyOrder::ExecuteImpl() const {
     else
         DebugLogger() << "PolicyOrder revoke " << m_policy_name << " from category " << m_category
                       << " in slot " << m_slot;
-    empire->AdoptPolicy(m_policy_name, m_category, m_adopt, m_slot, Objects());
+    empire->AdoptPolicy(m_policy_name, m_category, Objects(), m_adopt, m_slot);
 }
 
 ////////////////////////////////////////////////

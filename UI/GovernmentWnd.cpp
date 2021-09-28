@@ -149,7 +149,7 @@ namespace {
 
     boost::optional<AvailabilityManager::DisplayedAvailabilies>
     AvailabilityManager::DisplayedXAvailability(bool available, bool restricted) const {
-        const auto [showing_restricted, showing_available, showing_future] = m_availabilities;
+        const auto& [showing_restricted, showing_available, showing_future] = m_availabilities;
 
         bool res = showing_restricted && available && restricted;
         bool now = showing_available  && available && !restricted;
@@ -178,12 +178,21 @@ namespace {
         main_text += UserString(policy->ShortDescription()) + "\n\n";
 
         if (empire) {
-            if (!empire->PolicyAvailable(policy_name)) {
-                main_text += UserString("POLICY_LOCKED") + "\n\n";
-            } else {
-                auto cost = policy->AdoptionCost(empire_id);
-                main_text += boost::io::str(FlexibleFormat(UserString("POLICY_ADOPTABLE_COST")) % cost)  + "\n\n";
-            }
+            bool available = empire->PolicyAvailable(policy_name);
+            bool adopted = empire->PolicyAdopted(policy_name);
+
+            auto cost = policy->AdoptionCost(empire_id);
+            const auto& adoption_cost_template{adopted ?
+                UserString("POLICY_ADOPTED") : available ?
+                UserString("POLICY_ADOPTABLE_COST") : UserString("POLICY_LOCKED")};
+            main_text += boost::io::str(FlexibleFormat(adoption_cost_template) % cost) + "\n\n";
+
+            auto current_adoption_duration = empire->CurrentTurnsPolicyHasBeenAdopted(policy_name);
+            auto total_adoption_duration = empire->CumulativeTurnsPolicyHasBeenAdopted(policy_name);
+            const auto& adopted_time_timeplate{adopted ?
+                UserString("POLICY_ADOPTION_TIMES_CURRENT_AND_TOTAL") : UserString("POLICY_ADOPTION_TIME_TOTAL")};
+            main_text += boost::io::str(FlexibleFormat(adopted_time_timeplate)
+                                        % current_adoption_duration % total_adoption_duration) + "\n\n";
         }
 
         main_text += UserString(policy->Description());
@@ -453,7 +462,7 @@ void PoliciesListBox::Populate() {
 
 
     const GG::X TOTAL_WIDTH = ClientWidth() - ClientUI::ScrollWidth();
-    const int NUM_COLUMNS = std::max(1, Value(TOTAL_WIDTH / (SLOT_CONTROL_WIDTH + GG::X(PAD))));
+    const int MAX_COLUMNS = std::max(1, Value(TOTAL_WIDTH / (SLOT_CONTROL_WIDTH + GG::X(PAD))));
 
     int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const Empire* empire = GetEmpire(empire_id);  // may be nullptr
@@ -463,7 +472,7 @@ void PoliciesListBox::Populate() {
         m_empire_policies_changed_signal_connection = empire->PoliciesChangedSignal.connect(
             boost::bind(&PoliciesListBox::Populate, this), boost::signals2::at_front);
 
-    int cur_col = NUM_COLUMNS;
+    int cur_col = MAX_COLUMNS;
     std::shared_ptr<PoliciesListBoxRow> cur_row;
     int num_policies = 0;
 
@@ -477,7 +486,7 @@ void PoliciesListBox::Populate() {
         // take the sorted policies and make UI element rows for the PoliciesListBox
         for (const auto policy : policies_vec) {
             // check if current row is full, and make a new row if necessary
-            if (cur_col >= NUM_COLUMNS) {
+            if (cur_col >= MAX_COLUMNS) {
                 if (cur_row)
                     Insert(cur_row);
                 cur_col = 0;
@@ -501,7 +510,7 @@ void PoliciesListBox::Populate() {
         Insert(std::move(cur_row));
 
     // keep track of how many columns are present now
-    m_previous_num_columns = NUM_COLUMNS;
+    m_previous_num_columns = MAX_COLUMNS;
 
     // If there are no policies add a prompt to suggest a solution.
     if (num_policies == 0)
@@ -959,7 +968,8 @@ void PolicySlotControl::DropsAcceptable(DropsAcceptableIter first, DropsAcceptab
         if (policy &&
             policy->Category() == m_slot_category &&
             policy_control != m_policy_control.get() &&
-            empire->PolicyAvailable(policy->Name()))
+            empire->PolicyAvailable(policy->Name()) &&
+            empire->PolicyPrereqsAndExclusionsOK(policy->Name()))
         {
             it->second = true;
             return;
@@ -1006,7 +1016,7 @@ void PolicySlotControl::AcceptDrops(const GG::Pt& pt, std::vector<std::shared_pt
     if (wnds.size() != 1)
         ErrorLogger() << "PolicySlotControl::AcceptDrops given multiple wnds unexpectedly...";
 
-    const auto wnd = *(wnds.begin());
+    const auto& wnd = *(wnds.begin());
     auto* control = boost::polymorphic_downcast<const PolicyControl*>(wnd.get());
     const Policy* policy_type = control ? control->GetPolicy() : nullptr;
 
@@ -1199,30 +1209,39 @@ void GovernmentWnd::MainPanel::SetPolicy(const std::string& policy_name, unsigne
 { SetPolicy(GetPolicy(policy_name), slot); }
 
 namespace {
-    std::vector<std::pair<std::string, int>> ConcatenatedCategorySlots(int empire_id) {
-        std::vector<std::pair<std::string, int>> retval;
-        retval.reserve(50); // should be enough in most cases, avoid repeated reallocations
-
-        const Empire* empire = GetEmpire(empire_id);  // may be nullptr
+    // returns vector of category names and indices within category
+    std::vector<std::pair<int, std::string>> ConcatenatedCategorySlots(const Empire* empire) {
+        std::vector<std::pair<int, std::string>> retval;
         if (!empire)
             return retval;
+        retval.reserve(50); // should be enough in most cases, avoid repeated reallocations
 
-        const std::map<std::string, int> policy_slots = empire->TotalPolicySlots();
-
-        // for every slot in every category, add entry to retval in series
-        for (const auto& cat_slots : policy_slots) {
-            unsigned int num_slots_in_cat = static_cast<int>(cat_slots.second);
-            const std::string& cat_name = cat_slots.first;
-            for (unsigned int n = 0; n < num_slots_in_cat; ++n)
-                retval.emplace_back(cat_name, n);
+        // for every slot in every category, add entry to retval in series. count up separately
+        // for each slot in each category, to find index for each slot in that cateogry
+        for (auto& [cat_name, num_slots_in_cat] : empire->TotalPolicySlots()) {
+            for (unsigned int n = 0; n < static_cast<unsigned int>(std::max(0, num_slots_in_cat)); ++n) // treat negative numbers of slots as 0
+                retval.emplace_back(n, cat_name);
         }
 
         return retval;
     }
 }
 
+namespace {
+    std::pair<int, std::string> OverallSlotToCategoryAndSlot(const Empire* empire, int overall_slot) {
+        if (!empire || overall_slot < 0)
+            return {0, EMPTY_STRING};
+
+        auto empire_slots = ConcatenatedCategorySlots(empire);
+        if (overall_slot >= static_cast<int>(empire_slots.size()))
+            return {0, EMPTY_STRING};
+
+        return std::move(empire_slots[overall_slot]);
+    }
+}
+
 void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot) {
-    //DebugLogger() << "GovernmentWnd::MainPanel::SetPolicy(" << (policy ? policy->Name() : "no policy") << ", slot " << slot << ")";
+    DebugLogger() << "GovernmentWnd::MainPanel::SetPolicy(" << (policy ? policy->Name() : "no policy") << ", slot " << slot << ")";
 
     if (slot >= m_slots.size()) {
         ErrorLogger() << "GovernmentWnd::MainPanel::SetPolicy specified nonexistant slot";
@@ -1235,21 +1254,53 @@ void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot
         return;
     }
 
-    const auto initial_policy = m_slots[slot]->GetPolicy();
-    if (policy == initial_policy)
-        return; // nothing to do...
+    // what category and slot is policy being adopted in
+    auto&& [adopt_in_category_slot, adopt_in_category] = OverallSlotToCategoryAndSlot(empire, slot);
+    if (adopt_in_category.empty()) {
+        ErrorLogger() << "GovernmentWnd::MainPanel::SetPolicy specified invalid slot: " << slot;
+        return;
+    }
 
-    const std::string& initial_policy_name = (initial_policy ? initial_policy->Name() : EMPTY_STRING);
-    const std::string& category_name = m_slots[slot]->SlotCategory();
-    int order_slot = m_slots[slot]->CategoryIndex();
+    // what slots are available...
+    auto total_policy_slots = empire->TotalPolicySlots();
+    auto total_policy_slots_it = total_policy_slots.find(adopt_in_category);
+    if (total_policy_slots_it == total_policy_slots.end()) {
+        ErrorLogger() << "GovernmentWnd::MainPanel::SetPolicy asked to adopt in category " << adopt_in_category << " which has no slots";
+        return;
+    }
+    if (total_policy_slots_it->second <= adopt_in_category_slot) {
+        ErrorLogger() << "GovernmentWnd::MainPanel::SetPolicy asked to adopt in category " << adopt_in_category_slot
+                      << " and slot " << adopt_in_category_slot << " which is not an existing slot (max: " << total_policy_slots_it->second;
+        return;
+    }
 
-    // check if adopting or revoking a policy, adjust order accordingly
+
+    // what, if anything, is already in that slot?
+    // category -> slot in category -> policy in slot
+    auto initial_cats_slots_policy_adopted = empire->CategoriesSlotsPoliciesAdopted();
+    auto& init_slots_adopted{initial_cats_slots_policy_adopted[adopt_in_category]};
+    const auto& initial_policy_name{init_slots_adopted[adopt_in_category_slot]};
+
+    // check if adopting or revoking a policy. If adopting, then pass along the name of
+    // the policy to adopt. If de-adeopting, then pass the name of the policy to de-adopt.
     bool adopt = policy;
-    const std::string& oder_policy_name = (policy ? policy->Name() : initial_policy_name);
+
+    if (!adopt && initial_policy_name.empty()) {
+        DebugLogger() << "GovernmentWnd::MainPanel::SetPolicy requested to de-adopt policy in slot " << slot
+                      << " but that slot is already empty";
+        return;
+    }
+
+    const std::string& order_policy_name = (adopt ? policy->Name() : initial_policy_name);
+    if (adopt && initial_policy_name == order_policy_name) {
+        DebugLogger() << "GovernmentWnd::MainPanel::SetPolicy requested to adopt policy " << order_policy_name
+                      << " in slot " << slot << " but that policy is already in that slot";
+        return;
+    }
 
     // issue order to adopt or revoke
-    auto order = std::make_shared<PolicyOrder>(empire_id, oder_policy_name,
-                                               category_name, adopt, order_slot);
+    auto order = std::make_shared<PolicyOrder>(empire_id, order_policy_name, adopt_in_category,
+                                               adopt, adopt_in_category_slot);
     GGHumanClientApp::GetApp()->Orders().IssueOrder(std::move(order));
 
     // update UI after policy changes
@@ -1333,14 +1384,12 @@ void GovernmentWnd::MainPanel::Populate() {
     if (!empire)
         return;
 
-    auto all_slot_cats = ConcatenatedCategorySlots(empire_id);
+    auto all_slot_cats = ConcatenatedCategorySlots(empire);
     auto categories_slots_policies = empire->CategoriesSlotsPoliciesAdopted();
 
     for (unsigned int n = 0; n < all_slot_cats.size(); ++n) {
         // create slot controls for empire's policy slots
-        const auto& cat_slot = all_slot_cats[n];    // todo: std::tie ?
-        const std::string& category_name = cat_slot.first;
-        int category_index = cat_slot.second;
+        auto& [category_index, category_name] = all_slot_cats[n];
         auto slot_control = GG::Wnd::Create<PolicySlotControl>(category_name, category_index, n);
         m_slots.push_back(slot_control);
         AttachChild(slot_control);
@@ -1348,9 +1397,8 @@ void GovernmentWnd::MainPanel::Populate() {
         // assign policy controls to slots that correspond to adopted policies
         if (categories_slots_policies.count(category_name)) {
             const auto& slots = categories_slots_policies[category_name];
-            if (slots.count(category_index)) {
+            if (slots.count(category_index))
                 slot_control->SetPolicy(slots.at(category_index));
-            }
         }
 
         // signals to respond to UI manipulation
@@ -1372,7 +1420,7 @@ void GovernmentWnd::MainPanel::DoLayout() {
     constexpr int GUESSTIMATE_NUM_CHARS_IN_BUTTON_TEXT = 25;    // rough guesstimate... avoid overly long policy class names
     const GG::X BUTTON_WIDTH = PTS_WIDE*GUESSTIMATE_NUM_CHARS_IN_BUTTON_TEXT;
 
-    GG::Pt lr = ClientSize() + GG::Pt(-GG::X(PAD), -GG::Y(PAD));
+    const GG::Pt lr = ClientSize() + GG::Pt(-GG::X(PAD), -GG::Y(PAD));
     GG::Pt ul = lr - GG::Pt(BUTTON_WIDTH, BUTTON_HEIGHT);
     m_clear_button->SizeMove(ul, lr);
 
@@ -1380,13 +1428,21 @@ void GovernmentWnd::MainPanel::DoLayout() {
         return;
 
     // place background image of government
-    ul = m_slots.front()->Size() * 5/4;
-    //GG::Rect background_rect = GG::Rect(ul, ClientLowerRight());
+    const GG::Pt initial_slot_ul = m_slots.front()->Size() * 1/4;
+    ul = initial_slot_ul;
 
     // arrange policy slots
     //int count = 0;
+    std::string prev_cat = m_slots.front()->SlotCategory();
     for (auto& slot : m_slots) {
-        ul += {slot->Width()*5/4, GG::Y0};
+        // separate row per category
+        if (slot->SlotCategory() != prev_cat) {
+            ul.x = initial_slot_ul.x;
+            ul += slot->Size()*5/4;
+        } else {
+            ul += {slot->Width()*5/4, GG::Y0};
+        }
+        prev_cat = slot->SlotCategory();
         slot->MoveTo(ul);
     }
 }
@@ -1435,7 +1491,7 @@ void GovernmentWnd::CompleteConstruction() {
         boost::bind(&GovernmentWnd::MainPanel::ClearPolicy, m_main_panel, _1));
 
     auto zoom_to_policy_action = [](const Policy* policy, GG::Flags<GG::ModKey> modkeys) { ClientUI::GetClientUI()->ZoomToPolicy(policy->Name()); };
-    m_main_panel->PolicyClickedSignal.connect(zoom_to_policy_action);
+    //m_main_panel->PolicyClickedSignal.connect(zoom_to_policy_action);
     m_policy_palette->PolicyClickedSignal.connect(zoom_to_policy_action);
 
     CUIWnd::CompleteConstruction();

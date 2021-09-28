@@ -42,6 +42,11 @@ namespace {
             erase_last(str, "\"");
         }
     }
+
+    ///< the master list of abbreviated option names, and their corresponding long-form names
+    std::map<char, std::string> short_names;
+
+    OptionsDB options_db;
 }
 
 /////////////////////////////////////////////
@@ -53,7 +58,6 @@ bool RegisterOptions(OptionsDBFn function) {
 }
 
 OptionsDB& GetOptionsDB() {
-    static OptionsDB options_db;
     if (!OptionsRegistry().empty()) {
         for (OptionsDBFn fn : OptionsRegistry())
             fn(options_db);
@@ -66,47 +70,54 @@ OptionsDB& GetOptionsDB() {
 /////////////////////////////////////////////
 // OptionsDB::Option
 /////////////////////////////////////////////
-// static(s)
-std::map<char, std::string> OptionsDB::Option::short_names;
-
-OptionsDB::Option::Option()
-{}
-
-OptionsDB::Option::Option(char short_name_, const std::string& name_, const boost::any& value_,
-                          const boost::any& default_value_, const std::string& description_,
-                          const ValidatorBase* validator_, bool storable_, bool flag_, bool recognized_,
-                          const std::string& section) :
-    name(name_),
+OptionsDB::Option::Option(char short_name_, std::string name_, boost::any value_,
+                          boost::any default_value_, std::string description_,
+                          std::unique_ptr<ValidatorBase>&& validator_, bool storable_,
+                          bool flag_, bool recognized_, std::string section) :
+    name(std::move(name_)),
     short_name(short_name_),
-    value(value_),
-    default_value(default_value_),
-    description(description_),
-    validator(validator_),
+    value(std::move(value_)),
+    default_value(std::move(default_value_)),
+    description(std::move(description_)),
+    validator(std::move(validator_)),
     storable(storable_),
     flag(flag_),
     recognized(recognized_),
     option_changed_sig_ptr(new boost::signals2::signal<void ()>())
 {
-    if (short_name_)
-        short_names[short_name_] = name;
+    if (!validator)
+        DebugLogger() << "Option " << name << " created with null validator...";
 
     auto name_it = name.rfind('.');
     if (name_it != std::string::npos)
-        sections.emplace(name.substr(0, name_it));
+        sections.insert(name.substr(0, name_it));
+
+    if (short_name_) {
+        auto [insertion_it, insertion_succeeded] = short_names.emplace(short_name_, name);
+        if (!insertion_succeeded)
+            ErrorLogger() << "Tried to insert short name " << short_name << " for option " << name
+                          << " but that short name was already assigned to option " << insertion_it->second;
+    }
 
     if (!section.empty())
-        sections.emplace(section);
+        sections.insert(std::move(section));
     else if (sections.empty())
         sections.emplace("misc");
 }
+
+OptionsDB::Option::~Option() = default;
 
 bool OptionsDB::Option::SetFromString(const std::string& str) {
     bool changed = false;
     boost::any value_;
 
     if (!flag) {
-        value_ = validator->Validate(str);
-        changed = validator->String(value) != validator->String(value_);
+        if (validator) {
+            value_ = validator->Validate(str);
+            changed = validator->String(value) != validator->String(value_);
+        } else {
+            throw std::runtime_error("Option::SetFromString called with no OptionValidator set");
+        }
     } else {
         value_ = boost::lexical_cast<bool>(str);    // if a flag, then the str parameter should just indicate true or false with "1" or "0"
         changed = (boost::lexical_cast<std::string>(boost::any_cast<bool>(value))
@@ -130,17 +141,21 @@ bool OptionsDB::Option::SetToDefault() {
 }
 
 std::string OptionsDB::Option::ValueToString() const {
-    if (!flag)
+    if (flag)
+        return boost::lexical_cast<std::string>(boost::any_cast<bool>(value));
+    else if (validator)
         return validator->String(value);
     else
-        return boost::lexical_cast<std::string>(boost::any_cast<bool>(value));
+        throw std::runtime_error("Option::ValueToString called with no Validator set");
 }
 
 std::string OptionsDB::Option::DefaultValueToString() const {
-    if (!flag)
+    if (flag)
+        return boost::lexical_cast<std::string>(boost::any_cast<bool>(default_value));
+    else if (validator)
         return validator->String(default_value);
     else
-        return boost::lexical_cast<std::string>(boost::any_cast<bool>(default_value));
+        throw std::runtime_error("Option::DefaultValueToString called with no Validator set");
 }
 
 bool OptionsDB::Option::ValueIsDefault() const
@@ -150,8 +165,6 @@ bool OptionsDB::Option::ValueIsDefault() const
 /////////////////////////////////////////////
 // OptionsDB::OptionSection
 /////////////////////////////////////////////
-OptionsDB::OptionSection::OptionSection() = default;
-
 OptionsDB::OptionSection::OptionSection(const std::string& name_, const std::string& description_,
                                         std::function<bool (const std::string&)> option_predicate_) :
     name(name_),
@@ -162,16 +175,6 @@ OptionsDB::OptionSection::OptionSection(const std::string& name_, const std::str
 /////////////////////////////////////////////
 // OptionsDB
 /////////////////////////////////////////////
-// static(s)
-OptionsDB* OptionsDB::s_options_db = nullptr;
-
-OptionsDB::OptionsDB() : m_dirty(false) {
-    if (s_options_db)
-        throw std::runtime_error("Attempted to create a duplicate instance of singleton class OptionsDB.");
-
-    s_options_db = this;
-}
-
 bool OptionsDB::Commit(bool only_if_dirty, bool only_non_default) {
     if (only_if_dirty && !m_dirty)
         return true;
@@ -225,10 +228,12 @@ void OptionsDB::Validate(const std::string& name, const std::string& value) cons
     if (!OptionExists(it))
         throw std::runtime_error("Attempted to validate unknown option \"" + name + "\".");
 
-    if (it->second.validator)
-        it->second.validator->Validate(value);
-    else if (it->second.flag)
+    if (it->second.flag)
         boost::lexical_cast<bool>(value);
+    else if (it->second.validator)
+        it->second.validator->Validate(value);
+    else
+        throw std::runtime_error("Attempted to validate option with no validator set");
 }
 
 std::string OptionsDB::GetValueString(const std::string& option_name) const {
@@ -252,15 +257,17 @@ const std::string& OptionsDB::GetDescription(const std::string& option_name) con
     return it->second.description;
 }
 
-std::shared_ptr<const ValidatorBase> OptionsDB::GetValidator(const std::string& option_name) const {
+const ValidatorBase* OptionsDB::GetValidator(const std::string& option_name) const {
     auto it = m_options.find(option_name);
     if (!OptionExists(it))
         throw std::runtime_error(("OptionsDB::GetValidator(): No option called \"" + option_name + "\" could be found.").c_str());
-    return it->second.validator;
+    return it->second.validator.get();
 }
 
 namespace {
-    const std::size_t TERMINAL_LINE_WIDTH = 80;
+    constexpr std::size_t TERMINAL_LINE_WIDTH = 80;
+
+    const auto lexical_true_str = boost::lexical_cast<std::string>(true);
 
     /** Breaks and indents text over multiple lines when it exceeds width limits
      * @param text String to format, tokenized by spaces, tabs, and newlines (newlines retained but potentially indented)
@@ -279,7 +286,7 @@ namespace {
             if (token == "\n") 
                 lines.emplace_back();
             else if (widths.second < lines.back().size() + token.size() + indents.second)
-                lines.emplace_back(token + " ");
+                lines.push_back(token + " ");
             else if (!token.empty())
                 lines.back().append(token + " ");
         }
@@ -288,7 +295,7 @@ namespace {
         std::stringstream retval;
         auto first_line = std::move(lines.front());
         retval << std::string(indents.first, ' ') << first_line << "\n";
-        for (auto& line : lines)
+        for (const auto& line : lines)
             if (!line.empty())
                 retval << indent << line << "\n";
 
@@ -364,26 +371,28 @@ std::unordered_map<std::string, std::set<std::string>> OptionsDB::OptionsBySecti
     }
 
     // define which section are top level sections ("root"), move top level candidates with single option to misc
-    for (const auto& section_it : total_options_per_section) {
-        auto root_name = section_it.first.substr(0, section_it.first.find_first_of("."));
+    for (auto& [section_name, option_count] : total_options_per_section) {
+        (void)option_count; // quiet warning
+        auto root_name = section_name.substr(0, section_name.find_first_of("."));
         // root_name with no dot element allowed to pass if an option is known, potentially moving to misc section
         auto total_it = total_options_per_section.find(root_name);
         if (total_it == total_options_per_section.end())
             continue;
+        auto count = total_it->second;
 
-        if (total_it->second > 1) {
-            options_by_section["root"].emplace(std::move(root_name));
-        } else if (section_it.first != "misc" &&
-                   section_it.first != "root" &&
-                   !m_sections.count(section_it.first))
-        {
-            // move option to misc section
-            auto section_option_it = options_by_section.find(section_it.first);
-            if (section_option_it == options_by_section.end())
+        if (count > 1)
+            options_by_section["root"].insert(std::move(root_name));
+
+        else if (section_name != "misc" && section_name != "root" && !m_sections.count(section_name)) {
+            // no section found with specified name, so move options in section to misc section
+            auto section_options_it = options_by_section.find(section_name);
+            if (section_options_it == options_by_section.end())
                 continue;
-            for (auto&& option : section_option_it->second)
-                options_by_section["misc"].emplace(std::move(option));
-            options_by_section.erase(section_it.first);
+            auto& section_options = section_options_it->second;
+
+            for (auto& option : section_options)
+                options_by_section["misc"].insert(option);
+            options_by_section.erase(section_name);
         }
     }
 
@@ -399,6 +408,13 @@ void OptionsDB::GetUsage(std::ostream& os, const std::string& command_line, bool
         // remove the root section if unneeded
         if (options_by_section.count("root"))
             options_by_section.erase("root");
+    }
+
+    if (command_line.empty()) {
+        if (UserStringExists("COMMAND_LINE_HELP_GENERAL_DESCRIPTION"))
+            os << UserString("COMMAND_LINE_HELP_GENERAL_DESCRIPTION") << "\n";
+        else
+            os << "\nFreeOrion is a 4X Space Strategy game.\n\n";
     }
 
     // print description of command_line arg as section
@@ -620,7 +636,7 @@ OptionsDB::OptionChangedSignalType& OptionsDB::OptionChangedSignal(const std::st
 void OptionsDB::Remove(const std::string& name) {
     auto it = m_options.find(name);
     if (it != m_options.end()) {
-        Option::short_names.erase(it->second.short_name);
+        short_names.erase(it->second.short_name);
         m_options.erase(it);
         m_dirty = true;
     }
@@ -667,18 +683,22 @@ void OptionsDB::SetFromCommandLine(const std::vector<std::string>& args) {
                     StripQuotation(value_str);
                 }
 
-                if (value_str.at(0) == '-') { // this is either the last parameter or the next parameter is another option, assume this one is a flag
-                    m_options[option_name] = Option(static_cast<char>(0), option_name, true,
-                                                    boost::lexical_cast<std::string>(false),
-                                                    "", 0, false, true, false, std::string());
-                } else { // the next parameter is the value, store it as a string to be parsed later
-                    m_options[option_name] = Option(static_cast<char>(0), option_name,
-                                                    value_str, value_str, "",
-                                                    new Validator<std::string>(),
-                                                    false, false, false, std::string()); // don't attempt to store options that have only been specified on the command line
+                if (value_str.at(0) == '-') {
+                    // this is either the last parameter or the next parameter is another option, assume this one is a flag
+                    m_options.emplace(option_name,
+                                      Option{static_cast<char>(0), option_name, true, false, "",
+                                             std::make_unique<Validator<bool>>(), false, true, false});
+                } else {
+                    // the next parameter is the value, store it as a string to be parsed later, but
+                    // don't attempt to store options that have only been specified on the command line
+                    m_options.emplace(option_name,
+                                      Option{static_cast<char>(0), option_name, value_str, value_str, "",
+                                             std::make_unique<Validator<std::string>>(), false, false, false});
                 }
 
-                WarnLogger() << "Option \"" << option_name << "\", was specified on the command line but was not recognized.  It may not be registered yet or could be a typo.";
+                WarnLogger() << "Option \"" << option_name << "\", was specified on the command line but was not recognized."
+                             << " It may not be registered yet or could be a typo.";
+
 
             } else {
                 // recognized option
@@ -724,9 +744,9 @@ void OptionsDB::SetFromCommandLine(const std::vector<std::string>& args) {
                 throw std::runtime_error("A \'-\' was given with no options.");
 
             for (unsigned int j = 0; j < single_char_options.size(); ++j) {
-                auto short_name_it = Option::short_names.find(single_char_options[j]);
+                auto short_name_it = short_names.find(single_char_options[j]);
 
-                if (short_name_it == Option::short_names.end())
+                if (short_name_it == short_names.end())
                     throw std::runtime_error(std::string("Unknown option \"-") + single_char_options[j] + "\" was given.");
 
                 auto name_it = m_options.find(short_name_it->second);
@@ -755,9 +775,7 @@ void OptionsDB::SetFromCommandLine(const std::vector<std::string>& args) {
     }
 }
 
-void OptionsDB::SetFromFile(const boost::filesystem::path& file_path,
-                            const std::string& version)
-{
+void OptionsDB::SetFromFile(const boost::filesystem::path& file_path, const std::string& version) {
     XMLDoc doc;
     try {
         boost::filesystem::ifstream ifs(file_path);
@@ -792,18 +810,20 @@ void OptionsDB::SetFromXMLRecursive(const XMLElement& elem, const std::string& s
     auto it = m_options.find(option_name);
 
     if (it == m_options.end() || !it->second.recognized) {
+
+        TraceLogger() << "Option \"" << option_name << "\", was in config.xml but was not recognized."
+                      << " It may not be registered yet or you may need to delete your config.xml if it is out of date.";
+
         if (elem.Text().length() == 0) {
             // do not retain empty XML options
             return;
         } else {
             // Store unrecognized option to be parsed later if this options is added.
-            m_options[option_name] = Option(static_cast<char>(0), option_name,
-                                            elem.Text(), elem.Text(),
-                                            "", new Validator<std::string>(),
-                                            true, false, false, section_name);
+            Option option{static_cast<char>(0), option_name, elem.Text(), elem.Text(), "",
+                          std::make_unique<Validator<std::string>>(), true, false, false, section_name};
+            m_options.emplace(std::move(option_name), std::move(option));
         }
 
-        TraceLogger() << "Option \"" << option_name << "\", was in config.xml but was not recognized.  It may not be registered yet or you may need to delete your config.xml if it is out of date.";
         m_dirty = true;
         return;
     }
@@ -815,7 +835,6 @@ void OptionsDB::SetFromXMLRecursive(const XMLElement& elem, const std::string& s
     //}
 
     if (option.flag) {
-        static auto lexical_true_str = boost::lexical_cast<std::string>(true);
         option.value = static_cast<bool>(elem.Text() == lexical_true_str);
     } else {
         try {

@@ -20,8 +20,8 @@ struct FO_COMMON_API BoutBeginEvent : public CombatEvent {
     BoutBeginEvent() = default;
     explicit BoutBeginEvent(int bout);
 
-    std::string DebugString(const ObjectMap& objects) const override;
-    std::string CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const override;
+    [[nodiscard]] std::string DebugString(const ScriptingContext& context) const override;
+    [[nodiscard]] std::string CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const override;
 
     int bout = 0;
 };
@@ -34,19 +34,19 @@ struct FO_COMMON_API BoutEvent : public CombatEvent {
     BoutEvent() = default;
     explicit BoutEvent(int bout);
 
-    void AddEvent(const CombatEventPtr& event);
+    void AddEvent(CombatEventPtr event);
 
-    std::string DebugString(const ObjectMap& objects) const override;
-    std::string CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const override;
-    std::vector<ConstCombatEventPtr> SubEvents(int viewing_empire_id) const override;
+    [[nodiscard]] std::string DebugString(const ScriptingContext& context) const override;
+    [[nodiscard]] std::string CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const override;
+    [[nodiscard]] std::vector<ConstCombatEventPtr> SubEvents(int viewing_empire_id) const override;
 
-    bool AreSubEventsEmpty(int viewing_empire_id) const override
+    [[nodiscard]] bool AreSubEventsEmpty(int viewing_empire_id) const override
     { return events.empty(); }
 
-    virtual bool AreSubEventsOrdered() const
+    [[nodiscard]] virtual bool AreSubEventsOrdered() const
     { return true; }
 
-    bool FlattenSubEvents() const override
+    [[nodiscard]] bool FlattenSubEvents() const override
     { return true; }
 
 private:
@@ -66,16 +66,18 @@ struct FO_COMMON_API SimultaneousEvents : public CombatEvent {
 
     SimultaneousEvents() = default;
 
-    void AddEvent(const CombatEventPtr& event);
+    void AddEvent(CombatEventPtr event);
 
-    std::string DebugString(const ObjectMap& objects) const override;
-    std::string CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const override;
-    std::vector<ConstCombatEventPtr> SubEvents(int viewing_empire_id) const override;
+    [[nodiscard]] FO_COMMON_API std::string DebugString(const ScriptingContext& context) const override
+    { return "SimultaneousEvents has " + std::to_string(events.size()) + " events"; } // no idea why, but the linker refuses to find this function if defined in the .cpp
+    [[nodiscard]] FO_COMMON_API std::string CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const override
+    { return ""; } // no idea why, but the linker refuses to find this function if defined in the .cpp
+    [[nodiscard]] std::vector<ConstCombatEventPtr> SubEvents(int viewing_empire_id) const override;
 
-    bool AreSubEventsEmpty(int viewing_empire_id) const override
+    [[nodiscard]] bool AreSubEventsEmpty(int viewing_empire_id) const override
     { return events.empty(); }
 
-    virtual bool FlattenSubEvents() const override
+    [[nodiscard]] virtual bool FlattenSubEvents() const override
     { return true; }
 
 protected:
@@ -105,8 +107,8 @@ struct FO_COMMON_API InitialStealthEvent : public CombatEvent {
     InitialStealthEvent() = default;
     explicit InitialStealthEvent(const EmpireToObjectVisibilityMap& x);
 
-    std::string DebugString(const ObjectMap& objects) const override;
-    std::string CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const override;
+    [[nodiscard]] std::string DebugString(const ScriptingContext& context) const override;
+    [[nodiscard]] std::string CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const override;
 
 private:
     EmpireToObjectVisibilityMap empire_to_object_visibility;// filled by AutoresolveInfo::ReportInvisibleObjects
@@ -121,10 +123,10 @@ struct FO_COMMON_API StealthChangeEvent : public CombatEvent {
     StealthChangeEvent() = default;
     explicit StealthChangeEvent(int bout);
 
-    std::string DebugString(const ObjectMap& objects) const override;
-    std::string CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const override;
-    std::vector<ConstCombatEventPtr> SubEvents(int viewing_empire_id) const override;
-    bool AreSubEventsEmpty(int viewing_empire_id) const override;
+    [[nodiscard]] std::string DebugString(const ScriptingContext& context) const override;
+    [[nodiscard]] std::string CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const override;
+    [[nodiscard]] std::vector<ConstCombatEventPtr> SubEvents(int viewing_empire_id) const override;
+    [[nodiscard]] bool AreSubEventsEmpty(int viewing_empire_id) const override;
     void AddEvent(int attacker_id_, int target_id_, int attacker_empire_,
                   int target_empire_, Visibility new_visibility_);
 
@@ -136,8 +138,8 @@ struct FO_COMMON_API StealthChangeEvent : public CombatEvent {
         StealthChangeEventDetail(int attacker_id_, int target_id_, int attacker_empire_,
                                  int target_empire_, Visibility new_visibility_);
 
-        std::string DebugString(const ObjectMap& objects) const override;
-        std::string CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const override;
+        [[nodiscard]] std::string DebugString(const ScriptingContext& context) const override;
+        [[nodiscard]] std::string CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const override;
 
         int attacker_id = INVALID_OBJECT_ID;
         int target_id = INVALID_OBJECT_ID;
@@ -173,11 +175,11 @@ struct FO_COMMON_API WeaponFireEvent : public CombatEvent {
     WeaponFireEvent(int bout, int round, int attacker_id, int target_id, std::string weapon_name_,
                     const std::tuple<float, float, float>& power_shield_damage,
                     int attacker_owner_id_, int target_owner_id_);
-    std::string DebugString(const ObjectMap& objects) const override;
-    std::string CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const override;
-    std::string CombatLogDetails(int viewing_empire_id) const override;
-    bool AreDetailsEmpty(int viewing_empire_id) const override { return false; }
-    boost::optional<int> PrincipalFaction(int viewing_empire_id) const override;
+    [[nodiscard]] std::string DebugString(const ScriptingContext& context) const override;
+    [[nodiscard]] std::string CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const override;
+    [[nodiscard]] std::string CombatLogDetails(int viewing_empire_id) const override;
+    [[nodiscard]] bool AreDetailsEmpty(int viewing_empire_id) const override { return false; }
+    [[nodiscard]] boost::optional<int> PrincipalFaction(int viewing_empire_id) const override;
 
     int bout = -1;
     int round = -1;
@@ -196,9 +198,9 @@ struct FO_COMMON_API WeaponFireEvent : public CombatEvent {
 struct FO_COMMON_API IncapacitationEvent : public CombatEvent {
     explicit IncapacitationEvent();
     IncapacitationEvent(int bout_, int object_id_, int object_owner_id_);
-    std::string DebugString(const ObjectMap& objects) const override;
-    std::string CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const override;
-    boost::optional<int> PrincipalFaction(int viewing_empire_id) const override;
+    [[nodiscard]] std::string DebugString(const ScriptingContext& context) const override;
+    [[nodiscard]] std::string CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const override;
+    [[nodiscard]] boost::optional<int> PrincipalFaction(int viewing_empire_id) const override;
 
     int bout = 0;
     int object_id = INVALID_OBJECT_ID;
@@ -210,8 +212,8 @@ struct FO_COMMON_API IncapacitationEvent : public CombatEvent {
 struct FO_COMMON_API FightersAttackFightersEvent : public CombatEvent {
     FightersAttackFightersEvent() = default;
     explicit FightersAttackFightersEvent(int bout);
-    std::string DebugString(const ObjectMap& objects) const override;
-    std::string CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const override;
+    [[nodiscard]] std::string DebugString(const ScriptingContext& context) const override;
+    [[nodiscard]] std::string CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const override;
     void AddEvent(int attacker_empire_, int target_empire_);
 
 private:
@@ -230,9 +232,9 @@ struct FO_COMMON_API FighterLaunchEvent : public CombatEvent {
 
     FighterLaunchEvent() = default;
     FighterLaunchEvent(int bout_, int launched_from_id_, int fighter_owner_empire_id_, int number_launched_);
-    std::string DebugString(const ObjectMap& objects) const override;
-    std::string CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const override;
-    boost::optional<int> PrincipalFaction(int viewing_empire_id) const override;
+    [[nodiscard]] std::string DebugString(const ScriptingContext& context) const override;
+    [[nodiscard]] std::string CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const override;
+    [[nodiscard]] boost::optional<int> PrincipalFaction(int viewing_empire_id) const override;
 
     int bout = 0;
     int fighter_owner_empire_id = ALL_EMPIRES;
@@ -244,8 +246,8 @@ struct FO_COMMON_API FighterLaunchEvent : public CombatEvent {
 struct FO_COMMON_API FightersDestroyedEvent : public CombatEvent {
     FightersDestroyedEvent() = default;
     explicit FightersDestroyedEvent(int bout);
-    std::string DebugString(const ObjectMap& objects) const override;
-    std::string CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const override;
+    [[nodiscard]] std::string DebugString(const ScriptingContext& context) const override;
+    [[nodiscard]] std::string CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const override;
     void AddEvent(int target_empire_);
 
 private:
@@ -270,11 +272,11 @@ struct FO_COMMON_API WeaponsPlatformEvent : public CombatEvent {
     void AddEvent(int round, int target_id, int target_owner_id_, const std::string& weapon_name_,
                   float power_, float shield_, float damage_);
 
-    std::string DebugString(const ObjectMap& objects) const override;
-    std::string CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const override;
-    std::vector<ConstCombatEventPtr> SubEvents(int viewing_empire_id) const override;
-    bool AreSubEventsEmpty(int viewing_empire_id) const override;
-    boost::optional<int> PrincipalFaction(int viewing_empire_id) const override;
+    [[nodiscard]] std::string DebugString(const ScriptingContext& context) const override;
+    [[nodiscard]] std::string CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const override;
+    [[nodiscard]] std::vector<ConstCombatEventPtr> SubEvents(int viewing_empire_id) const override;
+    [[nodiscard]] bool AreSubEventsEmpty(int viewing_empire_id) const override;
+    [[nodiscard]] boost::optional<int> PrincipalFaction(int viewing_empire_id) const override;
 
     int bout = 0;
     int attacker_id = INVALID_OBJECT_ID;

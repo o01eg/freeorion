@@ -1667,7 +1667,7 @@ EmpireColorSelector::EmpireColorSelector(GG::Y h) :
 {
     Resize(GG::Pt(COLOR_SELECTOR_WIDTH, h - 8));
 
-    for (const GG::Clr& color : EmpireColors())
+    for (auto& color : EmpireColors())
         Insert(GG::Wnd::Create<ColorRow>(color, h - 4));
 
     SelChangedSignal.connect(
@@ -1788,10 +1788,6 @@ void FileDlg::CompleteConstruction() {
 //////////////////////////////////////////////////
 // ResourceInfoPanel
 //////////////////////////////////////////////////
-namespace {
-    GG::Y VERTICAL_SECTION_GAP(4);
-}
-
 ResourceInfoPanel::ResourceInfoPanel(std::string title, std::string point_units_str,
                                      const GG::X x, const GG::Y y, const GG::X w, const GG::Y h,
                                      const std::string& config_name) :

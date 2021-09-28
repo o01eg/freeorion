@@ -72,7 +72,7 @@ CommonParams::CommonParams(std::unique_ptr<ValueRef::ValueRef<double>>&& product
         tags.insert(boost::to_upper_copy<std::string>(tag));
 }
 
-CommonParams::~CommonParams() {}
+CommonParams::~CommonParams() = default;
 
 
 /////////////////////////////////////
@@ -90,9 +90,9 @@ ParsedShipDesign::ParsedShipDesign(
     m_designed_by_empire(designed_by_empire),
     m_hull(std::move(hull)),
     m_parts(std::move(parts)),
-    m_is_monster(monster),
     m_icon(std::move(icon)),
     m_3D_model(std::move(model)),
+    m_is_monster(monster),
     m_name_desc_in_stringtable(name_desc_in_stringtable)
 {}
 
@@ -116,9 +116,9 @@ ShipDesign::ShipDesign(const boost::optional<std::invalid_argument>& should_thro
     m_designed_by_empire(designed_by_empire),
     m_hull(std::move(hull)),
     m_parts(std::move(parts)),
-    m_is_monster(monster),
     m_icon(std::move(icon)),
     m_3D_model(std::move(model)),
+    m_is_monster(monster),
     m_name_desc_in_stringtable(name_desc_in_stringtable)
 {
     // Either force a valid design and log about it or just throw std::invalid_argument
@@ -386,7 +386,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id) const { // T
         return false;
     }
     // evaluate using location as the source, as it should be an object owned by this empire.
-    ScriptingContext location_as_source_context(location, location);
+    ScriptingContext location_as_source_context{location, location};
     if (!hull->Location()->Eval(location_as_source_context, location))
         return false;
 
@@ -441,7 +441,7 @@ ShipDesign::MaybeInvalidDesign(const std::string& hull_in,
         } else {
             if (produce_log)
                 ErrorLogger() << "Invalid ShipDesign no available hulls ";
-            hull = "";
+            hull.clear();
             parts.clear();
             return std::make_pair(hull, parts);
         }

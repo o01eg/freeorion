@@ -1,5 +1,7 @@
 #include "Empire.h"
 
+#include <thread>
+
 #include "../util/i18n.h"
 #include "../util/Random.h"
 #include "../util/Logger.h"

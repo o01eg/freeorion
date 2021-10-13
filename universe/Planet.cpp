@@ -66,7 +66,7 @@ Planet::Planet(PlanetType type, PlanetSize size) :
         m_rotational_period = -m_rotational_period;
 }
 
-Planet* Planet::Clone(Universe& universe, int empire_id) const {
+Planet* Planet::Clone(const Universe& universe, int empire_id) const {
     Visibility vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
@@ -77,7 +77,9 @@ Planet* Planet::Clone(Universe& universe, int empire_id) const {
     return retval.release();
 }
 
-void Planet::Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& universe, int empire_id) {
+void Planet::Copy(std::shared_ptr<const UniverseObject> copied_object,
+                  const Universe& universe, int empire_id)
+{
     if (copied_object.get() == this)
         return;
     auto copied_planet = std::dynamic_pointer_cast<const Planet>(copied_object);
@@ -120,9 +122,7 @@ void Planet::Copy(std::shared_ptr<const UniverseObject> copied_object, Universe&
                 // copy system name if at partial visibility, as it won't be copied
                 // by UniverseObject::Copy unless at full visibility, but players
                 // should know planet names even if they don't own the planet
-                universe.InhibitUniverseObjectSignals(true);
-                this->Rename(copied_planet->Name());
-                universe.InhibitUniverseObjectSignals(false);
+                m_name = copied_planet->Name();
             }
         }
     }
@@ -145,15 +145,15 @@ bool Planet::HostileToEmpire(int empire_id, const EmpireManager& empires) const 
     return empires.GetDiplomaticStatus(Owner(), empire_id) == DiplomaticStatus::DIPLO_WAR;
 }
 
-std::set<std::string> Planet::Tags() const {
-    const Species* species = GetSpecies(SpeciesName());
+std::set<std::string> Planet::Tags(const ScriptingContext& context) const {
+    const Species* species = context.species.GetSpecies(SpeciesName());
     if (!species)
         return {};
     return species->Tags();
 }
 
-bool Planet::HasTag(const std::string& name) const {
-    const Species* species = GetSpecies(SpeciesName());
+bool Planet::HasTag(const std::string& name, const ScriptingContext& context) const {
+    const Species* species = context.species.GetSpecies(SpeciesName());
 
     return species && species->Tags().count(name);
 }
@@ -847,18 +847,18 @@ void Planet::SetSurfaceTexture(const std::string& texture) {
     StateChangedSignal();
 }
 
-void Planet::PopGrowthProductionResearchPhase() {
-    UniverseObject::PopGrowthProductionResearchPhase();
+void Planet::PopGrowthProductionResearchPhase(ScriptingContext& context) {
+    UniverseObject::PopGrowthProductionResearchPhase(context);
     PopCenterPopGrowthProductionResearchPhase();
 
     // should be run after a meter update, but before a backpropagation, so check current, not initial, meter values
 
     // check for colonies without positive population, and change to outposts
     if (!SpeciesName().empty() && GetMeter(MeterType::METER_POPULATION)->Current() <= 0.0f) {
-        if (Empire* empire = GetEmpire(this->Owner())) {
+        if (auto empire = context.GetEmpire(this->Owner())) {
             empire->AddSitRepEntry(CreatePlanetDepopulatedSitRep(this->ID()));
 
-            if (!HasTag(TAG_STAT_SKIP_DEPOP))
+            if (!HasTag(TAG_STAT_SKIP_DEPOP, context))
                 empire->RecordPlanetDepopulated(*this);
         }
         // remove species
@@ -908,12 +908,14 @@ namespace {
     { return std::make_pair(std::max(id1, ind2), std::min(id1, ind2)); }
 }
 
-void Planet::ResolveGroundCombat(std::map<int, double>& empires_troops, const EmpireManager::DiploStatusMap& diplo_statuses) {
+void Planet::ResolveGroundCombat(std::map<int, double>& empires_troops,
+                                 const EmpireManager::DiploStatusMap& diplo_statuses)
+{
     if (empires_troops.empty() || empires_troops.size() == 1)
         return;
 
     // give bonuses for allied ground combat, so allies can effectively fight together
-    auto effective_empires_troops = empires_troops;
+    auto effective_empires_troops{empires_troops};
     for (auto& [empire1_id, troop1_count] : empires_troops) {
         (void)troop1_count; // quiet warning
         for (auto& [empire2_id, troop2_count] : empires_troops) {

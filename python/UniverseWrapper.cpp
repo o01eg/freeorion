@@ -393,7 +393,11 @@ namespace FreeOrionPython {
                                                 py::return_value_policy<py::return_by_value>())
             .def("initialMeterValue",           ObjectInitialMeterValue,
                                                 py::return_value_policy<py::return_by_value>())
-            .add_property("tags",               make_function(&UniverseObject::Tags,        py::return_value_policy<py::return_by_value>()))
+            .add_property("tags",               make_function(
+                                                    +[](const UniverseObject& o) -> std::set<std::string> { return o.Tags(ScriptingContext{}); },
+                                                    py::return_value_policy<py::return_by_value>()
+                                                ))
+            //.add_property("tags",               make_function(&UniverseObject::Tags,        py::return_value_policy<py::return_by_value>()))
             .def("hasTag",                      &UniverseObject::HasTag)
             .add_property("meters",             make_function(
                                                     +[](const UniverseObject& o) -> std::map<MeterType, Meter> { return {o.Meters().begin(), o.Meters().end()}; },
@@ -421,7 +425,7 @@ namespace FreeOrionPython {
             .add_property("speed",                     +[](const Fleet& fleet) -> float { return fleet.Speed(Objects()); })
             .add_property("canChangeDirectionEnRoute", &Fleet::CanChangeDirectionEnRoute)
             .add_property("hasMonsters",               +[](const Fleet& fleet) -> bool { return fleet.HasMonsters(GetUniverse()); })
-            .add_property("hasArmedShips",             +[](const Fleet& fleet) -> bool { return fleet.HasArmedShips(GetUniverse()); })
+            .add_property("hasArmedShips",             +[](const Fleet& fleet) -> bool { return fleet.HasArmedShips(ScriptingContext{}); })
             .add_property("hasFighterShips",           +[](const Fleet& fleet) -> bool { return fleet.HasFighterShips(GetUniverse()); })
             .add_property("hasColonyShips",            +[](const Fleet& fleet) -> bool { return fleet.HasColonyShips(GetUniverse()); })
             .add_property("hasOutpostShips",           +[](const Fleet& fleet) -> bool { return fleet.HasOutpostShips(GetUniverse()); })
@@ -446,7 +450,7 @@ namespace FreeOrionPython {
             .add_property("lastResuppliedOnTurn",   &Ship::LastResuppliedOnTurn)
             .add_property("lastTurnActiveInCombat", &Ship::LastTurnActiveInCombat)
             .add_property("isMonster",              +[](const Ship& ship) -> bool { return ship.IsMonster(GetUniverse()); })
-            .add_property("isArmed",                +[](const Ship& ship) -> bool { return ship.IsArmed(GetUniverse()); })
+            .add_property("isArmed",                +[](const Ship& ship) -> bool { return ship.IsArmed(ScriptingContext{}); })
             .add_property("hasFighters",            +[](const Ship& ship) -> bool { return ship.HasFighters(GetUniverse()); })
             .add_property("canColonize",            +[](const Ship& ship) -> bool { return ship.CanColonize(GetUniverse(), GetSpeciesManager()); })
             .add_property("canInvade",              +[](const Ship& ship) -> bool { return ship.HasTroops(GetUniverse()); })
@@ -544,8 +548,8 @@ namespace FreeOrionPython {
             .add_property("capacity",           &ShipPart::Capacity)
             .add_property("secondaryStat",      &ShipPart::SecondaryStat)
             .add_property("mountableSlotTypes", make_function(&ShipPart::MountableSlotTypes,py::return_value_policy<py::return_by_value>()))
-            .def("productionCost",              +[](const ShipPart& ship_part, int empire_id, int location_id, int design_id) -> float { return ship_part.ProductionCost(empire_id, location_id, design_id); })
-            .def("productionTime",              +[](const ShipPart& ship_part, int empire_id, int location_id, int design_id) -> int { return ship_part.ProductionTime(empire_id, location_id, design_id); })
+            .def("productionCost",              +[](const ShipPart& ship_part, int empire_id, int location_id, int design_id) -> float { return ship_part.ProductionCost(empire_id, location_id, ScriptingContext{}, design_id); })
+            .def("productionTime",              +[](const ShipPart& ship_part, int empire_id, int location_id, int design_id) -> int { return ship_part.ProductionTime(empire_id, location_id, ScriptingContext{}, design_id); })
             .def("canMountInSlotType",          &ShipPart::CanMountInSlotType)
             .add_property("costTimeLocationInvariant",
                                                 &ShipPart::ProductionCostTimeLocationInvariant)

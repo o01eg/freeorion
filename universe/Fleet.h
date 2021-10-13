@@ -107,10 +107,11 @@ public:
     [[nodiscard]] bool    BlockadedAtSystem(int start_system_id, int dest_system_id, const ScriptingContext& context) const; ///< returns true iff this fleet's movement would be blockaded at system.
     [[nodiscard]] float   Speed(const ObjectMap& objects) const;                      ///< Returns speed of fleet. (Should be equal to speed of slowest ship in fleet, unless in future the calculation of fleet speed changes.)
     [[nodiscard]] bool    CanChangeDirectionEnRoute() const   { return false; }       ///< Returns true iff this fleet can change its direction while in interstellar space.
-    [[nodiscard]] bool    CanDamageShips(const Universe& universe, float target_shields = 0.0f) const;              ///< Returns true if there is at least one ship in the fleet which is currently able to damage a ship using direct weapons or fighters
-    [[nodiscard]] bool    CanDestroyFighters(const Universe& universe) const;              ///< Returns true if there is at least one ship in the fleet which is currently able to destroy fighters using direct weapons or fighters
+    [[nodiscard]] bool    CanDamageShips(const ScriptingContext& context,
+                                         float target_shields = 0.0f) const;          ///< Returns true if there is at least one ship in the fleet which is currently able to damage a ship using direct weapons or fighters
+    [[nodiscard]] bool    CanDestroyFighters(const ScriptingContext& context) const;  ///< Returns true if there is at least one ship in the fleet which is currently able to destroy fighters using direct weapons or fighters
     [[nodiscard]] bool    HasMonsters(const Universe& universe) const;                ///< returns true iff this fleet contains monster ships.
-    [[nodiscard]] bool    HasArmedShips(const Universe& universe) const;              ///< Returns true if there is at least one armed ship in the fleet, meaning it has direct fire weapons or fighters that can be launched and that do damage
+    [[nodiscard]] bool    HasArmedShips(const ScriptingContext& context) const;       ///< Returns true if there is at least one armed ship in the fleet, meaning it has direct fire weapons or fighters that can be launched and that do damage
     [[nodiscard]] bool    HasFighterShips(const Universe& universe) const;            ///< Returns true if there is at least one ship with fighters in the fleet.
     [[nodiscard]] bool    HasColonyShips(const Universe& universe) const;             ///< Returns true if there is at least one colony ship with nonzero capacity in the fleet.
     [[nodiscard]] bool    HasOutpostShips(const Universe& universe) const;            ///< Returns true if there is at least one colony ship with zero capacity in the fleet
@@ -137,8 +138,8 @@ public:
       * (via combat or they retreat). **/
     [[nodiscard]] int ArrivalStarlane() const { return m_arrival_starlane; }
 
-    void Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& universe,
-              int empire_id = ALL_EMPIRES) override;
+    void Copy(std::shared_ptr<const UniverseObject> copied_object,
+              const Universe& universe, int empire_id = ALL_EMPIRES) override;
 
     /** Moves fleet, its ships, and sets systems as explored for empires. */
     void MovementPhase(ScriptingContext& context);
@@ -167,7 +168,7 @@ public:
     void SetMoveOrderedTurn(int turn);                      ///< marks fleet to as being ordered to move on indicated turn
 
     /* returns a name for a fleet based on its ships*/
-    [[nodiscard]] std::string GenerateFleetName(const Universe& u, const SpeciesManager& sm);
+    [[nodiscard]] std::string GenerateFleetName(const ScriptingContext& context);
 
     static constexpr int ETA_NEVER = (1 << 30);             ///< returned by ETA when fleet can't reach destination due to lack of route or inability to move
     static constexpr int ETA_UNKNOWN = (1 << 30) - 1;       ///< returned when ETA can't be determined
@@ -181,7 +182,7 @@ private:
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);
 
     /** Returns new copy of this Fleet. */
-    [[nodiscard]] Fleet* Clone(Universe& universe, int empire_id = ALL_EMPIRES) const override;
+    [[nodiscard]] Fleet* Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const override;
 
     std::set<int>   m_ships;
 

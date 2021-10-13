@@ -52,8 +52,8 @@ class FO_COMMON_API Planet :
     public ResourceCenter
 {
 public:
-    [[nodiscard]] std::set<std::string>   Tags() const override;
-    [[nodiscard]] bool                    HasTag(const std::string& name) const override;
+    [[nodiscard]] std::set<std::string>   Tags(const ScriptingContext& context) const override;
+    [[nodiscard]] bool                    HasTag(const std::string& name, const ScriptingContext& context) const override;
     [[nodiscard]] UniverseObjectType      ObjectType() const override;
 
     [[nodiscard]] std::string             Dump(unsigned short ntabs = 0) const override;
@@ -117,8 +117,8 @@ public:
     [[nodiscard]] std::map<int, double> EmpireGroundCombatForces() const;
 
 
-    void Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& universe,
-              int empire_id = ALL_EMPIRES) override;
+    void Copy(std::shared_ptr<const UniverseObject> copied_object,
+              const Universe& universe, int empire_id = ALL_EMPIRES) override;
 
     [[nodiscard]] Meter* GetMeter(MeterType type) override;
 
@@ -162,7 +162,7 @@ public:
     Planet() = default;
 
     /** returns new copy of this Planet. */
-    [[nodiscard]] Planet* Clone(Universe& universe, int empire_id = ALL_EMPIRES) const override;
+    [[nodiscard]] Planet* Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const override;
 
 private:
     friend class ObjectMap;
@@ -173,7 +173,7 @@ private:
     void AddMeter(MeterType meter_type) override
     { UniverseObject::AddMeter(meter_type); }
 
-    void PopGrowthProductionResearchPhase() override;
+    void PopGrowthProductionResearchPhase(ScriptingContext& context) override;
 
     void ClampMeters() override;
 

@@ -146,7 +146,7 @@ public:
     [[nodiscard]] float       ProductionStatus(int i, const ScriptingContext& context) const; ///< Returns the PPs spent towards item \a i in the build queue if it has partial progress, -1.0 if there is no such index in the production queue.
 
     /** Return true iff this empire can produce the specified item at the specified location. */
-    [[nodiscard]] bool        ProducibleItem(BuildType build_type, int location,
+    [[nodiscard]] bool        ProducibleItem(BuildType build_type, int location, // TODO: remove default context
                                              const ScriptingContext& context = ScriptingContext{}) const;
     [[nodiscard]] bool        ProducibleItem(BuildType build_type, const std::string& name, int location,
                                              const ScriptingContext& context = ScriptingContext{}) const;
@@ -262,22 +262,22 @@ public:
     void ResumeProduction(int index);                        ///< Sets the production of produce at postion \a index unpaused, if such an index exists
     void AllowUseImperialPP(int index, bool allow=true);     ///< Allows or disallows the use of the imperial stockpile for production
 
-    void AddNewlyResearchedTechToGrantAtStartOfNextTurn(const std::string& name);    ///< Inserts the given Tech into the Empire's list of innovations. Call ApplyAddedTech to make it effective.
-    void ApplyNewTechs();                           ///< Moves all Techs from the Empire's list of innovations into the Empire's list of available technologies.
-    void AddPolicy(const std::string& name);        ///< Inserts the given Policy into the Empire's list of available policies
-    void ApplyPolicies();                           ///< Unlocks anything unlocked by adopted policies
+    void AddNewlyResearchedTechToGrantAtStartOfNextTurn(const std::string& name); ///< Inserts the given Tech into the Empire's list of innovations. Call ApplyAddedTech to make it effective.
+    void ApplyNewTechs(Universe& universe, int current_turn);  ///< Moves all Techs from the Empire's list of innovations into the Empire's list of available technologies.
+    void AddPolicy(const std::string& name, int current_turn); ///< Inserts the given Policy into the Empire's list of available policies
+    void ApplyPolicies(Universe& universe, int current_turn);  ///< Unlocks anything unlocked by adopted policies
 
     //! Adds a given producible item (Building, Ship Hull, Ship part) to the
     //! list of available items.
-    void UnlockItem(const UnlockableItem& item);
+    void UnlockItem(const UnlockableItem& item, Universe& universe, int current_turn);
 
-    void AddBuildingType(const std::string& name);  ///< Inserts the given BuildingType into the Empire's list of available BuldingTypes.
+    void AddBuildingType(const std::string& name, int current_turn);  ///< Inserts the given BuildingType into the Empire's list of available BuldingTypes.
     //! Inserts the given ShipPart into the Empire's list of available ShipPart%s.
-    void AddShipPart(const std::string& name);
+    void AddShipPart(const std::string& name, int current_turn);
 
     //! Inserts the given ship ShipHull into the Empire's list of available
     //! ShipHull%s.
-    void AddShipHull(const std::string& name);
+    void AddShipHull(const std::string& name, int current_turn);
 
     void AddExploredSystem(int ID, int turn, const ObjectMap& objects); ///< Inserts the given ID into the Empire's list of explored systems.
 
@@ -373,13 +373,13 @@ public:
       * to spend.  Actual consumption of resources, removal of items from queue,
       * processing of finished items and population growth happens in various
       * Check(Whatever)Progress functions. */
-    void UpdateResourcePools();
+    void UpdateResourcePools(const ScriptingContext& context);
     /** Calls Update() on empire's research queue, which recalculates the RPs
       * spent on and number of turns left for each tech in the queue. */
     void UpdateResearchQueue();
     /** Calls Update() on empire's production queue, which recalculates the PPs
       * spent on and number of turns left for each project in the queue. */
-    void UpdateProductionQueue();
+    void UpdateProductionQueue(const ScriptingContext& context);
     /** Eventually: Calls appropriate subsystem Update to calculate influence
       * spent on social projects and maintenance of buildings.  Later call to
       * CheckInfluenceProgress() will then have the correct allocations of
@@ -392,7 +392,7 @@ public:
     /** Resets empire meters. */
     void ResetMeters();
 
-    void UpdateOwnedObjectCounters(const ObjectMap& objects);
+    void UpdateOwnedObjectCounters(const Universe& universe);
 
     void SetAuthenticated(bool authenticated = true);
 

@@ -4,6 +4,7 @@
 #include <set>
 #include <vector>
 #include <boost/circular_buffer.hpp>
+#include <boost/asio/high_resolution_timer.hpp>
 #include "ServerFramework.h"
 #include "ServerNetworking.h"
 #include "../Empire/EmpireManager.h"
@@ -48,6 +49,9 @@ public:
     [[nodiscard]] ObjectMap& EmpireKnownObjects(int empire_id) override;
 
     [[nodiscard]] std::string GetVisibleObjectName(std::shared_ptr<const UniverseObject> object) override;
+
+    [[nodiscard]] int EmpireID() const override
+    { return ALL_EMPIRES; }
 
     [[nodiscard]] int CurrentTurn() const override
     { return m_current_turn; }
@@ -302,8 +306,12 @@ private:
       * an empire is eliminated from the game */
     void    RemoveEmpireTurn(int empire_id);
 
+    /** Called when asyncio timer ends. Executes Python asyncio callbacks if any was generated. */
+    void    AsyncIOTimedoutHandler(const boost::system::error_code& error);
+
     boost::asio::io_context m_io_context;
     boost::asio::signal_set m_signals;
+    boost::asio::high_resolution_timer m_timer;
 
     Universe                m_universe;
     EmpireManager           m_empires;

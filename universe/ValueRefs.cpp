@@ -879,29 +879,31 @@ double Variable<double>::Eval(const ScriptingContext& context) const
 
     } else if (property_name == "DestroyFightersPerBattleMax") {
         if (auto ship = std::dynamic_pointer_cast<const Ship>(object)) {
-            InfoLogger() << "DestroyFightersPerBattleMax" <<  ship->TotalWeaponsFighterDamage();
-            // FIXME prevent recursion; disallowing the ValueRef inside of destroyFightersPerBattleMax via parsers would be best.
-            return ship->TotalWeaponsFighterDamage();
+            auto retval = ship->TotalWeaponsFighterDamage(context);
+            InfoLogger() << "DestroyFightersPerBattleMax" << retval;
+            // TODO: prevent recursion; disallowing the ValueRef inside of destroyFightersPerBattleMax via parsers would be best.
+            return retval;
         }
         return 0.0;
 
     } else if (property_name == "DamageStructurePerBattleMax") {
         if (auto ship = std::dynamic_pointer_cast<const Ship>(object)) {
-            // FIXME prevent recursion; disallowing the ValueRef inside of damageStructurePerBattleMax via parsers would be best.
-            InfoLogger() << "DamageStructurePerBattleMax" <<  ship->TotalWeaponsShipDamage();
-            return ship->TotalWeaponsShipDamage();
+            // TODO: prevent recursion; disallowing the ValueRef inside of damageStructurePerBattleMax via parsers would be best.
+            auto retval = ship->TotalWeaponsShipDamage(context);
+            InfoLogger() << "DamageStructurePerBattleMax" << retval;
+            return retval;
         }
         return 0.0;
 
     } else if (property_name == "PropagatedSupplyRange") {
-        const auto& ranges = GetSupplyManager().PropagatedSupplyRanges();   // TODO: Get from Context..
+        const auto& ranges = context.supply.PropagatedSupplyRanges();
         auto range_it = ranges.find(object->SystemID());
         if (range_it == ranges.end())
             return 0.0;
         return range_it->second;
 
     } else if (property_name == "PropagatedSupplyDistance") {
-        const auto& ranges = GetSupplyManager().PropagatedSupplyDistances(); // TODO: get from context
+        const auto& ranges = context.supply.PropagatedSupplyDistances();
         auto range_it = ranges.find(object->SystemID());
         if (range_it == ranges.end())
             return 0.0;
@@ -973,7 +975,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
 
     }
     else if (property_name == "SupplyingEmpire") {
-        return GetSupplyManager().EmpireThatCanSupplyAt(object->SystemID()); // TODO: Get SupplyManager from Context
+        return context.supply.EmpireThatCanSupplyAt(object->SystemID());
     }
     else if (property_name == "ID") {
         return object->ID();
@@ -1161,7 +1163,7 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
     }
 
     if (property_name == "Tags") {
-        auto tags = object->Tags();
+        auto tags = object->Tags(context);
         return {tags.begin(), tags.end()};
     }
     else if (property_name == "Specials") {
@@ -1488,13 +1490,7 @@ Visibility ComplexVariable<Visibility>::Eval(const ScriptingContext& context) co
                 return Visibility::VIS_NO_VISIBILITY;
         }
 
-        auto empire_it = context.empire_object_vis.find(empire_id);
-        if (empire_it == context.empire_object_vis.end())
-            return Visibility::VIS_NO_VISIBILITY;
-        auto obj_it = empire_it->second.find(object_id);
-        if (obj_it == empire_it->second.end())
-            return Visibility::VIS_NO_VISIBILITY;
-        return obj_it->second;
+        return context.ContextVis(object_id, empire_id);
     }
 
     return Visibility::INVALID_VISIBILITY;

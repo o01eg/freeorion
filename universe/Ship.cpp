@@ -21,15 +21,17 @@
 #include "../util/Random.h"
 #include "../util/i18n.h"
 
+#include <utility>
 
-Ship::Ship(int empire_id, int design_id, std::string species_name, int produced_by_empire_id) :
+
+Ship::Ship(int empire_id, int design_id, std::string species_name,
+           const Universe& universe, int produced_by_empire_id) :
     m_species_name(std::move(species_name)),
     m_design_id(design_id),
     m_produced_by_empire_id(produced_by_empire_id),
     m_arrived_on_turn(CurrentTurn()),
     m_last_resupplied_on_turn(CurrentTurn())
 {
-    const Universe& universe = GetUniverse();  // TODO: pass in ScriptingContext
     const ShipDesign* design = universe.GetShipDesign(design_id);
 
     if (!design)
@@ -58,7 +60,7 @@ Ship::Ship(int empire_id, int design_id, std::string species_name, int produced_
     AddMeter(MeterType::METER_TARGET_INFLUENCE);
     AddMeter(MeterType::METER_INFLUENCE);
 
-    for (const std::string& part_name : design->Parts()) { // TODO: pass in Universe with context...?
+    for (const std::string& part_name : design->Parts()) {
         if (!part_name.empty()) {
             const ShipPart* part = GetShipPart(part_name);
             if (!part) {
@@ -90,7 +92,7 @@ Ship::Ship(int empire_id, int design_id, std::string species_name, int produced_
     }
 }
 
-Ship* Ship::Clone(Universe& universe, int empire_id) const {
+Ship* Ship::Clone(const Universe& universe, int empire_id) const {
     Visibility vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
@@ -101,7 +103,9 @@ Ship* Ship::Clone(Universe& universe, int empire_id) const {
     return retval.release();
 }
 
-void Ship::Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& universe, int empire_id) {
+void Ship::Copy(std::shared_ptr<const UniverseObject> copied_object,
+                const Universe& universe, int empire_id)
+{
     if (copied_object.get() == this)
         return;
     auto copied_ship = std::dynamic_pointer_cast<const Ship>(copied_object);
@@ -117,12 +121,7 @@ void Ship::Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& u
     UniverseObject::Copy(std::move(copied_object), vis, visible_specials, universe);
 
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
-        if (this->m_fleet_id != copied_ship->m_fleet_id) {
-            // as with other containers, removal from the old container is triggered by the contained Object; removal from System is handled by UniverseObject::Copy
-            if (auto old_fleet = universe.Objects().get<Fleet>(this->m_fleet_id))
-                old_fleet->RemoveShips({this->ID()});
-            this->m_fleet_id = copied_ship->m_fleet_id; // as with other containers (Systems), actual insertion into fleet ships set is handled by the fleet
-        }
+        this->m_fleet_id =                      copied_ship->m_fleet_id;
 
         if (vis >= Visibility::VIS_PARTIAL_VISIBILITY) {
             if (this->Unowned())
@@ -154,8 +153,8 @@ bool Ship::HostileToEmpire(int empire_id, const EmpireManager& empires) const {
         empires.GetDiplomaticStatus(Owner(), empire_id) == DiplomaticStatus::DIPLO_WAR;
 }
 
-std::set<std::string> Ship::Tags() const {
-    const ShipDesign* design = GetUniverse().GetShipDesign(m_design_id); // TODO: pass in ScriptingContext
+std::set<std::string> Ship::Tags(const ScriptingContext& context) const {
+    const ShipDesign* design = context.ContextUniverse().GetShipDesign(m_design_id);
     if (!design)
         return {};
 
@@ -163,13 +162,9 @@ std::set<std::string> Ship::Tags() const {
     if (!hull)
         return {};
 
-    std::set<std::string> retval{hull->Tags().begin(), hull->Tags().end()};
+    std::set<std::string> retval{hull->Tags()};
 
-    const std::vector<std::string>& parts = design->Parts();
-    if (parts.empty())
-        return retval;
-
-    for (const std::string& part_name : parts) {
+    for (const std::string& part_name : design->Parts()) {
         if (const ShipPart* part = GetShipPart(part_name))
             retval.insert(part->Tags().begin(), part->Tags().end());
     }
@@ -177,8 +172,8 @@ std::set<std::string> Ship::Tags() const {
     return retval;
 }
 
-bool Ship::HasTag(const std::string& name) const {
-    const ShipDesign* design = GetUniverse().GetShipDesign(m_design_id); // TODO: pass in ScriptingContext
+bool Ship::HasTag(const std::string& name, const ScriptingContext& context) const {
+    const ShipDesign* design = context.ContextUniverse().GetShipDesign(m_design_id);
     if (design) {
         // check hull for tag
         const ShipHull* hull = ::GetShipHull(design->Hull());
@@ -193,7 +188,7 @@ bool Ship::HasTag(const std::string& name) const {
         }
     }
     // check species for tag
-    const Species* species = GetSpecies(SpeciesName());
+    const Species* species = context.species.GetSpecies(SpeciesName());
     if (species && species->Tags().count(name))
         return true;
 
@@ -237,17 +232,20 @@ bool Ship::IsMonster(const Universe& universe) const {
         return false;
 }
 
-bool Ship::CanDamageShips(float target_shields) const
-{ return TotalWeaponsShipDamage(target_shields, true) > 0.0f; }
+bool Ship::CanDamageShips(const ScriptingContext& context, float target_shields) const
+{ return TotalWeaponsShipDamage(context, target_shields, true) > 0.0f; }
 
-bool Ship::CanDestroyFighters() const
-{ return TotalWeaponsFighterDamage(true) > 0.0f; }
+bool Ship::CanDestroyFighters(const ScriptingContext& context) const
+{ return TotalWeaponsFighterDamage(context, true) > 0.0f; }
 
-bool Ship::IsArmed(const Universe& universe) const {
-    if (HasFighters(universe) && ((TotalWeaponsShipDamage(0.0f, true) > 0.0f) || (TotalWeaponsFighterDamage(true) > 0.0f)))
+bool Ship::IsArmed(const ScriptingContext& context) const {
+    if (HasFighters(context.ContextUniverse()) &&
+        ((TotalWeaponsShipDamage(context, 0.0f, true) > 0.0f)
+         || (TotalWeaponsFighterDamage(context, true) > 0.0f)))
         return true;
     else
-        return ((TotalWeaponsShipDamage(0.0f, false) > 0.0f) || (TotalWeaponsFighterDamage(false) > 0.0f));
+        return ((TotalWeaponsShipDamage(context, 0.0f, false) > 0.0f) ||
+                (TotalWeaponsFighterDamage(context, false) > 0.0f));
 }
 
 bool Ship::HasFighters(const Universe& universe) const {
@@ -487,38 +485,54 @@ float Ship::WeaponPartShipDamage(const ShipPart* part, const ScriptingContext& c
     }
 }
 
-float Ship::TotalWeaponsFighterDamage(bool launch_fighters) const {
+float Ship::TotalWeaponsFighterDamage(const ScriptingContext& context, bool launch_fighters) const {
     // sum up all individual weapons' attack strengths
     float total_shots = 0.0f;
-    auto all_weapons_shots = AllWeaponsFighterDamage(launch_fighters);
+    auto all_weapons_shots = AllWeaponsFighterDamage(context, launch_fighters);
     for (float shots : all_weapons_shots)
         total_shots += shots;
     return total_shots;
 }
 
-float Ship::TotalWeaponsShipDamage(float shield_DR, bool launch_fighters) const {
+float Ship::TotalWeaponsShipDamage(const ScriptingContext& context, float shield_DR,
+                                   bool launch_fighters) const
+{
     // sum up all individual weapons' attack strengths
     float total_attack = 0.0f;
-    auto all_weapons_damage = AllWeaponsShipDamage(shield_DR, launch_fighters);
+    auto all_weapons_damage = AllWeaponsShipDamage(context, shield_DR, launch_fighters);
     for (float attack : all_weapons_damage)
         total_attack += attack;
     return total_attack;
 }
 
-std::vector<float> Ship::AllWeaponsFighterDamage(bool launch_fighters) const
-{ return Combat::WeaponDamageImpl(std::static_pointer_cast<const Ship>(shared_from_this()), /*target_shield_DR*/0, /*max meters*/false, launch_fighters, /*target_ships*/false); }
+std::vector<float> Ship::AllWeaponsFighterDamage(const ScriptingContext& context,
+                                                 bool launch_fighters) const
+{
+    return Combat::WeaponDamageImpl(
+        context, std::static_pointer_cast<const Ship>(shared_from_this()),
+        /*target_shield_DR*/0, /*max meters*/false,
+        launch_fighters, /*target_ships*/false);
+}
 
-std::vector<float> Ship::AllWeaponsShipDamage(float shield_DR, bool launch_fighters) const
-{ return Combat::WeaponDamageImpl(std::static_pointer_cast<const Ship>(shared_from_this()), shield_DR, false, launch_fighters, true); }
+std::vector<float> Ship::AllWeaponsShipDamage(const ScriptingContext& context, float shield_DR,
+                                              bool launch_fighters) const
+{
+    return Combat::WeaponDamageImpl(
+        context, std::static_pointer_cast<const Ship>(shared_from_this()),
+        shield_DR, false, launch_fighters, true);
+}
 
-std::vector<float> Ship::AllWeaponsMaxShipDamage(const Universe& universe, float shield_DR, bool launch_fighters) const {
+std::vector<float> Ship::AllWeaponsMaxShipDamage(const ScriptingContext& context, float shield_DR,
+                                                 bool launch_fighters) const
+{
     std::vector<float> retval;
 
-    const ShipDesign* design = universe.GetShipDesign(m_design_id);
+    const ShipDesign* design = context.ContextUniverse().GetShipDesign(m_design_id);
     if (!design)
         return retval;
 
-    return Combat::WeaponDamageImpl(std::static_pointer_cast<const Ship>(shared_from_this()), shield_DR, true, launch_fighters);
+    return Combat::WeaponDamageImpl(context, std::static_pointer_cast<const Ship>(shared_from_this()),
+                                    shield_DR, true, launch_fighters);
 }
 
 void Ship::SetFleetID(int fleet_id) {

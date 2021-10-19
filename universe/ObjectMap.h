@@ -10,7 +10,6 @@
 #include <vector>
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/any_range.hpp>
-#include <boost/range/size.hpp>
 #include "ConstantsFwd.h"
 #include "../util/Export.h"
 
@@ -51,12 +50,16 @@ public:
       * ID \a id is not of type T. */
     template <typename T = UniverseObject>
     [[nodiscard]] std::shared_ptr<const T> get(int id) const;
+    template <typename T = UniverseObject>
+    [[nodiscard]] const T* getRaw(int id) const;
 
     /** Returns a pointer to the object of type T with ID number \a id.
       * Returns a null std::shared_ptr if none exists or the object with
       * ID \a id is not of type T. */
     template <typename T = UniverseObject>
     [[nodiscard]] std::shared_ptr<T> get(int id);
+    template <typename T = UniverseObject>
+    [[nodiscard]] T* getRaw(int id);
 
     using id_range = boost::any_range<int, boost::forward_traversal_tag>;
 
@@ -92,13 +95,35 @@ public:
 
     /** Returns all the objects of type T */
     template <typename T = UniverseObject>
-    [[nodiscard]] boost::select_second_const_range<container_type<T>> all() const
-    { return Map<T>() | boost::adaptors::map_values; }
+    [[nodiscard]] auto all() const
+    {
+        static const auto tx = [](const typename container_type<T>::mapped_type& p)
+            -> const typename container_type<const T>::mapped_type
+        { return std::const_pointer_cast<const T>(p); };
+
+        return Map<T>() | boost::adaptors::map_values | boost::adaptors::transformed(tx);
+    }
+
+    template <typename T = UniverseObject>
+    [[nodiscard]] auto allRaw() const
+    {
+        return Map<T>() | boost::adaptors::map_values | boost::adaptors::transformed(
+            [](const auto& p) -> const T* { return p.get(); }
+        );
+    }
 
     /** Returns all the objects of type T */
     template <typename T = UniverseObject>
-    [[nodiscard]] boost::select_second_mutable_range<container_type<T>> all()
-    { return Map<T>() | boost::adaptors::map_values; }
+    [[nodiscard]] auto all()
+    { return std::as_const(Map<T>()) | boost::adaptors::map_values; }
+
+    template <typename T = UniverseObject>
+    [[nodiscard]] auto allRaw()
+    {
+        return Map<T>() | boost::adaptors::map_values | boost::adaptors::transformed(
+            [](const auto& p) -> T* { return p.get(); }
+        );
+    }
 
     /** Returns the IDs of all objects not known to have been destroyed. */
     [[nodiscard]] std::vector<int> FindExistingObjectIDs() const;
@@ -240,6 +265,16 @@ std::shared_ptr<const T> ObjectMap::get(int id) const
 }
 
 template <typename T>
+const T* ObjectMap::getRaw(int id) const
+{
+    auto it = Map<typename std::remove_const_t<T>>().find(id);
+    return
+        it != Map<typename std::remove_const_t<T>>().end()
+            ? it->second.get()
+            : nullptr;
+}
+
+template <typename T>
 std::shared_ptr<T> ObjectMap::get(int id)
 {
     auto it = Map<typename std::remove_const_t<T>>().find(id);
@@ -247,6 +282,16 @@ std::shared_ptr<T> ObjectMap::get(int id)
         it != Map<typename std::remove_const_t<T>>().end()
             ? it->second
             : nullptr);
+}
+
+template <typename T>
+T* ObjectMap::getRaw(int id)
+{
+    auto it = Map<typename std::remove_const_t<T>>().find(id);
+    return
+        it != Map<typename std::remove_const_t<T>>().end()
+            ? it->second.get()
+            : nullptr;
 }
 
 template <typename T>

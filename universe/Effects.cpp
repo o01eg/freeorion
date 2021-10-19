@@ -1283,7 +1283,7 @@ void SetSpecies::Execute(ScriptingContext& context) const {
 
 
         const Species* species = GetSpecies(planet->SpeciesName());
-        auto& default_focus = species ? species->DefaultFocus() : "";
+        const auto& default_focus = species ? species->DefaultFocus() : "";
 
         // chose default focus if available. otherwise use any available focus
         bool default_available = false;
@@ -1295,7 +1295,7 @@ void SetSpecies::Execute(ScriptingContext& context) const {
         }
 
         if (default_available) {
-            planet->SetFocus(std::move(default_focus));
+            planet->SetFocus(default_focus);
         } else if (!available_foci.empty()) {
             planet->SetFocus(*available_foci.begin());
         }
@@ -2448,7 +2448,7 @@ void RemoveStarlanes::Execute(ScriptingContext& context) const {
     }
     auto target_system = dynamic_cast<System*>(context.effect_target.get());
     if (!target_system)
-        target_system = context.ContextObjects().get<System>(context.effect_target->SystemID()).get();
+        target_system = context.ContextObjects().getRaw<System>(context.effect_target->SystemID());
     if (!target_system)
         return; // nothing to do!
 
@@ -2468,7 +2468,7 @@ void RemoveStarlanes::Execute(ScriptingContext& context) const {
     for (auto& endpoint_object : endpoint_objects) {
         auto endpoint_system = dynamic_cast<const System*>(endpoint_object.get());
         if (!endpoint_system)
-            endpoint_system = context.ContextObjects().get<System>(endpoint_object->SystemID()).get();
+            endpoint_system = context.ContextObjects().getRaw<System>(endpoint_object->SystemID());
         if (!endpoint_system)
             continue;
         endpoint_systems.insert(const_cast<System*>(endpoint_system));

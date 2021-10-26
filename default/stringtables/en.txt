@@ -1878,7 +1878,7 @@ OPTIONS_DB_MOUSE_REPEAT_DELAY
 Sets delay between holding a mouse button and repeat clicks being generated
 
 OPTIONS_DB_MOUSE_REPEAT_INTERVAL
-Sets delay between repeat clicks while holding a moues button
+Sets delay between repeat clicks while holding a mouse button
 
 OPTIONS_DB_DISPLAY_TIMESTAMP
 Enables messages' timestamp in the chat windows.
@@ -11528,7 +11528,7 @@ PLC_METROPOLES
 Metropoles
 
 PLC_METROPOLES_DESC
-'''Boosts the output of up to [[value METROPOLES_PLANET_LIMIT]] planets. At most (1 / [[value METROPOLES_MIN_PLANETS]] or populated planets) with [[metertype METER_POPULATION]] of at least [[value METROPOLES_MINIMUM_POPULATION]] and [[metertype METER_HAPPINESS]] of at least [[value METROPOLES_MIN_STABILITY]] will be boosted.
+'''Boosts the output of up to [[value METROPOLES_PLANET_LIMIT]] planets, but not more than a fraction of 1 / [[value METROPOLES_MIN_PLANETS]] of all the empire's populated planets. To qualify for being boosted, planets must have [[metertype METER_POPULATION]] of at least [[value METROPOLES_MINIMUM_POPULATION]] and [[metertype METER_HAPPINESS]] of at least [[value METROPOLES_MIN_STABILITY]].
 The highest-populated of the qualified planets will receive, regardless of focus:
 • Increases [[metertype METER_TARGET_RESEARCH]] by [[value METROPOLES_TARGET_RESEARCH_PERPOP]] per population.
 • Increases [[metertype METER_TARGET_INDUSTRY]] by [[value METROPOLES_TARGET_INDUSTRY_PERPOP]] per population.
@@ -12019,7 +12019,7 @@ PLC_NECESSITY
 Necessity
 
 PLC_NECESSITY_DESC
-Increases [[metertype METER_TARGET_RESEARCH]] of planets with [[metertype METER_HAPPINESS]] less than [[value PLC_NECESSITY_MAX_STABILITY]] by the square root of the product of population and how far [[metertype METER_HAPPINESS]] is below [[value PLC_NECESSITY_MAX_STABILITY]].
+Increases [[metertype METER_TARGET_RESEARCH]] of research focused planets with [[metertype METER_HAPPINESS]] less than [[value PLC_NECESSITY_MAX_STABILITY]] by the square root of the product of population and how far [[metertype METER_HAPPINESS]] is below [[value PLC_NECESSITY_MAX_STABILITY]].
 
 PLC_NECESSITY_SHORT_DESC
 Boosts Unstable Planet Research
@@ -16324,19 +16324,19 @@ ULTIMATE_INFLUENCE_DESC
 +++	Ultimate [[metertype METER_INFLUENCE]]: 300%
 
 BAD_HAPPINESS_DESC
-−	Bad [[metertype METER_HAPPINESS]]: -5
+−	Bad [[metertype METER_HAPPINESS]]: [[value BAD_HAPPINESS_VAL]]
 
 AVERAGE_HAPPINESS_DESC
 '''	Average [[metertype METER_HAPPINESS]]: +0'''
 
 GOOD_HAPPINESS_DESC
-+	Good [[metertype METER_HAPPINESS]]: +5
++	Good [[metertype METER_HAPPINESS]]: +[[value GOOD_HAPPINESS_VAL]]
 
 GREAT_HAPPINESS_DESC
-++	Great [[metertype METER_HAPPINESS]]: +10
+++	Great [[metertype METER_HAPPINESS]]: +[[value GREAT_HAPPINESS_VAL]]
 
 ULTIMATE_HAPPINESS_DESC
-+++	Ultimate [[metertype METER_HAPPINESS]]: +15
++++	Ultimate [[metertype METER_HAPPINESS]]: +[[value ULTIMATE_HAPPINESS_VAL]]
 
 NO_DEFENSE_TROOPS_DESC
 −−−	No Defensive Ground [[metertype METER_TROOPS]]

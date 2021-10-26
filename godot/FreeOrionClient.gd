@@ -3,7 +3,6 @@ extends Control
 var game_setup_dlg: FOWindow
 var multiplayer_setup_dlg: FOWindow
 var auth_password_setup_dlg: FOWindow
-var network_thread: Thread
 
 onready var viewport = get_viewport()
 
@@ -21,6 +20,17 @@ func _ready():
 	auth_password_setup_dlg = preload("res://AuthPasswordSetup.tscn").instance()
 	auth_password_setup_dlg.connect("ok", self, "_on_AuthSetupDlg_ok")
 	auth_password_setup_dlg.connect("cancel", self, "_on_AuthSetupDlg_cancel")
+
+	global.chat_window = preload("res://ChatWindow.tscn").instance()
+	add_child(global.chat_window)
+	global.chat_window.hide()
+
+	FreeOrionNode.connect("auth_request", self, "_on_FreeOrion_auth_request", [], CONNECT_DEFERRED)
+	FreeOrionNode.connect("start_game", self, "_on_FreeOrion_start_game", [], CONNECT_DEFERRED)
+	FreeOrionNode.connect(
+		"chat_message", global.chat_window, "_on_FreeOrion_chat_message", [], CONNECT_DEFERRED
+	)
+	FreeOrionNode.connect("chat_message", self, "_on_FreeOrion_chat_message", [], CONNECT_DEFERRED)
 
 	var scale = 1
 	if OS.get_name() == "Android":
@@ -42,13 +52,6 @@ func _ready():
 
 	viewport.set_size_override(true, new_size)
 
-	network_thread = Thread.new()
-	network_thread.start($FreeOrion, "network_thread")
-
-
-func _exit_tree():
-	network_thread.wait_to_finish()
-
 
 func _on_SinglePlayerBtn_pressed():
 	$Popup.add_child(game_setup_dlg)
@@ -59,7 +62,7 @@ func _on_SinglePlayerBtn_pressed():
 
 
 func _on_QuickstartBtn_pressed():
-	$FreeOrion.new_single_player_game()
+	FreeOrionNode.new_single_player_game()
 
 
 func _on_MultiplayerBtn_pressed():
@@ -77,7 +80,7 @@ func _on_QuitBtn_pressed():
 func _on_GameSetupDlg_ok():
 	$Popup.hide()
 	$Popup.remove_child(game_setup_dlg)
-	$FreeOrion.new_single_player_game()
+	FreeOrionNode.new_single_player_game()
 
 
 func _on_GameSetupDlg_cancel():
@@ -88,9 +91,11 @@ func _on_GameSetupDlg_cancel():
 func _on_MultiplayerSetup_ok():
 	$Popup.hide()
 	$Popup.remove_child(multiplayer_setup_dlg)
-	$FreeOrion.connect_to_server(multiplayer_setup_dlg.server_name)
-	if $FreeOrion.is_server_connected():
-		$FreeOrion.join_game(multiplayer_setup_dlg.player_name, multiplayer_setup_dlg.client_type)
+	FreeOrionNode.connect_to_server(multiplayer_setup_dlg.server_name)
+	if FreeOrionNode.is_server_connected():
+		FreeOrionNode.join_game(
+			multiplayer_setup_dlg.player_name, multiplayer_setup_dlg.client_type
+		)
 
 
 func _on_MultiplayerSetup_cancel():
@@ -101,7 +106,9 @@ func _on_MultiplayerSetup_cancel():
 func _on_AuthSetupDlg_ok():
 	$Popup.hide()
 	$Popup.remove_child(auth_password_setup_dlg)
-	$FreeOrion.auth_response(auth_password_setup_dlg.player_name, auth_password_setup_dlg.password)
+	FreeOrionNode.auth_response(
+		auth_password_setup_dlg.player_name, auth_password_setup_dlg.password
+	)
 
 
 func _on_AuthSetupDlg_cancel():
@@ -119,5 +126,9 @@ func _on_FreeOrion_auth_request(player_name, _auth):
 
 
 func _on_FreeOrion_start_game(_is_new_game):
-	global.freeorion = $FreeOrion
+	remove_child(global.chat_window)
 	get_tree().change_scene("res://GalaxyMap.tscn")
+
+
+func _on_FreeOrion_chat_message(_text: String, _player_name: String, _text_color: Color, _pm: bool):
+	global.chat_window.show()

@@ -3,8 +3,7 @@
 #include <unordered_map>
 #include <boost/algorithm/clamp.hpp>
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/locale/conversion.hpp>
 #include <GG/GUI.h>
 #include <GG/RichText/RichText.h>
 #include <GG/ScrollPanel.h>
@@ -67,11 +66,11 @@ namespace {
     bool temp_bool = RegisterOptions(&AddOptions);
 
     const std::string EMPTY_STRING;
-    const std::string INCOMPLETE_DESIGN = "incomplete design";
-    const std::string UNIVERSE_OBJECT = "universe object";
-    const std::string PLANET_SUITABILITY_REPORT = "planet suitability report";
-    const std::string GRAPH = "data graph";
-    const std::string TEXT_SEARCH_RESULTS = "dynamic generated text";
+    constexpr std::string_view INCOMPLETE_DESIGN = "incomplete design";
+    constexpr std::string_view UNIVERSE_OBJECT = "universe object";
+    constexpr std::string_view PLANET_SUITABILITY_REPORT = "planet suitability report";
+    constexpr std::string_view GRAPH = "data graph";
+    constexpr std::string_view TEXT_SEARCH_RESULTS = "dynamic generated text";
 
     /** @content_tag{CTRL_ALWAYS_REPORT} Always display a species on a planet suitability report. **/
     const std::string TAG_ALWAYS_REPORT = "CTRL_ALWAYS_REPORT";
@@ -89,17 +88,19 @@ namespace {
      * @return The first matched pedia category for this set of tags,
      *          or empty string if there are no matches.
      */
-    std::string DetermineCustomCategory(const std::set<std::string>& tags) {
-        if (tags.empty())
-            return EMPTY_STRING;
-
+    template <class TagContainer = std::vector<std::string_view>>
+    std::string_view DetermineCustomCategory(const TagContainer& tags) {
         // for each tag, check if it starts with the prefix TAG_PEDIA_PREFIX
         // when a match is found, return the match (without the prefix portion)
-        for (const std::string& tag : tags)
-            if (boost::starts_with(tag, TAG_PEDIA_PREFIX))
-                return boost::replace_first_copy(tag, TAG_PEDIA_PREFIX, EMPTY_STRING);
+        for (std::string_view tag : tags) {
+            if (boost::starts_with(tag, TAG_PEDIA_PREFIX)) {
+                //return boost::replace_first_copy(tag, TAG_PEDIA_PREFIX, "");
+                tag.remove_prefix(TAG_PEDIA_PREFIX.length());
+                return tag;
+            }
+        }
 
-        return EMPTY_STRING;
+        return ""; // no matching tag found
     }
 
     /** Retreive a value label and general string representation for @a meter_type */
@@ -1499,7 +1500,7 @@ namespace {
 
         if (!unlocked_items.empty()) {
             for (const UnlockableItem& item : unlocked_items) {
-                auto& TAG = [type{item.type}]() -> const std::string& {
+                auto TAG = [type{item.type}]() -> std::string_view {
                     switch (type) {
                     case UnlockableItemType::UIT_BUILDING:    return VarText::BUILDING_TYPE_TAG;     break;
                     case UnlockableItemType::UIT_SHIP_PART:   return VarText::SHIP_PART_TAG;         break;
@@ -1507,7 +1508,7 @@ namespace {
                     case UnlockableItemType::UIT_SHIP_DESIGN: return VarText::PREDEFINED_DESIGN_TAG; break;
                     case UnlockableItemType::UIT_TECH:        return VarText::TECH_TAG;              break;
                     case UnlockableItemType::UIT_POLICY:      return VarText::POLICY_TAG;            break;
-                    default:                                  return EMPTY_STRING;
+                    default:                                  return "";
                     }
                 }();
 
@@ -1623,10 +1624,11 @@ namespace {
             for (auto& name : species_that_dislike)
                 detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
         }
+        detailed_description += "\n";
 
         if (GetOptionsDB().Get<bool>("resource.effects.description.shown") &&
             !policy->Effects().empty())
-        { detailed_description += "\n\n" + Dump(policy->Effects()); }
+        { detailed_description += "\n" + Dump(policy->Effects()); }
     }
 
     void RefreshDetailPanelBuildingTypeTag( const std::string& item_type, const std::string& item_name,
@@ -1760,14 +1762,14 @@ namespace {
         if (!objects_with_special.empty()) {
             detailed_description += "\n\n" + UserString("OBJECTS_WITH_SPECIAL");
             for (auto& obj : objects_with_special) {
-                const auto& TEXT_TAG = [&obj]() {
+                auto TEXT_TAG = [&obj]() -> std::string_view {
                     switch (obj->ObjectType()) {
                     case UniverseObjectType::OBJ_SHIP:      return VarText::SHIP_ID_TAG;    break;
                     case UniverseObjectType::OBJ_FLEET:     return VarText::FLEET_ID_TAG;   break;
                     case UniverseObjectType::OBJ_PLANET:    return VarText::PLANET_ID_TAG;  break;
                     case UniverseObjectType::OBJ_BUILDING:  return VarText::BUILDING_ID_TAG;break;
                     case UniverseObjectType::OBJ_SYSTEM:    return VarText::SYSTEM_ID_TAG;  break;
-                    default:                                return EMPTY_STRING;
+                    default:                                return "";
                     }
                 }();
 
@@ -3328,8 +3330,7 @@ namespace {
                                             bool search_article_text)
     {
         //std::cout << "start scanning article " << idx << ": " << article_name_link.first << std::endl;
-        auto article_name = boost::algorithm::to_lower_copy(article_name_link.first);
-
+        std::string article_name = boost::locale::to_lower(article_name_link.first, GetLocale("en_US.UTF-8"));
         // search for exact title matches
         if (article_name == search_text) {
             exact_match = std::move(article_name_link);
@@ -3365,10 +3366,11 @@ namespace {
         const auto& article_entry = GetEncyclopedia().GetArticleByCategoryAndKey(article_directory, article_key);
         if (!article_entry.description.empty()) {
             // article present in pedia directly
-            if (boost::icontains(UserString(article_entry.description), search_text)) {
+            const auto& article_text{UserString(article_entry.description)};
+            std::string article_text_lower = boost::locale::to_lower(article_text, GetLocale("en_US.UTF-8"));
+            if (boost::contains(article_text_lower, search_text))
                 article_match = std::move(article_name_link);
-                return;
-            }
+            return;
         }
 
 
@@ -3380,6 +3382,7 @@ namespace {
         float dummyB;
         std::string dummy3, dummy4, dummy5, dummy6;
         std::string detailed_description;
+        detailed_description.reserve(2000); // guessitmate
         GG::Clr dummyC;
         std::weak_ptr<const ShipDesign> dummyD;
 
@@ -3388,10 +3391,15 @@ namespace {
                                   dummy3, dummy1, dummy2, dummyA, dummyB, dummy4,
                                   dummy5, dummy6, detailed_description, dummyC,
                                   dummyD, true);
-        boost::algorithm::to_lower(detailed_description);
-
-        if (boost::contains(detailed_description, search_text))
+        if (boost::contains(detailed_description, search_text)) {
             article_match = std::move(article_name_link);
+            return;
+        }
+        std::string desc_lower = boost::locale::to_lower(detailed_description, GetLocale("en_US.UTF-8"));
+        if (boost::contains(desc_lower, search_text)) {
+            article_match = std::move(article_name_link);
+            return;
+        }
     }
 }
 
@@ -3510,7 +3518,7 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
     match_report += "\n\n" + boost::io::str(FlexibleFormat(UserString("ENC_SEARCH_TOOK"))
                                             % search_text % (std::to_string(duration_ms) + " ms"));
 
-    AddItem(TEXT_SEARCH_RESULTS, match_report);
+    AddItem(TEXT_SEARCH_RESULTS, std::move(match_report));
 }
 
 void EncyclopediaDetailPanel::Refresh() {
@@ -3552,6 +3560,7 @@ void EncyclopediaDetailPanel::RefreshImpl() {
     std::string general_type;           // general type of thing being shown, eg. "Building" or "Ship Part"
     std::string specific_type;          // specific type of thing; thing's purpose.  eg. "Farming" or "Colonization".  May be left blank for things without specific types (eg. specials)
     std::string detailed_description;
+    detailed_description.reserve(2000); // guesstimate
     GG::Clr color(GG::CLR_ZERO);
 
     if (m_items.empty())
@@ -3639,7 +3648,7 @@ void EncyclopediaDetailPanel::RefreshImpl() {
     m_scroll_panel->ScrollTo(GG::Y0);
 }
 
-void EncyclopediaDetailPanel::AddItem(const std::string& type, std::string name) {
+void EncyclopediaDetailPanel::AddItem(std::string_view type, std::string name) {
     // if the actual item is not the last one, all aubsequented items are deleted
     if (!m_items.empty()) {
         if (m_items_it->first == type && m_items_it->second == name)

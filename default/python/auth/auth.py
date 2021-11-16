@@ -184,6 +184,12 @@ class AuthProvider:
             self.conn_ro = psycopg2.connect(self.dsn_ro)
             exctype, value = sys.exc_info()[:2]
             error("Cann't load players: %s %s" % (exctype, value))
+
+        teams = [1 for _ in range(len(players) // 2)] + [2 for _ in range(len(players) // 2)]
+        random.shuffle(teams)
+        for p in players:
+            p.starting_team = teams.pop()
+
         return players
 
     def send_outbound_chat_message(self, text, player_name, allow_email):

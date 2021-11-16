@@ -1,3 +1,9 @@
+freeorion (0.4.10.9999.fo0018+git20211116.6c3d9f1ppa1~focal) focal; urgency=medium
+
+  * FO0018
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Tue, 16 Nov 2021 20:07:47 +0300
+
 freeorion (0.4.10.9999.fo0017+git20211005.980fd8eppa2~focal) focal; urgency=medium
 
   * Fix game rules from options.

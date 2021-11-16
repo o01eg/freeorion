@@ -104,16 +104,16 @@ public:
     [[nodiscard]] float                         SpecialCapacity(const std::string& name) const;         ///> returns the capacity of the special with name \a name or 0 if that special is not present
 
     /** Returns all tags this object has. */
-    [[nodiscard]] virtual std::set<std::string> Tags() const;
+    [[nodiscard]] virtual std::set<std::string> Tags(const ScriptingContext&) const;
 
     /** Returns true iff this object has the tag with the indicated \a name. */
-    [[nodiscard]] virtual bool                  HasTag(const std::string& name) const;
+    [[nodiscard]] virtual bool                  HasTag(const std::string& name, const ScriptingContext&) const;
 
     [[nodiscard]] virtual UniverseObjectType    ObjectType() const;
 
     /** Return human readable string description of object offset \p ntabs from
         margin. */
-    [[nodiscard]] virtual std::string Dump(unsigned short ntabs = 0) const;
+    [[nodiscard]] virtual std::string         Dump(unsigned short ntabs = 0) const;
 
     /** Returns id of the object that directly contains this object, if any, or
         INVALID_OBJECT_ID if this object is not contained by any other. */
@@ -153,7 +153,8 @@ public:
     /** copies data from \a copied_object to this object, limited to only copy
       * data about the copied object that is known to the empire with id
       * \a empire_id (or all data if empire_id is ALL_EMPIRES) */
-    virtual void    Copy(std::shared_ptr<const UniverseObject> copied_object, Universe&, int empire_id) = 0;
+    virtual void    Copy(std::shared_ptr<const UniverseObject> copied_object,
+                         const Universe&, int empire_id) = 0;
 
     void            SetID(int id);              ///< sets the ID number of the object to \a id
     void            Rename(std::string name);   ///< renames this object to \a name
@@ -200,8 +201,7 @@ public:
 
     /** performs the movement that this object is responsible for this object's
         actions during the pop growth/production/research phase of a turn. */
-    virtual void    PopGrowthProductionResearchPhase()
-    {};
+    virtual void    PopGrowthProductionResearchPhase(ScriptingContext&) {}
 
     static constexpr double INVALID_POSITION = -100000.0;           ///< the position in x and y at which default-constructed objects are placed
     static constexpr int    INVALID_OBJECT_AGE = -(1 << 30) - 1;;   ///< the age returned by UniverseObject::AgeInTurns() if the current turn is INVALID_GAME_TURN, or if the turn on which an object was created is INVALID_GAME_TURN
@@ -213,7 +213,7 @@ public:
       * is visible to the empire with the specified \a empire_id as determined
       * by the detection and visibility system.  Caller takes ownership of
       * returned pointee. */
-    [[nodiscard]] virtual UniverseObject* Clone(Universe& universe, int empire_id = ALL_EMPIRES) const = 0;
+    [[nodiscard]] virtual UniverseObject* Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const = 0;
 
 protected:
     friend class Universe;
@@ -227,8 +227,7 @@ protected:
     void AddMeter(MeterType meter_type); ///< inserts a meter into object as the \a meter_type meter.  Should be used by derived classes to add their specialized meters to objects
     void Init();                         ///< adds stealth meter
 
-    /** Used by public UniverseObject::Copy and derived classes' ::Copy methods.
-      */
+    /** Used by public UniverseObject::Copy and derived classes' ::Copy methods. */
     void Copy(std::shared_ptr<const UniverseObject> copied_object, Visibility vis,
               const std::set<std::string>& visible_specials,
               const Universe& universe);

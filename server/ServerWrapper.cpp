@@ -267,9 +267,8 @@ namespace {
     auto GetAllSpecials() -> py::list
     {
         py::list py_specials;
-        for (const auto& special_name : SpecialNames()) {
-            py_specials.append(py::object(special_name));
-        }
+        for (const auto& special_name : SpecialNames())
+            py_specials.append(py::object(std::string{special_name}));
         return py_specials;
     }
 
@@ -298,20 +297,24 @@ namespace {
     void EmpireUnlockItem(int empire_id, UnlockableItemType item_type,
                           const std::string& item_name)
     {
-        Empire* empire = GetEmpire(empire_id);
+        Universe& universe{GetUniverse()};
+        EmpireManager& empires{Empires()};
+        int current_turn{CurrentTurn()};
+
+        auto empire = empires.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EmpireUnlockItem: couldn't get empire with ID " << empire_id;
             return;
         }
-        UnlockableItem item = UnlockableItem(item_type, item_name);
-        empire->UnlockItem(item);
+        auto item = UnlockableItem{item_type, item_name};
+        empire->UnlockItem(item, universe, current_turn);
     }
 
-    void EmpireAddShipDesign(int empire_id, const std::string& design_name)
-    {
-        Universe& universe = GetUniverse();
+    void EmpireAddShipDesign(int empire_id, const std::string& design_name) {
+        Universe& universe{GetUniverse()};
+        EmpireManager& empires{Empires()};
 
-        Empire* empire = GetEmpire(empire_id);
+        auto empire = empires.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EmpireAddShipDesign: couldn't get empire with ID " << empire_id;
             return;
@@ -784,6 +787,7 @@ namespace {
     auto CreateShip(const std::string& name, const std::string& design_name, const std::string& species, int fleet_id) -> int
     {
         Universe& universe = GetUniverse();
+        ObjectMap& objects = universe.Objects();
 
         // check if we got a species name, if yes, check if species exists
         if (!species.empty() && !GetSpecies(species)) {
@@ -799,13 +803,13 @@ namespace {
         }
 
         // get fleet and check if it exists
-        auto fleet = Objects().get<Fleet>(fleet_id);
+        auto fleet = objects.get<Fleet>(fleet_id);
         if (!fleet) {
             ErrorLogger() << "CreateShip: couldn't get fleet with ID " << fleet_id;
             return INVALID_OBJECT_ID;
         }
 
-        auto system = Objects().get<System>(fleet->SystemID());
+        auto system = objects.get<System>(fleet->SystemID());
         if (!system) {
             ErrorLogger() << "CreateShip: couldn't get system for fleet";
             return INVALID_OBJECT_ID;
@@ -824,7 +828,7 @@ namespace {
         }
 
         // create new ship
-        auto ship = universe.InsertNew<Ship>(empire_id, ship_design->ID(), species, empire_id);
+        auto ship = universe.InsertNew<Ship>(empire_id, ship_design->ID(), species, universe, empire_id);
         if (!ship) {
             ErrorLogger() << "CreateShip: couldn't create new ship";
             return INVALID_OBJECT_ID;
@@ -1327,7 +1331,7 @@ namespace FreeOrionPython {
         py::def("current_turn",                     CurrentTurn);
         py::def("generate_sitrep",                  GenerateSitRep);
         py::def("generate_sitrep",                  +[](int empire_id, const std::string& template_string, const std::string& icon) { GenerateSitRep(empire_id, template_string, py::dict(), icon); });
-        py::def("generate_starlanes",               GenerateStarlanes);
+        py::def("generate_starlanes",               +[](int max_jumps_between_systems, int max_starlane_length) { GenerateStarlanes(max_jumps_between_systems, max_starlane_length, GetUniverse()); });
 
         py::def("species_preferred_focus",          SpeciesDefaultFocus);
         py::def("species_get_planet_environment",   SpeciesGetPlanetEnvironment);

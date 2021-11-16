@@ -1,7 +1,6 @@
 #include "FreeOrionNode.h"
 
-#include <codecvt>
-
+#include <boost/xpressive/xpressive.hpp>
 #include <boost/uuid/nil_generator.hpp>
 
 #include <OS.hpp>
@@ -12,6 +11,7 @@
 
 #include "../ClientNetworking.h"
 #include "../../combat/CombatLogManager.h"
+#include "../../Empire/Empire.h"
 #include "../../network/Message.h"
 #include "../../universe/Fleet.h"
 #include "../../universe/System.h"
@@ -21,6 +21,51 @@
 #include "../../util/Version.h"
 
 std::atomic_bool quit(false);
+
+// Copied from ChatWnd.cpp
+namespace {
+    std::string UserStringSubstitute(const boost::xpressive::smatch& match) {
+        auto key = match.str(1);
+
+        if (match.nested_results().empty()) {
+            // not parameterized
+            if (UserStringExists(key))
+                return UserString(key);
+            return key;
+        }
+
+        if (UserStringExists(key))
+            // replace key with user string if such exists
+            key = UserString(key);
+
+        auto formatter = FlexibleFormat(key);
+
+        size_t arg = 1;
+        for (auto submatch : match.nested_results())
+            formatter.bind_arg(arg++, submatch.str());
+
+        return formatter.str();
+    }
+
+    // finds instances of stringtable substitutions and/or string formatting
+    // within the text \a input and evaluates them. [[KEY]] will be looked up
+    // in the stringtable, and if found, replaced with the corresponding
+    // stringtable entry. If not found, KEY is used instead. [[KEY,var1,var2]]
+    // will look up KEY in the stringtable or use just KEY if there is no
+    // such stringtable entry, and then substitute var1 for all instances of %1%
+    // in the string, and var2 for all instances of %2% in the string. Any
+    // intance of %3% or higher numbers will be deleted from the string, unless
+    // a third or more parameters are specified.
+    std::string StringtableTextSubstitute(const std::string& input) {
+        using namespace boost::xpressive;
+
+        sregex param = (s1 = +_w);
+        sregex regex = as_xpr("[[") >> (s1 = +_w) >> !*(',' >> param) >> "]]";
+
+        return regex_replace(input, regex, UserStringSubstitute);
+    }
+}
+
 
 void FreeOrionNode::_register_methods() {
     register_method("_exit_tree", &FreeOrionNode::_exit_tree);
@@ -34,12 +79,17 @@ void FreeOrionNode::_register_methods() {
     register_method("auth_response", &FreeOrionNode::auth_response);
     register_method("get_systems", &FreeOrionNode::get_systems);
     register_method("get_fleets", &FreeOrionNode::get_fleets);
+    register_method("send_chat_message", &FreeOrionNode::send_chat_message);
+    register_method("options_commit", &FreeOrionNode::options_commit);
+    register_method("options_set", &FreeOrionNode::options_set);
 
     godot::register_signal<FreeOrionNode>("ping", "message", GODOT_VARIANT_TYPE_STRING);
     godot::register_signal<FreeOrionNode>("error", "problem", GODOT_VARIANT_TYPE_STRING, "fatal", GODOT_VARIANT_TYPE_BOOL);
     godot::register_signal<FreeOrionNode>("auth_request", "player_name", GODOT_VARIANT_TYPE_STRING, "auth", GODOT_VARIANT_TYPE_STRING);
     godot::register_signal<FreeOrionNode>("empire_status", "status", GODOT_VARIANT_TYPE_INT, "about_empire_id", GODOT_VARIANT_TYPE_INT);
     godot::register_signal<FreeOrionNode>("start_game", "is_new_game", GODOT_VARIANT_TYPE_BOOL);
+    // ToDo: implement timestamps
+    godot::register_signal<FreeOrionNode>("chat_message", "text", GODOT_VARIANT_TYPE_STRING, "player_name", GODOT_VARIANT_TYPE_STRING, "text_color", GODOT_VARIANT_TYPE_COLOR, "pm", GODOT_VARIANT_TYPE_BOOL);
 }
 
 FreeOrionNode::FreeOrionNode()
@@ -53,7 +103,7 @@ void FreeOrionNode::_init() {
     SetAndroidEnvironment(s_android_api_struct->godot_android_get_env(),
                           s_android_api_struct->godot_android_get_activity());
 #endif
-    std::string executable_path = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t>{}.to_bytes(godot::OS::get_singleton()->get_executable_path().unicode_str());
+    std::string executable_path = godot::OS::get_singleton()->get_executable_path().utf8().get_data();
 
     InitDirs(executable_path);
 
@@ -72,7 +122,7 @@ void FreeOrionNode::_init() {
     const godot::PoolStringArray wargs = godot::OS::get_singleton()->get_cmdline_args();
     const godot::PoolStringArray::Read wargs_read = wargs.read();
     for (int i = 0; i < wargs.size(); ++ i) {
-        const std::string arg = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t>{}.to_bytes(wargs_read[i].unicode_str());
+        const std::string arg = wargs_read[i].utf8().get_data();
         // Exclude Godot's options
         if (arg != "-s" && arg.rfind("-g", 0) != 0) {
             args.emplace_back(std::move(arg));
@@ -110,7 +160,11 @@ void FreeOrionNode::_init() {
     }
 #endif
 
-    app = std::make_unique<GodotClientApp>();
+    m_app = std::make_unique<GodotClientApp>();
+
+    m_network_thread = godot::Ref<godot::Thread>();
+    m_network_thread.instance();
+    m_network_thread->start(this, "network_thread");
 }
 
 
@@ -122,8 +176,11 @@ void FreeOrionNode::set_android_api_struct(const godot_gdnative_ext_android_api_
 #endif
 
 void FreeOrionNode::_exit_tree() {
+    DebugLogger() << "FreeOrionNode::_exit_tree(): Stopping freeorion node";
     quit = true;
-    app.reset();
+    m_network_thread->wait_to_finish();
+    m_app.reset();
+    DebugLogger() << "FreeOrionNode::_exit_tree(): Freeorion node stopped";
 
     ShutdownLoggingSystemFileSink();
 }
@@ -140,14 +197,15 @@ void FreeOrionNode::HandleMessage(Message&& msg) {
             break;
         }
         case Message::MessageType::SET_AUTH_ROLES: {
-            ExtractSetAuthorizationRolesMessage(msg, app->Networking().AuthorizationRoles());
+            ExtractSetAuthorizationRolesMessage(msg, m_app->Networking().AuthorizationRoles());
             break;
         }
         case Message::MessageType::JOIN_GAME: {
             int player_id;
             boost::uuids::uuid cookie;
             ExtractJoinAckMessageData(msg, player_id, cookie);
-            app->Networking().SetPlayerID(player_id);
+
+            m_app->Networking().SetPlayerID(player_id);
             break;
         }
         case Message::MessageType::HOST_ID: {
@@ -159,7 +217,7 @@ void FreeOrionNode::HandleMessage(Message&& msg) {
                 ErrorLogger() << "GDFreeOrion::handle_message(HOST_ID) could not convert \"" << text << "\" to host id";
             }
 
-            app->Networking().SetHostPlayerID(host_id);
+            m_app->Networking().SetHostPlayerID(host_id);
             break;
         }
         case Message::MessageType::PLAYER_STATUS: {
@@ -173,8 +231,8 @@ void FreeOrionNode::HandleMessage(Message&& msg) {
             try {
                 int host_id = boost::lexical_cast<int>(msg.Text());
 
-                app->Networking().SetPlayerID(host_id);
-                app->Networking().SetHostPlayerID(host_id);
+                m_app->Networking().SetPlayerID(host_id);
+                m_app->Networking().SetHostPlayerID(host_id);
             } catch (const boost::bad_lexical_cast& ex) {
                 ErrorLogger() << "GDFreeOrion::handle_message(HOST_ID) Host id " << msg.Text() << " is not a number: " << ex.what();
             }
@@ -190,25 +248,25 @@ void FreeOrionNode::HandleMessage(Message&& msg) {
             bool single_player_game = false;
             int empire_id = ALL_EMPIRES;
             int current_turn = INVALID_GAME_TURN;
-            app->Orders().Reset();
+            m_app->Orders().Reset();
             try {
                 ExtractGameStartMessageData(msg,                 single_player_game,             empire_id,
                                             current_turn,        Empires(),                      GetUniverse(),
                                             GetSpeciesManager(), GetCombatLogManager(),          GetSupplyManager(),
-                                            app->Players(),      app->Orders(),              loaded_game_data,
+                                            m_app->Players(),    m_app->Orders(),                loaded_game_data,
                                             ui_data_available,   ui_data,                        save_state_string_available,
-                                            save_state_string,   app->GetGalaxySetupData());
+                                            save_state_string,   m_app->GetGalaxySetupData());
             } catch (...) {
                 return;
             }
 
             DebugLogger() << "Extracted GameStart message for turn: " << current_turn << " with empire: " << empire_id;
 
-            app->SetSinglePlayerGame(single_player_game);
-            app->SetEmpireID(empire_id);
-            app->SetCurrentTurn(current_turn);
+            m_app->SetSinglePlayerGame(single_player_game);
+            m_app->SetEmpireID(empire_id);
+            m_app->SetCurrentTurn(current_turn);
 
-            GetGameRules().SetFromStrings(app->GetGalaxySetupData().GetGameRules());
+            GetGameRules().SetFromStrings(m_app->GetGalaxySetupData().GetGameRules());
 
             bool is_new_game = !(loaded_game_data && ui_data_available);
             emit_signal("start_game", is_new_game);
@@ -220,6 +278,58 @@ void FreeOrionNode::HandleMessage(Message&& msg) {
             int player_id;
             ExtractErrorMessageData(msg, player_id, problem, fatal);
             emit_signal("error", godot::String(problem.c_str()), fatal);
+            break;
+        }
+        case Message::MessageType::CHAT_HISTORY: {
+            std::vector<ChatHistoryEntity> chat_history;
+            ExtractChatHistoryMessage(msg, chat_history);
+
+            for (const auto& elem : chat_history) {
+                emit_signal("chat_message",
+                            godot::String(StringtableTextSubstitute(elem.text).c_str()),
+                            godot::String(elem.player_name.c_str()),
+                            elem.player_name.empty() ?
+                                godot::Color(1.0f, 1.0f, 1.0f, 1.0f) :
+                                godot::Color(std::get<0>(elem.text_color) / 255.0f,
+                                             std::get<1>(elem.text_color) / 255.0f,
+                                             std::get<2>(elem.text_color) / 255.0f,
+                                             std::get<3>(elem.text_color) / 255.0f),
+                            false);
+            }
+
+            break;
+        }
+        case Message::MessageType::PLAYER_CHAT: {
+            int sending_player_id;
+            boost::posix_time::ptime timestamp;
+            std::string data;
+            bool pm;
+            ExtractServerPlayerChatMessageData(msg, sending_player_id, timestamp, data, pm);
+
+            std::string player_name{UserString("PLAYER") + " " + std::to_string(sending_player_id)};
+            godot::Color text_color{1.0f, 1.0f, 1.0f, 1.0f};
+            if (sending_player_id != Networking::INVALID_PLAYER_ID) {
+                const auto& players = m_app->Players();
+                auto player_it = players.find(sending_player_id);
+                if (player_it != players.end()) {
+                    player_name = player_it->second.name;
+                    if (auto empire = GetEmpire(player_it->second.empire_id))
+                        text_color = godot::Color(std::get<0>(empire->Color()) / 255.0f,
+                                                  std::get<1>(empire->Color()) / 255.0f,
+                                                  std::get<2>(empire->Color()) / 255.0f,
+                                                  std::get<3>(empire->Color()) / 255.0f);
+                }
+            } else {
+                // It's a server message. Don't set player name.
+                player_name.clear();
+            }
+
+            emit_signal("chat_message",
+                        godot::String(StringtableTextSubstitute(data).c_str()),
+                        godot::String((pm ? player_name + UserString("MESSAGES_WHISPER") : player_name).c_str()),
+                        text_color,
+                        pm);
+
             break;
         }
         default:
@@ -234,20 +344,22 @@ void FreeOrionNode::HandleMessage(Message&& msg) {
 }
 
 void FreeOrionNode::network_thread() {
+    DebugLogger() << "FreeOrionNode::network_thread(): Freeorion networking started";
     while(!quit) {
-        if (auto msg = this->app->Networking().GetMessage()) {
+        if (auto msg = this->m_app->Networking().GetMessage()) {
             this->HandleMessage(std::move(*msg));
         } else {
             godot::OS::get_singleton()->delay_msec(20);
         }
     }
+    DebugLogger() << "FreeOrionNode::network_thread(): Freeorion networking stopped";
 }
 
 void FreeOrionNode::new_single_player_game() {
 #ifdef FREEORION_ANDROID
     ErrorLogger() << "No single player game supported";
 #else
-    app->NewSinglePlayerGame();
+    m_app->NewSinglePlayerGame();
 #endif
 }
 
@@ -256,23 +368,23 @@ godot::String FreeOrionNode::get_version() const {
 }
 
 bool FreeOrionNode::is_server_connected() const {
-    return app->Networking().IsConnected();
+    return m_app->Networking().IsConnected();
 }
 
 bool FreeOrionNode::connect_to_server(godot::String dest) {
-    std::string dest8 = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t>{}.to_bytes(dest.unicode_str());
-    return app->Networking().ConnectToServer(dest8);
+    std::string dest8 = dest.utf8().get_data();
+    return m_app->Networking().ConnectToServer(dest8);
 }
 
 void FreeOrionNode::join_game(godot::String player_name, int client_type) {
-    std::string player_name8 = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t>{}.to_bytes(player_name.unicode_str());
-    app->Networking().SendMessage(JoinGameMessage(player_name8, static_cast<Networking::ClientType>(client_type), boost::uuids::nil_uuid()));
+    std::string player_name8 = player_name.utf8().get_data();
+    m_app->Networking().SendMessage(JoinGameMessage(player_name8, static_cast<Networking::ClientType>(client_type), boost::uuids::nil_uuid()));
 }
 
 void FreeOrionNode::auth_response(godot::String player_name, godot::String password) {
-    std::string player_name8 = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t>{}.to_bytes(player_name.unicode_str());
-    std::string password8 = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t>{}.to_bytes(password.unicode_str());
-    app->Networking().SendMessage(AuthResponseMessage(player_name8, password8));
+    std::string player_name8 = player_name.utf8().get_data();
+    std::string password8 = password.utf8().get_data();
+    m_app->Networking().SendMessage(AuthResponseMessage(player_name8, password8));
 }
 
 godot::Dictionary FreeOrionNode::get_systems() const {
@@ -289,5 +401,24 @@ godot::Dictionary FreeOrionNode::get_fleets() const {
         fleets[fleet->ID()] = GodotFleet::Wrap(fleet);
     }
     return fleets;
+}
+
+void FreeOrionNode::send_chat_message(godot::String text) {
+    std::string text8 = text.utf8().get_data();
+    m_app->Networking().SendMessage(PlayerChatMessage(text8, {}, false));
+}
+
+void FreeOrionNode::options_commit()
+{ GetOptionsDB().Commit(); }
+
+void FreeOrionNode::options_set(godot::String option, godot::Variant value) {
+    std::string option8 = option.utf8().get_data();
+    switch (value.get_type()) {
+    case godot::Variant::Type::STRING:
+        GetOptionsDB().Set<std::string>(option8, godot::String(value).utf8().get_data());
+        break;
+    default:
+        ErrorLogger() << "Unsupported option " << option8 << " type " << value.get_type();
+    }
 }
 

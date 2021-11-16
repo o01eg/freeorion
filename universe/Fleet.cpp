@@ -75,15 +75,14 @@ namespace {
 
 
 Fleet::Fleet(std::string name, double x, double y, int owner) :
-    UniverseObject(std::move(name), x, y),
-    m_last_turn_move_ordered(BEFORE_FIRST_TURN)
+    UniverseObject(std::move(name), x, y)
 {
     UniverseObject::Init();
     SetOwner(owner);
 }
 
-Fleet* Fleet::Clone(Universe& universe, int empire_id) const {
-    Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(this->ID(), empire_id);
+Fleet* Fleet::Clone(const Universe& universe, int empire_id) const {
+    Visibility vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
@@ -93,7 +92,9 @@ Fleet* Fleet::Clone(Universe& universe, int empire_id) const {
     return retval.release();
 }
 
-void Fleet::Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& universe, int empire_id) {
+void Fleet::Copy(std::shared_ptr<const UniverseObject> copied_object,
+                 const Universe& universe, int empire_id)
+{
     if (copied_object.get() == this)
         return;
     auto copied_fleet = std::dynamic_pointer_cast<const Fleet>(copied_object);
@@ -195,13 +196,13 @@ const std::string& Fleet::PublicName(int empire_id, const Universe& universe) co
         return UserString("OBJ_FLEET");
 }
 
-int Fleet::MaxShipAgeInTurns() const { // TODO: pass ScriptingContext or ObjectMap
+int Fleet::MaxShipAgeInTurns(const ObjectMap& objects) const {
     if (m_ships.empty())
         return INVALID_OBJECT_AGE;
 
     bool fleet_is_scrapped = true;
     int retval = 0;
-    for (const auto& ship : Objects().find<Ship>(m_ships)) {
+    for (const auto& ship : objects.find<Ship>(m_ships)) {
         if (!ship || ship->OrderedScrapped())
             continue;
         if (ship->AgeInTurns() > retval)
@@ -285,9 +286,9 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
 
 
     // get current, previous and next systems of fleet
-    auto cur_system = context.ContextObjects().get<System>(this->SystemID()).get();            // may be 0
-    auto prev_system = context.ContextObjects().get<System>(this->PreviousSystemID()).get();   // may be 0 if this fleet is not moving or ordered to move
-    auto next_system = context.ContextObjects().get<System>(*route_it).get();                  // can't use this->NextSystemID() because this fleet may not be moving and may not have a next system. this might occur when a fleet is in a system, not ordered to move or ordered to move to a system, but a projected fleet move line is being calculated to a different system
+    auto cur_system = context.ContextObjects().getRaw<System>(this->SystemID());          // may be 0
+    auto prev_system = context.ContextObjects().getRaw<System>(this->PreviousSystemID()); // may be 0 if this fleet is not moving or ordered to move
+    auto next_system = context.ContextObjects().getRaw<System>(*route_it);                // can't use this->NextSystemID() because this fleet may not be moving and may not have a next system. this might occur when a fleet is in a system, not ordered to move or ordered to move to a system, but a projected fleet move line is being calculated to a different system
     if (!next_system) {
         ErrorLogger() << "Fleet::MovePath couldn't get next system with id " << *route_it << " for fleet " << this->Name() << "(" << this->ID() << ")";
         return retval;
@@ -453,7 +454,7 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
             ++route_it;
             if (route_it != route.end()) {
                 // update next system on route and distance to it from current position
-                next_system = EmpireKnownObjects(this->Owner()).get<System>(*route_it).get(); // TODO !!!
+                next_system = EmpireKnownObjects(this->Owner()).getRaw<System>(*route_it); // TODO !!!
                 if (next_system) {
                     TraceLogger() << "Fleet::MovePath checking unrestriced lane travel from Sys("
                                   <<  cur_system->ID() << ") to Sys(" << (next_system && next_system->ID()) << ")";
@@ -662,14 +663,16 @@ namespace {
     }
 }
 
-bool Fleet::CanDamageShips(const Universe& u, float target_shields) const {
-    auto isX = [target_shields](const std::shared_ptr<const Ship>& ship){ return ship->CanDamageShips(target_shields); };
-    return HasXShips(isX, m_ships, u.Objects());
+bool Fleet::CanDamageShips(const ScriptingContext& context, float target_shields) const {
+    auto isX = [target_shields, &context](const std::shared_ptr<const Ship>& ship)
+    { return ship->CanDamageShips(context, target_shields); };
+    return HasXShips(isX, m_ships, context.ContextObjects());
 }
 
-bool Fleet::CanDestroyFighters(const Universe& u) const {
-    auto isX = [](const std::shared_ptr<const Ship>& ship){ return ship->CanDestroyFighters(); };
-    return HasXShips(isX, m_ships, u.Objects());
+bool Fleet::CanDestroyFighters(const ScriptingContext& context) const {
+    auto isX = [&context](const std::shared_ptr<const Ship>& ship)
+    { return ship->CanDestroyFighters(context); };
+    return HasXShips(isX, m_ships, context.ContextObjects());
 }
 
 bool Fleet::HasMonsters(const Universe& u) const {
@@ -677,9 +680,9 @@ bool Fleet::HasMonsters(const Universe& u) const {
     return HasXShips(isX, m_ships, u.Objects());
 }
 
-bool Fleet::HasArmedShips(const Universe& u) const {
-    auto isX = [&u](const std::shared_ptr<const Ship>& ship){ return ship->IsArmed(u); };
-    return HasXShips(isX, m_ships, u.Objects());
+bool Fleet::HasArmedShips(const ScriptingContext& context) const {
+    auto isX = [&context](const std::shared_ptr<const Ship>& ship){ return ship->IsArmed(context); };
+    return HasXShips(isX, m_ships, context.ContextObjects());
 }
 
 bool Fleet::HasFighterShips(const Universe& u) const {
@@ -1313,10 +1316,10 @@ bool Fleet::BlockadedAtSystem(int start_system_id, int dest_system_id,
         // ageas since fleets can be created/destroyed as purely organizational matters.  Since these checks are
         // pertinent just during those stages of turn processing immediately following turn number advancement,
         // whereas the new ships were created just prior to turn advamcenemt, we require age greater than 1.
-        if (fleet->MaxShipAgeInTurns() <= 1)
+        if (fleet->MaxShipAgeInTurns(objects) <= 1)
             continue;
         // These are the most costly checks.  Do them last
-        if (!fleet->CanDamageShips(context.ContextUniverse()))
+        if (!fleet->CanDamageShips(context))
             continue;
 
         // don't exit early here, because blockade may yet be thwarted by ownership & presence check above
@@ -1404,20 +1407,24 @@ float Fleet::Shields(const ObjectMap& objects) const {
     return retval;
 }
 
-std::string Fleet::GenerateFleetName(const Universe& u, const SpeciesManager& sm) {
+std::string Fleet::GenerateFleetName(const ScriptingContext& context) {
     // TODO: Change returned name based on passed ship designs.  eg. return "colony fleet" if
     // ships are colony ships, or "battle fleet" if ships are armed.
     if (ID() == INVALID_OBJECT_ID)
         return UserString("NEW_FLEET_NAME_NO_NUMBER");
 
+    const Universe& u{context.ContextUniverse()};
+    const SpeciesManager& sm{context.species};
     const ObjectMap& objects = u.Objects();
     auto ships = objects.find<Ship>(m_ships);
 
     // todo: rewrite with a lambda and store in a const string& to avoid copies...
     std::string fleet_name_key = UserStringNop("NEW_FLEET_NAME");
 
-    auto IsCombatShip = [&u](const auto& ship)
-    { return ship.IsArmed(u) || ship.HasFighters(u) || ship.CanHaveTroops(u) || ship.CanBombard(u); };
+    auto IsCombatShip = [&context, &u](const auto& ship) {
+        return ship.IsArmed(context) || ship.HasFighters(u) ||
+               ship.CanHaveTroops(u) || ship.CanBombard(u);
+    };
 
     if (boost::algorithm::all_of(ships, [&u](const auto& ship){ return ship->IsMonster(u); }))
         fleet_name_key = UserStringNop("NEW_MONSTER_FLEET_NAME");

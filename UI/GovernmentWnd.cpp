@@ -528,7 +528,8 @@ void PoliciesListBox::ShowCategory(const std::string& category, bool refresh_lis
 
 void PoliciesListBox::ShowAllCategories(bool refresh_list) {
     auto cats = GetPolicyManager().PolicyCategories();
-    m_policy_categories_shown.insert(cats.begin(), cats.end());
+    std::transform(cats.begin(), cats.end(), std::inserter(m_policy_categories_shown, m_policy_categories_shown.end()),
+                   [](const auto sv) { return std::string{sv}; });
     if (refresh_list)
         Populate();
 }
@@ -608,18 +609,20 @@ void GovernmentWnd::PolicyPalette::CompleteConstruction() {
     m_policies_list->ClearPolicySignal.connect(ClearPolicySignal);
 
     // class buttons
-    for (auto& category : GetPolicyManager().PolicyCategories()) {
+    for (auto& cat_view : GetPolicyManager().PolicyCategories()) {
         // are there any policies of this class?
         if (std::none_of(GetPolicyManager().begin(), GetPolicyManager().end(),
-                         [category](auto& e){ return e.second && category == e.second->Category(); }))
+                         [cat_view](auto& e){ return e.second && cat_view == e.second->Category(); }))
         { continue; }
 
-        m_category_buttons[category] = GG::Wnd::Create<CUIStateButton>(
-            UserString(boost::lexical_cast<std::string>(category)),
-            GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
-        AttachChild(m_category_buttons[category]);
-        m_category_buttons[category]->CheckedSignal.connect(
-            boost::bind(&GovernmentWnd::PolicyPalette::ToggleCategory, this, category, true));
+        const auto& us_cateory{UserString(cat_view)};
+        auto [ptr_it, ignored] = m_category_buttons.emplace(std::string{cat_view}, GG::Wnd::Create<CUIStateButton>(
+            us_cateory, GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>()));
+        (void)ignored;
+        auto& [string_in_map, ptr_in_map] = *ptr_it;
+        AttachChild(ptr_in_map);
+        ptr_in_map->CheckedSignal.connect(
+            boost::bind(&GovernmentWnd::PolicyPalette::ToggleCategory, this, string_in_map, true));
     }
 
     auto& m_available_button = std::get<int(Availability::Enum::Available)>(m_availabilities_buttons);
@@ -853,8 +856,7 @@ void GovernmentWnd::PolicyPalette::Populate()
 class PolicySlotControl : public GG::Control {
 public:
     PolicySlotControl();
-    PolicySlotControl(const std::string& slot_category, int category_index,
-                      unsigned int slot_index);
+    PolicySlotControl(std::string slot_category, int category_index, unsigned int slot_index);
     void CompleteConstruction() override;
 
     const std::string&  SlotCategory() const    { return m_slot_category; }
@@ -902,10 +904,10 @@ PolicySlotControl::PolicySlotControl() :
     GG::Control(GG::X0, GG::Y0, SLOT_CONTROL_WIDTH, SLOT_CONTROL_HEIGHT, GG::INTERACTIVE)
 {}
 
-PolicySlotControl::PolicySlotControl(const std::string& slot_category, int category_index,
+PolicySlotControl::PolicySlotControl(std::string slot_category, int category_index,
                                      unsigned int slot_index) :
     GG::Control(GG::X0, GG::Y0, SLOT_CONTROL_WIDTH, SLOT_CONTROL_HEIGHT, GG::INTERACTIVE),
-    m_slot_category(slot_category),
+    m_slot_category(std::move(slot_category)),
     m_category_index(category_index),
     m_slot_index(slot_index)
 {}
@@ -1247,15 +1249,18 @@ void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot
         ErrorLogger() << "GovernmentWnd::MainPanel::SetPolicy specified nonexistant slot";
         return;
     }
+
+    ScriptingContext context;
+
     int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    Empire* empire = GetEmpire(empire_id);  // may be nullptr
+    auto empire = context.GetEmpire(empire_id);  // may be nullptr
     if (!empire) {
         ErrorLogger() << "GovernmentWnd::MainPanel::SetPolicy has no empire to set policies for";
         return;
     }
 
     // what category and slot is policy being adopted in
-    auto&& [adopt_in_category_slot, adopt_in_category] = OverallSlotToCategoryAndSlot(empire, slot);
+    auto&& [adopt_in_category_slot, adopt_in_category] = OverallSlotToCategoryAndSlot(empire.get(), slot);
     if (adopt_in_category.empty()) {
         ErrorLogger() << "GovernmentWnd::MainPanel::SetPolicy specified invalid slot: " << slot;
         return;
@@ -1301,13 +1306,12 @@ void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot
     // issue order to adopt or revoke
     auto order = std::make_shared<PolicyOrder>(empire_id, order_policy_name, adopt_in_category,
                                                adopt, adopt_in_category_slot);
-    GGHumanClientApp::GetApp()->Orders().IssueOrder(std::move(order));
+    GGHumanClientApp::GetApp()->Orders().IssueOrder(std::move(order), context);
 
     // update UI after policy changes
-    empire->UpdateInfluenceSpending();
+    empire->UpdateInfluenceSpending(context.ContextObjects());
     Populate();
-    ScriptingContext context{GetUniverse(), Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
-    GetUniverse().UpdateMeterEstimates(context);
+    context.ContextUniverse().UpdateMeterEstimates(context);
     SidePanel::Refresh();
     FleetUIManager::GetFleetUIManager().RefreshAll();
 }

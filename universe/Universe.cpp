@@ -89,18 +89,31 @@ namespace {
     // determining how much of their speed is consumed by the jump
     // unused variable consexprt double WORMHOLE_TRAVEL_DISTANCE = 0.1;
 
-    template <typename Key, typename Value>
-    struct constant_property
-    { Value m_value; };
+    void CheckContextVsThisUniverse(const Universe& universe, const ScriptingContext& context) {
+        const auto& universe_objects{universe.Objects()};
+        const auto& context_objects{context.ContextObjects()};
+        const auto& context_universe{context.ContextUniverse()};
+
+        if (&universe != &context_universe)
+            ErrorLogger() << "Universe member function passed context with different Universe from this";
+
+        if (&context_objects != &universe_objects)
+            ErrorLogger() << "Universe member function passed context different ObjectMap from this Universe";
+    }
 }
 
 namespace boost {
+    template <typename Key, typename Value>
+    struct constant_property
+    { Value m_value; };
+
     template <typename Key, typename Value>
     struct property_traits<constant_property<Key, Value>> {
         typedef Value value_type;
         typedef Key key_type;
         typedef readable_property_map_tag category;
     };
+
     template <typename Key, typename Value>
     const Value& get(const constant_property<Key, Value>& pmap, const Key&) { return pmap.m_value; }
 }
@@ -520,6 +533,7 @@ void Universe::ResetObjectMeters(const std::vector<std::shared_ptr<UniverseObjec
 }
 
 void Universe::ApplyAllEffectsAndUpdateMeters(ScriptingContext& context, bool do_accounting) {
+    CheckContextVsThisUniverse(*this, context);
     ScopedTimer timer("Universe::ApplyAllEffectsAndUpdateMeters");
 
     if (do_accounting) {
@@ -556,6 +570,7 @@ void Universe::ApplyAllEffectsAndUpdateMeters(ScriptingContext& context, bool do
 void Universe::ApplyMeterEffectsAndUpdateMeters(const std::vector<int>& object_ids, ScriptingContext& context,
                                                 bool do_accounting)
 {
+    CheckContextVsThisUniverse(*this, context);
     if (object_ids.empty())
         return;
     ScopedTimer timer("Universe::ApplyMeterEffectsAndUpdateMeters on " + std::to_string(object_ids.size()) + " objects");
@@ -587,6 +602,7 @@ void Universe::ApplyMeterEffectsAndUpdateMeters(const std::vector<int>& object_i
 }
 
 void Universe::ApplyMeterEffectsAndUpdateMeters(ScriptingContext& context, bool do_accounting) {
+    CheckContextVsThisUniverse(*this, context);
     ScopedTimer timer("Universe::ApplyMeterEffectsAndUpdateMeters on all objects");
     if (do_accounting) {
         // override if disabled
@@ -618,6 +634,7 @@ void Universe::ApplyMeterEffectsAndUpdateMeters(ScriptingContext& context, bool 
 }
 
 void Universe::ApplyAppearanceEffects(const std::vector<int>& object_ids, ScriptingContext& context) {
+    CheckContextVsThisUniverse(*this, context);
     if (object_ids.empty())
         return;
     ScopedTimer timer("Universe::ApplyAppearanceEffects on " + std::to_string(object_ids.size()) + " objects");
@@ -653,6 +670,7 @@ void Universe::ApplyGenerateSitRepEffects(ScriptingContext& context) {
 }
 
 void Universe::InitMeterEstimatesAndDiscrepancies(ScriptingContext& context) {
+    CheckContextVsThisUniverse(*this, context);
     DebugLogger(effects) << "Universe::InitMeterEstimatesAndDiscrepancies";
     ScopedTimer timer("Universe::InitMeterEstimatesAndDiscrepancies", true, std::chrono::microseconds(1));
 
@@ -756,6 +774,7 @@ void Universe::UpdateMeterEstimates(ScriptingContext& context, bool do_accountin
 }
 
 void Universe::UpdateMeterEstimates(int object_id, ScriptingContext& context, bool update_contained_objects) {
+    CheckContextVsThisUniverse(*this, context);
     // ids of the object and all valid contained objects
     std::unordered_set<int> collected_ids;
 
@@ -813,20 +832,6 @@ void Universe::UpdateMeterEstimates(const std::vector<int>& objects_vec, Scripti
     std::vector<int> final_objects_vec{objects_set.begin(), objects_set.end()};
     if (!final_objects_vec.empty())
         UpdateMeterEstimatesImpl(final_objects_vec, context, GetOptionsDB().Get<bool>("effects.accounting.enabled"));
-}
-
-namespace {
-    void CheckContextVsThisUniverse(const Universe& universe, const ScriptingContext& context) {
-        const auto& universe_objects{universe.Objects()};
-        const auto& context_objects{context.ContextObjects()};
-        const auto& context_universe{context.ContextUniverse()};
-
-        if (&universe != &context_universe)
-            ErrorLogger() << "Universe member function passed context with different Universe from this";
-
-        if (&context_objects != &universe_objects)
-            ErrorLogger() << "Universe member function passed context different ObjectMap from this Universe";
-    }
 }
 
 void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec,
@@ -979,7 +984,7 @@ namespace {
         const Effect::EffectsGroup*                 effects_group,
         const Condition::ObjectSet&                 source_objects,
         EffectsCauseType                            effect_cause_type,
-        const std::string&                          specific_cause_name,
+        std::string_view                            specific_cause_name,
         IntSetT&                                    candidate_object_ids,   // TODO: Can this be removed along with scope is source test?
         Effect::TargetSet&                          candidate_objects_in,   // may be empty: indicates to test for full universe of objects
         Effect::SourcesEffectsTargetsAndCausesVec&  source_effects_targets_causes_out,
@@ -988,7 +993,7 @@ namespace {
         TraceLogger(effects) << [&]() -> std::string {
             return "StoreTargetsAndCausesOfEffectsGroup < " + std::to_string(n) + " >"
                 + "  cause type: " + boost::lexical_cast<std::string>(effect_cause_type)
-                + "  specific cause: " + specific_cause_name
+                + "  specific cause: " + std::string {specific_cause_name}
                 + "  sources (" + std::to_string(source_objects.size())  + ")"
                 + "  candidate ids (" + std::to_string(candidate_object_ids.size()) + ")"
                 + "  candidate objects (" + std::to_string(candidate_objects_in.size()) + ")";
@@ -1006,19 +1011,20 @@ namespace {
 
         ScopedTimer timer(
             [
-                n, effect_cause_type, specific_cause_name,
+                n, effect_cause_type, name_view{specific_cause_name},
                 sz{source_objects.size()}, scope
             ] () -> std::string
         {
-            return "StoreTargetsAndCausesOfEffectsGroup < " + std::to_string(n) + " >"
+            return ("StoreTargetsAndCausesOfEffectsGroup < " + std::to_string(n) + " >"
                 + "  cause type: " + boost::lexical_cast<std::string>(effect_cause_type)
-                + "  specific cause: " + specific_cause_name
+                + "  specific cause: ").append(name_view)
                 + "  sources: " + std::to_string(sz)
                 + "  scope: " + boost::algorithm::erase_all_copy(scope->Dump(), "\n");
-        }, std::chrono::milliseconds(10));
+        }, std::chrono::milliseconds(5));
 
         source_effects_targets_causes_out.reserve(source_objects.size());
 
+        // could check if the scope is source-invariant, but in my tests this was true less than 1% of the time...
         for (auto& source : source_objects) {
             // assuming input sources objects set was already filtered with activation condition
             context.source = source;
@@ -1032,7 +1038,8 @@ namespace {
                 Effect::SourcedEffectsGroup{source->ID(), effects_group},
                 Effect::TargetsAndCause{
                     Effect::TargetSet{},
-                    Effect::EffectCause{effect_cause_type, specific_cause_name, effects_group->AccountingLabel()}});
+                    Effect::EffectCause{effect_cause_type, std::string{specific_cause_name},
+                                        effects_group->AccountingLabel()}});
 
             // extract output Effect::TargetSet
             Effect::TargetSet& matched_targets{source_effects_targets_causes_out.back().second.target_set};
@@ -1073,7 +1080,7 @@ namespace {
     template <typename ReorderBufferT, typename IntSetT>
     void DispatchEffectsGroupScopeEvaluations(
         EffectsCauseType effect_cause_type,
-        const std::string& specific_cause_name,
+        std::string_view specific_cause_name,
         const Condition::ObjectSet& source_objects,
         const std::vector<std::shared_ptr<Effect::EffectsGroup>>& effects_groups,
         bool only_meter_effects,
@@ -1220,7 +1227,7 @@ namespace {
                         Effect::SourcedEffectsGroup{source->ID(), effects_group},
                         Effect::TargetsAndCause{
                             {}, // empty Effect::TargetSet
-                            Effect::EffectCause{effect_cause_type, specific_cause_name,
+                            Effect::EffectCause{effect_cause_type, std::string{specific_cause_name},
                                                 effects_group->AccountingLabel()}});
                 }
 
@@ -1282,7 +1289,6 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
                                     const ScriptingContext& context,
                                     bool only_meter_effects) const
 {
-    CheckContextVsThisUniverse(*this, context);
     source_effects_targets_causes.clear();
     GetEffectsAndTargets(source_effects_targets_causes, std::vector<int>(), context, only_meter_effects);
 }
@@ -1293,7 +1299,6 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
                                     bool only_meter_effects) const
 {
     CheckContextVsThisUniverse(*this, context);
-
     SectionedScopedTimer type_timer("Effect TargetSets Evaluation", std::chrono::microseconds(0));
 
     // assemble target objects from input vector of IDs
@@ -1379,7 +1384,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     // 2) EffectsGroups from Specials
     type_timer.EnterSection("specials");
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for SPECIALS";
-    std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> specials_objects;
+    std::map<std::string_view, std::vector<std::shared_ptr<const UniverseObject>>> specials_objects;
     // determine objects with specials in a single pass
     for (const auto& obj : context.ContextObjects().all()) {
         if (destroyed_object_ids.count(obj->ID()))
@@ -1395,7 +1400,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         }
     }
     // dispatch condition evaluations
-    for (const std::string& special_name : GetSpecialsManager().SpecialNames()) {
+    for (const auto& special_name : GetSpecialsManager().SpecialNames()) {
         const Special* special = GetSpecial(special_name);
         auto specials_objects_it = specials_objects.find(special_name);
         if (specials_objects_it == specials_objects.end())
@@ -1662,7 +1667,6 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
                               bool only_generate_sitrep_effects/* = false*/)
 {
     CheckContextVsThisUniverse(*this, context);
-
     ScopedTimer timer("Universe::ExecuteEffects", true);
 
     context.ContextUniverse().m_marked_destroyed.clear();
@@ -3021,10 +3025,9 @@ void Universe::GetShipDesignsToSerialize(ShipDesignMap& designs_to_serialize, in
         designs_to_serialize.clear();
 
         // add generic monster ship designs so they always appear in players' pedias
-        for (const auto& ship_design_entry : m_ship_designs) {
-            ShipDesign* design = ship_design_entry.second;
+        for (const auto& [design_id, design] : m_ship_designs) {
             if (design->IsMonster() && design->DesignedByEmpire() == ALL_EMPIRES)
-                designs_to_serialize[design->ID()] = design;
+                designs_to_serialize.emplace(design_id, design);
         }
 
         // get empire's known ship designs
@@ -3038,7 +3041,7 @@ void Universe::GetShipDesignsToSerialize(ShipDesignMap& designs_to_serialize, in
         for (int design_id : empire_designs) {
             auto universe_design_it = m_ship_designs.find(design_id);
             if (universe_design_it != m_ship_designs.end())
-                designs_to_serialize[design_id] = universe_design_it->second;
+                designs_to_serialize.emplace(design_id, universe_design_it->second);
             else
                 ErrorLogger() << "Universe::GetShipDesignsToSerialize empire " << encoding_empire
                               << " should know about design with id " << design_id
@@ -3060,7 +3063,7 @@ void Universe::GetObjectsToSerialize(ObjectMap& objects, int encoding_empire) co
 
     } else if constexpr (!ENABLE_VISIBILITY_EMPIRE_MEMORY) {
         // if encoding without memory, copy all info visible to specified empire
-        objects.Copy(*m_objects, encoding_empire);
+        objects.Copy(*m_objects, *this, encoding_empire);
 
     } else {
         // if encoding for a specific empire with memory...

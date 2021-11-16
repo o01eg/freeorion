@@ -452,7 +452,7 @@ std::string StatisticDescription(StatisticType stat_type,
         boost::lexical_cast<std::string>(stat_type)));
 
     if (UserStringExists(stringtable_key)) {
-        boost::format formatter = FlexibleFormat(stringtable_key);
+        boost::format formatter = FlexibleFormat(UserString(stringtable_key));
         formatter % value_desc % condition_desc;
         return boost::io::str(formatter);
     }
@@ -610,10 +610,6 @@ void Constant<std::string>::SetTopLevelContent(const std::string& content_name)
 ///////////////////////////////////////////////////////////
 #define IF_CURRENT_VALUE(T)                                            \
 if (m_ref_type == ReferenceType::EFFECT_TARGET_VALUE_REFERENCE) {      \
-    if (context.current_value.empty())                                 \
-        throw std::runtime_error(                                      \
-            "Variable<" #T ">::Eval(): Value could not be evaluated, " \
-            "because no current value was provided.");                 \
     try {                                                              \
         return boost::get<T>(context.current_value);                   \
     } catch (const boost::bad_get&) {                                  \
@@ -879,29 +875,31 @@ double Variable<double>::Eval(const ScriptingContext& context) const
 
     } else if (property_name == "DestroyFightersPerBattleMax") {
         if (auto ship = std::dynamic_pointer_cast<const Ship>(object)) {
-            InfoLogger() << "DestroyFightersPerBattleMax" <<  ship->TotalWeaponsFighterDamage();
-            // FIXME prevent recursion; disallowing the ValueRef inside of destroyFightersPerBattleMax via parsers would be best.
-            return ship->TotalWeaponsFighterDamage();
+            auto retval = ship->TotalWeaponsFighterDamage(context);
+            InfoLogger() << "DestroyFightersPerBattleMax" << retval;
+            // TODO: prevent recursion; disallowing the ValueRef inside of destroyFightersPerBattleMax via parsers would be best.
+            return retval;
         }
         return 0.0;
 
     } else if (property_name == "DamageStructurePerBattleMax") {
         if (auto ship = std::dynamic_pointer_cast<const Ship>(object)) {
-            // FIXME prevent recursion; disallowing the ValueRef inside of damageStructurePerBattleMax via parsers would be best.
-            InfoLogger() << "DamageStructurePerBattleMax" <<  ship->TotalWeaponsShipDamage();
-            return ship->TotalWeaponsShipDamage();
+            // TODO: prevent recursion; disallowing the ValueRef inside of damageStructurePerBattleMax via parsers would be best.
+            auto retval = ship->TotalWeaponsShipDamage(context);
+            InfoLogger() << "DamageStructurePerBattleMax" << retval;
+            return retval;
         }
         return 0.0;
 
     } else if (property_name == "PropagatedSupplyRange") {
-        const auto& ranges = GetSupplyManager().PropagatedSupplyRanges();   // TODO: Get from Context..
+        const auto& ranges = context.supply.PropagatedSupplyRanges();
         auto range_it = ranges.find(object->SystemID());
         if (range_it == ranges.end())
             return 0.0;
         return range_it->second;
 
     } else if (property_name == "PropagatedSupplyDistance") {
-        const auto& ranges = GetSupplyManager().PropagatedSupplyDistances(); // TODO: get from context
+        const auto& ranges = context.supply.PropagatedSupplyDistances();
         auto range_it = ranges.find(object->SystemID());
         if (range_it == ranges.end())
             return 0.0;
@@ -973,7 +971,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
 
     }
     else if (property_name == "SupplyingEmpire") {
-        return GetSupplyManager().EmpireThatCanSupplyAt(object->SystemID()); // TODO: Get SupplyManager from Context
+        return context.supply.EmpireThatCanSupplyAt(object->SystemID());
     }
     else if (property_name == "ID") {
         return object->ID();
@@ -1161,7 +1159,7 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
     }
 
     if (property_name == "Tags") {
-        auto tags = object->Tags();
+        auto tags = object->Tags(context);
         return {tags.begin(), tags.end()};
     }
     else if (property_name == "Specials") {
@@ -1488,13 +1486,7 @@ Visibility ComplexVariable<Visibility>::Eval(const ScriptingContext& context) co
                 return Visibility::VIS_NO_VISIBILITY;
         }
 
-        auto empire_it = context.empire_object_vis.find(empire_id);
-        if (empire_it == context.empire_object_vis.end())
-            return Visibility::VIS_NO_VISIBILITY;
-        auto obj_it = empire_it->second.find(object_id);
-        if (obj_it == empire_it->second.end())
-            return Visibility::VIS_NO_VISIBILITY;
-        return obj_it->second;
+        return context.ContextVis(object_id, empire_id);
     }
 
     return Visibility::INVALID_VISIBILITY;
@@ -3057,6 +3049,16 @@ double Operation<double>::EvalImpl(const ScriptingContext& context) const
             break;
         }
 
+        case OpType::REMAINDER: {
+            double divisor = std::abs(RHS()->Eval(context));
+            if (divisor == 0.0)
+                return 0.0;
+            auto dividend = LHS()->Eval(context);
+            auto quotient = std::floor(dividend / divisor);
+            return dividend - quotient * divisor;
+            break;
+        }
+
         case OpType::NEGATE:
             return -(LHS()->Eval(context)); break;
 
@@ -3213,6 +3215,14 @@ int Operation<int>::EvalImpl(const ScriptingContext& context) const
             if (op2 == 0)
                 return 0;
             return LHS()->Eval(context) / op2;
+            break;
+        }
+
+        case OpType::REMAINDER: {
+            int op2 = RHS()->Eval(context);
+            if (op2 == 0)
+                return 0;
+            return LHS()->Eval(context) % op2;
             break;
         }
 

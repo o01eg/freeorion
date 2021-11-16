@@ -158,6 +158,7 @@ public:
 
         /** Comparison with std::string. */
         bool operator==(const std::string& rhs) const;
+        bool operator==(std::string_view rhs) const;
 
         /** Comparison with std::string. */
         bool operator!=(const std::string& rhs) const;
@@ -534,8 +535,8 @@ public:
         it from tight loops.  Do not call it from within Render().  Do not
         call it repeatedly on a known text.
     */
-    std::vector<std::shared_ptr<Font::TextElement>> ExpensiveParseFromTextToTextElements(const std::string& text,
-                                                                                         const Flags<TextFormat>& format) const;
+    std::vector<std::shared_ptr<Font::TextElement>> ExpensiveParseFromTextToTextElements(
+        const std::string& text, const Flags<TextFormat>& format) const;
 
     /** Fill \p text_elements with the font widths of characters from \p text starting from \p
         starting_from. */
@@ -601,6 +602,7 @@ public:
         when rendering text.  Passing "foo" will cause Font to treat "<foo>",
         "<foo [arg1 [arg2 ...]]>", and "</foo>" as tags. */
     static void RegisterKnownTag(const std::string& tag);
+    static void RegisterKnownTag(std::string_view tag);
 
     /** Removes \a tag from the known tag list.  Does not remove the built in
         tags: \<i>, \<u>, \<rgba r g b a>, and \<pre>. */
@@ -611,7 +613,7 @@ public:
     static void ClearKnownTags();
 
     /** Returns the input \a text, stripped of any formatting tags. */
-    static std::string StripTags(const std::string& text, bool strip_unpaired_tags = true);
+    static std::string StripTags(std::string_view text, bool strip_unpaired_tags = true);
 
     /** The base class for Font exceptions. */
     GG_ABSTRACT_EXCEPTION(Exception);

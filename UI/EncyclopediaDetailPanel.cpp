@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <boost/algorithm/clamp.hpp>
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/replace.hpp>
+#include <boost/locale/conversion.hpp>
 #include <GG/GUI.h>
 #include <GG/RichText/RichText.h>
 #include <GG/ScrollPanel.h>
@@ -66,11 +66,11 @@ namespace {
     bool temp_bool = RegisterOptions(&AddOptions);
 
     const std::string EMPTY_STRING;
-    const std::string INCOMPLETE_DESIGN = "incomplete design";
-    const std::string UNIVERSE_OBJECT = "universe object";
-    const std::string PLANET_SUITABILITY_REPORT = "planet suitability report";
-    const std::string GRAPH = "data graph";
-    const std::string TEXT_SEARCH_RESULTS = "dynamic generated text";
+    constexpr std::string_view INCOMPLETE_DESIGN = "incomplete design";
+    constexpr std::string_view UNIVERSE_OBJECT = "universe object";
+    constexpr std::string_view PLANET_SUITABILITY_REPORT = "planet suitability report";
+    constexpr std::string_view GRAPH = "data graph";
+    constexpr std::string_view TEXT_SEARCH_RESULTS = "dynamic generated text";
 
     /** @content_tag{CTRL_ALWAYS_REPORT} Always display a species on a planet suitability report. **/
     const std::string TAG_ALWAYS_REPORT = "CTRL_ALWAYS_REPORT";
@@ -88,17 +88,19 @@ namespace {
      * @return The first matched pedia category for this set of tags,
      *          or empty string if there are no matches.
      */
-    std::string DetermineCustomCategory(const std::set<std::string>& tags) {
-        if (tags.empty())
-            return EMPTY_STRING;
-
+    template <class TagContainer = std::vector<std::string_view>>
+    std::string_view DetermineCustomCategory(const TagContainer& tags) {
         // for each tag, check if it starts with the prefix TAG_PEDIA_PREFIX
         // when a match is found, return the match (without the prefix portion)
-        for (const std::string& tag : tags)
-            if (boost::starts_with(tag, TAG_PEDIA_PREFIX))
-                return boost::replace_first_copy(tag, TAG_PEDIA_PREFIX, EMPTY_STRING);
+        for (std::string_view tag : tags) {
+            if (boost::starts_with(tag, TAG_PEDIA_PREFIX)) {
+                //return boost::replace_first_copy(tag, TAG_PEDIA_PREFIX, "");
+                tag.remove_prefix(TAG_PEDIA_PREFIX.length());
+                return tag;
+            }
+        }
 
-        return EMPTY_STRING;
+        return ""; // no matching tag found
     }
 
     /** Retreive a value label and general string representation for @a meter_type */
@@ -121,8 +123,8 @@ namespace {
 
     void MeterTypeDirEntry(const MeterType& meter_type,
                            std::multimap<std::string,
-                                         std::pair<std::string,
-                                                   std::string>>& list)
+                                         std::pair<std::string, std::string>,
+                                         std::less<>>& list)
     {
         auto&& [value_label, string_rep] = MeterValueLabelAndString(meter_type);
 
@@ -154,7 +156,7 @@ namespace {
         subcategorization is something like a tech category (eg. growth). */
     void GetSortedPediaDirEntires(
         const std::string& dir_name,
-        std::multimap<std::string, std::pair<std::string, std::string>>& sorted_entries_list,
+        std::multimap<std::string, std::pair<std::string, std::string>, std::less<>>& sorted_entries_list,
         bool exclude_custom_categories_from_dir_name = true)
     {
         ScopedTimer subdir_timer("GetSortedPediaDirEntires(" + dir_name + ")",
@@ -262,12 +264,12 @@ namespace {
 
         }
         else if (dir_name == "ENC_SPECIAL") {
-            for (std::string& special_name : SpecialNames()) {
+            for (auto special_name : SpecialNames()) {
                 std::string tagged_text{LinkTaggedText(VarText::SPECIAL_TAG, special_name).append("\n")};
                 auto& us_name{UserString(special_name)};    // line before to avoid order of operations issues when moving from special_name
                 sorted_entries_list.emplace(
                     us_name,
-                    std::pair{std::move(tagged_text), std::move(special_name)});
+                    std::pair{std::move(tagged_text), special_name});
             }
 
         }
@@ -602,7 +604,7 @@ namespace {
 
     std::string PediaDirText(const std::string& dir_name) {
         // get sorted list of entries for requested directory
-        std::multimap<std::string, std::pair<std::string, std::string>> sorted_entries_list;
+        std::multimap<std::string, std::pair<std::string, std::string>, std::less<>> sorted_entries_list;
         GetSortedPediaDirEntires(dir_name, sorted_entries_list);
 
         std::string retval;
@@ -1083,14 +1085,12 @@ namespace {
 
 
         // map from (human readable article name) to (article-link-tag-text, article name stringtable key)
-        std::multimap<std::string, std::pair<std::string, std::string>> sorted_entries;
+        std::multimap<std::string, std::pair<std::string, std::string>, std::less<>> sorted_entries;
         GetSortedPediaDirEntires(dir_name, sorted_entries, exclude_custom_categories_from_dir_name);
 
 
-        for (auto& entry : sorted_entries) {
-            const std::string& readable_article_name = entry.first;
-            std::string& link_text = entry.second.first;
-            std::string& category_str_key = entry.second.second;
+        for (auto& [readable_article_name, link_category] : sorted_entries) {
+            auto& [link_text, category_str_key] = link_category;
 
             // explicitly exclude textures and input directory itself
             if (category_str_key == "ENC_TEXTURES" || category_str_key == dir_name)
@@ -1283,11 +1283,12 @@ namespace {
 
         // Ship Parts
         if (!only_description) {
+            const ScriptingContext context;
             name = UserString(item_name);
             texture = ClientUI::PartIcon(item_name);
             int default_location_id = DefaultLocationForEmpire(client_empire_id);
-            turns = part->ProductionTime(client_empire_id, default_location_id);
-            cost = part->ProductionCost(client_empire_id, default_location_id);
+            turns = part->ProductionTime(client_empire_id, default_location_id, context);
+            cost = part->ProductionCost(client_empire_id, default_location_id, context);
             cost_units = UserString("ENC_PP");
             general_type = UserString("ENC_SHIP_PART");
             specific_type = UserString(boost::lexical_cast<std::string>(part->Class()));
@@ -1497,7 +1498,7 @@ namespace {
 
         if (!unlocked_items.empty()) {
             for (const UnlockableItem& item : unlocked_items) {
-                auto& TAG = [type{item.type}]() -> const std::string& {
+                auto TAG = [type{item.type}]() -> std::string_view {
                     switch (type) {
                     case UnlockableItemType::UIT_BUILDING:    return VarText::BUILDING_TYPE_TAG;     break;
                     case UnlockableItemType::UIT_SHIP_PART:   return VarText::SHIP_PART_TAG;         break;
@@ -1505,7 +1506,7 @@ namespace {
                     case UnlockableItemType::UIT_SHIP_DESIGN: return VarText::PREDEFINED_DESIGN_TAG; break;
                     case UnlockableItemType::UIT_TECH:        return VarText::TECH_TAG;              break;
                     case UnlockableItemType::UIT_POLICY:      return VarText::POLICY_TAG;            break;
-                    default:                                  return EMPTY_STRING;
+                    default:                                  return "";
                     }
                 }();
 
@@ -1621,10 +1622,11 @@ namespace {
             for (auto& name : species_that_dislike)
                 detailed_description += LinkTaggedText(VarText::SPECIES_TAG, name) + " ";
         }
+        detailed_description += "\n";
 
         if (GetOptionsDB().Get<bool>("resource.effects.description.shown") &&
             !policy->Effects().empty())
-        { detailed_description += "\n\n" + Dump(policy->Effects()); }
+        { detailed_description += "\n" + Dump(policy->Effects()); }
     }
 
     void RefreshDetailPanelBuildingTypeTag( const std::string& item_type, const std::string& item_name,
@@ -1758,14 +1760,14 @@ namespace {
         if (!objects_with_special.empty()) {
             detailed_description += "\n\n" + UserString("OBJECTS_WITH_SPECIAL");
             for (auto& obj : objects_with_special) {
-                const auto& TEXT_TAG = [&obj]() {
+                auto TEXT_TAG = [&obj]() -> std::string_view {
                     switch (obj->ObjectType()) {
                     case UniverseObjectType::OBJ_SHIP:      return VarText::SHIP_ID_TAG;    break;
                     case UniverseObjectType::OBJ_FLEET:     return VarText::FLEET_ID_TAG;   break;
                     case UniverseObjectType::OBJ_PLANET:    return VarText::PLANET_ID_TAG;  break;
                     case UniverseObjectType::OBJ_BUILDING:  return VarText::BUILDING_ID_TAG;break;
                     case UniverseObjectType::OBJ_SYSTEM:    return VarText::SYSTEM_ID_TAG;  break;
-                    default:                                return EMPTY_STRING;
+                    default:                                return "";
                     }
                 }();
 
@@ -2471,15 +2473,16 @@ namespace {
         // within a loop that sets the species, updates meter, then checks
         // meter values for display
         const Universe& universe = GetUniverse();
+        const ScriptingContext context{universe, Empires()};
 
         auto& species = ship->SpeciesName().empty() ? "Generic" : UserString(ship->SpeciesName());
         float structure = ship->GetMeter(MeterType::METER_MAX_STRUCTURE)->Current();
         float shield = ship->GetMeter(MeterType::METER_MAX_SHIELD)->Current();
-        float attack = ship->TotalWeaponsShipDamage();
-        float destruction = ship->TotalWeaponsFighterDamage();
+        float attack = ship->TotalWeaponsShipDamage(context);
+        float destruction = ship->TotalWeaponsFighterDamage(context);
         float strength = std::pow(attack * structure, 0.6f);
-        float typical_shot = *std::max_element(enemy_shots.begin(), enemy_shots.end());
-        float typical_strength = std::pow(ship->TotalWeaponsShipDamage(enemy_DR) * structure * typical_shot / std::max(typical_shot - shield, 0.001f), 0.6f); // FIXME TotalWeaponsFighterDamage 
+        float typical_shot = enemy_shots.empty() ? 0.0f : *std::max_element(enemy_shots.begin(), enemy_shots.end()); // TODO: cbegin, cend (also elsewhere)
+        float typical_strength = std::pow(ship->TotalWeaponsShipDamage(context, enemy_DR) * structure * typical_shot / std::max(typical_shot - shield, 0.001f), 0.6f); // FIXME TotalWeaponsFighterDamage 
         return (FlexibleFormat(UserString("ENC_SHIP_DESIGN_DESCRIPTION_STATS_STR"))
             % species
             % attack
@@ -2493,7 +2496,7 @@ namespace {
             % ship->SumCurrentPartMeterValuesForPartClass(MeterType::METER_CAPACITY, ShipPartClass::PC_COLONY, universe)
             % ship->SumCurrentPartMeterValuesForPartClass(MeterType::METER_CAPACITY, ShipPartClass::PC_TROOPS, universe)
             % ship->FighterMax()
-            % (attack - ship->TotalWeaponsShipDamage(0.0f, false)) // FIXME TotalWeaponsFighterDamage
+            % (attack - ship->TotalWeaponsShipDamage(context, 0.0f, false)) // FIXME TotalWeaponsFighterDamage
             % ship->SumCurrentPartMeterValuesForPartClass(MeterType::METER_MAX_CAPACITY, ShipPartClass::PC_FIGHTER_BAY, universe)
             % strength
             % (strength / cost)
@@ -2520,6 +2523,7 @@ namespace {
         int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
         Universe& universe = GetUniverse();
         ObjectMap& objects = universe.Objects();
+        const ScriptingContext context{universe, Empires()};
 
         const ShipDesign* design = universe.GetShipDesign(design_id);
         if (!design) {
@@ -2547,17 +2551,17 @@ namespace {
         float enemy_DR = 20 * tech_level;
         TraceLogger() << "RefreshDetailPanelShipDesignTag default enemy stats:: tech_level: "
                       << tech_level << "   DR: " << enemy_DR << "   attack: " << typical_shot;
-        std::set<float> enemy_shots;
-        enemy_shots.insert(typical_shot);
+        std::set<float> enemy_shots{typical_shot};
 
 
         // select which species to show info for
 
+        // TODO: can this be a vector of string_view ?
         std::set<std::string> additional_species; // from currently selected planet and fleets, if any
         const auto& map_wnd = ClientUI::GetClientUI()->GetMapWnd();
         if (const auto planet = objects.get<Planet>(map_wnd->SelectedPlanetID())) {
             if (!planet->SpeciesName().empty())
-                additional_species.emplace(planet->SpeciesName());
+                additional_species.insert(planet->SpeciesName());
         }
 
         FleetUIManager& fleet_manager = FleetUIManager::GetFleetUIManager();
@@ -2590,7 +2594,7 @@ namespace {
                     enemy_DR = this_ship->GetMeter(MeterType::METER_MAX_SHIELD)->Initial();
                     DebugLogger() << "Using selected ship for enemy values, DR: " << enemy_DR;
                     enemy_shots.clear();
-                    auto this_damage = this_ship->AllWeaponsMaxShipDamage(universe); // FIXME FighterDamage
+                    auto this_damage = this_ship->AllWeaponsMaxShipDamage(context); // FIXME FighterDamage
                     for (float shot : this_damage)
                         DebugLogger() << "Weapons Dmg " << shot;
                     enemy_shots.insert(this_damage.begin(), this_damage.end());
@@ -2614,7 +2618,7 @@ namespace {
 
         if (!only_description) { // don't generate detailed stat description involving adding / removing temporary ship from universe
             // temporary ship to use for estimating design's meter values
-            auto temp = universe.InsertTemp<Ship>(client_empire_id, design_id, "", client_empire_id);
+            auto temp = universe.InsertTemp<Ship>(client_empire_id, design_id, "", universe, client_empire_id);
 
             // apply empty species for 'Generic' entry
             ScriptingContext context{universe, Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
@@ -2725,7 +2729,7 @@ namespace {
                     enemy_DR = this_ship->GetMeter(MeterType::METER_MAX_SHIELD)->Initial();
                     DebugLogger() << "Using selected ship for enemy values, DR: " << enemy_DR;
                     enemy_shots.clear();
-                    auto this_damage = this_ship->AllWeaponsMaxShipDamage(universe); // FIXME: MaxFighterDamage
+                    auto this_damage = this_ship->AllWeaponsMaxShipDamage(context); // FIXME: MaxFighterDamage
                     for (float shot : this_damage)
                         DebugLogger() << "Weapons Dmg " << shot;
                     enemy_shots.insert(this_damage.begin(), this_damage.end());
@@ -2749,7 +2753,8 @@ namespace {
 
 
         // temporary ship to use for estimating design's meter values
-        auto temp = universe.InsertTemp<Ship>(client_empire_id, TEMPORARY_OBJECT_ID, "", client_empire_id);
+        auto temp = universe.InsertTemp<Ship>(client_empire_id, TEMPORARY_OBJECT_ID, "",
+                                              universe, client_empire_id);
 
         // apply empty species for 'Generic' entry
         universe.UpdateMeterEstimates(temp->ID(), context);
@@ -3297,6 +3302,19 @@ namespace {
         }
     }
 
+    std::set<std::string> ExtractWords(const std::string& search_text) { // TODO: return vector<string_view> ?
+        std::set<std::string> words_in_search_text;
+        for (const auto& word_range : GG::GUI::GetGUI()->FindWordsStringIndices(search_text)) {
+            if (word_range.first == word_range.second)
+                continue;
+            std::string word(search_text.begin() + Value(word_range.first), search_text.begin() + Value(word_range.second));
+            if (word.empty())
+                continue;
+            words_in_search_text.insert(std::move(word));
+        }
+        return words_in_search_text;
+    }
+
     void SearchPediaArticleForWords(        std::string article_key,
                                             std::string article_directory,
                                             std::pair<std::string, std::string> article_name_link,
@@ -3310,17 +3328,17 @@ namespace {
                                             bool search_article_text)
     {
         //std::cout << "start scanning article " << idx << ": " << article_name_link.first << std::endl;
-        const auto& article_name = article_name_link.first;
-
+        std::string article_name = boost::locale::to_lower(article_name_link.first, GetLocale("en_US.UTF-8"));
         // search for exact title matches
-        if (boost::iequals(article_name, search_text)) {
+        if (article_name == search_text) {
             exact_match = std::move(article_name_link);
             return;
         }
 
-        // search for full word matches in titles
-        for (const std::string& word : words_in_search_text) {
-            if (GG::GUI::GetGUI()->ContainsWord(article_name, word)) {
+        // search for full word matches in title
+        auto title_words{ExtractWords(article_name)};
+        for (const auto& title_word : title_words) {
+            if (words_in_search_text.count(title_word)) {
                 word_match = std::move(article_name_link);
                 return;
             }
@@ -3332,7 +3350,7 @@ namespace {
             // reject searches in text for words less than 3 characters
             if (word.size() < 3)
                 continue;
-            if (boost::icontains(article_name, word)) {
+            if (boost::contains(article_name, word)) {
                 partial_match = std::move(article_name_link);
                 return;
             }
@@ -3346,10 +3364,11 @@ namespace {
         const auto& article_entry = GetEncyclopedia().GetArticleByCategoryAndKey(article_directory, article_key);
         if (!article_entry.description.empty()) {
             // article present in pedia directly
-            if (boost::icontains(UserString(article_entry.description), search_text)) {
+            const auto& article_text{UserString(article_entry.description)};
+            std::string article_text_lower = boost::locale::to_lower(article_text, GetLocale("en_US.UTF-8"));
+            if (boost::contains(article_text_lower, search_text))
                 article_match = std::move(article_name_link);
-                return;
-            }
+            return;
         }
 
 
@@ -3361,6 +3380,7 @@ namespace {
         float dummyB;
         std::string dummy3, dummy4, dummy5, dummy6;
         std::string detailed_description;
+        detailed_description.reserve(2000); // guessitmate
         GG::Clr dummyC;
         std::weak_ptr<const ShipDesign> dummyD;
 
@@ -3369,22 +3389,15 @@ namespace {
                                   dummy3, dummy1, dummy2, dummyA, dummyB, dummy4,
                                   dummy5, dummy6, detailed_description, dummyC,
                                   dummyD, true);
-
-        if (boost::icontains(detailed_description, search_text))
+        if (boost::contains(detailed_description, search_text)) {
             article_match = std::move(article_name_link);
-    }
-
-    std::set<std::string> ExtractWords(const std::string& search_text) {
-        std::set<std::string> words_in_search_text;
-        for (const auto& word_range : GG::GUI::GetGUI()->FindWordsStringIndices(search_text)) {
-            if (word_range.first == word_range.second)
-                continue;
-            std::string word(search_text.begin() + Value(word_range.first), search_text.begin() + Value(word_range.second));
-            if (word.empty())
-                continue;
-            words_in_search_text.insert(std::move(word));
+            return;
         }
-        return words_in_search_text;
+        std::string desc_lower = boost::locale::to_lower(detailed_description, GetLocale("en_US.UTF-8"));
+        if (boost::contains(desc_lower, search_text)) {
+            article_match = std::move(article_name_link);
+            return;
+        }
     }
 }
 
@@ -3396,7 +3409,7 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
     boost::asio::thread_pool thread_pool(num_threads);
 
     // search lists of articles for typed text
-    const std::string& search_text = m_search_edit->Text();
+    auto search_text = boost::algorithm::to_lower_copy(m_search_edit->Text());
     if (search_text.empty())
         return;
 
@@ -3503,7 +3516,7 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
     match_report += "\n\n" + boost::io::str(FlexibleFormat(UserString("ENC_SEARCH_TOOK"))
                                             % search_text % (std::to_string(duration_ms) + " ms"));
 
-    AddItem(TEXT_SEARCH_RESULTS, match_report);
+    AddItem(TEXT_SEARCH_RESULTS, std::move(match_report));
 }
 
 void EncyclopediaDetailPanel::Refresh() {
@@ -3545,6 +3558,7 @@ void EncyclopediaDetailPanel::RefreshImpl() {
     std::string general_type;           // general type of thing being shown, eg. "Building" or "Ship Part"
     std::string specific_type;          // specific type of thing; thing's purpose.  eg. "Farming" or "Colonization".  May be left blank for things without specific types (eg. specials)
     std::string detailed_description;
+    detailed_description.reserve(2000); // guesstimate
     GG::Clr color(GG::CLR_ZERO);
 
     if (m_items.empty())
@@ -3632,7 +3646,7 @@ void EncyclopediaDetailPanel::RefreshImpl() {
     m_scroll_panel->ScrollTo(GG::Y0);
 }
 
-void EncyclopediaDetailPanel::AddItem(const std::string& type, std::string name) {
+void EncyclopediaDetailPanel::AddItem(std::string_view type, std::string name) {
     // if the actual item is not the last one, all aubsequented items are deleted
     if (!m_items.empty()) {
         if (m_items_it->first == type && m_items_it->second == name)

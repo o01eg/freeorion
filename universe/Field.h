@@ -14,8 +14,8 @@ namespace Effect {
 /** a class representing a region of space */
 class FO_COMMON_API Field : public UniverseObject {
 public:
-    [[nodiscard]] std::set<std::string> Tags() const override;
-    [[nodiscard]] bool                  HasTag(const std::string& name) const override;
+    [[nodiscard]] std::set<std::string> Tags(const ScriptingContext&) const override;
+    [[nodiscard]] bool                  HasTag(const std::string& name, const ScriptingContext&) const override;
 
     [[nodiscard]] UniverseObjectType    ObjectType() const override;
 
@@ -35,7 +35,7 @@ public:
 
     std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const override;
 
-    void Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& universe,
+    void Copy(std::shared_ptr<const UniverseObject> copied_object, const Universe& universe,
               int empire_id = ALL_EMPIRES) override;
 
     void ResetTargetMaxUnpairedMeters() override;
@@ -48,7 +48,7 @@ private:
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);
 
     /** Returns new copy of this Field. */
-    [[nodiscard]] Field* Clone(Universe& universe, int empire_id = ALL_EMPIRES) const override;
+    [[nodiscard]] Field* Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const override;
 
     std::string m_type_name;
 

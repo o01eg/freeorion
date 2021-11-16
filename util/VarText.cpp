@@ -47,21 +47,17 @@ namespace {
     //!
     //! @return
     //!     The tagged content.
-    std::string WithTags(const std::string& content, const std::string& tag, const std::string& data) {
-        std::string open_tag = "<" + tag + " " + data + ">";
-        std::string close_tag = "</" + tag + ">";
-        return open_tag + content + close_tag;
+    std::string WithTags(std::string_view content, std::string_view tag, std::string_view data) {
+        std::string retval;
+        retval.reserve(1 + tag.size() + 1 + data.size() + 1 + content.size() + 2 + tag.size() + 2);
+        retval.append("<").append(tag).append(" ").append(data).append(">")
+              .append(content)
+              .append("</").append(tag).append(">");
+        return retval;
     }
 
-    //! Function signature of tag substitution functions.
-    //!
-    //! @param data
-    //!     Data values The signature of functions that generate substitution
-    //!     strings for tags.
-    typedef std::function<boost::optional<std::string> (const std::string& data)> TagString;
-
     //! Get string substitute for a tag that is a universe object
-    boost::optional<std::string> UniverseObjectString(const std::string& data, const std::string& tag) {
+    boost::optional<std::string> UniverseObjectString(const std::string& data, std::string_view tag) {
         int object_id = INVALID_OBJECT_ID;
         try {
             object_id = boost::lexical_cast<int>(data);
@@ -102,8 +98,10 @@ namespace {
         boost::optional<std::string> retval = boost::none;
         // validate data
         MeterType meter_type = MeterType::INVALID_METER_TYPE;
-        std::istringstream data_ss(data);
-        data_ss >> meter_type;
+        try {
+            meter_type = boost::lexical_cast<MeterType>(data);
+        } catch (...) {
+        }
 
         if (meter_type > MeterType::INVALID_METER_TYPE && meter_type < MeterType::NUM_METER_TYPES) {
             retval = boost::lexical_cast<std::string>(meter_type);
@@ -128,23 +126,26 @@ namespace {
         return boost::none;
     }
 
-    //! Returns substitution string for an empire tag
-    //! Interprets value of data as a name.
-    //! Returns translation of name, if Get says
-    //! that a thing by that name exists, otherwise boost::none.
+    //! Returns substitution string for tag and data, where \a data is looked up using the
+    //! GetByName function and the returned name is wrapped in \a tag to linkifying it.
+    //! If GetByName returns an empty optional or null pointer, then an empty optional<string>
+    //! is returned
     template <typename T, const T* (*GetByName)(const std::string&)>
-    boost::optional<std::string> NameString(const std::string& data, const std::string& tag) {
+    boost::optional<std::string> NameString(const std::string& data, std::string_view tag) {
         if (!GetByName(data))
             return boost::none;
         return WithTags(UserString(data), tag, data);
     }
 
-    //! Global substitution map, wrapped in a function to avoid initialization order issues
-    const std::map<std::string, TagString>& SubstitutionMap() {
-        static std::map<std::string, TagString> substitute_map{
-            {VarText::TEXT_TAG, [](const std::string& data) -> boost::optional<std::string>
+    //! Function signature of tag substitution functions.
+    using TagStringFunc = std::function<boost::optional<std::string> (const std::string& data)>;
+
+    //! tag data to user-readable text Substitution map
+    const std::map<std::string_view, TagStringFunc>& SubstitutionMap() {
+        static std::map<std::string_view, TagStringFunc> substitute_map{
+            {VarText::TEXT_TAG, [](const std::string& data)
                 { return UserString(data); }},
-            {VarText::RAW_TEXT_TAG, [](const std::string& data) -> boost::optional<std::string>
+            {VarText::RAW_TEXT_TAG, [](const std::string& data)
                 { return data; }},
             {VarText::PLANET_ID_TAG, [](const std::string& data)
                 { return UniverseObjectString(data, VarText::PLANET_ID_TAG); }},
@@ -158,7 +159,7 @@ namespace {
                 { return UniverseObjectString(data, VarText::BUILDING_ID_TAG); }},
             {VarText::FIELD_ID_TAG, [](const std::string& data)
                 { return UniverseObjectString(data, VarText::FIELD_ID_TAG); }},
-            {VarText::COMBAT_ID_TAG, [](const std::string& data) -> boost::optional<std::string>
+            {VarText::COMBAT_ID_TAG, [](const std::string& data)
                 { return WithTags(UserString("COMBAT"), VarText::COMBAT_ID_TAG, data); }},
             {VarText::TECH_TAG, [](const std::string& data)
                 { return NameString<Tech, GetTech>(data, VarText::TECH_TAG); }},
@@ -194,9 +195,10 @@ namespace {
 
 
     //! Looks up the given match in the Universe and returns the Universe
-    //! entities value.
+    //! entities value. If the lookup or the substitution fails, sets
+    //! \a valid to false.
     struct Substitute {
-        Substitute(const std::map<std::string, std::string>& variables, bool& valid) :
+        Substitute(const std::map<std::string, std::string, std::less<>>& variables, bool& valid) :
             m_variables(variables),
             m_valid(valid)
         {}
@@ -204,66 +206,40 @@ namespace {
         std::string operator()(xpr::smatch const& match) const {
             // Labelled variables have the form %tag:label%,  unlabelled are just %tag%
             // Use the label value. When missing, use the tag submatch as label instead.
-            std::string label{match[match[2].matched ? 2 : 1].str()};
+
+            const int idx = match[2].matched ? 2 : 1;
+            const auto& m{match[idx]};
+            std::string_view label{&*m.first, static_cast<size_t>(std::max(0, static_cast<int>(m.length())))};
 
             // look up child
             auto elem = m_variables.find(label);
-            if (m_variables.end() == elem) {
-                ErrorLogger() << "Substitute::operator(): No value found for label: " << label << " from token: " << match.str();
+            if (elem == m_variables.end()) {
+                ErrorLogger() << "Substitute::operator(): No value found for label: " << label
+                              << "  from token: " << match.str();
                 m_valid = false;
                 return UserString("ERROR");
             }
 
+            std::string_view tag{&*match[1].first, static_cast<size_t>(std::max(0, static_cast<int>(match[1].length())))};
 
-            std::string tag{match[1].str()};
-            auto substituter = SubstitutionMap().find(tag);
-            if (substituter != SubstitutionMap().end()) {
-                if (auto substitution = substituter->second(elem->second))
-                    return *substitution;
+            if (auto substituter = SubstitutionMap().find(tag); substituter != SubstitutionMap().end()) {
+                const auto& substitution_func = substituter->second;
+                const auto& variable_value = elem->second;
+                if (auto substitution = substitution_func(variable_value))
+                    return *substitution; // optional<std::string> contains a temporary string, which can't be returned by reference
             }
 
-            ErrorLogger() << "Substitute::operator(): No substitution executed for tag: " << tag << " from token: " << match.str();
+            ErrorLogger() << "Substitute::operator(): No substitution executed for tag: " << tag
+                          << " from token: " << match.str();
             m_valid = false;
             return UserString("ERROR");
         }
 
-        const std::map<std::string, std::string>& m_variables;
+        const std::map<std::string, std::string, std::less<>>& m_variables;
         bool& m_valid;
     };
 }
 
-
-const std::string VarText::TEXT_TAG = "text";
-const std::string VarText::RAW_TEXT_TAG = "rawtext";
-
-const std::string VarText::PLANET_ID_TAG = "planet";
-const std::string VarText::SYSTEM_ID_TAG = "system";
-const std::string VarText::SHIP_ID_TAG = "ship";
-const std::string VarText::FLEET_ID_TAG = "fleet";
-const std::string VarText::BUILDING_ID_TAG = "building";
-const std::string VarText::FIELD_ID_TAG = "field";
-
-const std::string VarText::COMBAT_ID_TAG = "combat";
-
-const std::string VarText::EMPIRE_ID_TAG = "empire";
-const std::string VarText::DESIGN_ID_TAG = "shipdesign";
-const std::string VarText::PREDEFINED_DESIGN_TAG = "predefinedshipdesign";
-
-const std::string VarText::FOCS_VALUE_TAG = "value";
-
-const std::string VarText::TECH_TAG = "tech";
-const std::string VarText::POLICY_TAG = "policy";
-const std::string VarText::BUILDING_TYPE_TAG = "buildingtype";
-const std::string VarText::SPECIAL_TAG = "special";
-const std::string VarText::SHIP_HULL_TAG = "shiphull";
-const std::string VarText::SHIP_PART_TAG = "shippart";
-const std::string VarText::SPECIES_TAG = "species";
-const std::string VarText::FIELD_TYPE_TAG = "fieldtype";
-const std::string VarText::METER_TYPE_TAG = "metertype";
-
-
-VarText::VarText()
-{}
 
 VarText::VarText(std::string template_string, bool stringtable_lookup) :
     m_template_string(std::move(template_string)),
@@ -287,23 +263,20 @@ void VarText::SetTemplateString(std::string template_string, bool stringtable_lo
     m_stringtable_lookup_flag = stringtable_lookup;
 }
 
-std::vector<std::string> VarText::GetVariableTags() const {
-    std::vector<std::string> retval;
+std::vector<std::string_view> VarText::GetVariableTags() const {
+    std::vector<std::string_view> retval;
     retval.reserve(m_variables.size());
-    for (const auto& variable : m_variables)
-        retval.emplace_back(variable.first);
+    for (const auto& [tag, data] : m_variables)
+        retval.emplace_back(tag);
     return retval;
 }
 
-void VarText::AddVariable(const std::string& tag, const std::string& data)
-{ m_variables[tag] = data; }
-
-void VarText::AddVariable(const std::string& tag, std::string&& data)
-{ m_variables[tag] = std::move(data); }
+void VarText::AddVariable(std::string tag, std::string data)
+{ m_variables[std::move(tag)] = std::move(data); }
 
 void VarText::AddVariables(std::vector<std::pair<std::string, std::string>>&& data) {
     for (auto& dat : data)
-        m_variables.emplace(std::move(dat));
+        m_variables.insert(std::move(dat));
 }
 
 void VarText::GenerateVarText() const {

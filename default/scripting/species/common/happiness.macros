@@ -12,7 +12,7 @@ BAD_HAPPINESS
             scope = Source
             activation = Planet
             accountinglabel = "BAD_HAPPINESS_LABEL"
-            effects = SetTargetHappiness value = Value - 5
+            effects = SetTargetHappiness value = Value + (NamedReal name = "BAD_HAPPINESS_VAL" value = -2.5)
 '''
 
 AVERAGE_HAPPINESS
@@ -31,7 +31,7 @@ GOOD_HAPPINESS
             scope = Source
             activation = Planet
             accountinglabel = "GOOD_HAPPINESS_LABEL"
-            effects = SetTargetHappiness value = Value + 5
+            effects = SetTargetHappiness value = Value + (NamedReal name = "GOOD_HAPPINESS_VAL" value = 2.5)
 '''
 
 GREAT_HAPPINESS
@@ -44,7 +44,7 @@ GREAT_HAPPINESS
             scope = Source
             activation = Planet
             accountinglabel = "GREAT_HAPPINESS_LABEL"
-            effects = SetTargetHappiness value = Value + 10
+            effects = SetTargetHappiness value = Value + (NamedReal name = "GREAT_HAPPINESS_VAL" value = 5)
 '''
 
 ULTIMATE_HAPPINESS
@@ -57,7 +57,7 @@ ULTIMATE_HAPPINESS
             scope = Source
             activation = Planet
             accountinglabel = "ULTIMATE_HAPPINESS_LABEL"
-            effects = SetTargetHappiness value = Value + 15
+            effects = SetTargetHappiness value = Value + (NamedReal name = "ULTIMATE_HAPPINESS_VAL" value = 7.5)
 '''
 
 INDEPENDENT_HAPPINESS
@@ -77,6 +77,12 @@ COMMON_HAPPINESS_EFFECTS
             effects = SetHappiness value = Value +
                 min(abs(Value(Target.TargetHappiness) - Value), 1) *
                     (1 - 2*(Statistic If condition = And [Target (Value > Value(Target.TargetHappiness))]))
+
+        EffectsGroup
+            scope = Source
+            activation = ((GameRule name = "RULE_BASELINE_PLANET_STABILITY") != 0)
+            accountinglabel = "RULE_BASELINE_PLANET_STABILITY"
+            effects = SetTargetHappiness value = Value + (GameRule name = "RULE_BASELINE_PLANET_STABILITY")
 
         EffectsGroup    // more stable when liked focuses are adopted
             scope = Source

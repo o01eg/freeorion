@@ -6,6 +6,7 @@
 #include <Godot.hpp>
 #include <Node.hpp>
 #include <String.hpp>
+#include <Thread.hpp>
 
 class Message;
 class GodotClientApp;
@@ -32,7 +33,7 @@ private:
       * Should be used instead of destructor. */
     void _exit_tree();
 
-    void HandleMessage(Message&&); ///< Process message in the networking thread
+    void HandleMessage(Message&&); ///< Processes message in the networking thread
 
     void network_thread(); ///< Function called in a separate networking thread
 
@@ -42,17 +43,24 @@ private:
 
     bool is_server_connected() const; ///< Returns if FreeOrion connected to server
 
-    bool connect_to_server(godot::String dest); ///< Connect to \a dest server
+    bool connect_to_server(godot::String dest); ///< Connects to \a dest server
 
-    void join_game(godot::String player_name, int client_type); ///< Join to connected server
+    void join_game(godot::String player_name, int client_type); ///< Joins to connected server
 
-    void auth_response(godot::String player_name, godot::String password); ///< Send \a password to the server
+    void auth_response(godot::String player_name, godot::String password); ///< Sends \a password to the server
 
     godot::Dictionary get_systems() const; ///< Returns Godot Dictionary with systems
 
     godot::Dictionary get_fleets() const; ///< Returns Godot Dictionary with fleets
 
-    std::unique_ptr<GodotClientApp> app;
+    void send_chat_message(godot::String text); ///< Sends \a text to chat
+
+    void options_commit(); ///< Commits options DB
+
+    void options_set(godot::String option, godot::Variant value); ///< Sets options DB value
+
+    std::unique_ptr<GodotClientApp> m_app;
+    godot::Ref<godot::Thread> m_network_thread;
 
 #if defined(FREEORION_ANDROID)
     static const godot_gdnative_ext_android_api_struct* s_android_api_struct;

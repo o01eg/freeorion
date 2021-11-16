@@ -17,8 +17,8 @@ public:
     typedef std::map<std::pair<MeterType, std::string>, Meter> PartMeterMap;
 
     [[nodiscard]] bool HostileToEmpire(int empire_id, const EmpireManager& empires) const override;
-    [[nodiscard]] std::set<std::string> Tags() const override;
-    [[nodiscard]] bool HasTag(const std::string& name) const override;
+    [[nodiscard]] std::set<std::string> Tags(const ScriptingContext& context) const override;
+    [[nodiscard]] bool HasTag(const std::string& name, const ScriptingContext& context) const override;
     [[nodiscard]] UniverseObjectType ObjectType() const override;
     [[nodiscard]] std::string Dump(unsigned short ntabs = 0) const override;
 
@@ -38,9 +38,10 @@ public:
     void ClampMeters() override;
 
     /** Returns new copy of this Ship. */
-    [[nodiscard]] Ship* Clone(Universe& universe, int empire_id = ALL_EMPIRES) const override;
+    [[nodiscard]] Ship* Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const override;
 
-    void Copy(std::shared_ptr<const UniverseObject> copied_object, Universe& universe, int empire_id = ALL_EMPIRES) override;
+    void Copy(std::shared_ptr<const UniverseObject> copied_object, 
+              const Universe& universe, int empire_id = ALL_EMPIRES) override;
 
     [[nodiscard]] int                         DesignID() const            { return m_design_id; }             ///< returns the design id of the ship
     [[nodiscard]] int                         FleetID() const             { return m_fleet_id; }              ///< returns the ID of the fleet the ship is residing in
@@ -48,9 +49,9 @@ public:
     [[nodiscard]] int                         ArrivedOnTurn() const       { return m_arrived_on_turn; }       ///< returns the turn on which this ship arrived in its current system
     [[nodiscard]] int                         LastResuppliedOnTurn() const{ return m_last_resupplied_on_turn;}///< returns the turn on which this ship was last resupplied / upgraded
     [[nodiscard]] bool                        IsMonster(const Universe& universe) const;
-    [[nodiscard]] bool                        CanDamageShips(float target_shields = 0.0f) const;
-    [[nodiscard]] bool                        CanDestroyFighters() const;
-    [[nodiscard]] bool                        IsArmed(const Universe& universe) const;
+    [[nodiscard]] bool                        CanDamageShips(const ScriptingContext& context, float target_shields = 0.0f) const;
+    [[nodiscard]] bool                        CanDestroyFighters(const ScriptingContext& context) const;
+    [[nodiscard]] bool                        IsArmed(const ScriptingContext& context) const;
     [[nodiscard]] bool                        HasFighters(const Universe& universe) const;
     [[nodiscard]] bool                        CanColonize(const Universe& universe, const SpeciesManager& sm) const;
     [[nodiscard]] bool                        HasTroops(const Universe& universe) const;
@@ -77,18 +78,18 @@ public:
 
     [[nodiscard]] float                       WeaponPartFighterDamage(const ShipPart* part, const ScriptingContext& context) const; ///< versus fighter enemies
     [[nodiscard]] float                       WeaponPartShipDamage(const ShipPart* part, const ScriptingContext& context) const; ///< versus an enemy context.effect_target ship with a given shields meter
-    [[nodiscard]] float                       TotalWeaponsFighterDamage(bool include_fighters = true) const; ///< versus an fighter enemy
-    [[nodiscard]] float                       TotalWeaponsShipDamage(float shield_DR = 0.0f, bool include_fighters = true) const; ///< versus an enemy ship with a given shields DR
+    [[nodiscard]] float                       TotalWeaponsFighterDamage(const ScriptingContext& context, bool include_fighters = true) const; ///< versus an fighter enemy
+    [[nodiscard]] float                       TotalWeaponsShipDamage(const ScriptingContext& context, float shield_DR = 0.0f, bool include_fighters = true) const; ///< versus an enemy ship with a given shields DR
     [[nodiscard]] float                       FighterCount() const;
     [[nodiscard]] float                       FighterMax() const;
-    [[nodiscard]] std::vector<float>          AllWeaponsFighterDamage(bool include_fighters = true) const;   ///< any shots against enemy fighters
+    [[nodiscard]] std::vector<float>          AllWeaponsFighterDamage(const ScriptingContext& context, bool include_fighters = true) const;   ///< any shots against enemy fighters
     /** returns any nonzero weapons strengths after adjustment versus an enemy with a given @p shield_DR shield rating,
       * uses the normal meters so it might be lower than AllWeaponsMaxShipDamage
       * if e.g. the ship has less than a full complement of fighters */
-    [[nodiscard]] std::vector<float>          AllWeaponsShipDamage(float shield_DR = 0.0f, bool include_fighters = true) const;
+    [[nodiscard]] std::vector<float>          AllWeaponsShipDamage(const ScriptingContext& context, float shield_DR = 0.0f, bool include_fighters = true) const;
     /** returns any nonzero weapons strengths after adjustment versus an enemy with a given @p shield_DR shield rating,
       * assuming the ship has been resupplied recently (i.e. this uses Max*Meters) */
-    [[nodiscard]] std::vector<float>          AllWeaponsMaxShipDamage(const Universe& universe, float shield_DR = 0.0f, bool include_fighters = true) const;
+    [[nodiscard]] std::vector<float>          AllWeaponsMaxShipDamage(const ScriptingContext& context, float shield_DR = 0.0f, bool include_fighters = true) const;
 
     void            SetFleetID(int fleet_id);                                   ///< sets the ID of the fleet the ship resides in
     void            SetArrivedOnTurn(int turn);
@@ -110,7 +111,7 @@ public:
     /** Create a ship from an @p empire_id, @p design_id, @p species_name and
         @p production_by_empire_id. */
     Ship(int empire_id, int design_id, std::string species_name,
-         int produced_by_empire_id = ALL_EMPIRES);
+         const Universe& universe, int produced_by_empire_id = ALL_EMPIRES);
     Ship() = default;
 
 private:

@@ -5,6 +5,7 @@
 
 struct source_wrapper {
     value_ref_wrapper<int> owner() const;
+    operator condition_wrapper() const;
 };
 
 struct target_wrapper {
@@ -24,5 +25,7 @@ struct local_candidate_wrapper {
     value_ref_wrapper<int> last_turn_conquered() const;
     value_ref_wrapper<int> last_turn_colonized() const;
 };
+
+void RegisterGlobalsSources(boost::python::dict& globals);
 
 #endif // _SourcePythonParser_h_

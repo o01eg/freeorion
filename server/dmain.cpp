@@ -72,6 +72,7 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
         GetOptionsDB().Add<bool>("network.server.allow-email.new-turn",                 UserStringNop("OPTIONS_DB_ALLOW_EMAIL_NEW_TURN"),       true);
         GetOptionsDB().Add<bool>("network.server.drop-empire-ready",                    UserStringNop("OPTIONS_DB_DROP_EMPIRE_READY"),          true);
         GetOptionsDB().Add<bool>("network.server.take-over-ai",                         UserStringNop("OPTIONS_DB_TAKE_OVER_AI"),               false);
+        GetOptionsDB().Add<int>("network.server.python.asyncio-interval",               UserStringNop("OPTIONS_DB_PYTHON_ASYNCIO_INTERVAL"),    -1);
 
         // if config.xml and persistent_config.xml are present, read and set options entries
         GetOptionsDB().SetFromFile(GetConfigPath(), FreeOrionVersionString());

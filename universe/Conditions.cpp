@@ -254,8 +254,6 @@ struct Condition::MatchHelper {
     const ScriptingContext& m_parent_context;
 };
 
-Condition::~Condition() = default;
-
 bool Condition::operator==(const Condition& rhs) const {
     if (this == &rhs)
         return true;
@@ -2045,7 +2043,7 @@ bool Armed::Match(const ScriptingContext& local_context) const {
 
     if (candidate->ObjectType() == UniverseObjectType::OBJ_SHIP) {
         auto* ship = static_cast<const Ship*>(candidate.get());
-        if (ship->IsArmed(local_context.ContextUniverse()))
+        if (ship->IsArmed(local_context))
             return true;
     }
 
@@ -2393,8 +2391,9 @@ bool Building::Match(const ScriptingContext& local_context) const {
         return true;
 
     // match one of the specified building types
+    const auto& btn{building->BuildingTypeName()};
     for (auto& name : m_names) {
-        if (name->Eval(local_context) == building->BuildingTypeName())
+        if (name->Eval(local_context) == btn)
             return true;
     }
 
@@ -2875,28 +2874,31 @@ bool HasTag::operator==(const Condition& rhs) const {
 
 namespace {
     struct HasTagSimpleMatch {
-        HasTagSimpleMatch() :
+        HasTagSimpleMatch(const ScriptingContext& context) :
             m_any_tag_ok(true),
-            m_name(EMPTY_STRING)
+            m_name(EMPTY_STRING),
+            m_context(context)
         {}
 
-        HasTagSimpleMatch(const std::string& name) :
+        HasTagSimpleMatch(const std::string& name, const ScriptingContext& context) :
             m_any_tag_ok(false),
-            m_name(name)
+            m_name(name),
+            m_context(context)
         {}
 
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
 
-            if (m_any_tag_ok && !candidate->Tags().empty())
+            if (m_any_tag_ok && !candidate->Tags(m_context).empty())
                 return true;
 
-            return candidate->HasTag(m_name);
+            return candidate->HasTag(m_name, m_context);
         }
 
-        bool               m_any_tag_ok;
-        const std::string& m_name;
+        bool                    m_any_tag_ok;
+        const std::string&      m_name;
+        const ScriptingContext& m_context;
     };
 }
 
@@ -2909,10 +2911,10 @@ void HasTag::Eval(const ScriptingContext& parent_context,
     if (simple_eval_safe) {
         // evaluate number limits once, use to match all candidates
         if (!m_name) {
-            EvalImpl(matches, non_matches, search_domain, HasTagSimpleMatch());
+            EvalImpl(matches, non_matches, search_domain, HasTagSimpleMatch(parent_context));
         } else {
             std::string name = boost::to_upper_copy<std::string>(m_name->Eval(parent_context));
-            EvalImpl(matches, non_matches, search_domain, HasTagSimpleMatch(name));
+            EvalImpl(matches, non_matches, search_domain, HasTagSimpleMatch(name, parent_context));
         }
     } else {
         // re-evaluate allowed turn range for each candidate object
@@ -2949,10 +2951,10 @@ bool HasTag::Match(const ScriptingContext& local_context) const {
     }
 
     if (!m_name)
-        return HasTagSimpleMatch()(candidate);
+        return HasTagSimpleMatch(local_context)(candidate);
 
     std::string name = boost::to_upper_copy<std::string>(m_name->Eval(local_context));
-    return HasTagSimpleMatch(name)(candidate);
+    return HasTagSimpleMatch(name, local_context)(candidate);
 }
 
 void HasTag::SetTopLevelContent(const std::string& content_name) {
@@ -5265,7 +5267,7 @@ namespace {
             if (candidate->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
                 auto system = static_cast<const System*>(candidate.get());
                 return std::count(m_types.begin(), m_types.end(), system->GetStarType());
-            } else if (auto system = m_objects.get<System>(candidate->SystemID()).get()) {
+            } else if (auto system = m_objects.getRaw<System>(candidate->SystemID())) {
                 return std::count(m_types.begin(), m_types.end(), system->GetStarType());
             } else {
                 return false;
@@ -5352,7 +5354,7 @@ bool StarType::Match(const ScriptingContext& local_context) const {
     if (candidate->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
         auto system = static_cast<const System*>(candidate.get());
         star_type = system->GetStarType();
-    } else if (auto system = local_context.ContextObjects().get<System>(candidate->SystemID()).get()) {
+    } else if (auto system = local_context.ContextObjects().getRaw<System>(candidate->SystemID())) {
         star_type = system->GetStarType();
     } else {
         return false;
@@ -5563,7 +5565,7 @@ namespace {
             const Ship* ship = nullptr;
             if (candidate->ObjectType() == UniverseObjectType::OBJ_FIGHTER) {
                 auto* fighter = static_cast<const ::Fighter*>(candidate.get());
-                ship = m_universe.Objects().get<Ship>(fighter->LaunchedFrom()).get();
+                ship = m_universe.Objects().getRaw<Ship>(fighter->LaunchedFrom());
             } else if (candidate->ObjectType() == UniverseObjectType::OBJ_SHIP) {
                 ship = static_cast<const ::Ship*>(candidate.get());
             }
@@ -7834,8 +7836,7 @@ namespace {
             m_empire_id(empire_id),
             m_since_turn(since_turn),
             m_vis(vis == Visibility::INVALID_VISIBILITY ? Visibility::VIS_BASIC_VISIBILITY : vis),
-            m_vis_map(context.empire_object_vis),
-            m_vis_turn_map(context.empire_object_vis_turns)
+            m_context{context}
         {}
 
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
@@ -7848,21 +7849,14 @@ namespace {
 
             if (m_since_turn == INVALID_GAME_TURN) {
                 // no valid game turn was specified, so use current universe state
-
-                auto empire_it = m_vis_map.find(m_empire_id);
-                if (empire_it == m_vis_map.end())
-                    return false;
-                const auto& object_map = empire_it->second;
-                auto object_it = object_map.find(candidate->ID());
-                if (object_it == object_map.end())
-                    return false;
-                return object_it->second >= m_vis;
+                return m_context.ContextVis(candidate->ID(), m_empire_id) >= m_vis;
 
             } else {
                 // if a game turn after which to check is specified, check the
                 // history of when empires saw which objects at which visibility
-                auto empire_it = m_vis_turn_map.find(m_empire_id);
-                if (empire_it == m_vis_turn_map.end())
+                const auto& vis_turn_map{m_context.empire_object_vis_turns};
+                auto empire_it = vis_turn_map.find(m_empire_id);
+                if (empire_it == vis_turn_map.end())
                     return false;
                 const auto& object_vis_turns_map = empire_it->second;
                 auto object_it = object_vis_turns_map.find(candidate->ID());
@@ -7876,11 +7870,10 @@ namespace {
             }
         }
 
-        int                                             m_empire_id = ALL_EMPIRES;
-        int                                             m_since_turn = BEFORE_FIRST_TURN;
-        Visibility                                      m_vis = Visibility::VIS_BASIC_VISIBILITY;
-        const Universe::EmpireObjectVisibilityMap&      m_vis_map;
-        const Universe::EmpireObjectVisibilityTurnMap&  m_vis_turn_map;
+        int                     m_empire_id = ALL_EMPIRES;
+        int                     m_since_turn = BEFORE_FIRST_TURN;
+        Visibility              m_vis = Visibility::VIS_BASIC_VISIBILITY;
+        const ScriptingContext& m_context;
 
     };
 }
@@ -8494,7 +8487,7 @@ namespace {
 
             // check all existing lanes of currently-being-checked system
             for (const auto& lane : sys_existing_lanes) {
-                auto lane_end_sys3 = objects.get<System>(lane.first).get();
+                auto lane_end_sys3 = objects.getRaw<System>(lane.first);
                 if (!lane_end_sys3)
                     continue;
                 // don't need to check against existing lanes that include one
@@ -8558,7 +8551,7 @@ namespace {
             // get system from candidate
             auto candidate_sys = dynamic_cast<const System*>(candidate.get());
             if (!candidate_sys)
-                candidate_sys = m_objects.get<System>(candidate->SystemID()).get();
+                candidate_sys = m_objects.getRaw<System>(candidate->SystemID());
             if (!candidate_sys)
                 return false;
 
@@ -8580,7 +8573,7 @@ namespace {
             // present lanes of the candidate system
             //TraceLogger() << "... Checking lanes of candidate system: " << candidate->UniverseObject::Name() << "\n";
             for (const auto& lane : candidate_sys->StarlanesWormholes()) {
-                auto candidate_existing_lane_end_sys = m_objects.get<System>(lane.first).get();
+                auto candidate_existing_lane_end_sys = m_objects.getRaw<System>(lane.first);
                 if (!candidate_existing_lane_end_sys)
                     continue;
 
@@ -8603,7 +8596,7 @@ namespace {
                 // check this destination system's existing lanes against a lane
                 // to the candidate system
                 for (const auto& dest_lane : dest_sys->StarlanesWormholes()) {
-                    auto dest_lane_end_sys = m_objects.get<System>(dest_lane.first).get();
+                    auto dest_lane_end_sys = m_objects.getRaw<System>(dest_lane.first);
                     if (!dest_lane_end_sys)
                         continue;
 
@@ -8881,7 +8874,7 @@ bool Stationary::Match(const ScriptingContext& local_context) const {
     auto fleet = dynamic_cast<const Fleet*>(candidate.get());
     if (!fleet)
         if (auto ship = dynamic_cast<const Ship*>(candidate.get()))
-            fleet = local_context.ContextObjects().get<Fleet>(ship->FleetID()).get();
+            fleet = local_context.ContextObjects().getRaw<Fleet>(ship->FleetID());
 
     if (fleet) {
         // if a fleet is available, it is "moving", or not stationary, if it's
@@ -8957,7 +8950,7 @@ bool Aggressive::Match(const ScriptingContext& local_context) const {
         fleet = static_cast<const Fleet*>(candidate.get());
     } else if (candidate->ObjectType() == UniverseObjectType::OBJ_SHIP) {
         auto* ship = static_cast<const Ship*>(candidate.get());
-        fleet = local_context.ContextObjects().get<Fleet>(ship->FleetID()).get();
+        fleet = local_context.ContextObjects().getRaw<Fleet>(ship->FleetID());
     }
 
     if (!fleet)
@@ -9144,7 +9137,7 @@ namespace {
                 return false;
             if (m_from_objects.empty())
                 return false;
-            const auto& groups = m_supply.ResourceSupplyGroups(m_empire_id);  // TODO: put supply info in ScriptingContext
+            const auto& groups = m_supply.ResourceSupplyGroups(m_empire_id);
             if (groups.empty())
                 return false;
 

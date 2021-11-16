@@ -1,13 +1,16 @@
 //! GiGi - A GUI for OpenGL
 //!
 //!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
-//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!  Copyright (C) 2013-2021 The FreeOrion Project
 //!
 //! Released under the GNU Lesser General Public License 2.1 or later.
 //! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
 //! SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include <cctype>
+#if __has_include(<charconv>)
+  #include <charconv>
+#endif
 #include <cmath>
 #include <iterator>
 #include <numeric>
@@ -240,7 +243,6 @@ constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 7> PRINTABLE_ASCII
     {0x3A, 0x41},
     {0x5B, 0x61},
     {0x7B, 0x7F}}};
-
 }
 
 
@@ -249,14 +251,30 @@ constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 7> PRINTABLE_ASCII
 ///////////////////////////////////////
 std::string GG::RgbaTag(const Clr& c)
 {
-    std::stringstream stream;
-    stream << "<rgba "
-           << static_cast<int>(c.r) << " "
-           << static_cast<int>(c.g) << " "
-           << static_cast<int>(c.b) << " "
-           << static_cast<int>(c.a)
-           << ">";
-    return stream.str();
+#if defined(__cpp_lib_to_chars)
+    std::array<std::string::value_type, 6 + 4*4 + 1> buffer{"<rgba "}; // rest should be nulls
+    auto result = std::to_chars(buffer.data() + 6, buffer.data() + 9, static_cast<int>(c.r));
+    *result.ptr = ' ';
+    result = std::to_chars(result.ptr + 1, result.ptr + 4, static_cast<int>(c.g));
+    *result.ptr = ' ';
+    result = std::to_chars(result.ptr + 1, result.ptr + 4, static_cast<int>(c.b));
+    *result.ptr = ' ';
+    result = std::to_chars(result.ptr + 1, result.ptr + 4, static_cast<int>(c.a));
+    *result.ptr = '>';
+    return {buffer.data()};
+#else
+    std::string retval;
+    // reserve space for leading "<rgba " and 4 numbers of 3 digits (000-255),
+    // each followed by 1 character (" " or ">").
+    // this is also probably within the small string optimization size (31 chars in my tests)
+    retval.reserve(6 + 4*4);
+    retval.append("<rgba ")
+          .append(std::to_string(static_cast<int>(c.r))).append(" ")
+          .append(std::to_string(static_cast<int>(c.g))).append(" ")
+          .append(std::to_string(static_cast<int>(c.b))).append(" ")
+          .append(std::to_string(static_cast<int>(c.a))).append(">");
+    return retval;
+#endif
 }
 
 
@@ -341,6 +359,9 @@ Font::Substring::operator std::string() const
 { return std::string(begin(), end()); }
 
 bool Font::Substring::operator==(const std::string& rhs) const
+{ return size() == rhs.size() && !std::memcmp(str->data() + first, rhs.data(), rhs.size()); }
+
+bool Font::Substring::operator==(std::string_view rhs) const
 { return size() == rhs.size() && !std::memcmp(str->data() + first, rhs.data(), rhs.size()); }
 
 bool Font::Substring::operator!=(const std::string& rhs) const
@@ -562,6 +583,9 @@ namespace {
 
         /** Add a tag to the set of known tags.*/
         void Insert(const std::string& tag)
+        { m_known_tags.emplace(tag); }
+
+        void Insert(std::string_view tag)
         { m_known_tags.emplace(tag); }
 
         /** Remove a tag from the set of known tags.*/
@@ -1200,39 +1224,37 @@ void Font::ProcessTagsBefore(const std::vector<LineData>& line_data, RenderState
     }
 }
 
-std::string Font::StripTags(const std::string& text, bool strip_unpaired_tags)
+std::string Font::StripTags(std::string_view text, bool strip_unpaired_tags)
 {
     using namespace boost::xpressive;
+    std::string text_str{text}; // temporary until StaticTagHandler().Regex returns a cregex
+    auto& regex = StaticTagHandler().Regex(text_str, false, strip_unpaired_tags);
 
-    sregex & regex = StaticTagHandler().Regex(text, false, strip_unpaired_tags);
+    static const mark_tag tag_name_tag(1);
+    static const mark_tag open_bracket_tag(2);
+    static const mark_tag close_bracket_tag(3);
+    static const mark_tag whitespace_tag(4);
+    static const mark_tag text_tag(5);
 
-    mark_tag tag_name_tag(1);
-    mark_tag open_bracket_tag(2);
-    mark_tag close_bracket_tag(3);
-    mark_tag whitespace_tag(4);
-    mark_tag text_tag(5);
-
-    std::stringstream retval;
+    std::string retval;
+    retval.reserve(text.size());
 
     // scan through matched markup and text, saving only the non-tag-text
-    sregex_iterator it(text.begin(), text.end(), regex);
+    sregex_iterator it(text_str.begin(), text_str.end(), regex);
     sregex_iterator end_it;
     for (; it != end_it; ++it) {
-        sub_match<std::string::const_iterator> const* text_match;
-        sub_match<std::string::const_iterator> const* whitespace_match;
-
-        text_match = &(*it)[text_tag];
-        if (text_match  && (text_match->matched)) {
-            retval << Substring(text, *text_match);
+        auto& text_match = (*it)[text_tag];
+        if (text_match.matched) {
+            retval.append(text_match.first, text_match.second);
 
         } else {
-            whitespace_match = &(*it)[whitespace_tag];
-            if (whitespace_match && whitespace_match->matched)
-                retval << Substring(text, *whitespace_match);
+            auto& whitespace_match = (*it)[whitespace_tag];
+            if (whitespace_match.matched)
+                retval.append(whitespace_match.first, whitespace_match.second);
         }
     }
 
-    return retval.str();
+    return retval;
 }
 
 Pt Font::TextExtent(const std::vector<LineData>& line_data) const
@@ -1249,6 +1271,9 @@ Pt Font::TextExtent(const std::vector<LineData>& line_data) const
 }
 
 void Font::RegisterKnownTag(const std::string& tag)
+{ StaticTagHandler().Insert(tag); }
+
+void Font::RegisterKnownTag(std::string_view tag)
 { StaticTagHandler().Insert(tag); }
 
 void Font::RemoveKnownTag(const std::string& tag)
@@ -1725,7 +1750,7 @@ std::vector<Font::LineData> Font::DetermineLines(
             else if (elem_as_tag->tag_name == ALIGN_RIGHT_TAG)
                 line_data.back().justification = ALIGN_RIGHT;
             else if (elem_as_tag->tag_name != PRE_TAG)
-                pending_formatting_tags.emplace_back(elem);
+                pending_formatting_tags.push_back(elem);
             last_line_of_curr_just = false;
             code_point_offset += elem->CodePointSize();
 
@@ -1737,7 +1762,7 @@ std::vector<Font::LineData> Font::DetermineLines(
                 (elem_as_tag->tag_name == ALIGN_RIGHT_TAG && line_data.back().justification == ALIGN_RIGHT))
                 last_line_of_curr_just = true;
             else if (elem_as_tag->tag_name != PRE_TAG)
-                pending_formatting_tags.emplace_back(elem);
+                pending_formatting_tags.push_back(elem);
             code_point_offset += elem->CodePointSize();
         }
         original_string_offset += elem->StringSize();

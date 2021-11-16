@@ -95,10 +95,12 @@ OwnerColoredSystemName::OwnerColoredSystemName(int system_id, int font_size,
 
     int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
-    const SpeciesManager& species_manager = GetSpeciesManager();
     const EmpireManager& empire_manager = Empires();
     const Universe& universe = GetUniverse();
     const ObjectMap& objects = universe.Objects();
+    const ScriptingContext context{universe, empire_manager};
+    const SpeciesManager& species_manager = context.species;
+
 
     auto system = objects.get<System>(system_id);
     if (!system)
@@ -156,7 +158,7 @@ OwnerColoredSystemName::OwnerColoredSystemName(int system_id, int font_size,
                 if (known_destroyed_object_ids.count(building_id))
                     continue;
 
-                if (building->HasTag(TAG_SHIPYARD)) {
+                if (building->HasTag(TAG_SHIPYARD, context)) {
                     has_shipyard = true;
                     break;
                 }
@@ -253,13 +255,13 @@ void SystemIcon::CompleteConstruction() {
     if (auto system = Objects().get<System>(m_system_id)) {
         StarType star_type = system->GetStarType();
         m_disc_texture = ui->GetModuloTexture(ClientUI::ArtDir() / "stars",
-                                              ClientUI::StarTypeFilePrefixes()[star_type],
+                                              ClientUI::StarTypeFilePrefix(star_type),
                                               m_system_id);
         m_halo_texture = ui->GetModuloTexture(ClientUI::ArtDir() / "stars",
-                                              ClientUI::HaloStarTypeFilePrefixes()[star_type],
+                                              ClientUI::HaloStarTypeFilePrefix(star_type),
                                               m_system_id);
         m_tiny_texture = ui->GetModuloTexture(ClientUI::ArtDir() / "stars",
-                                              "tiny_" + ClientUI::StarTypeFilePrefixes()[star_type],
+                                              std::string("tiny_").append(ClientUI::StarTypeFilePrefix(star_type)),
                                               m_system_id);
     } else {
         m_disc_texture = ui->GetTexture(ClientUI::ArtDir() / "misc" / "missing.png");

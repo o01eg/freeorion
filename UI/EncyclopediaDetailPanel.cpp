@@ -123,8 +123,8 @@ namespace {
 
     void MeterTypeDirEntry(const MeterType& meter_type,
                            std::multimap<std::string,
-                                         std::pair<std::string,
-                                                   std::string>>& list)
+                                         std::pair<std::string, std::string>,
+                                         std::less<>>& list)
     {
         auto&& [value_label, string_rep] = MeterValueLabelAndString(meter_type);
 
@@ -156,7 +156,7 @@ namespace {
         subcategorization is something like a tech category (eg. growth). */
     void GetSortedPediaDirEntires(
         const std::string& dir_name,
-        std::multimap<std::string, std::pair<std::string, std::string>>& sorted_entries_list,
+        std::multimap<std::string, std::pair<std::string, std::string>, std::less<>>& sorted_entries_list,
         bool exclude_custom_categories_from_dir_name = true)
     {
         ScopedTimer subdir_timer("GetSortedPediaDirEntires(" + dir_name + ")",
@@ -264,12 +264,12 @@ namespace {
 
         }
         else if (dir_name == "ENC_SPECIAL") {
-            for (std::string& special_name : SpecialNames()) {
+            for (auto special_name : SpecialNames()) {
                 std::string tagged_text{LinkTaggedText(VarText::SPECIAL_TAG, special_name).append("\n")};
                 auto& us_name{UserString(special_name)};    // line before to avoid order of operations issues when moving from special_name
                 sorted_entries_list.emplace(
                     us_name,
-                    std::pair{std::move(tagged_text), std::move(special_name)});
+                    std::pair{std::move(tagged_text), special_name});
             }
 
         }
@@ -604,7 +604,7 @@ namespace {
 
     std::string PediaDirText(const std::string& dir_name) {
         // get sorted list of entries for requested directory
-        std::multimap<std::string, std::pair<std::string, std::string>> sorted_entries_list;
+        std::multimap<std::string, std::pair<std::string, std::string>, std::less<>> sorted_entries_list;
         GetSortedPediaDirEntires(dir_name, sorted_entries_list);
 
         std::string retval;
@@ -1085,14 +1085,12 @@ namespace {
 
 
         // map from (human readable article name) to (article-link-tag-text, article name stringtable key)
-        std::multimap<std::string, std::pair<std::string, std::string>> sorted_entries;
+        std::multimap<std::string, std::pair<std::string, std::string>, std::less<>> sorted_entries;
         GetSortedPediaDirEntires(dir_name, sorted_entries, exclude_custom_categories_from_dir_name);
 
 
-        for (auto& entry : sorted_entries) {
-            const std::string& readable_article_name = entry.first;
-            std::string& link_text = entry.second.first;
-            std::string& category_str_key = entry.second.second;
+        for (auto& [readable_article_name, link_category] : sorted_entries) {
+            auto& [link_text, category_str_key] = link_category;
 
             // explicitly exclude textures and input directory itself
             if (category_str_key == "ENC_TEXTURES" || category_str_key == dir_name)

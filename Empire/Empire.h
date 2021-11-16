@@ -90,11 +90,11 @@ public:
     [[nodiscard]] const std::map<std::string, int>& PolicyCurrentAdoptedDurations() const;
 
     /** Returns the set of policies / slots the empire has avaialble. */
-    [[nodiscard]] const std::set<std::string>&  AvailablePolicies() const;
-    [[nodiscard]] bool                          PolicyAvailable(const std::string& name) const;
-    [[nodiscard]] bool                          PolicyPrereqsAndExclusionsOK(const std::string& name) const;
-    [[nodiscard]] std::map<std::string, int>    TotalPolicySlots() const; // how many total slots does this empire have in each category
-    [[nodiscard]] std::map<std::string, int>    EmptyPolicySlots() const; // how many empty slots does this empire have in each category
+    [[nodiscard]] const std::set<std::string>&    AvailablePolicies() const;
+    [[nodiscard]] bool                            PolicyAvailable(const std::string& name) const;
+    [[nodiscard]] bool                            PolicyPrereqsAndExclusionsOK(const std::string& name) const;
+    [[nodiscard]] std::map<std::string_view, int> TotalPolicySlots() const; // how many total slots does this empire have in each category
+    [[nodiscard]] std::map<std::string_view, int> EmptyPolicySlots() const; // how many empty slots does this empire have in each category
 
     /** Returns the set of Tech names available to this empire and the turns on
       * which they were researched. */
@@ -500,10 +500,10 @@ private:
 
     struct PolicyAdoptionInfo {
         PolicyAdoptionInfo() = default;
-        PolicyAdoptionInfo(int turn, const std::string& cat, int slot) :
+        PolicyAdoptionInfo(int turn, std::string cat, int slot) :
             adoption_turn(turn),
             slot_in_category(slot),
-            category(cat)
+            category(std::move(cat))
         {}
 
         int adoption_turn = INVALID_GAME_TURN;

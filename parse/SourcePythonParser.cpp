@@ -1,10 +1,17 @@
 #include "SourcePythonParser.h"
 
+#include <boost/python/dict.hpp>
+
+#include "../universe/Conditions.h"
 #include "../universe/ValueRefs.h"
 
 value_ref_wrapper<int> source_wrapper::owner() const {
     auto variable = std::make_shared<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "Owner");
     return value_ref_wrapper<int>(variable);
+}
+
+source_wrapper::operator condition_wrapper() const {
+    return condition_wrapper(std::make_shared<Condition::Source>());
 }
 
 value_ref_wrapper<double> target_wrapper::habitable_size() const {
@@ -49,5 +56,11 @@ value_ref_wrapper<int> local_candidate_wrapper::last_turn_conquered() const {
 
 value_ref_wrapper<int> local_candidate_wrapper::last_turn_colonized() const {
     return value_ref_wrapper<int>(std::make_shared<ValueRef::Variable<int>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "LastTurnColonized"));
+}
+
+void RegisterGlobalsSources(boost::python::dict& globals) {
+    globals["Source"] = source_wrapper();
+    globals["Target"] = target_wrapper();
+    globals["LocalCandidate"] = local_candidate_wrapper();
 }
 

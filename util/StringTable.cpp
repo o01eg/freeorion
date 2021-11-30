@@ -9,12 +9,43 @@
 #include <boost/algorithm/string/replace.hpp>
 
 #include <iostream>
+#include <atomic>
+
+#if defined(_MSC_VER) && _MSC_VER >= 1930
+struct IUnknown; // Workaround for "combaseapi.h(229,21): error C2760: syntax error: 'identifier' was unexpected here; expected 'type specifier'"
+#endif
+
+#if BOOST_VERSION >= 106500
+// define needed on Windows due to conflict with windows.h and std::min and std::max
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+// define needed in GCC
+#  ifndef _GNU_SOURCE
+#    define _GNU_SOURCE
+#  endif
+
+#  include <boost/stacktrace.hpp>
+#endif
 
 
 namespace {
     constexpr std::string_view DEFAULT_FILENAME = "en.txt";
     constexpr std::string_view ERROR_STRING = "ERROR: ";
     const std::string EMPTY_STRING;
+
+    std::string StackTrace() {
+        static std::atomic<int> string_error_lookup_count = 0;
+        if (string_error_lookup_count++ > 10)
+            return "";
+#if BOOST_VERSION >= 106500
+        std::stringstream ss;
+        ss << "stacktrace:\n" << boost::stacktrace::stacktrace();
+        return ss.str();
+#else
+        return "";
+#endif
+    }
 }
 
 
@@ -85,6 +116,10 @@ const std::string& StringTable::operator[] (const std::string& key) const {
         return it->second;
 
     auto error = m_error_strings.insert(ERROR_STRING + key);
+    if (error.second) {
+        ErrorLogger() << "Missing string: " << key;
+        DebugLogger() << StackTrace();
+    }
     return *(error.first);
 }
 
@@ -94,6 +129,10 @@ const std::string& StringTable::operator[] (const std::string_view key) const {
         return it->second;
 
     auto error = m_error_strings.insert(ERROR_STRING + key);
+    if (error.second) {
+        ErrorLogger() << "Missing string: " << key;
+        DebugLogger() << StackTrace();
+    }
     return *(error.first);
 }
 
@@ -103,6 +142,10 @@ const std::string& StringTable::operator[] (const char* key) const {
         return it->second;
 
     auto error = m_error_strings.insert(ERROR_STRING + key);
+    if (error.second) {
+        ErrorLogger() << "Missing string: " << key;
+        DebugLogger() << StackTrace();
+    }
     return *(error.first);
 }
 

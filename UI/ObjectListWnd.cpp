@@ -296,9 +296,9 @@ namespace {
     }
 
     const ValueRef::ValueRef<std::string>* GetValueRefByName(const std::string& name) {
-        for (const auto& entry : AvailableColumnTypes()) {
-            if (entry.first.first == name)
-                return entry.second.get();
+        for (const auto& [column_stringtable_key_and_submenu, val_ref] : AvailableColumnTypes()) {
+            if (column_stringtable_key_and_submenu.first == name)
+                return val_ref.get();
         }
         return nullptr;
     }
@@ -2384,7 +2384,7 @@ private:
 ////////////////////////////////////////////////
 // ObjectListWnd
 ////////////////////////////////////////////////
-ObjectListWnd::ObjectListWnd(const std::string& config_name) :
+ObjectListWnd::ObjectListWnd(std::string_view config_name) :
     CUIWnd(UserString("MAP_BTN_OBJECTS"),
            GG::ONTOP | GG::INTERACTIVE | GG::DRAGABLE | GG::RESIZABLE | CLOSABLE | PINABLE,
            config_name, false)

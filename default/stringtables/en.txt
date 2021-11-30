@@ -1683,6 +1683,12 @@ Sets UI default link color.
 OPTIONS_DB_UI_ROLLOVER_LINK_COLOR
 Sets UI rollover link color.
 
+OPTIONS_DB_UI_DEFAULT_TOOLTIP_COLOR
+Sets UI default tooltip color.
+
+OPTIONS_DB_UI_ROLLOVER_TOOLTIP_COLOR
+Sets UI rollover tooltip color.
+
 OPTIONS_DB_UI_CTRL_COLOR
 Sets UI control background color.
 
@@ -6716,7 +6722,8 @@ CONFIG_GUIDE_TITLE
 Configuration Guide
 
 CONFIG_GUIDE_TEXT
-'''Most configuration options for the game are stored and read from a single XML formatted file named config.xml.
+'''Most configuration options for the game are stored and read from a single XML formatted file named config.xml which should be located in [[browsepath PATH_CONFIG]].
+
 If this file does not exist (or is for a different build or version), it will be (re)created when the client starts.
 The configuration file is typically updated after a stored option is changed, but may be deferred until a later action (such as clicking Done or Apply).
 Some of these options can be changed from the [[OPTIONS_TITLE]] menu, under the Main Menu.
@@ -11832,6 +11839,7 @@ Indoctrination
 
 PLC_INDOCTRINATION_DESC
 '''• Increases [[metertype METER_TARGET_HAPPINESS]] on planets over time. The bonus grows by [[value PLC_INDOCTRINATION_PER_TURN]] per turn, up to a maximum of [[value PLC_INDOCTRINATION_STRENGTH_MAX]]. Conquered planets start with zero, settled planets get the current maximum.
+• Decreases [[metertype METER_TARGET_INFLUENCE]] by [[value PLC_INDOCTRINATION_INFLUENCE_COST_FLAT]], on planets that receive that boost to [[metertype METER_TARGET_HAPPINESS]].
 • Increases [[metertype METER_TARGET_INFLUENCE]] of the capital or planets with a [[buildingtype BLD_REGIONAL_ADMIN]] that have Influence focus by [[value PLC_INDOCTRINATION_INFLUENCE_FLAT]].'''
 
 PLC_INDOCTRINATION_SHORT_DESC

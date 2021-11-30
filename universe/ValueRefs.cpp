@@ -81,7 +81,7 @@ namespace {
         }
 
         if (!obj) {
-            std::string type_string;
+            std::string_view type_string;
             switch (ref_type) {
             case ValueRef::ReferenceType::SOURCE_REFERENCE:                    type_string = "Source";         break;
             case ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE:             type_string = "Target";         break;
@@ -106,7 +106,7 @@ namespace {
         }
 
         while (first != last) {
-            std::string property_name = *first;
+            std::string_view property_name = *first;
             if (property_name == "Planet") {
                 if (auto b = std::dynamic_pointer_cast<const Building>(obj)) {
                     obj = context.ContextObjects().get<Planet>(b->PlanetID());
@@ -279,10 +279,13 @@ namespace {
 }
 
 namespace ValueRef {
-std::string ValueRefBase::InvariancePattern() const {
-    return std::string(RootCandidateInvariant()?"R":"r") + (LocalCandidateInvariant()?"L":"l")
-        + (SourceInvariant()?"S":"s") + (TargetInvariant()?"T":"t")
-        + (SimpleIncrement()?"I":"i") + (ConstantExpr()?"C":"c");
+    std::string ValueRefBase::InvariancePattern() const {
+        return std::string{RootCandidateInvariant() ? "R" : "r"}
+            .append(LocalCandidateInvariant()       ? "L" : "l")
+            .append(SourceInvariant()               ? "S" : "s")
+            .append(TargetInvariant()               ? "T" : "t")
+            .append(SimpleIncrement()               ? "I" : "i")
+            .append(ConstantExpr()                  ? "C" : "c");
 }
 
 MeterType NameToMeter(const std::string& name) {
@@ -2554,7 +2557,12 @@ std::vector<std::string> ComplexVariable<std::vector<std::string>>::Eval(
         if (!empire)
             return {};
 
-        return empire->AdoptedPolicies();
+        auto pols = empire->AdoptedPolicies();
+        std::vector<std::string> retval;
+        retval.reserve(pols.size());
+        std::transform(pols.begin(), pols.end(), std::back_inserter(retval),
+                       [](const std::string_view sv) { return std::string{sv}; });
+        return retval;
 
     } else if (variable_name == "EmpireAvailablePolices") {
         int empire_id = ALL_EMPIRES;
@@ -2567,11 +2575,8 @@ std::vector<std::string> ComplexVariable<std::vector<std::string>>::Eval(
         if (!empire)
             return {};
 
-        std::vector<std::string> retval;
         const auto& pols = empire->AvailablePolicies();
-        retval.reserve(pols.size());
-        std::copy(pols.begin(), pols.end(), std::back_inserter(retval));
-        return retval;
+        return std::vector<std::string>{pols.begin(), pols.end()};
     }
 
     return {};

@@ -518,12 +518,17 @@ namespace {
 
             for (auto& [ref_key, val_ref] : GetNamedValueRefManager().GetItems()) {
                 auto& vref = val_ref.get();
-                std::string pre = dynamic_cast<ValueRef::ValueRef<int>*>(&vref)? " int " : (dynamic_cast<ValueRef::ValueRef<double>*>(&vref)?" real ":" any ");
+                std::string_view value_type = dynamic_cast<ValueRef::ValueRef<int>*>(&vref)? " int " : (dynamic_cast<ValueRef::ValueRef<double>*>(&vref)?" real ":" any ");
+                std::string_view key_str = UserStringExists(ref_key) ? UserString(ref_key) : "";
 
+                // (human-readable article name) -> (link tag text, category stringtable key)
                 sorted_entries_list.emplace(
                     ref_key,
-                    std::pair{ref_key + pre + LinkTaggedText(VarText::FOCS_VALUE_TAG, ref_key) +
-                              " '" + UserString(ref_key) + "' " + vref.InvariancePattern() + "\n", dir_name});
+                    std::pair{std::string{ref_key}.append(value_type)
+                                .append(LinkTaggedPresetText(VarText::FOCS_VALUE_TAG, ref_key, key_str))
+                                .append(key_str.empty() ? "" : (std::string{" '"}.append(key_str).append(" '")))
+                                .append(" ").append(vref.InvariancePattern().append("\n")),
+                              dir_name});
             }
 
         }
@@ -647,7 +652,7 @@ std::list<std::pair<std::string, std::string>>::iterator
     EncyclopediaDetailPanel::m_items_it = m_items.begin();
 
 EncyclopediaDetailPanel::EncyclopediaDetailPanel(GG::Flags<GG::WndFlag> flags,
-                                                 const std::string& config_name) :
+                                                 std::string_view config_name) :
     CUIWnd(UserString("MAP_BTN_PEDIA"), flags, config_name, false)
 {}
 
@@ -1857,7 +1862,7 @@ namespace {
         auto policies = empire->AdoptedPolicies();
         if (!policies.empty()) {
             // re-sort by adoption turn
-            std::multimap<int, std::string&> turns_policies_adopted;
+            std::multimap<int, std::string_view> turns_policies_adopted;
             for (auto& policy_name : policies) {
                 int turn = empire->TurnPolicyAdopted(policy_name);
                 turns_policies_adopted.emplace(turn, policy_name);

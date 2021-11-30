@@ -172,7 +172,8 @@ namespace {
         return out;
     }
 
-    auto ViewMapToStringMap(const std::map<std::string_view, int>& in) -> std::map<std::string, int>
+    template <typename C>
+    auto ViewMapToStringMap(const std::map<std::string_view, int, C>& in) -> std::map<std::string, int>
     {
         std::map<std::string, int> out;
         std::transform(in.begin(), in.end(), std::inserter(out, out.end()),
@@ -456,7 +457,10 @@ namespace FreeOrionPython {
             .def("adoptionCost",                    &Policy::AdoptionCost)
         ;
 
-        def("getPolicy",                            &GetPolicy,                                 py::return_value_policy<py::reference_existing_object>(), "Returns the policy (Policy) with the indicated name (string).");
+        def("getPolicy",
+            +[](const std::string& name) { return GetPolicy(name); },
+            py::return_value_policy<py::reference_existing_object>(),
+            "Returns the policy (Policy) with the indicated name (string).");
 
         def("policyCategories",
             +[]() -> std::vector<std::string> { return ViewSetToStringVec(GetPolicyManager().PolicyCategories()); },

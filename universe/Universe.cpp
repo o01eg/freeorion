@@ -1334,7 +1334,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     // 1) EffectsGroups from Species
     type_timer.EnterSection("species");
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for SPECIES";
-    std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> species_objects;
+    std::map<std::string_view, std::vector<std::shared_ptr<const UniverseObject>>> species_objects;
     // find each species planets in single pass, maintaining object map order per-species
     for (auto& planet : context.ContextObjects().all<Planet>()) {
         if (destroyed_object_ids.count(planet->ID()))
@@ -1481,7 +1481,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     type_timer.EnterSection("buildings");
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for BUILDINGS";
     // determine buildings of each type in a single pass
-    std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> buildings_by_type;
+    std::map<std::string_view, std::vector<std::shared_ptr<const UniverseObject>>> buildings_by_type;
     for (const auto& building : context.ContextObjects().all<Building>()) {
         if (destroyed_object_ids.count(building->ID()))
             continue;
@@ -1519,8 +1519,8 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     // determine ship hulls and parts of each type in a single pass
     // the same ship might be added multiple times if it contains the part multiple times
     // recomputing targets for the same ship and part is kind of silly here, but shouldn't hurt
-    std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> ships_by_ship_hull;
-    std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> ships_by_ship_part;
+    std::map<std::string_view, std::vector<std::shared_ptr<const UniverseObject>>> ships_by_ship_hull;
+    std::map<std::string_view, std::vector<std::shared_ptr<const UniverseObject>>> ships_by_ship_part;
 
     for (const auto& ship : context.ContextObjects().all<Ship>()) {
         if (destroyed_object_ids.count(ship->ID()))
@@ -1587,7 +1587,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     type_timer.EnterSection("fields");
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for FIELDS";
     // determine fields of each type in a single pass
-    std::map<std::string, std::vector<std::shared_ptr<const UniverseObject>>> fields_by_type;
+    std::map<std::string_view, std::vector<std::shared_ptr<const UniverseObject>>> fields_by_type;
     for (const auto& field : context.ContextObjects().all<Field>()) {
         if (destroyed_object_ids.count(field->ID()))
             continue;
@@ -1806,13 +1806,13 @@ void Universe::SetEffectDerivedVisibility(int empire_id, int object_id, int sour
 void Universe::ApplyEffectDerivedVisibilities(EmpireManager& empires) {
     EmpireObjectVisibilityMap new_empire_object_visibilities;
     // for each empire with a visibility map
-    for (auto& empire_entry : m_effect_specified_empire_object_visibilities) {
-        if (empire_entry.first == ALL_EMPIRES)
+    for (auto& [empire_id, obj_src_vis_ref_map] : m_effect_specified_empire_object_visibilities) { // TODO: should this consider effect priorities here... ie. is the final result visibility determined based on the order of the source objects, rather than the order of effect execution?
+        if (empire_id == ALL_EMPIRES)
             continue;   // can't set a non-empire's visibility
-        for (const auto& object_entry : empire_entry.second) {
-            if (object_entry.first <= INVALID_OBJECT_ID)
+        for (const auto& [viewed_obj_id, src_and_vis_ref_map] : obj_src_vis_ref_map) {
+            if (viewed_obj_id <= INVALID_OBJECT_ID)
                 continue;   // can't set a non-object's visibility
-            auto target = m_objects->get(object_entry.first);
+            auto target = m_objects->get(viewed_obj_id);
             if (!target)
                 continue;   // don't need to set a non-gettable object's visibility
 
@@ -1820,37 +1820,30 @@ void Universe::ApplyEffectDerivedVisibilities(EmpireManager& empires) {
             // use that as the target initial visibility for purposes of
             // evaluating this ValueRef. If not, use the object's current
             // in-universe Visibility for the specified empire
-            Visibility target_initial_vis =
-                m_empire_object_visibility[empire_entry.first][object_entry.first];
-            auto neov_it = new_empire_object_visibilities[empire_entry.first].find(object_entry.first);
-            if (neov_it != new_empire_object_visibilities[empire_entry.first].end())
+            Visibility target_initial_vis = m_empire_object_visibility[empire_id][viewed_obj_id];
+            auto neov_it = new_empire_object_visibilities[empire_id].find(viewed_obj_id);
+            if (neov_it != new_empire_object_visibilities[empire_id].end())
                 target_initial_vis = neov_it->second;
 
             // evaluate valuerefs and and store visibility of object
-            for (auto& source_ref_entry : object_entry.second) { // TODO: [[]]
+            for (auto& [source_obj_id, vis_val_ref] : src_and_vis_ref_map) {
                 // set up context for executing ValueRef to determine visibility to set
-                const ScriptingContext context{*this, empires, m_objects->get(source_ref_entry.first),
+                const ScriptingContext context{*this, empires, m_objects->get(source_obj_id),
                                                target, target_initial_vis};
 
-                const auto val_ref = source_ref_entry.second;
-
                 // evaluate and store actual new visibility level
-                Visibility vis = val_ref->Eval(context);
+                Visibility vis = vis_val_ref->Eval(context);
                 target_initial_vis = vis;   // store for next iteration's context
-                new_empire_object_visibilities[empire_entry.first][object_entry.first] = vis;
+                new_empire_object_visibilities[empire_id][viewed_obj_id] = vis;
             }
         }
     }
 
     // copy newly determined visibility levels into actual gamestate, without
     // erasing visibilities that aren't affected by the effects
-    for (auto empire_entry : new_empire_object_visibilities) {
-        int empire_id = empire_entry.first;
-        for (auto object_entry : empire_entry.second) {
-            int object_id = object_entry.first;
-            Visibility vis = object_entry.second;
+    for (auto& [empire_id, obj_vis_map] : new_empire_object_visibilities) {
+        for (auto& [object_id, vis] : obj_vis_map)
             m_empire_object_visibility[empire_id][object_id] = vis;
-        }
     }
 }
 

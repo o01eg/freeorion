@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <mutex>
 
 #include <boost/format.hpp>
-#include <boost/lexical_cast.hpp>
 
 #include "Export.h"
 
@@ -30,6 +30,26 @@ FO_COMMON_API std::vector<std::string> UserStringList(const std::string& key);
 FO_COMMON_API bool UserStringExists(const std::string& str);
 FO_COMMON_API bool UserStringExists(const std::string_view str);
 FO_COMMON_API bool UserStringExists(const char* str);
+
+/** Retains a stringtable access lock until destructed, making
+  * repeated stringtable lookups faster than re-locking for each. */
+class StringTable;
+class FO_COMMON_API LockedStringTable {
+public:
+    LockedStringTable();
+    ~LockedStringTable();
+    const std::string& UserString(const std::string& str) const;
+    const std::string& UserString(const std::string_view str) const;
+    const std::string& UserString(const char* str) const;
+    bool UserStringExists(const std::string& str) const;
+    bool UserStringExists(const std::string_view str) const;
+    bool UserStringExists(const char* str) const;
+
+private:
+    std::scoped_lock<std::recursive_mutex> m_lock;
+    const StringTable& m_table;
+    const StringTable& m_default_table;
+};
 
 /** Clears all loaded strings, so that subsequent UserString lookups will cause
   * the stringtable(s) to be reloaded. */
@@ -80,7 +100,7 @@ boost::format FlexibleFormatList(
         default: return plural_header_template; break;
         }
     }()};
-    boost::format header_fmt = FlexibleFormat(header_template) % boost::lexical_cast<std::string>(words.size());
+    boost::format header_fmt = FlexibleFormat(header_template) % std::to_string(words.size());
     for (const auto& word : header_words)
         header_fmt % word;
 

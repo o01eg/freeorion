@@ -119,7 +119,6 @@ namespace {
     // get currently set stringtable filename option value, or the default value
     // if the currenty value is empty
     std::string GetStringTableFileName() {
-        std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
         // initialize option value and default on first call
         if (!stringtable_filename_init)
             InitStringtableFileName();
@@ -264,6 +263,44 @@ bool UserStringExists(const char* str) {
     std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
     return GetStringTable().StringExists(str) || GetDevDefaultStringTable().StringExists(str);
 }
+
+LockedStringTable::LockedStringTable() :
+    m_lock(stringtable_access_mutex),
+    m_table(GetStringTable()),
+    m_default_table(GetDevDefaultStringTable())
+{}
+
+LockedStringTable::~LockedStringTable() = default;
+
+const std::string& LockedStringTable::UserString(const std::string& str) const {
+    const auto& [string_found, string_value] = m_table.CheckGet(str);
+    if (string_found)
+        return string_value;
+    return m_default_table[str];
+}
+
+const std::string& LockedStringTable::UserString(const std::string_view str) const {
+    const auto& [string_found, string_value] = m_table.CheckGet(str);
+    if (string_found)
+        return string_value;
+    return m_default_table[str];
+}
+
+const std::string& LockedStringTable::UserString(const char* str) const {
+    const auto& [string_found, string_value] = m_table.CheckGet(str);
+    if (string_found)
+        return string_value;
+    return m_default_table[str];
+}
+
+bool LockedStringTable::UserStringExists(const std::string& str) const
+{ return m_table.StringExists(str) || m_default_table.StringExists(str); }
+
+bool LockedStringTable::UserStringExists(const std::string_view str) const
+{ return m_table.StringExists(str) || m_default_table.StringExists(str); }
+
+bool LockedStringTable::UserStringExists(const char* str) const
+{ return m_table.StringExists(str) || m_default_table.StringExists(str); }
 
 boost::format FlexibleFormat(const std::string &string_to_format) {
     try {

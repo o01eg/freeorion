@@ -358,6 +358,30 @@ namespace {
 
     }
 
+    auto IsProducibleBuilding(const std::string& item_name, int location_id) -> bool
+    {
+        ScriptingContext context;
+        int empire_id = AIClientApp::GetApp()->EmpireID();
+        auto empire = context.GetEmpire(empire_id);
+        if (!empire) {
+            ErrorLogger() << "IsProducibleBuilding : couldn't get empire with id " << empire_id;
+            return false;
+        }
+        return empire->ProducibleItem(BuildType::BT_BUILDING, item_name, location_id, context);
+    }
+
+    auto IsEnqueuableBuilding(const std::string& item_name, int location_id) -> bool
+    {
+        ScriptingContext context;
+        int empire_id = AIClientApp::GetApp()->EmpireID();
+        auto empire = context.GetEmpire(empire_id);
+        if (!empire) {
+            ErrorLogger() << "IsEnqueuableBuilding : couldn't get empire with id " << empire_id;
+            return false;
+        }
+        return empire->EnqueuableItem(BuildType::BT_BUILDING, item_name, location_id, context);
+    }
+
     auto IssueEnqueueBuildingProductionOrder(const std::string& item_name, int location_id) -> int
     {
         ScriptingContext context;
@@ -387,6 +411,19 @@ namespace {
             context);
 
         return 1;
+    }
+
+    auto IsEnqueuableShip(int design_id, int location_id) -> bool
+    {
+        ScriptingContext context;
+        int empire_id = AIClientApp::GetApp()->EmpireID();
+        auto empire = context.GetEmpire(empire_id);
+        if (!empire) {
+            ErrorLogger() << "IsEnqueuableShip : couldn't get empire with id " << empire_id;
+            return false;
+        }
+        // as of this writing, ships don't have a distinction between producible and enqueuable
+        return empire->ProducibleItem(BuildType::BT_SHIP, design_id, location_id, context);
     }
 
     auto IssueEnqueueShipProductionOrder(int design_id, int location_id) -> int
@@ -702,11 +739,39 @@ namespace FreeOrionPython {
                 +[]() -> std::string { return (GetResourceDir() / GetOptionsDB().Get<std::string>("ai-path")).string(); },
                 py::return_value_policy<py::return_by_value>());
 
-        py::def("initMeterEstimatesDiscrepancies",      InitMeterEstimatesAndDiscrepancies);
+        py::def("initMeterEstimatesDiscrepancies",
+                InitMeterEstimatesAndDiscrepancies,
+                "For all objects and max / target meters, determines discrepancies "
+                "between actual meters and what the known universe should produce. "
+                "This is used later when updating meter estimates to incorporate "
+                "those discrepancies.");
         py::def("updateMeterEstimates",                 UpdateMeterEstimates);
         py::def("updateResourcePools",                  UpdateResourcePools);
         py::def("updateResearchQueue",                  UpdateResearchQueue);
         py::def("updateProductionQueue",                UpdateProductionQueue);
+
+        py::def("isProducibleBuilding",
+                IsProducibleBuilding,
+                "Returns true if the specified building type (string) can be produced "
+                "by this client's empire at the specified production location (int). "
+                "Being producible means that if the item is on the production queue, "
+                "it can be allocated production points that are available at its "
+                "location. Being producible does not mean that the building type can "
+                "be added to the queue.");
+        py::def("isEnqueuableBuilding",
+                IsEnqueuableBuilding,
+                "Returns true if the specified building type (string) can be enqueued "
+                "by this client's empire at the specified production location (int). "
+                "Being enqueuable means that the item can be added to the queue, but "
+                "does not mean that the item will be allocated production points once "
+                " it is added");
+        py::def("isEnqueuableShip",
+                IsEnqueuableShip,
+                "Returns true if the specified ship design (int) can be enqueued by "
+                "this client's empire at the specified production location (int). "
+                "Enqueued ships should always also be producible, and thus able to "
+                "be allocated production points once enqueued, if any are available "
+                "at the production location.");
 
         py::def("issueFleetMoveOrder",
                 +[](int fleet_id, int destination_id) -> int { return Issue<FleetMoveOrder>(fleet_id, destination_id, false); },

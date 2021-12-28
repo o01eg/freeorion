@@ -300,9 +300,7 @@ void Condition::Eval(const ScriptingContext& parent_context,
     }
 }
 
-void Condition::Eval(const ScriptingContext& parent_context,
-                     ObjectSet& matches) const
-{
+void Condition::Eval(const ScriptingContext& parent_context, ObjectSet& matches) const {
     matches.clear();
     ObjectSet condition_initial_candidates;
 
@@ -7842,10 +7840,10 @@ namespace {
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
-            if (m_empire_id == ALL_EMPIRES)
-                return true;
             if (m_vis == Visibility::VIS_NO_VISIBILITY)
                 return true;
+            if (m_empire_id == ALL_EMPIRES && m_context.combat_bout < 1)
+                return true; // outside of battle neutral forces have full visibility per default
 
             if (m_since_turn == INVALID_GAME_TURN) {
                 // no valid game turn was specified, so use current universe state
@@ -10313,8 +10311,13 @@ And::And(std::unique_ptr<Condition>&& operand1, std::unique_ptr<Condition>&& ope
     Condition()
 {
     // would prefer to initialize the vector m_operands in the initializer list, but this is difficult with non-copyable unique_ptr parameters
-    if (operand1)
-        m_operands.push_back(std::move(operand1));
+    if (operand1) {
+        if (And* operand1_and = dynamic_cast<And*>(operand1.get())) {
+            m_operands = std::move(operand1_and->m_operands);
+        } else {
+            m_operands.push_back(std::move(operand1));
+        }
+    }
     if (operand2)
         m_operands.push_back(std::move(operand2));
     if (operand3)
@@ -10519,8 +10522,13 @@ Or::Or(std::unique_ptr<Condition>&& operand1,
     Condition()
 {
     // would prefer to initialize the vector m_operands in the initializer list, but this is difficult with non-copyable unique_ptr parameters
-    if (operand1)
-        m_operands.push_back(std::move(operand1));
+    if (operand1) {
+        if (Or* operand1_or = dynamic_cast<Or*>(operand1.get())) {
+            m_operands = std::move(operand1_or->m_operands);
+        } else {
+            m_operands.push_back(std::move(operand1));
+        }
+    }
     if (operand2)
         m_operands.push_back(std::move(operand2));
     if (operand3)

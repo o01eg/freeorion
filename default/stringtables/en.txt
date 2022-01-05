@@ -7512,8 +7512,8 @@ SITREP_NOVA_DETECTED_LABEL
 Supernova detected
 
 SITREP_BUREAUCRACY_STOPPED
-'''The [[policy PLC_BUREAUCRACY]] is expanging, requiring more administrative facilities.
-Starting next turn, %rawtext:needbuildings% [[buildingtype BLD_REGIONAL_ADMIN]] and [[buildingtype BLD_IMPERIAL_PALACE]] will be needed to prevent the the bureaucracy from halting. Currently, a total of %rawtext:havebuildings% are owned.
+'''The [[policy PLC_BUREAUCRACY]] is expanding, requiring more administrative facilities.
+Starting next turn, %rawtext:needbuildings% facilities ([[buildingtype BLD_IMPERIAL_PALACE]], [[buildingtype BLD_REGIONAL_ADMIN]]) will be needed to prevent the bureaucracy from halting. Currently, a total of %rawtext:havebuildings% are owned.
 Bureaucracy requires an additional administrative building every [[value BUREACRACY_ADMINS_NEEDED_TURN_SCALING]] turns.'''
 
 SITREP_BUREAUCRACY_STOPPED_LABEL
@@ -11539,10 +11539,11 @@ PLC_NO_SUPPLY
 No Supply
 
 PLC_NO_SUPPLY_DESC
-Prevents planets from generating supply networks.
+'''• Prevents planets from generating supply networks.
+• Increases stealth of planets and buildings by [[value NO_SUPPLY_STEALTH_BOOST]].'''
 
 PLC_NO_SUPPLY_SHORT_DESC
-Stops supply propagation
+Stops supply propagation, boosts stealth
 
 PLC_CENTRALIZATION
 Centralization
@@ -11596,7 +11597,9 @@ PLC_CONTINUOUS_SCANNING
 Continuous Scanning
 
 PLC_CONTINUOUS_SCANNING_DESC
-Increases ship detection range and imperial detection strength, increasing with duration of adoption, while also reducing ship stealth.
+'''• Increases ship detection range by [[value CONTINUOUS_SCANNING_RANGE_BOOST]].
+• Increases imperial detection strength by 1 per turn that this policy has been been adopted, up to [[value CONTINUOUS_SCANNING_MAX_DETECTION_BOOST]].
+• Decreases ship stealth by [[value CONTINUOUS_SCANNING_STEALTH_PENALTY]].'''
 
 PLC_CONTINUOUS_SCANNING_SHORT_DESC
 Improves Detection and Hinders Stealth
@@ -11605,9 +11608,8 @@ PLC_EXPLORATION
 Exploration
 
 PLC_EXPLORATION_DESC
-'''Increases speed of ships with no weapons, fighters, shields, armour, troops, colony pods, bombardment, research, industry, influence, production, or general parts.
-
-Detection, fuel, and engine parts are allowed.'''
+'''• Increases speed of ships with no weapons, fighters, shields, armour, troops, colony pods, bombardment, research, industry, influence, production, or general parts. Detection, fuel, and engine parts are allowed.
+• Every turn a system is newly explored, the ships in that system generate a total of [[value EXPLORATION_RESEARCH_BONUS_TOTAL]] RP.'''
 
 PLC_EXPLORATION_SHORT_DESC
 Speeds Up Explorer Ships
@@ -11739,15 +11741,6 @@ All bonuses or penalties are [[value PLC_DIVERSITY_SCALING]] per species above o
 PLC_DIVERSITY_SHORT_DESC
 Improves research, stability, and Influence
 
-PLC_RESERVE_TANKS
-Reserve Tanks
-
-PLC_RESERVE_TANKS_DESC
-Adds +1 fuel capacity to all ships, but halves their speed when they have less than half of their max fuel left.
-
-PLC_RESERVE_TANKS_SHORT_DESC
-Improves ship fuel economy
-
 PLC_ENGINEERING
 Engineering Corps
 
@@ -11836,7 +11829,7 @@ PLC_FEUDALISM
 Feudalism
 
 PLC_FEUDALISM_DESC
-Increases [[metertype METER_TARGET_INDUSTRY]] of industry-fovused planets that are in systems with unowned planets that have the same species, by [[value PLC_FEUDALISM_DESC_INDUSTRY_SCALING]] times the square root of the total population of those unowned planets.
+Increases [[metertype METER_TARGET_INDUSTRY]] of industry-focused planets that are in systems with unowned planets that have the same species, by [[value PLC_FEUDALISM_DESC_INDUSTRY_SCALING]] times the square root of the total population of those unowned planets.
 
 PLC_FEUDALISM_SHORT_DESC
 Neutral Planets Boost Industry
@@ -11976,7 +11969,9 @@ Capital Markets
 
 PLC_CAPITAL_MARKETS_DESC
 '''• Planets with a luxury resource special and that are set to influence focus will export the resource to supply-connected planets. This boosts the stability of planets with species that like the resource by [[value SPECIAL_CAPITAL_MARKETS_STABILITY_FOCUS_BONUS]].
-• Increases the rate of growth or decay of [[metertype METER_INFLUENCE]] by [[value PLC_CAPITAL_MARKETS_INFLUENCE_RATE]] / turn towards [[metertype METER_TARGET_INFLUENCE]].'''
+• Increases [[metertype METER_TARGET_INFLUENCE]] on populated planets with at least [[value CAPITAL_MARKETS_INFLUENCE_MIN_STABILITY]] [[metertype METER_HAPPINESS]] by [[value CAPITAL_MARKETS_INFLUENCE_BONUS_SCALING]] per the lesser of [[metertype METER_CONSTRUCTION]] and [[metertype METER_POPULATION]].
+• Increases the rate of growth or decay of [[metertype METER_INFLUENCE]] and [[[[metertype METER_HAPPINESS]]]] by [[value PLC_CAPITAL_MARKETS_INFLUENCE_RATE]] / turn towards [[metertype METER_TARGET_INFLUENCE]] or [[metertype METER_TARGET_HAPPINESS]].
+• Reduces [[metertype METER_TARGET_HAPPINESS]] on populated empire planets by [[value CAPITAL_MARKETS_DEBT_INSTABILITY]] times the size of the empire's influence debt.'''
 
 PLC_CAPITAL_MARKETS_SHORT_DESC
 Boosts stability with resource export
@@ -12058,7 +12053,9 @@ PLC_NECESSITY
 Necessity
 
 PLC_NECESSITY_DESC
-Increases [[metertype METER_TARGET_RESEARCH]] of research focused planets with [[metertype METER_HAPPINESS]] less than [[value PLC_NECESSITY_MAX_STABILITY]] by the square root of the product of population and how far [[metertype METER_HAPPINESS]] is below [[value PLC_NECESSITY_MAX_STABILITY]].
+'''On research focused planets with [[metertype METER_HAPPINESS]] less than [[value PLC_NECESSITY_MAX_STABILITY]]:
+• Increases [[metertype METER_TARGET_RESEARCH]] by the square root of the product of population and how far [[metertype METER_HAPPINESS]] is below [[value PLC_NECESSITY_MAX_STABILITY]].
+• Increases [[metertype METER_RESEARCH]] growth by [[value PLC_NECESSITY_RESEARCH_GROWTH_BOOST]] per turn.'''
 
 PLC_NECESSITY_SHORT_DESC
 Boosts Unstable Planet Research
@@ -12067,7 +12064,7 @@ PLC_EXPLORATION_RESEARCH
 Exploration Research
 
 PLC_EXPLORATION_RESEARCH_DESC
-Every turn a system is newly explored, the ships in that system generate a total of [[value EXPLORATION_RESEARCH_BONUS_TOTAL]] RP.
+
 
 PLC_EXPLORATION_RESEARCH_SHORT_DESC
 Exploration Gives Research
@@ -14024,8 +14021,8 @@ BLD_CULTURE_ARCHIVES
 Cultural Archives
 
 BLD_CULTURE_ARCHIVES_DESC
-'''Increases [[metertype METER_TARGET_RESEARCH]] by [[value BLD_CULTURE_ARCHIVES_TARGET_RESEARCH_FLAT]] and [[metertype METER_TARGET_INDUSTRY]] by [[value BLD_CULTURE_ARCHIVES_TARGET_INDUSTRY_PERPOP]] per [[metertype METER_POPULATION]].
-The effects require a stability of [[value BLD_CULTURE_ARCHIVES_MIN_STABILITY]].
+'''• Increases [[metertype METER_TARGET_RESEARCH]] by [[value BLD_CULTURE_ARCHIVES_TARGET_RESEARCH_FLAT]] and [[metertype METER_TARGET_INDUSTRY]] by [[value BLD_CULTURE_ARCHIVES_TARGET_INDUSTRY_PERPOP]] per [[metertype METER_POPULATION]]. The effects require a stability of [[value BLD_CULTURE_ARCHIVES_MIN_STABILITY]].
+• Grants a social policy slot.
 
 Stores the sum accumulated knowledge from thousands of years of life on this planet, improving many aspects of planetary productivity.'''
 
@@ -14033,8 +14030,7 @@ BLD_CULTURE_LIBRARY
 Cultural Library
 
 BLD_CULTURE_LIBRARY_DESC
-'''Increases [[metertype METER_TARGET_RESEARCH]] by [[value BLD_CULTURE_LIBRARY_TARGET_RESEARCH_FLAT]].
-The effect requires a stability of [[value BLD_CULTURE_LIBRARY_MIN_STABILITY]].
+'''Increases [[metertype METER_TARGET_RESEARCH]] by [[value BLD_CULTURE_LIBRARY_TARGET_RESEARCH_FLAT]]. This effect requires a stability of [[value BLD_CULTURE_LIBRARY_MIN_STABILITY]].
 
 Stores the accumulated knowledge from thousands of years of life on this planet, giving a bonuses to research. This building will be destroyed when the [[metertype METER_POPULATION]] of the high tech natives reaches zero.'''
 
@@ -16751,6 +16747,11 @@ Rioting from %1% Instability
 # %2% name of species on planet
 PARTISANS_REBELLION
 %2% Partisans from Influence Debt
+
+# %1% name of planet
+# %2% name of species on planet
+INFLUENCE_DEBT_DECAY
+Influence Debt Decay
 
 # %1% name of planet
 # %2% name of species on planet

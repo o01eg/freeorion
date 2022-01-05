@@ -959,20 +959,6 @@ bool Font::RenderState::ColorsEmpty() const
 
 
 ///////////////////////////////////////
-// class GG::Font::RenderCache
-///////////////////////////////////////
-
-Font::RenderCache::RenderCache() :
-    vertices(std::make_unique<GL2DVertexBuffer>()),
-    coordinates(std::make_unique<GLTexCoordBuffer>()),
-    colors(std::make_unique<GLRGBAColorBuffer>()),
-    underline_vertices(std::make_unique<GL2DVertexBuffer>()),
-    underline_colors(std::make_unique<GLRGBAColorBuffer>())
-{}
-
-Font::RenderCache::~RenderCache() = default;
-
-///////////////////////////////////////
 // class GG::Font::LineData::CharData
 ///////////////////////////////////////
 Font::LineData::CharData::CharData(X extent_, StrSize str_index, StrSize str_size, CPSize cp_index,
@@ -1056,8 +1042,6 @@ X Font::RenderText(const Pt& pt_, const std::string& text) const
     Pt pt = pt_;
     X orig_x = pt.x;
 
-    double orig_color[4];
-    glGetDoublev(GL_CURRENT_COLOR, orig_color);
     glBindTexture(GL_TEXTURE_2D, m_texture->OpenGLId());
 
     RenderCache cache;
@@ -1073,9 +1057,9 @@ X Font::RenderText(const Pt& pt_, const std::string& text) const
         }
     }
 
-    cache.vertices->createServerBuffer();
-    cache.coordinates->createServerBuffer();
-    cache.colors->createServerBuffer();
+    cache.vertices.createServerBuffer();
+    cache.coordinates.createServerBuffer();
+    cache.colors.createServerBuffer();
     RenderCachedText(cache);
 
     return pt.x - orig_x;
@@ -1103,15 +1087,18 @@ void Font::RenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags
     RenderCachedText(cache);
 }
 
-void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags<TextFormat>& format, RenderCache& cache,
-                         const std::vector<LineData>& line_data, RenderState* render_state/* = 0*/) const
- {
-    RenderState state;
-    if (!render_state)
-        render_state = &state;
-
-    PreRenderText(ul, lr, text, format, line_data, *render_state,
-                  0, CP0, line_data.size(), line_data.empty() ? CP0 : CPSize(line_data.back().char_data.size()), cache);
+void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags<TextFormat>& format,
+                         RenderCache& cache,
+                         const std::vector<LineData>& line_data, RenderState* render_state) const
+{
+    if (render_state) {
+        PreRenderText(ul, lr, text, format, line_data, *render_state, 0, CP0, line_data.size(),
+                      line_data.empty() ? CP0 : CPSize(line_data.back().char_data.size()), cache);
+    } else {
+        RenderState render_state_local;
+        PreRenderText(ul, lr, text, format, line_data, render_state_local, 0, CP0, line_data.size(),
+                      line_data.empty() ? CP0 : CPSize(line_data.back().char_data.size()), cache);
+    }
 }
 
 void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags<TextFormat>& format,
@@ -1120,8 +1107,6 @@ void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Fl
                          std::size_t end_line, CPSize end_char,
                          RenderCache& cache) const
 {
-    double orig_color[4];
-    glGetDoublev(GL_CURRENT_COLOR, orig_color);
     //glBindTexture(GL_TEXTURE_2D, m_texture->OpenGLId());
 
     Y y_origin = ul.y; // default value for FORMAT_TOP
@@ -1150,9 +1135,8 @@ void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Fl
         auto string_end_it = text.end();
         for (CPSize j = start; j < end; ++j) {
             const auto& char_data = line.char_data[Value(j)];
-            for (auto tag : char_data.tags) {
-                HandleTag(tag, orig_color, render_state);
-            }
+            for (auto tag : char_data.tags)
+                HandleTag(tag, render_state);
             std::uint32_t c = utf8::peek_next(text.begin() + Value(char_data.string_index), string_end_it);
             assert((text[Value(char_data.string_index)] == '\n') == (c == WIDE_NEWLINE));
             if (c == WIDE_NEWLINE)
@@ -1166,9 +1150,9 @@ void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Fl
         }
     }
 
-    cache.vertices->createServerBuffer();
-    cache.coordinates->createServerBuffer();
-    cache.colors->createServerBuffer();
+    cache.vertices.createServerBuffer();
+    cache.coordinates.createServerBuffer();
+    cache.colors.createServerBuffer();
 }
 
 void Font::RenderCachedText(RenderCache& cache) const
@@ -1180,18 +1164,18 @@ void Font::RenderCachedText(RenderCache& cache) const
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
 
-    cache.vertices->activate();
-    cache.coordinates->activate();
-    cache.colors->activate();
-    glDrawArrays(GL_QUADS, 0,  cache.vertices->size());
+    cache.vertices.activate();
+    cache.coordinates.activate();
+    cache.colors.activate();
+    glDrawArrays(GL_QUADS, 0, cache.vertices.size());
 
     glBindTexture(GL_TEXTURE_2D, 0);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
-    if (!cache.underline_vertices->empty()) {
-        cache.underline_vertices->activate();
-        cache.underline_colors->activate();
-        glDrawArrays(GL_QUADS, 0, cache.underline_vertices->size());
+    if (!cache.underline_vertices.empty()) {
+        cache.underline_vertices.activate();
+        cache.underline_colors.activate();
+        glDrawArrays(GL_QUADS, 0, cache.underline_vertices.size());
     }
 
     glPopClientAttrib();
@@ -1200,9 +1184,6 @@ void Font::RenderCachedText(RenderCache& cache) const
 void Font::ProcessTagsBefore(const std::vector<LineData>& line_data, RenderState& render_state,
                              std::size_t begin_line, CPSize begin_char) const
 {
-    double orig_color[4];
-    glGetDoublev(GL_CURRENT_COLOR, orig_color);
-
     if (line_data.empty())
         return;
 
@@ -1213,7 +1194,7 @@ void Font::ProcessTagsBefore(const std::vector<LineData>& line_data, RenderState
              ++j)
         {
             for (auto& tag : line.char_data[Value(j)].tags) {
-                HandleTag(tag, orig_color, render_state);
+                HandleTag(tag, render_state);
             }
         }
     }
@@ -1983,24 +1964,24 @@ void Font::ValidateFormat(Flags<TextFormat>& format) const
 void Font::StoreGlyphImpl(Font::RenderCache& cache, Clr color, const Pt& pt,
                           const Glyph& glyph, int x_top_offset, int y_shift) const
 {
-    cache.coordinates->store(glyph.sub_texture.TexCoords()[0], glyph.sub_texture.TexCoords()[1]);
-    cache.vertices->store(pt.x + glyph.left_bearing + x_top_offset, pt.y + glyph.y_offset + y_shift);
-    cache.colors->store(color);
+    cache.coordinates.store(glyph.sub_texture.TexCoords()[0], glyph.sub_texture.TexCoords()[1]);
+    cache.vertices.store(pt.x + glyph.left_bearing + x_top_offset, pt.y + glyph.y_offset + y_shift);
+    cache.colors.store(color);
 
-    cache.coordinates->store(glyph.sub_texture.TexCoords()[2], glyph.sub_texture.TexCoords()[1]);
-    cache.vertices->store(pt.x + glyph.sub_texture.Width() + glyph.left_bearing + x_top_offset,
-                          pt.y + glyph.y_offset + y_shift);
-    cache.colors->store(color);
+    cache.coordinates.store(glyph.sub_texture.TexCoords()[2], glyph.sub_texture.TexCoords()[1]);
+    cache.vertices.store(pt.x + glyph.sub_texture.Width() + glyph.left_bearing + x_top_offset,
+                         pt.y + glyph.y_offset + y_shift);
+    cache.colors.store(color);
 
-    cache.coordinates->store(glyph.sub_texture.TexCoords()[2], glyph.sub_texture.TexCoords()[3]);
-    cache.vertices->store(pt.x + glyph.sub_texture.Width() + glyph.left_bearing - x_top_offset,
-                          pt.y + glyph.sub_texture.Height() + glyph.y_offset + y_shift);
-    cache.colors->store(color);
+    cache.coordinates.store(glyph.sub_texture.TexCoords()[2], glyph.sub_texture.TexCoords()[3]);
+    cache.vertices.store(pt.x + glyph.sub_texture.Width() + glyph.left_bearing - x_top_offset,
+                         pt.y + glyph.sub_texture.Height() + glyph.y_offset + y_shift);
+    cache.colors.store(color);
 
-    cache.coordinates->store(glyph.sub_texture.TexCoords()[0], glyph.sub_texture.TexCoords()[3]);
-    cache.vertices->store(pt.x + glyph.left_bearing - x_top_offset,
-                          pt.y + glyph.sub_texture.Height() + glyph.y_offset + y_shift);
-    cache.colors->store(color);
+    cache.coordinates.store(glyph.sub_texture.TexCoords()[0], glyph.sub_texture.TexCoords()[3]);
+    cache.vertices.store(pt.x + glyph.left_bearing - x_top_offset,
+                         pt.y + glyph.sub_texture.Height() + glyph.y_offset + y_shift);
+    cache.colors.store(color);
 }
 
 void Font::StoreUnderlineImpl(Font::RenderCache& cache, Clr color, const Pt& pt, const Glyph& glyph,
@@ -2011,14 +1992,14 @@ void Font::StoreUnderlineImpl(Font::RenderCache& cache, Clr color, const Pt& pt,
     X x2 = x1 + glyph.advance;
     Y y2(y1 + underline_height);
 
-    cache.underline_vertices->store(x1, y1);
-    cache.underline_colors->store(color);
-    cache.underline_vertices->store(x2, y1);
-    cache.underline_colors->store(color);
-    cache.underline_vertices->store(x2, y2);
-    cache.underline_colors->store(color);
-    cache.underline_vertices->store(x1, y2);
-    cache.underline_colors->store(color);
+    cache.underline_vertices.store(x1, y1);
+    cache.underline_colors.store(color);
+    cache.underline_vertices.store(x2, y1);
+    cache.underline_colors.store(color);
+    cache.underline_vertices.store(x2, y2);
+    cache.underline_colors.store(color);
+    cache.underline_vertices.store(x1, y2);
+    cache.underline_colors.store(color);
 }
 
 X Font::StoreGlyph(const Pt& pt, const Glyph& glyph, const Font::RenderState* render_state,
@@ -2065,8 +2046,40 @@ X Font::StoreGlyph(const Pt& pt, const Glyph& glyph, const Font::RenderState* re
     return glyph.advance;
 }
 
-void Font::HandleTag(const std::shared_ptr<FormattingTag>& tag, double* orig_color,
-                     RenderState& render_state) const
+namespace {
+    std::pair<std::array<GLubyte, 4>, bool> TagParamsToColor(const std::vector<Font::Substring>& params) {
+        std::array<GLubyte, 4> retval{};
+        if (params.size() != 4)
+            return {retval, false};
+
+        for (size_t n = 0; n < 4; ++n) {
+#if defined(__cpp_lib_to_chars)
+            const auto& param{params[n]};
+            if (param.empty())
+                return {retval, false};
+            const auto param_data = &*param.begin();
+            const auto param_size = param.size();
+            auto ec = std::from_chars(param_data, param_data + param_size, retval[n]).ec;
+            if (ec != std::errc())
+                return {retval, false};
+#else
+            try {
+                auto temp_colour = boost::lexical_cast<int>(params[n]);
+                if (temp_colour >= 0 && temp_colour <= 255)
+                    retval[n] = temp_colour;
+                else
+                    return {retval, false};
+            } catch (const boost::bad_lexical_cast&) {
+                return {retval, false};
+            }
+#endif
+        }
+
+        return {retval, true};
+    }
+}
+
+void Font::HandleTag(const std::shared_ptr<FormattingTag>& tag, RenderState& render_state) const
 {
     if (tag->tag_name == ITALIC_TAG) {
         if (tag->close_tag) {
@@ -2108,58 +2121,14 @@ void Font::HandleTag(const std::shared_ptr<FormattingTag>& tag, double* orig_col
         if (tag->close_tag) {
             // Popping is ok also for an empty color stack.
             render_state.PopColor();
+
         } else {
-            using boost::lexical_cast;
-            bool well_formed_tag = true;
-            if (4 == tag->params.size()) {
-                try {
-                    int temp_color[4];
-                    GLubyte color[4];
-                    temp_color[0] = lexical_cast<int>(tag->params[0]);
-                    temp_color[1] = lexical_cast<int>(tag->params[1]);
-                    temp_color[2] = lexical_cast<int>(tag->params[2]);
-                    temp_color[3] = lexical_cast<int>(tag->params[3]);
-                    if (0 <= temp_color[0] && temp_color[0] <= 255 &&
-                        0 <= temp_color[1] && temp_color[1] <= 255 &&
-                        0 <= temp_color[2] && temp_color[2] <= 255 &&
-                        0 <= temp_color[3] && temp_color[3] <= 255)
-                    {
-                        color[0] = temp_color[0];
-                        color[1] = temp_color[1];
-                        color[2] = temp_color[2];
-                        color[3] = temp_color[3];
-                        glColor4ubv(color);
-                        render_state.PushColor(color[0], color[1], color[2], color[3]);
-                    } else {
-                        well_formed_tag = false;
-                    }
-                } catch (const boost::bad_lexical_cast&) {
-                    try {
-                        double color[4];
-                        color[0] = lexical_cast<double>(tag->params[0]);
-                        color[1] = lexical_cast<double>(tag->params[1]);
-                        color[2] = lexical_cast<double>(tag->params[2]);
-                        color[3] = lexical_cast<double>(tag->params[3]);
-                        if (0.0 <= color[0] && color[0] <= 1.0 &&
-                            0.0 <= color[1] && color[1] <= 1.0 &&
-                            0.0 <= color[2] && color[2] <= 1.0 &&
-                            0.0 <= color[3] && color[3] <= 1.0)
-                        {
-                            glColor4dv(color);
-                            render_state.PushColor(color[0], color[1], color[2], color[3]);
-                        } else {
-                            well_formed_tag = false;
-                        }
-                    } catch (const boost::bad_lexical_cast&) {
-                        well_formed_tag = false;
-                    }
-                }
+            auto [color, well_formed_tag] = TagParamsToColor(tag->params);
+            if (well_formed_tag) {
+                glColor4ubv(color.data());
+                render_state.PushColor(color[0], color[1], color[2], color[3]);
             } else {
-                well_formed_tag = false;
-            }
-            if (!well_formed_tag) {
-                std::cerr << "GG::Font : Encountered malformed <rgba> formatting tag: "
-                          << tag->text;
+                std::cerr << "GG::Font : Encountered malformed <rgba> formatting tag: " << tag->text;
             }
         }
     }

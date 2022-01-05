@@ -304,8 +304,6 @@ private:
     void ValidateFormat();      ///< ensures that the format flags are consistent
     void AdjustMinimumSize();
     void RecomputeTextBounds(); ///< recalculates m_text_ul and m_text_lr
-    void RefreshCache();
-    void PurgeCache();
 
     /** Recompute line data, code points, text extent and minusable size cache when
         m_text_elements changes.*/
@@ -322,7 +320,7 @@ private:
     std::shared_ptr<Font>                           m_font;
     Pt                                              m_text_ul;     ///< stored relative to the control's UpperLeft()
     Pt                                              m_text_lr;     ///< stored relative to the control's UpperLeft()
-    std::unique_ptr<Font::RenderCache>              m_render_cache;///< Cache much of text rendering.
+    Font::RenderCache                               m_render_cache;///< Cache much of text rendering.
 
     mutable X                                       m_cached_minusable_size_width{X0};
     mutable Pt                                      m_cached_minusable_size;
@@ -345,11 +343,26 @@ void GG::TextControl::operator>>(T& t) const
 
 template <typename T>
 T GG::TextControl::GetValue() const
-{ return boost::lexical_cast<T, std::string>(m_text); }
+{
+    try {
+        return boost::lexical_cast<T, std::string>(m_text);
+    } catch (const boost::bad_lexical_cast&) {
+        return T();
+    }
+}
 
 template <typename T>
 void GG::TextControl::operator<<(T t)
-{ SetText(boost::lexical_cast<std::string>(t)); }
+{
+    if constexpr (std::is_same_v<std::decay_t<T>, std::string>) {
+        SetText(std::move(t));
+    } else if constexpr (std::is_same_v<T, const char*>) {
+        SetText(std::string{t});
+    } else {
+        using std::to_string;
+        SetText(to_string(t));
+    }
+}
 
 
 #endif

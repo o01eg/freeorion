@@ -152,6 +152,21 @@ namespace {
         );
     }
 
+    std::unique_ptr<ValueRef::Variable<std::string>> DistanceToSelected(UniverseObjectType uot) {
+        const char* prop = nullptr;
+        if (uot == UniverseObjectType::OBJ_SYSTEM)
+            prop = "SelectedSystemID";
+        else if (uot == UniverseObjectType::OBJ_FLEET)
+            prop = "SelectedFleetID";
+        else
+            throw std::invalid_argument("DistanceToSelected pass unsupported UniverseObjectType");
+
+        return StringCastedComplexValueRef<double>(
+            "DirectDistanceBetween",
+            std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "ID"),
+            std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, prop));
+    }
+
     std::unique_ptr<ValueRef::Variable<std::string>> SystemSupplyRangeValueRef(bool propagated = false) {
         return StringCastedComplexValueRef<double>(
             propagated ? "PropagatedSystemSupplyRange" :"SystemSupplyRange",
@@ -165,7 +180,6 @@ namespace {
             nullptr,
             std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "SystemID"));
     }
-
 
     std::unique_ptr<ValueRef::Variable<std::string>> DesignCostValueRef() {
         return StringCastedComplexValueRef<double>(
@@ -222,20 +236,22 @@ namespace {
                         std::unique_ptr<ValueRef::ValueRef<std::string>>> col_types;
         if (col_types.empty()) {
             // General
-            col_types[{UserStringNop("NAME"),                   ""}] =  StringValueRef("Name");
-            col_types[{UserStringNop("OBJECT_TYPE"),            ""}] =  UserStringValueRef("TypeName");
-            col_types[{UserStringNop("ID"),                     ""}] =  StringCastedValueRef<int>("ID");
-            col_types[{UserStringNop("CREATION_TURN"),          ""}] =  StringCastedValueRef<int>("CreationTurn");
-            col_types[{UserStringNop("AGE"),                    ""}] =  StringCastedValueRef<int>("Age");
-            col_types[{UserStringNop("SYSTEM"),                 ""}] =  ObjectNameValueRef("SystemID");
-            col_types[{UserStringNop("STAR_TYPE"),              ""}] =  UserStringCastedValueRef<StarType>("StarType");
-            col_types[{UserStringNop("BUILDING_TYPE"),          ""}] =  UserStringValueRef("BuildingType");
-            col_types[{UserStringNop("LAST_TURN_BATTLE_HERE"),  ""}] =  StringCastedValueRef<int>("LastTurnBattleHere");
-            col_types[{UserStringNop("NUM_SPECIALS"),           ""}] =  StringCastedValueRef<int>("NumSpecials");
-            col_types[{UserStringNop("SPECIALS"),               ""}] =  UserStringVecValueRef("Specials");
-            col_types[{UserStringNop("TAGS"),                   ""}] =  UserStringVecValueRef("Tags");
-            col_types[{UserStringNop("X"),                      ""}] =  StringCastedValueRef<double>("X");
-            col_types[{UserStringNop("Y"),                      ""}] =  StringCastedValueRef<double>("Y");
+            col_types[{UserStringNop("NAME"),                        ""}] = StringValueRef("Name");
+            col_types[{UserStringNop("OBJECT_TYPE"),                 ""}] = UserStringValueRef("TypeName");
+            col_types[{UserStringNop("ID"),                          ""}] = StringCastedValueRef<int>("ID");
+            col_types[{UserStringNop("CREATION_TURN"),               ""}] = StringCastedValueRef<int>("CreationTurn");
+            col_types[{UserStringNop("AGE"),                         ""}] = StringCastedValueRef<int>("Age");
+            col_types[{UserStringNop("SYSTEM"),                      ""}] = ObjectNameValueRef("SystemID");
+            col_types[{UserStringNop("STAR_TYPE"),                   ""}] = UserStringCastedValueRef<StarType>("StarType");
+            col_types[{UserStringNop("BUILDING_TYPE"),               ""}] = UserStringValueRef("BuildingType");
+            col_types[{UserStringNop("LAST_TURN_BATTLE_HERE"),       ""}] = StringCastedValueRef<int>("LastTurnBattleHere");
+            col_types[{UserStringNop("NUM_SPECIALS"),                ""}] = StringCastedValueRef<int>("NumSpecials");
+            col_types[{UserStringNop("SPECIALS"),                    ""}] = UserStringVecValueRef("Specials");
+            col_types[{UserStringNop("TAGS"),                        ""}] = UserStringVecValueRef("Tags");
+            col_types[{UserStringNop("X"),                           ""}] = StringCastedValueRef<double>("X");
+            col_types[{UserStringNop("Y"),                           ""}] = StringCastedValueRef<double>("Y");
+            col_types[{UserStringNop("DISTANCE_TO_SELECTED_SYSTEM"), ""}] = DistanceToSelected(UniverseObjectType::OBJ_SYSTEM);
+            col_types[{UserStringNop("DISTANCE_TO_SELECTED_FLEET"),  ""}] = DistanceToSelected(UniverseObjectType::OBJ_FLEET);
 
             // empire
             col_types[{UserStringNop("SUPPLYING_EMPIRE"),       ""}] =  EmpireNameValueRef("SupplyingEmpire");
@@ -1848,8 +1864,29 @@ namespace {
         static auto StringToFloat(const std::string& key) {
 #if defined(__cpp_lib_to_chars)
             float retval = 0.0f;
-            auto ec = std::from_chars(key.data(), key.data() + key.size(), retval).ec;
-            return std::pair{retval, ec};
+            auto result = std::from_chars(key.data(), key.data() + key.size(), retval);
+
+            // adjust for SI postfix
+            auto next_char_offset = std::distance(key.data(), result.ptr);
+            if (next_char_offset > 0 && static_cast<size_t>(next_char_offset) < key.length()) {
+                //std::cout << "key:\"" << key << "\" next char:" << *result.ptr << std::endl;
+                float power = 0.0f;
+                switch (*result.ptr) {
+                case 'f':   power = -15.0f; break;
+                case 'p':   power = -12.0f; break;
+                case 'n':   power = -9.0f; break;
+                case '\xC2':power = -6.0f; break; // first byte of mu in UTF-8
+                case 'm':   power = -3.0f; break;
+                case 'k':   power = 3.0f; break;
+                case 'M':   power = 6.0f; break;
+                case 'G':   power = 9.0f; break;
+                case 'T':   power = 12.0f; break;
+                default: break;
+                }
+                retval *= std::pow(10.0f, power);
+            }
+
+            return std::pair{retval, result.ec};
 #else
             try {
                 return std::pair{boost::lexical_cast<float>(key), std::errc()};
@@ -2520,7 +2557,6 @@ void ObjectListWnd::ObjectDoubleClicked(GG::ListBox::iterator it, const GG::Pt& 
 
 std::set<int> ObjectListWnd::SelectedObjectIDs() const {
     std::set<int> sel_ids;
-    const auto sel = m_list_box->Selections();
     for (const auto& entry : m_list_box->Selections()) {
         ObjectRow *row = dynamic_cast<ObjectRow *>(entry->get());
         if (row) {

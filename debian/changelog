@@ -1,3 +1,9 @@
+freeorion (0.4.10.9999.fo0019+git20220118.580d50dppa1~focal) focal; urgency=medium
+
+  * FO0019
+
+ -- O01eg <o01eg@yandex.ru>  Tue, 18 Jan 2022 18:59:16 +0000
+
 freeorion (0.4.10.9999.fo0018+git20211127.cd8138eppa1~focal) focal; urgency=medium
 
   * FO0018 again

@@ -178,7 +178,7 @@ class AuthProvider:
                         psd.player_name = r[0]
                         psd.empire_name = r[0]
                         psd.starting_species = r[1]
-                        psd.starting_team = r[2]
+                        psd.starting_team = 1 #  r[2]
                         players.append(psd)
         except psycopg2.InterfaceError:
             self.conn_ro = psycopg2.connect(self.dsn_ro)

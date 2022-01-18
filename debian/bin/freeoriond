@@ -9,7 +9,7 @@ pwd
 
 DATAPATH="--resource.path /usr/share/games/freeorion/default"
 
-GAME_UID=FO0018
+GAME_UID=FO0019
 
 SAVEFILE=`ls -t /var/lib/freeorion/save/${GAME_UID}/*.mps | head -n1`
 

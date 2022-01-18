@@ -461,6 +461,8 @@ private:
 
 [[nodiscard]] FO_COMMON_API MeterType          NameToMeter(const std::string& name);
 [[nodiscard]] FO_COMMON_API const std::string& MeterToName(MeterType meter);
+[[nodiscard]] FO_COMMON_API std::string_view   PlanetTypeToString(PlanetType type);
+[[nodiscard]] FO_COMMON_API std::string_view   PlanetEnvironmentToString(PlanetEnvironment env);
 [[nodiscard]] FO_COMMON_API std::string        ReconstructName(const std::vector<std::string>& property_name,
                                                                ReferenceType ref_type,
                                                                bool return_immediate_value = false);
@@ -1598,14 +1600,12 @@ bool StringCast<FromType>::operator==(const ValueRef<std::string>& rhs) const
 template <typename FromType>
 std::string StringCast<FromType>::Eval(const ScriptingContext& context) const
 {
-    if (!m_value_ref)
-        return "";
-    std::string retval;
     try {
-        retval = boost::lexical_cast<std::string>(m_value_ref->Eval(context));
+        if (m_value_ref)
+            return boost::lexical_cast<std::string>(m_value_ref->Eval(context));
     } catch (...) {
     }
-    return retval;
+    return "";
 }
 
 template <typename FromType>

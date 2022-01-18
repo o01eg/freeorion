@@ -277,7 +277,6 @@ namespace {
         };
         return meter_name_map;
     }
-
     // force early init to avoid threading issues later
     std::map<std::string, MeterType> dummy = GetMeterNameMap();
 
@@ -285,13 +284,14 @@ namespace {
 }
 
 namespace ValueRef {
-    std::string ValueRefBase::InvariancePattern() const {
-        return std::string{RootCandidateInvariant() ? "R" : "r"}
-            .append(LocalCandidateInvariant()       ? "L" : "l")
-            .append(SourceInvariant()               ? "S" : "s")
-            .append(TargetInvariant()               ? "T" : "t")
-            .append(SimpleIncrement()               ? "I" : "i")
-            .append(ConstantExpr()                  ? "C" : "c");
+
+std::string ValueRefBase::InvariancePattern() const {
+    return std::string{RootCandidateInvariant() ? "R" : "r"}
+        .append(LocalCandidateInvariant()       ? "L" : "l")
+        .append(SourceInvariant()               ? "S" : "s")
+        .append(TargetInvariant()               ? "T" : "t")
+        .append(SimpleIncrement()               ? "I" : "i")
+        .append(ConstantExpr()                  ? "C" : "c");
 }
 
 MeterType NameToMeter(const std::string& name) {
@@ -308,6 +308,47 @@ const std::string& MeterToName(MeterType meter) {
             return name; // CodeQL reports "Returning stack-allocated memory", but the name structured binding should be a reference as far as I can tell
     }
     return EMPTY_STRING;
+}
+
+constexpr std::string_view PlanetTypeToStringConstexpr(PlanetType type) {
+    switch (type) {
+    case PlanetType::PT_SWAMP:     return "Swamp";
+    case PlanetType::PT_TOXIC:     return "Toxic";
+    case PlanetType::PT_INFERNO:   return "Inferno";
+    case PlanetType::PT_RADIATED:  return "Radiated";
+    case PlanetType::PT_BARREN:    return "Barren";
+    case PlanetType::PT_TUNDRA:    return "Tundra";
+    case PlanetType::PT_DESERT:    return "Desert";
+    case PlanetType::PT_TERRAN:    return "Terran";
+    case PlanetType::PT_OCEAN:     return "Ocean";
+    case PlanetType::PT_ASTEROIDS: return "Asteroids";
+    case PlanetType::PT_GASGIANT:  return "GasGiant";
+    default:                       return "?";
+    }
+}
+
+std::string_view PlanetTypeToString(PlanetType type)
+{ return PlanetTypeToStringConstexpr(type); }
+
+PlanetType StringToPlanetType(std::string_view name) {
+    for (PlanetType pt = PlanetType::INVALID_PLANET_TYPE; pt < PlanetType::NUM_PLANET_TYPES;
+         pt = PlanetType(static_cast<std::underlying_type_t<PlanetType>>(pt) + 1))
+    {
+        if (PlanetTypeToStringConstexpr(pt) == name)
+            return pt;
+    }
+    return PlanetType::INVALID_PLANET_TYPE;
+}
+
+std::string_view PlanetEnvironmentToString(PlanetEnvironment env) {
+    switch (env) {
+    case PlanetEnvironment::PE_UNINHABITABLE: return "Uninhabitable";
+    case PlanetEnvironment::PE_HOSTILE:       return "Hostile";
+    case PlanetEnvironment::PE_POOR:          return "Poor";
+    case PlanetEnvironment::PE_ADEQUATE:      return "Adequate";
+    case PlanetEnvironment::PE_GOOD:          return "Good";
+    default:                                  return "?";
+    }
 }
 
 std::string ReconstructName(const std::vector<std::string>& property_name,
@@ -1942,6 +1983,32 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             return count;
         }
     }
+    else if (variable_name == "PlanetTypeDifference") {
+        // get planet types to find difference between...
+        PlanetType pt1;
+        if (m_int_ref1) {
+            int pt_int1 = m_int_ref1->Eval(context);
+            pt1 = PlanetType(pt_int1);
+        } else if (m_string_ref1) {
+            const std::string pt_name1 = m_string_ref1->Eval(context);
+            pt1 = StringToPlanetType(pt_name1);
+        } else {
+            return 0;
+        }
+
+        PlanetType pt2;
+        if (m_int_ref2) {
+            int pt_int2 = m_int_ref2->Eval(context);
+            pt2 = PlanetType(pt_int2);
+        } else if (m_string_ref2) {
+            const std::string pt_name2 = m_string_ref2->Eval(context);
+            pt2 = StringToPlanetType(pt_name2);
+        } else {
+            return 0;
+        }
+
+        return Planet::TypeDifference(pt1, pt2);
+    }
 
     return 0;
 }
@@ -1977,40 +2044,43 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
     // empire properties indexed by integers
     std::function<const std::map<int, float>& (const Empire&)> empire_property_int_key{nullptr};
 
-    if (variable_name == "PropagatedSystemSupplyRange")
-        empire_property_int_key = [](const Empire& empire) -> const std::map<int, float>& { return GetSupplyManager().PropagatedSupplyRanges(empire.EmpireID()); };
-    else if (variable_name == "SystemSupplyRange")
-        empire_property_int_key = &Empire::SystemSupplyRanges;
-    else if (variable_name == "PropagatedSystemSupplyDistance")
-        empire_property_int_key = [](const Empire& empire) -> const std::map<int, float>& { return GetSupplyManager().PropagatedSupplyDistances(empire.EmpireID()); };
-
-    if (empire_property_int_key) {
+    if (variable_name == "SystemSupplyRange") {
         using namespace boost::adaptors;
 
-        std::shared_ptr<const Empire> empire;
+        if (!m_int_ref2)
+            return 0.0; // no system specified... doesn't make sense to sum over systems...
+        int system_id = m_int_ref2->Eval(context);
+        if (system_id == INVALID_OBJECT_ID)
+            return 0.0;
 
         if (m_int_ref1) {
+            // single empire ID specified
             int empire_id = m_int_ref1->Eval(context);
             if (empire_id == ALL_EMPIRES)
                 return 0.0;
-            empire = context.GetEmpire(empire_id);
+            auto empire = context.GetEmpire(empire_id);
+            if (!empire)
+                return 0.0;
+            const auto& data = empire->SystemSupplyRanges();
+
+            auto it = data.find(system_id);
+            if (it != data.end())
+                return it->second;
+            else
+                return 0.0;
+
+        } else {
+            float empires_max = 0.0f;
+            // no empire ID specified, use max of all empires' ranges at specified system
+            for ([[maybe_unused]] auto& [unused_id, loop_empire] : context.Empires()) {
+                (void)unused_id; // quiet unused variable warning
+                const auto& empire_data = loop_empire->SystemSupplyRanges();
+                auto it = empire_data.find(system_id);
+                if (it != empire_data.end())
+                    empires_max = std::max(empires_max, it->second);
+            }
+            return empires_max;
         }
-
-        std::function<bool (const std::map<int, float>::value_type&)> key_filter;
-        key_filter = [](auto k) -> bool { return true; };
-
-        if (m_int_ref2)
-            key_filter = [k = m_int_ref2->Eval(context)](auto e) -> bool { return k == e.first; };
-
-        if (empire)
-            return boost::accumulate(empire_property_int_key(*empire) | filtered(key_filter) | map_values, 0.0f);
-
-        float sum = 0.0f;
-        for ([[maybe_unused]] auto& [unused_id, loop_empire] : context.Empires()) {
-            (void)unused_id; // quiet unused variable warning
-            sum += boost::accumulate(empire_property_int_key(*loop_empire) | filtered(key_filter) | map_values, 0.0f);
-        }
-        return sum;
     }
 
 
@@ -2027,11 +2097,9 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
 
         ResourceType res_type = ResourceType::INVALID_RESOURCE_TYPE;
         if (m_string_ref1) {
-            std::string res_name = m_string_ref1->Eval(context);
-            if (res_name == "Influence")
-                res_type = ResourceType::RE_INFLUENCE;
-            else if (res_name == "Industry")
-                res_type = ResourceType::RE_INDUSTRY;
+            const std::string res_name = m_string_ref1->Eval(context);
+            const auto meter_type = NameToMeter(res_name);
+            res_type = MeterToResource(meter_type);
         }
         if (res_type == ResourceType::INVALID_RESOURCE_TYPE)
             return 0;
@@ -2053,6 +2121,29 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
 
 
     // non-empire properties
+    std::function<const std::map<int, float>& ()> property_int_key{nullptr};
+
+    if (variable_name == "PropagatedSystemSupplyRange") // int_ref2 is system ID
+        property_int_key = []() -> const std::map<int, float>& { return GetSupplyManager().PropagatedSupplyRanges(); };
+    else if (variable_name == "PropagatedSystemSupplyDistance") // int_ref2 is system ID
+        property_int_key = []() -> const std::map<int, float>& { return GetSupplyManager().PropagatedSupplyDistances(); };
+
+    if (property_int_key) {
+        if (!m_int_ref2)
+            return 0.0; // no system specified... doesn't make sense to sum over systems...
+        int system_id = m_int_ref2->Eval(context);
+        if (system_id == INVALID_OBJECT_ID)
+            return 0.0;
+
+        const auto& data = property_int_key();
+        auto it = data.find(system_id);
+        if (it != data.end())
+            return it->second;
+        else
+            return 0.0;
+    }
+
+
     if (variable_name == "GameRule") {
         if (!m_string_ref1)
             return 0.0;
@@ -2764,7 +2855,7 @@ std::string StringCast<double>::Eval(const ScriptingContext& context) const
         if (abs_num < 0.1 || abs_num >= 1000)
             return DoubleToString(num, 3, false);
 
-        int precision = abs_num < 10 ? 2 : 1;
+        int precision = abs_num < 10 ? 2 : 1; // number of fractional decimal places
 
         // TODO: check if locale correctly does round trip of something with
         // a decimal place indicator using to_chars and from_chars.
@@ -2775,7 +2866,7 @@ std::string StringCast<double>::Eval(const ScriptingContext& context) const
             return buf.data();
 #else
             std::stringstream ss;
-            ss << std::setprecision(precision) << num;
+            ss << std::fixed << std::setprecision(precision) << num;
             return ss.str();
 #endif
     };

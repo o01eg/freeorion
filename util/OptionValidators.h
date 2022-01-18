@@ -32,8 +32,6 @@ namespace details {
 
 /** Interface base class for all OptionsDB validators. Simply provides the basic interface. */
 struct ValidatorBase {
-    ValidatorBase() = default;
-    ValidatorBase(ValidatorBase&& rhs) noexcept = default;
     virtual ~ValidatorBase() = default;
 
     /** returns normally if \a str is a valid value, or throws otherwise */
@@ -51,17 +49,22 @@ struct ValidatorBase {
 template <typename T>
 struct Validator : public ValidatorBase
 {
-    Validator() = default;
-    Validator(Validator&& rhs) noexcept = default;
-    ~Validator() override = default;
-
     boost::any Validate(const std::string& str) const override
     { return boost::any(boost::lexical_cast<T>(str)); }
     boost::any Validate(std::string_view str) const override
     { return boost::any(boost::lexical_cast<T>(str)); }
 
     [[nodiscard]] std::string String(const boost::any& value) const override
-    { return boost::lexical_cast<std::string>(boost::any_cast<T>(value)); }
+    {
+        if constexpr (std::is_same_v<T, std::string>)
+            return boost::any_cast<std::string>(value);
+        else if constexpr (std::is_enum_v<T>)
+            return std::string{to_string(boost::any_cast<T>(value))};
+        else if constexpr (std::is_arithmetic_v<T>)
+            return std::to_string(boost::any_cast<T>(value));
+        else
+            return boost::lexical_cast<std::string>(boost::any_cast<T>(value));
+    }
 
     [[nodiscard]] std::unique_ptr<ValidatorBase> Clone() const override
     { return std::make_unique<Validator>(); }
@@ -75,10 +78,6 @@ FO_COMMON_API std::vector<std::string> StringToList(const std::string& input_str
 template <>
 struct Validator<std::vector<std::string>> : public ValidatorBase
 {
-    Validator() = default;
-    Validator(Validator&& rhs) noexcept = default;
-    ~Validator() override = default;
-
     boost::any Validate(const std::string& str) const override
     { return boost::any(StringToList(str)); }
     boost::any Validate(std::string_view str) const override
@@ -97,7 +96,6 @@ struct RangedValidator : public Validator<T>
 {
     RangedValidator(const T& min, const T& max) : m_min(min), m_max(max) {}
     RangedValidator(RangedValidator&& rhs) noexcept = default;
-    ~RangedValidator() override = default;
 
     boost::any Validate(const std::string& str) const override {
         T val = boost::lexical_cast<T>(str);
@@ -123,7 +121,6 @@ struct StepValidator : public Validator<T>
 {
     StepValidator(const T& step, const T& origin = T()) : m_step_size(step), m_origin(origin) {}
     StepValidator(StepValidator&& rhs) noexcept = default;
-    ~StepValidator() override = default;
 
     boost::any Validate(const std::string& str) const override {
         T val = boost::lexical_cast<T>(str);
@@ -148,7 +145,6 @@ public:
     RangedStepValidator(const T& step, const T& min, const T& max) : m_step_size(step), m_origin(T()), m_min(min), m_max(max) {}
     RangedStepValidator(const T& step, const T& origin, const T& min, const T& max) : m_step_size (step), m_origin (origin), m_min (min), m_max (max) {}
     RangedStepValidator(RangedStepValidator&& rhs) noexcept = default;
-    ~RangedStepValidator() override = default;
 
     boost::any Validate(const std::string& str) const override {
         T val = boost::lexical_cast<T>(str);
@@ -174,11 +170,11 @@ public:
 template <typename T>
 struct DiscreteValidator : public Validator<T>
 {
-    DiscreteValidator(T single_value) :
+    explicit DiscreteValidator(T single_value) :
         m_values{std::move(single_value)}
     {}
 
-    DiscreteValidator(std::set<T> values) :
+    explicit DiscreteValidator(std::set<T> values) :
         m_values(std::move(values))
     {}
 
@@ -186,10 +182,6 @@ struct DiscreteValidator : public Validator<T>
     DiscreteValidator(iter start, iter finish) :
         m_values(start, finish)
     {}
-
-    DiscreteValidator(DiscreteValidator&& rhs) noexcept = default;
-
-    ~DiscreteValidator() override = default;
 
     boost::any Validate(const std::string& str) const override {
         T val = boost::lexical_cast<T>(str);

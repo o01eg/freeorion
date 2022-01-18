@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <shared_mutex>
 
 #include <boost/format.hpp>
-#include <boost/lexical_cast.hpp>
 
 #include "Export.h"
 
@@ -80,7 +80,7 @@ boost::format FlexibleFormatList(
         default: return plural_header_template; break;
         }
     }()};
-    boost::format header_fmt = FlexibleFormat(header_template) % boost::lexical_cast<std::string>(words.size());
+    boost::format header_fmt = FlexibleFormat(header_template) % std::to_string(words.size());
     for (const auto& word : header_words)
         header_fmt % word;
 
@@ -123,12 +123,14 @@ boost::format FlexibleFormatList(
 {
     return FlexibleFormatList(std::vector<std::string>(), words, all_header, all_header, all_header, all_header);
 }
+
 template<typename Container>
 boost::format FlexibleFormatList(
     const Container& words, const std::string& plural_header, const std::string& single_header)
 {
     return FlexibleFormatList(std::vector<std::string>(), words, plural_header, single_header, plural_header, plural_header);
 }
+
 template<typename Container>
 boost::format FlexibleFormatList(
     const Container& words, const std::string& plural_header,
@@ -153,6 +155,7 @@ boost::format FlexibleFormatList(
 {
     return FlexibleFormatList(header_words, words, all_header, all_header, all_header, all_header);
 }
+
 template<typename T1, typename T2>
 boost::format FlexibleFormatList(
     const T2& header_words, const T1& words, const std::string& plural_header, const std::string& single_header)

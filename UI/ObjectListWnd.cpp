@@ -30,6 +30,10 @@
 #include <boost/uuid/random_generator.hpp>
 
 #include <iterator>
+
+#if __has_include(<charconv>)
+  #include <charconv>
+#endif
 #include <sstream>
 
 std::vector<std::string_view> SpecialNames();
@@ -148,6 +152,21 @@ namespace {
         );
     }
 
+    std::unique_ptr<ValueRef::Variable<std::string>> DistanceToSelected(UniverseObjectType uot) {
+        const char* prop = nullptr;
+        if (uot == UniverseObjectType::OBJ_SYSTEM)
+            prop = "SelectedSystemID";
+        else if (uot == UniverseObjectType::OBJ_FLEET)
+            prop = "SelectedFleetID";
+        else
+            throw std::invalid_argument("DistanceToSelected pass unsupported UniverseObjectType");
+
+        return StringCastedComplexValueRef<double>(
+            "DirectDistanceBetween",
+            std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "ID"),
+            std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, prop));
+    }
+
     std::unique_ptr<ValueRef::Variable<std::string>> SystemSupplyRangeValueRef(bool propagated = false) {
         return StringCastedComplexValueRef<double>(
             propagated ? "PropagatedSystemSupplyRange" :"SystemSupplyRange",
@@ -161,7 +180,6 @@ namespace {
             nullptr,
             std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "SystemID"));
     }
-
 
     std::unique_ptr<ValueRef::Variable<std::string>> DesignCostValueRef() {
         return StringCastedComplexValueRef<double>(
@@ -218,20 +236,22 @@ namespace {
                         std::unique_ptr<ValueRef::ValueRef<std::string>>> col_types;
         if (col_types.empty()) {
             // General
-            col_types[{UserStringNop("NAME"),                   ""}] =  StringValueRef("Name");
-            col_types[{UserStringNop("OBJECT_TYPE"),            ""}] =  UserStringValueRef("TypeName");
-            col_types[{UserStringNop("ID"),                     ""}] =  StringCastedValueRef<int>("ID");
-            col_types[{UserStringNop("CREATION_TURN"),          ""}] =  StringCastedValueRef<int>("CreationTurn");
-            col_types[{UserStringNop("AGE"),                    ""}] =  StringCastedValueRef<int>("Age");
-            col_types[{UserStringNop("SYSTEM"),                 ""}] =  ObjectNameValueRef("SystemID");
-            col_types[{UserStringNop("STAR_TYPE"),              ""}] =  UserStringCastedValueRef<StarType>("StarType");
-            col_types[{UserStringNop("BUILDING_TYPE"),          ""}] =  UserStringValueRef("BuildingType");
-            col_types[{UserStringNop("LAST_TURN_BATTLE_HERE"),  ""}] =  StringCastedValueRef<int>("LastTurnBattleHere");
-            col_types[{UserStringNop("NUM_SPECIALS"),           ""}] =  StringCastedValueRef<int>("NumSpecials");
-            col_types[{UserStringNop("SPECIALS"),               ""}] =  UserStringVecValueRef("Specials");
-            col_types[{UserStringNop("TAGS"),                   ""}] =  UserStringVecValueRef("Tags");
-            col_types[{UserStringNop("X"),                      ""}] =  StringCastedValueRef<double>("X");
-            col_types[{UserStringNop("Y"),                      ""}] =  StringCastedValueRef<double>("Y");
+            col_types[{UserStringNop("NAME"),                        ""}] = StringValueRef("Name");
+            col_types[{UserStringNop("OBJECT_TYPE"),                 ""}] = UserStringValueRef("TypeName");
+            col_types[{UserStringNop("ID"),                          ""}] = StringCastedValueRef<int>("ID");
+            col_types[{UserStringNop("CREATION_TURN"),               ""}] = StringCastedValueRef<int>("CreationTurn");
+            col_types[{UserStringNop("AGE"),                         ""}] = StringCastedValueRef<int>("Age");
+            col_types[{UserStringNop("SYSTEM"),                      ""}] = ObjectNameValueRef("SystemID");
+            col_types[{UserStringNop("STAR_TYPE"),                   ""}] = UserStringCastedValueRef<StarType>("StarType");
+            col_types[{UserStringNop("BUILDING_TYPE"),               ""}] = UserStringValueRef("BuildingType");
+            col_types[{UserStringNop("LAST_TURN_BATTLE_HERE"),       ""}] = StringCastedValueRef<int>("LastTurnBattleHere");
+            col_types[{UserStringNop("NUM_SPECIALS"),                ""}] = StringCastedValueRef<int>("NumSpecials");
+            col_types[{UserStringNop("SPECIALS"),                    ""}] = UserStringVecValueRef("Specials");
+            col_types[{UserStringNop("TAGS"),                        ""}] = UserStringVecValueRef("Tags");
+            col_types[{UserStringNop("X"),                           ""}] = StringCastedValueRef<double>("X");
+            col_types[{UserStringNop("Y"),                           ""}] = StringCastedValueRef<double>("Y");
+            col_types[{UserStringNop("DISTANCE_TO_SELECTED_SYSTEM"), ""}] = DistanceToSelected(UniverseObjectType::OBJ_SYSTEM);
+            col_types[{UserStringNop("DISTANCE_TO_SELECTED_FLEET"),  ""}] = DistanceToSelected(UniverseObjectType::OBJ_FLEET);
 
             // empire
             col_types[{UserStringNop("SUPPLYING_EMPIRE"),       ""}] =  EmpireNameValueRef("SupplyingEmpire");
@@ -289,7 +309,7 @@ namespace {
             for (MeterType meter = MeterType(0); meter <= MeterType::METER_SPEED;  // the meter(s) after MeterType::METER_SPEED are part-specific
                  meter = MeterType(int(meter) + 1))
             {
-                col_types[{boost::lexical_cast<std::string>(meter), UserStringNop("METERS_SUBMENU")}] = StringCastedImmediateValueRef(ValueRef::MeterToName(meter));
+                col_types[{std::string{to_string(meter)},           UserStringNop("METERS_SUBMENU")}] = StringCastedImmediateValueRef(ValueRef::MeterToName(meter));
             }
         }
         return col_types;
@@ -458,7 +478,7 @@ namespace {
         std::vector<std::string> retval;
         retval.reserve(enum_vals.size());
         for (const enumT& enum_val : enum_vals)
-            retval.emplace_back(boost::lexical_cast<std::string>(enum_val));
+            retval.emplace_back(to_string(enum_val));
         return retval;
     }
 }
@@ -1166,7 +1186,7 @@ void FilterDialog::CompleteConstruction() {
 
         m_filters_layout->SetColumnStretch(col, 1.0);
 
-        label = Wnd::Create<CUIButton>(" " + UserString(boost::lexical_cast<std::string>(uot)) + " ");
+        label = Wnd::Create<CUIButton>(" " + UserString(to_string(uot)) + " ");
         label->LeftClickedSignal.connect(
             boost::bind(&FilterDialog::UpdateVisFiltersFromObjectTypeButton, this, uot));
         m_filters_layout->Add(std::move(label), 0, col, GG::ALIGN_CENTER | GG::ALIGN_VCENTER);
@@ -1382,8 +1402,7 @@ public:
         m_has_contents(has_contents)
     {
         SetChildClippingMode(ChildClippingMode::ClipToClient);
-        auto rcobj = std::dynamic_pointer_cast<const ResourceCenter>(obj);
-        if (rcobj)
+        if (auto rcobj = std::dynamic_pointer_cast<const ResourceCenter>(obj))
             rcobj->ResourceCenterChangedSignal.connect(
                 boost::bind(&ObjectPanel::ResourceCenterChanged, this));
 
@@ -1402,7 +1421,7 @@ public:
             return it->second;
 
         auto ref = GetColumnValueRef(column);
-        auto val = ref ? ref->Eval(ScriptingContext(Objects().get(m_object_id))) : "";
+        std::string val = ref ? ref->Eval(ScriptingContext{Objects().get(m_object_id)}) : "";
         m_column_val_cache[column] = val;
         return val;
     }
@@ -1833,23 +1852,63 @@ private:
 
 namespace {
     struct CustomRowCmp {
+        static bool StringCompare(const std::string& lhs_key, const std::string& rhs_key) {
+#if defined(FREEORION_MACOSX)
+            // Collate on OSX seemingly ignores greek characters, resulting in sort order: X α I, X β I, X α II
+            return lhs_key < rhs_key;
+#else
+            return GetLocale("en_US.UTF-8").operator()(lhs_key, rhs_key);
+#endif
+        }
+
+        static auto StringToFloat(const std::string& key) {
+#if defined(__cpp_lib_to_chars)
+            float retval = 0.0f;
+            auto result = std::from_chars(key.data(), key.data() + key.size(), retval);
+
+            // adjust for SI postfix
+            auto next_char_offset = std::distance(key.data(), result.ptr);
+            if (next_char_offset > 0 && static_cast<size_t>(next_char_offset) < key.length()) {
+                //std::cout << "key:\"" << key << "\" next char:" << *result.ptr << std::endl;
+                float power = 0.0f;
+                switch (*result.ptr) {
+                case 'f':   power = -15.0f; break;
+                case 'p':   power = -12.0f; break;
+                case 'n':   power = -9.0f; break;
+                case '\xC2':power = -6.0f; break; // first byte of mu in UTF-8
+                case 'm':   power = -3.0f; break;
+                case 'k':   power = 3.0f; break;
+                case 'M':   power = 6.0f; break;
+                case 'G':   power = 9.0f; break;
+                case 'T':   power = 12.0f; break;
+                default: break;
+                }
+                retval *= std::pow(10.0f, power);
+            }
+
+            return std::pair{retval, result.ec};
+#else
+            try {
+                return std::pair{boost::lexical_cast<float>(key), std::errc()};
+            } catch (...) {
+                return std::pair{0.0f, std::errc::invalid_argument};
+            }
+#endif
+        }
+
         bool operator()(const GG::ListBox::Row& lhs, const GG::ListBox::Row& rhs, std::size_t column) const {
             auto lhs_key = lhs.SortKey(column);
             auto rhs_key = rhs.SortKey(column);
-            try {
-                // attempt to cast sort keys to floats, so that number-aware
-                // sorting can be done for columns that contain numbers
-                float lhs_val = lhs_key.empty() ? 0.0f : boost::lexical_cast<float>(lhs_key);
-                float rhs_val = rhs_key.empty() ? 0.0f : boost::lexical_cast<float>(rhs_key);
-                return lhs_val < rhs_val;
-            } catch (...) {
-#if defined(FREEORION_MACOSX)
-                // Collate on OSX seemingly ignores greek characters, resulting in sort order: X α I, X β I, X α II
-                return lhs_key < rhs_key;
-#else
-                return GetLocale("en_US.UTF-8").operator()(lhs_key, rhs_key);
-#endif
-            }
+
+            auto [lhs_val, lhs_ec] = StringToFloat(lhs_key);
+            if (lhs_ec != std::errc())
+                return StringCompare(lhs_key, rhs_key);
+
+            auto [rhs_val, rhs_ec] = StringToFloat(rhs_key);
+            if (rhs_ec != std::errc())
+                return StringCompare(lhs_key, rhs_key);
+
+            return lhs_val < rhs_val;
         }
     };
 }
@@ -2091,7 +2150,7 @@ public:
 
                 ++indent;
                 // add building rows on this planet
-                for (auto& building : planet_buildings[planet->ID()])
+                for (auto& building : planet_buildings[PLANET_ID])
                     AddObjectRow(std::move(building), PLANET_ID, id_range{}, indent);
                 planet_buildings[PLANET_ID].clear();
                 --indent;
@@ -2135,15 +2194,17 @@ public:
 
         // add planets not in shown systems (ie. in no system or in systems that aren't shown)
         timer.EnterSection("non-system planet rows");
-        for (const auto& sys_planets : system_planets) {
-            for (const auto& planet : sys_planets.second) {
+        for (const auto& [system_id, planets] : system_planets) {
+            for (const auto& planet : planets) {
+                const int PLANET_ID = planet->ID();
+
                 std::vector<int> planet_contents;
-                planet_contents.reserve(planet_buildings[planet->ID()].size());
-                for (const auto& building : planet_buildings[planet->ID()])
+                planet_contents.reserve(planet_buildings[PLANET_ID].size());
+                for (const auto& building : planet_buildings[PLANET_ID])
                     planet_contents.emplace_back(building->ID());
 
-                AddObjectRow(planet, sys_planets.first, planet_contents, indent);
-                if (ObjectCollapsed(planet->ID())) {
+                AddObjectRow(planet, system_id, planet_contents, indent);
+                if (ObjectCollapsed(PLANET_ID)) {
                     // remove contained buildings, which will not be shown
                     planet_buildings[planet->ID()].clear();
                     continue;
@@ -2151,54 +2212,56 @@ public:
 
                 ++indent;
                 // add building rows on this planet
-                for (const auto& building : planet_buildings[planet->ID()])
-                    AddObjectRow(building, planet->ID(), id_range(), indent);
-                planet_buildings[planet->ID()].clear();
+                for (const auto& building : planet_buildings[PLANET_ID])
+                    AddObjectRow(building, PLANET_ID, id_range(), indent);
+                planet_buildings[PLANET_ID].clear();
                 --indent;
             }
         }
 
         // add buildings not on shown planets
-        for (const auto& plt_buildings : planet_buildings)
-            for (const auto& building : plt_buildings.second)
-                AddObjectRow(building, plt_buildings.first, id_range(), indent);
+        for (const auto& [planet_id, buildings] : planet_buildings)
+            for (const auto& building : buildings)
+                AddObjectRow(building, planet_id, id_range(), indent);
 
         // add fleets not in shown systems
         timer.EnterSection("non-system fleet rows");
         for (const auto& sys_fleets : system_fleets) {
            for (const auto& fleet : sys_fleets.second) {
+               const int FLEET_ID = fleet->ID();
+
                 // add fleet rows in this system
                 std::vector<int> fleet_contents;
-                fleet_contents.reserve(fleet_ships[fleet->ID()].size());
-                for (const auto& ship : fleet_ships[fleet->ID()])
+                fleet_contents.reserve(fleet_ships[FLEET_ID].size());
+                for (const auto& ship : fleet_ships[FLEET_ID])
                     fleet_contents.emplace_back(ship->ID());
 
                 AddObjectRow(fleet, sys_fleets.first, fleet_contents, indent);
-                if (ObjectCollapsed(fleet->ID())) {
+                if (ObjectCollapsed(FLEET_ID)) {
                     // remove contained ships, which will not be shown
-                    fleet_ships[fleet->ID()].clear();
+                    fleet_ships[FLEET_ID].clear();
                     continue;
                 }
 
                 ++indent;
                 // add ship rows in this fleet
-                for (const auto& ship : fleet_ships[fleet->ID()])
-                    AddObjectRow(ship, fleet->ID(), id_range(), indent);
-                fleet_ships[fleet->ID()].clear();
+                for (const auto& ship : fleet_ships[FLEET_ID])
+                    AddObjectRow(ship, FLEET_ID, id_range(), indent);
+                fleet_ships[FLEET_ID].clear();
                 --indent;
             }
-       }
+        }
 
         // add ships not in shown fleets
-        for (const auto& flt_ships : fleet_ships)
-            for (const auto& ship : flt_ships.second)
-                AddObjectRow(ship, flt_ships.first, id_range(), indent);
+        for (const auto& [fleet_id, ships] : fleet_ships)
+            for (const auto& ship : ships)
+                AddObjectRow(ship, fleet_id, id_range(), indent);
 
         // add fields not in shown systems
         timer.EnterSection("non-system field rows");
-        for (const auto& sys_fields : system_fields)
-            for (const auto& field : sys_fields.second)
-                AddObjectRow(field, sys_fields.first, id_range(), indent);
+        for (const auto& [system_id, fields] : system_fields)
+            for (const auto& field : fields)
+                AddObjectRow(field, system_id, id_range(), indent);
 
 
         // sort added rows
@@ -2494,7 +2557,6 @@ void ObjectListWnd::ObjectDoubleClicked(GG::ListBox::iterator it, const GG::Pt& 
 
 std::set<int> ObjectListWnd::SelectedObjectIDs() const {
     std::set<int> sel_ids;
-    const auto sel = m_list_box->Selections();
     for (const auto& entry : m_list_box->Selections()) {
         ObjectRow *row = dynamic_cast<ObjectRow *>(entry->get());
         if (row) {

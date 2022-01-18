@@ -1244,6 +1244,12 @@ All Systems Visible
 RULE_ALL_SYSTEMS_VISIBLE_DESC
 All system locations are known by all empires.
 
+RULE_EXTRASOLAR_SHIP_DETECTION
+Extrasolar Ship Detection
+
+RULE_EXTRASOLAR_SHIP_DETECTION_DESC
+Ships outside systems provide detection.
+
 RULE_UNSEEN_STEALTHY_PLANETS_INVISIBLE
 Undetectable Stealthy Planets
 
@@ -1496,6 +1502,9 @@ Multiplier to priority value of unexplored systems which have been previously se
 
 OPTIONS_DB_GALAXY_MAP_DETECTION_RANGE
 Toggles whether to show circles around objects to indicate their detection range on the galaxy map.
+
+OPTIONS_DB_GALAXY_MAP_DETECTION_RANGE_FUTURE
+Toggles whether, when showing detection range circles of fleets, to also show predicted future turn detection ranges for the selected fleet's expected movement path.
 
 OPTIONS_DB_GALAXY_MAP_DETECTION_RANGE_OPACITY
 Sets detection circle transparency.
@@ -3063,6 +3072,9 @@ Unexplored System distinctive mouseover overlay
 OPTIONS_GALAXY_MAP_DETECTION_RANGE
 Detection range circles
 
+OPTIONS_GALAXY_MAP_DETECTION_RANGE_FUTURE
+Selected fleet future detection range circles
+
 OPTIONS_GALAXY_MAP_DETECTION_RANGE_OPACITY
 Range circle opacity
 
@@ -3614,6 +3626,15 @@ Species
 
 CENSUS_TAG_HEADER
 Characteristics
+
+CENSUS_TARGET_POPULATION
+Target population: %1%
+
+CENSUS_TOTAL_POPULATION
+Current population: %1%
+
+CENSUS_TOTAL_WORLDS
+Settled worlds: %1%
 
 MAP_DETECTION_TITLE
 Empire Detection
@@ -4411,6 +4432,24 @@ Policy Adopted for %1% turns currently and %2% turns cumulative.
 
 POLICY_ADOPTION_TIME_TOTAL
 Policy Not Currently Adopted. Has been adopted for %2% turns cumulative.
+
+POLICY_LIST_ADOPTED
+Adopted
+
+POLICY_LIST_ADOPTABLE
+Adoptable
+
+POLICY_LIST_UNAFFORDABLE
+Unaffordable
+
+POLICY_LIST_RESTRICTED
+Restricted
+
+POLICY_LIST_LOCKED
+Locked
+
+ALL_POLICY_AVAILABILITY_FILTERS_BLOCKING_PROMPT
+Toggle the category and availability filters to show policies.
 
 
 ##
@@ -6954,6 +6993,12 @@ Supplying Empire
 SYSTEM_SUPPLY_RANGE
 System Supply Range
 
+DISTANCE_TO_SELECTED_SYSTEM
+Dist. to Sel. System
+
+DISTANCE_TO_SELECTED_FLEET
+Dist. to Sel. Fleet
+
 PROPAGATED_SUPPLY_RANGE
 Propagated Supply Range
 
@@ -7500,7 +7545,9 @@ SITREP_NOVA_DETECTED_LABEL
 Supernova detected
 
 SITREP_BUREAUCRACY_STOPPED
-The expanding [[policy PLC_BUREAUCRACY]] has halted work due to insufficient administrative facilities. Of [[buildingtype BLD_REGIONAL_ADMIN]] and [[buildingtype BLD_IMPERIAL_PALACE]], currently a total of %rawtext:havebuildings% are owned, but %rawtext:needbuildings% are needed to improve planet stability by [[value PLC_BUREAUCRACY_STABILITY_FLAT]]. [[policy PLC_BUREAUCRACY]] requires an additional administrative building every [[value BUREACRACY_ADMINS_NEEDED_TURN_SCALING]] turns.
+'''The [[policy PLC_BUREAUCRACY]] is expanding, requiring more administrative facilities.
+Starting next turn, %rawtext:needbuildings% facilities ([[buildingtype BLD_IMPERIAL_PALACE]], [[buildingtype BLD_REGIONAL_ADMIN]]) will be needed to prevent the bureaucracy from halting. Currently, a total of %rawtext:havebuildings% are owned.
+Bureaucracy requires an additional administrative building every [[value BUREACRACY_ADMINS_NEEDED_TURN_SCALING]] turns.'''
 
 SITREP_BUREAUCRACY_STOPPED_LABEL
 Bureaucratic Gridlock
@@ -7640,8 +7687,20 @@ Nest Eradication
 EFFECT_STARLANE_BORE
 At %system%: a new starlane has opened linking to a nearby system.
 
+EFFECT_STARLANE_BORE_FAILED
+At %system%: a Starlane Bore failed to open a new starlane.
+
 EFFECT_STARLANE_BORE_LABEL
 Starlane Bore
+
+EFFECT_STARLANE_NEXUS
+At %system%: new starlanes have been opened linking to a nearby systems.
+
+EFFECT_STARLANE_NEXUS_FAILED
+At %system%: a Starlane Nexus failed to open new starlanes.
+
+EFFECT_STARLANE_NEXUS_LABEL
+Starlane Nexus
 
 EFFECT_BLACKHOLE
 %system% has been collapsed to create a black hole.
@@ -7735,6 +7794,12 @@ Derelict Fuel
 
 EFFECT_BIOWEAPON
 %planet% has lost %rawtext% population due to a %shippart% attack.
+
+EFFECT_BIOWEAPON_GAIA
+%planet% has lost [[special GAIA_SPECIAL]] due to a %shippart% attack.
+
+EFFECT_BIOWEAPON_UNOWN
+%planet% has lost ownership due to a %shippart% attack.
 
 EFFECT_BIOWEAPON_LABEL
 Bioweapon Attack
@@ -9170,6 +9235,10 @@ This planet has a natural satellite, the orbital period of which is in 1:1 reson
 COMPUTRONIUM_SPECIAL
 Computronium Moon
 
+# %1% is the origin planet's name
+COMPUTRONIUM_ACCOUNTING_LABEL
+%1% Special <i>Computronium Moon</i>
+
 COMPUTRONIUM_SPECIAL_DESC
 '''When a planet with a Computronium Moon has the [[encyclopedia RESEARCH_FOCUS_TITLE]], all research focused planets in the empire gain [[value COMPUTRONIUM_TARGET_RESEARCH_PERPOP]] [[metertype METER_TARGET_RESEARCH]] per [[metertype METER_POPULATION]].
 The effect requires a stability of [[value COMPUTRONIUM_MIN_STABILITY]].
@@ -9192,6 +9261,21 @@ PHILOSOPHER_SPECIAL_DESC
 The research bonus requires a stability of [[value PHILOSOPHER_MIN_STABILITY]].
 
 The lone remnant of a planet-sized space wandering species has found his final rest orbiting in this system like a normal planet. Having lived for thousands of years he lost the will and ability to travel and resorts to pondering about the mysteries of the universe he has seen and learned about. Eccentric and slightly demented he refuses to communicate with anything that isn't the size and shape of his kin, leaving scientists no choice but to ask questions via the planet they are living on. Understandably colonizing the Philosopher Planet will disturb him gravely and he will fall silent. Construction on his surface is difficult as is to be expected from a living being.'''
+
+ASTEROID_COATING_SPECIAL
+Asteroid Coating
+
+ASTEROID_COATING_SPECIAL_DESC
+'''An outpost or colony on these asteroids will grant a structure bonus of +10% to all ships with Asteroid hulls in the empire.
+
+These asteroids are infected by transdimensional worms that eat tunnels through the rock, leaving behind a sticky slime that seems to automatically spread over the whole surface of the affected asteroid and prevents it from breaking apart.
+Applied to ships built with asteroid hulls the slime will naturally increase their durability. While this slime does not last long, these worms will frequently visit the affected ships, replenishing any lost slime before returning to their home. Unable to catch a living specimen, scientists theorize their mode of transport appears linked to our communications in some manner.'''
+
+ASTEROID_COATING_OWNED_SPECIAL
+Asteroid Coating
+
+ASTEROID_COATING_OWNED_SPECIAL_DESC
+[[ASTEROID_COATING_SPECIAL_DESC]]
 
 ABANDONED_COLONY_SPECIAL
 Abandoned Colony
@@ -11513,10 +11597,11 @@ PLC_NO_SUPPLY
 No Supply
 
 PLC_NO_SUPPLY_DESC
-Prevents planets from generating supply networks.
+'''• Prevents planets from generating supply networks.
+• Increases stealth of planets and buildings by [[value NO_SUPPLY_STEALTH_BOOST]].'''
 
 PLC_NO_SUPPLY_SHORT_DESC
-Stops supply propagation
+Stops supply propagation, boosts stealth
 
 PLC_CENTRALIZATION
 Centralization
@@ -11570,7 +11655,9 @@ PLC_CONTINUOUS_SCANNING
 Continuous Scanning
 
 PLC_CONTINUOUS_SCANNING_DESC
-Increases ship detection range and imperial detection strength, increasing with duration of adoption, while also reducing ship stealth.
+'''• Increases ship detection range by [[value CONTINUOUS_SCANNING_RANGE_BOOST]].
+• Increases imperial detection strength by 1 per turn that this policy has been been adopted, up to [[value CONTINUOUS_SCANNING_MAX_DETECTION_BOOST]].
+• Decreases ship stealth by [[value CONTINUOUS_SCANNING_STEALTH_PENALTY]].'''
 
 PLC_CONTINUOUS_SCANNING_SHORT_DESC
 Improves Detection and Hinders Stealth
@@ -11579,9 +11666,8 @@ PLC_EXPLORATION
 Exploration
 
 PLC_EXPLORATION_DESC
-'''Increases speed of ships with no weapons, fighters, shields, armour, troops, colony pods, bombardment, research, industry, influence, production, or general parts.
-
-Detection, fuel, and engine parts are allowed.'''
+'''• Increases speed of ships with no weapons, fighters, shields, armour, troops, colony pods, bombardment, research, industry, influence, production, or general parts. Detection, fuel, and engine parts are allowed.
+• Every turn a system is newly explored, the ships in that system generate a total of [[value EXPLORATION_RESEARCH_BONUS_TOTAL]] RP.'''
 
 PLC_EXPLORATION_SHORT_DESC
 Speeds Up Explorer Ships
@@ -11713,15 +11799,6 @@ All bonuses or penalties are [[value PLC_DIVERSITY_SCALING]] per species above o
 PLC_DIVERSITY_SHORT_DESC
 Improves research, stability, and Influence
 
-PLC_RESERVE_TANKS
-Reserve Tanks
-
-PLC_RESERVE_TANKS_DESC
-Adds +1 fuel capacity to all ships, but halves their speed when they have less than half of their max fuel left.
-
-PLC_RESERVE_TANKS_SHORT_DESC
-Improves ship fuel economy
-
 PLC_ENGINEERING
 Engineering Corps
 
@@ -11810,7 +11887,7 @@ PLC_FEUDALISM
 Feudalism
 
 PLC_FEUDALISM_DESC
-Increases [[metertype METER_TARGET_INDUSTRY]] of industry-fovused planets that are in systems with unowned planets that have the same species, by [[value PLC_FEUDALISM_DESC_INDUSTRY_SCALING]] times the square root of the total population of those unowned planets.
+Increases [[metertype METER_TARGET_INDUSTRY]] of industry-focused planets that are in systems with unowned planets that have the same species, by [[value PLC_FEUDALISM_DESC_INDUSTRY_SCALING]] times the square root of the total population of those unowned planets.
 
 PLC_FEUDALISM_SHORT_DESC
 Neutral Planets Boost Industry
@@ -11950,7 +12027,9 @@ Capital Markets
 
 PLC_CAPITAL_MARKETS_DESC
 '''• Planets with a luxury resource special and that are set to influence focus will export the resource to supply-connected planets. This boosts the stability of planets with species that like the resource by [[value SPECIAL_CAPITAL_MARKETS_STABILITY_FOCUS_BONUS]].
-• Increases the rate of growth or decay of [[metertype METER_INFLUENCE]] by [[value PLC_CAPITAL_MARKETS_INFLUENCE_RATE]] / turn towards [[metertype METER_TARGET_INFLUENCE]].'''
+• Increases [[metertype METER_TARGET_INFLUENCE]] on populated planets with at least [[value CAPITAL_MARKETS_INFLUENCE_MIN_STABILITY]] [[metertype METER_HAPPINESS]] by [[value CAPITAL_MARKETS_INFLUENCE_BONUS_SCALING]] per the lesser of [[metertype METER_CONSTRUCTION]] and [[metertype METER_POPULATION]].
+• Increases the rate of growth or decay of [[metertype METER_INFLUENCE]] and [[metertype METER_HAPPINESS]] by [[value PLC_CAPITAL_MARKETS_INFLUENCE_RATE]] / turn towards [[metertype METER_TARGET_INFLUENCE]] or [[metertype METER_TARGET_HAPPINESS]].
+• Reduces [[metertype METER_TARGET_HAPPINESS]] on populated empire planets by [[value CAPITAL_MARKETS_DEBT_INSTABILITY]] times the size of the empire's influence debt.'''
 
 PLC_CAPITAL_MARKETS_SHORT_DESC
 Boosts stability with resource export
@@ -12032,19 +12111,12 @@ PLC_NECESSITY
 Necessity
 
 PLC_NECESSITY_DESC
-Increases [[metertype METER_TARGET_RESEARCH]] of research focused planets with [[metertype METER_HAPPINESS]] less than [[value PLC_NECESSITY_MAX_STABILITY]] by the square root of the product of population and how far [[metertype METER_HAPPINESS]] is below [[value PLC_NECESSITY_MAX_STABILITY]].
+'''On research focused planets with [[metertype METER_HAPPINESS]] less than [[value PLC_NECESSITY_MAX_STABILITY]]:
+• Increases [[metertype METER_TARGET_RESEARCH]] by the square root of the product of population and how far [[metertype METER_HAPPINESS]] is below [[value PLC_NECESSITY_MAX_STABILITY]].
+• Increases [[metertype METER_RESEARCH]] growth by [[value PLC_NECESSITY_RESEARCH_GROWTH_BOOST]] per turn.'''
 
 PLC_NECESSITY_SHORT_DESC
 Boosts Unstable Planet Research
-
-PLC_EXPLORATION_RESEARCH
-Exploration Research
-
-PLC_EXPLORATION_RESEARCH_DESC
-Every turn a system is newly explored, the ships in that system generate a total of [[value EXPLORATION_RESEARCH_BONUS_TOTAL]] RP.
-
-PLC_EXPLORATION_RESEARCH_SHORT_DESC
-Exploration Gives Research
 
 PLC_FLANKING
 Flanking
@@ -12055,8 +12127,8 @@ PLC_FLANKING_DESC
 Also ships flying a pincer attack do that additional structural damage. A pincer attack happens when ships of the adopting empire are in flight arriving next turn in a system via different starlanes.
 
 • Weapon damage for ship weapons is increased by [[value PLC_FLANKING_DAMAGE_BOOST]] (i.e. for [[shippart SR_WEAPON_1_1]], [[shippart SR_WEAPON_2_1]], [[shippart SR_WEAPON_3_1]], or [[shippart SR_WEAPON_4_1]])
-• Weapon damage for strikers, bombers and heavy bombers is increased by [[value PLC_FLANKING_FIGHTER_DAMAGE_BOOST]] (i.e. for [[shippart FT_HANGAR_1]], [[shippart FT_HANGAR_2]], or [[shippart FT_HANGAR_3]])
-• Number of fighters launched per [[FT_BAY_1]] is increased by [[value PLC_FLANKING_BAY_LAUNCH_BONUS]]
+• Weapon damage for strikers, bombers and heavy bombers is increased by [[value PLC_FLANKING_FIGHTER_DAMAGE_BOOST]] (i.e. for [[shippart FT_HANGAR_2]], [[shippart FT_HANGAR_3]], or [[shippart FT_HANGAR_4]])
+• Number of interceptors launched per [[FT_BAY_1]] is increased by [[value PLC_FLANKING_BAY_LAUNCH_BONUS]] (see [[shippart FT_HANGAR_1]])
 • Number of shots for [[shippart SR_ARC_DISRUPTOR]] is increased by [[value PLC_FLANKING_ARC_DISRUPTOR_SHOT_BONUS]] '''
 
 PLC_FLANKING_SHORT_DESC
@@ -12910,6 +12982,15 @@ Deception
 SPY_ROOT_DECEPTION_DESC
 The art of deception is not natural to every species, but the ability to hide the truth can be most useful.
 
+SPY_DECPTION_EMPTY_SPACE_PENALTY
+Conspicuous in Empty Space
+
+SPY_DECPTION_DIM_STAR_PENALTY
+Conspicuous Near Dim Star
+
+SPY_DECPTION_SUBSTELLAR_INTERFERENCE
+High Radiation Background
+
 
 ##
 ## Technology application
@@ -13588,13 +13669,22 @@ SPY_DETECT_1
 Optical Scanner
 
 SPY_DETECT_1_DESC
-All colonies start the game with a [[metertype METER_DETECTION]] of 50, and the imperial [[encyclopedia DETECTION_TITLE]] to 10, and the ship part [[shippart DT_DETECTOR_1]] permits ships to reach the same level of detection.
+All colonies start the game with a [[metertype METER_DETECTION]] of [[value SPY_DETECT_1_RANGE]], and the imperial [[encyclopedia DETECTION_TITLE]] to 10, and the ship part [[shippart DT_DETECTOR_1]] permits ships to reach the same level of detection.
+
+SPY_DETECT_STELLAR_INTERFERENCE
+Stellar Interference
+
+SPY_DETECT_LENSING
+Gravitational Lensing
+
+SPY_DETECT_CLEAN_STELLAR_BACKGROUND
+Low Background Dark Sky
 
 SPY_DETECT_2
 Active Radar
 
 SPY_DETECT_2_DESC
-'''Unlocks the [[shippart DT_DETECTOR_2]] ship part and the [[buildingtype BLD_SCANNING_FACILITY]] building, increases the [[metertype METER_DETECTION]] of all planets to 75, and increases the imperial [[encyclopedia DETECTION_TITLE]] to 30.
+'''Unlocks the [[shippart DT_DETECTOR_2]] ship part and the [[buildingtype BLD_SCANNING_FACILITY]] building, increases the [[metertype METER_DETECTION]] of all planets to [[value SPY_DETECT_2_RANGE]], and increases the imperial [[encyclopedia DETECTION_TITLE]] to 30.
 
 Passively relying on incoming electromagnetic radiation for information about objects in the vicinity is crude and impractical, as this radiation can be masked or dampened. By emitting electromagnetic radiation and detecting returning radiation, it is possible to determine the location and velocity of many objects.'''
 
@@ -13602,7 +13692,7 @@ SPY_DETECT_3
 Neutron Scanner
 
 SPY_DETECT_3_DESC
-'''Unlocks the [[shippart DT_DETECTOR_3]] ship part, increases the [[metertype METER_DETECTION]] of all planets to 150, and increases the imperial [[encyclopedia DETECTION_TITLE]] to 50.
+'''Unlocks the [[shippart DT_DETECTOR_3]] ship part, increases the [[metertype METER_DETECTION]] of all planets to [[value SPY_DETECT_3_RANGE]], and increases the imperial [[encyclopedia DETECTION_TITLE]] to 50.
 
 Electromagnetic radiation has no rest mass and is easily manipulable. Simply by bending waves of light around an object, it is possible to render radar devices virtually useless. By firing waves of neutrons instead of electromagnetic radiation, more effective active scanning can be utilized.'''
 
@@ -13610,13 +13700,13 @@ SPY_DETECT_4
 Sensors
 
 SPY_DETECT_4_DESC
-Unlocks the [[shippart DT_DETECTOR_4]] ship part, increases the [[metertype METER_DETECTION]] of all planets to 200, and increases the imperial [[encyclopedia DETECTION_TITLE]] to 70.
+Unlocks the [[shippart DT_DETECTOR_4]] ship part, increases the [[metertype METER_DETECTION]] of all planets to [[value SPY_DETECT_4_RANGE]], and increases the imperial [[encyclopedia DETECTION_TITLE]] to 70.
 
 SPY_DETECT_5
 Omni-scanner
 
 SPY_DETECT_5_DESC
-The ultimate in detection. Increases the [[metertype METER_DETECTION]] of all planets to 300, and increases the imperial [[encyclopedia DETECTION_TITLE]] to 200.
+The ultimate in detection. Increases the [[metertype METER_DETECTION]] of all planets to [[value SPY_DETECT_5_RANGE]], and increases the imperial [[encyclopedia DETECTION_TITLE]] to 200.
 
 SPY_STEALTH_1
 Planetary Cloud Cover
@@ -13923,9 +14013,19 @@ SPY_PLANET_STEALTH_MOD
 Stealth Modifiers
 
 SPY_PLANET_STEALTH_MOD_DESC
-'''Increases the natural [[metertype METER_STEALTH]] of all planets by 5.
+'''Modifiers affect stealth:
 
-Reduces the stealth of ships when they are in the same system with more than [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] ships of the same empire.'''
+• [[BASIC_PLANET_STEALTH]] gives [[value PLANET_BASIC_STEALTH]] [[metertype METER_STEALTH]] to all planets.
+
+• Due to [[FLEET_UNSTEALTHINESS]], when there are more than [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] ships of the same empire in a system, their [[metertype METER_STEALTH]] is reduced by [[value FLEET_UNSTEALTH_SHIPS_SCALING]] multiplied by the square root of [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] less than the number of ships that empire has in the system.
+
+• Ships in systems with [[STAR_NONE]] receive a [[value SPY_DECPTION_EMPTY_SPACE_PENALTY]] penalty to [[metertype METER_STEALTH]] due to being [[SPY_DECPTION_EMPTY_SPACE_PENALTY]].
+
+• Ships in systems with a [[STAR_RED]] star receive a [[value SPY_DECPTION_DIM_STAR_PENALTY]] penalty to [[metertype METER_STEALTH]] due to being [[SPY_DECPTION_DIM_STAR_PENALTY]].
+
+• Ships in systems with a [[STAR_NEUTRON]] star receive a [[value SPY_DECPTION_NEUTRON_INTERFERENCE]] bonus to [[metertype METER_STEALTH]] due to [[SPY_DECPTION_SUBSTELLAR_INTERFERENCE]].
+
+• Ships in systems with a [[STAR_BLACK]] star receive a [[value SPY_DECPTION_BLACK_INTERFERENCE]] bonus to [[metertype METER_STEALTH]] due to [[SPY_DECPTION_SUBSTELLAR_INTERFERENCE]].'''
 
 BASIC_PLANET_STEALTH
 Universal Basic Stealth
@@ -13984,7 +14084,7 @@ BLD_ABANDON_OUTPOST
 Abandon Outpost
 
 BLD_ABANDON_OUTPOST_DESC
-Abandon the outpost on this planet. The building needs two turns to prepare dismantling the outpost. If dismantling is prepared, it takes an uninterupted turn without battles happening to completely abandon the outpost. The building gets used up in the process and the planet will be unowned afterwards.
+Abandon the outpost on this planet. The building needs two turns to prepare dismantling the outpost. If dismantling is prepared, it takes an uninterrupted turn without battles happening to completely abandon the outpost. The building gets used up in the process and the planet will be unowned afterwards.
 
 BLD_OBSERVATORY
 Observatory
@@ -13998,8 +14098,8 @@ BLD_CULTURE_ARCHIVES
 Cultural Archives
 
 BLD_CULTURE_ARCHIVES_DESC
-'''Increases [[metertype METER_TARGET_RESEARCH]] by [[value BLD_CULTURE_ARCHIVES_TARGET_RESEARCH_FLAT]] and [[metertype METER_TARGET_INDUSTRY]] by [[value BLD_CULTURE_ARCHIVES_TARGET_INDUSTRY_PERPOP]] per [[metertype METER_POPULATION]].
-The effects require a stability of [[value BLD_CULTURE_ARCHIVES_MIN_STABILITY]].
+'''• Increases [[metertype METER_TARGET_RESEARCH]] by [[value BLD_CULTURE_ARCHIVES_TARGET_RESEARCH_FLAT]] and [[metertype METER_TARGET_INDUSTRY]] by [[value BLD_CULTURE_ARCHIVES_TARGET_INDUSTRY_PERPOP]] per [[metertype METER_POPULATION]]. The effects require a stability of [[value BLD_CULTURE_ARCHIVES_MIN_STABILITY]].
+• Grants a social policy slot.
 
 Stores the sum accumulated knowledge from thousands of years of life on this planet, improving many aspects of planetary productivity.'''
 
@@ -14007,8 +14107,7 @@ BLD_CULTURE_LIBRARY
 Cultural Library
 
 BLD_CULTURE_LIBRARY_DESC
-'''Increases [[metertype METER_TARGET_RESEARCH]] by [[value BLD_CULTURE_LIBRARY_TARGET_RESEARCH_FLAT]].
-The effect requires a stability of [[value BLD_CULTURE_LIBRARY_MIN_STABILITY]].
+'''Increases [[metertype METER_TARGET_RESEARCH]] by [[value BLD_CULTURE_LIBRARY_TARGET_RESEARCH_FLAT]]. This effect requires a stability of [[value BLD_CULTURE_LIBRARY_MIN_STABILITY]].
 
 Stores the accumulated knowledge from thousands of years of life on this planet, giving a bonuses to research. This building will be destroyed when the [[metertype METER_POPULATION]] of the high tech natives reaches zero.'''
 
@@ -14505,13 +14604,14 @@ BLD_STARLANE_BORE
 Starlane Bore
 
 BLD_STARLANE_BORE_DESC
-Generates a single new starlane to the nearest system that can be connected without crossing existing starlanes or passing too close to another system.
+'''Generates a single new starlane to the nearest system that can be connected without crossing existing starlanes or passing too close to another system.
+New lanes may not pass closer than 20 uu to another system and may not meet existing star lanes at less than 30 degrees.'''
 
 BLD_STARLANE_NEXUS
 Starlane Nexus
 
 BLD_STARLANE_NEXUS_DESC
-Generates new starlanes to other star systems that can be connected without crossing existing starlanes or passing too close to another system.
+Generates new starlanes to other star systems. Works like a [[buildingtype BLD_STARLANE_BORE]], except that it keeps creating lanes until no new one can be added anymore.
 
 BLD_XENORESURRECTION_LAB
 Xenoresurrection Lab
@@ -16706,14 +16806,24 @@ Subterranean Bonus
 GAIA_LABEL
 Gaia Bonus
 
+# %1% Planet where the special is located
 WORLDTREE_LABEL
-World Tree Bonus
+%1% Special <i>Worldtree</i>
 
 TIDAL_LOCK_LABEL
 Tidally Locked Rotation
 
 HOMEWORLD_LABEL
 Homeworld
+
+GRO_TECH_ACCOUNTING_LABEL
+[[TT_TECH]]
+
+DEF_TECH_ACCOUNTING_LABEL
+[[TT_TECH]]
+
+CON_TECH_ACCOUNTING_LABEL
+[[TT_TECH]]
 
 # %1% name of planet
 # %2% name of species on planet
@@ -16724,6 +16834,11 @@ Rioting from %1% Instability
 # %2% name of species on planet
 PARTISANS_REBELLION
 %2% Partisans from Influence Debt
+
+# %1% name of planet
+# %2% name of species on planet
+INFLUENCE_DEBT_DECAY
+Influence Debt Decay
 
 # %1% name of planet
 # %2% name of species on planet
@@ -17618,6 +17733,9 @@ Show graphs list
 HOTKEY_MAP_PRODUCTION
 Toggle production panel
 
+HOTKEY_MAP_GOVERNMENT
+Toggle government window
+
 HOTKEY_MAP_SIT_REP
 Toggle situation report
 
@@ -17722,7 +17840,12 @@ Toggle fullscreen
 ## Name lists
 ##
 
-# Newline separated list of star cluster names
+# adding some parentheses into comment lines {
+#   like this,
+#   helps for code foldability in modern editors
+# } even if there are non-commented lines inbetween
+# because this is a txt-file..
+# Newline separated list of star cluster names {
 STAR_GROUP_WORDS
 '''Alpha
 Beta
@@ -17749,7 +17872,8 @@ Chi
 Psi
 Omega'''
 
-# Newline separated list of star cluster suffixes
+# }
+# Newline separated list of star cluster suffixes {
 STAR_GROUP_CHARS
 '''α
 β
@@ -17776,11 +17900,13 @@ STAR_GROUP_CHARS
 ψ
 ω'''
 
-# Newline separated list of star cluster names
+# }
+# Newline separated list of star cluster names {
 STAR_GROUP_NAMES
 Centauri
 
-# Newline separated list of star names
+# }
+# Newline separated list of star names {
 STAR_NAMES
 '''Aadhavan
 Aaftaab
@@ -17801,6 +17927,7 @@ Adria
 Aegir
 Aegis
 Aftab
+Agaron
 Agemem
 Agena
 Ahl
@@ -17808,6 +17935,7 @@ Ain
 Airy
 Ajai
 Ajax
+Akaali
 Akrab
 Al Borak
 Alathfar
@@ -17859,6 +17987,7 @@ Alshain
 Alshat
 Alsuhail
 Altair
+Altamid
 Alterf
 Aludra
 Alula
@@ -17906,7 +18035,9 @@ Arunan
 Arusha
 Ascella
 Asellus
+Asfaloth
 Asgard
+Ashfalot
 Asimov
 Asmodeus
 Aspidiske
@@ -17946,6 +18077,7 @@ Baer
 Baham
 Bahcall
 Baía
+Bajor
 Balan
 Balder
 Ballybran
@@ -17985,14 +18117,17 @@ Bop
 Borealis
 Borlach
 Boros
+Bortus
 Botein
 Brachium
 Bradbury
 Bragi
 Bravio
+Brekka
 Brethil
 Brey
 Brog
+Brunal
 Bud
 Burbidge
 Burke
@@ -18000,11 +18135,15 @@ Caebeth
 Calafia
 Cannon
 Canopus
+Canonis
 Capella
 Caph
 Caps
+Caramba
+Caramelior
 Carcharoth
 Carina
+Carmina
 Caroli
 Cassandra
 Cassini
@@ -18029,6 +18168,9 @@ Chort
 Chthon
 Ciryon
 Citlālin
+Clamor
+Clara
+Clarissima
 Coatlicue
 Coccolino
 Collassa
@@ -18039,6 +18181,7 @@ Cormack
 Corona
 Correctos
 Coruscant
+Covidia
 Crawford
 Crius
 Crow
@@ -18060,10 +18203,11 @@ Darquan
 Darrian
 Deadwood
 Deemi
+Delos
 Delphi
 Demeter
 Deneb
-Denebola
+Denobula
 Denubius
 Deucalion
 Dhrawn
@@ -18071,6 +18215,7 @@ Diadem
 Dicke
 Diell
 Diggity
+Dinaal
 Diphda
 Divakara
 Dnoces
@@ -18082,6 +18227,8 @@ Draco
 Draconis
 Drakka
 Draper
+Drayan
+Draylax
 Drengist
 Dres
 Dreven
@@ -18109,6 +18256,7 @@ Ehwaz
 Eilinel
 Ekkaia
 Ekul
+El-Adrel
 El Gero
 Elased
 Electra
@@ -18116,6 +18264,7 @@ Elena
 Elnath
 Eltanin
 Elu
+Eminiar
 Encke
 Endoria
 Endymion
@@ -18124,7 +18273,9 @@ Engwar
 Enif
 Eos
 Ephyse
+Epipopepi
 Epsylon
+Eren
 Eridani
 Erigone
 Erna
@@ -18154,6 +18305,8 @@ Faraday
 Farlight
 Fehu
 Felix
+Fenris
+Ferenginar
 Fetter
 Fetū
 Fhloston
@@ -18165,6 +18318,7 @@ Fiumena
 Fixas
 Fluttershy
 Fomalhaut
+Fonki
 Formic
 Fornacis
 Fowler
@@ -18223,6 +18377,7 @@ Gorra
 Gorta
 Gorthol
 Goth
+Gothos
 Graffias
 Grail
 Gram
@@ -18232,6 +18387,7 @@ Grotto
 Grue
 Gruis
 Grumium
+Grundibus
 Gundung
 Guradas
 Guth
@@ -18268,6 +18424,8 @@ Helotrix
 Hematopf
 Henderson
 Henge
+Heptagon
+Hepsjot
 Hera
 Herbert
 Herbig
@@ -18293,6 +18451,7 @@ Hnau
 Hnub Qub
 Hocotate
 Hoedus
+Hodor
 Holly
 Homam
 Honeydew
@@ -18334,6 +18493,7 @@ Iranha
 Ìràwọ̀
 Ireta
 Irk
+Irtok
 Iru
 Isa
 Ishtar
@@ -18373,10 +18533,13 @@ Kakata
 Kala
 Kalas
 Kalidasa
+Kaminar
 Kapteyn
 Karahkwa
 Kartaka
+Kartouche
 Kartow
+Katrud
 Kaus
 Kazzkark
 Keeta
@@ -18390,6 +18553,7 @@ Kepler
 Kerbin
 Kerry
 Kewkba
+Keyali
 Khaga
 Khama
 Kharak
@@ -18406,6 +18570,7 @@ Kirkwood
 Kitalpha
 Kithrup
 Klazart
+Klyden
 Klystron
 Knuth
 Kobol
@@ -18415,6 +18580,7 @@ Kornephori
 Kraj
 Krampus
 Kraz
+Kraxl
 Kregen
 Kril
 Kronos
@@ -18424,6 +18590,8 @@ Kuiper
 Kulthea
 Kulthos
 Kuma
+Kwejian
+Kyrbïs
 La
 Laan
 Laganini
@@ -18432,12 +18600,14 @@ Lagrange
 Laguz
 Lalaith
 Lamarckia
+LaMarr
 Lambda
 Langa
 Laplace
 Lassell
 Lava
 Laythe
+Ledos
 Leera
 Leibowitz
 Lemaitre
@@ -18449,6 +18619,7 @@ Lhûn
 Lilac
 Lintang
 Lir
+Lissepia
 Listavus
 Lister
 Lithia
@@ -18483,6 +18654,7 @@ Maia
 Majipoor
 Makina
 Malacandra
+Malcor
 Malin
 Mallus
 Mambo
@@ -18492,6 +18664,7 @@ Mannaz
 Mannga
 Manzil
 Maretta
+Maravel
 Marfik
 Margrave
 Marich
@@ -18560,6 +18733,7 @@ Mnemon
 Mobas
 Mobius
 Moctezuma
+Moclan
 Moho
 Moletrap
 Molyneux
@@ -18625,6 +18799,7 @@ Nit
 Nitzer
 Nivrim
 Niyat
+Ni'Var
 Njord
 Nocobi
 Nodus
@@ -18635,6 +18810,7 @@ Note
 Nuk
 Nunki
 Nusakan
+Nuxus
 Nyarl
 Nyénye
 Nyota
@@ -18657,14 +18833,21 @@ Ophiuchi
 Optera
 Orchid
 Orionis
+Ormelinn
 Orocarni
+Orrevil
 Orthe
+Orvil
 Osiris
 Othila
 Oyarsa
 Pacifica
 Pagalos
 Paladia
+Palladina
+Pandebilium
+Pandemonium
+Pandemax
 Pandora
 Panon Poe
 Papis
@@ -18672,6 +18855,7 @@ Paquin
 Paranar
 Parth
 Path
+Patrokles
 Pawn
 Pay
 Peacock
@@ -18721,6 +18905,7 @@ Posterior
 Prace
 Praecipua
 Praxis
+Prexnak
 Primodius
 Prior
 Procyon
@@ -18733,8 +18918,11 @@ Ptolemy
 Pulcherri
 Puppis
 Pyrrus
+Qanat
 Qar'To
+Qo'noS
 Quayal
+Quercia
 Quillur
 Ra
 Radar
@@ -18762,11 +18950,13 @@ Reber
 Regina
 Regis
 Regor
+Regoria
 Regulus
 Rehua
 Reilsa
 Remulak
 Requiem
+Retepsia
 Reticuli
 Reul
 Reverie
@@ -18781,6 +18971,7 @@ Riccioli
 Rigel
 Rimmer
 Rin
+Risa
 Robi
 Rochallor
 Rollage
@@ -18848,6 +19039,7 @@ Seren
 Setag
 Seyfert
 Shade
+Shalala
 Sham
 Shams
 Shapiro
@@ -18942,6 +19134,7 @@ Supina
 Suraj
 Surya
 Suryudu
+Symsym
 Synnax
 Syrma
 T'ae-yang
@@ -19070,6 +19263,7 @@ Vindeatrix
 Vinea
 Vista
 Volantis
+Volchok
 Vox
 Vulcan
 Waglen
@@ -19106,12 +19300,14 @@ Wraith
 Wunjo
 Xanadu
 Xanthus
+Xeleya
 Xendalla
 Xengara
 Xenon
 Xenos
 Xephos
 Xiddig
+Xoanon
 Xocotl
 Xudax
 Yaraay
@@ -19148,8 +19344,10 @@ Zillikian
 Zoctan
 Zomg
 Zon
+Zookeenee
 Zora
 Zosma
+Zukk
 Zun di
 Zvaigzne
 Zvezda
@@ -19159,7 +19357,8 @@ Zygot
 Zyrgon
 '''
 
-# Newline separated list of empire names
+# }
+# Newline separated list of empire names {
 EMPIRE_NAMES
 '''Academy
 Accord
@@ -19271,7 +19470,8 @@ Union
 Unity
 Zone'''
 
-# Newline separated list of mammal-based ship names
+# }
+# Newline separated ship name list based on mammals {
 SHIP_NAME_MAMMALS
 '''Aardvark
 Aardwolf
@@ -19388,6 +19588,7 @@ Shrew
 Skunk
 Sloth
 Stag
+Stallion
 Tamandua
 Tamarin
 Tapir
@@ -19396,6 +19597,7 @@ Tarsius
 Tenrec
 Tiger
 Vicugna
+Vixen
 Wallaby
 Walrus
 Warthog
@@ -19407,27 +19609,40 @@ Wolverine
 Wombat
 Zebra'''
 
-# Newline separated list of bird-based ship names
+# }
+# Newline separated ship name list based on birds {
 SHIP_NAME_BIRDS
 '''Albatross
 Canary
 Condor
 Cormorant
+Chicken
 Crow
+Cuckoo
+Dodo
 Dove
+Duck
 Eagle
+Emu
 Falcon
 Finch
 Flamingo
 Goose
+Gull
+Hen
 Heron
 Kestrel
 Kiwi
 Lark
+Nightingale
 Osprey
 Ostrich
+Owl
+Parrot
+Peacock
 Pelican
 Penguin
+Peregrine
 Pheasant
 Pidgeon
 Quail
@@ -19438,38 +19653,55 @@ Stork
 Swallow
 Swan
 Thrush
+Titmouse
 Woodpecker'''
 
-# Newline separated list of ship-based ship names
+# }
+# Newline separated ship name list based on fishes & other sea creatures {
 SHIP_NAME_FISH
 '''Albacore
+Anemone
 Anchovy
 Barracuda
 Bass
 Capelin
 Char
 Coelacanth
+Cod
+Coral
 Eel
 Flounder
+Fry
+Goldfish
 Gourami
 Guppy
+Haddock
 Herring
 Koi
 Lamprey
 Mackerel
 Marlin
 Minnow
+Octopus
 Pike
 Piranha
+Pollack
 Remora
+Salmon
 Sculpin
 Shark
 Sockeye
+Starfish
 Stingray
+Thuna
+Tilapia
 Trout
-Walleye'''
+Urchin
+Walleye
+Xifidi'''
 
-# Newline separated list of plant-based ship names
+# }
+# Newline separated ship name list based on trees or treelike plants {
 SHIP_NAME_FLORA
 '''Almond
 Apple
@@ -19486,6 +19718,7 @@ Cedar
 Cherry
 Chestnut
 Cinnamon
+Coconut
 Cork
 Cypress
 Dogwood
@@ -19494,6 +19727,7 @@ Elm
 Eucalyptus
 Fig
 Fir
+Grapevine
 Hazel
 Hickory
 Holly
@@ -19516,33 +19750,86 @@ Rubber
 Sequoia
 Spruce
 Sumac
-Willow'''
+Willow
+Yew'''
 
-# Newline separated list of mineral-based ship names
+# }
+# Newline separated ship name list based on minerals and stones {
 SHIP_NAME_STONE
-'''Amphibolite
+'''Adularia
+Agate
+Amber
+Amphibolite
 Andesite
+Anhydrite
+Asphalt
 Basalt
+Borax
+Chalcedony
 Chalk
+Chrysoberyl
 Clay
+Concrete
+Corundum
+Diamond
+Diopside
 Dolomite
+Emerald
+Feldspar
+Ferrite
 Flint
 Gabbro
 Gneiss
 Granite
+Haematite
+Hornblende
+Jasper
+Jett
 Komatite
+Lapislazuli
 Limestone
+Malachite
 Marble
+Melilith
 Obsidian
+Onyx
+Opal
+Orthoclase
+Pebble
 Pegmatite
 Pumice
+Pyrite
+Pyroxene
+Quartz
 Quartzite
+Rock
+Ruby
 Sandstone
+Sapphire
 Schist
 Shale
-Slate'''
+Slate
+Topaz
+Tourmaline
+Tuff
+Turquoise
+Zircon'''
 
-# Newline separated list of weather-based ship names
+# }
+# Newline separated ship name list inspired by stones and geology but not minerals {
+SHIP_NAME_OTHER_GEO
+'''Caldera
+Earthquake
+Lavaflow
+Menhir
+Nugget
+Obelisk
+Petroglyph
+Seismic
+Tremor'''
+
+# }
+# Newline separated ship name list based on weather {
 SHIP_NAME_WEATHER
 '''Autumn
 Avalanche
@@ -19556,12 +19843,10 @@ Daybreak
 Drizzle
 Drought
 Dusk
-Earthquake
 Eclipse
 Fog
 Heatwave
 Hurricane
-Lavaflow
 Lightning
 Maelstrom
 Mist
@@ -19589,7 +19874,8 @@ Whirlwind
 Wind
 Winter'''
 
-# Newline separated list of star constellationbased ship names
+# }
+# Newline separated ship name list based on star constellations {
 SHIP_NAME_CONSTELLATIONS
 '''Andromeda
 Antlia
@@ -19599,12 +19885,12 @@ Aquila
 Ara
 Aries
 Auriga
+Berenices
 Bootes
 Caelum
 Camelopardalis
 Cancer
 Canes
-Venatici
 Canis
 Capricornus
 Carina
@@ -19616,7 +19902,6 @@ Chamaeleon
 Circinus
 Columba
 Coma
-Berenices
 Corona
 Corvus
 Crater
@@ -19670,13 +19955,19 @@ Triangulum
 Tucana
 Ursa
 Vela
+Venatici
 Virgo
 Volans
 Vulpecula'''
 
-# Newline separated list of various namebased ship names
+# }
+# Newline separated ship name list based on various starnames {
 SHIP_NAME_STARS
 '''Acamar
+Aardharaa
+Aashada
+Aaslesha
+Abhijit
 Achernar
 Achird
 Acrux
@@ -19729,6 +20020,8 @@ Arkab
 Arrakis
 Ascella
 Asellus
+Ashresha
+Ashwini
 Asmidiske
 Asterope
 Atik
@@ -19745,18 +20038,24 @@ Beid
 Bellatrix
 Benetnasch
 Betelgeuse
+Bharani
+Bhargava
+Bhishaja
+Bhomyavasar
 Botein
+Brihaspativasara
+Budhavar
 Canopus
 Capella
 Caph
 Caput
-Trianguli
 Castor
 Celaeno
 Celbalrai
 Chara
 Cheleb
 Chertan
+Chitra
 Chort
 Cih
 Cor Caroli
@@ -19768,19 +20067,20 @@ Cursa
 Dabih
 Deneb
 Denebola
+Dhanishta
+Dhanu
 Diphda
 Dnoces
 Dschubba
 Dubhe
 Dziban
 Edasich
+Eerisham
 El
-Nath
 Electra
 Eltanin
 Enif
 Er
-Rai
 Eschamali
 Fomalhaut
 Furud
@@ -19792,37 +20092,47 @@ Gienah
 Gomeisa
 Graffias
 Grumium
+Guruvar
 Hadar
 Hamal
+Hastaa
+Hea
 Heka
 Heze
 Homam
+Hyadum
+Induvasar
 Izar
 Jabbah
+Jyeshta
 Kabdhilinan
 Kaffaljidhmah
 Kaitos
 Kalb
+Kanya
 Kaou
-Pih
+Karkataka
 Kaus
 Ke
-Kwan
 Keid
 Kentaurus
 Kin
-Yu
 Kitalpha
 Kochab
 Kokab
 Kornephoros
 Kraz
+Krittika
 Kuma
+Kumbha
 Kurhah
+Kwan
 Lesuth
 Maasim
 Maaz
 Maia
+Makara
+Mangalvar
 Marchab
 Marfak
 Markab
@@ -19840,6 +20150,7 @@ Menkib
 Merak
 Merope
 Mesarthim
+Mesha
 Miaplacidus
 Mimosa
 Minkar
@@ -19848,8 +20159,10 @@ Mira
 Mirach
 Mirak
 Mirzam
+Mithuna
 Mizar
 Mothallah
+Mrigash
 Muhlifain
 Muliphein
 Mulu-lizi
@@ -19857,6 +20170,7 @@ Muphrid
 Nakkar
 Naos
 Nashira
+Nath
 Navi
 Nekkar
 Nihal
@@ -19866,8 +20180,10 @@ Nusakan
 Phact
 Phad
 Phaet
+Phalguni
 Phecda
 Pherkab
+Pih
 Pleione
 Polaris
 Pollux
@@ -19875,21 +20191,29 @@ Porrima
 Praecipula
 Prijipati
 Primus
-Hyadum
 Procyon
 Propus
+Proshtapada
+Pubba
 Pulcherrima
+Punarvasu
+Purvashada
+Pushya
+Rai
 Rana
 Ras Algethi
 Ras Alhague
 Ras Elased
 Rasalas
 Rastaban
+Ravivar
 Regor
 Regulus
+Revathi
 Rigel
 Rigilkent
 Rischa
+Rohini
 Rotanev
 Ruchba
 Rukbah
@@ -19905,24 +20229,33 @@ Saiph
 Samakah
 Sargas
 Sarin
+Savitru
 Scheat
 Schedar
 Schemali
 Scutulum
 Segin
 Seginus
+Shaniva
+Shatha
 Shaula
 Shedir
 Sheliak
 Shelyak
 Sheratan
+Shravana
+Shukravar
+Simha
 Sirius
 Situla
 Skat
+Somavar
 Spica
+Sthiravasara
 Sualocin
 Suhail
 Sulafat
+Swati
 Syrma
 Talitha
 Tania
@@ -19934,83 +20267,39 @@ Tegmine
 Tejat
 Thabit
 Thuban
+Tishya
+Trianguli
+Tseang
 Tseen
 Tsih
 Tso
-Hea
 Tsze
-Tseang
+Tula
 Tyl
 Ukdah
 Unukalhai
+Uttara
+Uttarashada
 Vega
+Vichruta
 Vindemiatrix
+Vishaaka
+Vrishchika
 Wasat
 Wezen
 Wezn
 Yed
 Yildun
+Yu
 Zaniah
 Zaurak
 Zavijava
 Zozma
 Zubanalakrab
-Zubenhakrabi
-Aardharaa
-Aashada
-Aaslesha
-Abhijit
-Ashresha
-Ashwini
-Bharani
-Bhargava
-Bhishaja
-Bhomyavasar
-Brihaspativasara
-Budhavar
-Chitra
-Dhanishta
-Dhanu
-Guruvar
-Hastaa
-Induvasar
-Jyeshta
-Kanya
-Karkataka
-Krittika
-Kumbha
-Makara
-Mangalvar
-Mesha
-Mithuna
-Mrigasheerisham
-Phalguni
-Proshtapada
-Pubba
-Punarvasu
-Purvashada
-Pushya
-Ravivar
-Revathi
-Rohini
-Savitru
-Shaniva
-Shatha
-Shravana
-Shukravar
-Simha
-Somavar
-Sthiravasara
-Swati
-Tishya
-Tula
-Uttara
-Uttarashada
-Vichruta
-Vishaaka
-Vrishchika'''
+Zubenhakrabi'''
 
-# Newline separated list of roman mythology-based ship names
+# }
+# Newline separated ship name list based on roman mythology {
 SHIP_NAME_ROMAN_MYTHOLOGY
 '''Aurora
 Auster
@@ -20029,7 +20318,6 @@ Juno
 Justitia
 Latona
 Matuta
-Minerva
 Morta
 Nona
 Parcae
@@ -20046,7 +20334,8 @@ Vesper
 Vesta
 Vulturnus'''
 
-# Newline separated list of greek mythology-based ship names
+# }
+# Newline separated ship name list based on greek mythology {
 SHIP_NAME_GREEK_MYTHOLOGY
 '''Aesculapius
 Achelois
@@ -20056,6 +20345,7 @@ Adrasteia
 Aegaeon
 Aeolus
 Aether
+Agamemnon
 Agdistis
 Agrius
 Alastor
@@ -20091,6 +20381,11 @@ Caerus
 Calliope
 Calypso
 Ceto
+Cerberus
+Charybdis
+Chimaera
+Chimera
+Chiron
 Chloris
 Chronos
 Circe
@@ -20107,6 +20402,7 @@ Crius
 Cronus
 Cybele
 Cyclopes
+Cyclops
 Daphne
 Demeter
 Dinlas
@@ -20135,6 +20431,7 @@ Euterpe
 Galinthias
 Giants
 Glaucus
+Gorgon
 Gyes
 Hades
 Hamadryads
@@ -20157,9 +20454,11 @@ Irene
 Iris
 Lachesis
 Leto
+Medusa
 Melpomene
 Metis
 Metope
+Minerva
 Mnemosyne
 Moirae
 Momus
@@ -20169,12 +20468,14 @@ Nemesis
 Nereids
 Nereus
 Notus
+Nymph
 Oceanid
 Odysseus
 Ophion
 Oreads
 Otus
 Peitho
+Pegasus
 Peneus
 Persephone
 Pheme
@@ -20187,9 +20488,11 @@ Polyphemus
 Poseidon
 Priapus
 Prometheus
+Satyr
 Selene
 Semele
 Silenus
+Sphinx
 Sterope
 Steropes
 Tartarus
@@ -20208,7 +20511,8 @@ Typhon
 Zephyrus
 Zeus'''
 
-# Newline separated list of norse mythology-based ship names
+# }
+# Newline separated ship name list based on norse mythology {
 SHIP_NAME_NORSE_MYTHOLOGY
 '''Aegir
 Alaisiagae
@@ -20326,7 +20630,8 @@ Vili
 Yggdrasil
 Ymir'''
 
-# Newline separated list of basque mythology-based ship names
+# }
+# Newline separated ship name list based on basque mythology {
 SHIP_NAME_BASQUE_MYTHOLOGY
 '''Aatxe
 Adur
@@ -20410,17 +20715,11 @@ Yaun
 Zezengorri
 Zuberoa'''
 
+# }
 # FIXME: Sort these into their proper locations?
-# Newline separated list of various mythology-based ship names
+# Newline separated ship name list based on various mythologies {
 SHIP_NAME_UNSORTED_MYTHOLOGY
-'''Gorgon
-Sphinx
-Medusa
-Pegasus
-Echidna
-Satyr
-Nymph
-Cyclops
+'''Echidna
 Harpy
 Abarimon
 Abatwa
@@ -20450,12 +20749,7 @@ Bukavac
 Bunyip
 Buraq
 Catoblepas
-Cerberus
-Charybdis
 Cherufe
-Chimaera
-Chimera
-Chiron
 Chrysaor
 Cikavac
 Cluricaun
@@ -20587,10 +20881,11 @@ Wyvern
 Yuki-onna
 Yuurei'''
 
-# Newline separated list of scientist-based ship names
+# }
+# Newline separated ship name list based on scientists {
 SHIP_NAME_SCIENTISTS
 '''Ampere
-Angstrom
+Ångström
 Archimedes
 Aristotle
 Avogadro
@@ -20646,8 +20941,10 @@ Hertz
 Jenner
 Kelvin
 Kepler
+Koch
 Kuiper
 Lagrange
+Lamarck
 Lavoisier
 Leeuwenhoek
 Linnaeus
@@ -20668,24 +20965,26 @@ Planck
 Pliny
 Redi
 Richter
-Rontgen
+Röntgen
 Rutherford
 Sagan
 Salk
 Schwann
-Schrodinger
+Schrödinger
 Schwarzschild
 Spallanzani
 Tesla
 Tycho
 Vesalius
-Van
-Allen
+Van Allen
 Volta
 Voltaire
-Watson'''
+Watson
+Webb
+Zeiss'''
 
-# Newline separated list of author-based ship names
+# }
+# Newline separated ship name list based on authors {
 SHIP_NAME_AUTHORS
 '''Adams
 Aldiss
@@ -20693,6 +20992,7 @@ Alexander
 Anderson
 Anthony
 Asimov
+Atwood
 Banks
 Baum
 Beagle
@@ -20739,6 +21039,7 @@ Heinlein
 Henderson
 Herbert
 Hickman
+Huxley
 Johnson
 Jordan
 Kagan
@@ -20798,12 +21099,14 @@ Swanwick
 Tiptree
 Tolkien
 Turtledove
+Valente
 Vance
 Varley
 Verne
 Vinge
 Vonnegut
 Watt-Evans
+Weir
 Wells
 Wilhelm
 Williamson
@@ -20814,7 +21117,8 @@ Wolverton
 Zahn
 Zelazny'''
 
-# Newline separated list of artist-based ship names
+# }
+# Newline separated ship name list based on artists {
 SHIP_NAME_ARTISTS
 '''Botticelli
 Bruegel
@@ -20856,6 +21160,8 @@ Van Gogh
 Warhol
 Whistler'''
 
+# }
+# Newline separated ship name list based on virtues {
 SHIP_NAME_VIRTUES
 '''Altruism
 Autonomy
@@ -20938,7 +21244,8 @@ Virtue
 Wisdom
 Zeal'''
 
-# Newline separated list of emotion-based ship names
+# }
+# Newline separated ship name list based on emotions {
 SHIP_NAME_EMOTIONS
 '''Acceptance
 Agony
@@ -20971,7 +21278,8 @@ Sorrow
 Surprise
 Suspicion'''
 
-# Newline separated list of architecture-based ship names
+# }
+# Newline separated ship name list based on architecture {
 SHIP_NAME_ARCHITECTURE
 '''Apex
 Arch
@@ -21003,7 +21311,8 @@ Veranda
 Wall
 Window'''
 
-# Newline separated list of "master of orion 2"-based ship names
+# }
+# Newline separated ship name list based on "master of orion 2" {
 SHIP_NAME_MOO2_STARS
 '''Akrab
 Endoria
@@ -21020,10 +21329,29 @@ Xanthus
 Yarak
 Yekub'''
 
-SHIP_NAME_OTHER
+# }
+# Newline separated ship name list based on months or other times {
+SHIP_NAME_MONTH_TIME
+'''Easter Egg
 Eternal September
+Ides of March
+Four Seasons
+Red October
+Spring Break'''
 
-# Newline separated list of developer name based ship names
+# }
+# Newline separated ship name list based on real/fictional ship names {
+SHIP_NAME_OTHER
+'''Botany Bay
+Bounty
+Evergiven
+Heart of Gold
+Mayflower
+Rocinante
+Titanic'''
+
+# }
+# Newline separated ship name list based on developer names {
 SHIP_NAME_DEVS
 '''Adrian Broher
 Aquataine
@@ -21039,16 +21367,19 @@ Morlic
 O01eg
 Ophiuchusagrrr
 PD
+St Pake
 Tyreth
 Tzlaine
 Vezzra'''
 
+# }
 SHIP_NAMES
 '''[[SHIP_NAME_MAMMALS]]
 [[SHIP_NAME_BIRDS]]
 [[SHIP_NAME_FISH]]
 [[SHIP_NAME_FLORA]]
 [[SHIP_NAME_STONE]]
+[[SHIP_NAME_OTHER_GEO]]
 [[SHIP_NAME_WEATHER]]
 [[SHIP_NAME_CONSTELLATIONS]]
 [[SHIP_NAME_STARS]]
@@ -21059,6 +21390,7 @@ SHIP_NAMES
 [[SHIP_NAME_EMOTIONS]]
 [[SHIP_NAME_ARCHITECTURE]]
 [[SHIP_NAME_MOO2_STARS]]
+[[SHIP_NAME_MONTH_TIME]]
 [[SHIP_NAME_OTHER]]'''
 
 MONSTER_NAMES

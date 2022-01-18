@@ -1,6 +1,7 @@
 #include "Fleet.h"
 
 #include <boost/algorithm/cxx11/all_of.hpp>
+#include <boost/lexical_cast.hpp>
 #include "Pathfinder.h"
 #include "ShipDesign.h"
 #include "Ship.h"
@@ -15,13 +16,11 @@
 #include "../util/ScopedTimer.h"
 #include "../util/i18n.h"
 
-
 namespace {
     constexpr bool ALLOW_ALLIED_SUPPLY = true;
 
     const std::set<int> EMPTY_SET;
     constexpr double MAX_SHIP_SPEED = 500.0;        // max allowed speed of ship movement
-    constexpr double FLEET_MOVEMENT_EPSILON = 0.1;  // how close a fleet needs to be to a system to have arrived in the system
 
     bool SystemHasNoVisibleStarlanes(int system_id, const ObjectMap& objects)
     { return !GetPathfinder()->SystemHasVisibleStarlanes(system_id, objects); }
@@ -153,21 +152,21 @@ UniverseObjectType Fleet::ObjectType() const
 { return UniverseObjectType::OBJ_FLEET; }
 
 std::string Fleet::Dump(unsigned short ntabs) const {
-    std::stringstream os;
-    os << UniverseObject::Dump(ntabs);
-    os << " aggression: " << m_aggression
-       << " cur system: " << SystemID()
-       << " moving to: " << FinalDestinationID()
-       << " prev system: " << m_prev_system
-       << " next system: " << m_next_system
-       << " arrival lane: " << m_arrival_starlane
-       << " ships: ";
+    std::string retval = UniverseObject::Dump(ntabs);
+    retval.reserve(2048);
+    retval.append(" aggression: ").append(to_string(m_aggression))
+          .append(" cur system: ").append(std::to_string(SystemID()))
+          .append(" moving to: ").append(std::to_string(FinalDestinationID()))
+          .append(" prev system: ").append(std::to_string(m_prev_system))
+          .append(" next system: ").append(std::to_string(m_next_system))
+          .append(" arrival lane: ").append(std::to_string(m_arrival_starlane))
+          .append(" ships: ");
     for (auto it = m_ships.begin(); it != m_ships.end();) {
         int ship_id = *it;
         ++it;
-        os << ship_id << (it == m_ships.end() ? "" : ", ");
+        retval.append(std::to_string(ship_id)).append(it == m_ships.end() ? "" : ", ");
     }
-    return os.str();
+    return retval;
 }
 
 int Fleet::ContainerObjectID() const
@@ -246,10 +245,11 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
     float max_fuel = MaxFuel(context.ContextObjects());
 
     auto RouteNums = [route]() {
-        std::stringstream ss;
+        std::string retval;
+        retval.reserve(route.size() * 8);
         for (int waypoint : route)
-            ss << waypoint << " ";
-        return ss.str();
+            retval.append(std::to_string(waypoint)).append(" ");
+        return retval;
     };
     TraceLogger() << "Fleet::MovePath for Fleet " << this->Name() << " (" << this->ID()
                   << ") fuel: " << fuel << " at sys id: " << this->SystemID() << "  route: "

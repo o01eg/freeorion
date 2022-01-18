@@ -883,19 +883,19 @@ namespace {
     const std::string& GetPlanetSizeName(const Planet* planet) {
         if (!planet || planet->Size() == PlanetSize::SZ_ASTEROIDS || planet->Size() == PlanetSize::SZ_GASGIANT)
             return EMPTY_STRING;
-        return UserString(boost::lexical_cast<std::string>(planet->Size()));
+        return UserString(to_string(planet->Size()));
     }
 
     const std::string& GetPlanetTypeName(const Planet* planet)
-    { return UserString(boost::lexical_cast<std::string>(planet->Type())); }
+    { return UserString(to_string(planet->Type())); }
 
     const std::string& GetPlanetEnvironmentName(const Planet* planet, const std::string& species_name)
-    { return UserString(boost::lexical_cast<std::string>(planet->EnvironmentForSpecies(species_name))); }
+    { return UserString(to_string(planet->EnvironmentForSpecies(species_name))); }
 
     const std::string& GetStarTypeName(const System* system) {
         if (!system || system->GetStarType() == StarType::INVALID_STAR_TYPE)
             return EMPTY_STRING;
-        return UserString(boost::lexical_cast<std::string>(system->GetStarType()));
+        return UserString(to_string(system->GetStarType()));
     }
 
     const GG::Y PLANET_PANEL_TOP = GG::Y(140);
@@ -1615,7 +1615,7 @@ void SidePanel::PlanetPanel::Refresh() {
 
     auto selected_colony_ship = ValidSelectedColonyShip(SidePanel::SystemID());
     if (!selected_colony_ship && FleetUIManager::GetFleetUIManager().SelectedShipIDs().empty())
-        selected_colony_ship = objects.get<Ship>(AutomaticallyChosenColonyShip(m_planet_id)).get();
+        selected_colony_ship = objects.getRaw<Ship>(AutomaticallyChosenColonyShip(m_planet_id));
 
     auto invasion_ships = ValidSelectedInvasionShips(SidePanel::SystemID());
     if (invasion_ships.empty()) {
@@ -1739,7 +1739,7 @@ void SidePanel::PlanetPanel::Refresh() {
 
         std::string colonize_text;
         if (colony_ship_capacity > 0.0f) {
-            std::string&& initial_pop = DoubleToString(colony_ship_capacity, 2, false);
+            std::string initial_pop = DoubleToString(colony_ship_capacity, 2, false);
 
             std::string clr_tag;
             if (planet_capacity < colony_ship_capacity && colony_ship_capacity > 0.0f)
@@ -1747,9 +1747,9 @@ void SidePanel::PlanetPanel::Refresh() {
             else if (planet_capacity > colony_ship_capacity && colony_ship_capacity > 0.0f)
                 clr_tag = GG::RgbaTag(ClientUI::StatIncrColor());
 
-            std::string&& clr_tag_close = (clr_tag.empty() ? "" : "</rgba>");
+            std::string_view clr_tag_close = (clr_tag.empty() ? "" : "</rgba>");
 
-            std::string&& target_pop = clr_tag + DoubleToString(planet_capacity, 2, false) + clr_tag_close;
+            std::string target_pop = clr_tag + DoubleToString(planet_capacity, 2, false).append(clr_tag_close);
 
             colonize_text = boost::io::str(FlexibleFormat(UserString("PL_COLONIZE")) % initial_pop % target_pop);
         } else {
@@ -1813,7 +1813,7 @@ void SidePanel::PlanetPanel::Refresh() {
     const auto* planet_raw = planet.get();
     const auto& species_name{!planet_raw->SpeciesName().empty() ? planet_raw->SpeciesName() :
                              !colony_ship_species_name.empty() ? colony_ship_species_name : ""};
-    std::string&& env_size_text{
+    std::string env_size_text{
         species_name.empty() ?
             boost::io::str(FlexibleFormat(UserString("PL_TYPE_SIZE"))
                            % GetPlanetSizeName(planet_raw)
@@ -2900,7 +2900,7 @@ namespace {
             auto total_meter_value = 0.0f;
 
             auto title_label = GG::Wnd::Create<CUILabel>(
-                UserString(boost::lexical_cast<std::string>(m_meter_type)), GG::FORMAT_RIGHT);
+                UserString(to_string(m_meter_type)), GG::FORMAT_RIGHT);
             title_label->MoveTo(GG::Pt(GG::X0, GG::Y0));
             title_label->Resize(GG::Pt(LabelWidth(), row_height));
             title_label->SetFont(ClientUI::GetBoldFont());

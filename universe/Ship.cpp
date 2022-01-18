@@ -21,9 +21,6 @@
 #include "../util/Random.h"
 #include "../util/i18n.h"
 
-#include <utility>
-
-
 Ship::Ship(int empire_id, int design_id, std::string species_name,
            const Universe& universe, int produced_by_empire_id) :
     m_species_name(std::move(species_name)),
@@ -35,7 +32,8 @@ Ship::Ship(int empire_id, int design_id, std::string species_name,
     const ShipDesign* design = universe.GetShipDesign(design_id);
 
     if (!design)
-        throw std::invalid_argument("Attempted to construct a Ship with an invalid design id");
+        DebugLogger() << "Constructing a ship with an invalid design ID: " << design_id
+                      << "  ... could happen if copying from a ship seen only with basic vis...";
 
     if (!m_species_name.empty() && !GetSpecies(m_species_name))
         DebugLogger() << "Ship created with invalid species name: " << m_species_name;
@@ -205,24 +203,25 @@ bool Ship::ContainedBy(int object_id) const {
 }
 
 std::string Ship::Dump(unsigned short ntabs) const {
-    std::stringstream os;
-    os << UniverseObject::Dump(ntabs);
-    os << " design id: " << m_design_id
-       << " fleet id: " << m_fleet_id
-       << " species name: " << m_species_name
-       << " produced by empire id: " << m_produced_by_empire_id
-       << " arrived on turn: " << m_arrived_on_turn
-       << " last resupplied on turn: " << m_last_resupplied_on_turn;
+    std::string retval = UniverseObject::Dump(ntabs);
+    retval.reserve(2048); // guesstimate
+    retval.append(" design id: ").append(std::to_string(m_design_id))
+          .append(" fleet id: ").append(std::to_string(m_fleet_id))
+          .append(" species name: ").append(m_species_name)
+          .append(" produced by empire id: ").append(std::to_string(m_produced_by_empire_id))
+          .append(" arrived on turn: ").append(std::to_string(m_arrived_on_turn))
+          .append(" last resupplied on turn: ").append(std::to_string(m_last_resupplied_on_turn));
     if (!m_part_meters.empty()) {
-        os << " part meters: ";
-        for (const auto& entry : m_part_meters) {
-            const std::string part_name = entry.first.second;
-            MeterType meter_type = entry.first.first;
-            const Meter& meter = entry.second;
-            os << part_name << " " << meter_type << ": " << meter.Current() << "  ";
+        retval.append(" part meters: ");
+        for (const auto& [meter_type_part_name, meter] : m_part_meters) {
+            const auto& [meter_type, part_name] = meter_type_part_name;
+            retval.append(part_name).append(" ")
+                  .append(to_string(meter_type))
+                  .append(": ").append(std::to_string(meter.Current())).append("  ");
         }
     }
-    return os.str();
+
+    return retval;
 }
 
 bool Ship::IsMonster(const Universe& universe) const {
@@ -239,20 +238,51 @@ bool Ship::CanDestroyFighters(const ScriptingContext& context) const
 { return TotalWeaponsFighterDamage(context, true) > 0.0f; }
 
 bool Ship::IsArmed(const ScriptingContext& context) const {
-    if (HasFighters(context.ContextUniverse()) &&
-        ((TotalWeaponsShipDamage(context, 0.0f, true) > 0.0f)
-         || (TotalWeaponsFighterDamage(context, true) > 0.0f)))
-        return true;
-    else
-        return ((TotalWeaponsShipDamage(context, 0.0f, false) > 0.0f) ||
-                (TotalWeaponsFighterDamage(context, false) > 0.0f));
+    bool has_fighters = HasFighters(context.ContextUniverse());
+
+    for (auto& [meter_type_part, meter] : m_part_meters) {
+        auto& [meter_type, part_name] = meter_type_part;
+
+        const ShipPart* part = GetShipPart(part_name);
+        if (!part)
+            continue;
+
+        if (meter_type == MeterType::METER_CAPACITY &&
+            part->Class() == ShipPartClass::PC_DIRECT_WEAPON &&
+            meter.Current() > 0.0f)
+        {
+            return true; // ship has a direct weapon that can do damage
+
+        } else if (meter_type == MeterType::METER_SECONDARY_STAT &&
+                   has_fighters &&
+                   part->Class() == ShipPartClass::PC_FIGHTER_HANGAR &&
+                   meter.Current() > 0.0f)
+        {
+            return true; // ship has fighters and those fighters can do damage
+        }
+    }
+
+    return false;
 }
 
 bool Ship::HasFighters(const Universe& universe) const {
     const ShipDesign* design = universe.GetShipDesign(m_design_id);
     if (!design || !design->HasFighters())  // ensures ship has ability to launch fighters
         return false;
-    return FighterCount() >= 1.0f;          // ensures ship currently has fighters to launch
+
+    // ensure ship currently has fighters to launch
+    for (auto& [meter_type_part, meter] : m_part_meters) {
+        auto& [meter_type, part_name] = meter_type_part;
+        if (meter_type != MeterType::METER_CAPACITY)
+            continue;
+        const ShipPart* part = GetShipPart(part_name);
+        if (!part || part->Class() != ShipPartClass::PC_FIGHTER_HANGAR)
+            continue;
+        if (meter.Current() > 0.0f)
+            return true;
+    }
+
+    return false;
 }
 
 bool Ship::CanColonize(const Universe& universe, const SpeciesManager& sm) const {
@@ -420,13 +450,14 @@ float Ship::SumCurrentPartMeterValuesForPartClass(MeterType type, ShipPartClass 
 
 float Ship::FighterCount() const {
     float retval = 0.0f;
-    for (const auto& entry : m_part_meters) {
-        if (entry.first.first != MeterType::METER_CAPACITY)
+    for (auto& [meter_type_part, meter] : m_part_meters) {
+        auto& [meter_type, part_name] = meter_type_part;
+        if (meter_type != MeterType::METER_CAPACITY)
             continue;
-        const ShipPart* part = GetShipPart(entry.first.second);
+        const ShipPart* part = GetShipPart(part_name);
         if (!part || part->Class() != ShipPartClass::PC_FIGHTER_HANGAR)
             continue;
-        retval += entry.second.Current();
+        retval += meter.Current();
     }
 
     return retval;
@@ -434,19 +465,18 @@ float Ship::FighterCount() const {
 
 float Ship::FighterMax() const {
     float retval = 0.0f;
-    for (const auto& entry : m_part_meters) {
-        //std::map<std::pair<MeterType, std::string>, Meter>
-        if (entry.first.first != MeterType::METER_MAX_CAPACITY)
+    for (auto& [meter_type_part, meter] : m_part_meters) {
+        auto& [meter_type, part_name] = meter_type_part;
+        if (meter_type != MeterType::METER_MAX_CAPACITY)
             continue;
-        const ShipPart* part = GetShipPart(entry.first.second);
+        const ShipPart* part = GetShipPart(part_name);
         if (!part || part->Class() != ShipPartClass::PC_FIGHTER_HANGAR)
             continue;
-        retval += entry.second.Current();
+        retval += meter.Current();
     }
 
     return retval;
 }
-
 
 float Ship::WeaponPartFighterDamage(const ShipPart* part, const ScriptingContext& context) const {
     if (!part || (part->Class() != ShipPartClass::PC_DIRECT_WEAPON))
@@ -457,7 +487,7 @@ float Ship::WeaponPartFighterDamage(const ShipPart* part, const ScriptingContext
         return part->TotalFighterDamage()->Eval(context);
     } else {
         int num_bouts_with_fighter_targets = GetGameRules().Get<int>("RULE_NUM_COMBAT_ROUNDS") - 1;
-        return  CurrentPartMeterValue(MeterType::METER_SECONDARY_STAT, part->Name()) * num_bouts_with_fighter_targets;  // used within loop that updates meters, so need current, not initial values
+        return CurrentPartMeterValue(MeterType::METER_SECONDARY_STAT, part->Name()) * num_bouts_with_fighter_targets;  // used within loop that updates meters, so need current, not initial values
     }
 }
 

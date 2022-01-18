@@ -300,9 +300,7 @@ void Condition::Eval(const ScriptingContext& parent_context,
     }
 }
 
-void Condition::Eval(const ScriptingContext& parent_context,
-                     ObjectSet& matches) const
-{
+void Condition::Eval(const ScriptingContext& parent_context, ObjectSet& matches) const {
     matches.clear();
     ObjectSet condition_initial_candidates;
 
@@ -894,7 +892,7 @@ void SortedNumberOf::Eval(const ScriptingContext& parent_context,
     m_condition->Eval(local_context, subcondition_matching_matches, matches, SearchDomain::NON_MATCHES);
 
     // remaining input matches don't match the subcondition...
-    ObjectSet subcondition_non_matching_matches = matches;
+    ObjectSet subcondition_non_matching_matches = std::move(matches);
     matches.clear();    // to be refilled later
 
     // which input non_matches match the subcondition?
@@ -903,14 +901,14 @@ void SortedNumberOf::Eval(const ScriptingContext& parent_context,
     m_condition->Eval(local_context, subcondition_matching_non_matches, non_matches, SearchDomain::NON_MATCHES);
 
     // remaining input non_matches don't match the subcondition...
-    ObjectSet subcondition_non_matching_non_matches = non_matches;
+    ObjectSet subcondition_non_matching_non_matches = std::move(non_matches);
     non_matches.clear();    // to be refilled later
 
-    // assemble single set of subcondition matching objects
+    // assemble (copy) single set of subcondition matching objects
     ObjectSet all_subcondition_matches;
     all_subcondition_matches.reserve(subcondition_matching_matches.size() + subcondition_matching_non_matches.size());
     all_subcondition_matches.insert(all_subcondition_matches.end(),
-                                    subcondition_matching_matches.begin(),
+                                    subcondition_matching_matches.begin(), // not moving, want to copy
                                     subcondition_matching_matches.end());
     all_subcondition_matches.insert(all_subcondition_matches.end(),
                                     subcondition_matching_non_matches.begin(),
@@ -927,7 +925,7 @@ void SortedNumberOf::Eval(const ScriptingContext& parent_context,
     TransferSortedObjects(number, m_sort_key.get(), parent_context, m_sorting_method,
                           all_subcondition_matches, matched_objects);
 
-    // put objects back into matches and non_target sets as output...
+    // put objects back into matches and non_matches as output...
 
     if (search_domain == SearchDomain::NON_MATCHES) {
         // put matched objects that are in subcondition_matching_non_matches into matches
@@ -937,19 +935,25 @@ void SortedNumberOf::Eval(const ScriptingContext& parent_context,
                                      subcondition_matching_non_matches.end(), matched_object);
             if (smnt_it != subcondition_matching_non_matches.end()) {
                 // yes; move object to matches
-                *smnt_it = subcondition_matching_non_matches.back();
-                subcondition_matching_non_matches.pop_back();
-                matches.push_back(matched_object);   // TODO: can I std::move ?
+                *smnt_it = std::move(subcondition_matching_non_matches.back()); // replace pointer to matched_object with whatever is at the end of subcondition_matching_non_matches
+                subcondition_matching_non_matches.pop_back();                   // remove moved-from pointer at end
+                matches.push_back(std::move(matched_object));                   // move into output matches
             }
         }
 
         // put remaining (non-matched) objects in subcondition_matching_non_matches back into non_matches
-        non_matches.insert( non_matches.end(), subcondition_matching_non_matches.begin(),      subcondition_matching_non_matches.end());
+        non_matches.reserve(subcondition_matching_non_matches.size() + subcondition_non_matching_non_matches.size());
+        non_matches.insert( non_matches.end(), std::make_move_iterator(subcondition_matching_non_matches.begin()),
+                                               std::make_move_iterator(subcondition_matching_non_matches.end()));
         // put objects in subcondition_non_matching_non_matches back into non_matches
-        non_matches.insert( non_matches.end(), subcondition_non_matching_non_matches.begin(),  subcondition_non_matching_non_matches.end());
+        non_matches.insert( non_matches.end(), std::make_move_iterator(subcondition_non_matching_non_matches.begin()),
+                                               std::make_move_iterator(subcondition_non_matching_non_matches.end()));
         // put objects in subcondition_matching_matches and subcondition_non_matching_matches back into matches
-        matches.insert(     matches.end(),     subcondition_matching_matches.begin(),          subcondition_matching_matches.end());
-        matches.insert(     matches.end(),     subcondition_non_matching_matches.begin(),      subcondition_non_matching_matches.end());
+        matches.reserve(matches.size() + subcondition_matching_matches.size() + subcondition_non_matching_matches.size());
+        matches.insert(     matches.end(),     std::make_move_iterator(subcondition_matching_matches.begin()),
+                                               std::make_move_iterator(subcondition_matching_matches.end()));
+        matches.insert(     matches.end(),     std::make_move_iterator(subcondition_non_matching_matches.begin()),
+                                               std::make_move_iterator(subcondition_non_matching_matches.end()));
         // this leaves the original contents of matches unchanged, other than
         // possibly having transferred some objects into matches from non_matches
 
@@ -961,19 +965,23 @@ void SortedNumberOf::Eval(const ScriptingContext& parent_context,
                                     subcondition_matching_matches.end(), matched_object);
             if (smt_it != subcondition_matching_matches.end()) {
                 // yes; move back into matches
-                *smt_it = subcondition_matching_matches.back();
-                subcondition_matching_matches.pop_back();
-                matches.push_back(matched_object);   // TODO: can I std::move ?
+                *smt_it = std::move(subcondition_matching_matches.back());  // replace pointer to matched_object with whatever is at the end of subcondition_matching_matches
+                subcondition_matching_matches.pop_back();                   // remove moved-from poitner at end
+                matches.push_back(std::move(matched_object));               // move into output matches
             }
         }
 
-        // put remaining (non-matched) objects in subcondition_matching_matches) into non_matches
-        non_matches.insert( non_matches.end(), subcondition_matching_matches.begin(),          subcondition_matching_matches.end());
+        // put remaining (non-matched) objects in subcondition_matching_matches into non_matches
+        non_matches.insert( non_matches.end(), std::make_move_iterator(subcondition_matching_matches.begin()),
+                                               std::make_move_iterator(subcondition_matching_matches.end()));
         // put objects in subcondition_non_matching_matches into non_matches
-        non_matches.insert( non_matches.end(), subcondition_non_matching_matches.begin(),      subcondition_non_matching_matches.end());
+        non_matches.insert( non_matches.end(), std::make_move_iterator(subcondition_non_matching_matches.begin()),
+                                               std::make_move_iterator(subcondition_non_matching_matches.end()));
         // put objects in subcondition_matching_non_matches and subcondition_non_matching_non_matches back into non_matches
-        non_matches.insert( non_matches.end(), subcondition_matching_non_matches.begin(),      subcondition_matching_non_matches.end());
-        non_matches.insert( non_matches.end(), subcondition_non_matching_non_matches.begin(),  subcondition_non_matching_non_matches.end());
+        non_matches.insert( non_matches.end(), std::make_move_iterator(subcondition_matching_non_matches.begin()),
+                                               std::make_move_iterator(subcondition_matching_non_matches.end()));
+        non_matches.insert( non_matches.end(), std::make_move_iterator(subcondition_non_matching_non_matches.begin()),
+                                               std::make_move_iterator(subcondition_non_matching_non_matches.end()));
         // this leaves the original contents of non_matches unchanged, other than
         // possibly having transferred some objects into non_matches from matches
     }
@@ -1410,7 +1418,7 @@ std::string EmpireAffiliation::Description(bool negated/* = false*/) const {
         return str(FlexibleFormat((!negated)
             ? UserString("DESC_EMPIRE_AFFILIATION")
             : UserString("DESC_EMPIRE_AFFILIATION_NOT"))
-                   % UserString(boost::lexical_cast<std::string>(m_affiliation))
+                   % UserString(to_string(m_affiliation))
                    % empire_str);
     }
 }
@@ -2143,9 +2151,17 @@ void Type::Eval(const ScriptingContext& parent_context,
     }
 }
 
+void Type::Eval(const ScriptingContext& parent_context, ObjectSet& matches) const {
+    matches.clear();
+    ObjectSet condition_initial_candidates;
+
+    // just get initial content matches. these will all match this condition, so don't need to re-test
+    GetDefaultInitialCandidateObjects(parent_context, matches);
+}
+
 std::string Type::Description(bool negated/* = false*/) const {
     std::string value_str = m_type->ConstantExpr() ?
-                                UserString(boost::lexical_cast<std::string>(m_type->Eval())) :
+                                UserString(to_string(m_type->Eval())) :
                                 m_type->Description();
     return str(FlexibleFormat((!negated)
            ? UserString("DESC_TYPE")
@@ -4060,7 +4076,7 @@ std::string PlanetType::Description(bool negated/* = false*/) const {
     std::string values_str;
     for (unsigned int i = 0; i < m_types.size(); ++i) {
         values_str += m_types[i]->ConstantExpr() ?
-                        UserString(boost::lexical_cast<std::string>(m_types[i]->Eval())) :
+                        UserString(to_string(m_types[i]->Eval())) :
                         m_types[i]->Description();
         if (2 <= m_types.size() && i < m_types.size() - 2) {
             values_str += ", ";
@@ -4231,7 +4247,7 @@ std::string PlanetSize::Description(bool negated/* = false*/) const {
     std::string values_str;
     for (unsigned int i = 0; i < m_sizes.size(); ++i) {
         values_str += m_sizes[i]->ConstantExpr() ?
-                        UserString(boost::lexical_cast<std::string>(m_sizes[i]->Eval())) :
+                        UserString(to_string(m_sizes[i]->Eval())) :
                         m_sizes[i]->Description();
         if (2 <= m_sizes.size() && i < m_sizes.size() - 2) {
             values_str += ", ";
@@ -4430,7 +4446,7 @@ std::string PlanetEnvironment::Description(bool negated/* = false*/) const {
     std::string values_str;
     for (unsigned int i = 0; i < m_environments.size(); ++i) {
         values_str += m_environments[i]->ConstantExpr() ?
-                        UserString(boost::lexical_cast<std::string>(m_environments[i]->Eval())) :
+                        UserString(to_string(m_environments[i]->Eval())) :
                         m_environments[i]->Description();
         if (2 <= m_environments.size() && i < m_environments.size() - 2) {
             values_str += ", ";
@@ -5311,7 +5327,7 @@ std::string StarType::Description(bool negated/* = false*/) const {
     std::string values_str;
     for (unsigned int i = 0; i < m_types.size(); ++i) {
         values_str += m_types[i]->ConstantExpr() ?
-                        UserString(boost::lexical_cast<std::string>(m_types[i]->Eval())) :
+                        UserString(to_string(m_types[i]->Eval())) :
                         m_types[i]->Description();
         if (2 <= m_types.size() && i < m_types.size() - 2) {
             values_str += ", ";
@@ -5818,7 +5834,7 @@ std::string DesignHasPartClass::Description(bool negated/* = false*/) const {
         : UserString("DESC_DESIGN_HAS_PART_CLASS_NOT"))
                % low_str
                % high_str
-               % UserString(boost::lexical_cast<std::string>(m_class)));
+               % UserString(to_string(m_class)));
 }
 
 std::string DesignHasPartClass::Dump(unsigned short ntabs) const {
@@ -5827,7 +5843,7 @@ std::string DesignHasPartClass::Dump(unsigned short ntabs) const {
         retval += " low = " + m_low->Dump(ntabs);
     if (m_high)
         retval += " high = " + m_high->Dump(ntabs);
-    retval += " class = " + UserString(boost::lexical_cast<std::string>(m_class));
+    retval += " class = " + UserString(to_string(m_class));
     retval += "\n";
     return retval;
 }
@@ -6464,19 +6480,19 @@ std::string MeterValue::Description(bool negated/* = false*/) const {
         return str(FlexibleFormat((!negated) ?
                                     UserString("DESC_METER_VALUE_CURRENT_MIN") :
                                     UserString("DESC_METER_VALUE_CURRENT_MIN_NOT"))
-            % UserString(boost::lexical_cast<std::string>(m_meter))
+            % UserString(to_string(m_meter))
             % low_str);
     } else if (m_high && !m_low) {
         return str(FlexibleFormat((!negated) ?
                                     UserString("DESC_METER_VALUE_CURRENT_MAX") :
                                     UserString("DESC_METER_VALUE_CURRENT_MAX_NOT"))
-            % UserString(boost::lexical_cast<std::string>(m_meter))
+            % UserString(to_string(m_meter))
             % high_str);
     } else {
         return str(FlexibleFormat((!negated) ?
                                     UserString("DESC_METER_VALUE_CURRENT") :
                                     UserString("DESC_METER_VALUE_CURRENT_NOT"))
-            % UserString(boost::lexical_cast<std::string>(m_meter))
+            % UserString(to_string(m_meter))
             % low_str
             % high_str);
     }
@@ -6639,7 +6655,7 @@ std::string ShipPartMeterValue::Description(bool negated/* = false*/) const {
     return str(FlexibleFormat((!negated)
         ? UserString("DESC_SHIP_PART_METER_VALUE_CURRENT")
         : UserString("DESC_SHIP_PART_METER_VALUE_CURRENT_NOT"))
-               % UserString(boost::lexical_cast<std::string>(m_meter))
+               % UserString(to_string(m_meter))
                % part_str
                % low_str
                % high_str);
@@ -6977,7 +6993,7 @@ std::string EmpireStockpileValue::Description(bool negated/* = false*/) const {
     return str(FlexibleFormat((!negated)
         ? UserString("DESC_EMPIRE_STOCKPILE_VALUE")
         : UserString("DESC_EMPIRE_STOCKPILE_VALUE_NOT"))
-               % UserString(boost::lexical_cast<std::string>(m_stockpile))
+               % UserString(to_string(m_stockpile))
                % low_str
                % high_str);
 }
@@ -7842,10 +7858,10 @@ namespace {
         bool operator()(const std::shared_ptr<const UniverseObject>& candidate) const {
             if (!candidate)
                 return false;
-            if (m_empire_id == ALL_EMPIRES)
-                return true;
             if (m_vis == Visibility::VIS_NO_VISIBILITY)
                 return true;
+            if (m_empire_id == ALL_EMPIRES && m_context.combat_bout < 1)
+                return true; // outside of battle neutral forces have full visibility per default
 
             if (m_since_turn == INVALID_GAME_TURN) {
                 // no valid game turn was specified, so use current universe state
@@ -7919,13 +7935,13 @@ std::string VisibleToEmpire::Description(bool negated/* = false*/) const {
     std::string vis_string;
     if (m_vis) {
         if (m_vis->ConstantExpr()) {
-            vis_string = UserString(boost::lexical_cast<std::string>(m_vis->Eval()));
+            vis_string = UserString(to_string(m_vis->Eval()));
         } else {
             vis_string = m_vis->Description();
         }
     } else {
         // default if vis level not specified is any detected visibility level
-        vis_string = UserString(boost::lexical_cast<std::string>(Visibility::VIS_BASIC_VISIBILITY));
+        vis_string = UserString(to_string(Visibility::VIS_BASIC_VISIBILITY));
     }
 
     std::string turn_string;
@@ -8368,7 +8384,7 @@ namespace {
             return true;
 
         // if object is further from either of the lane end systems than they
-        // are from eachother, it is fine, regardless of the right-angle
+        // are from each other, it is fine, regardless of the right-angle
         // distance to the line between the systems
         if (dist2_12 < dist2_o1 || dist2_12 < dist2_o2)
             return false;
@@ -8383,21 +8399,20 @@ namespace {
         v_12_x /= mag_12;
         v_12_y /= mag_12;
 
-        // distance to point from line from vector projection / dot products
-        //.......O
+        // distance to point from line from vector projection / cross products
+        //       O
         //      /|
         //     / |
         //    /  |d
         //   /   |
         //  /a___|___
         // 1         2
-        // (1O).(12) = |1O| |12| cos(a)
-        // d = |1O| cos(a) = (1O).(12) / |12|
-        // d = -(O1).(12 / |12|)
-
+        // (1O)x(12) = |1O| |12| sin(a)
+        // d = |1O| sin(a) = (1O)x(12) / |12|
+        // d = (10)x(12 / |12|)
         constexpr float MIN_PERP_DIST = 20; // magic limit, in units of universe units (uu)
 
-        float perp_dist = std::abs(v_o1_x*v_12_x + v_o1_y*v_12_y);
+        float perp_dist = std::abs(v_o1_x*v_12_y - v_o1_y*v_12_x);
 
         return perp_dist < MIN_PERP_DIST;
     }
@@ -10314,8 +10329,13 @@ And::And(std::unique_ptr<Condition>&& operand1, std::unique_ptr<Condition>&& ope
     Condition()
 {
     // would prefer to initialize the vector m_operands in the initializer list, but this is difficult with non-copyable unique_ptr parameters
-    if (operand1)
-        m_operands.push_back(std::move(operand1));
+    if (operand1) {
+        if (And* operand1_and = dynamic_cast<And*>(operand1.get())) {
+            m_operands = std::move(operand1_and->m_operands);
+        } else {
+            m_operands.push_back(std::move(operand1));
+        }
+    }
     if (operand2)
         m_operands.push_back(std::move(operand2));
     if (operand3)
@@ -10520,8 +10540,13 @@ Or::Or(std::unique_ptr<Condition>&& operand1,
     Condition()
 {
     // would prefer to initialize the vector m_operands in the initializer list, but this is difficult with non-copyable unique_ptr parameters
-    if (operand1)
-        m_operands.push_back(std::move(operand1));
+    if (operand1) {
+        if (Or* operand1_or = dynamic_cast<Or*>(operand1.get())) {
+            m_operands = std::move(operand1_or->m_operands);
+        } else {
+            m_operands.push_back(std::move(operand1));
+        }
+    }
     if (operand2)
         m_operands.push_back(std::move(operand2));
     if (operand3)

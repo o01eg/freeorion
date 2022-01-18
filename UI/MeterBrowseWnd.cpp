@@ -119,9 +119,8 @@ void MeterBrowseWnd::Render() {
 }
 
 namespace {
-    const std::string& MeterToUserString(MeterType meter_type) {
-        return UserString(boost::lexical_cast<std::string>(meter_type));
-    }
+    const std::string& MeterToUserString(MeterType meter_type)
+    { return UserString(to_string(meter_type)); }
 }
 
 void MeterBrowseWnd::Initialize() {
@@ -343,7 +342,7 @@ void MeterBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
         switch (info.cause_type) {
         case EffectsCauseType::ECT_TECH: {
             name.clear();
-            if (const auto empire = GetEmpire(source->Owner()))
+            if (const auto empire = Empires().GetEmpire(source->Owner()))
                 name = empire->Name();
             const std::string& label_template = (info.custom_label.empty()
                 ? UserString("TT_TECH")
@@ -449,7 +448,7 @@ void MeterBrowseWnd::UpdateEffectLabelsAndValues(GG::Y& top) {
         }
         case EffectsCauseType::ECT_POLICY: {
             name.clear();
-            if (const auto empire = GetEmpire(source->Owner()))
+            if (const auto empire = Empires().GetEmpire(source->Owner()))
                 name = empire->Name();
             const std::string& label_template = (info.custom_label.empty()
                 ? UserString("TT_POLICY")

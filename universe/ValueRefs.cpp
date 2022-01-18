@@ -1,6 +1,9 @@
 #include "ValueRefs.h"
 
 #include <algorithm>
+#if __has_include(<charconv>)
+  #include <charconv>
+#endif
 #include <functional>
 #include <iomanip>
 #include <iterator>
@@ -54,7 +57,10 @@ std::string DoubleToString(double val, int digits, bool always_show_sign);
 bool UserStringExists(const std::string& str);
 
 namespace {
-    auto StackTrace() {
+    std::string StackTrace() {
+        static std::atomic<int> string_error_lookup_count = 0;
+        if (string_error_lookup_count++ > 10)
+            return "";
 #if BOOST_VERSION >= 106500
         std::stringstream ss;
         ss << "stacktrace:\n" << boost::stacktrace::stacktrace();
@@ -165,7 +171,7 @@ namespace {
             break;
         }
         if (obj) {
-            retval += UserString(boost::lexical_cast<std::string>(obj->ObjectType())) + " "
+            retval += UserString(to_string(obj->ObjectType())) + " "
                     + std::to_string(obj->ID()) + " ( " + obj->Name() + " ) ";
             initial_obj = obj;
         }
@@ -198,7 +204,7 @@ namespace {
             ++first;
 
             if (obj && initial_obj != obj) {
-                retval += "  Referenced Object: " + UserString(boost::lexical_cast<std::string>(obj->ObjectType())) + " "
+                retval += "  Referenced Object: " + UserString(to_string(obj->ObjectType())) + " "
                         + std::to_string(obj->ID()) + " ( " + obj->Name() + " )";
             }
             retval += " | ";
@@ -271,7 +277,6 @@ namespace {
         };
         return meter_name_map;
     }
-
     // force early init to avoid threading issues later
     std::map<std::string, MeterType> dummy = GetMeterNameMap();
 
@@ -279,13 +284,14 @@ namespace {
 }
 
 namespace ValueRef {
-    std::string ValueRefBase::InvariancePattern() const {
-        return std::string{RootCandidateInvariant() ? "R" : "r"}
-            .append(LocalCandidateInvariant()       ? "L" : "l")
-            .append(SourceInvariant()               ? "S" : "s")
-            .append(TargetInvariant()               ? "T" : "t")
-            .append(SimpleIncrement()               ? "I" : "i")
-            .append(ConstantExpr()                  ? "C" : "c");
+
+std::string ValueRefBase::InvariancePattern() const {
+    return std::string{RootCandidateInvariant() ? "R" : "r"}
+        .append(LocalCandidateInvariant()       ? "L" : "l")
+        .append(SourceInvariant()               ? "S" : "s")
+        .append(TargetInvariant()               ? "T" : "t")
+        .append(SimpleIncrement()               ? "I" : "i")
+        .append(ConstantExpr()                  ? "C" : "c");
 }
 
 MeterType NameToMeter(const std::string& name) {
@@ -302,6 +308,47 @@ const std::string& MeterToName(MeterType meter) {
             return name; // CodeQL reports "Returning stack-allocated memory", but the name structured binding should be a reference as far as I can tell
     }
     return EMPTY_STRING;
+}
+
+constexpr std::string_view PlanetTypeToStringConstexpr(PlanetType type) {
+    switch (type) {
+    case PlanetType::PT_SWAMP:     return "Swamp";
+    case PlanetType::PT_TOXIC:     return "Toxic";
+    case PlanetType::PT_INFERNO:   return "Inferno";
+    case PlanetType::PT_RADIATED:  return "Radiated";
+    case PlanetType::PT_BARREN:    return "Barren";
+    case PlanetType::PT_TUNDRA:    return "Tundra";
+    case PlanetType::PT_DESERT:    return "Desert";
+    case PlanetType::PT_TERRAN:    return "Terran";
+    case PlanetType::PT_OCEAN:     return "Ocean";
+    case PlanetType::PT_ASTEROIDS: return "Asteroids";
+    case PlanetType::PT_GASGIANT:  return "GasGiant";
+    default:                       return "?";
+    }
+}
+
+std::string_view PlanetTypeToString(PlanetType type)
+{ return PlanetTypeToStringConstexpr(type); }
+
+PlanetType StringToPlanetType(std::string_view name) {
+    for (PlanetType pt = PlanetType::INVALID_PLANET_TYPE; pt < PlanetType::NUM_PLANET_TYPES;
+         pt = PlanetType(static_cast<std::underlying_type_t<PlanetType>>(pt) + 1))
+    {
+        if (PlanetTypeToStringConstexpr(pt) == name)
+            return pt;
+    }
+    return PlanetType::INVALID_PLANET_TYPE;
+}
+
+std::string_view PlanetEnvironmentToString(PlanetEnvironment env) {
+    switch (env) {
+    case PlanetEnvironment::PE_UNINHABITABLE: return "Uninhabitable";
+    case PlanetEnvironment::PE_HOSTILE:       return "Hostile";
+    case PlanetEnvironment::PE_POOR:          return "Poor";
+    case PlanetEnvironment::PE_ADEQUATE:      return "Adequate";
+    case PlanetEnvironment::PE_GOOD:          return "Good";
+    default:                                  return "?";
+    }
 }
 
 std::string ReconstructName(const std::vector<std::string>& property_name,
@@ -451,8 +498,10 @@ std::string StatisticDescription(StatisticType stat_type,
                                  const std::string& value_desc,
                                  const std::string& condition_desc)
 {
-    std::string stringtable_key("DESC_VAR_" + boost::to_upper_copy(
-        boost::lexical_cast<std::string>(stat_type)));
+    std::string stat_str{to_string(stat_type)};
+    boost::algorithm::to_upper(stat_str);
+    std::string stringtable_key{"DESC_VAR_"};
+    stringtable_key.append(stat_str);
 
     if (UserStringExists(stringtable_key)) {
         boost::format formatter = FlexibleFormat(UserString(stringtable_key));
@@ -946,6 +995,14 @@ int Variable<int>::Eval(const ScriptingContext& context) const
             return static_cast<int>(context.galaxy_setup_data.GetAggression());
         if (property_name == "UsedInDesignID")
             return context.in_design_id;
+        if (property_name == "SelectedSystemID")
+            return IApp::GetApp()->SelectedSystemID();
+        if (property_name == "SelectedPlanetID")
+            return IApp::GetApp()->SelectedPlanetID();
+        if (property_name == "SelectedFleetID")
+            return IApp::GetApp()->SelectedFleetID();
+        if (property_name == "SelectedPlanetID")
+            return IApp::GetApp()->SelectedPlanetID();
 
         // add more non-object reference int functions here
 
@@ -1221,7 +1278,7 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
         return "";
 
     } else if (property_name == "TypeName") {
-        return boost::lexical_cast<std::string>(object->ObjectType());
+        return std::string{to_string(object->ObjectType())};
 
     }
 
@@ -1330,7 +1387,7 @@ std::string Statistic<std::string, std::string>::Eval(const ScriptingContext& co
         observed_values[std::move(entry)]++;
 
     auto max = std::max_element(observed_values.begin(), observed_values.end(),
-                                [](const auto& p1, const auto& p2) { return p1.second < p2.second; });
+                                [](const auto& p1, const auto& p2) -> bool { return p1.second < p2.second; });
 
     return max->first;
 }
@@ -1478,8 +1535,8 @@ Visibility ComplexVariable<Visibility>::Eval(const ScriptingContext& context) co
         int empire_id = ALL_EMPIRES;
         if (m_int_ref1) {
             empire_id = m_int_ref1->Eval(context);
-            if (empire_id == ALL_EMPIRES)
-                return Visibility::VIS_NO_VISIBILITY;
+            if (empire_id == ALL_EMPIRES && context.combat_bout < 1)
+                return Visibility::VIS_FULL_VISIBILITY; // outside of battle neutral forces have full visibility per default
         }
 
         int object_id = INVALID_OBJECT_ID;
@@ -1549,7 +1606,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         }
 
         std::function<bool (const std::map<std::string, int>::value_type&)> key_filter{nullptr};
-        key_filter = [](auto e){ return true; };
+        key_filter = [](auto e) -> bool { return true; };
 
         if (m_string_ref1) {
             std::string key_string = m_string_ref1->Eval(context);
@@ -1560,7 +1617,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
                 // special case for techs: make unresearched-tech's research-turn a big number
                 return IMPOSSIBLY_LARGE_TURN;
 
-            key_filter = [k{std::move(key_string)}](auto e){ return k == e.first; };
+            key_filter = [k{std::move(key_string)}](auto e) -> bool { return k == e.first; };
         }
         else if (variable_name == "ShipPartsOwned" && m_int_ref2) {
             int key_int = m_int_ref2->Eval(context);
@@ -1625,11 +1682,11 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         }
 
         std::function<bool (const std::map<int, int>::value_type&)> key_filter{nullptr};
-        key_filter = [](auto e){ return true; };
+        key_filter = [](auto e) -> bool { return true; };
 
         // if a key integer specified, get just that entry (for single empire or sum of all empires)
         if (m_int_ref2)
-            key_filter = [k = m_int_ref2->Eval(context)](auto e){ return k == e.first; };
+            key_filter = [k = m_int_ref2->Eval(context)](auto e) -> bool { return k == e.first; };
 
         // although indexed by integers, some of these may be specified by a
         // string that needs to be looked up. if a key string specified, get
@@ -1645,7 +1702,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
                 if (design)
                     key_int = design->ID();
             }
-            key_filter = [k = key_int](auto e){ return k == e.first; };
+            key_filter = [k = key_int](auto e) -> bool { return k == e.first; };
         }
 
         if (empire)
@@ -1676,7 +1733,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         empire_property = &Empire::OutpostsOwned;
 
         using namespace boost::adaptors;
-        auto GetRawPtr = [](const auto& smart_ptr){ return smart_ptr.get(); };
+        auto GetRawPtr = [](const auto& smart_ptr) { return smart_ptr.get(); };
 
         if (!empire) {
             return boost::accumulate(context.Empires() | map_values | transformed(GetRawPtr) |
@@ -1926,6 +1983,32 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             return count;
         }
     }
+    else if (variable_name == "PlanetTypeDifference") {
+        // get planet types to find difference between...
+        PlanetType pt1;
+        if (m_int_ref1) {
+            int pt_int1 = m_int_ref1->Eval(context);
+            pt1 = PlanetType(pt_int1);
+        } else if (m_string_ref1) {
+            const std::string pt_name1 = m_string_ref1->Eval(context);
+            pt1 = StringToPlanetType(pt_name1);
+        } else {
+            return 0;
+        }
+
+        PlanetType pt2;
+        if (m_int_ref2) {
+            int pt_int2 = m_int_ref2->Eval(context);
+            pt2 = PlanetType(pt_int2);
+        } else if (m_string_ref2) {
+            const std::string pt_name2 = m_string_ref2->Eval(context);
+            pt2 = StringToPlanetType(pt_name2);
+        } else {
+            return 0;
+        }
+
+        return Planet::TypeDifference(pt1, pt2);
+    }
 
     return 0;
 }
@@ -1961,40 +2044,43 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
     // empire properties indexed by integers
     std::function<const std::map<int, float>& (const Empire&)> empire_property_int_key{nullptr};
 
-    if (variable_name == "PropagatedSystemSupplyRange")
-        empire_property_int_key = [](const Empire& empire){ return GetSupplyManager().PropagatedSupplyRanges(empire.EmpireID()); };
-    if (variable_name == "SystemSupplyRange")
-        empire_property_int_key = &Empire::SystemSupplyRanges;
-    if (variable_name == "PropagatedSystemSupplyDistance")
-        empire_property_int_key = [](const Empire& empire){ return GetSupplyManager().PropagatedSupplyDistances(empire.EmpireID()); };
-
-    if (empire_property_int_key) {
+    if (variable_name == "SystemSupplyRange") {
         using namespace boost::adaptors;
 
-        std::shared_ptr<const Empire> empire;
+        if (!m_int_ref2)
+            return 0.0; // no system specified... doesn't make sense to sum over systems...
+        int system_id = m_int_ref2->Eval(context);
+        if (system_id == INVALID_OBJECT_ID)
+            return 0.0;
 
         if (m_int_ref1) {
+            // single empire ID specified
             int empire_id = m_int_ref1->Eval(context);
             if (empire_id == ALL_EMPIRES)
                 return 0.0;
-            empire = context.GetEmpire(empire_id);
+            auto empire = context.GetEmpire(empire_id);
+            if (!empire)
+                return 0.0;
+            const auto& data = empire->SystemSupplyRanges();
+
+            auto it = data.find(system_id);
+            if (it != data.end())
+                return it->second;
+            else
+                return 0.0;
+
+        } else {
+            float empires_max = 0.0f;
+            // no empire ID specified, use max of all empires' ranges at specified system
+            for ([[maybe_unused]] auto& [unused_id, loop_empire] : context.Empires()) {
+                (void)unused_id; // quiet unused variable warning
+                const auto& empire_data = loop_empire->SystemSupplyRanges();
+                auto it = empire_data.find(system_id);
+                if (it != empire_data.end())
+                    empires_max = std::max(empires_max, it->second);
+            }
+            return empires_max;
         }
-
-        std::function<bool (const std::map<int, float>::value_type&)> key_filter;
-        key_filter = [](auto k){ return true; };
-
-        if (m_int_ref2)
-            key_filter = [k = m_int_ref2->Eval(context)](auto e){ return k == e.first; };
-
-        if (empire)
-            return boost::accumulate(empire_property_int_key(*empire) | filtered(key_filter) | map_values, 0.0f);
-
-        float sum = 0.0f;
-        for ([[maybe_unused]] auto& [unused_id, loop_empire] : context.Empires()) {
-            (void)unused_id; // quiet unused variable warning
-            sum += boost::accumulate(empire_property_int_key(*loop_empire) | filtered(key_filter) | map_values, 0.0f);
-        }
-        return sum;
     }
 
 
@@ -2011,11 +2097,9 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
 
         ResourceType res_type = ResourceType::INVALID_RESOURCE_TYPE;
         if (m_string_ref1) {
-            std::string res_name = m_string_ref1->Eval(context);
-            if (res_name == "Influence")
-                res_type = ResourceType::RE_INFLUENCE;
-            else if (res_name == "Industry")
-                res_type = ResourceType::RE_INDUSTRY;
+            const std::string res_name = m_string_ref1->Eval(context);
+            const auto meter_type = NameToMeter(res_name);
+            res_type = MeterToResource(meter_type);
         }
         if (res_type == ResourceType::INVALID_RESOURCE_TYPE)
             return 0;
@@ -2037,6 +2121,29 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
 
 
     // non-empire properties
+    std::function<const std::map<int, float>& ()> property_int_key{nullptr};
+
+    if (variable_name == "PropagatedSystemSupplyRange") // int_ref2 is system ID
+        property_int_key = []() -> const std::map<int, float>& { return GetSupplyManager().PropagatedSupplyRanges(); };
+    else if (variable_name == "PropagatedSystemSupplyDistance") // int_ref2 is system ID
+        property_int_key = []() -> const std::map<int, float>& { return GetSupplyManager().PropagatedSupplyDistances(); };
+
+    if (property_int_key) {
+        if (!m_int_ref2)
+            return 0.0; // no system specified... doesn't make sense to sum over systems...
+        int system_id = m_int_ref2->Eval(context);
+        if (system_id == INVALID_OBJECT_ID)
+            return 0.0;
+
+        const auto& data = property_int_key();
+        auto it = data.find(system_id);
+        if (it != data.end())
+            return it->second;
+        else
+            return 0.0;
+    }
+
+
     if (variable_name == "GameRule") {
         if (!m_string_ref1)
             return 0.0;
@@ -2561,7 +2668,7 @@ std::vector<std::string> ComplexVariable<std::vector<std::string>>::Eval(
         std::vector<std::string> retval;
         retval.reserve(pols.size());
         std::transform(pols.begin(), pols.end(), std::back_inserter(retval),
-                       [](const std::string_view sv) { return std::string{sv}; });
+                       [](const std::string_view sv) -> std::string { return std::string{sv}; });
         return retval;
 
     } else if (variable_name == "EmpireAvailablePolices") {
@@ -2743,22 +2850,43 @@ std::string StringCast<double>::Eval(const ScriptingContext& context) const
         return "";
 
     double result = raw_ref->Eval(context);
+    auto Stringify = [](double num) -> std::string {
+        const auto abs_num = std::abs(num);
+        if (abs_num < 0.1 || abs_num >= 1000)
+            return DoubleToString(num, 3, false);
 
-    auto int_ref = dynamic_cast<Variable<double>*>(raw_ref);
-    if (!int_ref)
-        return std::to_string(result);
+        int precision = abs_num < 10 ? 2 : 1; // number of fractional decimal places
+
+        // TODO: check if locale correctly does round trip of something with
+        // a decimal place indicator using to_chars and from_chars.
+        // if not, need to use streaming always?
+#if defined(__cpp_lib_to_chars)
+            std::array<char, 32> buf = {};
+            std::to_chars(buf.data(), buf.data() + buf.size(), num, std::chars_format::fixed, precision);
+            return buf.data();
+#else
+            std::stringstream ss;
+            ss << std::fixed << std::setprecision(precision) << num;
+            return ss.str();
+#endif
+    };
+
+
+    auto ref = dynamic_cast<Variable<double>*>(raw_ref);
+    if (!ref)
+        return Stringify(result);
 
     // special case for a few sub-value-refs to help with UI representation
-    const auto& property = int_ref->PropertyName();
+    const auto& property = ref->PropertyName();
     if (property.empty())
-        return std::to_string(result);
+        return Stringify(result);
 
     const auto& end_of_property = property.back();
     if (end_of_property.empty())
-        return std::to_string(result);
+        return Stringify(result);
 
     // special case for a few sub-value-refs to help with UI representation
-    if (end_of_property == "X" || end_of_property == "Y") {
+    if (end_of_property == "X" || end_of_property == "Y" || end_of_property == "DirectDistanceBetween") {
         if (result == UniverseObject::INVALID_POSITION)
             return UserString("INVALID_POSITION");
 
@@ -2767,7 +2895,7 @@ std::string StringCast<double>::Eval(const ScriptingContext& context) const
         return ss.str();
     }
 
-    return DoubleToString(result, 3, false);
+    return Stringify(result);
 }
 
 template <>

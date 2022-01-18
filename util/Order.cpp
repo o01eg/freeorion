@@ -226,7 +226,6 @@ void NewFleetOrder::ExecuteImpl(ScriptingContext& context) const {
 
     Universe& u = context.ContextUniverse();
     ObjectMap& o = context.ContextObjects();
-    const SpeciesManager& sm = context.species;
 
     u.InhibitUniverseObjectSignals(true);
 
@@ -242,7 +241,8 @@ void NewFleetOrder::ExecuteImpl(ScriptingContext& context) const {
         fleet = u.InsertNew<Fleet>(m_fleet_name, system->X(), system->Y(), EmpireID());
         m_fleet_id = fleet->ID();
     } else {
-        fleet = u.InsertByEmpireWithID<Fleet>(EmpireID(), m_fleet_id, m_fleet_name, system->X(), system->Y(), EmpireID());
+        fleet = u.InsertByEmpireWithID<Fleet>(EmpireID(), m_fleet_id, m_fleet_name,
+                                              system->X(), system->Y(), EmpireID());
     }
 
     if (!fleet) {
@@ -1027,7 +1027,7 @@ void PolicyOrder::ExecuteImpl(ScriptingContext& context) const {
     else
         DebugLogger() << "PolicyOrder revoke " << m_policy_name << " from category " << m_category
                       << " in slot " << m_slot;
-    empire->AdoptPolicy(m_policy_name, m_category, context.ContextObjects(), m_adopt, m_slot);
+    empire->AdoptPolicy(m_policy_name, m_category, context, m_adopt, m_slot);
 }
 
 ////////////////////////////////////////////////

@@ -4,22 +4,22 @@
 
 BOOST_FIXTURE_TEST_SUITE(TestChecksum, ClientAppFixture)
 
-void TestCheckSumFromEnv(const char* env, unsigned int def, unsigned int expected) {
+void TestCheckSumFromEnv(const char* env, unsigned int def, unsigned int calculated) {
     bool force = false;
-    unsigned int value = def;
+    unsigned int expected = def;
 
     if (const char *env_value = std::getenv(env)) {
         force = true;
         try {
-            value = boost::lexical_cast<unsigned int>(env_value);
+            expected = boost::lexical_cast<unsigned int>(env_value);
         } catch (...) {
             // ignore
         }
     }
     if (force) {
-        BOOST_REQUIRE_MESSAGE(expected == value, env << " expected " << expected << " was " << value);
+        BOOST_REQUIRE_MESSAGE(calculated == expected, env << " expected " << expected << " was " << calculated);
     } else {
-        BOOST_WARN_MESSAGE(expected == value, env << " expected " << expected << " was " << value);
+        BOOST_WARN_MESSAGE(calculated == expected, env << " expected " << expected << " was " << calculated);
     }
 }
 
@@ -32,8 +32,8 @@ void TestCheckSumFromEnv(const char* env, unsigned int def, unsigned int expecte
 BOOST_AUTO_TEST_CASE(compare_checksum) {
     auto checksums = CheckSumContent();
 
-    TestCheckSumFromEnv("FO_CHECKSUM_NAMED_VALUEREF", 42021, checksums["NamedValueRefManager"]);
-    TestCheckSumFromEnv("FO_CHECKSUM_TECH", 9095847, checksums["TechManager"]);
+    TestCheckSumFromEnv("FO_CHECKSUM_NAMED_VALUEREF", 2465801, checksums["NamedValueRefManager"]);
+    TestCheckSumFromEnv("FO_CHECKSUM_TECH", 5355498, checksums["TechManager"]);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

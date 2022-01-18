@@ -51,6 +51,8 @@ namespace FleetDefaults {
     constexpr auto FLEET_DEFAULT_UNARMED = FleetAggression::FLEET_DEFENSIVE;
 }
 
+constexpr double FLEET_MOVEMENT_EPSILON = 0.1;  // how close a fleet needs to be to a system to have arrived in the system
+
 /** Encapsulates data for a FreeOrion fleet.  Fleets are basically a group of
   * ships that travel together. */
 class FO_COMMON_API Fleet : public UniverseObject {
@@ -67,7 +69,7 @@ public:
 
     [[nodiscard]] const std::string&      PublicName(int empire_id, const Universe& universe) const override;
 
-    std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const override;
+    std::shared_ptr<UniverseObject>       Accept(const UniverseObjectVisitor& visitor) const override;
 
     [[nodiscard]] const std::set<int>&    ShipIDs() const { return m_ships; } ///< returns set of IDs of ships in fleet.
     [[nodiscard]] int                     MaxShipAgeInTurns(const ObjectMap& objects) const; ///< Returns the age of the oldest ship in the fleet

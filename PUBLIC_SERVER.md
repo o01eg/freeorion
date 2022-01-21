@@ -443,3 +443,10 @@ CREATE TABLE games.turns (
 );
 GRANT SELECT, INSERT, UPDATE ON games.turns TO freeorion;
 ```
+
+# Add fields to games for RSS channel
+
+```sql
+ALTER TABLE games.games ADD COLUMN fo_forum_url VARCHAR(512) NULL;
+ALTER TABLE games.games ADD COLUMN create_ts TIMESTAMP WITHOUT TIME ZONE NULL;
+```

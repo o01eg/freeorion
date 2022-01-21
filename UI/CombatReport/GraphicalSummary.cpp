@@ -19,7 +19,6 @@ namespace {
     // These margins determine how we avoid drawing children on top of the
     // bevel in the lower right corner.
     constexpr GG::X BEVEL_MARGIN_X(6);
-    constexpr GG::Y BEVEL_MARGIN_Y(12);
 
     // The height of the space where the display option buttons are put
     GG::Y OPTION_BAR_HEIGHT(25);
@@ -268,10 +267,10 @@ public:
         m_sizer(sizer),
         m_hovered(false)
     {
-        const ObjectMap& objects = Objects();
-        auto object = objects.get(participant.object_id);
+        const Universe& u = GetUniverse();
+        auto object = u.Objects().get(participant.object_id);
         if (object) {
-            SetBrowseText(object->PublicName(ClientApp::GetApp()->EmpireID(), objects) + " " +
+            SetBrowseText(object->PublicName(ClientApp::GetApp()->EmpireID(), u) + " " +
                           DoubleToString(participant.current_health, 3, false) + "/" +
                           DoubleToString(participant.max_health, 3, false)
             );
@@ -373,7 +372,6 @@ public:
         AttachChild(m_dead_label);
 
         MakeBars();
-
     }
 
     void MakeBars() {
@@ -410,91 +408,6 @@ public:
         }
 
         m_y_axis_label->MoveTo(GG::Pt(-m_y_axis_label->MinUsableSize().x / 2 - AXIS_WIDTH, Height()/2 - m_y_axis_label->Height()/2));
-    }
-
-    void DrawArrow(GG::Pt begin, GG::Pt end) {
-        double head_width = 5.0;
-        // A vector (math) of the arrow we wish to draw
-        GG::Pt direction = end - begin;
-        double length = sqrt(1.0*(Value(direction.x)*Value(direction.x) +
-                                  Value(direction.y)*Value(direction.y)));
-        if (length == 0) {
-            return;
-        }
-
-        // The point in the main line of the arrow,
-        // paraller to which the head ends
-        //          \.
-        //           \.
-        // --------h-->
-        //           /.
-        //          /.
-        // h is at the handle
-        GG::Pt handle;
-        // How much to move off the handle to get to
-        // the end point of one of the head lines
-        GG::X delta_x;
-        GG::Y delta_y;
-
-        if (direction.x != 0 && direction.y != 0) {
-            // In a skewed arrow we need
-            // a bit of geometry to figure out the head
-            double x = Value(direction.x);
-            double y = Value(direction.y);
-            double normalizer = head_width / sqrt(1 + x*x / (y*y));
-            delta_x = GG::X(normalizer);
-            delta_y = GG::Y(- x / y * normalizer);
-
-            handle = end - GG::Pt((head_width / length) * direction.x, (head_width / length) * direction.y);
-        } else if (direction.x == 0) {
-            // Vertical arrow
-            handle = end;
-            handle.y -= boost::math::sign(Value(direction.y))*GG::Y(head_width);
-            delta_x = GG::X(head_width);
-            delta_y = GG::Y0;
-        } else {
-            //horizontal arrow
-            handle = end;
-            handle.x -= boost::math::sign(Value(direction.x)) * GG::X(head_width);
-            delta_x = GG::X0;
-            delta_y = GG::Y(head_width);
-        }
-
-        GG::Pt left_head = handle;
-        GG::Pt right_head = handle;
-
-        left_head.x += delta_x;
-        left_head.y += delta_y;
-        // The other line is on the opposite side of the handle
-        right_head.x -=  delta_x;
-        right_head.y -= delta_y;
-
-        glColor(GG::CLR_WHITE);
-        glLineWidth(2);
-        glDisable(GL_TEXTURE_2D);
-
-        GG::GL2DVertexBuffer verts;
-        verts.reserve(6);
-        verts.store(Value(begin.x),     Value(begin.y));
-        verts.store(Value(end.x),       Value(end.y));
-        verts.store(Value(end.x),       Value(end.y));
-        verts.store(Value(left_head.x), Value(left_head.y));
-        verts.store(Value(end.x),       Value(end.y));
-        verts.store(Value(right_head.x),Value(right_head.y));
-        verts.activate();
-
-        glDrawArrays(GL_LINES, 0, verts.size());
-
-        glEnable(GL_TEXTURE_2D);
-    }
-
-    void Render() override {
-        // Draw the axes outside th3e client area
-        GG::Pt begin(ClientUpperLeft().x - AXIS_WIDTH/2, ClientLowerRight().y + AXIS_HEIGHT/2);
-        GG::Pt x_end(ClientLowerRight().x, begin.y);
-        GG::Pt y_end(begin.x, ClientUpperLeft().y);
-        DrawArrow(begin, x_end);
-        DrawArrow(begin, y_end);
     }
 
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
@@ -666,8 +579,7 @@ GraphicalSummaryWnd::GraphicalSummaryWnd() :
     GG::Wnd(GG::X0, GG::Y0, GG::X1, GG::Y1, GG::NO_WND_FLAGS)
 {}
 
-GraphicalSummaryWnd::~GraphicalSummaryWnd()
-{}
+GraphicalSummaryWnd::~GraphicalSummaryWnd() = default;
 
 GG::Pt GraphicalSummaryWnd::MinUsableSize() const {
     GG::Pt min_size(GG::X0, GG::Y0);
@@ -777,7 +689,7 @@ void GraphicalSummaryWnd::GenerateGraph() {
         if (summary.second.total_max_health > EPSILON) {
             summary.second.Sort();
             auto box = GG::Wnd::Create<SideBar>(summary.second, *m_sizer);
-            m_side_boxes.emplace_back(box);
+            m_side_boxes.push_back(box);
             AttachChild(std::move(box));
         }
     }

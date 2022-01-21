@@ -36,8 +36,9 @@ namespace {
     //////////////////////////////////////////////////
     class QueueTechPanel : public GG::Control {
     public:
-        QueueTechPanel(GG::X x, GG::Y y, GG::X w, const std::string& tech_name, double allocated_rp,
-                       int turns_left, double turns_completed, int empire_id, bool paused = false);
+        QueueTechPanel(GG::X x, GG::Y y, GG::X w, const std::string& tech_name,
+                       double allocated_rp, int turns_left, double turns_completed,
+                       int empire_id, bool paused = false);
 
         void CompleteConstruction() override;
         void Render() override;
@@ -49,16 +50,16 @@ namespace {
     private:
         void Draw(GG::Clr clr, bool fill);
 
-        const std::string&      m_tech_name;
+        const std::string&                      m_tech_name; // TODO: make string_view ?
         std::shared_ptr<GG::Label>              m_name_text;
         std::shared_ptr<GG::Label>              m_RPs_and_turns_text;
         std::shared_ptr<GG::Label>              m_turns_remaining_text;
         std::shared_ptr<GG::StaticGraphic>      m_icon;
         std::shared_ptr<MultiTurnProgressBar>   m_progress_bar;
-        bool                    m_in_progress;
-        int                     m_total_turns;
-        int                     m_empire_id;
-        bool                    m_paused;
+        bool                                    m_in_progress; // TODO: give default values?
+        int                                     m_total_turns;
+        int                                     m_empire_id;
+        bool                                    m_paused;
     };
 
     //////////////////////////////////////////////////
@@ -290,7 +291,8 @@ namespace {
 //////////////////////////////////////////////////
 class ResearchQueueListBox : public QueueListBox {
 public:
-    ResearchQueueListBox(const boost::optional<std::string>& drop_type_str, const std::string& prompt_str) :
+    ResearchQueueListBox(const boost::optional<std::string_view>& drop_type_str,
+                         const std::string& prompt_str) :
         QueueListBox(drop_type_str, prompt_str)
     {}
 
@@ -357,8 +359,10 @@ public:
                "research.queue")
     {}
 
+    static constexpr std::string_view RESEARCH_QUEUE_ROW = "RESEARCH_QUEUE_ROW";
+
     void CompleteConstruction() override {
-        m_queue_lb = GG::Wnd::Create<ResearchQueueListBox>(std::string("RESEARCH_QUEUE_ROW"), UserString("RESEARCH_QUEUE_PROMPT"));
+        m_queue_lb = GG::Wnd::Create<ResearchQueueListBox>(RESEARCH_QUEUE_ROW, UserString("RESEARCH_QUEUE_PROMPT"));
         m_queue_lb->SetStyle(GG::LIST_NOSORT | GG::LIST_NOSEL | GG::LIST_USERDELETE);
         m_queue_lb->SetName("ResearchQueue ListBox");
 
@@ -489,9 +493,10 @@ void ResearchWnd::Refresh() {
     // connections of signals emitted from the empire must be remade
     m_empire_connection.disconnect();
 
-    if (Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID()))
+    if (Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID())) {
         m_empire_connection = empire->GetResearchQueue().ResearchQueueChangedSignal.connect(
-                                boost::bind(&ResearchWnd::ResearchQueueChangedSlot, this));
+            boost::bind(&ResearchWnd::ResearchQueueChangedSlot, this));
+    }
     Update();
 }
 
@@ -531,13 +536,17 @@ void ResearchWnd::TogglePedia()
 bool ResearchWnd::PediaVisible()
 { return m_tech_tree_wnd->PediaVisible(); }
 
-void ResearchWnd::QueueItemMoved(const GG::ListBox::iterator& row_it, const GG::ListBox::iterator& original_position_it) {
+void ResearchWnd::QueueItemMoved(const GG::ListBox::iterator& row_it,
+                                 const GG::ListBox::iterator& original_position_it)
+{
     if (!m_enabled)
         return;
 
     auto queue_row = boost::polymorphic_downcast<QueueRow*>(row_it->get());
     if (!queue_row)
         return;
+
+    ScriptingContext context;
 
     // This precorrects the position for a factor in Empire::PlaceTechInQueue
     int new_position = m_queue_wnd->GetQueueListBox()->IteraterIndex(row_it);
@@ -551,10 +560,11 @@ void ResearchWnd::QueueItemMoved(const GG::ListBox::iterator& row_it, const GG::
 
     GGHumanClientApp::GetApp()->Orders().IssueOrder(
         std::make_shared<ResearchQueueOrder>(empire_id, queue_row->elem.name,
-                                                static_cast<int>(corrected_new_position)));
+                                             static_cast<int>(corrected_new_position)),
+        context);
 
-    if (Empire* empire = GetEmpire(empire_id))
-        empire->UpdateResearchQueue();
+    if (auto empire = context.GetEmpire(empire_id))
+        empire->UpdateResearchQueue(context.ContextObjects());
 }
 
 void ResearchWnd::Sanitize()
@@ -629,8 +639,11 @@ void ResearchWnd::UpdateInfoPanel() {
 void ResearchWnd::AddTechsToQueueSlot(const std::vector<std::string>& tech_vec, int pos) {
     if (!m_enabled)
         return;
+
+    ScriptingContext context;
+
     int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    Empire* empire = GetEmpire(empire_id);
+    auto empire = context.GetEmpire(empire_id);
     if (!empire)
         return;
     const ResearchQueue& queue = empire->GetResearchQueue();
@@ -651,29 +664,33 @@ void ResearchWnd::AddTechsToQueueSlot(const std::vector<std::string>& tech_vec, 
         // or that we skipped because it happened to already be in the right spot.
         if (pos == -1) {
             if (!queue.InQueue(tech_name)) {
-                orders.IssueOrder(std::make_shared<ResearchQueueOrder>(empire_id, tech_name, pos));
+                orders.IssueOrder(std::make_shared<ResearchQueueOrder>(empire_id, tech_name, pos),
+                                  context);
             }
         } else if (!queue.InQueue(tech_name) || ((queue.find(tech_name) - queue.begin()) > pos)) {
-            orders.IssueOrder(std::make_shared<ResearchQueueOrder>(empire_id, tech_name, pos));
+            orders.IssueOrder(std::make_shared<ResearchQueueOrder>(empire_id, tech_name, pos),
+                              context);
             pos += 1;
         } else {
             if ((queue.find(tech_name) - queue.begin()) == pos)
                 pos += 1;
         }
     }
-    empire->UpdateResearchQueue();
+    empire->UpdateResearchQueue(context.ContextObjects());
 }
 
 void ResearchWnd::DeleteQueueItem(GG::ListBox::iterator it) {
     if (!m_enabled || m_queue_wnd->GetQueueListBox()->IteraterIndex(it) < 0)
         return;
 
+    ScriptingContext context;
+
     int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     OrderSet& orders = GGHumanClientApp::GetApp()->Orders();
     if (auto queue_row = boost::polymorphic_downcast<QueueRow*>(it->get()))
-        orders.IssueOrder(std::make_shared<ResearchQueueOrder>(empire_id, queue_row->elem.name));
-    if (auto empire = GetEmpire(empire_id))
-        empire->UpdateResearchQueue();
+        orders.IssueOrder(std::make_shared<ResearchQueueOrder>(empire_id, queue_row->elem.name), context);
+    if (auto empire = context.GetEmpire(empire_id))
+        empire->UpdateResearchQueue(context.ContextObjects());
 }
 
 void ResearchWnd::QueueItemClickedSlot(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
@@ -701,8 +718,9 @@ void ResearchWnd::QueueItemPaused(GG::ListBox::iterator it, bool pause) {
     if (!m_enabled || m_queue_wnd->GetQueueListBox()->IteraterIndex(it) < 0)
         return;
 
+    ScriptingContext context;
     int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    Empire* empire = GetEmpire(client_empire_id);
+    auto empire = context.GetEmpire(client_empire_id);
     if (!empire)
         return;
 
@@ -710,9 +728,10 @@ void ResearchWnd::QueueItemPaused(GG::ListBox::iterator it, bool pause) {
 
     if (QueueRow* queue_row = boost::polymorphic_downcast<QueueRow*>(it->get()))
         GGHumanClientApp::GetApp()->Orders().IssueOrder(
-            std::make_shared<ResearchQueueOrder>(client_empire_id, queue_row->elem.name, pause, -1.0f));
+            std::make_shared<ResearchQueueOrder>(client_empire_id, queue_row->elem.name, pause, -1.0f),
+            context);
 
-    empire->UpdateResearchQueue();
+    empire->UpdateResearchQueue(context.ContextObjects());
 }
 
 

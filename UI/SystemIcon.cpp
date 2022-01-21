@@ -95,26 +95,33 @@ OwnerColoredSystemName::OwnerColoredSystemName(int system_id, int font_size,
 
     int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
-    auto system = Objects().get<System>(system_id);
+    const EmpireManager& empire_manager = Empires();
+    const Universe& universe = GetUniverse();
+    const ObjectMap& objects = universe.Objects();
+    const ScriptingContext context{universe, empire_manager};
+    const SpeciesManager& species_manager = context.species;
+
+
+    auto system = objects.get<System>(system_id);
     if (!system)
         return;
 
-    const auto& known_destroyed_object_ids = GetUniverse().EmpireKnownDestroyedObjectIDs(client_empire_id);
+    const auto& known_destroyed_object_ids = universe.EmpireKnownDestroyedObjectIDs(client_empire_id);
     if (known_destroyed_object_ids.count(system_id))
         return;
 
-    const SpeciesManager& species_manager = GetSpeciesManager();
-    const EmpireManager& empire_manager = Empires();
 
     // get system name
-    const std::string& system_name = system->ApparentName(client_empire_id, blank_unexplored_and_none);
+    const std::string& system_name = system->ApparentName(
+        client_empire_id, universe, blank_unexplored_and_none);
 
     // loop through planets in system, checking if any are a homeworld, capital
     // or have a shipyard, or have neutral population
-    bool capital = false, homeworld = false, has_shipyard = false, has_neutrals = false, has_player_planet = false;
+    bool capital = false, homeworld = false, has_shipyard = false,
+         has_neutrals = false, has_player_planet = false;
 
     std::set<int> owner_empire_ids;
-    auto system_planets = Objects().find<const Planet>(system->PlanetIDs());
+    auto system_planets = objects.find<const Planet>(system->PlanetIDs());
 
     for (auto& planet : system_planets) {
         int planet_id = planet->ID();
@@ -145,13 +152,13 @@ OwnerColoredSystemName::OwnerColoredSystemName(int system_id, int font_size,
 
         // does planet contain a shipyard?
         if (!has_shipyard) {
-            for (auto& building : Objects().find<const Building>(planet->BuildingIDs())) {
+            for (auto& building : objects.find<const Building>(planet->BuildingIDs())) {
                 int building_id = building->ID();
 
                 if (known_destroyed_object_ids.count(building_id))
                     continue;
 
-                if (building->HasTag(TAG_SHIPYARD)) {
+                if (building->HasTag(TAG_SHIPYARD, context)) {
                     has_shipyard = true;
                     break;
                 }
@@ -198,9 +205,8 @@ OwnerColoredSystemName::OwnerColoredSystemName(int system_id, int font_size,
         text_color = ClientUI::TextColor();
     }
 
-    if (GetOptionsDB().Get<bool>("ui.name.id.shown")) {
+    if (GetOptionsDB().Get<bool>("ui.name.id.shown"))
         wrapped_system_name = wrapped_system_name + " (" + std::to_string(system_id) + ")";
-    }
 
     m_text = GG::Wnd::Create<GG::TextControl>(
         GG::X0, GG::Y0, GG::X1, GG::Y1,
@@ -249,13 +255,13 @@ void SystemIcon::CompleteConstruction() {
     if (auto system = Objects().get<System>(m_system_id)) {
         StarType star_type = system->GetStarType();
         m_disc_texture = ui->GetModuloTexture(ClientUI::ArtDir() / "stars",
-                                              ClientUI::StarTypeFilePrefixes()[star_type],
+                                              ClientUI::StarTypeFilePrefix(star_type),
                                               m_system_id);
         m_halo_texture = ui->GetModuloTexture(ClientUI::ArtDir() / "stars",
-                                              ClientUI::HaloStarTypeFilePrefixes()[star_type],
+                                              ClientUI::HaloStarTypeFilePrefix(star_type),
                                               m_system_id);
         m_tiny_texture = ui->GetModuloTexture(ClientUI::ArtDir() / "stars",
-                                              "tiny_" + ClientUI::StarTypeFilePrefixes()[star_type],
+                                              std::string("tiny_").append(ClientUI::StarTypeFilePrefix(star_type)),
                                               m_system_id);
     } else {
         m_disc_texture = ui->GetTexture(ClientUI::ArtDir() / "misc" / "missing.png");
@@ -273,7 +279,7 @@ void SystemIcon::CompleteConstruction() {
     GG::Pt sz{texture->DefaultWidth(), texture->DefaultHeight()};
     m_selection_indicator = GG::Wnd::Create<RotatingGraphic>(
         std::move(texture), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
-    m_selection_indicator->SetRPM(ClientUI::SystemSelectionIndicatorRPM());
+    m_selection_indicator->SetRPM(static_cast<float>(ClientUI::SystemSelectionIndicatorRPM()));
     AttachChild(m_selection_indicator);
     m_selection_indicator->Resize(sz);
 
@@ -309,9 +315,6 @@ void SystemIcon::CompleteConstruction() {
 
     Refresh();
 }
-
-SystemIcon::~SystemIcon()
-{}
 
 int SystemIcon::SystemID() const
 { return m_system_id; }

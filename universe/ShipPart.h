@@ -7,6 +7,7 @@
 #include "../util/Enum.h"
 #include "../util/Pending.h"
 
+struct ScriptingContext;
 
 //! Classifies ShipParts by general function.
 FO_ENUM(
@@ -43,7 +44,9 @@ public:
              std::string&& description, std::set<std::string>&& exclusions,
              std::vector<ShipSlotType> mountable_slot_types,
              std::string&& icon, bool add_standard_capacity_effect = true,
-             std::unique_ptr<Condition::Condition>&& combat_targets = nullptr);
+             std::unique_ptr<Condition::Condition>&& combat_targets = nullptr,
+             std::unique_ptr<ValueRef::ValueRef<double>>&& total_fighter_damage = nullptr,
+             std::unique_ptr<ValueRef::ValueRef<double>>&& total_ship_damage = nullptr);
 
     ~ShipPart();
 
@@ -74,6 +77,16 @@ public:
     //! Returns true if this part can be placed in a slot of the indicated type
     auto CanMountInSlotType(ShipSlotType slot_type) const -> bool;
 
+    //! Returns the value ref estimating maximum damage against fighters in a combat.
+    //! may be nullptr if no value ref was specified
+    auto TotalFighterDamage() const -> const ValueRef::ValueRef<double>*
+    { return m_total_fighter_damage.get(); }
+
+    //! Returns the value ref estimating maximum damage against ships in a combat.
+    //! may be nullptr if no value ref was specified
+    auto TotalShipDamage() const -> const ValueRef::ValueRef<double>*
+    { return m_total_ship_damage.get(); }
+
     //! Returns the condition for possible targets. may be nullptr if no
     //! condition was specified.
     auto CombatTargets() const -> const Condition::Condition*
@@ -87,10 +100,12 @@ public:
     auto ProductionCostTimeLocationInvariant() const -> bool;
 
     //! Returns the number of production points required to produce this part
-    auto ProductionCost(int empire_id, int location_id, int in_design_id = INVALID_DESIGN_ID) const -> float;
+    auto ProductionCost(int empire_id, int location_id, const ScriptingContext& context,
+                        int in_design_id = INVALID_DESIGN_ID) const -> float;
 
     //! Returns the number of turns required to produce this part
-    auto ProductionTime(int empire_id, int location_id, int in_design_id = INVALID_DESIGN_ID) const -> int;
+    auto ProductionTime(int empire_id, int location_id, const ScriptingContext& context,
+                        int in_design_id = INVALID_DESIGN_ID) const -> int;
 
     //! Returns whether this part type is producible by players and appears on
     //! the design screen
@@ -142,7 +157,6 @@ private:
     float           m_capacity = 0.0f;
     //! Damage for a hangar bay, shots per turn for a weapon, etc.
     float           m_secondary_stat = 0.0f;
-    bool            m_producible = false;
 
     std::unique_ptr<ValueRef::ValueRef<double>>         m_production_cost;
     std::unique_ptr<ValueRef::ValueRef<int>>            m_production_time;
@@ -154,8 +168,11 @@ private:
     std::set<std::string>                               m_exclusions;
     std::vector<std::shared_ptr<Effect::EffectsGroup>>  m_effects;
     std::string                                         m_icon;
-    bool                                                m_add_standard_capacity_effect = false;
     std::unique_ptr<Condition::Condition>               m_combat_targets;
+    std::unique_ptr<ValueRef::ValueRef<double>>         m_total_fighter_damage;
+    std::unique_ptr<ValueRef::ValueRef<double>>         m_total_ship_damage;
+    bool                                                m_add_standard_capacity_effect = false;
+    bool                                                m_producible = false;
 };
 
 
@@ -174,6 +191,9 @@ public:
 
     //! Iterator to one after the last ShipPart.
     auto end() const -> iterator;
+
+    //! How many parts are known?
+    auto size() const -> std::size_t;
 
     //! Returns the instance of this singleton class; you should use the free
     //! function GetShipPartManager() instead.

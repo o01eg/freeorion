@@ -52,8 +52,8 @@ namespace {
     auto jumpsToSuppliedSystem(const Empire& empire) -> std::map<int, int>
     {
         std::map<int, int> retval;
-        const std::map<int, std::set<int>>& empire_starlanes = empire.KnownStarlanes();
-        std::list<int> propagating_list;
+        const std::map<int, std::set<int>>& empire_starlanes = empire.KnownStarlanes(GetUniverse());
+        std::deque<int> propagating_list;
 
         for (int system_id : GetSupplyManager().FleetSupplyableSystemIDs(empire.EmpireID(), true)) {
             retval[system_id] = 0;
@@ -96,18 +96,18 @@ namespace {
 
     auto PlanetsWithAvailablePP(const Empire& empire) -> std::map<std::set<int>, float>
     {
-        const auto& industry_pool = empire.GetResourcePool(ResourceType::RE_INDUSTRY);
-        const ProductionQueue& prod_queue = empire.GetProductionQueue();
+        auto industry_pool{empire.GetResourcePool(ResourceType::RE_INDUSTRY)};
         std::map<std::set<int>, float> planets_with_available_pp;
-        for (const auto& objects_pp : prod_queue.AvailablePP(industry_pool)) {
-            std::set<int> planets;
-            for (const auto& planet : Objects().find<Planet>(objects_pp.first)) {
-                if (!planet)
-                    continue;
-                planets.insert(planet->ID());
+
+        // filter industry pool output to get just planet IDs
+        for (auto& [object_ids, PP] : industry_pool->Output()) {
+            std::set<int> planet_ids;
+            for (const auto& planet : Objects().find<Planet>(object_ids)) {
+                if (planet)
+                    planet_ids.insert(planet->ID());
             }
-            if (!planets.empty())
-                planets_with_available_pp[planets] = objects_pp.second;
+            if (!planet_ids.empty())
+                planets_with_available_pp.emplace(std::move(planet_ids), PP);
         }
         return planets_with_available_pp;
     }
@@ -131,20 +131,19 @@ namespace {
 
     auto PlanetsWithWastedPP(const Empire& empire) -> std::set<std::set<int>>
     {
-        const auto& industry_pool = empire.GetResourcePool(ResourceType::RE_INDUSTRY);
+        auto industry_pool{empire.GetResourcePool(ResourceType::RE_INDUSTRY)};
         const ProductionQueue& prod_queue = empire.GetProductionQueue();
         std::set<std::set<int>> planets_with_wasted_pp;
-        for (const auto& objects : prod_queue.ObjectsWithWastedPP(industry_pool)) {
-                 std::set<int> planets;
-                 for (const auto& planet : Objects().find<Planet>(objects)) {
-                    if (!planet)
-                        continue;
-                    planets.insert(planet->ID());
-                 }
-                 if (!planets.empty())
-                     planets_with_wasted_pp.insert(planets);
-             }
-             return planets_with_wasted_pp;
+        for (const auto& object_ids : prod_queue.ObjectsWithWastedPP(industry_pool)) {
+            std::set<int> planet_ids;
+            for (const auto& planet : Objects().find<Planet>(object_ids)) {
+                if (planet)
+                    planet_ids.insert(planet->ID());
+            }
+            if (!planet_ids.empty())
+                planets_with_wasted_pp.insert(std::move(planet_ids));
+        }
+        return planets_with_wasted_pp;
     }
 
     auto ResearchedTechNames(const Empire& empire) -> std::set<std::string>
@@ -153,6 +152,33 @@ namespace {
         for (const auto& entry : empire.ResearchedTechs())
             retval.insert(entry.first);
         return retval;
+    }
+
+    auto ViewSetToStringVec(const std::set<std::string_view>& in) -> std::vector<std::string>
+    {
+        std::vector<std::string> out;
+        out.reserve(in.size());
+        std::transform(in.begin(), in.end(), std::back_inserter(out),
+                       [](auto view) { return std::string{view}; });
+        return out;
+    }
+
+    auto ViewVecToStringVec(const std::vector<std::string_view>& in) -> std::vector<std::string>
+    {
+        std::vector<std::string> out;
+        out.reserve(in.size());
+        std::transform(in.begin(), in.end(), std::back_inserter(out),
+                       [](auto view) { return std::string{view}; });
+        return out;
+    }
+
+    template <typename C>
+    auto ViewMapToStringMap(const std::map<std::string_view, int, C>& in) -> std::map<std::string, int>
+    {
+        std::map<std::string, int> out;
+        std::transform(in.begin(), in.end(), std::inserter(out, out.end()),
+                       [](auto view_int) { return std::pair{std::string{view_int.first}, view_int.second}; });
+        return out;
     }
 }
 
@@ -225,11 +251,15 @@ namespace FreeOrionPython {
 
             .def("buildingTypeAvailable",           &Empire::BuildingTypeAvailable)
             .add_property("availableBuildingTypes", make_function(&Empire::AvailableBuildingTypes,  py::return_internal_reference<>()))
-            .def("shipDesignAvailable",             (bool (Empire::*)(int) const)&Empire::ShipDesignAvailable)
+
+            .def("shipDesignAvailable",             +[](const Empire& empire, int id) -> bool { return empire.ShipDesignAvailable(id, GetUniverse()); })
             .add_property("allShipDesigns",         make_function(&Empire::ShipDesigns,             py::return_value_policy<py::return_by_value>()))
-            .add_property("availableShipDesigns",   make_function(&Empire::AvailableShipDesigns,    py::return_value_policy<py::return_by_value>()))
+            .add_property("availableShipDesigns",   +[](const Empire& empire) -> std::set<int> { return empire.AvailableShipDesigns(GetUniverse()); })
+
+
             .add_property("availableShipParts",     make_function(&Empire::AvailableShipParts,      py::return_value_policy<py::copy_const_reference>()))
             .add_property("availableShipHulls",     make_function(&Empire::AvailableShipHulls,      py::return_value_policy<py::copy_const_reference>()))
+
             .add_property("productionQueue",        make_function(&Empire::GetProductionQueue,      py::return_internal_reference<>()))
             .def("productionCostAndTime",           +[](const Empire& empire, const ProductionQueue::Element& element) -> std::pair<float, int> { return element.ProductionCostAndTime(); },
                                                     py::return_value_policy<py::return_by_value>())
@@ -263,14 +293,23 @@ namespace FreeOrionPython {
             .add_property("turnsPoliciesAdopted",   make_function(&Empire::TurnsPoliciesAdopted,            py::return_value_policy<py::return_by_value>()))
             .add_property("availablePolicies",      make_function(&Empire::AvailablePolicies,               py::return_value_policy<py::copy_const_reference>()))
             .def("policyAvailable",                 &Empire::PolicyAvailable)
-            .add_property("totalPolicySlots",       make_function(&Empire::TotalPolicySlots,                py::return_value_policy<py::return_by_value>()))
-            .add_property("emptyPolicySlots",       make_function(&Empire::EmptyPolicySlots,                py::return_value_policy<py::return_by_value>()))
+
+            .add_property("totalPolicySlots",       make_function(
+                                                        +[](const Empire& e) -> std::map<std::string, int>
+                                                            { return ViewMapToStringMap(e.TotalPolicySlots()); },
+                                                        py::return_value_policy<py::return_by_value>()
+                                                    ))
+            .add_property("emptyPolicySlots",       make_function(
+                                                        +[](const Empire& e) -> std::map<std::string, int>
+                                                            { return ViewMapToStringMap(e.EmptyPolicySlots()); },
+                                                        py::return_value_policy<py::return_by_value>()
+                                                    ))
 
             .def("canBuild",                        +[](const Empire& empire, BuildType build_type, const std::string& name, int location) -> bool { return empire.ProducibleItem(build_type, name, location); })
             .def("canBuild",                        +[](const Empire& empire, BuildType build_type, int design, int location) -> bool { return empire.ProducibleItem(build_type, design, location); })
 
             .def("hasExploredSystem",               &Empire::HasExploredSystem)
-            .add_property("exploredSystemIDs",      make_function(&Empire::ExploredSystems,         py::return_internal_reference<>()))
+            .add_property("exploredSystemIDs",      make_function(&Empire::ExploredSystems,         py::return_value_policy<py::return_by_value>()))
 
             .add_property("eliminated",             &Empire::Eliminated)
             .add_property("won",                    &Empire::Won)
@@ -335,11 +374,17 @@ namespace FreeOrionPython {
             .add_property("empty",                  &ProductionQueue::empty)
             .add_property("totalSpent",             &ProductionQueue::TotalPPsSpent)
             .add_property("empireID",               &ProductionQueue::EmpireID)
-            .def("availablePP",                     &ProductionQueue::AvailablePP,
-                                                    py::return_value_policy<py::return_by_value>())
+
+            .def("availablePP",                     +[](const ProductionQueue& queue, const std::shared_ptr<ResourcePool>& r) -> std::map<std::set<int>, float> {
+                                                        return r ? r->Output() : std::map<std::set<int>, float>{};
+                                                    }, py::return_value_policy<py::return_by_value>())
+
             .add_property("allocatedPP",            make_function(&ProductionQueue::AllocatedPP,        py::return_internal_reference<>()))
-            .def("objectsWithWastedPP",             &ProductionQueue::ObjectsWithWastedPP,
-                                                    py::return_value_policy<py::return_by_value>())
+
+            .def("objectsWithWastedPP",             +[](const ProductionQueue& queue, const std::shared_ptr<ResourcePool>& r) -> std::set<std::set<int>> {
+                                                        const auto const_r{std::const_pointer_cast<const ResourcePool>(r)};
+                                                        return queue.ObjectsWithWastedPP(const_r);
+                                                    }, py::return_value_policy<py::return_by_value>())
             ;
 
         ////////////////////
@@ -385,44 +430,20 @@ namespace FreeOrionPython {
         def("getTech",                              &GetTech,                               py::return_value_policy<py::reference_existing_object>(), "Returns the tech (Tech) with the indicated name (string).");
         def("getTechCategories",                    &TechManager::CategoryNames,            py::return_value_policy<py::return_by_value>(), "Returns the names of all tech categories (StringVec).");
 
-        py::def("techs",
-                +[]() -> std::vector<std::string> { return GetTechManager().TechNames(); },
-                py::return_value_policy<py::return_by_value>(),
-                "Returns the names of all techs (StringVec).");
+        def("techs",
+            +[]() -> std::vector<std::string> { return GetTechManager().TechNames(); },
+            py::return_value_policy<py::return_by_value>(),
+            "Returns the names of all techs (StringVec).");
 
-        py::def("techsInCategory",
-                +[](const std::string& category) -> std::vector<std::string> { return GetTechManager().TechNames(category); },
-                py::return_value_policy<py::return_by_value>(),
-                "Returns the names of all techs (StringVec) in the indicated"
-                " tech category name (string).");
+        def("techsInCategory",
+            +[](const std::string& category) -> std::vector<std::string> { return GetTechManager().TechNames(category); },
+            py::return_value_policy<py::return_by_value>(),
+            "Returns the names of all techs (StringVec) in the indicated"
+            " tech category name (string).");
 
         py::class_<UnlockableItem>("UnlockableItem", py::init<UnlockableItemType, const std::string&>())
             .add_property("type",               &UnlockableItem::type)
             .add_property("name",               &UnlockableItem::name)
-        ;
-
-        ///////////////////////
-        //  Influence Queue  //
-        ///////////////////////
-        py::class_<InfluenceQueue::Element>("influenceQueueElement", py::no_init)
-            .def_readonly("name",                   &InfluenceQueue::Element::name)
-            .def_readonly("allocation",             &InfluenceQueue::Element::allocated_ip)
-        ;
-        py::class_<InfluenceQueue, boost::noncopyable>("influenceQueue", py::no_init)
-            .def("__iter__",                        py::iterator<InfluenceQueue>())  // InfluenceQueue provides STL container-like interface to contained queue
-            .def("__getitem__",                     +[](const InfluenceQueue& queue, int index) -> const InfluenceQueue::Element& { return queue[index]; },
-                                                    py::return_internal_reference<>())
-            .def("__len__",                         &InfluenceQueue::size)
-            .add_property("size",                   &InfluenceQueue::size)
-            .add_property("empty",                  &InfluenceQueue::empty)
-            .def("inQueue",                         &InfluenceQueue::InQueue)
-            .def("__contains__",                    +[](const InfluenceQueue* queue, const InfluenceQueue::Element& element) -> bool { return queue->InQueue(element.name); },
-                                                    py::return_value_policy<py::return_by_value>())
-            .add_property("totalSpent",             &InfluenceQueue::TotalIPsSpent)
-            .add_property("empireID",               &InfluenceQueue::EmpireID)
-
-            .add_property("allocatedStockpileIP",   &InfluenceQueue::AllocatedStockpileIP)
-            .add_property("expectedNewStockpile",   &InfluenceQueue::ExpectedNewStockpileAmount)
         ;
 
         //////////////////
@@ -436,19 +457,26 @@ namespace FreeOrionPython {
             .def("adoptionCost",                    &Policy::AdoptionCost)
         ;
 
-        def("getPolicy",                            &GetPolicy,                                 py::return_value_policy<py::reference_existing_object>(), "Returns the policy (Policy) with the indicated name (string).");
-        def("getPolicyCategories",                  &PolicyManager::PolicyCategories,           py::return_value_policy<py::return_by_value>(), "Returns the names of all policy categories (StringVec).");
+        def("getPolicy",
+            +[](const std::string& name) { return GetPolicy(name); },
+            py::return_value_policy<py::reference_existing_object>(),
+            "Returns the policy (Policy) with the indicated name (string).");
 
-        py::def("policies",
-                +[]() -> std::vector<std::string> { return GetPolicyManager().PolicyNames(); },
-               py::return_value_policy<py::return_by_value>(),
-               "Returns the names of all policies (StringVec).");
+        def("policyCategories",
+            +[]() -> std::vector<std::string> { return ViewSetToStringVec(GetPolicyManager().PolicyCategories()); },
+            py::return_value_policy<py::return_by_value>(),
+            "Returns the names of all policy categories (StringVec).");
 
-        py::def("policiesInCategory",
-                +[](const std::string& category) -> std::vector<std::string> { return GetPolicyManager().PolicyNames(category); },
-                py::return_value_policy<py::return_by_value>(),
-                "Returns the names of all policies (StringVec) in the"
-                " indicated policy category name (string).");
+        def("policies",
+            +[]() -> std::vector<std::string> { return ViewVecToStringVec(GetPolicyManager().PolicyNames()); },
+            py::return_value_policy<py::return_by_value>(),
+            "Returns the names of all policies (StringVec).");
+
+        def("policiesInCategory",
+            +[](const std::string& category) -> std::vector<std::string> { return ViewVecToStringVec(GetPolicyManager().PolicyNames(category)); },
+            py::return_value_policy<py::return_by_value>(),
+            "Returns the names of all policies (StringVec) in the"
+            " indicated policy category name (string).");
 
         ///////////////////////
         // DiplomaticMessage //

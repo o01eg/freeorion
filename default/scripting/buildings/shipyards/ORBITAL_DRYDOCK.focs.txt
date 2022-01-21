@@ -14,12 +14,14 @@ BuildingType
     tags = "ORBITAL"
     location = And [
         Planet
+        OwnedBy empire = Source.Owner
         Not Contains Building name = "BLD_SHIPYARD_ORBITAL_DRYDOCK"
         [[LOCATION_ALLOW_ENQUEUE_IF_PREREQ_ENQUEUED(BLD_SHIPYARD_BASE)]]
-        OwnedBy empire = Source.Owner
     ]
     enqueuelocation = [[ENQUEUE_BUILD_ONE_PER_PLANET]]
     effectsgroups = [
+		[[SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS]]
+		
         // ZERO-POP : With no pop, no repair or sitrep messages
         EffectsGroup
             scope = And [
@@ -39,6 +41,7 @@ BuildingType
                 Structure high = LocalCandidate.MaxStructure - 0.001
             ]
             activation = ContainedBy And [
+                Object id = Source.PlanetID
                 [[PLANET_OWNED_DRYDOCK_HIGHEST_HAPPINESS]]
                 Population high = 0
             ]
@@ -211,8 +214,8 @@ ORB_DRYDOCK_REPAIR_VAL
 // Planet in system with highest happiness that is owned and has a drydock
 PLANET_OWNED_DRYDOCK_HIGHEST_HAPPINESS
 '''MaximumNumberOf number = 1 sortkey = LocalCandidate.Happiness condition = And [
-    Planet
     InSystem id = Source.SystemID
+    Planet
     Or [
         OwnedBy empire = Source.Owner
         And [
@@ -233,3 +236,4 @@ PLANET_OWNED_DRYDOCK_HIGHEST_HAPPINESS
 #include "/scripting/common/priorities.macros"
 #include "/scripting/common/base_prod.macros"
 #include "/scripting/common/misc.macros"
+#include "/scripting/buildings/buildings.macros"

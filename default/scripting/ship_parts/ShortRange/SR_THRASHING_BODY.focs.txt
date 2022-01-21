@@ -4,19 +4,29 @@ Part
     class = ShortRange
     damage = 1
     shots = 10
+    destroyFightersPerBattleMax =
+        ShipPartMeter part = "SR_THRASHING_BODY" meter = SecondaryStat object = Source.ID
+        * NamedRealLookup name = "NUM_REAL_COMBAT_ROUNDS_IN_CLOSE_TARGETING_RANGE"
+    damageStructurePerBattleMax =
+        max(0,ShipPartMeter part = "SR_THRASHING_BODY" meter = Capacity object = Source.ID - Value(Target.Shield))
+        * ShipPartMeter part = "SR_THRASHING_BODY" meter = SecondaryStat object = Source.ID
+        * NamedRealLookup name = "NUM_REAL_COMBAT_ROUNDS_IN_CLOSE_TARGETING_RANGE"
     combatTargets = And [
         (CombatBout >= NamedIntegerLookup name = "FIRST_COMBAT_ROUND_IN_CLOSE_TARGETING_RANGE")
-        [[COMBAT_TARGETS_VISIBLE_ENEMY]]
         Or [
            Fighter
            [[COMBAT_TARGETS_NOT_DESTROYED_SHIP]]
         ]
+        [[COMBAT_TARGETS_VISIBLE_ENEMY]]
     ]
     mountableSlotTypes = External
     buildcost = 20 * [[FLEET_UPKEEP_MULTIPLICATOR]] * [[SHIP_PART_COST_MULTIPLIER]]
     buildtime = 1
     tags = [ "PEDIA_PC_DIRECT_WEAPON" ]
-    location = OwnedBy empire = Source.Owner
+    location = And [
+        Planet
+        OwnedBy empire = Source.Owner
+    ]
     icon = "icons/monsters/dragon-1.png"
 
 #include "shortrange.macros"

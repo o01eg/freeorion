@@ -1,0 +1,77 @@
+Policy
+    name = "PLC_BUREAUCRACY"
+    description = "PLC_BUREAUCRACY_DESC"
+    short_description = "PLC_BUREAUCRACY_SHORT_DESC"
+    category = "ECONOMIC_CATEGORY"
+    adoptioncost = floor(2.0 * [[POPULATION_OWNED_BY_EMPIRE]]^0.5)
+    prerequisites = [ "PLC_CENTRALIZATION" ]
+    unlock = Item type = Policy name = "PLC_TECHNOCRACY"
+    effectsgroups = [
+        [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
+
+        // costs IP to change focus: don't disrupt the system!
+        EffectsGroup
+            scope = And [
+                Planet
+                OwnedBy empire = Source.Owner
+                Species
+                (LocalCandidate.TurnsSinceFocusChange == 0)
+                (LocalCandidate.TurnsSinceColonization > 1) // all changes on first turn after colonization without penalty
+                Not (LocalCandidate.TurnsSinceLastConquered == 1) // same for newly conquered, note that 0 means never conquered
+            ]
+            priority = [[FOCUS_CHANGE_PENALTY_PRIORITY]]
+            effects = SetInfluence value = Value - (NamedReal name = "BUREAUCRACY_FOCUS_CHANGE_PENALTY" value = 3.0)
+
+        // increases stability on all planets, as long as there are enough regional admin buildings...
+        // ... if count of region admins is less than (turns_adopted / 10), no stability bonus
+        EffectsGroup
+            scope = And [
+                Planet
+                OwnedBy empire = Source.Owner
+                Species
+            ]
+            activation = Number
+                low = (TurnsSincePolicyAdopted empire = Source.Owner name = ThisPolicy) /
+                      (NamedInteger name = "BUREACRACY_ADMINS_NEEDED_TURN_SCALING" value = 10)
+                condition = And [
+                    Or [
+                        Building name = "BLD_REGIONAL_ADMIN"
+                        Building name = "BLD_IMPERIAL_PALACE"
+                    ]
+                    OwnedBy empire = Source.Owner
+                ]
+            effects = SetTargetHappiness value = Value + (NamedReal name = "PLC_BUREAUCRACY_STABILITY_FLAT" value = 5.0)
+
+        // Tell the player how much is needed to keep it going.
+        // Message is created 2 turns before an increase, so it is shown just before the required number increases.
+        // Of course one turn is not enough to build another regional admin, but since the message is shown even
+        // before the number increases to 1, the player can always check for the next increase by scrolling back
+        // to the last message. Also the turn before it halts is the perfect time for disabling it.
+        EffectsGroup
+            scope = Source
+            activation =
+                ((TurnsSincePolicyAdopted empire = Source.Owner name = ThisPolicy + 2) %
+                 NamedIntegerLookup name = "BUREACRACY_ADMINS_NEEDED_TURN_SCALING" == 0)
+            effects = GenerateSitRepMessage
+                message = "SITREP_BUREAUCRACY_STOPPED"
+                label = "SITREP_BUREAUCRACY_STOPPED_LABEL"
+                icon = "icons/policies/bureaucracy.png"
+                parameters = [
+                    tag = "havebuildings" data = Statistic Count condition = And [
+                        Or [
+                            Building name = "BLD_REGIONAL_ADMIN"
+                            Building name = "BLD_IMPERIAL_PALACE"
+                        ]
+                        OwnedBy empire = Source.Owner
+                    ]
+                    tag = "needbuildings" data = (TurnsSincePolicyAdopted empire = Source.Owner name = ThisPolicy + 2) /
+                                                 (NamedIntegerLookup name = "BUREACRACY_ADMINS_NEEDED_TURN_SCALING")
+                ]
+                empire = Source.Owner
+            
+    ]
+    graphic = "icons/policies/bureaucracy.png"
+
+#include "/scripting/common/base_prod.macros"
+#include "/scripting/policies/policies.macros"
+#include "/scripting/common/priorities.macros"

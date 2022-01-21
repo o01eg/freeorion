@@ -29,8 +29,7 @@ FocusType::FocusType(std::string& name, std::string& description,
     m_graphic(std::move(graphic))
 {}
 
-FocusType::~FocusType()
-{}
+FocusType::~FocusType() = default;
 
 std::string FocusType::Dump(unsigned short ntabs) const {
     std::string retval = DumpIndent(ntabs) + "FocusType\n";
@@ -56,35 +55,6 @@ unsigned int FocusType::GetCheckSum() const {
 /////////////////////////////////////////////////
 // Species                                     //
 /////////////////////////////////////////////////
-namespace {
-    std::string PlanetTypeToString(PlanetType type) {
-        switch (type) {
-        case PlanetType::PT_SWAMP:     return "Swamp";
-        case PlanetType::PT_TOXIC:     return "Toxic";
-        case PlanetType::PT_INFERNO:   return "Inferno";
-        case PlanetType::PT_RADIATED:  return "Radiated";
-        case PlanetType::PT_BARREN:    return "Barren";
-        case PlanetType::PT_TUNDRA:    return "Tundra";
-        case PlanetType::PT_DESERT:    return "Desert";
-        case PlanetType::PT_TERRAN:    return "Terran";
-        case PlanetType::PT_OCEAN:     return "Ocean";
-        case PlanetType::PT_ASTEROIDS: return "Asteroids";
-        case PlanetType::PT_GASGIANT:  return "GasGiant";
-        default:                       return "?";
-        }
-    }
-    std::string PlanetEnvironmentToString(PlanetEnvironment env) {
-        switch (env) {
-        case PlanetEnvironment::PE_UNINHABITABLE: return "Uninhabitable";
-        case PlanetEnvironment::PE_HOSTILE:       return "Hostile";
-        case PlanetEnvironment::PE_POOR:          return "Poor";
-        case PlanetEnvironment::PE_ADEQUATE:      return "Adequate";
-        case PlanetEnvironment::PE_GOOD:          return "Good";
-        default:                                  return "?";
-        }
-    }
-}
-
 Species::Species(std::string&& name, std::string&& desc,
                  std::string&& gameplay_desc, std::vector<FocusType>&& foci,
                  std::string&& default_focus,
@@ -114,16 +84,15 @@ Species::Species(std::string&& name, std::string&& desc,
     m_graphic(std::move(graphic))
 {
     for (auto&& effect : effects)
-        m_effects.emplace_back(std::move(effect));
+        m_effects.push_back(std::move(effect));
 
     Init();
 
     for (const std::string& tag : tags)
-        m_tags.emplace(boost::to_upper_copy<std::string>(tag));
+        m_tags.insert(boost::to_upper_copy<std::string>(tag));
 }
 
-Species::~Species()
-{}
+Species::~Species() = default;
 
 void Species::Init() {
     for (auto& effect : m_effects)
@@ -134,7 +103,7 @@ void Species::Init() {
         // (not uninhabitable) environment for this species
 
         std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetEnvironment>>> environments;
-        environments.emplace_back(
+        environments.push_back(
             std::make_unique<ValueRef::Constant<PlanetEnvironment>>(PlanetEnvironment::PE_UNINHABITABLE));
 
         auto this_species_name_ref =
@@ -161,7 +130,9 @@ void Species::Init() {
 }
 
 std::string Species::Dump(unsigned short ntabs) const {
-    std::string retval = DumpIndent(ntabs) + "Species\n";
+    std::string retval;
+    retval.reserve(500); // guesstimate
+    retval += DumpIndent(ntabs) + "Species\n";
     retval += DumpIndent(ntabs+1) + "name = \"" + m_name + "\"\n";
     retval += DumpIndent(ntabs+1) + "description = \"" + m_description + "\"\n";
     retval += DumpIndent(ntabs+1) + "gameplay_description = \"" + m_gameplay_description + "\"\n";
@@ -195,15 +166,21 @@ std::string Species::Dump(unsigned short ntabs) const {
         retval += DumpIndent(ntabs+1) + "combatTargets = " + m_combat_targets->Dump(ntabs+2);
     if (m_planet_environments.size() == 1) {
         retval += DumpIndent(ntabs+1) + "environments =\n";
-        retval += DumpIndent(ntabs+2) + "type = " + PlanetTypeToString(m_planet_environments.begin()->first)
-            + " environment = " + PlanetEnvironmentToString(m_planet_environments.begin()->second)
-            + "\n";
+        retval.append(DumpIndent(ntabs+2))
+              .append("type = ")
+              .append(ValueRef::PlanetTypeToString(m_planet_environments.begin()->first))
+              .append(" environment = ")
+              .append(ValueRef::PlanetEnvironmentToString(m_planet_environments.begin()->second))
+              .append("\n");
     } else {
         retval += DumpIndent(ntabs+1) + "environments = [\n";
         for (const auto& entry : m_planet_environments) {
-            retval += DumpIndent(ntabs+2) + "type = " + PlanetTypeToString(entry.first)
-                + " environment = " + PlanetEnvironmentToString(entry.second)
-                + "\n";
+            retval.append(DumpIndent(ntabs+2))
+                  .append("type = ")
+                  .append(ValueRef::PlanetTypeToString(entry.first))
+                  .append(" environment = ")
+                  .append(ValueRef::PlanetEnvironmentToString(entry.second))
+                  .append("\n");
         }
         retval += DumpIndent(ntabs+1) + "]\n";
     }
@@ -364,7 +341,7 @@ const Species* SpeciesManager::GetSpecies(const std::string& name) const {
     return it != s_species.end() ? it->second.get() : nullptr;
 }
 
-Species* SpeciesManager::GetSpecies(const std::string& name) {
+const Species* SpeciesManager::GetSpecies(std::string_view name) const {
     CheckPendingSpeciesTypes();
     auto it = s_species.find(name);
     return it != s_species.end() ? it->second.get() : nullptr;
@@ -522,16 +499,16 @@ float SpeciesManager::SpeciesSpeciesOpinion(const std::string& opinionated_speci
     return ra_sp_it->second;
 }
 
-std::vector<std::string> SpeciesManager::SpeciesThatLike(const std::string& content_name) const {
-    std::vector<std::string> retval;
+std::vector<std::string_view> SpeciesManager::SpeciesThatLike(const std::string& content_name) const {
+    std::vector<std::string_view> retval;
     for (const auto& [species_name, species] : *this)
         if (species->Likes().count(content_name))
             retval.push_back(species_name);
     return retval;
 }
 
-std::vector<std::string> SpeciesManager::SpeciesThatDislike(const std::string& content_name) const {
-    std::vector<std::string> retval;
+std::vector<std::string_view> SpeciesManager::SpeciesThatDislike(const std::string& content_name) const {
+    std::vector<std::string_view> retval;
     for (const auto& [species_name, species] : *this)
         if (species->Dislikes().count(content_name))
             retval.push_back(species_name);
@@ -564,35 +541,40 @@ void SpeciesManager::RemoveSpeciesHomeworld(const std::string& species, int home
 void SpeciesManager::ClearSpeciesHomeworlds()
 { m_species_homeworlds.clear(); }
 
-void SpeciesManager::UpdatePopulationCounter() {
+void SpeciesManager::UpdatePopulationCounter(const ObjectMap& objects) {
     // ships of each species and design
     m_species_object_populations.clear();
-    for (const auto& entry : Objects().ExistingObjects()) {
-        auto obj = entry.second;
-        if (obj->ObjectType() != UniverseObjectType::OBJ_PLANET && obj->ObjectType() != UniverseObjectType::OBJ_POP_CENTER)
-            continue;
+    for (const auto& [obj_id, obj] : objects.ExistingObjects()) {
+        if (obj->ObjectType() != UniverseObjectType::OBJ_PLANET &&
+            obj->ObjectType() != UniverseObjectType::OBJ_POP_CENTER)
+        { continue; }
 
         auto pop_center = std::dynamic_pointer_cast<const PopCenter>(obj);
-        if (!pop_center)
-            continue;
-
         const std::string& species = pop_center->SpeciesName();
         if (species.empty())
             continue;
 
         try {
-            m_species_object_populations[species][obj->ID()] += obj->GetMeter(MeterType::METER_POPULATION)->Current();
+            m_species_object_populations[species][obj_id] +=
+                obj->GetMeter(MeterType::METER_POPULATION)->Current();
         } catch (...) {
             continue;
         }
     }
 }
 
-std::map<std::string, std::map<int, float>>& SpeciesManager::SpeciesObjectPopulations(int encoding_empire)
+const std::map<std::string, std::map<int, float>>& SpeciesManager::SpeciesObjectPopulations(int) const
 { return m_species_object_populations; }
 
-std::map<std::string, std::map<std::string, int>>& SpeciesManager::SpeciesShipsDestroyed(int encoding_empire)
+const std::map<std::string, std::map<std::string, int>>& SpeciesManager::SpeciesShipsDestroyed(int) const
 { return m_species_species_ships_destroyed; }
+
+void SpeciesManager::SetSpeciesObjectPopulations(std::map<std::string, std::map<int, float>> sop)
+{ m_species_object_populations = std::move(sop); }
+
+void SpeciesManager::SetSpeciesShipsDestroyed(std::map<std::string, std::map<std::string, int>> ssd)
+{ m_species_species_ships_destroyed = std::move(ssd); }
+
 
 unsigned int SpeciesManager::GetCheckSum() const {
     CheckPendingSpeciesTypes();

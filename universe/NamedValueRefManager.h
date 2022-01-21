@@ -2,6 +2,7 @@
 #define _ValueRefManager_h_
 
 #include <map>
+#include <thread>
 #include "ValueRef.h"
 
 FO_COMMON_API const std::string& UserString(const std::string& str);
@@ -78,8 +79,23 @@ struct FO_COMMON_API NamedRef final : public ValueRef<T>
     }
 
     std::string Dump(unsigned short ntabs = 0) const override {
-        auto ref = GetValueRef();
-        return ref ? ref->Dump() : "NAMED_REF_UNKNOWN";
+        std::string retval = "Named";
+        if constexpr (std::is_same<T, int>::value) {
+            retval += "Integer";
+        } else if constexpr (std::is_same<T, double>::value) {
+            retval += "Real";
+        } else {
+            retval += "Generic";
+        }
+        if (m_is_lookup_only) {
+            retval += "Lookup";
+        }
+        retval += " name = \"" + m_value_ref_name + "\"";
+        if (!m_is_lookup_only) {
+            auto ref = GetValueRef();
+            retval += " value = " + (ref ? ref->Dump() : " (NAMED_REF_UNKNOWN)");
+        }
+        return retval;
     }
 
     void SetTopLevelContent(const std::string& content_name) override;
@@ -234,8 +250,13 @@ public:
 private:
     NamedValueRefManager();
 
+#ifdef __clang__
+    template <typename T>
+    friend struct ValueRef::NamedRef; // for SetTopLevelContent
+#else
     template <typename T>
     friend void ValueRef::NamedRef<T>::SetTopLevelContent(const std::string& content_name);
+#endif
 
     // getter of mutable ValueRef<T>* that can be modified within SetTopLevelContext functions
     template <typename T>

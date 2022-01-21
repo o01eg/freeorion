@@ -1,25 +1,23 @@
-from logging import warning, info, error
+from logging import error, info, warning
 
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
 # Logging is redirected before other imports so that import errors appear in log files.
 redirect_logging_to_freeorion_logger()
 
-import sys
-
-import random
-
 import freeorion as fo
+import random
+import sys
 
 import psycopg2
 import psycopg2.extensions
+
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
-import urllib.request
-
-import smtplib
 import configparser
+import smtplib
+import urllib.request
 
 # Constants defined by the C++ game engine
 NO_TEAM_ID = -1
@@ -44,13 +42,16 @@ class AuthProvider:
         self.conn = psycopg2.connect(self.dsn)
         self.conn_ro = psycopg2.connect(self.dsn_ro)
         self.roles_symbols = {
-            'h': fo.roleType.host, 'm': fo.roleType.clientTypeModerator,
-            'p': fo.roleType.clientTypePlayer, 'o': fo.roleType.clientTypeObserver,
-            'g': fo.roleType.galaxySetup
+            "h": fo.roleType.host,
+            "m": fo.roleType.clientTypeModerator,
+            "p": fo.roleType.clientTypePlayer,
+            "o": fo.roleType.clientTypeObserver,
+            "g": fo.roleType.galaxySetup,
         }
         self.default_roles = [fo.roleType.galaxySetup, fo.roleType.clientTypePlayer]
         self.mailconf = configparser.ConfigParser()
         self.mailconf.read(fo.get_user_config_dir() + "/mail.cfg")
+
         info("Auth initialized")
 
     def __parse_roles(self, roles_str):
@@ -70,13 +71,20 @@ class AuthProvider:
         try:
             with self.conn:
                 with self.conn.cursor() as curs:
-                    curs.execute(""" SELECT * FROM auth.check_contact(%s, %s, %s) """,
-                                 (player_name, otp, fo.get_galaxy_setup_data().gameUID))
+                    curs.execute(
+                        """ SELECT * FROM auth.check_contact(%s, %s, %s) """,
+                        (player_name, otp, fo.get_galaxy_setup_data().gameUID),
+                    )
                     for r in curs:
                         known_login = True
                         if r[0] == "xmpp":
                             try:
-                                req = urllib.request.Request("http://localhost:8083/", ("%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp)).encode())
+                                req = urllib.request.Request(
+                                    "http://localhost:8083/",
+                                    (
+                                        "%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp)
+                                    ).encode(),
+                                )
                                 req.add_header("X-XMPP-To", r[1])
                                 urllib.request.urlopen(req).read()
                                 info("OTP was send to %s via XMPP" % player_name)
@@ -85,12 +93,17 @@ class AuthProvider:
                                 error("Cann't send xmpp message to %s: %s %s" % (player_name, exctype, value))
                         elif r[0] == "email":
                             try:
-                                server = smtplib.SMTP_SSL(self.mailconf.get('mail', 'server'), 465)
+                                server = smtplib.SMTP_SSL(self.mailconf.get("mail", "server"), 465)
                                 server.ehlo()
-                                server.login(self.mailconf.get('mail', 'login'), self.mailconf.get('mail', 'passwd'))
-                                server.sendmail(self.mailconf.get('mail', 'from'), r[1], """From:
+                                server.login(self.mailconf.get("mail", "login"), self.mailconf.get("mail", "passwd"))
+                                server.sendmail(
+                                    self.mailconf.get("mail", "from"),
+                                    r[1],
+                                    """From:
                                         %s\r\nTo: %s\r\nSubject: FreeOrion OTP\r\n\r\nPassword %s
-                                        for player %s""" % (self.mailconf.get('mail', 'from'), r[1], otp, player_name))
+                                        for player %s"""
+                                    % (self.mailconf.get("mail", "from"), r[1], otp, player_name),
+                                )
                                 server.close()
                                 info("OTP was send to %s via email" % player_name)
                             except Exception:
@@ -114,8 +127,7 @@ class AuthProvider:
         try:
             with self.conn:
                 with self.conn.cursor() as curs:
-                    curs.execute(""" SELECT * FROM auth.check_otp(%s, %s) """,
-                                 (player_name, auth))
+                    curs.execute(""" SELECT * FROM auth.check_otp(%s, %s) """, (player_name, auth))
                     for r in curs:
                         authenticated = not not r[0]
                         info("Player %s was accepted %r" % (player_name, authenticated))
@@ -131,7 +143,7 @@ class AuthProvider:
 
     def list_players(self):
         """Not supported for public server"""
-        raise NameError('Not supported')
+        raise NameError("Not supported")
 
     def get_player_delegation(self, player_name):
         """Returns list of players delegated by this player"""

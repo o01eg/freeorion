@@ -38,7 +38,7 @@ namespace {
         std::string graphic;
     };
 
-    void insert_special(std::map<std::string, std::unique_ptr<Special>>& specials,
+    void insert_special(std::map<std::string, std::unique_ptr<Special>, std::less<>>& specials,
                         const special_data& special_pod,
                         std::string& name, std::string& description,
                         boost::optional<parse::detail::value_ref_payload<double>>& stealth,
@@ -142,11 +142,10 @@ namespace {
 
 namespace parse {
     start_rule_payload specials(const boost::filesystem::path& path) {
-        const lexer lexer;
         start_rule_payload specials_;
 
         for (const auto& file : ListDir(path, IsFOCScript))
-            detail::parse_file<grammar, start_rule_payload>(lexer, file, specials_);
+            detail::parse_file<grammar, start_rule_payload>(lexer::tok, file, specials_);
 
         return specials_;
     }

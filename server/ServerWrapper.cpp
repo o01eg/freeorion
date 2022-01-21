@@ -123,7 +123,7 @@ namespace {
 
     void SpeciesAddHomeworld(const std::string& species_name, int homeworld_id)
     {
-        Species* species = GetSpeciesManager().GetSpecies(species_name);
+        auto species = GetSpeciesManager().GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesAddHomeworld: couldn't get species " << species_name;
             return;
@@ -133,7 +133,7 @@ namespace {
 
     void SpeciesRemoveHomeworld(const std::string& species_name, int homeworld_id)
     {
-        Species* species = GetSpeciesManager().GetSpecies(species_name);
+        auto species = GetSpeciesManager().GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesAddHomeworld: couldn't get species " << species_name;
             return;
@@ -143,7 +143,7 @@ namespace {
 
     auto SpeciesCanColonize(const std::string& species_name) -> bool
     {
-        Species* species = GetSpeciesManager().GetSpecies(species_name);
+        auto species = GetSpeciesManager().GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "SpeciesCanColonize: couldn't get species " << species_name;
             return false;
@@ -267,9 +267,8 @@ namespace {
     auto GetAllSpecials() -> py::list
     {
         py::list py_specials;
-        for (const auto& special_name : SpecialNames()) {
-            py_specials.append(py::object(special_name));
-        }
+        for (const auto& special_name : SpecialNames())
+            py_specials.append(py::object(std::string{special_name}));
         return py_specials;
     }
 
@@ -286,31 +285,36 @@ namespace {
 
     auto EmpireSetHomeworld(int empire_id, int planet_id, const std::string& species_name) -> bool
     {
-        Empire* empire = GetEmpire(empire_id);
+        ScriptingContext context;
+        auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EmpireSetHomeworld: couldn't get empire with ID " << empire_id;
             return false;
         }
-        return SetEmpireHomeworld(empire, planet_id, species_name);
+        return SetEmpireHomeworld(empire.get(), planet_id, species_name, context);
     }
 
     void EmpireUnlockItem(int empire_id, UnlockableItemType item_type,
                           const std::string& item_name)
     {
-        Empire* empire = GetEmpire(empire_id);
+        Universe& universe{GetUniverse()};
+        EmpireManager& empires{Empires()};
+        int current_turn{CurrentTurn()};
+
+        auto empire = empires.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EmpireUnlockItem: couldn't get empire with ID " << empire_id;
             return;
         }
-        UnlockableItem item = UnlockableItem(item_type, item_name);
-        empire->UnlockItem(item);
+        auto item = UnlockableItem{item_type, item_name};
+        empire->UnlockItem(item, universe, current_turn);
     }
 
-    void EmpireAddShipDesign(int empire_id, const std::string& design_name)
-    {
-        Universe& universe = GetUniverse();
+    void EmpireAddShipDesign(int empire_id, const std::string& design_name) {
+        Universe& universe{GetUniverse()};
+        EmpireManager& empires{Empires()};
 
-        Empire* empire = GetEmpire(empire_id);
+        auto empire = empires.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EmpireAddShipDesign: couldn't get empire with ID " << empire_id;
             return;
@@ -325,6 +329,23 @@ namespace {
 
         universe.SetEmpireKnowledgeOfShipDesign(ship_design->ID(), empire_id);
         empire->AddShipDesign(ship_design->ID(), universe);
+    }
+
+    void EmpireSetStockpile(int empire_id, ResourceType resource_type, double value) {
+        EmpireManager& empires{Empires()};
+
+        auto empire = empires.GetEmpire(empire_id);
+        if (!empire) {
+            ErrorLogger() << "EmpireSetStockpile: couldn't get empire with ID " << empire_id;
+            return;
+        }
+
+        try {
+            empire->SetResourceStockpile(resource_type, value);
+        } catch (...) {
+            ErrorLogger() << "EmpireSetStockpile: empire has no resource pool of type " << resource_type;
+            return;
+        }
     }
 
     // Wrapper for preunlocked items
@@ -774,7 +795,7 @@ namespace {
             fleet->Rename(UserString("OBJ_FLEET") + " " + std::to_string(fleet->ID()));
         }
 
-        fleet->SetAggression(aggressive ? FleetAggression::FLEET_AGGRESSIVE : FleetAggression::FLEET_DEFENSIVE);
+        fleet->SetAggression(aggressive ? FleetDefaults::FLEET_DEFAULT_ARMED : FleetDefaults::FLEET_DEFAULT_UNARMED);
 
         // return fleet ID
         return fleet->ID();
@@ -783,6 +804,7 @@ namespace {
     auto CreateShip(const std::string& name, const std::string& design_name, const std::string& species, int fleet_id) -> int
     {
         Universe& universe = GetUniverse();
+        ObjectMap& objects = universe.Objects();
 
         // check if we got a species name, if yes, check if species exists
         if (!species.empty() && !GetSpecies(species)) {
@@ -798,13 +820,13 @@ namespace {
         }
 
         // get fleet and check if it exists
-        auto fleet = Objects().get<Fleet>(fleet_id);
+        auto fleet = objects.get<Fleet>(fleet_id);
         if (!fleet) {
             ErrorLogger() << "CreateShip: couldn't get fleet with ID " << fleet_id;
             return INVALID_OBJECT_ID;
         }
 
-        auto system = Objects().get<System>(fleet->SystemID());
+        auto system = objects.get<System>(fleet->SystemID());
         if (!system) {
             ErrorLogger() << "CreateShip: couldn't get system for fleet";
             return INVALID_OBJECT_ID;
@@ -823,7 +845,7 @@ namespace {
         }
 
         // create new ship
-        auto ship = universe.InsertNew<Ship>(empire_id, ship_design->ID(), species, empire_id);
+        auto ship = universe.InsertNew<Ship>(empire_id, ship_design->ID(), species, universe, empire_id);
         if (!ship) {
             ErrorLogger() << "CreateShip: couldn't create new ship";
             return INVALID_OBJECT_ID;
@@ -1303,11 +1325,17 @@ namespace FreeOrionPython {
             .def("spawn_limit",                 &MonsterFleetPlanWrapper::SpawnLimit)
             .def("locations",                   &MonsterFleetPlanWrapper::Locations);
 
-        py::def("get_universe",                     GetUniverse,                    py::return_value_policy<py::reference_existing_object>());
-        py::def("get_all_empires",                  GetAllEmpires);
-        py::def("get_empire",                       GetEmpire,                      py::return_value_policy<py::reference_existing_object>());
+        py::def("get_universe",                 GetUniverse,                    py::return_value_policy<py::reference_existing_object>());
+        py::def("get_all_empires",              GetAllEmpires);
+        py::def("get_empire",                   GetEmpire,                      py::return_value_policy<py::reference_existing_object>());
 
-        py::def("user_string",                      make_function(&UserString,      py::return_value_policy<py::copy_const_reference>()));
+        py::def("userString",
+                +[](const std::string& key) -> const std::string& { return UserString(key); },
+                py::return_value_policy<py::copy_const_reference>());
+        py::def("userStringExists",
+                +[](const std::string& key) -> bool { return UserStringExists(key); });
+        //py::def("userStringList",               &GetUserStringList); // could be copied from AIWrapper
+
         py::def("roman_number",                     RomanNumber);
         py::def("get_resource_dir",                 +[]() -> py::object { return py::object(PathToString(GetResourceDir())); });
 
@@ -1320,7 +1348,7 @@ namespace FreeOrionPython {
         py::def("current_turn",                     CurrentTurn);
         py::def("generate_sitrep",                  GenerateSitRep);
         py::def("generate_sitrep",                  +[](int empire_id, const std::string& template_string, const std::string& icon) { GenerateSitRep(empire_id, template_string, py::dict(), icon); });
-        py::def("generate_starlanes",               GenerateStarlanes);
+        py::def("generate_starlanes",               +[](int max_jumps_between_systems, int max_starlane_length) { GenerateStarlanes(max_jumps_between_systems, max_starlane_length, GetUniverse()); });
 
         py::def("species_preferred_focus",          SpeciesDefaultFocus);
         py::def("species_get_planet_environment",   SpeciesGetPlanetEnvironment);
@@ -1341,6 +1369,7 @@ namespace FreeOrionPython {
         py::def("empire_set_homeworld",             EmpireSetHomeworld);
         py::def("empire_unlock_item",               EmpireUnlockItem);
         py::def("empire_add_ship_design",           EmpireAddShipDesign);
+        py::def("empire_set_stockpile",             EmpireSetStockpile);
 
         py::def("design_create",                    ShipDesignCreate);
         py::def("design_get_premade_list",          ShipDesignGetPremadeList);

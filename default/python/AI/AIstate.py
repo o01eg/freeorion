@@ -1,29 +1,30 @@
 import copy
-from collections import Counter, OrderedDict as odict
-from logging import error, info, warning, debug
+import freeOrionAIInterface as fo
+from collections import Counter
+from collections import OrderedDict as odict
+from logging import debug, error, info, warning
 from operator import itemgetter
-from time import time
 from typing import Dict, List, Optional, Tuple
-
-import freeOrionAIInterface as fo  # pylint: disable=import-error
-from CombatRatingsAI import ShipCombatStats
-from common.print_utils import Table, Text, Float
 
 import AIFleetMission
 import ColonisationAI
+import CombatRatingsAI
 import ExplorationAI
 import FleetUtilsAI
-from EnumsAI import MissionType, ShipRoleType
-import CombatRatingsAI
 import MilitaryAI
 import PlanetUtilsAI
-from freeorion_tools import combine_ratings, get_partial_visibility_turn
 from AIDependencies import INVALID_ID, TECH_NATIVE_SPECIALS
-from character.character_module import create_character, Aggression
+from character.character_module import Aggression, create_character
+from CombatRatingsAI import ShipCombatStats
+from common.print_utils import Number, Table, Text
+from EnumsAI import MissionType, ShipRoleType
+from freeorion_tools import combine_ratings, get_partial_visibility_turn
 
 # moving ALL or NEARLY ALL 'global' variables into AIState object rather than module
 # in general, leaving items as a module attribute if they are recalculated each turn without reference to prior values
 # global variables
+from universe.system_network import get_neighbors
+
 colonyTargetedSystemIDs = []
 outpostTargetedSystemIDs = []
 opponentPlanetIDs = []
@@ -67,20 +68,20 @@ def convert_to_version(state, version):
         raise ConversionError("The AI savegame version is no longer supported.")
 
     if version == 4:
-        del state['qualifyingOutpostBaseTargets']
-        del state['qualifyingColonyBaseTargets']
-        state['orbital_colonization_manager'] = ColonisationAI.OrbitalColonizationManager()
+        del state["qualifyingOutpostBaseTargets"]
+        del state["qualifyingColonyBaseTargets"]
+        state["orbital_colonization_manager"] = ColonisationAI.OrbitalColonizationManager()
 
     if version == 5:
-        state['last_turn_played'] = 0
+        state["last_turn_played"] = 0
 
     if version == 6:
         # Anti-fighter and anti-planet stats were added to CombatRatingAI
-        state['_AIstate__empire_standard_enemy'] = state['_AIstate__empire_standard_enemy'] + (0, False) + (0, False)
+        state["_AIstate__empire_standard_enemy"] = state["_AIstate__empire_standard_enemy"] + (0, False) + (0, False)
 
     if version == 7:
         # This attribute now contains ShipCombatStats object
-        standard_enemy = state['_AIstate__empire_standard_enemy']
+        standard_enemy = state["_AIstate__empire_standard_enemy"]
 
         # Changes were done without update so it is possible that users
         # have saved game with state 6 but with new object.
@@ -88,13 +89,19 @@ def convert_to_version(state, version):
         if not isinstance(standard_enemy, ShipCombatStats):
             # Old value was a tuple of arguments
             (
-                attacks, structure, shields,
-                fighter_capacity, fighter_launch_rate, fighter_damage,
-                flak_shots, has_interceptors,
-                damage_vs_planets, has_bomber
-            ) = state['_AIstate__empire_standard_enemy']
+                attacks,
+                structure,
+                shields,
+                fighter_capacity,
+                fighter_launch_rate,
+                fighter_damage,
+                flak_shots,
+                has_interceptors,
+                damage_vs_planets,
+                has_bomber,
+            ) = state["_AIstate__empire_standard_enemy"]
 
-            state['_AIstate__empire_standard_enemy'] = ShipCombatStats(
+            state["_AIstate__empire_standard_enemy"] = ShipCombatStats(
                 attacks=attacks,
                 structure=structure,
                 shields=shields,
@@ -103,7 +110,7 @@ def convert_to_version(state, version):
                 flak_shots=flak_shots,
                 has_interceptors=has_interceptors,
                 damage_vs_planets=damage_vs_planets,
-                has_bomber=has_bomber
+                has_bomber=has_bomber,
             )
 
     #   state["some_new_member"] = some_default_value
@@ -133,11 +140,12 @@ class AIstate:
     via boost. If desiring to store a reference to a UniverseObject store its
     object id instead; for enum values store their int conversion value.
     """
+
     version = 7
 
     def __init__(self, aggression):
         # Do not allow to create AIstate instances with an invalid version number.
-        if not hasattr(AIstate, 'version'):
+        if not hasattr(AIstate, "version"):
             raise ConversionError("AIstate must have an integer version attribute for savegame compatibility")
         if not isinstance(AIstate.version, int):
             raise ConversionError("Version attribute of AIstate must be an integer!")
@@ -147,12 +155,6 @@ class AIstate:
         # need to store the version explicitly as the class variable "version" is only stored in the
         # self.__class__.__dict__ while we only pickle the object (i.e. self.__dict__ )
         self.version = AIstate.version
-
-        # Debug info
-        # unique id for game
-        self.uid = self.generate_uid(first=True)
-        # unique ids for turns.  {turn: uid}
-        self.turn_uids = {}
 
         # see AIstate docstring re importance of int cast for aggression
         self._aggression = int(aggression)
@@ -204,13 +206,13 @@ class AIstate:
     def __setstate__(self, state):
         try:
             for v in range(state.get("version", -1), AIstate.version):
-                convert_to_version(state, v+1)
+                convert_to_version(state, v + 1)
         except ConversionError:
-            if '_aggression' in state:
-                aggression = state['_aggression']
+            if "_aggression" in state:
+                aggression = state["_aggression"]
             else:
                 try:
-                    aggression = state['character'].get_trait(Aggression).key
+                    aggression = state["character"].get_trait(Aggression).key
                 except Exception:
                     error("Could not find the aggression level of the AI, defaulting to typical.", exc_info=True)
                     aggression = fo.aggression.typical
@@ -220,48 +222,10 @@ class AIstate:
         # build the ordered dict with sorted entries from the (unsorted) dict
         # that is contained in the savegame state.
         for content in ("colonisablePlanetIDs", "colonisableOutpostIDs"):
-            sorted_planets = sorted(state[content].items(),
-                                    key=itemgetter(1), reverse=True)
+            sorted_planets = sorted(state[content].items(), key=itemgetter(1), reverse=True)
             state[content] = odict(sorted_planets)
 
         self.__dict__ = state
-
-    def generate_uid(self, first=False):
-        """
-        Generates unique identifier.
-        It is hexed number of milliseconds.
-        To set self.uid use flag first=True result will be
-        number of mils between current time and some recent date
-        For turn result is mils between uid and current time
-        """
-        time_delta = (time() - 1433809768) * 1000
-        if not first:
-            time_delta - int(self.uid, 16)
-        res = hex(int(time_delta))[2:].strip('L')
-        return res
-
-    def set_turn_uid(self):
-        """
-        Set turn uid. Should be called once per generateOrders.
-        When game loaded same turn can be evaluated once again. We force change id for it.
-        """
-        uid = self.generate_uid()
-        self.turn_uids[fo.currentTurn()] = uid
-        return uid
-
-    def get_current_turn_uid(self):
-        """
-        Return uid of current turn.
-        """
-        return self.turn_uids.setdefault(fo.currentTurn(), self.generate_uid())
-
-    def get_prev_turn_uid(self):
-        """
-        Return uid of previous turn.
-        If called during the first turn after loading a saved game that had an AI version not yet using uids
-        will return default value.
-        """
-        return self.turn_uids.get(fo.currentTurn() - 1, '0')
 
     def __refresh(self):
         """Turn start AIstate cleanup/refresh."""
@@ -305,7 +269,7 @@ class AIstate:
         if fleet_id in self.__fleetRoleByID:
             del self.__fleetRoleByID[fleet_id]
         for sys_status in self.systemStatus.values():
-            for fleet_list in [sys_status.get('myfleets', []), sys_status.get('myFleetsAccessible', [])]:
+            for fleet_list in [sys_status.get("myfleets", []), sys_status.get("myFleetsAccessible", [])]:
                 if fleet_id in fleet_list:
                     fleet_list.remove(fleet_id)
 
@@ -314,52 +278,64 @@ class AIstate:
         current_turn = fo.currentTurn()
         if current_turn >= 100:
             return
-        threat_table = Table([
-            Text('System'), Text('Vis.'), Float('Total'), Float('by Monsters'), Float('by Fleets'),
-            Float('by Planets'), Float('1 jump away'), Float('2 jumps'), Float('3 jumps')],
-            table_name="System Threat Turn %d" % current_turn
+        threat_table = Table(
+            Text("System"),
+            Text("Vis."),
+            Number("Total"),
+            Number("by Monsters"),
+            Number("by Fleets"),
+            Number("by Planets"),
+            Number("1 jump away"),
+            Number("2 jumps"),
+            Number("3 jumps"),
+            table_name="System Threat Turn %d" % current_turn,
         )
         universe = fo.getUniverse()
         for sys_id in universe.systemIDs:
             sys_status = self.systemStatus.get(sys_id, {})
             system = universe.getSystem(sys_id)
-            threat_table.add_row([
+            threat_table.add_row(
                 system,
-                "Yes" if sys_status.get('currently_visible', False) else "No",
-                sys_status.get('totalThreat', 0),
-                sys_status.get('monsterThreat', 0),
-                sys_status.get('fleetThreat', 0),
-                sys_status.get('planetThreat', 0),
-                sys_status.get('neighborThreat', 0.0),
-                sys_status.get('jump2_threat', 0.0),
-                sys_status.get('jump3_threat', 0.0),
-            ])
-        info(threat_table)
+                "Yes" if sys_status.get("currently_visible", False) else "No",
+                sys_status.get("totalThreat", 0),
+                sys_status.get("monsterThreat", 0),
+                sys_status.get("fleetThreat", 0),
+                sys_status.get("planetThreat", 0),
+                sys_status.get("neighborThreat", 0.0),
+                sys_status.get("jump2_threat", 0.0),
+                sys_status.get("jump3_threat", 0.0),
+            )
+        threat_table.print_table(info)
 
     def __report_system_defenses(self):
         """Print a table with system defenses to the logfile."""
         current_turn = fo.currentTurn()
         if current_turn >= 100:
             return
-        defense_table = Table([
-            Text('System Defenses'), Float('Total'), Float('by Planets'), Float('by Fleets'),
-            Float('Fleets 1 jump away'), Float('2 jumps'), Float('3 jumps')],
-                table_name="System Defenses Turn %d" % current_turn
+        defense_table = Table(
+            Text("System Defenses"),
+            Number("Total"),
+            Number("by Planets"),
+            Number("by Fleets"),
+            Number("Fleets 1 jump away"),
+            Number("2 jumps"),
+            Number("3 jumps"),
+            table_name="System Defenses Turn %d" % current_turn,
         )
         universe = fo.getUniverse()
         for sys_id in universe.systemIDs:
             sys_status = self.systemStatus.get(sys_id, {})
             system = universe.getSystem(sys_id)
-            defense_table.add_row([
+            defense_table.add_row(
                 system,
-                sys_status.get('all_local_defenses', 0.0),
-                sys_status.get('mydefenses', {}).get('overall', 0.0),
-                sys_status.get('myFleetRating', 0.0),
-                sys_status.get('my_neighbor_rating', 0.0),
-                sys_status.get('my_jump2_rating', 0.0),
-                sys_status.get('my_jump3_rating', 0.0),
-            ])
-        info(defense_table)
+                sys_status.get("all_local_defenses", 0.0),
+                sys_status.get("mydefenses", {}).get("overall", 0.0),
+                sys_status.get("myFleetRating", 0.0),
+                sys_status.get("my_neighbor_rating", 0.0),
+                sys_status.get("my_jump2_rating", 0.0),
+                sys_status.get("my_jump3_rating", 0.0),
+            )
+        defense_table.print_table(info)
 
     def assess_planet_threat(self, pid, sighting_age=0):
         if sighting_age > 5:
@@ -367,7 +343,7 @@ class AIstate:
         universe = fo.getUniverse()
         planet = universe.getPlanet(pid)
         if not planet:
-            return {'overall': 0, 'attack': 0, 'health': 0}
+            return {"overall": 0, "attack": 0, "health": 0}
         init_shields = planet.initialMeterValue(fo.meterType.shield)
         next_shields = planet.currentMeterValue(fo.meterType.shield)  # always assumes regen will occur
         max_shields = planet.currentMeterValue(fo.meterType.maxShield)
@@ -376,8 +352,8 @@ class AIstate:
         max_defense = planet.currentMeterValue(fo.meterType.maxDefense)
         for special, bonuses in TECH_NATIVE_SPECIALS.items():
             if special in planet.specials and sighting_age > 0:
-                shield_bonus = bonuses.get('shields', 0)
-                defense_bonus = bonuses.get('defense', 0)
+                shield_bonus = bonuses.get("shields", 0)
+                defense_bonus = bonuses.get("defense", 0)
                 max_shields = max(max_shields, shield_bonus)
                 max_defense = max(max_defense, defense_bonus)
                 next_shields, init_shields = max(next_shields, shield_bonus), max(init_shields, shield_bonus)
@@ -389,9 +365,9 @@ class AIstate:
         defense_regen = max(1, next_defense - init_defense)
         shields = min(max_shields, init_shields + sighting_age * shield_regen)
         defense = min(max_defense, init_defense + sighting_age * defense_regen)
-        return {'overall': defense * (defense + shields), 'attack': defense, 'health': (defense + shields)}
+        return {"overall": defense * (defense + shields), "attack": defense, "health": (defense + shields)}
 
-    def assess_enemy_supply(self) -> Tuple[Dict[int, List[int]], Dict[int,  List[int]]]:
+    def assess_enemy_supply(self) -> Tuple[Dict[int, List[int]], Dict[int, List[int]]]:
         """
         Assesses where enemy empires have Supply
         :return: a tuple of 2 dicts, each of which is keyed by system id, and each of which is a list of empire ids
@@ -429,8 +405,13 @@ class AIstate:
 
         for fleet_id in universe.fleetIDs:
             fleet = universe.getFleet(fleet_id)
-            if (not fleet or fleet.empty or fleet.ownedBy(empire_id) or fleet.unowned or
-                    not (fleet.hasArmedShips or fleet.hasFighterShips)):
+            if (
+                not fleet
+                or fleet.empty
+                or fleet.ownedBy(empire_id)
+                or fleet.unowned
+                or not (fleet.hasArmedShips or fleet.hasFighterShips)
+            ):
                 continue
 
             # track old/dead enemy fighters for rating assessments in case not enough current info
@@ -447,7 +428,7 @@ class AIstate:
         self.empire_standard_enemy_rating = self.get_standard_enemy().get_rating()
 
     def __update_system_status(self):
-        debug('{0} Updating System Threats {0}'.format(10 * "="))
+        debug("=== Updating System Threats ===")
         universe = fo.getUniverse()
         empire = fo.getEmpire()
         empire_id = fo.empireID()
@@ -460,9 +441,9 @@ class AIstate:
         # TODO: Variables that are recalculated each turn from scratch should not be stored in AIstate
         # clear previous game state
         for sys_id in self.systemStatus:
-            self.systemStatus[sys_id]['enemy_ship_count'] = 0
-            self.systemStatus[sys_id]['myFleetRating'] = 0
-            self.systemStatus[sys_id]['myFleetRatingVsPlanets'] = 0
+            self.systemStatus[sys_id]["enemy_ship_count"] = 0
+            self.systemStatus[sys_id]["myFleetRating"] = 0
+            self.systemStatus[sys_id]["myFleetRatingVsPlanets"] = 0
 
         # for use in debugging
         verbose = False
@@ -500,11 +481,11 @@ class AIstate:
                 continue
 
             sys_status = self.systemStatus.setdefault(this_system_id, {})
-            sys_status['enemy_ship_count'] = sys_status.get('enemy_ship_count', 0) + len(fleet.shipIDs)
+            sys_status["enemy_ship_count"] = sys_status.get("enemy_ship_count", 0) + len(fleet.shipIDs)
             enemies_by_system.setdefault(this_system_id, []).append(fleet_id)
 
             if not fleet.unowned:
-                self.misc.setdefault('enemies_sighted', {}).setdefault(current_turn, []).append(fleet_id)
+                self.misc.setdefault("enemies_sighted", {}).setdefault(current_turn, []).append(fleet_id)
                 observed_empires.add(fleet.owner)
 
         # assess fleet and planet threats & my local fleets
@@ -514,19 +495,18 @@ class AIstate:
             if verbose:
                 debug("AIState threat evaluation for %s" % system)
             # update fleets
-            sys_status['myfleets'] = my_fleets_by_system.get(sys_id, [])
-            sys_status['myFleetsAccessible'] = fleet_spot_position.get(sys_id, [])
+            sys_status["myfleets"] = my_fleets_by_system.get(sys_id, [])
+            sys_status["myFleetsAccessible"] = fleet_spot_position.get(sys_id, [])
             local_enemy_fleet_ids = enemies_by_system.get(sys_id, [])
-            sys_status['localEnemyFleetIDs'] = local_enemy_fleet_ids
+            sys_status["localEnemyFleetIDs"] = local_enemy_fleet_ids
             if system:
-                sys_status['name'] = system.name
+                sys_status["name"] = system.name
 
             # update my fleet rating versus planets so that planet ratings can be more accurate
             my_ratings_against_planets_list = []
-            for fid in sys_status['myfleets']:
+            for fid in sys_status["myfleets"]:
                 my_ratings_against_planets_list.append(self.get_rating(fid, against_planets=True))
-                sys_status['myFleetRatingVsPlanets'] = combine_ratings(
-                    my_ratings_against_planets_list)
+                sys_status["myFleetRatingVsPlanets"] = combine_ratings(my_ratings_against_planets_list)
 
             # update threats
             monster_ratings = []  # immobile
@@ -536,7 +516,8 @@ class AIstate:
             for fid in local_enemy_fleet_ids:
                 fleet = universe.getFleet(fid)  # ensured to exist
                 fleet_rating = CombatRatingsAI.get_fleet_rating(
-                    fid, enemy_stats=CombatRatingsAI.get_empire_standard_military_ship_stats())
+                    fid, enemy_stats=CombatRatingsAI.get_empire_standard_military_ship_stats()
+                )
                 if fleet.speed == 0:
                     monster_ratings.append(fleet_rating)
                     if verbose:
@@ -565,23 +546,26 @@ class AIstate:
             if not system or partial_vis_turn < 0:
                 if verbose:
                     debug("Never had partial vis for %s - basing threat assessment on old info and lost ships" % system)
-                sys_status.setdefault('local_fleet_threats', set())
-                sys_status['planetThreat'] = 0
-                sys_status['fleetThreat'] = max(
+                sys_status.setdefault("local_fleet_threats", set())
+                sys_status["planetThreat"] = 0
+                sys_status["fleetThreat"] = max(
                     combine_ratings(enemy_rating, mob_rating),
-                    0.98 * sys_status.get('fleetThreat', 0),
-                    1.1*lost_fleet_rating - monster_rating)
-                sys_status['monsterThreat'] = max(
+                    0.98 * sys_status.get("fleetThreat", 0),
+                    1.1 * lost_fleet_rating - monster_rating,
+                )
+                sys_status["monsterThreat"] = max(
                     monster_rating,
-                    0.98 * sys_status.get('monsterThreat', 0),
-                    1.1*lost_fleet_rating - enemy_rating - mob_rating)
-                sys_status['enemy_threat'] = max(
+                    0.98 * sys_status.get("monsterThreat", 0),
+                    1.1 * lost_fleet_rating - enemy_rating - mob_rating,
+                )
+                sys_status["enemy_threat"] = max(
                     enemy_rating,
-                    0.98 * sys_status.get('enemy_threat', 0),
-                    1.1*lost_fleet_rating - monster_rating - mob_rating)
-                sys_status['mydefenses'] = {'overall': 0, 'attack': 0, 'health': 0}
-                sys_status['totalThreat'] = sys_status['fleetThreat']
-                sys_status['regional_fleet_threats'] = sys_status['local_fleet_threats'].copy()
+                    0.98 * sys_status.get("enemy_threat", 0),
+                    1.1 * lost_fleet_rating - monster_rating - mob_rating,
+                )
+                sys_status["mydefenses"] = {"overall": 0, "attack": 0, "health": 0}
+                sys_status["totalThreat"] = sys_status["fleetThreat"]
+                sys_status["regional_fleet_threats"] = sys_status["local_fleet_threats"].copy()
                 continue
 
             # have either stale or current info
@@ -594,19 +578,18 @@ class AIstate:
                 sighting_age = current_turn - get_partial_visibility_turn(pid)
                 prating = self.assess_planet_threat(pid, sighting_age)
                 if planet.ownedBy(empire_id):  # TODO: check for diplomatic status
-                    mypattack += prating['attack']
-                    myphealth += prating['health']
+                    mypattack += prating["attack"]
+                    myphealth += prating["health"]
                 else:
-                    pattack += prating['attack']
-                    phealth += prating['health']
+                    pattack += prating["attack"]
+                    phealth += prating["health"]
                     if any("_NEST_" in special for special in planet.specials):
-                        sys_status['nest_threat'] = 100
-            sys_status['planetThreat'] = pattack * phealth
-            sys_status['mydefenses'] = {'overall': mypattack * myphealth, 'attack': mypattack, 'health': myphealth}
+                        sys_status["nest_threat"] = 100
+            sys_status["planetThreat"] = pattack * phealth
+            sys_status["mydefenses"] = {"overall": mypattack * myphealth, "attack": mypattack, "health": myphealth}
 
             # previous threat assessment could account for losses, ignore the losses now
-            if (lost_fleet_rating and
-                    lost_fleet_rating < max(sys_status.get('totalThreat', 0), pattack * phealth)):
+            if lost_fleet_rating and lost_fleet_rating < max(sys_status.get("totalThreat", 0), pattack * phealth):
                 debug("In system %s: Ignoring lost fleets since known threats could cause it.", system)
                 lost_fleet_rating = 0
 
@@ -617,113 +600,121 @@ class AIstate:
 
             # Estimating stealthed enemies by fleets lost to them
             if not partial_vis_turn == current_turn:
-                sys_status.setdefault('local_fleet_threats', set())
-                sys_status['currently_visible'] = False
+                sys_status.setdefault("local_fleet_threats", set())
+                sys_status["currently_visible"] = False
                 # print ("Stale visibility for system %d ( %s ) -- last seen %d, "
                 #        "current Turn %d -- basing threat assessment on old info and lost ships") % (
                 #     sys_id, sys_status.get('name', "name unknown"), partial_vis_turn, currentTurn)
-                sys_status['fleetThreat'] = max(
+                sys_status["fleetThreat"] = max(
                     combine_ratings(enemy_rating, mob_rating),
-                    0.98 * sys_status.get('fleetThreat', 0),
-                    2.0 * lost_fleet_rating - max(sys_status.get('monsterThreat', 0), monster_rating))
-                sys_status['enemy_threat'] = max(
+                    0.98 * sys_status.get("fleetThreat", 0),
+                    2.0 * lost_fleet_rating - max(sys_status.get("monsterThreat", 0), monster_rating),
+                )
+                sys_status["enemy_threat"] = max(
                     enemy_rating,
-                    0.98 * sys_status.get('enemy_threat', 0),
-                    1.1*lost_fleet_rating - max(sys_status.get('monsterThreat', 0), monster_rating))
-                sys_status['monsterThreat'] = max(monster_rating, 0.98 * sys_status.get('monsterThreat', 0))
+                    0.98 * sys_status.get("enemy_threat", 0),
+                    1.1 * lost_fleet_rating - max(sys_status.get("monsterThreat", 0), monster_rating),
+                )
+                sys_status["monsterThreat"] = max(monster_rating, 0.98 * sys_status.get("monsterThreat", 0))
                 # sys_status['totalThreat'] = ((pattack + enemy_attack + monster_attack) ** 0.8)\
                 #                             * ((phealth + enemy_health + monster_health)** 0.6)  # reevaluate this
-                sys_status['totalThreat'] = max(
+                sys_status["totalThreat"] = max(
                     combine_ratings(enemy_rating, mob_rating, monster_rating, pattack * phealth),
                     2 * lost_fleet_rating,
-                    0.98 * sys_status.get('totalThreat', 0))
+                    0.98 * sys_status.get("totalThreat", 0),
+                )
             else:  # system considered visible
-                sys_status['currently_visible'] = True
-                sys_status['local_fleet_threats'] = set(mobile_fleets)
+                sys_status["currently_visible"] = True
+                sys_status["local_fleet_threats"] = set(mobile_fleets)
                 # includes mobile monsters
-                sys_status['fleetThreat'] = max(
-                    combine_ratings(enemy_rating, mob_rating), 2 * lost_fleet_rating - monster_rating)
+                sys_status["fleetThreat"] = max(
+                    combine_ratings(enemy_rating, mob_rating), 2 * lost_fleet_rating - monster_rating
+                )
                 if verbose:
-                    debug("enemy threat calc parts: enemy rating %.1f, lost fleet rating %.1f, monster_rating %.1f" % (
-                        enemy_rating, lost_fleet_rating, monster_rating))
+                    debug(
+                        "enemy threat calc parts: enemy rating %.1f, lost fleet rating %.1f, monster_rating %.1f"
+                        % (enemy_rating, lost_fleet_rating, monster_rating)
+                    )
                 # does NOT include mobile monsters
-                sys_status['enemy_threat'] = max(enemy_rating, 2*lost_fleet_rating - monster_rating)
-                sys_status['monsterThreat'] = monster_rating
-                sys_status['totalThreat'] = combine_ratings(
-                    sys_status['fleetThreat'],
-                    sys_status['monsterThreat'],
+                sys_status["enemy_threat"] = max(enemy_rating, 2 * lost_fleet_rating - monster_rating)
+                sys_status["monsterThreat"] = monster_rating
+                sys_status["totalThreat"] = combine_ratings(
+                    sys_status["fleetThreat"],
+                    sys_status["monsterThreat"],
                     pattack * phealth,
                 )
-            sys_status['regional_fleet_threats'] = sys_status['local_fleet_threats'].copy()
-            sys_status['fleetThreat'] = max(sys_status['fleetThreat'], sys_status.get('nest_threat', 0))
-            sys_status['totalThreat'] = max(sys_status['totalThreat'], sys_status.get('nest_threat', 0))
+            sys_status["regional_fleet_threats"] = sys_status["local_fleet_threats"].copy()
+            sys_status["fleetThreat"] = max(sys_status["fleetThreat"], sys_status.get("nest_threat", 0))
+            sys_status["totalThreat"] = max(sys_status["totalThreat"], sys_status.get("nest_threat", 0))
 
             # has been seen with Partial Vis, but is currently supply-blocked
             if partial_vis_turn > 0 and sys_id not in supply_unobstructed_systems:
-                sys_status['fleetThreat'] = max(sys_status['fleetThreat'], min_hidden_attack * min_hidden_health)
-                sys_status['totalThreat'] = max(sys_status['totalThreat'],
-                                                combine_ratings(sys_status.get('planetThreat', 0),
-                                                                (min_hidden_attack * min_hidden_health)))
-            if verbose and sys_status['fleetThreat'] > 0:
+                sys_status["fleetThreat"] = max(sys_status["fleetThreat"], min_hidden_attack * min_hidden_health)
+                sys_status["totalThreat"] = max(
+                    sys_status["totalThreat"],
+                    combine_ratings(sys_status.get("planetThreat", 0), (min_hidden_attack * min_hidden_health)),
+                )
+            if verbose and sys_status["fleetThreat"] > 0:
                 debug("%s intermediate status: %s" % (system, sys_status))
 
         enemy_supply, enemy_near_supply = self.assess_enemy_supply()  # TODO: assess change in enemy supply over time
         # assess secondary threats (threats of surrounding systems) and update my fleet rating
         for sys_id in universe.systemIDs:
             sys_status = self.systemStatus[sys_id]
-            sys_status['enemies_supplied'] = enemy_supply.get(sys_id, [])
+            sys_status["enemies_supplied"] = enemy_supply.get(sys_id, [])
             observed_empires.update(enemy_supply.get(sys_id, []))
-            sys_status['enemies_nearly_supplied'] = enemy_near_supply.get(sys_id, [])
+            sys_status["enemies_nearly_supplied"] = enemy_near_supply.get(sys_id, [])
             my_ratings_list = []
             my_ratings_against_planets_list = []
-            for fid in sys_status['myfleets']:
+            for fid in sys_status["myfleets"]:
                 this_rating = self.get_rating(fid, True, self.get_standard_enemy())
                 my_ratings_list.append(this_rating)
                 my_ratings_against_planets_list.append(self.get_rating(fid, against_planets=True))
             if sys_id != INVALID_ID:
-                sys_status['myFleetRating'] = combine_ratings(my_ratings_list)
-                sys_status['myFleetRatingVsPlanets'] = combine_ratings(
-                    my_ratings_against_planets_list)
-                sys_status['all_local_defenses'] = combine_ratings(
-                    sys_status['myFleetRating'], sys_status['mydefenses']['overall'])
-            sys_status['neighbors'] = set(universe.getImmediateNeighbors(sys_id, self.empireID))
+                sys_status["myFleetRating"] = combine_ratings(my_ratings_list)
+                sys_status["myFleetRatingVsPlanets"] = combine_ratings(my_ratings_against_planets_list)
+                sys_status["all_local_defenses"] = combine_ratings(
+                    sys_status["myFleetRating"], sys_status["mydefenses"]["overall"]
+                )
+            sys_status["neighbors"] = get_neighbors(sys_id)
 
         for sys_id in universe.systemIDs:
             sys_status = self.systemStatus[sys_id]
-            neighbors = sys_status.get('neighbors', set())
+            neighbors = sys_status.get("neighbors", set())
             this_system = universe.getSystem(sys_id)
             if verbose:
-                debug("Regional Assessment for %s with local fleet threat %.1f" % (
-                    this_system, sys_status.get('fleetThreat', 0)))
+                debug(
+                    "Regional Assessment for %s with local fleet threat %.1f"
+                    % (this_system, sys_status.get("fleetThreat", 0))
+                )
             jumps2 = set()
             jumps3 = set()
             jumps4 = set()
             for seta, setb in [(neighbors, jumps2), (jumps2, jumps3), (jumps3, jumps4)]:
                 for sys2id in seta:
-                    setb.update(self.systemStatus.get(sys2id, {}).get('neighbors', set()))
+                    setb.update(self.systemStatus.get(sys2id, {}).get("neighbors", set()))
             jump2ring = jumps2 - neighbors - {sys_id}
             jump3ring = jumps3 - jumps2 - neighbors - {sys_id}
             jump4ring = jumps4 - jumps3 - jumps2 - neighbors - {sys_id}
-            sys_status['2jump_ring'] = jump2ring
-            sys_status['3jump_ring'] = jump3ring
-            sys_status['4jump_ring'] = jump4ring
+            sys_status["2jump_ring"] = jump2ring
+            sys_status["3jump_ring"] = jump3ring
+            sys_status["4jump_ring"] = jump4ring
             threat, max_threat, myrating, j1_threats = self.area_ratings(neighbors)
-            sys_status['neighborThreat'] = threat
-            sys_status['max_neighbor_threat'] = max_threat
-            sys_status['my_neighbor_rating'] = myrating
+            sys_status["neighborThreat"] = threat
+            sys_status["max_neighbor_threat"] = max_threat
+            sys_status["my_neighbor_rating"] = myrating
             threat, max_threat, myrating, j2_threats = self.area_ratings(jump2ring)
-            sys_status['jump2_threat'] = threat
-            sys_status['my_jump2_rating'] = myrating
+            sys_status["jump2_threat"] = threat
+            sys_status["my_jump2_rating"] = myrating
             threat, max_threat, myrating, j3_threats = self.area_ratings(jump3ring)
-            sys_status['jump3_threat'] = threat
-            sys_status['my_jump3_rating'] = myrating
+            sys_status["jump3_threat"] = threat
+            sys_status["my_jump3_rating"] = myrating
             # for local system includes both enemies and mobs
-            threat_keys = ['fleetThreat', 'neighborThreat', 'jump2_threat']
-            sys_status['regional_threat'] = combine_ratings(
-                sys_status.get(x, 0) for x in threat_keys)
+            threat_keys = ["fleetThreat", "neighborThreat", "jump2_threat"]
+            sys_status["regional_threat"] = combine_ratings(sys_status.get(x, 0) for x in threat_keys)
             # TODO: investigate cases where regional_threat has been nonzero but no regional_threat_fleets
             # (probably due to attenuating history of past threats)
-            sys_status.setdefault('regional_fleet_threats', set()).update(j1_threats, j2_threats)
+            sys_status.setdefault("regional_fleet_threats", set()).update(j1_threats, j2_threats)
 
     def area_ratings(self, system_ids):
         """Returns (fleet_threat, max_threat, myFleetRating, threat_fleets) compiled over a group of systems."""
@@ -732,12 +723,12 @@ class AIstate:
         for sys_id in system_ids:
             sys_status = self.systemStatus.get(sys_id, {})
             # TODO: have distinct treatment for both enemy_threat and fleetThreat, respectively
-            fthreat = sys_status.get('enemy_threat', 0)
+            fthreat = sys_status.get("enemy_threat", 0)
             max_threat = max(max_threat, fthreat)
             threat = combine_ratings(threat, fthreat)
-            myrating = combine_ratings(myrating, sys_status.get('myFleetRating', 0))
+            myrating = combine_ratings(myrating, sys_status.get("myFleetRating", 0))
             # myrating = FleetUtilsAI.combine_ratings(myrating, sys_status.get('all_local_defenses', 0))
-            threat_fleets.update(sys_status.get('local_fleet_threats', []))
+            threat_fleets.update(sys_status.get("local_fleet_threats", []))
         return threat, max_threat, myrating, threat_fleets
 
     def get_fleet_mission(self, fleet_id: int) -> Optional[AIFleetMission.AIFleetMission]:
@@ -812,16 +803,19 @@ class AIstate:
     def get_rating(self, fleet_id, force_new=False, enemy_stats=None, against_planets=False):
         """Returns a dict with various rating info."""
         if fleet_id in self.fleetStatus and not force_new and enemy_stats is None:
-            return self.fleetStatus[fleet_id].get('rating', 0)
+            return self.fleetStatus[fleet_id].get("rating", 0)
         else:
             fleet = fo.getUniverse().getFleet(fleet_id)
             if not fleet:
                 return {}  # TODO: also ensure any info for that fleet is deleted
-            status = {'rating': CombatRatingsAI.get_fleet_rating(fleet_id, enemy_stats),
-                      'ratingVsPlanets': CombatRatingsAI.get_fleet_rating_against_planets(fleet_id),
-                      'sysID': fleet.systemID, 'nships': len(fleet.shipIDs)}
+            status = {
+                "rating": CombatRatingsAI.get_fleet_rating(fleet_id, enemy_stats),
+                "ratingVsPlanets": CombatRatingsAI.get_fleet_rating_against_planets(fleet_id),
+                "sysID": fleet.systemID,
+                "nships": len(fleet.shipIDs),
+            }
             self.fleetStatus[fleet_id] = status
-            return status['rating'] if not against_planets else status['ratingVsPlanets']
+            return status["rating"] if not against_planets else status["ratingVsPlanets"]
 
     def update_fleet_rating(self, fleet_id):
         self.get_rating(fleet_id, force_new=True)
@@ -830,8 +824,10 @@ class AIstate:
         """Returns ship role for given designID, assesses and adds as needed."""
 
         # if thought was invalid, recheck to be sure
-        if (ship_design_id in self.__shipRoleByDesignID and
-                self.__shipRoleByDesignID[ship_design_id] != ShipRoleType.INVALID):
+        if (
+            ship_design_id in self.__shipRoleByDesignID
+            and self.__shipRoleByDesignID[ship_design_id] != ShipRoleType.INVALID
+        ):
             return self.__shipRoleByDesignID[ship_design_id]
         else:
             role = FleetUtilsAI.assess_ship_design_role(fo.getShipDesign(ship_design_id))
@@ -850,17 +846,16 @@ class AIstate:
             role = FleetUtilsAI.assess_fleet_role(fleet_id)
             self.__fleetRoleByID[fleet_id] = role
             make_aggressive = False
-            if role in [MissionType.COLONISATION,
-                        MissionType.OUTPOST,
-                        MissionType.ORBITAL_INVASION,
-                        MissionType.ORBITAL_OUTPOST
-                        ]:
+            if role in [
+                MissionType.COLONISATION,
+                MissionType.OUTPOST,
+                MissionType.ORBITAL_INVASION,
+                MissionType.ORBITAL_OUTPOST,
+            ]:
                 pass
-            elif role in [MissionType.EXPLORATION,
-                          MissionType.INVASION
-                          ]:
+            elif role in [MissionType.EXPLORATION, MissionType.INVASION]:
                 this_rating = self.get_rating(fleet_id)  # Done!
-                n_ships = self.fleetStatus.get(fleet_id, {}).get('nships', 1)  # entry sould exist due to above line
+                n_ships = self.fleetStatus.get(fleet_id, {}).get("nships", 1)  # entry sould exist due to above line
                 if float(this_rating) / n_ships >= 0.5 * MilitaryAI.cur_best_mil_ship_rating():
                     make_aggressive = True
             else:
@@ -885,23 +880,26 @@ class AIstate:
         current_empire_fleets = FleetUtilsAI.get_empire_fleet_ids()
         self.shipCount = 0
 
-        fleet_table = Table([
-            Text('Fleet'), Float('Rating'), Float('Troops'),
-            Text('Location'), Text('Destination')],
-            table_name="Fleet Summary Turn %d" % fo.currentTurn()
+        fleet_table = Table(
+            Text("Fleet"),
+            Number("Rating"),
+            Number("Troops"),
+            Text("Location"),
+            Text("Destination"),
+            table_name="Fleet Summary Turn %d" % fo.currentTurn(),
         )
         # need to loop over a copy as entries are deleted in loop
         for fleet_id in list(self.__fleetRoleByID):
             fleet_status = self.fleetStatus.setdefault(fleet_id, {})
             rating = CombatRatingsAI.get_fleet_rating(fleet_id)
-            old_sys_id = fleet_status.get('sysID', -2)  # TODO: Introduce helper function instead
+            old_sys_id = fleet_status.get("sysID", -2)  # TODO: Introduce helper function instead
             fleet = universe.getFleet(fleet_id)
             if fleet:
                 sys_id = fleet.systemID
                 if old_sys_id in [-2, -1]:
                     old_sys_id = sys_id
-                fleet_status['nships'] = len(fleet.shipIDs)  # TODO: Introduce helper function instead
-                self.shipCount += fleet_status['nships']
+                fleet_status["nships"] = len(fleet.shipIDs)  # TODO: Introduce helper function instead
+                self.shipCount += fleet_status["nships"]
             else:
                 # can still retrieve a fleet object even if fleet was just destroyed, so shouldn't get here
                 # however,this has been observed happening, and is the reason a fleet check was added a few lines below.
@@ -913,7 +911,8 @@ class AIstate:
                 debug("Just lost %s", fleet)
                 if not just_resumed:
                     fleetsLostBySystem.setdefault(old_sys_id, []).append(
-                        max(rating, fleet_status.get('rating', 0.), MilitaryAI.MinThreat))
+                        max(rating, fleet_status.get("rating", 0.0), MilitaryAI.MinThreat)
+                    )
 
                 self.delete_fleet_info(fleet_id)
                 continue
@@ -922,22 +921,22 @@ class AIstate:
             this_sys = universe.getSystem(sys_id)
             next_sys = universe.getSystem(fleet.nextSystemID)
 
-            fleet_table.add_row([
-                    fleet,
-                    rating,
-                    FleetUtilsAI.count_troops_in_fleet(fleet_id),
-                    this_sys or 'starlane',
-                    next_sys or '-',
-                ])
+            fleet_table.add_row(
+                fleet,
+                rating,
+                FleetUtilsAI.count_troops_in_fleet(fleet_id),
+                this_sys or "starlane",
+                next_sys or "-",
+            )
 
-            fleet_status['rating'] = rating
+            fleet_status["rating"] = rating
             if next_sys:
-                fleet_status['sysID'] = next_sys.id
+                fleet_status["sysID"] = next_sys.id
             elif this_sys:
-                fleet_status['sysID'] = this_sys.id
+                fleet_status["sysID"] = this_sys.id
             else:
                 error("Fleet %s has no valid system." % fleet)
-        info(fleet_table)
+        fleet_table.print_table(info)
         # Next string used in charts. Don't modify it!
         debug("Empire Ship Count: %s" % self.shipCount)
         debug("Empire standard fighter summary: %s", CombatRatingsAI.get_empire_standard_military_ship_stats())
@@ -964,24 +963,30 @@ class AIstate:
         """Print a table reviewing last turn fleet missions to the log file."""
         universe = fo.getUniverse()
         mission_table = Table(
-                [Text('Fleet'), Text('Mission'), Text('Ships'), Float('Rating'), Float('Troops'), Text('Target')],
-                table_name="Turn %d: Fleet Mission Review from Last Turn" % fo.currentTurn())
+            Text("Fleet"),
+            Text("Mission"),
+            Text("Ships"),
+            Number("Rating"),
+            Number("Troops"),
+            Text("Target"),
+            table_name="Turn %d: Fleet Mission Review from Last Turn" % fo.currentTurn(),
+        )
         for fleet_id, mission in self.get_fleet_missions_map().items():
             fleet = universe.getFleet(fleet_id)
             if not fleet:
                 continue
             if not mission:
-                mission_table.add_row([fleet])
+                mission_table.add_row(fleet)
             else:
-                mission_table.add_row([
+                mission_table.add_row(
                     fleet,
                     mission.type or "None",
                     len(fleet.shipIDs),
                     CombatRatingsAI.get_fleet_rating(fleet_id),
                     FleetUtilsAI.count_troops_in_fleet(fleet_id),
-                    mission.target or "-"
-                ])
-        info(mission_table)
+                    mission.target or "-",
+                )
+        mission_table.print_table(info)
 
     def __split_new_fleets(self):
         """Split any new fleets.
@@ -1048,14 +1053,14 @@ class AIstate:
     def log_alliance_request(self, initiating_empire_id, recipient_empire_id):
         """Keep a record of alliance requests made or received by this empire."""
 
-        alliance_requests = self.diplomatic_logs.setdefault('alliance_requests', {})
+        alliance_requests = self.diplomatic_logs.setdefault("alliance_requests", {})
         log_index = (initiating_empire_id, recipient_empire_id)
         alliance_requests.setdefault(log_index, []).append(fo.currentTurn())
 
     def log_peace_request(self, initiating_empire_id, recipient_empire_id):
         """Keep a record of peace requests made or received by this empire."""
 
-        peace_requests = self.diplomatic_logs.setdefault('peace_requests', {})
+        peace_requests = self.diplomatic_logs.setdefault("peace_requests", {})
         log_index = (initiating_empire_id, recipient_empire_id)
         peace_requests.setdefault(log_index, []).append(fo.currentTurn())
 
@@ -1065,7 +1070,7 @@ class AIstate:
         # if war declaration is made on turn 1, don't hold it against them
         if fo.currentTurn() == 1:
             return
-        war_declarations = self.diplomatic_logs.setdefault('war_declarations', {})
+        war_declarations = self.diplomatic_logs.setdefault("war_declarations", {})
         log_index = (initiating_empire_id, recipient_empire_id)
         war_declarations.setdefault(log_index, []).append(fo.currentTurn())
 

@@ -72,8 +72,8 @@ namespace {
         auto part_name_vr =
             std::make_unique<ValueRef::Constant<std::string>>(part_name);
 
-        std::string stacking_group = (allow_stacking ? "" :
-            (part_name + "_" + boost::lexical_cast<std::string>(meter_type) + "_PartMeter"));
+        std::string stacking_group = allow_stacking ? "" :
+            (std::string{part_name}.append("_").append(to_string(meter_type)).append("_PartMeter"));
 
         std::vector<std::unique_ptr<Effect::Effect>> effects;
         effects.emplace_back(std::make_unique<Effect::SetShipPartMeter>(
@@ -148,13 +148,14 @@ ShipPart::ShipPart(ShipPartClass part_class, double capacity, double stat2,
                    std::string&& description, std::set<std::string>&& exclusions,
                    std::vector<ShipSlotType> mountable_slot_types,
                    std::string&& icon, bool add_standard_capacity_effect,
-                   std::unique_ptr<Condition::Condition>&& combat_targets) :
+                   std::unique_ptr<Condition::Condition>&& combat_targets,
+                   std::unique_ptr<ValueRef::ValueRef<double>>&& total_fighter_damage,
+                   std::unique_ptr<ValueRef::ValueRef<double>>&& total_ship_damage) :
     m_name(std::move(name)),
     m_description(std::move(description)),
     m_class(part_class),
     m_capacity(capacity),
     m_secondary_stat(stat2),
-    m_producible(common_params.producible),
     m_production_cost(std::move(common_params.production_cost)),
     m_production_time(std::move(common_params.production_time)),
     m_mountable_slot_types(std::move(mountable_slot_types)),
@@ -163,8 +164,11 @@ ShipPart::ShipPart(ShipPartClass part_class, double capacity, double stat2,
     m_location(std::move(common_params.location)),
     m_exclusions(std::move(exclusions)),
     m_icon(std::move(icon)),
+    m_combat_targets(std::move(combat_targets)),
+    m_total_fighter_damage(std::move(total_fighter_damage)),
+    m_total_ship_damage(std::move(total_ship_damage)),
     m_add_standard_capacity_effect(add_standard_capacity_effect),
-    m_combat_targets(std::move(combat_targets))
+    m_producible(common_params.producible)
 {
     Init(std::move(common_params.effects));
 
@@ -196,49 +200,49 @@ void ShipPart::Init(std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects
         switch (m_class) {
         case ShipPartClass::PC_COLONY:
         case ShipPartClass::PC_TROOPS:
-            m_effects.emplace_back(IncreaseMeter(MeterType::METER_CAPACITY,                     m_name, m_capacity, false));
+            m_effects.push_back(IncreaseMeter(MeterType::METER_CAPACITY,                     m_name, m_capacity, false));
             break;
         case ShipPartClass::PC_FIGHTER_HANGAR: {   // capacity indicates how many fighters are stored in this type of part (combined for all copies of the part)
-            m_effects.emplace_back(IncreaseMeter(MeterType::METER_MAX_CAPACITY,                 m_name, m_capacity, true));         // stacking capacities allowed for this part, so each part contributes to the total capacity
-            m_effects.emplace_back(IncreaseMeterRuleScaled(MeterType::METER_MAX_SECONDARY_STAT, m_name, m_secondary_stat, "RULE_FIGHTER_DAMAGE_FACTOR",     false));  // stacking damage not allowed, as damage per shot should be the same regardless of number of shots
+            m_effects.push_back(IncreaseMeter(MeterType::METER_MAX_CAPACITY,                 m_name, m_capacity, true));         // stacking capacities allowed for this part, so each part contributes to the total capacity
+            m_effects.push_back(IncreaseMeterRuleScaled(MeterType::METER_MAX_SECONDARY_STAT, m_name, m_secondary_stat, "RULE_FIGHTER_DAMAGE_FACTOR",     false));  // stacking damage not allowed, as damage per shot should be the same regardless of number of shots
             break;
         }
         case ShipPartClass::PC_FIGHTER_BAY: {      // capacity indicates how many fighters each instance of the part can launch per combat bout...
-            m_effects.emplace_back(IncreaseMeter(MeterType::METER_MAX_CAPACITY,                 m_name, m_capacity, false));
-            m_effects.emplace_back(IncreaseMeter(MeterType::METER_MAX_SECONDARY_STAT,           m_name, m_secondary_stat, false));
+            m_effects.push_back(IncreaseMeter(MeterType::METER_MAX_CAPACITY,                 m_name, m_capacity, false));
+            m_effects.push_back(IncreaseMeter(MeterType::METER_MAX_SECONDARY_STAT,           m_name, m_secondary_stat, false));
             break;
         }
         case ShipPartClass::PC_DIRECT_WEAPON: {    // capacity indicates weapon damage per shot
-            m_effects.emplace_back(IncreaseMeterRuleScaled(MeterType::METER_MAX_CAPACITY,       m_name, m_capacity,       "RULE_SHIP_WEAPON_DAMAGE_FACTOR", false));
-            m_effects.emplace_back(IncreaseMeter(MeterType::METER_MAX_SECONDARY_STAT,           m_name, m_secondary_stat, false));
+            m_effects.push_back(IncreaseMeterRuleScaled(MeterType::METER_MAX_CAPACITY,       m_name, m_capacity,       "RULE_SHIP_WEAPON_DAMAGE_FACTOR", false));
+            m_effects.push_back(IncreaseMeter(MeterType::METER_MAX_SECONDARY_STAT,           m_name, m_secondary_stat, false));
             break;
         }
         case ShipPartClass::PC_SHIELD:
-            m_effects.emplace_back(IncreaseMeterRuleScaled(MeterType::METER_MAX_SHIELD,    m_capacity,     "RULE_SHIP_WEAPON_DAMAGE_FACTOR"));
+            m_effects.push_back(IncreaseMeterRuleScaled(MeterType::METER_MAX_SHIELD,    m_capacity,     "RULE_SHIP_WEAPON_DAMAGE_FACTOR"));
             break;
         case ShipPartClass::PC_DETECTION:
-            m_effects.emplace_back(IncreaseMeter(MeterType::METER_DETECTION,               m_capacity));
+            m_effects.push_back(IncreaseMeter(MeterType::METER_DETECTION,               m_capacity));
             break;
         case ShipPartClass::PC_STEALTH:
-            m_effects.emplace_back(IncreaseMeter(MeterType::METER_STEALTH,                 m_capacity));
+            m_effects.push_back(IncreaseMeter(MeterType::METER_STEALTH,                 m_capacity));
             break;
         case ShipPartClass::PC_FUEL:
-            m_effects.emplace_back(IncreaseMeter(MeterType::METER_MAX_FUEL,                m_capacity));
+            m_effects.push_back(IncreaseMeter(MeterType::METER_MAX_FUEL,                m_capacity));
             break;
         case ShipPartClass::PC_ARMOUR:
-            m_effects.emplace_back(IncreaseMeterRuleScaled(MeterType::METER_MAX_STRUCTURE, m_capacity,     "RULE_SHIP_STRUCTURE_FACTOR"));
+            m_effects.push_back(IncreaseMeterRuleScaled(MeterType::METER_MAX_STRUCTURE, m_capacity,     "RULE_SHIP_STRUCTURE_FACTOR"));
             break;
         case ShipPartClass::PC_SPEED:
-            m_effects.emplace_back(IncreaseMeterRuleScaled(MeterType::METER_SPEED,         m_capacity,     "RULE_SHIP_SPEED_FACTOR"));
+            m_effects.push_back(IncreaseMeterRuleScaled(MeterType::METER_SPEED,         m_capacity,     "RULE_SHIP_SPEED_FACTOR"));
             break;
         case ShipPartClass::PC_RESEARCH:
-            m_effects.emplace_back(IncreaseMeter(MeterType::METER_TARGET_RESEARCH,         m_capacity));
+            m_effects.push_back(IncreaseMeter(MeterType::METER_TARGET_RESEARCH,         m_capacity));
             break;
         case ShipPartClass::PC_INDUSTRY:
-            m_effects.emplace_back(IncreaseMeter(MeterType::METER_TARGET_INDUSTRY,         m_capacity));
+            m_effects.push_back(IncreaseMeter(MeterType::METER_TARGET_INDUSTRY,         m_capacity));
             break;
         case ShipPartClass::PC_INFLUENCE:
-            m_effects.emplace_back(IncreaseMeter(MeterType::METER_TARGET_INFLUENCE,        m_capacity));
+            m_effects.push_back(IncreaseMeter(MeterType::METER_TARGET_INFLUENCE,        m_capacity));
             break;
         default:
             break;
@@ -255,12 +259,11 @@ void ShipPart::Init(std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects
         m_combat_targets->SetTopLevelContent(m_name);
     for (auto&& effect : effects) {
         effect->SetTopLevelContent(m_name);
-        m_effects.emplace_back(std::move(effect));
+        m_effects.push_back(std::move(effect));
     }
 }
 
-ShipPart::~ShipPart()
-{}
+ShipPart::~ShipPart() = default;
 
 bool ShipPart::operator==(const ShipPart& rhs) const {
     if (&rhs == this)
@@ -282,6 +285,8 @@ bool ShipPart::operator==(const ShipPart& rhs) const {
     CHECK_COND_VREF_MEMBER(m_production_cost)
     CHECK_COND_VREF_MEMBER(m_production_time)
     CHECK_COND_VREF_MEMBER(m_location)
+    CHECK_COND_VREF_MEMBER(m_total_fighter_damage)
+    CHECK_COND_VREF_MEMBER(m_total_ship_damage)
     CHECK_COND_VREF_MEMBER(m_combat_targets)
 
     if (m_effects.size() != rhs.m_effects.size())
@@ -371,7 +376,7 @@ float ShipPart::Capacity() const {
 float ShipPart::SecondaryStat() const {
     switch (m_class) {
     case ShipPartClass::PC_FIGHTER_HANGAR:
-        return m_capacity * GetGameRules().Get<double>("RULE_FIGHTER_DAMAGE_FACTOR");
+        return m_secondary_stat * GetGameRules().Get<double>("RULE_FIGHTER_DAMAGE_FACTOR");
         break;
     default:
         return m_secondary_stat;
@@ -428,7 +433,9 @@ bool ShipPart::ProductionCostTimeLocationInvariant() const {
     return true;
 }
 
-float ShipPart::ProductionCost(int empire_id, int location_id, int in_design_id) const {    // TODO: pass in ScriptingContext
+float ShipPart::ProductionCost(int empire_id, int location_id, const ScriptingContext& context,
+                               int in_design_id) const
+{
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_cost)
         return 1.0f;
 
@@ -439,39 +446,57 @@ float ShipPart::ProductionCost(int empire_id, int location_id, int in_design_id)
         return static_cast<float>(m_production_cost->Eval(ScriptingContext(temp_context, in_design_id)));
     }
 
-    auto location = Objects().get(location_id);
+    const ObjectMap& objects{context.ContextObjects()};
+    auto location = objects.get(location_id);
     if (!location && !m_production_cost->TargetInvariant())
         return ARBITRARY_LARGE_COST;
 
-    auto source = Empires().GetSource(empire_id);   // TODO: pass ObjectMap in and on here
+    std::shared_ptr<const UniverseObject> source;
+    if (auto empire = context.GetEmpire(empire_id))
+        source = empire->Source(context.ContextObjects());
     if (!source && !m_production_cost->SourceInvariant())
         return ARBITRARY_LARGE_COST;
 
-    const ScriptingContext context(std::move(source), std::move(location), in_design_id);
-    return static_cast<float>(m_production_cost->Eval(context));
+    constexpr int PRODUCTION_BLOCK_SIZE = 1;
+
+    const ScriptingContext design_id_context{
+        context, std::move(source),
+        std::const_pointer_cast<UniverseObject>(location), // won't be modified when evaluating a ValueRef, but needs to be a pointer to mutable to be passed as the target object
+        in_design_id, PRODUCTION_BLOCK_SIZE};
+
+    return static_cast<float>(m_production_cost->Eval(design_id_context));
 }
 
-int ShipPart::ProductionTime(int empire_id, int location_id, int in_design_id) const {  // TODO: pass in ScriptingContext
+int ShipPart::ProductionTime(int empire_id, int location_id, const ScriptingContext& context,
+                             int in_design_id) const
+{
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_time)
         return 1;
 
     if (m_production_time->ConstantExpr()) {
         return m_production_time->Eval();
     } else if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant()) {
-        ScriptingContext temp_context; // TODO: replace with passed in context
-        return m_production_time->Eval(ScriptingContext(temp_context, in_design_id));
+        return m_production_time->Eval(ScriptingContext{context, in_design_id});
     }
 
-    auto location = Objects().get(location_id);
+    const ObjectMap& objects{context.ContextObjects()};
+    auto location = objects.get(location_id);
     if (!location && !m_production_time->TargetInvariant())
         return ARBITRARY_LARGE_TURNS;
 
-    auto source = Empires().GetSource(empire_id);   // TODO: pass ObjectMap in and on here
+    std::shared_ptr<const UniverseObject> source;
+    if (auto empire = context.GetEmpire(empire_id))
+        source = empire->Source(context.ContextObjects());
     if (!source && !m_production_time->SourceInvariant())
         return ARBITRARY_LARGE_TURNS;
 
-    const ScriptingContext context(std::move(source), std::move(location), in_design_id);
-    return m_production_time->Eval(context);
+    constexpr int PRODUCTION_BLOCK_SIZE = 1;
+
+    const ScriptingContext design_id_context{
+        context, std::move(source),
+        std::const_pointer_cast<UniverseObject>(location), // won't be modified when evaluating a ValueRef, but needs to be a pointer to mutable to be passed as the target object
+        in_design_id, PRODUCTION_BLOCK_SIZE};
+    return m_production_time->Eval(design_id_context);
 }
 
 unsigned int ShipPart::GetCheckSum() const {
@@ -493,7 +518,10 @@ unsigned int ShipPart::GetCheckSum() const {
     CheckSums::CheckSumCombine(retval, m_exclusions);
     CheckSums::CheckSumCombine(retval, m_effects);
     CheckSums::CheckSumCombine(retval, m_icon);
-    CheckSums::CheckSumCombine(retval, m_add_standard_capacity_effect);
+    CheckSums::CheckSumCombine(retval, m_add_standard_capacity_effect),
+    CheckSums::CheckSumCombine(retval, m_combat_targets),
+    CheckSums::CheckSumCombine(retval, m_total_fighter_damage);
+    CheckSums::CheckSumCombine(retval, m_total_ship_damage);
 
     return retval;
 }
@@ -525,9 +553,14 @@ ShipPartManager::iterator ShipPartManager::begin() const {
     return m_parts.begin();
 }
 
-ShipPartManager::iterator ShipPartManager::end() const{
+ShipPartManager::iterator ShipPartManager::end() const {
     CheckPendingShipParts();
     return m_parts.end();
+}
+
+std::size_t ShipPartManager::size() const {
+    CheckPendingShipParts();
+    return m_parts.size();
 }
 
 unsigned int ShipPartManager::GetCheckSum() const {
@@ -554,7 +587,7 @@ void ShipPartManager::CheckPendingShipParts() const {
     TraceLogger() << [this]() {
         std::string retval("Part Types:");
         for (const auto& [part_name, part] : m_parts)
-            retval.append("\n\t" + part_name + " class: " + boost::lexical_cast<std::string>(part->Class()));
+            retval.append("\n\t").append(part_name).append(" class: ").append(to_string(part->Class()));
         return retval;
     }();
 }

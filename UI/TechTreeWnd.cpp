@@ -222,7 +222,7 @@ std::shared_ptr<GG::BrowseInfoWnd> TechRowBrowseWnd(const std::string& tech_name
   * categories, statuses and types of techs to show. */
 class TechTreeWnd::TechTreeControls : public CUIWnd {
 public:
-    TechTreeControls(const std::string& config_name = "");
+    TechTreeControls(std::string_view config_name = "");
     void CompleteConstruction() override;
 
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
@@ -234,7 +234,7 @@ public:
     /** Set checked value of control for TechStatus @p status to @p state */
     void SetTechStatus(TechStatus status, bool state);
 
-    void RefreshCategoryButtons();
+    void RefreshCategoryButtons(const std::set<std::string>& cats);
 
     boost::signals2::signal<void (std::string, bool)> CategoryCheckedSignal;
 
@@ -266,7 +266,7 @@ private:
     friend class TechTreeWnd;               // so TechTreeWnd can access buttons
 };
 
-TechTreeWnd::TechTreeControls::TechTreeControls(const std::string& config_name) :
+TechTreeWnd::TechTreeControls::TechTreeControls(std::string_view config_name) :
     CUIWnd(UserString("TECH_DISPLAY"), GG::INTERACTIVE | GG::DRAGABLE | GG::RESIZABLE | GG::ONTOP, config_name)
 {}
 
@@ -342,18 +342,15 @@ void TechTreeWnd::TechTreeControls::CompleteConstruction() {
     m_view_type_button->SetCheck(false);
     AttachChild(m_view_type_button);
 
-    RefreshCategoryButtons();
-
     SetChildClippingMode(ChildClippingMode::ClipToClient);
 
     CUIWnd::CompleteConstruction();
 
-    DoButtonLayout();
     SaveDefaultedOptions();
     SaveOptions();
 }
 
-void TechTreeWnd::TechTreeControls::RefreshCategoryButtons() {
+void TechTreeWnd::TechTreeControls::RefreshCategoryButtons(const std::set<std::string>& cats_shown) {
     for (auto& button : m_cat_buttons)
         DetachChildAndReset(button.second);
     m_cat_buttons.clear();
@@ -371,6 +368,8 @@ void TechTreeWnd::TechTreeControls::RefreshCategoryButtons() {
             GG::Wnd::Create<TextBrowseWnd>(UserString(category), ""));
         m_cat_buttons[category]->SetBrowseModeTime(tooltip_delay);
         AttachChild(m_cat_buttons[category]);
+
+        m_cat_buttons[category]->SetCheck(cats_shown.count(category));
 
         m_cat_buttons[category]->CheckedSignal.connect(
             boost::bind(&TechTreeControls::CategoryButtonCheckedSlot, this, category, boost::placeholders::_1));
@@ -642,14 +641,12 @@ private:
 class TechTreeWnd::LayoutPanel::TechPanel : public GG::Wnd {
 public:
     TechPanel(const std::string& tech_name, const TechTreeWnd::LayoutPanel* panel);
-    virtual         ~TechPanel();
     void CompleteConstruction() override;
 
     bool InWindow(const GG::Pt& pt) const override;
 
     /** Update layout and format only if required.*/
     void PreRender() override;
-
     void Render() override;
 
     void LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKey> mod_keys) override
@@ -728,9 +725,6 @@ void TechTreeWnd::LayoutPanel::TechPanel::CompleteConstruction() {
     SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
     Update();
 }
-
-TechTreeWnd::LayoutPanel::TechPanel::~TechPanel()
-{}
 
 int TechTreeWnd::LayoutPanel::TechPanel::FontSize() const
 { return ClientUI::Pts() * 3 / 2; }
@@ -1069,7 +1063,7 @@ void TechTreeWnd::LayoutPanel::TechPanel::Update() {
     if (const Tech* tech = GetTech(m_tech_name))
         m_cost_and_duration_text = boost::io::str(FlexibleFormat(UserString("TECH_TOTAL_COST_ALT_STR"))
                                                   % DoubleToString(tech->ResearchCost(client_empire_id), 1, false)
-                                                  % boost::lexical_cast<int>(tech->ResearchTime(client_empire_id)));
+                                                  % tech->ResearchTime(client_empire_id));
     m_cost_and_duration_label->SetText("<s>" + m_cost_and_duration_text + "<s>");
 
     m_eta_label->SetText("<s>" + m_eta_text + "</s>");
@@ -1484,8 +1478,8 @@ void TechTreeWnd::LayoutPanel::SelectTech(const std::string& tech_name)
 }
 
 void TechTreeWnd::LayoutPanel::TreeDraggedSlot(const GG::Pt& move) {
-    m_hscroll->ScrollTo(m_drag_scroll_position_x - Value(move.x / m_scale));
-    m_vscroll->ScrollTo(m_drag_scroll_position_y - Value(move.y / m_scale));
+    m_hscroll->ScrollTo(static_cast<int>(m_drag_scroll_position_x - Value(move.x / m_scale)));
+    m_vscroll->ScrollTo(static_cast<int>(m_drag_scroll_position_y - Value(move.y / m_scale)));
     m_scroll_position_x = m_hscroll->PosnRange().first;
     m_scroll_position_y = m_vscroll->PosnRange().first;
 }
@@ -1525,21 +1519,18 @@ bool TechTreeWnd::LayoutPanel::TreeZoomOutKeyboard() {
 class TechTreeWnd::TechListBox : public CUIListBox {
 public:
     TechListBox(GG::X w, GG::Y h);
-    virtual ~TechListBox();
-
     void CompleteConstruction() override;
 
     bool TechRowCmp(const GG::ListBox::Row& lhs, const GG::ListBox::Row& rhs, std::size_t column);
 
-    void    Reset();
-    void    Update(bool populate = true);
-
-    void    ShowCategory(const std::string& category);
-    void    ShowAllCategories();
-    void    HideCategory(const std::string& category);
-    void    HideAllCategories();
-    void    ShowStatus(TechStatus status);
-    void    HideStatus(TechStatus status);
+    void Reset();
+    void Update(bool populate = true);
+    void ShowCategory(const std::string& category);
+    void ShowAllCategories();
+    void HideCategory(const std::string& category);
+    void HideAllCategories();
+    void ShowStatus(TechStatus status);
+    void HideStatus(TechStatus status);
 
     mutable TechClickSignalType TechLeftClickedSignal;  ///< emitted when a technology is single-left-clicked
     mutable TechClickSignalType TechDoubleClickedSignal;///< emitted when a technology is double-clicked
@@ -1549,7 +1540,6 @@ private:
     class TechRow : public CUIListBox::Row {
     public:
         TechRow(GG::X w, const std::string& tech_name);
-
         void CompleteConstruction() override;
 
         void Render() override;
@@ -1829,11 +1819,7 @@ void TechTreeWnd::TechListBox::CompleteConstruction() {
     SetSortCmp([&](const GG::ListBox::Row& lhs, const GG::ListBox::Row& rhs, std::size_t col) { return TechRowCmp(lhs, rhs, col); });
 }
 
-TechTreeWnd::TechListBox::~TechListBox()
-{}
-
-void TechTreeWnd::TechListBox::Reset()
-{
+void TechTreeWnd::TechListBox::Reset() {
     m_tech_row_cache.clear();
     Populate();
 }
@@ -2072,7 +2058,7 @@ void TechTreeWnd::CompleteConstruction() {
     // connect button for all categories to update display
     m_tech_tree_controls->m_all_cat_button->CheckedSignal.connect(
         [this](bool checked) {
-            if(checked)
+            if (checked)
                 this->ShowAllCategories();
             else
                 this->HideAllCategories();
@@ -2104,9 +2090,6 @@ void TechTreeWnd::CompleteConstruction() {
     ShowTreeView();
 }
 
-TechTreeWnd::~TechTreeWnd()
-{}
-
 void TechTreeWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
     const GG::Pt old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
@@ -2124,7 +2107,7 @@ double TechTreeWnd::Scale() const
 void TechTreeWnd::Update() {
     m_layout_panel->Update();
     m_tech_list->Update();
-    m_tech_tree_controls->RefreshCategoryButtons();
+    m_tech_tree_controls->RefreshCategoryButtons(m_layout_panel->GetCategoriesShown());
 }
 
 void TechTreeWnd::Clear() {
@@ -2135,7 +2118,8 @@ void TechTreeWnd::Clear() {
 void TechTreeWnd::Reset() {
     m_layout_panel->Reset();
     m_tech_list->Reset();
-    m_tech_tree_controls->RefreshCategoryButtons();
+    m_tech_tree_controls->RefreshCategoryButtons(m_layout_panel->GetCategoriesShown());
+    ShowAllCategories();
 }
 
 void TechTreeWnd::InitializeWindows() {

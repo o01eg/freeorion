@@ -7,6 +7,7 @@
 #include "universe/Tech.h"
 #include "universe/UnlockableItem.h"
 #include "universe/ValueRefs.h"
+#include "util/CheckSums.h"
 #include "util/Directories.h"
 #include "util/GameRules.h"
 #include "util/Pending.h"
@@ -19,17 +20,17 @@ BOOST_FIXTURE_TEST_SUITE(TestPythonParser, ParserAppFixture)
 BOOST_AUTO_TEST_CASE(parse_game_rules) {
     PythonParser parser(m_python, m_scripting_dir);
 
-    Pending::Pending<GameRules> game_rules_p = Pending::ParseSynchronously(parse::game_rules, parser,  m_scripting_dir / "game_rules.focs.py");
+    auto game_rules_p = Pending::ParseSynchronously(parse::game_rules, parser,  m_scripting_dir / "game_rules.focs.py");
     auto game_rules = *Pending::WaitForPendingUnlocked(std::move(game_rules_p));
-    BOOST_REQUIRE(!game_rules.Empty());
-    BOOST_REQUIRE(game_rules.RuleExists("RULE_HABITABLE_SIZE_MEDIUM"));
-    BOOST_REQUIRE(GameRules::Type::TOGGLE == game_rules.GetType("RULE_ENABLE_ALLIED_REPAIR"));
+    BOOST_REQUIRE(!game_rules.empty());
+    BOOST_REQUIRE(game_rules.count("RULE_HABITABLE_SIZE_MEDIUM") > 0);
+    BOOST_REQUIRE(GameRule::Type::TOGGLE == game_rules["RULE_ENABLE_ALLIED_REPAIR"].type);
 }
 
 BOOST_AUTO_TEST_CASE(parse_techs) {
     PythonParser parser(m_python, m_scripting_dir);
 
-    Pending::Pending<TechManager::TechParseTuple> techs_p = Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, parser, m_scripting_dir / "techs");
+    auto techs_p = Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, parser, m_scripting_dir / "techs");
     auto [techs, tech_categories, categories_seen] = *Pending::WaitForPendingUnlocked(std::move(techs_p));
     BOOST_REQUIRE(!tech_categories.empty());
 
@@ -145,7 +146,7 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
                         ),
                         std::string("ORBITAL_HAB_LABEL")));
 
-        std::shared_ptr<Effect::EffectsGroup> effect_group = std::shared_ptr<Effect::EffectsGroup>(new Effect::EffectsGroup(
+        auto effect_group = std::shared_ptr<Effect::EffectsGroup>(new Effect::EffectsGroup(
                 std::make_unique<Condition::And>(
                     std::make_unique<Condition::Species>(),
                     std::make_unique<Condition::EmpireAffiliation>(
@@ -194,6 +195,11 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
     BOOST_REQUIRE_EQUAL(2, categories_seen.size());
 }
 
+/**
+ * Checks count of techs and tech categories in real scripts
+ * FO_CHECKSUM_TECH_NAME determines tech name to be check for FO_CHECKSUM_TECH_VALUE checksum
+ */
+
 BOOST_AUTO_TEST_CASE(parse_techs_full) {
     auto scripting_dir = boost::filesystem::system_complete(GetBinDir() / "default/scripting");
     BOOST_REQUIRE(scripting_dir.is_absolute());
@@ -202,16 +208,32 @@ BOOST_AUTO_TEST_CASE(parse_techs_full) {
 
     PythonParser parser(m_python, scripting_dir);
 
-    Pending::Pending<TechManager::TechParseTuple> techs_p = Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, parser, scripting_dir / "techs");
+    auto techs_p = Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, parser, scripting_dir / "techs");
     auto [techs, tech_categories, categories_seen] = *Pending::WaitForPendingUnlocked(std::move(techs_p));
 
     BOOST_REQUIRE(!techs.empty());
     BOOST_REQUIRE(!tech_categories.empty());
     BOOST_REQUIRE(!categories_seen.empty());
 
-    BOOST_REQUIRE_EQUAL(207, techs.size());
+    BOOST_REQUIRE_EQUAL(208, techs.size());
     BOOST_REQUIRE_EQUAL(9, tech_categories.size());
     BOOST_REQUIRE_EQUAL(9, categories_seen.size());
+
+    if (const char *tech_name = std::getenv("FO_CHECKSUM_TECH_NAME")) {
+        const auto tech_it = techs.get<TechManager::NameIndex>().find(tech_name);
+        BOOST_REQUIRE(techs.get<TechManager::NameIndex>().end() != tech_it);
+        BOOST_REQUIRE_EQUAL(tech_name, (*tech_it)->Name());
+
+        BOOST_TEST_MESSAGE("Dump " << tech_name << ":");
+        BOOST_TEST_MESSAGE((*tech_it)->Dump(0));
+
+        if (const char *tech_checksum_str = std::getenv("FO_CHECKSUM_TECH_VALUE")) {
+            unsigned int tech_checksum = boost::lexical_cast<unsigned int>(tech_checksum_str);
+            unsigned int value{0};
+            CheckSums::CheckSumCombine(value, *tech_it);
+            BOOST_REQUIRE_EQUAL(tech_checksum, value);
+        }
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

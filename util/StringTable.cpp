@@ -9,44 +9,74 @@
 #include <boost/algorithm/string/replace.hpp>
 
 #include <iostream>
+#include <atomic>
+
+#if defined(_MSC_VER) && _MSC_VER >= 1930
+struct IUnknown; // Workaround for "combaseapi.h(229,21): error C2760: syntax error: 'identifier' was unexpected here; expected 'type specifier'"
+#endif
+
+#if BOOST_VERSION >= 106500
+// define needed on Windows due to conflict with windows.h and std::min and std::max
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+// define needed in GCC
+#  ifndef _GNU_SOURCE
+#    define _GNU_SOURCE
+#  endif
+
+#  include <boost/stacktrace.hpp>
+#endif
 
 
 namespace {
-    const std::string DEFAULT_FILENAME = "en.txt";
-    const std::string ERROR_STRING = "ERROR: ";
+    constexpr std::string_view DEFAULT_FILENAME = "en.txt";
+    const std::string EMPTY_STRING;
 }
 
-
-StringTable::StringTable():
-    m_filename(DEFAULT_FILENAME)
-{ Load(); }
-
-StringTable::StringTable(const std::string& filename, std::shared_ptr<const StringTable> fallback):
-    m_filename(filename)
+StringTable::StringTable(std::string filename, std::shared_ptr<const StringTable> fallback):
+    m_filename(std::move(filename))
 { Load(fallback); }
 
-StringTable::~StringTable()
-{}
+bool StringTable::StringExists(const std::string& key) const
+{ return m_strings.find(key) != m_strings.end(); }
 
-bool StringTable::StringExists(const std::string& key) const {
-    std::scoped_lock lock(m_mutex);
-    return m_strings.count(key);
+bool StringTable::StringExists(const std::string_view key) const
+{ return m_strings.find(key) != m_strings.end(); }
+
+bool StringTable::StringExists(const char* key) const
+{ return m_strings.find(key) != m_strings.end(); }
+
+std::pair<bool, const std::string&> StringTable::CheckGet(const std::string& key) const {
+    auto it = m_strings.find(key);
+    bool found_string = it != m_strings.end();
+    return {found_string, found_string ? it->second : EMPTY_STRING};
 }
 
-const std::string& StringTable::operator[] (const std::string& key) const {
-    std::scoped_lock lock(m_mutex);
-
+std::pair<bool, const std::string&> StringTable::CheckGet(const std::string_view key) const {
     auto it = m_strings.find(key);
-    if (it != m_strings.end())
-        return it->second;
+    bool found_string = it != m_strings.end();
+    return {found_string, found_string ? it->second : EMPTY_STRING};
+}
 
-    auto error = m_error_strings.insert(ERROR_STRING + key);
-    return *(error.first);
+std::pair<bool, const std::string&> StringTable::CheckGet(const char* key) const {
+    auto it = m_strings.find(key);
+    bool found_string = it != m_strings.end();
+    return {found_string, found_string ? it->second : EMPTY_STRING};
+}
+
+const std::string& StringTable::Add(std::string key, std::string value)
+{ return m_strings.emplace(std::move(key), std::move(value)).first->second; }
+
+namespace {
+    std::string_view MatchLookupKey(const boost::xpressive::smatch& match, size_t idx) {
+        //return match[idx].str(); // constructs a std::string, which should be avoidable for lookup purposes...
+        const auto& m{match[idx]};
+        return {&*m.first, static_cast<size_t>(std::max(0, static_cast<int>(m.length())))};
+    }
 }
 
 void StringTable::Load(std::shared_ptr<const StringTable> fallback) {
-    std::scoped_lock lock(m_mutex);
-
     if (fallback && !fallback->m_initialized) {
         // this prevents deadlock if two stringtables were to be loaded
         // simultaneously with eachother as fallback tables
@@ -68,12 +98,11 @@ void StringTable::Load(std::shared_ptr<const StringTable> fallback) {
 
     parse::file_substitution(file_contents, path.parent_path(), m_filename);
 
-    std::map<std::string, std::string> fallback_lookup_strings;
+    decltype(fallback->m_strings) fallback_lookup_strings;
     std::string fallback_table_file;
     if (fallback) {
-        std::scoped_lock fallback_lock(fallback->m_mutex);
         fallback_table_file = fallback->Filename();
-        fallback_lookup_strings.insert(fallback->m_strings.begin(), fallback->m_strings.end());
+        fallback_lookup_strings = fallback->m_strings; //.insert(fallback->m_strings.begin(), fallback->m_strings.end());
     }
 
     using namespace boost::xpressive;
@@ -85,7 +114,7 @@ void StringTable::Load(std::shared_ptr<const StringTable> fallback) {
     const sregex MULTI_LINE_VALUE = -*_;
 
     const sregex ENTRY =
-        keep(*(space | +COMMENT)) >>
+        keep(*(space | keep(+COMMENT))) >>
         KEY >> *blank >> (_n | COMMENT) >>
         (("'''" >> MULTI_LINE_VALUE >> "'''" >> *space >> _n) | SINGLE_LINE_VALUE >> _n);
 
@@ -182,8 +211,8 @@ void StringTable::Load(std::shared_ptr<const StringTable> fallback) {
                     } else if (ref_check_it->second < position + match.length()) {
                         ErrorLogger() << "Expansion error in key expansion: [[" << ref_check_it->first << "]] having end " << ref_check_it->second;
                         ErrorLogger() << "         currently at expansion text position " << position << " with match length: " << match.length();
-                        ErrorLogger() << "         of current expansion text:" << user_read_entry;
-                        ErrorLogger() << "         from keyword "<< key << " with raw text:" << rawtext;
+                        ErrorLogger() << "         of current expansion text: " << user_read_entry;
+                        ErrorLogger() << "         from keyword "<< key << " with raw text: " << rawtext;
                         ErrorLogger() << "         and cumulative substitions: " << cumulative_subsititions;
                         // will also trigger further error logging below
                         ++ref_check_it;
@@ -193,22 +222,22 @@ void StringTable::Load(std::shared_ptr<const StringTable> fallback) {
                 if (!cyclic_reference_check.count(match[1])) {
                     //DebugLogger() << "Pushing to cyclic ref check: " << match[1];
                     cyclic_reference_check[match[1]] = position + match.length();
-                    auto map_lookup_it = m_strings.find(match[1]);
+
+                    auto map_lookup_it = m_strings.find(MatchLookupKey(match, 1u));
                     bool foundmatch = map_lookup_it != m_strings.end();
                     if (!foundmatch && !fallback_lookup_strings.empty()) {
                         DebugLogger() << "Key expansion: " << match[1] << " not found in primary stringtable: " << m_filename
                                       << "; checking in fallback file: " << fallback_table_file;
-                        map_lookup_it = fallback_lookup_strings.find(match[1]);
+                        map_lookup_it = fallback_lookup_strings.find(MatchLookupKey(match, 1u));
                         foundmatch = map_lookup_it != fallback_lookup_strings.end();
                     }
                     if (foundmatch) {
-                        const std::string substitution = map_lookup_it->second;
+                        const std::string& substitution = map_lookup_it->second;
                         cumulative_subsititions += substitution + "|**|";
                         user_read_entry.replace(position, match.length(), substitution);
                         std::size_t added_chars = substitution.length() - match.length();
-                        for (auto& ref_check : cyclic_reference_check) {
+                        for (auto& ref_check : cyclic_reference_check)
                             ref_check.second += added_chars;
-                        }
                         // replace recursively -- do not skip past substitution
                     } else {
                         ErrorLogger() << "Unresolved key expansion: " << match[1] << " in: " << m_filename << ".";
@@ -217,8 +246,8 @@ void StringTable::Load(std::shared_ptr<const StringTable> fallback) {
                 } else {
                     ErrorLogger() << "Cyclic key expansion: " << match[1] << " in: " << m_filename << "."
                                   << "         at expansion text position " << position;
-                    ErrorLogger() << "         of current expansion text:" << user_read_entry;
-                    ErrorLogger() << "         from keyword "<< key << " with raw text:" << rawtext;
+                    ErrorLogger() << "         of current expansion text: " << user_read_entry;
+                    ErrorLogger() << "         from keyword "<< key << " with raw text: " << rawtext;
                     ErrorLogger() << "         and cumulative substitions: " << cumulative_subsititions;
                     position += match.length();
                 }
@@ -232,12 +261,12 @@ void StringTable::Load(std::shared_ptr<const StringTable> fallback) {
             smatch match;
             while (regex_search(user_read_entry.begin() + position, user_read_entry.end(), match, REFERENCE)) {
                 position += match.position();
-                auto map_lookup_it = m_strings.find(match[2]);
+                auto map_lookup_it = m_strings.find(MatchLookupKey(match, 2u));
                 bool foundmatch = map_lookup_it != m_strings.end();
                 if (!foundmatch && !fallback_lookup_strings.empty()) {
                     DebugLogger() << "Key reference: " << match[2] << " not found in primary stringtable: " << m_filename
-                                  << "; checking in fallback file" << fallback_table_file;
-                    map_lookup_it = fallback_lookup_strings.find(match[2]);
+                                  << "; checking in fallback file: " << fallback_table_file;
+                    map_lookup_it = fallback_lookup_strings.find(MatchLookupKey(match, 2u));
                     foundmatch = map_lookup_it != fallback_lookup_strings.end();
                 }
                 if (foundmatch) {

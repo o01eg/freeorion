@@ -52,24 +52,24 @@ struct Availability {
 };
 
 namespace {
-    const std::string   PART_CONTROL_DROP_TYPE_STRING = "Part Control";
-    const std::string   HULL_PARTS_ROW_DROP_TYPE_STRING = "Hull and Parts Row";
-    const std::string   COMPLETE_DESIGN_ROW_DROP_STRING = "Complete Design Row";
-    const std::string   SAVED_DESIGN_ROW_DROP_STRING = "Saved Design Row";
-    const std::string   EMPTY_STRING;
-    const std::string   DES_PEDIA_WND_NAME = "design.pedia";
-    const std::string   DES_MAIN_WND_NAME = "design.edit";
-    const std::string   DES_BASE_SELECTOR_WND_NAME = "design.selector";
-    const std::string   DES_PART_PALETTE_WND_NAME = "design.parts";
-    constexpr GG::Y     BASES_LIST_BOX_ROW_HEIGHT{100};
-    constexpr GG::X     PART_CONTROL_WIDTH{54};
-    constexpr GG::Y     PART_CONTROL_HEIGHT{54};
-    constexpr GG::X     SLOT_CONTROL_WIDTH{60};
-    constexpr GG::Y     SLOT_CONTROL_HEIGHT{60};
-    constexpr GG::Pt    PALETTE_MIN_SIZE{GG::X{450}, GG::Y{400}};
-    constexpr GG::Pt    MAIN_PANEL_MIN_SIZE{GG::X{400}, GG::Y{160}};
-    constexpr GG::Pt    BASES_MIN_SIZE{GG::X{160}, GG::Y{160}};
-    constexpr int       PAD{3};
+    constexpr std::string_view PART_CONTROL_DROP_TYPE_STRING = "Part Control";
+    constexpr std::string_view HULL_PARTS_ROW_DROP_TYPE_STRING = "Hull and Parts Row";
+    constexpr std::string_view COMPLETE_DESIGN_ROW_DROP_STRING = "Complete Design Row";
+    constexpr std::string_view SAVED_DESIGN_ROW_DROP_STRING = "Saved Design Row";
+    const     std::string      EMPTY_STRING;
+    constexpr std::string_view DES_PEDIA_WND_NAME = "design.pedia";
+    constexpr std::string_view DES_MAIN_WND_NAME = "design.edit";
+    constexpr std::string_view DES_BASE_SELECTOR_WND_NAME = "design.selector";
+    constexpr std::string_view DES_PART_PALETTE_WND_NAME = "design.parts";
+    constexpr GG::Y            BASES_LIST_BOX_ROW_HEIGHT{100};
+    constexpr GG::X            PART_CONTROL_WIDTH{54};
+    constexpr GG::Y            PART_CONTROL_HEIGHT{54};
+    constexpr GG::X            SLOT_CONTROL_WIDTH{60};
+    constexpr GG::Y            SLOT_CONTROL_HEIGHT{60};
+    constexpr GG::Pt           PALETTE_MIN_SIZE{GG::X{450}, GG::Y{400}};
+    constexpr GG::Pt           MAIN_PANEL_MIN_SIZE{GG::X{400}, GG::Y{160}};
+    constexpr GG::Pt           BASES_MIN_SIZE{GG::X{160}, GG::Y{160}};
+    constexpr int              PAD{3};
 
     /** Returns texture with which to render a SlotControl, depending on \a slot_type. */
     std::shared_ptr<GG::Texture> SlotBackgroundTexture(ShipSlotType slot_type) {
@@ -272,8 +272,7 @@ namespace {
 
     class SavedDesignsManager : public ShipDesignManager::Designs {
     public:
-        SavedDesignsManager()
-        {}
+        SavedDesignsManager() = default;
 
         const std::list<boost::uuids::uuid>& OrderedDesignUUIDs() const;
         std::vector<int> OrderedIDs() const override;
@@ -350,7 +349,9 @@ namespace {
     void AddSavedDesignToDisplayedDesigns(const boost::uuids::uuid& uuid, int empire_id,
                                           bool is_front = true)
     {
-        const auto empire = GetEmpire(empire_id);
+        ScriptingContext context;
+
+        const auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "AddSavedDesignsToDisplayedDesigns HumanClient Does Not Control an Empire";
             return;
@@ -372,11 +373,11 @@ namespace {
         TraceLogger() << "Add saved design " << design->Name() << " to current designs.";
 
         // Give it a new UUID so that the empire design is distinct.
-        auto new_current_design = *design;
+        auto new_current_design{*design};
         new_current_design.SetUUID(boost::uuids::random_generator()());
 
         auto order = std::make_shared<ShipDesignOrder>(empire_id, new_current_design);
-        GGHumanClientApp::GetApp()->Orders().IssueOrder(order);
+        GGHumanClientApp::GetApp()->Orders().IssueOrder(order, context);
 
         auto& current_manager = GetDisplayedDesignsManager();
         const auto& all_ids = current_manager.AllOrderedIDs();
@@ -400,13 +401,16 @@ namespace {
         const auto empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
         manager.SetObsolete(design_id, obsolete);
+        ScriptingContext context;
+
 
         if (obsolete) {
             // make empire forget on the server
             GGHumanClientApp::GetApp()->Orders().IssueOrder(
-                std::make_shared<ShipDesignOrder>(empire_id, design_id, true));
+                std::make_shared<ShipDesignOrder>(empire_id, design_id, true),
+                context);
         } else {
-            const auto design = GetUniverse().GetShipDesign(design_id);
+            const auto design = context.ContextUniverse().GetShipDesign(design_id);
             if (!design) {
                 ErrorLogger() << "Attempted to toggle obsolete state of design id "
                               << design_id << " which is unknown to the server";
@@ -415,19 +419,22 @@ namespace {
 
             //make known to empire on server
             GGHumanClientApp::GetApp()->Orders().IssueOrder(
-                std::make_shared<ShipDesignOrder>(empire_id, design_id));
+                std::make_shared<ShipDesignOrder>(empire_id, design_id),
+                context);
         }
     }
 
     /** Remove design from DisplayedDesigns. */
     void DeleteFromDisplayedDesigns(const int design_id) {
         auto& manager = GetDisplayedDesignsManager();
+        ScriptingContext context;
 
         const auto empire_id = GGHumanClientApp::GetApp()->EmpireID();
         const auto maybe_obsolete = manager.IsObsolete(design_id);  // purpose of this obsolescence check is unclear... author didn't comment
         if (maybe_obsolete && !*maybe_obsolete)
             GGHumanClientApp::GetApp()->Orders().IssueOrder(          // erase design id order : empire should forget this design
-                std::make_shared<ShipDesignOrder>(empire_id, design_id, true));
+                std::make_shared<ShipDesignOrder>(empire_id, design_id, true),
+                context);
         manager.Remove(design_id);
     }
 
@@ -583,8 +590,8 @@ namespace {
         } else {
             // Add the new saved design.
             m_saved_designs.emplace(design.UUID(),
-                                    std::make_pair(std::make_unique<ShipDesign>(design),
-                                                   CreateSavePathForDesign(design)));
+                                    std::pair{std::make_unique<ShipDesign>(design),
+                                              CreateSavePathForDesign(design)});
             SaveDesign(design.UUID());
         }
 
@@ -1098,17 +1105,16 @@ namespace {
 //////////////////////////////////////////////////
 // ShipDesignManager                            //
 //////////////////////////////////////////////////
-
 ShipDesignManager::ShipDesignManager() :
     m_displayed_designs(std::make_unique<DisplayedShipDesignManager>()),
     m_saved_designs(std::make_unique<SavedDesignsManager>())
 {}
 
-ShipDesignManager::~ShipDesignManager()
-{}
+ShipDesignManager::~ShipDesignManager() = default;
 
 void ShipDesignManager::StartGame(int empire_id, bool is_new_game) {
-    auto empire = GetEmpire(empire_id);
+    ScriptingContext context;
+    auto empire = context.GetEmpire(empire_id);
     if (!empire) {
         ErrorLogger() << "Unable to initialize ShipDesignManager because empire id, " << empire_id << ", is invalid";
         return;
@@ -1152,10 +1158,10 @@ void ShipDesignManager::StartGame(int empire_id, bool is_new_game) {
         // Remove the default designs from the empire's current designs.
         // Purpose and logic of this is unclear... author didn't comment upon inquiry, but having this here reportedly fixes some issues...
         DebugLogger() << "Remove default designs from empire";
-        const auto ids = empire->ShipDesigns();
-        for (const auto design_id : ids) {
+        for (const auto design_id : empire->ShipDesigns()) {
             GGHumanClientApp::GetApp()->Orders().IssueOrder(
-                std::make_shared<ShipDesignOrder>(empire_id, design_id, true));
+                std::make_shared<ShipDesignOrder>(empire_id, design_id, true),
+                context);
         }
     }
 
@@ -1553,9 +1559,9 @@ void PartsListBox::CullSuperfluousParts(std::vector<const ShipPart*>& this_group
         } catch (...) {}
     }
 
-    for (auto part_it = this_group.begin();
-         part_it != this_group.end(); ++part_it)
-    {
+    const ScriptingContext context;
+
+    for (auto part_it = this_group.begin(); part_it != this_group.end(); ++part_it) {
         const ShipPart* checkPart = *part_it;
         for (const ShipPart* ref_part : this_group) {
             float cap_check = GetMainStat(checkPart);
@@ -1563,13 +1569,14 @@ void PartsListBox::CullSuperfluousParts(std::vector<const ShipPart*>& this_group
             if ((cap_check < 0.0f) || (cap_ref < 0.0f))
                 continue;  // not intended to handle such cases
             float cap_ratio = cap_ref / std::max(cap_check, 1e-4f) ;  // some part types currently have zero capacity, but need to reject if both are zero
-            float cost_check = checkPart->ProductionCost(empire_id, loc_id);
-            float cost_ref = ref_part->ProductionCost(empire_id, loc_id);
+            float cost_check = checkPart->ProductionCost(empire_id, loc_id, context);
+            float cost_ref = ref_part->ProductionCost(empire_id, loc_id, context);
             if ((cost_check < 0.0f) || (cost_ref < 0.0f))
                 continue;  // not intended to handle such cases
             float cost_ratio = (cost_ref + 1e-4) / (cost_check + 1e-4);  // can accept if somehow they both have cost zero
             float bargain_ratio = cap_ratio / std::max(cost_ratio, 1e-4f);
-            float time_ratio = float(std::max(1, ref_part->ProductionTime(empire_id, loc_id))) / std::max(1, checkPart->ProductionTime(empire_id, loc_id));
+            float time_ratio = float(std::max(1, ref_part->ProductionTime(empire_id, loc_id, context))) /
+                               std::max(1, checkPart->ProductionTime(empire_id, loc_id, context));
             // adjusting the max cost ratio to 1.4 or higher, will allow, for example, for
             // Zortium armor to make Standard armor redundant.  Setting a min_bargain_ratio higher than one can keep
             // trivial bargains from blocking lower valued parts.
@@ -1752,7 +1759,7 @@ void PartsListBox::HideSuperfluousParts(bool refresh_list) {
   * onto slots to assign parts to those slots */
 class DesignWnd::PartPalette : public CUIWnd {
 public:
-    PartPalette(const std::string& config_name);
+    PartPalette(std::string_view config_name);
     void CompleteConstruction() override;
 
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
@@ -1797,7 +1804,7 @@ private:
 
 };
 
-DesignWnd::PartPalette::PartPalette(const std::string& config_name) :
+DesignWnd::PartPalette::PartPalette(std::string_view config_name) :
     CUIWnd(UserString("DESIGN_WND_PART_PALETTE_TITLE"),
            GG::ONTOP | GG::INTERACTIVE | GG::DRAGABLE | GG::RESIZABLE,
            config_name),
@@ -1840,7 +1847,7 @@ void DesignWnd::PartPalette::CompleteConstruction() {
             continue;
 
         m_class_buttons[part_class] = GG::Wnd::Create<CUIStateButton>(
-            UserString(boost::lexical_cast<std::string>(part_class)), GG::FORMAT_CENTER,
+            UserString(to_string(part_class)), GG::FORMAT_CENTER,
             std::make_shared<CUILabelButtonRepresenter>());
         AttachChild(m_class_buttons[part_class]);
         m_class_buttons[part_class]->CheckedSignal.connect(
@@ -2143,17 +2150,24 @@ void DesignWnd::PartPalette::Populate()
   * scripts or saved (on disk) designs from previous games. */
 class BasesListBox : public QueueListBox {
 public:
-    static const std::string BASES_LIST_BOX_DROP_TYPE;
+    static constexpr std::string_view BASES_LIST_BOX_DROP_TYPE = "BasesListBoxRow";
 
     BasesListBox(const AvailabilityManager& availabilities_state,
-                 const boost::optional<std::string>& drop_type = boost::none,
-                 const boost::optional<std::string>& empty_prompt = boost::none);
+                 const boost::optional<std::string_view>& drop_type = boost::none,
+                 const boost::optional<std::string_view>& empty_prompt = boost::none);
+    BasesListBox(const AvailabilityManager& availabilities_state,
+                 const boost::optional<std::string_view>& drop_type,
+                 const std::string& empty_prompt) :
+        BasesListBox(availabilities_state, drop_type,
+                     boost::optional<std::string_view>{empty_prompt})
+    {}
     void CompleteConstruction() override;
 
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
-    void ChildrenDraggedAway(const std::vector<GG::Wnd*>& wnds, const GG::Wnd* destination) override;
-    virtual void QueueItemMoved(const GG::ListBox::iterator& row_it, const GG::ListBox::iterator& original_position_it)
-    {}
+    void ChildrenDraggedAway(const std::vector<GG::Wnd*>& wnds,
+                             const GG::Wnd* destination) override;
+    virtual void QueueItemMoved(const GG::ListBox::iterator& row_it, 
+                                const GG::ListBox::iterator& original_position_it) {}
     void SetEmpireShown(int empire_id, bool refresh_list = true);
     virtual void Populate();
 
@@ -2376,13 +2390,11 @@ void BasesListBox::CompletedDesignListBoxRow::CompleteConstruction() {
     SetDragDropDataType(COMPLETE_DESIGN_ROW_DROP_STRING);
 }
 
-const std::string BasesListBox::BASES_LIST_BOX_DROP_TYPE = "BasesListBoxRow";
-
 BasesListBox::BasesListBox(const AvailabilityManager& availabilities_state,
-                           const boost::optional<std::string>& drop_type,
-                           const boost::optional<std::string>& empty_prompt /*= boost::none*/) :
+                           const boost::optional<std::string_view>& drop_type,
+                           const boost::optional<std::string_view>& empty_prompt) :
     QueueListBox(drop_type,
-                 empty_prompt ? *empty_prompt : UserString("ADD_FIRST_DESIGN_DESIGN_QUEUE_PROMPT")),
+                 empty_prompt ? std::string{*empty_prompt} : UserString("ADD_FIRST_DESIGN_DESIGN_QUEUE_PROMPT")),
     m_empire_id_shown(ALL_EMPIRES),
     m_availabilities_state(availabilities_state)
 {}
@@ -2501,7 +2513,7 @@ void BasesListBox::ItemRightClickedImpl(GG::ListBox::iterator it, const GG::Pt& 
 class EmptyHullsListBox : public BasesListBox {
 public:
     EmptyHullsListBox(const AvailabilityManager& availabilities_state,
-                      const boost::optional<std::string>& drop_type = boost::none) :
+                      const boost::optional<std::string_view>& drop_type = boost::none) :
         BasesListBox::BasesListBox(availabilities_state, drop_type, UserString("ALL_AVAILABILITY_FILTERS_BLOCKING_PROMPT"))
     {}
 
@@ -2520,7 +2532,7 @@ protected:
 class CompletedDesignsListBox : public BasesListBox {
 public:
     CompletedDesignsListBox(const AvailabilityManager& availabilities_state,
-                            const boost::optional<std::string>& drop_type = boost::none) :
+                            const boost::optional<std::string_view>& drop_type = boost::none) :
         BasesListBox::BasesListBox(availabilities_state, drop_type)
     {};
 
@@ -2537,7 +2549,7 @@ protected:
 class SavedDesignsListBox : public BasesListBox {
 public:
     SavedDesignsListBox(const AvailabilityManager& availabilities_state,
-                        const boost::optional<std::string>& drop_type = boost::none) :
+                        const boost::optional<std::string_view>& drop_type = boost::none) :
         BasesListBox::BasesListBox(availabilities_state, drop_type, UserString("ADD_FIRST_SAVED_DESIGN_QUEUE_PROMPT"))
     {};
 
@@ -2568,7 +2580,7 @@ protected:
 class MonstersListBox : public BasesListBox {
 public:
     MonstersListBox(const AvailabilityManager& availabilities_state,
-                    const boost::optional<std::string>& drop_type = boost::none) :
+                    const boost::optional<std::string_view>& drop_type = boost::none) :
         BasesListBox::BasesListBox(availabilities_state, drop_type)
     {}
 
@@ -2585,7 +2597,7 @@ protected:
 class AllDesignsListBox : public BasesListBox {
 public:
     AllDesignsListBox(const AvailabilityManager& availabilities_state,
-                      const boost::optional<std::string>& drop_type = boost::none) :
+                      const boost::optional<std::string_view>& drop_type = boost::none) :
         BasesListBox::BasesListBox(availabilities_state, drop_type)
     {}
 
@@ -3030,14 +3042,14 @@ void CompletedDesignsListBox::BaseRightClicked(GG::ListBox::iterator it, const G
     if (!design_row)
         return;
 
+    ScriptingContext context;
+
     const auto design_id = design_row->DesignID();
-    const auto design = GetUniverse().GetShipDesign(design_id);
+    const auto design = context.ContextUniverse().GetShipDesign(design_id);
     if (!design)
         return;
 
     DesignRightClickedSignal(design);
-
-    const auto empire_id = EmpireID();
 
     DebugLogger() << "BasesListBox::BaseRightClicked on design id : " << design_id;
 
@@ -3048,41 +3060,44 @@ void CompletedDesignsListBox::BaseRightClicked(GG::ListBox::iterator it, const G
     const auto& manager = GetDisplayedDesignsManager();
     const auto maybe_obsolete = manager.IsObsolete(design_id);
     bool is_obsolete = maybe_obsolete && *maybe_obsolete;
-    auto toggle_obsolete_design_action = [&design_id, is_obsolete, this]() {
+    auto toggle_obsolete_design_action = [design_id, is_obsolete, this]() {
         SetObsoleteInDisplayedDesigns(design_id, !is_obsolete);
         Populate();
     };
 
-    auto delete_design_action = [&design_id, this]() {
+    auto delete_design_action = [design_id, this]() {
         DeleteFromDisplayedDesigns(design_id);
         Populate();
         DesignUpdatedSignal(design_id);
     };
 
-    auto rename_design_action = [&empire_id, &design_id, design, &design_row]() {
+    const auto empire_id = EmpireID();
+
+    auto rename_design_action = [empire_id, design_id, design, &design_row, &context]() {
         auto edit_wnd = GG::Wnd::Create<CUIEditWnd>(
             GG::X(350), UserString("DESIGN_ENTER_NEW_DESIGN_NAME"), design->Name());
         edit_wnd->Run();
         const std::string& result = edit_wnd->Result();
         if (!result.empty() && result != design->Name()) {
             GGHumanClientApp::GetApp()->Orders().IssueOrder(
-                std::make_shared<ShipDesignOrder>(empire_id, design_id, result));
+                std::make_shared<ShipDesignOrder>(empire_id, design_id, result),
+                context);
             design_row->SetDisplayName(design->Name());
         }
     };
 
-    auto movetotop_design_action = [&design, this]() {
-        GetDisplayedDesignsManager().MoveBefore(design->ID(), *GetDisplayedDesignsManager().OrderedIDs().begin());
+    auto movetotop_design_action = [id{design->ID()}, this]() {
+        GetDisplayedDesignsManager().MoveBefore(id, *GetDisplayedDesignsManager().OrderedIDs().begin());
         Populate();
     };
 
-    auto movetobottom_design_action = [&design, this]() {
-        GetDisplayedDesignsManager().MoveBefore(design->ID(), INVALID_DESIGN_ID);
+    auto movetobottom_design_action = [id{design->ID()}, this]() {
+        GetDisplayedDesignsManager().MoveBefore(id, INVALID_DESIGN_ID);
         Populate();
     };
 
     auto save_design_action = [&design]() {
-        auto saved_design = *design;
+        auto saved_design{*design};
         saved_design.SetUUID(boost::uuids::random_generator()());
         GetSavedDesignsManager().InsertBefore(
             saved_design, GetSavedDesignsManager().OrderedDesignUUIDs().begin());
@@ -3319,7 +3334,7 @@ bool SavedDesignsListBox::SavedDesignListBoxRow::LookupInStringtable() const {
 //////////////////////////////////////////////////
 class DesignWnd::BaseSelector : public CUIWnd {
 public:
-    BaseSelector(const std::string& config_name);
+    BaseSelector(std::string_view config_name);
     void CompleteConstruction() override;
 
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
@@ -3357,7 +3372,7 @@ private:
                std::shared_ptr<CUIStateButton>> m_availabilities_buttons;
 };
 
-DesignWnd::BaseSelector::BaseSelector(const std::string& config_name) :
+DesignWnd::BaseSelector::BaseSelector(std::string_view config_name) :
     CUIWnd(UserString("DESIGN_WND_STARTS"),
            GG::INTERACTIVE | GG::RESIZABLE | GG::ONTOP | GG::DRAGABLE | PINABLE,
            config_name)
@@ -3854,7 +3869,7 @@ public:
         const std::string m_text;
     };
 
-    MainPanel(const std::string& config_name);
+    MainPanel(std::string_view config_name);
     void CompleteConstruction() override;
 
     /** If editing a current design return a ShipDesign* otherwise boost::none. */
@@ -4034,7 +4049,7 @@ private:
     boost::signals2::connection                 m_empire_designs_changed_signal;
 };
 
-DesignWnd::MainPanel::MainPanel(const std::string& config_name) :
+DesignWnd::MainPanel::MainPanel(std::string_view config_name) :
     CUIWnd(UserString("DESIGN_WND_MAIN_PANEL_TITLE"),
            GG::INTERACTIVE | GG::DRAGABLE | GG::RESIZABLE,
            config_name)
@@ -4048,7 +4063,7 @@ void DesignWnd::MainPanel::CompleteConstruction() {
     m_design_description_toggle = GG::Wnd::Create<CUIStateButton>(UserString("DESIGN_WND_DESIGN_DESCRIPTION"),GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
     m_design_description_edit = GG::Wnd::Create<CUIMultiEdit>(UserString("DESIGN_DESCRIPTION_DEFAULT"));
     m_design_description_edit->SetTextFormat(m_design_description_edit->GetTextFormat() | GG::FORMAT_IGNORETAGS);
-    m_replace_button = Wnd::Create<CUIButton>(UserString("DESIGN_WND_UPDATE"));
+    m_replace_button = Wnd::Create<CUIButton>(UserString("DESIGN_WND_UPDATE_SAVED"));
     m_confirm_button = Wnd::Create<CUIButton>(UserString("DESIGN_WND_ADD_FINISHED"));
     m_clear_button = Wnd::Create<CUIButton>(UserString("DESIGN_WND_CLEAR"));
 
@@ -4528,7 +4543,7 @@ void DesignWnd::MainPanel::DoLayout() {
     const GG::X PTS_WIDE(PTS / 2);           // guess at how wide per character the font needs
     constexpr int PAD = 6;
 
-    GG::Pt ul,lr,ll,ur,mus;
+    GG::Pt ul,lr,ll,mus;
     lr = ClientSize() - GG::Pt(GG::X(PAD), GG::Y(PAD));
     m_confirm_button->SizeMove(lr - m_confirm_button->MinUsableSize(), lr);
 
@@ -4638,7 +4653,7 @@ void DesignWnd::MainPanel::DesignChanged() {
 
         // check part exclusions against other parts and hull
         std::set<std::string> already_seen_component_names;
-        already_seen_component_names.emplace(m_hull->Name());
+        already_seen_component_names.insert(m_hull->Name());
         for (std::string& part_name : Parts()) {
             if (m_disabled_by_part_conflict)
                 break;
@@ -4653,7 +4668,7 @@ void DesignWnd::MainPanel::DesignChanged() {
                     break;
                 }
             }
-            already_seen_component_names.emplace(std::move(part_name));
+            already_seen_component_names.insert(std::move(part_name));
         }
 
 
@@ -4901,12 +4916,13 @@ std::pair<int, boost::uuids::uuid> DesignWnd::MainPanel::AddDesign() {
 
         // Otherwise insert into current empire designs
         } else {
+            ScriptingContext context;
             int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-            const Empire* empire = GetEmpire(empire_id);
+            auto empire = context.GetEmpire(empire_id);
             if (!empire) return {INVALID_DESIGN_ID, boost::uuids::nil_generator()()};
 
             auto order = std::make_shared<ShipDesignOrder>(empire_id, design);
-            GGHumanClientApp::GetApp()->Orders().IssueOrder(order);
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(order, context);
             new_design_id = order->DesignID();
 
             auto& manager = GetDisplayedDesignsManager();
@@ -4962,9 +4978,12 @@ void DesignWnd::MainPanel::ReplaceDesign() {
             // Remove the old id from the Empire.
             const auto maybe_obsolete = manager.IsObsolete(replaced_id);
             bool is_obsolete = maybe_obsolete && *maybe_obsolete;
-            if (!is_obsolete)
+            if (!is_obsolete) {
+                ScriptingContext context;
                 GGHumanClientApp::GetApp()->Orders().IssueOrder(
-                    std::make_shared<ShipDesignOrder>(empire_id, replaced_id, true));
+                    std::make_shared<ShipDesignOrder>(empire_id, replaced_id, true),
+                    context);
+            }
 
             // Replace the old id in the manager.
             manager.MoveBefore(new_design_id, replaced_id);
@@ -4998,7 +5017,9 @@ void DesignWnd::CompleteConstruction() {
     Sound::TempUISoundDisabler sound_disabler;
     SetChildClippingMode(ChildClippingMode::ClipToClient);
 
-    m_detail_panel = GG::Wnd::Create<EncyclopediaDetailPanel>(GG::ONTOP | GG::INTERACTIVE | GG::DRAGABLE | GG::RESIZABLE | PINABLE, DES_PEDIA_WND_NAME);
+    m_detail_panel = GG::Wnd::Create<EncyclopediaDetailPanel>(
+        GG::ONTOP | GG::INTERACTIVE | GG::DRAGABLE | GG::RESIZABLE | PINABLE,
+        DES_PEDIA_WND_NAME);
     m_main_panel = GG::Wnd::Create<MainPanel>(DES_MAIN_WND_NAME);
     m_part_palette = GG::Wnd::Create<PartPalette>(DES_PART_PALETTE_WND_NAME);
     m_base_selector = GG::Wnd::Create<BaseSelector>(DES_BASE_SELECTOR_WND_NAME);

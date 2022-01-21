@@ -502,13 +502,13 @@ SD_COLONY_SHIP
 Колониальный корабль
 
 SD_COLONY_SHIP_DESC
-Безоружный корабль, [[SHIPDESIGN_MILLIONS_COLONIZATION_CAPACITY]]. [[MIN_POPULATION_THREE_REQUIRED]], в системе с [[buildingtype BLD_SHIPYARD_BASE]].
+Безоружный корабль, [[SHIPDESIGN_MILLIONS_COLONIZATION_CAPACITY]]. [[MIN_POPULATION_REQUIRED]], в системе с [[buildingtype BLD_SHIPYARD_BASE]].
 
 SD_CRYONIC_COLONY_SHIP
 Колониальный корабль с модулем криозаморозки
 
 SD_CRYONIC_COLONY_SHIP_DESC
-Безоружный корабль, [[SHIPDESIGN_MANY_MILLIONS_COLONIZATION_CAPACITY]]. [[MIN_POPULATION_THREE_REQUIRED]], в системе с [[buildingtype BLD_SHIPYARD_BASE]].
+Безоружный корабль, [[SHIPDESIGN_MANY_MILLIONS_COLONIZATION_CAPACITY]]. [[MIN_POPULATION_REQUIRED]], в системе с [[buildingtype BLD_SHIPYARD_BASE]].
 
 SD_OUTPOST_SHIP
 Аванпост
@@ -526,13 +526,13 @@ SD_COLONY_BASE
 База для колонии
 
 SD_COLONY_BASE_DESC
-Безоружный корабль, способный создавать [[SHIPDESIGN_COLONIZATION_CAPACITY_SAME_SYSTEM]]. [[MIN_POPULATION_THREE_REQUIRED]]. [[SHIPDESIGN_NO_TRAVEL]]
+Безоружный корабль, способный создавать [[SHIPDESIGN_COLONIZATION_CAPACITY_SAME_SYSTEM]]. [[MIN_POPULATION_REQUIRED]]. [[SHIPDESIGN_NO_TRAVEL]]
 
 SD_CRYONIC_COLONY_BASE
 Крионическая база для колонии
 
 SD_CRYONIC_COLONY_BASE_DESC
-Безоружный корабль, способный создавать большие [[SHIPDESIGN_COLONIZATION_CAPACITY_SAME_SYSTEM]]. [[MIN_POPULATION_THREE_REQUIRED]]. [[SHIPDESIGN_NO_TRAVEL]]
+Безоружный корабль, способный создавать большие [[SHIPDESIGN_COLONIZATION_CAPACITY_SAME_SYSTEM]]. [[MIN_POPULATION_REQUIRED]]. [[SHIPDESIGN_NO_TRAVEL]]
 
 SD_OUTPOST_BASE
 Аванпост (база)
@@ -1890,6 +1890,9 @@ OPTIONS_DB_SECTION_MISC
 OPTIONS_DB_SECTION_NETWORK
 Сервер и сеть
 
+OPTIONS_DB_SECTION_RAW
+All options with only raw description keys
+
 OPTIONS_DB_SECTION_SAVE
 Сохранение игры
 
@@ -3010,12 +3013,6 @@ MAP_DETECTION_TITLE
 MAP_DETECTION_TEXT
 Радиус обнаружения
 
-MAP_TRADE_TITLE
-Торговля
-
-MAP_TRADE_TEXT
-Эффективность торговли. (Торговля не реализована)
-
 MAP_FLEET_SHIP_COUNT
 Всего кораблей
 
@@ -3061,9 +3058,6 @@ INDUSTRY_PRODUCTION
 RESEARCH_PRODUCTION
 Наука
 
-TRADE_PRODUCTION
-Торговля
-
 STOCKPILE_GENERATION
 Вместимость резервов
 
@@ -3072,9 +3066,6 @@ INDUSTRY_CONSUMPTION
 
 RESEARCH_CONSUMPTION
 Научные затраты
-
-TRADE_CONSUMPTION
-Торговые расходы
 
 STOCKPILE_USE
 Задействование резервов
@@ -3500,9 +3491,6 @@ FW_FLEET_INDUSTRY_SUMMARY
 
 FW_FLEET_RESEARCH_SUMMARY
 Исследовательская мощь флота - суммарная исследовательская мощь кораблей флота.
-
-FW_FLEET_TRADE_SUMMARY
-Торговые возможности флота - общее количество торговых кораблей флота.
 
 FW_MERGE_SYSTEM_FLEETS
 Объединить все корабли в системе в единый флот
@@ -4646,6 +4634,12 @@ ENC_SHIP_DESIGN_DESCRIPTION_STATS_STR
             (<i>противник с атакой %17$.1f и щитами %18$.1f</i>):  %19$.f   (%20$.2f за PP)
 '''
 
+ENC_SDD_HANGAR
+[[encyclopedia PC_FIGHTER_HANGAR]] [[METER_CAPACITY]]
+
+ENC_SDD_BAY
+[[encyclopedia PC_FIGHTER_BAY]] [[METER_CAPACITY]]
+
 ENC_UNLOCKED_BY
 '''<u>Открытые технологии:</u>
 
@@ -5036,9 +5030,6 @@ METER_RESEARCH_VALUE_DESC
 
 Для исследования не требуется соединения систем линиями [[metertype METER_SUPPLY]].'''
 
-METER_TRADE_VALUE_LABEL
-Торговля
-
 METER_CONSTRUCTION_VALUE_LABEL
 Инфраструктура
 
@@ -5184,12 +5175,6 @@ GROWTH_FOCUS_TEXT
 
 [[GROWTH_SPECIALS_ENTRY_LIST]]'''
 
-TRADE_FOCUS_TITLE
-Цель: торговля
-
-TRADE_FOCUS_TEXT
-Торговля пока ничего не делает. Она показывает, где планируется больше ресурсов
-
 PROTECTION_FOCUS_TITLE
 Цель: защита
 
@@ -5275,6 +5260,9 @@ SELF_SUSTAINING_SPECIES_TITLE
 
 SELF_SUSTAINING_SPECIES_TEXT
 Самоподдерживающиеся виды могут быть энергетическими или кристаллическими существами или чем-то более иноземным. Их объединяет то, что они не нуждаются в питании, поэтому их МАКС численность населения очень высока. Несмотря на то, что у них отсутствуют факторы роста, их МАКС численность населения равна значению вида, который снабжен всеми тремя [[encyclopedia GROWTH_FOCUS_TITLE]] факторами
+
+GASEOUS_SPECIES_TITLE
+Gaseous Metabolism
 
 TELEPATHIC_TITLE
 Телепатия
@@ -5519,6 +5507,9 @@ ORBITAL_DRYDOCK_REPAIR_TEXT
 
 Любой бой в системе нарушит ремонт на этом ходу'''
 
+CONFIG_GUIDE_TITLE
+Configuration Guide
+
 ##
 ## Turn progress
 ##
@@ -5626,9 +5617,6 @@ BUILDING_TYPE
 
 FOCUS
 Цель
-
-PREFERRED_FOCUS
-Предпочтительная цель
 
 AVAILABLE_FOCI
 Доступные цели
@@ -6404,12 +6392,21 @@ CUSTOM_SITREP_INTRODUCTION
 Добро пожаловать в первоначальный брифинг о состоянии дел и обстановке в империи. В соответствии с директивой %tech% все занятые служащие империи стремятся собрать важную информацию и отправить ее на %system%, где она компилируется в отчеты, например, с уведомлением о важных событиях и других напоминаниях, выбранных лидером империи
 
 # This message value must contain no spaces. Use underlines instead.
+CUSTOM_1
+Custom_1
 
 # This message value must contain no spaces. Use underlines instead.
+CUSTOM_2
+Custom_2
 
 # This message value must contain no spaces. Use underlines instead.
+CUSTOM_3
+Custom_3
 
 # This message value must contain no spaces. Use underlines instead.
+CUSTOM_4
+Custom_4
+
 
 ##
 ## Victory/defeat
@@ -8084,10 +8081,6 @@ FOCUS_RESEARCH
 Исследования
 
 # Focus types
-FOCUS_TRADE
-Торговля
-
-# Focus types
 FOCUS_LOGISTICS
 Снабжение
 
@@ -8148,10 +8141,6 @@ METER_TARGET_RESEARCH
 Цель: наука
 
 # Meter types
-METER_TARGET_TRADE
-Цель: торговля
-
-# Meter types
 METER_TARGET_CONSTRUCTION
 Цель: строительство
 
@@ -8204,10 +8193,6 @@ METER_RESEARCH
 Исследования
 
 # Meter types
-METER_TRADE
-Торговля
-
-# Meter types
 METER_CONSTRUCTION
 Строительство
 
@@ -8244,6 +8229,10 @@ METER_SUPPLY
 Снабжение
 
 # Meter types
+METER_STOCKPILE
+Резервы
+
+# Meter types
 METER_TROOPS
 Войска
 
@@ -8277,36 +8266,6 @@ METER_SHIP_COST_FACTOR
 
 METER_TECH_COST_FACTOR
 Фактор стоимости технологии
-
-ALIGN_MILITARISM
-Милитаризм
-
-ALIGN_MILITARY_STRENGTH_DESC
-Сила и размер армии
-
-ALIGN_SOCIAL_CONTROL
-Социальный контроль
-
-ALIGN_SOCIAL_CONTROL_DESC
-Планка, до которой население отслеживается, ограничивается и подвергается воздействиям
-
-ALIGN_ENVIRONMENT_MODIFICATION
-Изменение окружающей среды
-
-ALIGN_ENVIRONMENT_MODIFICATION_DESC
-Использование терраформинга и других широкомасштабных проектов
-
-ALIGN_BIOLOGICAL_ALTERATION
-Биологические модификации
-
-ALIGN_BIOLOGICAL_ALTERATION_DESC
-Использование биоинженеринга и биологических модификаций
-
-ALIGN_MECHANIZATION
-Механизация
-
-ALIGN_MECHANIZATION_DESC
-Использование искусственных организмов и автоматизации
 
 # Empire affiliation types
 AFFIL_SELF
@@ -8359,10 +8318,6 @@ BT_SHIP
 # Resource types
 INVALID_RESOURCE_TYPE
 Неверный тип ресурса
-
-# Resource types
-RE_TRADE
-торговля
 
 # Resource types
 RE_INDUSTRY
@@ -8529,10 +8484,6 @@ PC_RESEARCH_DESC
 Научные детали увеличивают [[metertype METER_RESEARCH]] генерируемые кораблем. Кораблю может потребоваться [[metertype METER_POPULATION]] чтобы начать производить выходные мощности
 
 # Ship part classes
-PC_TRADE
-Торговля
-
-# Ship part classes
 PC_PRODUCTION_LOCATION
 Производство
 
@@ -8658,9 +8609,6 @@ DESC_VAR_LOCAL_CANDIDATE
 DESC_VAR_ROOT_CANDIDATE
 корневой кандидат состояния
 
-DESC_STATISTIC
-статистика
-
 DESC_STAT_TYPE
 тип отчета
 
@@ -8726,12 +8674,6 @@ DESC_VAR_GALAXYSTARLANEFREQUENCY
 
 DESC_VAR_NON_OBJECT_REFERENCE
 свободная переменная
-
-DESC_VAR_TRADESTOCKPILE
-торговый запас
-
-DESC_VAR_TRADEOUTPUT
-торговая ценность
 
 DESC_VAR_INDUSTRYOUTPUT
 промышленная мощность
@@ -8813,9 +8755,6 @@ DESC_VAR_OWNERTOPPRIORITYENQUEUEDTECH
 
 DESC_VAR_LASTTURNBATTLEHERE
 в последний раз бой был здесь
-
-DESC_COMPLEX
-Совокупность переменных
 
 # FOCS variable reference description text.
 # %1% reference type of the FOCS variable.
@@ -10487,15 +10426,6 @@ GRO_BIOTERROR_DESC
 GRO_REMOTE_TERRAFORM_SHORT_DESC
 Позволяет удаленный терраформинг
 
-GRO_CYBORG
-Киборги
-
-GRO_CYBORG_DESC
-'''Устанавливает максимальное население [[PE_HOSTILE]] миров в соответствии с размером планеты: ([[SZ_TINY]] +2) ([[SZ_SMALL]] +4) ([[SZ_MEDIUM]] +6) ([[SZ_LARGE]] +8) ([[SZ_HUGE]] +10)
-Увеличивает максимальные [[metertype METER_TROOPS]] на всех планетах на 0.2 за единицу населения
-
-Очень универсальное слияние организма и машины, способное адаптироваться к огромному разнообразию обстоятельств. Спонтанная генерация специализированных органов и механически усиленная прочность позволяют киборгам существовать с легкостью практически в любой среде'''
-
 GRO_GAIA_TRANS
 Гайя
 
@@ -11391,7 +11321,7 @@ BLD_SHIPYARD_ORBITAL_DRYDOCK
 BLD_SHIPYARD_ORBITAL_DRYDOCK_DESC
 '''Это обновление для [[buildingtype BLD_SHIPYARD_BASE]] и оно необходимо для постройки некоторых дальнейших улучшений. Это обновление также обеспечивает возможности ремонта поврежденных судов, восстанавливая их [[metertype METER_STRUCTURE]] на каждом ходе
 
-[[encyclopedia ORBITAL_DRYDOCK_REPAIR_TITLE]] улучшение также предоставляет возможность ремонта поврежденных кораблей, проводя полный ремонт структурных повреждений за один ход, только если уровень [metertype METER_HAPPINESS]] превышает 5 и если в системе не было битвы в этот ход
+[[encyclopedia ORBITAL_DRYDOCK_REPAIR_TITLE]] улучшение также предоставляет возможность ремонта поврежденных кораблей, проводя полный ремонт структурных повреждений за один ход, только если уровень [[metertype METER_HAPPINESS]] превышает 5 и если в системе не было битвы в этот ход
 
 Когда строится большое межзвездное судно, не практично перемещать большие детали с поверхности планеты на Орбитальные мастерские вверх и вниз в космических лифтах. Целесообразней изготавливать детали на месте и собирать их в единую конструкцию на том же самом орбитальном заводе, тем самым исключая необходимость в транспортировке, особенно массивных частей корабля с поверхности планеты'''
 
@@ -11511,6 +11441,12 @@ BLD_INDUSTRY_CENTER_DESC
 Усовершенствование [[tech PRO_INDUSTRY_CENTER_II]] удваивает бонус
 
 Дальнейшее усовершенствование [[tech PRO_INDUSTRY_CENTER_III]] утраивает базовый бонус'''
+
+BLD_INTERSPECIES_ACADEMY
+Species InterDesign Academy
+
+BLD_STOCKPILING_CENTER
+Imperial Entanglement Center
 
 BLD_MEGALITH
 Мегалит
@@ -11801,7 +11737,7 @@ BLD_COLONY_BASE
 База колоний
 
 BLD_COLONY_BASE_DESC
-Создает корабль [[predefinedshipdesign SD_COLONY_BASE]], который может использоваться для колонизации другой планеты в той же системе. [[MIN_POPULATION_THREE_REQUIRED]]
+Создает корабль [[predefinedshipdesign SD_COLONY_BASE]], который может использоваться для колонизации другой планеты в той же системе. [[MIN_POPULATION_REQUIRED]]
 
 BLD_EXPERIMENTOR_OUTPOST
 Экспериментальный аванпост
@@ -11969,7 +11905,7 @@ BLD_COL_SILEXIAN
 Колония Силексианцев
 
 BLD_COL_SILEXIAN_DESC
-Колония L_PART_1]] [[species SP_SILEXIAN]]. [[BLD_COL_PART_2]] Колония Силексианцев [[BLD_COL_PART_3]]
+Колония [[BLD_COL_PART_1]] [[species SP_SILEXIAN]]. [[BLD_COL_PART_2]] Колония Силексианцев [[BLD_COL_PART_3]]
 
 BLD_COL_SLY
 Колония Слаев
@@ -11987,7 +11923,7 @@ BLD_COL_TAEGHIRUS
 Колония Тэ Гирусов
 
 BLD_COL_TAEGHIRUS_DESC
-Колония [[BLD_COL_PART_1]] [[species SP_TAEGHIRUS]]. [[BLD_COL_PART_2]] Колония Тэ Гирусов [BLD_COL_PART_3]]
+Колония [[BLD_COL_PART_1]] [[species SP_TAEGHIRUS]]. [[BLD_COL_PART_2]] Колония Тэ Гирусов [[BLD_COL_PART_3]]
 
 BLD_COL_TRITH
 Колония Тритов
@@ -12919,7 +12855,7 @@ SH_RAVENOUS_DESC
 
 Органический рост: создается с [[metertype METER_STRUCTURE]] равной 5, но наращивает дополнительно 20 Прочности через 40 ходов
 
-metertype METER_STEALTH]] средняя, [[metertype METER_DETECTION]] превосходное и [[metertype METER_SPEED]] высокая
+[[metertype METER_STEALTH]] средняя, [[metertype METER_DETECTION]] превосходное и [[metertype METER_SPEED]] высокая
 
 С потенциалом мощного и быстрого военного корабля
 
@@ -13325,7 +13261,7 @@ BLD_SHIPYARD_BASE_ORG_ORB_INC_REQUIRED
 BLD_SHIPYARD_BASE_ORG_ORB_INC_ORG_XENO_FAC_REQUIRED
 Может быть построен только при наличии [[buildingtype BLD_SHIPYARD_BASE]] и [[buildingtype BLD_SHIPYARD_ORG_ORB_INC]] и [[buildingtype BLD_SHIPYARD_ORG_XENO_FAC]] в системе.
 
-MIN_POPULATION_THREE_REQUIRED
+MIN_POPULATION_REQUIRED
 Может быть построен только при наличии уровня населения не менее трёх.
 
 BLD_SHIPYARD_BASE_ORG_ORB_INC_ORG_CELL_GRO_CHAMB_REQUIRED
@@ -14013,16 +13949,39 @@ ORBITAL
 ##
 
 # Newline separated list of capitol names for beginner AIs
+AI_CAPITOL_NAMES_BEGINNER
+'''Ivory Tower
+Nunnery
+Monastery
+Orphanage'''
 
 # Newline separated list of capitol names for turtle AIs
+AI_CAPITOL_NAMES_TURTLE
+'''Citadel
+Prison'''
 
 # Newline separated list of capitol names for cautious AIs
+AI_CAPITOL_NAMES_CAUTIOUS
+'''Bastion
+Stronghold'''
 
 # Newline separated list of capitol names for typical AIs
+AI_CAPITOL_NAMES_TYPICAL
+'''Haven
+Free Trade Zone
+Homeworld'''
 
 # Newline separated list of capitol names for aggressive AIs
+AI_CAPITOL_NAMES_AGGRESSIVE
+'''Royal
+Imperial'''
 
 # Newline separated list of capitol names for maniacal AIs
+AI_CAPITOL_NAMES_MANIACAL
+'''Glorious
+Supreme
+Eternal
+Invincible'''
 
 AI_SHIPDESIGN_NAME_INVALID
 Неверный дизайн

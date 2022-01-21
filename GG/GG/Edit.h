@@ -69,7 +69,7 @@ public:
     const std::pair<CPSize, CPSize>& CursorPosn() const;
 
     /** Returns the text that is selected in this control. */
-    std::string SelectedText() const;
+    std::string_view SelectedText() const;
 
     /** Returns the color used to render the iterior of the control. */
     Clr InteriorColor() const;
@@ -170,7 +170,7 @@ protected:
     void LButtonUp(const Pt& pt, Flags<ModKey> mod_keys) override;
     void LClick(const Pt& pt, Flags<ModKey> mod_keys) override;
     void KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys) override;
-    void TextInput(const std::string* text) override;
+    void TextInput(const std::string& text) override;
     void GainingFocus() override;
     void LosingFocus() override;
 

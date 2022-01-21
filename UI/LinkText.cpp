@@ -17,17 +17,10 @@
 #include <boost/xpressive/xpressive.hpp>
 #include <boost/algorithm/string.hpp>
 
-// TextLinker static(s)
-const std::string TextLinker::ENCYCLOPEDIA_TAG("encyclopedia");
-const std::string TextLinker::GRAPH_TAG("graph");
-const std::string TextLinker::URL_TAG("url");
-const std::string TextLinker::BROWSE_PATH_TAG("browsepath");
-
 namespace {
     constexpr bool RENDER_DEBUGGING_LINK_RECTS = false;
-
-    // closing format tag
-    static const std::string LINK_FORMAT_CLOSE = "</rgba>";
+    constexpr std::string_view LINK_FORMAT_CLOSE = "</rgba>"; // closing format tag
+    const LinkDecorator DEFAULT_DECORATOR;
 
     std::string AllParamsAsString(const std::vector<GG::Font::Substring>& params) {
         std::string retval;
@@ -39,21 +32,27 @@ namespace {
         return retval;
     }
 
-    std::string ResolveNestedPathTypes(const std::string& text) {
+    std::string ResolveNestedPathTypes(std::string text) {
         if (text.empty())
             return text;
-        std::string new_text = text;
-        for (const auto& path_type : PathTypeStrings()) {
-            std::string path_string = PathToString(GetPath(path_type));
-            boost::replace_all(new_text, path_type, path_string);
-        }
-        return new_text;
+
+        const auto& path_type_strings = PathTypeStrings();
+        const auto& path_types = PathTypes();
+
+        constexpr auto pts_sz = std::tuple_size_v<std::decay_t<decltype(path_type_strings)>>;
+        constexpr auto pt_sz = std::tuple_size_v<std::decay_t<decltype(path_types)>>;
+        static_assert(pts_sz == pt_sz);
+
+        for (std::size_t idx = 0; idx < pts_sz; ++idx)
+            boost::replace_all(text, path_type_strings[idx], PathToString(GetPath(path_types[idx])));
+
+        return text;
     }
 
     namespace xpr = boost::xpressive;
     const xpr::sregex REGEX_NON_BRACKET = *~(xpr::set= '<', '>');
-    const std::string BROWSEPATH_TAG_OPEN_PRE("<" + TextLinker::BROWSE_PATH_TAG);
-    const std::string BROWSEPATH_TAG_CLOSE("</" + TextLinker::BROWSE_PATH_TAG + ">");
+    const std::string BROWSEPATH_TAG_OPEN_PRE{std::string{"<"}.append(TextLinker::BROWSE_PATH_TAG)};
+    const std::string BROWSEPATH_TAG_CLOSE{std::string{"</"}.append(TextLinker::BROWSE_PATH_TAG).append(">")};
     const xpr::sregex BROWSEPATH_SEARCH = BROWSEPATH_TAG_OPEN_PRE >> xpr::_s >> (xpr::s1 = REGEX_NON_BRACKET) >> ">" >>
                                           (xpr::s2 = REGEX_NON_BRACKET) >> BROWSEPATH_TAG_CLOSE;
 
@@ -103,15 +102,16 @@ namespace {
  *  If the tag content is empty or @p add_explanation is true,
  *  the value ref description gets added as explanation instead. */
 std::string ValueRefLinkText(const std::string& text, const bool add_explanation) {
-    auto FOCS_VALUE_TAG_CLOSE("</" + VarText::FOCS_VALUE_TAG + ">");
+    static const std::string FOCS_VALUE_TAG_CLOSE{std::string{"</"}.append(VarText::FOCS_VALUE_TAG).append(">")};
     if (!boost::contains(text, FOCS_VALUE_TAG_CLOSE))
         return text;
 
     std::string retval(text);
     auto text_it = retval.begin();
     xpr::smatch match;
-    const xpr::sregex FOCS_VALUE_SEARCH = ("<" + VarText::FOCS_VALUE_TAG) >> xpr::_s >> (xpr::s1 = REGEX_NON_BRACKET) >> ">" >>
-                                          (xpr::s2 = REGEX_NON_BRACKET) >> ("</" + VarText::FOCS_VALUE_TAG + ">");
+    const xpr::sregex FOCS_VALUE_SEARCH =
+        (std::string{"<"}.append(VarText::FOCS_VALUE_TAG)) >> xpr::_s >> (xpr::s1 = REGEX_NON_BRACKET) >> ">" >>
+        (xpr::s2 = REGEX_NON_BRACKET) >> (std::string{"</"}.append(VarText::FOCS_VALUE_TAG).append(">"));
 
     while (true) {
         if (!xpr::regex_search(text_it, retval.end(), match, FOCS_VALUE_SEARCH, xpr::regex_constants::match_default))
@@ -127,8 +127,9 @@ std::string ValueRefLinkText(const std::string& text, const bool add_explanation
             ? " (" + ((match[2].length()==0 || !UserStringExists(value_ref_name)) ? "" : match[2] + ": ") + value_ref->Description() + ")"
             : ""};
 
-        auto resolved_tooltip = "<" + VarText::FOCS_VALUE_TAG + " " + value_ref_name + ">"
-                                + value_str + explanation_str + "</" + VarText::FOCS_VALUE_TAG + ">";
+        auto resolved_tooltip = std::string{"<"}.append(VarText::FOCS_VALUE_TAG).append(" ")
+                               .append(value_ref_name).append(">").append(value_str).append(explanation_str)
+                               .append("</").append(VarText::FOCS_VALUE_TAG).append(">");
 
         retval.replace(text_it + match.position(), text_it + match.position() + match.length(), resolved_tooltip);
 
@@ -226,13 +227,11 @@ void LinkText::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
 // LinkDecorator
 ///////////////////////////////////////
 
-std::string LinkDecorator::Decorate(const std::string& target, const std::string& content) const{
-    return GG::RgbaTag(ClientUI::DefaultLinkColor()) + content + LINK_FORMAT_CLOSE;
-}
+std::string LinkDecorator::Decorate(const std::string& target, const std::string& content) const
+{ return GG::RgbaTag(ClientUI::DefaultLinkColor()).append(content).append(LINK_FORMAT_CLOSE); }
 
-std::string LinkDecorator::DecorateRollover(const std::string& target, const std::string& content) const{
-    return GG::RgbaTag(ClientUI::RolloverLinkColor()) + content + LINK_FORMAT_CLOSE;
-}
+std::string LinkDecorator::DecorateRollover(const std::string& target, const std::string& content) const
+{ return GG::RgbaTag(ClientUI::RolloverLinkColor()).append(content).append(LINK_FORMAT_CLOSE); }
 
 int LinkDecorator::CastStringToInt(const std::string& str) {
     std::stringstream ss;
@@ -248,60 +247,49 @@ int LinkDecorator::CastStringToInt(const std::string& str) {
 
 std::string ColorByOwner::Decorate(const std::string& object_id_str, const std::string& content) const {
     GG::Clr color = ClientUI::DefaultLinkColor();
-    const Empire* empire = nullptr;
     // get object indicated by object_id, and then get object's owner, if any
     int object_id = CastStringToInt(object_id_str);
     auto object = Objects().get(object_id);
     if (object && !object->Unowned())
-        empire = GetEmpire(object->Owner());
-    if (empire)
-        color = empire->Color();
-    return GG::RgbaTag(color) + content + "</rgba>";
+        if (auto empire = Empires().GetEmpire(object->Owner()))
+            color = empire->Color();
+    return GG::RgbaTag(color).append(content).append("</rgba>");
 }
 
-std::string PathTypeDecorator::Decorate(const std::string& path_type, const std::string& content) const {
-    return LinkDecorator::Decorate(path_type, BrowsePathLinkText(content));
-}
+std::string PathTypeDecorator::Decorate(const std::string& path_type, const std::string& content) const
+{ return LinkDecorator::Decorate(path_type, BrowsePathLinkText(content)); }
 
-std::string PathTypeDecorator::DecorateRollover(const std::string& path_type, const std::string& content) const {
-    return LinkDecorator::DecorateRollover(path_type, BrowsePathLinkText(content));
-}
+std::string PathTypeDecorator::DecorateRollover(const std::string& path_type, const std::string& content) const
+{ return LinkDecorator::DecorateRollover(path_type, BrowsePathLinkText(content)); }
 
-std::string ValueRefDecorator::Decorate(const std::string& value_ref_name, const std::string& content) const {
-    return GG::RgbaTag(ClientUI::DefaultTooltipColor()) + ::ValueRefLinkText(content, false) + LINK_FORMAT_CLOSE;
-}
+std::string ValueRefDecorator::Decorate(const std::string& value_ref_name, const std::string& content) const
+{ return GG::RgbaTag(ClientUI::DefaultTooltipColor()).append(::ValueRefLinkText(content, false)).append(LINK_FORMAT_CLOSE); }
 
-std::string ValueRefDecorator::DecorateRollover(const std::string& value_ref_name, const std::string& content) const {
-    return GG::RgbaTag(ClientUI::RolloverTooltipColor()) + ::ValueRefLinkText(content, true) + LINK_FORMAT_CLOSE;
-}
+std::string ValueRefDecorator::DecorateRollover(const std::string& value_ref_name, const std::string& content) const
+{ return GG::RgbaTag(ClientUI::RolloverTooltipColor()).append(::ValueRefLinkText(content, true)).append(LINK_FORMAT_CLOSE); }
 
 
 ///////////////////////////////////////
 // TextLinker::Link
 ///////////////////////////////////////
 struct TextLinker::Link {
-    std::string             type;           ///< contents of type field of link tag (eg "planet" in <planet 3>)
-    std::string             data;           ///< contents of data field of link tag (eg "3" in <planet 3>)
-    std::vector<GG::Rect>   rects;          ///< the rectangles in which this link falls, in window coordinates (some links may span more than one line)
-    std::pair<int, int>     text_posn;      ///< the index of the first (.first) and last + 1 (.second) characters in the raw link text
-    std::pair<int, int>     real_text_posn; ///< the index of the first and last + 1 characters in the current (potentially decorated) content string
+    std::string           type;           ///< contents of type field of link tag (eg "planet" in <planet 3>)
+    std::string           data;           ///< contents of data field of link tag (eg "3" in <planet 3>)
+    std::vector<GG::Rect> rects;          ///< the rectangles in which this link falls, in window coordinates (some links may span more than one line)
+    std::pair<int, int>   text_posn;      ///< the index of the first (.first) and last + 1 (.second) characters in the raw link text
+    std::pair<int, int>   real_text_posn; ///< the index of the first and last + 1 characters in the current (potentially decorated) content string
 };
 
 
 ///////////////////////////////////////
 // TextLinker
 ///////////////////////////////////////
-TextLinker::TextLinker() :
-    m_links(),
-    m_rollover_link(-1)
-{
-    RegisterLinkTags();
-}
+TextLinker::TextLinker()
+{ RegisterLinkTags(); }
 
-TextLinker::~TextLinker()
-{}
+TextLinker::~TextLinker() = default;
 
-void TextLinker::SetDecorator(const std::string& link_type, LinkDecorator* decorator) {
+void TextLinker::SetDecorator(std::string_view link_type, LinkDecorator* decorator) {
     m_decorators[link_type] = std::shared_ptr<LinkDecorator>(decorator);
     MarkLinks();
 }
@@ -310,9 +298,8 @@ std::string TextLinker::LinkDefaultFormatTag(const Link& link, const std::string
     const LinkDecorator* decorator = &DEFAULT_DECORATOR;
 
     auto it = m_decorators.find(link.type);
-    if (it != m_decorators.end()){
+    if (it != m_decorators.end())
         decorator = it->second.get();
-    }
 
     return decorator->Decorate(link.data, content);
 }
@@ -353,10 +340,8 @@ void TextLinker::LClick_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
         return;
     }
 
-    const auto& LINK_TYPE = m_links[sel_link].type;
-    const auto& DATA = m_links[sel_link].data;
-
-    LinkClickedSignal(LINK_TYPE, DATA);
+    const auto& LINK = m_links[sel_link];
+    LinkClickedSignal(LINK.type, LINK.data);
 }
 
 void TextLinker::RClick_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
@@ -368,10 +353,8 @@ void TextLinker::RClick_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
         return;
     }
 
-    const std::string& LINK_TYPE = m_links[sel_link].type;
-    const std::string& DATA = m_links[sel_link].data;
-
-    LinkRightClickedSignal(LINK_TYPE, DATA);
+    const auto& LINK = m_links[sel_link];
+    LinkClickedSignal(LINK.type, LINK.data);
 }
 
 void TextLinker::LDoubleClick_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
@@ -383,10 +366,8 @@ void TextLinker::LDoubleClick_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
         return;
     }
 
-    const std::string& LINK_TYPE = m_links[sel_link].type;
-    const std::string& DATA = m_links[sel_link].data;
-
-    LinkDoubleClickedSignal(LINK_TYPE, DATA);
+    const auto& LINK = m_links[sel_link];
+    LinkClickedSignal(LINK.type, LINK.data);
 }
 
 void TextLinker::MouseHere_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
@@ -405,7 +386,6 @@ void TextLinker::MouseLeave_() {
 void TextLinker::FindLinks() {
     m_links.clear();
 
-    GG::Y y_posn(0); // y-coordinate of the top of the current line
     Link link;
 
     // control text needs to be updated so that the line data is calculated from
@@ -591,16 +571,21 @@ void TextLinker::MarkLinks() {
     SetLinkedText(std::move(marked_text));
 }
 
-const LinkDecorator TextLinker::DEFAULT_DECORATOR;
+std::string LinkTaggedText(std::string_view tag, std::string_view stringtable_entry)
+{ return LinkTaggedPresetText(tag, stringtable_entry, UserString(stringtable_entry)); }
 
-std::string LinkTaggedText(const std::string& tag, const std::string& stringtable_entry)
-{ return "<" + tag + " " + stringtable_entry + ">" + UserString(stringtable_entry) + "</" + tag + ">"; }
+std::string LinkTaggedIDText(std::string_view tag, int id, std::string_view display_text)
+{ return LinkTaggedPresetText(tag, std::to_string(id), display_text); }
 
-std::string LinkTaggedIDText(const std::string& tag, int id, const std::string& text)
-{ return "<" + tag + " " + std::to_string(id) + ">" + text + "</" + tag + ">"; }
-
-std::string LinkTaggedPresetText(const std::string& tag, const std::string& stringtable_entry, const std::string& display_text)
-{ return "<" + tag + " " + stringtable_entry + ">" + display_text + "</" + tag + ">"; }
+std::string LinkTaggedPresetText(std::string_view tag, std::string_view stringtable_entry,
+                                 std::string_view display_text)
+{
+    std::string retval;
+    retval.reserve(10 + display_text.length() + 2*tag.length() + stringtable_entry.length());
+    retval.append("<").append(tag).append(" ").append(stringtable_entry)
+          .append(">").append(display_text).append("</").append(tag).append(">");
+    return retval;
+}
 
 namespace {
     static bool link_tags_registered = false;

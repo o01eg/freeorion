@@ -75,8 +75,8 @@ int         ClientUI::TitlePts()                { return GetOptionsDB().Get<int>
 GG::Clr     ClientUI::TextColor()               { return GetOptionsDB().Get<GG::Clr>("ui.font.color"); }
 GG::Clr     ClientUI::DefaultLinkColor()        { return GetOptionsDB().Get<GG::Clr>("ui.font.link.color"); }
 GG::Clr     ClientUI::RolloverLinkColor()       { return GetOptionsDB().Get<GG::Clr>("ui.font.link.rollover.color"); }
-GG::Clr     ClientUI::DefaultTooltipColor()        { return GetOptionsDB().Get<GG::Clr>("ui.font.tooltip.color"); }
-GG::Clr     ClientUI::RolloverTooltipColor()       { return GetOptionsDB().Get<GG::Clr>("ui.font.tooltip.rollover.color"); }
+GG::Clr     ClientUI::DefaultTooltipColor()     { return GetOptionsDB().Get<GG::Clr>("ui.font.tooltip.color"); }
+GG::Clr     ClientUI::RolloverTooltipColor()    { return GetOptionsDB().Get<GG::Clr>("ui.font.tooltip.rollover.color"); }
 
 
 GG::Clr     ClientUI::WndColor()                { return GetOptionsDB().Get<GG::Clr>("ui.window.background.color"); }
@@ -356,69 +356,74 @@ std::shared_ptr<GG::Texture> ClientUI::ShipDesignIcon(int design_id) {
 }
 
 
-GG::Clr     ClientUI::KnownTechFillColor()                   { return GetOptionsDB().Get<GG::Clr>("ui.research.status.completed.background.color"); }
-GG::Clr     ClientUI::KnownTechTextAndBorderColor()          { return GetOptionsDB().Get<GG::Clr>("ui.research.status.completed.border.color"); }
-GG::Clr     ClientUI::ResearchableTechFillColor()            { return GetOptionsDB().Get<GG::Clr>("ui.research.status.researchable.background.color"); }
-GG::Clr     ClientUI::ResearchableTechTextAndBorderColor()   { return GetOptionsDB().Get<GG::Clr>("ui.research.status.researchable.border.color"); }
-GG::Clr     ClientUI::UnresearchableTechFillColor()          { return GetOptionsDB().Get<GG::Clr>("ui.research.status.unresearchable.background.color"); }
-GG::Clr     ClientUI::UnresearchableTechTextAndBorderColor() { return GetOptionsDB().Get<GG::Clr>("ui.research.status.unresearchable.border.color"); }
-GG::Clr     ClientUI::TechWndProgressBarBackgroundColor()    { return GetOptionsDB().Get<GG::Clr>("ui.research.status.progress.background.color"); }
-GG::Clr     ClientUI::TechWndProgressBarColor()              { return GetOptionsDB().Get<GG::Clr>("ui.research.status.progress.color"); }
+GG::Clr ClientUI::KnownTechFillColor()                   { return GetOptionsDB().Get<GG::Clr>("ui.research.status.completed.background.color"); }
+GG::Clr ClientUI::KnownTechTextAndBorderColor()          { return GetOptionsDB().Get<GG::Clr>("ui.research.status.completed.border.color"); }
+GG::Clr ClientUI::ResearchableTechFillColor()            { return GetOptionsDB().Get<GG::Clr>("ui.research.status.researchable.background.color"); }
+GG::Clr ClientUI::ResearchableTechTextAndBorderColor()   { return GetOptionsDB().Get<GG::Clr>("ui.research.status.researchable.border.color"); }
+GG::Clr ClientUI::UnresearchableTechFillColor()          { return GetOptionsDB().Get<GG::Clr>("ui.research.status.unresearchable.background.color"); }
+GG::Clr ClientUI::UnresearchableTechTextAndBorderColor() { return GetOptionsDB().Get<GG::Clr>("ui.research.status.unresearchable.border.color"); }
+GG::Clr ClientUI::TechWndProgressBarBackgroundColor()    { return GetOptionsDB().Get<GG::Clr>("ui.research.status.progress.background.color"); }
+GG::Clr ClientUI::TechWndProgressBarColor()              { return GetOptionsDB().Get<GG::Clr>("ui.research.status.progress.color"); }
 
-GG::Clr     ClientUI::CategoryColor(const std::string& category_name) {
-    const TechCategory* category = GetTechCategory(category_name);
-    if (category)
+GG::Clr ClientUI::CategoryColor(const std::string& category_name) {
+    if (auto category = GetTechCategory(category_name))
         return category->colour;
-    return GG::Clr();
+    return {};
 }
 
-std::map<PlanetType, std::string>& ClientUI::PlanetTypeFilePrefixes() {
-    static std::map<PlanetType, std::string> prefixes;
-    if (prefixes.empty()) {
-        prefixes[PlanetType::PT_SWAMP] =    "Swamp";
-        prefixes[PlanetType::PT_TOXIC] =    "Toxic";
-        prefixes[PlanetType::PT_INFERNO] =  "Inferno";
-        prefixes[PlanetType::PT_RADIATED] = "Radiated";
-        prefixes[PlanetType::PT_BARREN] =   "Barren";
-        prefixes[PlanetType::PT_TUNDRA] =   "Tundra";
-        prefixes[PlanetType::PT_DESERT] =   "Desert";
-        prefixes[PlanetType::PT_TERRAN] =   "Terran";
-        prefixes[PlanetType::PT_OCEAN] =    "Ocean";
-        prefixes[PlanetType::PT_GASGIANT] = "GasGiant";
-    }
-    return prefixes;
+std::string_view ClientUI::PlanetTypeFilePrefix(PlanetType planet_type) {
+    static const std::map<PlanetType, std::string_view> prefixes{
+        {PlanetType::PT_SWAMP,   "Swamp"},
+        {PlanetType::PT_TOXIC,   "Toxic"},
+        {PlanetType::PT_INFERNO, "Inferno"},
+        {PlanetType::PT_RADIATED,"Radiated"},
+        {PlanetType::PT_BARREN,  "Barren"},
+        {PlanetType::PT_TUNDRA,  "Tundra"},
+        {PlanetType::PT_DESERT,  "Desert"},
+        {PlanetType::PT_TERRAN,  "Terran"},
+        {PlanetType::PT_OCEAN,   "Ocean"},
+        {PlanetType::PT_GASGIANT,"GasGiant"}
+    };
+    auto it = prefixes.find(planet_type);
+    if (it != prefixes.end())
+        return it->second;
+    return "";
 }
 
-std::map<StarType, std::string>& ClientUI::StarTypeFilePrefixes() {
-    static std::map<StarType, std::string> prefixes;
-    if (prefixes.empty()) {
-        prefixes[StarType::INVALID_STAR_TYPE] =   "unknown";
-        prefixes[StarType::STAR_BLUE] =           "blue";
-        prefixes[StarType::STAR_WHITE] =          "white";
-        prefixes[StarType::STAR_YELLOW] =         "yellow";
-        prefixes[StarType::STAR_ORANGE] =         "orange";
-        prefixes[StarType::STAR_RED] =            "red";
-        prefixes[StarType::STAR_NEUTRON] =        "neutron";
-        prefixes[StarType::STAR_BLACK] =          "blackhole";
-        prefixes[StarType::STAR_NONE] =           "nostar";
-    }
-    return prefixes;
+std::string_view ClientUI::StarTypeFilePrefix(StarType star_type) {
+    static const std::map<StarType, std::string_view> prefixes{
+        {StarType::INVALID_STAR_TYPE, "unknown"},
+        {StarType::STAR_BLUE,         "blue"},
+        {StarType::STAR_WHITE,        "white"},
+        {StarType::STAR_YELLOW,       "yellow"},
+        {StarType::STAR_ORANGE,       "orange"},
+        {StarType::STAR_RED,          "red"},
+        {StarType::STAR_NEUTRON,      "neutron"},
+        {StarType::STAR_BLACK,        "blackhole"},
+        {StarType::STAR_NONE,         "nostar"}
+    };
+    auto it = prefixes.find(star_type);
+    if (it != prefixes.end())
+        return it->second;
+    return "";
 }
 
-std::map<StarType, std::string>& ClientUI::HaloStarTypeFilePrefixes() {
-    static std::map<StarType, std::string> prefixes;
-    if (prefixes.empty()) {
-        prefixes[StarType::INVALID_STAR_TYPE] =   "halo_unknown";
-        prefixes[StarType::STAR_BLUE] =           "halo_blue";
-        prefixes[StarType::STAR_WHITE] =          "halo_white";
-        prefixes[StarType::STAR_YELLOW] =         "halo_yellow";
-        prefixes[StarType::STAR_ORANGE] =         "halo_orange";
-        prefixes[StarType::STAR_RED] =            "halo_red";
-        prefixes[StarType::STAR_NEUTRON] =        "halo_neutron";
-        prefixes[StarType::STAR_BLACK] =          "halo_blackhole";
-        prefixes[StarType::STAR_NONE] =           "halo_nostar";
-    }
-    return prefixes;
+std::string_view ClientUI::HaloStarTypeFilePrefix(StarType star_type) {
+    static const std::map<StarType, std::string_view> prefixes{
+        {StarType::INVALID_STAR_TYPE, "halo_unknown"},
+        {StarType::STAR_BLUE,         "halo_blue"},
+        {StarType::STAR_WHITE,        "halo_white"},
+        {StarType::STAR_YELLOW,       "halo_yellow"},
+        {StarType::STAR_ORANGE,       "halo_orange"},
+        {StarType::STAR_RED,          "halo_red"},
+        {StarType::STAR_NEUTRON,      "halo_neutron"},
+        {StarType::STAR_BLACK,        "halo_blackhole"},
+        {StarType::STAR_NONE,         "halo_nostar"}
+    };
+    auto it = prefixes.find(star_type);
+    if (it != prefixes.end())
+        return it->second;
+    return "";
 }
 
 
@@ -467,7 +472,7 @@ namespace {
                 std::set<GG::UnicodeCharset> default_stringtable_charsets = GG::UnicodeCharsetsToRender(stringtable_str);
                 DebugLogger() << "loading " << default_stringtable_charsets.size() << " charsets for default stringtable characters";
 
-                stringtable_charsets.insert(default_stringtable_charsets.begin(), default_stringtable_charsets.end());
+                stringtable_charsets.merge(default_stringtable_charsets); // insert(default_stringtable_charsets.begin(), default_stringtable_charsets.end());
                 DebugLogger() << "combined stringtable charsets have " << stringtable_charsets.size() << " charsets";
             }
 
@@ -847,9 +852,8 @@ bool ClientUI::ZoomToBuilding(int id) {
 }
 
 bool ClientUI::ZoomToField(int id) {
-    //if (auto field = Objects().get<Field>(id)) {
-    //  // TODO: implement this
-    //}
+    if (auto field = Objects().get<Field>(id))
+        GetMapWnd()->CenterOnObject(id);
     return false;
 }
 
@@ -895,7 +899,7 @@ bool ClientUI::ZoomToContent(const std::string& name, bool reverse_lookup/* = fa
 
         for (const auto& special_name : SpecialNames())
             if (boost::iequals(name, UserString(special_name)))
-                return ZoomToSpecial(special_name);
+                return ZoomToSpecial(std::string{special_name}); // TODO: pass just the string_view
 
         for ([[maybe_unused]] auto& [hull_name, ignored] : GetShipHullManager()) {
             (void)ignored;  // quiet unused variable warning
@@ -1056,22 +1060,22 @@ void ClientUI::HandleFullscreenSwitch() const {
 }
 
 std::shared_ptr<GG::Texture> ClientUI::GetRandomTexture(const boost::filesystem::path& dir,
-                                                        const std::string& prefix, bool mipmap/* = false*/)
+                                                        std::string_view prefix, bool mipmap)
 {
-    auto prefixed_textures = GetPrefixedTextures(dir, prefix, mipmap);
+    const auto& prefixed_textures = GetPrefixedTextures(dir, prefix, mipmap);
     if (prefixed_textures.empty())
         return nullptr;
     return prefixed_textures.at(RandInt(0, prefixed_textures.size()));
 }
 
 std::shared_ptr<GG::Texture> ClientUI::GetModuloTexture(const boost::filesystem::path& dir,
-                                                        const std::string& prefix, int n, bool mipmap/* = false*/)
+                                                        std::string_view prefix, int n, bool mipmap)
 {
     assert(0 <= n);
-    auto prefixed_textures = GetPrefixedTextures(dir, prefix, mipmap);
+    const auto& prefixed_textures = GetPrefixedTextures(dir, prefix, mipmap);
     if (prefixed_textures.empty())
         return nullptr;
-    return prefixed_textures.at(n % prefixed_textures.size());
+    return prefixed_textures[n % prefixed_textures.size()];
 }
 
 void ClientUI::RestoreFromSaveData(const SaveGameUIData& ui_data) {
@@ -1122,7 +1126,8 @@ std::shared_ptr<GG::Texture> ClientUI::GetTexture(const boost::filesystem::path&
 
 std::shared_ptr<GG::Font> ClientUI::GetFont(int pts/* = Pts()*/) {
      try {
-        return GG::GUI::GetGUI()->GetFont(GetOptionsDB().Get<std::string>("ui.font.path"), pts, RequiredCharsets().begin(), RequiredCharsets().end());
+        return GG::GUI::GetGUI()->GetFont(GetOptionsDB().Get<std::string>("ui.font.path"), pts,
+                                          RequiredCharsets().begin(), RequiredCharsets().end());
      } catch (...) {
          try {
             return GG::GUI::GetGUI()->GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.path"),
@@ -1159,21 +1164,20 @@ std::shared_ptr<GG::Font> ClientUI::GetTitleFont(int pts/* = TitlePts()*/) {
    }
 }
 
-std::vector<std::shared_ptr<GG::Texture>> ClientUI::GetPrefixedTextures(
-    const boost::filesystem::path& dir, const std::string& prefix, bool mipmap)
+const std::vector<std::shared_ptr<GG::Texture>>& ClientUI::GetPrefixedTextures(
+    const boost::filesystem::path& dir, std::string_view prefix, bool mipmap)
 {
     namespace fs = boost::filesystem;
-
-    std::string KEY = dir.string() + "/" + prefix;
-    auto prefixed_textures_it = m_prefixed_textures.find(KEY);
-
-    if (prefixed_textures_it != m_prefixed_textures.end())
-        return prefixed_textures_it->second;
-
     if (!fs::is_directory(dir)) {
         ErrorLogger() << "GetPrefixedTextures passed invalid dir: " << dir;
-        return {};
+        static const std::vector<std::shared_ptr<GG::Texture>> EMPTY_VEC;
+        return EMPTY_VEC;
     }
+
+    std::string KEY{(dir / prefix.data()).string()};
+    auto prefixed_textures_it = m_prefixed_textures.find(KEY);
+    if (prefixed_textures_it != m_prefixed_textures.end())
+        return prefixed_textures_it->second;
 
     // if not already loaded, load textures with requested key
     std::vector<std::shared_ptr<GG::Texture>> textures;
@@ -1181,8 +1185,8 @@ std::vector<std::shared_ptr<GG::Texture>> ClientUI::GetPrefixedTextures(
     for (fs::directory_iterator it(dir); it != end_it; ++it) {
         try {
             if (fs::exists(*it) &&
-                !fs::is_directory(*it)
-                && boost::algorithm::starts_with(it->path().filename().string(), prefix))
+                !fs::is_directory(*it) &&
+                boost::algorithm::starts_with(it->path().filename().string(), prefix))
             { textures.push_back(ClientUI::GetTexture(*it, mipmap)); }
         } catch (const fs::filesystem_error& e) {
             // ignore files for which permission is denied, and rethrow other exceptions
@@ -1191,9 +1195,9 @@ std::vector<std::shared_ptr<GG::Texture>> ClientUI::GetPrefixedTextures(
         }
     }
     std::sort(textures.begin(), textures.end(), TextureFileNameCompare);
-    m_prefixed_textures.emplace(std::move(KEY), textures);
-
-    return textures;
+    auto [emplace_it, b] = m_prefixed_textures.emplace(std::move(KEY), std::move(textures));
+    (void)b; // ignored
+    return emplace_it->second;
 }
 
 int FontBasedUpscale(int x) {

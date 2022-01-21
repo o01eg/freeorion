@@ -43,7 +43,7 @@ namespace {
     }
 
     /* returns prefix of filename used for icons for the indicated fleet button size type */
-    const std::string& FleetIconSizePrefix(FleetButton::SizeType size_type) {
+    const std::string& FleetIconSizePrefix(FleetButton::SizeType size_type) { // TODO: string_view ?
         static const std::string EMPTY_STRING;
         static const std::string BIG_STRING{"big-"};
         static const std::string MED_STRING{"med-"};
@@ -88,11 +88,13 @@ void FleetButton::CompleteConstruction() {
     Refresh(m_size);
 }
 
-FleetButton::~FleetButton()
-{}
-
 void FleetButton::Refresh(SizeType size_type) {
-    auto fleets_shared = Objects().find<Fleet>(m_fleets);
+    const Universe& u = GetUniverse();
+    const ObjectMap& o = u.Objects();
+    const EmpireManager& e = Empires();
+    ScriptingContext context{u, e};
+
+    auto fleets_shared = o.find<Fleet>(m_fleets);
     std::vector<const Fleet*> fleets;
     fleets.reserve(fleets_shared.size());
     std::transform(fleets_shared.begin(), fleets_shared.end(), std::back_inserter(fleets),
@@ -123,8 +125,8 @@ void FleetButton::Refresh(SizeType size_type) {
         bool monsters = true;
         // find if any ship in fleets in button is not a monster
         for (const auto& fleet : fleets) {
-            for (const auto& ship : Objects().find<Ship>(fleet->ShipIDs())) {
-                if (!ship->IsMonster()) {
+            for (const auto& ship : o.find<Ship>(fleet->ShipIDs())) {
+                if (!ship->IsMonster(u)) {
                     monsters = false;
                     break;
                 }
@@ -136,7 +138,7 @@ void FleetButton::Refresh(SizeType size_type) {
 
     } else {
         // single empire owner
-        const Empire* empire = GetEmpire(owner_id);
+        auto empire = e.GetEmpire(owner_id);
         SetColor(empire ? empire->Color() : GG::CLR_GRAY);
     }
 
@@ -179,7 +181,6 @@ void FleetButton::Refresh(SizeType size_type) {
     for (const auto& fleet : fleets) {
         if (fleet) {
             num_ships += fleet->NumShips();
-            ScriptingContext context;
             if (!m_fleet_blockaded && fleet->Blockaded(context))
                 m_fleet_blockaded = true;
         }
@@ -345,7 +346,8 @@ void FleetButton::LayoutIcons() {
                 continue;
 
             if (auto target_system = context.ContextObjects().get<System>(target_system_id.first)) {
-                available_exits += "\n" + target_system->ApparentName(GGHumanClientApp::GetApp()->EmpireID());
+                available_exits += "\n" + target_system->ApparentName(
+                    GGHumanClientApp::GetApp()->EmpireID(), context.ContextUniverse());
                 available_exits_count++;
             }
         }
@@ -437,17 +439,19 @@ std::vector<std::shared_ptr<GG::Texture>> FleetHeadIcons(
     bool hasOutpostShips = false;
     bool hasTroopShips = false;
     bool hasMonsters = false;
-    bool hasArmedShips = false;
+    bool canDamageShips = false;
 
-    for (auto* fleet : fleets) {
+    const Universe& u = GetUniverse();
+    const ScriptingContext context{u, Empires()};
+
+    for (const auto* fleet : fleets) {
         if (!fleet)
             continue;
-
-        hasColonyShips  = hasColonyShips  || fleet->HasColonyShips(Objects());
-        hasOutpostShips = hasOutpostShips || fleet->HasOutpostShips(Objects());
-        hasTroopShips   = hasTroopShips   || fleet->HasTroopShips(Objects());
-        hasMonsters     = hasMonsters     || fleet->HasMonsters(Objects());
-        hasArmedShips   = hasArmedShips   || fleet->HasArmedShips(Objects()) || fleet->HasFighterShips(Objects());
+        hasColonyShips  = hasColonyShips  || fleet->HasColonyShips(u);
+        hasOutpostShips = hasOutpostShips || fleet->HasOutpostShips(u);
+        hasTroopShips   = hasTroopShips   || fleet->HasTroopShips(u);
+        hasMonsters     = hasMonsters     || fleet->HasMonsters(u);
+        canDamageShips  = canDamageShips  || fleet->CanDamageShips(context);
     }
 
     // get file name main part depending on type of fleet
@@ -455,10 +459,10 @@ std::vector<std::shared_ptr<GG::Texture>> FleetHeadIcons(
     std::vector<std::string> main_filenames;
     main_filenames.reserve(4);
     if (hasMonsters) {
-        if (hasArmedShips)   { main_filenames.emplace_back(size_prefix + "head-monster.png"); }
+        if (canDamageShips)  { main_filenames.emplace_back(size_prefix + "head-monster.png"); }
         else                 { main_filenames.emplace_back(size_prefix + "head-monster-harmless.png"); }
     } else {
-        if (hasArmedShips)   { main_filenames.emplace_back(size_prefix + "head-warship.png"); }
+        if (canDamageShips)  { main_filenames.emplace_back(size_prefix + "head-warship.png"); }
         if (hasColonyShips)  { main_filenames.emplace_back(size_prefix + "head-colony.png");  }
         if (hasOutpostShips) { main_filenames.emplace_back(size_prefix + "head-outpost.png"); }
         if (hasTroopShips)   { main_filenames.emplace_back(size_prefix + "head-lander.png");  }

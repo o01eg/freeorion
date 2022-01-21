@@ -11,8 +11,8 @@
 /// but a decorator is free to manipulate the decorated text in any way.
 class LinkDecorator {
 public:
-    LinkDecorator() {};
-    virtual ~LinkDecorator() {};
+    LinkDecorator() = default;
+    virtual ~LinkDecorator() = default;
 
     /// Gets called for each link of the type this decorator is assigned to.
     /// The return value is shown to the user as the link.
@@ -65,18 +65,18 @@ public:
     /// Sets the link decorator for a link type.
     /// \param link_type The link type (tag) to be decorated. Eg. "planet"
     /// \param decorator The decorator to use. Assumes ownership.
-    void SetDecorator(const std::string& link_type, LinkDecorator* decorator);
+    void SetDecorator(std::string_view link_type, LinkDecorator* decorator);
 
     ///< link clicked signals: first string is the link type, second string is the specific item clicked
     mutable boost::signals2::signal<void (const std::string&, const std::string&)> LinkClickedSignal;
     mutable boost::signals2::signal<void (const std::string&, const std::string&)> LinkDoubleClickedSignal;
     mutable boost::signals2::signal<void (const std::string&, const std::string&)> LinkRightClickedSignal;
 
-    static const std::string ENCYCLOPEDIA_TAG;
-    static const std::string GRAPH_TAG;
-    static const std::string URL_TAG;
+    static constexpr std::string_view ENCYCLOPEDIA_TAG = "encyclopedia";
+    static constexpr std::string_view GRAPH_TAG = "graph";
+    static constexpr std::string_view URL_TAG = "url";
     /** Tag for clickable link to open users file manager at a specified directory */
-    static const std::string BROWSE_PATH_TAG;
+    static constexpr std::string_view BROWSE_PATH_TAG = "browsepath";
 
 protected:
     void Render_();
@@ -104,10 +104,9 @@ private:
     std::string LinkDefaultFormatTag(const Link& link, const std::string& content) const;
     std::string LinkRolloverFormatTag(const Link& link, const std::string& content) const;
 
-    std::vector<Link>                       m_links;
-    int                                     m_rollover_link;
-    std::map<std::string, LinkDecoratorPtr> m_decorators;
-    static const LinkDecorator DEFAULT_DECORATOR;
+    std::vector<Link>                            m_links;
+    int                                          m_rollover_link = -1;
+    std::map<std::string_view, LinkDecoratorPtr> m_decorators;
 };
 
 /** Allows text that the user sees to emit signals when clicked, and indicates
@@ -174,13 +173,14 @@ private:
 
 
 /// Helper for generating a link string with content from a stringtable entry
-std::string LinkTaggedText(const std::string& tag, const std::string& stringtable_entry);
+std::string LinkTaggedText(std::string_view tag, std::string_view stringtable_entry);
 
 /// Helper for generating a link string
-std::string LinkTaggedIDText(const std::string& tag, int id, const std::string& text);
+std::string LinkTaggedIDText(std::string_view tag, int id, std::string_view text);
 
 /// Helper for generating a link string with preset display text (not to be looked up in stringtable)
-std::string LinkTaggedPresetText(const std::string& tag, const std::string& stringtable_entry, const std::string& display_text);
+std::string LinkTaggedPresetText(std::string_view tag, std::string_view stringtable_entry,
+                                 std::string_view display_text);
 
 /// Free function to register link tags that TextLinker knows of.  This allows GG::Font to remove
 /// them so that they will not be rendered.  Must be called at least once before text with embedded

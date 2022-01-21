@@ -14,7 +14,7 @@ class AIClientApp : public ClientApp {
 public:
     AIClientApp() = delete;
 
-    AIClientApp(const std::vector<std::string>& args);
+    explicit AIClientApp(const std::vector<std::string>& args);
 
     AIClientApp(const AIClientApp&) = delete;
 
@@ -31,14 +31,18 @@ public:
     void                ExitApp(int code = 0); ///< does basic clean-up, then calls exit(); callable from anywhere in user code via GetApp()
     void                SetPlayerName(const std::string& player_name) { m_player_name = player_name; }
 
-    int EffectsProcessingThreads() const override;
+    [[nodiscard]] int   SelectedSystemID() const override { throw std::runtime_error{"AI client cannot access selected object ID"}; }
+    [[nodiscard]] int   SelectedPlanetID() const override { throw std::runtime_error{"AI client cannot access selected object ID"}; }
+    [[nodiscard]] int   SelectedFleetID() const override { throw std::runtime_error{"AI client cannot access selected object ID"}; }
+    [[nodiscard]] int   SelectedShipID() const override { throw std::runtime_error{"AI client cannot access selected object ID"}; }
+    [[nodiscard]] int   EffectsProcessingThreads() const override;
 
     /** @brief Return the player name of this client
      *
      * @return An UTF-8 encoded and NUL terminated string containing the player
      *      name of this client.
      */
-    const std::string& PlayerName() const
+    [[nodiscard]] const std::string& PlayerName() const
     { return m_player_name; }
 
     static AIClientApp* GetApp();       ///< returns a AIClientApp pointer to the singleton instance of the app

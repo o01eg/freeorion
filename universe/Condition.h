@@ -26,8 +26,7 @@ enum class SearchDomain : int {
 
 /** The base class for all Conditions. */
 struct FO_COMMON_API Condition {
-    Condition() = default;
-    virtual ~Condition();
+    virtual ~Condition() = default;
 
     virtual bool operator==(const Condition& rhs) const;
     bool operator!=(const Condition& rhs) const
@@ -44,8 +43,8 @@ struct FO_COMMON_API Condition {
               SearchDomain search_domain = SearchDomain::NON_MATCHES) const;
 
     /** Tests all objects in universe as NON_MATCHES. */
-    void Eval(const ScriptingContext& parent_context,
-              ObjectSet& matches) const;
+    virtual void Eval(const ScriptingContext& parent_context,
+                      ObjectSet& matches) const;
 
     /** Tests all objects in universe as NON_MATCHES. */
     void Eval(const ScriptingContext& parent_context,
@@ -54,10 +53,6 @@ struct FO_COMMON_API Condition {
     /** Tests single candidate object, returning true iff it matches condition. */
     bool Eval(const ScriptingContext& parent_context,
               std::shared_ptr<const UniverseObject> candidate) const;
-
-    /** Tests single candidate object, returning true iff it matches condition
-      * with empty ScriptingContext. If this condition is not invariant to */
-    bool Eval(std::shared_ptr<const UniverseObject> candidate) const;
 
     virtual void GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                    ObjectSet& condition_non_targets) const;
@@ -98,6 +93,7 @@ struct FO_COMMON_API Condition {
     [[nodiscard]] virtual std::unique_ptr<Condition> Clone() const = 0;
 
 protected:
+    Condition() = default;
     //! Copies invariants from other Condition
     Condition(const Condition& rhs) = default;
     Condition(Condition&& rhs) = delete;

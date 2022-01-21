@@ -243,6 +243,7 @@ namespace parse {
         ship_part_class_enum_grammar        ship_part_class_enum;
         detail::complex_variable_rule<int>  game_rule;
         detail::complex_variable_rule<int>  empire_name_ref;
+        detail::complex_variable_rule<int>  empire_id_ref;
         detail::complex_variable_rule<int>  empire_ships_destroyed;
         detail::complex_variable_rule<int>  jumps_between;
         //complex_variable_rule<int>          jumps_between_by_empire_supply;
@@ -267,6 +268,7 @@ namespace parse {
         detail::simple_int_parser_rules simple_int_rules;
         int_complex_parser_grammar      int_complex_grammar;
         detail::value_ref_rule<int>     named_int_valueref;
+        detail::value_ref_rule<int>     total_fighter_shots;
     };
 
     struct double_complex_parser_grammar : public detail::complex_variable_grammar<double> {
@@ -309,7 +311,9 @@ namespace parse {
         detail::value_ref_rule<double>      int_free_variable_cast;
         detail::value_ref_rule<double>      int_statistic_cast;
         detail::value_ref_rule<double>      int_complex_variable_cast;
+        detail::value_ref_rule<double>      int_total_fighter_shots_cast;
         detail::value_ref_rule<double>      named_real_valueref;
+        detail::value_ref_rule<double>      named_int_valueref_cast;
     };
 
     struct castable_as_int_parser_rules {

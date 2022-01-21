@@ -4,6 +4,7 @@
 #include <set>
 #include <vector>
 #include <boost/circular_buffer.hpp>
+#include <boost/asio/high_resolution_timer.hpp>
 #include "ServerFramework.h"
 #include "ServerNetworking.h"
 #include "../Empire/EmpireManager.h"
@@ -36,66 +37,74 @@ public:
     ServerApp& operator=(IApp&&) = delete;
 
     /** Returns a ClientApp pointer to the singleton instance of the app. */
-    static ServerApp* GetApp();
-    Universe& GetUniverse() override;
-    EmpireManager& Empires() override;
-    Empire* GetEmpire(int id) override;
-    SupplyManager& GetSupplyManager() override;
-    SpeciesManager& GetSpeciesManager() override;
-    Species* GetSpecies(const std::string& name) override;
+    [[nodiscard]] static ServerApp* GetApp();
+    [[nodiscard]] Universe& GetUniverse() noexcept override;
+    [[nodiscard]] EmpireManager& Empires() override;
+    [[nodiscard]] Empire* GetEmpire(int id) override;
+    [[nodiscard]] SupplyManager& GetSupplyManager() override;
+    [[nodiscard]] SpeciesManager& GetSpeciesManager() override;
+    [[nodiscard]] const Species* GetSpecies(const std::string& name) override;
 
     /** Returns the server's map for known objects of specified empire. */
-    ObjectMap& EmpireKnownObjects(int empire_id) override;
+    [[nodiscard]] ObjectMap& EmpireKnownObjects(int empire_id) override;
 
-    std::string GetVisibleObjectName(std::shared_ptr<const UniverseObject> object) override;
+    [[nodiscard]] std::string GetVisibleObjectName(std::shared_ptr<const UniverseObject> object) override;
 
-    int CurrentTurn() const override
+    [[nodiscard]] int EmpireID() const override
+    { return ALL_EMPIRES; }
+
+    [[nodiscard]] int CurrentTurn() const override
     { return m_current_turn; }
 
-    const GalaxySetupData&  GetGalaxySetupData() const override
+    [[nodiscard]] int SelectedSystemID() const override { throw std::runtime_error{"Server cannot access selected object ID"}; }
+    [[nodiscard]] int SelectedPlanetID() const override { throw std::runtime_error{"Server cannot access selected object ID"}; }
+    [[nodiscard]] int SelectedFleetID() const override { throw std::runtime_error{"Server cannot access selected object ID"}; }
+    [[nodiscard]] int SelectedShipID() const override { throw std::runtime_error{"Server cannot access selected object ID"}; }
+
+    [[nodiscard]] const GalaxySetupData&  GetGalaxySetupData() const override
     { return m_galaxy_setup_data; }
 
     /** Checks if player with ID \a player_id is a human player
         who's client runs on the same machine as the server */
-    bool IsLocalHumanPlayer(int player_id);
+    [[nodiscard]] bool IsLocalHumanPlayer(int player_id);
 
     /** Returns the networking client type for the given empire_id. */
-    Networking::ClientType GetEmpireClientType(int empire_id) const override;
+    [[nodiscard]] Networking::ClientType GetEmpireClientType(int empire_id) const override;
 
     /** Returns the networking client type for the given player_id. */
-    Networking::ClientType GetPlayerClientType(int player_id) const override;
+    [[nodiscard]] Networking::ClientType GetPlayerClientType(int player_id) const override;
 
-    int EffectsProcessingThreads() const override;
+    [[nodiscard]] int EffectsProcessingThreads() const override;
 
     /** Returns the empire ID for the player with ID \a player_id */
-    int PlayerEmpireID(int player_id) const;
+    [[nodiscard]] int PlayerEmpireID(int player_id) const;
 
     /** Returns the player ID for the player controlling the empire with id \a
         empire_id */
-    int EmpirePlayerID(int empire_id) const;
+    [[nodiscard]] int EmpirePlayerID(int empire_id) const;
 
     /** Checks if \a player_name are not used by other players. */
-    bool IsAvailableName(const std::string& player_name) const;
+    [[nodiscard]] bool IsAvailableName(const std::string& player_name) const;
 
     /** Checks if server runs in a hostless mode. */
-    bool IsHostless() const;
+    [[nodiscard]] bool IsHostless() const;
 
     /** Returns chat history buffer. */
-    const boost::circular_buffer<ChatHistoryEntity>& GetChatHistory() const;
+    [[nodiscard]] const boost::circular_buffer<ChatHistoryEntity>& GetChatHistory() const;
 
     /** Extracts player save game data. */
-    std::vector<PlayerSaveGameData> GetPlayerSaveGameData() const;
+    [[nodiscard]] std::vector<PlayerSaveGameData> GetPlayerSaveGameData() const;
 
-    bool IsTurnExpired() const;
+    [[nodiscard]] bool IsTurnExpired() const;
 
-    bool IsHaveWinner() const;
+    [[nodiscard]] bool IsHaveWinner() const;
 
     void operator()(); ///< external interface to Run()
 
     void StartBackgroundParsing(const PythonParser& python, std::promise<void>&& barrier) override;
 
     /** Returns the galaxy setup data used for the current game */
-    GalaxySetupData&    GetGalaxySetupData() { return m_galaxy_setup_data; }
+    [[nodiscard]] GalaxySetupData&    GetGalaxySetupData() { return m_galaxy_setup_data; }
 
     /** creates an AI client child process for each element of \a AIs*/
     void    CreateAIClients(const std::vector<PlayerSetupData>& player_setup_data, int max_aggression = 4);
@@ -166,20 +175,21 @@ public:
                            std::shared_ptr<ServerSaveGameData> server_save_game_data);
 
     /** Checks if \a player_name requires auth to login and fill \a roles if not. */
-    bool IsAuthRequiredOrFillRoles(const std::string& player_name, Networking::AuthRoles& roles);
+    [[nodiscard]] bool IsAuthRequiredOrFillRoles(const std::string& player_name, Networking::AuthRoles& roles);
 
     /** Checks if \a auth match \a player_name and fill \a roles if successed. */
-    bool IsAuthSuccessAndFillRoles(const std::string& player_name, const std::string& auth, Networking::AuthRoles& roles);
+    [[nodiscard]] bool IsAuthSuccessAndFillRoles(const std::string& player_name, const std::string& auth,
+                                                 Networking::AuthRoles& roles);
 
     /** Returns list of player for multiplayer quickstart*/
-    std::list<PlayerSetupData> FillListPlayers();
+    [[nodiscard]] std::vector<PlayerSetupData> FillListPlayers();
 
     /** Adds new observing player to running game.
       * Simply sends GAME_START message so established player knows he is in the game. */
     void AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_connection);
 
     /** Eliminate player's empire by \a player_connection. Return true if player was eliminated. */
-    bool EliminatePlayer(const PlayerConnectionPtr& player_connection);
+    [[nodiscard]] bool EliminatePlayer(const PlayerConnectionPtr& player_connection);
 
     /** Drop link between player with \a player_id and his empire. */
     void DropPlayerEmpireLink(int planet_id);
@@ -192,7 +202,7 @@ public:
     int AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, int target_empire_id);
 
     /** Get list of players delegated by \a player_name */
-    std::list<std::string> GetPlayerDelegation(const std::string& player_name);
+    [[nodiscard]] std::vector<std::string> GetPlayerDelegation(const std::string& player_name);
 
     /** Sets turn to be expired. Server doesn't wait for human player turns. */
     void ExpireTurn();
@@ -210,7 +220,7 @@ public:
                          std::array<unsigned char, 4> text_color,
                          const boost::posix_time::ptime& timestamp);
 
-    ServerNetworking&           Networking();     ///< returns the networking object for the server
+    [[nodiscard]] ServerNetworking& Networking();     ///< returns the networking object for the server
 private:
     void    Run();          ///< initializes app state, then executes main event handler/render loop (Poll())
 
@@ -301,8 +311,12 @@ private:
       * an empire is eliminated from the game */
     void    RemoveEmpireTurn(int empire_id);
 
+    /** Called when asyncio timer ends. Executes Python asyncio callbacks if any was generated. */
+    void    AsyncIOTimedoutHandler(const boost::system::error_code& error);
+
     boost::asio::io_context m_io_context;
     boost::asio::signal_set m_signals;
+    boost::asio::high_resolution_timer m_timer;
 
     Universe                m_universe;
     EmpireManager           m_empires;

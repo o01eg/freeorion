@@ -143,7 +143,9 @@ namespace {
                 return;
             m_initialized = true;
 
-            const Empire* empire = GetEmpire(m_empire_id);
+            ScriptingContext context;
+            const EmpireManager& empires{Empires()}; // TODO: pass in?
+            auto empire = empires.GetEmpire(m_empire_id);
 
             std::shared_ptr<GG::Texture>                texture;
             std::string                                 name_text;
@@ -190,7 +192,7 @@ namespace {
                 stockpile = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->Stockpile();
                 stockpile_limit_per_turn = empire->GetProductionQueue().StockpileCapacity();
 
-                auto [total_cost, minimum_production_time] = m_item.ProductionCostAndTime(m_empire_id, m_location_id);
+                auto [total_cost, minimum_production_time] = m_item.ProductionCostAndTime(m_empire_id, m_location_id, context);
 
                 int production_time = ProductionTurns(total_cost, minimum_production_time,
                                                       local_pp_output, stockpile,
@@ -242,7 +244,7 @@ namespace {
             return source;
 
         // not a valid source?!  scan through all objects to find one owned by this empire
-        for (const auto& obj : GetUniverse().Objects().all()) {
+        for (const auto& obj : Objects().all()) {
             if (obj->OwnedBy(empire_id))
                 return obj;
         }
@@ -302,7 +304,7 @@ namespace {
     std::shared_ptr<GG::BrowseInfoWnd> ProductionItemRowBrowseWnd(const ProductionQueue::ProductionItem& item,
                                                                   int candidate_object_id, int empire_id)
     {
-        ScopedTimer("ProductionItemRowBrowseWnd: " + item.name);
+        ScopedTimer timer("ProductionItemRowBrowseWnd: " + item.name);
 
         // get available PP for empire at candidate location
         float local_pp_output = 0.0f;
@@ -532,7 +534,7 @@ namespace {
             SetRowAlignment(GG::ALIGN_NONE);
             SetChildClippingMode(ChildClippingMode::ClipToClient);
 
-            ScopedTimer("ProductionItemRow: " + item.name);
+            ScopedTimer timer("ProductionItemRow: " + item.name);
 
             if (m_item.build_type == BuildType::BT_SHIP) {
                 SetDragDropDataType(std::to_string(m_item.design_id));
@@ -614,7 +616,7 @@ namespace {
 //////////////////////////////////////////////////
 class BuildDesignatorWnd::BuildSelector : public CUIWnd {
 public:
-    BuildSelector(const std::string& config_name = "");
+    explicit BuildSelector(std::string_view config_name = "");
     void CompleteConstruction() override;
 
     /** returns set of BulldType shown in this selector */
@@ -691,7 +693,7 @@ private:
     friend class BuildDesignatorWnd;        // so BuildDesignatorWnd can access buttons
 };
 
-BuildDesignatorWnd::BuildSelector::BuildSelector(const std::string& config_name) :
+BuildDesignatorWnd::BuildSelector::BuildSelector(std::string_view config_name) :
     CUIWnd(UserString("PRODUCTION_WND_BUILD_ITEMS_TITLE"),
            GG::INTERACTIVE | GG::DRAGABLE | GG::RESIZABLE | GG::ONTOP | PINABLE,
            config_name),
@@ -817,7 +819,7 @@ void BuildDesignatorWnd::BuildSelector::SetEmpireID(int empire_id, bool refresh_
 }
 
 void BuildDesignatorWnd::BuildSelector::Refresh() {
-    ScopedTimer timer("BuildDesignatorWnd::BuildSelector::Refresh()", true);
+    ScopedTimer timer("BuildDesignatorWnd::BuildSelector::Refresh()");
     if (auto prod_loc = Objects().get(this->m_production_location))
         this->SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_WND_BUILD_ITEMS_TITLE_LOCATION")) % prod_loc->Name()));
     else
@@ -957,7 +959,9 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
 }
 
 void BuildDesignatorWnd::BuildSelector::PopulateList() {
-    Empire* empire = GetEmpire(m_empire_id);
+    const Universe& universe{GetUniverse()}; // TODO: pass in?
+    const EmpireManager& empires{Empires()}; // TODO: pass in?
+    auto empire = empires.GetEmpire(m_empire_id);
     if (!empire)
         return;
 
@@ -1011,9 +1015,9 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
         if (empire) {
             design_ids = ClientUI::GetClientUI()->GetShipDesignManager()->DisplayedDesigns()->OrderedIDs();
         } else {
-            design_ids.reserve(GetUniverse().NumShipDesigns());
-            for (auto it = GetUniverse().beginShipDesigns();
-                 it != GetUniverse().endShipDesigns(); ++it)
+            design_ids.reserve(universe.NumShipDesigns());
+            for (auto it = universe.beginShipDesigns();
+                 it != universe.endShipDesigns(); ++it)
             { design_ids.push_back(it->first); }
         }
 
@@ -1023,13 +1027,13 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
         for (int ship_design_id : design_ids) {
             if (!BuildableItemVisible(BuildType::BT_SHIP, ship_design_id))
                 continue;
-            const ShipDesign* ship_design = GetUniverse().GetShipDesign(ship_design_id);
+            const ShipDesign* ship_design = universe.GetShipDesign(ship_design_id);
             if (!ship_design)
                 continue;
             timer.EnterSection(ship_design->Name());
             auto item_row = GG::Wnd::Create<ProductionItemRow>(
                 row_size.x, row_size.y, 
-                ProductionQueue::ProductionItem(BuildType::BT_SHIP, ship_design_id),
+                ProductionQueue::ProductionItem(BuildType::BT_SHIP, ship_design_id, universe),
                 m_empire_id, m_production_location);
             rows.push_back(std::move(item_row));
         }
@@ -1147,8 +1151,6 @@ void BuildDesignatorWnd::BuildSelector::BuildItemRightClicked(GG::ListBox::itera
 //////////////////////////////////////////////////
 // BuildDesignatorWnd
 //////////////////////////////////////////////////
-const std::string BuildDesignatorWnd::PRODUCTION_ITEM_DROP_TYPE = "Production Item";
-
 BuildDesignatorWnd::BuildDesignatorWnd(GG::X w, GG::Y h) :
     Wnd(GG::X0, GG::Y0, w, h, GG::INTERACTIVE | GG::ONTOP)
 {}

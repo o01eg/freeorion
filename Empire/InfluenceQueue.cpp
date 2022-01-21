@@ -106,7 +106,7 @@ const InfluenceQueue::Element& InfluenceQueue::operator[](std::size_t i) const {
 const InfluenceQueue::Element& InfluenceQueue::operator[](int i) const
 { return operator[](static_cast<std::size_t>(i)); }
 
-void InfluenceQueue::Update(const ObjectMap& objects) {
+void InfluenceQueue::Update(const ScriptingContext& context) {
     const Empire* empire = GetEmpire(m_empire_id);
     if (!empire) {
         ErrorLogger() << "InfluenceQueue::Update passed null empire.  doing nothing.";
@@ -120,15 +120,15 @@ void InfluenceQueue::Update(const ObjectMap& objects) {
     float stockpiled_IP = empire->ResourceStockpile(ResourceType::RE_INFLUENCE);
 
     float spending_on_policy_adoption_ip = 0.0f;
-    for (auto policy_turn : empire->TurnsPoliciesAdopted()) {
-        if (policy_turn.second != CurrentTurn())
+    for (const auto& [policy_name, adoption_turn] : empire->TurnsPoliciesAdopted()) {
+        if (adoption_turn != CurrentTurn())
             continue;
-        auto policy = GetPolicy(policy_turn.first);
+        auto policy = GetPolicy(policy_name);
         if (!policy) {
-            ErrorLogger() << "InfluenceQueue::Update couldn't get policy supposedly adopted this turn: " << policy_turn.first;
+            ErrorLogger() << "InfluenceQueue::Update couldn't get policy supposedly adopted this turn: " << policy_name;
             continue;
         }
-        spending_on_policy_adoption_ip += policy->AdoptionCost(m_empire_id, objects);
+        spending_on_policy_adoption_ip += policy->AdoptionCost(m_empire_id, context);
     }
 
     m_total_IPs_spent = spending_on_policy_adoption_ip;

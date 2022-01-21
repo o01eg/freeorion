@@ -7,6 +7,11 @@
 #include "../util/i18n.h"
 #include <type_traits>
 
+constexpr std::string_view to_string(StarType);
+constexpr std::string_view to_string(PlanetEnvironment);
+constexpr std::string_view to_string(PlanetType);
+constexpr std::string_view to_string(PlanetSize);
+
 namespace ValueRef {
 
 //! The common base class for all ValueRef classes. This class provides
@@ -15,53 +20,66 @@ struct FO_COMMON_API ValueRefBase {
     ValueRefBase() = default;
     virtual ~ValueRefBase() = default;
 
-    virtual bool RootCandidateInvariant() const  { return m_root_candidate_invariant; }
-    virtual bool LocalCandidateInvariant() const { return m_local_candidate_invariant; }
-    virtual bool TargetInvariant() const         { return m_target_invariant; }
-    virtual bool SourceInvariant() const         { return m_source_invariant; }
-    virtual bool SimpleIncrement() const         { return false; }
-    virtual bool ConstantExpr() const            { return false; }
+    // these getters can't be noexcept due to a derived class doing complicated stuff
+    [[nodiscard]] virtual bool RootCandidateInvariant() const  { return m_root_candidate_invariant; }
+    [[nodiscard]] virtual bool LocalCandidateInvariant() const { return m_local_candidate_invariant; }
+    [[nodiscard]] virtual bool TargetInvariant() const         { return m_target_invariant; }
+    [[nodiscard]] virtual bool SourceInvariant() const         { return m_source_invariant; }
+    [[nodiscard]] virtual bool SimpleIncrement() const         { return m_simple_increment; }
+    [[nodiscard]] virtual bool ConstantExpr() const            { return m_constant_expr; }
 
-    std::string InvariancePattern() const;
-    virtual std::string Description() const = 0;                    //! Returns a user-readable text description of this ValueRef
-    virtual std::string EvalAsString() const = 0;                   //! Returns a textual representation of the evaluation result  with an empty/default context
-    virtual std::string Dump(unsigned short ntabs = 0) const = 0;   //! Returns a textual representation that should be parseable to recreate this ValueRef
+    [[nodiscard]] std::string         InvariancePattern() const;
+    [[nodiscard]] virtual std::string Description() const = 0;                    //! Returns a user-readable text description of this ValueRef
+    [[nodiscard]] virtual std::string EvalAsString() const = 0;                   //! Returns a textual representation of the evaluation result  with an empty/default context
+    [[nodiscard]] virtual std::string Dump(unsigned short ntabs = 0) const = 0;   //! Returns a textual representation that should be parseable to recreate this ValueRef
 
     virtual void SetTopLevelContent(const std::string& content_name) {}
 
-    virtual unsigned int GetCheckSum() const { return 0; }
+    [[nodiscard]] virtual unsigned int GetCheckSum() const { return 0; }
 
 protected:
     bool m_root_candidate_invariant = false;
     bool m_local_candidate_invariant = false;
     bool m_target_invariant = false;
     bool m_source_invariant = false;
+    bool m_constant_expr = false;
+    bool m_simple_increment = false;
 };
 
-template<typename T, typename std::enable_if_t<std::is_arithmetic_v<T>>* = nullptr>
+
+template<typename T>
 std::string FlexibleToString(T&& t)
 {
-    if constexpr (std::is_floating_point_v<T>)
+    if constexpr (std::is_floating_point_v<std::decay_t<T>>) {
         return DoubleToString(t, 3, false);
-    else
+
+    } else if constexpr (std::is_enum_v<T>) {
+        auto maybe_retval = to_string(t);
+        if (UserStringExists(maybe_retval))
+            return UserString(maybe_retval);
+        else
+            return std::string{maybe_retval};
+
+    } else if constexpr (std::is_convertible_v<std::decay_t<T>, std::string>) {
+        return t;
+
+    } else if constexpr (std::is_same_v<std::decay_t<T>, std::string_view>) {
+        return std::string{t};
+
+    } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+        size_t total_size = 0;
+        for (auto& ts : t)
+            total_size += ts.size();
+        std::string retval;
+        retval.reserve(total_size);
+        for (auto& ts: t)
+            retval.append(ts);
+        return retval;
+
+    } else {
         return std::to_string(t);
+    }
 }
-
-template<typename T, typename std::enable_if_t<std::is_enum_v<T>>* = nullptr>
-std::string FlexibleToString(T&& t)
-{ return std::to_string(static_cast<std::underlying_type_t<T>>(t)); }
-
-inline std::string FlexibleToString(std::string&& t)
-{ return std::move(t); }
-
-template<typename T, typename std::enable_if_t<std::is_same_v<T, std::vector<std::string>>>* = nullptr>
-std::string FlexibleToString(T&& t)
-{
-    std::string s;
-    for (auto&& piece : t) s += piece;
-    return s;
-}
-
 
 //! The base class for all ValueRef classes returning type T. This class
 //! provides the public interface for a ValueRef expression tree.
@@ -71,28 +89,27 @@ struct FO_COMMON_API ValueRef : public ValueRefBase
     ValueRef() = default;
     virtual ~ValueRef() = default;
 
-    virtual bool operator==(const ValueRef<T>& rhs) const;
+    [[nodiscard]] virtual bool operator==(const ValueRef<T>& rhs) const;
 
-    bool operator!=(const ValueRef<T>& rhs) const
+    [[nodiscard]] bool operator!=(const ValueRef<T>& rhs) const
     { return !(*this == rhs); }
 
     /** Evaluates the expression tree with a default context.  Useful for
       * evaluating expressions that do not depend on source, target, or
       * candidate objects. */
-    T Eval() const
+    [[nodiscard]] T Eval() const
     { return Eval(::ScriptingContext{}); }
 
     /** Evaluates the expression tree and return the results; \a context
       * is used to fill in any instances of the "Value" variable or references
       * to objects such as the source, effect target, or condition candidates
       * that exist in the tree. */
-    virtual T Eval(const ScriptingContext& context) const = 0;
+    [[nodiscard]] virtual T Eval(const ScriptingContext& context) const = 0;
 
-    /** Evaluates the expression tree with an empty context and retuns the
+    /** Evaluates the expression tree with an empty context and returns the
       * a string representation of the result value iff the result type is
-      * supported (currently std::string, int, float, double, enum).
-      * See ValueRefs.cpp for specialisation implementations. */
-    std::string EvalAsString() const final
+      * supported. Otherwise returns and empty string. */
+    [[nodiscard]] std::string EvalAsString() const final
     { return FlexibleToString(Eval()); }
 
     /** Makes a clone of this ValueRef in a new owning pointer. Required for Boost.Python, which
@@ -104,7 +121,7 @@ FO_ENUM(
     (StatisticType),
     ((INVALID_STATISTIC_TYPE, -1))
 
-    ((IF))          // returns T(1) if anything matches the condition, or T(0) otherwise
+    ((IF))          // returns T{1} if anything matches the condition, or T{0} otherwise
 
     ((COUNT))       // returns the number of objects matching the condition
     ((UNIQUE_COUNT))// returns the number of distinct property values of objects matching the condition. eg. if 3 objects have the property value "small", and two have "big", then this value is 2, as there are 2 unique property values.
@@ -144,9 +161,8 @@ template<typename T>
 [[nodiscard]] inline std::vector<std::pair<std::string, std::unique_ptr<T>>> CloneUnique(const std::vector<std::pair<std::string, std::unique_ptr<T>>>& vec) {
     std::vector<std::pair<std::string, std::unique_ptr<T>>> retval;
     retval.reserve(vec.size());
-    for (const auto& val : vec) {
+    for (const auto& val : vec)
         retval.emplace_back(val.first, CloneUnique(val.second));
-    }
     return retval;
 }
 

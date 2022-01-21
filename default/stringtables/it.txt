@@ -1299,12 +1299,6 @@ Rilevamento Impero
 MAP_DETECTION_TEXT
 Forza Rilevamento Impero
 
-MAP_TRADE_TITLE
-Commercio
-
-MAP_TRADE_TEXT
-Commercio totale impero. (Commercio non fa nulla)
-
 
 ##
 ## Side panel/System information
@@ -1326,17 +1320,11 @@ Produzione Industriale
 RESEARCH_PRODUCTION
 Produzione Ricerca
 
-TRADE_PRODUCTION
-Produzione Commercio
-
 INDUSTRY_CONSUMPTION
 Consumo Industriale
 
 RESEARCH_CONSUMPTION
 Consumo Ricerca
-
-TRADE_CONSUMPTION
-Consumo Commercio
 
 IMPORT_EXPORT_TOOLTIP
 Importazione / Esportazione
@@ -2000,14 +1988,14 @@ Popolazione
 ## Encyclopedia articles
 ##
 
+DETECTION_TITLE
+Detection Strength
+
 METER_INDUSTRY_VALUE_LABEL
 Industria
 
 METER_RESEARCH_VALUE_LABEL
 Ricerca
-
-METER_TRADE_VALUE_LABEL
-Commercio
 
 METER_CONSTRUCTION_VALUE_LABEL
 Infrastrutture
@@ -2063,12 +2051,6 @@ Gli avamposti sono stazioni non presidiate che possono essere fondate in luoghi 
 
 GROWTH_FOCUS_TITLE
 Focus sulla Crescita
-
-TRADE_FOCUS_TITLE
-Focus sul Commercio
-
-TRADE_FOCUS_TEXT
-Il focus sul commercio non fa nulla, ancora. E' solo un segnaposto per i prossimi aggiornamenti.
 
 PROTECTION_FOCUS_TITLE
 Focus sulla Protezione
@@ -2662,9 +2644,29 @@ industria
 FOCUS_RESEARCH
 ricerca
 
-# Focus types
-FOCUS_TRADE
-commercio
+# Meter types
+METER_DETECTION
+Detection Range
+
+# Meter types
+METER_DEFENSE
+Defense
+
+# Meter types
+METER_SUPPLY
+Supply
+
+# Meter types
+METER_INDUSTRY
+Industry
+
+# Meter types
+METER_SHIELD
+Shields
+
+# Meter types
+METER_TROOPS
+Troops
 
 # Empire affiliation types
 AFFIL_SELF
@@ -2709,10 +2711,6 @@ edificare
 # Build types
 BT_SHIP
 nave
-
-# Resource types
-RE_TRADE
-commercio
 
 # Resource types
 RE_INDUSTRY
@@ -2956,9 +2954,6 @@ Translinguistica
 
 LRN_PSIONICS
 Psionica
-
-LRN_ARTIF_MINDS
-Mente Artificiale
 
 LRN_XENOARCH
 Xenoarcheologia
@@ -3590,6 +3585,11 @@ CO_SUSPEND_ANIM_POD_DESC
 
 Tutte le parti della nave di classe colonia richiedono il pianeta su cui sono costruite per avere una popolazione di almeno tre.'''
 
+CO_OUTPOST_POD
+Outpost Module
+
+GT_TROOP_POD
+Ground Troop Pod
 
 ##
 ## Ship hulls

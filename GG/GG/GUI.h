@@ -227,7 +227,8 @@ public:
     virtual void    HandleSystemEvents() = 0;
 
     /** Event handler for GG events. */
-    void            HandleGGEvent(EventType event, Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys, const Pt& pos, const Pt& rel, const std::string* text = nullptr);
+    void            HandleGGEvent(EventType event, Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys,
+                                  const Pt& pos, const Pt& rel, std::string text = std::string());
 
     void            ClearEventState();
 
@@ -355,7 +356,7 @@ public:
     /** Sets the currently-installed cursor. */
     void SetCursor(const std::shared_ptr<Cursor>& cursor);
 
-    virtual bool SetClipboardText(const std::string& text); ///< sets text stored in clipboard
+    virtual bool SetClipboardText(std::string text);        ///< sets text stored in clipboard
     bool CopyFocusWndText();                                ///< copies current focus Wnd as text to clipboard
     bool CopyWndText(const Wnd* wnd);                       ///< copies \a wnd as text to clipboard
     bool PasteFocusWndText(const std::string& text);        ///< attempts to paste \a text into the current focus Wnd

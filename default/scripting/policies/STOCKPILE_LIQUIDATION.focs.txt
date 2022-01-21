@@ -3,8 +3,8 @@ Policy
     description = "PLC_STOCKPILE_LIQUIDATION_DESC"
     short_description = "PLC_STOCKPILE_LIQUIDATION_SHORT_DESC"
     category = "ECONOMIC_CATEGORY"
-    adoptioncost = 5 + floor(Statistic Sum value = LocalCandidate.Population condition = And [ Planet OwnedBy empire = Source.Owner ])
-    exclusions = [ "PLC_BALANCE" ]
+    adoptioncost = floor([[POPULATION_OWNED_BY_EMPIRE]]^0.5)
+    exclusions = [ "PLC_MODERATION" ]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
 

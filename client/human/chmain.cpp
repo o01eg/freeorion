@@ -40,7 +40,7 @@ constexpr bool STORE_FULLSCREEN_FLAG = false;
 // so there is no reason to default to not touching it.
 constexpr bool FAKE_MODE_CHANGE_FLAG = false;
 #else
-constexpr bool  STORE_FULLSCREEN_FLAG = true;
+constexpr bool STORE_FULLSCREEN_FLAG = true;
 // The X window system does not always work
 // well with resolution changes, so we avoid them
 // by default
@@ -51,7 +51,7 @@ int mainSetupAndRun();
 int mainConfigOptionsSetup(const std::vector<std::string>& args);
 
 
-#if defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_HAIKU)
+#if defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_NETBSD) || defined(FREEORION_DRAGONFLY) || defined(FREEORION_HAIKU)
 int main(int argc, char* argv[]) {
     // copy command line arguments to vector
     std::vector<std::string> args;
@@ -94,7 +94,7 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
     // did the player request the version output?
     if (GetOptionsDB().Get<bool>("version")) {
         ShutdownLoggingSystemFileSink();
-        std::cout << "FreeOrionCH " << FreeOrionVersionString() << std::endl;
+        std::cout << "FreeOrion Human Client " << FreeOrionVersionString() << std::endl;
         return 0;   // quit without actually starting game
     }
 
@@ -148,8 +148,8 @@ int mainConfigOptionsSetup(const std::vector<std::string>& args) {
         GetOptionsDB().AddSection("audio.music", UserStringNop("OPTIONS_DB_SECTION_AUDIO_MUSIC"));
         GetOptionsDB().AddSection("audio.effects", UserStringNop("OPTIONS_DB_SECTION_AUDIO_EFFECTS"));
         GetOptionsDB().AddSection("audio.effects.paths", UserStringNop("OPTIONS_DB_SECTION_AUDIO_EFFECTS_PATHS"),
-                                  [](const std::string& name)->bool {
-                                      std::string suffix { "sound.path" };
+                                  [](std::string_view name)->bool {
+                                      static constexpr std::string_view suffix{"sound.path"};
                                       return name.size() > suffix.size() &&
                                              name.substr(name.size() - suffix.size()) == suffix;
                                   });
@@ -161,14 +161,14 @@ int mainConfigOptionsSetup(const std::vector<std::string>& args) {
         GetOptionsDB().AddSection("setup", UserStringNop("OPTIONS_DB_SECTION_SETUP"));
         GetOptionsDB().AddSection("ui", UserStringNop("OPTIONS_DB_SECTION_UI"));
         GetOptionsDB().AddSection("ui.colors", UserStringNop("OPTIONS_DB_SECTION_UI_COLORS"),
-                                  [](const std::string& name)->bool {
-                                      std::string suffix { ".color" };
+                                  [](std::string_view name)->bool {
+                                      static constexpr std::string_view suffix{".color"};
                                       return name.size() > suffix.size() &&
                                              name.substr(name.size() - suffix.size()) == suffix;
                                   });
         GetOptionsDB().AddSection("ui.hotkeys", UserStringNop("OPTIONS_DB_SECTION_UI_HOTKEYS"),
-                                  [](const std::string& name)->bool {
-                                      std::string suffix { ".hotkey" };
+                                  [](std::string_view name)->bool {
+                                      static constexpr std::string_view suffix{".hotkey"};
                                       return name.size() > suffix.size() &&
                                              name.substr(name.size() - suffix.size()) == suffix;
                                   });
@@ -274,7 +274,7 @@ int mainSetupAndRun() {
 #endif
 
         GGHumanClientApp app(width, height, true, "FreeOrion " + FreeOrionVersionString(),
-                           left, top, fullscreen, fake_mode_change);
+                             left, top, fullscreen, fake_mode_change);
 
         if (GetOptionsDB().Get<bool>("quickstart")) {
             // immediately start the server, establish network connections, and

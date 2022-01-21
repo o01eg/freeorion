@@ -23,6 +23,7 @@ namespace Condition {
 namespace Effect {
     class EffectsGroup;
 }
+class ObjectMap;
 
 //! Environmental suitability of planets for a particular Species
 FO_ENUM(
@@ -171,7 +172,7 @@ private:
     { bool operator()(const std::map<std::string, std::unique_ptr<Species>>::value_type& species_entry) const; };
 
 public:
-    using SpeciesTypeMap = std::map<std::string, std::unique_ptr<Species>>;
+    using SpeciesTypeMap = std::map<std::string, std::unique_ptr<Species>, std::less<>>;
     using CensusOrder = std::vector<std::string>;
     using iterator = SpeciesTypeMap::const_iterator;
     typedef boost::filter_iterator<PlayableSpecies, iterator> playable_iterator;
@@ -182,7 +183,7 @@ public:
     /** returns the building type with the name \a name; you should use the
       * free function GetSpecies() instead, mainly to save some typing. */
     const Species*      GetSpecies(const std::string& name) const;
-    Species*            GetSpecies(const std::string& name);
+    const Species*      GetSpecies(std::string_view name) const;
 
     /** iterators for all species */
     iterator            begin() const;
@@ -241,8 +242,8 @@ public:
     float SpeciesSpeciesOpinion(const std::string& opinionated_species_name,
                                 const std::string& rated_species_name) const;
 
-    std::vector<std::string> SpeciesThatLike(const std::string& content_name) const;
-    std::vector<std::string> SpeciesThatDislike(const std::string& content_name) const;
+    std::vector<std::string_view> SpeciesThatLike(const std::string& content_name) const;
+    std::vector<std::string_view> SpeciesThatDislike(const std::string& content_name) const;
 
     /** Returns a number, calculated from the contained data, which should be
       * different for different contained data, and must be the same for
@@ -269,10 +270,12 @@ public:
     void RemoveSpeciesHomeworld(const std::string& species, int homeworld_id);
     void ClearSpeciesHomeworlds();
 
-    void UpdatePopulationCounter();
+    void UpdatePopulationCounter(const ObjectMap& objects);
 
-    std::map<std::string, std::map<int, float>>&        SpeciesObjectPopulations(int encoding_empire = ALL_EMPIRES);
-    std::map<std::string, std::map<std::string, int>>&  SpeciesShipsDestroyed(int encoding_empire = ALL_EMPIRES);
+    const std::map<std::string, std::map<int, float>>&       SpeciesObjectPopulations(int encoding_empire = ALL_EMPIRES) const;
+    const std::map<std::string, std::map<std::string, int>>& SpeciesShipsDestroyed(int encoding_empire = ALL_EMPIRES) const;
+    void SetSpeciesObjectPopulations(std::map<std::string, std::map<int, float>> sop);
+    void SetSpeciesShipsDestroyed(std::map<std::string, std::map<std::string, int>> ssd);
 
     /** Sets species types to the value of \p future. */
     void SetSpeciesTypes(Pending::Pending<std::pair<SpeciesTypeMap, CensusOrder>>&& future);

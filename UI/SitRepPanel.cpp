@@ -12,6 +12,8 @@
 #include "../util/SitRepEntry.h"
 #include "../universe/ShipDesign.h"
 
+#include "../util/ScopedTimer.h"
+
 #include <GG/Layout.h>
 
 #include <boost/lexical_cast.hpp>
@@ -133,27 +135,30 @@ namespace {
     }
 
     std::vector<std::string> AllSitRepTemplateStrings() {
-        std::set<std::string> template_set;
-
         // get templates for each empire
-        for (auto& entry : Empires()) {
-            auto empire_strings = EmpireSitRepTemplateStrings(entry.first);
-            template_set.insert(empire_strings.begin(), empire_strings.end());
-        }
+        std::set<std::string> template_set;
+        for (const auto& entry : Empires())
+            template_set.merge(EmpireSitRepTemplateStrings(entry.first));
+
+        auto ordered_template_strings{OrderedSitrepTemplateStrings()};
 
         std::vector<std::string> retval;
+        retval.reserve(ordered_template_strings.size() + template_set.size());
 
-        // only use those ordered templates actually in the current set of sitrep templates
-        for (const std::string& templ : OrderedSitrepTemplateStrings()) {
-            if ( template_set.count(templ) &&
+        // first add only use those ordered templates actually in the current set of sitrep templates
+        for (std::string& templ : OrderedSitrepTemplateStrings()) {
+            if (template_set.count(templ) &&
                 !std::count(retval.begin(), retval.end(), templ))
-            { retval.push_back(templ); }
+            { retval.push_back(std::move(templ)); }
         }
 
-        //now add the current templates that did not have a specified order
-        for (const std::string& templ : template_set)
-            if (!std::count(retval.begin(), retval.end(), templ))
-                retval.push_back(templ);
+        // next add the current templates that did not have a specified order
+        for (auto it = template_set.begin(); it != template_set.end();) {
+            if (!std::count(retval.begin(), retval.end(), *it))
+                retval.push_back(std::move(template_set.extract(it++).value()));
+            else
+                ++it;
+        }
 
         return retval;
     }
@@ -373,7 +378,7 @@ namespace {
     };
 }
 
-SitRepPanel::SitRepPanel(const std::string& config_name) :
+SitRepPanel::SitRepPanel(std::string_view config_name) :
     CUIWnd(UserString("SITREP_PANEL_TITLE"),
            GG::ONTOP | GG::INTERACTIVE | GG::DRAGABLE | GG::RESIZABLE | CLOSABLE | PINABLE,
            config_name),
@@ -475,17 +480,18 @@ namespace {
      consuming for sitreps that the player will never view. */
     std::map<int, std::list<SitRepEntry>> GetUnvalidatedSitRepsSortedByTurn(int empire_id) {
         std::set<const Empire*> sr_empires;
-        const Empire* empire = GetEmpire(empire_id);
-        if (empire) {
+
+        if (const Empire* empire = GetEmpire(empire_id)) {
             sr_empires.insert(empire);
+
         } else {
-            // Moderator mode, sort sitreps from all empires
+            // Observer / Moderator mode, sort sitreps from all empires
             for (const auto& entry : Empires())
                 sr_empires.insert(entry.second.get());
         }
 
         std::map<int, std::list<SitRepEntry>> turns;
-        for (auto& sitrep_empire : sr_empires) {
+        for (auto sitrep_empire : sr_empires) {
             for (auto sitrep_it = sitrep_empire->SitRepBegin();
                  sitrep_it != sitrep_empire->SitRepEnd(); ++sitrep_it)
             {
@@ -596,16 +602,19 @@ void SitRepPanel::LastClicked() {
 }
 
 void SitRepPanel::FilterClicked() {
+    SectionedScopedTimer filter_click_timer{"SitRepPanel::FilterClicked"};
     std::map<int, std::string> menu_index_templates;
     std::map<int, bool> menu_index_checked;
     int index = 1;
     bool all_checked = true;
 
+    filter_click_timer.EnterSection("get templates");
     auto all_templates = AllSitRepTemplateStrings();
 
-    auto popup = GG::Wnd::Create<CUIPopupMenu>(m_filter_button->Left(),
-                                               m_filter_button->Bottom());
+    filter_click_timer.EnterSection("create popupmenu");
+    auto popup = GG::Wnd::Create<CUIPopupMenu>(m_filter_button->Left(), m_filter_button->Bottom());
 
+    filter_click_timer.EnterSection("add templates");
     for (const std::string& templ : all_templates) {
         menu_index_templates[index] = templ;
         bool check = true;
@@ -628,7 +637,7 @@ void SitRepPanel::FilterClicked() {
             }
         };
 
-        popup->AddMenuItem(GG::MenuItem(menu_label, false, check, select_template_action));
+        popup->AddMenuItem(menu_label, false, check, select_template_action);
         ++index;
     }
 
@@ -636,28 +645,27 @@ void SitRepPanel::FilterClicked() {
         // select / deselect all templates
         if (all_checked) {
             // deselect all
-            for (const std::string& templ : all_templates) {
-                m_hidden_sitrep_templates.insert(templ);
-            }
+            m_hidden_sitrep_templates.insert(std::make_move_iterator(all_templates.begin()),
+                                             std::make_move_iterator(all_templates.end()));
         } else {
             // select all
             m_hidden_sitrep_templates.clear();
         }
     };
-    popup->AddMenuItem(GG::MenuItem((all_checked ? UserString("NONE") : UserString("ALL")),
-                                   false, false, all_templates_action));
+    popup->AddMenuItem((all_checked ? UserString("NONE") : UserString("ALL")),
+                       false, false, all_templates_action);
 
+    filter_click_timer.EnterSection("run menu");
     if (!popup->Run())
         return;
 
+    filter_click_timer.EnterSection("cleanup");
     SetHiddenSitRepTemplateStringsInOptions(m_hidden_sitrep_templates);
 
     Update();
 }
 
-void SitRepPanel::IgnoreSitRep(GG::ListBox::iterator it, const GG::Pt& pt,
-                               const GG::Flags<GG::ModKey>& mod)
-{
+void SitRepPanel::IgnoreSitRep(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& mod) {
     SitRepRow* sitrep_row = dynamic_cast<SitRepRow*>(it->get());
     if (!sitrep_row)
         return;
@@ -670,9 +678,7 @@ void SitRepPanel::IgnoreSitRep(GG::ListBox::iterator it, const GG::Pt& pt,
     Update();
 }
 
-void SitRepPanel::DismissalMenu(GG::ListBox::iterator it, const GG::Pt& pt,
-                                const GG::Flags<GG::ModKey>& mod)
-{
+void SitRepPanel::DismissalMenu(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& mod) {
     GG::MenuItem menu_contents, submenu_ignore, submenu_block, separator_item;
     std::string sitrep_text, sitrep_template;
     std::string entry_margin("  ");
@@ -691,12 +697,12 @@ void SitRepPanel::DismissalMenu(GG::ListBox::iterator it, const GG::Pt& pt,
             auto snooze10_action = [&sitrep_text, start_turn]() { SnoozeSitRepForNTurns(sitrep_text, start_turn, 10); };
             auto snooze_indefinite_action = [&sitrep_text]() { permanently_snoozed_sitreps.insert(sitrep_text); };
 
-            submenu_ignore.next_level.emplace_back(GG::MenuItem(entry_margin + UserString("SITREP_SNOOZE_5_TURNS"),
-                                                                false, false, snooze5_action));
-            submenu_ignore.next_level.emplace_back(GG::MenuItem(entry_margin + UserString("SITREP_SNOOZE_10_TURNS"),
-                                                                false, false, snooze10_action));
-            submenu_ignore.next_level.emplace_back(GG::MenuItem(entry_margin + UserString("SITREP_SNOOZE_INDEFINITE"),
-                                                                false, false, snooze_indefinite_action));
+            submenu_ignore.next_level.emplace_back(entry_margin + UserString("SITREP_SNOOZE_5_TURNS"),
+                                                   false, false, snooze5_action);
+            submenu_ignore.next_level.emplace_back(entry_margin + UserString("SITREP_SNOOZE_10_TURNS"),
+                                                   false, false, snooze10_action);
+            submenu_ignore.next_level.emplace_back(entry_margin + UserString("SITREP_SNOOZE_INDEFINITE"),
+                                                   false, false, snooze_indefinite_action);
             submenu_ignore.next_level.emplace_back(separator_item);
         }
     }
@@ -707,10 +713,10 @@ void SitRepPanel::DismissalMenu(GG::ListBox::iterator it, const GG::Pt& pt,
         snoozed_sitreps.clear();
         permanently_snoozed_sitreps.clear();
     };
-    submenu_ignore.next_level.emplace_back(GG::MenuItem(entry_margin + UserString("SITREP_SNOOZE_CLEAR_ALL"),
-                                                        false, false, snooze_clear_action));
-    submenu_ignore.next_level.emplace_back(GG::MenuItem(entry_margin + UserString("SITREP_SNOOZE_CLEAR_INDEFINITE"),
-                                                        false, false, snooze_clear_indefinite_action));
+    submenu_ignore.next_level.emplace_back(entry_margin + UserString("SITREP_SNOOZE_CLEAR_ALL"),
+                                           false, false, snooze_clear_action);
+    submenu_ignore.next_level.emplace_back(entry_margin + UserString("SITREP_SNOOZE_CLEAR_INDEFINITE"),
+                                           false, false, snooze_clear_indefinite_action);
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
     popup->AddMenuItem(std::move(submenu_ignore));
 
@@ -752,12 +758,9 @@ void SitRepPanel::DismissalMenu(GG::ListBox::iterator it, const GG::Pt& pt,
         GG::GUI::GetGUI()->SetClipboardText(GG::Font::StripTags(sitrep_text));
     };
     auto help_action = []() { ClientUI::GetClientUI()->ZoomToEncyclopediaEntry("SITREP_IGNORE_BLOCK_TITLE"); };
-
-    popup->AddMenuItem(GG::MenuItem(entry_margin + UserString("HOTKEY_COPY"),
-                                    false, false, copy_action));
-    popup->AddMenuItem(GG::MenuItem(entry_margin + UserString("POPUP_MENU_PEDIA_PREFIX") +
-                                    UserString("SITREP_IGNORE_BLOCK_TITLE"),
-                                    false, false, help_action));
+    popup->AddMenuItem(entry_margin + UserString("HOTKEY_COPY"), false, false, copy_action);
+    popup->AddMenuItem(entry_margin + UserString("POPUP_MENU_PEDIA_PREFIX") + UserString("SITREP_IGNORE_BLOCK_TITLE"),
+                       false, false, help_action);
 
     if (!popup->Run())
         return;
@@ -814,7 +817,7 @@ void SitRepPanel::Update() {
     // create UI rows for all sitrps
     GG::X width = m_sitreps_lb->ClientWidth();
     // first the ordered sitreps
-    for (const SitRepEntry& sitrep : ordered_sitreps) {
+    for (SitRepEntry& sitrep : ordered_sitreps) {
         m_sitreps_lb->Insert(GG::Wnd::Create<SitRepRow>(width, GG::Y(ClientUI::Pts()*2),
                                                         std::move(sitrep)));
     }

@@ -18,15 +18,37 @@ from typing import Union
 import EnumsAI
 from AIstate import AIstate
 
-from ._definitions import (ENUM_PREFIX, FALSE, FLOAT_PREFIX, INT_PREFIX, InvalidSaveGameException, NONE, PLACEHOLDER,
-                           SET_PREFIX, TRUE, TUPLE_PREFIX, trusted_classes, )
+from ._definitions import (
+    ENUM_PREFIX,
+    FALSE,
+    FLOAT_PREFIX,
+    INT_PREFIX,
+    NONE,
+    PLACEHOLDER,
+    SET_PREFIX,
+    TRUE,
+    TUPLE_PREFIX,
+    InvalidSaveGameException,
+    trusted_classes,
+)
 
 
 class SaveDecompressException(Exception):
     """
     Exception class for troubles with decompressing save game string.
     """
-    pass
+
+
+def _starts_with_prefix(prefix: str, candidate: str) -> bool:
+    return candidate.startswith(prefix)
+
+
+def _extract_value(prefix: str, value: str):
+    return value[len(prefix) :]
+
+
+def _extract_collection(prefix: str, value: str):
+    return value[len(prefix) + 1 : -1]
 
 
 def load_savegame_string(string: Union[str, bytes]) -> AIstate:
@@ -44,7 +66,7 @@ def load_savegame_string(string: Union[str, bytes]) -> AIstate:
         new_string = zlib.decompress(new_string)
     except zlib.error as e:
         raise SaveDecompressException("Fail to decompress savestate %s" % e) from e
-    return decode(new_string.decode('utf-8'))
+    return decode(new_string.decode("utf-8"))
 
 
 def decode(obj):
@@ -52,7 +74,6 @@ def decode(obj):
 
 
 class _FreeOrionAISaveGameDecoder(json.JSONDecoder):
-
     def __init__(self, **kwargs):
         # do not allow control characters
         super(_FreeOrionAISaveGameDecoder, self).__init__(strict=True, **kwargs)
@@ -66,18 +87,16 @@ class _FreeOrionAISaveGameDecoder(json.JSONDecoder):
     def __interpret_dict(self, obj):
         # if the dict does not contain the class-encoding keys,
         # then it is a standard dictionary.
-        if not all(key in obj for key in ('__class__', '__module__')):
-            return {self.__interpret(key): self.__interpret(value)
-                    for key, value in obj.items()}
+        if not all(key in obj for key in ("__class__", "__module__")):
+            return {self.__interpret(key): self.__interpret(value) for key, value in obj.items()}
 
         # pop and verify class and module name, then parse the class content
-        class_name = obj.pop('__class__')
-        module_name = obj.pop('__module__')
-        full_name = '%s.%s' % (module_name, class_name)
+        class_name = obj.pop("__class__")
+        module_name = obj.pop("__module__")
+        full_name = "%s.%s" % (module_name, class_name)
         cls = trusted_classes.get(full_name)
         if cls is None:
-            raise InvalidSaveGameException("DANGER DANGER - %s not trusted"
-                                           % full_name)
+            raise InvalidSaveGameException("DANGER DANGER - %s not trusted" % full_name)
 
         parsed_content = self.__interpret_dict(obj)
 
@@ -91,8 +110,7 @@ class _FreeOrionAISaveGameDecoder(json.JSONDecoder):
             setstate = new_instance.__setstate__
         except AttributeError:
             if not type(parsed_content) == dict:
-                raise InvalidSaveGameException("Could not set content for %s"
-                                               % new_instance)
+                raise InvalidSaveGameException("Could not set content for %s" % new_instance)
             new_instance.__dict__ = parsed_content
         else:
             # only call now to not catch exceptions in the setstate method
@@ -115,58 +133,54 @@ class _FreeOrionAISaveGameDecoder(json.JSONDecoder):
 
         # if it is a string, check if it encodes another data type
         if isinstance(x, str):
-
             # does it encode an integer?
-            if x.startswith(INT_PREFIX):
-                x = x[len(INT_PREFIX):]
+            if _starts_with_prefix(INT_PREFIX, x):
+                x = _extract_value(INT_PREFIX, x)
                 return int(x)
 
             # does it encode a float?
-            if x.startswith(FLOAT_PREFIX):
-                x = x[len(FLOAT_PREFIX):]
+            if _starts_with_prefix(FLOAT_PREFIX, x):
+                x = _extract_value(FLOAT_PREFIX, x)
                 return float(x)
 
             # does it encode a tuple?
-            if x.startswith(TUPLE_PREFIX):
+            if _starts_with_prefix(TUPLE_PREFIX, x):
                 # ignore surrounding parentheses
-                content = x[len(TUPLE_PREFIX) + 1:-1]
+                content = _extract_collection(TUPLE_PREFIX, x)
                 content = _replace_quote_placeholders(content)
                 result = self.decode(content)
                 return tuple(result)
 
             # does it encode a set?
-            if x.startswith(SET_PREFIX):
+            if _starts_with_prefix(SET_PREFIX, x):
                 # ignore surrounding parentheses
-                content = x[len(SET_PREFIX) + 1:-1]
+                content = _extract_collection(SET_PREFIX, x)
                 content = _replace_quote_placeholders(content)
                 result = self.decode(content)
                 return set(result)
 
             # does it encode an enum?
-            if x.startswith(ENUM_PREFIX):
-                full_name = x[len(ENUM_PREFIX):]
-                partial_names = full_name.split('.')
+            if _starts_with_prefix(ENUM_PREFIX, x):
+                full_name = _extract_value(ENUM_PREFIX, x)
+                partial_names = full_name.split(".")
                 if not len(partial_names) == 2:
-                    raise InvalidSaveGameException("Could not decode Enum %s"
-                                                   % x)
+                    raise InvalidSaveGameException("Could not decode Enum %s" % x)
                 enum_name = partial_names[0]
                 enum = getattr(EnumsAI, enum_name, None)
                 if enum is None:
-                    raise InvalidSaveGameException("Invalid enum %s"
-                                                   % enum_name)
+                    raise InvalidSaveGameException("Invalid enum %s" % enum_name)
                 retval = getattr(enum, partial_names[1], None)
                 if retval is None:
-                    raise InvalidSaveGameException("Invalid enum value %s"
-                                                   % full_name)
+                    raise InvalidSaveGameException("Invalid enum value %s" % full_name)
                 return retval
 
-            if x == TRUE:
+            if _starts_with_prefix(TRUE, x):
                 return True
 
-            if x == FALSE:
+            if _starts_with_prefix(FALSE, x):
                 return False
 
-            if x == NONE:
+            if _starts_with_prefix(NONE, x):
                 return None
 
             # no special cases apply at this point, should be a standard string
@@ -193,12 +207,12 @@ def _replace_quote_placeholders(s):
     n = 0  # counts nesting level (i.e. number of opened but not closed parentheses)
     start = 0  # starting point for string replacement
     for i in range(len(s)):
-        if s[i] == '(':
+        if s[i] == "(":
             # if this is an outer opening parenthesis, then replace placeholder from last parenthesis to here
             if n == 0:
                 s = s[:start] + s[start:i].replace(PLACEHOLDER, '"') + s[i:]
             n += 1
-        elif s[i] == ')':
+        elif s[i] == ")":
             n -= 1
             if n == 0:
                 start = i

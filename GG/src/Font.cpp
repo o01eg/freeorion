@@ -1,13 +1,16 @@
 //! GiGi - A GUI for OpenGL
 //!
 //!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
-//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!  Copyright (C) 2013-2021 The FreeOrion Project
 //!
 //! Released under the GNU Lesser General Public License 2.1 or later.
 //! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
 //! SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include <cctype>
+#if __has_include(<charconv>)
+  #include <charconv>
+#endif
 #include <cmath>
 #include <iterator>
 #include <numeric>
@@ -29,15 +32,10 @@
 
 #define DEBUG_DETERMINELINES 0
 
-namespace GG { namespace detail {
-
-FTFaceWrapper::FTFaceWrapper()
-{}
-
-FTFaceWrapper::~FTFaceWrapper()
-{ if (m_face) FT_Done_Face(m_face); }
-
-} }
+namespace GG::detail {
+    FTFaceWrapper::~FTFaceWrapper()
+    { if (m_face) FT_Done_Face(m_face); }
+}
 
 using namespace GG;
 
@@ -76,10 +74,10 @@ struct TempGlyphData
     TempGlyphData() {}
     TempGlyphData(const Pt& ul_, const Pt& lr_, Y y_ofs, X lb, X a) :
         ul(ul_), lr(lr_), y_offset(y_ofs), left_b(lb), adv(a) {}
-    Pt          ul, lr;   ///< area of glyph subtexture within texture
-    Y           y_offset; ///< vertical offset to draw texture (may be negative!)
-    X           left_b;   ///< left bearing (see Glyph)
-    X           adv;      ///< advance of glyph (see Glyph)
+    Pt ul, lr;   ///< area of glyph subtexture within texture
+    Y  y_offset; ///< vertical offset to draw texture (may be negative!)
+    X  left_b;   ///< left bearing (see Glyph)
+    X  adv;      ///< advance of glyph (see Glyph)
 };
 
 /// A two dimensional grid of pixels that expands to
@@ -228,30 +226,19 @@ void SetJustification(bool& last_line_of_curr_just, Font::LineData& line_data, A
 constexpr double ITALICS_SLANT_ANGLE = 12; // degrees
 const double ITALICS_FACTOR = 1.0 / tan((90 - ITALICS_SLANT_ANGLE) * 3.1415926 / 180.0); // factor used to shear glyphs ITALICS_SLANT_ANGLE degrees CW from straight up
 
-const std::vector<std::pair<std::uint32_t, std::uint32_t>> PRINTABLE_ASCII_ALPHA_RANGES{
+constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 2> PRINTABLE_ASCII_ALPHA_RANGES{{
     {0x41, 0x5B},
-    {0x61, 0x7B}};
+    {0x61, 0x7B}}};
 
-const std::vector<std::pair<std::uint32_t, std::uint32_t>> PRINTABLE_ASCII_NONALPHA_RANGES{
+constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 7> PRINTABLE_ASCII_NONALPHA_RANGES{{
     {0x09, 0x0D},
     {0x20, 0x21},
     {0x30, 0x3A},
     {0x21, 0x30},
     {0x3A, 0x41},
     {0x5B, 0x61},
-    {0x7B, 0x7F}};
-
+    {0x7B, 0x7F}}};
 }
-
-///////////////////////////////////////
-// Constants
-///////////////////////////////////////
-const StrSize GG::S0(0);
-const StrSize GG::S1(1);
-const StrSize GG::INVALID_STR_SIZE(std::numeric_limits<std::size_t>::max());
-const CPSize GG::CP0(0);
-const CPSize GG::CP1(1);
-const CPSize GG::INVALID_CP_SIZE(std::numeric_limits<std::size_t>::max());
 
 
 ///////////////////////////////////////
@@ -259,32 +246,36 @@ const CPSize GG::INVALID_CP_SIZE(std::numeric_limits<std::size_t>::max());
 ///////////////////////////////////////
 std::string GG::RgbaTag(const Clr& c)
 {
-    std::stringstream stream;
-    stream << "<rgba "
-           << static_cast<int>(c.r) << " "
-           << static_cast<int>(c.g) << " "
-           << static_cast<int>(c.b) << " "
-           << static_cast<int>(c.a)
-           << ">";
-    return stream.str();
+#if defined(__cpp_lib_to_chars)
+    std::array<std::string::value_type, 6 + 4*4 + 1> buffer{"<rgba "}; // rest should be nulls
+    auto result = std::to_chars(buffer.data() + 6, buffer.data() + 9, static_cast<int>(c.r));
+    *result.ptr = ' ';
+    result = std::to_chars(result.ptr + 1, result.ptr + 4, static_cast<int>(c.g));
+    *result.ptr = ' ';
+    result = std::to_chars(result.ptr + 1, result.ptr + 4, static_cast<int>(c.b));
+    *result.ptr = ' ';
+    result = std::to_chars(result.ptr + 1, result.ptr + 4, static_cast<int>(c.a));
+    *result.ptr = '>';
+    return {buffer.data()};
+#else
+    std::string retval;
+    // reserve space for leading "<rgba " and 4 numbers of 3 digits (000-255),
+    // each followed by 1 character (" " or ">").
+    // this is also probably within the small string optimization size (31 chars in my tests)
+    retval.reserve(6 + 4*4);
+    retval.append("<rgba ")
+          .append(std::to_string(static_cast<int>(c.r))).append(" ")
+          .append(std::to_string(static_cast<int>(c.g))).append(" ")
+          .append(std::to_string(static_cast<int>(c.b))).append(" ")
+          .append(std::to_string(static_cast<int>(c.a))).append(">");
+    return retval;
+#endif
 }
 
 
 ///////////////////////////////////////
 // TextFormat
 ///////////////////////////////////////
-const TextFormat GG::FORMAT_NONE         (0);
-const TextFormat GG::FORMAT_VCENTER      (1 << 0);
-const TextFormat GG::FORMAT_TOP          (1 << 1);
-const TextFormat GG::FORMAT_BOTTOM       (1 << 2);
-const TextFormat GG::FORMAT_CENTER       (1 << 3);
-const TextFormat GG::FORMAT_LEFT         (1 << 4);
-const TextFormat GG::FORMAT_RIGHT        (1 << 5);
-const TextFormat GG::FORMAT_NOWRAP       (1 << 6);
-const TextFormat GG::FORMAT_WORDBREAK    (1 << 7);
-const TextFormat GG::FORMAT_LINEWRAP     (1 << 8);
-const TextFormat GG::FORMAT_IGNORETAGS   (1 << 9);
-
 GG_FLAGSPEC_IMPL(TextFormat);
 
 namespace {
@@ -363,6 +354,9 @@ Font::Substring::operator std::string() const
 { return std::string(begin(), end()); }
 
 bool Font::Substring::operator==(const std::string& rhs) const
+{ return size() == rhs.size() && !std::memcmp(str->data() + first, rhs.data(), rhs.size()); }
+
+bool Font::Substring::operator==(std::string_view rhs) const
 { return size() == rhs.size() && !std::memcmp(str->data() + first, rhs.data(), rhs.size()); }
 
 bool Font::Substring::operator!=(const std::string& rhs) const
@@ -586,6 +580,9 @@ namespace {
         void Insert(const std::string& tag)
         { m_known_tags.emplace(tag); }
 
+        void Insert(std::string_view tag)
+        { m_known_tags.emplace(tag); }
+
         /** Remove a tag from the set of known tags.*/
         void Erase(const std::string& tag)
         { m_known_tags.erase(tag); }
@@ -651,19 +648,9 @@ namespace {
 ///////////////////////////////////////
 // class GG::Font::TextElement
 ///////////////////////////////////////
-Font::TextElement::TextElement() :
-    whitespace(false),
-    newline(false),
-    cached_width(-X1)
-{}
-
 Font::TextElement::TextElement(bool ws, bool nl) :
     whitespace(ws),
-    newline(nl),
-    cached_width(-X1)
-{}
-
-Font::TextElement::~TextElement()
+    newline(nl)
 {}
 
 void Font::TextElement::Bind(const std::string& whole_text)
@@ -684,7 +671,6 @@ StrSize Font::TextElement::StringSize() const
 
 CPSize Font::TextElement::CodePointSize() const
 { return CPSize(widths.size()); }
-
 
 bool Font::TextElement::operator==(const TextElement &rhs) const
 {
@@ -872,8 +858,7 @@ Font::TextAndElementsAssembler::TextAndElementsAssembler(const Font& font) :
 {}
 
 // Required because Impl is defined here
-Font::TextAndElementsAssembler::~TextAndElementsAssembler()
-{}
+Font::TextAndElementsAssembler::~TextAndElementsAssembler() = default;
 
 const std::string& Font::TextAndElementsAssembler::Text() const
 { return m_impl->Text(); }
@@ -977,18 +962,15 @@ bool Font::RenderState::ColorsEmpty() const
 // class GG::Font::RenderCache
 ///////////////////////////////////////
 
-// Must be here for scoped_ptr deleter to work
 Font::RenderCache::RenderCache() :
-    vertices(new GL2DVertexBuffer()),
-    coordinates(new GLTexCoordBuffer()),
-    colors(new GLRGBAColorBuffer()),
-    underline_vertices(new GL2DVertexBuffer()),
-    underline_colors(new GLRGBAColorBuffer())
+    vertices(std::make_unique<GL2DVertexBuffer>()),
+    coordinates(std::make_unique<GLTexCoordBuffer>()),
+    colors(std::make_unique<GLRGBAColorBuffer>()),
+    underline_vertices(std::make_unique<GL2DVertexBuffer>()),
+    underline_colors(std::make_unique<GLRGBAColorBuffer>())
 {}
 
-// Must be here for unique_ptr deleter to work
-Font::RenderCache::~RenderCache()
-{}
+Font::RenderCache::~RenderCache() = default;
 
 ///////////////////////////////////////
 // class GG::Font::LineData::CharData
@@ -1074,8 +1056,6 @@ X Font::RenderText(const Pt& pt_, const std::string& text) const
     Pt pt = pt_;
     X orig_x = pt.x;
 
-    double orig_color[4];
-    glGetDoublev(GL_CURRENT_COLOR, orig_color);
     glBindTexture(GL_TEXTURE_2D, m_texture->OpenGLId());
 
     RenderCache cache;
@@ -1121,15 +1101,18 @@ void Font::RenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags
     RenderCachedText(cache);
 }
 
-void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags<TextFormat>& format, RenderCache& cache,
-                         const std::vector<LineData>& line_data, RenderState* render_state/* = 0*/) const
- {
-    RenderState state;
-    if (!render_state)
-        render_state = &state;
-
-    PreRenderText(ul, lr, text, format, line_data, *render_state,
-                  0, CP0, line_data.size(), line_data.empty() ? CP0 : CPSize(line_data.back().char_data.size()), cache);
+void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags<TextFormat>& format,
+                         RenderCache& cache,
+                         const std::vector<LineData>& line_data, RenderState* render_state) const
+{
+    if (render_state) {
+        PreRenderText(ul, lr, text, format, line_data, *render_state, 0, CP0, line_data.size(),
+                      line_data.empty() ? CP0 : CPSize(line_data.back().char_data.size()), cache);
+    } else {
+        RenderState render_state_local;
+        PreRenderText(ul, lr, text, format, line_data, render_state_local, 0, CP0, line_data.size(),
+                      line_data.empty() ? CP0 : CPSize(line_data.back().char_data.size()), cache);
+    }
 }
 
 void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags<TextFormat>& format,
@@ -1138,8 +1121,6 @@ void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Fl
                          std::size_t end_line, CPSize end_char,
                          RenderCache& cache) const
 {
-    double orig_color[4];
-    glGetDoublev(GL_CURRENT_COLOR, orig_color);
     //glBindTexture(GL_TEXTURE_2D, m_texture->OpenGLId());
 
     Y y_origin = ul.y; // default value for FORMAT_TOP
@@ -1169,7 +1150,7 @@ void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Fl
         for (CPSize j = start; j < end; ++j) {
             const auto& char_data = line.char_data[Value(j)];
             for (auto tag : char_data.tags) {
-                HandleTag(tag, orig_color, render_state);
+                HandleTag(tag, render_state);
             }
             std::uint32_t c = utf8::peek_next(text.begin() + Value(char_data.string_index), string_end_it);
             assert((text[Value(char_data.string_index)] == '\n') == (c == WIDE_NEWLINE));
@@ -1218,9 +1199,6 @@ void Font::RenderCachedText(RenderCache& cache) const
 void Font::ProcessTagsBefore(const std::vector<LineData>& line_data, RenderState& render_state,
                              std::size_t begin_line, CPSize begin_char) const
 {
-    double orig_color[4];
-    glGetDoublev(GL_CURRENT_COLOR, orig_color);
-
     if (line_data.empty())
         return;
 
@@ -1231,45 +1209,43 @@ void Font::ProcessTagsBefore(const std::vector<LineData>& line_data, RenderState
              ++j)
         {
             for (auto& tag : line.char_data[Value(j)].tags) {
-                HandleTag(tag, orig_color, render_state);
+                HandleTag(tag, render_state);
             }
         }
     }
 }
 
-std::string Font::StripTags(const std::string& text, bool strip_unpaired_tags)
+std::string Font::StripTags(std::string_view text, bool strip_unpaired_tags)
 {
     using namespace boost::xpressive;
+    std::string text_str{text}; // temporary until StaticTagHandler().Regex returns a cregex
+    auto& regex = StaticTagHandler().Regex(text_str, false, strip_unpaired_tags);
 
-    sregex & regex = StaticTagHandler().Regex(text, false, strip_unpaired_tags);
+    static const mark_tag tag_name_tag(1);
+    static const mark_tag open_bracket_tag(2);
+    static const mark_tag close_bracket_tag(3);
+    static const mark_tag whitespace_tag(4);
+    static const mark_tag text_tag(5);
 
-    mark_tag tag_name_tag(1);
-    mark_tag open_bracket_tag(2);
-    mark_tag close_bracket_tag(3);
-    mark_tag whitespace_tag(4);
-    mark_tag text_tag(5);
-
-    std::stringstream retval;
+    std::string retval;
+    retval.reserve(text.size());
 
     // scan through matched markup and text, saving only the non-tag-text
-    sregex_iterator it(text.begin(), text.end(), regex);
+    sregex_iterator it(text_str.begin(), text_str.end(), regex);
     sregex_iterator end_it;
     for (; it != end_it; ++it) {
-        sub_match<std::string::const_iterator> const* text_match;
-        sub_match<std::string::const_iterator> const* whitespace_match;
-
-        text_match = &(*it)[text_tag];
-        if (text_match  && (text_match->matched)) {
-            retval << Substring(text, *text_match);
+        auto& text_match = (*it)[text_tag];
+        if (text_match.matched) {
+            retval.append(text_match.first, text_match.second);
 
         } else {
-            whitespace_match = &(*it)[whitespace_tag];
-            if (whitespace_match && whitespace_match->matched)
-                retval << Substring(text, *whitespace_match);
+            auto& whitespace_match = (*it)[whitespace_tag];
+            if (whitespace_match.matched)
+                retval.append(whitespace_match.first, whitespace_match.second);
         }
     }
 
-    return retval.str();
+    return retval;
 }
 
 Pt Font::TextExtent(const std::vector<LineData>& line_data) const
@@ -1286,6 +1262,9 @@ Pt Font::TextExtent(const std::vector<LineData>& line_data) const
 }
 
 void Font::RegisterKnownTag(const std::string& tag)
+{ StaticTagHandler().Insert(tag); }
+
+void Font::RegisterKnownTag(std::string_view tag)
 { StaticTagHandler().Insert(tag); }
 
 void Font::RemoveKnownTag(const std::string& tag)
@@ -1592,7 +1571,7 @@ std::vector<Font::LineData> Font::DetermineLines(
     ValidateFormat(format);
 
     RenderState render_state;
-    int tab_width = 8; // default tab width
+    constexpr int tab_width = 8; // default tab width
     X tab_pixel_width = tab_width * m_space_width; // get the length of a tab stop
     bool expand_tabs = format & FORMAT_LEFT; // tab expansion only takes place when the lines are left-justified (otherwise, tabs are just spaces)
     Alignment orig_just = ALIGN_NONE;
@@ -1762,7 +1741,7 @@ std::vector<Font::LineData> Font::DetermineLines(
             else if (elem_as_tag->tag_name == ALIGN_RIGHT_TAG)
                 line_data.back().justification = ALIGN_RIGHT;
             else if (elem_as_tag->tag_name != PRE_TAG)
-                pending_formatting_tags.emplace_back(elem);
+                pending_formatting_tags.push_back(elem);
             last_line_of_curr_just = false;
             code_point_offset += elem->CodePointSize();
 
@@ -1774,7 +1753,7 @@ std::vector<Font::LineData> Font::DetermineLines(
                 (elem_as_tag->tag_name == ALIGN_RIGHT_TAG && line_data.back().justification == ALIGN_RIGHT))
                 last_line_of_curr_just = true;
             else if (elem_as_tag->tag_name != PRE_TAG)
-                pending_formatting_tags.emplace_back(elem);
+                pending_formatting_tags.push_back(elem);
             code_point_offset += elem->CodePointSize();
         }
         original_string_offset += elem->StringSize();
@@ -1812,10 +1791,8 @@ void Font::Init(FT_Face& face)
 {
     FT_Fixed scale;
 
-    if (!m_pt_sz) {
-        throw InvalidPointSize("Attempted to create font \"" + m_font_filename +
-                               "\" with 0 point size");
-    }
+    if (!m_pt_sz)
+        throw InvalidPointSize("Attempted to create font \"" + m_font_filename + "\" with 0 point size");
 
     // Set the character size and use default 72 DPI
     if (FT_Set_Char_Size(face, 0, m_pt_sz * 64, 0, 0)) // if error is returned
@@ -1830,9 +1807,9 @@ void Font::Init(FT_Face& face)
     // underline info
     m_underline_offset = std::floor(FT_MulFix(face->underline_position, scale) / 64.0);
     m_underline_height = std::ceil(FT_MulFix(face->underline_thickness, scale) / 64.0);
-    if (m_underline_height < 1.0) {
+    if (m_underline_height < 1.0)
         m_underline_height = 1.0;
-    }
+
     // italics info
     m_italics_offset = Value(ITALICS_FACTOR * m_height / 2.0);
     // shadow info
@@ -1882,9 +1859,8 @@ void Font::Init(FT_Face& face)
         for (std::uint32_t c = low; c < high; ++c) {
             if (!temp_glyph_data.count(c) && GenerateGlyph(face, c)) {
                 const FT_Bitmap& glyph_bitmap = face->glyph->bitmap;
-                if ((glyph_bitmap.width > TEX_MAX_SIZE) | (glyph_bitmap.rows > TEX_MAX_SIZE)) {
+                if ((glyph_bitmap.width > TEX_MAX_SIZE) || (glyph_bitmap.rows > TEX_MAX_SIZE))
                     ThrowBadGlyph("GG::Font::Init : Glyph too large for buffer'%1%'", c); // catch broken fonts
-                }
 
                 if (Value(x) + glyph_bitmap.width >= TEX_MAX_SIZE) { // start a new row of glyph images
                     if (x > max_x) max_x = x;
@@ -1895,9 +1871,8 @@ void Font::Init(FT_Face& face)
                     // We cannot make the texture any larger. The font does not fit.
                     ThrowBadGlyph("GG::Font::Init : Face too large for buffer. First glyph to no longer fit: '%1%'", c);
                 }
-                if (y + Y(glyph_bitmap.rows) > max_y) {
+                if (y + Y(glyph_bitmap.rows) > max_y)
                     max_y = y + Y(glyph_bitmap.rows + 1); //Leave a one pixel gap between glyphs
-                }
 
                 std::uint8_t*  src_start = glyph_bitmap.buffer;
                 // Resize buffer to fit new data
@@ -1937,8 +1912,10 @@ void Font::Init(FT_Face& face)
                     (unsigned char*)buffer.Buffer(), GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, 2);
 
     // create Glyph objects from temp glyph data
-    for (const auto& glyph_data : temp_glyph_data)
-        m_glyphs[glyph_data.first] = Glyph(m_texture, glyph_data.second.ul, glyph_data.second.lr, glyph_data.second.y_offset, glyph_data.second.left_b, glyph_data.second.adv);
+    for (const auto& glyph_data : temp_glyph_data) {
+        m_glyphs[glyph_data.first] = Glyph(m_texture, glyph_data.second.ul, glyph_data.second.lr,
+                                           glyph_data.second.y_offset, glyph_data.second.left_b, glyph_data.second.adv);
+    }
 
     // record the width of the space character
     auto glyph_it = m_glyphs.find(WIDE_SPACE);
@@ -2084,8 +2061,40 @@ X Font::StoreGlyph(const Pt& pt, const Glyph& glyph, const Font::RenderState* re
     return glyph.advance;
 }
 
-void Font::HandleTag(const std::shared_ptr<FormattingTag>& tag, double* orig_color,
-                     RenderState& render_state) const
+namespace {
+    std::pair<std::array<GLubyte, 4>, bool> TagParamsToColor(const std::vector<Font::Substring>& params) {
+        std::array<GLubyte, 4> retval{};
+        if (params.size() != 4)
+            return {retval, false};
+
+        for (size_t n = 0; n < 4; ++n) {
+#if defined(__cpp_lib_to_chars)
+            const auto& param{params[n]};
+            if (param.empty())
+                return {retval, false};
+            const auto param_data = &*param.begin();
+            const auto param_size = param.size();
+            auto ec = std::from_chars(param_data, param_data + param_size, retval[n]).ec;
+            if (ec != std::errc())
+                return {retval, false};
+#else
+            try {
+                auto temp_colour = boost::lexical_cast<int>(params[n]);
+                if (temp_colour >= 0 && temp_colour <= 255)
+                    retval[n] = temp_colour;
+                else
+                    return {retval, false};
+            } catch (const boost::bad_lexical_cast&) {
+                return {retval, false};
+            }
+#endif
+        }
+
+        return {retval, true};
+    }
+}
+
+void Font::HandleTag(const std::shared_ptr<FormattingTag>& tag, RenderState& render_state) const
 {
     if (tag->tag_name == ITALIC_TAG) {
         if (tag->close_tag) {
@@ -2127,58 +2136,14 @@ void Font::HandleTag(const std::shared_ptr<FormattingTag>& tag, double* orig_col
         if (tag->close_tag) {
             // Popping is ok also for an empty color stack.
             render_state.PopColor();
+
         } else {
-            using boost::lexical_cast;
-            bool well_formed_tag = true;
-            if (4 == tag->params.size()) {
-                try {
-                    int temp_color[4];
-                    GLubyte color[4];
-                    temp_color[0] = lexical_cast<int>(tag->params[0]);
-                    temp_color[1] = lexical_cast<int>(tag->params[1]);
-                    temp_color[2] = lexical_cast<int>(tag->params[2]);
-                    temp_color[3] = lexical_cast<int>(tag->params[3]);
-                    if (0 <= temp_color[0] && temp_color[0] <= 255 &&
-                        0 <= temp_color[1] && temp_color[1] <= 255 &&
-                        0 <= temp_color[2] && temp_color[2] <= 255 &&
-                        0 <= temp_color[3] && temp_color[3] <= 255)
-                    {
-                        color[0] = temp_color[0];
-                        color[1] = temp_color[1];
-                        color[2] = temp_color[2];
-                        color[3] = temp_color[3];
-                        glColor4ubv(color);
-                        render_state.PushColor(color[0], color[1], color[2], color[3]);
-                    } else {
-                        well_formed_tag = false;
-                    }
-                } catch (const boost::bad_lexical_cast&) {
-                    try {
-                        double color[4];
-                        color[0] = lexical_cast<double>(tag->params[0]);
-                        color[1] = lexical_cast<double>(tag->params[1]);
-                        color[2] = lexical_cast<double>(tag->params[2]);
-                        color[3] = lexical_cast<double>(tag->params[3]);
-                        if (0.0 <= color[0] && color[0] <= 1.0 &&
-                            0.0 <= color[1] && color[1] <= 1.0 &&
-                            0.0 <= color[2] && color[2] <= 1.0 &&
-                            0.0 <= color[3] && color[3] <= 1.0)
-                        {
-                            glColor4dv(color);
-                            render_state.PushColor(color[0], color[1], color[2], color[3]);
-                        } else {
-                            well_formed_tag = false;
-                        }
-                    } catch (const boost::bad_lexical_cast&) {
-                        well_formed_tag = false;
-                    }
-                }
+            auto [color, well_formed_tag] = TagParamsToColor(tag->params);
+            if (well_formed_tag) {
+                glColor4ubv(color.data());
+                render_state.PushColor(color[0], color[1], color[2], color[3]);
             } else {
-                well_formed_tag = false;
-            }
-            if (!well_formed_tag) {
-                std::cerr << "GG::Font : Encountered malformed <rgba> formatting tag: "
-                          << tag->text;
+                std::cerr << "GG::Font : Encountered malformed <rgba> formatting tag: " << tag->text;
             }
         }
     }

@@ -22,12 +22,12 @@ Required Software Dependencies
 FreeOrion depends on the following software to build:
 
   * [Visual Studio] - 2017 or 2019 for Windows Desktop ; Windows only
-  * [Xcode] - 9.4 or later ; Mac OS X only
+  * [Xcode] - 10.1 or later ; Mac OS X only
   * [CMake] - 3.4 (Mac OS X) ; 3.1 or later (Other non-Windows)
   * A C++17 compliant compiler - Other Operating Systems
     * [GNU GCC] - 8.0 or later
     * [Clang] - 5 or later
-  * [Python] - 3.5.* or later
+  * [Python] - 3.6.* or later
   * [Git]
 
 FreeOrion depends on the following libraries or APIs to run:
@@ -37,7 +37,7 @@ FreeOrion depends on the following libraries or APIs to run:
   * OpenAL - It's recommended to use the [OpenAL Soft] implementation
   * [Boost] - 1.58 or later
   * [zlib]
-  * [libpython] - 3.5.* or later
+  * [libpython] - 3.6.* or later
   * [FreeType2]
   * [libpng]
   * [libogg]
@@ -60,9 +60,9 @@ manager or compiling from source).
 Step by step procedure:
 
  * On Windows:
-   * Download the [FreeOrionSDK v11] from the FreeOrionSDK respository releases.
+   * Download the [FreeOrionSDK v12] from the FreeOrionSDK respository releases.
  * On Mac OS X:
-   * The [FreeOrionSDK v11] is downloaded automatically when CMake creates the
+   * The [FreeOrionSDK v12] is downloaded automatically when CMake creates the
      build environment.
  * Linux and other Operating Systems:
    * Install build and runtime dependencies by the preferred way for the
@@ -120,40 +120,39 @@ Visual Studio.  Now compile the whole project by selecting the
 After the build finished successfully the binaries can be found within
 the `freeorion-project/FreeOrion` directory.
 
-I
+### Windows (CMake)
 
-### Windows (CMake; work in progress)
+After preparing the SDK as above, open a Visual Studio x86 Native Tools command prompt (from the start menu Visual Studio folder), and change to the _source_directory_.
 
 Create a `build` directory inside the _source_directory_ and change into
-this directory. It will contain all compile FreeOrion build artifacs.
-
-Execute cmake to generate a Visual Studio solution:
+this directory. It will contain all compile FreeOrion build artifacs:
 
 ```
-cmake .. -G "Visual Studio 15 2017"
+mkdir build
+cd build
 ```
 
-After successfully creating the Makefiles build the whole project by
-calling:
+Execute cmake to generate a Visual Studio solution, eg:
 
 ```
-MSBuild.exe -p:Configuration=Release FreeOrion.sln
+cmake .. -G "Visual Studio 16 2019" -T v141 -A Win32 -DBUILD_TESTING=On -DCMAKE_C_FLAGS=/MP -DCMAKE_CXX_FLAGS=/MP
 ```
 
-In case you want to utilize multiple CPU cores by running parallel
-compile jobs, you can add the `-m` option to the command.
+Then run the build:
 
-Alternatively, you can build FreeOrion by opening the `FreeOrion.sln`
-project solution with Visual Studio.  Now compile the whole project
-by selecting the `Build` -> `Build Solution` menu entry.
-This will leave you with a build of FreeOrion executables.
+```
+cmake --build . --config "Release" -- /maxcpucount
+```
 
-After the build finished successfully the binaries can be found within
-the `freeorion-project/Freeorion/build/Release` directory.
+Alternatively, you can build FreeOrion by opening the cmake-generated
+`FreeOrion.sln` project solution with Visual Studio.  Now compile the
+whole project by selecting the `Build` -> `Build Solution` menu entry.
 
-To run the executable without creating the symbolic link, you can first
-change the directory to `freeorion-project/Freeorion`, then run
-`./build/Release/FreeOrion.exe`.
+After the build finished successfully, the executable binaries can be
+found within the `freeorion-project/Freeorion/build/Release` directory.
+That directory will also contain a symbolic link to the default
+resources directory, `freeorion-project/Freeorion/default`, allowing
+the FreeOrion client to be run from that location.
 
 
 ### Mac OS X
@@ -204,9 +203,14 @@ the `freeorion-project/build` directory.
 
 Install Android NDK.
 
-Build [Python-For-Android].
+Build [Python-For-Android]. Pack standard library with
 
-Build [Boost-For-Android] with iconv support for boost_locale library
+```bash
+zip -r -9 -q --exclude=*.pyc --exclude=*.a --exclude=*.so \
+<Project>/godot/default/python/lib/python36.zip .
+```
+
+Build [Boost-For-Android] with iconv support for boost_locale library and python support.
 
 ```bash
 ./build-android.sh --with-iconv --arch=arm64-v8a --with-python=`readlink -f ../python-install` --layout=system $ANDROID_NDK
@@ -218,7 +222,7 @@ Create a `build` directory aside the _source_directory_ and change into
 this directory. It will contain all compile FreeOrion build artifacs.
 
 ```bash
-<android>/cmake/3.10.2.4988404/bin/cmake -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=21 -DANDROID_NDK=<android>/ndk-bundle/ -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=<android>/ndk-bundle/build/cmake/android.toolchain.cmake -DCMAKE_CXX_FLAGS=-std=c++14 -DANDROID_ALLOW_UNDEFINED_SYMBOLS=Off -DBUILD_SERVER=OFF -DBUILD_AI=OFF -DBUILD_CLIENT_GG=OFF -DBoost_INCLUDE_DIR=<Boost-for-Android>/build/out/armeabi-v7a/include/ -DBoost_USE_STATIC_LIBS=On -DBoost_LIBRARY_DIR=<Boost-for-Android>/build/out/armeabi-v7a/lib/ -DBUILD_CLIENT_GODOT=On -DICUI18N_LIBRARY=<Boost-for-Android>/libiconv-libicu-android/armeabi-v7a/lib/libicui18n.a -DICUUC_LIBRARY=<Boost-for-Android>/libiconv-libicu-android/armeabi-v7a/lib/libicuuc.a -DICUDATA_LIBRARY=<Boost-for-Android>/libiconv-libicu-android/armeabi-v7a/lib/libicudata.a -DICONV_LIBRARY=<Boost-for-Android>/libiconv-libicu-android/armeabi-v7a/lib/libiconv.so ../freeorion
+<android>/cmake/3.10.2.4988404/bin/cmake -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=21 -DANDROID_NDK=<android>/ndk-bundle/ -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=<android>/ndk-bundle/build/cmake/android.toolchain.cmake -DCMAKE_CXX_FLAGS=-std=c++14 -DANDROID_ALLOW_UNDEFINED_SYMBOLS=Off -DBUILD_SERVER=OFF -DBUILD_AI=OFF -DBUILD_CLIENT_GG=OFF -DBoost_INCLUDE_DIR=<Boost-for-Android>/build/out/armeabi-v7a/include/ -DBoost_USE_STATIC_LIBS=On -DBoost_LIBRARY_DIR=<Boost-for-Android>/build/out/armeabi-v7a/lib/ -DBUILD_CLIENT_GODOT=On -DICUI18N_LIBRARY=<Boost-for-Android>/libiconv-libicu-android/armeabi-v7a/lib/libicui18n.a -DICUUC_LIBRARY=<Boost-for-Android>/libiconv-libicu-android/armeabi-v7a/lib/libicuuc.a -DICUDATA_LIBRARY=<Boost-for-Android>/libiconv-libicu-android/armeabi-v7a/lib/libicudata.a -DICONV_LIBRARY=<Boost-for-Android>/libiconv-libicu-android/armeabi-v7a/lib/libiconv.so -DPYTHON_LIBRARY=<Python-for-Android>/lib/libpython3.6m.a -DPYTHON_INCLUDE_DIR=<Python-for-Android>/include/python3.6m/ ../freeorion
 ```
 
 After successfully creating the Makefiles build the whole project by
@@ -229,7 +233,17 @@ calling:
 ```
 
 After the build finished successfully the godot libraries can be found within
-the `freeorion-project/build` directory.
+the `freeorion-project/build` directory and copied to `godot/client/bin/`.
+
+Call `strip` on those libraries to clean debug symbols.
+
+Export [Godot-Export-Android] with additional `default/*` resources.
+
+To get logs run:
+
+```bash
+adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeorion-godot.log
+```
 
 [Visual Studio]: https://visualstudio.microsoft.com/vs/older-downloads/
 [Xcode]: https://itunes.apple.com/de/app/xcode/id497799835?mt=12

@@ -1667,7 +1667,7 @@ EmpireColorSelector::EmpireColorSelector(GG::Y h) :
 {
     Resize(GG::Pt(COLOR_SELECTOR_WIDTH, h - 8));
 
-    for (const GG::Clr& color : EmpireColors())
+    for (auto& color : EmpireColors())
         Insert(GG::Wnd::Create<ColorRow>(color, h - 4));
 
     SelChangedSignal.connect(
@@ -1788,13 +1788,9 @@ void FileDlg::CompleteConstruction() {
 //////////////////////////////////////////////////
 // ResourceInfoPanel
 //////////////////////////////////////////////////
-namespace {
-    GG::Y VERTICAL_SECTION_GAP(4);
-}
-
 ResourceInfoPanel::ResourceInfoPanel(std::string title, std::string point_units_str,
                                      const GG::X x, const GG::Y y, const GG::X w, const GG::Y h,
-                                     const std::string& config_name) :
+                                     std::string_view config_name) :
     CUIWnd(title, x, y, w, h,
            GG::INTERACTIVE | GG::RESIZABLE | GG::DRAGABLE | GG::ONTOP | PINABLE,
            config_name, false),
@@ -1901,12 +1897,6 @@ void ResourceInfoPanel::SetStockpileCost(float stockpile, float stockpile_use,
     *m_stockpile_use << DoubleToString(stockpile_use, 3, false);
 
     *m_stockpile_max_use << DoubleToString(stockpile_use_max, 3, false);
-
-    TraceLogger() << "SetStockpileCost:  set name";
-    const Empire* empire = GetEmpire(m_empire_id);
-    const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
-    SetName(boost::io::str(FlexibleFormat(UserString("STOCKPILE_INFO_EMPIRE")) % m_title_str % empire_name));
-    TraceLogger() << "SetStockpileCost:  done.";
 }
 
 void ResourceInfoPanel::SetLocalPointsCost(float local_points, float local_cost, float local_stockpile_use,

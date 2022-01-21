@@ -133,57 +133,57 @@ void MessageWndEdit::FindGameWords() {
      // add player and empire names
     for ([[maybe_unused]] auto& [ignored_id, empire] : Empires()) {
         (void)ignored_id;   // quiet unused variable warning
-        m_game_words.emplace(empire->Name());
-        m_game_words.emplace(empire->PlayerName());
+        m_game_words.insert(empire->Name());
+        m_game_words.insert(empire->PlayerName());
     }
     // add system names
     for (auto& system : GetUniverse().Objects().all<System>()) {
         if (!system->Name().empty())
-            m_game_words.emplace(system->Name());
+            m_game_words.insert(system->Name());
     }
      // add ship names
     for (auto& ship : GetUniverse().Objects().all<Ship>()) {
         if (!ship->Name().empty())
-            m_game_words.emplace(ship->Name());
+            m_game_words.insert(ship->Name());
     }
      // add ship design names
 
     for (const auto& design : GetPredefinedShipDesignManager().GetOrderedShipDesigns()) {
         if (!design->Name().empty())
-            m_game_words.emplace(UserString(design->Name()));
+            m_game_words.insert(UserString(design->Name()));
     }
      // add specials names
-    for (const std::string& special_name : SpecialNames()) {
+    for (const auto& special_name : SpecialNames()) {
         if (!special_name.empty())
-            m_game_words.emplace(UserString(special_name));
+            m_game_words.insert(UserString(special_name));
     }
      // add species names
     for (const auto& [name, species] : GetSpeciesManager()) {
         if (!name.empty())
-            m_game_words.emplace(UserString(name));
+            m_game_words.insert(UserString(name));
         (void)species; // quiet unused variable warning
     }
      // add techs names
     for (const std::string& tech_name : GetTechManager().TechNames()) {
         if (!tech_name.empty())
-            m_game_words.emplace(UserString(tech_name));
+            m_game_words.insert(UserString(tech_name));
     }
     // add building type names
     for (const auto& [name, type] : GetBuildingTypeManager()) {
         if (!name.empty())
-            m_game_words.emplace(UserString(name));
+            m_game_words.insert(UserString(name));
         (void)type; // quiet unused variable warning
     }
     // add ship hulls
     for (const auto& design : GetPredefinedShipDesignManager().GetOrderedShipDesigns()) {
         if (!design->Hull().empty())
-            m_game_words.emplace(UserString(design->Hull()));
+            m_game_words.insert(UserString(design->Hull()));
     }
     // add ship parts
     for (const auto& design : GetPredefinedShipDesignManager().GetOrderedShipDesigns()) {
         for (const std::string& part_name : design->Parts()) {
             if (!part_name.empty())
-                m_game_words.emplace(UserString(part_name));
+                m_game_words.insert(UserString(part_name));
         }
     }
  }
@@ -292,7 +292,7 @@ bool MessageWndEdit::CompleteWord(const std::set<std::string>& names, const std:
 ////////////////////
 //   MessageWnd   //
 ////////////////////
-MessageWnd::MessageWnd(GG::Flags<GG::WndFlag> flags, const std::string& config_name) :
+MessageWnd::MessageWnd(GG::Flags<GG::WndFlag> flags, std::string_view config_name) :
     CUIWnd(UserString("MESSAGES_PANEL_TITLE"), flags, config_name)
 {}
 
@@ -597,8 +597,7 @@ void MessageWnd::HandleTextCommand(const std::string& text) {
             std::set<int> recipient;
             recipient.insert(player_id);
             SendChatMessage(message, recipient, true);
-        }
-        else {
+        } else {
             *m_display += UserString("MESSAGES_INVALID") + "\n";
         }
     }
@@ -617,7 +616,7 @@ void MessageWnd::MessageEntered() {
         m_history[0] = trimmed_text;
         m_history.push_front("");
     } else {
-        m_history[0] = "";
+        m_history[0].clear();
     }
     while (12 < static_cast<int>(m_history.size()) + 1)
         m_history.pop_back();

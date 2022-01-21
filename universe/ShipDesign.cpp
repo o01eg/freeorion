@@ -72,7 +72,7 @@ CommonParams::CommonParams(std::unique_ptr<ValueRef::ValueRef<double>>&& product
         tags.insert(boost::to_upper_copy<std::string>(tag));
 }
 
-CommonParams::~CommonParams() {}
+CommonParams::~CommonParams() = default;
 
 
 /////////////////////////////////////
@@ -90,9 +90,9 @@ ParsedShipDesign::ParsedShipDesign(
     m_designed_by_empire(designed_by_empire),
     m_hull(std::move(hull)),
     m_parts(std::move(parts)),
-    m_is_monster(monster),
     m_icon(std::move(icon)),
     m_3D_model(std::move(model)),
+    m_is_monster(monster),
     m_name_desc_in_stringtable(name_desc_in_stringtable)
 {}
 
@@ -116,9 +116,9 @@ ShipDesign::ShipDesign(const boost::optional<std::invalid_argument>& should_thro
     m_designed_by_empire(designed_by_empire),
     m_hull(std::move(hull)),
     m_parts(std::move(parts)),
-    m_is_monster(monster),
     m_icon(std::move(icon)),
     m_3D_model(std::move(model)),
+    m_is_monster(monster),
     m_name_desc_in_stringtable(name_desc_in_stringtable)
 {
     // Either force a valid design and log about it or just throw std::invalid_argument
@@ -192,7 +192,7 @@ float ShipDesign::ProductionCost(int empire_id, int location_id) const {
     int part_count = 0;
     for (const std::string& part_name : m_parts) {
         if (const ShipPart* part = GetShipPart(part_name)) {
-            cost_accumulator += part->ProductionCost(empire_id, location_id, m_id);
+            cost_accumulator += part->ProductionCost(empire_id, location_id, context, m_id);
             part_count++;
         }
     }
@@ -211,13 +211,16 @@ int ShipDesign::ProductionTime(int empire_id, int location_id) const {
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION"))
         return 1;
 
+    ScriptingContext context; // TODO: pass in
+
     int time_accumulator = 1;
     if (const ShipHull* hull = GetShipHull(m_hull))
         time_accumulator = std::max(time_accumulator, hull->ProductionTime(empire_id, location_id));
 
     for (const std::string& part_name : m_parts)
         if (const ShipPart* part = GetShipPart(part_name))
-            time_accumulator = std::max(time_accumulator, part->ProductionTime(empire_id, location_id));
+            time_accumulator = std::max(time_accumulator,
+                                        part->ProductionTime(empire_id, location_id, context));
 
     // assuming that ARBITRARY_LARGE_TURNS is larger than any reasonable turns,
     // so the std::max calls will preserve it be returned
@@ -386,7 +389,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id) const { // T
         return false;
     }
     // evaluate using location as the source, as it should be an object owned by this empire.
-    ScriptingContext location_as_source_context(location, location);
+    ScriptingContext location_as_source_context{location, location};
     if (!hull->Location()->Eval(location_as_source_context, location))
         return false;
 
@@ -441,7 +444,7 @@ ShipDesign::MaybeInvalidDesign(const std::string& hull_in,
         } else {
             if (produce_log)
                 ErrorLogger() << "Invalid ShipDesign no available hulls ";
-            hull = "";
+            hull.clear();
             parts.clear();
             return std::make_pair(hull, parts);
         }
@@ -746,17 +749,14 @@ PredefinedShipDesignManager::PredefinedShipDesignManager() {
 }
 
 namespace {
-    void AddDesignToUniverse(std::unordered_map<std::string, int>& design_generic_ids,
+    void AddDesignToUniverse(Universe& universe, std::unordered_map<std::string, int>& design_generic_ids,
                              const std::unique_ptr<ShipDesign>& design, bool monster)
     {
         if (!design)
             return;
 
-        Universe& universe = GetUniverse(); // TODO: pass in
         /* check if there already exists this same design in the universe. */
-        for (auto it = universe.beginShipDesigns();
-             it != universe.endShipDesigns(); ++it)
-        {
+        for (auto it = universe.beginShipDesigns(); it != universe.endShipDesigns(); ++it) {
             const ShipDesign* existing_design = it->second;
             if (!existing_design) {
                 ErrorLogger() << "PredefinedShipDesignManager::AddShipDesignsToUniverse found an invalid design in the Universe";
@@ -788,15 +788,15 @@ namespace {
     };
 }
 
-void PredefinedShipDesignManager::AddShipDesignsToUniverse() const { // TODO: pass in and pass along Universe&
+void PredefinedShipDesignManager::AddShipDesignsToUniverse(Universe& universe) const {
     CheckPendingDesignsTypes();
     m_design_generic_ids.clear();
 
     for (const auto& uuid : m_ship_ordering)
-        AddDesignToUniverse(m_design_generic_ids, m_designs.at(uuid), false);
+        AddDesignToUniverse(universe, m_design_generic_ids, m_designs.at(uuid), false);
 
     for (const auto& uuid : m_monster_ordering)
-        AddDesignToUniverse(m_design_generic_ids, m_designs.at(uuid), true);
+        AddDesignToUniverse(universe, m_design_generic_ids, m_designs.at(uuid), true);
 }
 
 PredefinedShipDesignManager& PredefinedShipDesignManager::GetPredefinedShipDesignManager() {

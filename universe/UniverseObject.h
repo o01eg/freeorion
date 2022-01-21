@@ -23,6 +23,8 @@ class System;
 class SitRepEntry;
 class EmpireManager;
 class ObjectMap;
+class Universe;
+struct ScriptingContext;
 struct UniverseObjectVisitor;
 
 // The ID number assigned to temporary universe objects
@@ -83,76 +85,79 @@ public:
 
     typedef StateChangedSignalType::slot_type StateChangedSlotType;
 
-    int                         ID() const;                         ///< returns the ID number of this object.  Each object in FreeOrion has a unique ID number.
-    const std::string&          Name() const;                       ///< returns the name of this object; some valid objects will have no name
-    virtual double              X() const;                          ///< the X-coordinate of this object
-    virtual double              Y() const;                          ///< the Y-coordinate of this object
+    [[nodiscard]] int                           ID() const;     ///< returns the ID number of this object.  Each object in FreeOrion has a unique ID number.
+    [[nodiscard]] const std::string&            Name() const;   ///< returns the name of this object; some valid objects will have no name
+    [[nodiscard]] virtual double                X() const;      ///< the X-coordinate of this object
+    [[nodiscard]] virtual double                Y() const;      ///< the Y-coordinate of this object
 
-    virtual int                 Owner() const;                      ///< returns the ID of the empire that owns this object, or ALL_EMPIRES if there is no owner
-    bool                        Unowned() const;                    ///< returns true iff there are no owners of this object
-    bool                        OwnedBy(int empire) const;          ///< returns true iff the empire with id \a empire owns this object; unowned objects always return false;
+    [[nodiscard]] int                           Owner() const;              ///< returns the ID of the empire that owns this object, or ALL_EMPIRES if there is no owner
+    [[nodiscard]] bool                          Unowned() const;            ///< returns true iff there are no owners of this object
+    [[nodiscard]] bool                          OwnedBy(int empire) const;  ///< returns true iff the empire with id \a empire owns this object; unowned objects always return false;
     /** Object owner is at war with empire @p empire_id */
-    virtual bool                HostileToEmpire(int empire_id, const EmpireManager& empires) const;
+    [[nodiscard]] virtual bool                  HostileToEmpire(int empire_id, const EmpireManager& empires) const;
 
-    virtual int                 SystemID() const;                   ///< returns the ID number of the system in which this object can be found, or INVALID_OBJECT_ID if the object is not within any system
+    [[nodiscard]] virtual int                   SystemID() const;                                       ///< returns the ID number of the system in which this object can be found, or INVALID_OBJECT_ID if the object is not within any system
 
-    const std::map<std::string, std::pair<int, float>>&   Specials() const;         ///< returns the Specials attached to this object
-    bool                        HasSpecial(const std::string& name) const;          ///< returns true iff this object has a special with the indicated \a name
-    int                         SpecialAddedOnTurn(const std::string& name) const;  ///< returns the turn on which the special with name \a name was added to this object, or INVALID_GAME_TURN if that special is not present
-    float                       SpecialCapacity(const std::string& name) const;     ///> returns the capacity of the special with name \a name or 0 if that special is not present
+    [[nodiscard]] const std::map<std::string,   std::pair<int, float>>& Specials() const;               ///< returns the Specials attached to this object
+    [[nodiscard]] bool                          HasSpecial(const std::string& name) const;              ///< returns true iff this object has a special with the indicated \a name
+    [[nodiscard]] int                           SpecialAddedOnTurn(const std::string& name) const;      ///< returns the turn on which the special with name \a name was added to this object, or INVALID_GAME_TURN if that special is not present
+    [[nodiscard]] float                         SpecialCapacity(const std::string& name) const;         ///> returns the capacity of the special with name \a name or 0 if that special is not present
 
     /** Returns all tags this object has. */
-    virtual std::set<std::string>   Tags() const;
+    [[nodiscard]] virtual std::set<std::string> Tags(const ScriptingContext&) const;
 
     /** Returns true iff this object has the tag with the indicated \a name. */
-    virtual bool                HasTag(const std::string& name) const;
+    [[nodiscard]] virtual bool                  HasTag(const std::string& name, const ScriptingContext&) const;
 
-    virtual UniverseObjectType  ObjectType() const;
+    [[nodiscard]] virtual UniverseObjectType    ObjectType() const;
 
     /** Return human readable string description of object offset \p ntabs from
         margin. */
-    virtual std::string         Dump(unsigned short ntabs = 0) const;
+    [[nodiscard]] virtual std::string         Dump(unsigned short ntabs = 0) const;
 
     /** Returns id of the object that directly contains this object, if any, or
         INVALID_OBJECT_ID if this object is not contained by any other. */
-    virtual int                 ContainerObjectID() const;
+    [[nodiscard]] virtual int                 ContainerObjectID() const;
 
     /** Returns ids of objects contained within this object. */
-    virtual const std::set<int>&ContainedObjectIDs() const;
+    [[nodiscard]] virtual const std::set<int>&ContainedObjectIDs() const;
 
     /** Returns true if there is an object with id \a object_id is contained
         within this UniverseObject. */
-    virtual bool                Contains(int object_id) const;
+    [[nodiscard]] virtual bool                Contains(int object_id) const;
 
     /* Returns true if there is an object with id \a object_id that contains
        this UniverseObject. */
-    virtual bool                ContainedBy(int object_id) const;
+    [[nodiscard]] virtual bool                ContainedBy(int object_id) const;
 
-    std::set<int>               VisibleContainedObjectIDs(int empire_id) const; ///< returns the subset of contained object IDs that is visible to empire with id \a empire_id
+    [[nodiscard]] std::set<int>               VisibleContainedObjectIDs(int empire_id) const; ///< returns the subset of contained object IDs that is visible to empire with id \a empire_id
 
-    const MeterMap&             Meters() const { return m_meters; }             ///< returns this UniverseObject's meters
-    const Meter*                GetMeter(MeterType type) const;                 ///< returns the requested Meter, or 0 if no such Meter of that type is found in this object
+    [[nodiscard]] const MeterMap&             Meters() const { return m_meters; }             ///< returns this UniverseObject's meters
+    [[nodiscard]] const Meter*                GetMeter(MeterType type) const;                 ///< returns the requested Meter, or 0 if no such Meter of that type is found in this object
 
-    Visibility                  GetVisibility(int empire_id) const; ///< returns the visibility status of this universe object relative to the input empire.
+    using EmpireIDtoObjectIDtoVisMap = std::map<int, std::map<int, Visibility>>; // duplicates Universe::EmpireObjectVisibilityMap
+    [[nodiscard]] Visibility                  GetVisibility(int empire_id, const EmpireIDtoObjectIDtoVisMap& v) const;
+    [[nodiscard]] Visibility                  GetVisibility(int empire_id, const Universe& u) const;
 
     /** Returns the name of this objectas it appears to empire \a empire_id .*/
-    virtual const std::string&  PublicName(int empire_id, const ObjectMap& objects) const;
+    [[nodiscard]] virtual const std::string&  PublicName(int empire_id, const Universe& universe) const;
 
     /** Accepts a visitor object \see UniverseObjectVisitor */
-    virtual std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const;
+    virtual std::shared_ptr<UniverseObject>   Accept(const UniverseObjectVisitor& visitor) const;
 
-    int                         CreationTurn() const;               ///< returns game turn on which object was created
-    int                         AgeInTurns() const;                 ///< returns elapsed number of turns between turn object was created and current game turn
+    [[nodiscard]] int                         CreationTurn() const;               ///< returns game turn on which object was created
+    [[nodiscard]] int                         AgeInTurns() const;                 ///< returns elapsed number of turns between turn object was created and current game turn
 
     mutable StateChangedSignalType StateChangedSignal;              ///< emitted when the UniverseObject is altered in any way
 
     /** copies data from \a copied_object to this object, limited to only copy
       * data about the copied object that is known to the empire with id
       * \a empire_id (or all data if empire_id is ALL_EMPIRES) */
-    virtual void    Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_id) = 0;
+    virtual void    Copy(std::shared_ptr<const UniverseObject> copied_object,
+                         const Universe&, int empire_id) = 0;
 
-    void            SetID(int id);                      ///< sets the ID number of the object to \a id
-    void            Rename(const std::string& name);    ///< renames this object to \a name     // TODO: by-value + move instead of const reference
+    void            SetID(int id);              ///< sets the ID number of the object to \a id
+    void            Rename(std::string name);   ///< renames this object to \a name
 
     /** moves this object by relative displacements x and y. */
     void            Move(double x, double y);
@@ -164,8 +169,8 @@ public:
     /** moves this object to map coordinates (x, y). */
     void            MoveTo(double x, double y);
 
-    MeterMap&       Meters() { return m_meters; }           ///< returns this UniverseObject's meters
-    Meter*          GetMeter(MeterType type);               ///< returns the requested Meter, or 0 if no such Meter of that type is found in this object
+    [[nodiscard]] MeterMap& Meters() { return m_meters; } ///< returns this UniverseObject's meters
+    [[nodiscard]] Meter*    GetMeter(MeterType type);     ///< returns the requested Meter, or 0 if no such Meter of that type is found in this object
 
     /** Sets all this UniverseObject's meters' initial values equal to their
         current values. */
@@ -196,12 +201,19 @@ public:
 
     /** performs the movement that this object is responsible for this object's
         actions during the pop growth/production/research phase of a turn. */
-    virtual void    PopGrowthProductionResearchPhase()
-    {};
+    virtual void    PopGrowthProductionResearchPhase(ScriptingContext&) {}
 
     static constexpr double INVALID_POSITION = -100000.0;           ///< the position in x and y at which default-constructed objects are placed
     static constexpr int    INVALID_OBJECT_AGE = -(1 << 30) - 1;;   ///< the age returned by UniverseObject::AgeInTurns() if the current turn is INVALID_GAME_TURN, or if the turn on which an object was created is INVALID_GAME_TURN
     static constexpr int    SINCE_BEFORE_TIME_AGE = (1 << 30) + 1;  ///< the age returned by UniverseObject::AgeInTurns() if an object was created on turn BEFORE_FIRST_TURN
+
+    virtual ~UniverseObject() = default;
+
+    /** returns new copy of this UniverseObject, limited to only copy data that
+      * is visible to the empire with the specified \a empire_id as determined
+      * by the detection and visibility system.  Caller takes ownership of
+      * returned pointee. */
+    [[nodiscard]] virtual UniverseObject* Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const = 0;
 
 protected:
     friend class Universe;
@@ -212,37 +224,27 @@ protected:
 
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);
 
-public:
-    virtual ~UniverseObject();
+    void AddMeter(MeterType meter_type); ///< inserts a meter into object as the \a meter_type meter.  Should be used by derived classes to add their specialized meters to objects
+    void Init();                         ///< adds stealth meter
 
-protected:
-    /** returns new copy of this UniverseObject, limited to only copy data that
-      * is visible to the empire with the specified \a empire_id as determined
-      * by the detection and visibility system.  Caller takes ownership of
-      * returned pointee. */
-    virtual UniverseObject* Clone(int empire_id = ALL_EMPIRES) const = 0;
-
-    void                    AddMeter(MeterType meter_type); ///< inserts a meter into object as the \a meter_type meter.  Should be used by derived classes to add their specialized meters to objects
-    void                    Init();                         ///< adds stealth meter
-
-    /** Used by public UniverseObject::Copy and derived classes' ::Copy methods.
-      */
+    /** Used by public UniverseObject::Copy and derived classes' ::Copy methods. */
     void Copy(std::shared_ptr<const UniverseObject> copied_object, Visibility vis,
-              const std::set<std::string>& visible_specials);
+              const std::set<std::string>& visible_specials,
+              const Universe& universe);
 
-    std::string             m_name;
+    std::string m_name;
 
 private:
-    MeterMap                CensoredMeters(Visibility vis) const;   ///< returns set of meters of this object that are censored based on the specified Visibility \a vis
+    [[nodiscard]] MeterMap CensoredMeters(Visibility vis) const; ///< returns set of meters of this object that are censored based on the specified Visibility \a vis
 
-    int                                             m_id = INVALID_OBJECT_ID;
-    double                                          m_x = INVALID_POSITION;
-    double                                          m_y = INVALID_POSITION;
-    int                                             m_owner_empire_id = ALL_EMPIRES;
-    int                                             m_system_id = INVALID_OBJECT_ID;
-    std::map<std::string, std::pair<int, float>>    m_specials; // map from special name to pair of (turn added, capacity)
-    MeterMap                                        m_meters;
-    int                                             m_created_on_turn = INVALID_GAME_TURN;
+    int                                          m_id = INVALID_OBJECT_ID;
+    double                                       m_x = INVALID_POSITION;
+    double                                       m_y = INVALID_POSITION;
+    int                                          m_owner_empire_id = ALL_EMPIRES;
+    int                                          m_system_id = INVALID_OBJECT_ID;
+    std::map<std::string, std::pair<int, float>> m_specials; // map from special name to pair of (turn added, capacity)
+    MeterMap                                     m_meters;
+    int                                          m_created_on_turn = INVALID_GAME_TURN;
 
     template <typename Archive>
     friend void serialize(Archive&, UniverseObject&, unsigned int const);
@@ -250,7 +252,7 @@ private:
 
 /** A function that returns the correct amount of spacing for an indentation of
   * \p ntabs during a dump. */
-inline std::string DumpIndent(unsigned short ntabs = 1)
+[[nodiscard]] inline std::string DumpIndent(unsigned short ntabs = 1)
 { return std::string(ntabs * 4 /* conversion to size_t is safe */, ' '); }
 
 

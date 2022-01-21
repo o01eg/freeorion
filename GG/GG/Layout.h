@@ -211,7 +211,7 @@ public:
     //! cell.
     GG_CONCRETE_EXCEPTION(AttemptedOverwrite, GG::Layout, Exception);
 
-    static const unsigned int INVALID_CELL_MARGIN;
+    static constexpr unsigned int INVALID_CELL_MARGIN = std::numeric_limits<unsigned int>::max();
 
 protected:
     void MouseWheel(const Pt& pt, int move, Flags<ModKey> mod_keys) override;
@@ -269,7 +269,7 @@ private:
     unsigned int                    m_cell_margin = 1;
     std::vector<RowColParams>       m_row_params;
     std::vector<RowColParams>       m_column_params;
-    std::map<Wnd*, WndPosition>     m_wnd_positions;
+    std::map<Wnd*, WndPosition, std::less<>> m_wnd_positions;
     Pt                              m_min_usable_size;
     bool                            m_ignore_child_resize = false;
     bool                            m_stop_resize_recursion = false;

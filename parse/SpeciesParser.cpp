@@ -94,7 +94,7 @@ namespace {
     };
 
     void insert_species(
-        std::map<std::string, std::unique_ptr<Species>>& species,
+        SpeciesManager::SpeciesTypeMap& species,
         SpeciesStrings& strings,
         boost::optional<std::map<PlanetType, PlanetEnvironment>>& planet_environments,
         boost::optional<parse::effects_group_payload>& effects,
@@ -163,7 +163,7 @@ namespace {
     };
 
     using start_rule_payload = std::pair<
-        std::map<std::string, std::unique_ptr<Species>>, // species_by_name
+        SpeciesManager::SpeciesTypeMap, // species_by_name
         std::vector<std::string> // census ordering
     >;
     using start_rule_signature = void(start_rule_payload::first_type&);
@@ -387,13 +387,12 @@ namespace {
 
 namespace parse {
     start_rule_payload species(const boost::filesystem::path& path) {
-        const lexer lexer;
         start_rule_payload retval;
         auto& [species_, ordering] = retval;
 
         boost::filesystem::path manifest_file;
 
-        ScopedTimer timer("Species Parsing", true);
+        ScopedTimer timer("Species Parsing");
 
         for (const auto& file : ListDir(path, IsFOCScript)) {
             if (file.filename() == "SpeciesCensusOrdering.focs.txt" ) {
@@ -401,13 +400,13 @@ namespace parse {
                 continue;
             }
 
-            detail::parse_file<grammar, start_rule_payload::first_type>(lexer, file, species_);
+            detail::parse_file<grammar, start_rule_payload::first_type>(lexer::tok, file, species_);
         }
 
         if (!manifest_file.empty()) {
             try {
                 detail::parse_file<manifest_grammar, start_rule_payload::second_type>(
-                    lexer, manifest_file, ordering);
+                    lexer::tok, manifest_file, ordering);
 
             } catch (const std::runtime_error& e) {
                 ErrorLogger() << "Failed to species census manifest in " << manifest_file << " from " << path

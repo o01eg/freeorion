@@ -28,7 +28,6 @@
     (Article)                                   \
     (Application)                               \
     (Asteroids)                                 \
-    (Attack)                                    \
     (Barren)                                    \
     (Basic)                                     \
     (BlackHole)                                 \
@@ -52,6 +51,7 @@
     (Capacity)                                  \
     (Capital)                                   \
     (Capture)                                   \
+    (carrier)                                   \
     (captureresult)                             \
     (category)                                  \
     (ceil)                                      \
@@ -70,6 +70,7 @@
     (Core)                                      \
     (cos)                                       \
     (Count)                                     \
+    (countIf)                                   \
     (CountUnique)                               \
     (CounterClockwiseNextPlanetType)            \
     (CreateBuilding)                            \
@@ -79,12 +80,15 @@
     (CreateShip)                                \
     (CreateSystem)                              \
     (CreationTurn)                              \
+    (CumulativeTurnsPolicyAdopted)              \
     (CurrentContent)                            \
     (CurrentTurn)
 
 #define TOKEN_SEQ_3                             \
     (damage)                                    \
     (Damage)                                    \
+    (damageStructurePerBattleMax)               \
+    (DamageStructurePerBattleMax)               \
     (data)                                      \
     (default)                                   \
     (defaultfocus)                              \
@@ -103,6 +107,8 @@
     (designname)                                \
     (destination)                               \
     (Destroy)                                   \
+    (destroyFightersPerBattleMax)               \
+    (DestroyFightersPerBattleMax)               \
     (Detection)                                 \
     (DirectDistanceBetween)                     \
     (Disabled)                                  \
@@ -317,6 +323,7 @@
     (Or)                                        \
     (Orange)                                    \
     (Orbit)                                     \
+    (OrderedAlternativesOf)                     \
     (OrderedBombardedBy)                        \
     (OriginalType)                              \
     (OutpostsOwned)                             \
@@ -355,6 +362,7 @@
     (position)                                  \
     (prerequisites)                             \
     (PreviousSystemID)                          \
+    (PreviousToFinalDestinationID)              \
     (priority)                                  \
     (probability)                               \
     (ProducedByEmpire)                          \
@@ -572,7 +580,7 @@
     (TopPriorityEnqueuedTech)                   \
     (TopPriorityResearchableTech)               \
     (TopPriorityTransferrableTech)              \
-    (OrderedAlternativesOf)                     \
+    (TotalFighterShots)                         \
     (Toxic)                                     \
     (Trade)
 
@@ -582,13 +590,21 @@
     (turn)                                      \
     (Turn)                                      \
     (TurnPolicyAdopted)                         \
+    (TurnsSinceColonization)                    \
     (TurnsSinceFocusChange)                     \
+    (TurnsSinceLastConquered)                   \
+    (TurnsSincePolicyAdopted)                   \
+    (TurnSystemExplored)                        \
     (TurnTechResearched)                        \
     (type)                                      \
     (Uninhabitable)                             \
     (UniverseCentreX)                           \
     (UniverseCentreY)                           \
     (UniverseWidth)                             \
+    (UnlockBuildingType)                        \
+    (UnlockPolicy)                              \
+    (UnlockShipHull)                            \
+    (UnlockShipPart)                            \
     (unlock)                                    \
     (Unowned)                                   \
     (Unproducible)                              \

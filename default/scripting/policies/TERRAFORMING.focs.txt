@@ -3,10 +3,58 @@ Policy
     description = "PLC_TERRAFORMING_DESC"
     short_description = "PLC_TERRAFORMING_SHORT_DESC"
     category = "ECONOMIC_CATEGORY"
-    adoptioncost = 1.0*floor(5 + 0.25 * Statistic Sum value = LocalCandidate.Population condition = And [ Planet OwnedBy empire = Source.Owner ])
+    adoptioncost = floor(2.0 * [[POPULATION_OWNED_BY_EMPIRE]]^0.5)
     exclusions = [ "PLC_ENVIRONMENTALISM" ]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
+
+        EffectsGroup
+            scope = And [
+                Planet
+                OwnedBy empire = Source.Owner
+                Not Planet type = GasGiant
+                Not Planet type = Asteroids
+                Not Planet type = LocalCandidate.OriginalType
+            ]
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
+            effects =
+                SetTargetHappiness value = Value
+                    + (NamedReal name = "PLC_TERRAFORMING_TARGET_HAPPINESS_ORIGINAL_FLAT"
+                                 value = 1)
+                        * Target.DistanceFromOriginalType
+
+        EffectsGroup
+            scope = And [
+                Planet
+                OwnedBy empire = Source.Owner
+                Not Planet type = GasGiant
+                Not Planet type = Asteroids
+                Not Planet type = LocalCandidate.OriginalType
+                Focus type = "FOCUS_INFLUENCE"
+            ]
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
+            effects = 
+                SetTargetInfluence value = Value
+                    + (NamedReal name = "PLC_TERRAFORMING__TARGET_INFLUENCE_ORIGINAL_FLAT"
+                                 value = 1)
+                        * Target.DistanceFromOriginalType
+
+        EffectsGroup
+            scope = And [
+                Planet
+                OwnedBy empire = Source.Owner
+                Not Planet type = GasGiant
+                Not Planet type = Asteroids
+                Not Planet type = LocalCandidate.OriginalType
+                Focus type = "FOCUS_RESEARCH"
+            ]
+            priority = [[TARGET_AFTER_SCALING_PRIORITY]]
+            effects =
+                SetTargetResearch value = Value
+                    + (NamedReal name = "PLC_TERRAFORMING_TARGET_RESEARCH_SCALING"
+                                 value = 1)
+                    * Target.DistanceFromOriginalType
+
     ]
     graphic = "icons/policies/terraforming.png"
 

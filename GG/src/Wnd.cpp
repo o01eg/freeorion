@@ -444,7 +444,7 @@ void Wnd::ClampRectWithMinAndMaxSize(Pt& ul, Pt& lr) const
     }
 }
 
-void Wnd::SetDragDropDataType(const std::string& data_type)
+void Wnd::SetDragDropDataType(std::string data_type)
 { m_drag_drop_data_type = data_type; }
 
 void Wnd::StartingChildDragDrop(const Wnd* wnd, const Pt& offset)
@@ -1096,7 +1096,7 @@ void Wnd::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys
 void Wnd::KeyRelease(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys)
 { if (!Interactive()) ForwardEventToParent(); }
 
-void Wnd::TextInput(const std::string* text)
+void Wnd::TextInput(const std::string&)
 { if (!Interactive()) ForwardEventToParent(); }
 
 void Wnd::GainingFocus()

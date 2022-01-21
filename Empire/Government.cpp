@@ -12,6 +12,7 @@
 #include "../util/GameRules.h"
 #include "../util/CheckSums.h"
 #include "../util/ScopedTimer.h"
+#include "../Empire/Empire.h"
 #include "../Empire/EmpireManager.h"
 
 #include <boost/filesystem/fstream.hpp>
@@ -112,7 +113,7 @@ std::string Policy::Dump(unsigned short ntabs) const {
     return retval;
 }
 
-float Policy::AdoptionCost(int empire_id, const ObjectMap& objects) const {
+float Policy::AdoptionCost(int empire_id, const ScriptingContext& context) const {
     constexpr auto arbitrary_large_number = 999999.9f;
 
     if (GetGameRules().Get<bool>("RULE_CHEAP_POLICIES") || !m_adoption_cost) {
@@ -128,12 +129,20 @@ float Policy::AdoptionCost(int empire_id, const ObjectMap& objects) const {
         return arbitrary_large_number;
 
     } else {
-        auto source = Empires().GetSource(empire_id, objects);
-        if (!source && !m_adoption_cost->SourceInvariant())
+        if (context.source)
+            return static_cast<float>(m_adoption_cost->Eval(context));
+
+        // get a source to reference in evaulation of cost value-ref
+        auto empire = context.GetEmpire(empire_id);
+        if (!empire)
+            return arbitrary_large_number;
+        auto source = empire->Source(context.ContextObjects());
+        if (!source)
             return arbitrary_large_number;
 
-        const ScriptingContext context(std::move(source));
-        return static_cast<float>(m_adoption_cost->Eval(context));
+        // construct new context with source specified
+        const ScriptingContext source_context{source, context};
+        return static_cast<float>(m_adoption_cost->Eval(source_context));
     }
 }
 
@@ -160,26 +169,32 @@ const Policy* PolicyManager::GetPolicy(const std::string& name) const {
     return it == m_policies.end() ? nullptr : it->second.get();
 }
 
-std::vector<std::string> PolicyManager::PolicyNames() const {
+const Policy* PolicyManager::GetPolicy(std::string_view name) const {
+    return this->GetPolicy(std::string{name}); // TODO: avoid construction by enabling heterogenous lookup
+}
+
+std::vector<std::string_view> PolicyManager::PolicyNames() const {
     CheckPendingPolicies();
-    std::vector<std::string> retval;
+    std::vector<std::string_view> retval;
+    retval.reserve(m_policies.size());
     for (const auto& policy : m_policies)
         retval.emplace_back(policy.first);
     return retval;
 }
 
-std::vector<std::string> PolicyManager::PolicyNames(const std::string& name) const {
+std::vector<std::string_view> PolicyManager::PolicyNames(const std::string& name) const {
     CheckPendingPolicies();
-    std::vector<std::string> retval;
+    std::vector<std::string_view> retval;
+    retval.reserve(m_policies.size());
     for (const auto& policy : m_policies)
         if (policy.second->Category() == name)
             retval.emplace_back(policy.first);
     return retval;
 }
 
-std::set<std::string> PolicyManager::PolicyCategories() const {
+std::set<std::string_view> PolicyManager::PolicyCategories() const {
     CheckPendingPolicies();
-    std::set<std::string> retval;
+    std::set<std::string_view> retval;
     for (const auto& policy : m_policies)
         retval.emplace(policy.second->Category());
     return retval;
@@ -194,12 +209,6 @@ PolicyManager::iterator PolicyManager::end() const {
     CheckPendingPolicies();
     return m_policies.end();
 }
-
-PolicyManager::PolicyManager()
-{}
-
-PolicyManager::~PolicyManager()
-{}
 
 void PolicyManager::CheckPendingPolicies() const {
     if (!m_pending_types)
@@ -225,10 +234,14 @@ void PolicyManager::SetPolicies(Pending::Pending<PoliciesTypeMap>&& future)
 ///////////////////////////////////////////////////////////
 // Free Functions                                        //
 ///////////////////////////////////////////////////////////
-PolicyManager& GetPolicyManager() {
+[[nodiscard]] PolicyManager& GetPolicyManager() {
     static PolicyManager manager;
     return manager;
 }
 
-const Policy* GetPolicy(const std::string& name)
+[[nodiscard]] const Policy* GetPolicy(const std::string& name)
 { return GetPolicyManager().GetPolicy(name); }
+
+[[nodiscard]] const Policy* GetPolicy(std::string_view name)
+{ return GetPolicyManager().GetPolicy(name); }
+

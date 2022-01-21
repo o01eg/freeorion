@@ -102,6 +102,13 @@ auto PythonServer::InitModules() -> bool
     // Save ChatProvider instance in chat module's namespace
     m_python_module_chat.attr("__dict__")["chat_history_provider"] = m_python_module_chat.attr("ChatHistoryProvider")();
 
+    // Save asyncio event loop
+    if (GetOptionsDB().Get<int>("network.server.python.asyncio-interval") > 0) {
+        py::object asyncio = py::import("asyncio");
+
+        m_asyncio_event_loop = asyncio.attr("get_event_loop")();
+    }
+
     DebugLogger() << "Server Python modules successfully initialized!";
     return true;
 }
@@ -118,16 +125,16 @@ auto PythonServer::IsRequireAuthOrReturnRoles(const std::string& player_name, bo
         ErrorLogger() << "Unable to call Python method is_require_auth";
         return false;
     }
+    roles.Clear();
     py::object r = f(player_name);
     py::extract<py::list> py_roles(r);
     if (py_roles.check()) {
         result = false;
         py::stl_input_iterator<Networking::RoleType> role_begin(py_roles), role_end;
-        for (auto& it = role_begin; it != role_end; ++ it) {
-             roles.SetRole(*it, true);
-        }
+        for (auto& it = role_begin; it != role_end; ++it)
+            roles.SetRole(*it, true);
     } else {
-        result = true;
+        result = py::extract<bool>(r)();
     }
     return true;
 }
@@ -150,9 +157,8 @@ auto PythonServer::IsSuccessAuthAndReturnRoles(const std::string& player_name, c
         result = true;
 
         py::stl_input_iterator<Networking::RoleType> role_begin(py_roles), role_end;
-        for (auto& it = role_begin; it != role_end; ++ it) {
+        for (auto& it = role_begin; it != role_end; ++it)
              roles.SetRole(*it, true);
-        }
     } else {
         result = false;
         DebugLogger() << "Wrong auth data for \"" << player_name << "\": check returns " << py::extract<std::string>(py::str(r))();
@@ -176,9 +182,8 @@ auto PythonServer::FillListPlayers(std::list<PlayerSetupData>& players) const ->
     py::extract<py::list> py_players(r);
     if (py_players.check()) {
         py::stl_input_iterator<PlayerSetupData> players_begin(py_players), players_end;
-        for (auto& it = players_begin; it != players_end; ++ it) {
+        for (auto& it = players_begin; it != players_end; ++it)
             players.push_back(*it);
-        }
     } else {
         DebugLogger() << "Wrong players list data: check returns " << py::extract<std::string>(py::str(r))();
         return false;
@@ -202,9 +207,8 @@ auto PythonServer::GetPlayerDelegation(const std::string& player_name, std::list
     py::extract<py::list> py_players(r);
     if (py_players.check()) {
         py::stl_input_iterator<std::string> players_begin(py_players), players_end;
-        for (auto& it = players_begin; it != players_end; ++ it) {
+        for (auto& it = players_begin; it != players_end; ++it)
             result.push_back(*it);
-        }
     } else {
         DebugLogger() << "Wrong delegated players list data: check returns " << py::extract<std::string>(py::str(r))();
         return false;
@@ -229,7 +233,7 @@ auto PythonServer::LoadChatHistory(boost::circular_buffer<ChatHistoryEntity>& ch
     py::extract<py::list> py_history(r);
     if (py_history.check()) {
         py::stl_input_iterator<py::tuple> entity_begin(py_history), entity_end;
-        for (auto& it = entity_begin; it != entity_end; ++ it) {
+        for (auto& it = entity_begin; it != entity_end; ++it) {
             ChatHistoryEntity e;
             e.timestamp = boost::posix_time::from_time_t(py::extract<time_t>((*it)[0]));;
             e.player_name = py::extract<std::string>((*it)[1]);
@@ -310,6 +314,24 @@ auto PythonServer::ExecuteTurnEvents() -> bool
         return false;
     }
     return f();
+}
+
+auto PythonServer::AsyncIOTick() -> bool
+{
+    py::object stop = m_asyncio_event_loop.attr("stop");
+    if (!stop) {
+        ErrorLogger() << "Unable to call Python function stop";
+        return false;
+    }
+    stop();
+    py::object run_forever = m_asyncio_event_loop.attr("run_forever");
+    if (!run_forever) {
+        ErrorLogger() << "Unable to call Python function run_forever";
+        return false;
+    }
+    run_forever();
+
+    return true;
 }
 
 auto GetPythonUniverseGeneratorDir() -> const std::string

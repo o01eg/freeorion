@@ -74,7 +74,7 @@ void PopulationPanel::CompleteConstruction() {
         MeterType meter_type = meter_stat.first;
 
         meter_stat.second->RightClickedSignal.connect([this, meter_type](const GG::Pt& pt) {
-            std::string meter_string = boost::lexical_cast<std::string>(meter_type);
+            auto meter_string = to_string(meter_type);
 
             auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
             auto pc = Objects().get<PopCenter>(m_popcenter_id);
@@ -89,7 +89,7 @@ void PopulationPanel::CompleteConstruction() {
                 }
             }
 
-            auto pedia_meter_type_action = [meter_string]() { ClientUI::GetClientUI()->ZoomToMeterTypeArticle(meter_string); };
+            auto pedia_meter_type_action = [meter_string]() { ClientUI::GetClientUI()->ZoomToMeterTypeArticle(std::string{meter_string}); };
             std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) %
                                                                     UserString(meter_string));
             popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false,
@@ -113,9 +113,6 @@ void PopulationPanel::CompleteConstruction() {
     Refresh();
 }
 
-PopulationPanel::~PopulationPanel()
-{}
-
 void PopulationPanel::ExpandCollapse(bool expanded) {
     if (expanded == s_expanded_map[m_popcenter_id]) return; // nothing to do
     s_expanded_map[m_popcenter_id] = expanded;
@@ -125,9 +122,9 @@ void PopulationPanel::ExpandCollapse(bool expanded) {
 
 void PopulationPanel::Update() {
     // remove any old browse wnds
-    for (auto& meter_stat : m_meter_stats) {
-        meter_stat.second->ClearBrowseInfoWnd();
-        m_multi_icon_value_indicator->ClearToolTip(meter_stat.first);
+    for (auto& [meter_name, old_stat_icon] : m_meter_stats) {
+        old_stat_icon->ClearBrowseInfoWnd();
+        m_multi_icon_value_indicator->ClearToolTip(meter_name);
     }
 
     auto pop = Objects().get<PopCenter>(m_popcenter_id);
@@ -143,12 +140,12 @@ void PopulationPanel::Update() {
         m_multi_icon_value_indicator->Update();
 
     // tooltips
-    for (auto& meter_stat : m_meter_stats) {
-        meter_stat.second->SetValue(pop->GetMeter(meter_stat.first)->Initial());
+    for (auto& [meter_name, old_stat_icon] : m_meter_stats) {
+        old_stat_icon->SetValue(pop->GetMeter(meter_name)->Initial());
 
-        auto browse_wnd = GG::Wnd::Create<MeterBrowseWnd>(m_popcenter_id, meter_stat.first, AssociatedMeterType(meter_stat.first));
-        meter_stat.second->SetBrowseInfoWnd(browse_wnd);
-        m_multi_icon_value_indicator->SetToolTip(meter_stat.first, browse_wnd);
+        auto browse_wnd = GG::Wnd::Create<MeterBrowseWnd>(m_popcenter_id, meter_name, AssociatedMeterType(meter_name));
+        old_stat_icon->SetBrowseInfoWnd(browse_wnd);
+        m_multi_icon_value_indicator->SetToolTip(meter_name, browse_wnd);
     }
 }
 

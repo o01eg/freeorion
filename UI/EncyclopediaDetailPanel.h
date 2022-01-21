@@ -29,9 +29,9 @@ class EncyclopediaDetailPanel : public CUIWnd {
 public:
     EncyclopediaDetailPanel(GG::Flags<GG::WndFlag> flags = GG::ONTOP | GG::INTERACTIVE | GG::DRAGABLE |
                                                            GG::RESIZABLE | CLOSABLE | PINABLE,
-                            const std::string& config_name = "");
+                            std::string_view config_name = "");
     void CompleteConstruction() override;
-    virtual ~EncyclopediaDetailPanel();
+    ~EncyclopediaDetailPanel() = default;
 
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
     void KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override;
@@ -42,7 +42,7 @@ public:
       * the Wnd, rather than being restricted to the client area of a CUIWnd */
     GG::Pt ClientUpperLeft() const override;
 
-    void AddItem(const std::string& type, std::string name); // adds a new item to m_items
+    void AddItem(std::string_view type, std::string name); // adds a new item to m_items
     void PopItem();
     void ClearItems();
     int GetItemsSize() { return m_items.size(); }
@@ -75,7 +75,7 @@ public:
     void SetDesign(const std::string& design_id);
     void SetItem(const ShipDesign* design);
     void SetIncompleteDesign(std::weak_ptr<const ShipDesign> incomplete_design);
-    void SetMeterType(const std::string& meter_string);
+    void SetMeterType(std::string meter_string);
     void SetItem(const MeterType& meter_type);
     void SetGraph(const std::string& graph_id);
     void SetIndex();

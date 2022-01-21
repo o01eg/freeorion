@@ -99,7 +99,7 @@ public:
 
     Universe();
     Universe& operator=(Universe&& other) noexcept;
-    virtual ~Universe();
+    ~Universe();
 
 
     /** Returns objects in this Universe. */
@@ -172,6 +172,20 @@ public:
     /** Returns the set of specials attached to the object with id \a object_id
       * that the empire with id \a empire_id can see this turn. */
     std::set<std::string> GetObjectVisibleSpecialsByEmpire(int object_id, int empire_id) const;
+
+    /** Returns map from empire ID to map from location (X, Y) to detection range
+      * that empire has at that location. */
+    std::map<int, std::map<std::pair<double, double>, float>>
+    GetEmpiresPositionDetectionRanges(const ObjectMap& objects) const;
+
+    std::map<int, std::map<std::pair<double, double>, float>>
+    GetEmpiresPositionDetectionRanges(const ObjectMap& objects, const std::set<int>& exclude_ids) const;
+
+    /** Returns map from empire ID to map from location (X, Y) to detection range
+      * that empire is expected to have at that location after the next turn's
+      * fleet movement. */
+    std::map<int, std::map<std::pair<double, double>, float>>
+    GetEmpiresPositionNextTurnFleetDetectionRanges(const ScriptingContext& context) const;
 
     /** Return the Pathfinder */
     std::shared_ptr<const Pathfinder> GetPathfinder() const { return m_pathfinder; }
@@ -314,7 +328,7 @@ public:
 
     /** Record in statistics that \a object_id was destroyed by species/empire
       * associated with \a source_object_id */
-    void CountDestructionInStats(int object_id, int source_object_id, ScriptingContext& context);
+    void CountDestructionInStats(int object_id, int source_object_id, const std::map<int, std::shared_ptr<Empire>>& empires);
 
     /** Removes the object with ID number \a object_id from the universe's map
       * of existing objects, and adds the object's id to the set of destroyed
@@ -362,17 +376,32 @@ public:
     /** InsertNew constructs and inserts a UniverseObject into the object map with a new
         id. It returns the new object. */
     template <typename T, typename... Args>
-    std::shared_ptr<T> InsertNew(Args&&... args) {
-        int id = GenerateObjectID();
-        return InsertID<T>(id, std::forward<Args>(args)...);
-    }
+    std::shared_ptr<T> InsertNew(Args&&... args)
+    { return InsertID<T>(GenerateObjectID(), std::forward<Args>(args)...); }
 
     /** InsertTemp constructs and inserts a temporary UniverseObject into the object map with a
         temporary id. It returns the new object. */
     template <typename T, typename... Args>
-    std::shared_ptr<T> InsertTemp(Args&&... args) {
-        auto id = TEMPORARY_OBJECT_ID;
-        return InsertID<T>(id, std::forward<Args>(args)...);
+    std::shared_ptr<T> InsertTemp(Args&&... args)
+    { return InsertID<T>(TEMPORARY_OBJECT_ID, std::forward<Args>(args)...); }
+
+    /** InsertTemp inserts the provided \a objets into the object map with a series of
+      * temporary ids. It returns the ids of the inserted objects. */
+    template <typename T>
+    std::vector<int> InsertTemp(const std::vector<std::shared_ptr<T>>& objects)
+    {
+        auto ID = TEMPORARY_OBJECT_ID;
+        std::vector<int> retval;
+        retval.reserve(objects.size());
+        for (auto& obj : objects) {
+            if (!obj)
+                continue;
+            retval.push_back(ID);
+            obj->SetID(ID); // assign and decrement temporary ID
+            m_objects->insert(std::move(obj)); // directly insert into objects, skipping ID validation
+            ID--;
+        }
+        return retval;
     }
 
     /** \p empire_id inserts object \p obj into the universe with the given \p id.
@@ -380,10 +409,10 @@ public:
         and receive a new id and then are run a second time on the server using
         the id assigned on the client. */
     template <typename T, typename... Args>
-    std::shared_ptr<T> InsertByEmpireWithID(int empire_id, int id, Args&&... args) {
+    std::shared_ptr<T> InsertByEmpireWithID(int empire_id, int id, Args&&... args)
+    {
         if (!VerifyUnusedObjectID(empire_id, id))
             return nullptr;
-
         return InsertID<T>(id, std::forward<Args>(args)...);
     }
 
@@ -436,12 +465,10 @@ private:
     /** Inserts object \p obj into the universe with the given \p id. */
     template <typename T, typename... Args>
     std::shared_ptr<T> InsertID(int id, Args&&... args) {
+        static_assert(std::is_base_of_v<UniverseObject, T>);
+        static_assert(!std::is_same_v<UniverseObject, T>);
         auto obj = std::make_shared<T>(std::forward<Args>(args)...);
-        auto uobj = std::dynamic_pointer_cast<UniverseObject>(obj);
-        if (!uobj)
-            return nullptr;
-
-        InsertIDCore(std::move(uobj), id);
+        InsertIDCore(obj, id);
         return obj;
     }
 

@@ -35,10 +35,9 @@ namespace {
         const ClientApp* app = ClientApp::GetApp();
         if (!app)
             return retval;
-        for (const auto& id_and_order : app->Orders()) {
-            if (auto order = std::dynamic_pointer_cast<ScrapOrder>(id_and_order.second)) {
-                retval[order->ObjectID()] = id_and_order.first;
-            }
+        for (const auto& [order_id, order] : app->Orders()) {
+            if (auto scrap_order = std::dynamic_pointer_cast<ScrapOrder>(order))
+                retval.emplace(scrap_order->ObjectID(), order_id);
         }
         return retval;
     }
@@ -70,7 +69,7 @@ void BuildingsPanel::CompleteConstruction() {
     // get owner, connect its production queue changed signal to update this panel
     auto planet = Objects().get(m_planet_id);
     if (planet) {
-        if (const Empire* empire = GetEmpire(planet->Owner())) {
+        if (auto empire = Empires().GetEmpire(planet->Owner())) {
             const ProductionQueue& queue = empire->GetProductionQueue();
             queue.ProductionQueueChangedSignal.connect(
                 boost::bind(&BuildingsPanel::RequirePreRender, this));
@@ -79,9 +78,6 @@ void BuildingsPanel::CompleteConstruction() {
 
     RequirePreRender();
 }
-
-BuildingsPanel::~BuildingsPanel()
-{}
 
 void BuildingsPanel::ExpandCollapse(bool expanded) {
     if (expanded == s_expanded_map[m_planet_id]) return; // nothing to do
@@ -134,7 +130,7 @@ void BuildingsPanel::Update() {
     }
 
     // get in-progress buildings
-    const Empire* empire = GetEmpire(planet->Owner());
+    const auto empire = Empires().GetEmpire(planet->Owner());
     if (!empire)
         return;
 
@@ -400,8 +396,11 @@ void BuildingIndicator::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
     // verify that this indicator represents an existing building, and not a
     // queued production item, and that the owner of the building is this
     // client's player's empire
+    ScriptingContext context;
+    ObjectMap& objects{context.ContextObjects()};
+
     int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    auto building = Objects().get<Building>(m_building_id);
+    auto building = objects.get<Building>(m_building_id);
     if (!building)
         return;
 
@@ -413,17 +412,18 @@ void BuildingIndicator::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
         return;
     }
 
-    auto scrap_building_action = [this, empire_id]() {
+    auto scrap_building_action = [this, empire_id, &context]() {
         GGHumanClientApp::GetApp()->Orders().IssueOrder(
-        std::make_shared<ScrapOrder>(empire_id, m_building_id));
+            std::make_shared<ScrapOrder>(empire_id, m_building_id, context),
+            context);
     };
 
-    auto un_scrap_building_action = [building]() {
+    auto un_scrap_building_action = [building, &context]() {
         // find order to scrap this building, and recind it
         auto pending_scrap_orders = PendingScrapOrders();
         auto it = pending_scrap_orders.find(building->ID());
         if (it != pending_scrap_orders.end())
-            GGHumanClientApp::GetApp()->Orders().RescindOrder(it->second);
+            GGHumanClientApp::GetApp()->Orders().RescindOrder(it->second, context);
     };
 
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
@@ -431,19 +431,20 @@ void BuildingIndicator::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
     if (m_order_issuing_enabled) {
         if (!building->OrderedScrapped()) {
             // create popup menu with "Scrap" option
-            popup->AddMenuItem(GG::MenuItem(UserString("ORDER_BUIDLING_SCRAP"), false, false, scrap_building_action));
+            popup->AddMenuItem(GG::MenuItem(UserString("ORDER_BUIDLING_SCRAP"), false, false,
+                                            scrap_building_action));
         } else {
             // create popup menu with "Cancel Scrap" option
-            popup->AddMenuItem(GG::MenuItem(UserString("ORDER_CANCEL_BUIDLING_SCRAP"), false, false, un_scrap_building_action));
+            popup->AddMenuItem(GG::MenuItem(UserString("ORDER_CANCEL_BUIDLING_SCRAP"), false, false,
+                                            un_scrap_building_action));
         }
     }
 
     const std::string& building_type = building->BuildingTypeName();
     const BuildingType* bt = GetBuildingType(building_type);
     if (bt) {
-        auto pedia_lookup_building_type_action = [building_type]() {
-            ClientUI::GetClientUI()->ZoomToBuildingType(building_type);
-        };
+        auto pedia_lookup_building_type_action = [building_type]()
+        { ClientUI::GetClientUI()->ZoomToBuildingType(building_type); };
         std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) % UserString(building_type));
         popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false,
                                         pedia_lookup_building_type_action));

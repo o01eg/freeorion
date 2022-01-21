@@ -17,18 +17,28 @@
 //!
 //! If @p enable_output is true and duration is greater than threshold then
 //! print output.
+//!
+//! If enable_output is false, duration() and DurationString() can still be
+//! queried to produce custom results from the output
+
+#if defined(__GNUC__)
+// GCC doesn't seem to like class [[nodiscard]] mixed with FO_COMMON_API
 class FO_COMMON_API ScopedTimer {
+#else
+class FO_COMMON_API [[nodiscard]] ScopedTimer {
+#endif
 public:
-    explicit ScopedTimer(std::string timed_name = "", bool enable_output = false,
+    ScopedTimer(); // defaults to not logging output on destruction
+    explicit ScopedTimer(std::string timed_name, bool enable_output = true,
                          std::chrono::microseconds threshold = std::chrono::milliseconds(1));
-    ScopedTimer(std::string timed_name, std::chrono::microseconds threshold);
-    ScopedTimer(std::function<std::string ()> output_text_fn, std::chrono::microseconds threshold);
+    ScopedTimer(std::string timed_name, std::chrono::microseconds threshold); // defaults to logging output on destruction
+    ScopedTimer(std::function<std::string ()> output_text_fn, std::chrono::microseconds threshold); // defaults to logging output on destruction
     ~ScopedTimer();
 
     void restart();
 
-    double duration() const;
-    std::string DurationString() const;
+    [[nodiscard]] double duration() const;
+    [[nodiscard]] std::string DurationString() const;
 
     class Impl;
 
@@ -99,12 +109,15 @@ private:
 //! Title - final section      time: xxxx ms
 //! Title                      time: xxxx ms
 //! ```
+#if defined(__GNUC__)
+// GCC doesn't seem to like class [[nodiscard]] mixed with FO_COMMON_API
 class FO_COMMON_API SectionedScopedTimer {
+#else
+class FO_COMMON_API [[nodiscard]] SectionedScopedTimer {
+#endif
 public:
     explicit SectionedScopedTimer(std::string timed_name,
-                                  std::chrono::microseconds threshold = std::chrono::milliseconds(1),
-                                  bool enable_output = true,
-                                  bool unify_section_duration_units = true);
+                                  std::chrono::microseconds threshold = std::chrono::milliseconds(1));
     ~SectionedScopedTimer();
 
     //! Start recording times for @p section_name.
@@ -114,7 +127,7 @@ public:
     //! strucures.
     void EnterSection(const std::string& section_name);
 
-    std::chrono::nanoseconds Elapsed() const;
+    [[nodiscard]] std::chrono::nanoseconds Elapsed() const;
 
 private:
     class Impl;

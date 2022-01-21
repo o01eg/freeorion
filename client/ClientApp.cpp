@@ -27,10 +27,10 @@ int ClientApp::EmpireID() const
 int ClientApp::CurrentTurn() const
 { return m_current_turn; }
 
-Universe& ClientApp::GetUniverse()
+Universe& ClientApp::GetUniverse() noexcept
 { return m_universe; }
 
-const Universe& ClientApp::GetUniverse() const
+const Universe& ClientApp::GetUniverse() const noexcept
 { return m_universe; }
 
 GalaxySetupData& ClientApp::GetGalaxySetupData()
@@ -54,7 +54,7 @@ SpeciesManager& ClientApp::GetSpeciesManager()
 const SpeciesManager& ClientApp::GetSpeciesManager() const
 { return m_species_manager; }
 
-Species* ClientApp::GetSpecies(const std::string& name)
+const Species* ClientApp::GetSpecies(const std::string& name)
 { return m_species_manager.GetSpecies(name); }
 
 SupplyManager& ClientApp::GetSupplyManager()
@@ -139,9 +139,11 @@ std::string ClientApp::GetVisibleObjectName(std::shared_ptr<const UniverseObject
         return std::string();
     }
 
-    std::string name_text = object->PublicName(m_empire_id, m_universe.Objects());
+    std::string name_text;
     if (auto system = std::dynamic_pointer_cast<const System>(object))
-        name_text = system->ApparentName(m_empire_id);
+        name_text = system->ApparentName(m_empire_id, m_universe);
+    else
+        name_text = object->PublicName(m_empire_id, m_universe);
 
     return name_text;
 }

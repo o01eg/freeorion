@@ -26,7 +26,6 @@
 #include <GG/FontFwd.h>
 #include <GG/Texture.h>
 #include <GG/UnicodeCharsets.h>
-#include <boost/graph/graph_concepts.hpp>
 
 
 struct FT_FaceRec_;
@@ -159,6 +158,7 @@ public:
 
         /** Comparison with std::string. */
         bool operator==(const std::string& rhs) const;
+        bool operator==(std::string_view rhs) const;
 
         /** Comparison with std::string. */
         bool operator!=(const std::string& rhs) const;
@@ -196,7 +196,7 @@ public:
             \a nl indicates that it is a newline element. */
         TextElement(bool ws, bool nl);
 
-        virtual ~TextElement();
+        virtual ~TextElement() = default;
 
         /** Attach this TextElement to the string \p whole_text, by
             attaching the SubString data member text to \p whole_text.
@@ -240,15 +240,15 @@ public:
         /** The text from the original string represented by the element. */
         Substring text;
 
-        std::vector<X> widths;     ///< The widths of the glyphs in \a text.
-        const bool     whitespace; ///< True iff this is a whitespace element.
-        const bool     newline;    ///< True iff this is a newline element.
+        std::vector<X> widths;             ///< The widths of the glyphs in \a text.
+        const bool     whitespace = false; ///< True iff this is a whitespace element.
+        const bool     newline = false;    ///< True iff this is a newline element.
 
     protected:
-        TextElement();
+        TextElement() = default;
 
     private:
-        mutable X cached_width{0};
+        mutable X cached_width{-X1};
     };
 
     /** \brief TextAndElementsAssembler is used to assemble a matched pair of text and a vector of
@@ -262,7 +262,7 @@ public:
     {
     public:
         TextAndElementsAssembler(const Font& font);
-        ~TextAndElementsAssembler();
+        ~TextAndElementsAssembler(); // needed for unique_ptr<Impl>
 
         /** Return the constructed text.*/
         const std::string& Text() const;
@@ -427,7 +427,7 @@ public:
         std::unique_ptr<GLRGBAColorBuffer> underline_colors;
 
         RenderCache();
-        ~RenderCache();
+        ~RenderCache(); // needed for unique_ptr<forward_declared_class>
     };
 
     /** Construct a font using only the printable ASCII characters.
@@ -535,8 +535,8 @@ public:
         it from tight loops.  Do not call it from within Render().  Do not
         call it repeatedly on a known text.
     */
-    std::vector<std::shared_ptr<Font::TextElement>> ExpensiveParseFromTextToTextElements(const std::string& text,
-                                                                                         const Flags<TextFormat>& format) const;
+    std::vector<std::shared_ptr<Font::TextElement>> ExpensiveParseFromTextToTextElements(
+        const std::string& text, const Flags<TextFormat>& format) const;
 
     /** Fill \p text_elements with the font widths of characters from \p text starting from \p
         starting_from. */
@@ -602,6 +602,7 @@ public:
         when rendering text.  Passing "foo" will cause Font to treat "<foo>",
         "<foo [arg1 [arg2 ...]]>", and "</foo>" as tags. */
     static void RegisterKnownTag(const std::string& tag);
+    static void RegisterKnownTag(std::string_view tag);
 
     /** Removes \a tag from the known tag list.  Does not remove the built in
         tags: \<i>, \<u>, \<rgba r g b a>, and \<pre>. */
@@ -612,7 +613,7 @@ public:
     static void ClearKnownTags();
 
     /** Returns the input \a text, stripped of any formatting tags. */
-    static std::string StripTags(const std::string& text, bool strip_unpaired_tags = true);
+    static std::string StripTags(std::string_view text, bool strip_unpaired_tags = true);
 
     /** The base class for Font exceptions. */
     GG_ABSTRACT_EXCEPTION(Exception);
@@ -685,8 +686,7 @@ private:
                                          const Glyph& glyph, Y descent, Y height,
                                          Y underline_height, Y underline_offset) const;
 
-    void              HandleTag(const std::shared_ptr<FormattingTag>& tag, double* orig_color,
-                                RenderState& render_state) const;
+    void              HandleTag(const std::shared_ptr<FormattingTag>& tag, RenderState& render_state) const;
     bool              IsDefaultFont();
 
     std::shared_ptr<Font> GetDefaultFont(unsigned int pts);
@@ -829,7 +829,7 @@ GG_API FontManager& GetFontManager();
 GG_EXCEPTION(FailedFTLibraryInit);
 
 namespace detail {
-    template <typename CharT, bool CharIsSigned = boost::is_signed<CharT>::value>
+    template <typename CharT, bool CharIsSigned = std::is_signed_v<CharT>>
     struct ValidUTFChar;
 
     template <typename CharT>
@@ -848,12 +848,11 @@ namespace detail {
 
     struct GG_API FTFaceWrapper
     {
-        FTFaceWrapper();
+        FTFaceWrapper() = default;
         ~FTFaceWrapper();
         FT_Face m_face = nullptr;
     };
 }
-
 }
 
 

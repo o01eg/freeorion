@@ -74,7 +74,7 @@
 class FO_COMMON_API VarText {
 public:
     //! Create a VarText instance with an empty #m_template_string.
-    VarText();
+    VarText() = default;
 
     //! Create a VarText instance from the given @p template_string.
     //!
@@ -97,7 +97,7 @@ public:
     { return m_stringtable_lookup_flag; }
 
     //! Return the variables available for substitution.
-    std::vector<std::string> GetVariableTags() const;
+    std::vector<std::string_view> GetVariableTags() const;
 
     //! Set the #m_template_string to the given @p template_string.
     //!
@@ -114,18 +114,9 @@ public:
     //!     Tag of the #m_variables set, may be labled.
     //! @param  data
     //!     Data value of the #m_variables set.
-    void AddVariable(const std::string& tag, const std::string& data);
-
-    //! Assign @p data to a given @p tag. Overwrites / replaces data of existing tags.
-    //!
-    //! The @p data should match @p tag as listed in
-    //!   @ref variable_tags "Variable tags".
-    //!
-    //! @param  tag
-    //!     Tag of the #m_variables set, may be labled.
-    //! @param  data
-    //!     Data value of the #m_variables set.
-    void AddVariable(const std::string& tag, std::string&& data);
+    void AddVariable(std::string tag, std::string data);
+    void AddVariable(std::string_view tag, std::string data)
+    { AddVariable(std::string{tag}, std::move(data)); }
 
     //! Assign @p data as tags. Does not overwrite or replace data of existing tags.
     //!
@@ -145,49 +136,49 @@ public:
     //! @{
 
     //! Variable value is a StringTable key.
-    static const std::string TEXT_TAG;
+    static constexpr std::string_view TEXT_TAG = "text";
     //! Variable value is a literal string.
-    static const std::string RAW_TEXT_TAG;
+    static constexpr std::string_view RAW_TEXT_TAG = "rawtext";
     //! Variable value is a Planet::ID().
-    static const std::string PLANET_ID_TAG;
+    static constexpr std::string_view PLANET_ID_TAG = "planet";
     //! Variable value is a System::ID().
-    static const std::string SYSTEM_ID_TAG;
+    static constexpr std::string_view SYSTEM_ID_TAG = "system";
     //! Variable value is a Ship::ID().
-    static const std::string SHIP_ID_TAG;
+    static constexpr std::string_view SHIP_ID_TAG = "ship";
     //! Variable value is a Fleet::ID().
-    static const std::string FLEET_ID_TAG;
+    static constexpr std::string_view FLEET_ID_TAG = "fleet";
     //! Variable value is a Building::ID().
-    static const std::string BUILDING_ID_TAG;
+    static constexpr std::string_view BUILDING_ID_TAG = "building";
     //! Variable value is a Field::ID().
-    static const std::string FIELD_ID_TAG;
+    static constexpr std::string_view FIELD_ID_TAG = "field";
     //! Variable value represents a CombatLog.
-    static const std::string COMBAT_ID_TAG;
+    static constexpr std::string_view COMBAT_ID_TAG = "combat";
     //! Variable value is an Empire::EmpireID().
-    static const std::string EMPIRE_ID_TAG;
+    static constexpr std::string_view EMPIRE_ID_TAG = "empire";
     //! Variable value is a ShipDesign::ID().
-    static const std::string DESIGN_ID_TAG;
+    static constexpr std::string_view DESIGN_ID_TAG = "shipdesign";
     //! Variable value is a ShipDesign::ID() of a predefined ShipDesign.
-    static const std::string PREDEFINED_DESIGN_TAG;
+    static constexpr std::string_view PREDEFINED_DESIGN_TAG = "predefinedshipdesign";
     //! Variable value is a Tech::Name().
-    static const std::string TECH_TAG;
+    static constexpr std::string_view TECH_TAG = "tech";
     //! Variable value is a Policy::Name().
-    static const std::string POLICY_TAG;
+    static constexpr std::string_view POLICY_TAG = "policy";
     //! Variable value is a BuildingType::Name().
-    static const std::string BUILDING_TYPE_TAG;
+    static constexpr std::string_view BUILDING_TYPE_TAG = "buildingtype";
     //! Variable value is a Special::Name().
-    static const std::string SPECIAL_TAG;
+    static constexpr std::string_view SPECIAL_TAG = "special";
     //! Variable value is a ShipHull::Name().
-    static const std::string SHIP_HULL_TAG;
+    static constexpr std::string_view SHIP_HULL_TAG = "shiphull";
     //! Variable value is a ShipPart::Name().
-    static const std::string SHIP_PART_TAG;
+    static constexpr std::string_view SHIP_PART_TAG = "shippart";
     //! Variable value is a Species::Name().
-    static const std::string SPECIES_TAG;
+    static constexpr std::string_view SPECIES_TAG = "species";
     //! Variable value is a FieldType::Name().
-    static const std::string FIELD_TYPE_TAG;
+    static constexpr std::string_view FIELD_TYPE_TAG = "fieldtype";
     //! Variable value is a predefined MeterType string representation.
-    static const std::string METER_TYPE_TAG;
+    static constexpr std::string_view METER_TYPE_TAG = "metertype";
     //! Variable value is the name of a registed ValueRef.
-    static const std::string FOCS_VALUE_TAG;
+    static constexpr std::string_view FOCS_VALUE_TAG = "value";
 
     //! @}
 
@@ -200,14 +191,14 @@ protected:
     //! substituted to render the text as user-readable.
     //!
     //! @see  #m_stringtable_lookup_flag
-    std::string m_template_string;
+    std::string m_template_string; // need to hold own copy of this string to support deserialization
 
     //! If true the #m_template_string will be looked up in the stringtable
     //! prior to substitution for variables.
     bool m_stringtable_lookup_flag = false;
 
     //! Maps variable tags into values, which are used during text substitution.
-    std::map<std::string, std::string> m_variables;
+    std::map<std::string, std::string, std::less<>> m_variables; // need to hold own copies of strings here to support deserialization
 
     //! #m_template_string with applied #m_variables substitute.
     mutable std::string m_text;

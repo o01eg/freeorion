@@ -5,14 +5,13 @@
 
 #include "../universe/Condition.h"
 
-struct condition_wrapper {
-    condition_wrapper(std::shared_ptr<Condition::Condition>&& ref)
-        : condition(std::move(ref))
-    { }
+namespace boost::python {
+    class dict;
+}
 
-    condition_wrapper(const std::shared_ptr<Condition::Condition>& ref)
-        : condition(ref)
-    { }
+struct condition_wrapper {
+    condition_wrapper(std::shared_ptr<Condition::Condition>&& ref) : condition(std::move(ref)) {}
+    condition_wrapper(const std::shared_ptr<Condition::Condition>& ref) : condition(ref) {}
 
     std::shared_ptr<Condition::Condition> condition;
 };
@@ -20,6 +19,8 @@ struct condition_wrapper {
 condition_wrapper operator&(const condition_wrapper&, const condition_wrapper&);
 condition_wrapper operator|(const condition_wrapper&, const condition_wrapper&);
 condition_wrapper operator~(const condition_wrapper&);
+
+void RegisterGlobalsConditions(boost::python::dict& globals);
 
 #endif // _ConditionPythonParser_h_
 

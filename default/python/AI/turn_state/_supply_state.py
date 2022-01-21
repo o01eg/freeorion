@@ -1,12 +1,13 @@
+import freeOrionAIInterface as fo
 from logging import error, warning
 from typing import Dict, Mapping, Tuple
 
-import freeOrionAIInterface as fo
-from freeorion_tools import cache_for_current_turn
+from common.fo_typing import SystemId
+from freeorion_tools.caching import cache_for_current_turn
 
 
 @cache_for_current_turn
-def _get_system_supply_map() -> Dict[int, int]:
+def _get_system_supply_map() -> Dict[SystemId, int]:
     return fo.getEmpire().supplyProjections()  # map from system_id to supply
 
 
@@ -29,7 +30,7 @@ def get_system_supply(sys_id: int) -> int:
 
 
 @cache_for_current_turn
-def _get_systems_map_by_jumps_to_supply() -> Mapping[int, Tuple[int]]:
+def _get_systems_map_by_jumps_to_supply() -> Mapping[int, Tuple[SystemId]]:
     systems_by_jumps_to_supply = {}
 
     for sys_id, supply_val in _get_system_supply_map().items():
@@ -37,7 +38,7 @@ def _get_systems_map_by_jumps_to_supply() -> Mapping[int, Tuple[int]]:
     return {key: tuple(value) for key, value in systems_by_jumps_to_supply.items()}
 
 
-def get_systems_by_supply_tier(supply_tier: int) -> Tuple[int]:
+def get_systems_by_supply_tier(supply_tier: int) -> Tuple[SystemId]:
     """
     Get systems with supply tier.
 
@@ -45,8 +46,10 @@ def get_systems_by_supply_tier(supply_tier: int) -> Tuple[int]:
     Negative values indicate jumps away from supply.
     """
     if supply_tier > 0:
-        warning("The current implementation does not distinguish between positive supply levels. "
-                "Interpreting the query as supply_tier=0 (indicating system in supply).")
+        warning(
+            "The current implementation does not distinguish between positive supply levels. "
+            "Interpreting the query as supply_tier=0 (indicating system in supply)."
+        )
         supply_tier = 0
     return _get_systems_map_by_jumps_to_supply().get(supply_tier, tuple())
 
@@ -58,12 +61,11 @@ def _get_enemy_supply_distance_map() -> Mapping[int, int]:
 
     for enemy in enemies:
         if enemy is None:
-            error('Got None for enemy empire!')
+            error("Got None for enemy empire!")
             continue
 
         for sys_id, supply_val in enemy.supplyProjections().items():
-            distance_to_enemy_supply[sys_id] = min(
-                distance_to_enemy_supply.get(sys_id, 999), -supply_val)
+            distance_to_enemy_supply[sys_id] = min(distance_to_enemy_supply.get(sys_id, 999), -supply_val)
 
     return distance_to_enemy_supply
 

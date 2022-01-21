@@ -65,7 +65,7 @@ public:
     virtual bool FakeModeChange() const final;
 
     void ExitApp(int code = 0) override;
-    bool SetClipboardText(const std::string& text) override;
+    bool SetClipboardText(std::string text) override;
 
     void Enter2DMode() override;
     void Exit2DMode() override;
@@ -135,11 +135,11 @@ private:
     GG::Y           m_app_height{768};
     GG::X           m_initial_x{0};         ///< The initial position of the application window
     GG::Y           m_initial_y{0};
-    bool            m_fullscreen = false;
-    bool            m_fake_mode_change = false;
     int             m_display_id = 0;
     SDL_Window*     m_window = nullptr;     ///< The sdl window
     SDL_GLContext   m_gl_context = nullptr; ///< The OpenGL context
+    bool            m_fullscreen = false;
+    bool            m_fake_mode_change = false;
     bool            m_done = false;         ///< Set true true when we should exit.
 
     /** Virtual screen for fake fullscreen.  Equals nullptr ifi

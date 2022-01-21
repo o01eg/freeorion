@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <shared_mutex>
 
 #include <boost/format.hpp>
-#include <boost/lexical_cast.hpp>
 
 #include "Export.h"
 
@@ -17,15 +17,19 @@ FO_COMMON_API std::locale GetLocale(const std::string& name = std::string(""));
 
 /** Returns a language-specific string for the key-string \a str */
 FO_COMMON_API const std::string& UserString(const std::string& str);
+FO_COMMON_API const std::string& UserString(const std::string_view str);
+FO_COMMON_API const std::string& UserString(const char* str);
 
 /** Returns all entries in current stringtable */
-FO_COMMON_API const std::map<std::string, std::string>& AllStringtableEntries(bool default_table = false);
+FO_COMMON_API const std::map<std::string, std::string, std::less<>>& AllStringtableEntries(bool default_table = false);
 
 /** Returns a language-specific vector of strings for given @a key. */
 FO_COMMON_API std::vector<std::string> UserStringList(const std::string& key);
 
 /** Returns true iff a user-string exists for the key string \a str */
 FO_COMMON_API bool UserStringExists(const std::string& str);
+FO_COMMON_API bool UserStringExists(const std::string_view str);
+FO_COMMON_API bool UserStringExists(const char* str);
 
 /** Clears all loaded strings, so that subsequent UserString lookups will cause
   * the stringtable(s) to be reloaded. */
@@ -76,7 +80,7 @@ boost::format FlexibleFormatList(
         default: return plural_header_template; break;
         }
     }()};
-    boost::format header_fmt = FlexibleFormat(header_template) % boost::lexical_cast<std::string>(words.size());
+    boost::format header_fmt = FlexibleFormat(header_template) % std::to_string(words.size());
     for (const auto& word : header_words)
         header_fmt % word;
 
@@ -119,12 +123,14 @@ boost::format FlexibleFormatList(
 {
     return FlexibleFormatList(std::vector<std::string>(), words, all_header, all_header, all_header, all_header);
 }
+
 template<typename Container>
 boost::format FlexibleFormatList(
     const Container& words, const std::string& plural_header, const std::string& single_header)
 {
     return FlexibleFormatList(std::vector<std::string>(), words, plural_header, single_header, plural_header, plural_header);
 }
+
 template<typename Container>
 boost::format FlexibleFormatList(
     const Container& words, const std::string& plural_header,
@@ -136,11 +142,11 @@ boost::format FlexibleFormatList(
 template<typename T1, typename T2>
 boost::format FlexibleFormatList(const T2& header_words, const T1& words)
 {
-    return FlexibleFormatList(header_words, words
-                              , UserString("FORMAT_LIST_DEFAULT_PLURAL_HEADER")
-                              , UserString("FORMAT_LIST_DEFAULT_SINGLE_HEADER")
-                              , UserString("FORMAT_LIST_DEFAULT_EMPTY_HEADER")
-                              , UserString("FORMAT_LIST_DEFAULT_DUAL_HEADER"));
+    return FlexibleFormatList(header_words, words,
+                              UserString("FORMAT_LIST_DEFAULT_PLURAL_HEADER"),
+                              UserString("FORMAT_LIST_DEFAULT_SINGLE_HEADER"),
+                              UserString("FORMAT_LIST_DEFAULT_EMPTY_HEADER"),
+                              UserString("FORMAT_LIST_DEFAULT_DUAL_HEADER"));
 }
 
 template<typename T1, typename T2>
@@ -149,6 +155,7 @@ boost::format FlexibleFormatList(
 {
     return FlexibleFormatList(header_words, words, all_header, all_header, all_header, all_header);
 }
+
 template<typename T1, typename T2>
 boost::format FlexibleFormatList(
     const T2& header_words, const T1& words, const std::string& plural_header, const std::string& single_header)

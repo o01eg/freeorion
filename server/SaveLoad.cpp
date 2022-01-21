@@ -98,6 +98,20 @@ std::map<int, SaveGameEmpireData> CompileSaveGameEmpireData() {
     return retval;
 }
 
+namespace {
+    constexpr size_t Pow(size_t base, size_t exp) {
+        size_t retval = 1;
+        while (exp--)
+            retval *= base;
+        return retval;
+    }
+    static_assert(Pow(3,4) == 81);
+    static_assert(Pow(0,100) == 0);
+    static_assert(Pow(2,10) == 1024);
+    static_assert(Pow(6234834,0) == 1);
+    static_assert(Pow(0,0) == 1);
+}
+
 int SaveGame(const std::string& filename, const ServerSaveGameData& server_save_game_data,
              const std::vector<PlayerSaveGameData>& player_save_game_data, const Universe& universe,
              const EmpireManager& empire_manager, const SpeciesManager& species_manager,
@@ -187,11 +201,10 @@ int SaveGame(const std::string& filename, const ServerSaveGameData& server_save_
                     std::string serial_str, compressed_str;
                     try {
                         DebugLogger() << "String Max Size: " << serial_str.max_size();
-                        std::string::size_type capacity = std::min(serial_str.max_size(),
-                            static_cast<std::string::size_type>(std::pow(2.0, 29.0)));
+                        const std::string::size_type capacity = std::min(serial_str.max_size(), Pow(2,29)-12); // I read on StackOverflow that Qt grows string capacity to slightly less than powers of two due to some allocators perform worse at exact powers of 2
                         DebugLogger() << "Reserving Capacity:: " << capacity;
                         serial_str.reserve(capacity);
-                        compressed_str.reserve(std::pow(2.0, 26.0));
+                        compressed_str.reserve(Pow(2,26)-12);
                     }
                     catch (...) {
                         DebugLogger() << "Unable to preallocate full serialization buffers. Attempting serialization with dynamic buffer allocation.";
@@ -529,7 +542,7 @@ void LoadPlayerSaveHeaderData(const std::string& filename, std::vector<PlayerSav
     ServerSaveGameData  ignored_server_save_game_data;
     GalaxySetupData     ignored_galaxy_setup_data;
 
-    ScopedTimer timer("LoadPlayerSaveHeaderData: " + filename, true);
+    ScopedTimer timer("LoadPlayerSaveHeaderData: " + filename);
 
     try {
         DebugLogger() << "Reading player save game data from: " << filename;
@@ -581,7 +594,7 @@ void LoadEmpireSaveGameData(const std::string& filename,
     ServerSaveGameData                  saved_server_save_game_data;
     GalaxySetupData                     saved_galaxy_setup_data;
 
-    ScopedTimer timer("LoadEmpireSaveGameData: " + filename, true);
+    ScopedTimer timer("LoadEmpireSaveGameData: " + filename);
 
     try {
         fs::path path = FilenameToPath(filename);

@@ -23,9 +23,10 @@ public:
     const ParserAppFixture& operator=(const ParserAppFixture&) = delete;
     ParserAppFixture& operator=(ParserAppFixture&&) = delete;
 
+    int EmpireID() const override;
     int CurrentTurn() const override;
 
-    Universe& GetUniverse() override;
+    Universe& GetUniverse() noexcept override;
 
     const GalaxySetupData& GetGalaxySetupData() const override;
 
@@ -40,7 +41,7 @@ public:
     Empire* GetEmpire(int empire_id) override;
 
     SpeciesManager& GetSpeciesManager() override;
-    Species* GetSpecies(const std::string& name) override;
+    const Species* GetSpecies(const std::string& name) override;
 
     SupplyManager& GetSupplyManager() override;
 

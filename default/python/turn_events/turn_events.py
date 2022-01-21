@@ -3,11 +3,11 @@ from common.configure_logging import redirect_logging_to_freeorion_logger
 # Logging is redirected before other imports so that import errors appear in log files.
 redirect_logging_to_freeorion_logger()
 
-import sys
-from random import random, uniform, choice
-from math import sin, cos, pi
-
 import freeorion as fo
+import sys
+from math import cos, pi, sin
+from random import choice, random, uniform
+
 from universe_tables import MONSTER_FREQUENCY
 
 
@@ -17,13 +17,7 @@ def execute_turn_events():
     # creating fields
     systems = fo.get_systems()
     radius = fo.get_universe_width() / 2.0
-    field_types = [
-        "FLD_MOLECULAR_CLOUD",
-        "FLD_ION_STORM",
-        "FLD_NANITE_SWARM",
-        "FLD_METEOR_BLIZZARD",
-        "FLD_VOID_RIFT"
-    ]
+    field_types = ["FLD_MOLECULAR_CLOUD", "FLD_ION_STORM", "FLD_NANITE_SWARM", "FLD_METEOR_BLIZZARD", "FLD_VOID_RIFT"]
 
     if random() < max(0.00015 * radius, 0.03):
         field_type = choice(field_types)

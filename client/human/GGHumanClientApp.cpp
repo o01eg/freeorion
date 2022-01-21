@@ -209,7 +209,7 @@ std::string GGHumanClientApp::EncodeServerAddressOption(const std::string& serve
 }
 
 GGHumanClientApp::GGHumanClientApp(int width, int height, bool calculate_fps, std::string name,
-                               int x, int y, bool fullscreen, bool fake_mode_change) :
+                                   int x, int y, bool fullscreen, bool fake_mode_change) :
     ClientApp(),
     SDLGUI(width, height, calculate_fps, std::move(name), x, y, fullscreen, fake_mode_change)
 {
@@ -355,7 +355,7 @@ GGHumanClientApp::GGHumanClientApp(int width, int height, bool calculate_fps, st
     // Start parsing content
     std::promise<void> barrier;
     std::future<void> barrier_future = barrier.get_future();
-    std::thread background([this] (auto b) {
+    std::thread background([this](auto b){
         DebugLogger() << "Started background parser thread";
         PythonCommon python;
         python.Initialize();
@@ -1279,7 +1279,7 @@ namespace {
     }
 
     boost::filesystem::path CreateNewAutosaveFilePath(int client_empire_id, bool is_single_player) {
-        const char* legal_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-";
+        constexpr const char* legal_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-";
 
         // get empire name, filtered for filename acceptability
         const Empire* empire = GetEmpire(client_empire_id);
@@ -1436,6 +1436,7 @@ void GGHumanClientApp::ExitSDL(int exit_code)
 { SDLGUI::ExitApp(exit_code); }
 
 void GGHumanClientApp::ResetOrExitApp(bool reset, bool skip_savegame, int exit_code /* = 0*/) {
+    DebugLogger() << "GGHumanClientApp::ResetOrExitApp(" << reset << ", " << skip_savegame << ", " << exit_code << ")";
     if (m_exit_handled) {
         static int repeat_count = 0;
         if (repeat_count++ > 2) {
@@ -1532,6 +1533,38 @@ int GGHumanClientApp::AutoTurnsLeft() const
 bool GGHumanClientApp::HaveWindowFocus() const
 { return m_have_window_focus; }
 
+int GGHumanClientApp::SelectedSystemID() const {
+    if (m_ui) {
+        if (auto mapwnd = m_ui->GetMapWnd())
+            return mapwnd->SelectedSystemID();
+    }
+    return INVALID_OBJECT_ID;
+}
+
+int GGHumanClientApp::SelectedPlanetID() const {
+    if (m_ui) {
+        if (auto mapwnd = m_ui->GetMapWnd())
+            return mapwnd->SelectedPlanetID();
+    }
+    return INVALID_OBJECT_ID;
+}
+
+int GGHumanClientApp::SelectedFleetID() const {
+    if (m_ui) {
+        if (auto mapwnd = m_ui->GetMapWnd())
+            return mapwnd->SelectedFleetID();
+    }
+    return INVALID_OBJECT_ID;
+}
+
+int GGHumanClientApp::SelectedShipID() const {
+    if (m_ui) {
+        if (auto mapwnd = m_ui->GetMapWnd())
+            return mapwnd->SelectedShipID();
+    }
+    return INVALID_OBJECT_ID;
+}
+
 int GGHumanClientApp::EffectsProcessingThreads() const
 { return GetOptionsDB().Get<int>("effects.ui.threads"); }
 
@@ -1570,7 +1603,7 @@ void GGHumanClientApp::DisconnectedFromServer() {
 }
 
 GGHumanClientApp* GGHumanClientApp::GetApp()
-{ return dynamic_cast<GGHumanClientApp*>(GG::GUI::GetGUI()); }
+{ return static_cast<GGHumanClientApp*>(GG::GUI::GetGUI()); }
 
 void GGHumanClientApp::Initialize()
 {}

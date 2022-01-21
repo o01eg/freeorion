@@ -34,12 +34,12 @@
 #  include <android/log.h>
 #endif
 
-#if defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_HAIKU) || defined(FREEORION_ANDROID)
+#if defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_NETBSD) || defined(FREEORION_DRAGONFLY) || defined(FREEORION_HAIKU) || defined(FREEORION_ANDROID)
 #include "binreloc.h"
 #include <unistd.h>
 #include <boost/filesystem/fstream.hpp>
 
-#  ifdef __FreeBSD__
+#  if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__DragonFly__)
 #    include <sys/sysctl.h>
 #  endif
 #  ifdef __HAIKU__
@@ -47,9 +47,9 @@
 #  endif
 #endif
 
-# if defined(FREEORION_WIN32) || defined(FREEORION_MACOSX) || defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_HAIKU) || defined(FREEORION_ANDROID)
+# if defined(FREEORION_WIN32) || defined(FREEORION_MACOSX) || defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_NETBSD) || defined(FREEORION_DRAGONFLY) || defined(FREEORION_HAIKU) || defined(FREEORION_ANDROID)
 # else
-#  error Neither FREEORION_LINUX, FREEORION_MACOSX, FREEORION_FREEBSD, FREEORION_OPENBSD, FREEORION_WIN32, FREEORION_HAIKU nor FREEORION_ANDROID set
+#  error Neither FREEORION_LINUX, FREEORION_MACOSX, FREEORION_FREEBSD, FREEORION_OPENBSD, FREEORION_NETBSD, FREEORION_DRAGONFLY, FREEORION_WIN32, FREEORION_HAIKU nor FREEORION_ANDROID set
 #endif
 
 
@@ -58,18 +58,6 @@ namespace fs = ::boost::filesystem;
 namespace {
     bool g_initialized = false;
     fs::path bin_dir = fs::initial_path();
-
-    const std::string EMPTY_STRING;
-    const std::string PATH_BINARY_STR = "PATH_BINARY";
-    const std::string PATH_RESOURCE_STR = "PATH_RESOURCE";
-    const std::string PATH_DATA_ROOT_STR = "PATH_DATA_ROOT";
-    const std::string PATH_DATA_USER_STR = "PATH_DATA_USER";
-    const std::string PATH_CONFIG_STR = "PATH_CONFIG";
-    const std::string PATH_CACHE_STR = "PATH_CACHE";
-    const std::string PATH_SAVE_STR = "PATH_SAVE";
-    const std::string PATH_TEMP_STR = "PATH_TEMP";
-    const std::string PATH_PYTHON_STR = "PATH_PYTHON";
-    const std::string PATH_INVALID_STR = "PATH_INVALID";
 
 #if defined(FREEORION_MACOSX)
     fs::path       s_user_dir;
@@ -83,6 +71,7 @@ namespace {
     thread_local JNIEnv* s_jni_env = nullptr;
     fs::path       s_user_dir;
     fs::path       s_cache_dir;
+    fs::path       s_python_home;
     jweak          s_activity;
     AAssetManager* s_asset_manager;
     jobject        s_jni_asset_manager;
@@ -103,9 +92,30 @@ void RedirectOutputLogAndroid(int priority, const char* tag, int fd)
     });
     background.detach();
 }
+
+void CopyInitialResourceAndroid(const std::string& rel_path)
+{
+    AAsset* asset = AAssetManager_open(s_asset_manager, ("default/python/" + rel_path).c_str(), AASSET_MODE_STREAMING);
+    if (asset == nullptr) {
+        return;
+    }
+    off64_t asset_length = AAsset_getLength64(asset);
+    if (asset_length <= 0) {
+        AAsset_close(asset);
+        return;
+    }
+
+    char buf[4096];
+    int nb_read = 0;
+    fs::ofstream ofs(s_python_home / rel_path, std::ios::binary);
+    while ((nb_read = AAsset_read(asset, buf, 4096)) > 0) {
+        ofs.write(buf, nb_read);
+    }
+    ofs.close();
+}
 #endif
 
-#if defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_HAIKU)
+#if defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_NETBSD) || defined(FREEORION_DRAGONFLY) || defined(FREEORION_HAIKU)
     //! Copy directory from to directory to only to a depth of safe_depth
     void copy_directory_safe(fs::path from, fs::path to, int safe_depth)
     {
@@ -203,41 +213,55 @@ void RedirectOutputLogAndroid(int priority, const char* tag, int fd)
 #endif
 }
 
-auto PathTypeToString(PathType path_type) -> std::string const&
-{
-    switch (path_type) {
-        case PathType::PATH_BINARY:    return PATH_BINARY_STR;
-        case PathType::PATH_RESOURCE:  return PATH_RESOURCE_STR;
-        case PathType::PATH_PYTHON:    return PATH_PYTHON_STR;
-        case PathType::PATH_DATA_ROOT: return PATH_DATA_ROOT_STR;
-        case PathType::PATH_DATA_USER: return PATH_DATA_USER_STR;
-        case PathType::PATH_CONFIG:    return PATH_CONFIG_STR;
-        case PathType::PATH_CACHE:     return PATH_CACHE_STR;
-        case PathType::PATH_SAVE:      return PATH_SAVE_STR;
-        case PathType::PATH_TEMP:      return PATH_TEMP_STR;
-        case PathType::PATH_INVALID:   return PATH_INVALID_STR;
-        default:                       return EMPTY_STRING;
-    }
-}
 
-auto PathTypeStrings() -> std::vector<std::string> const&
-{
-    static std::vector<std::string> path_type_list;
-    if (path_type_list.empty()) {
-        path_type_list.reserve(10); // should be enough
-        for (auto path_type = PathType(0); path_type < PathType::PATH_INVALID;
-             path_type = PathType(int(path_type) + 1))
-        {
-            // PATH_PYTHON is only valid for FREEORION_WIN32 or FREEORION_MACOSX
-#if defined(FREEORION_LINUX)
-            if (path_type == PathType::PATH_PYTHON)
-                continue;
+namespace {
+    constexpr auto PathTypeToStringImpl(PathType path_type) -> std::string_view
+    {
+        switch (path_type) {
+            case PathType::PATH_BINARY:    return "PATH_BINARY";
+            case PathType::PATH_RESOURCE:  return "PATH_RESOURCE";
+            case PathType::PATH_DATA_ROOT: return "PATH_DATA_ROOT";
+            case PathType::PATH_DATA_USER: return "PATH_DATA_USER";
+            case PathType::PATH_CONFIG:    return "PATH_CONFIG";
+            case PathType::PATH_CACHE:     return "PATH_CACHE";
+            case PathType::PATH_SAVE:      return "PATH_SAVE";
+            case PathType::PATH_TEMP:      return "PATH_TEMP";
+#if !defined(FREEORION_LINUX)
+            case PathType::PATH_PYTHON:    return "PATH_PYTHON";
 #endif
-            path_type_list.emplace_back(PathTypeToString(path_type));
+            case PathType::PATH_INVALID:   return "PATH_INVALID";
+            default:                       return "";
         }
     }
-    return path_type_list;
+
+    constexpr auto PathTypesImpl() {
+        static_assert(std::is_same_v<std::underlying_type_t<PathType>, int>);
+        static_assert(int(PathType::PATH_INVALID) > 0);
+        std::array<PathType, NUM_PATH_TYPES> retval{};
+
+        for (PathType pt = PathType(0); pt < PathType::PATH_INVALID; pt = PathType(int(pt) + 1))
+            retval[std::size_t(pt)] = pt;
+        return retval;
+    }
+
+    constexpr auto PathTypesViewsImpl() {
+        std::array<std::string_view, NUM_PATH_TYPES> retval{};
+        std::size_t idx = 0;
+        for (const auto& pt : PathTypesImpl())
+            retval[idx++]= PathTypeToStringImpl(pt);
+        return retval;
+    };
+    constexpr auto path_type_views = PathTypesViewsImpl();
 }
+
+auto PathTypeToString(PathType path_type) -> std::string_view
+{ return PathTypeToStringImpl(path_type); }
+
+std::array<PathType, NUM_PATH_TYPES> PathTypes()
+{ return PathTypesImpl(); }
+
+auto PathTypeStrings() -> const std::array<std::string_view, NUM_PATH_TYPES>&
+{ return path_type_views; }
 
 void InitBinDir(std::string const& argv0)
 {
@@ -248,7 +272,7 @@ void InitBinDir(std::string const& argv0)
     } catch (const fs::filesystem_error &) {
         bin_dir = fs::initial_path();
     }
-#elif defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_HAIKU)
+#elif defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_NETBSD) || defined(FREEORION_DRAGONFLY) || defined(FREEORION_HAIKU)
     bool problem = false;
     try {
         // get this executable's path by following link
@@ -257,12 +281,21 @@ void InitBinDir(std::string const& argv0)
 #if defined(FREEORION_LINUX)
         problem = (-1 == readlink("/proc/self/exe", buf, sizeof(buf) - 1));
 #endif
-#if defined(FREEORION_FREEBSD)
+#if defined(FREEORION_FREEBSD) || defined(FREEORION_DRAGONFLY)
         int mib[4];
         mib[0] = CTL_KERN;
         mib[1] = KERN_PROC;
         mib[2] = KERN_PROC_PATHNAME;
         mib[3] = -1;
+        size_t buf_size = sizeof(buf);
+        sysctl(mib, 4, buf, &buf_size, 0, 0);
+#endif
+#if defined(FREEORION_NETBSD)
+        int mib[4];
+        mib[0] = CTL_KERN;
+        mib[1] = KERN_PROC_ARGS;
+        mib[2] = -1;
+        mib[3] = KERN_PROC_PATHNAME;
         size_t buf_size = sizeof(buf);
         sysctl(mib, 4, buf, &buf_size, 0, 0);
 #endif
@@ -371,7 +404,7 @@ void InitDirs(std::string const& argv0)
     // Intentionally do not create the server save dir.
     // The server save dir is publically accessible and should not be
     // automatically created for the user.
-#elif defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_HAIKU)
+#elif defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_NETBSD) || defined(FREEORION_DRAGONFLY) || defined(FREEORION_HAIKU)
     /* store working dir.  some implimentations get the value of initial_path
      * from the value of current_path the first time initial_path is called,
      * so it is necessary to call initial_path as soon as possible after
@@ -467,6 +500,10 @@ void InitDirs(std::string const& argv0)
 
     RedirectOutputLogAndroid(ANDROID_LOG_ERROR, "stderr", 2);
     RedirectOutputLogAndroid(ANDROID_LOG_INFO, "stdout", 1);
+
+    s_python_home = s_cache_dir / "python";
+    fs::create_directories(s_python_home / "lib");
+    CopyInitialResourceAndroid("lib/python36.zip");
 #endif
 
     g_initialized = true;
@@ -476,7 +513,7 @@ auto GetUserConfigDir() -> fs::path const
 {
 #if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32) || defined(FREEORION_ANDROID)
     return GetUserDataDir();
-#elif defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_HAIKU)
+#elif defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_NETBSD) || defined(FREEORION_DRAGONFLY) || defined(FREEORION_HAIKU)
     static fs::path p = getenv("XDG_CONFIG_HOME")
         ? fs::path(getenv("XDG_CONFIG_HOME")) / "freeorion"
         : fs::path(getenv("HOME")) / ".config" / "freeorion";
@@ -506,7 +543,7 @@ auto GetUserDataDir() -> fs::path const
     if (!g_initialized)
         InitDirs("");
     return s_user_dir;
-#elif defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_HAIKU) || defined(FREEORION_ANDROID)
+#elif defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_NETBSD) || defined(FREEORION_DRAGONFLY) || defined(FREEORION_HAIKU) || defined(FREEORION_ANDROID)
     static fs::path p = getenv("XDG_DATA_HOME")
         ? fs::path(getenv("XDG_DATA_HOME")) / "freeorion"
         : fs::path(getenv("HOME")) / ".local" / "share" / "freeorion";
@@ -523,7 +560,7 @@ auto GetRootDataDir() -> fs::path const
     if (!g_initialized)
         InitDirs("");
     return s_root_data_dir;
-#elif defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_HAIKU)
+#elif defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_NETBSD) || defined(FREEORION_DRAGONFLY) || defined(FREEORION_HAIKU)
     if (!g_initialized)
         InitDirs("");
     char* dir_name = br_find_data_dir(SHAREPATH);
@@ -549,7 +586,7 @@ auto GetBinDir() -> fs::path const
     if (!g_initialized)
         InitDirs("");
     return s_bin_dir;
-#elif defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_HAIKU) || defined(FREEORION_ANDROID)
+#elif defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_NETBSD) || defined(FREEORION_DRAGONFLY) || defined(FREEORION_HAIKU) || defined(FREEORION_ANDROID)
     if (!g_initialized)
         InitDirs("");
     return bin_dir;
@@ -560,10 +597,10 @@ auto GetBinDir() -> fs::path const
 #endif
 }
 
-#if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32)
+#if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32) || defined(FREEORION_ANDROID)
 auto GetPythonHome() -> fs::path const
 {
-#if defined(FREEORION_MACOSX)
+#if defined(FREEORION_MACOSX) || defined(FREEORION_ANDROID)
     if (!g_initialized)
         InitDirs("");
     return s_python_home;
@@ -761,7 +798,7 @@ auto IsFOCScript(const fs::path& path) -> bool
 { return IsExistingFile(path) && ".txt" == path.extension() && path.stem().extension() == ".focs"; }
 
 auto IsFOCPyScript(const fs::path& path) -> bool
-{ return fs::is_regular_file(path) && ".py" == path.extension() && path.stem().extension() == ".focs"; }
+{ return IsExistingFile(path) && ".py" == path.extension() && path.stem().extension() == ".focs"; }
 
 auto ListDir(const fs::path& path, std::function<bool (const fs::path&)> predicate) -> std::vector<fs::path>
 {
@@ -893,8 +930,8 @@ auto GetPath(PathType path_type) -> fs::path
         return GetSaveDir();
     case PathType::PATH_TEMP:
         return fs::temp_directory_path();
-    case PathType::PATH_PYTHON:
 #if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32)
+    case PathType::PATH_PYTHON:
         return GetPythonHome();
 #endif
     case PathType::PATH_INVALID:
@@ -902,33 +939,6 @@ auto GetPath(PathType path_type) -> fs::path
         ErrorLogger() << "Invalid path type " << path_type;
         return fs::temp_directory_path();
     }
-}
-
-auto GetPath(std::string const& path_string) -> fs::path
-{
-    if (path_string.empty()) {
-        ErrorLogger() << "GetPath called with empty argument";
-        return fs::temp_directory_path();
-    }
-
-    PathType path_type;
-    try {
-        path_type = boost::lexical_cast<PathType>(path_string);
-    } catch (const boost::bad_lexical_cast& ec) {
-        // try partial match
-        std::string retval = path_string;
-        for (const auto& path_type_str : PathTypeStrings()) {
-            std::string path_type_string = PathToString(GetPath(path_type_str));
-            boost::replace_all(retval, path_type_str, path_type_string);
-        }
-        if (path_string != retval) {
-            return FilenameToPath(retval);
-        } else {
-            ErrorLogger() << "Invalid cast for PathType from string " << path_string;
-            return fs::temp_directory_path();
-        }
-    }
-    return GetPath(path_type);
 }
 
 auto IsExistingFile(const fs::path& path) -> bool

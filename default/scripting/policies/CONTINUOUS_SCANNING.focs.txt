@@ -3,7 +3,7 @@ Policy
     description = "PLC_CONTINUOUS_SCANNING_DESC"
     short_description = "PLC_CONTINUOUS_SCANNING_SHORT_DESC"
     category = "MILITARY_CATEGORY"
-    adoptioncost = 5 + floor(Statistic Count condition = And [Ship OwnedBy empire = Source.Owner])
+    adoptioncost = 5 + [[SHIPS_OWNED_BY_EMPIRE]]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
 
@@ -13,8 +13,8 @@ Policy
                 OwnedBy empire = Source.Owner
             ]
             effects = [
-                SetDetection value = Value + 5
-                SetStealth value = Value - 10
+                SetDetection value = Value + (NamedReal name = "CONTINUOUS_SCANNING_RANGE_BOOST" value = 5.0)
+                SetStealth value = Value - (NamedReal name = "CONTINUOUS_SCANNING_STEALTH_PENALTY" value = 10.0)
             ]
 
         EffectsGroup
@@ -25,10 +25,8 @@ Policy
             effects = SetEmpireMeter
                 empire = Source.Owner
                 meter = "METER_DETECTION_STRENGTH"
-                value = Value + min(20.0,
-                    CurrentTurn - TurnPolicyAdopted empire = Source.Owner
-                                                    name = "PLC_CONTINUOUS_SCANNING"
-                                   )
+                value = Value + min((NamedReal name = "CONTINUOUS_SCANNING_MAX_DETECTION_BOOST" value = 20.0),
+                                    TurnsSincePolicyAdopted empire = Source.Owner name = ThisPolicy)
     ]
     graphic = "icons/policies/continuous_scanning.png"
 

@@ -28,8 +28,8 @@ public:
     GGHumanClientApp() = delete;
 
     GGHumanClientApp(int width, int height, bool calculate_FPS,
-                   std::string name, int x, int y,
-                   bool fullscreen, bool fake_mode_change);
+                     std::string name, int x, int y,
+                     bool fullscreen, bool fake_mode_change);
 
     GGHumanClientApp(const GGHumanClientApp&) = delete;
     GGHumanClientApp(GGHumanClientApp&&) = delete;
@@ -37,6 +37,11 @@ public:
 
     const GGHumanClientApp& operator=(const GGHumanClientApp&) = delete;
     GGHumanClientApp& operator=(const GGHumanClientApp&&) = delete;
+
+    [[nodiscard]] int SelectedSystemID() const override;
+    [[nodiscard]] int SelectedPlanetID() const override;
+    [[nodiscard]] int SelectedFleetID() const override;
+    [[nodiscard]] int SelectedShipID() const override;
 
     int EffectsProcessingThreads() const override;
     bool SinglePlayerGame() const;  ///< returns true iff this game is a single-player game
@@ -81,17 +86,17 @@ public:
     void RequestSavePreviews(const std::string& relative_directory);
     void Autosave();                    ///< Autosaves the current game, iff autosaves are enabled and any turn number requirements are met
     void ContinueSinglePlayerGame();    ///< Load the newest single player autosave and continue playing game
-    bool IsLoadGameAvailable() const;
-    std::string SelectLoadFile();       ///< Lets the user select a multiplayer save to load
+    [[nodiscard]] bool IsLoadGameAvailable() const;
+    [[nodiscard]] std::string SelectLoadFile(); ///< Lets the user select a multiplayer save to load
     void InitAutoTurns(int auto_turns); ///< Initialize auto turn counter
     void DecAutoTurns(int n = 1);       ///< Decrease auto turn counter
     void EliminateSelf();               ///< Resign from the game
 
-    ClientUI& GetClientUI()
+    [[nodiscard]] ClientUI& GetClientUI()
     { return *m_ui.get(); }
 
     void Reinitialize();
-    float GLVersion() const;
+    [[nodiscard]] float GLVersion() const;
 
     void UpdateCombatLogs(const Message& msg);
     /** Update any open SaveGameDialog with previews from the server. */
@@ -107,22 +112,22 @@ public:
     mutable FullscreenSwitchSignalType  FullscreenSwitchSignal;
     mutable RepositionWindowsSignalType RepositionWindowsSignal;
 
-    static std::pair<int, int>  GetWindowWidthHeight();
-    static std::pair<int, int>  GetWindowLeftTop();
+    [[nodiscard]] static std::pair<int, int> GetWindowWidthHeight();
+    [[nodiscard]] static std::pair<int, int> GetWindowLeftTop();
 
-    static GGHumanClientApp*      GetApp();               ///< returns GGHumanClientApp pointer to the single instance of the app
+    [[nodiscard]] static GGHumanClientApp*   GetApp(); ///< returns GGHumanClientApp pointer to the single instance of the app
 
     /** Adds window dimension options to OptionsDB after the start of main, but before GGHumanClientApp constructor.
         OSX will not tolerate static initialization of SDL, to check screen size. */
     static void AddWindowSizeOptionsAfterMainStart(OptionsDB& db);
 
     /** Converts server address to correct option name */
-    static std::string EncodeServerAddressOption(const std::string& server);
+    [[nodiscard]] static std::string EncodeServerAddressOption(const std::string& server);
 
     /** If hosting then send the logger state to the server. */
     void SendLoggingConfigToServer();
 
-    boost::intrusive_ptr<const boost::statechart::event_base> GetDeferredPostedEvent();
+    [[nodiscard]] boost::intrusive_ptr<const boost::statechart::event_base> GetDeferredPostedEvent();
     void PostDeferredEvent(boost::intrusive_ptr<const boost::statechart::event_base> event);
 
 protected:
@@ -186,8 +191,8 @@ private:
     bool m_game_started = false;        ///< true when a game is currently in progress
     bool m_exit_handled = false;        ///< true when the exit logic is already being handled
     bool m_connected = false;           ///< true if we are in a state in which we are supposed to be connected to the server
-    int  m_auto_turns = 0;              ///< auto turn counter
     bool m_have_window_focus = true;
+    int  m_auto_turns = 0;              ///< auto turn counter
 
     /** Filenames of all in progress saves.  There maybe multiple saves in
         progress if a player and an autosave are initiated at the same time. */

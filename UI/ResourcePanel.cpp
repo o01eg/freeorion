@@ -17,8 +17,6 @@
 
 namespace {
     constexpr int   EDGE_PAD(3);
-    constexpr GG::X METER_BROWSE_LABEL_WIDTH(300);
-    constexpr GG::X METER_BROWSE_VALUE_WIDTH(50);
 
     /** How big we want meter icons with respect to the current UI font size.
       * Meters should scale along font size, but not below the size for the
@@ -67,10 +65,10 @@ void ResourcePanel::CompleteConstruction() {
         m_meter_stats.emplace_back(meter, stat);
         meters.emplace_back(meter, AssociatedMeterType(meter));
         stat->RightClickedSignal.connect([meter](const GG::Pt& pt) {
-            std::string meter_string = boost::lexical_cast<std::string>(meter);
+            auto meter_string = to_string(meter);
 
             auto pedia_zoom_to_article_action = [meter_string]() {
-                ClientUI::GetClientUI()->ZoomToMeterTypeArticle(meter_string); };
+                ClientUI::GetClientUI()->ZoomToMeterTypeArticle(std::string{meter_string}); };
 
             auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
             std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) %
@@ -92,9 +90,6 @@ void ResourcePanel::CompleteConstruction() {
 
     Refresh();
 }
-
-ResourcePanel::~ResourcePanel()
-{}
 
 void ResourcePanel::ExpandCollapse(bool expanded) {
     if (expanded == s_expanded_map[m_rescenter_id]) return; // nothing to do

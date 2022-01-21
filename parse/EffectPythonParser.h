@@ -6,6 +6,10 @@
 #include "../universe/Effect.h"
 #include "../universe/UnlockableItem.h"
 
+namespace boost::python {
+    class dict;
+}
+
 struct effect_wrapper {
     effect_wrapper(std::shared_ptr<Effect::Effect>&& ref)
         : effect(std::move(ref))
@@ -41,6 +45,8 @@ struct unlockable_item_wrapper {
 
     UnlockableItem item;
 };
+
+void RegisterGlobalsEffects(boost::python::dict& globals);
 
 #endif
 

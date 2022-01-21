@@ -14,6 +14,7 @@
 #include <map>
 #include <set>
 #include <vector>
+#include <unordered_map>
 
 class BuildingType;
 class FieldType;
@@ -25,7 +26,7 @@ struct ParsedShipDesign;
 class Special;
 class Species;
 struct EncyclopediaArticle;
-class GameRules;
+struct GameRule;
 struct UnlockableItem;
 class Policy;
 
@@ -41,7 +42,7 @@ namespace parse {
     FO_PARSE_API std::map<std::string, std::unique_ptr<BuildingType>> buildings(const boost::filesystem::path& path);
     FO_PARSE_API std::map<std::string, std::unique_ptr<FieldType>> fields(const boost::filesystem::path& path);
     FO_PARSE_API std::map<std::string, std::unique_ptr<ValueRef::ValueRefBase>> named_value_refs(const boost::filesystem::path& path);
-    FO_PARSE_API std::map<std::string, std::unique_ptr<Special>> specials(const boost::filesystem::path& path);
+    FO_PARSE_API std::map<std::string, std::unique_ptr<Special>, std::less<>> specials(const boost::filesystem::path& path);
 
     FO_PARSE_API std::map<std::string, std::unique_ptr<Policy>> policies(const boost::filesystem::path& path);
 
@@ -49,7 +50,7 @@ namespace parse {
         species_by_name. If a file exists called SpeciesCensusOrdering.focs.txt, parse it and
         store the census order in \p ordering. */
     using species_type = std::pair<
-        std::map<std::string, std::unique_ptr<Species>>, // species_by_name,
+        std::map<std::string, std::unique_ptr<Species>, std::less<>>, // species_by_name,
         std::vector<std::string> // ordering
         >;
     FO_PARSE_API species_type species(const boost::filesystem::path& path);
@@ -77,7 +78,7 @@ namespace parse {
     FO_PARSE_API std::vector<std::unique_ptr<MonsterFleetPlan>> monster_fleet_plans(const boost::filesystem::path& path);
     FO_PARSE_API std::map<std::string, std::unique_ptr<ValueRef::ValueRef<double>>> statistics(const boost::filesystem::path& path);
     FO_PARSE_API std::map<std::string, std::vector<EncyclopediaArticle>> encyclopedia_articles(const boost::filesystem::path& path);
-    FO_PARSE_API GameRules game_rules(const PythonParser& parser, const boost::filesystem::path& path);
+    FO_PARSE_API std::unordered_map<std::string, GameRule> game_rules(const PythonParser& parser, const boost::filesystem::path& path);
 
     FO_PARSE_API void file_substitution(std::string& text, const boost::filesystem::path& file_search_path, const std::string& filename);
     FO_PARSE_API void process_include_substitutions(std::string& text,

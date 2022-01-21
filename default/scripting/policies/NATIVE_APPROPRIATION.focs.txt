@@ -3,10 +3,10 @@ Policy
     description = "PLC_NATIVE_APPROPRIATION_DESC"
     short_description = "PLC_NATIVE_APPROPRIATION_SHORT_DESC"
     category = "SOCIAL_CATEGORY"
-    adoptioncost = 5 + floor(5 + 0.25 * Statistic Sum value = LocalCandidate.Population
-                                        condition = And [ Planet OwnedBy empire = Source.Owner ])
+    adoptioncost = floor(2.0 * [[POPULATION_OWNED_BY_EMPIRE]]^0.5)
     prerequisites = [ "PLC_DIVERSITY" ]
     exclusions = [ "PLC_RACIAL_PURITY" ]
+    unlock = Item type = Policy name = "PLC_THE_HUNT"
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
 
@@ -27,7 +27,7 @@ Policy
                     ]
                 ]
             ]
-            effects = SetTargetResearch value = Value + (NamedReal name = "PLC_NATIVE_APPROPRIATION_RESEARCH_PERPLANET" value = 5) *
+            effects = SetTargetResearch value = Value + (NamedReal name = "PLC_NATIVE_APPROPRIATION_RESEARCH_PERPLANET" value = 5.0) *
                 Statistic Count condition = And [
                     InSystem id = Target.SystemID
                     Planet

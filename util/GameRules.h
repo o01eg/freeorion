@@ -21,9 +21,7 @@ FO_COMMON_API bool RegisterGameRules(GameRulesFn function);
 /** returns the single instance of the GameRules class */
 FO_COMMON_API GameRules& GetGameRules();
 
-/** Database of values that control how the game mechanics function. */
-class FO_COMMON_API GameRules {
-public:
+struct FO_COMMON_API GameRule : public OptionsDB::Option {
     enum class Type : int {
         INVALID = -1,
         TOGGLE,
@@ -32,53 +30,58 @@ public:
         STRING
     };
 
-    static inline constexpr Type RuleTypeForType(bool dummy)
+    [[nodiscard]] static constexpr Type RuleTypeForType(bool)
     { return Type::TOGGLE; }
-    static inline constexpr Type RuleTypeForType(int dummy)
+    [[nodiscard]] static constexpr Type RuleTypeForType(int)
     { return Type::INT; }
-    static inline constexpr Type RuleTypeForType(double dummy)
+    [[nodiscard]] static constexpr Type RuleTypeForType(double)
     { return Type::DOUBLE; }
-    static inline Type RuleTypeForType(std::string dummy)
+    [[nodiscard]] static inline Type RuleTypeForType(std::string)
     { return Type::STRING; }
 
-    struct FO_COMMON_API Rule : public OptionsDB::Option {
-        Rule();
-        Rule(Type type_, const std::string& name_, const boost::any& value_,
-             const boost::any& default_value_, const std::string& description_,
-             const ValidatorBase *validator_, bool engine_internal_,
-             const std::string& category_ = "");
-        bool IsInternal() const { return this->storable; }
 
-        Type type = Type::INVALID;
-        std::string category;
-    };
+    GameRule() = default;
+    GameRule(Type type_, std::string name_, boost::any value_,
+             boost::any default_value_, std::string description_,
+             std::unique_ptr<ValidatorBase>&& validator_, bool engine_internal_,
+             std::string category_ = std::string());
+    [[nodiscard]] bool IsInternal() const { return this->storable; }
 
-    using GameRulesTypeMap = std::unordered_map<std::string, Rule>;
+    Type type = Type::INVALID;
+    std::string category;
+};
 
-    GameRules();
+using GameRulesTypeMap = std::unordered_map<std::string, GameRule>;
 
-    bool Empty() const;
-    std::unordered_map<std::string, Rule>::const_iterator begin() const;
-    std::unordered_map<std::string, Rule>::const_iterator end() const;
 
-    bool RuleExists(const std::string& name) const;
-    bool RuleExists(const std::string& name, Type type) const;
-    Type GetType(const std::string& name) const;
-    bool RuleIsInternal(const std::string& name) const;
+/** Database of values that control how the game mechanics function. */
+class FO_COMMON_API GameRules {
+public:
+    GameRules() = default;
+    ~GameRules() = default;
+
+    [[nodiscard]] bool Empty();
+    [[nodiscard]] std::unordered_map<std::string, GameRule>::const_iterator begin();
+    [[nodiscard]] std::unordered_map<std::string, GameRule>::const_iterator end();
+
+    [[nodiscard]] bool RuleExists(const std::string& name);
+    [[nodiscard]] bool RuleExists(const std::string& name, GameRule::Type type);
+    [[nodiscard]] GameRule::Type GetType(const std::string& name);
+    [[nodiscard]] bool RuleIsInternal(const std::string& name);
 
     /** returns the description string for rule \a rule_name, or throws
       * std::runtime_error if no such rule exists. */
-    const std::string& GetDescription(const std::string& rule_name) const;
+    [[nodiscard]] const std::string& GetDescription(const std::string& rule_name);
 
     /** returns the validator for rule \a rule_name, or throws
       * std::runtime_error if no such rule exists. */
-    std::shared_ptr<const ValidatorBase> GetValidator(const std::string& rule_name) const;
+    [[nodiscard]] const ValidatorBase* GetValidator(const std::string& rule_name);
 
     /** returns all contained rules as map of name and value string. */
-    std::map<std::string, std::string> GetRulesAsStrings() const;
+    [[nodiscard]] std::map<std::string, std::string> GetRulesAsStrings();
 
     template <typename T>
-    T Get(const std::string& name) const
+    [[nodiscard]] T Get(const std::string& name)
     {
         CheckPendingGameRules();
         auto it = m_game_rules.find(name);
@@ -101,38 +104,54 @@ public:
         Adds option setup.rules.{RULE_NAME} to override default value and
         option setup.rules.server-locked.{RULE_NAME} to block rule changes from players */
     template <typename T>
-    void Add(const std::string& name, const std::string& description,
-             const std::string& category, T default_value,
-             bool engine_interal, const ValidatorBase& validator = Validator<T>())
+    void Add(std::string name, std::string description, std::string category, T default_value,
+             bool engine_internal, std::unique_ptr<ValidatorBase> validator = nullptr)
     {
         CheckPendingGameRules();
+
+        if (!validator)
+            validator = std::make_unique<Validator<T>>();
+
         auto it = m_game_rules.find(name);
         if (it != m_game_rules.end())
-            throw std::runtime_error("GameRules::Add<>() : Rule " + name + " was added twice.");
-        if (!GetOptionsDB().OptionExists("setup.rules.server-locked." + name)) {
+            throw std::runtime_error("GameRules::Add<>() : GameRule " + name + " was added twice.");
+
+        if (!GetOptionsDB().OptionExists("setup.rules.server-locked." + name))
             GetOptionsDB().Add<bool>("setup.rules.server-locked." + name, description, false);
-        }
-        if (!GetOptionsDB().OptionExists("setup.rules." + name)) {
-            GetOptionsDB().Add<T>("setup.rules." + name, description, default_value,
-                                  validator);
-        }
+
+        if (!GetOptionsDB().OptionExists("setup.rules." + name))
+            GetOptionsDB().Add<T>("setup.rules." + name, description, std::move(default_value),
+                                  validator->Clone());
+
         T value = GetOptionsDB().Get<T>("setup.rules." + name);
-        m_game_rules[name] = Rule(RuleTypeForType(T()), name, value, value, description,
-                                  validator.Clone(), engine_interal, category);
+
         DebugLogger() << "Added game rule named " << name << " with default value " << value;
+
+        GameRule&& rule{GameRule::RuleTypeForType(T()), name, value, value, std::move(description),
+                        std::move(validator), engine_internal, std::move(category)};
+        m_game_rules.insert_or_assign(std::move(name), std::move(rule));
+    }
+
+    template <typename T, typename V>
+    void Add(std::string name, std::string description, std::string category, T default_value,
+             bool engine_internal, V&& validator,
+             typename std::enable_if_t<std::is_convertible_v<V, Validator<T>>>* = nullptr)
+    {
+        Add(std::move(name), std::move(description), std::move(category), std::move(default_value),
+            engine_internal, std::make_unique<V>(std::move(validator)));
     }
 
     /** Adds rules from the \p future. */
-    void Add(Pending::Pending<GameRules>&& future);
+    void Add(Pending::Pending<GameRulesTypeMap>&& future);
 
     template <typename T>
-    void Set(const std::string& name, const T& value)
+    void Set(const std::string& name, T value)
     {
         CheckPendingGameRules();
         auto it = m_game_rules.find(name);
         if (it == m_game_rules.end())
             throw std::runtime_error("GameRules::Set<>() : Attempted to set nonexistent rule \"" + name + "\".");
-        it->second.SetFromValue(value);
+        it->second.SetFromValue(std::move(value));
     }
 
     void SetFromStrings(const std::map<std::string, std::string>& names_values);
@@ -145,14 +164,16 @@ public:
     void ResetToDefaults();
 
 private:
+    void Add(GameRule&& rule);
+
     /** Assigns any m_pending_rules to m_game_rules. */
-    void CheckPendingGameRules() const;
+    void CheckPendingGameRules();
 
     /** Future rules being parsed by parser.  mutable so that it can
         be assigned to m_game_rules when completed.*/
-    mutable boost::optional<Pending::Pending<GameRules>> m_pending_rules = boost::none;
+    boost::optional<Pending::Pending<GameRulesTypeMap>> m_pending_rules = boost::none;
 
-    mutable GameRulesTypeMap m_game_rules;
+    GameRulesTypeMap m_game_rules;
 
     friend FO_COMMON_API GameRules& GetGameRules();
 };

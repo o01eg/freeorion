@@ -188,37 +188,55 @@ void Empire::serialize(Archive& ar, const unsigned int version)
     bool visible =
         (ALL_EMPIRES == encoding_empire) ||
         (m_id == encoding_empire); // TODO: GameRule for all empire info known to other empires
-    bool allied_visible = visible ||
-        Empires().GetDiplomaticStatus(m_id, GlobalSerializationEncodingForEmpire()) ==
+    bool allied_visible = visible;
+    if constexpr (Archive::is_saving::value)
+        allied_visible = allied_visible || Empires().GetDiplomaticStatus(m_id, GlobalSerializationEncodingForEmpire()) ==
             DiplomaticStatus::DIPLO_ALLIED;
 
     TraceLogger() << "serializing empire " << m_id << ": " << m_name;
     TraceLogger() << "encoding empire: " << encoding_empire;
-    TraceLogger() << std::string(visible ? "visible" : "NOT visible") << "  /  "
-                  << std::string(allied_visible ? "allied visible" : "NOT allied visible");
-
-    if (Archive::is_loading::value && version < 1) {
-        // adapt set to map
-        std::set<std::string> temp_stringset;
-        ar  & boost::serialization::make_nvp("m_techs", temp_stringset);
-        m_techs.clear();
-        for (auto& entry : temp_stringset)
-            m_techs[entry] = BEFORE_FIRST_TURN;
+    if constexpr (Archive::is_loading::value) {
+        TraceLogger() << std::string(visible ? "visible" : "NOT visible");
     } else {
-        ar  & BOOST_SERIALIZATION_NVP(m_techs);
-
-        if (Archive::is_loading::value && version < 4) {
-            m_adopted_policies.clear();
-            m_initial_adopted_policies.clear();
-            m_available_policies.clear();
-            m_policy_adoption_total_duration.clear();
-        } else {
-            ar  & BOOST_SERIALIZATION_NVP(m_adopted_policies)
-                & BOOST_SERIALIZATION_NVP(m_initial_adopted_policies)
-                & BOOST_SERIALIZATION_NVP(m_available_policies)
-                & BOOST_SERIALIZATION_NVP(m_policy_adoption_total_duration);
-        }
+        TraceLogger() << std::string(visible ? "visible" : "NOT visible") << "  /  "
+                      << std::string(allied_visible ? "allied visible" : "NOT allied visible");
     }
+
+    ar  & BOOST_SERIALIZATION_NVP(m_techs);
+
+    if (Archive::is_loading::value && version < 10) {
+        std::map<std::string, PolicyAdoptionInfo> adopted_policies;
+        std::map<std::string, PolicyAdoptionInfo> initial_adopted_policies;
+        std::set<std::string>                     available_policies;
+
+        ar  & boost::serialization::make_nvp("m_adopted_policies", adopted_policies);
+        m_adopted_policies.clear();
+        m_adopted_policies.insert(adopted_policies.begin(), adopted_policies.end());
+
+        ar  & boost::serialization::make_nvp("m_initial_adopted_policies", initial_adopted_policies);
+        m_initial_adopted_policies.clear();
+        m_initial_adopted_policies.insert(initial_adopted_policies.begin(), initial_adopted_policies.end());
+
+        ar  & boost::serialization::make_nvp("m_available_policies", available_policies);
+        m_available_policies.clear();
+        m_available_policies.insert(available_policies.begin(), available_policies.end());
+
+    } else {
+        ar  & BOOST_SERIALIZATION_NVP(m_adopted_policies)
+            & BOOST_SERIALIZATION_NVP(m_initial_adopted_policies)
+            & BOOST_SERIALIZATION_NVP(m_available_policies);
+    }
+
+    ar  & BOOST_SERIALIZATION_NVP(m_policy_adoption_total_duration);
+
+    if (Archive::is_loading::value && version < 7) {
+        m_policy_adoption_current_duration.clear();
+        for (auto& [policy_name, adoption_info] : m_adopted_policies)
+            m_policy_adoption_current_duration[policy_name] = CurrentTurn() - adoption_info.adoption_turn;
+    } else {
+        ar  & BOOST_SERIALIZATION_NVP(m_policy_adoption_current_duration);
+    }
+
 
     ar  & BOOST_SERIALIZATION_NVP(m_meters);
     if (Archive::is_saving::value && !allied_visible) {
@@ -257,10 +275,19 @@ void Empire::serialize(Archive& ar, const unsigned int version)
         ar  & boost::serialization::make_nvp("m_ship_designs", m_known_ship_designs);
         ar  & BOOST_SERIALIZATION_NVP(m_sitrep_entries)
             & BOOST_SERIALIZATION_NVP(m_resource_pools)
-            & BOOST_SERIALIZATION_NVP(m_population_pool)
+            & BOOST_SERIALIZATION_NVP(m_population_pool);
 
-            & BOOST_SERIALIZATION_NVP(m_explored_systems)
-            & BOOST_SERIALIZATION_NVP(m_ship_names_used)
+        if (Archive::is_loading::value && version < 8) {
+            std::set<int> explored_system_ids;
+            ar  & boost::serialization::make_nvp("m_explored_systems", explored_system_ids);
+            m_explored_systems.clear();
+            for (auto id : explored_system_ids)
+                m_explored_systems.emplace(id, 0);
+        } else {
+            ar  & BOOST_SERIALIZATION_NVP(m_explored_systems);
+        }
+
+        ar  & BOOST_SERIALIZATION_NVP(m_ship_names_used)
 
             & BOOST_SERIALIZATION_NVP(m_species_ships_owned)
             & BOOST_SERIALIZATION_NVP(m_ship_designs_owned)
@@ -268,9 +295,15 @@ void Empire::serialize(Archive& ar, const unsigned int version)
             & BOOST_SERIALIZATION_NVP(m_ship_part_class_owned)
             & BOOST_SERIALIZATION_NVP(m_species_colonies_owned)
             & BOOST_SERIALIZATION_NVP(m_outposts_owned)
-            & BOOST_SERIALIZATION_NVP(m_building_types_owned)
+            & BOOST_SERIALIZATION_NVP(m_building_types_owned);
 
-            & BOOST_SERIALIZATION_NVP(m_empire_ships_destroyed)
+        if (Archive::is_loading::value && version < 9) {
+            m_ships_destroyed.clear();
+        } else {
+            ar  & BOOST_SERIALIZATION_NVP(m_ships_destroyed);
+        }
+
+        ar  & BOOST_SERIALIZATION_NVP(m_empire_ships_destroyed)
             & BOOST_SERIALIZATION_NVP(m_ship_designs_destroyed)
             & BOOST_SERIALIZATION_NVP(m_species_ships_destroyed)
             & BOOST_SERIALIZATION_NVP(m_species_planets_invaded)
@@ -314,7 +347,7 @@ void Empire::serialize(Archive& ar, const unsigned int version)
     TraceLogger() << "DONE serializing empire " << m_id << ": " << m_name;
 }
 
-BOOST_CLASS_VERSION(Empire, 6)
+BOOST_CLASS_VERSION(Empire, 10)
 
 template void Empire::serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, const unsigned int);
 template void Empire::serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, const unsigned int);
@@ -334,9 +367,8 @@ void serialize(Archive& ar, EmpireManager& em, unsigned int const version)
 
     TraceLogger() << "Serializing EmpireManager encoding empire: " << GlobalSerializationEncodingForEmpire();
 
-    if constexpr (Archive::is_loading::value) {
+    if constexpr (Archive::is_loading::value)
         em.Clear();    // clean up any existing dynamically allocated contents before replacing containers with deserialized data
-    }
 
     std::map<std::pair<int, int>, DiplomaticMessage> messages;
     if constexpr (Archive::is_saving::value)
@@ -346,13 +378,8 @@ void serialize(Archive& ar, EmpireManager& em, unsigned int const version)
     if (Archive::is_loading::value && version < 1) {
         std::map<int, Empire*> empire_raw_ptr_map;
         ar  & make_nvp("m_empire_map", empire_raw_ptr_map);
-        TraceLogger() << "EmpireManager deserialized " << empire_raw_ptr_map.size() << " raw pointer empires:";
-        for (const auto& entry : empire_raw_ptr_map)
-            TraceLogger() << entry.second->Name() << " (" << entry.first << ")";
-
-        for (const auto& entry : empire_raw_ptr_map)
-            em.m_empire_map[entry.first] = std::shared_ptr<Empire>(entry.second);
-        TraceLogger() << "EmpireManager put raw pointers into shared_ptr";
+        for (const auto& [empire_id, empire_ptr] : empire_raw_ptr_map)
+            em.m_empire_map[empire_id] = std::shared_ptr<Empire>(empire_ptr);
 
     } else if (Archive::is_loading::value && version < 2) {
         ar  & make_nvp("m_empire_map", em.m_empire_map);
@@ -367,16 +394,16 @@ void serialize(Archive& ar, EmpireManager& em, unsigned int const version)
     ar  & BOOST_SERIALIZATION_NVP(messages);
 
     if constexpr (Archive::is_loading::value) {
-        for (const auto& entry : em.m_empire_map)
-            em.m_const_empire_map.emplace(entry.first, entry.second);
+        for (auto& [empire_id, empire_ptr] : em.m_empire_map)
+            em.m_const_empire_map.emplace(empire_id, empire_ptr);
 
         em.m_diplomatic_messages = std::move(messages);
 
         // erase invalid empire diplomatic statuses
         std::vector<std::pair<int, int>> to_erase;
-        for (auto& r : em.m_empire_diplomatic_statuses) {
-            const auto& e1 = r.first.first;
-            const auto& e2 = r.first.second;
+        for (auto& [ids, diplo_status] : em.m_empire_diplomatic_statuses) {
+            (void)diplo_status; // quiet unused warning
+            const auto& [e1, e2] = ids;
             if (em.m_empire_map.count(e1) < 1 || em.m_empire_map.count(e2) < 1) {
                 to_erase.emplace_back(e1, e2);
                 ErrorLogger() << "Erased invalid diplomatic status between empires " << e1 << " and " << e2;
@@ -386,15 +413,17 @@ void serialize(Archive& ar, EmpireManager& em, unsigned int const version)
             em.m_empire_diplomatic_statuses.erase(p);
 
         // add missing empire diplomatic statuses
-        for (const auto& e1 : em.m_empire_map) {
-            for (const auto& e2 : em.m_empire_map) {
-                if (e1.first >= e2.first)
+        for (const auto& [e1_id, e1_ptr] : em.m_empire_map) {
+            (void)e1_ptr; // quiet warning
+            for (const auto& [e2_id, e2_ptr] : em.m_empire_map) {
+                (void)e2_ptr; // quiet warning
+                if (e1_id >= e2_id)
                     continue;
-                auto dk = DiploKey(e1.first, e2.first);
+                auto dk = DiploKey(e1_id, e2_id);
                 if (em.m_empire_diplomatic_statuses.count(dk) < 1) {
                     em.m_empire_diplomatic_statuses[dk] = DiplomaticStatus::DIPLO_WAR;
                     ErrorLogger() << "Added missing diplomatic status (default WAR) between empires "
-                                  << e1.first << " and " << e2.first;
+                                  << e1_id << " and " << e2_id;
                 }
             }
         }

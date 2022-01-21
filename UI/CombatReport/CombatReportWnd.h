@@ -9,17 +9,13 @@
 /// Shows a report on a combat
 class CombatReportWnd : public CUIWnd {
 public:
-    CombatReportWnd(const std::string& config_name = "");
+    CombatReportWnd(std::string_view config_name = "");
     void CompleteConstruction() override;
-    // Must have explicit destructor since Impl is incomplete here
-    virtual ~CombatReportWnd();
+    virtual ~CombatReportWnd(); // Must have explicit destructor since Impl is incomplete here
 
     void CloseClicked() override;
-
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
-
-    /// Sets which combat to show.
-    void            SetLog(int log_id);
+    void SetLog(int log_id);
 
 private:
     class Impl;

@@ -7,13 +7,72 @@
 
 #include <boost/locale.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
+#include <atomic>
 
-#include <mutex>
+#if BOOST_VERSION >= 106500
+// define needed on Windows due to conflict with windows.h and std::min and std::max
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+// define needed in GCC
+#  ifndef _GNU_SOURCE
+#    define _GNU_SOURCE
+#  endif
+#  if defined(_MSC_VER) && _MSC_VER >= 1930
+struct IUnknown; // Workaround for "combaseapi.h(229,21): error C2760: syntax error: 'identifier' was unexpected here; expected 'type specifier'"
+#  endif
+
+#  include <boost/stacktrace.hpp>
+#endif
 
 namespace {
-    std::map<std::string, std::shared_ptr<const StringTable>>  stringtables;
-    std::recursive_mutex                                       stringtable_access_mutex;
-    bool                                                       stringtable_filename_init = false;
+    std::map<std::string, std::shared_ptr<StringTable>> stringtables;
+    std::shared_mutex                                   stringtable_access_mutex;
+    std::atomic<bool>                                   stringtable_filename_init;
+    std::mutex                                          stringtable_filename_init_mutex;
+    StringTable                                         error_stringtable;
+    std::shared_mutex                                   error_stringtable_access_mutex;
+    constexpr std::string_view                          ERROR_STRING = "ERROR: ";
+
+
+    std::string StackTrace() {
+        static std::atomic<int> string_error_lookup_count = 0;
+        if (string_error_lookup_count++ > 10)
+            return "";
+#if BOOST_VERSION >= 106500
+        std::stringstream ss;
+        ss << "stacktrace:\n" << boost::stacktrace::stacktrace();
+        return ss.str();
+#else
+        return "";
+#endif
+    }
+
+
+    std::string operator+(const std::string_view sv, const std::string& s) {
+        std::string retval;
+        retval.reserve(sv.size() + s.size());
+        retval.append(sv);
+        retval.append(s);
+        return retval;
+    }
+
+    std::string operator+(const std::string_view sv1, const std::string_view sv2) {
+        std::string retval;
+        retval.reserve(sv1.size() + sv2.size());
+        retval.append(sv1);
+        retval.append(sv2);
+        return retval;
+    }
+
+    std::string operator+(const std::string_view sv, const char* c) {
+        std::string retval;
+        retval.reserve(sv.size() + std::strlen(c));
+        retval.append(sv);
+        retval.append(c);
+        return retval;
+    }
+
 
     // fallback stringtable to look up key in if entry is not found in currently configured stringtable
     boost::filesystem::path DevDefaultEnglishStringtablePath()
@@ -57,7 +116,7 @@ namespace {
         }
 
         if (!IsExistingFile(default_stringtable_path))
-            ErrorLogger() << "Default english stringtable file also not presennt!!: " << PathToString(default_stringtable_path);
+            ErrorLogger() << "Default english stringtable file also not present !!!: " << PathToString(default_stringtable_path);
 
         DebugLogger() << "GetDefaultStringTableFileName returning: " << PathToString(default_stringtable_path);
         return default_stringtable_path;
@@ -69,10 +128,15 @@ namespace {
     // a path in the standard location, or reverts to the default stringtable
     // location if other attempts fail.
     void InitStringtableFileName() {
-        stringtable_filename_init = true;
+        if (stringtable_filename_init)
+            return; // already initialized
+        std::scoped_lock filename_init_lock{stringtable_filename_init_mutex};
+        if (stringtable_filename_init)
+            return; // already initialized while getting the lock...
 
         // set option default value based on system locale
         auto default_stringtable_path = GetDefaultStringTableFileName();
+        auto default_stringtable_path_string = PathToString(default_stringtable_path);
         GetOptionsDB().SetDefault("resource.stringtable.path", PathToString(default_stringtable_path));
 
         // get option-configured stringtable path. may be the default empty
@@ -86,9 +150,10 @@ namespace {
         DebugLogger() << "Stringtable option path: " << option_path;
 
         if (option_path.empty()) {
-            DebugLogger() << "Stringtable option path not specified yet, using default: " << PathToString(default_stringtable_path);
-            stringtable_path = PathToString(default_stringtable_path);
+            DebugLogger() << "Stringtable option path not specified yet, using default: " << default_stringtable_path_string;
+            stringtable_path = std::move(default_stringtable_path_string);
             GetOptionsDB().Set("resource.stringtable.path", PathToString(stringtable_path));
+            stringtable_filename_init = true;
             return;
         }
 
@@ -108,21 +173,20 @@ namespace {
             set_option = true;
             // fall back to default option value
             ErrorLogger() << "Stringtable option path file is missing: " << PathToString(stringtable_path);
-            DebugLogger() << "Resetting to default: " << PathToString(default_stringtable_path);
-            stringtable_path = default_stringtable_path;
+            DebugLogger() << "Resetting to default: " << default_stringtable_path_string;
+            stringtable_path = std::move(default_stringtable_path);
         }
 
         if (set_option)
             GetOptionsDB().Set("resource.stringtable.path", PathToString(stringtable_path));
+
+        stringtable_filename_init = true;
     }
 
     // get currently set stringtable filename option value, or the default value
     // if the currenty value is empty
     std::string GetStringTableFileName() {
-        std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
-        // initialize option value and default on first call
-        if (!stringtable_filename_init)
-            InitStringtableFileName();
+        InitStringtableFileName();
 
         std::string option_path = GetOptionsDB().Get<std::string>("resource.stringtable.path");
         if (option_path.empty())
@@ -131,41 +195,86 @@ namespace {
             return option_path;
     }
 
-    const StringTable& GetStringTable(boost::filesystem::path stringtable_path) {
-        std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
+    template <typename SS>
+    std::shared_ptr<StringTable> GetOrCreateStringTable(
+        SS&& filename, std::shared_lock<std::shared_mutex>& access_lock,
+        std::shared_ptr<const StringTable> fallback = nullptr)
+    {
 
-        if (!stringtable_filename_init)
-            InitStringtableFileName();
+        if (auto it = stringtables.find(filename); it != stringtables.end())
+            return it->second;
 
-        // ensure the default stringtable is loaded first
-        auto default_stringtable_filename{GetOptionsDB().GetDefault<std::string>("resource.stringtable.path")};
-        auto default_stringtable_it = stringtables.find(default_stringtable_filename);
-        if (default_stringtable_it == stringtables.end()) {
-            auto table = std::make_shared<StringTable>(default_stringtable_filename);
-            stringtables[default_stringtable_filename] = table;
-            default_stringtable_it = stringtables.find(default_stringtable_filename);
+        auto retval{std::make_shared<StringTable>(filename, std::move(fallback))};
+
+        access_lock.unlock();
+        try {
+            std::unique_lock mutation_lock(stringtable_access_mutex);
+            stringtables.emplace(std::forward<SS>(filename), retval);
+        } catch (...) {
+            ErrorLogger() << "Unable to emplace new stringtable";
+            access_lock.lock();
+            return nullptr;
         }
 
-        auto stringtable_filename = PathToString(stringtable_path);
-
-        // attempt to find requested stringtable...
-        auto it = stringtables.find(stringtable_filename);
-        if (it != stringtables.end())
-            return *(it->second);
-
-        // if not already loaded, load, store, and return,
-        // using default stringtable for fallback expansion lookups
-        auto table = std::make_shared<StringTable>(stringtable_filename, default_stringtable_it->second);
-        stringtables[stringtable_filename] = table;
-
-        return *table;
+        access_lock.lock();
+        return retval;
     }
 
-    const StringTable& GetStringTable()
-    { return GetStringTable(GetStringTableFileName()); }
+    StringTable& GetStringTable(const std::string& stringtable_filename,
+                                std::shared_lock<std::shared_mutex>& access_lock)
+    {
+        if (!access_lock)
+            ErrorLogger() << "GetStringTable passed unlocked shared_lock";
 
-    const StringTable& GetDevDefaultStringTable()
-    { return GetStringTable(DevDefaultEnglishStringtablePath()); }
+        if (auto it = stringtables.find(stringtable_filename); it != stringtables.end())
+            return *it->second;
+
+        // ensure the default stringtable is loaded first
+        InitStringtableFileName();
+        auto default_stringtable_filename{GetOptionsDB().GetDefault<std::string>("resource.stringtable.path")};
+
+        if (default_stringtable_filename == stringtable_filename) {
+            if (auto default_table{GetOrCreateStringTable(default_stringtable_filename, access_lock)})
+                return *default_table;
+            throw std::runtime_error("couldn't get default stringtable!");
+        }
+
+        auto default_table{GetOrCreateStringTable(std::move(default_stringtable_filename), access_lock)};
+
+        if (auto table{GetOrCreateStringTable(stringtable_filename, access_lock, default_table)})
+            return *table;
+        else if (default_table)
+            return *default_table;
+        else
+            throw std::runtime_error("couldn't get stringtable or default stringtable!");
+    }
+
+    std::shared_mutex path_LUT_mutex;
+    std::map<boost::filesystem::path, std::string> path_to_string_LUT;
+
+    StringTable& GetStringTable(const boost::filesystem::path& stringtable_path,
+                                std::shared_lock<std::shared_mutex>& access_lock)
+    {
+        {
+            std::shared_lock path_LUT_read_lock{path_LUT_mutex};
+            auto path_it = path_to_string_LUT.find(stringtable_path);
+            if (path_it != path_to_string_LUT.end())
+                return GetStringTable(path_it->second, access_lock);
+        }
+
+        {
+            std::unique_lock path_LUT_write_lock{path_LUT_mutex};
+            const auto& string_of_path = path_to_string_LUT.emplace(stringtable_path,
+                                                                    PathToString(stringtable_path)).first->second;
+            return GetStringTable(string_of_path, access_lock);
+        }
+    }
+
+    StringTable& GetStringTable(std::shared_lock<std::shared_mutex>& access_lock)
+    { return GetStringTable(GetStringTableFileName(), access_lock); }
+
+    StringTable& GetDevDefaultStringTable(std::shared_lock<std::shared_mutex>& access_lock)
+    { return GetStringTable(DevDefaultEnglishStringtablePath(), access_lock); }
 }
 
 #if !defined(FREEORION_ANDROID)
@@ -202,38 +311,138 @@ std::locale GetLocale(const std::string& name) {
 #endif
 
 void FlushLoadedStringTables() {
-    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
+    std::unique_lock mutation_lock(stringtable_access_mutex);
     stringtables.clear();
 }
 
-const std::map<std::string, std::string>& AllStringtableEntries(bool default_table) {
-    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
-    if (default_table)
-        return GetDevDefaultStringTable().AllStrings();
-    else
-        return GetStringTable().AllStrings();
+const std::map<std::string, std::string, std::less<>>& AllStringtableEntries(bool default_table) {
+    std::shared_lock stringtable_lock(stringtable_access_mutex);
+    if (default_table) {
+        auto& retval = GetDevDefaultStringTable(stringtable_lock).AllStrings();
+        return retval;
+    } else {
+        auto& retval = GetStringTable(stringtable_lock).AllStrings();
+        return retval;
+    }
 }
 
 const std::string& UserString(const std::string& str) {
-    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
-    if (GetStringTable().StringExists(str))
-        return GetStringTable()[str];
-    return GetDevDefaultStringTable()[str];
+    {
+        std::shared_lock stringtable_lock(stringtable_access_mutex);
+        const auto& [string_found, string_value] = GetStringTable(stringtable_lock).CheckGet(str);
+        if (string_found)
+            return string_value;
+
+        const auto& [default_string_found, default_string_value] =
+            GetDevDefaultStringTable(stringtable_lock).CheckGet(str);
+        if (default_string_found)
+            return default_string_value;
+    }
+
+    {
+        std::shared_lock error_read_lock(error_stringtable_access_mutex);
+        const auto& [error_string_found, error_string_value] = error_stringtable.CheckGet(str);
+        if (error_string_found)
+            return error_string_value;
+    }
+
+    ErrorLogger() << "Missing string: " << str;
+    DebugLogger() << StackTrace();
+
+    {
+        std::unique_lock error_mutation_lock(error_stringtable_access_mutex);
+        auto error_string{ERROR_STRING + str};
+        return error_stringtable.Add(str, std::move(error_string));
+    }
+}
+
+const std::string& UserString(const std::string_view str) {
+    {
+        std::shared_lock stringtable_lock(stringtable_access_mutex);
+        const auto& [string_found, string_value] = GetStringTable(stringtable_lock).CheckGet(str);
+        if (string_found)
+            return string_value;
+
+        const auto& [default_string_found, default_string_value] =
+            GetDevDefaultStringTable(stringtable_lock).CheckGet(str);
+        if (default_string_found)
+            return default_string_value;
+    }
+
+    {
+        std::shared_lock error_read_lock(error_stringtable_access_mutex);
+        const auto& [error_string_found, error_string_value] = error_stringtable.CheckGet(str);
+        if (error_string_found)
+            return error_string_value;
+    }
+
+    ErrorLogger() << "Missing string: " << str;
+    DebugLogger() << StackTrace();
+
+    {
+        std::unique_lock error_mutation_lock(error_stringtable_access_mutex);
+        auto error_string{ERROR_STRING + str};
+        return error_stringtable.Add(std::string{str}, std::move(error_string));
+    }
+}
+
+const std::string& UserString(const char* str) {
+    {
+        std::shared_lock stringtable_lock(stringtable_access_mutex);
+        const auto& [string_found, string_value] = GetStringTable(stringtable_lock).CheckGet(str);
+        if (string_found)
+            return string_value;
+
+        const auto& [default_string_found, default_string_value] =
+            GetDevDefaultStringTable(stringtable_lock).CheckGet(str);
+        if (default_string_found)
+            return default_string_value;
+    }
+
+    {
+        std::shared_lock error_read_lock(error_stringtable_access_mutex);
+        const auto& [error_string_found, error_string_value] = error_stringtable.CheckGet(str);
+        if (error_string_found)
+            return error_string_value;
+    }
+
+    ErrorLogger() << "Missing string: " << str;
+    DebugLogger() << StackTrace();
+
+    {
+        std::unique_lock error_mutation_lock(error_stringtable_access_mutex);
+        auto error_string{ERROR_STRING + str};
+        return error_stringtable.Add(std::string{str}, std::move(error_string));
+    }
 }
 
 std::vector<std::string> UserStringList(const std::string& key) {
-    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
     std::vector<std::string> result;
+    result.reserve(20); // rough guesstimate
     std::istringstream template_stream(UserString(key));
+    // split big string into newline-separated substrings strings
     std::string item;
     while (std::getline(template_stream, item))
-        result.emplace_back(std::move(item));
+        result.push_back(std::move(item));
     return result;
 }
 
 bool UserStringExists(const std::string& str) {
-    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
-    return GetStringTable().StringExists(str) || GetDevDefaultStringTable().StringExists(str);
+    std::shared_lock stringtable_lock(stringtable_access_mutex);
+    return GetStringTable(stringtable_lock).StringExists(str) ||
+           GetDevDefaultStringTable(stringtable_lock).StringExists(str);
+}
+
+bool UserStringExists(const std::string_view str) {
+    std::shared_lock stringtable_lock(stringtable_access_mutex);
+    return GetStringTable(stringtable_lock).StringExists(str) ||
+           GetDevDefaultStringTable(stringtable_lock).StringExists(str);
+}
+
+bool UserStringExists(const char* str) {
+    std::shared_lock stringtable_lock(stringtable_access_mutex);
+    return GetStringTable(stringtable_lock).StringExists(str) ||
+           GetDevDefaultStringTable(stringtable_lock).StringExists(str);
 }
 
 boost::format FlexibleFormat(const std::string &string_to_format) {
@@ -250,8 +459,8 @@ boost::format FlexibleFormat(const std::string &string_to_format) {
 }
 
 const std::string& Language() {
-    std::scoped_lock<std::recursive_mutex> stringtable_lock(stringtable_access_mutex);
-    return GetStringTable().Language();
+    std::shared_lock stringtable_lock(stringtable_access_mutex);
+    return GetStringTable(stringtable_lock).Language();
 }
 
 std::string RomanNumber(unsigned int n) {

@@ -23,10 +23,8 @@ GG_ENUM(ModeratorActionSetting,
 
 class ModeratorActionsWnd : public CUIWnd {
 public:
-    ModeratorActionsWnd(const std::string& config_name = "");
+    ModeratorActionsWnd(std::string_view config_name = "");
     void CompleteConstruction() override;
-
-    virtual ~ModeratorActionsWnd();
 
     ModeratorActionSetting  SelectedAction() const;
     PlanetType              SelectedPlanetType() const;
@@ -36,8 +34,8 @@ public:
 
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
 
-    void            Refresh();
-    void            EnableActions(bool enable = true);
+    void Refresh();
+    void EnableActions(bool enable = true);
 
     mutable boost::signals2::signal<void ()>           ClosingSignal;
     mutable boost::signals2::signal<void ()>           NoActionSelectedSignal;
@@ -50,15 +48,15 @@ public:
 private:
     void CloseClicked() override;
 
-    void            DoLayout();
+    void DoLayout();
 
-    void            NoAction();
-    void            CreateSystem();
-    void            CreatePlanet();
-    void            DeleteObject();
-    void            SetOwner();
-    void            AddStarlane();
-    void            RemoveStarlane();
+    void NoAction();
+    void CreateSystem();
+    void CreatePlanet();
+    void DeleteObject();
+    void SetOwner();
+    void AddStarlane();
+    void RemoveStarlane();
 
     StarType        StarTypeFromIndex(std::size_t i) const;
     PlanetType      PlanetTypeFromIndex(std::size_t i) const;

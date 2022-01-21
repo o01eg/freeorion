@@ -51,12 +51,11 @@ BuildingType::BuildingType(std::string&& name, std::string&& description,
     for (auto&& effect : common_params.effects)
         m_effects.push_back(std::move(effect));
     for (const std::string& tag : common_params.tags)
-        m_tags.emplace(boost::to_upper_copy<std::string>(tag));
+        m_tags.insert(boost::to_upper_copy<std::string>(tag));
     Init();
 }
 
-BuildingType::~BuildingType()
-{}
+BuildingType::~BuildingType() = default;
 
 bool BuildingType::operator==(const BuildingType& rhs) const {
     if (&rhs == this)
@@ -164,8 +163,8 @@ std::string BuildingType::Dump(unsigned short ntabs) const {
     if (m_production_time)
         retval += DumpIndent(ntabs+1) + "buildtime = " + m_production_time->Dump(ntabs+1) + "\n";
     retval += DumpIndent(ntabs+1) + (m_producible ? "Producible" : "Unproducible") + "\n";
-    retval += DumpIndent(ntabs+1) + "captureresult = " +
-        boost::lexical_cast<std::string>(m_capture_result) + "\n";
+    retval += DumpIndent(ntabs+1) + "captureresult = ";
+    retval.append(to_string(m_capture_result)).append("\n");
 
     if (!m_tags.empty()) {
         if (m_tags.size() == 1) {
@@ -242,7 +241,7 @@ float BuildingType::ProductionCost(int empire_id, int location_id,
     // cost uses target object to represent the location where something is
     // being produced, and target object is normally mutable, but will not
     // actually be modified by evaluating the cost ValueRef
-    ScriptingContext local_context(std::move(source), context);
+    ScriptingContext local_context{std::move(source), context};
     local_context.effect_target = std::const_pointer_cast<UniverseObject>(location);
 
     return m_production_cost->Eval(local_context);
@@ -283,7 +282,7 @@ int BuildingType::ProductionTime(int empire_id, int location_id,
     // cost uses target object to represent the location where something is
     // being produced, and target object is normally mutable, but will not
     // actually be modified by evaluating the cost ValueRef
-    ScriptingContext local_context(std::move(source), context);
+    ScriptingContext local_context{std::move(source), context};
     local_context.effect_target = std::const_pointer_cast<UniverseObject>(location);
 
     return m_production_time->Eval(local_context);

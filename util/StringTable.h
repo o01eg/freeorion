@@ -6,7 +6,7 @@
 
 #include <string>
 #include <map>
-#include <unordered_set>
+#include <set>
 #include <mutex>
 #include <memory>
 
@@ -45,7 +45,7 @@
 //!   terminated by a newline, trimming of any whitespace at the begining or end
 //!   of the translated string or a multi-line string.
 //! * A multi-line string starts and ends with three single quotes `'''`. As the
-//!   name implies a multi-line string can span over multiple lines and any
+//!   name implies, a multi-line string can span over multiple lines and any
 //!   whitespace inside the string will be preseved.
 //!
 //! A minimal example translation file for the english language `en.txt` should
@@ -122,9 +122,8 @@
 //! ```
 class StringTable {
 public:
-    //! Create a StringTable instance by loading translations from the default
-    //! translation file.
-    StringTable();
+    //! Create an empty StringTable
+    StringTable() = default;
 
     //! Create a StringTable from the given @p filename.
     //!
@@ -133,39 +132,59 @@ public:
     //! @param  fallback
     //!     A StringTable that should be used look up unknown translation
     //!     entries.
-    StringTable(const std::string& filename, std::shared_ptr<const StringTable> fallback = nullptr);
+    explicit StringTable(std::string filename, std::shared_ptr<const StringTable> fallback = nullptr);
 
-    ~StringTable();
+    ~StringTable() = default;
 
-    //! Returns a translation for @p key.
-    //!
-    //! @param key
-    //!     The identifying key of a translation entry.
-    //!
-    //! @return
-    //!     The translation for @p key or S_ERROR_STRING if no translation was
-    //!     found.
-    const std::string& operator[] (const std::string& key) const;
-
-    //! Returns if a translation for @p key exists.
+    //! Returns if a translation for @p key exists. Caller should have shared (read)
+    //! access to this stringtable before calling this function.
     //!
     //! @param key
     //!     The identifying key of a translation entry.
     //!
     //! @return
     //!     True iff a translation with that key exists, false otherwise.
-    bool StringExists(const std::string& key) const;
+    [[nodiscard]] bool StringExists(const std::string& key) const;
+    [[nodiscard]] bool StringExists(const std::string_view key) const;
+    [[nodiscard]] bool StringExists(const char* key) const;
+
+    //! Returns if a translation for @p key exists and what that translation is, if it exists.
+    //! Caller should have shared (read) access to this stringtable before calling this function.
+    //!
+    //! @param key
+    //!     The identifying key of a translation entry.
+    //!
+    //! @return
+    //!     pair containing true iff a translation with that key exists, false otherwise, and
+    //!                     reference to the translation or to an emptry string if no translation exists
+    [[nodiscard]] std::pair<bool, const std::string&> CheckGet(const std::string& key) const;
+    [[nodiscard]] std::pair<bool, const std::string&> CheckGet(const std::string_view key) const;
+    [[nodiscard]] std::pair<bool, const std::string&> CheckGet(const char* key) const;
 
     //! Returns the native language name of this StringTable.
-    inline const std::string& Language() const
+    [[nodiscard]] const std::string& Language() const
     { return m_language; }
 
     //! Returns the translation file name this StringTable was loaded from.
-    inline const std::string& Filename() const
+    [[nodiscard]] const std::string& Filename() const
     { return m_filename; }
 
-    inline const std::map<std::string, std::string>& AllStrings() const
+    [[nodiscard]] const auto& AllStrings() const
     { return m_strings; }
+
+    //! Adds the a @p key and @p value pair to this StringTable, and returns a reference
+    //! to the newly-added string. If the key already exists, it is overwritten.
+    //! Caller should have exclusive (write) access to this stringtable before calling
+    //! this function.
+    //!
+    //! @param key
+    //!     The identifying key of a translation entry.
+    //! @param value
+    //!     The value to be stored with index key
+    //!
+    //! @return
+    //!     A string for @p key containing "ERROR: key"
+    const std::string& Add(std::string key, std::string value);
 
 private:
     //! Loads this StringTable from #m_filename
@@ -182,15 +201,7 @@ private:
     std::string m_language;
 
     //! Mapping of translation entry keys to translated strings.
-    std::map<std::string, std::string> m_strings;
-
-    //! Cache for missing translation keys to ensure the returned error
-    //! reference string is not destroyed due local scope.
-    mutable std::unordered_set<std::string> m_error_strings;
-
-    //! Ensure that multithreaded access to a StringTable is done in an orderly
-    //! fashion.
-    mutable std::mutex m_mutex;
+    std::map<std::string, std::string, std::less<>> m_strings;
 
     //! True if the StringTable was completely loaded and all references
     //! were successfully resolved.

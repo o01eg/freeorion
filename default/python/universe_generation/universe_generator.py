@@ -3,26 +3,26 @@ from common.configure_logging import redirect_logging_to_freeorion_logger
 # Logging is redirected before other imports so that import errors appear in log files.
 redirect_logging_to_freeorion_logger()
 
+import freeorion as fo
 import random
 
-import freeorion as fo
-
-from starnames import name_star_systems
-from galaxy import calc_star_system_positions
-from starsystems import name_planets, generate_systems
-from empires import compile_home_system_list, setup_empire
-from fields import generate_fields
-from natives import generate_natives
-from monsters import generate_monsters
-from specials import distribute_specials
-from teams import place_teams
-from util import int_hash, seed_rng, report_error, error_list
-from universe_tables import MAX_JUMPS_BETWEEN_SYSTEMS, MAX_STARLANE_LENGTH
 import universe_statistics
-
 from common.handlers import init_handlers
 from common.listeners import listener
 from common.option_tools import parse_config
+from empires import compile_home_system_list, setup_empire
+from fields import generate_fields
+from galaxy import calc_star_system_positions
+from monsters import generate_monsters
+from natives import generate_natives
+from specials import distribute_specials
+from starnames import name_star_systems
+from starsystems import generate_systems, name_planets
+from teams import place_teams
+from universe_tables import MAX_JUMPS_BETWEEN_SYSTEMS, MAX_STARLANE_LENGTH
+
+from util import error_list, int_hash, report_error, seed_rng
+
 parse_config(fo.get_options_db_option_str("ai-config"), fo.get_user_config_dir())
 init_handlers(fo.get_options_db_option_str("ai-config"), None)
 
@@ -33,6 +33,7 @@ class PyGalaxySetupData:
     This data can then be modified when needed during the universe generation process, without having to
     change the original data structure.
     """
+
     def __init__(self, galaxy_setup_data):
         self.seed = galaxy_setup_data.seed
         self.size = galaxy_setup_data.size
@@ -81,7 +82,7 @@ def create_universe(psd_map):
     total_players = len(psd_map)
 
     # initialize RNG
-    h = int_hash(gsd.seed.encode('utf-8'))
+    h = int_hash(gsd.seed.encode("utf-8"))
     print("Using hashed seed", h)
     seed_rng(h)
     seed_pool = [random.random() for _ in range(100)]
@@ -130,8 +131,9 @@ def create_universe(psd_map):
     seed_rng(seed_pool.pop())
     if teams:
         psds = list(psd_map.items())
-        for home_system, team in place_teams(home_systems, systems, teams):
-            home_systems.remove(home_system)
+        hs = list(home_systems)
+        for home_system, team in place_teams(hs, systems, teams):
+            hs.remove(home_system)
             psds_new = list()
             placed = False
             for empire, psd in psds:
@@ -145,7 +147,7 @@ def create_universe(psd_map):
                 report_error("Python create_universe: couldn't set up empire for team %d" % team)
             psds = psds_new
         # place leftovers
-        for (empire, psd), home_system in zip(psds, home_systems):
+        for (empire, psd), home_system in zip(psds, hs):
             if not setup_empire(empire, psd.empire_name, home_system, psd.starting_species, psd.player_name):
                 report_error("Python create_universe: couldn't set up empire for player %s" % psd.player_name)
     else:

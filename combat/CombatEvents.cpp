@@ -10,6 +10,9 @@
 
 #include "../Empire/Empire.h"
 
+#if __has_include(<charconv>)
+  #include <charconv>
+#endif
 #include <sstream>
 
 namespace {
@@ -27,10 +30,9 @@ namespace {
     bool temp_bool = RegisterGameRules(&AddRules);
 
 
-    //TODO: Move this code into a common non UI linked location, so that
-    //there is no duplicated code between server and clientUI.
-    const std::string EMPTY_STRING("");
-    const std::string& LinkTag(UniverseObjectType obj_type) {
+    // TODO: Move this code into a common non UI linked location, so that
+    // there is no duplicated code between server and clientUI.
+    std::string_view LinkTag(UniverseObjectType obj_type) {
         switch (obj_type) {
         case UniverseObjectType::OBJ_SHIP:
             return VarText::SHIP_ID_TAG;
@@ -44,49 +46,74 @@ namespace {
             return VarText::SYSTEM_ID_TAG;
         case UniverseObjectType::OBJ_FIELD:
         case UniverseObjectType::OBJ_FIGHTER:
+            [[fallthrough]];
         default:
-            return EMPTY_STRING;
+            return "";
         }
     }
 
-    std::string WrapWithTagAndId(const std::string& meat, const std::string& tag, int id) {
-        std::stringstream ss;
-        ss << "<" << tag << " " << std::to_string(id) << ">" << meat << "</" << tag << ">";
-        return ss.str();
+    std::string WrapWithTagAndId(std::string_view meat, std::string_view tag, int id) {
+        std::string retval;
+        retval.reserve(1  + 2* tag.size() + 1 + 10 + 1 + meat.size() + 2 + 1); // guesstimate
+        retval.append("<").append(tag).append(" ").append(std::to_string(id)).append(">")
+              .append(meat).append("</").append(tag).append(">");
+        return retval;
     }
 
-    std::string WrapUserStringWithTag(const std::string& table_id, const std::string& tag) {
-        std::stringstream ss;
-        ss << "<" << tag << " " << table_id << ">" << UserString(table_id) << "</" << tag << ">";
-        return ss.str();
+    std::string WrapUserStringWithTag(std::string_view table_id, std::string_view tag) {
+        std::string retval;
+        const auto& us{UserString(table_id)};
+        retval.reserve(1 + 2*tag.size() + 1 + table_id.size() + 1 + us.size() + 2 + 1 + 5);
+        retval.append("<").append(tag).append(" ").append(table_id).append(">")
+              .append(us).append("</").append(tag).append(">");
+        return retval;
     }
 
     //Copied pasted from Font.cpp due to Font not being linked into AI and server code
-    std::string WrapColorTag(std::string const & text, const EmpireColor& c) {
-        std::stringstream stream;
-        stream << "<rgba "
-               << static_cast<int>(std::get<0>(c)) << " "
-               << static_cast<int>(std::get<1>(c)) << " "
-               << static_cast<int>(std::get<2>(c)) << " "
-               << static_cast<int>(std::get<3>(c))
-               << ">" << text << "</rgba>";
-        return stream.str();
+    std::string WrapColorTag(std::string_view text, EmpireColor c) {
+        constexpr auto lim = std::numeric_limits<EmpireColor::value_type>::max();
+        static_assert(lim < 1000); // ensure no more than 3 characters will be consumed per number
+        assert(c.size() >= 4);
+
+        std::string retval;
+
+#if defined(__cpp_lib_to_chars)
+        std::array<std::string::value_type, 6 + 4*4 + 1> buffer{"<rgba "}; // rest should be nulls
+        auto result = std::to_chars(buffer.data() + 6, buffer.data() + 9, static_cast<int>(c[0]));
+        *result.ptr = ' ';
+        result = std::to_chars(result.ptr + 1, result.ptr + 4, static_cast<int>(c[1]));
+        *result.ptr = ' ';
+        result = std::to_chars(result.ptr + 1, result.ptr + 4, static_cast<int>(c[2]));
+        *result.ptr = ' ';
+        result = std::to_chars(result.ptr + 1, result.ptr + 4, static_cast<int>(c[3]));
+        *result.ptr = '>';
+        retval.reserve(buffer.size() + text.size() + 7 + 1);
+        retval.append(buffer.data()).append(text).append("</rgba>");
+#else
+        retval.reserve(6 + 4*4 + text.size() + 7 + 4);
+        retval.append("<rgba ")
+              .append(std::to_string(static_cast<int>(std::get<0>(c)))).append(" ")
+              .append(std::to_string(static_cast<int>(std::get<1>(c)))).append(" ")
+              .append(std::to_string(static_cast<int>(std::get<2>(c)))).append(" ")
+              .append(std::to_string(static_cast<int>(std::get<3>(c)))).append(">")
+              .append(text).append("</rgba>");
+#endif
+        return retval;
     }
 
-    std::string EmpireColorWrappedText(int empire_id, const std::string& text) {
+    std::string EmpireColorWrappedText(int empire_id, std::string_view text) {
         // TODO: refactor this to somewhere that links with the UI code.
         // Hardcoded default color becauses not linked with UI code.
-        const Empire* empire = GetEmpire(empire_id);
-        EmpireColor c = (empire ? empire->Color() : EmpireColor{{80, 255, 128, 255}});
-        return WrapColorTag(text, c);
+        auto empire = GetEmpire(empire_id);
+        return WrapColorTag(text, empire ? empire->Color() : EmpireColor{{80, 255, 128, 255}});
     }
 
     /// Creates a link tag of the appropriate type for object_id,
     /// with the content being the public name from the point of view of empire_id.
     /// Returns UserString("ENC_COMBAT_UNKNOWN_OBJECT") if object_id is not found.
-    std::string PublicNameLink(int empire_id, int object_id, const ObjectMap& objects) {
-        if (auto object = objects.get(object_id)) {
-            const auto& name = object->PublicName(empire_id, objects);
+    std::string PublicNameLink(int empire_id, int object_id, const Universe& u) {
+        if (auto object = u.Objects().get(object_id)) {
+            const auto& name = object->PublicName(empire_id, u);
             const auto& tag = LinkTag(object->ObjectType());
             return WrapWithTagAndId(name, tag, object_id);
         } else {
@@ -96,25 +123,25 @@ namespace {
 
     /// Creates a link tag of the appropriate type for either a fighter or another object.
     std::string FighterOrPublicNameLink(int viewing_empire_id, int object_id,
-                                        int object_empire_id, const ObjectMap& objects)
+                                        int object_empire_id, const Universe& u)
     {
         if (object_id >= 0)   // ship
-            return PublicNameLink(viewing_empire_id, object_id, objects);
+            return PublicNameLink(viewing_empire_id, object_id, u);
         else                  // fighter
             return EmpireColorWrappedText(object_empire_id, UserString("OBJ_FIGHTER"));
     }
 
-    std::string EmpireLink(int empire_id) { // TODO: pass and get empire from EmpireManager
-        if (const Empire* empire = GetEmpire(empire_id)) {
-            const std::string& tag = VarText::EMPIRE_ID_TAG;
-            std::string empire_wrapped = WrapWithTagAndId(empire->Name(), tag, empire_id);
-            return EmpireColorWrappedText(empire_id, empire_wrapped);
+    std::string EmpireLink(int empire_id, const ScriptingContext& context) {
+        if (empire_id == ALL_EMPIRES) {
+            return UserString("NEUTRAL");
+        } else if (auto empire = context.GetEmpire(empire_id)) {
+            return EmpireColorWrappedText(empire_id, WrapWithTagAndId(empire->Name(), VarText::EMPIRE_ID_TAG, empire_id));
         } else {
             return UserString("ENC_COMBAT_UNKNOWN_OBJECT");
         }
     }
 
-    std::string ShipPartLink(const std::string& part) {
+    std::string ShipPartLink(std::string_view part) {
         return part.empty() ? UserString("ENC_COMBAT_UNKNOWN_OBJECT")
             : WrapUserStringWithTag(part, VarText::SHIP_PART_TAG);
     }
@@ -128,13 +155,10 @@ BoutBeginEvent::BoutBeginEvent(int bout_) :
     bout(bout_)
 {}
 
-std::string BoutBeginEvent::DebugString(const ObjectMap&) const {
-    std::stringstream ss;
-    ss << "Bout " << bout << " begins.";
-    return ss.str();
-}
+std::string BoutBeginEvent::DebugString(const ScriptingContext&) const
+{ return std::string{"Bout "}.append(std::to_string(bout)).append(" begins."); }
 
-std::string BoutBeginEvent::CombatLogDescription(int viewing_empire_id, const ObjectMap&) const
+std::string BoutBeginEvent::CombatLogDescription(int viewing_empire_id, const ScriptingContext&) const
 { return str(FlexibleFormat(UserString("ENC_ROUND_BEGIN")) % bout); }
 
 
@@ -145,16 +169,16 @@ BoutEvent::BoutEvent(int _bout):
     bout(_bout)
 {}
 
-void BoutEvent::AddEvent(const CombatEventPtr& event)
-{ events.push_back(event); }
+void BoutEvent::AddEvent(CombatEventPtr event)
+{ events.push_back(std::move(event)); }
 
-std::string BoutEvent::DebugString(const ObjectMap&) const {
+std::string BoutEvent::DebugString(const ScriptingContext&) const {
     std::stringstream ss;
     ss << "Bout " << bout << " has " << events.size() << " events";
     return ss.str();
 }
 
-std::string BoutEvent::CombatLogDescription(int viewing_empire_id, const ObjectMap&) const
+std::string BoutEvent::CombatLogDescription(int viewing_empire_id, const ScriptingContext&) const
 { return str(FlexibleFormat(UserString("ENC_ROUND_BEGIN")) % bout); }
 
 std::vector<ConstCombatEventPtr> BoutEvent::SubEvents(int viewing_empire_id) const
@@ -164,17 +188,19 @@ std::vector<ConstCombatEventPtr> BoutEvent::SubEvents(int viewing_empire_id) con
 //////////////////////////////////////////
 ///////// SimultaneousEvents ///////////////////
 //////////////////////////////////////////
-void SimultaneousEvents::AddEvent(const CombatEventPtr& event)  // TODO: make not const and move
-{ events.push_back(event); }
+void SimultaneousEvents::AddEvent(CombatEventPtr event)
+{ events.push_back(std::move(event)); }
 
-std::string SimultaneousEvents::DebugString(const ObjectMap&) const {
-    std::stringstream ss;
-    ss << "SimultaneousEvents has " << events.size() << " events";
-    return ss.str();
-}
+// The following two function definitions were moved to the header because the linker refuses to find them otherwise...
 
-std::string SimultaneousEvents::CombatLogDescription(int viewing_empire_id, const ObjectMap&) const
-{ return ""; }
+//std::string SimultaneousEvents::DebugString(const ScriptingContext& context) const {
+//    std::stringstream ss;
+//    ss << "SimultaneousEvents has " << events.size() << " events";
+//    return ss.str();
+//}
+
+//std::string SimultaneousEvents::CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const
+//{ return ""; }
 
 std::vector<ConstCombatEventPtr> SimultaneousEvents::SubEvents(int viewing_empire_id) const {
     // Sort the events by viewing empire, then ALL_EMPIRES and then
@@ -217,32 +243,33 @@ InitialStealthEvent::InitialStealthEvent(const EmpireToObjectVisibilityMap& x) :
     empire_to_object_visibility(x)
 {}
 
-std::string InitialStealthEvent::DebugString(const ObjectMap& objects) const {
+std::string InitialStealthEvent::DebugString(const ScriptingContext& context) const {
     std::stringstream ss;
     ss << "InitialStealthEvent: ";
-    for (const auto& empire_object_vis : empire_to_object_visibility) {
-        ss << " Viewing Empire: " << EmpireLink(empire_object_vis.first) << "\n";
+    for (auto& [empire_id, empire_object_vis] : empire_to_object_visibility) {
+        ss << " Viewing Empire: " << EmpireLink(empire_id, context) << "\n";
 
-        for (const auto& viewed_object : empire_object_vis.second) {
-            const auto obj = objects.get(viewed_object.first);
+        for (auto& [object_id, object_vis] : empire_object_vis) {
+            (void)object_vis; // quiet warning
+            const auto obj = context.ContextObjects().get(object_id);
             int owner_id = obj ? obj->Owner() : ALL_EMPIRES;
-            ss << FighterOrPublicNameLink(ALL_EMPIRES, viewed_object.first, owner_id, objects);
+            if (owner_id == ALL_EMPIRES)
+                continue;
+            ss << FighterOrPublicNameLink(ALL_EMPIRES, object_id, owner_id, context.ContextUniverse());
         }
         ss << "\n";
     }
     return ss.str();
 }
 
-std::string InitialStealthEvent::CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const {
+std::string InitialStealthEvent::CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const {
     DebugLogger() << "CombatLogDescription for InitialStealthEvent viewing empire empire: " << viewing_empire_id;
 
     std::string desc;
 
-    for (const auto& detector_empire : empire_to_object_visibility) {
-        int detector_empire_id = detector_empire.first;
+    for (auto& [detector_empire_id, visible_objects] : empire_to_object_visibility) {
         DebugLogger() << "CombatLogDescription for InitialStealthEvent for detector empire: " << detector_empire_id;
 
-        const auto& visible_objects = detector_empire.second;
         if (visible_objects.empty()) {
             DebugLogger() << " ... no object info recorded for detector empire: " << detector_empire_id;
             continue;
@@ -250,23 +277,27 @@ std::string InitialStealthEvent::CombatLogDescription(int viewing_empire_id, con
 
         // Check Visibility of objects, report those that are not visible.
         std::vector<std::string> cloaked_attackers;
-        for (auto& object_vis : visible_objects) {
-            const auto obj = objects.get(object_vis.first);
-            const auto name = obj ? obj->Name() : UserString("UNKNOWN");
-            DebugLogger() << " ... object: " << name << " (" << object_vis.first << ") has vis: " << object_vis.second;
-            if (object_vis.second > Visibility::VIS_NO_VISIBILITY)
+        for (auto& [object_id, object_vis] : visible_objects) {
+            const auto obj = context.ContextObjects().get(object_id);
+            const auto& name = obj ? obj->Name() : UserString("UNKNOWN");
+            DebugLogger() << " ... object: " << name << " (" << object_id << ") has vis: " << object_vis;
+            if (object_vis > Visibility::VIS_NO_VISIBILITY)
                 continue;
 
             // all empires specifies empire to use for link color if this is a fighter
             cloaked_attackers.push_back(FighterOrPublicNameLink(
-                viewing_empire_id, object_vis.first, ALL_EMPIRES, objects));
+                viewing_empire_id, object_id, ALL_EMPIRES, context.ContextUniverse()));
         }
 
         if (!cloaked_attackers.empty()) {
             desc += "\n"; //< Add \n at start of the report and between each empire
-            std::vector<std::string> detector_empire_link(1, EmpireLink(detector_empire.first));
-            desc += FlexibleFormatList(detector_empire_link, cloaked_attackers,
-                                       UserString("ENC_COMBAT_INITIAL_STEALTH_LIST")).str();
+            if (detector_empire_id != ALL_EMPIRES) {
+                std::vector<std::string> detector_empire_link{EmpireLink(detector_empire_id, context)};
+                desc += FlexibleFormatList(detector_empire_link, cloaked_attackers,
+                                           UserString("ENC_COMBAT_INITIAL_STEALTH_LIST")).str();
+            } else {
+                desc += FlexibleFormatList(cloaked_attackers, UserString("ENC_COMBAT_NEUTRAL_INITIAL_STEALTH_LIST")).str();
+            }
         }
     }
 
@@ -294,20 +325,20 @@ StealthChangeEvent::StealthChangeEventDetail::StealthChangeEventDetail(
     visibility(new_visibility_)
 {}
 
-std::string StealthChangeEvent::StealthChangeEventDetail::DebugString(const ObjectMap& objects) const {
+std::string StealthChangeEvent::StealthChangeEventDetail::DebugString(const ScriptingContext& context) const {
     std::stringstream ss;
     ss << "StealthChangeDetailEvent"
-       <<  FighterOrPublicNameLink(ALL_EMPIRES, attacker_id, attacker_empire_id, objects)
+       <<  FighterOrPublicNameLink(ALL_EMPIRES, attacker_id, attacker_empire_id, context.ContextUniverse())
        << "->" << visibility << " ";
     return ss.str();
 }
 
 std::string StealthChangeEvent::StealthChangeEventDetail::CombatLogDescription(
-    int viewing_empire_id, const ObjectMap& objects) const
+    int viewing_empire_id, const ScriptingContext& context) const
 {
-    std::string attacker_link = FighterOrPublicNameLink(viewing_empire_id, attacker_id, attacker_empire_id, objects);
-    std::string target_link = FighterOrPublicNameLink(viewing_empire_id, target_id, target_empire_id, objects);
-    std::string empire_link = EmpireLink(target_empire_id);
+    std::string attacker_link = FighterOrPublicNameLink(viewing_empire_id, attacker_id, attacker_empire_id, context.ContextUniverse());
+    std::string target_link = FighterOrPublicNameLink(viewing_empire_id, target_id, target_empire_id, context.ContextUniverse());
+    std::string empire_link = EmpireLink(target_empire_id, context);
     const std::string& template_str = UserString("ENC_COMBAT_STEALTH_DECLOAK_ATTACK");
 
     return str(FlexibleFormat(template_str)
@@ -325,43 +356,43 @@ void StealthChangeEvent::AddEvent(int attacker_id_, int target_id_, int attacker
             attacker_id_, target_id_, attacker_empire_, target_empire_, new_visibility_));
 }
 
-std::string StealthChangeEvent::DebugString(const ObjectMap& objects) const {
+std::string StealthChangeEvent::DebugString(const ScriptingContext& context) const {
     std::stringstream ss;
     ss << "StealthChangeEvent";
     if (events.size() > 4) {
         ss << events.size() << " empires.";
     } else {
-        for (const auto& target : events) {
-            ss << "Target Empire: " << EmpireLink(target.first) << "\n";
+        for (auto& [target_empire_id, stealth_change_events] : events) {
+            ss << "Target Empire: " << EmpireLink(target_empire_id, context) << "\n";
 
-            if (target.second.size() > 4) {
-                ss << target.second.size() << " events.";
+            if (stealth_change_events.size() > 4) {
+                ss << stealth_change_events.size() << " events.";
             } else {
-                for (const auto& event : target.second)
-                    ss << event->DebugString(objects);
+                for (const auto& event : stealth_change_events)
+                    ss << event->DebugString(context);
             }
         }
     }
     return ss.str();
 }
 
-std::string StealthChangeEvent::CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const {
+std::string StealthChangeEvent::CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const {
     std::string desc;
 
     if (events.empty())
         return desc;
 
-    for (const auto& target : events) {
+    for (const auto& [target_empire_id, stealth_change_events] : events) {
         std::vector<std::string> uncloaked_attackers;
-        uncloaked_attackers.reserve(target.second.size());
-        for (const auto& event : target.second)
+        uncloaked_attackers.reserve(stealth_change_events.size());
+        for (const auto& event : stealth_change_events)
             uncloaked_attackers.push_back(FighterOrPublicNameLink(
-                viewing_empire_id, event->attacker_id, event->attacker_empire_id, objects));
+                viewing_empire_id, event->attacker_id, event->attacker_empire_id, context.ContextUniverse()));
 
         if (!uncloaked_attackers.empty()) {
             if (!desc.empty())
                 desc += "\n";
-            std::vector<std::string> target_empire_link(1, EmpireLink(target.first));
+            std::vector<std::string> target_empire_link{EmpireLink(target_empire_id, context)};
 
             desc += FlexibleFormatList(target_empire_link, uncloaked_attackers,
                                        UserString("ENC_COMBAT_STEALTH_DECLOAK_ATTACK_MANY_EVENTS"),
@@ -401,7 +432,7 @@ WeaponFireEvent::WeaponFireEvent(
     target_owner_id(target_owner_id_)
 { std::tie(power, shield, damage) = power_shield_damage; }
 
-std::string WeaponFireEvent::DebugString(const ObjectMap&) const {
+std::string WeaponFireEvent::DebugString(const ScriptingContext&) const {
     std::stringstream ss;
     ss << "rnd: " << round << " : "
        << attacker_id << " -> " << target_id << " : " << weapon_name << " "
@@ -409,9 +440,9 @@ std::string WeaponFireEvent::DebugString(const ObjectMap&) const {
     return ss.str();
 }
 
-std::string WeaponFireEvent::CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const {
-    std::string attacker_link = FighterOrPublicNameLink(viewing_empire_id, attacker_id, attacker_owner_id, objects);
-    std::string target_link = FighterOrPublicNameLink(viewing_empire_id, target_id, target_owner_id, objects);
+std::string WeaponFireEvent::CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const {
+    std::string attacker_link = FighterOrPublicNameLink(viewing_empire_id, attacker_id, attacker_owner_id, context.ContextUniverse());
+    std::string target_link = FighterOrPublicNameLink(viewing_empire_id, target_id, target_owner_id, context.ContextUniverse());
 
     const std::string& template_str = UserString("ENC_COMBAT_ATTACK_STR");
 
@@ -460,15 +491,15 @@ IncapacitationEvent::IncapacitationEvent(int bout_, int object_id_, int object_o
     object_owner_id(object_owner_id_)
 {}
 
-std::string IncapacitationEvent::DebugString(const ObjectMap&) const {
+std::string IncapacitationEvent::DebugString(const ScriptingContext&) const {
     std::stringstream ss;
     ss << "incapacitation of " << object_id << " owned by " << object_owner_id << " at bout " << bout;
     return ss.str();
 }
 
 
-std::string IncapacitationEvent::CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const {
-    auto object = objects.get(object_id);
+std::string IncapacitationEvent::CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const {
+    auto object = context.ContextObjects().get(object_id);
     std::string template_str, object_str;
     int owner_id = object_owner_id;
 
@@ -482,18 +513,18 @@ std::string IncapacitationEvent::CombatLogDescription(int viewing_empire_id, con
 
     } else if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
         template_str = UserString("ENC_COMBAT_PLANET_INCAPACITATED_STR");
-        object_str = PublicNameLink(viewing_empire_id, object_id, objects);
+        object_str = PublicNameLink(viewing_empire_id, object_id, context.ContextUniverse());
 
     } else {    // ships or other to-be-determined objects...
         template_str = UserString("ENC_COMBAT_DESTROYED_STR");
-        object_str = PublicNameLink(viewing_empire_id, object_id, objects);
+        object_str = PublicNameLink(viewing_empire_id, object_id, context.ContextUniverse());
     }
 
     std::string owner_string = " ";
-    if (const Empire* owner = GetEmpire(owner_id))  // TODO: pass in and use EmpireManager here...
+    if (auto owner = context.GetEmpire(owner_id))
         owner_string += owner->Name() + " ";
 
-    std::string object_link = FighterOrPublicNameLink(viewing_empire_id, object_id, object_owner_id, objects);
+    std::string object_link = FighterOrPublicNameLink(viewing_empire_id, object_id, object_owner_id, context.ContextUniverse());
 
     return str(FlexibleFormat(template_str) % owner_string % object_link);
 }
@@ -512,17 +543,17 @@ FightersAttackFightersEvent::FightersAttackFightersEvent(int bout_) :
 void FightersAttackFightersEvent::AddEvent(int attacker_empire_, int target_empire_)
 { events[{attacker_empire_, target_empire_}] += 1; }
 
-std::string FightersAttackFightersEvent::DebugString(const ObjectMap&) const {
+std::string FightersAttackFightersEvent::DebugString(const ScriptingContext&) const {
     std::stringstream ss;
     ss << "FightersAttackFightersEvent: ";
-    for (const auto& index_and_event: events) {
-        ss << index_and_event.second << " repeated fighters from empire " << index_and_event.first.first
-           << " attacking fighters from empire " << index_and_event.first.second << ", ";
+    for (auto& [index, event]: events) {
+        ss << event << " repeated fighters from empire " << index.first
+           << " attacking fighters from empire " << index.second << ", ";
     }
     return ss.str();
 }
 
-std::string FightersAttackFightersEvent::CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const {
+std::string FightersAttackFightersEvent::CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const {
     if (events.empty())
         return "";
 
@@ -533,7 +564,7 @@ std::string FightersAttackFightersEvent::CombatLogDescription(int viewing_empire
     // Use show_events_for_empire to show events in this order: viewing empire, ALL_EMPIRES and
     // then the remainder.
     auto show_events_for_empire =
-        [&ss, &num_events_remaining, &events_to_show, &viewing_empire_id, &objects]
+        [&ss, &num_events_remaining, &events_to_show, &viewing_empire_id, &context]
         (boost::optional<int> show_attacker)
     {
             int attacker_empire;
@@ -552,9 +583,9 @@ std::string FightersAttackFightersEvent::CombatLogDescription(int viewing_empire
 
                 auto count = std::to_string(index_and_event.second);
                 const auto&& attacker_link = FighterOrPublicNameLink(
-                    viewing_empire_id, INVALID_OBJECT_ID, attacker_empire, objects);
+                    viewing_empire_id, INVALID_OBJECT_ID, attacker_empire, context.ContextUniverse());
                 const auto&& target_link = FighterOrPublicNameLink(
-                    viewing_empire_id, INVALID_OBJECT_ID, target_empire, objects);
+                    viewing_empire_id, INVALID_OBJECT_ID, target_empire, context.ContextUniverse());
                 const std::string& template_str = UserString("ENC_COMBAT_ATTACK_REPEATED_STR");
 
                 ss << str(FlexibleFormat(template_str) % count % attacker_link % target_link);
@@ -582,7 +613,7 @@ FighterLaunchEvent::FighterLaunchEvent(int bout_, int launched_from_id_, int fig
     number_launched(number_launched_)
 {}
 
-std::string FighterLaunchEvent::DebugString(const ObjectMap&) const {
+std::string FighterLaunchEvent::DebugString(const ScriptingContext&) const {
     std::stringstream ss;
     ss << "launch from object " << launched_from_id
        << " of " << number_launched
@@ -591,8 +622,8 @@ std::string FighterLaunchEvent::DebugString(const ObjectMap&) const {
     return ss.str();
 }
 
-std::string FighterLaunchEvent::CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const {
-    std::string launched_from_link = PublicNameLink(viewing_empire_id, launched_from_id, objects);
+std::string FighterLaunchEvent::CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const {
+    std::string launched_from_link = PublicNameLink(viewing_empire_id, launched_from_id, context.ContextUniverse());
     std::string empire_coloured_fighter = EmpireColorWrappedText(fighter_owner_empire_id, UserString("OBJ_FIGHTER"));
 
     // launching negative fighters indicates recovery of them by the ship
@@ -620,17 +651,16 @@ FightersDestroyedEvent::FightersDestroyedEvent(int bout_) :
 void FightersDestroyedEvent::AddEvent(int target_empire_)
 { events[target_empire_] += 1; }
 
-std::string FightersDestroyedEvent::DebugString(const ObjectMap&) const {
+std::string FightersDestroyedEvent::DebugString(const ScriptingContext&) const {
     std::stringstream ss;
     ss << "FightersDestroyedEvent: ";
-    for (const auto& index_and_event : events) {
-        ss << index_and_event.second << " repeated fighters from empire "
-           << index_and_event.first << " destroyed.";
+    for (auto& [empire_id, count] : events) {
+        ss << count << " repeated fighters from empire " << empire_id << " destroyed.";
     }
     return ss.str();
 }
 
-std::string FightersDestroyedEvent::CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const {
+std::string FightersDestroyedEvent::CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const {
     if (events.empty())
         return "";
 
@@ -641,7 +671,7 @@ std::string FightersDestroyedEvent::CombatLogDescription(int viewing_empire_id, 
     // Use show_events_for_empire to show events in this order: viewing empire,
     // ALL_EMPIRES and then the remainder.
     auto show_events_for_empire =
-        [&ss, &num_events_remaining, &events_to_show, &viewing_empire_id, &objects]
+        [&ss, &num_events_remaining, &events_to_show, &viewing_empire_id, &context]
         (boost::optional<int> show_empire_id)
     {
             for (auto& [target_empire_id, count] : events_to_show) {
@@ -655,9 +685,9 @@ std::string FightersDestroyedEvent::CombatLogDescription(int viewing_empire_id, 
                     continue;
 
                 auto count_str{std::to_string(count)};
-                auto target_empire_link{EmpireLink(target_empire_id)};
+                auto target_empire_link{EmpireLink(target_empire_id, context)};
                 const auto target_link{FighterOrPublicNameLink(
-                    viewing_empire_id, INVALID_OBJECT_ID, target_empire_id, objects)};
+                    viewing_empire_id, INVALID_OBJECT_ID, target_empire_id, context.ContextUniverse())};
 
                 if (count == 1) {
                     const std::string& template_str = UserString("ENC_COMBAT_FIGHTER_INCAPACITATED_STR");
@@ -700,17 +730,19 @@ void WeaponsPlatformEvent::AddEvent(int round_, int target_id_, int target_owner
             attacker_owner_id, target_owner_id_));
 }
 
-std::string WeaponsPlatformEvent::DebugString(const ObjectMap& objects) const {
+std::string WeaponsPlatformEvent::DebugString(const ScriptingContext& context) const {
     std::stringstream desc;
     desc << "WeaponsPlatformEvent bout = " << bout << " attacker_id = "
         << attacker_id << " attacker_owner = "<< attacker_owner_id;
-    for (const auto& target : events)
-        for (const auto& attack : target.second)
-            desc << "\n" << attack->DebugString(objects);
+    for (auto& [ignored, event_vec] : events) {
+        (void)ignored;
+        for (const auto& attack : event_vec)
+            desc << "\n" << attack->DebugString(context);
+    }
     return desc.str();
 }
 
-std::string WeaponsPlatformEvent::CombatLogDescription(int viewing_empire_id, const ObjectMap& objects) const {
+std::string WeaponsPlatformEvent::CombatLogDescription(int viewing_empire_id, const ScriptingContext& context) const {
     if (events.empty())
         return "";
 
@@ -722,9 +754,8 @@ std::string WeaponsPlatformEvent::CombatLogDescription(int viewing_empire_id, co
             continue;
 
         const auto& fire_event(*target.second.begin());
-        std::string target_public_name(
-            FighterOrPublicNameLink(viewing_empire_id, target.first,
-                                    fire_event->target_owner_id, objects));
+        std::string target_public_name{
+            FighterOrPublicNameLink(viewing_empire_id, target.first, fire_event->target_owner_id, context.ContextUniverse())};
 
         double damage = 0.0f;
         for (auto attack_it : target.second)
@@ -741,8 +772,8 @@ std::string WeaponsPlatformEvent::CombatLogDescription(int viewing_empire_id, co
 
     std::string desc;
 
-    const std::vector<std::string> attacker_link(
-        1, FighterOrPublicNameLink(viewing_empire_id, attacker_id, attacker_owner_id, objects));
+    std::vector<std::string> attacker_link{FighterOrPublicNameLink(viewing_empire_id, attacker_id, attacker_owner_id,
+                                                                   context.ContextUniverse())};
 
     if (!damaged_target_links.empty() ) {
         desc += FlexibleFormatList(attacker_link, damaged_target_links,

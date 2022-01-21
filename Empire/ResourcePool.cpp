@@ -15,7 +15,6 @@ MeterType ResourceToMeter(ResourceType type) {
     case ResourceType::RE_INFLUENCE: return MeterType::METER_INFLUENCE;
     case ResourceType::RE_STOCKPILE: return MeterType::METER_STOCKPILE;
     default:
-        assert(0);
         return MeterType::INVALID_METER_TYPE;
         break;
     }
@@ -28,7 +27,6 @@ MeterType ResourceToTargetMeter(ResourceType type) {
     case ResourceType::RE_INFLUENCE: return MeterType::METER_TARGET_INFLUENCE;
     case ResourceType::RE_STOCKPILE: return MeterType::METER_MAX_STOCKPILE;
     default:
-        assert(0);
         return MeterType::INVALID_METER_TYPE;
         break;
     }
@@ -41,7 +39,6 @@ ResourceType MeterToResource(MeterType type) {
     case MeterType::METER_INFLUENCE: return ResourceType::RE_INFLUENCE;
     case MeterType::METER_STOCKPILE: return ResourceType::RE_STOCKPILE;
     default:
-        assert(0);
         return ResourceType::INVALID_RESOURCE_TYPE;
         break;
     }
@@ -67,18 +64,18 @@ float ResourcePool::Stockpile() const
 float ResourcePool::TotalOutput() const {
     float retval = 0.0f;
     for (const auto& entry : m_connected_object_groups_resource_output)
-    { retval += entry.second; }
+        retval += entry.second;
     return retval;
 }
 
-std::map<std::set<int>, float> ResourcePool::Output() const
+const std::map<std::set<int>, float>& ResourcePool::Output() const
 { return m_connected_object_groups_resource_output; }
 
 float ResourcePool::GroupOutput(int object_id) const {
     // find group containing specified object
-    for (const auto& entry : m_connected_object_groups_resource_output) {
-        if (entry.first.count(object_id))
-            return entry.second;
+    for (const auto& [group, output] : m_connected_object_groups_resource_output) {
+        if (group.count(object_id))
+            return output;
     }
 
     // default return case:
@@ -89,7 +86,7 @@ float ResourcePool::GroupOutput(int object_id) const {
 float ResourcePool::TargetOutput() const {
     float retval = 0.0f;
     for (const auto& entry : m_connected_object_groups_resource_target_output)
-    { retval += entry.second; }
+        retval += entry.second;
     return retval;
 }
 
@@ -108,14 +105,12 @@ float ResourcePool::GroupTargetOutput(int object_id) const {
 float ResourcePool::TotalAvailable() const {
     float retval = m_stockpile;
     for (const auto& entry : m_connected_object_groups_resource_output)
-    { retval += entry.second; }
+        retval += entry.second;
     return retval;
 }
 
-std::map<std::set<int>, float> ResourcePool::Available() const {
-    auto retval = m_connected_object_groups_resource_output;
-    return retval;
-}
+std::map<std::set<int>, float> ResourcePool::Available() const
+{ return m_connected_object_groups_resource_output; }
 
 float ResourcePool::GroupAvailable(int object_id) const {
     TraceLogger() << "ResourcePool::GroupAvailable(" << object_id << ")";
@@ -124,26 +119,26 @@ float ResourcePool::GroupAvailable(int object_id) const {
 }
 
 std::string ResourcePool::Dump() const {
-    std::string retval = "ResourcePool type = " + boost::lexical_cast<std::string>(m_type) +
-                         " stockpile = " + std::to_string(m_stockpile) +
-                         " object_ids: ";
+    std::string retval{"ResourcePool type = "};
+    retval.append(to_string(m_type)).append(" stockpile = ").append(std::to_string(m_stockpile))
+          .append(" object_ids: ");
     for (int obj_id : m_object_ids)
-        retval += std::to_string(obj_id) + ", ";
+        retval.append(std::to_string(obj_id)).append(", ");
     return retval;
 }
 
-void ResourcePool::SetObjects(const std::vector<int>& object_ids)
-{ m_object_ids = object_ids; }
+void ResourcePool::SetObjects(std::vector<int> object_ids)
+{ m_object_ids = std::move(object_ids); }
 
 void ResourcePool::SetConnectedSupplyGroups(const std::set<std::set<int>>& connected_system_groups)
 { m_connected_system_groups = connected_system_groups; }
 
 void ResourcePool::SetStockpile(float d) {
-    DebugLogger() << "ResourcePool " << boost::lexical_cast<std::string>(m_type) << " set to " << d;
+    DebugLogger() << "ResourcePool " << to_string(m_type) << " set to " << d;
     m_stockpile = d;
 }
 
-void ResourcePool::Update() {
+void ResourcePool::Update(const ObjectMap& objects) {
     //DebugLogger() << "ResourcePool::Update for type " << m_type;
     // sum production from all ResourceCenters in each group, for resource point type appropriate for this pool
     MeterType meter_type = ResourceToMeter(m_type);
@@ -166,7 +161,7 @@ void ResourcePool::Update() {
     // system.  If a group does, place the object into that system group's set
     // of objects.  If no group contains the object, place the object in its own
     // single-object group.
-    for (auto& obj : Objects().find<const UniverseObject>(m_object_ids)) {
+    for (auto& obj : objects.find<const UniverseObject>(m_object_ids)) {
         int object_id = obj->ID();
         int object_system_id = obj->SystemID();
         // can't generate resources when not in a system
@@ -174,33 +169,32 @@ void ResourcePool::Update() {
             continue;
 
         // is object's system in a system group?
-        std::set<int> object_system_group;
-        for (const auto& sys_group : m_connected_system_groups) {
-            if (sys_group.count(object_system_id)) {
-                object_system_group = sys_group;
-                break;
-            }
-        }
+        auto object_system_group = [&]() -> std::set<int> {
+            for (const auto& sys_group : m_connected_system_groups)
+                if (sys_group.find(object_system_id) != sys_group.end())
+                    return sys_group;
+            return {};
+        }();
 
         // if object's system is not in a system group, add it as its
         // own entry in m_connected_object_groups_resource_output and m_connected_object_groups_resource_target_output
         // this will allow the object to use its own locally produced
         // resource when, for instance, distributing pp
         if (object_system_group.empty()) {
-            object_system_group.insert(object_id);  // just use this already-available set to store the object id, even though it is not likely actually a system
+            // store object id in set, even though it is not likely actually a system
+            object_system_group.insert(object_id);
 
             const auto* mmt = obj->GetMeter(meter_type);
-            m_connected_object_groups_resource_output[object_system_group] = mmt ? mmt->Current() : 0.0f;
-
             const auto* mtmt = obj->GetMeter(target_meter_type);
-            m_connected_object_groups_resource_target_output[object_system_group] = mtmt ? mtmt->Current() : 0.0f;
 
-            continue;
+            m_connected_object_groups_resource_output[object_system_group] = mmt ? mmt->Current() : 0.0f;
+            m_connected_object_groups_resource_target_output[std::move(object_system_group)] = mtmt ? mtmt->Current() : 0.0f;
+
+        } else {
+            // if resource center's system is in a system group, record which system
+            // group that is for later
+            system_groups_to_object_groups[std::move(object_system_group)].insert(std::move(obj));
         }
-
-        // if resource center's system is in a system group, record which system
-        // group that is for later
-        system_groups_to_object_groups[object_system_group].insert(obj);
     }
 
     // sum the resource production for object groups, and store the total

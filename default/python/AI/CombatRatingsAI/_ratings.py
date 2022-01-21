@@ -2,8 +2,9 @@ from collections import Counter
 
 from CombatRatingsAI._fleet_combat_stats import get_fleet_combat_stats
 from CombatRatingsAI._ship_combat_stats import ShipCombatStats, get_ship_combat_stats
+from common.fo_typing import FleetId, ShipId
 from EnumsAI import MissionType
-from freeorion_tools import cache_for_current_turn
+from freeorion_tools.caching import cache_for_current_turn
 
 
 @cache_for_current_turn
@@ -29,7 +30,7 @@ def get_empire_standard_military_ship_stats() -> ShipCombatStats:
 
 
 def default_ship_stats() -> ShipCombatStats:
-    """ Return some ship stats to assume if no other intel is available.
+    """Return some ship stats to assume if no other intel is available.
 
     :return: Some weak standard ship
     """
@@ -43,7 +44,7 @@ def default_ship_stats() -> ShipCombatStats:
         flak_shots=0,
         has_interceptors=False,
         damage_vs_planets=0,
-        has_bomber=False
+        has_bomber=False,
     )
 
 
@@ -52,13 +53,13 @@ def weight_attack_troops(troops: float, grade: str) -> float:
 
     :return: piloting grade weighted troops
     """
-    weight = {'NO': 0.0, 'BAD': 0.5, '': 1.0, 'GOOD': 1.5, 'GREAT': 2.0, 'ULTIMATE': 3.0}.get(grade, 1.0)
+    weight = {"NO": 0.0, "BAD": 0.5, "": 1.0, "GOOD": 1.5, "GREAT": 2.0, "ULTIMATE": 3.0}.get(grade, 1.0)
     return troops * weight
 
 
-def weight_shields(shields, grade):
+def weight_shields(shields: float, grade: str) -> float:
     """Re-weights shields based on species defense bonus."""
-    offset = {'NO': 0, 'BAD': 0, '': 0, 'GOOD': 1.0, 'GREAT': 0, 'ULTIMATE': 0}.get(grade, 0)
+    offset = {"NO": 0, "BAD": 0, "": 0, "GOOD": 1.0, "GREAT": 0, "ULTIMATE": 0}.get(grade, 0)
     return shields + offset
 
 
@@ -86,7 +87,7 @@ def rating_difference(first_rating: float, second_rating: float) -> float:
     return rating_needed(max(first_rating, second_rating), min(first_rating, second_rating))
 
 
-def get_fleet_rating(fleet_id: int, enemy_stats: ShipCombatStats = None) -> float:
+def get_fleet_rating(fleet_id: FleetId, enemy_stats: ShipCombatStats = None) -> float:
     """Get rating for the fleet against specified enemy.
 
     :param fleet_id: fleet to be rated
@@ -95,9 +96,9 @@ def get_fleet_rating(fleet_id: int, enemy_stats: ShipCombatStats = None) -> floa
     return get_fleet_combat_stats(fleet_id, max_stats=False).get_rating(enemy_stats)
 
 
-def get_fleet_rating_against_planets(fleet_id):
+def get_fleet_rating_against_planets(fleet_id: FleetId):
     return get_fleet_combat_stats(fleet_id, max_stats=False).get_rating_vs_planets()
 
 
-def get_ship_rating(ship_id, enemy_stats=None):
+def get_ship_rating(ship_id: ShipId, enemy_stats=None):
     return get_ship_combat_stats(ship_id=ship_id, max_stats=False).get_rating(enemy_stats)

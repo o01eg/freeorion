@@ -23,18 +23,20 @@ Building::Building(int empire_id, const std::string& building_type,
     UniverseObject::Init();
 }
 
-Building* Building::Clone(int empire_id) const {
-    Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(this->ID(), empire_id);
+Building* Building::Clone(const Universe& universe, int empire_id) const {
+    Visibility vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
 
-    Building* retval = new Building(Owner(), m_building_type, m_produced_by_empire_id);
-    retval->Copy(shared_from_this(), empire_id);
-    return retval;
+    auto retval = std::make_unique<Building>();
+    retval->Copy(shared_from_this(), universe, empire_id);
+    return retval.release();
 }
 
-void Building::Copy(std::shared_ptr<const UniverseObject> copied_object, int empire_id) {
+void Building::Copy(std::shared_ptr<const UniverseObject> copied_object,
+                    const Universe& universe, int empire_id)
+{
     if (copied_object.get() == this)
         return;
     auto copied_building = std::dynamic_pointer_cast<const Building>(copied_object);
@@ -44,10 +46,10 @@ void Building::Copy(std::shared_ptr<const UniverseObject> copied_object, int emp
     }
 
     int copied_object_id = copied_object->ID();
-    Visibility vis = GetUniverse().GetObjectVisibilityByEmpire(copied_object_id, empire_id);
-    auto visible_specials = GetUniverse().GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
+    Visibility vis = universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
+    auto visible_specials = universe.GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
 
-    UniverseObject::Copy(std::move(copied_object), vis, visible_specials);
+    UniverseObject::Copy(std::move(copied_object), vis, visible_specials, universe);
 
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
         this->m_planet_id =                 copied_building->m_planet_id;
@@ -71,13 +73,13 @@ bool Building::HostileToEmpire(int empire_id, const EmpireManager& empires) cons
         empires.GetDiplomaticStatus(Owner(), empire_id) == DiplomaticStatus::DIPLO_WAR;
 }
 
-std::set<std::string> Building::Tags() const {
+std::set<std::string> Building::Tags(const ScriptingContext&) const {
     if (const BuildingType* type = ::GetBuildingType(m_building_type))
         return type->Tags();
     return {};
 }
 
-bool Building::HasTag(const std::string& name) const {
+bool Building::HasTag(const std::string& name, const ScriptingContext&) const {
     const BuildingType* type = GetBuildingType(m_building_type);
     return type && type->Tags().count(name);
 }

@@ -16,14 +16,11 @@ namespace {
 }
 
 ResourceCenter::ResourceCenter() :
-    m_focus(),
     m_last_turn_focus_changed(INVALID_GAME_TURN),
-    m_focus_turn_initial(),
     m_last_turn_focus_changed_turn_initial(INVALID_GAME_TURN)
 {}
 
-ResourceCenter::~ResourceCenter()
-{}
+ResourceCenter::~ResourceCenter() = default;
 
 ResourceCenter::ResourceCenter(const ResourceCenter& rhs) :
     m_focus(rhs.m_focus),
@@ -86,9 +83,8 @@ const std::string& ResourceCenter::FocusIcon(const std::string& focus_name) cons
 { return EMPTY_STRING; }
 
 std::string ResourceCenter::Dump(unsigned short ntabs) const {
-    std::stringstream os;
-    os << "ResourceCenter focus: " << m_focus << " last changed on turn: " << m_last_turn_focus_changed;
-    return os.str();
+    return std::string{"ResourceCenter focus: "}.append(m_focus)
+        .append(" last changed on turn: ").append(std::to_string(m_last_turn_focus_changed));
 }
 
 void ResourceCenter::SetFocus(const std::string& focus) {

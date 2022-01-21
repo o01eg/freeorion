@@ -402,7 +402,8 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
         ErrorLogger(FSM) << "Unable to recover server terminating.";
         if (m_server.IsHostless()) {
             if (GetOptionsDB().Get<bool>("save.auto.hostless.enabled") &&
-                GetOptionsDB().Get<bool>("save.auto.exit.enabled"))
+                GetOptionsDB().Get<bool>("save.auto.exit.enabled") &&
+                m_server.CurrentTurn() > 0)
             {
                 // save game on exit
                 std::string save_filename = GetAutoSaveFileName(m_server.CurrentTurn());
@@ -570,7 +571,8 @@ bool ServerFSM::EstablishPlayer(const PlayerConnectionPtr& player_connection,
         {
             // add "player enter game" message
             boost::posix_time::ptime timestamp = boost::posix_time::second_clock::universal_time();
-            std::string data = std::string("[[") + UserStringNop("PLAYER_ENTERED_GAME") + "," + player_connection->PlayerName() + "]]";
+            std::string data = std::string("[[").append(UserStringNop("PLAYER_ENTERED_GAME"))
+                                                .append(",").append(player_connection->PlayerName()).append("]]");
             m_server.PushChatMessage(data, "", CLR_SERVER, timestamp);
 
             // send message to other players
@@ -582,18 +584,16 @@ bool ServerFSM::EstablishPlayer(const PlayerConnectionPtr& player_connection,
             }
 
             std::vector<std::reference_wrapper<const ChatHistoryEntity>> chat_history;
-            for (const auto& elem : m_server.GetChatHistory()) {
+            for (const auto& elem : m_server.GetChatHistory())
                 chat_history.push_back(std::cref(elem));
-            }
-            if (chat_history.size() > 0) {
+            if (chat_history.size() > 0)
                 player_connection->SendMessage(ChatHistoryMessage(chat_history));
-            }
         }
     }
 
     // disconnect "ghost" connection after establishing new
     for (const auto& conn : to_disconnect)
-    { m_server.Networking().Disconnect(conn); }
+        m_server.Networking().Disconnect(conn);
 
     return client_type != Networking::ClientType::INVALID_CLIENT_TYPE;
 }
@@ -738,8 +738,7 @@ sc::result Idle::react(const Hostless&) {
     if (autostart_load_filename.empty()) {
         DebugLogger(FSM) << "Start new game";
 
-        std::list<PlayerSetupData> human_players = server.FillListPlayers();
-
+        auto human_players = server.FillListPlayers();
         for (auto& player_setup_data : human_players) {
             DebugLogger(FSM) << "Create player " << player_setup_data.player_name;
             player_setup_data.player_id =     Networking::INVALID_PLAYER_ID;
@@ -2702,7 +2701,8 @@ sc::result PlayingGame::react(const ShutdownServer& msg) {
 
     if (server.IsHostless() &&
         GetOptionsDB().Get<bool>("save.auto.hostless.enabled") &&
-        GetOptionsDB().Get<bool>("save.auto.exit.enabled"))
+        GetOptionsDB().Get<bool>("save.auto.exit.enabled") &&
+        server.CurrentTurn() > 0)
     {
         // save game on exit
         std::string save_filename = GetAutoSaveFileName(server.CurrentTurn());
@@ -3404,7 +3404,7 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
     }
 
     // save game so orders from the player will be backuped
-    if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.each-player.enabled")) {
+    if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.each-player.enabled") && server.CurrentTurn() > 0) {
         PlayerConnectionPtr dummy_connection = nullptr;
         post_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(server.CurrentTurn())), dummy_connection));
     }
@@ -3454,6 +3454,10 @@ sc::result WaitingForTurnEnd::react(const SaveGameRequest& msg) {
 void WaitingForTurnEnd::SaveTimedoutHandler(const boost::system::error_code& error) {
     if (error) {
         DebugLogger() << "Save timed out cancelled";
+        return;
+    }
+
+    if (Server().CurrentTurn() <= 0) {
         return;
     }
 
@@ -3518,7 +3522,7 @@ sc::result ProcessingTurn::react(const ProcessTurn& u) {
         GetOptionsDB().Set<bool>("network.server.publish-statistics", true);
     }
 
-    if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.enabled")) {
+    if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.enabled") && server.CurrentTurn() > 0) {
         PlayerConnectionPtr dummy_connection = nullptr;
         post_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(server.CurrentTurn())), dummy_connection));
     }

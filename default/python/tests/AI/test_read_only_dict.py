@@ -1,13 +1,12 @@
 import pytest
-from pytest import raises
-
 from freeorion_tools import ReadOnlyDict
+from pytest import raises
 
 dict_content = {
     1: -1,
     1.09: 1.1,
-    'abc': 'xyz',
-    (1, 2, 3): ('a', 1, (1, 2)),
+    "abc": "xyz",
+    (1, 2, 3): ("a", 1, (1, 2)),
 }
 
 
@@ -36,11 +35,11 @@ def test_readonly_dict_get_existing_key_works_same_as_for_dict():
 def test_readonly_dict_get_non_existiong_key_works_same_as_for_dict():
     test_dict = ReadOnlyDict(dict_content)
     # check correct functionality if keys not in dict
-    assert 'INVALID_KEY' not in test_dict
-    assert test_dict.get('INVALID_KEY', -99999) == -99999
+    assert "INVALID_KEY" not in test_dict
+    assert test_dict.get("INVALID_KEY", -99999) == -99999
     with pytest.raises(KeyError, match="'INVALID_KEY'"):
         # noinspection PyStatementEffect
-        test_dict['INVALID_KEY']
+        test_dict["INVALID_KEY"]
         pytest.fail("Invalid key lookup didn't raise a KeyError")
 
 
@@ -70,12 +69,12 @@ def test_readonly_dict_remove_value_raises_error():
 def test_readonly_dict_set_value_raises_error():
     test_dict = ReadOnlyDict(dict_content)
     with raises(TypeError, match="'ReadOnlyDict' object does not support item assignment"):
-        test_dict['INVALID_KEY'] = 1
-        pytest.fail('Can add items to the dict.')
-    assert 'INVALID_KEY' not in test_dict
+        test_dict["INVALID_KEY"] = 1
+        pytest.fail("Can add items to the dict.")
+    assert "INVALID_KEY" not in test_dict
 
 
 def test_readonly_create_from_dict_with_hashable_values_raises_error():
     with raises(TypeError, match="unhashable type: 'list'"):
         ReadOnlyDict({1: [1]})
-        pytest.fail('Can store mutable items in dict')
+        pytest.fail("Can store mutable items in dict")

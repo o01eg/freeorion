@@ -15,12 +15,17 @@ ParserAppFixture::ParserAppFixture() {
     BOOST_REQUIRE(m_scripting_dir.is_absolute());
     BOOST_REQUIRE(fs::exists(m_scripting_dir));
     BOOST_REQUIRE(fs::is_directory(m_scripting_dir));
+
+    GetOptionsDB().Set<std::string>("resource.path", PathToString(GetBinDir() / "default"));
 }
+
+int ParserAppFixture::EmpireID() const
+{ return ALL_EMPIRES; }
 
 int ParserAppFixture::CurrentTurn() const
 { return INVALID_GAME_TURN; }
 
-Universe& ParserAppFixture::GetUniverse()
+Universe& ParserAppFixture::GetUniverse() noexcept
 { return m_universe; }
 
 const GalaxySetupData& ParserAppFixture::GetGalaxySetupData() const
@@ -50,15 +55,14 @@ Empire* ParserAppFixture::GetEmpire(int empire_id)
 SpeciesManager& ParserAppFixture::GetSpeciesManager()
 { return m_species_manager; }
 
-Species* ParserAppFixture::GetSpecies(const std::string& name)
+const Species* ParserAppFixture::GetSpecies(const std::string& name)
 { return m_species_manager.GetSpecies(name); }
 
 SupplyManager& ParserAppFixture::GetSupplyManager()
 { return m_supply_manager; }
 
-ObjectMap& ParserAppFixture::EmpireKnownObjects(int empire_id) {
-    return m_universe.EmpireKnownObjects(empire_id);
-}
+ObjectMap& ParserAppFixture::EmpireKnownObjects(int empire_id)
+{ return m_universe.EmpireKnownObjects(empire_id); }
 
 int ParserAppFixture::EffectsProcessingThreads() const
 { return 1; }

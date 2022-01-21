@@ -1,14 +1,16 @@
+import freeOrionAIInterface as fo
 from logging import debug, error, info
 
-import freeOrionAIInterface as fo  # interface used to interact with FreeOrion AI client # pylint: disable=import-error
 import FleetUtilsAI
-from EnumsAI import MissionType
 import MoveUtilsAI
 import PlanetUtilsAI
-from AIDependencies import INVALID_ID
-from freeorion_tools import get_fleet_position, get_partial_visibility_turn
+from AIDependencies import INVALID_ID, MINIMUM_GUARD_DISTANCE_TO_HOME_SYSTEM
 from aistate_interface import get_aistate
+from common.fo_typing import SystemId
+from EnumsAI import MissionType
+from freeorion_tools import get_fleet_position, get_partial_visibility_turn
 from target import TargetSystem
+from universe.system_network import get_neighbors, systems_connected
 
 graph_flags = set()
 border_unexplored_system_ids = set()
@@ -44,8 +46,10 @@ def assign_scouts_to_explore_systems():
     if not border_unexplored_system_ids or (capital_sys_id == INVALID_ID):
         return
     exp_systems_by_dist = sorted((universe.linearDistance(capital_sys_id, x), x) for x in border_unexplored_system_ids)
-    debug("Exploration system considering following system-distance pairs:\n  %s" % (
-        "\n  ".join("%3d: %5.1f" % (sys_id, dist) for (dist, sys_id) in exp_systems_by_dist)))
+    debug(
+        "Exploration system considering following system-distance pairs:\n  %s"
+        % ("\n  ".join("%3d: %5.1f" % (sys_id, dist) for (dist, sys_id) in exp_systems_by_dist))
+    )
     explore_list = [sys_id for dist, sys_id in exp_systems_by_dist]
 
     already_covered, available_scouts = get_current_exploration_info()
@@ -53,11 +57,14 @@ def assign_scouts_to_explore_systems():
     debug("Explorable system IDs: %s" % explore_list)
     debug("Already targeted: %s" % already_covered)
     aistate = get_aistate()
-    needs_vis = aistate.misc.setdefault('needs_vis', [])
+    needs_vis = aistate.misc.setdefault("needs_vis", [])
     check_list = aistate.needsEmergencyExploration + needs_vis + explore_list
     if INVALID_ID in check_list:  # shouldn't normally happen, unless due to bug elsewhere
-        for sys_list, name in [(aistate.needsEmergencyExploration, "aistate.needsEmergencyExploration"),
-                               (needs_vis, "needs_vis"), (explore_list, "explore_list")]:
+        for sys_list, name in [
+            (aistate.needsEmergencyExploration, "aistate.needsEmergencyExploration"),
+            (needs_vis, "needs_vis"),
+            (explore_list, "explore_list"),
+        ]:
             if INVALID_ID in sys_list:
                 error("INVALID_ID found in " + name, exc_info=True)
     # emergency coverage can be due to invasion detection trouble, etc.
@@ -65,8 +72,10 @@ def assign_scouts_to_explore_systems():
     needs_coverage = [sys_id for sys_id in check_list if sys_id not in already_covered and sys_id != INVALID_ID]
     debug("Needs coverage: %s" % needs_coverage)
 
-    debug("Available scouts & AIstate locs: %s" % [(x, aistate.fleetStatus.get(x, {}).get('sysID', INVALID_ID))
-                                                   for x in available_scouts])
+    debug(
+        "Available scouts & AIstate locs: %s"
+        % [(x, aistate.fleetStatus.get(x, {}).get("sysID", INVALID_ID)) for x in available_scouts]
+    )
     debug("Available scouts & universe locs: %s" % [(x, universe.getFleet(x).systemID) for x in available_scouts])
     if not needs_coverage or not available_scouts:
         return
@@ -79,18 +88,20 @@ def assign_scouts_to_explore_systems():
                 if sys_id in needs_vis:
                     del needs_vis[needs_vis.index(sys_id)]
                 if sys_id in aistate.needsEmergencyExploration:
-                    del aistate.needsEmergencyExploration[
-                        aistate.needsEmergencyExploration.index(sys_id)]
+                    del aistate.needsEmergencyExploration[aistate.needsEmergencyExploration.index(sys_id)]
                 debug("system id %d already currently visible; skipping exploration" % sys_id)
                 needs_coverage.remove(sys_id)
                 continue
 
         # skip systems threatened by monsters
         sys_status = aistate.systemStatus.setdefault(sys_id, {})
-        if (not aistate.character.may_explore_system(sys_status.setdefault('monsterThreat', 0)) or (
-                fo.currentTurn() < 20 and aistate.systemStatus[sys_id]['monsterThreat'] > 0)):
-            debug("Skipping exploration of system %d due to Big Monster, threat %d" % (
-                sys_id, aistate.systemStatus[sys_id]['monsterThreat']))
+        if not aistate.character.may_explore_system(sys_status.setdefault("monsterThreat", 0)) or (
+            fo.currentTurn() < 20 and aistate.systemStatus[sys_id]["monsterThreat"] > 0
+        ):
+            debug(
+                "Skipping exploration of system %d due to Big Monster, threat %d"
+                % (sys_id, aistate.systemStatus[sys_id]["monsterThreat"])
+            )
             needs_coverage.remove(sys_id)
             continue
 
@@ -147,24 +158,25 @@ def follow_vis_system_connections(start_system_id, home_system_id):
             pre_vis = "an unknown system"
         system_header = "*** system %s;" % system
         if fo.currentTurn() < 50:
-            visibility_turn_list = sorted(universe.getVisibilityTurnsMap(cur_system_id, empire_id).items(),
-                                          key=lambda x: x[0].numerator)
-            visibility_info = ', '.join('%s: %s' % (vis.name, turn) for vis, turn in visibility_turn_list)
+            visibility_turn_list = sorted(
+                universe.getVisibilityTurnsMap(cur_system_id, empire_id).items(), key=lambda x: x[0].numerator
+            )
+            visibility_info = ", ".join("%s: %s" % (vis.name, turn) for vis, turn in visibility_turn_list)
             debug("%s previously %s. Visibility per turn: %s " % (system_header, pre_vis, visibility_info))
             status_info = []
         else:
             status_info = [system_header]
 
         has_been_visible = get_partial_visibility_turn(cur_system_id) > 0
-        is_connected = universe.systemsConnected(cur_system_id, home_system_id, -1)  # self.empire_id)
+        is_connected = systems_connected(cur_system_id, home_system_id)
         status_info.append("    -- is%s partially visible" % ("" if has_been_visible else " not"))
         status_info.append("    -- is%s visibly connected to homesystem" % ("" if is_connected else " not"))
         if has_been_visible:
             sys_status = aistate.systemStatus.setdefault(cur_system_id, {})
             aistate.visInteriorSystemIDs.add(cur_system_id)
             aistate.visBorderSystemIDs.discard(cur_system_id)
-            neighbors = set(universe.getImmediateNeighbors(cur_system_id, empire_id))
-            sys_status.setdefault('neighbors', set()).update(neighbors)
+            neighbors = get_neighbors(cur_system_id)
+            sys_status.setdefault("neighbors", set()).update(neighbors)
             if neighbors:
                 status_info.append(" -- has neighbors %s" % sorted(neighbors))
                 for sys_id in neighbors:
@@ -174,7 +186,7 @@ def follow_vis_system_connections(start_system_id, home_system_id):
                         aistate.visBorderSystemIDs.add(sys_id)
                         exploration_list.append(sys_id)
         if fo.currentTurn() < 50:
-            debug('\n'.join(status_info))
+            debug("\n".join(status_info))
             debug("----------------------------------------------------------")
 
 
@@ -184,10 +196,9 @@ def update_explored_systems():
     obs_lanes = empire.obstructedStarlanes()
     obs_lanes_list = [el for el in obs_lanes]  # should result in list of tuples (sys_id1, sys_id2)
     if obs_lanes_list:
-        debug("Obstructed starlanes are: %s" % ', '.join('%s-%s' % item for item in obs_lanes_list))
+        debug("Obstructed starlanes are: %s" % ", ".join("%s-%s" % item for item in obs_lanes_list))
     else:
         debug("No obstructed Starlanes")
-    empire_id = fo.empireID()
     newly_explored = []
     still_unexplored = []
     aistate = get_aistate()
@@ -208,14 +219,46 @@ def update_explored_systems():
     dummy = []
     for id_list, next_list in [(newly_explored, neighbor_list), (neighbor_list, dummy)]:
         for sys_id in id_list:
-            neighbors = list(universe.getImmediateNeighbors(sys_id, empire_id))
+            neighbors = get_neighbors(sys_id)
             for neighbor_id in neighbors:
                 # when it matters, unexplored will be smaller than explored
                 if neighbor_id not in aistate.unexploredSystemIDs:
                     next_list.append(neighbor_id)
 
     for sys_id in still_unexplored:
-        neighbors = list(universe.getImmediateNeighbors(sys_id, empire_id))
+        neighbors = get_neighbors(sys_id)
         if any(nid in aistate.exploredSystemIDs for nid in neighbors):
             border_unexplored_system_ids.add(sys_id)
     return newly_explored
+
+
+def request_emergency_exploration(system_id: SystemId):
+    aistate = get_aistate()
+    if system_id not in aistate.needsEmergencyExploration:
+        aistate.needsEmergencyExploration.append(system_id)
+
+
+def system_could_have_unknown_stationary_guard(system_id: SystemId) -> bool:
+    """Return True if the system may have spawned stationary guards.
+
+    A stationary guard is defined as immobile monster fleets spawned at game start.
+    If this function indicates that there is no such guard, there still may be other threats.
+    """
+    # We do not play around invisible guards, so if system was visible at some point,
+    # there should not be a stationary guard there
+    system_was_visible = get_partial_visibility_turn(system_id) > 0
+    if system_was_visible:
+        return False
+
+    # Universe setup settings may forbid guards
+    if fo.getGalaxySetupData().monsterFrequency == fo.galaxySetupOption.none:
+        return False
+
+    # Stationary guards require some distance to the home system to be spawned
+    home_system = PlanetUtilsAI.get_capital_sys_id()
+    jump_distance_to_home_system = fo.getUniverse().jumpDistance(system_id, home_system)
+    if jump_distance_to_home_system < MINIMUM_GUARD_DISTANCE_TO_HOME_SYSTEM:
+        return False
+
+    # No indicator that there isn't a stationary guard
+    return True

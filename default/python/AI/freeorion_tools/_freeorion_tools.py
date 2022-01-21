@@ -1,19 +1,19 @@
 # This Python file uses the following encoding: utf-8
+import freeOrionAIInterface as fo
 import inspect
 import pprint
 import re
 import traceback
 from collections.abc import Mapping
 from functools import wraps
-from logging import debug, error, ERROR, getLogger, Handler, warning
+from logging import ERROR, Handler, debug, error, getLogger, warning
 
-import freeOrionAIInterface as fo  # pylint: disable=import-error
-from aistate_interface import get_aistate
 from common.configure_logging import FOLogFormatter
+from freeorion_tools.caching import cache_for_current_turn, cache_for_session
 
 # color wrappers for chat:
-RED = '<rgba 255 0 0 255>%s</rgba>'
-WHITE = '<rgba 255 255 255 255>%s</rgba>'
+RED = "<rgba 255 0 0 255>%s</rgba>"
+WHITE = "<rgba 255 255 255 255>%s</rgba>"
 
 
 def dict_from_map(thismap):
@@ -47,36 +47,6 @@ def get_ai_tag_grade(tag_list, tag_type):
     return ""
 
 
-# this name left with C naming style for compatibility with translation assistance procedures
-def UserString(label, default=None):  # pylint: disable=invalid-name
-    """
-    A translation assistance tool is intended to search for this method to identify translatable strings.
-
-    :param label: a UserString key
-    :param default: a default value to return if there is a key error
-    :return: a translated string for the label
-    """
-
-    table_string = fo.userString(label)
-
-    if "ERROR: " + label in table_string:  # implement test for string lookup not found error
-        return default or table_string
-    else:
-        return table_string
-
-
-# this name left with C naming style for compatibility with translation assistance procedures
-def UserStringList(label):  # pylint: disable=invalid-name
-    """
-    A translation assistance tool is intended to search for this method to identify translatable strings.
-
-    :param label: a UserString key
-    :return: a python list of translated strings from the UserString list identified by the label
-    """
-
-    return fo.userStringList(label)
-
-
 def tech_is_complete(tech):
     """
     Return if tech is complete.
@@ -105,11 +75,12 @@ def ppstring(foo):
 
 
 class ConsoleLogHandler(Handler):
-    """A log handler to send errors to the console. """
+    """A log handler to send errors to the console."""
+
     def emit(self, record):
         """Emit a record.
 
-        If a formatter is specified, it is used to format the record and then sent to human players. """
+        If a formatter is specified, it is used to format the record and then sent to human players."""
         try:
             human_ids = [x for x in fo.allPlayerIDs() if fo.playerIsHost(x)]
             if not human_ids:
@@ -129,8 +100,10 @@ class ConsoleLogHandler(Handler):
 console_handler = ConsoleLogHandler()
 
 console_handler.setFormatter(
-    FOLogFormatter(RED % ('%s : %%(filename)s:%%(funcName)s():%%(lineno)d  - %%(message)s'
-                          % fo.userString('AI_ERROR_MSG'))))
+    FOLogFormatter(
+        RED % ("%s : %%(filename)s:%%(funcName)s():%%(lineno)d  - %%(message)s" % fo.userString("AI_ERROR_MSG"))
+    )
+)
 
 console_handler.setLevel(ERROR)
 
@@ -139,11 +112,11 @@ getLogger().addHandler(console_handler)
 
 def remove_tags(message):
     """Remove tags described in Font.h from message."""
-    expr = r'</?(i|u|(rgba ([0-1]\.)?\d+ ([0-1]\.)?\d+ ([0-1]\.)?\d+ ([0-1]\.)?\d+)|rgba|left|center|right|pre)>'
-    return re.sub(expr, '', message)
+    expr = r"</?(i|u|(rgba ([0-1]\.)?\d+ ([0-1]\.)?\d+ ([0-1]\.)?\d+ ([0-1]\.)?\d+)|rgba|left|center|right|pre)>"
+    return re.sub(expr, "", message)
 
 
-def chat_human(message):
+def chat_human(message, send_to_logs=True):
     """
     Send chat message to human and print it to log.
     Log message cleared form tags.
@@ -151,70 +124,8 @@ def chat_human(message):
     human_id = [x for x in fo.allPlayerIDs() if fo.playerIsHost(x)][0]
     message = str(message)
     fo.sendChatMessage(human_id, message)
-    debug("Chat Message to human: %s", remove_tags(message))
-
-
-def cache_for_session(func):
-    """
-    Cache a function value for current session.
-
-    Wraps only functions with hashable arguments.
-    Use this only if the called function return value is constant throughout the game.
-    """
-    _cache = {}
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        key = (func, args, tuple(kwargs.items()))
-        if key in _cache:
-            return _cache[key]
-        res = func(*args, **kwargs)
-        _cache[key] = res
-        return res
-    wrapper._cache = _cache
-    return wrapper
-
-
-def cache_for_current_turn(func):
-    """
-    Cache a function value updated each turn.
-
-    The cache is non-persistent through loading a game.
-    Wraps only functions with hashable arguments.
-    """
-    _cache = {}
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        key = (func, args, tuple(kwargs.items()))
-        this_turn = fo.currentTurn()
-        if key in _cache and _cache[key][0] == this_turn:
-            return _cache[key][1]
-        res = func(*args, **kwargs)
-        _cache[key] = (this_turn, res)
-        return res
-    wrapper._cache = _cache
-    return wrapper
-
-
-def cache_by_turn_persistent(func):
-    """
-    Cache a function value by turn, persistent through loading a game.
-
-    It will also provides a history that may be analysed.
-    The cache is keyed by the original function name. It only wraps functions without arguments.
-
-    As the result is stored in AIstate, its type must be trusted by the savegame_codec module.
-    """
-    @wraps(func)
-    def wrapper():
-        if get_aistate() is None:
-            return func()
-        else:
-            cache = get_aistate().misc.setdefault('caches', {}).setdefault(func.__name__, {})
-            this_turn = fo.currentTurn()
-            return cache[this_turn] if this_turn in cache else cache.setdefault(this_turn, func())
-    return wrapper
+    if send_to_logs:
+        debug("Chat Message to human: %s", remove_tags(message))
 
 
 def dict_to_tuple(dic):
@@ -245,29 +156,29 @@ def get_partial_visibility_turn(obj_id: int) -> int:
 class ReadOnlyDict(Mapping):
     """A dict that offers only read access.
 
-     Note that if the values of the ReadOnlyDict are mutable,
-     then those objects may actually be changed.
+    Note that if the values of the ReadOnlyDict are mutable,
+    then those objects may actually be changed.
 
-     It is strongly advised to store only immutable objects.
-     A slight protection is offered by checking for hashability of the values.
+    It is strongly advised to store only immutable objects.
+    A slight protection is offered by checking for hashability of the values.
 
-      Example usage:
-      my_dict = ReadOnlyDict({1:2, 3:4})
-      print my_dict[1]
-      for k in my_dict:
-          print my_dict.get(k, -1)
-      for k in my_dict.keys():
-          print my_dict[k]
-      for k, v in my_dict.iteritems():
-          print k, v
-      my_dict[5] = 4  # throws TypeError
-      del my_dict[1]  # throws TypeError
+     Example usage:
+     my_dict = ReadOnlyDict({1:2, 3:4})
+     print my_dict[1]
+     for k in my_dict:
+         print my_dict.get(k, -1)
+     for k in my_dict.keys():
+         print my_dict[k]
+     for k, v in my_dict.iteritems():
+         print k, v
+     my_dict[5] = 4  # throws TypeError
+     del my_dict[1]  # throws TypeError
 
-      Implementation note:
+     Implementation note:
 
-     The checks that values are hashable is the main difference from the built-in types.MappingProxyType.
-     MappingProxyType has slightly different signature and cannot be inherited.
-     """
+    The checks that values are hashable is the main difference from the built-in types.MappingProxyType.
+    MappingProxyType has slightly different signature and cannot be inherited.
+    """
 
     def __init__(self, *args, **kwargs):
         self._data = dict(*args, **kwargs)
@@ -295,8 +206,7 @@ def dump_universe():
     """Dump the universe but not more than once per turn."""
     cur_turn = fo.currentTurn()
 
-    if (not hasattr(dump_universe, "last_dump") or
-            dump_universe.last_dump < cur_turn):
+    if not hasattr(dump_universe, "last_dump") or dump_universe.last_dump < cur_turn:
         dump_universe.last_dump = cur_turn
         fo.getUniverse().dump()  # goes to debug logger
 
@@ -313,6 +223,7 @@ class LogLevelSwitcher:
 
     debug("baz")  # not printed, we are back to INFO level
     """
+
     def __init__(self, log_level):
         self.target_log_level = log_level
         self.old_log_level = 0
@@ -340,6 +251,7 @@ def with_log_level(log_level):
     def foo():
         debug("debug stuff")
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -347,6 +259,7 @@ def with_log_level(log_level):
                 return func(*args, **kwargs)
 
         return wrapper
+
     return decorator
 
 
@@ -370,7 +283,7 @@ def assertion_fails(cond: bool, msg: str = "") -> bool:
     warning("\n===")
     error(header)
     stack = traceback.extract_stack()[:-1]  # do not log this function
-    warning("Stack trace (most recent call last): %s", ''.join(traceback.format_list(stack)))
+    warning("Stack trace (most recent call last): %s", "".join(traceback.format_list(stack)))
     frame = inspect.currentframe().f_back
     local_vars = pprint.pformat(frame.f_locals)
     warning("Locals inside the {}\n{}".format(frame.f_code.co_name, local_vars))

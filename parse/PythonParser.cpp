@@ -39,11 +39,11 @@ namespace {
 }
 
 struct module_spec {
-    module_spec(const std::string& name, const std::string& parent_, const PythonParser& parser_)
-        : fullname(name)
-        , parent(parent_)
-        , parser(parser_)
-    { }
+    module_spec(const std::string& name, const std::string& parent_, const PythonParser& parser_) :
+        fullname(name),
+        parent(parent_),
+        parser(parser_)
+    {}
 
     py::list path;
     std::string fullname;
@@ -51,9 +51,9 @@ struct module_spec {
     const PythonParser& parser;
 };
 
-PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path& scripting_dir)
-    : m_python(_python)
-    , m_scripting_dir(scripting_dir)
+PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path& scripting_dir) :
+    m_python(_python),
+    m_scripting_dir(scripting_dir)
 {
     if (!m_python.IsPythonRunning()) {
         ErrorLogger() << "Python parse given non-initialized python!";
@@ -91,7 +91,8 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(py::self_ns::self + int())
             .def(py::self_ns::self + double())
             .def(py::self_ns::self + py::self_ns::self)
-            .def(py::self_ns::self - py::self_ns::self);
+            .def(py::self_ns::self - py::self_ns::self)
+            .def(py::self_ns::self <= py::self_ns::self);
         py::class_<value_ref_wrapper<std::string>>("ValueRefString", py::no_init);
         py::class_<condition_wrapper>("Condition", py::no_init)
             .def(py::self_ns::self & py::self_ns::self)
@@ -112,14 +113,29 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def_readonly("ID", &target_wrapper::id)
             .def_readonly("Owner", &target_wrapper::owner)
             .def_readonly("SystemID", &target_wrapper::system_id)
-            .def_readonly("DesignID", &target_wrapper::design_id);
+            .def_readonly("DesignID", &target_wrapper::design_id)
+            .def_readonly("TargetIndustry", &target_wrapper::target_industry)
+            .def_readonly("TargetResearch", &target_wrapper::target_research)
+            .def_readonly("TargetConstruction", &target_wrapper::target_construction)
+            .def_readonly("MaxStockpile", &target_wrapper::max_stockpile);
         py::class_<local_candidate_wrapper>("__LocalCandidate", py::no_init)
             .def_readonly("LastTurnAttackedByShip", &local_candidate_wrapper::last_turn_attacked_by_ship)
             .def_readonly("LastTurnConquered", &local_candidate_wrapper::last_turn_conquered)
-            .def_readonly("LastTurnColonized", &local_candidate_wrapper::last_turn_colonized);
+            .def_readonly("LastTurnColonized", &local_candidate_wrapper::last_turn_colonized)
+            .def_readonly("Industry", &local_candidate_wrapper::industry)
+            .def_readonly("TargetIndustry", &local_candidate_wrapper::target_industry)
+            .def_readonly("Research", &local_candidate_wrapper::research)
+            .def_readonly("TargetResearch", &local_candidate_wrapper::target_research)
+            .def_readonly("Construction", &local_candidate_wrapper::construction)
+            .def_readonly("TargetConstruction", &local_candidate_wrapper::target_construction)
+            .def_readonly("Stockpile", &local_candidate_wrapper::stockpile)
+            .def_readonly("MaxStockpile", &local_candidate_wrapper::max_stockpile);
+
+        py::implicitly_convertible<source_wrapper, condition_wrapper>();
 
         m_meta_path = py::extract<py::list>(py::import("sys").attr("meta_path"));
         m_meta_path.append(boost::cref(*this));
+
     } catch (const boost::python::error_already_set& err) {
         m_python.HandleErrorAlreadySet();
         if (!m_python.IsPythonRunning()) {
@@ -178,39 +194,34 @@ bool PythonParser::ParseFileCommon(const boost::filesystem::path& path,
 
 py::object PythonParser::find_spec(const std::string& fullname, const py::object& path, const py::object& target) const {
     auto module_path(m_scripting_dir);
-    std::string parent = "";
-    std::string current = "";
-    for (boost::algorithm::split_iterator<std::string::const_iterator> it
-         = boost::algorithm::make_split_iterator(fullname, boost::algorithm::token_finder(boost::algorithm::is_any_of(".")));
-         it != boost::algorithm::split_iterator<std::string::const_iterator>();
-         ++ it)
+    std::string parent;
+    std::string current;
+    for (auto it = boost::algorithm::make_split_iterator(fullname, boost::algorithm::token_finder(boost::algorithm::is_any_of(".")));
+         it != boost::algorithm::split_iterator<std::string::const_iterator>(); ++it)
     {
         module_path = module_path / boost::copy_range<std::string>(*it);
         if (!current.empty()) {
-            if (parent.empty()) {
+            if (parent.empty())
                 parent = std::move(current);
-            } else {
+            else
                 parent = parent + "." + current;
-            }
         }
         current = boost::copy_range<std::string>(*it);
     }
 
-    if (boost::filesystem::exists(module_path) && boost::filesystem::is_directory(module_path)) {
+    if (IsExistingDir(module_path)) {
         return py::object(module_spec(fullname, parent, *this));
     } else {
         module_path.replace_extension("py");
-        if (boost::filesystem::exists(module_path) && boost::filesystem::is_regular_file(module_path)) {
+        if (IsExistingFile(module_path))
             return py::object(module_spec(fullname, parent, *this));
-        } else {
+        else
             return py::object();
-        }
     }
 }
 
-py::object PythonParser::create_module(const module_spec& spec) {
-    return py::object();
-}
+py::object PythonParser::create_module(const module_spec& spec)
+{ return py::object(); }
 
 py::object PythonParser::exec_module(py::object& module) {
     std::string fullname = py::extract<std::string>(module.attr("__name__"));
@@ -218,19 +229,15 @@ py::object PythonParser::exec_module(py::object& module) {
     py::dict m_dict = py::extract<py::dict>(module.attr("__dict__"));
 
     auto module_path(m_scripting_dir);
-    for (boost::algorithm::split_iterator<std::string::iterator> it
-         = boost::algorithm::make_split_iterator(fullname, boost::algorithm::token_finder(boost::algorithm::is_any_of(".")));
-         it != boost::algorithm::split_iterator<std::string::iterator>();
-         ++ it)
-    {
-        module_path = module_path / boost::copy_range<std::string>(*it);
-    }
+    for (auto it = boost::algorithm::make_split_iterator(fullname, boost::algorithm::token_finder(boost::algorithm::is_any_of(".")));
+         it != boost::algorithm::split_iterator<std::string::iterator>(); ++it)
+    { module_path = module_path / boost::copy_range<std::string>(*it); }
 
-    if (boost::filesystem::exists(module_path) && boost::filesystem::is_directory(module_path)) {
+    if (IsExistingDir(module_path)) {
         return py::object();
     } else {
         module_path.replace_extension("py");
-        if (boost::filesystem::exists(module_path) && boost::filesystem::is_regular_file(module_path)) {
+        if (IsExistingFile(module_path)) {
             std::string file_contents;
             bool read_success = ReadFile(module_path, file_contents);
             if (!read_success) {
@@ -243,16 +250,13 @@ py::object PythonParser::exec_module(py::object& module) {
             // and still import will work
             py::dict globals = m_current_globals ? (*m_current_globals) : py::dict();
             py::stl_input_iterator<py::object> g_begin(globals.keys()), g_end;
-            for (auto it = g_begin; it != g_end; ++ it) {
-                if (!m_dict.has_key(*it)) {
+            for (auto it = g_begin; it != g_end; ++it) {
+                if (!m_dict.has_key(*it))
                     m_dict[*it] = globals[*it];
-                }
             }
 
             try {
-                py::exec(file_contents.c_str(),
-                         m_dict,
-                         m_dict);
+                py::exec(file_contents.c_str(), m_dict, m_dict);
             } catch (const boost::python::error_already_set& err) {
                 m_python.HandleErrorAlreadySet();
                 if (!m_python.IsPythonRunning()) {

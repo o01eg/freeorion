@@ -22,15 +22,9 @@
                                                 return false;               \
                                         }   }
 
-SpecialsManager::SpecialsManager()
-{}
-
-SpecialsManager::~SpecialsManager()
-{}
-
-std::vector<std::string> SpecialsManager::SpecialNames() const {
+std::vector<std::string_view> SpecialsManager::SpecialNames() const {
     CheckPendingSpecialsTypes();
-    std::vector<std::string> retval;
+    std::vector<std::string_view> retval;
     retval.reserve(m_specials.size());
     for (const auto& entry : m_specials)
         retval.emplace_back(entry.first);
@@ -93,8 +87,7 @@ Special::Special(std::string&& name, std::string&& description,
     Init();
 }
 
-Special::~Special()
-{}
+Special::~Special() = default;
 
 bool Special::operator==(const Special& rhs) const {
     if (&rhs == this)
@@ -222,5 +215,8 @@ unsigned int Special::GetCheckSum() const {
 const Special* GetSpecial(const std::string& name)
 { return GetSpecialsManager().GetSpecial(name); }
 
-std::vector<std::string> SpecialNames()
+const Special* GetSpecial(std::string_view name)
+{ return GetSpecialsManager().GetSpecial(std::string{name}); }
+
+std::vector<std::string_view> SpecialNames()
 { return GetSpecialsManager().SpecialNames(); }

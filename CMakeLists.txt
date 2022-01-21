@@ -1,6 +1,8 @@
-cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 
-cmake_policy(SET CMP0042 NEW)
+if(POLICY CMP0072)
+  cmake_policy(SET CMP0072 NEW)
+endif()
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_HOME_DIRECTORY}/cmake ${CMAKE_HOME_DIRECTORY}/GG/cmake)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12 CACHE STRING "Set the minimum OSX deployment target version")
@@ -23,11 +25,14 @@ message(STATUS "Build type CMAKE_BUILD_TYPE set to ${CMAKE_BUILD_TYPE}")
 include(UseCompilerCache)
 find_compiler_cache(PROGRAM ccache)
 
+list(APPEND GODOT_CPP_CMAKE_VARS "CMAKE_BUILD_TYPE;CMAKE_CONFIGURATION_TYPES;CMAKE_TOOLCHAIN_FILE;PYTHON_EXECUTABLE")
 get_cmake_property(vars CACHE_VARIABLES)
 foreach(var ${vars})
   get_property(currentHelpString CACHE "${var}" PROPERTY HELPSTRING)
     if("${currentHelpString}" MATCHES "No help, variable specified on the command line." OR "${currentHelpString}" STREQUAL "")
+      if(NOT "${var}" IN_LIST GODOT_CPP_CMAKE_VARS)
         list(APPEND CL_ARGS "-D${var}=${${var}}")
+      endif()
     endif()
 endforeach()
 
@@ -87,7 +92,7 @@ if(WIN32)
 endif()
 
 if(APPLE)
-    set(FreeOrionSDK_VERSION 11)
+    set(FreeOrionSDK_VERSION 12)
     set(FreeOrionSDK_FILE "FreeOrionSDK_${FreeOrionSDK_VERSION}_Clang-MacOSX-10.9-x86_64.tar.bz2")
     if(NOT EXISTS "${CMAKE_BINARY_DIR}/${FreeOrionSDK_FILE}")
     file(DOWNLOAD
@@ -109,7 +114,7 @@ if(APPLE)
     # Location of the FreeOrionSDK root
     set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/dep/")
     set(CMAKE_FRAMEWORK_PATH "${CMAKE_BINARY_DIR}/dep/Frameworks")
-    set(CMAKE_PROGRAM_PATH "${CMAKE_FRAMEWORK_PATH}/Python.framework/Versions/3.5/bin")
+    set(CMAKE_PROGRAM_PATH "${CMAKE_FRAMEWORK_PATH}/Python.framework/Versions/3.6/bin")
 endif()
 
 if(UNIX)
@@ -205,6 +210,8 @@ set_property(DIRECTORY APPEND
         $<$<PLATFORM_ID:Linux>:FREEORION_LINUX>
         $<$<PLATFORM_ID:FreeBSD>:FREEORION_FREEBSD>
         $<$<PLATFORM_ID:OpenBSD>:FREEORION_OPENBSD>
+        $<$<PLATFORM_ID:NetBSD>:FREEORION_NETBSD>
+        $<$<PLATFORM_ID:DragonFly>:FREEORION_DRAGONFLY>
         $<$<PLATFORM_ID:Haiku>:FREEORION_HAIKU>
         $<$<PLATFORM_ID:Android>:FREEORION_ANDROID>
 )
@@ -235,7 +242,7 @@ include(TestForBug2795)
 ## Collect project dependencies.
 ##
 
-set(MINIMUM_PYTHON_VERSION 3.5)
+set(MINIMUM_PYTHON_VERSION 3.6)
 set(MINIMUM_BOOST_VERSION 1.60.0)
 
 find_package(Threads)
@@ -407,11 +414,11 @@ target_link_libraries(freeorioncommon
         Boost::python${Boost_PYTHON_SUFFIX}
         Boost::thread
         Boost::serialization
+        ${PYTHON_LIBRARIES}
         ZLIB::ZLIB
         ${ICUI18N_LIBRARY}
         ${ICUUC_LIBRARY}
         ${ICUDATA_LIBRARY}
-        ${PYTHON_LIBRARIES}
         ${ANDROID_LIBRARY}
         ${LOG_LIBRARY}
     PRIVATE
@@ -645,7 +652,7 @@ if(BUILD_CLIENT_GG)
         freeorionparse
         GiGi::GiGi
         ${SDL_LIBRARIES}
-        ${OPENGL_gl_LIBRARY}
+        $<IF:$<BOOL:${OPENGL_opengl_LIBRARY}>,${OPENGL_opengl_LIBRARY},${OPENGL_gl_LIBRARY}>
         ${OPENAL_LIBRARY}
         ${OGG_LIBRARIES}
         ${VORBIS_LIBRARIES}
@@ -672,7 +679,7 @@ if(BUILD_CLIENT_GODOT)
         include(ExternalProject)
         ExternalProject_Add(godotcpp
             GIT_REPOSITORY https://github.com/godotengine/godot-cpp
-            GIT_TAG d7c55b1ab2606253e94db5ed3caf75f90a47d03c
+            GIT_TAG 476a870d6c02957df63f3b961df8823874549de1
             SOURCE_DIR ${CMAKE_BINARY_DIR}/godot-cpp
             BINARY_DIR ${CMAKE_BINARY_DIR}/godot-cpp-build
             CMAKE_ARGS
@@ -811,11 +818,43 @@ if(BUILD_CLIENT_GODOT)
            ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}
         COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeoriongodot>" "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}"
+        COMMAND
+            ${CMAKE_COMMAND}
+            -DMODE=DATA_LINK
+            "-DDESTINATION=${CMAKE_SOURCE_DIR}/godot/assets/"
+            "-DSOURCE_PATH=${PROJECT_SOURCE_DIR}/default/data/art"
+            -P "${PROJECT_SOURCE_DIR}/cmake/TargetDependencies.cmake"
+        COMMAND
+            ${CMAKE_COMMAND}
+            -DMODE=DATA_LINK
+            "-DDESTINATION=${CMAKE_SOURCE_DIR}/godot/assets/"
+            "-DSOURCE_PATH=${PROJECT_SOURCE_DIR}/default/data/fonts"
+            -P "${PROJECT_SOURCE_DIR}/cmake/TargetDependencies.cmake"
+        COMMAND
+            ${CMAKE_COMMAND}
+            -DMODE=DATA_LINK
+            "-DDESTINATION=${CMAKE_SOURCE_DIR}/godot/assets/"
+            "-DSOURCE_PATH=${PROJECT_SOURCE_DIR}/default/data/sound"
+            -P "${PROJECT_SOURCE_DIR}/cmake/TargetDependencies.cmake"
     )
     if(ANDROID)
         add_custom_command(TARGET freeoriongodot POST_BUILD
             COMMAND
                 ${CMAKE_COMMAND} -E copy_if_different "${ICONV_LIBRARY}" "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}"
+            COMMAND
+                ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/godot/default/
+            COMMAND
+                ${CMAKE_COMMAND}
+                -DMODE=DATA_LINK
+                "-DDESTINATION=${CMAKE_SOURCE_DIR}/godot/default/"
+                "-DSOURCE_PATH=${PROJECT_SOURCE_DIR}/default/scripting"
+                -P "${PROJECT_SOURCE_DIR}/cmake/TargetDependencies.cmake"
+            COMMAND
+                ${CMAKE_COMMAND}
+                -DMODE=DATA_LINK
+                "-DDESTINATION=${CMAKE_SOURCE_DIR}/godot/default/"
+                "-DSOURCE_PATH=${PROJECT_SOURCE_DIR}/default/stringtables"
+                -P "${PROJECT_SOURCE_DIR}/cmake/TargetDependencies.cmake"
         )
     endif()
 endif()

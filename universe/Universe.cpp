@@ -1103,6 +1103,9 @@ namespace {
 
         // evaluate activation conditions of effects_groups on input source objects
         std::vector<Condition::ObjectSet> active_sources{effects_groups.size()};
+        std::vector<std::pair<std::size_t, std::future<Condition::ObjectSet>>> futures;
+        futures.reserve(active_sources.size());
+
 
         for (std::size_t i = 0; i < effects_groups.size(); ++i) {
             const auto* effects_group = effects_groups.at(i).get();
@@ -1121,7 +1124,8 @@ namespace {
             bool cache_hit = false;
             for (const auto& cond_idx : already_evaluated_activation_condition_idx) {
                 if (*cond_idx.first == *(effects_group->Activation())) {
-                    active_sources[i] = active_sources[cond_idx.second];    // copy previous condition evaluation result
+                    // get later after everything has evaluated...
+                    //active_sources[i] = active_sources[cond_idx.second];    // copy previous condition evaluation result
                     cache_hit = true;
                     break;
                 }
@@ -1130,29 +1134,61 @@ namespace {
                 continue;   // don't need to evaluate activation condition on these sources again
 
             // no cache hit; need to evaluate activation condition on input source objects
-            if (effects_group->Activation()->SourceInvariant()) {
-                // can apply condition to all source objects simultaneously
-                Condition::ObjectSet rejected;
-                rejected.reserve(source_objects.size());
-                active_sources[i] = source_objects; // copy input source objects set
-                context.source = nullptr;
-                effects_group->Activation()->Eval(context, active_sources[i],
-                                                  rejected, Condition::SearchDomain::MATCHES);
+            auto eval_active_sources = [
+                &source_objects,
+                &context,
+                activation{effects_group->Activation()}
+            ]() -> Condition::ObjectSet
+            {
+                Condition::ObjectSet retval;
 
-            } else {
-                // need to apply separately to each source object
-                active_sources[i].reserve(source_objects.size());
-                for (auto& obj : source_objects) {
-                    context.source = obj;
-                    if (effects_group->Activation()->Eval(context, obj))
-                        active_sources[i].push_back(obj);
+                if (activation->SourceInvariant()) {
+                    // can apply condition to all source objects simultaneously
+                    Condition::ObjectSet rejected;
+                    rejected.reserve(source_objects.size());
+                    retval = source_objects;
+                    ScriptingContext source_context{nullptr, context};
+                    activation->Eval(source_context, retval, rejected, Condition::SearchDomain::MATCHES);
+
+                } else {
+                    // need to apply separately to each source object
+                    ScriptingContext source_context{context};
+                    retval.reserve(source_objects.size());
+                    for (auto& obj : source_objects) {
+                        source_context.source = obj;
+                        if (activation->Eval(source_context, obj))
+                            retval.push_back(std::move(source_context.source));
+                    }
                 }
-            }
+
+                return retval;
+            };
+
+            futures.emplace_back(i, std::async(std::launch::async, eval_active_sources));
 
             // save evaluation lookup index in cache
             already_evaluated_activation_condition_idx.emplace_back(effects_group->Activation(), i);
         }
 
+        for (auto& [i, fut] : futures)
+            active_sources[i] = fut.get();
+
+
+        // loop over effects groups again, copying the cached results
+        for (std::size_t i = 0; i < effects_groups.size(); ++i) {
+            const auto* effects_group = effects_groups.at(i).get();
+            if (only_meter_effects && !effects_group->HasMeterEffects())
+                continue;
+            if (!effects_group->Scope() || !effects_group->Activation())
+                continue;
+
+            for (const auto& cond_idx : already_evaluated_activation_condition_idx) {
+                if (*cond_idx.first == *(effects_group->Activation())) {
+                    active_sources[i] = active_sources[cond_idx.second];    // copy previous condition evaluation result
+                    break;
+                }
+            }
+        }
 
         TraceLogger(effects) << [&]() {
             std::stringstream ss;
@@ -1329,9 +1365,9 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     int n = 0;  // count dispatched condition evaluations
 
 
-    // 1) EffectsGroups from Species
-    type_timer.EnterSection("species");
-    TraceLogger(effects) << "Universe::GetEffectsAndTargets for SPECIES";
+    // 1) EffectsGroups from Planet Species
+    type_timer.EnterSection("planet species");
+    TraceLogger(effects) << "Universe::GetEffectsAndTargets for PLANET SPECIES";
     std::map<std::string_view, std::vector<std::shared_ptr<const UniverseObject>>> species_objects;
     // find each species planets in single pass, maintaining object map order per-species
     for (auto& planet : context.ContextObjects().all<Planet>()) {
@@ -1347,7 +1383,30 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         }
         species_objects[species_name].push_back(planet);
     }
+    // allocate storage for target sets and dispatch condition evaluations
+    for ([[maybe_unused]] auto& [species_name, species] : context.species) {
+        auto species_objects_it = species_objects.find(species_name);
+        if (species_objects_it == species_objects.end())
+            continue;
+        const auto& source_objects = species_objects_it->second;
+        if (source_objects.empty())
+            continue;
+
+        DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_SPECIES, species_name,
+                                             source_objects, species->Effects(),
+                                             only_meter_effects,
+                                             context, potential_targets,
+                                             potential_ids_set,
+                                             source_effects_targets_causes_reorder_buffer,
+                                             thread_pool, n);
+    }
+
+
+    // 1.5) EffectsGroups from Ship Species
     // find each species ships in single pass, maintaining object map order per-species
+    type_timer.EnterSection("ship species");
+    TraceLogger(effects) << "Universe::GetEffectsAndTargets for SHIP SPECIES";
+    species_objects.clear();
     for (auto& ship : context.ContextObjects().all<Ship>()) {
         if (destroyed_object_ids.count(ship->ID()))
             continue;
@@ -1378,6 +1437,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
                                              source_effects_targets_causes_reorder_buffer,
                                              thread_pool, n);
     }
+
 
     // 2) EffectsGroups from Specials
     type_timer.EnterSection("specials");
@@ -1779,7 +1839,8 @@ void Universe::CountDestructionInStats(int object_id, int source_object_id,
     auto source = objects.get(source_object_id);
     if (!source)
         return;
-    if (auto shp = std::dynamic_pointer_cast<const Ship>(obj)) {
+    if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
+        auto shp = std::static_pointer_cast<const Ship>(obj);
         auto source_empire = empires.find(source->Owner());
         if (source_empire != empires.end() && source_empire->second)
             source_empire->second->RecordShipShotDown(*shp);
@@ -1875,11 +1936,16 @@ void Universe::ForgetKnownObject(int empire_id, int object_id) {
     int container_id = obj->ContainerObjectID();
     if (container_id != INVALID_OBJECT_ID) {
         if (auto container = objects.get(container_id)) {
-            if (auto system = std::dynamic_pointer_cast<System>(container))
+            if (container->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
+                auto system = std::static_pointer_cast<System>(container);
                 system->Remove(object_id);
-            else if (auto planet = std::dynamic_pointer_cast<Planet>(container))
+
+            } else if (container->ObjectType() == UniverseObjectType::OBJ_PLANET) {
+                auto planet = std::static_pointer_cast<Planet>(container);
                 planet->RemoveBuilding(object_id);
-            else if (auto fleet = std::dynamic_pointer_cast<Fleet>(container)) {
+
+            } else if (container->ObjectType() == UniverseObjectType::OBJ_FLEET) {
+                auto fleet = std::static_pointer_cast<Fleet>(container);
                 fleet->RemoveShips({object_id});
                 if (fleet->Empty())
                     objects.erase(fleet->ID());

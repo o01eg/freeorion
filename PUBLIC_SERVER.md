@@ -450,3 +450,17 @@ GRANT SELECT, INSERT, UPDATE ON games.turns TO freeorion;
 ALTER TABLE games.games ADD COLUMN fo_forum_url VARCHAR(512) NULL;
 ALTER TABLE games.games ADD COLUMN create_ts TIMESTAMP WITHOUT TIME ZONE NULL;
 ```
+
+# Add table to store tokens to reset password
+
+```sql
+CREATE TABLE auth.reset_tokens (
+ player_name CITEXT REFERENCES auth.users(player_name) PRIMARY KEY,
+ token UUID NOT NULL,
+ ip_address TEXT NULL,
+ create_ts TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+ last_error TEXT NULL,
+ UNIQUE(token)
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON auth.reset_tokens TO freeorion;
+```

@@ -7,6 +7,7 @@
 #include "../universe/UniverseObject.h"
 #include "../universe/UnlockableItem.h"
 #include "../universe/Planet.h"
+#include "../universe/ScriptingContext.h"
 #include "../universe/Tech.h"
 #include "../util/AppInterface.h"
 #include "../util/Logger.h"
@@ -35,14 +36,13 @@ namespace {
 
     auto obstructedStarlanes(const Empire& empire) -> std::vector<std::pair<int, int>>
     {
-        const std::set<std::pair<int, int>>& laneset = GetSupplyManager().SupplyObstructedStarlaneTraversals(empire.EmpireID());
-        std::vector<std::pair<int, int>> retval;
+        const auto& laneset = GetSupplyManager().SupplyObstructedStarlaneTraversals(empire.EmpireID());
+        static_assert(!std::is_same_v<std::decay_t<decltype(laneset)>, std::vector<std::pair<int, int>>>); // if are the same, don't need to explicitly construct the return value...
         try {
-            for (const std::pair<int, int>& lane : laneset)
-            { retval.push_back(lane); }
+            return {laneset.begin(), laneset.end()};
         } catch (...) {
+            return {};
         }
-        return retval;
     }
 
     auto jumpsToSuppliedSystem(const Empire& empire) -> std::map<int, int>
@@ -485,7 +485,9 @@ namespace FreeOrionPython {
             .add_property("description",            make_function(&Policy::Description,         py::return_value_policy<py::copy_const_reference>()))
             .add_property("shortDescription",       make_function(&Policy::ShortDescription,    py::return_value_policy<py::copy_const_reference>()))
             .add_property("category",               make_function(&Policy::Category,            py::return_value_policy<py::copy_const_reference>()))
-            .def("adoptionCost",                    &Policy::AdoptionCost)
+            .def("adoptionCost",                    +[](const Policy& p)                       { return p.AdoptionCost(AppEmpireID(), ScriptingContext{}); })
+            .def("adoptionCost",                    +[](const Policy& p, const Empire& empire) { return p.AdoptionCost(empire.EmpireID(), ScriptingContext{}); })
+            .def("adoptionCost",                    +[](const Policy& p, int empire_id)        { return p.AdoptionCost(empire_id, ScriptingContext{}); })
         ;
 
         def("getPolicy",

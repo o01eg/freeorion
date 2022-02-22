@@ -16,13 +16,17 @@ BASE_INFLUENCE_COSTS
                         Planet
                         OwnedBy empire = Source.Owner
                         Species
+                        Not Species name = "SP_EXOBOT"
                     ] +
                     ((NamedReal name = "OUTPOST_RELATIVE_ADMIN_COUNT" value = 0.25) *
                         (Statistic Count condition = And [
                             Planet
                             OwnedBy empire = Source.Owner
-                            Not Species
-                        ])                
+                            Or [
+                                Not Species
+                                Species name = "SP_EXOBOT"
+                            ]
+                        ])
                     )
                 )^0.5)
 
@@ -75,7 +79,6 @@ NO_INFLUENCE
 
 ARTISANS_INFLUENCE_STABILITY
 '''
-        [[DESCRIPTION_EFFECTSGROUP_MACRO(ARTISTIC_TRAIT_DESC)]]
         EffectsGroup     // artistic species generate influence when artisans workshops policy adopted
             scope = Source
             activation = And [

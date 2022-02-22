@@ -6170,11 +6170,11 @@ METER_INFLUENCE_VALUE_LABEL
 Influence
 
 METER_INFLUENCE_VALUE_DESC
-'''The Influence (or IP "Influence Points") of all planets in the empire represents such things as diplomatic influence, back-room dealing, espionage, public relations, propaganda, and cultural influence. It can be used to adopt [[encyclopedia ENC_POLICY]]s, and is needed to pay for the maintenance of colonies. When total IP cost of colony maintenance is greater than total IP output of the empire, the available Influence will decrease and eventually the empire won't be able to maintain all its colonies, unless more planets are set to [[encyclopedia INFLUENCE_FOCUS_TITLE]].
+'''The Influence (or IP "Influence Points") of all planets in the empire represents such things as diplomatic influence, back-room dealing, espionage, public relations, propaganda, and cultural influence. It can be used to adopt government [[encyclopedia ENC_POLICY]], and is consumed for the maintenance of populated colonies. When total IP cost of colony maintenance is greater than total IP output of the empire, the available influence stockpile will decrease. If influence continues being consumed faster than it is generated, the empire may go into influence debt, which can lead to reduced stability and rebel troops on an empire's colones. Influence generation can be increased by setting planets to [[encyclopedia INFLUENCE_FOCUS_TITLE]].
 
-The Target Influence is the stable Influence output level a planet will approach, given the current factors influencing the Influence resources. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, [[encyclopedia ENC_POLICY]] adopted by the empire, and various other game effects. If these factors change, then the Target Research value is likely to shift.
+The Target Influence is the stable Influence output level a planet will approach, given the current factors influencing the Influence resources. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, [[encyclopedia ENC_POLICY]] adopted by the empire, and various other game effects. If these factors change, then the Target Influence value is likely to shift.
 
-Influence does not require [[metertype METER_SUPPLY]] line connections to be used, but some colonies can have greater influence upkeeps when not connected to the capital.'''
+Influence does not require [[metertype METER_SUPPLY]] line connections to be used, but  colonies may have consume more influence when when not connected to the capital, or when further from the [[buildingtype BLD_IMPERIAL_PALACE]] or a [[buildingtype BLD_REGIONAL_ADMIN]].'''
 
 METER_CONSTRUCTION_VALUE_LABEL
 Infrastructure
@@ -6523,7 +6523,9 @@ TELEPATHIC_TITLE
 Telepathy
 
 TELEPATHY_TEXT
-Telepathic species are immune to mind-control and make it easier to research [[tech LRN_PSIONICS]].
+'''Telepathic species are immune to mind-control and make it easier to research [[tech LRN_PSIONICS]].
+
+List of Telepathic species:'''
 
 XENOPHOBIC_SPECIES_TITLE
 Xenophobic
@@ -6531,13 +6533,17 @@ Xenophobic
 XENOPHOBIC_SPECIES_TEXT
 '''Xenophobic species will automatically divert some of their industrial efforts into harassing other species that are nearby. The affected nearby species will suffer an industrial penalty due to this harassment. A Xenophobic species of [[encyclopedia SELF_SUSTAINING_SPECIES_TITLE]] will also find the presence of alien species nearby to be disruptive to its natural balances (whether due to some direct effect or simply due to wasted energies being applied to harassing the alien species, has not been determined) resulting in a reduced [[metertype METER_TARGET_POPULATION]].
 
-Xenophobic species start with [[tech CON_CONC_CAMP]].'''
+Xenophobic species start with [[tech CON_CONC_CAMP]].
+
+List of Xenophobic species:'''
 
 ARTISTIC_SPECIES_TITLE
 Artistic Trait
 
 ARTISTIC_SPECIES_TRAIT_TEXT
-Artistic species produce artistic works when their empire has adopted [[policy PLC_ARTISAN_WORKSHOPS]], which generates influence. Additionally, other planets with different artistic species in the same system are more stable.
+'''Artistic species produce artistic works when their empire has adopted [[policy PLC_ARTISAN_WORKSHOPS]], which generates influence. Additionally, other planets with different artistic species in the same system are more stable.
+
+List of Artistic species:'''
 
 FLEET_UPKEEP_TITLE
 Fleet Upkeep
@@ -8216,7 +8222,7 @@ Human
 SP_HUMAN_GAMEPLAY_DESC
 '''Relentless, tribal pursuit predators.
 Prefer [[PT_TERRAN]] planets.
-[[encyclopedia ORGANIC_SPECIES_TITLE]]
+[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_HUMAN_DESC
@@ -8234,7 +8240,7 @@ SP_SCYLIOR_GAMEPLAY_DESC
 '''<img src="species/preview/scylior.png"></img>
 Three-tentacled, aquatic nautiloids.
 Prefer [[PT_OCEAN]] planets.
-[[encyclopedia ORGANIC_SPECIES_TITLE]]
+[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_SCYLIOR_DESC
@@ -8521,7 +8527,7 @@ Cray
 SP_CRAY_GAMEPLAY_DESC
 '''Cheerful enthusiastic robots.
 Prefer [[PT_BARREN]] planets.
-[[encyclopedia ROBOTIC_SPECIES_TITLE]]
+[[encyclopedia ROBOTIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_CRAY_DESC
@@ -8557,7 +8563,7 @@ Cynos
 
 SP_CYNOS_GAMEPLAY_DESC
 '''Walking plants sustained by a giant non-sentient mother plant.
-[[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]]
+[[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_CYNOS_DESC
@@ -8620,7 +8626,7 @@ Egassem
 SP_EGASSEM_GAMEPLAY_DESC
 '''Super massive, nuclear, lava-dwelling, crystalline amoebas.
 Prefer [[PT_INFERNO]] planets.
-[[encyclopedia LITHIC_SPECIES_TITLE]]
+[[encyclopedia LITHIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_EGASSEM_DESC
@@ -8640,7 +8646,7 @@ Sslith
 SP_SSLITH_GAMEPLAY_DESC
 '''Flat, aquatic, pliable creatures.
 Prefer [[PT_OCEAN]] planets.
-[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]]
+[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]], [[encyclopedia TELEPATHIC_TITLE]]
 '''
 
 SP_SSLITH_DESC
@@ -8656,7 +8662,7 @@ Fifty-Seven
 
 SP_FIFTYSEVEN_GAMEPLAY_DESC
 '''Math-obsessed sky-serpents, singing planet-wide fractal songs.
-[[encyclopedia ORGANIC_SPECIES_TITLE]]
+[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_FIFTYSEVEN_DESC
@@ -8698,7 +8704,7 @@ Thenian
 
 SP_THENIAN_GAMEPLAY_DESC
 '''Thoughtful gasbags.
-[[encyclopedia GASEOUS_SPECIES_TITLE]]
+[[encyclopedia GASEOUS_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_THENIAN_DESC
@@ -8888,7 +8894,7 @@ Silexian
 SP_SILEXIAN_GAMEPLAY_DESC
 '''Gleaming gardener robots, left on their own.
 Prefer [[PT_TERRAN]] planets.
-[[encyclopedia ROBOTIC_SPECIES_TITLE]]
+[[encyclopedia ROBOTIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_SILEXIAN_DESC
@@ -9030,7 +9036,7 @@ Ourbools
 SP_OURBOOLS_GAMEPLAY_DESC
 '''Giant blind swimmers who "see" gravitation.
 Prefer [[PT_OCEAN]] planets.
-[[encyclopedia ORGANIC_SPECIES_TITLE]]
+[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_OURBOOLS_DESC
@@ -9169,7 +9175,7 @@ Misiorla
 SP_MISIORLA_GAMEPLAY_DESC
 '''Chaotic, liberal, born pilots.
 Prefer [[PT_TOXIC]] planets.
-[[encyclopedia ORGANIC_SPECIES_TITLE]]
+[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_MISIORLA_DESC
@@ -9193,6 +9199,10 @@ SP_EXOBOT_GAMEPLAY_DESC
 
 SP_EXOBOT_DESC
 '''While not as efficient as fully self-directed citizens, Exobots can colonize otherwise inhospitable planets, and build more Exobots.
+
+Exobot planets act like outposts for their impact on an empire's per-planet influence, which is less than other colonies, but do still consume influence themselves.
+
+Exobot planets do not receive a stability penalty when in influence debt while [[policy PLC_CAPITAL_MARKETS]] is adopted.
 '''
 
 SP_ANCIENT_GUARDIANS
@@ -9225,7 +9235,7 @@ Super Testers
 SP_SUPER_TEST_GAMEPLAY_DESC
 '''Super Testers are grossly unbalanced and unfair. They are nearly Omniscient. And they thrive on all planets. ([[metertype METER_STEALTH]]-busting power only works when they are in a Capital)
 [[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia LITHIC_SPECIES_TITLE]], [[encyclopedia ROBOTIC_SPECIES_TITLE]], [[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]]
-[[encyclopedia TELEPATHIC_TITLE]]
+[[encyclopedia ARTISTIC]], [[encyclopedia TELEPATHIC_TITLE]]
 '''
 
 SP_SUPER_TEST_DESC
@@ -11985,7 +11995,9 @@ PLC_EXOBOT_PRODUCTIVITY
 Exobot Productivity
 
 PLC_EXOBOT_PRODUCTIVITY_DESC
-Increases effective exobot production output on industry-focused worlds from very bad to just bad.
+'''Increases effective exobot production output on industry-focused worlds from very bad to just bad.
+
+Decreases the stability and production output of non-exobot populated planets in the empire by [[value PLC_EXOBOT_OTHER_PLANET_INDUSTRY_PENALTY]].'''
 
 PLC_EXOBOT_PRODUCTIVITY_SHORT_DESC
 Boosts exobot production
@@ -12220,10 +12232,10 @@ PLC_ARTISAN_WORKSHOPS
 Artisan Workshops
 
 PLC_ARTISAN_WORKSHOPS_DESC
-Planets with [[ARTISTIC]] species that are set to influence focus will generate influence and will export aesthetically pleasing crafts to planets in their system, boosting the stability of those planets.
+Planets with [[encyclopedia ARTISTIC]] species that are set to influence focus will generate influence and will export aesthetically pleasing crafts to planets in their system, boosting the stability of those planets.
 
 PLC_ARTISAN_WORKSHOPS_SHORT_DESC
-Artistic species produce luxuries
+[[encyclopedia ARTISTIC]] species produce luxuries
 
 PLC_BOOTSTRAPPING
 Colonial Bootstrapping
@@ -12232,7 +12244,7 @@ PLC_BOOTSTRAPPING_DESC
 '''• Increases the growth rate of industry, research, and influence meters, and boosts stability on colonies with population less than [[value PLC_BOOTSTRAPPING_MAX_POP]].
 • Increases stability of planets that were colonized in the last [[value PLC_BOOTSTRAPPING_MAX_TURNS]] turns, decreasing over time.
 
-New colonies often benefit from programs that supprt their early development and the dedication of the colonists to establishing their new home.'''
+New colonies often benefit from programs that support their early development and the dedication of the colonists to establishing their new home.'''
 
 PLC_BOOTSTRAPPING_SHORT_DESC
 Boosts small colonies
@@ -12241,7 +12253,11 @@ PLC_PROPAGANDA
 Propaganda Broadcasts
 
 PLC_PROPAGANDA_DESC
-Increases imperial capital influence by [[value PROPAGANDA_INFLUENCE_FLAT]].
+'''Increases imperial capital influence of the empire that adopts this policy by [[value PROPAGANDA_INFLUENCE_FLAT]].
+
+Increases imperial capital influence of allied empires by [[value PROPAGANDA_INFLUENCE_ALLIED_FLAT]], if they have not also adopted this policy.
+
+Decreases imperial capital influence of enemy empires by [[value PROPAGANDA_INFLUENCE_ENEMY_FLAT]], if they have not also adopted this policy and they have visibility of at least one object owned by the empire that adopts this policy.'''
 
 PLC_PROPAGANDA_SHORT_DESC
 Increases capital influence
@@ -13844,7 +13860,7 @@ SPY_DETECT_1
 Optical Scanner
 
 SPY_DETECT_1_DESC
-All colonies start the game with a [[metertype METER_DETECTION]] of [[value SPY_DETECT_1_RANGE]], and the imperial [[encyclopedia DETECTION_TITLE]] to 10, and the ship part [[shippart DT_DETECTOR_1]] permits ships to reach the same level of detection.
+All colonies start the game with a [[metertype METER_DETECTION]] of [[value SPY_DETECT_1_RANGE]], and an imperial [[encyclopedia DETECTION_TITLE]] of 10, and the ship part [[shippart DT_DETECTOR_1]] permits ships to reach the same level of detection.
 
 SPY_DETECT_STELLAR_INTERFERENCE
 Stellar Interference
@@ -14449,7 +14465,7 @@ BLD_SCANNING_FACILITY
 Scanning Facility
 
 BLD_SCANNING_FACILITY_DESC
-'''Increases [[metertype METER_DETECTION]] of the planet by 75.
+'''Increases [[metertype METER_DETECTION]] of the planet by [[value SCANNING_FACILITY_RANGE]].
 
 A combination of long-range scanning devices and great computing power to analyze the data allows a larger area of space to be scanned for any objects.'''
 
@@ -15806,7 +15822,7 @@ SH_ROBOTIC
 Robotic Hull
 
 SH_ROBOTIC_DESC
-'''This hull is completely automated and functions under the principals of [[tech SHP_MIL_ROBO_CONT]]. It has four external slots and one internal slot, and repairs 2 points of [[metertype METER_STRUCTURE]] each turn as long as the ship has not been in combat.
+'''This hull is completely automated and functions under the principals of [[tech SHP_MIL_ROBO_CONT]]. It has four external slots and one internal slot, and repairs [[value SHP_ROBOTIC_REPAIR]] points of [[metertype METER_STRUCTURE]] each turn as long as the ship has not been in combat.
 
 [[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is medium and [[metertype METER_SPEED]] is average.
 
@@ -16493,7 +16509,7 @@ BLD_SHIPYARD_BASE_ORBITAL_DRYDOCK_CON_GEOINT_REQUIRED
 Can only be built at a location with a [[buildingtype BLD_SHIPYARD_BASE]], an [[buildingtype BLD_SHIPYARD_ORBITAL_DRYDOCK]], and a [[buildingtype BLD_SHIPYARD_CON_GEOINT]].
 
 LIVING_HULL_AUTO_REGEN
-Living hull regenerates [[metertype METER_STRUCTURE]] and [[metertype METER_FUEL]] between combats.
+Living hull regenerates [[value SHP_LIVING_HULL_REPAIR]] [[metertype METER_STRUCTURE]] between combats and [[value SHP_LIVING_HULL_FUEL_REGEN]] [[metertype METER_FUEL]] while stationary.
 
 BLD_SHIPYARD_BASE_ORG_ORB_INC_REQUIRED
 Can only be built at a location with a [[buildingtype BLD_SHIPYARD_BASE]] and an [[buildingtype BLD_SHIPYARD_ORG_ORB_INC]].
@@ -16731,6 +16747,9 @@ GREAT_HAPPINESS_DESC
 ULTIMATE_HAPPINESS_DESC
 +++	Ultimate [[metertype METER_HAPPINESS]]: +[[value ULTIMATE_HAPPINESS_VAL]]
 
+INDEPENDENT_HAPPINESS_DESC
+⋄	Independent [[metertype METER_HAPPINESS]]: Baseline Stability unaffected by supply connections
+
 NO_DEFENSE_TROOPS_DESC
 −−−	No Defensive Ground [[metertype METER_TROOPS]]
 
@@ -16929,7 +16948,7 @@ COMMUNAL_VISION_DESC
 ⋄	Communal Vision: shares visibility within the same species regardless of affiliation
 
 ARTISTIC_TRAIT_DESC
-+	Artistic: Improved stability and happiness
++	[[encyclopedia ARTISTIC]]: Improved stability and happiness
 
 
 ##
@@ -17824,7 +17843,7 @@ Please spare your humble servants, and our gratitude shall be forever yours!
 AI_FIRST_TURN_GREETING_MSG201
 Stay the hell away from us!
 
-AI_FIRST_TURN_GREETING_MSG203
+AI_FIRST_TURN_GREETING_MSG202
 Stay away from us, and we will stay away from you!
 
 AI_FIRST_TURN_GREETING_MSG301

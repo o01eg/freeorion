@@ -98,7 +98,7 @@ def outpod_pod_cost():
 def galaxy_is_sparse():
     setup_data = fo.getGalaxySetupData()
     avg_empire_systems = setup_data.size // len(fo.allEmpireIDs())
-    return (setup_data.monsterFrequency <= fo.galaxySetupOption.low) and (
+    return (setup_data.monsterFrequency <= fo.galaxySetupOptionMonsterFreq.veryLow) and (
         (avg_empire_systems >= 40) or ((avg_empire_systems >= 35) and (setup_data.shape != fo.galaxyShape.elliptical))
     )
 
@@ -494,11 +494,21 @@ def send_colony_ships(colony_fleet_ids, evaluated_planets, mission_type):
 
 def _print_empire_species_roster():
     """Print empire species roster in table format to log."""
-    grade_map = {"ULTIMATE": "+++", "GREAT": "++", "GOOD": "+", "AVERAGE": "o", "BAD": "-", "NO": "---"}
+    grade_map = {
+        "ULTIMATE": "+++",
+        "GREAT": "++",
+        "GOOD": "+",
+        "AVERAGE": "o",
+        "BAD": "-",
+        "VERY_BAD": "--",
+        "EXTREMELY_BAD": "---",
+        "NO": "x",
+    }
 
     grade_tags = [
         Tags.INDUSTRY,
         Tags.RESEARCH,
+        Tags.INFLUENCE,
         Tags.POPULATION,
         Tags.SUPPLY,
         Tags.WEAPONS,
@@ -508,6 +518,7 @@ def _print_empire_species_roster():
     grade_tags_names = {
         Tags.INDUSTRY: "Ind.",
         Tags.RESEARCH: "Res.",
+        Tags.INFLUENCE: "Infl.",
         Tags.POPULATION: "Pop.",
         Tags.SUPPLY: "Supply",
         Tags.WEAPONS: "Pilot",

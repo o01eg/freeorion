@@ -58,7 +58,7 @@ Empire::Empire() :
 { Init(); }
 
 Empire::Empire(std::string name, std::string player_name,
-               int empire_id, const EmpireColor& color, bool authenticated) :
+               int empire_id, EmpireColor color, bool authenticated) :
     m_id(empire_id),
     m_name(std::move(name)),
     m_player_name(std::move(player_name)),
@@ -87,9 +87,6 @@ void Empire::Init() {
     for (auto& entry : PolicyCategoriesSlotsMeters())
         m_meters[std::move(entry.second)];
 }
-
-Empire::~Empire()
-{ ClearSitRep(); }
 
 const std::string& Empire::Name() const
 { return m_name; }
@@ -306,7 +303,7 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     // adopt policy in requested category on this turn, unless it was already
     // adopted at the start of this turn, in which case restore / keep its
     // previous adtoption turn
-    int adoption_turn = CurrentTurn();
+    int adoption_turn = context.current_turn;
     auto it = m_initial_adopted_policies.find(name);
     if (it != m_initial_adopted_policies.end())
         adoption_turn = it->second.adoption_turn;
@@ -506,15 +503,13 @@ bool Empire::PolicyAffordable(std::string_view name, const ScriptingContext& con
         return false;
     }
 
-    const ObjectMap& objects{context.ContextObjects()};
-
     double other_this_turn_adopted_policies_cost = 0.0;
     for (auto& [adopted_policy_name, adoption_info] : m_adopted_policies) {
-        if (adoption_info.adoption_turn != CurrentTurn())
+        if (adoption_info.adoption_turn != context.current_turn)
             continue;
         auto pre_adopted_policy = GetPolicy(adopted_policy_name);
         if (!pre_adopted_policy) {
-            ErrorLogger() << "Empire::PolicyAffordable couldn't find policy named " << adopted_policy_name << " that was supposedly already adopted this turn (" << CurrentTurn() << ")";
+            ErrorLogger() << "Empire::PolicyAffordable couldn't find policy named " << adopted_policy_name << " that was supposedly already adopted this turn (" << context.current_turn << ")";
             continue;
         }
         DebugLogger() << "Empire::PolicyAffordable : Already adopted policy this turn: " << adopted_policy_name
@@ -1043,7 +1038,7 @@ void Empire::Eliminate(EmpireManager& empires) {
 bool Empire::Won() const
 { return !m_victories.empty(); }
 
-void Empire::Win(const std::string& reason, EmpireManager& empires) {
+void Empire::Win(const std::string& reason, const EmpireManager::container_type& empires) {
     if (m_victories.insert(reason).second) {
         for (auto& entry : empires)
             entry.second->AddSitRepEntry(CreateVictorySitRep(reason, EmpireID()));
@@ -1810,7 +1805,7 @@ void Empire::ApplyNewTechs(Universe& universe, int current_turn) {
             UnlockItem(item, universe, current_turn);  // potential infinite if a tech (in)directly unlocks itself?
 
         if (!m_techs.count(new_tech)) {
-            m_techs[new_tech] = CurrentTurn();
+            m_techs[new_tech] = current_turn;
             AddSitRepEntry(CreateTechResearchedSitRep(new_tech, current_turn));
         }
     }
@@ -2187,6 +2182,9 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
     std::map<int, std::vector<std::shared_ptr<Ship>>> system_new_ships;
     std::map<int, int> new_ship_rally_point_ids;
 
+    auto& universe = context.ContextUniverse();
+
+
     // preprocess the queue to get all the costs and times of all items
     // at every location at which they are being produced,
     // before doing any generation of new objects or other modifications
@@ -2200,7 +2198,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
 
     for (auto& elem : m_production_queue) {
         // for items that don't depend on location, only store cost/time once
-        int location_id = (elem.item.CostIsProductionLocationInvariant(context.ContextUniverse()) ? INVALID_OBJECT_ID : elem.location);
+        int location_id = (elem.item.CostIsProductionLocationInvariant(universe) ? INVALID_OBJECT_ID : elem.location);
         auto key = std::make_pair(elem.item, location_id);
 
         if (!queue_item_costs_and_times.count(key))
@@ -2222,7 +2220,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
         int build_turns;
 
         // for items that don't depend on location, only store cost/time once
-        int location_id = (elem.item.CostIsProductionLocationInvariant(context.ContextUniverse()) ? INVALID_OBJECT_ID : elem.location);
+        int location_id = (elem.item.CostIsProductionLocationInvariant(universe) ? INVALID_OBJECT_ID : elem.location);
         std::pair<ProductionQueue::ProductionItem, int> key(elem.item, location_id);
 
         std::tie(item_cost, build_turns) = queue_item_costs_and_times[key];
@@ -2374,7 +2372,8 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
             auto planet = context.ContextObjects().get<Planet>(elem.location);
 
             // create new building
-            auto building = context.ContextUniverse().InsertNew<Building>(m_id, elem.item.name, m_id);
+            auto building = universe.InsertNew<Building>(m_id, elem.item.name,
+                                                         m_id, context.current_turn);
             planet->AddBuilding(building->ID());
             building->SetPlanetID(planet->ID());
             system->Insert(building);
@@ -2382,8 +2381,9 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
             // record building production in empire stats
             m_building_types_produced[elem.item.name]++;
 
-            AddSitRepEntry(CreateBuildingBuiltSitRep(building->ID(), planet->ID(), context.current_turn));
-            DebugLogger() << "New Building created on turn: " << CurrentTurn();
+            AddSitRepEntry(CreateBuildingBuiltSitRep(building->ID(), planet->ID(),
+                                                     context.current_turn));
+            DebugLogger() << "New Building created on turn: " << context.current_turn;
             break;
         }
 
@@ -2406,7 +2406,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
             // else give up...
             if (species_name.empty()) {
                 // only really a problem for colony ships, which need to have a species to function
-                const auto* design = context.ContextUniverse().GetShipDesign(elem.item.design_id);
+                const auto* design = universe.GetShipDesign(elem.item.design_id);
                 if (!design) {
                     ErrorLogger() << "Couldn't get ShipDesign with id: " << elem.item.design_id;
                     break;
@@ -2421,8 +2421,9 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
 
             for (int count = 0; count < elem.blocksize; count++) {
                 // create ship
-                ship = context.ContextUniverse().InsertNew<Ship>(
-                    m_id, elem.item.design_id, species_name, context.ContextUniverse(), m_id);
+                ship = universe.InsertNew<Ship>(
+                    m_id, elem.item.design_id, species_name, universe,
+                    context.species, m_id, context.current_turn);
                 system->Insert(ship);
 
                 // record ship production in empire stats
@@ -2443,18 +2444,19 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 // everything that is traced with an associated max meter.
                 ship->SetShipMetersToMax();
                 // set ship speed so that it can be affected by non-zero speed checks
-                if (auto* design = context.ContextUniverse().GetShipDesign(elem.item.design_id))
+                if (auto* design = universe.GetShipDesign(elem.item.design_id))
                     ship->GetMeter(MeterType::METER_SPEED)->Set(design->Speed(), design->Speed());
                 ship->BackPropagateMeters();
 
                 ship->Rename(NewShipName());
 
                 // store ships to put into fleets later
+                const auto SHIP_ID = ship->ID();
                 system_new_ships[system->ID()].push_back(ship);
 
                 // store ship rally points
                 if (elem.rally_point_id != INVALID_OBJECT_ID)
-                    new_ship_rally_point_ids[ship->ID()] = elem.rally_point_id;
+                    new_ship_rally_point_ids[SHIP_ID] = elem.rally_point_id;
             }
             // add sitrep
             if (elem.blocksize == 1) {
@@ -2510,6 +2512,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
             new_ships_by_rally_point_id_and_design_id[rally_point_id][ship->DesignID()].emplace_back(ship);
         }
 
+
         // create fleets for ships with the same rally point, grouped by
         // ship design
         // Do not group unarmed ships with no troops (i.e. scouts and
@@ -2528,15 +2531,16 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 // create a single fleet for combat ships and individual
                 // fleets for non-combat ships
                 bool individual_fleets = !(   (*ships.begin())->IsArmed(context)
-                                           || (*ships.begin())->HasFighters(context.ContextUniverse())
-                                           || (*ships.begin())->CanHaveTroops(context.ContextUniverse())
-                                           || (*ships.begin())->CanBombard(context.ContextUniverse()));
+                                           || (*ships.begin())->HasFighters(universe)
+                                           || (*ships.begin())->CanHaveTroops(universe)
+                                           || (*ships.begin())->CanBombard(universe));
 
                 std::vector<std::shared_ptr<Fleet>> fleets;
                 std::shared_ptr<Fleet> fleet;
 
                 if (!individual_fleets) {
-                    fleet = context.ContextUniverse().InsertNew<Fleet>("", system->X(), system->Y(), m_id);
+                    fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(), m_id,
+                                                      context.current_turn);
 
                     system->Insert(fleet);
                     // set prev system to prevent conflicts with CalculateRouteTo used for
@@ -2552,7 +2556,8 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
 
                 for (auto& ship : ships) {
                     if (individual_fleets) {
-                        fleet = context.ContextUniverse().InsertNew<Fleet>("", system->X(), system->Y(), m_id);
+                        fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(),
+                                                          m_id, context.current_turn);
 
                         system->Insert(fleet);
                         // set prev system to prevent conflicts with CalculateRouteTo used for
@@ -2579,10 +2584,10 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
 
                     if (rally_point_id != INVALID_OBJECT_ID) {
                         if (context.ContextObjects().get<System>(rally_point_id)) {
-                            next_fleet->CalculateRouteTo(rally_point_id, context.ContextUniverse());
+                            next_fleet->CalculateRouteTo(rally_point_id, universe);
                         } else if (auto rally_obj = context.ContextObjects().get(rally_point_id)) {
                             if (context.ContextObjects().get<System>(rally_obj->SystemID()))
-                                next_fleet->CalculateRouteTo(rally_obj->SystemID(), context.ContextUniverse());
+                                next_fleet->CalculateRouteTo(rally_obj->SystemID(), universe);
                         } else {
                             ErrorLogger() << "Unable to find system to route to with rally point id: " << rally_point_id;
                         }

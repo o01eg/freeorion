@@ -478,13 +478,11 @@ void PoliciesListBox::Populate() {
     ScopedTimer scoped_timer("PoliciesListBox::Populate");
 
     GG::Pt slot_size = GG::Pt(SLOT_CONTROL_WIDTH, SLOT_CONTROL_HEIGHT);
-    int text_pts = ClientUI::Pts();
 
     auto policy_palette = Parent();
     auto gov_wnd = std::dynamic_pointer_cast<GovernmentWnd>(policy_palette->Parent());
     if (gov_wnd) {
         slot_size = gov_wnd->GetPolicySlotSize();
-        text_pts = gov_wnd->GetPolicyTextSize();
     }
 
     const GG::X TOTAL_WIDTH = ClientWidth() - ClientUI::ScrollWidth();
@@ -662,12 +660,11 @@ void GovernmentWnd::PolicyPalette::CompleteConstruction() {
             boost::bind(&GovernmentWnd::PolicyPalette::ToggleCategory, this, string_in_map, true));
     }
 
-    constexpr std::array<std::string_view, 5> BUTTON_LABELS = {{
+    static constexpr std::array<std::string_view, 5> BUTTON_LABELS = {{
             UserStringNop("POLICY_LIST_ADOPTED"), UserStringNop("POLICY_LIST_ADOPTABLE"),
             UserStringNop("POLICY_LIST_UNAFFORDABLE"), UserStringNop("POLICY_LIST_RESTRICTED"),
             UserStringNop("POLICY_LIST_LOCKED")}};
     for (size_t n = 0; n < 5; ++n) {
-        Availability avail = static_cast<Availability>(n);
         auto& button = m_availabilities_buttons[n];
         button = GG::Wnd::Create<CUIStateButton>(UserString(BUTTON_LABELS[n]),
                                                  GG::FORMAT_CENTER, std::make_shared<CUILabelButtonRepresenter>());
@@ -693,12 +690,12 @@ void GovernmentWnd::PolicyPalette::DoLayout() {
     const int     PTS = ClientUI::Pts();
     const GG::X   PTS_WIDE{PTS/2};        // guess at how wide per character the font needs
     const GG::Y   BUTTON_HEIGHT{PTS*3/2};
-    constexpr int BUTTON_SEPARATION = 3;  // vertical or horizontal sepration between adjacent buttons
-    constexpr int BUTTON_EDGE_PAD = 2;    // distance from edges of control to buttons
-    constexpr GG::X RIGHT_EDGE_PAD{8};    // to account for border of CUIWnd
+    static constexpr int BUTTON_SEPARATION = 3;  // vertical or horizontal sepration between adjacent buttons
+    static constexpr int BUTTON_EDGE_PAD = 2;    // distance from edges of control to buttons
+    static constexpr GG::X RIGHT_EDGE_PAD{8};    // to account for border of CUIWnd
 
     const GG::X USABLE_WIDTH = std::max(ClientWidth() - RIGHT_EDGE_PAD, GG::X1);// space in which to fit buttons
-    constexpr int GUESSTIMATE_NUM_CHARS_IN_BUTTON_LABEL = 14; // rough guesstimate... avoid overly long policy class names
+    static constexpr int GUESSTIMATE_NUM_CHARS_IN_BUTTON_LABEL = 14; // rough guesstimate... avoid overly long policy class names
     const GG::X MIN_BUTTON_WIDTH = PTS_WIDE*GUESSTIMATE_NUM_CHARS_IN_BUTTON_LABEL;
     const size_t MAX_BUTTONS_PER_ROW = std::max(Value(USABLE_WIDTH / (MIN_BUTTON_WIDTH + BUTTON_SEPARATION)), 1);
 
@@ -1453,7 +1450,7 @@ void GovernmentWnd::MainPanel::Populate() {
 void GovernmentWnd::MainPanel::DoLayout() {
     const int PTS = ClientUI::Pts();
     const GG::Y BUTTON_HEIGHT(PTS * 2);
-    constexpr int PAD = 6;
+    static constexpr int PAD = 6;
     const GG::Pt lr = ClientSize() + GG::Pt(-GG::X(PAD), -GG::Y(PAD));
 
     if (m_slots.empty())
@@ -1619,13 +1616,13 @@ int GovernmentWnd::GetPolicyTextSize() {
 }
 
 void GovernmentWnd::DoLayout() {
-    constexpr int GUESSTIMATE_NUM_CHARS_IN_BUTTON_TEXT = 10; // guesstimate for clear btn
+    static constexpr int GUESSTIMATE_NUM_CHARS_IN_BUTTON_TEXT = 10; // guesstimate for clear btn
     const int PTS = ClientUI::Pts();
     const GG::X PTS_WIDE(PTS / 2);           // guess at how wide per character the font needs
     const GG::X BUTTON_WIDTH = PTS_WIDE * GUESSTIMATE_NUM_CHARS_IN_BUTTON_TEXT;
     const GG::Y BUTTON_HEIGHT(PTS * 2);
 
-    constexpr GG::Pt palette_ul(GG::X0, GG::Y0);
+    static constexpr GG::Pt palette_ul(GG::X0, GG::Y0);
     const GG::Pt palette_lr(palette_ul + GG::Pt(ClientWidth(), ClientHeight() / 2));
     const int num_size_buttons = static_cast<int>(m_policy_size_buttons->NumButtons());
 

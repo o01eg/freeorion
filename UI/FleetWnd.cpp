@@ -40,8 +40,8 @@ namespace {
     constexpr GG::Y FLEET_WND_HEIGHT = GG::Y(400);
 
     // how should ship and fleet icons be scaled and/or positioned in the reserved space
-    const GG::Flags<GG::GraphicStyle>   DataPanelIconStyle()
-    { return GG::GRAPHIC_CENTER | GG::GRAPHIC_VCENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE; }
+    constexpr auto DATA_PANEL_ICON_STYLE = 
+        GG::GRAPHIC_CENTER | GG::GRAPHIC_VCENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE;
 
     constexpr GG::X            DATA_PANEL_TEXT_PAD{4}; // padding on the left and right of fleet/ship description
     constexpr int              DATA_PANEL_BORDER = 1;  // how thick should the border around ship or fleet panel be
@@ -353,7 +353,7 @@ namespace {
     { return GetOptionsDB().Get<FleetAggression>("ui.fleet.aggression"); }
 
     void SetNewFleetAggressiveOptionSetting(FleetAggression aggression)
-    { GetOptionsDB().Set<FleetAggression>("ui.fleet.aggression", aggression); }
+    { GetOptionsDB().Set("ui.fleet.aggression", aggression); }
 
     std::shared_ptr<GG::Texture> FleetAggressiveIcon()
     { return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "fleet_aggressive.png"); }
@@ -721,7 +721,7 @@ namespace {
         m_selected = b;
 
         const GG::Clr& unselected_text_color = ClientUI::TextColor();
-        constexpr GG::Clr selected_text_color = GG::CLR_BLACK;
+        static constexpr GG::Clr selected_text_color = GG::CLR_BLACK;
 
         GG::Clr text_color_to_use = m_selected ? selected_text_color : unselected_text_color;
 
@@ -758,7 +758,7 @@ namespace {
         const ShipDesign* design = universe.GetShipDesign(ship->DesignID());
         auto icon{ClientUI::ShipDesignIcon(design ? design->ID() : INVALID_OBJECT_ID)};
 
-        m_ship_icon = GG::Wnd::Create<GG::StaticGraphic>(std::move(icon), DataPanelIconStyle());
+        m_ship_icon = GG::Wnd::Create<GG::StaticGraphic>(std::move(icon), DATA_PANEL_ICON_STYLE);
         m_ship_icon->Resize(GG::Pt(DataPanelIconSpace().x, ClientHeight()));
         AttachChild(m_ship_icon);
 
@@ -766,7 +766,7 @@ namespace {
         auto add_overlay = [this](const std::string& file) {
             if (auto overlay_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / file, true)) {
                 auto overlay = GG::Wnd::Create<GG::StaticGraphic>(std::move(overlay_texture),
-                                                                  DataPanelIconStyle());
+                                                                  DATA_PANEL_ICON_STYLE);
                 overlay->Resize(GG::Pt(DataPanelIconSpace().x, ClientHeight()));
                 AttachChild(overlay);
                 m_ship_icon_overlays.emplace_back(std::move(overlay));
@@ -1403,7 +1403,7 @@ void FleetDataPanel::Refresh() {
         auto new_fleet_texture = ClientUI::GetTexture(
             ClientUI::ArtDir() / "icons" / "buttons" / "new_fleet.png", true);
         m_fleet_icon = GG::Wnd::Create<GG::StaticGraphic>(
-            std::move(new_fleet_texture), DataPanelIconStyle());
+            std::move(new_fleet_texture), DATA_PANEL_ICON_STYLE);
         AttachChild(m_fleet_icon);
 
     } else if (auto fleet = o.get<Fleet>(m_fleet_id)) {
@@ -1429,7 +1429,7 @@ void FleetDataPanel::Refresh() {
         std::vector<std::shared_ptr<GG::Texture>> icons{
             FleetHeadIcons(fleet.get(), FleetButton::SizeType::LARGE)};
         icons.emplace_back(FleetSizeIcon(fleet.get(), FleetButton::SizeType::LARGE));
-        std::vector<GG::Flags<GG::GraphicStyle>> styles(icons.size(), DataPanelIconStyle());
+        std::vector<GG::Flags<GG::GraphicStyle>> styles(icons.size(), DATA_PANEL_ICON_STYLE);
 
         m_fleet_icon = GG::Wnd::Create<MultiTextureStaticGraphic>(std::move(icons), std::move(styles));
         AttachChild(m_fleet_icon);
@@ -1460,7 +1460,7 @@ void FleetDataPanel::Refresh() {
         auto add_overlay = [this](const std::string& file) {
             if (auto overlay_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / file, true)) {
                 auto overlay = GG::Wnd::Create<GG::StaticGraphic>(std::move(overlay_texture),
-                                                                  DataPanelIconStyle());
+                                                                  DATA_PANEL_ICON_STYLE);
                 overlay->Resize(GG::Pt(DataPanelIconSpace().x, ClientHeight()));
                 AttachChild(overlay);
                 m_fleet_icon_overlays.emplace_back(std::move(overlay));
@@ -1831,7 +1831,7 @@ void FleetDataPanel::Init() {
 
 void FleetDataPanel::ColorTextForSelect() {
     const GG::Clr& unselected_text_color = ClientUI::TextColor();
-    constexpr GG::Clr selected_text_color = GG::CLR_BLACK;
+    static constexpr GG::Clr selected_text_color = GG::CLR_BLACK;
 
     GG::Clr text_color_to_use = m_selected ? selected_text_color : unselected_text_color;
 
@@ -3217,7 +3217,7 @@ void FleetWnd::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
 
 void FleetWnd::DoLayout() {
     const GG::X TOTAL_WIDTH(ClientWidth());
-    constexpr GG::X LEFT{0};
+    static constexpr GG::X LEFT{0};
     const GG::X RIGHT(TOTAL_WIDTH);
 
     const GG::Y TOTAL_HEIGHT(ClientHeight());

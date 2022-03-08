@@ -3579,11 +3579,13 @@ void InOrIsSystem::Eval(const ScriptingContext& parent_context,
 }
 
 std::string InOrIsSystem::Description(bool negated/* = false*/) const {
+    const auto& objects = Objects();
+
     std::string system_str;
     int system_id = INVALID_OBJECT_ID;
     if (m_system_id && m_system_id->ConstantExpr())
         system_id = m_system_id->Eval();
-    if (auto system = Objects().get<System>(system_id))
+    if (auto system = objects.get<System>(system_id))
         system_str = system->Name();
     else if (m_system_id)
         system_str = m_system_id->Description();
@@ -3739,11 +3741,13 @@ void OnPlanet::Eval(const ScriptingContext& parent_context,
 }
 
 std::string OnPlanet::Description(bool negated/* = false*/) const {
+    const auto& objects = Objects();
+
     std::string planet_str;
     int planet_id = INVALID_OBJECT_ID;
     if (m_planet_id && m_planet_id->ConstantExpr())
         planet_id = m_planet_id->Eval();
-    if (auto planet = Objects().get<Planet>(planet_id))
+    if (auto planet = objects.get<Planet>(planet_id))
         planet_str = planet->Name();
     else if (m_planet_id)
         planet_str = m_planet_id->Description();
@@ -3884,11 +3888,13 @@ void ObjectID::Eval(const ScriptingContext& parent_context,
 }
 
 std::string ObjectID::Description(bool negated/* = false*/) const {
+    const auto& objects = Objects();
+
     std::string object_str;
     int object_id = INVALID_OBJECT_ID;
     if (m_object_id && m_object_id->ConstantExpr())
         object_id = m_object_id->Eval();
-    if (auto system = Objects().get<System>(object_id))
+    if (auto system = objects.get<System>(object_id))
         object_str = system->Name();
     else if (m_object_id)
         object_str = m_object_id->Description();
@@ -5557,10 +5563,12 @@ namespace {
             if (!candidate)
                 return false;
 
+            const auto& objects = m_universe.Objects();
+
             const Ship* ship = nullptr;
             if (candidate->ObjectType() == UniverseObjectType::OBJ_FIGHTER) {
                 auto* fighter = static_cast<const ::Fighter*>(candidate.get());
-                ship = m_universe.Objects().getRaw<Ship>(fighter->LaunchedFrom());
+                ship = objects.getRaw<Ship>(fighter->LaunchedFrom());
             } else if (candidate->ObjectType() == UniverseObjectType::OBJ_SHIP) {
                 ship = static_cast<const ::Ship*>(candidate.get());
             }
@@ -8304,8 +8312,8 @@ namespace {
         dy2 /= mag;
 
 
-        constexpr float MAX_LANE_DOT_PRODUCT = 0.87f; // magic limit adjusted to allow no more than 12 starlanes from a system
-                                                      // arccos(0.87) = 0.515594 rad = 29.5 degrees
+        static constexpr float MAX_LANE_DOT_PRODUCT = 0.87f; // magic limit adjusted to allow no more than 12 starlanes from a system
+                                                             // arccos(0.87) = 0.515594 rad = 29.5 degrees
 
         float dp = (dx1 * dx2) + (dy1 * dy2);
         //TraceLogger(conditions) << "systems: " << sys1->UniverseObject::Name() << "  " << lane1_sys2->UniverseObject::Name() << "  " << lane2_sys2->UniverseObject::Name() << "  dp: " << dp << "\n";
@@ -8372,7 +8380,7 @@ namespace {
         // (1O)x(12) = |1O| |12| sin(a)
         // d = |1O| sin(a) = (1O)x(12) / |12|
         // d = (10)x(12 / |12|)
-        constexpr float MIN_PERP_DIST = 20; // magic limit, in units of universe units (uu)
+        static constexpr float MIN_PERP_DIST = 20; // magic limit, in units of universe units (uu)
 
         float perp_dist = std::abs(v_o1_x*v_12_y - v_o1_y*v_12_x);
 

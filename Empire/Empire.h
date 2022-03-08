@@ -14,11 +14,11 @@
 #include "../universe/Meter.h"
 #include "../util/AppInterface.h"
 #include "../util/Export.h"
+#include "../util/SitRepEntry.h"
 
 
 struct UnlockableItem;
 class ShipDesign;
-class SitRepEntry;
 class ResourcePool;
 
 typedef std::array<unsigned char, 4> EmpireColor;
@@ -57,8 +57,7 @@ public:
     //@}
 
     Empire(std::string name, std::string player_name, int ID,
-           const EmpireColor& color, bool authenticated);
-    ~Empire();
+           EmpireColor color, bool authenticated);
 
     [[nodiscard]] const std::string&  Name() const;            ///< Returns the Empire's name
     [[nodiscard]] const std::string&  PlayerName() const;      ///< Returns the Empire's player's name
@@ -287,10 +286,10 @@ public:
     void AddShipDesign(int ship_design_id, const Universe& universe, int next_design_id = INVALID_DESIGN_ID);
     int AddShipDesign(ShipDesign* ship_design, Universe& universe); ///< inserts given ShipDesign into the Universe, adds the design's id to the Empire's set of ids, and returns the new design's id, which is INVALID_OBJECT_ID on failure.  If successful, universe takes ownership of passed ShipDesign.
 
-    [[nodiscard]] std::string NewShipName();                        ///< generates a random ship name, appending II, III, etc., to it if it has been used before by this empire
-    void Eliminate(EmpireManager& empires = Empires());             ///< Marks empire as eliminated and cleans up empire after it is eliminated.  Queues are cleared, capital is reset, and other state info not relevant to an eliminated empire is cleared
+    [[nodiscard]] std::string NewShipName();         ///< generates a random ship name, appending II, III, etc., to it if it has been used before by this empire
+    void Eliminate(EmpireManager& empires);          ///< Marks empire as eliminated and cleans up empire after it is eliminated.  Queues are cleared, capital is reset, and other state info not relevant to an eliminated empire is cleared
     /** Marks this empire as having won for this reason, and sends the appropriate sitreps */
-    void Win(const std::string& reason, EmpireManager& empires = Empires());
+    void Win(const std::string& reason, const EmpireManager::container_type& empires);
     void SetReady(bool ready);                       ///< Marks this empire with readiness status
     void AutoTurnSetReady();                         ///< Decreases auto-turn counter and set empire ready if not expired or set unready
     void SetAutoTurn(int turns_count);               ///< Set auto-turn counter
@@ -321,10 +320,11 @@ public:
       * producing objects and systems through which it can be propagated. */
     void UpdateSystemSupplyRanges(const std::set<int>& known_objects, const ObjectMap& objects);
     /** Calculates ranges that systems can send fleet and resource supplies. */
-    void UpdateSystemSupplyRanges(const Universe& universe = GetUniverse());
+    void UpdateSystemSupplyRanges(const Universe& universe);
     /** Calculates systems that can propagate supply (fleet or resource) using
       * the specified set of \a known_systems */
-    void UpdateSupplyUnobstructedSystems(const ScriptingContext& context, const std::set<int>& known_systems,
+    void UpdateSupplyUnobstructedSystems(const ScriptingContext& context,
+                                         const std::set<int>& known_systems,
                                          bool precombat = false);
     /** Calculates systems that can propagate supply using this empire's own /
       * internal list of explored systems. */

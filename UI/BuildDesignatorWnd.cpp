@@ -38,8 +38,8 @@ namespace {
     { db.Add("ui." + PROD_PEDIA_WND_NAME + ".hidden.enabled", UserStringNop("OPTIONS_DB_PRODUCTION_PEDIA_HIDDEN"), false); }
     bool temp_bool = RegisterOptions(&AddOptions);
 
-    constexpr int MAX_PRODUCTION_TURNS = 200;
-    constexpr float EPSILON = 0.001f;
+    static constexpr int MAX_PRODUCTION_TURNS = 200;
+    static constexpr float EPSILON = 0.001f;
 
     int ProductionTurns(float total_cost, int minimum_production_time, float local_pp_output,
                         float stockpile, float stockpile_limit_per_turn)
@@ -144,8 +144,7 @@ namespace {
             m_initialized = true;
 
             ScriptingContext context;
-            const EmpireManager& empires{Empires()}; // TODO: pass in?
-            auto empire = empires.GetEmpire(m_empire_id);
+            auto empire = context.GetEmpire(m_empire_id);
 
             std::shared_ptr<GG::Texture>                texture;
             std::string                                 name_text;
@@ -163,8 +162,7 @@ namespace {
             case BuildType::BT_SHIP: {
                 texture = ClientUI::ShipDesignIcon(m_item.design_id);
                 desc_text = UserString("BT_SHIP");
-                const ShipDesign* design = GetUniverse().GetShipDesign(m_item.design_id);
-                if (design)
+                if (const ShipDesign* design = context.ContextUniverse().GetShipDesign(m_item.design_id))
                     name_text = design->Name(true);
                 break;
             }
@@ -190,7 +188,7 @@ namespace {
 
                 // from stockpile
                 stockpile = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->Stockpile();
-                stockpile_limit_per_turn = empire->GetProductionQueue().StockpileCapacity();
+                stockpile_limit_per_turn = empire->GetProductionQueue().StockpileCapacity(context.ContextObjects());
 
                 auto [total_cost, minimum_production_time] = m_item.ProductionCostAndTime(m_empire_id, m_location_id, context);
 
@@ -231,28 +229,6 @@ namespace {
         std::shared_ptr<GG::Label>              m_desc;
     };
 
-    std::shared_ptr<const UniverseObject> GetSourceObjectForEmpire(int empire_id) {
-        // get a source object, which is owned by the empire,
-        // preferably the capital
-        if (empire_id == ALL_EMPIRES)
-            return nullptr;
-        const Empire* empire = GetEmpire(empire_id);
-        if (!empire)
-            return nullptr;
-
-        if (auto source = Objects().get(empire->CapitalID()))
-            return source;
-
-        // not a valid source?!  scan through all objects to find one owned by this empire
-        for (const auto& obj : Objects().all()) {
-            if (obj->OwnedBy(empire_id))
-                return obj;
-        }
-
-        // if this empire doesn't own ANYTHING, default to a null source
-        return nullptr;
-    }
-
     std::string EnqueueAndLocationConditionDescription(const std::string& building_name, int candidate_object_id,
                                                        int empire_id, bool only_failed_conditions)
     {
@@ -263,11 +239,17 @@ namespace {
             enqueue_conditions.push_back(building_type->EnqueueLocation());
             enqueue_conditions.push_back(building_type->Location());
         }
-        auto source = GetSourceObjectForEmpire(empire_id);
+
+        ScriptingContext context;
+        const auto& objects = context.ContextObjects();
+        std::shared_ptr<const UniverseObject> source;
+        if (auto empire = context.GetEmpire(empire_id))
+            source = empire->Source(objects);
+
         if (only_failed_conditions)
-            return ConditionFailedDescription(enqueue_conditions, Objects().get(candidate_object_id), source);
+            return ConditionFailedDescription(enqueue_conditions, objects.get(candidate_object_id), std::move(source));
         else
-            return ConditionDescription(enqueue_conditions, Objects().get(candidate_object_id), source);
+            return ConditionDescription(enqueue_conditions, objects.get(candidate_object_id), std::move(source));
     }
 
     std::string LocationConditionDescription(int ship_design_id, int candidate_object_id,
@@ -283,7 +265,11 @@ namespace {
         static const std::shared_ptr<Condition::Condition> can_colonize_cond =
             std::make_shared<Condition::CanColonize>();
 
-        if (const ShipDesign* ship_design = GetUniverse().GetShipDesign(ship_design_id)) {
+        ScriptingContext context;
+        const Universe& universe = context.ContextUniverse();
+        const ObjectMap& objects = context.ContextObjects();
+
+        if (const ShipDesign* ship_design = universe.GetShipDesign(ship_design_id)) {
             if (ship_design->CanColonize())
                 location_conditions.push_back(can_colonize_cond.get());
             if (const ShipHull* ship_hull = GetShipHull(ship_design->Hull()))
@@ -293,12 +279,15 @@ namespace {
                     location_conditions.push_back(part->Location());
             }
         }
-        auto source = GetSourceObjectForEmpire(empire_id);
+
+        std::shared_ptr<const UniverseObject> source;
+        if (auto empire = context.GetEmpire(empire_id))
+            source = empire->Source(objects);
 
         if (only_failed_conditions)
-            return ConditionFailedDescription(location_conditions, Objects().get(candidate_object_id), source);
+            return ConditionFailedDescription(location_conditions, objects.get(candidate_object_id), std::move(source));
         else
-            return ConditionDescription(location_conditions, Objects().get(candidate_object_id), source);
+            return ConditionDescription(location_conditions, objects.get(candidate_object_id), std::move(source));
     }
 
     std::shared_ptr<GG::BrowseInfoWnd> ProductionItemRowBrowseWnd(const ProductionQueue::ProductionItem& item,
@@ -306,17 +295,19 @@ namespace {
     {
         ScopedTimer timer("ProductionItemRowBrowseWnd: " + item.name);
 
+        ScriptingContext context;
+
         // get available PP for empire at candidate location
         float local_pp_output = 0.0f;
         float stockpile = 0.0f;
         float stockpile_limit_per_turn = 0.0f;
-        if (const auto* empire = GetEmpire(empire_id)) {
+        if (auto empire = context.GetEmpire(empire_id)) {
             // from industry output
             local_pp_output = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->GroupAvailable(candidate_object_id);
 
             // from stockpile
             stockpile = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->Stockpile();
-            stockpile_limit_per_turn = empire->GetProductionQueue().StockpileCapacity();
+            stockpile_limit_per_turn = empire->GetProductionQueue().StockpileCapacity(context.ContextObjects());
         }
 
         auto obj = Objects().get(candidate_object_id);
@@ -330,9 +321,8 @@ namespace {
             if (!building_type)
                 return nullptr;
 
-            const std::string& title = UserString(item.name);
+            auto& title = UserString(item.name);
             std::string main_text;
-
 
 
             if (obj || building_type->ProductionCostTimeLocationInvariant()) {
@@ -959,9 +949,9 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
 }
 
 void BuildDesignatorWnd::BuildSelector::PopulateList() {
-    const Universe& universe{GetUniverse()}; // TODO: pass in?
-    const EmpireManager& empires{Empires()}; // TODO: pass in?
-    auto empire = empires.GetEmpire(m_empire_id);
+    ScriptingContext context;
+    const Universe& universe{context.ContextUniverse()};
+    auto empire = context.GetEmpire(m_empire_id);
     if (!empire)
         return;
 
@@ -1074,6 +1064,9 @@ void BuildDesignatorWnd::BuildSelector::BuildItemLeftClicked(GG::ListBox::iterat
 
     BuildType build_type = item.build_type;
 
+    ScriptingContext context;
+    const Universe& universe{context.ContextUniverse()};
+
     if (build_type == BuildType::BT_BUILDING) {
         const BuildingType* building_type = GetBuildingType(item.name);
         if (!building_type) {
@@ -1083,7 +1076,7 @@ void BuildDesignatorWnd::BuildSelector::BuildItemLeftClicked(GG::ListBox::iterat
         DisplayBuildingTypeSignal(building_type);
 
     } else if (build_type == BuildType::BT_SHIP) {
-        const ShipDesign* design = GetUniverse().GetShipDesign(item.design_id);
+        const ShipDesign* design = universe.GetShipDesign(item.design_id);
         if (!design) {
             ErrorLogger() << "BuildDesignatorWnd::BuildSelector::BuildItemSelected unable to find design with id " << item.design_id;
             return;
@@ -1114,11 +1107,14 @@ void BuildDesignatorWnd::BuildSelector::BuildItemRightClicked(GG::ListBox::itera
         return;
     const ProductionQueue::ProductionItem& item = item_row->Item();
 
-    std::string item_name;
+    ScriptingContext context;
+    const Universe& universe{context.ContextUniverse()};
+
+    std::string_view item_name;
     if (item.build_type == BuildType::BT_BUILDING) {
         item_name = item.name;
     } else if (item.build_type == BuildType::BT_SHIP) {
-        item_name = GetUniverse().GetShipDesign(item.design_id)->Name(false);
+        item_name = universe.GetShipDesign(item.design_id)->Name(false);
     } else if (item.build_type == BuildType::BT_STOCKPILE) {
         item_name = UserStringNop("PROJECT_BT_STOCKPILE");
     } else {
@@ -1243,10 +1239,11 @@ void BuildDesignatorWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
 void BuildDesignatorWnd::CenterOnBuild(int queue_idx, bool open) {
     SetBuild(queue_idx);
 
-    const ObjectMap& objects = GetUniverse().Objects();
+    ScriptingContext context;
+    const ObjectMap& objects = context.ContextObjects();
 
     int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    const Empire* empire = GetEmpire(empire_id);
+    auto empire = context.GetEmpire(empire_id);
     if (!empire) {
         ErrorLogger() << "BuildDesignatorWnd::CenterOnBuild couldn't get empire with id " << empire_id;
         return;
@@ -1269,12 +1266,17 @@ void BuildDesignatorWnd::CenterOnBuild(int queue_idx, bool open) {
 }
 
 void BuildDesignatorWnd::SetBuild(int queue_idx) {
+    ScriptingContext context;
+
     int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    const Empire* empire = GetEmpire(empire_id);
+    auto empire = context.GetEmpire(empire_id);
     if (!empire) {
         ErrorLogger() << "BuildDesignatorWnd::SetBuild couldn't get empire with id " << empire_id;
         return;
     }
+
+    const Universe& universe = context.ContextUniverse();
+
     const ProductionQueue& queue = empire->GetProductionQueue();
     if (0 <= queue_idx && queue_idx < static_cast<int>(queue.size())) {
         BuildType buildType = queue[queue_idx].item.build_type;
@@ -1283,7 +1285,7 @@ void BuildDesignatorWnd::SetBuild(int queue_idx) {
             assert(building_type);
             m_build_selector->DisplayBuildingTypeSignal(building_type);
         } else if (buildType == BuildType::BT_SHIP) {
-            const ShipDesign* design = GetUniverse().GetShipDesign(queue[queue_idx].item.design_id);
+            const ShipDesign* design = universe.GetShipDesign(queue[queue_idx].item.design_id);
             assert(design);
             m_build_selector->DisplayShipDesignSignal(design);
         } else if (buildType == BuildType::BT_STOCKPILE) {
@@ -1330,7 +1332,7 @@ void BuildDesignatorWnd::InitializeWindows() {
     GG::X queue_width(GetOptionsDB().Get<int>("ui.queue.width"));
 
     const GG::X SIDEPANEL_WIDTH(GetOptionsDB().Get<int>("ui.map.sidepanel.width"));
-    constexpr GG::Y PANEL_HEIGHT{240};
+    static constexpr GG::Y PANEL_HEIGHT{240};
 
     const GG::Pt pedia_ul(queue_width, GG::Y0);
     const GG::Pt pedia_wh(Width() - SIDEPANEL_WIDTH - queue_width, PANEL_HEIGHT);

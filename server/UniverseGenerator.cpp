@@ -316,7 +316,7 @@ namespace {
             (void)lanes;
             accessibleSystemsMap.emplace_hint(accessibleSystemsMap.end(), sys, -1);
         }
-        constexpr int mapped_type_max = std::numeric_limits<decltype(accessibleSystemsMap)::mapped_type>::max();
+        static constexpr int mapped_type_max = std::numeric_limits<decltype(accessibleSystemsMap)::mapped_type>::max();
         maxLaneJumps = std::min(maxLaneJumps, mapped_type_max);
 
         // add starting system to list and set of accessible systems
@@ -600,7 +600,7 @@ namespace {
 }
 
 void GenerateStarlanes(int max_jumps_between_systems, int max_starlane_length,
-                       Universe& universe)
+                       Universe& universe, const EmpireManager& empires)
 {
     DebugLogger() << "GenerateStarlanes  max jumps b/w sys: " << max_jumps_between_systems
                   << "  max lane length: " << max_starlane_length;
@@ -719,14 +719,14 @@ void GenerateStarlanes(int max_jumps_between_systems, int max_starlane_length,
     }
 
     // add the starlane to the stars
-    for (auto& sys : Objects().all<System>()) {
+    for (auto& sys : universe.Objects().all<System>()) {
         const auto& sys_lanes = system_lanes[sys->ID()];
         for (auto& lane_end_id : sys_lanes)
             sys->AddStarlane(lane_end_id);
     }
 
     DebugLogger() << "Initializing System Graph";
-    GetUniverse().InitializeSystemGraph(Empires(), Objects());
+    universe.InitializeSystemGraph(empires);
 }
 
 void SetActiveMetersToTargetMaxCurrentValues(ObjectMap& object_map) {
@@ -836,7 +836,7 @@ void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data) {
         if (color_it != colors.end())
             colors.erase(color_it);
 
-        constexpr EmpireColor CLR_ZERO{{0, 0, 0, 0}};
+        static constexpr EmpireColor CLR_ZERO{{0, 0, 0, 0}};
 
         // if no colour already set, do so automatically
         if (empire_colour == CLR_ZERO) {

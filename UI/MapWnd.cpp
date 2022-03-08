@@ -65,11 +65,28 @@
 
 
 namespace {
-    const double     ZOOM_STEP_SIZE = std::pow(2.0, 1.0/4.0);
+    constexpr double Pow(double base, int exp) {
+        double retval = 1.0;
+        bool invert = exp < 0;
+        size_t abs_exp = exp >= 0 ? exp : -exp;
+        while (abs_exp--)
+            retval *= base;
+        return invert ? (1.0 / retval) : retval;
+    }
+
+    // "Babylonian Method" of finding square roots...
+    double constexpr SqrtIterative2(double a, double c) {
+        double g = 0.5 * (c + a/c);
+        return (g == c) ? g : SqrtIterative2(a, g);
+    }
+    double constexpr Sqrt(double a)
+    { return SqrtIterative2(a, a); }
+
+    constexpr double ZOOM_STEP_SIZE = Sqrt(Sqrt(2.0));
     constexpr double ZOOM_IN_MAX_STEPS = 12.0;
-    constexpr double ZOOM_IN_MIN_STEPS = -10.0;//-7.0;   // negative zoom steps indicates zooming out
-    const double     ZOOM_MAX = std::pow(ZOOM_STEP_SIZE, ZOOM_IN_MAX_STEPS);
-    const double     ZOOM_MIN = std::pow(ZOOM_STEP_SIZE, ZOOM_IN_MIN_STEPS);
+    constexpr double ZOOM_IN_MIN_STEPS = -10.0; // negative zoom steps indicates zooming out
+    constexpr double ZOOM_MAX = Pow(ZOOM_STEP_SIZE, ZOOM_IN_MAX_STEPS);
+    constexpr double ZOOM_MIN = Pow(ZOOM_STEP_SIZE, ZOOM_IN_MIN_STEPS);
 
     constexpr GG::X  SITREP_PANEL_WIDTH{400};
     constexpr GG::Y  SITREP_PANEL_HEIGHT{200};
@@ -362,7 +379,7 @@ namespace {
 
         void Render() override {
             const GG::Y row_height{ClientUI::Pts() + (m_margin * 2)};
-            constexpr GG::Y offset{32};
+            static constexpr GG::Y offset{32};
             const GG::Clr& BG_CLR = ClientUI::WndColor();
             const GG::Clr& BORDER_CLR = ClientUI::WndOuterBorderColor();
             const GG::Pt& UL = GG::Pt(UpperLeft().x, UpperLeft().y + offset);
@@ -395,7 +412,7 @@ namespace {
 
         void DoLayout() {
             const GG::Y row_height{ClientUI::Pts()};
-            constexpr GG::Y offset{32};
+            static constexpr GG::Y offset{32};
             const GG::X descr_width{m_col_widths.at(0) - (m_margin * 2)};
             const GG::X value_width{m_col_widths.at(1) - (m_margin * 3)};
 
@@ -1373,8 +1390,8 @@ void MapWnd::CompleteConstruction() {
     m_scale_line->Hide();
 
     // Zoom slider
-    constexpr int ZOOM_SLIDER_MIN = static_cast<int>(ZOOM_IN_MIN_STEPS),
-                  ZOOM_SLIDER_MAX = static_cast<int>(ZOOM_IN_MAX_STEPS);
+    static constexpr int ZOOM_SLIDER_MIN = static_cast<int>(ZOOM_IN_MIN_STEPS),
+                         ZOOM_SLIDER_MAX = static_cast<int>(ZOOM_IN_MAX_STEPS);
     m_zoom_slider = GG::Wnd::Create<CUISlider<double>>(ZOOM_SLIDER_MIN, ZOOM_SLIDER_MAX,
                                                        GG::Orientation::VERTICAL,
                                                        GG::INTERACTIVE | GG::ONTOP);
@@ -1593,8 +1610,8 @@ void MapWnd::InitializeWindows() {
     const GG::Pt moderator_wh(SITREP_PANEL_WIDTH, SITREP_PANEL_HEIGHT);
 
     // Combat report
-    constexpr GG::Pt combat_log_ul(GG::X(150), GG::Y(50));
-    constexpr GG::Pt combat_log_wh(GG::X(400), GG::Y(300));
+    static constexpr GG::Pt combat_log_ul(GG::X(150), GG::Y(50));
+    static constexpr GG::Pt combat_log_wh(GG::X(400), GG::Y(300));
 
     // government window
     const GG::Pt gov_ul(GG::X0, m_scale_line->Bottom() + m_scale_line->Height() + GG::Y(LAYOUT_MARGIN*2));
@@ -2344,7 +2361,7 @@ void MapWnd::RenderMovementLineETAIndicators(const MapWnd::MovementLineData& mov
         return; // nothing to draw.
 
 
-    constexpr double MARKER_HALF_SIZE = 9;
+    static constexpr double MARKER_HALF_SIZE = 9;
     const int MARKER_PTS = ClientUI::Pts();
     auto font = ClientUI::GetBoldFont(MARKER_PTS);
     auto flags = GG::FORMAT_CENTER | GG::FORMAT_VCENTER;
@@ -4123,7 +4140,6 @@ void MapWnd::InitVisibilityRadiiRenderingBuffers() {
             circle_colour.a = 8*GetOptionsDB().Get<int>("ui.map.detection.range.opacity");
 
             GG::Pt circle_centre = GG::Pt{GG::X(X), GG::Y(Y)};
-            int radius_i = static_cast<int>(radius);
             GG::Pt rad_pt{GG::X(radius), GG::Y(radius)};
             GG::Pt ul = circle_centre - rad_pt;
             GG::Pt lr = circle_centre + rad_pt;
@@ -5177,10 +5193,10 @@ int MapWnd::SystemIconSize() const
 { return static_cast<int>(ClientUI::SystemIconSize() * ZoomFactor()); }
 
 int MapWnd::SystemNamePts() const {
-    constexpr int    SYSTEM_NAME_MINIMUM_PTS = 6;    // limit to absolute minimum point size
-    constexpr double MAX_NAME_ZOOM_FACTOR = 1.5;     // limit to relative max above standard UI font size
-    const double     NAME_ZOOM_FACTOR = std::min(MAX_NAME_ZOOM_FACTOR, ZoomFactor());
-    const int        ZOOMED_PTS = static_cast<int>(ClientUI::Pts() * NAME_ZOOM_FACTOR);
+    static constexpr int    SYSTEM_NAME_MINIMUM_PTS = 6;    // limit to absolute minimum point size
+    static constexpr double MAX_NAME_ZOOM_FACTOR = 1.5;     // limit to relative max above standard UI font size
+    const double            NAME_ZOOM_FACTOR = std::min(MAX_NAME_ZOOM_FACTOR, ZoomFactor());
+    const int               ZOOMED_PTS = static_cast<int>(ClientUI::Pts() * NAME_ZOOM_FACTOR);
     return std::max(ZOOMED_PTS, SYSTEM_NAME_MINIMUM_PTS);
 }
 
@@ -6855,7 +6871,8 @@ void MapWnd::RefreshDetectionIndicator() {
 }
 
 void MapWnd::RefreshIndustryResourceIndicator() {
-    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
+    ScriptingContext context;
+    auto empire = context.GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (!empire) {
         m_industry->SetValue(0.0);
         m_industry_wasted->Hide();
@@ -6871,7 +6888,7 @@ void MapWnd::RefreshIndustryResourceIndicator() {
     double total_PP_target_output = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->TargetOutput();
     float  stockpile = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->Stockpile();
     float  stockpile_used = boost::accumulate(empire->GetProductionQueue().AllocatedStockpilePP() | boost::adaptors::map_values, 0.0f);
-    float  stockpile_use_capacity = empire->GetProductionQueue().StockpileCapacity();
+    float  stockpile_use_capacity = empire->GetProductionQueue().StockpileCapacity(context.ContextObjects());
     float  expected_stockpile = empire->GetProductionQueue().ExpectedNewStockpileAmount();
 
     float  stockpile_plusminus_next_turn = expected_stockpile - stockpile;

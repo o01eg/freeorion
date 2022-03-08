@@ -56,7 +56,7 @@ namespace {
             return nullptr;
 
         Universe& universe = context.ContextUniverse();
-        auto fleet = universe.InsertNew<Fleet>("", x, y, ship->Owner());
+        auto fleet = universe.InsertNew<Fleet>("", x, y, ship->Owner(), context.current_turn);
 
         fleet->Rename(fleet->GenerateFleetName(context));
         fleet->GetMeter(MeterType::METER_STEALTH)->SetCurrent(Meter::LARGE_VALUE);
@@ -603,13 +603,14 @@ void SetMeter::Execute(ScriptingContext& context,
     {
         auto old_value = meter->Current();
         meter->SetCurrent(new_meter_value);
-        auto diff = new_meter_value - old_value;
 
-        if (have_accounting)
+        if (have_accounting) {
+            auto diff = new_meter_value - old_value;
             accounting[target_id][meter_type].emplace_back(
                 source_id, effect_cause.cause_type,
                 diff, new_meter_value,
                 effect_cause.specific_cause, accounting_label);
+        }
     };
 
 
@@ -632,7 +633,7 @@ void SetMeter::Execute(ScriptingContext& context,
         auto op_ref = static_cast<ValueRef::Operation<double>*>(m_value.get());
         auto op_type = op_ref->GetOpType();
         auto rhs = op_ref->RHS()->Eval(context);
-        auto lhs_ref = op_ref->LHS();
+        [[maybe_unused]] auto lhs_ref = op_ref->LHS();
         assert(lhs_ref && lhs_ref->GetReferenceType() == ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE);
 
         for (auto& target : targets) {
@@ -854,7 +855,7 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
             auto op_ref = static_cast<ValueRef::Operation<double>*>(m_value.get());
             auto op_type = op_ref->GetOpType();
             auto rhs = op_ref->RHS()->Eval(context);
-            auto lhs_ref = op_ref->LHS();
+            [[maybe_unused]] auto lhs_ref = op_ref->LHS();
             assert(lhs_ref && lhs_ref->GetReferenceType() == ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE);
 
             for (auto& target : targets) {
@@ -929,7 +930,7 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
         auto op_ref = static_cast<ValueRef::Operation<double>*>(m_value.get());
         auto op_type = op_ref->GetOpType();
         auto rhs = op_ref->RHS()->Eval(context);
-        auto lhs_ref = op_ref->LHS();
+        [[maybe_unused]] auto lhs_ref = op_ref->LHS();
         assert(lhs_ref && lhs_ref->GetReferenceType() == ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE);
 
         for (auto& target : targets) {
@@ -957,8 +958,10 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
         }
 
         // set new meter values and update accounting
-        for (auto [new_val, target_id, meter] : target_new_meter_vals)
+        for (auto [new_val, target_id, meter] : target_new_meter_vals) {
+            (void)target_id;
             meter->SetCurrent(new_val);
+        }
     }
 }
 
@@ -1112,17 +1115,16 @@ void SetEmpireMeter::Execute(ScriptingContext& context, const TargetSet& targets
 
         } else if (m_value->TargetInvariant()) {
             // meter value does not depend on target, so handle with single ValueRef evaluation
+            // value is also target invariant, so just need to set once
             auto new_val = m_value->Eval(context);
-            for (auto& target : targets) {
-                if (auto meter = GetEmpireMeter(context, m_empire_id, m_meter))
-                    meter->SetCurrent(new_val);
-            }
+            if (auto meter = GetEmpireMeter(context, m_empire_id, m_meter))
+                meter->SetCurrent(new_val);
 
         } else if (m_value->SimpleIncrement()) {
             auto op_ref = static_cast<ValueRef::Operation<double>*>(m_value.get());
             auto op_type = op_ref->GetOpType();
             auto rhs = op_ref->RHS()->Eval(context);
-            auto lhs_ref = op_ref->LHS();
+            [[maybe_unused]] auto lhs_ref = op_ref->LHS();
             assert(lhs_ref && lhs_ref->GetReferenceType() == ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE);
 
             for (auto& target : targets) {
@@ -1164,25 +1166,25 @@ void SetEmpireMeter::Execute(ScriptingContext& context, const TargetSet& targets
 
     } else if (m_value->TargetInvariant()) {
         // meter value does not depend on target, so handle with single ValueRef evaluation
+        // and just set once
         auto new_val = m_value->Eval(context);
-        for (auto& target : targets) {
-            if (auto meter = GetEmpireMeter(context, empire_id, m_meter))
-                meter->SetCurrent(new_val);
-        }
+        if (auto meter = GetEmpireMeter(context, empire_id, m_meter))
+            meter->SetCurrent(new_val);
 
     } else if (m_value->SimpleIncrement()) {
         auto op_ref = static_cast<ValueRef::Operation<double>*>(m_value.get());
         auto op_type = op_ref->GetOpType();
         auto rhs = op_ref->RHS()->Eval(context);
-        auto lhs_ref = op_ref->LHS();
+        [[maybe_unused]] auto lhs_ref = op_ref->LHS();
         assert(lhs_ref && lhs_ref->GetReferenceType() == ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE);
 
-        for (auto& target : targets) {
-            if (auto meter = GetEmpireMeter(context, empire_id, m_meter)) {
-                auto lhs = meter->Current();
-                auto new_val = ValueRef::Operation<double>::EvalImpl(op_type, lhs, rhs);
-                meter->SetCurrent(new_val);
+        if (auto meter = GetEmpireMeter(context, empire_id, m_meter)) {
+            auto lhs = meter->Current();
+            for (auto& target : targets) {
+                (void)target; // don't use the target objects, but should re-apply the adjustment once per target
+                lhs = ValueRef::Operation<double>::EvalImpl(op_type, lhs, rhs);
             }
+            meter->SetCurrent(lhs);
         }
 
     } else {
@@ -1804,7 +1806,8 @@ void CreatePlanet::Execute(ScriptingContext& context) const {
         return;
     }
 
-    auto planet = context.ContextUniverse().InsertNew<Planet>(type, size);
+    auto& universe = context.ContextUniverse();
+    auto planet = universe.InsertNew<Planet>(type, size, context.current_turn);
     if (!planet) {
         ErrorLogger(effects) << "CreatePlanet::Execute unable to create new Planet object";
         return;
@@ -1823,7 +1826,7 @@ void CreatePlanet::Execute(ScriptingContext& context) const {
     planet->Rename(std::move(name_str));
 
     // apply after-creation effects
-    ScriptingContext local_context{context, std::move(planet), ScriptingContext::CurrentValueVariant()};
+    ScriptingContext local_context{context, std::move(planet), ScriptingContext::DEFAULT_CURRENT_VALUE};
     for (auto& effect : m_effects_to_apply_after) {
         if (effect)
             effect->Execute(local_context);
@@ -1917,7 +1920,9 @@ void CreateBuilding::Execute(ScriptingContext& context) const {
         return;
     }
 
-    auto building = context.ContextUniverse().InsertNew<Building>(ALL_EMPIRES, building_type_name, ALL_EMPIRES);
+    auto& universe = context.ContextUniverse();
+    auto building = universe.InsertNew<Building>(ALL_EMPIRES, std::move(building_type_name),
+                                                 ALL_EMPIRES, context.current_turn);
     if (!building) {
         ErrorLogger(effects) << "CreateBuilding::Execute couldn't create building!";
         return;
@@ -1940,7 +1945,7 @@ void CreateBuilding::Execute(ScriptingContext& context) const {
     }
 
     // apply after-creation effects
-    ScriptingContext local_context{context, std::move(building), ScriptingContext::CurrentValueVariant()};
+    ScriptingContext local_context{context, std::move(building), ScriptingContext::DEFAULT_CURRENT_VALUE};
     for (auto& effect : m_effects_to_apply_after) {
         if (effect)
             effect->Execute(local_context);
@@ -2080,7 +2085,8 @@ void CreateShip::Execute(ScriptingContext& context) const {
     //// etc.
 
     auto ship = context.ContextUniverse().InsertNew<Ship>(
-        empire_id, design_id, std::move(species_name), context.ContextUniverse(), ALL_EMPIRES);
+        empire_id, design_id, std::move(species_name), context.ContextUniverse(),
+        context.species, ALL_EMPIRES, context.current_turn);
     system->Insert(ship);
 
     if (m_name) {
@@ -2110,7 +2116,7 @@ void CreateShip::Execute(ScriptingContext& context) const {
     CreateNewFleet(std::move(system), ship, context);
 
     // apply after-creation effects
-    ScriptingContext local_context{context, std::move(ship), ScriptingContext::CurrentValueVariant()};
+    ScriptingContext local_context{context, std::move(ship), ScriptingContext::DEFAULT_CURRENT_VALUE};
     for (auto& effect : m_effects_to_apply_after) {
         if (effect)
             effect->Execute(local_context);
@@ -2244,7 +2250,8 @@ void CreateField::Execute(ScriptingContext& context) const {
     else
         y = target->Y();
 
-    auto field = context.ContextUniverse().InsertNew<Field>(field_type->Name(), x, y, size);
+    auto& universe = context.ContextUniverse();
+    auto field = universe.InsertNew<Field>(field_type->Name(), x, y, size, context.current_turn);
     if (!field) {
         ErrorLogger(effects) << "CreateField::Execute couldn't create field!";
         return;
@@ -2269,10 +2276,10 @@ void CreateField::Execute(ScriptingContext& context) const {
     field->Rename(std::move(name_str));
 
     // apply after-creation effects
-    ScriptingContext local_context{context, std::move(field), ScriptingContext::CurrentValueVariant()};
+    ScriptingContext new_field_target_context{context, std::move(field), ScriptingContext::DEFAULT_CURRENT_VALUE};
     for (auto& effect : m_effects_to_apply_after) {
         if (effect)
-            effect->Execute(local_context);
+            effect->Execute(new_field_target_context);
     }
 }
 
@@ -2391,17 +2398,18 @@ void CreateSystem::Execute(ScriptingContext& context) const {
         name_str = GenerateSystemName(context.ContextObjects());
     }
 
-    auto system = context.ContextUniverse().InsertNew<System>(star_type, name_str, x, y);
+    auto& universe = context.ContextUniverse();
+    auto system = universe.InsertNew<System>(star_type, name_str, x, y, context.current_turn);
     if (!system) {
         ErrorLogger(effects) << "CreateSystem::Execute couldn't create system!";
         return;
     }
 
     // apply after-creation effects
-    ScriptingContext local_context{context, std::move(system), ScriptingContext::CurrentValueVariant()};
+    ScriptingContext system_target_context{context, std::move(system), ScriptingContext::DEFAULT_CURRENT_VALUE};
     for (auto& effect : m_effects_to_apply_after) {
         if (effect)
-            effect->Execute(local_context);
+            effect->Execute(system_target_context);
     }
 }
 
@@ -3583,7 +3591,7 @@ void Victory::Execute(ScriptingContext& context) const {
         return;
     }
     if (auto empire = context.GetEmpire(context.effect_target->Owner()))
-        empire->Win(m_reason_string);
+        empire->Win(m_reason_string, context.Empires());
     else
         ErrorLogger(effects) << "Trying to grant victory to a missing empire!";
 }

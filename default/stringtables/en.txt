@@ -2640,6 +2640,14 @@ Random
 GSETUP_NONE
 None
 
+# Frequency value of monsters.
+GSETUP_EXTREMELY_LOW
+Extremely Low
+
+# Frequency value of monsters.
+GSETUP_VERY_LOW
+Very Low
+
 # Frequency value of starlanes, planets, specials, monsters and native species.
 GSETUP_LOW
 Low
@@ -2651,6 +2659,14 @@ Medium
 # Frequency value of starlanes, planets, specials, monsters and native species.
 GSETUP_HIGH
 High
+
+# Frequency value of monsters.
+GSETUP_VERY_HIGH
+Very High
+
+# Frequency value of monsters.
+GSETUP_EXTREMELY_HIGH
+Extremely High
 
 # A galaxy age to select when generating a universe.
 GSETUP_YOUNG
@@ -12008,8 +12024,8 @@ Confederation
 PLC_CONFEDERATION_DESC
 '''Planets of the empire are organized in a confederacy of independent systems.
 
-• Increases [[metertype METER_TARGET_INFLUENCE]] on colonies disconnected from the capital by [[value PLC_CONFEDERATION_SUPPLY_DISCONNECTED_INFLUENCE_FLAT]]
-• Increases [[metertype METER_TARGET_HAPPINESS]] on colonies disconnected from the capital and regional administrative centres by [[value DISCONNECTED_FROM_CAPITAL_AND_REGIONAL_ADMIN_STABILITY_PENALTY]]
+• Removes [[metertype METER_TARGET_INFLUENCE]] penalty (baseline for most species) on colonies disconnected from the [[buildingtype BLD_IMPERIAL_PALACE]]
+• Removes [[metertype METER_TARGET_HAPPINESS]] penalty (baseline for most species) on colonies disconnected from the [[buildingtype BLD_IMPERIAL_PALACE]] and [[buildingtype BLD_REGIONAL_ADMIN]]
 • Reduces [[metertype METER_TARGET_HAPPINESS]] ([[value PLC_CONFEDERATION_TARGET_HAPPINESS_FLAT]]) on all planets
 • Increases [[metertype METER_MAX_TROOPS]] by [[value PLC_CONFEDERATION_MAX_TROOPS_FLAT]]'''
 

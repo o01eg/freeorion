@@ -129,11 +129,11 @@ namespace {
     constexpr int MIN_HEIGHT = 600;
 
     /** Sets the default and current values for the string option @p option_name to @p option_value if initially empty */
-    void SetEmptyStringDefaultOption(const std::string& option_name, const std::string& option_value) {
+    void SetEmptyStringDefaultOption(std::string_view option_name, std::string option_value) {
         OptionsDB& db = GetOptionsDB();
         if (db.Get<std::string>(option_name).empty()) {
-            db.SetDefault<std::string>(option_name, option_value);
-            db.Set(option_name, option_value);
+            db.SetDefault(option_name, option_value);
+            db.Set(option_name, std::move(option_value));
         }
     }
 
@@ -549,12 +549,12 @@ void GGHumanClientApp::NewSinglePlayerGame(bool quickstart) {
     setup_data.SetSeed(GetOptionsDB().Get<std::string>("setup.seed"));
     setup_data.size =             GetOptionsDB().Get<int>("setup.star.count");
     setup_data.shape =            GetOptionsDB().Get<Shape>("setup.galaxy.shape");
-    setup_data.age =              GetOptionsDB().Get<GalaxySetupOption>("setup.galaxy.age");
-    setup_data.starlane_freq =    GetOptionsDB().Get<GalaxySetupOption>("setup.starlane.frequency");
-    setup_data.planet_density =   GetOptionsDB().Get<GalaxySetupOption>("setup.planet.density");
-    setup_data.specials_freq =    GetOptionsDB().Get<GalaxySetupOption>("setup.specials.frequency");
-    setup_data.monster_freq =     GetOptionsDB().Get<GalaxySetupOption>("setup.monster.frequency");
-    setup_data.native_freq =      GetOptionsDB().Get<GalaxySetupOption>("setup.native.frequency");
+    setup_data.age =              GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.galaxy.age");
+    setup_data.starlane_freq =    GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.starlane.frequency");
+    setup_data.planet_density =   GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.planet.density");
+    setup_data.specials_freq =    GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.specials.frequency");
+    setup_data.monster_freq =     GetOptionsDB().Get<GalaxySetupOptionMonsterFreq>("setup.monster.frequency");
+    setup_data.native_freq =      GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.native.frequency");
     setup_data.ai_aggr =          GetOptionsDB().Get<Aggression>("setup.ai.aggression");
     setup_data.game_rules =       game_rules;
 
@@ -1279,7 +1279,7 @@ namespace {
     }
 
     boost::filesystem::path CreateNewAutosaveFilePath(int client_empire_id, bool is_single_player) {
-        constexpr const char* legal_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-";
+        static constexpr const char* legal_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-";
 
         // get empire name, filtered for filename acceptability
         const Empire* empire = GetEmpire(client_empire_id);

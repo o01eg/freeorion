@@ -47,10 +47,8 @@ namespace {
 
     // The participant bar height when its parent side bar height is
     // MIN_SIDE_BAR_HEIGHT.
-    int MIN_PARTICIPANT_BAR_HEIGHT = MIN_SIDE_BAR_HEIGHT -
-                                     Value(AXIS_HEIGHT) -
-                                     Value(X_AXIS_LABEL_MARGIN) -
-                                     Value(SIDE_BAR_UP_MARGIN);
+    constexpr int MIN_PARTICIPANT_BAR_HEIGHT =
+        MIN_SIDE_BAR_HEIGHT - Value(AXIS_HEIGHT) - Value(X_AXIS_LABEL_MARGIN) - Value(SIDE_BAR_UP_MARGIN);
 
     constexpr float EPSILON = 0.00001f;
 
@@ -63,28 +61,28 @@ namespace {
 
     // command-line options
     void AddOptions(OptionsDB& db) {
-        db.Add<bool>(OPTIONS_ROOT + TOGGLE_BAR_HEIGHT_PROPORTIONAL,
-                     UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_BAR_HEIGHT_PROPORTIONAL"),
-                     false);
-        db.Add<bool>(OPTIONS_ROOT + TOGGLE_BAR_WIDTH_PROPORTIONAL,
-                     UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_BAR_WIDTH_PROPORTIONAL"),
-                     true);
-        db.Add<bool>(OPTIONS_ROOT + TOGGLE_BAR_HEALTH_SMOOTH,
-                     UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_BAR_HEALTH_SMOOTH"),
-                     true);
-        db.Add<bool>(OPTIONS_ROOT + TOGGLE_GRAPH_HEIGHT_PROPORTIONAL,
-                     UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_GRAPH_HEIGHT_PROPORTIONAL"),
-                     false);
+        db.Add(OPTIONS_ROOT + TOGGLE_BAR_HEIGHT_PROPORTIONAL,
+               UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_BAR_HEIGHT_PROPORTIONAL"),
+               false);
+        db.Add(OPTIONS_ROOT + TOGGLE_BAR_WIDTH_PROPORTIONAL,
+               UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_BAR_WIDTH_PROPORTIONAL"),
+               true);
+        db.Add(OPTIONS_ROOT + TOGGLE_BAR_HEALTH_SMOOTH,
+               UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_BAR_HEALTH_SMOOTH"),
+               true);
+        db.Add(OPTIONS_ROOT + TOGGLE_GRAPH_HEIGHT_PROPORTIONAL,
+               UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_GRAPH_HEIGHT_PROPORTIONAL"),
+               false);
 
-        db.Add<GG::Clr>("ui.combat.summary.dead.color",
-                        UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_DEAD_COLOR"),
-                        GG::Clr(128, 0, 0, 255));
-        db.Add<GG::Clr>("ui.combat.summary.damaged.color",
-                        UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_WOUND_COLOR"),
-                        GG::CLR_RED);
-        db.Add<GG::Clr>("ui.combat.summary.undamaged.color",
-                        UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_HEALTH_COLOR"),
-                        GG::CLR_GREEN);
+        db.Add("ui.combat.summary.dead.color",
+               UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_DEAD_COLOR"),
+               GG::Clr(128, 0, 0, 255));
+        db.Add("ui.combat.summary.damaged.color",
+               UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_WOUND_COLOR"),
+               GG::CLR_RED);
+        db.Add("ui.combat.summary.undamaged.color",
+               UserStringNop("OPTIONS_DB_UI_COMBAT_SUMMARY_HEALTH_COLOR"),
+               GG::CLR_GREEN);
     }
     bool temp_bool = RegisterOptions(&AddOptions);
 
@@ -483,9 +481,6 @@ public:
             std::static_pointer_cast<OptionsBar>(shared_from_this())));
         DoLayout();
     }
-
-    virtual ~OptionsBar()
-    {}
 
     GG::Pt MinUsableSize() const override {
         GG::Pt min_size(GG::X0, GG::Y0);

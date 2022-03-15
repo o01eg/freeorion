@@ -203,14 +203,16 @@ NEW_PLANET_NAME
 NEW_ASTEROIDS_SUFFIX
 [[PT_ASTEROIDS]]
 
+# appended to names of systems if they are empty
 EMPTY_SPACE
-Deep Space
+''''''
 
+# appended to names of systems
 UNEXPLORED_REGION
-Unexplored Region
+''' (unexplored)'''
 
 UNEXPLORED_SYSTEM
-Unexplored System
+''' (unexplored)'''
 
 NOT_APPLICABLE
 N/A
@@ -8847,7 +8849,7 @@ Their ancestral desert world's environment possesses an extremely unlikely combi
 Since reproducing their native environment anywhere else is out of the question, they can never leave. Unless their entire world were to be moved, and great care taken not to interrupt the tidal-static-electric effects from its neighbouring star system.
 
 Description:
-A single Nymnmnych is hard to grasp. They blend into a cascading caccophony of self-perpetuating lightning-like electromagnetic discharges, in which an outsider can only discern a smear of blueish grizzle. Moving at the speed of light, yet bound to the ground, each and every indiviual covers the entire planetary surface several times per second. Where they meet, they briefly resonate with each other (somewhere in the low to mid terahertz range). Without corporeal form, they need to imprint their memories into the ferromagnetic portion of their planet's crust. Any mining or mechanical activities would impair or even destroy their racial memories, which is why they refrain from industry.
+A single Nymnmnych is hard to grasp. They blend into a cascading caccophony of self-perpetuating lightning-like electromagnetic discharges, in which an outsider can only discern a smear of blueish grizzle. Moving at the speed of light, yet bound to the ground, each and every individual covers the entire planetary surface several times per second. Where they meet, they briefly resonate with each other (somewhere in the low to mid terahertz range). Without corporeal form, they need to imprint their memories into the ferromagnetic portion of their planet's crust. Any mining or mechanical activities would impair or even destroy their racial memories, which is why they refrain from industry.
 
 Daily lives:
 Today's nymnmnian society is mainly preoccupied with reviewing and rating, archiving and cataloguing old tv shows and other entertainment broadcasts from foreign civilizations. They can not do otherwise, because those broadcasts touch the very essence of their beings – all their life is a non-stop binge-watching marathon if they want to or not. In consequence, they are the absolute masters of movie mockery in all the galaxies.
@@ -9297,6 +9299,30 @@ High Tech Natives
 
 HIGH_TECH_NATIVES_SPECIAL_DESC
 The natives on this planet have developed very advanced technology, giving their planet much stronger defenses against attack and invasion when independent of an empire.
+
+NATIVE_FORTIFICATION_MINIMAL
+Minimal Native Fortifications
+
+NATIVE_FORTIFICATION_MINIMAL_DESC
+The natives on this planet have built minimal fortications, giving their planet stronger defenses against attack and invasion when independent of an empire.
+
+NATIVE_FORTIFICATION_LOW
+Basic Native Fortifications
+
+NATIVE_FORTIFICATION_LOW_DESC
+The natives on this planet have built basic fortications, giving their planet stronger defenses against attack and invasion when independent of an empire.
+
+NATIVE_FORTIFICATION_MEDIUM
+Moderate Native Fortifications
+
+NATIVE_FORTIFICATION_MEDIUM_DESC
+The natives on this planet have built moderate fortications, giving their planet stronger defenses against attack and invasion when independent of an empire.
+
+NATIVE_FORTIFICATION_HIGH
+Strong Native Fortifications
+
+NATIVE_FORTIFICATION_HIGH_DESC
+The natives on this planet have built strong fortications, giving their planet stronger defenses against attack and invasion when independent of an empire.
 
 GAIA_SPECIAL
 Gaia

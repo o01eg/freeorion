@@ -1390,7 +1390,8 @@ std::string EmpireAffiliation::Description(bool negated/* = false*/) const {
         int empire_id = ALL_EMPIRES;
         if (m_empire_id->ConstantExpr())
             empire_id = m_empire_id->Eval();
-        if (const Empire* empire = GetEmpire(empire_id))
+        ScriptingContext context;
+        if (auto empire = context.GetEmpire(empire_id))
             empire_str = empire->Name();
         else
             empire_str = m_empire_id->Description();
@@ -4928,7 +4929,8 @@ std::string Enqueued::Description(bool negated/* = false*/) const {
         int empire_id = ALL_EMPIRES;
         if (m_empire_id->ConstantExpr())
             empire_id = m_empire_id->Eval();
-        if (const Empire* empire = GetEmpire(empire_id))
+        ScriptingContext context;
+        if (auto empire = context.GetEmpire(empire_id))
             empire_str = empire->Name();
         else
             empire_str = m_empire_id->Description();
@@ -6190,7 +6192,8 @@ std::string ProducedByEmpire::Description(bool negated/* = false*/) const {
         int empire_id = ALL_EMPIRES;
         if (m_empire_id->ConstantExpr())
             empire_id = m_empire_id->Eval();
-        if (const Empire* empire = GetEmpire(empire_id))
+        ScriptingContext context;
+        if (auto empire = context.GetEmpire(empire_id))
             empire_str = empire->Name();
         else
             empire_str = m_empire_id->Description();
@@ -6779,7 +6782,8 @@ std::string EmpireMeterValue::Description(bool negated/* = false*/) const {
         int empire_id = ALL_EMPIRES;
         if (m_empire_id->ConstantExpr())
             empire_id = m_empire_id->Eval();
-        if (const Empire* empire = GetEmpire(empire_id))
+        ScriptingContext context;
+        if (auto empire = context.GetEmpire(empire_id))
             empire_str = empire->Name();
         else
             empire_str = m_empire_id->Description();
@@ -7897,7 +7901,8 @@ std::string VisibleToEmpire::Description(bool negated/* = false*/) const {
         int empire_id = ALL_EMPIRES;
         if (m_empire_id->ConstantExpr())
             empire_id = m_empire_id->Eval();
-        if (const Empire* empire = GetEmpire(empire_id))
+        ScriptingContext context;
+        if (auto empire = context.GetEmpire(empire_id))
             empire_str = empire->Name();
         else
             empire_str = m_empire_id->Description();
@@ -8779,7 +8784,8 @@ std::string ExploredByEmpire::Description(bool negated/* = false*/) const {
         int empire_id = ALL_EMPIRES;
         if (m_empire_id->ConstantExpr())
             empire_id = m_empire_id->Eval();
-        if (const Empire* empire = GetEmpire(empire_id))
+        ScriptingContext context;
+        if (auto empire = context.GetEmpire(empire_id))
             empire_str = empire->Name();
         else
             empire_str = m_empire_id->Description();
@@ -9010,7 +9016,8 @@ void FleetSupplyableByEmpire::Eval(const ScriptingContext& parent_context,
     if (simple_eval_safe) {
         // evaluate empire id once, and use to check all candidate objects
         int empire_id = m_empire_id->Eval(parent_context);
-        EvalImpl(matches, non_matches, search_domain, FleetSupplyableSimpleMatch(empire_id, parent_context.supply));
+        EvalImpl(matches, non_matches, search_domain,
+                 FleetSupplyableSimpleMatch(empire_id, parent_context.supply));
     } else {
         // re-evaluate empire id for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -9023,7 +9030,8 @@ std::string FleetSupplyableByEmpire::Description(bool negated/* = false*/) const
         int empire_id = ALL_EMPIRES;
         if (m_empire_id->ConstantExpr())
             empire_id = m_empire_id->Eval();
-        if (const Empire* empire = GetEmpire(empire_id))
+        ScriptingContext context;
+        if (auto empire = context.GetEmpire(empire_id))
             empire_str = empire->Name();
         else
             empire_str = m_empire_id->Description();
@@ -9224,7 +9232,8 @@ std::string ResourceSupplyConnectedByEmpire::Description(bool negated/* = false*
         int empire_id = ALL_EMPIRES;
         if (m_empire_id->ConstantExpr())
             empire_id = m_empire_id->Eval();
-        if (const Empire* empire = GetEmpire(empire_id))
+        ScriptingContext context;
+        if (auto empire = context.GetEmpire(empire_id))
             empire_str = empire->Name();
         else
             empire_str = m_empire_id->Description();

@@ -367,6 +367,13 @@ struct ScriptingContext {
         return it == diplo_statuses.end() ? DiplomaticStatus::INVALID_DIPLOMATIC_STATUS : it->second;
     }
 
+    std::set<int> GetEmpireIDsWithDiplomaticStatusWithEmpire(
+        int empire_id, DiplomaticStatus diplo_status) const
+    {
+        return EmpireManager::GetEmpireIDsWithDiplomaticStatusWithEmpire(
+            empire_id, diplo_status, diplo_statuses);
+    }
+
     Visibility ContextVis(int object_id, int empire_id) const {
         auto empire_it = empire_object_vis.find(empire_id);
         if (empire_it == empire_object_vis.end())
@@ -400,6 +407,14 @@ struct ScriptingContext {
             return *empires;
         ErrorLogger() << "ScriptingContext::ContextUniverse() asked for undefined mutable empires";
         throw std::runtime_error("ScriptingContext::ContextUniverse() asked for undefined mutable empires");
+    }
+
+    std::vector<int> EmpireIDs() const {
+        std::vector<int> retval;
+        retval.reserve(const_empires.size());
+        std::transform(const_empires.begin(), const_empires.end(),
+                       std::back_inserter(retval), [](const auto& e) { return e.first; });
+        return retval;
     }
 
     // script evaluation local state, some of which may vary during evaluation of an expression

@@ -254,7 +254,8 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
 
     // determine all systems where fleet(s) can be resupplied if fuel runs out
     auto empire = context.GetEmpire(this->Owner());
-    auto fleet_supplied_systems = context.supply.FleetSupplyableSystemIDs(this->Owner(), ALLOW_ALLIED_SUPPLY);
+    auto fleet_supplied_systems = context.supply.FleetSupplyableSystemIDs(
+        this->Owner(), ALLOW_ALLIED_SUPPLY, context);
     auto& unobstructed_systems = empire ? empire->SupplyUnobstructedSystems() : EMPTY_SET;
 
     // determine if, given fuel available and supplyable systems, fleet will ever be able to move
@@ -853,7 +854,9 @@ void Fleet::MovementPhase(ScriptingContext& context) {
 
     // if owner of fleet can resupply ships at the location of this fleet, then
     // resupply all ships in this fleet
-    if (supply.SystemHasFleetSupply(SystemID(), Owner(), ALLOW_ALLIED_SUPPLY)) {
+    if (supply.SystemHasFleetSupply(SystemID(), Owner(), ALLOW_ALLIED_SUPPLY,
+                                    context.diplo_statuses))
+    {
         for (auto& ship : ships)
             ship->Resupply();
     }
@@ -995,7 +998,8 @@ void Fleet::MovementPhase(ScriptingContext& context) {
             if (m_travel_route.front() == system->ID())
                 m_travel_route.erase(m_travel_route.begin());
 
-            bool resupply_here = supply.SystemHasFleetSupply(system->ID(), this->Owner(), ALLOW_ALLIED_SUPPLY);
+            bool resupply_here = supply.SystemHasFleetSupply(
+                system->ID(), this->Owner(), ALLOW_ALLIED_SUPPLY, context.diplo_statuses);
 
             // if this system can provide supplies, reset consumed fuel and refuel ships
             if (resupply_here) {

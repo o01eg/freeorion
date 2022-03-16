@@ -1,4 +1,10 @@
-freeorion (0.4.10.999+1SNAPSHOT20220314ppa10~bionic) bionic; urgency=medium
+freeorion (0.4.10.999+1SNAPSHOT20220314ppa11~bionic) bionic; urgency=medium
+
+  * Fix order enum.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Wed, 16 Mar 2022 12:36:58 +0300
+
+freeorion (0.4.10.999+1SNAPSHOT20220314ppa10~jammy) jammy; urgency=medium
 
   * Fix game rules enums.
 

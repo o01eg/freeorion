@@ -15,12 +15,12 @@ declare -r pubring_auto="${custom_gpg_home}/pubring.auto"
 echo
 echo "Decrypting secret gpg keyring.."
 # $super_secret_password is taken from the script's env. See below in the blog.
-{ echo $super_secret_password | gpg --batch --yes --skip-verify --passphrase-fd 0 --output "${secring_auto}" -d "${secring_auto}".gpg ; } || { end_with_error "Failed to decrypt secret gpg keyring." ; }
+{ echo $SUPER_SECRET_PASSWORD | gpg --batch --yes --skip-verify --passphrase-fd 0 --output "${secring_auto}" -d "${secring_auto}".gpg ; } || { end_with_error "Failed to decrypt secret gpg keyring." ; }
 echo Success!
 
 echo "Decrypting secret ssh key.."
 # $super_secret_password is taken from the script's env. See below in the blog.
-{ echo $super_secret_password | gpg --batch --yes --skip-verify --passphrase-fd 0 --output .ci/id_dsa -d .ci/id_dsa.gpg ; } || { end_with_error "Failed to decrypt secret ssh key." ; }
+{ echo $SUPER_SECRET_PASSWORD | gpg --batch --yes --skip-verify --passphrase-fd 0 --output .ci/id_dsa -d .ci/id_dsa.gpg ; } || { end_with_error "Failed to decrypt secret ssh key." ; }
 chmod 600 .ci/id_dsa || { end_with_error "Failed to decrypt secret ssh key." ; }
 echo Success!
 
@@ -28,6 +28,8 @@ echo
 echo Importing keyrings..
 { gpg --import "${secring_auto}" ; } || { end_with_error "Could not import secret keyring into gpg." ; }
 { gpg --import "${pubring_auto}" ; } || { end_with_error "Could not import public keyring into gpg." ; }
+
+gpg -K
 
 mkdir -p $HOME/.ssh/
 chmod 700 $HOME/.ssh/

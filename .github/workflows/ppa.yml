@@ -1,0 +1,41 @@
+name: "Ubuntu PPA"
+
+on:
+  push:
+    tags:
+      - 'ppa-2[0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].[0-9a-f]+_[0-9]+'
+
+jobs:
+  build-ppa:
+    name: PPA ${{ matrix.dist }}
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        dist: [bionic, focal, impish, jammy]
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        id: build-ppa-install-cache-id
+        with:
+          path: ${{ runner.temp }}/cache-build-linux-install
+          key: build-ppa-install-cache-key-v1.1
+      - uses: airvzxf/cache-anything-new-action@v1.0.1
+        with:
+          script: 'ppa-install-build.sh'
+          is_cached: ${{ steps.build-ppa-install-cache-id.outputs.cache-hit }}
+          cache: ${{ runner.temp }}/cache-build-linux-install
+          snapshot: '/'
+          exclude: '/boot /data /dev /mnt /proc /run /sys'
+      - name: Export secret keys
+        run: bash .ci/before_script.sh
+        env:
+          SUPER_SECRET_PASSWORD: ${{ secrets.SUPER_SECRET_PASSWORD }}
+      - name: Prepare version
+        run: python cmake/make_versioncpp.py . CMake
+      - name: Build
+        run: bash .ci/script.sh ${{ matrix.dist }} ${{ github.ref_name }}
+      - name: Deploy
+        run: bash .ci/deploy.sh ${{ matrix.dist }} ${{ github.ref_name }}    
+

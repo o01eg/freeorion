@@ -1,23 +1,32 @@
 #!/usr/bin/make -f
 #export DH_VERBOSE=1
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+export CCACHE_DIR=$(CURDIR)/ccache
 DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
-WEAK_HOSTS := armel armhf
 
-ifneq (,$(findstring $(DEB_HOST_ARCH),$(WEAK_HOSTS)))
+MAX  := 2
+TYPE := RelWithDebInfo
+
+ifeq (32,$(DEB_HOST_ARCH_BITS))
+ifeq (,$(filter $(DEB_HOST_ARCH), i386))
 	MAX  := 1
-	TYPE := MinSizeRel
-else
-	MAX  := 2
-	TYPE := RelWithDebInfo
+	TYPE := Release
+	export DEB_CFLAGS_MAINT_APPEND = -g1
+	export DEB_CXXFLAGS_MAINT_APPEND = -g1
+endif
 endif
 
 %:
 	dh $@ --max-parallel=$(MAX) --with python3
 
 override_dh_auto_configure:
+	cd $(CURDIR)/godot-cpp && cmake \
+		-DCMAKE_BUILD_TYPE=Release
+	cd $(CURDIR)/godot-cpp && cmake --build . -j $(MAX)
 	dh_auto_configure -- \
+		-DGODOT_CPP_ROOT=$(CURDIR)/godot-cpp \
+		-DBUILD_CLIENT_GODOT=ON \
 		-DBUILD_DOCUMENTATION=off \
 		-DBUILD_TUTORIALS=off \
 		-DLIB_SUFFIX=/freeorion \
@@ -31,17 +40,27 @@ override_dh_shlibdeps:
 override_dh_installchangelogs:
 	dh_installchangelogs ChangeLog.md
 
-override_dh_install:
-	dh_install
+override_dh_missing:
 	dh_missing --fail-missing
+
+override_dh_install:
+#	godot-headless wants a writable homedir, simulate it (see Debian Policy 4.9)
+	mkdir -p home/
+#	Note: we use godot3-headless really (#976623)
+	HOME=$(CURDIR)/home godot3-server --path godot --export-pack "Linux/X11" $(CURDIR)/freeorion.pck
+	dh_install
 	find debian -type d -empty -delete -printf 'removed %p\n'
 	$(RM) -v debian/freeorion-data/usr/share/games/freeorion/default/LICENSE* \
 		debian/freeorion-data/usr/share/games/freeorion/default/COPYING \
 		debian/freeorion-data/usr/share/games/freeorion/default/data/fonts/LICENSE.*
 
+override_dh_auto_clean:
+	rm -rf home/ freeorion.pck
+
 override_dh_python3:
 	dh_python3 -pfreeorion-data /usr/share/games
 
 get-orig-source:
-	wget https://github.com/freeorion/freeorion/releases/download/v0.4.7.1/FreeOrion_v0.4.7.1_2017-09-03.139ffd9_Source.tar.gz
+	wget https://github.com/freeorion/freeorion/releases/download/v0.4.10.1/FreeOrion_v0.4.10.1_2020-09-25.39cfe10_Source.tar.gz
+
 

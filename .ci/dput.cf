@@ -1,6 +1,6 @@
 [freeorion-ppa-sftp]
 fqdn = ppa.launchpad.net
 method = sftp
-incoming = ~o01eg/freeorion/
+incoming = ~o01eg/freeorion-godot/
 login = o01eg
 

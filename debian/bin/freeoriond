@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+
+ROOT=/usr/share/games/freeorion
+cd ${ROOT}
+printf 'CWD: '
+pwd
+
+LD_LIBRARY_PATH="/usr/lib/freeorion:${LD_LIBRARY_PATH}" \
+/usr/lib/freeorion/freeoriond "$@"

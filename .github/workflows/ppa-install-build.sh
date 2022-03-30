@@ -15,4 +15,5 @@ sudo apt install -y devscripts \
         libopenal-dev \
         libsdl2-dev \
         libvorbis-dev \
-	dh-python
+	dh-python \
+	godot3-server

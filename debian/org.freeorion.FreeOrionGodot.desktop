@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=FreeOrionGodot
+GenericName=Turn-based space strategy game
+Comment=Turn-based space empire and galactic conquest (4X) computer game (Godot client)
+Exec=godot3-runner --main-pack /usr/share/games/freeorion/freeorion.pck
+Path=/usr/share/games/freeorion/
+Icon=freeorion
+StartupNotify=false
+Terminal=false
+Type=Application
+Categories=Game;StrategyGame;
+Keywords=space;strategy;empire;galaxy;turn-based;aliens;species;planets;fleet;research;resources;Godot;

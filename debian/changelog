@@ -1,3 +1,9 @@
+freeorion (0.4.10.999+1SNAPSHOT20220327ppa2~focal) focal; urgency=medium
+
+  * Fix godot installation.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Wed, 30 Mar 2022 12:08:05 +0300
+
 freeorion (0.4.10.999+1SNAPSHOT20220327ppa1~bionic) bionic; urgency=medium
 
   * Update upstream.

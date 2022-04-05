@@ -92,7 +92,7 @@ public:
     /** Returns the set of policies / slots the empire has avaialble. */
     [[nodiscard]] const std::set<std::string, std::less<>>&    AvailablePolicies() const;
     [[nodiscard]] bool                                         PolicyAvailable(std::string_view name) const;
-    [[nodiscard]] bool                                         PolicyPrereqsAndExclusionsOK(std::string_view name) const;
+    [[nodiscard]] bool                                         PolicyPrereqsAndExclusionsOK(std::string_view name, int current_turn) const;
     [[nodiscard]] bool                                         PolicyAffordable(std::string_view name, const ScriptingContext& context) const;
     [[nodiscard]] std::map<std::string_view, int, std::less<>> TotalPolicySlots() const; // how many total slots does this empire have in each category
     [[nodiscard]] std::map<std::string_view, int, std::less<>> EmptyPolicySlots() const; // how many empty slots does this empire have in each category
@@ -217,7 +217,7 @@ public:
     /** Checks that all policy adoption conditions are met, removing any that
       * are not allowed. Also copies adopted policies to initial adopted
       * policies. Updates how many turns each policy has (ever) been adopted. */
-    void UpdatePolicies(bool update_cumulative_adoption_time);
+    void UpdatePolicies(bool update_cumulative_adoption_time, int current_turn);
 
     /** Returns the meter with the indicated \a name if it exists, or nullptr. */
     [[nodiscard]] Meter* GetMeter(const std::string& name);
@@ -396,6 +396,10 @@ public:
     void ResetMeters();
 
     void UpdateOwnedObjectCounters(const Universe& universe);
+
+    /** called after loading a saved game, remove obsolete stuff such as no longer
+      * existing policies... */
+    void CheckObsoleteGameContent();
 
     void SetAuthenticated(bool authenticated = true);
 

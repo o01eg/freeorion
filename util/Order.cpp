@@ -274,7 +274,7 @@ void NewFleetOrder::ExecuteImpl(ScriptingContext& context) const {
         if (auto old_fleet = o.get<Fleet>(ship->FleetID())) {
             ordered_moved_turn = std::max(ordered_moved_turn, old_fleet->LastTurnMoveOrdered());
             old_fleet->RemoveShips({ship->ID()});
-            modified_fleets.emplace(std::move(old_fleet));
+            modified_fleets.insert(std::move(old_fleet));
         }
         ship->SetFleetID(fleet->ID());
     }
@@ -344,7 +344,7 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
 
     // ensure a zero-length (invalid) route is not requested / sent to a fleet
     if (m_route.empty())
-        m_route.emplace_back(start_system);
+        m_route.push_back(start_system);
 }
 
 std::string FleetMoveOrder::Dump() const {

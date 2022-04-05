@@ -211,7 +211,7 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     }
 
     // are there conflicts with other policies or missing prerequisite policies?
-    if (!PolicyPrereqsAndExclusionsOK(name)) {
+    if (!PolicyPrereqsAndExclusionsOK(name, context.current_turn)) {
         ErrorLogger() << "Empire::AdoptPolicy asked to adopt policy " << name
                       << " whose prerequisites are not met or which has a conflicting exclusion with already-adopted policies";
         return;
@@ -317,23 +317,7 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     PoliciesChangedSignal();
 }
 
-void Empire::UpdatePolicies(bool update_cumulative_adoption_time) {
-    // remove any unrecognized policies and uncategorized policies
-    auto policies_temp = m_adopted_policies;
-    for (auto& [policy_name, adoption_info] : policies_temp) {
-        const auto* policy = GetPolicy(policy_name);
-        if (!policy) {
-            ErrorLogger() << "UpdatePolicies couldn't find policy with name: " << policy_name;
-            m_adopted_policies.erase(policy_name);
-            continue;
-        }
-
-        if (adoption_info.category.empty()) {
-            ErrorLogger() << "UpdatePolicies found policy " << policy_name << " in empty category?";
-            m_adopted_policies.erase(policy_name);
-        }
-    }
-
+void Empire::UpdatePolicies(bool update_cumulative_adoption_time, int current_turn) {
     // TODO: Check and handle policy exclusions in this function...
 
     // check that there are enough slots for adopted policies in their current slots
@@ -354,7 +338,7 @@ void Empire::UpdatePolicies(bool update_cumulative_adoption_time) {
     for (const auto& cat : categories_needing_rearrangement) {
         DebugLogger() << "Rearranging poilicies in category " << cat << ":";
 
-        policies_temp = m_adopted_policies;
+        auto policies_temp = m_adopted_policies;
 
         // all adopted policies in this category, sorted by slot and adoption turn (lower first)
         std::multimap<std::pair<int, int>, std::string> slots_turns_policies;
@@ -381,7 +365,7 @@ void Empire::UpdatePolicies(bool update_cumulative_adoption_time) {
     // update counters of how many turns each policy has been adopted
     m_policy_adoption_current_duration.clear();
     for (auto& [policy_name, adoption_info] : m_adopted_policies) {
-        m_policy_adoption_current_duration[policy_name] = CurrentTurn() - adoption_info.adoption_turn;
+        m_policy_adoption_current_duration[policy_name] = current_turn - adoption_info.adoption_turn;
 
         if (update_cumulative_adoption_time)
             m_policy_adoption_total_duration[policy_name]++;  // assumes default initialization to 0
@@ -427,7 +411,7 @@ std::vector<std::string_view> Empire::AdoptedPolicies() const {
     std::vector<std::string_view> retval;
     retval.reserve(m_adopted_policies.size());
     for (const auto& entry : m_adopted_policies)
-        retval.emplace_back(entry.first);
+        retval.push_back(entry.first);
     return retval;
 }
 
@@ -458,7 +442,7 @@ const std::set<std::string, std::less<>>& Empire::AvailablePolicies() const
 bool Empire::PolicyAvailable(std::string_view name) const
 { return m_available_policies.count(name); }
 
-bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name) const {
+bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name, int current_turn) const {
     const std::string name_str{name}; // TODO: remove this when possible for heterogenous lookup
     const Policy* policy_to_adopt = GetPolicy(name_str);
     if (!policy_to_adopt)
@@ -489,7 +473,7 @@ bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name) const {
             return false;
         // must have adopted policy at least one turn before, to prevent
         // same-turn policy swapping to bypass prereqs at no cost
-        if (it->second.adoption_turn >= CurrentTurn())
+        if (it->second.adoption_turn >= current_turn)
             return false;
     }
 
@@ -1915,7 +1899,7 @@ void Empire::AddExploredSystem(int ID, int turn, const ObjectMap& objects) {
 std::string Empire::NewShipName() {
     static std::vector<std::string> ship_names = UserStringList("SHIP_NAMES");
     if (ship_names.empty())
-        ship_names.emplace_back(UserString("OBJ_SHIP"));
+        ship_names.push_back(UserString("OBJ_SHIP"));
 
     // select name randomly from list
     int ship_name_idx = RandInt(0, static_cast<int>(ship_names.size()) - 1);
@@ -2492,14 +2476,12 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
     }
 
     // create fleets for new ships and put ships into fleets
-    for (auto& entry : system_new_ships) {
-        auto system = context.ContextObjects().get<System>(entry.first);
+    for (auto& [system_id, new_ships] : system_new_ships) {
+        auto system = context.ContextObjects().get<System>(system_id);
         if (!system) {
-            ErrorLogger() << "Couldn't get system with id " << entry.first << " for creating new fleets for newly produced ships";
+            ErrorLogger() << "Couldn't get system with id " << system_id << " for creating new fleets for newly produced ships";
             continue;
         }
-
-        auto& new_ships = entry.second;
         if (new_ships.empty())
             continue;
 
@@ -2508,12 +2490,12 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
             new_ships_by_rally_point_id_and_design_id;
         for (auto& ship : new_ships) {
             int rally_point_id = INVALID_OBJECT_ID;
-
             auto rally_it = new_ship_rally_point_ids.find(ship->ID());
             if (rally_it != new_ship_rally_point_ids.end())
                 rally_point_id = rally_it->second;
 
-            new_ships_by_rally_point_id_and_design_id[rally_point_id][ship->DesignID()].emplace_back(ship);
+            auto design_id = ship->DesignID();
+            new_ships_by_rally_point_id_and_design_id[rally_point_id][design_id].push_back(std::move(ship));
         }
 
 
@@ -2555,7 +2537,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                     // set invalid arrival starlane so that fleet won't necessarily be free from blockades
                     fleet->SetArrivalStarlane(INVALID_OBJECT_ID);
 
-                    fleets.emplace_back(fleet);
+                    fleets.push_back(fleet); // can't move
                 }
 
                 for (auto& ship : ships) {
@@ -2572,7 +2554,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                         // set invalid arrival starlane so that fleet won't necessarily be free from blockades
                         fleet->SetArrivalStarlane(INVALID_OBJECT_ID);
 
-                        fleets.push_back(fleet);
+                        fleets.push_back(fleet); // can't move
                     }
                     ship_ids.push_back(ship->ID());
                     fleet->AddShips({ship->ID()});
@@ -2782,6 +2764,34 @@ void Empire::UpdateOwnedObjectCounters(const Universe& universe) {
         m_building_types_owned[building->BuildingTypeName()]++;
     }
 }
+
+
+void Empire::CheckObsoleteGameContent() {
+    // remove any unrecognized policies and uncategorized policies
+    auto policies_temp = m_adopted_policies;
+    for (auto& [policy_name, adoption_info] : policies_temp) {
+        const auto* policy = GetPolicy(policy_name);
+        if (!policy) {
+            ErrorLogger() << "UpdatePolicies couldn't find policy with name: " << policy_name;
+            m_adopted_policies.erase(policy_name);
+            continue;
+        }
+
+        if (adoption_info.category.empty()) {
+            ErrorLogger() << "UpdatePolicies found policy " << policy_name << " in empty category?";
+            m_adopted_policies.erase(policy_name);
+        }
+    }
+    auto policies_temp2 = m_available_policies;
+    for (auto& policy_name : policies_temp2) {
+        const auto* policy = GetPolicy(policy_name);
+        if (!policy) {
+            ErrorLogger() << "UpdatePolicies couldn't find policy with name: " << policy_name;
+            m_available_policies.erase(policy_name);
+        }
+    }
+}
+
 
 void Empire::SetAuthenticated(bool authenticated /*= true*/)
 { m_authenticated = authenticated; }

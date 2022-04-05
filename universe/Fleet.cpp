@@ -106,7 +106,7 @@ void Fleet::Copy(std::shared_ptr<const UniverseObject> copied_object,
     UniverseObject::Copy(std::move(copied_object), vis, visible_specials, universe);
 
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
-        m_ships =               copied_fleet->VisibleContainedObjectIDs(empire_id);
+        m_ships =               copied_fleet->VisibleContainedObjectIDs(empire_id, universe.GetEmpireObjectVisibility());
 
         m_next_system =         ((EmpireKnownObjects(empire_id).get<System>(copied_fleet->m_next_system))
                                     ? copied_fleet->m_next_system : INVALID_OBJECT_ID);
@@ -795,7 +795,7 @@ void Fleet::SetRoute(const std::list<int>& route, const ObjectMap& objects) {
     } else {    // m_travel_route.empty() && this->SystemID() == INVALID_OBJECT_ID
         if (m_next_system != INVALID_OBJECT_ID) {
             ErrorLogger() << "Fleet::SetRoute fleet " << this->Name() << " has empty route but fleet is not in a system. Resetting route to end at next system: " << m_next_system;
-            m_travel_route.emplace_back(m_next_system);
+            m_travel_route.push_back(m_next_system);
         } else {
             ErrorLogger() << "Fleet::SetRoute fleet " << this->Name() << " has empty route but fleet is not in a system, and has no next system set.";
         }

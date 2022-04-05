@@ -1903,7 +1903,7 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
     }
     // unclaim owned planets
     for (const auto& planet : planets)
-        planet->Reset();
+        planet->Reset(m_universe.Objects());
 
     // Don't wait for turn
     RemoveEmpireTurn(empire_id);
@@ -2793,10 +2793,11 @@ namespace {
     }
 
     /** Does colonization, with safety checks */
-    bool ColonizePlanet(int ship_id, int planet_id, Universe& universe,
+    bool ColonizePlanet(int ship_id, int planet_id, ScriptingContext& context,
                         const std::vector<int>& empire_ids)
     {
-        auto& objects = universe.Objects();
+        auto& objects = context.ContextObjects();
+        auto& universe = context.ContextUniverse();
 
         auto ship = objects.get<Ship>(ship_id);
         if (!ship) {
@@ -2834,7 +2835,7 @@ namespace {
 
         // colonize planet by calling Planet class Colonize member function
         // do this BEFORE destroying the ship, since species_name is a const reference to Ship::m_species_name
-        if (!planet->Colonize(empire_id, species_name, colonist_capacity)) {
+        if (!planet->Colonize(empire_id, species_name, colonist_capacity, context)) {
             ErrorLogger() << "ColonizePlanet: couldn't colonize planet";
             return false;
         }
@@ -2958,7 +2959,7 @@ namespace {
 
 
             // do colonization
-            if (!ColonizePlanet(colonizing_ship_id, planet_id, universe, empire_ids))
+            if (!ColonizePlanet(colonizing_ship_id, planet_id, context, empire_ids))
                 continue;   // skip sitrep if colonization failed
 
             // record successful colonization
@@ -3318,17 +3319,19 @@ namespace {
     }
 
     /** Causes ResourceCenters (Planets) to update their focus records */
-    void UpdateResourceCenterFocusHistoryInfo() {
-        for (auto& planet : GetUniverse().Objects().all<Planet>())
+    void UpdateResourceCenterFocusHistoryInfo(ObjectMap& objects) {
+        for (auto& planet : objects.all<Planet>())
             planet->UpdateFocusHistory();
     }
 
     /** Check validity of adopted policies, overwrite initial adopted
       * policies with those currently adopted, update adopted turns counters. */
-    void UpdateEmpirePolicies(EmpireManager& empires, bool update_cumulative_adoption_time = false) {
+    void UpdateEmpirePolicies(EmpireManager& empires, int current_turn,
+                              bool update_cumulative_adoption_time = false)
+    {
         for ([[maybe_unused]] auto& [empire_id, empire] : empires) {
             (void)empire_id;    // quieting unused variable warning
-            empire->UpdatePolicies(update_cumulative_adoption_time);
+            empire->UpdatePolicies(update_cumulative_adoption_time, current_turn);
         }
     }
 
@@ -3388,12 +3391,12 @@ void ServerApp::PreCombatProcessTurns() {
     ClearEmpireTurnOrders();
 
     // update ResourceCenter focus history info
-    UpdateResourceCenterFocusHistoryInfo();
+    UpdateResourceCenterFocusHistoryInfo(context.ContextObjects());
 
     // validate adopted policies, and update Empire Policy history
     // actual policy adoption and influence consumption occurrs during order
     // execution above
-    UpdateEmpirePolicies(m_empires, false);
+    UpdateEmpirePolicies(m_empires, context.current_turn, false);
 
     // clean up empty fleets that empires didn't order deleted
     CleanEmptyFleets();
@@ -3466,7 +3469,7 @@ void ServerApp::PreCombatProcessTurns() {
         for (auto& [empire_id, empire] : m_empires) {
             if (fleet->GetVisibility(empire_id, m_universe) >= Visibility::VIS_BASIC_VISIBILITY)
                 empire->AddSitRepEntry(
-                    CreateFleetArrivedAtDestinationSitRep(fleet->SystemID(), fleet->ID(), empire_id));
+                    CreateFleetArrivedAtDestinationSitRep(fleet->SystemID(), fleet->ID(), empire_id, context));
         }
     }
 
@@ -3746,7 +3749,7 @@ void ServerApp::PostCombatProcessTurns() {
 
 
     // do another policy update before final meter update to be consistent with what clients calculate...
-    UpdateEmpirePolicies(m_empires, true);
+    UpdateEmpirePolicies(m_empires, context.current_turn, true);
 
 
     TraceLogger(effects) << "ServerApp::PostCombatProcessTurns Before Final Meter Estimate Update: ";

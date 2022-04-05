@@ -159,7 +159,7 @@ namespace {
         // if shortest path is empty, the route may be impossible or trivial, so just set route to move fleet
         // to the next system that it was just set to move to anyway.
         if (route_pair.first.empty())
-            route_pair.first.emplace_back(new_next_system);
+            route_pair.first.push_back(new_next_system);
 
 
         // set fleet with newly recalculated route
@@ -1821,7 +1821,9 @@ void CreatePlanet::Execute(ScriptingContext& context) const {
         if (m_name->ConstantExpr() && UserStringExists(name_str))
             name_str = UserString(name_str);
     } else {
-        name_str = str(FlexibleFormat(UserString("NEW_PLANET_NAME")) % system->Name() % planet->CardinalSuffix());
+        name_str = str(FlexibleFormat(UserString("NEW_PLANET_NAME"))
+                       % system->Name()
+                       % planet->CardinalSuffix(context.ContextObjects()));
     }
     planet->Rename(std::move(name_str));
 

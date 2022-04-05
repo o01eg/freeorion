@@ -114,13 +114,35 @@ namespace {
         return it != cats.end();
     }
 
-    /** Retreive a value label and general string representation for @a meter_type */
-    std::pair<std::string, std::string> MeterValueLabelAndString(const MeterType& meter_type) {
-        std::pair<std::string, std::string> retval;
+    /** Retreive a value label and general string representation for @a meter_type
+      * eg. {"METER_STEALTH_VALUE_LABEL", UserString("METER_STEALTH")} */
+    auto MeterValueLabelAndString(MeterType meter_type) {
+        auto meter_type_sv{to_string(meter_type)};
+        std::pair<std::string_view, std::string_view> retval{"", meter_type_sv};
 
-        retval.second = to_string(meter_type);
+        if (meter_type == MeterType::INVALID_METER_TYPE)
+            return retval;
 
-        retval.first = retval.second + "_VALUE_LABEL";
+        using signed_idx_type = std::underlying_type_t<MeterType>;
+        static constexpr auto INVALID_IDX = static_cast<signed_idx_type>(MeterType::INVALID_METER_TYPE);
+        static_assert(INVALID_IDX == -1);
+        static constexpr auto NUM_IDX = static_cast<signed_idx_type>(MeterType::NUM_METER_TYPES);
+        // TODO: additional static_assert that verifies that the numerical representation of
+        //       all values of MeterType are -1 or higher. would work better with an
+        //       IterateEnum implementation that works constexpr. as of this writing, it
+        //       uses an std::map, which is not constexpr OK in C++17
+
+        static const auto label_value_strings = []() {
+            std::array<std::string, NUM_IDX> retval{};
+            for (size_t idx = 0; idx < NUM_IDX; ++idx)
+                retval[idx] = std::string{to_string(MeterType(static_cast<signed_idx_type>(idx)))}
+                                .append("_VALUE_LABEL");
+            return retval;
+        }();
+
+        size_t idx = static_cast<size_t>(static_cast<signed_idx_type>(meter_type));
+        retval.first = label_value_strings[idx];
+
         if (UserStringExists(retval.first)) {
             retval.first = UserString(retval.first);
         } else {
@@ -132,19 +154,19 @@ namespace {
         return retval;
     }
 
-    void MeterTypeDirEntry(const MeterType& meter_type,
-                           std::multimap<std::string,
-                                         std::pair<std::string, std::string>,
-                                         std::less<>>& list)
+    void MeterTypeDirEntry(MeterType meter_type,
+                           std::vector<std::pair<std::string_view,
+                                                 std::pair<std::string, std::string>>>& list)
     {
-        auto&& [value_label, string_rep] = MeterValueLabelAndString(meter_type);
+        auto [value_label, string_rep] = MeterValueLabelAndString(meter_type);
 
         if (value_label.empty() || string_rep.empty())
             return;
 
-        std::string&& link_string = LinkTaggedPresetText(VarText::METER_TYPE_TAG, string_rep, value_label) + "\n";
-
-        list.emplace(std::move(value_label), std::pair{std::move(link_string), std::move(string_rep)});
+        list.emplace_back(std::piecewise_construct,
+                          std::forward_as_tuple(value_label),
+                          std::forward_as_tuple(LinkTaggedPresetText(VarText::METER_TYPE_TAG, string_rep, value_label).append("\n"),
+                                                string_rep));
     }
 
     const std::vector<std::string>& GetSearchTextDirNames() {
@@ -166,13 +188,13 @@ namespace {
         subcategorization of it). Category is something like "ENC_TECH" and
         subcategorization is something like a tech category (eg. growth). */
     auto GetSortedPediaDirEntires(
-        const std::string& dir_name,
+        std::string_view dir_name,
         bool exclude_custom_categories_from_dir_name = true)
     {
-        ScopedTimer subdir_timer("GetSortedPediaDirEntires(" + dir_name + ")",
+        ScopedTimer subdir_timer(std::string{"GetSortedPediaDirEntires("}.append(dir_name).append(")"),
                                  true, std::chrono::milliseconds(20));
 
-        std::multimap<std::string, std::pair<std::string, std::string>, std::less<>> retval;
+        std::vector<std::pair<std::string_view, std::pair<std::string, std::string>>> retval;
 
         const Encyclopedia& encyclopedia = GetEncyclopedia();
         int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
@@ -186,16 +208,16 @@ namespace {
                 if (str == "ENC_INDEX")
                     continue;
                 auto& us_name{UserString(str)};
-                retval.emplace(
-                    us_name,
-                    std::pair{LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, str, us_name).append("\n"), str});
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(us_name),
+                                    std::forward_as_tuple(LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, str, us_name).append("\n"), str));
             }
 
             for (auto str : {"ENC_TEXTURES", "ENC_HOMEWORLDS"}) {
                 auto& us_name{UserString(str)};
-                retval.emplace(
-                    us_name,
-                    std::pair{LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, str, us_name).append("\n"), str});
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(us_name),
+                                    std::forward_as_tuple(LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, str, us_name).append("\n"), str));
             }
 
             for ([[maybe_unused]] auto& [category_name, article_vec] : encyclopedia.Articles()) {
@@ -206,9 +228,9 @@ namespace {
                     continue;
                 (void)article_vec; // quiet unused variable warning
                 auto& us_name{UserString(category_name)};
-                retval.emplace(
-                    us_name,
-                    std::pair{LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, category_name, us_name).append("\n"), category_name});
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(us_name),
+                                    std::forward_as_tuple(LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, category_name, us_name).append("\n"), category_name));
             }
 
         }
@@ -216,9 +238,9 @@ namespace {
             for (auto& [part_name, part] : GetShipPartManager()) {
                 if (!exclude_custom_categories_from_dir_name || !HasCustomCategory(part->Tags())) {
                     auto& us_name{UserString(part_name)};
-                    retval.emplace(
-                        us_name,
-                        std::pair{LinkTaggedPresetText(VarText::SHIP_PART_TAG, part_name, us_name).append("\n"), part_name});
+                    retval.emplace_back(std::piecewise_construct,
+                                        std::forward_as_tuple(us_name),
+                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::SHIP_PART_TAG, part_name, us_name).append("\n"), part_name));
                 }
             }
 
@@ -227,9 +249,9 @@ namespace {
             for (auto& [hull_name, hull] : GetShipHullManager()) {
                 if (!exclude_custom_categories_from_dir_name || !HasCustomCategory(hull->Tags())) {
                     auto& us_name{UserString(hull_name)};
-                    retval.emplace(
-                        us_name,
-                        std::pair{LinkTaggedPresetText(VarText::SHIP_HULL_TAG, hull_name, us_name).append("\n"), hull_name});
+                    retval.emplace_back(std::piecewise_construct,
+                                        std::forward_as_tuple(us_name),
+                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::SHIP_HULL_TAG, hull_name, us_name).append("\n"), hull_name));
                 }
             }
 
@@ -237,7 +259,7 @@ namespace {
         else if (dir_name == "ENC_TECH") {
             // sort tech names by user-visible name, so names are shown alphabetically in UI
             auto tech_names{GetTechManager().TechNames()};
-            std::vector<std::pair<std::string, std::string>> userstring_tech_names;
+            std::vector<std::pair<std::string_view, std::string>> userstring_tech_names;
             userstring_tech_names.reserve(tech_names.size());
             for (auto& tech_name : tech_names) {
                 auto& us_name{UserString(tech_name)};   // use tech_name on line before moving from tech_name to avoid order of evaluation issues
@@ -250,9 +272,9 @@ namespace {
                 if (!exclude_custom_categories_from_dir_name || !HasCustomCategory(GetTech(tech_name)->Tags())) {
                     // already iterating over userstring-looked-up names, so don't need to re-look-up-here
                     std::string tagged_text{LinkTaggedPresetText(VarText::TECH_TAG, tech_name, us_name).append("\n")};
-                    retval.emplace(
-                        std::move(us_name),
-                        std::pair(std::move(tagged_text), std::move(tech_name)));
+                    retval.emplace_back(std::piecewise_construct,
+                                        std::forward_as_tuple(us_name),
+                                        std::forward_as_tuple(std::move(tagged_text), std::move(tech_name)));
                 }
             }
 
@@ -261,9 +283,9 @@ namespace {
             for (auto& policy_name : GetPolicyManager().PolicyNames()) {
                 auto& us_name{UserString(policy_name)}; // line before to avoid order of evaluation issues when moving from policy_name
                 std::string tagged_text{LinkTaggedPresetText(VarText::POLICY_TAG, policy_name, us_name).append("\n")};
-                retval.emplace(
-                    us_name,
-                    std::pair{std::move(tagged_text), std::move(policy_name)});
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(us_name),
+                                    std::forward_as_tuple(std::move(tagged_text), policy_name));
             }
 
         }
@@ -271,9 +293,9 @@ namespace {
             for (const auto& [building_name, building_type] : GetBuildingTypeManager()) {
                 if (!exclude_custom_categories_from_dir_name || !HasCustomCategory(building_type->Tags())) {
                     auto& us_name{UserString(building_name)};
-                    retval.emplace(
-                        us_name,
-                        std::pair{LinkTaggedPresetText(VarText::BUILDING_TYPE_TAG, building_name, us_name).append("\n"), building_name});
+                    retval.emplace_back(std::piecewise_construct,
+                                        std::forward_as_tuple(us_name),
+                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::BUILDING_TYPE_TAG, building_name, us_name).append("\n"), building_name));
                 }
             }
 
@@ -282,9 +304,9 @@ namespace {
             for (auto special_name : SpecialNames()) {
                 auto& us_name{UserString(special_name)};    // line before to avoid order of operations issues when moving from special_name
                 std::string tagged_text{LinkTaggedPresetText(VarText::SPECIAL_TAG, special_name, us_name).append("\n")};
-                retval.emplace(
-                    us_name,
-                    std::pair{std::move(tagged_text), special_name});
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(us_name),
+                                    std::forward_as_tuple(std::move(tagged_text), special_name));
             }
 
         }
@@ -294,9 +316,9 @@ namespace {
                 for (const auto& [species_name, species] : GetSpeciesManager()) {
                     (void)species; // quiet warning
                     auto& us_name{UserString(species_name)};
-                    retval.emplace(
-                        us_name,
-                        std::pair{LinkTaggedPresetText(VarText::SPECIES_TAG, species_name, us_name).append("\n"), species_name});
+                    retval.emplace_back(std::piecewise_construct,
+                                        std::forward_as_tuple(us_name),
+                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::SPECIES_TAG, species_name, us_name).append("\n"), species_name));
                 }
             }
 
@@ -321,10 +343,11 @@ namespace {
                         if (first) first = false;
                         else homeworld_info.append(",  ");
                         if (auto homeworld = objects.get<Planet>(homeworld_id)) {
-                            known_homeworlds.emplace(homeworld_id);
+                            known_homeworlds.insert(homeworld_id);
                             // if known, add to beginning
-                            homeworld_info.append(LinkTaggedIDText(VarText::PLANET_ID_TAG, homeworld_id,
-                                                              homeworld->PublicName(client_empire_id, universe))
+                            homeworld_info.append(
+                                LinkTaggedIDText(VarText::PLANET_ID_TAG, homeworld_id,
+                                                 homeworld->PublicName(client_empire_id, universe))
                             );
                         } else { 
                             // add to end
@@ -353,10 +376,13 @@ namespace {
                         }
                     }
                 }
-                retval.emplace(UserString(entry.first),
-                               std::pair{species_entry.append("\n"), entry.first});
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(UserString(entry.first)),
+                                    std::forward_as_tuple(species_entry.append("\n"), entry.first));
             }
-            retval.emplace("⃠ ", std::pair{"\n\n", "  "});
+            retval.emplace_back(std::piecewise_construct,
+                                std::forward_as_tuple("⃠ "),
+                                std::forward_as_tuple("\n\n", "  "));
             for (const auto& entry : GetSpeciesManager()) {
                 if (!homeworlds.count(entry.first) || homeworlds.at(entry.first).empty()) {
                     std::string species_entry{
@@ -365,19 +391,21 @@ namespace {
                         .append(UserString("NO_HOMEWORLD"))
                         .append("\n")
                     };
-                    retval.emplace("⃠⃠" + std::string( "⃠ ") + UserString(entry.first),
-                                   std::pair{std::move(species_entry), entry.first});
+                    retval.emplace_back(std::piecewise_construct,
+                                        std::forward_as_tuple("⃠⃠⃠ " + UserString(entry.first)),
+                                        std::forward_as_tuple(std::move(species_entry), entry.first));
                 }
             }
 
         }
         else if (dir_name == "ENC_FIELD_TYPE") {
-            for (const auto& entry : GetFieldTypeManager()) {
-                if (!exclude_custom_categories_from_dir_name || !HasCustomCategory(entry.second->Tags())) {
-                    auto& us_name{UserString(entry.first)};
-                    retval.emplace(
-                        us_name,
-                        std::pair{LinkTaggedPresetText(VarText::FIELD_TYPE_TAG, entry.first, us_name).append("\n"), entry.first});
+            for (const auto& [field_name, field] : GetFieldTypeManager()) {
+                if (!exclude_custom_categories_from_dir_name || !HasCustomCategory(field->Tags())) {
+                    auto& us_name{UserString(field_name)};
+                    retval.emplace_back(std::piecewise_construct,
+                                        std::forward_as_tuple(us_name),
+                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::FIELD_TYPE_TAG, field_name, us_name).append("\n"),
+                                                              field_name));
                 }
             }
 
@@ -394,10 +422,10 @@ namespace {
         }
         else if (dir_name == "ENC_EMPIRE") {
             for (const auto& [id, empire] : Empires()) {
-                retval.emplace(
-                    empire->Name(),
-                    std::pair{LinkTaggedIDText(VarText::EMPIRE_ID_TAG, id, empire->Name()).append("\n"),
-                              std::to_string(id)});
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(empire->Name()),
+                                    std::forward_as_tuple(LinkTaggedIDText(VarText::EMPIRE_ID_TAG, id, empire->Name()).append("\n"),
+                                                          std::to_string(id)));
             }
 
         }
@@ -406,20 +434,20 @@ namespace {
                 const auto& [design_id, design] = *it;
                 if (design->IsMonster())
                     continue;
-                retval.emplace(
-                    design->Name(),
-                    std::pair{LinkTaggedIDText(VarText::DESIGN_ID_TAG, design_id, design->Name()).append("\n"),
-                              std::to_string(design_id)});
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(design->Name()),
+                                    std::forward_as_tuple(LinkTaggedIDText(VarText::DESIGN_ID_TAG, design_id, design->Name()).append("\n"),
+                                                          std::to_string(design_id)));
             }
 
         }
         else if (dir_name == "ENC_SHIP") {
             for (auto& ship : objects.all<Ship>()) {
-                const std::string& ship_name = ship->PublicName(client_empire_id, universe);
-                retval.emplace(
-                    ship_name,
-                    std::pair{LinkTaggedIDText(VarText::SHIP_ID_TAG, ship->ID(), ship_name).append("  "),
-                              std::to_string(ship->ID())});
+                auto& ship_name = ship->PublicName(client_empire_id, universe);
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(ship_name),
+                                    std::forward_as_tuple(LinkTaggedIDText(VarText::SHIP_ID_TAG, ship->ID(), ship_name).append("  "),
+                                                          std::to_string(ship->ID())));
             }
 
         }
@@ -427,120 +455,123 @@ namespace {
             for (auto& ship : objects.all<Ship>()) {
                 if (!ship->IsMonster(universe))
                     continue;
-                const std::string& ship_name = ship->PublicName(client_empire_id, universe);
-                retval.emplace(
-                    ship_name,
-                    std::pair{LinkTaggedIDText(VarText::SHIP_ID_TAG, ship->ID(), ship_name).append("  "),
-                              std::to_string(ship->ID())});
+                auto& ship_name = ship->PublicName(client_empire_id, universe);
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(ship_name),
+                                    std::forward_as_tuple(LinkTaggedIDText(VarText::SHIP_ID_TAG, ship->ID(), ship_name).append("  "),
+                                                          std::to_string(ship->ID())));
             }
 
         }
         else if (dir_name == "ENC_MONSTER_TYPE") {
             for (auto it = universe.beginShipDesigns(); it != universe.endShipDesigns(); ++it) {
-                const auto& [design_id, design] = *it;
-                if (design->IsMonster())
-                    retval.emplace(
-                        design->Name(),
-                        std::pair{LinkTaggedIDText(VarText::DESIGN_ID_TAG, design_id, design->Name()).append("\n"),
-                                  std::to_string(design_id)});
+                auto&& [design_id, design] = *it;
+                if (design && design->IsMonster())
+                    retval.emplace_back(std::piecewise_construct,
+                                        std::forward_as_tuple(design->Name()),
+                                        std::forward_as_tuple(LinkTaggedIDText(VarText::DESIGN_ID_TAG, design_id, design->Name()).append("\n"),
+                                                              std::to_string(design_id)));
             }
 
         }
         else if (dir_name == "ENC_FLEET") {
             for (auto& fleet : objects.all<Fleet>()) {
-                const std::string& flt_name = fleet->PublicName(client_empire_id, universe);
-                retval.emplace(
-                    flt_name,
-                    std::pair{LinkTaggedIDText(VarText::FLEET_ID_TAG, fleet->ID(), flt_name).append("  "),
-                              std::to_string(fleet->ID())});
+                auto& flt_name = fleet->PublicName(client_empire_id, universe);
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(flt_name),
+                                    std::forward_as_tuple(LinkTaggedIDText(VarText::FLEET_ID_TAG, fleet->ID(), flt_name).append("  "),
+                                                          std::to_string(fleet->ID())));
             }
 
         }
         else if (dir_name == "ENC_PLANET") {
             for (auto& planet : objects.all<Planet>()) {
-                const std::string& plt_name = planet->PublicName(client_empire_id, universe);
-                retval.emplace(
-                    plt_name,
-                    std::pair{LinkTaggedIDText(VarText::PLANET_ID_TAG, planet->ID(), plt_name).append("  "),
-                              std::to_string(planet->ID())});
+                auto& plt_name = planet->PublicName(client_empire_id, universe);
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(plt_name),
+                                    std::forward_as_tuple(LinkTaggedIDText(VarText::PLANET_ID_TAG, planet->ID(), plt_name).append("  "),
+                                                          std::to_string(planet->ID())));
             }
 
         }
         else if (dir_name == "ENC_BUILDING") {
             for (auto& building : objects.all<Building>()) {
-                const std::string& bld_name = building->PublicName(client_empire_id, universe);
-                retval.emplace(
-                    bld_name,
-                    std::pair{LinkTaggedIDText(VarText::BUILDING_ID_TAG, building->ID(), bld_name).append("  "),
-                              std::to_string(building->ID())});
+                auto& bld_name = building->PublicName(client_empire_id, universe);
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(bld_name),
+                                    std::forward_as_tuple(LinkTaggedIDText(VarText::BUILDING_ID_TAG, building->ID(), bld_name).append("  "),
+                                                          std::to_string(building->ID())));
             }
 
         }
         else if (dir_name == "ENC_SYSTEM") {
             for (auto& system : objects.all<System>()) {
-                std::string sys_name = system->ApparentName(client_empire_id, universe);
-                retval.emplace(
-                    sys_name,
-                    std::pair{LinkTaggedIDText(VarText::SYSTEM_ID_TAG, system->ID(), sys_name).append("  "),
-                              std::to_string(system->ID())});
+                auto sys_name = system->ApparentName(client_empire_id, universe);
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(sys_name),
+                                    std::forward_as_tuple(LinkTaggedIDText(VarText::SYSTEM_ID_TAG, system->ID(), sys_name).append("  "),
+                                                          std::to_string(system->ID())));
             }
 
         }
         else if (dir_name == "ENC_FIELD") {
             for (auto& field : objects.all<Field>()) {
                 const std::string& field_name = field->Name();
-                retval.emplace(
-                    field_name,
-                    std::pair{LinkTaggedIDText(VarText::FIELD_ID_TAG, field->ID(), field_name).append("  "),
-                              std::to_string(field->ID())});
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(field_name),
+                                    std::forward_as_tuple(LinkTaggedIDText(VarText::FIELD_ID_TAG, field->ID(), field_name).append("  "),
+                                                          std::to_string(field->ID())));
             }
 
         }
         else if (dir_name == "ENC_GRAPH") {
             for (const auto& stat_record : universe.GetStatRecords()) {
                 auto& us_name{UserString(stat_record.first)};
-                retval.emplace(
-                    us_name,
-                    std::pair{LinkTaggedPresetText(TextLinker::GRAPH_TAG, stat_record.first, us_name).append("\n"),
-                              stat_record.first});
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(us_name),
+                                    std::forward_as_tuple(LinkTaggedPresetText(TextLinker::GRAPH_TAG, stat_record.first, us_name).append("\n"),
+                                                          stat_record.first));
             }
 
         }
         else if (dir_name == "ENC_TEXTURES") {
              for (auto& [tex_name, tex] : GG::GetTextureManager().Textures()) {
-                 std::string&& texture_info_str = boost::io::str(
+                 auto texture_info_str = boost::io::str(
                      FlexibleFormat(UserString("ENC_TEXTURE_INFO")) %
                      Value(tex->Width()) %
                      Value(tex->Height()) %
                      tex->BytesPP() %
                      tex_name);
-                 retval.emplace(
-                     tex_name,
-                     std::pair{std::move(texture_info_str), tex_name});
+                 retval.emplace_back(std::piecewise_construct,
+                                     std::forward_as_tuple(tex_name),
+                                     std::forward_as_tuple(std::move(texture_info_str), tex_name));
              }
 
              for (auto& [tex_name, tex] : GG::GetVectorTextureManager().Textures()) {
-                 std::string&& texture_info_str = boost::io::str(
+                 auto texture_info_str = boost::io::str(
                      FlexibleFormat(UserString("ENC_VECTOR_TEXTURE_INFO")) %
                      Value(tex->Size().x) %
                      Value(tex->Size().y) %
                      tex->NumShapes() %
                      tex_name);
-                 retval.emplace(
-                     tex_name,
-                     std::pair{std::move(texture_info_str), tex_name});
+                 retval.emplace_back(std::piecewise_construct,
+                                     std::forward_as_tuple(tex_name),
+                                     std::forward_as_tuple(std::move(texture_info_str), tex_name));
              }
 
         }
         else if (dir_name == "ENC_STRINGS") {
             // show all stringable keys and values
             for (auto& [str_key, str_val] : AllStringtableEntries())
-                retval.emplace(str_key, std::pair{str_key + ": " + str_val + "\n", str_key});
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(str_key),
+                                    std::forward_as_tuple(str_key + ": " + str_val + "\n", str_key));
 
         }
         else if  (dir_name == "ENC_NAMED_VALUE_REF") {
-            retval.emplace("ENC_NAMED_VALUE_REF_DESC",
-                                        std::pair{UserString("ENC_NAMED_VALUE_REF_DESC") + "\n\n", dir_name});
+            retval.emplace_back(std::piecewise_construct,
+                                std::forward_as_tuple("ENC_NAMED_VALUE_REF_DESC"),
+                                std::forward_as_tuple(UserString("ENC_NAMED_VALUE_REF_DESC") + "\n\n", dir_name));
 
             for (auto& [ref_key, val_ref] : GetNamedValueRefManager().GetItems()) {
                 auto& vref = val_ref.get();
@@ -548,49 +579,54 @@ namespace {
                 std::string_view key_str = UserStringExists(ref_key) ? UserString(ref_key) : "";
 
                 // (human-readable article name) -> (link tag text, category stringtable key)
-                retval.emplace(
-                    ref_key,
-                    std::pair{std::string{ref_key}.append(value_type)
-                                .append(LinkTaggedPresetText(VarText::FOCS_VALUE_TAG, ref_key, key_str))
-                                .append(key_str.empty() ? "" : (std::string{" '"}.append(key_str).append(" '")))
-                                .append(" ").append(vref.InvariancePattern().append("\n")),
-                              dir_name});
+                retval.emplace_back(
+                    std::piecewise_construct,
+                    std::forward_as_tuple(ref_key),
+                    std::forward_as_tuple(std::string{ref_key}.append(value_type)
+                                          .append(LinkTaggedPresetText(VarText::FOCS_VALUE_TAG, ref_key, key_str))
+                                          .append(key_str.empty() ? "" : (std::string{" '"}.append(key_str).append(" '")))
+                                          .append(" ").append(vref.InvariancePattern().append("\n")),
+                                          dir_name));
             }
 
         }
         else {
             // Any content definitions (FOCS files) that define a pedia category
             // should have their pedia article added to this category.
-            std::map<std::string, std::pair<std::string, std::string>> dir_entries;
+            std::vector<std::pair<std::string_view, std::pair<std::string_view, std::string_view>>> dir_entries;
+            dir_entries.reserve(GetShipPartManager().size() + GetShipHullManager().size() +
+                                GetTechManager().size() + GetBuildingTypeManager().NumBuildingTypes() +
+                                GetSpeciesManager().NumSpecies() + GetFieldTypeManager().size());
 
             // part types
             for (auto& [part_name, part_type] : GetShipPartManager())
                 if (HasCustomCategory(part_type->Tags(), dir_name))
-                    dir_entries.emplace(
-                        UserString(part_name),
-                        std::pair{VarText::SHIP_PART_TAG, part_name});
+                    dir_entries.emplace_back(std::piecewise_construct,
+                                             std::forward_as_tuple(UserString(part_name)),
+                                             std::forward_as_tuple(VarText::SHIP_PART_TAG, part_name));
 
             // hull types
             for (auto& [hull_name, hull_type] : GetShipHullManager())
                 if (HasCustomCategory(hull_type->Tags(), dir_name))
-                    dir_entries.emplace(
-                        UserString(hull_name),
-                        std::pair{VarText::SHIP_HULL_TAG, hull_name});
+                    dir_entries.emplace_back(std::piecewise_construct,
+                                             std::forward_as_tuple(UserString(hull_name)),
+                                             std::forward_as_tuple(VarText::SHIP_HULL_TAG, hull_name));
 
             // techs
             for (const auto& tech : GetTechManager()) {
                 const auto& tech_name = tech->Name();
                 if (HasCustomCategory(tech->Tags(), dir_name))
-                    dir_entries[UserString(tech_name)] =
-                        std::pair{VarText::TECH_TAG, tech_name};
+                    dir_entries.emplace_back(std::piecewise_construct,
+                                             std::forward_as_tuple(UserString(tech_name)),
+                                             std::forward_as_tuple(VarText::TECH_TAG, tech_name));
             }
 
             // building types
             for (auto& [building_name, building_type] : GetBuildingTypeManager())
                 if (HasCustomCategory(building_type->Tags(), dir_name))
-                    dir_entries.emplace(
-                        UserString(building_name),
-                        std::pair{VarText::BUILDING_TYPE_TAG, building_name});
+                    dir_entries.emplace_back(std::piecewise_construct,
+                                             std::forward_as_tuple(UserString(building_name)),
+                                             std::forward_as_tuple(VarText::BUILDING_TYPE_TAG, building_name));
 
             // species
             for (auto& [species_name, species] : GetSpeciesManager())
@@ -599,43 +635,46 @@ namespace {
                    (dir_name == "PLAYABLE_SPECIES" && species->Playable()) ||
                     HasCustomCategory(species->Tags(), dir_name))
                 {
-                    dir_entries.emplace(
-                        UserString(species_name),
-                        std::pair{VarText::SPECIES_TAG, species_name});
+                    dir_entries.emplace_back(std::piecewise_construct,
+                                             std::forward_as_tuple(UserString(species_name)),
+                                             std::forward_as_tuple(VarText::SPECIES_TAG, species_name));
                 }
 
             // field types
             for (auto& [field_name, field_type] : GetFieldTypeManager())
                 if (HasCustomCategory(field_type->Tags(), dir_name))
-                    dir_entries.emplace(
-                        UserString(field_name),
-                        std::pair{VarText::FIELD_TYPE_TAG, field_name});
+                    dir_entries.emplace_back(std::piecewise_construct,
+                                             std::forward_as_tuple(UserString(field_name)),
+                                             std::forward_as_tuple(VarText::FIELD_TYPE_TAG, field_name));
 
-            // Add sorted entries, keyed by human-readable article name, containing (tag, article stringtable key)
+            // Sort entries, keyed by human-readable article name,
+            // containing (tag, article stringtable key)
+            std::sort(dir_entries.begin(), dir_entries.end());
             for (auto& [readable_name, tag_key] : dir_entries) {
-                auto&& linked_text{LinkTaggedText(tag_key.first, tag_key.second) + "\n"};
-                retval.emplace(
-                    readable_name,
-                    std::pair{std::move(linked_text), std::move(tag_key.second)});
+                auto linked_text{LinkTaggedText(tag_key.first, tag_key.second).append("\n")};
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(readable_name),
+                                    std::forward_as_tuple(std::move(linked_text), tag_key.second));
             }
         }
 
         // Add any defined entries for this directory
         const auto& articles = encyclopedia.Articles();
-        auto category_it = articles.find(dir_name);
+        auto category_it = articles.find(std::string{dir_name}); // TODO: make Articles support heterogenous comparison
         if (category_it != articles.end()) {
             for (const EncyclopediaArticle& article : category_it->second) {
                 // Prevent duplicate addition of hard-coded directories that also have a content definition
                 if (article.name == dir_name)
                     continue;
                 auto& us_name{UserString(article.name)};
-                retval.emplace(
-                    us_name,
-                    std::pair{LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, article.name, us_name) + "\n", article.name});
+                retval.emplace_back(std::piecewise_construct,
+                                    std::forward_as_tuple(us_name),
+                                    std::forward_as_tuple(LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, article.name, us_name) + "\n", article.name));
             }
         }
 
 
+        std::sort(retval.begin(), retval.end());
         return retval;
     }
 
@@ -1107,16 +1146,19 @@ namespace {
     /** Recursively searches pedia directory \a dir_name for articles and
       * sub-directories. Returns a map from
       * (category_str_key, dir_name) to (readable_article_name, link_text) */
-    [[nodiscard]] std::map<std::pair<std::string, std::string>, std::pair<std::string, std::string>>
-        GetSubDirs(const std::string& dir_name, bool exclude_custom_categories_from_dir_name = true, int depth = 0)
+    [[nodiscard]] auto GetSubDirs(std::string_view dir_name,
+                                  bool exclude_custom_categories_from_dir_name = true,
+                                  int depth = 0)
     {
         std::map<std::pair<std::string, std::string>, std::pair<std::string, std::string>> retval;
 
         if (dir_name == "ENC_STRINGS")
             return retval;
 
-        ScopedTimer subdir_timer("GetSubDirs(" + dir_name + ", " + std::to_string(exclude_custom_categories_from_dir_name) +
-                                 ", " + std::to_string(depth) + ")", std::chrono::milliseconds(5));
+        ScopedTimer subdir_timer(std::string{"GetSubDirs("}.append(dir_name).append(", ")
+                                 .append(std::to_string(exclude_custom_categories_from_dir_name))
+                                 .append(", ").append(std::to_string(depth)).append(")"),
+                                 std::chrono::milliseconds(5));
 
         depth++;
         // safety check to pre-empt potential infinite loop
@@ -2492,21 +2534,23 @@ namespace {
                                             GG::Clr& color, bool only_description = false)
     {
         MeterType meter_type = MeterType::INVALID_METER_TYPE;
+
+
         std::istringstream item_ss(item_name);
         item_ss >> meter_type;
-        auto meter_name = MeterValueLabelAndString(meter_type);
-
+        auto [meter_value_label, meter_name] = MeterValueLabelAndString(meter_type);
+        std::string meter_name_value_desc{std::string{meter_name}.append("_VALUE_DESC")};
 
         if (!only_description) {
             texture = ClientUI::MeterIcon(meter_type);
             general_type = UserString("ENC_METER_TYPE");
-            name = meter_name.first;
+            name = meter_value_label;
         }
 
-        if (UserStringExists(meter_name.second + "_VALUE_DESC"))
-            detailed_description += UserString(meter_name.second + "_VALUE_DESC");
+        if (UserStringExists(meter_name_value_desc))
+            detailed_description += UserString(meter_name_value_desc);
         else
-            detailed_description += meter_name.first;
+            detailed_description += meter_value_label;
     }
 
     std::string GetDetailedDescriptionBase(const ShipDesign* design) {
@@ -2955,7 +2999,9 @@ namespace {
             // their own planet allows comparison vs other races, which might
             // be better suited to this planet. 
             if (species->CanColonize() || species_name == planet_current_species)
-                retval.push_back(species_name);
+                // The planet's species may change, so better create a string_view
+                // from the species->Name(), not species_name
+                retval.push_back(species->Name());
         }
 
         return retval;
@@ -3007,7 +3053,8 @@ namespace {
                 float planet_capacity = ((planet_environment == PlanetEnvironment::PE_UNINHABITABLE) ?
                                          0.0f : planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current()); // want value after temporary meter update, so get current, not initial value of meter
 
-                retval.emplace(planet_capacity, std::pair{species_name, planet_environment});
+                retval.emplace(std::piecewise_construct, std::forward_as_tuple(planet_capacity),
+                               std::forward_as_tuple(species_name, planet_environment));
             } catch (const std::exception& e) {
                 ErrorLogger() << "Caught exception emplacing into species env by target pop : " << e.what();
             }
@@ -3896,7 +3943,7 @@ void EncyclopediaDetailPanel::SetEmpire(const std::string& empire_id) {
 
 void EncyclopediaDetailPanel::SetDesign(int design_id) {
     int current_item_id = INVALID_DESIGN_ID;
-    if (m_items_it != m_items.end()) {
+    if (m_items_it != m_items.end() && m_items_it->first == "ENC_SHIP_DESIGN") {
         try {
             current_item_id = boost::lexical_cast<int>(m_items_it->second);
         } catch (...) {

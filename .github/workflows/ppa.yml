@@ -1,9 +1,9 @@
-name: "Ubuntu PPA"
+name: "Ubuntu Godot PPA"
 
 on:
   push:
     tags:
-      - 'ppa-2[0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].[0-9a-f]+_[0-9]+'
+      - 'ppa-godot-2[0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].[0-9a-f]+_[0-9]+'
 
 jobs:
   build-ppa:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        dist: [bionic, focal, impish, jammy]
+        dist: [focal, impish, jammy]
 
     steps:
       - name: Checkout sources
@@ -20,7 +20,7 @@ jobs:
         id: build-ppa-install-cache-id
         with:
           path: ${{ runner.temp }}/cache-build-linux-install
-          key: build-ppa-install-cache-key-v1.1
+          key: build-ppa-godot-install-cache-key-v1.2
       - uses: airvzxf/cache-anything-new-action@v1.0.1
         with:
           script: 'ppa-install-build.sh'

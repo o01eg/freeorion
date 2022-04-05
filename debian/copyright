@@ -61,9 +61,13 @@ Files: default/data/fonts/Roboto-*
 Copyright: 2015, Google Inc.
 License: Apache-2.0
 
+Files: packaging/org.freeorion.FreeOrion.metainfo.xml
+Copyright: The FreeOrion project
+License: CC-BY-SA-3.0
+
 Files: debian/*
 Copyright: 2013-2014, Dmitry Smirnov <onlyjob@debian.org>
-           2013-2017, Markus Koschany <apo@debian.org>
+           2013-2020, Markus Koschany <apo@debian.org>
 License: LGPL-2.1+
 
 License: GPL-2

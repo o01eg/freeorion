@@ -1,5 +1,7 @@
-debian/bin/*                                usr/games
+debian/bin/freeorion                        usr/games
+debian/bin/freeoriond                       usr/bin
+debian/org.freeorion.FreeOrionGodot.desktop usr/share/applications/
 usr/bin/*                                   usr/lib/freeorion
 usr/lib/*/freeorion
 usr/share/applications
-usr/share/metainfo/org.freeorion.FreeOrion.metainfo.xml
+usr/share/metainfo

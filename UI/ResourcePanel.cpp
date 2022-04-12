@@ -38,15 +38,17 @@ void ResourcePanel::CompleteConstruction() {
     SetName("ResourcePanel");
 
     auto res = Objects().get<ResourceCenter>(m_rescenter_id);
-    if (!res)
-        throw std::invalid_argument("Attempted to construct a ResourcePanel with an UniverseObject that is not a ResourceCenter");
+    if (!res) {
+        ErrorLogger() << "ResourcePanel constructed with invalid resource center id " << m_rescenter_id;
+        return;
+    }
 
     m_expand_button->LeftPressedSignal.connect(
         boost::bind(&ResourcePanel::ExpandCollapseButtonPressed, this));
 
     const auto obj = Objects().get(m_rescenter_id);
     if (!obj) {
-        ErrorLogger() << "Invalid object id " << m_rescenter_id;
+        ErrorLogger() << "ResourcePanel constructed with invalid object id " << m_rescenter_id;
         return;
     }
 
@@ -58,12 +60,26 @@ void ResourcePanel::CompleteConstruction() {
                             MeterType::METER_INFLUENCE, MeterType::METER_SUPPLY,
                             MeterType::METER_STOCKPILE})
     {
+        auto p_meter = obj->GetMeter(meter);
+        if (!p_meter) {
+            ErrorLogger() << "ResourcePanel constructed with object " << obj->Dump()
+                          << " with no " << to_string(meter) << " meter";
+            continue;
+        }
+        auto assoc_meter = AssociatedMeterType(meter);
+        auto p_assoc_meter = obj->GetMeter(assoc_meter);
+        if (!p_assoc_meter) {
+            ErrorLogger() << "ResourcePanel constructed with object " << obj->Dump()
+                          << " with no " << to_string(assoc_meter) << " meter";
+            continue;
+        }
+
         auto stat = GG::Wnd::Create<StatisticIcon>(
             ClientUI::MeterIcon(meter), obj->GetMeter(meter)->Initial(),
             3, false, MeterIconSize().x, MeterIconSize().y);
         AttachChild(stat);
         m_meter_stats.emplace_back(meter, stat);
-        meters.emplace_back(meter, AssociatedMeterType(meter));
+        meters.emplace_back(meter, assoc_meter);
         stat->RightClickedSignal.connect([meter](const GG::Pt& pt) {
             auto meter_string = to_string(meter);
 
@@ -136,12 +152,17 @@ void ResourcePanel::Update() {
     m_multi_icon_value_indicator->Update();
 
     // tooltips
-    for (auto& meter_stat : m_meter_stats) {
-        meter_stat.second->SetValue(obj->GetMeter(meter_stat.first)->Initial());
+    for (auto& [meter_type, stat_icon] : m_meter_stats) {
+        if (!stat_icon)
+            continue;
+        auto meter = obj->GetMeter(meter_type);
+        auto init = meter ? meter->Initial() : 0.0f;
+        stat_icon->SetValue(init);
 
-        auto browse_wnd = GG::Wnd::Create<MeterBrowseWnd>(m_rescenter_id, meter_stat.first, AssociatedMeterType(meter_stat.first));
-        meter_stat.second->SetBrowseInfoWnd(browse_wnd);
-        m_multi_icon_value_indicator->SetToolTip(meter_stat.first, browse_wnd);
+        auto assoc_meter_type = AssociatedMeterType(meter_type);
+        auto browse_wnd = GG::Wnd::Create<MeterBrowseWnd>(m_rescenter_id, meter_type, assoc_meter_type);
+        stat_icon->SetBrowseInfoWnd(browse_wnd);
+        m_multi_icon_value_indicator->SetToolTip(meter_type, browse_wnd);
     }
 
     std::sort(m_meter_stats.begin(), m_meter_stats.end(), SortByMeterValue);
@@ -166,9 +187,8 @@ void ResourcePanel::ExpandCollapseButtonPressed()
 void ResourcePanel::DoLayout() {
     AccordionPanel::DoLayout();
 
-    for (auto& meter_stat : m_meter_stats) {
+    for (auto& meter_stat : m_meter_stats)
         DetachChild(meter_stat.second);
-    }
 
     // detach / hide meter bars and large resource indicators
     DetachChild(m_multi_meter_status_bar);

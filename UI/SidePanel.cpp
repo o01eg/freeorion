@@ -591,7 +591,7 @@ private:
     std::shared_ptr<BuildingsPanel>         m_buildings_panel;              ///< contains icons representing buildings
     std::shared_ptr<SpecialsPanel>          m_specials_panel;               ///< contains icons representing specials
     StarType                                m_star_type = StarType::INVALID_STAR_TYPE;
-    boost::signals2::connection             m_planet_connection;
+    boost::signals2::scoped_connection      m_planet_connection;
     bool                                    m_selected = false;             ///< is this planet panel selected
     bool                                    m_order_issuing_enabled = false;///< can orders be issues via this planet panel?
 };
@@ -1590,7 +1590,7 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
         wrapped_planet_name = "<u>" + wrapped_planet_name + "</u>";
     if (GetOptionsDB().Get<bool>("ui.name.id.shown"))
         wrapped_planet_name = wrapped_planet_name + " (" + std::to_string(m_planet_id) + ")";
- 
+
 
     // set name
     m_planet_name->SetText("<s>" + wrapped_planet_name + "</s>");
@@ -3023,27 +3023,28 @@ void SidePanel::CompleteConstruction() {
 
     using boost::placeholders::_1;
 
-    m_system_name->DropDownOpenedSignal.connect(
-        boost::bind(&SidePanel::SystemNameDropListOpenedSlot, this, _1));
-    m_system_name->SelChangedSignal.connect(
-        boost::bind(&SidePanel::SystemSelectionChangedSlot, this, _1));
-    m_system_name->SelChangedWhileDroppedSignal.connect(
-        boost::bind(&SidePanel::SystemSelectionChangedSlot, this, _1));
-    m_button_prev->LeftClickedSignal.connect(
-        boost::bind(&SidePanel::PrevButtonClicked, this));
-    m_button_next->LeftClickedSignal.connect(
-        boost::bind(&SidePanel::NextButtonClicked, this));
-    m_planet_panel_container->PlanetClickedSignal.connect(
+    m_connections.reserve(9);
+    m_connections.emplace_back(m_system_name->DropDownOpenedSignal.connect(
+        [this](auto b) { SystemNameDropListOpenedSlot(b); }));
+    m_connections.emplace_back(m_system_name->SelChangedSignal.connect(
+        [this](auto it) { SystemSelectionChangedSlot(it); }));
+    m_connections.emplace_back(m_system_name->SelChangedWhileDroppedSignal.connect(
+        [this](auto it) { SystemSelectionChangedSlot(it); }));
+    m_connections.emplace_back(m_button_prev->LeftClickedSignal.connect(
+        [this]() { PrevButtonClicked(); }));
+    m_connections.emplace_back(m_button_next->LeftClickedSignal.connect(
+        [this]() { NextButtonClicked(); }));
+    m_connections.emplace_back(m_planet_panel_container->PlanetClickedSignal.connect(
         [this](auto id) {
             const ScriptingContext context;
             PlanetClickedSlot(id, context.ContextObjects());
-        });
-    m_planet_panel_container->PlanetLeftDoubleClickedSignal.connect(
-        PlanetDoubleClickedSignal);
-    m_planet_panel_container->PlanetRightClickedSignal.connect(
-        PlanetRightClickedSignal);
-    m_planet_panel_container->BuildingRightClickedSignal.connect(
-        BuildingRightClickedSignal);
+        }));
+    m_connections.emplace_back(m_planet_panel_container->PlanetLeftDoubleClickedSignal.connect(
+        PlanetDoubleClickedSignal));
+    m_connections.emplace_back(m_planet_panel_container->PlanetRightClickedSignal.connect(
+        PlanetRightClickedSignal));
+    m_connections.emplace_back(m_planet_panel_container->BuildingRightClickedSignal.connect(
+        BuildingRightClickedSignal));
 
     SetMinSize(GG::Pt(GG::X(MaxPlanetDiameter() + BORDER_LEFT + BORDER_RIGHT + 120),
                       PLANET_PANEL_TOP + GG::Y(MaxPlanetDiameter())));
@@ -3226,20 +3227,20 @@ void SidePanel::RefreshInPreRender(ScriptingContext& context) {
 
 
     // connect state changed and insertion signals for planets and fleets in system
-    auto system = Objects().get<System>(s_system_id);
+    auto system = context.ContextObjects().get<System>(s_system_id);
     if (!system) {
         ErrorLogger() << "SidePanel::Refresh couldn't get system with id " << s_system_id;
         return;
     }
 
-    for (auto& planet : Objects().find<Planet>(system->PlanetIDs())) {
+    for (auto& planet : context.ContextObjects().find<Planet>(system->PlanetIDs())) {
         s_system_connections.insert(planet->ResourceCenterChangedSignal.connect(
-                                        SidePanel::ResourceCenterChangedSignal));
+            SidePanel::ResourceCenterChangedSignal));
     }
 
-    for (auto& fleet : Objects().find<Fleet>(system->FleetIDs())) {
+    for (auto& fleet : context.ContextObjects().find<Fleet>(system->FleetIDs())) {
         s_fleet_state_change_signals[fleet->ID()] = fleet->StateChangedSignal.connect(
-                                                        &SidePanel::Update);
+            &SidePanel::Update);
     }
 
     //s_system_connections.insert(s_system->StateChangedSignal.connect(&SidePanel::Update));

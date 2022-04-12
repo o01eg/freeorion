@@ -11,6 +11,7 @@
 #include "../universe/Field.h"
 #include "../universe/FieldType.h"
 #include "../universe/Fleet.h"
+#include "../universe/NamedValueRefManager.h"
 #include "../universe/Pathfinder.h"
 #include "../universe/Planet.h"
 #include "../universe/PopCenter.h"
@@ -271,6 +272,36 @@ namespace FreeOrionPython {
         py::class_<Effect::AccountingMap>("TargetIDAccountingMapMap")
             .def(py::map_indexing_suite<Effect::AccountingMap, true>())
         ;
+
+        //////////////////////////////////////////////
+        //   Content Named Global Constant Values   //
+        //////////////////////////////////////////////
+        py::def("namedRealDefined",
+                +[](const std::string& name) -> bool { return GetValueRef<double>(name, true); },
+                "Returns true/false (boolean) whether there is a defined double-valued "
+                "scripted constant with name (string).");
+        py::def("namedIntDefined",
+                +[](const std::string& name) -> bool { return GetValueRef<int>(name, true); },
+                "Returns true/false (boolean) whether there is a defined int-valued "
+                "scripted constant with name (string).");
+        py::def("getNamedValue",
+                +[](const std::string& name) -> py::object {
+                    auto eval = [](auto&& ref) -> py::object {
+                        if (ref->ConstantExpr()) 
+                            return py::object(ref->Eval());
+                        const ScriptingContext context;
+                        return py::object(ref->Eval(context));
+                    };
+
+                    if (const auto ref = GetValueRef<double>(name, true))
+                        return eval(ref);
+                    else if (const auto ref = GetValueRef<int>(name, true))
+                        return eval(ref);
+                    else
+                        return py::object();
+                },
+                "Returns the named value of the scripted constant with name (string). "
+                "If no such named constant exists, returns none.");
 
         ///////////////
         //   Meter   //
@@ -720,9 +751,12 @@ namespace FreeOrionPython {
             .add_property("preferredFocus",     make_function(&Species::DefaultFocus,   py::return_value_policy<py::copy_const_reference>()))
             .add_property("canColonize",        make_function(&Species::CanColonize,    py::return_value_policy<py::return_by_value>()))
             .add_property("canProduceShips",    make_function(&Species::CanProduceShips,py::return_value_policy<py::return_by_value>()))
+            .add_property("native",             &Species::Native)
             .add_property("tags",               make_function(&Species::Tags,           py::return_value_policy<py::return_by_value>()))
             .add_property("spawnrate",          make_function(&Species::SpawnRate,      py::return_value_policy<py::return_by_value>()))
             .add_property("spawnlimit",         make_function(&Species::SpawnLimit,     py::return_value_policy<py::return_by_value>()))
+            .add_property("likes",              make_function(&Species::Likes,          py::return_value_policy<py::return_by_value>()))
+            .add_property("dislikes",           make_function(&Species::Dislikes,       py::return_value_policy<py::return_by_value>()))
             .def("getPlanetEnvironment",        &Species::GetPlanetEnvironment)
             .def("dump",                        &Species::Dump,                         py::return_value_policy<py::return_by_value>(), "Returns string with debug information, use '0' as argument.")
         ;

@@ -2267,9 +2267,9 @@ protected:
 private:
     void InitRowSizes();
 
-    int                         m_empire_id_shown = ALL_EMPIRES;
-    const AvailabilityManager&  m_availabilities_state;
-    boost::signals2::connection m_empire_designs_changed_signal;
+    int                                m_empire_id_shown = ALL_EMPIRES;
+    const AvailabilityManager&         m_availabilities_state;
+    boost::signals2::scoped_connection m_empire_designs_changed_signal;
 };
 
 BasesListBox::HullAndNamePanel::HullAndNamePanel(GG::X w, GG::Y h, const std::string& hull,
@@ -4049,7 +4049,7 @@ private:
     bool                                        m_disabled_by_name = false; // if the design confirm button is currently disabled due to empty name
     bool                                        m_disabled_by_part_conflict = false;
 
-    boost::signals2::connection                 m_empire_designs_changed_signal;
+    boost::signals2::scoped_connection          m_empire_designs_changed_signal;
 };
 
 DesignWnd::MainPanel::MainPanel(std::string_view config_name) :

@@ -490,3 +490,19 @@ $$
  END
 $$ LANGUAGE plpgsql;
 ```
+
+# Check permanent password without game uid
+
+```sql
+DROP FUNCTION auth.check_otp(player_name_param CITEXT, otp CHAR(6));
+
+CREATE FUNCTION auth.check_otp(player_name_param CITEXT, otp CHAR(6))
+RETURNS BOOLEAN AS
+$$
+  WITH hashed_otp AS (DELETE FROM auth.otp WHERE otp.player_name = player_name_param RETURNING otp.otp)
+  SELECT (TABLE hashed_otp) IS NOT NULL AND (TABLE hashed_otp) = crypt(otp, (TABLE hashed_otp))
+    OR u.game_password = crypt(otp, u.game_password)
+  FROM auth.users u WHERE u.player_name = player_name_param;
+$$ LANGUAGE sql VOLATILE;
+```
+

@@ -4,13 +4,16 @@ Policy
     short_description = "PLC_CENTRALIZATION_SHORT_DESC"
     category = "ECONOMIC_CATEGORY"
     adoptioncost = floor(2.0 * [[POPULATION_OWNED_BY_EMPIRE]]^0.5)
-    exclusions = [ "PLC_CONFEDERATION" "PLC_COLONIZATION" "PLC_ISOLATION" ]
+    exclusions = [ "PLC_COLONIZATION" "PLC_CONFEDERATION" "PLC_FEUDALISM" "PLC_ISOLATION" ]
     unlock = [
         Item type = Building name = "BLD_REGIONAL_ADMIN"
         Item type = Policy name = "PLC_METROPOLES"
     ]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
+
+        // Makes colony buildings and colony/outpost ship parts more expensive
+        // See COLONIZATION_POLICY_MULTIPLIER macro in ../common/upkeep.macros
 
         // capital bonuses
         EffectsGroup
@@ -76,7 +79,7 @@ Policy
                         (NamedReal name = "PLC_CENTRALIZATION_TARGET_INFLUENCE_PERJUMP" value = -0.5)
                             * JumpsBetween object = Source.ID object = Target.ID)
     ]
-    graphic = "icons/policies/centralization.png"
+    graphic = "icons/policies/economic_centralization.png"
 
 #include "/scripting/common/base_prod.macros"
 #include "/scripting/policies/policies.macros"

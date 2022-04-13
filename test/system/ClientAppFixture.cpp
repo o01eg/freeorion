@@ -78,12 +78,12 @@ void ClientAppFixture::HostSPGame(unsigned int num_AIs) {
     setup_data.SetSeed("TestSeed1");
     setup_data.size =             100;
     setup_data.shape =            Shape::SPIRAL_4;
-    setup_data.age =              GalaxySetupOption::GALAXY_SETUP_MEDIUM;
-    setup_data.starlane_freq =    GalaxySetupOption::GALAXY_SETUP_MEDIUM;
-    setup_data.planet_density =   GalaxySetupOption::GALAXY_SETUP_MEDIUM;
-    setup_data.specials_freq =    GalaxySetupOption::GALAXY_SETUP_MEDIUM;
-    setup_data.monster_freq =     GalaxySetupOption::GALAXY_SETUP_MEDIUM;
-    setup_data.native_freq =      GalaxySetupOption::GALAXY_SETUP_MEDIUM;
+    setup_data.age =              GalaxySetupOptionGeneric::GALAXY_SETUP_MEDIUM;
+    setup_data.starlane_freq =    GalaxySetupOptionGeneric::GALAXY_SETUP_MEDIUM;
+    setup_data.planet_density =   GalaxySetupOptionGeneric::GALAXY_SETUP_MEDIUM;
+    setup_data.specials_freq =    GalaxySetupOptionGeneric::GALAXY_SETUP_MEDIUM;
+    setup_data.monster_freq =     GalaxySetupOptionMonsterFreq::MONSTER_SETUP_MEDIUM;
+    setup_data.native_freq =      GalaxySetupOptionGeneric::GALAXY_SETUP_MEDIUM;
     setup_data.ai_aggr =          Aggression::MANIACAL;
     setup_data.game_rules =       game_rules;
 
@@ -126,6 +126,7 @@ void ClientAppFixture::JoinGame() {
     m_lobby_updated = false;
     m_networking->SendMessage(JoinGameMessage("TestPlayer",
                                               Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER,
+                                              {},
                                               m_cookie));
 }
 
@@ -265,7 +266,7 @@ bool ClientAppFixture::HandleMessage(Message& msg) {
             host_id = boost::lexical_cast<int>(msg.Text());
             m_networking->SetHostPlayerID(host_id);
             BOOST_TEST_MESSAGE("Set Host Player ID to: " << host_id);
-        } catch (const boost::bad_lexical_cast& ex) {
+        } catch (const boost::bad_lexical_cast&) {
             ErrorLogger() << "HOST_ID: Could not convert \"" << msg.Text() << "\" to host id";
             BOOST_TEST_MESSAGE("Couldn't get host ID: " << msg.Text());
             return false;

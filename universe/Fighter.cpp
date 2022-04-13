@@ -6,13 +6,8 @@
 #include "../util/Logger.h"
 
 
-namespace {
-    static const std::string EMPTY_STRING;
-}
-
 Fighter::Fighter(int empire_id, int launched_from_id, const std::string& species_name,
-                 float damage, const ::Condition::Condition* combat_targets) :
-    UniverseObject(),
+                 float damage, const ::Condition::Condition* combat_targets/*, int current_turn*/) :
     m_damage(damage),
     m_launched_from_id(launched_from_id),
     m_species_name(species_name),

@@ -53,7 +53,7 @@ namespace {
                 std::move(increase_vr)
             );
         std::vector<std::unique_ptr<Effect::Effect>> effects;
-        effects.emplace_back(std::make_unique<Effect::SetMeter>(meter_type, std::move(vr)));
+        effects.push_back(std::make_unique<Effect::SetMeter>(meter_type, std::move(vr)));
 
         return std::make_shared<Effect::EffectsGroup>(std::move(scope), std::move(activation),
                                                       std::move(effects));
@@ -226,13 +226,13 @@ void ShipHull::Init(std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects
                     bool default_structure_effects)
 {
     if (default_fuel_effects && m_fuel != 0)
-        m_effects.emplace_back(IncreaseMeter(MeterType::METER_MAX_FUEL,      m_fuel));
+        m_effects.push_back(IncreaseMeter(MeterType::METER_MAX_FUEL,      m_fuel));
     if (default_stealth_effects && m_stealth != 0)
-        m_effects.emplace_back(IncreaseMeter(MeterType::METER_STEALTH,       m_stealth));
+        m_effects.push_back(IncreaseMeter(MeterType::METER_STEALTH,       m_stealth));
     if (default_structure_effects && m_structure != 0)
-        m_effects.emplace_back(IncreaseMeter(MeterType::METER_MAX_STRUCTURE, m_structure, "RULE_SHIP_STRUCTURE_FACTOR"));
+        m_effects.push_back(IncreaseMeter(MeterType::METER_MAX_STRUCTURE, m_structure, "RULE_SHIP_STRUCTURE_FACTOR"));
     if (default_speed_effects && m_speed != 0)
-        m_effects.emplace_back(IncreaseMeter(MeterType::METER_SPEED,         m_speed,     "RULE_SHIP_SPEED_FACTOR"));
+        m_effects.push_back(IncreaseMeter(MeterType::METER_SPEED,         m_speed,     "RULE_SHIP_SPEED_FACTOR"));
 
     if (m_production_cost)
         m_production_cost->SetTopLevelContent(m_name);
@@ -242,7 +242,7 @@ void ShipHull::Init(std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects
         m_location->SetTopLevelContent(m_name);
     for (auto&& effect : effects) {
         effect->SetTopLevelContent(m_name);
-        m_effects.emplace_back(std::move(effect));
+        m_effects.push_back(std::move(effect));
     }
 }
 
@@ -282,9 +282,12 @@ float ShipHull::ProductionCost(int empire_id, int location_id,
     if (m_production_cost->ConstantExpr())
         return static_cast<float>(m_production_cost->Eval());
 
+    static constexpr int PRODUCTION_BLOCK_SIZE = 1;
+
     if (m_production_cost->SourceInvariant() && m_production_cost->TargetInvariant()) {
-        ScriptingContext design_context{parent_context, in_design_id};
-        return static_cast<float>(m_production_cost->Eval(design_context));
+        const ScriptingContext design_id_context{
+            parent_context, nullptr, nullptr, in_design_id, PRODUCTION_BLOCK_SIZE};
+        return static_cast<float>(m_production_cost->Eval(design_id_context));
     }
 
     auto location = parent_context.ContextObjects().get(location_id);
@@ -292,18 +295,19 @@ float ShipHull::ProductionCost(int empire_id, int location_id,
         return ARBITRARY_LARGE_COST;
 
     auto empire = parent_context.GetEmpire(empire_id);
-    std::shared_ptr<const UniverseObject> source = empire ? empire->Source(parent_context.ContextObjects()) : nullptr;
+    auto source = empire ? empire->Source(parent_context.ContextObjects()) : nullptr;
     if (!source && !m_production_cost->SourceInvariant())
         return ARBITRARY_LARGE_COST;
 
-    ScriptingContext local_context{parent_context, in_design_id};
-    local_context.source = std::move(source);
-    local_context.effect_target = std::const_pointer_cast<UniverseObject>(location); // not actually modified by evaluating a ValueRef
-    return static_cast<float>(m_production_cost->Eval(local_context));
+    const ScriptingContext design_id_context{
+        parent_context, std::move(source),
+        std::const_pointer_cast<UniverseObject>(location), // won't be modified when evaluating a ValueRef, but needs to be a pointer to mutable to be passed as the target object
+        in_design_id, PRODUCTION_BLOCK_SIZE};
+    return static_cast<float>(m_production_cost->Eval(design_id_context));
 }
 
 int ShipHull::ProductionTime(int empire_id, int location_id,
-                               const ScriptingContext& parent_context, int in_design_id) const
+                             const ScriptingContext& parent_context, int in_design_id) const
 {
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_time)
         return 1;
@@ -311,22 +315,28 @@ int ShipHull::ProductionTime(int empire_id, int location_id,
     if (m_production_time->ConstantExpr())
         return m_production_time->Eval();
 
-    ScriptingContext design_context{parent_context, in_design_id};
-    if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant())
-        return m_production_time->Eval(design_context);
+    static constexpr int PRODUCTION_BLOCK_SIZE = 1;
+
+    if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant()) {
+        const ScriptingContext design_id_context{
+            parent_context, nullptr, nullptr, in_design_id, PRODUCTION_BLOCK_SIZE};
+        return m_production_time->Eval(design_id_context);
+    }
 
     auto location = parent_context.ContextObjects().get(location_id);
     if (!location && !m_production_time->TargetInvariant())
         return ARBITRARY_LARGE_TURNS;
 
     auto empire = parent_context.GetEmpire(empire_id);
-    std::shared_ptr<const UniverseObject> source = empire ? empire->Source(parent_context.ContextObjects()) : nullptr;
+    auto source = empire ? empire->Source(parent_context.ContextObjects()) : nullptr;
     if (!source && !m_production_time->SourceInvariant())
         return ARBITRARY_LARGE_TURNS;
 
-    design_context.source = std::move(source);
-    design_context.effect_target = std::const_pointer_cast<UniverseObject>(location); // not actually modified by evaluating a ValueRef
-    return m_production_time->Eval(design_context);
+    const ScriptingContext design_id_context{
+        parent_context, std::move(source),
+        std::const_pointer_cast<UniverseObject>(location), // won't be modified when evaluating a ValueRef, but needs to be a pointer to mutable to be passed as the target object
+        in_design_id, PRODUCTION_BLOCK_SIZE};
+    return m_production_time->Eval(design_id_context);
 }
 
 unsigned int ShipHull::GetCheckSum() const {

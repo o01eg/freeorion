@@ -37,7 +37,7 @@ class GG_API Button : public Control
 {
 public:
     /// the states of being for a GG::Button
-    GG_CLASS_ENUM(ButtonState,
+    GG_CLASS_ENUM(ButtonState, unsigned char,
         BN_PRESSED,    ///< The button is being pressed by the user, and the cursor is over the button
         BN_UNPRESSED,  ///< The button is unpressed
         BN_ROLLOVER    ///< The button has the cursor over it, but is unpressed
@@ -134,7 +134,7 @@ class GG_API StateButton : public Control
 {
 public:
     /// the states of being for a GG::Button
-    GG_CLASS_ENUM(ButtonState,
+    GG_CLASS_ENUM(ButtonState, unsigned char,
         BN_PRESSED,    ///< The button is being pressed by the user, and the cursor is over the button
         BN_UNPRESSED,  ///< The button is unpressed
         BN_ROLLOVER    ///< The button has the cursor over it, but is unpressed
@@ -397,7 +397,7 @@ protected:
 
         std::shared_ptr<StateButton> button;
 
-        boost::signals2::connection connection;
+        boost::signals2::scoped_connection connection;
     };
 
     const std::vector<ButtonSlot>& ButtonSlots() const; ///< returns the state buttons in the group

@@ -12,6 +12,10 @@
 #include "../universe/System.h"
 #include "../universe/Species.h"
 
+#include "../util/ScopedTimer.h"
+
+#include <boost/container/flat_map.hpp>
+
 #include <limits>
 
 namespace {
@@ -285,28 +289,6 @@ namespace {
     bool ConnectedWithin(int system1, int system2, int maxLaneJumps,
                          const std::map<int, std::set<int>>& system_lanes)
     {
-        // list of indices of systems that are accessible from previously visited systems.
-        // when a new system is found to be accessible, it is added to the back of the
-        // list.  the list is iterated through from front to back to find systems
-        // to examine
-        std::list<int> accessibleSystemsList;
-        std::list<int>::iterator sysListIter, sysListEnd;
-
-        // map using star index number as the key, and also storing the number of starlane
-        // jumps away from system1 a given system is.  this is used to determine if a
-        // system has already been added to the accessibleSystemsList without needing
-        // to iterate through the list.  it also provides some indication of the
-        // current depth of the search, which allows the serch to terminate after searching
-        // to the depth of maxLaneJumps without finding system2
-        // (considered using a vector for this, but felt that for large galaxies, the
-        // size of the vector and the time to intialize would be too much)
-        std::map<int, int> accessibleSystemsMap;
-
-        // system currently being investigated, destination of a starlane origination at cur_sys_id
-        int cur_sys_id, curLaneDest;
-        // "depth" level in tree of system currently being investigated
-        int curDepth;
-
         // check for simple cases for quick termination
         if (system1 == system2) return true; // system is always connected to itself
         if (0 == maxLaneJumps) return false; // no system is connected to any other system by less than 1 jump
@@ -317,44 +299,51 @@ namespace {
         if (system_lanes.at(system1).empty()) return false; // no lanes out of start system
         if (system_lanes.at(system2).empty()) return false; // no lanes out of destination system
 
+        // list of indices of systems that are accessible from previously visited systems.
+        // when a new system is found to be accessible, it is added to the back of the
+        // list.  the list is iterated through from front to back to find systems
+        // to examine
+        std::vector<int> accessibleSystemsList;
+        accessibleSystemsList.reserve(system_lanes.size());
+
+        // Map from system_id to the number of starlane jumps away from system1
+        // that sytsem is. This indicates the depth of the search, which allows
+        // the serch to terminate after searching to the depth of maxLaneJumps
+        // without finding system2
+        boost::container::flat_map<int, int> accessibleSystemsMap;
+        accessibleSystemsMap.reserve(system_lanes.size());
+        for (auto& [sys, lanes] : system_lanes) {
+            (void)lanes;
+            accessibleSystemsMap.emplace_hint(accessibleSystemsMap.end(), sys, -1);
+        }
+        static constexpr int mapped_type_max = std::numeric_limits<decltype(accessibleSystemsMap)::mapped_type>::max();
+        maxLaneJumps = std::min(maxLaneJumps, mapped_type_max);
 
         // add starting system to list and set of accessible systems
         accessibleSystemsList.push_back(system1);
-        accessibleSystemsMap.emplace(system1, 0);
+        accessibleSystemsMap[system1] = 0;
+
 
         // loop through visited systems
-        sysListIter = accessibleSystemsList.begin();
-        sysListEnd = accessibleSystemsList.end();
-        while (sysListIter != sysListEnd) {
-            cur_sys_id = *sysListIter;
-
+        for (std::size_t idx = 0; idx < accessibleSystemsList.size(); ++idx) {
+            auto cur_sys_id = accessibleSystemsList[idx];
             // check that iteration hasn't reached maxLaneJumps levels deep, which would
             // mean that system2 isn't within maxLaneJumps starlane jumps of system1
-            curDepth = (*accessibleSystemsMap.find(cur_sys_id)).second;
-
+            auto curDepth = accessibleSystemsMap[cur_sys_id];
             if (curDepth >= maxLaneJumps) return false;
 
             // get set of starlanes for this system
-            auto curSysLanesSetIter = system_lanes.at(cur_sys_id).begin();
-            auto curSysLanesSetEnd = system_lanes.at(cur_sys_id).end();
+            for (auto curLaneDest : system_lanes.at(cur_sys_id)) {
+                // check for goal
+                if (curLaneDest == system2) return true;
 
-            // add starlanes accessible from this system to list and set of accessible starlanes
-            // (and check for the goal starlane)
-            while (curSysLanesSetIter != curSysLanesSetEnd) {
-                curLaneDest = *curSysLanesSetIter;
-
-                // check if curLaneDest has been added to the map of accessible systems
-                if (!accessibleSystemsMap.count(curLaneDest)) {
-                    // check for goal
-                    if (curLaneDest == system2) return true;
-
-                    // add curLaneDest to accessible systems list and map
+                auto& cur_lane_dest_depth = accessibleSystemsMap[curLaneDest];
+                if (cur_lane_dest_depth < 0) {
+                    // this lane was not yet considered, so update its depth in map and add to list ot consider
                     accessibleSystemsList.push_back(curLaneDest);
-                    accessibleSystemsMap.emplace(curLaneDest, curDepth + 1);
+                    cur_lane_dest_depth = curDepth + 1;
                 }
-                ++curSysLanesSetIter;
             }
-            ++sysListIter;
         }
         return false; // default
     }
@@ -503,8 +492,7 @@ namespace {
         }
     }
 
-    /** Removes lanes from passed graph that are angularly too close to
-      * each other. */
+    /** Removes lanes from passed graph that are too long. */
     void CullTooLongLanes(double max_lane_length,
                           std::map<int, std::set<int>>& system_lanes,
                           const std::map<int, std::shared_ptr<const System>>& systems)
@@ -512,6 +500,9 @@ namespace {
         DebugLogger() << "CullTooLongLanes max lane length: " << max_lane_length
                       << "  potential lanes: " << IntSetMapSizeCount(system_lanes)
                       << "  systems: " << systems.size();
+
+        ScopedTimer timer("CullTooLongLanes", std::chrono::milliseconds{1});
+
         // map, indexed by lane length, of start and end stars of lanes to be removed
         std::multimap<double, std::pair<int, int>, std::greater<double>> lanes_to_remove;
 
@@ -523,9 +514,10 @@ namespace {
             return;
 
         // get squared max lane lenth, so as to eliminate the need to take square roots of lane lenths...
-        double max_lane_length2 = max_lane_length*max_lane_length;
+        const double max_lane_length2 = max_lane_length*max_lane_length;
+        std::size_t total_lanes_count = 0;
 
-        // loop through systems
+        // loop through systems and lanes to find long lanes
         for (const auto& [cur_sys_id, cur_system] : systems) {
             // get position of current system (for use in calculating vector)
             double startX = cur_system->X();
@@ -533,11 +525,9 @@ namespace {
 
             // iterate through all lanes in system, checking lengths and
             // marking to be removed if necessary
-            auto lane_it = system_lanes[cur_sys_id].begin();
-            auto lane_end = system_lanes[cur_sys_id].end();
-            while (lane_it != lane_end) {
-                // get destination for this lane
-                int dest_sys_id = *lane_it;
+            for (const auto dest_sys_id : system_lanes[cur_sys_id]) {
+                total_lanes_count++;
+
                 // convert start and end into ordered pair to represent lane
                 std::pair<int, int> lane;
                 if (cur_sys_id < dest_sys_id)
@@ -560,52 +550,57 @@ namespace {
                                   << cur_sys_id << " and " << dest_sys_id;
                     lanes_to_remove.emplace(lane_length2, lane);
                 }
-
-                ++lane_it;
             }
         }
 
         DebugLogger() << "CullTooLongLanes identified " << lanes_to_remove.size()
-                      << " long lanes to possibly remove";
+                      << " long lanes to possibly remove of " << total_lanes_count << " lanes total";
 
-        // Iterate through set of lanes to remove, and remove them in turn.  Since lanes were inserted in the map indexed by
-        // their length, iteration starting with begin starts with the longest lane first, then moves through the lanes as
-        // they get shorter, ensuring that the longest lanes are removed first.
-        auto lanes_to_remove_it = lanes_to_remove.begin();
-        while (lanes_to_remove_it != lanes_to_remove.end()) {
-            auto lane = lanes_to_remove_it->second;
+        std::size_t total_checked_lanes = 0;
+        std::size_t removable_lanes = 0;
 
-            // ensure the lane still exists
-            if (system_lanes[lane.first].count(lane.second) > 0 &&
-                system_lanes[lane.second].count(lane.first) > 0)
-            {
-                // remove lane
-                system_lanes[lane.first].erase(lane.second);
-                system_lanes[lane.second].erase(lane.first);
+        // TODO: Consider re-implementing this as a minimal spanning tree
+        //       and immediately remove any lane not in that tree, and
+        //       thus avoid having to check connectivity for each
+        //       potential lane removal
 
-                // if removing lane has disconnected systems, reconnect them
-                if (!ConnectedWithin(lane.first, lane.second, systems.size(), system_lanes)) {
-                    system_lanes[lane.first].insert(lane.second);
-                    system_lanes[lane.second].insert(lane.first);
-                    TraceLogger() << "CullTooLongLanes can't remove lane between systems with ids: "
-                                  << lane.first << " and " << lane.second
-                                  << " because they would then be disconnected (more than "
-                                  << systems.size() << " jumps apart)";
-                } else {
-                    TraceLogger() << "CullTooLongLanes removing lane between systems with ids: "
-                                  << lane.first << " and " << lane.second;
-                }
+        // Iterate through set of lanes to remove, and remove them in turn.
+        // Lanes are sorted by length, so are processed longest-first
+        for (const auto& [dist, lane] : lanes_to_remove) {
+            if (system_lanes[lane.first].count(lane.second) == 0 ||
+                system_lanes[lane.second].count(lane.first) == 0)
+            { continue; }
+
+            // remove lane
+            system_lanes[lane.first].erase(lane.second);
+            system_lanes[lane.second].erase(lane.first);
+
+            total_checked_lanes++;
+
+            // if removing lane has disconnected systems, reconnect them
+            if (!ConnectedWithin(lane.first, lane.second, systems.size(), system_lanes)) {
+                system_lanes[lane.first].insert(lane.second);
+                system_lanes[lane.second].insert(lane.first);
+                TraceLogger() << "CullTooLongLanes can't remove lane between systems with ids: "
+                              << lane.first << " and " << lane.second
+                              << " because they would then be disconnected (more than "
+                              << systems.size() << " jumps apart)";
+            } else {
+                removable_lanes++;
+                TraceLogger() << "CullTooLongLanes removing lane between systems with ids: "
+                              << lane.first << " and " << lane.second;
             }
-            ++lanes_to_remove_it;
         }
 
         DebugLogger() << "CullTooLongLanes left with " << IntSetMapSizeCount(system_lanes)
-                      << " lanes";
+                      << " lanes.  " << total_checked_lanes << " were checked and "
+                      << removable_lanes << " were removable and "
+                      << total_checked_lanes - removable_lanes << " were not removable";
     }
 }
 
 void GenerateStarlanes(int max_jumps_between_systems, int max_starlane_length,
-                       Universe& universe)
+                       Universe& universe, const EmpireManager& empires)
 {
     DebugLogger() << "GenerateStarlanes  max jumps b/w sys: " << max_jumps_between_systems
                   << "  max lane length: " << max_starlane_length;
@@ -707,9 +702,8 @@ void GenerateStarlanes(int max_jumps_between_systems, int max_starlane_length,
         // the lane connects too far apart
         for (const auto& [sys1_id, sys1_lanes] : potential_system_lanes) {
             for (auto& sys2_id : sys1_lanes) {
-                // TODO: skip cases where sys2 < sys1 since these should already
-                //       have been handled by previous loop iterations, since
-                //       all lanes should exist in both directions
+                if (sys2_id <= sys1_id)
+                    continue; // skip lanes that should already have been checked since lanes exist in both directions
 
                 // try removing lane
                 system_lanes[sys1_id].erase(sys2_id);
@@ -725,14 +719,14 @@ void GenerateStarlanes(int max_jumps_between_systems, int max_starlane_length,
     }
 
     // add the starlane to the stars
-    for (auto& sys : Objects().all<System>()) {
+    for (auto& sys : universe.Objects().all<System>()) {
         const auto& sys_lanes = system_lanes[sys->ID()];
         for (auto& lane_end_id : sys_lanes)
             sys->AddStarlane(lane_end_id);
     }
 
     DebugLogger() << "Initializing System Graph";
-    GetUniverse().InitializeSystemGraph(Empires(), Objects());
+    universe.InitializeSystemGraph(empires);
 }
 
 void SetActiveMetersToTargetMaxCurrentValues(ObjectMap& object_map) {
@@ -767,7 +761,9 @@ void SetNativePopulationValues(ObjectMap& object_map) {
     }
 }
 
-bool SetEmpireHomeworld(Empire* empire, int planet_id, std::string species_name, ScriptingContext& context) {
+bool SetEmpireHomeworld(Empire* empire, int planet_id, std::string species_name,
+                        ScriptingContext& context)
+{
     // get home planet and system, check if they exist
     auto home_planet = context.ContextObjects().get<Planet>(planet_id);
     if (!home_planet)
@@ -810,7 +806,7 @@ bool SetEmpireHomeworld(Empire* empire, int planet_id, std::string species_name,
             home_planet->SetSize(PlanetSize::SZ_MEDIUM);
     }
 
-    home_planet->Colonize(empire->EmpireID(), species_name, Meter::LARGE_VALUE);
+    home_planet->Colonize(empire->EmpireID(), species_name, Meter::LARGE_VALUE, context);
     context.species.AddSpeciesHomeworld(std::move(species_name), home_planet->ID());
 
     empire->SetCapitalID(home_planet->ID(), context.ContextObjects());
@@ -842,7 +838,7 @@ void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data) {
         if (color_it != colors.end())
             colors.erase(color_it);
 
-        constexpr EmpireColor CLR_ZERO{{0, 0, 0, 0}};
+        static constexpr EmpireColor CLR_ZERO{{0, 0, 0, 0}};
 
         // if no colour already set, do so automatically
         if (empire_colour == CLR_ZERO) {

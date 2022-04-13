@@ -61,14 +61,16 @@ namespace {
         }
     }
 
-    const Tech* Cheapest(const std::vector<const Tech*>& next_techs, int empire_id) {
+    const Tech* Cheapest(const std::vector<const Tech*>& next_techs, int empire_id,
+                         const ScriptingContext& context)
+    {
         if (next_techs.empty())
             return nullptr;
 
-        float min_price = next_techs[0]->ResearchCost(empire_id);
+        float min_price = next_techs[0]->ResearchCost(empire_id, context);
         int min_index = 0;
         for (unsigned int i = 0; i < next_techs.size(); ++i) {
-            float price = next_techs[i]->ResearchCost(empire_id);
+            float price = next_techs[i]->ResearchCost(empire_id, context);
             if (price < min_price) {
                 min_price = price;
                 min_index = i;
@@ -135,7 +137,7 @@ Tech::Tech(std::string&& name, std::string&& description,
     m_graphic(std::move(graphic))
 {
     for (const std::string& tag : tags)
-        m_tags.emplace(boost::to_upper_copy<std::string>(tag));
+        m_tags.insert(boost::to_upper_copy<std::string>(tag));
     Init();
 }
 
@@ -156,9 +158,9 @@ Tech::Tech(TechInfo&& tech_info,
     m_graphic(std::move(graphic))
 {
     for (auto&& effect : effects)
-        m_effects.emplace_back(std::move(effect));
+        m_effects.push_back(std::move(effect));
     for (const std::string& tag : tech_info.tags)
-        m_tags.emplace(boost::to_upper_copy<std::string>(tag));
+        m_tags.insert(boost::to_upper_copy<std::string>(tag));
     Init();
 }
 
@@ -283,11 +285,8 @@ std::string Tech::Dump(unsigned short ntabs) const {
     return retval;
 }
 
-float Tech::ResearchCost(int empire_id) const { // TODO: pass in ScriptingContext
-    const auto ARBITRARY_LARGE_COST = 999999.9f;
-
-    const ObjectMap& objects{Objects()};
-    const EmpireManager& empires{Empires()};
+float Tech::ResearchCost(int empire_id, const ScriptingContext& context) const {
+    constexpr auto ARBITRARY_LARGE_COST = 999999.9f;
 
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_TECH_RESEARCH") || !m_research_cost) {
         return 1.0;
@@ -302,21 +301,22 @@ float Tech::ResearchCost(int empire_id) const { // TODO: pass in ScriptingContex
         return ARBITRARY_LARGE_COST;
 
     } else {
-        auto source = empires.GetSource(empire_id, objects);   // TODO: pass ScriptingContext and use here
+        auto empire = context.GetEmpire(empire_id);
+        if (!empire)
+            return ARBITRARY_LARGE_COST;
+        auto source = empire->Source(context.ContextObjects());
         if (!source)
             return ARBITRARY_LARGE_COST;
-        return m_research_cost->Eval(ScriptingContext{std::move(source)});
+        ScriptingContext source_context{std::move(source), context};
+        return m_research_cost->Eval(source_context);
     }
 }
 
-float Tech::PerTurnCost(int empire_id) const
-{ return ResearchCost(empire_id) / std::max(1, ResearchTime(empire_id)); }
+float Tech::PerTurnCost(int empire_id, const ScriptingContext& context) const
+{ return ResearchCost(empire_id, context) / std::max(1, ResearchTime(empire_id, context)); }
 
-int Tech::ResearchTime(int empire_id) const {
-    const auto ARBITRARY_LARGE_TURNS = 9999;
-
-    const ObjectMap& objects{Objects()};
-    const EmpireManager& empires{Empires()};
+int Tech::ResearchTime(int empire_id, const ScriptingContext& context) const {
+    constexpr auto ARBITRARY_LARGE_TURNS = 9999;
 
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_TECH_RESEARCH") || !m_research_turns) {
         return 1;
@@ -331,9 +331,13 @@ int Tech::ResearchTime(int empire_id) const {
         return ARBITRARY_LARGE_TURNS;
 
     } else {
-        auto source = empires.GetSource(empire_id, objects);
-        if (!source && !m_research_turns->SourceInvariant())
+        auto empire = context.GetEmpire(empire_id);
+        if (!empire)
             return ARBITRARY_LARGE_TURNS;
+        auto source = empire->Source(context.ContextObjects());
+        if (!source)
+            return ARBITRARY_LARGE_TURNS;
+        ScriptingContext source_context{context, std::move(source)};
 
         return m_research_turns->Eval(ScriptingContext(std::move(source)));
     }
@@ -369,6 +373,18 @@ TechManager* TechManager::s_instance = nullptr;
 const Tech* TechManager::GetTech(const std::string& name) const {
     CheckPendingTechs();
     iterator it = m_techs.get<NameIndex>().find(name);
+    return it == m_techs.get<NameIndex>().end() ? nullptr : it->get();
+}
+
+const Tech* TechManager::GetTech(const char* name) const {
+    CheckPendingTechs();
+    iterator it = m_techs.get<NameIndex>().find(name, std::less<>());
+    return it == m_techs.get<NameIndex>().end() ? nullptr : it->get();
+}
+
+const Tech* TechManager::GetTech(std::string_view name) const {
+    CheckPendingTechs();
+    iterator it = m_techs.get<NameIndex>().find(name, std::less<>());
     return it == m_techs.get<NameIndex>().end() ? nullptr : it->get();
 }
 
@@ -416,9 +432,11 @@ std::vector<const Tech*> TechManager::AllNextTechs(const std::set<std::string>& 
     return retval;
 }
 
-const Tech* TechManager::CheapestNextTech(const std::set<std::string>& known_techs, int empire_id) {
+const Tech* TechManager::CheapestNextTech(const std::set<std::string>& known_techs,
+                                          int empire_id, const ScriptingContext& context)
+{
     CheckPendingTechs();
-    return Cheapest(AllNextTechs(known_techs), empire_id);
+    return Cheapest(AllNextTechs(known_techs), empire_id, context);
 }
 
 std::vector<const Tech*> TechManager::NextTechsTowards(const std::set<std::string>& known_techs,
@@ -436,8 +454,8 @@ std::vector<const Tech*> TechManager::NextTechsTowards(const std::set<std::strin
 
 const Tech* TechManager::CheapestNextTechTowards(const std::set<std::string>& known_techs,
                                                  const std::string& desired_tech,
-                                                 int empire_id)
-{ return Cheapest(NextTechsTowards(known_techs, desired_tech, empire_id), empire_id); }
+                                                 int empire_id, const ScriptingContext& context)
+{ return Cheapest(NextTechsTowards(known_techs, desired_tech, empire_id), empire_id, context); }
 
 size_t TechManager::size() const
 { return m_techs.size(); }
@@ -489,7 +507,7 @@ void TechManager::CheckPendingTechs() const {
     for (const auto& map : m_categories) {
         auto set_it = categories_seen_in_techs.find(map.first);
         if (set_it == categories_seen_in_techs.end()) {
-            empty_defined_categories.emplace(map.first);
+            empty_defined_categories.insert(map.first);
         } else {
             categories_seen_in_techs.erase(set_it);
         }
@@ -533,7 +551,7 @@ void TechManager::CheckPendingTechs() const {
     for (const auto& tech : m_techs) {
         for (const std::string& prereq : tech->Prerequisites()) {
             if (Tech* prereq_tech = const_cast<Tech*>(GetTech(prereq)))
-                prereq_tech->m_unlocked_techs.emplace(tech->Name());
+                prereq_tech->m_unlocked_techs.insert(tech->Name());
         }
     }
 
@@ -623,7 +641,7 @@ std::string TechManager::FindFirstDependencyCycle() const {
 
             if (starting_stack_size == stack.size()) {
                 stack.pop_back();
-                checked_techs.emplace(current_tech);
+                checked_techs.insert(current_tech);
             }
         }
     }
@@ -684,8 +702,9 @@ TechManager& TechManager::GetTechManager() {
     return manager;
 }
 
-std::vector<std::string> TechManager::RecursivePrereqs(const std::string& tech_name, int empire_id,
-                                                       bool min_required /*= true*/) const
+std::vector<std::string> TechManager::RecursivePrereqs(
+    const std::string& tech_name, int empire_id, bool min_required,
+    const ScriptingContext& context) const
 {
     std::vector<std::string> retval;
     const Tech* initial_tech = this->GetTech(tech_name);
@@ -697,7 +716,7 @@ std::vector<std::string> TechManager::RecursivePrereqs(const std::string& tech_n
                                         initial_tech->Prerequisites().end()};  // initialized with 1st order prereqs
     std::set<std::string> prereqs_set;                                         // set of (unique) prereqs leading to tech
     std::multimap<float, std::string> techs_to_add_map;                        // indexed and sorted by cost per turn
-    const Empire* empire = GetEmpire(empire_id);
+    auto empire = context.GetEmpire(empire_id);
 
     // traverse list, appending new prereqs to it, and putting unique prereqs into set
     for (std::string& cur_name : prereqs_list) {
@@ -710,11 +729,11 @@ std::vector<std::string> TechManager::RecursivePrereqs(const std::string& tech_n
             continue;
 
         // tech is new, so put it into the set of already-processed prereqs
-        prereqs_set.emplace(cur_name);
+        prereqs_set.insert(cur_name);
 
         // and the map of techs, sorted by cost
         const Tech* cur_tech = this->GetTech(cur_name);
-        techs_to_add_map.emplace(cur_tech->ResearchCost(empire_id), std::move(cur_name));
+        techs_to_add_map.emplace(cur_tech->ResearchCost(empire_id, context), std::move(cur_name));
 
         // get prereqs of new tech, append to list
         prereqs_list.insert(prereqs_list.end(), cur_tech->Prerequisites().begin(),
@@ -724,7 +743,7 @@ std::vector<std::string> TechManager::RecursivePrereqs(const std::string& tech_n
     // extract sorted techs into vector, to be passed to signal...
     retval.reserve(techs_to_add_map.size());
     for (auto& tech_to_add : techs_to_add_map)
-        retval.emplace_back(std::move(tech_to_add.second));
+        retval.push_back(std::move(tech_to_add.second));
 
     return retval;
 }
@@ -752,6 +771,9 @@ TechManager& GetTechManager()
 { return TechManager::GetTechManager(); }
 
 const Tech* GetTech(const std::string& name)
+{ return GetTechManager().GetTech(name); }
+
+const Tech* GetTech(std::string_view name)
 { return GetTechManager().GetTech(name); }
 
 const TechCategory* GetTechCategory(const std::string& name)

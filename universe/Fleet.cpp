@@ -73,12 +73,9 @@ namespace {
 }
 
 
-Fleet::Fleet(std::string name, double x, double y, int owner) :
-    UniverseObject(std::move(name), x, y)
-{
-    UniverseObject::Init();
-    SetOwner(owner);
-}
+Fleet::Fleet(std::string name, double x, double y, int owner_id, int creation_turn) :
+    UniverseObject{std::move(name), owner_id, creation_turn}
+{ UniverseObject::Init(); }
 
 Fleet* Fleet::Clone(const Universe& universe, int empire_id) const {
     Visibility vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
@@ -109,7 +106,7 @@ void Fleet::Copy(std::shared_ptr<const UniverseObject> copied_object,
     UniverseObject::Copy(std::move(copied_object), vis, visible_specials, universe);
 
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
-        m_ships =               copied_fleet->VisibleContainedObjectIDs(empire_id);
+        m_ships =               copied_fleet->VisibleContainedObjectIDs(empire_id, universe.GetEmpireObjectVisibility());
 
         m_next_system =         ((EmpireKnownObjects(empire_id).get<System>(copied_fleet->m_next_system))
                                     ? copied_fleet->m_next_system : INVALID_OBJECT_ID);
@@ -257,7 +254,8 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
 
     // determine all systems where fleet(s) can be resupplied if fuel runs out
     auto empire = context.GetEmpire(this->Owner());
-    auto fleet_supplied_systems = context.supply.FleetSupplyableSystemIDs(this->Owner(), ALLOW_ALLIED_SUPPLY);
+    auto fleet_supplied_systems = context.supply.FleetSupplyableSystemIDs(
+        this->Owner(), ALLOW_ALLIED_SUPPLY, context);
     auto& unobstructed_systems = empire ? empire->SupplyUnobstructedSystems() : EMPTY_SET;
 
     // determine if, given fuel available and supplyable systems, fleet will ever be able to move
@@ -327,7 +325,7 @@ std::list<MovePathNode> Fleet::MovePath(const std::list<int>& route, bool flag_b
                         false);
 
 
-    constexpr int TOO_LONG =            100; // limit on turns to simulate.  99 turns max keeps ETA to two digits, making UI work better
+    static constexpr int TOO_LONG =     100; // limit on turns to simulate.  99 turns max keeps ETA to two digits, making UI work better
     int           turns_taken =         1;
     double        turn_dist_remaining = this->Speed(context.ContextObjects()); // additional distance that can be travelled in current turn of fleet movement being simulated
     double        cur_x =               this->X();
@@ -797,7 +795,7 @@ void Fleet::SetRoute(const std::list<int>& route, const ObjectMap& objects) {
     } else {    // m_travel_route.empty() && this->SystemID() == INVALID_OBJECT_ID
         if (m_next_system != INVALID_OBJECT_ID) {
             ErrorLogger() << "Fleet::SetRoute fleet " << this->Name() << " has empty route but fleet is not in a system. Resetting route to end at next system: " << m_next_system;
-            m_travel_route.emplace_back(m_next_system);
+            m_travel_route.push_back(m_next_system);
         } else {
             ErrorLogger() << "Fleet::SetRoute fleet " << this->Name() << " has empty route but fleet is not in a system, and has no next system set.";
         }
@@ -849,16 +847,21 @@ void Fleet::MovementPhase(ScriptingContext& context) {
         supply_unobstructed_systems.insert(empire->SupplyUnobstructedSystems().begin(),
                                            empire->SupplyUnobstructedSystems().end());
 
-    auto ships = context.ContextObjects().find<Ship>(m_ships);
+    auto& objects = context.ContextObjects();
+    auto& supply = context.supply;
+
+    auto ships = objects.find<Ship>(m_ships);
 
     // if owner of fleet can resupply ships at the location of this fleet, then
     // resupply all ships in this fleet
-    if (GetSupplyManager().SystemHasFleetSupply(SystemID(), Owner(), ALLOW_ALLIED_SUPPLY)) {
+    if (supply.SystemHasFleetSupply(SystemID(), Owner(), ALLOW_ALLIED_SUPPLY,
+                                    context.diplo_statuses))
+    {
         for (auto& ship : ships)
             ship->Resupply();
     }
 
-    auto current_system = context.ContextObjects().get<System>(SystemID());
+    auto current_system = objects.get<System>(SystemID());
     auto initial_system = current_system;
     auto move_path = MovePath(false, context);
 
@@ -867,11 +870,10 @@ void Fleet::MovementPhase(ScriptingContext& context) {
                       << ")  route:" << [&]() {
             std::stringstream ss;
             for (auto sys_id : this->TravelRoute()) {
-                auto sys = context.ContextObjects().get<System>(sys_id);
-                if (sys)
+                if (auto sys = objects.get<System>(sys_id))
                     ss << "  " << sys->Name() << " (" << sys_id << ")";
                 else
-                    ss << "  (??\?) (" << sys_id << ")";
+                    ss << "  (???) (" << sys_id << ")";
             }
             return ss.str();
         }()
@@ -899,9 +901,9 @@ void Fleet::MovementPhase(ScriptingContext& context) {
     if (!move_path.empty() && !m_travel_route.empty() &&
          move_path.back().object_id != m_travel_route.back())
     {
-        auto shortened_route = TruncateRouteToEndAtSystem(m_travel_route, context.ContextObjects(), move_path.back().object_id);
+        auto shortened_route = TruncateRouteToEndAtSystem(m_travel_route, objects, move_path.back().object_id);
         try {
-            SetRoute(shortened_route, context.ContextObjects());
+            SetRoute(shortened_route, objects);
         } catch (const std::exception& e) {
             ErrorLogger() << "Caught exception in Fleet MovementPhase shorentning route: " << e.what();
         }
@@ -976,7 +978,7 @@ void Fleet::MovementPhase(ScriptingContext& context) {
     for (it = move_path.begin(); it != move_path.end(); ++it) {
         next_it = it;   ++next_it;
 
-        auto system = Objects().get<System>(it->object_id);
+        auto system = objects.get<System>(it->object_id);
 
         // is this system the last node reached this turn?  either it's an end of turn node,
         // or there are no more nodes after this one on path
@@ -996,7 +998,8 @@ void Fleet::MovementPhase(ScriptingContext& context) {
             if (m_travel_route.front() == system->ID())
                 m_travel_route.erase(m_travel_route.begin());
 
-            bool resupply_here = GetSupplyManager().SystemHasFleetSupply(system->ID(), this->Owner(), ALLOW_ALLIED_SUPPLY);
+            bool resupply_here = supply.SystemHasFleetSupply(
+                system->ID(), this->Owner(), ALLOW_ALLIED_SUPPLY, context.diplo_statuses);
 
             // if this system can provide supplies, reset consumed fuel and refuel ships
             if (resupply_here) {
@@ -1010,7 +1013,7 @@ void Fleet::MovementPhase(ScriptingContext& context) {
             // is system the last node reached this turn?
             if (node_is_next_stop) {
                 // fleet ends turn at this node.  insert fleet and ships into system
-                InsertFleetWithShips(*this, system, context.ContextObjects());
+                InsertFleetWithShips(*this, system, objects);
 
                 current_system = system;
 
@@ -1034,7 +1037,7 @@ void Fleet::MovementPhase(ScriptingContext& context) {
             // node is not a system.
             m_arrival_starlane = m_prev_system;
             if (node_is_next_stop) { // node is not a system, but is it the last node reached this turn?
-                MoveFleetWithShips(*this, it->x, it->y, context.ContextObjects());
+                MoveFleetWithShips(*this, it->x, it->y, objects);
                 break;
             }
         }
@@ -1045,7 +1048,7 @@ void Fleet::MovementPhase(ScriptingContext& context) {
     if (!m_travel_route.empty() && next_it != move_path.end() && it != move_path.end()) {
         // there is another system later on the path to aim for.  find it
         for (; next_it != move_path.end(); ++next_it) {
-            if (context.ContextObjects().get<System>(next_it->object_id)) {
+            if (objects.get<System>(next_it->object_id)) {
                 //DebugLogger() << "___ setting m_next_system to " << next_it->object_id;
                 m_next_system = next_it->object_id;
                 break;

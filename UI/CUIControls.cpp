@@ -121,8 +121,8 @@ void CUIButton::MouseEnter(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
 
 GG::Pt CUIButton::MinUsableSize() const {
     GG::Pt result = GG::Button::MinUsableSize();
-    constexpr int CUIBUTTON_HPADDING = 10;
-    constexpr int CUIBUTTON_VPADDING = 3;
+    static constexpr int CUIBUTTON_HPADDING = 10;
+    static constexpr int CUIBUTTON_VPADDING = 3;
 
     result.x += CUIBUTTON_HPADDING * 2;
     result.y += CUIBUTTON_VPADDING * 2;
@@ -288,7 +288,7 @@ void CUICheckBoxRepresenter::Render(const GG::StateButton& button) const {
         AdjustBrightness(border_color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
     }
 
-    constexpr int MARGIN = 3;
+    static constexpr int MARGIN = 3;
     FlatRectangle(bn_ul, bn_lr, GG::CLR_ZERO, border_color_to_use, 1);
     if (button.Checked()) {
         GG::Clr inside_color = color_to_use;
@@ -388,7 +388,7 @@ void CUIRadioRepresenter::Render(const GG::StateButton& button) const {
         AdjustBrightness(border_color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
     }
 
-    constexpr int MARGIN = 2;
+    static constexpr int MARGIN = 2;
     FlatCircle(bn_ul, bn_lr, GG::CLR_ZERO, border_color_to_use, 1);
     if (button.Checked()) {
         GG::Clr inside_color = color_to_use;
@@ -439,7 +439,7 @@ void CUITabRepresenter::Render(const GG::StateButton& button) const {
                              GG::StateButton::ButtonState::BN_ROLLOVER == button.State()))
     { AdjustBrightness(border_color_to_use, 100); }
 
-    constexpr int UNCHECKED_OFFSET = 4;
+    static constexpr int UNCHECKED_OFFSET = 4;
 
     if (!button.Checked()) {
         ul.y += UNCHECKED_OFFSET;
@@ -541,8 +541,8 @@ void CUIIconButtonRepresenter::Render(const GG::StateButton& button) const {
     GG::Clr bg_clr(ClientUI::CtrlColor());
     GG::Clr border_clr(button.Disabled() ? DisabledColor(ClientUI::CtrlBorderColor()) : ClientUI::CtrlBorderColor());
 
-    constexpr int BORDER_THICKNESS = 1;
-    constexpr int ICON_SIZE_REDUCE = BORDER_THICKNESS * 2;
+    static constexpr int BORDER_THICKNESS = 1;
+    static constexpr int ICON_SIZE_REDUCE = BORDER_THICKNESS * 2;
 
     GG::Pt icon_ul = button.UpperLeft();
     GG::Pt icon_lr = button.LowerRight();
@@ -661,7 +661,7 @@ void CUIScroll::ScrollTab::Render() {
         AdjustBrightness(border_color,     100);
     }
 
-    constexpr int CUISCROLL_ANGLE_OFFSET = 3;
+    static constexpr int CUISCROLL_ANGLE_OFFSET = 3;
 
     AngledCornerRectangle(ul, lr, background_color, border_color, CUISCROLL_ANGLE_OFFSET, 1);
 }
@@ -741,7 +741,7 @@ void CUIScroll::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
 ///////////////////////////////////////
 // class CUIListBox
 ///////////////////////////////////////
-CUIListBox::CUIListBox(void) :
+CUIListBox::CUIListBox() :
     ListBox(ClientUI::CtrlBorderColor(), ClientUI::CtrlColor())
 {
     SelRowsChangedSignal.connect(-1,    &PlayListSelectSound);
@@ -1020,7 +1020,7 @@ void CensoredCUIEdit::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
 void CensoredCUIEdit::SetText(std::string str) {
     m_raw_text = std::move(str);
 
-    auto font = GetFont();
+    const auto& font = GetFont();
     if (!font) {
         ErrorLogger() << "CensoredCUIEdit::SetText couldn't get font!";
         return;
@@ -1056,7 +1056,7 @@ void CensoredCUIEdit::AcceptPastedText(const std::string& text) {
         std::size_t line;
         std::tie(line, pos) = LinePositionOf(m_cursor_pos.first, GetLineData());
 
-        auto new_raw_text = m_raw_text;
+        std::string new_raw_text = m_raw_text;
         new_raw_text.insert(Value(StringIndexOf(line, pos, GetLineData())), text);
 
         SetText(std::move(new_raw_text));
@@ -1854,7 +1854,9 @@ void ResourceInfoPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
         DoLayout();
 }
 
-void ResourceInfoPanel::SetTotalPointsCost(float total_points, float total_cost) {
+void ResourceInfoPanel::SetTotalPointsCost(float total_points, float total_cost,
+                                           const ScriptingContext& context)
+{
     AttachChild(m_total_points_label);
     AttachChild(m_total_points);
     AttachChild(m_total_points_P_label);
@@ -1871,7 +1873,7 @@ void ResourceInfoPanel::SetTotalPointsCost(float total_points, float total_cost)
     else
         m_wasted_points->SetTextColor(ClientUI::TextColor());
 
-    const Empire* empire = GetEmpire(m_empire_id);
+    auto empire = context.GetEmpire(m_empire_id);
     const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
     SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_INFO_EMPIRE")) % m_title_str % empire_name));
 }
@@ -1899,8 +1901,10 @@ void ResourceInfoPanel::SetStockpileCost(float stockpile, float stockpile_use,
     *m_stockpile_max_use << DoubleToString(stockpile_use_max, 3, false);
 }
 
-void ResourceInfoPanel::SetLocalPointsCost(float local_points, float local_cost, float local_stockpile_use,
-                                           float local_stockpile_use_max, const std::string& location_name)
+void ResourceInfoPanel::SetLocalPointsCost(
+    float local_points, float local_cost, float local_stockpile_use,
+    float local_stockpile_use_max, const std::string& location_name,
+    const ScriptingContext& context)
 {
     AttachChild(m_local_points);
     AttachChild(m_local_points_P_label);
@@ -1920,7 +1924,7 @@ void ResourceInfoPanel::SetLocalPointsCost(float local_points, float local_cost,
     else
         m_local_wasted_points->SetTextColor(ClientUI::TextColor());
 
-    const Empire* empire = GetEmpire(m_empire_id);
+    auto empire = context.GetEmpire(m_empire_id);
     const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
     SetName(boost::io::str(FlexibleFormat(
         UserString("PRODUCTION_INFO_AT_LOCATION_TITLE")) % m_title_str % location_name % empire_name));
@@ -1933,7 +1937,8 @@ void ResourceInfoPanel::SetEmpireID(int empire_id) {
     int old_empire_id = m_empire_id;
     m_empire_id = empire_id;
     if (old_empire_id != m_empire_id) {
-        const Empire* empire = GetEmpire(m_empire_id);
+        const ScriptingContext context;
+        auto empire = context.GetEmpire(m_empire_id);
         const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
         // let a subsequent SetLocalPointsCost call re-set the title to include location info if necessary
         SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_INFO_EMPIRE")) % m_title_str % empire_name));
@@ -1948,7 +1953,8 @@ void ResourceInfoPanel::ClearLocalInfo() {
     DetachChild(m_local_stockpile_use);
     DetachChild(m_local_stockpile_use_P_label);
 
-    const Empire* empire = GetEmpire(m_empire_id);
+    const ScriptingContext context;
+    auto empire = context.GetEmpire(m_empire_id);
     const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
     SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_INFO_EMPIRE")) % m_title_str % empire_name));
 
@@ -1979,11 +1985,11 @@ void ResourceInfoPanel::Clear() {
 
 void ResourceInfoPanel::DoLayout() {
     const int STAT_TEXT_PTS = ClientUI::Pts();
-    constexpr int CENTERLINE_GAP = 4;
+    static constexpr int CENTERLINE_GAP = 4;
     const GG::X LABEL_TEXT_WIDTH = (Width() - 4 - CENTERLINE_GAP) * 7 / 16 ;
     const GG::X VALUE_TEXT_WIDTH = ((Width() - 4 - CENTERLINE_GAP) - LABEL_TEXT_WIDTH) / 2;
 
-    constexpr GG::X LEFT_TEXT_X{0};
+    static constexpr GG::X LEFT_TEXT_X{0};
     const GG::X RIGHT_TEXT_X = LEFT_TEXT_X + LABEL_TEXT_WIDTH + 8 + CENTERLINE_GAP;
     const GG::X P_LABEL_X = RIGHT_TEXT_X + 40;
     const GG::X DOUBLE_LEFT_TEXT_X = P_LABEL_X + 30 + 4;

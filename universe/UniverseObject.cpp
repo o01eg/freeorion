@@ -10,6 +10,7 @@
 #include "UniverseObjectVisitor.h"
 #include "Universe.h"
 #include "../Empire/EmpireManager.h"
+#include "../Empire/Empire.h"
 #include "../util/AppInterface.h"
 #include "../util/Logger.h"
 #include "../util/i18n.h"
@@ -18,20 +19,27 @@ namespace ValueRef {
     const std::string& MeterToName(MeterType meter);
 }
 
-UniverseObject::UniverseObject() :
-    StateChangedSignal(blocking_combiner<boost::signals2::optional_last_value<void>>(
-        GetUniverse().UniverseObjectSignalsInhibited())),
-    m_created_on_turn(CurrentTurn())
+UniverseObject::UniverseObject(std::string name, double x, double y, int owner_id,
+                               int creation_turn) :
+    m_name(std::move(name)),
+    m_owner_empire_id(owner_id),
+    m_created_on_turn(creation_turn),
+    m_x(x),
+    m_y(y)
 {}
 
-UniverseObject::UniverseObject(std::string name, double x, double y) :
-    StateChangedSignal(blocking_combiner<boost::signals2::optional_last_value<void>>(
-        GetUniverse().UniverseObjectSignalsInhibited())),
+UniverseObject::UniverseObject(std::string name, int owner_id, int creation_turn) :
     m_name(std::move(name)),
-    m_x(x),
-    m_y(y),
-    m_created_on_turn(CurrentTurn())
+    m_owner_empire_id(owner_id),
+    m_created_on_turn(creation_turn)
 {}
+
+assignable_blocking_combiner::assignable_blocking_combiner(const Universe& universe) :
+    blocking([&universe]() -> bool { return universe.UniverseObjectSignalsInhibited(); })
+{}
+
+void UniverseObject::SetSignalCombiner(const Universe& universe)
+{ StateChangedSignal.set_combiner(CombinerType{universe}); }
 
 void UniverseObject::Copy(std::shared_ptr<const UniverseObject> copied_object,
                           Visibility vis, const std::set<std::string>& visible_specials,
@@ -160,9 +168,10 @@ UniverseObjectType UniverseObject::ObjectType() const
 { return UniverseObjectType::INVALID_UNIVERSE_OBJECT_TYPE; }
 
 std::string UniverseObject::Dump(unsigned short ntabs) const {
-    const auto& objects{Objects()};
+    const ScriptingContext context;
+    const auto& universe = context.ContextUniverse();
+    const auto& objects = context.ContextObjects();
     auto system = objects.get<System>(this->SystemID());
-
 
     std::string retval;
     retval.reserve(2048); // guesstimate
@@ -178,7 +187,7 @@ std::string UniverseObject::Dump(unsigned short ntabs) const {
     } else {
         retval.append("  at: (").append(std::to_string(this->X())).append(", ")
               .append(std::to_string(this->Y())).append(")");
-        int near_id = GetUniverse().GetPathfinder()->NearestSystemTo(this->X(), this->Y(), objects);
+        int near_id = universe.GetPathfinder()->NearestSystemTo(this->X(), this->Y(), objects);
         auto near_system = objects.get<System>(near_id);
         if (near_system) {
             auto& sys_name = near_system->Name();
@@ -191,11 +200,8 @@ std::string UniverseObject::Dump(unsigned short ntabs) const {
     if (Unowned()) {
         retval.append(" owner: (Unowned) ");
     } else {
-        auto& empire_name = Empires().GetEmpireName(m_owner_empire_id);
-        if (!empire_name.empty())
-            retval.append(" owner: ").append(empire_name);
-        else
-            retval.append(" owner: (Unknown Empire)");
+        auto empire = context.GetEmpire(m_owner_empire_id);
+        retval.append(" owner: ").append(empire ? empire->Name() : "(Unknown Empire)");
     }
     retval.append(" created on turn: ").append(std::to_string(m_created_on_turn))
           .append(" specials: ");
@@ -205,7 +211,7 @@ std::string UniverseObject::Dump(unsigned short ntabs) const {
               .append(std::to_string(turn_amount.second)).append(") ");
     retval.append("  Meters: ");
     for (auto& [meter_type, meter] : m_meters)
-        retval.append(ValueRef::MeterToName(meter_type)).append(": ").append(meter.Dump()).append("  ");
+        retval.append(ValueRef::MeterToName(meter_type)).append(": ").append(meter.Dump().data()).append("  ");
     return retval;
 }
 
@@ -216,11 +222,21 @@ namespace {
 const std::set<int>& UniverseObject::ContainedObjectIDs() const
 { return EMPTY_SET; }
 
-std::set<int> UniverseObject::VisibleContainedObjectIDs(int empire_id) const {
+std::set<int> UniverseObject::VisibleContainedObjectIDs(
+    int empire_id, const EmpireObjectVisMap& vis) const
+{
+    auto object_id_visible = [empire_id, &vis](int object_id) -> bool {
+        auto empire_it = vis.find(empire_id);
+        if (empire_it == vis.end())
+            return false;
+        auto obj_it = empire_it->second.find(object_id);
+        return obj_it != empire_it->second.end()
+            && obj_it->second >= Visibility::VIS_BASIC_VISIBILITY;
+    };
+
     std::set<int> retval;
-    const Universe& universe = GetUniverse(); // TODO: pass in
     for (int object_id : ContainedObjectIDs()) {
-        if (universe.GetObjectVisibilityByEmpire(object_id, empire_id) >= Visibility::VIS_BASIC_VISIBILITY)
+        if (object_id_visible(object_id))
             retval.insert(object_id);
     }
     return retval;
@@ -299,6 +315,14 @@ void UniverseObject::MoveTo(const std::shared_ptr<const UniverseObject>& object)
 }
 
 void UniverseObject::MoveTo(const std::shared_ptr<UniverseObject>& object) {
+    if (!object) {
+        ErrorLogger() << "UniverseObject::MoveTo : attempted to move to a null object.";
+        return;
+    }
+    MoveTo(object->X(), object->Y());
+}
+
+void UniverseObject::MoveTo(const UniverseObject* object) {
     if (!object) {
         ErrorLogger() << "UniverseObject::MoveTo : attempted to move to a null object.";
         return;

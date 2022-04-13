@@ -64,7 +64,7 @@ class AuthProvider:
                 roles.append(r)
         return roles
 
-    def is_require_auth_or_return_roles(self, player_name):
+    def is_require_auth_or_return_roles(self, player_name: str, ip_address: str):
         """Returns True if player should be authenticated or list of roles for anonymous players"""
         # check if otp needed
         have_password = False

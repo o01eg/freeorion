@@ -129,11 +129,11 @@ namespace {
     constexpr int MIN_HEIGHT = 600;
 
     /** Sets the default and current values for the string option @p option_name to @p option_value if initially empty */
-    void SetEmptyStringDefaultOption(const std::string& option_name, const std::string& option_value) {
+    void SetEmptyStringDefaultOption(std::string_view option_name, std::string option_value) {
         OptionsDB& db = GetOptionsDB();
         if (db.Get<std::string>(option_name).empty()) {
-            db.SetDefault<std::string>(option_name, option_value);
-            db.Set(option_name, option_value);
+            db.SetDefault(option_name, option_value);
+            db.Set(option_name, std::move(option_value));
         }
     }
 
@@ -396,11 +396,11 @@ bool GGHumanClientApp::CanSaveNow() const {
         return false;
 
     // can't save while AIs are playing their turns...
-    for (const auto& entry : Empires()) {
-        if (GetEmpireClientType(entry.first) != Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
+    for (const auto& [id, empire] : m_empires) {
+        if (GetEmpireClientType(id) != Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
             continue;   // only care about AIs
 
-        if (!entry.second->Ready()) {
+        if (!empire->Ready()) {
             return false;
         }
     }
@@ -500,7 +500,7 @@ void GGHumanClientApp::NewSinglePlayerGame(bool quickstart) {
         m_single_player_game = true;
         try {
             StartServer();
-        } catch (const LocalServerAlreadyRunningException& err) {
+        } catch (const LocalServerAlreadyRunningException&) {
             ClientUI::MessageBox(UserString("LOCAL_SERVER_ALREADY_RUNNING_ERROR"), true);
             return;
         } catch (const std::runtime_error& err) {
@@ -549,12 +549,12 @@ void GGHumanClientApp::NewSinglePlayerGame(bool quickstart) {
     setup_data.SetSeed(GetOptionsDB().Get<std::string>("setup.seed"));
     setup_data.size =             GetOptionsDB().Get<int>("setup.star.count");
     setup_data.shape =            GetOptionsDB().Get<Shape>("setup.galaxy.shape");
-    setup_data.age =              GetOptionsDB().Get<GalaxySetupOption>("setup.galaxy.age");
-    setup_data.starlane_freq =    GetOptionsDB().Get<GalaxySetupOption>("setup.starlane.frequency");
-    setup_data.planet_density =   GetOptionsDB().Get<GalaxySetupOption>("setup.planet.density");
-    setup_data.specials_freq =    GetOptionsDB().Get<GalaxySetupOption>("setup.specials.frequency");
-    setup_data.monster_freq =     GetOptionsDB().Get<GalaxySetupOption>("setup.monster.frequency");
-    setup_data.native_freq =      GetOptionsDB().Get<GalaxySetupOption>("setup.native.frequency");
+    setup_data.age =              GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.galaxy.age");
+    setup_data.starlane_freq =    GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.starlane.frequency");
+    setup_data.planet_density =   GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.planet.density");
+    setup_data.specials_freq =    GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.specials.frequency");
+    setup_data.monster_freq =     GetOptionsDB().Get<GalaxySetupOptionMonsterFreq>("setup.monster.frequency");
+    setup_data.native_freq =      GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.native.frequency");
     setup_data.ai_aggr =          GetOptionsDB().Get<Aggression>("setup.ai.aggression");
     setup_data.game_rules =       game_rules;
 
@@ -641,7 +641,7 @@ void GGHumanClientApp::MultiPlayerGame() {
             try {
                 StartServer();
                 FreeServer();
-            } catch (const LocalServerAlreadyRunningException& err) {
+            } catch (const LocalServerAlreadyRunningException&) {
                 ClientUI::MessageBox(UserString("LOCAL_SERVER_ALREADY_RUNNING_ERROR"), true);
                 return;
             } catch (const std::runtime_error& err) {
@@ -685,6 +685,7 @@ void GGHumanClientApp::MultiPlayerGame() {
 
         m_networking->SendMessage(JoinGameMessage(server_connect_wnd->GetResult().player_name,
                                                   server_connect_wnd->GetResult().type,
+                                                  DependencyVersions(),
                                                   cookie));
         m_fsm->process_event(JoinMPGameRequested());
     }
@@ -767,7 +768,7 @@ void GGHumanClientApp::LoadSinglePlayerGame(std::string filename/* = ""*/) {
         m_single_player_game = true;
         try {
             StartServer();
-        } catch (const LocalServerAlreadyRunningException& err) {
+        } catch (const LocalServerAlreadyRunningException&) {
             ClientUI::MessageBox(UserString("LOCAL_SERVER_ALREADY_RUNNING_ERROR"), true);
             return;
         } catch (const std::runtime_error& err) {
@@ -813,7 +814,7 @@ void GGHumanClientApp::RequestSavePreviews(const std::string& relative_directory
         m_single_player_game = true;
         try {
             StartServer();
-        } catch (const LocalServerAlreadyRunningException& err) {
+        } catch (const LocalServerAlreadyRunningException&) {
             ClientUI::MessageBox(UserString("LOCAL_SERVER_ALREADY_RUNNING_ERROR"), true);
             return;
         } catch (const std::runtime_error& err) {
@@ -917,7 +918,7 @@ float GGHumanClientApp::GLVersion() const
 void GGHumanClientApp::StartTurn(const SaveGameUIData& ui_data) {
     DebugLogger() << "GGHumanClientApp::StartTurn";
 
-    if (const Empire* empire = GetEmpire(EmpireID())) {
+    if (auto empire = m_empires.GetEmpire(EmpireID())) {
         double RP = empire->ResourceOutput(ResourceType::RE_RESEARCH);
         double PP = empire->ResourceOutput(ResourceType::RE_INDUSTRY);
         int turn_number = CurrentTurn();
@@ -1278,16 +1279,14 @@ namespace {
         }
     }
 
-    boost::filesystem::path CreateNewAutosaveFilePath(int client_empire_id, bool is_single_player) {
-        constexpr const char* legal_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-";
+    boost::filesystem::path CreateNewAutosaveFilePath(int client_empire_id, bool is_single_player,
+                                                      const EmpireManager& empires)
+    {
+        static constexpr const char* legal_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-";
 
         // get empire name, filtered for filename acceptability
-        const Empire* empire = GetEmpire(client_empire_id);
-        std::string empire_name;
-        if (empire)
-            empire_name = empire->Name();
-        else
-            empire_name = UserString("OBSERVER");
+        auto empire =  empires.GetEmpire(client_empire_id);
+        std::string empire_name{empire ? empire->Name() : UserString("OBSERVER")};
         std::string::size_type first_good_empire_char = empire_name.find_first_of(legal_chars);
         if (first_good_empire_char == std::string::npos) {
             empire_name.clear();
@@ -1362,7 +1361,7 @@ void GGHumanClientApp::Autosave() {
     if (!(is_initial_save || is_valid_autosave || is_final_save))
         return;
 
-    auto autosave_file_path = CreateNewAutosaveFilePath(EmpireID(), m_single_player_game);
+    auto autosave_file_path = CreateNewAutosaveFilePath(EmpireID(), m_single_player_game, m_empires);
 
     // check for and remove excess oldest autosaves.
     boost::filesystem::path autosave_dir_path((m_single_player_game ? GetSaveDir() : GetServerSaveDir()) / "auto");

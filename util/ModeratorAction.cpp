@@ -23,14 +23,13 @@ Moderator::DestroyUniverseObject::DestroyUniverseObject(int object_id) :
     m_object_id(object_id)
 {}
 
-void Moderator::DestroyUniverseObject::Execute() const
-{ GetUniverse().RecursiveDestroy(m_object_id); }
-
-std::string Moderator::DestroyUniverseObject::Dump() const {
-    std::string retval = "Moderator::DestroyUniverseObject object_id = "
-                       + std::to_string(m_object_id);
-    return retval;
+void Moderator::DestroyUniverseObject::Execute() const {
+    auto empire_ids = Empires().EmpireIDs();
+    GetUniverse().RecursiveDestroy(m_object_id, empire_ids);
 }
+
+std::string Moderator::DestroyUniverseObject::Dump() const
+{ return "Moderator::DestroyUniverseObject object_id = " + std::to_string(m_object_id); }
 
 /////////////////////////////////////////////////////
 // Moderator::SetOwner
@@ -169,7 +168,8 @@ namespace {
 }
 
 void Moderator::CreateSystem::Execute() const {
-    auto system = GetUniverse().InsertNew<System>(m_star_type, GenerateSystemName(), m_x, m_y);
+    auto system = GetUniverse().InsertNew<System>(m_star_type, GenerateSystemName(),
+                                                  m_x, m_y, CurrentTurn());
     if (!system) {
         ErrorLogger() << "CreateSystem::Execute couldn't create system!";
         return;
@@ -214,7 +214,8 @@ void Moderator::CreatePlanet::Execute() const {
         return;
     }
 
-    auto planet = GetUniverse().InsertNew<Planet>(m_planet_type, m_planet_size);
+    auto& universe = GetUniverse();
+    auto planet = universe.InsertNew<Planet>(m_planet_type, m_planet_size, CurrentTurn());
     if (!planet) {
         ErrorLogger() << "CreatePlanet::Execute unable to create new Planet object";
         return;

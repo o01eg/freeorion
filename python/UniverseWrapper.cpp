@@ -2,6 +2,7 @@
 #include <boost/python.hpp>
 #include <boost/python/suite/indexing/map_indexing_suite.hpp>
 #include <boost/python/suite/indexing/vector_indexing_suite.hpp>
+
 #include "../Empire/EmpireManager.h"
 #include "../universe/Building.h"
 #include "../universe/BuildingType.h"
@@ -10,6 +11,7 @@
 #include "../universe/Field.h"
 #include "../universe/FieldType.h"
 #include "../universe/Fleet.h"
+#include "../universe/NamedValueRefManager.h"
 #include "../universe/Pathfinder.h"
 #include "../universe/Planet.h"
 #include "../universe/PopCenter.h"
@@ -175,6 +177,13 @@ namespace {
         ScriptingContext location_as_source_context{location, location};
         return part_type.Location()->Eval(location_as_source_context, std::move(location));
     }
+
+    template <typename X>
+    struct PairToTupleConverter {
+        static PyObject* convert(X pair) {
+            return py::incref(py::make_tuple(pair.first, pair.second).ptr());
+        }
+    };
 }
 
 namespace FreeOrionPython {
@@ -222,11 +231,9 @@ namespace FreeOrionPython {
             .def(py::map_indexing_suite<std::map<MeterType, Meter>, true>())
         ;
 
-        // typedef std::map<std::pair<MeterType, std::string>, Meter> PartMeterMap;
-        py::class_<std::pair<MeterType, std::string>>("MeterTypeStringPair")
-            .add_property("meterType",  &std::pair<MeterType, std::string>::first)
-            .add_property("string",     &std::pair<MeterType, std::string>::second)
-        ;
+        py::to_python_converter<std::pair<MeterType, std::string>,
+                                PairToTupleConverter<std::pair<MeterType, std::string>>>();
+
         py::class_<Ship::PartMeterMap>("ShipPartMeterMap")
             .def(py::map_indexing_suite<Ship::PartMeterMap>())
         ;
@@ -252,30 +259,59 @@ namespace FreeOrionPython {
         py::class_<std::vector<Effect::AccountingInfo>>("AccountingInfoVec")
             .def(py::vector_indexing_suite<std::vector<Effect::AccountingInfo>, true>())
         ;
-
         py::class_<Effect::AccountingMap::mapped_type::value_type>("MeterTypeAccountingInfoVecPair")
             .add_property("meterType",          &Effect::AccountingMap::mapped_type::value_type::first)
-            .add_property("accountingInfo",     &Effect::AccountingMap::mapped_type::value_type::second)
         ;
+        py::to_python_converter<Effect::AccountingMap::mapped_type::value_type,
+            PairToTupleConverter<Effect::AccountingMap::mapped_type::value_type>>();
         py::class_<Effect::AccountingMap::mapped_type>("MeterTypeAccountingInfoVecMap")
             .def(py::map_indexing_suite<Effect::AccountingMap::mapped_type, true>())
         ;
-
-        py::class_<Effect::AccountingMap::value_type>("IntMeterTypeAccountingInfoVecMapPair")
-            .add_property("targetID",           &Effect::AccountingMap::value_type::first)
-            .add_property("meterAccounting",    &Effect::AccountingMap::value_type::second)
-        ;
+        py::to_python_converter<Effect::AccountingMap::value_type,
+            PairToTupleConverter<Effect::AccountingMap::value_type>>();
         py::class_<Effect::AccountingMap>("TargetIDAccountingMapMap")
             .def(py::map_indexing_suite<Effect::AccountingMap, true>())
         ;
+
+        //////////////////////////////////////////////
+        //   Content Named Global Constant Values   //
+        //////////////////////////////////////////////
+        py::def("namedRealDefined",
+                +[](const std::string& name) -> bool { return GetValueRef<double>(name, true); },
+                "Returns true/false (boolean) whether there is a defined double-valued "
+                "scripted constant with name (string).");
+        py::def("namedIntDefined",
+                +[](const std::string& name) -> bool { return GetValueRef<int>(name, true); },
+                "Returns true/false (boolean) whether there is a defined int-valued "
+                "scripted constant with name (string).");
+        py::def("getNamedValue",
+                +[](const std::string& name) -> py::object {
+                    auto eval = [](auto&& ref) -> py::object {
+                        if (ref->ConstantExpr()) 
+                            return py::object(ref->Eval());
+                        const ScriptingContext context;
+                        return py::object(ref->Eval(context));
+                    };
+
+                    if (const auto ref = GetValueRef<double>(name, true))
+                        return eval(ref);
+                    else if (const auto ref = GetValueRef<int>(name, true))
+                        return eval(ref);
+                    else
+                        return py::object();
+                },
+                "Returns the named value of the scripted constant with name (string). "
+                "If no such named constant exists, returns none.");
 
         ///////////////
         //   Meter   //
         ///////////////
         py::class_<Meter, boost::noncopyable>("meter", py::no_init)
-            .add_property("current",            &Meter::Current)
-            .add_property("initial",            &Meter::Initial)
-            .def("dump",                        &Meter::Dump,                       py::return_value_policy<py::return_by_value>(), "Returns string with debug information, use '0' as argument.")
+            .add_property("current",            &Meter::cur)
+            .add_property("initial",            &Meter::init)
+            .def("dump",                        +[](const Meter& m) -> std::string { return m.Dump(0).data(); },
+                                                py::return_value_policy<py::return_by_value>(),
+                                                "Returns string with debug information.")
         ;
 
         ////////////////////
@@ -458,8 +494,8 @@ namespace FreeOrionPython {
             .add_property("canBombard",             +[](const Ship& ship) -> bool { return ship.CanBombard(GetUniverse()); })
             .add_property("speciesName",            make_function(&Ship::SpeciesName,       py::return_value_policy<py::copy_const_reference>()))
             .add_property("speed",                  &Ship::Speed)
-            .add_property("colonyCapacity",         +[](const Ship& ship) -> bool { return ship.ColonyCapacity(GetUniverse()); })
-            .add_property("troopCapacity",          +[](const Ship& ship) -> bool { return ship.TroopCapacity(GetUniverse()); })
+            .add_property("colonyCapacity",         +[](const Ship& ship) -> float { return ship.ColonyCapacity(GetUniverse()); })
+            .add_property("troopCapacity",          +[](const Ship& ship) -> float { return ship.TroopCapacity(GetUniverse()); })
             .add_property("orderedScrapped",        &Ship::OrderedScrapped)
             .add_property("orderedColonizePlanet",  &Ship::OrderedColonizePlanet)
             .add_property("orderedInvadePlanet",    &Ship::OrderedInvadePlanet)
@@ -645,6 +681,7 @@ namespace FreeOrionPython {
             .def("OrbitalPositionOnTurn",                   &Planet::OrbitalPositionOnTurn)
             .add_property("RotationalPeriod",               &Planet::RotationalPeriod)
             .add_property("LastTurnAttackedByShip",         &Planet::LastTurnAttackedByShip)
+            .add_property("LastTurnColonized",              &Planet::LastTurnColonized)
             .add_property("LastTurnConquered",              &Planet::LastTurnConquered)
             .add_property("buildingIDs",                    make_function(&Planet::BuildingIDs,     py::return_internal_reference<>()))
             .add_property("habitableSize",                  &Planet::HabitableSize)
@@ -714,9 +751,12 @@ namespace FreeOrionPython {
             .add_property("preferredFocus",     make_function(&Species::DefaultFocus,   py::return_value_policy<py::copy_const_reference>()))
             .add_property("canColonize",        make_function(&Species::CanColonize,    py::return_value_policy<py::return_by_value>()))
             .add_property("canProduceShips",    make_function(&Species::CanProduceShips,py::return_value_policy<py::return_by_value>()))
+            .add_property("native",             &Species::Native)
             .add_property("tags",               make_function(&Species::Tags,           py::return_value_policy<py::return_by_value>()))
             .add_property("spawnrate",          make_function(&Species::SpawnRate,      py::return_value_policy<py::return_by_value>()))
             .add_property("spawnlimit",         make_function(&Species::SpawnLimit,     py::return_value_policy<py::return_by_value>()))
+            .add_property("likes",              make_function(&Species::Likes,          py::return_value_policy<py::return_by_value>()))
+            .add_property("dislikes",           make_function(&Species::Dislikes,       py::return_value_policy<py::return_by_value>()))
             .def("getPlanetEnvironment",        &Species::GetPlanetEnvironment)
             .def("dump",                        &Species::Dump,                         py::return_value_policy<py::return_by_value>(), "Returns string with debug information, use '0' as argument.")
         ;

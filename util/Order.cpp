@@ -226,6 +226,7 @@ void NewFleetOrder::ExecuteImpl(ScriptingContext& context) const {
 
     Universe& u = context.ContextUniverse();
     ObjectMap& o = context.ContextObjects();
+    auto empire_ids = context.EmpireIDs();
 
     u.InhibitUniverseObjectSignals(true);
 
@@ -238,11 +239,13 @@ void NewFleetOrder::ExecuteImpl(ScriptingContext& context) const {
     std::shared_ptr<Fleet> fleet;
     if (m_fleet_id == INVALID_OBJECT_ID) {
         // create fleet
-        fleet = u.InsertNew<Fleet>(m_fleet_name, system->X(), system->Y(), EmpireID());
+        fleet = u.InsertNew<Fleet>(m_fleet_name, system->X(), system->Y(),
+                                   EmpireID(), context.current_turn);
         m_fleet_id = fleet->ID();
     } else {
         fleet = u.InsertByEmpireWithID<Fleet>(EmpireID(), m_fleet_id, m_fleet_name,
-                                              system->X(), system->Y(), EmpireID());
+                                              system->X(), system->Y(), EmpireID(),
+                                              context.current_turn);
     }
 
     if (!fleet) {
@@ -271,7 +274,7 @@ void NewFleetOrder::ExecuteImpl(ScriptingContext& context) const {
         if (auto old_fleet = o.get<Fleet>(ship->FleetID())) {
             ordered_moved_turn = std::max(ordered_moved_turn, old_fleet->LastTurnMoveOrdered());
             old_fleet->RemoveShips({ship->ID()});
-            modified_fleets.emplace(std::move(old_fleet));
+            modified_fleets.insert(std::move(old_fleet));
         }
         ship->SetFleetID(fleet->ID());
     }
@@ -295,7 +298,7 @@ void NewFleetOrder::ExecuteImpl(ScriptingContext& context) const {
             if (auto modified_fleet_system = o.get<System>(modified_fleet->SystemID()))
                 modified_fleet_system->Remove(modified_fleet->ID());
 
-            u.Destroy(modified_fleet->ID());
+            u.Destroy(modified_fleet->ID(), empire_ids);
         }
     }
 }
@@ -341,7 +344,7 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
 
     // ensure a zero-length (invalid) route is not requested / sent to a fleet
     if (m_route.empty())
-        m_route.emplace_back(start_system);
+        m_route.push_back(start_system);
 }
 
 std::string FleetMoveOrder::Dump() const {
@@ -508,11 +511,11 @@ bool FleetTransferOrder::Check(int empire_id, int dest_fleet_id, const std::vect
 void FleetTransferOrder::ExecuteImpl(ScriptingContext& context) const {
     GetValidatedEmpire(context);
 
-    if (!Check(EmpireID(), DestinationFleet(), m_add_ships, context))
+    if (!Check(EmpireID(), m_dest_fleet, m_add_ships, context))
         return;
 
     // look up the destination fleet
-    auto target_fleet = context.ContextObjects().get<Fleet>(DestinationFleet());
+    auto target_fleet = context.ContextObjects().get<Fleet>(m_dest_fleet);
 
     // check that all ships are in the same system
     auto ships = context.ContextObjects().find<Ship>(m_add_ships);
@@ -541,6 +544,7 @@ void FleetTransferOrder::ExecuteImpl(ScriptingContext& context) const {
 
     // signal change to fleet states
     modified_fleets.insert(target_fleet.get());
+    auto empire_ids = context.EmpireIDs();
 
     for (auto* modified_fleet : modified_fleets) {
         if (!modified_fleet) {
@@ -551,7 +555,7 @@ void FleetTransferOrder::ExecuteImpl(ScriptingContext& context) const {
             if (auto system = context.ContextObjects().getRaw<System>(modified_fleet->SystemID()))
                 system->Remove(modified_fleet->ID());
 
-            context.ContextUniverse().Destroy(modified_fleet->ID());
+            context.ContextUniverse().Destroy(modified_fleet->ID(), empire_ids);
         }
     }
 }

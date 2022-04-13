@@ -137,9 +137,10 @@ namespace {
 
     std::string EmpireIdToText(int empire_id) {
         std::string retval;
-        constexpr size_t retval_sz = 24 + 1 + VarText::EMPIRE_ID_TAG.length()*2 + 1 + 8 + 1 + 30 + 3 + 1 + 10; // semi-guesstimate
+        static constexpr size_t retval_sz = 24 + 1 + VarText::EMPIRE_ID_TAG.length()*2 + 1 + 8 + 1 + 30 + 3 + 1 + 10 + 20; // semi-guesstimate
         retval.reserve(retval_sz);
-        if (const auto empire = GetEmpire(empire_id))
+        const ScriptingContext context;
+        if (const auto empire = context.GetEmpire(empire_id))
             return retval.append(GG::RgbaTag(empire->Color())).append("<").append(VarText::EMPIRE_ID_TAG).append(" ")
                          .append(std::to_string(empire->EmpireID())).append(">").append(empire->Name()).append("</")
                          .append(VarText::EMPIRE_ID_TAG).append(">").append("</rgba>");
@@ -148,11 +149,8 @@ namespace {
     }
 
     /// converts to "Empire_name: n" text
-    std::string CountToText(int empire_id, int forces_count) {
-        std::stringstream ss;
-        ss << EmpireIdToText(empire_id) << ": " << forces_count;
-        return ss.str();
-    }
+    std::string CountToText(int empire_id, int forces_count)
+    { return EmpireIdToText(empire_id).append(": ").append(std::to_string(forces_count)); }
 
     class OrderByNameAndId {
     public:
@@ -358,7 +356,8 @@ namespace {
     }
 
     size_t EmpireForcesAccordionPanel::CountForces(
-        std::vector<std::vector<std::shared_ptr<UniverseObject>>> forces) {
+        std::vector<std::vector<std::shared_ptr<UniverseObject>>> forces)
+    {
         size_t n = 0;
         for (const auto& owner_forces : forces)
             n += owner_forces.size();
@@ -454,14 +453,11 @@ namespace {
             // Check if any part of text is in the scrollers visible area
             const auto* scroll_panel = FindParentOfType<GG::ScrollPanel>(Parent().get());
             if (scroll_panel && (scroll_panel->InClient(UpperLeft())
-                             || scroll_panel->InClient(LowerRight())
-                             || scroll_panel->InClient(GG::Pt(Right(), Top()))
-                             || scroll_panel->InClient(GG::Pt(Left(), Bottom()))))
+                              || scroll_panel->InClient(LowerRight())
+                              || scroll_panel->InClient(GG::Pt(Right(), Top()))
+                              || scroll_panel->InClient(GG::Pt(Left(), Bottom()))))
             {
-                for (boost::signals2::connection& signal : m_signals)
-                    signal.disconnect();
-
-                m_signals.clear();
+                m_signals.clear(); // should disconnect scoped signals
 
                 SetText(*m_text);
                 m_text.reset();
@@ -480,7 +476,7 @@ namespace {
         }
 
         std::unique_ptr<std::string> m_text;
-        std::vector<boost::signals2::connection> m_signals;
+        std::vector<boost::signals2::scoped_connection> m_signals;
     };
 
 }

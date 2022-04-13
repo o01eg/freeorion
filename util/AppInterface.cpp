@@ -46,7 +46,7 @@ int IApp::MAX_AI_PLAYERS() {
     // order fiasco, because it is used in more than one compilation
     // unit during static initialization, albeit a the moment in two
     // different threads.
-    constexpr int max_number_AIs = 40;
+    static constexpr int max_number_AIs = 40;
     return max_number_AIs;
 }
 
@@ -59,6 +59,8 @@ void IApp::StartBackgroundParsing(const PythonParser& python, std::promise<void>
         barrier.set_exception(std::make_exception_ptr(std::runtime_error("non-existant resources directory")));
         return;
     }
+
+    DebugLogger() << "Start background parsing...";
 
     // named value ref parsing can be done in parallel as the referencing happens after parsing
     if (IsExistingDir(rdir / "scripting/common"))

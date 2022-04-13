@@ -468,7 +468,7 @@ boost::statechart::result MPLobby::react(const HostID& msg) {
     int host_id = Networking::INVALID_PLAYER_ID;
     try {
         host_id = boost::lexical_cast<int>(text);
-    } catch (const boost::bad_lexical_cast& ex) {
+    } catch (const boost::bad_lexical_cast&) {
         ErrorLogger(FSM) << "MPLobby::react(const HostID& msg) could not convert \"" << text << "\" to host id";
     }
 
@@ -641,7 +641,7 @@ boost::statechart::result PlayingGame::react(const HostID& msg) {
     int host_id = Networking::INVALID_PLAYER_ID;
     try {
         host_id = boost::lexical_cast<int>(text);
-    } catch (const boost::bad_lexical_cast& ex) {
+    } catch (const boost::bad_lexical_cast&) {
         ErrorLogger(FSM) << "PlayingGame::react(const HostID& msg) could not convert \"" << text << "\" to host id";
     }
 
@@ -711,7 +711,7 @@ boost::statechart::result PlayingGame::react(const Diplomacy& d) {
 
     DiplomaticMessage diplo_message;
     ExtractDiplomacyMessageData(d.m_message, diplo_message);
-    Empires().SetDiplomaticMessage(diplo_message);
+    Client().Empires().SetDiplomaticMessage(diplo_message);
 
     return discard_event();
 }
@@ -721,7 +721,7 @@ boost::statechart::result PlayingGame::react(const DiplomaticStatusUpdate& u) {
 
     DiplomaticStatusUpdateInfo diplo_update;
     ExtractDiplomaticStatusMessageData(u.m_message, diplo_update);
-    Empires().SetDiplomaticStatus(diplo_update.empire1_id, diplo_update.empire2_id, diplo_update.diplo_status);
+    Client().Empires().SetDiplomaticStatus(diplo_update.empire1_id, diplo_update.empire2_id, diplo_update.diplo_status);
 
     return discard_event();
 }
@@ -818,7 +818,7 @@ boost::statechart::result PlayingGame::react(const TurnTimeout& msg) {
     int timeout_remain = 0;
     try {
         timeout_remain = boost::lexical_cast<int>(text);
-    } catch (const boost::bad_lexical_cast& ex) {
+    } catch (const boost::bad_lexical_cast&) {
         ErrorLogger(FSM) << "PlayingGame::react(const TurnTimeout& msg) could not convert \"" << text << "\" to timeout";
     }
     Client().GetClientUI().GetMapWnd()->ResetTimeoutClock(timeout_remain);
@@ -930,11 +930,11 @@ boost::statechart::result WaitingForGameStart::react(const GameStartDataUnpacked
         Client().GetGalaxySetupData() = std::move(unpacked.galaxy_setup_data);
         GetGameRules().SetFromStrings(Client().GetGalaxySetupData().GetGameRules());
 
-        Empires() = std::move(unpacked.empires);
-        GetUniverse() = std::move(unpacked.universe);
-        GetSpeciesManager() = std::move(unpacked.species);
-        GetCombatLogManager() = std::move(unpacked.combat_logs);
-        GetSupplyManager() = std::move(unpacked.supply);
+        Client().Empires() = std::move(unpacked.empires);
+        Client().GetUniverse() = std::move(unpacked.universe);
+        Client().GetSpeciesManager() = std::move(unpacked.species);
+        GetCombatLogManager() = std::move(unpacked.combat_logs); // TODO: move into IApp ?
+        Client().GetSupplyManager() = std::move(unpacked.supply);
         Client().Players() = std::move(unpacked.player_info);
         Client().Orders() = std::move(unpacked.orders);
 
@@ -1104,12 +1104,14 @@ PlayingTurn::PlayingTurn(my_context ctx) :
 
     Client().GetClientUI().GetPlayerListWnd()->Refresh();
 
+    ScriptingContext context;
+
     Client().Register(Client().GetClientUI().GetMapWnd());
-    Client().GetClientUI().GetMapWnd()->InitTurn();
+    Client().GetClientUI().GetMapWnd()->InitTurn(context);
     Client().GetClientUI().GetMapWnd()->RegisterWindows(); // only useful at game start but InitTurn() takes a long time, don't want to display windows before content is ready.  could go in WaitingForGameStart dtor but what if it is given e.g. an error reaction?
     // TODO: reselect last fleet if stored in save game ui data?
     Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(
-        boost::io::str(FlexibleFormat(UserString("TURN_BEGIN")) % CurrentTurn()) + "\n");
+        boost::io::str(FlexibleFormat(UserString("TURN_BEGIN")) % context.current_turn) + "\n");
 
     if (Client().GetApp()->GetClientType() != Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER)
         Client().GetClientUI().GetMapWnd()->EnableOrderIssuing(true);

@@ -14,6 +14,10 @@ source_wrapper::operator condition_wrapper() const {
     return condition_wrapper(std::make_shared<Condition::Source>());
 }
 
+value_ref_wrapper<double> target_wrapper::construction() const {
+    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Construction"));
+}
+
 value_ref_wrapper<double> target_wrapper::habitable_size() const {
     return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "HabitableSize"));
 }
@@ -28,6 +32,10 @@ value_ref_wrapper<double> target_wrapper::max_defense() const {
 
 value_ref_wrapper<double> target_wrapper::max_troops() const {
     return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "MaxTroops"));
+}
+
+value_ref_wrapper<double> target_wrapper::target_happiness() const {
+    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "TargetHappiness"));
 }
 
 value_ref_wrapper<double> target_wrapper::target_industry() const {
@@ -60,6 +68,17 @@ value_ref_wrapper<int> target_wrapper::system_id() const {
 
 value_ref_wrapper<int> target_wrapper::design_id() const {
     return value_ref_wrapper<int>(std::make_shared<ValueRef::Variable<int>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "DesignID"));
+}
+
+target_wrapper::operator condition_wrapper() const {
+    return condition_wrapper(std::make_shared<Condition::Target>());
+}
+
+condition_wrapper operator&(const target_wrapper& lhs, const condition_wrapper& rhs) {
+    return condition_wrapper(std::make_shared<Condition::And>(
+        std::make_unique<Condition::Target>(),
+        rhs.condition->Clone()
+    ));
 }
 
 value_ref_wrapper<int> local_candidate_wrapper::last_turn_attacked_by_ship() const {

@@ -27,6 +27,7 @@ Policy
                 Planet
                 OwnedBy empire = Source.Owner
                 Species
+                Not Species name = "SP_EXOBOT"
             ]
             activation = And [
                 Source
@@ -55,7 +56,7 @@ Policy
 
             ]
     ]
-    graphic = "icons/policies/capital_markets.png"
+    graphic = "icons/policies/economic_capital_markets.png"
 
 #include "/scripting/common/base_prod.macros"
 #include "/scripting/policies/policies.macros"

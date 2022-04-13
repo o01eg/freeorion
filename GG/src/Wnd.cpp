@@ -134,31 +134,14 @@ bool dummy = RegisterWndFlags();
 ///////////////////////////////////////
 // class GG::Wnd
 ///////////////////////////////////////
-// static(s)
 unsigned int Wnd::s_default_browse_time = 1500;
 std::shared_ptr<BrowseInfoWnd> Wnd::s_default_browse_info_wnd;
 
-Wnd::Wnd() :
-    std::enable_shared_from_this<Wnd>(),
-    m_child_clipping_mode(ChildClippingMode::DontClip),
-    m_upperleft(X0, Y0),
-    m_lowerright(X1, Y1),
-    m_max_size(X(1 << 30), Y(1 << 30))
-{
-    m_browse_modes.resize(1);
-    m_browse_modes[0].time = s_default_browse_time;
-    m_browse_modes[0].wnd = s_default_browse_info_wnd;
-}
-
-Wnd::Wnd(X x, Y y, X w, Y h, Flags<WndFlag> flags/* = INTERACTIVE | DRAGABLE*/) :
-    Wnd()
-{
-    m_upperleft = Pt(x, y);
-    m_lowerright = Pt(x + w, y + h);
-
-    m_flags = flags;
-    ValidateFlags();
-}
+Wnd::Wnd(X x, Y y, X w, Y h, Flags<WndFlag> flags) :
+    m_upperleft{x, y},
+    m_lowerright{x + w, y + h},
+    m_flags{flags}
+{ ValidateFlags(); }
 
 Wnd::~Wnd()
 {
@@ -382,11 +365,11 @@ const std::shared_ptr<StyleFactory>& Wnd::GetStyleFactory() const
 
 WndRegion Wnd::WindowRegion(const Pt& pt) const
 {
-    constexpr int LEFT = 0;
-    constexpr int MIDDLE = 1;
-    constexpr int RIGHT = 2;
-    constexpr int TOP = 0;
-    constexpr int BOTTOM = 2;
+    static constexpr int LEFT = 0;
+    static constexpr int MIDDLE = 1;
+    static constexpr int RIGHT = 2;
+    static constexpr int TOP = 0;
+    static constexpr int BOTTOM = 2;
 
     // window regions look like this:
     // 0111112
@@ -407,6 +390,7 @@ WndRegion Wnd::WindowRegion(const Pt& pt) const
     else if (pt.y > ClientLowerRight().y)
         y_pos = BOTTOM;
 
+    static_assert(std::is_signed_v<std::underlying_type_t<WndRegion>>);
     return (Resizable() ? WndRegion(x_pos + 3 * y_pos) : WndRegion::WR_NONE);
 }
 

@@ -12,9 +12,9 @@
 /////////////////////////////////////////////////
 // Field                                       //
 /////////////////////////////////////////////////
-Field::Field(const std::string& field_type, double x, double y, double radius) :
-    UniverseObject("", x, y),
-    m_type_name(field_type)
+Field::Field(std::string field_type, double x, double y, double radius, int creation_turn) :
+    UniverseObject{"", x, y, ALL_EMPIRES, creation_turn},
+    m_type_name(std::move(field_type))
 {
     if (const FieldType* type = GetFieldType(m_type_name))
         Rename(UserString(type->Name()));

@@ -54,8 +54,8 @@ GG::Pt AccordionPanel::ClientLowerRight() const
 void AccordionPanel::SetInteriorColor(GG::Clr c)
 { m_interior_color = c; }
 
-void AccordionPanel::SetBorderMargin(unsigned int margin)
-{ m_border_margin = margin; }
+void AccordionPanel::SetBorderMargin(int margin)
+{ m_border_margin = std::max<int>(0, margin); }
 
 void AccordionPanel::Render() {
     if (Height() < 1 || Width() < 1)
@@ -115,9 +115,8 @@ void AccordionPanel::SetCollapsed(bool collapsed) {
     ExpandCollapseSignal();
 }
 
-bool AccordionPanel::IsCollapsed() const {
-    return m_collapsed;
-}
+bool AccordionPanel::IsCollapsed() const
+{ return m_collapsed; }
 
 void AccordionPanel::DoLayout() {
     GG::Pt expand_button_ul(m_is_left ? GG::X(-(EXPAND_BUTTON_SIZE + m_border_margin))

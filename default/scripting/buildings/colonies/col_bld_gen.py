@@ -10,7 +10,7 @@ import os
 import os.path
 import string
 
-# List of all species in game: definition key, graphic file(relative to default/data/art)
+# List of all colonizable species in game: definition key, graphic file(relative to default/data/art)
 species_list = [
     ("SP_SUPER_TEST", "icons/species/other-04.png"),
     ("SP_ABADDONI", "icons/species/abaddonnian.png"),
@@ -63,7 +63,7 @@ species_colony_gamerules = {"SP_SUPER_TEST": "RULE_ENABLE_SUPER_TESTER"}
 buildcost_default = 50
 
 # Species specific overrides to base buildcost
-species_buildcost = {"SP_EXOBOT": 70}
+species_buildcost = {"SP_EXOBOT": 60}
 
 # default buildtime factor
 buildtime_factor_default = "1.0"
@@ -79,7 +79,7 @@ t_main = string.Template(
 BuildingType
     name = "BLD_COL_${name}"
     description = "BLD_COL_${name}_DESC"
-    buildcost = ${cost} * [[COLONY_UPKEEP_MULTIPLICATOR]] * [[BUILDING_COST_MULTIPLIER]]
+    buildcost = ${cost} * [[COLONY_UPKEEP_MULTIPLICATOR]] * [[BUILDING_COST_MULTIPLIER]] * [[COLONIZATION_POLICY_MULTIPLIER]]
     buildtime = ${time}
     tags = [ ${tags} ]
     location = And [
@@ -183,17 +183,17 @@ t_buildtime_stat_cond_extinct = string.Template(
     """condition = And [
                 Planet
                 OwnedBy empire = Source.Owner
-            Or [
-               And [
-                   Species name = "${id}"
-                   Population low = [[MIN_RECOLONIZING_SIZE]]
-                   Happiness low = 5
+                Or [
+                   And [
+                       Species name = "${id}"
+                       Population low = [[MIN_RECOLONIZING_SIZE]]
+                       Happiness low = 5
+                    ]
+                    And [
+                        HasSpecial name = "EXTINCT_${name}_SPECIAL"
+                        Contains Building name = "BLD_XENORESURRECTION_LAB"
+                    ]
                 ]
-                And [
-                    HasSpecial name = "EXTINCT_${name}_SPECIAL"
-                    Contains Building name = "BLD_XENORESURRECTION_LAB"
-                ]
-            ]
                 ResourceSupplyConnected empire = Source.Owner condition = Target
             ]"""
 )
@@ -206,6 +206,7 @@ t_buildtime = string.Template(
         ) / (60
              + 20 * (Statistic If condition = Or [
                  And [ Source OwnerHasTech name = "SHP_MIL_ROBO_CONT" ]
+                 And [ Source OwnerHasTech name = "SHP_SPACE_FLUX_BUBBLE" ]
                  And [ Source OwnerHasTech name = "SHP_ORG_HULL" ]
                  And [ Source OwnerHasTech name = "SHP_QUANT_ENRG_MAG" ]
              ])

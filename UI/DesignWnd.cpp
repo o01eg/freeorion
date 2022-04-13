@@ -188,9 +188,6 @@ namespace {
       * ShipDesigns in the DesignWnd and the ProductionWnd. */
     class DisplayedShipDesignManager : public ShipDesignManager::Designs {
     public:
-        DisplayedShipDesignManager()
-        {}
-
         /** Return non-obsolete available ordered ids. */
         std::vector<int> OrderedIDs() const override;
 
@@ -213,7 +210,7 @@ namespace {
 
         /** Return true if design \p id is obsolete or boost::none if \p id is not in
             the manager. */
-        boost::optional<bool> IsObsolete(const int id) const;
+        boost::optional<bool> IsObsolete(const int id, const ScriptingContext& context) const;
         /** Return UI event number that obsoletes \p hull if it is obsolete. */
         boost::optional<int> IsHullObsolete(const std::string& hull) const;
         /** Return UI event number that obsoletes \p part if it is obsolete. */
@@ -430,9 +427,9 @@ namespace {
         ScriptingContext context;
 
         const auto empire_id = GGHumanClientApp::GetApp()->EmpireID();
-        const auto maybe_obsolete = manager.IsObsolete(design_id);  // purpose of this obsolescence check is unclear... author didn't comment
+        const auto maybe_obsolete = manager.IsObsolete(design_id, context); // purpose of this obsolescence check is unclear... author didn't comment
         if (maybe_obsolete && !*maybe_obsolete)
-            GGHumanClientApp::GetApp()->Orders().IssueOrder(          // erase design id order : empire should forget this design
+            GGHumanClientApp::GetApp()->Orders().IssueOrder(  // erase design id order : empire should forget this design
                 std::make_shared<ShipDesignOrder>(empire_id, design_id, true),
                 context);
         manager.Remove(design_id);
@@ -667,12 +664,13 @@ namespace {
         // Only OrderedIDs is part of the Designs base class and
         // accessible outside this file.
         GetSavedDesignsManager().CheckPendingDesigns();
+        const ScriptingContext context;
 
         // Remove all obsolete ids from the list
         std::vector<int> retval;
         std::copy_if(m_ordered_design_ids.begin(), m_ordered_design_ids.end(), std::back_inserter(retval),
-                     [this](const int id) {
-                         const auto maybe_obsolete = IsObsolete(id);
+                     [this, &context](const int id) {
+                         const auto maybe_obsolete = IsObsolete(id, context);
                          const auto known_and_not_obsolete = maybe_obsolete ? !*maybe_obsolete : false;
                          return known_and_not_obsolete;
                      });
@@ -785,7 +783,9 @@ namespace {
     { return m_id_to_obsolete_and_loc.count(id); }
 
 
-    boost::optional<bool> DisplayedShipDesignManager::IsObsolete(const int id) const {
+    boost::optional<bool> DisplayedShipDesignManager::IsObsolete(
+        const int id, const ScriptingContext& context) const
+    {
         // A non boost::none value for a specific design overrides the hull and part values
         auto it_id = m_id_to_obsolete_and_loc.find(id);
 
@@ -793,7 +793,7 @@ namespace {
         if (it_id == m_id_to_obsolete_and_loc.end())
             return boost::none;
 
-        const auto design = GetUniverse().GetShipDesign(id);
+        const auto design = context.ContextUniverse().GetShipDesign(id);
         if (!design) {
             ErrorLogger() << "DisplayedShipDesignManager::IsObsolete design id "
                           << id << " is unknown to the server";
@@ -806,7 +806,7 @@ namespace {
         int latest_obsolete_event = -1;
         int latest_unobsolete_event = 0;
 
-        if (const auto maybe_obsolete_design = it_id->second.first) {
+        if (const auto& maybe_obsolete_design = it_id->second.first) {
             if (maybe_obsolete_design->first)
                 latest_obsolete_event = maybe_obsolete_design->second;
             else
@@ -1048,11 +1048,12 @@ namespace {
     boost::optional<AvailabilityManager::DisplayedAvailabilies>
     AvailabilityManager::DisplayedDesignAvailability(const ShipDesign& design) const {
         int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-        const Empire* empire = GetEmpire(empire_id);  // may be nullptr
+        const ScriptingContext context;
+        auto empire = context.GetEmpire(empire_id);
         bool available = empire ? empire->ShipDesignAvailable(design) : true;
 
         const auto& manager = GetDisplayedDesignsManager();
-        const auto maybe_obsolete = manager.IsObsolete(design.ID());
+        const auto maybe_obsolete = manager.IsObsolete(design.ID(), context);
         bool is_obsolete = maybe_obsolete && *maybe_obsolete;
 
         return DisplayedXAvailability(available, is_obsolete);
@@ -1908,19 +1909,19 @@ void DesignWnd::PartPalette::DoLayout() {
     const int PTS = ClientUI::Pts();
     const GG::X PTS_WIDE(PTS/2);         // guess at how wide per character the font needs
     const GG::Y BUTTON_HEIGHT(PTS*3/2);
-    constexpr int BUTTON_SEPARATION = 3; // vertical or horizontal sepration between adjacent buttons
-    constexpr int BUTTON_EDGE_PAD = 2;   // distance from edges of control to buttons
-    constexpr GG::X RIGHT_EDGE_PAD(8);   // to account for border of CUIWnd
+    static constexpr int BUTTON_SEPARATION = 3; // vertical or horizontal sepration between adjacent buttons
+    static constexpr int BUTTON_EDGE_PAD = 2;   // distance from edges of control to buttons
+    static constexpr GG::X RIGHT_EDGE_PAD(8);   // to account for border of CUIWnd
 
     const GG::X USABLE_WIDTH = std::max(ClientWidth() - RIGHT_EDGE_PAD, GG::X1);   // space in which to fit buttons
-    constexpr int GUESSTIMATE_NUM_CHARS_IN_BUTTON_LABEL = 14;                   // rough guesstimate... avoid overly long part class names
+    static constexpr int GUESSTIMATE_NUM_CHARS_IN_BUTTON_LABEL = 14;                   // rough guesstimate... avoid overly long part class names
     const GG::X MIN_BUTTON_WIDTH = PTS_WIDE*GUESSTIMATE_NUM_CHARS_IN_BUTTON_LABEL;
     const int MAX_BUTTONS_PER_ROW = std::max(Value(USABLE_WIDTH / (MIN_BUTTON_WIDTH + BUTTON_SEPARATION)), 1);
 
     const int NUM_CLASS_BUTTONS = std::max(1, static_cast<int>(m_class_buttons.size()));
-    constexpr int NUM_SUPERFLUOUS_CULL_BUTTONS = 1;
-    constexpr int NUM_AVAILABILITY_BUTTONS = 3;
-    constexpr int NUM_NON_CLASS_BUTTONS = NUM_SUPERFLUOUS_CULL_BUTTONS + NUM_AVAILABILITY_BUTTONS;
+    static constexpr int NUM_SUPERFLUOUS_CULL_BUTTONS = 1;
+    static constexpr int NUM_AVAILABILITY_BUTTONS = 3;
+    static constexpr int NUM_NON_CLASS_BUTTONS = NUM_SUPERFLUOUS_CULL_BUTTONS + NUM_AVAILABILITY_BUTTONS;
 
     // determine whether to put non-class buttons (availability and redundancy)
     // in one column or two.
@@ -1973,7 +1974,7 @@ void DesignWnd::PartPalette::DoLayout() {
     // superfluous button or to complete a 2X2 grid left of the class buttons.
     auto place_avail_button_adjacent =
         [&col, &row, &num_non_class_buttons_per_row, NUM_CLASS_BUTTONS_PER_ROW,
-         BUTTON_EDGE_PAD, COL_OFFSET, ROW_OFFSET, BUTTON_WIDTH, BUTTON_HEIGHT]
+         COL_OFFSET, ROW_OFFSET, BUTTON_WIDTH, BUTTON_HEIGHT]
         (GG::Wnd* avail_btn)
         {
             if (num_non_class_buttons_per_row == 1) {
@@ -2266,9 +2267,9 @@ protected:
 private:
     void InitRowSizes();
 
-    int                         m_empire_id_shown = ALL_EMPIRES;
-    const AvailabilityManager&  m_availabilities_state;
-    boost::signals2::connection m_empire_designs_changed_signal;
+    int                                m_empire_id_shown = ALL_EMPIRES;
+    const AvailabilityManager&         m_availabilities_state;
+    boost::signals2::scoped_connection m_empire_designs_changed_signal;
 };
 
 BasesListBox::HullAndNamePanel::HullAndNamePanel(GG::X w, GG::Y h, const std::string& hull,
@@ -2490,7 +2491,6 @@ void BasesListBox::Populate() {
         BringRowIntoView(--end());
     if (init_first_row_offset < NumRows())
         BringRowIntoView(std::next(begin(), init_first_row_offset));
-
 }
 
 GG::Pt BasesListBox::ListRowSize()
@@ -2943,14 +2943,16 @@ void CompletedDesignsListBox::BaseLeftClicked(GG::ListBox::iterator it, const GG
     if (!design_row)
         return;
     int id = design_row->DesignID();
-    const ShipDesign* design = GetUniverse().GetShipDesign(id);
+
+    const ScriptingContext context;
+    const ShipDesign* design = context.ContextUniverse().GetShipDesign(id);
     if (!design)
         return;
 
     const auto& manager = GetDisplayedDesignsManager();
 
     if (modkeys & GG::MOD_KEY_CTRL && manager.IsKnown(id)) {
-        const auto maybe_obsolete = manager.IsObsolete(id);
+        const auto maybe_obsolete = manager.IsObsolete(id, context);
         bool is_obsolete = maybe_obsolete && *maybe_obsolete;
         SetObsoleteInDisplayedDesigns(id, !is_obsolete);
         Populate();
@@ -3058,7 +3060,7 @@ void CompletedDesignsListBox::BaseRightClicked(GG::ListBox::iterator it, const G
 
     // Context menu actions
     const auto& manager = GetDisplayedDesignsManager();
-    const auto maybe_obsolete = manager.IsObsolete(design_id);
+    const auto maybe_obsolete = manager.IsObsolete(design_id, context);
     bool is_obsolete = maybe_obsolete && *maybe_obsolete;
     auto toggle_obsolete_design_action = [design_id, is_obsolete, this]() {
         SetObsoleteInDisplayedDesigns(design_id, !is_obsolete);
@@ -3073,12 +3075,13 @@ void CompletedDesignsListBox::BaseRightClicked(GG::ListBox::iterator it, const G
 
     const auto empire_id = EmpireID();
 
-    auto rename_design_action = [empire_id, design_id, design, &design_row, &context]() {
+    auto rename_design_action = [empire_id, design_id, design, &design_row]() {
         auto edit_wnd = GG::Wnd::Create<CUIEditWnd>(
             GG::X(350), UserString("DESIGN_ENTER_NEW_DESIGN_NAME"), design->Name());
         edit_wnd->Run();
         const std::string& result = edit_wnd->Result();
         if (!result.empty() && result != design->Name()) {
+            ScriptingContext context;
             GGHumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<ShipDesignOrder>(empire_id, design_id, result),
                 context);
@@ -3521,10 +3524,10 @@ void DesignWnd::BaseSelector::EnableOrderIssuing(bool enable/* = true*/) {
 }
 
 void DesignWnd::BaseSelector::DoLayout() {
-    constexpr GG::X LEFT_PAD{5};
-    constexpr GG::Y TOP_PAD{2};
+    static constexpr GG::X LEFT_PAD{5};
+    static constexpr GG::Y TOP_PAD{2};
     const GG::X AVAILABLE_WIDTH = ClientWidth() - 2*LEFT_PAD;
-    constexpr int BUTTON_SEPARATION = 3;
+    static constexpr int BUTTON_SEPARATION = 3;
     const GG::X BUTTON_WIDTH = (AVAILABLE_WIDTH - 2*BUTTON_SEPARATION) / 3;
     const int PTS = ClientUI::Pts();
     const GG::Y BUTTON_HEIGHT(PTS * 2);
@@ -4046,7 +4049,7 @@ private:
     bool                                        m_disabled_by_name = false; // if the design confirm button is currently disabled due to empty name
     bool                                        m_disabled_by_part_conflict = false;
 
-    boost::signals2::connection                 m_empire_designs_changed_signal;
+    boost::signals2::scoped_connection          m_empire_designs_changed_signal;
 };
 
 DesignWnd::MainPanel::MainPanel(std::string_view config_name) :
@@ -4541,7 +4544,7 @@ void DesignWnd::MainPanel::DoLayout() {
 
     const int PTS = ClientUI::Pts();
     const GG::X PTS_WIDE(PTS / 2);           // guess at how wide per character the font needs
-    constexpr int PAD = 6;
+    static constexpr int PAD = 6;
 
     GG::Pt ul,lr,ll,mus;
     lr = ClientSize() - GG::Pt(GG::X(PAD), GG::Y(PAD));
@@ -4976,10 +4979,10 @@ void DesignWnd::MainPanel::ReplaceDesign() {
             if (new_design_id == INVALID_DESIGN_ID) return;
 
             // Remove the old id from the Empire.
-            const auto maybe_obsolete = manager.IsObsolete(replaced_id);
+            ScriptingContext context;
+            const auto maybe_obsolete = manager.IsObsolete(replaced_id, context);
             bool is_obsolete = maybe_obsolete && *maybe_obsolete;
             if (!is_obsolete) {
-                ScriptingContext context;
                 GGHumanClientApp::GetApp()->Orders().IssueOrder(
                     std::make_shared<ShipDesignOrder>(empire_id, replaced_id, true),
                     context);
@@ -5107,7 +5110,7 @@ void DesignWnd::Render()
 { GG::FlatRectangle(UpperLeft(), LowerRight(), ClientUI::WndColor(), GG::CLR_ZERO, 0); }
 
 void DesignWnd::InitializeWindows() {
-    constexpr GG::X selector_width = GG::X(300);
+    static constexpr GG::X selector_width = GG::X(300);
     const GG::X main_width = ClientWidth() - selector_width;
 
     const GG::Pt pedia_ul(selector_width, GG::Y0);
@@ -5119,7 +5122,7 @@ void DesignWnd::InitializeWindows() {
     const GG::Pt palette_ul(selector_width + pedia_wh.x, pedia_ul.y);
     const GG::Pt palette_wh(main_width - pedia_wh.x, pedia_wh.y);
 
-    constexpr GG::Pt selector_ul(GG::X0, GG::Y0);
+    static constexpr GG::Pt selector_ul(GG::X0, GG::Y0);
     const GG::Pt selector_wh(selector_width, ClientHeight());
 
     m_detail_panel-> InitSizeMove(pedia_ul,     pedia_ul + pedia_wh);

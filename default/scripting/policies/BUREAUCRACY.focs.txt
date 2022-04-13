@@ -55,7 +55,7 @@ Policy
             effects = GenerateSitRepMessage
                 message = "SITREP_BUREAUCRACY_STOPPED"
                 label = "SITREP_BUREAUCRACY_STOPPED_LABEL"
-                icon = "icons/policies/bureaucracy.png"
+                icon = "icons/policies/economic_bureaucracy.png"
                 parameters = [
                     tag = "havebuildings" data = Statistic Count condition = And [
                         Or [
@@ -70,7 +70,7 @@ Policy
                 empire = Source.Owner
             
     ]
-    graphic = "icons/policies/bureaucracy.png"
+    graphic = "icons/policies/economic_bureaucracy.png"
 
 #include "/scripting/common/base_prod.macros"
 #include "/scripting/policies/policies.macros"

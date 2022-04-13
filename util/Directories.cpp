@@ -235,11 +235,11 @@ namespace {
     }
 
     constexpr auto PathTypesImpl() {
-        static_assert(std::is_same_v<std::underlying_type_t<PathType>, int>);
-        static_assert(int(PathType::PATH_INVALID) > 0);
+        static_assert(std::is_same_v<std::underlying_type_t<PathType>, signed char>);
+        static_assert(char(PathType::PATH_INVALID) > 0);
         std::array<PathType, NUM_PATH_TYPES> retval{};
 
-        for (PathType pt = PathType(0); pt < PathType::PATH_INVALID; pt = PathType(int(pt) + 1))
+        for (PathType pt = PathType(0); pt < PathType::PATH_INVALID; pt = PathType(char(pt) + 1))
             retval[std::size_t(pt)] = pt;
         return retval;
     }
@@ -503,7 +503,7 @@ void InitDirs(std::string const& argv0)
 
     s_python_home = s_cache_dir / "python";
     fs::create_directories(s_python_home / "lib");
-    CopyInitialResourceAndroid("lib/python36.zip");
+    CopyInitialResourceAndroid("lib/python39.zip");
 #endif
 
     g_initialized = true;
@@ -657,7 +657,7 @@ void CompleteXDGMigration()
         const std::string options_save_dir = GetOptionsDB().Get<std::string>("save.path");
         const fs::path old_path = fs::path(getenv("HOME")) / ".freeorion";
         if (fs::path(options_save_dir) == old_path)
-            GetOptionsDB().Set<std::string>("save.path", GetUserDataDir().string());
+            GetOptionsDB().Set("save.path", GetUserDataDir().string());
     }
 }
 
@@ -847,9 +847,8 @@ auto ListDir(const fs::path& path, std::function<bool (const fs::path&)> predica
                 fs::path file = dir / filename;
                 DebugLogger() << "ListDir: found file " << file.string();
                 env->ReleaseStringUTFChars(jstr, filename);
-                if (predicate(file)) {
-                    retval.emplace_back(file);
-                }
+                if (predicate(file))
+                    retval.push_back(file);
 
                 directories.push_front(std::move(file));
             }
@@ -870,7 +869,7 @@ auto ListDir(const fs::path& path, std::function<bool (const fs::path&)> predica
              dir_it != fs::recursive_directory_iterator(); ++dir_it)
         {
             if (predicate(dir_it->path()))
-                retval.emplace_back(dir_it->path());
+                retval.push_back(dir_it->path());
             else
                 TraceLogger() << "ListDir: Discarding non-matching path: " << PathToString(dir_it->path());
         }

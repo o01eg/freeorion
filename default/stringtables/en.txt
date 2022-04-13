@@ -203,14 +203,16 @@ NEW_PLANET_NAME
 NEW_ASTEROIDS_SUFFIX
 [[PT_ASTEROIDS]]
 
+# appended to names of systems if they are empty
 EMPTY_SPACE
-Deep Space
+''''''
 
+# appended to names of systems
 UNEXPLORED_REGION
-Unexplored Region
+''' (unexplored)'''
 
 UNEXPLORED_SYSTEM
-Unexplored System
+''' (unexplored)'''
 
 NOT_APPLICABLE
 N/A
@@ -915,7 +917,7 @@ FLD_VOID_RIFT
 Void Rift
 
 FLD_VOID_RIFT_DESC
-Anomalous rift in space that reduces ship [[metertype METER_SPEED]] by 50%.
+Anomalous rift in spacetime that reduces ship [[metertype METER_SPEED]] by 50%.
 
 
 ##
@@ -1207,6 +1209,12 @@ Enable Super-Tester Takeover
 
 RULE_ENABLE_SUPER_TESTER_DESC
 Enables [[BLD_SUPER_TEST]] building
+
+RULE_ALLOW_REPEATED_SPECIES
+Allows repeated species
+
+RULE_ALLOW_REPEATED_SPECIES_DESC
+Allows repeated species when there are less players than playable species. When there are more players than playable species there are always repeated species.
 
 RULE_STOCKPILE_IMPORT_LIMITED
 Stockpile Import Limited
@@ -2640,6 +2648,14 @@ Random
 GSETUP_NONE
 None
 
+# Frequency value of monsters.
+GSETUP_EXTREMELY_LOW
+Extremely Low
+
+# Frequency value of monsters.
+GSETUP_VERY_LOW
+Very Low
+
 # Frequency value of starlanes, planets, specials, monsters and native species.
 GSETUP_LOW
 Low
@@ -2651,6 +2667,14 @@ Medium
 # Frequency value of starlanes, planets, specials, monsters and native species.
 GSETUP_HIGH
 High
+
+# Frequency value of monsters.
+GSETUP_VERY_HIGH
+Very High
+
+# Frequency value of monsters.
+GSETUP_EXTREMELY_HIGH
+Extremely High
 
 # A galaxy age to select when generating a universe.
 GSETUP_YOUNG
@@ -5027,11 +5051,20 @@ Rough Estimate of Total Military Strength
 PP_OUTPUT
 Production Output
 
+PP_STOCKPILE
+Production Stockpile
+
+STOCKPILE_EXTRACTION
+Stockpile Extraction
+
 RP_OUTPUT
 Research Output
 
 IP_OUTPUT
 Net Influence Output
+
+IP_STOCKPILE
+Influence Stockpile
 
 PLANET_COUNT
 Planets
@@ -5211,6 +5244,12 @@ ENC_POICY_PREREQUISITES
 
 ENC_SPECIAL
 Special
+
+KNOWN_FIELDS_OF_THIS_TYPE
+Clickable list of currently known fields of this type with galactic coordinates attached:
+
+NO_KNOWN_FIELDS
+none
 
 OBJECTS_WITH_SPECIAL
 '''Objects with Special: '''
@@ -6155,11 +6194,11 @@ METER_INFLUENCE_VALUE_LABEL
 Influence
 
 METER_INFLUENCE_VALUE_DESC
-'''The Influence (or IP "Influence Points") of all planets in the empire represents such things as diplomatic influence, back-room dealing, espionage, public relations, propaganda, and cultural influence. It can be used to adopt [[encyclopedia ENC_POLICY]]s, and is needed to pay for the maintenance of colonies. When total IP cost of colony maintenance is greater than total IP output of the empire, the available Influence will decrease and eventually the empire won't be able to maintain all its colonies, unless more planets are set to [[encyclopedia INFLUENCE_FOCUS_TITLE]].
+'''The Influence (or IP "Influence Points") of all planets in the empire represents such things as diplomatic influence, back-room dealing, espionage, public relations, propaganda, and cultural influence. It can be used to adopt government [[encyclopedia ENC_POLICY]], and is consumed for the maintenance of populated colonies. When total IP cost of colony maintenance is greater than total IP output of the empire, the available influence stockpile will decrease. If influence continues being consumed faster than it is generated, the empire may go into influence debt, which can lead to reduced stability and rebel troops on an empire's colones. Influence generation can be increased by setting planets to [[encyclopedia INFLUENCE_FOCUS_TITLE]].
 
-The Target Influence is the stable Influence output level a planet will approach, given the current factors influencing the Influence resources. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, [[encyclopedia ENC_POLICY]] adopted by the empire, and various other game effects. If these factors change, then the Target Research value is likely to shift.
+The Target Influence is the stable Influence output level a planet will approach, given the current factors influencing the Influence resources. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, [[encyclopedia ENC_POLICY]] adopted by the empire, and various other game effects. If these factors change, then the Target Influence value is likely to shift.
 
-Influence does not require [[metertype METER_SUPPLY]] line connections to be used, but some colonies can have greater influence upkeeps when not connected to the capital.'''
+Influence does not require [[metertype METER_SUPPLY]] line connections to be used, but  colonies may have consume more influence when when not connected to the capital, or when further from the [[buildingtype BLD_IMPERIAL_PALACE]] or a [[buildingtype BLD_REGIONAL_ADMIN]].'''
 
 METER_CONSTRUCTION_VALUE_LABEL
 Infrastructure
@@ -6508,7 +6547,9 @@ TELEPATHIC_TITLE
 Telepathy
 
 TELEPATHY_TEXT
-Telepathic species are immune to mind-control and make it easier to research [[tech LRN_PSIONICS]].
+'''Telepathic species are immune to mind-control and make it easier to research [[tech LRN_PSIONICS]].
+
+List of Telepathic species:'''
 
 XENOPHOBIC_SPECIES_TITLE
 Xenophobic
@@ -6516,13 +6557,17 @@ Xenophobic
 XENOPHOBIC_SPECIES_TEXT
 '''Xenophobic species will automatically divert some of their industrial efforts into harassing other species that are nearby. The affected nearby species will suffer an industrial penalty due to this harassment. A Xenophobic species of [[encyclopedia SELF_SUSTAINING_SPECIES_TITLE]] will also find the presence of alien species nearby to be disruptive to its natural balances (whether due to some direct effect or simply due to wasted energies being applied to harassing the alien species, has not been determined) resulting in a reduced [[metertype METER_TARGET_POPULATION]].
 
-Xenophobic species start with [[tech CON_CONC_CAMP]].'''
+Xenophobic species start with [[tech CON_CONC_CAMP]].
+
+List of Xenophobic species:'''
 
 ARTISTIC_SPECIES_TITLE
 Artistic Trait
 
 ARTISTIC_SPECIES_TRAIT_TEXT
-Artistic species produce artistic works when their empire has adopted [[policy PLC_ARTISAN_WORKSHOPS]], which generates influence. Additionally, other planets with different artistic species in the same system are more stable.
+'''Artistic species produce artistic works when their empire has adopted [[policy PLC_ARTISAN_WORKSHOPS]], which generates influence. Additionally, other planets with different artistic species in the same system are more stable.
+
+List of Artistic species:'''
 
 FLEET_UPKEEP_TITLE
 Fleet Upkeep
@@ -6690,10 +6735,20 @@ QUICK_START_GUIDE_TITLE
 **Quick Start Guide**
 
 QUICK_START_GUIDE_TEXT
-'''This is a brief introduction to FreeOrion gameplay. A somewhat less brief Quick Play Guide is available at freeorion.org (current URL: <url  http://freeorion.org/index.php/V0.4_Quick_Play_Guide>freeorion.org/index.php/V0.4_Quick_Play_Guide</url> ).
+'''This Pedia provides information about many aspects of FreeOrion, including mechanics and content, as well as in-game objects and empires during a game. The pedia can be accessed from the top level index page, which provides categorized lists of articles, by entering text in the box at the top of the pedia page to search articles for the entered text, or via right-click popup menu links from many in-game objects in the interface.
 
-[[DETAILED_PEDIA_REFERENCE]]
-Important sections include [[encyclopedia CATEGORY_GAME_CONCEPTS]], [[encyclopedia CATEGORY_GUIDES]], and the [[encyclopedia ENC_METER_TYPE]] list.
+At the start of a new game, there are three important issues that should be addressed:
+
+1. Fleets are initially idle at homeworld's planetary system. Visible in the [[encyclopedia MAP_WINDOW_ARTICLE_TITLE]] is a star map, with the home system icon selected and highlighted in the center. At the top right of the system icon is a fleet icon. Fleets can be selected by left-clicking on the fleet icon on the map, which will open the fleets window, where all the fleets in a system and their contained ships can be viewed. If a fleet is selected, it can be given movement orders by right-clicking a nearby target star that is connected to the fleet's system by a starlane. Fleets that are not given move orders will stay idle. A good first step is often to send scout fleets to explore nearby systems, which will reveal more about their contents and any further starlane connections beyond them. See also [[encyclopedia FLEET_MOVEMENT_ARTICLE_TITLE]].
+
+2. Industry on the home world is not producing anything until told what to manufacture next. A single click on the red cogwheel in the bar of icons and numbers at the top of the screen, or double-clicking the image of the home planet on the right side of the screen, will open up the [[encyclopedia PRODUCTION_WINDOW_ARTICLE_TITLE]]. Production can be ordered is done by double-clicking entries from the list of "Producible Items". If the production queue does not yet use up all the available production points for the current turn, there will a red exclamation mark next to the cogwheel symbol. A good first step is to order the production of more scout ships, or a military command building. After ordering production, the production view can be closed by clicking on the cogwheel again or hitting escape.
+
+3. Research on the homeworld is not being directed effectively until research priorities are specified. A single click on the blue Erlenmeyer flask in the title bar will open the research window with the technology-tree. See also [[encyclopedia RESEARCH_TECH_GUIDE_TITLE]]. Double-clicking technologies will schedule them for research, which consumes the available research points. A good first step is often to research a technology that will give some bonus to the homeworld, such as [[tech GRO_PLANET_ECOL]] or [[tech PRO_ROBOTIC_PROD]].
+
+When there are no more exclamation signs in the title bar and when all fleet movement orders are given, it is time to finalize the turn by clicking the Turn button in the top left corner. This will apply all the decisions made during the previous (or first) turn, i.e. it will move ships as ordered, increase the progress of the industry production runs and of the technology research projects, thus concluding a rotation which can be thought of as a year. The changed map state and a new report by the [[tech SPY_CUSTOM_ADVISORIES]] will be ready for the next rotation.
+
+
+This is a brief introduction to FreeOrion gameplay. A somewhat less brief Quick Play Guide is available at freeorion.org (current URL: <url  http://freeorion.org/index.php/V0.4_Quick_Play_Guide>freeorion.org/index.php/V0.4_Quick_Play_Guide</url>).
 '''
 
 SITREP_IGNORE_BLOCK_TITLE
@@ -7224,7 +7279,9 @@ SITREP_SHOWALL_TEMPLATES
 Show all blocked SitReps
 
 SITREP_WELCOME
-[[encyclopedia GREETINGS_GUIDE_TITLE]] [[GREETINGS_GUIDE_REFERENCE]]
+'''[[encyclopedia GREETINGS_GUIDE_TITLE]] [[GREETINGS_INTRO]]
+If you are a newcomer to this universe, please click on the word "[[GREETINGS_GUIDE_TITLE]]" for some basic advice on how to play.
+'''
 
 SITREP_WELCOME_LABEL
 Welcome
@@ -7654,6 +7711,12 @@ On %planet%: the %building% performed partial repairs on the %ship%.
 EFFECT_DRYDOCK_SHIP_REPAIR_COMPLETE
 On %planet%: the %building% completed repairs on the %ship%.
 
+EFFECT_THENIAN_NATURAL_DIEOFF
+On %planet% a natural [[species SP_THENIAN]] die-off occurred, halving the current population.
+
+EFFECT_THENIAN_NATURAL_DIEOFF_LABEL
+Natural Die-off
+
 EFFECT_MONSTER_SPAWNING
 In %system%: A %predefinedshipdesign% was spawned.
 
@@ -7673,7 +7736,7 @@ EFFECT_GAIA_LABEL
 Gaia Paradise
 
 EFFECT_TERRAFORM
-%planet% has been terraformed.
+%planet% has been terraformed to %user_string% (%environment%).
 
 EFFECT_TERRAFORM_LABEL
 Terraform
@@ -7775,10 +7838,16 @@ EFFECT_NEBULA_LABEL
 Nebula
 
 EFFECT_TREE
-At %system%: a new Dyson Forest has started to grow and surround the star.
+At %system%: a new [[predefinedshipdesign SM_TREE]] has started to grow and surround the star.
 
 EFFECT_TREE_LABEL
-Dyson Forest
+[[SM_TREE]]
+
+EFFECT_DERELICT_TROOPS
+At %system%: a [[predefinedshipdesign SD_SMALL_TROOP_SHIP]] of %species% was found and salvaged.
+
+EFFECT_DERELICT_TROOPS_LABEL
+Derelict Seedlings
 
 EFFECT_DERELICT_MAP
 At %system%: information on the area was obtained from an abandoned %special%.
@@ -8177,7 +8246,7 @@ Human
 SP_HUMAN_GAMEPLAY_DESC
 '''Relentless, tribal pursuit predators.
 Prefer [[PT_TERRAN]] planets.
-[[encyclopedia ORGANIC_SPECIES_TITLE]]
+[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_HUMAN_DESC
@@ -8195,7 +8264,7 @@ SP_SCYLIOR_GAMEPLAY_DESC
 '''<img src="species/preview/scylior.png"></img>
 Three-tentacled, aquatic nautiloids.
 Prefer [[PT_OCEAN]] planets.
-[[encyclopedia ORGANIC_SPECIES_TITLE]]
+[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_SCYLIOR_DESC
@@ -8376,7 +8445,6 @@ SP_LAENFA_GAMEPLAY_DESC
 '''<img src="species/preview/laenfa.png"></img>
 Sneaky, telepathic, sentient vines.
 Prefer [[PT_OCEAN]] planets.
-Ships regenerate 1 fuel per turn at white stars, and 2 fuel per turn a blue stars.
 [[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]]
 '''
 
@@ -8399,13 +8467,16 @@ Greatly prefer [[PT_GASGIANT]]s.
 '''
 
 SP_SLY_DESC
-'''Description:
-The Sly live in gas giants. The gas giants are so foreign to most species in the universe that, for most of their history, they have been overlooked.
-Not being able to build devices, they couldn't leave their homeworld. Recently, they were able to obtain necessary equipment and technology for spacefaring from traders in exchange for their knowledge of history.
-On the right diet, Sly excrete refined fuel. When in system with a gas giant, a Sly-crewed ship will regenerate fuel. When in a system with a planet populated by friendly Sly, Sly-crewed ships will be refueled and repaired, as if they were in a friendly supply network with [[tech SHP_FLEET_REPAIR]].
+'''
+Description:
+The Sly live in gas giants. The gas giants are so foreign to most species in the universe that, for most of their history, they have been overlooked. Although experts in the field of xenobiology have long since speculated, that there might as well be live in just about any type of environment imaginable, if one just had the necessary technology to detect or make contact with it.
+
+Not being able to build advanced devices themselves, the Sly couldn't leave their heavy homeworld for a long time. Recently though, they were able to obtain the necessary equipment and technologies for spacefaring from interstellar traders in exchange for their deep knowledge of history.
+
+On the right diet, a Sly will excrete refined fuel. When Sly crewed ships are in systems with a [[PT_GASGIANT]], a their ships will regenerate a little bit of fuel each turn. When in a system with a planet populated by friendly Sly, Sly-crewed ships will be refueled and repaired, as if they were in a friendly supply network with [[tech SHP_FLEET_REPAIR]].
 
 Social Structure:
-The Sly are very long-lived and keep the songs alive in which the whole cultural knowledge is encoded. They are very open and curious towards the galaxy and the other species they are now finally able to encounter.
+The Sly are very long-lived and keep the songs alive in which the whole cultural knowledge is encoded. The echoes of their verbal lore resound down to the deepest and densest layers of their world(s), where harmonies and resonances build up over millenia. Despite their fixation with their racial memories, they are very open minded and curious towards the galaxy and the other species they are now finally able to encounter.
 '''
 
 SP_LEMBALALAM
@@ -8480,7 +8551,7 @@ Cray
 SP_CRAY_GAMEPLAY_DESC
 '''Cheerful enthusiastic robots.
 Prefer [[PT_BARREN]] planets.
-[[encyclopedia ROBOTIC_SPECIES_TITLE]]
+[[encyclopedia ROBOTIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_CRAY_DESC
@@ -8516,7 +8587,7 @@ Cynos
 
 SP_CYNOS_GAMEPLAY_DESC
 '''Walking plants sustained by a giant non-sentient mother plant.
-[[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]]
+[[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_CYNOS_DESC
@@ -8579,7 +8650,7 @@ Egassem
 SP_EGASSEM_GAMEPLAY_DESC
 '''Super massive, nuclear, lava-dwelling, crystalline amoebas.
 Prefer [[PT_INFERNO]] planets.
-[[encyclopedia LITHIC_SPECIES_TITLE]]
+[[encyclopedia LITHIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_EGASSEM_DESC
@@ -8599,7 +8670,7 @@ Sslith
 SP_SSLITH_GAMEPLAY_DESC
 '''Flat, aquatic, pliable creatures.
 Prefer [[PT_OCEAN]] planets.
-[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]]
+[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]], [[encyclopedia TELEPATHIC_TITLE]]
 '''
 
 SP_SSLITH_DESC
@@ -8615,7 +8686,7 @@ Fifty-Seven
 
 SP_FIFTYSEVEN_GAMEPLAY_DESC
 '''Math-obsessed sky-serpents, singing planet-wide fractal songs.
-[[encyclopedia ORGANIC_SPECIES_TITLE]]
+[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_FIFTYSEVEN_DESC
@@ -8652,6 +8723,122 @@ Homeworld:
 A swamp world with a dense atmosphere and fairly dense biosphere.
 '''
 
+SP_THENIAN
+Thenian
+
+SP_THENIAN_GAMEPLAY_DESC
+'''Thoughtful gasbags.
+[[encyclopedia GASEOUS_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
+'''
+
+SP_THENIAN_DESC
+'''
+At home in the boundary layers between the ultra high pressured inner atmosphere of their [[PT_GASGIANT]] and the outermost metallic helium core. They take their sustenance from the magnetic differential currents and are subject to periodical population die-offs which is completely natural and of no concern to themselves whatsoever. Whenever the maximum population density is reached, another die-off occurs so they can grow anew with unrelenting vigor. (Current [[metertype METER_POPULATION]] of [[SP_THENIAN]] colonies will be cut in half the turn after the maximum is reached.)
+
+As integrated as they are into their world's internal structure, it makes no sense for the Thenian to even try to leave. Unless another [[PT_GASGIANT]] were to physically come into direct contact with theirs, they just can not make the leap into space is all. So they dive and thrive
+'''
+
+SP_CELESTEPHYTE
+Celestephyte
+
+SP_CELESTEPHYTE_GAMEPLAY_DESC
+'''
+Slow growing telepathic lichen. Quite fragile and mostly harmless.
+[[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]], lives only on a few asteroids.
+'''
+
+SP_CELESTEPHYTE_DESC
+'''
+
+Although parts easily break off and can be transplanted on virgin rocks, it is highly unlikely they will ever take root. Certain rare trace elements (see ->Unobtainium) needed by its symbiotic astral fungus to telepathically travel the interdimensional universal webworks are so rare indeed, that Celestephyte have long since ago colonized every single rock even remotely habitable to them.
+
+While adult Celestephyte have prehensile appendages and can in theory do some useful work, they rarely do so in practice and like to stick to the theory. Much rather prefer they to not disturb the delicate interconnectedness of all their minute little mycelia, their intra- and interasteroidal web of fungus roots so to speak. But most of all they prefer not to be disturbed.
+
+When confronted with an enemy anyway, they try to stun them with their blatant incompetence and by staring them in the eyes if they have eyes and not yet invented the technology of protective sun goggles. Sometimes this even has the intended effect, but indirectly, because the attacker laugh themselves to death in a hysteric frenzy induced by the astral fungus'es spores transmitted telepathically through the accusing gaze of the defending Celestephyte. But that mostly works only on the weak minded, who would not have come to confront the ancient Celestephyte in the first place. That makes them kind of not quite adapted to this galaxy's way of live and some experts in the field of astromycology have speculated, that Celestephyte were originally introduced from Andromeda during the second coming of Chtullluhhulurtl by its fierceful minnions, the Fluffy Teddy Tenderizers, as they were called back in those dark and pre-empiric times.
+'''
+
+SP_KHAKTURIAN
+Khakturian
+
+SP_KHAKTURIAN_GAMEPLAY_DESC
+'''
+Spiky and hardy. Biennial invasive weed, herbicide resistant.
+Shoots poisonous abrasive thorns when in early sessile stage, later forms formidable tumbleweed-like offshoots for reproduction.
+[[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]]
+'''
+
+SP_KHAKTURIAN_DESC
+'''
+As invasive weed species go, this is a pretty stubborn one and hard to eradicate. When they plant their seedling-troopers into an enemy-world's ground, noone wants to share that piece of ground with them anymore, so obtrusive and obnoxious are they.
+
+Lifecycle:
+Can be grown from seeds (import restrictions are in place in many systems, the local [[buildingtype BLD_REGIONAL_ADMIN]] should be consulted before starting a plantation). No stratification required. After an initial watering in, they are drought tolerant, herbicide resistant and thrive in the dry desert sands by pulling moisture out of the atmosphere.
+
+Ecology:
+What Khakturian crave, is electrolytes and a lots of sunlights, so they love the eternal daylight that comes with a [[special TIDAL_LOCK_SPECIAL]]. Occasionally being eaten by (strong enough) herbivores does not faze them, they take it stoically and simply grow back. Although they can get a slight inferiority complex when dwarfed by the giant [[special WORLDTREE_SPECIAL]] and totally do not enjoy to stand in its shadow, they can appreciate the benefits it brings to all the other species and so they mostly just ignore it. (Khakturian do not benefit from any [[WORLDTREE_SPECIAL]] bonus.)
+
+'''
+
+SP_SLEEPERS
+Sleepers
+
+SP_SLEEPERS_GAMEPLAY_DESC
+'''
+Boring burrowers with feathered feet. Sleep a lot.
+Sometimes they dream of far away places they can never visit.
+[[encyclopedia ORGANIC_SPECIES_TITLE]]
+'''
+
+SP_SLEEPERS_DESC
+'''
+
+Feathered flightless birdlike creatues who are forced to hibernate a lot. Before winter is coming, which is five sixths of their year, suitable sleeping sites need to be prepared. Sometimes they dream of far away places they can never visit. But mainly their winters are dominated just by deep and dreamless sleeping. When they are awake during and around periastron, the very brief really livable period in their world's orbit closest to the star, they can be quite industrious. But they mostly prefer to sit around and do nothing. Somnambulism is a trait they greatly admire, but the art of sleepwalking is beyond them and they never achieved it.
+'''
+
+SP_NIGHTSIDERS
+Nightsiders
+
+SP_NIGHTSIDERS_GAMEPLAY_DESC
+'''
+Shady bloodsuckers with a dark sense of humor. Literally.
+Highly adapted to and at home in the eternal infernal night.
+[[encyclopedia ORGANIC_SPECIES_TITLE]]
+'''
+
+SP_NIGHTSIDERS_DESC
+'''
+
+Hated and feared by most other organic species for obvious reasons. Lurking in the shadows and preying on those, who naïvely wander into the dark. Their thirst for blood is not based on any ideology or emotion but purely on the necessities of biology. In this case haematophagy, living off of others' blood similar to the irritating tick or flee, but bigger and with space ships to boot.
+
+Although they'd like to be, they are not really telepathic. Instead, they are haemaesthetic – they can sense the blood of their potential victims over great distances. (Colonies of Nightsiders will detect nearby worlds populated with beings with [[encyclopedia ORGANIC_SPECIES_TITLE]] up to 9 starlanes away). They themselves call it their Sanguine Sensorium and describe it as a kind of itching, pointing them to the worlds where they can fall upon their victims at night.
+
+They are so bad, they invite fire and brimstone. (Colonies of Nightsiders will attract a nearby [[fieldtype FLD_METEOR_BLIZZARD]]).
+
+They are so incredibly bad, they even repel good fields. (Colonies of Nightsiders will deflect an oncoming [[fieldtype FLD_NANITE_SWARM]]).
+
+When asked, why they like or dislike certain things, a typical Nightsider might give answers along the following lines.
+
+Questioner: Would you like to join our [[buildingtype BLD_INTERSPECIES_ACADEMY]]?
+Nightsider: Sure, why not, show us all your organic species you got over there. Maybe we even come for a visit some night or other.
+
+Questioner: A new [[buildingtype BLD_SCANNING_FACILITY]] or [[buildingtype BLD_LIGHTHOUSE]] needs to be built close to your colony.
+Nightsider: No thank you. We can see quite well enough ourselves. Keep these ideas in the daylight where they belong.
+
+Questioner: Why won't you be friends with our [[species SP_SETINON]] and [[species SP_SSLITH]]?
+Nightsider: We can feel they are there, but too small to be of any use as food. So.. what was the question again?
+
+Questioner: What with the shields up and all that defensive posture?
+Nightsider: Why not. We're good at it. We like it. Go away. Nothing to see here anyway. We will come to your world when we need your blood.
+
+Questioner: Would you like some [[special SHIMMER_SILK_SPECIAL]]?
+Nightsider: Keep that shiny stuff in the daylight where it belongs.
+
+Questioner: How about some [[special MIMETIC_ALLOY_SPECIAL]]?
+Nightsider: Whats that. Never heard of it. Let me see that. Not seeing anything. Oohh it moves stealthily. And now it trembled ... I did not get it yet. Give me that.
+
+At this point there would be a preview of what Nightsiders look like – but that is pointless since they are really from the dark side and it is unlikely that any organic being will need any visual aid to recognize, when a Nightsider is upon them...
+'''
+
 SP_NYMNMN
 Nymnmn
 
@@ -8662,7 +8849,17 @@ Prefer [[PT_DESERT]] planets.
 '''
 
 SP_NYMNMN_DESC
-''''''
+'''Homeworld:
+Their ancestral desert world's environment possesses an extremely unlikely combination of fractally recurring storm patterns in the upper ionosphere, paired with constant static electrical discharges produced by solar tides from its neighbouring star system, which enabled the early development of self-replicating electromagnetic wavelets. These wavelets are comparable to the ancient precursors of single celled organisms and continued to evolve into more and more complex wafers over the eons. Since they can only exist in a quite narrow spectral band, there was never much room for the analogue of biodiversity – every more advanced developmental stage totally consumed its predecessors in order to be able to exist at all.
+
+Since reproducing their native environment anywhere else is out of the question, they can never leave. Unless their entire world were to be moved, and great care taken not to interrupt the tidal-static-electric effects from its neighbouring star system.
+
+Description:
+A single Nymnmnych is hard to grasp. They blend into a cascading caccophony of self-perpetuating lightning-like electromagnetic discharges, in which an outsider can only discern a smear of blueish grizzle. Moving at the speed of light, yet bound to the ground, each and every individual covers the entire planetary surface several times per second. Where they meet, they briefly resonate with each other (somewhere in the low to mid terahertz range). Without corporeal form, they need to imprint their memories into the ferromagnetic portion of their planet's crust. Any mining or mechanical activities would impair or even destroy their racial memories, which is why they refrain from industry.
+
+Daily lives:
+Today's nymnmnian society is mainly preoccupied with reviewing and rating, archiving and cataloguing old tv shows and other entertainment broadcasts from foreign civilizations. They can not do otherwise, because those broadcasts touch the very essence of their beings – all their life is a non-stop binge-watching marathon if they want to or not. In consequence, they are the absolute masters of movie mockery in all the galaxies.
+'''
 
 SP_TRENCHERS
 Trenchers
@@ -8675,7 +8872,10 @@ Prefer [[PT_BARREN]] planets.
 '''
 
 SP_TRENCHERS_DESC
+'''Description:
+Coming soon.
 <img src="species/trenchers.png"></img>
+'''
 
 SP_RAAAGH
 Raaagh
@@ -8687,7 +8887,7 @@ Prefer [[PT_TERRAN]] planets.
 '''
 
 SP_RAAAGH_DESC
-'''The Raaagh are 1.5 meter tall stripe-furred bipeds. The body is held leaning forward at 45 degrees, leaving the fanged jaws, and clawed arms free to fight, build or capture prey. Triangular ears and slit pupils give a cat-like appearance. The tiny young hatch from a clutch of a dozen eggs at once. Little care or attention is paid to the young at this stage - they must survive on their own competing against their siblings for hiding places and stealing food like vermin. After three years usually only one is left, and the surviving young begin to learn to speak. This suddenly activates parental instincts, and the survivor is carefully raised as a member of the Pride.
+'''The Raaagh are 1.5 meter tall stripe-furred bipeds. The body is held leaning forward at 45 degrees, leaving the fanged jaws and clawed arms free to fight, build or capture prey. Triangular ears and slit pupils give a cat-like appearance. The tiny young hatch from a clutch of a dozen eggs at once. Little care or attention is paid to the young at this stage – they must survive on their own, competing against their siblings for hiding places and stealing food like vermin. After three years usually only one is left, and the surviving young begin to learn to speak. This suddenly activates parental instincts, and the survivor is carefully raised as a member of the Pride.
 
 Personality:
 Extreme territoriality is the Raaagh's most distinctive trait, woven throughout their daily lives and culture. Related to that is a preference for the familiar and known. Curiosity is minimal, which probably explains their stone age technology.
@@ -8696,7 +8896,7 @@ Homeworld:
 The Raaagh homeworld is of the Terran type. Sea and land are more or less evenly spread out, with the largest continent covering only 4% of planet's surface. The many small continents and large islands encourage a territorial attitude.
 
 Reason for Staying:
-There's not bit of land big enough for an individual Raaagh to live on that hasn't been fought over for centuries. The genetic compulsion of a Raaagh is to guard his territory with his life, and when possible to expand into adjacent land. Abandoning one's territory is inconceivable, and a Raaagh forcibly removed from his territory goes violently insane.
+There's no bit of land big enough for an individual Raaagh to live on that hasn't been fought over for centuries. The genetic compulsion of a Raaagh is to guard its territory with their life, and when possible to expand into adjacent land. Abandoning one's territory is inconceivable, and a Raaagh forcibly removed from their territory goes violently insane.
 '''
 
 SP_BEIGEGOO
@@ -8709,7 +8909,7 @@ Prefers [[PT_RADIATED]] planets.
 '''
 
 SP_BEIGEGOO_DESC
-'''The entire planet is covered in a beige haze of Nanites. It is unknown whether they were dropped as a weapon, were an out of control experiment, or are a means of extracting resources, but they have been thorough. There's nothing left but the planet's radioactive core. These Nanites are very efficient assemblers, and are eager to do so if provided raw materials. However the Nanites, are extremely protective of the secret of their design - they self destruct if any are captured or removed from the planet.
+'''The entire planet is covered in a beige haze of Nanites. It is unknown whether they were dropped as a weapon, were an out of control experiment, or are a means of extracting resources, but they have been thorough. There's nothing left but the planet's radioactive core. These Nanites are very efficient assemblers, and are eager to do so if provided raw materials. However, the Nanites are extremely protective of the secret of their design - they self destruct if any are captured or removed from the planet.
 '''
 
 SP_SILEXIAN
@@ -8718,7 +8918,7 @@ Silexian
 SP_SILEXIAN_GAMEPLAY_DESC
 '''Gleaming gardener robots, left on their own.
 Prefer [[PT_TERRAN]] planets.
-[[encyclopedia ROBOTIC_SPECIES_TITLE]]
+[[encyclopedia ROBOTIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_SILEXIAN_DESC
@@ -8860,7 +9060,7 @@ Ourbools
 SP_OURBOOLS_GAMEPLAY_DESC
 '''Giant blind swimmers who "see" gravitation.
 Prefer [[PT_OCEAN]] planets.
-[[encyclopedia ORGANIC_SPECIES_TITLE]]
+[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_OURBOOLS_DESC
@@ -8999,7 +9199,7 @@ Misiorla
 SP_MISIORLA_GAMEPLAY_DESC
 '''Chaotic, liberal, born pilots.
 Prefer [[PT_TOXIC]] planets.
-[[encyclopedia ORGANIC_SPECIES_TITLE]]
+[[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia ARTISTIC]]
 '''
 
 SP_MISIORLA_DESC
@@ -9023,6 +9223,10 @@ SP_EXOBOT_GAMEPLAY_DESC
 
 SP_EXOBOT_DESC
 '''While not as efficient as fully self-directed citizens, Exobots can colonize otherwise inhospitable planets, and build more Exobots.
+
+Exobot planets act like outposts for their impact on an empire's per-planet influence, which is less than other colonies, but do still consume influence themselves.
+
+Exobot planets do not receive a stability penalty when in influence debt while [[policy PLC_CAPITAL_MARKETS]] is adopted.
 '''
 
 SP_ANCIENT_GUARDIANS
@@ -9055,7 +9259,7 @@ Super Testers
 SP_SUPER_TEST_GAMEPLAY_DESC
 '''Super Testers are grossly unbalanced and unfair. They are nearly Omniscient. And they thrive on all planets. ([[metertype METER_STEALTH]]-busting power only works when they are in a Capital)
 [[encyclopedia ORGANIC_SPECIES_TITLE]], [[encyclopedia LITHIC_SPECIES_TITLE]], [[encyclopedia ROBOTIC_SPECIES_TITLE]], [[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]]
-[[encyclopedia TELEPATHIC_TITLE]]
+[[encyclopedia ARTISTIC]], [[encyclopedia TELEPATHIC_TITLE]]
 '''
 
 SP_SUPER_TEST_DESC
@@ -9101,6 +9305,30 @@ High Tech Natives
 
 HIGH_TECH_NATIVES_SPECIAL_DESC
 The natives on this planet have developed very advanced technology, giving their planet much stronger defenses against attack and invasion when independent of an empire.
+
+NATIVE_FORTIFICATION_MINIMAL
+Minimal Native Fortifications
+
+NATIVE_FORTIFICATION_MINIMAL_DESC
+The natives on this planet have built minimal fortications, giving their planet stronger defenses against attack and invasion when independent of an empire.
+
+NATIVE_FORTIFICATION_LOW
+Basic Native Fortifications
+
+NATIVE_FORTIFICATION_LOW_DESC
+The natives on this planet have built basic fortications, giving their planet stronger defenses against attack and invasion when independent of an empire.
+
+NATIVE_FORTIFICATION_MEDIUM
+Moderate Native Fortifications
+
+NATIVE_FORTIFICATION_MEDIUM_DESC
+The natives on this planet have built moderate fortications, giving their planet stronger defenses against attack and invasion when independent of an empire.
+
+NATIVE_FORTIFICATION_HIGH
+Strong Native Fortifications
+
+NATIVE_FORTIFICATION_HIGH_DESC
+The natives on this planet have built strong fortications, giving their planet stronger defenses against attack and invasion when independent of an empire.
 
 GAIA_SPECIAL
 Gaia
@@ -9272,7 +9500,7 @@ These asteroids are infected by transdimensional worms that eat tunnels through 
 Applied to ships built with asteroid hulls the slime will naturally increase their durability. While this slime does not last long, these worms will frequently visit the affected ships, replenishing any lost slime before returning to their home. Unable to catch a living specimen, scientists theorize their mode of transport appears linked to our communications in some manner.'''
 
 ASTEROID_COATING_OWNED_SPECIAL
-Asteroid Coating
+Asteroid Coating (Owned)
 
 ASTEROID_COATING_OWNED_SPECIAL_DESC
 [[ASTEROID_COATING_SPECIAL_DESC]]
@@ -9387,8 +9615,11 @@ Derelict Scout
 DERELICT_SPECIAL3
 Derelict Tanker
 
+DERELICT_SPECIAL4
+Derelict Trooper
+
 DERELICT_SPECIAL_DESC
-An ancient, derelict ship from an unknown species. Who knows what it could reveal...
+An ancient derelict ship from an unknown species. Who knows what it could reveal...
 
 ACCRETION_DISC_SPECIAL
 Accretion Disc
@@ -9515,6 +9746,12 @@ This planet has pools of mimetic alloy on its surface, which morphs to resemble 
 
 MIMETIC_ALLOY_SPECIAL_IMPORTS
 Imported [[MIMETIC_ALLOY_SPECIAL]]
+
+STARLANE_DRIVE_ACTIVATED_SPECIAL
+Scripting auxiliary
+
+STARLANE_DRIVE_ACTIVATED_SPECIAL_DESC
+A special you will never see, it is used internally by the content scripting.
 
 
 ##
@@ -11747,7 +11984,7 @@ PLC_TERRAFORMING
 Terraforming
 
 PLC_TERRAFORMING_DESC
-'''• Decreases the minimum time to produce [[buildingtype BLD_TERRAFORM]] and [[buildingtype BLD_TERRAFORM_REVERT]] projects on planets.
+'''• Decreases the minimum time and cost to produce Terraforming projects on planets.
 • Boosts [[metertype METER_TARGET_HAPPINESS]] on terraformed planets by [[value PLC_TERRAFORMING_TARGET_HAPPINESS_ORIGINAL_FLAT]] per step they have been terraformed away from their original planet type
 • Boosts [[metertype METER_TARGET_INFLUENCE]] on planets set to influence focus by [[value PLC_TERRAFORMING__TARGET_INFLUENCE_ORIGINAL_FLAT]] per step they have been terraformed away from their original planet type
 • Boosts [[metertype METER_TARGET_RESEARCH]] on planets set to research focus by the square root of [[metertype METER_POPULATION]] times [[value PLC_TERRAFORMING_TARGET_RESEARCH_SCALING]] per step they have been terraformed away from their original planet type'''
@@ -11812,7 +12049,9 @@ PLC_EXOBOT_PRODUCTIVITY
 Exobot Productivity
 
 PLC_EXOBOT_PRODUCTIVITY_DESC
-Increases effective exobot production output on industry-focused worlds from very bad to just bad.
+'''Increases effective exobot production output on industry-focused worlds from very bad to just bad.
+
+Decreases the stability and production output of non-exobot populated planets in the empire by [[value PLC_EXOBOT_OTHER_PLANET_INDUSTRY_PENALTY]].'''
 
 PLC_EXOBOT_PRODUCTIVITY_SHORT_DESC
 Boosts exobot production
@@ -11823,8 +12062,8 @@ Confederation
 PLC_CONFEDERATION_DESC
 '''Planets of the empire are organized in a confederacy of independent systems.
 
-• Increases [[metertype METER_TARGET_INFLUENCE]] on colonies disconnected from the capital by [[value PLC_CONFEDERATION_SUPPLY_DISCONNECTED_INFLUENCE_FLAT]]
-• Increases [[metertype METER_TARGET_HAPPINESS]] on colonies disconnected from the capital and regional administrative centres by [[value DISCONNECTED_FROM_CAPITAL_AND_REGIONAL_ADMIN_STABILITY_PENALTY]]
+• Removes [[metertype METER_TARGET_INFLUENCE]] penalty (baseline for most species) on colonies disconnected from the [[buildingtype BLD_IMPERIAL_PALACE]]
+• Removes [[metertype METER_TARGET_HAPPINESS]] penalty (baseline for most species) on colonies disconnected from the [[buildingtype BLD_IMPERIAL_PALACE]] and [[buildingtype BLD_REGIONAL_ADMIN]]
 • Reduces [[metertype METER_TARGET_HAPPINESS]] ([[value PLC_CONFEDERATION_TARGET_HAPPINESS_FLAT]]) on all planets
 • Increases [[metertype METER_MAX_TROOPS]] by [[value PLC_CONFEDERATION_MAX_TROOPS_FLAT]]'''
 
@@ -12047,10 +12286,10 @@ PLC_ARTISAN_WORKSHOPS
 Artisan Workshops
 
 PLC_ARTISAN_WORKSHOPS_DESC
-Planets with [[ARTISTIC]] species that are set to influence focus will generate influence and will export aesthetically pleasing crafts to planets in their system, boosting the stability of those planets.
+Planets with [[encyclopedia ARTISTIC]] species that are set to influence focus will generate influence and will export aesthetically pleasing crafts to planets in their system, boosting the stability of those planets.
 
 PLC_ARTISAN_WORKSHOPS_SHORT_DESC
-Artistic species produce luxuries
+[[encyclopedia ARTISTIC]] species produce luxuries
 
 PLC_BOOTSTRAPPING
 Colonial Bootstrapping
@@ -12059,7 +12298,7 @@ PLC_BOOTSTRAPPING_DESC
 '''• Increases the growth rate of industry, research, and influence meters, and boosts stability on colonies with population less than [[value PLC_BOOTSTRAPPING_MAX_POP]].
 • Increases stability of planets that were colonized in the last [[value PLC_BOOTSTRAPPING_MAX_TURNS]] turns, decreasing over time.
 
-New colonies often benefit from programs that supprt their early development and the dedication of the colonists to establishing their new home.'''
+New colonies often benefit from programs that support their early development and the dedication of the colonists to establishing their new home.'''
 
 PLC_BOOTSTRAPPING_SHORT_DESC
 Boosts small colonies
@@ -12068,7 +12307,11 @@ PLC_PROPAGANDA
 Propaganda Broadcasts
 
 PLC_PROPAGANDA_DESC
-Increases imperial capital influence by [[value PROPAGANDA_INFLUENCE_FLAT]].
+'''Increases imperial capital influence of the empire that adopts this policy by [[value PROPAGANDA_INFLUENCE_FLAT]].
+
+Increases imperial capital influence of allied empires by [[value PROPAGANDA_INFLUENCE_ALLIED_FLAT]], if they have not also adopted this policy.
+
+Decreases imperial capital influence of enemy empires by [[value PROPAGANDA_INFLUENCE_ENEMY_FLAT]], if they have not also adopted this policy and they have visibility of at least one object owned by the empire that adopts this policy.'''
 
 PLC_PROPAGANDA_SHORT_DESC
 Increases capital influence
@@ -12831,7 +13074,9 @@ SHP_SPACE_FLUX_BUBBLE
 Spatial Flux Bubble
 
 SHP_SPACE_FLUX_BUBBLE_DESC
-Ordinarily, propulsion in space is limited to either propellant or field propulsion. On relatively small scales however, it is possible to propel an object in space much like one could in water: by pushing backwards the medium in which the object is immersed. This requires the manipulation of space itself whereby the smallest units of space are collapsed, forcing the matter they once contained into adjacent units of space. This method of propulsion is very efficient, but dangerous on larger scales and easily detectable due to the dimensional effects. Further research into stealth technologies can reduce the dimensional disruption. The simplest solution to building a vessel using the flux propulsion is the bubble drive, which covers a sphere-shaped hull. More complex solutions are possible with better techs [[tech SHP_SPACE_FLUX_DRIVE]] and [[tech SHP_SPACE_FLUX_COMPOSITION]].
+'''Unless faster ship hulls have already been researched, this tech decreases the time to build a colony building far away from the corresponding species in the empire.
+
+Ordinarily, propulsion in space is limited to either propellant or field propulsion. On relatively small scales however, it is possible to propel an object in space much like one could in water: by pushing backwards the medium in which the object is immersed. This requires the manipulation of space itself whereby the smallest units of space are collapsed, forcing the matter they once contained into adjacent units of space. This method of propulsion is very efficient, but dangerous on larger scales and easily detectable due to the dimensional effects. Further research into stealth technologies can reduce the dimensional disruption. The simplest solution to building a vessel using the flux propulsion is the bubble drive, which covers a sphere-shaped hull. More complex solutions are possible with better techs [[tech SHP_SPACE_FLUX_DRIVE]] and [[tech SHP_SPACE_FLUX_COMPOSITION]].'''
 
 SHP_SPACE_FLUX_COMPOSITION
 Spatial Flux Composition
@@ -13669,7 +13914,7 @@ SPY_DETECT_1
 Optical Scanner
 
 SPY_DETECT_1_DESC
-All colonies start the game with a [[metertype METER_DETECTION]] of [[value SPY_DETECT_1_RANGE]], and the imperial [[encyclopedia DETECTION_TITLE]] to 10, and the ship part [[shippart DT_DETECTOR_1]] permits ships to reach the same level of detection.
+All colonies start the game with a [[metertype METER_DETECTION]] of [[value SPY_DETECT_1_RANGE]], and an imperial [[encyclopedia DETECTION_TITLE]] of 10, and the ship part [[shippart DT_DETECTOR_1]] permits ships to reach the same level of detection.
 
 SPY_DETECT_STELLAR_INTERFERENCE
 Stellar Interference
@@ -14274,7 +14519,7 @@ BLD_SCANNING_FACILITY
 Scanning Facility
 
 BLD_SCANNING_FACILITY_DESC
-'''Increases [[metertype METER_DETECTION]] of the planet by 75.
+'''Increases [[metertype METER_DETECTION]] of the planet by [[value SCANNING_FACILITY_RANGE]].
 
 A combination of long-range scanning devices and great computing power to analyze the data allows a larger area of space to be scanned for any objects.'''
 
@@ -14433,17 +14678,59 @@ BLD_CLONING_CENTER_DESC
 
 [[tech GRO_INDUSTRY_CLONE]] allows made-to-order populations to be produced industrially, significantly improving population.'''
 
-BLD_TERRAFORM
-Terraforming
+BLD_TERRAFORM_TERRAN
+Terraform to [[PT_TERRAN]]
 
-BLD_TERRAFORM_DESC
-Terraforms a world one step closer to the [[encyclopedia ENVIRONMENT_TITLE]] preference of the inhabiting species.
+BLD_TERRAFORM_TERRAN_DESC
+Terraforms a world to a [[PT_TERRAN]] environment.
 
-BLD_TERRAFORM_REVERT
-Terraforming Reversion
+BLD_TERRAFORM_OCEAN
+Terraform to [[PT_OCEAN]]
 
-BLD_TERRAFORM_REVERT_DESC
-Terraforms a world one step back towards its original type of [[encyclopedia ENVIRONMENT_TITLE]].
+BLD_TERRAFORM_OCEAN_DESC
+Terraforms a world to a [[PT_OCEAN]] environment.
+
+BLD_TERRAFORM_SWAMP
+Terraform to [[PT_SWAMP]]
+
+BLD_TERRAFORM_SWAMP_DESC
+Terraforms a world to a [[PT_SWAMP]] environment.
+
+BLD_TERRAFORM_TOXIC
+Terraform to [[PT_TOXIC]]
+
+BLD_TERRAFORM_TOXIC_DESC
+Terraforms a world to a [[PT_TOXIC]] environment.
+
+BLD_TERRAFORM_INFERNO
+Terraform to [[PT_INFERNO]]
+
+BLD_TERRAFORM_INFERNO_DESC
+Terraforms a world to a [[PT_INFERNO]] environment.
+
+BLD_TERRAFORM_RADIATED
+Terraform to [[PT_RADIATED]]
+
+BLD_TERRAFORM_RADIATED_DESC
+Terraforms a world to a [[PT_RADIATED]] environment.
+
+BLD_TERRAFORM_BARREN
+Terraform to [[PT_BARREN]]
+
+BLD_TERRAFORM_BARREN_DESC
+Terraforms a world to a [[PT_BARREN]] environment.
+
+BLD_TERRAFORM_TUNDRA
+Terraform to [[PT_TUNDRA]]
+
+BLD_TERRAFORM_TUNDRA_DESC
+Terraforms a world to a [[PT_TUNDRA]] environment.
+
+BLD_TERRAFORM_DESERT
+Terraform to [[PT_DESERT]]
+
+BLD_TERRAFORM_DESERT_DESC
+Terraforms a world to a [[PT_DESERT]] environment.
 
 BLD_REMOTE_TERRAFORM
 Remote Terraforming
@@ -14656,187 +14943,187 @@ BLD_SCRYING_SPHERE_DESC
 Grants visibility to all other planets that have a Scrying Sphere.'''
 
 BLD_COL_ABADDONI
-Abaddoni Colony
+Colony of [[SP_ABADDONI]]
 
 BLD_COL_ABADDONI_DESC
 [[BLD_COL_PART_1]] [[species SP_ABADDONI]] colony. [[BLD_COL_PART_2]] Abaddoni colony [[BLD_COL_PART_3]].
 
 BLD_COL_BANFORO
-Banforo Colony
+Colony of [[SP_BANFORO]]
 
 BLD_COL_BANFORO_DESC
 [[BLD_COL_PART_1]] [[species SP_BANFORO]] colony. [[BLD_COL_PART_2]] Banforo colony [[BLD_COL_PART_3]].
 
 BLD_COL_CHATO
-Chato Colony
+Colony of [[SP_CHATO]]
 
 BLD_COL_CHATO_DESC
 [[BLD_COL_PART_1]] [[species SP_CHATO]] colony. [[BLD_COL_PART_2]] Chato colony [[BLD_COL_PART_3]].
 
 BLD_COL_CRAY
-Cray Colony
+Colony of [[SP_CRAY]]
 
 BLD_COL_CRAY_DESC
 [[BLD_COL_PART_1]] [[species SP_CRAY]] colony. [[BLD_COL_PART_2]] Cray colony [[BLD_COL_PART_3]].
 
 BLD_COL_DERTHREAN
-Derthrean Colony
+Colony of [[SP_DERTHREAN]]
 
 BLD_COL_DERTHREAN_DESC
 [[BLD_COL_PART_1]] [[species SP_DERTHREAN]] colony. [[BLD_COL_PART_2]] Derthrean colony [[BLD_COL_PART_3]].
 
 BLD_COL_EAXAW
-Eaxaw Colony
+Colony of [[SP_EAXAW]]
 
 BLD_COL_EAXAW_DESC
 [[BLD_COL_PART_1]] [[species SP_EAXAW]] colony. [[BLD_COL_PART_2]] Eaxaw colony [[BLD_COL_PART_3]].
 
 BLD_COL_EGASSEM
-Egassem Colony
+Colony of [[SP_EGASSEM]]
 
 BLD_COL_EGASSEM_DESC
 [[BLD_COL_PART_1]] [[species SP_EGASSEM]] colony. [[BLD_COL_PART_2]] Egassem colony [[BLD_COL_PART_3]].
 
 BLD_COL_ETTY
-Etty Colony
+Colony of [[SP_ETTY]]
 
 BLD_COL_ETTY_DESC
 [[BLD_COL_PART_1]] [[species SP_ETTY]] colony. [[BLD_COL_PART_2]] Etty colony [[BLD_COL_PART_3]].
 
 BLD_COL_FURTHEST
-Furthest Colony
+Colony of [[SP_FURTHEST]]
 
 BLD_COL_FURTHEST_DESC
 [[BLD_COL_PART_1]] [[species SP_FURTHEST]] colony. [[BLD_COL_PART_2]] Furthest colony [[BLD_COL_PART_3]].
 
 BLD_COL_FULVER
-Fulver Colony
+Colony of [[SP_FULVER]]
 
 BLD_COL_FULVER_DESC
 [[BLD_COL_PART_1]] [[species SP_FULVER]] colony. [[BLD_COL_PART_2]] Fulver colony [[BLD_COL_PART_3]].
 
 BLD_COL_GEORGE
-George Colony
+Colony of [[SP_GEORGE]]
 
 BLD_COL_GEORGE_DESC
 [[BLD_COL_PART_1]] [[species SP_GEORGE]] colony. [[BLD_COL_PART_2]] George colony [[BLD_COL_PART_3]].
 
 BLD_COL_GYSACHE
-Gysache Colony
+Colony of [[SP_GYSACHE]]
 
 BLD_COL_GYSACHE_DESC
 [[BLD_COL_PART_1]] [[species SP_GYSACHE]] colony. [[BLD_COL_PART_2]] Gysache colony [[BLD_COL_PART_3]].
 
 BLD_COL_HAPPY
-Happybirthday Colony
+Colony of [[SP_HAPPY]]
 
 BLD_COL_HAPPY_DESC
 [[BLD_COL_PART_1]] [[species SP_HAPPY]] colony. [[BLD_COL_PART_2]] Happybirthday colony [[BLD_COL_PART_3]].
 
 BLD_COL_HHHOH
-Hhhoh Colony
+Colony of [[SP_HHHOH]]
 
 BLD_COL_HHHOH_DESC
 [[BLD_COL_PART_1]] [[species SP_HHHOH]] colony. [[BLD_COL_PART_2]] Hhhoh colony [[BLD_COL_PART_3]].
 
 BLD_COL_HUMAN
-Human Colony
+Colony of [[SP_HUMAN]]
 
 BLD_COL_HUMAN_DESC
 [[BLD_COL_PART_1]] [[species SP_HUMAN]] colony. [[BLD_COL_PART_2]] Human colony [[BLD_COL_PART_3]].
 
 BLD_COL_KILANDOW
-Kilandow Colony
+Colony of [[SP_KILANDOW]]
 
 BLD_COL_KILANDOW_DESC
 [[BLD_COL_PART_1]] [[species SP_KILANDOW]] colony. [[BLD_COL_PART_2]] Kilandow colony [[BLD_COL_PART_3]].
 
 BLD_COL_KOBUNTURA
-Kobuntura Colony
+Colony of [[SP_KOBUNTURA]]
 
 BLD_COL_KOBUNTURA_DESC
 [[BLD_COL_PART_1]] [[species SP_KOBUNTURA]] colony. [[BLD_COL_PART_2]] Kobuntura colony [[BLD_COL_PART_3]].
 
 BLD_COL_LAENFA
-Laenfa Colony
+Colony of [[SP_LAENFA]]
 
 BLD_COL_LAENFA_DESC
 [[BLD_COL_PART_1]] [[species SP_LAENFA]] colony. [[BLD_COL_PART_2]] Laenfa colony [[BLD_COL_PART_3]].
 
 BLD_COL_MISIORLA
-Misiorla Colony
+Colony of [[SP_MISIORLA]]
 
 BLD_COL_MISIORLA_DESC
 [[BLD_COL_PART_1]] [[species SP_MISIORLA]] colony. [[BLD_COL_PART_2]] Misiorla colony [[BLD_COL_PART_3]].
 
 BLD_COL_MUURSH
-Mu Ursh Colony
+Colony of [[SP_MUURSH]]
 
 BLD_COL_MUURSH_DESC
 [[BLD_COL_PART_1]] [[species SP_MUURSH]] colony. [[BLD_COL_PART_2]] Mu Ursh colony [[BLD_COL_PART_3]].
 
 BLD_COL_PHINNERT
-Phinnert Colony
+Colony of [[SP_PHINNERT]]
 
 BLD_COL_PHINNERT_DESC
 [[BLD_COL_PART_1]] [[species SP_PHINNERT]] colony. [[BLD_COL_PART_2]] Phinnert colony [[BLD_COL_PART_3]].
 
 BLD_COL_REPLICON
-Replicon Colony
+Colony of [[SP_REPLICON]]
 
 BLD_COL_REPLICON_DESC
 [[BLD_COL_PART_1]] [[species SP_REPLICON]] colony. [[BLD_COL_PART_2]] Replicon colony [[BLD_COL_PART_3]].
 
 BLD_COL_SCYLIOR
-Scylior Colony
+Colony of [[SP_SCYLIOR]]
 
 BLD_COL_SCYLIOR_DESC
 [[BLD_COL_PART_1]] [[species SP_SCYLIOR]] colony. [[BLD_COL_PART_2]] Scylior colony [[BLD_COL_PART_3]].
 
 BLD_COL_SETINON
-Setinon Colony
+Colony of [[SP_SETINON]]
 
 BLD_COL_SETINON_DESC
 [[BLD_COL_PART_1]] [[species SP_SETINON]] colony. [[BLD_COL_PART_2]] Setinon colony [[BLD_COL_PART_3]].
 
 BLD_COL_SILEXIAN
-Silexian Colony
+Colony of [[SP_SILEXIAN]]
 
 BLD_COL_SILEXIAN_DESC
 [[BLD_COL_PART_1]] [[species SP_SILEXIAN]] colony. [[BLD_COL_PART_2]] Silexian colony [[BLD_COL_PART_3]].
 
 BLD_COL_SLY
-Sly Colony
+Colony of [[SP_SLY]]
 
 BLD_COL_SLY_DESC
 [[BLD_COL_PART_1]] [[species SP_SLY]] colony. [[BLD_COL_PART_2]] Sly colony [[BLD_COL_PART_3]].
 
 BLD_COL_SSLITH
-Sslith Colony
+Colony of [[SP_SSLITH]]
 
 BLD_COL_SSLITH_DESC
 [[BLD_COL_PART_1]] [[species SP_SSLITH]] colony. [[BLD_COL_PART_2]] Sslith colony [[BLD_COL_PART_3]].
 
 BLD_COL_TAEGHIRUS
-Tae Ghirus Colony
+Colony of [[SP_TAEGHIRUS]]
 
 BLD_COL_TAEGHIRUS_DESC
 [[BLD_COL_PART_1]] [[species SP_TAEGHIRUS]] colony. [[BLD_COL_PART_2]] Tae Ghirus colony [[BLD_COL_PART_3]].
 
 BLD_COL_TRITH
-Trith Colony
+Colony of [[SP_TRITH]]
 
 BLD_COL_TRITH_DESC
 [[BLD_COL_PART_1]] [[species SP_TRITH]] colony. [[BLD_COL_PART_2]] Trith colony [[BLD_COL_PART_3]].
 
 BLD_COL_UGMORS
-Ugmors Colony
+Colony of [[SP_UGMORS]]
 
 BLD_COL_UGMORS_DESC
 [[BLD_COL_PART_1]] [[species SP_UGMORS]] colony. [[BLD_COL_PART_2]] Ugmors colony [[BLD_COL_PART_3]].
 
 BLD_COL_EXOBOT
-Exobot Colony
+Colony of [[SP_EXOBOT]]
 
 BLD_COL_EXOBOT_DESC
 This building will construct an [[species SP_EXOBOT]] colony at an [[encyclopedia OUTPOSTS_TITLE]]. Contrary to the colony buildings of other species, an Exobot colony does not need an already existing Exobot colony within supply range, as the Exobots are constructed as part of the colony directly planetside. However, because of that they are more expensive to build, and they still need an empire owned planet within supply range.
@@ -15589,7 +15876,7 @@ SH_ROBOTIC
 Robotic Hull
 
 SH_ROBOTIC_DESC
-'''This hull is completely automated and functions under the principals of [[tech SHP_MIL_ROBO_CONT]]. It has four external slots and one internal slot, and repairs 2 points of [[metertype METER_STRUCTURE]] each turn as long as the ship has not been in combat.
+'''This hull is completely automated and functions under the principals of [[tech SHP_MIL_ROBO_CONT]]. It has four external slots and one internal slot, and repairs [[value SHP_ROBOTIC_REPAIR]] points of [[metertype METER_STRUCTURE]] each turn as long as the ship has not been in combat.
 
 [[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is medium and [[metertype METER_SPEED]] is average.
 
@@ -16276,7 +16563,7 @@ BLD_SHIPYARD_BASE_ORBITAL_DRYDOCK_CON_GEOINT_REQUIRED
 Can only be built at a location with a [[buildingtype BLD_SHIPYARD_BASE]], an [[buildingtype BLD_SHIPYARD_ORBITAL_DRYDOCK]], and a [[buildingtype BLD_SHIPYARD_CON_GEOINT]].
 
 LIVING_HULL_AUTO_REGEN
-Living hull regenerates [[metertype METER_STRUCTURE]] and [[metertype METER_FUEL]] between combats.
+Living hull regenerates [[value SHP_LIVING_HULL_REPAIR]] [[metertype METER_STRUCTURE]] between combats and [[value SHP_LIVING_HULL_FUEL_REGEN]] [[metertype METER_FUEL]] while stationary.
 
 BLD_SHIPYARD_BASE_ORG_ORB_INC_REQUIRED
 Can only be built at a location with a [[buildingtype BLD_SHIPYARD_BASE]] and an [[buildingtype BLD_SHIPYARD_ORG_ORB_INC]].
@@ -16415,13 +16702,13 @@ GROWTH_SPECIALS_ENTRY_LIST
 '''Some specials function for organic species only, some for lithic species only, and some for robotic species only; no other [[encyclopedia METABOLISM_TITLE]] currently has applicable Growth Specials.
 
 [[encyclopedia ORGANIC_SPECIES_TITLE]] specials:
-[[special FRUIT_SPECIAL]] | [[special SPICE_SPECIAL]] | [[special PROBIOTIC_SPECIAL]]
+[[special FRUIT_SPECIAL]],  [[special SPICE_SPECIAL]],  [[special PROBIOTIC_SPECIAL]]
 
 [[encyclopedia ROBOTIC_SPECIES_TITLE]] specials:
-[[special MONOPOLE_SPECIAL]] | [[special SUPERCONDUCTOR_SPECIAL]] | [[special POSITRONIUM_SPECIAL]]
+[[special MONOPOLE_SPECIAL]],  [[special SUPERCONDUCTOR_SPECIAL]],  [[special POSITRONIUM_SPECIAL]]
 
 [[encyclopedia LITHIC_SPECIES_TITLE]] specials:
-[[special MINERALS_SPECIAL]] | [[special ELERIUM_SPECIAL]] | [[special CRYSTALS_SPECIAL]] '''
+[[special MINERALS_SPECIAL]],  [[special ELERIUM_SPECIAL]],  [[special CRYSTALS_SPECIAL]] '''
 
 GROWTH_SPECIAL_LABEL
 Planet <i>%1%</i> [[TT_SPECIAL]]
@@ -16429,6 +16716,11 @@ Planet <i>%1%</i> [[TT_SPECIAL]]
 
 ##
 ## Species picks
+##
+## + for positive effects
+## - for negative effects
+## ⋄ for neutral or other effects
+## use tabs for spacing
 ##
 
 NO_INDUSTRY_DESC
@@ -16441,7 +16733,7 @@ BAD_INDUSTRY_DESC
 −	Bad [[metertype METER_INDUSTRY]]: 75%
 
 AVERAGE_INDUSTRY_DESC
-'''	Average [[metertype METER_INDUSTRY]]: 100%'''
+⋄	Average [[metertype METER_INDUSTRY]]: 100%
 
 GOOD_INDUSTRY_DESC
 +	Good [[metertype METER_INDUSTRY]]: 150%
@@ -16462,7 +16754,7 @@ BAD_RESEARCH_DESC
 −	Bad [[metertype METER_RESEARCH]]: 75%
 
 AVERAGE_RESEARCH_DESC
-'''	Average [[metertype METER_RESEARCH]]: 100%'''
+⋄	Average [[metertype METER_RESEARCH]]: 100%
 
 GOOD_RESEARCH_DESC
 +	Good [[metertype METER_RESEARCH]]: 150%
@@ -16483,7 +16775,7 @@ BAD_INFLUENCE_DESC
 −	Bad [[metertype METER_INFLUENCE]]: 75%
 
 AVERAGE_INFLUENCE_DESC
-'''	Average [[metertype METER_INFLUENCE]]: 100%'''
+⋄	Average [[metertype METER_INFLUENCE]]: 100%
 
 GOOD_INFLUENCE_DESC
 +	Good [[metertype METER_INFLUENCE]]: 150%
@@ -16498,7 +16790,7 @@ BAD_HAPPINESS_DESC
 −	Bad [[metertype METER_HAPPINESS]]: [[value BAD_HAPPINESS_VAL]]
 
 AVERAGE_HAPPINESS_DESC
-'''	Average [[metertype METER_HAPPINESS]]: +0'''
+⋄	Average [[metertype METER_HAPPINESS]]: +0
 
 GOOD_HAPPINESS_DESC
 +	Good [[metertype METER_HAPPINESS]]: +[[value GOOD_HAPPINESS_VAL]]
@@ -16509,6 +16801,9 @@ GREAT_HAPPINESS_DESC
 ULTIMATE_HAPPINESS_DESC
 +++	Ultimate [[metertype METER_HAPPINESS]]: +[[value ULTIMATE_HAPPINESS_VAL]]
 
+INDEPENDENT_HAPPINESS_DESC
+⋄	Independent [[metertype METER_HAPPINESS]]: Baseline Stability unaffected by supply connections
+
 NO_DEFENSE_TROOPS_DESC
 −−−	No Defensive Ground [[metertype METER_TROOPS]]
 
@@ -16516,7 +16811,7 @@ BAD_DEFENSE_TROOPS_DESC
 −	Bad Defensive Ground [[metertype METER_TROOPS]]: 50%
 
 AVERAGE_DEFENSE_TROOPS_DESC
-'''	Average Defensive Ground [[metertype METER_TROOPS]]: 100%'''
+⋄	Average Defensive Ground [[metertype METER_TROOPS]]: 100%
 
 GOOD_DEFENSE_TROOPS_DESC
 +	Good Defensive Ground [[metertype METER_TROOPS]]: 150%
@@ -16528,7 +16823,7 @@ ULTIMATE_DEFENSE_TROOPS_DESC
 +++	Ultimate Defensive Ground [[metertype METER_TROOPS]]: 300%
 
 ANCIENT_DEFENSE_TROOPS_DESC
-+++	Ancient Defensive Ground [[metertype METER_TROOPS]]: 10 per [[metertype METER_POPULATION]]
++++	Ancient Defensive Ground [[metertype METER_TROOPS]]: +10 per [[metertype METER_POPULATION]]
 
 NO_OFFENSE_TROOPS_DESC
 −−−	No Offensive Ground [[metertype METER_TROOPS]]
@@ -16537,7 +16832,7 @@ BAD_OFFENSE_TROOPS_DESC
 −	Bad Offensive Ground [[metertype METER_TROOPS]]: 50%
 
 AVERAGE_OFFENSE_TROOPS_DESC
-'''	Average Offensive Ground [[metertype METER_TROOPS]]: 100%'''
+⋄	Average Offensive Ground [[metertype METER_TROOPS]]: 100%
 
 GOOD_OFFENSE_TROOPS_DESC
 +	Good Offensive Ground [[metertype METER_TROOPS]]: 150%
@@ -16564,7 +16859,7 @@ BAD_STEALTH_DESC
 −	Bad Planetary [[metertype METER_STEALTH]]: −20 malus
 
 AVERAGE_STEALTH_DESC
-'''	Average Planetary [[metertype METER_STEALTH]]'''
+⋄	Average Planetary [[metertype METER_STEALTH]]
 
 GOOD_STEALTH_DESC
 +	Good Planetary [[metertype METER_STEALTH]]: +20 bonus
@@ -16576,26 +16871,36 @@ ULTIMATE_STEALTH_DESC
 +++	Ultimate Planetary [[metertype METER_STEALTH]]: +60 bonus
 
 BAD_WEAPONS_DESC
-−	Bad Pilots: Base damage per ship weapon reduced by one level.
+−	Bad Pilots: weapon damage reduced by one level
 
 GOOD_WEAPONS_DESC
-+	Good Pilots: Base damage per ship weapon increased by one level.
++	Good Pilots: weapon damage increased by one level
 
 GREAT_WEAPONS_DESC
-++	Great Pilots: Base damage per ship weapon increased by two levels.
+++	Great Pilots: weapon damge increased by two levels
 
 ULTIMATE_WEAPONS_DESC
-+++	Ultimate Pilots: Base damage per ship weapon increased by three levels.
++++	Ultimate Pilots: weapon damage increased by three levels
 
+PHOTOTROP_DESC
++	Refuel 1.0 per turn at White and 2.0 at Blue Stars
+
+# 0.1 natural ramscoop-refuelling + 0.1 additional gaseous refueling = 0.2 q.e.d.
 GASEOUS_DESC
 '''+	Live on Gas Giants
-+	Refuel on Gas Giants 0.1'''
++	Refuel on Gas Giants 0.2 per turn'''
+
+EXTREMELY_BAD_POPULATION_DESC
+−−−	Extremely Bad [[metertype METER_POPULATION]]: 25%
+
+VERY_BAD_POPULATION_DESC
+−−	Very Bad [[metertype METER_POPULATION]]: 50%
 
 BAD_POPULATION_DESC
 −	Bad [[metertype METER_POPULATION]]: 75%
 
 AVERAGE_POPULATION_DESC
-'''	Average [[metertype METER_POPULATION]]: 100%'''
+⋄	Average [[metertype METER_POPULATION]]: 100%
 
 GOOD_POPULATION_DESC
 +	Good [[metertype METER_POPULATION]]: 125%
@@ -16610,7 +16915,7 @@ BAD_SUPPLY_DESC
 −	Bad [[metertype METER_SUPPLY]]: no bonus
 
 AVERAGE_SUPPLY_DESC
-'''	Average [[metertype METER_SUPPLY]]: +1'''
+⋄	Average [[metertype METER_SUPPLY]]: +1
 
 GREAT_SUPPLY_DESC
 +	Great [[metertype METER_SUPPLY]]: +2
@@ -16625,7 +16930,7 @@ BAD_STOCKPILE_DESC
 −	Bad [[metertype METER_STOCKPILE]]: +0.01 per [[metertype METER_POPULATION]]
 
 AVERAGE_STOCKPILE_DESC
-'''	Average [[metertype METER_STOCKPILE]]: +0.02 per [[metertype METER_POPULATION]]'''
+⋄	Average [[metertype METER_STOCKPILE]]: +0.02 per [[metertype METER_POPULATION]]
 
 GOOD_STOCKPILE_DESC
 +	Good [[metertype METER_STOCKPILE]]: +0.06 per [[metertype METER_POPULATION]]
@@ -16649,10 +16954,10 @@ GOOD_PLANETARY_DEFENSE_DESC
 +	Good planetary [[metertype METER_DEFENSE]]: +5
 
 BROAD_EP_DESC
-+	Broad Planet Tolerance: can tolerate more types.
++	Broad Planet Tolerance: can tolerate more types
 
 NARROW_EP_DESC
-−−	Narrow Planet Tolerance: flourishes on fewer types.
+−−	Narrow Planet Tolerance: flourishes on fewer types
 
 FAST_COLONIZATION_DESC
 +	Fast Colonization: -25% time to build colonies
@@ -16667,7 +16972,7 @@ BAD_FUEL_DESC
 −	Bad Maximum [[metertype METER_FUEL]]: -0.5
 
 AVERAGE_FUEL_DESC
-'''	Average Maximum [[metertype METER_FUEL]]: +0'''
+⋄	Average Maximum [[metertype METER_FUEL]]: +0
 
 GOOD_FUEL_DESC
 +	Good Maximum [[metertype METER_FUEL]]: +0.5
@@ -16682,16 +16987,22 @@ GREAT_ASTEROID_INDUSTRY_DESC
 +	Good Asteroid Miners: + 0.2 [[metertype METER_INDUSTRY]] per [[metertype METER_POPULATION]] when Industry Focused in systems with owned asteroid belts.
 
 LIGHT_SENSITIVE_DESC
-−	Light Sensitive: [[metertype METER_POPULATION]] is reduced in systems with [[STAR_BLUE]] and to a lesser extend [[STAR_WHITE]] stars.
+−	Light Sensitive: [[metertype METER_POPULATION]] is reduced in systems with [[STAR_BLUE]] and to a lesser extent [[STAR_WHITE]] stars.
+
+HAEMAESTHETIC_DETECTION_DESC
++	Sanguine Sensorium: can sense nearby planets populated with organic beings.
 
 TELEPATHIC_DETECTION_DESC
-+	Telepathic Detection: can sense nearby populated planets.
++	Telepathic Detection: can sense nearby populated planets
 
 PRECOGNITIVE_DETECTION_DESC
-+	Procognitive Detection: can sense starlane connected planets.
++	Precognitive Detection: can sense starlane connected planets
 
 COMMUNAL_VISION_DESC
-'''	Communal Vision: shares visibility within the same species.'''
+⋄	Communal Vision: shares visibility within the same species regardless of affiliation
+
+ARTISTIC_TRAIT_DESC
++	[[encyclopedia ARTISTIC]]: Improved stability and happiness
 
 
 ##
@@ -16846,47 +17157,57 @@ DEPENDENCE_ON_IMPERIAL_SUPPORT_DUE_TO_ENVIRONMENT
 Dependence on Empire due to %1% Environment
 
 # %1% FIXME
-# %2% FIXME
+# %2% name of species on planet
+EXTREMELY_BAD_POPULATION_LABEL
+%2% Extremely Bad Population
+
+# %1% FIXME
+# %2% name of species on planet
+VERY_BAD_POPULATION_LABEL
+%2% Very Bad Population
+
+# %1% FIXME
+# %2% name of species on planet
 BAD_POPULATION_LABEL
 %2% Bad Population
 
 # %1% FIXME
-# %2% FIXME
+# %2% name of species on planet
 GOOD_POPULATION_LABEL
 %2% Good Population
 
 # %1% FIXME
-# %2% FIXME
+# %2% name of species on planet
 FOCUS_INDUSTRY_LABEL
 %2% Industry Focus
 
 # %1% FIXME
-# %2% FIXME
+# %2% name of species on planet
 VERY_BAD_INDUSTRY_LABEL
 %2% Very Bad Industry
 
 # %1% FIXME
-# %2% FIXME
+# %2% name of species on planet
 BAD_INDUSTRY_LABEL
 %2% Bad Industry
 
 # %1% FIXME
-# %2% FIXME
+# %2% name of species on planet
 GOOD_INDUSTRY_LABEL
 %2% Good Industry
 
 # %1% FIXME
-# %2% FIXME
+# %2% name of species on planet
 GREAT_INDUSTRY_LABEL
 %2% Great Industry
 
 # %1% FIXME
-# %2% FIXME
+# %2% name of species on planet
 ULTIMATE_INDUSTRY_LABEL
 %2% Ultimate Industry
 
 # %1% FIXME
-# %2% FIXME
+# %2% name of species on planet
 FOCUS_RESEARCH_LABEL
 %2% Research Focus
 
@@ -17382,7 +17703,7 @@ Invincible'''
 AI_SHIPDESIGN_NAME_INVALID
 Invalid Design
 
-# Newline separated list of military ship names owned by AIs.
+# Newline separated list of military ship names owned by AIs. {
 # The usage is determined by a rating defined inside the AI scripts. The names
 # are roughly ordered by order of appearance in the game.
 AI_SHIPDESIGN_NAME_MILITARY
@@ -17405,6 +17726,7 @@ Hades
 Nemesis
 Zeus'''
 
+# }
 # Newline separated list of local troop transporter names owned by AIs.
 # The usage is determined by a rating defined inside the AI scripts. The names
 # are roughly ordered by order of appearance in the game.
@@ -17575,7 +17897,7 @@ Please spare your humble servants, and our gratitude shall be forever yours!
 AI_FIRST_TURN_GREETING_MSG201
 Stay the hell away from us!
 
-AI_FIRST_TURN_GREETING_MSG203
+AI_FIRST_TURN_GREETING_MSG202
 Stay away from us, and we will stay away from you!
 
 AI_FIRST_TURN_GREETING_MSG301
@@ -18239,6 +18561,7 @@ Dukalis
 Duna
 Dunatis
 Dungortheb
+Dungsibims
 Durash
 Durgosh
 Dvorak
@@ -18300,6 +18623,7 @@ Ezellohar
 Ezra
 Fafnir
 Fairchild
+Falavf
 Falmari
 Faraday
 Farlight
@@ -18355,6 +18679,7 @@ Giausar
 Giedi
 Gienah
 Giiziss
+Gilat
 Gilly
 Gimboid
 Gimilzôr
@@ -18383,6 +18708,7 @@ Grail
 Gram
 Gray
 Grian
+Gromphlamm
 Grotto
 Grue
 Gruis
@@ -18401,9 +18727,11 @@ Haedi
 Hagalaz
 Hale
 Haleth
+Halima-Ifa
 Halley
 Hamal
 Hananim
+Hardin
 Haretha
 Harlequin
 Hartmann
@@ -18429,6 +18757,7 @@ Hepsjot
 Hera
 Herbert
 Herbig
+Hermelin
 Hercules
 Herculis
 Herschel
@@ -18513,6 +18842,7 @@ Jabbah
 Jansky
 Jelena
 Jera
+Jetson
 Jhonaai
 Jiangyin
 Jijo
@@ -18542,6 +18872,7 @@ Kartow
 Katrud
 Kaus
 Kazzkark
+Keaen
 Keeta
 Keid
 Kelvin
@@ -18577,6 +18908,7 @@ Kobol
 Kochab
 Kochanski
 Kornephori
+Kotonëaster
 Kraj
 Krampus
 Kraz
@@ -18604,6 +18936,7 @@ LaMarr
 Lambda
 Langa
 Laplace
+Larken
 Lassell
 Lava
 Laythe
@@ -18678,6 +19011,7 @@ Matar
 Matenga
 Mbyja
 Mebsuta
+Mechthild
 Medea
 Media
 Megalon
@@ -18783,7 +19117,9 @@ Nekkar
 Nemari
 Nenning
 Neptunus
+Nerf
 Neruval
+Nervus
 Newton
 Nexus
 Ngôi Sao
@@ -18818,6 +19154,7 @@ Oa
 Oakka
 Oasis
 Obaca
+Obrekt
 Octo
 Odin
 Odyssey
@@ -18888,6 +19225,7 @@ Pickering
 Pike
 Pinatha
 Pinkie
+Pirene
 Pisces
 Piscium
 Plato
@@ -18899,6 +19237,7 @@ Polaris
 Pollus
 Pollux
 Polyphemus
+Ponderosa
 PooshNa
 Porrima
 Posterior
@@ -19009,6 +19348,7 @@ Sakuru
 Salm
 Salpeter
 Salusa
+Salvor
 Sandage
 Sangre
 Santo
@@ -19162,6 +19502,7 @@ Tauri
 Taygeta
 Taylor
 Techno
+Techtel
 Tegmen
 Tegmine
 Teja
@@ -19173,6 +19514,7 @@ Tenebra
 Teoblan
 Terebellum
 Terminus
+Tesbinh
 Tewari
 Thabit
 Thalassa
@@ -19261,7 +19603,9 @@ Verrier
 Vhilinyar
 Vindeatrix
 Vinea
+Viralia
 Vista
+Vloubiz
 Volantis
 Volchok
 Vox
@@ -19511,6 +19855,7 @@ Dromedary
 Dugong
 Elephant
 Elk
+Ermine
 Fennec
 Ferret
 Fox
@@ -19820,13 +20165,15 @@ Zircon'''
 SHIP_NAME_OTHER_GEO
 '''Caldera
 Earthquake
+Geysir
 Lavaflow
 Menhir
 Nugget
 Obelisk
 Petroglyph
 Seismic
-Tremor'''
+Tremor
+Vatnajökull'''
 
 # }
 # Newline separated ship name list based on weather {
@@ -20908,6 +21255,7 @@ Dalton
 Descartes
 Dirac
 Doppler
+Drosten
 Edison
 Einstein
 Euler
@@ -21351,6 +21699,14 @@ Rocinante
 Titanic'''
 
 # }
+# Newline separated ship name list based on various fictional monster names {
+SHIP_NAME_FICTIONAL_MONSTERS
+'''Beowulf
+Gormagander
+Nessi
+'''
+
+# }
 # Newline separated ship name list based on developer names {
 SHIP_NAME_DEVS
 '''Adrian Broher
@@ -21399,6 +21755,7 @@ MONSTER_NAMES
 [[SHIP_NAME_NORSE_MYTHOLOGY]]
 [[SHIP_NAME_BASQUE_MYTHOLOGY]]
 [[SHIP_NAME_UNSORTED_MYTHOLOGY]]
+[[SHIP_NAME_FICTIONAL_MONSTERS]]
 [[SHIP_NAME_DEVS]]'''
 
 #include "content_specific_parameters.txt"

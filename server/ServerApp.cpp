@@ -101,17 +101,17 @@ ServerApp::ServerApp() :
     InfoLogger() << FreeOrionVersionString();
     LogDependencyVersions();
 
-    m_galaxy_setup_data.seed = GetOptionsDB().Get<std::string>("setup.seed");
-    m_galaxy_setup_data.size = GetOptionsDB().Get<int>("setup.star.count");
-    m_galaxy_setup_data.shape = GetOptionsDB().Get<Shape>("setup.galaxy.shape");
-    m_galaxy_setup_data.age = GetOptionsDB().Get<GalaxySetupOption>("setup.galaxy.age");
-    m_galaxy_setup_data.starlane_freq = GetOptionsDB().Get<GalaxySetupOption>("setup.starlane.frequency");
-    m_galaxy_setup_data.planet_density = GetOptionsDB().Get<GalaxySetupOption>("setup.planet.density");
-    m_galaxy_setup_data.specials_freq = GetOptionsDB().Get<GalaxySetupOption>("setup.specials.frequency");
-    m_galaxy_setup_data.monster_freq = GetOptionsDB().Get<GalaxySetupOption>("setup.monster.frequency");
-    m_galaxy_setup_data.native_freq = GetOptionsDB().Get<GalaxySetupOption>("setup.native.frequency");
-    m_galaxy_setup_data.ai_aggr = GetOptionsDB().Get<Aggression>("setup.ai.aggression");
-    m_galaxy_setup_data.game_uid = GetOptionsDB().Get<std::string>("setup.game.uid");
+    m_galaxy_setup_data.seed =           GetOptionsDB().Get<std::string>("setup.seed");
+    m_galaxy_setup_data.size =           GetOptionsDB().Get<int>("setup.star.count");
+    m_galaxy_setup_data.shape =          GetOptionsDB().Get<Shape>("setup.galaxy.shape");
+    m_galaxy_setup_data.age =            GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.galaxy.age");
+    m_galaxy_setup_data.starlane_freq =  GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.starlane.frequency");
+    m_galaxy_setup_data.planet_density = GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.planet.density");
+    m_galaxy_setup_data.specials_freq =  GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.specials.frequency");
+    m_galaxy_setup_data.monster_freq =   GetOptionsDB().Get<GalaxySetupOptionMonsterFreq>("setup.monster.frequency");
+    m_galaxy_setup_data.native_freq =    GetOptionsDB().Get<GalaxySetupOptionGeneric>("setup.native.frequency");
+    m_galaxy_setup_data.ai_aggr =        GetOptionsDB().Get<Aggression>("setup.ai.aggression");
+    m_galaxy_setup_data.game_uid =       GetOptionsDB().Get<std::string>("setup.game.uid");
 
     // Initialize Python before FSM initialization
     // to be able use it for parsing
@@ -141,9 +141,9 @@ ServerApp::ServerApp() :
 
     namespace ph = boost::placeholders;
 
-    Empires().DiplomaticStatusChangedSignal.connect(
+    m_empires.DiplomaticStatusChangedSignal.connect(
         boost::bind(&ServerApp::HandleDiplomaticStatusChange, this, ph::_1, ph::_2));
-    Empires().DiplomaticMessageChangedSignal.connect(
+    m_empires.DiplomaticMessageChangedSignal.connect(
         boost::bind(&ServerApp::HandleDiplomaticMessageChange,this, ph::_1, ph::_2));
 
     m_signals.async_wait(boost::bind(&ServerApp::SignalHandler, this, ph::_1, ph::_2));
@@ -377,7 +377,7 @@ void ServerApp::AsyncIOTimedoutHandler(const boost::system::error_code& error) {
     bool success = false;
     try {
         success = m_python_server.AsyncIOTick();
-    } catch (const boost::python::error_already_set& err) {
+    } catch (const boost::python::error_already_set&) {
         success = false;
         m_python_server.HandleErrorAlreadySet();
         if (!m_python_server.IsPythonRunning()) {
@@ -930,7 +930,6 @@ void ServerApp::LoadSPGameInit(const std::vector<PlayerSaveGameData>& player_sav
     // Need to determine which data in player_save_game_data should be assigned to which established player
     std::vector<std::pair<int, int>> player_id_to_save_game_data_index;
 
-    auto established_player_it = m_networking.established_begin();
 
     // assign all saved game data to a player ID
     for (int i = 0; i < static_cast<int>(player_save_game_data.size()); ++i) {
@@ -946,15 +945,16 @@ void ServerApp::LoadSPGameInit(const std::vector<PlayerSaveGameData>& player_sav
             // assigned to player IDs of established AI players
 
             // cycle to find next established AI player
-            while (established_player_it != m_networking.established_end()) {
-                const PlayerConnectionPtr player_connection = *established_player_it;
-                ++established_player_it;
-                // if player is an AI, assign it to this
-                if (player_connection->GetClientType() == Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
-                    int player_id = player_connection->PlayerID();
-                    player_id_to_save_game_data_index.emplace_back(player_id, i);
-                    break;
-                }
+            for (auto established_it = m_networking.established_begin(); established_it != m_networking.established_end(); ++established_it)
+            {
+                const PlayerConnectionPtr player_connection = *established_it;
+                if (player_connection->GetClientType() != Networking::ClientType::CLIENT_TYPE_AI_PLAYER
+                    || player_connection->PlayerName() != psgd.name)
+                    continue;
+
+                int player_id = player_connection->PlayerID();
+                player_id_to_save_game_data_index.emplace_back(player_id, i);
+                break;
             }
         } else {
             // do nothing for any other player type, until another player type is implemented
@@ -1085,7 +1085,7 @@ void ServerApp::LoadChatHistory() {
         m_python_server.SetCurrentDir(GetPythonChatDir());
         // Call the Python load_history function
         success = m_python_server.LoadChatHistory(m_chat_history);
-    } catch (const boost::python::error_already_set& err) {
+    } catch (const boost::python::error_already_set&) {
         success = false;
         m_python_server.HandleErrorAlreadySet();
         if (!m_python_server.IsPythonRunning()) {
@@ -1119,7 +1119,7 @@ void ServerApp::PushChatMessage(const std::string& text,
         m_python_server.SetCurrentDir(GetPythonChatDir());
         // Call the Python load_history function
         success = m_python_server.PutChatHistoryEntity(chat);
-    } catch (const boost::python::error_already_set& err) {
+    } catch (const boost::python::error_already_set&) {
         success = false;
         m_python_server.HandleErrorAlreadySet();
         if (!m_python_server.IsPythonRunning()) {
@@ -1578,7 +1578,7 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
         m_python_server.SetCurrentDir(GetPythonUniverseGeneratorDir());
         // Call the main Python universe generator function
         success = m_python_server.CreateUniverse(player_setup_data);
-    } catch (const boost::python::error_already_set& err) {
+    } catch (const boost::python::error_already_set&) {
         success = false;
         m_python_server.HandleErrorAlreadySet();
         if (!m_python_server.IsPythonRunning()) {
@@ -1642,7 +1642,7 @@ void ServerApp::ExecuteScriptedTurnEvents() {
         m_python_server.SetCurrentDir(GetPythonTurnEventsDir());
         // Call the main Python turn events function
         success = m_python_server.ExecuteTurnEvents();
-    } catch (const boost::python::error_already_set& err) {
+    } catch (const boost::python::error_already_set&) {
         success = false;
         m_python_server.HandleErrorAlreadySet();
         if (!m_python_server.IsPythonRunning()) {
@@ -1735,14 +1735,14 @@ bool ServerApp::IsAvailableName(const std::string& player_name) const {
     return m_networking.IsAvailableNameInCookies(player_name);
 }
 
-bool ServerApp::IsAuthRequiredOrFillRoles(const std::string& player_name, Networking::AuthRoles& roles) {
+bool ServerApp::IsAuthRequiredOrFillRoles(const std::string& player_name, const std::string& ip_address, Networking::AuthRoles& roles) {
     bool result = false;
     bool success = false;
     try {
         m_python_server.SetCurrentDir(GetPythonAuthDir());
         // Call the main Python turn events function
-        success = m_python_server.IsRequireAuthOrReturnRoles(player_name, result, roles);
-    } catch (const boost::python::error_already_set& err) {
+        success = m_python_server.IsRequireAuthOrReturnRoles(player_name, ip_address, result, roles);
+    } catch (const boost::python::error_already_set&) {
         success = false;
         m_python_server.HandleErrorAlreadySet();
         if (!m_python_server.IsPythonRunning()) {
@@ -1771,7 +1771,7 @@ bool ServerApp::IsAuthSuccessAndFillRoles(const std::string& player_name, const 
         m_python_server.SetCurrentDir(GetPythonAuthDir());
         // Call the main Python turn events function
         success = m_python_server.IsSuccessAuthAndReturnRoles(player_name, auth, result, roles);
-    } catch (const boost::python::error_already_set& err) {
+    } catch (const boost::python::error_already_set&) {
         success = false;
         m_python_server.HandleErrorAlreadySet();
         if (!m_python_server.IsPythonRunning()) {
@@ -1799,7 +1799,7 @@ std::vector<PlayerSetupData> ServerApp::FillListPlayers() {
     try {
         m_python_server.SetCurrentDir(GetPythonAuthDir());
         success = m_python_server.FillListPlayers(result);
-    } catch (const boost::python::error_already_set& err) {
+    } catch (const boost::python::error_already_set&) {
         success = false;
         m_python_server.HandleErrorAlreadySet();
         if (!m_python_server.IsPythonRunning()) {
@@ -1856,7 +1856,7 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
 
     // test if there other human or disconnected players in the game
     bool other_human_player = false;
-    for (auto& empires : Empires()) {
+    for (auto& empires : m_empires) {
         if (!empires.second->Eliminated() &&
             empire_id != empires.second->EmpireID())
         {
@@ -1874,7 +1874,7 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
         return false;
     }
 
-    Empire* empire = GetEmpire(empire_id);
+    auto empire = m_empires.GetEmpire(empire_id);
     if (!empire) {
         player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_NONPLAYER_CANNOT_CONCEDE"), false));
         return false;
@@ -1888,21 +1888,22 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
     }
 
     // empire elimination
-    empire->Eliminate();
+    empire->Eliminate(m_empires);
+    auto empire_ids = m_empires.EmpireIDs();
 
     // destroy owned ships
     for (auto& obj : m_universe.Objects().find<Ship>(OwnedVisitor(empire_id))) {
         obj->SetOwner(ALL_EMPIRES);
-        m_universe.RecursiveDestroy(obj->ID());
+        m_universe.RecursiveDestroy(obj->ID(), empire_ids);
     }
     // destroy owned buildings
     for (auto& obj : m_universe.Objects().find<Building>(OwnedVisitor(empire_id))) {
         obj->SetOwner(ALL_EMPIRES);
-        m_universe.RecursiveDestroy(obj->ID());
+        m_universe.RecursiveDestroy(obj->ID(), empire_ids);
     }
     // unclaim owned planets
     for (const auto& planet : planets)
-        planet->Reset();
+        planet->Reset(m_universe.Objects());
 
     // Don't wait for turn
     RemoveEmpireTurn(empire_id);
@@ -1930,7 +1931,7 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     int empire_id = ALL_EMPIRES;
     auto delegation = GetPlayerDelegation(player_connection->PlayerName());
     if (GetOptionsDB().Get<bool>("network.server.take-over-ai")) {
-        for (auto& e : Empires()) {
+        for (auto& e : m_empires) {
             if (!e.second->Eliminated() &&
                 GetEmpireClientType(e.first) == Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
             {
@@ -1940,7 +1941,7 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     }
     if (target_empire_id == ALL_EMPIRES) {
         // search empire by player name
-        for (auto& [loop_empire_id, loop_empire] : Empires()) {
+        for (auto& [loop_empire_id, loop_empire] : m_empires) {
             if (loop_empire->PlayerName() == player_connection->PlayerName()) {
                 empire_id = loop_empire_id;
                 empire = loop_empire;
@@ -1949,7 +1950,7 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
         }
         // Assign player to empire if he doesn't have own empire and delegates signle
         if (delegation.size() == 1 && empire == nullptr) {
-            for (auto& [loop_empire_id, loop_empire] : Empires()) {
+            for (auto& [loop_empire_id, loop_empire] : m_empires) {
                 if (loop_empire->PlayerName() == delegation.front()) {
                     empire_id = loop_empire_id;
                     empire = loop_empire;
@@ -1964,7 +1965,7 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     } else {
         // use provided empire and test if it's player himself or one of delegated
         empire_id = target_empire_id;
-        empire = Empires().GetEmpire(target_empire_id);
+        empire = m_empires.GetEmpire(target_empire_id);
         if (!empire)
             return ALL_EMPIRES;
 
@@ -2061,7 +2062,7 @@ std::vector<std::string> ServerApp::GetPlayerDelegation(const std::string& playe
         m_python_server.SetCurrentDir(GetPythonAuthDir());
         // Call the auth provider function get_player_delegation
         success = m_python_server.GetPlayerDelegation(player_name, result);
-    } catch (const boost::python::error_already_set& err) {
+    } catch (const boost::python::error_already_set&) {
         success = false;
         m_python_server.HandleErrorAlreadySet();
         if (!m_python_server.IsPythonRunning()) {
@@ -2132,9 +2133,8 @@ void ServerApp::ClearEmpireTurnOrders() {
             order.second->orders.reset();
         }
     }
-    for (auto& empire : Empires()) {
+    for (auto& empire : m_empires)
         empire.second->AutoTurnSetReady();
-    }
 }
 
 void ServerApp::SetEmpireSaveGameData(int empire_id, std::unique_ptr<PlayerSaveGameData>&& save_game_data)
@@ -2155,7 +2155,7 @@ void ServerApp::UpdatePartialOrders(int empire_id, const OrderSet& added, const 
 }
 
 void ServerApp::RevokeEmpireTurnReadyness(int empire_id) {
-    if (auto* empire = GetEmpire(empire_id))
+    if (auto empire = m_empires.GetEmpire(empire_id))
         empire->SetReady(false);
 }
 
@@ -2166,7 +2166,7 @@ bool ServerApp::AllOrdersReceived() {
     bool all_orders_received = true;
     for (const auto& empire_orders : m_turn_sequence) {
         bool empire_orders_received = true;
-        const auto empire = GetEmpire(empire_orders.first);
+        const auto empire = m_empires.GetEmpire(empire_orders.first);
         if (!empire) {
             ErrorLogger() << " ... invalid empire id in turn sequence: "<< empire_orders.first;
             continue;
@@ -2544,7 +2544,9 @@ namespace {
 
     /** Takes contents of CombatInfo struct and puts it into the universe.
       * Used to store results of combat in main universe. */
-    void DisseminateSystemCombatInfo(const std::vector<CombatInfo>& combats, Universe& universe) {
+    void DisseminateSystemCombatInfo(const std::vector<CombatInfo>& combats, Universe& universe,
+                                     const EmpireManager& empires)
+    {
         // As of this writing, pointers to objects are inserted into the combat
         // ObjectMap, and these pointers still refer to the main gamestate
         // objects. Thus, copying the objects in the main gamestate are already
@@ -2554,6 +2556,8 @@ namespace {
         // gamestate. Standard visibility updating will then transfer the
         // modified objects / combat results to empires' known gamestate
         // ObjectMaps.
+        const auto empire_ids = empires.EmpireIDs();
+
         for (const CombatInfo& combat_info : combats) {
             // update visibilities from combat, in case anything was revealed
             // by shooting during combat
@@ -2596,7 +2600,7 @@ namespace {
             // destroyed
             std::set<int> all_destroyed_object_ids;
             for (int destroyed_object_id : combat_info.destroyed_object_ids) {
-                auto dest_obj_ids = universe.RecursiveDestroy(destroyed_object_id);
+                auto dest_obj_ids = universe.RecursiveDestroy(destroyed_object_id, empire_ids);
                 all_destroyed_object_ids.insert(dest_obj_ids.begin(), dest_obj_ids.end());
             }
 
@@ -2789,8 +2793,11 @@ namespace {
     }
 
     /** Does colonization, with safety checks */
-    bool ColonizePlanet(int ship_id, int planet_id, Universe& universe) {
-        auto& objects = universe.Objects();
+    bool ColonizePlanet(int ship_id, int planet_id, ScriptingContext& context,
+                        const std::vector<int>& empire_ids)
+    {
+        auto& objects = context.ContextObjects();
+        auto& universe = context.ContextUniverse();
 
         auto ship = objects.get<Ship>(ship_id);
         if (!ship) {
@@ -2828,7 +2835,7 @@ namespace {
 
         // colonize planet by calling Planet class Colonize member function
         // do this BEFORE destroying the ship, since species_name is a const reference to Ship::m_species_name
-        if (!planet->Colonize(empire_id, species_name, colonist_capacity)) {
+        if (!planet->Colonize(empire_id, species_name, colonist_capacity, context)) {
             ErrorLogger() << "ColonizePlanet: couldn't colonize planet";
             return false;
         }
@@ -2836,19 +2843,18 @@ namespace {
         auto system = objects.get<System>(ship->SystemID());
 
         // destroy colonizing ship, and its fleet if now empty
-        auto fleet = objects.get<Fleet>(ship->FleetID());
-        if (fleet) {
+        if (auto fleet = objects.get<Fleet>(ship->FleetID())) {
             fleet->RemoveShips({ship->ID()});
             if (fleet->Empty()) {
                 if (system)
                     system->Remove(fleet->ID());
-                universe.Destroy(fleet->ID());
+                universe.Destroy(fleet->ID(), empire_ids);
             }
         }
 
         if (system)
             system->Remove(ship->ID());
-        universe.RecursiveDestroy(ship->ID()); // does not count as a loss of a ship for the species / empire
+        universe.RecursiveDestroy(ship->ID(), empire_ids); // does not count as a loss of a ship for the species / empire
 
         return true;
     }
@@ -2858,6 +2864,7 @@ namespace {
     void HandleColonization(ScriptingContext& context) {
         Universe& universe = context.ContextUniverse();
         ObjectMap& objects = context.ContextObjects();
+        auto empire_ids = context.EmpireIDs();
 
         // collect, for each planet, what ships have been ordered to colonize it
         std::map<int, std::map<int, std::set<int>>> planet_empire_colonization_ship_ids; // map from planet ID to map from empire ID to set of ship IDs
@@ -2952,7 +2959,7 @@ namespace {
 
 
             // do colonization
-            if (!ColonizePlanet(colonizing_ship_id, planet_id, universe))
+            if (!ColonizePlanet(colonizing_ship_id, planet_id, context, empire_ids))
                 continue;   // skip sitrep if colonization failed
 
             // record successful colonization
@@ -2977,6 +2984,7 @@ namespace {
         std::map<int, std::map<int, double>> planet_empire_troops;  // map from planet ID to map from empire ID to pair consisting of set of ship IDs and amount of troops empires have at planet
         std::vector<std::shared_ptr<Ship>> invade_ships;
         ObjectMap& objects = universe.Objects();
+        auto empire_ids = empires.EmpireIDs();
 
         // collect ships that are invading and the troops they carry
         for (auto& ship : objects.all<Ship>()) {
@@ -3017,13 +3025,13 @@ namespace {
                 if (fleet->Empty()) {
                     if (system)
                         system->Remove(fleet->ID());
-                    universe.Destroy(fleet->ID());
+                    universe.Destroy(fleet->ID(), empire_ids);
                 }
             }
             if (system)
                 system->Remove(ship->ID());
 
-            universe.RecursiveDestroy(ship->ID()); // does not count as ship loss for empire/species
+            universe.RecursiveDestroy(ship->ID(), empire_ids); // does not count as ship loss for empire/species
         }
 
         // store invasion info in empires
@@ -3241,6 +3249,7 @@ namespace {
     void HandleScrapping(Universe& universe, EmpireManager& empires) {
         std::vector<std::shared_ptr<Ship>> scrapped_ships;
         ObjectMap& objects{universe.Objects()};
+        auto empire_ids = empires.EmpireIDs();
 
         for (auto& ship : objects.all<Ship>()) {
             if (ship->OrderedScrapped())
@@ -3260,7 +3269,7 @@ namespace {
                 if (fleet->Empty()) {
                     //scrapped_object_ids.push_back(fleet->ID());
                     system->Remove(fleet->ID());
-                    universe.Destroy(fleet->ID());
+                    universe.Destroy(fleet->ID(), empire_ids);
                 }
             }
 
@@ -3270,11 +3279,10 @@ namespace {
                 scrapping_empire->RecordShipScrapped(*ship);
 
             //scrapped_object_ids.push_back(ship->ID());
-            universe.Destroy(ship->ID());
+            universe.Destroy(ship->ID(), empire_ids);
         }
 
         std::vector<std::shared_ptr<Building>> scrapped_buildings;
-
         for (auto& building : objects.all<Building>()) {
             if (building->OrderedScrapped())
                 scrapped_buildings.push_back(building);
@@ -3293,7 +3301,7 @@ namespace {
                 scrapping_empire->RecordBuildingScrapped(*building);
 
             //scrapped_object_ids.push_back(building->ID());
-            universe.Destroy(building->ID());
+            universe.Destroy(building->ID(), empire_ids);
         }
     }
 
@@ -3311,25 +3319,28 @@ namespace {
     }
 
     /** Causes ResourceCenters (Planets) to update their focus records */
-    void UpdateResourceCenterFocusHistoryInfo() {
-        for (auto& planet : GetUniverse().Objects().all<Planet>())
+    void UpdateResourceCenterFocusHistoryInfo(ObjectMap& objects) {
+        for (auto& planet : objects.all<Planet>())
             planet->UpdateFocusHistory();
     }
 
     /** Check validity of adopted policies, overwrite initial adopted
       * policies with those currently adopted, update adopted turns counters. */
-    void UpdateEmpirePolicies(EmpireManager& empires, bool update_cumulative_adoption_time = false) {
+    void UpdateEmpirePolicies(EmpireManager& empires, int current_turn,
+                              bool update_cumulative_adoption_time = false)
+    {
         for ([[maybe_unused]] auto& [empire_id, empire] : empires) {
             (void)empire_id;    // quieting unused variable warning
-            empire->UpdatePolicies(update_cumulative_adoption_time);
+            empire->UpdatePolicies(update_cumulative_adoption_time, current_turn);
         }
     }
 
     /** Deletes empty fleets. */
-    void CleanEmptyFleets() {
+    void CleanEmptyFleets(ScriptingContext& context) {
         std::vector<std::shared_ptr<Fleet>> empty_fleets;
-        Universe& universe{GetUniverse()};
-        ObjectMap& objects{universe.Objects()};
+        Universe& universe{context.ContextUniverse()};
+        ObjectMap& objects{context.ContextObjects()};
+        auto empire_ids = context.EmpireIDs();
 
         for (auto& fleet : objects.all<Fleet>()) {
             if (fleet->Empty())
@@ -3340,7 +3351,7 @@ namespace {
             if (auto sys = objects.get<System>(fleet->SystemID()))
                 sys->Remove(fleet->ID());
 
-            universe.RecursiveDestroy(fleet->ID());
+            universe.RecursiveDestroy(fleet->ID(), empire_ids);
         }
     }
 }
@@ -3380,18 +3391,18 @@ void ServerApp::PreCombatProcessTurns() {
     ClearEmpireTurnOrders();
 
     // update ResourceCenter focus history info
-    UpdateResourceCenterFocusHistoryInfo();
+    UpdateResourceCenterFocusHistoryInfo(context.ContextObjects());
 
     // validate adopted policies, and update Empire Policy history
     // actual policy adoption and influence consumption occurrs during order
     // execution above
-    UpdateEmpirePolicies(m_empires, false);
+    UpdateEmpirePolicies(m_empires, context.current_turn, false);
 
     // clean up empty fleets that empires didn't order deleted
-    CleanEmptyFleets();
+    CleanEmptyFleets(context);
 
     // update production queues after order execution
-    for (auto& entry : Empires()) {
+    for (auto& entry : m_empires) {
         if (entry.second->Eliminated())
             continue;   // skip eliminated empires
         entry.second->UpdateProductionQueue(context);
@@ -3458,7 +3469,7 @@ void ServerApp::PreCombatProcessTurns() {
         for (auto& [empire_id, empire] : m_empires) {
             if (fleet->GetVisibility(empire_id, m_universe) >= Visibility::VIS_BASIC_VISIBILITY)
                 empire->AddSitRepEntry(
-                    CreateFleetArrivedAtDestinationSitRep(fleet->SystemID(), fleet->ID(), empire_id));
+                    CreateFleetArrivedAtDestinationSitRep(fleet->SystemID(), fleet->ID(), empire_id, context));
         }
     }
 
@@ -3512,7 +3523,7 @@ void ServerApp::ProcessCombats() {
 
     UpdateEmpireCombatDestructionInfo(combats, context);
 
-    DisseminateSystemCombatInfo(combats, m_universe);
+    DisseminateSystemCombatInfo(combats, m_universe, m_empires);
     // update visibilities with any new info gleaned during combat
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
     // update stale object info based on any mid- combat glimpses
@@ -3573,10 +3584,11 @@ void ServerApp::UpdateMonsterTravelRestrictions() {
 void ServerApp::PostCombatProcessTurns() {
     ScopedTimer timer("ServerApp::PostCombatProcessTurns");
 
-    ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data, m_species_manager,m_supply_manager};
+    ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data,
+                             m_species_manager, m_supply_manager};
 
     // post-combat visibility update
-    m_universe.UpdateEmpireObjectVisibilities(Empires());
+    m_universe.UpdateEmpireObjectVisibilities(m_empires);
     m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
 
 
@@ -3648,7 +3660,7 @@ void ServerApp::PostCombatProcessTurns() {
         if (empire->Eliminated())
             continue;   // skip eliminated empires
 
-        for (const auto& tech : empire->CheckResearchProgress())
+        for (const auto& tech : empire->CheckResearchProgress(context))
             empire->AddNewlyResearchedTechToGrantAtStartOfNextTurn(tech);
         empire->CheckProductionProgress(context);
         empire->CheckInfluenceProgress();
@@ -3737,7 +3749,7 @@ void ServerApp::PostCombatProcessTurns() {
 
 
     // do another policy update before final meter update to be consistent with what clients calculate...
-    UpdateEmpirePolicies(m_empires, true);
+    UpdateEmpirePolicies(m_empires, context.current_turn, true);
 
 
     TraceLogger(effects) << "ServerApp::PostCombatProcessTurns Before Final Meter Estimate Update: ";
@@ -3814,10 +3826,10 @@ void ServerApp::CheckForEmpireElimination() {
     std::set<std::shared_ptr<Empire>> surviving_empires;
     std::set<std::shared_ptr<Empire>> non_eliminated_non_ai_controlled_empires;
     for (auto& [empire_id, empire] : m_empires) {
-        if (empire->Eliminated())
+        if (empire->Eliminated()) {
             continue;   // don't double-eliminate an empire
-        else if (EmpireEliminated(empire_id, m_universe.Objects())) {
-            empire->Eliminate();
+        } else if (EmpireEliminated(empire_id, m_universe.Objects())) {
+            empire->Eliminate(m_empires);
             RemoveEmpireTurn(empire_id);
             const int player_id = EmpirePlayerID(empire_id);
             DebugLogger() << "ServerApp::CheckForEmpireElimination empire #" << empire_id << " " << empire->Name()
@@ -3844,7 +3856,7 @@ void ServerApp::CheckForEmpireElimination() {
 
     if (surviving_empires.size() == 1) { // last man standing
         auto& only_empire = *surviving_empires.begin();
-        only_empire->Win(UserStringNop("VICTORY_ALL_ENEMIES_ELIMINATED"));
+        only_empire->Win(UserStringNop("VICTORY_ALL_ENEMIES_ELIMINATED"), m_empires.GetEmpires());
     } else if (!m_single_player_game &&
                static_cast<int>(non_eliminated_non_ai_controlled_empires.size()) <= GetGameRules().Get<int>("RULE_THRESHOLD_HUMAN_PLAYER_WIN"))
     {
@@ -3856,19 +3868,19 @@ void ServerApp::CheckForEmpireElimination() {
                 auto emp2_it = emp1_it;
                 ++emp2_it;
                 for (; emp2_it != non_eliminated_non_ai_controlled_empires.end(); ++emp2_it) {
-                    if (Empires().GetDiplomaticStatus((*emp1_it)->EmpireID(), (*emp2_it)->EmpireID()) != DiplomaticStatus::DIPLO_ALLIED)
+                    if (m_empires.GetDiplomaticStatus((*emp1_it)->EmpireID(), (*emp2_it)->EmpireID()) != DiplomaticStatus::DIPLO_ALLIED)
                         return;
                 }
             }
         }
 
         for (auto& empire : non_eliminated_non_ai_controlled_empires)
-            empire->Win(UserStringNop("VICTORY_FEW_HUMANS_ALIVE"));
+            empire->Win(UserStringNop("VICTORY_FEW_HUMANS_ALIVE"), m_empires.GetEmpires());
     }
 }
 
 void ServerApp::HandleDiplomaticStatusChange(int empire1_id, int empire2_id) {
-    DiplomaticStatus status = Empires().GetDiplomaticStatus(empire1_id, empire2_id);
+    DiplomaticStatus status = m_empires.GetDiplomaticStatus(empire1_id, empire2_id);
     DiplomaticStatusUpdateInfo update(empire1_id, empire2_id, status);
 
     for (auto player_it = m_networking.established_begin();
@@ -3880,7 +3892,7 @@ void ServerApp::HandleDiplomaticStatusChange(int empire1_id, int empire2_id) {
 }
 
 void ServerApp::HandleDiplomaticMessageChange(int empire1_id, int empire2_id) {
-    const DiplomaticMessage& message = Empires().GetDiplomaticMessage(empire1_id, empire2_id);
+    const DiplomaticMessage& message = m_empires.GetDiplomaticMessage(empire1_id, empire2_id);
     // get players corresponding to empires in message
     int player1_id = EmpirePlayerID(empire1_id);
     int player2_id = EmpirePlayerID(empire2_id);

@@ -44,7 +44,7 @@ FO_COMMON_API const std::string& TextForGalaxyShape(Shape shape);
 
 //! General-use option for galaxy setup picks with "more" or "less" options.
 FO_ENUM(
-    (GalaxySetupOption),
+    (GalaxySetupOptionGeneric),
     ((INVALID_GALAXY_SETUP_OPTION, -1))
     ((GALAXY_SETUP_NONE))
     ((GALAXY_SETUP_LOW))
@@ -53,10 +53,26 @@ FO_ENUM(
     ((GALAXY_SETUP_RANDOM))
     ((NUM_GALAXY_SETUP_OPTIONS))
 )
+//! Returns a user readable string for a GalaxySetupOptionGeneric
+FO_COMMON_API const std::string& TextForGalaxySetupSetting(GalaxySetupOptionGeneric gso);
 
-//! Returns a user readable string for a GalaxySetupOption
-FO_COMMON_API const std::string& TextForGalaxySetupSetting(GalaxySetupOption gso);
-
+//! Specific-use option for galaxy setup monster picks
+FO_ENUM(
+    (GalaxySetupOptionMonsterFreq),
+    ((INVALID_MONSTER_SETUP_OPTION, -1))
+    ((MONSTER_SETUP_NONE))
+    ((MONSTER_SETUP_EXTREMELY_LOW))
+    ((MONSTER_SETUP_VERY_LOW))
+    ((MONSTER_SETUP_LOW))
+    ((MONSTER_SETUP_MEDIUM))
+    ((MONSTER_SETUP_HIGH))
+    ((MONSTER_SETUP_VERY_HIGH))
+    ((MONSTER_SETUP_EXTREMELY_HIGH))
+    ((MONSTER_SETUP_RANDOM))
+    ((NUM_GALAXY_SETUP_OPTION_MONSTER_FREQS))
+)
+//! Returns a user readable string for a GalaxySetupOptionGeneric
+FO_COMMON_API const std::string& TextForGalaxySetupSetting(GalaxySetupOptionMonsterFreq gso);
 
 //! Levels of AI Aggression during galaxy generation
 FO_ENUM(
@@ -81,38 +97,38 @@ struct FO_COMMON_API GalaxySetupData {
     GalaxySetupData(const GalaxySetupData&) = default;
     GalaxySetupData(GalaxySetupData&& base);
 
-    const std::string&  GetSeed() const;
-    int                 GetSize() const;
-    Shape               GetShape() const;
-    GalaxySetupOption   GetAge() const;
-    GalaxySetupOption   GetStarlaneFreq() const;
-    GalaxySetupOption   GetPlanetDensity() const;
-    GalaxySetupOption   GetSpecialsFreq() const;
-    GalaxySetupOption   GetMonsterFreq() const;
-    GalaxySetupOption   GetNativeFreq() const;
-    Aggression          GetAggression() const;
-    const std::map<std::string, std::string>&
-                        GetGameRules() const;
-    const std::string&  GetGameUID() const;
+    const std::string&           GetSeed() const;
+    int                          GetSize() const;
+    Shape                        GetShape() const;
+    GalaxySetupOptionGeneric     GetAge() const;
+    GalaxySetupOptionGeneric     GetStarlaneFreq() const;
+    GalaxySetupOptionGeneric     GetPlanetDensity() const;
+    GalaxySetupOptionGeneric     GetSpecialsFreq() const;
+    GalaxySetupOptionMonsterFreq GetMonsterFreq() const;
+    GalaxySetupOptionGeneric     GetNativeFreq() const;
+    Aggression                   GetAggression() const;
+    
+    const std::map<std::string, std::string>& GetGameRules() const;
+    const std::string&                        GetGameUID() const;
 
     void                SetSeed(const std::string& seed);
     void                SetGameUID(const std::string& game_uid);
 
     GalaxySetupData& operator=(const GalaxySetupData&) = default;
 
-    std::string         seed;
-    int                 size = 100;
-    Shape               shape = Shape::SPIRAL_2;
-    GalaxySetupOption   age = GalaxySetupOption::GALAXY_SETUP_MEDIUM;
-    GalaxySetupOption   starlane_freq = GalaxySetupOption::GALAXY_SETUP_MEDIUM;
-    GalaxySetupOption   planet_density = GalaxySetupOption::GALAXY_SETUP_MEDIUM;
-    GalaxySetupOption   specials_freq = GalaxySetupOption::GALAXY_SETUP_MEDIUM;
-    GalaxySetupOption   monster_freq = GalaxySetupOption::GALAXY_SETUP_MEDIUM;
-    GalaxySetupOption   native_freq = GalaxySetupOption::GALAXY_SETUP_MEDIUM;
-    Aggression          ai_aggr = Aggression::MANIACAL;
-    std::map<std::string, std::string>
-                        game_rules;
-    std::string         game_uid;
+    std::string                  seed;
+    int                          size = 100;
+    Shape                        shape = Shape::SPIRAL_2;
+    GalaxySetupOptionGeneric     age = GalaxySetupOptionGeneric::GALAXY_SETUP_MEDIUM;
+    GalaxySetupOptionGeneric     starlane_freq = GalaxySetupOptionGeneric::GALAXY_SETUP_MEDIUM;
+    GalaxySetupOptionGeneric     planet_density = GalaxySetupOptionGeneric::GALAXY_SETUP_MEDIUM;
+    GalaxySetupOptionGeneric     specials_freq = GalaxySetupOptionGeneric::GALAXY_SETUP_MEDIUM;
+    GalaxySetupOptionMonsterFreq monster_freq = GalaxySetupOptionMonsterFreq::MONSTER_SETUP_MEDIUM;
+    GalaxySetupOptionGeneric     native_freq = GalaxySetupOptionGeneric::GALAXY_SETUP_MEDIUM;
+    Aggression                   ai_aggr = Aggression::MANIACAL;
+    
+    std::map<std::string, std::string>  game_rules;
+    std::string                         game_uid;
 
     /** HACK! This must be set to the encoding empire's id when serializing a
       * GalaxySetupData, so that only the relevant parts of the galaxy data are
@@ -141,6 +157,18 @@ struct FO_COMMON_API SaveGameUIData {
 
 /** The data for one empire necessary for game-setup during multiplayer loading. */
 struct FO_COMMON_API SaveGameEmpireData {
+    SaveGameEmpireData() = default;
+    SaveGameEmpireData(int id, std::string ename, std::string pname,
+                       std::array<unsigned char, 4> c, bool a, bool e, bool w) :
+        empire_id(id),
+        empire_name(std::move(ename)),
+        player_name(std::move(pname)),
+        color(c),
+        authenticated(a),
+        eliminated(e),
+        won(w)
+    {}
+
     int         empire_id = ALL_EMPIRES;
     std::string empire_name;
     std::string player_name;
@@ -194,9 +222,9 @@ struct PlayerSetupData {
     //! When loading a game, the ID of the empire that this player will control
     int                     save_game_empire_id = ALL_EMPIRES;
     Networking::ClientType  client_type = Networking::ClientType::INVALID_CLIENT_TYPE;
+    int                     starting_team = Networking::NO_TEAM_ID;
     bool                    player_ready = false;
     bool                    authenticated = false;
-    int                     starting_team = Networking::NO_TEAM_ID;
 };
 
 bool FO_COMMON_API operator==(const PlayerSetupData& lhs, const PlayerSetupData& rhs);

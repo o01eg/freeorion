@@ -464,3 +464,45 @@ CREATE TABLE auth.reset_tokens (
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON auth.reset_tokens TO freeorion;
 ```
+
+# Check permanent password
+
+```sql
+DROP FUNCTION auth.check_otp(player_name_param CITEXT, otp CHAR(6), game_uid_param VARCHAR(20));
+
+CREATE FUNCTION auth.check_otp(player_name_param CITEXT, otp CHAR(6), game_uid_param VARCHAR(20))
+RETURNS TABLE (
+ authenticated BOOLEAN,
+ client_type auth.client_types) AS
+$$
+ BEGIN
+  CREATE TEMP TABLE tmp_cnts ON COMMIT DROP AS
+  WITH hashed_otp AS (DELETE FROM auth.otp WHERE otp.player_name = player_name_param RETURNING otp.otp)
+  SELECT (TABLE hashed_otp) IS NOT NULL AND (TABLE hashed_otp) = crypt(otp, (TABLE hashed_otp))
+    OR u.game_password = crypt(otp, u.game_password)
+  FROM auth.users u WHERE u.player_name = player_name_param;
+
+  RETURN QUERY SELECT t.*, p.client_type
+  FROM tmp_cnts t
+  CROSS JOIN games.players p
+  WHERE p.player_name = player_name_param
+  AND p.game_uid = game_uid_param;
+ END
+$$ LANGUAGE plpgsql;
+```
+
+# Check permanent password without game uid
+
+```sql
+DROP FUNCTION auth.check_otp(player_name_param CITEXT, otp CHAR(6));
+
+CREATE FUNCTION auth.check_otp(player_name_param CITEXT, otp CHAR(6))
+RETURNS BOOLEAN AS
+$$
+  WITH hashed_otp AS (DELETE FROM auth.otp WHERE otp.player_name = player_name_param RETURNING otp.otp)
+  SELECT (TABLE hashed_otp) IS NOT NULL AND (TABLE hashed_otp) = crypt(otp, (TABLE hashed_otp))
+    OR u.game_password = crypt(otp, u.game_password)
+  FROM auth.users u WHERE u.player_name = player_name_param;
+$$ LANGUAGE sql VOLATILE;
+```
+

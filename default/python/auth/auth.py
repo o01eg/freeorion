@@ -66,6 +66,29 @@ class AuthProvider:
 
     def is_require_auth_or_return_roles(self, player_name):
         """Returns True if player should be authenticated or list of roles for anonymous players"""
+        # check if otp needed
+        have_password = False
+        have_user = False
+        try:
+            with self.conn:
+                with self.conn.cursor() as curs:
+                    curs.execute(
+                        """ SELECT game_password IS NOT NULL FROM auth.users WHERE player_name = %s """,
+                        (player_name,),
+                    )
+                    for r in curs:
+                        have_password = not not r[0]
+                        have_user = True
+        except psycopg2.InterfaceError:
+            self.conn = psycopg2.connect(self.dsn)
+            exctype, value = sys.exc_info()[:2]
+            error("Cann't check player %s: %s %s" % (player_name, exctype, value))
+
+        if not have_user:
+            return self.default_roles
+        elif have_password:
+            return True
+
         otp = "%0.5d" % random.randint(999, 99999)
         known_login = False
         try:

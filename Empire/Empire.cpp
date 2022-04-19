@@ -317,6 +317,13 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     PoliciesChangedSignal();
 }
 
+void Empire::RevertPolicies() {
+    if (m_adopted_policies != m_initial_adopted_policies) {
+        m_adopted_policies = m_initial_adopted_policies;
+        PoliciesChangedSignal();
+    }
+}
+
 void Empire::UpdatePolicies(bool update_cumulative_adoption_time, int current_turn) {
     // TODO: Check and handle policy exclusions in this function...
 
@@ -415,6 +422,14 @@ std::vector<std::string_view> Empire::AdoptedPolicies() const {
     return retval;
 }
 
+std::vector<std::string_view> Empire::InitialAdoptedPolicies() const {
+    std::vector<std::string_view> retval;
+    retval.reserve(m_initial_adopted_policies.size());
+    for (const auto& entry : m_initial_adopted_policies)
+        retval.push_back(entry.first);
+    return retval;
+}
+
 std::map<std::string_view, std::map<int, std::string_view>>
 Empire::CategoriesSlotsPoliciesAdopted() const {
     std::map<std::string_view, std::map<int, std::string_view>> retval;
@@ -448,7 +463,7 @@ bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name, int current_tur
     if (!policy_to_adopt)
         return false;
 
-    // is there an exclusion or prerequisite conflict?
+    // is there an exclusion conflict?
     for (auto& [already_adopted_policy_name, ignored] : m_adopted_policies) {
         (void)ignored; // quiet warning
         if (policy_to_adopt->Exclusions().count(already_adopted_policy_name)) {
@@ -467,13 +482,10 @@ bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name, int current_tur
         }
     }
 
+    // are there any unmet prerequisites (with the initial adopted policies this turn)
     for (const auto& prereq : policy_to_adopt->Prerequisites()) {
-        auto it = m_adopted_policies.find(prereq);
-        if (it == m_adopted_policies.end())
-            return false;
-        // must have adopted policy at least one turn before, to prevent
-        // same-turn policy swapping to bypass prereqs at no cost
-        if (it->second.adoption_turn >= current_turn)
+        auto it = m_initial_adopted_policies.find(prereq);
+        if (it == m_initial_adopted_policies.end() || it->second.adoption_turn >= current_turn)
             return false;
     }
 
@@ -2126,8 +2138,8 @@ std::vector<std::string> Empire::CheckResearchProgress(const ScriptingContext& c
         float progress_fraction = m_research_progress[tech_name];
 
         float progress_fraction_left = 1.0f - progress_fraction;
-        float max_progress_per_turn = RPs_per_turn_limit / tech_cost;
-        float progress_possible_with_available_rp = rp_left_to_spend / tech_cost;
+        float max_progress_per_turn = RPs_per_turn_limit / static_cast<float>(tech_cost);
+        float progress_possible_with_available_rp = rp_left_to_spend / static_cast<float>(tech_cost);
 
         //DebugLogger() << "... progress left: " << progress_fraction_left
         //              << " max per turn: " << max_progress_per_turn
@@ -2137,7 +2149,7 @@ std::vector<std::string> Empire::CheckResearchProgress(const ScriptingContext& c
             progress_fraction_left,
             std::min(max_progress_per_turn, progress_possible_with_available_rp));
 
-        float consumed_rp = progress_increase * tech_cost;
+        float consumed_rp = progress_increase * static_cast<float>(tech_cost);
 
         m_research_progress[tech_name] += progress_increase;
         rp_left_to_spend -= consumed_rp;

@@ -2092,12 +2092,13 @@ const boost::circular_buffer<ChatHistoryEntity>& ServerApp::GetChatHistory() con
 
 std::vector<PlayerSaveGameData> ServerApp::GetPlayerSaveGameData() const {
     std::vector<PlayerSaveGameData> player_save_game_data;
-    for (const auto& m_save_data : m_turn_sequence) {
-        DebugLogger() << "ServerApp::GetPlayerSaveGameData() Empire " << m_save_data.first
-                      << " save_game_data " << m_save_data.second.get();
-        if (m_save_data.second) {
-            player_save_game_data.push_back(*m_save_data.second);
-        }
+    for (const auto& [empire_id, save_data] : m_turn_sequence) {
+        DebugLogger() << "ServerApp::GetPlayerSaveGameData() Empire " << empire_id
+                      << " type: " << boost::lexical_cast<std::string>(save_data->client_type)
+                      << " save_game_data state string size: " << save_data->save_state_string.size()
+                      << " UI data?: " << save_data->ui_data;
+        if (save_data)
+            player_save_game_data.push_back(*save_data);
     }
     return player_save_game_data;
 }
@@ -2126,28 +2127,33 @@ void ServerApp::RemoveEmpireTurn(int empire_id)
 { m_turn_sequence.erase(empire_id); }
 
 void ServerApp::ClearEmpireTurnOrders() {
-    for (auto& order : m_turn_sequence) {
-        if (order.second) {
+    for (auto& [empire_id, save_data] : m_turn_sequence) {
+        (void)empire_id;
+        if (save_data) {
             // reset only orders
             // left UI data and AI state intact
-            order.second->orders.reset();
+            save_data->orders.reset();
         }
     }
-    for (auto& empire : m_empires)
-        empire.second->AutoTurnSetReady();
+    for (auto& [empire_id, empire] : m_empires) {
+        (void)empire_id;
+        empire->AutoTurnSetReady();
+    }
 }
 
 void ServerApp::SetEmpireSaveGameData(int empire_id, std::unique_ptr<PlayerSaveGameData>&& save_game_data)
 { m_turn_sequence[empire_id] = std::move(save_game_data); }
 
-void ServerApp::UpdatePartialOrders(int empire_id, const OrderSet& added, const std::set<int>& deleted) {
+void ServerApp::UpdatePartialOrders(int empire_id, const OrderSet& added,
+                                    const std::set<int>& deleted)
+{
     const auto& psgd = m_turn_sequence[empire_id];
     if (psgd) {
         if (psgd->orders) {
-            for (int id : deleted)
-                 psgd->orders->erase(id);
-            for (auto it : added)
-                 psgd->orders->insert(it);
+            for (int del_id : deleted)
+                 psgd->orders->erase(del_id);
+            for (auto& add_set : added)
+                 psgd->orders->insert(add_set);
         } else {
             psgd->orders = std::make_shared<OrderSet>(added);
         }
@@ -2164,32 +2170,32 @@ bool ServerApp::AllOrdersReceived() {
     DebugLogger() << "ServerApp::AllOrdersReceived for turn: " << m_current_turn
                   << (m_turn_expired ? " (expired)" : "");
     bool all_orders_received = true;
-    for (const auto& empire_orders : m_turn_sequence) {
+    for (const auto& [empire_id, save_data] : m_turn_sequence) {
         bool empire_orders_received = true;
-        const auto empire = m_empires.GetEmpire(empire_orders.first);
+        const auto empire = m_empires.GetEmpire(empire_id);
         if (!empire) {
-            ErrorLogger() << " ... invalid empire id in turn sequence: "<< empire_orders.first;
+            ErrorLogger() << " ... invalid empire id in turn sequence: "<< empire_id;
             continue;
         } else if (empire->Eliminated()) {
-            ErrorLogger() << " ... eliminated empire in turn sequence: " << empire_orders.first;
+            ErrorLogger() << " ... eliminated empire in turn sequence: " << empire_id;
             continue;
         } else if (!empire->Ready()) {
-            DebugLogger() << " ... not ready empire id: " << empire_orders.first;
+            DebugLogger() << " ... not ready empire id: " << empire_id;
             empire_orders_received = false;
-        } else if (!empire_orders.second) {
-            DebugLogger() << " ... no orders from empire id: " << empire_orders.first;
+        } else if (!save_data) {
+            DebugLogger() << " ... no orders from empire id: " << empire_id;
             empire_orders_received = false;
-        } else if (!empire_orders.second->orders) {
-            DebugLogger() << " ... no orders from empire id: " << empire_orders.first;
+        } else if (!save_data->orders) {
+            DebugLogger() << " ... no orders from empire id: " << empire_id;
             empire_orders_received = false;
         } else {
-            DebugLogger() << " ... have orders from empire id: " << empire_orders.first;
+            DebugLogger() << " ... have orders from empire id: " << empire_id;
         }
         if (!empire_orders_received) {
-            if (GetEmpireClientType(empire_orders.first) != Networking::ClientType::CLIENT_TYPE_AI_PLAYER
+            if (GetEmpireClientType(empire_id) != Networking::ClientType::CLIENT_TYPE_AI_PLAYER
                 && m_turn_expired)
             {
-                DebugLogger() << " ...... turn expired for empire id: " << empire_orders.first;
+                DebugLogger() << " ...... turn expired for empire id: " << empire_id;
             } else {
                 all_orders_received = false;
             }
@@ -2515,19 +2521,17 @@ namespace {
 
     /** Clears and refills \a combats with CombatInfo structs for
       * every system where a combat should occur this turn. */
-    std::vector<CombatInfo> AssembleSystemCombatInfo(
-        Universe& universe, EmpireManager& empires, const GalaxySetupData& setup_data,
-        SpeciesManager& species, const SupplyManager& supply)
-    {
+    std::vector<CombatInfo> AssembleSystemCombatInfo(ScriptingContext& context) {
         std::vector<CombatInfo> combats;
-        combats.reserve(universe.Objects().size());
+        combats.reserve(context.ContextObjects().size());
         // for each system, find if a combat will occur in it, and if so, assemble
         // necessary information about that combat in combats
-        const ScriptingContext context{universe, empires, setup_data, species, supply};
-        for (const auto& sys : universe.Objects().all<System>()) {
+        for (const auto& sys : context.ContextObjects().all<System>()) {
             if (CombatConditionsInSystem(sys->ID(), context))
-                combats.emplace_back(sys->ID(), CurrentTurn(), universe,
-                                     empires, setup_data, species, supply);
+                combats.emplace_back(sys->ID(), context.current_turn, context.ContextUniverse(),
+                                     context.Empires(), context.diplo_statuses,
+                                     context.galaxy_setup_data, context.species,
+                                     context.supply);
         }
         return combats;
     }
@@ -2537,7 +2541,7 @@ namespace {
       * updating after combat. */
     void BackProjectSystemCombatInfoObjectMeters(std::vector<CombatInfo>& combats) {
         for (CombatInfo& combat : combats) {
-            for (const auto& object : combat.objects->all())
+            for (const auto& object : combat.objects.all())
                 object->BackPropagateMeters();
         }
     }
@@ -2633,23 +2637,18 @@ namespace {
     }
 
     /** Creates sitreps for all empires involved in a combat. */
-    void CreateCombatSitReps(const std::vector<CombatInfo>& combats) {
+    void CreateCombatSitReps(std::vector<CombatInfo>& combats) {
         CombatLogManager& log_manager = GetCombatLogManager();
 
-        for (const CombatInfo& combat_info : combats) {
-            auto& empires = combat_info.empires;
-            if (!combat_info.objects) {
-                ErrorLogger() << "CreateCombatSitReps CombatInfo has null objects?!";
-                continue;
-            }
-            const ObjectMap& objects{*combat_info.objects};
+        for (CombatInfo& combat_info : combats) {
+            const ObjectMap& objects{combat_info.objects};
 
             // add combat log entry
-            int log_id = log_manager.AddNewLog(CombatLog(combat_info));
+            int log_id = log_manager.AddNewLog(CombatLog{combat_info});
 
             // basic "combat occured" sitreps
             for (int empire_id : combat_info.empire_ids) {
-                if (auto empire{empires.GetEmpire(empire_id)})
+                if (auto empire{combat_info.GetEmpire(empire_id)})
                     empire->AddSitRepEntry(CreateCombatSitRep(
                         combat_info.system_id, log_id, EnemyId(empire_id, combat_info.empire_ids)));
             }
@@ -2658,7 +2657,7 @@ namespace {
             for (auto& [knowing_empire_id, known_destroyed_object_ids] :
                  combat_info.destroyed_object_knowers)
             {
-                if (auto empire{empires.GetEmpire(knowing_empire_id)}) {
+                if (auto empire{combat_info.GetEmpire(knowing_empire_id)}) {
                     for (int dest_obj_id : known_destroyed_object_ids) {
                         empire->AddSitRepEntry(CreateCombatDestroyedObjectSitRep(
                             dest_obj_id, combat_info.system_id, knowing_empire_id, combat_info.turn));
@@ -2684,7 +2683,7 @@ namespace {
                     if (damaged_obj_it->second < Visibility::VIS_BASIC_VISIBILITY)
                         continue;
 
-                    if (auto empire = empires.GetEmpire(viewing_empire_id))
+                    if (auto empire = combat_info.GetEmpire(viewing_empire_id))
                         empire->AddSitRepEntry(CreateCombatDamagedObjectSitRep(
                             damaged_object_id, combat_info.system_id, viewing_empire_id,
                             objects, combat_info.turn));
@@ -2719,10 +2718,12 @@ namespace {
     }
 
     /** Records info in Empires about what they destroyed or had destroyed during combat. */
-    void UpdateEmpireCombatDestructionInfo(const std::vector<CombatInfo>& combats, ScriptingContext& context) {
-        const ObjectMap& objects = context.ContextObjects();
-
+    void UpdateEmpireCombatDestructionInfo(const std::vector<CombatInfo>& combats,
+                                           ScriptingContext& context)
+    {
         for (const CombatInfo& combat_info : combats) {
+            const auto& combat_objects = combat_info.objects;
+
             std::vector<WeaponFireEvent::ConstWeaponFireEventPtr> events_that_killed;
             for (auto& event : FlattenEvents(combat_info.combat_events)) { // TODO: could do the filtering in the call function and avoid some moves later...
                 auto fire_event = std::dynamic_pointer_cast<const WeaponFireEvent>(std::move(event));
@@ -2743,21 +2744,26 @@ namespace {
             std::unordered_map<int, int> empire_destroyed_ship_ids;
 
             for (const auto& attack_event : events_that_killed) {
-                auto attacker = objects.get(attack_event->attacker_id);
+                auto attacker = combat_objects.get(attack_event->attacker_id);
                 if (!attacker)
                     continue;
                 int attacker_empire_id = attacker->Owner();
                 auto attacker_empire = context.GetEmpire(attacker_empire_id);
 
-                auto target_ship = objects.get<Ship>(attack_event->target_id);
+                auto target_ship = combat_objects.get<Ship>(attack_event->target_id);
                 if (!target_ship)
                     continue;
-                auto target_empire = context.GetEmpire(target_ship->Owner());
+                int target_empire_id = target_ship->Owner();
+                auto target_empire = context.GetEmpire(target_empire_id);
 
-                DebugLogger() << "Attacker " << attacker->Name() << " (id: " << attacker->ID()
-                              << "  empire: " << attacker_empire_id << ")  attacks "
-                              << target_ship->Name() << " (id: " << target_ship->ID() << "  empire: "
-                              << (target_empire ? std::to_string(target_empire->EmpireID()) : "(unowned)")
+                auto attacker_object_type = attacker->ObjectType();
+
+                DebugLogger() << "Attacker " << to_string(attacker_object_type)
+                              << " " << attacker->Name() << " (id: " << attacker->ID()
+                              << "  empire: " << std::to_string(attacker_empire_id)
+                              << ")  attacks " << target_ship->Name()
+                              << " (id: " << target_ship->ID()
+                              << "  empire: " << std::to_string(target_empire_id)
                               << "  species: " << target_ship->SpeciesName() << ")";
 
                 if (attacker_empire)
@@ -3503,8 +3509,7 @@ void ServerApp::ProcessCombats() {
 
     // collect data about locations where combat is to occur:
     // map from system ID to CombatInfo for that system
-    auto combats = AssembleSystemCombatInfo(m_universe, m_empires, m_galaxy_setup_data,
-                                            m_species_manager, m_supply_manager);
+    auto combats = AssembleSystemCombatInfo(context);
 
     // loop through assembled combat infos, handling each combat to update the
     // various systems' CombatInfo structs
@@ -3514,7 +3519,7 @@ void ServerApp::ProcessCombats() {
             combat_system->SetLastTurnBattleHere(CurrentTurn());
 
         DebugLogger(combat) << "Processing combat at " << (combat_system ? combat_system->Name() : "(No System id: " + std::to_string(combat_info.system_id) + ")");
-        TraceLogger(combat) << combat_info.objects->Dump();
+        TraceLogger(combat) << combat_info.objects.Dump();
 
         AutoResolveCombat(combat_info);
     }

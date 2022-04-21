@@ -506,3 +506,9 @@ $$
 $$ LANGUAGE sql VOLATILE;
 ```
 
+# Add some notes to add in RSS
+
+```sql
+ALTER TABLE games.games ADD COLUMN notes_html VARCHAR(4096) NULL;
+```
+

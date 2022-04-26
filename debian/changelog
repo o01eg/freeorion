@@ -1,3 +1,9 @@
+freeorion (0.4.10.9999.fo0020+git20220424.f9e776bppa1~focal) focal; urgency=medium
+
+  * FO0020
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Tue, 26 Apr 2022 22:09:41 +0300
+
 freeorion (0.4.10.9999.fo0019+git20220118.580d50dppa1~focal) focal; urgency=medium
 
   * FO0019

@@ -54,13 +54,13 @@ namespace {
             default_columns_widths.emplace_back("", 8*12);  // arbitrary default width
 
         for (unsigned int i = 0; i < default_columns_widths.size(); ++i) {
-            db.Add<std::string>("ui.objects.columns.c" + std::to_string(i) + ".stringkey",
-                                UserStringNop("OPTIONS_DB_OBJECTS_LIST_COLUMN_INFO"),
-                                default_columns_widths[i].first);
-            db.Add<int>("ui.objects.columns.c" + std::to_string(i) + ".width",
-                        UserStringNop("OPTIONS_DB_OBJECTS_LIST_COLUMN_WIDTH"),
-                        default_columns_widths[i].second,
-                        RangedValidator<int>(1, 200));
+            db.Add("ui.objects.columns.c" + std::to_string(i) + ".stringkey",
+                   UserStringNop("OPTIONS_DB_OBJECTS_LIST_COLUMN_INFO"),
+                   default_columns_widths[i].first);
+            db.Add("ui.objects.columns.c" + std::to_string(i) + ".width",
+                   UserStringNop("OPTIONS_DB_OBJECTS_LIST_COLUMN_WIDTH"),
+                   default_columns_widths[i].second,
+                   RangedValidator<int>(1, 200));
         }
     }
     bool temp_bool = RegisterOptions(&AddOptions);
@@ -371,7 +371,7 @@ namespace {
 
     constexpr int DATA_PANEL_BORDER = 1;
 
-    enum class VIS_DISPLAY : int { SHOW_VISIBLE, SHOW_PREVIOUSLY_VISIBLE, SHOW_DESTROYED };
+    enum class VIS_DISPLAY : char { SHOW_VISIBLE, SHOW_PREVIOUSLY_VISIBLE, SHOW_DESTROYED };
 
     const std::string EMPTY_STRING;
     const std::string ALL_CONDITION(UserStringNop("CONDITION_ALL"));
@@ -853,7 +853,7 @@ private:
             return;
         const std::string& condition_key = condition_row->GetKey();
 
-        constexpr GG::X PAD{3};
+        static constexpr GG::X PAD{3};
         GG::X param_widget_left = DropListWidth() + PAD;
         GG::Y param_widget_top = GG::Y0;
 
@@ -1957,9 +1957,6 @@ public:
             boost::bind(&ObjectListBox::UniverseObjectDeleted, this, boost::placeholders::_1));
     }
 
-    virtual ~ObjectListBox()
-    {}
-
     void PreRender() override {
         CUIListBox::PreRender();
         const GG::Pt row_size = ListRowSize();
@@ -2028,9 +2025,7 @@ public:
 
     void ClearContents() {
         Clear();
-        for (auto& entry : m_object_change_connections)
-            entry.second.disconnect();
-        m_object_change_connections.clear();
+        m_object_change_connections.clear(); // should disconnect scoped connections
     }
 
     bool ObjectShown(const std::shared_ptr<const UniverseObject>& obj,
@@ -2403,7 +2398,6 @@ private:
         }
 
         // erase this row and remove any signals related to it
-        m_object_change_connections[object_row->ObjectID()].disconnect();
         m_object_change_connections.erase(object_row->ObjectID());
         this->Erase(it);
     }
@@ -2433,15 +2427,15 @@ private:
             Refresh();
     }
 
-    void UniverseObjectDeleted(std::shared_ptr<const UniverseObject> obj)
+    void UniverseObjectDeleted(const std::shared_ptr<const UniverseObject>& obj)
     { if (obj) RemoveObjectRow(obj->ID()); }
 
-    std::map<int, boost::signals2::connection>          m_object_change_connections;
+    std::map<int, boost::signals2::scoped_connection>   m_object_change_connections;
     std::set<int>                                       m_collapsed_objects;
     std::unique_ptr<Condition::Condition>               m_filter_condition;
     std::map<UniverseObjectType, std::set<VIS_DISPLAY>> m_visibilities;
     std::shared_ptr<ObjectHeaderRow>                    m_header_row;
-    boost::signals2::connection                         m_obj_deleted_connection;
+    boost::signals2::scoped_connection                  m_obj_deleted_connection;
 };
 
 ////////////////////////////////////////////////
@@ -2619,9 +2613,9 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
     if (!obj)
         return;
 
-    constexpr int MENUITEM_SET_FOCUS_BASE = 20;
-    constexpr int MENUITEM_SET_SHIP_BASE = 50;
-    constexpr int MENUITEM_SET_BUILDING_BASE = 250;
+    static constexpr int MENUITEM_SET_FOCUS_BASE = 20;
+    static constexpr int MENUITEM_SET_SHIP_BASE = 50;
+    static constexpr int MENUITEM_SET_BUILDING_BASE = 250;
     int menuitem_id = MENUITEM_SET_FOCUS_BASE;
     int ship_menuitem_id = MENUITEM_SET_SHIP_BASE;
     int bld_menuitem_id = MENUITEM_SET_BUILDING_BASE;

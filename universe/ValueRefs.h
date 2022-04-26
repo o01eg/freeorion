@@ -68,15 +68,6 @@ private:
     std::string m_top_level_content;    // in the special case that T is std::string and m_value is "CurrentContent", return this instead
 };
 
-enum class ReferenceType : int {
-    INVALID_REFERENCE_TYPE = -1,
-    NON_OBJECT_REFERENCE,               // ValueRef::Variable is not evalulated on any specific object
-    SOURCE_REFERENCE,                   // ValueRef::Variable is evaluated on the source object
-    EFFECT_TARGET_REFERENCE,            // ValueRef::Variable is evaluated on the target object of an effect while it is being executed
-    EFFECT_TARGET_VALUE_REFERENCE,      // ValueRef::Variable is evaluated on the target object value of an effect while it is being executed
-    CONDITION_LOCAL_CANDIDATE_REFERENCE,// ValueRef::Variable is evaluated on an object that is a candidate to be matched by a condition.  In a subcondition, this will reference the local candidate, and not the candidate of an enclosing condition.
-    CONDITION_ROOT_CANDIDATE_REFERENCE  // ValueRef::Variable is evaluated on an object that is a candidate to be matched by a condition.  In a subcondition, this will still reference the root candidate, and not the candidate of the local condition.
-};
 
 /** The variable value ValueRef class.  The value returned by this node is
   * taken from the gamestate, most often from the Source or Target objects. */
@@ -109,7 +100,7 @@ struct FO_COMMON_API Variable : public ValueRef<T>
     [[nodiscard]] T Eval(const ScriptingContext& context) const override;
     [[nodiscard]] std::string Description() const override;
     [[nodiscard]] std::string Dump(unsigned short ntabs = 0) const override;
-    [[nodiscard]] ReferenceType GetReferenceType() const noexcept { return m_ref_type; }
+    [[nodiscard]] ReferenceType GetReferenceType() const noexcept override { return m_ref_type; }
     [[nodiscard]] const std::vector<std::string>& PropertyName() const noexcept { return m_property_name; }
     [[nodiscard]] bool ReturnImmediateValue() const noexcept { return m_return_immediate_value; }
 
@@ -345,7 +336,7 @@ private:
 
 /** Returns the in-game name of the object / empire / etc. with a specified id. */
 struct FO_COMMON_API NameLookup final : public Variable<std::string> {
-    enum class LookupType : int {
+    enum class LookupType : signed char {
         INVALID_LOOKUP = -1,
         OBJECT_NAME,
         EMPIRE_NAME,
@@ -377,7 +368,7 @@ private:
     LookupType m_lookup_type;
 };
 
-enum class OpType : int {
+enum class OpType : char {
     PLUS,
     MINUS,
     TIMES,
@@ -432,6 +423,8 @@ struct FO_COMMON_API Operation final : public ValueRef<T>
     [[nodiscard]] std::string Description() const override;
     [[nodiscard]] std::string Dump(unsigned short ntabs = 0) const override;
     [[nodiscard]] OpType      GetOpType() const;
+
+    [[nodiscard]] static T    EvalImpl(OpType op_type, T lhs, T rhs);
 
     [[nodiscard]] const ValueRef<T>*              LHS() const; // 1st operand (or nullptr if none exists)
     [[nodiscard]] const ValueRef<T>*              RHS() const; // 2nd operand (or nullptr if no 2nd operand exists)
@@ -1210,7 +1203,7 @@ template struct Statistic<int, std::string>;
 // TotalFighterShots (of a carrier during one battle)    //
 ///////////////////////////////////////////////////////////
 
-// Definig implementation here leads to ODR-hell
+// Defining implementation here leads to ODR-hell
 
 ///////////////////////////////////////////////////////////
 // ComplexVariable                                       //
@@ -1785,7 +1778,7 @@ Operation<T>::Operation(const Operation<T>& rhs) :
     this->m_target_invariant = rhs.m_target_invariant;
     this->m_source_invariant = rhs.m_source_invariant;
     this->m_constant_expr = rhs.m_constant_expr;
-    this->m_simple_increment = rhs.m_simple_increment; // only case where this might not be false
+    this->m_simple_increment = rhs.m_simple_increment; // this is the only type of ValueRef that can be a simple increment ref
 }
 
 template <typename T>
@@ -1815,25 +1808,25 @@ void Operation<T>::InitConstInvariants()
         [](const auto& operand) { return operand && operand->SourceInvariant(); });
 
 
-    // determine if this is a simple incrment operation
-    if (m_op_type != OpType::PLUS && m_op_type != OpType::MINUS) {
-        this->m_simple_increment = false;
+    // m_simple_increment = false by default
+    // determine if this is a simple incrment operation, meaning it is a calculation
+    // that depends only on:
+    // 1) the effect target value (ie. a meter value or some other property that is
+    //    being modified by an effect)
+    // 2) a single target-invariant value (ie. a constant, something that depends only
+    //    on the source object or a target-independent complex value ref)
+
+    if (m_operands.size() != 2)
         return;
-    }
-    if (m_operands.size() < 2 || !m_operands[0] || !m_operands[1]) {
-        this->m_simple_increment = false;
+    auto& lhs{m_operands[0]};
+    auto& rhs{m_operands[1]};
+    if (!rhs || !lhs)
         return;
-    }
     // RHS must be the same value for all targets
-    if (!m_operands[1]->TargetInvariant()) {
-        this->m_simple_increment = false;
+    if (!rhs->TargetInvariant())
         return;
-    }
     // LHS must be just the immediate value of what's being incremented
-    if (const auto lhs = dynamic_cast<const Variable<T>*>(m_operands[0].get()))
-        this->m_simple_increment = (lhs->GetReferenceType() == ReferenceType::EFFECT_TARGET_VALUE_REFERENCE);
-    else
-        this->m_simple_increment = false;
+    this->m_simple_increment = (lhs->GetReferenceType() == ReferenceType::EFFECT_TARGET_VALUE_REFERENCE);
 }
 
 template <typename T>
@@ -1908,8 +1901,74 @@ T Operation<T>::Eval(const ScriptingContext& context) const
 }
 
 template <typename T>
+T Operation<T>::EvalImpl(OpType op_type, const T lhs, const T rhs)
+{
+    switch (op_type) {
+    case OpType::NOOP : {
+        return lhs;
+        break;
+    }
+
+    case OpType::TIMES: {
+        // useful for writing a "Statistic If" expression with arbitrary types.
+        // If returns T{0} or T{1} for nothing or something matching the
+        // sampling condition. This can be checked here by returning T{0} if
+        // the LHS operand is T{0} and just returning RHS() otherwise.
+        return (lhs == T{0}) ? T{0} : rhs;
+        break;
+    }
+
+    case OpType::MAXIMUM: {
+        return std::max<T>(lhs, rhs);
+        break;
+    }
+    case OpType::MINIMUM: {
+        return std::min<T>(lhs, rhs);
+        break;
+    }
+
+    case OpType::RANDOM_PICK: {
+        return (RandInt(0, 1) == 0) ? lhs : rhs;
+        break;
+    }
+
+    case OpType::COMPARE_EQUAL: {
+        return (lhs == rhs) ? T{1} : T{0};
+        break;
+    }
+    case OpType::COMPARE_GREATER_THAN: {
+        return (lhs > rhs) ? T{1} : T{0};
+        break;
+    }
+    case OpType::COMPARE_GREATER_THAN_OR_EQUAL: {
+        return (lhs >= rhs) ? T{1} : T{0};
+        break;
+    }
+    case OpType::COMPARE_LESS_THAN: {
+        return (lhs < rhs) ? T{1} : T{0};
+        break;
+    }
+    case OpType::COMPARE_LESS_THAN_OR_EQUAL: {
+        return (lhs <= rhs) ? T{1} : T{0};
+        break;
+    }
+    case OpType::COMPARE_NOT_EQUAL:  {
+        return (lhs != rhs) ? T{1} : T{0};
+        break;
+    }
+
+    default:
+        break;
+    }
+    throw std::runtime_error("ValueRef::Operation<T>::EvalImpl evaluated with an unknown or invalid OpType.");
+}
+
+template <typename T>
 T Operation<T>::EvalImpl(const ScriptingContext& context) const
 {
+    if (this->m_simple_increment)
+        return EvalImpl(m_op_type, LHS()->Eval(context), RHS()->Eval(context));
+
     switch (m_op_type) {
     case OpType::NOOP : {
         DebugLogger() << "ValueRef::Operation<T>::NoOp::EvalImpl";
@@ -1917,7 +1976,6 @@ T Operation<T>::EvalImpl(const ScriptingContext& context) const
         DebugLogger() << "ValueRef::Operation<T>::NoOp::EvalImpl. Sub-Expression returned: " << retval
                         << " from: " << LHS()->Dump();
         return retval;
-        break;
     }
 
     case OpType::TIMES: {
@@ -1933,16 +1991,20 @@ T Operation<T>::EvalImpl(const ScriptingContext& context) const
 
     case OpType::MAXIMUM:
     case OpType::MINIMUM: {
+        if (m_operands.empty())
+            return T{-1};
+
         // evaluate all operands, return smallest or biggest
-        std::set<T> vals;
+        std::vector<T> vals;
+        vals.reserve(m_operands.size());
         for (auto& vr : m_operands) {
             if (vr)
-                vals.emplace(vr->Eval(context));
+                vals.push_back(vr->Eval(context));
         }
         if (m_op_type == OpType::MINIMUM)
-            return vals.empty() ? T(-1) : *vals.begin();
+            return *std::min_element(vals.begin(), vals.end());
         else
-            return vals.empty() ? T(-1) : *vals.rbegin();
+            return *std::max_element(vals.begin(), vals.end());
         break;
     }
 
@@ -1964,8 +2026,11 @@ T Operation<T>::EvalImpl(const ScriptingContext& context) const
     case OpType::COMPARE_LESS_THAN:
     case OpType::COMPARE_LESS_THAN_OR_EQUAL:
     case OpType::COMPARE_NOT_EQUAL: {
-        const T&& lhs_val = LHS()->Eval(context);
-        const T&& rhs_val = RHS()->Eval(context);
+        T lhs_val = LHS()->Eval(context);
+        T rhs_val = RHS()->Eval(context);
+        if (m_operands.size() == 2)
+            return EvalImpl(m_op_type, lhs_val, rhs_val);
+
         bool test_result = false;
         switch (m_op_type) {
             case OpType::COMPARE_EQUAL:                 test_result = lhs_val == rhs_val;   break;
@@ -1976,9 +2041,8 @@ T Operation<T>::EvalImpl(const ScriptingContext& context) const
             case OpType::COMPARE_NOT_EQUAL:             test_result = lhs_val != rhs_val;   break;
             default:    break;  // ??? do nothing, default to false
         }
-        if (m_operands.size() < 3) {
-            return T{1};
-        } else if (m_operands.size() < 4) {
+
+        if (m_operands.size() == 3) {
             if (test_result)
                 return m_operands[2]->Eval(context);
             else
@@ -2013,6 +2077,17 @@ unsigned int Operation<T>::GetCheckSum() const
     return retval;
 }
 
+
+template <>
+FO_COMMON_API std::string Operation<std::string>::EvalImpl(OpType op_type, std::string lhs, std::string rhs);
+
+template <>
+FO_COMMON_API double Operation<double>::EvalImpl(OpType op_type, double lhs, double rhs);
+
+template <>
+FO_COMMON_API int Operation<int>::EvalImpl(OpType op_type, int lhs, int rhs);
+
+
 template <>
 FO_COMMON_API std::string Operation<std::string>::EvalImpl(const ScriptingContext& context) const;
 
@@ -2021,6 +2096,7 @@ FO_COMMON_API double Operation<double>::EvalImpl(const ScriptingContext& context
 
 template <>
 FO_COMMON_API int Operation<int>::EvalImpl(const ScriptingContext& context) const;
+
 
 template <typename T>
 std::string Operation<T>::Description() const
@@ -2195,7 +2271,7 @@ std::string Operation<T>::Dump(unsigned short ntabs) const
     }
 
     if (m_op_type == OpType::RANDOM_UNIFORM)
-        return "random(" + LHS()->Dump(ntabs) + ", " + LHS()->Dump(ntabs) + ")";
+        return "RandomNumber(" + LHS()->Dump(ntabs) + ", " + LHS()->Dump(ntabs) + ")";
 
     if (m_op_type == OpType::RANDOM_PICK) {
         std::string retval = "randompick(";

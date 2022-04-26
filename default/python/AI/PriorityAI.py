@@ -48,7 +48,9 @@ def calculate_priorities():
     debug("\n=== Preparing to Calculate Priorities ===")
     prioritiees_timer.start("setting Production Priority")
     aistate = get_aistate()
-    aistate.set_priority(PriorityType.RESOURCE_PRODUCTION, 50)  # let this one stay fixed & just adjust Research
+    # let this one stay fixed & just adjust Research and Influence
+    aistate.set_priority(PriorityType.RESOURCE_PRODUCTION, 50)
+    # RESOURCE_INFLUENCE priority is calculated in PolicyAI
 
     debug("\n*** Calculating Research Priority ***\n")
     prioritiees_timer.start("setting Research Priority")
@@ -97,7 +99,7 @@ def _calculate_industry_priority():  # currently only used to print status
     empire = fo.getEmpire()
     # get current industry production & Target
     industry_production = empire.resourceProduction(fo.resourceType.industry)
-    owned_planet_ids = PlanetUtilsAI.get_owned_planets_by_empire(universe.planetIDs)
+    owned_planet_ids = PlanetUtilsAI.get_owned_planets_by_empire()
     planets = (universe.getPlanet(x) for x in owned_planet_ids)
     target_pp = sum(x.currentMeterValue(fo.meterType.targetIndustry) for x in planets)
 
@@ -155,7 +157,7 @@ def _calculate_research_priority():
         and (get_number_of_colonies() < 12)
     )
     # get current industry production & Target
-    owned_planet_ids = PlanetUtilsAI.get_owned_planets_by_empire(universe.planetIDs)
+    owned_planet_ids = PlanetUtilsAI.get_owned_planets_by_empire()
     planets = (universe.getPlanet(x) for x in owned_planet_ids)
     target_rp = sum(map(lambda _x: _x.currentMeterValue(fo.meterType.targetResearch), planets))
     galaxy_is_sparse = ColonisationAI.galaxy_is_sparse()
@@ -249,7 +251,7 @@ def _calculate_exploration_priority():
     # These caps could perhaps instead be tied more directly to military priority and
     # total empire production.
     desired_number_of_scouts = int(
-        min(4 + mil_ships / 5, 4 + fo.currentTurn() / 50.0, 2 + num_unexplored_systems ** 0.5)
+        min(4 + mil_ships / 5, 4 + fo.currentTurn() / 50.0, 2 + num_unexplored_systems**0.5)
     )
     scouts_needed = max(0, desired_number_of_scouts - (num_scouts + queued_scout_ships))
     exploration_priority = int(40 * scouts_needed)
@@ -458,7 +460,7 @@ def _calculate_invasion_priority():
 
 
 def allotted_invasion_targets():
-    return 1 + int(fo.currentTurn() // 25)
+    return min(1 + int(fo.currentTurn() // 50), 3)
 
 
 def _calculate_military_priority():
@@ -517,15 +519,15 @@ def _calculate_military_priority():
                 status.get("fleetThreat", 0) ** 0.5
                 + 0.8 * status.get("max_neighbor_threat", 0) ** 0.5
                 + 0.2 * status.get("neighborThreat", 0) ** 0.5
-                + monster_threat ** 0.5
+                + monster_threat**0.5
                 + status.get("planetThreat", 0) ** 0.5
             )
         else:
             threat_root = (
-                status.get("fleetThreat", 0) ** 0.5 + monster_threat ** 0.5 + status.get("planetThreat", 0) ** 0.5
+                status.get("fleetThreat", 0) ** 0.5 + monster_threat**0.5 + status.get("planetThreat", 0) ** 0.5
             )
         ships_needed_here = math.ceil(
-            (max(0, (threat_root - (my_rating ** 0.5 + my_defenses ** 0.5))) ** 2) / cur_ship_rating
+            (max(0, (threat_root - (my_rating**0.5 + my_defenses**0.5))) ** 2) / cur_ship_rating
         )
         ships_needed += ships_needed_here
         ships_needed_allocation.append((universe.getSystem(sys_id), ships_needed_here))

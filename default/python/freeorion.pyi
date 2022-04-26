@@ -64,7 +64,7 @@ class FleetPlan:
 
 class GalaxySetupData:
     @property
-    def age(self) -> galaxySetupOption: ...
+    def age(self) -> galaxySetupOptionGeneric: ...
 
     @property
     def gameUID(self) -> str: ...
@@ -73,13 +73,13 @@ class GalaxySetupData:
     def maxAIAggression(self) -> aggression: ...
 
     @property
-    def monsterFrequency(self) -> galaxySetupOption: ...
+    def monsterFrequency(self) -> galaxySetupOptionMonsterFreq: ...
 
     @property
-    def nativeFrequency(self) -> galaxySetupOption: ...
+    def nativeFrequency(self) -> galaxySetupOptionGeneric: ...
 
     @property
-    def planetDensity(self) -> galaxySetupOption: ...
+    def planetDensity(self) -> galaxySetupOptionGeneric: ...
 
     @property
     def seed(self) -> str: ...
@@ -91,10 +91,10 @@ class GalaxySetupData:
     def size(self) -> int: ...
 
     @property
-    def specialsFrequency(self) -> galaxySetupOption: ...
+    def specialsFrequency(self) -> galaxySetupOptionGeneric: ...
 
     @property
-    def starlaneFrequency(self) -> galaxySetupOption: ...
+    def starlaneFrequency(self) -> galaxySetupOptionGeneric: ...
 
 
 class GameRules:
@@ -188,14 +188,6 @@ class IntIntMap:
     def __setitem__(self, obj1: object, obj2: object) -> None: ...
 
 
-class IntMeterTypeAccountingInfoVecMapPair:
-    @property
-    def meterAccounting(self): ...
-
-    @property
-    def targetID(self): ...
-
-
 class IntPairVec:
     def __contains__(self, obj: object) -> bool: ...
 
@@ -226,6 +218,20 @@ class IntSet:
     def empty(self) -> bool: ...
 
     def size(self) -> int: ...
+
+
+class IntSetFltMap:
+    def __contains__(self, obj: object) -> bool: ...
+
+    def __delitem__(self, obj: object) -> None: ...
+
+    def __getitem__(self, obj: object) -> object: ...
+
+    def __iter__(self) -> object: ...
+
+    def __len__(self) -> int: ...
+
+    def __setitem__(self, obj1: object, obj2: object) -> None: ...
 
 
 class IntSetSet:
@@ -290,9 +296,6 @@ class MeterTypeAccountingInfoVecMap:
 
 class MeterTypeAccountingInfoVecPair:
     @property
-    def accountingInfo(self): ...
-
-    @property
     def meterType(self): ...
 
 
@@ -308,14 +311,6 @@ class MeterTypeMeterMap:
     def __len__(self) -> int: ...
 
     def __setitem__(self, obj1: object, obj2: object) -> None: ...
-
-
-class MeterTypeStringPair:
-    @property
-    def meterType(self): ...
-
-    @property
-    def string(self): ...
 
 
 class MonsterFleetPlan:
@@ -422,6 +417,20 @@ class StringIntMap:
 
 
 class StringSet:
+    def __contains__(self, string: str) -> bool: ...
+
+    def __iter__(self) -> object: ...
+
+    def __len__(self) -> int: ...
+
+    def count(self, string: str) -> int: ...
+
+    def empty(self) -> bool: ...
+
+    def size(self) -> int: ...
+
+
+class StringSet2:
     def __contains__(self, string: str) -> bool: ...
 
     def __iter__(self) -> object: ...
@@ -596,7 +605,7 @@ class empire:
     def availableBuildingTypes(self) -> StringSet: ...
 
     @property
-    def availablePolicies(self) -> StringSet: ...
+    def availablePolicies(self) -> StringSet2: ...
 
     @property
     def availableShipDesigns(self) -> IntSet: ...
@@ -638,10 +647,10 @@ class empire:
     def name(self) -> str: ...
 
     @property
-    def planetsWithAllocatedPP(self) -> resPoolMap: ...
+    def planetsWithAllocatedPP(self) -> IntSetFltMap: ...
 
     @property
-    def planetsWithAvailablePP(self) -> resPoolMap: ...
+    def planetsWithAvailablePP(self) -> IntSetFltMap: ...
 
     @property
     def planetsWithWastedPP(self) -> IntSetSet: ...
@@ -698,6 +707,8 @@ class empire:
 
     def policyAvailable(self, string: str) -> bool: ...
 
+    def policyPrereqsAndExclusionsOK(self, string: str) -> bool: ...
+
     def population(self) -> float: ...
 
     def preservedLaneTravel(self, number1: int, number2: int) -> bool: ...
@@ -716,7 +727,10 @@ class empire:
 
     def slotPolicyAdoptedIn(self, string: str) -> int: ...
 
-    def supplyProjections(self) -> Dict[SystemId, int]: ...
+    def supplyProjections(self) -> Dict[SystemId, int]:
+        """
+        Returns the (negative) number of jumps (int) away each known system ID (int) is from this empire's supply network. 0 in dicates systems that are fleet supplied. -1 indicates a system that is 1 jump away from a supplied system. -4 indicates a system that is 4 jumps from a supply connection.
+        """
 
     def techResearched(self, string: str) -> bool: ...
 
@@ -736,44 +750,6 @@ class fieldType:
         """
 
 
-class influenceQueue:
-    @property
-    def allocatedStockpileIP(self): ...
-
-    @property
-    def empireID(self) -> EmpireId: ...
-
-    @property
-    def empty(self): ...
-
-    @property
-    def expectedNewStockpile(self): ...
-
-    @property
-    def size(self): ...
-
-    @property
-    def totalSpent(self): ...
-
-    def __contains__(self, influence_queue_element: influenceQueueElement) -> bool: ...
-
-    def __getitem__(self, number: int) -> influenceQueueElement: ...
-
-    def __iter__(self) -> object: ...
-
-    def __len__(self) -> int: ...
-
-    def inQueue(self, string: str) -> bool: ...
-
-
-class influenceQueueElement:
-    @property
-    def allocation(self): ...
-
-    @property
-    def name(self) -> str: ...
-
-
 class meter:
     @property
     def current(self) -> float: ...
@@ -781,9 +757,9 @@ class meter:
     @property
     def initial(self) -> float: ...
 
-    def dump(self, number: int) -> str:
+    def dump(self) -> str:
         """
-        Returns string with debug information, use '0' as argument.
+        Returns string with debug information.
         """
 
 
@@ -800,7 +776,13 @@ class policy:
     @property
     def shortDescription(self): ...
 
-    def adoptionCost(self, number: int, obj: object) -> float: ...
+    @overload
+    def adoptionCost(self) -> float: ...
+    @overload
+    def adoptionCost(self, empire_object: empire) -> float: ...
+    @overload
+    def adoptionCost(self, number: int) -> float: ...
+    def adoptionCost(*args) -> float: ...
 
 
 class popCenter:
@@ -810,7 +792,7 @@ class popCenter:
 
 class productionQueue:
     @property
-    def allocatedPP(self) -> resPoolMap: ...
+    def allocatedPP(self) -> IntSetFltMap: ...
 
     @property
     def empireID(self) -> EmpireId: ...
@@ -830,7 +812,7 @@ class productionQueue:
 
     def __len__(self) -> int: ...
 
-    def availablePP(self, res_pool: resPool) -> resPoolMap: ...
+    def availablePP(self, res_pool: resPool) -> IntSetFltMap: ...
 
     def objectsWithWastedPP(self, res_pool: resPool) -> IntSetSet: ...
 
@@ -1138,13 +1120,22 @@ class species:
     def description(self) -> str: ...
 
     @property
+    def dislikes(self) -> StringSet: ...
+
+    @property
     def foci(self) -> StringVec: ...
 
     @property
     def homeworlds(self) -> IntSet: ...
 
     @property
+    def likes(self) -> StringSet: ...
+
+    @property
     def name(self) -> str: ...
+
+    @property
+    def native(self) -> bool: ...
 
     @property
     def preferredFocus(self) -> str: ...
@@ -1341,7 +1332,7 @@ class universeObject:
 
     def hasSpecial(self, string: str) -> bool: ...
 
-    def hasTag(self, string: str) -> bool: ...
+    def hasTag(self, string: str, obj: object) -> bool: ...
 
     def initialMeterValue(self, meter_type: meterType) -> float: ...
 
@@ -1550,6 +1541,9 @@ class planet(universeObject, popCenter, resourceCenter):
     def LastTurnAttackedByShip(self) -> int: ...
 
     @property
+    def LastTurnColonized(self) -> int: ...
+
+    @property
     def LastTurnConquered(self) -> int: ...
 
     @property
@@ -1660,13 +1654,26 @@ class fleetAggression(IntEnum):
     aggressive = 3
 
 
-class galaxySetupOption(IntEnum):
+class galaxySetupOptionGeneric(IntEnum):
     invalid = -1
     none = 0
     low = 1
     medium = 2
     high = 3
     random = 4
+
+
+class galaxySetupOptionMonsterFreq(IntEnum):
+    invalid = -1
+    none = 0
+    extremelyLow = 1
+    veryLow = 2
+    low = 3
+    medium = 4
+    high = 5
+    veryHigh = 6
+    extremelyHigh = 7
+    random = 8
 
 
 class galaxyShape(IntEnum):
@@ -1896,6 +1903,9 @@ def empire_set_homeworld(number1: int, number2: int, string: str) -> bool: ...
 def empire_set_name(number: int, string: str) -> None: ...
 
 
+def empire_set_stockpile(number: int, resource_type: resourceType, floating_number: float) -> None: ...
+
+
 def empire_unlock_item(number: int, unlockable_item_type: unlockableItemType, string: str) -> None: ...
 
 
@@ -1928,15 +1938,15 @@ def getGameRules() -> GameRules:
     """
 
 
+def getNamedValue(string: str) -> object:
+    """
+    Returns the named value of the scripted constant with name (string). If no such named constant exists, returns none.
+    """
+
+
 def getPolicy(string: str) -> policy:
     """
     Returns the policy (Policy) with the indicated name (string).
-    """
-
-
-def getPolicyCategories(obj: object) -> StringSet:
-    """
-    Returns the names of all policy categories (StringVec).
     """
 
 
@@ -2006,7 +2016,10 @@ def get_empire(number: int) -> empire: ...
 def get_galaxy_setup_data() -> GalaxySetupData: ...
 
 
-def get_name(number: int) -> object: ...
+def get_name(number: int) -> object:
+    """
+    Returns the name (string) of the universe object with the specified object id (int). If there is no such object, returns an empty string and logs an error to the error log.
+    """
 
 
 def get_native_species() -> list: ...
@@ -2102,6 +2115,18 @@ def load_starting_buildings() -> list: ...
 def load_unlockable_item_list() -> list: ...
 
 
+def namedIntDefined(string: str) -> bool:
+    """
+    Returns true/false (boolean) whether there is a defined int-valued scripted constant with name (string).
+    """
+
+
+def namedRealDefined(string: str) -> bool:
+    """
+    Returns true/false (boolean) whether there is a defined double-valued scripted constant with name (string).
+    """
+
+
 def objs_get_systems(item_list: list) -> list: ...
 
 
@@ -2153,13 +2178,22 @@ def policiesInCategory(string: str) -> StringVec:
     """
 
 
+def policyCategories() -> StringVec:
+    """
+    Returns the names of all policy categories (StringVec).
+    """
+
+
 def remove_special(number: int, string: str) -> None: ...
 
 
 def roman_number(number: int) -> str: ...
 
 
-def set_name(number: int, string: str) -> None: ...
+def set_name(number: int, string: str) -> None:
+    """
+    Sets the name (string) of the universe object with the specified object id (int). If there is no such object, just logs an error to the error log.
+    """
 
 
 def set_universe_width(floating_number: float) -> None: ...
@@ -2243,7 +2277,10 @@ def techsInCategory(string: str) -> StringVec:
     """
 
 
-def user_string(string: str) -> str: ...
+def userString(string: str) -> str: ...
+
+
+def userStringExists(string: str) -> bool: ...
 
 
 def validShipDesign(ship_design: shipDesign, string: str, string_list: StringVec) -> bool:

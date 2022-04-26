@@ -4,7 +4,7 @@ Policy
     short_description = "PLC_TERROR_SUPPRESSION_SHORT_DESC"
     category = "MILITARY_CATEGORY"
     adoptioncost = 0.0
-    exclusions = [ "PLC_CONFEDERATION" "PLC_LIBERTY" ]
+    exclusions = [ "PLC_ARTISAN_WORKSHOPS" "PLC_CONFEDERATION" "PLC_LIBERTY" ]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
 
@@ -58,6 +58,6 @@ Policy
                (NamedReal name = "PLC_TERROR_SUPPRESSION_SHIP_INFLUENCE_FLAT" value = 0.2)
         ]
     ]
-    graphic = "icons/policies/terror_suppression.png"
+    graphic = "icons/policies/military_terror_suppression.png"
 
 #include "/scripting/policies/policies.macros"

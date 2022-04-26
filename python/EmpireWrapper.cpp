@@ -7,6 +7,7 @@
 #include "../universe/UniverseObject.h"
 #include "../universe/UnlockableItem.h"
 #include "../universe/Planet.h"
+#include "../universe/ScriptingContext.h"
 #include "../universe/Tech.h"
 #include "../util/AppInterface.h"
 #include "../util/Logger.h"
@@ -33,29 +34,27 @@ namespace {
         }
     };
 
-    typedef PairToTupleConverter<int, int> IntIntPairConverter;
-
-    typedef PairToTupleConverter<float, int> FloatIntPairConverter;
-
     auto obstructedStarlanes(const Empire& empire) -> std::vector<std::pair<int, int>>
     {
-        const std::set<std::pair<int, int>>& laneset = GetSupplyManager().SupplyObstructedStarlaneTraversals(empire.EmpireID());
-        std::vector<std::pair<int, int>> retval;
+        const auto& laneset = GetSupplyManager().SupplyObstructedStarlaneTraversals(empire.EmpireID());
+        static_assert(!std::is_same_v<std::decay_t<decltype(laneset)>, std::vector<std::pair<int, int>>>); // if are the same, don't need to explicitly construct the return value...
         try {
-            for (const std::pair<int, int>& lane : laneset)
-            { retval.push_back(lane); }
+            return {laneset.begin(), laneset.end()};
         } catch (...) {
+            return {};
         }
-        return retval;
     }
 
     auto jumpsToSuppliedSystem(const Empire& empire) -> std::map<int, int>
     {
+        ScriptingContext context;
+        const SupplyManager& supply = context.supply;
+
         std::map<int, int> retval;
-        const std::map<int, std::set<int>>& empire_starlanes = empire.KnownStarlanes(GetUniverse());
+        const auto empire_starlanes = empire.KnownStarlanes(GetUniverse());
         std::deque<int> propagating_list;
 
-        for (int system_id : GetSupplyManager().FleetSupplyableSystemIDs(empire.EmpireID(), true)) {
+        for (int system_id : supply.FleetSupplyableSystemIDs(empire.EmpireID(), true, context)) {
             retval[system_id] = 0;
             propagating_list.push_back(system_id);
         }
@@ -201,9 +200,8 @@ namespace FreeOrionPython {
      *                                                  called
      */
     void WrapEmpire() {
-        py::to_python_converter<std::pair<int, int>, IntIntPairConverter>();
-
-        py::to_python_converter<std::pair<float, int>, FloatIntPairConverter>();
+        py::to_python_converter<std::pair<int, int>, PairToTupleConverter<int, int>>();
+        py::to_python_converter<std::pair<float, int>, PairToTupleConverter<float, int>>();
 
         py::class_<std::map<std::pair<int, int>, int>>("PairIntInt_IntMap")
             .def(py::map_indexing_suite<std::map<std::pair<int, int>, int>, true>())
@@ -219,7 +217,10 @@ namespace FreeOrionPython {
 
         py::class_<ResourcePool, std::shared_ptr<ResourcePool>, boost::noncopyable>("resPool", py::no_init);
 
-        FreeOrionPython::SetWrapper<std::set<int>>::Wrap("IntSetSet");
+        FreeOrionPython::SetWrapper<std::set<std::set<int>>>::Wrap("IntSetSet");
+        FreeOrionPython::SetWrapper<std::set<int>>::Wrap("IntSet");
+        FreeOrionPython::SetWrapper<std::set<std::string>>::Wrap("StringSet");
+        FreeOrionPython::SetWrapper<std::set<std::string, std::less<>>>::Wrap("StringSet2");
 
         py::class_<std::map<std::set<int>, float>>("resPoolMap")
             .def(py::map_indexing_suite<std::map<std::set<int>, float>, true>())
@@ -235,6 +236,18 @@ namespace FreeOrionPython {
 
         py::class_<std::map<std::string, std::map<int, std::string>>>("String_IntStringMap_Map")
             .def(py::map_indexing_suite<std::map<std::string, std::map<int, std::string>>, true>())
+        ;
+
+        py::class_<std::map<int, float>>("IntFltMap")
+            .def(py::map_indexing_suite<std::map<int, float>, true>())
+        ;
+
+        py::class_<std::map<int, float>>("IntIntMap")
+            .def(py::map_indexing_suite<std::map<int, float>, true>())
+        ;
+
+        py::class_<std::map<std::set<int>, float>>("IntSetFltMap")
+            .def(py::map_indexing_suite<std::map<std::set<int>, float>, true>())
         ;
 
         ///////////////////
@@ -282,26 +295,48 @@ namespace FreeOrionPython {
                                                         py::return_value_policy<py::return_by_value>()
                                                     ))
             .def("getTechStatus",                   &Empire::GetTechStatus)
-            .def("researchProgress",                &Empire::ResearchProgress)
+            .def("researchProgress",                +[](const Empire& e, const std::string& tech) { return e.ResearchProgress(tech, ScriptingContext{}); })
             .add_property("researchQueue",          make_function(&Empire::GetResearchQueue,        py::return_internal_reference<>()))
 
-            .def("policyAdopted",                   &Empire::PolicyAdopted)
-            .def("turnPolicyAdopted",               &Empire::TurnPolicyAdopted)
-            .def("slotPolicyAdoptedIn",             &Empire::SlotPolicyAdoptedIn)
-            .add_property("adoptedPolicies",        make_function(&Empire::AdoptedPolicies,                 py::return_value_policy<py::return_by_value>()))
-            .add_property("categoriesSlotPolicies", make_function(&Empire::CategoriesSlotsPoliciesAdopted,  py::return_value_policy<py::return_by_value>()))
-            .add_property("turnsPoliciesAdopted",   make_function(&Empire::TurnsPoliciesAdopted,            py::return_value_policy<py::return_by_value>()))
+            .def("policyAdopted",                   +[](const Empire& e, const std::string& policy) { return e.PolicyAdopted(policy); })
+            .def("turnPolicyAdopted",               +[](const Empire& e, const std::string& policy) { return e.TurnPolicyAdopted(policy); })
+            .def("slotPolicyAdoptedIn",             +[](const Empire& e, const std::string& policy) { return e.SlotPolicyAdoptedIn(policy); })
+
+            .add_property("adoptedPolicies",        make_function(
+                                                        +[](const Empire& e)
+                                                        { return ViewVecToStringVec(e.AdoptedPolicies()); },
+                                                        py::return_value_policy<py::return_by_value>()
+                                                    ))
+            .add_property("categoriesSlotPolicies", make_function(
+                                                        +[](const Empire& e) -> std::map<std::string, std::map<int, std::string>> {
+                                                            std::map<std::string, std::map<int, std::string>> retval;
+                                                            for (auto& [cat, slots_policies] : e.CategoriesSlotsPoliciesAdopted())
+                                                                for (auto& [slot, policy] : slots_policies)
+                                                                    retval[std::string{cat}].emplace(slot, policy);
+                                                            return retval;
+                                                        },
+                                                        py::return_value_policy<py::return_by_value>()
+                                                    ))
+            .add_property("turnsPoliciesAdopted",   make_function(
+                                                        +[](const Empire& e)
+                                                        { return ViewMapToStringMap(e.TurnsPoliciesAdopted()); },
+                                                        py::return_value_policy<py::return_by_value>()
+                                                    ))
+
             .add_property("availablePolicies",      make_function(&Empire::AvailablePolicies,               py::return_value_policy<py::copy_const_reference>()))
-            .def("policyAvailable",                 &Empire::PolicyAvailable)
+
+            .def("policyAvailable",                 +[](const Empire& e, const std::string& policy) { return e.PolicyAvailable(policy); })
+
+            .def("policyPrereqsAndExclusionsOK",    +[](const Empire& e, const std::string& policy) { return e.PolicyPrereqsAndExclusionsOK(policy, CurrentTurn()); })
 
             .add_property("totalPolicySlots",       make_function(
                                                         +[](const Empire& e) -> std::map<std::string, int>
-                                                            { return ViewMapToStringMap(e.TotalPolicySlots()); },
+                                                        { return ViewMapToStringMap(e.TotalPolicySlots()); },
                                                         py::return_value_policy<py::return_by_value>()
                                                     ))
             .add_property("emptyPolicySlots",       make_function(
                                                         +[](const Empire& e) -> std::map<std::string, int>
-                                                            { return ViewMapToStringMap(e.EmptyPolicySlots()); },
+                                                        { return ViewMapToStringMap(e.EmptyPolicySlots()); },
                                                         py::return_value_policy<py::return_by_value>()
                                                     ))
 
@@ -333,7 +368,8 @@ namespace FreeOrionPython {
             .def("obstructedStarlanes",             obstructedStarlanes,
                                                     py::return_value_policy<py::return_by_value>())
             .def("supplyProjections",               jumpsToSuppliedSystem,
-                                                    py::return_value_policy<py::return_by_value>())
+                                                    py::return_value_policy<py::return_by_value>(),
+                                                    "Returns the (negative) number of jumps (int) away each known system ID (int) is from this empire's supply network. 0 in dicates systems that are fleet supplied. -1 indicates a system that is 1 jump away from a supplied system. -4 indicates a system that is 4 jumps from a supply connection.")
             .def("getMeter",                        +[](const Empire& empire, const std::string& name) -> const Meter* { return empire.GetMeter(name); },
                                                     py::return_internal_reference<>(),
                                                     "Returns the empire meter with the indicated name (string).")
@@ -417,18 +453,22 @@ namespace FreeOrionPython {
             .add_property("description",            make_function(&Tech::Description,       py::return_value_policy<py::copy_const_reference>()))
             .add_property("shortDescription",       make_function(&Tech::ShortDescription,  py::return_value_policy<py::copy_const_reference>()))
             .add_property("category",               make_function(&Tech::Category,          py::return_value_policy<py::copy_const_reference>()))
-            .def("researchCost",                    &Tech::ResearchCost)
-            .def("perTurnCost",                     &Tech::PerTurnCost)
-            .def("researchTime",                    &Tech::ResearchTime)
+            .def("researchCost",                    +[](const Tech& t, int empire_id) { return t.ResearchCost(empire_id, ScriptingContext{}); })
+            .def("perTurnCost",                     +[](const Tech& t, int empire_id) { return t.PerTurnCost(empire_id, ScriptingContext{}); })
+            .def("researchTime",                    +[](const Tech& t, int empire_id) { return t.ResearchTime(empire_id, ScriptingContext{}); })
             .add_property("prerequisites",          make_function(&Tech::Prerequisites,     py::return_internal_reference<>()))
             .add_property("unlockedTechs",          make_function(&Tech::UnlockedTechs,     py::return_internal_reference<>()))
             .add_property("unlockedItems",          make_function(&Tech::UnlockedItems,     py::return_internal_reference<>()))
-            .def("recursivePrerequisites",          +[](const Tech& tech, int empire_id) -> std::vector<std::string> { return GetTechManager().RecursivePrereqs(tech.Name(), empire_id); },
+            .def("recursivePrerequisites",          +[](const Tech& tech, int empire_id) -> std::vector<std::string> { return GetTechManager().RecursivePrereqs(tech.Name(), empire_id, true, ScriptingContext{}); },
                                                     py::return_value_policy<py::return_by_value>())
         ;
 
-        def("getTech",                              &GetTech,                               py::return_value_policy<py::reference_existing_object>(), "Returns the tech (Tech) with the indicated name (string).");
-        def("getTechCategories",                    &TechManager::CategoryNames,            py::return_value_policy<py::return_by_value>(), "Returns the names of all tech categories (StringVec).");
+        def("getTech",                              +[](const std::string& name) -> const Tech* { return GetTech(name); },
+                                                    py::return_value_policy<py::reference_existing_object>(),
+                                                    "Returns the tech (Tech) with the indicated name (string).");
+        def("getTechCategories",                    &TechManager::CategoryNames,
+                                                    py::return_value_policy<py::return_by_value>(),
+                                                    "Returns the names of all tech categories (StringVec).");
 
         def("techs",
             +[]() -> std::vector<std::string> { return GetTechManager().TechNames(); },
@@ -454,7 +494,9 @@ namespace FreeOrionPython {
             .add_property("description",            make_function(&Policy::Description,         py::return_value_policy<py::copy_const_reference>()))
             .add_property("shortDescription",       make_function(&Policy::ShortDescription,    py::return_value_policy<py::copy_const_reference>()))
             .add_property("category",               make_function(&Policy::Category,            py::return_value_policy<py::copy_const_reference>()))
-            .def("adoptionCost",                    &Policy::AdoptionCost)
+            .def("adoptionCost",                    +[](const Policy& p)                       { return p.AdoptionCost(AppEmpireID(), ScriptingContext{}); })
+            .def("adoptionCost",                    +[](const Policy& p, const Empire& empire) { return p.AdoptionCost(empire.EmpireID(), ScriptingContext{}); })
+            .def("adoptionCost",                    +[](const Policy& p, int empire_id)        { return p.AdoptionCost(empire_id, ScriptingContext{}); })
         ;
 
         def("getPolicy",

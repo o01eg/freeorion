@@ -8,8 +8,6 @@
     (abs)                                       \
     (accountinglabel)                           \
     (activation)                                \
-    (AddedBefore)                               \
-    (AddedSince)                                \
     (AddSpecial)                                \
     (AddStarlanes)                              \
     (Adequate)                                  \
@@ -158,6 +156,7 @@
     (focus)                                     \
     (Focus)                                     \
     (FocusType)                                 \
+    (from)                                      \
     (fuel)                                      \
     (Fuel)                                      \
     (Full)                                      \
@@ -352,7 +351,8 @@
     (PlanetEnvironment)                         \
     (PlanetID)                                  \
     (planetsize)                                \
-    (planettype)                                \
+    (PlanetType)                                \
+    (PlanetTypeDifference)                      \
     (Playable)                                  \
     (PointDefense)                              \
     (Policy)                                    \
@@ -581,6 +581,7 @@
     (TopPriorityResearchableTech)               \
     (TopPriorityTransferrableTech)              \
     (TotalFighterShots)                         \
+    (to)                                        \
     (Toxic)                                     \
     (Trade)
 

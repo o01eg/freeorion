@@ -43,8 +43,9 @@ BOOST_PYTHON_MODULE(freeorion) {
         .def(py::map_indexing_suite<std::map<int, bool>>())
     ;
 
-    FreeOrionPython::SetWrapper<int>::Wrap("IntSet");
-    FreeOrionPython::SetWrapper<std::string>::Wrap("StringSet");
+    FreeOrionPython::SetWrapper<std::set<int>>::Wrap("IntSet");
+    FreeOrionPython::SetWrapper<std::set<std::string>>::Wrap("StringSet");
+    FreeOrionPython::SetWrapper<std::set<std::string, std::less<>>>::Wrap("StringSet2");
 }
 
 
@@ -113,7 +114,7 @@ auto PythonServer::InitModules() -> bool
     return true;
 }
 
-auto PythonServer::IsRequireAuthOrReturnRoles(const std::string& player_name, bool &result, Networking::AuthRoles& roles) const -> bool
+auto PythonServer::IsRequireAuthOrReturnRoles(const std::string& player_name, const std::string& ip_address, bool &result, Networking::AuthRoles& roles) const -> bool
 {
     py::object auth_provider = m_python_module_auth.attr("__dict__")["auth_provider"];
     if (!auth_provider) {
@@ -126,7 +127,7 @@ auto PythonServer::IsRequireAuthOrReturnRoles(const std::string& player_name, bo
         return false;
     }
     roles.Clear();
-    py::object r = f(player_name);
+    py::object r = f(player_name, ip_address);
     py::extract<py::list> py_roles(r);
     if (py_roles.check()) {
         result = false;

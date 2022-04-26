@@ -125,7 +125,8 @@ namespace {
 //   TechRowBrowseWnd    //
 ///////////////////////////
 std::shared_ptr<GG::BrowseInfoWnd> TechRowBrowseWnd(const std::string& tech_name, int empire_id) {
-    const Empire* empire = GetEmpire(empire_id);
+    ScriptingContext context;
+    auto empire = context.GetEmpire(empire_id);
     const Tech* tech = GetTech(tech_name);
     if (!tech)
         return nullptr;
@@ -171,10 +172,10 @@ std::shared_ptr<GG::BrowseInfoWnd> TechRowBrowseWnd(const std::string& tech_name
         if (queue_it != queue.end()) {
             main_text += UserString("TECH_WND_ENQUEUED") + "\n";
 
-            float progress = empire->ResearchProgress(tech_name);
-            float total_cost = tech->ResearchCost(empire_id);
+            float progress = empire->ResearchProgress(tech_name, context);
+            float total_cost = tech->ResearchCost(empire_id, context);
             float allocation = queue_it->allocated_rp;
-            float max_allocation = tech->PerTurnCost(empire_id);
+            float max_allocation = tech->PerTurnCost(empire_id, context);
 
             // %1% / %2%  +  %3% / %4% RP/turn
             main_text += boost::io::str(FlexibleFormat(UserString("TECH_WND_PROGRESS"))
@@ -189,8 +190,8 @@ std::shared_ptr<GG::BrowseInfoWnd> TechRowBrowseWnd(const std::string& tech_name
                     % ETA);
 
         } else if (tech->Researchable()) {
-            int turns = tech->ResearchTime(empire_id);
-            float cost = tech->ResearchCost(empire_id);
+            int turns = tech->ResearchTime(empire_id, context);
+            float cost = tech->ResearchCost(empire_id, context);
             const std::string& cost_units = UserString("ENC_RP");
 
             main_text += boost::io::str(FlexibleFormat(UserString("ENC_COST_AND_TURNS_STR"))
@@ -200,8 +201,8 @@ std::shared_ptr<GG::BrowseInfoWnd> TechRowBrowseWnd(const std::string& tech_name
         }
 
     } else if (tech->Researchable()) {
-        int turns = tech->ResearchTime(empire_id);
-        float cost = tech->ResearchCost(empire_id);
+        int turns = tech->ResearchTime(empire_id, context);
+        float cost = tech->ResearchCost(empire_id, context);
         const std::string& cost_units = UserString("ENC_RP");
 
         main_text += boost::io::str(FlexibleFormat(UserString("ENC_COST_AND_TURNS_STR"))
@@ -393,7 +394,7 @@ void TechTreeWnd::TechTreeControls::DoButtonLayout() {
     m_row_offset = BUTTON_HEIGHT + BUTTON_SEPARATION;   // vertical distance between each row of buttons
     m_buttons_per_row = std::max(Value(USABLE_WIDTH / (m_col_offset)), 1);
 
-    constexpr int NUM_NON_CATEGORY_BUTTONS = 6;  //  ALL, Locked, Partial, Unlocked, Complete, ViewType
+    static constexpr int NUM_NON_CATEGORY_BUTTONS = 6;  //  ALL, Locked, Partial, Unlocked, Complete, ViewType
 
     // place category buttons: fill each row completely before starting next row
     int row = 0, col = -1;
@@ -739,7 +740,7 @@ bool TechTreeWnd::LayoutPanel::TechPanel::InWindow(const GG::Pt& pt) const {
 void TechTreeWnd::LayoutPanel::TechPanel::PreRender() {
     GG::Wnd::PreRender();
 
-    constexpr int PAD = 8;
+    static constexpr int PAD = 8;
     GG::X text_left(GG::X(Value(TechPanelHeight())) + PAD);
     GG::Y text_top(0);
     GG::X text_width(TechPanelWidth() - text_left);
@@ -789,7 +790,7 @@ void TechTreeWnd::LayoutPanel::TechPanel::PreRender() {
 }
 
 void TechTreeWnd::LayoutPanel::TechPanel::Render() {
-    constexpr int PAD = 8;
+    static constexpr int PAD = 8;
     GG::X text_left(GG::X(Value(TechPanelHeight())) + PAD);
     GG::Y text_top(0);
     GG::X text_width(TechPanelWidth() - text_left);
@@ -944,8 +945,9 @@ void TechTreeWnd::LayoutPanel::TechPanel::Update() {
     Select(m_layout_panel->m_selected_tech_name == m_tech_name);
 
     int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    ScriptingContext context;
 
-    if (const Empire* empire = GetEmpire(client_empire_id)) {
+    if (auto empire = context.GetEmpire(client_empire_id)) {
         m_status = empire->GetTechStatus(m_tech_name);
         m_enqueued = empire->GetResearchQueue().InQueue(m_tech_name);
 
@@ -976,7 +978,7 @@ void TechTreeWnd::LayoutPanel::TechPanel::Update() {
         }
 
         if (m_unlock_icons.empty()) {
-            constexpr int PAD = 8;
+            static constexpr int PAD = 8;
             GG::X icon_left(GG::X(Value(TechPanelHeight())) + PAD*3/2);
             GG::Y icon_height = TechPanelHeight()/2;
             GG::X icon_width = GG::X(Value(icon_height));
@@ -1062,8 +1064,8 @@ void TechTreeWnd::LayoutPanel::TechPanel::Update() {
 
     if (const Tech* tech = GetTech(m_tech_name))
         m_cost_and_duration_text = boost::io::str(FlexibleFormat(UserString("TECH_TOTAL_COST_ALT_STR"))
-                                                  % DoubleToString(tech->ResearchCost(client_empire_id), 1, false)
-                                                  % tech->ResearchTime(client_empire_id));
+                                                  % DoubleToString(tech->ResearchCost(client_empire_id, context), 1, false)
+                                                  % tech->ResearchTime(client_empire_id, context));
     m_cost_and_duration_label->SetText("<s>" + m_cost_and_duration_text + "<s>");
 
     m_eta_label->SetText("<s>" + m_eta_text + "</s>");
@@ -1354,7 +1356,7 @@ void TechTreeWnd::LayoutPanel::Layout(bool keep_position) {
     const double NODE_SEP = Value(TechPanelHeight()) * GetOptionsDB().Get<double>("ui.research.tree.spacing.vertical");
     const double WIDTH = Value(TechPanelWidth());
     const double HEIGHT = Value(TechPanelHeight());
-    constexpr double X_MARGIN{12};
+    static constexpr double X_MARGIN{12};
 
     // view state initial data
     int initial_hscroll_pos = m_hscroll->PosnRange().first;
@@ -1611,7 +1613,7 @@ bool TechTreeWnd::TechListBox::TechRowCmp(const GG::ListBox::Row& lhs, const GG:
     } else {
         try {  // attempt compare by int
             retval = boost::lexical_cast<int>(lhs_key) < boost::lexical_cast<int>(rhs_key);
-        } catch (const boost::bad_lexical_cast& e) {
+        } catch (const boost::bad_lexical_cast&) {
             retval = GetLocale("en_US.UTF-8").operator()(lhs_key, rhs_key);
         }
     }
@@ -1632,10 +1634,12 @@ void TechTreeWnd::TechListBox::TechRow::CompleteConstruction() {
     const Tech* this_row_tech = ::GetTech(m_tech);
     if (!this_row_tech)
         return;
+    ScriptingContext context;
 
     std::vector<GG::X> col_widths = ColWidths(Width());
     const GG::X GRAPHIC_WIDTH = col_widths[0];
-    const GG::Y ICON_HEIGHT(std::min(Value(Height()) - 12, std::max(ClientUI::Pts(), Value(GRAPHIC_WIDTH) - 6)));
+    const GG::Y ICON_HEIGHT(std::min(Value(Height()) - 12,
+                                     std::max(ClientUI::Pts(), Value(GRAPHIC_WIDTH) - 6)));
     // TODO replace string padding with new TextFormat flag
     std::string just_pad = "    ";
 
@@ -1651,14 +1655,16 @@ void TechTreeWnd::TechListBox::TechRow::CompleteConstruction() {
     text->SetChildClippingMode(ChildClippingMode::ClipToWindow);
     push_back(std::move(text));
 
-    std::string cost_str = std::to_string(std::lround(this_row_tech->ResearchCost(GGHumanClientApp::GetApp()->EmpireID())));
+    std::string cost_str = std::to_string(std::lround(
+        this_row_tech->ResearchCost(GGHumanClientApp::GetApp()->EmpireID(), context)));
     text = GG::Wnd::Create<CUILabel>(cost_str + just_pad + just_pad, GG::FORMAT_RIGHT);
     text->SetResetMinSize(false);
     text->ClipText(true);
     text->SetChildClippingMode(ChildClippingMode::ClipToWindow);
     push_back(std::move(text));
 
-    std::string time_str = std::to_string(this_row_tech->ResearchTime(GGHumanClientApp::GetApp()->EmpireID()));
+    std::string time_str = std::to_string(
+        this_row_tech->ResearchTime(GGHumanClientApp::GetApp()->EmpireID(), context));
     text = GG::Wnd::Create<CUILabel>(time_str + just_pad + just_pad, GG::FORMAT_RIGHT);
     text->SetResetMinSize(false);
     text->ClipText(true);
@@ -1685,13 +1691,15 @@ void TechTreeWnd::TechListBox::TechRow::Update() {
     std::string just_pad = "    ";
 
     auto client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    auto empire = GetEmpire(client_empire_id);
+    ScriptingContext context;
+    auto empire = context.GetEmpire(client_empire_id);
 
-    std::string cost_str = std::to_string(std::lround(this_row_tech->ResearchCost(client_empire_id)));
+    std::string cost_str = std::to_string(std::lround(
+        this_row_tech->ResearchCost(client_empire_id, context)));
     if (GG::Button* cost_btn = dynamic_cast<GG::Button*>((size() >= 3) ? at(2) : nullptr))
         cost_btn->SetText(cost_str + just_pad + just_pad);
 
-    std::string time_str = std::to_string(this_row_tech->ResearchTime(client_empire_id));
+    std::string time_str = std::to_string(this_row_tech->ResearchTime(client_empire_id, context));
     if (GG::Button* time_btn = dynamic_cast<GG::Button*>((size() >= 4) ? at(3) : nullptr))
         time_btn->SetText(time_str + just_pad + just_pad);
 
@@ -2123,8 +2131,8 @@ void TechTreeWnd::Reset() {
 }
 
 void TechTreeWnd::InitializeWindows() {
-    constexpr GG::Pt pedia_ul(GG::X0,  GG::Y0);
-    constexpr GG::Pt pedia_wh(GG::X(480), GG::Y(240));
+    static constexpr GG::Pt pedia_ul(GG::X0,  GG::Y0);
+    static constexpr GG::Pt pedia_wh(GG::X(480), GG::Y(240));
 
     // Don't know this wnd's height in advance so place it off the bottom edge,
     // it subclasses CUIWnd so it will reposition itself to be visible.
@@ -2198,16 +2206,16 @@ void TechTreeWnd::ToggleAllCategories() {
 void TechTreeWnd::SetTechStatus(const TechStatus status, const bool state) {
     switch (status) {
     case TechStatus::TS_UNRESEARCHABLE:
-        GetOptionsDB().Set<bool>("ui.research.status.unresearchable.shown", state);
+        GetOptionsDB().Set("ui.research.status.unresearchable.shown", state);
         break;
     case TechStatus::TS_HAS_RESEARCHED_PREREQ:
-        GetOptionsDB().Set<bool>("ui.research.status.partial.shown", state);
+        GetOptionsDB().Set("ui.research.status.partial.shown", state);
         break;
     case TechStatus::TS_RESEARCHABLE:
-        GetOptionsDB().Set<bool>("ui.research.status.researchable.shown", state);
+        GetOptionsDB().Set("ui.research.status.researchable.shown", state);
         break;
     case TechStatus::TS_COMPLETE:
-        GetOptionsDB().Set<bool>("ui.research.status.completed.shown", state);
+        GetOptionsDB().Set("ui.research.status.completed.shown", state);
         break;
     default:
         ; // do nothing
@@ -2301,12 +2309,12 @@ void TechTreeWnd::TechLeftClickedSlot(const std::string& tech_name,
     }
 }
 
-void TechTreeWnd::AddTechToResearchQueue(const std::string& tech_name,
-                                         bool to_front)
-{
+void TechTreeWnd::AddTechToResearchQueue(const std::string& tech_name, bool to_front) {
     const Tech* tech = GetTech(tech_name);
     if (!tech) return;
-    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
+
+    ScriptingContext context;
+    auto empire = context.GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     TechStatus tech_status = TechStatus::TS_UNRESEARCHABLE;
     if (empire)
         tech_status = empire->GetTechStatus(tech_name);
@@ -2328,8 +2336,8 @@ void TechTreeWnd::AddTechToResearchQueue(const std::string& tech_name,
     // if tech can't yet be researched, add any prerequisites it requires (recursively) and then add it
     TechManager& manager = GetTechManager();
     int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    std::vector<std::string> tech_vec = manager.RecursivePrereqs(tech_name, empire_id);
-    tech_vec.emplace_back(tech_name);
+    auto tech_vec = manager.RecursivePrereqs(tech_name, empire_id, true, context);
+    tech_vec.push_back(tech_name);
     AddTechsToQueueSignal(tech_vec, queue_pos);
 }
 

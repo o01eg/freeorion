@@ -14,11 +14,11 @@
 #include "../universe/Meter.h"
 #include "../util/AppInterface.h"
 #include "../util/Export.h"
+#include "../util/SitRepEntry.h"
 
 
 struct UnlockableItem;
 class ShipDesign;
-class SitRepEntry;
 class ResourcePool;
 
 typedef std::array<unsigned char, 4> EmpireColor;
@@ -57,8 +57,7 @@ public:
     //@}
 
     Empire(std::string name, std::string player_name, int ID,
-           const EmpireColor& color, bool authenticated);
-    ~Empire();
+           EmpireColor color, bool authenticated);
 
     [[nodiscard]] const std::string&  Name() const;            ///< Returns the Empire's name
     [[nodiscard]] const std::string&  PlayerName() const;      ///< Returns the Empire's player's name
@@ -79,6 +78,8 @@ public:
 
     [[nodiscard]] int                           SlotPolicyAdoptedIn(std::string_view name) const;
     [[nodiscard]] std::vector<std::string_view> AdoptedPolicies() const;
+    [[nodiscard]] std::vector<std::string_view> InitialAdoptedPolicies() const;
+    [[nodiscard]] bool                          PoliciesModified() const { return m_adopted_policies != m_initial_adopted_policies; }
 
     /** For each category, returns the slots in which policies have been adopted
       * and what policy is in that slot. */
@@ -93,7 +94,7 @@ public:
     /** Returns the set of policies / slots the empire has avaialble. */
     [[nodiscard]] const std::set<std::string, std::less<>>&    AvailablePolicies() const;
     [[nodiscard]] bool                                         PolicyAvailable(std::string_view name) const;
-    [[nodiscard]] bool                                         PolicyPrereqsAndExclusionsOK(std::string_view name) const;
+    [[nodiscard]] bool                                         PolicyPrereqsAndExclusionsOK(std::string_view name, int current_turn) const;
     [[nodiscard]] bool                                         PolicyAffordable(std::string_view name, const ScriptingContext& context) const;
     [[nodiscard]] std::map<std::string_view, int, std::less<>> TotalPolicySlots() const; // how many total slots does this empire have in each category
     [[nodiscard]] std::map<std::string_view, int, std::less<>> EmptyPolicySlots() const; // how many empty slots does this empire have in each category
@@ -113,16 +114,16 @@ public:
     [[nodiscard]] const std::set<std::string>& AvailableShipHulls() const;         ///< Returns the set of ship hull names that that the empire can currently build
 
     [[nodiscard]] const std::string&           TopPriorityEnqueuedTech() const;
-    [[nodiscard]] const std::string&           MostExpensiveEnqueuedTech() const;
-    [[nodiscard]] const std::string&           LeastExpensiveEnqueuedTech() const;
+    [[nodiscard]] const std::string&           MostExpensiveEnqueuedTech(const ScriptingContext& context) const;
+    [[nodiscard]] const std::string&           LeastExpensiveEnqueuedTech(const ScriptingContext& context) const;
     [[nodiscard]] const std::string&           MostRPSpentEnqueuedTech() const;
-    [[nodiscard]] const std::string&           MostRPCostLeftEnqueuedTech() const;
+    [[nodiscard]] const std::string&           MostRPCostLeftEnqueuedTech(const ScriptingContext& context) const;
 
     [[nodiscard]] const std::string&           TopPriorityResearchableTech() const;
     [[nodiscard]] const std::string&           MostExpensiveResearchableTech() const;
-    [[nodiscard]] const std::string&           LeastExpensiveResearchableTech() const;
+    [[nodiscard]] const std::string&           LeastExpensiveResearchableTech(const ScriptingContext& context) const;
     [[nodiscard]] const std::string&           MostRPSpentResearchableTech() const;
-    [[nodiscard]] const std::string&           MostRPCostLeftResearchableTech() const;
+    [[nodiscard]] const std::string&           MostRPCostLeftResearchableTech(const ScriptingContext& context) const;
 
     [[nodiscard]] const Meter*                                 GetMeter(const std::string& name) const;
     [[nodiscard]] std::map<std::string, Meter>::const_iterator meter_begin() const { return m_meters.begin(); }
@@ -133,7 +134,7 @@ public:
     [[nodiscard]] const InfluenceQueue&   GetInfluenceQueue() const;                  ///< Returns the queue of items being funded with influence.
 
     [[nodiscard]] bool        ResearchableTech(const std::string& name) const;        ///< Returns true iff \a name is a tech that has not been researched, and has no unresearched prerequisites.
-    [[nodiscard]] float       ResearchProgress(const std::string& name) const;        ///< Returns the RPs spent towards tech \a name if it has partial research progress, or 0.0 if it is already researched.
+    [[nodiscard]] float       ResearchProgress(const std::string& name, const ScriptingContext& context) const;        ///< Returns the RPs spent towards tech \a name if it has partial research progress, or 0.0 if it is already researched.
     [[nodiscard]] bool        TechResearched(const std::string& name) const;          ///< Returns true iff this tech has been completely researched.
     [[nodiscard]] bool        HasResearchedPrereqAndUnresearchedPrereq(const std::string& name) const;    ///< Returns true iff this tech has some but not all prerequisites researched
     [[nodiscard]] TechStatus  GetTechStatus(const std::string& name) const;           ///< Returns the status (researchable, researched, unresearchable) for this tech for this
@@ -215,10 +216,15 @@ public:
     void AdoptPolicy(const std::string& name, const std::string& category,
                      const ScriptingContext& context, bool adopt = true, int slot = -1);
 
+    /** Reverts adopted policies to the initial state for the current turn.
+      * Does not verify if the initial adopted policies were in a valid
+      * configuration.*/
+    void RevertPolicies();
+
     /** Checks that all policy adoption conditions are met, removing any that
       * are not allowed. Also copies adopted policies to initial adopted
       * policies. Updates how many turns each policy has (ever) been adopted. */
-    void UpdatePolicies(bool update_cumulative_adoption_time);
+    void UpdatePolicies(bool update_cumulative_adoption_time, int current_turn);
 
     /** Returns the meter with the indicated \a name if it exists, or nullptr. */
     [[nodiscard]] Meter* GetMeter(const std::string& name);
@@ -238,7 +244,8 @@ public:
     void ResumeResearch(const std::string& name);
 
     /** Sets research progress of tech with \a name to \a progress. */
-    void SetTechResearchProgress(const std::string& name, float progress);
+    void SetTechResearchProgress(const std::string& name, float progress,
+                                 const ScriptingContext& context);
 
     /** Adds the indicated build to the production queue, placing it before
       * position \a pos.  If \a pos < 0 or queue.size() <= pos, the build is
@@ -287,10 +294,10 @@ public:
     void AddShipDesign(int ship_design_id, const Universe& universe, int next_design_id = INVALID_DESIGN_ID);
     int AddShipDesign(ShipDesign* ship_design, Universe& universe); ///< inserts given ShipDesign into the Universe, adds the design's id to the Empire's set of ids, and returns the new design's id, which is INVALID_OBJECT_ID on failure.  If successful, universe takes ownership of passed ShipDesign.
 
-    [[nodiscard]] std::string NewShipName();                        ///< generates a random ship name, appending II, III, etc., to it if it has been used before by this empire
-    void Eliminate(EmpireManager& empires = Empires());             ///< Marks empire as eliminated and cleans up empire after it is eliminated.  Queues are cleared, capital is reset, and other state info not relevant to an eliminated empire is cleared
+    [[nodiscard]] std::string NewShipName();         ///< generates a random ship name, appending II, III, etc., to it if it has been used before by this empire
+    void Eliminate(EmpireManager& empires);          ///< Marks empire as eliminated and cleans up empire after it is eliminated.  Queues are cleared, capital is reset, and other state info not relevant to an eliminated empire is cleared
     /** Marks this empire as having won for this reason, and sends the appropriate sitreps */
-    void Win(const std::string& reason, EmpireManager& empires = Empires());
+    void Win(const std::string& reason, const EmpireManager::container_type& empires);
     void SetReady(bool ready);                       ///< Marks this empire with readiness status
     void AutoTurnSetReady();                         ///< Decreases auto-turn counter and set empire ready if not expired or set unready
     void SetAutoTurn(int turns_count);               ///< Set auto-turn counter
@@ -321,10 +328,11 @@ public:
       * producing objects and systems through which it can be propagated. */
     void UpdateSystemSupplyRanges(const std::set<int>& known_objects, const ObjectMap& objects);
     /** Calculates ranges that systems can send fleet and resource supplies. */
-    void UpdateSystemSupplyRanges(const Universe& universe = GetUniverse());
+    void UpdateSystemSupplyRanges(const Universe& universe);
     /** Calculates systems that can propagate supply (fleet or resource) using
       * the specified set of \a known_systems */
-    void UpdateSupplyUnobstructedSystems(const ScriptingContext& context, const std::set<int>& known_systems,
+    void UpdateSupplyUnobstructedSystems(const ScriptingContext& context,
+                                         const std::set<int>& known_systems,
                                          bool precombat = false);
     /** Calculates systems that can propagate supply using this empire's own /
       * internal list of explored systems. */
@@ -350,7 +358,7 @@ public:
 
     /** Checks for tech projects that have been completed, and returns a vector
       * of the techs that should be added to the known techs list. */
-    std::vector<std::string> CheckResearchProgress();
+    std::vector<std::string> CheckResearchProgress(const ScriptingContext& context);
 
     /** Eventually : Will check for social projects that have been completed and
       * / or process ongoing social projects, and update the empire's influence
@@ -378,7 +386,7 @@ public:
     void UpdateResourcePools(const ScriptingContext& context);
     /** Calls Update() on empire's research queue, which recalculates the RPs
       * spent on and number of turns left for each tech in the queue. */
-    void UpdateResearchQueue(const ObjectMap& objects);
+    void UpdateResearchQueue(const ScriptingContext& context);
     /** Calls Update() on empire's production queue, which recalculates the PPs
       * spent on and number of turns left for each project in the queue. */
     void UpdateProductionQueue(const ScriptingContext& context);
@@ -395,6 +403,10 @@ public:
     void ResetMeters();
 
     void UpdateOwnedObjectCounters(const Universe& universe);
+
+    /** called after loading a saved game, remove obsolete stuff such as no longer
+      * existing policies... */
+    void CheckObsoleteGameContent();
 
     void SetAuthenticated(bool authenticated = true);
 
@@ -511,6 +523,12 @@ private:
         int adoption_turn = INVALID_GAME_TURN;
         int slot_in_category = INVALID_SLOT_INDEX;
         std::string category;
+
+        bool operator==(const PolicyAdoptionInfo& rhs) const {
+            return adoption_turn == rhs.adoption_turn &&
+                   slot_in_category == rhs.slot_in_category &&
+                   category != rhs.category;
+        }
 
         friend class boost::serialization::access;
         template <class Archive>

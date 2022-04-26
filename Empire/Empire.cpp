@@ -61,7 +61,7 @@ Empire::Empire() :
 { Init(); }
 
 Empire::Empire(std::string name, std::string player_name,
-               int empire_id, const EmpireColor& color, bool authenticated) :
+               int empire_id, EmpireColor color, bool authenticated) :
     m_id(empire_id),
     m_name(std::move(name)),
     m_player_name(std::move(player_name)),
@@ -90,9 +90,6 @@ void Empire::Init() {
     for (auto& entry : PolicyCategoriesSlotsMeters())
         m_meters[std::move(entry.second)];
 }
-
-Empire::~Empire()
-{ ClearSitRep(); }
 
 const std::string& Empire::Name() const
 { return m_name; }
@@ -217,7 +214,7 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     }
 
     // are there conflicts with other policies or missing prerequisite policies?
-    if (!PolicyPrereqsAndExclusionsOK(name)) {
+    if (!PolicyPrereqsAndExclusionsOK(name, context.current_turn)) {
         ErrorLogger() << "Empire::AdoptPolicy asked to adopt policy " << name
                       << " whose prerequisites are not met or which has a conflicting exclusion with already-adopted policies";
         return;
@@ -309,7 +306,7 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     // adopt policy in requested category on this turn, unless it was already
     // adopted at the start of this turn, in which case restore / keep its
     // previous adtoption turn
-    int adoption_turn = CurrentTurn();
+    int adoption_turn = context.current_turn;
     auto it = m_initial_adopted_policies.find(name);
     if (it != m_initial_adopted_policies.end())
         adoption_turn = it->second.adoption_turn;
@@ -323,23 +320,14 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     PoliciesChangedSignal();
 }
 
-void Empire::UpdatePolicies(bool update_cumulative_adoption_time) {
-    // remove any unrecognized policies and uncategorized policies
-    auto policies_temp = m_adopted_policies;
-    for (auto& [policy_name, adoption_info] : policies_temp) {
-        const auto* policy = GetPolicy(policy_name);
-        if (!policy) {
-            ErrorLogger() << "UpdatePolicies couldn't find policy with name: " << policy_name;
-            m_adopted_policies.erase(policy_name);
-            continue;
-        }
-
-        if (adoption_info.category.empty()) {
-            ErrorLogger() << "UpdatePolicies found policy " << policy_name << " in empty category?";
-            m_adopted_policies.erase(policy_name);
-        }
+void Empire::RevertPolicies() {
+    if (m_adopted_policies != m_initial_adopted_policies) {
+        m_adopted_policies = m_initial_adopted_policies;
+        PoliciesChangedSignal();
     }
+}
 
+void Empire::UpdatePolicies(bool update_cumulative_adoption_time, int current_turn) {
     // TODO: Check and handle policy exclusions in this function...
 
     // check that there are enough slots for adopted policies in their current slots
@@ -360,7 +348,7 @@ void Empire::UpdatePolicies(bool update_cumulative_adoption_time) {
     for (const auto& cat : categories_needing_rearrangement) {
         DebugLogger() << "Rearranging poilicies in category " << cat << ":";
 
-        policies_temp = m_adopted_policies;
+        auto policies_temp = m_adopted_policies;
 
         // all adopted policies in this category, sorted by slot and adoption turn (lower first)
         std::multimap<std::pair<int, int>, std::string> slots_turns_policies;
@@ -387,7 +375,7 @@ void Empire::UpdatePolicies(bool update_cumulative_adoption_time) {
     // update counters of how many turns each policy has been adopted
     m_policy_adoption_current_duration.clear();
     for (auto& [policy_name, adoption_info] : m_adopted_policies) {
-        m_policy_adoption_current_duration[policy_name] = CurrentTurn() - adoption_info.adoption_turn;
+        m_policy_adoption_current_duration[policy_name] = current_turn - adoption_info.adoption_turn;
 
         if (update_cumulative_adoption_time)
             m_policy_adoption_total_duration[policy_name]++;  // assumes default initialization to 0
@@ -433,7 +421,15 @@ std::vector<std::string_view> Empire::AdoptedPolicies() const {
     std::vector<std::string_view> retval;
     retval.reserve(m_adopted_policies.size());
     for (const auto& entry : m_adopted_policies)
-        retval.emplace_back(entry.first);
+        retval.push_back(entry.first);
+    return retval;
+}
+
+std::vector<std::string_view> Empire::InitialAdoptedPolicies() const {
+    std::vector<std::string_view> retval;
+    retval.reserve(m_initial_adopted_policies.size());
+    for (const auto& entry : m_initial_adopted_policies)
+        retval.push_back(entry.first);
     return retval;
 }
 
@@ -464,13 +460,13 @@ const std::set<std::string, std::less<>>& Empire::AvailablePolicies() const
 bool Empire::PolicyAvailable(std::string_view name) const
 { return m_available_policies.count(name); }
 
-bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name) const {
+bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name, int current_turn) const {
     const std::string name_str{name}; // TODO: remove this when possible for heterogenous lookup
     const Policy* policy_to_adopt = GetPolicy(name_str);
     if (!policy_to_adopt)
         return false;
 
-    // is there an exclusion or prerequisite conflict?
+    // is there an exclusion conflict?
     for (auto& [already_adopted_policy_name, ignored] : m_adopted_policies) {
         (void)ignored; // quiet warning
         if (policy_to_adopt->Exclusions().count(already_adopted_policy_name)) {
@@ -489,13 +485,10 @@ bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name) const {
         }
     }
 
+    // are there any unmet prerequisites (with the initial adopted policies this turn)
     for (const auto& prereq : policy_to_adopt->Prerequisites()) {
-        auto it = m_adopted_policies.find(prereq);
-        if (it == m_adopted_policies.end())
-            return false;
-        // must have adopted policy at least one turn before, to prevent
-        // same-turn policy swapping to bypass prereqs at no cost
-        if (it->second.adoption_turn >= CurrentTurn())
+        auto it = m_initial_adopted_policies.find(prereq);
+        if (it == m_initial_adopted_policies.end() || it->second.adoption_turn >= current_turn)
             return false;
     }
 
@@ -509,15 +502,13 @@ bool Empire::PolicyAffordable(std::string_view name, const ScriptingContext& con
         return false;
     }
 
-    const ObjectMap& objects{context.ContextObjects()};
-
     double other_this_turn_adopted_policies_cost = 0.0;
     for (auto& [adopted_policy_name, adoption_info] : m_adopted_policies) {
-        if (adoption_info.adoption_turn != CurrentTurn())
+        if (adoption_info.adoption_turn != context.current_turn)
             continue;
         auto pre_adopted_policy = GetPolicy(adopted_policy_name);
         if (!pre_adopted_policy) {
-            ErrorLogger() << "Empire::PolicyAffordable couldn't find policy named " << adopted_policy_name << " that was supposedly already adopted this turn (" << CurrentTurn() << ")";
+            ErrorLogger() << "Empire::PolicyAffordable couldn't find policy named " << adopted_policy_name << " that was supposedly already adopted this turn (" << context.current_turn << ")";
             continue;
         }
         DebugLogger() << "Empire::PolicyAffordable : Already adopted policy this turn: " << adopted_policy_name
@@ -631,14 +622,14 @@ bool Empire::HasResearchedPrereqAndUnresearchedPrereq(const std::string& name) c
 const ResearchQueue& Empire::GetResearchQueue() const
 { return m_research_queue; }
 
-float Empire::ResearchProgress(const std::string& name) const {
+float Empire::ResearchProgress(const std::string& name, const ScriptingContext& context) const {
     auto it = m_research_progress.find(name);
     if (it == m_research_progress.end())
         return 0.0f;
     const Tech* tech = GetTech(it->first);
     if (!tech)
         return 0.0f;
-    float tech_cost = tech->ResearchCost(m_id);
+    float tech_cost = tech->ResearchCost(m_id, context);
     return it->second * tech_cost;
 }
 
@@ -663,7 +654,7 @@ const std::string& Empire::TopPriorityEnqueuedTech() const {
     return tech;
 }
 
-const std::string& Empire::MostExpensiveEnqueuedTech() const {
+const std::string& Empire::MostExpensiveEnqueuedTech(const ScriptingContext& context) const {
     if (m_research_queue.empty())
         return EMPTY_STRING;
     float biggest_cost = -99999.9f; // arbitrary small number
@@ -674,7 +665,7 @@ const std::string& Empire::MostExpensiveEnqueuedTech() const {
         const Tech* tech = GetTech(elem.name);
         if (!tech)
             continue;
-        float tech_cost = tech->ResearchCost(m_id);
+        float tech_cost = tech->ResearchCost(m_id, context);
         if (tech_cost > biggest_cost) {
             biggest_cost = tech_cost;
             best_elem = &elem;
@@ -686,7 +677,7 @@ const std::string& Empire::MostExpensiveEnqueuedTech() const {
     return EMPTY_STRING;
 }
 
-const std::string& Empire::LeastExpensiveEnqueuedTech() const {
+const std::string& Empire::LeastExpensiveEnqueuedTech(const ScriptingContext& context) const {
     if (m_research_queue.empty())
         return EMPTY_STRING;
     float smallest_cost = 999999.9f; // arbitrary large number
@@ -697,7 +688,7 @@ const std::string& Empire::LeastExpensiveEnqueuedTech() const {
         const Tech* tech = GetTech(elem.name);
         if (!tech)
             continue;
-        float tech_cost = tech->ResearchCost(m_id);
+        float tech_cost = tech->ResearchCost(m_id, context);
         if (tech_cost < smallest_cost) {
             smallest_cost = tech_cost;
             best_elem = &elem;
@@ -728,7 +719,7 @@ const std::string& Empire::MostRPSpentEnqueuedTech() const {
     return EMPTY_STRING;
 }
 
-const std::string& Empire::MostRPCostLeftEnqueuedTech() const {
+const std::string& Empire::MostRPCostLeftEnqueuedTech(const ScriptingContext& context) const {
     float most_left = -999999.9f;  // arbitrary small number
     const std::map<std::string, float>::value_type* best_progress = nullptr;
 
@@ -741,7 +732,7 @@ const std::string& Empire::MostRPCostLeftEnqueuedTech() const {
         if (!m_research_queue.InQueue(tech_name))
             continue;
 
-        float rp_total_cost = tech->ResearchCost(m_id);
+        float rp_total_cost = tech->ResearchCost(m_id, context);
         float rp_left = std::max(0.0f, rp_total_cost - rp_spent);
 
         if (rp_left > most_left) {
@@ -769,7 +760,7 @@ const std::string& Empire::MostExpensiveResearchableTech() const {
     return EMPTY_STRING;    // TODO: IMPLEMENT THIS
 }
 
-const std::string& Empire::LeastExpensiveResearchableTech() const {
+const std::string& Empire::LeastExpensiveResearchableTech(const ScriptingContext& context) const {
     return EMPTY_STRING;    // TODO: IMPLEMENT THIS
 }
 
@@ -777,7 +768,7 @@ const std::string& Empire::MostRPSpentResearchableTech() const {
     return EMPTY_STRING;    // TODO: IMPLEMENT THIS
 }
 
-const std::string& Empire::MostRPCostLeftResearchableTech() const {
+const std::string& Empire::MostRPCostLeftResearchableTech(const ScriptingContext& context) const {
     return EMPTY_STRING;    // TODO: IMPLEMENT THIS
 }
 
@@ -1046,7 +1037,7 @@ void Empire::Eliminate(EmpireManager& empires) {
 bool Empire::Won() const
 { return !m_victories.empty(); }
 
-void Empire::Win(const std::string& reason, EmpireManager& empires) {
+void Empire::Win(const std::string& reason, const EmpireManager::container_type& empires) {
     if (m_victories.insert(reason).second) {
         for (auto& entry : empires)
             entry.second->AddSitRepEntry(CreateVictorySitRep(reason, EmpireID()));
@@ -1528,7 +1519,9 @@ void Empire::ResumeResearch(const std::string& name){
         it->paused = false;
 }
 
-void Empire::SetTechResearchProgress(const std::string& name, float progress) {
+void Empire::SetTechResearchProgress(const std::string& name, float progress,
+                                     const ScriptingContext& context)
+{
     const Tech* tech = GetTech(name);
     if (!tech) {
         ErrorLogger() << "Empire::SetTechResearchProgress no such tech as: " << name;
@@ -1542,9 +1535,9 @@ void Empire::SetTechResearchProgress(const std::string& name, float progress) {
     m_research_progress[name] = clamped_progress;
 
     // if tech is complete, ensure it is on the queue, so it will be researched next turn
-    if (clamped_progress >= tech->ResearchCost(m_id) &&
-            !m_research_queue.InQueue(name))
-        m_research_queue.push_back(name);
+    if (clamped_progress >= tech->ResearchCost(m_id, context) &&
+        !m_research_queue.InQueue(name))
+    { m_research_queue.push_back(name); }
 
     // don't just give tech to empire, as another effect might reduce its progress before end of turn
 }
@@ -1821,7 +1814,7 @@ void Empire::ApplyNewTechs(Universe& universe, int current_turn) {
             UnlockItem(item, universe, current_turn);  // potential infinite if a tech (in)directly unlocks itself?
 
         if (!m_techs.count(new_tech)) {
-            m_techs[new_tech] = CurrentTurn();
+            m_techs[new_tech] = current_turn;
             AddSitRepEntry(CreateTechResearchedSitRep(new_tech, current_turn));
         }
     }
@@ -1929,7 +1922,7 @@ void Empire::AddExploredSystem(int ID, int turn, const ObjectMap& objects) {
 std::string Empire::NewShipName() {
     static std::vector<std::string> ship_names = UserStringList("SHIP_NAMES");
     if (ship_names.empty())
-        ship_names.emplace_back(UserString("OBJ_SHIP"));
+        ship_names.push_back(UserString("OBJ_SHIP"));
 
     // select name randomly from list
     int ship_name_idx = RandInt(0, static_cast<int>(ship_names.size()) - 1);
@@ -2085,7 +2078,7 @@ namespace {
     }
 }
 
-std::vector<std::string> Empire::CheckResearchProgress() {
+std::vector<std::string> Empire::CheckResearchProgress(const ScriptingContext& context) {
     SanitizeResearchQueue(m_research_queue);
 
     float spent_rp{0.0f};
@@ -2100,12 +2093,12 @@ std::vector<std::string> Empire::CheckResearchProgress() {
             continue;
         }
         float& progress = m_research_progress[elem.name];
-        float tech_cost = tech->ResearchCost(m_id);
+        float tech_cost = tech->ResearchCost(m_id, context);
         progress += elem.allocated_rp / std::max(EPSILON, tech_cost);
         spent_rp += elem.allocated_rp;
-        if (tech->ResearchCost(m_id) - EPSILON <= progress * tech_cost) {
+        if (tech_cost - EPSILON <= progress * tech_cost) {
             m_research_progress.erase(elem.name);
-            to_erase_from_queue_and_grant_next_turn.emplace_back(elem.name);
+            to_erase_from_queue_and_grant_next_turn.push_back(elem.name);
         }
     }
 
@@ -2121,7 +2114,8 @@ std::vector<std::string> Empire::CheckResearchProgress() {
         techs_not_suitable_for_auto_allocation.insert(elem.name);
 
     // for all available and suitable techs, store ordered by cost to complete
-    std::multimap<double, std::string> costs_to_complete_available_unpaused_techs;
+    std::vector<std::pair<double, std::string>> costs_to_complete_available_unpaused_techs;
+    costs_to_complete_available_unpaused_techs.reserve(GetTechManager().size());
     for (const auto& tech : GetTechManager()) {
         const std::string& tech_name = tech->Name();
         if (techs_not_suitable_for_auto_allocation.count(tech_name) > 0)
@@ -2130,32 +2124,33 @@ std::vector<std::string> Empire::CheckResearchProgress() {
             continue;
         if (!tech->Researchable())
             continue;
-        double progress = this->ResearchProgress(tech_name);
-        double total_cost = tech->ResearchCost(m_id);
+        double progress = this->ResearchProgress(tech_name, context);
+        double total_cost = tech->ResearchCost(m_id, context);
         if (progress >= total_cost)
             continue;
-        costs_to_complete_available_unpaused_techs.emplace(total_cost - progress, tech_name);
+        costs_to_complete_available_unpaused_techs.emplace_back(total_cost - progress, tech_name);
     }
+    std::sort(costs_to_complete_available_unpaused_techs.begin(),
+              costs_to_complete_available_unpaused_techs.end());
 
     // in order of minimum additional cost to complete, allocate RP to
     // techs up to available RP and per-turn limits
-    for (auto const& cost_tech : costs_to_complete_available_unpaused_techs) {
+    for (auto const& [tech_cost, tech_name] : costs_to_complete_available_unpaused_techs) {
         if (rp_left_to_spend <= EPSILON)
             break;
 
-        const Tech* tech = GetTech(cost_tech.second);
+        const Tech* tech = GetTech(tech_name);
         if (!tech)
             continue;
 
         //DebugLogger() << "extra tech: " << cost_tech.second << " needs: " << cost_tech.first << " more RP to finish";
 
-        float RPs_per_turn_limit = tech->PerTurnCost(m_id);
-        float tech_total_cost = tech->ResearchCost(m_id);
-        float progress_fraction = m_research_progress[cost_tech.second];
+        float RPs_per_turn_limit = tech->PerTurnCost(m_id, context);
+        float progress_fraction = m_research_progress[tech_name];
 
         float progress_fraction_left = 1.0f - progress_fraction;
-        float max_progress_per_turn = RPs_per_turn_limit / tech_total_cost;
-        float progress_possible_with_available_rp = rp_left_to_spend / tech_total_cost;
+        float max_progress_per_turn = RPs_per_turn_limit / static_cast<float>(tech_cost);
+        float progress_possible_with_available_rp = rp_left_to_spend / static_cast<float>(tech_cost);
 
         //DebugLogger() << "... progress left: " << progress_fraction_left
         //              << " max per turn: " << max_progress_per_turn
@@ -2165,13 +2160,13 @@ std::vector<std::string> Empire::CheckResearchProgress() {
             progress_fraction_left,
             std::min(max_progress_per_turn, progress_possible_with_available_rp));
 
-        float consumed_rp = progress_increase * tech_total_cost;
+        float consumed_rp = progress_increase * static_cast<float>(tech_cost);
 
-        m_research_progress[cost_tech.second] += progress_increase;
+        m_research_progress[tech_name] += progress_increase;
         rp_left_to_spend -= consumed_rp;
 
-        if (tech->ResearchCost(m_id) - EPSILON <= m_research_progress[cost_tech.second] * tech_total_cost)
-            to_erase_from_queue_and_grant_next_turn.emplace_back(cost_tech.second);
+        if (tech_cost - EPSILON <= m_research_progress[tech_name] * tech_cost)
+            to_erase_from_queue_and_grant_next_turn.push_back(tech_name);
 
         //DebugLogger() << "... allocated: " << consumed_rp << " to increase progress by: " << progress_increase;
     }
@@ -2198,6 +2193,9 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
     std::map<int, std::vector<std::shared_ptr<Ship>>> system_new_ships;
     std::map<int, int> new_ship_rally_point_ids;
 
+    auto& universe = context.ContextUniverse();
+
+
     // preprocess the queue to get all the costs and times of all items
     // at every location at which they are being produced,
     // before doing any generation of new objects or other modifications
@@ -2211,7 +2209,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
 
     for (auto& elem : m_production_queue) {
         // for items that don't depend on location, only store cost/time once
-        int location_id = (elem.item.CostIsProductionLocationInvariant(context.ContextUniverse()) ? INVALID_OBJECT_ID : elem.location);
+        int location_id = (elem.item.CostIsProductionLocationInvariant(universe) ? INVALID_OBJECT_ID : elem.location);
         auto key = std::make_pair(elem.item, location_id);
 
         if (!queue_item_costs_and_times.count(key))
@@ -2233,7 +2231,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
         int build_turns;
 
         // for items that don't depend on location, only store cost/time once
-        int location_id = (elem.item.CostIsProductionLocationInvariant(context.ContextUniverse()) ? INVALID_OBJECT_ID : elem.location);
+        int location_id = (elem.item.CostIsProductionLocationInvariant(universe) ? INVALID_OBJECT_ID : elem.location);
         std::pair<ProductionQueue::ProductionItem, int> key(elem.item, location_id);
 
         std::tie(item_cost, build_turns) = queue_item_costs_and_times[key];
@@ -2385,7 +2383,8 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
             auto planet = context.ContextObjects().get<Planet>(elem.location);
 
             // create new building
-            auto building = context.ContextUniverse().InsertNew<Building>(m_id, elem.item.name, m_id);
+            auto building = universe.InsertNew<Building>(m_id, elem.item.name,
+                                                         m_id, context.current_turn);
             planet->AddBuilding(building->ID());
             building->SetPlanetID(planet->ID());
             system->Insert(building);
@@ -2393,8 +2392,9 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
             // record building production in empire stats
             m_building_types_produced[elem.item.name]++;
 
-            AddSitRepEntry(CreateBuildingBuiltSitRep(building->ID(), planet->ID(), context.current_turn));
-            DebugLogger() << "New Building created on turn: " << CurrentTurn();
+            AddSitRepEntry(CreateBuildingBuiltSitRep(building->ID(), planet->ID(),
+                                                     context.current_turn));
+            DebugLogger() << "New Building created on turn: " << context.current_turn;
             break;
         }
 
@@ -2417,7 +2417,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
             // else give up...
             if (species_name.empty()) {
                 // only really a problem for colony ships, which need to have a species to function
-                const auto* design = context.ContextUniverse().GetShipDesign(elem.item.design_id);
+                const auto* design = universe.GetShipDesign(elem.item.design_id);
                 if (!design) {
                     ErrorLogger() << "Couldn't get ShipDesign with id: " << elem.item.design_id;
                     break;
@@ -2432,8 +2432,9 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
 
             for (int count = 0; count < elem.blocksize; count++) {
                 // create ship
-                ship = context.ContextUniverse().InsertNew<Ship>(
-                    m_id, elem.item.design_id, species_name, context.ContextUniverse(), m_id);
+                ship = universe.InsertNew<Ship>(
+                    m_id, elem.item.design_id, species_name, universe,
+                    context.species, m_id, context.current_turn);
                 system->Insert(ship);
 
                 // record ship production in empire stats
@@ -2454,18 +2455,19 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 // everything that is traced with an associated max meter.
                 ship->SetShipMetersToMax();
                 // set ship speed so that it can be affected by non-zero speed checks
-                if (auto* design = context.ContextUniverse().GetShipDesign(elem.item.design_id))
+                if (auto* design = universe.GetShipDesign(elem.item.design_id))
                     ship->GetMeter(MeterType::METER_SPEED)->Set(design->Speed(), design->Speed());
                 ship->BackPropagateMeters();
 
                 ship->Rename(NewShipName());
 
                 // store ships to put into fleets later
+                const auto SHIP_ID = ship->ID();
                 system_new_ships[system->ID()].push_back(ship);
 
                 // store ship rally points
                 if (elem.rally_point_id != INVALID_OBJECT_ID)
-                    new_ship_rally_point_ids[ship->ID()] = elem.rally_point_id;
+                    new_ship_rally_point_ids[SHIP_ID] = elem.rally_point_id;
             }
             // add sitrep
             if (elem.blocksize == 1) {
@@ -2497,14 +2499,12 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
     }
 
     // create fleets for new ships and put ships into fleets
-    for (auto& entry : system_new_ships) {
-        auto system = context.ContextObjects().get<System>(entry.first);
+    for (auto& [system_id, new_ships] : system_new_ships) {
+        auto system = context.ContextObjects().get<System>(system_id);
         if (!system) {
-            ErrorLogger() << "Couldn't get system with id " << entry.first << " for creating new fleets for newly produced ships";
+            ErrorLogger() << "Couldn't get system with id " << system_id << " for creating new fleets for newly produced ships";
             continue;
         }
-
-        auto& new_ships = entry.second;
         if (new_ships.empty())
             continue;
 
@@ -2513,13 +2513,14 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
             new_ships_by_rally_point_id_and_design_id;
         for (auto& ship : new_ships) {
             int rally_point_id = INVALID_OBJECT_ID;
-
             auto rally_it = new_ship_rally_point_ids.find(ship->ID());
             if (rally_it != new_ship_rally_point_ids.end())
                 rally_point_id = rally_it->second;
 
-            new_ships_by_rally_point_id_and_design_id[rally_point_id][ship->DesignID()].emplace_back(ship);
+            auto design_id = ship->DesignID();
+            new_ships_by_rally_point_id_and_design_id[rally_point_id][design_id].push_back(std::move(ship));
         }
+
 
         // create fleets for ships with the same rally point, grouped by
         // ship design
@@ -2539,15 +2540,16 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 // create a single fleet for combat ships and individual
                 // fleets for non-combat ships
                 bool individual_fleets = !(   (*ships.begin())->IsArmed(context)
-                                           || (*ships.begin())->HasFighters(context.ContextUniverse())
-                                           || (*ships.begin())->CanHaveTroops(context.ContextUniverse())
-                                           || (*ships.begin())->CanBombard(context.ContextUniverse()));
+                                           || (*ships.begin())->HasFighters(universe)
+                                           || (*ships.begin())->CanHaveTroops(universe)
+                                           || (*ships.begin())->CanBombard(universe));
 
                 std::vector<std::shared_ptr<Fleet>> fleets;
                 std::shared_ptr<Fleet> fleet;
 
                 if (!individual_fleets) {
-                    fleet = context.ContextUniverse().InsertNew<Fleet>("", system->X(), system->Y(), m_id);
+                    fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(), m_id,
+                                                      context.current_turn);
 
                     system->Insert(fleet);
                     // set prev system to prevent conflicts with CalculateRouteTo used for
@@ -2558,12 +2560,13 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                     // set invalid arrival starlane so that fleet won't necessarily be free from blockades
                     fleet->SetArrivalStarlane(INVALID_OBJECT_ID);
 
-                    fleets.emplace_back(fleet);
+                    fleets.push_back(fleet); // can't move
                 }
 
                 for (auto& ship : ships) {
                     if (individual_fleets) {
-                        fleet = context.ContextUniverse().InsertNew<Fleet>("", system->X(), system->Y(), m_id);
+                        fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(),
+                                                          m_id, context.current_turn);
 
                         system->Insert(fleet);
                         // set prev system to prevent conflicts with CalculateRouteTo used for
@@ -2574,7 +2577,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                         // set invalid arrival starlane so that fleet won't necessarily be free from blockades
                         fleet->SetArrivalStarlane(INVALID_OBJECT_ID);
 
-                        fleets.push_back(fleet);
+                        fleets.push_back(fleet); // can't move
                     }
                     ship_ids.push_back(ship->ID());
                     fleet->AddShips({ship->ID()});
@@ -2590,10 +2593,10 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
 
                     if (rally_point_id != INVALID_OBJECT_ID) {
                         if (context.ContextObjects().get<System>(rally_point_id)) {
-                            next_fleet->CalculateRouteTo(rally_point_id, context.ContextUniverse());
+                            next_fleet->CalculateRouteTo(rally_point_id, universe);
                         } else if (auto rally_obj = context.ContextObjects().get(rally_point_id)) {
                             if (context.ContextObjects().get<System>(rally_obj->SystemID()))
-                                next_fleet->CalculateRouteTo(rally_obj->SystemID(), context.ContextUniverse());
+                                next_fleet->CalculateRouteTo(rally_obj->SystemID(), universe);
                         } else {
                             ErrorLogger() << "Unable to find system to route to with rally point id: " << rally_point_id;
                         }
@@ -2681,15 +2684,16 @@ void Empire::UpdateResourcePools(const ScriptingContext& context) {
     // updating queues, allocated_rp, distribution and growth each update their
     // respective pools, (as well as the ways in which the resources are used,
     // which needs to be done simultaneously to keep things consistent)
-    UpdateResearchQueue(context.ContextObjects());
+    UpdateResearchQueue(context);
     UpdateProductionQueue(context);
     UpdateInfluenceSpending(context);
     UpdatePopulationGrowth(context.ContextObjects());
 }
 
-void Empire::UpdateResearchQueue(const ObjectMap& objects) {
-    m_resource_pools[ResourceType::RE_RESEARCH]->Update(objects);
-    m_research_queue.Update(m_resource_pools[ResourceType::RE_RESEARCH]->TotalAvailable(), m_research_progress);
+void Empire::UpdateResearchQueue(const ScriptingContext& context) {
+    m_resource_pools[ResourceType::RE_RESEARCH]->Update(context.ContextObjects());
+    m_research_queue.Update(m_resource_pools[ResourceType::RE_RESEARCH]->TotalAvailable(),
+                            m_research_progress, context);
     m_resource_pools[ResourceType::RE_RESEARCH]->ChangedSignal();
 }
 
@@ -2783,6 +2787,34 @@ void Empire::UpdateOwnedObjectCounters(const Universe& universe) {
         m_building_types_owned[building->BuildingTypeName()]++;
     }
 }
+
+
+void Empire::CheckObsoleteGameContent() {
+    // remove any unrecognized policies and uncategorized policies
+    auto policies_temp = m_adopted_policies;
+    for (auto& [policy_name, adoption_info] : policies_temp) {
+        const auto* policy = GetPolicy(policy_name);
+        if (!policy) {
+            ErrorLogger() << "UpdatePolicies couldn't find policy with name: " << policy_name;
+            m_adopted_policies.erase(policy_name);
+            continue;
+        }
+
+        if (adoption_info.category.empty()) {
+            ErrorLogger() << "UpdatePolicies found policy " << policy_name << " in empty category?";
+            m_adopted_policies.erase(policy_name);
+        }
+    }
+    auto policies_temp2 = m_available_policies;
+    for (auto& policy_name : policies_temp2) {
+        const auto* policy = GetPolicy(policy_name);
+        if (!policy) {
+            ErrorLogger() << "UpdatePolicies couldn't find policy with name: " << policy_name;
+            m_available_policies.erase(policy_name);
+        }
+    }
+}
+
 
 void Empire::SetAuthenticated(bool authenticated /*= true*/)
 { m_authenticated = authenticated; }

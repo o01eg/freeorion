@@ -134,33 +134,39 @@ Universe::Universe() :
 {}
 
 Universe& Universe::operator=(Universe&& other) noexcept {
-    if (this != &other) {
-        m_pathfinder = std::move(other.m_pathfinder);
-        m_objects = std::move(other.m_objects);
-        m_empire_latest_known_objects = std::move(other.m_empire_latest_known_objects);
-        m_destroyed_object_ids = std::move(other.m_destroyed_object_ids);
-        m_empire_object_visibility = std::move(other.m_empire_object_visibility);
-        m_empire_object_visibility_turns = std::move(other.m_empire_object_visibility_turns);
-        m_effect_specified_empire_object_visibilities = std::move(other.m_effect_specified_empire_object_visibilities);
-        m_empire_object_visible_specials = std::move(other.m_empire_object_visible_specials);
-        m_empire_known_destroyed_object_ids = std::move(other.m_empire_known_destroyed_object_ids);
-        m_empire_stale_knowledge_object_ids = std::move(other.m_empire_stale_knowledge_object_ids);
-        m_ship_designs = std::move(other.m_ship_designs);
-        m_empire_known_ship_design_ids = std::move(other.m_empire_known_ship_design_ids);
-        m_effect_accounting_map = std::move(other.m_effect_accounting_map);
-        m_effect_discrepancy_map = std::move(other.m_effect_discrepancy_map);
-        m_marked_destroyed = std::move(other.m_marked_destroyed);
-        m_universe_width = std::move(other.m_universe_width);
-        m_inhibit_universe_object_signals = std::move(other.m_inhibit_universe_object_signals);
-        m_stat_records = std::move(other.m_stat_records);
-        m_unlocked_items = std::move(other.m_unlocked_items);
-        m_unlocked_buildings = std::move(other.m_unlocked_buildings);
-        m_unlocked_fleet_plans = std::move(other.m_unlocked_fleet_plans);
-        m_monster_fleet_plans = std::move(other.m_monster_fleet_plans);
-        m_empire_stats = std::move(other.m_empire_stats);
-        m_object_id_allocator = std::move(other.m_object_id_allocator);
-        m_design_id_allocator = std::move(other.m_design_id_allocator);
-    }
+    if (this == &other)
+        return *this;
+
+    m_pathfinder = std::move(other.m_pathfinder);
+    m_objects = std::move(other.m_objects);
+    m_empire_latest_known_objects = std::move(other.m_empire_latest_known_objects);
+    m_destroyed_object_ids = std::move(other.m_destroyed_object_ids);
+    m_empire_object_visibility = std::move(other.m_empire_object_visibility);
+    m_empire_object_visibility_turns = std::move(other.m_empire_object_visibility_turns);
+    m_effect_specified_empire_object_visibilities = std::move(other.m_effect_specified_empire_object_visibilities);
+    m_empire_object_visible_specials = std::move(other.m_empire_object_visible_specials);
+    m_empire_known_destroyed_object_ids = std::move(other.m_empire_known_destroyed_object_ids);
+    m_empire_stale_knowledge_object_ids = std::move(other.m_empire_stale_knowledge_object_ids);
+    m_ship_designs = std::move(other.m_ship_designs);
+    m_empire_known_ship_design_ids = std::move(other.m_empire_known_ship_design_ids);
+    m_effect_accounting_map = std::move(other.m_effect_accounting_map);
+    m_effect_discrepancy_map = std::move(other.m_effect_discrepancy_map);
+    m_marked_destroyed = std::move(other.m_marked_destroyed);
+    m_universe_width = other.m_universe_width;
+    m_inhibit_universe_object_signals = other.m_inhibit_universe_object_signals;
+    m_stat_records = std::move(other.m_stat_records);
+    m_unlocked_items = std::move(other.m_unlocked_items);
+    m_unlocked_buildings = std::move(other.m_unlocked_buildings);
+    m_unlocked_fleet_plans = std::move(other.m_unlocked_fleet_plans);
+    m_monster_fleet_plans = std::move(other.m_monster_fleet_plans);
+    m_empire_stats = std::move(other.m_empire_stats);
+    m_object_id_allocator = std::move(other.m_object_id_allocator);
+    m_design_id_allocator = std::move(other.m_design_id_allocator);
+
+    // use the Universe u's flag to enable/disable StateChangedSignal for these UniverseObject
+    for (auto& obj : m_objects->all())
+        obj->SetSignalCombiner(*this);
+
     return *this;
 }
 
@@ -443,15 +449,11 @@ std::set<std::string> Universe::GetObjectVisibleSpecialsByEmpire(int object_id, 
     }
 }
 
-int Universe::GenerateObjectID() {
-    auto new_id = m_object_id_allocator->NewID();
-    return new_id;
-}
+int Universe::GenerateObjectID()
+{ return m_object_id_allocator->NewID(*this); }
 
-int Universe::GenerateDesignID() {
-    auto new_id = m_design_id_allocator->NewID();
-    return new_id;
-}
+int Universe::GenerateDesignID()
+{ return m_design_id_allocator->NewID(*this); }
 
 void Universe::ObfuscateIDGenerator() {
     m_object_id_allocator->ObfuscateBeforeSerialization();
@@ -476,8 +478,10 @@ void Universe::InsertIDCore(std::shared_ptr<UniverseObject> obj, int id) {
         obj->SetID(INVALID_OBJECT_ID);
         return;
     }
-
     obj->SetID(id);
+
+    obj->StateChangedSignal.set_combiner(UniverseObject::CombinerType{*this});
+
     m_objects->insert(std::move(obj));
 }
 
@@ -558,7 +562,7 @@ void Universe::ApplyAllEffectsAndUpdateMeters(ScriptingContext& context, bool do
     // turn) and active meters have the proper baseline from which to
     // accumulate changes from effects
     ResetAllObjectMeters(true, true);
-    for ([[maybe_unused]] auto& [empire_id, empire] : context.Empires()) {
+    for ([[maybe_unused]] auto& [empire_id, empire] : context.Empires().GetEmpires()) {
         (void)empire_id;    // quieting unused variable warning
         empire->ResetMeters();
     }
@@ -941,7 +945,7 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec,
                     continue;
 
                 TraceLogger(effects) << "object " << obj->ID() << " has meter " << type
-                                     << ": discrepancy: " << discrepancy << " and : " << meter->Dump();
+                                     << ": discrepancy: " << discrepancy << " and : " << meter->Dump().data();
 
                 meter->AddToCurrent(discrepancy);
 
@@ -1103,6 +1107,9 @@ namespace {
 
         // evaluate activation conditions of effects_groups on input source objects
         std::vector<Condition::ObjectSet> active_sources{effects_groups.size()};
+        std::vector<std::pair<std::size_t, std::future<Condition::ObjectSet>>> futures;
+        futures.reserve(active_sources.size());
+
 
         for (std::size_t i = 0; i < effects_groups.size(); ++i) {
             const auto* effects_group = effects_groups.at(i).get();
@@ -1121,7 +1128,8 @@ namespace {
             bool cache_hit = false;
             for (const auto& cond_idx : already_evaluated_activation_condition_idx) {
                 if (*cond_idx.first == *(effects_group->Activation())) {
-                    active_sources[i] = active_sources[cond_idx.second];    // copy previous condition evaluation result
+                    // get later after everything has evaluated...
+                    //active_sources[i] = active_sources[cond_idx.second];    // copy previous condition evaluation result
                     cache_hit = true;
                     break;
                 }
@@ -1130,29 +1138,61 @@ namespace {
                 continue;   // don't need to evaluate activation condition on these sources again
 
             // no cache hit; need to evaluate activation condition on input source objects
-            if (effects_group->Activation()->SourceInvariant()) {
-                // can apply condition to all source objects simultaneously
-                Condition::ObjectSet rejected;
-                rejected.reserve(source_objects.size());
-                active_sources[i] = source_objects; // copy input source objects set
-                context.source = nullptr;
-                effects_group->Activation()->Eval(context, active_sources[i],
-                                                  rejected, Condition::SearchDomain::MATCHES);
+            auto eval_active_sources = [
+                &source_objects,
+                &context,
+                activation{effects_group->Activation()}
+            ]() -> Condition::ObjectSet
+            {
+                Condition::ObjectSet retval;
 
-            } else {
-                // need to apply separately to each source object
-                active_sources[i].reserve(source_objects.size());
-                for (auto& obj : source_objects) {
-                    context.source = obj;
-                    if (effects_group->Activation()->Eval(context, obj))
-                        active_sources[i].push_back(obj);
+                if (activation->SourceInvariant()) {
+                    // can apply condition to all source objects simultaneously
+                    Condition::ObjectSet rejected;
+                    rejected.reserve(source_objects.size());
+                    retval = source_objects;
+                    ScriptingContext source_context{nullptr, context};
+                    activation->Eval(source_context, retval, rejected, Condition::SearchDomain::MATCHES);
+
+                } else {
+                    // need to apply separately to each source object
+                    ScriptingContext source_context{context};
+                    retval.reserve(source_objects.size());
+                    for (auto& obj : source_objects) {
+                        source_context.source = obj;
+                        if (activation->Eval(source_context, obj))
+                            retval.push_back(std::move(source_context.source));
+                    }
                 }
-            }
+
+                return retval;
+            };
+
+            futures.emplace_back(i, std::async(std::launch::async, eval_active_sources));
 
             // save evaluation lookup index in cache
             already_evaluated_activation_condition_idx.emplace_back(effects_group->Activation(), i);
         }
 
+        for (auto& [i, fut] : futures)
+            active_sources[i] = fut.get();
+
+
+        // loop over effects groups again, copying the cached results
+        for (std::size_t i = 0; i < effects_groups.size(); ++i) {
+            const auto* effects_group = effects_groups.at(i).get();
+            if (only_meter_effects && !effects_group->HasMeterEffects())
+                continue;
+            if (!effects_group->Scope() || !effects_group->Activation())
+                continue;
+
+            for (const auto& cond_idx : already_evaluated_activation_condition_idx) {
+                if (*cond_idx.first == *(effects_group->Activation())) {
+                    active_sources[i] = active_sources[cond_idx.second];    // copy previous condition evaluation result
+                    break;
+                }
+            }
+        }
 
         TraceLogger(effects) << [&]() {
             std::stringstream ss;
@@ -1329,9 +1369,9 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     int n = 0;  // count dispatched condition evaluations
 
 
-    // 1) EffectsGroups from Species
-    type_timer.EnterSection("species");
-    TraceLogger(effects) << "Universe::GetEffectsAndTargets for SPECIES";
+    // 1) EffectsGroups from Planet Species
+    type_timer.EnterSection("planet species");
+    TraceLogger(effects) << "Universe::GetEffectsAndTargets for PLANET SPECIES";
     std::map<std::string_view, std::vector<std::shared_ptr<const UniverseObject>>> species_objects;
     // find each species planets in single pass, maintaining object map order per-species
     for (auto& planet : context.ContextObjects().all<Planet>()) {
@@ -1347,7 +1387,30 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         }
         species_objects[species_name].push_back(planet);
     }
+    // allocate storage for target sets and dispatch condition evaluations
+    for ([[maybe_unused]] auto& [species_name, species] : context.species) {
+        auto species_objects_it = species_objects.find(species_name);
+        if (species_objects_it == species_objects.end())
+            continue;
+        const auto& source_objects = species_objects_it->second;
+        if (source_objects.empty())
+            continue;
+
+        DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_SPECIES, species_name,
+                                             source_objects, species->Effects(),
+                                             only_meter_effects,
+                                             context, potential_targets,
+                                             potential_ids_set,
+                                             source_effects_targets_causes_reorder_buffer,
+                                             thread_pool, n);
+    }
+
+
+    // 1.5) EffectsGroups from Ship Species
     // find each species ships in single pass, maintaining object map order per-species
+    type_timer.EnterSection("ship species");
+    TraceLogger(effects) << "Universe::GetEffectsAndTargets for SHIP SPECIES";
+    species_objects.clear();
     for (auto& ship : context.ContextObjects().all<Ship>()) {
         if (destroyed_object_ids.count(ship->ID()))
             continue;
@@ -1378,6 +1441,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
                                              source_effects_targets_causes_reorder_buffer,
                                              thread_pool, n);
     }
+
 
     // 2) EffectsGroups from Specials
     type_timer.EnterSection("specials");
@@ -1421,7 +1485,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     type_timer.EnterSection("techs");
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for TECHS";
     std::vector<Condition::ObjectSet> tech_sources;   // for each empire, a set with a single source object for all its techs
-    tech_sources.reserve(context.Empires().size());
+    tech_sources.reserve(context.Empires().NumEmpires());
     // select a source object for each empire and dispatch condition evaluations
     for (auto& [empire_id, empire] : context.Empires()) {
         (void)empire_id;    // quiet unused variable warning
@@ -1451,7 +1515,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     type_timer.EnterSection("policies");
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for POLICIES";
     std::vector<Condition::ObjectSet> policy_sources; // for each empire, a set with a single source object for all its policies
-    policy_sources.reserve(context.Empires().size());
+    policy_sources.reserve(context.Empires().NumEmpires());
     for (const auto& [empire_id, empire] : context.Empires()) {
         (void)empire_id;    // quiet unused varianle warning
         auto source = empire->Source(context.ContextObjects());
@@ -1675,8 +1739,13 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
     for (auto& [priority, setc] : source_effects_targets_causes) {
         (void)priority; // quiet unused variable warning
 
+        // check each effects group to see if it should execute...
+        std::vector<bool> executed_effects_group_flags(setc.size(), false);
+
+        std::size_t check_group_idx = 0;
         for (auto& [sourced_effects_group, targets_and_cause] : setc) {
             Effect::TargetSet& target_set{targets_and_cause.target_set};
+            auto current_group_idx = check_group_idx++;
 
             const Effect::EffectsGroup* effects_group = sourced_effects_group.effects_group;
 
@@ -1718,10 +1787,28 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
             if (target_set.empty())
                 continue;
 
+            // mark this effectsgroup to be executed below...
+            executed_effects_group_flags[current_group_idx] = true;
+        }
+
+        TraceLogger(effects) << "ExecuteEffects priority " << priority << " executing " << [&executed_effects_group_flags]() {
+            std::size_t count = 0;
+            for (auto b : executed_effects_group_flags)
+                count += b;
+            return count;
+        }() << " of " << setc.size() << " source_effects_targets_causes";
+
+        // actually execute effectsgroups that were determined to fire...
+        check_group_idx = 0;
+        for (auto& [sourced_effects_group, targets_and_cause] : setc) {
+            if (!executed_effects_group_flags[check_group_idx++])
+                continue;
+            const Effect::EffectsGroup* effects_group = sourced_effects_group.effects_group;
+
             TraceLogger(effects) << "\n\n * * * * * * * * * * * (new effects group log entry)("
-                                 << " content: " << effects_group->TopLevelContent()
-                                 << "  acc.label: " << effects_group->AccountingLabel()
-                                 << "  stack grp: " << effects_group->StackingGroup() << " )";
+            << " content: " << effects_group->TopLevelContent()
+            << "  acc.label: " << effects_group->AccountingLabel()
+            << "  stack grp: " << effects_group->StackingGroup() << " )";
 
             // execute Effects in the EffectsGroup
             auto source = context.ContextObjects().get(sourced_effects_group.source_object_id);
@@ -1738,6 +1825,9 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
         }
     }
 
+    auto empire_ids = context.EmpireIDs();
+
+
     // actually do destroy effect action.  Executing the effect just marks
     // objects to be destroyed, but doesn't actually do so in order to ensure
     // no interaction in order of effects and source or target objects being
@@ -1750,21 +1840,23 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
         if (!obj)
             continue;
 
+        auto& empires = context.Empires().GetEmpires();
+
         // recording of what species/empire destroyed what other stuff in
         // empire statistics for this destroyed object and any contained objects
         for (int destructor : destructors)
-            CountDestructionInStats(obj_id, destructor, context.Empires());
+            CountDestructionInStats(obj_id, destructor, empires);
 
         for (int contained_obj_id : obj->ContainedObjectIDs()) {
             for (int destructor : destructors)
-                CountDestructionInStats(contained_obj_id, destructor, context.Empires());
+                CountDestructionInStats(contained_obj_id, destructor, empires);
         }
         // not worried about fleets being deleted because all their ships were
         // destroyed...  as of this writing there are no stats tracking
         // destruction of fleets.
 
         // do actual recursive destruction.
-        RecursiveDestroy(obj_id);
+        RecursiveDestroy(obj_id, empire_ids);
     }
 }
 
@@ -1779,7 +1871,8 @@ void Universe::CountDestructionInStats(int object_id, int source_object_id,
     auto source = objects.get(source_object_id);
     if (!source)
         return;
-    if (auto shp = std::dynamic_pointer_cast<const Ship>(obj)) {
+    if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
+        auto shp = std::static_pointer_cast<const Ship>(obj);
         auto source_empire = empires.find(source->Owner());
         if (source_empire != empires.end() && source_empire->second)
             source_empire->second->RecordShipShotDown(*shp);
@@ -1875,11 +1968,16 @@ void Universe::ForgetKnownObject(int empire_id, int object_id) {
     int container_id = obj->ContainerObjectID();
     if (container_id != INVALID_OBJECT_ID) {
         if (auto container = objects.get(container_id)) {
-            if (auto system = std::dynamic_pointer_cast<System>(container))
+            if (container->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
+                auto system = std::static_pointer_cast<System>(container);
                 system->Remove(object_id);
-            else if (auto planet = std::dynamic_pointer_cast<Planet>(container))
+
+            } else if (container->ObjectType() == UniverseObjectType::OBJ_PLANET) {
+                auto planet = std::static_pointer_cast<Planet>(container);
                 planet->RemoveBuilding(object_id);
-            else if (auto fleet = std::dynamic_pointer_cast<Fleet>(container)) {
+
+            } else if (container->ObjectType() == UniverseObjectType::OBJ_FLEET) {
+                auto fleet = std::static_pointer_cast<Fleet>(container);
                 fleet->RemoveShips({object_id});
                 if (fleet->Empty())
                     objects.erase(fleet->ID());
@@ -2167,13 +2265,13 @@ namespace {
     void SetEmpireFieldVisibilitiesFromRanges(
         const std::map<int, std::map<std::pair<double, double>, float>>&
             empire_location_detection_ranges,
-        const ObjectMap& objects)
+        Universe& universe, EmpireManager& empires)
     {
-        Universe& universe = GetUniverse();
+        const ObjectMap& objects{universe.Objects()};
 
         for (const auto& [detecting_empire_id, detector_position_ranges] : empire_location_detection_ranges) {
             double detection_strength = 0.0;
-            const Empire* empire = GetEmpire(detecting_empire_id);
+            const auto empire = empires.GetEmpire(detecting_empire_id);
             if (!empire)
                 continue;
             const Meter* meter = empire->GetMeter("METER_DETECTION_STRENGTH");
@@ -2213,10 +2311,9 @@ namespace {
         const std::map<int, std::map<std::pair<double, double>, float>>&
             empire_location_detection_ranges,
         const std::map<int, std::map<std::pair<double, double>, std::vector<int>>>&
-            empire_location_potentially_detectable_objects)
+            empire_location_potentially_detectable_objects,
+        Universe& universe)
     {
-        Universe& universe = GetUniverse();
-
         for (const auto& [detecting_empire_id, detector_position_ranges] : empire_location_detection_ranges) {
             // for this empire, get objects it could potentially detect
             const auto empire_detectable_objects_it =
@@ -2259,10 +2356,11 @@ namespace {
     }
 
     /** sets all objects visible to all empires */
-    void SetAllObjectsVisibleToAllEmpires(Universe& universe) {
+    void SetAllObjectsVisibleToAllEmpires(Universe& universe,
+                                          const EmpireManager::const_container_type& empires) {
         // set every object visible to all empires
         for (const auto& obj : universe.Objects().all()) {
-            for (auto& [empire_id, empire] : Empires()) {
+            for (auto& [empire_id, empire] : empires) {
                 if (empire->Eliminated())
                     continue;
                 universe.SetEmpireObjectVisibility(empire_id, obj->ID(), Visibility::VIS_FULL_VISIBILITY);
@@ -2274,9 +2372,11 @@ namespace {
     }
 
     /** sets all systems basically visible to all empires */
-    void SetAllSystemsBasicallyVisibleToAllEmpires(Universe& universe) {
+    void SetAllSystemsBasicallyVisibleToAllEmpires(Universe& universe,
+                                                   const EmpireManager& empires)
+    {
         for (const auto& obj : universe.Objects().all<System>()) {
-            for (auto& [empire_id, empire] : Empires()) {
+            for (auto& [empire_id, empire] : empires) {
                 if (empire->Eliminated())
                     continue;
                 universe.SetEmpireObjectVisibility(empire_id, obj->ID(), Visibility::VIS_BASIC_VISIBILITY);
@@ -2287,8 +2387,8 @@ namespace {
     /** sets planets that an empire has at some time had visibility of, which
       * are also in system where an empire owns an object, to be basically
       * visible, and those systems to be partially visible */
-    void SetSameSystemPlanetsVisible(const ObjectMap& objects) {
-        Universe& universe = GetUniverse();
+    void SetSameSystemPlanetsVisible(Universe& universe) {
+        const ObjectMap& objects = universe.Objects();
         // map from empire ID to ID of systems where those empires own at least one object
         std::map<int, std::set<int>> empires_systems_with_owned_objects;
         // get systems where empires have owned objects
@@ -2488,7 +2588,7 @@ namespace {
     {
         // after setting object visibility, similarly set visibility of objects'
         // specials for each empire
-        for (const auto& [empire_id, empire] : Empires()) {
+        for (const auto& [empire_id, empire] : input_context.Empires()) {
             auto& obj_vis_map = empire_object_visibility[empire_id];
             auto& obj_specials_map = empire_object_visible_specials[empire_id];
 
@@ -2599,10 +2699,10 @@ void Universe::UpdateEmpireObjectVisibilities(EmpireManager& empires) {
     m_empire_object_visible_specials.clear();
 
     if (GetGameRules().Get<bool>("RULE_ALL_OBJECTS_VISIBLE")) {
-        SetAllObjectsVisibleToAllEmpires(*this);
+        SetAllObjectsVisibleToAllEmpires(*this, std::as_const(empires).GetEmpires());
         return;
     } else if (GetGameRules().Get<bool>("RULE_ALL_SYSTEMS_VISIBLE")) {
-        SetAllSystemsBasicallyVisibleToAllEmpires(*this);
+        SetAllSystemsBasicallyVisibleToAllEmpires(*this, empires);
     }
 
     SetEmpireOwnedObjectVisibilities(*this);
@@ -2613,10 +2713,11 @@ void Universe::UpdateEmpireObjectVisibilities(EmpireManager& empires) {
         GetEmpiresPositionsPotentiallyDetectableObjects(*m_objects, empires);
 
     SetEmpireObjectVisibilitiesFromRanges(empire_position_detection_ranges,
-                                          empire_position_potentially_detectable_objects);
-    SetEmpireFieldVisibilitiesFromRanges(empire_position_detection_ranges, *m_objects);
+                                          empire_position_potentially_detectable_objects,
+                                          *this);
+    SetEmpireFieldVisibilitiesFromRanges(empire_position_detection_ranges, *this, empires);
 
-    SetSameSystemPlanetsVisible(*m_objects);
+    SetSameSystemPlanetsVisible(*this);
 
     ApplyEffectDerivedVisibilities(empires);
 
@@ -2826,10 +2927,8 @@ void Universe::SetEmpireKnowledgeOfDestroyedObject(int object_id, int empire_id)
         ErrorLogger() << "SetEmpireKnowledgeOfDestroyedObject called with INVALID_OBJECT_ID";
         return;
     }
-    if (!GetEmpire(empire_id)) {
-        ErrorLogger() << "SetEmpireKnowledgeOfDestroyedObject called for invalid empire id: " << empire_id;
+    if (empire_id == ALL_EMPIRES)
         return;
-    }
     m_empire_known_destroyed_object_ids[empire_id].insert(object_id);
 }
 
@@ -2846,7 +2945,9 @@ void Universe::SetEmpireKnowledgeOfShipDesign(int ship_design_id, int empire_id)
     m_empire_known_ship_design_ids[empire_id].insert(ship_design_id);
 }
 
-void Universe::Destroy(int object_id, bool update_destroyed_object_knowers/* = true*/) {
+void Universe::Destroy(int object_id, const std::vector<int>& empires_ids,
+                       bool update_destroyed_object_knowers)
+{
     // remove object from any containing UniverseObject
     auto obj = m_objects->get(object_id);
     if (!obj) {
@@ -2858,8 +2959,7 @@ void Universe::Destroy(int object_id, bool update_destroyed_object_knowers/* = t
 
     if (update_destroyed_object_knowers) {
         // record empires that know this object has been destroyed
-        for (auto& empire_entry : Empires()) {
-            int empire_id = empire_entry.first;
+        for (auto empire_id : empires_ids) {
             if (obj->GetVisibility(empire_id, *this) >= Visibility::VIS_BASIC_VISIBILITY) {
                 SetEmpireKnowledgeOfDestroyedObject(object_id, empire_id);
                 // TODO: Update m_empire_latest_known_objects somehow?
@@ -2872,7 +2972,7 @@ void Universe::Destroy(int object_id, bool update_destroyed_object_knowers/* = t
     m_objects->erase(object_id);
 }
 
-std::set<int> Universe::RecursiveDestroy(int object_id) {
+std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& empire_ids) {
     std::set<int> retval;
 
     auto obj = m_objects->get(object_id);
@@ -2883,7 +2983,7 @@ std::set<int> Universe::RecursiveDestroy(int object_id) {
 
     auto system = m_objects->get<System>(obj->SystemID());
 
-    if (auto ship = std::dynamic_pointer_cast<Ship>(obj)) {
+    if (auto ship = std::dynamic_pointer_cast<Ship>(obj)) { // TODO: static cast after checking ObjectType
         // if a ship is being deleted, and it is the last ship in its fleet, then the empty fleet should also be deleted
         auto fleet = m_objects->get<Fleet>(ship->FleetID());
         if (fleet) {
@@ -2891,43 +2991,43 @@ std::set<int> Universe::RecursiveDestroy(int object_id) {
             if (fleet->Empty()) {
                 if (system)
                     system->Remove(fleet->ID());
-                Destroy(fleet->ID());
+                Destroy(fleet->ID(), empire_ids);
                 retval.insert(fleet->ID());
             }
         }
         if (system)
             system->Remove(object_id);
-        Destroy(object_id);
+        Destroy(object_id, empire_ids);
         retval.insert(object_id);
 
     } else if (auto obj_fleet = std::dynamic_pointer_cast<Fleet>(obj)) {
         for (int ship_id : obj_fleet->ShipIDs()) {
             if (system)
                 system->Remove(ship_id);
-            Destroy(ship_id);
+            Destroy(ship_id, empire_ids);
             retval.insert(ship_id);
         }
         if (system)
             system->Remove(object_id);
-        Destroy(object_id);
+        Destroy(object_id, empire_ids);
         retval.insert(object_id);
 
     } else if (auto obj_planet = std::dynamic_pointer_cast<Planet>(obj)) {
         for (int building_id : obj_planet->BuildingIDs()) {
             if (system)
                 system->Remove(building_id);
-            Destroy(building_id);
+            Destroy(building_id, empire_ids);
             retval.insert(building_id);
         }
         if (system)
             system->Remove(object_id);
-        Destroy(object_id);
+        Destroy(object_id, empire_ids);
         retval.insert(object_id);
 
     } else if (auto obj_system = std::dynamic_pointer_cast<System>(obj)) {
         // destroy all objects in system
         for (int system_id : obj_system->ObjectIDs()) {
-            Destroy(system_id);
+            Destroy(system_id, empire_ids);
             retval.insert(system_id);
         }
 
@@ -2945,10 +3045,10 @@ std::set<int> Universe::RecursiveDestroy(int object_id) {
             { fleets_to_destroy.push_back(fleet); }
         }
         for (auto& fleet : fleets_to_destroy)
-            RecursiveDestroy(fleet->ID());
+            RecursiveDestroy(fleet->ID(), empire_ids);
 
         // then destroy system itself
-        Destroy(object_id);
+        Destroy(object_id, empire_ids);
         retval.insert(object_id);
         // don't need to bother with removing things from system, fleets, or
         // ships, since everything in system is being destroyed
@@ -2959,13 +3059,13 @@ std::set<int> Universe::RecursiveDestroy(int object_id) {
             planet->RemoveBuilding(object_id);
         if (system)
             system->Remove(object_id);
-        Destroy(object_id);
+        Destroy(object_id, empire_ids);
         retval.insert(object_id);
 
     } else if (obj->ObjectType() == UniverseObjectType::OBJ_FIELD) {
         if (system)
             system->Remove(object_id);
-        Destroy(object_id);
+        Destroy(object_id, empire_ids);
         retval.insert(object_id);
     }
     // else ??? object is of some type unknown as of this writing.
@@ -3012,7 +3112,7 @@ void Universe::UpdateEmpireVisibilityFilteredSystemGraphsWithMainObjectMap(const
 double Universe::UniverseWidth() const
 { return m_universe_width; }
 
-const bool& Universe::UniverseObjectSignalsInhibited()
+const bool& Universe::UniverseObjectSignalsInhibited() const
 { return m_inhibit_universe_object_signals; }
 
 void Universe::InhibitUniverseObjectSignals(bool inhibit)

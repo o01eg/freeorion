@@ -71,7 +71,8 @@ namespace {
     void GenerateSitRep(int empire_id, const std::string& template_string,
                         const py::dict& py_params, const std::string& icon)
     {
-        int sitrep_turn = CurrentTurn() + 1;
+        ScriptingContext context;
+        int sitrep_turn = context.current_turn + 1;
 
         std::vector<std::pair<std::string, std::string>> params;
 
@@ -85,12 +86,12 @@ namespace {
         }
 
         if (empire_id == ALL_EMPIRES) {
-            for (const auto& entry : Empires()) {
+            for (const auto& entry : context.Empires()) {
                 entry.second->AddSitRepEntry(CreateSitRep(
                     template_string, sitrep_turn, icon, params));  // copy params for each...
             }
         } else {
-            Empire* empire = GetEmpire(empire_id);
+            auto empire = context.GetEmpire(empire_id);
             if (!empire) {
                 ErrorLogger() << "GenerateSitRep: couldn't get empire with ID " << empire_id;
                 return;
@@ -275,7 +276,8 @@ namespace {
     // Wrappers for Empire class member functions
     void EmpireSetName(int empire_id, const std::string& name)
     {
-        Empire* empire = GetEmpire(empire_id);
+        ScriptingContext context;
+        auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EmpireSetName: couldn't get empire with ID " << empire_id;
             return;
@@ -670,7 +672,8 @@ namespace {
         }
 
         // Create system and insert it into the object map
-        auto system = GetUniverse().InsertNew<System>(star_type, star_name, x, y);
+        auto& universe = GetUniverse();
+        auto system = universe.InsertNew<System>(star_type, star_name, x, y, CurrentTurn());
         if (!system) {
             ErrorLogger() << "CreateSystem : Attempt to insert system into the object map failed";
             return INVALID_OBJECT_ID;
@@ -722,7 +725,8 @@ namespace {
         }
 
         // Create planet and insert it into the object map
-        auto planet = GetUniverse().InsertNew<Planet>(planet_type, size);
+        auto& universe = GetUniverse();
+        auto planet = universe.InsertNew<Planet>(planet_type, size, CurrentTurn());
         if (!planet) {
             ErrorLogger() << "CreateSystem : Attempt to insert planet into the object map failed";
             return INVALID_OBJECT_ID;
@@ -740,25 +744,28 @@ namespace {
 
     auto CreateBuilding(const std::string& building_type, int planet_id, int empire_id) -> int
     {
-        auto planet = Objects().get<Planet>(planet_id);
+        ScriptingContext context;
+        ObjectMap& objects = context.ContextObjects();
+        auto planet = objects.get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "CreateBuilding: couldn't get planet with ID " << planet_id;
             return INVALID_OBJECT_ID;
         }
 
-        auto system = Objects().get<System>(planet->SystemID());
+        auto system = objects.get<System>(planet->SystemID());
         if (!system) {
             ErrorLogger() << "CreateBuilding: couldn't get system for planet";
             return INVALID_OBJECT_ID;
         }
 
-        const Empire* empire = GetEmpire(empire_id);
+        auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "CreateBuilding: couldn't get empire with ID " << empire_id;
             return INVALID_OBJECT_ID;
         }
 
-        auto building = GetUniverse().InsertNew<Building>(empire_id, building_type, empire_id);
+        auto building = context.ContextUniverse().InsertNew<Building>(
+            empire_id, building_type, empire_id, context.current_turn);
         if (!building) {
             ErrorLogger() << "CreateBuilding: couldn't create building";
             return INVALID_OBJECT_ID;
@@ -780,7 +787,9 @@ namespace {
         }
 
         // Create new fleet at the position of the specified system
-        auto fleet = GetUniverse().InsertNew<Fleet>(name, system->X(), system->Y(), empire_id);
+        auto& universe = GetUniverse();
+        auto fleet = universe.InsertNew<Fleet>(name, system->X(), system->Y(),
+                                               empire_id, CurrentTurn());
         if (!fleet) {
             ErrorLogger() << "CreateFleet: couldn't create new fleet";
             return INVALID_OBJECT_ID;
@@ -801,10 +810,12 @@ namespace {
         return fleet->ID();
     }
 
-    auto CreateShip(const std::string& name, const std::string& design_name, const std::string& species, int fleet_id) -> int
+    auto CreateShip(const std::string& name, const std::string& design_name,
+                    const std::string& species, int fleet_id) -> int
     {
-        Universe& universe = GetUniverse();
-        ObjectMap& objects = universe.Objects();
+        ScriptingContext context;
+        Universe& universe = context.ContextUniverse();
+        ObjectMap& objects = context.ContextObjects();
 
         // check if we got a species name, if yes, check if species exists
         if (!species.empty() && !GetSpecies(species)) {
@@ -835,9 +846,9 @@ namespace {
         // get owner empire of specified fleet
         int empire_id = fleet->Owner();
         // if we got the id of an actual empire, get the empire object and check if it exists
-        Empire* empire = nullptr;
+        std::shared_ptr<Empire> empire;
         if (empire_id != ALL_EMPIRES) {
-            empire = GetEmpire(empire_id);
+            empire = context.GetEmpire(empire_id);
             if (!empire) {
                 ErrorLogger() << "CreateShip: couldn't get empire with ID " << empire_id;
                 return INVALID_OBJECT_ID;
@@ -845,7 +856,8 @@ namespace {
         }
 
         // create new ship
-        auto ship = universe.InsertNew<Ship>(empire_id, ship_design->ID(), species, universe, empire_id);
+        auto ship = universe.InsertNew<Ship>(empire_id, ship_design->ID(), species, universe,
+                                             GetSpeciesManager(), empire_id, CurrentTurn());
         if (!ship) {
             ErrorLogger() << "CreateShip: couldn't create new ship";
             return INVALID_OBJECT_ID;
@@ -905,7 +917,8 @@ namespace {
         }
 
         // create the new field
-        auto field = GetUniverse().InsertNew<Field>(field_type->Name(), x, y, size);
+        auto& universe = GetUniverse();
+        auto field = universe.InsertNew<Field>(field_type_name, x, y, size, CurrentTurn());
         if (!field) {
             ErrorLogger() << "CreateFieldImpl: couldn't create field";
             return nullptr;
@@ -918,8 +931,7 @@ namespace {
 
     auto CreateField(const std::string& field_type_name, double x, double y, double size) -> int
     {
-        auto field = CreateFieldImpl(field_type_name, x, y, size);
-        if (field)
+        if (auto field = CreateFieldImpl(field_type_name, x, y, size))
             return field->ID();
         else
             return INVALID_OBJECT_ID;
@@ -1245,34 +1257,38 @@ namespace {
 
     auto PlanetMakeOutpost(int planet_id, int empire_id) -> bool
     {
-        auto planet = Objects().get<Planet>(planet_id);
+        ScriptingContext context;
+
+        auto planet = context.ContextObjects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetMakeOutpost: couldn't get planet with ID:" << planet_id;
             return false;
         }
 
-        if (!GetEmpire(empire_id)) {
+        if (!context.GetEmpire(empire_id)) {
             ErrorLogger() << "PlanetMakeOutpost: couldn't get empire with ID " << empire_id;
             return false;
         }
 
-        return planet->Colonize(empire_id, "", 0.0);
+        return planet->Colonize(empire_id, "", 0.0, context);
     }
 
     auto PlanetMakeColony(int planet_id, int empire_id, const std::string& species, double population) -> bool
     {
-        auto planet = Objects().get<Planet>(planet_id);
+        ScriptingContext context;
+
+        auto planet = context.ContextObjects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetMakeColony: couldn't get planet with ID:" << planet_id;
             return false;
         }
 
-        if (!GetEmpire(empire_id)) {
+        if (!context.GetEmpire(empire_id)) {
             ErrorLogger() << "PlanetMakeColony: couldn't get empire with ID " << empire_id;
             return false;
         }
 
-        if (!GetSpecies(species)) {
+        if (!context.species.GetSpecies(species)) {
             ErrorLogger() << "PlanetMakeColony: couldn't get species with name: " << species;
             return false;
         }
@@ -1280,18 +1296,20 @@ namespace {
         if (population < 0.0)
             population = 0.0;
 
-        return planet->Colonize(empire_id, species, population);
+        return planet->Colonize(empire_id, species, population, context);
     }
 
     auto PlanetCardinalSuffix(int planet_id) -> py::object
     {
-        auto planet = Objects().get<Planet>(planet_id);
+        const ScriptingContext context;
+
+        auto planet = context.ContextObjects().get<Planet>(planet_id);
         if (!planet) {
             ErrorLogger() << "PlanetCardinalSuffix: couldn't get planet with ID:" << planet_id;
             return py::object(UserString("ERROR"));
         }
 
-        return py::object(planet->CardinalSuffix());
+        return py::object(planet->CardinalSuffix(context.ContextObjects()));
     }
 
     auto PlayerEmpireColor(const PlayerSetupData* psd) -> py::tuple
@@ -1348,7 +1366,7 @@ namespace FreeOrionPython {
         py::def("current_turn",                     CurrentTurn);
         py::def("generate_sitrep",                  GenerateSitRep);
         py::def("generate_sitrep",                  +[](int empire_id, const std::string& template_string, const std::string& icon) { GenerateSitRep(empire_id, template_string, py::dict(), icon); });
-        py::def("generate_starlanes",               +[](int max_jumps_between_systems, int max_starlane_length) { GenerateStarlanes(max_jumps_between_systems, max_starlane_length, GetUniverse()); });
+        py::def("generate_starlanes",               +[](int max_jumps_between_systems, int max_starlane_length) { GenerateStarlanes(max_jumps_between_systems, max_starlane_length, GetUniverse(), Empires()); });
 
         py::def("species_preferred_focus",          SpeciesDefaultFocus);
         py::def("species_get_planet_environment",   SpeciesGetPlanetEnvironment);
@@ -1380,8 +1398,8 @@ namespace FreeOrionPython {
         py::def("load_fleet_plan_list",             LoadFleetPlanList);
         py::def("load_monster_fleet_plan_list",     LoadMonsterFleetPlanList);
 
-        py::def("get_name",                         GetName);
-        py::def("set_name",                         SetName);
+        py::def("get_name",                         GetName, "Returns the name (string) of the universe object with the specified object id (int). If there is no such object, returns an empty string and logs an error to the error log.");
+        py::def("set_name",                         SetName, "Sets the name (string) of the universe object with the specified object id (int). If there is no such object, just logs an error to the error log.");
         py::def("get_x",                            GetX);
         py::def("get_y",                            GetY);
         py::def("get_pos",                          GetPos);

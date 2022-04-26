@@ -6,6 +6,7 @@
 #include <string>
 #include <boost/serialization/access.hpp>
 #include "../universe/ConstantsFwd.h"
+#include "../universe/EnumsFwd.h"
 #include "../util/Export.h"
 
 class Universe;
@@ -30,7 +31,7 @@ public:
       * and blockade). */
     [[nodiscard]] const std::map<int, std::set<int>>&                     FleetSupplyableSystemIDs() const;
     [[nodiscard]] const std::set<int>&                                    FleetSupplyableSystemIDs(int empire_id) const;
-    [[nodiscard]] std::set<int>                                           FleetSupplyableSystemIDs(int empire_id, bool include_allies) const;
+    [[nodiscard]] std::set<int>                                           FleetSupplyableSystemIDs(int empire_id, bool include_allies, const ScriptingContext& context) const;
     [[nodiscard]] int                                                     EmpireThatCanSupplyAt(int system_id) const;
 
     /** Returns set of sets of systems that can share industry (systems in
@@ -56,7 +57,8 @@ public:
     /** Returns true if system with id \a system_id is fleet supplyable or in
       * one of the resource supply groups for empire with id \a empire_id */
     [[nodiscard]] bool        SystemHasFleetSupply(int system_id, int empire_id) const;
-    [[nodiscard]] bool        SystemHasFleetSupply(int system_id, int empire_id, bool include_allies) const;
+    [[nodiscard]] bool        SystemHasFleetSupply(int system_id, int empire_id, bool include_allies,
+                                                   const std::map<std::pair<int, int>, DiplomaticStatus>& diplo_statuses) const;
 
     [[nodiscard]] std::string Dump(const Universe& u, int empire_id = ALL_EMPIRES) const;
 

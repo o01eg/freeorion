@@ -2,6 +2,7 @@ from typing import Dict, List, Mapping, Sequence, Union
 
 import AIDependencies
 from common.fo_typing import PlanetId, SpeciesName
+from empire.survey_lock import survey_universe_lock
 from freeorion_tools import tech_is_complete
 from freeorion_tools.caching import cache_for_current_turn
 
@@ -17,14 +18,17 @@ def set_colony_builders(species_name: SpeciesName, yards: Sequence[PlanetId]):
     empire_colonizers.setdefault(species_name, []).extend(yards)
 
 
+@survey_universe_lock
 def can_build_colony_for_species(species_name: Union[SpeciesName, str]):
     return species_name in get_colony_builders()
 
 
+@survey_universe_lock
 def get_colony_builder_locations(species_name: SpeciesName) -> List[PlanetId]:
     return get_colony_builders()[species_name]
 
 
+@survey_universe_lock
 def can_build_only_sly_colonies():
     """
     Return true if empire could build only SP_SLY colonies.
@@ -37,6 +41,7 @@ def can_build_only_sly_colonies():
     return list(get_colony_builders()) == ["SP_SLY"]
 
 
+@survey_universe_lock
 def get_colony_builders() -> Mapping[SpeciesName, List[PlanetId]]:
     """
     Return map from the species to list of the planet where you could build a colony ship with it.

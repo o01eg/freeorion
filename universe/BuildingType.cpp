@@ -27,7 +27,7 @@ namespace {
         // makes all buildings cost 1 PP and take 1 turn to produce
         rules.Add<bool>(UserStringNop("RULE_CHEAP_AND_FAST_BUILDING_PRODUCTION"),
                         UserStringNop("RULE_CHEAP_AND_FAST_BUILDING_PRODUCTION_DESC"),
-                        "", false, true);
+                        "TEST", false, true);
     }
     bool temp_bool = RegisterGameRules(&AddRules);
 }
@@ -267,7 +267,7 @@ int BuildingType::ProductionTime(int empire_id, int location_id,
     else if (m_production_time->SourceInvariant() && m_production_time->TargetInvariant())
         return m_production_time->Eval();
 
-    constexpr int ARBITRARY_LARGE_TURNS = 9999;
+    static constexpr int ARBITRARY_LARGE_TURNS = 9999;
 
     auto location = context.ContextObjects().get(location_id);
     if (!location && !m_production_time->TargetInvariant())

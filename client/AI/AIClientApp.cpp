@@ -49,15 +49,14 @@ namespace {
     void AddTraitBypassOption(OptionsDB& db, std::string const & root, std::string ROOT,
                               T def, const ValidatorBase& validator)
     {
-        std::string option_root = "ai.trait." + root + ".";
-        std::string user_string_root = "OPTIONS_DB_AI_CONFIG_TRAIT_"+ROOT;
-        db.Add<bool>(option_root + "force.enabled", UserStringNop(user_string_root + "_FORCE"), false);
-        db.Add<T>(option_root + "default", UserStringNop(user_string_root + "_FORCE_VALUE"), def, validator.Clone());
+        const std::string option_root = "ai.trait." + root + ".";
+        const std::string user_string_root = "OPTIONS_DB_AI_CONFIG_TRAIT_" + ROOT;
+        db.Add(option_root + "force.enabled", UserStringNop(user_string_root + "_FORCE"),       false);
+        db.Add(option_root + "default",       UserStringNop(user_string_root + "_FORCE_VALUE"), def,    validator.Clone());
 
         for (int ii = 1; ii <= IApp::MAX_AI_PLAYERS(); ++ii) {
-            std::stringstream ss;
-            ss << option_root << "ai_" << std::to_string(ii);
-            db.Add<T>(ss.str(), UserStringNop(user_string_root + "_FORCE_VALUE"), def, validator.Clone());
+            db.Add(option_root + "ai_" + std::to_string(ii),
+                   UserStringNop(user_string_root + "_FORCE_VALUE"), def, validator.Clone());
         }
     }
 
@@ -66,20 +65,17 @@ namespace {
         // character and forcing them all to one value for testing
         // purposes.
 
-        constexpr int max_aggression = 5;
-        constexpr int no_value = -1;
-        AddTraitBypassOption<int>(db, "aggression", "AGGRESSION", no_value, RangedValidator<int>(no_value, max_aggression));
-        AddTraitBypassOption<int>(db, "empire-id", "EMPIREID", no_value, RangedValidator<int>(no_value, IApp::MAX_AI_PLAYERS()));
+        static constexpr int max_aggression = 5;
+        static constexpr int no_value = -1;
+        AddTraitBypassOption(db, "aggression", "AGGRESSION", no_value, RangedValidator<int>(no_value, max_aggression));
+        AddTraitBypassOption(db, "empire-id",  "EMPIREID",   no_value, RangedValidator<int>(no_value, IApp::MAX_AI_PLAYERS()));
     }
     bool temp_bool = RegisterOptions(&AddOptions);
 
 }
 
 // static member(s)
-AIClientApp::AIClientApp(const std::vector<std::string>& args) :
-    m_player_name(""),
-    m_max_aggression(0)
-{
+AIClientApp::AIClientApp(const std::vector<std::string>& args) {
     if (args.size() < 2) {
         std::cerr << "The AI client should not be executed directly!  Run freeorion to start the game.";
         ExitApp(1);
@@ -140,6 +136,7 @@ void AIClientApp::Run() {
         // join game
         Networking().SendMessage(JoinGameMessage(PlayerName(),
                                                  Networking::ClientType::CLIENT_TYPE_AI_PLAYER,
+                                                 DependencyVersions(),
                                                  boost::uuids::nil_uuid()));
 
         // Start parsing content
@@ -293,7 +290,10 @@ void AIClientApp::HandleMessage(const Message& msg) {
             //Max 5         :  0   0   0   8  17  75
 
             const std::string g_seed = GetGalaxySetupData().seed;
-            const std::string emp_name = GetEmpire(m_empire_id)->Name();
+            auto empire = m_empires.GetEmpire(m_empire_id);
+            if (!empire)
+                ErrorLogger() << "HandleMessage GAME_START couldn't get empire with id: " << m_empire_id;
+            const auto& emp_name = empire ? empire->Name() : "";
             unsigned int my_seed = 0;
 
             try {

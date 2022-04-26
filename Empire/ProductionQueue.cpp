@@ -108,18 +108,20 @@ namespace {
         return retval;
     }
 
-    float CalculateNewStockpile(int empire_id, float starting_stockpile, float project_transfer_to_stockpile,
+    float CalculateNewStockpile(int empire_id, float starting_stockpile,
+                                float project_transfer_to_stockpile,
                                 const std::map<std::set<int>, float>& available_pp,
                                 const std::map<std::set<int>, float>& allocated_pp,
-                                const std::map<std::set<int>, float>& allocated_stockpile_pp)
+                                const std::map<std::set<int>, float>& allocated_stockpile_pp,
+                                const ScriptingContext& context)
     {
         TraceLogger() << "CalculateNewStockpile for empire " << empire_id;
-        const Empire* empire = GetEmpire(empire_id);
+        auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "CalculateStockpileContribution() passed null empire.  doing nothing.";
             return 0.0f;
         }
-        float stockpile_limit = empire->GetProductionQueue().StockpileCapacity();
+        float stockpile_limit = empire->GetProductionQueue().StockpileCapacity(context.ContextObjects());
         float stockpile_used = boost::accumulate(allocated_stockpile_pp | boost::adaptors::map_values, 0.0f);
         TraceLogger() << " ... stockpile limit: " << stockpile_limit << "  used: " << stockpile_used << "   starting: " << starting_stockpile;
         float new_contributions = 0.0f;
@@ -433,14 +435,15 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id, c
             auto location_obj = context.ContextObjects().get(location_id);
             ScriptingContext location_target_context{location_obj, context}; // non-const but should be OK as only passed below to function taking const ScriptingContext&
 
-            for (const auto& psc : bt->ProductionSpecialConsumption()) {
-                if (!psc.second.first)
+            for (const auto& [special_name, consumption] : bt->ProductionSpecialConsumption()) {
+                const auto& [amount, cond] = consumption;
+                if (!amount)
                     continue;
                 Condition::ObjectSet matches;
                 // if a condition selecting where to take resources from was specified, use it.
                 // Otherwise take from the production location
-                if (psc.second.second) {
-                    psc.second.second->Eval(location_target_context, matches);
+                if (cond) {
+                    cond->Eval(location_target_context, matches);
                 } else {
                     matches.push_back(location_obj);
                 }
@@ -448,7 +451,7 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id, c
                 // determine how much to take from each matched object
                 for (auto& object : matches) {
                     location_target_context.effect_target = std::const_pointer_cast<UniverseObject>(object); // call to ValueRef cannot modify the pointed-to object
-                    retval[psc.first][object->ID()] += psc.second.first->Eval(location_target_context);
+                    retval[special_name][object->ID()] += static_cast<float>(amount->Eval(location_target_context));
                 }
             }
         }
@@ -457,13 +460,14 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id, c
     case BuildType::BT_SHIP: {
         if (const ShipDesign* sd = context.ContextUniverse().GetShipDesign(design_id)) {
             auto location_obj = context.ContextObjects().get(location_id);
-            const ScriptingContext location_target_context{location_obj, context};
+            const ScriptingContext location_target_context{std::move(location_obj), context};
 
             if (const ShipHull* ship_hull = GetShipHull(sd->Hull())) {
-                for (const auto& psc : ship_hull->ProductionSpecialConsumption()) {
-                    if (!psc.second.first)
-                        continue;
-                    retval[psc.first][location_id] += psc.second.first->Eval(location_target_context);
+                for (const auto& [special_name, consumption] : ship_hull->ProductionSpecialConsumption()) {
+                    const auto& [amount, cond] = consumption;
+                    (void)cond;
+                    if (amount)
+                        retval[special_name][location_id] += static_cast<float>(amount->Eval(location_target_context));
                 }
             }
 
@@ -471,10 +475,11 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id, c
                 const ShipPart* part = GetShipPart(part_name);
                 if (!part)
                     continue;
-                for (const auto& psc : part->ProductionSpecialConsumption()) {
-                    if (!psc.second.first)
-                        continue;
-                    retval[psc.first][location_id] += psc.second.first->Eval(location_target_context);
+                for (const auto& [special_name, consumption] : part->ProductionSpecialConsumption()) {
+                    const auto& [amount, cond] = consumption;
+                    (void)cond;
+                    if (amount)
+                        retval[special_name][location_id] += static_cast<float>(amount->Eval(location_target_context));
                 }
             }
         }
@@ -490,7 +495,9 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id, c
 }
 
 std::map<MeterType, std::map<int, float>>
-ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id, const ScriptingContext& context) const {
+ProductionQueue::ProductionItem::CompletionMeterConsumption(
+    int location_id, const ScriptingContext& context) const
+{
     std::map<MeterType, std::map<int, float>> retval;
 
     const ScriptingContext location_context{context.ContextObjects().get(location_id), context};
@@ -498,10 +505,11 @@ ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id, con
     switch (build_type) {
     case BuildType::BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
-            for (const auto& pmc : bt->ProductionMeterConsumption()) {
-                if (!pmc.second.first)
-                    continue;
-                retval[pmc.first][location_id] = pmc.second.first->Eval(location_context);
+            for (const auto& [mt, consumption] : bt->ProductionMeterConsumption()) {
+                const auto& [amount, cond] = consumption;
+                (void)cond;
+                if (amount)
+                    retval[mt][location_id] = static_cast<float>(amount->Eval(location_context));
             }
         }
         break;
@@ -509,10 +517,11 @@ ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id, con
     case BuildType::BT_SHIP: {
         if (const ShipDesign* sd = context.ContextUniverse().GetShipDesign(design_id)) {
             if (const ShipHull* ship_hull = GetShipHull(sd->Hull())) {
-                for (const auto& pmc : ship_hull->ProductionMeterConsumption()) {
-                    if (!pmc.second.first)
-                        continue;
-                    retval[pmc.first][location_id] += pmc.second.first->Eval(location_context);
+                for (const auto& [mt, consumption] : ship_hull->ProductionMeterConsumption()) {
+                    const auto& [amount, cond] = consumption;
+                    (void)cond;
+                    if (amount)
+                        retval[mt][location_id] += static_cast<float>(amount->Eval(location_context));
                 }
             }
 
@@ -520,10 +529,11 @@ ProductionQueue::ProductionItem::CompletionMeterConsumption(int location_id, con
                 const ShipPart* pt = GetShipPart(part_name);
                 if (!pt)
                     continue;
-                for (const auto& pmc : pt->ProductionMeterConsumption()) {
-                    if (!pmc.second.first)
-                        continue;
-                    retval[pmc.first][location_id] += pmc.second.first->Eval(location_context);
+                for (const auto& [mt, consumption] : pt->ProductionMeterConsumption()) {
+                    const auto& [amount, cond] = consumption;
+                    (void)cond;
+                    if (amount)
+                        retval[mt][location_id] += static_cast<float>(amount->Eval(location_context));
                 }
             }
         }
@@ -603,14 +613,14 @@ const std::map<std::set<int>, float>& ProductionQueue::AllocatedPP() const
 const std::map<std::set<int>, float>& ProductionQueue::AllocatedStockpilePP() const
 { return m_object_group_allocated_stockpile_pp; }
 
-float ProductionQueue::StockpileCapacity() const {
+float ProductionQueue::StockpileCapacity(const ObjectMap& objects) const {
     if (m_empire_id == ALL_EMPIRES)
         return 0.0f;
 
     float retval = 0.0f;
 
     // TODO: if something other than planets has METER_STOCKPILE added, adjust here
-    for (const auto& obj : Objects().find<Planet>(OwnedVisitor(m_empire_id))) {
+    for (const auto& obj : objects.find<Planet>(OwnedVisitor(m_empire_id))) {
         const auto* meter = obj->GetMeter(MeterType::METER_STOCKPILE);
         if (!meter)
             continue;
@@ -697,7 +707,7 @@ void ProductionQueue::Update(const ScriptingContext& context) {
     auto& available_pp = industry_resource_pool->Output();
     float pp_in_stockpile = industry_resource_pool->Stockpile();
     TraceLogger() << "========= pp_in_stockpile:     " << pp_in_stockpile << " ========";
-    float stockpile_limit = StockpileCapacity();
+    float stockpile_limit = StockpileCapacity(context.ContextObjects());
     float available_stockpile = std::min(pp_in_stockpile, stockpile_limit);
     TraceLogger() << "========= available_stockpile: " << available_stockpile << " ========";
 
@@ -721,8 +731,8 @@ void ProductionQueue::Update(const ScriptingContext& context) {
             auto set_it = group.find(location_id);
             if (set_it != group.end()) {
                 // system is in this group.
-                queue_element_groups.emplace_back(group);   // record this discovery
-                break;                                      // stop searching for a group containing a system, since one has been found
+                queue_element_groups.push_back(group); // record this discovery
+                break;                                 // stop searching for a group containing a system, since one has been found
             }
         }
     }
@@ -764,8 +774,10 @@ void ProductionQueue::Update(const ScriptingContext& context) {
 
     //update expected new stockpile amount
     m_expected_new_stockpile_amount = CalculateNewStockpile(
-        m_empire_id, pp_in_stockpile, project_transfer_to_stockpile, available_pp, m_object_group_allocated_pp,
-        m_object_group_allocated_stockpile_pp);
+        m_empire_id, pp_in_stockpile, project_transfer_to_stockpile,
+        available_pp, m_object_group_allocated_pp,
+        m_object_group_allocated_stockpile_pp,
+        context);
     m_expected_project_transfer_to_stockpile = project_transfer_to_stockpile;
 
     // if at least one resource-sharing system group have available PP, simulate
@@ -861,7 +873,8 @@ void ProductionQueue::Update(const ScriptingContext& context) {
         }
         sim_pp_in_stockpile = CalculateNewStockpile(
             m_empire_id, sim_pp_in_stockpile, sim_project_transfer_to_stockpile,
-            available_pp, allocated_pp, allocated_stockpile_pp);
+            available_pp, allocated_pp, allocated_stockpile_pp,
+            context);
         sim_available_stockpile = std::min(sim_pp_in_stockpile, stockpile_limit);
     }
     update_timer.EnterSection("Logging");

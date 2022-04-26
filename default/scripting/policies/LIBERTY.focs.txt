@@ -4,33 +4,26 @@ Policy
     short_description = "PLC_LIBERTY_SHORT_DESC"
     category = "SOCIAL_CATEGORY"
     adoptioncost = floor(3.0 * [[POPULATION_OWNED_BY_EMPIRE]]^0.5)
-    exclusions = [ "PLC_MARTIAL_LAW" "PLC_TERROR_SUPPRESSION" "PLC_INDOCTRINATION" "PLC_CONFORMANCE" ]
+    exclusions = [ "PLC_CONFORMANCE" "PLC_DIVINE_AUTHORITY" "PLC_FEUDALISM" "PLC_INDOCTRINATION" "PLC_MARTIAL_LAW" "PLC_TERROR_SUPPRESSION" "PLC_THE_HUNT" ]
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
 
-        // EmpireHasAdoptedPolicy PLC_LIBERTY used in setting stability adjustments for species likes / dislikes
+        // EmpireHasAdoptedPolicy PLC_LIBERTY is used in setting stability adjustments for species dislikes in
+        // species/common/happiness.macros (foci), buildings/buildings.macros and policies/policies.macros (policies)
 
-        // effects: penalizes stability, conditionally increases research
+        // increases research by +(stability-5)/5 RP for planets with stability>5
         EffectsGroup
         scope = And [
             Planet
             OwnedBy empire = Source.Owner
             Species
+            Happiness low = (NamedReal name = "PLC_LIBERTY_MIN_STABILITY" value = 5)
         ]
-        effects = [
-            SetTargetHappiness value = Value - (NamedReal name = "PLC_LIBERTY_STABILITY_PENALTY_FLAT" value = 2.0)
-        ]
-        EffectsGroup
-        scope = And [
-            Planet
-            OwnedBy empire = Source.Owner
-            Species
-            Happiness low = (NamedReal name = "PLC_LIBERTY_MIN_STABILITY" value = 6)
-        ]
-        effects = [
-            SetTargetResearch value = Value + (NamedReal name = "PLC_LIBERTY_RESEARCH_BONUS_FLAT" value = 2.0)
-        ]
+        priority = [[TARGET_AFTER_SCALING_PRIORITY]]
+        effects = SetTargetResearch value = Value + (Target.Happiness - NamedRealLookup name = "PLC_LIBERTY_MIN_STABILITY")*
+                                                    (NamedReal name = "PLC_LIBERTY_RESEARCH_BONUS_PER_STABILITY" value = 0.2)
     ]
-    graphic = "icons/policies/liberty.png"
+    graphic = "icons/policies/social_liberty.png"
 
 #include "/scripting/policies/policies.macros"
+#include "/scripting/common/priorities.macros"

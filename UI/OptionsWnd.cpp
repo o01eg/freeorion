@@ -851,7 +851,7 @@ void OptionsWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
 }
 
 void OptionsWnd::DoLayout() {
-    constexpr GG::X BUTTON_WIDTH{75};
+    static constexpr GG::X BUTTON_WIDTH{75};
     const GG::Y BUTTON_HEIGHT(ClientUI::GetFont()->Lineskip() + 6);
 
     GG::Pt done_button_lr = ScreenToClient(ClientLowerRight()) - GG::Pt(GG::X(LAYOUT_MARGIN), GG::Y(LAYOUT_MARGIN));
@@ -1196,7 +1196,7 @@ void OptionsWnd::FileOptionImpl(GG::ListBox* page, int indentation_level, const 
                 edit->SetTextColor(GG::CLR_RED);
             } else {
                 edit->SetTextColor(ClientUI::TextColor());
-                GetOptionsDB().Set<std::string>(option_name, str);
+                GetOptionsDB().Set(option_name, str);
             }
         }
     );
@@ -1258,7 +1258,7 @@ void OptionsWnd::ColorOption(GG::ListBox* page, int indentation_level, const std
     text_control->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
     text_control->SetBrowseText(UserString(GetOptionsDB().GetDescription(option_name)));
     color_selector->ColorChangedSignal.connect(
-        [option_name](const GG::Clr& clr) { GetOptionsDB().Set<GG::Clr>(option_name, clr); });
+        [option_name](const GG::Clr& clr) { GetOptionsDB().Set(option_name, clr); });
 }
 
 void OptionsWnd::FontOption(GG::ListBox* page, int indentation_level, const std::string& option_name,
@@ -1394,8 +1394,8 @@ void OptionsWnd::ResolutionOption(GG::ListBox* page, int indentation_level) {
                 drop_list_row->Name().begin(), drop_list_row->Name().end(),
                 (qi::int_[phx::ref(w) = qi::_1] >> " x " >> qi::int_[phx::ref(h) = qi::_1])
             );
-            GetOptionsDB().Set<int>("video.fullscreen.width", w);
-            GetOptionsDB().Set<int>("video.fullscreen.height", h);
+            GetOptionsDB().Set("video.fullscreen.width", w);
+            GetOptionsDB().Set("video.fullscreen.height", h);
         }
     );
 }

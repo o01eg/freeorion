@@ -7,11 +7,6 @@
 #include "../util/i18n.h"
 #include <type_traits>
 
-constexpr std::string_view to_string(StarType);
-constexpr std::string_view to_string(PlanetEnvironment);
-constexpr std::string_view to_string(PlanetType);
-constexpr std::string_view to_string(PlanetSize);
-
 namespace ValueRef {
 
 //! The common base class for all ValueRef classes. This class provides
@@ -46,22 +41,16 @@ protected:
     bool m_simple_increment = false;
 };
 
-
 template<typename T>
 std::string FlexibleToString(T&& t)
 {
+    static_assert(!std::is_enum_v<T>);
+
     if constexpr (std::is_floating_point_v<std::decay_t<T>>) {
         return DoubleToString(t, 3, false);
 
-    } else if constexpr (std::is_enum_v<T>) {
-        auto maybe_retval = to_string(t);
-        if (UserStringExists(maybe_retval))
-            return UserString(maybe_retval);
-        else
-            return std::string{maybe_retval};
-
     } else if constexpr (std::is_convertible_v<std::decay_t<T>, std::string>) {
-        return t;
+        return std::forward<T>(t);
 
     } else if constexpr (std::is_same_v<std::decay_t<T>, std::string_view>) {
         return std::string{t};
@@ -80,6 +69,24 @@ std::string FlexibleToString(T&& t)
         return std::to_string(t);
     }
 }
+
+[[nodiscard]] FO_COMMON_API std::string FlexibleToString(StarType t);
+[[nodiscard]] FO_COMMON_API std::string FlexibleToString(PlanetEnvironment t);
+[[nodiscard]] FO_COMMON_API std::string FlexibleToString(PlanetType t);
+[[nodiscard]] FO_COMMON_API std::string FlexibleToString(PlanetSize t);
+[[nodiscard]] FO_COMMON_API std::string FlexibleToString(Visibility t);
+[[nodiscard]] FO_COMMON_API std::string FlexibleToString(UniverseObjectType t);
+
+
+enum class ReferenceType : signed char {
+    INVALID_REFERENCE_TYPE = -1,
+    NON_OBJECT_REFERENCE,               // ValueRef::Variable is not evalulated on any specific object
+    SOURCE_REFERENCE,                   // ValueRef::Variable is evaluated on the source object
+    EFFECT_TARGET_REFERENCE,            // ValueRef::Variable is evaluated on the target object of an effect while it is being executed
+    EFFECT_TARGET_VALUE_REFERENCE,      // ValueRef::Variable is evaluated on the target object value of an effect while it is being executed
+    CONDITION_LOCAL_CANDIDATE_REFERENCE,// ValueRef::Variable is evaluated on an object that is a candidate to be matched by a condition.  In a subcondition, this will reference the local candidate, and not the candidate of an enclosing condition.
+    CONDITION_ROOT_CANDIDATE_REFERENCE  // ValueRef::Variable is evaluated on an object that is a candidate to be matched by a condition.  In a subcondition, this will still reference the root candidate, and not the candidate of the local condition.
+};
 
 //! The base class for all ValueRef classes returning type T. This class
 //! provides the public interface for a ValueRef expression tree.
@@ -111,6 +118,8 @@ struct FO_COMMON_API ValueRef : public ValueRefBase
       * supported. Otherwise returns and empty string. */
     [[nodiscard]] std::string EvalAsString() const final
     { return FlexibleToString(Eval()); }
+
+    [[nodiscard]] virtual ReferenceType GetReferenceType() const noexcept { return ReferenceType::INVALID_REFERENCE_TYPE; }
 
     /** Makes a clone of this ValueRef in a new owning pointer. Required for Boost.Python, which
       * doesn't supports move semantics for returned values. */

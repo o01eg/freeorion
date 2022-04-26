@@ -26,8 +26,8 @@ namespace {
 }
 
 
-System::System(StarType star, const std::string& name, double x, double y) :
-    UniverseObject(name, x, y),
+System::System(StarType star, std::string name, double x, double y, int current_turn) :
+    UniverseObject{std::move(name), x, y, ALL_EMPIRES, current_turn},
     m_star(star)
 {
     if (m_star < StarType::INVALID_STAR_TYPE || StarType::NUM_STAR_TYPES < m_star)
@@ -73,7 +73,7 @@ void System::Copy(std::shared_ptr<const UniverseObject> copied_object,
         }
 
         // copy visible info of visible contained objects
-        this->m_objects = copied_system->VisibleContainedObjectIDs(empire_id);
+        this->m_objects = copied_system->VisibleContainedObjectIDs(empire_id, universe.GetEmpireObjectVisibility());
 
         // only copy orbit info for visible planets
         size_t orbits_size = m_orbits.size();
@@ -177,8 +177,8 @@ std::string System::Dump(unsigned short ntabs) const {
     return retval;
 }
 
-const std::string& System::ApparentName(int empire_id, const Universe& u,
-                                        bool blank_unexplored_and_none) const
+std::string System::ApparentName(int empire_id, const Universe& u,
+                                 bool blank_unexplored_and_none) const
 {
     static const std::string EMPTY_STRING;
 
@@ -194,9 +194,9 @@ const std::string& System::ApparentName(int empire_id, const Universe& u,
             return EMPTY_STRING;
 
         if (m_star == StarType::INVALID_STAR_TYPE)
-            return UserString("UNEXPLORED_REGION");
+            return m_name + UserString("UNEXPLORED_REGION");
         else
-            return UserString("UNEXPLORED_SYSTEM");
+            return m_name + UserString("UNEXPLORED_SYSTEM");
     }
 
     if (m_star == StarType::STAR_NONE) {
@@ -209,8 +209,7 @@ const std::string& System::ApparentName(int empire_id, const Universe& u,
             //DebugLogger() << "System::ApparentName No-Star System (" << ID() << "), returning name "<< EMPTY_STRING;
             return EMPTY_STRING;
         }
-        //DebugLogger() << "System::ApparentName No-Star System (" << ID() << "), returning name "<< UserString("EMPTY_SPACE");
-        return UserString("EMPTY_SPACE");
+        return m_name + UserString("EMPTY_SPACE");
     }
 
     return this->PublicName(empire_id, u); // todo get Objects from inputs
@@ -545,9 +544,9 @@ std::map<int, bool> System::VisibleStarlanesWormholes(int empire_id, const Unive
     std::vector<const Fleet*> moving_empire_fleets;
     moving_empire_fleets.reserve(objects.size<Fleet>());
     static const MovingFleetVisitor moving_fleet_visitor;
-    for (auto& object : objects.find(moving_fleet_visitor)) {
+    for (auto& object : objects.find<Fleet>(moving_fleet_visitor)) {
         if (object && object->ObjectType() == UniverseObjectType::OBJ_FLEET && object->OwnedBy(empire_id))
-            moving_empire_fleets.emplace_back(static_cast<const Fleet*>(object.get()));
+            moving_empire_fleets.push_back(static_cast<const Fleet*>(object.get()));
     }
 
     // add any lanes an owned fleet is moving along that connect to this system

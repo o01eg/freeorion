@@ -46,10 +46,11 @@ def get_starting_species_pool():
     """
     Empire species pool generator, return random empire species and ensure somewhat even distribution
     """
-    # fill the initial pool with two sets of all playable species
-    # this way we have somewhat, but not absolutely strict even distribution of starting species at least when there
-    # is only a few number of players (some species can occur twice at max while others not at all)
-    pool = fo.get_playable_species() * 2
+    # fill the initial pool of playable species, without repetitions unless RULE_ALLOW_REPEATED_SPECIES is true
+    if not fo.getGameRules().getToggle("RULE_ALLOW_REPEATED_SPECIES"):
+        pool = fo.get_playable_species()
+    else:
+        pool = fo.get_playable_species() * 2
 
     # randomize order in initial pool so we don't get the same species all the time
     random.shuffle(pool)
@@ -320,7 +321,7 @@ def add_planets_to_vicinity(vicinity, num_planets, gsd):
         # pick a planet size, continue until we get a size that matches the HS_ACCEPTABLE_PLANET_SIZES option
         planet_size = fo.planetSize.unknown
         while planet_size not in HS_ACCEPTABLE_PLANET_SIZES:
-            planet_size = calc_planet_size(star_type, orbit, fo.galaxySetupOption.high, gsd.shape)
+            planet_size = calc_planet_size(star_type, orbit, fo.galaxySetupOptionGeneric.high, gsd.shape)
 
         # pick an according planet type
         planet_type = calc_planet_type(star_type, orbit, planet_size)

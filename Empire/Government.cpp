@@ -23,7 +23,7 @@ namespace {
     void AddRules(GameRules& rules) {
         // makes all policies cost 1 influence to adopt
         rules.Add<bool>(UserStringNop("RULE_CHEAP_POLICIES"), UserStringNop("RULE_CHEAP_POLICIES_DESC"),
-                        "", false, true);
+                        "TEST", false, true);
     }
     bool temp_bool = RegisterGameRules(&AddRules);
 }
@@ -114,7 +114,7 @@ std::string Policy::Dump(unsigned short ntabs) const {
 }
 
 float Policy::AdoptionCost(int empire_id, const ScriptingContext& context) const {
-    constexpr auto arbitrary_large_number = 999999.9f;
+    static constexpr auto arbitrary_large_number = 999999.9f;
 
     if (GetGameRules().Get<bool>("RULE_CHEAP_POLICIES") || !m_adoption_cost) {
         return 1.0f;
@@ -141,7 +141,7 @@ float Policy::AdoptionCost(int empire_id, const ScriptingContext& context) const
             return arbitrary_large_number;
 
         // construct new context with source specified
-        const ScriptingContext source_context{source, context};
+        const ScriptingContext source_context{std::move(source), context};
         return static_cast<float>(m_adoption_cost->Eval(source_context));
     }
 }

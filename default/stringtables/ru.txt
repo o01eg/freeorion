@@ -11561,18 +11561,6 @@ BLD_CLONING_CENTER_DESC
 
 Промышленное клонирование позволит производить на заказ население в промышленном масштабе, значительно улучшая популяцию'''
 
-BLD_TERRAFORM
-Терраформинг
-
-BLD_TERRAFORM_DESC
-Терраформирует мир на один шаг ближе к [[encyclopedia ENVIRONMENT_TITLE]] предпочтениям проживающего вида
-
-BLD_TERRAFORM_REVERT
-Обратный терраформинг
-
-BLD_TERRAFORM_REVERT_DESC
-Терраформирует мир на один шаг назад к своему первоначальному виду [[encyclopedia ENVIRONMENT_TITLE]]
-
 BLD_REMOTE_TERRAFORM
 Удаленный терраформинг
 
@@ -14123,7 +14111,7 @@ AI_FIRST_TURN_GREETING_MSG103
 AI_FIRST_TURN_GREETING_MSG201
 Держитесь подальше от нас!
 
-AI_FIRST_TURN_GREETING_MSG203
+AI_FIRST_TURN_GREETING_MSG202
 Держитесь от нас подальше, а мы будем держаться подальше от вас!
 
 AI_FIRST_TURN_GREETING_MSG301

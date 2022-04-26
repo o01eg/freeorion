@@ -4,7 +4,7 @@ Policy
     short_description = "PLC_RACIAL_PURITY_SHORT_DESC"
     category = "SOCIAL_CATEGORY"
     adoptioncost = floor(2.0 * [[POPULATION_OWNED_BY_EMPIRE]]^0.5)
-    exclusions = [ "PLC_DIVERSITY" "PLC_NATIVE_APPROPRIATION" ]
+    exclusions = [ "PLC_AUGMENTATION" "PLC_COLONIALISM" "PLC_DIVERSITY" "PLC_NATIVE_APPROPRIATION" "PLC_VASSALIZATION" ]
     unlock = Item type = Policy name = "PLC_THE_HUNT"
     effectsgroups = [
         [[SPECIES_LIKES_OR_DISLIKES_POLICY_STABILITY_EFFECTS]]
@@ -29,7 +29,7 @@ Policy
                                  value = -1.0 * [[RESEARCH_PER_POP]])
             ]
     ]
-    graphic = "icons/policies/racial_purity.png"
+    graphic = "icons/policies/social_racial_purity.png"
 
 #include "/scripting/common/base_prod.macros"
 #include "/scripting/policies/policies.macros"

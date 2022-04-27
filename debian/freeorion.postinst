@@ -36,11 +36,16 @@ case "$1" in
 	mkdir -p /var/log/freeorion
 	chown -R freeorion:freeorion /var/log/freeorion
 
+	mkdir -p /etc/freeorion
 	chown -R freeorion:freeorion /etc/freeorion
 
 	# fix persistent_config.xml
 	chmod 0600 /etc/freeorion/persistent_config.xml
+
+	touch /etc/freeorion/db.txt
 	chmod 0600 /etc/freeorion/db.txt
+
+	touch /etc/freeorion/mail.cfg
 	chmod 0600 /etc/freeorion/mail.cfg
     ;;
 

@@ -182,15 +182,11 @@ class AuthProvider:
                     curs.execute(
                         """ SELECT u.player_name, MIN(p.species), MIN(p.team_id)
                             FROM auth.users u
-                            INNER JOIN auth.contacts c
-                            ON c.player_name = u.player_name
                             INNER JOIN games.players p
                             ON p.player_name = u.player_name
                             INNER JOIN games.games g
                             ON g.game_uid = p.game_uid
-                            WHERE c.is_active
-                            AND c.delete_ts IS NULL
-                            AND p.is_confirmed
+                            WHERE p.is_confirmed
                             AND p.client_type = 'p'
                             AND g.game_uid = %s
                             GROUP BY u.player_name """,
@@ -201,7 +197,7 @@ class AuthProvider:
                         psd.player_name = r[0]
                         psd.empire_name = r[0]
                         psd.starting_species = r[1]
-                        psd.starting_team = 1 #  r[2]
+                        psd.starting_team = r[2]
                         players.append(psd)
         except psycopg2.InterfaceError:
             self.conn_ro = psycopg2.connect(self.dsn_ro)

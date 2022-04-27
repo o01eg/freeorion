@@ -2295,8 +2295,16 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
     std::string client_version_string;
     std::map<std::string, std::string> dependencies;
     boost::uuids::uuid cookie = boost::uuids::nil_generator{}();
-    ExtractJoinGameMessageData(message, player_name, client_type, client_version_string,
-                               dependencies, cookie);
+
+    try {
+        ExtractJoinGameMessageData(message, player_name, client_type, client_version_string,
+                                   dependencies, cookie);
+    } catch (const std::exception&) {
+        ErrorLogger(FSM) << "WaitingForMPGameJoiners::react(const JoinGame& msg): couldn't extract data from join game message";
+        player_connection->SendMessage(ErrorMessage(UserString("ERROR_INCOMPATIBLE_VERSION"), true));
+        server.Networking().Disconnect(player_connection);
+        return discard_event();
+    }
 
     DebugLogger() << "Player " << player_name << " has dependencies: " << StringifyDependencies(dependencies);
 

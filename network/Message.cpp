@@ -164,8 +164,8 @@ Message JoinGameMessage(const std::string& player_name,
         oa << BOOST_SERIALIZATION_NVP(player_name)
            << BOOST_SERIALIZATION_NVP(client_type)
            << BOOST_SERIALIZATION_NVP(client_version_string)
-           << BOOST_SERIALIZATION_NVP(cookie);
-        oa << BOOST_SERIALIZATION_NVP(dependencies);
+           << BOOST_SERIALIZATION_NVP(cookie)
+           << BOOST_SERIALIZATION_NVP(dependencies);
     }
     return Message{Message::MessageType::JOIN_GAME, std::move(os).str()};
 }
@@ -970,8 +970,8 @@ void ExtractJoinGameMessageData(const Message& msg, std::string& player_name,
         try {
             ia >> BOOST_SERIALIZATION_NVP(dependencies);
         } catch (...) {
-            DebugLogger() << "ExtractJoinAckMessageData(const Message& msg, int& player_id, "
-                          << "boost::uuids::uuid& cookie) didn't get a list of dependencies.";
+            DebugLogger() << "ExtractJoinGameMessageData(const Message& msg, std::string& player_name = " << player_name << ", "
+                          << "Networking::ClientType client_type, std::string& version_string) didn't get a list of dependencies.";
         }
     } catch (const std::exception& err) {
         ErrorLogger() << "ExtractJoinGameMessageData(const Message& msg, std::string& player_name, "

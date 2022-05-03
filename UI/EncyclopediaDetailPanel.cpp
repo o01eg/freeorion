@@ -117,8 +117,7 @@ namespace {
     /** Retreive a value label and general string representation for @a meter_type
       * eg. {"METER_STEALTH_VALUE_LABEL", UserString("METER_STEALTH")} */
     auto MeterValueLabelAndString(MeterType meter_type) {
-        auto meter_type_sv{to_string(meter_type)};
-        std::pair<std::string_view, std::string_view> retval{"", meter_type_sv};
+        std::pair<std::string_view, std::string_view> retval{"", to_string(meter_type)};
 
         if (meter_type == MeterType::INVALID_METER_TYPE)
             return retval;
@@ -130,7 +129,7 @@ namespace {
         // TODO: additional static_assert that verifies that the numerical representation of
         //       all values of MeterType are -1 or higher. would work better with an
         //       IterateEnum implementation that works constexpr. as of this writing, it
-        //       uses an std::map, which is not constexpr OK in C++17
+        //       uses an std::vector, which is not constexpr OK in C++17
 
         static const auto label_value_strings = []() {
             std::array<std::string, NUM_IDX> retval{};
@@ -170,7 +169,7 @@ namespace {
     }
 
     const std::vector<std::string>& GetSearchTextDirNames() {
-        static std::vector<std::string> dir_names{
+        static const std::vector<std::string> dir_names{
             "ENC_INDEX",        "ENC_SHIP_PART",    "ENC_SHIP_HULL",    "ENC_TECH",
             "ENC_POLICY",
             "ENC_BUILDING_TYPE","ENC_SPECIAL",      "ENC_SPECIES",      "ENC_FIELD_TYPE",
@@ -2581,7 +2580,7 @@ namespace {
             % parts_list);
     }
 
-    std::string GetDetailedDescriptionStats(const std::shared_ptr<Ship> ship,
+    std::string GetDetailedDescriptionStats(const std::shared_ptr<Ship>& ship,
                                             const ShipDesign* design,
                                             float enemy_DR,
                                             std::set<float> enemy_shots, float cost)
@@ -2824,9 +2823,8 @@ namespace {
         cost_units = UserString("ENC_PP");
 
 
-        universe.InsertShipDesignID(new ShipDesign(*incomplete_design), client_empire_id, TEMPORARY_OBJECT_ID);
+        universe.InsertShipDesignID(new ShipDesign(*incomplete_design), client_empire_id, incomplete_design->ID());
         detailed_description = GetDetailedDescriptionBase(incomplete_design.get());
-
         float tech_level = boost::algorithm::clamp(context.current_turn / 400.0f, 0.0f, 1.0f);
         float typical_shot = 3 + 27 * tech_level;
         float enemy_DR = 20 * tech_level;
@@ -2877,7 +2875,7 @@ namespace {
 
 
         // temporary ship to use for estimating design's meter values
-        auto temp = universe.InsertTemp<Ship>(client_empire_id, INVALID_DESIGN_ID, "",
+        auto temp = universe.InsertTemp<Ship>(client_empire_id, incomplete_design->ID(), "",
                                               universe, species_manager, client_empire_id,
                                               context.current_turn);
 

@@ -60,17 +60,14 @@ namespace {
 // class CUILabel
 ///////////////////////////////////////
 CUILabel::CUILabel(std::string str,
-                   GG::Flags<GG::TextFormat> format/* = GG::FORMAT_NONE*/,
-                   GG::Flags<GG::WndFlag> flags/* = GG::NO_WND_FLAGS*/,
-                   GG::X x /*= GG::X0*/, GG::Y y /*= GG::Y0*/, GG::X w /*= GG::X1*/, GG::Y h/*= GG::Y1*/) :
+                   GG::Flags<GG::TextFormat> format, GG::Flags<GG::WndFlag> flags,
+                   GG::X x, GG::Y y, GG::X w, GG::Y h) :
     TextControl(x, y, w, h, std::move(str), ClientUI::GetFont(), ClientUI::TextColor(), format, flags)
 {}
 
-CUILabel::CUILabel(std::string str,
-                   std::vector<std::shared_ptr<GG::Font::TextElement>> text_elements,
-                   GG::Flags<GG::TextFormat> format/* = GG::FORMAT_NONE*/,
-                   GG::Flags<GG::WndFlag> flags/* = GG::NO_WND_FLAGS*/,
-                   GG::X x /*= GG::X0*/, GG::Y y /*= GG::Y0*/, GG::X w /*= GG::X1*/, GG::Y h/*= GG::Y1*/) :
+CUILabel::CUILabel(std::string str, std::vector<std::shared_ptr<GG::Font::TextElement>> text_elements,
+                   GG::Flags<GG::TextFormat> format, GG::Flags<GG::WndFlag> flags,
+                   GG::X x, GG::Y y, GG::X w, GG::Y h) :
     TextControl(x, y, w, h, std::move(str), std::move(text_elements),
                 ClientUI::GetFont(), ClientUI::TextColor(), format, flags)
 {}
@@ -2424,30 +2421,24 @@ void RotatingGraphic::Render() {
     glRotatef(angle, 0.0f, 0.0f, 1.0f);                                             // rotate about centre
     glTranslatef(-Value(rendered_area.MidX()), -Value(rendered_area.MidY()), 0.0f); // tx to be centred on 0, 0
 
-    // set up vertices for translated scaled quad corners
-    GG::GL2DVertexBuffer verts;
-    verts.store(rendered_area.UpperLeft());                     // upper left
-    verts.store(rendered_area.Right(), rendered_area.Top());    // upper right
-    verts.store(rendered_area.Left(),  rendered_area.Bottom()); // lower left
-    verts.store(rendered_area.LowerRight());                    // lower right
+    if (rendered_area != last_rendered_area) {
+        last_rendered_area = rendered_area;
+        // set up vertices for translated scaled quad corners
+        verts.clear();
+        verts.store(rendered_area.UpperLeft());                     // upper left
+        verts.store(rendered_area.Right(), rendered_area.Top());    // upper right
+        verts.store(rendered_area.Left(),  rendered_area.Bottom()); // lower left
+        verts.store(rendered_area.LowerRight());                    // lower right
+    }
 
     // set up texture coordinates for vertices
-    GLfloat texture_coordinate_data[8];
-    const GLfloat* tex_coords = texture->DefaultTexCoords();
-    texture_coordinate_data[2*0] =      tex_coords[0];
-    texture_coordinate_data[2*0 + 1] =  tex_coords[1];
-    texture_coordinate_data[2*1] =      tex_coords[2];
-    texture_coordinate_data[2*1 + 1] =  tex_coords[1];
-    texture_coordinate_data[2*2] =      tex_coords[0];
-    texture_coordinate_data[2*2 + 1] =  tex_coords[3];
-    texture_coordinate_data[2*3] =      tex_coords[2];
-    texture_coordinate_data[2*3 + 1] =  tex_coords[3];
+    const GLfloat* tc = texture->DefaultTexCoords();
+    GLfloat texture_coordinate_data[8] = {tc[0], tc[1], tc[2], tc[1], tc[0], tc[3], tc[2], tc[3]};
+
 
     //// debug
     //std::cout << "rendered area: " << rendered_area << "  ul: " << UpperLeft() << "  sz: " << Size() << std::endl;
-    //std::cout << "tex coords: " << tex_coords[0] << ", " << tex_coords[1] << ";  "
-    //                            << tex_coords[2] << ", " << tex_coords[3]
-    //                            << std::endl;
+    //std::cout << "tex coords: " << tc[0] << ", " << tc[1] << ";  " << tc[2] << ", " << tc[3] << std::endl;
     //// end debug
 
     // render textured quad

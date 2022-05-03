@@ -54,11 +54,8 @@ constexpr bool INSTRUMENT_GET_WINDOW_UNDER = false;
 struct AcceleratorEcho
 {
     AcceleratorEcho(Key key, Flags<ModKey> mod_keys) :
-        m_str("GG SIGNAL : GUI::AcceleratorSignal(key=" +
-                boost::lexical_cast<std::string>(key) +
-                " mod_keys=" +
-                boost::lexical_cast<std::string>(mod_keys) +
-                ")")
+        m_str(std::string{"GG SIGNAL : GUI::AcceleratorSignal(key="}.append(to_string(key))
+              .append(" mod_keys=").append(boost::lexical_cast<std::string>(mod_keys)).append(")"))
     {}
     bool operator()()
     {
@@ -1581,17 +1578,16 @@ bool GUI::FocusWndDeselect()
 GUI* GUI::GetGUI()
 { return s_gui; }
 
-void GUI::PreRenderWindow(const std::shared_ptr<Wnd>& wnd)
-{ PreRenderWindow(wnd.get()); }
+void GUI::PreRenderWindow(const std::shared_ptr<Wnd>& wnd, bool even_if_not_visible)
+{ PreRenderWindow(wnd.get(), even_if_not_visible); }
 
-void GUI::PreRenderWindow(Wnd* wnd)
+void GUI::PreRenderWindow(Wnd* wnd, bool even_if_not_visible)
 {
-    if (!wnd || !wnd->Visible())
+    if (!wnd || (!even_if_not_visible && !wnd->Visible()))
         return;
 
-    for (auto& child_wnd : wnd->m_children) {
-        PreRenderWindow(child_wnd.get());
-    }
+    for (auto& child_wnd : wnd->m_children)
+        PreRenderWindow(child_wnd.get(), even_if_not_visible);
 
     if (wnd->PreRenderRequired())
         wnd->PreRender();

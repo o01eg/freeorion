@@ -243,7 +243,7 @@ include(TestForBug2795)
 ##
 
 set(MINIMUM_PYTHON_VERSION 3.6)
-set(MINIMUM_BOOST_VERSION 1.60.0)
+set(MINIMUM_BOOST_VERSION 1.69.0)
 
 find_package(Threads)
 find_package(PythonInterp ${MINIMUM_PYTHON_VERSION} REQUIRED)
@@ -329,6 +329,8 @@ set_property(DIRECTORY APPEND
         # fixed this with python bug #10910
         $<$<PLATFORM_ID:Darwin>:BOOST_DATE_TIME_NO_LOCALE>
         $<$<PLATFORM_ID:FreeBSD>:BOOST_DATE_TIME_NO_LOCALE>
+        # Forcing backtrace using api for boost stacktrace due to lacking on ::Unwind side
+        $<$<PLATFORM_ID:FreeBSD>:BOOST_STACKTRACE_USE_LIBC_BACKTRACE_FUNCTION>
 )
 
 
@@ -428,6 +430,9 @@ target_link_libraries(freeorioncommon
         ${CORE_FOUNDATION_LIBRARY}
 )
 
+if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+	target_link_libraries(freeorioncommon PUBLIC execinfo)
+endif()
 if(CMAKE_SYSTEM_NAME MATCHES "Haiku")
 	target_link_libraries(freeorioncommon PUBLIC network)
 endif()

@@ -93,6 +93,8 @@
    <allow-email>
     <new-turn>0</new-turn> <!-- Enable -->
    </allow-email>
+   <allow-observers>1</allow-observers> <!-- Disable -->
+   <send-turn-chat>0</send-turn-chat> <!-- Enable -->
    <human>
     <min>3</min>
    </human>

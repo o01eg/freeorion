@@ -23,17 +23,18 @@ import urllib.request
 def execute_turn_events():
     print("Executing turn events for turn", fo.current_turn())
 
-    try:
-        req = urllib.request.Request(
-            "http://localhost:8083/",
-            ("%s: Turn %d has come to an end." % (fo.get_galaxy_setup_data().gameUID, fo.current_turn())).encode(),
-        )
-        req.add_header("X-XMPP-Muc", "smac")
-        urllib.request.urlopen(req).read()
-        info("Chat notification was send via XMPP")
-    except Exception:
-        exctype, value = sys.exc_info()[:2]
-        error("Cann't send chat notification: %s %s" % (exctype, value))
+    if fo.get_options_db_option_bool("network.server.send-turn-chat"):
+        try:
+            req = urllib.request.Request(
+                "http://localhost:8083/",
+                ("%s: Turn %d has come to an end." % (fo.get_galaxy_setup_data().gameUID, fo.current_turn())).encode(),
+            )
+            req.add_header("X-XMPP-Muc", "smac")
+            urllib.request.urlopen(req).read()
+            info("Chat notification was send via XMPP")
+        except Exception:
+            exctype, value = sys.exc_info()[:2]
+            error("Cann't send chat notification: %s %s" % (exctype, value))
 
     try:
         dsn = ""

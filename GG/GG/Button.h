@@ -104,7 +104,8 @@ protected:
     /** Draws the button rolled-over.  If an rollover graphic has been supplied, it is used. */
     virtual void RenderRollover();
 
-    std::shared_ptr<TextControl> m_label;   ///< Label used to display text
+    std::shared_ptr<TextControl> m_label;        ///< Label used to display text
+    std::shared_ptr<TextControl> m_label_shadow; ///< Label used to display text
 
 private:
     void RenderDefault();     ///< This just draws the default unadorned square-and-rectangle button
@@ -145,7 +146,8 @@ public:
     typedef boost::signals2::signal<void (bool)> CheckedSignalType;
 
     StateButton(std::string str, const std::shared_ptr<Font>& font, Flags<TextFormat> format,
-                Clr color, std::shared_ptr<StateButtonRepresenter> representer, Clr text_color = CLR_BLACK); ///< Ctor
+                Clr color, std::shared_ptr<StateButtonRepresenter> representer,
+                Clr text_color = CLR_BLACK);
     void CompleteConstruction() override;
 
     Pt                  MinUsableSize() const override;
@@ -182,9 +184,9 @@ protected:
 
 private:
     std::shared_ptr<StateButtonRepresenter> m_representer;
-    std::shared_ptr<TextControl>            m_label;       ///< Label used to display text
-    ButtonState                             m_state;       ///< Button is always in exactly one of the ButtonState states above
-    bool                                    m_checked;     ///< true when this button in a checked, active state
+    std::shared_ptr<TextControl>            m_label;
+    ButtonState                             m_state = ButtonState::BN_UNPRESSED;
+    bool                                    m_checked = false;     ///< true when this button in a checked, active state
 };
 
 

@@ -282,17 +282,17 @@ namespace {
     bool RegisterTextFormats()
     {
         FlagSpec<TextFormat>& spec = FlagSpec<TextFormat>::instance();
-        spec.insert(FORMAT_NONE,        "FORMAT_NONE",      true);
-        spec.insert(FORMAT_VCENTER,     "FORMAT_VCENTER",   true);
-        spec.insert(FORMAT_TOP,         "FORMAT_TOP",       true);
-        spec.insert(FORMAT_BOTTOM,      "FORMAT_BOTTOM",    true);
-        spec.insert(FORMAT_CENTER,      "FORMAT_CENTER",    true);
-        spec.insert(FORMAT_LEFT,        "FORMAT_LEFT",      true);
-        spec.insert(FORMAT_RIGHT,       "FORMAT_RIGHT",     true);
-        spec.insert(FORMAT_NOWRAP,      "FORMAT_NOWRAP",    true);
-        spec.insert(FORMAT_WORDBREAK,   "FORMAT_WORDBREAK", true);
-        spec.insert(FORMAT_LINEWRAP,    "FORMAT_LINEWRAP",  true);
-        spec.insert(FORMAT_IGNORETAGS,  "FORMAT_IGNORETAGS",true);
+        spec.insert(FORMAT_NONE,        "FORMAT_NONE");
+        spec.insert(FORMAT_VCENTER,     "FORMAT_VCENTER");
+        spec.insert(FORMAT_TOP,         "FORMAT_TOP");
+        spec.insert(FORMAT_BOTTOM,      "FORMAT_BOTTOM");
+        spec.insert(FORMAT_CENTER,      "FORMAT_CENTER");
+        spec.insert(FORMAT_LEFT,        "FORMAT_LEFT");
+        spec.insert(FORMAT_RIGHT,       "FORMAT_RIGHT");
+        spec.insert(FORMAT_NOWRAP,      "FORMAT_NOWRAP");
+        spec.insert(FORMAT_WORDBREAK,   "FORMAT_WORDBREAK");
+        spec.insert(FORMAT_LINEWRAP,    "FORMAT_LINEWRAP");
+        spec.insert(FORMAT_IGNORETAGS,  "FORMAT_IGNORETAGS");
         return true;
     }
     bool dummy = RegisterTextFormats();
@@ -1094,7 +1094,7 @@ void Font::RenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags
                       const std::vector<LineData>& line_data, RenderState& render_state,
                       std::size_t begin_line, CPSize begin_char,
                       std::size_t end_line, CPSize end_char) const
- {
+{
     RenderCache cache;
     PreRenderText(ul, lr, text, format, line_data, render_state, begin_line, begin_char, end_line, end_char, cache);
     RenderCachedText(cache);

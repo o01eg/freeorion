@@ -127,21 +127,6 @@ Alignment AlignmentFromStyle(Flags<ListBoxStyle> style)
 ///////////////////////////////////////
 // ListBoxStyle
 ///////////////////////////////////////
-const ListBoxStyle GG::LIST_NONE            (0);
-const ListBoxStyle GG::LIST_VCENTER         (1 << 0);
-const ListBoxStyle GG::LIST_TOP             (1 << 1);
-const ListBoxStyle GG::LIST_BOTTOM          (1 << 2);
-const ListBoxStyle GG::LIST_CENTER          (1 << 3);
-const ListBoxStyle GG::LIST_LEFT            (1 << 4);
-const ListBoxStyle GG::LIST_RIGHT           (1 << 5);
-const ListBoxStyle GG::LIST_NOSORT          (1 << 6);
-const ListBoxStyle GG::LIST_SORTDESCENDING  (1 << 7);
-const ListBoxStyle GG::LIST_NOSEL           (1 << 8);
-const ListBoxStyle GG::LIST_SINGLESEL       (1 << 9);
-const ListBoxStyle GG::LIST_QUICKSEL        (1 << 10);
-const ListBoxStyle GG::LIST_USERDELETE      (1 << 11);
-const ListBoxStyle GG::LIST_BROWSEUPDATES   (1 << 12);
-
 GG_FLAGSPEC_IMPL(ListBoxStyle);
 
 namespace {
@@ -149,20 +134,20 @@ namespace {
 bool RegisterListBoxStyles()
 {
     FlagSpec<ListBoxStyle>& spec = FlagSpec<ListBoxStyle>::instance();
-    spec.insert(LIST_NONE,          "LIST_NONE",            true);
-    spec.insert(LIST_VCENTER,       "LIST_VCENTER",         true);
-    spec.insert(LIST_TOP,           "LIST_TOP",             true);
-    spec.insert(LIST_BOTTOM,        "LIST_BOTTOM",          true);
-    spec.insert(LIST_CENTER,        "LIST_CENTER",          true);
-    spec.insert(LIST_LEFT,          "LIST_LEFT",            true);
-    spec.insert(LIST_RIGHT,         "LIST_RIGHT",           true);
-    spec.insert(LIST_NOSORT,        "LIST_NOSORT",          true);
-    spec.insert(LIST_SORTDESCENDING,"LIST_SORTDESCENDING",  true);
-    spec.insert(LIST_NOSEL,         "LIST_NOSEL",           true);
-    spec.insert(LIST_SINGLESEL,     "LIST_SINGLESEL",       true);
-    spec.insert(LIST_QUICKSEL,      "LIST_QUICKSEL",        true);
-    spec.insert(LIST_USERDELETE,    "LIST_USERDELETE",      true);
-    spec.insert(LIST_BROWSEUPDATES, "LIST_BROWSEUPDATES",   true);
+    spec.insert(LIST_NONE,          "LIST_NONE");
+    spec.insert(LIST_VCENTER,       "LIST_VCENTER");
+    spec.insert(LIST_TOP,           "LIST_TOP");
+    spec.insert(LIST_BOTTOM,        "LIST_BOTTOM");
+    spec.insert(LIST_CENTER,        "LIST_CENTER");
+    spec.insert(LIST_LEFT,          "LIST_LEFT");
+    spec.insert(LIST_RIGHT,         "LIST_RIGHT");
+    spec.insert(LIST_NOSORT,        "LIST_NOSORT");
+    spec.insert(LIST_SORTDESCENDING,"LIST_SORTDESCENDING");
+    spec.insert(LIST_NOSEL,         "LIST_NOSEL");
+    spec.insert(LIST_SINGLESEL,     "LIST_SINGLESEL");
+    spec.insert(LIST_QUICKSEL,      "LIST_QUICKSEL");
+    spec.insert(LIST_USERDELETE,    "LIST_USERDELETE");
+    spec.insert(LIST_BROWSEUPDATES, "LIST_BROWSEUPDATES");
     return true;
 }
 bool dummy = RegisterListBoxStyles();

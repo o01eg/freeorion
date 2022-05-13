@@ -148,7 +148,7 @@ class AuthProvider:
     def is_success_auth_and_return_roles(self, player_name, auth):
         """Return False if passowrd doesn't match or list of roles for authenticated player"""
         authenticated = False
-        roles = self.default_roles
+        roles = []
         try:
             with self.conn:
                 with self.conn.cursor() as curs:
@@ -160,7 +160,7 @@ class AuthProvider:
                         authenticated = not not r[0]
                         role = self.roles_symbols.get(r[1])
                         if role is not None:
-                            roles = [role]
+                            roles.append(role)
                         info("Player %s was accepted %r" % (player_name, authenticated))
         except psycopg2.InterfaceError:
             self.conn = psycopg2.connect(self.dsn)

@@ -174,7 +174,7 @@ public:
         >
     > TechContainer;
 
-    using TechCategoryMap = std::map<std::string, std::unique_ptr<TechCategory>>;
+    using TechCategoryMap = std::map<std::string, std::unique_ptr<TechCategory>, std::less<>>;
 
     /** iterator that runs over techs within a category */
     typedef TechContainer::index<CategoryIndex>::type::const_iterator category_iterator;
@@ -183,21 +183,19 @@ public:
     typedef TechContainer::index<NameIndex>::type::const_iterator iterator;
 
     /** returns the tech with the name \a name; you should use the free function GetTech() instead */
-    [[nodiscard]] const Tech*              GetTech(const std::string& name) const;
     [[nodiscard]] const Tech*              GetTech(std::string_view name) const;
-    [[nodiscard]] const Tech*              GetTech(const char* name) const;
 
     /** returns the tech category with the name \a name; you should use the free function GetTechCategory() instead */
-    [[nodiscard]] const TechCategory*      GetTechCategory(const std::string& name) const;
+    [[nodiscard]] const TechCategory*      GetTechCategory(std::string_view name) const;
 
     /** returns the list of category names */
-    [[nodiscard]] std::vector<std::string> CategoryNames() const;
+    [[nodiscard]] std::vector<std::string_view> CategoryNames() const;
 
     /** returns list of all tech names */
-    [[nodiscard]] std::vector<std::string> TechNames() const;
+    [[nodiscard]] std::vector<std::string_view> TechNames() const;
 
     /** returns list of names of techs in specified category */
-    [[nodiscard]] std::vector<std::string> TechNames(const std::string& name) const;
+    [[nodiscard]] std::vector<std::string_view> TechNames(const std::string& name) const;
 
     /** returns all researchable techs */
     [[nodiscard]] std::vector<const Tech*> AllNextTechs(const std::set<std::string>& known_techs);
@@ -248,7 +246,7 @@ public:
 
     using TechParseTuple = std::tuple<
         TechManager::TechContainer, // techs_
-        std::map<std::string, std::unique_ptr<TechCategory>>, // tech_categories,
+        std::map<std::string, std::unique_ptr<TechCategory>, std::less<>>, // tech_categories,
         std::set<std::string> // categories_seen
         >;
     /** Sets types to the value of \p future. */
@@ -299,11 +297,9 @@ FO_COMMON_API TechManager& GetTechManager();
 //! @return
 //! A pointer to the ::Tech matching @p name or nullptr if no ::Tech with that
 //! name was found.
-FO_COMMON_API const Tech* GetTech(const std::string& name);
 FO_COMMON_API const Tech* GetTech(std::string_view name);
 
 /** returns a pointer to the tech category with the name \a name, or 0 if no such category exists */
-FO_COMMON_API const TechCategory* GetTechCategory(const std::string& name);
-
+FO_COMMON_API const TechCategory* GetTechCategory(std::string_view name);
 
 #endif

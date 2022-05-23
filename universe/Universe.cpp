@@ -369,13 +369,12 @@ void Universe::RenameShipDesign(int design_id, const std::string& name/* = ""*/,
     design->SetDescription(description);
 }
 
-const ShipDesign* Universe::GetGenericShipDesign(const std::string& name) const {
+const ShipDesign* Universe::GetGenericShipDesign(std::string_view name) const {
     if (name.empty())
         return nullptr;
     for (const auto& entry : m_ship_designs) {
         const ShipDesign* design = entry.second;
-        const std::string& design_name = design->Name(false);
-        if (name == design_name)
+        if (name == design->Name(false))
             return design;
     }
     return nullptr;
@@ -764,8 +763,7 @@ void Universe::InitMeterEstimatesAndDiscrepancies(ScriptingContext& context) {
             meter.AddToCurrent(discrepancy);
 
             // add discrepancy adjustment to meter accounting
-            account_map[type].emplace_back(INVALID_OBJECT_ID, EffectsCauseType::ECT_UNKNOWN_CAUSE,
-                                           discrepancy, meter.Current());
+            account_map[type].emplace_back(discrepancy, meter.Current());
 
             TraceLogger(effects) << "... ... " << type << ": " << discrepancy;
         }
@@ -1039,11 +1037,11 @@ namespace {
             // TargetsAndCause {TargetSet target_set; EffectCause effect_cause;}
             // typedef std::vector<std::pair<SourcedEffectsGroup, TargetsAndCause>> SourcesEffectsTargetsAndCausesVec;
             source_effects_targets_causes_out.emplace_back(
-                Effect::SourcedEffectsGroup{source->ID(), effects_group},
-                Effect::TargetsAndCause{
-                    Effect::TargetSet{},
-                    Effect::EffectCause{effect_cause_type, std::string{specific_cause_name},
-                                        effects_group->AccountingLabel()}});
+                std::piecewise_construct,
+                std::forward_as_tuple(source->ID(), effects_group),
+                std::forward_as_tuple(effect_cause_type,
+                                      std::string{specific_cause_name},
+                                      effects_group->AccountingLabel()));
 
             // extract output Effect::TargetSet
             Effect::TargetSet& matched_targets{source_effects_targets_causes_out.back().second.target_set};
@@ -1263,12 +1261,13 @@ namespace {
                 auto& vec_out{source_effects_targets_causes_reorder_buffer_out.back().first};
                 for (auto& source : active_sources[i]) {
                     context.source = source;
+
                     vec_out.emplace_back(
-                        Effect::SourcedEffectsGroup{source->ID(), effects_group},
-                        Effect::TargetsAndCause{
-                            {}, // empty Effect::TargetSet
-                            Effect::EffectCause{effect_cause_type, std::string{specific_cause_name},
-                                                effects_group->AccountingLabel()}});
+                        std::piecewise_construct,
+                        std::forward_as_tuple(source->ID(), effects_group),
+                        std::forward_as_tuple(effect_cause_type,
+                                              std::string{specific_cause_name},
+                                              effects_group->AccountingLabel()));
                 }
 
                 cache_hit = true;

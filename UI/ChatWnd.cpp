@@ -46,7 +46,7 @@ namespace {
 
         auto formatter = FlexibleFormat(key);
 
-        size_t arg = 1;
+        std::size_t arg = 1;
         for (auto submatch : match.nested_results())
             formatter.bind_arg(arg++, submatch.str());
 
@@ -164,7 +164,7 @@ void MessageWndEdit::FindGameWords() {
         (void)species; // quiet unused variable warning
     }
      // add techs names
-    for (const std::string& tech_name : GetTechManager().TechNames()) {
+    for (const auto& tech_name : GetTechManager().TechNames()) {
         if (!tech_name.empty())
             m_game_words.insert(UserString(tech_name));
     }

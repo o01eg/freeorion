@@ -48,7 +48,6 @@ from EnumsAI import (
     get_priority_production_types,
 )
 from freeorion_tools import ppstring, tech_is_complete
-from PolicyAI import dislike_multiplier
 from production import print_building_list, print_capital_info, print_production_queue
 from turn_state import (
     get_all_empire_planets,
@@ -636,6 +635,7 @@ def generate_production_orders():
     building_expense += _build_gas_giant_generator()
     building_expense += _build_translator()
     building_expense += _build_regional_administration()
+    building_expense += _build_military_command()
 
     building_name = "BLD_SOL_ORB_GEN"
     if empire.buildingTypeAvailable(building_name) and aistate.character.may_build_building(building_name):
@@ -1785,7 +1785,7 @@ def _try_enqueue(
             preferred_locations.append((_location_rating(planet), pid))
         else:
             locations.append((_location_rating(planet), pid))
-    for _, pid in sorted(preferred_locations) + sorted(locations):
+    for _, pid in sorted(preferred_locations, reverse=True) + sorted(locations, reverse=True):
         planet = universe.getPlanet(pid)
         res = building_type.enqueue(pid)
         debug("Enqueueing %s at planet %d (%s) , with result %d", building_type, pid, planet.name, res)
@@ -1811,7 +1811,7 @@ def _may_enqueue_for_stability(building_type: BuildingType, new_turn_cost: float
     # Note that the strongest effect is always on the building's planet itself.
     opinion = building_type.get_opinions()
     universe = fo.getUniverse()
-    if len(opinion.likes) >= len(opinion.dislikes) * dislike_multiplier():
+    if len(opinion.likes) >= len(opinion.dislikes) * PlanetUtilsAI.dislike_factor():
         like_candidates = opinion.likes - building_type.built_or_queued_at()
         # plans may change, so consider only actual colonies that like it
         candidates = [pid for pid in like_candidates if universe.getPlanet(pid).speciesName]
@@ -1880,7 +1880,7 @@ def _build_gas_giant_generator() -> float:
         best_gg = -2
         debug(f"Gas Giant Generator rating for {universe.getSystem(sys).name} ...")
         for pid, planet in planets:
-            likes = opinion.value(pid, 1, 0, -1 * dislike_multiplier())
+            likes = opinion.value(pid, 1, 0, -1 * PlanetUtilsAI.dislike_factor())
             debug(f"  {planet.name} likes {likes}")
             # TBD -4 if build here...
             stability = planet.currentMeterValue(fo.meterType.targetHappiness) + likes
@@ -1933,7 +1933,7 @@ def _build_translator():
             # TBD: compare with other foci, or get the information from ResourceAI
             # long term: ResourceAI planet information should be moved to _planet_state or similar
             rating = planet.currentMeterValue(fo.meterType.targetInfluence) * opinion.value(
-                pid, 1.5, 1.0, 0.5 / dislike_multiplier()
+                pid, 1.5, 1.0, 0.5 / PlanetUtilsAI.dislike_factor()
             )
             candidates.append((rating, pid))
     candidates.sort(reverse=True)
@@ -1999,7 +1999,7 @@ def _rate_system_for_admin(sys_id: SystemId, systems_that_may_profit: List[Tuple
         return 0.0
     # First like gets a big bonus, but we can build it only on one.
     # Number of planets to prefer better defended systems.
-    rating = 1.5 * (len(likes) - len(dislikes) * dislike_multiplier()) + 3 * (likes != set()) + len(planets)
+    rating = 1.5 * (len(likes) - len(dislikes) * PlanetUtilsAI.dislike_factor()) + 3 * (likes != set()) + len(planets)
 
     universe = fo.getUniverse()
     for current_distance, other_sys_id in systems_that_may_profit:
@@ -2015,3 +2015,21 @@ def _rate_system_for_admin(sys_id: SystemId, systems_that_may_profit: List[Tuple
                         rating += 2
     debug(f"admin rating {universe.getSystem(sys_id)}={rating}")
     return rating
+
+
+def _build_military_command() -> float:
+    """
+    Consider building a Military Command, return added turn costs.
+    Since its major purpose is to provide policy slots, and we may need the production for more important
+    things, do not build it too early. Won't build it at all, if all our planets dislike it.
+    """
+    building_type = BuildingType.MILITARY_COMMAND
+    palace_planet = BuildingType.PALACE.built_at()
+    # an empire can only build one, and if we do not have a palace, this is definitely more important
+    if building_type.built_or_queued_at() or not palace_planet:
+        return 0.0
+    # cost is independent of the location, but we need a valid location
+    if fo.getEmpire().productionPoints > building_type.turn_cost(list(palace_planet)[0]) * 1.5:
+        # default selection should prefer the capital, unless its species dislikes it.
+        return _try_enqueue(building_type, get_inhabited_planets())
+    return 0.0

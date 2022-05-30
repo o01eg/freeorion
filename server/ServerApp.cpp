@@ -120,11 +120,7 @@ ServerApp::ServerApp() :
         throw std::runtime_error("Python not initialized");
 
     if (GetOptionsDB().Get<int>("network.server.python.asyncio-interval") > 0) {
-#if BOOST_VERSION >= 106600
         m_timer.expires_after(std::chrono::seconds(GetOptionsDB().Get<int>("network.server.python.asyncio-interval")));
-#else
-        m_timer.expires_from_now(std::chrono::seconds(GetOptionsDB().Get<int>("network.server.python.asyncio-interval")));
-#endif
         m_timer.async_wait(boost::bind(&ServerApp::AsyncIOTimedoutHandler,
                                        this,
                                        boost::asio::placeholders::error));
@@ -286,6 +282,14 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
     } else {
         DebugLogger() << "ai-config not set.";
     }
+    std::string ai_log_dir = GetOptionsDB().Get<std::string>("ai-log-dir");
+    if (!ai_log_dir.empty()) {
+        args.push_back("--ai-log-dir");
+        args.push_back(ai_log_dir);
+        DebugLogger() << "ai-log-dir set to '" << ai_log_dir << "'";
+    } else {
+        DebugLogger() << "ai-log-dir not set.";
+    }
 
     // for each AI client player, create a new AI client process
     for (const PlayerSetupData& psd : player_setup_data) {
@@ -393,11 +397,7 @@ void ServerApp::AsyncIOTimedoutHandler(const boost::system::error_code& error) {
 
     if (success) {
         if (GetOptionsDB().Get<int>("network.server.python.asyncio-interval") > 0) {
-#if BOOST_VERSION >= 106600
             m_timer.expires_after(std::chrono::seconds(GetOptionsDB().Get<int>("network.server.python.asyncio-interval")));
-#else
-            m_timer.expires_from_now(std::chrono::seconds(GetOptionsDB().Get<int>("network.server.python.asyncio-interval")));
-#endif
             m_timer.async_wait(boost::bind(&ServerApp::AsyncIOTimedoutHandler,
                                              this,
                                              boost::asio::placeholders::error));

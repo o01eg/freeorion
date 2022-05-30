@@ -1410,6 +1410,9 @@ Skip comparing the resource directory checksums.  This allows faster startup whe
 OPTIONS_DB_TESTING
 Linux only. AI will output log to console instead file for testing purpose.
 
+OPTIONS_DB_LOAD_OR_QUICKSTART
+Searches latest multi-player save game in autosave directory. Loads and starts it if found or quick-starts new game with predefined options and game rules. Requires hostless mode and no restriction on the minimum number of connected players, because the server will start with no connected players.
+
 OPTIONS_DB_GENERATE_CONFIG_XML
 Uses default settings, settings from any existing config.xml file, and settings given on the command line to generate a config.xml file. This will overwrite the current config.xml file, if it exists.
 
@@ -2065,6 +2068,9 @@ Sets the path for the directory containing the AI script files, for current exec
 
 OPTIONS_DB_AI_CONFIG
 Is available to the AI via the freeorioninterface, is set for current execution only. Current expected use is to name an optional AI config file within the AI script folder; default is the empty string. Intended to facilitate AI testing.
+
+OPTIONS_DB_AI_LOG_DIR
+Sets the path for the directory where AI clients writes log files.
 
 OPTIONS_DB_AI_CONFIG_TRAIT_AGGRESSION_FORCED
 Boolean for AI testing which indicates if all AIs are forced to have the same Aggression Trait.
@@ -12054,9 +12060,9 @@ Diversity
 
 PLC_DIVERSITY_DESC
 '''Gives bonuses or penalties to research, stability, and capital influence, dependent on the number of species in the empire.
-The research bonus requires a stability of [[value PLC_DIVERSITY_MIN_STABILITY]].
+The research bonus requires research focus and a stability of [[value PLC_DIVERSITY_MIN_STABILITY]].
 
-All bonuses or penalties are [[value PLC_DIVERSITY_SCALING]] per species above or below 4 species that are present.'''
+All bonuses or penalties are [[value PLC_DIVERSITY_SCALING]] per species above or below [[value PLC_DIVERSITY_THRESHOLD]] species that are present.'''
 
 PLC_DIVERSITY_SHORT_DESC
 Improves research, stability, and Influence
@@ -12306,7 +12312,9 @@ PLC_ARTISAN_WORKSHOPS
 Artisan Workshops
 
 PLC_ARTISAN_WORKSHOPS_DESC
-Planets with [[encyclopedia ARTISTIC]] species that are set to influence focus will generate influence and will export aesthetically pleasing crafts to planets in their system, boosting the stability of those planets.
+'''Planets with [[encyclopedia ARTISTIC]] species will generate influence by exporting aesthetically pleasing crafts.
+• Increases [[metertype METER_TARGET_INFLUENCE]] on planet set to influence focus with a minimum stability of [[value ARTISANS_MIN_STABILITY_FOCUS]] by [[value ARTISANS_INFLUENCE_FLAT_FOCUS]].
+• Increases [[metertype METER_TARGET_INFLUENCE]] on planet not set to influence focus and a minimum stability of [[value ARTISANS_MIN_STABILITY_NO_FOCUS]] by [[value ARTISANS_INFLUENCE_FLAT_NO_FOCUS]].'''
 
 PLC_ARTISAN_WORKSHOPS_SHORT_DESC
 [[encyclopedia ARTISTIC]] species produce luxuries

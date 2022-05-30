@@ -3,19 +3,19 @@
 import freeOrionAIInterface as fo
 from copy import copy
 from logging import debug, error
-from typing import Optional, Set
+from typing import Iterable, Optional, Set, Union
 
 import PlanetUtilsAI
+from AIDependencies import Tags
 from aistate_interface import get_aistate
 from buildings import BuildingType
-from EnumsAI import PriorityType
+from common.fo_typing import PlanetId, SpeciesName
+from EnumsAI import FocusType, PriorityType
+from freeorion_tools import assertion_fails, get_species_tag_value
+from freeorion_tools.caching import cache_for_current_turn
+from turn_state import get_empire_planets_by_species
 
-propaganda = "PLC_PROPAGANDA"
-algo_research = "PLC_ALGORITHMIC_RESEARCH"
-liberty = "PLC_LIBERTY"
-diversity = "PLC_DIVERSITY"
-artisans = "PLC_ARTISAN_WORKSHOPS"
-moderation = "PLC_MODERATION"
+economic_category = "ECONOMIC_CATEGORY"
 industrialism = "PLC_INDUSTRIALISM"
 technocracy = "PLC_TECHNOCRACY"
 centralization = "PLC_CENTRALIZATION"
@@ -24,13 +24,23 @@ infra1 = "PLC_PLANETARY_INFRA"
 infra2 = "PLC_SYSTEM_INFRA"
 infra3 = "PLC_INTERSTELLAR_INFRA"
 
+military_category = "MILITARY_CATEGORY"
+allied_repair = "PLC_ALLIED_REPAIR"
+charge = "PLC_CHARGE"
+scanning = "PLC_CONTINUOUS_SCANNING"
+simplicity = "PLC_DESIGN_SIMPLICITY"
+engineering = "PLC_ENGINEERING"
+exploration = "PLC_EXPLORATION"
+flanking = "PLC_FLANKING_DESC"
+recruitment = "PLC_MARINE_RECRUITMENT"
+# martial law and terror suppression currently ignored
 
-def dislike_multiplier() -> float:
-    """Returns multiplier for dislike effects."""
-    # See happiness.macros
-    has_liberty = fo.getEmpire().policyAdopted(liberty)
-    # conformance not used yet
-    return 1.0 * fo.getNamedValue("PLC_LIBERTY_DISLIKE_FACTOR") ** has_liberty
+social_category = "SOCIAL_CATEGORY"
+propaganda = "PLC_PROPAGANDA"
+algo_research = "PLC_ALGORITHMIC_RESEARCH"
+liberty = "PLC_LIBERTY"
+diversity = "PLC_DIVERSITY"
+artisans = "PLC_ARTISAN_WORKSHOPS"
 
 
 class _EmpireOutput:
@@ -39,6 +49,7 @@ class _EmpireOutput:
         self.research = 0.0
         self.influence = 0.0
         self.population_stability = 0.0
+        self.stability_scaling = 0.75
 
     def __str__(self):
         return "pp=%.1f, rp=%.1f, ip=%.1f, population_stabililty=%d" % (
@@ -79,7 +90,7 @@ class _EmpireOutput:
         elif stability >= 10:
             # 10 give a lot of bonuses, increases above 10 are less important
             stability = 11 + (stability - 10) / 2
-        self.population_stability += population * stability
+        self.population_stability += population * stability * self.stability_scaling
 
 
 class PolicyManager:
@@ -101,67 +112,197 @@ class PolicyManager:
                     fo.issueDeadoptPolicyOrder(entry.key())
                     self._adopted.remove(entry.key())
         self._originally_adopted = copy(self._adopted)
-        self._adoptable = self._get_adoptable()
         empire_owned_planet_ids = PlanetUtilsAI.get_owned_planets_by_empire()
         self._populated_planet_ids = PlanetUtilsAI.get_populated_planet_ids(empire_owned_planet_ids)
         self._num_populated = len(self._populated_planet_ids)
         self._num_outposts = len(empire_owned_planet_ids) - self._num_populated
+        self._max_turn_bureaucracy = self._calculate_max_turn_bureaucracy()
         self._centralization_cost = fo.getPolicy(centralization).adoptionCost()
         self._bureaucracy_cost = fo.getPolicy(bureaucracy).adoptionCost()
-        admin_buildings = len(BuildingType.PALACE.built_at()) + len(BuildingType.REGIONAL_ADMIN.built_at())
-        turns_per_building = fo.getNamedValue("BUREAUCRACY_ADMINS_NEEDED_TURN_SCALING")
-        # bureaucracy needs (turns / turns_per_building) buildings rounded down
-        self._max_turn_bureaucracy = (admin_buildings + 1) * turns_per_building - 1
+        self._wanted_ip = self._wanted_for_bureaucracy()
+        self._adoptable = self._get_adoptable()
+        self._available = set(self._empire.availablePolicies)
+        self._rating_functions = {
+            propaganda: lambda: 20 + self._rate_opinion(propaganda),
+            algo_research: self._rate_algo_research,
+            diversity: self._rate_diversity,
+            artisans: self._rate_artisans,
+            # military policies are mostly chosen by opinion, plus some rule-of-thumb values
+            allied_repair: lambda: self._rate_opinion(charge),  # no effect, unless we have allies...
+            charge: lambda: 5 + self._rate_opinion(charge),  # A small bonus in battle
+            scanning: lambda: 20 + self._rate_opinion(scanning),  # May help us detect ships and planets
+            simplicity: lambda: 20 + self._rate_opinion(simplicity),  # Makes simple ships cheaper
+            engineering: self._rate_engineering_corps,
+            exploration: lambda: 10 + self._rate_opinion(exploration),  # may give a little research, speeds up scouts
+            flanking: lambda: 5 + self._rate_opinion(flanking),  # A small bonus in battle
+            recruitment: lambda: 15 + self._rate_opinion(recruitment),  # cheaper troop ships
+        }
+
+    # Policies that may use IP "reserved" by wanted_ip.
+    # The first two get IP specially reserved for them in the constructor.
+    # If we are low on IP, adopting something that helps as gain IP should be worth it.
+    # Technocracy and industrialism are important overall.
+    _prioritised_policies = (bureaucracy, centralization, propaganda, artisans, technocracy, industrialism)
 
     def generate_orders(self) -> None:
         """The main task of the class, called once every turn by FreeOrionAI."""
         debug(
-            "Start turn %d IP: %.2f + %.2f, adoptable: %s, adopted: %s",
+            "Start turn %d IP: %.2f + %.2f, adopted: %s, adoptable: %s",
             fo.currentTurn(),
             self._ip,
             self._get_infl_prod(),
-            self._adoptable,
             self._adopted,
+            self._adoptable,
         )
+        debug(f"Empty slots: {[str(s) for s in self._empire.emptyPolicySlots]}")
         self._process_social()
+        self._process_military()
         self._process_infrastructure()
-        # TBD: military policies
-        # we need the extra slots first
+        # We need the extra slots, before adopting others economic policies.
+        # TBD?: Possibly start with Centralization.
         if infra1 in self._adopted:
             self._process_bureaucracy()
             self._techno_or_industry()
         new_production = self._get_infl_prod(True)
-        debug("End of turn IP: %.2f + %.2f", self._ip, new_production)
+        debug("End of turn IP: %.2f (wanted %.2f) + %.2f", self._ip, self._wanted_ip, new_production)
         self._determine_influence_priority(new_production)
 
     def _process_social(self) -> None:
-        """Process social policies."""
+        """
+        Process social policies.
+        So far we use propaganda, liberty, diversity, artisan workshops and algo. research.
+        Propaganda is activated in turn 1 and usually replaced by liberty in 7.
+        Since liberty affects so many other things, we check it first, then simply rate all others and
+        try to adopt the best possible ones for the slots we have.
+        """
         self._process_liberty()
-        # The last two we simply adopt when we have a slot and enough IP.
-        # Note that this will adopt propaganda in turn 1
-        # TBD check for dislike? algo_research is currently disliked by Chato
-        if self._can_adopt(propaganda):
-            self._adopt(propaganda)
-        if self._can_adopt(algo_research):
-            self._adopt(algo_research)
+        self._process_policy_options(social_category, (propaganda, algo_research, diversity, artisans))
+
+    def _process_military(self) -> None:
+        options = (allied_repair, charge, scanning, simplicity, engineering, exploration, flanking, recruitment)
+        self._process_policy_options(military_category, options)
+
+    def _process_policy_options(self, category: str, options: Iterable[str]) -> None:
+        """
+        Rate all given policies and deadopt policies with a negative rating.
+        Then evaluate if any of the other is worth being adopted, possible even to replace another one.
+        If we find a policy should be adopted, but lack the IP, increase _wanted_ip.
+        Given policies must all have the same category.
+        """
+        adopted = []
+        may_adopt = []
+        for policy in options:
+            if not self._potentially_available(policy):
+                continue
+            rating = self._rate_policy(policy)
+            cost = fo.getPolicy(policy).adoptionCost()
+            if policy in self._adopted:
+                if rating < 0:
+                    self._deadopt(policy)
+                else:
+                    adopted.append((rating, policy))
+            elif rating > 6:
+                may_adopt.append((rating, policy, cost))
+        if may_adopt:
+            adopted.sort()
+            may_adopt.sort()
+            # Policies do not change too often, one per turn should do
+            new_rating, new_policy, new_cost = may_adopt.pop()
+            rated_cost = self._rate_costs(new_cost)
+            debug(
+                f"_process_policy_options({category}): best new={new_policy}, rating={new_rating}, cost={new_cost}"
+                f", rated_cost={rated_cost}, slots={self._empire.emptyPolicySlots[category]}"
+            )
+            if self._empire.emptyPolicySlots[category]:
+                if new_rating > rated_cost:
+                    self._we_want(new_policy, new_cost)
+            elif adopted:
+                old_rating, old_policy = adopted.pop(0)
+                debug(f"_process_policy_options({category}): lowest adopted={old_policy}, rating={old_rating}")
+                if new_rating - old_rating > rated_cost:
+                    self._we_want(new_policy, new_cost, old_policy)
+
+    def _we_want(self, name: str, cost: float, replace: Optional[str] = None) -> None:
+        if name not in self._empire.availablePolicies:
+            unlocker = self._unlocked_by(name)
+            if not assertion_fails(unlocker, f"_we_want: we can neither adopt nor unlock {name} yet"):
+                debug(f"Trying to adopt {unlocker} to unlock {name}")
+                self._we_want(unlocker, fo.getPolicy(unlocker).adoptionCost())
+            return
+        if self._can_adopt(name, replace):
+            if replace:
+                self._deadopt(replace)
+            self._adopt(name)
+        else:
+            # We seem to have insufficient IP. Add cost to wanted_ip, to raise the influence priority
+            self._wanted_ip += cost
+            debug(f"Adopting {name} failed due to insufficient IP, adding {cost} to wanted_ip")
+
+    @staticmethod
+    def _unlocked_by(name: str) -> Optional[str]:
+        """Returns another policy that unlocks the given policy, if any."""
+        # Some day we should get that information from the server.
+        # So far only one case.
+        if name == artisans:
+            return diversity
+        return None
+
+    @cache_for_current_turn
+    def _rate_policy(self, name: str) -> float:
+        """Gives a rough value of a policy."""
+        rating_function = self._rating_functions.get(name)
+        if assertion_fails(rating_function, f"_rate_policy({name}) not yet supported"):
+            return 0.0
+        return rating_function()
+
+    def _rate_costs(self, costs: float) -> float:
+        """
+        How do we rate the costs in comparison to a policies rating?
+        Generally costs / 3, but less if we have plenty of IP.
+        """
+        unreserved_ip = self._ip - self._wanted_ip
+        priority = self._aistate.get_priority(PriorityType.RESOURCE_INFLUENCE)
+        # For big empires, costs of some policies go over 100 and their rating doesn't grow that much, but they may
+        # also have lots of IP and the policy may still be useful. Note that costs should be less than unreserved_ip,
+        # so if cost is e.g. 1/3 of unreserved_ip, this limits the rating to 0.5 * priority.
+        return min(costs / 3, 1.5 * priority * costs / unreserved_ip)
+
+    @staticmethod
+    def _rate_opinion(name: str) -> float:
+        """Return a rating value for the empire's planet opinion on a policy"""
+        opinion = PlanetUtilsAI.get_planet_opinion(name)
+        return 1.5 * (len(opinion.likes) - len(opinion.dislikes) * PlanetUtilsAI.dislike_factor())
+
+    def _rate_algo_research(self) -> float:
+        """Rate algorithmic research"""
+        # First should do, but things may change. Liberty is more important!
+        if fo.currentTurn() <= 10 or algo_research not in self._empire.availablePolicies:
+            return 0.0
+        # At 20 there are typically no planets with research focus
+        # TBD: check how many planet have research focus or use meter_update?
+        base_value = max(0, self._aistate.get_priority(PriorityType.RESOURCE_RESEARCH) - 20)
+        rating = base_value + self._rate_opinion(algo_research)
+        debug(f"_rate_algo_research: rating={rating}")
+        return rating
 
     def _process_liberty(self) -> None:
         """
-        Adopt or deadopt liberty, may replace propaganda.
+        Adopt or deadopt liberty, may replace another social policy.
         Liberty is available very early, but to help setting up basic policies we keep propaganda at least
         until we have infra1. Getting a second slot before that should be nearly impossible.
         Centralization is always kept only for one turn and if population has a strong opinion on it,
         stability calculation may be extremely different from normal turns, leading to a change that would
         possibly be reverted next turn, so we skip processing liberty while centralization is adopted.
         """
+        could_replace = {propaganda, algo_research, diversity, artisans} & self._adopted
         if (
             infra1 in self._adopted
             and centralization not in self._adopted
-            and (liberty in self._adopted or self._can_adopt(liberty, propaganda))
+            and (liberty in self._adopted or self._can_adopt(liberty, could_replace))
         ):
             adoption_cost = fo.getPolicy(liberty).adoptionCost()
             # liberty will generally make species less happy, but generates research
-            debug("Checking liberty, first without change:")
+            debug("Evaluating liberty, first without change:")
             current_output = self._calculate_empire_output()
             if liberty in self._adopted:
                 self._deadopt(liberty)
@@ -176,16 +317,18 @@ class PolicyManager:
                     self._universe.updateMeterEstimates(self._populated_planet_ids)
                     self._deadopt(liberty)
             else:
-                # Can only adopt it by replacing propaganda
-                self._deadopt(propaganda)
+                # Can only adopt it by replacing something. Note that we ignore the other replaced policies rating
+                # here, since its effect is also evaluated by _calculate_empire_output.
+                self._deadopt_one_of(could_replace)
                 self._adopt(liberty)
                 with_liberty = self._calculate_empire_output()
                 if current_output.is_better_than(with_liberty, adoption_cost):
                     self._universe.updateMeterEstimates(self._populated_planet_ids)
                     self._deadopt(liberty)
-                    self._adopt(propaganda)
+                    self._readopt_selected_one()
 
     def _calculate_empire_output(self) -> _EmpireOutput:
+        """Update empire meters, then calculate an estimation of the expected empire output."""
         # TBD: here we could use the stability-adapted update, that would be much better than trying
         # to rate the stability effects again production effects.
         self._universe.updateMeterEstimates(self._populated_planet_ids)
@@ -194,6 +337,85 @@ class PolicyManager:
             result.add_planet(self._universe.getPlanet(pid))
         debug(f"Empire output: {result}")
         return result
+
+    def _rate_diversity(self) -> float:
+        """Rate diversity."""
+        if diversity not in self._empire.availablePolicies:
+            return 0.0
+        # diversity affects stability, but also gives a bonus to research-focused planets and a little influence,
+        diversity_value = len(get_empire_planets_by_species()) - fo.getNamedValue("PLC_DIVERSITY_THRESHOLD")
+        diversity_scaling = fo.getNamedValue("PLC_DIVERSITY_SCALING")
+        # Research bonus goes to research-focused planets only. With priority there are usually none.
+        research_priority = self._aistate.get_priority(PriorityType.RESOURCE_RESEARCH)
+        research_bonus = max(0, research_priority - 20)
+        # + 4 for global influence
+        global_influence_bonus = 4
+        rating = self._rate_opinion(diversity) + diversity_scaling * diversity_value * (
+            self._num_populated + global_influence_bonus + research_bonus
+        )
+        debug(
+            f"_rate_diversity: rating={rating}. diversity_value={diversity_value}, "
+            f"research priority={research_priority}"
+        )
+        return rating
+
+    def _rate_artisans(self) -> float:
+        """Rate artisan workshops."""
+        # Diversity unlocks artisans, so if we have diversity, we could unlock artisans
+        if diversity not in self._empire.availablePolicies:
+            return 0.0
+        # TBD: could use _calculate_empire_output, but we'd still have to check the species, since artistic
+        # species may not be switched to influence.
+        rating = 0.0
+        artists = []
+        for species_name, planets in get_empire_planets_by_species().items():
+            species = fo.getSpecies(species_name)
+            if Tags.ARTISTIC in species.tags:
+                artists.append(species_name)
+                for pid in planets:
+                    rating += self._rate_artisan_planet(pid, species_name)
+        rating += self._rate_opinion(artisans)
+        debug(f"_rate_artisans: {rating}, artists: {artists}")
+        return rating
+
+    def _rate_artisan_planet(self, pid: PlanetId, species_name: SpeciesName) -> float:
+        focus_bonus = fo.getNamedValue("ARTISANS_INFLUENCE_FLAT_FOCUS")
+        focus_minimum = fo.getNamedValue("ARTISANS_MIN_STABILITY_FOCUS")
+        species_focus_bonus = focus_bonus * get_species_tag_value(species_name, Tags.INFLUENCE)
+        planet = self._universe.getPlanet(pid)
+        stability = planet.currentMeterValue(fo.meterType.targetHappiness)
+        # First check whether the planet would currently get the focus bonus.
+        if planet.focus == FocusType.FOCUS_INFLUENCE:
+            return 3 * species_focus_bonus if stability >= focus_minimum else 0.0
+
+        # Planet does not have influence focus...
+        # Check for the non-focus bonus. Since we would get this "for free", rate it higher
+        non_focus_bonus = fo.getNamedValue("ARTISANS_INFLUENCE_FLAT_NO_FOCUS")
+        non_focus_minimum = fo.getNamedValue("ARTISANS_MIN_STABILITY_NO_FOCUS")
+        rating = 0.0
+        if stability >= non_focus_minimum:
+            rating += 4 * non_focus_bonus
+        # Check whether this planet would get the focus bonus, if we'd switch it to influence.
+        if PlanetUtilsAI.stability_with_focus(planet, FocusType.FOCUS_INFLUENCE) >= focus_minimum:
+            rating += species_focus_bonus
+        return rating
+
+    def _rate_engineering_corps(self) -> float:
+        """
+        Rate Engineering Corps.
+        This policy reduces ship upkeep at the cost of influence, it won't do us any good if we are short on
+        influence, but otherwise may help us maintain big fleets.
+        """
+        ships_owned = self._empire.totalShipsOwned
+        debug(f"totalShipsOwned={ships_owned}")
+        influence_priority = self._aistate.get_priority(PriorityType.RESOURCE_INFLUENCE)
+        # since influence_priority tends to vary strongly, do not return negative unless
+        influence_priority_threshold = 40
+        if influence_priority > 2 * influence_priority_threshold:
+            return -1  # any negative value means, deadopt
+        if influence_priority > influence_priority_threshold:
+            return 0  # do not deadopt yet
+        return ships_owned / 25 * (influence_priority_threshold - influence_priority)
 
     def _process_infrastructure(self) -> None:
         """Handle infrastructure policies."""
@@ -227,6 +449,7 @@ class PolicyManager:
         safety_margin = self._num_populated / 4
         if self._bureaucracy_cost + safety_margin > self._ip + self._get_infl_prod(True):
             debug(f"{self._bureaucracy_cost} + {safety_margin} <= {self._ip} + {self._get_infl_prod(True)}")
+
             self._deadopt(centralization)
             self._ip += self._centralization_cost
 
@@ -288,25 +511,10 @@ class PolicyManager:
                 # TBD work on ResourceAI again...
                 self._set_priority(18.0, True)
             return
-        # How much IP would we have if we keep the current production for 3 turns?
-        forecast = self._ip + 3 * new_production
+        # How much IP would we have available if we keep the current production for 3 turns?
+        forecast = self._ip - self._wanted_ip + 3 * new_production
         # adopting _centralization_cost costs a lot and also drops the incoming, so add 1 per populated planet
         repeated_expenses = self._centralization_cost + self._bureaucracy_cost + self._num_populated
-        if bureaucracy not in self._adopted and centralization not in self._adopted:
-            # If we are unable to keep bureaucracy, lower the forecast by roughly the amount
-            # we will have to spend to activate it again.
-            forecast -= repeated_expenses
-        elif bureaucracy in self._adopted:
-            # To avoid a saw tooth effect when adopting centralisation, account part of the future cost while
-            # bureaucracy is adopted. Ideally IP will produce a saw tooth graph that way, while priority
-            # remains relatively stable.
-            turns_adopted = fo.currentTurn() - self._empire.turnsPoliciesAdopted[bureaucracy]
-            forecast -= repeated_expenses * turns_adopted / self._max_turn_bureaucracy
-        else:
-            # Adopting centralization is only half of the cost, but it always temporarily drops our production
-            # which further lower the forecast, Only reducing it by 1/4 seems to roughly fit.
-            forecast -= repeated_expenses / 4
-
         threshold = 20 + repeated_expenses
         if forecast < threshold:
             # Basic value: the lower the forecast, the more urgent we need influence
@@ -317,6 +525,32 @@ class PolicyManager:
         # The more planets we have, the more influence we need in general, outpost have only a minor effect
         priority *= (3 + self._num_populated + self._num_outposts / 10) / 10
         self._set_priority(priority, False)
+
+    def _wanted_for_bureaucracy(self) -> float:
+        """Determine how many IP we want to reserve for the bureaucracy cycle."""
+        repeated_expenses = self._centralization_cost + self._bureaucracy_cost + self._num_populated
+        if fo.currentTurn() <= 10:
+            # allow setup up basics (propaganda, infra1, liberty) first
+            return 0.0
+        if bureaucracy in self._adopted:
+            # To avoid a saw tooth effect when adopting centralisation, account part of the future cost while
+            # bureaucracy is adopted. Ideally IP will produce a saw tooth graph that way, while priority
+            # remains relatively stable.
+            turns_adopted = fo.currentTurn() - self._empire.turnsPoliciesAdopted[bureaucracy]
+            return repeated_expenses * turns_adopted / self._max_turn_bureaucracy
+        if centralization in self._adopted:
+            # we need _bureaucracy_cost next turn, so if production is negative, we must reserve more
+            return self._bureaucracy_cost - min(0, self._get_infl_prod())
+        # Neither bureaucracy nor centralization adopted
+        return repeated_expenses
+
+    @staticmethod
+    def _calculate_max_turn_bureaucracy() -> int:
+        """Determine how many turns we can currently keep bureaucracy."""
+        admin_buildings = len(BuildingType.PALACE.built_at()) + len(BuildingType.REGIONAL_ADMIN.built_at())
+        turns_per_building = fo.getNamedValue("BUREAUCRACY_ADMINS_NEEDED_TURN_SCALING")
+        # bureaucracy needs (turns / turns_per_building) buildings rounded down
+        return (admin_buildings + 1) * turns_per_building - 1
 
     def _set_priority(self, calculated_priority: float, ignore_old: bool) -> None:
         """Set and log influence priority."""
@@ -336,8 +570,15 @@ class PolicyManager:
             fo.updateResourcePools()
         return self._empire.resourceProduction(fo.resourceType.influence)
 
-    def _can_adopt(self, name: str, replace_other: Optional[str] = None) -> bool:
-        """Note that when replace_other is set, this function currently assumes that with
+    def _potentially_available(self, name: str) -> bool:
+        """Determine whether we have a way to adopt given policy."""
+        # future extension could be to request a technology or building
+        return name in self._available or self._unlocked_by(name) in self._available
+
+    def _can_adopt(self, name: str, replace: Union[str, Set[str], None] = None) -> bool:
+        """
+        Can we adopt named policy, possibly by replacing (one of) replace?
+        Note that when replace_other is set, this function currently assumes that with
         replace_other removed, there are no other exclusions for policy(name).
         If this won't do, the function needs to temporarily deadopt replace_other or
         policyPrereqsAndExclusionsOK must be extended so that replace_other can be passed to it.
@@ -345,10 +586,13 @@ class PolicyManager:
         if name in self._adopted:
             return False
         policy = fo.getPolicy(name)
+        wanted = 0.0 if name in self._prioritised_policies else self._wanted_ip
         ret = name in self._empire.availablePolicies and (
-            policy.adoptionCost() <= self._ip or name in self._originally_adopted
+            policy.adoptionCost() <= (self._ip - wanted) or name in self._originally_adopted
         )
-        if replace_other and replace_other in self._adopted:
+        if isinstance(replace, str) and replace in self._adopted:
+            return ret
+        if isinstance(replace, set) and replace & self._adopted:
             return ret
         return (
             ret and self._empire.emptyPolicySlots[policy.category] and self._empire.policyPrereqsAndExclusionsOK(name)
@@ -395,6 +639,24 @@ class PolicyManager:
                 self._ip += fo.getPolicy(name).adoptionCost()
             debug(f"Issued deadoption order for {name} turn {fo.currentTurn()}, remaining IP: {self._ip}")
 
+    def _deadopt_one_of(self, names: Set[str]) -> None:
+        """
+        Deadopt one of the given policies and store its name.
+        This can be used after a decision is made, or to temporarily deadopt one for
+        decision-making. In the later case, use _readopt_selected_one() to revert it.
+        """
+        selection = sorted((self._rate_policy(name), name) for name in names)
+        debug(f"selection = {selection}")
+        for _, name in selection:
+            if name in self._adopted:
+                self._selected_deadopt = name
+                self._deadopt(name)
+                break
+
+    def _readopt_selected_one(self) -> None:
+        """Re-adopt the policy deadopted by the last call to _deadopt_one_of()."""
+        self._adopt(self._selected_deadopt)
+
     def print_status(self) -> None:
         # only for interactive debugging
         print("\nAdoptable Policies:")
@@ -408,7 +670,7 @@ class PolicyManager:
             print(" ", category.key() + ":")
             for slot in category.data():
                 print("   ", slot.key(), "->", slot.data(), "turn", self._empire.turnPolicyAdopted(slot.data()))
-        print("Influence:", self._ip)
+        print(f"Influence: {self._ip} (wanted: {self._wanted_ip})")
         print("Infl. Prod.:", self._get_infl_prod())
         print("Num Planet (pop./outp.): %d/%d" % (self._num_populated, self._num_outposts))
 

@@ -512,14 +512,11 @@ std::string ComplexVariableDump(const std::vector<std::string>& property_names,
     return retval;
 }
 
-std::string StatisticDescription(StatisticType stat_type,
-                                 const std::string& value_desc,
-                                 const std::string& condition_desc)
+std::string StatisticDescription(StatisticType stat_type, std::string_view value_desc,
+                                 std::string_view condition_desc)
 {
-    std::string stat_str{to_string(stat_type)};
-    boost::algorithm::to_upper(stat_str);
     std::string stringtable_key{"DESC_VAR_"};
-    stringtable_key.append(stat_str);
+    stringtable_key.append(to_string(stat_type)); // assumes that all StatisticType names are ALL_CAPS
 
     if (UserStringExists(stringtable_key)) {
         boost::format formatter = FlexibleFormat(UserString(stringtable_key));
@@ -1281,8 +1278,8 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
         std::vector<std::string> retval;
         auto tags = object->Tags(context);
         retval.reserve(tags.size());
-        std::copy(tags.first.begin(), tags.first.end(), std::back_inserter(retval));
-        std::copy(tags.second.begin(), tags.second.end(), std::back_inserter(retval));
+        std::transform(tags.first.begin(), tags.first.end(), std::back_inserter(retval), [](auto sv) { return std::string{sv}; });
+        std::transform(tags.second.begin(), tags.second.end(), std::back_inserter(retval), [](auto sv) { return std::string{sv}; });
         return retval;
     }
     else if (property_name == "Specials") {
@@ -2373,11 +2370,14 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         if (liked_or_disliked_content_name.empty())
             return 0.0;
 
-        if (species->Likes().count(liked_or_disliked_content_name))
-            return 1.0;
-        else if (species->Dislikes().count(liked_or_disliked_content_name))
-            return -1.0;
-        return 0.0;
+        if (std::any_of(species->Likes().begin(), species->Likes().end(),
+                        [&liked_or_disliked_content_name](const auto& l) { return l == liked_or_disliked_content_name; }))
+        { return 1.0; }
+        else if (std::any_of(species->Dislikes().begin(), species->Dislikes().end(),
+                             [&liked_or_disliked_content_name](const auto& d) { return d == liked_or_disliked_content_name; }))
+        { return -1.0; }
+        else
+        { return 0.0; }
 
     }
     else if (variable_name == "SpeciesEmpireOpinion") {

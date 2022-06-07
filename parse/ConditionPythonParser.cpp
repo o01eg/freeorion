@@ -118,8 +118,13 @@ namespace {
 
         } else if (kw.has_key("environment")) {
             std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetEnvironment>>> environments;
-            py_parse::detail::flatten_list<value_ref_wrapper< ::PlanetEnvironment>>(kw["environment"], [](const value_ref_wrapper< ::PlanetEnvironment>& o, std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetEnvironment>>>& v) {
-                v.push_back(ValueRef::CloneUnique(o.value_ref));
+            py_parse::detail::flatten_list<boost::python::object>(kw["environment"], [](const boost::python::object& o, std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetEnvironment>>>& v) {
+                auto env_arg = boost::python::extract<value_ref_wrapper< ::PlanetEnvironment>>(o);
+                if (env_arg.check()) {
+                    v.push_back(ValueRef::CloneUnique(env_arg().value_ref));
+                } else {
+                    v.push_back(std::make_unique<ValueRef::Constant< ::PlanetEnvironment>>(boost::python::extract<enum_wrapper< ::PlanetEnvironment>>(o)().value));
+                }
             }, environments);
             return condition_wrapper(std::make_shared<Condition::PlanetEnvironment>(std::move(environments)));
         }
@@ -189,6 +194,17 @@ namespace {
             std::move(low),
             std::move(high)));
     }
+
+    condition_wrapper insert_owner_has_tech_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        std::unique_ptr<ValueRef::ValueRef<std::string>> name;
+        auto name_args = boost::python::extract<value_ref_wrapper<std::string>>(kw["name"]);
+        if (name_args.check()) {
+            name = ValueRef::CloneUnique(name_args().value_ref);
+        } else {
+            name = std::make_unique<ValueRef::Constant<std::string>>(boost::python::extract<std::string>(kw["name"])());
+        }
+        return condition_wrapper(std::make_shared<Condition::OwnerHasTech>(std::move(name)));
+    }
 }
 
 void RegisterGlobalsConditions(boost::python::dict& globals) {
@@ -200,8 +216,50 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
     globals["Unowned"] = condition_wrapper(std::make_shared<Condition::EmpireAffiliation>(EmpireAffiliationType::AFFIL_NONE));
     globals["Human"] = condition_wrapper(std::make_shared<Condition::EmpireAffiliation>(EmpireAffiliationType::AFFIL_HUMAN));
 
-    globals["Structure"] = boost::python::raw_function([] (auto args, auto kw) -> auto { return insert_meter_value_(args, kw, MeterType::METER_STRUCTURE);});
-    globals["Population"] = boost::python::raw_function([] (auto args, auto kw) -> auto { return insert_meter_value_(args, kw, MeterType::METER_POPULATION);});
+    globals["OwnerHasTech"] = boost::python::raw_function(insert_owner_has_tech_);
+
+    // non_ship_part_meter_enum_grammar
+    for (const auto& meter : std::initializer_list<std::pair<const char*, MeterType>>{
+            {"TargetConstruction", MeterType::METER_TARGET_CONSTRUCTION},
+            {"TargetIndustry",     MeterType::METER_TARGET_INDUSTRY},
+            {"TargetPopulation",   MeterType::METER_TARGET_POPULATION},
+            {"TargetResearch",     MeterType::METER_TARGET_RESEARCH},
+            {"TargetInfluence",    MeterType::METER_TARGET_INFLUENCE},
+            {"TargetHappiness",    MeterType::METER_TARGET_HAPPINESS},
+            {"MaxDefense",         MeterType::METER_MAX_DEFENSE},
+            {"MaxFuel",            MeterType::METER_MAX_FUEL},
+            {"MaxShield",          MeterType::METER_MAX_SHIELD},
+            {"MaxStructure",       MeterType::METER_MAX_STRUCTURE},
+            {"MaxTroops",          MeterType::METER_MAX_TROOPS},
+            {"MaxSupply",          MeterType::METER_MAX_SUPPLY},
+            {"MaxStockpile",       MeterType::METER_MAX_STOCKPILE},
+
+            {"Construction",       MeterType::METER_CONSTRUCTION},
+            {"Industry",           MeterType::METER_INDUSTRY},
+            {"Population",         MeterType::METER_POPULATION},
+            {"Research",           MeterType::METER_RESEARCH},
+            {"Influence",          MeterType::METER_INFLUENCE},
+            {"Happiness",          MeterType::METER_HAPPINESS},
+
+            {"Defense",            MeterType::METER_DEFENSE},
+            {"Fuel",               MeterType::METER_FUEL},
+            {"Shield",             MeterType::METER_SHIELD},
+            {"Structure",          MeterType::METER_STRUCTURE},
+            {"Troops",             MeterType::METER_TROOPS},
+            {"Supply",             MeterType::METER_SUPPLY},
+            {"Stockpile",          MeterType::METER_STOCKPILE},
+
+            {"RebelTroops",        MeterType::METER_REBEL_TROOPS},
+            {"Stealth",            MeterType::METER_STEALTH},
+            {"Detection",          MeterType::METER_DETECTION},
+            {"Speed",              MeterType::METER_SPEED},
+
+            {"Size",               MeterType::METER_SIZE}})
+    {
+        const auto m = meter.second;
+        const auto f_insert_meter_value = [m](const auto& args, const auto& kw) { return insert_meter_value_(args, kw, m); };
+        globals[meter.first] = boost::python::raw_function(f_insert_meter_value);
+    }
 
     globals["Species"] = condition_wrapper(std::make_shared<Condition::Species>());
 

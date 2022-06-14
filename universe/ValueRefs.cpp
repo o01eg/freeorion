@@ -2953,7 +2953,7 @@ std::string StringCast<double>::Eval(const ScriptingContext& context) const
         // a decimal place indicator using to_chars and from_chars.
         // if not, need to use streaming always?
 #if defined(__cpp_lib_to_chars)
-            std::array<char, 32> buf = {};
+            std::array<std::string::value_type, 32> buf = {};
             std::to_chars(buf.data(), buf.data() + buf.size(), num, std::chars_format::fixed, precision);
             return buf.data();
 #else
@@ -3058,12 +3058,12 @@ std::string UserStringLookup<std::string>::Eval(const ScriptingContext& context)
 
 template <>
 std::string UserStringLookup<std::vector<std::string>>::Eval(const ScriptingContext& context) const {
-    if (!m_value_ref)
-        return "";
-    std::vector<std::string> ref_vals = m_value_ref->Eval(context);
-    if (ref_vals.empty())
-        return "";
     std::string retval;
+    if (!m_value_ref)
+        return retval;
+    auto ref_vals = m_value_ref->Eval(context);
+    if (ref_vals.empty())
+        return retval;
     for (auto& val : ref_vals) {
         if (val.empty() || !UserStringExists(val))
             continue;

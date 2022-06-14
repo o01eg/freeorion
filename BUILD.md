@@ -1,19 +1,22 @@
 Building FreeOrion
 ==================
 
+These notes are applicable for building the master development Git branch
+of FreeOrion. For building numbered FreeOrion releases, consult the
+corresponding release branch, eg. [FreeOrion v0.4.10 BUILD.md]
 
 Hardware and OS Requirements
 ----------------------------
 
-FreeOrion will compile on Windows 7 (or later), Mac OS X 10.10 (or later) and
+FreeOrion should compile on Windows 7 (or later), Mac OS X 10.10 (or later) and
 Linux operating systems. Other operating systems have reported to work, but
 support is not actively maintained by the FreeOrion developers. FreeOrion is
 developed for x86 compatible processor architectures, other architectures
 haven't been tested.
 
 The FreeOrion source code makes heavy use of templates and requires much memory
-to compile ; 6 GiB RAM or more is recommended. To build FreeOrion, expect up to
-45 minutes on a Intel Core i5 system.
+to compile ; 8 GiB RAM or more is recommended. Expect up to 45 minutes on a Intel
+Core i5 system, or about 5 min on a 12-core AMD Ryzen 9 3.8 GHz system.
 
 
 Required Software Dependencies
@@ -35,7 +38,7 @@ FreeOrion depends on the following libraries or APIs to run:
   * OpenGL - 2.1 or later ; usually provided by the graphic card driver or
     Operating System
   * OpenAL - It's recommended to use the [OpenAL Soft] implementation
-  * [Boost] - 1.58 or later
+  * [Boost] - 1.69 or later
   * [zlib]
   * [libpython] - 3.6.* or later
   * [FreeType2]
@@ -114,8 +117,10 @@ maintained Visual Studio Project is used for building.
 
 To build FreeOrion open the `FreeOrion.sln` project solution within
 `_source directory_\msvc2019` or `_source directory_\msvc2022` with
-Visual Studio.  Now compile the whole project by selecting the
-`Build` -> `Build Solution` menu entry.
+Visual Studio.  Make sure that the platform configuration (Win32 or
+x64) matches the version of the FreeOrion SDK that you downloaded.
+Compile the whole project by selecting the `Build` -> `Build Solution`
+menu entry.
 
 After the build finished successfully the binaries can be found within
 the `freeorion-project/FreeOrion` directory.
@@ -262,8 +267,9 @@ adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeorion-god
 [libvorbis]: https://xiph.org/downloads/
 [SDL2]: https://www.libsdl.org/download-2.0.php
 [Software Development Kit]: https://github.com/freeorion/freeorion-sdk
-[FreeOrionSDK v11]: https://github.com/freeorion/freeorion-sdk/releases/tag/v11
+[FreeOrionSDK v12]: https://github.com/freeorion/freeorion-sdk/releases/tag/v12
 [FreeOrion Releases]: https://github.com/freeorion/freeorion/releases
 [make jobs]: https://www.gnu.org/software/make/manual/html_node/Parallel.html
 [Python-For-Android]: https://github.com/python-cmake-buildsystem/python-cmake-buildsystem/pull/262
 [Boost-For-Android]: https://github.com/moritz-wundke/Boost-for-Android
+[FreeOrion v0.4.10 BUILD.md]: https://github.com/freeorion/freeorion/blob/release-v0.4.10/BUILD.md

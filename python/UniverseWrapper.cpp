@@ -143,9 +143,10 @@ namespace {
 
     auto SystemNeighborsMap(const Universe& universe, int system1_id, int empire_id) -> std::map<int, double>
     {
+        auto neighbours{universe.GetPathfinder()->ImmediateNeighbors(system1_id, empire_id)};
         std::map<int, double> retval;
-        for (const auto& entry : universe.GetPathfinder()->ImmediateNeighbors(system1_id, empire_id))
-            retval.emplace(entry.second, entry.first);
+        std::transform(neighbours.begin(), neighbours.end(), std::inserter(retval, retval.end()),
+                       [](auto& n) { return std::pair{n.second, n.first}; });
         return retval;
     }
 
@@ -153,8 +154,8 @@ namespace {
     {
         std::vector<std::string> retval;
         retval.reserve(object.Specials().size());
-        for (const auto& special : object.Specials())
-            retval.push_back(special.first);
+        std::transform(object.Specials().begin(), object.Specials().end(), std::back_inserter(retval),
+                       [](const auto& s) { return s.first; });
         return retval;
     }
 
@@ -486,6 +487,7 @@ namespace FreeOrionPython {
             .add_property("finalDestinationID",        &Fleet::FinalDestinationID)
             .add_property("previousSystemID",          &Fleet::PreviousSystemID)
             .add_property("nextSystemID",              &Fleet::NextSystemID)
+            .add_property("route",                     +[](const Fleet& fleet) -> std::vector<int> { return fleet.TravelRoute(); })
             .add_property("aggressive",                &Fleet::Aggressive)
             .add_property("obstructive",               &Fleet::Obstructive)
             .add_property("aggression",                &Fleet::Aggression)

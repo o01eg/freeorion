@@ -19,19 +19,21 @@ namespace ValueRef {
     const std::string& MeterToName(MeterType meter);
 }
 
-UniverseObject::UniverseObject(std::string name, double x, double y, int owner_id,
-                               int creation_turn) :
+UniverseObject::UniverseObject(UniverseObjectType type, std::string name,
+                               double x, double y, int owner_id, int creation_turn) :
     m_name(std::move(name)),
     m_owner_empire_id(owner_id),
     m_created_on_turn(creation_turn),
     m_x(x),
-    m_y(y)
+    m_y(y),
+    m_type(type)
 {}
 
-UniverseObject::UniverseObject(std::string name, int owner_id, int creation_turn) :
+UniverseObject::UniverseObject(UniverseObjectType type, std::string name, int owner_id, int creation_turn) :
     m_name(std::move(name)),
     m_owner_empire_id(owner_id),
-    m_created_on_turn(creation_turn)
+    m_created_on_turn(creation_turn),
+    m_type(type)
 {}
 
 assignable_blocking_combiner::assignable_blocking_combiner(const Universe& universe) :
@@ -84,16 +86,19 @@ void UniverseObject::Copy(std::shared_ptr<const UniverseObject> copied_object,
         }
     }
 
+
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
+        this->m_type =                  copied_object->m_type;
         this->m_id =                    copied_object->m_id;
         this->m_system_id =             copied_object->m_system_id;
         this->m_x =                     copied_object->m_x;
         this->m_y =                     copied_object->m_y;
 
         this->m_specials.clear();
-        for (const auto& entry_special : copied_object->m_specials) {
-            if (visible_specials.count(entry_special.first))
-                this->m_specials[entry_special.first] = entry_special.second;
+        this->m_specials.reserve(copied_object->m_specials.size());
+        for (const auto& [entry_special_name, entry_special] : copied_object->m_specials) {
+            if (visible_specials.count(entry_special_name))
+                this->m_specials[entry_special_name] = entry_special;
         }
 
         if (vis >= Visibility::VIS_PARTIAL_VISIBILITY) {
@@ -109,21 +114,6 @@ void UniverseObject::Copy(std::shared_ptr<const UniverseObject> copied_object,
 void UniverseObject::Init()
 { AddMeter(MeterType::METER_STEALTH); }
 
-int UniverseObject::ID() const
-{ return m_id; }
-
-const std::string& UniverseObject::Name() const
-{ return m_name; }
-
-double UniverseObject::X() const
-{ return m_x; }
-
-double UniverseObject::Y() const
-{ return m_y; }
-
-int UniverseObject::CreationTurn() const
-{ return m_created_on_turn; }
-
 int UniverseObject::AgeInTurns() const {
     if (m_created_on_turn == BEFORE_FIRST_TURN)
         return SINCE_BEFORE_TIME_AGE;
@@ -132,34 +122,26 @@ int UniverseObject::AgeInTurns() const {
     return CurrentTurn() - m_created_on_turn;
 }
 
-int UniverseObject::Owner() const
-{ return m_owner_empire_id; }
+bool UniverseObject::HasSpecial(std::string_view name) const {
+    return std::any_of(m_specials.begin(), m_specials.end(),
+                       [name](const auto& s) { return name == s.first; });
+}
 
-int UniverseObject::SystemID() const
-{ return m_system_id; }
-
-const std::map<std::string, std::pair<int, float>>& UniverseObject::Specials() const
-{ return m_specials; }
-
-bool UniverseObject::HasSpecial(const std::string& name) const
-{ return m_specials.count(name); }
-
-int UniverseObject::SpecialAddedOnTurn(const std::string& name) const {
-    auto it = m_specials.find(name);
+int UniverseObject::SpecialAddedOnTurn(std::string_view name) const {
+    auto it = std::find_if(m_specials.begin(), m_specials.end(),
+                           [name](const auto& s) { return name == s.first; });
     if (it == m_specials.end())
         return INVALID_GAME_TURN;
     return it->second.first;
 }
 
-float UniverseObject::SpecialCapacity(const std::string& name) const {
-    auto it = m_specials.find(name);
+float UniverseObject::SpecialCapacity(std::string_view name) const {
+    auto it = std::find_if(m_specials.begin(), m_specials.end(),
+                           [name](const auto& s) { return name == s.first; });
     if (it == m_specials.end())
         return 0.0f;
     return it->second.second;
 }
-
-UniverseObjectType UniverseObject::ObjectType() const
-{ return UniverseObjectType::INVALID_UNIVERSE_OBJECT_TYPE; }
 
 std::string UniverseObject::Dump(unsigned short ntabs) const {
     const ScriptingContext context;
@@ -169,7 +151,7 @@ std::string UniverseObject::Dump(unsigned short ntabs) const {
 
     std::string retval;
     retval.reserve(2048); // guesstimate
-    retval.append(to_string(this->ObjectType())).append(" ")
+    retval.append(to_string(m_type)).append(" ")
           .append(std::to_string(this->ID())).append(": ").append(this->Name());
 
     if (system) {
@@ -236,15 +218,6 @@ std::set<int> UniverseObject::VisibleContainedObjectIDs(
     return retval;
 }
 
-int UniverseObject::ContainerObjectID() const
-{ return INVALID_OBJECT_ID; }
-
-bool UniverseObject::Contains(int object_id) const
-{ return false; }
-
-bool UniverseObject::ContainedBy(int object_id) const
-{ return false; }
-
 const Meter* UniverseObject::GetMeter(MeterType type) const {
     auto it = m_meters.find(type);
     if (it != m_meters.end())
@@ -260,10 +233,10 @@ void UniverseObject::AddMeter(MeterType meter_type) {
 }
 
 bool UniverseObject::Unowned() const
-{ return Owner() == ALL_EMPIRES; }
+{ return m_owner_empire_id == ALL_EMPIRES; }
 
 bool UniverseObject::OwnedBy(int empire) const
-{ return empire != ALL_EMPIRES && empire == Owner(); }
+{ return empire != ALL_EMPIRES && empire == m_owner_empire_id; }
 
 bool UniverseObject::HostileToEmpire(int, const EmpireManager&) const
 { return false; }
@@ -364,14 +337,15 @@ void UniverseObject::SetSystem(int sys) {
     }
 }
 
-void UniverseObject::AddSpecial(const std::string& name, float capacity)
-{ m_specials[name] = std::make_pair(CurrentTurn(), capacity); }
+void UniverseObject::AddSpecial(const std::string& name, float capacity) // TODO: pass turn
+{ m_specials[name] = std::pair{CurrentTurn(), capacity}; }
 
 void UniverseObject::SetSpecialCapacity(const std::string& name, float capacity) {
-    if (m_specials.count(name))
-        m_specials[name].second = capacity;
+    auto it = m_specials.find(name);
+    if (it != m_specials.end())
+        it->second.second = capacity;
     else
-        AddSpecial(name, capacity);
+        m_specials[name] = std::pair{CurrentTurn(), capacity};
 }
 
 void UniverseObject::RemoveSpecial(const std::string& name)

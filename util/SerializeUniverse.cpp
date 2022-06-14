@@ -215,7 +215,7 @@ void serialize(Archive& ar, Universe& u, unsigned int const version)
 }
 
 BOOST_CLASS_EXPORT(UniverseObject)
-BOOST_CLASS_VERSION(UniverseObject, 2)
+BOOST_CLASS_VERSION(UniverseObject, 3)
 
 template <typename Archive>
 void serialize(Archive& ar, UniverseObject& o, unsigned int const version)
@@ -227,8 +227,15 @@ void serialize(Archive& ar, UniverseObject& o, unsigned int const version)
         & make_nvp("m_x", o.m_x)
         & make_nvp("m_y", o.m_y)
         & make_nvp("m_owner_empire_id", o.m_owner_empire_id)
-        & make_nvp("m_system_id", o.m_system_id)
-        & make_nvp("m_specials", o.m_specials);
+        & make_nvp("m_system_id", o.m_system_id);
+    if (version < 3) {
+        std::map<std::string, std::pair<int, float>> specials_map;
+        ar  & make_nvp("m_specials", specials_map);
+        o.m_specials.reserve(specials_map.size());
+        o.m_specials.insert(specials_map.begin(), specials_map.end());
+    } else {
+        ar  & make_nvp("m_specials", o.m_specials);
+    }
     if (version < 2) {
         std::map<MeterType, Meter> meter_map;
         ar  & make_nvp("m_meters", meter_map);
@@ -377,8 +384,14 @@ void serialize(Archive& ar, Fleet& obj, unsigned int const version)
         ar  & make_nvp("m_aggression", obj.m_aggression);
     }
 
-    ar  & make_nvp("m_ordered_given_to_empire_id", obj.m_ordered_given_to_empire_id)
-        & make_nvp("m_travel_route", obj.m_travel_route);
+    ar  & make_nvp("m_ordered_given_to_empire_id", obj.m_ordered_given_to_empire_id);
+    if (version < 6) {
+        std::list<int> travel_route;
+        ar & make_nvp("m_travel_route", travel_route);
+        obj.m_travel_route = std::vector(travel_route.begin(), travel_route.end());
+    } else {
+        ar & make_nvp("m_travel_route", obj.m_travel_route);
+    }
     if (version < 3) {
         double dummy_travel_distance;
         ar & boost::serialization::make_nvp("m_travel_distance", dummy_travel_distance);
@@ -391,7 +404,7 @@ void serialize(Archive& ar, Fleet& obj, unsigned int const version)
 }
 
 BOOST_CLASS_EXPORT(Fleet)
-BOOST_CLASS_VERSION(Fleet, 5)
+BOOST_CLASS_VERSION(Fleet, 6)
 
 
 template <typename Archive>

@@ -76,7 +76,7 @@ namespace {
                               ));
     }
 
-    effect_wrapper insert_if_(const py::tuple& args, const py::dict& kw) {
+    effect_wrapper insert_conditional_(const py::tuple& args, const py::dict& kw) {
         auto condition = ValueRef::CloneUnique(py::extract<condition_wrapper>(kw["condition"])().condition);
 
         std::vector<std::unique_ptr<Effect::Effect>> effects;
@@ -197,6 +197,20 @@ namespace {
         else 
             return effect_wrapper(std::make_shared<Effect::SetEmpireStockpile>(resource.value, std::move(value)));
     }
+
+    effect_wrapper insert_set_owner_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        std::unique_ptr<ValueRef::ValueRef<int>> empire;
+        if (kw.has_key("empire")) {
+            auto empire_args = boost::python::extract<value_ref_wrapper<int>>(kw["empire"]);
+            if (empire_args.check()) {
+                empire = ValueRef::CloneUnique(empire_args().value_ref);
+            } else {
+                empire = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(kw["empire"])());
+            }
+        }
+       
+        return effect_wrapper(std::make_shared<Effect::SetOwner>(std::move(empire)));
+    }
 }
 
 void RegisterGlobalsEffects(py::dict& globals) {
@@ -210,7 +224,7 @@ void RegisterGlobalsEffects(py::dict& globals) {
     globals["Destroy"] = effect_wrapper(std::make_shared<Effect::Destroy>());
 
     globals["GenerateSitRepMessage"] = py::raw_function(insert_generate_sit_rep_message_);
-    globals["If"] = py::raw_function(insert_if_);
+    globals["Conditional"] = py::raw_function(insert_conditional_);
 
     globals["SetEmpireMeter"] = py::raw_function(set_empire_meter);
 
@@ -259,5 +273,6 @@ void RegisterGlobalsEffects(py::dict& globals) {
     }
 
     globals["SetEmpireStockpile"] = py::raw_function(insert_set_empire_stockpile);
+    globals["SetOwner"] = py::raw_function(insert_set_owner_);
 }
 

@@ -33,6 +33,8 @@ from turn_state._empire_resources import (
     have_gas_giant,
     have_nest,
     have_ruins,
+    have_worldtree,
+    owned_asteroid_coatings,
     population_with_industry_focus,
     population_with_research_focus,
     set_have_asteroids,
@@ -54,6 +56,9 @@ from turn_state._planet_state import (
 )
 from turn_state._supply_state import (
     get_distance_to_enemy_supply,
+    get_supply_group,
+    get_supply_group_id,
     get_system_supply,
     get_systems_by_supply_tier,
+    supply_connected,
 )

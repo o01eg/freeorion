@@ -89,6 +89,7 @@ class Tags:
     WEAPONS = "WEAPONS"
     RESEARCH = "RESEARCH"
     SUPPLY = "SUPPLY"
+    STABILITY = "HAPPINESS"
     ATTACKTROOPS = "OFFENSE_TROOPS"
     STEALTH = "STEALTH"
     SHIELDS = "SHIELDS"
@@ -219,9 +220,15 @@ for metab, boosts in metabolismBoostMap.items():
 # Please see the Note at top of this file regarding PlanetSize-Dependent-Lookup
 # Regardless of whether the sub-dictionary here has PlanetSize keys, the final
 # value will be applied as a *fixed-size mod* to the max population
+WORLDTREE_SPECIAL = "WORLDTREE_SPECIAL"
 POP_FIXED_MOD_SPECIALS = {
-    "DIM_RIFT_MASTER_SPECIAL": -4,
+    WORLDTREE_SPECIAL: 1,  # Not for SP_KHAKTURIAN...
 }
+
+
+def not_affect_by_special(special: str, species: str) -> bool:  # stupid special handlings...
+    return special == WORLDTREE_SPECIAL and species == "SP_KHAKTURIAN"
+
 
 # Please see the Note at top of this file regarding PlanetSize-Dependent-Lookup
 # The return value from the respective sub-dictionary will be applied as a
@@ -247,11 +254,13 @@ COMPUTRONIUM_SPECIAL = "COMPUTRONIUM_SPECIAL"
 COMPUTRONIUM_RES_MULTIPLIER = 0.5
 
 ANCIENT_RUINS_SPECIAL = "ANCIENT_RUINS_SPECIAL"
+ASTEROID_COATING_OWNED_SPECIAL = "ASTEROID_COATING_OWNED_SPECIAL"
+ASTEROID_COATING_SPECIAL = "ASTEROID_COATING_SPECIAL"
 # </editor-fold>
 
 # <editor-fold desc="Supply related specials">
 SUPPLY_MOD_SPECIALS = {
-    "WORLDTREE_SPECIAL": {
+    WORLDTREE_SPECIAL: {
         -1: 1,
     },
     "ECCENTRIC_ORBIT_SPECIAL": {
@@ -681,6 +690,7 @@ SPECIES_INDUSTRY_MODIFIER = {"NO": 0.0, "VERY_BAD": 0.5, "BAD": 0.75, "GOOD": 1.
 SPECIES_INFLUENCE_MODIFIER = {"NO": 0.0, "VERY_BAD": 0.5, "BAD": 0.75, "GOOD": 1.5, "GREAT": 2.0, "ULTIMATE": 3.0}
 SPECIES_POPULATION_MODIFIER = {"EXTREMELY_BAD": 0.25, "VERY_BAD": 0.5, "BAD": 0.75, "GOOD": 1.25}
 SPECIES_SUPPLY_MODIFIER = {"VERY_BAD": -1, "BAD": 0, "AVERAGE": 1, "GREAT": 2, "ULTIMATE": 3}
+SPECIES_STABILITY_MODIFIER = {"VERY_BAD": -5.0, "BAD": -2.5, "AVERAGE": 0, "GOOD": 2.5, "GREAT": 5.0, "ULTIMATE": 7.5}
 SPECIES_FUEL_MODIFIER = {"NO": -100, "BAD": -0.5, "AVERAGE": 0, "GOOD": 0.5, "GREAT": 1, "ULTIMATE": 1.5}
 # values for both offense and defense
 SPECIES_TROOP_MODIFIER = {"NO": 0.0, "BAD": 0.5, "": 1.0, "GOOD": 1.5, "GREAT": 2.0, "ULTIMATE": 3.0}

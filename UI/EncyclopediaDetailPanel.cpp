@@ -54,6 +54,10 @@
 #include "../util/ThreadPool.h"
 #include "../util/VarText.h"
 
+#if __has_include(<charconv>)
+#include <charconv>
+#endif
+
 using boost::io::str;
 
 namespace {
@@ -90,6 +94,118 @@ namespace {
         });
     }
 
+    constexpr int ToIntCX(std::string_view sv, int default_result = -1) {
+        if (sv.empty())
+            return default_result;
+
+        bool is_negative = (sv.front() == '-');
+        sv = sv.substr(is_negative);
+        for (auto c : sv)
+            if (c > '9' || c < '0')
+                return default_result;
+
+        int64_t retval = 0;
+        for (auto c : sv) {
+            retval *= 10;
+            retval += (c - '0');
+        }
+
+        retval *= (is_negative ? -1 : 1);
+
+        constexpr int64_t max_int = std::numeric_limits<int>::max();
+        constexpr int64_t min_int = std::numeric_limits<int>::min();
+
+        return (retval > max_int) ? max_int :
+               (retval < min_int) ? min_int :
+               retval;
+    }
+    static_assert(ToIntCX("2147483647") == 2147483647);
+    static_assert(ToIntCX("-104") == -104);
+    static_assert(ToIntCX("banana", -10) == -10);
+    static_assert(ToIntCX("-banana") == -1);
+    static_assert(ToIntCX("-0banana", -20) == -20);
+    static_assert(ToIntCX("") == -1);
+    static_assert(ToIntCX("0") == 0);
+    static_assert(ToIntCX("0000") == 0);
+    static_assert(ToIntCX("-0000") == 0);
+
+    // wrapper for converting string to integer
+    int ToInt(std::string_view sv, int default_result = -1) {
+#if defined(__cpp_lib_to_chars)
+        int retval = default_result;
+        std::from_chars(sv.data(), sv.data() + sv.size(), retval);
+        return retval;
+#else
+        return ToIntCX(sv, default_result);
+#endif
+    }
+
+    // compile-time exponentiation
+    constexpr long long Pow(long long base, long long exp) {
+        long long retval = 1;
+        while (exp--)
+            retval *= base;
+        return retval;
+    }
+    static_assert(std::numeric_limits<long long>::max() > std::numeric_limits<int>::max());
+    static_assert(std::numeric_limits<int>::max() > 0);
+
+    // how many base-10 digits are needed to represent a number as text
+    template<typename T, std::enable_if<std::is_integral_v<T>>* = nullptr>
+    constexpr std::size_t Digits(T t) {
+        std::size_t retval = 1;
+
+        if constexpr (std::is_same_v<T, bool>) {
+            return 5; // for "false"
+        } else {
+            if constexpr (std::is_signed_v<T>)
+                retval += (t < 0);
+
+            while (t != 0) {
+                retval += 1;
+                t /= 10;
+            }
+            return retval;
+        }
+    }
+    constexpr auto digits_int_max = Digits(std::numeric_limits<int>::max());
+    constexpr auto digits_int_min = Digits(std::numeric_limits<int>::min());
+    static_assert(digits_int_min <= 22 && digits_int_max <= 15);
+    constexpr auto digits_long_long_int_max = Digits(std::numeric_limits<long long int>::max());
+    constexpr auto digits_long_long_int_min = Digits(std::numeric_limits<long long int>::min());
+    static_assert(digits_long_long_int_min <= 22 && digits_long_long_int_max <= 22);
+
+    // wrapper for converting number to string/string_view
+    template<typename T, std::enable_if<std::is_integral_v<T>>* = nullptr>
+    auto ToChars(T t) {
+#if !defined(__cpp_lib_to_chars)
+        return std::to_string(t);
+#else
+        if constexpr (std::is_same_v<T, bool>) {
+            return t ? std::string_view{"true"} : std::string_view{"false"};
+
+        } else if constexpr (Digits(std::numeric_limits<T>::min()) < 15 &&
+                             Digits(std::numeric_limits<T>::max()) < 15)
+        {
+            std::array<std::string::value_type, 15> buf{};
+            std::to_chars(buf.data(), buf.data() + buf.size(), t);
+            return std::string{buf.data()};
+
+        } else if constexpr (Digits(std::numeric_limits<T>::min()) < 24 &&
+                             Digits(std::numeric_limits<T>::max()) < 24)
+        {
+            std::array<std::string::value_type, 24> buf{};
+            std::to_chars(buf.data(), buf.data() + buf.size(), t);
+            return std::string{buf.data()};
+
+        } else {
+            std::to_string(t);
+        }
+#endif
+    }
+}
+
+namespace {
     // Checks content \a tags for any custom pedia categories
     template <typename StringContainer>
     bool HasCustomCategory(const StringContainer& tags) {
@@ -139,7 +255,7 @@ namespace {
     }
 
     void MeterTypeDirEntry(MeterType meter_type,
-                           std::vector<std::pair<std::string_view,
+                           std::vector<std::pair<std::string,
                                                  std::pair<std::string, std::string>>>& list)
     {
         auto [value_label, string_rep] = MeterValueLabelAndString(meter_type);
@@ -167,10 +283,14 @@ namespace {
         return dir_names;
     }
 
+    std::map<std::string, std::string> prepended_homeworld_names;
+    std::mutex prepended_homeworld_names_access;
+
     /** Returns map from (Human-readable and thus sorted article name) to
-        pair of (article link tag text, stringtable key for article category or
-        subcategorization of it). Category is something like "ENC_TECH" and
-        subcategorization is something like a tech category (eg. growth). */
+        pair of (article link tag text, key for article category or
+        subcategorization of it or article key). Category is something like
+        "ENC_TECH" and subcategorization is something like a tech category
+        (eg. growth) or tech_name or an object ID. */
     auto GetSortedPediaDirEntires(
         std::string_view dir_name,
         bool exclude_custom_categories_from_dir_name = true)
@@ -178,7 +298,10 @@ namespace {
         ScopedTimer subdir_timer(std::string{"GetSortedPediaDirEntires("}.append(dir_name).append(")"),
                                  true, std::chrono::milliseconds(20));
 
-        std::vector<std::pair<std::string_view, std::pair<std::string, std::string>>> retval;
+        // first: readable name. can't be a view because some names are on-the fly generated, eg. system apparent name
+        // second.first: link text. generated on the fly
+        // second.second: item name/id/key within category. coul be dynamically generated from an ID number
+        std::vector<std::pair<std::string, std::pair<std::string, std::string>>> retval;
 
         const Encyclopedia& encyclopedia = GetEncyclopedia();
         int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
@@ -194,14 +317,16 @@ namespace {
                 auto& us_name{UserString(str)};
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(us_name),
-                                    std::forward_as_tuple(LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, str, us_name).append("\n"), str));
+                                    std::forward_as_tuple(LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, str, us_name).append("\n"),
+                                                          str));
             }
 
             for (auto str : {"ENC_TEXTURES", "ENC_HOMEWORLDS"}) {
                 auto& us_name{UserString(str)};
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(us_name),
-                                    std::forward_as_tuple(LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, str, us_name).append("\n"), str));
+                                    std::forward_as_tuple(LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, str, us_name).append("\n"),
+                                                          str));
             }
 
             for ([[maybe_unused]] auto& [category_name, article_vec] : encyclopedia.Articles()) {
@@ -214,7 +339,8 @@ namespace {
                 auto& us_name{UserString(category_name)};
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(us_name),
-                                    std::forward_as_tuple(LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, category_name, us_name).append("\n"), category_name));
+                                    std::forward_as_tuple(LinkTaggedPresetText(TextLinker::ENCYCLOPEDIA_TAG, category_name, us_name).append("\n"),
+                                                          category_name));
             }
 
         }
@@ -224,7 +350,8 @@ namespace {
                     auto& us_name{UserString(part_name)};
                     retval.emplace_back(std::piecewise_construct,
                                         std::forward_as_tuple(us_name),
-                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::SHIP_PART_TAG, part_name, us_name).append("\n"), part_name));
+                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::SHIP_PART_TAG, part_name, us_name).append("\n"),
+                                                              part_name));
                 }
             }
 
@@ -235,7 +362,8 @@ namespace {
                     auto& us_name{UserString(hull_name)};
                     retval.emplace_back(std::piecewise_construct,
                                         std::forward_as_tuple(us_name),
-                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::SHIP_HULL_TAG, hull_name, us_name).append("\n"), hull_name));
+                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::SHIP_HULL_TAG, hull_name, us_name).append("\n"),
+                                                              hull_name));
                 }
             }
 
@@ -243,12 +371,14 @@ namespace {
         else if (dir_name == "ENC_TECH") {
             // sort tech names by user-visible name, so names are shown alphabetically in UI
             auto tech_names{GetTechManager().TechNames()};
-            std::vector<std::pair<std::string_view, std::string>> userstring_tech_names;
+            static_assert(std::is_same_v<std::string_view, decltype(tech_names)::value_type>);
+            using two_sv_t = std::pair<std::string_view, std::string_view>;
+            std::vector<two_sv_t> userstring_tech_names;
             userstring_tech_names.reserve(tech_names.size());
-            for (auto& tech_name : tech_names) {
-                auto& us_name{UserString(tech_name)};   // use tech_name on line before moving from tech_name to avoid order of evaluation issues
-                userstring_tech_names.emplace_back(us_name, std::move(tech_name));
-            }
+            std::transform(tech_names.begin(), tech_names.end(), std::back_inserter(userstring_tech_names),
+                           [](const auto tech_name) -> std::pair<std::string_view, std::string_view> {
+                               return {UserString(tech_name), tech_name};
+                           });
             std::sort(userstring_tech_names.begin(), userstring_tech_names.end());
 
             // second loop over alphabetically sorted names...
@@ -258,7 +388,8 @@ namespace {
                     std::string tagged_text{LinkTaggedPresetText(VarText::TECH_TAG, tech_name, us_name).append("\n")};
                     retval.emplace_back(std::piecewise_construct,
                                         std::forward_as_tuple(us_name),
-                                        std::forward_as_tuple(std::move(tagged_text), std::move(tech_name)));
+                                        std::forward_as_tuple(std::move(tagged_text),
+                                                              tech_name));
                 }
             }
 
@@ -269,7 +400,8 @@ namespace {
                 std::string tagged_text{LinkTaggedPresetText(VarText::POLICY_TAG, policy_name, us_name).append("\n")};
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(us_name),
-                                    std::forward_as_tuple(std::move(tagged_text), policy_name));
+                                    std::forward_as_tuple(std::move(tagged_text),
+                                                          policy_name));
             }
 
         }
@@ -279,7 +411,8 @@ namespace {
                     auto& us_name{UserString(building_name)};
                     retval.emplace_back(std::piecewise_construct,
                                         std::forward_as_tuple(us_name),
-                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::BUILDING_TYPE_TAG, building_name, us_name).append("\n"), building_name));
+                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::BUILDING_TYPE_TAG, building_name, us_name).append("\n"),
+                                                              building_name));
                 }
             }
 
@@ -290,7 +423,8 @@ namespace {
                 std::string tagged_text{LinkTaggedPresetText(VarText::SPECIAL_TAG, special_name, us_name).append("\n")};
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(us_name),
-                                    std::forward_as_tuple(std::move(tagged_text), special_name));
+                                    std::forward_as_tuple(std::move(tagged_text),
+                                                          special_name));
             }
 
         }
@@ -302,7 +436,8 @@ namespace {
                     auto& us_name{UserString(species_name)};
                     retval.emplace_back(std::piecewise_construct,
                                         std::forward_as_tuple(us_name),
-                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::SPECIES_TAG, species_name, us_name).append("\n"), species_name));
+                                        std::forward_as_tuple(LinkTaggedPresetText(VarText::SPECIES_TAG, species_name, us_name).append("\n"),
+                                                              species_name));
                 }
             }
 
@@ -321,7 +456,7 @@ namespace {
                 } else {
                     const auto& this_species_homeworlds = homeworlds.at(entry.first);
                     std::string homeworld_info;
-                    species_entry.append("(").append(std::to_string(this_species_homeworlds.size())).append("):  ");
+                    species_entry.append("(").append(ToChars(this_species_homeworlds.size())).append("):  ");
                     bool first = true;
                     for (int homeworld_id : this_species_homeworlds) {
                         if (first) first = false;
@@ -349,7 +484,7 @@ namespace {
                 }
                 if (!species_occupied_planets.empty()) {
                     if (species_occupied_planets.size() >= 5) {
-                        species_entry.append("  |   ").append(std::to_string(species_occupied_planets.size()))
+                        species_entry.append("  |   ").append(ToChars(species_occupied_planets.size()))
                                      .append(" ").append(UserString("OCCUPIED_PLANETS"));
                     } else {
                         species_entry.append("  |   ").append(UserString("OCCUPIED_PLANETS")).append(":  ");
@@ -364,9 +499,24 @@ namespace {
                                     std::forward_as_tuple(UserString(entry.first)),
                                     std::forward_as_tuple(species_entry.append("\n"), entry.first));
             }
+
+#if defined(__cpp_lib_char8_t)
+            static constexpr std::u8string_view slash_thing_chars = u8"\u20E0 ";
+            static constexpr auto slash_thing_arr = []() {
+                std::array<std::string_view::value_type, slash_thing_chars.size()> retval{};
+                for (std::size_t idx = 0; idx < retval.size(); ++idx)
+                    retval[idx] = slash_thing_chars[idx];
+                return retval;
+            }();
+            static const std::string_view slash_thing(slash_thing_arr.data(), slash_thing_arr.size());
+#else
+            static constexpr std::string_view slash_thing = u8"\u20E0 "; // "⃠"  ⃠ Combining Enclosing Circle Backslash
+#endif
+
             retval.emplace_back(std::piecewise_construct,
-                                std::forward_as_tuple("⃠ "),
+                                std::forward_as_tuple(slash_thing),
                                 std::forward_as_tuple("\n\n", "  "));
+
             for (const auto& entry : GetSpeciesManager()) {
                 if (!homeworlds.count(entry.first) || homeworlds.at(entry.first).empty()) {
                     std::string species_entry{
@@ -375,9 +525,16 @@ namespace {
                         .append(UserString("NO_HOMEWORLD"))
                         .append("\n")
                     };
-                    retval.emplace_back(std::piecewise_construct,
-                                        std::forward_as_tuple("⃠⃠⃠ " + UserString(entry.first)),
-                                        std::forward_as_tuple(std::move(species_entry), entry.first));
+                    const auto& us_entry_first = UserString(entry.first);
+                    {
+                        std::scoped_lock prepended_lock{prepended_homeworld_names_access};
+                        const auto& prep_entry = prepended_homeworld_names.try_emplace(
+                            us_entry_first, std::string{slash_thing}.append(us_entry_first)).first->second;
+
+                        retval.emplace_back(std::piecewise_construct,
+                                            std::forward_as_tuple(prep_entry),
+                                            std::forward_as_tuple(std::move(species_entry), entry.first));
+                    }
                 }
             }
 
@@ -409,7 +566,7 @@ namespace {
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(empire->Name()),
                                     std::forward_as_tuple(LinkTaggedIDText(VarText::EMPIRE_ID_TAG, id, empire->Name()).append("\n"),
-                                                          std::to_string(id)));
+                                                          ToChars(id)));
             }
 
         }
@@ -421,7 +578,7 @@ namespace {
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(design->Name()),
                                     std::forward_as_tuple(LinkTaggedIDText(VarText::DESIGN_ID_TAG, design_id, design->Name()).append("\n"),
-                                                          std::to_string(design_id)));
+                                                          ToChars(design_id)));
             }
 
         }
@@ -431,7 +588,7 @@ namespace {
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(ship_name),
                                     std::forward_as_tuple(LinkTaggedIDText(VarText::SHIP_ID_TAG, ship->ID(), ship_name).append("  "),
-                                                          std::to_string(ship->ID())));
+                                                          ToChars(ship->ID())));
             }
 
         }
@@ -443,7 +600,7 @@ namespace {
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(ship_name),
                                     std::forward_as_tuple(LinkTaggedIDText(VarText::SHIP_ID_TAG, ship->ID(), ship_name).append("  "),
-                                                          std::to_string(ship->ID())));
+                                                          ToChars(ship->ID())));
             }
 
         }
@@ -454,7 +611,7 @@ namespace {
                     retval.emplace_back(std::piecewise_construct,
                                         std::forward_as_tuple(design->Name()),
                                         std::forward_as_tuple(LinkTaggedIDText(VarText::DESIGN_ID_TAG, design_id, design->Name()).append("\n"),
-                                                              std::to_string(design_id)));
+                                                              ToChars(design_id)));
             }
 
         }
@@ -464,7 +621,7 @@ namespace {
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(flt_name),
                                     std::forward_as_tuple(LinkTaggedIDText(VarText::FLEET_ID_TAG, fleet->ID(), flt_name).append("  "),
-                                                          std::to_string(fleet->ID())));
+                                                          ToChars(fleet->ID())));
             }
 
         }
@@ -474,7 +631,7 @@ namespace {
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(plt_name),
                                     std::forward_as_tuple(LinkTaggedIDText(VarText::PLANET_ID_TAG, planet->ID(), plt_name).append("  "),
-                                                          std::to_string(planet->ID())));
+                                                          ToChars(planet->ID())));
             }
 
         }
@@ -484,7 +641,7 @@ namespace {
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(bld_name),
                                     std::forward_as_tuple(LinkTaggedIDText(VarText::BUILDING_ID_TAG, building->ID(), bld_name).append("  "),
-                                                          std::to_string(building->ID())));
+                                                          ToChars(building->ID())));
             }
 
         }
@@ -494,7 +651,7 @@ namespace {
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(sys_name),
                                     std::forward_as_tuple(LinkTaggedIDText(VarText::SYSTEM_ID_TAG, system->ID(), sys_name).append("  "),
-                                                          std::to_string(system->ID())));
+                                                          ToChars(system->ID())));
             }
 
         }
@@ -504,7 +661,7 @@ namespace {
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(field_name),
                                     std::forward_as_tuple(LinkTaggedIDText(VarText::FIELD_ID_TAG, field->ID(), field_name).append("  "),
-                                                          std::to_string(field->ID())));
+                                                          ToChars(field->ID())));
             }
 
         }
@@ -528,7 +685,8 @@ namespace {
                      tex_name);
                  retval.emplace_back(std::piecewise_construct,
                                      std::forward_as_tuple(tex_name),
-                                     std::forward_as_tuple(std::move(texture_info_str), tex_name));
+                                     std::forward_as_tuple(std::move(texture_info_str),
+                                                           tex_name));
              }
 
              for (auto& [tex_name, tex] : GG::GetVectorTextureManager().Textures()) {
@@ -540,7 +698,8 @@ namespace {
                      tex_name);
                  retval.emplace_back(std::piecewise_construct,
                                      std::forward_as_tuple(tex_name),
-                                     std::forward_as_tuple(std::move(texture_info_str), tex_name));
+                                     std::forward_as_tuple(std::move(texture_info_str),
+                                                           tex_name));
              }
 
         }
@@ -549,7 +708,8 @@ namespace {
             for (auto& [str_key, str_val] : AllStringtableEntries())
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(str_key),
-                                    std::forward_as_tuple(str_key + ": " + str_val + "\n", str_key));
+                                    std::forward_as_tuple(str_key + ": " + str_val + "\n",
+                                                          str_key));
 
         }
         else if  (dir_name == "ENC_NAMED_VALUE_REF") {
@@ -1018,64 +1178,59 @@ void EncyclopediaDetailPanel::InitBuffers() {
 }
 
 void EncyclopediaDetailPanel::HandleLinkClick(const std::string& link_type, const std::string& data) {
-    using boost::lexical_cast;
-    try {
-        if (link_type == VarText::PLANET_ID_TAG) {
-            ClientUI::GetClientUI()->ZoomToPlanet(lexical_cast<int>(data));
-            this->SetPlanet(lexical_cast<int>(data));
+    if (link_type == VarText::PLANET_ID_TAG) {
+        auto id = ToInt(data, INVALID_OBJECT_ID);
+        ClientUI::GetClientUI()->ZoomToPlanet(id);
+        this->SetPlanet(id);
 
-        } else if (link_type == VarText::SYSTEM_ID_TAG) {
-            ClientUI::GetClientUI()->ZoomToSystem(lexical_cast<int>(data));
-        } else if (link_type == VarText::FLEET_ID_TAG) {
-            ClientUI::GetClientUI()->ZoomToFleet(lexical_cast<int>(data));
-        } else if (link_type == VarText::SHIP_ID_TAG) {
-            ClientUI::GetClientUI()->ZoomToShip(lexical_cast<int>(data));
-        } else if (link_type == VarText::BUILDING_ID_TAG) {
-            ClientUI::GetClientUI()->ZoomToBuilding(lexical_cast<int>(data));
-        } else if (link_type == VarText::FIELD_ID_TAG) {
-            ClientUI::GetClientUI()->ZoomToField(lexical_cast<int>(data));
+    } else if (link_type == VarText::SYSTEM_ID_TAG) {
+        ClientUI::GetClientUI()->ZoomToSystem(ToInt(data, INVALID_OBJECT_ID));
+    } else if (link_type == VarText::FLEET_ID_TAG) {
+        ClientUI::GetClientUI()->ZoomToFleet(ToInt(data, INVALID_OBJECT_ID));
+    } else if (link_type == VarText::SHIP_ID_TAG) {
+        ClientUI::GetClientUI()->ZoomToShip(ToInt(data, INVALID_OBJECT_ID));
+    } else if (link_type == VarText::BUILDING_ID_TAG) {
+        ClientUI::GetClientUI()->ZoomToBuilding(ToInt(data, INVALID_OBJECT_ID));
+    } else if (link_type == VarText::FIELD_ID_TAG) {
+        ClientUI::GetClientUI()->ZoomToField(ToInt(data, INVALID_OBJECT_ID));
 
-        } else if (link_type == VarText::COMBAT_ID_TAG) {
-            ClientUI::GetClientUI()->ZoomToCombatLog(lexical_cast<int>(data));
+    } else if (link_type == VarText::COMBAT_ID_TAG) {
+        ClientUI::GetClientUI()->ZoomToCombatLog(ToInt(data, CombatLogManager::INVALID_COMBAT_LOG_ID));
 
-        } else if (link_type == VarText::EMPIRE_ID_TAG) {
-            this->SetEmpire(lexical_cast<int>(data));
-        } else if (link_type == VarText::DESIGN_ID_TAG) {
-            this->SetDesign(lexical_cast<int>(data));
-        } else if (link_type == VarText::PREDEFINED_DESIGN_TAG) {
-            if (const ShipDesign* design = GetUniverse().GetGenericShipDesign(data))
-                this->SetDesign(design->ID());
+    } else if (link_type == VarText::EMPIRE_ID_TAG) {
+        this->SetEmpire(ToInt(data, ALL_EMPIRES));
+    } else if (link_type == VarText::DESIGN_ID_TAG) {
+        this->SetDesign(ToInt(data, INVALID_DESIGN_ID));
+    } else if (link_type == VarText::PREDEFINED_DESIGN_TAG) {
+        if (const ShipDesign* design = GetUniverse().GetGenericShipDesign(data))
+            this->SetDesign(design->ID());
 
-        } else if (link_type == VarText::TECH_TAG) {
-            this->SetTech(data);
-        } else if (link_type == VarText::POLICY_TAG) {
-            this->SetPolicy(data);
-        } else if (link_type == VarText::BUILDING_TYPE_TAG) {
-            this->SetBuildingType(data);
-        } else if (link_type == VarText::FIELD_TYPE_TAG) {
-            this->SetFieldType(data);
-        } else if (link_type == VarText::METER_TYPE_TAG) {
-            this->SetMeterType(data);
-        } else if (link_type == VarText::SPECIAL_TAG) {
-            this->SetSpecial(data);
-        } else if (link_type == VarText::SHIP_HULL_TAG) {
-            this->SetShipHull(data);
-        } else if (link_type == VarText::SHIP_PART_TAG) {
-            this->SetShipPart(data);
-        } else if (link_type == VarText::SPECIES_TAG) {
-            this->SetSpecies(data);
-        } else if (link_type == TextLinker::ENCYCLOPEDIA_TAG) {
-            this->SetText(data, false);
-        } else if (link_type == TextLinker::GRAPH_TAG) {
-            this->SetGraph(data);
-        } else if (link_type == TextLinker::URL_TAG) {
-            GGHumanClientApp::GetApp()->OpenURL(data);
-        } else if (link_type == TextLinker::BROWSE_PATH_TAG) {
-            GGHumanClientApp::GetApp()->BrowsePath(FilenameToPath(data));
-        }
-
-    } catch (const boost::bad_lexical_cast&) {
-        ErrorLogger() << "EncyclopediaDetailPanel::HandleLinkClick caught lexical cast exception for link type: " << link_type << " and data: " << data;
+    } else if (link_type == VarText::TECH_TAG) {
+        this->SetTech(data);
+    } else if (link_type == VarText::POLICY_TAG) {
+        this->SetPolicy(data);
+    } else if (link_type == VarText::BUILDING_TYPE_TAG) {
+        this->SetBuildingType(data);
+    } else if (link_type == VarText::FIELD_TYPE_TAG) {
+        this->SetFieldType(data);
+    } else if (link_type == VarText::METER_TYPE_TAG) {
+        this->SetMeterType(data);
+    } else if (link_type == VarText::SPECIAL_TAG) {
+        this->SetSpecial(data);
+    } else if (link_type == VarText::SHIP_HULL_TAG) {
+        this->SetShipHull(data);
+    } else if (link_type == VarText::SHIP_PART_TAG) {
+        this->SetShipPart(data);
+    } else if (link_type == VarText::SPECIES_TAG) {
+        this->SetSpecies(data);
+    } else if (link_type == TextLinker::ENCYCLOPEDIA_TAG) {
+        this->SetText(data, false);
+    } else if (link_type == TextLinker::GRAPH_TAG) {
+        this->SetGraph(data);
+    } else if (link_type == TextLinker::URL_TAG) {
+        GGHumanClientApp::GetApp()->OpenURL(data);
+    } else if (link_type == TextLinker::BROWSE_PATH_TAG) {
+        GGHumanClientApp::GetApp()->BrowsePath(FilenameToPath(data));
     }
 }
 
@@ -1129,7 +1284,7 @@ void EncyclopediaDetailPanel::HandleLinkDoubleClick(const std::string& link_type
 namespace {
     /** Recursively searches pedia directory \a dir_name for articles and
       * sub-directories. Returns a map from
-      * (category_str_key, dir_name) to (readable_article_name, link_text) */
+      * (article_key, dir_name) to (readable_article_name, link_text) */
     [[nodiscard]] auto GetSubDirs(std::string_view dir_name,
                                   bool exclude_custom_categories_from_dir_name = true,
                                   int depth = 0)
@@ -1139,10 +1294,10 @@ namespace {
         if (dir_name == "ENC_STRINGS")
             return retval;
 
-        ScopedTimer subdir_timer(std::string{"GetSubDirs("}.append(dir_name).append(", ")
-                                 .append(std::to_string(exclude_custom_categories_from_dir_name))
-                                 .append(", ").append(std::to_string(depth)).append(")"),
-                                 std::chrono::milliseconds(5));
+        ScopedTimer subdir_timer{
+            std::string{"GetSubDirs("}.append(dir_name).append(", ")
+            .append(ToChars(exclude_custom_categories_from_dir_name))
+            .append(", ").append(ToChars(depth) + ")")};
 
         depth++;
         // safety check to pre-empt potential infinite loop
@@ -1159,19 +1314,24 @@ namespace {
         std::vector<std::future<decltype(GetSubDirs(""))>> futures;
         futures.reserve(sorted_entries.size());
 
-        for (auto& [readable_article_name, link_category] : sorted_entries) {
-            auto& [link_text, category_str_key] = link_category;
+        for (auto& [readable_article_name, link_key] : sorted_entries) {
+            const auto& [link_text, key] = link_key;
+
+            if (!utf8::is_valid(readable_article_name.begin(), readable_article_name.end())) {
+                ErrorLogger() << "GetSubDirs invalid article name: " << readable_article_name
+                              << "  with key: " << key;
+            }
 
             // explicitly exclude textures and input directory itself
-            if (category_str_key == "ENC_TEXTURES" || category_str_key == dir_name)
+            if (key == "ENC_TEXTURES" || key == dir_name)
                 continue;
 
             futures.push_back(std::async(std::launch::async,
                                          GetSubDirs,
-                                         category_str_key, exclude_custom_categories_from_dir_name, depth));
+                                         key, exclude_custom_categories_from_dir_name, depth));
 
-            retval.emplace(std::pair{std::move(category_str_key), dir_name},
-                           std::pair{readable_article_name, std::move(link_text)});
+            retval.emplace(std::pair{key, dir_name}, // don't move from key as it's viewed by the above future
+                           std::pair{std::string{readable_article_name}, std::move(link_text)});
         }
 
         for (auto& fut : futures)
@@ -1276,7 +1436,7 @@ namespace {
 
             detailed_description += str(FlexibleFormat(UserString("ENC_GALAXY_SETUP_SETTINGS"))
                 % gsd.seed
-                % std::to_string(gsd.size)
+                % ToChars(gsd.size)
                 % TextForGalaxyShape(gsd.shape)
                 % TextForGalaxySetupSetting(gsd.age)
                 % TextForGalaxySetupSetting(gsd.starlane_freq)
@@ -1443,7 +1603,7 @@ namespace {
 
         std::string slots_list;
         for (auto slot_type : {ShipSlotType::SL_EXTERNAL, ShipSlotType::SL_INTERNAL, ShipSlotType::SL_CORE})
-            slots_list += UserString(to_string((slot_type))) + ": " + std::to_string(hull->NumSlots(slot_type)) + "\n";
+            slots_list += UserString(to_string(slot_type)) + ": " + ToChars(hull->NumSlots(slot_type)) + "\n";
         detailed_description += UserString(hull->Description()) + "\n\n" + str(FlexibleFormat(UserString("HULL_DESC"))
             % hull->Speed()
             % hull->Fuel()
@@ -1692,7 +1852,7 @@ namespace {
         int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
         int this_location_id = ClientUI::GetClientUI()->GetMapWnd()->SelectedPlanetID();
-        if (this_location_id == INVALID_OBJECT_ID)
+        if (this_location_id == INVALID_OBJECT_ID && !only_description)
             this_location_id = DefaultLocationForEmpire(client_empire_id);
 
         // Building types
@@ -1713,11 +1873,11 @@ namespace {
         } else {
             detailed_description += str(FlexibleFormat(UserString("ENC_AUTO_TIME_COST_VARIABLE_STR")) % UserString("ENC_VERB_PRODUCE_STR"));
             if (auto planet = Objects().get<Planet>(this_location_id)) {
-                int local_cost = building_type->ProductionCost(client_empire_id, this_location_id);
-                int local_time = building_type->ProductionTime(client_empire_id, this_location_id);
+                int local_cost = only_description ? 1 : building_type->ProductionCost(client_empire_id, this_location_id);
+                int local_time = only_description ? 1 : building_type->ProductionTime(client_empire_id, this_location_id);
                 auto& local_name = planet->Name();
-                detailed_description += str(FlexibleFormat(UserString("ENC_AUTO_TIME_COST_VARIABLE_DETAIL_STR")) 
-                                        % local_name % local_cost % cost_units % local_time);
+                detailed_description += str(FlexibleFormat(UserString("ENC_AUTO_TIME_COST_VARIABLE_DETAIL_STR"))
+                                            % local_name % local_cost % cost_units % local_time);
             }
         }
 
@@ -1859,12 +2019,9 @@ namespace {
                                             std::string& specific_type, std::string& detailed_description,
                                             GG::Clr& color, bool only_description = false)
     {
-        int empire_id = ALL_EMPIRES;
-        try {
-            empire_id = boost::lexical_cast<int>(item_name);
-        } catch(...)
-        {}
-        Empire* empire = GetEmpire(empire_id);
+        int empire_id = ToInt(item_name, ALL_EMPIRES);
+        const ScriptingContext context;
+        auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EncyclopediaDetailPanel::Refresh couldn't find empire with id " << item_name;
             return;
@@ -1915,7 +2072,7 @@ namespace {
             for (auto& [adoption_turn, policy_name] : turns_policies_adopted) {
                 detailed_description += "\n";
                 std::string turn_text{adoption_turn == BEFORE_FIRST_TURN ? UserString("BEFORE_FIRST_TURN") :
-                    (UserString("TURN") + " " + std::to_string(adoption_turn))};
+                    (UserString("TURN") + " " + ToChars(adoption_turn))};
                 detailed_description.append(LinkTaggedPresetText(VarText::POLICY_TAG, policy_name, UserString(policy_name)))
                     .append(" : ").append(turn_text);
             }
@@ -1964,8 +2121,10 @@ namespace {
         }
 
         // Issued orders this turn
-        detailed_description.append("\n\n").append(UserString("ISSUED_ORDERS"))
-            .append("\n").append(GGHumanClientApp::GetApp()->Orders().Dump());
+        if (empire_id == GGHumanClientApp::GetApp()->EmpireID())
+            detailed_description.append("\n\n").append(UserString("ISSUED_ORDERS"))
+                                .append("\n").append(GGHumanClientApp::GetApp()->Orders().Dump());
+
 
         // Techs
         auto& techs = empire->ResearchedTechs();
@@ -1981,7 +2140,7 @@ namespace {
                 if (researched_turn == BEFORE_FIRST_TURN)
                     turn_text = UserString("BEFORE_FIRST_TURN");
                 else
-                    turn_text = UserString("TURN") + " " + std::to_string(researched_turn);
+                    turn_text = UserString("TURN") + " " + ToChars(researched_turn);
                 detailed_description.append(LinkTaggedPresetText(VarText::TECH_TAG, tech_name, UserString(tech_name)))
                     .append(" : ").append(turn_text);
             }
@@ -2028,7 +2187,7 @@ namespace {
         if (!empire_ships_destroyed.empty())
             detailed_description.append("\n\n").append(UserString("EMPIRE_SHIPS_DESTROYED"));
         for (const auto& entry : empire_ships_destroyed) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             const Empire* target_empire = GetEmpire(entry.first);
             std::string target_empire_name;
             if (target_empire)
@@ -2045,7 +2204,7 @@ namespace {
         if (!empire_designs_destroyed.empty())
             detailed_description.append("\n\n").append(UserString("SHIP_DESIGNS_DESTROYED"));
         for (const auto& entry : empire_designs_destroyed) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             const ShipDesign* design = GetUniverse().GetShipDesign(entry.first);
             std::string design_name;
             if (design)
@@ -2062,7 +2221,7 @@ namespace {
         if (!species_ships_destroyed.empty())
             detailed_description.append("\n\n").append(UserString("SPECIES_SHIPS_DESTROYED"));
         for (const auto& entry : species_ships_destroyed) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             std::string species_name;
             if (entry.first.empty())
                 species_name = UserString("NONE");
@@ -2077,7 +2236,7 @@ namespace {
         if (!species_planets_invaded.empty())
             detailed_description.append("\n\n").append(UserString("SPECIES_PLANETS_INVADED"));
         for (const auto& entry : species_planets_invaded) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             std::string species_name;
             if (entry.first.empty())
                 species_name = UserString("NONE");
@@ -2092,7 +2251,7 @@ namespace {
         if (!species_ships_produced.empty())
             detailed_description.append("\n\n").append(UserString("SPECIES_SHIPS_PRODUCED"));
         for (const auto& entry : species_ships_produced) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             std::string species_name;
             if (entry.first.empty())
                 species_name = UserString("NONE");
@@ -2107,7 +2266,7 @@ namespace {
         if (!ship_designs_produced.empty())
             detailed_description.append("\n\n").append(UserString("SHIP_DESIGNS_PRODUCED"));
         for (const auto& entry : ship_designs_produced) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             const ShipDesign* design = GetUniverse().GetShipDesign(entry.first);
             std::string design_name;
             if (design)
@@ -2124,7 +2283,7 @@ namespace {
         if (!species_ships_lost.empty())
             detailed_description.append("\n\n").append(UserString("SPECIES_SHIPS_LOST"));
         for (const auto& entry : species_ships_lost) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             std::string species_name;
             if (entry.first.empty())
                 species_name = UserString("NONE");
@@ -2139,7 +2298,7 @@ namespace {
         if (!ship_designs_lost.empty())
             detailed_description.append("\n\n").append(UserString("SHIP_DESIGNS_LOST"));
         for (const auto& entry : ship_designs_lost) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             const ShipDesign* design = GetUniverse().GetShipDesign(entry.first);
             std::string design_name;
             if (design)
@@ -2156,7 +2315,7 @@ namespace {
         if (!species_ships_scrapped.empty())
             detailed_description.append("\n\n").append(UserString("SPECIES_SHIPS_SCRAPPED"));
         for (const auto& entry : species_ships_scrapped) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             std::string species_name;
             if (entry.first.empty())
                 species_name = UserString("NONE");
@@ -2171,7 +2330,7 @@ namespace {
         if (!ship_designs_scrapped.empty())
             detailed_description.append("\n\n").append(UserString("SHIP_DESIGNS_SCRAPPED"));
         for (const auto& entry : ship_designs_scrapped) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             const ShipDesign* design = GetUniverse().GetShipDesign(entry.first);
             std::string design_name;
             if (design)
@@ -2188,7 +2347,7 @@ namespace {
         if (!species_planets_depoped.empty())
             detailed_description.append("\n\n").append(UserString("SPECIES_PLANETS_DEPOPED"));
         for (const auto& entry : species_planets_depoped) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             std::string species_name;
             if (entry.first.empty())
                 species_name = UserString("NONE");
@@ -2203,7 +2362,7 @@ namespace {
         if (!species_planets_bombed.empty())
             detailed_description.append("\n\n").append(UserString("SPECIES_PLANETS_BOMBED"));
         for (const auto& entry : species_planets_bombed) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             std::string species_name;
             if (entry.first.empty())
                 species_name = UserString("NONE");
@@ -2218,7 +2377,7 @@ namespace {
         if (!building_types_produced.empty())
             detailed_description.append("\n\n").append(UserString("BUILDING_TYPES_PRODUCED"));
         for (const auto& entry : building_types_produced) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             std::string building_type_name;
             if (entry.first.empty())
                 building_type_name = UserString("NONE");
@@ -2233,7 +2392,7 @@ namespace {
         if (!building_types_scrapped.empty())
             detailed_description.append("\n\n").append(UserString("BUILDING_TYPES_SCRAPPED"));
         for (const auto& entry : building_types_scrapped) {
-            std::string num_str = std::to_string(entry.second);
+            std::string num_str = ToChars(entry.second);
             std::string building_type_name;
             if (entry.first.empty())
                 building_type_name = UserString("NONE");
@@ -2517,11 +2676,10 @@ namespace {
                                             std::string& specific_type, std::string& detailed_description,
                                             GG::Clr& color, bool only_description = false)
     {
-        MeterType meter_type = MeterType::INVALID_METER_TYPE;
+        // TODO: don't need to go back and forth to MeterType and string_view.
+        //       can concatenate and look up input item_name
 
-
-        std::istringstream item_ss(item_name);
-        item_ss >> meter_type;
+        MeterType meter_type = MeterTypeFromString(item_name, MeterType::INVALID_METER_TYPE);
         auto [meter_value_label, meter_name] = MeterValueLabelAndString(meter_type);
         std::string meter_name_value_desc{std::string{meter_name}.append("_VALUE_DESC")};
 
@@ -2557,7 +2715,7 @@ namespace {
             auto& [part_name, part_count] = *part_it;
             parts_list += LinkTaggedPresetText(VarText::SHIP_PART_TAG, part_name, UserString(part_name));
             if (part_it->second > 1)
-                parts_list.append(" x").append(std::to_string(part_count));
+                parts_list.append(" x").append(ToChars(part_count));
         }
         return str(FlexibleFormat(UserString("ENC_SHIP_DESIGN_DESCRIPTION_BASE_STR"))
             % design->Description()
@@ -2619,13 +2777,7 @@ namespace {
                                             std::string& specific_type, std::string& detailed_description,
                                             GG::Clr& color, bool only_description = false)
     {
-        int design_id = INVALID_DESIGN_ID;
-        try {
-            design_id = boost::lexical_cast<int>(item_name);
-        } catch (...) {
-            ErrorLogger() << "RefreshDetailPanelShipDesignTag couldn't convert name to design ID: " << item_name;
-            return;
-        }
+        int design_id = ToInt(item_name, INVALID_DESIGN_ID);
         int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
         ScriptingContext context;
         Universe& universe = context.ContextUniverse();
@@ -2634,7 +2786,7 @@ namespace {
 
         const ShipDesign* design = universe.GetShipDesign(design_id);
         if (!design) {
-            ErrorLogger() << "RefreshDetailPanelShipDesignTag couldn't find ShipDesign with id " << item_name;
+            ErrorLogger() << "RefreshDetailPanelShipDesignTag couldn't find ShipDesign with id " << design_id;
             return;
         }
 
@@ -2891,17 +3043,15 @@ namespace {
                                             std::string& specific_type, std::string& detailed_description,
                                             GG::Clr& color, bool only_description = false)
     {
-        int id = boost::lexical_cast<int>(item_name);
-        if (id == INVALID_OBJECT_ID)
-            return;
+        int object_id = ToInt(item_name, INVALID_OBJECT_ID);
         int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
         const Universe& universe = GetUniverse();
         const ObjectMap& objects = universe.Objects();
 
-        auto obj = objects.get(id);
+        auto obj = objects.get(object_id);
         if (!obj) {
-            ErrorLogger() << "EncyclopediaDetailPanel::Refresh couldn't find UniverseObject with id " << item_name;
+            ErrorLogger() << "EncyclopediaDetailPanel::Refresh couldn't find UniverseObject with id " << object_id;
             return;
         }
 
@@ -2914,7 +3064,7 @@ namespace {
         general_type = GeneralTypeOfObject(obj->ObjectType());
         if (general_type.empty()) {
             ErrorLogger() << "EncyclopediaDetailPanel::Refresh couldn't interpret object: " << obj->Name()
-                          << " (" << item_name << ")";
+                          << " (" << object_id << ")";
             return;
         }
     }
@@ -3068,14 +3218,20 @@ namespace {
         auto font = ClientUI::GetFont();
 
 #if defined(__cpp_lib_char8_t)
-        static constexpr std::u8string_view hair_space_chars{u8"\u200A"};
-        static const std::string hair_space_str{hair_space_chars.begin(), hair_space_chars.end()};
         DebugLogger() << "HairSpaceExtext with __cpp_lib_char8_t defined";
+        static constexpr std::u8string_view hair_space_u8chars{u8"\u200A"};
+        static constexpr auto hair_space_arr = []() {
+            std::array<std::string_view::value_type, hair_space_u8chars.size()> retval{};
+            for (std::size_t idx = 0; idx < retval.size(); ++idx)
+                retval[idx] = hair_space_u8chars[idx];
+            return retval;
+        }();
+        static constexpr std::string_view hair_space_chars(hair_space_arr.data(), hair_space_arr.size());
 #else
-        static constexpr std::string_view hair_space_chars{u8"\u200A"};
-        static const std::string hair_space_str{hair_space_chars};
         DebugLogger() << "HairSpaceExtext without __cpp_lib_char8_t defined";
+        static constexpr std::string_view hair_space_chars{u8"\u200A"};
 #endif
+        static const std::string hair_space_str{hair_space_chars};
         DebugLogger() << "hair_space_str: " << hair_space_str << " valid UTF8?: "
                       << utf8::is_valid(hair_space_str.begin(), hair_space_str.end());
 
@@ -3130,7 +3286,7 @@ namespace {
         try {
             // align end of column with end of longest row
             auto hair_space_width = HairSpaceExtent().x;
-            auto hair_space_width_str = std::to_string(Value(hair_space_width));
+            auto hair_space_width_str = ToChars(Value(hair_space_width));
 #if defined(__cpp_lib_char8_t)
             std::u8string hair_space_chars{u8"\u200A"};
             std::string hair_space_str{hair_space_chars.begin(), hair_space_chars.end()};
@@ -3145,22 +3301,22 @@ namespace {
                 }
                 auto distance = longest_width - column1_species_extents.at(it.first).x;
                 std::size_t num_spaces = Value(distance) / Value(hair_space_width);
-                TraceLogger() << it.first << " Num spaces: " << std::to_string(Value(longest_width))
-                              << " - " << std::to_string(Value(column1_species_extents.at(it.first).x))
-                              << " = " << std::to_string(Value(distance))
-                              << " / " << std::to_string(Value(hair_space_width))
-                              << " = " << std::to_string(num_spaces);;
+                TraceLogger() << it.first << " Num spaces: " << ToChars(Value(longest_width))
+                              << " - " << ToChars(Value(column1_species_extents.at(it.first).x))
+                              << " = " << ToChars(Value(distance))
+                              << " / " << ToChars(Value(hair_space_width))
+                              << " = " << ToChars(num_spaces);;
                 for (std::size_t i = 0; i < num_spaces; ++i)
                     it.second.append(hair_space_str);
 
                 TraceLogger() << "Species Suitability Column 1:\n\t" << it.first << " \"" << it.second << "\"" << [&]() {
                     std::string out;
                     auto col_val = Value(column1_species_extents.at(it.first).x);
-                    out.append("\n\t\t(" + std::to_string(col_val) + " + (" + std::to_string(num_spaces) + " * " + hair_space_width_str);
-                    out.append(") = " + std::to_string(col_val + (num_spaces * Value(hair_space_width))) + ")");
+                    out.append("\n\t\t(" + ToChars(col_val) + " + (" + ToChars(num_spaces) + " * " + hair_space_width_str);
+                    out.append(") = " + ToChars(col_val + (num_spaces * Value(hair_space_width))) + ")");
                     auto text_elements = font->ExpensiveParseFromTextToTextElements(it.second, format);
                     auto lines = font->DetermineLines(it.second, format, GG::X(1 << 15), text_elements);
-                    out.append(" = " + std::to_string(Value(font->TextExtent(lines).x)));
+                    out.append(" = " + ToChars(Value(font->TextExtent(lines).x)));
                     return out;
                 }();
             }
@@ -3273,7 +3429,7 @@ namespace {
         Universe& universe = GetUniverse();
         ObjectMap& objects = universe.Objects();
 
-        int planet_id = boost::lexical_cast<int>(item_name);
+        int planet_id = ToInt(item_name, INVALID_OBJECT_ID);
         auto planet = objects.get<Planet>(planet_id); // non-const so it can be test modified to check results for various species
         if (!planet) {
             ErrorLogger() << "RefreshDetailPlanetSuitability couldn't find planet with id " << planet_id;
@@ -3281,7 +3437,7 @@ namespace {
         }
 
         // show image of planet environment at the top of the suitability report
-        const auto& filename = PlanetEnvFilename(planet->Type(), planet_id);
+        auto filename = PlanetEnvFilename(planet->Type(), planet_id);
         if (!filename.empty()) {
             auto env_img_tag = std::string{"<img src=\"encyclopedia/planet_environments/"}
                                 .append(filename).append("\"></img>");
@@ -3476,18 +3632,347 @@ namespace {
         }
     }
 
-    std::set<std::string> ExtractWords(const std::string& search_text) { // TODO: return vector<string_view> ?
-        std::set<std::string> words_in_search_text;
-        for (const auto& word_range : GG::GUI::GetGUI()->FindWordsStringIndices(search_text)) {
-            if (word_range.first == word_range.second)
-                continue;
-            std::string word(search_text.begin() + Value(word_range.first), search_text.begin() + Value(word_range.second));
-            if (word.empty())
-                continue;
-            words_in_search_text.insert(std::move(word));
-        }
-        return words_in_search_text;
+    namespace {
+        // UTF-8 code points that can be easily converted from lower and upper case by offsetting the wchar_t
+
+        // Latin-1 supplement
+        static constexpr uint8_t A_WITH_GRAVE_byte1 = 0x80; // À
+        //static_assert(u8"\u00C0"[1] == A_WITH_GRAVE_byte1);
+        //static_assert(u8"\u00C0"[0] == u8"À"[0] && u8"\u00C0"[1] == u8"À"[1]);
+
+        static constexpr uint8_t O_WITH_DIARESIS_byte1 = 0x96; // Ö
+        // multiply symbol × is between these ranges...
+        static constexpr uint8_t O_WITH_STROKE_byte1 = 0x98; // Ø
+
+        static constexpr uint8_t THORN_byte1 = 0x9E; // Þ
+        //static_assert(u8"\u00DE"[1] == THORN_byte1);
+        static constexpr uint8_t a_with_grave_byte1 = 0xA0; // à
+        //static_assert(u8"\u00E0"[1] == a_with_grave_byte1);
+
+        static constexpr uint8_t y_with_diaresis_byte1 = 0xBF; // ÿ
+
+
+        // Latin extended-A first half
+        static constexpr uint8_t A_WITH_MACRON_byte1 = 0x80; // Ā
+        //static_assert(u8"\u0100"[1] == A_WITH_MACRON_byte1);
+        //static_assert(u8"\u0100"[0] == u8"Ā"[0] && u8"\u0100"[1] == u8"Ā"[1]);
+        static constexpr uint8_t I_WITH_OGONEK_byte1 = 0xAE; // Į
+        //static_assert(u8"\u012E"[1] == I_WITH_OGONEK_byte1);
+        //static_assert(u8"\u012E"[0] == u8"Į"[0] && u8"\u012E"[1] == u8"Į"[1]);
+
+        static constexpr uint8_t LIGATURE_IJ_byte1 = 0xB2; // Ĳ
+        //static_assert(u8"\u0132"[1] == LIGATURE_IJ_byte1);
+        //static_assert(u8"\u0132"[0] == u8"Ĳ"[0] && u8"\u0132"[1] == u8"Ĳ"[1]);
+        static constexpr uint8_t K_WITH_CEDILLA_byte1 = 0xB6; // Ķ
+        //static_assert(u8"\u0136"[1] == K_WITH_CEDILLA_byte1);
+        //static_assert(u8"\u0136"[0] == u8"Ķ"[0] && u8"\u0136"[1] == u8"Ķ"[1]);
+
+        static constexpr uint8_t kra_byte1 = 0xB8; // ĸ
+
+        static constexpr uint8_t L_WITH_ACUTE_byte1 = 0xB9; // Ĺ
+        //static_assert(u8"\u0139"[1] == L_WITH_ACUTE_byte1);
+        //static_assert(u8"\u0139"[0] == u8"Ĺ"[0] && u8"\u0139"[1] == u8"Ĺ"[1]);
+        static constexpr uint8_t L_WITH_CARON_byte1 = 0xBD; // Ľ
+        //static_assert(u8"\u013D"[1] == L_WITH_CARON_byte1);
+        //static_assert(u8"\u013D"[0] == u8"Ľ"[0] && u8"\u013D"[1] == u8"Ľ"[1]);
+
+
+        static constexpr uint8_t a_with_macron_byte1 = 0x81; // ā
+        static constexpr uint8_t awmb0 = u8"\u0101"[0];
+        static constexpr uint8_t awmb1 = u8"\u0101"[1];
+        static_assert(awmb0 == 0xC4);
+        static_assert(awmb1 == 0x81);
+        static_assert(awmb1 == a_with_macron_byte1);
+
+        static_assert(a_with_macron_byte1 - A_WITH_MACRON_byte1 == 1); // this range of chars is offset by one between upper and and lower case
+
+        // Latin Extended-A first-to-second half
+        static constexpr uint8_t L_WITH_MIDDLE_DOT_byte1 = 0xBF; // first byte C4
+        static constexpr uint8_t l_with_middle_dot_byte1 = 0x80; // first byte C5
+
+        // Latin Extended-A second half
+        static constexpr uint8_t L_WITH_STROKE_byte1 = 0x81; // Ł
+        static constexpr uint8_t l_with_stroke_byte1 = 0x82; // ł
+        static constexpr uint8_t N_WITH_CARON_byte1 = 0x87; // Ň
+
+        static constexpr uint8_t n_preceeded_by_apostrophe_byte1 = 0x89; // ŉ
+
+        static constexpr uint8_t ENG_byte1 = 0x8A; // Ŋ
+        static constexpr uint8_t Y_WITH_CIRCUMFLEX_byte1 = 0xB6; // Ŷ
+
+        static constexpr uint8_t Y_WITH_DIARESIS_byte1 = 0xB8; // Ÿ
+
+        static constexpr uint8_t Z_WITH_ACCUTE_byte1 = 0xB9; // Ź
+        static constexpr uint8_t Z_WITH_CARON_byte1 = 0xBD; // Ž
+
+        static constexpr uint8_t long_s_byte1 = 0xBF; // ſ
+
+        // Greek and Coptic
+
+        // first byte 0xCE
+        static constexpr uint8_t ALPHA_byte1 = 0x91; // Α
+        static constexpr uint8_t OMICRON_byte1 = 0x9F; // Ο
+        static constexpr uint8_t PI_byte1 = 0xA0; // Π
+        static constexpr uint8_t RHO_byte1 = 0xA1; // Ρ
+        // no code at 0xA2
+        static constexpr uint8_t SIGMA_byte1 = 0xA3; // Ρ
+        //static constexpr uint8_t OMEGA_byte1 = 0xA9; // Ω
+        static constexpr uint8_t UPSILON_WITH_DIALYTIKA_byte1 = 0xAB; // Ϋ
+
+        static constexpr uint8_t alpha_with_tonos_byte1 = 0xAC; // ά
+        static constexpr uint8_t alpha_byte1 = 0xB1; // α
+        static constexpr uint8_t omicron_byte1 = 0xBF; // ο
+
+        // first byte 0xCF
+        static constexpr uint8_t pi_byte1 = 0x80;
+        static constexpr uint8_t rho_byte1 = 0x81; // ρ
+
+        static constexpr uint8_t final_sigma_byte1 = 0x82; // ς
+
+        static constexpr uint8_t sigma_byte1 = 0x83; // σ
+        static constexpr uint8_t upsilon_with_dialytika_byte1 = 0x8B; // ϋ
+
+        static constexpr uint8_t omicron_with_tonos_byte1 = 0x8C; // ό
+        static constexpr uint8_t omega_with_tonos_byte1 = 0x8E; // ώ
+
+        // note: alternate mu encoding covered by full page 0xC2 case
+        static constexpr auto mu = u8"\u00B5"; // µ
+        static_assert(mu[0] == u8"µ"[0]);
+        static_assert(mu[1] == u8"µ"[1]);
+
+
+        static constexpr auto o_with_dot_below = u8"ọ";
+        static constexpr uint8_t o_with_dot_below_byte1 = o_with_dot_below[1];
+        static constexpr uint8_t o_with_dot_below_byte2 = o_with_dot_below[2];
     }
+
+    // Checks if the (next few) chars starting at \a it are a 3-byte code
+    // point that is handled by CustomToLower or does not need modification
+    // to be lower-case. Returns true if it is OK or handled. Returns false
+    // to indicate that CustomToLower won't check for that char or make it
+    // lower case if it is not already.
+    inline bool IsOK3CharCode(const std::string::iterator& it) {
+        uint8_t c1 = *it;
+        uint8_t c2 = *(it + 1);
+        uint8_t c3 = *(it + 2);
+
+        if (c1 == 0xE2) {
+            if ((c2 >= 0x80 && c2 <= 0x83) ||
+                (c2 >= 0x86 && c2 <= 0x91) ||
+                (c2 >= 0x94 && c2 <= 0xAF) ||
+                (c2 >= 0xB4))
+            {
+                // all caseless or lower
+                return true;
+            }
+
+        } else if (c1 == 0xE1) {
+            if (c2 == o_with_dot_below_byte1 && c3 == o_with_dot_below_byte2) {
+                // already lower case
+                return true;
+            }
+
+        } else if (c1 >= 0xE3 && c1 <= 0xE9) {
+            // all caseless or lower
+            return true;
+        }
+
+        // are other ranges that could be checked: https://www.unicode.org/Public/14.0.0/ucd/CaseFolding.txt
+
+        return false; // character not in handled pages
+    }
+
+    // Converts some UTF-8 upper-case chars to lower-case. returns true if
+    // all code points in the text were in ranges known to not require further
+    // case conversion after having applied this function. If some code points were
+    // outside the known rage or couldn't be converted, returns false, indicating
+    // that further case conversion may be needed.
+    bool CustomToLower(std::string::iterator it, const std::string::iterator end_it) {
+        std::ptrdiff_t dist = std::distance(it, end_it);
+        bool retval = true; // util an char outside the handled range is seen
+        auto prev_char_it = it;
+        bool once = true;
+
+        //DebugLogger() << "CustomToLower on: " << std::string_view(it, end_it) << " : " << [it, end_it]() mutable {
+        //    std::string retval;
+        //    for (; it != end_it; ++it) {
+        //        uint8_t c = *it;
+        //        retval += std::to_string(static_cast<unsigned int>(c));
+        //    }
+        //    return retval;
+        //}();
+
+        while (dist >= 2) {
+            if (!retval && once) {
+                once = false;
+                const uint8_t prev_c1 = *prev_char_it;
+                std::ptrdiff_t prev_sequence_length = (prev_c1 < 0x80) ? 1 : (prev_c1 <= 0xDF) ? 2 : (prev_c1 <= 0xEF) ? 3 : 4;
+                DebugLogger() << "not handled char: " << std::string_view(&*prev_char_it, prev_sequence_length);
+            }
+
+            prev_char_it = it;
+            const uint8_t c1 = *it;
+
+            std::ptrdiff_t sequence_length = (c1 < 0x80) ? 1 : (c1 <= 0xDF) ? 2 : (c1 <= 0xEF) ? 3 : 4;
+            //DebugLogger() << std::string_view(&*it, sequence_length) << "(" << sequence_length << ") : " << static_cast<int>(c1) << " " << static_cast<int>(*(it+1));
+
+            // adjust current sequence if it is a recognized capital letter
+            if (sequence_length == 1) { // ASCII
+                if (c1 >= 'A' && c1 <= 'Z')
+                    *it += ('a' - 'A');
+                // other code points are lower case or caseless
+
+            } else if (sequence_length == 2) {
+                if (c1 >= 0x80 && c1 <= 0xC1) {
+                    retval = false;
+                    break; // invalid UTF-8 ?
+
+                } else if (c1 == 0xC2) { // first 64 Latin Supplement has no upper-case
+
+                } else if (c1 == 0xC3) { // Latin-1 Supplement starting at capital A with Grave
+                    auto cur_it = it + 1;
+                    const uint8_t c2 = *cur_it;
+                    if ((c2 >= A_WITH_GRAVE_byte1 && c2 <= O_WITH_DIARESIS_byte1) ||
+                        (c2 >= O_WITH_STROKE_byte1 && c2 <= THORN_byte1))
+                    {
+                        static constexpr uint8_t offset = a_with_grave_byte1 - A_WITH_GRAVE_byte1;
+                        *cur_it += offset;
+                    }
+                    // other code poitns are lower case or caseless
+
+                } else if (c1 == 0xC4) { // Latin Extended-A starting at A with Macron
+                    auto cur_it = it + 1;
+                    const uint8_t c2 = *cur_it;
+                    if ((c2 >= A_WITH_MACRON_byte1 && c2 <= I_WITH_OGONEK_byte1) ||
+                        (c2 >= LIGATURE_IJ_byte1 && c2 <= K_WITH_CEDILLA_byte1))
+                    {
+                        *cur_it += (c2 % 2 == 0);
+
+                    } else if (c2 == kra_byte1) {
+                        // do nothing, already lower case
+
+                    } else if (c2 >= L_WITH_ACUTE_byte1 && c2 <= L_WITH_CARON_byte1) {
+                        *cur_it += (c2 % 2/* == 1*/);
+
+                    } else if (c2 == L_WITH_MIDDLE_DOT_byte1) {
+                        *it += 1; // to 0xC5
+                        *cur_it = l_with_middle_dot_byte1;
+
+                    } else {
+                        retval = false; // character not handled
+                    }
+
+                } else if (c1 == 0xC5) { // Latin Extended-A starting with L with Stroke
+                    auto cur_it = it + 1;
+                    const uint8_t c2 = *cur_it;
+                    if (c2 >= L_WITH_STROKE_byte1 && c2 <= N_WITH_CARON_byte1) {
+                        *cur_it += (c2 % 2/* == 1*/);
+
+                    } else if (c2 == n_preceeded_by_apostrophe_byte1) {
+                        // do nothing, already lower case
+
+                    } else if (c2 >= ENG_byte1 && c2 <= Y_WITH_CIRCUMFLEX_byte1) {
+                        *cur_it += (c2 % 2 == 0);
+
+                    } else if (c2 == Y_WITH_DIARESIS_byte1) {
+                        *it -= 2; // to 0xC3;
+                        *cur_it = y_with_diaresis_byte1;
+                        static_assert(0xBF == y_with_diaresis_byte1);
+
+                    } else if (c2 >= Z_WITH_ACCUTE_byte1 && c2 <= Z_WITH_CARON_byte1) {
+                        *cur_it += (c2 % 2/* == 1*/);
+
+                    } else if (c2 == long_s_byte1) {
+                        // do nothing, already lower case
+
+                    } else {
+                        retval = false; // character not handled
+                    }
+
+                } else if (c1 == 0xCC || // // spacing modified letters, combining diacritical marks
+                           (c1 == 0xCD && static_cast<uint8_t>(*(it + 1)) <= 0xAF))
+                {
+                    static_assert(static_cast<uint8_t>(192) == 0xC0);
+                    using it_char_t = std::decay_t<decltype(*it)>;
+                    static constexpr it_char_t neg_40(-40);
+                    static constexpr uint8_t neg_40_uint_8 = static_cast<uint8_t>(neg_40);
+                    static_assert(neg_40_uint_8 == 0xD8);
+                    // do nothing, not cased
+
+                // note: some Greek in 0xCD page not handled
+                } else if (c1 == 0xCE) { // Greek and Coptic
+                    auto cur_it = it + 1;
+                    const uint8_t c2 = *cur_it;
+
+                    if (c2 >= ALPHA_byte1 && c2 <= OMICRON_byte1) {
+                        static constexpr auto offset = alpha_byte1 - ALPHA_byte1;
+                        static_assert(ALPHA_byte1 + offset == alpha_byte1);
+                        *cur_it += offset;
+
+                    } else if (c2 == PI_byte1) {
+                        *it += 1; // to 0xCF
+                        *cur_it = pi_byte1;
+
+                    } else if (c2 == RHO_byte1) {
+                        *it += 1; // to 0xCF
+                        *cur_it = rho_byte1;
+
+                    } else if (c2 >= SIGMA_byte1 && c2 <= UPSILON_WITH_DIALYTIKA_byte1) {
+                        *it += 1; // to 0xCF
+                        static constexpr auto offset = sigma_byte1 - SIGMA_byte1;
+                        static_assert(SIGMA_byte1 + offset == sigma_byte1);
+                        *cur_it += offset;
+
+                    } else if (c2 >= alpha_with_tonos_byte1 && c2 <= omicron_byte1) {
+                        // do nothing, already lower case
+
+                    } else {
+                        retval = false; // character not handled
+                    }
+
+                } else if (c1 == 0xCF) { // Greek and Coptic
+                    auto cur_it = it + 1;
+                    const uint8_t c2 = *cur_it;
+
+                    if (c2 >= pi_byte1 && c2 <= omega_with_tonos_byte1) {
+                        // do nothing, already lower case
+                    } else {
+                        retval = false;
+                    }
+
+                } else {
+                    retval = false; // character not handled
+                }
+
+            } else if (sequence_length == 3) {
+                if (dist < 3 || !IsOK3CharCode(it)) {
+                    //DebugLogger() << "unrecognized 3 length code: " << std::string_view(&*it, 3);
+                    retval = false;  // unrecognized code
+                }
+
+            } else { // if (sequence_length >= 4) {
+                retval = false; // unrecognized code
+            }
+
+            if (dist < sequence_length) {
+                retval = false;
+                break; // invalid UTF-8, possibly due to truncation of string
+            }
+            it += sequence_length;
+            dist -= sequence_length;
+        }
+
+        if (dist == 1) {
+            uint8_t c1 = *it;
+            *it += (c1 >= 'A' && c1 <= 'Z') * ('a' - 'A');
+        }
+
+        return retval;
+    }
+
+
+    auto ExtractWords(std::string_view text)
+    { return GG::GUI::GetGUI()->FindWordsStringViews(text); }
 
     void SearchPediaArticleForWords(        std::string article_key,
                                             std::string article_directory,
@@ -3497,12 +3982,16 @@ namespace {
                                             std::pair<std::string, std::string>& partial_match,
                                             std::pair<std::string, std::string>& article_match,
                                             const std::string& search_text,
-                                            const std::set<std::string>& words_in_search_text,
+                                            const std::vector<std::string_view>& words_in_search_text,
                                             std::size_t idx,
                                             bool search_article_text)
     {
         //std::cout << "start scanning article " << idx << ": " << article_name_link.first << std::endl;
-        std::string article_name = boost::locale::to_lower(article_name_link.first, GetLocale("en_US.UTF-8"));
+        auto article_name{article_name_link.first};
+        auto all_handled = CustomToLower(article_name.begin(), article_name.end());
+        if (!all_handled)
+            article_name = boost::locale::to_lower(article_name_link.first, GetLocale("en_US.UTF-8"));
+
         // search for exact title matches
         if (article_name == search_text) {
             exact_match = std::move(article_name_link);
@@ -3512,7 +4001,9 @@ namespace {
         // search for full word matches in title
         auto title_words{ExtractWords(article_name)};
         for (const auto& title_word : title_words) {
-            if (words_in_search_text.count(title_word)) {
+            if (std::any_of(words_in_search_text.begin(), words_in_search_text.end(),
+                            [title_word](const auto& wist) { return wist == title_word; }))
+            {
                 word_match = std::move(article_name_link);
                 return;
             }
@@ -3520,7 +4011,7 @@ namespace {
 
         // search for partial word matches: searched-for words that appear
         // in the title text, not necessarily as a complete word
-        for (const std::string& word : words_in_search_text) {
+        for (const auto& word : words_in_search_text) {
             // reject searches in text for words less than 3 characters
             if (word.size() < 3)
                 continue;
@@ -3567,7 +4058,12 @@ namespace {
             article_match = std::move(article_name_link);
             return;
         }
-        std::string desc_lower = boost::locale::to_lower(detailed_description, GetLocale("en_US.UTF-8"));
+
+        auto desc_lower{detailed_description};
+        all_handled = CustomToLower(desc_lower.begin(), desc_lower.end());
+        if (!all_handled)
+            desc_lower = boost::locale::to_lower(detailed_description, GetLocale("en_US.UTF-8"));
+
         if (boost::contains(desc_lower, search_text)) {
             article_match = std::move(article_name_link);
             return;
@@ -3583,15 +4079,18 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
     boost::asio::thread_pool thread_pool(num_threads);
 
     // search lists of articles for typed text
-    auto search_text = boost::algorithm::to_lower_copy(m_search_edit->Text());
+    auto search_text = m_search_edit->Text();
     if (search_text.empty())
         return;
+    auto all_handled = CustomToLower(search_text.begin(), search_text.end());
+    if (!all_handled)
+        search_text = boost::locale::to_lower(m_search_edit->Text(), GetLocale("en_US.UTF-8"));
+
 
     // find distinct words in search text
-    std::set<std::string> words_in_search_text = ExtractWords(search_text);
+    auto words_in_search_text = ExtractWords(search_text);
     if (words_in_search_text.empty())
         return;
-
 
     // search through all articles for full or partial matches to search query
     timer.EnterSection("get subdirs");
@@ -3613,6 +4112,20 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
     // assemble link text to all pedia entries, indexed by name
     std::size_t idx = -1;
     for (auto& [article_key_directory, article_name_link] : pedia_entries) {
+        if (!utf8::is_valid(article_key_directory.first.begin(), article_key_directory.first.end())) {
+            ErrorLogger() << "Invalid key UTF8: " << article_key_directory.first
+                          << "  name: " << article_name_link.first
+                          << "  dir: " << article_key_directory.second;
+            continue;
+        }
+        if (!utf8::is_valid(article_name_link.first.begin(), article_name_link.first.end())) {
+            ErrorLogger() << "Invalid name UTF8: " << article_name_link.first
+                          << "  key: " << article_key_directory.first
+                          << "  dir: " << article_key_directory.second;
+            continue;
+        }
+
+
         idx++;
         auto& emr{exact_match_report[idx]};
         auto& wmr{word_match_report[idx]};
@@ -3688,7 +4201,7 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
     auto duration = timer.Elapsed();
     auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
     match_report += "\n\n" + boost::io::str(FlexibleFormat(UserString("ENC_SEARCH_TOOK"))
-                                            % search_text % (std::to_string(duration_ms) + " ms"));
+                                            % search_text % (ToChars(duration_ms) + " ms"));
 
     AddItem(TEXT_SEARCH_RESULTS, std::move(match_report));
 }
@@ -3877,17 +4390,13 @@ void EncyclopediaDetailPanel::SetText(const std::string& text, bool lookup_in_st
 }
 
 void EncyclopediaDetailPanel::SetPlanet(int planet_id) {
-    int current_item_id = INVALID_OBJECT_ID;
-    if (m_items_it != m_items.end() && m_items_it->first == PLANET_SUITABILITY_REPORT) {
-        try {
-            current_item_id = boost::lexical_cast<int>(m_items_it->second);
-        } catch (...) {
-        }
-    }
+    int current_item_id =
+        (m_items_it != m_items.end() && m_items_it->first == PLANET_SUITABILITY_REPORT) ?
+            ToInt(m_items_it->second, INVALID_OBJECT_ID) : INVALID_OBJECT_ID;
     if (planet_id == current_item_id)
         return;
 
-    AddItem(PLANET_SUITABILITY_REPORT, std::to_string(planet_id));
+    AddItem(PLANET_SUITABILITY_REPORT, ToChars(planet_id));
 }
 
 void EncyclopediaDetailPanel::SetTech(const std::string& tech_name) {
@@ -3944,16 +4453,10 @@ void EncyclopediaDetailPanel::SetMeterType(std::string meter_string) {
 }
 
 void EncyclopediaDetailPanel::SetObject(int object_id) {
-    int current_item_id = INVALID_OBJECT_ID;
-    if (m_items_it != m_items.end()) {
-        try {
-            current_item_id = boost::lexical_cast<int>(m_items_it->second);
-        } catch (...) {
-        }
-    }
+    int current_item_id = ToInt(m_items_it->second, INVALID_OBJECT_ID);
     if (object_id == current_item_id)
         return;
-    AddItem(UNIVERSE_OBJECT, std::to_string(object_id));
+    AddItem(UNIVERSE_OBJECT, ToChars(object_id));
 }
 
 void EncyclopediaDetailPanel::SetObject(const std::string& object_id) {
@@ -3963,16 +4466,10 @@ void EncyclopediaDetailPanel::SetObject(const std::string& object_id) {
 }
 
 void EncyclopediaDetailPanel::SetEmpire(int empire_id) {
-    int current_item_id = ALL_EMPIRES;
-    if (m_items_it != m_items.end()) {
-        try {
-            current_item_id = boost::lexical_cast<int>(m_items_it->second);
-        } catch (...) {
-        }
-    }
+    int current_item_id = ToInt(m_items_it->second, ALL_EMPIRES);
     if (empire_id == current_item_id)
         return;
-    AddItem("ENC_EMPIRE", std::to_string(empire_id));
+    AddItem("ENC_EMPIRE", ToChars(empire_id));
 }
 
 void EncyclopediaDetailPanel::SetEmpire(const std::string& empire_id) {
@@ -3982,16 +4479,11 @@ void EncyclopediaDetailPanel::SetEmpire(const std::string& empire_id) {
 }
 
 void EncyclopediaDetailPanel::SetDesign(int design_id) {
-    int current_item_id = INVALID_DESIGN_ID;
-    if (m_items_it != m_items.end() && m_items_it->first == "ENC_SHIP_DESIGN") {
-        try {
-            current_item_id = boost::lexical_cast<int>(m_items_it->second);
-        } catch (...) {
-        }
-    }
+    int current_item_id = (m_items_it->first == "ENC_SHIP_DESIGN") ?
+        ToInt(m_items_it->second, INVALID_DESIGN_ID) : INVALID_DESIGN_ID;
     if (design_id == current_item_id)
         return;
-    AddItem("ENC_SHIP_DESIGN", std::to_string(design_id));
+    AddItem("ENC_SHIP_DESIGN", ToChars(design_id));
 }
 
 void EncyclopediaDetailPanel::SetDesign(const std::string& design_id) {

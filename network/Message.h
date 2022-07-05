@@ -186,10 +186,10 @@ FO_COMMON_API Message ErrorMessage(const std::string& problem, bool fatal = true
                                    int player_id = Networking::INVALID_PLAYER_ID);
 
 /** creates a HOST_SP_GAME message*/
-FO_COMMON_API Message HostSPGameMessage(const SinglePlayerSetupData& setup_data);
+FO_COMMON_API Message HostSPGameMessage(const SinglePlayerSetupData& setup_data, const std::map<std::string, std::string>& dependencies);
 
 /** creates a minimal HOST_MP_GAME message used to initiate multiplayer "lobby" setup*/
-FO_COMMON_API Message HostMPGameMessage(const std::string& host_player_name);
+FO_COMMON_API Message HostMPGameMessage(const std::string& host_player_name, const std::map<std::string, std::string>& dependencies);
 
 /** creates a JOIN_GAME message.  The sender's player name, client type, and
   * cookie are sent in the message.*/
@@ -207,7 +207,8 @@ FO_COMMON_API Message GameStartMessage(
     const EmpireManager& empires, const Universe& universe,
     const SpeciesManager& species, CombatLogManager& combat_logs,
     const SupplyManager& supply, const std::map<int, PlayerInfo>& players,
-    GalaxySetupData galaxy_setup_data, bool use_binary_serialization);
+    GalaxySetupData galaxy_setup_data, bool use_binary_serialization,
+    bool use_compression);
 
 /** creates a GAME_START message.  Contains the initial game state visible to
   * the player.  Also includes data loaded from a saved game. */
@@ -217,7 +218,8 @@ FO_COMMON_API Message GameStartMessage(
     const SpeciesManager& species, CombatLogManager& combat_logs,
     const SupplyManager& supply, const std::map<int, PlayerInfo>& players,
     const OrderSet& orders, const SaveGameUIData* ui_data,
-    GalaxySetupData galaxy_setup_data, bool use_binary_serialization);
+    GalaxySetupData galaxy_setup_data, bool use_binary_serialization,
+    bool use_compression);
 
 /** creates a GAME_START message.  Contains the initial game state visible to
   * the player.  Also includes state string loaded from a saved game. */
@@ -227,7 +229,8 @@ FO_COMMON_API Message GameStartMessage(
     const SpeciesManager& species, CombatLogManager& combat_logs,
     const SupplyManager& supply, const std::map<int, PlayerInfo>& players,
     const OrderSet& orders, const std::string* save_state_string,
-    GalaxySetupData galaxy_setup_data, bool use_binary_serialization);
+    GalaxySetupData galaxy_setup_data, bool use_binary_serialization,
+    bool use_compression);
 
 /** creates a HOST_SP_GAME acknowledgement message.  The \a player_id is the ID
   * of the receiving player.  This message should only be sent by the server.*/
@@ -266,11 +269,13 @@ FO_COMMON_API Message TurnUpdateMessage(int empire_id, int current_turn,
                                         const EmpireManager& empires, const Universe& universe,
                                         const SpeciesManager& species, CombatLogManager& combat_logs,
                                         const SupplyManager& supply,
-                                        const std::map<int, PlayerInfo>& players, bool use_binary_serialization);
+                                        const std::map<int, PlayerInfo>& players, bool use_binary_serialization,
+                                        bool use_compression);
 
 /** create a TURN_PARTIAL_UPDATE message. */
 FO_COMMON_API Message TurnPartialUpdateMessage(int empire_id, const Universe& universe,
-                                               bool use_binary_serialization);
+                                               bool use_binary_serialization,
+                                               bool use_compression);
 
 /** creates a SAVE_GAME_INITIATE request message.  This message should only be sent by
   * the host player.*/
@@ -312,7 +317,7 @@ FO_COMMON_API Message RequestCombatLogsMessage(const std::vector<int>& ids);
 
 /** returns combat logs to the client */
 FO_COMMON_API Message DispatchCombatLogsMessage(const std::vector<std::pair<int, const CombatLog>>& logs,
-                                                bool use_binary_serialization);
+                                                bool use_binary_serialization, bool use_compression);
 
 /** Sends logger configuration details to server or ai process. */
 FO_COMMON_API Message LoggerConfigMessage(int sender, const std::set<std::tuple<std::string, std::string, LogLevel>>& options);
@@ -332,7 +337,8 @@ FO_COMMON_API Message ServerLobbyUpdateMessage(const MultiplayerLobbyData& lobby
 
 /** creates an CHAT_HISTORY message containing latest chat messages.
     This message should only be sent by the server.*/
-FO_COMMON_API Message ChatHistoryMessage(const std::vector<std::reference_wrapper<const ChatHistoryEntity>>& chat_history);
+FO_COMMON_API Message ChatHistoryMessage(const std::vector<std::reference_wrapper<const ChatHistoryEntity>>& chat_history,
+                                         bool use_compression);
 
 /** creates an PLAYER_CHAT message containing a chat string to be broadcast to player \a receiver, or all players if \a
     receiver is Networking::INVALID_PLAYER_ID. Note that the receiver of this message is always the server.*/
@@ -378,7 +384,7 @@ FO_COMMON_API Message AutoTurnMessage(int turns_count);
 FO_COMMON_API void ExtractErrorMessageData(const Message& msg, int& player_id, std::string& problem, bool& fatal);
 
 FO_COMMON_API void ExtractHostMPGameMessageData(const Message& msg, std::string& host_player_name,
-                                                std::string& client_version_string);
+                                                std::string& client_version_string, std::map<std::string, std::string>& dependencies);
 
 FO_COMMON_API void ExtractLobbyUpdateMessageData(const Message& msg, MultiplayerLobbyData& lobby_data);
 
@@ -439,7 +445,7 @@ FO_COMMON_API void ExtractPlayerStatusMessageData(const Message& msg,
                                                   Message::PlayerStatus& status,
                                                   int& about_empire_id);
 
-FO_COMMON_API void ExtractHostSPGameMessageData(const Message& msg, SinglePlayerSetupData& setup_data, std::string& client_version_string);
+FO_COMMON_API void ExtractHostSPGameMessageData(const Message& msg, SinglePlayerSetupData& setup_data, std::string& client_version_string, std::map<std::string, std::string>& dependencies);
 
 FO_COMMON_API void ExtractEndGameMessageData(const Message& msg, Message::EndGameReason& reason, std::string& reason_player_name);
 

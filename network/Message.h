@@ -134,6 +134,7 @@ public:
         (Message, EndGameReason),
         ((LOCAL_CLIENT_DISCONNECT)) ///< the local player's client networking detected a disconnection from the server
         ((PLAYER_DISCONNECT))       ///< an active player (not an observer) was disconnected
+        ((UNKNOWN))                 ///< unable to determine reason for end game
     )
 
     Message() = default;
@@ -449,7 +450,7 @@ FO_COMMON_API void ExtractHostSPGameMessageData(const Message& msg, SinglePlayer
 
 FO_COMMON_API void ExtractEndGameMessageData(const Message& msg, Message::EndGameReason& reason, std::string& reason_player_name);
 
-FO_COMMON_API void ExtractModeratorActionMessageData(const Message& msg, Moderator::ModeratorAction*& action);
+FO_COMMON_API void ExtractModeratorActionMessageData(const Message& msg, std::unique_ptr<Moderator::ModeratorAction>& action);
 
 FO_COMMON_API void ExtractDiplomacyMessageData(const Message& msg, DiplomaticMessage& diplo_message);
 

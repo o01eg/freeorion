@@ -38,14 +38,13 @@ namespace {
     }
 
     /** Return \p full_route terminates at \p last_system or before the first
-        system not known to the \p empire_id. */
+      * system not known to the \p empire_id. If \a last_system is INVALID_OBJECT_ID,
+      * returns an empty route. */
     std::vector<int> TruncateRouteToEndAtSystem(const std::vector<int>& full_route,
                                                 const ObjectMap& objects, int last_system)
     {
-        std::vector<int> truncated_route;
-
         if (full_route.empty() || (last_system == INVALID_OBJECT_ID))
-            return truncated_route;
+            return {};
 
         auto visible_end_it = full_route.cend();
         if (last_system != full_route.back()) {
@@ -53,22 +52,24 @@ namespace {
 
             // if requested last system not in route, do nothing
             if (visible_end_it == full_route.end())
-                return truncated_route;
+                return {};
 
             ++visible_end_it;
         }
 
         // Remove any extra systems from the route after the apparent destination.
-        // SystemHasNoVisibleStarlanes determines if empire_id knows about the
-        // system and/or its starlanes.  It is enforced on the server in the
-        // visibility calculations that an owning empire knows about a) the
-        // system containing a fleet, b) the starlane on which a fleet is travelling
-        // and c) both systems terminating a starlane on which a fleet is travelling.
+        // SystemHasNoVisibleStarlanes checks in objects, which is the known universe
+        // on clients or full universe on the server.
+        //
+        // It is enforced on the server, in the visibility calculations, that an
+        // owning empire knows about:
+        // a) the system containing a fleet
+        // b) the starlane on which a fleet is travelling
+        // c) both systems terminating a starlane on which a fleet is travelling.
         auto end_it = std::find_if(full_route.begin(), visible_end_it,
-                                   boost::bind(&SystemHasNoVisibleStarlanes, boost::placeholders::_1, std::ref(objects)));
+                                   [&objects](int id) { return SystemHasNoVisibleStarlanes(id, objects); });
 
-        std::copy(full_route.begin(), end_it, std::back_inserter(truncated_route));
-        return truncated_route;
+        return {full_route.begin(), end_it};
     }
 }
 
@@ -733,11 +734,20 @@ std::shared_ptr<UniverseObject> Fleet::Accept(const UniverseObjectVisitor& visit
 { return visitor.Visit(std::const_pointer_cast<Fleet>(std::static_pointer_cast<const Fleet>(shared_from_this()))); }
 
 void Fleet::SetRoute(const std::vector<int>& route, const ObjectMap& objects) {
-    if (UnknownRoute())
-        throw std::invalid_argument("Fleet::SetRoute() : Attempted to set an unknown route.");
-
-    if (m_prev_system != SystemID() && m_prev_system == route.front() && !CanChangeDirectionEnRoute())
-        throw std::invalid_argument("Fleet::SetRoute() : Illegally attempted to change a fleet's direction while it was in transit.");
+    if (route.empty()) {
+        if (SystemID() == INVALID_OBJECT_ID) {
+            ErrorLogger() << "Fleet::SetRoute() : Attempted to change fleet " << this->Name()
+                          << " (" << this->ID() << ") route to empty while not in a system.";
+            return;
+        }
+    } else if (m_prev_system != SystemID() &&
+               m_prev_system == route.front() &&
+               !CanChangeDirectionEnRoute())
+    {
+        ErrorLogger() << "Fleet::SetRoute() : Illegally attempted to change fleet " << this->Name()
+                      << " (" << this->ID() << ") direction while in transit.";
+        return;
+    }
 
     m_travel_route = route;
 

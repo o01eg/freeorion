@@ -321,31 +321,37 @@ namespace FreeOrionPython {
                 +[](const std::string& name) -> bool { return GetValueRef<int>(name, true); },
                 "Returns true/false (boolean) whether there is a defined int-valued "
                 "scripted constant with name (string).");
-        py::def("getNamedValue",
-                +[](const std::string& name) -> py::object {
-                    auto eval = [](auto&& ref) -> py::object {
+        py::def("getNamedReal",
+                +[](const std::string& name) -> double {
+                    if (const auto ref = GetValueRef<double>(name, true)) {
                         if (ref->ConstantExpr()) 
-                            return py::object(ref->Eval());
+                            return ref->Eval();
                         const ScriptingContext context;
-                        return py::object(ref->Eval(context));
-                    };
-
-                    if (const auto ref = GetValueRef<double>(name, true))
-                        return eval(ref);
-                    else if (const auto ref = GetValueRef<int>(name, true))
-                        return eval(ref);
-                    else
-                        return py::object();
+                        return ref->Eval(context);
+                    }
+                    return 0.0;
                 },
-                "Returns the named value of the scripted constant with name (string). "
-                "If no such named constant exists, returns none.");
+                "Returns the named real value of the scripted constant with name (string). "
+                "If no such named constant exists, returns 0.0.");
+        py::def("getNamedInt",
+                +[](const std::string& name) -> int {
+                    if (const auto ref = GetValueRef<int>(name, true)) {
+                        if (ref->ConstantExpr())
+                            return ref->Eval();
+                        const ScriptingContext context;
+                        return ref->Eval(context);
+                    }
+                    return 0;
+                },
+                "Returns the named integer value of the scripted constant with name (string). "
+                "If no such named constant exists, returns 0.");
 
         ///////////////
         //   Meter   //
         ///////////////
         py::class_<Meter, boost::noncopyable>("meter", py::no_init)
-            .add_property("current",            &Meter::cur)
-            .add_property("initial",            &Meter::init)
+            .add_property("current",            +[](const Meter& m) -> float { return m.Current(); })
+            .add_property("initial",            +[](const Meter& m) -> float { return m.Initial(); })
             .def("dump",                        +[](const Meter& m) -> std::string { return m.Dump(0).data(); },
                                                 py::return_value_policy<py::return_by_value>(),
                                                 "Returns string with debug information.")

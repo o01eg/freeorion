@@ -994,11 +994,13 @@ void GGHumanClientApp::RenderBegin() {
 }
 
 void GGHumanClientApp::HandleMessage(Message&& msg) {
+    auto msg_type = msg.Type();
+
     if (INSTRUMENT_MESSAGE_HANDLING)
-        std::cerr << "GGHumanClientApp::HandleMessage(" << msg.Type() << ")\n";
+        std::cerr << "GGHumanClientApp::HandleMessage(" << msg_type << ")\n";
 
     try {
-        switch (msg.Type()) {
+        switch (msg_type) {
         case Message::MessageType::ERROR_MSG:               m_fsm->process_event(Error(msg));                   break;
         case Message::MessageType::HOST_MP_GAME:            m_fsm->process_event(HostMPGame(msg));              break;
         case Message::MessageType::HOST_SP_GAME:            m_fsm->process_event(HostSPGame(msg));              break;
@@ -1026,11 +1028,11 @@ void GGHumanClientApp::HandleMessage(Message&& msg) {
         case Message::MessageType::TURN_TIMEOUT:            m_fsm->process_event(TurnTimeout(msg));             break;
         case Message::MessageType::PLAYER_INFO:             m_fsm->process_event(PlayerInfoMsg(msg));           break;
         default:
-            ErrorLogger() << "GGHumanClientApp::HandleMessage : Received an unknown message type \"" << msg.Type() << "\".";
+            ErrorLogger() << "GGHumanClientApp::HandleMessage : Received an unknown message type \"" << msg_type << "\".";
         }
     } catch (const std::exception& e) {
         ErrorLogger() << "GGHumanClientApp::HandleMessage : Exception while reacting to message of type \""
-                      << msg.Type() << "\". what: " << e.what();
+                      << msg_type << "\". what: " << e.what();
     }
 }
 
@@ -1038,12 +1040,14 @@ void GGHumanClientApp::UpdateCombatLogs(const Message& msg) {
     ScopedTimer timer("GGHumanClientApp::UpdateCombatLogs");
 
     // Unpack the combat logs from the message
-    std::vector<std::pair<int, CombatLog>> logs;
-    ExtractDispatchCombatLogsMessageData(msg, logs);
+    try {
+        std::vector<std::pair<int, CombatLog>> logs;
+        ExtractDispatchCombatLogsMessageData(msg, logs);
 
-    // Update the combat log manager with the completed logs.
-    for (auto it = logs.begin(); it != logs.end(); ++it)
-        GetCombatLogManager().CompleteLog(it->first, it->second);
+        // Update the combat log manager with the completed logs.
+        for (auto it = logs.begin(); it != logs.end(); ++it)
+            GetCombatLogManager().CompleteLog(it->first, it->second);
+    } catch (...) {}
 }
 
 void GGHumanClientApp::HandleSaveGamePreviews(const Message& msg) {
@@ -1051,16 +1055,20 @@ void GGHumanClientApp::HandleSaveGamePreviews(const Message& msg) {
     if (!sfd)
         return;
 
-    PreviewInformation previews;
-    ExtractDispatchSavePreviewsMessageData(msg, previews);
-    DebugLogger() << "GGHumanClientApp::RequestSavePreviews Got " << previews.previews.size() << " previews.";
+    try {
+        PreviewInformation previews;
+        ExtractDispatchSavePreviewsMessageData(msg, previews);
+        DebugLogger() << "GGHumanClientApp::RequestSavePreviews Got " << previews.previews.size() << " previews.";
 
-    sfd->SetPreviewList(std::move(previews));
+        sfd->SetPreviewList(std::move(previews));
+    } catch (...) {}
 }
 
 void GGHumanClientApp::HandleSetAuthRoles(const Message& msg) {
-    ExtractSetAuthorizationRolesMessage(msg, m_networking->AuthorizationRoles());
-    DebugLogger() << "New roles: " << m_networking->AuthorizationRoles().Text();
+    try {
+        ExtractSetAuthorizationRolesMessage(msg, m_networking->AuthorizationRoles());
+        DebugLogger() << "New roles: " << m_networking->AuthorizationRoles().Text();
+    } catch (...) {}
 }
 
 void GGHumanClientApp::ChangeLoggerThreshold(const std::string& option_name, LogLevel option_value) {

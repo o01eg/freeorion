@@ -3,9 +3,9 @@ from typing import Dict, Tuple
 
 import AIDependencies
 import PolicyAI
-from buildings import BuildingType
+from buildings import BuildingType, iterate_buildings_types
 from colonization.colony_score import debug_rating
-from freeorion_tools import get_species_tag_value
+from freeorion_tools import get_named_real, get_species_stability
 from freeorion_tools.caching import cache_for_current_turn
 from PlanetUtilsAI import dislike_factor
 from turn_state import get_colonized_planets, have_worldtree
@@ -19,7 +19,7 @@ def calculate_stability(planet: fo.planet, species: fo.species) -> float:
     Supply-connection to nearest regional admin still TBD.
     """
     baseline = fo.getGameRules().getDouble("RULE_BASELINE_PLANET_STABILITY")
-    species_mod = get_species_tag_value(species.name, AIDependencies.Tags.STABILITY)
+    species_mod = get_species_stability(species.name)
     home_bonus = AIDependencies.STABILITY_HOMEWORLD_BONUS if planet.id in species.homeworlds else 0.0
     policies = _evaluate_policies(species)
     specials = _evaluate_specials(planet, species)
@@ -44,7 +44,7 @@ def _evaluate_policies(species: fo.species) -> float:
     result = sum(like_value for p in empire.adoptedPolicies if p in species.likes)
     result -= sum(dislike_value for p in empire.adoptedPolicies if p in species.dislikes)
     if PolicyAI.bureaucracy in empire.adoptedPolicies:
-        result += fo.getNamedValue("PLC_BUREAUCRACY_STABILITY_FLAT")
+        result += get_named_real("PLC_BUREAUCRACY_STABILITY_FLAT")
     # TBD: add conformance, indoctrination, etc. when the AI learns to use them
     return result
 
@@ -82,7 +82,7 @@ def _count_building(planet: fo.planet) -> Dict[str, Tuple[int, int, int]]:
     system_pids = set(pid for pid in system.planetIDs if pid != planet.id)
     # TODO: add all buildings to BuildingType, so we get them all here
     result = {}
-    for building_type in BuildingType:
+    for building_type in iterate_buildings_types():
         # So far we only consider conquering / settling this planet. By the time we have it,
         # queued buildings are likely finished as well, so we consider them here already.
         all_pids = building_type.built_or_queued_at()
@@ -119,7 +119,7 @@ def _evaluate_xenophobia(planet, species) -> float:
     relevant_systems = within_n_jumps(planet.systemID, 5) & set(colonies.keys())
     result = 0.0
     universe = fo.getUniverse()
-    value = fo.getNamedValue("XENOPHOBIC_SELF_TARGET_HAPPINESS_COUNT")
+    value = get_named_real("XENOPHOBIC_SELF_TARGET_HAPPINESS_COUNT")
     for sys_id in relevant_systems:
         for pid in colonies[sys_id]:
             planet_species = universe.getPlanet(pid).speciesName
@@ -134,7 +134,7 @@ def _evaluate_administration(planet: fo.planet, species: fo.species) -> float:
     universe = fo.getUniverse()
     if AIDependencies.Tags.INDEPENDENT not in species.tags:
         admin_systems = BuildingType.REGIONAL_ADMIN.built_or_queued_at_sys() | palace.built_or_queued_at_sys()
-        jumps_to_admin = min(universe.jumpDistance(planet.systemID, admin) for admin in admin_systems)
+        jumps_to_admin = min((universe.jumpDistance(planet.systemID, admin) for admin in admin_systems), default=99)
         # cap at 5, if it is 6 or more, we could build a Regional Admin on this planet
         # TODO: check if the planet would be supply-connected to the nearest administration
         # disconnected gives namedReal("DISCONNECTED_FROM_CAPITAL_AND_REGIONAL_ADMIN_STABILITY_PENALTY")

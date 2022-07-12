@@ -325,27 +325,57 @@ def get_species_tag_grade(species_name: str, tag_type: AIDependencies.Tags) -> s
 
 
 @cache_for_session
-def get_species_tag_value(species_name: str, tag_type: AIDependencies.Tags) -> float:
-    """Get a numeric value for a skill-like (GOOD, BAD...) Tag."""
-    grade = get_species_tag_grade(species_name, tag_type)
-    if tag_type == AIDependencies.Tags.INDUSTRY:
-        return AIDependencies.SPECIES_INDUSTRY_MODIFIER.get(grade, 1.0)
-    if tag_type == AIDependencies.Tags.RESEARCH:
-        return AIDependencies.SPECIES_RESEARCH_MODIFIER.get(grade, 1.0)
-    if tag_type == AIDependencies.Tags.INFLUENCE:
-        return AIDependencies.SPECIES_INFLUENCE_MODIFIER.get(grade, 1.0)
-    if tag_type == AIDependencies.Tags.POPULATION:
-        return AIDependencies.SPECIES_POPULATION_MODIFIER.get(grade, 1.0)
-    if tag_type == AIDependencies.Tags.SUPPLY:
-        return AIDependencies.SPECIES_SUPPLY_MODIFIER.get(grade, 1.0)
-    if tag_type == AIDependencies.Tags.STABILITY:
-        return AIDependencies.SPECIES_STABILITY_MODIFIER.get(grade, 0.0)
-    if tag_type == AIDependencies.Tags.FUEL:
-        return AIDependencies.SPECIES_FUEL_MODIFIER.get(grade, 0.0)
-    if tag_type == AIDependencies.Tags.ATTACKTROOPS:
-        return AIDependencies.SPECIES_TROOP_MODIFIER.get(grade, 1.0)
-    if tag_type == AIDependencies.Tags.STEALTH:
-        return AIDependencies.STEALTH_STRENGTHS_BY_SPECIES_TAG.get(grade, 0.0)
+def get_species_stealth(species_name: str) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.STEALTH)
+    return AIDependencies.STEALTH_STRENGTHS_BY_SPECIES_TAG.get(grade, 0.0)
+
+
+@cache_for_session
+def get_species_attack_troops(species_name: str) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.ATTACKTROOPS)
+    return AIDependencies.SPECIES_TROOP_MODIFIER.get(grade, 1.0)
+
+
+@cache_for_session
+def get_species_fuel(species_name: str) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.FUEL)
+    return AIDependencies.SPECIES_FUEL_MODIFIER.get(grade, 0.0)
+
+
+@cache_for_session
+def get_species_stability(species_name: str) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.STABILITY)
+    return AIDependencies.SPECIES_STABILITY_MODIFIER.get(grade, 0.0)
+
+
+@cache_for_session
+def get_species_supply(species_name: str) -> int:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.SUPPLY)
+    return int(AIDependencies.SPECIES_SUPPLY_MODIFIER.get(grade, 1))
+
+
+@cache_for_session
+def get_species_population(species_name: str) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.POPULATION)
+    return AIDependencies.SPECIES_POPULATION_MODIFIER.get(grade, 1.0)
+
+
+@cache_for_session
+def get_species_influence(species_name: str) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.INFLUENCE)
+    return AIDependencies.SPECIES_INFLUENCE_MODIFIER.get(grade, 1.0)
+
+
+@cache_for_session
+def get_species_research(species_name: str) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.RESEARCH)
+    return AIDependencies.SPECIES_RESEARCH_MODIFIER.get(grade, 1.0)
+
+
+@cache_for_session
+def get_species_industry(species_name: str) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.INDUSTRY)
+    return AIDependencies.SPECIES_INDUSTRY_MODIFIER.get(grade, 1.0)
 
 
 @cache_for_session
@@ -371,14 +401,10 @@ def get_named_int(name: str) -> int:
     Note that we do not raise and exception so that the AI can continue, as good as it can, with outdated information.
     This is also why we return 1, returning 0 could cause followup errors if the value is used as divisor.
     """
-    value = fo.getNamedValue(name)
-    if value is None:
-        error(f"Requested NamedInt {name}, which doesn't exist!")
-        value = 1
-    elif not isinstance(value, int):
-        error(f"Requested value {name} of type int got {type(value)}!")
-        value = 1
-    return value
+    if fo.namedIntDefined(name):
+        return fo.getNamedInt(name)
+    error(f"Requested integer {name} does not exist!")
+    return 1
 
 
 def get_named_real(name: str) -> float:
@@ -388,11 +414,7 @@ def get_named_real(name: str) -> float:
     Note that we do not raise and exception so that the AI can continue, as good as it can, with outdated information.
     This is also why we return 1, returning 0 could cause followup errors if the value is used as divisor.
     """
-    value = fo.getNamedValue(name)
-    if value is None:
-        error(f"Requested NamedReal {name}, which doesn't exist!")
-        value = 1.0
-    elif not isinstance(value, float):
-        error(f"Requested value {name} of type float got {type(value)}!")
-        value = 1.0
-    return value
+    if fo.namedRealDefined(name):
+        return fo.getNamedReal(name)
+    error(f"Requested integer {name} does not exist!")
+    return 1.0

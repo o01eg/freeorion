@@ -3,7 +3,7 @@ from common.base_prod import TECH_COST_MULTIPLIER
 Tech(
     name="LRN_PSIONICS",
     description="LRN_PSIONICS_DESC",
-    short_description="THEORY_SHORT_DESC",
+    short_description="POLICY_UNLOCK_SHORT_DESC",
     category="LEARNING_CATEGORY",
     researchcost=300 * TECH_COST_MULTIPLIER
     - (
@@ -21,8 +21,8 @@ Tech(
     tags=["PEDIA_LEARNING_CATEGORY", "THEORY"],
     prerequisites="LRN_TRANSLING_THT",
     unlock=[
-        Item(type=Policy, name="PLC_INDOCTRINATION"),
-        Item(type=Policy, name="PLC_CONFORMANCE"),
+        Item(type=UnlockPolicy, name="PLC_INDOCTRINATION"),
+        Item(type=UnlockPolicy, name="PLC_CONFORMANCE"),
     ],
     graphic="icons/tech/psionics.png",
 )

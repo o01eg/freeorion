@@ -3,7 +3,7 @@ from common.base_prod import TECH_COST_MULTIPLIER
 Tech(
     name="CON_TRANS_ARCH",
     description="CON_TRANS_ARCH_DESC",
-    short_description="BUILDING_UNLOCK_SHORT_DESC",
+    short_description="VARIOUS_UNLOCK_SHORT_DESC",
     category="CONSTRUCTION_CATEGORY",
     researchcost=1000 * TECH_COST_MULTIPLIER,
     researchturns=10,
@@ -13,8 +13,8 @@ Tech(
         "CON_NDIM_STRC",
     ],
     unlock=[
-        Item(type=Building, name="BLD_MEGALITH"),
-        Item(type=Policy, name="PLC_DIVINE_AUTHORITY"),
+        Item(type=UnlockBuilding, name="BLD_MEGALITH"),
+        Item(type=UnlockPolicy, name="PLC_DIVINE_AUTHORITY"),
     ],
     effectsgroups=EffectsGroup(
         scope=Source,

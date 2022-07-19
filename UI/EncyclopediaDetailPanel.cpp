@@ -478,9 +478,9 @@ namespace {
 
                 // occupied planets
                 std::vector<const Planet*> species_occupied_planets;
-                for (const auto& planet : objects.all<Planet>()) {
+                for (const auto& planet : objects.allRaw<Planet>()) {
                     if ((planet->SpeciesName() == entry.first) && !known_homeworlds.count(planet->ID()))
-                        species_occupied_planets.emplace_back(planet.get());
+                        species_occupied_planets.push_back(planet);
                 }
                 if (!species_occupied_planets.empty()) {
                     if (species_occupied_planets.size() >= 5) {
@@ -583,7 +583,7 @@ namespace {
 
         }
         else if (dir_name == "ENC_SHIP") {
-            for (auto& ship : objects.all<Ship>()) {
+            for (auto* ship : objects.allRaw<Ship>()) {
                 auto& ship_name = ship->PublicName(client_empire_id, universe);
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(ship_name),
@@ -593,7 +593,7 @@ namespace {
 
         }
         else if (dir_name == "ENC_MONSTER") {
-            for (auto& ship : objects.all<Ship>()) {
+            for (auto* ship : objects.allRaw<Ship>()) {
                 if (!ship->IsMonster(universe))
                     continue;
                 auto& ship_name = ship->PublicName(client_empire_id, universe);
@@ -616,7 +616,7 @@ namespace {
 
         }
         else if (dir_name == "ENC_FLEET") {
-            for (auto& fleet : objects.all<Fleet>()) {
+            for (auto* fleet : objects.allRaw<Fleet>()) {
                 auto& flt_name = fleet->PublicName(client_empire_id, universe);
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(flt_name),
@@ -626,7 +626,7 @@ namespace {
 
         }
         else if (dir_name == "ENC_PLANET") {
-            for (auto& planet : objects.all<Planet>()) {
+            for (auto* planet : objects.allRaw<Planet>()) {
                 auto& plt_name = planet->PublicName(client_empire_id, universe);
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(plt_name),
@@ -636,7 +636,7 @@ namespace {
 
         }
         else if (dir_name == "ENC_BUILDING") {
-            for (auto& building : objects.all<Building>()) {
+            for (auto* building : objects.allRaw<Building>()) {
                 auto& bld_name = building->PublicName(client_empire_id, universe);
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(bld_name),
@@ -646,7 +646,7 @@ namespace {
 
         }
         else if (dir_name == "ENC_SYSTEM") {
-            for (auto& system : objects.all<System>()) {
+            for (auto* system : objects.allRaw<System>()) {
                 auto sys_name = system->ApparentName(client_empire_id, universe);
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(sys_name),
@@ -656,7 +656,7 @@ namespace {
 
         }
         else if (dir_name == "ENC_FIELD") {
-            for (auto& field : objects.all<Field>()) {
+            for (auto* field : objects.allRaw<Field>()) {
                 const std::string& field_name = field->Name();
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(field_name),
@@ -1350,12 +1350,12 @@ namespace {
             return INVALID_OBJECT_ID;
         }
         // get a location where the empire might build something.
-        auto location = Objects().get(empire->CapitalID());
+        const UniverseObject* location = Objects().getRaw(empire->CapitalID());
         // no capital?  scan through all objects to find one owned by this empire
         // TODO: only loop over planets?
         // TODO: pass in a location condition, and pick a location that matches it if possible
         if (!location) {
-            for (const auto& obj : Objects().all()) {
+            for (const auto* obj : Objects().allRaw()) {
                 if (obj->OwnedBy(empire_id)) {
                     location = obj;
                     break;
@@ -2862,7 +2862,7 @@ namespace {
                 }
             }
         } else if (fleet_manager.ActiveFleetWnd()) {
-            for (const auto& fleet : objects.find<Fleet>(fleet_manager.ActiveFleetWnd()->SelectedFleetIDs())) {
+            for (const auto& fleet : objects.findRaw<Fleet>(fleet_manager.ActiveFleetWnd()->SelectedFleetIDs())) {
                 if (!fleet)
                     continue;
                 chosen_ships.insert(fleet->ShipIDs().begin(), fleet->ShipIDs().end());
@@ -3738,10 +3738,31 @@ namespace {
         static constexpr uint8_t omicron_with_tonos_byte1 = 0x8C; // ό
         static constexpr uint8_t omega_with_tonos_byte1 = 0x8E; // ώ
 
-        // note: alternate mu encoding covered by full page 0xC2 case
-        static constexpr auto mu = u8"\u00B5"; // µ
-        static_assert(mu[0] == u8"µ"[0]);
-        static_assert(mu[1] == u8"µ"[1]);
+        // note: alternate mu/micro encoding covered by full page 0xC2 case
+        static constexpr auto micro = u8"\u00B5"; // µ (micro)
+        static constexpr uint8_t microb0 = micro[0];
+        static constexpr uint8_t microb1 = micro[1];
+        static_assert(microb0 == 0xC2);
+        static_assert(microb1 == 0xB5);
+
+        static constexpr auto micro2 = u8"µ";
+        static constexpr uint8_t micro2b0 = micro2[0];
+        static constexpr uint8_t micro2b1 = micro2[1];
+        static_assert(microb0 == 0xC2);
+        static_assert(microb1 == 0xB5);
+
+        static constexpr auto mu = u8"\u03BC"; // μ (lower case mu)
+        static constexpr uint8_t mub0 = mu[0];
+        static constexpr uint8_t mub1 = mu[1];
+        static_assert(mub0 == 0xCE);
+        static_assert(mub1 == 0xBC);
+
+        // following tests fail on MSVC x64
+        static constexpr auto mu2 = u8"μ";
+        static constexpr uint8_t mu2b0 = mu2[0];
+        static constexpr uint8_t mu2b1 = mu2[1];
+        //static_assert(mu2b0 == 0xCE);
+        //static_assert(mu2b1 == 0xBC);
 
 
         static constexpr auto o_with_dot_below = u8"ọ";

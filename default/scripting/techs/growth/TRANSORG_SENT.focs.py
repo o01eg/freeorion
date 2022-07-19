@@ -4,13 +4,13 @@ from common.priorities import AFTER_ALL_TARGET_MAX_METERS_PRIORITY
 Tech(
     name="GRO_TRANSORG_SENT",
     description="GRO_TRANSORG_SENT_DESC",
-    short_description="THEORY_SHORT_DESC",
+    short_description="POLICY_UNLOCK_SHORT_DESC",
     category="GROWTH_CATEGORY",
     researchcost=75 * TECH_COST_MULTIPLIER,
     researchturns=7,
     tags=["PEDIA_GROWTH_CATEGORY", "THEORY"],
     prerequisites=["GRO_TERRAFORM"],
-    unlock=Item(type=Policy, name="PLC_TERRAFORMING"),
+    unlock=Item(type=UnlockPolicy, name="PLC_TERRAFORMING"),
     effectsgroups=[
         EffectsGroup(
             scope=ProductionCenter & OwnedBy(empire=Source.Owner),

@@ -484,7 +484,7 @@ float Ship::WeaponPartShipDamage(const ShipPart* part, const ScriptingContext& c
         float part_shots = CurrentPartMeterValue(MeterType::METER_SECONDARY_STAT, part->Name());
         float target_shield = 0.0f;
         if (context.effect_target) {
-            const Ship* target = static_cast<const Ship*>(context.effect_target.get());
+            const Ship* target = static_cast<const Ship*>(context.effect_target);
             target_shield = target->GetMeter(MeterType::METER_SHIELD)->Current();
         }
         if (part_attack > target_shield) {
@@ -610,7 +610,6 @@ void Ship::SetSpecies(std::string species_name) {
     if (!GetSpecies(species_name))
         ErrorLogger() << "Ship::SetSpecies couldn't get species with name " << species_name;
     m_species_name = std::move(species_name);
-    
 }
 
 void Ship::SetOrderedScrapped(bool b) {

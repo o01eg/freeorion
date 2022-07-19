@@ -10,6 +10,7 @@ from typing import (
     List,
     NamedTuple,
     NewType,
+    Sequence,
     Set,
     Tuple,
     Union,
@@ -27,7 +28,7 @@ from buildings import BuildingType, Shipyard, get_empire_drydocks
 from character.character_module import Aggression
 from colonization import rate_planetary_piloting
 from colonization.rate_pilots import GREAT_PILOT_RATING
-from common.fo_typing import PlanetId, SystemId
+from common.fo_typing import BuildingName, PlanetId, SystemId
 from empire.buildings_locations import get_best_pilot_facilities
 from empire.colony_builders import (
     can_build_colony_for_species,
@@ -111,7 +112,7 @@ def translators_wanted() -> int:
     return int(importance)
 
 
-def _get_capital_info():
+def _get_capital_info() -> Tuple[PlanetId, "fo.planet", SystemId]:
     capital_id = PlanetUtilsAI.get_capital()
     if capital_id is None or capital_id == INVALID_ID:
         homeworld = None
@@ -148,6 +149,11 @@ def _first_turn_action():
             fo.updateProductionQueue()
 
 
+def get_building_allocations() -> float:
+    empire = fo.getEmpire()
+    return sum(e.allocation for e in empire.productionQueue if e.buildType == EmpireProductionTypes.BT_BUILDING)
+
+
 # TODO Move Building names to AIDependencies to avoid typos and for IDE-Support
 def generate_production_orders():
     """generate production orders"""
@@ -170,6 +176,7 @@ def generate_production_orders():
     building_ratio = aistate.character.preferred_building_ratio([0.4, 0.35, 0.30])
     capital_id, homeworld, capital_system_id = _get_capital_info()
     current_turn = fo.currentTurn()
+    building_expense += get_building_allocations()
     if not homeworld:
         debug("if no capital, no place to build, should get around to capturing or colonizing a new one")  # TODO
     else:
@@ -179,20 +186,9 @@ def generate_production_orders():
 
         possible_building_type_ids = []
         for type_id in empire.availableBuildingTypes:
-            try:
-                if fo.getBuildingType(type_id).canBeProduced(empire.empireID, homeworld.id):
-                    possible_building_type_ids.append(type_id)
-            except:  # noqa: E722
-                if fo.getBuildingType(type_id) is None:
-                    debug(
-                        "For empire %d, 'available Building Type priority_id' %s returns None from fo.getBuildingType(type_id)"
-                        % (empire.empireID, type_id)
-                    )
-                else:
-                    debug(
-                        "For empire %d, problem getting BuildingTypeID for 'available Building Type priority_id' %s"
-                        % (empire.empireID, type_id)
-                    )
+            if fo.getBuildingType(type_id).canBeProduced(empire.empireID, homeworld.id):
+                possible_building_type_ids.append(type_id)
+
         if possible_building_type_ids:
             debug("Possible building types to build:")
             for type_id in possible_building_type_ids:
@@ -206,24 +202,9 @@ def generate_production_orders():
                     )
                 )
 
-            possible_building_types = [
-                fo.getBuildingType(type_id) and fo.getBuildingType(type_id).name
-                for type_id in possible_building_type_ids
-            ]  # makes sure is not None before getting name
+            possible_building_types = [fo.getBuildingType(type_id).name for type_id in possible_building_type_ids]
 
-            debug("")
-            debug("Buildings already in Production Queue:")
-            capital_queued_buildings = []
-            for element in [e for e in (empire.productionQueue) if (e.buildType == EmpireProductionTypes.BT_BUILDING)]:
-                building_expense += element.allocation
-                if element.locationID == homeworld.id:
-                    capital_queued_buildings.append(element)
-            for bldg in capital_queued_buildings:
-                debug("    %s turns: %s PP: %s" % (bldg.name, bldg.turnsLeft, bldg.allocation))
-            if not capital_queued_buildings:
-                debug("No capital queued buildings")
-            debug("")
-            queued_building_names = [bldg.name for bldg in capital_queued_buildings]
+            queued_building_names = _get_queued_buildings(capital_id)
 
             if "BLD_AUTO_HISTORY_ANALYSER" in possible_building_types:
                 for pid in find_automatic_historic_analyzer_candidates():
@@ -1251,6 +1232,26 @@ def generate_production_orders():
     print_production_queue(after_turn=True)
 
 
+def _get_queued_buildings(pid: PlanetId) -> List[BuildingName]:
+    debug("Buildings already in Production Queue:")
+    capital_queued_buildings = _get_queued_buildings_for_planet(pid)
+    for bldg in capital_queued_buildings:
+        debug("    %s turns: %s PP: %s" % (bldg.name, bldg.turnsLeft, bldg.allocation))
+    if not capital_queued_buildings:
+        debug("No capital queued buildings")
+    queued_building_names = [bldg.name for bldg in capital_queued_buildings]
+    return queued_building_names
+
+
+def _is_queued_building_on_planet(e: "fo.productionQueueElement", pid: PlanetId) -> bool:
+    return e.buildType == EmpireProductionTypes.BT_BUILDING and e.locationID == pid
+
+
+def _get_queued_buildings_for_planet(pid: PlanetId) -> Sequence["fo.productionQueueElement"]:
+    queue = fo.getEmpire().productionQueue
+    return [e for e in queue if _is_queued_building_on_planet(e, pid)]
+
+
 def update_stockpile_use():
     """Decide which elements in the production_queue will be enabled for drawing from the imperial stockpile.  This
     initial version simply ensures that every resource group with at least one item on the queue has its highest
@@ -1295,7 +1296,7 @@ def already_has_completed_colony_building(planet_id) -> bool:
     return any(universe.getBuilding(bldg).name.startswith("BLD_COL_") for bldg in planet.buildingIDs)
 
 
-def _build_ship_facilities(building_type: BuildingType, top_pids: Set[PlanetId] = frozenset()) -> None:
+def _build_ship_facilities(building_type: Shipyard, top_pids: Set[PlanetId] = frozenset()) -> None:
     # TODO: add total_pp checks below, so don't overload queue
     if not building_type.available():
         return

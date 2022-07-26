@@ -433,7 +433,7 @@ void Effect::Execute(ScriptingContext& context, const TargetSet& targets) const 
 
     // execute effects on targets
     ScriptingContext local_context{context};
-    for (const auto& target : targets) {
+    for (auto* target : targets) {
         local_context.effect_target = target;
         Execute(local_context);
     }
@@ -505,7 +505,7 @@ namespace {
     std::string TargetsDump(const TargetSet& targets) {
         std::string retval;
         retval.reserve(1500*targets.size()); // rough guesstimate
-        for (auto& target : targets)
+        for (auto* target : targets)
             retval.append("\n").append(target->Dump());
         return retval;
     }
@@ -534,7 +534,7 @@ namespace {
             return {Meter::INVALID_VALUE, m};
 
         ScriptingContext::CurrentValueVariant cvv{m->Current()};
-        ScriptingContext target_meter_context{std::forward<C>(context), std::forward<T>(target), cvv};
+        const ScriptingContext target_meter_context{std::forward<C>(context), std::forward<T>(target), cvv};
         return {value_ref->Eval(target_meter_context), m};
     }
 
@@ -547,7 +547,7 @@ namespace {
         static_assert(std::is_same_v<std::decay_t<M>, MeterType> ||
                       std::is_same_v<std::decay_t<M>, Meter*>);
 
-        const auto& target = context.effect_target;
+        const auto* target = context.effect_target;
         Meter* m = nullptr;
         if constexpr (std::is_same_v<M, MeterType>)
             m = target ? target->GetMeter(meter) : nullptr;
@@ -561,8 +561,8 @@ namespace {
         if (!target)
             return {Meter::INVALID_VALUE, m};
 
-        ScriptingContext::CurrentValueVariant meter_cvv{m->Current()};
-        ScriptingContext target_meter_context{std::forward<C>(context), meter_cvv};
+        const ScriptingContext::CurrentValueVariant meter_cvv{m->Current()};
+        const ScriptingContext target_meter_context{std::forward<C>(context), meter_cvv};
         return {value_ref->Eval(target_meter_context), m};
     }
 }
@@ -615,7 +615,7 @@ void SetMeter::Execute(ScriptingContext& context,
 
 
     if (targets.size() == 1) {
-        auto& target = targets.front();
+        auto* target = targets.front();
         if (Meter* meter = target->GetMeter(m_meter)) {
             auto new_val = NewMeterValue(context, meter, m_value, target).first;
             update_meter(new_val, target->ID(), meter);
@@ -624,7 +624,7 @@ void SetMeter::Execute(ScriptingContext& context,
     } else if (m_value->TargetInvariant()) {
         // meter value does not depend on target, so handle with single ValueRef evaluation
         auto new_val = m_value->Eval(context);
-        for (auto& target : targets) {
+        for (auto* target : targets) {
             if (Meter* meter = target->GetMeter(m_meter))
                 update_meter(new_val, target->ID(), meter);
         }
@@ -636,7 +636,7 @@ void SetMeter::Execute(ScriptingContext& context,
         [[maybe_unused]] auto lhs_ref = op_ref->LHS();
         assert(lhs_ref && lhs_ref->GetReferenceType() == ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE);
 
-        for (auto& target : targets) {
+        for (auto* target : targets) {
             if (Meter* meter = target->GetMeter(m_meter)) {
                 auto lhs = meter->Current();
                 auto new_val = ValueRef::Operation<double>::EvalImpl(op_type, lhs, rhs);
@@ -648,7 +648,7 @@ void SetMeter::Execute(ScriptingContext& context,
         // calculate new meter values before modifying anything...
         std::vector<std::tuple<double, int, Meter*>> target_new_meter_vals;
         target_new_meter_vals.reserve(targets.size());
-        for (auto& target : targets) {
+        for (auto* target : targets) {
             if (Meter* meter = target->GetMeter(m_meter))
                 target_new_meter_vals.emplace_back(
                     NewMeterValue(context, meter, m_value, target).first, target->ID(), meter);
@@ -802,13 +802,13 @@ void SetShipPartMeter::Execute(ScriptingContext& context,
 
     TraceLogger(effects) << "\n\nExecute SetShipPartMeter effect: \n" << Dump();
     TraceLogger(effects) << "SetShipPartMeter execute targets before: ";
-    for (auto& target : targets)
+    for (auto* target : targets)
         TraceLogger(effects) << " ... " << target->Dump(1);
 
     Execute(context, targets);
 
     TraceLogger(effects) << "SetShipPartMeter execute targets after: ";
-    for (auto& target : targets)
+    for (auto* target : targets)
         TraceLogger(effects) << " ... " << target->Dump(1);
 }
 
@@ -823,7 +823,7 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
 
     if (!m_part_name->TargetInvariant()) {
         if (targets.size() == 1) {
-            auto& target = targets.front();
+            auto* target = targets.front();
             if (target->ObjectType() != UniverseObjectType::OBJ_SHIP)
                 return;
             auto ship = static_cast<Ship*>(target);
@@ -839,12 +839,12 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
         } else if (m_value->TargetInvariant()) {
             // meter value does not depend on target, so handle with single ValueRef evaluation
             auto new_val = m_value->Eval(context);
-            for (auto& target : targets) {
+            for (auto* target : targets) {
                 if (target->ObjectType() != UniverseObjectType::OBJ_SHIP)
                     continue;
                 auto ship = static_cast<Ship*>(target);
 
-                ScriptingContext target_context{context, target};
+                const ScriptingContext target_context{context, target};
                 auto part_name = m_part_name->Eval(target_context);
 
                 if (Meter* meter = ship->GetPartMeter(m_meter, part_name))
@@ -858,12 +858,12 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
             [[maybe_unused]] auto lhs_ref = op_ref->LHS();
             assert(lhs_ref && lhs_ref->GetReferenceType() == ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE);
 
-            for (auto& target : targets) {
+            for (auto* target : targets) {
                 if (target->ObjectType() != UniverseObjectType::OBJ_SHIP)
                     continue;
                 auto ship = static_cast<Ship*>(target);
 
-                ScriptingContext target_context{context, target};
+                const ScriptingContext target_context{context, target};
                 auto part_name = m_part_name->Eval(target_context);
 
                 if (Meter* meter = ship->GetPartMeter(m_meter, part_name)) {
@@ -877,7 +877,7 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
             // calculate new meter values before modifying anything...
             std::vector<std::tuple<double, int, Meter*>> target_new_meter_vals;
             target_new_meter_vals.reserve(targets.size());
-            for (auto& target : targets) {
+            for (auto* target : targets) {
                 if (target->ObjectType() != UniverseObjectType::OBJ_SHIP)
                     continue;
                 auto ship = static_cast<Ship*>(target);
@@ -905,7 +905,7 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
     std::string part_name = m_part_name->Eval(context);
 
     if (targets.size() == 1) {
-        auto& target = targets.front();
+        auto* target = targets.front();
         if (target->ObjectType() != UniverseObjectType::OBJ_SHIP)
             return;
         auto ship = static_cast<Ship*>(target);
@@ -918,7 +918,7 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
     } else if (m_value->TargetInvariant()) {
         // meter value does not depend on target, so handle with single ValueRef evaluation
         auto new_val = m_value->Eval(context);
-        for (auto& target : targets) {
+        for (auto* target : targets) {
             if (target->ObjectType() != UniverseObjectType::OBJ_SHIP)
                 continue;
             auto ship = static_cast<Ship*>(target);
@@ -933,7 +933,7 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
         [[maybe_unused]] auto lhs_ref = op_ref->LHS();
         assert(lhs_ref && lhs_ref->GetReferenceType() == ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE);
 
-        for (auto& target : targets) {
+        for (auto* target : targets) {
             if (target->ObjectType() != UniverseObjectType::OBJ_SHIP)
                 continue;
             auto ship = static_cast<Ship*>(target);
@@ -948,7 +948,7 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
         // calculate new meter values before modifying anything...
         std::vector<std::tuple<double, int, Meter*>> target_new_meter_vals;
         target_new_meter_vals.reserve(targets.size());
-        for (auto& target : targets) {
+        for (auto* target : targets) {
             if (target->ObjectType() != UniverseObjectType::OBJ_SHIP)
                 continue;
             auto ship = static_cast<Ship*>(target);
@@ -1106,7 +1106,7 @@ void SetEmpireMeter::Execute(ScriptingContext& context, const TargetSet& targets
 
     if (!m_empire_id->TargetInvariant()) {
         if (targets.size() == 1) {
-            auto& target = targets.front();
+            auto* target = targets.front();
             ScriptingContext target_context{context, target};
             if (auto meter = GetEmpireMeter(target_context, m_empire_id, m_meter)) {
                 auto new_val = NewMeterValue(std::move(target_context), meter, m_value).first;
@@ -1127,7 +1127,7 @@ void SetEmpireMeter::Execute(ScriptingContext& context, const TargetSet& targets
             [[maybe_unused]] auto lhs_ref = op_ref->LHS();
             assert(lhs_ref && lhs_ref->GetReferenceType() == ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE);
 
-            for (auto& target : targets) {
+            for (auto* target : targets) {
                 ScriptingContext target_context{context, target};
                 if (auto meter = GetEmpireMeter(target_context, m_empire_id, m_meter)) {
                     auto lhs = meter->Current();
@@ -1140,7 +1140,7 @@ void SetEmpireMeter::Execute(ScriptingContext& context, const TargetSet& targets
             // for empire meters, unlike object meters, pre-calculating doesn't work
             // since multiple target objects could be assoicated with the same
             // empire meter, so have to calculate new meter values one at a time...
-            for (auto& target : targets) {
+            for (auto* target : targets) {
                 ScriptingContext target_context{context, target};
                 if (auto meter = GetEmpireMeter(target_context, m_empire_id, m_meter)) {
                     auto new_val = NewMeterValue(std::move(target_context), meter, m_value).first;
@@ -1158,7 +1158,7 @@ void SetEmpireMeter::Execute(ScriptingContext& context, const TargetSet& targets
     const int empire_id = m_empire_id->Eval(context);
 
     if (targets.size() == 1) {
-        auto& target = targets.front();
+        auto* target = targets.front();
         if (auto meter = GetEmpireMeter(context, empire_id, m_meter)) {
             auto new_val = NewMeterValue(context, meter, m_value, target).first;
             meter->SetCurrent(new_val);
@@ -1180,7 +1180,7 @@ void SetEmpireMeter::Execute(ScriptingContext& context, const TargetSet& targets
 
         if (auto meter = GetEmpireMeter(context, empire_id, m_meter)) {
             auto lhs = meter->Current();
-            for (auto& target : targets) {
+            for (auto* target : targets) {
                 (void)target; // don't use the target objects, but should re-apply the adjustment once per target
                 lhs = ValueRef::Operation<double>::EvalImpl(op_type, lhs, rhs);
             }
@@ -1191,7 +1191,7 @@ void SetEmpireMeter::Execute(ScriptingContext& context, const TargetSet& targets
         // for empire meters, unlike object meters, pre-calculating doesn't work
         // since multiple target objects could be assoicated with the same
         // empire meter, so have to calculate new meter values one at a time...
-        for (auto& target : targets) {
+        for (auto* target : targets) {
             if (auto meter = GetEmpireMeter(context, empire_id, m_meter)) {
                 auto new_val = NewMeterValue(context, meter, m_value, target).first;
                 meter->SetCurrent(new_val);
@@ -2626,11 +2626,9 @@ void AddStarlanes::Execute(ScriptingContext& context) const {
     if (!target_system)
         return; // nothing to do!
 
-    // get other endpoint systems...
-    TargetSet endpoint_objects;
-    // apply endpoints condition to determine objects whose systems should be
+    // from endpoints condition, get objects whose systems should be
     // connected to the source system
-    m_other_lane_endpoint_condition->Eval(context, endpoint_objects);
+    TargetSet endpoint_objects = m_other_lane_endpoint_condition->Eval(context);
 
     // early exit if there are no valid locations
     if (endpoint_objects.empty())
@@ -2702,10 +2700,10 @@ void RemoveStarlanes::Execute(ScriptingContext& context) const {
 
     // get other endpoint systems...
 
-    Condition::ObjectSet endpoint_objects;
     // apply endpoints condition to determine objects whose systems should be
     // connected to the source system
-    m_other_lane_endpoint_condition->Eval(context, endpoint_objects);
+    Condition::ObjectSet endpoint_objects =
+        m_other_lane_endpoint_condition->Eval(std::as_const(context));
 
     // early exit if there are no valid locations - can't move anything if there's nowhere to move to
     if (endpoint_objects.empty())
@@ -2812,9 +2810,8 @@ void MoveTo::Execute(ScriptingContext& context) const {
     Universe& universe = context.ContextUniverse();
     ObjectMap& objects = context.ContextObjects();
 
-    TargetSet valid_locations;
     // apply location condition to determine valid location to move target to
-    m_location_condition->Eval(context, valid_locations);
+    TargetSet valid_locations = m_location_condition->Eval(context);
 
     // early exit if there are no valid locations - can't move anything if there's nowhere to move to
     if (valid_locations.empty())
@@ -3129,8 +3126,8 @@ MoveInOrbit::MoveInOrbit(std::unique_ptr<ValueRef::ValueRef<double>>&& speed,
 {}
 
 MoveInOrbit::MoveInOrbit(std::unique_ptr<ValueRef::ValueRef<double>>&& speed,
-                         std::unique_ptr<ValueRef::ValueRef<double>>&& focus_x/* = 0*/,
-                         std::unique_ptr<ValueRef::ValueRef<double>>&& focus_y/* = 0*/) :
+                         std::unique_ptr<ValueRef::ValueRef<double>>&& focus_x,
+                         std::unique_ptr<ValueRef::ValueRef<double>>&& focus_y) :
     m_speed(std::move(speed)),
     m_focus_x(std::move(focus_x)),
     m_focus_y(std::move(focus_y))
@@ -3141,7 +3138,7 @@ void MoveInOrbit::Execute(ScriptingContext& context) const {
         ErrorLogger(effects) << "MoveInOrbit::Execute given no target object";
         return;
     }
-    auto& target = context.effect_target;
+    auto* target = context.effect_target;
 
     double focus_x = 0.0, focus_y = 0.0, speed = 1.0;
     if (m_focus_x) {
@@ -3159,8 +3156,7 @@ void MoveInOrbit::Execute(ScriptingContext& context) const {
     if (speed == 0.0)
         return;
     if (m_focal_point_condition) {
-        Condition::ObjectSet matches;
-        m_focal_point_condition->Eval(context, matches);
+        Condition::ObjectSet matches = m_focal_point_condition->Eval(std::as_const(context));
         if (matches.empty())
             return;
         const auto& focus_object = *matches.begin();
@@ -3288,8 +3284,8 @@ MoveTowards::MoveTowards(std::unique_ptr<ValueRef::ValueRef<double>>&& speed,
 {}
 
 MoveTowards::MoveTowards(std::unique_ptr<ValueRef::ValueRef<double>>&& speed,
-                         std::unique_ptr<ValueRef::ValueRef<double>>&& dest_x/* = 0*/,
-                         std::unique_ptr<ValueRef::ValueRef<double>>&& dest_y/* = 0*/) :
+                         std::unique_ptr<ValueRef::ValueRef<double>>&& dest_x,
+                         std::unique_ptr<ValueRef::ValueRef<double>>&& dest_y) :
     m_speed(std::move(speed)),
     m_dest_x(std::move(dest_x)),
     m_dest_y(std::move(dest_y))
@@ -3318,8 +3314,7 @@ void MoveTowards::Execute(ScriptingContext& context) const {
     if (speed == 0.0)
         return;
     if (m_dest_condition) {
-        Condition::ObjectSet matches;
-        m_dest_condition->Eval(context, matches);
+        Condition::ObjectSet matches = m_dest_condition->Eval(std::as_const(context));
         if (matches.empty())
             return;
         auto focus_object = matches.front();
@@ -3350,16 +3345,16 @@ void MoveTowards::Execute(ScriptingContext& context) const {
     if (target->X() == new_x && target->Y() == new_y)
         return; // nothing to do
 
-    if (auto system = dynamic_cast<System*>(target)) {
+    if (auto* system = dynamic_cast<System*>(target)) {
         system->MoveTo(new_x, new_y);
-        for (auto& obj : context.ContextObjects().findRaw<UniverseObject>(system->ObjectIDs()))
+        for (auto* obj : context.ContextObjects().findRaw<UniverseObject>(system->ObjectIDs()))
             obj->MoveTo(new_x, new_y);
 
         // don't need to remove objects from system or insert into it, as all
         // contained objects in system are moved with it, maintaining their
         // containment situation
 
-    } else if (auto fleet = dynamic_cast<Fleet*>(target)) {
+    } else if (auto* fleet = dynamic_cast<Fleet*>(target)) {
         auto old_sys = context.ContextObjects().getRaw<System>(fleet->SystemID());
         if (old_sys)
             old_sys->Remove(fleet->ID());
@@ -3375,7 +3370,7 @@ void MoveTowards::Execute(ScriptingContext& context) const {
         // todo: is fleet now close enough to fall into a system?
         UpdateFleetRoute(fleet, INVALID_OBJECT_ID, INVALID_OBJECT_ID, context);
 
-    } else if (auto ship = dynamic_cast<Ship*>(target)) {
+    } else if (auto* ship = dynamic_cast<Ship*>(target)) {
         auto old_sys = context.ContextObjects().getRaw<System>(ship->SystemID());
         if (old_sys)
             old_sys->Remove(ship->ID());
@@ -3399,7 +3394,7 @@ void MoveTowards::Execute(ScriptingContext& context) const {
             context.ContextUniverse().EffectDestroy(old_fleet->ID(), INVALID_OBJECT_ID);    // no object in particular destroyed this fleet
         }
 
-    } else if (auto field = dynamic_cast<Field*>(target)) {
+    } else if (auto* field = dynamic_cast<Field*>(target)) {
         auto old_sys = context.ContextObjects().getRaw<System>(field->SystemID());
         if (old_sys)
             old_sys->Remove(field->ID());
@@ -3471,9 +3466,8 @@ void SetDestination::Execute(ScriptingContext& context) const {
         return;
     }
 
-    TargetSet valid_locations;
     // apply location condition to determine valid location to move target to
-    m_location_condition->Eval(context, valid_locations);
+    TargetSet valid_locations = m_location_condition->Eval(context);
 
     // early exit if there are no valid locations - can't move anything if there's nowhere to move to
     if (valid_locations.empty())
@@ -3627,7 +3621,7 @@ std::unique_ptr<Effect> Victory::Clone() const {
 ///////////////////////////////////////////////////////////
 SetEmpireTechProgress::SetEmpireTechProgress(std::unique_ptr<ValueRef::ValueRef<std::string>>&& tech_name,
                                              std::unique_ptr<ValueRef::ValueRef<double>>&& research_progress,
-                                             std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id /*= nullptr*/) :
+                                             std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id) :
     m_tech_name(std::move(tech_name)),
     m_research_progress(std::move(research_progress)),
     m_empire_id(
@@ -3926,12 +3920,12 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
         // evaluate condition
         Condition::ObjectSet condition_matches;
         if (m_condition)
-            m_condition->Eval(context, condition_matches);
+            condition_matches = m_condition->Eval(std::as_const(context));
 
         // add empires that can see any condition-matching object
         for ([[maybe_unused]] auto& [empire_id, unused_empire] : context.Empires()) {
             (void)unused_empire;
-            for (auto& object : condition_matches) {
+            for (auto* object : condition_matches) {
                 auto vis = context.ContextVis(object->ID(), empire_id);
                 if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
                     recipient_empire_ids.insert(empire_id);
@@ -4246,14 +4240,20 @@ void SetVisibility::Execute(ScriptingContext& context) const {
     }
 
     // what to set visibility of?
-    std::set<int> object_ids;
+    std::vector<int> object_ids;
     if (!m_condition) {
-        object_ids.insert(context.effect_target->ID());
+        object_ids.push_back(context.effect_target->ID());
     } else {
-        Condition::ObjectSet condition_matches;
-        m_condition->Eval(context, condition_matches);
-        for (auto& object : condition_matches)
-            object_ids.insert(object->ID());
+        // get target object IDs
+        Condition::ObjectSet condition_matches = m_condition->Eval(std::as_const(context));
+        object_ids.reserve(condition_matches.size());
+        std::transform(condition_matches.begin(), condition_matches.end(),
+                       std::back_inserter(object_ids),
+                       [](const auto* o) { return o->ID(); });
+        // ensure uniqueness
+        std::sort(object_ids.begin(), object_ids.end());
+        auto unique_it = std::unique(object_ids.begin(), object_ids.end());
+        object_ids.resize(std::distance(object_ids.begin(), unique_it));
     }
 
     int source_id = INVALID_OBJECT_ID;

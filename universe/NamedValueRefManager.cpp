@@ -94,11 +94,21 @@ template const ValueRef::ValueRef<StarType>* NamedValueRefManager::GetValueRef(s
 const ValueRef::ValueRefBase* NamedValueRefManager::GetValueRefBase(std::string_view name) const {
     if (auto* drefp = GetValueRef<double>(name))
         return drefp;
-    if (auto* irefp = GetValueRef<int>(name))
+    if (auto* irefp = GetValueRef<int>(name)) {
+        DebugLogger() << "NamedValueRefManager::GetValueRefBase found registered (int) valueref for \"" << name << "\" "
+                      << "(After trying (double) registry)";
         return irefp;
+    }
     CheckPendingNamedValueRefs();
     const auto it = m_value_refs.find(name);
-    return it != m_value_refs.end() ? it->second.get() : nullptr;
+    if (it != m_value_refs.end()) {
+        DebugLogger() << "NamedValueRefManager::GetValueRefBase found no registered (generic) valueref for \"" << name << "\" "
+                      << "(After trying (int|double) registries.";
+        return it->second.get();
+    }
+    ErrorLogger() << "NamedValueRefManager::GetValueRefBase found no registered (double|int|generic) valueref for \"" << name << "\". "
+                  << "This should not happen once \"#3225 Refactor initialisation of invariants in value refs to happen after parsing\" is implemented";
+    return nullptr;
 }
 
 NamedValueRefManager& NamedValueRefManager::GetNamedValueRefManager() {
@@ -178,6 +188,11 @@ void NamedValueRefManager::RegisterValueRef(std::string&& valueref_name,
 
 template <>
 void NamedValueRefManager::RegisterValueRef(std::string&& valueref_name,
+                                            std::unique_ptr<ValueRef::ValueRef<std::string>>&& vref)
+{ RegisterValueRefImpl(m_value_refs, m_value_refs_mutex, "string", std::move(valueref_name), std::move(vref)); }
+
+template <>
+void NamedValueRefManager::RegisterValueRef(std::string&& valueref_name,
                                             std::unique_ptr<ValueRef::ValueRef<int>>&& vref)
 { RegisterValueRefImpl(m_value_refs_int, m_value_refs_int_mutex, "int", std::move(valueref_name), std::move(vref)); }
 
@@ -220,6 +235,7 @@ namespace ValueRef {
     // trigger instantiations
     template struct NamedRef<double>;
     template struct NamedRef<int>;
+    template struct NamedRef<std::string>;
     template struct NamedRef<PlanetEnvironment>;
     template struct NamedRef<PlanetSize>;
     template struct NamedRef<PlanetType>;

@@ -1304,6 +1304,12 @@ Planet Stability Baseline
 RULE_BASELINE_PLANET_STABILITY_DESC
 Baseline level of planet [[METER_HAPPINESS]].
 
+RULE_MINIMUM_MONSTER_DISTANCE_CAPITAL
+Minimum distance monsters start from Capital
+
+RULE_MINIMUM_MONSTER_DISTANCE_CAPITAL_DESC
+Minimum distance monsters start from Capital
+
 RULE_ALLOW_CONCEDE
 Allow Conceding
 
@@ -3398,9 +3404,6 @@ System sidepanel open meter update
 
 OPTIONS_UI_OBJECT_CHANGED_METER_UPDATE
 Object changed meter update
-
-OPTIONS_DB_UI_EFFECTS_MOVE_TEST
-Test / internal engine switch: Use pointer moves, not casts of containers of pointers, when evaluating conditions.
 
 OPTIONS_ADD_SAVED_DESIGNS
 Add All Saved Ship Designs at Game Start
@@ -13770,19 +13773,19 @@ Piloting traits do not affect [[FT_HANGAR_1]] fighters.
 At the end of combat, carriers will collect any fighters that have survived. If a carrier is in [[metertype METER_SUPPLY]] immediately after movement is resolved, it will refill hangars to maximum.'''
 
 SHP_FIGHTERS_2
-Laser Fighters
+Fighters and Launch Bays 2
 
 SHP_FIGHTERS_2_DESC
 Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have laser weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 12, [[shippart FT_HANGAR_3]] by 18, and [[shippart FT_HANGAR_4]] by 36. For [[shippart FT_HANGAR_1]] fighters the capacity as well as the launch rate of the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_FIGHTERS_3
-Plasma Fighters
+Fighters and Launch Bays 3
 
 SHP_FIGHTERS_3_DESC
 Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have plasma weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 12, [[shippart FT_HANGAR_3]] by 18, and [[shippart FT_HANGAR_4]] by 36. For [[shippart FT_HANGAR_1]] fighters the capacity as well as the launch rate of the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_FIGHTERS_4
-Death Ray Fighters
+Fighters and Launch Bays 4
 
 SHP_FIGHTERS_4_DESC
 Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have death ray weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 12, [[shippart FT_HANGAR_3]] by 18, and [[shippart FT_HANGAR_4]] by 36. For [[shippart FT_HANGAR_1]] fighters the capacity as well as the launch rate of the [[shippart FT_BAY_1]] is increased by 1.
@@ -17010,8 +17013,17 @@ GREAT_STOCKPILE_DESC
 ULTIMATE_STOCKPILE_DESC
 +++	Ultimate [[metertype METER_STOCKPILE]]: +0.3 per [[metertype METER_POPULATION]]
 
+BAD_SHIP_SHIELD_DESC
+-	Bad ship [[metertype METER_SHIELD]]: Weaker ship shields
+
 GOOD_SHIP_SHIELD_DESC
-+	Good ship [[metertype METER_SHIELD]]: +1
++	Good ship [[metertype METER_SHIELD]]: Stronger ship shields
+
+GREAT_SHIP_SHIELD_DESC
+++	Great ship [[metertype METER_SHIELD]]: Stronger ship shields
+
+ULTIMATE_SHIP_SHIELD_DESC
++++	Ultimate ship [[metertype METER_SHIELD]]: Strongest ship shields
 
 GOOD_PLANETARY_SHIELD_DESC
 +	Good planetary [[metertype METER_SHIELD]]: +5

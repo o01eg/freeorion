@@ -47,57 +47,57 @@ namespace {
     using boost::placeholders::_1;
 
     void AddAllObjectsSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingObjects().size());
-        for (const auto& obj : objects.ExistingObjects())
+        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting().size());
+        for (const auto& obj : objects.allExisting())
             condition_non_targets.push_back(obj.second.get());
         // in my tests, this range for loop with emplace_back was about 5% faster than std::transform with std::back_inserter and a lambda returning the .second of the map entries
     }
 
     void AddBuildingSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingBuildings().size());
-        for (const auto& obj : objects.ExistingBuildings())
+        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<Building>().size());
+        for (const auto& obj : objects.allExisting<Building>())
             condition_non_targets.push_back(obj.second.get());
     }
 
     void AddFieldSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingFields().size());
-        for (const auto& obj : objects.ExistingFields())
+        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<Field>().size());
+        for (const auto& obj : objects.allExisting<Field>())
             condition_non_targets.push_back(obj.second.get());
     }
 
     void AddFleetSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingFleets().size());
-        for (const auto& obj : objects.ExistingFleets())
+        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<Fleet>().size());
+        for (const auto& obj : objects.allExisting<Fleet>())
             condition_non_targets.push_back(obj.second.get());
     }
 
     void AddPlanetSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingPlanets().size());
-        for (const auto& obj : objects.ExistingPlanets())
+        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<Planet>().size());
+        for (const auto& obj : objects.allExisting<Planet>())
             condition_non_targets.push_back(obj.second.get());
     }
 
     void AddPopCenterSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingPopCenters().size());
-        for (const auto& obj : objects.ExistingPopCenters())
+        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<PopCenter>().size());
+        for (const auto& obj : objects.allExisting<PopCenter>())
             condition_non_targets.push_back(obj.second.get());
     }
 
     void AddResCenterSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingResourceCenters().size());
-        for (const auto& obj : objects.ExistingResourceCenters())
+        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<ResourceCenter>().size());
+        for (const auto& obj : objects.allExisting<ResourceCenter>())
             condition_non_targets.push_back(obj.second.get());
     }
 
     void AddShipSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingShips().size());
-        for (const auto& obj : objects.ExistingShips())
+        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<Ship>().size());
+        for (const auto& obj : objects.allExisting<Ship>())
             condition_non_targets.push_back(obj.second.get());
     }
 
     void AddSystemSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.ExistingSystems().size());
-        for (const auto& obj : objects.ExistingSystems())
+        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<System>().size());
+        for (const auto& obj : objects.allExisting<System>())
             condition_non_targets.push_back(obj.second.get());
     }
 
@@ -114,8 +114,10 @@ namespace {
         auto& from_set = domain_matches ? matches : non_matches;
         auto& to_set = domain_matches ? non_matches : matches;
 
+        // checking for from_set.size() == 1 and/or to_set.empty() and early exiting didn't seem to speed up evaluation
+
         auto part_it = std::stable_partition(from_set.begin(), from_set.end(),
-                                             [pred, domain_matches](const auto* o) { return pred(o) == domain_matches; });
+            [pred, domain_matches](const auto* o) { return pred(o) == domain_matches; });
         to_set.insert(to_set.end(), part_it, from_set.end());
         from_set.erase(part_it, from_set.end());
     }
@@ -230,21 +232,6 @@ std::string ConditionDescription(const std::vector<const Condition*>& conditions
 ///////////////////////////////////////////////////////////
 // Condition                                             //
 ///////////////////////////////////////////////////////////
-struct Condition::MatchHelper {
-    MatchHelper(const Condition* this_, const ScriptingContext& parent_context) :
-        m_this(this_),
-        m_parent_context(parent_context)
-    {}
-
-    bool operator()(const UniverseObject* candidate) const {
-        ScriptingContext context{m_parent_context, candidate};
-        return m_this->Match(context);
-    }
-
-    const Condition* m_this = nullptr;
-    const ScriptingContext& m_parent_context;
-};
-
 bool Condition::operator==(const Condition& rhs) const {
     if (this == &rhs)
         return true;
@@ -258,7 +245,14 @@ bool Condition::operator==(const Condition& rhs) const {
 void Condition::Eval(const ScriptingContext& parent_context,
                      ObjectSet& matches, ObjectSet& non_matches,
                      SearchDomain search_domain) const
-{ EvalImpl(matches, non_matches, search_domain, MatchHelper(this, parent_context)); }
+{
+    EvalImpl(matches, non_matches, search_domain,
+             [cond{this}, &parent_context](const UniverseObject* candidate) -> bool
+    {
+        const ScriptingContext candidate_context{parent_context, candidate};
+        return cond->Match(candidate_context);
+    });
+}
 
 void Condition::Eval(ScriptingContext& parent_context,
                      Effect::TargetSet& matches, Effect::TargetSet& non_matches,
@@ -3935,7 +3929,7 @@ void ObjectID::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
     if (object_id == INVALID_OBJECT_ID)
         return;
 
-    if (auto obj = parent_context.ContextObjects().ExistingObject(object_id))
+    if (auto obj = parent_context.ContextObjects().getExisting(object_id))
         condition_non_targets.push_back(obj.get());
 }
 
@@ -8071,7 +8065,6 @@ void WithinDistance::Eval(const ScriptingContext& parent_context,
                             (parent_context.condition_root_candidate || RootCandidateInvariant());
     if (simple_eval_safe) {
         // evaluate contained objects and distance once and check for all candidates
-        TraceLogger(conditions) << "WithinDistance::Eval simple case";
 
         // get subcondition matches
         ObjectSet subcondition_matches = m_condition->Eval(parent_context);
@@ -8081,7 +8074,6 @@ void WithinDistance::Eval(const ScriptingContext& parent_context,
         EvalImpl(matches, non_matches, search_domain, WithinDistanceSimpleMatch(subcondition_matches, distance));
     } else {
         // re-evaluate contained objects for each candidate object
-        TraceLogger(conditions) << "WithinDistance::Eval full case";
         Condition::Eval(parent_context, matches, non_matches, search_domain);
     }
 }
@@ -10335,6 +10327,7 @@ void And::Eval(const ScriptingContext& parent_context, ObjectSet& matches,
         return ss;
     };
 
+    /*
     TraceLogger(conditions) << [&]() {
         std::stringstream ss;
         ss << "And::Eval searching " << (search_domain == SearchDomain::MATCHES ? "matches" : "non_matches")
@@ -10342,6 +10335,7 @@ void And::Eval(const ScriptingContext& parent_context, ObjectSet& matches,
            << " and input non_matches(" << non_matches.size() << "): " << ObjList(non_matches);
         return ss.str();
     }();
+    */
 
     if (search_domain == SearchDomain::NON_MATCHES) {
         ObjectSet partly_checked_non_matches;
@@ -10350,6 +10344,7 @@ void And::Eval(const ScriptingContext& parent_context, ObjectSet& matches,
         // move items in non_matches set that pass first operand condition into
         // partly_checked_non_matches set
         m_operands[0]->Eval(parent_context, partly_checked_non_matches, non_matches, SearchDomain::NON_MATCHES);
+        /*
         TraceLogger(conditions) << [&]() {
             std::stringstream ss;
             ss << "Subcondition: " << m_operands[0]->Dump()
@@ -10357,11 +10352,13 @@ void And::Eval(const ScriptingContext& parent_context, ObjectSet& matches,
                << ObjList(partly_checked_non_matches);
             return ss.str();
         }();
+        */
 
         // move items that don't pass one of the other conditions back to non_matches
         for (unsigned int i = 1; i < m_operands.size(); ++i) {
             if (partly_checked_non_matches.empty()) break;
             m_operands[i]->Eval(parent_context, partly_checked_non_matches, non_matches, SearchDomain::MATCHES);
+            /*
             TraceLogger(conditions) << [&]() {
                 std::stringstream ss;
                 ss << "Subcondition: " << m_operands[i]->Dump()
@@ -10369,6 +10366,7 @@ void And::Eval(const ScriptingContext& parent_context, ObjectSet& matches,
                    << ObjList(partly_checked_non_matches);
                 return ss.str();
             }();
+            */
         }
 
         // merge items that passed all operand conditions into matches
@@ -10385,15 +10383,19 @@ void And::Eval(const ScriptingContext& parent_context, ObjectSet& matches,
         for (auto& operand : m_operands) {
             if (matches.empty()) break;
             operand->Eval(parent_context, matches, non_matches, SearchDomain::MATCHES);
+            /*
             TraceLogger(conditions) << "Subcondition: " << operand->Dump()
                                     <<"\nremaining matches (" << matches.size() << "): " << ObjList(matches);
+            */
         }
 
         // items already in non_matches set are not checked, and remain in non_matches set
         // even if they pass all operand conditions
     }
+    /*
     TraceLogger(conditions) << "And::Eval final matches (" << matches.size() << "): " << ObjList(matches)
                             << " and non_matches (" << non_matches.size() << "): " << ObjList(non_matches);
+    */
 }
 
 std::string And::Description(bool negated) const {

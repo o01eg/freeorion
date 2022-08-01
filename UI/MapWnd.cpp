@@ -3724,7 +3724,7 @@ namespace {
                            res_group_cores, res_group_core_members,
                            member_to_core, under_alloc_res_grp_core_members);
 
-        const std::set<int>& this_client_known_destroyed_objects =
+        const auto& this_client_known_destroyed_objects =
             GetUniverse().EmpireKnownDestroyedObjectIDs(GGHumanClientApp::GetApp()->EmpireID());
         //unused variable const GG::Clr UNOWNED_LANE_COLOUR = GetOptionsDB().Get<GG::Clr>("ui.map.starlane.color");
 
@@ -3884,7 +3884,7 @@ namespace {
 
         std::map<std::pair<int, int>, LaneEndpoints> retval;
 
-        const std::set<int>& this_client_known_destroyed_objects =
+        const auto& this_client_known_destroyed_objects =
             GetUniverse().EmpireKnownDestroyedObjectIDs(GGHumanClientApp::GetApp()->EmpireID());
 
         for (auto const& id_icon : sys_icons) {
@@ -4915,10 +4915,11 @@ namespace {
     using StarlaneToFleetsMap = KeyToFleetsMap<std::pair<int, int>>;
 
     /** Return fleet if \p obj is not destroyed, not stale, a fleet and not empty.*/
+    template <typename IntSet>
     std::shared_ptr<const Fleet> IsQualifiedFleet(const std::shared_ptr<const UniverseObject>& obj,
                                                   int empire_id,
-                                                  const std::set<int>& known_destroyed_objects,
-                                                  const std::set<int>& stale_object_info)
+                                                  const IntSet& known_destroyed_objects,
+                                                  const IntSet& stale_object_info)
     {
         int object_id = obj->ID();
         if (obj->ObjectType() != UniverseObjectType::OBJ_FLEET)
@@ -5047,7 +5048,7 @@ void MapWnd::DeferredRefreshFleetButtons() {
     LocationXEmpireToFleetsMap moving_fleets;
     LocationXEmpireToFleetsMap offroad_fleets;
 
-    for (const auto& entry : Objects().ExistingFleets()) {
+    for (const auto& entry : Objects().allExisting<Fleet>()) {
         auto fleet = IsQualifiedFleet(entry.second, client_empire_id,
                                       this_client_known_destroyed_objects,
                                       this_client_stale_object_info);
@@ -7030,19 +7031,23 @@ namespace {
     }
 
     std::set<std::pair<std::string, int>, CustomRowCmp> GetOwnedSystemNamesIDs(int empire_id) {
-        auto owned_planets = Objects().find<Planet>(OwnedVisitor(empire_id));
+        auto owned_planets = Objects().findRaw<const Planet>(
+            [empire_id](const Planet* p) { return p->OwnedBy(empire_id); });
 
         // get IDs of systems that contain any owned planets
-        std::set<int> system_ids;
-        for (auto& obj : owned_planets)
-            system_ids.insert(obj->SystemID());
+        std::vector<int> system_ids;
+        system_ids.reserve(owned_planets.size());
+        std::transform(owned_planets.begin(), owned_planets.end(), std::back_inserter(system_ids),
+                       [](const auto* p) { return p->SystemID(); });
+        std::sort(system_ids.begin(), system_ids.end());
+        auto it = std::unique(system_ids.begin(), system_ids.end());
+        system_ids.erase(it, system_ids.end());
 
         // store systems, sorted alphabetically
+        const auto sys = Objects().findRaw<const System>(system_ids);
         std::set<std::pair<std::string, int>, CustomRowCmp> system_names_ids;
-        for (const auto& sys : Objects().findRaw<System>(system_ids)) {
-            if (sys)
-                system_names_ids.emplace(sys->Name(), sys->ID());
-        }
+        std::transform(sys.begin(), sys.end(), std::inserter(system_names_ids, system_names_ids.end()),
+                       [](const System* s) -> std::pair<std::string, int> { return {s->Name(), s->ID()}; });
 
         return system_names_ids;
     }
@@ -7153,8 +7158,14 @@ bool MapWnd::ZoomToNextSystem() {
 }
 
 bool MapWnd::ZoomToPrevIdleFleet() {
-    auto vec = GetUniverse().Objects().findIDs<Fleet>(
-        StationaryFleetVisitor(GGHumanClientApp::GetApp()->EmpireID()));
+    const auto client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    auto is_stationary_client_empire_fleet = [client_empire_id](const Fleet* fleet) {
+        return (fleet->FinalDestinationID() == INVALID_OBJECT_ID || fleet->TravelRoute().empty()) &&
+                (client_empire_id == ALL_EMPIRES ||
+                (!fleet->Unowned() && fleet->Owner() == client_empire_id));
+    };
+    auto vec = GetUniverse().Objects().findIDs<Fleet>(is_stationary_client_empire_fleet);
+
     auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
     const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
     if (it != vec.begin())

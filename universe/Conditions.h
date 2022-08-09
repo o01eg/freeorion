@@ -290,6 +290,8 @@ struct FO_COMMON_API Capital final : public Condition {
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
     void GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                            ObjectSet& condition_non_targets) const override;
+    bool InitialCandidatesAllMatch() const override { return true; };
+
     [[nodiscard]] std::string  Description(bool negated = false) const override;
     [[nodiscard]] std::string  Dump(unsigned short ntabs = 0) const override;
     void                       SetTopLevelContent(const std::string& content_name) override {}
@@ -406,7 +408,6 @@ private:
 
     std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> m_names;
 };
-
 
 /** Matches all objects that have an attached Special named \a name. */
 struct FO_COMMON_API HasSpecial final : public Condition {
@@ -704,6 +705,31 @@ private:
     bool Match(const ScriptingContext& local_context) const override;
 
     std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> m_names;
+};
+
+/** Matches objects if the specified species' opinion of the specified content
+  * is within the specified bounds. */
+struct FO_COMMON_API SpeciesOpinion final : public Condition {
+    SpeciesOpinion(std::unique_ptr<ValueRef::ValueRef<std::string>>&& species,
+                   std::unique_ptr<ValueRef::ValueRef<std::string>>&& content,
+                   ComparisonType comp = ComparisonType::GREATER_THAN);
+
+    bool operator==(const Condition& rhs) const override;
+    void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
+              ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
+    [[nodiscard]] std::string Description(bool negated = false) const override;
+    [[nodiscard]] std::string Dump(unsigned short ntabs = 0) const override;
+    void SetTopLevelContent(const std::string& content_name) override;
+    [[nodiscard]] unsigned int GetCheckSum() const override;
+
+    [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
+
+private:
+    bool Match(const ScriptingContext& local_context) const override;
+
+    std::unique_ptr<ValueRef::ValueRef<std::string>> m_species;
+    std::unique_ptr<ValueRef::ValueRef<std::string>> m_content;
+    ComparisonType m_comp = ComparisonType::GREATER_THAN;
 };
 
 /** Matches planets where the indicated number of the indicated building type

@@ -1020,7 +1020,7 @@ namespace {
                 .append("  specific cause: ").append(name_view)
                 .append("  sources: ").append(std::to_string(sz))
                 .append("  scope: ").append(boost::algorithm::erase_all_copy(scope->Dump(), "\n"));
-        }, std::chrono::milliseconds(5));
+        }, std::chrono::milliseconds(3));
 
         source_effects_targets_causes_out.reserve(source_objects.size());
 
@@ -1823,7 +1823,7 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
         }
     }
 
-    auto empire_ids = context.EmpireIDs();
+    const auto& empire_ids = context.EmpireIDs();
 
 
     // actually do destroy effect action.  Executing the effect just marks

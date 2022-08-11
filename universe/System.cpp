@@ -27,7 +27,7 @@ namespace {
 
 
 System::System(StarType star, std::string name, double x, double y, int current_turn) :
-    UniverseObject{std::move(name), x, y, ALL_EMPIRES, current_turn},
+    UniverseObject{UniverseObjectType::OBJ_SYSTEM, std::move(name), x, y, ALL_EMPIRES, current_turn},
     m_star(star)
 {
     if (m_star < StarType::INVALID_STAR_TYPE || StarType::NUM_STAR_TYPES < m_star)
@@ -136,9 +136,6 @@ void System::Copy(std::shared_ptr<const UniverseObject> copied_object,
     }
 }
 
-UniverseObjectType System::ObjectType() const
-{ return UniverseObjectType::OBJ_SYSTEM; }
-
 std::string System::Dump(unsigned short ntabs) const {
     std::string retval = UniverseObject::Dump(ntabs);
     retval.reserve(2048);
@@ -201,7 +198,7 @@ std::string System::ApparentName(int empire_id, const Universe& u,
 
     if (m_star == StarType::STAR_NONE) {
         // determine if there are any planets in the system
-        for (const auto& entry : o.ExistingPlanets()) {
+        for (const auto& entry : o.allExisting<Planet>()) {
             if (entry.second->SystemID() == this->ID())
                 return this->PublicName(empire_id, u);
         }
@@ -264,7 +261,7 @@ bool System::HasWormholeTo(int id) const {
 int System::EffectiveOwner(const ObjectMap& objects) const {
     // Check if all of the owners are the same empire.
     int first_owner_found = ALL_EMPIRES;
-    for (const auto& planet : objects.find<Planet>(m_planets)) {
+    for (const auto& planet : objects.findRaw<Planet>(m_planets)) {
         const int owner = planet->Owner();
         if (owner == ALL_EMPIRES)
             continue;
@@ -276,9 +273,6 @@ int System::EffectiveOwner(const ObjectMap& objects) const {
     return first_owner_found;
 }
 
-const std::set<int>& System::ContainedObjectIDs() const
-{ return m_objects; }
-
 bool System::Contains(int object_id) const {
     if (object_id == INVALID_OBJECT_ID)
         return false;
@@ -288,7 +282,10 @@ bool System::Contains(int object_id) const {
 std::shared_ptr<UniverseObject> System::Accept(const UniverseObjectVisitor& visitor) const
 { return visitor.Visit(std::const_pointer_cast<System>(std::static_pointer_cast<const System>(shared_from_this()))); }
 
-void System::Insert(std::shared_ptr<UniverseObject> obj, int orbit/* = -1*/) {
+void System::Insert(std::shared_ptr<UniverseObject> obj, int orbit)
+{ Insert (obj.get(), orbit); }
+
+void System::Insert(UniverseObject* obj, int orbit) {
     if (!obj) {
         ErrorLogger() << "System::Insert() : Attempted to place a null object in a System";
         return;
@@ -357,13 +354,13 @@ void System::Insert(std::shared_ptr<UniverseObject> obj, int orbit/* = -1*/) {
     switch (obj->ObjectType()) {
     case UniverseObjectType::OBJ_SHIP: {
         m_ships.insert(obj->ID());
-        if (auto ship = std::dynamic_pointer_cast<Ship>(obj))
+        if (auto ship = static_cast<Ship*>(obj))
             ship->SetArrivedOnTurn(CurrentTurn());
         break;
     }
     case UniverseObjectType::OBJ_FLEET: {
         m_fleets.insert(obj->ID());
-        FleetsInsertedSignal({std::dynamic_pointer_cast<Fleet>(obj)});
+        FleetsInsertedSignal({static_cast<Fleet*>(obj)});
         break;
     }
     case UniverseObjectType::OBJ_PLANET:
@@ -412,7 +409,7 @@ void System::Remove(int id) {
     m_objects.erase(id);
 
     if (removed_fleet) {
-        if (auto fleet = Objects().get<Fleet>(id))
+        if (auto fleet = Objects().getRaw<Fleet>(id))
             FleetsRemovedSignal({fleet});
     }
     StateChangedSignal();
@@ -501,9 +498,6 @@ std::set<int> System::FreeOrbits() const {
     return retval;
 }
 
-const std::map<int, bool>& System::StarlanesWormholes() const
-{ return m_starlanes_wormholes; }
-
 std::map<int, bool> System::VisibleStarlanesWormholes(int empire_id, const Universe& universe) const {
     if (empire_id == ALL_EMPIRES)
         return m_starlanes_wormholes;
@@ -546,11 +540,11 @@ std::map<int, bool> System::VisibleStarlanesWormholes(int empire_id, const Unive
     static const MovingFleetVisitor moving_fleet_visitor;
     for (auto& object : objects.find<Fleet>(moving_fleet_visitor)) {
         if (object && object->ObjectType() == UniverseObjectType::OBJ_FLEET && object->OwnedBy(empire_id))
-            moving_empire_fleets.push_back(static_cast<const Fleet*>(object.get()));
+            moving_empire_fleets.push_back(object.get());
     }
 
     // add any lanes an owned fleet is moving along that connect to this system
-    for (auto& fleet : moving_empire_fleets) {
+    for (auto* fleet : moving_empire_fleets) {
         if (fleet->SystemID() != INVALID_OBJECT_ID) {
             ErrorLogger() << "System::VisibleStarlanesWormholes somehow got a moving fleet that had a valid system id?";
             continue;

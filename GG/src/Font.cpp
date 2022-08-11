@@ -41,22 +41,22 @@ using namespace GG;
 
 namespace {
 
-const std::uint32_t WIDE_SPACE = ' ';
-const std::uint32_t WIDE_NEWLINE = '\n';
-const std::uint32_t WIDE_CR = '\r';
-const std::uint32_t WIDE_FF = '\f';
-const std::uint32_t WIDE_TAB = '\t';
+constexpr std::uint32_t WIDE_SPACE = ' ';
+constexpr std::uint32_t WIDE_NEWLINE = '\n';
+constexpr std::uint32_t WIDE_CR = '\r';
+constexpr std::uint32_t WIDE_FF = '\f';
+constexpr std::uint32_t WIDE_TAB = '\t';
 
-const std::string ITALIC_TAG = "i";
-const std::string SHADOW_TAG = "s";
-const std::string UNDERLINE_TAG = "u";
-const std::string SUPERSCRIPT_TAG = "sup";
-const std::string SUBSCRIPT_TAG = "sub";
-const std::string RGBA_TAG = "rgba";
-const std::string ALIGN_LEFT_TAG = "left";
-const std::string ALIGN_CENTER_TAG = "center";
-const std::string ALIGN_RIGHT_TAG = "right";
-const std::string PRE_TAG = "pre";
+constexpr std::string_view ITALIC_TAG = "i";
+constexpr std::string_view SHADOW_TAG = "s";
+constexpr std::string_view UNDERLINE_TAG = "u";
+constexpr std::string_view SUPERSCRIPT_TAG = "sup";
+constexpr std::string_view SUBSCRIPT_TAG = "sub";
+constexpr std::string_view RGBA_TAG = "rgba";
+constexpr std::string_view ALIGN_LEFT_TAG = "left";
+constexpr std::string_view ALIGN_CENTER_TAG = "center";
+constexpr std::string_view ALIGN_RIGHT_TAG = "right";
+constexpr std::string_view PRE_TAG = "pre";
 
 template <typename T>
 T NextPowerOfTwo(T input)
@@ -361,6 +361,10 @@ bool Font::Substring::operator==(std::string_view rhs) const
 
 bool Font::Substring::operator!=(const std::string& rhs) const
 { return !operator==(rhs); }
+
+bool Font::Substring::operator!=(std::string_view rhs) const
+{ return !operator==(rhs); }
+
 
 Font::Substring& Font::Substring::operator+=(const IterPair& rhs)
 {
@@ -746,9 +750,9 @@ public:
 
         // Create the opening part of an open tag, like this: "<tag"
         auto element = std::make_shared<Font::FormattingTag>(false);
-        size_t tag_begin = m_text.size();
-        size_t tag_name_begin = m_text.append("<").size();
-        size_t tag_name_end = m_text.append(tag).size();
+        auto tag_begin = m_text.size();
+        auto tag_name_begin = m_text.append("<").size();
+        auto tag_name_end = m_text.append(tag).size();
         element->tag_name = Substring(m_text,
                                       std::next(m_text.begin(), tag_name_begin),
                                       std::next(m_text.begin(), tag_name_end));
@@ -757,8 +761,8 @@ public:
         if (params) {
             for (const std::string& param : *params) {
                 m_text.append(" ");
-                size_t param_begin = m_text.size();
-                size_t param_end = m_text.append(param).size();
+                auto param_begin = m_text.size();
+                auto param_end = m_text.append(param).size();
 
                 element->params.emplace_back(m_text,
                                              std::next(m_text.begin(), param_begin),
@@ -767,7 +771,7 @@ public:
         }
 
         // Create the close part of an open tag to complete the tag, like this:"<tag param1 param2>"
-        size_t tag_end = m_text.append(">").size();
+        auto tag_end = m_text.append(">").size();
         element->text = Substring(m_text,
                                   std::next(m_text.begin(), tag_begin),
                                   std::next(m_text.begin(), tag_end));
@@ -785,10 +789,10 @@ public:
 
         // Create a close tag that looks like this: "</tag>"
         auto element = std::make_shared<Font::FormattingTag>(true);
-        size_t tag_begin = m_text.size();
-        size_t tag_name_begin = m_text.append("</").size();
-        size_t tag_name_end = m_text.append(tag).size();
-        size_t tag_end = m_text.append(">").size();
+        auto tag_begin = m_text.size();
+        auto tag_name_begin = m_text.append("</").size();
+        auto tag_name_end = m_text.append(tag).size();
+        auto tag_end = m_text.append(">").size();
         element->text = Substring(m_text,
                                   std::next(m_text.begin(), tag_begin),
                                   std::next(m_text.begin(), tag_end));
@@ -805,8 +809,8 @@ public:
         m_are_widths_calculated = false;
 
         auto element = std::make_shared<Font::TextElement>(false, false);
-        size_t begin = m_text.size();
-        size_t end = m_text.append(text).size();
+        auto begin = m_text.size();
+        auto end = m_text.append(text).size();
         element->text = Substring(m_text,
                                   std::next(m_text.begin(), begin),
                                   std::next(m_text.begin(), end));
@@ -819,8 +823,8 @@ public:
         m_are_widths_calculated = false;
 
         auto element = std::make_shared<Font::TextElement>(true, false);
-        size_t begin = m_text.size();
-        size_t end = m_text.append(whitespace).size();
+        auto begin = m_text.size();
+        auto end = m_text.append(whitespace).size();
         element->text = Substring(m_text,
                                   std::next(m_text.begin(), begin),
                                   std::next(m_text.begin(), end));
@@ -1079,7 +1083,7 @@ X Font::RenderText(const Pt& pt_, const std::string& text) const
 }
 
 void Font::RenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags<TextFormat>& format,
-                      const std::vector<LineData>& line_data, RenderState* render_state/* = 0*/) const
+                      const std::vector<LineData>& line_data, RenderState* render_state) const
 {
     RenderState state;
     if (!render_state)
@@ -1500,7 +1504,7 @@ void Font::ChangeTemplatedText(
     std::string& text,
     std::vector<std::shared_ptr<Font::TextElement>>& text_elements,
     const std::string& new_text,
-    size_t targ_offset) const
+    std::size_t targ_offset) const
 {
     if (targ_offset >= text_elements.size())
         return;
@@ -1511,15 +1515,15 @@ void Font::ChangeTemplatedText(
     int change_of_len = 0;
 
     // Find the target text element.
-    size_t curr_offset = 0;
+    std::size_t curr_offset = 0;
     std::vector<std::shared_ptr<Font::TextElement>>::iterator te_it = text_elements.begin();
     while (te_it != text_elements.end()) {
         if ((*te_it)->Type() == TextElement::TextElementType::TEXT) {
             // Change the target text element
             if (targ_offset == curr_offset) {
                 // Change text
-                size_t ii_sub_begin = (*te_it)->text.begin() - text.begin();
-                size_t sub_len = (*te_it)->text.end() - (*te_it)->text.begin();
+                auto ii_sub_begin = (*te_it)->text.begin() - text.begin();
+                auto sub_len = (*te_it)->text.end() - (*te_it)->text.begin();
                 text.erase(ii_sub_begin, sub_len);
                 text.insert(ii_sub_begin, new_text);
 
@@ -1544,8 +1548,8 @@ void Font::ChangeTemplatedText(
         // Adjust the offset of each subsequent text_element
         while (te_it != text_elements.end())
         {
-            size_t ii_sub_begin = (*te_it)->text.begin() - text.begin();
-            size_t ii_sub_end = (*te_it)->text.end() - text.begin();
+            auto ii_sub_begin = (*te_it)->text.begin() - text.begin();
+            auto ii_sub_end = (*te_it)->text.end() - text.begin();
             (*te_it)->text = Substring(text,
                                        std::next(text.begin(), ii_sub_begin + change_of_len),
                                        std::next(text.begin(), ii_sub_end + change_of_len));

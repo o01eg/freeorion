@@ -46,7 +46,7 @@ namespace {
 
         auto formatter = FlexibleFormat(key);
 
-        size_t arg = 1;
+        std::size_t arg = 1;
         for (auto submatch : match.nested_results())
             formatter.bind_arg(arg++, submatch.str());
 
@@ -137,12 +137,12 @@ void MessageWndEdit::FindGameWords() {
         m_game_words.insert(empire->PlayerName());
     }
     // add system names
-    for (auto& system : GetUniverse().Objects().all<System>()) {
+    for (auto system : GetUniverse().Objects().allRaw<System>()) {
         if (!system->Name().empty())
             m_game_words.insert(system->Name());
     }
      // add ship names
-    for (auto& ship : GetUniverse().Objects().all<Ship>()) {
+    for (auto ship : GetUniverse().Objects().allRaw<Ship>()) {
         if (!ship->Name().empty())
             m_game_words.insert(ship->Name());
     }
@@ -164,7 +164,7 @@ void MessageWndEdit::FindGameWords() {
         (void)species; // quiet unused variable warning
     }
      // add techs names
-    for (const std::string& tech_name : GetTechManager().TechNames()) {
+    for (const auto& tech_name : GetTechManager().TechNames()) {
         if (!tech_name.empty())
             m_game_words.insert(UserString(tech_name));
     }
@@ -405,7 +405,7 @@ void MessageWnd::HandlePlayerChatMessage(const std::string& text,
     }
 }
 
-void MessageWnd::HandleTurnPhaseUpdate(Message::TurnProgressPhase phase_id, bool prefixed /*= false*/) {
+void MessageWnd::HandleTurnPhaseUpdate(Message::TurnProgressPhase phase_id, bool prefixed) {
     std::string phase_str;
     switch (phase_id) {
     case Message::TurnProgressPhase::FLEET_MOVEMENT:

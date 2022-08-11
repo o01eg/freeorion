@@ -30,12 +30,7 @@ def _get_property_return_type_by_name(attr_name: str) -> str:
 def _update_property_return_type(attr_name: str, rtype: str):
     """
     Match property of known type.
-
-    This method is double check for case when
-    properties of different object could have different return types.
-
     """
-
     if rtype.startswith("<type"):
         rtype = rtype[7:-2]
     else:
@@ -57,6 +52,7 @@ def _update_property_return_type(attr_name: str, rtype: str):
         ("owner", "int"): "EmpireId",
         ("speciesName", "str"): "SpeciesName",
         ("designedOnTurn", "int"): "Turn",
+        ("buildingTypeName", "str"): "BuildingName",
     }
     return property_map.get((attr_name, rtype), rtype)
 
@@ -110,7 +106,6 @@ def _handle_class(info: ClassInfo):
         else:
             result.append("    @property")
             result.append("    def %s(self)%s: ..." % (property_name, return_annotation))
-        result.append("")
 
     for routine_name, routine_docs in instance_methods:
         docs = Docs(routine_docs, 2, is_class=True)
@@ -136,11 +131,9 @@ def _handle_class(info: ClassInfo):
 
             result.append("    def %s(*args)%s:%s%s" % (routine_name, return_annotation, doc_string, end))
 
-        result.append("")
     if not (properties or instance_methods):
-        result.append("    ...")
-    if not result[-1]:
-        result.pop()
+        result[-1] += " ..."
+    result.append("")
     yield "\n".join(result)
 
 

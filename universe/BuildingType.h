@@ -101,8 +101,10 @@ public:
     auto ProductionSpecialConsumption() const -> const ConsumptionMap<std::string>&
     { return m_production_special_consumption; }
 
-    auto Tags() const -> const std::set<std::string>&
-    { return m_tags; }
+    const auto& Tags() const { return m_tags; }
+
+    auto HasTag(std::string_view tag) const -> bool
+    { return std::any_of(m_tags.begin(), m_tags.end(), [tag](const auto& t) { return t == tag; }); }
 
     //! Returns the condition that determines the locations where this building
     //! can be produced
@@ -161,7 +163,8 @@ private:
     std::unique_ptr<ValueRef::ValueRef<int>>            m_production_time;
     bool                                                m_producible = true;
     CaptureResult                                       m_capture_result;
-    std::set<std::string>                               m_tags;
+    const std::string                                   m_tags_concatenated;
+    const std::vector<std::string_view>                 m_tags;
     ConsumptionMap<MeterType>                           m_production_meter_consumption;
     ConsumptionMap<std::string>                         m_production_special_consumption;
     std::unique_ptr<Condition::Condition>               m_location;
@@ -173,12 +176,12 @@ private:
 //! Holds all FreeOrion BuildingType%s.  Types may be looked up by name.
 class BuildingTypeManager {
 public:
-    using container_type = std::map<std::string, std::unique_ptr<BuildingType>>;
+    using container_type = std::map<std::string, std::unique_ptr<BuildingType>, std::less<>>;
     using iterator = container_type::const_iterator;
 
     //! Returns the building type with the name @p name; you should use the
     //! free function GetBuildingType(...) instead, mainly to save some typing.
-    auto GetBuildingType(const std::string& name) const -> const BuildingType*;
+    auto GetBuildingType(std::string_view name) const -> const BuildingType*;
 
     auto NumBuildingTypes() const -> std::size_t { return m_building_types.size(); }
 
@@ -225,7 +228,7 @@ FO_COMMON_API auto GetBuildingTypeManager() -> BuildingTypeManager&;
 
 //! Returns the BuildingType specification object for a building of type
 //! @p name.  If no such BuildingType exists, nullptr is returned instead.
-FO_COMMON_API auto GetBuildingType(const std::string& name) -> const BuildingType*;
+FO_COMMON_API auto GetBuildingType(std::string_view name) -> const BuildingType*;
 
 
 #endif

@@ -110,6 +110,39 @@ ShipHull::ShipHull(float fuel, float speed, float stealth, float structure,
     m_production_time(std::move(common_params.production_time)),
     m_producible(common_params.producible),
     m_slots(std::move(slots)),
+    m_tags_concatenated([&common_params]() {
+        // ensure tags are all upper-case
+        std::for_each(common_params.tags.begin(), common_params.tags.end(),
+                      [](auto& t) { boost::to_upper<std::string>(t); });
+
+        // allocate storage for concatenated tags
+        std::string retval;
+        // TODO: transform_reduce when available on all platforms...
+        std::size_t params_sz = 0;
+        for (const auto& t : common_params.tags)
+            params_sz += t.size();
+        retval.reserve(params_sz);
+
+        // concatenate tags
+        std::for_each(common_params.tags.begin(), common_params.tags.end(),
+                      [&retval](const auto& t) { retval.append(t); });
+        return retval;
+    }()),
+    m_tags([&common_params, this]() {
+        std::vector<std::string_view> retval;
+        std::size_t next_idx = 0;
+        retval.reserve(common_params.tags.size());
+        std::string_view sv{m_tags_concatenated};
+
+        // store views into concatenated tags string
+        std::for_each(common_params.tags.begin(), common_params.tags.end(),
+                      [&next_idx, &retval, this, sv](const auto& t)
+        {
+            retval.push_back(sv.substr(next_idx, t.size()));
+            next_idx += t.size();
+        });
+        return retval;
+    }()),
     m_production_meter_consumption(std::move(common_params.production_meter_consumption)),
     m_production_special_consumption(std::move(common_params.production_special_consumption)),
     m_location(std::move(common_params.location)),
@@ -123,9 +156,6 @@ ShipHull::ShipHull(float fuel, float speed, float stealth, float structure,
          default_speed_effects,
          default_stealth_effects,
          default_structure_effects);
-
-    for (const std::string& tag : common_params.tags)
-        m_tags.insert(boost::to_upper_copy<std::string>(tag));
 }
 
 ShipHull::~ShipHull() = default;
@@ -290,7 +320,7 @@ float ShipHull::ProductionCost(int empire_id, int location_id,
         return static_cast<float>(m_production_cost->Eval(design_id_context));
     }
 
-    auto location = parent_context.ContextObjects().get(location_id);
+    auto location = parent_context.ContextObjects().getRaw(location_id);
     if (!location && !m_production_cost->TargetInvariant())
         return ARBITRARY_LARGE_COST;
 
@@ -300,8 +330,8 @@ float ShipHull::ProductionCost(int empire_id, int location_id,
         return ARBITRARY_LARGE_COST;
 
     const ScriptingContext design_id_context{
-        parent_context, std::move(source),
-        std::const_pointer_cast<UniverseObject>(location), // won't be modified when evaluating a ValueRef, but needs to be a pointer to mutable to be passed as the target object
+        parent_context, source.get(),
+        const_cast<UniverseObject*>(location), // won't be modified when evaluating a ValueRef, but needs to be a pointer to mutable to be passed as the target object
         in_design_id, PRODUCTION_BLOCK_SIZE};
     return static_cast<float>(m_production_cost->Eval(design_id_context));
 }
@@ -323,7 +353,7 @@ int ShipHull::ProductionTime(int empire_id, int location_id,
         return m_production_time->Eval(design_id_context);
     }
 
-    auto location = parent_context.ContextObjects().get(location_id);
+    auto location = parent_context.ContextObjects().getRaw(location_id);
     if (!location && !m_production_time->TargetInvariant())
         return ARBITRARY_LARGE_TURNS;
 
@@ -333,8 +363,8 @@ int ShipHull::ProductionTime(int empire_id, int location_id,
         return ARBITRARY_LARGE_TURNS;
 
     const ScriptingContext design_id_context{
-        parent_context, std::move(source),
-        std::const_pointer_cast<UniverseObject>(location), // won't be modified when evaluating a ValueRef, but needs to be a pointer to mutable to be passed as the target object
+        parent_context, source.get(),
+        const_cast<UniverseObject*>(location), // won't be modified when evaluating a ValueRef, but needs to be a pointer to mutable to be passed as the target object
         in_design_id, PRODUCTION_BLOCK_SIZE};
     return m_production_time->Eval(design_id_context);
 }
@@ -375,7 +405,7 @@ ShipHullManager::ShipHullManager() {
     s_instance = this;
 }
 
-const ShipHull* ShipHullManager::GetShipHull(const std::string& name) const {
+const ShipHull* ShipHullManager::GetShipHull(std::string_view name) const {
     CheckPendingShipHulls();
     auto it = m_hulls.find(name);
     return it != m_hulls.end() ? it->second.get() : nullptr;
@@ -446,5 +476,6 @@ namespace CheckSums {
 ShipHullManager& GetShipHullManager()
 { return ShipHullManager::GetShipHullManager(); }
 
-const ShipHull* GetShipHull(const std::string& name)
-{ return GetShipHullManager().GetShipHull(name); }
+const ShipHull* GetShipHull(std::string_view name)
+{ return GetShipHullManager().GetShipHull(std::string{name}); }
+

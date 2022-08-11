@@ -7,8 +7,11 @@ import traceback
 from collections.abc import Mapping
 from functools import wraps
 from logging import ERROR, Handler, debug, error, getLogger, warning
+from typing import Optional
 
+import AIDependencies
 from common.configure_logging import FOLogFormatter
+from common.fo_typing import SpeciesName
 from freeorion_tools.caching import cache_for_current_turn, cache_for_session
 
 # color wrappers for chat:
@@ -49,14 +52,25 @@ def get_ai_tag_grade(tag_list, tag_type):
     return ""
 
 
-def tech_is_complete(tech):
+def tech_is_complete(tech: str) -> bool:
     """
-    Return if tech is complete.
+    Return if tech has been researched.
     """
     return fo.getEmpire().techResearched(tech)
 
 
-def policy_is_adopted(policy):
+def tech_soon_available(tech: str, max_position: int) -> bool:
+    """
+    Return if tech has been researched or is in at most in max_position in the current research queue.
+    """
+    empire = fo.getEmpire()
+    if empire.techResearched(tech):
+        return True
+    research_queue = empire.researchQueue
+    return any(research_queue[i].tech == tech for i in range(0, min(max_position, len(research_queue))))
+
+
+def policy_is_adopted(policy: str) -> bool:
     """
     Return if policy is currently adopted.
     """
@@ -301,7 +315,8 @@ def assertion_fails(cond: bool, msg: str = "") -> bool:
 
 
 @cache_for_session
-def get_species_tag_grade(species_name, tag_type):
+def get_species_tag_grade(species_name: Optional[SpeciesName], tag_type: AIDependencies.Tags) -> str:
+    """Determine grade string ("NO", "BAD", "GOOD", etc.), if any, for given tag and species."""
     if not species_name:
         return ""
     species = fo.getSpecies(species_name)
@@ -309,6 +324,66 @@ def get_species_tag_grade(species_name, tag_type):
         return ""
 
     return get_ai_tag_grade(species.tags, tag_type)
+
+
+@cache_for_session
+def get_species_stealth(species_name: Optional[SpeciesName]) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.STEALTH)
+    return AIDependencies.STEALTH_STRENGTHS_BY_SPECIES_TAG.get(grade, 0.0)
+
+
+@cache_for_session
+def get_species_attack_troops(species_name: Optional[SpeciesName]) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.ATTACKTROOPS)
+    return AIDependencies.SPECIES_TROOP_MODIFIER.get(grade, 1.0)
+
+
+@cache_for_session
+def get_species_fuel(species_name: Optional[SpeciesName]) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.FUEL)
+    return AIDependencies.SPECIES_FUEL_MODIFIER.get(grade, 0.0)
+
+
+@cache_for_session
+def get_species_ship_shields(species_name: Optional[SpeciesName]) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.SHIP_SHIELDS)
+    return AIDependencies.SPECIES_SHIP_SHIELD_MODIFIER.get(grade, 0.0)
+
+
+@cache_for_session
+def get_species_stability(species_name: Optional[SpeciesName]) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.STABILITY)
+    return AIDependencies.SPECIES_STABILITY_MODIFIER.get(grade, 0.0)
+
+
+@cache_for_session
+def get_species_supply(species_name: Optional[SpeciesName]) -> int:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.SUPPLY)
+    return int(AIDependencies.SPECIES_SUPPLY_MODIFIER.get(grade, 1))
+
+
+@cache_for_session
+def get_species_population(species_name: Optional[SpeciesName]) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.POPULATION)
+    return AIDependencies.SPECIES_POPULATION_MODIFIER.get(grade, 1.0)
+
+
+@cache_for_session
+def get_species_influence(species_name: Optional[SpeciesName]) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.INFLUENCE)
+    return AIDependencies.SPECIES_INFLUENCE_MODIFIER.get(grade, 1.0)
+
+
+@cache_for_session
+def get_species_research(species_name: Optional[SpeciesName]) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.RESEARCH)
+    return AIDependencies.SPECIES_RESEARCH_MODIFIER.get(grade, 1.0)
+
+
+@cache_for_session
+def get_species_industry(species_name: Optional[SpeciesName]) -> float:
+    grade = get_species_tag_grade(species_name, AIDependencies.Tags.INDUSTRY)
+    return AIDependencies.SPECIES_INDUSTRY_MODIFIER.get(grade, 1.0)
 
 
 @cache_for_session
@@ -325,3 +400,29 @@ def get_ship_part(part_name: str):
         warning("Could not find part %s" % part_name)
 
     return part_type
+
+
+def get_named_int(name: str) -> int:
+    """
+    Returns a NamedReal from FOCS.
+    If the value does not exist, reports an error and returns 1.
+    Note that we do not raise and exception so that the AI can continue, as good as it can, with outdated information.
+    This is also why we return 1, returning 0 could cause followup errors if the value is used as divisor.
+    """
+    if fo.namedIntDefined(name):
+        return fo.getNamedInt(name)
+    error(f"Requested integer {name} does not exist!")
+    return 1
+
+
+def get_named_real(name: str) -> float:
+    """
+    Returns a NamedReal from FOCS.
+    If the value does not exist, reports an error and returns 1.0.
+    Note that we do not raise and exception so that the AI can continue, as good as it can, with outdated information.
+    This is also why we return 1, returning 0 could cause followup errors if the value is used as divisor.
+    """
+    if fo.namedRealDefined(name):
+        return fo.getNamedReal(name)
+    error(f"Requested integer {name} does not exist!")
+    return 1.0

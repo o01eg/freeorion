@@ -5,129 +5,67 @@
 #include "../universe/Conditions.h"
 #include "../universe/ValueRefs.h"
 
-value_ref_wrapper<int> source_wrapper::owner() const {
-    auto variable = std::make_shared<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "Owner");
-    return value_ref_wrapper<int>(variable);
+value_ref_wrapper<int> variable_wrapper::get_int_property(const char *property) const {
+    std::vector property_name = std::vector(m_container);
+    property_name.emplace_back(property);
+    return value_ref_wrapper<int>(std::make_shared<ValueRef::Variable<int>>(m_reference_type, property_name));
 }
 
-source_wrapper::operator condition_wrapper() const {
-    return condition_wrapper(std::make_shared<Condition::Source>());
+value_ref_wrapper<double> variable_wrapper::get_double_property(const char *property) const {
+    std::vector property_name = std::vector(m_container);
+    property_name.emplace_back(property);
+    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(m_reference_type, property_name));
 }
 
-value_ref_wrapper<double> target_wrapper::construction() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Construction"));
+value_ref_wrapper<std::string> variable_wrapper::get_string_property(const char *property) const {
+    std::vector property_name = std::vector(m_container);
+    property_name.emplace_back(property);
+    return value_ref_wrapper<std::string>(std::make_shared<ValueRef::Variable<std::string>>(m_reference_type, property_name));
 }
 
-value_ref_wrapper<double> target_wrapper::habitable_size() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "HabitableSize"));
+variable_wrapper variable_wrapper::get_variable_property(const char *property) const {
+    return variable_wrapper(m_reference_type, std::vector{std::string(property)});
 }
 
-value_ref_wrapper<double> target_wrapper::max_shield() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "MaxShield"));
+variable_wrapper::operator condition_wrapper() const {
+    switch (m_reference_type) {
+        case ValueRef::ReferenceType::SOURCE_REFERENCE:
+            return condition_wrapper(std::make_shared<Condition::Source>());
+        case ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE:
+            return condition_wrapper(std::make_shared<Condition::Target>());
+        case ValueRef::ReferenceType::CONDITION_ROOT_CANDIDATE_REFERENCE:
+            return condition_wrapper(std::make_shared<Condition::RootCandidate>());
+        default:
+            throw std::runtime_error(std::string("Not implemented in ") + __func__ + " type " + std::to_string(static_cast<signed int>(m_reference_type)));
+    }
 }
 
-value_ref_wrapper<double> target_wrapper::max_defense() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "MaxDefense"));
-}
+condition_wrapper operator&(const variable_wrapper& lhs, const condition_wrapper& rhs) {
+    std::unique_ptr<Condition::Condition> variable;
+    switch (lhs.m_reference_type) {
+        case ValueRef::ReferenceType::SOURCE_REFERENCE:
+            variable = std::make_unique<Condition::Source>();
+            break;
+        case ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE:
+            variable = std::make_unique<Condition::Target>();
+            break;
+        case ValueRef::ReferenceType::CONDITION_ROOT_CANDIDATE_REFERENCE:
+            variable = std::make_unique<Condition::RootCandidate>();
+            break;
+        default:
+            throw std::runtime_error(std::string("Not implemented in ") + __func__ + " type " + std::to_string(static_cast<int>(lhs.m_reference_type)) + rhs.condition->Dump());
+    }
 
-value_ref_wrapper<double> target_wrapper::max_troops() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "MaxTroops"));
-}
-
-value_ref_wrapper<double> target_wrapper::target_happiness() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "TargetHappiness"));
-}
-
-value_ref_wrapper<double> target_wrapper::target_industry() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "TargetIndustry"));
-}
-
-value_ref_wrapper<double> target_wrapper::target_research() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "TargetResearch"));
-}
-
-value_ref_wrapper<double> target_wrapper::target_construction() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "TargetConstruction"));
-}
-
-value_ref_wrapper<double> target_wrapper::max_stockpile() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "MaxStockpile"));
-}
-
-value_ref_wrapper<int> target_wrapper::id() const {
-    return value_ref_wrapper<int>(std::make_shared<ValueRef::Variable<int>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "ID"));
-}
-
-value_ref_wrapper<int> target_wrapper::owner() const {
-    return value_ref_wrapper<int>(std::make_shared<ValueRef::Variable<int>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Owner"));
-}
-
-value_ref_wrapper<int> target_wrapper::system_id() const {
-    return value_ref_wrapper<int>(std::make_shared<ValueRef::Variable<int>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "SystemID"));
-}
-
-value_ref_wrapper<int> target_wrapper::design_id() const {
-    return value_ref_wrapper<int>(std::make_shared<ValueRef::Variable<int>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "DesignID"));
-}
-
-target_wrapper::operator condition_wrapper() const {
-    return condition_wrapper(std::make_shared<Condition::Target>());
-}
-
-condition_wrapper operator&(const target_wrapper& lhs, const condition_wrapper& rhs) {
     return condition_wrapper(std::make_shared<Condition::And>(
-        std::make_unique<Condition::Target>(),
+        std::move(variable),
         rhs.condition->Clone()
     ));
 }
 
-value_ref_wrapper<int> local_candidate_wrapper::last_turn_attacked_by_ship() const {
-    return value_ref_wrapper<int>(std::make_shared<ValueRef::Variable<int>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "LastTurnAttackedByShip"));
-}
-
-value_ref_wrapper<int> local_candidate_wrapper::last_turn_conquered() const {
-    return value_ref_wrapper<int>(std::make_shared<ValueRef::Variable<int>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "LastTurnConquered"));
-}
-
-value_ref_wrapper<int> local_candidate_wrapper::last_turn_colonized() const {
-    return value_ref_wrapper<int>(std::make_shared<ValueRef::Variable<int>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "LastTurnColonized"));
-}
-
-value_ref_wrapper<double> local_candidate_wrapper::industry() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "Industry"));
-}
-
-value_ref_wrapper<double> local_candidate_wrapper::target_industry() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "TargetIndustry"));
-}
-
-value_ref_wrapper<double> local_candidate_wrapper::research() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "Research"));
-}
-
-value_ref_wrapper<double> local_candidate_wrapper::target_research() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "TargetResearch"));
-}
-
-value_ref_wrapper<double> local_candidate_wrapper::construction() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "Construction"));
-}
-
-value_ref_wrapper<double> local_candidate_wrapper::target_construction() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "TargetConstruction"));
-}
-
-value_ref_wrapper<double> local_candidate_wrapper::stockpile() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "Stockpile"));
-}
-
-value_ref_wrapper<double> local_candidate_wrapper::max_stockpile() const {
-    return value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "MaxStockpile"));
-}
-
 void RegisterGlobalsSources(boost::python::dict& globals) {
-    globals["Source"] = source_wrapper();
-    globals["Target"] = target_wrapper();
-    globals["LocalCandidate"] = local_candidate_wrapper();
+    globals["Source"] = variable_wrapper(ValueRef::ReferenceType::SOURCE_REFERENCE);
+    globals["Target"] = variable_wrapper(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE);
+    globals["LocalCandidate"] = variable_wrapper(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE);
+    globals["RootCandidate"] = variable_wrapper(ValueRef::ReferenceType::CONDITION_ROOT_CANDIDATE_REFERENCE);
 }
 

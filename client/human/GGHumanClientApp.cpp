@@ -145,8 +145,13 @@ namespace {
         SetEmptyStringDefaultOption("setup.multiplayer.player.name", player_name);
     }
 
-    std::string GetGLVersionString()
-    { return boost::lexical_cast<std::string>(glGetString(GL_VERSION)); }
+    std::string GetGLVersionString() {
+        std::array<std::string::value_type, 64> buff{};
+        auto* v = glGetString(GL_VERSION);
+        for (auto buff_it = buff.begin(); v && *v && buff_it != buff.end();)
+            *buff_it++ = *v++;
+        return buff.data();
+    }
 
     static float stored_gl_version = -1.0f;  // to be replaced when gl version first checked
 
@@ -408,7 +413,7 @@ bool GGHumanClientApp::CanSaveNow() const {
     return true;
 }
 
-void GGHumanClientApp::SetSinglePlayerGame(bool sp/* = true*/)
+void GGHumanClientApp::SetSinglePlayerGame(bool sp)
 { m_single_player_game = sp; }
 
 #ifdef FREEORION_MACOSX
@@ -614,7 +619,7 @@ void GGHumanClientApp::NewSinglePlayerGame(bool quickstart) {
 
 
     TraceLogger() << "Sending host SP setup message";
-    m_networking->SendMessage(HostSPGameMessage(setup_data));
+    m_networking->SendMessage(HostSPGameMessage(setup_data, DependencyVersions()));
     m_fsm->process_event(HostSPGameRequested());
     TraceLogger() << "GGHumanClientApp::NewSinglePlayerGame done";
 }
@@ -663,7 +668,7 @@ void GGHumanClientApp::MultiPlayerGame() {
     }
 
     if (server_connect_wnd->GetResult().server_dest == "HOST GAME SELECTED") {
-        m_networking->SendMessage(HostMPGameMessage(server_connect_wnd->GetResult().player_name));
+        m_networking->SendMessage(HostMPGameMessage(server_connect_wnd->GetResult().player_name, DependencyVersions()));
         m_fsm->process_event(HostMPGameRequested());
     } else {
         boost::uuids::uuid cookie = boost::uuids::nil_uuid();
@@ -725,7 +730,7 @@ void GGHumanClientApp::SaveGameCompleted() {
     }
 }
 
-void GGHumanClientApp::LoadSinglePlayerGame(std::string filename/* = ""*/) {
+void GGHumanClientApp::LoadSinglePlayerGame(std::string filename) {
     DebugLogger() << "GGHumanClientApp::LoadSinglePlayerGame";
 
     if (!filename.empty()) {
@@ -799,7 +804,7 @@ void GGHumanClientApp::LoadSinglePlayerGame(std::string filename/* = ""*/) {
     // leving setup_data.m_players empty : not specified when loading a game, as server will generate from save file
 
 
-    m_networking->SendMessage(HostSPGameMessage(setup_data));
+    m_networking->SendMessage(HostSPGameMessage(setup_data, DependencyVersions()));
     m_fsm->process_event(HostSPGameRequested());
 }
 
@@ -989,11 +994,13 @@ void GGHumanClientApp::RenderBegin() {
 }
 
 void GGHumanClientApp::HandleMessage(Message&& msg) {
+    auto msg_type = msg.Type();
+
     if (INSTRUMENT_MESSAGE_HANDLING)
-        std::cerr << "GGHumanClientApp::HandleMessage(" << msg.Type() << ")\n";
+        std::cerr << "GGHumanClientApp::HandleMessage(" << msg_type << ")\n";
 
     try {
-        switch (msg.Type()) {
+        switch (msg_type) {
         case Message::MessageType::ERROR_MSG:               m_fsm->process_event(Error(msg));                   break;
         case Message::MessageType::HOST_MP_GAME:            m_fsm->process_event(HostMPGame(msg));              break;
         case Message::MessageType::HOST_SP_GAME:            m_fsm->process_event(HostSPGame(msg));              break;
@@ -1021,11 +1028,11 @@ void GGHumanClientApp::HandleMessage(Message&& msg) {
         case Message::MessageType::TURN_TIMEOUT:            m_fsm->process_event(TurnTimeout(msg));             break;
         case Message::MessageType::PLAYER_INFO:             m_fsm->process_event(PlayerInfoMsg(msg));           break;
         default:
-            ErrorLogger() << "GGHumanClientApp::HandleMessage : Received an unknown message type \"" << msg.Type() << "\".";
+            ErrorLogger() << "GGHumanClientApp::HandleMessage : Received an unknown message type \"" << msg_type << "\".";
         }
     } catch (const std::exception& e) {
         ErrorLogger() << "GGHumanClientApp::HandleMessage : Exception while reacting to message of type \""
-                      << msg.Type() << "\". what: " << e.what();
+                      << msg_type << "\". what: " << e.what();
     }
 }
 
@@ -1033,12 +1040,14 @@ void GGHumanClientApp::UpdateCombatLogs(const Message& msg) {
     ScopedTimer timer("GGHumanClientApp::UpdateCombatLogs");
 
     // Unpack the combat logs from the message
-    std::vector<std::pair<int, CombatLog>> logs;
-    ExtractDispatchCombatLogsMessageData(msg, logs);
+    try {
+        std::vector<std::pair<int, CombatLog>> logs;
+        ExtractDispatchCombatLogsMessageData(msg, logs);
 
-    // Update the combat log manager with the completed logs.
-    for (auto it = logs.begin(); it != logs.end(); ++it)
-        GetCombatLogManager().CompleteLog(it->first, it->second);
+        // Update the combat log manager with the completed logs.
+        for (auto it = logs.begin(); it != logs.end(); ++it)
+            GetCombatLogManager().CompleteLog(it->first, it->second);
+    } catch (...) {}
 }
 
 void GGHumanClientApp::HandleSaveGamePreviews(const Message& msg) {
@@ -1046,16 +1055,20 @@ void GGHumanClientApp::HandleSaveGamePreviews(const Message& msg) {
     if (!sfd)
         return;
 
-    PreviewInformation previews;
-    ExtractDispatchSavePreviewsMessageData(msg, previews);
-    DebugLogger() << "GGHumanClientApp::RequestSavePreviews Got " << previews.previews.size() << " previews.";
+    try {
+        PreviewInformation previews;
+        ExtractDispatchSavePreviewsMessageData(msg, previews);
+        DebugLogger() << "GGHumanClientApp::RequestSavePreviews Got " << previews.previews.size() << " previews.";
 
-    sfd->SetPreviewList(std::move(previews));
+        sfd->SetPreviewList(std::move(previews));
+    } catch (...) {}
 }
 
 void GGHumanClientApp::HandleSetAuthRoles(const Message& msg) {
-    ExtractSetAuthorizationRolesMessage(msg, m_networking->AuthorizationRoles());
-    DebugLogger() << "New roles: " << m_networking->AuthorizationRoles().Text();
+    try {
+        ExtractSetAuthorizationRolesMessage(msg, m_networking->AuthorizationRoles());
+        DebugLogger() << "New roles: " << m_networking->AuthorizationRoles().Text();
+    } catch (...) {}
 }
 
 void GGHumanClientApp::ChangeLoggerThreshold(const std::string& option_name, LogLevel option_value) {
@@ -1438,7 +1451,7 @@ void GGHumanClientApp::ExitApp(int exit_code)
 void GGHumanClientApp::ExitSDL(int exit_code)
 { SDLGUI::ExitApp(exit_code); }
 
-void GGHumanClientApp::ResetOrExitApp(bool reset, bool skip_savegame, int exit_code /* = 0*/) {
+void GGHumanClientApp::ResetOrExitApp(bool reset, bool skip_savegame, int exit_code ) {
     DebugLogger() << "GGHumanClientApp::ResetOrExitApp(" << reset << ", " << skip_savegame << ", " << exit_code << ")";
     if (m_exit_handled) {
         static int repeat_count = 0;

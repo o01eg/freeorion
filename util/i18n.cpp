@@ -9,21 +9,19 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <atomic>
 
-#if BOOST_VERSION >= 106500
 // define needed on Windows due to conflict with windows.h and std::min and std::max
-#  ifndef NOMINMAX
-#    define NOMINMAX
-#  endif
-// define needed in GCC
-#  ifndef _GNU_SOURCE
-#    define _GNU_SOURCE
-#  endif
-#  if defined(_MSC_VER) && _MSC_VER >= 1930
-struct IUnknown; // Workaround for "combaseapi.h(229,21): error C2760: syntax error: 'identifier' was unexpected here; expected 'type specifier'"
-#  endif
-
-#  include <boost/stacktrace.hpp>
+#ifndef NOMINMAX
+#  define NOMINMAX
 #endif
+// define needed in GCC
+#ifndef _GNU_SOURCE
+#  define _GNU_SOURCE
+#endif
+#if defined(_MSC_VER) && _MSC_VER >= 1930
+struct IUnknown; // Workaround for "combaseapi.h(229,21): error C2760: syntax error: 'identifier' was unexpected here; expected 'type specifier'"
+#endif
+
+#include <boost/stacktrace.hpp>
 
 namespace {
     std::map<std::string, std::shared_ptr<StringTable>> stringtables;
@@ -37,15 +35,11 @@ namespace {
 
     std::string StackTrace() {
         static std::atomic<int> string_error_lookup_count = 0;
-        if (string_error_lookup_count++ > 10)
+        if (string_error_lookup_count++ > 3)
             return "";
-#if BOOST_VERSION >= 106500
         std::stringstream ss;
         ss << "stacktrace:\n" << boost::stacktrace::stacktrace();
         return ss.str();
-#else
-        return "";
-#endif
     }
 
 
@@ -278,34 +272,20 @@ namespace {
 }
 
 #if !defined(FREEORION_ANDROID)
-std::locale GetLocale(const std::string& name) {
-    static bool locale_init { false };
-    // Initialize backend and generator on first use, provide a log for current enivornment locale
-    static auto locale_backend = boost::locale::localization_backend_manager::global();
-    if (!locale_init)
+const std::locale& GetLocale(std::string_view name) {
+    thread_local auto retval = [name_str{std::string{name}}]() -> std::locale {
+        static auto locale_backend = boost::locale::localization_backend_manager::global();
         locale_backend.select("std");
-    static boost::locale::generator locale_gen(locale_backend);
-    if (!locale_init) {
+        static boost::locale::generator locale_gen(locale_backend);
         locale_gen.locale_cache_enabled(true);
         try {
-            InfoLogger() << "Global locale: " << std::use_facet<boost::locale::info>(locale_gen("")).name();
-        } catch (const std::runtime_error&) {
-            ErrorLogger() << "Global locale: set to invalid locale, setting to C locale";
-            std::locale::global(std::locale::classic());
+            auto retval = locale_gen.generate(name_str);
+            std::use_facet<boost::locale::info>(retval);
+            return retval;
+        } catch (...) {
+            return std::locale::classic();
         }
-        locale_init = true;
-    }
-
-    std::locale retval;
-    try {
-        retval = locale_gen(name);
-    } catch(const std::runtime_error&) {
-        ErrorLogger() << "Requested locale \"" << name << "\" is not a valid locale for this operating system";
-        return std::locale::classic();
-    }
-
-    TraceLogger() << "Requested " << (name.empty() ? "(default)" : name) << " locale"
-                  << " returning " << std::use_facet<boost::locale::info>(retval).name();
+    }();
     return retval;
 }
 #endif
@@ -465,30 +445,27 @@ const std::string& Language() {
 
 std::string RomanNumber(unsigned int n) {
     //letter pattern (N) and the associated values (V)
-    static const std::string N[] =      { "M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
-    static constexpr unsigned int V[] = {1000,  900, 500,  400, 100,   90,  50,   40,  10,    9,   5,    4,   1};
-    unsigned int remainder = n; // remainder of the number to be written
-    int i = 0;                  // pattern index
-    if (n == 0) return "";      // the romans didn't know there is a zero, read a book about history of the zero if you want to know more
-                                // Roman numbers are written using patterns, you chosse the highest pattern lower that the number
-                                // write it down, and substract it's value until you reach zero.
+    static constexpr std::array N = {  "M",  "CM",  "D",  "CD",  "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I" };
+    static constexpr std::array V = { 1000u, 900u, 500u,  400u, 100u,  90u, 50u,  40u, 10u,   9u,  5u,   4u,  1u };
+    if (n == 0) return ""; // the romans didn't know there is a zero, read a book about history of the zero if you want to know more
+                           // Roman numbers are written using patterns, you chosse the highest pattern lower that the number
+                           // write it down, and substract it's value until you reach zero.
 
     // safety check to avoid very long loops
     if (n > 10000)
         return "!";
 
-    //we start with the highest pattern and reduce the size every time it doesn't fit
+    // start with the highest pattern and reduce the size every time it doesn't fit
     std::string retval;
+    unsigned int remainder = n; // remainder of the number to be written
+    int i = 0;                  // pattern index
     while (remainder > 0) {
-        //check if number is larger than the actual pattern value
+        // check if number is larger than the actual pattern value
         if (remainder >= V[i]) {
-            //write pattern down
-            retval += N[i];
-            //reduce number
-            remainder -= V[i];
+            retval += N[i]; // write pattern down
+            remainder -= V[i]; // reduce number
         } else {
-            //we need the next pattern
-            i++;
+            i++; // go to next pattern
         }
     }
     return retval;
@@ -534,7 +511,7 @@ namespace {
 }
 
 std::string DoubleToString(double val, int digits, bool always_show_sign) {
-    std::string text; // = ""
+    std::string text;
 
     // minimum digits is 2. Fewer than this and things can't be sensibly displayed.
     // eg. 300 with 2 digits is 0.3k. With 1 digits, it would be unrepresentable.
@@ -643,7 +620,7 @@ std::string DoubleToString(double val, int digits, bool always_show_sign) {
         text += "n";        // nano
         break;
     case -6:
-        text += "\xC2\xB5"; // micro.  mu in UTF-8
+        text += "\xC2\xB5"; // micro / µ in UTF-8
         break;
     case -3:
         text += "m";        // milli

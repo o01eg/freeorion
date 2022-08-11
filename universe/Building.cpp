@@ -10,7 +10,7 @@
 
 Building::Building(int empire_id, std::string building_type, int produced_by_empire_id,
                    int creation_turn) :
-    UniverseObject{"", empire_id, creation_turn},
+    UniverseObject{UniverseObjectType::OBJ_BUILDING, "", empire_id, creation_turn},
     m_building_type(std::move(building_type)),
     m_produced_by_empire_id(produced_by_empire_id)
 {
@@ -70,19 +70,16 @@ bool Building::HostileToEmpire(int empire_id, const EmpireManager& empires) cons
         empires.GetDiplomaticStatus(Owner(), empire_id) == DiplomaticStatus::DIPLO_WAR;
 }
 
-std::set<std::string> Building::Tags(const ScriptingContext&) const {
+UniverseObject::TagVecs Building::Tags(const ScriptingContext&) const {
     if (const BuildingType* type = ::GetBuildingType(m_building_type))
         return type->Tags();
     return {};
 }
 
-bool Building::HasTag(const std::string& name, const ScriptingContext&) const {
+bool Building::HasTag(std::string_view name, const ScriptingContext&) const {
     const BuildingType* type = GetBuildingType(m_building_type);
-    return type && type->Tags().count(name);
+    return type && type->HasTag(name);
 }
-
-UniverseObjectType Building::ObjectType() const
-{ return UniverseObjectType::OBJ_BUILDING; }
 
 bool Building::ContainedBy(int object_id) const {
     return object_id != INVALID_OBJECT_ID

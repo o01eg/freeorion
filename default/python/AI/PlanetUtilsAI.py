@@ -10,15 +10,17 @@ from typing import (
     Optional,
     Sequence,
     Set,
+    Tuple,
     Union,
 )
 
-from AIDependencies import INVALID_ID
+import AIDependencies
+from AIDependencies import INVALID_ID, STABILITY_PER_LIKED_FOCUS
 from aistate_interface import get_aistate
 from common.fo_typing import PlanetId, SpeciesName, SystemId
 from empire.colony_builders import get_colony_builders, get_extra_colony_builders
 from empire.ship_builders import get_ship_builders
-from freeorion_tools import ppstring
+from freeorion_tools import get_named_real, ppstring
 from freeorion_tools.caching import cache_for_current_turn
 
 
@@ -168,6 +170,12 @@ def get_populated_planet_ids(planet_ids: Sequence[PlanetId]) -> Sequence[PlanetI
     return [pid for pid in planet_ids if universe.getPlanet(pid).initialMeterValue(fo.meterType.population) > 0]
 
 
+@cache_for_current_turn
+def get_empire_populated_planets() -> Tuple[fo.planet]:
+    universe = fo.getUniverse()
+    return tuple(universe.getPlanet(pid) for pid in get_populated_planet_ids(get_owned_planets_by_empire()))
+
+
 def get_systems(planet_ids: Sequence[PlanetId]) -> Sequence[SystemId]:
     """
     Return list of systems containing planet_ids.
@@ -278,3 +286,41 @@ def _calculate_get_planet_opinions() -> Dict[str, Opinion]:
             # else: no species -> neutral
             opinion.neutral.add(pid)
     return result
+
+
+def dislike_factor() -> float:
+    """Returns multiplier for dislike effects."""
+    # See happiness.macros
+    has_liberty = fo.getEmpire().policyAdopted("PLC_LIBERTY")
+    # conformance not used yet
+    return get_named_real("PLC_LIBERTY_DISLIKE_FACTOR") if has_liberty else 1.0
+
+
+def focus_stability_effect(species: fo.species, focus: str) -> float:
+    """How does the focus affect the stability of a planet with the species."""
+    result = 0.0
+    if focus in species.likes:
+        result += STABILITY_PER_LIKED_FOCUS
+    if focus in species.dislikes:
+        result += STABILITY_PER_LIKED_FOCUS * dislike_factor()
+    empire = fo.getEmpire()
+    # TODO move policy definitions to AIDependency? Or used an EnumClass like BuildingType?
+    if focus == AIDependencies.Tags.INDUSTRY and empire.policyAdopted("PLC_INDUSTRIALISM"):
+        result += fo.getNamedValue("PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT")
+    if focus == AIDependencies.Tags.INDUSTRY and empire.policyAdopted("PLC_TECHNOCRACY"):
+        result += fo.getNamedValue("PLC_TECHNOCRACY_TARGET_HAPPINESS_FLAT")
+    return result
+
+
+def stability_with_focus(planet: fo.planet, focus: str) -> float:
+    """
+    What would the planets target stability be when switched to the given focus.
+    Returns -99 if species cannot use the specified focus.
+    """
+    stability = planet.currentMeterValue(fo.meterType.targetHappiness)
+    species = fo.getSpecies(planet.speciesName)
+    if focus not in species.foci:
+        # The actual value here is not important. If some part of the AI asks for a stability,
+        # returning a big negative value here should stop it from considering that focus for anything.
+        return -99.0
+    return stability - focus_stability_effect(species, planet.focus) + focus_stability_effect(species, focus)

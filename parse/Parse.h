@@ -12,6 +12,7 @@
 
 #include <array>
 #include <map>
+#include <memory>
 #include <set>
 #include <vector>
 #include <unordered_map>
@@ -39,12 +40,12 @@ namespace ValueRef {
 }
 
 namespace parse {
-    FO_PARSE_API std::map<std::string, std::unique_ptr<BuildingType>> buildings(const boost::filesystem::path& path);
-    FO_PARSE_API std::map<std::string, std::unique_ptr<FieldType>> fields(const boost::filesystem::path& path);
-    FO_PARSE_API std::map<std::string, std::unique_ptr<ValueRef::ValueRefBase>> named_value_refs(const boost::filesystem::path& path);
+    FO_PARSE_API std::map<std::string, std::unique_ptr<BuildingType>, std::less<>> buildings(const boost::filesystem::path& path);
+    FO_PARSE_API std::map<std::string, std::unique_ptr<FieldType>, std::less<>> fields(const boost::filesystem::path& path);
+    FO_PARSE_API std::map<std::string, std::unique_ptr<ValueRef::ValueRefBase>, std::less<>> named_value_refs(const boost::filesystem::path& path);
     FO_PARSE_API std::map<std::string, std::unique_ptr<Special>, std::less<>> specials(const boost::filesystem::path& path);
 
-    FO_PARSE_API std::map<std::string, std::unique_ptr<Policy>> policies(const boost::filesystem::path& path);
+    FO_PARSE_API std::map<std::string, std::unique_ptr<Policy>, std::less<>> policies(const boost::filesystem::path& path);
 
     /** Parse all species in directory \p path, store them with their name in \p
         species_by_name. If a file exists called SpeciesCensusOrdering.focs.txt, parse it and
@@ -62,8 +63,8 @@ namespace parse {
 
     FO_PARSE_API std::vector<UnlockableItem> items(const boost::filesystem::path& path);
     FO_PARSE_API std::vector<UnlockableItem> starting_buildings(const boost::filesystem::path& path);
-    FO_PARSE_API std::map<std::string, std::unique_ptr<ShipPart>> ship_parts(const boost::filesystem::path& path);
-    FO_PARSE_API std::map<std::string, std::unique_ptr<ShipHull>> ship_hulls(const boost::filesystem::path& path);
+    FO_PARSE_API std::map<std::string, std::unique_ptr<ShipPart>, std::less<>> ship_parts(const boost::filesystem::path& path);
+    FO_PARSE_API std::map<std::string, std::unique_ptr<ShipHull>, std::less<>> ship_hulls(const boost::filesystem::path& path);
 
     /** Parse all ship designs in directory \p path, store them with their filename in \p
         design_and_path. If a file exists called ShipDesignOrdering.focs.txt, parse it and
@@ -77,7 +78,7 @@ namespace parse {
     FO_PARSE_API std::vector<std::unique_ptr<FleetPlan>> fleet_plans(const boost::filesystem::path& path);
     FO_PARSE_API std::vector<std::unique_ptr<MonsterFleetPlan>> monster_fleet_plans(const boost::filesystem::path& path);
     FO_PARSE_API std::map<std::string, std::unique_ptr<ValueRef::ValueRef<double>>> statistics(const boost::filesystem::path& path);
-    FO_PARSE_API std::map<std::string, std::vector<EncyclopediaArticle>> encyclopedia_articles(const boost::filesystem::path& path);
+    FO_PARSE_API std::map<std::string, std::vector<EncyclopediaArticle>, std::less<>> encyclopedia_articles(const boost::filesystem::path& path);
     FO_PARSE_API std::unordered_map<std::string, GameRule> game_rules(const PythonParser& parser, const boost::filesystem::path& path);
 
     FO_PARSE_API void file_substitution(std::string& text, const boost::filesystem::path& file_search_path, const std::string& filename);

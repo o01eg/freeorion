@@ -76,7 +76,7 @@ namespace {
                               ));
     }
 
-    effect_wrapper insert_if_(const py::tuple& args, const py::dict& kw) {
+    effect_wrapper insert_conditional_(const py::tuple& args, const py::dict& kw) {
         auto condition = ValueRef::CloneUnique(py::extract<condition_wrapper>(kw["condition"])().condition);
 
         std::vector<std::unique_ptr<Effect::Effect>> effects;
@@ -85,17 +85,18 @@ namespace {
         }, effects);
         
         std::vector<std::unique_ptr<Effect::Effect>> else_;
-        py_parse::detail::flatten_list<effect_wrapper>(kw["else_"], [](const effect_wrapper& o, std::vector<std::unique_ptr<Effect::Effect>> &v) {
-            v.push_back(ValueRef::CloneUnique(o.effect));
-        }, else_);
+        if (kw.has_key("else_")) {
+            py_parse::detail::flatten_list<effect_wrapper>(kw["else_"], [](const effect_wrapper& o, std::vector<std::unique_ptr<Effect::Effect>> &v) {
+                v.push_back(ValueRef::CloneUnique(o.effect));
+            }, else_);
+        }
 
         return effect_wrapper(std::make_shared<Effect::Conditional>(std::move(condition),
                                                                     std::move(effects),
                                                                     std::move(else_)));
     }
 
-    template <MeterType M>
-    effect_wrapper insert_set_meter_(const py::tuple& args, const py::dict& kw) {
+    effect_wrapper insert_set_meter_(const MeterType m, const py::tuple& args, const py::dict& kw) {
         auto value = py::extract<value_ref_wrapper<double>>(kw["value"])();
 
         boost::optional<std::string> accountinglabel;
@@ -103,9 +104,26 @@ namespace {
             accountinglabel = py::extract<std::string>(kw["accountinglabel"])();
         }
         return effect_wrapper(std::make_shared<Effect::SetMeter>(
-            M,
+            m,
             ValueRef::CloneUnique(value.value_ref),
             accountinglabel));
+    }
+
+    effect_wrapper insert_ship_part_set_meter_(const MeterType m, const py::tuple& args, const py::dict& kw) {
+        auto value = py::extract<value_ref_wrapper<double>>(kw["value"])();
+
+        std::unique_ptr<ValueRef::ValueRef<std::string>> partname;
+        auto partname_args = boost::python::extract<value_ref_wrapper<std::string>>(kw["partname"]);
+        if (partname_args.check()) {
+            partname = ValueRef::CloneUnique(partname_args().value_ref);
+        } else {
+            partname = std::make_unique<ValueRef::Constant<std::string>>(boost::python::extract<std::string>(kw["partname"])());
+        }
+
+        return effect_wrapper(std::make_shared<Effect::SetShipPartMeter>(
+            m,
+            std::move(partname),
+            ValueRef::CloneUnique(value.value_ref)));
     }
 
     unlockable_item_wrapper insert_item_(const py::tuple& args, const py::dict& kw) {
@@ -198,38 +216,98 @@ namespace {
         else 
             return effect_wrapper(std::make_shared<Effect::SetEmpireStockpile>(resource.value, std::move(value)));
     }
+
+    effect_wrapper insert_set_owner_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        std::unique_ptr<ValueRef::ValueRef<int>> empire;
+        if (kw.has_key("empire")) {
+            auto empire_args = boost::python::extract<value_ref_wrapper<int>>(kw["empire"]);
+            if (empire_args.check()) {
+                empire = ValueRef::CloneUnique(empire_args().value_ref);
+            } else {
+                empire = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(kw["empire"])());
+            }
+        }
+       
+        return effect_wrapper(std::make_shared<Effect::SetOwner>(std::move(empire)));
+    }
+
+    effect_wrapper victory(const boost::python::tuple& args, const boost::python::dict& kw) {
+        auto reason = boost::python::extract<std::string>(kw["reason"])();
+        return effect_wrapper(std::make_shared<Effect::Victory>(reason));
+    }
 }
 
 void RegisterGlobalsEffects(py::dict& globals) {
     globals["EffectsGroup"] = py::raw_function(insert_effects_group_);
     globals["Item"] = py::raw_function(insert_item_);
 
-    globals["Policy"] = enum_wrapper<UnlockableItemType>(UnlockableItemType::UIT_POLICY);
-    globals["Building"] = enum_wrapper<UnlockableItemType>(UnlockableItemType::UIT_BUILDING);
-    globals["ShipPart"] = enum_wrapper<UnlockableItemType>(UnlockableItemType::UIT_SHIP_PART);
-
     globals["Destroy"] = effect_wrapper(std::make_shared<Effect::Destroy>());
 
     globals["GenerateSitRepMessage"] = py::raw_function(insert_generate_sit_rep_message_);
-    globals["If"] = py::raw_function(insert_if_);
+    globals["Conditional"] = py::raw_function(insert_conditional_);
 
     globals["SetEmpireMeter"] = py::raw_function(set_empire_meter);
+    globals["Victory"] = py::raw_function(victory);
 
-    globals["SetConstruction"] = py::raw_function(insert_set_meter_<MeterType::METER_CONSTRUCTION>);
-    globals["SetDefense"] = py::raw_function(insert_set_meter_<MeterType::METER_DEFENSE>);
-    globals["SetHappiness"] = py::raw_function(insert_set_meter_<MeterType::METER_HAPPINESS>);   
-    globals["SetIndustry"] = py::raw_function(insert_set_meter_<MeterType::METER_INDUSTRY>);
-    globals["SetMaxShield"] = py::raw_function(insert_set_meter_<MeterType::METER_MAX_SHIELD>);
-    globals["SetMaxSupply"] = py::raw_function(insert_set_meter_<MeterType::METER_MAX_SUPPLY>);
-    globals["SetMaxTroops"] = py::raw_function(insert_set_meter_<MeterType::METER_MAX_TROOPS>);
-    globals["SetResearch"] = py::raw_function(insert_set_meter_<MeterType::METER_RESEARCH>);
-    globals["SetShield"] = py::raw_function(insert_set_meter_<MeterType::METER_SHIELD>);
-    globals["SetStockpile"] = py::raw_function(insert_set_meter_<MeterType::METER_STOCKPILE>);
-    globals["SetStructure"] = py::raw_function(insert_set_meter_<MeterType::METER_STRUCTURE>);
-    globals["SetTargetConstruction"] = py::raw_function(insert_set_meter_<MeterType::METER_TARGET_CONSTRUCTION>);
-    globals["SetTargetPopulation"] = py::raw_function(insert_set_meter_<MeterType::METER_TARGET_POPULATION>);
-    globals["SetTroops"] = py::raw_function(insert_set_meter_<MeterType::METER_TROOPS>);
+    // set_non_ship_part_meter_enum_grammar
+    for (const auto& meter : std::initializer_list<std::pair<const char*, MeterType>>{
+            {"SetTargetConstruction", MeterType::METER_TARGET_CONSTRUCTION},
+            {"SetTargetIndustry",     MeterType::METER_TARGET_INDUSTRY},
+            {"SetTargetPopulation",   MeterType::METER_TARGET_POPULATION},
+            {"SetTargetResearch",     MeterType::METER_TARGET_RESEARCH},
+            {"SetTargetInfluence",    MeterType::METER_TARGET_INFLUENCE},
+            {"SetTargetHappiness",    MeterType::METER_TARGET_HAPPINESS},
+
+            {"SetMaxDefense",         MeterType::METER_MAX_DEFENSE},
+            {"SetMaxFuel",            MeterType::METER_MAX_FUEL},
+            {"SetMaxShield",          MeterType::METER_MAX_SHIELD},
+            {"SetMaxStructure",       MeterType::METER_MAX_STRUCTURE},
+            {"SetMaxTroops",          MeterType::METER_MAX_TROOPS},
+            {"SetMaxSupply",          MeterType::METER_MAX_SUPPLY},
+            {"SetMaxStockpile",       MeterType::METER_MAX_STOCKPILE},
+
+            {"SetConstruction",       MeterType::METER_CONSTRUCTION},
+            {"SetIndustry",           MeterType::METER_INDUSTRY},
+            {"SetPopulation",         MeterType::METER_POPULATION},
+            {"SetResearch",           MeterType::METER_RESEARCH},
+            {"SetInfluence",          MeterType::METER_INFLUENCE},
+            {"SetHappiness",          MeterType::METER_HAPPINESS},
+
+            {"SetDefense",            MeterType::METER_DEFENSE},
+            {"SetFuel",               MeterType::METER_FUEL},
+            {"SetShield",             MeterType::METER_SHIELD},
+            {"SetStructure",          MeterType::METER_STRUCTURE},
+            {"SetTroops",             MeterType::METER_TROOPS},
+            {"SetSupply",             MeterType::METER_SUPPLY},
+            {"SetStockpile",          MeterType::METER_STOCKPILE},
+
+            {"SetRebelTroops",        MeterType::METER_REBEL_TROOPS},
+            {"SetStealth",            MeterType::METER_STEALTH},
+            {"SetDetection",          MeterType::METER_DETECTION},
+            {"SetSpeed",              MeterType::METER_SPEED},
+
+            {"SetSize",               MeterType::METER_SIZE}})
+    {
+        const auto m = meter.second;
+        const auto f_insert_set_meter = [m](const boost::python::tuple& args, const boost::python::dict& kw) { return insert_set_meter_(m, args, kw); };
+        globals[meter.first] = boost::python::raw_function(f_insert_set_meter);
+    }
+
+    // set_ship_part_meter_enum_grammar
+    for (const auto& meter : std::initializer_list<std::pair<const char*, MeterType>>{
+            {"SetMaxCapacity",      MeterType::METER_MAX_CAPACITY},
+            {"SetMaxDamage",        MeterType::METER_MAX_CAPACITY},
+            {"SetMaxSecondaryStat", MeterType::METER_MAX_SECONDARY_STAT},
+            {"SetCapacity",         MeterType::METER_CAPACITY},
+            {"SetDamage",           MeterType::METER_CAPACITY},
+            {"SetSecondaryStat",    MeterType::METER_SECONDARY_STAT}})
+    {
+        const auto m = meter.second;
+        const auto f_insert_set_meter = [m](const boost::python::tuple& args, const boost::python::dict& kw) { return insert_ship_part_set_meter_(m, args, kw); };
+        globals[meter.first] = boost::python::raw_function(f_insert_set_meter);
+    }
 
     globals["SetEmpireStockpile"] = py::raw_function(insert_set_empire_stockpile);
+    globals["SetOwner"] = py::raw_function(insert_set_owner_);
 }
 

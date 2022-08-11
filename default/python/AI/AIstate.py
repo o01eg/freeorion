@@ -17,6 +17,7 @@ from AIDependencies import INVALID_ID, TECH_NATIVE_SPECIALS
 from character.character_module import Aggression, create_character
 from CombatRatingsAI import ShipCombatStats
 from common.print_utils import Number, Table, Text
+from DiplomaticCorp import get_diplomatic_status
 from EnumsAI import MissionType, ShipRoleType
 from freeorion_tools import combine_ratings, get_partial_visibility_turn
 
@@ -480,6 +481,9 @@ class AIstate:
             if get_partial_visibility_turn(fleet_id) < (current_turn - 1):
                 continue
 
+            if get_diplomatic_status(fleet.owner) != fo.diplomaticStatus.war:
+                continue
+
             sys_status = self.systemStatus.setdefault(this_system_id, {})
             sys_status["enemy_ship_count"] = sys_status.get("enemy_ship_count", 0) + len(fleet.shipIDs)
             enemies_by_system.setdefault(this_system_id, []).append(fleet_id)
@@ -937,8 +941,6 @@ class AIstate:
             else:
                 error("Fleet %s has no valid system." % fleet)
         fleet_table.print_table(info)
-        # Next string used in charts. Don't modify it!
-        debug("Empire Ship Count: %s" % self.shipCount)
         debug("Empire standard fighter summary: %s", CombatRatingsAI.get_empire_standard_military_ship_stats())
         debug("------------------------")
 

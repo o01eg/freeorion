@@ -41,7 +41,7 @@ public:
         double x = 0.5, y = 0.5;
     };
 
-    ShipHull() = default;
+    ShipHull() = delete;
 
     ShipHull(float fuel, float speed, float stealth, float structure,
              bool default_fuel_effects, bool default_speed_effects,
@@ -58,43 +58,35 @@ public:
     { return !(*this == rhs); }
 
     //! Returns name of hull
-    auto Name() const -> const std::string&
-    { return m_name; }
+    auto Name() const -> const std::string& { return m_name; }
 
     //! Returns description, including a description of the stats and effects
     //! of this hull
-    auto Description() const -> const std::string&
-    { return m_description; }
+    auto Description() const -> const std::string& { return m_description; }
 
     //! Returns starlane speed of hull
     auto Speed() const -> float;
 
     //! Returns fuel capacity of hull
-    auto Fuel() const -> float
-    { return m_fuel; }
+    auto Fuel() const -> float { return m_fuel; }
 
     //! Returns stealth of hull
-    auto Stealth() const -> float
-    { return m_stealth; }
+    auto Stealth() const -> float { return m_stealth; }
 
     //! Returns structure of hull
     auto Structure() const -> float;
 
     //! Returns shields of hull
-    auto Shields() const -> float
-    { return 0.0f; }
+    auto Shields() const -> float { return 0.0f; }
 
     //! Returns colonist capacity of hull
-    auto ColonyCapacity() const -> float
-    { return 0.0f; }
+    auto ColonyCapacity() const -> float { return 0.0f; }
 
     //! Returns the troop capacity of hull
-    auto TroopCapacity() const -> float
-    { return 0.0f; }
+    auto TroopCapacity() const -> float { return 0.0f; }
 
     //! Returns detection ability of hull
-    auto Detection() const -> float
-    { return 0.0f; }
+    auto Detection() const -> float { return 0.0f; }
 
     //! Returns true if the production cost and time are invariant (does not
     //! depend on) the location
@@ -110,8 +102,7 @@ public:
 
     //! Returns whether this hull type is producible by players and appears on
     //! the design screen
-    auto Producible() const -> bool
-    { return m_producible; }
+    auto Producible() const -> bool { return m_producible; }
 
     auto ProductionMeterConsumption() const -> const ConsumptionMap<MeterType>&
     { return m_production_meter_consumption; }
@@ -120,44 +111,36 @@ public:
     { return m_production_special_consumption; }
 
     //! Returns total number of of slots in hull
-    auto NumSlots() const -> unsigned int
-    { return m_slots.size(); }
+    auto NumSlots() const -> unsigned int { return m_slots.size(); }
 
     //! Returns number of of slots of indicated type in hull
     auto NumSlots(ShipSlotType slot_type) const -> unsigned int;
 
     //! Returns vector of slots in hull
-    auto Slots() const -> const std::vector<Slot>&
-    { return m_slots; }
+    auto Slots() const -> const std::vector<Slot>& { return m_slots; }
 
-    auto Tags() const -> const std::set<std::string>&
-    { return m_tags; }
+    const auto& Tags() const { return m_tags; }
 
-    auto HasTag(const std::string& tag) const -> bool
-    { return m_tags.count(tag) != 0; }
+    bool HasTag(std::string_view tag) const
+    { return std::any_of(m_tags.begin(), m_tags.end(), [&tag](const auto& t) { return t == tag; }); }
 
     //! Returns the condition that determines the locations where ShipDesign
     //! containing hull can be produced
-    auto Location() const -> const Condition::Condition*
-    { return m_location.get(); }
+    auto Location() const -> const Condition::Condition* { return m_location.get(); }
 
     //! Returns the names of other content that cannot be used in the same
     //! ship design as this part
-    auto Exclusions() const -> const std::set<std::string>&
-    { return m_exclusions; }
+    auto Exclusions() const -> const std::set<std::string>& { return m_exclusions; }
 
     //! Returns the EffectsGroups that encapsulate the effects this part hull
     //! has.
-    auto Effects() const -> const std::vector<std::shared_ptr<Effect::EffectsGroup>>&
-    { return m_effects; }
+    auto Effects() const -> const std::vector<std::shared_ptr<Effect::EffectsGroup>>& { return m_effects; }
 
     //! Returns the image that represents the hull on the design screen
-    auto Graphic() const -> const std::string&
-    { return m_graphic; }
+    auto Graphic() const -> const std::string& { return m_graphic; }
 
     //! Returns the small icon to represent hull
-    auto Icon() const -> const std::string&
-    { return m_icon; }
+    auto Icon() const -> const std::string& { return m_icon; }
 
     //! Returns a number, calculated from the contained data, which should be
     //! different for different contained data, and must be the same for
@@ -185,7 +168,8 @@ private:
     std::unique_ptr<ValueRef::ValueRef<int>>            m_production_time;
     bool                                                m_producible = false;
     std::vector<Slot>                                   m_slots;
-    std::set<std::string>                               m_tags;
+    const std::string                                   m_tags_concatenated;
+    const std::vector<std::string_view>                 m_tags;
     ConsumptionMap<MeterType>                           m_production_meter_consumption;
     ConsumptionMap<std::string>                         m_production_special_consumption;
     std::unique_ptr<Condition::Condition>               m_location;
@@ -204,12 +188,12 @@ namespace CheckSums {
 //! Holds FreeOrion hull types
 class FO_COMMON_API ShipHullManager {
 public:
-    using container_type = std::map<std::string, std::unique_ptr<ShipHull>>;
+    using container_type = std::map<std::string, std::unique_ptr<ShipHull>, std::less<>>;
     using iterator = container_type::const_iterator;
 
     //! Returns the hull type with the name @a name; you should use the free
     //! function GetShipHull() instead
-    auto GetShipHull(const std::string& name) const -> const ShipHull*;
+    auto GetShipHull(std::string_view name) const -> const ShipHull*;
 
     //! iterator to the first hull type
     auto begin() const -> iterator;
@@ -256,7 +240,6 @@ FO_COMMON_API auto GetShipHullManager() -> ShipHullManager&;
 
 //! Returns the ship ShipHull specification object with name @p name.  If no
 //! such ShipHull exists, nullptr is returned instead.
-FO_COMMON_API auto GetShipHull(const std::string& name) -> const ShipHull*;
-
+FO_COMMON_API auto GetShipHull(std::string_view name) -> const ShipHull*;
 
 #endif

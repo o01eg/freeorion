@@ -215,16 +215,10 @@ namespace FreeOrionPython {
             .def(py::vector_indexing_suite<std::vector<UnlockableItem>, true>())
         ;
 
-        py::class_<ResourcePool, std::shared_ptr<ResourcePool>, boost::noncopyable>("resPool", py::no_init);
-
         FreeOrionPython::SetWrapper<std::set<std::set<int>>>::Wrap("IntSetSet");
         FreeOrionPython::SetWrapper<std::set<int>>::Wrap("IntSet");
         FreeOrionPython::SetWrapper<std::set<std::string>>::Wrap("StringSet");
         FreeOrionPython::SetWrapper<std::set<std::string, std::less<>>>::Wrap("StringSet2");
-
-        py::class_<std::map<std::set<int>, float>>("resPoolMap")
-            .def(py::map_indexing_suite<std::map<std::set<int>, float>, true>())
-        ;
 
         py::class_<std::map<std::string, int>>("StringIntMap")
             .def(py::map_indexing_suite<std::map<std::string, int>, true>())
@@ -265,6 +259,7 @@ namespace FreeOrionPython {
             .def("buildingTypeAvailable",           &Empire::BuildingTypeAvailable)
             .add_property("availableBuildingTypes", make_function(&Empire::AvailableBuildingTypes,  py::return_internal_reference<>()))
 
+            .add_property("totalShipsOwned",        make_function(&Empire::TotalShipsOwned,         py::return_value_policy<py::return_by_value>()))
             .def("shipDesignAvailable",             +[](const Empire& empire, int id) -> bool { return empire.ShipDesignAvailable(id, GetUniverse()); })
             .add_property("allShipDesigns",         make_function(&Empire::ShipDesigns,             py::return_value_policy<py::return_by_value>()))
             .add_property("availableShipDesigns",   +[](const Empire& empire) -> std::set<int> { return empire.AvailableShipDesigns(GetUniverse()); })
@@ -353,7 +348,6 @@ namespace FreeOrionPython {
             .def("resourceStockpile",               &Empire::ResourceStockpile)
             .def("resourceProduction",              &Empire::ResourceOutput)
             .def("resourceAvailable",               &Empire::ResourceAvailable)
-            .def("getResourcePool",                 &Empire::GetResourcePool)
 
             .def("population",                      &Empire::Population)
 
@@ -364,6 +358,10 @@ namespace FreeOrionPython {
                                                         ))
             .add_property("supplyUnobstructedSystems",  make_function(&Empire::SupplyUnobstructedSystems,   py::return_internal_reference<>()))
             .add_property("systemSupplyRanges",         make_function(&Empire::SystemSupplyRanges,          py::return_internal_reference<>()))
+            .add_property("resourceSupplyGroups",       make_function(
+                                                             +[](const Empire& empire) -> const std::set<std::set<int>>& { return GetSupplyManager().ResourceSupplyGroups(empire.EmpireID()); },
+                                                             py::return_value_policy<py::copy_const_reference>()
+                                                        ))
 
             .def("obstructedStarlanes",             obstructedStarlanes,
                                                     py::return_value_policy<py::return_by_value>())
@@ -411,17 +409,8 @@ namespace FreeOrionPython {
             .add_property("totalSpent",             &ProductionQueue::TotalPPsSpent)
             .add_property("empireID",               &ProductionQueue::EmpireID)
 
-            .def("availablePP",                     +[](const ProductionQueue& queue, const std::shared_ptr<ResourcePool>& r) -> std::map<std::set<int>, float> {
-                                                        return r ? r->Output() : std::map<std::set<int>, float>{};
-                                                    }, py::return_value_policy<py::return_by_value>())
-
             .add_property("allocatedPP",            make_function(&ProductionQueue::AllocatedPP,        py::return_internal_reference<>()))
-
-            .def("objectsWithWastedPP",             +[](const ProductionQueue& queue, const std::shared_ptr<ResourcePool>& r) -> std::set<std::set<int>> {
-                                                        const auto const_r{std::const_pointer_cast<const ResourcePool>(r)};
-                                                        return queue.ObjectsWithWastedPP(const_r);
-                                                    }, py::return_value_policy<py::return_by_value>())
-            ;
+        ;
 
         ////////////////////
         // Research Queue //
@@ -466,20 +455,21 @@ namespace FreeOrionPython {
         def("getTech",                              +[](const std::string& name) -> const Tech* { return GetTech(name); },
                                                     py::return_value_policy<py::reference_existing_object>(),
                                                     "Returns the tech (Tech) with the indicated name (string).");
-        def("getTechCategories",                    &TechManager::CategoryNames,
-                                                    py::return_value_policy<py::return_by_value>(),
-                                                    "Returns the names of all tech categories (StringVec).");
+
+        def("getTechCategories",
+            +[]() -> std::vector<std::string> { return ViewVecToStringVec(GetTechManager().CategoryNames()); },
+            py::return_value_policy<py::return_by_value>(),
+            "Returns the names of all tech categories (StringVec).");
 
         def("techs",
-            +[]() -> std::vector<std::string> { return GetTechManager().TechNames(); },
+            +[]() -> std::vector<std::string> { return ViewVecToStringVec(GetTechManager().TechNames()); },
             py::return_value_policy<py::return_by_value>(),
             "Returns the names of all techs (StringVec).");
 
         def("techsInCategory",
-            +[](const std::string& category) -> std::vector<std::string> { return GetTechManager().TechNames(category); },
+            +[](const std::string& category) -> std::vector<std::string> { return ViewVecToStringVec(GetTechManager().TechNames(category)); },
             py::return_value_policy<py::return_by_value>(),
-            "Returns the names of all techs (StringVec) in the indicated"
-            " tech category name (string).");
+            "Returns the names of all techs (StringVec) in the indicated tech category name (string).");
 
         py::class_<UnlockableItem>("UnlockableItem", py::init<UnlockableItemType, const std::string&>())
             .add_property("type",               &UnlockableItem::type)

@@ -28,16 +28,16 @@ Tech(
             & (LocalCandidate.LastTurnConquered < CurrentTurn),
             priority=AFTER_ALL_TARGET_MAX_METERS_PRIORITY,
             effects=[
-                SetShield(value=Min(float, Value + PLANET_SHIELD_FACTOR, Value(Target.MaxShield))),
-                SetDefense(value=Min(float, Value + PLANET_DEFENSE_FACTOR, Value(Target.MaxDefense))),
-                SetTroops(value=Min(float, Value + 1, Value(Target.MaxTroops))),
+                SetShield(value=MinOf(float, Value + PLANET_SHIELD_FACTOR, Value(Target.MaxShield))),
+                SetDefense(value=MinOf(float, Value + PLANET_DEFENSE_FACTOR, Value(Target.MaxDefense))),
+                SetTroops(value=MinOf(float, Value + 1, Value(Target.MaxTroops))),
             ],
         ),
         EffectsGroup(  # set minimum troops for just-colonized planets
             scope=Planet() & OwnedBy(empire=Source.Owner) & (LocalCandidate.LastTurnColonized == CurrentTurn),
             priority=AFTER_ALL_TARGET_MAX_METERS_PRIORITY,
             effects=SetTroops(
-                value=Min(float, NamedRealLookup(name="IMPERIAL_GARRISON_MAX_TROOPS_FLAT"), Value(Target.MaxTroops))
+                value=MinOf(float, NamedRealLookup(name="IMPERIAL_GARRISON_MAX_TROOPS_FLAT"), Value(Target.MaxTroops))
             ),
         ),
     ],
@@ -54,7 +54,7 @@ Tech(
     unresearchable=True,
     tags=["PEDIA_DEFENSE_CATEGORY"],
     prerequisites="SPY_STEALTH_3",
-    unlock=Item(type=Building, name="BLD_PLANET_CLOAK"),
+    unlock=Item(type=UnlockBuilding, name="BLD_PLANET_CLOAK"),
 )
 
 Tech(

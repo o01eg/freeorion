@@ -319,7 +319,7 @@ CPSize Edit::LastVisibleChar() const
             if (client_size_x <= X0 - first_char_offset)
                 break;
         } else {
-            size_t retval_minus_1 = Value(retval - 1);
+            std::size_t retval_minus_1 = Value(retval - 1);
             auto retval_minus_1_char_data = char_data.at(retval_minus_1);
             if (client_size_x <= retval_minus_1_char_data.extent - first_char_offset)
                 break;
@@ -647,8 +647,8 @@ void GG::GetTranslatedCodePoint(Key key, std::uint32_t key_code_point, Flags<Mod
     }
 }
 
-CPSize GG::NextWordEdgeFrom(const std::string& text, CPSize from_position, bool search_right) {
-    std::set<std::pair<CPSize, CPSize>> words = GUI::GetGUI()->FindWords(text);
+CPSize GG::NextWordEdgeFrom(std::string_view text, CPSize from_position, bool search_right) {
+    auto words = GUI::GetGUI()->FindWords(text);
     CPSize retval = CP0;
 
     if (!search_right) {

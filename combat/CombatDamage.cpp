@@ -71,7 +71,7 @@ namespace {
                     // as TotalFighterDamage contains the damage from all fighters, do not further include fighter
                     include_fighters = false;
                 } else if (part->CombatTargets() && context.effect_target &&
-                           part->CombatTargets()->Eval(context, context.effect_target)) 
+                           part->CombatTargets()->Eval(context, context.effect_target))
                 {
                     fighter_damage = ship->CurrentPartMeterValue(SECONDARY_METER, part_name);
                     available_fighters = std::max(0, static_cast<int>(
@@ -179,18 +179,20 @@ std::vector<float> Combat::WeaponDamageImpl(
         {source->Owner(), {{TEMPORARY_OBJECT_ID, {{Visibility::VIS_FULL_VISIBILITY, context.current_turn}}}}}};
 
     if (target_ships) {
+        auto temp_ship = TempShipForDamageCalcs(source, context);
         ScriptingContext temp_ship_context{context, empire_object_vis, empire_object_visibility_turns,
-                                           source, TempShipForDamageCalcs(source, context)};
+                                           source.get(), temp_ship.get()};
 
-        return WeaponDamageCalcImpl(std::move(source), max, launch_fighters,
+        return WeaponDamageCalcImpl(source, max, launch_fighters,
                                     target_ships, temp_ship_context);
 
     } else {
         // create temporary fighter to test targetting condition on...
+        auto temp_fighter = TempFighterForDamageCalcs(source, context);
         ScriptingContext temp_fighter_context{context, empire_object_vis, empire_object_visibility_turns,
-                                              source, TempFighterForDamageCalcs(source, context)};
+                                              source.get(), temp_fighter.get()};
 
-        return WeaponDamageCalcImpl(std::move(source), max, launch_fighters,
+        return WeaponDamageCalcImpl(source, max, launch_fighters,
                                     target_ships, temp_fighter_context);
     }
 }
@@ -210,8 +212,9 @@ std::map<int, Combat::FighterBoutInfo> Combat::ResolveFighterBouts(
         {ship->Owner(), {{TEMPORARY_OBJECT_ID, Visibility::VIS_FULL_VISIBILITY}}}};
     Universe::EmpireObjectVisibilityTurnMap empire_object_visibility_turns{
         {ship->Owner(), {{TEMPORARY_OBJECT_ID, {{Visibility::VIS_FULL_VISIBILITY, context.current_turn}}}}}};
+    auto temp_ship = TempShipForDamageCalcs(ship, context);
     ScriptingContext ship_target_context{context, empire_object_vis, empire_object_visibility_turns,
-                                         ship, TempShipForDamageCalcs(ship, context)};
+                                         ship.get(), temp_ship.get()};
 
     for (int bout = 1; bout <= target_bout; ++bout) {
         ship_target_context.combat_bout = bout;
@@ -260,8 +263,7 @@ int Combat::TotalFighterShots(const ScriptingContext& context, const Ship& ship,
         int shots_this_bout = launched_fighters;
         if (sampling_condition && launched_fighters > 0) {
             // check if not shooting
-            condition_matches.clear();
-            sampling_condition->Eval(mut_context, condition_matches);
+            condition_matches = sampling_condition->Eval(std::as_const(mut_context));
             if (condition_matches.size() == 0)
                 shots_this_bout = 0;
         }

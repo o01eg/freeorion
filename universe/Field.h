@@ -14,10 +14,8 @@ namespace Effect {
 /** a class representing a region of space */
 class FO_COMMON_API Field : public UniverseObject {
 public:
-    [[nodiscard]] std::set<std::string> Tags(const ScriptingContext&) const override;
-    [[nodiscard]] bool                  HasTag(const std::string& name, const ScriptingContext&) const override;
-
-    [[nodiscard]] UniverseObjectType    ObjectType() const override;
+    [[nodiscard]] TagVecs               Tags(const ScriptingContext&) const override;
+    [[nodiscard]] bool                  HasTag(std::string_view name, const ScriptingContext&) const override;
 
     [[nodiscard]] std::string           Dump(unsigned short ntabs = 0) const override;
 
@@ -42,7 +40,7 @@ public:
     void ClampMeters() override;
 
     Field(std::string field_type, double x, double y, double radius, int creation_turn);
-    Field() = default;
+    Field() : UniverseObject(UniverseObjectType::OBJ_FIELD) {}
 
 private:
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);

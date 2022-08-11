@@ -398,9 +398,9 @@ bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id, 
             auto c = bt->EnqueueLocation();
             if (!c)
                 return true;
-            auto location_obj = context.ContextObjects().get(location_id);
+            auto location_obj = context.ContextObjects().getRaw(location_id);
             const ScriptingContext location_context(location_obj, context);
-            return c->Eval(location_context, std::move(location_obj));
+            return c->Eval(location_context, location_obj);
         }
         return true;
         break;
@@ -432,7 +432,7 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id, c
     switch (build_type) {
     case BuildType::BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
-            auto location_obj = context.ContextObjects().get(location_id);
+            auto location_obj = context.ContextObjects().getRaw(location_id);
             ScriptingContext location_target_context{location_obj, context}; // non-const but should be OK as only passed below to function taking const ScriptingContext&
 
             for (const auto& [special_name, consumption] : bt->ProductionSpecialConsumption()) {
@@ -442,15 +442,14 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id, c
                 Condition::ObjectSet matches;
                 // if a condition selecting where to take resources from was specified, use it.
                 // Otherwise take from the production location
-                if (cond) {
-                    cond->Eval(location_target_context, matches);
-                } else {
+                if (cond)
+                    matches = cond->Eval(std::as_const(location_target_context));
+                else
                     matches.push_back(location_obj);
-                }
 
                 // determine how much to take from each matched object
-                for (auto& object : matches) {
-                    location_target_context.effect_target = std::const_pointer_cast<UniverseObject>(object); // call to ValueRef cannot modify the pointed-to object
+                for (auto* object : matches) {
+                    location_target_context.effect_target = const_cast<UniverseObject*>(object); // call to ValueRef cannot modify the pointed-to object
                     retval[special_name][object->ID()] += static_cast<float>(amount->Eval(location_target_context));
                 }
             }
@@ -459,8 +458,8 @@ ProductionQueue::ProductionItem::CompletionSpecialConsumption(int location_id, c
     }
     case BuildType::BT_SHIP: {
         if (const ShipDesign* sd = context.ContextUniverse().GetShipDesign(design_id)) {
-            auto location_obj = context.ContextObjects().get(location_id);
-            const ScriptingContext location_target_context{std::move(location_obj), context};
+            auto location_obj = context.ContextObjects().getRaw(location_id);
+            const ScriptingContext location_target_context{location_obj, context};
 
             if (const ShipHull* ship_hull = GetShipHull(sd->Hull())) {
                 for (const auto& [special_name, consumption] : ship_hull->ProductionSpecialConsumption()) {
@@ -500,7 +499,7 @@ ProductionQueue::ProductionItem::CompletionMeterConsumption(
 {
     std::map<MeterType, std::map<int, float>> retval;
 
-    const ScriptingContext location_context{context.ContextObjects().get(location_id), context};
+    const ScriptingContext location_context{context.ContextObjects().getRaw(location_id), context};
 
     switch (build_type) {
     case BuildType::BT_BUILDING: {
@@ -620,11 +619,11 @@ float ProductionQueue::StockpileCapacity(const ObjectMap& objects) const {
     float retval = 0.0f;
 
     // TODO: if something other than planets has METER_STOCKPILE added, adjust here
-    for (const auto& obj : objects.find<Planet>(OwnedVisitor(m_empire_id))) {
-        const auto* meter = obj->GetMeter(MeterType::METER_STOCKPILE);
-        if (!meter)
-            continue;
-        retval += meter->Current();
+    auto owned_planets = objects.find<Planet>([empire_id{m_empire_id}](const Planet* p)
+                                              { return p->OwnedBy(empire_id); });
+    for (const auto& obj : owned_planets) {
+        if (const auto* meter = obj->GetMeter(MeterType::METER_STOCKPILE))
+            retval += meter->Current();
     }
     return retval;
 }

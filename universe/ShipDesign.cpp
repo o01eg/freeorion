@@ -53,7 +53,7 @@ namespace {
 CommonParams::CommonParams(std::unique_ptr<ValueRef::ValueRef<double>>&& production_cost_,
                            std::unique_ptr<ValueRef::ValueRef<int>>&& production_time_,
                            bool producible_,
-                           const std::set<std::string>& tags_,
+                           std::set<std::string>& tags_,
                            std::unique_ptr<Condition::Condition>&& location_,
                            std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects_,
                            ConsumptionMap<MeterType>&& production_meter_consumption_,
@@ -62,14 +62,14 @@ CommonParams::CommonParams(std::unique_ptr<ValueRef::ValueRef<double>>&& product
     production_cost(std::move(production_cost_)),
     production_time(std::move(production_time_)),
     producible(producible_),
+    tags(tags_.begin(), tags_.end()),
     production_meter_consumption(std::move(production_meter_consumption_)),
     production_special_consumption(std::move(production_special_consumption_)),
     location(std::move(location_)),
     enqueue_location(std::move(enqueue_location_)),
     effects(std::move(effects_))
 {
-    for (const std::string& tag : tags_)
-        tags.insert(boost::to_upper_copy<std::string>(tag));
+    std::transform(tags.begin(), tags.end(), tags.begin(), [](const auto& t) { return boost::to_upper_copy(t); } );
 }
 
 CommonParams::~CommonParams() = default;
@@ -96,11 +96,11 @@ ParsedShipDesign::ParsedShipDesign(
     m_name_desc_in_stringtable(name_desc_in_stringtable)
 {}
 
+
 ////////////////////////////////////////////////
 // ShipDesign
 ////////////////////////////////////////////////
-ShipDesign::ShipDesign()
-{}
+ShipDesign::ShipDesign() = default;
 
 ShipDesign::ShipDesign(const boost::optional<std::invalid_argument>& should_throw,
                        std::string name, std::string description,
@@ -134,7 +134,7 @@ ShipDesign::ShipDesign(const ParsedShipDesign& design) :
                design.m_is_monster, design.m_uuid)
 {}
 
-const std::string& ShipDesign::Name(bool stringtable_lookup /* = true */) const {
+const std::string& ShipDesign::Name(bool stringtable_lookup) const {
     if (m_name_desc_in_stringtable && stringtable_lookup)
         return UserString(m_name);
     else
@@ -149,7 +149,7 @@ void ShipDesign::SetName(const std::string& name) {
 void ShipDesign::SetUUID(const boost::uuids::uuid& uuid)
 { m_uuid = uuid; }
 
-const std::string& ShipDesign::Description(bool stringtable_lookup /* = true */) const {
+const std::string& ShipDesign::Description(bool stringtable_lookup) const {
     if (m_name_desc_in_stringtable && stringtable_lookup)
         return UserString(m_description);
     else
@@ -353,7 +353,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id) const { // T
     }
 
     // must own the production location...
-    auto location = Objects().get(location_id); // TODO: get from context
+    auto location = Objects().getRaw(location_id); // TODO: get from context
     if (!location) {
         WarnLogger() << "ShipDesign::ProductionLocation unable to get location object with id " << location_id;
         return false;
@@ -361,10 +361,10 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id) const { // T
     if (!location->OwnedBy(empire_id))
         return false;
 
-    auto planet = std::dynamic_pointer_cast<const Planet>(location);
-    std::shared_ptr<const Ship> ship;
+    auto planet = dynamic_cast<const Planet*>(location);
+    const Ship* ship = nullptr;
     if (!planet)
-        ship = std::dynamic_pointer_cast<const Ship>(location);
+        ship = dynamic_cast<const Ship*>(location);
     if (!planet && !ship)
         return false;
 
@@ -574,6 +574,8 @@ void ShipDesign::BuildStatCaches() {
         return;
     }
 
+    std::vector<std::string_view> tags(hull->Tags().begin(), hull->Tags().end());
+
     m_producible =      hull->Producible();
     m_detection =       hull->Detection();
     m_colony_capacity = hull->ColonyCapacity();
@@ -598,6 +600,8 @@ void ShipDesign::BuildStatCaches() {
             ErrorLogger() << "ShipDesign::BuildStatCaches couldn't get part with name " << part_name;
             continue;
         }
+
+        std::copy(part->Tags().begin(), part->Tags().end(), std::back_inserter(tags));
 
         if (!part->Producible())
             m_producible = false;
@@ -670,6 +674,25 @@ void ShipDesign::BuildStatCaches() {
             part_class < ShipPartClass::NUM_SHIP_PART_CLASSES)
         { m_num_part_classes[part_class]++; }
     }
+
+    // collect unique tags
+    std::sort(tags.begin(), tags.end());
+    auto last = std::unique(tags.begin(), tags.end());
+
+    // compile concatenated tags into contiguous storage
+    // TODO: transform_reduce when available on all platforms...
+    std::size_t tags_sz = 0;
+    std::for_each(tags.begin(), last, [&tags_sz](auto str) { tags_sz += str.size(); });
+
+    m_tags_concatenated.reserve(tags_sz);
+    m_tags.clear();
+    m_tags.reserve(tags.size());
+
+    std::for_each(tags.begin(), last, [this](auto str) {
+        auto next_start = m_tags_concatenated.size();
+        m_tags_concatenated.append(str);
+        m_tags.push_back(std::string_view{m_tags_concatenated}.substr(next_start));
+    });
 }
 
 std::string ShipDesign::Dump(unsigned short ntabs) const {
@@ -734,10 +757,10 @@ bool operator ==(const ShipDesign& first, const ShipDesign& second) {
     return first_parts == second_parts;
 }
 
+
 /////////////////////////////////////
 // PredefinedShipDesignManager     //
 /////////////////////////////////////
-// static(s)
 PredefinedShipDesignManager* PredefinedShipDesignManager::s_instance = nullptr;
 
 PredefinedShipDesignManager::PredefinedShipDesignManager() {
@@ -803,7 +826,6 @@ PredefinedShipDesignManager& PredefinedShipDesignManager::GetPredefinedShipDesig
     static PredefinedShipDesignManager manager;
     return manager;
 }
-
 
 std::vector<const ShipDesign*> PredefinedShipDesignManager::GetOrderedShipDesigns() const {
     CheckPendingDesignsTypes();

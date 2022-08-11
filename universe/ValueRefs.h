@@ -7,7 +7,6 @@
 #include <numeric>
 #include <unordered_set>
 #include <unordered_map>
-#include <boost/algorithm/cxx11/all_of.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
@@ -154,11 +153,6 @@ struct FO_COMMON_API Statistic final : public Variable<T>
     }
 
 protected:
-    /** Gets the set of objects in the Universe that match the sampling condition. */
-    void GetConditionMatches(const ScriptingContext& context,
-                             Condition::ObjectSet& condition_targets,
-                             Condition::Condition* condition) const;
-
     /** Evaluates the property for the specified objects. */
     std::vector<V> GetObjectPropertyValues(const ScriptingContext& context,
                                            const Condition::ObjectSet& objects) const;
@@ -452,8 +446,11 @@ private:
     T                                           m_cached_const_value = T();
 };
 
+/* Convert between names and MeterType. Names are scripting token, like Population
+ * and not the MeterType string representations like METER_POPULATION */
 [[nodiscard]] FO_COMMON_API MeterType          NameToMeter(const std::string& name);
 [[nodiscard]] FO_COMMON_API const std::string& MeterToName(MeterType meter);
+
 [[nodiscard]] FO_COMMON_API std::string_view   PlanetTypeToString(PlanetType type);
 [[nodiscard]] FO_COMMON_API std::string_view   PlanetEnvironmentToString(PlanetEnvironment env);
 [[nodiscard]] FO_COMMON_API std::string        ReconstructName(const std::vector<std::string>& property_name,
@@ -481,7 +478,7 @@ private:
     const ValueRef<std::string>* string_ref2);
 
 [[nodiscard]] FO_COMMON_API std::string StatisticDescription(
-    StatisticType stat_type, const std::string& value_desc, const std::string& condition_desc);
+    StatisticType stat_type, std::string_view value_desc, std::string_view condition_desc);
 
 // Template Implementations
 ///////////////////////////////////////////////////////////
@@ -789,16 +786,6 @@ bool Statistic<T, V>::operator==(const ValueRef<T>& rhs) const
 }
 
 template <typename T, typename V>
-void Statistic<T, V>::GetConditionMatches(const ScriptingContext& context,
-                                          Condition::ObjectSet& condition_targets,
-                                          Condition::Condition* condition) const
-{
-    condition_targets.clear();
-    if (condition)
-        condition->Eval(context, condition_targets);
-}
-
-template <typename T, typename V>
 std::vector<V> Statistic<T, V>::GetObjectPropertyValues(const ScriptingContext& context,
                                                         const Condition::ObjectSet& objects) const
 {
@@ -806,8 +793,8 @@ std::vector<V> Statistic<T, V>::GetObjectPropertyValues(const ScriptingContext& 
 
     if (m_value_ref) {
         std::transform(objects.begin(), objects.end(), retval.begin(),
-                       [&context, &ref{m_value_ref}](const auto& obj)
-            { return ref->Eval(ScriptingContext(context, obj)); });
+                       [&context, &ref{m_value_ref}](const auto* obj)
+        { return ref->Eval(ScriptingContext(context, obj)); });
     }
 
     return retval;
@@ -1167,8 +1154,8 @@ T ReduceData(StatisticType stat_type, std::vector<V> object_property_values)
 template <typename T, typename V>
 T Statistic<T, V>::Eval(const ScriptingContext& context) const
 {
-    Condition::ObjectSet condition_matches;
-    GetConditionMatches(context, condition_matches, m_sampling_condition.get());
+    const auto* scond = m_sampling_condition.get();
+    Condition::ObjectSet condition_matches = scond ? scond->Eval(context) : Condition::ObjectSet{};
 
     // these two statistic types don't depend on the object property values,
     // so can be evaluated without getting those values.
@@ -1263,12 +1250,12 @@ ComplexVariable<T>::ComplexVariable(const ComplexVariable<T>& rhs) :
 template <typename T>
 void ComplexVariable<T>::InitInvariants()
 {
-    std::initializer_list<ValueRefBase*> refs =
+    std::initializer_list<const ValueRefBase*> refs =
         { m_int_ref1.get(), m_int_ref2.get(), m_int_ref3.get(), m_string_ref1.get(), m_string_ref2.get() };
-    this->m_root_candidate_invariant = boost::algorithm::all_of(refs, [](const auto& e) { return !e || e->RootCandidateInvariant(); });
-    this->m_local_candidate_invariant = boost::algorithm::all_of(refs, [](const auto& e) { return !e || e->LocalCandidateInvariant(); });
-    this->m_target_invariant = boost::algorithm::all_of(refs, [](const auto& e) { return !e || e->TargetInvariant(); });
-    this->m_source_invariant = boost::algorithm::all_of(refs, [](const auto& e) { return !e || e->SourceInvariant(); });
+    this->m_root_candidate_invariant = std::all_of(refs.begin(), refs.end(), [](const auto& e) { return !e || e->RootCandidateInvariant(); });
+    this->m_local_candidate_invariant = std::all_of(refs.begin(), refs.end(), [](const auto& e) { return !e || e->LocalCandidateInvariant(); });
+    this->m_target_invariant = std::all_of(refs.begin(), refs.end(), [](const auto& e) { return !e || e->TargetInvariant(); });
+    this->m_source_invariant = std::all_of(refs.begin(), refs.end(), [](const auto& e) { return !e || e->SourceInvariant(); });
     // this->m_constant_expr and this->m_simple_increment should always be false
 }
 
@@ -1525,7 +1512,7 @@ std::string StaticCast<FromType, ToType>::Description() const
 
 template <typename FromType, typename ToType>
 std::string StaticCast<FromType, ToType>::Dump(unsigned short ntabs) const
-{ return m_value_ref->Dump(ntabs); }
+{ return "(" + m_value_ref->Dump(ntabs) + ") // StaticCast{" + typeid(FromType).name() + "," + typeid(ToType).name() + "}\n" + DumpIndent(ntabs + 1); }
 
 template <typename FromType, typename ToType>
 void StaticCast<FromType, ToType>::SetTopLevelContent(const std::string& content_name)
@@ -1596,12 +1583,29 @@ bool StringCast<FromType>::operator==(const ValueRef<std::string>& rhs) const
 template <typename FromType>
 std::string StringCast<FromType>::Eval(const ScriptingContext& context) const
 {
-    try {
-        if (m_value_ref)
-            return boost::lexical_cast<std::string>(m_value_ref->Eval(context));
-    } catch (...) {
+    if (!m_value_ref)
+        return "";
+    auto value = m_value_ref->Eval(context);
+
+    if constexpr (std::is_same_v<FromType, std::string>) {
+        return value;
+    } else if constexpr (std::is_enum_v<FromType>) {
+        return std::string{to_string(value)};
+    } else if constexpr (std::is_arithmetic_v<FromType>) {
+        return std::to_string(value);
+    } else if constexpr (std::is_same_v<FromType, std::vector<std::string>>) {
+        std::string retval;
+        retval.reserve(16*value.size()); // TODO: sum sizes of value to reserve
+        std::for_each(value.begin(), value.end(),
+                      [&retval](const auto& v) { retval.append(v).append(" "); });
+        return retval;
+    } else {
+        try {
+            return boost::lexical_cast<std::string>(value);
+        } catch (...) {
+            return "";
+        }
     }
-    return "";
 }
 
 template <typename FromType>
@@ -1630,7 +1634,7 @@ std::string StringCast<FromType>::Description() const
 
 template <typename FromType>
 std::string StringCast<FromType>::Dump(unsigned short ntabs) const
-{ return m_value_ref->Dump(ntabs); }
+{ return "(" + m_value_ref->Dump(ntabs) + ") // StringCast{" + typeid(FromType).name() + "}\n" + DumpIndent(ntabs + 1); }
 
 template <typename FromType>
 void StringCast<FromType>::SetTopLevelContent(const std::string& content_name) {
@@ -1690,7 +1694,7 @@ template <typename FromType>
 std::string UserStringLookup<FromType>::Eval(const ScriptingContext& context) const {
     if (!m_value_ref)
         return "";
-    std::string ref_val = boost::lexical_cast<std::string>(m_value_ref->Eval(context));
+    auto ref_val = to_string(m_value_ref->Eval(context));
     if (ref_val.empty() || !UserStringExists(ref_val))
         return "";
     return UserString(ref_val);

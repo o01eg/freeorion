@@ -131,13 +131,39 @@ Tech::Tech(std::string&& name, std::string&& description,
     m_research_cost(std::move(research_cost)),
     m_research_turns(std::move(research_turns)),
     m_researchable(researchable),
+    m_tags_concatenated([&tags]() {
+        // allocate storage for concatenated tags
+        // TODO: transform_reduce when available on all platforms...
+        std::size_t params_sz = 0;
+        for (const auto& t : tags)
+            params_sz += t.size();
+        std::string retval;
+        retval.reserve(params_sz);
+
+        // concatenate tags
+        std::for_each(tags.begin(), tags.end(), [&retval](const auto& t)
+        { retval.append(boost::to_upper_copy<std::string>(t)); });
+        return retval;
+    }()),
+    m_tags([&tags, this]() {
+        std::vector<std::string_view> retval;
+        std::size_t next_idx = 0;
+        retval.reserve(tags.size());
+        std::string_view sv{m_tags_concatenated};
+
+        // store views into concatenated tags string
+        std::for_each(tags.begin(), tags.end(), [&next_idx, &retval, this, sv](const auto& t) {
+            std::string upper_t = boost::to_upper_copy<std::string>(t);
+            retval.push_back(sv.substr(next_idx, upper_t.size()));
+            next_idx += upper_t.size();
+        });
+        return retval;
+    }()),
     m_effects(std::move(effects)),
     m_prerequisites(std::move(prerequisites)),
     m_unlocked_items(std::move(unlocked_items)),
     m_graphic(std::move(graphic))
 {
-    for (const std::string& tag : tags)
-        m_tags.insert(boost::to_upper_copy<std::string>(tag));
     Init();
 }
 
@@ -153,14 +179,40 @@ Tech::Tech(TechInfo&& tech_info,
     m_research_cost(std::move(tech_info.research_cost)),
     m_research_turns(std::move(tech_info.research_turns)),
     m_researchable(tech_info.researchable),
+    m_tags_concatenated([&tech_info]() {
+        // allocate storage for concatenated tags
+        // TODO: transform_reduce when available on all platforms...
+        std::size_t params_sz = 0;
+        for (const auto& t : tech_info.tags)
+            params_sz += t.size();
+        std::string retval;
+        retval.reserve(params_sz);
+
+        // concatenate tags
+        std::for_each(tech_info.tags.begin(), tech_info.tags.end(), [&retval](const auto& t)
+        { retval.append(boost::to_upper_copy<std::string>(t)); });
+        return retval;
+    }()),
+    m_tags([&tech_info, this]() {
+        std::vector<std::string_view> retval;
+        std::size_t next_idx = 0;
+        retval.reserve(tech_info.tags.size());
+        std::string_view sv{m_tags_concatenated};
+
+        // store views into concatenated tags string
+        std::for_each(tech_info.tags.begin(), tech_info.tags.end(), [&next_idx, &retval, this, sv](const auto& t) {
+            std::string upper_t = boost::to_upper_copy<std::string>(t);
+            retval.push_back(sv.substr(next_idx, upper_t.size()));
+            next_idx += upper_t.size();
+        });
+        return retval;
+    }()),
     m_prerequisites(std::move(prerequisites)),
     m_unlocked_items(std::move(unlocked_items)),
     m_graphic(std::move(graphic))
 {
     for (auto&& effect : effects)
         m_effects.push_back(std::move(effect));
-    for (const std::string& tag : tech_info.tags)
-        m_tags.insert(boost::to_upper_copy<std::string>(tag));
     Init();
 }
 
@@ -240,11 +292,11 @@ std::string Tech::Dump(unsigned short ntabs) const {
     if (!m_tags.empty()) {
         retval += DumpIndent(ntabs+1) + "tags = ";
         if (m_tags.size() == 1) {
-            retval += "[ \"" + *m_tags.begin() + "\" ]\n";
+            retval.append("[ \"").append(m_tags.front()).append("\" ]\n");
         } else {
             retval += "[\n";
-            for (const std::string& tag : m_tags)
-                retval += DumpIndent(ntabs+2) + "\"" + tag + "\"\n";
+            for (auto tag : m_tags)
+                retval.append(DumpIndent(ntabs+2)).append("\"").append(tag).append("\"\n");
             retval += DumpIndent(ntabs+1) + "]\n";
         }
     }
@@ -307,7 +359,7 @@ float Tech::ResearchCost(int empire_id, const ScriptingContext& context) const {
         auto source = empire->Source(context.ContextObjects());
         if (!source)
             return ARBITRARY_LARGE_COST;
-        ScriptingContext source_context{std::move(source), context};
+        const ScriptingContext source_context{source.get(), context};
         return m_research_cost->Eval(source_context);
     }
 }
@@ -337,9 +389,9 @@ int Tech::ResearchTime(int empire_id, const ScriptingContext& context) const {
         auto source = empire->Source(context.ContextObjects());
         if (!source)
             return ARBITRARY_LARGE_TURNS;
-        ScriptingContext source_context{context, std::move(source)};
+        ScriptingContext source_context{source.get(), context};
 
-        return m_research_turns->Eval(ScriptingContext(std::move(source)));
+        return m_research_turns->Eval(source_context);
     }
 }
 
@@ -370,51 +422,39 @@ unsigned int Tech::GetCheckSum() const {
 // static(s)
 TechManager* TechManager::s_instance = nullptr;
 
-const Tech* TechManager::GetTech(const std::string& name) const {
-    CheckPendingTechs();
-    iterator it = m_techs.get<NameIndex>().find(name);
-    return it == m_techs.get<NameIndex>().end() ? nullptr : it->get();
-}
-
-const Tech* TechManager::GetTech(const char* name) const {
-    CheckPendingTechs();
-    iterator it = m_techs.get<NameIndex>().find(name, std::less<>());
-    return it == m_techs.get<NameIndex>().end() ? nullptr : it->get();
-}
-
 const Tech* TechManager::GetTech(std::string_view name) const {
     CheckPendingTechs();
     iterator it = m_techs.get<NameIndex>().find(name, std::less<>());
     return it == m_techs.get<NameIndex>().end() ? nullptr : it->get();
 }
 
-const TechCategory* TechManager::GetTechCategory(const std::string& name) const {
+const TechCategory* TechManager::GetTechCategory(std::string_view name) const {
     CheckPendingTechs();
     auto it = m_categories.find(name);
     return it == m_categories.end() ? nullptr : it->second.get();
 }
 
-std::vector<std::string> TechManager::CategoryNames() const {
+std::vector<std::string_view> TechManager::CategoryNames() const {
     CheckPendingTechs();
-    std::vector<std::string> retval;
+    std::vector<std::string_view> retval;
     retval.reserve(m_categories.size());
     for (const auto& entry : m_categories)
         retval.emplace_back(entry.first);
     return retval;
 }
 
-std::vector<std::string> TechManager::TechNames() const {
+std::vector<std::string_view> TechManager::TechNames() const {
     CheckPendingTechs();
-    std::vector<std::string> retval;
+    std::vector<std::string_view> retval;
     retval.reserve(m_techs.size());
     for (const auto& tech : m_techs.get<NameIndex>())
         retval.emplace_back(tech->Name());
     return retval;
 }
 
-std::vector<std::string> TechManager::TechNames(const std::string& name) const {
+std::vector<std::string_view> TechManager::TechNames(const std::string& name) const {
     CheckPendingTechs();
-    std::vector<std::string> retval;
+    std::vector<std::string_view> retval;
     retval.reserve(m_techs.size());
     for (TechManager::category_iterator it = category_begin(name); it != category_end(name); ++it)
         retval.emplace_back((*it)->Name());
@@ -770,11 +810,8 @@ unsigned int TechManager::GetCheckSum() const {
 TechManager& GetTechManager()
 { return TechManager::GetTechManager(); }
 
-const Tech* GetTech(const std::string& name)
-{ return GetTechManager().GetTech(name); }
-
 const Tech* GetTech(std::string_view name)
 { return GetTechManager().GetTech(name); }
 
-const TechCategory* GetTechCategory(const std::string& name)
+const TechCategory* GetTechCategory(std::string_view name)
 { return GetTechManager().GetTechCategory(name); }

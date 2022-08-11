@@ -79,17 +79,95 @@ Species::Species(std::string&& name, std::string&& desc,
     m_can_produce_ships(can_produce_ships),
     m_spawn_rate(spawn_rate),
     m_spawn_limit(spawn_limit),
-    m_likes(std::move(likes)),
-    m_dislikes(std::move(dislikes)),
+    m_tags_concatenated([&tags, &likes, &dislikes]() {
+        // ensure capitalization and determine size of tags, likes, dislikes
+        std::size_t params_sz = 0;
+        std::vector<std::string> upper_tags;
+        upper_tags.reserve(tags.size());
+        for (const auto& t : tags) {
+            const auto& upper_tag = upper_tags.emplace_back(boost::to_upper_copy<std::string>(t));
+            params_sz += upper_tag.size();
+        }
+        std::vector<std::string> upper_likes;
+        upper_likes.reserve(likes.size());
+        for (const auto& l : likes) {
+            const auto& upper_like = upper_likes.emplace_back(boost::to_upper_copy<std::string>(l));
+            params_sz += upper_like.size();
+        }
+        std::vector<std::string> upper_dislikes;
+        upper_dislikes.reserve(dislikes.size());
+        for (const auto& d : dislikes) {
+            const auto& upper_dislike = upper_dislikes.emplace_back(boost::to_upper_copy<std::string>(d));
+            params_sz += upper_dislike.size();
+        }
+
+        // storage for concatenating tags, likes, and dislikes
+        std::ostringstream retval;
+
+        // concatenate tags, likes, and dislikes
+        std::copy(upper_tags.begin(), upper_tags.end(), std::ostream_iterator<std::string>(retval));
+        std::copy(upper_likes.begin(), upper_likes.end(), std::ostream_iterator<std::string>(retval));
+        std::copy(upper_dislikes.begin(), upper_dislikes.end(), std::ostream_iterator<std::string>(retval));
+        return std::move(retval).str();
+    }()),
+    m_tags([&tags, this]() {
+        std::vector<std::string_view> retval;
+        retval.reserve(tags.size());
+
+        const std::string_view sv{m_tags_concatenated};
+        std::size_t next_idx = 0;
+
+        // store views into concatenated tags/likes string
+        std::for_each(tags.begin(), tags.end(), [&next_idx, &retval, this, sv](const auto& t) {
+            std::string upper_t = boost::to_upper_copy<std::string>(t);
+            retval.push_back(sv.substr(next_idx, upper_t.size()));
+            next_idx += upper_t.size();
+        });
+        return retval;
+    }()),
+    m_likes([&likes, this]() {
+        std::vector<std::string_view> retval;
+        retval.reserve(likes.size());
+
+        const std::string_view sv{m_tags_concatenated};
+        std::size_t next_idx = 0;
+        // find starting point for first like, after end of tags, within m_tags_concatenated
+        std::for_each(m_tags.begin(), m_tags.end(), [&next_idx](const auto& t) { next_idx += t.size(); });
+
+        // store views into concatenated tags/likes string
+        std::for_each(likes.begin(), likes.end(), [&next_idx, &retval, this, sv](const auto& t) {
+            std::string upper_t = boost::to_upper_copy<std::string>(t);
+            retval.push_back(sv.substr(next_idx, upper_t.size()));
+            next_idx += upper_t.size();
+        });
+
+        return retval;
+    }()),
+    m_dislikes([&dislikes, this]() {
+        std::vector<std::string_view> retval;
+        retval.reserve(dislikes.size());
+
+        const std::string_view sv{m_tags_concatenated};
+        std::size_t next_idx = 0;
+        // find starting point for first dislike, after end of tags and likes, within m_tags_concatenated
+        std::for_each(m_tags.begin(), m_tags.end(), [&next_idx](const auto& t) { next_idx += t.size(); });
+        std::for_each(m_likes.begin(), m_likes.end(), [&next_idx](const auto& t) { next_idx += t.size(); });
+
+        // store views into concatenated tags/likes string
+        std::for_each(dislikes.begin(), dislikes.end(), [&next_idx, &retval, this, sv](const auto& t) {
+            std::string upper_t = boost::to_upper_copy<std::string>(t);
+            retval.push_back(sv.substr(next_idx, upper_t.size()));
+            next_idx += upper_t.size();
+        });
+
+        return retval;
+    }()),
     m_graphic(std::move(graphic))
 {
     for (auto&& effect : effects)
         m_effects.push_back(std::move(effect));
 
     Init();
-
-    for (const std::string& tag : tags)
-        m_tags.insert(boost::to_upper_copy<std::string>(tag));
 }
 
 Species::~Species() = default;
@@ -146,7 +224,7 @@ std::string Species::Dump(unsigned short ntabs) const {
         retval += DumpIndent(ntabs+1) + "CanColonize\n";
     if (m_foci.size() == 1) {
         retval += DumpIndent(ntabs+1) + "foci =\n";
-        m_foci.begin()->Dump(ntabs+1);
+        retval += m_foci.front().Dump(ntabs+1);
     } else {
         retval += DumpIndent(ntabs+1) + "foci = [\n";
         for (const FocusType& focus : m_foci)
@@ -354,14 +432,13 @@ bool SpeciesManager::NativeSpecies::operator()(
     const std::map<std::string, std::unique_ptr<Species>>::value_type& species_entry) const
 { return species_entry.second->Native(); }
 
-const Species* SpeciesManager::GetSpecies(const std::string& name) const {
+const Species* SpeciesManager::GetSpecies(std::string_view name) const {
     CheckPendingSpeciesTypes();
     auto it = s_species.find(name);
     return it != s_species.end() ? it->second.get() : nullptr;
 }
 
-const Species* SpeciesManager::GetSpecies(std::string_view name) const {
-    CheckPendingSpeciesTypes();
+const Species* SpeciesManager::GetSpeciesUnchecked(std::string_view name) const {
     auto it = s_species.find(name);
     return it != s_species.end() ? it->second.get() : nullptr;
 }
@@ -482,7 +559,7 @@ void SpeciesManager::SetSpeciesSpeciesOpinion(const std::string& opinionated_spe
 { m_species_species_opinions[opinionated_species][rated_species] = opinion; }
 
 const std::map<std::string, std::set<int>>& SpeciesManager::GetSpeciesHomeworldsMap(
-    int encoding_empire/* = ALL_EMPIRES*/) const
+    int encoding_empire) const
 {
     if (encoding_empire == ALL_EMPIRES)
         return m_species_homeworlds;
@@ -490,10 +567,10 @@ const std::map<std::string, std::set<int>>& SpeciesManager::GetSpeciesHomeworlds
     return m_species_homeworlds;
 }
 
-const std::map<std::string, std::map<int, float>>& SpeciesManager::GetSpeciesEmpireOpinionsMap(int encoding_empire/* = ALL_EMPIRES*/) const
+const std::map<std::string, std::map<int, float>>& SpeciesManager::GetSpeciesEmpireOpinionsMap(int encoding_empire) const
 { return m_species_empire_opinions; }
 
-const std::map<std::string, std::map<std::string, float>>& SpeciesManager::GetSpeciesSpeciesOpinionsMap(int encoding_empire/* = ALL_EMPIRES*/) const
+const std::map<std::string, std::map<std::string, float>>& SpeciesManager::GetSpeciesSpeciesOpinionsMap(int encoding_empire) const
 { return m_species_species_opinions; }
 
 float SpeciesManager::SpeciesEmpireOpinion(const std::string& species_name, int empire_id) const {
@@ -520,19 +597,27 @@ float SpeciesManager::SpeciesSpeciesOpinion(const std::string& opinionated_speci
     return ra_sp_it->second;
 }
 
-std::vector<std::string_view> SpeciesManager::SpeciesThatLike(const std::string& content_name) const {
+std::vector<std::string_view> SpeciesManager::SpeciesThatLike(std::string_view content_name) const {
+    CheckPendingSpeciesTypes();
     std::vector<std::string_view> retval;
-    for (const auto& [species_name, species] : *this)
-        if (species->Likes().count(content_name))
-            retval.push_back(species_name);
+    retval.reserve(s_species.size());
+    std::for_each(s_species.begin(), s_species.end(), [&retval, content_name](const auto& s) {
+        const auto& likes = s.second->Likes();
+        if (std::any_of(likes.begin(), likes.end(), [content_name](const auto& l) { return l == content_name; }))
+            retval.emplace_back(s.first);
+    });
     return retval;
 }
 
-std::vector<std::string_view> SpeciesManager::SpeciesThatDislike(const std::string& content_name) const {
+std::vector<std::string_view> SpeciesManager::SpeciesThatDislike(std::string_view content_name) const {
+    CheckPendingSpeciesTypes();
     std::vector<std::string_view> retval;
-    for (const auto& [species_name, species] : *this)
-        if (species->Dislikes().count(content_name))
-            retval.push_back(species_name);
+    retval.reserve(s_species.size());
+    std::for_each(s_species.begin(), s_species.end(), [&retval, content_name](const auto& s) {
+        const auto& dislikes = s.second->Dislikes();
+        if (std::any_of(dislikes.begin(), dislikes.end(), [content_name](const auto& l) { return l == content_name; }))
+            retval.emplace_back(s.first);
+    });
     return retval;
 }
 
@@ -565,7 +650,7 @@ void SpeciesManager::ClearSpeciesHomeworlds()
 void SpeciesManager::UpdatePopulationCounter(const ObjectMap& objects) {
     // ships of each species and design
     m_species_object_populations.clear();
-    for (const auto& [obj_id, obj] : objects.ExistingObjects()) {
+    for (const auto& [obj_id, obj] : objects.allExisting()) {
         if (obj->ObjectType() != UniverseObjectType::OBJ_PLANET &&
             obj->ObjectType() != UniverseObjectType::OBJ_POP_CENTER)
         { continue; }

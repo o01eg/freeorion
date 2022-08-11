@@ -44,7 +44,7 @@ Layout::WndPosition::WndPosition(std::size_t first_row_, std::size_t first_colum
 {}
 
 Layout::Layout(X x, Y y, X w, Y h, std::size_t rows, std::size_t columns,
-               unsigned int border_margin/* = 0*/, unsigned int cell_margin/* = INVALID_CELL_MARGIN*/) :
+               unsigned int border_margin, unsigned int cell_margin) :
     Wnd(x, y, w, h, NO_WND_FLAGS),
     m_cells(rows, std::vector<std::weak_ptr<Wnd>>(columns)),
     m_border_margin(border_margin),
@@ -384,11 +384,11 @@ void Layout::DoLayout(Pt ul, Pt lr)
         current_origin += m_column_params[i].current_width;
     }
 
-    if (m_row_params.back().current_origin + m_row_params.back().current_width != Value(Height()) - m_border_margin)
-        throw FailedCalculationCheck("Layout::DoLayout() : calculated row positions do not sum to the height of the layout");
+    //if (m_row_params.back().current_origin + m_row_params.back().current_width != Value(Height()) - m_border_margin)
+    //    throw FailedCalculationCheck("Layout::DoLayout() : calculated row positions do not sum to the height of the layout");
 
-    if (m_column_params.back().current_origin + m_column_params.back().current_width != Value(Width()) - m_border_margin)
-        throw FailedCalculationCheck("Layout::DoLayout() : calculated column positions do not sum to the width of the layout");
+    //if (m_column_params.back().current_origin + m_column_params.back().current_width != Value(Width()) - m_border_margin)
+    //    throw FailedCalculationCheck("Layout::DoLayout() : calculated column positions do not sum to the width of the layout");
 
     // resize cells and their contents
     m_ignore_child_resize = true;
@@ -492,12 +492,12 @@ void Layout::Render()
 }
 
 void Layout::Add(std::shared_ptr<Wnd> wnd, std::size_t row, std::size_t column,
-                 Flags<Alignment> alignment/* = ALIGN_NONE*/)
+                 Flags<Alignment> alignment)
 { Add(std::move(wnd), row, column, 1, 1, alignment); }
 
 void Layout::Add(std::shared_ptr<Wnd> wnd, std::size_t row, std::size_t column,
                  std::size_t num_rows, std::size_t num_columns,
-                 Flags<Alignment> alignment/* = ALIGN_NONE*/)
+                 Flags<Alignment> alignment)
 {
     std::size_t last_row = row + num_rows;
     std::size_t last_column = column + num_columns;

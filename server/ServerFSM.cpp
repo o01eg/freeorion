@@ -115,7 +115,7 @@ namespace {
             case Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR:   ss << "MODERATOR, ";    break;
             case Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER:    ss << "OBSERVER, ";     break;
             case Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER:      ss << "PLAYER, "; break;
-            default:                                        ss << "<invalid client type>, ";
+            default:                                                    ss << "<invalid client type>, ";
             }
             EmpireColor empire_color = entry.second.empire_color;
             ss << "(" << static_cast<unsigned int>(std::get<0>(empire_color))
@@ -154,14 +154,16 @@ namespace {
 
 
     /** Return true for fatal errors.*/
-    bool HandleErrorMessage(const Error& msg, ServerApp &server) {
-        std::string problem;
-        bool fatal;
-        int player_id;
-        ExtractErrorMessageData(msg.m_message, player_id, problem, fatal);
-
+    bool HandleErrorMessage(const Error& msg, ServerApp& server) {
         std::stringstream ss;
-
+        std::string problem;
+        bool fatal = false;
+        int player_id = Networking::INVALID_PLAYER_ID;
+        try {
+            ExtractErrorMessageData(msg.m_message, player_id, problem, fatal);
+        } catch (...) {
+            problem = UserString("UNKNOWN");
+        }
         ss << "Server received from player "
            << msg.m_player_connection->PlayerName() << "("
            << msg.m_player_connection->PlayerID() << ")"
@@ -189,6 +191,9 @@ namespace {
         boost::filesystem::path save_path(autosave_dir_path / save_filename);
         return save_path.string();
     }
+
+    bool IsMultiplayerSaveFile(const boost::filesystem::path& path)
+    { return IsExistingFile(path) && MP_SAVE_FILE_EXTENSION == path.extension(); }
 
     EmpireColor GetUnusedEmpireColour(const std::list<std::pair<int, PlayerSetupData>>& psd,
                                   const std::map<int, SaveGameEmpireData> &sged = std::map<int, SaveGameEmpireData>())
@@ -517,7 +522,7 @@ bool ServerFSM::EstablishPlayer(const PlayerConnectionPtr& player_connection,
              it != m_server.m_networking.established_end(); ++it)
         {
             if ((*it)->PlayerName() == player_name && player_connection != (*it)) {
-                (*it)->SendMessage(ErrorMessage(UserString("ERROR_CONNECTION_WAS_REPLACED"), true));
+                (*it)->SendMessage(ErrorMessage(UserStringNop("ERROR_CONNECTION_WAS_REPLACED"), true));
                 to_disconnect.push_back(*it);
 
                 // If we're going to establish Human Player
@@ -587,7 +592,7 @@ bool ServerFSM::EstablishPlayer(const PlayerConnectionPtr& player_connection,
             for (const auto& elem : m_server.GetChatHistory())
                 chat_history.push_back(std::cref(elem));
             if (chat_history.size() > 0)
-                player_connection->SendMessage(ChatHistoryMessage(chat_history));
+                player_connection->SendMessage(ChatHistoryMessage(chat_history, !player_connection->IsLocalConnection()));
         }
     }
 
@@ -610,9 +615,11 @@ Idle::Idle(my_context c) :
     if (Server().IsHostless())
         post_event(Hostless());
     else if (!GetOptionsDB().Get<std::string>("load").empty())
-        throw std::invalid_argument("Autostart load file was choosed but the server wasn't started in a hostless mode");
+        throw std::invalid_argument("Autostart load file was chosen but the server wasn't started in a hostless mode");
     else if (GetOptionsDB().Get<bool>("quickstart"))
-        throw std::invalid_argument("Quickstart was choosed but the server wasn't started in a hostless mode");
+        throw std::invalid_argument("Quickstart was chosen but the server wasn't started in a hostless mode");
+    else if (GetOptionsDB().Get<bool>("load-or-quickstart"))
+        throw std::invalid_argument("Load or quickstart was chosen but the server wasn't started in a hostless mode");
 }
 
 Idle::~Idle()
@@ -626,7 +633,10 @@ sc::result Idle::react(const HostMPGame& msg) {
 
     std::string host_player_name;
     std::string client_version_string;
-    ExtractHostMPGameMessageData(message, host_player_name, client_version_string);
+    std::map<std::string, std::string> dependencies;
+    try {
+        ExtractHostMPGameMessageData(message, host_player_name, client_version_string, dependencies);
+    } catch (...) {}
 
     // validate host name (was found and wasn't empty)
     if (host_player_name.empty()) {
@@ -645,12 +655,12 @@ sc::result Idle::react(const HostMPGame& msg) {
 
     DebugLogger(FSM) << "Idle::react(HostMPGame) about to send acknowledgement to host";
     player_connection->SetAuthRoles({
-                    Networking::RoleType::ROLE_HOST,
-                    Networking::RoleType::ROLE_CLIENT_TYPE_MODERATOR,
-                    Networking::RoleType::ROLE_CLIENT_TYPE_PLAYER,
-                    Networking::RoleType::ROLE_CLIENT_TYPE_OBSERVER,
-                    Networking::RoleType::ROLE_GALAXY_SETUP
-                    });
+        Networking::RoleType::ROLE_HOST,
+        Networking::RoleType::ROLE_CLIENT_TYPE_MODERATOR,
+        Networking::RoleType::ROLE_CLIENT_TYPE_PLAYER,
+        Networking::RoleType::ROLE_CLIENT_TYPE_OBSERVER,
+        Networking::RoleType::ROLE_GALAXY_SETUP
+    });
     player_connection->SendMessage(HostMPAckMessage(host_player_id));
 
     server.m_single_player_game = false;
@@ -668,7 +678,10 @@ sc::result Idle::react(const HostSPGame& msg) {
 
     auto single_player_setup_data = std::make_shared<SinglePlayerSetupData>();
     std::string client_version_string;
-    ExtractHostSPGameMessageData(message, *single_player_setup_data, client_version_string);
+    std::map<std::string, std::string> dependencies;
+    try {
+        ExtractHostSPGameMessageData(message, *single_player_setup_data, client_version_string, dependencies);
+    } catch (...) {}
 
 
     // get host player's name from setup data or saved file
@@ -722,7 +735,8 @@ sc::result Idle::react(const Hostless&) {
     TraceLogger(FSM) << "(ServerFSM) Idle.Hostless";
     std::string autostart_load_filename = GetOptionsDB().Get<std::string>("load");
     bool quickstart = GetOptionsDB().Get<bool>("quickstart");
-    if (!quickstart && autostart_load_filename.empty())
+    bool load_or_quickstart = GetOptionsDB().Get<bool>("load-or-quickstart");
+    if (!quickstart && !load_or_quickstart && autostart_load_filename.empty())
         return transit<MPLobby>();
 
     if (GetOptionsDB().Get<int>("network.server.conn-human-empire-players.min") > 0) {
@@ -735,6 +749,24 @@ sc::result Idle::react(const Hostless&) {
     std::vector<PlayerSaveGameData> player_save_game_data;
     server.InitializePython();
     server.LoadChatHistory();
+
+    if (load_or_quickstart) {
+        // Search save games in a subfolder with game UID or "auto" formed in
+        // `GetAutoSaveFileName`.
+        std::string subdir = server.m_galaxy_setup_data.GetGameUID();
+        boost::filesystem::path autosave_dir_path = GetServerSaveDir() / (subdir.empty() ? "auto" : subdir);
+        if (IsExistingDir(autosave_dir_path)) {
+            auto saves = ListDir(autosave_dir_path, IsMultiplayerSaveFile);
+            for (const auto& save : saves) {
+                // Filenames of saves lexicographically sorted with turns and timestamps so latest
+                // file will have greater string representation.
+                if (PathToString(save) > autostart_load_filename) {
+                    autostart_load_filename = PathToString(save);
+                }
+            }
+        }
+    }
+
     if (autostart_load_filename.empty()) {
         DebugLogger(FSM) << "Start new game";
 
@@ -1179,7 +1211,7 @@ void MPLobby::EstablishPlayer(const PlayerConnectionPtr& player_connection,
 namespace {
     std::string StringifyDependencies(const std::map<std::string, std::string>& deps) {
         std::string retval;
-        for (auto [dep, version] : deps)
+        for (auto& [dep, version] : deps)
             retval.append(dep).append(": ").append(version).append("   ");
         return retval;
     }
@@ -1201,7 +1233,7 @@ sc::result MPLobby::react(const JoinGame& msg) {
                                    dependencies, cookie);
     } catch (const std::exception&) {
         ErrorLogger(FSM) << "MPLobby::react(const JoinGame& msg): couldn't extract data from join game message";
-        player_connection->SendMessage(ErrorMessage(UserString("ERROR_INCOMPATIBLE_VERSION"), true));
+        player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_INCOMPATIBLE_VERSION"), true));
         server.Networking().Disconnect(player_connection);
         return discard_event();
     }
@@ -1291,7 +1323,9 @@ sc::result MPLobby::react(const AuthResponse& msg) {
 
     std::string player_name;
     std::string auth;
-    ExtractAuthResponseMessageData(message, player_name, auth);
+    try {
+        ExtractAuthResponseMessageData(message, player_name, auth);
+    } catch (...) {}
 
     Networking::AuthRoles roles;
 
@@ -1322,7 +1356,9 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
     const PlayerConnectionPtr& sender = msg.m_player_connection;
 
     MultiplayerLobbyData incoming_lobby_data;
-    ExtractLobbyUpdateMessageData(message, incoming_lobby_data);
+    try {
+        ExtractLobbyUpdateMessageData(message, incoming_lobby_data);
+    } catch (...) {}
 
     // check if new lobby data changed player setup data.  if so, need to echo
     // back to sender with updated lobby details.
@@ -1901,7 +1937,9 @@ sc::result MPLobby::react(const PlayerChat& msg) {
     std::string data;
     std::set<int> recipients;
     bool pm;
-    ExtractPlayerChatMessageData(message, recipients, data, pm);
+    try  {
+        ExtractPlayerChatMessageData(message, recipients, data, pm);
+    } catch (...) {}
 
     boost::posix_time::ptime timestamp = boost::posix_time::second_clock::universal_time();
 
@@ -2159,8 +2197,10 @@ sc::result WaitingForSPGameJoiners::react(const JoinGame& msg) {
     std::string client_version_string;
     std::map<std::string, std::string> dependencies;
     boost::uuids::uuid cookie = boost::uuids::nil_generator{}();
-    ExtractJoinGameMessageData(message, player_name, client_type, client_version_string,
-                               dependencies, cookie);
+    try {
+        ExtractJoinGameMessageData(message, player_name, client_type, client_version_string,
+                                   dependencies, cookie);
+    } catch (...) {}
 
     DebugLogger() << "Player " << player_name << " has dependencies: " << StringifyDependencies(dependencies);
 
@@ -2325,8 +2365,10 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
     std::string client_version_string;
     std::map<std::string, std::string> dependencies;
     boost::uuids::uuid cookie = boost::uuids::nil_generator{}();
-    ExtractJoinGameMessageData(message, player_name, client_type, client_version_string,
-                               dependencies, cookie);
+    try {
+        ExtractJoinGameMessageData(message, player_name, client_type, client_version_string,
+                                   dependencies, cookie);
+    } catch (...) {}
 
     DebugLogger() << "Player " << player_name << " has dependencies: " << StringifyDependencies(dependencies);
 
@@ -2370,7 +2412,7 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
                  it != server.m_networking.established_end(); ++it)
             {
                 if ((*it)->PlayerName() == player_name && player_connection != (*it)) {
-                    (*it)->SendMessage(ErrorMessage(UserString("ERROR_CONNECTION_WAS_REPLACED"), true));
+                    (*it)->SendMessage(ErrorMessage(UserStringNop("ERROR_CONNECTION_WAS_REPLACED"), true));
                     to_disconnect.push_back(*it);
                 }
             }
@@ -2472,7 +2514,13 @@ sc::result WaitingForMPGameJoiners::react(const AuthResponse& msg) {
 
     std::string player_name;
     std::string auth;
-    ExtractAuthResponseMessageData(message, player_name, auth);
+    try {
+        ExtractAuthResponseMessageData(message, player_name, auth);
+    } catch (...) {
+        // unable to read message
+        player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_INCOMPATIBLE_VERSION"), true));
+        return discard_event();
+    }
 
     Networking::AuthRoles roles;
 
@@ -2494,7 +2542,7 @@ sc::result WaitingForMPGameJoiners::react(const AuthResponse& msg) {
              it != server.m_networking.established_end(); ++it)
         {
             if ((*it)->PlayerName() == player_name && player_connection != (*it)) {
-                (*it)->SendMessage(ErrorMessage(UserString("ERROR_CONNECTION_WAS_REPLACED"), true));
+                (*it)->SendMessage(ErrorMessage(UserStringNop("ERROR_CONNECTION_WAS_REPLACED"), true));
                 to_disconnect.push_back(*it);
             }
         }
@@ -2640,13 +2688,18 @@ sc::result PlayingGame::react(const PlayerChat& msg) {
 
     std::string data;
     std::set<int> recipients;
-    bool pm;
-    ExtractPlayerChatMessageData(message, recipients, data, pm);
+    bool pm = true;
+    try {
+        ExtractPlayerChatMessageData(message, recipients, data, pm);
+    } catch (...) {
+        // unable to read message
+        sender->SendMessage(ErrorMessage(UserStringNop("ERROR_INCOMPATIBLE_VERSION"), true));
+        return discard_event();
+    }
 
     boost::posix_time::ptime timestamp = boost::posix_time::second_clock::universal_time();
 
-    if (recipients.empty() && sender->GetClientType() != Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
-    {
+    if (recipients.empty() && sender->GetClientType() != Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
         EmpireColor text_color = CLR_SERVER;
         if (auto empire = server.Empires().GetEmpire(server.PlayerEmpireID(sender->PlayerID())))
             text_color = empire->Color();
@@ -2674,8 +2727,10 @@ sc::result PlayingGame::react(const Diplomacy& msg) {
     const Message& message = msg.m_message;
 
     DiplomaticMessage diplo_message;
-    ExtractDiplomacyMessageData(message, diplo_message);
-    Empires().HandleDiplomaticMessage(diplo_message);
+    try {
+        ExtractDiplomacyMessageData(message, diplo_message);
+        Empires().HandleDiplomaticMessage(diplo_message);
+    } catch (...) {}
 
     return discard_event();
 }
@@ -2694,8 +2749,10 @@ sc::result PlayingGame::react(const ModeratorAct& msg) {
         return discard_event();
     }
 
-    Moderator::ModeratorAction* action = nullptr;
-    ExtractModeratorActionMessageData(message, action);
+    std::unique_ptr<Moderator::ModeratorAction> action;
+    try {
+        ExtractModeratorActionMessageData(message, action);
+    } catch (...) {}
 
     DebugLogger(FSM) << "PlayingGame::react(ModeratorAct): " << (action ? action->Dump() : "(null)");
 
@@ -2707,10 +2764,9 @@ sc::result PlayingGame::react(const ModeratorAct& msg) {
         bool use_binary_serialization = sender->IsBinarySerializationUsed();
         sender->SendMessage(TurnProgressMessage(Message::TurnProgressPhase::DOWNLOADING));
         sender->SendMessage(TurnPartialUpdateMessage(server.PlayerEmpireID(player_id),
-                                                     GetUniverse(), use_binary_serialization));
+                                                     GetUniverse(), use_binary_serialization,
+                                                     !sender->IsLocalConnection()));
     }
-
-    delete action;
 
     return discard_event();
 }
@@ -2843,7 +2899,7 @@ sc::result PlayingGame::react(const JoinGame& msg) {
                                    dependencies, cookie);
     } catch (const std::exception&) {
         ErrorLogger(FSM) << "PlayingGame::react(const JoinGame& msg): couldn't extract data from join game message";
-        player_connection->SendMessage(ErrorMessage(UserString("ERROR_INCOMPATIBLE_VERSION"), true));
+        player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_INCOMPATIBLE_VERSION"), true));
         server.Networking().Disconnect(player_connection);
         return discard_event();
     }
@@ -2927,7 +2983,9 @@ sc::result PlayingGame::react(const AuthResponse& msg) {
 
     std::string player_name;
     std::string auth;
-    ExtractAuthResponseMessageData(message, player_name, auth);
+    try {
+        ExtractAuthResponseMessageData(message, player_name, auth);
+    } catch (...) {}
 
     Networking::AuthRoles roles;
 
@@ -3054,7 +3112,12 @@ sc::result PlayingGame::react(const LobbyUpdate& msg) {
     const Message& message = msg.m_message;
 
     MultiplayerLobbyData incoming_lobby_data;
-    ExtractLobbyUpdateMessageData(message, incoming_lobby_data);
+    try {
+        ExtractLobbyUpdateMessageData(message, incoming_lobby_data);
+    } catch (...) {
+        sender->SendMessage(ErrorMessage(UserStringNop("ERROR_INCOMPATIBLE_VERSION")));
+        return discard_event();
+    }
 
     // try to add the player into the game if he choose empire
     for (const auto& player : incoming_lobby_data.players) {
@@ -3108,11 +3171,7 @@ WaitingForTurnEnd::WaitingForTurnEnd(my_context c) :
 {
     TraceLogger(FSM) << "(ServerFSM) WaitingForTurnEnd";
     if (GetOptionsDB().Get<int>("save.auto.interval") > 0) {
-#if BOOST_VERSION >= 106600
         m_timeout.expires_after(std::chrono::seconds(GetOptionsDB().Get<int>("save.auto.interval")));
-#else
-        m_timeout.expires_from_now(std::chrono::seconds(GetOptionsDB().Get<int>("save.auto.interval")));
-#endif
         m_timeout.async_wait(boost::bind(&WaitingForTurnEnd::SaveTimedoutHandler,
                                          this,
                                          boost::asio::placeholders::error));
@@ -3242,9 +3301,11 @@ sc::result WaitingForTurnEnd::react(const TurnOrders& msg) {
         DebugLogger(FSM) << "WaitingForTurnEnd.TurnOrders : Received orders from player " << player_id
                          << " for empire " << empire_id << " count of " << order_set->size();
 
-        server.SetEmpireSaveGameData(empire_id, std::make_unique<PlayerSaveGameData>(sender->PlayerName(), empire_id,
-                                     order_set, ui_data, save_state_string,
-                                     client_type));
+        server.SetEmpireSaveGameData(
+            empire_id,
+            std::make_unique<PlayerSaveGameData>(sender->PlayerName(), empire_id, std::move(order_set),
+                                                 std::move(ui_data), std::move(save_state_string),
+                                                 client_type));
         empire->SetAutoTurn(0);
         empire->SetReady(true);
 
@@ -3450,28 +3511,40 @@ sc::result WaitingForTurnEnd::react(const SaveGameRequest& msg) {
         return discard_event();
     }
 
-    std::string save_filename = message.Text(); // store requested save file name in Base state context so that sibling state can retreive it
 
-    ServerSaveGameData server_data{server.m_current_turn};
+    // check if AIs have valid state info
+    auto server_player_save_data = server.GetPlayerSaveGameData();
+    bool ais_all_have_state = true;
+    for (const auto& spsd : server_player_save_data) {
+        if (spsd.client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER &&
+            spsd.save_state_string.empty())
+        {
+            ais_all_have_state = false;
+            break;
+        }
+    }
+    if (!ais_all_have_state) {
+        // lacking state info from AIs...
+        ErrorLogger() << "WaitingForTurnEnd::react(const SaveGameRequest& msg): don't have save state string for AI(s). Loaded save will lack AI state info, such as aggression setting.";
+    }
 
-    // retreive requested save name from Base state, which should have been
-    // set in WaitingForTurnEnd::react(const SaveGameRequest& msg)
-    int bytes_written = 0;
 
     // save game...
     try {
-        bytes_written = SaveGame(save_filename,     server_data,    server.GetPlayerSaveGameData(),
-                                 GetUniverse(),     Empires(),      GetSpeciesManager(),
-                                 GetCombatLogManager(),             server.m_galaxy_setup_data,
-                                 !server.m_single_player_game);
+        ServerSaveGameData server_data{server.m_current_turn};
+        const auto& save_filename = message.Text();
+        int bytes_written = SaveGame(save_filename,         server_data,        server_player_save_data,
+                                     server.GetUniverse(),  server.Empires(),   server.GetSpeciesManager(),
+                                     GetCombatLogManager(), server.m_galaxy_setup_data,
+                                     !server.m_single_player_game);
+        // inform players that save is complete
+        SendMessageToAllPlayers(ServerSaveGameCompleteMessage(save_filename, bytes_written));
 
     } catch (const std::exception& error) {
         ErrorLogger(FSM) << "While saving, catch std::exception: " << error.what();
         SendMessageToAllPlayers(ErrorMessage(UserStringNop("UNABLE_TO_WRITE_SAVE_FILE"), false));
     }
 
-    // inform players that save is complete
-    SendMessageToAllPlayers(ServerSaveGameCompleteMessage(save_filename, bytes_written));
 
     return discard_event();
 }
@@ -3482,19 +3555,15 @@ void WaitingForTurnEnd::SaveTimedoutHandler(const boost::system::error_code& err
         return;
     }
 
-    if (Server().CurrentTurn() <= 0) {
+    if (Server().CurrentTurn() <= 0)
         return;
-    }
+
 
     DebugLogger() << "Save timed out.";
     PlayerConnectionPtr dummy_connection = nullptr;
     Server().m_fsm->process_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(Server().CurrentTurn())), dummy_connection));
     if (GetOptionsDB().Get<int>("save.auto.interval") > 0) {
-#if BOOST_VERSION >= 106600
         m_timeout.expires_after(std::chrono::seconds(GetOptionsDB().Get<int>("save.auto.interval")));
-#else
-        m_timeout.expires_from_now(std::chrono::seconds(GetOptionsDB().Get<int>("save.auto.interval")));
-#endif
         m_timeout.async_wait(boost::bind(&WaitingForTurnEnd::SaveTimedoutHandler,
                                          this,
                                          boost::asio::placeholders::error));

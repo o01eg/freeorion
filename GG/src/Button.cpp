@@ -17,39 +17,42 @@
 using namespace GG;
 
 namespace {
+    void ClickedEcho()
+    { std::cerr << "GG SIGNAL : Button::LeftClickedSignal()" << std::endl; }
 
-void ClickedEcho()
-{ std::cerr << "GG SIGNAL : Button::LeftClickedSignal()" << std::endl; }
+    void CheckedEcho(bool checked)
+    { std::cerr << "GG SIGNAL : StateButton::CheckedSignal(checked=" << checked << ")" << std::endl; }
 
-void CheckedEcho(bool checked)
-{ std::cerr << "GG SIGNAL : StateButton::CheckedSignal(checked=" << checked << ")" << std::endl; }
+    void ButtonChangedEcho(std::size_t index)
+    { std::cerr << "GG SIGNAL : RadioButtonGroup::ButtonChangedSignal(index=" << index << ")" << std::endl; }
 
-void ButtonChangedEcho(std::size_t index)
-{
-    std::cerr << "GG SIGNAL : RadioButtonGroup::ButtonChangedSignal(index="
-                << index << ")" << std::endl;
-}
-
+    constexpr GG::Pt SHADOW_OFFSET{GG::X(2), GG::Y(2)};
 }
 
 ////////////////////////////////////////////////
 // GG::Button
 ////////////////////////////////////////////////
 Button::Button(std::string str, const std::shared_ptr<Font>& font, Clr color,
-               Clr text_color/* = CLR_BLACK*/, Flags<WndFlag> flags/* = INTERACTIVE*/) :
+               Clr text_color, Flags<WndFlag> flags) :
     Control(X0, Y0, X1, Y1, flags),
-    m_label(Wnd::Create<TextControl>(X0, Y0, X1, Y1, std::move(str), font,
-                                     text_color, FORMAT_NONE, NO_WND_FLAGS))
+    m_label(Wnd::Create<TextControl>(X0, Y0, X1, Y1, str, font,
+                                     text_color, FORMAT_NONE, NO_WND_FLAGS)),
+    m_label_shadow(Wnd::Create<TextControl>(SHADOW_OFFSET.x, SHADOW_OFFSET.y, X1, Y1, std::move(str),
+                                            font, CLR_SHADOW, FORMAT_NONE, NO_WND_FLAGS))
 {
     m_color = color;
     m_label->Hide();
+    m_label_shadow->Hide();
 
     if (INSTRUMENT_ALL_SIGNALS)
         LeftClickedSignal.connect(&ClickedEcho);
 }
 
 void Button::CompleteConstruction()
-{ AttachChild(m_label); }
+{
+    AttachChild(m_label_shadow);
+    AttachChild(m_label);
+}
 
 Pt Button::MinUsableSize() const
 { return m_label->MinUsableSize(); }
@@ -58,6 +61,7 @@ void Button::Show()
 {
     Wnd::Show();
     m_label->Hide();
+    m_label_shadow->Hide();
 }
 
 Button::ButtonState Button::State() const
@@ -92,6 +96,7 @@ void Button::SizeMove(const Pt& ul, const Pt& lr)
         return;
 
     m_label->Resize(Size());
+    m_label_shadow->Resize(Size());
 }
 
 void Button::SetColor(Clr c)
@@ -101,7 +106,10 @@ void Button::SetState(ButtonState state)
 { m_state = state; }
 
 void Button::SetText(std::string text)
-{ m_label->SetText(std::move(text)); }
+{
+    m_label->SetText(text);
+    m_label_shadow->SetText(std::move(text));
+}
 
 void Button::SetUnpressedGraphic(SubTexture st)
 { m_unpressed_graphic = std::move(st); }
@@ -206,14 +214,8 @@ void Button::RenderUnpressed()
     } else {
         RenderDefault();
     }
-    // draw text shadow
-    Clr temp = m_label->TextColor();  // save original color
-    m_label->SetTextColor(CLR_SHADOW); // shadow color
-    m_label->OffsetMove(Pt(X(2), Y(2)));
-    m_label->Render();
-    m_label->OffsetMove(Pt(X(-2), Y(-2)));
-    m_label->SetTextColor(temp);    // restore original color
-    // draw text
+    // draw text shadow and text
+    m_label_shadow->Render();
     m_label->Render();
 }
 
@@ -225,6 +227,9 @@ void Button::RenderPressed()
     } else {
         RenderDefault();
     }
+    m_label_shadow->OffsetMove(Pt(X1, Y1));
+    m_label_shadow->Render();
+    m_label_shadow->OffsetMove(Pt(-X1, -Y1));
     m_label->OffsetMove(Pt(X1, Y1));
     m_label->Render();
     m_label->OffsetMove(Pt(-X1, -Y1));
@@ -238,14 +243,7 @@ void Button::RenderRollover()
     } else {
         RenderDefault();
     }
-    // draw text shadow
-    Clr temp = m_label->TextColor();  // save original color
-    m_label->SetTextColor(CLR_SHADOW); // shadow color
-    m_label->OffsetMove(Pt(X(2), Y(2)));
-    m_label->Render();
-    m_label->OffsetMove(Pt(X(-2), Y(-2)));
-    m_label->SetTextColor(temp);    // restore original color
-    // draw text
+    m_label_shadow->Render();
     m_label->Render();
 }
 
@@ -265,16 +263,12 @@ void Button::RenderDefault()
 StateButton::StateButton(std::string str, const std::shared_ptr<Font>& font,
                          Flags<TextFormat> format, Clr color,
                          std::shared_ptr<StateButtonRepresenter> representer,
-                         Clr text_color/* = CLR_BLACK*/) :
+                         Clr text_color) :
     Control(X0, Y0, X1, Y1, INTERACTIVE),
     m_representer(std::move(representer)),
     m_label(Wnd::Create<TextControl>(X0, Y0, X1, Y1, std::move(str), font,
-                                     text_color, format, NO_WND_FLAGS)),
-    m_state(ButtonState::BN_UNPRESSED),
-    m_checked(false)
-{
-    m_color = color;
-}
+                                     text_color, format, NO_WND_FLAGS))
+{ m_color = color; }
 
 void StateButton::CompleteConstruction()
 {
@@ -360,7 +354,7 @@ void StateButton::SizeMove(const Pt& ul, const Pt& lr)
 void StateButton::Reset()
 { SetCheck(false); }
 
-void StateButton::SetCheck(bool b/* = true*/)
+void StateButton::SetCheck(bool b)
 { m_checked = b; }
 
 void StateButton::SetTextColor(Clr c)
@@ -449,7 +443,7 @@ Pt StateButtonRepresenter::MinUsableSize(const StateButton& button) const
 ////////////////////////////////////////////////
 // GG::BeveledCheckBoxRepresenter
 ////////////////////////////////////////////////
-BeveledCheckBoxRepresenter::BeveledCheckBoxRepresenter(Clr interior/* = CLR_ZERO*/):
+BeveledCheckBoxRepresenter::BeveledCheckBoxRepresenter(Clr interior):
     m_int_color(interior)
 {}
 
@@ -484,7 +478,7 @@ void BeveledCheckBoxRepresenter::Render(const GG::StateButton& button) const
 ////////////////////////////////////////////////
 // GG::BeveledRadioRepresenter
 ////////////////////////////////////////////////
-BeveledRadioRepresenter::BeveledRadioRepresenter(Clr interior/* = CLR_ZERO*/):
+BeveledRadioRepresenter::BeveledRadioRepresenter(Clr interior):
     m_int_color(interior)
 {}
 
@@ -629,7 +623,7 @@ void RadioButtonGroup::SetCheck(std::size_t index)
     SetCheckImpl(index, false);
 }
 
-void RadioButtonGroup::DisableButton(std::size_t index, bool b/* = true*/)
+void RadioButtonGroup::DisableButton(std::size_t index, bool b)
 {
     if (index < m_button_slots.size()) {
         bool was_disabled = m_button_slots[index].button->Disabled();

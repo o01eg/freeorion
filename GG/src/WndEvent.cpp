@@ -15,46 +15,28 @@ using namespace GG;
 ///////////////////////////////////////
 // ModKeys
 ///////////////////////////////////////
-const ModKey GG::MOD_KEY_NONE         (0x0000);
-const ModKey GG::MOD_KEY_LSHIFT       (0x0001);
-const ModKey GG::MOD_KEY_RSHIFT       (0x0002);
-const ModKey GG::MOD_KEY_LCTRL        (0x0040);
-const ModKey GG::MOD_KEY_RCTRL        (0x0080);
-const ModKey GG::MOD_KEY_LALT         (0x0100);
-const ModKey GG::MOD_KEY_RALT         (0x0200);
-const ModKey GG::MOD_KEY_LMETA        (0x0400);
-const ModKey GG::MOD_KEY_RMETA        (0x0800);
-const ModKey GG::MOD_KEY_NUM          (0x1000);
-const ModKey GG::MOD_KEY_CAPS         (0x2000);
-const ModKey GG::MOD_KEY_MODE         (0x4000);
-
 namespace {
 
 bool RegisterModKeys()
 {
     FlagSpec<ModKey>& spec = FlagSpec<ModKey>::instance();
-    spec.insert(MOD_KEY_NONE,   "MOD_KEY_NONE",     true);
-    spec.insert(MOD_KEY_LSHIFT, "MOD_KEY_LSHIFT",   true);
-    spec.insert(MOD_KEY_RSHIFT, "MOD_KEY_RSHIFT",   true);
-    spec.insert(MOD_KEY_LCTRL,  "MOD_KEY_LCTRL",    true);
-    spec.insert(MOD_KEY_RCTRL,  "MOD_KEY_RCTRL",    true);
-    spec.insert(MOD_KEY_LALT,   "MOD_KEY_LALT",     true);
-    spec.insert(MOD_KEY_RALT,   "MOD_KEY_RALT",     true);
-    spec.insert(MOD_KEY_LMETA,  "MOD_KEY_LMETA",    true);
-    spec.insert(MOD_KEY_RMETA,  "MOD_KEY_RMETA",    true);
-    spec.insert(MOD_KEY_NUM,    "MOD_KEY_NUM",      true);
-    spec.insert(MOD_KEY_CAPS,   "MOD_KEY_CAPS",     true);
-    spec.insert(MOD_KEY_MODE,   "MOD_KEY_MODE",     true);
+    spec.insert(MOD_KEY_NONE,   "MOD_KEY_NONE");
+    spec.insert(MOD_KEY_LSHIFT, "MOD_KEY_LSHIFT");
+    spec.insert(MOD_KEY_RSHIFT, "MOD_KEY_RSHIFT");
+    spec.insert(MOD_KEY_LCTRL,  "MOD_KEY_LCTRL");
+    spec.insert(MOD_KEY_RCTRL,  "MOD_KEY_RCTRL");
+    spec.insert(MOD_KEY_LALT,   "MOD_KEY_LALT");
+    spec.insert(MOD_KEY_RALT,   "MOD_KEY_RALT");
+    spec.insert(MOD_KEY_LMETA,  "MOD_KEY_LMETA");
+    spec.insert(MOD_KEY_RMETA,  "MOD_KEY_RMETA");
+    spec.insert(MOD_KEY_NUM,    "MOD_KEY_NUM");
+    spec.insert(MOD_KEY_CAPS,   "MOD_KEY_CAPS");
+    spec.insert(MOD_KEY_MODE,   "MOD_KEY_MODE");
     return true;
 }
 bool dummy = RegisterModKeys();
 
 }
-
-const Flags<ModKey> GG::MOD_KEY_CTRL  ((MOD_KEY_LCTRL | MOD_KEY_RCTRL));
-const Flags<ModKey> GG::MOD_KEY_SHIFT ((MOD_KEY_LSHIFT | MOD_KEY_RSHIFT));
-const Flags<ModKey> GG::MOD_KEY_ALT   ((MOD_KEY_LALT | MOD_KEY_RALT));
-const Flags<ModKey> GG::MOD_KEY_META  ((MOD_KEY_LMETA | MOD_KEY_RMETA));
 
 GG_FLAGSPEC_IMPL(ModKey);
 
@@ -113,9 +95,9 @@ WndEvent::WndEvent(EventType type, const Pt& pt, const Wnd* const drag_wnd, Flag
 
 WndEvent::WndEvent(EventType type, Key key, std::uint32_t code_point, Flags<ModKey> mod_keys) :
     m_type(type),
-    m_key(key),
     m_key_code_point(code_point),
-    m_mod_keys(mod_keys)
+    m_mod_keys(mod_keys),
+    m_key(key)
 {}
 
 WndEvent::WndEvent(EventType type, unsigned int ticks, Timer* timer) :

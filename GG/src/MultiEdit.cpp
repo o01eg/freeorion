@@ -36,21 +36,6 @@ bool LineEndsWithEndlineCharacter(const std::vector<Font::LineData>& lines,
 ///////////////////////////////////////
 // MultiEditStyle
 ///////////////////////////////////////
-const MultiEditStyle GG::MULTI_NONE             (0);
-const MultiEditStyle GG::MULTI_WORDBREAK        (1 << 0);
-const MultiEditStyle GG::MULTI_LINEWRAP         (1 << 1);
-const MultiEditStyle GG::MULTI_VCENTER          (1 << 2);
-const MultiEditStyle GG::MULTI_TOP              (1 << 3);
-const MultiEditStyle GG::MULTI_BOTTOM           (1 << 4);
-const MultiEditStyle GG::MULTI_CENTER           (1 << 5);
-const MultiEditStyle GG::MULTI_LEFT             (1 << 6);
-const MultiEditStyle GG::MULTI_RIGHT            (1 << 7);
-const MultiEditStyle GG::MULTI_READ_ONLY        (1 << 8);
-const MultiEditStyle GG::MULTI_TERMINAL_STYLE   (1 << 9);
-const MultiEditStyle GG::MULTI_INTEGRAL_HEIGHT  (1 << 10);
-const MultiEditStyle GG::MULTI_NO_VSCROLL       (1 << 11);
-const MultiEditStyle GG::MULTI_NO_HSCROLL       (1 << 12);
-
 GG_FLAGSPEC_IMPL(MultiEditStyle);
 
 namespace {
@@ -58,20 +43,20 @@ namespace {
 bool RegisterMultiEditStyles()
 {
     FlagSpec<MultiEditStyle>& spec = FlagSpec<MultiEditStyle>::instance();
-    spec.insert(MULTI_NONE,             "MULTI_NONE",           true);
-    spec.insert(MULTI_WORDBREAK,        "MULTI_WORDBREAK",      true);
-    spec.insert(MULTI_LINEWRAP,         "MULTI_LINEWRAP",       true);
-    spec.insert(MULTI_VCENTER,          "MULTI_VCENTER",        true);
-    spec.insert(MULTI_TOP,              "MULTI_TOP",            true);
-    spec.insert(MULTI_BOTTOM,           "MULTI_BOTTOM",         true);
-    spec.insert(MULTI_CENTER,           "MULTI_CENTER",         true);
-    spec.insert(MULTI_LEFT,             "MULTI_LEFT",           true);
-    spec.insert(MULTI_RIGHT,            "MULTI_RIGHT",          true);
-    spec.insert(MULTI_READ_ONLY,        "MULTI_READ_ONLY",      true);
-    spec.insert(MULTI_TERMINAL_STYLE,   "MULTI_TERMINAL_STYLE", true);
-    spec.insert(MULTI_INTEGRAL_HEIGHT,  "MULTI_INTEGRAL_HEIGHT",true);
-    spec.insert(MULTI_NO_VSCROLL,       "MULTI_NO_VSCROLL",     true);
-    spec.insert(MULTI_NO_HSCROLL,       "MULTI_NO_HSCROLL",     true);
+    spec.insert(MULTI_NONE,             "MULTI_NONE");
+    spec.insert(MULTI_WORDBREAK,        "MULTI_WORDBREAK");
+    spec.insert(MULTI_LINEWRAP,         "MULTI_LINEWRAP");
+    spec.insert(MULTI_VCENTER,          "MULTI_VCENTER");
+    spec.insert(MULTI_TOP,              "MULTI_TOP");
+    spec.insert(MULTI_BOTTOM,           "MULTI_BOTTOM");
+    spec.insert(MULTI_CENTER,           "MULTI_CENTER");
+    spec.insert(MULTI_LEFT,             "MULTI_LEFT");
+    spec.insert(MULTI_RIGHT,            "MULTI_RIGHT");
+    spec.insert(MULTI_READ_ONLY,        "MULTI_READ_ONLY");
+    spec.insert(MULTI_TERMINAL_STYLE,   "MULTI_TERMINAL_STYLE");
+    spec.insert(MULTI_INTEGRAL_HEIGHT,  "MULTI_INTEGRAL_HEIGHT");
+    spec.insert(MULTI_NO_VSCROLL,       "MULTI_NO_VSCROLL");
+    spec.insert(MULTI_NO_HSCROLL,       "MULTI_NO_HSCROLL");
     return true;
 }
 bool dummy = RegisterMultiEditStyles();
@@ -81,15 +66,12 @@ constexpr std::size_t ALL_LINES = std::numeric_limits<std::size_t>::max();
 constexpr unsigned int BORDER_THICK = 2;
 }
 
-const Flags<MultiEditStyle> GG::MULTI_NO_SCROLL{MULTI_NO_VSCROLL | MULTI_NO_HSCROLL};
-
 
 ////////////////////////////////////////////////
 // GG::MultiEdit
 ////////////////////////////////////////////////
 MultiEdit::MultiEdit(std::string str, const std::shared_ptr<Font>& font, Clr color,
-                     Flags<MultiEditStyle> style/* = MULTI_LINEWRAP*/,
-                     Clr text_color/* = CLR_BLACK*/, Clr interior/* = CLR_ZERO*/) :
+                     Flags<MultiEditStyle> style, Clr text_color, Clr interior) :
     Edit(std::move(str), font, color, text_color, interior),
     m_style(style),
     m_cursor_begin(0, CP0),
@@ -164,7 +146,7 @@ void MultiEdit::Render()
     const auto& text = Text();
     const auto focus_wnd{GUI::GetGUI()->FocusWnd().get()};
     const bool multiselected = MultiSelected();
-    const size_t caret_row = (!multiselected && focus_wnd == this && !(m_style & MULTI_READ_ONLY))
+    const std::size_t caret_row = (!multiselected && focus_wnd == this && !(m_style & MULTI_READ_ONLY))
         ? m_cursor_begin.first : std::numeric_limits<size_t>::max();
 
     // process tags
@@ -460,7 +442,7 @@ std::pair<std::size_t, CPSize> MultiEdit::CharAt(const Pt& pt) const
 
     std::pair<std::size_t, CPSize> retval;
 
-    size_t row = RowAt(pt.y);
+    std::size_t row = RowAt(pt.y);
     retval.first = std::min(row, GetLineData().size() - 1);
 
     if (row > retval.first)
@@ -1013,7 +995,7 @@ void MultiEdit::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mo
             emit_signal = true;
         } else if (m_cursor_begin.first < GetLineData().size() - 1) {
             // cursor is not on the last line, but is at the end of its line
-            size_t next_line = m_cursor_begin.first + 1;
+            std::size_t next_line = m_cursor_begin.first + 1;
             CPSize start_of_line = CP0;
             Erase(m_cursor_begin.first, m_cursor_begin.second, next_line, start_of_line);
             emit_signal = true;

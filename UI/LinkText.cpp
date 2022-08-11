@@ -25,13 +25,13 @@ class Special;
 class FieldType;
 class ShipHull;
 class ShipPart;
-const Tech*         GetTech(const std::string& name);
-const Policy*       GetPolicy(const std::string& name);
-const BuildingType* GetBuildingType(const std::string& name);
-const Special*      GetSpecial(const std::string& name);
-const FieldType*    GetFieldType(const std::string& name);
-const ShipHull*     GetShipHull(const std::string& name);
-const ShipPart*     GetShipPart(const std::string& name);
+const Tech*         GetTech(std::string_view name);
+const Policy*       GetPolicy(std::string_view name);
+const BuildingType* GetBuildingType(std::string_view name);
+const Special*      GetSpecial(std::string_view name);
+const FieldType*    GetFieldType(std::string_view name);
+const ShipHull*     GetShipHull(std::string_view name);
+const ShipPart*     GetShipPart(std::string_view name);
 
 
 namespace {
@@ -160,7 +160,7 @@ std::string ValueRefLinkText(const std::string& text, const bool add_explanation
 // LinkText
 ///////////////////////////////////////
 LinkText::LinkText(GG::X x, GG::Y y, GG::X w, const std::string& str, const std::shared_ptr<GG::Font>& font,
-                   GG::Flags<GG::TextFormat> format/* = GG::FORMAT_NONE*/, GG::Clr color/* = GG::CLR_BLACK*/) :
+                   GG::Flags<GG::TextFormat> format, GG::Clr color) :
     GG::TextControl(x, y, w, GG::Y1, str, font, color, format, GG::INTERACTIVE),
     TextLinker(),
     m_raw_text(str)
@@ -171,7 +171,7 @@ LinkText::LinkText(GG::X x, GG::Y y, GG::X w, const std::string& str, const std:
 }
 
 LinkText::LinkText(GG::X x, GG::Y y, const std::string& str, const std::shared_ptr<GG::Font>& font,
-                   GG::Clr color/* = GG::CLR_BLACK*/) :
+                   GG::Clr color) :
     GG::TextControl(x, y, GG::X1, GG::Y1, str, font, color, GG::FORMAT_NOWRAP, GG::INTERACTIVE),
     TextLinker(),
     m_raw_text(str)
@@ -588,7 +588,7 @@ void TextLinker::MarkLinks() {
     SetLinkedText(std::move(marked_text));
 }
 
-std::string LinkStringIfPossible(const std::string &raw, const std::string &user_string) {
+std::string LinkStringIfPossible(std::string_view raw, std::string_view user_string) {
     if      (GetBuildingType(raw)) return LinkTaggedPresetText(VarText::BUILDING_TYPE_TAG, raw, user_string);
     else if (GetSpecies(raw))      return LinkTaggedPresetText(VarText::SPECIES_TAG,       raw, user_string);
     else if (GetSpecial(raw))      return LinkTaggedPresetText(VarText::SPECIAL_TAG,       raw, user_string);
@@ -597,35 +597,46 @@ std::string LinkStringIfPossible(const std::string &raw, const std::string &user
     else if (GetShipPart(raw))     return LinkTaggedPresetText(VarText::SHIP_PART_TAG,     raw, user_string);
     else if (GetTech(raw))         return LinkTaggedPresetText(VarText::TECH_TAG,          raw, user_string);
     else if (GetFieldType(raw))    return LinkTaggedPresetText(VarText::FIELD_TYPE_TAG,    raw, user_string);
-    else return user_string;
+    else return std::string{user_string};
 }
 
-std::string LinkList(const std::vector<std::string> &strings) {
+std::string LinkList(const std::vector<std::string>& strings) {
     std::string s;
     bool first = true;
     for (std::string string : strings) {
-        if (first) first = false;
-        else s.append(",  ");
-        s.append(LinkStringIfPossible(string,UserString(string)));
+        if (first)
+            first = false;
+        else
+            s.append(",  ");
+        s.append(LinkStringIfPossible(string, UserString(string)));
     }
     return s;
 }
 
-std::string LinkList(std::vector<std::string_view> strings) {
+std::string LinkList(const std::vector<std::string_view>& strings) {
     std::string s;
     bool first = true;
     for (std::string_view string : strings) {
-        if (first) first = false;
-        else s.append(",  ");
-        std::string str(string);
-        s.append(LinkStringIfPossible(str,UserString(string)));
+        if (first)
+            first = false;
+        else
+            s.append(",  ");
+        s.append(LinkStringIfPossible(string, UserString(string)));
     }
     return s;
 }
 
-std::string LinkList(const std::set<std::string> &strings) {
-    std::vector<std::string> vector(strings.begin(), strings.end());
-    return LinkList(vector);
+std::string LinkList(const std::set<std::string>& strings) {
+    std::string s;
+    bool first = true;
+    for (const auto& string : strings) {
+        if (first)
+            first = false;
+        else
+            s.append(",  ");
+        s.append(LinkStringIfPossible(string, UserString(string)));
+    }
+    return s;
 }
 
 std::string LinkTaggedText(std::string_view tag, std::string_view stringtable_entry)

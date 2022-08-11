@@ -18,9 +18,9 @@ using namespace GG;
 // GG::TextControl
 ////////////////////////////////////////////////
 TextControl::TextControl(X x, Y y, X w, Y h, std::string str,
-                         const std::shared_ptr<Font>& font, Clr color/* = CLR_BLACK*/,
-                         Flags<TextFormat> format/* = FORMAT_NONE*/,
-                         Flags<WndFlag> flags/* = NO_WND_FLAGS*/) :
+                         const std::shared_ptr<Font>& font, Clr color,
+                         Flags<TextFormat> format,
+                         Flags<WndFlag> flags) :
     Control(x, y, w, h, flags),
     m_format(format),
     m_text_color(color),
@@ -33,8 +33,8 @@ TextControl::TextControl(X x, Y y, X w, Y h, std::string str,
 TextControl::TextControl(X x, Y y, X w, Y h, std::string str,
                          std::vector<std::shared_ptr<Font::TextElement>> text_elements,
                          const std::shared_ptr<Font>& font,
-                         Clr color /*= CLR_BLACK*/, Flags<TextFormat> format /*= FORMAT_NONE*/,
-                         Flags<WndFlag> flags /*= NO_WND_FLAGS*/) :
+                         Clr color, Flags<TextFormat> format,
+                         Flags<WndFlag> flags) :
     Control(x, y, w, h, flags),
     m_format(format),
     m_text_color(color),
@@ -166,33 +166,32 @@ Pt TextControl::TextLowerRight() const
 
 void TextControl::Render()
 {
+    if (!m_font)
+        return;
+
     Clr clr_to_use = Disabled() ? DisabledColor(TextColor()) : TextColor();
     glColor(clr_to_use);
-    if (m_font) {
-        if (!m_render_cache) {
-            RefreshCache();
-        }
-        if (m_clip_text)
-            BeginClipping();
-        glPushMatrix();
-        Pt ul = ClientUpperLeft();
-        glTranslated(Value(ul.x), Value(ul.y), 0);
-        m_font->RenderCachedText(*m_render_cache);
-        glPopMatrix();
-        if (m_clip_text)
-            EndClipping();
-    }
+
+    if (!m_render_cache)
+        RefreshCache();
+    if (m_clip_text)
+        BeginClipping();
+
+    glPushMatrix();
+    Pt ul = ClientUpperLeft();
+    glTranslated(Value(ul.x), Value(ul.y), 0);
+    m_font->RenderCachedText(*m_render_cache);
+    glPopMatrix();
+
+    if (m_clip_text)
+        EndClipping();
 }
 
 void TextControl::RefreshCache() {
-    PurgeCache();
     m_render_cache.reset(new Font::RenderCache());
     if (m_font)
         m_font->PreRenderText(Pt(X0, Y0), Size(), m_text, m_format, *m_render_cache, m_line_data);
 }
-
-void TextControl::PurgeCache()
-{ m_render_cache.reset(); }
 
 void TextControl::SetText(std::string str)
 {
@@ -244,7 +243,7 @@ void TextControl::RecomputeLineData() {
     Pt text_sz = m_font->TextExtent(m_line_data);
     m_text_ul = Pt();
     m_text_lr = text_sz;
-    PurgeCache();
+    m_render_cache.reset();
     if (m_format & FORMAT_NOWRAP) {
         Resize(text_sz);
     } else {
@@ -293,7 +292,7 @@ void TextControl::SizeMove(const Pt& ul, const Pt& lr)
         Pt text_sz = m_font->TextExtent(m_line_data);
         m_text_ul = Pt();
         m_text_lr = text_sz;
-        PurgeCache();
+        m_render_cache.reset();
     }
     RecomputeTextBounds();
 }
@@ -309,14 +308,14 @@ void TextControl::SetTextFormat(Flags<TextFormat> format)
 void TextControl::SetTextColor(Clr color)
 {
     m_text_color = color;
-    PurgeCache();
+    m_render_cache.reset();
 }
 
 void TextControl::SetColor(Clr c)
 {
     Control::SetColor(c);
     m_text_color = c;
-    PurgeCache();
+    m_render_cache.reset();
 }
 
 void TextControl::ClipText(bool b)
@@ -355,7 +354,7 @@ void TextControl::Insert(CPSize pos, const std::string& s)
     Insert(line, pos, s);
 }
 
-void TextControl::Erase(CPSize pos, CPSize num/* = CP1*/)
+void TextControl::Erase(CPSize pos, CPSize num)
 {
     std::size_t line;
     std::tie(line, pos) = LinePositionOf(pos, m_line_data);
@@ -378,7 +377,7 @@ void TextControl::Insert(std::size_t line, CPSize pos, const std::string& s)
     SetText(std::move(m_text));
 }
 
-void TextControl::Erase(std::size_t line, CPSize pos, CPSize num/* = CP1*/)
+void TextControl::Erase(std::size_t line, CPSize pos, CPSize num)
 {
     auto it = m_text.begin() + Value(StringIndexOf(line, pos, m_line_data));
     auto end_it = m_text.begin() + Value(StringIndexOf(line, pos + num, m_line_data));

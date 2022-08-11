@@ -100,15 +100,6 @@ struct ForwardToParentException {};
 ///////////////////////////////////////
 // WndFlags
 ///////////////////////////////////////
-const WndFlag GG::NO_WND_FLAGS       (0);
-const WndFlag GG::INTERACTIVE        (1 << 0);
-const WndFlag GG::REPEAT_BUTTON_DOWN (1 << 1);
-const WndFlag GG::DRAGABLE           (1 << 2);
-const WndFlag GG::RESIZABLE          (1 << 3);
-const WndFlag GG::ONTOP              (1 << 4);
-const WndFlag GG::MODAL              (1 << 5);
-const WndFlag GG::REPEAT_KEY_PRESS   (1 << 6);
-
 GG_FLAGSPEC_IMPL(WndFlag);
 
 namespace {
@@ -116,14 +107,14 @@ namespace {
 bool RegisterWndFlags()
 {
     FlagSpec<WndFlag>& spec = FlagSpec<WndFlag>::instance();
-    spec.insert(NO_WND_FLAGS,       "NO_WND_FLAGS",         true);
-    spec.insert(INTERACTIVE,        "INTERACTIVE",          true);
-    spec.insert(REPEAT_BUTTON_DOWN, "REPEAT_BUTTON_DOWN",   true);
-    spec.insert(DRAGABLE,           "DRAGABLE",             true);
-    spec.insert(RESIZABLE,          "RESIZABLE",            true);
-    spec.insert(ONTOP,              "ONTOP",                true);
-    spec.insert(MODAL,              "MODAL",                true);
-    spec.insert(REPEAT_KEY_PRESS,   "REPEAT_KEY_PRESS",     true);
+    spec.insert(NO_WND_FLAGS,       "NO_WND_FLAGS");
+    spec.insert(INTERACTIVE,        "INTERACTIVE");
+    spec.insert(REPEAT_BUTTON_DOWN, "REPEAT_BUTTON_DOWN");
+    spec.insert(DRAGABLE,           "DRAGABLE");
+    spec.insert(RESIZABLE,          "RESIZABLE");
+    spec.insert(ONTOP,              "ONTOP");
+    spec.insert(MODAL,              "MODAL");
+    spec.insert(REPEAT_KEY_PRESS,   "REPEAT_KEY_PRESS");
     return true;
 }
 bool dummy = RegisterWndFlags();
@@ -931,7 +922,7 @@ bool Wnd::Run()
 void Wnd::EndRun()
 { m_done = true; }
 
-void Wnd::SetBrowseModeTime(unsigned int time, std::size_t mode/* = 0*/)
+void Wnd::SetBrowseModeTime(unsigned int time, std::size_t mode)
 {
     if (m_browse_modes.size() <= mode) {
         if (m_browse_modes.empty()) {
@@ -950,13 +941,13 @@ void Wnd::SetBrowseModeTime(unsigned int time, std::size_t mode/* = 0*/)
     m_browse_modes[mode].time = time;
 }
 
-void Wnd::SetBrowseInfoWnd(std::shared_ptr<BrowseInfoWnd> wnd, std::size_t mode/* = 0*/)
+void Wnd::SetBrowseInfoWnd(std::shared_ptr<BrowseInfoWnd> wnd, std::size_t mode)
 { m_browse_modes.at(mode).wnd = std::move(wnd); }
 
-void Wnd::ClearBrowseInfoWnd(std::size_t mode/* = 0*/)
+void Wnd::ClearBrowseInfoWnd(std::size_t mode)
 { m_browse_modes.at(mode).wnd.reset(); }
 
-void Wnd::SetBrowseText(std::string text, std::size_t mode/* = 0*/)
+void Wnd::SetBrowseText(std::string text, std::size_t mode)
 { m_browse_modes.at(mode).text = std::move(text); }
 
 void Wnd::SetBrowseModes(std::vector<BrowseInfoMode> modes)

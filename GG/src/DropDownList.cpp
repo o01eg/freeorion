@@ -27,7 +27,7 @@ public:
     typedef ListBox::iterator iterator;
     typedef boost::signals2::signal<void (iterator)>   SelChangedSignalType;
 
-    ModalListPicker(Clr color, const DropDownList* relative_to_wnd, size_t m_num_shown_rows);
+    ModalListPicker(Clr color, const DropDownList* relative_to_wnd, std::size_t m_num_shown_rows);
     void CompleteConstruction() override;
     ~ModalListPicker();
 
@@ -103,7 +103,7 @@ private:
     Pt DetermineListHeight(const Pt& drop_down_size);
 
     std::shared_ptr<ListBox> m_lb_wnd;
-    const size_t             m_num_shown_rows = 0;
+    const std::size_t        m_num_shown_rows = 0;
     const DropDownList*      m_relative_to_wnd = nullptr;
     bool                     m_dropped = false; ///< Is the drop down list open.
 
@@ -147,7 +147,7 @@ struct ModalListPickerSelChangedEcho
 ////////////////////////////////////////////////
 // ModalListPicker
 ////////////////////////////////////////////////
-ModalListPicker::ModalListPicker(Clr color, const DropDownList* relative_to_wnd, size_t num_rows) :
+ModalListPicker::ModalListPicker(Clr color, const DropDownList* relative_to_wnd, std::size_t num_rows) :
     Control(X0, Y0, GUI::GetGUI()->AppWidth(), GUI::GetGUI()->AppHeight(), INTERACTIVE | MODAL),
     m_lb_wnd(GetStyleFactory()->NewDropDownListListBox(color, color)),
     m_num_shown_rows(std::max<std::size_t>(1, num_rows)),
@@ -716,18 +716,13 @@ void DropDownList::RenderDisplayedRow()
         return;
 
     /** The following code possibly renders the selected row twice.  Once in the selected area and
-        also in the drop down list if it is visible.*/
-    auto current_item = *CurrentItem();
+      * also in the drop down list if it is visible.*/
+    auto* current_item = CurrentItem()->get();
     bool sel_visible = current_item->Visible();
-    bool lb_visible = LB()->Visible();
+    //bool lb_visible = LB()->Visible();
 
-    // The following is necessary because neither LB() nor the selected row may be visible and
-    // prerendered.
-    if (!lb_visible)
-        LB()->Show();
-    GUI::GetGUI()->PreRenderWindow(LB());
-    if (!lb_visible)
-        LB()->Hide();
+    // neither LB() nor the selected row may be visible and prerendered.
+    GUI::GetGUI()->PreRenderWindow(LB(), true);
 
     if (!sel_visible)
         current_item->Show();
@@ -737,10 +732,10 @@ void DropDownList::RenderDisplayedRow()
                        Top() + Height() / 2 - (current_item->Top() + current_item->Height() / 2));
     current_item->OffsetMove(offset);
 
-    GUI::GetGUI()->PreRenderWindow(current_item.get());
+    GUI::GetGUI()->PreRenderWindow(current_item);
 
     BeginClipping();
-    GUI::GetGUI()->RenderWindow(current_item.get());
+    GUI::GetGUI()->RenderWindow(current_item);
     EndClipping();
 
     current_item->OffsetMove(-offset);
@@ -818,7 +813,7 @@ void DropDownList::Insert(std::vector<std::shared_ptr<Row>>&& rows)
     RequirePreRender();
 }
 
-std::shared_ptr<DropDownList::Row> DropDownList::Erase(iterator it, bool signal/* = false*/)
+std::shared_ptr<DropDownList::Row> DropDownList::Erase(iterator it, bool signal)
 { return LB()->Erase(it, signal); }
 
 void DropDownList::Clear()
@@ -880,7 +875,7 @@ void DropDownList::SetRowAlignment(iterator it, Alignment align)
 void DropDownList::SetColStretch(std::size_t n, double stretch)
 { LB()->SetColStretch(n, stretch); }
 
-void DropDownList::NormalizeRowsOnInsert(bool enable /*= true*/)
+void DropDownList::NormalizeRowsOnInsert(bool enable)
 { LB()->NormalizeRowsOnInsert(enable); }
 
 void DropDownList::LButtonDown(const Pt& pt, Flags<ModKey> mod_keys)

@@ -1,8 +1,9 @@
 #ifndef _Enum_h_
 #define _Enum_h_
 
+#include <algorithm>
 #include <iostream>
-#include <map>
+#include <vector>
 #include <string>
 
 #include <boost/preprocessor/comparison/equal.hpp>
@@ -21,12 +22,16 @@
         BOOST_PP_TUPLE_ELEM(0, elem) = BOOST_PP_TUPLE_ELEM(1, elem), \
         BOOST_PP_TUPLE_ELEM(0, elem)),
 
+/** @brief Extracts EnumName from (EnumName) or (ClassName, EnumName) */
+#define FO_ENUM_NAME_FROM_TYPENAME(typeName) \
+BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
+            BOOST_PP_TUPLE_ELEM(1, typeName), \
+            BOOST_PP_TUPLE_ELEM(0, typeName))
+
 /** @brief Implementation detail for FO_ENUM */
 #define FO_DEF_ENUM(typeName, values) \
 enum class \
-BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-    BOOST_PP_TUPLE_ELEM(1, typeName), \
-    BOOST_PP_TUPLE_ELEM(0, typeName)) \
+FO_ENUM_NAME_FROM_TYPENAME(typeName) \
 : signed char { \
     BOOST_PP_SEQ_FOR_EACH(FO_DEF_ENUM_VALUE, _, values) \
 };
@@ -43,17 +48,14 @@ constexpr \
 BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
         friend, \
         BOOST_PP_EMPTY()) \
-std::string_view to_string(\
-BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-    BOOST_PP_TUPLE_ELEM(1, typeName), \
-    BOOST_PP_TUPLE_ELEM(0, typeName)) value) \
-{ \
+std::string_view to_string( \
+FO_ENUM_NAME_FROM_TYPENAME(typeName) \
+value) { \
     switch(value) \
     { \
         BOOST_PP_SEQ_FOR_EACH(FO_DEF_ENUM_TOSTRING_CASE, \
-            BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-                BOOST_PP_TUPLE_ELEM(1, typeName), \
-                BOOST_PP_TUPLE_ELEM(0, typeName)), values) \
+            FO_ENUM_NAME_FROM_TYPENAME(typeName), \
+            values) \
         default: \
             return ""; \
             break; \
@@ -74,16 +76,11 @@ BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
         friend, \
         BOOST_PP_EMPTY()) \
 std::ostream& operator <<(std::ostream& stream, \
-BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-    BOOST_PP_TUPLE_ELEM(1, typeName), \
-    BOOST_PP_TUPLE_ELEM(0, typeName)) value) \
-{ \
-    switch(value) \
-    { \
+FO_ENUM_NAME_FROM_TYPENAME(typeName) value) { \
+    switch(value) { \
         BOOST_PP_SEQ_FOR_EACH(FO_DEF_ENUM_OSTREAM_CASE, \
-            BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-                BOOST_PP_TUPLE_ELEM(1, typeName), \
-                BOOST_PP_TUPLE_ELEM(0, typeName)), values) \
+            FO_ENUM_NAME_FROM_TYPENAME(typeName), \
+            values) \
         default: \
             stream.setstate(std::ios::failbit); \
             break; \
@@ -105,23 +102,17 @@ BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
         friend, \
         BOOST_PP_EMPTY()) \
 std::istream& operator >>(std::istream& stream, \
-BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-    BOOST_PP_TUPLE_ELEM(1, typeName), \
-    BOOST_PP_TUPLE_ELEM(0, typeName))& value) \
+FO_ENUM_NAME_FROM_TYPENAME(typeName)& value) \
 { \
     std::string token; \
- \
     stream >> token; \
- \
-    if(false) \
-        ; \
+    if (false); \
     BOOST_PP_SEQ_FOR_EACH(FO_DEF_ENUM_ISTREAM_CASE, \
         BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
             BOOST_PP_TUPLE_ELEM(1, typeName), \
             BOOST_PP_TUPLE_ELEM(0, typeName)), values) \
     else \
         stream.setstate(std::ios::failbit); \
- \
     return stream; \
 }
 
@@ -139,21 +130,13 @@ inline \
 BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
         static, \
         BOOST_PP_EMPTY()) \
-std::map< \
-BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-    BOOST_PP_TUPLE_ELEM(1, typeName), \
-    BOOST_PP_TUPLE_ELEM(0, typeName)), const char*> \
-BOOST_PP_CAT(BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-    BOOST_PP_TUPLE_ELEM(1, typeName), \
-    BOOST_PP_TUPLE_ELEM(0, typeName)), Values)() {\
-static const std::map< \
-BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-    BOOST_PP_TUPLE_ELEM(1, typeName), \
-    BOOST_PP_TUPLE_ELEM(0, typeName)), const char*> ret{ \
+std::vector<std::pair< \
+FO_ENUM_NAME_FROM_TYPENAME(typeName), std::string_view>> \
+BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), Values)() {\
+static const std::vector<std::pair< \
+FO_ENUM_NAME_FROM_TYPENAME(typeName), std::string_view>> ret{ \
     BOOST_PP_SEQ_FOR_EACH(FO_DEF_ENUM_ITERATE_VALUE, \
-        BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-            BOOST_PP_TUPLE_ELEM(1, typeName), \
-            BOOST_PP_TUPLE_ELEM(0, typeName)), values) \
+        FO_ENUM_NAME_FROM_TYPENAME(typeName), values) \
     }; \
     return ret; \
 }; \
@@ -161,24 +144,32 @@ inline \
 BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
         static, \
         BOOST_PP_EMPTY()) \
-std::map< \
-BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-    BOOST_PP_TUPLE_ELEM(1, typeName), \
-    BOOST_PP_TUPLE_ELEM(0, typeName)), const char*> \
+std::vector<std::pair< \
+FO_ENUM_NAME_FROM_TYPENAME(typeName), std::string_view>> \
 IterateEnum(EnumIterator< \
-BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-    BOOST_PP_TUPLE_ELEM(1, typeName), \
-    BOOST_PP_TUPLE_ELEM(0, typeName)) >){ return \
+FO_ENUM_NAME_FROM_TYPENAME(typeName) >){ return \
 BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
     BOOST_PP_TUPLE_ELEM(0, typeName)::, \
     BOOST_PP_EMPTY()) \
-BOOST_PP_CAT(BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-    BOOST_PP_TUPLE_ELEM(1, typeName), \
-    BOOST_PP_TUPLE_ELEM(0, typeName)), Values)();};
+BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), Values)();};
 
 /** @brief Implementation detail for FO_ENUM */
 #define FO_DEF_ENUM_ADD_STRING_REPR(s, data, elem) \
     BOOST_PP_TUPLE_PUSH_BACK(elem, BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(0, elem)))
+
+/** @brief Implementation detail for FO_ENUM */
+#define FO_DEF_ENUM_FROM_STRING(typeName) \
+inline FO_ENUM_NAME_FROM_TYPENAME(typeName) \
+BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), FromString)( \
+    std::string_view sv, \
+    FO_ENUM_NAME_FROM_TYPENAME(typeName) not_found_result = FO_ENUM_NAME_FROM_TYPENAME(typeName)(0) \
+) { \
+    const auto vals = BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), Values)(); \
+    auto val_it = std::find_if(vals.begin(), vals.end(), [sv](const auto& e) { return sv == e.second; }); \
+    if (val_it != vals.end()) \
+        return val_it->first; \
+    return not_found_result; \
+}
 
 /** @brief Define an enumeration
  *
@@ -251,7 +242,7 @@ BOOST_PP_CAT(BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
     FO_DEF_ENUM_TOSTRING(typeName, BOOST_PP_SEQ_TRANSFORM(FO_DEF_ENUM_ADD_STRING_REPR, _, values)) \
     FO_DEF_ENUM_OSTREAM(typeName, BOOST_PP_SEQ_TRANSFORM(FO_DEF_ENUM_ADD_STRING_REPR, _, values)) \
     FO_DEF_ENUM_ISTREAM(typeName, BOOST_PP_SEQ_TRANSFORM(FO_DEF_ENUM_ADD_STRING_REPR, _, values)) \
-    FO_DEF_ENUM_ITERATE(typeName, BOOST_PP_SEQ_TRANSFORM(FO_DEF_ENUM_ADD_STRING_REPR, _, values))
-
+    FO_DEF_ENUM_ITERATE(typeName, BOOST_PP_SEQ_TRANSFORM(FO_DEF_ENUM_ADD_STRING_REPR, _, values)) \
+    FO_DEF_ENUM_FROM_STRING(typeName)
 #endif
 

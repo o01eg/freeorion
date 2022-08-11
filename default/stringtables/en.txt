@@ -863,19 +863,19 @@ FLD_ION_STORM
 Ion Storm
 
 FLD_ION_STORM_DESC
-Magnetic vortex of relativistic charged particles that can interfere with sensors and obscures all objects within it. All objects inside the storm receive an increase to [[metertype METER_STEALTH]] of 40, but a decrease to [[metertype METER_DETECTION]] of 40.
+Magnetic vortex of relativistic charged particles that can interfere with sensors and obscures all objects within it. All objects inside the storm receive an increase to [[metertype METER_STEALTH]] of [[value FLD_ION_STORM_STEALTH_BONUS]], but a decrease to [[metertype METER_DETECTION]] of [[value FLD_ION_STORM_DETECTION_MALUS]].
 
 FLD_MOLECULAR_CLOUD
 Molecular Cloud
 
 FLD_MOLECULAR_CLOUD_DESC
-Diffuse cloud of complex molecules that disrupts ship shielding. All ships have their [[metertype METER_SHIELD]] decreased by 15.
+Diffuse cloud of complex molecules that disrupts ship shielding. All ships have their [[metertype METER_SHIELD]] decreased by [[value FLD_MOLECULAR_CLOUD_SHIELD_MALUS]].
 
 FLD_NEBULA_1
 Nebula
 
 FLD_NEBULA_1_DESC
-Cloud of hydrogen gas that could coalesce to form a new star. Ship [[metertype METER_SPEED]] and [[metertype METER_DETECTION]] are reduced by 20, [[metertype METER_STEALTH]] is increased by 20.
+Cloud of hydrogen gas that could coalesce to form a new star. Ship [[metertype METER_SPEED]] is reduced by [[value FLD_NEBULA_SPEED_MALUS]], [[metertype METER_DETECTION]] is reduced by [[value FLD_NEBULA_DETECTION_MALUS]], [[metertype METER_STEALTH]] is increased by [[value FLD_NEBULA_STEALTH_BONUS]].
 
 FLD_NEBULA_2
 [[FLD_NEBULA_1]]
@@ -1304,6 +1304,12 @@ Planet Stability Baseline
 RULE_BASELINE_PLANET_STABILITY_DESC
 Baseline level of planet [[METER_HAPPINESS]].
 
+RULE_MINIMUM_MONSTER_DISTANCE_CAPITAL
+Minimum distance monsters start from Capital
+
+RULE_MINIMUM_MONSTER_DISTANCE_CAPITAL_DESC
+Minimum distance monsters start from Capital
+
 RULE_ALLOW_CONCEDE
 Allow Conceding
 
@@ -1409,6 +1415,9 @@ Skip comparing the resource directory checksums.  This allows faster startup whe
 
 OPTIONS_DB_TESTING
 Linux only. AI will output log to console instead file for testing purpose.
+
+OPTIONS_DB_LOAD_OR_QUICKSTART
+Searches latest multi-player save game in autosave directory. Loads and starts it if found or quick-starts new game with predefined options and game rules. Requires hostless mode and no restriction on the minimum number of connected players, because the server will start with no connected players.
 
 OPTIONS_DB_GENERATE_CONFIG_XML
 Uses default settings, settings from any existing config.xml file, and settings given on the command line to generate a config.xml file. This will overwrite the current config.xml file, if it exists.
@@ -1573,6 +1582,12 @@ Drop empire's readiness on joining to the playing game.
 
 OPTIONS_DB_TAKE_OVER_AI
 Server option to allow human players to take control of AI empires.
+
+OPTIONS_DB_ALLOW_OBSERVERS
+Server option to allow any players connect to the games as Observer.
+
+OPTIONS_DB_LISTEN_FD
+Server option to choose pre-opened file descriptor to accept connections. Works on Linux with xinetd or systemd socket activation. By default disabled.
 
 OPTIONS_DB_PYTHON_ASYNCIO_INTERVAL
 Interval in seconds to call python asyncio event loop or -1 to disable it. By default asyncio calls disabled.
@@ -2059,6 +2074,9 @@ Sets the path for the directory containing the AI script files, for current exec
 
 OPTIONS_DB_AI_CONFIG
 Is available to the AI via the freeorioninterface, is set for current execution only. Current expected use is to name an optional AI config file within the AI script folder; default is the empty string. Intended to facilitate AI testing.
+
+OPTIONS_DB_AI_LOG_DIR
+Sets the path for the directory where AI clients writes log files.
 
 OPTIONS_DB_AI_CONFIG_TRAIT_AGGRESSION_FORCED
 Boolean for AI testing which indicates if all AIs are forced to have the same Aggression Trait.
@@ -3387,9 +3405,6 @@ System sidepanel open meter update
 OPTIONS_UI_OBJECT_CHANGED_METER_UPDATE
 Object changed meter update
 
-OPTIONS_DB_UI_EFFECTS_MOVE_TEST
-Test / internal engine switch: Use pointer moves, not casts of containers of pointers, when evaluating conditions.
-
 OPTIONS_ADD_SAVED_DESIGNS
 Add All Saved Ship Designs at Game Start
 
@@ -4445,6 +4460,18 @@ Description
 POLICY_LOCKED
 Policy Unavailable but would require %1% IP to adopt
 
+POLICY_RESTRICTED
+Policy Restricted but would require %1% IP to adopt
+
+POLICY_EXCLUDED
+Policy Adoption Restricted by Exclusion with %1%
+
+POLICY_PREREQ_MISSING
+Policy Adoption Restricted by Prerequisite %1%
+
+POLICY_PREREQ_MET
+Policy Adtoption Allowed by Prerequisite %1%
+
 POLICY_ADOPTABLE_COST
 Policy Adoptable for %1% IP
 
@@ -5025,8 +5052,8 @@ Unable to write file:\n"%1%"
 GOVERNMENT_INFO_IP
 IP
 
-GOVERNMENT_WND_CLEAR
-Clear
+GOVERNMENT_WND_REVERT
+Revert
 
 ECONOMIC_CATEGORY
 Economic
@@ -6424,7 +6451,9 @@ LOGISTICS_FOCUS_TITLE
 Logistics Focus
 
 LOGISTICS_FOCUS_TEXT
-Planets focused on Logistics have their [[metertype METER_SUPPLY]] increased by 3. This extends the planet's empire's supply network from the planet by 3 starlane jumps.
+'''Planets focused on Logistics have their [[metertype METER_SUPPLY]] increased by 3. This extends the planet's empire's supply network from the planet by 3 starlane jumps.
+
+Unlocked by: [[tech SHP_INTSTEL_LOG]].'''
 
 PLANETDRIVE_FOCUS_TITLE
 Planet Drive Focus
@@ -6436,7 +6465,7 @@ PROTECTION_FOCUS_TITLE
 Protection Focus
 
 PROTECTION_FOCUS_TEXT
-The Protection focus represents a planet wholly focused on defending itself. [[metertype METER_TROOPS]], Planetary [[metertype METER_DEFENSE]], and Planetary [[metertype METER_SHIELD]] are doubled.
+The Protection focus represents a planet wholly focused on defending itself. [[metertype METER_TROOPS]], Planetary [[metertype METER_DEFENSE]], and Planetary [[metertype METER_SHIELD]] are doubled. [[metertype METER_TARGET_HAPPINESS]] is increased by [[value PROTECION_FOCUS_STABILITY_BONUS]].
 
 PSYCHIC_FOCUS_TITLE
 Psychic Domination Focus
@@ -6446,7 +6475,9 @@ PSYCHIC_FOCUS_TEXT
 
 Each turn, there is a 10% chance of taking control of each ship, unless the enemy empire also posesses the technology [[LRN_PSY_DOM]].
 
-When the Psychic Domination Focus is engaged, it also reduces the chance that [[predefinedshipdesign SM_PSIONIC_SNOWFLAKE]]s will take control of ships controlled by the planet's empire within the system.'''
+When the Psychic Domination Focus is engaged, it also reduces the chance that [[predefinedshipdesign SM_PSIONIC_SNOWFLAKE]]s will take control of ships controlled by the planet's empire within the system.
+
+Unlocked by: [[tech LRN_PSY_DOM]].'''
 
 STOCKPILE_FOCUS_TITLE
 Stockpile Distribution Focus
@@ -6489,7 +6520,7 @@ Each [[encyclopedia ENC_SPECIES]] has its own environmental preferences, which d
 
 The planet suitability report can be displayed by right-clicking on a planet in the system sidepanel. A green number following the suitability data indicates the maximum [[metertype METER_POPULATION]] the planet could achieve if colonized by this species, whereas a red number indicates that the colony will be unviable, and Population will decrease over several turns until the Colonists have all died off and the colony is lost.
 
-When terraforming a planet (by [[metertype METER_RESEARCH]] or if the planet has the [[special GAIA_SPECIAL]] special) in order to better suit the species environmental preferences, the planet's original environment is modified by stages, until it finally reaches the [[PE_GOOD]] suitability for the species who wants to live on the planet. The terraforming stages can be checked on the suitability wheel displayed below.
+When terraforming a planet (by [[metertype METER_RESEARCH]] or if the planet has the [[special GAIA_SPECIAL]] special) in order to better suit the species environmental preferences, the planet's original environment is modified by stages, until it finally reaches the [[PE_GOOD]] suitability for the species who wants to live on the planet. Terraforming projects are unlocked by [[tech GRO_TERRAFORM]]. The terraforming stages can be checked on the suitability wheel displayed below.
 
 Clockwise from top: [[PT_TERRAN]], [[PT_OCEAN]], [[PT_SWAMP]], [[PT_TOXIC]], [[PT_INFERNO]], [[PT_RADIATED]], [[PT_BARREN]], [[PT_TUNDRA]], [[PT_DESERT]]
 
@@ -6568,6 +6599,14 @@ ARTISTIC_SPECIES_TRAIT_TEXT
 '''Artistic species produce artistic works when their empire has adopted [[policy PLC_ARTISAN_WORKSHOPS]], which generates influence. Additionally, other planets with different artistic species in the same system are more stable.
 
 List of Artistic species:'''
+
+SNEAKY_TITLE
+Sneaky
+
+SNEAKY_TEXT
+'''Sneaky species research [[tech SPY_STEALTH_1]], [[tech SPY_STEALTH_2]], [[tech SPY_STEALTH_3]] and [[tech SPY_STEALTH_4]] at reduced costs.
+
+List of Sneaky species:'''
 
 FLEET_UPKEEP_TITLE
 Fleet Upkeep
@@ -7601,14 +7640,6 @@ Astronomers have observed a new supernova, destroying everything in the star sys
 SITREP_NOVA_DETECTED_LABEL
 Supernova detected
 
-SITREP_BUREAUCRACY_STOPPED
-'''The [[policy PLC_BUREAUCRACY]] is expanding, requiring more administrative facilities.
-Starting next turn, %rawtext:needbuildings% facilities ([[buildingtype BLD_IMPERIAL_PALACE]], [[buildingtype BLD_REGIONAL_ADMIN]]) will be needed to prevent the bureaucracy from halting. Currently, a total of %rawtext:havebuildings% are owned.
-Bureaucracy requires an additional administrative building every [[value BUREACRACY_ADMINS_NEEDED_TURN_SCALING]] turns.'''
-
-SITREP_BUREAUCRACY_STOPPED_LABEL
-Bureaucratic Gridlock
-
 EFFECT_EXPERIMENT_MONSTERS_LAUNCH
 WARNING: Sightings of %rawtext% %predefinedshipdesign% are reported around the %species% Outpost at %system%!
 
@@ -7735,8 +7766,14 @@ On %planet%: The citizens rejoice as their world is now a [[special GAIA_SPECIAL
 EFFECT_GAIA_LABEL
 Gaia Paradise
 
+EFFECT_TERRAFORM_BEST
+%planet% has been terraformed to %planettype% (%environment%).
+
+EFFECT_TERRAFORM_BEST_LABEL
+Terraform
+
 EFFECT_TERRAFORM
-%planet% has been terraformed to %user_string% (%environment%).
+%planet% has been terraformed to %planettype% (%environment%).
 
 EFFECT_TERRAFORM_LABEL
 Terraform
@@ -8445,7 +8482,7 @@ SP_LAENFA_GAMEPLAY_DESC
 '''<img src="species/preview/laenfa.png"></img>
 Sneaky, telepathic, sentient vines.
 Prefer [[PT_OCEAN]] planets.
-[[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]]
+[[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]], [[encyclopedia SNEAKY_TITLE]]
 '''
 
 SP_LAENFA_DESC
@@ -8873,7 +8910,14 @@ Prefer [[PT_BARREN]] planets.
 
 SP_TRENCHERS_DESC
 '''Description:
-Coming soon.
+The Trenchers are an enigma of the galaxy. Who built them? Why do they constantly dig their spiral trenches? Theories abound: "The trenches are an obscure form of communication" or "The patterns are of religious importance to the Trenchers". No one really knows.
+
+Homeworld:
+The Trenchers homeworld is a barren planet. It is mostly flat except for the elaborate trenches dug by its inhabitants, and a series of artificial hills constructed from the soil left over by the Trenchers digging. It is nearly devoid of plant life, with the exception of a local iridescent moss that clings to the side of the trenches.
+
+Society:
+Little is known about Trencher society; they seem to show no interest in anything apart from digging trenches and the construction of new workers. Strange rumours and reports of Trenchers gathering together and spinning on their wheels in some sort of ritualistic dance abound. However, no one has ever been able to confirm the existence of this behavior, and most experts have dismissed these reports as an adverse side effect of consuming the local flora.
+
 <img src="species/trenchers.png"></img>
 '''
 
@@ -10030,7 +10074,7 @@ FOCUS_PROTECTION
 Protection
 
 FOCUS_PROTECTION_DESC
-Increases shields, defenses and troops.
+Increases shields, defenses, troops and stability.
 
 # Focus types
 FOCUS_DOMINATION
@@ -11188,6 +11232,26 @@ DESC_SPECIES
 DESC_SPECIES_NOT
 ''' that does not contain species %1%'''
 
+# %1% textual decription of the species.
+# %2% description of content liked
+DESC_SPECIES_LIKES
+''' when species %1% likes %2%'''
+
+# %1% textual decription of the species.
+# %2% description of content liked
+DESC_SPECIES_LIKES_NOT
+''' when species %1% does not like %2%'''
+
+# %1% textual decription of the species.
+# %2% description of content liked
+DESC_SPECIES_DISLIKES
+''' when species %1% dislikes %2%'''
+
+# %1% textual decription of the species.
+# %2% description of content disliked
+DESC_SPECIES_DISLIKES_NOT
+''' when species %1% does not dislike %2%'''
+
 # %1% name of the empire that enqueued items.
 # %2% textual description of the lower limit for the number of enqueued items.
 # %3% textual description of the upper limit for the number of enqueued items.
@@ -11984,10 +12048,11 @@ PLC_TERRAFORMING
 Terraforming
 
 PLC_TERRAFORMING_DESC
-'''• Decreases the minimum time and cost to produce Terraforming projects on planets.
+'''• Decreases the minimum time to produce Terraforming projects on planets. Projects are unlocked by [[tech GRO_TERRAFORM]].
 • Boosts [[metertype METER_TARGET_HAPPINESS]] on terraformed planets by [[value PLC_TERRAFORMING_TARGET_HAPPINESS_ORIGINAL_FLAT]] per step they have been terraformed away from their original planet type
-• Boosts [[metertype METER_TARGET_INFLUENCE]] on planets set to influence focus by [[value PLC_TERRAFORMING__TARGET_INFLUENCE_ORIGINAL_FLAT]] per step they have been terraformed away from their original planet type
-• Boosts [[metertype METER_TARGET_RESEARCH]] on planets set to research focus by the square root of [[metertype METER_POPULATION]] times [[value PLC_TERRAFORMING_TARGET_RESEARCH_SCALING]] per step they have been terraformed away from their original planet type'''
+• Boosts [[metertype METER_TARGET_INFLUENCE]] on planets set to influence focus by [[value PLC_TERRAFORMING_TARGET_INFLUENCE_ORIGINAL_FLAT]] per step they have been terraformed away from their original planet type
+• Boosts [[metertype METER_TARGET_RESEARCH]] on planets set to research focus by the square root of [[metertype METER_POPULATION]] times [[value PLC_TERRAFORMING_TARGET_RESEARCH_SCALING]] per step they have been terraformed away from their original planet type
+Artificial planets count as having been terraformed [[value PLC_TERRAFORMING_ARTIFICIAL_PLANET_DISTANCE]] steps regardless of there current environment.'''
 
 PLC_TERRAFORMING_SHORT_DESC
 Speeds up terraforming
@@ -11997,9 +12062,9 @@ Industrialism
 
 PLC_INDUSTRIALISM_DESC
 '''Industry-focused planets get a boost to [[metertype METER_TARGET_INDUSTRY]] of [[value PLC_INDUSTRIALISM_TARGET_INDUSTRY_PERCENT]]% and a bonus of [[value PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT]] to [[metertype METER_HAPPINESS]].
-The effect requires a stability of [[value PLC_INDUSTRIALISM_MIN_STABILITY]].
+The production bonus requires a stability of [[value PLC_INDUSTRIALISM_MIN_STABILITY]].
 
-Also makes some production-boosting generation techs cheaper to research.'''
+Makes production-boosting power generation techs cheaper to research: [[tech PRO_ORBITAL_GEN]] [[tech PRO_SOL_ORB_GEN]] [[tech PRO_FUSION_GEN]] [[tech PRO_SINGULAR_GEN]] [[tech PRO_ZERO_GEN]]'''
 
 PLC_INDUSTRIALISM_SHORT_DESC
 Improves industry output
@@ -12008,7 +12073,8 @@ PLC_TECHNOCRACY
 Technocracy
 
 PLC_TECHNOCRACY_DESC
-Research-focused planets get a boost to [[metertype METER_TARGET_RESEARCH]] of [[value PLC_INDUSTRIALISM_TARGET_INDUSTRY_PERCENT]]% and a bonus of [[value PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT]] to [[metertype METER_HAPPINESS]].
+'''Research-focused planets get a boost to [[metertype METER_TARGET_RESEARCH]] of [[value PLC_TECHNOCRACY_TARGET_RESEARCH_PERCENT]]% and a bonus of [[value PLC_TECHNOCRACY_TARGET_HAPPINESS_FLAT]] to [[metertype METER_HAPPINESS]].
+The research bonus requires a stability of [[value PLC_TECHNOCRACY_MIN_STABILITY]].'''
 
 PLC_TECHNOCRACY_SHORT_DESC
 Improves research output
@@ -12029,9 +12095,9 @@ Diversity
 
 PLC_DIVERSITY_DESC
 '''Gives bonuses or penalties to research, stability, and capital influence, dependent on the number of species in the empire.
-The research bonus requires a stability of [[value PLC_DIVERSITY_MIN_STABILITY]].
+The research bonus requires research focus and a stability of [[value PLC_DIVERSITY_MIN_STABILITY]].
 
-All bonuses or penalties are [[value PLC_DIVERSITY_SCALING]] per species above or below 4 species that are present.'''
+All bonuses or penalties are [[value PLC_DIVERSITY_SCALING]] per species above or below [[value PLC_DIVERSITY_THRESHOLD]] species that are present.'''
 
 PLC_DIVERSITY_SHORT_DESC
 Improves research, stability, and Influence
@@ -12074,9 +12140,13 @@ PLC_RACIAL_PURITY
 Racial Purity
 
 PLC_RACIAL_PURITY_DESC
-'''Planets with species different from the capital's species have various penalities applied.
+'''Provides benefits for single-species empires, but penalizes species other than that on the capital planet.
 
-Planets with other species have penalties.
+Planets with species different from the capital's species have various penalities applied:
+• Reduces [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_RACIAL_PURITY_TARGET_HAPPINESS_FLAT]]
+• Reduces [[metertype METER_TARGET_INFLUENCE]] by [[value PLC_RACIAL_PURITY_TARGET_HAPPINESS_FLAT]]
+• Reduces [[metertype METER_TARGET_RESEARCH]] by [[value PLC_RACIAL_PURITY_TARGET_RESEARCH_PERPOP]] per [[metertype METER_POPULATION]]
+• Reduces [[metertype METER_TARGET_INDUSTRY]] by [[value PLC_RACIAL_PURITY_TARGET_INDUSTRY_PERPOP]] per [[metertype METER_POPULATION]]
 
 Allows [[buildingtype BLD_CONC_CAMP]] to be produced.'''
 
@@ -12198,26 +12268,21 @@ PLC_CONFORMANCE
 Conformance
 
 PLC_CONFORMANCE_DESC
-'''• Reduces the impact of species likes and dislikes on planet stability due to buildings and policies.
-• Descreases [[metertype METER_TARGET_RESEARCH]] by [[value PLC_CONFORMANCE_RESEARCH_PENALTY_FLAT]] on all planets 
-• Increases [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_CONFORMANCE_STABILITY_BONUS_FLAT]]
-
-On planets with a stability of at least [[value PLC_CONFORMANCE_MIN_STABILITY]]:
-• Increases [[metertype METER_TARGET_CONSTRUCTION]] by [[value PLC_CONFORMANCE_INFRASTRUCTURE_BONUS_FLAT]]
-• Increases [[metertype METER_STOCKPILE]] by [[value PLC_CONFORMANCE_STOCKPILING_BONUS_FLAT]]'''
+'''• Reduces the impact of species dislikes on planet stability due to buildings, policies or focus (x[[value PLC_CONFORMANCE_DISLIKE_FACTOR]]).
+• Increases [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_CONFORMANCE_STABILITY_BONUS_FLAT]]'''
 
 PLC_CONFORMANCE_SHORT_DESC
-Reduces species opinion effects
+Reduces species dislikes effects and increases stability
 
 PLC_LIBERTY
 Liberty
 
 PLC_LIBERTY_DESC
-'''• Increases the impact of species likes and dislikes on planet stability due to buildings and policies.
-• Increases [[metertype METER_TARGET_RESEARCH]] by [[value PLC_LIBERTY_RESEARCH_BONUS_FLAT]] and decreases [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_LIBERTY_STABILITY_PENALTY_FLAT]] on all planets with a stability of at least [[value PLC_LIBERTY_MIN_STABILITY]].'''
+'''• Increases the impact of species dislikes on planet stability due to buildings, policies or planetary focus (x[[value PLC_LIBERTY_DISLIKE_FACTOR]]).
+• Increases [[metertype METER_TARGET_RESEARCH]] on research-focused planets with a stability of more than [[value PLC_LIBERTY_MIN_STABILITY]]. Increase is [[value PLC_LIBERTY_RESEARCH_BONUS_SCALING]] per population, multiplied by how much stability is above [[value PLC_LIBERTY_MIN_STABILITY]], up to a maximum of [[value PLC_LIBERTY_MAX_STABILITY]].'''
 
 PLC_LIBERTY_SHORT_DESC
-Increases species opinion effects
+Increases species dislikes effects and research
 
 PLC_TRAFFIC_CONTROL
 Traffic Control
@@ -12266,7 +12331,7 @@ Capital Markets
 
 PLC_CAPITAL_MARKETS_DESC
 '''• Planets with a luxury resource special and that are set to influence focus will export the resource to supply-connected planets. This boosts the stability of planets with species that like the resource by [[value SPECIAL_CAPITAL_MARKETS_STABILITY_FOCUS_BONUS]].
-• Increases [[metertype METER_TARGET_INFLUENCE]] on populated planets with at least [[value CAPITAL_MARKETS_INFLUENCE_MIN_STABILITY]] [[metertype METER_HAPPINESS]] by [[value CAPITAL_MARKETS_INFLUENCE_BONUS_SCALING]] per the lesser of [[metertype METER_CONSTRUCTION]] and [[metertype METER_POPULATION]].
+• Increases [[metertype METER_TARGET_INFLUENCE]] on influence-focused planets with at least [[value CAPITAL_MARKETS_INFLUENCE_MIN_STABILITY]] [[metertype METER_HAPPINESS]] by [[value CAPITAL_MARKETS_INFLUENCE_BONUS_SCALING]] per the lesser of [[metertype METER_CONSTRUCTION]] and [[metertype METER_POPULATION]].
 • Increases the rate of growth or decay of [[metertype METER_INFLUENCE]] and [[metertype METER_HAPPINESS]] by [[value PLC_CAPITAL_MARKETS_INFLUENCE_RATE]] / turn towards [[metertype METER_TARGET_INFLUENCE]] or [[metertype METER_TARGET_HAPPINESS]].
 • Reduces [[metertype METER_TARGET_HAPPINESS]] on populated empire planets by [[value CAPITAL_MARKETS_DEBT_INSTABILITY]] times the size of the empire's influence debt.'''
 
@@ -12286,7 +12351,9 @@ PLC_ARTISAN_WORKSHOPS
 Artisan Workshops
 
 PLC_ARTISAN_WORKSHOPS_DESC
-Planets with [[encyclopedia ARTISTIC]] species that are set to influence focus will generate influence and will export aesthetically pleasing crafts to planets in their system, boosting the stability of those planets.
+'''Planets with [[encyclopedia ARTISTIC]] species will generate influence by exporting aesthetically pleasing crafts.
+• Increases [[metertype METER_TARGET_INFLUENCE]] on planet set to influence focus with a minimum stability of [[value ARTISANS_MIN_STABILITY_FOCUS]] by [[value ARTISANS_INFLUENCE_FLAT_FOCUS]].
+• Increases [[metertype METER_TARGET_INFLUENCE]] on planet not set to influence focus and a minimum stability of [[value ARTISANS_MIN_STABILITY_NO_FOCUS]] by [[value ARTISANS_INFLUENCE_FLAT_NO_FOCUS]].'''
 
 PLC_ARTISAN_WORKSHOPS_SHORT_DESC
 [[encyclopedia ARTISTIC]] species produce luxuries
@@ -12344,8 +12411,10 @@ PLC_BUREAUCRACY
 Bureaucracy
 
 PLC_BUREAUCRACY_DESC
-'''• Increases an empire's populated planet stability by [[value PLC_BUREAUCRACY_STABILITY_FLAT]], as long as the empire has enough [[buildingtype BLD_REGIONAL_ADMIN]]. An additional [[buildingtype BLD_REGIONAL_ADMIN]] is required per [[value BUREACRACY_ADMINS_NEEDED_TURN_SCALING]] turns this policy has been adopted.
-• Changing planet focus reduces that planet's [[metertype METER_INFLUENCE]] by [[value BUREAUCRACY_FOCUS_CHANGE_PENALTY]].'''
+'''• Increases an empire's populated planet stability by [[value PLC_BUREAUCRACY_STABILITY_FLAT]].
+• Changing planet focus reduces that planet's [[metertype METER_INFLUENCE]] by [[value BUREAUCRACY_FOCUS_CHANGE_PENALTY]].
+• Costs some influence based on the overall population. Costs are reduced by having more adminstrative buildings ([[buildingtype BLD_IMPERIAL_PALACE]], [[buildingtype BLD_REGIONAL_ADMIN]]) and by having [[PLC_CENTRALIZATION]] adopted.
+'''
 
 PLC_BUREAUCRACY_SHORT_DESC
 Boosts stability
@@ -12994,7 +13063,7 @@ CON_CONTGRAV_ARCH
 Gravitic Architecture
 
 CON_CONTGRAV_ARCH_DESC
-'''Increases the [[metertype METER_SUPPLY]] line range by 1 of colonies set to Logistics focus.
+'''Increases the [[metertype METER_SUPPLY]] line range by 1 of colonies set to [[encyclopedia LOGISTICS_FOCUS_TITLE]].
 
 By installing a massive null gravity generator at a planet's core, it becomes possible to turn a planet's gravity on or off like a light switch, but in a narrow well. The planet's industry then gains all the benefits of low-G and zero-G, but without the drawbacks. Reverse gravity wells can also be created, making space launches cost practically nothing.
 
@@ -13044,7 +13113,7 @@ SHP_INTSTEL_LOG
 Interstellar Logistics
 
 SHP_INTSTEL_LOG_DESC
-'''Unlocks the Logistics focus setting, which increases the [[metertype METER_SUPPLY]] of planets by 3.
+'''Unlocks the [[encyclopedia LOGISTICS_FOCUS_TITLE]] setting, which increases the [[metertype METER_SUPPLY]] of planets by 3.
 
 [[COLONY_BUILDING_TIME_DECREASE]]
 
@@ -13227,13 +13296,13 @@ Deception
 SPY_ROOT_DECEPTION_DESC
 The art of deception is not natural to every species, but the ability to hide the truth can be most useful.
 
-SPY_DECPTION_EMPTY_SPACE_PENALTY
+SPY_DECEPTION_EMPTY_SPACE_PENALTY
 Conspicuous in Empty Space
 
-SPY_DECPTION_DIM_STAR_PENALTY
+SPY_DECEPTION_DIM_STAR_PENALTY
 Conspicuous Near Dim Star
 
-SPY_DECPTION_SUBSTELLAR_INTERFERENCE
+SPY_DECEPTION_SUBSTELLAR_INTERFERENCE
 High Radiation Background
 
 
@@ -13262,11 +13331,32 @@ Unlocks Ship Hull
 BUILDING_UNLOCK_SHORT_DESC
 Unlocks Building
 
+POLICY_UNLOCK_SHORT_DESC
+Unlocks Policy
+
+POLICY_SLOT_UNLOCK_SHORT_DESC
+Unlocks Slot
+
+POLICY_AND_SLOT_UNLOCK_SHORT_DESC
+Unlocks Slot & Policy
+
+POLICY_AND_BUILDING_UNLOCK_SHORT_DESC
+Unlocks Policy & Building
+
+VARIOUS_UNLOCK_SHORT_DESC
+Unlocks Various Things
+
 RESEARCH_SHORT_DESC
 Improves Research
 
 INDUSTRY_SHORT_DESC
 Improves Industry
+
+RESEARCH_AND_SLOT_SHORT_DESC
+Improves Research, Unlocks Slot
+
+INDUSTRY_AND_SLOT_SHORT_DESC
+Improves Industry, Unlocks Slot
 
 SUPPLY_SHORT_DESC
 Improves Supply
@@ -13317,7 +13407,7 @@ EXOBOT_SHORT_DESC
 Builds Exobot Citizens
 
 STARLANE_SPEED_SHORT_DESC
-Increases Starlane Speed
+Unlocks the [[encyclopedia LOGISTICS_FOCUS_TITLE]]
 
 CON_ORBITAL_CON
 Orbital Construction
@@ -13389,7 +13479,9 @@ GRO_TERRAFORM
 Terraforming
 
 GRO_TERRAFORM_DESC
-Changing the environmental type of a planet is a massive undertaking, the challenge of this process is to a large degree logistical. The precise method depends greatly on the type of planet to be changed and the desired result. However, in all cases much of the surface of the entire planet and its atmosphere needs to be converted to other types of molecules, vented into space or buried under the crust. As such, this process requires most of the planet to be accessible to the terraformers, and cannot be performed on a world with [[metertype METER_TARGET_POPULATION]] less than one.
+'''Changing the environmental type of a planet is a massive undertaking, the challenge of this process is to a large degree logistical. The precise method depends greatly on the type of planet to be changed and the desired result. However, in all cases much of the surface of the entire planet and its atmosphere needs to be converted to other types of molecules, vented into space or buried under the crust. As such, this process requires most of the planet to be accessible to the terraformers, and cannot be performed on a world with [[metertype METER_TARGET_POPULATION]] less than one.
+
+[[ALL_BLD_TERRAFORM_DESC]]'''
 
 GRO_TERRAFORM_SHORT_DESC
 Allows terraforming
@@ -13398,7 +13490,12 @@ GRO_REMOTE_TERRAFORM
 Remote Terraforming
 
 GRO_REMOTE_TERRAFORM_DESC
-Traditional terraforming methods treat the planet as a structure and attempt to alter its environment through physical and chemical means. This necessitates that the majority of the planet be accessible to the terraforming species, which generally limits its usefulness. By treating the planet as an organism and altering its physiology indirectly, it is possible to make use of less labour intensive, though more time consuming terraforming methods, allowing outposts on poor and hostile worlds to make use of terraforming.
+'''Traditional terraforming methods treat the planet as a structure and attempt to alter its environment through physical and chemical means. This necessitates that the majority of the planet be accessible to the terraforming species, which generally limits its usefulness. By treating the planet as an organism and altering its physiology indirectly, it is possible to make use of less labour intensive, though more time consuming terraforming methods, allowing outposts on poor and hostile worlds to make use of terraforming.
+
+[[ALL_BLD_TERRAFORM_DESC]]'''
+
+ALL_BLD_TERRAFORM_DESC
+There are two types of terraform projects. The [[buildingtype BLD_TERRAFORM_BEST]] is build by a population inhabiting a planet in order to directly transform it into the best possible [[encyclopedia ENVIRONMENT_TITLE]]. A series of projects targeting a specific close related [[encyclopedia ENVIRONMENT_TITLE]] each allows for more choice and can also be build on an [[encyclopedia OUTPOSTS_TITLE]]. In total a direct transformation is cheaper and faster to build than a series of terraforming steps.
 
 GRO_BIOTERROR
 Bioterror Facilities
@@ -13495,7 +13592,7 @@ LRN_PSY_DOM_DESC
 
 Reduces the chance that [[predefinedshipdesign SM_PSIONIC_SNOWFLAKE]]s take over ships.
 
-It is difficult to force a conscious individual to submit to the total mental control of another entity against its will. By manipulating the timeframes involved however, the mental force exerted by a population over a period of hours may be brought to bear on a single individual in the span of a few seconds, creating an almost irresistible compulsion to join the unified mind.'''
+It is difficult to force a conscious individual to submit to the total mental control of another entity against its will. By manipulating the timeframes involved however, the mental force exerted by a population over a period of hours may be brought to bear on a single individual in the span of a few seconds, creating an almost irresistible compulsion to join the unified mind. This ability does not appear to work on Mega Fauna, apparently space monster brains are just too different.'''
 
 MIND_CONTROL_SHORT_DESC
 Allows Mind Control
@@ -13707,19 +13804,19 @@ Piloting traits do not affect [[FT_HANGAR_1]] fighters.
 At the end of combat, carriers will collect any fighters that have survived. If a carrier is in [[metertype METER_SUPPLY]] immediately after movement is resolved, it will refill hangars to maximum.'''
 
 SHP_FIGHTERS_2
-Laser Fighters
+Fighters and Launch Bays 2
 
 SHP_FIGHTERS_2_DESC
 Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have laser weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 12, [[shippart FT_HANGAR_3]] by 18, and [[shippart FT_HANGAR_4]] by 36. For [[shippart FT_HANGAR_1]] fighters the capacity as well as the launch rate of the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_FIGHTERS_3
-Plasma Fighters
+Fighters and Launch Bays 3
 
 SHP_FIGHTERS_3_DESC
 Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have plasma weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 12, [[shippart FT_HANGAR_3]] by 18, and [[shippart FT_HANGAR_4]] by 36. For [[shippart FT_HANGAR_1]] fighters the capacity as well as the launch rate of the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_FIGHTERS_4
-Death Ray Fighters
+Fighters and Launch Bays 4
 
 SHP_FIGHTERS_4_DESC
 Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have death ray weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 12, [[shippart FT_HANGAR_3]] by 18, and [[shippart FT_HANGAR_4]] by 36. For [[shippart FT_HANGAR_1]] fighters the capacity as well as the launch rate of the [[shippart FT_BAY_1]] is increased by 1.
@@ -14264,13 +14361,13 @@ SPY_PLANET_STEALTH_MOD_DESC
 
 • Due to [[FLEET_UNSTEALTHINESS]], when there are more than [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] ships of the same empire in a system, their [[metertype METER_STEALTH]] is reduced by [[value FLEET_UNSTEALTH_SHIPS_SCALING]] multiplied by the square root of [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] less than the number of ships that empire has in the system.
 
-• Ships in systems with [[STAR_NONE]] receive a [[value SPY_DECPTION_EMPTY_SPACE_PENALTY]] penalty to [[metertype METER_STEALTH]] due to being [[SPY_DECPTION_EMPTY_SPACE_PENALTY]].
+• Ships in systems with [[STAR_NONE]] receive a [[value SPY_DECEPTION_EMPTY_SPACE_PENALTY]] penalty to [[metertype METER_STEALTH]] due to being [[SPY_DECEPTION_EMPTY_SPACE_PENALTY]].
 
-• Ships in systems with a [[STAR_RED]] star receive a [[value SPY_DECPTION_DIM_STAR_PENALTY]] penalty to [[metertype METER_STEALTH]] due to being [[SPY_DECPTION_DIM_STAR_PENALTY]].
+• Ships in systems with a [[STAR_RED]] star receive a [[value SPY_DECEPTION_DIM_STAR_PENALTY]] penalty to [[metertype METER_STEALTH]] due to being [[SPY_DECEPTION_DIM_STAR_PENALTY]].
 
-• Ships in systems with a [[STAR_NEUTRON]] star receive a [[value SPY_DECPTION_NEUTRON_INTERFERENCE]] bonus to [[metertype METER_STEALTH]] due to [[SPY_DECPTION_SUBSTELLAR_INTERFERENCE]].
+• Ships in systems with a [[STAR_NEUTRON]] star receive a [[value SPY_DECEPTION_NEUTRON_INTERFERENCE]] bonus to [[metertype METER_STEALTH]] due to [[SPY_DECEPTION_SUBSTELLAR_INTERFERENCE]].
 
-• Ships in systems with a [[STAR_BLACK]] star receive a [[value SPY_DECPTION_BLACK_INTERFERENCE]] bonus to [[metertype METER_STEALTH]] due to [[SPY_DECPTION_SUBSTELLAR_INTERFERENCE]].'''
+• Ships in systems with a [[STAR_BLACK]] star receive a [[value SPY_DECEPTION_BLACK_INTERFERENCE]] bonus to [[metertype METER_STEALTH]] due to [[SPY_DECEPTION_SUBSTELLAR_INTERFERENCE]].'''
 
 BASIC_PLANET_STEALTH
 Universal Basic Stealth
@@ -14677,6 +14774,12 @@ BLD_CLONING_CENTER_DESC
 '''Increases the [[metertype METER_TARGET_POPULATION]] on all planets by planet size: ([[SZ_TINY]] +1) ([[SZ_SMALL]] +2) ([[SZ_MEDIUM]] +3) ([[SZ_LARGE]] +4) ([[SZ_HUGE]] +5).
 
 [[tech GRO_INDUSTRY_CLONE]] allows made-to-order populations to be produced industrially, significantly improving population.'''
+
+BLD_TERRAFORM_BEST
+Popular Terraforming
+
+BLD_TERRAFORM_BEST_DESC
+Terraforms a world to the [[encyclopedia ENVIRONMENT_TITLE]] preference of the inhabiting species.
 
 BLD_TERRAFORM_TERRAN
 Terraform to [[PT_TERRAN]]
@@ -15921,7 +16024,7 @@ SH_SPACE_FLUX_COMPOSITE_DESC
 FLUX_STEALTH_DESC
 '''Base [[metertype METER_STEALTH]] of ships with this hull is [[value SPATIAL_FLUX_STEALTH_HULL_BASE]] when in a fleet that is set to initiate combat, and [[value SPATIAL_FLUX_STEALTH_NON_AGGRESSIVE]] for other fleet aggression settings.
 
-Researching each of [[tech SPY_STEALTH_PART_1]], [[tech SPY_STEALTH_PART_2]], [[tech SPY_STEALTH_PART_3]], and [[tech SPY_STEALTH_4]] will increase base stealth by [[value SPATIAL_FLUX_STEALTH_TECH_BONUS]].
+Researching each of [[tech SPY_STEALTH_PART_1]], [[tech SPY_STEALTH_PART_2]], [[tech SPY_STEALTH_PART_3]], and [[tech SPY_STEALTH_4]] will increase base stealth by [[value SPATIAL_FLUX_STEALTH_TECH_BONUS]] when in a fleet not set to initiate combat.
 
 If the ship stops in a system, its stealth is reduced by [[value SPATIAL_FLUX_STEALTH_ARRIVAL_MALUS]] for 2 turns, due to breakdown of flux coherence.'''
 
@@ -16069,7 +16172,7 @@ SH_ORGANIC
 Organic Hull
 
 SH_ORGANIC_DESC
-'''A living hull with three external slots and one internal slot.
+'''A living hull with one external slot and one internal slot.
 Organic Growth: starts with 5 [[metertype METER_STRUCTURE]], but grows an additional 5 structure over 25 turns.
 
 [[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is low and [[metertype METER_SPEED]] is high.
@@ -16941,8 +17044,17 @@ GREAT_STOCKPILE_DESC
 ULTIMATE_STOCKPILE_DESC
 +++	Ultimate [[metertype METER_STOCKPILE]]: +0.3 per [[metertype METER_POPULATION]]
 
+BAD_SHIP_SHIELD_DESC
+-	Bad ship [[metertype METER_SHIELD]]: Weaker ship shields
+
 GOOD_SHIP_SHIELD_DESC
-+	Good ship [[metertype METER_SHIELD]]: +1
++	Good ship [[metertype METER_SHIELD]]: Stronger ship shields
+
+GREAT_SHIP_SHIELD_DESC
+++	Great ship [[metertype METER_SHIELD]]: Stronger ship shields
+
+ULTIMATE_SHIP_SHIELD_DESC
++++	Ultimate ship [[metertype METER_SHIELD]]: Strongest ship shields
 
 GOOD_PLANETARY_SHIELD_DESC
 +	Good planetary [[metertype METER_SHIELD]]: +5
@@ -17030,7 +17142,7 @@ CAPITAL_DISCONNECTION_LABEL
 Not Connected to Empire Capital
 
 ARTISAN_APPRECIATION
-Likes Influence-Focused Artistic Species In System
+Likes other Artistic Species in System
 
 # %1% name of empire
 # %2% name of policy

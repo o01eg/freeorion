@@ -773,7 +773,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
             CapitalDefenseAllocator(capital_sys_id, allocation_helper).allocate()
 
         # defend other planets
-        empire_planet_ids = PlanetUtilsAI.get_owned_planets_by_empire(universe.planetIDs)
+        empire_planet_ids = PlanetUtilsAI.get_owned_planets_by_empire()
         empire_occupied_system_ids = list(set(PlanetUtilsAI.get_systems(empire_planet_ids)) - {capital_sys_id})
         for sys_id in empire_occupied_system_ids:
             PlanetDefenseAllocator(sys_id, allocation_helper).allocate()
@@ -811,7 +811,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
             for sid in interior_targets1
             if (
                 allocation_helper.threat_bias + systems_status.get(sid, {}).get("totalThreat", 0)
-                > 0.8 * allocation_helper.already_assigned_rating[sid]
+                > 0.8 * allocation_helper.already_assigned_rating.get(sid, 0)
             )
         ]
         for sys_id in interior_targets:

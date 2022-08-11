@@ -1428,25 +1428,22 @@ void PartsListBox::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
     }
 }
 
-void PartsListBox::AcceptDrops(const GG::Pt& pt,
+void PartsListBox::AcceptDrops(const GG::Pt&,
                                std::vector<std::shared_ptr<GG::Wnd>> wnds,
                                GG::Flags<GG::ModKey> mod_keys)
 {
     // Accept parts being discarded from the ship under design
 
     // If ctrl is pressed then signal all parts of the same type to be cleared.
-    if (!(GG::GUI::GetGUI()->ModKeys() & GG::MOD_KEY_CTRL))
+    if (!(mod_keys & GG::MOD_KEY_CTRL))
         return;
 
     if (wnds.empty())
         return;
 
-    auto* control = boost::polymorphic_downcast<const PartControl*>(wnds.begin()->get());
-    auto* part = control ? control->Part() : nullptr;
-    if (!part)
-        return;
-
-    ClearPartSignal(part->Name());
+    if (auto* control = boost::polymorphic_downcast<const PartControl*>(wnds.begin()->get()))
+        if (auto* part = control->Part())
+            ClearPartSignal(part->Name());
 }
 
 PartGroupsType PartsListBox::GroupAvailableDisplayableParts(const Empire* empire) const {
@@ -2858,7 +2855,7 @@ std::shared_ptr<BasesListBox::Row> AllDesignsListBox::ChildrenDraggedAwayCore(co
     return row;
 }
 
-void EmptyHullsListBox::EnableOrderIssuing(bool enable/* = true*/)
+void EmptyHullsListBox::EnableOrderIssuing(bool enable)
 { QueueListBox::EnableOrderIssuing(enable); }
 
 void MonstersListBox::EnableOrderIssuing(bool)
@@ -3345,7 +3342,7 @@ public:
     void Reset();
     void ToggleAvailability(const Availability::Enum type);
     void SetEmpireShown(int empire_id, bool refresh_list);
-    void EnableOrderIssuing(bool enable/* = true*/);
+    void EnableOrderIssuing(bool enable);
 
     mutable boost::signals2::signal<void (int)>                         DesignSelectedSignal;
     mutable boost::signals2::signal<void (int)>                         DesignUpdatedSignal;
@@ -3516,7 +3513,7 @@ void DesignWnd::BaseSelector::ToggleAvailability(Availability::Enum type) {
     m_saved_designs_list->Populate();
 }
 
-void DesignWnd::BaseSelector::EnableOrderIssuing(bool enable/* = true*/) {
+void DesignWnd::BaseSelector::EnableOrderIssuing(bool enable) {
     m_hulls_list->EnableOrderIssuing(enable);
     m_designs_list->EnableOrderIssuing(enable);
     m_saved_designs_list->EnableOrderIssuing(enable);
@@ -3731,11 +3728,9 @@ void SlotControl::AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::
         ErrorLogger() << "SlotControl::AcceptDrops given multiple wnds unexpectedly...";
 
     const auto wnd = *(wnds.begin());
-    const PartControl* control = boost::polymorphic_downcast<const PartControl*>(wnd.get());
-    const ShipPart* part = control ? control->Part() : nullptr;
-
-    if (part)
-        SlotContentsAlteredSignal(part, (mod_keys & GG::MOD_KEY_CTRL));
+    if (const PartControl* control = boost::polymorphic_downcast<const PartControl*>(wnd.get()))
+        if (const ShipPart* part = control->Part())
+            SlotContentsAlteredSignal(part, mod_keys & GG::MOD_KEY_CTRL);
 }
 
 void SlotControl::ChildrenDraggedAway(const std::vector<GG::Wnd*>& wnds,
@@ -4233,8 +4228,8 @@ void DesignWnd::MainPanel::SetPart(const std::string& part_name, unsigned int sl
 { SetPart(GetShipPart(part_name), slot); }
 
 void DesignWnd::MainPanel::SetPart(const ShipPart* part, unsigned int slot,
-                                   bool emit_signal /* = false */,
-                                   bool change_all_similar_parts /*= false*/)
+                                   bool emit_signal,
+                                   bool change_all_similar_parts)
 {
     //DebugLogger() << "DesignWnd::MainPanel::SetPart(" << (part ? part->Name() : "no part") << ", slot " << slot << ")";
     if (slot > m_slots.size()) {
@@ -4844,6 +4839,7 @@ void DesignWnd::MainPanel::RefreshIncompleteDesign() const {
             CurrentTurn(), ClientApp::GetApp()->EmpireID(),
             hull, Parts(), icon, "", name.IsInStringtable(),
             false, std::move(uuid));
+        m_incomplete_design->SetID(INCOMPLETE_DESIGN_ID);
     } catch (const std::invalid_argument& e) {
         ErrorLogger() << "DesignWnd::MainPanel::RefreshIncompleteDesign " << e.what();
     }
@@ -5150,5 +5146,5 @@ void DesignWnd::DesignNameChanged() {
     m_base_selector->Reset();
 }
 
-void DesignWnd::EnableOrderIssuing(bool enable/* = true*/)
+void DesignWnd::EnableOrderIssuing(bool enable)
 { m_base_selector->EnableOrderIssuing(enable); }

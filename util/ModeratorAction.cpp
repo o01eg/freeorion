@@ -24,8 +24,9 @@ Moderator::DestroyUniverseObject::DestroyUniverseObject(int object_id) :
 {}
 
 void Moderator::DestroyUniverseObject::Execute() const {
-    auto empire_ids = Empires().EmpireIDs();
+    const auto& empire_ids = Empires().EmpireIDs();
     GetUniverse().RecursiveDestroy(m_object_id, empire_ids);
+    GetUniverse().InitializeSystemGraph(Empires());
 }
 
 std::string Moderator::DestroyUniverseObject::Dump() const
@@ -85,6 +86,7 @@ void Moderator::AddStarlane::Execute() const {
     }
     sys1->AddStarlane(m_id_2);
     sys2->AddStarlane(m_id_1);
+    GetUniverse().InitializeSystemGraph(Empires());
 }
 
 std::string Moderator::AddStarlane::Dump() const {
@@ -121,6 +123,7 @@ void Moderator::RemoveStarlane::Execute() const {
     }
     sys1->RemoveStarlane(m_id_2);
     sys2->RemoveStarlane(m_id_1);
+    GetUniverse().InitializeSystemGraph(Empires());
 }
 
 std::string Moderator::RemoveStarlane::Dump() const {
@@ -154,7 +157,7 @@ namespace {
         for (const std::string& star_name : star_names) {
             // does an existing system have this name?
             bool dupe = false;
-            for (auto& system : Objects().all<System>()) {
+            for (auto* system : Objects().allRaw<System>()) {
                 if (system->Name() == star_name) {
                     dupe = true;
                     break;  // another system has this name. skip to next potential name.
@@ -170,6 +173,7 @@ namespace {
 void Moderator::CreateSystem::Execute() const {
     auto system = GetUniverse().InsertNew<System>(m_star_type, GenerateSystemName(),
                                                   m_x, m_y, CurrentTurn());
+    GetUniverse().InitializeSystemGraph(Empires());
     if (!system) {
         ErrorLogger() << "CreateSystem::Execute couldn't create system!";
         return;

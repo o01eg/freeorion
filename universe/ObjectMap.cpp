@@ -147,6 +147,31 @@ namespace {
     { map.erase(id); }
 }
 
+namespace {
+    using const_mut_planet_range_t = decltype(std::declval<ObjectMap>().all<Planet>());
+    using const_mut_planet_t = decltype(std::declval<const_mut_planet_range_t>().front());
+    static_assert(std::is_same_v<const_mut_planet_t, const std::shared_ptr<Planet>&>);
+
+    using const_const_planet_range_t = decltype(std::declval<const ObjectMap>().all<Planet>());
+    using const_const_planet_t = decltype(std::declval<const_const_planet_range_t>().front());
+    static_assert(std::is_same_v<const_const_planet_t, std::shared_ptr<const Planet>>);
+
+    using const_const_planet_range_t2 = decltype(std::declval<ObjectMap>().all<const Planet>());
+    using const_const_planet_t2 = decltype(std::declval<const_const_planet_range_t2>().front());
+    static_assert(std::is_same_v<const_const_planet_t2, std::shared_ptr<const Planet>>);
+
+    using const_mut_planet_raw_range_t = decltype(std::declval<ObjectMap>().allRaw<Planet>());
+    using const_mut_planet_raw_t = decltype(std::declval<const_mut_planet_raw_range_t>().front());
+    static_assert(std::is_same_v<const_mut_planet_raw_t, Planet*>);
+
+    using const_const_planet_raw_range_t = decltype(std::declval<const ObjectMap>().allRaw<Planet>());
+    using const_const_planet_raw_t = decltype(std::declval<const_const_planet_raw_range_t>().front());
+    static_assert(std::is_same_v<const_const_planet_raw_t, const Planet*>);
+
+    using const_const_planet_raw_range_t2 = decltype(std::declval<ObjectMap>().allRaw<const Planet>());
+    using const_const_planet_raw_t2 = decltype(std::declval<const_const_planet_raw_range_t2>().front());
+    static_assert(std::is_same_v<const_const_planet_raw_t2, const Planet*>);
+}
 
 /////////////////////////////////////////////
 // class ObjectMap
@@ -193,9 +218,6 @@ ObjectMap* ObjectMap::Clone(const Universe& universe, int empire_id) const {
     result->Copy(*this, universe, empire_id);
     return result.release();
 }
-
-bool ObjectMap::empty() const
-{ return m_objects.empty(); }
 
 int ObjectMap::HighestObjectID() const {
     if (m_objects.empty())
@@ -264,17 +286,16 @@ std::vector<int> ObjectMap::FindExistingObjectIDs() const {
     return result;
 }
 
-void ObjectMap::UpdateCurrentDestroyedObjects(const std::set<int>& destroyed_object_ids) {
+void ObjectMap::UpdateCurrentDestroyedObjects(const std::unordered_set<int>& destroyed_object_ids) {
     FOR_EACH_EXISTING_MAP(ClearMap);
     for (const auto& [ID, obj] : m_objects) {
         if (!obj || destroyed_object_ids.count(ID))
             continue;
         FOR_EACH_EXISTING_MAP(TryInsertIntoMap, obj);
-
     }
 }
 
-void ObjectMap::AuditContainment(const std::set<int>& destroyed_object_ids) {
+void ObjectMap::AuditContainment(const std::unordered_set<int>& destroyed_object_ids) {
     // determine all objects that some other object thinks contains them
     std::map<int, std::set<int>> contained_objs;
     std::map<int, std::set<int>> contained_planets;
@@ -283,7 +304,7 @@ void ObjectMap::AuditContainment(const std::set<int>& destroyed_object_ids) {
     std::map<int, std::set<int>> contained_ships;
     std::map<int, std::set<int>> contained_fields;
 
-    for (const auto& contained : all()) {
+    for (const auto* contained : allRaw()) {
         if (destroyed_object_ids.count(contained->ID()))
             continue;
 
@@ -320,11 +341,11 @@ void ObjectMap::AuditContainment(const std::set<int>& destroyed_object_ids) {
     }
 
     // set contained objects of all possible containers
-    for (const auto& obj : all()) {
+    for (auto* obj : allRaw()) {
         const int ID = obj->ID();
         const auto TYPE = obj->ObjectType();
         if (TYPE == UniverseObjectType::OBJ_SYSTEM) {
-            auto sys = std::static_pointer_cast<System>(obj);
+            auto sys = static_cast<System*>(obj);
             sys->m_objects =    contained_objs[ID];
             sys->m_planets =    contained_planets[ID];
             sys->m_buildings =  contained_buildings[ID];
@@ -333,11 +354,11 @@ void ObjectMap::AuditContainment(const std::set<int>& destroyed_object_ids) {
             sys->m_fields =     contained_fields[ID];
 
         } else if (TYPE == UniverseObjectType::OBJ_PLANET) {
-            auto plt = std::static_pointer_cast<Planet>(obj);
+            auto plt = static_cast<Planet*>(obj);
             plt->m_buildings =  contained_buildings[ID];
 
         } else if (TYPE == UniverseObjectType::OBJ_FLEET) {
-            auto flt = std::static_pointer_cast<Fleet>(obj);
+            auto flt = static_cast<Fleet*>(obj);
             flt->m_ships =      contained_ships[ID];
         }
     }
@@ -358,89 +379,11 @@ std::string ObjectMap::Dump(unsigned short ntabs) const {
     return dump_stream.str();
 }
 
-std::shared_ptr<const UniverseObject> ObjectMap::ExistingObject(int id) const {
+std::shared_ptr<const UniverseObject> ObjectMap::getExisting(int id) const {
     auto it = m_existing_objects.find(id);
     if (it != m_existing_objects.end())
         return it->second;
     return nullptr;
 }
 
-// Static helpers
 
-template <typename T>
-void ObjectMap::SwapMap(ObjectMap::container_type<T>& map, ObjectMap& rhs)
-{ map.swap(rhs.Map<T>()); }
-
-// template specializations
-
-template <>
-const ObjectMap::container_type<UniverseObject>& ObjectMap::Map() const
-{ return m_objects; }
-
-template <>
-const ObjectMap::container_type<ResourceCenter>& ObjectMap::Map() const
-{ return m_resource_centers; }
-
-template <>
-const ObjectMap::container_type<PopCenter>& ObjectMap::Map() const
-{ return m_pop_centers; }
-
-template <>
-const ObjectMap::container_type<Ship>& ObjectMap::Map() const
-{ return m_ships; }
-
-template <>
-const ObjectMap::container_type<Fleet>& ObjectMap::Map() const
-{ return m_fleets; }
-
-template <>
-const ObjectMap::container_type<Planet>& ObjectMap::Map() const
-{ return m_planets; }
-
-template <>
-const ObjectMap::container_type<System>& ObjectMap::Map() const
-{ return m_systems; }
-
-template <>
-const ObjectMap::container_type<Building>& ObjectMap::Map() const
-{ return m_buildings; }
-
-template <>
-const ObjectMap::container_type<Field>& ObjectMap::Map() const
-{ return m_fields; }
-
-template <>
-ObjectMap::container_type<UniverseObject>& ObjectMap::Map()
-{ return m_objects; }
-
-template <>
-ObjectMap::container_type<ResourceCenter>& ObjectMap::Map()
-{ return m_resource_centers; }
-
-template <>
-ObjectMap::container_type<PopCenter>& ObjectMap::Map()
-{ return m_pop_centers; }
-
-template <>
-ObjectMap::container_type<Ship>& ObjectMap::Map()
-{ return m_ships; }
-
-template <>
-ObjectMap::container_type<Fleet>& ObjectMap::Map()
-{ return m_fleets; }
-
-template <>
-ObjectMap::container_type<Planet>& ObjectMap::Map()
-{ return m_planets; }
-
-template <>
-ObjectMap::container_type<System>& ObjectMap::Map()
-{ return m_systems; }
-
-template <>
-ObjectMap::container_type<Building>& ObjectMap::Map()
-{ return m_buildings; }
-
-template <>
-ObjectMap::container_type<Field>& ObjectMap::Map()
-{ return m_fields; }

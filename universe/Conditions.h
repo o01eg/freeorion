@@ -55,8 +55,8 @@ enum class ContentType : unsigned char {
 /** Same as ConditionDescription, but returns a string only with conditions that have not been met. */
 [[nodiscard]] FO_COMMON_API std::string ConditionFailedDescription(
     const std::vector<const Condition*>& conditions,
-    std::shared_ptr<const UniverseObject> candidate_object = nullptr,
-    std::shared_ptr<const UniverseObject> source_object = nullptr);
+    const UniverseObject* candidate_object = nullptr,
+    const UniverseObject* source_object = nullptr);
 
 /** Returns a single string which describes a vector of Conditions. If multiple
   * conditions are passed, they are treated as if they were contained by an And
@@ -69,8 +69,8 @@ enum class ContentType : unsigned char {
   * of conditions matches the object. */
 [[nodiscard]] FO_COMMON_API std::string ConditionDescription(
     const std::vector<const Condition*>& conditions,
-    std::shared_ptr<const UniverseObject> candidate_object = nullptr,
-    std::shared_ptr<const UniverseObject> source_object = nullptr);
+    const UniverseObject* candidate_object = nullptr,
+    const UniverseObject* source_object = nullptr);
 
 /** Matches all objects if the number of objects that match Condition
   * \a condition is is >= \a low and < \a high.  Matched objects may
@@ -290,6 +290,8 @@ struct FO_COMMON_API Capital final : public Condition {
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
     void GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                            ObjectSet& condition_non_targets) const override;
+    bool InitialCandidatesAllMatch() const override { return true; };
+
     [[nodiscard]] std::string  Description(bool negated = false) const override;
     [[nodiscard]] std::string  Dump(unsigned short ntabs = 0) const override;
     void                       SetTopLevelContent(const std::string& content_name) override {}
@@ -343,10 +345,11 @@ struct FO_COMMON_API Type final : public Condition {
     bool operator==(const Condition& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
-    void Eval(const ScriptingContext& parent_context, ObjectSet& matches) const override;
 
     void GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                            ObjectSet& condition_non_targets) const override;
+    bool InitialCandidatesAllMatch() const override;
+
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(unsigned short ntabs = 0) const override;
     void SetTopLevelContent(const std::string& content_name) override;
@@ -405,7 +408,6 @@ private:
 
     std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> m_names;
 };
-
 
 /** Matches all objects that have an attached Special named \a name. */
 struct FO_COMMON_API HasSpecial final : public Condition {
@@ -541,6 +543,8 @@ struct FO_COMMON_API InOrIsSystem final : public Condition {
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
     void GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                            ObjectSet& condition_non_targets) const override;
+    bool InitialCandidatesAllMatch() const override;
+
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(unsigned short ntabs = 0) const override;
     void SetTopLevelContent(const std::string& content_name) override;
@@ -565,6 +569,8 @@ struct FO_COMMON_API OnPlanet final : public Condition {
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
     void GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                            ObjectSet& condition_non_targets) const override;
+    bool InitialCandidatesAllMatch() const override;
+
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(unsigned short ntabs = 0) const override;
     void SetTopLevelContent(const std::string& content_name) override;
@@ -587,6 +593,8 @@ struct FO_COMMON_API ObjectID final : public Condition {
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
     void GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                            ObjectSet& condition_non_targets) const override;
+    bool InitialCandidatesAllMatch() const override;
+
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(unsigned short ntabs = 0) const override;
     void SetTopLevelContent(const std::string& content_name) override;
@@ -697,6 +705,31 @@ private:
     bool Match(const ScriptingContext& local_context) const override;
 
     std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> m_names;
+};
+
+/** Matches objects if the specified species' opinion of the specified content
+  * is within the specified bounds. */
+struct FO_COMMON_API SpeciesOpinion final : public Condition {
+    SpeciesOpinion(std::unique_ptr<ValueRef::ValueRef<std::string>>&& species,
+                   std::unique_ptr<ValueRef::ValueRef<std::string>>&& content,
+                   ComparisonType comp = ComparisonType::GREATER_THAN);
+
+    bool operator==(const Condition& rhs) const override;
+    void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
+              ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
+    [[nodiscard]] std::string Description(bool negated = false) const override;
+    [[nodiscard]] std::string Dump(unsigned short ntabs = 0) const override;
+    void SetTopLevelContent(const std::string& content_name) override;
+    [[nodiscard]] unsigned int GetCheckSum() const override;
+
+    [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
+
+private:
+    bool Match(const ScriptingContext& local_context) const override;
+
+    std::unique_ptr<ValueRef::ValueRef<std::string>> m_species;
+    std::unique_ptr<ValueRef::ValueRef<std::string>> m_content;
+    ComparisonType m_comp = ComparisonType::GREATER_THAN;
 };
 
 /** Matches planets where the indicated number of the indicated building type
@@ -1463,6 +1496,18 @@ struct FO_COMMON_API ValueTest final : public Condition {
 
     [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
 
+    [[nodiscard]] std::array<const ValueRef::ValueRef<double>*, 3> ValuesDouble() const
+    { return {m_value_ref1.get(), m_value_ref2.get(), m_value_ref3.get()}; }
+
+    [[nodiscard]] std::array<const ValueRef::ValueRef<std::string>*, 3> ValuesString() const
+    { return {m_string_value_ref1.get(), m_string_value_ref2.get(), m_string_value_ref3.get()}; }
+
+    [[nodiscard]] std::array<const ValueRef::ValueRef<int>*, 3> ValuesInt() const
+    { return {m_int_value_ref1.get(), m_int_value_ref2.get(), m_int_value_ref3.get()}; }
+
+    [[nodiscard]] std::array<ComparisonType, 2> CompareTypes() const
+    { return {m_compare_type1, m_compare_type2}; }
+
 private:
     bool Match(const ScriptingContext& local_context) const override;
 
@@ -1543,6 +1588,8 @@ struct FO_COMMON_API And final : public Condition {
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
     void GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                            ObjectSet& condition_non_targets) const override;
+    bool InitialCandidatesAllMatch() const override;
+
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(unsigned short ntabs = 0) const override;
     void SetTopLevelContent(const std::string& content_name) override;
@@ -1568,6 +1615,8 @@ struct FO_COMMON_API Or final : public Condition {
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
     void GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                            ObjectSet& condition_non_targets) const override;
+    bool InitialCandidatesAllMatch() const override;
+
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(unsigned short ntabs = 0) const override;
     virtual void SetTopLevelContent(const std::string& content_name) override;

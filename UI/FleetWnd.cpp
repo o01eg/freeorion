@@ -304,19 +304,19 @@ namespace {
 
         // filter fleets in system to select just those owned by this client's
         // empire, and collect their ship ids
-        std::vector<std::shared_ptr<Fleet>> all_system_fleets(objects.find<Fleet>(system->FleetIDs()));
+        auto all_system_fleets = objects.findRaw<Fleet>(system->FleetIDs());
         std::vector<int> empire_system_fleet_ids;
         empire_system_fleet_ids.reserve(all_system_fleets.size());
         std::vector<int> empire_system_ship_ids;
         empire_system_ship_ids.reserve(all_system_fleets.size());   // probably an underestimate
 
-        for (auto& fleet : all_system_fleets) {
+        for (auto* fleet : all_system_fleets) {
             if (!fleet->OwnedBy(client_empire_id))
                 continue;
             if (fleet->ID() == target_fleet->ID() || fleet->ID() == INVALID_OBJECT_ID)
                 continue;   // no need to do things to target fleet's contents
 
-            const std::set<int>& fleet_ships = fleet->ShipIDs();
+            const auto& fleet_ships = fleet->ShipIDs();
             empire_system_ship_ids.insert(empire_system_ship_ids.end(),
                                           fleet_ships.begin(), fleet_ships.end());
             empire_system_fleet_ids.push_back(fleet->ID());
@@ -445,9 +445,9 @@ std::set<int> FleetUIManager::SelectedShipIDs() const {
 
 std::shared_ptr<FleetWnd> FleetUIManager::NewFleetWnd(
     const std::vector<int>& fleet_ids,
-    double allowed_bounding_box_leeway /*= 0*/,
-    int selected_fleet_id/* = INVALID_OBJECT_ID*/,
-    GG::Flags<GG::WndFlag> flags/* = GG::INTERACTIVE | GG::DRAGABLE | GG::ONTOP | CLOSABLE | GG::RESIZABLE*/)
+    double allowed_bounding_box_leeway,
+    int selected_fleet_id,
+    GG::Flags<GG::WndFlag> flags)
 {
     std::string config_name;
     if (!GetOptionsDB().Get<bool>("ui.fleet.multiple.enabled")) {
@@ -549,7 +549,7 @@ void FleetUIManager::FleetWndClicked(std::shared_ptr<FleetWnd> fleet_wnd) {
     SetActiveFleetWnd(std::move(fleet_wnd));
 }
 
-void FleetUIManager::EnableOrderIssuing(bool enable/* = true*/) {
+void FleetUIManager::EnableOrderIssuing(bool enable) {
     m_order_issuing_enabled = enable;
     GG::ProcessThenRemoveExpiredPtrs(m_fleet_wnds,
                                  [&enable](std::shared_ptr<FleetWnd>& wnd)
@@ -1531,8 +1531,8 @@ void FleetDataPanel::SetStatIconValues() {
     const ScriptingContext context{universe, Empires()};
 
 
-    const std::set<int>& this_client_known_destroyed_objects = universe.EmpireKnownDestroyedObjectIDs(client_empire_id);
-    const std::set<int>& this_client_stale_object_info = universe.EmpireStaleKnowledgeObjectIDs(client_empire_id);
+    const auto& this_client_known_destroyed_objects = universe.EmpireKnownDestroyedObjectIDs(client_empire_id);
+    const auto& this_client_stale_object_info = universe.EmpireStaleKnowledgeObjectIDs(client_empire_id);
     int ship_count =        0;
     float damage_tally  =   0.0f;
     float destroy_tally =   0.0f;
@@ -2290,12 +2290,12 @@ public:
         ManuallyManageColProps();
 
         int this_client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-        const std::set<int>& this_client_known_destroyed_objects =
+        const auto& this_client_known_destroyed_objects =
             GetUniverse().EmpireKnownDestroyedObjectIDs(this_client_empire_id);
-        const std::set<int>& this_client_stale_object_info =
+        const auto& this_client_stale_object_info =
             GetUniverse().EmpireStaleKnowledgeObjectIDs(this_client_empire_id);
 
-        const std::set<int>& ship_ids = fleet->ShipIDs();
+        const auto& ship_ids = fleet->ShipIDs();
         std::vector<std::shared_ptr<GG::ListBox::Row>> rows;
         rows.reserve(ship_ids.size());
         for (int ship_id : ship_ids) {
@@ -2305,7 +2305,7 @@ public:
             if (this_client_stale_object_info.count(ship_id))
                 continue;
 
-            rows.emplace_back(GG::Wnd::Create<ShipRow>(GG::X1, row_size.y, ship_id));
+            rows.push_back(GG::Wnd::Create<ShipRow>(GG::X1, row_size.y, ship_id));
         }
         Insert(rows);
         for (auto& row : rows)
@@ -2447,7 +2447,7 @@ private:
 };
 
 FleetDetailPanel::FleetDetailPanel(GG::X w, GG::Y h, int fleet_id, bool order_issuing_enabled,
-                                   GG::Flags<GG::WndFlag> flags/* = GG::NO_WND_FLAGS*/) :
+                                   GG::Flags<GG::WndFlag> flags) :
     GG::Wnd(GG::X0, GG::Y0, w, h, flags),
     m_order_issuing_enabled(order_issuing_enabled)
 {
@@ -2573,7 +2573,7 @@ void FleetDetailPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
         DoLayout();
 }
 
-void FleetDetailPanel::EnableOrderIssuing(bool enabled/* = true*/) {
+void FleetDetailPanel::EnableOrderIssuing(bool enabled) {
     m_order_issuing_enabled = enabled;
     m_ships_lb->EnableOrderIssuing(m_order_issuing_enabled);
 }
@@ -2795,9 +2795,9 @@ namespace {
 }
 
 FleetWnd::FleetWnd(const std::vector<int>& fleet_ids, bool order_issuing_enabled,
-                   double allowed_bounding_box_leeway /*= 0*/,
-                   int selected_fleet_id/* = INVALID_OBJECT_ID*/,
-                   GG::Flags<GG::WndFlag> flags/* = INTERACTIVE | DRAGABLE | ONTOP | CLOSABLE | RESIZABLE*/,
+                   double allowed_bounding_box_leeway,
+                   int selected_fleet_id,
+                   GG::Flags<GG::WndFlag> flags,
                    std::string_view config_name) :
     MapWndPopup("", flags | GG::RESIZABLE, config_name),
     m_fleet_ids(fleet_ids.begin(), fleet_ids.end()),
@@ -2949,8 +2949,8 @@ void FleetWnd::SetStatIconValues() {
     const ObjectMap& objects = universe.Objects();
     const ScriptingContext context{universe, Empires()};
 
-    const std::set<int>& this_client_known_destroyed_objects = universe.EmpireKnownDestroyedObjectIDs(client_empire_id);
-    const std::set<int>& this_client_stale_object_info = universe.EmpireStaleKnowledgeObjectIDs(client_empire_id);
+    const auto& this_client_known_destroyed_objects = universe.EmpireKnownDestroyedObjectIDs(client_empire_id);
+    const auto& this_client_stale_object_info = universe.EmpireStaleKnowledgeObjectIDs(client_empire_id);
 
 
     for (auto& fleet : objects.find<const Fleet>(m_fleet_ids)) {
@@ -3898,7 +3898,7 @@ void FleetWnd::UniverseObjectDeleted(const std::shared_ptr<const UniverseObject>
     }
 }
 
-void FleetWnd::EnableOrderIssuing(bool enable/* = true*/) {
+void FleetWnd::EnableOrderIssuing(bool enable) {
     m_order_issuing_enabled = enable;
     if (m_new_fleet_drop_target)
         m_new_fleet_drop_target->Disable(!m_order_issuing_enabled);

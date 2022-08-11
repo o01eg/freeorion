@@ -27,6 +27,8 @@ NamedInteger name = "MIN_COLONY_SIZE" value = [[MIN_RECOLONIZING_SIZE]]
 
 NamedInteger name = "MIN_COLONY_HAPPINESS" value = [[MIN_RECOLONIZING_HAPPINESS]]
 
+NamedInteger name = "MIN_MONSTER_DISTANCE" value = (GameRule name = "RULE_MINIMUM_MONSTER_DISTANCE_CAPITAL") - 1
+
 // Spatial Flux Stealth section
 NamedReal name = "SPATIAL_FLUX_STEALTH_HULL_BASE" value = [[SPATIAL_FLUX_STEALTH_HULL_BASE]]
 NamedReal name = "SPATIAL_FLUX_STEALTH_ARRIVAL_MALUS" value = 30
@@ -40,6 +42,13 @@ SPATIAL_FLUX_STEALTH_HULL_BASE
 SPATIAL_FLUX_STEALTH_NON_AGGRESSIVE_BONUS
 '''10'''
 
+NamedReal name = "PLC_LIBERTY_DISLIKE_FACTOR" value = 2.0
+
+NamedReal name = "PLC_CONFORMANCE_DISLIKE_FACTOR" value = 0.5
+
+NamedReal name = "FLD_NEBULA_SPEED_MALUS" value = 20
+NamedReal name = "FLD_NEBULA_STEALTH_BONUS" value = 20
+NamedReal name = "FLD_NEBULA_DETECTION_MALUS" value = 20
 
 #include "/scripting/common/misc.macros"
 #include "/scripting/common/base_prod.macros"

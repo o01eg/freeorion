@@ -47,7 +47,7 @@ namespace {
 // Planet
 ////////////////////////////////////////////////////////////
 Planet::Planet(PlanetType type, PlanetSize size, int creation_turn) :
-    UniverseObject{"", ALL_EMPIRES, creation_turn},
+    UniverseObject{UniverseObjectType::OBJ_PLANET, "", ALL_EMPIRES, creation_turn},
     m_type(type),
     m_original_type(type),
     m_size(size),
@@ -146,21 +146,16 @@ bool Planet::HostileToEmpire(int empire_id, const EmpireManager& empires) const 
     return empires.GetDiplomaticStatus(Owner(), empire_id) == DiplomaticStatus::DIPLO_WAR;
 }
 
-std::set<std::string> Planet::Tags(const ScriptingContext& context) const {
-    const Species* species = context.species.GetSpecies(SpeciesName());
-    if (!species)
-        return {};
-    return species->Tags();
+UniverseObject::TagVecs Planet::Tags(const ScriptingContext& context) const {
+    if (const Species* species = context.species.GetSpecies(SpeciesName()))
+        return species->Tags();
+    return {};
 }
 
-bool Planet::HasTag(const std::string& name, const ScriptingContext& context) const {
+bool Planet::HasTag(std::string_view name, const ScriptingContext& context) const {
     const Species* species = context.species.GetSpecies(SpeciesName());
-
-    return species && species->Tags().count(name);
+    return species && species->HasTag(name);
 }
-
-UniverseObjectType Planet::ObjectType() const
-{ return UniverseObjectType::OBJ_PLANET; }
 
 std::string Planet::Dump(unsigned short ntabs) const {
     std::string retval = UniverseObject::Dump(ntabs);
@@ -239,6 +234,23 @@ PlanetEnvironment Planet::EnvironmentForSpecies(const std::string& species_name)
         return PlanetEnvironment::PE_UNINHABITABLE;
     }
     return species->GetPlanetEnvironment(m_type);
+}
+
+PlanetType Planet::NextBestPlanetTypeForSpecies(const std::string& species_name) const {
+    const Species* species = nullptr;
+    if (species_name.empty()) {
+        const std::string& this_planet_species_name = this->SpeciesName();
+        if (this_planet_species_name.empty())
+            return m_type;
+        species = GetSpecies(this_planet_species_name);
+    } else {
+        species = GetSpecies(species_name);
+    }
+    if (!species) {
+        ErrorLogger() << "Planet::NextBestPlanetTypeForSpecies couldn't get species with name \"" << species_name << "\"";
+        return m_type;
+    }
+    return species->NextBestPlanetType(m_type);
 }
 
 PlanetType Planet::NextBetterPlanetTypeForSpecies(const std::string& species_name) const {
@@ -391,29 +403,11 @@ PlanetSize Planet::NextLargerPlanetSize() const
 PlanetSize Planet::NextSmallerPlanetSize() const
 { return PlanetSizeIncrement(m_size, -1); }
 
-float Planet::OrbitalPeriod() const
-{ return m_orbital_period; }
-
-float Planet::InitialOrbitalPosition() const
-{ return m_initial_orbital_position; }
-
 float Planet::OrbitalPositionOnTurn(int turn) const
 { return m_initial_orbital_position + OrbitalPeriod() * 2.0 * 3.1415926 / 4 * turn; }
 
-float Planet::RotationalPeriod() const
-{ return m_rotational_period; }
-
-float Planet::AxialTilt() const
-{ return m_axial_tilt; }
-
 std::shared_ptr<UniverseObject> Planet::Accept(const UniverseObjectVisitor& visitor) const
 { return visitor.Visit(std::const_pointer_cast<Planet>(std::static_pointer_cast<const Planet>(UniverseObject::shared_from_this()))); }
-
-Meter* Planet::GetMeter(MeterType type)
-{ return UniverseObject::GetMeter(type); }
-
-const Meter* Planet::GetMeter(MeterType type) const
-{ return UniverseObject::GetMeter(type); }
 
 std::string Planet::CardinalSuffix(const ObjectMap& objects) const {
     std::string retval;
@@ -490,12 +484,6 @@ std::string Planet::CardinalSuffix(const ObjectMap& objects) const {
     return retval;
 }
 
-int Planet::ContainerObjectID() const
-{ return this->SystemID(); }
-
-const std::set<int>& Planet::ContainedObjectIDs() const
-{ return m_buildings; }
-
 bool Planet::Contains(int object_id) const
 { return object_id != INVALID_OBJECT_ID && m_buildings.count(object_id); }
 
@@ -504,15 +492,12 @@ bool Planet::ContainedBy(int object_id) const
 
 std::vector<std::string> Planet::AvailableFoci() const {    // TODO: pass ScriptingContext
     std::vector<std::string> retval;
-    auto this_planet = std::dynamic_pointer_cast<const Planet>(UniverseObject::shared_from_this());
-    if (!this_planet)
-        return retval;
-    const ScriptingContext context{this_planet};
-    if (const auto* species = GetSpecies(this_planet->SpeciesName())) {
+    const ScriptingContext context{this};
+    if (const auto* species = GetSpecies(this->SpeciesName())) {
         retval.reserve(species->Foci().size());
         for (const auto& focus_type : species->Foci()) {
             if (const auto* location = focus_type.Location()) {
-                if (location->Eval(context, this_planet))
+                if (location->Eval(context, this))
                     retval.push_back(focus_type.Name());
             }
         }
@@ -663,7 +648,7 @@ void Planet::Conquer(int conquerer, EmpireManager& empires, Universe& universe) 
     Empire::ConquerProductionQueueItemsAtLocation(ID(), conquerer, empires);
 
     ObjectMap& objects{universe.Objects()};
-    auto empire_ids = empires.EmpireIDs();
+    const auto& empire_ids = empires.EmpireIDs();
 
     // deal with UniverseObjects (eg. buildings) located on this planet
     for (auto& building : objects.find<Building>(m_buildings)) {

@@ -455,7 +455,7 @@ void PlayerConnection::HandleMessageHeaderRead(boost::system::error_code error,
         ErrorLogger(network) << "PlayerConnection::HandleMessageHeaderRead():"
                              << " player ID: " << m_ID
                              << "  name: " << m_player_name
-                             << "  client type: " << boost::lexical_cast<std::string>(m_client_type)
+                             << "  client type: " << to_string(m_client_type)
                              << "  client version: " << m_client_version_string
                              << "  authenticated: " << m_authenticated
                              << "  cookie: " << boost::uuids::to_string(m_cookie)
@@ -818,6 +818,20 @@ void ServerNetworking::CleanupCookies() {
 }
 
 void ServerNetworking::Init() {
+#if defined(FREEORION_LINUX)
+    if (GetOptionsDB().Get<int>("network.server.listen.fd") >= 0) {
+        try {
+            m_player_connection_acceptor.assign(tcp::v6(), GetOptionsDB().Get<int>("network.server.listen.fd"));
+        } catch (const std::exception &e) {
+            ErrorLogger(network) << "Server cannot assign to IPv6 socket: " << e.what()
+                                 << ". Fallback to IPv4";
+            m_player_connection_acceptor.assign(tcp::v4(), GetOptionsDB().Get<int>("network.server.listen.fd"));
+        }
+        AcceptNextMessagingConnection();
+        return;
+    }
+#endif
+
     // use a dual stack (ipv6 + ipv4) socket
     tcp::endpoint message_endpoint{tcp::v6(), static_cast<unsigned short>(Networking::MessagePort())};
 
@@ -858,11 +872,7 @@ void ServerNetworking::AcceptNextMessagingConnection() {
     using boost::placeholders::_1;
 
     auto next_connection = PlayerConnection::NewConnection(
-#if BOOST_VERSION >= 106600
         m_player_connection_acceptor.get_executor().context(),
-#else
-        m_player_connection_acceptor.get_io_service(),
-#endif
         m_nonplayer_message_callback,
         m_player_message_callback,
         boost::bind(&ServerNetworking::DisconnectImpl, this, _1));

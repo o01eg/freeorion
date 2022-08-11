@@ -28,7 +28,7 @@ namespace std {
 namespace parse {
 
     template <typename T>
-    void insert_named_ref(std::map<std::string, std::unique_ptr<ValueRef::ValueRefBase>>& named_refs,
+    void insert_named_ref(std::map<std::string, std::unique_ptr<ValueRef::ValueRefBase>, std::less<>>& named_refs,
                           const std::string& name,
                           const parse::detail::MovableEnvelope<ValueRef::ValueRef<T>>& ref_envelope,
                           bool& pass)
@@ -83,10 +83,15 @@ namespace parse {
                    > label(tok.value_) > qi::as<parse::detail::MovableEnvelope<ValueRef::ValueRef<double>>>()[double_rules.expr]
                     ) [ insert_named_ref_(_r1, _2, _3, _pass) ]
                     |
+                    ((omit_[tok.Named_] >> tok.String_)
+                   > label(tok.name_) > tok.string
+                   > label(tok.value_) > qi::as<parse::detail::MovableEnvelope<ValueRef::ValueRef<std::string>>>()[string_grammar.expr]
+                    ) [ insert_named_ref_(_r1, _2, _3, _pass) ]
+                    |
                     ((omit_[tok.Named_] >> tok.PlanetType_) > label(tok.name_) > tok.string > label(tok.value_) > planet_type_rules.expr
                     ) [ insert_named_ref_(_r1, _2, _3, _pass) ]
                     |
-                    ((omit_[tok.Named_] >> tok.environment_) > label(tok.name_) > tok.string > label(tok.value_) > planet_environment_rules.expr
+                    ((omit_[tok.Named_] >> tok.Environment_) > label(tok.name_) > tok.string > label(tok.value_) > planet_environment_rules.expr
                     ) [ insert_named_ref_(_r1, _2, _3, _pass) ] 
                 ;
 
@@ -105,7 +110,7 @@ namespace parse {
         }
 
         using named_value_ref_rule = parse::detail::rule<
-            void (std::map<std::string, std::unique_ptr<ValueRef::ValueRefBase>>&)>;
+            void (std::map<std::string, std::unique_ptr<ValueRef::ValueRefBase>, std::less<>>&)>;
 
         using start_rule = parse::detail::rule<start_rule_signature>;
 

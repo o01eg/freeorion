@@ -54,7 +54,7 @@ SpeciesManager& ClientApp::GetSpeciesManager()
 const SpeciesManager& ClientApp::GetSpeciesManager() const
 { return m_species_manager; }
 
-const Species* ClientApp::GetSpecies(const std::string& name)
+const Species* ClientApp::GetSpecies(std::string_view name)
 { return m_species_manager.GetSpecies(name); }
 
 SupplyManager& ClientApp::GetSupplyManager()
@@ -139,13 +139,12 @@ std::string ClientApp::GetVisibleObjectName(std::shared_ptr<const UniverseObject
         return std::string();
     }
 
-    std::string name_text;
-    if (auto system = std::dynamic_pointer_cast<const System>(object))
-        name_text = system->ApparentName(m_empire_id, m_universe);
-    else
-        name_text = object->PublicName(m_empire_id, m_universe);
-
-    return name_text;
+    if (object->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
+        auto system = std::static_pointer_cast<const System>(object);
+        return system->ApparentName(m_empire_id, m_universe);
+    } else {
+        return object->PublicName(m_empire_id, m_universe);
+    }
 }
 
 ClientApp* ClientApp::GetApp()

@@ -37,6 +37,7 @@ def make_stub(
         "\n"
         "from common.fo_typing import (\n"
         "    BuildingId,\n"
+        "    BuildingName,\n"
         "    EmpireId,\n"
         "    FleetId,\n"
         "    ObjectId,\n"
@@ -54,5 +55,4 @@ def make_stub(
 
     with open(result_path, "w") as f:
         f.write(header)
-        f.write("\n\n\n".join(res))
-        f.write("\n")
+        f.write("\n".join(res))

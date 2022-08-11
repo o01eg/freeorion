@@ -24,16 +24,16 @@ namespace {
 bool RegisterGraphicStyles()
 {
     FlagSpec<GraphicStyle>& spec = FlagSpec<GraphicStyle>::instance();
-    spec.insert(GRAPHIC_NONE,       "GRAPHIC_NONE",         true);
-    spec.insert(GRAPHIC_VCENTER,    "GRAPHIC_VCENTER",      true);
-    spec.insert(GRAPHIC_TOP,        "GRAPHIC_TOP",          true);
-    spec.insert(GRAPHIC_BOTTOM,     "GRAPHIC_BOTTOM",       true);
-    spec.insert(GRAPHIC_CENTER,     "GRAPHIC_CENTER",       true);
-    spec.insert(GRAPHIC_LEFT,       "GRAPHIC_LEFT",         true);
-    spec.insert(GRAPHIC_RIGHT,      "GRAPHIC_RIGHT",        true);
-    spec.insert(GRAPHIC_FITGRAPHIC, "GRAPHIC_FITGRAPHIC",   true);
-    spec.insert(GRAPHIC_SHRINKFIT,  "GRAPHIC_SHRINKFIT",    true);
-    spec.insert(GRAPHIC_PROPSCALE,  "GRAPHIC_PROPSCALE",    true);
+    spec.insert(GRAPHIC_NONE,       "GRAPHIC_NONE");
+    spec.insert(GRAPHIC_VCENTER,    "GRAPHIC_VCENTER");
+    spec.insert(GRAPHIC_TOP,        "GRAPHIC_TOP");
+    spec.insert(GRAPHIC_BOTTOM,     "GRAPHIC_BOTTOM");
+    spec.insert(GRAPHIC_CENTER,     "GRAPHIC_CENTER");
+    spec.insert(GRAPHIC_LEFT,       "GRAPHIC_LEFT");
+    spec.insert(GRAPHIC_RIGHT,      "GRAPHIC_RIGHT");
+    spec.insert(GRAPHIC_FITGRAPHIC, "GRAPHIC_FITGRAPHIC");
+    spec.insert(GRAPHIC_SHRINKFIT,  "GRAPHIC_SHRINKFIT");
+    spec.insert(GRAPHIC_PROPSCALE,  "GRAPHIC_PROPSCALE");
     return true;
 }
 bool dummy = RegisterGraphicStyles();
@@ -45,8 +45,8 @@ bool dummy = RegisterGraphicStyles();
 // GG::StaticGraphic
 ////////////////////////////////////////////////
 StaticGraphic::StaticGraphic(std::shared_ptr<Texture> texture,
-                             Flags<GraphicStyle> style/* = GRAPHIC_NONE*/,
-                             Flags<WndFlag> flags/* = 0*/) :
+                             Flags<GraphicStyle> style,
+                             Flags<WndFlag> flags) :
     Control(X0, Y0, X1, Y1, flags),
     m_style(style)
 {
@@ -59,8 +59,8 @@ StaticGraphic::StaticGraphic(std::shared_ptr<Texture> texture,
 }
 
 StaticGraphic::StaticGraphic(SubTexture subtexture,
-                             Flags<GraphicStyle> style/* = GRAPHIC_NONE*/,
-                             Flags<WndFlag> flags/* = 0*/) :
+                             Flags<GraphicStyle> style,
+                             Flags<WndFlag> flags) :
     Control(X0, Y0, X1, Y1, flags),
     m_graphic(std::move(subtexture)),
     m_style(style)
@@ -70,8 +70,8 @@ StaticGraphic::StaticGraphic(SubTexture subtexture,
 }
 
 StaticGraphic::StaticGraphic(std::shared_ptr<VectorTexture> texture,
-                             Flags<GraphicStyle> style/* = GRAPHIC_NONE*/,
-                             Flags<WndFlag> flags/* = 0*/) :
+                             Flags<GraphicStyle> style,
+                             Flags<WndFlag> flags) :
     Control(X0, Y0, X1, Y1, flags),
     m_vector_texture(std::move(texture)),
     m_style(style)

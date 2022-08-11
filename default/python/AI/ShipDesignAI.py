@@ -53,15 +53,12 @@ import AIDependencies
 import FleetUtilsAI
 from AIDependencies import INVALID_ID, Tags
 from aistate_interface import get_aistate
-from CombatRatingsAI import (
-    ShipCombatStats,
-    get_allowed_targets,
-    weight_attack_troops,
-    weight_shields,
-)
+from CombatRatingsAI import ShipCombatStats, get_allowed_targets, species_shield_bonus
 from freeorion_tools import (
     assertion_fails,
     get_ship_part,
+    get_species_attack_troops,
+    get_species_fuel,
     get_species_tag_grade,
     tech_is_complete,
 )
@@ -514,6 +511,7 @@ class DesignStats:
         self.has_interceptors = False
         self.damage_vs_planets = 0
         self.has_bomber = False
+        self.shield_type = None
 
     def convert_to_combat_stats(self):
         """Return a tuple as expected by CombatRatingsAI"""
@@ -748,6 +746,7 @@ class ShipDesigner:
                 shield_counter += 1
                 if shield_counter == 1:
                     self.design_stats.shields = capacity
+                    self.design_stats.shield_type = part.name
                 else:
                     self.design_stats.shields = 0
             elif partclass in TROOPS:
@@ -788,11 +787,10 @@ class ShipDesigner:
         self._apply_hardcoded_effects(ignore_species)
 
         if self.species and not ignore_species:
-            shields_grade = get_species_tag_grade(self.species, Tags.SHIELDS)
-            self.design_stats.shields = weight_shields(self.design_stats.shields, shields_grade)
+            self.design_stats.shields += species_shield_bonus(self.species, self.design_stats.shields)
             if self.design_stats.troops:
-                troops_grade = get_species_tag_grade(self.species, Tags.ATTACKTROOPS)
-                self.design_stats.troops = weight_attack_troops(self.design_stats.troops, troops_grade)
+                troops_grade = get_species_attack_troops(self.species)
+                self.design_stats.troops = self.design_stats.troops * troops_grade
 
     def _apply_hardcoded_effects(self, ignore_species=False):
         """Update stats that can not be read out by the AI yet, i.e. applied by effects.
@@ -893,7 +891,7 @@ class ShipDesigner:
 
         # fuel effects (besides already handled FUEL TECH_EFFECTS e.g. GRO_ENERGY_META)
         if not ignore_species:
-            self.design_stats.fuel += _get_species_fuel_bonus(self.species)
+            self.design_stats.fuel += get_species_fuel(self.species)
         # set fuel to zero for NO_FUEL species (-100 fuel bonus)
         if self.design_stats.fuel < 0:
             self.design_stats.fuel = 0
@@ -1035,7 +1033,7 @@ class ShipDesigner:
                 weapons_grade = get_species_tag_grade(self.species, Tags.WEAPONS)
                 relevant_grades.append("WEAPON: %s" % weapons_grade)
             if SHIELDS & self.useful_part_classes:
-                shields_grade = get_species_tag_grade(self.species, Tags.SHIELDS)
+                shields_grade = get_species_tag_grade(self.species, Tags.SHIP_SHIELDS)
                 relevant_grades.append("SHIELDS: %s" % shields_grade)
             if TROOPS & self.useful_part_classes:
                 troops_grade = get_species_tag_grade(self.species, Tags.ATTACKTROOPS)
@@ -1228,7 +1226,7 @@ class ShipDesigner:
         This heuristic will always find a local maximum. For simple enough (convex) rating functions this is also
         the global maximum. More intrigued functions might require a different approach, however. Another problem might
         occur if we have a non-stacking part available for both the external and internal slot. We will never exchange
-        these parts in this algorithm so if future oontent has this situation, we need to either specify a very distinct
+        these parts in this algorithm so if future content has this situation, we need to either specify a very distinct
         _starting_guess() or change the algorithm.
 
         :param available_parts: dict, indexed by slottype, containing a list of partnames for the slot
@@ -2281,7 +2279,3 @@ def _get_tech_bonus(upgrade_dict, part_name):
         total_tech_bonus += bonus if tech_is_complete(tech) else 0
         # TODO: Error checking if tech is actually a valid tech (tech_is_complete simply returns false)
     return total_tech_bonus
-
-
-def _get_species_fuel_bonus(species_name):
-    return AIDependencies.SPECIES_FUEL_MODIFIER.get(get_species_tag_grade(species_name, Tags.FUEL), 0)

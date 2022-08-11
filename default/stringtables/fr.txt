@@ -270,7 +270,7 @@ CONTENT
 Contenu
 
 MULTIPLAYER
-Multijoueurs
+Multijoueur
 
 
 ##
@@ -863,19 +863,19 @@ FLD_ION_STORM
 Tempête Ionique
 
 FLD_ION_STORM_DESC
-Vortex magnétique de particules relativistes chargées, pouvant perturber les capteurs et masquer tout objet se trouvant dans son périmètre. Tout objet au sein de la tempête voit sa [[metertype METER_STEALTH]] augmenter de 40, mais son [[metertype METER_DETECTION]] diminuer de 40.
+Vortex magnétique de particules relativistes chargées, pouvant perturber les capteurs et masquer tout objet se trouvant dans son périmètre. Tout objet au sein de la tempête voit sa [[metertype METER_STEALTH]] augmenter de [[value FLD_ION_STORM_STEALTH_BONUS]], mais son [[metertype METER_DETECTION]] diminuer de [[value FLD_ION_STORM_DETECTION_MALUS]].
 
 FLD_MOLECULAR_CLOUD
 Nuage Moléculaire
 
 FLD_MOLECULAR_CLOUD_DESC
-Nuage diffus de molécules complexes pouvant perturber le champ de protection des astronefs, ces derniers voyant la solidité de leurs [[metertype METER_SHIELD]] diminuer de 15.
+Nuage diffus de molécules complexes pouvant perturber le champ de protection des astronefs, ces derniers voyant la solidité de leurs [[metertype METER_SHIELD]] diminuer de [[value FLD_MOLECULAR_CLOUD_SHIELD_MALUS]].
 
 FLD_NEBULA_1
 Nébuleuse
 
 FLD_NEBULA_1_DESC
-Nuage de gaz d'hydrogène qui, en s'effondrant sur lui-même, peut donner naissance à une nouvelle étoile. La [[metertype METER_SPEED]] et le [[metertype METER_DETECTION]] des astronefs diminuent de 20, la [[metertype METER_STEALTH]] augmente de 20.
+Nuage de gaz d'hydrogène qui, en s'effondrant sur lui-même, peut donner naissance à une nouvelle étoile. La [[metertype METER_SPEED]] des astronefs diminue de [[value FLD_NEBULA_SPEED_MALUS]], leur [[metertype METER_DETECTION]] diminue de [[value FLD_NEBULA_DETECTION_MALUS]], mais leur [[metertype METER_STEALTH]] augmente de [[value FLD_NEBULA_STEALTH_BONUS]].
 
 FLD_NEBULA_2  # translated
 [[FLD_NEBULA_1]]
@@ -1304,6 +1304,12 @@ Stabilité planétaire de base
 RULE_BASELINE_PLANET_STABILITY_DESC
 Niveau de base de la [[METER_HAPPINESS]] d'une planète.
 
+RULE_MINIMUM_MONSTER_DISTANCE_CAPITAL
+Distance minimum entre monstres et Capitale 
+
+RULE_MINIMUM_MONSTER_DISTANCE_CAPITAL_DESC
+Distance minimum à laquelle débutent les monstres par rapport à la Capitale.
+
 RULE_ALLOW_CONCEDE
 Autoriser Capitulation
 
@@ -1320,7 +1326,7 @@ RULE_THRESHOLD_HUMAN_PLAYER_WIN
 Maximum de joueurs humains vainqueurs
 
 RULE_THRESHOLD_HUMAN_PLAYER_WIN_DESC
-Nombre maximum de joueurs humains pouvant gagner collectivement dans une partie multijoueurs s'il n'y a pas d'autres joueurs humains survivants.
+Nombre maximum de joueurs humains pouvant gagner collectivement dans une partie multijoueur s'il n'y a pas d'autres joueurs humains survivants.
 
 RULE_ONLY_ALLIANCE_WIN
 Seuls les joueurs alliés gagnent
@@ -1409,6 +1415,9 @@ Ignore le contrôle du dossier de ressources. Ceci permet un démarrage plus rap
 
 OPTIONS_DB_TESTING
 Linux uniquement. L'IA enverra le fichier journal vers la console au lieu de créer un fichier externe.
+
+OPTIONS_DB_LOAD_OR_QUICKSTART
+Recherche dans le dossier de sauvegarde automatique la dernière sauvegarde d'une partie multijoueur. Si trouvée, charge et démarre celle-ci ou crée une nouvelle partie avec les options et règles de jeu prédéfinies. Nécessite le mode sans hôte et aucune restriction sur le nombre minimum de joueurs connectés, car le serveur démarrera sans joueurs connectés.
 
 OPTIONS_DB_GENERATE_CONFIG_XML
 Génère un fichier config.xml à partir des réglages contenus dans les fichiers config.xml existants et donnés dans la ligne de commande. Ceci écrasera le fichier config.xml actuel, s'il existe.
@@ -1524,22 +1533,22 @@ OPTIONS_DB_EXTERNAL_SERVER_ADDRESS
 Adresse à laquelle se connecter en mode serveur externe. Si utilisé, ce client devient le gestionnaire de la partie.
 
 OPTIONS_DB_MP_HOST_ADDRESS
-Adresse à laquelle se connecter pour rejoindre une partie multijoueurs.
+Adresse à laquelle se connecter pour rejoindre une partie multijoueur.
 
 OPTIONS_DB_MP_PLAYER_NAME
-Nom utilisé par le joueur lorsqu'il héberge ou rejoint une partie multijoueurs.
+Nom utilisé par le joueur lorsqu'il héberge ou rejoint une partie multijoueur.
 
 OPTIONS_DB_MP_AI_MIN
-Définit le nombre minimum de joueurs IA requis pour démarrer une partie multijoueurs.
+Définit le nombre minimum de joueurs IA requis pour démarrer une partie multijoueur.
 
 OPTIONS_DB_MP_AI_MAX
-Limite le nombre de joueurs IA dans une partie multijoueurs. Une valeur de -1 correspond à un nombre illimité.
+Limite le nombre de joueurs IA dans une partie multijoueur. Une valeur de -1 correspond à un nombre illimité.
 
 OPTIONS_DB_MP_HUMAN_MIN
-Définit le nombre minimum de joueurs humains requis pour démarrer une partie multijoueurs.
+Définit le nombre minimum de joueurs humains requis pour démarrer une partie multijoueur.
 
 OPTIONS_DB_MP_HUMAN_MAX
-Limite le nombre de joueurs humains dans une partie multijoueurs. Une valeur de -1 correspond à un nombre illimité.
+Limite le nombre de joueurs humains dans une partie multijoueur. Une valeur de -1 correspond à un nombre illimité.
 
 OPTIONS_DB_MP_CONN_HUMAN_MIN
 Nombre minimum de joueurs humains actifs, au-dessous duquel le serveur stoppera la partie en cours.
@@ -1574,6 +1583,12 @@ Annuler la lecture du statut de l'empire en rejoignant une partie en cours.
 OPTIONS_DB_TAKE_OVER_AI
 Option de serveur permettant aux joueurs humains de prendre le contrôle des empires dirigés par l'IA.
 
+OPTIONS_DB_ALLOW_OBSERVERS
+Option de serveur permettant à tout joueur de se connecter aux parties en tant qu'Observateur.
+
+OPTIONS_DB_LISTEN_FD
+Option de serveur permettant de définir un fichier de description pré-chargé pour accepter les connexions. Fonctionne sous Linux avec xinetd ou systemd socket activation. Option désactivée par défaut.
+
 OPTIONS_DB_PYTHON_ASYNCIO_INTERVAL
 Intervalle en secondes d'appel de la boucle d'évènements python asyncio ou -1 pour le désactiver. Les appels d'asyncio sont désactivés par défaut.
 
@@ -1605,13 +1620,13 @@ OPTIONS_DB_SHOW_FPS
 Affiche/Cache le nombre d'images par seconde.
 
 OPTIONS_DB_LIMIT_FPS
-Active/Désactive la limitation du Ni/s (nombre d'images par seconde). La limite est définie avec l'option Ni/s Maximal.
+Active/Désactive la limitation du Ni/s (nombre d'images par seconde). La limite est définie avec l'option Ni/s Maximum.
 
 OPTIONS_DB_MAX_FPS
 Fixe la valeur limite du Ni/s (nombre d'images par seconde) lorsque sa limitation est activée avec l'option Limitation Ni/s.
 
 OPTIONS_DB_LIMIT_FPS_NO_FOCUS
-Active/Désactive la limitation du Ni/s lorsque la fenêtre principale de jeu n'est pas sélectionnée. La limite est définie avec l'option Ni/s Maximal (hors-fenêtre).
+Active/Désactive la limitation du Ni/s lorsque la fenêtre principale de jeu n'est pas sélectionnée. La limite est définie avec l'option Ni/s Maximum (hors-fenêtre).
 
 OPTIONS_DB_MAX_FPS_NO_FOCUS
 Fixe la valeur limite du Ni/s (nombre d'images par seconde) lorsque la fenêtre principale de jeu n'est pas sélectionnée, si la limitation est activée avec l'option Limitation Ni/s (hors-fenêtre).
@@ -2060,6 +2075,9 @@ Définit le chemin du dossier contenant les fichiers de script de l'IA, pour l'e
 OPTIONS_DB_AI_CONFIG
 Est disponible pour l'IA via l'interface freeorion, et utilisé pour l'éxécution en cours uniquement. Permet de nommer un fichier de configuration optionnel de l'IA à l'intérieur du dossier de scripts de l'IA; par défaut une valeur nulle. A pour but de faciliter le test de l'IA.
 
+OPTIONS_DB_AI_LOG_DIR
+Définit le chemin du dossier dans lequel les clients IA créent les fichiers log.
+
 OPTIONS_DB_AI_CONFIG_TRAIT_AGGRESSION_FORCED
 Valeur boléenne pour test d'IA indiquant si toutes les IAs ont forcément le même Niveau d'Agressivité.
 
@@ -2088,13 +2106,13 @@ OPTIONS_DB_AUTOSAVE_TURNS
 Fixe le nombre de tours séparant les sauvegardes automatiques.
 
 OPTIONS_DB_AUTOSAVE_LIMIT
-Fixe le nombre maximal de sauvegardes automatiques à conserver.
+Fixe le nombre maximum de sauvegardes automatiques à conserver.
 
 OPTIONS_DB_AUTOSAVE_GALAXY_CREATION
 Active une sauvegarde automatique dès que la galaxie est créée et avant toute action de jeu.
 
 OPTIONS_DB_AUTOSAVE_GAME_CLOSE
-Active une sauvegarde automatique lors d'un abandon ou de la fermeture du jeu. En mode multijoueurs sans hôte, active une sauvegarde automatique lorsque le serveur ferme une partie suite à la déconnexion d'un joueur ou lorsque le serveur est arrêté.
+Active une sauvegarde automatique lors d'un abandon ou de la fermeture du jeu. En mode multijoueur sans hôte, active une sauvegarde automatique lorsque le serveur ferme une partie suite à la déconnexion d'un joueur ou lorsque le serveur est arrêté.
 
 OPTIONS_DB_AUTOSAVE_HOSTLESS
 Active la sauvegarde automatique en mode sans hôte.
@@ -2112,7 +2130,7 @@ OPTIONS_DB_MUSIC_VOLUME
 Fixe le volume sonore de la musique (de 0 à 255).
 
 OPTIONS_DB_QUICKSTART
-Lance une nouvelle partie en court-circuitant le menu principal en mode solo ou le salon en multijoueurs. En multijoueurs, nécessite le mode sans hôte et aucune restriction sur le nombre minimum de joueurs connectés, car le serveur démarrera sans joueurs connectés.
+Lance une nouvelle partie en court-circuitant le menu principal en mode solo ou le salon en multijoueur. En multijoueur, nécessite le mode sans hôte et aucune restriction sur le nombre minimum de joueurs connectés, car le serveur démarrera sans joueurs connectés.
 
 OPTIONS_DB_CONTINUE
 Reprend une partie depuis la sauvegarde la plus récente, sans passer par le menu principal.
@@ -2139,7 +2157,7 @@ OPTIONS_DB_UI_SITREP_ICONSIZE
 Définit la largeur et la hauteur des icônes du Rapport de Situation; par défaut 16 (min 12, max 64).
 
 OPTIONS_DB_LOAD
-Charge et démarre la partie sauvegardée solo ou multijoueurs spécifiée. En multijoueurs, nécessite le mode sans hôte et aucune restriction sur le nombre minimum de joueurs connectés, car le serveur démarrera sans joueurs connectés.
+Charge et démarre la partie sauvegardée solo ou multijoueur spécifiée. En multijoueur, nécessite le mode sans hôte et aucune restriction sur le nombre minimum de joueurs connectés, car le serveur démarrera sans joueurs connectés.
 
 OPTIONS_DB_EFFECTS_THREADS_UI_DESC
 Spécifie le nombre de threads simultanés pour le rendu des effets dans l'interface utilisateur. Plus d'un thread peut mener à des plantages inopinés.
@@ -2417,7 +2435,7 @@ INTRO_BTN_QUICK_START
 Démarrage rapide
 
 INTRO_BTN_MULTI_PLAYER
-Partie multijoueurs
+Partie multijoueur
 
 INTRO_BTN_LOAD_GAME
 Charger une partie
@@ -2492,7 +2510,7 @@ Mot de Passe
 ##
 
 MPLOBBY_WINDOW_TITLE
-Configuration multijoueurs
+Configuration multijoueur
 
 MULTIPLAYER_GAME_START_CONDITIONS
 Noms et couleurs uniques requis
@@ -2762,7 +2780,7 @@ Bouton désactivé
 SAVE_DISABLED_BROWSE_TEXT
 '''Le bouton "Sauvegarder" est désactivé. Possibles causes:
 
-- Il s'agit d'une partie multijoueurs dont ce client n'est ni l'Hôte ni le Modérateur.
+- Il s'agit d'une partie multijoueur dont ce client n'est ni l'Hôte ni le Modérateur.
 
 - Le menu a été ouvert alors qu'au moins une des IAs n'a pas encore terminé son tour de jeu (indiqué par un triangle vert à gauche de l'icône représentant le type de joueur dans la fenêtre Empires).
 
@@ -2893,7 +2911,7 @@ OPTIONS_MISC_UI
 Options diverses de l'interface utilisateur
 
 OPTIONS_AUTOSAVE_LIMIT
-Nombre maximal de sauvegardes automatiques
+Nombre maximum de sauvegardes automatiques
 
 OPTIONS_AUTOSAVE_TURNS_BETWEEN
 Tours entre les sauvegardes automatiques
@@ -2995,13 +3013,13 @@ OPTIONS_LIMIT_FPS
 Limitation du Ni/s
 
 OPTIONS_MAX_FPS
-Ni/s Maximal
+Ni/s Maximum
 
 OPTIONS_LIMIT_FPS_NO_FOCUS
 Limitation du Ni/s (hors-fenêtre)
 
 OPTIONS_MAX_FPS_NO_FOCUS
-Ni/s Maximal (hors-fenêtre)
+Ni/s Maximum (hors-fenêtre)
 
 OPTIONS_APPLY
 Appliquer
@@ -3386,9 +3404,6 @@ Mise à jour indicateurs quand ouverture panneau latéral
 
 OPTIONS_UI_OBJECT_CHANGED_METER_UPDATE
 Mise à jour indicateurs quand changement d'un objet
-
-OPTIONS_DB_UI_EFFECTS_MOVE_TEST
-Test / modificateur moteur interne: Utilise des redirections de pointeurs, au lieu d'appels de conteneurs de pointeurs, lors de l'évaluation des conditions.
 
 OPTIONS_ADD_SAVED_DESIGNS
 Ajouter tous les modèles d'astronef sauvegardés au démarrage d'une partie
@@ -4443,7 +4458,19 @@ Description
 ##
 
 POLICY_LOCKED
-Politique indisponible mais demanderait %1% PI pour être adoptée.
+Politique indisponible mais demanderait %1% PI pour être adoptée
+
+POLICY_RESTRICTED
+Politique inapplicable mais demanderait %1% PI pour être adoptée
+
+POLICY_EXCLUDED
+Politique inapplicable car incompatible avec %1%
+
+POLICY_PREREQ_MISSING
+Politique inapplicable car prérequis %1% non-adopté
+
+POLICY_PREREQ_MET
+Politique applicable car prérequis %1% adopté
 
 POLICY_ADOPTABLE_COST
 Politique adoptable pour %1% PI
@@ -5025,14 +5052,14 @@ Impossible de créer le fichier:\n"%1%"
 GOVERNMENT_INFO_IP
 PI
 
-GOVERNMENT_WND_CLEAR
-Vider
+GOVERNMENT_WND_REVERT
+Rétablir
 
 ECONOMIC_CATEGORY
 Économique
 
 SOCIAL_CATEGORY
-Social
+Sociale
 
 MILITARY_CATEGORY
 Militaire
@@ -5258,7 +5285,7 @@ SPECIES_THAT_LIKE
 '''Espèces qui aiment : '''
 
 SPECIES_THAT_DISLIKE
-'''Espèces qui n'aiment pas : '''
+'''Espèces qui détestent : '''
 
 ENC_BUILDING_TYPE
 Type de Structures
@@ -5664,11 +5691,11 @@ ENC_TECH_DETAIL_UNLOCKED_ITEM_STR
 
 # %1% category of the technology.
 ENC_TECH_DETAIL_TYPE_STR
-Technologie %1% -
+- Technologie %1%
 
 # %1% category of the policy.
 ENC_POLICY_DETAIL_TYPE_STR
-Politique Domaine %1% -
+- Politique %1%
 
 # %1% object, technology or other content that should be looked up in the
 #     encyclopedia.
@@ -6185,7 +6212,7 @@ METER_RESEARCH_VALUE_DESC
 
 La Projection Recherche est le niveau optimal de capacité en Recherche qu'une planète tend à approcher, compte tenu des différents facteurs influençant les ressources en Recherche. Sa valeur est liée aux <encyclopedia ENC_BUILDING_TYPE>Types de Structures</encyclopedia> bâtis sur la planète, aux [[encyclopedia ENC_TECH]] recherchées par l'empire, aux <encyclopedia ENC_SPECIAL>Particularités</encyclopedia> liées à la planète, aux [[encyclopedia ENC_POLICY]] adoptées par l'empire, ainsi que divers effets de jeu. Si ces facteurs changent, alors la valeur de Projection Recherche est susceptible de fluctuer à son tour.
 
-L'assimilation complète de chaque technologie nécessite un nombre minimal de tours. Par exemple, si une technologie coûte 15 PR et requiert un minimum de 3 tours, seulement 5 PR par tour peuvent lui être alloués.
+L'assimilation complète de chaque technologie nécessite un nombre minimum de tours. Par exemple, si une technologie coûte 15 PR et requiert un minimum de 3 tours, seulement 5 PR par tour peuvent lui être alloués.
 Les PR sont affectés aux technologies à assimiler selon leur position dans la file d'attente: la technologie en tête de file est prioritaire. Les PR restants sont alloués au projet suivant dans la file et ainsi de suite, jusqu'à épuisement des points disponibles. L'ordre des technologies dans la file d'attente peut être modifié: les technologies que vous jugez prioritaires peuvent ainsi être déplacées en tête de file. Si des PR restent non-alloués après que chaque technologie ait reçu son maximum autorisé de PR, ces PR en excédent sont automatiquement attribués à une ou plusieurs technologies déverrouillées et présentant le moins de PR nécessaires ou restants avant assimilation.
 
 À l'inverse de l'[[metertype METER_INDUSTRY]], la Recherche n'impose pas d'échanges matériels entre planètes et n'est donc pas dépendante des lignes d'[[metertype METER_SUPPLY]] de l'empire.'''
@@ -6424,7 +6451,9 @@ LOGISTICS_FOCUS_TITLE
 Focus Logistique
 
 LOGISTICS_FOCUS_TEXT
-Les planètes en Focus Logistique voient leur [[metertype METER_SUPPLY]] augmenter de 3, ce qui déploie le réseau impérial d'approvisionnement de la planète sur 3 Voies spatiales supplémentaires consécutives.
+'''Les planètes en Focus Logistique voient leur [[metertype METER_SUPPLY]] augmenter de 3, ce qui déploie le réseau impérial d'approvisionnement de la planète sur 3 Voies spatiales supplémentaires consécutives.
+
+Débloqué par : [[tech SHP_INTSTEL_LOG]].'''
 
 PLANETDRIVE_FOCUS_TITLE
 Focus Navigation Planétaire
@@ -6436,7 +6465,7 @@ PROTECTION_FOCUS_TITLE
 Focus Protection
 
 PROTECTION_FOCUS_TEXT
-Privilégier la Protection consiste pour une planète à se consacrer entièrement à sa propre défense. Ses effectifs d'[[metertype METER_TROOPS]], sa capacité de [[metertype METER_DEFENSE]], et la solidité de ses [[metertype METER_SHIELD]] sont par conséquent doublés.
+Privilégier la Protection consiste pour une planète à se consacrer entièrement à sa propre défense. Ses effectifs d'[[metertype METER_TROOPS]], sa capacité de [[metertype METER_DEFENSE]], et la solidité de ses [[metertype METER_SHIELD]] sont par conséquent doublés. La [[metertype METER_TARGET_HAPPINESS]] augmente de [[value PROTECION_FOCUS_STABILITY_BONUS]].
 
 PSYCHIC_FOCUS_TITLE
 Focus Domination Psychique
@@ -6446,7 +6475,9 @@ PSYCHIC_FOCUS_TEXT
 
 À chaque tour, procure 10% de chance de prendre le contrôle de chaque astronef, à moins que l'empire ennemi ne dispose également de la technologie [[LRN_PSY_DOM]].
 
-Lorsque le Focus Domination Psychique est activé, réduit par ailleurs la chance qu'un [[predefinedshipdesign SM_PSIONIC_SNOWFLAKE]] prenne le contrôle des astronefs de l'empire se trouvant dans le même système.'''
+Lorsque le Focus Domination Psychique est activé, réduit par ailleurs la chance qu'un [[predefinedshipdesign SM_PSIONIC_SNOWFLAKE]] prenne le contrôle des astronefs de l'empire se trouvant dans le même système.
+
+Débloqué par : [[tech LRN_PSY_DOM]].'''
 
 STOCKPILE_FOCUS_TITLE
 Focus Distribution Stock
@@ -6489,7 +6520,7 @@ Chaque [[encyclopedia ENC_SPECIES]] a ses propres préférences environnementale
 
 Le rapport d'Habitabilité d'une planète peut être affiché par un clic-droit sur une planète dans le panneau latéral. À la suite de la donnée d'Habitabilité, un nombre de couleur verte indique la [[metertype METER_POPULATION]] maximale que la planète peut atteindre si colonisée par cette espèce, tandis qu'un nombre de couleur rouge indique que la colonie ne sera pas viable. La Population diminuera sur plusieurs tours, jusqu'à ce que la totalité des Colons ait péri et que la colonie soit perdue.
 
-Lors de la terraformation d'une planète dans le but de mieux l'adapter aux préférences environnementales de l'espèce (via la [[metertype METER_RESEARCH]] ou si la planète dispose de la Particularité [[special GAIA_SPECIAL]]), l'Environnement d'origine de la planète est modifié par paliers, jusqu'à que ce dernier atteigne l'Habitabilité [[PE_GOOD]] pour l'espèce désirant vivre sur la planète. Les étapes de terraformation d'une planète peuvent être consultées ci-dessous sous la forme d'une représentation circulaire des différents types d'Environnement.
+Lors de la terraformation d'une planète dans le but de mieux l'adapter aux préférences environnementales de l'espèce (via la [[metertype METER_RESEARCH]] ou si la planète dispose de la Particularité [[special GAIA_SPECIAL]]), l'Environnement d'origine de la planète est modifié par paliers, jusqu'à que ce dernier atteigne l'Habitabilité [[PE_GOOD]] pour l'espèce désirant vivre sur la planète. Les projets de terraformation sont débloqués par la technologie [[tech GRO_TERRAFORM]]. Les étapes de terraformation d'une planète peuvent être consultées ci-dessous sous la forme d'une représentation circulaire des différents types d'Environnement.
 
 Depuis midi dans le sens horaire: [[PT_TERRAN]], [[PT_OCEAN]], [[PT_SWAMP]], [[PT_TOXIC]], [[PT_INFERNO]], [[PT_RADIATED]], [[PT_BARREN]], [[PT_TUNDRA]], [[PT_DESERT]]
 
@@ -6568,6 +6599,14 @@ ARTISTIC_SPECIES_TRAIT_TEXT
 '''Les espèces artistiques réalisent des travaux d'ordre artistique lorsque leur empire a adopté la Politique [[policy PLC_ARTISAN_WORKSHOPS]], laquelle génère de l'[[metertype METER_INFLUENCE]]. De plus, les autres planètes situées dans le même système et peuplées d'espèces artistiques différentes, jouiront d'une meilleure [[metertype METER_HAPPINESS]].
 
 Liste des espèces artistiques:'''
+
+SNEAKY_TITLE
+Sournoise
+
+SNEAKY_TEXT
+'''Les espèces sournoises recherchent les technologies [[tech SPY_STEALTH_1]], [[tech SPY_STEALTH_2]], [[tech SPY_STEALTH_3]] et [[tech SPY_STEALTH_4]] à un coût réduit.
+
+Liste des espèces sournoises:'''
 
 FLEET_UPKEEP_TITLE
 Entretien des Flottes
@@ -7601,14 +7640,6 @@ Les astronomes ont observé une nouvelle supernova ayant détruit la totalité d
 SITREP_NOVA_DETECTED_LABEL
 Supernova détectée
 
-SITREP_BUREAUCRACY_STOPPED
-'''Le développement de la [[policy PLC_BUREAUCRACY]] nécessite des structures administratives supplémentaires.
-À partir du prochain tour, %rawtext:needbuildings% structures ([[buildingtype BLD_REGIONAL_ADMIN]], [[buildingtype BLD_IMPERIAL_PALACE]]) seront requises afin d'éviter la paralysie de la bureaucratie. Actuellement, un total de %rawtext:havebuildings% structures se trouvent dans l'empire.
-La Bureaucratie requiert une structure administrative supplémentaire tous les [[value BUREACRACY_ADMINS_NEEDED_TURN_SCALING]] tours.'''
-
-SITREP_BUREAUCRACY_STOPPED_LABEL
-Paralysie Bureaucratique
-
 EFFECT_EXPERIMENT_MONSTERS_LAUNCH
 ALERTE : il semble que %rawtext% %predefinedshipdesign% aient été repérés dans le système %system%, rôdant près de l'Avant-Poste %species%!
 
@@ -7735,8 +7766,14 @@ Sur %planet% : les habitants jouissent désormais d'un monde devenu un paradis [
 EFFECT_GAIA_LABEL
 Paradis Gaia
 
+EFFECT_TERRAFORM_BEST
+%planet% a été terraformée en planète %planettype% (%environment%).
+
+EFFECT_TERRAFORM_BEST_LABEL
+Terraformation
+
 EFFECT_TERRAFORM
-La planète %planet% a été terraformée en planète %user_string% (%environment%).
+%planet% a été terraformée en planète %planettype% (%environment%).
 
 EFFECT_TERRAFORM_LABEL
 Terraformation
@@ -8445,7 +8482,7 @@ SP_LAENFA_GAMEPLAY_DESC
 '''<img src="species/preview/laenfa.png"></img>
 Vignes sentientes, télépathes, et insidieuses.
 Préfèrent les Planètes [[PT_OCEAN]]s.
-[[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]]
+[[encyclopedia PHOTOTROPHIC_SPECIES_TITLE]], [[encyclopedia TELEPATHIC_TITLE]], [[encyclopedia SNEAKY_TITLE]]
 '''
 
 SP_LAENFA_DESC
@@ -8816,7 +8853,7 @@ Ils émettent tellement d'ondes négatives, qu'ils semblent attirer le feu et le
 
 Ces ondes sont si négatives, qu'elles repoussent même les Milieux bénéfiques. (Les colonies de Nightsiders repousseront un [[fieldtype FLD_NANITE_SWARM]] en approche).
 
-Lorsqu'on leur demande ce qu'ils aiment ou n'aiment pas, un Nightsider typique répondra toujours de la même manière.
+Lorsqu'on leur demande ce qu'ils aiment ou détestent, un Nightsider typique répondra toujours de la même manière.
 
 Question: Aimeriez-vous rejoindre notre [[buildingtype BLD_INTERSPECIES_ACADEMY]]?
 Nightsider: Bien sûr, pourquoi pas, montrez-nous toutes les espèces organiques qui s'y rassemblent. On viendra peut-être même la visiter une de ces nuits.
@@ -8873,7 +8910,14 @@ Préfèrent les Planètes [[PT_BARREN]]s.
 
 SP_TRENCHERS_DESC  # translated
 '''Description:
-À venir.
+Les Trenchers sont une énigme pour toute la galaxie. Qui les a conçus? Pourquoi creusent-ils en permanence des tranchées en forme de spirale? Les théories sont nombreuses: "Ces tranchées sont une forme insondable de communication" ou bien "Ces formes et motifs ont une importance religieuse pour les Trenchers". En réalité, le mystère reste entier.
+
+Monde Natal:
+Le monde des Trenchers est une planète stérile et totalement plate, à l'exception des tranchées complexes creusées par ses habitants, ainsi qu'une chaîne de collines artificielles formées par les énormes quantités de terre extraites par les Trenchers. Leur monde est presque totalement dépourvu de vie végétale, exceptée une mousse endémique aux couleurs irisées, recouvrant les parois des tranchées.
+
+Société:
+Très peu de données sont disponibles concernant la structure sociale des Trenchers. Rien ne semble les intéresser, hormis creuser des tranchées et construire de nouveaux ouvriers. D'étranges rumeurs et informations mentionnent que les Trenchers peuvent se rassembler pour tournoyer tous ensemble sur leurs roues, dans ce qui s'apparente à une sorte de danse rituelle collective. Cependant, personne n'a été en mesure de prouver l'existence de ce comportement. La plupart des experts ont donc rejeté ces rapports résultant probablement des effets secondaires indésirables dûs à la consommation de la plante locale.
+
 <img src="species/trenchers.png"></img>
 '''
 
@@ -9515,19 +9559,19 @@ KRAKEN_NEST_SPECIAL
 Nid Kraken
 
 KRAKEN_NEST_SPECIAL_DESC
-Avec le temps, de jeunes Kraken naîtront sur cette planète. Un empire maîtrisant la [[tech SHP_DOMESTIC_MONSTER]] pourra les apprivoiser.
+Avec le temps, de jeunes Kraken naîtront sur cette planète. Un empire maîtrisant la technologie [[tech SHP_DOMESTIC_MONSTER]] pourra les apprivoiser.
 
 SNOWFLAKE_NEST_SPECIAL
 Nid Floconneux
 
 SNOWFLAKE_NEST_SPECIAL_DESC
-Avec le temps, de jeunes Flocons de Neige naîtront sur cette planète. Un empire maîtrisant la [[tech SHP_DOMESTIC_MONSTER]] pourra les apprivoiser.
+Avec le temps, de jeunes Flocons de Neige naîtront sur cette planète. Un empire maîtrisant la technologie [[tech SHP_DOMESTIC_MONSTER]] pourra les apprivoiser.
 
 JUGGERNAUT_NEST_SPECIAL
 Nid Mastodonte
 
 JUGGERNAUT_NEST_SPECIAL_DESC
-Avec le temps, de jeunes Mastodontes naîtront sur cette planète. Un empire maîtrisant la [[tech SHP_DOMESTIC_MONSTER]] pourra les apprivoiser.
+Avec le temps, de jeunes Mastodontes naîtront sur cette planète. Un empire maîtrisant la technologie [[tech SHP_DOMESTIC_MONSTER]] pourra les apprivoiser.
 
 KRAKEN_IN_THE_ICE_SPECIAL
 Kraken Congelé
@@ -10030,7 +10074,7 @@ FOCUS_PROTECTION  # translated
 Protection
 
 FOCUS_PROTECTION_DESC
-Augmente boucliers, défense et infanterie.
+Augmente boucliers, défense, infanterie et stabilité.
 
 # Focus types
 FOCUS_DOMINATION
@@ -11188,6 +11232,26 @@ DESC_SPECIES
 DESC_SPECIES_NOT
 ''' n'hébergeant pas l'espèce %1%'''
 
+# %1% textual decription of the species.
+# %2% description of content liked
+DESC_SPECIES_LIKES
+''' quand l'espèce %1% aime %2%'''
+
+# %1% textual decription of the species.
+# %2% description of content liked
+DESC_SPECIES_LIKES_NOT
+''' quand l'espèce %1% n'aime pas %2%'''
+
+# %1% textual decription of the species.
+# %2% description of content liked
+DESC_SPECIES_DISLIKES
+''' quand l'espèce %1% déteste %2%'''
+
+# %1% textual decription of the species.
+# %2% description of content disliked
+DESC_SPECIES_DISLIKES_NOT
+''' quand l'espèce %1% ne déteste pas %2%'''
+
 # %1% name of the empire that enqueued items.
 # %2% textual description of the lower limit for the number of enqueued items.
 # %3% textual description of the upper limit for the number of enqueued items.
@@ -11893,7 +11957,7 @@ Scan Continuel
 
 PLC_CONTINUOUS_SCANNING_DESC
 '''• Améliore le Champ de Détection des astronefs de [[value CONTINUOUS_SCANNING_RANGE_BOOST]].
-• Augmente la Capacité de Détection impériale de 1 par tour à partir de l'adoption de cette Politique, jusqu'à un bonus de [[value CONTINUOUS_SCANNING_MAX_DETECTION_BOOST]].
+• Augmente la Capacité de Détection impériale de 1 par tour à partir de l'adoption de cette Politique, jusqu'à un maximum de [[value CONTINUOUS_SCANNING_MAX_DETECTION_BOOST]].
 • Diminue la Furtivité des astronefs de [[value CONTINUOUS_SCANNING_STEALTH_PENALTY]].'''
 
 PLC_CONTINUOUS_SCANNING_SHORT_DESC
@@ -11984,10 +12048,11 @@ PLC_TERRAFORMING
 Terraformation
 
 PLC_TERRAFORMING_DESC
-'''• Diminue le temps et le coût minimum nécessaires pour mener à bien les projets de Terraformation sur une planète.
+'''• Diminue le temps minimum pour mener à bien les projets de Terraformation sur une planète. Ces projets sont débloqués par la technologie [[tech GRO_TERRAFORM]].
 • Améliore la [[metertype METER_TARGET_HAPPINESS]] sur les planètes terraformées de [[value PLC_TERRAFORMING_TARGET_HAPPINESS_ORIGINAL_FLAT]] par palier les séparant de leur type planétaire d'origine après terraformation.
-• Améliore la [[metertype METER_TARGET_INFLUENCE]] sur les planètes en Focus Influence de [[value PLC_TERRAFORMING__TARGET_INFLUENCE_ORIGINAL_FLAT]] par palier les séparant de leur type planétaire d'origine après terraformation.
-• Améliore la [[metertype METER_TARGET_RESEARCH]] sur les planètes en Focus Recherche de la racine carrée de la [[metertype METER_POPULATION]] x [[value PLC_TERRAFORMING_TARGET_RESEARCH_SCALING]] par palier les séparant de leur type planétaire d'origine après terraformation.'''
+• Améliore la [[metertype METER_TARGET_INFLUENCE]] sur les planètes en Focus Influence de [[value PLC_TERRAFORMING_TARGET_INFLUENCE_ORIGINAL_FLAT]] par palier les séparant de leur type planétaire d'origine après terraformation.
+• Améliore la [[metertype METER_TARGET_RESEARCH]] sur les planètes en Focus Recherche de la racine carrée de la [[metertype METER_POPULATION]] x [[value PLC_TERRAFORMING_TARGET_RESEARCH_SCALING]] par palier les séparant de leur type planétaire d'origine après terraformation.
+Les planètes artificielles comptent comme ayant été terraformées sur [[value PLC_TERRAFORMING_ARTIFICIAL_PLANET_DISTANCE]] paliers, quel que soit leur [[encyclopedia ENVIRONMENT_TITLE]] actuel.'''
 
 PLC_TERRAFORMING_SHORT_DESC
 Accélère la terraformation
@@ -11997,9 +12062,9 @@ Industrialisme
 
 PLC_INDUSTRIALISM_DESC
 '''Les planètes en Focus Industrie améliorent leur [[metertype METER_TARGET_INDUSTRY]] de [[value PLC_INDUSTRIALISM_TARGET_INDUSTRY_PERCENT]]% et leur [[metertype METER_HAPPINESS]] augmente de [[value PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT]].
-Cet effet requiert une [[metertype METER_HAPPINESS]] de [[value PLC_INDUSTRIALISM_MIN_STABILITY]].
+Le bonus de Production requiert une [[metertype METER_HAPPINESS]] de [[value PLC_INDUSTRIALISM_MIN_STABILITY]].
 
-Diminue le coût de recherche de certaines technologies de Génération améliorant la production.'''
+Diminue le coût de recherche des technologies de Génération d'énergie améliorant la production: [[tech PRO_ORBITAL_GEN]], [[tech PRO_SOL_ORB_GEN]], [[tech PRO_FUSION_GEN]], [[tech PRO_SINGULAR_GEN]], et [[tech PRO_ZERO_GEN]].'''
 
 PLC_INDUSTRIALISM_SHORT_DESC
 Améliore la capacité industrielle
@@ -12008,7 +12073,8 @@ PLC_TECHNOCRACY
 Technocratie
 
 PLC_TECHNOCRACY_DESC
-Les planètes en Focus Recherche améliorent leur [[metertype METER_TARGET_RESEARCH]] de [[value PLC_INDUSTRIALISM_TARGET_INDUSTRY_PERCENT]]% et reçoivent un bonus de [[value PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT]] en [[metertype METER_HAPPINESS]].
+'''Les planètes en Focus Recherche améliorent leur [[metertype METER_TARGET_RESEARCH]] de [[value PLC_TECHNOCRACY_TARGET_RESEARCH_PERCENT]]% et reçoivent un bonus de [[value PLC_TECHNOCRACY_TARGET_HAPPINESS_FLAT]] en [[metertype METER_HAPPINESS]].
+Le bonus de Recherche requiert une [[metertype METER_HAPPINESS]] de [[value PLC_TECHNOCRACY_MIN_STABILITY]].'''
 
 PLC_TECHNOCRACY_SHORT_DESC
 Améliore la capacité en Recherche
@@ -12029,9 +12095,9 @@ Diversité
 
 PLC_DIVERSITY_DESC
 '''Accorde des bonus ou des pénalités à la Recherche, la Stabilité, et à l'Influence de la Capitale, selon le nombre d'espèces présentes au sein de l'empire.
-Le bonus de Recherche requiert une [[metertype METER_HAPPINESS]] de [[value PLC_DIVERSITY_MIN_STABILITY]].
+Le bonus de Recherche requiert le Focus Recherche et une [[metertype METER_HAPPINESS]] de [[value PLC_DIVERSITY_MIN_STABILITY]].
 
-La valeur de tous les bonus ou pénalités est de [[value PLC_DIVERSITY_SCALING]] par espèce, et sera d'autant plus importante que le nombre d'espèces présentes dans l'empire est supérieur ou inférieur à 4.'''
+La valeur de tous les bonus ou pénalités est de [[value PLC_DIVERSITY_SCALING]] par espèce, et sera d'autant plus importante que le nombre d'espèces présentes dans l'empire est supérieur ou inférieur à [[value PLC_DIVERSITY_THRESHOLD]].'''
 
 PLC_DIVERSITY_SHORT_DESC
 Améliore la Recherche, la Stabilité, et l'Influence
@@ -12074,11 +12140,15 @@ PLC_RACIAL_PURITY
 Pureté Raciale
 
 PLC_RACIAL_PURITY_DESC
-'''Les planètes abritant des espèces différentes de celle dirigeant la Capitale sont soumises à diverses pénalités.
+'''Accorde un bénéfice aux empires à espèce unique, mais pénalise les espèces autres que celle dirigeant la Capitale.
 
-Les planètes peuplées par d'autres espèces subissent des pénalités.
+Les planètes peuplées par des espèces différentes de celle de la Capitale subissent diverses pénalités:
+• Diminue la [[metertype METER_TARGET_HAPPINESS]] de [[value PLC_RACIAL_PURITY_TARGET_HAPPINESS_FLAT]]
+• Diminue la [[metertype METER_TARGET_INFLUENCE]] de [[value PLC_RACIAL_PURITY_TARGET_HAPPINESS_FLAT]]
+• Diminue la [[metertype METER_TARGET_RESEARCH]] de [[value PLC_RACIAL_PURITY_TARGET_RESEARCH_PERPOP]] par [[metertype METER_POPULATION]]
+• Diminue la [[metertype METER_TARGET_INDUSTRY]] de [[value PLC_RACIAL_PURITY_TARGET_INDUSTRY_PERPOP]] par [[metertype METER_POPULATION]]
 
-Permet la construction de [[buildingtype BLD_CONC_CAMP]].'''
+Permet la construction de la structure [[buildingtype BLD_CONC_CAMP]].'''
 
 PLC_RACIAL_PURITY_SHORT_DESC
 Favorise l'espèce de la Capitale
@@ -12198,26 +12268,21 @@ PLC_CONFORMANCE
 Conformité
 
 PLC_CONFORMANCE_DESC
-'''• Réduit l'impact des préférences d'une espèce (aime ou n'aime pas telles structures ou Politiques) sur la [[metertype METER_HAPPINESS]] planétaire.
-• Diminue la [[metertype METER_TARGET_RESEARCH]] de [[value PLC_CONFORMANCE_RESEARCH_PENALTY_FLAT]] sur toutes les planètes. 
-• Augmente la [[metertype METER_TARGET_HAPPINESS]] de [[value PLC_CONFORMANCE_STABILITY_BONUS_FLAT]].
-
-Sur toutes les planètes dont la [[metertype METER_HAPPINESS]] est au moins égale à [[value PLC_CONFORMANCE_MIN_STABILITY]]:
-• Augmente la [[metertype METER_TARGET_CONSTRUCTION]] de [[value PLC_CONFORMANCE_INFRASTRUCTURE_BONUS_FLAT]].
-• Augmente la [[metertype METER_STOCKPILE]] de [[value PLC_CONFORMANCE_STOCKPILING_BONUS_FLAT]].'''
+'''• Réduit l'impact de ce que déteste une espèce (structures, Politiques, ou Focus) sur la [[metertype METER_HAPPINESS]] planétaire (x[[value PLC_CONFORMANCE_DISLIKE_FACTOR]]).
+• Augmente la [[metertype METER_TARGET_HAPPINESS]] de [[value PLC_CONFORMANCE_STABILITY_BONUS_FLAT]].'''
 
 PLC_CONFORMANCE_SHORT_DESC
-Réduit les effets des opinions d'une espèce
+Réduit les effets de ce que déteste une espèce et augmente la Stabilité
 
 PLC_LIBERTY
 Liberté
 
 PLC_LIBERTY_DESC
-'''• Augmente l'impact des préférences d'une espèce (aime ou n'aime pas telles structures ou Politiques) sur la [[metertype METER_HAPPINESS]] planétaire.
-• Sur toutes les planètes dont la [[metertype METER_HAPPINESS]] est au moins égale à [[value PLC_LIBERTY_MIN_STABILITY]], augmente la [[metertype METER_TARGET_RESEARCH]] de [[value PLC_LIBERTY_RESEARCH_BONUS_FLAT]] et diminue la [[metertype METER_TARGET_HAPPINESS]] de [[value PLC_LIBERTY_STABILITY_PENALTY_FLAT]].'''
+'''• Augmente l'impact de ce que déteste une espèce (structures, Politiques, ou Focus) sur la [[metertype METER_HAPPINESS]] planétaire (x[[value PLC_LIBERTY_DISLIKE_FACTOR]]).
+• Augmente la [[metertype METER_TARGET_RESEARCH]] sur les planètes en Focus Recherche ayant une [[metertype METER_HAPPINESS]] supérieure à [[value PLC_LIBERTY_MIN_STABILITY]]. L'augmentation est de [[value PLC_LIBERTY_RESEARCH_BONUS_SCALING]] par Population, multipliée par combien la Stabilité est supérieure à [[value PLC_LIBERTY_MIN_STABILITY]], jusqu'à un maximum de [[value PLC_LIBERTY_MAX_STABILITY]].'''
 
 PLC_LIBERTY_SHORT_DESC
-Augmente les effets des opinions d'une espèce
+Augmente les effets de ce que déteste une espèce ainsi que la Recherche
 
 PLC_TRAFFIC_CONTROL
 Gestion du Trafic
@@ -12265,8 +12330,8 @@ PLC_CAPITAL_MARKETS
 Marchés Capitaux
 
 PLC_CAPITAL_MARKETS_DESC
-'''• Les planètes disposant d'une Particularité de ressources de luxe et réglées sur le Focus Influence, exporteront cette ressource vers les planètes reliées par lignes d'[[metertype METER_SUPPLY]]. Cela améliore de [[value SPECIAL_CAPITAL_MARKETS_STABILITY_FOCUS_BONUS]] la [[metertype METER_HAPPINESS]] des planètes peuplées d'espèces appréciant cette ressource.
-• Augmente la [[metertype METER_TARGET_INFLUENCE]] des planètes habitées ayant une [[metertype METER_HAPPINESS]] au moins égale à [[value CAPITAL_MARKETS_INFLUENCE_MIN_STABILITY]], de [[value CAPITAL_MARKETS_INFLUENCE_BONUS_SCALING]] par la valeur la plus faible entre l'[[metertype METER_CONSTRUCTION]] et la [[metertype METER_POPULATION]].
+'''• Les planètes disposant d'une Particularité de ressources de luxe et réglées sur le Focus Influence, exporteront cette ressource vers les planètes reliées par lignes d'[[metertype METER_SUPPLY]]. Cela améliore de [[value SPECIAL_CAPITAL_MARKETS_STABILITY_FOCUS_BONUS]] la [[metertype METER_HAPPINESS]] des planètes peuplées d'espèces aimant cette ressource.
+• Augmente la [[metertype METER_TARGET_INFLUENCE]] des planètes en Focus Influence ayant une [[metertype METER_HAPPINESS]] au moins égale à [[value CAPITAL_MARKETS_INFLUENCE_MIN_STABILITY]], de [[value CAPITAL_MARKETS_INFLUENCE_BONUS_SCALING]] par la valeur la plus faible entre l'[[metertype METER_CONSTRUCTION]] et la [[metertype METER_POPULATION]].
 • Augmente le taux de progression ou de régression de l'[[metertype METER_INFLUENCE]] et de la [[metertype METER_HAPPINESS]] de [[value PLC_CAPITAL_MARKETS_INFLUENCE_RATE]] / tour pour atteindre la valeur de la [[metertype METER_TARGET_INFLUENCE]] ou de la [[metertype METER_TARGET_HAPPINESS]].
 • Réduit la [[metertype METER_TARGET_HAPPINESS]] sur les planètes habitées appartenant à l'empire de [[value CAPITAL_MARKETS_DEBT_INSTABILITY]] fois la valeur de la dette d'Influence de l'empire.'''
 
@@ -12277,7 +12342,7 @@ PLC_BLACK_MARKET
 Marchés Noirs
 
 PLC_BLACK_MARKET_DESC
-La [[metertype METER_TARGET_INFLUENCE]] des planètes avec une [[metertype METER_HAPPINESS]] de [[value PLC_BLACK_MARKET_MAX_STABILITY]] ou moins, et étant réglées sur le Focus Influence, augmentera de [[value SPECIAL_BLACK_MARKET_INFLUENCE_FOCUS_BONUS]] pour chaque planète reliées par ligne d'[[metertype METER_SUPPLY]] et disposant d'une Particularité de ressources de luxe, qu'apprécie la population de la planète en Focus Influence.
+La [[metertype METER_TARGET_INFLUENCE]] des planètes avec une [[metertype METER_HAPPINESS]] de [[value PLC_BLACK_MARKET_MAX_STABILITY]] ou moins, et étant réglées sur le Focus Influence, augmentera de [[value SPECIAL_BLACK_MARKET_INFLUENCE_FOCUS_BONUS]] pour chaque planète reliées par ligne d'[[metertype METER_SUPPLY]] et disposant d'une Particularité de ressources de luxe appréciée par la population de la planète en Focus Influence.
 
 PLC_BLACK_MARKET_SHORT_DESC
 Améliore l'Influence selon les ressources
@@ -12286,7 +12351,9 @@ PLC_ARTISAN_WORKSHOPS
 Ateliers Artisanaux
 
 PLC_ARTISAN_WORKSHOPS_DESC
-Les planètes peuplés d'espèces de type [[encyclopedia ARTISTIC]] et réglées sur le Focus Influence généreront de l'Influence et exporteront de l'artisanat de luxe vers les planètes du même système, améliorant la [[metertype METER_HAPPINESS]] de ces planètes.
+'''Les planètes peuplées d'espèces de type [[encyclopedia ARTISTIC]] généreront de l'Influence en exportant de l'artisanat de luxe. 
+• Augmente de [[value ARTISANS_INFLUENCE_FLAT_FOCUS]] la [[metertype METER_TARGET_INFLUENCE]] sur les planètes en Focus Influence et ayant une [[metertype METER_HAPPINESS]] minimum de [[value ARTISANS_MIN_STABILITY_FOCUS]].
+• Augmente de [[value ARTISANS_INFLUENCE_FLAT_NO_FOCUS]] la [[metertype METER_TARGET_INFLUENCE]] sur les planètes non réglées en Focus Influence et n'ayant pas une Stabilité minimum de [[value ARTISANS_MIN_STABILITY_NO_FOCUS]].'''
 
 PLC_ARTISAN_WORKSHOPS_SHORT_DESC
 Production d'objets de luxe par les espèces de type [[encyclopedia ARTISTIC]]
@@ -12304,7 +12371,7 @@ PLC_BOOTSTRAPPING_SHORT_DESC
 Améliore les colonies de petite taille
 
 PLC_PROPAGANDA
-Informations Propagandistes
+Diffusions Propagandistes
 
 PLC_PROPAGANDA_DESC
 '''Augmente de [[value PROPAGANDA_INFLUENCE_FLAT]] l'Influence de la Capitale de l'empire adoptant cette politique.
@@ -12344,8 +12411,10 @@ PLC_BUREAUCRACY
 Bureaucratie
 
 PLC_BUREAUCRACY_DESC
-'''• Augmente la [[metertype METER_TARGET_HAPPINESS]] d'une planète habitée et appartenant à l'empire de [[value PLC_BUREAUCRACY_STABILITY_FLAT]], tant que l'empire dispose de suffisamment de structures d'[[buildingtype BLD_REGIONAL_ADMIN]]. Une structure supplémentaire d'[[buildingtype BLD_REGIONAL_ADMIN]] est requise tous les [[value BUREACRACY_ADMINS_NEEDED_TURN_SCALING]] tours à partir de l'adoption de cette Politique.
-• Modifier le Focus planétaire réduit l'[[metertype METER_INFLUENCE]] de cette planète de [[value BUREAUCRACY_FOCUS_CHANGE_PENALTY]].'''
+'''• Augmente de [[value PLC_BUREAUCRACY_STABILITY_FLAT]] la [[metertype METER_TARGET_HAPPINESS]] d'une planète habitée et appartenant à l'empire.
+• Modifier le Focus planétaire réduit l'[[metertype METER_INFLUENCE]] de cette planète de [[value BUREAUCRACY_FOCUS_CHANGE_PENALTY]].
+• Coûte de l'Influence selon la population globale. Les coûts sont réduits en possédant davantage de structures administratives ([[buildingtype BLD_IMPERIAL_PALACE]], [[buildingtype BLD_REGIONAL_ADMIN]]) et en adoptant la Politique [[PLC_CENTRALIZATION]].
+'''
 
 PLC_BUREAUCRACY_SHORT_DESC
 Améliore la Stabilité
@@ -12994,7 +13063,7 @@ CON_CONTGRAV_ARCH
 Architecture Gravitationnelle
 
 CON_CONTGRAV_ARCH_DESC
-'''Augmente de 1 la portée de l'[[metertype METER_SUPPLY]] des colonies en Focus Logistique.
+'''Augmente de 1 la portée de l'[[metertype METER_SUPPLY]] des colonies en [[encyclopedia LOGISTICS_FOCUS_TITLE]].
 
 L'installation d'un générateur de gravité nulle au cœur d'une planète rend possible le contrôle binaire "marche/arrêt" de la gravité planétaire, mais seulement sur une zone limitée. L'industrie planétaire profite alors des nombreux bénéfices de la faible gravité et de la gravité zéro (low-G et zero-G), mais sans ses inconvénients. Une gravité inversée peut être également générée, rendant les coûts des lancements spatiaux quasiment inexistants.
 
@@ -13044,7 +13113,7 @@ SHP_INTSTEL_LOG
 Logistique Interstellaire
 
 SHP_INTSTEL_LOG_DESC
-'''Débloque le Focus Logistique, augmentant l'[[metertype METER_SUPPLY]] de 3 sur toutes les planètes.
+'''Débloque le [[encyclopedia LOGISTICS_FOCUS_TITLE]], augmentant l'[[metertype METER_SUPPLY]] de 3 sur toutes les planètes.
 
 [[COLONY_BUILDING_TIME_DECREASE]]
 
@@ -13227,13 +13296,13 @@ Tromperie
 SPY_ROOT_DECEPTION_DESC
 L'art de la tromperie n’est pas naturel à toutes les espèces, mais la possibilité de dissimuler la vérité peut s'avérer bien utile.
 
-SPY_DECPTION_EMPTY_SPACE_PENALTY
+SPY_DECEPTION_EMPTY_SPACE_PENALTY
 Visibilité dans l'espace interstellaire
 
-SPY_DECPTION_DIM_STAR_PENALTY
+SPY_DECEPTION_DIM_STAR_PENALTY
 Visibilité à proximité d'une étoile faible
 
-SPY_DECPTION_SUBSTELLAR_INTERFERENCE
+SPY_DECEPTION_SUBSTELLAR_INTERFERENCE
 Milieu à fort rayonnement cosmique
 
 
@@ -13262,11 +13331,32 @@ Débloque une coque d'astronef
 BUILDING_UNLOCK_SHORT_DESC
 Débloque une structure
 
+POLICY_UNLOCK_SHORT_DESC
+Débloque une politique
+
+POLICY_SLOT_UNLOCK_SHORT_DESC
+Débloque un choix politique
+
+POLICY_AND_SLOT_UNLOCK_SHORT_DESC
+Débloque une politique et un choix politique
+
+POLICY_AND_BUILDING_UNLOCK_SHORT_DESC
+Débloque une politique et une structure
+
+VARIOUS_UNLOCK_SHORT_DESC
+Débloque divers éléments
+
 RESEARCH_SHORT_DESC
 Améliore la Recherche
 
 INDUSTRY_SHORT_DESC
 Améliore l'Industrie
+
+RESEARCH_AND_SLOT_SHORT_DESC
+Améliore la Recherche, Débloque un choix politique
+
+INDUSTRY_AND_SLOT_SHORT_DESC
+Améliore l'Industrie, Débloque un choix politique
 
 SUPPLY_SHORT_DESC
 Améliore l'Approvisionnement
@@ -13317,7 +13407,7 @@ EXOBOT_SHORT_DESC
 Crée des citoyens exobots
 
 STARLANE_SPEED_SHORT_DESC
-Augmente la Vitesse sur Voie spatiale
+Débloque le [[encyclopedia LOGISTICS_FOCUS_TITLE]]
 
 CON_ORBITAL_CON
 Construction Orbitale
@@ -13389,7 +13479,9 @@ GRO_TERRAFORM
 Terraformation
 
 GRO_TERRAFORM_DESC
-Modifier le type d'environnement d'une planète est une entreprise titanesque, le challenge de ce processus résidant principalement dans l'immense logistique nécessaire. La méthode en question dépend quant à elle de l'environnement d'origine de la planète et du résultat désiré. Cependant, dans tous les cas, la quasi-totalité de la surface planétaire et de l'atmosphère nécessite d'être convertie en d'autres types de molécules, diffusées dans l'espace à modifier ou injectées sous la croûte terrestre. Par conséquent, le processus requiert que la majeure partie de la planète soit accessible aux terraformeurs, et ne peut être enclencher si la [[metertype METER_TARGET_POPULATION]] est inférieure à un.
+'''Modifier le type d'environnement d'une planète est une entreprise titanesque, le challenge de ce processus résidant principalement dans l'immense logistique nécessaire. La méthode en question dépend quant à elle de l'environnement d'origine de la planète et du résultat désiré. Cependant, dans tous les cas, la quasi-totalité de la surface planétaire et de l'atmosphère nécessite d'être convertie en d'autres types de molécules, diffusées dans l'espace à modifier ou injectées sous la croûte terrestre. Par conséquent, le processus requiert que la majeure partie de la planète soit accessible aux terraformeurs, et ne peut être enclencher si la [[metertype METER_TARGET_POPULATION]] est inférieure à un.
+
+[[ALL_BLD_TERRAFORM_DESC]]'''
 
 GRO_TERRAFORM_SHORT_DESC
 Permet la terraformation
@@ -13398,7 +13490,12 @@ GRO_REMOTE_TERRAFORM
 Terraformation à Distance
 
 GRO_REMOTE_TERRAFORM_DESC
-Les méthodes traditionnelles de terraformation considèrent la planète comme une structure et modifient son environnement à l'aide de processus physiques et chimiques. Cela nécessite que la majorité de la planète soit accessible à l'espèce opérant la terraformation, ce qui généralement limite l'efficacité de l'entreprise. En envisageant la planète comme un organisme et en modifiant en quelque sorte sa physiologie, il est alors possible d'avoir recours à moins de main-d'œuvre, bien que la terraformation prenne alors plus de temps, mais permettant ainsi aux avant-postes se trouvant sur des planètes à environnement pauvre ou hostile, d'enclencher un processus de terraformation.
+'''Les méthodes traditionnelles de terraformation considèrent la planète comme une structure et modifient son environnement à l'aide de processus physiques et chimiques. Cela nécessite que la majorité de la planète soit accessible à l'espèce opérant la terraformation, ce qui généralement limite l'efficacité de l'entreprise. En envisageant la planète comme un organisme et en modifiant en quelque sorte sa physiologie, il est alors possible d'avoir recours à moins de main-d'œuvre, bien que la terraformation prenne alors plus de temps, mais permettant ainsi aux avant-postes se trouvant sur des planètes à environnement pauvre ou hostile, d'enclencher un processus de terraformation.
+
+[[ALL_BLD_TERRAFORM_DESC]]'''
+
+ALL_BLD_TERRAFORM_DESC
+Il existe deux types de projets de terraformation. La structure [[buildingtype BLD_TERRAFORM_BEST]] est construite par la population d'une planète afin de convertir directement cette dernière au meilleur type d'[[encyclopedia ENVIRONMENT_TITLE]] possible. Une série de projets dont chacun vise à établir un [[encyclopedia ENVIRONMENT_TITLE]] optimal spécifique pour plusieurs espèces à la fois, permet un meilleur contrôle, et peut être également construit sur un [[encyclopedia OUTPOSTS_TITLE]]. Globalement, une conversion directe est moins coûteuse et plus rapide que d'entreprendre une série de paliers de terraformation.
 
 GRO_BIOTERROR
 Complexe Bioterroriste
@@ -13495,7 +13592,7 @@ LRN_PSY_DOM_DESC
 
 Réduit la probabilité de prise de contrôle d'un astronef par un [[predefinedshipdesign SM_PSIONIC_SNOWFLAKE]].
 
-Il est difficile de soumettre un individu conscient à un contrôle mental total par une entité étrangère, et ce contre son gré. En manipulant cependant les durées de soumission, la force mentale accumulée par une population sur plusieurs heures peut être canalisée sur un unique individu durant quelques secondes, engendrant ainsi une compulsion quasi-irrésistible de se joindre à l'esprit unifié.'''
+Il est difficile de soumettre un individu conscient à un contrôle mental total par une entité étrangère, et ce, contre son gré. En manipulant cependant les durées de soumission, la force mentale accumulée par une population sur plusieurs heures peut être canalisée sur un unique individu durant quelques secondes, engendrant ainsi une compulsion quasi-irrésistible de se joindre à l'esprit unifié. Cette capacité semble toutefois n'avoir aucun effet sur la Méga-Faune, l'encéphale des monstres spatiaux étant apparemment trop différent.'''
 
 MIND_CONTROL_SHORT_DESC
 Permet le Contrôle de l'Esprit
@@ -13707,19 +13804,19 @@ L'attribut "Pilotes" n'affecte pas les chasseurs provenant d'un [[shippart FT_HA
 Au terme d'un combat, les astronefs transporteurs récupèreront automatiquement les chasseurs non-détruits. Si un transporteur est stationnaire dans une zone d'[[metertype METER_SUPPLY]], ses hangars seront rééquipés à leur capacité maximale.'''
 
 SHP_FIGHTERS_2
-Chasseurs Laser
+Chasseurs et Rampes de Lancement 2
 
 SHP_FIGHTERS_2_DESC
 Améliore les chasseurs de tous les transporteurs à portée d'[[metertype METER_SUPPLY]] en les dotant d'un armement Laser. Les [[encyclopedia DAMAGE_TITLE]] infligés par les chasseurs d'un [[shippart FT_HANGAR_2]] augmentent de 12, augmentent de 18 pour un [[shippart FT_HANGAR_3]] et de 36 pour un [[shippart FT_HANGAR_4]]. Pour les chasseurs d'un [[shippart FT_HANGAR_1]], la capacité ainsi que la cadence de lancement de la [[shippart FT_BAY_1]] augmentent de 1.
 
 SHP_FIGHTERS_3
-Chasseurs Plasma
+Chasseurs et Rampes de Lancement 3
 
 SHP_FIGHTERS_3_DESC
 Améliore les chasseurs de tous les transporteurs à portée d'[[metertype METER_SUPPLY]] en les dotant d'un armement Plasma. Les [[encyclopedia DAMAGE_TITLE]] infligés par les chasseurs d'un [[shippart FT_HANGAR_2]] augmentent de 12, augmentent de 18 pour un [[shippart FT_HANGAR_3]] et de 36 pour un [[shippart FT_HANGAR_4]]. Pour les chasseurs d'un [[shippart FT_HANGAR_1]], la capacité ainsi que la cadence de lancement de la [[shippart FT_BAY_1]] augmentent de 1.
 
 SHP_FIGHTERS_4
-Chasseurs Gamma
+Chasseurs et Rampes de Lancement 4
 
 SHP_FIGHTERS_4_DESC
 Améliore les chasseurs de tous les transporteurs à portée d'[[metertype METER_SUPPLY]] en les dotant d'un armement Gamma. Les [[encyclopedia DAMAGE_TITLE]] infligés par les chasseurs d'un [[shippart FT_HANGAR_2]] augmentent de 12, augmentent de 18 pour un [[shippart FT_HANGAR_3]] et de 36 pour un [[shippart FT_HANGAR_4]]. Pour les chasseurs d'un [[shippart FT_HANGAR_1]], la capacité ainsi que la cadence de lancement de la [[shippart FT_BAY_1]] augmentent de 1.
@@ -14010,7 +14107,7 @@ SPY_CUSTOM_ADVISORIES_DESC
 '''La Direction du Renseignement Impérial rassemble et traite les informations émanant de plusieurs sources, tels que les espions, les informateurs, ainsi que les organismes officiels de commandement. Les sujets les plus importants sont présentés à chaque tour comme Rapports de Situation (SitReps). Si un SitRep est réaffiché tour après tour plus qu'il n'est nécessaire pour mémoriser l'information, il est possible d'ignorer le SitRep pour le tour en cours par un double-clic sur son icône, ou bien pour plusieurs tours par un clic-droit sur l'icône du SitRep.
 
 La plupart des Sitreps sont prédéfinis ou déterminés automatiquement, mais des Sitreps Personnalisés peuvent être spécifiés et/ou traduits en éditant le fichier default/customizations/custom_sitreps.txt.
-(Note: lors d'une partie multijoueurs, les fichiers du Serveur sont utilisés afin de déterminer quels SitReps sont envoyés aux empires.)
+(Note: lors d'une partie multijoueur, les fichiers du Serveur sont utilisés afin de déterminer quels SitReps sont envoyés aux empires.)
 Des informations supplémentaires concernant les scripts dans FreeOrion sont disponibles sur le Wiki:  http://www.freeorion.org/index.php/Free_Orion_Content_Script_(FOCS)
 Il existe quatre labels prédéfinis pouvant être utilisés avec des Sitreps Personnalisés, afin que ces derniers apparaissent en tête de la Fenêtre Rapport de Situation. Des informations supplémentaires sur comment définir ces messages sont disponibles sur le Wiki, ainsi que dans le fichier custom_sitreps.txt.
 Ces quatres labels sont:
@@ -14264,13 +14361,13 @@ SPY_PLANET_STEALTH_MOD_DESC
 
 • En raison de la [[FLEET_UNSTEALTHINESS]], lorsque plus de [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] astronefs d'un même empire se trouvent dans un système, leur [[metertype METER_STEALTH]] est réduite de [[value FLEET_UNSTEALTH_SHIPS_SCALING]] multiplié par la racine carrée de [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] moins le nombre d'astronefs appartenant à l'empire dans le système.
 
-• Les astronefs se trouvant dans un système n'abritant [[STAR_NONE]] subissent une pénalité de [[value SPY_DECPTION_EMPTY_SPACE_PENALTY]] en [[metertype METER_STEALTH]] en raison de leur [[SPY_DECPTION_EMPTY_SPACE_PENALTY]].
+• Les astronefs se trouvant dans un système n'abritant [[STAR_NONE]] subissent une pénalité de [[value SPY_DECEPTION_EMPTY_SPACE_PENALTY]] en [[metertype METER_STEALTH]] en raison de leur [[SPY_DECEPTION_EMPTY_SPACE_PENALTY]].
 
-• Les astronefs se trouvant dans un système abritant une Étoile [[STAR_RED]] subissent une pénalité de [[value SPY_DECPTION_DIM_STAR_PENALTY]] en [[metertype METER_STEALTH]] en raison de leur [[SPY_DECPTION_DIM_STAR_PENALTY]].
+• Les astronefs se trouvant dans un système abritant une Étoile [[STAR_RED]] subissent une pénalité de [[value SPY_DECEPTION_DIM_STAR_PENALTY]] en [[metertype METER_STEALTH]] en raison de leur [[SPY_DECEPTION_DIM_STAR_PENALTY]].
 
-• Les astronefs se trouvant dans un système abritant une Étoile [[STAR_NEUTRON]] reçoivent un bonus de [[value SPY_DECPTION_NEUTRON_INTERFERENCE]] en [[metertype METER_STEALTH]] en raison du [[SPY_DECPTION_SUBSTELLAR_INTERFERENCE]].
+• Les astronefs se trouvant dans un système abritant une Étoile [[STAR_NEUTRON]] reçoivent un bonus de [[value SPY_DECEPTION_NEUTRON_INTERFERENCE]] en [[metertype METER_STEALTH]] en raison du [[SPY_DECEPTION_SUBSTELLAR_INTERFERENCE]].
 
-• Les astronefs se trouvant dans un système abritant un [[STAR_BLACK]] reçoivent un bonus de [[value SPY_DECPTION_BLACK_INTERFERENCE]] en [[metertype METER_STEALTH]] en raison du [[SPY_DECPTION_SUBSTELLAR_INTERFERENCE]].'''
+• Les astronefs se trouvant dans un système abritant un [[STAR_BLACK]] reçoivent un bonus de [[value SPY_DECEPTION_BLACK_INTERFERENCE]] en [[metertype METER_STEALTH]] en raison du [[SPY_DECEPTION_SUBSTELLAR_INTERFERENCE]].'''
 
 BASIC_PLANET_STEALTH
 Furtivité Universelle Initiale
@@ -14678,6 +14775,12 @@ BLD_CLONING_CENTER_DESC
 
 Le [[tech GRO_INDUSTRY_CLONE]] permet de produire industriellement des populations sur-mesure, améliorant considérablement leur croissance.'''
 
+BLD_TERRAFORM_BEST
+Terraformation Idéale
+
+BLD_TERRAFORM_BEST_DESC
+Terraforme un monde au type d'[[encyclopedia ENVIRONMENT_TITLE]] favori de l'espèce résidente.
+
 BLD_TERRAFORM_TERRAN
 Terraformation [[PT_TERRAN]]
 
@@ -14736,7 +14839,7 @@ BLD_REMOTE_TERRAFORM
 Terraformation à Distance
 
 BLD_REMOTE_TERRAFORM_DESC
-Terraforme une planète en un type d'[[encyclopedia ENVIRONMENT_TITLE]] un palier plus proche de l'Environnement favori de l'espèce. Ce processus peut être enclenché depuis un [[encyclopedia OUTPOSTS_TITLE]].
+Terraforme une planète en un type d'[[encyclopedia ENVIRONMENT_TITLE]] un palier plus proche de l'Environnement favori de l'espèce résidente. Ce processus peut être enclenché depuis un [[encyclopedia OUTPOSTS_TITLE]].
 
 BLD_NEST_ERADICATOR
 Éradicateur de Nid
@@ -15921,7 +16024,7 @@ Son [[metertype METER_DETECTION]] est standard et sa [[metertype METER_SPEED]] e
 FLUX_STEALTH_DESC
 '''La [[metertype METER_STEALTH]] de base des astronefs équipés de cette coque est de [[value SPATIAL_FLUX_STEALTH_HULL_BASE]] lorsque la flotte est réglée sur '[[FW_AGGRESSIVE]]', et de [[value SPATIAL_FLUX_STEALTH_NON_AGGRESSIVE]] pour tout autre réglage de comportement d'attaque des flottes.
 
-La recherche de chaque technologie parmi [[tech SPY_STEALTH_PART_1]], [[tech SPY_STEALTH_PART_2]], [[tech SPY_STEALTH_PART_3]], et [[tech SPY_STEALTH_4]] augmentera la Furtivité de base de [[value SPATIAL_FLUX_STEALTH_TECH_BONUS]].
+La recherche de chaque technologie parmi [[tech SPY_STEALTH_PART_1]], [[tech SPY_STEALTH_PART_2]], [[tech SPY_STEALTH_PART_3]], et [[tech SPY_STEALTH_4]] augmentera la Furtivité de base de [[value SPATIAL_FLUX_STEALTH_TECH_BONUS]], si l'astronef se trouve dans une Flotte non réglée sur '[[FW_AGGRESSIVE]]'.
 
 Si un astronef s'arrête dans un système, sa Furtivité est réduite de [[value SPATIAL_FLUX_STEALTH_ARRIVAL_MALUS]] pour 2 tours, en raison de la rupture d'équilibre du flux.'''
 
@@ -16069,7 +16172,7 @@ SH_ORGANIC
 Coque Organique
 
 SH_ORGANIC_DESC
-'''Une coque vivante disposant de trois niches externes et d'une niche interne.
+'''Une coque vivante disposant d'une niche externe et d'une niche interne.
 Croissance Organique: débute avec une [[metertype METER_STRUCTURE]] égale à 5, mais bénéficie d'un bonus additionnel de 5 après 25 tours.
 
 Sa [[metertype METER_STEALTH]] est standard, son [[metertype METER_DETECTION]] est faible et sa [[metertype METER_SPEED]] élevée.
@@ -16844,16 +16947,16 @@ ULTIMATE_OFFENSE_TROOPS_DESC
 +++	Parfait en [[metertype METER_TROOPS]] offensive : 300%
 
 BAD_DETECTION_DESC
-−	Faible [[metertype METER_DETECTION]] : −20 malus
+−	Faible en [[metertype METER_DETECTION]] : −20 malus
 
 GOOD_DETECTION_DESC
-+	Bon [[metertype METER_DETECTION]] : +25 bonus
++	Bon en [[metertype METER_DETECTION]] : +25 bonus
 
 GREAT_DETECTION_DESC
-++	Excellent [[metertype METER_DETECTION]] : +50 bonus
+++	Excellent en [[metertype METER_DETECTION]] : +50 bonus
 
 ULTIMATE_DETECTION_DESC
-+++	Parfait [[metertype METER_DETECTION]] : +100 bonus
++++	Parfait en [[metertype METER_DETECTION]] : +100 bonus
 
 BAD_STEALTH_DESC
 −	Mauvais en [[metertype METER_STEALTH]] Planétaire : −20 malus
@@ -16941,17 +17044,26 @@ GREAT_STOCKPILE_DESC
 ULTIMATE_STOCKPILE_DESC
 +++	Parfait en [[metertype METER_STOCKPILE]] : +0.3 par [[metertype METER_POPULATION]]
 
+BAD_SHIP_SHIELD_DESC
+-	Mauvais en [[metertype METER_SHIELD]] d'astronefs : boucliers d'astronefs moins solides
+
 GOOD_SHIP_SHIELD_DESC
-+	Bons [[metertype METER_SHIELD]] d'astronefs : +1
++	Bon en [[metertype METER_SHIELD]] d'astronefs : boucliers d'astronefs plus solides
+
+GREAT_SHIP_SHIELD_DESC
+++	Excellent en [[metertype METER_SHIELD]] d'astronefs : boucliers d'astronefs plus solides
+
+ULTIMATE_SHIP_SHIELD_DESC
++++	Parfait en [[metertype METER_SHIELD]] d'astronefs : boucliers d'astronefs les plus solides
 
 GOOD_PLANETARY_SHIELD_DESC
-+	Bons [[metertype METER_SHIELD]] planétaires : +5
++	Bon en [[metertype METER_SHIELD]] planétaires : +5
 
 ANCIENT_PLANETARY_SHIELD_DESC
 +++	[[metertype METER_SHIELD]] planétaires ancestraux : +500
 
 GOOD_PLANETARY_DEFENSE_DESC
-+	Bonne [[metertype METER_DEFENSE]] planétaire : +5
++	Bon en [[metertype METER_DEFENSE]] planétaire : +5
 
 BROAD_EP_DESC
 +	Grande adaptabilité : peut s'acclimater à plus de types planétaires
@@ -17030,7 +17142,7 @@ CAPITAL_DISCONNECTION_LABEL
 Non connecté à la Capitale d'Empire
 
 ARTISAN_APPRECIATION
-Aime les espèces artistiques en Focus Influence dans le système
+Aime les autres espèces artistiques dans le système
 
 # %1% name of empire
 # %2% name of policy
@@ -17040,7 +17152,7 @@ Aime la Politique %2% de %1%
 # %1% name of empire
 # %2% name of policy
 DISLIKES_POLICY_LABEL
-N'aime pas la Politique %2% de %1%
+Déteste la Politique %2% de %1%
 
 # %1% name of planet
 # %2% name of building
@@ -17050,7 +17162,7 @@ Aime la structure %2% sur %1%
 # %1% name of planet
 # %2% name of building
 DISLIKES_BUILDING_LABEL
-N'aime pas la structure %2% sur %1%
+Déteste la structure %2% sur %1%
 
 # %1% name of planet
 # %2% name of species on planet (not the focus!)
@@ -17060,7 +17172,7 @@ Aime le Focus sur %1%
 # %1% name of planet
 # %2% name of species on planet (not the focus!)
 DISLIKES_FOCUS_LABEL
-N'aime pas le Focus sur %1%
+Déteste le Focus sur %1%
 
 # %1% name of planet
 # %2% name of special
@@ -17070,7 +17182,7 @@ Aime %2% sur %1%
 # %1% name of planet
 # %2% name of special
 DISLIKES_SPECIAL_LABEL
-N'aime pas %2% sur %1% 
+Déteste %2% sur %1% 
 
 # %1% name of planet
 # %2% name of species on planet
@@ -17547,7 +17659,7 @@ LIKES
 '''Aime : '''
 
 DISLIKES
-'''N'aime pas : '''
+'''Déteste : '''
 
 ROBOTIC_INTERFACE_EFFECT
 Réseau d'équipage robotique

@@ -1,8 +1,10 @@
 #include "PythonParser.h"
 
+#include "../universe/Species.h"
 #include "../universe/UnlockableItem.h"
 #include "../universe/ValueRef.h"
 #include "../universe/ValueRefs.h"
+#include "../universe/Conditions.h"
 #include "../util/Directories.h"
 #include "../util/Logger.h"
 #include "../util/PythonCommon.h"
@@ -17,6 +19,7 @@
 #include <boost/core/noncopyable.hpp>
 #include <boost/core/ref.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/mpl/vector.hpp>
 #include <boost/python/class.hpp>
 #include <boost/python/import.hpp>
 #include <boost/python/object.hpp>
@@ -46,6 +49,7 @@ struct module_spec {
     {}
 
     py::list path;
+    py::list uninitialized_submodules;
     std::string fullname;
     std::string parent;
     const PythonParser& parser;
@@ -75,6 +79,7 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
 
         py::class_<module_spec>("PythonParserSpec", py::no_init)
             .def_readonly("name", &module_spec::fullname)
+            .def_readonly("_uninitialized_submodules", &module_spec::uninitialized_submodules)
             .add_static_property("loader", py::make_getter(*this, py::return_value_policy<py::reference_existing_object>()))
             .def_readonly("submodule_search_locations", &module_spec::path)
             .def_readonly("has_location", false)
@@ -83,23 +88,41 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
 
         // Use wrappers to not collide with types in server and AI
         py::class_<value_ref_wrapper<int>>("ValueRefInt", py::no_init)
+            .def(int() * py::self_ns::self)
+            .def(double() * py::self_ns::self)
             .def(py::self_ns::self - int())
+            .def(py::self_ns::self + py::self_ns::self)
+            .def(py::self_ns::self + int())
             .def(py::self_ns::self < py::self_ns::self)
+            .def(py::self_ns::self >= py::self_ns::self)
             .def(py::self_ns::self == py::self_ns::self)
             .def(py::self_ns::self == int());
         py::class_<value_ref_wrapper<double>>("ValueRefDouble", py::no_init)
             .def("__call__", &value_ref_wrapper<double>::call)
             .def(int() * py::self_ns::self)
+            .def(py::other<value_ref_wrapper<int>>() * py::self_ns::self)
+            .def(py::self_ns::self * py::other<value_ref_wrapper<int>>())
             .def(py::self_ns::self * double())
             .def(py::self_ns::self * py::self_ns::self)
             .def(double() * py::self_ns::self)
+            .def(py::self_ns::self / py::self_ns::self)
+            .def(py::self_ns::self / int())
             .def(py::self_ns::self + int())
             .def(py::self_ns::self + double())
             .def(py::self_ns::self + py::self_ns::self)
+            .def(py::self_ns::self + py::other<value_ref_wrapper<int>>())
+            .def(py::self_ns::self - double())
             .def(py::self_ns::self - py::self_ns::self)
+            .def(int() + py::self_ns::self)
             .def(int() - py::self_ns::self)
+            .def(py::self_ns::self - int())
+            .def(double() <= py::self_ns::self)
+            .def(py::self_ns::self <= double())
             .def(py::self_ns::self <= py::self_ns::self)
-            .def(py::self_ns::self > py::self_ns::self);
+            .def(py::self_ns::self >= int())
+            .def(py::self_ns::self > py::self_ns::self)
+            .def(py::self_ns::self < py::self_ns::self)
+            .def(py::self_ns::pow(py::self_ns::self, double()));
         py::class_<value_ref_wrapper<std::string>>("ValueRefString", py::no_init);
         py::class_<condition_wrapper>("Condition", py::no_init)
             .def(py::self_ns::self & py::self_ns::self)
@@ -107,43 +130,130 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(~py::self_ns::self);
         py::class_<effect_wrapper>("Effect", py::no_init);
         py::class_<effect_group_wrapper>("EffectsGroup", py::no_init);
-        py::class_<enum_wrapper<UnlockableItemType>>("UnlockableItemType", py::no_init);
-        py::class_<enum_wrapper<EmpireAffiliationType>>("EmpireAffiliationType", py::no_init);
-        py::class_<enum_wrapper<ResourceType>>("ResourceType", py::no_init);
+        py::class_<enum_wrapper<UnlockableItemType>>("__UnlockableItemType", py::no_init);
+        py::class_<enum_wrapper<EmpireAffiliationType>>("__EmpireAffiliationType", py::no_init);
+        py::class_<enum_wrapper<ResourceType>>("__ResourceType", py::no_init);
+        py::class_<enum_wrapper< ::PlanetEnvironment>>("__PlanetEnvironment", py::no_init);
+        py::class_<enum_wrapper<PlanetSize>>("__PlanetSize", py::no_init);
+        py::class_<enum_wrapper<PlanetType>>("__PlanetType", py::no_init);
+        py::class_<enum_wrapper< ::StarType>>("__StarType", py::no_init);
+        py::class_<enum_wrapper<ValueRef::StatisticType>>("__StatisticType", py::no_init);
+        py::class_<enum_wrapper<Condition::ContentType>>("__LocationContentType", py::no_init);
+        py::class_<enum_wrapper<BuildType>>("__BuildType", py::no_init);
         py::class_<unlockable_item_wrapper>("UnlockableItem", py::no_init);
-        py::class_<source_wrapper>("__Source", py::no_init)
-            .def_readonly("Owner", &source_wrapper::owner);
-        py::class_<target_wrapper>("__Target", py::no_init)
-            .def_readonly("Construction", &target_wrapper::construction)
-            .def_readonly("HabitableSize", &target_wrapper::habitable_size)
-            .def_readonly("MaxShield", &target_wrapper::max_shield)
-            .def_readonly("MaxDefense", &target_wrapper::max_defense)
-            .def_readonly("MaxTroops", &target_wrapper::max_troops)
-            .def_readonly("ID", &target_wrapper::id)
-            .def_readonly("Owner", &target_wrapper::owner)
-            .def_readonly("SystemID", &target_wrapper::system_id)
-            .def_readonly("DesignID", &target_wrapper::design_id)
-            .def_readonly("TargetHappiness", &target_wrapper::target_happiness)
-            .def_readonly("TargetIndustry", &target_wrapper::target_industry)
-            .def_readonly("TargetResearch", &target_wrapper::target_research)
-            .def_readonly("TargetConstruction", &target_wrapper::target_construction)
-            .def_readonly("MaxStockpile", &target_wrapper::max_stockpile)
+        auto py_variable_wrapper = py::class_<variable_wrapper>("__Variable", py::no_init)
             .def(py::self_ns::self & py::other<condition_wrapper>());
-        py::class_<local_candidate_wrapper>("__LocalCandidate", py::no_init)
-            .def_readonly("LastTurnAttackedByShip", &local_candidate_wrapper::last_turn_attacked_by_ship)
-            .def_readonly("LastTurnConquered", &local_candidate_wrapper::last_turn_conquered)
-            .def_readonly("LastTurnColonized", &local_candidate_wrapper::last_turn_colonized)
-            .def_readonly("Industry", &local_candidate_wrapper::industry)
-            .def_readonly("TargetIndustry", &local_candidate_wrapper::target_industry)
-            .def_readonly("Research", &local_candidate_wrapper::research)
-            .def_readonly("TargetResearch", &local_candidate_wrapper::target_research)
-            .def_readonly("Construction", &local_candidate_wrapper::construction)
-            .def_readonly("TargetConstruction", &local_candidate_wrapper::target_construction)
-            .def_readonly("Stockpile", &local_candidate_wrapper::stockpile)
-            .def_readonly("MaxStockpile", &local_candidate_wrapper::max_stockpile);
 
-        py::implicitly_convertible<source_wrapper, condition_wrapper>();
-        py::implicitly_convertible<target_wrapper, condition_wrapper>();
+        for (const char* property : {"Owner",
+                                     "SupplyingEmpire",
+                                     "ID",
+                                     "CreationTurn",
+                                     "Age",
+                                     "ProducedByEmpireID",
+                                     "ArrivedOnTurn",
+                                     "DesignID",
+                                     "FleetID",
+                                     "PlanetID",
+                                     "SystemID",
+                                     "ContainerID",
+                                     "FinalDestinationID",
+                                     "NextSystemID",
+                                     "NearestSystemID",
+                                     "PreviousSystemID",
+                                     "PreviousToFinalDestinationID",
+                                     "NumShips",
+                                     "NumStarlanes",
+                                     "LastTurnActiveInBattle",
+                                     "LastTurnAttackedByShip",
+                                     "LastTurnBattleHere",
+                                     "LastTurnColonized",
+                                     "LastTurnConquered",
+                                     "LastTurnMoveOrdered",
+                                     "LastTurnResupplied",
+                                     "Orbit",
+                                     "TurnsSinceColonization",
+                                     "TurnsSinceFocusChange",
+                                     "TurnsSinceLastConquered",
+                                     "ETA",
+                                     "LaunchedFrom"})
+        {
+            py_variable_wrapper.add_property(property, py::make_function(
+                [property] (const variable_wrapper& w) { return w.get_int_property(property); },
+                py::default_call_policies(),
+                boost::mpl::vector<value_ref_wrapper<int>, const variable_wrapper&>()));
+        }
+
+        for (const char* property : {"Industry",
+                                     "TargetIndustry",
+                                     "Research",
+                                     "TargetResearch",
+                                     "Influence",
+                                     "TargetInfluence",
+                                     "Construction",
+                                     "TargetConstruction",
+                                     "Population",
+                                     "TargetPopulation",
+                                     "TargetHappiness",
+                                     "Happiness",
+                                     "MaxFuel",
+                                     "Fuel",
+                                     "MaxShield",
+                                     "Shield",
+                                     "MaxDefense",
+                                     "Defense",
+                                     "MaxTroops",
+                                     "Troops",
+                                     "RebelTroops",
+                                     "MaxStructure",
+                                     "Structure",
+                                     "MaxSupply",
+                                     "Supply",
+                                     "MaxStockpile",
+                                     "Stockpile",
+                                     "Stealth",
+                                     "Detection",
+                                     "Speed",
+                                     "X",
+                                     "Y",
+                                     "SizeAsDouble",
+                                     "HabitableSize",
+                                     "Size",
+                                     "DistanceFromOriginalType",
+                                     "DestroyFightersPerBattleMax",
+                                     "DamageStructurePerBattleMax",
+                                     "PropagatedSupplyRange"})
+        {
+            py_variable_wrapper.add_property(property, py::make_function(
+                [property] (const variable_wrapper& w) { return w.get_double_property(property); },
+                py::default_call_policies(),
+                boost::mpl::vector<value_ref_wrapper<double>, const variable_wrapper&>()));
+        }
+
+        for (const char* property : {"Name",
+                                     "Species",
+                                     "BuildingType",
+                                     "FieldType",
+                                     "Focus",
+                                     "DefaultFocus",
+                                     "Hull"})
+        {
+            py_variable_wrapper.add_property(property, py::make_function(
+                [property] (const variable_wrapper& w) { return w.get_string_property(property); },
+                py::default_call_policies(),
+                boost::mpl::vector<value_ref_wrapper<std::string>, const variable_wrapper&>()));
+        }
+
+        for (const char* property : {"Planet",
+                                     "System",
+                                     "Fleet"})
+        {
+             py_variable_wrapper.add_property(property, py::make_function(
+                [property] (const variable_wrapper& w) { return w.get_variable_property(property); },
+                py::default_call_policies(),
+                boost::mpl::vector<variable_wrapper, const variable_wrapper&>()));
+        }
+
+        py::implicitly_convertible<variable_wrapper, condition_wrapper>();
 
         m_meta_path = py::extract<py::list>(py::import("sys").attr("meta_path"));
         m_meta_path.append(boost::cref(*this));

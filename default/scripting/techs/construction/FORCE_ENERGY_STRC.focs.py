@@ -16,68 +16,68 @@ Tech(
             accountinglabel="CON_TECH_ACCOUNTING_LABEL",
             priority=AFTER_ALL_TARGET_MAX_METERS_PRIORITY,
             effects=[
-                If(
+                Conditional(
                     condition=(Value(LocalCandidate.Industry) <= Value(LocalCandidate.TargetIndustry)),
                     effects=SetIndustry(
-                        value=Min(
+                        value=MinOf(
                             float,
                             Value + NamedReal(name="FORCE_ENERGY_RATE_INCREASE", value=3.0),
                             Value(Target.TargetIndustry),
                         )
                     ),
                     else_=SetIndustry(
-                        value=Max(
+                        value=MaxOf(
                             float,
                             Value - NamedRealLookup(name="FORCE_ENERGY_RATE_INCREASE"),
                             Value(Target.TargetIndustry),
                         )
                     ),
                 ),
-                If(
+                Conditional(
                     condition=(Value(LocalCandidate.Research) <= Value(LocalCandidate.TargetResearch)),
                     effects=SetResearch(
-                        value=Min(
+                        value=MinOf(
                             float,
                             Value + NamedRealLookup(name="FORCE_ENERGY_RATE_INCREASE"),
                             Value(Target.TargetResearch),
                         )
                     ),
                     else_=SetResearch(
-                        value=Max(
+                        value=MaxOf(
                             float,
                             Value - NamedRealLookup(name="FORCE_ENERGY_RATE_INCREASE"),
                             Value(Target.TargetResearch),
                         )
                     ),
                 ),
-                If(
+                Conditional(
                     condition=(Value(LocalCandidate.Construction) <= Value(LocalCandidate.TargetConstruction)),
                     effects=SetConstruction(
-                        value=Min(
+                        value=MinOf(
                             float,
                             Value + NamedRealLookup(name="FORCE_ENERGY_RATE_INCREASE"),
                             Value(Target.TargetConstruction),
                         )
                     ),
                     else_=SetConstruction(
-                        value=Max(
+                        value=MaxOf(
                             float,
                             Value - NamedRealLookup(name="FORCE_ENERGY_RATE_INCREASE"),
                             Value(Target.TargetConstruction),
                         )
                     ),
                 ),
-                If(
+                Conditional(
                     condition=(Value(LocalCandidate.Stockpile) <= Value(LocalCandidate.MaxStockpile)),
                     effects=SetStockpile(
-                        value=Min(
+                        value=MinOf(
                             float,
                             Value + NamedRealLookup(name="FORCE_ENERGY_RATE_INCREASE"),
                             Value(Target.MaxStockpile),
                         )
                     ),
                     else_=SetStockpile(
-                        value=Max(
+                        value=MaxOf(
                             float,
                             Value - NamedRealLookup(name="FORCE_ENERGY_RATE_INCREASE"),
                             Value(Target.MaxStockpile),

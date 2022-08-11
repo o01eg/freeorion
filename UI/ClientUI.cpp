@@ -44,7 +44,7 @@
 #include <GG/UnicodeCharsets.h>
 
 #include <boost/spirit/include/qi.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
+#include <boost/phoenix/operator.hpp>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -241,7 +241,7 @@ std::shared_ptr<GG::Texture> ClientUI::MeterIcon(MeterType meter_type) {
     return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "meter" / icon_filename, true);
 }
 
-std::shared_ptr<GG::Texture> ClientUI::BuildingIcon(const std::string& building_type_name) {
+std::shared_ptr<GG::Texture> ClientUI::BuildingIcon(std::string_view building_type_name) {
     const BuildingType* building_type = GetBuildingType(building_type_name);
     std::string graphic_name;
     if (building_type)
@@ -251,7 +251,7 @@ std::shared_ptr<GG::Texture> ClientUI::BuildingIcon(const std::string& building_
     return ClientUI::GetTexture(ArtDir() / graphic_name, true);
 }
 
-std::shared_ptr<GG::Texture> ClientUI::CategoryIcon(const std::string& category_name) {
+std::shared_ptr<GG::Texture> ClientUI::CategoryIcon(std::string_view category_name) {
     std::string icon_filename;
     if (const TechCategory* category = GetTechCategory(category_name))
         return ClientUI::GetTexture(ArtDir() / "icons" / "tech" / "categories" / category->graphic, true);
@@ -259,7 +259,7 @@ std::shared_ptr<GG::Texture> ClientUI::CategoryIcon(const std::string& category_
         return ClientUI::GetTexture(ClientUI::ArtDir() / "", true);
 }
 
-std::shared_ptr<GG::Texture> ClientUI::TechIcon(const std::string& tech_name) {
+std::shared_ptr<GG::Texture> ClientUI::TechIcon(std::string_view tech_name) {
     const Tech* tech = GetTechManager().GetTech(tech_name);
     std::string texture_name;
     if (tech) {
@@ -270,7 +270,7 @@ std::shared_ptr<GG::Texture> ClientUI::TechIcon(const std::string& tech_name) {
     return ClientUI::GetTexture(ArtDir() / texture_name, true);
 }
 
-std::shared_ptr<GG::Texture> ClientUI::PolicyIcon(const std::string& policy_name) {
+std::shared_ptr<GG::Texture> ClientUI::PolicyIcon(std::string_view policy_name) {
     const Policy* policy = GetPolicyManager().GetPolicy(policy_name);
     std::string texture_name;
     if (policy)
@@ -278,7 +278,7 @@ std::shared_ptr<GG::Texture> ClientUI::PolicyIcon(const std::string& policy_name
     return ClientUI::GetTexture(ArtDir() / texture_name, true);
 }
 
-std::shared_ptr<GG::Texture> ClientUI::SpecialIcon(const std::string& special_name) {
+std::shared_ptr<GG::Texture> ClientUI::SpecialIcon(std::string_view special_name) {
     const Special* special = GetSpecial(special_name);
     std::string texture_name;
     if (special)
@@ -288,7 +288,7 @@ std::shared_ptr<GG::Texture> ClientUI::SpecialIcon(const std::string& special_na
     return ClientUI::GetTexture(ArtDir() / texture_name, true);
 }
 
-std::shared_ptr<GG::Texture> ClientUI::SpeciesIcon(const std::string& species_name) {
+std::shared_ptr<GG::Texture> ClientUI::SpeciesIcon(std::string_view species_name) {
     const Species* species = GetSpecies(species_name);
     std::string texture_name;
     if (species)
@@ -298,7 +298,7 @@ std::shared_ptr<GG::Texture> ClientUI::SpeciesIcon(const std::string& species_na
     return ClientUI::GetTexture(ArtDir() / texture_name, true);
 }
 
-std::shared_ptr<GG::Texture> ClientUI::FieldTexture(const std::string& field_type_name) {
+std::shared_ptr<GG::Texture> ClientUI::FieldTexture(std::string_view field_type_name) {
     const FieldType* type = GetFieldType(field_type_name);
     std::string texture_name;
     if (type)
@@ -308,7 +308,7 @@ std::shared_ptr<GG::Texture> ClientUI::FieldTexture(const std::string& field_typ
     return ClientUI::GetTexture(ArtDir() / texture_name, true);
 }
 
-std::shared_ptr<GG::Texture> ClientUI::PartIcon(const std::string& part_name) {
+std::shared_ptr<GG::Texture> ClientUI::PartIcon(std::string_view part_name) {
     const ShipPart* part = GetShipPart(part_name);
     std::string texture_name;
     if (part)
@@ -318,7 +318,7 @@ std::shared_ptr<GG::Texture> ClientUI::PartIcon(const std::string& part_name) {
     return ClientUI::GetTexture(ArtDir() / texture_name, false);
 }
 
-std::shared_ptr<GG::Texture> ClientUI::HullTexture(const std::string& hull_name) {
+std::shared_ptr<GG::Texture> ClientUI::HullTexture(std::string_view hull_name) {
     const ShipHull* hull = GetShipHull(hull_name);
     std::string texture_name;
     if (hull) {
@@ -331,7 +331,7 @@ std::shared_ptr<GG::Texture> ClientUI::HullTexture(const std::string& hull_name)
     return ClientUI::GetTexture(ArtDir() / texture_name, true);
 }
 
-std::shared_ptr<GG::Texture> ClientUI::HullIcon(const std::string& hull_name) {
+std::shared_ptr<GG::Texture> ClientUI::HullIcon(std::string_view hull_name) {
     const ShipHull* hull = GetShipHull(hull_name);
     std::string texture_name;
     if (hull) {
@@ -365,7 +365,7 @@ GG::Clr ClientUI::UnresearchableTechTextAndBorderColor() { return GetOptionsDB()
 GG::Clr ClientUI::TechWndProgressBarBackgroundColor()    { return GetOptionsDB().Get<GG::Clr>("ui.research.status.progress.background.color"); }
 GG::Clr ClientUI::TechWndProgressBarColor()              { return GetOptionsDB().Get<GG::Clr>("ui.research.status.progress.color"); }
 
-GG::Clr ClientUI::CategoryColor(const std::string& category_name) {
+GG::Clr ClientUI::CategoryColor(std::string_view category_name) {
     if (auto category = GetTechCategory(category_name))
         return category->colour;
     return {};
@@ -787,13 +787,13 @@ std::string ClientUI::FormatTimestamp(boost::posix_time::ptime timestamp) {
 
 bool ClientUI::ZoomToObject(const std::string& name) {
     // try first by finding the object by name
-    for (auto& obj : GetUniverse().Objects().all<UniverseObject>())
+    for (auto obj : GetUniverse().Objects().allRaw<UniverseObject>())
         if (boost::iequals(obj->Name(), name))
             return ZoomToObject(obj->ID());
 
     // try again by converting string to an ID
     try {
-        return ZoomToObject(std::stoi(name));
+        return ZoomToObject(std::stoi(name)); // TODO: probably a better way to cast string to int
     } catch (...) {
     }
 
@@ -884,7 +884,7 @@ void ClientUI::ZoomToFleet(std::shared_ptr<const Fleet> fleet) {
         fleet_wnd->SelectFleet(fleet->ID());
 }
 
-bool ClientUI::ZoomToContent(const std::string& name, bool reverse_lookup/* = false*/) {
+bool ClientUI::ZoomToContent(const std::string& name, bool reverse_lookup) {
     if (reverse_lookup) {
         for (const auto& tech : GetTechManager()) {
             if (boost::iequals(name, UserString(tech->Name())))
@@ -1086,7 +1086,7 @@ void ClientUI::RestoreFromSaveData(const SaveGameUIData& ui_data) {
 ClientUI* ClientUI::GetClientUI()
 { return s_the_UI; }
 
-void ClientUI::MessageBox(const std::string& message, bool play_alert_sound/* = false*/) {
+void ClientUI::MessageBox(const std::string& message, bool play_alert_sound) {
     auto dlg = GG::GUI::GetGUI()->GetStyleFactory()->NewThreeButtonDlg(
         GG::X(320), GG::Y(200), message, GetFont(Pts()+2),
         WndColor(), WndOuterBorderColor(), CtrlColor(), TextColor(),
@@ -1096,7 +1096,7 @@ void ClientUI::MessageBox(const std::string& message, bool play_alert_sound/* = 
     dlg->Run();
 }
 
-std::shared_ptr<GG::Texture> ClientUI::GetTexture(const boost::filesystem::path& path, bool mipmap/* = false*/) {
+std::shared_ptr<GG::Texture> ClientUI::GetTexture(const boost::filesystem::path& path, bool mipmap) {
     std::shared_ptr<GG::Texture> retval;
     try {
         retval = GGHumanClientApp::GetApp()->GetTexture(path, mipmap);
@@ -1124,7 +1124,7 @@ std::shared_ptr<GG::Texture> ClientUI::GetTexture(const boost::filesystem::path&
     return retval;
 }
 
-std::shared_ptr<GG::Font> ClientUI::GetFont(int pts/* = Pts()*/) {
+std::shared_ptr<GG::Font> ClientUI::GetFont(int pts) {
      try {
         return GG::GUI::GetGUI()->GetFont(GetOptionsDB().Get<std::string>("ui.font.path"), pts,
                                           RequiredCharsets().begin(), RequiredCharsets().end());
@@ -1138,7 +1138,7 @@ std::shared_ptr<GG::Font> ClientUI::GetFont(int pts/* = Pts()*/) {
     }
 }
 
-std::shared_ptr<GG::Font> ClientUI::GetBoldFont(int pts/* = Pts()*/) {
+std::shared_ptr<GG::Font> ClientUI::GetBoldFont(int pts) {
     try {
         return GG::GUI::GetGUI()->GetFont(GetOptionsDB().Get<std::string>("ui.font.bold.path"), pts, RequiredCharsets().begin(), RequiredCharsets().end());
     } catch (...) {
@@ -1151,7 +1151,7 @@ std::shared_ptr<GG::Font> ClientUI::GetBoldFont(int pts/* = Pts()*/) {
     }
 }
 
-std::shared_ptr<GG::Font> ClientUI::GetTitleFont(int pts/* = TitlePts()*/) {
+std::shared_ptr<GG::Font> ClientUI::GetTitleFont(int pts) {
     try {
         return GG::GUI::GetGUI()->GetFont(GetOptionsDB().Get<std::string>("ui.font.title.path"), pts, RequiredCharsets().begin(), RequiredCharsets().end());
     } catch (...) {

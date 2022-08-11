@@ -54,6 +54,7 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
         GetOptionsDB().AddFlag("hostless",                                              UserStringNop("OPTIONS_DB_HOSTLESS"),                   false);
         GetOptionsDB().AddFlag("skip-checksum",                                         UserStringNop("OPTIONS_DB_SKIP_CHECKSUM"),              false);
         GetOptionsDB().AddFlag("testing",                                               UserStringNop("OPTIONS_DB_TESTING"),                    false);
+        GetOptionsDB().AddFlag("load-or-quickstart",                                    UserStringNop("OPTIONS_DB_LOAD_OR_QUICKSTART"),         false);
         GetOptionsDB().Add<int>("network.server.ai.min",                                UserStringNop("OPTIONS_DB_MP_AI_MIN"),                  0);
         GetOptionsDB().Add<int>("network.server.ai.max",                                UserStringNop("OPTIONS_DB_MP_AI_MAX"),                  -1);
         GetOptionsDB().Add<int>("network.server.human.min",                             UserStringNop("OPTIONS_DB_MP_HUMAN_MIN"),               0);
@@ -71,6 +72,10 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
         GetOptionsDB().Add<int>("network.server.client-message-size.max",               UserStringNop("OPTIONS_DB_CLIENT_MESSAGE_SIZE_MAX"),    0);
         GetOptionsDB().Add<bool>("network.server.drop-empire-ready",                    UserStringNop("OPTIONS_DB_DROP_EMPIRE_READY"),          true);
         GetOptionsDB().Add<bool>("network.server.take-over-ai",                         UserStringNop("OPTIONS_DB_TAKE_OVER_AI"),               false);
+        GetOptionsDB().Add<bool>("network.server.allow-observers",                      UserStringNop("OPTIONS_DB_ALLOW_OBSERVERS"),            false);
+#if defined(FREEORION_LINUX)
+        GetOptionsDB().Add<int>("network.server.listen.fd",                             UserStringNop("OPTIONS_DB_LISTEN_FD"),                  -1);
+#endif
         GetOptionsDB().Add<int>("network.server.python.asyncio-interval",               UserStringNop("OPTIONS_DB_PYTHON_ASYNCIO_INTERVAL"),    -1);
 
         // if config.xml and persistent_config.xml are present, read and set options entries

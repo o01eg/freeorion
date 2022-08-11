@@ -10,10 +10,10 @@
 /** A Building UniverseObject type. */
 class FO_COMMON_API Building : public UniverseObject {
 public:
+    [[nodiscard]] TagVecs               Tags(const ScriptingContext&) const override;
+    [[nodiscard]] bool                  HasTag(std::string_view name, const ScriptingContext&) const override;
+
     [[nodiscard]] bool                  HostileToEmpire(int empire_id, const EmpireManager& empires) const override;
-    [[nodiscard]] std::set<std::string> Tags(const ScriptingContext&) const override;
-    [[nodiscard]] bool                  HasTag(const std::string& name, const ScriptingContext&) const override;
-    [[nodiscard]] UniverseObjectType    ObjectType() const override;
     [[nodiscard]] std::string           Dump(unsigned short ntabs = 0) const override;
     [[nodiscard]] int                   ContainerObjectID() const override { return m_planet_id; }
     [[nodiscard]] bool                  ContainedBy(int object_id) const override;
@@ -35,7 +35,7 @@ public:
 
     Building(int empire_id, std::string building_type,
              int produced_by_empire_id, int creation_turn);
-    Building() = default;
+    Building() : UniverseObject(UniverseObjectType::OBJ_BUILDING) {}
 
 private:
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);

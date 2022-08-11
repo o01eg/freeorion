@@ -174,13 +174,30 @@ bool NewFleetOrder::Check(int empire, const std::string& fleet_name, const std::
 
     int system_id = INVALID_OBJECT_ID;
 
-    for (const auto& ship : context.ContextObjects().find<Ship>(ship_ids)) {
-        // verify that empire is not trying to take ships from somebody else's fleet
+    std::set<int> arrival_starlane_ids;
+    for (const auto& ship : context.ContextObjects().findRaw<Ship>(ship_ids)) {
         if (!ship) {
             ErrorLogger() << "Empire " << empire << " attempted to create a new fleet (" << fleet_name
                           << ") with an invalid ship";
             return false;
         }
+
+        auto ship_fleet = context.ContextObjects().get<Fleet>(ship->FleetID());
+        if (!ship_fleet)
+            continue;   // OK
+        auto arr_lane = ship_fleet->ArrivalStarlane();
+        if (arr_lane == INVALID_OBJECT_ID) // newly produced fleets have invalid object ID as arrival lane for one turn. this lets them be merged with fleets that have had their arrival lane set to their system
+            arr_lane = ship_fleet->SystemID();
+        arrival_starlane_ids.insert(arr_lane);
+    }
+    if (arrival_starlane_ids.size() > 1) {
+        ErrorLogger() << "Empire " << empire << " attempted to create a new fleet with ships from multiple arrival starlanes";
+        return false;
+    }
+
+
+    for (const auto& ship : context.ContextObjects().findRaw<Ship>(ship_ids)) {
+        // verify that empire is not trying to take ships from somebody else's fleet
         if (!ship->OwnedBy(empire)) {
             ErrorLogger() << "Empire " << empire << " attempted to create a new fleet (" << fleet_name
                           << ") with ships from another's (" << ship->Owner() << ") fleet.";
@@ -226,12 +243,12 @@ void NewFleetOrder::ExecuteImpl(ScriptingContext& context) const {
 
     Universe& u = context.ContextUniverse();
     ObjectMap& o = context.ContextObjects();
-    auto empire_ids = context.EmpireIDs();
+    const auto& empire_ids = context.EmpireIDs();
 
     u.InhibitUniverseObjectSignals(true);
 
     // validate specified ships
-    auto validated_ships = o.find<Ship>(m_ship_ids);
+    auto validated_ships = o.findRaw<Ship>(m_ship_ids);
 
     int system_id = validated_ships[0]->SystemID();
     auto system = o.get<System>(system_id);
@@ -286,7 +303,7 @@ void NewFleetOrder::ExecuteImpl(ScriptingContext& context) const {
 
     u.InhibitUniverseObjectSignals(false);
 
-    std::vector<std::shared_ptr<Fleet>> created_fleets{fleet};
+    std::vector<const Fleet*> created_fleets{fleet.get()};
     system->FleetsInsertedSignal(created_fleets);
     system->StateChangedSignal();
 
@@ -337,10 +354,10 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
         DebugLogger() << "FleetMoveOrder removing fleet " << fleet_id
                       << " current system location " << fleet->SystemID()
                       << " from shortest path to system " << m_dest_system;
-        short_path.first.pop_front();
+        short_path.first.erase(short_path.first.begin()); // pop_front();
     }
 
-    std::copy(short_path.first.begin(), short_path.first.end(), std::back_inserter(m_route));
+    m_route = std::move(short_path.first);
 
     // ensure a zero-length (invalid) route is not requested / sent to a fleet
     if (m_route.empty())
@@ -420,7 +437,7 @@ void FleetMoveOrder::ExecuteImpl(ScriptingContext& context) const {
     if (!fleet_travel_route.empty() && fleet_travel_route.front() == fleet->SystemID()) {
         DebugLogger() << "FleetMoveOrder::ExecuteImpl given route that starts with fleet " << fleet->ID()
                       << "'s current system (" << fleet_travel_route.front() << "); removing it";
-        fleet_travel_route.pop_front();
+        fleet_travel_route.erase(fleet_travel_route.begin()); // pop_front();
     }
 
     // check destination validity: disallow movement that's out of range
@@ -449,12 +466,11 @@ FleetTransferOrder::FleetTransferOrder(int empire, int dest_fleet, const std::ve
     m_add_ships(ships)
 {
     if (!Check(empire, dest_fleet, ships, context))
-        return;
+        ErrorLogger() << "FleetTransferOrder constructor found problem...";
 }
 
-std::string FleetTransferOrder::Dump() const {
-    return UserString("ORDER_FLEET_TRANSFER");
-}
+std::string FleetTransferOrder::Dump() const
+{ return UserString("ORDER_FLEET_TRANSFER"); }
 
 bool FleetTransferOrder::Check(int empire_id, int dest_fleet_id, const std::vector<int>& ship_ids,
                                const ScriptingContext& context)
@@ -477,9 +493,9 @@ bool FleetTransferOrder::Check(int empire_id, int dest_fleet_id, const std::vect
         return false;
     }
 
-    bool invalid_ships {false};
+    bool invalid_ships{false};
 
-    for (auto ship : objects.find<Ship>(ship_ids)) {
+    for (const auto& ship : objects.find<Ship>(ship_ids)) {
         if (!ship) {
             ErrorLogger() << "IssueFleetTransferOrder : passed an invalid ship_id";
             invalid_ships = true;
@@ -503,6 +519,31 @@ bool FleetTransferOrder::Check(int empire_id, int dest_fleet_id, const std::vect
             invalid_ships = true;
             break;
         }
+
+        if (ship->FleetID() == dest_fleet_id) {
+            ErrorLogger() << "IssueFleetTransferOrder : passed ship that is already in the target fleet";
+            invalid_ships = true;
+            break;
+        }
+
+        if (auto original_fleet = context.ContextObjects().get<Fleet>(ship->FleetID())) {
+            auto ship_old_fleet_arr_lane = original_fleet->ArrivalStarlane();
+            if (ship_old_fleet_arr_lane == INVALID_OBJECT_ID) // deal with quirky case where new fleets have no arrival lane for one turn
+                ship_old_fleet_arr_lane = original_fleet->SystemID();
+            auto new_fleet_arr_lane = fleet->ArrivalStarlane();
+            if (new_fleet_arr_lane == INVALID_OBJECT_ID)      // same quirky case can affect both source and destination fleets
+                new_fleet_arr_lane = fleet->SystemID();
+
+            if (ship_old_fleet_arr_lane != new_fleet_arr_lane) {
+                ErrorLogger() << "IssueFleetTransferOrder : passed ship " << ship->ID()
+                              << " that is in a fleet " << original_fleet->ID()
+                              << " that has a different arrival starlane " << ship_old_fleet_arr_lane
+                              << " than the destination fleet " << fleet->ID()
+                              << " with arrival starlane " << new_fleet_arr_lane;
+                invalid_ships = true;
+                break;
+            }
+        }
     }
 
     return !invalid_ships;
@@ -518,7 +559,7 @@ void FleetTransferOrder::ExecuteImpl(ScriptingContext& context) const {
     auto target_fleet = context.ContextObjects().get<Fleet>(m_dest_fleet);
 
     // check that all ships are in the same system
-    auto ships = context.ContextObjects().find<Ship>(m_add_ships);
+    auto ships = context.ContextObjects().findRaw<Ship>(m_add_ships);
 
     context.ContextUniverse().InhibitUniverseObjectSignals(true);
 
@@ -544,7 +585,7 @@ void FleetTransferOrder::ExecuteImpl(ScriptingContext& context) const {
 
     // signal change to fleet states
     modified_fleets.insert(target_fleet.get());
-    auto empire_ids = context.EmpireIDs();
+    const auto& empire_ids = context.EmpireIDs();
 
     for (auto* modified_fleet : modified_fleets) {
         if (!modified_fleet) {
@@ -1025,13 +1066,17 @@ std::string PolicyOrder::Dump() const
 
 void PolicyOrder::ExecuteImpl(ScriptingContext& context) const {
     auto empire = GetValidatedEmpire(context);
-    if (m_adopt)
+    if (m_adopt) {
         DebugLogger() << "PolicyOrder adopt " << m_policy_name << " in category " << m_category
                       << " in slot " << m_slot;
-    else
+        empire->AdoptPolicy(m_policy_name, m_category, context, m_adopt, m_slot);
+    } else if (!m_revert) {
         DebugLogger() << "PolicyOrder revoke " << m_policy_name << " from category " << m_category
                       << " in slot " << m_slot;
-    empire->AdoptPolicy(m_policy_name, m_category, context, m_adopt, m_slot);
+        empire->AdoptPolicy(m_policy_name, m_category, context, m_adopt, m_slot);
+    } else {
+        empire->RevertPolicies();
+    }
 }
 
 ////////////////////////////////////////////////
@@ -1055,9 +1100,8 @@ ResearchQueueOrder::ResearchQueueOrder(int empire, const std::string& tech_name,
     m_pause(pause ? PAUSE : RESUME)
 {}
 
-std::string ResearchQueueOrder::Dump() const {
-    return UserString("ORDER_RESEARCH");
-}
+std::string ResearchQueueOrder::Dump() const
+{ return UserString("ORDER_RESEARCH"); }
 
 void ResearchQueueOrder::ExecuteImpl(ScriptingContext& context) const {
     auto empire = GetValidatedEmpire(context);
@@ -1133,9 +1177,8 @@ ProductionQueueOrder::ProductionQueueOrder(ProdQueueOrderAction action, int empi
     }
 }
 
-std::string ProductionQueueOrder::Dump() const {
-    return UserString("ORDER_PRODUCTION");
-}
+std::string ProductionQueueOrder::Dump() const
+{ return UserString("ORDER_PRODUCTION"); }
 
 void ProductionQueueOrder::ExecuteImpl(ScriptingContext& context) const {
     try {
@@ -1277,20 +1320,14 @@ void ProductionQueueOrder::ExecuteImpl(ScriptingContext& context) const {
 ////////////////////////////////////////////////
 // ShipDesignOrder
 ////////////////////////////////////////////////
-ShipDesignOrder::ShipDesignOrder() :
-    m_uuid(boost::uuids::nil_generator()())
-{}
-
 ShipDesignOrder::ShipDesignOrder(int empire, int existing_design_id_to_remember) :
     Order(empire),
-    m_design_id(existing_design_id_to_remember),
-    m_uuid(boost::uuids::nil_generator()())
+    m_design_id(existing_design_id_to_remember)
 {}
 
 ShipDesignOrder::ShipDesignOrder(int empire, int design_id_to_erase, bool dummy) :
     Order(empire),
     m_design_id(design_id_to_erase),
-    m_uuid(boost::uuids::nil_generator()()),
     m_delete_design_from_empire(true)
 {}
 
@@ -1310,18 +1347,17 @@ ShipDesignOrder::ShipDesignOrder(int empire, const ShipDesign& ship_design) :
     m_name_desc_in_stringtable(ship_design.LookupInStringtable())
 {}
 
-ShipDesignOrder::ShipDesignOrder(int empire, int existing_design_id, const std::string& new_name/* = ""*/, const std::string& new_description/* = ""*/) :
+ShipDesignOrder::ShipDesignOrder(int empire, int existing_design_id,
+                                 const std::string& new_name, const std::string& new_description) :
     Order(empire),
     m_design_id(existing_design_id),
-    m_uuid(boost::uuids::nil_generator()()),
     m_update_name_or_description(true),
     m_name(new_name),
     m_description(new_description)
 {}
 
-std::string ShipDesignOrder::Dump() const {
-    return UserString("ORDER_SHIP_DESIGN");
-}
+std::string ShipDesignOrder::Dump() const
+{ return UserString("ORDER_SHIP_DESIGN"); }
 
 void ShipDesignOrder::ExecuteImpl(ScriptingContext& context) const {
     auto empire = GetValidatedEmpire(context);
@@ -1433,9 +1469,8 @@ ScrapOrder::ScrapOrder(int empire, int object_id, const ScriptingContext& contex
         return;
 }
 
-std::string ScrapOrder::Dump() const {
-    return UserString("ORDER_SCRAP");
-}
+std::string ScrapOrder::Dump() const
+{ return UserString("ORDER_SCRAP"); }
 
 bool ScrapOrder::Check(int empire_id, int object_id, const ScriptingContext& context) {
     auto obj = context.ContextObjects().get(object_id);
@@ -1508,9 +1543,8 @@ AggressiveOrder::AggressiveOrder(int empire, int object_id, FleetAggression aggr
         return;
 }
 
-std::string AggressiveOrder::Dump() const {
-    return UserString("ORDER_FLEET_AGGRESSION");
-}
+std::string AggressiveOrder::Dump() const
+{ return UserString("ORDER_FLEET_AGGRESSION"); }
 
 bool AggressiveOrder::Check(int empire_id, int object_id, FleetAggression aggression,
                             const ScriptingContext& context)
@@ -1537,9 +1571,10 @@ void AggressiveOrder::ExecuteImpl(ScriptingContext& context) const {
     if (!Check(EmpireID(), m_object_id, m_aggression, context))
         return;
 
-    auto fleet = context.ContextObjects().get<Fleet>(m_object_id);
-
-    fleet->SetAggression(m_aggression);
+    if (auto fleet = context.ContextObjects().get<Fleet>(m_object_id))
+        fleet->SetAggression(m_aggression);
+    else
+        ErrorLogger() << "AggressiveOrder::ExecuteImpl couldn't find fleet with id " << m_object_id;
 }
 
 /////////////////////////////////////////////////////
@@ -1555,9 +1590,8 @@ GiveObjectToEmpireOrder::GiveObjectToEmpireOrder(int empire, int object_id, int 
         return;
 }
 
-std::string GiveObjectToEmpireOrder::Dump() const {
-    return UserString("ORDER_GIVE_TO_EMPIRE");
-}
+std::string GiveObjectToEmpireOrder::Dump() const
+{ return UserString("ORDER_GIVE_TO_EMPIRE"); }
 
 bool GiveObjectToEmpireOrder::Check(int empire_id, int object_id, int recipient_empire_id,
                                     const ScriptingContext& context)
@@ -1599,7 +1633,7 @@ bool GiveObjectToEmpireOrder::Check(int empire_id, int object_id, int recipient_
         return false;
     }
 
-    auto system_objects = objects.find<const UniverseObject>(system->ObjectIDs());
+    auto system_objects = objects.findRaw<const UniverseObject>(system->ObjectIDs());
     if (!std::any_of(system_objects.begin(), system_objects.end(),
                      [recipient_empire_id](const auto& o){ return o->Owner() == recipient_empire_id; }))
     {
@@ -1650,9 +1684,8 @@ ForgetOrder::ForgetOrder(int empire, int object_id) :
     m_object_id(object_id)
 {}
 
-std::string ForgetOrder::Dump() const {
-    return UserString("ORDER_FORGET");
-}
+std::string ForgetOrder::Dump() const
+{ return UserString("ORDER_FORGET"); }
 
 void ForgetOrder::ExecuteImpl(ScriptingContext& context) const {
     GetValidatedEmpire(context);

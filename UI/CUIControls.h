@@ -279,8 +279,8 @@ public:
     void LosingFocus() override;
     void Render() override;
     virtual bool AutoComplete() { return false; };
-    void DisallowChars(const std::string& chars)
-    { m_disallowed_chars = chars; }
+    void DisallowChars(std::string chars)
+    { m_disallowed_chars = std::move(chars); }
 
     mutable boost::signals2::signal<void ()> GainingFocusSignal;
     mutable boost::signals2::signal<void ()> LosingFocusSignal;
@@ -410,7 +410,7 @@ public:
                     GG::Flags<GG::ModKey> mod_keys) override;
     void DragDropLeave() override;
 
-    void SetValue(double value, size_t index = 0);  ///< sets displayed \a value with \a index
+    void SetValue(double value, std::size_t index = 0);  ///< sets displayed \a value with \a index
 
     mutable boost::signals2::signal<void (const GG::Pt&)> LeftClickedSignal;
     mutable boost::signals2::signal<void (const GG::Pt&)> RightClickedSignal;
@@ -642,6 +642,8 @@ public:
 private:
     float m_rpm = 20.0f;
     float m_phase_offset = 0.0f;
+    GG::GL2DVertexBuffer verts;
+    GG::Rect last_rendered_area = {};
 };
 
 /** Renders scanlines over its area. */

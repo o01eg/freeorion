@@ -60,17 +60,14 @@ namespace {
 // class CUILabel
 ///////////////////////////////////////
 CUILabel::CUILabel(std::string str,
-                   GG::Flags<GG::TextFormat> format/* = GG::FORMAT_NONE*/,
-                   GG::Flags<GG::WndFlag> flags/* = GG::NO_WND_FLAGS*/,
-                   GG::X x /*= GG::X0*/, GG::Y y /*= GG::Y0*/, GG::X w /*= GG::X1*/, GG::Y h/*= GG::Y1*/) :
+                   GG::Flags<GG::TextFormat> format, GG::Flags<GG::WndFlag> flags,
+                   GG::X x, GG::Y y, GG::X w, GG::Y h) :
     TextControl(x, y, w, h, std::move(str), ClientUI::GetFont(), ClientUI::TextColor(), format, flags)
 {}
 
-CUILabel::CUILabel(std::string str,
-                   std::vector<std::shared_ptr<GG::Font::TextElement>> text_elements,
-                   GG::Flags<GG::TextFormat> format/* = GG::FORMAT_NONE*/,
-                   GG::Flags<GG::WndFlag> flags/* = GG::NO_WND_FLAGS*/,
-                   GG::X x /*= GG::X0*/, GG::Y y /*= GG::Y0*/, GG::X w /*= GG::X1*/, GG::Y h/*= GG::Y1*/) :
+CUILabel::CUILabel(std::string str, std::vector<std::shared_ptr<GG::Font::TextElement>> text_elements,
+                   GG::Flags<GG::TextFormat> format, GG::Flags<GG::WndFlag> flags,
+                   GG::X x, GG::Y y, GG::X w, GG::Y h) :
     TextControl(x, y, w, h, std::move(str), std::move(text_elements),
                 ClientUI::GetFont(), ClientUI::TextColor(), format, flags)
 {}
@@ -214,7 +211,7 @@ bool SettableInWindowCUIButton::InWindow(const GG::Pt& pt) const {
 // class CUIArrowButton
 ///////////////////////////////////////
 CUIArrowButton::CUIArrowButton(ShapeOrientation orientation, bool fill_background,
-                               GG::Flags<GG::WndFlag> flags/* = GG::INTERACTIVE*/) :
+                               GG::Flags<GG::WndFlag> flags) :
     Button("", nullptr, ClientUI::DropDownListArrowColor(), GG::CLR_ZERO, flags),
     m_orientation(orientation),
     m_fill_background_with_wnd_color(fill_background)
@@ -1100,7 +1097,7 @@ void CensoredCUIEdit::ClearSelected() {
 // class CUIMultiEdit
 ///////////////////////////////////////
 CUIMultiEdit::CUIMultiEdit(std::string str,
-                           GG::Flags<GG::MultiEditStyle> style/* = MULTI_LINEWRAP*/) :
+                           GG::Flags<GG::MultiEditStyle> style) :
     MultiEdit(std::move(str), ClientUI::GetFont(), ClientUI::CtrlBorderColor(), style,
               ClientUI::TextColor(), ClientUI::CtrlColor())
 {}
@@ -1307,8 +1304,7 @@ namespace {
     constexpr int STAT_ICON_PAD = 2;    // horizontal or vertical space between icon and label
 }
 
-StatisticIcon::StatisticIcon(std::shared_ptr<GG::Texture> texture,
-                             GG::X w /*= GG::X1*/, GG::Y h /*= GG::Y1*/) :
+StatisticIcon::StatisticIcon(std::shared_ptr<GG::Texture> texture, GG::X w, GG::Y h) :
     GG::Control(GG::X0, GG::Y0, w, h, GG::INTERACTIVE)
 {
     m_icon = GG::Wnd::Create<GG::StaticGraphic>(std::move(texture), GG::GRAPHIC_FITGRAPHIC);
@@ -1316,7 +1312,7 @@ StatisticIcon::StatisticIcon(std::shared_ptr<GG::Texture> texture,
 
 StatisticIcon::StatisticIcon(std::shared_ptr<GG::Texture> texture,
                              double value, int digits, bool showsign,
-                             GG::X w /*= GG::X1*/, GG::Y h /*= GG::Y1*/) :
+                             GG::X w, GG::Y h) :
     GG::Control(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
     m_values(1, std::tuple<double, int, bool>{value, digits, showsign})
 {
@@ -1358,7 +1354,7 @@ double StatisticIcon::GetValue(size_t index) const {
     return std::get<0>(m_values[index]);
 }
 
-void StatisticIcon::SetValue(double value, size_t index) {
+void StatisticIcon::SetValue(double value, std::size_t index) {
     if (index < 0u || index > 1u) {
         ErrorLogger() << "StatisticIcon::SetValue passed index out of range index:" << index;
         return;
@@ -2424,30 +2420,24 @@ void RotatingGraphic::Render() {
     glRotatef(angle, 0.0f, 0.0f, 1.0f);                                             // rotate about centre
     glTranslatef(-Value(rendered_area.MidX()), -Value(rendered_area.MidY()), 0.0f); // tx to be centred on 0, 0
 
-    // set up vertices for translated scaled quad corners
-    GG::GL2DVertexBuffer verts;
-    verts.store(rendered_area.UpperLeft());                     // upper left
-    verts.store(rendered_area.Right(), rendered_area.Top());    // upper right
-    verts.store(rendered_area.Left(),  rendered_area.Bottom()); // lower left
-    verts.store(rendered_area.LowerRight());                    // lower right
+    if (rendered_area != last_rendered_area) {
+        last_rendered_area = rendered_area;
+        // set up vertices for translated scaled quad corners
+        verts.clear();
+        verts.store(rendered_area.UpperLeft());                     // upper left
+        verts.store(rendered_area.Right(), rendered_area.Top());    // upper right
+        verts.store(rendered_area.Left(),  rendered_area.Bottom()); // lower left
+        verts.store(rendered_area.LowerRight());                    // lower right
+    }
 
     // set up texture coordinates for vertices
-    GLfloat texture_coordinate_data[8];
-    const GLfloat* tex_coords = texture->DefaultTexCoords();
-    texture_coordinate_data[2*0] =      tex_coords[0];
-    texture_coordinate_data[2*0 + 1] =  tex_coords[1];
-    texture_coordinate_data[2*1] =      tex_coords[2];
-    texture_coordinate_data[2*1 + 1] =  tex_coords[1];
-    texture_coordinate_data[2*2] =      tex_coords[0];
-    texture_coordinate_data[2*2 + 1] =  tex_coords[3];
-    texture_coordinate_data[2*3] =      tex_coords[2];
-    texture_coordinate_data[2*3 + 1] =  tex_coords[3];
+    const GLfloat* tc = texture->DefaultTexCoords();
+    GLfloat texture_coordinate_data[8] = {tc[0], tc[1], tc[2], tc[1], tc[0], tc[3], tc[2], tc[3]};
+
 
     //// debug
     //std::cout << "rendered area: " << rendered_area << "  ul: " << UpperLeft() << "  sz: " << Size() << std::endl;
-    //std::cout << "tex coords: " << tex_coords[0] << ", " << tex_coords[1] << ";  "
-    //                            << tex_coords[2] << ", " << tex_coords[3]
-    //                            << std::endl;
+    //std::cout << "tex coords: " << tc[0] << ", " << tc[1] << ";  " << tc[2] << ", " << tc[3] << std::endl;
     //// end debug
 
     // render textured quad

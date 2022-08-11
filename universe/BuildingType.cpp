@@ -27,7 +27,7 @@ namespace {
         // makes all buildings cost 1 PP and take 1 turn to produce
         rules.Add<bool>(UserStringNop("RULE_CHEAP_AND_FAST_BUILDING_PRODUCTION"),
                         UserStringNop("RULE_CHEAP_AND_FAST_BUILDING_PRODUCTION_DESC"),
-                        "", false, true);
+                        "TEST", false, true);
     }
     bool temp_bool = RegisterGameRules(&AddRules);
 }
@@ -42,6 +42,39 @@ BuildingType::BuildingType(std::string&& name, std::string&& description,
     m_production_time(std::move(common_params.production_time)),
     m_producible(common_params.producible),
     m_capture_result(capture_result),
+    m_tags_concatenated([&common_params]() {
+        // ensure tags are all upper-case
+        std::for_each(common_params.tags.begin(), common_params.tags.end(),
+                      [](auto& t) { boost::to_upper<std::string>(t); });
+
+        // allocate storage for concatenated tags
+        std::string retval;
+        // TODO: transform_reduce when available on all platforms...
+        std::size_t params_sz = 0;
+        for (const auto& t : common_params.tags)
+            params_sz += t.size();
+        retval.reserve(params_sz);
+
+        // concatenate tags
+        std::for_each(common_params.tags.begin(), common_params.tags.end(),
+                      [&retval](const auto& t) { retval.append(t); });
+        return retval;
+    }()),
+    m_tags([&common_params, this]() {
+        std::vector<std::string_view> retval;
+        std::size_t next_idx = 0;
+        retval.reserve(common_params.tags.size());
+        std::string_view sv{m_tags_concatenated};
+
+        // store views into concatenated tags string
+        std::for_each(common_params.tags.begin(), common_params.tags.end(),
+                      [&next_idx, &retval, this, sv](const auto& t)
+        {
+            retval.push_back(sv.substr(next_idx, t.size()));
+            next_idx += t.size();
+        });
+        return retval;
+    }()),
     m_production_meter_consumption(std::move(common_params.production_meter_consumption)),
     m_production_special_consumption(std::move(common_params.production_special_consumption)),
     m_location(std::move(common_params.location)),
@@ -50,8 +83,6 @@ BuildingType::BuildingType(std::string&& name, std::string&& description,
 {
     for (auto&& effect : common_params.effects)
         m_effects.push_back(std::move(effect));
-    for (const std::string& tag : common_params.tags)
-        m_tags.insert(boost::to_upper_copy<std::string>(tag));
     Init();
 }
 
@@ -168,11 +199,11 @@ std::string BuildingType::Dump(unsigned short ntabs) const {
 
     if (!m_tags.empty()) {
         if (m_tags.size() == 1) {
-            retval += DumpIndent(ntabs+1) + "tags = \"" + *m_tags.begin() + "\"\n";
+            retval.append(DumpIndent(ntabs+1)).append("tags = \"").append(m_tags.front()).append("\"\n");
         } else {
             retval += DumpIndent(ntabs+1) + "tags = [ ";
-            for (const std::string& tag : m_tags)
-               retval += "\"" + tag + "\" ";
+            for (const auto& tag : m_tags)
+               retval.append("\"").append(tag).append("\" ");
             retval += " ]\n";
         }
     }
@@ -228,12 +259,12 @@ float BuildingType::ProductionCost(int empire_id, int location_id,
 
     const auto ARBITRARY_LARGE_COST = 999999.9f;
 
-    auto location = context.ContextObjects().get(location_id);
+    auto location = context.ContextObjects().getRaw(location_id);
     if (!location && !m_production_cost->TargetInvariant())
         return ARBITRARY_LARGE_COST;
 
     auto empire = context.GetEmpire(empire_id);
-    std::shared_ptr<const UniverseObject> source = empire ? empire->Source(context.ContextObjects()) : nullptr;
+    auto source = empire ? empire->Source(context.ContextObjects()) : nullptr;
 
     if (!source && !m_production_cost->SourceInvariant())
         return ARBITRARY_LARGE_COST;
@@ -241,8 +272,8 @@ float BuildingType::ProductionCost(int empire_id, int location_id,
     // cost uses target object to represent the location where something is
     // being produced, and target object is normally mutable, but will not
     // actually be modified by evaluating the cost ValueRef
-    ScriptingContext local_context{std::move(source), context};
-    local_context.effect_target = std::const_pointer_cast<UniverseObject>(location);
+    const ScriptingContext local_context{context, source.get(), const_cast<UniverseObject*>(location),
+                                         INVALID_DESIGN_ID, 1};
 
     return m_production_cost->Eval(local_context);
 }
@@ -269,12 +300,12 @@ int BuildingType::ProductionTime(int empire_id, int location_id,
 
     static constexpr int ARBITRARY_LARGE_TURNS = 9999;
 
-    auto location = context.ContextObjects().get(location_id);
+    auto location = context.ContextObjects().getRaw(location_id);
     if (!location && !m_production_time->TargetInvariant())
         return ARBITRARY_LARGE_TURNS;
 
     auto empire = context.GetEmpire(empire_id);
-    std::shared_ptr<const UniverseObject> source = empire ? empire->Source(context.ContextObjects()) : nullptr;
+    auto source = empire ? empire->Source(context.ContextObjects()) : nullptr;
 
     if (!source && !m_production_time->SourceInvariant())
         return ARBITRARY_LARGE_TURNS;
@@ -282,8 +313,8 @@ int BuildingType::ProductionTime(int empire_id, int location_id,
     // cost uses target object to represent the location where something is
     // being produced, and target object is normally mutable, but will not
     // actually be modified by evaluating the cost ValueRef
-    ScriptingContext local_context{std::move(source), context};
-    local_context.effect_target = std::const_pointer_cast<UniverseObject>(location);
+    const ScriptingContext local_context{context, source.get(), const_cast<UniverseObject*>(location),
+                                         INVALID_DESIGN_ID, 1};
 
     return m_production_time->Eval(local_context);
 }
@@ -292,34 +323,38 @@ bool BuildingType::ProductionLocation(int empire_id, int location_id, const Scri
     if (!m_location)
         return true;
 
-    auto location = context.ContextObjects().get(location_id);
+    auto location = context.ContextObjects().getRaw(location_id);
     if (!location)
         return false;
 
     auto empire = context.GetEmpire(empire_id);
-    std::shared_ptr<const UniverseObject> source = empire ? empire->Source(context.ContextObjects()) : nullptr;
+    auto source = empire ? empire->Source(context.ContextObjects()) : nullptr;
     if (!source)
         return false;
 
-    ScriptingContext source_context{std::move(source), context};
-    return m_location->Eval(source_context, std::move(location));
+    const ScriptingContext local_context{context, source.get(), const_cast<UniverseObject*>(location),
+                                         INVALID_DESIGN_ID, 1};
+
+    return m_location->Eval(local_context, location);
 }
 
 bool BuildingType::EnqueueLocation(int empire_id, int location_id, const ScriptingContext& context) const {
     if (!m_enqueue_location)
         return true;
 
-    auto location = context.ContextObjects().get(location_id);
+    auto location = context.ContextObjects().getRaw(location_id);
     if (!location)
         return false;
 
     auto empire = context.GetEmpire(empire_id);
-    std::shared_ptr<const UniverseObject> source = empire ? empire->Source(context.ContextObjects()) : nullptr;
+    auto source = empire ? empire->Source(context.ContextObjects()) : nullptr;
     if (!source)
         return false;
 
-    ScriptingContext source_context{std::move(source), context};
-    return m_enqueue_location->Eval(source_context, std::move(location));
+    const ScriptingContext local_context{context, source.get(), const_cast<UniverseObject*>(location),
+                                         INVALID_DESIGN_ID, 1};
+
+    return m_enqueue_location->Eval(local_context, location);
 }
 
 unsigned int BuildingType::GetCheckSum() const {
@@ -353,7 +388,7 @@ BuildingTypeManager::BuildingTypeManager() {
     s_instance = this;
 }
 
-const BuildingType* BuildingTypeManager::GetBuildingType(const std::string& name) const {
+const BuildingType* BuildingTypeManager::GetBuildingType(std::string_view name) const {
     CheckPendingBuildingTypes();
     const auto& it = m_building_types.find(name);
     return it != m_building_types.end() ? it->second.get() : nullptr;
@@ -392,9 +427,8 @@ void BuildingTypeManager::SetBuildingTypes(Pending::Pending<container_type>&& pe
 void BuildingTypeManager::CheckPendingBuildingTypes() const
 { Pending::SwapPending(m_pending_building_types, m_building_types); }
 
-
 BuildingTypeManager& GetBuildingTypeManager()
 { return BuildingTypeManager::GetBuildingTypeManager(); }
 
-const BuildingType* GetBuildingType(const std::string& name)
+const BuildingType* GetBuildingType(std::string_view name)
 { return GetBuildingTypeManager().GetBuildingType(name); }

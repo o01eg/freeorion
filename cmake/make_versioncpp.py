@@ -13,7 +13,7 @@ from subprocess import CalledProcessError, check_output
 INVALID_BUILD_NO = "???"
 
 
-class Generator(object):
+class Generator:
     def __init__(self, infile, outfile):
         self.infile = infile
         self.outfile = outfile
@@ -104,6 +104,7 @@ else:
     boost_python_suffix = "%d%d" % (sys.version_info.major, sys.version_info.minor)
 
 required_boost_libraries = [
+    "boost_atomic",
     "boost_chrono",
     "boost_date_time",
     "boost_filesystem",

@@ -9,6 +9,9 @@ on:
       - 'packaging/**'
       - 'snap/**'
       - '*.md'
+      - 'check/**'
+      - 'default/**'
+      - 'test-scripting/**'
   pull_request:
     paths-ignore:
       - 'msvc*/**'
@@ -17,6 +20,9 @@ on:
       - 'packaging/**'
       - 'snap/**'
       - '*.md'
+      - 'check/**'
+      - 'default/**'
+      - 'test-scripting/**'
 
 jobs:
   build-ubuntu:
@@ -24,19 +30,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-18.04]
-        client-gg: ['ON', 'OFF']
-        client-godot: ['OFF']
-        compiler: [gcc]
+        os: [ubuntu-20.04]
+        client-gg: ['ON']
+        client-godot: ['ON']
+        compiler: [gcc, clang]
         include:
           - os: ubuntu-20.04
             client-gg: 'ON'
             client-godot: 'OFF'
             compiler: clang
-          - os: ubuntu-20.04
-            client-gg: 'ON'
-            client-godot: 'ON'
-            compiler: gcc
     env:
       CACHE_NAME: linux
     steps:
@@ -111,7 +113,7 @@ jobs:
           cd build
           cmake --build . --config Release --target unittest
       - name: Run Godot unit tests
-        if: matrix.client-godot == 'ON' && matrix.os == 'ubuntu-20.04'
+        if: matrix.client-godot == 'ON'
         run: |
           cp `which godot3-server` build/
           ./build/godot3-server --verbose -s --path godot addons/gut/gut_cmdln.gd -gdir=res://test/ -ginclude_subdirs -gexit

@@ -287,7 +287,7 @@ void InitBinDir(std::string const& argv0)
         mib[1] = KERN_PROC;
         mib[2] = KERN_PROC_PATHNAME;
         mib[3] = -1;
-        size_t buf_size = sizeof(buf);
+        std::size_t buf_size = sizeof(buf);
         sysctl(mib, 4, buf, &buf_size, 0, 0);
 #endif
 #if defined(FREEORION_NETBSD)
@@ -296,7 +296,7 @@ void InitBinDir(std::string const& argv0)
         mib[1] = KERN_PROC_ARGS;
         mib[2] = -1;
         mib[3] = KERN_PROC_PATHNAME;
-        size_t buf_size = sizeof(buf);
+        std::size_t buf_size = sizeof(buf);
         sysctl(mib, 4, buf, &buf_size, 0, 0);
 #endif
 #if defined(FREEORION_OPENBSD)
@@ -343,7 +343,7 @@ void InitBinDir(std::string const& argv0)
             bin_dir = p;
         }
     }
-#elif defined(FREEORION_MACOSX) || defined(FREEORION_ADROID)
+#elif defined(FREEORION_MACOSX) || defined(FREEORION_ANDROID)
     // no binary directory setup required.
 #endif
 }
@@ -748,11 +748,7 @@ auto FilenameToPath(std::string const& path_str) -> fs::path
 #if defined(FREEORION_WIN32)
     // convert UTF-8 directory string to UTF-16
     fs::path::string_type directory_native = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t>{}.from_bytes(path_str);
-#if (BOOST_VERSION >= 106300)
     return fs::path(directory_native).generic_path();
-#else
-    return fs::path(directory_native);
-#endif
 #else // defined(FREEORION_WIN32)
     return fs::path(path_str);
 #endif // defined(FREEORION_WIN32)

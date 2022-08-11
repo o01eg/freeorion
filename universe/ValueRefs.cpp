@@ -37,21 +37,19 @@
 #include "../util/MultiplayerCommon.h"
 #include "../util/Random.h"
 
-#if BOOST_VERSION >= 106500
 // define needed on Windows due to conflict with windows.h and std::min and std::max
-#  ifndef NOMINMAX
-#    define NOMINMAX
-#  endif
-// define needed in GCC
-#  ifndef _GNU_SOURCE
-#    define _GNU_SOURCE
-#  endif
-#  if defined(_MSC_VER) && _MSC_VER >= 1930
-struct IUnknown; // Workaround for "combaseapi.h(229,21): error C2760: syntax error: 'identifier' was unexpected here; expected 'type specifier'"
-#  endif
-
-#  include <boost/stacktrace.hpp>
+#ifndef NOMINMAX
+#  define NOMINMAX
 #endif
+// define needed in GCC
+#ifndef _GNU_SOURCE
+#  define _GNU_SOURCE
+#endif
+#if defined(_MSC_VER) && _MSC_VER >= 1930
+struct IUnknown; // Workaround for "combaseapi.h(229,21): error C2760: syntax error: 'identifier' was unexpected here; expected 'type specifier'"
+#endif
+
+#include <boost/stacktrace.hpp>
 
 std::string DoubleToString(double val, int digits, bool always_show_sign);
 bool UserStringExists(const std::string& str);
@@ -61,22 +59,16 @@ namespace {
         static std::atomic<int> string_error_lookup_count = 0;
         if (string_error_lookup_count++ > 10)
             return "";
-#if BOOST_VERSION >= 106500
         std::stringstream ss;
         ss << "stacktrace:\n" << boost::stacktrace::stacktrace();
         return ss.str();
-#else
-        return "";
-#endif
     }
 
-    std::shared_ptr<const UniverseObject> FollowReference(
-        std::vector<std::string>::const_iterator first,
-        std::vector<std::string>::const_iterator last,
-        ValueRef::ReferenceType ref_type,
-        const ScriptingContext& context)
+    const UniverseObject* FollowReference(
+        std::vector<std::string>::const_iterator first, std::vector<std::string>::const_iterator last,
+        ValueRef::ReferenceType ref_type, const ScriptingContext& context)
     {
-        std::shared_ptr<const UniverseObject> obj;
+        const UniverseObject* obj = nullptr;
         switch (ref_type) {
         case ValueRef::ReferenceType::NON_OBJECT_REFERENCE:                return context.condition_local_candidate;   break;
         case ValueRef::ReferenceType::SOURCE_REFERENCE:                    obj = context.source;                       break;
@@ -115,21 +107,21 @@ namespace {
             std::string_view property_name = *first;
             if (property_name == "Planet") {
                 if (obj->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
-                    auto b = std::static_pointer_cast<const Building>(obj);
-                    obj = context.ContextObjects().get<Planet>(b->PlanetID());
+                    auto b = static_cast<const Building*>(obj);
+                    obj = context.ContextObjects().getRaw<Planet>(b->PlanetID());
                 } else {
                     ErrorLogger() << "FollowReference : object not a building, so can't get its planet.";
                     obj = nullptr;
                 }
             } else if (property_name == "System") {
                 if (obj)
-                    obj = context.ContextObjects().get<System>(obj->SystemID());
+                    obj = context.ContextObjects().getRaw<System>(obj->SystemID());
                 if (!obj)
                     ErrorLogger() << "FollowReference : Unable to get system for object";
             } else if (property_name == "Fleet") {
                 if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-                    auto s = std::static_pointer_cast<const Ship>(obj);
-                    obj = context.ContextObjects().get<Fleet>(s->FleetID());
+                    auto s = static_cast<const Ship*>(obj);
+                    obj = context.ContextObjects().getRaw<Fleet>(s->FleetID());
                 } else {
                     ErrorLogger() << "FollowReference : object not a ship, so can't get its fleet";
                     obj = nullptr;
@@ -147,7 +139,8 @@ namespace {
                                ValueRef::ReferenceType ref_type,
                                const ScriptingContext& context)
     {
-        std::shared_ptr<const UniverseObject> obj, initial_obj;
+        const UniverseObject* obj = nullptr;
+        const UniverseObject* initial_obj = nullptr;
         std::string retval = ReconstructName(property_name, ref_type, false) + " : ";
         switch (ref_type) {
         case ValueRef::ReferenceType::NON_OBJECT_REFERENCE:
@@ -186,22 +179,22 @@ namespace {
             retval.append(" ").append(property_name_part).append(" ");
             if (property_name_part == "Planet") {
                 if (obj->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
-                    auto b = std::static_pointer_cast<const Building>(obj);
+                    auto b = static_cast<const Building*>(obj);
                     retval.append("(").append(std::to_string(b->PlanetID())).append("): ");
-                    obj = context.ContextObjects().get<Planet>(b->PlanetID());
+                    obj = context.ContextObjects().getRaw<Planet>(b->PlanetID());
                 } else {
                     obj = nullptr;
                 }
             } else if (property_name_part == "System") {
                 if (obj) {
                     retval.append("(").append(std::to_string(obj->SystemID())).append("): ");
-                    obj = context.ContextObjects().get<System>(obj->SystemID());
+                    obj = context.ContextObjects().getRaw<System>(obj->SystemID());
                 }
             } else if (property_name_part == "Fleet") {
                 if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-                    auto s = std::static_pointer_cast<const Ship>(obj);
+                    auto s = static_cast<const Ship*>(obj);
                     retval.append("(").append(std::to_string(s->FleetID())).append("): ");
-                    obj = context.ContextObjects().get<Fleet>(s->FleetID());
+                    obj = context.ContextObjects().getRaw<Fleet>(s->FleetID());
                 } else
                     obj = nullptr;
             }
@@ -518,14 +511,11 @@ std::string ComplexVariableDump(const std::vector<std::string>& property_names,
     return retval;
 }
 
-std::string StatisticDescription(StatisticType stat_type,
-                                 const std::string& value_desc,
-                                 const std::string& condition_desc)
+std::string StatisticDescription(StatisticType stat_type, std::string_view value_desc,
+                                 std::string_view condition_desc)
 {
-    std::string stat_str{to_string(stat_type)};
-    boost::algorithm::to_upper(stat_str);
     std::string stringtable_key{"DESC_VAR_"};
-    stringtable_key.append(stat_str);
+    stringtable_key.append(to_string(stat_type)); // assumes that all StatisticType names are ALL_CAPS
 
     if (UserStringExists(stringtable_key)) {
         boost::format formatter = FlexibleFormat(UserString(stringtable_key));
@@ -731,7 +721,7 @@ PlanetSize Variable<PlanetSize>::Eval(const ScriptingContext& context) const
 
     if (planet_property) {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-            auto p = std::static_pointer_cast<const Planet>(object);
+            auto p = static_cast<const Planet*>(object);
             return planet_property(*p);
         }
         return PlanetSize::INVALID_PLANET_SIZE;
@@ -764,6 +754,8 @@ PlanetType Variable<PlanetType>::Eval(const ScriptingContext& context) const
         planet_property = &Planet::OriginalType;
     else if (property_name == "NextCloserToOriginalPlanetType")
         planet_property = &Planet::NextCloserToOriginalPlanetType;
+    else if (property_name == "NextBestPlanetType")
+        planet_property = boost::bind(&Planet::NextBestPlanetTypeForSpecies, boost::placeholders::_1, "");
     else if (property_name == "NextBetterPlanetType")
         planet_property = boost::bind(&Planet::NextBetterPlanetTypeForSpecies, boost::placeholders::_1, "");
     else if (property_name == "ClockwiseNextPlanetType")
@@ -773,7 +765,7 @@ PlanetType Variable<PlanetType>::Eval(const ScriptingContext& context) const
 
     if (planet_property) {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-            auto p = std::static_pointer_cast<const Planet>(object);
+            auto p = static_cast<const Planet*>(object);
             return planet_property(*p);
         }
         return PlanetType::INVALID_PLANET_TYPE;
@@ -798,7 +790,7 @@ PlanetEnvironment Variable<PlanetEnvironment>::Eval(const ScriptingContext& cont
             return PlanetEnvironment::INVALID_PLANET_ENVIRONMENT;
         }
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-            auto p = std::static_pointer_cast<const Planet>(object);
+            auto p = static_cast<const Planet*>(object);
             return p->EnvironmentForSpecies();
         }
 
@@ -856,7 +848,7 @@ StarType Variable<StarType>::Eval(const ScriptingContext& context) const
 
     if (system_property) {
         if (object->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
-            auto s = std::static_pointer_cast<const System>(object);
+            auto s = static_cast<const System*>(object);
             return system_property(*s);
         }
         return StarType::INVALID_STAR_TYPE;
@@ -937,7 +929,7 @@ double Variable<double>::Eval(const ScriptingContext& context) const
         planet_property = &Planet::DistanceFromOriginalType;
 
     if (planet_property) {
-        if (auto planet = dynamic_cast<const Planet*>(object.get()))
+        if (auto planet = dynamic_cast<const Planet*>(object))
             return planet_property(*planet);
         return 0.0;
 
@@ -951,9 +943,9 @@ double Variable<double>::Eval(const ScriptingContext& context) const
 
     } else if (property_name == "DestroyFightersPerBattleMax") {
         if (object->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-            auto ship = std::static_pointer_cast<const Ship>(object);
+            auto ship = static_cast<const Ship*>(object);
             auto retval = ship->TotalWeaponsFighterDamage(context);
-            InfoLogger() << "DestroyFightersPerBattleMax" << retval;
+            TraceLogger() << "DestroyFightersPerBattleMax" << retval;
             // TODO: prevent recursion; disallowing the ValueRef inside of destroyFightersPerBattleMax via parsers would be best.
             return retval;
         }
@@ -961,10 +953,10 @@ double Variable<double>::Eval(const ScriptingContext& context) const
 
     } else if (property_name == "DamageStructurePerBattleMax") {
         if (object->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-            auto ship = std::static_pointer_cast<const Ship>(object);
+            auto ship = static_cast<const Ship*>(object);
             // TODO: prevent recursion; disallowing the ValueRef inside of damageStructurePerBattleMax via parsers would be best.
             auto retval = ship->TotalWeaponsShipDamage(context);
-            InfoLogger() << "DamageStructurePerBattleMax" << retval;
+            TraceLogger() << "DamageStructurePerBattleMax" << retval;
             return retval;
         }
         return 0.0;
@@ -1081,7 +1073,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
 
     if (ship_property) {
         if (object->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-            auto ship = std::static_pointer_cast<const Ship>(object);
+            auto ship = static_cast<const Ship*>(object);
             return ship_property(*ship);
         }
         return INVALID_GAME_TURN;
@@ -1104,7 +1096,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
 
     if (fleet_property) {
         if (object->ObjectType() == UniverseObjectType::OBJ_FLEET) {
-            auto fleet = std::static_pointer_cast<const Fleet>(object);
+            auto fleet = static_cast<const Fleet*>(object);
             return fleet_property(*fleet);
         }
         return INVALID_OBJECT_ID;
@@ -1121,7 +1113,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
 
     if (planet_property) {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-            auto planet = std::static_pointer_cast<const Planet>(object);
+            auto planet = static_cast<const Planet*>(object);
             return planet_property(*planet);
         }
         return INVALID_GAME_TURN;
@@ -1129,7 +1121,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
 
     if (property_name == "TurnsSinceFocusChange") {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-            auto planet = std::static_pointer_cast<const Planet>(object);
+            auto planet = static_cast<const Planet*>(object);
             return planet->TurnsSinceFocusChange();
         }
         return 0;
@@ -1137,25 +1129,25 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     }
     else if (property_name == "TurnsSinceColonization") {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-            auto planet = std::static_pointer_cast<const Planet>(object);
+            auto planet = static_cast<const Planet*>(object);
             return planet->TurnsSinceColonization();
         }
         return 0;
     }
     else if (property_name == "TurnsSinceLastConquered") {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-            auto planet = std::static_pointer_cast<const Planet>(object);
+            auto planet = static_cast<const Planet*>(object);
             return planet->TurnsSinceLastConquered();
         }
         return 0;
     }
     else if (property_name == "ProducedByEmpireID") {
         if (object->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-            auto ship = std::static_pointer_cast<const Ship>(object);
+            auto ship = static_cast<const Ship*>(object);
             return ship->ProducedByEmpireID();
 
         } else if (object->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
-            auto building = std::static_pointer_cast<const Building>(object);
+            auto building = static_cast<const Building*>(object);
             return building->ProducedByEmpireID();
         }
         return ALL_EMPIRES;
@@ -1163,7 +1155,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     }
     else if (property_name == "DesignID") {
         if (object->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-            auto ship = std::static_pointer_cast<const Ship>(object);
+            auto ship = static_cast<const Ship*>(object);
             return ship->DesignID();
         }
         return INVALID_DESIGN_ID;
@@ -1171,11 +1163,11 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     }
     else if (property_name == "FleetID") {
         if (object->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-            auto ship = std::static_pointer_cast<const Ship>(object);
+            auto ship = static_cast<const Ship*>(object);
             return ship->FleetID();
 
         } else if (object->ObjectType() == UniverseObjectType::OBJ_FLEET) {
-            auto fleet = std::static_pointer_cast<const Fleet>(object);
+            auto fleet = static_cast<const Fleet*>(object);
             return fleet->ID();
         }
         return INVALID_OBJECT_ID;
@@ -1183,11 +1175,11 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     }
     else if (property_name == "PlanetID") {
         if (object->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
-            auto building = std::static_pointer_cast<const Building>(object);
+            auto building = static_cast<const Building*>(object);
             return building->PlanetID();
 
         } else if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-            auto planet = std::static_pointer_cast<const Planet>(object);
+            auto planet = static_cast<const Planet*>(object);
             return planet->ID();
         }
         return INVALID_OBJECT_ID;
@@ -1202,7 +1194,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     }
     else if (property_name == "NumShips") {
         if (object->ObjectType() == UniverseObjectType::OBJ_FLEET) {
-            auto fleet = std::static_pointer_cast<const Fleet>(object);
+            auto fleet = static_cast<const Fleet*>(object);
             return fleet->NumShips();
         }
         return 0;
@@ -1210,7 +1202,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     }
     else if (property_name == "NumStarlanes") {
         if (object->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
-            auto system = std::static_pointer_cast<const System>(object);
+            auto system = static_cast<const System*>(object);
             return system->NumStarlanes();
             }
         return 0;
@@ -1218,24 +1210,24 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     }
     else if (property_name == "LastTurnBattleHere") {
         if (object->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
-            auto system = std::static_pointer_cast<const System>(object);
+            auto system = static_cast<const System*>(object);
             return system->LastTurnBattleHere();
 
-        } else if (auto system = context.ContextObjects().get<System>(object->SystemID())) {
+        } else if (auto system = context.ContextObjects().getRaw<System>(object->SystemID())) {
             return system->LastTurnBattleHere();
         }
         return INVALID_GAME_TURN;
 
     }
     else if (property_name == "Orbit") {
-        if (auto system = context.ContextObjects().get<System>(object->SystemID()))
+        if (auto system = context.ContextObjects().getRaw<System>(object->SystemID()))
             return system->OrbitOfPlanet(object->ID());
         return -1;
 
     }
     else if (property_name == "ETA") {
         if (object->ObjectType() == UniverseObjectType::OBJ_FLEET) {
-            auto fleet = std::static_pointer_cast<const Fleet>(object);
+            auto fleet = static_cast<const Fleet*>(object);
             return fleet->ETA(context).first;
         }
         return 0;
@@ -1247,7 +1239,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     }
     else if (property_name == "LaunchedFrom") {
         if (object->ObjectType() == UniverseObjectType::OBJ_FIGHTER) {
-            auto fighter = std::static_pointer_cast<const Fighter>(object);
+            auto fighter = static_cast<const Fighter*>(object);
             return fighter->LaunchedFrom();
         }
         return INVALID_OBJECT_ID;
@@ -1282,8 +1274,12 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
     }
 
     if (property_name == "Tags") {
+        std::vector<std::string> retval;
         auto tags = object->Tags(context);
-        return {tags.begin(), tags.end()};
+        retval.reserve(tags.size());
+        std::transform(tags.first.begin(), tags.first.end(), std::back_inserter(retval), [](auto sv) { return std::string{sv}; });
+        std::transform(tags.second.begin(), tags.second.end(), std::back_inserter(retval), [](auto sv) { return std::string{sv}; });
+        return retval;
     }
     else if (property_name == "Specials") {
         auto obj_special_names_range = object->Specials() | boost::adaptors::map_keys;
@@ -1291,14 +1287,14 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
     }
     else if (property_name == "AvailableFoci") {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-            auto planet = std::static_pointer_cast<const Planet>(object);
+            auto planet = static_cast<const Planet*>(object);
             return planet->AvailableFoci();
         }
         return {};
     }
     else if (property_name == "Parts") {
         if (object->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-            auto ship = std::static_pointer_cast<const Ship>(object);
+            auto ship = static_cast<const Ship*>(object);
             if (const ShipDesign* design = context.ContextUniverse().GetShipDesign(ship->DesignID()))
                 return design->Parts();
         }
@@ -1371,22 +1367,22 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
 
     if (property_name == "Species") {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-            auto planet = std::static_pointer_cast<const Planet>(object);
+            auto planet = static_cast<const Planet*>(object);
             return planet->SpeciesName();
 
         } else if (object->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-            auto ship = std::static_pointer_cast<const Ship>(object);
+            auto ship = static_cast<const Ship*>(object);
             return ship->SpeciesName();
 
         } else if (object->ObjectType() == UniverseObjectType::OBJ_FIGHTER) {
-            auto fighter = std::static_pointer_cast<const Fighter>(object);
+            auto fighter = static_cast<const Fighter*>(object);
             return fighter->SpeciesName();
         }
         return "";
 
     } else if (property_name == "Hull") {
         if (object->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-            auto ship = std::static_pointer_cast<const Ship>(object);
+            auto ship = static_cast<const Ship*>(object);
             if (const ShipDesign* design = context.ContextUniverse().GetShipDesign(ship->DesignID()))
                 return design->Hull();
         }
@@ -1394,21 +1390,21 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
 
     } else if (property_name == "FieldType") {
         if (object->ObjectType() == UniverseObjectType::OBJ_FIELD) {
-            auto field = std::static_pointer_cast<const Field>(object);
+            auto field = static_cast<const Field*>(object);
             return field->FieldTypeName();
         }
         return "";
 
     } else if (property_name == "BuildingType") {
         if (object->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
-            auto building = std::static_pointer_cast<const Building>(object);
+            auto building = static_cast<const Building*>(object);
             return building->BuildingTypeName();
         }
         return "";
 
     } else if (property_name == "Focus") {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-            auto planet = std::static_pointer_cast<const Planet>(object);
+            auto planet = static_cast<const Planet*>(object);
             return planet->Focus();
         }
         return "";
@@ -1416,11 +1412,11 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
     } else if (property_name == "DefaultFocus") {
         const Species* species = nullptr;
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-            auto planet = std::static_pointer_cast<const Planet>(object);
+            auto planet = static_cast<const Planet*>(object);
             species = GetSpecies(planet->SpeciesName());
 
         } else if (object->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-            auto ship = std::static_pointer_cast<const Ship>(object);
+            auto ship = static_cast<const Ship*>(object);
             species = GetSpecies(ship->SpeciesName());
         }
         if (species)
@@ -1442,8 +1438,10 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
 template <>
 std::string Statistic<std::string, std::string>::Eval(const ScriptingContext& context) const
 {
-    Condition::ObjectSet condition_matches;
-    GetConditionMatches(context, condition_matches, m_sampling_condition.get());
+    const auto* scond = m_sampling_condition.get();
+    if (!scond)
+        return "";
+    Condition::ObjectSet condition_matches = scond->Eval(context);
 
     if (condition_matches.empty())
         return "";  // empty string
@@ -1641,11 +1639,14 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
 {
     const std::string& variable_name = m_property_name.back();
 
-
     // empire properties indexed by strings
-    std::function<const std::map<std::string, int>& (const Empire&)> empire_property_string_key{nullptr};
+    std::function<const std::map<std::string, int>&              (const Empire&)> empire_property_string_key {nullptr};
+    std::function<const std::map<std::string, int, std::less<>>& (const Empire&)> empire_property_string_key2{nullptr};
 
-    if (variable_name == "BuildingTypesOwned")
+    if (variable_name == "TurnTechResearched")
+        empire_property_string_key2 = &Empire::ResearchedTechs;
+
+    else if (variable_name == "BuildingTypesOwned")
         empire_property_string_key = &Empire::BuildingTypesOwned;
     else if (variable_name == "BuildingTypesProduced")
         empire_property_string_key = &Empire::BuildingTypesProduced;
@@ -1671,14 +1672,12 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         empire_property_string_key = &Empire::SpeciesShipsScrapped;
     else if (variable_name == "ShipPartsOwned")
         empire_property_string_key = &Empire::ShipPartsOwned;
-    else if (variable_name == "TurnTechResearched")
-        empire_property_string_key = &Empire::ResearchedTechs;
     else if (variable_name == "TurnsSincePolicyAdopted")
         empire_property_string_key = &Empire::PolicyCurrentAdoptedDurations;
     else if (variable_name == "CumulativeTurnsPolicyAdopted")
         empire_property_string_key = &Empire::PolicyTotalAdoptedDurations;
 
-    if (empire_property_string_key) {
+    if (empire_property_string_key || empire_property_string_key2) {
         using namespace boost::adaptors;
 
         std::shared_ptr<const Empire> empire;
@@ -1722,13 +1721,20 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             return sum;
         }
 
-        if (empire)
-            return boost::accumulate(empire_property_string_key(*empire) | filtered(key_filter) | map_values, 0);
+        if (empire) {
+            if (empire_property_string_key)
+                return boost::accumulate(empire_property_string_key(*empire) | filtered(key_filter) | map_values, 0);
+            else if (empire_property_string_key2)
+                return boost::accumulate(empire_property_string_key2(*empire) | filtered(key_filter) | map_values, 0);
+        }
 
         int sum = 0;
         for ([[maybe_unused]] auto& [ignored_id, loop_empire] : context.Empires()) {
             (void)ignored_id; // quiet unused variable warning
-            sum += boost::accumulate(empire_property_string_key(*loop_empire) | filtered(key_filter) | map_values, 0);
+            if (empire_property_string_key)
+                sum += boost::accumulate(empire_property_string_key(*loop_empire) | filtered(key_filter) | map_values, 0);
+            else if (empire_property_string_key2)
+                sum += boost::accumulate(empire_property_string_key2(*loop_empire) | filtered(key_filter) | map_values, 0);
         }
         return sum;
     }
@@ -2365,11 +2371,14 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         if (liked_or_disliked_content_name.empty())
             return 0.0;
 
-        if (species->Likes().count(liked_or_disliked_content_name))
-            return 1.0;
-        else if (species->Dislikes().count(liked_or_disliked_content_name))
-            return -1.0;
-        return 0.0;
+        if (std::any_of(species->Likes().begin(), species->Likes().end(),
+                        [&liked_or_disliked_content_name](const auto& l) { return l == liked_or_disliked_content_name; }))
+        { return 1.0; }
+        else if (std::any_of(species->Dislikes().begin(), species->Dislikes().end(),
+                             [&liked_or_disliked_content_name](const auto& d) { return d == liked_or_disliked_content_name; }))
+        { return -1.0; }
+        else
+        { return 0.0; }
 
     }
     else if (variable_name == "SpeciesEmpireOpinion") {
@@ -2417,12 +2426,9 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         int object_id = INVALID_OBJECT_ID;
         if (m_int_ref1)
             object_id = m_int_ref1->Eval(context);
-        auto object = context.ContextObjects().get(object_id);
-        if (!object)
+        auto ship = context.ContextObjects().getRaw<const Ship>(object_id);
+        if (!ship)
             return 0.0;
-        if (object->ObjectType() != UniverseObjectType::OBJ_SHIP)
-            return 0.0;
-        auto ship = std::static_pointer_cast<const Ship>(object);
 
         if (!m_string_ref1)
             return 0.0;
@@ -2945,7 +2951,7 @@ std::string StringCast<double>::Eval(const ScriptingContext& context) const
         // a decimal place indicator using to_chars and from_chars.
         // if not, need to use streaming always?
 #if defined(__cpp_lib_to_chars)
-            std::array<char, 32> buf = {};
+            std::array<std::string::value_type, 32> buf = {};
             std::to_chars(buf.data(), buf.data() + buf.size(), num, std::chars_format::fixed, precision);
             return buf.data();
 #else
@@ -3050,12 +3056,12 @@ std::string UserStringLookup<std::string>::Eval(const ScriptingContext& context)
 
 template <>
 std::string UserStringLookup<std::vector<std::string>>::Eval(const ScriptingContext& context) const {
-    if (!m_value_ref)
-        return "";
-    std::vector<std::string> ref_vals = m_value_ref->Eval(context);
-    if (ref_vals.empty())
-        return "";
     std::string retval;
+    if (!m_value_ref)
+        return retval;
+    auto ref_vals = m_value_ref->Eval(context);
+    if (ref_vals.empty())
+        return retval;
     for (auto& val : ref_vals) {
         if (val.empty() || !UserStringExists(val))
             continue;

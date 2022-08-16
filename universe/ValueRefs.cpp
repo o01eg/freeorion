@@ -26,7 +26,6 @@
 #include "Species.h"
 #include "System.h"
 #include "Tech.h"
-#include "UniverseObjectVisitors.h"
 #include "UniverseObject.h"
 #include "Universe.h"
 #include "../combat/CombatDamage.h"
@@ -209,30 +208,6 @@ namespace {
         }
         return retval;
     }
-
-    struct ObjectTypeVisitor : UniverseObjectVisitor {
-        ObjectTypeVisitor() : m_type(UniverseObjectType::INVALID_UNIVERSE_OBJECT_TYPE) {}
-
-        std::shared_ptr<UniverseObject> Visit(const std::shared_ptr<Building>& obj) const override
-        { m_type = UniverseObjectType::OBJ_BUILDING; return obj; }
-
-        std::shared_ptr<UniverseObject> Visit(const std::shared_ptr<Fleet>& obj) const override
-        { m_type = UniverseObjectType::OBJ_FLEET; return obj; }
-
-        std::shared_ptr<UniverseObject> Visit(const std::shared_ptr<Planet>& obj) const override
-        { m_type = UniverseObjectType::OBJ_PLANET; return obj; }
-
-        std::shared_ptr<UniverseObject> Visit(const std::shared_ptr<Ship>& obj) const override
-        { m_type = UniverseObjectType::OBJ_SHIP; return obj; }
-
-        std::shared_ptr<UniverseObject> Visit(const std::shared_ptr<System>& obj) const override
-        { m_type = UniverseObjectType::OBJ_SYSTEM; return obj; }
-
-        std::shared_ptr<UniverseObject> Visit(const std::shared_ptr<Field>& obj) const override
-        { m_type = UniverseObjectType::OBJ_FIELD; return obj; }
-
-        mutable UniverseObjectType m_type;
-    };
 
     const std::map<std::string, MeterType>& GetMeterNameMap() {
         static const std::map<std::string, MeterType> meter_name_map{

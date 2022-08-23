@@ -48,11 +48,11 @@ namespace {
         //TODO C++11 Move Constructor.
 
         /**Number of rows and columns. (N)*/
-        size_t size() const
+        std::size_t size() const
         { return m_data.size(); }
 
         /**Resize and clear all mutexes.  Assumes that table is locked.*/
-        void resize(size_t a_size) {
+        void resize(std::size_t a_size) {
             m_data.clear();
             m_data.resize(a_size);
             m_row_mutexes.resize(a_size);
@@ -87,12 +87,12 @@ namespace {
     public:
         distance_matrix_cache(Storage& the_storage) : m_storage(the_storage) {}
         /**Read lock the table and return the size N.*/
-        size_t size() {
+        std::size_t size() {
             std::shared_lock<std::shared_mutex> guard(m_storage.m_mutex);
             return m_storage.size();
         }
         /**Write lock the table and resize to N = \p a_size.*/
-        void resize(size_t a_size) {
+        void resize(std::size_t a_size) {
             std::unique_lock<std::shared_mutex> guard(m_storage.m_mutex);
             m_storage.resize(a_size);
         }
@@ -103,10 +103,10 @@ namespace {
         // the function so that the function still has the required signature.
 
         /// Cache miss handler
-        typedef std::function<void (size_t&, Row)> cache_miss_handler;
+        typedef std::function<void (std::size_t&, Row)> cache_miss_handler;
 
         /// A function to examine an entire row cache hit
-        typedef std::function<void (size_t &/*ii*/, const Row /*row*/)> cache_hit_handler;
+        typedef std::function<void (std::size_t &/*ii*/, const Row /*row*/)> cache_hit_handler;
 
         /** Retrieve a single element at (\p ii, \p jj).
           * On cache miss call the \p fill_row which must fill the row
@@ -114,10 +114,10 @@ namespace {
           * Throws if either index is out of range or if \p fill_row
           * does not fill the row  on a cache miss.
           */
-        T get_T(size_t ii, size_t jj, cache_miss_handler fill_row) const {
+        T get_T(std::size_t ii, std::size_t jj, cache_miss_handler fill_row) const {
             std::shared_lock<std::shared_mutex> guard(m_storage.m_mutex);
 
-            size_t NN = m_storage.size();
+            auto NN = m_storage.size();
             if ((ii >= NN) || (jj >= NN)) {
                 ErrorLogger() << "distance_matrix_cache::get_T passed invalid node indices: "
                               << ii << "," << jj << " matrix size: " << NN;
@@ -165,10 +165,10 @@ namespace {
           * Throws if index is out of range or if \p fill_row
           * does not fill the row  on a cache miss.
           */
-        void examine_row(size_t ii, cache_miss_handler fill_row, cache_hit_handler use_row) const {
+        void examine_row(std::size_t ii, cache_miss_handler fill_row, cache_hit_handler use_row) const {
             std::shared_lock<std::shared_mutex> guard(m_storage.m_mutex);
 
-            size_t NN = m_storage.size();
+            std::size_t NN = m_storage.size();
             if (ii >= NN) {
                 ErrorLogger() << "distance_matrix_cache::get_row passed invalid index: "
                               << ii << " matrix size: " << NN;
@@ -312,10 +312,10 @@ namespace SystemPathing {
     template <typename Graph>
     std::pair<std::vector<int>, double> ShortestPathImpl(
         const Graph& graph, int system1_id, int system2_id,
-        double linear_distance, const boost::container::flat_map<int, size_t>& id_to_graph_index)
+        const boost::container::flat_map<int, std::size_t>& id_to_graph_index)
     {
         // convert system IDs to graph indices.  try/catch for invalid input system ids.
-        size_t system1_index, system2_index;
+        std::size_t system1_index, system2_index;
         try {
             system1_index = id_to_graph_index.at(system1_id);
             system2_index = id_to_graph_index.at(system2_id);
@@ -387,7 +387,7 @@ namespace SystemPathing {
     template <typename Graph>
     std::pair<std::vector<int>, int> LeastJumpsPathImpl(
         const Graph& graph, int system1_id, int system2_id,
-        const boost::container::flat_map<int, size_t>& id_to_graph_index,
+        const boost::container::flat_map<int, std::size_t>& id_to_graph_index,
         int max_jumps = INT_MAX)
     {
         // early exit if systems are the same
@@ -395,7 +395,7 @@ namespace SystemPathing {
             return {{system2_id}, 0}; // no jumps needed
 
         // convert system IDs to graph indices.  try/catch for invalid input system ids.
-        size_t system1_index, system2_index;
+        std::size_t system1_index, system2_index;
         try {
             system1_index = id_to_graph_index.at(system1_id);
             system2_index = id_to_graph_index.at(system2_id);
@@ -455,7 +455,7 @@ namespace SystemPathing {
 
     template <typename Graph>
     auto ImmediateNeighborsImpl(
-        const Graph& graph, int system_id, const boost::container::flat_map<int, size_t>& id_to_graph_index)
+        const Graph& graph, int system_id, const boost::container::flat_map<int, std::size_t>& id_to_graph_index)
     {
         const auto& edge_weight_map = boost::get(boost::edge_weight, graph);
         const auto& sys_id_property_map = boost::get(vertex_system_id_t(), graph);
@@ -629,17 +629,18 @@ namespace {
             const SystemGraph*                       m_graph = nullptr;
             Pathfinder::SystemExclusionPredicateType m_pred;
         };
-        typedef boost::filtered_graph<SystemGraph, SystemPredicateFilter> SystemPredicateGraph;
-        typedef std::map<int, std::shared_ptr<SystemPredicateGraph>> EmpireSystemPredicateMap;
-        typedef std::map<Pathfinder::SystemExclusionPredicateType, EmpireSystemPredicateMap> SystemPredicateGraphMap;
+
+        using SystemPredicateGraph = boost::filtered_graph<SystemGraph, SystemPredicateFilter>;
+        using EmpireSystemPredicateMap = std::map<int, std::shared_ptr<SystemPredicateGraph>>;
+        using SystemPredicateGraphMap = std::map<Pathfinder::SystemExclusionPredicateType, EmpireSystemPredicateMap>;
 
         // declare property map types for properties declared above
-        typedef boost::property_map<SystemGraph, vertex_system_id_t>::const_type        ConstSystemIDPropertyMap;
-        typedef boost::property_map<SystemGraph, vertex_system_id_t>::type              SystemIDPropertyMap;
-        typedef boost::property_map<SystemGraph, boost::vertex_index_t>::const_type     ConstIndexPropertyMap;
-        typedef boost::property_map<SystemGraph, boost::vertex_index_t>::type           IndexPropertyMap;
-        typedef boost::property_map<SystemGraph, boost::edge_weight_t>::const_type      ConstEdgeWeightPropertyMap;
-        typedef boost::property_map<SystemGraph, boost::edge_weight_t>::type            EdgeWeightPropertyMap;
+        using ConstSystemIDPropertyMap = boost::property_map<SystemGraph, vertex_system_id_t>::const_type;
+        using SystemIDPropertyMap = boost::property_map<SystemGraph, vertex_system_id_t>::type;
+        using ConstIndexPropertyMap = boost::property_map<SystemGraph, boost::vertex_index_t>::const_type;
+        using IndexPropertyMap = boost::property_map<SystemGraph, boost::vertex_index_t>::type;
+        using ConstEdgeWeightPropertyMap = boost::property_map<SystemGraph, boost::edge_weight_t>::const_type;
+        using EdgeWeightPropertyMap = boost::property_map<SystemGraph, boost::edge_weight_t>::type;
 
         SystemGraph              system_graph;              ///< a graph in which the systems are vertices and the starlanes are edges
         EmpireViewSystemGraphMap empire_system_graph_views; ///< a map of empire IDs to the views of the system graph by those empires
@@ -671,11 +672,11 @@ public:
     bool SystemHasVisibleStarlanes(int system_id, const ObjectMap& objects) const;
     std::vector<std::pair<double, int>> ImmediateNeighbors(int system_id, int empire_id = ALL_EMPIRES) const;
 
-    std::vector<int> WithinJumps(size_t jumps, int candidate) const;
-    std::vector<int> WithinJumps(size_t jumps, std::vector<int> candidates) const;
+    std::vector<int> WithinJumps(std::size_t jumps, int candidate) const;
+    std::vector<int> WithinJumps(std::size_t jumps, std::vector<int> candidates) const;
     void WithinJumpsCacheHit(
-        std::vector<int>& result, size_t jump_limit,
-        size_t ii, const std::vector<short>& row) const;
+        std::vector<int>& result, std::size_t jump_limit,
+        std::size_t ii, const std::vector<short>& row) const;
 
     std::pair<Condition::ObjectSet, Condition::ObjectSet>
     WithinJumpsOfOthers(
@@ -696,7 +697,7 @@ public:
     void WithinJumpsOfOthersCacheHit(
         bool& answer, int jumps, const ObjectMap& objects,
         const Condition::ObjectSet& others,
-        size_t ii, distance_matrix_storage<short>::row_ref row) const;
+        std::size_t ii, distance_matrix_storage<short>::row_ref row) const;
 
     int NearestSystemTo(double x, double y, const ObjectMap& objects) const;
 
@@ -708,12 +709,12 @@ public:
 
     /** When a cache miss occurs fill \p row with the distances
         from index \p ii to every other index.*/
-    void HandleCacheMiss(size_t ii, distance_matrix_storage<short>::row_ref row) const;
+    void HandleCacheMiss(std::size_t ii, distance_matrix_storage<short>::row_ref row) const;
 
 
-    mutable distance_matrix_storage<short>  m_system_jumps; ///< indexed by system graph index (not system id), caches the smallest number of jumps to travel between all the systems
-    std::shared_ptr<GraphImpl>              m_graph_impl = std::make_shared<GraphImpl>(); ///< a graph in which the systems are vertices and the starlanes are edges
-    boost::container::flat_map<int, size_t> m_system_id_to_graph_index;
+    mutable distance_matrix_storage<short>        m_system_jumps; ///< indexed by system graph index (not system id), caches the smallest number of jumps to travel between all the systems
+    std::shared_ptr<GraphImpl>                   m_graph_impl = std::make_shared<GraphImpl>(); ///< a graph in which the systems are vertices and the starlanes are edges
+    boost::container::flat_map<int, std::size_t> m_system_id_to_graph_index;
 };
 
 /////////////////////////////////////////////
@@ -737,7 +738,9 @@ namespace {
 }
 
 /** HandleCacheMiss requires that \p row be locked by exterior context. */
-void Pathfinder::PathfinderImpl::HandleCacheMiss(size_t ii, distance_matrix_storage<short>::row_ref row) const {
+void Pathfinder::PathfinderImpl::HandleCacheMiss(
+    std::size_t ii, distance_matrix_storage<short>::row_ref row) const
+{
     using DistancePropertyMap = boost::iterator_property_map<std::vector<short>::iterator,
                                                              boost::identity_property_map>;
     // FIXME: compute the i row and the j column, but only utilize the i row.
@@ -784,10 +787,10 @@ short Pathfinder::PathfinderImpl::JumpDistanceBetweenSystems(int system1_id, int
     try {
         distance_matrix_cache<distance_matrix_storage<short>> cache(m_system_jumps);
 
-        size_t system1_index = m_system_id_to_graph_index.at(system1_id);
-        size_t system2_index = m_system_id_to_graph_index.at(system2_id);
-        size_t smaller_index = std::min(system1_index, system2_index);
-        size_t other_index   = std::max(system1_index, system2_index);
+        std::size_t system1_index = m_system_id_to_graph_index.at(system1_id);
+        std::size_t system2_index = m_system_id_to_graph_index.at(system2_id);
+        std::size_t smaller_index = std::min(system1_index, system2_index);
+        std::size_t other_index   = std::max(system1_index, system2_index);
 
         namespace ph = boost::placeholders;
 
@@ -975,9 +978,8 @@ std::pair<std::vector<int>, double> Pathfinder::PathfinderImpl::ShortestPath(
     if (empire_id == ALL_EMPIRES) {
         // find path on full / complete system graph
         try {
-            double linear_distance = LinearDistance(system1_id, system2_id, objects);
             return ShortestPathImpl(m_graph_impl->system_graph, system1_id, system2_id,
-                                    linear_distance, m_system_id_to_graph_index);
+                                    m_system_id_to_graph_index);
         } catch (const std::out_of_range&) {
             ErrorLogger() << "PathfinderImpl::ShortestPath passed invalid system id(s): "
                           << system1_id << " & " << system2_id;
@@ -992,9 +994,8 @@ std::pair<std::vector<int>, double> Pathfinder::PathfinderImpl::ShortestPath(
         throw std::out_of_range("PathfinderImpl::ShortestPath passed unknown empire id");
     }
     try {
-        double linear_distance = LinearDistance(system1_id, system2_id, objects);
         return ShortestPathImpl(*graph_it->second, system1_id, system2_id,
-                                linear_distance, m_system_id_to_graph_index);
+                                m_system_id_to_graph_index);
     } catch (const std::out_of_range&) {
         ErrorLogger() << "PathfinderImpl::ShortestPath passed invalid system id(s): "
                       << system1_id << " & " << system2_id;
@@ -1033,9 +1034,8 @@ std::pair<std::vector<int>, double> Pathfinder::PathfinderImpl::ShortestPath(
     }
 
     try {
-        auto linear_distance = LinearDistance(system1_id, system2_id, objects);
         return ShortestPathImpl(*graph_it->second, system1_id, system2_id,
-                                linear_distance, m_system_id_to_graph_index);
+                                m_system_id_to_graph_index);
     } catch (const std::out_of_range&) {
         ErrorLogger() << "Invalid system id(s): " << system1_id << ", " << system2_id;
         throw;
@@ -1173,7 +1173,7 @@ std::vector<std::pair<double, int>> Pathfinder::PathfinderImpl::ImmediateNeighbo
 }
 
 void Pathfinder::PathfinderImpl::WithinJumpsCacheHit(
-    std::vector<int>& result, size_t jump_limit, size_t ii, const std::vector<short>& row) const
+    std::vector<int>& result, std::size_t jump_limit, std::size_t ii, const std::vector<short>& row) const
 {
     TraceLogger() << "Cache Hit ii: " << ii << "  jumps: " << jump_limit;
     // Scan the LUT of system ids and add any result from the row within
@@ -1185,14 +1185,14 @@ void Pathfinder::PathfinderImpl::WithinJumpsCacheHit(
     }
 }
 
-std::vector<int> Pathfinder::WithinJumps(size_t jumps, std::vector<int> candidates) const
+std::vector<int> Pathfinder::WithinJumps(std::size_t jumps, std::vector<int> candidates) const
 { return pimpl->WithinJumps(jumps, std::move(candidates)); }
 
-std::vector<int> Pathfinder::WithinJumps(size_t jumps, int candidate) const
+std::vector<int> Pathfinder::WithinJumps(std::size_t jumps, int candidate) const
 { return pimpl->WithinJumps(jumps, candidate); }
 
 std::vector<int> Pathfinder::PathfinderImpl::WithinJumps(
-    size_t jumps, std::vector<int> near) const
+    std::size_t jumps, std::vector<int> near) const
 {
     if (near.empty())
         return near;
@@ -1217,8 +1217,8 @@ std::vector<int> Pathfinder::PathfinderImpl::WithinJumps(
             using row_ref = distance_matrix_storage<short>::row_ref;
             cache.examine_row(
                 system_index,
-                [this](size_t ii, row_ref row) { HandleCacheMiss(ii, row); }, // boost::bind(&Pathfinder::PathfinderImpl::HandleCacheMiss, this, ph::_1, ph::_2)
-                [this, jumps, &row_result](size_t ii, row_ref row) { WithinJumpsCacheHit(row_result, jumps, ii, row); }); // boost::bind(&Pathfinder::PathfinderImpl::WithinJumpsCacheHit, this, row_result, jumps, ph::_1, ph::_2));
+                [this](std::size_t ii, row_ref row) { HandleCacheMiss(ii, row); }, // boost::bind(&Pathfinder::PathfinderImpl::HandleCacheMiss, this, ph::_1, ph::_2)
+                [this, jumps, &row_result](std::size_t ii, row_ref row) { WithinJumpsCacheHit(row_result, jumps, ii, row); }); // boost::bind(&Pathfinder::PathfinderImpl::WithinJumpsCacheHit, this, row_result, jumps, ph::_1, ph::_2));
             return row_result;
         };
 
@@ -1244,7 +1244,7 @@ std::vector<int> Pathfinder::PathfinderImpl::WithinJumps(
     return near;
 }
 
-std::vector<int> Pathfinder::PathfinderImpl::WithinJumps(size_t jumps, int candidate) const {
+std::vector<int> Pathfinder::PathfinderImpl::WithinJumps(std::size_t jumps, int candidate) const {
     auto index_it = m_system_id_to_graph_index.find(candidate);
     if (index_it == m_system_id_to_graph_index.end())
         return {};
@@ -1259,8 +1259,8 @@ std::vector<int> Pathfinder::PathfinderImpl::WithinJumps(size_t jumps, int candi
     using row_ref = distance_matrix_storage<short>::row_ref;
     cache.examine_row(
         system_index,
-        [this](size_t ii, row_ref row) { HandleCacheMiss(ii, row); },
-        [this, jumps, &row_result](size_t ii, row_ref row) { WithinJumpsCacheHit(row_result, jumps, ii, row); });
+        [this](std::size_t ii, row_ref row) { HandleCacheMiss(ii, row); },
+        [this, jumps, &row_result](std::size_t ii, row_ref row) { WithinJumpsCacheHit(row_result, jumps, ii, row); });
 
     // ensure uniqueness of results
     std::sort(row_result.begin(), row_result.end());
@@ -1335,7 +1335,7 @@ void Pathfinder::PathfinderImpl::WithinJumpsOfOthersCacheHit(
     bool& answer, int jumps,
     const ObjectMap& objects,
     const Condition::ObjectSet& others,
-    size_t ii, distance_matrix_storage<short>::row_ref row) const
+    std::size_t ii, distance_matrix_storage<short>::row_ref row) const
 {
     // Check if any of the others are within jumps of candidate, by looping
     // through all of the others and applying the WithinJumpsOfOthersOtherVisitor.
@@ -1395,7 +1395,7 @@ bool Pathfinder::PathfinderImpl::WithinJumpsOfOthers(
     if (others.empty())
         return false;
 
-    size_t system_index;
+    std::size_t system_index;
     try {
         system_index = m_system_id_to_graph_index.at(system_id);
     } catch (const std::out_of_range&) {
@@ -1455,7 +1455,7 @@ void Pathfinder::PathfinderImpl::InitializeSystemGraph(const ObjectMap& objects,
     decltype(m_system_id_to_graph_index)::sequence_type system_id_to_graph_idx_vec;
     system_id_to_graph_idx_vec.reserve(system_ids.size());
 
-    for (size_t system_index = 0; system_index < system_ids.size(); ++system_index) {
+    for (std::size_t system_index = 0; system_index < system_ids.size(); ++system_index) {
         // add a vertex to the graph for this system, and assign it the system's universe ID as a property
         boost::add_vertex(new_graph_impl->system_graph);
         int system_id = system_ids[system_index];
@@ -1470,7 +1470,7 @@ void Pathfinder::PathfinderImpl::InitializeSystemGraph(const ObjectMap& objects,
                                       std::make_move_iterator(system_id_to_graph_idx_vec.end()));
 
     // add edges for all starlanes
-    for (size_t system1_index = 0; system1_index < system_ids.size(); ++system1_index) {
+    for (std::size_t system1_index = 0; system1_index < system_ids.size(); ++system1_index) {
         int system1_id = system_ids[system1_index];
         auto system1 = objects.get<System>(system1_id);
 
@@ -1487,7 +1487,7 @@ void Pathfinder::PathfinderImpl::InitializeSystemGraph(const ObjectMap& objects,
             auto reverse_lookup_map_it = m_system_id_to_graph_index.find(lane_dest_id);
             if (reverse_lookup_map_it == m_system_id_to_graph_index.end())
                 continue;   // couldn't find destination system id in vertex lookup map; don't add to graph
-            size_t lane_dest_graph_index = reverse_lookup_map_it->second;
+            std::size_t lane_dest_graph_index = reverse_lookup_map_it->second;
 
             auto [edge_descriptor, add_success] =
                 boost::add_edge(system1_index, lane_dest_graph_index, new_graph_impl->system_graph);

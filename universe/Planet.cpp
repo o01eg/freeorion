@@ -157,7 +157,7 @@ bool Planet::HasTag(std::string_view name, const ScriptingContext& context) cons
     return species && species->HasTag(name);
 }
 
-std::string Planet::Dump(unsigned short ntabs) const {
+std::string Planet::Dump(uint8_t ntabs) const {
     std::string retval = UniverseObject::Dump(ntabs);
     retval.reserve(2048);
     retval += PopCenter::Dump(ntabs);
@@ -529,19 +529,17 @@ std::map<int, double> Planet::EmpireGroundCombatForces() const {
     return empire_troops;
 }
 
-int Planet::TurnsSinceColonization() const {
+int Planet::TurnsSinceColonization(int current_turn) const {
     if (m_turn_last_colonized == INVALID_GAME_TURN)
         return 0;
-    int current_turn = CurrentTurn();
     if (current_turn == INVALID_GAME_TURN)
         return 0;
     return current_turn - m_turn_last_colonized;
 }
 
-int Planet::TurnsSinceLastConquered() const {
+int Planet::TurnsSinceLastConquered(int current_turn) const {
     if (m_turn_last_conquered == INVALID_GAME_TURN)
         return 0;
-    int current_turn = CurrentTurn();
     if (current_turn == INVALID_GAME_TURN)
         return 0;
     return current_turn - m_turn_last_conquered;
@@ -583,7 +581,7 @@ void Planet::SetHighAxialTilt() {
 }
 
 void Planet::AddBuilding(int building_id) {
-    size_t buildings_size = m_buildings.size();
+    auto buildings_size = m_buildings.size();
     m_buildings.insert(building_id);
     if (buildings_size != m_buildings.size())
         StateChangedSignal();

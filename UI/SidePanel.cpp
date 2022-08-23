@@ -232,7 +232,7 @@ namespace {
 
         if (!usphere_initialized) {
             // calculate azimuth on unit sphere along equator
-            for (auto longitude : boost::irange<size_t>(0, azimuth.size())) {
+            for (auto longitude : boost::irange<std::size_t>(0, azimuth.size())) {
                 float phi = 2 * M_PI * longitude / (azimuth.size() - 1);
                 azimuth[longitude] = {std::sin(phi), std::cos(phi)};
             }
@@ -241,7 +241,7 @@ namespace {
             azimuth.back() = azimuth[0];
 
             // calculate elevation on unit sphere along meridian
-            for (auto latitude : boost::irange<size_t>(0, elevation.size())) {
+            for (auto latitude : boost::irange<std::size_t>(0, elevation.size())) {
                 float theta = M_PI * latitude / (elevation.size() - 1);
                 elevation[latitude] = {std::sin(theta), std::cos(theta)};
             }
@@ -272,9 +272,9 @@ namespace {
         glMaterialfv(GL_FRONT, GL_DIFFUSE, diffuse_v);
 
         glColor(GG::CLR_WHITE);
-        for (auto latitude : boost::irange<size_t>(0, elevation.size() - 1)) {
+        for (auto latitude : boost::irange<std::size_t>(0, elevation.size() - 1)) {
             glBegin(GL_QUAD_STRIP);
-            for (auto longitude : boost::irange<size_t>(0, azimuth.size())) {
+            for (auto longitude : boost::irange<std::size_t>(0, azimuth.size())) {
                 glNormal3f(azimuth[longitude].sin * elevation[latitude+1].sin,
                            azimuth[longitude].cos * elevation[latitude+1].sin,
                            elevation[latitude+1].cos);
@@ -809,7 +809,7 @@ namespace {
 /** A class to display all of the system names*/
 class SidePanel::SystemNameDropDownList : public CUIDropDownList {
     public:
-    SystemNameDropDownList(size_t num_shown_elements) :
+    SystemNameDropDownList(std::size_t num_shown_elements) :
         CUIDropDownList(num_shown_elements),
         m_order_issuing_enabled(true)
     { }
@@ -2127,7 +2127,7 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
     if (planet->OwnedBy(GGHumanClientApp::GetApp()->EmpireID()) && m_order_issuing_enabled
         && m_planet_name->InClient(pt))
     {
-        auto rename_action = [this, planet]() { // rename planet
+        auto rename_action = [context, this, planet]() mutable { // rename planet
             auto edit_wnd = GG::Wnd::Create<CUIEditWnd>(
                 GG::X(350), UserString("SP_ENTER_NEW_PLANET_NAME"), planet->Name());
             edit_wnd->Run();
@@ -2135,14 +2135,15 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
             if (!m_order_issuing_enabled)
                 return;
 
-            ScriptingContext context;
+            auto result = edit_wnd->Result();
+
             if (!RenameOrder::Check(GGHumanClientApp::GetApp()->EmpireID(),
-                                    planet->ID(), edit_wnd->Result(), context))
+                                    planet->ID(), result, context))
             { return; }
 
             GGHumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<RenameOrder>(GGHumanClientApp::GetApp()->EmpireID(),
-                                              planet->ID(), edit_wnd->Result(), context),
+                                              planet->ID(), std::move(result), context),
                 context);
             Refresh(context);
         };
@@ -2161,10 +2162,9 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
 
         // submenus for each available recipient empire
         GG::MenuItem give_away_menu(UserString("ORDER_GIVE_PLANET_TO_EMPIRE"), false, false);
-        for (auto& entry : Empires()) {
+        for (auto& entry : context.Empires()) {
             int recipient_empire_id = entry.first;
-            auto gift_action = [recipient_empire_id, client_empire_id, planet]() {
-                ScriptingContext context;
+            auto gift_action = [context, recipient_empire_id, client_empire_id, planet]() mutable {
                 GGHumanClientApp::GetApp()->Orders().IssueOrder(
                     std::make_shared<GiveObjectToEmpireOrder>(
                         client_empire_id, planet->ID(), recipient_empire_id, context),
@@ -2177,9 +2177,8 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
         popup->AddMenuItem(std::move(give_away_menu));
 
         if (planet->OrderedGivenToEmpire() != ALL_EMPIRES) {
-            auto ungift_action = [planet]() { // cancel give away order for this fleet
+            auto ungift_action = [context, planet]() mutable { // cancel give away order for this fleet
                 const OrderSet orders = GGHumanClientApp::GetApp()->Orders();
-                ScriptingContext context;
                 for (const auto& id_and_order : orders) {
                     if (auto order = std::dynamic_pointer_cast<
                         GiveObjectToEmpireOrder>(id_and_order.second))
@@ -3596,16 +3595,11 @@ bool SidePanel::PlanetSelectable(int planet_id, const ObjectMap& objects) const 
     if (!planet)
         return false;
 
-    // Find a selection visitor and apply it to planet
-    std::shared_ptr<UniverseObjectVisitor> selectable_visitor;
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    if (empire_id != ALL_EMPIRES)
-        selectable_visitor = std::make_shared<OwnedVisitor>(empire_id);
+    if (planet->Unowned())
+        return false;
 
-    if (!selectable_visitor)
-        return true;
-
-    return planet->Accept(*selectable_visitor).use_count();
+    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    return planet->OwnedBy(client_empire_id);
 }
 
 void SidePanel::SelectPlanet(int planet_id, const ObjectMap& objects) {
@@ -3613,7 +3607,7 @@ void SidePanel::SelectPlanet(int planet_id, const ObjectMap& objects) {
         return;
 
     // Use the first sidepanel with selection enabled to determine if planet is selectable.
-    bool planet_selectable(false);
+    bool planet_selectable = false;
     for (auto& weak_panel : s_side_panels) {
         if (auto panel = weak_panel.lock())
             if (panel->m_selection_enabled) {
@@ -3640,7 +3634,7 @@ void SidePanel::SetSystem(int system_id) {
     if (s_system_id == system_id)
         return;
 
-    auto system = Objects().get<System>(system_id);
+    auto system = Objects().getRaw<const System>(system_id);
     if (!system) {
         s_system_id = INVALID_OBJECT_ID;
         return;
@@ -3648,7 +3642,7 @@ void SidePanel::SetSystem(int system_id) {
 
     s_system_id = system_id;
 
-    if (Objects().get<System>(s_system_id))
+    if (Objects().getRaw<const System>(s_system_id))
         PlaySidePanelOpenSound();
 
     // refresh sidepanels

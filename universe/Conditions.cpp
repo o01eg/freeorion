@@ -43,61 +43,11 @@ namespace {
 
     DeclareThreadSafeLogger(conditions);
 
-    using boost::placeholders::_1;
-
+    template <typename T = UniverseObject>
     void AddAllObjectsSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting().size());
-        for (const auto& obj : objects.allExisting())
-            condition_non_targets.push_back(obj.second.get());
-        // in my tests, this range for loop with emplace_back was about 5% faster than std::transform with std::back_inserter and a lambda returning the .second of the map entries
-    }
-
-    void AddBuildingSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<Building>().size());
-        for (const auto& obj : objects.allExisting<Building>())
-            condition_non_targets.push_back(obj.second.get());
-    }
-
-    void AddFieldSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<Field>().size());
-        for (const auto& obj : objects.allExisting<Field>())
-            condition_non_targets.push_back(obj.second.get());
-    }
-
-    void AddFleetSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<Fleet>().size());
-        for (const auto& obj : objects.allExisting<Fleet>())
-            condition_non_targets.push_back(obj.second.get());
-    }
-
-    void AddPlanetSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<Planet>().size());
-        for (const auto& obj : objects.allExisting<Planet>())
-            condition_non_targets.push_back(obj.second.get());
-    }
-
-    void AddPopCenterSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<PopCenter>().size());
-        for (const auto& obj : objects.allExisting<PopCenter>())
-            condition_non_targets.push_back(obj.second.get());
-    }
-
-    void AddResCenterSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<ResourceCenter>().size());
-        for (const auto& obj : objects.allExisting<ResourceCenter>())
-            condition_non_targets.push_back(obj.second.get());
-    }
-
-    void AddShipSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<Ship>().size());
-        for (const auto& obj : objects.allExisting<Ship>())
-            condition_non_targets.push_back(obj.second.get());
-    }
-
-    void AddSystemSet(const ObjectMap& objects, Condition::ObjectSet& condition_non_targets) {
-        condition_non_targets.reserve(condition_non_targets.size() + objects.allExisting<System>().size());
-        for (const auto& obj : objects.allExisting<System>())
-            condition_non_targets.push_back(obj.second.get());
+        const auto& all_t = objects.allExistingRaw<T>();
+        condition_non_targets.reserve(condition_non_targets.size() + all_t.size());
+        condition_non_targets.insert(condition_non_targets.end(), all_t.begin(), all_t.end());
     }
 
     /** Used by 4-parameter Condition::Eval function, and some of its
@@ -287,6 +237,7 @@ Effect::TargetSet Condition::Eval(ScriptingContext& parent_context) const
 {
     ObjectSet matches_as_objectset{this->Eval(std::as_const(parent_context))};
     Effect::TargetSet retval;
+    retval.reserve(matches_as_objectset.size());
     std::transform(matches_as_objectset.begin(), matches_as_objectset.end(),
                    std::back_inserter(retval),
                    [](auto&& o) { return const_cast<UniverseObject*>(o); });
@@ -310,7 +261,7 @@ void Condition::GetDefaultInitialCandidateObjects(const ScriptingContext& parent
 std::string Condition::Description(bool negated) const
 { return ""; }
 
-std::string Condition::Dump(unsigned short ntabs) const
+std::string Condition::Dump(uint8_t ntabs) const
 { return ""; }
 
 bool Condition::Match(const ScriptingContext& local_context) const
@@ -372,7 +323,7 @@ std::string Number::Description(bool negated) const {
                % m_condition->Description());
 }
 
-std::string Number::Dump(unsigned short ntabs) const {
+std::string Number::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Number";
     if (m_low)
         retval += " low = " + m_low->Dump(ntabs);
@@ -583,7 +534,7 @@ std::string Turn::Description(bool negated) const {
     }
 }
 
-std::string Turn::Dump(unsigned short ntabs) const {
+std::string Turn::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Turn";
     if (m_low)
         retval += " low = " + m_low->Dump(ntabs);
@@ -989,7 +940,7 @@ std::string SortedNumberOf::Description(bool negated) const {
     }
 }
 
-std::string SortedNumberOf::Dump(unsigned short ntabs) const {
+std::string SortedNumberOf::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs);
     switch (m_sorting_method) {
     case SortingMethod::SORT_RANDOM:
@@ -1085,7 +1036,7 @@ std::string All::Description(bool negated) const {
         : UserString("DESC_ALL_NOT");
 }
 
-std::string All::Dump(unsigned short ntabs) const
+std::string All::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "All\n"; }
 
 unsigned int All::GetCheckSum() const {
@@ -1130,7 +1081,7 @@ std::string None::Description(bool negated) const {
         : UserString("DESC_NONE_NOT");
 }
 
-std::string None::Dump(unsigned short ntabs) const
+std::string None::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "None\n"; }
 
 unsigned int None::GetCheckSum() const {
@@ -1168,7 +1119,7 @@ bool NoOp::operator==(const Condition& rhs) const
 std::string NoOp::Description(bool negated) const
 { return UserString("DESC_NOOP"); }
 
-std::string NoOp::Dump(unsigned short ntabs) const
+std::string NoOp::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "NoOp\n"; }
 
 unsigned int NoOp::GetCheckSum() const {
@@ -1377,7 +1328,7 @@ std::string EmpireAffiliation::Description(bool negated) const {
     }
 }
 
-std::string EmpireAffiliation::Dump(unsigned short ntabs) const {
+std::string EmpireAffiliation::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs);
     if (m_affiliation == EmpireAffiliationType::AFFIL_SELF) {
         retval += "OwnedBy";
@@ -1472,7 +1423,7 @@ std::string Source::Description(bool negated) const {
         : UserString("DESC_SOURCE_NOT");
 }
 
-std::string Source::Dump(unsigned short ntabs) const
+std::string Source::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "Source\n"; }
 
 bool Source::Match(const ScriptingContext& local_context) const {
@@ -1518,7 +1469,7 @@ std::string RootCandidate::Description(bool negated) const {
         : UserString("DESC_ROOT_CANDIDATE_NOT");
 }
 
-std::string RootCandidate::Dump(unsigned short ntabs) const
+std::string RootCandidate::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "RootCandidate\n"; }
 
 bool RootCandidate::Match(const ScriptingContext& local_context) const {
@@ -1564,7 +1515,7 @@ std::string Target::Description(bool negated) const {
         : UserString("DESC_TARGET_NOT");
 }
 
-std::string Target::Dump(unsigned short ntabs) const
+std::string Target::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "Target\n"; }
 
 bool Target::Match(const ScriptingContext& local_context) const {
@@ -1664,9 +1615,7 @@ namespace {
 
             } else {
                 // match any of the species specified
-                if (std::any_of(m_names.begin(), m_names.end(),
-                                [planet_id, this](const auto& name)
-                {
+                if (std::any_of(m_names.begin(), m_names.end(), [planet_id, this](const auto& name) {
                     auto it = m_species_homeworlds.find(name);
                     if (it == m_species_homeworlds.end())
                         return false;
@@ -1734,7 +1683,7 @@ std::string Homeworld::Description(bool negated) const {
         % values_str);
 }
 
-std::string Homeworld::Dump(unsigned short ntabs) const {
+std::string Homeworld::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "HomeWorld";
     if (m_names.size() == 1) {
         retval += " name = " + m_names[0]->Dump(ntabs);
@@ -1782,7 +1731,7 @@ bool Homeworld::Match(const ScriptingContext& local_context) const {
 
 void Homeworld::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                   ObjectSet& condition_non_targets) const
-{ AddPlanetSet(parent_context.ContextObjects(), condition_non_targets); }
+{ AddAllObjectsSet<Planet>(parent_context.ContextObjects(), condition_non_targets); }
 
 void Homeworld::SetTopLevelContent(const std::string& content_name) {
     for (auto& name : m_names) {
@@ -1853,7 +1802,7 @@ std::string Capital::Description(bool negated) const {
         : UserString("DESC_CAPITAL_NOT");
 }
 
-std::string Capital::Dump(unsigned short ntabs) const
+std::string Capital::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "Capital\n"; }
 
 bool Capital::Match(const ScriptingContext& local_context) const {
@@ -1917,7 +1866,7 @@ std::string Monster::Description(bool negated) const {
         : UserString("DESC_MONSTER_NOT");
 }
 
-std::string Monster::Dump(unsigned short ntabs) const
+std::string Monster::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "Monster\n"; }
 
 bool Monster::Match(const ScriptingContext& local_context) const {
@@ -1938,7 +1887,7 @@ bool Monster::Match(const ScriptingContext& local_context) const {
 
 void Monster::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                 ObjectSet& condition_non_targets) const
-{ AddShipSet(parent_context.ContextObjects(), condition_non_targets); }
+{ AddAllObjectsSet<Ship>(parent_context.ContextObjects(), condition_non_targets); }
 
 unsigned int Monster::GetCheckSum() const {
     unsigned int retval{0};
@@ -1970,7 +1919,7 @@ std::string Armed::Description(bool negated) const {
         : UserString("DESC_ARMED_NOT");
 }
 
-std::string Armed::Dump(unsigned short ntabs) const
+std::string Armed::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "Armed\n"; }
 
 bool Armed::Match(const ScriptingContext& local_context) const {
@@ -2091,7 +2040,7 @@ std::string Type::Description(bool negated) const {
            % value_str);
 }
 
-std::string Type::Dump(unsigned short ntabs) const {
+std::string Type::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs);
     if (dynamic_cast<ValueRef::Constant<UniverseObjectType>*>(m_type.get())) {
         switch (m_type->Eval()) {
@@ -2139,28 +2088,28 @@ void Type::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_cont
 
     switch (m_type->Eval(parent_context)) {
         case UniverseObjectType::OBJ_BUILDING:
-            AddBuildingSet(parent_context.ContextObjects(), condition_non_targets);
+            AddAllObjectsSet<::Building>(parent_context.ContextObjects(), condition_non_targets);
             break;
         case UniverseObjectType::OBJ_FIELD:
-            AddFieldSet(parent_context.ContextObjects(), condition_non_targets);
+            AddAllObjectsSet<::Field>(parent_context.ContextObjects(), condition_non_targets);
             break;
         case UniverseObjectType::OBJ_FLEET:
-            AddFleetSet(parent_context.ContextObjects(), condition_non_targets);
+            AddAllObjectsSet<Fleet>(parent_context.ContextObjects(), condition_non_targets);
             break;
         case UniverseObjectType::OBJ_PLANET:
-            AddPlanetSet(parent_context.ContextObjects(), condition_non_targets);
+            AddAllObjectsSet<Planet>(parent_context.ContextObjects(), condition_non_targets);
             break;
         case UniverseObjectType::OBJ_POP_CENTER:
-            AddPopCenterSet(parent_context.ContextObjects(), condition_non_targets);
+            AddAllObjectsSet<PopCenter>(parent_context.ContextObjects(), condition_non_targets);
             break;
         case UniverseObjectType::OBJ_PROD_CENTER:
-            AddResCenterSet(parent_context.ContextObjects(), condition_non_targets);
+            AddAllObjectsSet<ResourceCenter>(parent_context.ContextObjects(), condition_non_targets);
             break;
         case UniverseObjectType::OBJ_SHIP:
-            AddShipSet(parent_context.ContextObjects(), condition_non_targets);
+            AddAllObjectsSet<Ship>(parent_context.ContextObjects(), condition_non_targets);
             break;
         case UniverseObjectType::OBJ_SYSTEM:
-            AddSystemSet(parent_context.ContextObjects(), condition_non_targets);
+            AddAllObjectsSet<System>(parent_context.ContextObjects(), condition_non_targets);
             break;
         case UniverseObjectType::OBJ_FIGHTER:   // shouldn't exist outside of combat as a separate object
         default:
@@ -2321,7 +2270,7 @@ std::string Building::Description(bool negated) const {
            % values_str);
 }
 
-std::string Building::Dump(unsigned short ntabs) const {
+std::string Building::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Building name = ";
     if (m_names.size() == 1) {
         retval += m_names[0]->Dump(ntabs) + "\n";
@@ -2337,7 +2286,7 @@ std::string Building::Dump(unsigned short ntabs) const {
 
 void Building::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                  ObjectSet& condition_non_targets) const
-{ AddBuildingSet(parent_context.ContextObjects(), condition_non_targets); }
+{ AddAllObjectsSet<::Building>(parent_context.ContextObjects(), condition_non_targets); }
 
 bool Building::Match(const ScriptingContext& local_context) const {
     const auto* candidate = local_context.condition_local_candidate;
@@ -2488,7 +2437,7 @@ std::string Field::Description(bool negated) const {
            % values_str);
 }
 
-std::string Field::Dump(unsigned short ntabs) const {
+std::string Field::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Field name = ";
     if (m_names.size() == 1) {
         retval += m_names[0]->Dump(ntabs) + "\n";
@@ -2504,7 +2453,7 @@ std::string Field::Dump(unsigned short ntabs) const {
 
 void Field::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                               ObjectSet& condition_non_targets) const
-{ AddFieldSet(parent_context.ContextObjects(), condition_non_targets); }
+{ AddAllObjectsSet<::Field>(parent_context.ContextObjects(), condition_non_targets); }
 
 bool Field::Match(const ScriptingContext& local_context) const {
     const auto* candidate = local_context.condition_local_candidate;
@@ -2737,7 +2686,7 @@ std::string HasSpecial::Description(bool negated) const {
                 % name_str);
 }
 
-std::string HasSpecial::Dump(unsigned short ntabs) const {
+std::string HasSpecial::Dump(uint8_t ntabs) const {
     std::string name_str = (m_name ? m_name->Dump(ntabs) : "");
 
     if (m_since_turn_low || m_since_turn_high) {
@@ -2895,7 +2844,7 @@ std::string HasTag::Description(bool negated) const {
         % name_str);
 }
 
-std::string HasTag::Dump(unsigned short ntabs) const {
+std::string HasTag::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "HasTag";
     if (m_name)
         retval += " name = " + m_name->Dump(ntabs);
@@ -3015,7 +2964,7 @@ std::string CreatedOnTurn::Description(bool negated) const {
                % high_str);
 }
 
-std::string CreatedOnTurn::Dump(unsigned short ntabs) const {
+std::string CreatedOnTurn::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "CreatedOnTurn";
     if (m_low)
         retval += " low = " + m_low->Dump(ntabs);
@@ -3212,7 +3161,7 @@ std::string Contains::Description(bool negated) const {
         % m_condition->Description());
 }
 
-std::string Contains::Dump(unsigned short ntabs) const {
+std::string Contains::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Contains condition =\n";
     retval += m_condition->Dump(ntabs+1);
     return retval;
@@ -3222,9 +3171,9 @@ void Contains::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
                                                  ObjectSet& condition_non_targets) const
 {
     // objects that can contain other objects: systems, fleets, planets
-    AddSystemSet(parent_context.ContextObjects(), condition_non_targets);
-    AddFleetSet(parent_context.ContextObjects(), condition_non_targets);
-    AddPlanetSet(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<System>(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Fleet>(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Planet>(parent_context.ContextObjects(), condition_non_targets);
 }
 
 bool Contains::Match(const ScriptingContext& local_context) const {
@@ -3425,7 +3374,7 @@ std::string ContainedBy::Description(bool negated) const {
         % m_condition->Description());
 }
 
-std::string ContainedBy::Dump(unsigned short ntabs) const {
+std::string ContainedBy::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "ContainedBy condition =\n";
     retval += m_condition->Dump(ntabs+1);
     return retval;
@@ -3435,10 +3384,10 @@ void ContainedBy::GetDefaultInitialCandidateObjects(const ScriptingContext& pare
                                                     ObjectSet& condition_non_targets) const
 {
     // objects that can be contained by other objects: fleets, planets, ships, buildings
-    AddFleetSet(parent_context.ContextObjects(), condition_non_targets);
-    AddPlanetSet(parent_context.ContextObjects(), condition_non_targets);
-    AddShipSet(parent_context.ContextObjects(), condition_non_targets);
-    AddBuildingSet(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Fleet>(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Planet>(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Ship>(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<::Building>(parent_context.ContextObjects(), condition_non_targets);
 }
 
 bool ContainedBy::Match(const ScriptingContext& local_context) const {
@@ -3570,7 +3519,7 @@ std::string InOrIsSystem::Description(bool negated) const {
     return str(FlexibleFormat(description_str) % system_str);
 }
 
-std::string InOrIsSystem::Dump(unsigned short ntabs) const {
+std::string InOrIsSystem::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "InSystem";
     if (m_system_id)
         retval += " id = " + m_system_id->Dump(ntabs);
@@ -3738,7 +3687,7 @@ std::string OnPlanet::Description(bool negated) const {
     return str(FlexibleFormat(description_str) % planet_str);
 }
 
-std::string OnPlanet::Dump(unsigned short ntabs) const {
+std::string OnPlanet::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "OnPlanet";
     if (m_planet_id)
         retval += " id = " + m_planet_id->Dump(ntabs);
@@ -3758,7 +3707,7 @@ void OnPlanet::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
 {
     if (!m_planet_id) {
         // only buildings can be on planets
-        AddBuildingSet(parent_context.ContextObjects(), condition_non_targets);
+        AddAllObjectsSet<::Building>(parent_context.ContextObjects(), condition_non_targets);
         return;
     }
 
@@ -3768,7 +3717,7 @@ void OnPlanet::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_
 
     if (!simple_eval_safe) {
         // only buildings can be on planets
-        AddBuildingSet(parent_context.ContextObjects(), condition_non_targets);
+        AddAllObjectsSet<::Building>(parent_context.ContextObjects(), condition_non_targets);
         return;
     }
 
@@ -3888,7 +3837,7 @@ std::string ObjectID::Description(bool negated) const {
                % object_str);
 }
 
-std::string ObjectID::Dump(unsigned short ntabs) const
+std::string ObjectID::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "Object id = " + m_object_id->Dump(ntabs) + "\n"; }
 
 bool ObjectID::InitialCandidatesAllMatch() const {
@@ -4062,7 +4011,7 @@ std::string PlanetType::Description(bool negated) const {
         % values_str);
 }
 
-std::string PlanetType::Dump(unsigned short ntabs) const {
+std::string PlanetType::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Planet type = ";
     if (m_types.size() == 1) {
         retval += m_types[0]->Dump(ntabs) + "\n";
@@ -4079,8 +4028,8 @@ std::string PlanetType::Dump(unsigned short ntabs) const {
 void PlanetType::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                    ObjectSet& condition_non_targets) const
 {
-    AddPlanetSet(parent_context.ContextObjects(), condition_non_targets);
-    AddBuildingSet(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Planet>(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<::Building>(parent_context.ContextObjects(), condition_non_targets);
 }
 
 bool PlanetType::Match(const ScriptingContext& local_context) const {
@@ -4241,7 +4190,7 @@ std::string PlanetSize::Description(bool negated) const {
         % values_str);
 }
 
-std::string PlanetSize::Dump(unsigned short ntabs) const {
+std::string PlanetSize::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Planet size = ";
     if (m_sizes.size() == 1) {
         retval += m_sizes[0]->Dump(ntabs) + "\n";
@@ -4258,8 +4207,8 @@ std::string PlanetSize::Dump(unsigned short ntabs) const {
 void PlanetSize::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                    ObjectSet& condition_non_targets) const
 {
-    AddPlanetSet(parent_context.ContextObjects(), condition_non_targets);
-    AddBuildingSet(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Planet>(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<::Building>(parent_context.ContextObjects(), condition_non_targets);
 }
 
 bool PlanetSize::Match(const ScriptingContext& local_context) const {
@@ -4448,7 +4397,7 @@ std::string PlanetEnvironment::Description(bool negated) const {
         % species_str);
 }
 
-std::string PlanetEnvironment::Dump(unsigned short ntabs) const {
+std::string PlanetEnvironment::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Planet environment = ";
     if (m_environments.size() == 1) {
         retval += m_environments[0]->Dump(ntabs);
@@ -4468,8 +4417,8 @@ std::string PlanetEnvironment::Dump(unsigned short ntabs) const {
 void PlanetEnvironment::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                           ObjectSet& condition_non_targets) const
 {
-    AddPlanetSet(parent_context.ContextObjects(), condition_non_targets);
-    AddBuildingSet(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Planet>(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<::Building>(parent_context.ContextObjects(), condition_non_targets);
 }
 
 bool PlanetEnvironment::Match(const ScriptingContext& local_context) const {
@@ -4648,7 +4597,7 @@ std::string Species::Description(bool negated) const {
         % values_str);
 }
 
-std::string Species::Dump(unsigned short ntabs) const {
+std::string Species::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Species";
     if (m_names.empty()) {
         retval += "\n";
@@ -4667,9 +4616,9 @@ std::string Species::Dump(unsigned short ntabs) const {
 void Species::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                 ObjectSet& condition_non_targets) const
 {
-    AddPlanetSet(parent_context.ContextObjects(), condition_non_targets);
-    AddBuildingSet(parent_context.ContextObjects(), condition_non_targets);
-    AddShipSet(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Planet>(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<::Building>(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Ship>(parent_context.ContextObjects(), condition_non_targets);
 }
 
 bool Species::Match(const ScriptingContext& local_context) const {
@@ -4784,19 +4733,19 @@ namespace {
         auto& from = test_val ? matches : non_matches;
         auto& to = test_val ? non_matches : matches;
 
-        auto o_it = from.begin();
-        auto m_it = mask.begin();
+        auto o_it = from.begin();               // next object to test
+        auto from_dest = o_it;                  // where to put next object if it stays in from_set
+        auto to_dest = std::back_inserter(to);  // where to put next object if it moves to to_set
+        auto m_it = mask.begin();               // next object's mask value to check
         const auto m_end = mask.end();
-        auto dest = std::back_inserter(to);
 
         for (; m_it != m_end; ++m_it) {
-            if (*m_it != test_val) {
-                *dest++ = std::exchange(*o_it, from.back());
-                from.pop_back();
-            } else {
-                ++o_it;
-            }
+            if (*m_it != test_val)
+                *to_dest++ = *o_it++;       // put at next position in to set and move to next object to test
+            else
+                *from_dest++ = *o_it++;     // put at next output position in from set and move to next object to check mask for
         }
+        from.erase(from_dest, from.end());  // remove any remaining stuff past last used output position in from set
     };
 
     template <typename V, typename Pred>
@@ -4820,19 +4769,19 @@ namespace {
         auto& from = test_val ? matches : non_matches;
         auto& to = test_val ? non_matches : matches;
 
-        auto o_it = from.begin();
-        auto v_it = vals.begin();
+        auto o_it = from.begin();               // next object to test
+        auto from_dest = o_it;                  // where to put next object if it stays in from_set
+        auto to_dest = std::back_inserter(to);  // where to put next object if it moves to to_set
+        auto v_it = vals.begin();               // next object's value to test
         const auto v_end = vals.end();
-        auto dest = std::back_inserter(to);
 
         for (; v_it != v_end; ++v_it) {
-            if (pred(*v_it) != test_val) {
-                *dest++ = std::exchange(*o_it, from.back());
-                from.pop_back();
-            } else {
-                ++o_it;
-            }
+            if (pred(*v_it) != test_val)
+                *to_dest++ = *o_it++;       // put at next position in to set and move to next object to test
+            else
+                *from_dest++ = *o_it++;     // put at next output position in from set and move to next object to test
         }
+        from.erase(from_dest, from.end());  // remove any remaining stuff past last used output position in from set
     };
 }
 
@@ -4865,9 +4814,11 @@ void SpeciesOpinion::Eval(const ScriptingContext& parent_context,
         return;
     }
 
+    const auto& sm{parent_context.species};
 
     if (m_content && m_content->LocalCandidateInvariant()) {
-        auto process_objects_with_different_species = [search_domain, &matches, &non_matches, this]
+        auto process_objects_with_different_species =
+            [&sm, search_domain, &matches, &non_matches, this]
             (const auto& species_for_objects, std::string content)
         {
             // determine all unique species
@@ -4880,7 +4831,6 @@ void SpeciesOpinion::Eval(const ScriptingContext& parent_context,
             std::vector<std::string_view> matching_species;
             matching_species.reserve(unique_species.size());
 
-            const auto& sm{GetSpeciesManager()};
             if (sm.empty()) // forces check for pending species
                 DebugLogger() << "SpeciesOpinion found no species...";
 
@@ -4920,10 +4870,10 @@ void SpeciesOpinion::Eval(const ScriptingContext& parent_context,
                                           species_for_objects, is_matching_species);
         };
 
-        auto process_objects_with_same_species = [search_domain, &matches, &non_matches, this]
+        auto process_objects_with_same_species =
+            [&sm, search_domain, &matches, &non_matches, this]
             (std::string species_name, std::string content)
         {
-            const auto& sm{GetSpeciesManager()};
             if (sm.empty()) // forces check for pending species
                 DebugLogger() << "SpeciesOpinion found no species...";
             const auto* species = sm.GetSpeciesUnchecked(species_name);
@@ -5011,7 +4961,7 @@ std::string SpeciesOpinion::Description(bool negated) const {
                % content_str);
 }
 
-std::string SpeciesOpinion::Dump(unsigned short ntabs) const {
+std::string SpeciesOpinion::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs);
     switch (m_comp) {
     case ComparisonType::GREATER_THAN:
@@ -5347,7 +5297,7 @@ std::string Enqueued::Description(bool negated) const {
                % what_str);
 }
 
-std::string Enqueued::Dump(unsigned short ntabs) const {
+std::string Enqueued::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Enqueued";
 
     if (m_build_type == BuildType::BT_BUILDING) {
@@ -5388,7 +5338,7 @@ bool Enqueued::Match(const ScriptingContext& local_context) const {
 void Enqueued::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                  ObjectSet& condition_non_targets) const
 {
-    AddPlanetSet(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Planet>(parent_context.ContextObjects(), condition_non_targets);
 }
 
 void Enqueued::SetTopLevelContent(const std::string& content_name) {
@@ -5537,7 +5487,7 @@ std::string FocusType::Description(bool negated) const {
         % values_str);
 }
 
-std::string FocusType::Dump(unsigned short ntabs) const {
+std::string FocusType::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Focus name = ";
     if (m_names.size() == 1) {
         retval += m_names[0]->Dump(ntabs) + "\n";
@@ -5574,8 +5524,8 @@ bool FocusType::Match(const ScriptingContext& local_context) const {
 void FocusType::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                   ObjectSet& condition_non_targets) const
 {
-    AddPlanetSet(parent_context.ContextObjects(), condition_non_targets);
-    AddBuildingSet(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Planet>(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<::Building>(parent_context.ContextObjects(), condition_non_targets);
 }
 
 void FocusType::SetTopLevelContent(const std::string& content_name) {
@@ -5700,7 +5650,7 @@ std::string StarType::Description(bool negated) const {
         % values_str);
 }
 
-std::string StarType::Dump(unsigned short ntabs) const {
+std::string StarType::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Star type = ";
     if (m_types.size() == 1) {
         retval += m_types[0]->Dump(ntabs) + "\n";
@@ -5845,7 +5795,7 @@ std::string DesignHasHull::Description(bool negated) const {
         % name_str);
 }
 
-std::string DesignHasHull::Dump(unsigned short ntabs) const {
+std::string DesignHasHull::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "DesignHasHull";
     if (m_name)
         retval += " name = " + m_name->Dump(ntabs);
@@ -5868,7 +5818,7 @@ bool DesignHasHull::Match(const ScriptingContext& local_context) const {
 void DesignHasHull::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                       ObjectSet& condition_non_targets) const
 {
-    AddShipSet(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Ship>(parent_context.ContextObjects(), condition_non_targets);
 }
 
 void DesignHasHull::SetTopLevelContent(const std::string& content_name) {
@@ -6017,7 +5967,7 @@ std::string DesignHasPart::Description(bool negated) const {
         % name_str);
 }
 
-std::string DesignHasPart::Dump(unsigned short ntabs) const {
+std::string DesignHasPart::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "DesignHasPart";
     if (m_low)
         retval += "low = " + m_low->Dump(ntabs);
@@ -6046,7 +5996,7 @@ bool DesignHasPart::Match(const ScriptingContext& local_context) const {
 void DesignHasPart::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                       ObjectSet& condition_non_targets) const
 {
-    AddShipSet(parent_context.ContextObjects(), condition_non_targets);
+    AddAllObjectsSet<Ship>(parent_context.ContextObjects(), condition_non_targets);
 }
 
 void DesignHasPart::SetTopLevelContent(const std::string& content_name) {
@@ -6193,7 +6143,7 @@ std::string DesignHasPartClass::Description(bool negated) const {
                % UserString(to_string(m_class)));
 }
 
-std::string DesignHasPartClass::Dump(unsigned short ntabs) const {
+std::string DesignHasPartClass::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "DesignHasPartClass";
     if (m_low)
         retval += " low = " + m_low->Dump(ntabs);
@@ -6219,7 +6169,7 @@ bool DesignHasPartClass::Match(const ScriptingContext& local_context) const {
 
 void DesignHasPartClass::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                            ObjectSet& condition_non_targets) const
-{ AddShipSet(parent_context.ContextObjects(), condition_non_targets); }
+{ AddAllObjectsSet<Ship>(parent_context.ContextObjects(), condition_non_targets); }
 
 void DesignHasPartClass::SetTopLevelContent(const std::string& content_name) {
     if (m_low)
@@ -6347,7 +6297,7 @@ std::string PredefinedShipDesign::Description(bool negated) const {
         % name_str);
 }
 
-std::string PredefinedShipDesign::Dump(unsigned short ntabs) const {
+std::string PredefinedShipDesign::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "PredefinedShipDesign";
     if (m_name)
         retval += " name = " + m_name->Dump(ntabs);
@@ -6462,7 +6412,7 @@ std::string NumberedShipDesign::Description(bool negated) const {
                % id_str);
 }
 
-std::string NumberedShipDesign::Dump(unsigned short ntabs) const
+std::string NumberedShipDesign::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "NumberedShipDesign design_id = " + m_design_id->Dump(ntabs); }
 
 bool NumberedShipDesign::Match(const ScriptingContext& local_context) const {
@@ -6573,7 +6523,7 @@ std::string ProducedByEmpire::Description(bool negated) const {
                % empire_str);
 }
 
-std::string ProducedByEmpire::Dump(unsigned short ntabs) const
+std::string ProducedByEmpire::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "ProducedByEmpire empire = " + m_empire_id->Dump(ntabs); }
 
 bool ProducedByEmpire::Match(const ScriptingContext& local_context) const {
@@ -6673,7 +6623,7 @@ std::string Chance::Description(bool negated) const {
     }
 }
 
-std::string Chance::Dump(unsigned short ntabs) const
+std::string Chance::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "Random probability = " + m_chance->Dump(ntabs) + "\n"; }
 
 bool Chance::Match(const ScriptingContext& local_context) const {
@@ -6850,7 +6800,7 @@ std::string MeterValue::Description(bool negated) const {
     }
 }
 
-std::string MeterValue::Dump(unsigned short ntabs) const {
+std::string MeterValue::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs);
     retval += MeterTypeDumpString(m_meter);
     if (m_low)
@@ -7012,7 +6962,7 @@ std::string ShipPartMeterValue::Description(bool negated) const {
                % high_str);
 }
 
-std::string ShipPartMeterValue::Dump(unsigned short ntabs) const {
+std::string ShipPartMeterValue::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs);
     retval += MeterTypeDumpString(m_meter);
     if (m_part_name)
@@ -7173,7 +7123,7 @@ std::string EmpireMeterValue::Description(bool negated) const {
                % empire_str);
 }
 
-std::string EmpireMeterValue::Dump(unsigned short ntabs) const {
+std::string EmpireMeterValue::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "EmpireMeterValue";
     if (m_empire_id)
         retval += " empire = " + m_empire_id->Dump(ntabs);
@@ -7348,7 +7298,7 @@ std::string EmpireStockpileValue::Description(bool negated) const {
                % high_str);
 }
 
-std::string EmpireStockpileValue::Dump(unsigned short ntabs) const {
+std::string EmpireStockpileValue::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs);
     switch (m_stockpile) {
     case ResourceType::RE_INFLUENCE: retval += "OwnerInfluenceStockpile";break;
@@ -7513,7 +7463,7 @@ std::string EmpireHasAdoptedPolicy::Description(bool negated) const {
         % name_str);
 }
 
-std::string EmpireHasAdoptedPolicy::Dump(unsigned short ntabs) const {
+std::string EmpireHasAdoptedPolicy::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "EmpireHasAdoptedPolicy";
     if (m_empire_id)
         retval += " empire = " + m_empire_id->Dump(ntabs);
@@ -7676,7 +7626,7 @@ std::string OwnerHasTech::Description(bool negated) const {
         % name_str);
 }
 
-std::string OwnerHasTech::Dump(unsigned short ntabs) const {
+std::string OwnerHasTech::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "OwnerHasTech";
     if (m_empire_id)
         retval += " empire = " + m_empire_id->Dump(ntabs);
@@ -7821,7 +7771,7 @@ std::string OwnerHasBuildingTypeAvailable::Description(bool negated) const {
         : UserString("DESC_OWNER_HAS_BUILDING_TYPE_NOT");
 }
 
-std::string OwnerHasBuildingTypeAvailable::Dump(unsigned short ntabs) const {
+std::string OwnerHasBuildingTypeAvailable::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "OwnerHasBuildingTypeAvailable";
     if (m_empire_id)
         retval += " empire = " + m_empire_id->Dump(ntabs);
@@ -7965,7 +7915,7 @@ std::string OwnerHasShipDesignAvailable::Description(bool negated) const {
         : UserString("DESC_OWNER_HAS_SHIP_DESIGN_NOT");
 }
 
-std::string OwnerHasShipDesignAvailable::Dump(unsigned short ntabs) const {
+std::string OwnerHasShipDesignAvailable::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "OwnerHasShipDesignAvailable";
     if (m_empire_id)
         retval += " empire = " + m_empire_id->Dump(ntabs);
@@ -8107,7 +8057,7 @@ std::string OwnerHasShipPartAvailable::Description(bool negated) const {
         : UserString("DESC_OWNER_HAS_SHIP_PART_NOT");
 }
 
-std::string OwnerHasShipPartAvailable::Dump(unsigned short ntabs) const {
+std::string OwnerHasShipPartAvailable::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "OwnerHasShipPartAvailable";
     if (m_empire_id)
         retval += " empire = " + m_empire_id->Dump(ntabs);
@@ -8317,7 +8267,7 @@ std::string VisibleToEmpire::Description(bool negated) const {
     }
 }
 
-std::string VisibleToEmpire::Dump(unsigned short ntabs) const {
+std::string VisibleToEmpire::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "VisibleToEmpire";
     if (m_empire_id)
         retval += " empire = " + m_empire_id->Dump(ntabs);
@@ -8461,7 +8411,7 @@ std::string WithinDistance::Description(bool negated) const {
                % m_condition->Description());
 }
 
-std::string WithinDistance::Dump(unsigned short ntabs) const {
+std::string WithinDistance::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "WithinDistance distance = " + m_distance->Dump(ntabs) + " condition =\n";
     retval += m_condition->Dump(ntabs+1);
     return retval;
@@ -8570,7 +8520,7 @@ std::string WithinStarlaneJumps::Description(bool negated) const {
                % m_condition->Description());
 }
 
-std::string WithinStarlaneJumps::Dump(unsigned short ntabs) const {
+std::string WithinStarlaneJumps::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "WithinStarlaneJumps jumps = " + m_jumps->Dump(ntabs) + " condition =\n";
     retval += m_condition->Dump(ntabs+1);
     return retval;
@@ -9046,7 +8996,7 @@ std::string CanAddStarlaneConnection::Description(bool negated) const {
         % m_condition->Description());
 }
 
-std::string CanAddStarlaneConnection::Dump(unsigned short ntabs) const {
+std::string CanAddStarlaneConnection::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "CanAddStarlanesTo condition =\n";
     retval += m_condition->Dump(ntabs+1);
     return retval;
@@ -9169,7 +9119,7 @@ std::string ExploredByEmpire::Description(bool negated) const {
                % empire_str);
 }
 
-std::string ExploredByEmpire::Dump(unsigned short ntabs) const
+std::string ExploredByEmpire::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "ExploredByEmpire empire_id = " + m_empire_id->Dump(ntabs); }
 
 bool ExploredByEmpire::Match(const ScriptingContext& local_context) const {
@@ -9218,7 +9168,7 @@ std::string Stationary::Description(bool negated) const {
         : UserString("DESC_STATIONARY_NOT");
 }
 
-std::string Stationary::Dump(unsigned short ntabs) const
+std::string Stationary::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "Stationary\n"; }
 
 bool Stationary::Match(const ScriptingContext& local_context) const {
@@ -9291,7 +9241,7 @@ std::string Aggressive::Description(bool negated) const {
             : UserString("DESC_PASSIVE_NOT");
 }
 
-std::string Aggressive::Dump(unsigned short ntabs) const
+std::string Aggressive::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + (m_aggressive ? "Aggressive\n" : "Passive\n"); }
 
 bool Aggressive::Match(const ScriptingContext& local_context) const {
@@ -9415,7 +9365,7 @@ std::string FleetSupplyableByEmpire::Description(bool negated) const {
                % empire_str);
 }
 
-std::string FleetSupplyableByEmpire::Dump(unsigned short ntabs) const
+std::string FleetSupplyableByEmpire::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "ResupplyableBy empire_id = " + m_empire_id->Dump(ntabs); }
 
 bool FleetSupplyableByEmpire::Match(const ScriptingContext& local_context) const {
@@ -9616,7 +9566,7 @@ std::string ResourceSupplyConnectedByEmpire::Description(bool negated) const {
                % m_condition->Description());
 }
 
-std::string ResourceSupplyConnectedByEmpire::Dump(unsigned short ntabs) const {
+std::string ResourceSupplyConnectedByEmpire::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "ResourceSupplyConnectedBy empire_id = "
         + m_empire_id->Dump(ntabs) + " condition = \n";
     retval += m_condition->Dump(ntabs+1);
@@ -9664,7 +9614,7 @@ std::string CanColonize::Description(bool negated) const {
         : UserString("DESC_CAN_COLONIZE_NOT")));
 }
 
-std::string CanColonize::Dump(unsigned short ntabs) const
+std::string CanColonize::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "CanColonize\n"; }
 
 bool CanColonize::Match(const ScriptingContext& local_context) const {
@@ -9746,7 +9696,7 @@ std::string CanProduceShips::Description(bool negated) const {
         : UserString("DESC_CAN_PRODUCE_SHIPS_NOT")));
 }
 
-std::string CanProduceShips::Dump(unsigned short ntabs) const
+std::string CanProduceShips::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "CanColonize\n"; }
 
 bool CanProduceShips::Match(const ScriptingContext& local_context) const {
@@ -9896,7 +9846,7 @@ std::string OrderedBombarded::Description(bool negated) const {
                % by_str);
 }
 
-std::string OrderedBombarded::Dump(unsigned short ntabs) const
+std::string OrderedBombarded::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "OrderedBombarded object = " + m_by_object_condition->Dump(ntabs); }
 
 bool OrderedBombarded::Match(const ScriptingContext& local_context) const {
@@ -10485,7 +10435,7 @@ std::string ValueTest::Description(bool negated) const {
                % composed_comparison);
 }
 
-std::string ValueTest::Dump(unsigned short ntabs) const {
+std::string ValueTest::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "(";
     if (m_value_ref1)
         retval += m_value_ref1->Dump(ntabs);
@@ -10746,7 +10696,7 @@ std::string Location::Description(bool negated) const {
                % name_str);
 }
 
-std::string Location::Dump(unsigned short ntabs) const {
+std::string Location::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Location content_type = ";
 
     switch (m_content_type) {
@@ -10910,7 +10860,7 @@ std::string CombatTarget::Description(bool negated) const {
                % name_str);
 }
 
-std::string CombatTarget::Dump(unsigned short ntabs) const {
+std::string CombatTarget::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "CombatTarget content_type = ";
 
     switch (m_content_type) {
@@ -11143,7 +11093,7 @@ std::string And::Description(bool negated) const {
     return values_str;
 }
 
-std::string And::Dump(unsigned short ntabs) const {
+std::string And::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "And [\n";
     for (auto& operand : m_operands)
         retval += operand->Dump(ntabs+1);
@@ -11362,7 +11312,7 @@ void Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_contex
     // substantially slower for many Or conditions
 }
 
-std::string Or::Dump(unsigned short ntabs) const {
+std::string Or::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Or [\n";
     for (auto& operand : m_operands)
         retval += operand->Dump(ntabs+1);
@@ -11435,7 +11385,7 @@ void Not::Eval(const ScriptingContext& parent_context, ObjectSet& matches, Objec
 std::string Not::Description(bool negated) const
 { return m_operand->Description(!negated); }
 
-std::string Not::Dump(unsigned short ntabs) const {
+std::string Not::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Not\n";
     retval += m_operand->Dump(ntabs+1);
     return retval;
@@ -11625,7 +11575,7 @@ std::string OrderedAlternativesOf::Description(bool negated) const {
     return values_str;
 }
 
-std::string OrderedAlternativesOf::Dump(unsigned short ntabs) const {
+std::string OrderedAlternativesOf::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "OrderedAlternativesOf [\n";
     for (auto& operand : m_operands)
         retval += operand->Dump(ntabs+1);

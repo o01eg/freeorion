@@ -76,10 +76,10 @@ void System::Copy(std::shared_ptr<const UniverseObject> copied_object,
         this->m_objects = copied_system->VisibleContainedObjectIDs(empire_id, universe.GetEmpireObjectVisibility());
 
         // only copy orbit info for visible planets
-        size_t orbits_size = m_orbits.size();
+        auto orbits_size = m_orbits.size();
         m_orbits.clear();
         m_orbits.assign(orbits_size, INVALID_OBJECT_ID);
-        for (std::size_t o = 0; o < copied_system->m_orbits.size(); ++o) {
+        for (std::size_t o = 0u; o < copied_system->m_orbits.size(); ++o) {
             int planet_id = copied_system->m_orbits[o];
             if (m_objects.count(planet_id))
                 m_orbits[o] = planet_id;
@@ -136,7 +136,7 @@ void System::Copy(std::shared_ptr<const UniverseObject> copied_object,
     }
 }
 
-std::string System::Dump(unsigned short ntabs) const {
+std::string System::Dump(uint8_t ntabs) const {
     std::string retval = UniverseObject::Dump(ntabs);
     retval.reserve(2048);
     retval.append(" star type: ").append(to_string(m_star))
@@ -535,16 +535,14 @@ std::map<int, bool> System::VisibleStarlanesWormholes(int empire_id, const Unive
     // check if any fleets owned by empire are moving along a starlane connected to this system...
 
     // get moving fleets owned by empire
-    std::vector<const Fleet*> moving_empire_fleets;
-    moving_empire_fleets.reserve(objects.size<Fleet>());
-    static const MovingFleetVisitor moving_fleet_visitor;
-    for (auto& object : objects.find<Fleet>(moving_fleet_visitor)) {
-        if (object && object->ObjectType() == UniverseObjectType::OBJ_FLEET && object->OwnedBy(empire_id))
-            moving_empire_fleets.push_back(object.get());
-    }
+    auto is_owned_moving_fleet = [empire_id](const Fleet* fleet) {
+        return fleet->FinalDestinationID() != INVALID_OBJECT_ID &&
+            fleet->SystemID() == INVALID_OBJECT_ID &&
+            fleet->OwnedBy(empire_id);
+    };
 
     // add any lanes an owned fleet is moving along that connect to this system
-    for (auto* fleet : moving_empire_fleets) {
+    for (auto* fleet : objects.findRaw<const Fleet>(is_owned_moving_fleet)) {
         if (fleet->SystemID() != INVALID_OBJECT_ID) {
             ErrorLogger() << "System::VisibleStarlanesWormholes somehow got a moving fleet that had a valid system id?";
             continue;

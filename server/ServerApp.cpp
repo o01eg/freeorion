@@ -32,7 +32,6 @@
 #include "../universe/Species.h"
 #include "../universe/System.h"
 #include "../universe/Tech.h"
-#include "../universe/UniverseObjectVisitors.h"
 #include "../universe/UnlockableItem.h"
 #include "../universe/ValueRef.h"
 #include "../util/Directories.h"
@@ -248,7 +247,7 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
     std::vector<std::string> args, arg;
     args.push_back("\"" + AI_CLIENT_EXE + "\"");
     args.push_back("place_holder");
-    size_t player_pos = args.size()-1;
+    std::size_t player_pos = args.size()-1;
     std::stringstream max_aggr_str;
     max_aggr_str << max_aggression;
     args.push_back(max_aggr_str.str());
@@ -820,7 +819,7 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
         entry.second->UpdateOwnedObjectCounters(m_universe);
 
     UpdateEmpireSupply(context, m_supply_manager, false);
-    m_universe.UpdateStatRecords(m_empires);
+    m_universe.UpdateStatRecords(context);
 }
 
 bool ServerApp::NewGameInitVerifyJoiners(const std::vector<PlayerSetupData>& player_setup_data) {
@@ -918,10 +917,10 @@ void ServerApp::SendNewGameStartMessages() {
         bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
         player_connection->SendMessage(GameStartMessage(m_single_player_game,    empire_id,
                                                         m_current_turn,          m_empires,
-                                                        m_universe,              GetSpeciesManager(),
-                                                        GetCombatLogManager(),   GetSupplyManager(),
+                                                        m_universe,              m_species_manager,
+                                                        GetCombatLogManager(),   m_supply_manager,
                                                         player_info_map,         m_galaxy_setup_data,
-                                                        use_binary_serialization, !player_connection->IsLocalConnection()));
+                                                        use_binary_serialization,!player_connection->IsLocalConnection()));
     }
 }
 
@@ -1111,7 +1110,7 @@ void ServerApp::LoadChatHistory() {
 
 void ServerApp::PushChatMessage(const std::string& text,
                                 const std::string& player_name,
-                                std::array<unsigned char, 4> text_color,
+                                std::array<uint8_t, 4> text_color,
                                 const boost::posix_time::ptime& timestamp)
 {
     ChatHistoryEntity chat{timestamp, player_name, text, text_color};
@@ -1499,16 +1498,16 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
 
             player_connection->SendMessage(GameStartMessage(m_single_player_game, empire_id,
                                                             m_current_turn, m_empires, m_universe,
-                                                            GetSpeciesManager(), GetCombatLogManager(),
-                                                            GetSupplyManager(), player_info_map, *orders, sss,
+                                                            m_species_manager, GetCombatLogManager(),
+                                                            m_supply_manager, player_info_map, *orders, sss,
                                                             m_galaxy_setup_data, use_binary_serialization,
                                                             !player_connection->IsLocalConnection()));
 
         } else if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER) {
             player_connection->SendMessage(GameStartMessage(m_single_player_game, empire_id,
                                                             m_current_turn, m_empires, m_universe,
-                                                            GetSpeciesManager(), GetCombatLogManager(),
-                                                            GetSupplyManager(), player_info_map, *orders,
+                                                            m_species_manager, GetCombatLogManager(),
+                                                            m_supply_manager, player_info_map, *orders,
                                                             psgd.ui_data.get(), m_galaxy_setup_data,
                                                             use_binary_serialization,
                                                             !player_connection->IsLocalConnection()));
@@ -1519,8 +1518,8 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
 
             player_connection->SendMessage(GameStartMessage(m_single_player_game, ALL_EMPIRES,
                                                             m_current_turn, m_empires, m_universe,
-                                                            GetSpeciesManager(), GetCombatLogManager(),
-                                                            GetSupplyManager(), player_info_map,
+                                                            m_species_manager, GetCombatLogManager(),
+                                                            m_supply_manager, player_info_map,
                                                             m_galaxy_setup_data, use_binary_serialization,
                                                             !player_connection->IsLocalConnection()));
         } else {
@@ -1575,7 +1574,7 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
     // Add predefined ship designs to universe
     GetPredefinedShipDesignManager().AddShipDesignsToUniverse(m_universe);
     // Initialize empire objects for each player
-    InitEmpires(player_setup_data);
+    InitEmpires(player_setup_data, m_empires);
 
     bool success{false};
     try {
@@ -1845,8 +1844,8 @@ void ServerApp::AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_conn
         // simply sends GAME_START message so established player will known he is in the game now
         player_connection->SendMessage(GameStartMessage(m_single_player_game, ALL_EMPIRES,
                                                         m_current_turn, m_empires, m_universe,
-                                                        GetSpeciesManager(), GetCombatLogManager(),
-                                                        GetSupplyManager(), player_info_map,
+                                                        m_species_manager, GetCombatLogManager(),
+                                                        m_supply_manager, player_info_map,
                                                         m_galaxy_setup_data, use_binary_serialization,
                                                         !player_connection->IsLocalConnection()));
     } else {
@@ -1893,9 +1892,11 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
         return false;
     }
 
+    auto is_owned = [empire_id](const UniverseObject* obj) { return obj->OwnedBy(empire_id); };
+
     // test for colonies count
-    auto planets = m_universe.Objects().find<Planet>(OwnedVisitor(empire_id));
-    if (planets.size() > static_cast<size_t>(GetGameRules().Get<int>("RULE_CONCEDE_COLONIES_THRESHOLD"))) {
+    auto planets = m_universe.Objects().findRaw <Planet>(is_owned);
+    if (planets.size() > static_cast<std::size_t>(GetGameRules().Get<int>("RULE_CONCEDE_COLONIES_THRESHOLD"))) {
         player_connection->SendMessage(ErrorMessage(UserStringNop("ERROR_CONCEDE_EXCEED_COLONIES"), false));
         return false;
     }
@@ -1905,17 +1906,17 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
     const auto& empire_ids = m_empires.EmpireIDs();
 
     // destroy owned ships
-    for (auto& obj : m_universe.Objects().find<Ship>(OwnedVisitor(empire_id))) {
+    for (auto* obj : m_universe.Objects().findRaw<Ship>(is_owned)) {
         obj->SetOwner(ALL_EMPIRES);
         m_universe.RecursiveDestroy(obj->ID(), empire_ids);
     }
     // destroy owned buildings
-    for (auto& obj : m_universe.Objects().find<Building>(OwnedVisitor(empire_id))) {
+    for (auto* obj : m_universe.Objects().findRaw<Building>(is_owned)) {
         obj->SetOwner(ALL_EMPIRES);
         m_universe.RecursiveDestroy(obj->ID(), empire_ids);
     }
     // unclaim owned planets
-    for (const auto& planet : planets)
+    for (auto* planet : planets)
         planet->Reset(m_universe.Objects());
 
     // Don't wait for turn
@@ -2059,8 +2060,8 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     player_connection->SendMessage(GameStartMessage(
         m_single_player_game, empire_id,
         m_current_turn, m_empires, m_universe,
-        GetSpeciesManager(), GetCombatLogManager(),
-        GetSupplyManager(), player_info_map, orders,
+        m_species_manager, GetCombatLogManager(),
+        m_supply_manager, player_info_map, orders,
         ui_data,
         m_galaxy_setup_data,
         use_binary_serialization,
@@ -2219,20 +2220,6 @@ bool ServerApp::AllOrdersReceived() {
 }
 
 namespace {
-    struct PopulatedOwnedVisitor : public UniverseObjectVisitor {
-        PopulatedOwnedVisitor(int empire_id = ALL_EMPIRES) :
-            m_empire_id(empire_id)
-        {}
-        virtual ~PopulatedOwnedVisitor() = default;
-        auto Visit(const std::shared_ptr<Planet>& obj) const -> std::shared_ptr<UniverseObject> override {
-            return (obj
-                    && obj->OwnedBy(m_empire_id)
-                    && obj->Populated())
-                ? obj : nullptr;
-        }
-        const int m_empire_id;
-    };
-
     /** Returns true if \a empire has been eliminated by the applicable
       * definition of elimination.  As of this writing, elimination means
       * having no ships and no population on planets. */
@@ -2657,8 +2644,6 @@ namespace {
         CombatLogManager& log_manager = GetCombatLogManager();
 
         for (CombatInfo& combat_info : combats) {
-            const ObjectMap& objects{combat_info.objects};
-
             // add combat log entry
             int log_id = log_manager.AddNewLog(CombatLog{combat_info});
 
@@ -2666,7 +2651,8 @@ namespace {
             for (int empire_id : combat_info.empire_ids) {
                 if (auto empire{combat_info.GetEmpire(empire_id)})
                     empire->AddSitRepEntry(CreateCombatSitRep(
-                        combat_info.system_id, log_id, EnemyId(empire_id, combat_info.empire_ids)));
+                        combat_info.system_id, log_id, EnemyId(empire_id, combat_info.empire_ids),
+                        combat_info.turn));
             }
 
             // sitreps about destroyed objects
@@ -2675,8 +2661,9 @@ namespace {
             {
                 if (auto empire{combat_info.GetEmpire(knowing_empire_id)}) {
                     for (int dest_obj_id : known_destroyed_object_ids) {
-                        empire->AddSitRepEntry(CreateCombatDestroyedObjectSitRep(
-                            dest_obj_id, combat_info.system_id, knowing_empire_id, combat_info.turn));
+                        if (auto* obj = combat_info.objects.getRaw(dest_obj_id))
+                            empire->AddSitRepEntry(CreateCombatDestroyedObjectSitRep(
+                                obj, combat_info.system_id, knowing_empire_id, combat_info.turn));
                     }
                 }
             }
@@ -2689,20 +2676,24 @@ namespace {
                     //DebugLogger() << " ... Object is destroyed and doesn't need a sitrep.";
                     continue;
                 }
+                const auto* obj = combat_info.objects.getRaw(damaged_object_id);
+                if (!obj) {
+                    ErrorLogger() << "CreateCombatSitreps couldn't find damaged object with id: " << damaged_object_id;
+                    continue;
+                }
+
                 // which empires know about this object?
                 for (auto& [viewing_empire_id, empire_known_objects] : combat_info.empire_object_visibility) {
                     // does this empire know about this object?
                     auto damaged_obj_it = empire_known_objects.find(damaged_object_id);
                     if (damaged_obj_it == empire_known_objects.end())
                         continue;
-                    //DebugLogger() << " ... Empire " << viewing_empire_id << " has visibility " << damaged_obj_it->second << " of object " << damaged_object_id;
                     if (damaged_obj_it->second < Visibility::VIS_BASIC_VISIBILITY)
                         continue;
 
                     if (auto empire = combat_info.GetEmpire(viewing_empire_id))
                         empire->AddSitRepEntry(CreateCombatDamagedObjectSitRep(
-                            damaged_object_id, combat_info.system_id, viewing_empire_id,
-                            objects, combat_info.turn));
+                            obj, combat_info.system_id, viewing_empire_id, combat_info.turn));
                 }
             }
         }
@@ -3533,7 +3524,7 @@ void ServerApp::ProcessCombats() {
     for (CombatInfo& combat_info : combats) {
         auto combat_system = combat_info.GetSystem();
         if (combat_system)
-            combat_system->SetLastTurnBattleHere(CurrentTurn());
+            combat_system->SetLastTurnBattleHere(context.current_turn);
 
         DebugLogger(combat) << "Processing combat at " << (combat_system ? combat_system->Name() : "(No System id: " + std::to_string(combat_info.system_id) + ")");
         TraceLogger(combat) << combat_info.objects.Dump();
@@ -3633,7 +3624,7 @@ void ServerApp::PostCombatProcessTurns() {
     // execute all effects and update meters prior to production, research, etc.
     if (GetGameRules().Get<bool>("RULE_RESEED_PRNG_SERVER")) {
         static boost::hash<std::string> pcpt_string_hash;
-        Seed(static_cast<unsigned int>(CurrentTurn()) + pcpt_string_hash(m_galaxy_setup_data.seed));
+        Seed(static_cast<unsigned int>(context.current_turn) + pcpt_string_hash(m_galaxy_setup_data.seed));
     }
     m_universe.ApplyAllEffectsAndUpdateMeters(context, false);
 
@@ -3788,7 +3779,7 @@ void ServerApp::PostCombatProcessTurns() {
 
 
     // misc. other updates and records
-    m_universe.UpdateStatRecords(m_empires);
+    m_universe.UpdateStatRecords(context);
     for ([[maybe_unused]] auto& [ignored_empire_id, empire] : m_empires) {
         (void)ignored_empire_id;    // quiet unused variable warning
         empire->UpdateOwnedObjectCounters(m_universe);
@@ -3829,12 +3820,11 @@ void ServerApp::PostCombatProcessTurns() {
             player->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER)
         {
             bool use_binary_serialization = player->IsBinarySerializationUsed();
-            player->SendMessage(TurnUpdateMessage(empire_id, m_current_turn,
-                                                  m_empires,                          m_universe,
-                                                  GetSpeciesManager(),                GetCombatLogManager(),
-                                                  GetSupplyManager(),                 players,
-                                                  use_binary_serialization,
-                                                  !player->IsLocalConnection()));
+            player->SendMessage(TurnUpdateMessage(empire_id,                m_current_turn,
+                                                  m_empires,                m_universe,
+                                                  m_species_manager,        GetCombatLogManager(),
+                                                  m_supply_manager,         players,
+                                                  use_binary_serialization, !player->IsLocalConnection()));
         }
     }
     m_turn_expired = false;

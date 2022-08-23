@@ -67,10 +67,9 @@ void ResourceCenter::Init() {
 const std::string& ResourceCenter::Focus() const
 { return m_focus; }
 
-int ResourceCenter::TurnsSinceFocusChange() const {
+int ResourceCenter::TurnsSinceFocusChange(int current_turn) const {
     if (m_last_turn_focus_changed == INVALID_GAME_TURN)
         return 0;
-    int current_turn = CurrentTurn();
     if (current_turn == INVALID_GAME_TURN)
         return 0;
     return current_turn - m_last_turn_focus_changed;
@@ -82,7 +81,7 @@ std::vector<std::string> ResourceCenter::AvailableFoci() const
 const std::string& ResourceCenter::FocusIcon(const std::string& focus_name) const
 { return EMPTY_STRING; }
 
-std::string ResourceCenter::Dump(unsigned short ntabs) const {
+std::string ResourceCenter::Dump(uint8_t ntabs) const {
     return std::string{"ResourceCenter focus: "}.append(m_focus)
         .append(" last changed on turn: ").append(std::to_string(m_last_turn_focus_changed));
 }

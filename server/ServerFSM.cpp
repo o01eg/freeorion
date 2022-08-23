@@ -417,9 +417,9 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
                 int bytes_written = 0;
                 // save game...
                 try {
-                    bytes_written = SaveGame(save_filename,     server_data,    m_server.GetPlayerSaveGameData(),
-                                             GetUniverse(),     Empires(),      GetSpeciesManager(),
-                                             GetCombatLogManager(),             m_server.m_galaxy_setup_data,
+                    bytes_written = SaveGame(save_filename,             server_data,        m_server.GetPlayerSaveGameData(),
+                                             m_server.GetUniverse(),    m_server.Empires(), m_server.GetSpeciesManager(),
+                                             GetCombatLogManager(),     m_server.m_galaxy_setup_data,
                                              !m_server.m_single_player_game);
                 } catch (const std::exception& error) {
                     ErrorLogger(FSM) << "While saving, catch std::exception: " << error.what();
@@ -781,7 +781,7 @@ sc::result Idle::react(const Hostless&) {
             lobby_data->players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
         }
 
-        const SpeciesManager& sm = GetSpeciesManager();
+        const SpeciesManager& sm = server.GetSpeciesManager();
         auto max_ai = GetOptionsDB().Get<int>("network.server.ai.max");
         const int ai_count = GetOptionsDB().Get<int>("setup.ai.player.count");
         int ai_next_index = 1;
@@ -804,8 +804,8 @@ sc::result Idle::react(const Hostless&) {
         DebugLogger(FSM) << "Loading file " << autostart_load_filename;
         try {
             LoadGame(autostart_load_filename,   *server_save_game_data,
-                     player_save_game_data,     GetUniverse(),
-                     Empires(),                 GetSpeciesManager(),
+                     player_save_game_data,     server.GetUniverse(),
+                     server.Empires(),          server.GetSpeciesManager(),
                      GetCombatLogManager(),     server.m_galaxy_setup_data);
             int seed = 0;
             try {
@@ -873,7 +873,7 @@ MPLobby::MPLobby(my_context c) :
     ServerApp& server = Server();
     server.LoadChatHistory();
     m_lobby_data->game_rules = GetGameRules().GetRulesAsStrings();
-    const SpeciesManager& sm = GetSpeciesManager();
+    const SpeciesManager& sm = server.GetSpeciesManager();
     if (server.IsHostless()) {
         DebugLogger(FSM) << "(ServerFSM) MPLobby. Fill MPLobby data from the previous game.";
 
@@ -1133,7 +1133,7 @@ void MPLobby::EstablishPlayer(const PlayerConnectionPtr& player_connection,
                               const Networking::AuthRoles& roles)
 {
     ServerApp& server = Server();
-    const SpeciesManager& sm = GetSpeciesManager();
+    const SpeciesManager& sm = server.GetSpeciesManager();
 
     if (context<ServerFSM>().EstablishPlayer(player_connection,
                                              player_name,
@@ -1394,7 +1394,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                     if (m_lobby_data->seed != "")
                         psd.starting_species_name = "RANDOM";
                     else
-                        psd.starting_species_name = GetSpeciesManager().SequentialPlayableSpeciesName(m_ai_next_index);
+                        psd.starting_species_name = server.m_species_manager.SequentialPlayableSpeciesName(m_ai_next_index);
                 }
 
             } else if (psd.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER) {
@@ -1845,8 +1845,8 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
 
                 try {
                     LoadGame(save_filename,             *m_server_save_game_data,
-                             m_player_save_game_data,   GetUniverse(),
-                             Empires(),                 GetSpeciesManager(),
+                             m_player_save_game_data,   server.GetUniverse(),
+                             server.Empires(),          server.GetSpeciesManager(),
                              GetCombatLogManager(),     server.m_galaxy_setup_data);
                     int seed = 0;
                     try {
@@ -1961,8 +1961,8 @@ sc::result MPLobby::react(const StartMPGame& msg) {
 
             try {
                 LoadGame(save_filename,             *m_server_save_game_data,
-                         m_player_save_game_data,   GetUniverse(),
-                         Empires(),                 GetSpeciesManager(),
+                         m_player_save_game_data,   server.GetUniverse(),
+                         server.Empires(),          server.GetSpeciesManager(),
                          GetCombatLogManager(),     server.m_galaxy_setup_data);
                 int seed = 0;
                 try {
@@ -2249,9 +2249,9 @@ sc::result WaitingForSPGameJoiners::react(const CheckStartConditions& u) {
         } else {
             DebugLogger(FSM) << "Loading SP game save file: " << m_single_player_setup_data->filename;
             try {
-                LoadGame(m_single_player_setup_data->filename,              *m_server_save_game_data,
-                         m_player_save_game_data,   GetUniverse(),          Empires(),
-                         GetSpeciesManager(),       GetCombatLogManager(),  server.m_galaxy_setup_data);
+                LoadGame(m_single_player_setup_data->filename,                  *m_server_save_game_data,
+                         m_player_save_game_data,       server.GetUniverse(),   server.Empires(),
+                         server.GetSpeciesManager(),    GetCombatLogManager(),  server.m_galaxy_setup_data);
 
             } catch (...) {
                 SendMessageToHost(ErrorMessage(UserStringNop("UNABLE_TO_READ_SAVE_FILE"), true));
@@ -2699,11 +2699,12 @@ sc::result PlayingGame::react(const PlayerChat& msg) {
 sc::result PlayingGame::react(const Diplomacy& msg) {
     TraceLogger(FSM) << "(ServerFSM) PlayingGame.Diplomacy";
     const Message& message = msg.m_message;
+    ServerApp& server = Server();
 
     DiplomaticMessage diplo_message;
     try {
         ExtractDiplomacyMessageData(message, diplo_message);
-        Empires().HandleDiplomaticMessage(diplo_message);
+        server.Empires().HandleDiplomaticMessage(diplo_message);
     } catch (...) {}
 
     return discard_event();
@@ -2761,9 +2762,9 @@ sc::result PlayingGame::react(const ShutdownServer& msg) {
         int bytes_written = 0;
         // save game...
         try {
-            bytes_written = SaveGame(save_filename,     server_data,    server.GetPlayerSaveGameData(),
-                                     GetUniverse(),     Empires(),      GetSpeciesManager(),
-                                     GetCombatLogManager(),             server.m_galaxy_setup_data,
+            bytes_written = SaveGame(save_filename,         server_data,        server.GetPlayerSaveGameData(),
+                                     server.GetUniverse(),  server.Empires(),   server.GetSpeciesManager(),
+                                     GetCombatLogManager(), server.m_galaxy_setup_data,
                                      !server.m_single_player_game);
         } catch (const std::exception& error) {
             ErrorLogger(FSM) << "While saving, catch std::exception: " << error.what();

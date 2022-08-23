@@ -22,8 +22,7 @@
 #include <map>
 #include <sstream>
 #include <string>
-#include <boost/algorithm/string/trim.hpp>
-
+#include <limits>
 
 namespace GG {
 
@@ -64,7 +63,7 @@ public:
         return std::numeric_limits<EnumType>::max();
     }
 
-    [[nodiscard]] constexpr std::size_t size() const { return m_size; }
+    [[nodiscard]] constexpr auto size() const { return m_size; }
 
     [[nodiscard]] constexpr bool empty() const { return m_size == 0; }
 
@@ -74,7 +73,7 @@ private:
         if (Count(comma_separated_names, ',') > CAPACITY)
             throw std::invalid_argument("too many comma separated enum vals to build map");
         auto count_names = SplitApply(comma_separated_names, Trim, ',');
-        for (size_t i = 0; i < count_names.first; ++i)
+        for (std::size_t i = 0; i < count_names.first; ++i)
             Insert(count_names.second[i]);
     }
 
@@ -105,7 +104,7 @@ private:
         m_values[place_idx] = value;
     }
 
-    static constexpr std::size_t CAPACITY = std::numeric_limits<unsigned char>::max();
+    static constexpr std::size_t CAPACITY = std::numeric_limits<uint8_t>::max();
 
 
     [[nodiscard]] static constexpr std::pair<std::string_view, std::string_view> Split(
@@ -129,10 +128,10 @@ private:
 
 
     // how many times does \a delim appear in text?
-    [[nodiscard]] static constexpr std::size_t Count(std::string_view text, const char delim)
+    [[nodiscard]] static constexpr auto Count(std::string_view text, const char delim)
     {
         std::size_t retval = 1;
-        for (size_t i = 0; i < text.length(); ++i)
+        for (std::size_t i = 0; i < text.length(); ++i)
             retval += text[i] == delim;
         return retval;
     }
@@ -140,8 +139,8 @@ private:
     static_assert(comma_count == 3);
 
 
-    template <size_t RETVAL_CAP = CAPACITY, typename F>
-    [[nodiscard]] static constexpr std::pair<size_t, std::array<std::string_view, RETVAL_CAP>>
+    template <std::size_t RETVAL_CAP = CAPACITY, typename F>
+    [[nodiscard]] static constexpr std::pair<std::size_t, std::array<std::string_view, RETVAL_CAP>>
         SplitApply(std::string_view comma_separated_names, F&& fn, char delim)
     {
         std::size_t count = 0;

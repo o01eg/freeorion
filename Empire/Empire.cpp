@@ -130,19 +130,17 @@ std::shared_ptr<const UniverseObject> Empire::Source(const ObjectMap& objects) c
     }
 
     // Find any planet / ship owned by the empire
-    // TODO determine if allExisting() is faster and acceptable
-    for (const auto& obj : objects.all<Planet>()) {
-        if (obj->OwnedBy(m_id)) {
-            m_source_id = obj->ID();
-            return obj;
-        }
-    }
-    for (const auto& obj : objects.all<Ship>()) {
-        if (obj->OwnedBy(m_id)) {
-            m_source_id = obj->ID();
-            return obj;
-        }
-    }
+    auto owned = [this](const auto& o) { return o.second->OwnedBy(m_id); };
+
+    const auto& planets = objects.allExisting<Planet>();
+    auto p_it = std::find_if(planets.begin(), planets.end(), owned);
+    if (p_it != planets.end())
+        return p_it->second;
+
+    auto ships = objects.allExisting<Ship>();
+    auto s_it = std::find_if(ships.begin(), ships.end(), owned);
+    if (s_it != ships.end())
+        return s_it->second;
 
     m_source_id = INVALID_OBJECT_ID;
     return nullptr;
@@ -401,14 +399,18 @@ int Empire::TurnPolicyAdopted(std::string_view name) const {
 }
 
 int Empire::CurrentTurnsPolicyHasBeenAdopted(std::string_view name) const {
-    auto it = m_policy_adoption_current_duration.find(std::string{name}); // TODO: remove temporary string construction
+    auto it = std::find_if(m_policy_adoption_current_duration.begin(),
+                           m_policy_adoption_current_duration.end(),
+                           [name](const auto& pacd) { return name == pacd.first; });
     if (it == m_policy_adoption_current_duration.end())
         return 0;
     return it->second;
 }
 
 int Empire::CumulativeTurnsPolicyHasBeenAdopted(std::string_view name) const {
-    auto it = m_policy_adoption_total_duration.find(std::string{name}); // TODO: remove temporary string construction
+    auto it = std::find_if(m_policy_adoption_total_duration.begin(),
+                           m_policy_adoption_total_duration.end(),
+                           [name](const auto& patd) { return name == patd.first; });
     if (it == m_policy_adoption_total_duration.end())
         return 0;
     return it->second;
@@ -465,8 +467,7 @@ bool Empire::PolicyAvailable(std::string_view name) const
 { return m_available_policies.count(name); }
 
 bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name, int current_turn) const {
-    const std::string name_str{name}; // TODO: remove this when possible for heterogenous lookup
-    const Policy* policy_to_adopt = GetPolicy(name_str);
+    const Policy* policy_to_adopt = GetPolicy(name);
     if (!policy_to_adopt)
         return false;
 
@@ -483,7 +484,8 @@ bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name, int current_tur
             ErrorLogger() << "Couldn't get already adopted policy: " << already_adopted_policy_name;
             continue;
         }
-        if (already_adopted_policy->Exclusions().count(name_str)) {
+        const auto& excl = already_adopted_policy->Exclusions();
+        if (std::any_of(excl.begin(), excl.end(), [name](const auto& x) { return name == x; })) {
             // already adopted policy has an exclusion with the policy to be adopted
             return false;
         }
@@ -1227,7 +1229,7 @@ void Empire::UpdateSupplyUnobstructedSystems(const ScriptingContext& context,
                 // fleets themselves may be created and/or destroyed purely as organizational matters, we check ship
                 // age not fleet age.
                 int cutoff_age = precombat ? 1 : 0;
-                if (fleet_at_war && fleet->MaxShipAgeInTurns(objects) > cutoff_age) {
+                if (fleet_at_war && fleet->MaxShipAgeInTurns(objects, context.current_turn) > cutoff_age) {
                     systems_containing_obstructing_objects.insert(system_id);
                     if (fleet->ArrivalStarlane() == system_id)
                         unrestricted_obstruction_systems.insert(system_id);
@@ -2353,7 +2355,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                     continue;
                 float cur_capacity = obj->SpecialCapacity(special_type.first);
                 float new_capacity = std::max(0.0f, cur_capacity - special_meter.second * elem.blocksize);
-                obj->SetSpecialCapacity(special_type.first, new_capacity);
+                obj->SetSpecialCapacity(special_type.first, new_capacity, context.current_turn);
             }
         }
         for (auto& meter_type : mc) {

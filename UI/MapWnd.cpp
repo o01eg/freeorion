@@ -609,7 +609,7 @@ namespace {
         }
 
     private:
-        void UpdateImpl(size_t mode, const Wnd* target) override {
+        void UpdateImpl(std::size_t mode, const Wnd* target) override {
             UpdateLabels();
             ResetShipDesignLabels();
             DoLayout();
@@ -2507,7 +2507,7 @@ void MapWnd::RenderVisibilityRadii() {
                                              0.0, TWO_PI, false, 0, false);
 
                 // store colours for line segments
-                for (size_t count = 0; count < verts.size(); ++count)
+                for (std::size_t count = 0; count < verts.size(); ++count)
                     vert_colours.store(circle_colour);
 
                 verts.activate();
@@ -4396,6 +4396,11 @@ void MapWnd::ShowEmpire(int empire_id) {
 void MapWnd::ShowMeterTypeArticle(const std::string& meter_string) {
     ShowPedia();
     m_pedia_panel->SetMeterType(meter_string);
+}
+
+void MapWnd::ShowMeterTypeArticle(MeterType meter_type) {
+    ShowPedia();
+    m_pedia_panel->SetMeterType(meter_type);
 }
 
 void MapWnd::ShowEncyclopediaEntry(const std::string& str) {
@@ -7185,8 +7190,14 @@ bool MapWnd::ZoomToPrevIdleFleet() {
 }
 
 bool MapWnd::ZoomToNextIdleFleet() {
-    auto vec = GetUniverse().Objects().findIDs<Fleet>(
-        StationaryFleetVisitor(GGHumanClientApp::GetApp()->EmpireID()));
+    const auto client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    auto is_stationary_client_empire_fleet = [client_empire_id](const Fleet* fleet) {
+        return (fleet->FinalDestinationID() == INVALID_OBJECT_ID || fleet->TravelRoute().empty()) &&
+                (client_empire_id == ALL_EMPIRES ||
+                (!fleet->Unowned() && fleet->Owner() == client_empire_id));
+    };
+    auto vec = GetUniverse().Objects().findIDs<Fleet>(is_stationary_client_empire_fleet);
+
     auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
     const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
     if (it != vec.end())
@@ -7204,7 +7215,11 @@ bool MapWnd::ZoomToNextIdleFleet() {
 }
 
 bool MapWnd::ZoomToPrevFleet() {
-    auto vec = GetUniverse().Objects().findIDs<Fleet>(OwnedVisitor(GGHumanClientApp::GetApp()->EmpireID()));
+    auto client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    auto is_owned_fleet = [client_empire_id](const Fleet* fleet)
+    { return client_empire_id == ALL_EMPIRES || fleet->OwnedBy(client_empire_id); };
+    auto vec = GetUniverse().Objects().findIDs<Fleet>(is_owned_fleet);
+
     auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
     const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
     if (it != vec.begin())
@@ -7224,8 +7239,11 @@ bool MapWnd::ZoomToPrevFleet() {
 }
 
 bool MapWnd::ZoomToNextFleet() {
-    auto vec = GetUniverse().Objects().findIDs<Fleet>(
-        OwnedVisitor(GGHumanClientApp::GetApp()->EmpireID()));
+    auto client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    auto is_owned_fleet = [client_empire_id](const Fleet* fleet)
+    { return client_empire_id == ALL_EMPIRES || fleet->OwnedBy(client_empire_id); };
+    auto vec = GetUniverse().Objects().findIDs<Fleet>(is_owned_fleet);
+
     auto it = std::find_if(vec.begin(), vec.end(),
         [cur_id{this->m_current_fleet_id}](int o_id){ return o_id == cur_id; });
     auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
@@ -7478,9 +7496,11 @@ namespace {
         std::pair<std::vector<int>, double> route_distance;
 
         if (ignore_hostile)
-            route_distance = universe.GetPathfinder()->ShortestPath(start_id, destination_id, empire_id, objects);
+            route_distance = universe.GetPathfinder()->ShortestPath(
+                start_id, destination_id, empire_id, objects);
         else
-            route_distance = universe.GetPathfinder()->ShortestPath(start_id, destination_id, empire_id, fleet_pred, empires, objects);
+            route_distance = universe.GetPathfinder()->ShortestPath(
+                start_id, destination_id, empire_id, fleet_pred, empires, objects);
 
         if (!route_distance.first.empty() && route_distance.second > 0.0)
             return {route_distance.second, std::move(route_distance.first)};

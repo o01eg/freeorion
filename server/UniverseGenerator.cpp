@@ -166,7 +166,7 @@ namespace Delauney {
         triangle_list.push_front({num_points_in_vec - 1, num_points_in_vec - 2,
                                   num_points_in_vec - 3, points_vec});
 
-        if (points_vec.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+        if (points_vec.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
             ErrorLogger() << "Attempted to run Delauney Triangulation on " << points_vec.size()
                           << " points.  The limit is " << std::numeric_limits<int>::max();
             return std::list<Delauney::DTTriangle>();
@@ -816,7 +816,7 @@ bool SetEmpireHomeworld(Empire* empire, int planet_id, std::string species_name,
     return true;
 }
 
-void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data) {
+void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data, EmpireManager& empires) {
     DebugLogger() << "Initializing " << player_setup_data.size() << " empires";
 
     // copy empire colour table, so that individual colours can be removed after they're used
@@ -849,9 +849,9 @@ void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data) {
                 colors.erase(colors.begin());
             } else {
                 // as a last resort, make up a colour
-                empire_colour = {{static_cast<unsigned char>(RandInt(0, 255)),
-                                  static_cast<unsigned char>(RandInt(0, 255)),
-                                  static_cast<unsigned char>(RandInt(0, 255)),
+                empire_colour = {{static_cast<uint8_t>(RandInt(0, 255)),
+                                  static_cast<uint8_t>(RandInt(0, 255)),
+                                  static_cast<uint8_t>(RandInt(0, 255)),
                                   255}};
             }
         }
@@ -863,11 +863,11 @@ void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data) {
                       << " for player: " << player_name << " in team: " << psd.starting_team;
 
         // create new Empire object through empire manager
-        Empires().CreateEmpire(empire_id, std::move(empire_name), player_name,
-                               empire_colour, authenticated);
+        empires.CreateEmpire(empire_id, std::move(empire_name), player_name,
+                             empire_colour, authenticated);
     }
 
-    Empires().ResetDiplomacy();
+    empires.ResetDiplomacy();
 
     for (auto& [player_id1, psd1] : player_setup_data) {
         if (psd1.starting_team < 0)
@@ -880,7 +880,7 @@ void InitEmpires(const std::map<int, PlayerSetupData>& player_setup_data) {
             if (psd1.starting_team != psd2.starting_team)
                 continue;
 
-            Empires().SetDiplomaticStatus(player_id1, player_id2, DiplomaticStatus::DIPLO_ALLIED);
+            empires.SetDiplomaticStatus(player_id1, player_id2, DiplomaticStatus::DIPLO_ALLIED);
         }
     }
 }

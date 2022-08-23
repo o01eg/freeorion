@@ -26,7 +26,7 @@ public:
     [[nodiscard]] constexpr float Current() const noexcept { return FromInt(cur); };
     [[nodiscard]] constexpr float Initial() const noexcept { return FromInt(init); };
 
-    [[nodiscard]] std::array<std::string::value_type, 64> Dump(unsigned short ntabs = 0) const noexcept; ///< returns text of meter values
+    [[nodiscard]] std::array<std::string::value_type, 64> Dump(uint8_t ntabs = 0) const noexcept; ///< returns text of meter values
 
     [[nodiscard]] constexpr bool operator==(const Meter& rhs) const noexcept
     { return cur == rhs.cur && init == rhs.init; }
@@ -56,8 +56,8 @@ public:
 
     using ToCharsArrayT = std::array<std::string::value_type, 24>;
     [[nodiscard]] ToCharsArrayT ToChars() const;
-    size_t ToChars(char* buffer, char* buffer_end) const;
-    size_t SetFromChars(std::string_view chars);
+    std::size_t ToChars(char* buffer, char* buffer_end) const;
+    std::size_t SetFromChars(std::string_view chars);
 
     static constexpr float DEFAULT_VALUE = 0.0f;                        ///< value assigned to current or initial when resetting or when no value is specified in a constructor
     static constexpr float LARGE_VALUE = static_cast<float>(2 << 15);   ///< a very large number, which is useful to set current to when it will be later clamped, to ensure that the result is the max value in the clamp range

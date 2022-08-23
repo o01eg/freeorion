@@ -114,12 +114,12 @@ void UniverseObject::Copy(std::shared_ptr<const UniverseObject> copied_object,
 void UniverseObject::Init()
 { AddMeter(MeterType::METER_STEALTH); }
 
-int UniverseObject::AgeInTurns() const {
+int UniverseObject::AgeInTurns(int current_turn) const {
     if (m_created_on_turn == BEFORE_FIRST_TURN)
         return SINCE_BEFORE_TIME_AGE;
-    if ((m_created_on_turn == INVALID_GAME_TURN) || (CurrentTurn() == INVALID_GAME_TURN))
+    if ((m_created_on_turn == INVALID_GAME_TURN) || (current_turn == INVALID_GAME_TURN))
         return INVALID_OBJECT_AGE;
-    return CurrentTurn() - m_created_on_turn;
+    return current_turn - m_created_on_turn;
 }
 
 bool UniverseObject::HasSpecial(std::string_view name) const {
@@ -143,7 +143,7 @@ float UniverseObject::SpecialCapacity(std::string_view name) const {
     return it->second.second;
 }
 
-std::string UniverseObject::Dump(unsigned short ntabs) const {
+std::string UniverseObject::Dump(uint8_t ntabs) const {
     const ScriptingContext context;
     const auto& universe = context.ContextUniverse();
     const auto& objects = context.ContextObjects();
@@ -232,15 +232,6 @@ void UniverseObject::AddMeter(MeterType meter_type) {
         m_meters[meter_type];
 }
 
-bool UniverseObject::Unowned() const
-{ return m_owner_empire_id == ALL_EMPIRES; }
-
-bool UniverseObject::OwnedBy(int empire) const
-{ return empire != ALL_EMPIRES && empire == m_owner_empire_id; }
-
-bool UniverseObject::HostileToEmpire(int, const EmpireManager&) const
-{ return false; }
-
 Visibility UniverseObject::GetVisibility(int empire_id, const EmpireIDtoObjectIDtoVisMap& v) const {
     auto empire_it = v.find(empire_id);
     if (empire_it == v.end())
@@ -253,9 +244,6 @@ Visibility UniverseObject::GetVisibility(int empire_id, const EmpireIDtoObjectID
 
 Visibility UniverseObject::GetVisibility(int empire_id, const Universe& u) const
 { return GetVisibility(empire_id, u.GetEmpireObjectVisibility()); }
-
-const std::string& UniverseObject::PublicName(int, const Universe&) const
-{ return m_name; }
 
 std::shared_ptr<UniverseObject> UniverseObject::Accept(const UniverseObjectVisitor& visitor) const
 { return visitor.Visit(std::const_pointer_cast<UniverseObject>(shared_from_this())); }
@@ -337,15 +325,17 @@ void UniverseObject::SetSystem(int sys) {
     }
 }
 
-void UniverseObject::AddSpecial(const std::string& name, float capacity) // TODO: pass turn
-{ m_specials[name] = std::pair{CurrentTurn(), capacity}; }
+void UniverseObject::AddSpecial(std::string name, float capacity, int turn)
+{ m_specials[std::move(name)] = std::pair{turn, capacity}; }
 
-void UniverseObject::SetSpecialCapacity(const std::string& name, float capacity) {
+void UniverseObject::SetSpecialCapacity(std::string name, float capacity, int turn) {
     auto it = m_specials.find(name);
     if (it != m_specials.end())
         it->second.second = capacity;
     else
-        m_specials[name] = std::pair{CurrentTurn(), capacity};
+        m_specials.emplace(std::piecewise_construct,
+                           std::forward_as_tuple(std::move(name)),
+                           std::forward_as_tuple(turn, capacity));
 }
 
 void UniverseObject::RemoveSpecial(const std::string& name)

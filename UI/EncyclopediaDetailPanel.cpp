@@ -72,7 +72,6 @@ namespace {
     constexpr std::string_view INCOMPLETE_DESIGN = "incomplete design";
     constexpr std::string_view UNIVERSE_OBJECT = "universe object";
     constexpr std::string_view PLANET_SUITABILITY_REPORT = "planet suitability report";
-    constexpr std::string_view GRAPH = "data graph";
     constexpr std::string_view TEXT_SEARCH_RESULTS = "dynamic generated text";
 
     /** @content_tag{CTRL_ALWAYS_REPORT} Always display a species on a planet suitability report. **/
@@ -139,13 +138,6 @@ namespace {
 #endif
     }
 
-    // compile-time exponentiation
-    constexpr long long Pow(long long base, long long exp) {
-        long long retval = 1;
-        while (exp--)
-            retval *= base;
-        return retval;
-    }
     static_assert(std::numeric_limits<long long>::max() > std::numeric_limits<int>::max());
     static_assert(std::numeric_limits<int>::max() > 0);
 
@@ -233,7 +225,7 @@ namespace {
 
         static const auto label_value_strings = []() {
             std::array<std::string, NUM_IDX> retval{};
-            for (size_t idx = 0; idx < NUM_IDX; ++idx)
+            for (std::size_t idx = 0; idx < NUM_IDX; ++idx)
                 retval[idx] = std::string{to_string(MeterType(static_cast<signed_idx_type>(idx)))}
                                 .append("_VALUE_LABEL");
             return retval;
@@ -703,7 +695,8 @@ namespace {
             for (auto& [ref_key, val_ref] : GetNamedValueRefManager().GetItems()) {
                 auto& vref = val_ref.get();
                 std::string_view value_type = dynamic_cast<ValueRef::ValueRef<int>*>(&vref)? " int " : (dynamic_cast<ValueRef::ValueRef<double>*>(&vref)?" real ":" any ");
-                std::string_view key_str = UserStringExists(ref_key) ? UserString(ref_key) : "";
+                std::string_view key_str = UserStringExists(ref_key) ?
+                    std::string_view{UserString(ref_key)} : std::string_view{""};
 
                 // (human-readable article name) -> (link tag text, category stringtable key)
                 retval.emplace_back(
@@ -3678,7 +3671,7 @@ namespace {
 
         // Latin Extended-A second half
         static constexpr uint8_t L_WITH_STROKE_byte1 = 0x81; // Ł
-        static constexpr uint8_t l_with_stroke_byte1 = 0x82; // ł
+        //static constexpr uint8_t l_with_stroke_byte1 = 0x82; // ł
         static constexpr uint8_t N_WITH_CARON_byte1 = 0x87; // Ň
 
         static constexpr uint8_t n_preceeded_by_apostrophe_byte1 = 0x89; // ŉ
@@ -3713,12 +3706,12 @@ namespace {
         static constexpr uint8_t pi_byte1 = 0x80;
         static constexpr uint8_t rho_byte1 = 0x81; // ρ
 
-        static constexpr uint8_t final_sigma_byte1 = 0x82; // ς
+        //static constexpr uint8_t final_sigma_byte1 = 0x82; // ς
 
         static constexpr uint8_t sigma_byte1 = 0x83; // σ
-        static constexpr uint8_t upsilon_with_dialytika_byte1 = 0x8B; // ϋ
+        //static constexpr uint8_t upsilon_with_dialytika_byte1 = 0x8B; // ϋ
 
-        static constexpr uint8_t omicron_with_tonos_byte1 = 0x8C; // ό
+        //static constexpr uint8_t omicron_with_tonos_byte1 = 0x8C; // ό
         static constexpr uint8_t omega_with_tonos_byte1 = 0x8E; // ώ
 
         // note: alternate mu/micro encoding covered by full page 0xC2 case
@@ -3731,8 +3724,8 @@ namespace {
         static constexpr auto micro2 = u8"µ";
         static constexpr uint8_t micro2b0 = micro2[0];
         static constexpr uint8_t micro2b1 = micro2[1];
-        static_assert(microb0 == 0xC2);
-        static_assert(microb1 == 0xB5);
+        static_assert(micro2b0 == 0xC2);
+        static_assert(micro2b1 == 0xB5);
 
         static constexpr auto mu = u8"\u03BC"; // μ (lower case mu)
         static constexpr uint8_t mub0 = mu[0];
@@ -3741,9 +3734,9 @@ namespace {
         static_assert(mub1 == 0xBC);
 
         // following tests fail on MSVC x64
-        static constexpr auto mu2 = u8"μ";
-        static constexpr uint8_t mu2b0 = mu2[0];
-        static constexpr uint8_t mu2b1 = mu2[1];
+        //static constexpr auto mu2 = u8"μ";
+        //static constexpr uint8_t mu2b0 = mu2[0];
+        //static constexpr uint8_t mu2b1 = mu2[1];
         //static_assert(mu2b0 == 0xCE);
         //static_assert(mu2b1 == 0xBC);
 
@@ -4457,6 +4450,11 @@ void EncyclopediaDetailPanel::SetFieldType(const std::string& field_type_name) {
 void EncyclopediaDetailPanel::SetMeterType(std::string meter_string) {
     if (!meter_string.empty())
         AddItem("ENC_METER_TYPE", std::move(meter_string));
+}
+
+void EncyclopediaDetailPanel::SetMeterType(MeterType meter_type) {
+    if (meter_type != MeterType::INVALID_METER_TYPE)
+        AddItem("ENC_METER_TYPE", std::string{to_string(meter_type)});
 }
 
 void EncyclopediaDetailPanel::SetObject(int object_id) {

@@ -609,7 +609,7 @@ namespace {
         }
 
     private:
-        void UpdateImpl(size_t mode, const Wnd* target) override {
+        void UpdateImpl(std::size_t mode, const Wnd* target) override {
             UpdateLabels();
             ResetShipDesignLabels();
             DoLayout();
@@ -2507,7 +2507,7 @@ void MapWnd::RenderVisibilityRadii() {
                                              0.0, TWO_PI, false, 0, false);
 
                 // store colours for line segments
-                for (size_t count = 0; count < verts.size(); ++count)
+                for (std::size_t count = 0; count < verts.size(); ++count)
                     vert_colours.store(circle_colour);
 
                 verts.activate();
@@ -4396,6 +4396,11 @@ void MapWnd::ShowEmpire(int empire_id) {
 void MapWnd::ShowMeterTypeArticle(const std::string& meter_string) {
     ShowPedia();
     m_pedia_panel->SetMeterType(meter_string);
+}
+
+void MapWnd::ShowMeterTypeArticle(MeterType meter_type) {
+    ShowPedia();
+    m_pedia_panel->SetMeterType(meter_type);
 }
 
 void MapWnd::ShowEncyclopediaEntry(const std::string& str) {
@@ -7491,9 +7496,11 @@ namespace {
         std::pair<std::vector<int>, double> route_distance;
 
         if (ignore_hostile)
-            route_distance = universe.GetPathfinder()->ShortestPath(start_id, destination_id, empire_id, objects);
+            route_distance = universe.GetPathfinder()->ShortestPath(
+                start_id, destination_id, empire_id, objects);
         else
-            route_distance = universe.GetPathfinder()->ShortestPath(start_id, destination_id, empire_id, fleet_pred, empires, objects);
+            route_distance = universe.GetPathfinder()->ShortestPath(
+                start_id, destination_id, empire_id, fleet_pred, empires, objects);
 
         if (!route_distance.first.empty() && route_distance.second > 0.0)
             return {route_distance.second, std::move(route_distance.first)};

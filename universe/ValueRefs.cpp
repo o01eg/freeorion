@@ -468,10 +468,6 @@ std::string ComplexVariableDump(const std::vector<std::string>& property_names,
     }
     std::string retval{property_names.back()};
 
-    // TODO: Depending on the property name, the parameter names will vary.
-    //       Need to handle each case correctly, in order for the Dumped
-    //       text to be parsable as the correct ComplexVariable.
-
     if (int_ref1)
         retval += " int1 = " + int_ref1->Dump();
     if (int_ref2)
@@ -525,7 +521,7 @@ std::string Constant<std::string>::Description() const
 }
 
 template <>
-std::string Constant<PlanetSize>::Dump(unsigned short ntabs) const
+std::string Constant<PlanetSize>::Dump(uint8_t ntabs) const
 {
     switch (m_value) {
     case PlanetSize::SZ_TINY:      return "Tiny";
@@ -540,7 +536,7 @@ std::string Constant<PlanetSize>::Dump(unsigned short ntabs) const
 }
 
 template <>
-std::string Constant<PlanetType>::Dump(unsigned short ntabs) const
+std::string Constant<PlanetType>::Dump(uint8_t ntabs) const
 {
     switch (m_value) {
     case PlanetType::PT_SWAMP:      return "Swamp";
@@ -559,7 +555,7 @@ std::string Constant<PlanetType>::Dump(unsigned short ntabs) const
 }
 
 template <>
-std::string Constant<PlanetEnvironment>::Dump(unsigned short ntabs) const
+std::string Constant<PlanetEnvironment>::Dump(uint8_t ntabs) const
 {
     switch (m_value) {
     case PlanetEnvironment::PE_UNINHABITABLE: return "Uninhabitable";
@@ -572,7 +568,7 @@ std::string Constant<PlanetEnvironment>::Dump(unsigned short ntabs) const
 }
 
 template <>
-std::string Constant<UniverseObjectType>::Dump(unsigned short ntabs) const
+std::string Constant<UniverseObjectType>::Dump(uint8_t ntabs) const
 {
     switch (m_value) {
     case UniverseObjectType::OBJ_BUILDING:    return "Building";
@@ -588,7 +584,7 @@ std::string Constant<UniverseObjectType>::Dump(unsigned short ntabs) const
 }
 
 template <>
-std::string Constant<StarType>::Dump(unsigned short ntabs) const
+std::string Constant<StarType>::Dump(uint8_t ntabs) const
 {
     switch (m_value) {
     case StarType::STAR_BLUE:    return "Blue";
@@ -604,7 +600,7 @@ std::string Constant<StarType>::Dump(unsigned short ntabs) const
 }
 
 template <>
-std::string Constant<Visibility>::Dump(unsigned short ntabs) const
+std::string Constant<Visibility>::Dump(uint8_t ntabs) const
 {
     switch (m_value) {
     case Visibility::VIS_NO_VISIBILITY:      return "Invisible";
@@ -616,15 +612,15 @@ std::string Constant<Visibility>::Dump(unsigned short ntabs) const
 }
 
 template <>
-std::string Constant<int>::Dump(unsigned short ntabs) const
+std::string Constant<int>::Dump(uint8_t ntabs) const
 { return std::to_string(m_value); }
 
 template <>
-std::string Constant<double>::Dump(unsigned short ntabs) const
+std::string Constant<double>::Dump(uint8_t ntabs) const
 { return std::to_string(m_value); }
 
 template <>
-std::string Constant<std::string>::Dump(unsigned short ntabs) const
+std::string Constant<std::string>::Dump(uint8_t ntabs) const
 { return "\"" + Description() + "\""; }
 
 template <>
@@ -1033,7 +1029,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
         return object->CreationTurn();
     }
     else if (property_name == "Age") {
-        return object->AgeInTurns();
+        return object->AgeInTurns(context.current_turn);
 
     }
 
@@ -1097,7 +1093,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     if (property_name == "TurnsSinceFocusChange") {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
             auto planet = static_cast<const Planet*>(object);
-            return planet->TurnsSinceFocusChange();
+            return planet->TurnsSinceFocusChange(context.current_turn);
         }
         return 0;
 
@@ -1105,14 +1101,14 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     else if (property_name == "TurnsSinceColonization") {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
             auto planet = static_cast<const Planet*>(object);
-            return planet->TurnsSinceColonization();
+            return planet->TurnsSinceColonization(context.current_turn);
         }
         return 0;
     }
     else if (property_name == "TurnsSinceLastConquered") {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
             auto planet = static_cast<const Planet*>(object);
-            return planet->TurnsSinceLastConquered();
+            return planet->TurnsSinceLastConquered(context.current_turn);
         }
         return 0;
     }
@@ -1500,7 +1496,7 @@ std::string TotalFighterShots::Description() const
     return retval;
 }
 
-std::string TotalFighterShots::Dump(unsigned short ntabs) const
+std::string TotalFighterShots::Dump(uint8_t ntabs) const
 {
     std::string retval = "TotalFighterShots";
     if (m_carrier_id)
@@ -2757,7 +2753,7 @@ std::vector<std::string> ComplexVariable<std::vector<std::string>>::Eval(
 #undef IF_CURRENT_VALUE
 
 template <>
-std::string ComplexVariable<Visibility>::Dump(unsigned short ntabs) const
+std::string ComplexVariable<Visibility>::Dump(uint8_t ntabs) const
 {
     const std::string& variable_name = m_property_name.back();
     std::string retval = variable_name;
@@ -2773,7 +2769,7 @@ std::string ComplexVariable<Visibility>::Dump(unsigned short ntabs) const
 }
 
 template <>
-std::string ComplexVariable<double>::Dump(unsigned short ntabs) const
+std::string ComplexVariable<double>::Dump(uint8_t ntabs) const
 {
     const std::string& variable_name = m_property_name.back();
     std::string retval = variable_name;
@@ -2860,7 +2856,7 @@ std::string ComplexVariable<double>::Dump(unsigned short ntabs) const
 }
 
 template <>
-std::string ComplexVariable<int>::Dump(unsigned short ntabs) const
+std::string ComplexVariable<int>::Dump(uint8_t ntabs) const
 {
     const std::string& variable_name = m_property_name.back();
     std::string retval = variable_name;
@@ -2874,7 +2870,7 @@ std::string ComplexVariable<int>::Dump(unsigned short ntabs) const
 }
 
 template <>
-std::string ComplexVariable<std::string>::Dump(unsigned short ntabs) const
+std::string ComplexVariable<std::string>::Dump(uint8_t ntabs) const
 {
     const std::string& variable_name = m_property_name.back();
     std::string retval = variable_name;
@@ -2888,7 +2884,7 @@ std::string ComplexVariable<std::string>::Dump(unsigned short ntabs) const
 }
 
 template <>
-std::string ComplexVariable<std::vector<std::string>>::Dump(unsigned short ntabs) const
+std::string ComplexVariable<std::vector<std::string>>::Dump(uint8_t ntabs) const
 {
     const std::string& variable_name = m_property_name.back();
     std::string retval = variable_name;
@@ -3115,7 +3111,7 @@ std::string NameLookup::Eval(const ScriptingContext& context) const {
 std::string NameLookup::Description() const
 { return m_value_ref->Description(); }
 
-std::string NameLookup::Dump(unsigned short ntabs) const
+std::string NameLookup::Dump(uint8_t ntabs) const
 { return m_value_ref->Dump(ntabs); }
 
 void NameLookup::SetTopLevelContent(const std::string& content_name) {

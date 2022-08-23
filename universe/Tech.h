@@ -76,7 +76,7 @@ public:
     [[nodiscard]] const std::string&  Name() const                { return m_name; }              //!< returns name of this tech
     [[nodiscard]] const std::string&  Description() const         { return m_description; }       //!< Returns the text description of this tech
     [[nodiscard]] const std::string&  ShortDescription() const    { return m_short_description; } //!< Returns the single-line short text description of this tech
-    [[nodiscard]] std::string         Dump(unsigned short ntabs = 0) const;                               //!< Returns a text representation of this object
+    [[nodiscard]] std::string         Dump(uint8_t ntabs = 0) const;                                      //!< Returns a text representation of this object
     [[nodiscard]] const std::string&  Category() const            { return m_category; }                  //!< retursn the name of the category to which this tech belongs
     [[nodiscard]] float               ResearchCost(int empire_id, const ScriptingContext& context) const; //!< returns the total research cost in RPs required to research this tech
     [[nodiscard]] float               PerTurnCost(int empire_id, const ScriptingContext& context) const;  //!< returns the maximum number of RPs per turn allowed to be spent on researching this tech
@@ -135,14 +135,14 @@ private:
 struct FO_COMMON_API TechCategory {
     TechCategory() = default;
     TechCategory(std::string name_, std::string&& graphic_,
-                 std::array<unsigned char, 4> colour_):
+                 std::array<uint8_t, 4> colour_):
         name(std::move(name_)),
         graphic(std::move(graphic_)),
         colour(colour_)
     {}
-    std::string name;                       ///< name of category
-    std::string graphic;                    ///< icon that represents catetegory
-    std::array<unsigned char, 4> colour{{255, 255, 255, 255}}; ///< colour associatied with category
+    std::string             name;                           ///< name of category
+    std::string             graphic;                        ///< icon that represents catetegory
+    std::array<uint8_t, 4>  colour{{255, 255, 255, 255}};   ///< colour associatied with category
 };
 
 namespace CheckSums {
@@ -218,7 +218,7 @@ public:
         const std::set<std::string>& known_techs, const std::string& desired_tech,
         int empire_id, const ScriptingContext& context);
 
-    [[nodiscard]] size_t                   size() const;
+    [[nodiscard]] std::size_t              size() const;
 
     /** iterator to the first tech */
     [[nodiscard]] iterator                 begin() const;

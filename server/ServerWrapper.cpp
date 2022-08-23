@@ -154,16 +154,15 @@ namespace {
 
     auto GetAllSpecies() -> py::list
     {
-        py::list            species_list;
-        for (const auto& entry : GetSpeciesManager()) {
+        py::list species_list;
+        for (const auto& entry : GetSpeciesManager())
             species_list.append(py::object(entry.first));
-        }
         return species_list;
     }
 
     auto GetPlayableSpecies() -> py::list
     {
-        py::list            species_list;
+        py::list species_list;
         SpeciesManager& species_manager = GetSpeciesManager();
         for (auto it = species_manager.playable_begin();
              it != species_manager.playable_end(); ++it)
@@ -173,7 +172,7 @@ namespace {
 
     auto GetNativeSpecies() -> py::list
     {
-        py::list            species_list;
+        py::list species_list;
         SpeciesManager& species_manager = GetSpeciesManager();
         for (auto it = species_manager.native_begin();
              it != species_manager.native_end(); ++it)
@@ -609,7 +608,7 @@ namespace {
         return obj->Owner();
     }
 
-    void AddSpecial(int object_id, const std::string special_name)
+    void AddSpecial(int object_id, std::string special_name)
     {
         // get the universe object and check if it exists
         auto obj = Objects().get(object_id);
@@ -626,7 +625,7 @@ namespace {
 
         float capacity = special->InitialCapacity(object_id);
 
-        obj->AddSpecial(special_name, capacity);
+        obj->AddSpecial(std::move(special_name), capacity, CurrentTurn());
     }
 
     void RemoveSpecial(int object_id, const std::string special_name)
@@ -971,7 +970,7 @@ namespace {
     }
 
     // Return all systems within \p jumps of \p sys_ids
-    auto SystemsWithinJumps(size_t jumps, const py::list& sys_ids) -> py::list
+    auto SystemsWithinJumps(std::size_t jumps, const py::list& sys_ids) -> py::list
     {
         py::list py_systems;
         py::stl_input_iterator<int> end;

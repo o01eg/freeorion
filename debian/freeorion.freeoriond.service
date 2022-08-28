@@ -1,17 +1,19 @@
 [Unit]
 Description=FreeOrion server
-After=network.target postgresql@10-main.service
+After=network.target postgresql@14-main.service
 OnFailure=unit-status-freeorion@.service
 
 [Service]
 User=freeorion
 Group=freeorion
 Environment="XDG_CONFIG_HOME=/etc" "XDG_DATA_HOME=/var/lib/"
-ExecStart=/usr/games/freeoriond --hostless --log-file /var/log/freeorion/freeoriond.log
+ExecStart=/usr/lib/freeorion/freeoriond --hostless --load-or-quickstart --resource.path /usr/share/games/freeorion/default --log-file /var/log/freeorion/freeoriond.log --ai-log-dir /var/log/freeorion/ --network.server.listen.fd 0
 ExecStopPost=/bin/bash -c "D=$$(/bin/date \"+%%Y-%%m-%%dT%%H-%%M-%%S\") ; xz -z -Q -S .$$D.xz /var/log/freeorion/freeoriond.log"
 RestartSec=20
 Restart=on-failure
 LimitCORE=infinity
+WorkingDirectory=/usr/share/games/freeorion
+StandardInput=socket
 
 [Install]
 WantedBy=multi-user.target

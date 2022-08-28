@@ -1,0 +1,9 @@
+[Unit]
+Description=FreeOrion server
+
+[Socket] 
+ListenStream = 12346 
+Accept = no
+
+[Install] 
+WantedBy = sockets.target

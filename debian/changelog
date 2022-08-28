@@ -1,3 +1,9 @@
+freeorion (0.4.10.9999.fo0021+git20220823.9b1afe0ppa1~jammy) jammy; urgency=medium
+
+  * Update to jammy.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Sun, 28 Aug 2022 23:27:15 +0300
+
 freeorion (0.4.10.9999.fo0020+git20220510.3abfde4ppa2~focal) focal; urgency=medium
 
   * Add fighters effect fix.

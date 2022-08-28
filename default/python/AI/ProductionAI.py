@@ -56,6 +56,7 @@ from EnumsAI import (
     ShipRoleType,
     get_priority_production_types,
 )
+from expansion_plans import get_colonisable_planet_ids
 from freeorion_tools import get_named_real, ppstring, tech_is_complete
 from production import print_building_list, print_capital_info, print_production_queue
 from turn_state import (
@@ -187,7 +188,10 @@ def generate_production_orders():
 
         possible_building_type_ids = []
         for type_id in empire.availableBuildingTypes:
-            if fo.getBuildingType(type_id).canBeProduced(empire.empireID, homeworld.id):
+            # Apparently, when loading a saved game from another version, availableBuildingTypes may return
+            # buildings that are not in our script.
+            fo_building_type = fo.getBuildingType(type_id)
+            if fo_building_type and fo_building_type.canBeProduced(empire.empireID, homeworld.id):
                 possible_building_type_ids.append(type_id)
 
         if possible_building_type_ids:
@@ -785,7 +789,7 @@ def generate_production_orders():
     ]
     colony_bldg_entries = [
         entry
-        for entry in aistate.colonisablePlanetIDs.items()
+        for entry in get_colonisable_planet_ids().items()
         if entry[1][0] > MINIMUM_COLONY_SCORE
         and entry[0] not in queued_clny_bld_locs
         and entry[0] in get_empire_outposts()

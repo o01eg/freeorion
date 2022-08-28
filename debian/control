@@ -8,7 +8,6 @@ Build-Depends:
  cmake,
  debhelper (>= 11),
  dh-python,
- dh-systemd,
  dh-apparmor,
  dpkg-dev (>= 1.19),
  libboost-all-dev,

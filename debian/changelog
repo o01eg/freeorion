@@ -1,3 +1,9 @@
+freeorion (0.4.10+git20220827~b282382-1) unstable; urgency=medium
+
+  * Upgrade to Ubuntu 22.04.1 LTS Jammy.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Sun, 28 Aug 2022 20:48:14 +0300
+
 freeorion (0.4.10+git20200521~f044659-1) unstable; urgency=medium
 
   * Update upstream.

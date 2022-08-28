@@ -28,7 +28,9 @@ override_dh_auto_configure:
 	dh_auto_configure -- \
 		-DBUILD_DOCUMENTATION=off \
 		-DBUILD_TUTORIALS=off \
-		-DBUILD_HEADLESS=on \
+		-DBUILD_CLIENT_GG=off \
+		-DBUILD_CLIENT_GODOT=off \
+		-DBUILD_TESTING=off \
 		-DLIB_SUFFIX=/freeorion \
 		-DCMAKE_VERBOSE_MAKEFILE=ON \
 		-DCMAKE_BUILD_TYPE=$(TYPE)

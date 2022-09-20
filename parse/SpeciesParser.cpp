@@ -1,5 +1,12 @@
 #include "Parse.h"
 
+#include "PythonParserImpl.h"
+#include "ValueRefPythonParser.h"
+#include "ConditionPythonParser.h"
+#include "EffectPythonParser.h"
+#include "EnumPythonParser.h"
+#include "SourcePythonParser.h"
+
 #include "ParseImpl.h"
 #include "EnumParser.h"
 #include "ValueRefParser.h"
@@ -15,6 +22,9 @@
 
 #include <boost/phoenix.hpp>
 
+#include <boost/python/import.hpp>
+#include <boost/python/make_function.hpp>
+#include <boost/python/raw_function.hpp>
 
 #define DEBUG_PARSERS 0
 
@@ -338,55 +348,77 @@ namespace {
         parse::detail::planet_environment_parser_rules             planet_environment_rules;
     };
 
-    using manifest_start_rule_signature = void (std::vector<std::string>&);
+    void insert_species_census_ordering_(const boost::python::list& tags, start_rule_payload::second_type& ordering) {
+        boost::python::stl_input_iterator<std::string> tags_begin(tags), tags_end;
+        for (auto it = tags_begin; it != tags_end; ++it)
+            ordering.push_back(*it);
+    }
 
-    struct manifest_grammar : public parse::detail::grammar<manifest_start_rule_signature> {
-        manifest_grammar(const parse::lexer& tok,
-                         const std::string& filename,
-                         const parse::text_iterator& first, const parse::text_iterator& last) :
-            manifest_grammar::base_type(start)
+    boost::python::object py_insert_species_(start_rule_payload::first_type& species_, const boost::python::tuple& args, const boost::python::dict& kw) {
+        auto name = boost::python::extract<std::string>(kw["name"])();
+        auto description = boost::python::extract<std::string>(kw["description"])();
+        auto gameplay_description = boost::python::extract<std::string>(kw["gameplay_description"])();
+
+        auto species_ptr = std::make_unique<Species>(
+            std::move(name), std::move(description), std::move(gameplay_description),
+            std::vector<FocusType>{},
+            std::string{},
+            std::map<PlanetType, PlanetEnvironment>{},
+            std::vector<std::unique_ptr<Effect::EffectsGroup>>{},
+            nullptr,
+            false,
+            false,
+            false,
+            false,
+            std::set<std::string>{},    // intentionally not moved
+            std::set<std::string>{},
+            std::set<std::string>{},
+            std::string{},
+            1.0,
+            9999);
+
+        auto& species_name{species_ptr->Name()};
+        species_.emplace(species_name, std::move(species_ptr));
+
+        return boost::python::object();
+    }
+
+    struct py_grammar {
+         boost::python::dict globals;
+
+        py_grammar(const PythonParser& parser, start_rule_payload::first_type& species_) :
+            globals(boost::python::import("builtins").attr("__dict__"))
         {
-            namespace phoenix = boost::phoenix;
-            namespace qi = boost::spirit::qi;
-
-            using phoenix::push_back;
-
-            qi::_1_type _1;
-            qi::_2_type _2;
-            qi::_3_type _3;
-            qi::_4_type _4;
-            qi::_r1_type _r1;
-            qi::omit_type omit_;
-
-            species_manifest
-                =    omit_[tok.SpeciesCensusOrdering_]
-                >    *(label(tok.tag_) > tok.string [ push_back(_r1, _1) ])
-                ;
-
-            start
-                =   +species_manifest(_r1)
-                ;
-
-            species_manifest.name("ParsedSpeciesCensusOrdering");
-
-#if DEBUG_PARSERS
-            debug(species_manifest);
+#if PY_VERSION_HEX < 0x03080000
+            globals["__builtins__"] = boost::python::import("builtins");
 #endif
+            RegisterGlobalsEffects(globals);
+            RegisterGlobalsConditions(globals);
+            RegisterGlobalsValueRefs(globals, parser);
+            RegisterGlobalsSources(globals);
+            RegisterGlobalsEnums(globals);
 
-            qi::on_error<qi::fail>(start, parse::report_error(filename, first, last, _1, _2, _3, _4));
+            globals["Species"] = boost::python::raw_function([&species_](const boost::python::tuple& args, const boost::python::dict& kw) { return py_insert_species_(species_, args, kw); });
         }
 
-        using manifest_rule = parse::detail::rule<void (std::vector<std::string>&)>;
-        using start_rule = parse::detail::rule<manifest_start_rule_signature>;
+        boost::python::dict operator()() const
+        { return globals; }
+    };
 
-        parse::detail::Labeller label;
-        manifest_rule species_manifest;
-        start_rule start;
+    struct py_manifest_grammar {
+        boost::python::dict operator()(start_rule_payload::second_type& ordering) const {
+            boost::python::dict globals(boost::python::import("builtins").attr("__dict__"));
+            std::function<void(const boost::python::list&)> f_insert_species_census_ordering = 
+            globals["SpeciesCensusOrdering"] = boost::python::make_function([&ordering](auto tags) { return insert_species_census_ordering_(tags, ordering); },
+                boost::python::default_call_policies(),
+                boost::mpl::vector<void, const boost::python::list&>());
+            return globals;
+        }
     };
 }
 
 namespace parse {
-    start_rule_payload species(const boost::filesystem::path& path) {
+    start_rule_payload species(const PythonParser& parser, const boost::filesystem::path& path) {
         start_rule_payload retval;
         auto& [species_, ordering] = retval;
 
@@ -394,19 +426,23 @@ namespace parse {
 
         ScopedTimer timer("Species Parsing");
 
-        for (const auto& file : ListDir(path, IsFOCScript)) {
-            if (file.filename() == "SpeciesCensusOrdering.focs.txt" ) {
+        for (const auto& file : ListDir(path, IsFOCScript))
+            detail::parse_file<grammar, start_rule_payload::first_type>(lexer::tok, file, species_);
+
+        py_grammar p = py_grammar(parser, species_);
+        for (const auto& file : ListDir(path, IsFOCPyScript)) {
+            if (file.filename() == "SpeciesCensusOrdering.focs.py" ) {
                 manifest_file = file;
                 continue;
             }
 
-            detail::parse_file<grammar, start_rule_payload::first_type>(lexer::tok, file, species_);
+            py_parse::detail::parse_file<py_grammar>(parser, file, p);
         }
 
         if (!manifest_file.empty()) {
             try {
-                detail::parse_file<manifest_grammar, start_rule_payload::second_type>(
-                    lexer::tok, manifest_file, ordering);
+                py_parse::detail::parse_file<py_manifest_grammar, start_rule_payload::second_type>(
+                    parser, manifest_file, py_manifest_grammar(), ordering);
 
             } catch (const std::runtime_error& e) {
                 ErrorLogger() << "Failed to species census manifest in " << manifest_file << " from " << path

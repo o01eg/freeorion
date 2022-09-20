@@ -6344,9 +6344,32 @@ METER_HAPPINESS_VALUE_LABEL
 Stability
 
 METER_HAPPINESS_VALUE_DESC
-'''The Stability of a colony's population starts out between 1 and 5 after initial colonization depending on how suitable the planet's [[encyclopedia ENVIRONMENT_TITLE]] is for that species. Stability is reduced to 0 after invasion and may also be affected by other factors. A minimum Stability of 5 is necessary for a colony to act as a source of settlers for colonizing other planets. Also [[metertype METER_INDUSTRY]] and [[metertype METER_RESEARCH]] only start growing if Stability is at least 5.
+'''The Stability of a colony's population starts out between 1 and 5 after initial colonization depending on how suitable the planet's [[encyclopedia ENVIRONMENT_TITLE]] is for that species. Stability is reduced to 0 after invasion and may also be affected by other factors. A minimum Stability of 5 is necessary for a colony to act as a source of settlers for colonizing other planets. Also [[metertype METER_INDUSTRY]] and [[metertype METER_RESEARCH]] grows slowly if Stability is below 5.
 
-The Target Stability is the stable Stability level a planet's population will approach, given the current factors influencing the planetary Stability. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, and various other game effects. If these factors change, then the Target Stability value is likely to shift.'''
+The Target Stability is the stable Stability level a planet's population will approach, given the current factors influencing the planetary Stability. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, and various other game effects. If these factors change, then the Target Stability value is likely to shift.
+
+Common stability modifiers:
+[[STABILITY_MODIFIERS]]
+'''
+
+STABILITY_MODIFIERS
+'''• -/+ 5 Capital Supply Connection - Based on distance in jumps from Capital or Regional Administration Building. Does not affect [[encyclopedia INDEPENDENT_SPECIES_TRAIT_TEXT]] species and empires that have adopted [[policy PLC_CONFEDERATION]] policy.
+• +5 Homeworld Species - species on their own homeworld are more stable
+• +5 Capital Species - Colonies with the same species as the capital are more stable. Does not apply on the Capital itself.
+• +10 Capital - Colony contains [[buildingtype BLD_IMPERIAL_PALACE]].
+• Environment - Bonus or Penalty based on environmental preference of species. Set at gamestart in game rules via the MISC: Stability tab.
+• Planet Size - Bonus or Penalty based on planet size. Set at gamestart in game rules via the MISC: Stability tab.
+• +1 Artisan Appreciation - 2 or more Artistic Species in same system.
+• -2/+2 Liked/Disliked Focus - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• -2/+2 Liked/Disliked Policies -  - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• Liked/Disliked Buildings (On Planet) - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• Liked/Disliked Buildings (In-system) - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• Liked/Disliked Buildings (Off-system) - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• Liked/Disliked Specials (On Planet) - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• Liked/Disliked Specials (In-system) - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• Specials - Examples include [[special GAIA_SPECIAL]] and [[special WORLDTREE_SPECIAL]].
+• Policies
+• Species Traits'''
 
 METER_CAPACITY_VALUE_LABEL
 Stat - Primary
@@ -6704,6 +6727,14 @@ ARTISTIC_SPECIES_TRAIT_TEXT
 '''Artistic species produce artistic works when their empire has adopted [[policy PLC_ARTISAN_WORKSHOPS]], which generates influence. Additionally, other planets with different artistic species in the same system are more stable.
 
 List of Artistic species:'''
+
+INDEPENDENT_SPECIES_TITLE
+Independent Trait
+
+INDEPENDENT_SPECIES_TRAIT_TEXT
+'''Independent species' stability is unaffected by modifiers based on distance from capitals or regional administration.
+
+List of Independent species:'''
 
 SNEAKY_TITLE
 Sneaky
@@ -14167,7 +14198,7 @@ Planetary Cloud Cover
 SPY_STEALTH_1_DESC
 '''Gives all planets and outposts in the empire the [[special CLOUD_COVER_SLAVE_SPECIAL]] special which increases the [[metertype METER_STEALTH]] of all planets and buildings by 20.
 
-The [[metertype METER_RESEARCH]] cost of this tech is reduced by the cost of researching [[tech SPY_STEALTH_PART_1]] if it has already been completed.'''
+The [[metertype METER_RESEARCH]] cost of this tech is halved if [[tech SPY_STEALTH_PART_1]] has already been completed and/or if the empire includes a [[encyclopedia SNEAKY_TITLE]] species.'''
 
 SPY_STEALTH_PART_1
 Electromagnetic Dampening
@@ -14181,7 +14212,7 @@ Planetary Ash Clouds
 SPY_STEALTH_2_DESC
 '''Gives all planets and outposts in the empire the [[special VOLCANIC_ASH_SLAVE_SPECIAL]] special which increases the [[metertype METER_STEALTH]] of all planets and buildings by 40.
 
-The [[metertype METER_RESEARCH]] cost of this tech is reduced by the cost of researching [[tech SPY_STEALTH_PART_2]] if it has already been completed.'''
+The [[metertype METER_RESEARCH]] cost of this tech is halved if [[tech SPY_STEALTH_PART_2]] has already been completed and/or if the empire includes a [[encyclopedia SNEAKY_TITLE]] species.'''
 
 SPY_STEALTH_PART_2
 Radiation Absorbing
@@ -14195,7 +14226,7 @@ Planetary Dimensional Cloak
 SPY_STEALTH_3_DESC
 '''Gives all planets and outposts in the empire the [[special DIM_RIFT_SLAVE_SPECIAL]] special which increases the [[metertype METER_STEALTH]] of all planets and buildings by 60.
 
-The [[metertype METER_RESEARCH]] cost of this tech is reduced by the cost of researching [[tech SPY_STEALTH_PART_3]] if it has already been completed.'''
+The [[metertype METER_RESEARCH]] cost of this tech is halved if [[tech SPY_STEALTH_PART_3]] has already been completed and/or if the empire includes a [[encyclopedia SNEAKY_TITLE]] species.'''
 
 SPY_STEALTH_PART_3
 Dimensional Cloaking
@@ -14208,6 +14239,8 @@ Planetary Phasing Cloak
 
 SPY_STEALTH_4_DESC
 '''Unlocks the [[shippart ST_CLOAK_4]] ship part and gives all planets and outposts in the empire the [[special VOID_SLAVE_SPECIAL]] special which increases the [[metertype METER_STEALTH]] of all planets and buildings by 80.
+
+The [[metertype METER_RESEARCH]] cost of this tech is halved if the empire includes a [[encyclopedia SNEAKY_TITLE]] species.
 
 Even the most carefully concealed ship emits radiation in the form of force carrier particles. By modulating the wave forms of these particles, it is possible to synchronize them with the background radiation, hampering even very advanced attempts to detect the ship.'''
 
@@ -15126,9 +15159,7 @@ Nearly-Universal Translator
 BLD_TRANSLATOR_DESC
 '''Grants 1 social [[encyclopedia ENC_POLICY_SLOTS]].
 
-Increases influence output on its planet, when that planet is set to influence focus, by [[value TRANSLATOR_PER_SPECIES_INFLUENCE]] times the square root of the number of unique species on planets controlled by the empire that owns this building.
-
-Production cost decreases when more unique species are visible to the producing empire.'''
+Increases influence output on its planet, when that planet is set to influence focus, by [[value TRANSLATOR_PER_SPECIES_INFLUENCE]] times the square root of the number of unique species on planets controlled by the empire that owns this building.'''
 
 BLD_COLONY_BASE
 Colony Base

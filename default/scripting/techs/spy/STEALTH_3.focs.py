@@ -7,8 +7,8 @@ Tech(
     category="SPY_CATEGORY",
     researchcost=(
         700
-        - (350 * StatisticIf(float, condition=Source & OwnerHasTech(name="SPY_STEALTH_PART_3")))
         * TECH_COST_MULTIPLIER
+        / (1 + StatisticIf(float, condition=Source & OwnerHasTech(name="SPY_STEALTH_PART_3")))
         / (1 + StatisticIf(float, condition=OwnedBy(empire=Source.Owner) & HasTag(name="SNEAKY")))
     ),
     researchturns=7,

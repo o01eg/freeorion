@@ -8,6 +8,7 @@
 #include "universe/Tech.h"
 #include "universe/UnlockableItem.h"
 #include "universe/ValueRefs.h"
+#include "universe/NamedValueRefManager.h"
 #include "util/CheckSums.h"
 #include "util/Directories.h"
 #include "util/GameRules.h"
@@ -15,6 +16,12 @@
 #include "util/PythonCommon.h"
 
 #include "ParserAppFixture.h"
+
+namespace {
+    template <typename T, size_t N>
+    inline std::vector<std::unique_ptr<T>> array_to_vector(std::array<std::unique_ptr<T>, N>&& a)
+    { return {std::make_move_iterator(a.begin()), std::make_move_iterator(a.end())}; }
+}
 
 BOOST_FIXTURE_TEST_SUITE(TestPythonParser, ParserAppFixture)
 
@@ -201,11 +208,11 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
 BOOST_AUTO_TEST_CASE(parse_species) {
     PythonParser parser(m_python, m_scripting_dir);
 
-    auto species_p = Pending::StartAsyncParsing(parse::species, m_scripting_dir / "species");
+    auto species_p = Pending::ParseSynchronously(parse::species, parser, m_scripting_dir / "species");
     auto [species, ordering] = *Pending::WaitForPendingUnlocked(std::move(species_p));
 
     BOOST_REQUIRE(!ordering.empty());
-    BOOST_REQUIRE(!species.empty());
+    BOOST_CHECK(!species.empty());
 
     BOOST_REQUIRE_EQUAL("LITHIC", ordering[0]);
     BOOST_REQUIRE_EQUAL("ORGANIC", ordering[1]);
@@ -276,7 +283,75 @@ BOOST_AUTO_TEST_CASE(parse_species) {
         Species test_species{"SP_ABADDONI",
             "SP_ABADDONI_DESC",
             "SP_ABADDONI_GAMEPLAY_DESC",
-            {},
+            {
+                {"FOCUS_INDUSTRY", "FOCUS_INDUSTRY_DESC", std::make_unique<Condition::Type>(UniverseObjectType::OBJ_PLANET), "icons/focus/industry.png"},
+                {"FOCUS_RESEARCH", "FOCUS_RESEARCH_DESC", std::make_unique<Condition::Type>(UniverseObjectType::OBJ_PLANET), "icons/focus/research.png"},
+                {"FOCUS_INFLUENCE", "FOCUS_INFLUENCE_DESC", std::make_unique<Condition::Type>(UniverseObjectType::OBJ_PLANET), "icons/focus/influence.png"},
+                {"FOCUS_GROWTH", "FOCUS_GROWTH_DESC", std::make_unique<Condition::Or>(array_to_vector<Condition::Condition, 10>({
+                    std::make_unique<Condition::And>(
+                        std::make_unique<Condition::Homeworld>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Variable<std::string>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "Species")})),
+                        std::make_unique<Condition::Not>(std::make_unique<Condition::HasTag>("SELF_SUSTAINING"))
+                    ),
+                    std::make_unique<Condition::HasSpecial>("POSITRONIUM_SPECIAL"),
+                    std::make_unique<Condition::HasSpecial>("SUPERCONDUCTOR_SPECIAL"),
+                    std::make_unique<Condition::HasSpecial>("MONOPOLE_SPECIAL"),
+                    std::make_unique<Condition::HasSpecial>("SPICE_SPECIAL"),
+                    std::make_unique<Condition::HasSpecial>("FRUIT_SPECIAL"),
+                    std::make_unique<Condition::HasSpecial>("PROBIOTIC_SPECIAL"),
+                    std::make_unique<Condition::HasSpecial>("ELERIUM_SPECIAL"),
+                    std::make_unique<Condition::HasSpecial>("CRYSTALS_SPECIAL"),
+                    std::make_unique<Condition::HasSpecial>("MINERALS_SPECIAL")
+                })), "icons/focus/growth.png"},
+                {"FOCUS_PROTECTION", "FOCUS_PROTECTION_DESC", std::make_unique<Condition::Type>(UniverseObjectType::OBJ_PLANET), "icons/focus/protection.png"},
+                {"FOCUS_LOGISTICS", "FOCUS_LOGISTICS_DESC", std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("SHP_INTSTEL_LOG")), "icons/focus/supply.png"},
+                {"FOCUS_STOCKPILE", "FOCUS_STOCKPILE_DESC", std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("PRO_GENERIC_SUPPLIES")), "icons/focus/stockpile.png"},
+                {"FOCUS_STEALTH", "FOCUS_STEALTH_DESC", std::make_unique<Condition::Or>(
+                    std::make_unique<Condition::Contains>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_PLANET_CLOAK")}))),
+                    std::make_unique<Condition::And>(
+                        std::make_unique<Condition::Contains>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("DEF_PLANET_CLOAK"))
+                    )
+                ), "icons/focus/stealth.png"},
+                {"FOCUS_BIOTERROR", "FOCUS_BIOTERROR_DESC", std::make_unique<Condition::Or>(
+                    std::make_unique<Condition::Contains>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_BIOTERROR_PROJECTOR")}))),
+                    std::make_unique<Condition::And>(
+                        std::make_unique<Condition::Contains>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("GRO_BIOTERROR"))
+                    )
+                ), "icons/focus/bioterror.png"},
+                {"FOCUS_STARGATE_SEND", "FOCUS_STARGATE_SEND_DESC", std::make_unique<Condition::Or>(
+                    std::make_unique<Condition::Contains>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_STARGATE")}))),
+                    std::make_unique<Condition::And>(
+                        std::make_unique<Condition::Contains>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("CON_STARGATE"))
+                    )
+                ), "icons/focus/stargate_send.png"},
+                {"FOCUS_STARGATE_RECEIVE", "FOCUS_STARGATE_RECEIVE_DESC", std::make_unique<Condition::Or>(
+                    std::make_unique<Condition::Contains>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_STARGATE")}))),
+                    std::make_unique<Condition::And>(
+                        std::make_unique<Condition::Contains>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("CON_STARGATE"))
+                    )
+                ), "icons/focus/stargate_receive.png"},
+                {"FOCUS_PLANET_DRIVE", "FOCUS_PLANET_DRIVE_DESC", std::make_unique<Condition::Or>(
+                    std::make_unique<Condition::Contains>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_PLANET_DRIVE")}))),
+                    std::make_unique<Condition::And>(
+                        std::make_unique<Condition::Contains>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("CON_PLANET_DRIVE"))
+                    )
+                ), "icons/building/planetary_stardrive.png"},
+                {"FOCUS_DISTORTION", "FOCUS_DISTORTION_DESC", std::make_unique<Condition::Or>(
+                    std::make_unique<Condition::Contains>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_SPATIAL_DISTORT_GEN")}))),
+                    std::make_unique<Condition::And>(
+                        std::make_unique<Condition::Contains>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("LRN_SPATIAL_DISTORT_GEN"))
+                    )
+                ), "icons/focus/distortion.png"},
+                {"FOCUS_DOMINATION", "FOCUS_DOMINATION_DESC", std::make_unique<Condition::And>(
+                    std::make_unique<Condition::HasTag>("TELEPATHIC"),
+                    std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("LRN_PSY_DOM"))
+                ), "icons/focus/psi_domination.png"}
+            },
             "FOCUS_INDUSTRY",
             {
                 {PlanetType::PT_SWAMP, PlanetEnvironment::PE_POOR},
@@ -291,7 +366,33 @@ BOOST_AUTO_TEST_CASE(parse_species) {
                 {PlanetType::PT_ASTEROIDS, PlanetEnvironment::PE_UNINHABITABLE},
                 {PlanetType::PT_GASGIANT, PlanetEnvironment::PE_UNINHABITABLE},
             },
-            {},
+            array_to_vector<Effect::EffectsGroup, 1>({
+                std::make_unique<Effect::EffectsGroup>(
+                    std::make_unique<Condition::Source>(),
+                    std::make_unique<Condition::And>(
+                        std::make_unique<Condition::Type>(UniverseObjectType::OBJ_PLANET),
+                        std::make_unique<Condition::MeterValue>(MeterType::METER_TARGET_INDUSTRY,
+                            std::make_unique<ValueRef::Constant<double>>(0.0),
+                            nullptr),
+                        std::make_unique<Condition::MeterValue>(MeterType::METER_HAPPINESS,
+                            std::make_unique<ValueRef::Constant<double>>(0.0),
+                            nullptr),
+                        std::make_unique<Condition::FocusType>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("FOCUS_INDUSTRY")}))
+                    ),
+                    array_to_vector<Effect::Effect, 1>({std::make_unique<Effect::SetMeter>(MeterType::METER_TARGET_INDUSTRY,
+                        std::make_unique<ValueRef::Operation<double>>(ValueRef::OpType::PLUS,
+                            std::make_unique<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE),
+                            std::make_unique<ValueRef::Operation<double>>(ValueRef::OpType::TIMES,
+                                std::make_unique<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Population"),
+                                std::make_unique<ValueRef::NamedRef<double>>("INDUSTRY_FOCUS_TARGET_INDUSTRY_PERPOP")
+                            )
+                        )
+                    )}),
+                    "FOCUS_INDUSTRY_LABEL",
+                    "",
+                    98
+                )
+            }),
             nullptr,
             true,
             false,
@@ -365,9 +466,11 @@ BOOST_AUTO_TEST_CASE(parse_species_full) {
     BOOST_REQUIRE(boost::filesystem::exists(scripting_dir));
     BOOST_REQUIRE(boost::filesystem::is_directory(scripting_dir));
 
+    PythonParser parser(m_python, scripting_dir);
+
     auto named_values = Pending::ParseSynchronously(parse::named_value_refs, scripting_dir / "common");
 
-    auto species_p = Pending::StartAsyncParsing(parse::species, scripting_dir / "species");
+    auto species_p = Pending::ParseSynchronously(parse::species, parser, scripting_dir / "species");
     auto [species, ordering] = *Pending::WaitForPendingUnlocked(std::move(species_p));
 
     BOOST_REQUIRE(!ordering.empty());

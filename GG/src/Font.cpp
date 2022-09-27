@@ -240,36 +240,55 @@ constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 7> PRINTABLE_ASCII
     {0x7B, 0x7F}}};
 }
 
+namespace {
+    // writes 1-3 chars, starting at to_it, and outputs how many were written
+    // written chars represent \a n as decimal digits
+    constexpr auto ToChars = [](auto& to_it, uint8_t n) {
+        uint8_t hundreds = n / 100;
+        uint8_t remainder = n % 100;
+        uint8_t tens = remainder / 10;
+        uint8_t ones = n % 10;
+
+        (*to_it) = ('0' + hundreds);
+        to_it += (hundreds > 0);
+        (*to_it) = ('0' + tens);
+        to_it += (hundreds > 0 || tens > 0);
+        (*to_it) = ('0' + ones);
+        ++to_it;
+    };
+    constexpr auto one_zero_nine = []() {
+        std::array<char, 4> retval = {};
+        auto it = retval.begin();
+        ToChars(it, 109);
+        return retval;
+    }();
+    static_assert(std::string_view{one_zero_nine.data()} == "109");
+    constexpr auto three_zero = []() {
+        std::array<char, 4> retval = {};
+        auto it = retval.begin();
+        ToChars(it, 30);
+        return retval;
+    }();
+    static_assert(std::string_view{three_zero.data()} == "30");
+}
+
 
 ///////////////////////////////////////
 // function GG::RgbaTag
 ///////////////////////////////////////
-std::string GG::RgbaTag(const Clr& c)
+std::string GG::RgbaTag(Clr c)
 {
-#if defined(__cpp_lib_to_chars)
     std::array<std::string::value_type, 6 + 4*4 + 1> buffer{"<rgba "}; // rest should be nulls
-    auto result = std::to_chars(buffer.data() + 6, buffer.data() + 9, static_cast<int>(c.r));
-    *result.ptr = ' ';
-    result = std::to_chars(result.ptr + 1, result.ptr + 4, static_cast<int>(c.g));
-    *result.ptr = ' ';
-    result = std::to_chars(result.ptr + 1, result.ptr + 4, static_cast<int>(c.b));
-    *result.ptr = ' ';
-    result = std::to_chars(result.ptr + 1, result.ptr + 4, static_cast<int>(c.a));
-    *result.ptr = '>';
+    auto it = buffer.data() + 6;
+    ToChars(it, c.r);
+    *(it++) = ' ';
+    ToChars(it, c.g);
+    *(it++) = ' ';
+    ToChars(it, c.b);
+    *(it++) = ' ';
+    ToChars(it, c.a);
+    *it = '>';
     return {buffer.data()};
-#else
-    std::string retval;
-    // reserve space for leading "<rgba " and 4 numbers of 3 digits (000-255),
-    // each followed by 1 character (" " or ">").
-    // this is also probably within the small string optimization size (31 chars in my tests)
-    retval.reserve(6 + 4*4);
-    retval.append("<rgba ")
-          .append(std::to_string(static_cast<int>(c.r))).append(" ")
-          .append(std::to_string(static_cast<int>(c.g))).append(" ")
-          .append(std::to_string(static_cast<int>(c.b))).append(" ")
-          .append(std::to_string(static_cast<int>(c.a))).append(">");
-    return retval;
-#endif
 }
 
 
@@ -338,33 +357,14 @@ void Font::Substring::Bind(const std::string& str_)
     str = &str_;
 }
 
-std::string::const_iterator Font::Substring::begin() const
-{ return std::next(str->begin(), first); }
-
-std::string::const_iterator Font::Substring::end() const
-{ return std::next(str->begin(), second); }
-
-bool Font::Substring::empty() const
-{ return first == second; }
-
-std::size_t Font::Substring::size() const
-{ return second - first; }
-
-Font::Substring::operator std::string() const
-{ return std::string(begin(), end()); }
-
 bool Font::Substring::operator==(const std::string& rhs) const
-{ return size() == rhs.size() && !std::memcmp(str->data() + first, rhs.data(), rhs.size()); }
+{ return size() == rhs.size() && !std::memcmp(str->data() + first, rhs.data(), size()); }
 
 bool Font::Substring::operator==(std::string_view rhs) const
-{ return size() == rhs.size() && !std::memcmp(str->data() + first, rhs.data(), rhs.size()); }
+{ return size() == rhs.size() && !std::memcmp(str->data() + first, rhs.data(), size()); }
 
-bool Font::Substring::operator!=(const std::string& rhs) const
-{ return !operator==(rhs); }
-
-bool Font::Substring::operator!=(std::string_view rhs) const
-{ return !operator==(rhs); }
-
+bool Font::Substring::operator==(const Substring& rhs) const
+{ return size() == rhs.size() && !std::memcmp(str->data() + first, rhs.data() + rhs.first, size()); }
 
 Font::Substring& Font::Substring::operator+=(const IterPair& rhs)
 {
@@ -1367,8 +1367,7 @@ namespace DebugOutput {
 }
 
 std::vector<std::shared_ptr<Font::TextElement>>
-    Font::ExpensiveParseFromTextToTextElements(const std::string& text,
-                                               const Flags<TextFormat>& format) const
+Font::ExpensiveParseFromTextToTextElements(const std::string& text, Flags<TextFormat> format) const
 {
     std::vector<std::shared_ptr<TextElement>> text_elements;
 
@@ -1572,7 +1571,7 @@ std::vector<Font::LineData> Font::DetermineLines(
         return std::vector<Font::LineData>{};
     }
 
-    ValidateFormat(format);
+    ValidateFormat(format); // may modify format
 
     RenderState render_state;
     static constexpr int tab_width = 8; // default tab width
@@ -1960,7 +1959,7 @@ bool Font::GenerateGlyph(FT_Face face, std::uint32_t ch)
 void Font::ValidateFormat(Flags<TextFormat>& format) const
 {
     // correct any disagreements in the format flags
-    int dup_ct = 0;   // duplication count
+    uint8_t dup_ct = 0;   // duplication count
     if (format & FORMAT_LEFT) ++dup_ct;
     if (format & FORMAT_RIGHT) ++dup_ct;
     if (format & FORMAT_CENTER) ++dup_ct;
@@ -1968,11 +1967,11 @@ void Font::ValidateFormat(Flags<TextFormat>& format) const
         format &= ~(FORMAT_RIGHT | FORMAT_CENTER);
         format |= FORMAT_LEFT;
     }
-    dup_ct = 0;
-    if (format & FORMAT_TOP) ++dup_ct;
-    if (format & FORMAT_BOTTOM) ++dup_ct;
-    if (format & FORMAT_VCENTER) ++dup_ct;
-    if (dup_ct != 1) {   // exactly one must be picked; when none or multiples are picked, use FORMAT_TOP by default
+    uint8_t dup_ct2 = 0;
+    if (format & FORMAT_TOP) ++dup_ct2;
+    if (format & FORMAT_BOTTOM) ++dup_ct2;
+    if (format & FORMAT_VCENTER) ++dup_ct2;
+    if (dup_ct2 != 1) {   // exactly one must be picked; when none or multiples are picked, use FORMAT_TOP by default
         format &= ~(FORMAT_BOTTOM | FORMAT_VCENTER);
         format |= FORMAT_TOP;
     }
@@ -2076,9 +2075,7 @@ namespace {
             const auto& param{params[n]};
             if (param.empty())
                 return {retval, false};
-            const auto param_data = &*param.begin();
-            const auto param_size = param.size();
-            auto ec = std::from_chars(param_data, param_data + param_size, retval[n]).ec;
+            auto ec = std::from_chars(param.data(), param.data() + param.size(), retval[n]).ec;
             if (ec != std::errc())
                 return {retval, false};
 #else

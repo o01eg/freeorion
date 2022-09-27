@@ -239,18 +239,25 @@ private:
         std::vector<Vertex>     vertices;   // cached apparent universe positions of starts and ends of line segments drawn to represent move path
     };
 
+    void BufferAddMoveLineVertices(GG::GL2DVertexBuffer& dot_verts_buf,
+                                   GG::GLRGBAColorBuffer& dot_colours_buf,
+                                   GG::GLTexCoordBuffer& dot_star_texture_coords_buf,
+                                   float offset, float dot_size, int dot_spacing,
+                                   const MapWnd::MovementLineData& move_line,
+                                   GG::Clr colour_override = GG::CLR_ZERO) const;
+
     class MapScaleLine;
 
     void InitializeWindows();
 
     void Zoom(int delta);                            //!< changes the zoom level of the main map by zoom step size to the power of \a delta (adds delta to the current zoom exponent)
-    void Zoom(int delta, const GG::Pt& position);    //!< changes the zoom level of the main map by zoom step size to the power of \a delta (adds delta to the current zoom exponent) Keeps the screen position \a position in the same place after zooming
+    void Zoom(int delta, const GG::Pt position);     //!< changes the zoom level of the main map by zoom step size to the power of \a delta (adds delta to the current zoom exponent) Keeps the screen position \a position in the same place after zooming
     void SetZoom(double steps_in, bool update_slide);//!< sets zoom level of the main map to zoom step size to the power of \a steps_in and updates zoom slider position if \a update_slide is true
-    void SetZoom(double steps_in, bool update_slide, const GG::Pt& position);//!< sets zoom level of the main map to zoom step size to the power of \a steps_in and updates zoom slider position if \a update_slide is true. Keeps the screen position \a position in the same place after zooming
+    void SetZoom(double steps_in, bool update_slide, const GG::Pt position);//!< sets zoom level of the main map to zoom step size to the power of \a steps_in and updates zoom slider position if \a update_slide is true. Keeps the screen position \a position in the same place after zooming
 
-    void Pan(const GG::Pt& delta);                   //!< pans map
-    bool PanX(GG::X x = GG::X(50));
-    bool PanY(GG::Y y = GG::Y(50));
+    void Pan(const GG::Pt delta);
+    bool PanX(GG::X x);
+    bool PanY(GG::Y y);
 
     /** Mark all fleet buttons for a refresh. */
     void RefreshFleetButtons(bool recreate = true);
@@ -317,12 +324,6 @@ private:
 
     /* renders the dashed lines indicating where each fleet is going */
     void RenderFleetMovementLines();
-
-    /* renders a single fleet movement line. if \a clr is GG::CLR_ZERO, the lane
-     * is rendered with the .colour attribute of \a move_line. assumes that the
-     * move dot texture has already been bound. */
-    void RenderMovementLine(const MapWnd::MovementLineData& move_line, float dot_size, float dot_spacing, float dot_shift,
-                            GG::Clr clr = GG::CLR_ZERO);
 
     /* renders ETA indicators at end-of-turn positions for a single fleet movement
      * line.  if \a clr is GG::CLR_ZERO, the indicators are filled with the .colour
@@ -509,15 +510,24 @@ private:
 
     std::map<std::shared_ptr<GG::Texture>, GG::GL2DVertexBuffer> m_star_core_quad_vertices;
     std::map<std::shared_ptr<GG::Texture>, GG::GL2DVertexBuffer> m_star_halo_quad_vertices;
-    GG::GL2DVertexBuffer            m_galaxy_gas_quad_vertices;
-    GG::GLTexCoordBuffer            m_galaxy_gas_texture_coords;
-    GG::GLTexCoordBuffer            m_star_texture_coords;
-    GG::GL2DVertexBuffer            m_star_circle_vertices;
+    GG::GL2DVertexBuffer    m_galaxy_gas_quad_vertices;
+    GG::GLTexCoordBuffer    m_galaxy_gas_texture_coords;
+    GG::GLTexCoordBuffer    m_star_texture_coords;
+    GG::GL2DVertexBuffer    m_star_circle_vertices;
 
-    GG::GL2DVertexBuffer            m_starlane_vertices;
-    GG::GLRGBAColorBuffer           m_starlane_colors;
-    GG::GL2DVertexBuffer            m_RC_starlane_vertices;
-    GG::GLRGBAColorBuffer           m_RC_starlane_colors;
+    GG::GL2DVertexBuffer    m_starlane_vertices;
+    GG::GLRGBAColorBuffer   m_starlane_colors;
+    GG::GL2DVertexBuffer    m_RC_starlane_vertices;
+    GG::GLRGBAColorBuffer   m_RC_starlane_colors;
+
+    GG::GL2DVertexBuffer    m_fleet_move_dot_vertices;
+    GG::GLRGBAColorBuffer   m_fleet_move_dot_colours;
+    GG::GLTexCoordBuffer    m_fleet_move_dot_star_texture_coords;
+    std::size_t             m_projected_move_dots_start_index = 0;
+
+    GG::GL2DVertexBuffer    m_scanline_circle_vertices;
+    GG::GL2DVertexBuffer    m_system_circle_vertices;
+    GG::GLRGBAColorBuffer   m_system_circle_colours;
 
     /** First buffer is visible fields, second buffer is not visible (scanlined)
         fields for each texture. */

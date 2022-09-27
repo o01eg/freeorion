@@ -76,11 +76,11 @@ namespace {
     }
 
     // "Babylonian Method" of finding square roots...
-    double constexpr SqrtIterative2(double a, double c) {
+    constexpr double SqrtIterative2(double a, double c) {
         double g = 0.5 * (c + a/c);
         return (g == c) ? g : SqrtIterative2(a, g);
     }
-    double constexpr Sqrt(double a)
+    constexpr double Sqrt(double a)
     { return SqrtIterative2(a, a); }
 
     constexpr double ZOOM_STEP_SIZE = Sqrt(Sqrt(2.0));
@@ -298,11 +298,11 @@ namespace {
                                                          dist_along_lane);
     }
 
-    bool InRect(GG::X left, GG::Y top, GG::X right, GG::Y bottom, const GG::Pt& pt)
+    bool InRect(GG::X left, GG::Y top, GG::X right, GG::Y bottom, const GG::Pt pt)
     { return pt.x >= left && pt.y >= top && pt.x < right && pt.y < bottom; } //pt >= ul && pt < lr;
 
     auto InWndRect(const GG::Wnd* top_wnd) {
-        return [top_wnd](const GG::Wnd* wnd, const GG::Pt& pt) -> bool {
+        return [top_wnd](const GG::Wnd* wnd, const GG::Pt pt) -> bool {
             if (!wnd)
                 return false;
             return InRect(wnd->Left(), top_wnd ? top_wnd->Top() : wnd->Top(),
@@ -388,8 +388,8 @@ namespace {
             static constexpr GG::Y offset{32};
             const GG::Clr& BG_CLR = ClientUI::WndColor();
             const GG::Clr& BORDER_CLR = ClientUI::WndOuterBorderColor();
-            const GG::Pt& UL = GG::Pt(UpperLeft().x, UpperLeft().y + offset);
-            const GG::Pt& LR = LowerRight();
+            const GG::Pt UL = GG::Pt(UpperLeft().x, UpperLeft().y + offset);
+            const GG::Pt LR = LowerRight();
 
             // main background
             GG::FlatRectangle(UL, LR, BG_CLR, BORDER_CLR);
@@ -548,7 +548,7 @@ namespace {
         void LayoutRow(const std::string& descr,
                        GG::Pt& descr_ul, GG::Pt& descr_lr,
                        GG::Pt& value_ul, GG::Pt& value_lr,
-                       const GG::Pt& row_advance)
+                       const GG::Pt row_advance)
         {
             if (!m_labels.count(descr)) {
                 ErrorLogger() << "Unable to find expected label key " << descr;
@@ -558,15 +558,12 @@ namespace {
             LayoutRow(m_labels.at(descr), descr_ul, descr_lr, value_ul, value_lr, row_advance);
         }
 
-        void LayoutRow(LabelValueType& row,
-            GG::Pt& descr_ul, GG::Pt& descr_lr,
-            GG::Pt& value_ul, GG::Pt& value_lr,
-            const GG::Pt& row_advance)
+        void LayoutRow(LabelValueType& row, GG::Pt& descr_ul, GG::Pt& descr_lr,
+                       GG::Pt& value_ul, GG::Pt& value_lr, const GG::Pt row_advance)
         {
             row.first->SizeMove(descr_ul, descr_lr);
-            if (row.second) {
+            if (row.second)
                 row.second->SizeMove(value_ul, value_lr);
-            }
             descr_ul += row_advance;
             descr_lr += row_advance;
             value_ul += row_advance;
@@ -585,22 +582,21 @@ namespace {
                 GG::Y height{ ClientUI::Pts() };
                 // center format for title label
                 m_ship_design_labels.emplace_back(
-                    GG::Wnd::Create<CUILabel>(GetUniverse().GetShipDesign(entry.first)->Name(),
+                    GG::Wnd::Create<CUILabel>(
+                        GetUniverse().GetShipDesign(entry.first)->Name(),
                         GG::FORMAT_RIGHT,
                         GG::NO_WND_FLAGS, GG::X0, GG::Y0,
-                        m_col_widths.at(0) - (m_margin * 2), height
-                        ),
-                    GG::Wnd::Create<CUILabel>(std::to_string(entry.second),
+                        m_col_widths.at(0) - (m_margin * 2), height),
+                    GG::Wnd::Create<CUILabel>(
+                        std::to_string(entry.second),
                         GG::FORMAT_RIGHT,
                         GG::NO_WND_FLAGS, GG::X0, GG::Y0,
-                        m_col_widths.at(1) - (m_margin * 2), height
-                        )
+                        m_col_widths.at(1) - (m_margin * 2), height)
                 );
             }
             std::sort(m_ship_design_labels.begin(), m_ship_design_labels.end(),
-                [](LabelValueType a, LabelValueType b) {
-                    return a.first->Text() < b.first->Text();
-                }
+                [](LabelValueType a, LabelValueType b)
+                { return a.first->Text() < b.first->Text(); }
             );
             for (auto& labels : m_ship_design_labels) {
                 AttachChild(labels.first);
@@ -878,8 +874,10 @@ LaneEndpoints::LaneEndpoints() :
 // MapWnd::MovementLineData::Vertex
 ////////////////////////////////////////////////
 struct MapWnd::MovementLineData::Vertex {
-    Vertex(double x_, double y_, int eta_, bool show_eta_, bool flag_blockade_ = false, bool flag_supply_block_ = false) :
-        x(x_), y(y_), eta(eta_), show_eta(show_eta_), flag_blockade(flag_blockade_), flag_supply_block(flag_supply_block_)
+    Vertex(double x_, double y_, int eta_, bool show_eta_,
+           bool flag_blockade_ = false, bool flag_supply_block_ = false) :
+        x(x_), y(y_), eta(eta_), show_eta(show_eta_),
+        flag_blockade(flag_blockade_), flag_supply_block(flag_supply_block_)
     {}
     double  x, y;       // apparent in-universe position of a point on move line.  not actual universe positions, but rather where the move line vertices are drawn
     int     eta;        // turns taken to reach point by object travelling along move line
@@ -1979,11 +1977,6 @@ void MapWnd::RenderSystems() {
     auto& known_destroyed_object_ids = universe.EmpireKnownDestroyedObjectIDs(empire_id);
 
 
-    glPushMatrix();
-    glLoadIdentity();
-    glDisable(GL_TEXTURE_2D);
-    glEnable(GL_LINE_SMOOTH);
-
     // distance between inner and outer system circle
     const double circle_distance = GetOptionsDB().Get<double>("ui.map.system.circle.distance");
     // width of outer...
@@ -1992,47 +1985,78 @@ void MapWnd::RenderSystems() {
     const double inner_circle_width = GetOptionsDB().Get<double>("ui.map.system.circle.inner.width");
     // width of inner circle line when map is zoomed out
     const double max_inner_circle_width = GetOptionsDB().Get<double>("ui.map.system.circle.inner.max.width");
+    // thick
+    const float line_thick = std::max(std::min(2 / ZoomFactor(), max_inner_circle_width), inner_circle_width);
+
+
+    std::vector<std::pair<int, int>> colony_count_by_empire_id;
+    colony_count_by_empire_id.reserve(empires.NumEmpires() + 1);
+    auto increment_empire_colony_count = [&colony_count_by_empire_id](int col_empire_id) {
+        auto it = std::find_if(colony_count_by_empire_id.begin(), colony_count_by_empire_id.end(),
+                               [col_empire_id](const auto& e) { return e.first == col_empire_id; });
+        if (it != colony_count_by_empire_id.end())
+            it->second++;
+        else
+            colony_count_by_empire_id.emplace_back(col_empire_id, 1);
+    };
+
+
+    std::vector<std::pair<int, GG::Clr>> empire_colours;
+    empire_colours.reserve(colony_count_by_empire_id.size());
+    std::transform(empires.begin(), empires.end(), std::back_inserter(empire_colours),
+                   [](const auto& e) { return std::pair{e.first, e.second->Color()}; });
+    auto get_empire_colour = [&empire_colours,
+                              neutral_colour{GetOptionsDB().Get<GG::Clr>("ui.map.starlane.color")}]
+                              (int empire_id)
+    {
+        auto it = std::find_if(empire_colours.begin(), empire_colours.end(),
+                               [empire_id](const auto& id_clr) { return empire_id == id_clr.first; });
+        if (it != empire_colours.end())
+            return it->second;
+        return neutral_colour;
+    };
+
+    m_scanline_circle_vertices.clear();
+    m_system_circle_vertices.clear();
+    m_system_circle_colours.clear();
+    m_scanline_circle_vertices.reserve(120*m_system_icons.size());
+    m_system_circle_vertices.reserve(120*m_system_icons.size());
+    m_system_circle_colours.reserve(120*m_system_icons.size());
 
 
     for (const auto& [system_id, icon] : m_system_icons) {
-        // Render scanlines...
         GG::Pt icon_size = icon->LowerRight() - icon->UpperLeft();
         GG::Pt icon_middle = icon->UpperLeft() + (icon_size / 2);
         GG::Pt circle_size = GG::Pt(static_cast<GG::X>(icon->EnclosingCircleDiameter()),
                                     static_cast<GG::Y>(icon->EnclosingCircleDiameter()));
         GG::Pt circle_ul = icon_middle - (circle_size / 2);
         GG::Pt circle_lr = circle_ul + circle_size;
-        if (fog_scanlines
-            && (universe.GetObjectVisibilityByEmpire(system_id, empire_id) <= Visibility::VIS_BASIC_VISIBILITY))
+
+
+        // prep scanlines
+        if (fog_scanlines &&
+            universe.GetObjectVisibilityByEmpire(system_id, empire_id) <= Visibility::VIS_BASIC_VISIBILITY)
         {
-            m_scanline_shader.SetColor(GetOptionsDB().Get<GG::Clr>("ui.map.system.scanlines.color"));
-            m_scanline_shader.RenderCircle(circle_ul, circle_lr);
+            BufferStoreCircleArcVertices(m_scanline_circle_vertices, circle_ul, circle_lr,
+                                         0, TWO_PI, true, 24, false);
         }
 
 
-        // Render circles around systems that have at least one starlane, if they are enabled
-        if (!circles) continue;
-
-        auto system = objects.get<System>(system_id);
+        if (!circles)
+            continue;
+        auto* system = objects.getRaw<const System>(system_id);
         if (!system || system->NumStarlanes() < 1)
             continue;
 
+
+        // prep circles around systems that have at least one starlane, if they are enabled
         GG::Pt circle_distance_pt = GG::Pt(GG::X1, GG::Y1) * circle_distance;
         GG::Pt inner_circle_ul = circle_ul + (circle_distance_pt * ZoomFactor());
         GG::Pt inner_circle_lr = circle_lr - (circle_distance_pt * ZoomFactor());
 
         bool has_empire_planet = false;
         bool has_neutrals = false;
-        std::vector<std::pair<int, int>> colony_count_by_empire_id;
-        colony_count_by_empire_id.reserve(empires.NumEmpires() + 1);
-        auto increment_empire_colony_count = [&colony_count_by_empire_id](int col_empire_id) {
-            auto it = std::find_if(colony_count_by_empire_id.begin(), colony_count_by_empire_id.end(),
-                                   [col_empire_id](const auto& e) { return e.first == col_empire_id; });
-            if (it != colony_count_by_empire_id.end())
-                it->second++;
-            else
-                colony_count_by_empire_id.emplace_back(col_empire_id, 1);
-        };
+        colony_count_by_empire_id.clear();
 
         for (const auto& planet : objects.findRaw<const Planet>(system->PlanetIDs())) {
             if (known_destroyed_object_ids.count(planet->ID()) > 0)
@@ -2053,60 +2077,99 @@ void MapWnd::RenderSystems() {
             }
         }
 
-        // draw outer circle in color of supplying empire
-        int supply_empire_id = supply.EmpireThatCanSupplyAt(system_id);
-        if (supply_empire_id != ALL_EMPIRES) {
-            if (auto empire = context.GetEmpire(supply_empire_id))
-                glColor(empire->Color());
-            else
-                ErrorLogger() << "MapWnd::RenderSystems(): could not load empire with id " << supply_empire_id;
-        } else {
-            glColor(GetOptionsDB().Get<GG::Clr>("ui.map.starlane.color"));
-        }
 
-        glLineWidth(outer_circle_width);
-        CircleArc(circle_ul, circle_lr, 0.0, TWO_PI, false);
+        // outer circle in color of supplying empire
+        int supply_empire_id = supply.EmpireThatCanSupplyAt(system_id);
+        auto pre_sz = m_system_circle_vertices.size();
+        BufferStoreCircleArcVertices(m_system_circle_vertices, circle_ul, circle_lr,
+                                     0.0, TWO_PI, false, 0, false);
+        std::size_t count = m_system_circle_vertices.size() - pre_sz;
+        const auto clr = get_empire_colour(supply_empire_id);
+        for (std::size_t n = 0; n < count; ++n)
+            m_system_circle_colours.store(clr);
+
 
         // systems with neutrals and no empire have a segmented inner circle
-        if (has_neutrals && !(has_empire_planet)) {
-            float line_width = std::max(std::min(2 / ZoomFactor(), max_inner_circle_width), inner_circle_width);
-            glLineWidth(line_width);
-            glColor(ClientUI::TextColor());
+        if (has_neutrals && !has_empire_planet) {
+            static constexpr std::size_t segments = 24;
+            static constexpr double segment_arc = TWO_PI / segments;
 
-            float segment = static_cast<float>(TWO_PI) / 24.0f;
-            for (int n = 0; n < 24; n = n + 2)
-                CircleArc(inner_circle_ul, inner_circle_lr, n * segment, (n+1) * segment, false);
+            pre_sz = m_system_circle_vertices.size();
+            for (std::size_t n = 0; n < segments; n = n + 2) {
+                auto theta1 = n * segment_arc;
+                auto theta2 = (n+1) * segment_arc;
+                BufferStoreCircleArcVertices(m_system_circle_vertices, inner_circle_ul, inner_circle_lr,
+                                             theta1, theta2, false, 48, false);
+            }
+            std::size_t count = m_system_circle_vertices.size() - pre_sz;
+            const auto clr = ClientUI::TextColor();
+            for (std::size_t n = 0; n < count; ++n)
+                m_system_circle_colours.store(clr);
         }
 
-        // systems with empire planets have an unbroken inner circle; color segments for each empire present
-        if (!has_empire_planet) continue;
 
-        float line_width = std::max(std::min(2 / ZoomFactor(), max_inner_circle_width), inner_circle_width);
-        glLineWidth(line_width);
+        // systems with empire planets have an unbroken inner circle,
+        // with different-color segments for each empire present
+        if (!has_empire_planet)
+            continue;
 
 #if (defined(__clang_major__)) || (defined(__GNUC__) && (__GNUC__ < 11))
         int colonized_planets = 0;
         for (const auto& e : colony_count_by_empire_id)
             colonized_planets += e.second;
 #else
-        int colonized_planets = std::transform_reduce(colony_count_by_empire_id.begin(), colony_count_by_empire_id.end(),
-                                                      0, std::plus<>(), [](const auto& e) { return e.second; });
+        int colonized_planets = std::transform_reduce(
+            colony_count_by_empire_id.begin(), colony_count_by_empire_id.end(),
+            0, std::plus<>(), [](const auto& e) { return e.second; });
 #endif
-        const double segment = TWO_PI / std::max(colonized_planets, 1);
+        const std::size_t segments = std::max(colonized_planets, 1);
+        const double segment_arc = TWO_PI / segments;
 
-        int position = 0;
-        for (auto& [empire_id, colony_count] : colony_count_by_empire_id) {
-            if (auto empire = context.GetEmpire(empire_id))
-                glColor(empire->Color());
-            else
-                glColor(ClientUI::TextColor());
 
-            CircleArc(inner_circle_ul, inner_circle_lr, position * segment,
-                      (colony_count + position) * segment, false);
-            position += colony_count;
+        std::size_t n = 0;
+        for (const auto& [empire_id, colony_count] : colony_count_by_empire_id) {
+            pre_sz = m_system_circle_vertices.size();
+            auto theta1 = n*segment_arc;
+            auto theta2 = (n + colony_count)*segment_arc;
+            BufferStoreCircleArcVertices(m_system_circle_vertices, inner_circle_ul, inner_circle_lr,
+                                         theta1, theta2, false, 30, false);
+            std::size_t count = m_system_circle_vertices.size() - pre_sz;
+            n += colony_count;
+            const auto clr = (empire_id == ALL_EMPIRES) ?
+                ClientUI::TextColor() : get_empire_colour(empire_id);
+            for (std::size_t n2 = 0; n2 < count; ++n2)
+                m_system_circle_colours.store(clr);
         }
     }
 
+
+    glPushMatrix();
+    glLoadIdentity();
+    glDisable(GL_TEXTURE_2D);
+    glEnable(GL_LINE_SMOOTH);
+    //glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS); // already pushed above
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glDisableClientState(GL_COLOR_ARRAY);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+
+    // render scanlines
+    m_scanline_shader.SetColor(GetOptionsDB().Get<GG::Clr>("ui.map.system.scanlines.color"));
+    m_scanline_shader.StartUsing();
+    m_scanline_circle_vertices.activate();
+    glDrawArrays(GL_TRIANGLES, 0, m_scanline_circle_vertices.size());
+    m_scanline_shader.StopUsing();
+
+
+    // render system circles
+    glEnableClientState(GL_COLOR_ARRAY);
+    glLineWidth(line_thick);
+    m_system_circle_vertices.activate();
+    m_system_circle_colours.activate();
+    glDrawArrays(GL_LINES, 0, m_system_circle_vertices.size());
+
+
+    glPopClientAttrib();
     glDisable(GL_LINE_SMOOTH);
     glEnable(GL_TEXTURE_2D);
     glPopMatrix();
@@ -2125,7 +2188,8 @@ void MapWnd::RenderStarlanes() {
 }
 
 void MapWnd::RenderStarlanes(GG::GL2DVertexBuffer& vertices, GG::GLRGBAColorBuffer& colours,
-                             double thickness, bool coloured, bool do_base_render) {
+                             double thickness, bool coloured, bool do_base_render)
+{
     if (vertices.size() && (colours.size() || !coloured) && (coloured || do_base_render)) {
         // render starlanes with vertex buffer (and possibly colour buffer)
         const GG::Clr UNOWNED_LANE_COLOUR = GetOptionsDB().Get<GG::Clr>("ui.map.starlane.color");
@@ -2151,8 +2215,6 @@ void MapWnd::RenderStarlanes(GG::GL2DVertexBuffer& vertices, GG::GLRGBAColorBuff
 
         glDrawArrays(GL_LINES, 0, vertices.size());
 
-        glLineWidth(1.0);
-
         glPopClientAttrib();
         glPopAttrib();
 
@@ -2164,13 +2226,84 @@ void MapWnd::RenderStarlanes(GG::GL2DVertexBuffer& vertices, GG::GLRGBAColorBuff
 }
 
 namespace {
-    GG::GL2DVertexBuffer dot_vertices_buffer;
-    GG::GLTexCoordBuffer dot_star_texture_coords;
-    constexpr std::size_t BUFFER_CAPACITY(512); // should be long enough for most plausible fleet move lines
+    auto MoveLineDotTexture()
+    { return ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "move_line_dot.png"); }
+}
 
-    std::shared_ptr<GG::Texture> MoveLineDotTexture() {
-        auto retval = ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "move_line_dot.png");
-        return retval;
+void MapWnd::BufferAddMoveLineVertices(GG::GL2DVertexBuffer& dot_verts_buf,
+                                       GG::GLRGBAColorBuffer& dot_colours_buf,
+                                       GG::GLTexCoordBuffer& dot_star_texture_coords_buf,
+                                       float offset, float dot_size, int dot_spacing,
+                                       const MapWnd::MovementLineData& move_line,
+                                       GG::Clr colour_override) const
+{
+    const float dot_half_sz = dot_size / 2.0f;
+
+    const auto colour = colour_override == GG::CLR_ZERO ? move_line.colour : colour_override;
+
+    std::vector<std::pair<int, int>> vert_screen_coords;
+    vert_screen_coords.reserve(move_line.vertices.size());
+    std::transform(move_line.vertices.begin(), move_line.vertices.end(),
+                   std::back_inserter(vert_screen_coords),
+                   [left{Value(ClientUpperLeft().x)},
+                    top{Value(ClientUpperLeft().y)},
+                    zoom{ZoomFactor()}] (const auto& vert)
+    {
+        int x = (vert.x * zoom) + left;
+        int y = (vert.y * zoom) + top;
+        return std::pair{x, y};
+    });
+
+    auto vert_coord_it = vert_screen_coords.begin();
+    auto vert_coord_end = vert_screen_coords.end();
+
+    for (; vert_coord_it != vert_coord_end;) {
+        // get next two vertices screen positions
+        const auto& [x1, y1] = *vert_coord_it;
+        ++vert_coord_it;
+        if (vert_coord_it == vert_coord_end)
+            break;
+        const auto& [x2, y2] = *vert_coord_it;
+
+        // get unit vector along line connecting vertices
+        float deltaX = x2 - x1;
+        float deltaY = y2 - y1;
+        float length = std::sqrt(deltaX*deltaX + deltaY*deltaY);
+        if (!isnormal(length)) // safety check
+            continue;
+        float inv_length = 1.0 / length;
+        float uVecX = deltaX * inv_length;
+        float uVecY = deltaY * inv_length;
+
+        // increment along line, adding dots to buffers, until end of line segment is passed
+        while (offset < length) {
+            // don't know why the dot needs to be shifted half a dot size down/right and
+            // rendered 2 x dot size on each axis, but apparently it does...
+
+            // find position of dot from initial vertex position, offset length and unit vectors
+            const auto left = x1 + offset * uVecX + dot_half_sz;
+            const auto top =  y1 + offset * uVecY + dot_half_sz;
+
+            dot_verts_buf.store(left - dot_size, top - dot_size);
+            dot_verts_buf.store(left - dot_size, top + dot_size);
+            dot_verts_buf.store(left + dot_size, top + dot_size);
+            dot_verts_buf.store(left + dot_size, top - dot_size);
+
+            // move offset to that for next dot
+            offset += dot_spacing;
+
+            dot_colours_buf.store(colour);
+            dot_colours_buf.store(colour);
+            dot_colours_buf.store(colour);
+            dot_colours_buf.store(colour);
+
+            dot_star_texture_coords_buf.store(0.0f, 0.0f);
+            dot_star_texture_coords_buf.store(0.0f, 1.0f);
+            dot_star_texture_coords_buf.store(1.0f, 1.0f);
+            dot_star_texture_coords_buf.store(1.0f, 0.0f);
+        }
+
+        offset -= length;   // so next segment's dots meld smoothly into this segment's
     }
 }
 
@@ -2190,18 +2323,6 @@ void MapWnd::RenderFleetMovementLines() {
     auto move_line_dot_texture = MoveLineDotTexture();
     float dot_size = Value(move_line_dot_texture->DefaultWidth());
 
-    // texture coords
-    if (dot_star_texture_coords.empty()) {
-        dot_star_texture_coords.reserve(BUFFER_CAPACITY*4);
-        for (std::size_t i = 0; i < BUFFER_CAPACITY; ++i) {
-            dot_star_texture_coords.store(0.0f, 0.0f);
-            dot_star_texture_coords.store(0.0f, 1.0f);
-            dot_star_texture_coords.store(1.0f, 1.0f);
-            dot_star_texture_coords.store(1.0f, 0.0f);
-        }
-    }
-
-
     // dots rendered same size for all zoom levels, so do positioning in screen
     // space instead of universe space
     glPushMatrix();
@@ -2210,19 +2331,63 @@ void MapWnd::RenderFleetMovementLines() {
     // render movement lines for all fleets
     glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
     glEnableClientState(GL_VERTEX_ARRAY);
-    glDisableClientState(GL_COLOR_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 
     glBindTexture(GL_TEXTURE_2D, move_line_dot_texture->OpenGLId());
-    for (const auto& fleet_line : m_fleet_lines)
-    { RenderMovementLine(fleet_line.second, dot_size, dot_spacing, move_line_animation_shift); }
+
+    const float dot_half_sz = dot_size / 2.0f;
+
+    const auto sz = (m_fleet_lines.size() + m_projected_fleet_lines.size()) * 4;
+    m_fleet_move_dot_vertices.clear();
+    m_fleet_move_dot_vertices.reserve(sz);
+    m_fleet_move_dot_colours.clear();
+    m_fleet_move_dot_colours.reserve(sz);
+    m_fleet_move_dot_star_texture_coords.clear();
+    m_fleet_move_dot_star_texture_coords.reserve(sz);
+
+    for (const auto& [fleet_id, move_line] : m_fleet_lines) {
+        (void)fleet_id;
+        if (move_line.vertices.empty() || move_line.vertices.size() % 2 == 1)
+            continue;
+        BufferAddMoveLineVertices(m_fleet_move_dot_vertices, m_fleet_move_dot_colours,
+                                  m_fleet_move_dot_star_texture_coords, move_line_animation_shift,
+                                  dot_size, dot_spacing, move_line);
+    }
+    m_projected_move_dots_start_index = m_fleet_move_dot_vertices.size();
+
+    for (const auto& [fleet_id, proj_line] : m_projected_fleet_lines) {
+        (void)fleet_id;
+        if (proj_line.vertices.empty() || proj_line.vertices.size() % 2 == 1)
+            continue;
+        BufferAddMoveLineVertices(m_fleet_move_dot_vertices, m_fleet_move_dot_colours,
+                                  m_fleet_move_dot_star_texture_coords, move_line_animation_shift,
+                                  dot_size, dot_spacing, proj_line, GG::CLR_WHITE);
+    }
+
 
     // re-render selected fleets' movement lines in white
     for (int fleet_id : m_selected_fleet_ids) {
         auto line_it = m_fleet_lines.find(fleet_id);
-        if (line_it != m_fleet_lines.end())
-            RenderMovementLine(line_it->second, dot_size, dot_spacing, move_line_animation_shift, GG::CLR_WHITE);
+        if (line_it != m_fleet_lines.end()) {
+            const auto& move_line = line_it->second;
+            if (!move_line.vertices.empty() && move_line.vertices.size() % 2 == 0) {
+                BufferAddMoveLineVertices(m_fleet_move_dot_vertices, m_fleet_move_dot_colours,
+                                          m_fleet_move_dot_star_texture_coords,
+                                          move_line_animation_shift,
+                                          dot_size, dot_spacing, move_line,
+                                          GG::CLR_WHITE);
+            }
+        }
     }
+
+    // after adding all dots to buffer, render general fleet move dots in one call
+    m_fleet_move_dot_vertices.activate();
+    m_fleet_move_dot_colours.activate();
+    m_fleet_move_dot_star_texture_coords.activate();
+    glDrawArrays(GL_QUADS, 0, m_projected_move_dots_start_index);
+
+    glDisableClientState(GL_COLOR_ARRAY);
 
     // render move line ETA indicators for selected fleets
     for (int fleet_id : m_selected_fleet_ids) {
@@ -2231,103 +2396,21 @@ void MapWnd::RenderFleetMovementLines() {
             RenderMovementLineETAIndicators(line_it->second);
     }
 
-    // render projected move lines
+    // render projected move lines, starting from offset index
     glBindTexture(GL_TEXTURE_2D, move_line_dot_texture->OpenGLId());
-    for (const auto& fleet_line : m_projected_fleet_lines)
-    { RenderMovementLine(fleet_line.second, dot_size, dot_spacing, move_line_animation_shift, GG::CLR_WHITE); }
+    m_fleet_move_dot_vertices.activate();
+    m_fleet_move_dot_colours.activate();
+    m_fleet_move_dot_star_texture_coords.activate();
+    glDrawArrays(GL_QUADS, m_projected_move_dots_start_index,
+                 m_fleet_move_dot_vertices.size() - m_projected_move_dots_start_index);
+
 
     // render projected move line ETA indicators
     for (const auto& eta_indicator : m_projected_fleet_lines)
-    { RenderMovementLineETAIndicators(eta_indicator.second, GG::CLR_WHITE); }
+        RenderMovementLineETAIndicators(eta_indicator.second, GG::CLR_WHITE);
 
     glPopClientAttrib();
     glPopMatrix();
-}
-
-void MapWnd::RenderMovementLine(const MapWnd::MovementLineData& move_line, float dot_size,
-                                float dot_spacing, float dot_shift, GG::Clr clr)
-{
-    // assumes:
-    // - dot texture has already been bound
-    // - identity matrix has been loaded
-    // - vertex array and texture coord array client states ahve been enabled
-
-    const auto& vertices = move_line.vertices;
-    if (vertices.empty())
-        return; // nothing to draw.  need at least two nodes at different locations to draw a line
-    if (vertices.size() % 2 == 1) {
-        //ErrorLogger() << "RenderMovementLine given an odd number of vertices (" << vertices.size() << ") to render?!";
-        return;
-    }
-
-    // if no override colour specified, use line's own colour info
-    if (clr == GG::CLR_ZERO)
-        glColor(move_line.colour);
-    else
-        glColor(clr);
-
-    float dot_half_sz = dot_size / 2.0f;
-    float offset = dot_shift;  // step along line in by move_line_animation_shift to get position of first dot
-
-
-    // movement line data changes every frame, so no use for a server buffer...
-    // so fill a client buffer each frame with latest vertex data for this line.
-    // however, want to avoid extra reallocations of buffer, so reserve space.
-    dot_vertices_buffer.clear();
-    dot_vertices_buffer.reserve(BUFFER_CAPACITY*4);
-
-    unsigned int dots_added_to_buffer = 0;
-
-    // set vertex positions to outline a quad for each move line vertex
-    for (auto verts_it = vertices.begin(); verts_it != vertices.end(); ++verts_it) {
-        if (dots_added_to_buffer >= BUFFER_CAPACITY)
-            break; // can't fit any more!
-
-        // get next two vertices
-        const auto& vert1 = *verts_it;
-        ++verts_it;
-        const auto& vert2 = *verts_it;
-
-        // find centres of dots on screen
-        GG::Pt vert1Pt = ScreenCoordsFromUniversePosition(vert1.x, vert1.y);
-        GG::Pt vert2Pt = ScreenCoordsFromUniversePosition(vert2.x, vert2.y);
-
-        // get unit vector along line connecting vertices
-        float deltaX = Value(vert2Pt.x - vert1Pt.x);
-        float deltaY = Value(vert2Pt.y - vert1Pt.y);
-        float length = std::sqrt(deltaX*deltaX + deltaY*deltaY);
-        if (length == 0.0f) // safety check
-            length = 1.0f;
-        float uVecX = deltaX / length;
-        float uVecY = deltaY / length;
-
-        // increment along line, adding dots to buffers, until end of line segment is passed
-        while (offset < length && dots_added_to_buffer < BUFFER_CAPACITY) {
-            ++dots_added_to_buffer;
-
-            // don't know why the dot needs to be shifted half a dot size down/right and
-            // rendered 2 x dot size on each axis, but apparently it does...
-
-            // find position of dot from initial vertex position, offset length and unit vectors
-            std::pair<float, float> ul(Value(vert1Pt.x) + offset * uVecX + dot_half_sz,
-                                       Value(vert1Pt.y) + offset * uVecY + dot_half_sz);
-
-            dot_vertices_buffer.store(ul.first - dot_size,   ul.second - dot_size);
-            dot_vertices_buffer.store(ul.first - dot_size,   ul.second + dot_size);
-            dot_vertices_buffer.store(ul.first + dot_size,   ul.second + dot_size);
-            dot_vertices_buffer.store(ul.first + dot_size,   ul.second - dot_size);
-
-            // move offset to that for next dot
-            offset += dot_spacing;
-        }
-
-        offset -= length;   // so next segment's dots meld smoothly into this segment's
-    }
-
-    // after adding all dots to buffer, render in one call
-    dot_vertices_buffer.activate();
-    dot_star_texture_coords.activate();
-    glDrawArrays(GL_QUADS, 0, dot_vertices_buffer.size());
 }
 
 void MapWnd::RenderMovementLineETAIndicators(const MapWnd::MovementLineData& move_line,
@@ -2338,14 +2421,14 @@ void MapWnd::RenderMovementLineETAIndicators(const MapWnd::MovementLineData& mov
         return; // nothing to draw.
 
 
-    static constexpr double MARKER_HALF_SIZE = 9;
+    static constexpr GG::Pt MARKER_HALF_SIZE_PT{GG::X{9}, GG::Y{9}};
     const int MARKER_PTS = ClientUI::Pts();
     auto font = ClientUI::GetBoldFont(MARKER_PTS);
     auto flags = GG::FORMAT_CENTER | GG::FORMAT_VCENTER;
 
     glPushMatrix();
     glLoadIdentity();
-    int flag_border = 5;
+    static constexpr int flag_border = 5;
 
     for (const auto& vert : vertices) {
         if (!vert.show_eta)
@@ -2353,16 +2436,14 @@ void MapWnd::RenderMovementLineETAIndicators(const MapWnd::MovementLineData& mov
 
         // draw background disc in empire colour, or passed-in colour
         GG::Pt marker_centre = ScreenCoordsFromUniversePosition(vert.x, vert.y);
-        GG::Pt ul = marker_centre - GG::Pt(GG::X(static_cast<int>(MARKER_HALF_SIZE)),
-                                           GG::Y(static_cast<int>(MARKER_HALF_SIZE)));
-        GG::Pt lr = marker_centre + GG::Pt(GG::X(static_cast<int>(MARKER_HALF_SIZE)),
-                                           GG::Y(static_cast<int>(MARKER_HALF_SIZE)));
+        GG::Pt ul = marker_centre - MARKER_HALF_SIZE_PT;
+        GG::Pt lr = marker_centre + MARKER_HALF_SIZE_PT;
 
         glDisable(GL_TEXTURE_2D);
 
         // segmented circle of wedges to indicate blockades
         if (vert.flag_blockade) {
-            float wedge = static_cast<float>(TWO_PI)/12.0f;
+            static constexpr float wedge = static_cast<float>(TWO_PI)/12.0f;
             for (int n = 0; n < 12; n = n + 2) {
                 glColor(GG::CLR_BLACK);
                 CircleArc(ul + GG::Pt(-flag_border*GG::X1,      -flag_border*GG::Y1),   lr + GG::Pt(flag_border*GG::X1,     flag_border*GG::Y1),    n*wedge,        (n+1)*wedge, true);
@@ -2370,7 +2451,7 @@ void MapWnd::RenderMovementLineETAIndicators(const MapWnd::MovementLineData& mov
                 CircleArc(ul + GG::Pt(-(flag_border)*GG::X1,    -(flag_border)*GG::Y1), lr + GG::Pt((flag_border)*GG::X1,   (flag_border)*GG::Y1),  (n+1)*wedge,    (n+2)*wedge, true);
             }
         } else if (vert.flag_supply_block) {
-            float wedge = static_cast<float>(TWO_PI)/12.0f;
+            static constexpr float wedge = static_cast<float>(TWO_PI)/12.0f;
             for (int n = 0; n < 12; n = n + 2) {
                 glColor(GG::CLR_BLACK);
                 CircleArc(ul + GG::Pt(-flag_border*GG::X1,      -flag_border*GG::Y1),   lr + GG::Pt(flag_border*GG::X1,     flag_border*GG::Y1),    n*wedge,        (n+1)*wedge, true);
@@ -2391,7 +2472,7 @@ void MapWnd::RenderMovementLineETAIndicators(const MapWnd::MovementLineData& mov
 
 
         // render ETA number in white with black shadows
-        std::string text = "<s>" + std::to_string(vert.eta) + "</s>";
+        std::string text = "<s>" + std::to_string(vert.eta) + "</s>"; // TODO: use to_chars and reused string?
         glColor(GG::CLR_WHITE);
         // TODO cache the text_elements
         auto text_elements = font->ExpensiveParseFromTextToTextElements(text, flags);
@@ -2404,9 +2485,19 @@ void MapWnd::RenderMovementLineETAIndicators(const MapWnd::MovementLineData& mov
 namespace {
     constexpr GG::Pt BORDER_INSET{GG::X(1.0f), GG::Y(1.0f)};
 
-    std::map<GG::Clr, std::vector<std::pair<GG::Pt, GG::Pt>>>
-        GetFleetFutureTurnDetectionRangeCircles(const ScriptingContext& context, const std::set<int>& fleet_ids) {
-        std::map<GG::Clr, std::vector<std::pair<GG::Pt, GG::Pt>>> retval;
+    // Reimplementation of the boost::hash_range function, embedding
+    // boost::hash_combine and using std::hash instead of boost::hash
+    struct hash_clr {
+        std::size_t operator()(const GG::Clr& clr) const noexcept {
+            static constexpr std::hash<uint32_t> hasher;
+            return hasher(uint32_t(clr));
+        }
+    };
+
+    auto GetFleetFutureTurnDetectionRangeCircles(const ScriptingContext& context,
+                                                 const std::set<int>& fleet_ids)
+    {
+        std::unordered_map<GG::Clr, std::vector<std::pair<GG::Pt, GG::Pt>>, hash_clr> retval;
 
         for (const auto& fleet : context.ContextObjects().findRaw<Fleet>(fleet_ids)) {
             float fleet_detection_range = 0.0f;
@@ -2417,10 +2508,12 @@ namespace {
             // skip fleets with no detection range
             if (fleet_detection_range <= 0.0f)
                 continue;
+            const int radius = static_cast<int>(fleet_detection_range);
+            const GG::Pt rad_pt{GG::X{radius}, GG::Y{radius}};
 
             // get colour... empire, monster, or neutral
             auto empire = context.GetEmpire(fleet->Owner());
-            GG::Clr empire_colour = empire ? empire->Color() :
+            const GG::Clr empire_colour = empire ? empire->Color() :
                 fleet->HasMonsters(context.ContextUniverse()) ? GG::CLR_RED : GG::CLR_WHITE;
 
             // get all current and future positions of fleet
@@ -2435,8 +2528,6 @@ namespace {
                 { continue; }
 
                 GG::Pt circle_centre = GG::Pt{GG::X(node.x), GG::Y(node.y)};
-                int radius = static_cast<int>(fleet_detection_range);
-                GG::Pt rad_pt{GG::X{radius}, GG::Y{radius}};
                 retval[empire_colour].emplace_back(circle_centre - rad_pt, circle_centre + rad_pt);
             }
         }
@@ -2504,7 +2595,7 @@ void MapWnd::RenderVisibilityRadii() {
                 verts.clear();
                 vert_colours.clear();
                 BufferStoreCircleArcVertices(verts, ul + BORDER_INSET, lr - BORDER_INSET,
-                                             0.0, TWO_PI, false, 0, false);
+                                             0.0, TWO_PI, false, 72, false);
 
                 // store colours for line segments
                 for (std::size_t count = 0; count < verts.size(); ++count)
@@ -2585,7 +2676,7 @@ void MapWnd::RemoveWindows() {
     }
 }
 
-void MapWnd::Pan(const GG::Pt& delta) {
+void MapWnd::Pan(const GG::Pt delta) {
     GG::Pt move_to_pt = ClientUpperLeft() + delta;
     CorrectMapPosition(move_to_pt);
     MoveTo(move_to_pt - GG::Pt(AppWidth(), AppHeight()));
@@ -2620,7 +2711,7 @@ void MapWnd::LButtonUp(const GG::Pt &pt, GG::Flags<GG::ModKey> mod_keys) {
     m_dragged = false;
 }
 
-void MapWnd::LClick(const GG::Pt &pt, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
     m_drag_offset = GG::Pt(-GG::X1, -GG::Y1);
     FleetUIManager& manager = FleetUIManager::GetFleetUIManager();
     const auto fleet_wnd = manager.ActiveFleetWnd();
@@ -2690,7 +2781,6 @@ void MapWnd::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
         popup->AddMenuItem(GG::MenuItem(UserString("OPTIONS_GALAXY_MAP_DETECTION_RANGE"),   false, detectionRange, detection_range_action));
         // display popup menu
         popup->Run();
-
     }
 }
 
@@ -2700,15 +2790,13 @@ void MapWnd::MouseWheel(const GG::Pt& pt, int move, GG::Flags<GG::ModKey> mod_ke
 }
 
 void MapWnd::KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) {
-    if (key == GG::Key::GGK_LSHIFT || key == GG::Key::GGK_RSHIFT) {
+    if (key == GG::Key::GGK_LSHIFT || key == GG::Key::GGK_RSHIFT)
         ReplotProjectedFleetMovement(mod_keys & GG::MOD_KEY_SHIFT);
-    }
 }
 
 void MapWnd::KeyRelease(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) {
-    if (key == GG::Key::GGK_LSHIFT || key == GG::Key::GGK_RSHIFT) {
+    if (key == GG::Key::GGK_LSHIFT || key == GG::Key::GGK_RSHIFT)
         ReplotProjectedFleetMovement(mod_keys & GG::MOD_KEY_SHIFT);
-    }
 }
 
 void MapWnd::EnableOrderIssuing(bool enable) {
@@ -3105,7 +3193,7 @@ void MapWnd::InitSystemRenderingBuffers() {
     // be.  This allows us to use one set of texture coords for everything, even
     // though the star-halo textures must be rendered at sizes as much as twice
     // as large as the star-disc textures.
-    GLfloat tex_coords[4] = {-0.5, -0.5, 1.5, 1.5};
+    static constexpr GLfloat tex_coords[4] = {-0.5, -0.5, 1.5, 1.5};
     for (std::size_t i = 0; i < m_system_icons.size(); ++i)
         GG::Texture::InitBuffer(m_star_texture_coords, tex_coords);
 
@@ -3113,7 +3201,7 @@ void MapWnd::InitSystemRenderingBuffers() {
     for (const auto& system_icon : m_system_icons) {
         const auto& icon = system_icon.second;
         int system_id = system_icon.first;
-        auto system = Objects().get<System>(system_id);
+        auto* system = Objects().getRaw<const System>(system_id);
         if (!system) {
             ErrorLogger() << "MapWnd::InitSystemRenderingBuffers couldn't get system with id " << system_id;
             continue;
@@ -3194,7 +3282,7 @@ void MapWnd::InitSystemRenderingBuffers() {
             const GLfloat tx_low_y = tex_coord_min_y  + (subtexture_y_index + 0)*(tex_coord_max_y - tex_coord_min_y)/3;
             const GLfloat tx_high_y = tex_coord_min_y + (subtexture_y_index + 1)*(tex_coord_max_y - tex_coord_min_y)/3;
 
-            GLfloat rot_tex_coords[4] = {tx_low_x, tx_low_y, tx_high_x, tx_high_y};
+            const GLfloat rot_tex_coords[4] = {tx_low_x, tx_low_y, tx_high_x, tx_high_y};
             GG::Texture::InitBuffer(m_galaxy_gas_texture_coords, rot_tex_coords);
         }
     }
@@ -3656,7 +3744,7 @@ namespace {
                 if (this_client_known_destroyed_objects.count(lane_end_sys_id))
                     continue;
 
-                auto dest_system = Objects().get<System>(render_lane.first);
+                auto* dest_system = Objects().getRaw<const System>(render_lane.first);
                 if (!dest_system)
                     continue;
 
@@ -3753,7 +3841,7 @@ namespace {
                 if (this_client_known_destroyed_objects.count(lane_end_sys_id))
                     continue;
 
-                auto dest_system = Objects().get<System>(render_lane.first);
+                auto* dest_system = Objects().getRaw<const System>(render_lane.first);
                 if (!dest_system)
                     continue;
                 //std::cout << "colouring lanes between " << start_system->Name() << " and " << dest_system->Name() << std::endl;
@@ -4094,7 +4182,7 @@ void MapWnd::InitVisibilityRadiiRenderingBuffers() {
     //auto empire_position_max_detection_ranges = universe.GetEmpiresPositionNextTurnFleetDetectionRanges(context);
 
 
-    std::map<GG::Clr, std::vector<std::pair<GG::Pt, GG::Pt>>> circles;
+    std::unordered_map<GG::Clr, std::vector<std::pair<GG::Pt, GG::Pt>>, hash_clr> circles;
 
 
     for (const auto& [empire_id, detection_circles] : empire_position_max_detection_ranges) {
@@ -4134,12 +4222,14 @@ void MapWnd::InitVisibilityRadiiRenderingBuffers() {
         std::size_t radii_start_index = m_visibility_radii_vertices.size();
         std::size_t border_start_index = m_visibility_radii_border_vertices.size();
 
-        for (const auto& ul_lr : ul_lrs) {
-            const auto& [ul, lr] = ul_lr;
+        for (const auto& [ul, lr] : ul_lrs) {
+            static constexpr std::size_t verts_per_circle = 36;
+            static constexpr std::size_t vert_per_cricle_edge = 72;
 
             unsigned int initial_size = m_visibility_radii_vertices.size();
             // store triangles for filled / transparent part of radii
-            BufferStoreCircleArcVertices(m_visibility_radii_vertices, ul, lr, 0.0, TWO_PI, true, 0, false);
+            BufferStoreCircleArcVertices(m_visibility_radii_vertices, ul, lr,
+                                         0.0, TWO_PI, true, verts_per_circle, false);
 
             // store colours for triangles
             unsigned int size_increment = m_visibility_radii_vertices.size() - initial_size;
@@ -4149,7 +4239,7 @@ void MapWnd::InitVisibilityRadiiRenderingBuffers() {
             // store line segments for border lines of radii
             initial_size = m_visibility_radii_border_vertices.size();
             BufferStoreCircleArcVertices(m_visibility_radii_border_vertices, ul + BORDER_INSET, lr - BORDER_INSET,
-                                         0.0, TWO_PI, false, 0, false);
+                                         0.0, TWO_PI, false, vert_per_cricle_edge, false);
 
             // store colours for line segments
             size_increment = m_visibility_radii_border_vertices.size() - initial_size;
@@ -5210,7 +5300,7 @@ void MapWnd::Zoom(int delta) {
     Zoom(delta, center);
 }
 
-void MapWnd::Zoom(int delta, const GG::Pt& position) {
+void MapWnd::Zoom(int delta, const GG::Pt position) {
     if (delta == 0)
         return;
 
@@ -5224,7 +5314,7 @@ void MapWnd::SetZoom(double steps_in, bool update_slide) {
     SetZoom(steps_in, update_slide, center);
 }
 
-void MapWnd::SetZoom(double steps_in, bool update_slide, const GG::Pt& position) {
+void MapWnd::SetZoom(double steps_in, bool update_slide, const GG::Pt position) {
     if (GetOptionsDB().Get<bool>("ui.map.lock"))
         return;
 

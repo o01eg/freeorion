@@ -30,7 +30,7 @@ struct FO_COMMON_API ValueRefBase {
 
     virtual void SetTopLevelContent(const std::string& content_name) {}
 
-    [[nodiscard]] virtual unsigned int GetCheckSum() const { return 0; }
+    [[nodiscard]] virtual uint32_t GetCheckSum() const { return 0; }
 
 protected:
     bool m_root_candidate_invariant = false;
@@ -158,7 +158,8 @@ template<typename T>
 { return ptr ? ptr->Clone() : nullptr; }
 
 template<typename T>
-[[nodiscard]] inline std::vector<std::unique_ptr<T>> CloneUnique(const std::vector<std::unique_ptr<T>>& vec) {
+[[nodiscard]] inline auto CloneUnique(const std::vector<std::unique_ptr<T>>& vec)
+{
     std::vector<std::unique_ptr<T>> retval;
     retval.reserve(vec.size());
     for (const auto& val : vec)
@@ -167,7 +168,8 @@ template<typename T>
 }
 
 template<typename T>
-[[nodiscard]] inline std::vector<std::pair<std::string, std::unique_ptr<T>>> CloneUnique(const std::vector<std::pair<std::string, std::unique_ptr<T>>>& vec) {
+[[nodiscard]] inline auto CloneUnique(const std::vector<std::pair<std::string, std::unique_ptr<T>>>& vec)
+{
     std::vector<std::pair<std::string, std::unique_ptr<T>>> retval;
     retval.reserve(vec.size());
     for (const auto& val : vec)

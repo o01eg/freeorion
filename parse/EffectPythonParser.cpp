@@ -97,7 +97,13 @@ namespace {
     }
 
     effect_wrapper insert_set_meter_(const MeterType m, const py::tuple& args, const py::dict& kw) {
-        auto value = py::extract<value_ref_wrapper<double>>(kw["value"])();
+        std::unique_ptr<ValueRef::ValueRef<double>> value;
+        auto value_arg = py::extract<value_ref_wrapper<double>>(kw["value"]);
+        if (value_arg.check()) {
+            value = ValueRef::CloneUnique(value_arg().value_ref);
+        } else {
+            value = std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(kw["value"])());
+        }
 
         boost::optional<std::string> accountinglabel;
         if (kw.has_key("accountinglabel")) {
@@ -105,7 +111,7 @@ namespace {
         }
         return effect_wrapper(std::make_shared<Effect::SetMeter>(
             m,
-            ValueRef::CloneUnique(value.value_ref),
+            std::move(value),
             accountinglabel));
     }
 
@@ -231,6 +237,22 @@ namespace {
         return effect_wrapper(std::make_shared<Effect::SetOwner>(std::move(empire)));
     }
 
+    effect_wrapper insert_set_star_type_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        std::unique_ptr<ValueRef::ValueRef< ::StarType>> star_type;
+        auto star_type_arg = py::extract<value_ref_wrapper< ::StarType>>(kw["type"]);
+        if (star_type_arg.check()) {
+            star_type = ValueRef::CloneUnique(star_type_arg().value_ref);
+        } else {
+            star_type = std::make_unique<ValueRef::Constant< ::StarType>>(boost::python::extract<enum_wrapper< ::StarType>>(kw["type"])().value);
+        }
+        return effect_wrapper(std::make_shared<Effect::SetStarType>(std::move(star_type)));
+    }
+
+    effect_wrapper insert_move_to_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        auto destination = py::extract<condition_wrapper>(kw["destination"])();
+        return effect_wrapper(std::make_shared<Effect::MoveTo>(ValueRef::CloneUnique(destination.condition)));
+    }
+
     effect_wrapper victory(const boost::python::tuple& args, const boost::python::dict& kw) {
         auto reason = boost::python::extract<std::string>(kw["reason"])();
         return effect_wrapper(std::make_shared<Effect::Victory>(reason));
@@ -345,5 +367,7 @@ void RegisterGlobalsEffects(py::dict& globals) {
 
     globals["SetEmpireStockpile"] = py::raw_function(insert_set_empire_stockpile);
     globals["SetOwner"] = py::raw_function(insert_set_owner_);
+    globals["SetStarType"] = py::raw_function(insert_set_star_type_);
+    globals["MoveTo"] = py::raw_function(insert_move_to_);
 }
 

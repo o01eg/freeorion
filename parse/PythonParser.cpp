@@ -91,11 +91,13 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(int() * py::self_ns::self)
             .def(double() * py::self_ns::self)
             .def(py::self_ns::self - int())
+            .def(int() - py::self_ns::self)
             .def(py::self_ns::self + py::self_ns::self)
             .def(py::self_ns::self + int())
             .def(py::self_ns::self < py::self_ns::self)
             .def(py::self_ns::self >= py::self_ns::self)
             .def(py::self_ns::self == py::self_ns::self)
+            .def(double() - py::self_ns::self)
             .def(py::self_ns::self == int());
         py::class_<value_ref_wrapper<double>>("ValueRefDouble", py::no_init)
             .def("__call__", &value_ref_wrapper<double>::call)
@@ -107,6 +109,7 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(double() * py::self_ns::self)
             .def(py::self_ns::self / py::self_ns::self)
             .def(py::self_ns::self / int())
+            .def(py::self_ns::self / double())
             .def(py::self_ns::self + int())
             .def(py::self_ns::self + double())
             .def(py::self_ns::self + py::self_ns::self)
@@ -121,11 +124,15 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(py::self_ns::self <= py::self_ns::self)
             .def(py::self_ns::self >= int())
             .def(py::self_ns::self > py::self_ns::self)
+            .def(py::self_ns::self >= py::self_ns::self)
             .def(py::self_ns::self < py::self_ns::self)
+            .def(double() < py::self_ns::self)
+            .def(py::self_ns::self < double())
             .def(py::self_ns::pow(py::self_ns::self, double()));
         py::class_<value_ref_wrapper<std::string>>("ValueRefString", py::no_init);
         py::class_<condition_wrapper>("Condition", py::no_init)
             .def(py::self_ns::self & py::self_ns::self)
+            .def(py::self_ns::self & py::other<value_ref_wrapper<double>>())
             .def(py::self_ns::self | py::self_ns::self)
             .def(~py::self_ns::self);
         py::class_<effect_wrapper>("Effect", py::no_init);
@@ -135,7 +142,11 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
         py::class_<enum_wrapper<ResourceType>>("__ResourceType", py::no_init);
         py::class_<enum_wrapper< ::PlanetEnvironment>>("__PlanetEnvironment", py::no_init);
         py::class_<enum_wrapper<PlanetSize>>("__PlanetSize", py::no_init);
-        py::class_<enum_wrapper<PlanetType>>("__PlanetType", py::no_init);
+        py::class_<enum_wrapper<PlanetType>>("__PlanetType", py::no_init)
+            .def(py::self_ns::self == py::self_ns::self)
+            .def("__hash__", py::make_function(std::hash<enum_wrapper<PlanetType>>{},
+                py::default_call_policies(),
+                boost::mpl::vector<std::size_t, const enum_wrapper<PlanetType>&>()));
         py::class_<enum_wrapper< ::StarType>>("__StarType", py::no_init);
         py::class_<enum_wrapper<ValueRef::StatisticType>>("__StatisticType", py::no_init);
         py::class_<enum_wrapper<Condition::ContentType>>("__LocationContentType", py::no_init);
@@ -143,7 +154,9 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
         py::class_<unlockable_item_wrapper>("UnlockableItem", py::no_init);
         py::class_<FocusType>("__FocusType", py::no_init);
         auto py_variable_wrapper = py::class_<variable_wrapper>("__Variable", py::no_init)
-            .def(py::self_ns::self & py::other<condition_wrapper>());
+            .def(py::self_ns::self & py::other<value_ref_wrapper<double>>())
+            .def(py::self_ns::self & py::other<condition_wrapper>())
+            .def(~py::self_ns::self);
 
         for (const char* property : {"Owner",
                                      "SupplyingEmpire",

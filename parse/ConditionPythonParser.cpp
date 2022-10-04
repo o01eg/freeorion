@@ -60,6 +60,92 @@ condition_wrapper operator&(const condition_wrapper& lhs, const condition_wrappe
     ));
 }
 
+condition_wrapper operator&(const condition_wrapper& lhs, const value_ref_wrapper<double>& rhs) {
+    std::shared_ptr<ValueRef::Operation<double>> rhs_op = std::dynamic_pointer_cast<ValueRef::Operation<double>>(rhs.value_ref);
+
+    std::shared_ptr<Condition::ValueTest> rhs_cond;
+    if (rhs_op && rhs_op->LHS() && rhs_op->RHS()) {
+        Condition::ComparisonType cmp_type;
+        switch (rhs_op->GetOpType()) {
+            case ValueRef::OpType::COMPARE_EQUAL:
+                cmp_type = Condition::ComparisonType::EQUAL;
+                break;
+            case ValueRef::OpType::COMPARE_GREATER_THAN:
+                cmp_type = Condition::ComparisonType::GREATER_THAN;
+                break;
+            case ValueRef::OpType::COMPARE_GREATER_THAN_OR_EQUAL:
+                cmp_type = Condition::ComparisonType::GREATER_THAN_OR_EQUAL;
+                break;
+            case ValueRef::OpType::COMPARE_LESS_THAN:
+                cmp_type = Condition::ComparisonType::LESS_THAN;
+                break;
+            case ValueRef::OpType::COMPARE_LESS_THAN_OR_EQUAL:
+                cmp_type = Condition::ComparisonType::LESS_THAN_OR_EQUAL;
+                break;
+            case ValueRef::OpType::COMPARE_NOT_EQUAL:
+                cmp_type = Condition::ComparisonType::NOT_EQUAL;
+                break;
+            default:
+                throw std::runtime_error(std::string("Not implemented in ") + __func__ + " op type " + std::to_string(static_cast<int>(rhs_op->GetOpType())) + rhs.value_ref->Dump());
+        }
+
+        rhs_cond = std::make_shared<Condition::ValueTest>(rhs_op->LHS()->Clone(),
+                cmp_type,
+                rhs_op->RHS()->Clone());
+    } else {
+        throw std::runtime_error(std::string("Not implemented in ") + __func__ + " op " + rhs.value_ref->Dump());
+    }
+
+    std::shared_ptr<Condition::ValueTest> lhs_cond = std::dynamic_pointer_cast<Condition::ValueTest>(lhs.condition);
+
+    if (lhs_cond && rhs_cond) {
+        const auto lhs_vals = lhs_cond->ValuesDouble();
+        const auto rhs_vals = rhs_cond->ValuesDouble();
+
+        if (!lhs_vals[2] && !rhs_vals[2] && lhs_vals[1] && rhs_vals[0] && (*lhs_vals[1] == *rhs_vals[0])) {
+            return condition_wrapper(std::make_shared<Condition::ValueTest>(
+                lhs_vals[0] ? lhs_vals[0]->Clone() : nullptr,
+                lhs_cond->CompareTypes()[0],
+                lhs_vals[1]->Clone(),
+                rhs_cond->CompareTypes()[0],
+                rhs_vals[1] ? rhs_vals[1]->Clone() : nullptr
+            ));
+        }
+
+        const auto lhs_vals_i = lhs_cond->ValuesInt();
+        const auto rhs_vals_i = rhs_cond->ValuesInt();
+
+        if (!lhs_vals_i[2] && !rhs_vals_i[2] && lhs_vals_i[1] && rhs_vals_i[0] && (*lhs_vals_i[1] == *rhs_vals_i[0])) {
+            return condition_wrapper(std::make_shared<Condition::ValueTest>(
+                lhs_vals_i[0] ? lhs_vals_i[0]->Clone() : nullptr,
+                lhs_cond->CompareTypes()[0],
+                lhs_vals_i[1]->Clone(),
+                rhs_cond->CompareTypes()[0],
+                rhs_vals_i[1] ? rhs_vals_i[1]->Clone() : nullptr
+            ));
+        }
+
+        const auto lhs_vals_s = lhs_cond->ValuesString();
+        const auto rhs_vals_s = rhs_cond->ValuesString();
+
+        if (!lhs_vals_s[2] && !rhs_vals_s[2] && lhs_vals_s[1] && rhs_vals_s[0] && (*lhs_vals_s[1] == *rhs_vals_s[0])) {
+            return condition_wrapper(std::make_shared<Condition::ValueTest>(
+                lhs_vals_s[0] ? lhs_vals_s[0]->Clone() : nullptr,
+                lhs_cond->CompareTypes()[0],
+                lhs_vals_s[1]->Clone(),
+                rhs_cond->CompareTypes()[0],
+                rhs_vals_s[1] ? rhs_vals_s[1]->Clone() : nullptr
+            ));
+        }
+    }
+
+    return condition_wrapper(std::make_shared<Condition::And>(
+        lhs.condition->Clone(),
+        rhs_cond->Clone()
+    ));
+}
+
+
 condition_wrapper operator|(const condition_wrapper& lhs, const condition_wrapper& rhs) {
     return condition_wrapper(std::make_shared<Condition::Or>(
         lhs.condition->Clone(),
@@ -182,6 +268,52 @@ namespace {
             return condition_wrapper(std::make_shared<Condition::PlanetEnvironment>(std::move(environments)));
         }
         return condition_wrapper(std::make_shared<Condition::Type>(UniverseObjectType::OBJ_PLANET));
+    }
+
+    condition_wrapper insert_homeworld_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        if (kw.has_key("name")) {
+            std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> names;
+            py_parse::detail::flatten_list<boost::python::object>(kw["name"], [](const boost::python::object& o, std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>& v) {
+                auto name_arg = boost::python::extract<value_ref_wrapper<std::string>>(o);
+                if (name_arg.check()) {
+                    v.push_back(ValueRef::CloneUnique(name_arg().value_ref));
+                } else {
+                    v.push_back(std::make_unique<ValueRef::Constant<std::string>>(boost::python::extract<std::string>(o)()));
+                }
+            }, names);
+            return condition_wrapper(std::make_shared<Condition::Homeworld>(std::move(names)));
+        }
+        return condition_wrapper(std::make_shared<Condition::Homeworld>());
+    }
+
+    condition_wrapper insert_has_special_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        if (kw.has_key("name")) {
+            std::unique_ptr<ValueRef::ValueRef<std::string>> name;
+            auto name_args = boost::python::extract<value_ref_wrapper<std::string>>(kw["name"]);
+            if (name_args.check()) {
+                name = ValueRef::CloneUnique(name_args().value_ref);
+            } else {
+                name = std::make_unique<ValueRef::Constant<std::string>>(boost::python::extract<std::string>(kw["name"])());
+            }
+            return condition_wrapper(std::make_shared<Condition::HasSpecial>(std::move(name)));
+        }
+        return condition_wrapper(std::make_shared<Condition::HasSpecial>());
+    }
+
+    condition_wrapper insert_has_species_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        if (kw.has_key("name")) {
+            std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> names;
+            py_parse::detail::flatten_list<boost::python::object>(kw["name"], [](const boost::python::object& o, std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>& v) {
+                auto name_arg = boost::python::extract<value_ref_wrapper<std::string>>(o);
+                if (name_arg.check()) {
+                    v.push_back(ValueRef::CloneUnique(name_arg().value_ref));
+                } else {
+                    v.push_back(std::make_unique<ValueRef::Constant<std::string>>(boost::python::extract<std::string>(o)()));
+                }
+            }, names);
+            return condition_wrapper(std::make_shared<Condition::Species>(std::move(names)));
+        }
+        return condition_wrapper(std::make_shared<Condition::Species>());
     }
 
     condition_wrapper insert_has_tag_(const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -538,6 +670,50 @@ namespace {
 
         return condition_wrapper(std::make_shared<Condition::Turn>(std::move(low), std::move(high)));
     }
+
+    condition_wrapper insert_resource_supply_connected_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        std::unique_ptr<ValueRef::ValueRef<int>> empire;
+        auto empire_args = boost::python::extract<value_ref_wrapper<int>>(kw["empire"]);
+        if (empire_args.check()) {
+            empire = ValueRef::CloneUnique(empire_args().value_ref);
+        } else {
+            empire = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(kw["empire"])());
+        }
+
+        auto condition = boost::python::extract<condition_wrapper>(kw["condition"])();
+        return condition_wrapper(std::make_shared<Condition::ResourceSupplyConnectedByEmpire>(std::move(empire),
+            std::move(ValueRef::CloneUnique(condition.condition))));
+    }
+
+    condition_wrapper insert_within_starlane_jumps_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        auto condition = boost::python::extract<condition_wrapper>(kw["condition"])();
+
+        std::unique_ptr<ValueRef::ValueRef<int>> jumps;
+        auto jumps_args = boost::python::extract<value_ref_wrapper<int>>(kw["jumps"]);
+        if (jumps_args.check()) {
+            jumps = ValueRef::CloneUnique(jumps_args().value_ref);
+        } else {
+            jumps = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(kw["jumps"])());
+        }
+
+        return condition_wrapper(std::make_shared<Condition::WithinStarlaneJumps>(std::move(jumps),
+            std::move(ValueRef::CloneUnique(condition.condition))));
+    }
+
+    condition_wrapper insert_within_distance_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        auto condition = boost::python::extract<condition_wrapper>(kw["condition"])();
+
+        std::unique_ptr<ValueRef::ValueRef<double>> distance;
+        auto distance_args = boost::python::extract<value_ref_wrapper<double>>(kw["distance"]);
+        if (distance_args.check()) {
+            distance = ValueRef::CloneUnique(distance_args().value_ref);
+        } else {
+            distance = std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(kw["distance"])());
+        }
+
+        return condition_wrapper(std::make_shared<Condition::WithinDistance>(std::move(distance),
+            std::move(ValueRef::CloneUnique(condition.condition))));
+    }
 }
 
 void RegisterGlobalsConditions(boost::python::dict& globals) {
@@ -550,7 +726,7 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
     globals["Stationary"] = condition_wrapper(std::make_shared<Condition::Stationary>());
 
     globals["Unowned"] = condition_wrapper(std::make_shared<Condition::EmpireAffiliation>(EmpireAffiliationType::AFFIL_NONE));
-    globals["Human"] = condition_wrapper(std::make_shared<Condition::EmpireAffiliation>(EmpireAffiliationType::AFFIL_HUMAN));
+    globals["IsHuman"] = condition_wrapper(std::make_shared<Condition::EmpireAffiliation>(EmpireAffiliationType::AFFIL_HUMAN));
 
     globals["OwnerHasTech"] = boost::python::raw_function(insert_owner_has_tech_);
     globals["Random"] = boost::python::raw_function(insert_random_);
@@ -617,11 +793,13 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
         globals[op.first] = enum_wrapper<Condition::ContentType>(op.second);
     }
 
-    globals["HasSpecies"] = condition_wrapper(std::make_shared<Condition::Species>());
+    globals["HasSpecies"] = boost::python::raw_function(insert_has_species_);
     globals["CanColonize"] = condition_wrapper(std::make_shared<Condition::CanColonize>());
 
     globals["HasTag"] = boost::python::raw_function(insert_has_tag_);
     globals["Planet"] = boost::python::raw_function(insert_planet_);
+    globals["Homeworld"] = boost::python::raw_function(insert_homeworld_);
+    globals["HasSpecial"] = boost::python::raw_function(insert_has_special_);
     globals["VisibleToEmpire"] = boost::python::raw_function(insert_visible_to_empire_);
     globals["OwnedBy"] = boost::python::raw_function(insert_owned_by_);
     globals["ContainedBy"] = insert_contained_by_;
@@ -630,5 +808,8 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
     globals["EmpireStockpile"] = boost::python::raw_function(insert_empire_stockpile_);
     globals["EmpireHasAdoptedPolicy"] = boost::python::raw_function(insert_empire_has_adopted_policy_);
     globals["Turn"] = boost::python::raw_function(insert_turn_);
+    globals["ResourceSupplyConnected"] = boost::python::raw_function(insert_resource_supply_connected_);
+    globals["WithinStarlaneJumps"] = boost::python::raw_function(insert_within_starlane_jumps_);
+    globals["WithinDistance"] = boost::python::raw_function(insert_within_distance_);
 }
 

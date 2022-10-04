@@ -14,11 +14,8 @@
 #ifndef _GG_Clr_h_
 #define _GG_Clr_h_
 
-
-#include <algorithm>
 #include <array>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 #include <GG/Export.h>
 
@@ -57,16 +54,12 @@ struct Clr
     constexpr Clr(std::string_view hex_colour)
     {
         const auto sz = hex_colour.size();
-        if (sz != 6 && sz != 8)
-            throw std::invalid_argument("GG::HexClr passed wrong length string");
 
         auto val_from_two_hex_chars = [](std::string_view chars) -> uint8_t {
             auto digit0 = chars[0];
             auto digit1 = chars[1];
-
             uint8_t val0 = 16 * (digit0 >= 'A' ? (digit0 - 'A' + 10) : (digit0 - '0'));
             uint8_t val1 = (digit1 >= 'A' ? (digit1 - 'A' + 10) : (digit1 - '0'));
-
             return val0 + val1;
         };
         static_assert(val_from_two_hex_chars("01") == 1);
@@ -75,13 +68,10 @@ struct Clr
         constexpr auto huh = val_from_two_hex_chars("!.");
         static_assert(huh == 14u);
 
-        r = val_from_two_hex_chars(hex_colour.substr(0, 2));
-        g = val_from_two_hex_chars(hex_colour.substr(2, 2));
-        b = val_from_two_hex_chars(hex_colour.substr(4, 2));
-        if (sz == 8)
-            a = val_from_two_hex_chars(hex_colour.substr(6, 2));
-        else
-            a = 255;
+        r = (sz >= 2) ? val_from_two_hex_chars(hex_colour.substr(0, 2)) : 0;
+        g = (sz >= 4) ? val_from_two_hex_chars(hex_colour.substr(2, 2)) : 0;
+        b = (sz >= 6) ? val_from_two_hex_chars(hex_colour.substr(4, 2)) : 0;
+        a = (sz >= 8) ? val_from_two_hex_chars(hex_colour.substr(6, 2)) : 255;
     }
 
     explicit constexpr operator uint32_t() const noexcept
@@ -90,6 +80,16 @@ struct Clr
         retval += g << 16;
         retval += b << 8;
         retval += a;
+        return retval;
+    }
+
+    operator std::string() const
+    {
+        std::string retval;
+        retval.reserve(1 + 4*3 + 3*2 + 1 + 1);
+        retval.append("(").append(std::to_string(+r)).append(", ").append(std::to_string(+g))
+              .append(", ").append(std::to_string(+b)).append(", ").append(std::to_string(+a))
+              .append(")");
         return retval;
     }
 
@@ -114,8 +114,11 @@ constexpr bool operator!=(const Clr rhs, const Clr lhs) noexcept
 static_assert(Clr("A0FF01") == Clr{160, 255, 1, 255});
 static_assert(Clr("12345678") == Clr{16*1+2, 16*3+4, 16*5+6, 16*7+8});
 
-
-GG_API std::ostream& operator<<(std::ostream& os, const Clr pt);
+inline std::ostream& operator<<(std::ostream& os, const Clr clr)
+{
+    os << "(" << +clr.r << ", " << +clr.g << ", " << +clr.b << ", " << +clr.a << ")";
+    return os;
+}
 
 //! Returns the lightened version of color clr.  LightenClr leaves the alpha
 //! channel unchanged, and multiplies the other channels by some factor.

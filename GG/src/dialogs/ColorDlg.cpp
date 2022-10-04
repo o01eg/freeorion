@@ -247,16 +247,10 @@ void ValuePicker::SetValueFromPt(Pt pt)
 // ColorDlg
 ////////////////////////////////////////////////
 
-ColorDlg::ColorButton::ColorButton(const Clr& color) :
+ColorDlg::ColorButton::ColorButton(Clr color) :
     Button("", nullptr, color),
     m_represented_color(CLR_BLACK)
 {}
-
-Clr ColorDlg::ColorButton::RepresentedColor() const
-{ return m_represented_color; }
-
-void ColorDlg::ColorButton::SetRepresentedColor(const Clr& color)
-{ m_represented_color = color; }
 
 void ColorDlg::ColorButton::RenderUnpressed()
 {
@@ -353,9 +347,16 @@ void ColorDlg::ColorDisplay::Render()
 
 namespace {
     enum : uint8_t {R, G, B, A, H, S, V};
-}
 
-std::vector<Clr> ColorDlg::s_custom_colors;
+    constexpr std::size_t COLOR_BUTTON_ROWS = 4;
+    constexpr std::size_t COLOR_BUTTON_COLS = 5;
+
+    std::vector<Clr> custom_colors = {
+        GG::CLR_WHITE,      GG::CLR_LIGHT_GRAY, GG::CLR_GRAY,       GG::CLR_DARK_GRAY,  GG::CLR_BLACK,
+        GG::CLR_PINK,       GG::CLR_RED,        GG::CLR_DARK_RED,   GG::CLR_MAGENTA,    GG::CLR_PURPLE,
+        GG::CLR_BLUE,       GG::CLR_DARK_BLUE,  GG::CLR_TEAL,       GG::CLR_CYAN,       GG::CLR_GREEN,
+        GG::CLR_DARK_GREEN, GG::CLR_OLIVE,      GG::CLR_YELLOW,     GG::CLR_ORANGE,     GG::CLR_GRAY};
+}
 
 ColorDlg::ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<Font>& font,
                    Clr dialog_color, Clr border_color, Clr text_color) :
@@ -370,18 +371,6 @@ ColorDlg::ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<Font>& fo
     Clr color = m_current_color;
 
     const auto& style = GetStyleFactory();
-
-    static constexpr int COLOR_BUTTON_ROWS = 4;
-    static constexpr int COLOR_BUTTON_COLS = 5;
-    if (s_custom_colors.empty()) {
-        s_custom_colors = { GG::CLR_WHITE,      GG::CLR_LIGHT_GRAY, GG::CLR_GRAY,       GG::CLR_DARK_GRAY,  GG::CLR_BLACK,
-                            GG::CLR_PINK,       GG::CLR_RED,        GG::CLR_DARK_RED,   GG::CLR_MAGENTA,    GG::CLR_PURPLE,
-                            GG::CLR_BLUE,       GG::CLR_DARK_BLUE,  GG::CLR_TEAL,       GG::CLR_CYAN,       GG::CLR_GREEN,
-                            GG::CLR_DARK_GREEN, GG::CLR_OLIVE,      GG::CLR_YELLOW,     GG::CLR_ORANGE};
-
-        for (unsigned int i = s_custom_colors.size(); i < COLOR_BUTTON_ROWS * COLOR_BUTTON_COLS; ++i)
-            s_custom_colors.push_back(CLR_GRAY);
-    }
 
     m_hue_saturation_picker = Wnd::Create<HueSaturationPicker>(X(10), Y(10), X(300), Y(300));
     m_hue_saturation_picker->SetHueSaturation(m_current_color.h, m_current_color.s);
@@ -423,7 +412,7 @@ ColorDlg::ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<Font>& fo
     for (int i = 0; i < COLOR_BUTTON_ROWS; ++i) {
         for (int j = 0; j < COLOR_BUTTON_COLS; ++j) {
             m_color_buttons.push_back(Wnd::Create<ColorButton>(m_color));
-            m_color_buttons.back()->SetRepresentedColor(s_custom_colors[i * COLOR_BUTTON_COLS + j]);
+            m_color_buttons.back()->SetRepresentedColor(custom_colors[i * COLOR_BUTTON_COLS + j]);
             m_color_buttons_layout->Add(m_color_buttons.back(), i, j);
         }
     }
@@ -482,26 +471,25 @@ void ColorDlg::CompleteConstruction()
     master_layout->Add(m_sliders_ok_cancel_layout, 0, 1, 3, 1);
     SetLayout(master_layout);
 
-    using boost::placeholders::_1;
-    using boost::placeholders::_2;
-    using boost::placeholders::_3;
-
     for (std::size_t i = 0; i < m_color_buttons.size(); ++i) {
         m_color_buttons[i]->LeftClickedSignal.connect(
             [this, i](){ this->ColorButtonClicked(i); });
     }
-    m_sliders[R]->SlidSignal.connect(boost::bind(&ColorDlg::RedSliderChanged, this, _1, _2, _3));
-    m_sliders[G]->SlidSignal.connect(boost::bind(&ColorDlg::GreenSliderChanged, this, _1, _2, _3));
-    m_sliders[B]->SlidSignal.connect(boost::bind(&ColorDlg::BlueSliderChanged, this, _1, _2, _3));
-    m_sliders[A]->SlidSignal.connect(boost::bind(&ColorDlg::AlphaSliderChanged, this, _1, _2, _3));
-    m_sliders[H]->SlidSignal.connect(boost::bind(&ColorDlg::HueSliderChanged, this, _1, _2, _3));
-    m_sliders[S]->SlidSignal.connect(boost::bind(&ColorDlg::SaturationSliderChanged, this, _1, _2, _3));
-    m_sliders[V]->SlidSignal.connect(boost::bind(&ColorDlg::ValueSliderChanged, this, _1, _2, _3));
-    m_ok->LeftClickedSignal.connect(boost::bind(&ColorDlg::OkClicked, this));
-    m_cancel->LeftClickedSignal.connect(boost::bind(&ColorDlg::CancelClicked, this));
-    m_hue_saturation_picker->ChangedSignal.connect(boost::bind(&ValuePicker::SetHueSaturation, m_value_picker, _1, _2));
-    m_hue_saturation_picker->ChangedSignal.connect(boost::bind(&ColorDlg::HueSaturationPickerChanged, this, _1, _2));
-    m_value_picker->ChangedSignal.connect(boost::bind(&ColorDlg::ValuePickerChanged, this, _1));
+
+    m_sliders[R]->SlidSignal.connect([this](auto pos, auto ub, auto lb) { RedSliderChanged(pos, ub, lb); });
+    m_sliders[G]->SlidSignal.connect([this](auto pos, auto ub, auto lb) { GreenSliderChanged(pos, ub, lb); });
+    m_sliders[B]->SlidSignal.connect([this](auto pos, auto ub, auto lb) { BlueSliderChanged(pos, ub, lb); });
+    m_sliders[A]->SlidSignal.connect([this](auto pos, auto ub, auto lb) { AlphaSliderChanged(pos, ub, lb); });
+    m_sliders[H]->SlidSignal.connect([this](auto pos, auto ub, auto lb) { HueSliderChanged(pos, ub, lb); });
+    m_sliders[S]->SlidSignal.connect([this](auto pos, auto ub, auto lb) { SaturationSliderChanged(pos, ub, lb); });
+    m_sliders[V]->SlidSignal.connect([this](auto pos, auto ub, auto lb) { ValueSliderChanged(pos, ub, lb); });
+    m_ok->LeftClickedSignal.connect([this]() { OkClicked(); });
+    m_cancel->LeftClickedSignal.connect([this]() { CancelClicked(); });
+    m_hue_saturation_picker->ChangedSignal.connect([this](auto hue, auto sat) {
+        m_value_picker->SetHueSaturation(hue, sat);
+        HueSaturationPickerChanged(hue, sat);
+    });
+    m_value_picker->ChangedSignal.connect([this](auto value) { ValuePickerChanged(value); });
 }
 
 bool ColorDlg::ColorWasSelected() const
@@ -539,7 +527,7 @@ void ColorDlg::ColorChanged(HSVClr color)
     m_new_color_square->SetColor(rgb_color);
     if (m_current_color_button != INVALID_COLOR_BUTTON) {
         m_color_buttons[m_current_color_button]->SetRepresentedColor(rgb_color);
-        s_custom_colors[m_current_color_button] = rgb_color;
+        custom_colors[m_current_color_button] = rgb_color;
     }
     UpdateRGBSliders();
     UpdateHSVSliders();
@@ -590,7 +578,7 @@ void ColorDlg::ColorChangeFromRGBSlider()
     m_new_color_square->SetColor(color);
     if (m_current_color_button != INVALID_COLOR_BUTTON) {
         m_color_buttons[m_current_color_button]->SetRepresentedColor(color);
-        s_custom_colors[m_current_color_button] = color;
+        custom_colors[m_current_color_button] = color;
     }
     UpdateHSVSliders();
 }

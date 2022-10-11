@@ -49,64 +49,69 @@ struct ValidatorBase {
     [[nodiscard]] virtual std::unique_ptr<ValidatorBase> Clone() && = 0;
 };
 
-/** determines if a string is a valid value for an OptionsDB option */
-template <typename T>
-struct Validator : public ValidatorBase
-{
-    boost::any Validate(const std::string& str) const override
-    { return boost::any(boost::lexical_cast<T>(str)); }
-    boost::any Validate(std::string_view str) const override
-    { return boost::any(boost::lexical_cast<T>(str)); }
-
-    [[nodiscard]] std::string String(const boost::any& value) const override
-    {
-        if constexpr (std::is_same_v<T, std::string>) {
-            try {
-                return boost::any_cast<std::string>(value);
-            } catch (...) {
-                try {
-                    return boost::any_cast<const char*>(value);
-                } catch (...) {
-                    return "";
-                }
-            }
-        } else if constexpr (std::is_enum_v<T>) {
-            return std::string{to_string(boost::any_cast<T>(value))};
-        } else if constexpr (std::is_arithmetic_v<T>) {
-            return std::to_string(boost::any_cast<T>(value));
-        } else {
-            return boost::lexical_cast<std::string>(boost::any_cast<T>(value));
-        }
-    }
-
-    [[nodiscard]] std::unique_ptr<ValidatorBase> Clone() const & override
-    { return std::make_unique<Validator>(); }
-
-    [[nodiscard]] std::unique_ptr<ValidatorBase> Clone() && override
-    { return std::make_unique<Validator>(); }
-};
-
 FO_COMMON_API std::string ListToString(std::vector<std::string> input_list);
 FO_COMMON_API std::vector<std::string> StringToList(std::string_view input_string);
 FO_COMMON_API std::vector<std::string> StringToList(const char* input_string);
 FO_COMMON_API std::vector<std::string> StringToList(const std::string& input_string);
 
-template <>
-struct Validator<std::vector<std::string>> : public ValidatorBase
+/** determines if a string is a valid value for an OptionsDB option */
+template <typename T>
+struct Validator : public ValidatorBase
 {
     boost::any Validate(const std::string& str) const override
-    { return boost::any(StringToList(str)); }
+    {
+        if constexpr (std::is_same_v<T, std::vector<std::string>>)
+            return boost::any(StringToList(str));
+        else if constexpr (std::is_same_v<T, std::string>)
+            return boost::any(std::string{str});
+        else
+            return boost::any(boost::lexical_cast<T>(str));
+    }
+
     boost::any Validate(std::string_view str) const override
-    { return boost::any(StringToList(str)); }
+    {
+        if constexpr (std::is_same_v<T, std::vector<std::string>>)
+            return boost::any(StringToList(str));
+        else if constexpr (std::is_same_v<T, std::string>)
+            return boost::any(std::string{str});
+        else
+            return boost::any(boost::lexical_cast<T>(str));
+    }
 
     [[nodiscard]] std::string String(const boost::any& value) const override
-    { return ListToString(boost::any_cast<std::vector<std::string>>(value)); }
+    {
+        if constexpr (std::is_same_v<T, std::string>) {
+            if (value.type() == typeid(std::string))
+                return boost::any_cast<std::string>(value);
+            else if (value.type() == typeid(const char*))
+                return std::string{boost::any_cast<const char*>(value)};
+            else if (value.type() == typeid(std::string_view))
+                return std::string{boost::any_cast<std::string_view>(value)};
+
+        } else if constexpr (std::is_enum_v<T>) {
+            if (value.type() == typeid(T))
+                return std::string{to_string(boost::any_cast<T>(value))};
+
+        } else if constexpr (std::is_arithmetic_v<T>) {
+            if (value.type() == typeid(T))
+                return std::to_string(boost::any_cast<T>(value));
+
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            if (value.type() == typeid(T))
+                return ListToString(boost::any_cast<std::vector<std::string>>(value));
+
+        } else {
+            if (value.type() == typeid(T))
+                return boost::lexical_cast<std::string>(boost::any_cast<T>(value));
+        }
+        return "";
+    }
 
     [[nodiscard]] std::unique_ptr<ValidatorBase> Clone() const & override
-    { return std::make_unique<Validator<std::vector<std::string>>>(); }
+    { return std::make_unique<Validator<T>>(); }
 
     [[nodiscard]] std::unique_ptr<ValidatorBase> Clone() && override
-    { return std::make_unique<Validator<std::vector<std::string>>>(); }
+    { return std::make_unique<Validator<T>>(); }
 };
 
 /** a Validator that constrains the range of valid values */

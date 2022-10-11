@@ -704,7 +704,7 @@ if(BUILD_CLIENT_GODOT)
         include(ExternalProject)
         ExternalProject_Add(godotcpp
             GIT_REPOSITORY https://github.com/godotengine/godot-cpp
-            GIT_TAG 476a870d6c02957df63f3b961df8823874549de1
+            GIT_TAG 316b91c5f5d89d82ae935513c28df78f9e238e8b
             SOURCE_DIR ${CMAKE_BINARY_DIR}/godot-cpp
             BINARY_DIR ${CMAKE_BINARY_DIR}/godot-cpp-build
             CMAKE_ARGS
@@ -842,7 +842,7 @@ if(BUILD_CLIENT_GODOT)
         COMMAND
            ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}
         COMMAND
-           ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeoriongodot>" "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}"
+           ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeoriongodot>" "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}/$<TARGET_FILE_NAME:freeoriongodot>"
         COMMAND
             ${CMAKE_COMMAND}
             -DMODE=DATA_LINK
@@ -865,7 +865,11 @@ if(BUILD_CLIENT_GODOT)
     if(ANDROID)
         add_custom_command(TARGET freeoriongodot POST_BUILD
             COMMAND
-                ${CMAKE_COMMAND} -E copy_if_different "${ICONV_LIBRARY}" "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}"
+                ${CMAKE_COMMAND} -E copy_if_different "${ICONV_LIBRARY}" "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}/libiconv.so"
+            COMMAND
+                ${CMAKE_STRIP} -g -S -d --strip-debug "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}/libiconv.so"
+            COMMAND
+                ${CMAKE_STRIP} -g -S -d --strip-debug "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}/$<TARGET_FILE_NAME:freeoriongodot>"
             COMMAND
                 ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/godot/default/
             COMMAND

@@ -1,6 +1,9 @@
+from itertools import islice
+
 import freeOrionAIInterface as fo
 import random
 from logging import debug, error, warning
+from typing import List, Mapping
 
 import AIDependencies as Dep
 import AIstate
@@ -128,7 +131,7 @@ def get_possible_projects():
     return set(preliminary_projects) - set(TechsListsAI.unusable_techs())
 
 
-def get_completed_techs():
+def get_completed_techs() -> List[str]:
     """Get completed and available for use techs."""
     return [tech for tech in fo.techs() if tech_is_complete(tech)]
 
@@ -174,45 +177,12 @@ def generate_classic_research_orders():
 
     resource_production = empire.resourceProduction(fo.resourceType.research)
     completed_techs = sorted(list(get_completed_techs()))
-    _print_reserch_order_header(resource_production, completed_techs)
+    _print_research_order_header(resource_production, completed_techs)
+    _print_research_queue_head(completed_techs)
 
-    #
-    # report techs currently at head of research queue
-    #
     research_queue = empire.researchQueue
     research_queue_list = get_research_queue_techs()
     total_rp = empire.resourceProduction(fo.resourceType.research)
-    tech_turns_left = {}
-    if research_queue_list:
-        debug("Techs currently at head of Research Queue:")
-        for element in list(research_queue)[:10]:
-            tech_turns_left[element.tech] = element.turnsLeft
-            this_tech = fo.getTech(element.tech)
-            if not this_tech:
-                warning("Can't retrieve tech ", element.tech)
-                continue
-            missing_prereqs = [
-                preReq for preReq in this_tech.recursivePrerequisites(empire_id) if preReq not in completed_techs
-            ]
-            # unlocked_items = [(uli.name, uli.type) for uli in this_tech.unlocked_items]
-            unlocked_items = [uli.name for uli in this_tech.unlockedItems]
-            if not missing_prereqs:
-                debug(
-                    "    %25s allocated %6.2f RP (%d turns left)-- unlockable items: %s ",
-                    element.tech,
-                    element.allocation,
-                    tech_turns_left[element.tech],
-                    unlocked_items,
-                )
-            else:
-                debug(
-                    "    %25s allocated %6.2f RP -- missing preReqs: %s -- unlockable items: %s ",
-                    element.tech,
-                    element.allocation,
-                    missing_prereqs,
-                    unlocked_items,
-                )
-        debug("")
     #
     # set starting techs, or after turn 100 add any additional default techs
     #
@@ -274,35 +244,17 @@ def generate_classic_research_orders():
 
         if fo.currentTurn() == 1:
             return
-        if True:
-            research_queue_list = get_research_queue_techs()
-            def_techs = TechsListsAI.defense_techs_1()
-            for def_tech in def_techs:
-                if (
-                    aistate.character.may_research_tech_classic(def_tech)
-                    and def_tech not in research_queue_list[:5]
-                    and not tech_is_complete(def_tech)
-                ):
-                    res = fo.issueEnqueueTechOrder(def_tech, min(3, len(research_queue_list)))
-                    debug("Empire is very defensive, so attempted to fast-track %s, got result %d", def_tech, res)
-        if False:  # with current stats of Conc Camps, disabling this fast-track
-            research_queue_list = get_research_queue_techs()
-            if "CON_CONC_CAMP" in research_queue_list and aistate.character.may_research_tech_classic("CON_CONC_CAMP"):
-                insert_idx = min(40, research_queue_list.index("CON_CONC_CAMP"))
-            else:
-                insert_idx = max(0, min(40, len(research_queue_list) - 10))
-            if "SHP_DEFLECTOR_SHIELD" in research_queue_list and aistate.character.may_research_tech_classic(
-                "SHP_DEFLECTOR_SHIELD"
+        research_queue_list = get_research_queue_techs()
+        def_techs = TechsListsAI.defense_techs_1()
+        for def_tech in def_techs:
+            if (
+                aistate.character.may_research_tech_classic(def_tech)
+                and def_tech not in research_queue_list[:5]
+                and not tech_is_complete(def_tech)
             ):
-                insert_idx = min(insert_idx, research_queue_list.index("SHP_DEFLECTOR_SHIELD"))
-            for cc_tech in ["CON_ARCH_PSYCH", "CON_CONC_CAMP"]:
-                if (
-                    cc_tech not in research_queue_list[: insert_idx + 1]
-                    and not tech_is_complete(cc_tech)
-                    and aistate.character.may_research_tech_classic(cc_tech)
-                ):
-                    res = fo.issueEnqueueTechOrder(cc_tech, insert_idx)
-                    debug("Empire is very aggressive, so attempted to fast-track %s, got result %d", cc_tech, res)
+                res = fo.issueEnqueueTechOrder(def_tech, min(3, len(research_queue_list)))
+                debug("Empire is very defensive, so attempted to fast-track %s, got result %d", def_tech, res)
+        disabled_research_features()
 
     elif fo.currentTurn() > 100:
         generate_default_research_order()
@@ -337,68 +289,6 @@ def generate_classic_research_orders():
         research_queue_list = get_research_queue_techs()
 
     #
-    # Supply range and detection range
-    if False:  # disabled for now, otherwise just to help with cold-folding / organization
-        if len(aistate.colonisablePlanetIDs) == 0:
-            best_colony_site_score = 0
-        else:
-            best_colony_site_score = next(iter(aistate.colonisablePlanetIDs.items()))[1]
-        if len(aistate.colonisableOutpostIDs) == 0:
-            best_outpost_site_score = 0
-        else:
-            best_outpost_site_score = next(iter(aistate.colonisableOutpostIDs.items()))[1]
-        need_improved_scouting = best_colony_site_score < 150 or best_outpost_site_score < 200
-
-        if need_improved_scouting:
-            if not tech_is_complete("CON_ORBITAL_CON"):
-                num_techs_accelerated += 1
-                if ("CON_ORBITAL_CON" not in research_queue_list[: 1 + num_techs_accelerated]) and (
-                    tech_is_complete("PRO_FUSION_GEN")
-                    or ("PRO_FUSION_GEN" in research_queue_list[: 1 + num_techs_accelerated])
-                ):
-                    res = fo.issueEnqueueTechOrder("CON_ORBITAL_CON", num_techs_accelerated)
-                    debug(
-                        "Empire has poor colony/outpost prospects, so attempted to fast-track %s, got result %d",
-                        "CON_ORBITAL_CON",
-                        res,
-                    )
-            elif not tech_is_complete("CON_CONTGRAV_ARCH"):
-                num_techs_accelerated += 1
-                if ("CON_CONTGRAV_ARCH" not in research_queue_list[: 1 + num_techs_accelerated]) and (
-                    tech_is_complete("CON_METRO_INFRA")
-                ):
-                    for supply_tech in [
-                        _s_tech
-                        for _s_tech in ["CON_ARCH_MONOFILS", "CON_CONTGRAV_ARCH"]
-                        if not tech_is_complete(_s_tech)
-                    ]:
-                        res = fo.issueEnqueueTechOrder(supply_tech, num_techs_accelerated)
-                        debug(
-                            "Empire has poor colony/outpost prospects, so attempted to fast-track %s, got result %d",
-                            supply_tech,
-                            res,
-                        )
-            else:
-                pass
-            research_queue_list = get_research_queue_techs()
-            # could add more supply tech
-
-            if False and not tech_is_complete("SPY_DETECT_2"):  # disabled for now, detect2
-                num_techs_accelerated += 1
-                if "SPY_DETECT_2" not in research_queue_list[: 2 + num_techs_accelerated] and tech_is_complete(
-                    "PRO_FUSION_GEN"
-                ):
-                    if "CON_ORBITAL_CON" not in research_queue_list[: 1 + num_techs_accelerated]:
-                        res = fo.issueEnqueueTechOrder("SPY_DETECT_2", num_techs_accelerated)
-                    else:
-                        co_idx = research_queue_list.index("CON_ORBITAL_CON")
-                        res = fo.issueEnqueueTechOrder("SPY_DETECT_2", co_idx + 1)
-                    debug(
-                        "Empire has poor colony/outpost prospects, so attempted to fast-track %s, got result %d"
-                        "CON_ORBITAL_CON",
-                        res,
-                    )
-                research_queue_list = get_research_queue_techs()
 
     #
     # check to accelerate xeno_arch
@@ -426,49 +316,6 @@ def generate_classic_research_orders():
                         )
                 research_queue_list = get_research_queue_techs()
 
-    if False and not enemies_sighted:  # curently disabled
-        # params = [ (tech, gate, target_slot, add_tech_list), ]
-        params = [
-            ("GRO_XENO_GENETICS", "PRO_EXOBOTS", "PRO_EXOBOTS", ["GRO_GENETIC_MED", "GRO_XENO_GENETICS"]),
-            ("PRO_EXOBOTS", "PRO_ADAPTIVE_AUTOMATION", "PRO_ADAPTIVE_AUTOMATION", ["PRO_EXOBOTS"]),
-            ("PRO_ADAPTIVE_AUTOMATION", "PRO_NANOTECH_PROD", "PRO_NANOTECH_PROD", ["PRO_ADAPTIVE_AUTOMATION"]),
-            (
-                "PRO_INDUSTRY_CENTER_I",
-                "GRO_SYMBIOTIC_BIO",
-                "GRO_SYMBIOTIC_BIO",
-                ["PRO_ROBOTIC_PROD", "PRO_FUSION_GEN", "PRO_INDUSTRY_CENTER_I"],
-            ),
-            ("GRO_SYMBIOTIC_BIO", "SHP_ORG_HULL", "SHP_ZORTRIUM_PLATE", ["GRO_SYMBIOTIC_BIO"]),
-        ]
-        for (tech, gate, target_slot, add_tech_list) in params:
-            if tech_is_complete(tech):
-                break
-            if tech_turns_left.get(gate, 0) not in [
-                0,
-                1,
-                2,
-            ]:  # needs to exclude -1, the flag for no predicted completion
-                continue
-            if target_slot in research_queue_list:
-                target_index = 1 + research_queue_list.index(target_slot)
-            else:
-                target_index = num_techs_accelerated
-            for move_tech in add_tech_list:
-                debug(
-                    "for tech %s, target_slot %s, target_index:%s ; num_techs_accelerated:%s",
-                    move_tech,
-                    target_slot,
-                    target_index,
-                    num_techs_accelerated,
-                )
-                if tech_is_complete(move_tech):
-                    continue
-                if target_index <= num_techs_accelerated:
-                    num_techs_accelerated += 1
-                if move_tech not in research_queue_list[: 1 + target_index]:
-                    fo.issueEnqueueTechOrder(move_tech, target_index)
-                    debug("Research: To prioritize %s, have advanced %s to slot %d", tech, move_tech, target_index)
-                    target_index += 1
     #
     # check to accelerate asteroid or GG tech
     if True:  # just to help with cold-folding / organization
@@ -610,26 +457,7 @@ def generate_classic_research_orders():
                         fmt_str += " with current target_RP %.1f and current pop %.1f, on turn %d"
                         debug(fmt_str, dt_ech, res, resource_production, empire.population(), fo.currentTurn())
                 research_queue_list = get_research_queue_techs()
-    #
-    # check to accelerate quant net
-    if False:  # disabled for now, otherwise just to help with cold-folding / organization
-        if aistate.character.may_research_tech_classic("LRN_QUANT_NET") and (population_with_research_focus() >= 40):
-            if not tech_is_complete("LRN_QUANT_NET"):
-                insert_idx = num_techs_accelerated  # TODO determine min target slot if reenabling
-                for qnTech in ["LRN_NDIM_SUBSPACE", "LRN_QUANT_NET"]:
-                    if qnTech not in research_queue_list[: insert_idx + 2] and not tech_is_complete(qnTech):
-                        res = fo.issueEnqueueTechOrder(qnTech, insert_idx)
-                        num_techs_accelerated += 1
-                        insert_idx += 1
-                        debug(
-                            "Empire has many researchers, so attempted to fast-track %s (got result %d) on turn %d",
-                            qnTech,
-                            res,
-                            fo.currentTurn(),
-                        )
-                research_queue_list = get_research_queue_techs()
 
-    #
     # if we own a blackhole, accelerate sing_gen and conc camp
     if True:  # just to help with cold-folding / organization
         if (
@@ -716,7 +544,41 @@ def generate_classic_research_orders():
             debug("Tech %s gives access to new parts or hulls but there seems to be no military advantage.", tech)
 
 
-def _print_reserch_order_header(resource_production, completed_techs):
+def _print_research_queue_head(completed_techs: List[str], first_n_techs=10):
+    empire_id = fo.getEmpire().empireID
+    research_queue = fo.getEmpire().researchQueue
+
+    debug("Techs currently at head of Research Queue")
+
+    for element in islice(research_queue, first_n_techs):
+        this_tech = fo.getTech(element.tech)
+        if not this_tech:
+            warning("Can't retrieve tech %s", element.tech)
+            continue
+        missing_prereqs = [
+            pre_req for pre_req in this_tech.recursivePrerequisites(empire_id) if pre_req not in completed_techs
+        ]
+        unlocked_items = [uli.name for uli in this_tech.unlockedItems]
+        if not missing_prereqs:
+            debug(
+                "%-27s allocated %6.2f RP (%d turns left) -- unlocks: %s",
+                element.tech,
+                element.allocation,
+                element.turnsLeft,
+                unlocked_items,
+            )
+        else:
+            debug(
+                "%-27s allocated %6.2f RP -- missing preReqs: %s -- unlocks: %s",
+                element.tech,
+                element.allocation,
+                missing_prereqs,
+                unlocked_items,
+            )
+    debug("")
+
+
+def _print_research_order_header(resource_production, completed_techs):
     debug("Research Queue Management:")
     debug("\nTotal Current Research Points: %.2f\n", resource_production)
     debug("Techs researched and available for use:")
@@ -725,3 +587,161 @@ def _print_reserch_order_header(resource_production, completed_techs):
     for tline in zip(tlist[0::3], tlist[1::3], tlist[2::3]):
         debug("%25s %25s %25s", *tline)
     debug("")
+
+
+# flake8: noqa: noqa: F821
+def disabled_research_features():
+    """
+    Bunch of code that is disabled but might be restored in the future.
+    """
+    return
+
+    #
+    # with current stats of Conc Camps, disabling this fast-track
+    #
+    research_queue_list = get_research_queue_techs()
+    if "CON_CONC_CAMP" in research_queue_list and aistate.character.may_research_tech_classic("CON_CONC_CAMP"):
+        insert_idx = min(40, research_queue_list.index("CON_CONC_CAMP"))
+    else:
+        insert_idx = max(0, min(40, len(research_queue_list) - 10))
+    if "SHP_DEFLECTOR_SHIELD" in research_queue_list and aistate.character.may_research_tech_classic(
+        "SHP_DEFLECTOR_SHIELD"
+    ):
+        insert_idx = min(insert_idx, research_queue_list.index("SHP_DEFLECTOR_SHIELD"))
+    for cc_tech in ["CON_ARCH_PSYCH", "CON_CONC_CAMP"]:
+        if (
+            cc_tech not in research_queue_list[: insert_idx + 1]
+            and not tech_is_complete(cc_tech)
+            and aistate.character.may_research_tech_classic(cc_tech)
+        ):
+            res = fo.issueEnqueueTechOrder(cc_tech, insert_idx)
+            debug("Empire is very aggressive, so attempted to fast-track %s, got result %d", cc_tech, res)
+
+        # Supply range and detection range
+
+    #
+    # disabled for now
+    #
+    if len(aistate.colonisablePlanetIDs) == 0:
+        best_colony_site_score = 0
+    else:
+        best_colony_site_score = next(iter(aistate.colonisablePlanetIDs.items()))[1]
+    if len(aistate.colonisableOutpostIDs) == 0:
+        best_outpost_site_score = 0
+    else:
+        best_outpost_site_score = next(iter(aistate.colonisableOutpostIDs.items()))[1]
+    need_improved_scouting = best_colony_site_score < 150 or best_outpost_site_score < 200
+
+    if need_improved_scouting:
+        if not tech_is_complete("CON_ORBITAL_CON"):
+            num_techs_accelerated += 1
+            if ("CON_ORBITAL_CON" not in research_queue_list[: 1 + num_techs_accelerated]) and (
+                tech_is_complete("PRO_FUSION_GEN")
+                or ("PRO_FUSION_GEN" in research_queue_list[: 1 + num_techs_accelerated])
+            ):
+                res = fo.issueEnqueueTechOrder("CON_ORBITAL_CON", num_techs_accelerated)
+                debug(
+                    "Empire has poor colony/outpost prospects, so attempted to fast-track %s, got result %d",
+                    "CON_ORBITAL_CON",
+                    res,
+                )
+        elif not tech_is_complete("CON_CONTGRAV_ARCH"):
+            num_techs_accelerated += 1
+            if ("CON_CONTGRAV_ARCH" not in research_queue_list[: 1 + num_techs_accelerated]) and (
+                tech_is_complete("CON_METRO_INFRA")
+            ):
+                for supply_tech in [
+                    _s_tech for _s_tech in ["CON_ARCH_MONOFILS", "CON_CONTGRAV_ARCH"] if not tech_is_complete(_s_tech)
+                ]:
+                    res = fo.issueEnqueueTechOrder(supply_tech, num_techs_accelerated)
+                    debug(
+                        "Empire has poor colony/outpost prospects, so attempted to fast-track %s, got result %d",
+                        supply_tech,
+                        res,
+                    )
+        else:
+            pass
+        research_queue_list = get_research_queue_techs()
+        # could add more supply tech
+
+        if False and not tech_is_complete("SPY_DETECT_2"):  # disabled for now, detect2
+            num_techs_accelerated += 1
+            if "SPY_DETECT_2" not in research_queue_list[: 2 + num_techs_accelerated] and tech_is_complete(
+                "PRO_FUSION_GEN"
+            ):
+                if "CON_ORBITAL_CON" not in research_queue_list[: 1 + num_techs_accelerated]:
+                    res = fo.issueEnqueueTechOrder("SPY_DETECT_2", num_techs_accelerated)
+                else:
+                    co_idx = research_queue_list.index("CON_ORBITAL_CON")
+                    res = fo.issueEnqueueTechOrder("SPY_DETECT_2", co_idx + 1)
+                debug(
+                    "Empire has poor colony/outpost prospects, so attempted to fast-track %s, got result %d"
+                    "CON_ORBITAL_CON",
+                    res,
+                )
+            research_queue_list = get_research_queue_techs()
+        #
+        # check to accelerate quant net
+        #
+        if aistate.character.may_research_tech_classic("LRN_QUANT_NET") and (population_with_research_focus() >= 40):
+            if not tech_is_complete("LRN_QUANT_NET"):
+                insert_idx = num_techs_accelerated  # TODO determine min target slot if reenabling
+                for qnTech in ["LRN_NDIM_SUBSPACE", "LRN_QUANT_NET"]:
+                    if qnTech not in research_queue_list[: insert_idx + 2] and not tech_is_complete(qnTech):
+                        res = fo.issueEnqueueTechOrder(qnTech, insert_idx)
+                        num_techs_accelerated += 1
+                        insert_idx += 1
+                        debug(
+                            "Empire has many researchers, so attempted to fast-track %s (got result %d) on turn %d",
+                            qnTech,
+                            res,
+                            fo.currentTurn(),
+                        )
+                research_queue_list = get_research_queue_techs()
+
+    #
+    # Currently disabled
+    #
+    if not enemies_sighted:
+        # params = [ (tech, gate, target_slot, add_tech_list), ]
+        params = [
+            ("GRO_XENO_GENETICS", "PRO_EXOBOTS", "PRO_EXOBOTS", ["GRO_GENETIC_MED", "GRO_XENO_GENETICS"]),
+            ("PRO_EXOBOTS", "PRO_ADAPTIVE_AUTOMATION", "PRO_ADAPTIVE_AUTOMATION", ["PRO_EXOBOTS"]),
+            ("PRO_ADAPTIVE_AUTOMATION", "PRO_NANOTECH_PROD", "PRO_NANOTECH_PROD", ["PRO_ADAPTIVE_AUTOMATION"]),
+            (
+                "PRO_INDUSTRY_CENTER_I",
+                "GRO_SYMBIOTIC_BIO",
+                "GRO_SYMBIOTIC_BIO",
+                ["PRO_ROBOTIC_PROD", "PRO_FUSION_GEN", "PRO_INDUSTRY_CENTER_I"],
+            ),
+            ("GRO_SYMBIOTIC_BIO", "SHP_ORG_HULL", "SHP_ZORTRIUM_PLATE", ["GRO_SYMBIOTIC_BIO"]),
+        ]
+        for (tech, gate, target_slot, add_tech_list) in params:
+            if tech_is_complete(tech):
+                break
+            if tech_turns_left.get(gate, 0) not in [
+                0,
+                1,
+                2,
+            ]:  # needs to exclude -1, the flag for no predicted completion
+                continue
+            if target_slot in research_queue_list:
+                target_index = 1 + research_queue_list.index(target_slot)
+            else:
+                target_index = num_techs_accelerated
+            for move_tech in add_tech_list:
+                debug(
+                    "for tech %s, target_slot %s, target_index:%s ; num_techs_accelerated:%s",
+                    move_tech,
+                    target_slot,
+                    target_index,
+                    num_techs_accelerated,
+                )
+                if tech_is_complete(move_tech):
+                    continue
+                if target_index <= num_techs_accelerated:
+                    num_techs_accelerated += 1
+                if move_tech not in research_queue_list[: 1 + target_index]:
+                    fo.issueEnqueueTechOrder(move_tech, target_index)
+                    debug("Research: To prioritize %s, have advanced %s to slot %d", tech, move_tech, target_index)
+                    target_index += 1

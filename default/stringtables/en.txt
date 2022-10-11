@@ -1273,7 +1273,7 @@ RULE_BASIC_VIS_SYSTEM_INFO_SHOWN
 Basic System Info Visible
 
 RULE_BASIC_VIS_SYSTEM_INFO_SHOWN_DESC
-'''<u>If On</u>: Systems that are detected by an empire at only basic visibility have their name and star type revealed to that empire.
+'''<u>If On</u>: Systems that are detected by an empire at only basic visibility have their name and star type revealed to that empire. Causes a UI issue where it is difficult to tell if starlanes of a system are known.
 
 <u>If Off</u>: Basic level visible systems that have never been detected at higher visiblity have unknown name and star type.'''
 
@@ -6388,7 +6388,9 @@ METER_FUEL_VALUE_LABEL
 Fuel
 
 METER_FUEL_VALUE_DESC
-'''Fuel allows ships to travel the starlanes outside of [[metertype METER_SUPPLY]] of their empire. Fuel is consumed for each starlane traversed outside of supply; stopping within [[metertype METER_SUPPLY]] lines will fully refuel a ship. If a ship remains stationary beyond friendly [[metertype METER_SUPPLY]] lines, fuel will slowly regenerate.
+'''Fuel allows ships to travel the starlanes outside of [[metertype METER_SUPPLY]] of their empire. 1 fuel is consumed for each starlane traversed outside of supply and passing through [[metertype METER_SUPPLY]] lines will fully refuel a ship. Fuel is deducted on entering the starlane and entering a starlane from within supply does not cost fuel.
+
+If a ship remains stationary beyond friendly [[metertype METER_SUPPLY]] lines, fuel will regenerate at a rate of 0.1 each turn. This can be modified by hull type such as living hulls, parts such as the [[shippart FU_RAMSCOOP]] or pilot species such as [[species SP_LAENFA]] and [[species SP_SLY]].
 
 The effective amount of fuel a <encyclopedia ENC_SHIP_DESIGN>Ship Design</encyclopedia> depends on the base fuel of the hull and additional fuel effects scaled by the [[encyclopedia FUEL_EFFICIENCY_TITLE]] of the [[encyclopedia ENC_SHIP_HULL]]. Fuel efficiency changes the effective capacity of fuel [[encyclopedia ENC_SHIP_PART]]s and will multiply any other fuel-modifying effects.
 
@@ -6431,7 +6433,18 @@ A set of core supply starlanes for an empire (the set of least-jump starlanes co
 
 Supply lines can also be used to refill the [[metertype METER_FUEL]] supply of ships.
 
-Supply lines will be obstructed by armed enemy ships belonging to empires with which an empire is at [[encyclopedia WAR_TITLE]]. At the opposite end of the spectrum, empires in an [[encyclopedia ALLIANCE_TITLE]] will share supply lines and all their associated benefits.'''
+Empires in an [[encyclopedia ALLIANCE_TITLE]] use each other's supply lines.
+The extension of supply lines from source planets into a system can be obstructed by armed enemy ships that are in that system and that are in fleets set to [[FLEET_OBSTRUCTIVE]] or [[FLEET_AGGRESSIVE]]. Enemy ships are those owned by empires that are at [[encyclopedia WAR_TITLE]] with the supply line's empire and neutral / monster ships.
+
+If multiple empires compete for supply in a system (without any obstructions to either's supply propagation), the empire with the highested propagated supply range will supply that system. To break ties, a bonus per empire is calculated and added to the propagated supply before comparison.
+
+• Has a colony in the system: +0.5
+• Has an outpost (but no colony) in the system: +0.3
+* Has supply sources in the system: +(0.001 * SUM(own supply in the system))
+* Distance to the source of supply that reaches the system and that, before propagation, is the strongest. That is, a 4 strength source 4 jumps away is stronger than a 3 strength source 3 jumps away: +(0.0001 * distance to maximum supplying system)
+* Has supply sources in the system: +(0.00001 * SUM(own max supply in the system))
+* Total supply: +(0.00000001 * SUM(own supply in the empire))
+If there is still a tie, and all the tied empires are allied, one of the allied empires is randomly chosen. If at least one non-allied empire ties, no empire wins and the system will not be part of any supply group.'''
 
 METER_STOCKPILE_VALUE_LABEL
 Stockpile Distribution
@@ -6471,7 +6484,11 @@ Stealth
 METER_STEALTH_VALUE_DESC
 '''The term Stealth represents the ability of an object to dodge all kinds of sensors. Only empires with a [[encyclopedia DETECTION_TITLE]] higher than or equal to the Stealth value can see the object.
 
-Space ships, buildings, specials, systems and planets have a Stealth meter.'''
+If an empire owns more than [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] in a system, that empire will suffer a stealth penalty of [[value FLEET_UNSTEALTH_SHIPS_SCALING]] multiplied by the square root of the number of excess ships.
+
+Space ships, buildings, specials, systems and planets have a Stealth meter.
+
+[[DETECTION_STAR_MODIFIERS]]'''
 
 METER_DETECTION_VALUE_LABEL
 Detection Range
@@ -6481,7 +6498,20 @@ METER_DETECTION_VALUE_DESC
 
 Space ships and planets have a Detection Range meter. There is the option to display Detection Range circles (in uu) in the Galaxy Map section of the Options menu. To facilitate predictions of what would be within a Detection Range, there are also options to display a standard 'Map Scale Line' as well as a 'Map Scale Circle' centered on the currently selected system and indicating the same distance as the Map Scale Line. They are both responsive to the the map zoom level and can be toggled via hotkeys.
 
-Some objects or abilities may allow vision of certain areas outside of this range. Some examples are from species abilities of [[species SP_TRITH]] or [[species SP_GEORGE]], or from the effects from a [[buildingtype BLD_SCRYING_SPHERE]].'''
+Some objects or abilities may allow vision of certain areas outside of this range. Some examples are from species abilities of [[species SP_TRITH]] or [[species SP_GEORGE]], or from the effects from a [[buildingtype BLD_SCRYING_SPHERE]].
+
+[[DETECTION_STAR_MODIFIERS]]'''
+
+DETECTION_STAR_MODIFIERS
+'''Detection Range and Ship Stealth are modified by the systems star type:
+• No Star: +10 Detection Range. -10 Ship Stealth.
+• Neutron Star: -15 Detection Range. +5 Ship Stealth.
+• Black Hole: +5 Detection Range. +10 Ship Stealth.
+• Red Star: -5 Ship Stealth.
+• Orange Star: No Modifiers.
+• Yellow Star: -5 Detection Range.
+• White Star: -10 Detection Range.
+• Blue Star: -15 Detection Range.'''
 
 METER_SPEED_VALUE_LABEL
 Speed
@@ -6632,7 +6662,7 @@ DETECTION_TITLE
 Detection Strength
 
 DETECTION_TEXT
-'''The term Detection Strength represents the technological level of an empire's sensors. An empire can only see objects that have a [[metertype METER_STEALTH]] value lower than or equal to its Detection Strength and are within [[metertype METER_DETECTION]] of a controlled space ship or planet.
+'''The term Detection Strength represents the technological level of an empire's sensors. An empire can only see objects that have a [[metertype METER_STEALTH]] value lower than or equal to its Detection Strength and are within [[metertype METER_DETECTION]] of a controlled space ship or planet. Unowned monsters and natives have a detection strength equal to their detection range.
 
 Empires have a Detection Strength meter.'''
 

@@ -275,6 +275,14 @@ condition_wrapper operator<(const value_ref_wrapper<double>& lhs, double rhs) {
     );
 }
 
+value_ref_wrapper<double> operator!=(const value_ref_wrapper<double>& lhs, int rhs) {
+    return value_ref_wrapper<double>(
+        std::make_shared<ValueRef::Operation<double>>(ValueRef::OpType::COMPARE_NOT_EQUAL,
+            ValueRef::CloneUnique(lhs.value_ref),
+            std::make_unique<ValueRef::Constant<double>>(rhs))
+    );
+}
+
 value_ref_wrapper<int> operator*(int lhs, const value_ref_wrapper<int>& rhs) {
     return value_ref_wrapper<int>(
         std::make_shared<ValueRef::Operation<int>>(ValueRef::OpType::TIMES,
@@ -733,8 +741,7 @@ void RegisterGlobalsValueRefs(boost::python::dict& globals, const PythonParser& 
             {"Floor", ValueRef::OpType::ROUND_DOWN},
             {"Sign",  ValueRef::OpType::SIGN}})
     {
-        std::function<boost::python::object(const boost::python::tuple&, const boost::python::dict&)> f_insert_abs = [&parser, op](const boost::python::tuple& args, const boost::python::dict& kw) { return insert_1arg_(parser, op.second, args, kw); };
-        globals[op.first] = boost::python::raw_function(f_insert_abs, 2);
+        globals[op.first] = boost::python::raw_function([&parser, op](const boost::python::tuple& args, const boost::python::dict& kw) { return insert_1arg_(parser, op.second, args, kw); }, 2);
     }
 
     // CurrentContent

@@ -1,3 +1,33 @@
+/*************************************************************************/
+/*  String.cpp                                                           */
+/*************************************************************************/
+/*                       This file is part of:                           */
+/*                           GODOT ENGINE                                */
+/*                      https://godotengine.org                          */
+/*************************************************************************/
+/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
+/*                                                                       */
+/* Permission is hereby granted, free of charge, to any person obtaining */
+/* a copy of this software and associated documentation files (the       */
+/* "Software"), to deal in the Software without restriction, including   */
+/* without limitation the rights to use, copy, modify, merge, publish,   */
+/* distribute, sublicense, and/or sell copies of the Software, and to    */
+/* permit persons to whom the Software is furnished to do so, subject to */
+/* the following conditions:                                             */
+/*                                                                       */
+/* The above copyright notice and this permission notice shall be        */
+/* included in all copies or substantial portions of the Software.       */
+/*                                                                       */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
+/*************************************************************************/
+
 #include "String.hpp"
 
 #include "Array.hpp"
@@ -73,6 +103,10 @@ String::String(const String &other) {
 	godot::api->godot_string_new_copy(&_godot_string, &other._godot_string);
 }
 
+String::String(String &&other) {
+	godot::api->godot_string_new_copy(&_godot_string, &other._godot_string);
+}
+
 String::~String() {
 	godot::api->godot_string_destroy(&_godot_string);
 }
@@ -90,6 +124,11 @@ int String::length() const {
 }
 
 void String::operator=(const String &s) {
+	godot::api->godot_string_destroy(&_godot_string);
+	godot::api->godot_string_new_copy(&_godot_string, &s._godot_string);
+}
+
+void String::operator=(String &&s) {
 	godot::api->godot_string_destroy(&_godot_string);
 	godot::api->godot_string_new_copy(&_godot_string, &s._godot_string);
 }
@@ -183,7 +222,7 @@ String operator+(const wchar_t *a, const String &b) {
 	return String(a) + b;
 }
 
-bool String::begins_with(String &p_string) const {
+bool String::begins_with(const String &p_string) const {
 	return godot::api->godot_string_begins_with(&_godot_string, &p_string._godot_string);
 }
 
@@ -212,7 +251,7 @@ bool String::empty() const {
 	return godot::api->godot_string_empty(&_godot_string);
 }
 
-bool String::ends_with(String &p_string) const {
+bool String::ends_with(const String &p_string) const {
 	return godot::api->godot_string_ends_with(&_godot_string, &p_string._godot_string);
 }
 

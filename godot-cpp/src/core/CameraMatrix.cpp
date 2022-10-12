@@ -1,12 +1,12 @@
 /*************************************************************************/
-/*  camera_matrix.cpp                                                    */
+/*  CameraMatrix.cpp                                                     */
 /*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2020 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2020 Godot Engine contributors (cf. AUTHORS.md).   */
+/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -561,7 +561,7 @@ real_t CameraMatrix::get_fov() const {
 	right_plane.normalize();
 
 	if ((matrix[8] == 0) && (matrix[9] == 0)) {
-		return Math::rad2deg(acos(abs(right_plane.normal.x))) * 2.0;
+		return Math::rad2deg(acos(std::abs(right_plane.normal.x))) * 2.0;
 	} else {
 		// our frustum is asymmetrical need to calculate the left planes angle separately..
 		Plane left_plane = Plane(matrix[3] + matrix[0],
@@ -570,7 +570,7 @@ real_t CameraMatrix::get_fov() const {
 				matrix[15] + matrix[12]);
 		left_plane.normalize();
 
-		return Math::rad2deg(acos(abs(left_plane.normal.x))) + Math::rad2deg(acos(abs(right_plane.normal.x)));
+		return Math::rad2deg(acos(std::abs(left_plane.normal.x))) + Math::rad2deg(acos(std::abs(right_plane.normal.x)));
 	}
 }
 

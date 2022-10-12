@@ -1,3 +1,33 @@
+/*************************************************************************/
+/*  Rect2.cpp                                                            */
+/*************************************************************************/
+/*                       This file is part of:                           */
+/*                           GODOT ENGINE                                */
+/*                      https://godotengine.org                          */
+/*************************************************************************/
+/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
+/*                                                                       */
+/* Permission is hereby granted, free of charge, to any person obtaining */
+/* a copy of this software and associated documentation files (the       */
+/* "Software"), to deal in the Software without restriction, including   */
+/* without limitation the rights to use, copy, modify, merge, publish,   */
+/* distribute, sublicense, and/or sell copies of the Software, and to    */
+/* permit persons to whom the Software is furnished to do so, subject to */
+/* the following conditions:                                             */
+/*                                                                       */
+/* The above copyright notice and this permission notice shall be        */
+/* included in all copies or substantial portions of the Software.       */
+/*                                                                       */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
+/*************************************************************************/
+
 #include "Rect2.hpp"
 #include "String.hpp"
 #include "Transform2D.hpp"
@@ -16,25 +46,35 @@ namespace godot {
 #endif
 
 real_t Rect2::distance_to(const Vector2 &p_point) const {
-	real_t dist = 1e20;
+	real_t dist = 0.0;
+	bool inside = true;
 
 	if (p_point.x < position.x) {
-		dist = MIN(dist, position.x - p_point.x);
+		real_t d = position.x - p_point.x;
+		dist = d;
+		inside = false;
 	}
 	if (p_point.y < position.y) {
-		dist = MIN(dist, position.y - p_point.y);
+		real_t d = position.y - p_point.y;
+		dist = inside ? d : MIN(dist, d);
+		inside = false;
 	}
 	if (p_point.x >= (position.x + size.x)) {
-		dist = MIN(p_point.x - (position.x + size.x), dist);
+		real_t d = p_point.x - (position.x + size.x);
+		dist = inside ? d : MIN(dist, d);
+		inside = false;
 	}
 	if (p_point.y >= (position.y + size.y)) {
-		dist = MIN(p_point.y - (position.y + size.y), dist);
+		real_t d = p_point.y - (position.y + size.y);
+		dist = inside ? d : MIN(dist, d);
+		inside = false;
 	}
 
-	if (dist == 1e20)
+	if (inside) {
 		return 0;
-	else
+	} else {
 		return dist;
+	}
 }
 
 Rect2 Rect2::clip(const Rect2 &p_rect) const { /// return a clipped rect

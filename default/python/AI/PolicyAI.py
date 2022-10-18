@@ -234,7 +234,10 @@ class PolicyManager:
         try to adopt the best possible ones for the slots we have.
         """
         self._conformance_or_liberty()
-        self._process_policy_options(social_category, (propaganda, algo_research, diversity, artisans, population))
+        options = {propaganda, algo_research, diversity, artisans, population}
+        if conformance in self._adopted:
+            options -= conformance_exclusions
+        self._process_policy_options(social_category, options)
 
     def _process_military(self) -> None:
         """Process military policies."""
@@ -257,7 +260,7 @@ class PolicyManager:
         elif infra1 in self._adoptable:
             self._adopt(infra1)
 
-    def _process_policy_options(self, category: str, options: Iterable[str]) -> None:
+    def _process_policy_options(self, category: str, options: Iterable[str]) -> None:  # noqa: max-complexity
         """
         Rate all given policies and deadopt policies with a negative rating.
         Then evaluate if any of the other is worth being adopted, possible even to replace another one.

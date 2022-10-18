@@ -45,9 +45,9 @@ jobs:
         shell: cmake -P {0}
         run: |
           string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
-          message("::set-output name=timestamp::${current_date}")
+          file(APPEND "$ENV{GITHUB_OUTPUT}" "timestamp=${current_date}")
       - name: Cache compilation
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/Library/Caches/
           key: build-${{ matrix.os }}-ccache-${{ steps.build-macos-ccache-timestamp.outputs.timestamp }}

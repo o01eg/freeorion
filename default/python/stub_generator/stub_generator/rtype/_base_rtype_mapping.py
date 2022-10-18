@@ -41,11 +41,11 @@ class PairToken(SimpleCollectionToken):
 
 class MapToken(Token):
     def __init__(self, value: str):
-        super(MapToken, self).__init__(value, "Dict[", "]", 2)
+        super(MapToken, self).__init__(value, "Map[", "]", 2)
 
 
 _tokens: List[Token] = [
-    SimpleCollectionToken("Vec", "Sequence"),
+    SimpleCollectionToken("Vec", "Vec"),
     SimpleCollectionToken("Set", "Set"),
     MapToken("Map"),
     PairToken("Pair"),
@@ -72,6 +72,7 @@ def _split_once(string):
 
 
 def _iter_arguments(string) -> Iterator[Token]:
+    string = string.replace("_", "")
     while string:
         string, token = _split_once(string)
         yield token

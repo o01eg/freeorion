@@ -9,12 +9,12 @@ Tech(
     researchcost=120 * TECH_COST_MULTIPLIER,
     researchturns=5,
     tags=["PEDIA_LEARNING_CATEGORY"],
-    prerequisites="LRN_PSIONICS",
+    prerequisites=["LRN_PSIONICS"],
     effectsgroups=[
         EffectsGroup(
             scope=ProductionCenter
             & OwnedBy(empire=Source.Owner)
-            & Focus(type="FOCUS_RESEARCH")
+            & Focus(type=["FOCUS_RESEARCH"])
             & Happiness(low=NamedReal(name="LRN_DISTRIB_THOUGHT_MIN_STABILITY", value=10)),
             priority=TARGET_AFTER_2ND_SCALING_PRIORITY,
             effects=SetTargetResearch(
@@ -31,7 +31,7 @@ Tech(
                             Max,
                             value=DirectDistanceBetween(Target.ID, LocalCandidate.ID),
                             condition=System
-                            & Contains(Planet() & OwnedBy(empire=Source.Owner) & Focus(type="FOCUS_RESEARCH")),
+                            & Contains(Planet() & OwnedBy(empire=Source.Owner) & Focus(type=["FOCUS_RESEARCH"])),
                         )
                         ** 0.5,
                     ),

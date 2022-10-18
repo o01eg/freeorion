@@ -8,7 +8,7 @@
 
 #include "../universe/ValueRefs.h"
 #include "../universe/NamedValueRefManager.h"
-#include "../universe/Conditions.h"
+#include "../Empire/ResourcePool.h"
 
 #include "EnumPythonParser.h"
 #include "PythonParser.h"
@@ -18,6 +18,15 @@ value_ref_wrapper<double> pow(const value_ref_wrapper<double>& lhs, double rhs) 
         std::make_shared<ValueRef::Operation<double>>(ValueRef::OpType::EXPONENTIATE,
             ValueRef::CloneUnique(lhs.value_ref),
             std::make_unique<ValueRef::Constant<double>>(rhs)
+        )
+    );
+}
+
+value_ref_wrapper<double> pow(double lhs, const value_ref_wrapper<double>& rhs) {
+    return value_ref_wrapper<double>(
+        std::make_shared<ValueRef::Operation<double>>(ValueRef::OpType::EXPONENTIATE,
+            std::make_unique<ValueRef::Constant<double>>(lhs),
+            ValueRef::CloneUnique(rhs.value_ref)
         )
     );
 }
@@ -157,6 +166,15 @@ value_ref_wrapper<double> operator+(const value_ref_wrapper<double>& lhs, const 
     );
 }
 
+value_ref_wrapper<double> operator+(double lhs, const value_ref_wrapper<int>& rhs) {
+    return value_ref_wrapper<double>(
+        std::make_shared<ValueRef::Operation<double>>(ValueRef::OpType::PLUS,
+            std::make_unique<ValueRef::Constant<double>>(lhs),
+            std::make_unique<ValueRef::StaticCast<int, double>>(ValueRef::CloneUnique(rhs.value_ref))
+        )
+    );
+}
+
 value_ref_wrapper<double> operator-(const value_ref_wrapper<double>& lhs, double rhs) {
     return value_ref_wrapper<double>(
         std::make_shared<ValueRef::Operation<double>>(ValueRef::OpType::MINUS,
@@ -202,37 +220,36 @@ value_ref_wrapper<double> operator-(const value_ref_wrapper<double>& lhs, int rh
     );
 }
 
-condition_wrapper operator>=(const value_ref_wrapper<double>& lhs, int rhs) {
-    return condition_wrapper(
-        std::make_shared<Condition::ValueTest>(ValueRef::CloneUnique(lhs.value_ref),
-            Condition::ComparisonType::GREATER_THAN_OR_EQUAL,
+value_ref_wrapper<double> operator>=(const value_ref_wrapper<double>& lhs, int rhs) {
+    return value_ref_wrapper<double>(
+        std::make_shared<ValueRef::Operation<double>>(ValueRef::OpType::COMPARE_GREATER_THAN_OR_EQUAL,
+            ValueRef::CloneUnique(lhs.value_ref),
             std::make_unique<ValueRef::Constant<double>>(rhs)
-        )
-    );
+    ));
 }
 
-condition_wrapper operator<=(const value_ref_wrapper<double>& lhs, const value_ref_wrapper<double>& rhs) {
-    return condition_wrapper(
-        std::make_shared<Condition::ValueTest>(ValueRef::CloneUnique(lhs.value_ref),
-            Condition::ComparisonType::LESS_THAN_OR_EQUAL,
-            ValueRef::CloneUnique(rhs.value_ref))
-    );
+value_ref_wrapper<double> operator<=(const value_ref_wrapper<double>& lhs, const value_ref_wrapper<double>& rhs) {
+    return value_ref_wrapper<double>(
+        std::make_shared<ValueRef::Operation<double>>(ValueRef::OpType::COMPARE_LESS_THAN_OR_EQUAL,
+            ValueRef::CloneUnique(lhs.value_ref),
+            ValueRef::CloneUnique(rhs.value_ref)
+    ));
 }
 
-condition_wrapper operator<=(double lhs, const value_ref_wrapper<double>& rhs) {
-    return condition_wrapper(
-        std::make_shared<Condition::ValueTest>(std::make_unique<ValueRef::Constant<double>>(lhs),
-            Condition::ComparisonType::LESS_THAN_OR_EQUAL,
-            ValueRef::CloneUnique(rhs.value_ref))
-    );
+value_ref_wrapper<double> operator<=(double lhs, const value_ref_wrapper<double>& rhs) {
+    return value_ref_wrapper<double>(
+        std::make_shared<ValueRef::Operation<double>>(ValueRef::OpType::COMPARE_LESS_THAN_OR_EQUAL,
+            std::make_unique<ValueRef::Constant<double>>(lhs),
+            ValueRef::CloneUnique(rhs.value_ref)
+    ));
 }
 
-condition_wrapper operator<=(const value_ref_wrapper<double>& lhs, double rhs) {
-    return condition_wrapper(
-        std::make_shared<Condition::ValueTest>(ValueRef::CloneUnique(lhs.value_ref),
-            Condition::ComparisonType::LESS_THAN_OR_EQUAL,
-            std::make_unique<ValueRef::Constant<double>>(rhs))
-    );
+value_ref_wrapper<double> operator<=(const value_ref_wrapper<double>& lhs, double rhs) {
+    return value_ref_wrapper<double>(
+        std::make_shared<ValueRef::Operation<double>>(ValueRef::OpType::COMPARE_LESS_THAN_OR_EQUAL,
+            ValueRef::CloneUnique(lhs.value_ref),
+            std::make_unique<ValueRef::Constant<double>>(rhs)
+    ));
 }
 
 value_ref_wrapper<double> operator>(const value_ref_wrapper<double>& lhs, const value_ref_wrapper<double>& rhs) {
@@ -259,18 +276,18 @@ value_ref_wrapper<double> operator<(const value_ref_wrapper<double>& lhs, const 
     );
 }
 
-condition_wrapper operator<(double lhs, const value_ref_wrapper<double>& rhs) {
-    return condition_wrapper(
-        std::make_shared<Condition::ValueTest>(std::make_unique<ValueRef::Constant<double>>(lhs),
-            Condition::ComparisonType::LESS_THAN,
+value_ref_wrapper<double> operator<(double lhs, const value_ref_wrapper<double>& rhs) {
+    return value_ref_wrapper<double>(
+        std::make_shared<ValueRef::Operation<double>>(ValueRef::OpType::COMPARE_LESS_THAN,
+            std::make_unique<ValueRef::Constant<double>>(lhs),
             ValueRef::CloneUnique(rhs.value_ref))
     );
 }
 
-condition_wrapper operator<(const value_ref_wrapper<double>& lhs, double rhs) {
-    return condition_wrapper(
-        std::make_shared<Condition::ValueTest>(ValueRef::CloneUnique(lhs.value_ref),
-            Condition::ComparisonType::LESS_THAN,
+value_ref_wrapper<double> operator<(const value_ref_wrapper<double>& lhs, double rhs) {
+    return value_ref_wrapper<double>(
+        std::make_shared<ValueRef::Operation<double>>(ValueRef::OpType::COMPARE_LESS_THAN,
+            ValueRef::CloneUnique(lhs.value_ref),
             std::make_unique<ValueRef::Constant<double>>(rhs))
     );
 }
@@ -328,38 +345,61 @@ value_ref_wrapper<int> operator+(const value_ref_wrapper<int>& lhs, const value_
     );
 }
 
-condition_wrapper operator<(const value_ref_wrapper<int>& lhs, const value_ref_wrapper<int>& rhs) {
-    return condition_wrapper(
-        std::make_shared<Condition::ValueTest>(ValueRef::CloneUnique(lhs.value_ref),
-            Condition::ComparisonType::LESS_THAN,
+value_ref_wrapper<int> operator<(const value_ref_wrapper<int>& lhs, const value_ref_wrapper<int>& rhs) {
+    return value_ref_wrapper<int>(
+        std::make_shared<ValueRef::Operation<int>>(ValueRef::OpType::COMPARE_LESS_THAN,
+            ValueRef::CloneUnique(lhs.value_ref),
             ValueRef::CloneUnique(rhs.value_ref))
     );
 }
 
-condition_wrapper operator>=(const value_ref_wrapper<int>& lhs, const value_ref_wrapper<int>& rhs) {
-    return condition_wrapper(
-        std::make_shared<Condition::ValueTest>(ValueRef::CloneUnique(lhs.value_ref),
-            Condition::ComparisonType::GREATER_THAN_OR_EQUAL,
-            ValueRef::CloneUnique(rhs.value_ref))
-    );
-}
-
-condition_wrapper operator==(const value_ref_wrapper<int>& lhs, const value_ref_wrapper<int>& rhs) {
-    return condition_wrapper(
-        std::make_shared<Condition::ValueTest>(ValueRef::CloneUnique(lhs.value_ref),
-            Condition::ComparisonType::EQUAL,
-            ValueRef::CloneUnique(rhs.value_ref))
-    );
-}
-
-condition_wrapper operator==(const value_ref_wrapper<int>& lhs, int rhs) {
-    return condition_wrapper(
-        std::make_shared<Condition::ValueTest>(ValueRef::CloneUnique(lhs.value_ref),
-            Condition::ComparisonType::EQUAL,
+value_ref_wrapper<int> operator<(const value_ref_wrapper<int>& lhs, int rhs) {
+    return value_ref_wrapper<int>(
+        std::make_shared<ValueRef::Operation<int>>(ValueRef::OpType::COMPARE_LESS_THAN,
+            ValueRef::CloneUnique(lhs.value_ref),
             std::make_unique<ValueRef::Constant<int>>(rhs))
     );
 }
 
+value_ref_wrapper<int> operator>(const value_ref_wrapper<int>& lhs, int rhs) {
+    return value_ref_wrapper<int>(
+        std::make_shared<ValueRef::Operation<int>>(ValueRef::OpType::COMPARE_GREATER_THAN,
+            ValueRef::CloneUnique(lhs.value_ref),
+            std::make_unique<ValueRef::Constant<int>>(rhs))
+    );
+}
+
+value_ref_wrapper<int> operator>=(const value_ref_wrapper<int>& lhs, const value_ref_wrapper<int>& rhs) {
+    return value_ref_wrapper<int>(
+        std::make_shared<ValueRef::Operation<int>>(ValueRef::OpType::COMPARE_GREATER_THAN_OR_EQUAL,
+            ValueRef::CloneUnique(lhs.value_ref),
+            ValueRef::CloneUnique(rhs.value_ref))
+    );
+}
+
+value_ref_wrapper<int> operator==(const value_ref_wrapper<int>& lhs, const value_ref_wrapper<int>& rhs) {
+    return value_ref_wrapper<int>(
+        std::make_shared<ValueRef::Operation<int>>(ValueRef::OpType::COMPARE_EQUAL,
+            ValueRef::CloneUnique(lhs.value_ref),
+            ValueRef::CloneUnique(rhs.value_ref))
+    );
+}
+
+value_ref_wrapper<int> operator==(const value_ref_wrapper<int>& lhs, int rhs) {
+    return value_ref_wrapper<int>(
+        std::make_shared<ValueRef::Operation<int>>(ValueRef::OpType::COMPARE_EQUAL,
+            ValueRef::CloneUnique(lhs.value_ref),
+            std::make_unique<ValueRef::Constant<int>>(rhs))
+    );
+}
+
+value_ref_wrapper<int> operator!=(const value_ref_wrapper<int>& lhs, int rhs) {
+    return value_ref_wrapper<int>(
+        std::make_shared<ValueRef::Operation<int>>(ValueRef::OpType::COMPARE_NOT_EQUAL,
+            ValueRef::CloneUnique(lhs.value_ref),
+            std::make_unique<ValueRef::Constant<int>>(rhs))
+    );
+}
 
 namespace {
     template<typename T>
@@ -490,7 +530,12 @@ namespace {
             if (value_arg.check()) {
                 value = ValueRef::CloneUnique(value_arg().value_ref);
             } else {
-                value = std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(kw["value"])());
+                const auto value_int_arg = boost::python::extract<value_ref_wrapper<int>>(kw["value"]);
+                if (value_int_arg.check()) {
+                    value = std::make_unique<ValueRef::StaticCast<int, double>>(ValueRef::CloneUnique(value_int_arg().value_ref));
+                } else {
+                    value = std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(kw["value"])());
+               }
             }
             return boost::python::object(value_ref_wrapper<double>(std::make_shared<ValueRef::Statistic<double, double>>(std::move(value), type, ValueRef::CloneUnique(condition))));
         } else {
@@ -608,6 +653,33 @@ namespace {
         ));
     }
 
+    value_ref_wrapper<int> insert_jumps_between_(boost::python::object arg1, boost::python::object arg2) {
+        std::unique_ptr<ValueRef::ValueRef<int>> id1;
+        auto id1_args = boost::python::extract<value_ref_wrapper<int>>(arg1);
+        if (id1_args.check()) {
+            id1 = ValueRef::CloneUnique(id1_args().value_ref);
+        } else {
+            id1 = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(arg1)());
+        }
+
+        std::unique_ptr<ValueRef::ValueRef<int>> id2;
+        auto id2_args = boost::python::extract<value_ref_wrapper<int>>(arg2);
+        if (id2_args.check()) {
+            id2 = ValueRef::CloneUnique(id2_args().value_ref);
+        } else {
+            id2 = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(arg2)());
+        }
+
+        return value_ref_wrapper<int>(std::make_shared<ValueRef::ComplexVariable<int>>(
+            "JumpsBetween",
+            std::move(id1),
+            std::move(id2),
+            nullptr,
+            nullptr,
+            nullptr
+        ));
+    }
+
     value_ref_wrapper<std::string> insert_user_string(const boost::python::object& expr) {
         std::unique_ptr<ValueRef::ValueRef<std::string>> expr_;
         auto expr_args = boost::python::extract<value_ref_wrapper<std::string>>(expr);
@@ -670,9 +742,42 @@ namespace {
             nullptr
         ));
     }
+
+    value_ref_wrapper<double> insert_empire_stockpile_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        std::unique_ptr<ValueRef::ValueRef<int>> empire;
+        auto empire_args = boost::python::extract<value_ref_wrapper<int>>(kw["empire"]);
+        if (empire_args.check()) {
+            empire = ValueRef::CloneUnique(empire_args().value_ref);
+        } else {
+            empire = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(kw["empire"])());
+        }
+        auto resource = boost::python::extract<enum_wrapper<ResourceType>>(kw["resource"])();
+        std::string resource_str;
+        switch (resource.value) {
+            case ResourceType::RE_INFLUENCE:
+                resource_str = "Influence";
+                break;
+            case ResourceType::RE_INDUSTRY:
+                resource_str = "Industry";
+                break;
+            default:
+                throw std::runtime_error(std::string("Not supported") + __func__);
+        }
+
+        return value_ref_wrapper<double>(std::make_shared<ValueRef::ComplexVariable<double>>(
+            "EmpireStockpile",
+            std::move(empire),
+            nullptr,
+            nullptr,
+            std::move(std::make_unique<ValueRef::Constant<std::string>>(resource_str)),
+            nullptr
+        ));
+    }
 }
 
 void RegisterGlobalsValueRefs(boost::python::dict& globals, const PythonParser& parser) {
+    globals["NamedInteger"] = boost::python::raw_function(insert_named_<int>);
+    globals["NamedIntegerLookup"] = boost::python::raw_function(insert_named_lookup_<int>);
     globals["NamedReal"] = boost::python::raw_function(insert_named_<double>);
     globals["NamedRealLookup"] = boost::python::raw_function(insert_named_lookup_<double>);
     globals["Value"] = value_ref_wrapper<double>(std::make_shared<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE));
@@ -783,8 +888,11 @@ void RegisterGlobalsValueRefs(boost::python::dict& globals, const PythonParser& 
     globals["Statistic"] = boost::python::raw_function(f_insert_statistic, 2);
 
     globals["DirectDistanceBetween"] = insert_direct_distance_between_;
+    globals["JumpsBetween"] = insert_jumps_between_;
     globals["UserString"] = insert_user_string;
     globals["PartsInShipDesign"] = boost::python::raw_function(insert_parts_in_ship_design_);
     globals["EmpireMeterValue"] = boost::python::raw_function(insert_empire_meter_value_);
+    globals["EmpireStockpile"] = boost::python::raw_function(insert_empire_stockpile_);
+
 }
 

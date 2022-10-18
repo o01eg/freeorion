@@ -6498,7 +6498,7 @@ METER_DETECTION_VALUE_DESC
 
 Space ships and planets have a Detection Range meter. There is the option to display Detection Range circles (in uu) in the Galaxy Map section of the Options menu. To facilitate predictions of what would be within a Detection Range, there are also options to display a standard 'Map Scale Line' as well as a 'Map Scale Circle' centered on the currently selected system and indicating the same distance as the Map Scale Line. They are both responsive to the the map zoom level and can be toggled via hotkeys.
 
-Some objects or abilities may allow vision of certain areas outside of this range. Some examples are from species abilities of [[species SP_TRITH]] or [[species SP_GEORGE]], or from the effects from a [[buildingtype BLD_SCRYING_SPHERE]].
+Some content may allow vision outside of this range. This includes the species abilities of [[species SP_FULVER]], [[species SP_GEORGE]], [[SP_NIGHTSIDERS]] or [[species SP_TRITH]], the [[buildingtype BLD_SCRYING_SPHERE]], or finding a map in a derelict scout when exploring new systems.
 
 [[DETECTION_STAR_MODIFIERS]]'''
 
@@ -10627,7 +10627,7 @@ Stealth
 PC_STEALTH_DESC
 '''Stealth parts increase the [[metertype METER_STEALTH]] of a ship. The effects from these parts do not complement each other, only the highest rated part will affect the ship.
 
-If combat occurs in a system, ships that are invisible to an enemy are not targetted by the enemy's weapons. If the ship attacks, it may become visible for the following rounds.
+If combat occurs in a system, ships that are invisible to an enemy are not targetted by the enemy's weapons. If the ship attacks, it may become visible for the following combat rounds.
 
 See also: [[metertype METER_DETECTION]], [[encyclopedia DETECTION_TITLE]]'''
 
@@ -12110,7 +12110,7 @@ The effect requires a stability of [[value PLC_CENTRALIZATION_MIN_STABILITY]].
 However, it also reduces [[metertype METER_SUPPLY]] range ([[value PLC_CENTRALIZATION_MAX_SUPPLY_FLAT]]) and [[metertype METER_STOCKPILE]] ([[value PLC_CENTRALIZATION_MAX_STOCKPILE_FLAT]]), and increases the [[metertype METER_INFLUENCE]] cost of the empire's colonies:
 • [[metertype METER_SUPPLY]] connected colonies get a penalization of [[value PLC_CENTRALIZATION_TARGET_INFLUENCE_PERJUMP]] per jump distance to the capital, capped at [[value PLC_CENTRALIZATION_TARGET_INFLUENCE_MAX]].
 • Colonies not [[metertype METER_SUPPLY]] connected to the capital gets the maximum penalization ([[value PLC_CENTRALIZATION_TARGET_INFLUENCE_MAX]]).
-Additionally, the cost of colonization ship parts is increased by 50%.
+Additionally, the cost of colonization ship parts is increased by 33%.
 
 Logistics of the whole empire are focused into boosting the capital's production, by diverting there most of the social and material resources. This causes some resentment in the colonies, which increases [[metertype METER_INFLUENCE]] costs.'''
 
@@ -12140,7 +12140,8 @@ PLC_COLONIZATION
 Colonization
 
 PLC_COLONIZATION_DESC
-Decreases cost of colonization ship parts and give ships with colony parts but no weapons, troops, bombard, or general parts +1 base fuel capacity.
+'''• Decreases cost of colonization ship parts, outpost ship parts and colonization buildings by 33%.
+• Gives ships with colony parts but no weapons, troops, bombard, or general parts +1 base fuel capacity.'''
 
 PLC_COLONIZATION_SHORT_DESC
 Discounts Colonization
@@ -12160,7 +12161,7 @@ PLC_EXPLORATION
 Exploration
 
 PLC_EXPLORATION_DESC
-'''• Increases speed of ships with no weapons, fighters, shields, armour, troops, colony pods, bombardment, research, industry, influence, production, or general parts. Detection, fuel, and engine parts are allowed.
+'''• Increases speed of ships with no weapons, fighters, shields, armour, troops, colony pods, bombardment, research, industry, influence, production, or general parts by [[value PLC_EXPLORATION_SPEED_BONUS]] uu. Detection, fuel, and engine parts are allowed.
 • Every turn a system is newly explored, the ships in that system generate a total of [[value EXPLORATION_RESEARCH_BONUS_TOTAL]] RP.'''
 
 PLC_EXPLORATION_SHORT_DESC
@@ -12228,11 +12229,10 @@ PLC_ENVIRONMENTALISM
 Environmentalism
 
 PLC_ENVIRONMENTALISM_DESC
-'''Decreases industry and construction of all owned planets. Penalizes further construction, stability, and influence on terraformed planets.
-
-Boosts research, stability, influence, and stealth on non-terraformed populated planets.
-
-Makes terraforming more expensive.'''
+'''• Decreases [[metertype METER_CONSTRUCTION]] by [[value PLC_ENVIRONMENTALISM_TARGET_CONSTRUCTION_TERRAFORMED_FLAT]], [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_ENVIRONMENTALISM_TARGET_HAPPINESS_FLAT]] and [[metertype METER_TARGET_INFLUENCE]] by [[value PLC_ENVIRONMENTALISM_TARGET_INFLUENCE_FLAT]] on planets that have been terraformed, or otherwise changed from their original environment.
+• Decreases [[metertype METER_TARGET_INDUSTRY]] by [[value PLC_ENVIRONMENTALISM_TARGET_INDUSTRY_FLAT]] and [[metertype METER_CONSTRUCTION]] by [[value PLC_ENVIRONMENTALISM_TARGET_CONSTRUCTION_FLAT]] on non-asteroids.
+• Boosts [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_ENVIRONMENTALISM_TARGET_HAPPINESS_ORIGINAL_FLAT]], [[metertype METER_TARGET_INFLUENCE]] by [[value PLC_ENVIRONMENTALISM_TARGET_INFLUENCE_ORIGINAL_FLAT]], [[metertype METER_TARGET_RESEARCH]] by [[value PLC_ENVIRONMENTALISM_TARGET_RESEARCH_ORIGINAL_FLAT]] and [[metertype METER_STEALTH]] by [[value PLC_ENVIRONMENTALISM_STEALTH_ORIGINAL_FLAT]] on planets that are not asteroids or gas giants, have not been terraformed, contain no buildings and are not industry-focused.
+• Makes terraforming a planet 3x as expensive.'''
 
 PLC_ENVIRONMENTALISM_SHORT_DESC
 Bonuses for not terraforming
@@ -12257,7 +12257,7 @@ PLC_INDUSTRIALISM_DESC
 '''Industry-focused planets get a boost to [[metertype METER_TARGET_INDUSTRY]] of [[value PLC_INDUSTRIALISM_TARGET_INDUSTRY_PERCENT]]% and a bonus of [[value PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT]] to [[metertype METER_HAPPINESS]].
 The production bonus requires a stability of [[value PLC_INDUSTRIALISM_MIN_STABILITY]].
 
-Makes production-boosting power generation techs cheaper to research: [[tech PRO_ORBITAL_GEN]] [[tech PRO_SOL_ORB_GEN]] [[tech PRO_FUSION_GEN]] [[tech PRO_SINGULAR_GEN]] [[tech PRO_ZERO_GEN]]'''
+Makes production-boosting power generation techs cheaper to research: [[tech PRO_ORBITAL_GEN]], [[tech PRO_SOL_ORB_GEN]], [[tech PRO_FUSION_GEN]], [[tech PRO_SINGULAR_GEN]], [[tech PRO_ZERO_GEN]]'''
 
 PLC_INDUSTRIALISM_SHORT_DESC
 Improves industry output
@@ -12276,7 +12276,9 @@ PLC_CHECKPOINTS
 Border Checkpoints
 
 PLC_CHECKPOINTS_DESC
-'''Increases imperial detection strength by 1 per turn up to [[value PLC_CHECKPOINTS_DETECTION_STRENGTH_MAX]].
+'''Decreases [[metertype METER_STEALTH]] of foreign ships and planets in [[metertype METER_SUPPLY]] by up to [[value PLC_CHECKPOINTS_MAX_STEALTH_MALUS]]. Ships and planets are considered foreign if not owned by or allied to this empire. Unowned planets and monsters are also foreign.
+
+The decrease depends on the time this policy is adapted, decreasing [[metertype METER_STEALTH]] by 1 per turn up to [[value PLC_CHECKPOINTS_MAX_STEALTH_MALUS]].
 
 Reduces imperial [[metertype METER_SUPPLY]] line range ([[value PLC_CHECKPOINTS_MAX_SUPPLY_FLAT]]) and [[metertype METER_INFLUENCE]] generation ([[value PLC_CHECKPOINTS_TARGET_INFLUENCE_FLAT]]).'''
 
@@ -12404,7 +12406,7 @@ PLC_THE_HUNT
 The Hunt
 
 PLC_THE_HUNT_DESC
-Boosts [[metertype METER_TARGET_HAPPINESS]], [[metertype METER_TARGET_INFLUENCE]], and [[metertype METER_MAX_TROOPS]] of planets in systems that also contain an unowned populated planet, with no [[metertype METER_SHIELD]] or [[metertype METER_DEFENSE]], and with a species other than the species on the benefiting planet or on the the imperial capital.
+Boosts [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_THE_HUNT_HAPPINESS_FLAT]], [[metertype METER_TARGET_INFLUENCE]] by [[value PLC_THE_HUNT_INFLUENCE_FLAT]], and [[metertype METER_MAX_TROOPS]] by [[value PLC_THE_HUNT_TROOPS_MAX_FLAT]] on planets in systems that also contain an unowned populated planet, with no [[metertype METER_SHIELD]] or [[metertype METER_DEFENSE]], and with a species other than the species on the benefiting planet or on the the imperial capital.
 
 PLC_THE_HUNT_SHORT_DESC
 Hunting Natives Gives Boosts
@@ -14565,6 +14567,8 @@ SPY_PLANET_STEALTH_MOD_DESC
 '''Modifiers affect stealth:
 
 • [[BASIC_PLANET_STEALTH]] gives [[value PLANET_BASIC_STEALTH]] [[metertype METER_STEALTH]] to all planets.
+
+• Colonies may have an extra malus or bonus to [[metertype METER_STEALTH]] based on the colony's species.
 
 • Due to [[FLEET_UNSTEALTHINESS]], when there are more than [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] ships of the same empire in a system, their [[metertype METER_STEALTH]] is reduced by [[value FLEET_UNSTEALTH_SHIPS_SCALING]] multiplied by the square root of [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] less than the number of ships that empire has in the system.
 

@@ -358,10 +358,8 @@ namespace {
         auto name = boost::python::extract<std::string>(kw["name"])();
         auto description = boost::python::extract<std::string>(kw["description"])();
         auto gameplay_description = boost::python::extract<std::string>(kw["gameplay_description"])();
-        std::vector<FocusType> foci;
-        py_parse::detail::flatten_list<FocusType>(kw["foci"], [](const FocusType& o, std::vector<FocusType>& v) {
-            v.push_back(o);
-        }, foci);
+        boost::python::stl_input_iterator<FocusType> foci_begin(kw["foci"]), foci_end;
+        std::vector<FocusType> foci(foci_begin, foci_end);
         auto defaultfocus = boost::python::extract<std::string>(kw["defaultfocus"])();
         std::map<PlanetType, PlanetEnvironment> environments;
         auto environments_args = boost::python::extract<boost::python::dict>(kw["environments"])();
@@ -372,9 +370,10 @@ namespace {
         }
 
         std::vector<std::shared_ptr<Effect::EffectsGroup>> effectsgroups;
-        py_parse::detail::flatten_list<effect_group_wrapper>(kw["effectsgroups"], [](const effect_group_wrapper& o, std::vector<std::shared_ptr<Effect::EffectsGroup>>& v) {
-            v.push_back(o.effects_group);
-        }, effectsgroups);
+        boost::python::stl_input_iterator<effect_group_wrapper> effectsgroups_begin(kw["effectsgroups"]), effectsgroups_end;
+        for (auto it = effectsgroups_begin; it != effectsgroups_end; ++it) {
+            effectsgroups.push_back(it->effects_group);
+        }
         bool playable = false;
         if (kw.has_key("playable")) {
             playable = boost::python::extract<bool>(kw["playable"])();
@@ -435,18 +434,6 @@ namespace {
         return boost::python::object();
     }
 
-    FocusType insert_focus_type_(const boost::python::tuple& args, const boost::python::dict& kw) {
-        auto name = boost::python::extract<std::string>(kw["name"])();
-        auto description = boost::python::extract<std::string>(kw["description"])();
-        auto location = boost::python::extract<condition_wrapper>(kw["location"])();
-        auto graphic = boost::python::extract<std::string>(kw["graphic"])();
-
-        return {std::move(name),
-            std::move(description),
-            std::move(ValueRef::CloneUnique(location.condition)),
-            std::move(graphic)};
-    }
-
     struct py_grammar {
          boost::python::dict globals;
 
@@ -463,7 +450,6 @@ namespace {
             RegisterGlobalsEnums(globals);
 
             globals["Species"] = boost::python::raw_function([&species_](const boost::python::tuple& args, const boost::python::dict& kw) { return py_insert_species_(species_, args, kw); });
-            globals["FocusType"] = boost::python::raw_function(insert_focus_type_);
         }
 
         boost::python::dict operator()() const

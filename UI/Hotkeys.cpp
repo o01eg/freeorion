@@ -55,7 +55,9 @@ namespace {
     std::map<std::string, Hotkey> hotkeys;
 }
 
-void Hotkey::AddHotkey(const std::string& name, const std::string& description, GG::Key key, GG::Flags<GG::ModKey> mod) {
+void Hotkey::AddHotkey(const std::string& name, const std::string& description,
+                       GG::Key key, GG::Flags<GG::ModKey> mod)
+{
     auto [it, inserted] = hotkeys.emplace(name, Hotkey(name, description, key, mod));
     (void)it; // suppress unused variable warning
     if (!inserted)
@@ -161,33 +163,50 @@ static void ReplaceInString(std::string& str, const std::string& what,
     } while(true);
 }
 
-std::string Hotkey::PrettyPrint(GG::Key key, GG::Flags<GG::ModKey> mod) {
-    std::string retval;
-    if (mod & GG::MOD_KEY_CTRL)
-        retval += "CTRL+";
-    if (mod & GG::MOD_KEY_ALT)
-        retval += "ALT+";
-    if (mod & GG::MOD_KEY_SHIFT)
-        retval += "SHIFT+";
-    if (mod & GG::MOD_KEY_META)
-        retval += "META+";
+namespace {
+    std::string PrettyPrint(GG::Key key, GG::Flags<GG::ModKey> mod) {
+        std::string retval;
+        if (mod & GG::MOD_KEY_CTRL)
+            retval += "CTRL+";
+        if (mod & GG::MOD_KEY_ALT)
+            retval += "ALT+";
+        if (mod & GG::MOD_KEY_SHIFT)
+            retval += "SHIFT+";
+        if (mod & GG::MOD_KEY_META)
+            retval += "META+";
 
-    std::ostringstream key_stream;
-    key_stream << key;
-    std::string key_string = key_stream.str();
-    ReplaceInString(key_string, "GGK_", "");
+        std::ostringstream key_stream;
+        key_stream << key;
+        std::string key_string = key_stream.str();
+        ReplaceInString(key_string, "GGK_", "");
 
-    retval += key_string;
-    return retval;
+        retval += key_string;
+        return retval;
+    }
+
+    constexpr bool IsTypingSafe(GG::Key key, GG::Flags<GG::ModKey> mod) noexcept {
+        if (GG::Key::GGK_INSERT <= key && GG::Key::GGK_PAGEUP >= key)
+            return false;
+        if (GG::Key::GGK_END <= key && GG::Key::GGK_UP >= key)
+            return false;
+        if (mod & (GG::MOD_KEY_CTRL | GG::MOD_KEY_ALT | GG::MOD_KEY_META))
+            return true;
+        if (key >= GG::Key::GGK_F1 && key <= GG::Key::GGK_F12)
+            return true;
+        if (key >= GG::Key::GGK_F13 && key <= GG::Key::GGK_F24)
+            return true;
+        if (key == GG::Key::GGK_TAB || key == GG::Key::GGK_ESCAPE || key == GG::Key::GGK_NONE)
+            return true;
+        return false;
+    }
 }
 
 std::string Hotkey::PrettyPrint() const
-{ return PrettyPrint(m_key, m_mod_keys); }
+{ return ::PrettyPrint(m_key, m_mod_keys); }
 
 void Hotkey::ReadFromOptions(OptionsDB& db) {
-    for (auto& entry : hotkeys) {
-        Hotkey& hotkey = entry.second;
-
+    for (auto& [ignored, hotkey] : hotkeys) {
+        (void)ignored;
         std::string options_db_name = hotkey.m_name + ".hotkey";
         if (!db.OptionExists(options_db_name)) {
             ErrorLogger() << "Hotkey::ReadFromOptions : no option for " << options_db_name;
@@ -206,7 +225,7 @@ void Hotkey::ReadFromOptions(OptionsDB& db) {
         if (key_modkey_pair.first == GG::Key::GGK_NONE)
             continue;
 
-        if (!IsTypingSafe(key_modkey_pair.first, key_modkey_pair.second)) {
+        if (!::IsTypingSafe(key_modkey_pair.first, key_modkey_pair.second)) {
             DebugLogger() << "Hotkey::ReadFromOptions : Typing-unsafe key spec: '"
                           << option_string << "' for hotkey " << hotkey.m_name;
         }
@@ -232,9 +251,6 @@ Hotkey::Hotkey(const std::string& name, const std::string& description,
 const Hotkey& Hotkey::NamedHotkey(const std::string& name)
 { return PrivateNamedHotkey(name); }
 
-std::string Hotkey::GetDescription() const
-{ return m_description; }
-
 Hotkey& Hotkey::PrivateNamedHotkey(const std::string& name) {
     std::string error_msg = "Hotkey::PrivateNamedHotkey error: no hotkey named: " + name;
 
@@ -245,27 +261,8 @@ Hotkey& Hotkey::PrivateNamedHotkey(const std::string& name) {
     return i->second;
 }
 
-bool Hotkey::IsTypingSafe(GG::Key key, GG::Flags<GG::ModKey> mod) {
-    if (GG::Key::GGK_INSERT <= key && GG::Key::GGK_PAGEUP >= key)
-        return false;
-    if (GG::Key::GGK_END <= key && GG::Key::GGK_UP >= key)
-        return false;
-    if (mod & (GG::MOD_KEY_CTRL | GG::MOD_KEY_ALT | GG::MOD_KEY_META))
-        return true;
-    if (key >= GG::Key::GGK_F1 && key <= GG::Key::GGK_F12)
-        return true;
-    if (key >= GG::Key::GGK_F13 && key <= GG::Key::GGK_F24)
-        return true;
-    if (key == GG::Key::GGK_TAB || key == GG::Key::GGK_ESCAPE || key == GG::Key::GGK_NONE)
-        return true;
-    return false;
-}
-
-bool Hotkey::IsTypingSafe() const
-{ return IsTypingSafe(m_key, m_mod_keys); }
-
-bool Hotkey::IsDefault() const
-{ return m_key == m_key_default && m_mod_keys == m_mod_keys_default; }
+bool Hotkey::IsTypingSafe() const noexcept
+{ return ::IsTypingSafe(m_key, m_mod_keys); }
 
 void Hotkey::SetHotkey(const Hotkey& hotkey, GG::Key key, GG::Flags<GG::ModKey> mod) {
     Hotkey& hk = PrivateNamedHotkey(hotkey.m_name);
@@ -284,53 +281,6 @@ void Hotkey::ResetHotkey(const Hotkey& old_hotkey) {
 
 void Hotkey::ClearHotkey(const Hotkey& old_hotkey)
 { Hotkey::SetHotkey(old_hotkey, GG::Key::GGK_NONE, GG::Flags<GG::ModKey>()); }
-
-//////////////////////////////////////////////////////////////////////
-// InvisibleWindowCondition
-//////////////////////////////////////////////////////////////////////
-InvisibleWindowCondition::InvisibleWindowCondition(std::initializer_list<const GG::Wnd*> bl) :
-    m_blacklist(bl)
-{}
-
-bool InvisibleWindowCondition::operator()() const {
-    for (const auto& wnd : m_blacklist) {
-        if (wnd->Visible())
-            return false;
-    }
-    return true;
-}
-
-
-//////////////////////////////////////////////////////////////////////
-// OrCondition
-//////////////////////////////////////////////////////////////////////
-OrCondition::OrCondition(std::initializer_list<std::function<bool()>> conditions) :
-    m_conditions(conditions)
-{}
-
-bool OrCondition::operator()() const {
-    for (auto& cond : m_conditions) {
-        if (cond())
-            return true;
-    }
-    return false;
-}
-
-
-//////////////////////////////////////////////////////////////////////
-// AndCondition
-//////////////////////////////////////////////////////////////////////
-AndCondition::AndCondition(std::initializer_list<std::function<bool()>> conditions) :
-    m_conditions(conditions)
-{}
-
-bool AndCondition::operator()() const {
-    for (auto& cond : m_conditions) {
-        if (!cond())
-            return false;
-    }
-    return true;
-}
 
 
 //////////////////////////////////////////////////////////////////////
@@ -381,7 +331,7 @@ bool HotkeyManager::ProcessNamedShortcut(const std::string& name, GG::Key key,
                                          GG::Flags<GG::ModKey> mod)
 {
     // reject unsafe-for-typing key combinations while typing
-    if (GG::GUI::GetGUI()->FocusWndAcceptsTypingInput() && !Hotkey::IsTypingSafe(key, mod))
+    if (GG::GUI::GetGUI()->FocusWndAcceptsTypingInput() && !::IsTypingSafe(key, mod))
         return false;
 
     // First update the connection state according to the current status.

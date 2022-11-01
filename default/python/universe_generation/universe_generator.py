@@ -1,4 +1,4 @@
-from logging import error
+from logging import error, warning
 
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
@@ -163,6 +163,21 @@ def create_universe(psd_map):  # noqa: max-complexity
         for empire, psd, home_system in zip(psd_map.keys(), psd_map.values(), home_systems):
             if not setup_empire(empire, psd.empire_name, home_system, psd.starting_species, psd.player_name):
                 report_error("Python create_universe: couldn't set up empire for player %s" % psd.player_name)
+
+    diplomacy_symbols = {
+        "w": fo.diplomaticStatus.war,
+        "p": fo.diplomaticStatus.peace,
+        "a": fo.diplomaticStatus.allied,
+    }
+
+    try:
+        with open(fo.get_user_config_dir() + "/diplomacy.txt", "r") as f:
+            for line in f:
+                e1, e2, st = line.rsplit(":", 2)
+                fo.empire_set_diplomacy(int(e1), int(e2), diplomacy_symbols[st.strip()])
+    except IOError:
+        exctype, value = sys.exc_info()[:2]
+        warning("Read diplomacy: %s %s" % (exctype, value))       
 
     # assign names to all star systems and their planets
     # this needs to be done after all systems have been generated and empire home systems have been set, as

@@ -1,3 +1,9 @@
+freeorion (0.4.10.9999.fo0022+git20221101.6387e2eppa1~jammy) jammy; urgency=medium
+
+  * FO0022 game
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Tue, 01 Nov 2022 18:21:54 +0300
+
 freeorion (0.4.10.9999.fo0021+git20220830.000f16bppa2~jammy) jammy; urgency=medium
 
   * Change supply calculation.

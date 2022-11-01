@@ -147,10 +147,11 @@ namespace {
 
     auto ResearchedTechNames(const Empire& empire) -> std::set<std::string>
     {
-        std::set<std::string> retval;
-        for (const auto& entry : empire.ResearchedTechs())
-            retval.insert(entry.first);
-        return retval;
+        std::set<std::string> out;
+        const auto& rt = empire.ResearchedTechs();
+        std::transform(rt.begin(), rt.end(), std::inserter(out, out.end()),
+                       [](const auto& t) { return t.first; });
+        return out;
     }
 
     auto ViewSetToStringVec(const std::set<std::string_view>& in) -> std::vector<std::string>
@@ -318,7 +319,13 @@ namespace FreeOrionPython {
                                                         py::return_value_policy<py::return_by_value>()
                                                     ))
 
-            .add_property("availablePolicies",      make_function(&Empire::AvailablePolicies,               py::return_value_policy<py::copy_const_reference>()))
+            .add_property("availablePolicies",      make_function(
+                                                        +[](const Empire& e)
+                                                        {
+                                                            const auto& ap = e.AvailablePolicies();
+                                                            return std::set<std::string>(ap.begin(), ap.end());
+                                                        },
+                                                        py::return_value_policy<py::return_by_value>()))
 
             .def("policyAvailable",                 +[](const Empire& e, const std::string& policy) { return e.PolicyAvailable(policy); })
 

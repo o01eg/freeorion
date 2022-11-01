@@ -91,12 +91,19 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(int() * py::self_ns::self)
             .def(double() * py::self_ns::self)
             .def(py::self_ns::self - int())
+            .def(int() - py::self_ns::self)
             .def(py::self_ns::self + py::self_ns::self)
             .def(py::self_ns::self + int())
+            .def(double() + py::self_ns::self)
             .def(py::self_ns::self < py::self_ns::self)
+            .def(py::self_ns::self < int())
+            .def(py::self_ns::self > int())
             .def(py::self_ns::self >= py::self_ns::self)
             .def(py::self_ns::self == py::self_ns::self)
-            .def(py::self_ns::self == int());
+            .def(double() - py::self_ns::self)
+            .def(py::self_ns::self == int())
+            .def(py::self_ns::self != int())
+            .def(py::self_ns::self | py::self_ns::self);
         py::class_<value_ref_wrapper<double>>("ValueRefDouble", py::no_init)
             .def("__call__", &value_ref_wrapper<double>::call)
             .def(int() * py::self_ns::self)
@@ -107,6 +114,7 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(double() * py::self_ns::self)
             .def(py::self_ns::self / py::self_ns::self)
             .def(py::self_ns::self / int())
+            .def(py::self_ns::self / double())
             .def(py::self_ns::self + int())
             .def(py::self_ns::self + double())
             .def(py::self_ns::self + py::self_ns::self)
@@ -121,12 +129,22 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(py::self_ns::self <= py::self_ns::self)
             .def(py::self_ns::self >= int())
             .def(py::self_ns::self > py::self_ns::self)
+            .def(py::self_ns::self >= py::self_ns::self)
             .def(py::self_ns::self < py::self_ns::self)
-            .def(py::self_ns::pow(py::self_ns::self, double()));
+            .def(double() < py::self_ns::self)
+            .def(py::self_ns::self < double())
+            .def(py::self_ns::self != int())
+            .def(py::self_ns::pow(py::self_ns::self, double()))
+            .def(py::self_ns::pow(double(), py::self_ns::self))
+            .def(py::self_ns::pow(py::self_ns::self, py::self_ns::self))
+            .def(py::self_ns::self & py::self_ns::self);
         py::class_<value_ref_wrapper<std::string>>("ValueRefString", py::no_init);
         py::class_<condition_wrapper>("Condition", py::no_init)
             .def(py::self_ns::self & py::self_ns::self)
+            .def(py::self_ns::self & py::other<value_ref_wrapper<double>>())
+            .def(py::self_ns::self & py::other<value_ref_wrapper<int>>())
             .def(py::self_ns::self | py::self_ns::self)
+            .def(py::self_ns::self | py::other<value_ref_wrapper<int>>())
             .def(~py::self_ns::self);
         py::class_<effect_wrapper>("Effect", py::no_init);
         py::class_<effect_group_wrapper>("EffectsGroup", py::no_init);
@@ -135,14 +153,21 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
         py::class_<enum_wrapper<ResourceType>>("__ResourceType", py::no_init);
         py::class_<enum_wrapper< ::PlanetEnvironment>>("__PlanetEnvironment", py::no_init);
         py::class_<enum_wrapper<PlanetSize>>("__PlanetSize", py::no_init);
-        py::class_<enum_wrapper<PlanetType>>("__PlanetType", py::no_init);
+        py::class_<enum_wrapper<PlanetType>>("__PlanetType", py::no_init)
+            .def(py::self_ns::self == py::self_ns::self)
+            .def("__hash__", py::make_function(std::hash<enum_wrapper<PlanetType>>{},
+                py::default_call_policies(),
+                boost::mpl::vector<std::size_t, const enum_wrapper<PlanetType>&>()));
         py::class_<enum_wrapper< ::StarType>>("__StarType", py::no_init);
         py::class_<enum_wrapper<ValueRef::StatisticType>>("__StatisticType", py::no_init);
         py::class_<enum_wrapper<Condition::ContentType>>("__LocationContentType", py::no_init);
         py::class_<enum_wrapper<BuildType>>("__BuildType", py::no_init);
         py::class_<unlockable_item_wrapper>("UnlockableItem", py::no_init);
+        py::class_<FocusType>("__FocusType", py::no_init);
         auto py_variable_wrapper = py::class_<variable_wrapper>("__Variable", py::no_init)
-            .def(py::self_ns::self & py::other<condition_wrapper>());
+            .def(py::self_ns::self & py::other<value_ref_wrapper<double>>())
+            .def(py::self_ns::self & py::other<condition_wrapper>())
+            .def(~py::self_ns::self);
 
         for (const char* property : {"Owner",
                                      "SupplyingEmpire",
@@ -254,6 +279,8 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
         }
 
         py::implicitly_convertible<variable_wrapper, condition_wrapper>();
+        py::implicitly_convertible<value_ref_wrapper<double>, condition_wrapper>();
+        py::implicitly_convertible<value_ref_wrapper<int>, condition_wrapper>();
 
         m_meta_path = py::extract<py::list>(py::import("sys").attr("meta_path"));
         m_meta_path.append(boost::cref(*this));
@@ -296,12 +323,10 @@ bool PythonParser::ParseFileCommon(const boost::filesystem::path& path,
     }
 
     try {
-        m_current_globals = globals;
         py::exec(file_contents.c_str(), globals);
-        m_current_globals = boost::none;
     } catch (const boost::python::error_already_set&) {
-        m_current_globals = boost::none;
         m_python.HandleErrorAlreadySet();
+        ErrorLogger() << "Unable to parse data file " << filename;
         if (!m_python.IsPythonRunning()) {
             ErrorLogger() << "Python interpreter is no longer running.  Attempting to restart.";
             if (m_python.Initialize()) {
@@ -311,9 +336,6 @@ bool PythonParser::ParseFileCommon(const boost::filesystem::path& path,
             }
         }
         return false;
-    } catch (...) {
-        m_current_globals = boost::none;
-        throw;
     }
 
     return true;
@@ -375,17 +397,21 @@ py::object PythonParser::exec_module(py::object& module) {
             // store globals content in module namespace
             // it is required so functions in the same module will see each other
             // and still import will work
-            py::dict globals = m_current_globals ? (*m_current_globals) : py::dict();
-            py::stl_input_iterator<py::object> g_begin(globals.keys()), g_end;
-            for (auto it = g_begin; it != g_end; ++it) {
-                if (!m_dict.has_key(*it))
-                    m_dict[*it] = globals[*it];
-            }
-
+            DebugLogger() << "Executing module file " << module_path.string();
             try {
+#if PY_VERSION_HEX < 0x03080000
+                m_dict["__builtins__"] = boost::python::import("builtins");
+#endif
+                RegisterGlobalsEffects(m_dict);
+                RegisterGlobalsConditions(m_dict);
+                RegisterGlobalsValueRefs(m_dict, *this);
+                RegisterGlobalsSources(m_dict);
+                RegisterGlobalsEnums(m_dict);
+
                 py::exec(file_contents.c_str(), m_dict, m_dict);
             } catch (const boost::python::error_already_set&) {
                 m_python.HandleErrorAlreadySet();
+                ErrorLogger() << "Unable to parse module file " << module_path.string();
                 if (!m_python.IsPythonRunning()) {
                     ErrorLogger() << "Python interpreter is no longer running.  Attempting to restart.";
                     if (m_python.Initialize()) {
@@ -394,12 +420,12 @@ py::object PythonParser::exec_module(py::object& module) {
                         ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
                     }
                 }
-                throw import_error("Cannot execute module");
+                throw import_error("Cannot execute module " + fullname);
             }
 
             return py::object();
         } else {
-            throw import_error("Module not existed");
+            throw import_error("Module not existed " + fullname);
         }
     }
 }

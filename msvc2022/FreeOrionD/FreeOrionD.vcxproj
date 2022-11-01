@@ -120,6 +120,7 @@
       <ShowIncludes>false</ShowIncludes>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8</AdditionalOptions>
+      <DisableSpecificWarnings>4244; 4251; 4275</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -149,6 +150,7 @@
       <ForcedIncludeFiles>StdAfx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <ShowIncludes>false</ShowIncludes>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -233,7 +235,9 @@
     <ClCompile Include="..\..\server\SaveLoad.cpp" />
     <ClCompile Include="..\..\server\ServerApp.cpp" />
     <ClCompile Include="..\..\server\ServerFramework.cpp" />
-    <ClCompile Include="..\..\server\ServerFSM.cpp" />
+    <ClCompile Include="..\..\server\ServerFSM.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244; 4251; 4275; 4996</DisableSpecificWarnings>
+    </ClCompile>
     <ClCompile Include="..\..\server\ServerNetworking.cpp" />
     <ClCompile Include="..\..\server\ServerWrapper.cpp" />
     <ClCompile Include="..\..\server\UniverseGenerator.cpp" />

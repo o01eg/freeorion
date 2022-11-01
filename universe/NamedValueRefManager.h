@@ -8,8 +8,8 @@
 FO_COMMON_API const std::string& UserString(const std::string& str);
 
 namespace CheckSums {
-    FO_COMMON_API void CheckSumCombine(unsigned int& sum, const char* s);
-    FO_COMMON_API void CheckSumCombine(unsigned int& sum, const std::string& c);
+    FO_COMMON_API void CheckSumCombine(uint32_t& sum, const char* s);
+    FO_COMMON_API void CheckSumCombine(uint32_t& sum, const std::string& c);
 }
 
 class NamedValueRefManager;
@@ -78,7 +78,7 @@ struct FO_COMMON_API NamedRef final : public ValueRef<T>
         return ref ? ref->Description() : UserString("NAMED_REF_UNKNOWN");
     }
 
-    std::string Dump(uint8_t ntabs = 0) const override {
+    [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override {
         std::string retval = "Named";
         if constexpr (std::is_same<T, int>::value) {
             retval += "Integer";
@@ -100,20 +100,20 @@ struct FO_COMMON_API NamedRef final : public ValueRef<T>
 
     void SetTopLevelContent(const std::string& content_name) override;
 
-    const ValueRef<T>* GetValueRef() const {
+    [[nodiscard]] const ValueRef<T>* GetValueRef() const {
         TraceLogger() << "NamedRef<T>::GetValueRef() look for registered valueref for \"" << m_value_ref_name << '"';
         return ::GetValueRef<T>(m_value_ref_name, m_is_lookup_only);
     }
 
-    unsigned int GetCheckSum() const override {
-        unsigned int retval{0};
+    [[nodiscard]] uint32_t GetCheckSum() const override {
+        uint32_t retval{0};
         CheckSums::CheckSumCombine(retval, "ValueRef::NamedRef");
         CheckSums::CheckSumCombine(retval, m_value_ref_name);
         TraceLogger() << "GetCheckSum(NamedRef<T>): " << typeid(*this).name() << " retval: " << retval;
         return retval;
     }
 
-    std::unique_ptr<ValueRef<T>> Clone() const override
+    [[nodiscard]] std::unique_ptr<ValueRef<T>> Clone() const override
     { return std::make_unique<NamedRef<T>>(m_value_ref_name, m_is_lookup_only); }
 
 private:
@@ -235,7 +235,7 @@ public:
     //! and executions of the program and the function. Useful to verify that
     //! the parsed content is consistent without sending it all between
     //! clients and server.
-    auto GetCheckSum() const -> unsigned int;
+    auto GetCheckSum() const -> uint32_t;
 
     using NamedValueRefParseMap = std::map<std::string, std::unique_ptr<ValueRef::ValueRefBase>, std::less<>>;
     //! This sets the asynchronous parse, so we can block on that
@@ -272,8 +272,8 @@ private:
     V* GetValueRefImpl(const std::map<NamedValueRefManager::key_type, std::unique_ptr<V>, std::less<>>& registry,
                        std::string_view label, std::string_view name) const
     {
-        TraceLogger() << "NamedValueRefManager::GetValueRef look for registered (" << label << ") valueref for \"" << name << '"';
-        TraceLogger() << "Number of registered (" << label << ") ValueRefs: " << registry.size();
+        //TraceLogger() << "NamedValueRefManager::GetValueRef look for registered (" << label << ") valueref for \"" << name << '"';
+        //TraceLogger() << "Number of registered (" << label << ") ValueRefs: " << registry.size();
         const auto it = registry.find(name);
         if (it != registry.end())
             return it->second.get();

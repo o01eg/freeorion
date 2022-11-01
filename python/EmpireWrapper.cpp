@@ -147,10 +147,11 @@ namespace {
 
     auto ResearchedTechNames(const Empire& empire) -> std::set<std::string>
     {
-        std::set<std::string> retval;
-        for (const auto& entry : empire.ResearchedTechs())
-            retval.insert(entry.first);
-        return retval;
+        std::set<std::string> out;
+        const auto& rt = empire.ResearchedTechs();
+        std::transform(rt.begin(), rt.end(), std::inserter(out, out.end()),
+                       [](const auto& t) { return t.first; });
+        return out;
     }
 
     auto ViewSetToStringVec(const std::set<std::string_view>& in) -> std::vector<std::string>
@@ -203,11 +204,11 @@ namespace FreeOrionPython {
         py::to_python_converter<std::pair<int, int>, PairToTupleConverter<int, int>>();
         py::to_python_converter<std::pair<float, int>, PairToTupleConverter<float, int>>();
 
-        py::class_<std::map<std::pair<int, int>, int>>("PairIntInt_IntMap")
+        py::class_<std::map<std::pair<int, int>, int>>("IntIntPairIntMap")
             .def(py::map_indexing_suite<std::map<std::pair<int, int>, int>, true>())
         ;
 
-        py::class_<std::vector<std::pair<int, int>>>("IntPairVec")
+        py::class_<std::vector<std::pair<int, int>>>("IntIntPairVec")
             .def(py::vector_indexing_suite<std::vector<std::pair<int, int>>, true>())
         ;
 
@@ -228,11 +229,11 @@ namespace FreeOrionPython {
             .def(py::map_indexing_suite<std::map<int, std::string>, true>())
         ;
 
-        py::class_<std::map<std::string, std::map<int, std::string>>>("String_IntStringMap_Map")
+        py::class_<std::map<std::string, std::map<int, std::string>>>("StringIntStringMapMap")
             .def(py::map_indexing_suite<std::map<std::string, std::map<int, std::string>>, true>())
         ;
 
-        py::class_<std::map<int, float>>("IntFltMap")
+        py::class_<std::map<int, float>>("IntFloatMap")
             .def(py::map_indexing_suite<std::map<int, float>, true>())
         ;
 
@@ -240,7 +241,7 @@ namespace FreeOrionPython {
             .def(py::map_indexing_suite<std::map<int, float>, true>())
         ;
 
-        py::class_<std::map<std::set<int>, float>>("IntSetFltMap")
+        py::class_<std::map<std::set<int>, float>>("IntSetFloatMap")
             .def(py::map_indexing_suite<std::map<std::set<int>, float>, true>())
         ;
 
@@ -262,7 +263,7 @@ namespace FreeOrionPython {
             .add_property("totalShipsOwned",        make_function(&Empire::TotalShipsOwned,         py::return_value_policy<py::return_by_value>()))
             .def("shipDesignAvailable",             +[](const Empire& empire, int id) -> bool { return empire.ShipDesignAvailable(id, GetUniverse()); })
             .add_property("allShipDesigns",         make_function(&Empire::ShipDesigns,             py::return_value_policy<py::return_by_value>()))
-            .add_property("availableShipDesigns",   +[](const Empire& empire) -> std::set<int> { return empire.AvailableShipDesigns(GetUniverse()); })
+            .add_property("availableShipDesigns",   +[](const Empire& empire) -> std::set<int> { auto temp{empire.AvailableShipDesigns(GetUniverse())}; return {temp.begin(), temp.end()}; })
 
 
             .add_property("availableShipParts",     make_function(&Empire::AvailableShipParts,      py::return_value_policy<py::copy_const_reference>()))
@@ -318,7 +319,13 @@ namespace FreeOrionPython {
                                                         py::return_value_policy<py::return_by_value>()
                                                     ))
 
-            .add_property("availablePolicies",      make_function(&Empire::AvailablePolicies,               py::return_value_policy<py::copy_const_reference>()))
+            .add_property("availablePolicies",      make_function(
+                                                        +[](const Empire& e)
+                                                        {
+                                                            const auto& ap = e.AvailablePolicies();
+                                                            return std::set<std::string>(ap.begin(), ap.end());
+                                                        },
+                                                        py::return_value_policy<py::return_by_value>()))
 
             .def("policyAvailable",                 +[](const Empire& e, const std::string& policy) { return e.PolicyAvailable(policy); })
 

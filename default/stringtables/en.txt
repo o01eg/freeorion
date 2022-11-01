@@ -1273,7 +1273,7 @@ RULE_BASIC_VIS_SYSTEM_INFO_SHOWN
 Basic System Info Visible
 
 RULE_BASIC_VIS_SYSTEM_INFO_SHOWN_DESC
-'''<u>If On</u>: Systems that are detected by an empire at only basic visibility have their name and star type revealed to that empire.
+'''<u>If On</u>: Systems that are detected by an empire at only basic visibility have their name and star type revealed to that empire. Causes a UI issue where it is difficult to tell if starlanes of a system are known.
 
 <u>If Off</u>: Basic level visible systems that have never been detected at higher visiblity have unknown name and star type.'''
 
@@ -6347,9 +6347,32 @@ METER_HAPPINESS_VALUE_LABEL
 Stability
 
 METER_HAPPINESS_VALUE_DESC
-'''The Stability of a colony's population starts out between 1 and 5 after initial colonization depending on how suitable the planet's [[encyclopedia ENVIRONMENT_TITLE]] is for that species. Stability is reduced to 0 after invasion and may also be affected by other factors. A minimum Stability of 5 is necessary for a colony to act as a source of settlers for colonizing other planets. Also [[metertype METER_INDUSTRY]] and [[metertype METER_RESEARCH]] only start growing if Stability is at least 5.
+'''The Stability of a colony's population starts out between 1 and 5 after initial colonization depending on how suitable the planet's [[encyclopedia ENVIRONMENT_TITLE]] is for that species. Stability is reduced to 0 after invasion and may also be affected by other factors. A minimum Stability of 5 is necessary for a colony to act as a source of settlers for colonizing other planets. Also [[metertype METER_INDUSTRY]] and [[metertype METER_RESEARCH]] grows slowly if Stability is below 5.
 
-The Target Stability is the stable Stability level a planet's population will approach, given the current factors influencing the planetary Stability. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, and various other game effects. If these factors change, then the Target Stability value is likely to shift.'''
+The Target Stability is the stable Stability level a planet's population will approach, given the current factors influencing the planetary Stability. Its value is connected to [[encyclopedia ENC_BUILDING_TYPE]]s built on the planet, [[encyclopedia ENC_TECH]] researched by the empire, [[encyclopedia ENC_SPECIAL]]s linked to the planet, and various other game effects. If these factors change, then the Target Stability value is likely to shift.
+
+Common stability modifiers:
+[[STABILITY_MODIFIERS]]
+'''
+
+STABILITY_MODIFIERS
+'''• -/+ 5 Capital Supply Connection - Based on distance in jumps from Capital or Regional Administration Building. Does not affect [[encyclopedia INDEPENDENT_SPECIES_TRAIT_TEXT]] species and empires that have adopted [[policy PLC_CONFEDERATION]] policy.
+• +5 Homeworld Species - species on their own homeworld are more stable
+• +5 Capital Species - Colonies with the same species as the capital are more stable. Does not apply on the Capital itself.
+• +10 Capital - Colony contains [[buildingtype BLD_IMPERIAL_PALACE]].
+• Environment - Bonus or Penalty based on environmental preference of species. Set at gamestart in game rules via the MISC: Stability tab.
+• Planet Size - Bonus or Penalty based on planet size. Set at gamestart in game rules via the MISC: Stability tab.
+• +1 Artisan Appreciation - 2 or more Artistic Species in same system.
+• -2/+2 Liked/Disliked Focus - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• -2/+2 Liked/Disliked Policies -  - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• Liked/Disliked Buildings (On Planet) - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• Liked/Disliked Buildings (In-system) - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• Liked/Disliked Buildings (Off-system) - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• Liked/Disliked Specials (On Planet) - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• Liked/Disliked Specials (In-system) - Modified by policies: [[policy PLC_LIBERTY]] and [[policy PLC_CONFORMANCE]].
+• Specials - Examples include [[special GAIA_SPECIAL]] and [[special WORLDTREE_SPECIAL]].
+• Policies
+• Species Traits'''
 
 METER_CAPACITY_VALUE_LABEL
 Stat - Primary
@@ -6368,7 +6391,9 @@ METER_FUEL_VALUE_LABEL
 Fuel
 
 METER_FUEL_VALUE_DESC
-'''Fuel allows ships to travel the starlanes outside of [[metertype METER_SUPPLY]] of their empire. Fuel is consumed for each starlane traversed outside of supply; stopping within [[metertype METER_SUPPLY]] lines will fully refuel a ship. If a ship remains stationary beyond friendly [[metertype METER_SUPPLY]] lines, fuel will slowly regenerate.
+'''Fuel allows ships to travel the starlanes outside of [[metertype METER_SUPPLY]] of their empire. 1 fuel is consumed for each starlane traversed outside of supply and passing through [[metertype METER_SUPPLY]] lines will fully refuel a ship. Fuel is deducted on entering the starlane and entering a starlane from within supply does not cost fuel.
+
+If a ship remains stationary beyond friendly [[metertype METER_SUPPLY]] lines, fuel will regenerate at a rate of 0.1 each turn. This can be modified by hull type such as living hulls, parts such as the [[shippart FU_RAMSCOOP]] or pilot species such as [[species SP_LAENFA]] and [[species SP_SLY]].
 
 The effective amount of fuel a <encyclopedia ENC_SHIP_DESIGN>Ship Design</encyclopedia> depends on the base fuel of the hull and additional fuel effects scaled by the [[encyclopedia FUEL_EFFICIENCY_TITLE]] of the [[encyclopedia ENC_SHIP_HULL]]. Fuel efficiency changes the effective capacity of fuel [[encyclopedia ENC_SHIP_PART]]s and will multiply any other fuel-modifying effects.
 
@@ -6411,7 +6436,18 @@ A set of core supply starlanes for an empire (the set of least-jump starlanes co
 
 Supply lines can also be used to refill the [[metertype METER_FUEL]] supply of ships.
 
-Supply lines will be obstructed by armed enemy ships belonging to empires with which an empire is at [[encyclopedia WAR_TITLE]]. At the opposite end of the spectrum, empires in an [[encyclopedia ALLIANCE_TITLE]] will share supply lines and all their associated benefits.'''
+Empires in an [[encyclopedia ALLIANCE_TITLE]] use each other's supply lines.
+The extension of supply lines from source planets into a system can be obstructed by armed enemy ships that are in that system and that are in fleets set to [[FLEET_OBSTRUCTIVE]] or [[FLEET_AGGRESSIVE]]. Enemy ships are those owned by empires that are at [[encyclopedia WAR_TITLE]] with the supply line's empire and neutral / monster ships.
+
+If multiple empires compete for supply in a system (without any obstructions to either's supply propagation), the empire with the highested propagated supply range will supply that system. To break ties, a bonus per empire is calculated and added to the propagated supply before comparison.
+
+• Has a colony in the system: +0.5
+• Has an outpost (but no colony) in the system: +0.3
+* Has supply sources in the system: +(0.001 * SUM(own supply in the system))
+* Distance to the source of supply that reaches the system and that, before propagation, is the strongest. That is, a 4 strength source 4 jumps away is stronger than a 3 strength source 3 jumps away: +(0.0001 * distance to maximum supplying system)
+* Has supply sources in the system: +(0.00001 * SUM(own max supply in the system))
+* Total supply: +(0.00000001 * SUM(own supply in the empire))
+If there is still a tie, and all the tied empires are allied, one of the allied empires is randomly chosen. If at least one non-allied empire ties, no empire wins and the system will not be part of any supply group.'''
 
 METER_STOCKPILE_VALUE_LABEL
 Stockpile Distribution
@@ -6451,7 +6487,11 @@ Stealth
 METER_STEALTH_VALUE_DESC
 '''The term Stealth represents the ability of an object to dodge all kinds of sensors. Only empires with a [[encyclopedia DETECTION_TITLE]] higher than or equal to the Stealth value can see the object.
 
-Space ships, buildings, specials, systems and planets have a Stealth meter.'''
+If an empire owns more than [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] in a system, that empire will suffer a stealth penalty of [[value FLEET_UNSTEALTH_SHIPS_SCALING]] multiplied by the square root of the number of excess ships.
+
+Space ships, buildings, specials, systems and planets have a Stealth meter.
+
+[[DETECTION_STAR_MODIFIERS]]'''
 
 METER_DETECTION_VALUE_LABEL
 Detection Range
@@ -6461,7 +6501,20 @@ METER_DETECTION_VALUE_DESC
 
 Space ships and planets have a Detection Range meter. There is the option to display Detection Range circles (in uu) in the Galaxy Map section of the Options menu. To facilitate predictions of what would be within a Detection Range, there are also options to display a standard 'Map Scale Line' as well as a 'Map Scale Circle' centered on the currently selected system and indicating the same distance as the Map Scale Line. They are both responsive to the the map zoom level and can be toggled via hotkeys.
 
-Some objects or abilities may allow vision of certain areas outside of this range. Some examples are from species abilities of [[species SP_TRITH]] or [[species SP_GEORGE]], or from the effects from a [[buildingtype BLD_SCRYING_SPHERE]].'''
+Some content may allow vision outside of this range. This includes the species abilities of [[species SP_FULVER]], [[species SP_GEORGE]], [[SP_NIGHTSIDERS]] or [[species SP_TRITH]], the [[buildingtype BLD_SCRYING_SPHERE]], or finding a map in a derelict scout when exploring new systems.
+
+[[DETECTION_STAR_MODIFIERS]]'''
+
+DETECTION_STAR_MODIFIERS
+'''Detection Range and Ship Stealth are modified by the systems star type:
+• No Star: +10 Detection Range. -10 Ship Stealth.
+• Neutron Star: -15 Detection Range. +5 Ship Stealth.
+• Black Hole: +5 Detection Range. +10 Ship Stealth.
+• Red Star: -5 Ship Stealth.
+• Orange Star: No Modifiers.
+• Yellow Star: -5 Detection Range.
+• White Star: -10 Detection Range.
+• Blue Star: -15 Detection Range.'''
 
 METER_SPEED_VALUE_LABEL
 Speed
@@ -6612,7 +6665,7 @@ DETECTION_TITLE
 Detection Strength
 
 DETECTION_TEXT
-'''The term Detection Strength represents the technological level of an empire's sensors. An empire can only see objects that have a [[metertype METER_STEALTH]] value lower than or equal to its Detection Strength and are within [[metertype METER_DETECTION]] of a controlled space ship or planet.
+'''The term Detection Strength represents the technological level of an empire's sensors. An empire can only see objects that have a [[metertype METER_STEALTH]] value lower than or equal to its Detection Strength and are within [[metertype METER_DETECTION]] of a controlled space ship or planet. Unowned monsters and natives have a detection strength equal to their detection range.
 
 Empires have a Detection Strength meter.'''
 
@@ -6694,7 +6747,14 @@ XENOPHOBIC_SPECIES_TITLE
 Xenophobic
 
 XENOPHOBIC_SPECIES_TEXT
-'''Xenophobic species will automatically divert some of their industrial efforts into harassing other species that are nearby. The affected nearby species will suffer an industrial penalty due to this harassment. A Xenophobic species of [[encyclopedia SELF_SUSTAINING_SPECIES_TITLE]] will also find the presence of alien species nearby to be disruptive to its natural balances (whether due to some direct effect or simply due to wasted energies being applied to harassing the alien species, has not been determined) resulting in a reduced [[metertype METER_TARGET_POPULATION]].
+'''Xenophobic species get upset by the nearby pressence of other intelligent species, and will divert some of their efforts into harassing them, reducing both species' [[metertype METER_TARGET_HAPPINESS]] dependent on the distance between their planets. At a distance of [[value XENOPHOBIC_MAX_JUMPS]] jumps, the penalty is [[value XENOPHOBIC_TARGET_STABILITY_PERJUMP]], and grows by that amount per starlane jump closer. The penalty is cumulative for each offending planet nearby:
+• 4 jumps: -0.5 stability
+• 3 jumps: -1.0 stability
+• 2 jumps: -1.5 stability
+• 1 jumps: -2.0 stability
+• In same system: -2.5 stability
+
+A Xenophobic species of [[encyclopedia SELF_SUSTAINING_SPECIES_TITLE]] will also find the presence of alien species nearby to be disruptive to its natural balances, reducing the xenophobic species' [[metertype METER_TARGET_POPULATION]].
 
 Xenophobic species start with [[tech CON_CONC_CAMP]].
 
@@ -6708,6 +6768,14 @@ ARTISTIC_SPECIES_TRAIT_TEXT
 
 List of Artistic species:'''
 
+INDEPENDENT_SPECIES_TITLE
+Independent Trait
+
+INDEPENDENT_SPECIES_TRAIT_TEXT
+'''Independent species' stability is unaffected by modifiers based on distance from capitals or regional administration.
+
+List of Independent species:'''
+
 SNEAKY_TITLE
 Sneaky
 
@@ -6715,6 +6783,14 @@ SNEAKY_TEXT
 '''Sneaky species research [[tech SPY_STEALTH_1]], [[tech SPY_STEALTH_2]], [[tech SPY_STEALTH_3]] and [[tech SPY_STEALTH_4]] at reduced costs.
 
 List of Sneaky species:'''
+
+ADAPTIVE_TITLE
+Adaptive
+
+ADAPTIVE_TEXT
+'''Adaptive species research [[tech GRO_SYMBIOTIC_BIO]], [[tech GRO_XENO_GENETICS]] and [[tech GRO_XENO_HYBRIDS]] at reduced costs.
+
+List of Adaptive species:'''
 
 FLEET_UPKEEP_TITLE
 Fleet Upkeep
@@ -8251,7 +8327,7 @@ BEGINNER_HINT_12
 12: Be on the lookout for planets with [[encyclopedia ENC_SPECIAL]]s, they usually indicate some special resource on that planet that may benefit your entire empire if utilized properly. Right click on a special's icon to access its 'Pedia entry and find out more!
 
 BEGINNER_HINT_13
-13: Only [[species SP_EXOBOT]] can settle asteroid belts. If you find a lot of asteroids belts nearby you might want to research how to build them sooner rather than later!
+13: Unlike most species, [[species SP_EXOBOT]] can settle asteroid belts. If there are many asteroids belts nearby, consider researching to unlock them!
 
 BEGINNER_HINT_14
 14: Research [[metertype METER_SUPPLY]] improvements, like the [[tech CON_ORBITAL_CON]], to increase the distance from your systems that your supply lines reach.
@@ -9573,7 +9649,7 @@ FORTRESS_SPECIAL
 Fortress
 
 FORTRESS_SPECIAL_DESC
-'''Increases [[metertype METER_SHIELD]] by +800, [[metertype METER_DEFENSE]] by +180, [[metertype METER_TROOPS]] by +30 and [[metertype METER_DETECTION]] by +30. Shields will be regenerated by 40 per turn and Defense by 6 per turn. Mines will reduce the [[metertype METER_STRUCTURE]] of enemy ships in the system by 24 per turn. Every turn there is a 5% chance of a Sentry being spawned to protect the system, unless one is already present.
+'''Increases [[metertype METER_SHIELD]] by +[[value FORTRESS_SPECIAL_SHIELD_BONUS]], [[metertype METER_DEFENSE]] by +[[value FORTRESS_SPECIAL_DEFENSE_BONUS]], [[metertype METER_TROOPS]] by +[[value FORTRESS_SPECIAL_TROOPS_BONUS]] and [[metertype METER_DETECTION]] by +[[value FORTRESS_SPECIAL_DETECTION_BONUS]]. Shields will be regenerated by 40 per turn and Defense by [[value FORTRESS_SPECIAL_DEFENSE_REGEN]] per turn. Mines will reduce the [[metertype METER_STRUCTURE]] of enemy ships in the system by 24 per turn. Every turn there is a 5% chance of a Sentry being spawned to protect the system, unless one is already present.
 
 This planet has been prepared for defense by one of the ancient Precursor civilizations. It's brimming with planetary shields, weaponry and sensory equipment to withstand any kind of siege. Everything is still fully functional and surprisingly user friendly.'''
 
@@ -9712,6 +9788,18 @@ Psychic Fatigue
 
 CONC_CAMP_SLAVE_SPECIAL_DESC
 There may no longer be [[buildingtype BLD_CONC_CAMP]] operating on this planet today, but memories are still close to the surface, and remnants such as poorly hidden mass graves are still occasionally found. A psychic wound still lies upon the populace, and they do not thrive.
+
+RACIAL_PURITY_SENTINEL_SPECIAL
+Racial Purity
+
+RACIAL_PURITY_SENTINEL_SPECIAL_DESC
+This empire applies the [[policy PLC_RACIAL_PURITY]] policy.
+
+RACIAL_PURITY_REMNANT_SPECIAL
+Racial Resentment
+
+RACIAL_PURITY_REMNANT_SPECIAL_DESC
+This empire recently de-adopted the [[policy PLC_RACIAL_PURITY]] policy and memories of its adoption linger in the populace. Its toll on [[metertype METER_HAPPINESS]] on the planets of the empire will fade over time.
 
 CLOUD_COVER_MASTER_SPECIAL
 Cloud Spawns
@@ -10542,7 +10630,7 @@ Stealth
 PC_STEALTH_DESC
 '''Stealth parts increase the [[metertype METER_STEALTH]] of a ship. The effects from these parts do not complement each other, only the highest rated part will affect the ship.
 
-If combat occurs in a system, ships that are invisible to an enemy are not targetted by the enemy's weapons. If the ship attacks, it may become visible for the following rounds.
+If combat occurs in a system, ships that are invisible to an enemy are not targetted by the enemy's weapons. If the ship attacks, it may become visible for the following combat rounds.
 
 See also: [[metertype METER_DETECTION]], [[encyclopedia DETECTION_TITLE]]'''
 
@@ -12025,7 +12113,7 @@ The effect requires a stability of [[value PLC_CENTRALIZATION_MIN_STABILITY]].
 However, it also reduces [[metertype METER_SUPPLY]] range ([[value PLC_CENTRALIZATION_MAX_SUPPLY_FLAT]]) and [[metertype METER_STOCKPILE]] ([[value PLC_CENTRALIZATION_MAX_STOCKPILE_FLAT]]), and increases the [[metertype METER_INFLUENCE]] cost of the empire's colonies:
 • [[metertype METER_SUPPLY]] connected colonies get a penalization of [[value PLC_CENTRALIZATION_TARGET_INFLUENCE_PERJUMP]] per jump distance to the capital, capped at [[value PLC_CENTRALIZATION_TARGET_INFLUENCE_MAX]].
 • Colonies not [[metertype METER_SUPPLY]] connected to the capital gets the maximum penalization ([[value PLC_CENTRALIZATION_TARGET_INFLUENCE_MAX]]).
-Additionally, the cost of colonization ship parts is increased by 50%.
+Additionally, the cost of colonization ship parts is increased by 33%.
 
 Logistics of the whole empire are focused into boosting the capital's production, by diverting there most of the social and material resources. This causes some resentment in the colonies, which increases [[metertype METER_INFLUENCE]] costs.'''
 
@@ -12055,7 +12143,8 @@ PLC_COLONIZATION
 Colonization
 
 PLC_COLONIZATION_DESC
-Decreases cost of colonization ship parts and give ships with colony parts but no weapons, troops, bombard, or general parts +1 base fuel capacity.
+'''• Decreases cost of colonization ship parts, outpost ship parts and colonization buildings by 33%.
+• Gives ships with colony parts but no weapons, troops, bombard, or general parts +1 base fuel capacity.'''
 
 PLC_COLONIZATION_SHORT_DESC
 Discounts Colonization
@@ -12075,7 +12164,7 @@ PLC_EXPLORATION
 Exploration
 
 PLC_EXPLORATION_DESC
-'''• Increases speed of ships with no weapons, fighters, shields, armour, troops, colony pods, bombardment, research, industry, influence, production, or general parts. Detection, fuel, and engine parts are allowed.
+'''• Increases speed of ships with no weapons, fighters, shields, armour, troops, colony pods, bombardment, research, industry, influence, production, or general parts by [[value PLC_EXPLORATION_SPEED_BONUS]] uu. Detection, fuel, and engine parts are allowed.
 • Every turn a system is newly explored, the ships in that system generate a total of [[value EXPLORATION_RESEARCH_BONUS_TOTAL]] RP.'''
 
 PLC_EXPLORATION_SHORT_DESC
@@ -12143,11 +12232,10 @@ PLC_ENVIRONMENTALISM
 Environmentalism
 
 PLC_ENVIRONMENTALISM_DESC
-'''Decreases industry and construction of all owned planets. Penalizes further construction, stability, and influence on terraformed planets.
-
-Boosts research, stability, influence, and stealth on non-terraformed populated planets.
-
-Makes terraforming more expensive.'''
+'''• Decreases [[metertype METER_CONSTRUCTION]] by [[value PLC_ENVIRONMENTALISM_TARGET_CONSTRUCTION_TERRAFORMED_FLAT]], [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_ENVIRONMENTALISM_TARGET_HAPPINESS_FLAT]] and [[metertype METER_TARGET_INFLUENCE]] by [[value PLC_ENVIRONMENTALISM_TARGET_INFLUENCE_FLAT]] on planets that have been terraformed, or otherwise changed from their original environment.
+• Decreases [[metertype METER_TARGET_INDUSTRY]] by [[value PLC_ENVIRONMENTALISM_TARGET_INDUSTRY_FLAT]] and [[metertype METER_CONSTRUCTION]] by [[value PLC_ENVIRONMENTALISM_TARGET_CONSTRUCTION_FLAT]] on non-asteroids.
+• Boosts [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_ENVIRONMENTALISM_TARGET_HAPPINESS_ORIGINAL_FLAT]], [[metertype METER_TARGET_INFLUENCE]] by [[value PLC_ENVIRONMENTALISM_TARGET_INFLUENCE_ORIGINAL_FLAT]], [[metertype METER_TARGET_RESEARCH]] by [[value PLC_ENVIRONMENTALISM_TARGET_RESEARCH_ORIGINAL_FLAT]] and [[metertype METER_STEALTH]] by [[value PLC_ENVIRONMENTALISM_STEALTH_ORIGINAL_FLAT]] on planets that are not asteroids or gas giants, have not been terraformed, contain no buildings and are not industry-focused.
+• Makes terraforming a planet 3x as expensive.'''
 
 PLC_ENVIRONMENTALISM_SHORT_DESC
 Bonuses for not terraforming
@@ -12172,7 +12260,7 @@ PLC_INDUSTRIALISM_DESC
 '''Industry-focused planets get a boost to [[metertype METER_TARGET_INDUSTRY]] of [[value PLC_INDUSTRIALISM_TARGET_INDUSTRY_PERCENT]]% and a bonus of [[value PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT]] to [[metertype METER_HAPPINESS]].
 The production bonus requires a stability of [[value PLC_INDUSTRIALISM_MIN_STABILITY]].
 
-Makes production-boosting power generation techs cheaper to research: [[tech PRO_ORBITAL_GEN]] [[tech PRO_SOL_ORB_GEN]] [[tech PRO_FUSION_GEN]] [[tech PRO_SINGULAR_GEN]] [[tech PRO_ZERO_GEN]]'''
+Makes production-boosting power generation techs cheaper to research: [[tech PRO_ORBITAL_GEN]], [[tech PRO_SOL_ORB_GEN]], [[tech PRO_FUSION_GEN]], [[tech PRO_SINGULAR_GEN]], [[tech PRO_ZERO_GEN]]'''
 
 PLC_INDUSTRIALISM_SHORT_DESC
 Improves industry output
@@ -12191,9 +12279,11 @@ PLC_CHECKPOINTS
 Border Checkpoints
 
 PLC_CHECKPOINTS_DESC
-'''Increases imperial detection strength by 1 per turn up to [[value PLC_CHECKPOINTS_DETECTION_STRENGTH_MAX]].
+'''Decreases [[metertype METER_STEALTH]] of foreign ships and planets in [[metertype METER_SUPPLY]] by up to [[value PLC_CHECKPOINTS_MAX_STEALTH_MALUS]]. Ships and planets are considered foreign if not owned by or allied to this empire. Unowned planets and monsters are also foreign.
 
-Reduces imperial [[metertype METER_SUPPLY]] line range ([[value PLC_CHECKPOINTS_MAX_SUPPLY_FLAT]]) and [[metertype METER_INFLUENCE]] generation ([[value PLC_CHECKPOINTS_TARGET_INFLUENCE_FLAT]]).'''
+The decrease depends on the time this policy is adopted, decreasing [[metertype METER_STEALTH]] by 1 per turn up to [[value PLC_CHECKPOINTS_MAX_STEALTH_MALUS]].
+
+Reduces [[metertype METER_INFLUENCE]] generation ([[value PLC_CHECKPOINTS_TARGET_INFLUENCE_FLAT]]).'''
 
 PLC_CHECKPOINTS_SHORT_DESC
 Improves Detection / Hinders Supply
@@ -12225,7 +12315,7 @@ Exobot Productivity
 PLC_EXOBOT_PRODUCTIVITY_DESC
 '''Increases effective exobot production output on industry-focused worlds from very bad to just bad.
 
-Decreases the stability and production output of non-exobot populated planets in the empire by [[value PLC_EXOBOT_OTHER_PLANET_INDUSTRY_PENALTY]].'''
+Decreases the stability and production output of non-exobot populated planets set to industry focus by [[value PLC_EXOBOT_OTHER_PLANET_INDUSTRY_PENALTY]].'''
 
 PLC_EXOBOT_PRODUCTIVITY_SHORT_DESC
 Boosts exobot production
@@ -12248,13 +12338,19 @@ PLC_RACIAL_PURITY
 Racial Purity
 
 PLC_RACIAL_PURITY_DESC
-'''Provides benefits for single-species empires, but penalizes species other than that on the capital planet.
+'''The species on the empire capital planet asserts dominance over all other species in the empire. This provides benefits for single-species empires, especially if they are [[encyclopedia XENOPHOBIC_SPECIES_TITLE]], but penalizes any other species.
 
-Planets with species different from the capital's species have various penalities applied:
-• Reduces [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_RACIAL_PURITY_TARGET_HAPPINESS_FLAT]]
-• Reduces [[metertype METER_TARGET_INFLUENCE]] by [[value PLC_RACIAL_PURITY_TARGET_HAPPINESS_FLAT]]
-• Reduces [[metertype METER_TARGET_RESEARCH]] by [[value PLC_RACIAL_PURITY_TARGET_RESEARCH_PERPOP]] per [[metertype METER_POPULATION]]
-• Reduces [[metertype METER_TARGET_INDUSTRY]] by [[value PLC_RACIAL_PURITY_TARGET_INDUSTRY_PERPOP]] per [[metertype METER_POPULATION]]
+Planets with the capital's species have various bonuses applied:
+• Increases [[metertype METER_TARGET_HAPPINESS]] over time. The bonus grows by [[value PLC_RACIAL_PURITY_STABILITY_PER_TURN]] per turn after adopting the policy, up to a maximum of [[value PLC_RACIAL_PURITY_TARGET_STABILITY_SELF]].
+• Increases [[metertype METER_TARGET_INFLUENCE]] of influence-focused planets by [[value PLC_RACIAL_PURITY_TARGET_INFLUENCE_SELF]].
+• If the capital species is xenophobic, removes the xenophobic harassment and frenzy between that species and the rest of owned planets.
+
+Planets with species different from [[species SP_EXOBOT]] or the capital's species have various penalities applied:
+• Reduces [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_RACIAL_PURITY_TARGET_STABILITY_OTHER]]
+• Reduces [[metertype METER_TARGET_INFLUENCE]] by [[value PLC_RACIAL_PURITY_TARGET_INFLUENCE_OTHER]]
+• Disables [[encyclopedia INFLUENCE_FOCUS_TITLE]] and [[encyclopedia RESEARCH_FOCUS_TITLE]]
+
+Oppression also allows the empire to force other species to work harder, increasing their [[metertype METER_TARGET_INDUSTRY]] by [[value PLC_RACIAL_PURITY_TARGET_INDUSTRY_OTHER]] per [[metertype METER_POPULATION]].
 
 Allows [[buildingtype BLD_CONC_CAMP]] to be produced.'''
 
@@ -12313,7 +12409,7 @@ PLC_THE_HUNT
 The Hunt
 
 PLC_THE_HUNT_DESC
-Boosts [[metertype METER_TARGET_HAPPINESS]], [[metertype METER_TARGET_INFLUENCE]], and [[metertype METER_MAX_TROOPS]] of planets in systems that also contain an unowned populated planet, with no [[metertype METER_SHIELD]] or [[metertype METER_DEFENSE]], and with a species other than the species on the benefiting planet or on the the imperial capital.
+Boosts [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_THE_HUNT_HAPPINESS_FLAT]], [[metertype METER_TARGET_INFLUENCE]] by [[value PLC_THE_HUNT_INFLUENCE_FLAT]], and [[metertype METER_MAX_TROOPS]] by [[value PLC_THE_HUNT_TROOPS_MAX_FLAT]] on planets in systems that also contain an unowned populated planet, with no [[metertype METER_SHIELD]] or [[metertype METER_DEFENSE]], and with a species other than the species on the benefiting planet or on the the imperial capital.
 
 PLC_THE_HUNT_SHORT_DESC
 Hunting Natives Gives Boosts
@@ -12792,7 +12888,7 @@ LRN_FORCE_FIELD
 Force-Field Harmonics
 
 LRN_FORCE_FIELD_DESC
-'''Increases max [[metertype METER_SHIELD]] on all planets by 80 and unlocks basic ship shielding technology. [[metertype METER_SHIELD]] are generally much more expensive than armor, due to the technology needed to produce shielding fields, but shields provide a far stronger defense than [[encyclopedia ARMOR_TITLE]]. However, there can only be one active shield generator on a ship, so shield parts do not stack.
+'''Increases max [[metertype METER_SHIELD]] on all planets by [[value LRN_FORCE_FIELD_MAX_SHIELD_FLAT]] and unlocks basic ship shielding technology. [[metertype METER_SHIELD]] are generally much more expensive than armor, due to the technology needed to produce shielding fields, but shields provide a far stronger defense than [[encyclopedia ARMOR_TITLE]]. However, there can only be one active shield generator on a ship, so shield parts do not stack.
 
 Like Fourier analysis of sound, electromagnetism, strong and weak forces may be expressed as harmonic quantum standing-wave superpositions of force-carrier particles. By selectively amplifying these harmonics, forces may be arbitrarily controlled to shield, attack, contain or support.'''
 
@@ -13775,31 +13871,31 @@ DEF_PLAN_BARRIER_SHLD_1
 Planetary Barrier Shield 1
 
 DEF_PLAN_BARRIER_SHLD_1_DESC
-Increases max [[metertype METER_SHIELD]] on planets by 240, cumulative with [[tech LRN_FORCE_FIELD]], and regenerates each turn by 8 plus the greater of (i) 2 times the value of the planets' [[metertype METER_CONSTRUCTION]] or (ii) 8 (so long as the shields are not already knocked to zero).
+Increases max [[metertype METER_SHIELD]] on planets by [[value DEF_PLAN_BARRIER_SHLD_1_MAX_SHIELD_FLAT]], cumulative with [[tech LRN_FORCE_FIELD]], and regenerates each turn by 8 plus the greater of (i) 2 times the value of the planets' [[metertype METER_CONSTRUCTION]] or (ii) 8 (so long as the shields are not already knocked to zero).
 
 DEF_PLAN_BARRIER_SHLD_2
 Planetary Barrier Shield 2
 
 DEF_PLAN_BARRIER_SHLD_2_DESC
-Increases max [[metertype METER_SHIELD]] on planets by 480, cumulative with other shield boosts, and regenerates each turn by 8 plus the greater of (i) 8 times the value of the planets' [[metertype METER_CONSTRUCTION]] or (ii) 32 (so long as the shields are not already knocked below 24).
+Increases max [[metertype METER_SHIELD]] on planets by [[value DEF_PLAN_BARRIER_SHLD_2_MAX_SHIELD_FLAT]], cumulative with other shield boosts, and regenerates each turn by 8 plus the greater of (i) 8 times the value of the planets' [[metertype METER_CONSTRUCTION]] or (ii) 32 (so long as the shields are not already knocked below 24).
 
 DEF_PLAN_BARRIER_SHLD_3
 Planetary Barrier Shield 3
 
 DEF_PLAN_BARRIER_SHLD_3_DESC
-Increases max [[metertype METER_SHIELD]] on planets by 720, cumulative with other shield boosts, and regenerates each turn by 8 plus the greater of (i) 16 times the value of the planets' [[metertype METER_CONSTRUCTION]] or (ii) 72 (so long as the shields are not already knocked below 40).
+Increases max [[metertype METER_SHIELD]] on planets by [[value DEF_PLAN_BARRIER_SHLD_3_MAX_SHIELD_FLAT]], cumulative with other shield boosts, and regenerates each turn by 8 plus the greater of (i) 16 times the value of the planets' [[metertype METER_CONSTRUCTION]] or (ii) 72 (so long as the shields are not already knocked below 40).
 
 DEF_PLAN_BARRIER_SHLD_4
 Planetary Barrier Shield 4
 
 DEF_PLAN_BARRIER_SHLD_4_DESC
-Increases max [[metertype METER_SHIELD]] on planets by 1200, cumulative with other shield boosts, and regenerates each turn by 8 plus the greater of (i) 20 times the value of the planets' [[metertype METER_CONSTRUCTION]] or (ii) 144 (so long as the shields are not already knocked below 72).
+Increases max [[metertype METER_SHIELD]] on planets by [[value DEF_PLAN_BARRIER_SHLD_4_MAX_SHIELD_FLAT]], cumulative with other shield boosts, and regenerates each turn by 8 plus the greater of (i) 20 times the value of the planets' [[metertype METER_CONSTRUCTION]] or (ii) 144 (so long as the shields are not already knocked below 72).
 
 DEF_PLAN_BARRIER_SHLD_5
 Planetary Barrier Shield 5
 
 DEF_PLAN_BARRIER_SHLD_5_DESC
-Increases max [[metertype METER_SHIELD]] on planets by an additional 1200, cumulative with other shield boosts and regenerates each turn by 8 plus the greater of (i)  40 times the value of the planets' [[metertype METER_CONSTRUCTION]] or (ii) 256 (so long as the shields are not already knocked below 112).
+Increases max [[metertype METER_SHIELD]] on planets by an additional [[value DEF_PLAN_BARRIER_SHLD_5_MAX_SHIELD_FLAT]], cumulative with other shield boosts and regenerates each turn by 8 plus the greater of (i)  40 times the value of the planets' [[metertype METER_CONSTRUCTION]] or (ii) 256 (so long as the shields are not already knocked below 112).
 
 DEF_SYST_DEF_MINE_1
 System Defense Mines 1
@@ -14170,7 +14266,7 @@ Planetary Cloud Cover
 SPY_STEALTH_1_DESC
 '''Gives all planets and outposts in the empire the [[special CLOUD_COVER_SLAVE_SPECIAL]] special which increases the [[metertype METER_STEALTH]] of all planets and buildings by 20.
 
-The [[metertype METER_RESEARCH]] cost of this tech is reduced by the cost of researching [[tech SPY_STEALTH_PART_1]] if it has already been completed.'''
+The [[metertype METER_RESEARCH]] cost of this tech is halved if [[tech SPY_STEALTH_PART_1]] has already been completed and/or if the empire includes a [[encyclopedia SNEAKY_TITLE]] species.'''
 
 SPY_STEALTH_PART_1
 Electromagnetic Dampening
@@ -14184,7 +14280,7 @@ Planetary Ash Clouds
 SPY_STEALTH_2_DESC
 '''Gives all planets and outposts in the empire the [[special VOLCANIC_ASH_SLAVE_SPECIAL]] special which increases the [[metertype METER_STEALTH]] of all planets and buildings by 40.
 
-The [[metertype METER_RESEARCH]] cost of this tech is reduced by the cost of researching [[tech SPY_STEALTH_PART_2]] if it has already been completed.'''
+The [[metertype METER_RESEARCH]] cost of this tech is halved if [[tech SPY_STEALTH_PART_2]] has already been completed and/or if the empire includes a [[encyclopedia SNEAKY_TITLE]] species.'''
 
 SPY_STEALTH_PART_2
 Radiation Absorbing
@@ -14198,7 +14294,7 @@ Planetary Dimensional Cloak
 SPY_STEALTH_3_DESC
 '''Gives all planets and outposts in the empire the [[special DIM_RIFT_SLAVE_SPECIAL]] special which increases the [[metertype METER_STEALTH]] of all planets and buildings by 60.
 
-The [[metertype METER_RESEARCH]] cost of this tech is reduced by the cost of researching [[tech SPY_STEALTH_PART_3]] if it has already been completed.'''
+The [[metertype METER_RESEARCH]] cost of this tech is halved if [[tech SPY_STEALTH_PART_3]] has already been completed and/or if the empire includes a [[encyclopedia SNEAKY_TITLE]] species.'''
 
 SPY_STEALTH_PART_3
 Dimensional Cloaking
@@ -14211,6 +14307,8 @@ Planetary Phasing Cloak
 
 SPY_STEALTH_4_DESC
 '''Unlocks the [[shippart ST_CLOAK_4]] ship part and gives all planets and outposts in the empire the [[special VOID_SLAVE_SPECIAL]] special which increases the [[metertype METER_STEALTH]] of all planets and buildings by 80.
+
+The [[metertype METER_RESEARCH]] cost of this tech is halved if the empire includes a [[encyclopedia SNEAKY_TITLE]] species.
 
 Even the most carefully concealed ship emits radiation in the form of force carrier particles. By modulating the wave forms of these particles, it is possible to synchronize them with the background radiation, hampering even very advanced attempts to detect the ship.'''
 
@@ -14472,6 +14570,8 @@ SPY_PLANET_STEALTH_MOD_DESC
 '''Modifiers affect stealth:
 
 • [[BASIC_PLANET_STEALTH]] gives [[value PLANET_BASIC_STEALTH]] [[metertype METER_STEALTH]] to all planets.
+
+• Colonies may have an extra malus or bonus to [[metertype METER_STEALTH]] based on the colony's species.
 
 • Due to [[FLEET_UNSTEALTHINESS]], when there are more than [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] ships of the same empire in a system, their [[metertype METER_STEALTH]] is reduced by [[value FLEET_UNSTEALTH_SHIPS_SCALING]] multiplied by the square root of [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] less than the number of ships that empire has in the system.
 
@@ -15129,9 +15229,7 @@ Nearly-Universal Translator
 BLD_TRANSLATOR_DESC
 '''Grants 1 social [[encyclopedia ENC_POLICY_SLOTS]].
 
-Increases influence output on its planet, when that planet is set to influence focus, by [[value TRANSLATOR_PER_SPECIES_INFLUENCE]] times the square root of the number of unique species on planets controlled by the empire that owns this building.
-
-Production cost decreases when more unique species are visible to the producing empire.'''
+Increases influence output on its planet, when that planet is set to influence focus, by [[value TRANSLATOR_PER_SPECIES_INFLUENCE]] times the square root of the number of unique species on planets controlled by the empire that owns this building.'''
 
 BLD_COLONY_BASE
 Colony Base
@@ -16256,7 +16354,7 @@ SH_AGREGATE_ASTEROID
 Aggregate Asteroid Hull
 
 SH_AGREGATE_ASTEROID_DESC
-'''This massive hull is formed by combining several large asteroids. It has fifteen external slots and four internal slots.
+'''This massive hull is formed by combining several large asteroids. It has thirteen external slots and four internal slots.
 
 [[metertype METER_STEALTH]] is medium but the hull gets a large bonus on the galaxy map when it is in a system with an asteroid belt, and in combat when it is hiding in an asteroid belt. [[metertype METER_DETECTION]] is medium and [[metertype METER_SPEED]] is low.
 
@@ -17013,6 +17111,9 @@ GREAT_INFLUENCE_DESC
 ULTIMATE_INFLUENCE_DESC
 +++	Ultimate [[metertype METER_INFLUENCE]]: 200%
 
+VERY_BAD_HAPPINESS_DESC
+−−	Very Bad [[metertype METER_HAPPINESS]]: [[value VERY_BAD_HAPPINESS_VAL]]
+
 BAD_HAPPINESS_DESC
 −	Bad [[metertype METER_HAPPINESS]]: [[value BAD_HAPPINESS_VAL]]
 
@@ -17131,6 +17232,9 @@ AVERAGE_POPULATION_DESC
 
 GOOD_POPULATION_DESC
 +	Good [[metertype METER_POPULATION]]: 125%
+
+GREAT_POPULATION_DESC
+++	Great [[metertype METER_POPULATION]]: 150%
 
 FIXED_LOW_POPULATION_DESC
 −−	Maximum Population is fixed at 5
@@ -17434,6 +17538,11 @@ GOOD_POPULATION_LABEL
 
 # %1% FIXME
 # %2% name of species on planet
+GREAT_POPULATION_LABEL
+%2% Great Population
+
+# %1% FIXME
+# %2% name of species on planet
 FOCUS_INDUSTRY_LABEL
 %2% Industry Focus
 
@@ -17521,6 +17630,11 @@ GREAT_INFLUENCE_LABEL
 # %2% FIXME
 ULTIMATE_INFLUENCE_LABEL
 %2% Ultimate Influence
+
+# %1% FIXME
+# %2% FIXME
+VERY_BAD_HAPPINESS_LABEL
+%2% Very Bad Stability
 
 # %1% FIXME
 # %2% FIXME

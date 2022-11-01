@@ -722,8 +722,8 @@ std::string ShipDesign::Dump(uint8_t ntabs) const {
     return retval;
 }
 
-unsigned int ShipDesign::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t ShipDesign::GetCheckSum() const {
+    uint32_t retval{0};
     CheckSums::CheckSumCombine(retval, m_id);
     CheckSums::CheckSumCombine(retval, m_uuid);
     CheckSums::CheckSumCombine(retval, m_name);
@@ -779,8 +779,8 @@ namespace {
             return;
 
         /* check if there already exists this same design in the universe. */
-        for (auto it = universe.beginShipDesigns(); it != universe.endShipDesigns(); ++it) {
-            const ShipDesign* existing_design = it->second;
+        for (auto [existing_id, existing_design] : universe.ShipDesigns()) {
+            (void)existing_id;
             if (!existing_design) {
                 ErrorLogger() << "PredefinedShipDesignManager::AddShipDesignsToUniverse found an invalid design in the Universe";
                 continue;
@@ -853,9 +853,9 @@ int PredefinedShipDesignManager::GetDesignID(const std::string& name) const {
     return it->second;
 }
 
-unsigned int PredefinedShipDesignManager::GetCheckSum() const {
+uint32_t PredefinedShipDesignManager::GetCheckSum() const {
     CheckPendingDesignsTypes();
-    unsigned int retval{0};
+    uint32_t retval{0};
 
     auto build_checksum = [&retval, this](const std::vector<boost::uuids::uuid>& ordering){
         for (auto const& uuid : ordering) {

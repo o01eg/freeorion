@@ -61,7 +61,7 @@ namespace {
         return result;
     }
 
-    enum class SpeciesInfo : unsigned char {
+    enum class SpeciesInfo : uint8_t {
         TAGS,
         LIKES,
         DISLIKES
@@ -112,7 +112,8 @@ namespace {
     {
         auto path = universe.GetPathfinder()->ShortestPath(
             start_sys, end_sys, empire_id, universe.EmpireKnownObjects(empire_id));
-        return std::vector<int>{path.first.begin(), path.first.end()};
+        static_assert(std::is_same_v<std::vector<int>, decltype(path.first)>);
+        return path.first;
     }
 
     auto ShortestNonHostilePath(const Universe& universe, int start_sys, int end_sys, int empire_id) -> std::vector<int>
@@ -121,14 +122,16 @@ namespace {
         auto fleet_pred = std::make_shared<HostileVisitor>(empire_id, empires);
         auto path = universe.GetPathfinder()->ShortestPath(
             start_sys, end_sys, empire_id, fleet_pred, empires, universe.EmpireKnownObjects(empire_id));
-        return std::vector<int>{path.first.begin(), path.first.end()};
+        static_assert(std::is_same_v<std::vector<int>, decltype(path.first)>);
+        return path.first;
     }
 
     auto LeastJumpsPath(const Universe& universe, int start_sys, int end_sys, int empire_id) -> std::vector<int>
     {
         auto path = universe.GetPathfinder()->LeastJumpsPath(
             start_sys, end_sys, empire_id);
-        return std::vector<int>{path.first.begin(), path.first.end()};
+        static_assert(std::is_same_v<std::vector<int>, decltype(path.first)>);
+        return path.first;
     }
 
     auto ImmediateNeighbors(const Universe& universe, int system1_id, int empire_id) -> std::vector<int>
@@ -221,6 +224,15 @@ namespace {
             return py::incref(py::make_tuple(pair.first, pair.second).ptr());
         }
     };
+
+    std::vector<std::string> ExtractList(const py::list& py_string_list) {
+        std::vector<std::string> retval;
+        retval.reserve(len(py_string_list));
+        for (int i = 0; i < len(py_string_list); i++)
+            retval.push_back(py::extract<std::string>(py_string_list[i]));
+        return retval;
+    }
+
 }
 
 namespace FreeOrionPython {
@@ -248,19 +260,19 @@ namespace FreeOrionPython {
         py::class_<std::map<int, int>>("IntIntMap")
             .def(py::map_indexing_suite<std::map<int, int>, true>())
         ;
-        py::class_<std::map<int, double>>("IntDblMap")
+        py::class_<std::map<int, double>>("IntDoubleMap")
             .def(py::map_indexing_suite<std::map<int, double>, true>())
         ;
-        py::class_<std::map<int, float>>("IntFltMap")
+        py::class_<std::map<int, float>>("IntFloatMap")
             .def(py::map_indexing_suite<std::map<int, float>, true>())
         ;
         py::class_<std::map<Visibility, int>>("VisibilityIntMap")
             .def(py::map_indexing_suite<std::map<Visibility, int>, true>())
         ;
-        py::class_<std::vector<ShipSlotType>>("ShipSlotVec")
+        py::class_<std::vector<ShipSlotType>>("ShipSlotTypeVec")
             .def(py::vector_indexing_suite<std::vector<ShipSlotType>, true>())
         ;
-        py::class_<std::map<std::string, std::string>>("StringsMap")
+        py::class_<std::map<std::string, std::string>>("StringStringMap")
             .def(py::map_indexing_suite<std::map<std::string, std::string>, true>())
         ;
 
@@ -271,14 +283,14 @@ namespace FreeOrionPython {
         py::to_python_converter<std::pair<MeterType, std::string>,
                                 PairToTupleConverter<std::pair<MeterType, std::string>>>();
 
-        py::class_<Ship::PartMeterMap>("ShipPartMeterMap")
+        py::class_<Ship::PartMeterMap>("MeterTypeStringPairMeterMap")
             .def(py::map_indexing_suite<Ship::PartMeterMap>())
         ;
 
-        py::class_<std::map<std::string, std::map<int, std::map<int, double>>>>("StatRecordsMap")
+        py::class_<std::map<std::string, std::map<int, std::map<int, double>>>>("StringIntIntDoubleMapMapMap")
             .def(py::map_indexing_suite<std::map<std::string, std::map<int, std::map<int, double>>>, true>())
         ;
-        py::class_<std::map<int, std::map<int, double>>>("IntIntDblMapMap")
+        py::class_<std::map<int, std::map<int, double>>>("IntIntDoubleMapMap")
             .def(py::map_indexing_suite<std::map<int, std::map<int, double>>, true>())
         ;
 
@@ -306,7 +318,7 @@ namespace FreeOrionPython {
         ;
         py::to_python_converter<Effect::AccountingMap::value_type,
             PairToTupleConverter<Effect::AccountingMap::value_type>>();
-        py::class_<Effect::AccountingMap>("TargetIDAccountingMapMap")
+        py::class_<Effect::AccountingMap>("IntMeterTypeAccountingInfoVecMapMap")
             .def(py::map_indexing_suite<Effect::AccountingMap, true>())
         ;
 
@@ -603,9 +615,9 @@ namespace FreeOrionPython {
             .def("dump",                        &ShipDesign::Dump,                          py::return_value_policy<py::return_by_value>(), "Returns string with debug information, use '0' as argument.")
         ;
         py::def("validShipDesign",
-                +[](const ShipDesign& design, const std::string& hull, const std::vector<std::string>& parts) -> bool { return design.ValidDesign(hull, parts); },
+                +[](const std::string& hull, const py::list& parts) -> bool { return ShipDesign::ValidDesign(hull, ExtractList(parts)); },
                 "Returns true (boolean) if the passed hull (string) and parts"
-                " (StringVec) make up a valid ship design, and false (boolean)"
+                " (list of string) make up a valid ship design, and false (boolean)"
                 " otherwise. Valid ship designs don't have any parts in slots"
                 " that can't accept that type of part, and contain only hulls"
                 " and parts that exist (and may also need to contain the"

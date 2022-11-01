@@ -122,7 +122,7 @@ public:
 
     /// These are the only events absolutely necessary for GG to function
     /// properly
-    enum class EventType : char {
+    enum class EventType : uint8_t {
         IDLE,        ///< nothing has changed since the last message, but the GUI might want to update some things anyway
         KEYPRESS,    ///< a down key press or key repeat, with or without modifiers like Alt, Ctrl, Meta, etc.
         KEYRELEASE,  ///< a key release, with or without modifiers like Alt, Ctrl, Meta, etc.
@@ -152,7 +152,7 @@ public:
     bool                        FocusWndAcceptsTypingInput() const; ///< returns true iff the current focus GG::Wnd accepts typing input
     std::shared_ptr<Wnd>        PrevFocusInteractiveWnd() const;    ///< returns the previous Wnd to the current FocusWnd. Cycles through INTERACTIVE Wnds, in order determined by parent-child relationships
     std::shared_ptr<Wnd>        NextFocusInteractiveWnd() const;    ///< returns the next Wnd to the current FocusWnd.
-    std::shared_ptr<Wnd>        GetWindowUnder(const Pt& pt) const; ///< returns the GG::Wnd under the point pt
+    std::shared_ptr<Wnd>        GetWindowUnder(Pt pt) const;        ///< returns the GG::Wnd under the point pt
     virtual unsigned int        Ticks() const = 0;                  ///< returns milliseconds since the app started running
     bool                        RenderingDragDropWnds() const;      ///< returns true iff drag-and-drop Wnds are currently being rendered
     bool                        FPSEnabled() const;                 ///< returns true iff FPS calulations are turned on
@@ -297,7 +297,7 @@ public:
     /** Returns a shared_ptr to the desired font, supporting all printable
         ASCII characters, from the in-memory contents \a file_contents. */
     std::shared_ptr<Font> GetFont(const std::string& font_filename, unsigned int pts,
-                                  const std::vector<unsigned char>& file_contents);
+                                  const std::vector<uint8_t>& file_contents);
 
     /** Returns a shared_ptr to the desired font, supporting all the
         characters in the UnicodeCharsets in the range [first, last). */
@@ -310,7 +310,7 @@ public:
         in-memory contents \a file_contents. */
     template <typename CharSetIter>
     std::shared_ptr<Font> GetFont(const std::string& font_filename, unsigned int pts,
-                                  const std::vector<unsigned char>& file_contents,
+                                  const std::vector<uint8_t>& file_contents,
                                   CharSetIter first, CharSetIter last);
 
     /** Returns a shared_ptr to existing font \a font in a new size, \a pts. */
@@ -470,7 +470,7 @@ std::shared_ptr<Font> GUI::GetFont(const std::string& font_filename, unsigned in
 
 template <typename CharSetIter>
 std::shared_ptr<Font> GUI::GetFont(const std::string& font_filename, unsigned int pts,
-                                   const std::vector<unsigned char>& file_contents,
+                                   const std::vector<uint8_t>& file_contents,
                                    CharSetIter first, CharSetIter last)
 { return GetFontManager().GetFont(font_filename, pts, file_contents, first, last); }
 

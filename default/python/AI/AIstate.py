@@ -428,7 +428,7 @@ class AIstate:
         self.__empire_standard_enemy = max(e_f_dict, key=e_f_dict.get)
         self.empire_standard_enemy_rating = self.get_standard_enemy().get_rating()
 
-    def __update_system_status(self):
+    def __update_system_status(self):  # noqa: max-complexity
         debug("=== Updating System Threats ===")
         universe = fo.getUniverse()
         empire = fo.getEmpire()
@@ -939,7 +939,7 @@ class AIstate:
             elif this_sys:
                 fleet_status["sysID"] = this_sys.id
             else:
-                error("Fleet %s has no valid system." % fleet)
+                warning("Fleet %s has no valid system." % fleet)
         fleet_table.print_table(info)
         debug("Empire standard fighter summary: %s", CombatRatingsAI.get_empire_standard_military_ship_stats())
         debug("------------------------")

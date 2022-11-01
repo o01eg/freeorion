@@ -279,14 +279,13 @@ public:
     void LosingFocus() override;
     void Render() override;
     virtual bool AutoComplete() { return false; };
-    void DisallowChars(std::string chars)
-    { m_disallowed_chars = std::move(chars); }
+    void DisallowChars(std::string_view chars) { m_disallowed_chars = chars; }
 
     mutable boost::signals2::signal<void ()> GainingFocusSignal;
     mutable boost::signals2::signal<void ()> LosingFocusSignal;
 
 private:
-    std::string m_disallowed_chars;
+    std::string_view m_disallowed_chars;
 };
 
 /** a FreeOrion Edit control that replaces its displayed characters with a
@@ -453,7 +452,7 @@ public:
 
     void SelectColor(const GG::Clr& clr);
 
-    mutable boost::signals2::signal<void (const GG::Clr&)> ColorChangedSignal;
+    mutable boost::signals2::signal<void (GG::Clr)> ColorChangedSignal;
 };
 
 /** A control used to pick arbitrary colors using GG::ColorDlg. */
@@ -468,7 +467,7 @@ public:
     void RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
     void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
 
-    mutable boost::signals2::signal<void (const GG::Clr&)> ColorChangedSignal;
+    mutable boost::signals2::signal<void (GG::Clr)> ColorChangedSignal;
 
 private:
     virtual void InitBuffer();
@@ -649,18 +648,18 @@ private:
 /** Renders scanlines over its area. */
 class ScanlineControl : public GG::Control {
 public:
-    ScanlineControl(GG::X x, GG::Y y, GG::X w, GG::Y h, bool square = false,
-                    GG::Clr clr = GG::CLR_BLACK);
+    ScanlineControl(GG::X x = GG::X0, GG::Y y = GG::Y0, GG::X w = GG::X1, GG::Y h = GG::Y1,
+                    bool square = false, GG::Clr clr = GG::CLR_BLACK);
 
-    /** Changes the color used to draw the scanlines. */
     void Render() override;
 
+    /** Changes the color used to draw the scanlines. */
     void SetColor(GG::Clr clr) override
     { m_color = clr; };
 
 private:
+    GG::Clr m_color = GG::CLR_WHITE;
     bool m_square = false;
-    GG::Clr m_color;
 };
 
 /** Consistently rendered popup menu */

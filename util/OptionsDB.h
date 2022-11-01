@@ -12,6 +12,7 @@
 #include <functional>
 #include <map>
 #include <unordered_set>
+#include <unordered_map>
 
 
 class OptionsDB;
@@ -109,11 +110,7 @@ template<typename T> constexpr bool is_unique_ptr_v = is_unique_ptr<T>::value;
 class FO_COMMON_API OptionsDB {
 public:
     /** emitted when an option has changed */
-    typedef boost::signals2::signal<void ()>                   OptionChangedSignalType;
-    /** emitted when an option is added */
-    typedef boost::signals2::signal<void (const std::string&)> OptionAddedSignalType;
-    /** emitted when an option is removed */
-    typedef boost::signals2::signal<void (const std::string&)> OptionRemovedSignalType;
+    typedef boost::signals2::signal<void ()> OptionChangedSignalType;
 
     /** indicates whether an option with name \a name has been added to this
         OptionsDB. */
@@ -217,10 +214,8 @@ public:
     std::vector<std::string_view> FindOptions(std::string_view prefix, bool allow_unrecognized = false) const;
 
     /** the option changed signal object for the given option */
-    OptionChangedSignalType&        OptionChangedSignal(const std::string& option);
+    OptionChangedSignalType&        OptionChangedSignal(std::string_view option);
 
-    mutable OptionAddedSignalType   OptionAddedSignal;   ///< the option added signal object for this DB
-    mutable OptionRemovedSignalType OptionRemovedSignal; ///< the change removed signal object for this DB
 
     /** adds an Option, optionally with a custom validator */
     template <typename T>
@@ -261,7 +256,6 @@ public:
                       std::move(section)};
         it = m_options.insert_or_assign(std::move(name), std::move(option)).first;
         m_dirty = true;
-        OptionAddedSignal(it->first);
     }
 
     template <typename T, typename V,
@@ -326,7 +320,6 @@ public:
                       std::move(section)};
         const auto& n_ref = m_options.insert_or_assign(std::move(name), std::move(option)).first->first;
         m_dirty = true;
-        OptionAddedSignal(n_ref);
     }
 
     template <typename T, typename V,
@@ -370,7 +363,6 @@ public:
                         std::move(validator), storable, true, true, std::move(section)};
         m_options.insert_or_assign(name, std::move(option));
         m_dirty = true;
-        OptionAddedSignal(name);
     }
 
     /** adds an Option with an alternative one-character shortened name, which
@@ -401,15 +393,14 @@ public:
                         std::move(validator), storable, true, true, std::move(section)};
         m_options.insert_or_assign(name, std::move(option));
         m_dirty = true;
-        OptionAddedSignal(name);
     }
 
     /** removes an Option */
-    void Remove(const std::string& name);
+    void Remove(std::string_view name);
 
     /** removes all unrecognized Options that begin with \a prefix.  A blank
       * string will remove all unrecognized Options. */
-    void RemoveUnrecognized(const std::string& prefix = "");
+    void RemoveUnrecognized(std::string_view prefix = "");
 
     /** sets the value of option \a name to \a value */
     template <typename T>
@@ -485,7 +476,7 @@ public:
             boolean conversions are done for them. */
         std::unique_ptr<ValidatorBase> validator;
 
-        mutable std::shared_ptr<boost::signals2::signal<void ()>> option_changed_sig_ptr;
+        OptionChangedSignalType option_changed_sig;
     };
 
     struct FO_COMMON_API OptionSection {
@@ -530,9 +521,10 @@ private:
 
 template <typename T>
 bool OptionsDB::Option::SetFromValue(T&& value_) {
-    if (value.type() != typeid(T))
-        ErrorLogger() << "OptionsDB::Option::SetFromValue expected type " << value.type().name()
+    if (value.type() != typeid(std::decay_t<T>)) {
+        DebugLogger() << "OptionsDB::Option::SetFromValue expected type " << value.type().name()
                       << " but got value of type " << typeid(T).name();
+    }
 
     bool changed = false;
 
@@ -553,7 +545,7 @@ bool OptionsDB::Option::SetFromValue(T&& value_) {
 
     if (changed) {
         value = std::forward<T>(value_);
-        (*option_changed_sig_ptr)();
+        option_changed_sig();
     }
     return changed;
 }

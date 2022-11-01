@@ -9,10 +9,10 @@ Tech(
     researchcost=24 * TECH_COST_MULTIPLIER,
     researchturns=2,
     tags=["PEDIA_GROWTH_CATEGORY"],
-    prerequisites="GRO_PLANET_ECOL",
+    prerequisites=["GRO_PLANET_ECOL"],
     effectsgroups=[
         EffectsGroup(
-            scope=Species & OwnedBy(empire=Source.Owner),
+            scope=HasSpecies() & OwnedBy(empire=Source.Owner),
             accountinglabel="GRO_TECH_ACCOUNTING_LABEL",
             priority=TARGET_POPULATION_AFTER_SCALING_PRIORITY,
             effects=SetTargetPopulation(value=Value + 1 * Target.HabitableSize),

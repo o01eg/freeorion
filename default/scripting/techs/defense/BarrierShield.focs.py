@@ -10,13 +10,15 @@ Tech(
     researchcost=125 * TECH_COST_MULTIPLIER,
     researchturns=5,
     tags=["PEDIA_DEFENSE_CATEGORY"],
-    prerequisites="LRN_FORCE_FIELD",
+    prerequisites=["LRN_FORCE_FIELD"],
     effectsgroups=[
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner),
             accountinglabel="DEF_TECH_ACCOUNTING_LABEL",
             priority=DEFAULT_PRIORITY,
-            effects=SetMaxShield(value=Value + (30 * PLANET_SHIELD_FACTOR)),
+            effects=SetMaxShield(
+                value=Value + NamedReal(name="DEF_PLAN_BARRIER_SHLD_1_MAX_SHIELD_FLAT", value=30 * PLANET_SHIELD_FACTOR)
+            ),
         ),
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner) & (LocalCandidate.LastTurnAttackedByShip < CurrentTurn - 1),
@@ -41,13 +43,15 @@ Tech(
     researchcost=192 * TECH_COST_MULTIPLIER,
     researchturns=6,
     tags=["PEDIA_DEFENSE_CATEGORY"],
-    prerequisites="DEF_PLAN_BARRIER_SHLD_1",
+    prerequisites=["DEF_PLAN_BARRIER_SHLD_1"],
     effectsgroups=[
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner),
             accountinglabel="DEF_TECH_ACCOUNTING_LABEL",
             priority=DEFAULT_PRIORITY,
-            effects=SetMaxShield(value=Value + (60 * PLANET_SHIELD_FACTOR)),
+            effects=SetMaxShield(
+                value=Value + NamedReal(name="DEF_PLAN_BARRIER_SHLD_2_MAX_SHIELD_FLAT", value=60 * PLANET_SHIELD_FACTOR)
+            ),
         ),
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner) & (LocalCandidate.LastTurnAttackedByShip < CurrentTurn - 1),
@@ -74,13 +78,15 @@ Tech(
     researchcost=360 * TECH_COST_MULTIPLIER,
     researchturns=8,
     tags=["PEDIA_DEFENSE_CATEGORY"],
-    prerequisites="DEF_PLAN_BARRIER_SHLD_2",
+    prerequisites=["DEF_PLAN_BARRIER_SHLD_2"],
     effectsgroups=[
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner),
             accountinglabel="DEF_TECH_ACCOUNTING_LABEL",
             priority=DEFAULT_PRIORITY,
-            effects=SetMaxShield(value=Value + (90 * PLANET_SHIELD_FACTOR)),
+            effects=SetMaxShield(
+                value=Value + NamedReal(name="DEF_PLAN_BARRIER_SHLD_3_MAX_SHIELD_FLAT", value=90 * PLANET_SHIELD_FACTOR)
+            ),
         ),
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner) & (LocalCandidate.LastTurnAttackedByShip < CurrentTurn - 1),
@@ -107,13 +113,16 @@ Tech(
     researchcost=600 * TECH_COST_MULTIPLIER,
     researchturns=10,
     tags=["PEDIA_DEFENSE_CATEGORY"],
-    prerequisites="DEF_PLAN_BARRIER_SHLD_3",
+    prerequisites=["DEF_PLAN_BARRIER_SHLD_3"],
     effectsgroups=[
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner),
             accountinglabel="DEF_TECH_ACCOUNTING_LABEL",
             priority=DEFAULT_PRIORITY,
-            effects=SetMaxShield(value=Value + (150 * PLANET_SHIELD_FACTOR)),
+            effects=SetMaxShield(
+                value=Value
+                + NamedReal(name="DEF_PLAN_BARRIER_SHLD_4_MAX_SHIELD_FLAT", value=150 * PLANET_SHIELD_FACTOR)
+            ),
         ),
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner) & (LocalCandidate.LastTurnAttackedByShip < CurrentTurn - 1),
@@ -140,13 +149,16 @@ Tech(
     researchcost=1200 * TECH_COST_MULTIPLIER,
     researchturns=12,
     tags=["PEDIA_DEFENSE_CATEGORY"],
-    prerequisites="DEF_PLAN_BARRIER_SHLD_4",
+    prerequisites=["DEF_PLAN_BARRIER_SHLD_4"],
     effectsgroups=[
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner),
             accountinglabel="DEF_TECH_ACCOUNTING_LABEL",
             priority=DEFAULT_PRIORITY,
-            effects=SetMaxShield(value=Value + (150 * PLANET_SHIELD_FACTOR)),
+            effects=SetMaxShield(
+                value=Value
+                + NamedReal(name="DEF_PLAN_BARRIER_SHLD_5_MAX_SHIELD_FLAT", value=150 * PLANET_SHIELD_FACTOR)
+            ),
         ),
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner) & (LocalCandidate.LastTurnAttackedByShip < CurrentTurn - 1),

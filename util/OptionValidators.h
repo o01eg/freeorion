@@ -49,62 +49,79 @@ struct ValidatorBase {
     [[nodiscard]] virtual std::unique_ptr<ValidatorBase> Clone() && = 0;
 };
 
-/** determines if a string is a valid value for an OptionsDB option */
-template <typename T>
-struct Validator : public ValidatorBase
-{
-    boost::any Validate(const std::string& str) const override
-    { return boost::any(boost::lexical_cast<T>(str)); }
-    boost::any Validate(std::string_view str) const override
-    { return boost::any(boost::lexical_cast<T>(str)); }
-
-    [[nodiscard]] std::string String(const boost::any& value) const override
-    {
-        if constexpr (std::is_same_v<T, std::string>)
-            return boost::any_cast<std::string>(value);
-        else if constexpr (std::is_enum_v<T>)
-            return std::string{to_string(boost::any_cast<T>(value))};
-        else if constexpr (std::is_arithmetic_v<T>)
-            return std::to_string(boost::any_cast<T>(value));
-        else
-            return boost::lexical_cast<std::string>(boost::any_cast<T>(value));
-    }
-
-    [[nodiscard]] std::unique_ptr<ValidatorBase> Clone() const & override
-    { return std::make_unique<Validator>(); }
-
-    [[nodiscard]] std::unique_ptr<ValidatorBase> Clone() && override
-    { return std::make_unique<Validator>(); }
-};
-
 FO_COMMON_API std::string ListToString(std::vector<std::string> input_list);
 FO_COMMON_API std::vector<std::string> StringToList(std::string_view input_string);
 FO_COMMON_API std::vector<std::string> StringToList(const char* input_string);
 FO_COMMON_API std::vector<std::string> StringToList(const std::string& input_string);
 
-template <>
-struct Validator<std::vector<std::string>> : public ValidatorBase
+/** determines if a string is a valid value for an OptionsDB option */
+template <typename T>
+struct Validator : public ValidatorBase
 {
     boost::any Validate(const std::string& str) const override
-    { return boost::any(StringToList(str)); }
+    {
+        if constexpr (std::is_same_v<T, std::vector<std::string>>)
+            return boost::any(StringToList(str));
+        else if constexpr (std::is_same_v<T, std::string>)
+            return boost::any(std::string{str});
+        else
+            return boost::any(boost::lexical_cast<T>(str));
+    }
+
     boost::any Validate(std::string_view str) const override
-    { return boost::any(StringToList(str)); }
+    {
+        if constexpr (std::is_same_v<T, std::vector<std::string>>)
+            return boost::any(StringToList(str));
+        else if constexpr (std::is_same_v<T, std::string>)
+            return boost::any(std::string{str});
+        else
+            return boost::any(boost::lexical_cast<T>(str));
+    }
 
     [[nodiscard]] std::string String(const boost::any& value) const override
-    { return ListToString(boost::any_cast<std::vector<std::string>>(value)); }
+    {
+        if constexpr (std::is_same_v<T, std::string>) {
+            if (value.type() == typeid(std::string))
+                return boost::any_cast<std::string>(value);
+            else if (value.type() == typeid(const char*))
+                return std::string{boost::any_cast<const char*>(value)};
+            else if (value.type() == typeid(std::string_view))
+                return std::string{boost::any_cast<std::string_view>(value)};
+
+        } else if constexpr (std::is_enum_v<T>) {
+            if (value.type() == typeid(T))
+                return std::string{to_string(boost::any_cast<T>(value))};
+
+        } else if constexpr (std::is_arithmetic_v<T>) {
+            if (value.type() == typeid(T))
+                return std::to_string(boost::any_cast<T>(value));
+
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            if (value.type() == typeid(T))
+                return ListToString(boost::any_cast<std::vector<std::string>>(value));
+
+        } else {
+            if (value.type() == typeid(T))
+                return boost::lexical_cast<std::string>(boost::any_cast<T>(value));
+        }
+        return "";
+    }
 
     [[nodiscard]] std::unique_ptr<ValidatorBase> Clone() const & override
-    { return std::make_unique<Validator<std::vector<std::string>>>(); }
+    { return std::make_unique<Validator<T>>(); }
 
     [[nodiscard]] std::unique_ptr<ValidatorBase> Clone() && override
-    { return std::make_unique<Validator<std::vector<std::string>>>(); }
+    { return std::make_unique<Validator<T>>(); }
 };
 
 /** a Validator that constrains the range of valid values */
 template <typename T>
 struct RangedValidator : public Validator<T>
 {
-    RangedValidator(const T& min, const T& max) : m_min(min), m_max(max) {}
+    RangedValidator(T min, T max) :
+        m_min(min),
+        m_max(max)
+    {}
     RangedValidator(RangedValidator&& rhs) noexcept = default;
 
     boost::any Validate(const std::string& str) const override {
@@ -122,7 +139,7 @@ struct RangedValidator : public Validator<T>
 
     T m_min;
     T m_max;
-    static_assert(std::is_nothrow_move_constructible<T>::value);
+    static_assert(std::is_arithmetic_v<T> || std::is_enum_v<T>);
 };
 
 /** a Validator that constrains valid values to certain step-values
@@ -132,7 +149,10 @@ struct RangedValidator : public Validator<T>
 template <typename T>
 struct StepValidator : public Validator<T>
 {
-    StepValidator(const T& step, const T& origin = T()) : m_step_size(step), m_origin(origin) {}
+    StepValidator(T step, T origin = 0) :
+        m_step_size(step),
+        m_origin(origin)
+    {}
     StepValidator(StepValidator&& rhs) noexcept = default;
 
     boost::any Validate(const std::string& str) const override {
@@ -150,7 +170,7 @@ struct StepValidator : public Validator<T>
 
     T m_step_size;
     T m_origin;
-    static_assert(std::is_nothrow_move_constructible<T>::value);
+    static_assert(std::is_arithmetic_v<T>);
 };
 
 /** a Validator similar to a StepValidator, but that further constrains the valid values to be within a certain range (eg: [25, 50, ..., 200]). */
@@ -158,8 +178,18 @@ template <typename T>
 struct RangedStepValidator : public Validator<T>
 {
 public:
-    RangedStepValidator(const T& step, const T& min, const T& max) : m_step_size(step), m_origin(T()), m_min(min), m_max(max) {}
-    RangedStepValidator(const T& step, const T& origin, const T& min, const T& max) : m_step_size (step), m_origin (origin), m_min (min), m_max (max) {}
+    RangedStepValidator(T step, T min, T max) :
+        m_step_size(step),
+        m_origin(T()),
+        m_min(min),
+        m_max(max)
+    {}
+    RangedStepValidator(T step, T origin, T min, T max) :
+        m_step_size (step),
+        m_origin(origin),
+        m_min(min),
+        m_max(max)
+    {}
     RangedStepValidator(RangedStepValidator&& rhs) noexcept = default;
 
     boost::any Validate(const std::string& str) const override {
@@ -181,7 +211,7 @@ public:
     T m_origin;
     T m_min;
     T m_max;
-    static_assert(std::is_nothrow_move_constructible<T>::value);
+    static_assert(std::is_arithmetic_v<T>);
 };
 
 /// a Validator that specifies a finite number of valid values.
@@ -193,22 +223,33 @@ struct DiscreteValidator : public Validator<T>
         m_values{std::move(single_value)}
     {}
 
-    explicit DiscreteValidator(std::set<T> values) :
+    explicit DiscreteValidator(std::vector<T> values) :
         m_values(std::move(values))
     {}
 
-    template <typename iter>
-    DiscreteValidator(iter start, iter finish) :
-        m_values(start, finish)
+    explicit DiscreteValidator(const std::vector<std::string_view>& values) :
+        m_values(values.begin(), values.end())
+    {}
+
+    explicit DiscreteValidator(const std::vector<const char*>& values) :
+        m_values(values.begin(), values.end())
+    {}
+
+    template <std::size_t N>
+    explicit DiscreteValidator(const std::array<const char*, N>& values) :
+        m_values(values.begin(), values.end())
     {}
 
     boost::any Validate(const std::string& str) const override {
-        T val = boost::lexical_cast<T>(str);
-
-        if (!m_values.count(val))
-            throw boost::bad_lexical_cast();
-
-        return boost::any(val);
+        if constexpr (std::is_same_v<std::string, T>) {
+            if (std::any_of(m_values.begin(), m_values.end(), [&str](const auto& v) { return str == v; }))
+                return boost::any(str);
+        } else {
+            T val = boost::lexical_cast<T>(str);
+            if (std::any_of(m_values.begin(), m_values.end(), [val](auto v) { return val == v; }))
+                return boost::any(val);
+        }
+        throw boost::bad_lexical_cast();
     }
 
     [[nodiscard]] std::unique_ptr<ValidatorBase> Clone() const & override
@@ -218,8 +259,8 @@ struct DiscreteValidator : public Validator<T>
     { return std::make_unique<DiscreteValidator>(std::move(m_values)); }
 
     /// Stores the list of vaild values.
-    std::set<T> m_values;
-    static_assert(std::is_nothrow_move_constructible<T>::value);
+    std::vector<T> m_values;
+    static_assert(std::is_arithmetic_v<T> || std::is_same_v<std::string, T>);
 };
 
 /// a Validator that performs a logical OR of two validators.
@@ -274,7 +315,7 @@ struct OrValidator : public Validator<T>
 
     std::unique_ptr<Validator<T>> m_validator_a;
     std::unique_ptr<Validator<T>> m_validator_b;
-    static_assert(std::is_nothrow_move_constructible<std::unique_ptr<Validator<T>>>::value);
+    static_assert(std::is_nothrow_move_constructible_v<std::unique_ptr<Validator<T>>>);
 };
 
 

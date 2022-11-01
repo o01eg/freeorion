@@ -157,10 +157,10 @@ def get_building_allocations() -> float:
 
 
 # TODO Move Building names to AIDependencies to avoid typos and for IDE-Support
-def generate_production_orders():
-    """generate production orders"""
+def generate_production_orders():  # noqa: max-complexity
+    """Generate production orders."""
     # first check ship designs
-    # next check for buildings etc that could be placed on queue regardless of locally available PP
+    # next check for buildings etc, that could be placed on queue regardless of locally available PP
     # next loop over resource groups, adding buildings & ships
     print_production_queue()
     universe = fo.getUniverse()
@@ -667,7 +667,6 @@ def generate_production_orders():
                 colony_ship_map.setdefault(ship.speciesName, []).append(1)
 
     building_name = "BLD_CONC_CAMP"
-    verbose_camp = False
     building_type = fo.getBuildingType(building_name)
     for pid in get_inhabited_planets():
         planet = universe.getPlanet(pid)
@@ -681,7 +680,6 @@ def generate_production_orders():
         t_ind = planet.currentMeterValue(fo.meterType.targetIndustry)
         c_ind = planet.currentMeterValue(fo.meterType.industry)
         pop_disqualified = (c_pop <= 32) or (c_pop < 0.9 * t_pop)
-        built_camp = False
         this_spec = planet.speciesName
         safety_margin_met = (
             can_build_colony_for_species(this_spec)
@@ -690,24 +688,6 @@ def generate_production_orders():
         if (
             pop_disqualified or not safety_margin_met
         ):  # check even if not aggressive, etc, just in case acquired planet with a ConcCamp on it
-            if can_build_camp:
-                if pop_disqualified:
-                    if verbose_camp:
-                        debug(
-                            "Conc Camp disqualified at %s due to low pop: current %.1f target: %.1f",
-                            planet.name,
-                            c_pop,
-                            t_pop,
-                        )
-                else:
-                    if verbose_camp:
-                        debug(
-                            "Conc Camp disqualified at %s due to safety margin; species %s, colonizing planets %s, with %d colony ships",
-                            planet.name,
-                            planet.speciesName,
-                            get_empire_planets_with_species(planet.speciesName),
-                            len(colony_ship_map.get(planet.speciesName, [])),
-                        )
             for bldg in planet.buildingIDs:
                 if universe.getBuilding(bldg).buildingTypeName == building_name:
                     res = fo.issueScrapOrder(bldg)
@@ -723,12 +703,7 @@ def generate_production_orders():
             queued_building_locs = [
                 element.locationID for element in (empire.productionQueue) if (element.name == building_name)
             ]
-            if c_pop < 0.95 * t_pop:
-                if verbose_camp:
-                    debug(
-                        "Conc Camp disqualified at %s due to pop: current %.1f target: %.1f", planet.name, c_pop, t_pop
-                    )
-            else:
+            if c_pop >= 0.95 * t_pop:
                 if pid not in queued_building_locs:
                     if planet.focus in [FocusType.FOCUS_INDUSTRY]:
                         if c_ind >= t_ind + c_pop:
@@ -743,7 +718,6 @@ def generate_production_orders():
                             universe.updateMeterEstimates([pid])
                             continue
                     res = fo.issueEnqueueBuildingProductionOrder(building_name, pid)
-                    built_camp = res
                     debug(
                         "Enqueueing %s at planet %d (%s) , with result %d",
                         building_name,
@@ -760,9 +734,6 @@ def generate_production_orders():
                             "Enqueing Conc Camp at %s despite building_type.canBeProduced(empire.empireID, pid) reporting %s"
                             % (planet, can_build_camp)
                         )
-        if verbose_camp:
-            debug("conc camp status at %s : checkedCamp: %s, built_camp: %s", planet.name, can_build_camp, built_camp)
-
     building_expense += _build_scanning_facility()
 
     _build_orbital_drydock(top_pilot_systems)
@@ -1553,7 +1524,7 @@ def _build_scanning_facility() -> float:
     return _may_enqueue_for_stability(building_type, turn_cost)
 
 
-def _build_gas_giant_generator() -> float:
+def _build_gas_giant_generator() -> float:  # noqa: max-complexity
     """Consider building Gas Giant Generators, return added turn costs."""
     building_type = BuildingType.GAS_GIANT_GEN
     if not building_type.available():
@@ -1737,7 +1708,7 @@ class ShipYardInfo(NamedTuple):
     top_pilot_systems: TopPilotSystems
 
 
-def _build_basic_shipyards() -> ShipYardInfo:
+def _build_basic_shipyards() -> ShipYardInfo:  # noqa: max-complexity
     """
     Consider building basic ship yards and also determine some value needed for other shipyard buildings.
     """
@@ -1800,7 +1771,7 @@ def _build_basic_shipyards() -> ShipYardInfo:
     return ShipYardInfo(queued_shipyard_pids, colony_systems, top_pilot_systems)  # TBD return added costs?
 
 
-def _build_energy_shipyards(
+def _build_energy_shipyards(  # noqa: max-complexity
     queued_shipyard_pids: List[PlanetId],
     colony_systems: Dict[PlanetId, SystemId],
     building_ratio: float,
@@ -1882,7 +1853,9 @@ def _build_energy_shipyards(
     return blackhole_pilots, red_pilots, building_expense
 
 
-def _build_asteroid_processor(top_pilot_systems: TopPilotSystems, queued_shipyard_pids: List[PlanetId]) -> float:
+def _build_asteroid_processor(  # noqa: max-complexity
+    top_pilot_systems: TopPilotSystems, queued_shipyard_pids: List[PlanetId]
+) -> float:
     """Consider building asteroid processor, return added turn costs."""
     building_type = Shipyard.ASTEROID
     building_expense = 0.0
@@ -1964,7 +1937,7 @@ def _build_asteroid_processor(top_pilot_systems: TopPilotSystems, queued_shipyar
     return building_expense
 
 
-def _build_orbital_drydock(top_pilot_systems: TopPilotSystems) -> None:
+def _build_orbital_drydock(top_pilot_systems: TopPilotSystems) -> None:  # noqa: max-complexity
     """Consider building orbital drydocks."""
     building_type = Shipyard.ORBITAL_DRYDOCK
     if building_type.available():

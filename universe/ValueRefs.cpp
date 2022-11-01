@@ -255,6 +255,21 @@ namespace {
         "Speed"
     };
 
+    // Array of planet types enumerated by PlanetType with INVALID_PLANET_TYPE as first element
+    constexpr std::array<std::string_view, static_cast<std::size_t>(PlanetType::NUM_PLANET_TYPES) + 1> NAME_BY_PLANET = {
+        "?",
+        "Swamp",
+        "Toxic",
+        "Inferno",
+        "Radiated",
+        "Barren",
+        "Tundra",
+        "Desert",
+        "Terran",
+        "Ocean",
+        "Asteroids",
+        "GasGiant"
+    };
 }
 
 namespace ValueRef {
@@ -304,36 +319,24 @@ std::string_view MeterToName(const MeterType meter) {
     return NAME_BY_METER[static_cast<std::underlying_type_t<MeterType>>(meter) + 1];
 }
 
-constexpr std::string_view PlanetTypeToStringConstexpr(PlanetType type) {
-    switch (type) {
-    case PlanetType::PT_SWAMP:     return "Swamp";
-    case PlanetType::PT_TOXIC:     return "Toxic";
-    case PlanetType::PT_INFERNO:   return "Inferno";
-    case PlanetType::PT_RADIATED:  return "Radiated";
-    case PlanetType::PT_BARREN:    return "Barren";
-    case PlanetType::PT_TUNDRA:    return "Tundra";
-    case PlanetType::PT_DESERT:    return "Desert";
-    case PlanetType::PT_TERRAN:    return "Terran";
-    case PlanetType::PT_OCEAN:     return "Ocean";
-    case PlanetType::PT_ASTEROIDS: return "Asteroids";
-    case PlanetType::PT_GASGIANT:  return "GasGiant";
-    default:                       return "?";
-    }
+std::string_view PlanetTypeToString(const PlanetType planet) {
+    // NOTE: INVALID_PLANET_TYPE (enum's -1 position) <= planet < NUM_PLANET_TYPES (enum's final position)
+    return NAME_BY_PLANET[static_cast<std::underlying_type_t<PlanetType>>(planet) + 1]; 
 }
-
-std::string_view PlanetTypeToString(PlanetType type)
-{ return PlanetTypeToStringConstexpr(type); }
 
 // @return the correct PlanetType enum for a user friendly planet type string (e.g. "Ocean"), else it returns PlanetType::INVALID_PLANET_TYPE
-PlanetType StringToPlanetType(std::string_view name) {
-    for (PlanetType pt = PlanetType::INVALID_PLANET_TYPE; pt < PlanetType::NUM_PLANET_TYPES;
-         pt = PlanetType(static_cast<std::underlying_type_t<PlanetType>>(pt) + 1))
-    {
-        if (PlanetTypeToStringConstexpr(pt) == name)
-            return pt;
+constexpr PlanetType StringToPlanetType(const std::string_view name) {
+    for (int i = 0; i < static_cast<int>(NAME_BY_PLANET.size()); i++) {
+        if (NAME_BY_PLANET[i] == name)
+            return static_cast<PlanetType>(i - 1);
     }
+
     return PlanetType::INVALID_PLANET_TYPE;
 }
+
+static_assert(StringToPlanetType("not a planet") == PlanetType::INVALID_PLANET_TYPE, "Name to Planet conversion failed for invalid planet type!");
+static_assert(StringToPlanetType("Swamp") == PlanetType::PT_SWAMP, "Name to Planet conversion failed for 'Swamp' planet!");
+static_assert(StringToPlanetType("GasGiant") == PlanetType::PT_GASGIANT, "Name to Planet conversion failed for 'GasGiant' planet!");
 
 std::string_view PlanetEnvironmentToString(PlanetEnvironment env) {
     switch (env) {
@@ -729,9 +732,9 @@ PlanetType Variable<PlanetType>::Eval(const ScriptingContext& context) const
     else if (property_name == "NextCloserToOriginalPlanetType")
         planet_property = &Planet::NextCloserToOriginalPlanetType;
     else if (property_name == "NextBestPlanetType")
-        planet_property = boost::bind(&Planet::NextBestPlanetTypeForSpecies, boost::placeholders::_1, "");
+        planet_property = [](const Planet& planet) { return planet.NextBestPlanetTypeForSpecies(); };
     else if (property_name == "NextBetterPlanetType")
-        planet_property = boost::bind(&Planet::NextBetterPlanetTypeForSpecies, boost::placeholders::_1, "");
+        planet_property = [](const Planet& planet) { return planet.NextBetterPlanetTypeForSpecies(); };
     else if (property_name == "ClockwiseNextPlanetType")
         planet_property = &Planet::ClockwiseNextPlanetType;
     else if (property_name == "CounterClockwiseNextPlanetType")
@@ -1438,7 +1441,7 @@ std::string Statistic<std::string, std::string>::Eval(const ScriptingContext& co
     auto object_property_values = GetObjectPropertyValues(context, condition_matches);
 
     // count appearances to determine the value that appears the most often
-    std::map<std::string, unsigned int> observed_values;
+    std::unordered_map<std::string, uint32_t> observed_values;
     for (auto& entry : object_property_values)
         observed_values[std::move(entry)]++;
 
@@ -1469,8 +1472,7 @@ TotalFighterShots::TotalFighterShots(std::unique_ptr<ValueRef<int>>&& carrier_id
     this->m_source_invariant = true;
 }
 
-bool TotalFighterShots::operator==(const ValueRef<int>& rhs) const
-{
+bool TotalFighterShots::operator==(const ValueRef<int>& rhs) const {
     if (&rhs == this)
         return true;
     if (typeid(rhs) != typeid(*this))
@@ -1485,8 +1487,7 @@ bool TotalFighterShots::operator==(const ValueRef<int>& rhs) const
     return false;
 }
 
-std::string TotalFighterShots::Description() const
-{
+std::string TotalFighterShots::Description() const {
     std::string retval = "TotalFighterShots(";
     if (m_carrier_id) {
         retval += m_carrier_id->Description();
@@ -1499,8 +1500,7 @@ std::string TotalFighterShots::Description() const
     return retval;
 }
 
-std::string TotalFighterShots::Dump(uint8_t ntabs) const
-{
+std::string TotalFighterShots::Dump(uint8_t ntabs) const {
     std::string retval = "TotalFighterShots";
     if (m_carrier_id)
         retval += " carrier = " + m_carrier_id->Dump();
@@ -1509,15 +1509,14 @@ std::string TotalFighterShots::Dump(uint8_t ntabs) const
     return retval;
 }
 
-void TotalFighterShots::SetTopLevelContent(const std::string& content_name)
-{
+void TotalFighterShots::SetTopLevelContent(const std::string& content_name) {
     if (m_sampling_condition)
         m_sampling_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int TotalFighterShots::GetCheckSum() const
+uint32_t TotalFighterShots::GetCheckSum() const
 {
-    unsigned int retval{0};
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "ValueRef::TotalFighterShots");
     CheckSums::CheckSumCombine(retval, m_carrier_id);
@@ -1526,8 +1525,7 @@ unsigned int TotalFighterShots::GetCheckSum() const
     return retval;
 }
 
-int TotalFighterShots::Eval(const ScriptingContext& context) const
-{
+int TotalFighterShots::Eval(const ScriptingContext& context) const {
     if (!m_carrier_id) {
         ErrorLogger() << "TotalFighterShots condition without carrier id";
         return 0;
@@ -2170,7 +2168,7 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
 
         std::function<int (const Empire*)> empire_property{nullptr};
 
-        empire_property = boost::bind(&Empire::ResourceStockpile, boost::placeholders::_1, res_type);
+        empire_property = [res_type](const Empire* empire) { return empire->ResourceStockpile(res_type); };
 
         using namespace boost::adaptors;
         auto GetRawPtr = [](const auto& smart_ptr){ return smart_ptr.get(); };
@@ -3122,8 +3120,8 @@ void NameLookup::SetTopLevelContent(const std::string& content_name) {
         m_value_ref->SetTopLevelContent(content_name);
 }
 
-unsigned int NameLookup::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t NameLookup::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "ValueRef::NameLookup");
     CheckSums::CheckSumCombine(retval, m_value_ref);
@@ -3552,7 +3550,7 @@ std::string Operation<std::string>::EvalImpl(const ScriptingContext& context) co
         // select one operand, evaluate it, return result
         if (m_operands.empty())
             return "";
-        unsigned int idx = RandInt(0, m_operands.size() - 1);
+        std::ptrdiff_t idx = RandInt(0, m_operands.size() - 1);
         auto& vr = *std::next(m_operands.begin(), idx);
         if (!vr)
             return "";
@@ -3718,7 +3716,7 @@ double Operation<double>::EvalImpl(const ScriptingContext& context) const
             // select one operand, evaluate it, return result
             if (m_operands.empty())
                 return 0.0;
-            unsigned int idx = RandInt(0, m_operands.size() - 1);
+            std::ptrdiff_t idx = RandInt(0, m_operands.size() - 1);
             auto& vr = *std::next(m_operands.begin(), idx);
             if (!vr)
                 return 0.0;
@@ -3906,7 +3904,7 @@ int Operation<int>::EvalImpl(const ScriptingContext& context) const
             // select one operand, evaluate it, return result
             if (m_operands.empty())
                 return 0;
-            unsigned int idx = RandInt(0, m_operands.size() - 1);
+            std::ptrdiff_t idx = RandInt(0, m_operands.size() - 1);
             auto& vr = *std::next(m_operands.begin(), idx);
             if (!vr)
                 return 0;

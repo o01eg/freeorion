@@ -5,10 +5,16 @@ import AIDependencies
 import PolicyAI
 from buildings import BuildingType, iterate_buildings_types
 from colonization.colony_score import debug_rating
-from freeorion_tools import get_game_rule_int, get_named_real, get_species_stability
+from EnumsAI import FocusType
+from freeorion_tools import (
+    get_game_rule_int,
+    get_named_int,
+    get_named_real,
+    get_species_stability,
+)
 from freeorion_tools.caching import cache_for_current_turn
 from PlanetUtilsAI import dislike_factor
-from turn_state import get_colonized_planets, have_worldtree
+from turn_state import get_empire_planets_by_species, have_worldtree, luxury_resources
 from universe.system_network import within_n_jumps
 
 _size_modifier = {
@@ -65,6 +71,17 @@ def _evaluate_policies(species: fo.species) -> float:
     result -= sum(dislike_value for p in empire.adoptedPolicies if p in species.dislikes)
     if PolicyAI.bureaucracy in empire.adoptedPolicies:
         result += get_named_real("PLC_BUREAUCRACY_STABILITY_FLAT")
+    if PolicyAI.diversity in empire.adoptedPolicies:
+        current_species = get_empire_planets_by_species()
+        # The evaluated planet may add another species
+        num_species = len(current_species) + (1 if species not in current_species else 0)
+        diversity_value = num_species - get_named_int("PLC_DIVERSITY_THRESHOLD")
+        diversity_scaling = get_named_real("PLC_DIVERSITY_SCALING")
+        result += diversity_value * diversity_scaling
+    if PolicyAI.capital_markets in empire.adoptedPolicies:
+        for special, planets in luxury_resources().items():
+            if special in species.likes and any(planet.focus == FocusType.FOCUS_INFLUENCE for planet in planets):
+                result += get_named_real("CAPITAL_MARKETS_INFLUENCE_BONUS_SCALING")
     # TBD: add conformance, indoctrination, etc. when the AI learns to use them
     return result
 
@@ -135,16 +152,18 @@ def _evaluate_buildings(planet: fo.planet, species: fo.species) -> float:
 def _evaluate_xenophobia(planet, species) -> float:
     if AIDependencies.Tags.XENOPHOBIC not in species.tags:
         return 0.0
-    colonies = get_colonized_planets()
-    relevant_systems = within_n_jumps(planet.systemID, 5) & set(colonies.keys())
-    result = 0.0
     universe = fo.getUniverse()
-    value = get_named_real("XENOPHOBIC_SELF_TARGET_HAPPINESS_COUNT")
+    max_jumps = get_named_int("XENOPHOBIC_MAX_JUMPS")
+    relevant_systems = within_n_jumps(planet.systemID, max_jumps)
+    penalty_perjump = get_named_real("XENOPHOBIC_TARGET_STABILITY_PERJUMP")
+    result = 0.0
     for sys_id in relevant_systems:
-        for pid in colonies[sys_id]:
+        system = universe.getSystem(sys_id)
+        for pid in system.planetIDs:
             planet_species = universe.getPlanet(pid).speciesName
+            # TODO Do not count owned, different species planets when Racial Purity is adopted. AI doesn't adopt Racial Purity yet.
             if planet_species not in ("SP_EXOBOT", species.name, ""):
-                result += value  # value is negative
+                result += penalty_perjump * (1 + max_jumps - universe.jumpDistance(planet.systemID, pid))
     return result
 
 

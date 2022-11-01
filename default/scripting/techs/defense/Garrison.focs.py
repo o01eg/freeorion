@@ -2,6 +2,7 @@ from common.base_prod import TECH_COST_MULTIPLIER, TROOPS_PER_POP
 from common.priorities import (
     AFTER_ALL_TARGET_MAX_METERS_PRIORITY,
     TARGET_AFTER_SCALING_PRIORITY,
+    TARGET_EARLY_BEFORE_SCALING_PRIORITY,
 )
 
 Tech(
@@ -12,7 +13,7 @@ Tech(
     researchcost=9 * TECH_COST_MULTIPLIER,
     researchturns=3,
     tags=["PEDIA_DEFENSE_CATEGORY"],
-    prerequisites="DEF_ROOT_DEFENSE",
+    prerequisites=["DEF_ROOT_DEFENSE"],
     effectsgroups=[
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner),
@@ -33,7 +34,7 @@ Tech(
     researchcost=25 * TECH_COST_MULTIPLIER,
     researchturns=5,
     tags=["PEDIA_DEFENSE_CATEGORY"],
-    prerequisites="DEF_GARRISON_1",
+    prerequisites=["DEF_GARRISON_1"],
     unlock=Item(type=UnlockPolicy, name="PLC_CHECKPOINTS"),
     effectsgroups=[
         EffectsGroup(
@@ -53,6 +54,7 @@ Tech(
             scope=Planet() & OwnedBy(empire=Source.Owner) & Population(low=0.01),
             stackinggroup="GARRISON_2_TROOPS_STACK",
             accountinglabel="DEF_TECH_ACCOUNTING_LABEL",
+            priority=TARGET_EARLY_BEFORE_SCALING_PRIORITY,
             effects=SetMaxTroops(
                 value=Value
                 + Target.Population * NamedReal(name="GARRISON_2_MAXTROOPS_PERPOP", value=2 * TROOPS_PER_POP)
@@ -70,7 +72,7 @@ Tech(
     researchcost=84 * TECH_COST_MULTIPLIER,
     researchturns=7,
     tags=["PEDIA_DEFENSE_CATEGORY"],
-    prerequisites="DEF_GARRISON_2",
+    prerequisites=["DEF_GARRISON_2"],
     effectsgroups=[
         EffectsGroup(
             scope=Planet()
@@ -104,7 +106,7 @@ Tech(
     researchcost=216 * TECH_COST_MULTIPLIER,
     researchturns=9,
     tags=["PEDIA_DEFENSE_CATEGORY"],
-    prerequisites="DEF_GARRISON_3",
+    prerequisites=["DEF_GARRISON_3"],
     unlock=Item(type=UnlockPolicy, name="PLC_MARTIAL_LAW"),
     effectsgroups=[
         EffectsGroup(
@@ -124,6 +126,7 @@ Tech(
             scope=Planet() & OwnedBy(empire=Source.Owner) & Population(low=0.01),
             stackinggroup="GARRISON_4_TROOPS_STACK",
             accountinglabel="DEF_TECH_ACCOUNTING_LABEL",
+            priority=TARGET_EARLY_BEFORE_SCALING_PRIORITY,
             effects=SetMaxTroops(
                 value=Value
                 + Target.Population * NamedReal(name="GARRISON_4_MAX_TROOPS_PERPOP", value=3 * TROOPS_PER_POP)

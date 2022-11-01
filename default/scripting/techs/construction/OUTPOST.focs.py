@@ -35,7 +35,7 @@ Tech(
         ),
         # Influence growth / reduction towards target, since outposts have no species to get this effect from
         EffectsGroup(
-            scope=Planet() & OwnedBy(empire=Source.Owner) & (~Species),
+            scope=Planet() & OwnedBy(empire=Source.Owner) & (~HasSpecies()),
             priority=AFTER_ALL_TARGET_MAX_METERS_PRIORITY,
             effects=SetHappiness(
                 value=Value
@@ -46,7 +46,7 @@ Tech(
         # Reset influence to 0 if no policies adopted. Not really relevant to Outposts, but I need somewhere to put this...
         EffectsGroup(
             scope=Source,
-            activation=EmpireStockpile(empire=Source.Owner, resource=Influence, high=0)
+            activation=HasEmpireStockpile(empire=Source.Owner, resource=Influence, high=0)
             & (NumPoliciesAdopted(empire=Source.Owner) == 0),
             priority=METER_OVERRIDE_PRIORITY,
             effects=SetEmpireStockpile(resource=Influence, value=0.0),

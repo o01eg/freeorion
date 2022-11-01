@@ -30,14 +30,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-11]
+        os: [macos-11, macos-12]
     env:
       CACHE_NAME: macos-full
       CMAKE_BUILD_PARALLEL_LEVEL: 2
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Clean up Mono
         run: sudo ./.github/workflows/mono-uninstall.sh
       - name: Prepare ccache timestamp
@@ -45,9 +45,9 @@ jobs:
         shell: cmake -P {0}
         run: |
           string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
-          message("::set-output name=timestamp::${current_date}")
+          file(APPEND "$ENV{GITHUB_OUTPUT}" "timestamp=${current_date}")
       - name: Cache compilation
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/Library/Caches/
           key: build-${{ matrix.os }}-ccache-${{ steps.build-macos-ccache-timestamp.outputs.timestamp }}
@@ -73,5 +73,19 @@ jobs:
           alias cmake="/usr/local/bin/gtimeout 40m /usr/local/bin/cmake"
           cd build
           cmake --build . --config Release -- -parallelizeTargets
+      - name: Generate binaries
+        run: |
+          export PATH="/usr/local/opt/ccache/libexec:$PATH"
+          alias cmake="/usr/local/bin/gtimeout 40m /usr/local/bin/cmake"
+          cd build
+          cmake --build . --config Release --target package -- -parallelizeTargets
           ccache --cleanup
           ccache --show-stats || true
+      - name: Decrypt deploy SSH key
+        if: github.ref == 'refs/heads/weekly-test-builds' && github.event_name == 'push' && matrix.os == 'macos-11'
+        run: bash .github/pre-deploy.sh
+        env:
+          DEPLOY_SSH_PASSWORD: ${{ secrets.DEPLOY_SSH_PASSWORD }}
+      - name: Upload binaries only
+        if: github.ref == 'refs/heads/weekly-test-builds' && github.event_name == 'push' && matrix.os == 'macos-11'
+        run: bash -c 'scp build/FreeOrion_*_Test_MacOSX_10.12.dmg o01eg@frs.sourceforge.net:/home/frs/project/freeorion/FreeOrion/Test/'

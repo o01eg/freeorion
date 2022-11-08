@@ -153,7 +153,7 @@ namespace {
     constexpr std::array<char, 4> some_chars4{50, 60, ch(192), 80}; // two ascii chars, then an invalid first byte
     static_assert(!IsValidUTF8(some_chars4));
 
-    constexpr bool IsControlChar(const uint8_t c)
+    constexpr bool IsControlChar(const uint8_t c) noexcept
     { return c < 0x20 || c == 0x7F || (c >= 0x81 && c <= 0x9F); }
 
     constexpr std::string_view formatting_chars = "<>;:,.@#$%&*(){}'\"/?\\`[]|\a\b\f\n\r\t\b";
@@ -278,7 +278,7 @@ NewFleetOrder::NewFleetOrder(int empire, std::string fleet_name,
         return;
 }
 
-bool NewFleetOrder::Aggressive() const
+bool NewFleetOrder::Aggressive() const noexcept
 { return m_aggression == FleetAggression::FLEET_AGGRESSIVE; }
 
 std::string NewFleetOrder::Dump() const {
@@ -312,7 +312,7 @@ bool NewFleetOrder::Check(int empire, const std::string& fleet_name, const std::
     int system_id = INVALID_OBJECT_ID;
 
     std::set<int> arrival_starlane_ids;
-    for (const auto& ship : context.ContextObjects().findRaw<Ship>(ship_ids)) {
+    for (const auto* ship : context.ContextObjects().findRaw<Ship>(ship_ids)) {
         if (!ship) {
             ErrorLogger() << "Empire " << empire << " attempted to create a new fleet (" << fleet_name
                           << ") with an invalid ship";
@@ -333,7 +333,7 @@ bool NewFleetOrder::Check(int empire, const std::string& fleet_name, const std::
     }
 
 
-    for (const auto& ship : context.ContextObjects().findRaw<Ship>(ship_ids)) {
+    for (const auto* ship : context.ContextObjects().findRaw<Ship>(ship_ids)) {
         // verify that empire is not trying to take ships from somebody else's fleet
         if (!ship->OwnedBy(empire)) {
             ErrorLogger() << "Empire " << empire << " attempted to create a new fleet (" << fleet_name
@@ -808,7 +808,9 @@ bool ColonizeOrder::Check(int empire_id, int ship_id, int planet_id,
         ErrorLogger() << "ColonizeOrder::Check() : given planet that empire has insufficient visibility of";
         return false;
     }
-    if (colonist_capacity > 0.0f && planet->EnvironmentForSpecies(ship->SpeciesName()) < PlanetEnvironment::PE_HOSTILE) {
+    if (colonist_capacity > 0.0f &&
+        planet->EnvironmentForSpecies(context, ship->SpeciesName()) < PlanetEnvironment::PE_HOSTILE)
+    {
         ErrorLogger() << "ColonizeOrder::Check() : nonzero colonist capacity, " << colonist_capacity
                       << ", and planet " << planet->Name() << " of type, " << planet->Type() << ", that ship's species, "
                       << ship->SpeciesName() << ", can't colonize";
@@ -1138,21 +1140,26 @@ std::string ChangeFocusOrder::Dump() const
 { return UserString("ORDER_FOCUS_CHANGE"); }
 
 bool ChangeFocusOrder::Check(int empire_id, int planet_id, const std::string& focus,
-                             const ScriptingContext& context) {
-    auto planet = context.ContextObjects().get<Planet>(planet_id);
+                             const ScriptingContext& context)
+{
+    auto planet = context.ContextObjects().getRaw<Planet>(planet_id);
 
     if (!planet) {
-        ErrorLogger() << "Illegal planet id specified in change planet focus order.";
+        ErrorLogger() << "Invalid planet id " << planet_id << " specified in change planet focus order.";
         return false;
     }
 
     if (!planet->OwnedBy(empire_id)) {
-        ErrorLogger() << "Empire attempted to issue change planet focus to another's planet.";
+        ErrorLogger() << "Empire " << empire_id
+                      << " attempted to issue change planet focus to another's planet: " << planet_id;
         return false;
     }
 
-    if constexpr (false) {    // todo: verify that focus is valid for specified planet
-        ErrorLogger() << "IssueChangeFocusOrder : invalid focus specified";
+    if (!planet->FocusAvailable(focus, context)) {
+        ErrorLogger() << "IssueChangeFocusOrder : invalid focus (" << focus
+                      << ") for specified for planet " << planet_id << " and empire " << empire_id;
+        // TODO: further clarify why invalid? get species and check that it has the focus, and then
+        //       if the location condition fails?
         return false;
     }
 
@@ -1165,9 +1172,9 @@ void ChangeFocusOrder::ExecuteImpl(ScriptingContext& context) const {
     if (!Check(EmpireID(), m_planet, m_focus, context))
         return;
 
-    auto planet = context.ContextObjects().get<Planet>(m_planet);
+    auto planet = context.ContextObjects().getRaw<Planet>(m_planet);
 
-    planet->SetFocus(m_focus);
+    planet->SetFocus(m_focus, context);
 }
 
 ////////////////////////////////////////////////

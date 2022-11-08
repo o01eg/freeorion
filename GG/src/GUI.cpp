@@ -43,7 +43,7 @@ struct AcceleratorEcho
 {
     AcceleratorEcho(Key key, Flags<ModKey> mod_keys) :
         m_str(std::string{"GG SIGNAL : GUI::AcceleratorSignal(key="}.append(to_string(key))
-              .append(" mod_keys=").append(boost::lexical_cast<std::string>(mod_keys)).append(")"))
+              .append(" mod_keys=").append(to_string(mod_keys)).append(")"))
     {}
     bool operator()()
     {
@@ -1141,7 +1141,7 @@ void GUI::SaveWndAsPNG(const Wnd* wnd, const std::string& filename) const
 }
 
 void GUI::HandleGGEvent(EventType event, Key key, std::uint32_t key_code_point,
-                        Flags<ModKey> mod_keys, const Pt& pos, const Pt& rel, std::string text)
+                        Flags<ModKey> mod_keys, Pt pos, Pt rel, std::string text)
 {
     m_impl->m_mod_keys = mod_keys;
 
@@ -1316,7 +1316,8 @@ void GUI::MoveUp(const std::shared_ptr<Wnd>& wnd)
 void GUI::MoveDown(const std::shared_ptr<Wnd>& wnd)
 { if (wnd) m_impl->m_zlist.MoveDown(wnd); }
 
-void GUI::RegisterDragDropWnd(std::shared_ptr<Wnd> wnd, const Pt& offset, std::shared_ptr<Wnd> originating_wnd)
+void GUI::RegisterDragDropWnd(std::shared_ptr<Wnd> wnd, Pt offset,
+                              std::shared_ptr<Wnd> originating_wnd)
 {
     assert(wnd);
 
@@ -1793,7 +1794,7 @@ std::shared_ptr<Wnd> GUI::ModalWindow() const
     return nullptr;
 }
 
-std::shared_ptr<Wnd> GUI::CheckedGetWindowUnder(const Pt& pt, Flags<ModKey> mod_keys)
+std::shared_ptr<Wnd> GUI::CheckedGetWindowUnder(Pt pt, Flags<ModKey> mod_keys)
 {
     auto wnd_under_pt = GetWindowUnder(pt);
     const auto& dragged_wnd = m_impl->m_curr_drag_wnd; // wnd being continuously repositioned / dragged around, not a drag-drop

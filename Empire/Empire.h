@@ -126,10 +126,9 @@ public:
     [[nodiscard]] const std::string&           MostRPCostLeftResearchableTech(const ScriptingContext& context) const;
 
     [[nodiscard]] const Meter*                 GetMeter(std::string_view name) const;
-    [[nodiscard]] auto                         meter_begin() const { return m_meters.cbegin(); }
-    [[nodiscard]] auto                         meter_end() const   { return m_meters.cend(); }
+    [[nodiscard]] const auto&                  GetMeters() const noexcept { return m_meters; }
 
-    [[nodiscard]] const ResearchQueue&         GetResearchQueue() const;              ///< Returns the queue of techs being or queued to be researched.
+    [[nodiscard]] const ResearchQueue&         GetResearchQueue() const noexcept { return m_research_queue; }
     [[nodiscard]] const ProductionQueue&       GetProductionQueue() const noexcept { return m_production_queue; }
     [[nodiscard]] const InfluenceQueue&        GetInfluenceQueue() const noexcept { return m_influence_queue; }
 
@@ -149,20 +148,20 @@ public:
     [[nodiscard]] float       ProductionStatus(int i, const ScriptingContext& context) const; ///< Returns the PPs spent towards item \a i in the build queue if it has partial progress, -1.0 if there is no such index in the production queue.
 
     /** Return true iff this empire can produce the specified item at the specified location. */
-    [[nodiscard]] bool        ProducibleItem(BuildType build_type, int location, // TODO: remove default context
-                                             const ScriptingContext& context = ScriptingContext{}) const;
+    [[nodiscard]] bool        ProducibleItem(BuildType build_type, int location,
+                                             const ScriptingContext& context) const;
     [[nodiscard]] bool        ProducibleItem(BuildType build_type, const std::string& name, int location,
-                                             const ScriptingContext& context = ScriptingContext{}) const;
+                                             const ScriptingContext& context) const;
     [[nodiscard]] bool        ProducibleItem(BuildType build_type, int design_id, int location,
-                                             const ScriptingContext& context = ScriptingContext{}) const;
+                                             const ScriptingContext& context) const;
     [[nodiscard]] bool        ProducibleItem(const ProductionQueue::ProductionItem& item, int location,
-                                             const ScriptingContext& context = ScriptingContext{}) const;
+                                             const ScriptingContext& context) const;
 
     /** Return true iff this empire can enqueue the specified item at the specified location. */
     [[nodiscard]] bool        EnqueuableItem(BuildType build_type, const std::string& name, int location,
-                                             const ScriptingContext& context = ScriptingContext{}) const;
+                                             const ScriptingContext& context) const;
     [[nodiscard]] bool        EnqueuableItem(const ProductionQueue::ProductionItem& item, int location,
-                                             const ScriptingContext& context = ScriptingContext{}) const;
+                                             const ScriptingContext& context) const;
 
     [[nodiscard]] bool        HasExploredSystem(int ID) const;                            ///< returns  true if the given item is in the appropriate list, false if it is not.
 

@@ -90,8 +90,9 @@ namespace {
                           << "  strings: " << [it=first, last]() mutable -> std::string
                             {
                                 std::string retval;
+                                retval.reserve(100); // guesstimate
                                 for (; it != last; ++it)
-                                    retval += *it + " ";
+                                    retval.append(*it).append(" ");
                                 return retval;
                             }()
                           << " source: " << (context.source ? context.source->Name() : "0")
@@ -732,9 +733,9 @@ PlanetType Variable<PlanetType>::Eval(const ScriptingContext& context) const
     else if (property_name == "NextCloserToOriginalPlanetType")
         planet_property = &Planet::NextCloserToOriginalPlanetType;
     else if (property_name == "NextBestPlanetType")
-        planet_property = [](const Planet& planet) { return planet.NextBestPlanetTypeForSpecies(); };
+        planet_property = [&context](const Planet& p) { return p.NextBestPlanetTypeForSpecies(context); };
     else if (property_name == "NextBetterPlanetType")
-        planet_property = [](const Planet& planet) { return planet.NextBetterPlanetTypeForSpecies(); };
+        planet_property = [&context](const Planet& p) { return p.NextBetterPlanetTypeForSpecies(context); };
     else if (property_name == "ClockwiseNextPlanetType")
         planet_property = &Planet::ClockwiseNextPlanetType;
     else if (property_name == "CounterClockwiseNextPlanetType")
@@ -768,7 +769,7 @@ PlanetEnvironment Variable<PlanetEnvironment>::Eval(const ScriptingContext& cont
         }
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
             auto p = static_cast<const Planet*>(object);
-            return p->EnvironmentForSpecies();
+            return p->EnvironmentForSpecies(context);
         }
 
         return PlanetEnvironment::INVALID_PLANET_ENVIRONMENT;
@@ -1265,7 +1266,7 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
     else if (property_name == "AvailableFoci") {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
             auto planet = static_cast<const Planet*>(object);
-            return planet->AvailableFoci();
+            return planet->AvailableFoci(context);
         }
         return {};
     }
@@ -1390,11 +1391,11 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
         const Species* species = nullptr;
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
             auto planet = static_cast<const Planet*>(object);
-            species = GetSpecies(planet->SpeciesName());
+            species = context.species.GetSpecies(planet->SpeciesName());
 
         } else if (object->ObjectType() == UniverseObjectType::OBJ_SHIP) {
             auto ship = static_cast<const Ship*>(object);
-            species = GetSpecies(ship->SpeciesName());
+            species = context.species.GetSpecies(ship->SpeciesName());
         }
         if (species)
             return species->DefaultFocus();
@@ -1566,7 +1567,7 @@ PlanetEnvironment ComplexVariable<PlanetEnvironment>::Eval(const ScriptingContex
         std::string species_name;
         if (m_string_ref1)
             species_name = m_string_ref1->Eval(context);
-        return planet->EnvironmentForSpecies(species_name);
+        return planet->EnvironmentForSpecies(context, species_name);
     }
 
     return PlanetEnvironment::INVALID_PLANET_ENVIRONMENT;

@@ -85,9 +85,10 @@ namespace {
     auto SpeciesFoci(const Species& species) -> std::vector<std::string>
     {
         std::vector<std::string> retval;
-        retval.reserve(species.Foci().size());
-        for (const FocusType& focus : species.Foci())
-            retval.push_back(focus.Name());
+        const auto& foci = species.Foci();
+        retval.reserve(foci.size());
+        std::transform(foci.begin(), foci.end(), std::back_inserter(retval),
+                       [](const auto& f) { return f.Name(); });
         return retval;
     }
 
@@ -724,7 +725,7 @@ namespace FreeOrionPython {
             .add_property("type",                           &Planet::Type)
             .add_property("originalType",                   &Planet::OriginalType)
             .add_property("distanceFromOriginalType",       &Planet::DistanceFromOriginalType)
-            .def("environmentForSpecies",                   &Planet::EnvironmentForSpecies)
+            .def("environmentForSpecies",                   +[](const Planet& planet, const std::string& species) { return planet.EnvironmentForSpecies(ScriptingContext{}, species); })
             .def("nextBetterPlanetTypeForSpecies",          &Planet::NextBetterPlanetTypeForSpecies)
             .add_property("clockwiseNextPlanetType",        &Planet::ClockwiseNextPlanetType)
             .add_property("counterClockwiseNextPlanetType", &Planet::CounterClockwiseNextPlanetType)

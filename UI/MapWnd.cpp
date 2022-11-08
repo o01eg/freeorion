@@ -701,12 +701,12 @@ public:
 
         // get selected fleet speeds and detection ranges
         std::set<double> fixed_distances;
-        for (const auto& fleet : Objects().findRaw<Fleet>(fleet_ids)) {
+        for (const auto* fleet : Objects().findRaw<Fleet>(fleet_ids)) {
             if (!fleet)
                 continue;
             if (fleet->Speed(Objects()) > 20)
                 fixed_distances.insert(fleet->Speed(Objects()));
-            for (const auto& ship : Objects().findRaw<Ship>(fleet->ShipIDs())) {
+            for (const auto* ship : Objects().findRaw<Ship>(fleet->ShipIDs())) {
                 if (!ship)
                     continue;
                 const float ship_range = ship->GetMeter(MeterType::METER_DETECTION)->Initial();
@@ -718,8 +718,8 @@ public:
             }
         }
         // get detection ranges for planets in the selected system (if any)
-        if (const auto system = Objects().get<System>(sel_system_id).get()) {
-            for (const auto& planet : Objects().findRaw<Planet>(system->PlanetIDs())) {
+        if (const auto* system = Objects().getRaw<System>(sel_system_id)) {
+            for (const auto* planet : Objects().findRaw<Planet>(system->PlanetIDs())) {
                 if (!planet)
                     continue;
                 const float planet_range = planet->GetMeter(MeterType::METER_DETECTION)->Initial();
@@ -1567,19 +1567,19 @@ void MapWnd::InitializeWindows() {
 
     // situation report window
     const GG::Pt sitrep_ul(SCALE_LINE_MAX_WIDTH + LAYOUT_MARGIN, m_toolbar->Bottom());
-    const GG::Pt sitrep_wh(SITREP_PANEL_WIDTH, SITREP_PANEL_HEIGHT);
+    static constexpr GG::Pt sitrep_wh(SITREP_PANEL_WIDTH, SITREP_PANEL_HEIGHT);
 
     // encyclopedia panel
     const GG::Pt pedia_ul(SCALE_LINE_MAX_WIDTH + LAYOUT_MARGIN, m_toolbar->Bottom() + SITREP_PANEL_HEIGHT);
-    const GG::Pt pedia_wh(SITREP_PANEL_WIDTH*3/2, SITREP_PANEL_HEIGHT*3);
+    static constexpr GG::Pt pedia_wh(SITREP_PANEL_WIDTH*3/2, SITREP_PANEL_HEIGHT*3);
 
     // objects list
     const GG::Pt object_list_ul(SCALE_LINE_MAX_WIDTH/2, m_scale_line->Bottom() + GG::Y(LAYOUT_MARGIN));
-    const GG::Pt object_list_wh(SITREP_PANEL_WIDTH*2, SITREP_PANEL_HEIGHT*3);
+    static constexpr GG::Pt object_list_wh(SITREP_PANEL_WIDTH*2, SITREP_PANEL_HEIGHT*3);
 
     // moderator actions
     const GG::Pt moderator_ul(GG::X0, m_scale_line->Bottom() + GG::Y(LAYOUT_MARGIN));
-    const GG::Pt moderator_wh(SITREP_PANEL_WIDTH, SITREP_PANEL_HEIGHT);
+    static constexpr GG::Pt moderator_wh(SITREP_PANEL_WIDTH, SITREP_PANEL_HEIGHT);
 
     // Combat report
     static constexpr GG::Pt combat_log_ul(GG::X(150), GG::Y(50));
@@ -1587,7 +1587,7 @@ void MapWnd::InitializeWindows() {
 
     // government window
     const GG::Pt gov_ul(GG::X0, m_scale_line->Bottom() + m_scale_line->Height() + GG::Y(LAYOUT_MARGIN*2));
-    const GG::Pt gov_wh(SITREP_PANEL_WIDTH*2, SITREP_PANEL_HEIGHT*3);
+    static constexpr GG::Pt gov_wh(SITREP_PANEL_WIDTH*2, SITREP_PANEL_HEIGHT*3);
 
     m_side_panel->       InitSizeMove(sidepanel_ul,     sidepanel_ul + sidepanel_wh);
     m_sitrep_panel->     InitSizeMove(sitrep_ul,        sitrep_ul + sitrep_wh);
@@ -2057,7 +2057,7 @@ void MapWnd::RenderSystems() {
         bool has_neutrals = false;
         colony_count_by_empire_id.clear();
 
-        for (const auto& planet : objects.findRaw<const Planet>(system->PlanetIDs())) {
+        for (const auto* planet : objects.findRaw<const Planet>(system->PlanetIDs())) {
             if (known_destroyed_object_ids.count(planet->ID()) > 0)
                 continue;
 
@@ -2498,9 +2498,9 @@ namespace {
     {
         std::unordered_map<GG::Clr, std::vector<std::pair<GG::Pt, GG::Pt>>, hash_clr> retval;
 
-        for (const auto& fleet : context.ContextObjects().findRaw<Fleet>(fleet_ids)) {
+        for (const auto* fleet : context.ContextObjects().findRaw<Fleet>(fleet_ids)) {
             float fleet_detection_range = 0.0f;
-            for (const auto& ship : context.ContextObjects().findRaw<Ship>(fleet->ShipIDs())) {
+            for (const auto* ship : context.ContextObjects().findRaw<Ship>(fleet->ShipIDs())) {
                 if (const Meter* detection_meter = ship->GetMeter(MeterType::METER_DETECTION))
                     fleet_detection_range = std::max(fleet_detection_range, detection_meter->Current());
             }
@@ -4589,7 +4589,7 @@ void MapWnd::ReselectLastFleet() {
 
     // search through stored selected fleets' ids and remove ids of missing fleets
     std::set<int> missing_fleets;
-    for (const auto& fleet : objects.findRaw<Fleet>(m_selected_fleet_ids)) {
+    for (const auto* fleet : objects.findRaw<Fleet>(m_selected_fleet_ids)) {
         if (fleet)
             missing_fleets.insert(fleet->ID());
     }
@@ -5213,7 +5213,7 @@ void MapWnd::CreateFleetButtonsOfType(FleetButtonMap& type_fleet_buttons,
 
         // sort fleets by position
         std::map<std::pair<double, double>, std::vector<int>> fleet_positions_ids;
-        for (const auto& fleet : Objects().findRaw<Fleet>(fleet_IDs)) {
+        for (const auto* fleet : Objects().findRaw<Fleet>(fleet_IDs)) {
             if (!fleet)
                 continue;
             fleet_positions_ids[{fleet->X(), fleet->Y()}].emplace_back(fleet->ID());
@@ -5496,7 +5496,7 @@ void MapWnd::SystemRightClicked(int system_id, GG::Flags<GG::ModKey> mod_keys) {
             if (!system)
                 return;
 
-            for (auto& obj : Objects().findRaw<const UniverseObject>(system->ContainedObjectIDs())) {
+            for (auto* obj : Objects().findRaw<const UniverseObject>(system->ContainedObjectIDs())) {
                 UniverseObjectType obj_type = obj->ObjectType();
                 if (obj_type >= UniverseObjectType::OBJ_BUILDING && obj_type < UniverseObjectType::OBJ_SYSTEM) {
                     net.SendMessage(ModeratorActionMessage(
@@ -5616,7 +5616,7 @@ void MapWnd::PlotFleetMovement(int system_id, bool execute_move, bool append) {
     const Universe& universe{context.ContextUniverse()};
 
     // apply to all selected this-player-owned fleets in currently-active FleetWnd
-    for (const auto& fleet : objects.findRaw<Fleet>(fleet_ids)) {
+    for (const auto* fleet : objects.findRaw<Fleet>(fleet_ids)) {
         if (!fleet)
             continue;
 
@@ -5871,7 +5871,7 @@ void MapWnd::FleetButtonRightClicked(const FleetButton* fleet_btn) {
     std::vector<int> sensor_ghosts;
 
     // find sensor ghosts
-    for (const auto& fleet : Objects().findRaw<Fleet>(fleet_ids)) {
+    for (const auto* fleet : Objects().findRaw<Fleet>(fleet_ids)) {
         if (!fleet)
             continue;
         if (fleet->OwnedBy(empire_id))
@@ -7029,6 +7029,8 @@ void MapWnd::RefreshIndustryResourceIndicator() {
 }
 
 void MapWnd::RefreshPopulationIndicator() {
+    // TODO: make a ScriptingContext and use instead of free GetEmpire, Objects, etc.
+
     float target_population = 0.0f;
     Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (!empire) {
@@ -7046,20 +7048,21 @@ void MapWnd::RefreshPopulationIndicator() {
     std::map<std::string, float> tag_counts;
     std::map<std::string, int>   tag_worlds;
     const ObjectMap& objects = Objects();
+    const SpeciesManager& sm = GetSpeciesManager();
 
     //tally up all species population counts
-    for (const auto& pc : objects.findRaw<PopCenter>(pop_center_ids)) {
+    for (const auto* pc : objects.findRaw<PopCenter>(pop_center_ids)) {
         if (!pc)
             continue;
 
-        const std::string& species_name = pc->SpeciesName();
+        const auto& species_name = pc->SpeciesName();
         if (species_name.empty())
             continue;
         float this_pop = pc->GetMeter(MeterType::METER_POPULATION)->Initial();
         population_counts[species_name] += this_pop;
         population_worlds[species_name] += 1;
-        if (const Species* species = GetSpecies(species_name) ) {
-            for (auto& tag : species->Tags()) {
+        if (const Species* species = sm.GetSpecies(species_name) ) {
+            for (auto tag : species->Tags()) {
                 tag_counts[std::string{tag}] += this_pop;
                 tag_worlds[std::string{tag}] += 1;
             }
@@ -7369,7 +7372,7 @@ bool MapWnd::ZoomToSystemWithWastedPP() {
     if (obj_group.empty())
         return false; // shouldn't happen?
     for (const auto& obj_ids : wasted_PP_objects) {
-        for (const auto& obj : Objects().findRaw<UniverseObject>(obj_ids)) {
+        for (const auto* obj : Objects().findRaw<UniverseObject>(obj_ids)) {
             if (obj && obj->SystemID() != INVALID_OBJECT_ID) {
                 // found object with wasted PP that is in a system.  zoom there.
                 CenterOnObject(obj->SystemID());
@@ -7895,7 +7898,7 @@ void MapWnd::DispatchFleetsExploring() {
 
     // clean the fleet list by removing non-existing fleet, and extract the
     // fleets waiting for orders
-    for (const auto& fleet : objects.findRaw<Fleet>(m_fleets_exploring)) {
+    for (const auto* fleet : objects.findRaw<Fleet>(m_fleets_exploring)) {
         if (!fleet)
             continue;
         if (destroyed_objects.count(fleet->ID())) {
@@ -7925,7 +7928,7 @@ void MapWnd::DispatchFleetsExploring() {
 
     // Populate list of unexplored systems
     SystemIDListType unexplored_systems;
-    for (const auto& system : objects.findRaw<System>(candidates_unknown_systems)) {
+    for (const auto* system : objects.findRaw<System>(candidates_unknown_systems)) {
         if (!system)
             continue;
         if (!empire->HasExploredSystem(system->ID()) &&
@@ -7949,7 +7952,7 @@ void MapWnd::DispatchFleetsExploring() {
 
     // Determine fleet routes for each unexplored system
     std::unordered_map<int, int> fleet_route_count;
-    for (const auto& unexplored_system : objects.findRaw<System>(unexplored_systems)) {
+    for (const auto* unexplored_system : objects.findRaw<System>(unexplored_systems)) {
         if (!unexplored_system)
             continue;
 

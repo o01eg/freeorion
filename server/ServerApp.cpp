@@ -316,20 +316,8 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
 ServerApp* ServerApp::GetApp()
 { return static_cast<ServerApp*>(s_app); }
 
-Universe& ServerApp::GetUniverse() noexcept
-{ return m_universe; }
-
-EmpireManager& ServerApp::Empires()
-{ return m_empires; }
-
 Empire* ServerApp::GetEmpire(int id)
 { return m_empires.GetEmpire(id).get(); }
-
-SupplyManager& ServerApp::GetSupplyManager()
-{ return m_supply_manager; }
-
-SpeciesManager& ServerApp::GetSpeciesManager()
-{ return m_species_manager; }
 
 const Species* ServerApp::GetSpecies(std::string_view name)
 { return m_species_manager.GetSpecies(name); }
@@ -337,17 +325,8 @@ const Species* ServerApp::GetSpecies(std::string_view name)
 ObjectMap& ServerApp::EmpireKnownObjects(int empire_id)
 { return m_universe.EmpireKnownObjects(empire_id); }
 
-ServerNetworking& ServerApp::Networking()
-{ return m_networking; }
-
-std::string ServerApp::GetVisibleObjectName(std::shared_ptr<const UniverseObject> object) {
-    if (!object) {
-        ErrorLogger() << "ServerApp::GetVisibleObjectName(): expected non null object pointer.";
-        return std::string();
-    }
-
-    return object->Name();
-}
+std::string ServerApp::GetVisibleObjectName(const UniverseObject& object)
+{ return object.Name(); }
 
 void ServerApp::Run() {
     DebugLogger() << "FreeOrion server waiting for network events";
@@ -726,7 +705,7 @@ namespace {
                 // determine population centers and resource centers of empire, tells resource pools
                 // the centers and groups of systems that can share resources (note that being able to
                 // share resources doesn't mean a system produces resources)
-                empire->InitResourcePools(context.ContextObjects());
+                empire->InitResourcePools(context.ContextObjects(), context.supply);
 
                 // determine how much of each resources is available in each resource sharing group
                 empire->UpdateResourcePools(context);
@@ -812,7 +791,7 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
 
     // update visibility information to ensure data sent out is up-to-date
     DebugLogger() << "ServerApp::NewGameInitConcurrentWithJoiners: Updating first-turn Empire stuff";
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
 
     // initialize empire owned object counters
     for (auto& entry : m_empires)
@@ -1113,7 +1092,7 @@ void ServerApp::PushChatMessage(const std::string& text,
                                 std::array<uint8_t, 4> text_color,
                                 const boost::posix_time::ptime& timestamp)
 {
-    ChatHistoryEntity chat{timestamp, player_name, text, text_color};
+    ChatHistoryEntity chat{player_name, text, timestamp, text_color};
     m_chat_history.push_back(chat);
 
     bool success = false;
@@ -1805,7 +1784,7 @@ bool ServerApp::IsAuthSuccessAndFillRoles(const std::string& player_name, const 
 }
 
 std::vector<PlayerSetupData> ServerApp::FillListPlayers() {
-    std::list<PlayerSetupData> result;
+    std::vector<PlayerSetupData> result;
     bool success = false;
     try {
         m_python_server.SetCurrentDir(GetPythonAuthDir());
@@ -1826,10 +1805,10 @@ std::vector<PlayerSetupData> ServerApp::FillListPlayers() {
 
     if (!success) {
         ErrorLogger() << "Python scripted player list failed.";
-        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
-                                                                      false));
+        ServerApp::GetApp()->Networking().SendMessageAll(
+            ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
     }
-    return {result.begin(), result.end()};
+    return result;
 }
 
 void ServerApp::AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
@@ -2071,7 +2050,7 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
 }
 
 std::vector<std::string> ServerApp::GetPlayerDelegation(const std::string& player_name) {
-    std::list<std::string> result;
+    std::vector<std::string> result;
     bool success = false;
     try {
         m_python_server.SetCurrentDir(GetPythonAuthDir());
@@ -2688,7 +2667,7 @@ namespace {
                     auto damaged_obj_it = empire_known_objects.find(damaged_object_id);
                     if (damaged_obj_it == empire_known_objects.end())
                         continue;
-                    if (damaged_obj_it->second < Visibility::VIS_BASIC_VISIBILITY)
+                    if (damaged_obj_it->second < Visibility::VIS_PARTIAL_VISIBILITY)
                         continue;
 
                     if (auto empire = combat_info.GetEmpire(viewing_empire_id))
@@ -2832,7 +2811,9 @@ namespace {
 
         float colonist_capacity = ship->ColonyCapacity(universe);
 
-        if (colonist_capacity > 0.0f && planet->EnvironmentForSpecies(species_name) < PlanetEnvironment::PE_HOSTILE) {
+        if (colonist_capacity > 0.0f &&
+            planet->EnvironmentForSpecies(ScriptingContext{}, species_name) < PlanetEnvironment::PE_HOSTILE)
+        {
             ErrorLogger() << "ColonizePlanet nonzero colonist capacity and planet that ship's species can't colonize";
             return false;
         }
@@ -2993,11 +2974,13 @@ namespace {
 
     /** Determines which ships ordered to invade planets, does invasion and
       * ground combat resolution */
-    void HandleInvasion(EmpireManager& empires, Universe& universe) {
+    void HandleInvasion(ScriptingContext& context) {
         std::map<int, std::map<int, double>> planet_empire_troops;  // map from planet ID to map from empire ID to pair consisting of set of ship IDs and amount of troops empires have at planet
         std::vector<Ship*> invade_ships;
-        ObjectMap& objects = universe.Objects();
-        const auto& empire_ids = empires.EmpireIDs();
+        Universe& universe = context.ContextUniverse();
+        ObjectMap& objects = context.ContextObjects();
+        EmpireManager& empires = context.Empires();
+        const auto& empire_ids = context.EmpireIDs();
 
         // collect ships that are invading and the troops they carry
         for (auto* ship : objects.allRaw<Ship>()) {
@@ -3102,7 +3085,7 @@ namespace {
                 // if planet is unowned and victor is an empire, or if planet is
                 // owned by an empire that is not the victor, conquer it
                 if ((victor_id != ALL_EMPIRES) && (planet->Unowned() || !planet->OwnedBy(victor_id))) {
-                    planet->Conquer(victor_id, empires, universe);
+                    planet->Conquer(victor_id, context);
 
                     // create planet conquered sitrep for all involved empires
                     for (int empire_id : all_involved_empires) {
@@ -3117,7 +3100,7 @@ namespace {
 
                 } else if (!planet->Unowned() && victor_id == ALL_EMPIRES) {
                     int previous_owner_id = planet->Owner();
-                    planet->Conquer(ALL_EMPIRES, empires, universe);
+                    planet->Conquer(ALL_EMPIRES, context);
                     DebugLogger() << "Independents conquer planet";
                     for (const auto& empire_troops : empires_troops)
                         DebugLogger() << " empire: " << empire_troops.first << ": " << empire_troops.second;
@@ -3260,29 +3243,26 @@ namespace {
 
     /** Destroys suitable objects that have been ordered scrapped.*/
     void HandleScrapping(Universe& universe, EmpireManager& empires) {
-        std::vector<Ship*> scrapped_ships;
         ObjectMap& objects{universe.Objects()};
         const auto& empire_ids = empires.EmpireIDs();
 
-        for (auto* ship : objects.allRaw<Ship>()) {
-            if (ship->OrderedScrapped())
-                scrapped_ships.push_back(ship);
-        }
-
-        for (auto& ship : scrapped_ships) {
+        const auto scrapped_ships = objects.findRaw<Ship>([](const Ship* s) { return s->OrderedScrapped(); });
+        for (const auto* ship : scrapped_ships) {
             DebugLogger() << "... ship: " << ship->ID() << " ordered scrapped";
+            const auto ship_id = ship->ID();
+            const auto fleet_id = ship->FleetID();
+            const auto sys_id = ship->SystemID();
 
-            auto* system = objects.getRaw<System>(ship->SystemID());
+            auto* system = objects.getRaw<System>(sys_id);
             if (system)
-                system->Remove(ship->ID());
+                system->Remove(ship_id);
 
-            auto* fleet = objects.getRaw<Fleet>(ship->FleetID());
-            if (fleet) {
-                fleet->RemoveShips({ship->ID()});
+            if (auto* fleet = objects.getRaw<Fleet>(fleet_id)) {
+                fleet->RemoveShips({ship_id});
                 if (fleet->Empty()) {
-                    //scrapped_object_ids.push_back(fleet->ID());
-                    system->Remove(fleet->ID());
-                    universe.Destroy(fleet->ID(), empire_ids);
+                    if (system)
+                        system->Remove(fleet_id);
+                    universe.Destroy(fleet_id, empire_ids);
                 }
             }
 
@@ -3292,15 +3272,10 @@ namespace {
                 scrapping_empire->RecordShipScrapped(*ship);
 
             //scrapped_object_ids.push_back(ship->ID());
-            universe.Destroy(ship->ID(), empire_ids);
+            universe.Destroy(ship_id, empire_ids);
         }
 
-        std::vector<Building*> scrapped_buildings;
-        for (auto* building : objects.allRaw<Building>()) {
-            if (building->OrderedScrapped())
-                scrapped_buildings.push_back(building);
-        }
-
+        auto scrapped_buildings = objects.findRaw<Building>([](const Building* b) { return b->OrderedScrapped(); });
         for (auto* building : scrapped_buildings) {
             if (auto* planet = objects.getRaw<Planet>(building->PlanetID()))
                 planet->RemoveBuilding(building->ID());
@@ -3428,7 +3403,7 @@ void ServerApp::PreCombatProcessTurns() {
     HandleColonization(context);
 
     DebugLogger() << "ServerApp::ProcessTurns invasion";
-    HandleInvasion(m_empires, m_universe);
+    HandleInvasion(context);
 
     DebugLogger() << "ServerApp::ProcessTurns gifting";
     HandleGifting(m_empires, m_universe.Objects());
@@ -3470,7 +3445,7 @@ void ServerApp::PreCombatProcessTurns() {
 
     // post-movement visibility update
     m_universe.UpdateEmpireObjectVisibilities(m_empires);
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
     m_universe.UpdateEmpireStaleObjectKnowledge(m_empires);
 
     // SitReps for fleets having arrived at destinations
@@ -3538,7 +3513,7 @@ void ServerApp::ProcessCombats() {
 
     DisseminateSystemCombatInfo(combats, m_universe, m_empires);
     // update visibilities with any new info gleaned during combat
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
     // update stale object info based on any mid- combat glimpses
     // before visibility is totally recalculated in the post combat processing
     m_universe.UpdateEmpireStaleObjectKnowledge(m_empires);
@@ -3596,7 +3571,7 @@ void ServerApp::PostCombatProcessTurns() {
 
     // post-combat visibility update
     m_universe.UpdateEmpireObjectVisibilities(m_empires);
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
 
 
     // check for loss of empire capitals
@@ -3641,7 +3616,7 @@ void ServerApp::PostCombatProcessTurns() {
     // now that we've had combat and applied Effects, update visibilities again, prior
     //  to updating system obstructions below.
     m_universe.UpdateEmpireObjectVisibilities(m_empires);
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
 
     UpdateEmpireSupply(context, m_supply_manager, false);
 
@@ -3720,7 +3695,7 @@ void ServerApp::PostCombatProcessTurns() {
     // visibility update removes an empires ability to detect an object, the
     // empire will still know the latest state on the
     // turn when the empire did have detection ability for the object
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
 
     // post-production and meter-effects visibility update
     m_universe.UpdateEmpireObjectVisibilities(m_empires);
@@ -3775,7 +3750,7 @@ void ServerApp::PostCombatProcessTurns() {
     UpdateEmpireSupply(context, m_supply_manager, true);
 
     // copy latest visible gamestate to each empire's known object state
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
 
 
     // misc. other updates and records
@@ -3877,7 +3852,9 @@ void ServerApp::CheckForEmpireElimination() {
                 auto emp2_it = emp1_it;
                 ++emp2_it;
                 for (; emp2_it != non_eliminated_non_ai_controlled_empires.end(); ++emp2_it) {
-                    if (m_empires.GetDiplomaticStatus((*emp1_it)->EmpireID(), (*emp2_it)->EmpireID()) != DiplomaticStatus::DIPLO_ALLIED)
+                    const auto status = m_empires.GetDiplomaticStatus((*emp1_it)->EmpireID(), (*emp2_it)->EmpireID());
+                    // if diplomacy forbidden then allow peace status
+                    if (status == DiplomaticStatus::DIPLO_WAR || (GetGameRules().Get<std::string>("RULE_DIPLOMACY") != UserStringNop("RULE_DIPLOMACY_FORBIDDEN_FOR_ALL") && status == DiplomaticStatus::DIPLO_PEACE))
                         return;
                 }
             }

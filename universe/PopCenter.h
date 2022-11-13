@@ -11,6 +11,7 @@
 class Meter;
 class UniverseObject;
 class ObjectMap;
+class SpeciesManager;
 
 /** The PopCenter class is an abstract base class for anything in the FreeOrion
   * gamestate that has population on or in it.  Most likely, such an object
@@ -24,23 +25,23 @@ public:
     explicit PopCenter(const std::string& species_name);
     virtual ~PopCenter() = default;
 
-    const std::string&  SpeciesName() const {return m_species_name;}        ///< returns the name of the species that populates this planet
+    const std::string&  SpeciesName() const noexcept { return m_species_name; } ///< name of the species that populates this planet
     std::string         Dump(uint8_t ntabs = 0) const;
     bool                Populated() const;
-    virtual Meter*      GetMeter(MeterType type) = 0;                       ///< implementation should return the requested Meter, or 0 if no such Meter of that type is found in this object
-    virtual const Meter*GetMeter(MeterType type) const = 0;                 ///< implementation should return the requested Meter, or 0 if no such Meter of that type is found in this object
+    virtual Meter*      GetMeter(MeterType type) = 0;       ///< implementation should return the requested Meter, or 0 if no such Meter of that type is found in this object
+    virtual const Meter*GetMeter(MeterType type) const = 0; ///< implementation should return the requested Meter, or 0 if no such Meter of that type is found in this object
 
     void                Copy(std::shared_ptr<const PopCenter> copied_object, Visibility vis);
     void                Copy(std::shared_ptr<const PopCenter> copied_object);
-    virtual void        SetSpecies(std::string species_name);               ///< sets the species of the population to \a species_name
-    virtual void        Reset(ObjectMap&);                                  ///< sets all meters to 0, clears race name
-    virtual void        Depopulate();                                       ///< removes population
+    virtual void        SetSpecies(std::string species_name, int turn, const SpeciesManager& sm); ///< sets the species of the population to \a species_name
+    virtual void        Reset(ObjectMap&); ///< sets all meters to 0, clears race name
+    virtual void        Depopulate(int);   ///< removes population
 
 protected:
     void Init();    ///< initialization that needs to be called by derived class after derived class is constructed
     void PopCenterResetTargetMaxUnpairedMeters();
     void PopCenterClampMeters();
-    void PopCenterPopGrowthProductionResearchPhase();
+    void PopCenterPopGrowthProductionResearchPhase(int turn);
 
 private:
     virtual void AddMeter(MeterType meter_type) = 0;///< implementation should add a meter to the object so that it can be accessed with the GetMeter() functions

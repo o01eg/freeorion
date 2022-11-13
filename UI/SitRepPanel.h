@@ -40,14 +40,6 @@ private:
                        const GG::Flags<GG::ModKey>& mod);
     void DoLayout();
 
-    bool IsSitRepInvalid(SitRepEntry& sitrep) const;
-
-    /** Search \p forward from \p turn for the next turn with valid sitreps.
-      * Remove turns from \p turns that have all invalid or otherwise filtered
-      * out sitreps. */
-    int GetNextNonEmptySitrepsTurn(std::map<int, std::list<SitRepEntry>>& turns,
-                                   int turn, bool forward) const;
-
     std::shared_ptr<GG::ListBox>    m_sitreps_lb;
     std::shared_ptr<GG::Button>     m_prev_turn_button;
     std::shared_ptr<GG::Button>     m_next_turn_button;

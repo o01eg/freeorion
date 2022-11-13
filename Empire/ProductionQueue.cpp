@@ -377,10 +377,9 @@ std::pair<float, int> ProductionQueue::ProductionItem::ProductionCostAndTime(
                 type->ProductionTime(empire_id, location_id, context)};
 
     } else if (build_type == BuildType::BT_SHIP) {
-        const ShipDesign* design = context.ContextUniverse().GetShipDesign(design_id);
-        if (design)
-            return {design->ProductionCost(empire_id, location_id),
-                    design->ProductionTime(empire_id, location_id)};
+        if (const ShipDesign* design = context.ContextUniverse().GetShipDesign(design_id))
+            return {design->ProductionCost(empire_id, location_id, context),
+                    design->ProductionTime(empire_id, location_id, context)};
         return {-1.0f, -1};
 
     } else if (build_type == BuildType::BT_STOCKPILE) {
@@ -594,9 +593,6 @@ ProductionQueue::ProductionQueue(int empire_id) :
     m_empire_id(empire_id)
 {}
 
-int ProductionQueue::ProjectsInProgress() const
-{ return m_projects_in_progress; }
-
 float ProductionQueue::TotalPPsSpent() const {
     // add up allocated PP from all resource sharing object groups
     float retval = 0.0f;
@@ -604,12 +600,6 @@ float ProductionQueue::TotalPPsSpent() const {
         retval += entry.second;
     return retval;
 }
-
-const std::map<std::set<int>, float>& ProductionQueue::AllocatedPP() const
-{ return m_object_group_allocated_pp; }
-
-const std::map<std::set<int>, float>& ProductionQueue::AllocatedStockpilePP() const
-{ return m_object_group_allocated_stockpile_pp; }
 
 float ProductionQueue::StockpileCapacity(const ObjectMap& objects) const {
     if (m_empire_id == ALL_EMPIRES)
@@ -649,18 +639,6 @@ std::set<std::set<int>> ProductionQueue::ObjectsWithWastedPP(const std::shared_p
     }
     return retval;
 }
-
-bool ProductionQueue::empty() const
-{ return !m_queue.size(); }
-
-unsigned int ProductionQueue::size() const
-{ return m_queue.size(); }
-
-ProductionQueue::const_iterator ProductionQueue::begin() const
-{ return m_queue.begin(); }
-
-ProductionQueue::const_iterator ProductionQueue::end() const
-{ return m_queue.end(); }
 
 ProductionQueue::const_iterator ProductionQueue::find(int i) const
 { return (0 <= i && i < static_cast<int>(size())) ? (begin() + i) : end(); }
@@ -925,12 +903,6 @@ ProductionQueue::iterator ProductionQueue::erase(iterator it) {
         throw std::out_of_range("Tried to erase ProductionQueue item out of bounds.");
     return m_queue.erase(it);
 }
-
-ProductionQueue::iterator ProductionQueue::begin()
-{ return m_queue.begin(); }
-
-ProductionQueue::iterator ProductionQueue::end()
-{ return m_queue.end(); }
 
 ProductionQueue::iterator ProductionQueue::find(int i)
 { return (0 <= i && i < static_cast<int>(size())) ? (begin() + i) : end(); }

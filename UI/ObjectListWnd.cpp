@@ -372,7 +372,7 @@ namespace {
 
     constexpr int DATA_PANEL_BORDER = 1;
 
-    enum class VIS_DISPLAY : char { SHOW_VISIBLE, SHOW_PREVIOUSLY_VISIBLE, SHOW_DESTROYED };
+    enum class VIS_DISPLAY : uint8_t { SHOW_VISIBLE, SHOW_PREVIOUSLY_VISIBLE, SHOW_DESTROYED };
 
     constexpr std::string_view EMPTY_STRING;
     constexpr std::string_view ALL_CONDITION(UserStringNop("CONDITION_ALL"));
@@ -1024,7 +1024,7 @@ private:
             // collect all valid foci on any object in universe
             std::set<std::string> all_foci;
             for (auto* planet : objects.allRaw<Planet>()) {
-                auto obj_foci = planet->AvailableFoci();
+                auto obj_foci = planet->AvailableFoci(context);
                 all_foci.insert(std::make_move_iterator(obj_foci.begin()),
                                 std::make_move_iterator(obj_foci.end()));
             }
@@ -2642,42 +2642,49 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
             if (!row)
                 continue;
 
-            auto one_planet = universe.Objects().get<Planet>(row->ObjectID());
-                if (one_planet && one_planet->OwnedBy(app->EmpireID())) {
-                for (const std::string& planet_focus : one_planet->AvailableFoci())
-                    all_foci[planet_focus]++;
+            auto one_planet = universe.Objects().getRaw<const Planet>(row->ObjectID());
+            if (one_planet && one_planet->OwnedBy(app->EmpireID())) {
+                for (auto& planet_focus : one_planet->AvailableFoci(context))
+                    all_foci[std::move(planet_focus)]++;
 
                 for (int ship_design_id : cur_empire->AvailableShipDesigns(GetUniverse())) {
-                    if (cur_empire->ProducibleItem(BuildType::BT_SHIP, ship_design_id, row->ObjectID()))
-                        avail_designs[ship_design_id]++;
+                    if (cur_empire->ProducibleItem(BuildType::BT_SHIP, ship_design_id,
+                                                   row->ObjectID(), context))
+                    { avail_designs[ship_design_id]++; }
                 }
 
-                for (const std::string& building_type : cur_empire->AvailableBuildingTypes()) {
-                    if (cur_empire->EnqueuableItem(BuildType::BT_BUILDING, building_type, row->ObjectID()) &&
-                        cur_empire->ProducibleItem(BuildType::BT_BUILDING, building_type, row->ObjectID()))
+                for (const auto& building_type : cur_empire->AvailableBuildingTypes()) {
+                    if (cur_empire->EnqueuableItem(BuildType::BT_BUILDING, building_type,
+                                                   row->ObjectID(), context) &&
+                        cur_empire->ProducibleItem(BuildType::BT_BUILDING, building_type,
+                                                   row->ObjectID(), context))
                     { avail_blds[building_type]++; }
                 }
             }
         }
 
+        auto& orders{app->Orders()};
+        const int app_empire_id{app->EmpireID()};
+
         GG::MenuItem focusMenuItem(UserString("MENUITEM_SET_FOCUS"), false, false/*, no action*/);
         for (auto& [focus_name, count_of_planets_that_have_focus_available] : all_foci) {
             menuitem_id++;
-            auto focus_action = [focus{focus_name}, app, &universe, &context,
-                                 lb{m_list_box}, &focus_ship_building_common_action]()
+            auto focus_action = [focus{focus_name}, empire_id{app_empire_id},
+                                 &orders, &universe, &context, lb{m_list_box},
+                                 &focus_ship_building_common_action]()
             {
                 for (const auto& selection : lb->Selections()) {
                     ObjectRow* row = dynamic_cast<ObjectRow*>(selection->get());
                     if (!row)
                         continue;
 
-                    auto one_planet = universe.Objects().get<Planet>(row->ObjectID());
-                    if (!(one_planet && one_planet->OwnedBy(app->EmpireID())))
+                    auto one_planet = universe.Objects().getRaw<const Planet>(row->ObjectID());
+                    if (!(one_planet && one_planet->OwnedBy(empire_id)))
                         continue;
 
-                    one_planet->SetFocus(focus);
-                    app->Orders().IssueOrder(std::make_shared<ChangeFocusOrder>(
-                        app->EmpireID(), one_planet->ID(), focus, context),
+                    one_planet->SetFocus(focus, context);
+                    orders.IssueOrder(std::make_shared<ChangeFocusOrder>(
+                        empire_id, one_planet->ID(), focus, context),
                         context);
                 }
 
@@ -2711,7 +2718,8 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
                         continue;
                     auto one_planet = universe.Objects().get<Planet>(row->ObjectID());
                     if (!one_planet || !one_planet->OwnedBy(app->EmpireID()) ||
-                        !cur_empire->ProducibleItem(BuildType::BT_SHIP, ship_design, row->ObjectID()))
+                        !cur_empire->ProducibleItem(BuildType::BT_SHIP, ship_design,
+                                                    row->ObjectID(), context))
                     { continue; }
                     ProductionQueue::ProductionItem ship_item(BuildType::BT_SHIP, ship_design, universe);
                     app->Orders().IssueOrder(std::make_shared<ProductionQueueOrder>(
@@ -2758,8 +2766,10 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
 
                     auto one_planet = objects.get<Planet>(row->ObjectID());
                     if (!one_planet || !one_planet->OwnedBy(app->EmpireID())
-                        || !cur_empire->EnqueuableItem(BuildType::BT_BUILDING, building_type_name, row->ObjectID())
-                        || !cur_empire->ProducibleItem(BuildType::BT_BUILDING, building_type_name, row->ObjectID()))
+                        || !cur_empire->EnqueuableItem(BuildType::BT_BUILDING, building_type_name,
+                                                       row->ObjectID(), context)
+                        || !cur_empire->ProducibleItem(BuildType::BT_BUILDING, building_type_name,
+                                                       row->ObjectID(), context))
                     { continue; }
 
                     ProductionQueue::ProductionItem bld_item(BuildType::BT_BUILDING, building_type_name);

@@ -45,22 +45,22 @@ struct GG_API Pt
 {
     constexpr Pt() = default;
 
-    constexpr Pt(X x_, Y y_) :
+    constexpr Pt(X x_, Y y_) noexcept :
         x(x_),
         y(y_)
     {}
 
-    constexpr Pt(X_d x_, Y y_) :
+    constexpr Pt(X_d x_, Y y_) noexcept :
         x(x_),
         y(y_)
     {}
 
-    constexpr Pt(X x_, Y_d y_) :
+    constexpr Pt(X x_, Y_d y_) noexcept :
         x(x_),
         y(y_)
     {}
 
-    constexpr Pt(X_d x_, Y_d y_) :
+    constexpr Pt(X_d x_, Y_d y_) noexcept :
         x(x_),
         y(y_)
     {}
@@ -71,11 +71,11 @@ struct GG_API Pt
     [[nodiscard]] constexpr bool Less(const Pt& rhs) const noexcept
     { return x < rhs.x ? true : (x == rhs.x ? (y < rhs.y ? true : false) : false); }
 
-    [[nodiscard]] constexpr Pt  operator-() const            { return Pt(-x, -y); }
-    constexpr Pt& operator+=(const Pt& rhs)    { x += rhs.x; y += rhs.y; return *this; }
-    constexpr Pt& operator-=(const Pt& rhs)    { x -= rhs.x; y -= rhs.y; return *this; }
-    constexpr Pt& operator/=(const double rhs) { x /= rhs;   y /= rhs;   return *this; }
-    constexpr Pt& operator*=(const double rhs) { x *= rhs;   y *= rhs;   return *this; }
+    [[nodiscard]] constexpr Pt operator-() const noexcept { return Pt(-x, -y); }
+    constexpr Pt& operator+=(const Pt& rhs)      { x += rhs.x; y += rhs.y; return *this; }
+    constexpr Pt& operator-=(const Pt& rhs)      { x -= rhs.x; y -= rhs.y; return *this; }
+    constexpr Pt& operator/=(const double rhs)   { x /= rhs;   y /= rhs;   return *this; }
+    constexpr Pt& operator*=(const double rhs)   { x *= rhs;   y *= rhs;   return *this; }
 
     [[nodiscard]] operator std::string() const;
 
@@ -103,7 +103,7 @@ struct GG_API Rect
 {
     constexpr Rect() = default;
 
-    constexpr Rect(const Pt& pt1, const Pt& pt2) :
+    constexpr Rect(Pt pt1, Pt pt2) :
         ul{std::min(pt1.x, pt2.x), std::min(pt1.y, pt2.y)},
         lr{std::max(pt1.x, pt2.x), std::max(pt1.y, pt2.y)}
     {}
@@ -124,10 +124,10 @@ struct GG_API Rect
     [[nodiscard]] constexpr X  MidX() const noexcept       { return (lr.x + ul.x)/2; } ///< returns the horizontal mid-point of the Rect
     [[nodiscard]] constexpr Y  MidY() const noexcept       { return (lr.y + ul.y)/2; } ///< returns the vertical mid-point of the Rect
 
-    [[nodiscard]] constexpr bool Contains(const Pt& pt) const noexcept { return ul <= pt && pt < lr; }
+    [[nodiscard]] constexpr bool Contains(Pt pt) const noexcept { return ul <= pt && pt < lr; }
 
-    constexpr Rect& operator+=(const Pt& pt) { ul += pt; lr += pt; return *this; } ///< shifts the Rect by adding \a pt to each corner
-    constexpr Rect& operator-=(const Pt& pt) { ul -= pt; lr -= pt; return *this; } ///< shifts the Rect by subtracting \a pt from each corner
+    constexpr Rect& operator+=(Pt pt) { ul += pt; lr += pt; return *this; } ///< shifts the Rect by adding \a pt to each corner
+    constexpr Rect& operator-=(Pt pt) { ul -= pt; lr -= pt; return *this; } ///< shifts the Rect by subtracting \a pt from each corner
 
     Pt ul; ///< the upper-left corner of the Rect
     Pt lr; ///< the lower-right corner of the Rect

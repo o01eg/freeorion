@@ -181,8 +181,8 @@ namespace {
         return fatal;
     }
 
-    std::string GetAutoSaveFileName(int current_turn) {
-        std::string subdir = GetGalaxySetupData().GetGameUID();
+    std::string GetAutoSaveFileName(int current_turn, const GalaxySetupData& gsd) {
+        const auto& subdir = gsd.GetGameUID();
         boost::filesystem::path autosave_dir_path = GetServerSaveDir() / (subdir.empty() ? "auto" : subdir);
         const auto& extension = MP_SAVE_FILE_EXTENSION;
         // Add timestamp to autosave generated files
@@ -294,9 +294,6 @@ void ServerFSM::unconsumed_event(const sc::event_base &event) {
                      << ss.str() << ".  It is being ignored.";
 }
 
-ServerApp& ServerFSM::Server()
-{ return m_server; }
-
 void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
     PlayerConnectionPtr& player_connection = d.m_player_connection;
     bool must_quit = false;
@@ -407,12 +404,12 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
     if (must_quit) {
         ErrorLogger(FSM) << "Unable to recover server terminating.";
         if (m_server.IsHostless()) {
-            if (GetOptionsDB().Get<bool>("save.auto.hostless.enabled") &&
-                GetOptionsDB().Get<bool>("save.auto.exit.enabled") &&
+            if (GetOptionsDB().Get<bool>("save.auto.exit.enabled") &&
                 m_server.CurrentTurn() > 0)
             {
                 // save game on exit
-                std::string save_filename = GetAutoSaveFileName(m_server.CurrentTurn());
+                std::string save_filename = GetAutoSaveFileName(m_server.CurrentTurn(),
+                                                                m_server.GetGalaxySetupData());
                 ServerSaveGameData server_data{m_server.CurrentTurn()};
                 int bytes_written = 0;
                 // save game...
@@ -496,7 +493,8 @@ bool ServerFSM::EstablishPlayer(const PlayerConnectionPtr& player_connection,
                                 const std::string& client_version_string,
                                 const Networking::AuthRoles& roles)
 {
-    std::list<PlayerConnectionPtr> to_disconnect;
+    std::vector<PlayerConnectionPtr> to_disconnect;
+    to_disconnect.reserve(m_server.m_networking.size());
 
     // set and test roles
     player_connection->SetAuthRoles(roles);
@@ -778,7 +776,7 @@ sc::result Idle::react(const Hostless&) {
             player_setup_data.client_type =   Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER;
             player_setup_data.empire_color =  GetUnusedEmpireColour(lobby_data->players);
             player_setup_data.authenticated = true;
-            lobby_data->players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
+            lobby_data->players.emplace_back(Networking::INVALID_PLAYER_ID, std::move(player_setup_data));
         }
 
         const SpeciesManager& sm = server.GetSpeciesManager();
@@ -797,7 +795,7 @@ sc::result Idle::react(const Hostless&) {
             else
                 player_setup_data.starting_species_name = sm.SequentialPlayableSpeciesName(ai_next_index);
 
-            lobby_data->players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
+            lobby_data->players.emplace_back(Networking::INVALID_PLAYER_ID, std::move(player_setup_data));
         }
     } else {
         DebugLogger(FSM) << "Loading file " << autostart_load_filename;
@@ -816,7 +814,8 @@ sc::result Idle::react(const Hostless&) {
                     seed = static_cast<unsigned int>(h);
                 } catch (...) {}
             }
-            DebugLogger(FSM) << "Seeding with loaded galaxy seed: " << server.m_galaxy_setup_data.seed << "  interpreted as actual seed: " << seed;
+            DebugLogger(FSM) << "Seeding with loaded galaxy seed: " << server.m_galaxy_setup_data.seed
+                             << "  interpreted as: " << seed;
             Seed(seed);
 
             // fill lobby data with AI to start them with server
@@ -829,7 +828,7 @@ sc::result Idle::react(const Hostless&) {
                 player_setup_data.player_name =   UserString("AI_PLAYER") + "_" + std::to_string(ai_next_index++);
                 player_setup_data.client_type =   Networking::ClientType::CLIENT_TYPE_AI_PLAYER;
                 player_setup_data.save_game_empire_id = psgd.empire_id;
-                lobby_data->players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
+                lobby_data->players.emplace_back(Networking::INVALID_PLAYER_ID, std::move(player_setup_data));
             }
         } catch (const std::exception& e) {
             throw e;
@@ -878,7 +877,8 @@ MPLobby::MPLobby(my_context c) :
         m_lobby_data->any_can_edit = true;
 
         auto max_ai = GetOptionsDB().Get<int>("network.server.ai.max");
-        std::list<PlayerConnectionPtr> to_disconnect;
+        std::vector<PlayerConnectionPtr> to_disconnect;
+        to_disconnect.reserve(server.m_networking.size());
         // Try to use connections:
         for (const auto& player_connection : server.m_networking) {
             // If connection was not established disconnect it.
@@ -902,7 +902,8 @@ MPLobby::MPLobby(my_context c) :
                     player_setup_data.starting_species_name = sm.SequentialPlayableSpeciesName(player_id);
                 player_setup_data.authenticated = player_connection->IsAuthenticated();
 
-                m_lobby_data->players.push_back({player_id, player_setup_data});
+                m_lobby_data->players.emplace_back(player_id, std::move(player_setup_data));
+
             } else if (player_connection->GetClientType() == Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
                 if (m_ai_next_index <= max_ai || max_ai < 0) {
                     PlayerSetupData player_setup_data;
@@ -916,7 +917,8 @@ MPLobby::MPLobby(my_context c) :
                     else
                         player_setup_data.starting_species_name = sm.SequentialPlayableSpeciesName(m_ai_next_index);
 
-                    m_lobby_data->players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
+                    m_lobby_data->players.emplace_back(Networking::INVALID_PLAYER_ID,
+                                                       std::move(player_setup_data));
                 }
                 // disconnect AI
                 to_disconnect.push_back(player_connection);
@@ -943,7 +945,8 @@ MPLobby::MPLobby(my_context c) :
                 else
                     player_setup_data.starting_species_name = sm.SequentialPlayableSpeciesName(m_ai_next_index);
 
-                m_lobby_data->players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
+                m_lobby_data->players.emplace_back(Networking::INVALID_PLAYER_ID,
+                                                   std::move(player_setup_data));
             }
         }
 
@@ -2408,7 +2411,8 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
                 player_connection->SetAuthenticated();
 
             // drop other connection with same name before checks for expected players
-            std::list<PlayerConnectionPtr> to_disconnect;
+            std::vector<PlayerConnectionPtr> to_disconnect;
+            to_disconnect.reserve(server.m_networking.size());
             for (auto it = server.m_networking.established_begin();
                  it != server.m_networking.established_end(); ++it)
             {
@@ -2418,7 +2422,7 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
                 }
             }
             for (const auto& conn : to_disconnect)
-            { server.Networking().Disconnect(conn); }
+                server.Networking().Disconnect(conn);
         } else {
             if (server.IsAuthRequiredOrFillRoles(player_name, player_connection->GetIpAddress(), roles)) {
                 // send authentication request
@@ -2538,7 +2542,8 @@ sc::result WaitingForMPGameJoiners::react(const AuthResponse& msg) {
 
     if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER) {
         // drop other connection with same name before checks for expected players
-        std::list<PlayerConnectionPtr> to_disconnect;
+        std::vector<PlayerConnectionPtr> to_disconnect;
+        to_disconnect.reserve(server.m_networking.size());
         for (ServerNetworking::const_established_iterator it = server.m_networking.established_begin();
              it != server.m_networking.established_end(); ++it)
         {
@@ -2548,7 +2553,7 @@ sc::result WaitingForMPGameJoiners::react(const AuthResponse& msg) {
             }
         }
         for (const auto& conn : to_disconnect)
-        { server.Networking().Disconnect(conn); }
+            server.Networking().Disconnect(conn);
 
         // expected human player
         if (!player_connection->HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_PLAYER)) {
@@ -2779,12 +2784,11 @@ sc::result PlayingGame::react(const ShutdownServer& msg) {
     ServerApp& server = Server();
 
     if (server.IsHostless() &&
-        GetOptionsDB().Get<bool>("save.auto.hostless.enabled") &&
         GetOptionsDB().Get<bool>("save.auto.exit.enabled") &&
         server.CurrentTurn() > 0)
     {
         // save game on exit
-        std::string save_filename = GetAutoSaveFileName(server.CurrentTurn());
+        std::string save_filename = GetAutoSaveFileName(server.CurrentTurn(), server.GetGalaxySetupData());
         ServerSaveGameData server_data{server.CurrentTurn()};
         int bytes_written = 0;
         // save game...
@@ -3494,7 +3498,9 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
     // save game so orders from the player will be backuped
     if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.each-player.enabled") && server.CurrentTurn() > 0) {
         PlayerConnectionPtr dummy_connection = nullptr;
-        post_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(server.CurrentTurn())), dummy_connection));
+        post_event(SaveGameRequest(HostSaveGameInitiateMessage(
+            GetAutoSaveFileName(server.CurrentTurn(), server.GetGalaxySetupData())),
+            dummy_connection));
     }
 
     return discard_event();
@@ -3563,7 +3569,9 @@ void WaitingForTurnEnd::SaveTimedoutHandler(const boost::system::error_code& err
 
     DebugLogger() << "Save timed out.";
     PlayerConnectionPtr dummy_connection = nullptr;
-    Server().m_fsm->process_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(Server().CurrentTurn())), dummy_connection));
+    Server().m_fsm->process_event(SaveGameRequest(HostSaveGameInitiateMessage(
+        GetAutoSaveFileName(Server().CurrentTurn(), Server().GetGalaxySetupData())),
+        dummy_connection));
     if (GetOptionsDB().Get<int>("save.auto.interval") > 0) {
         m_timeout.expires_after(std::chrono::seconds(GetOptionsDB().Get<int>("save.auto.interval")));
         m_timeout.async_wait(boost::bind(&WaitingForTurnEnd::SaveTimedoutHandler,
@@ -3620,7 +3628,9 @@ sc::result ProcessingTurn::react(const ProcessTurn& u) {
 
     if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.enabled") && server.CurrentTurn() > 0) {
         PlayerConnectionPtr dummy_connection = nullptr;
-        post_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(server.CurrentTurn())), dummy_connection));
+        post_event(SaveGameRequest(HostSaveGameInitiateMessage(GetAutoSaveFileName(
+            server.CurrentTurn(), server.GetGalaxySetupData())),
+            dummy_connection));
     }
     return transit<WaitingForTurnEnd>();
 }

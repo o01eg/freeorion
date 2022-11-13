@@ -308,18 +308,16 @@ void MessageWnd::CompleteConstruction() {
     m_edit = GG::Wnd::Create<MessageWndEdit>();
     AttachChild(m_edit);
 
-    m_edit->TextEnteredSignal.connect(boost::bind(&MessageWnd::MessageEntered, this));
-    m_edit->UpPressedSignal.connect(boost::bind(&MessageWnd::MessageHistoryUpRequested, this));
-    m_edit->DownPressedSignal.connect(boost::bind(&MessageWnd::MessageHistoryDownRequested, this));
+    m_edit->TextEnteredSignal.connect([this]() { MessageEntered(); });
+    m_edit->UpPressedSignal.connect([this]() { MessageHistoryUpRequested(); });
+    m_edit->DownPressedSignal.connect([this]() { MessageHistoryDownRequested(); });
     m_edit->GainingFocusSignal.connect(TypingSignal);
     m_edit->LosingFocusSignal.connect(DoneTypingSignal);
 
     m_history.push_front("");
 
-    namespace ph = boost::placeholders;
-
-    Empires().DiplomaticStatusChangedSignal.connect(
-        boost::bind(&MessageWnd::HandleDiplomaticStatusChange, this, ph::_1, ph::_2));
+    m_diplo_status_connection = Empires().DiplomaticStatusChangedSignal.connect(
+        [this](int empire1_id, int empire2_id) { HandleDiplomaticStatusChange(empire1_id, empire2_id); });
 
     DoLayout();
     SaveDefaultedOptions();
@@ -372,23 +370,24 @@ void MessageWnd::HandlePlayerChatMessage(const std::string& text,
 {
     std::string filtered_message = StringtableTextSubstitute(text);
     std::string wrapped_text = RgbaTag(text_color);
-    std::string pm_text;
-    if (pm)
-        pm_text = UserString("MESSAGES_WHISPER");
     const std::string&& formatted_timestamp = ClientUI::FormatTimestamp(timestamp);
     if (utf8::is_valid(formatted_timestamp.begin(), formatted_timestamp.end()))
-        wrapped_text += formatted_timestamp;
-    if (player_name.empty())
-        wrapped_text += filtered_message + "</rgba>";
-    else
-        wrapped_text += player_name + pm_text + ": " + filtered_message + "</rgba>";
+        wrapped_text.append(formatted_timestamp);
+    if (player_name.empty()) {
+        wrapped_text.append(filtered_message).append("</rgba>");
+    } else {
+        wrapped_text.append(player_name);
+        if (pm)
+            wrapped_text.append(UserString("MESSAGES_WHISPER"));
+        wrapped_text.append(": ").append(filtered_message).append("</rgba>");
+    }
     TraceLogger() << "HandlePlayerChatMessage sender: " << player_name
                   << "  sender colour rgba tag: " << RgbaTag(text_color)
                   << "  filtered message: " << filtered_message
                   << "  timestamp text: " << ClientUI::FormatTimestamp(timestamp)
                   << "  wrapped text: " << wrapped_text;
 
-    *m_display += wrapped_text + "\n";
+    *m_display += wrapped_text.append("\n");
     m_display_show_time = GG::GUI::GetGUI()->Ticks();
 
     // if client empire is target of message, show message window
@@ -398,7 +397,7 @@ void MessageWnd::HandlePlayerChatMessage(const std::string& text,
         return;
     }
     // only show and flash message window if other player sent message
-    const std::map<int, PlayerInfo>& players = app->Players();
+    const auto& players = app->Players();
     const auto it = players.find(app->PlayerID());
     if (it == players.end() || it->second.name != player_name) {
         Flash();

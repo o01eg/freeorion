@@ -112,7 +112,9 @@ def try_again(mil_fleet_ids, try_reset=False, thisround=""):
     get_military_fleets(try_reset=try_reset, thisround=thisround)
 
 
-def avail_mil_needing_repair(mil_fleet_ids, split_ships=False, on_mission=False, repair_limit=0.70):
+def avail_mil_needing_repair(  # noqa: max-complexity
+    mil_fleet_ids, split_ships=False, on_mission=False, repair_limit=0.70
+):
     """Returns tuple of lists: (ids_needing_repair, ids_not)."""
     fleet_buckets = [[], []]
     universe = fo.getUniverse()
@@ -466,13 +468,13 @@ class PlanetDefenseAllocator(Allocator):
     def allocate(self):
         remaining_rating = self._allocation_helper.remaining_rating
         if remaining_rating > 0:
-            super(PlanetDefenseAllocator, self).allocate()
+            super().allocate()
             return
         if self._minimum_allocation(self._calculate_threat()):
             pass  # raise ReleaseMilitaryException TODO
 
     def _minimum_allocation(self, threat):
-        super_call = super(PlanetDefenseAllocator, self)._minimum_allocation(threat)
+        super_call = super()._minimum_allocation(threat)
         restriction = 0.5 * self._allocation_helper.available_rating
         return min(super_call, restriction)
 
@@ -595,7 +597,7 @@ class BorderSecurityAllocator(LocalThreatAllocator):
     _allocation_group = "accessibleTargets"
 
     def __init__(self, sys_id, allocation_helper):
-        super(BorderSecurityAllocator, self).__init__(sys_id, allocation_helper)
+        super().__init__(sys_id, allocation_helper)
 
     def _maximum_allocation(self, threat):
         return self._max_alloc_factor * self.safety_factor * max(self._local_threat(), self._neighbor_threat())
@@ -642,12 +644,11 @@ def enemies_nearly_supplying_system(sys_id):
     return get_aistate().systemStatus.get(sys_id, {}).get("enemies_nearly_supplied", [])
 
 
-def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
+def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):  # noqa: max-complexity
     """Get armed military fleets."""
     global _military_allocations
 
     universe = fo.getUniverse()
-    empire_id = fo.empireID()
     home_system_id = PlanetUtilsAI.get_capital_sys_id()
 
     all_military_fleet_ids = (
@@ -655,18 +656,6 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
         if mil_fleets_ids is not None
         else FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.MILITARY)
     )
-
-    # Todo: This block had been originally added to address situations where fleet missions were not properly
-    #  terminating, leaving fleets stuck in stale deployments. Assess if this block is still needed at all; delete
-    #  if not, otherwise restructure the following code so that in event a reset is occurring greater priority is given
-    #  to providing military support to locations where a necessary Secure mission might have just been released (i.e.,
-    #  at invasion and colony/outpost targets where the troopships and colony ships are on their way), or else allow
-    #  only a partial reset which does not reset Secure missions.
-    enable_periodic_mission_reset = False
-    if enable_periodic_mission_reset and try_reset and (fo.currentTurn() + empire_id) % 30 == 0 and thisround == "Main":
-        debug("Resetting all Military missions as part of an automatic periodic reset to clear stale missions.")
-        try_again(all_military_fleet_ids, try_reset=False, thisround=thisround + " Reset")
-        return
 
     mil_fleets_ids = list(FleetUtilsAI.extract_fleet_ids_without_mission_types(all_military_fleet_ids))
     mil_needing_repair_ids, mil_fleets_ids = avail_mil_needing_repair(mil_fleets_ids, split_ships=True)
@@ -882,14 +871,14 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"):
     if _verbose_mil_reporting or "Main" in thisround:
         debug(
             "------------------------------\nFinal %s Round Military Allocations: %s \n-----------------------"
-            % (thisround, dict([(sid, alloc) for sid, alloc, _, _, _ in new_allocations]))
+            % (thisround, {sid: alloc for sid, alloc, _, _, _ in new_allocations})
         )
         debug("(Apparently) remaining military rating: %.1f" % remaining_mil_rating)
 
     return new_allocations
 
 
-def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, round=1):
+def assign_military_fleets_to_systems(use_fleet_id_list=None, allocations=None, round=1):  # noqa: max-complexity
     # assign military fleets to military theater systems
     global _military_allocations
     universe = fo.getUniverse()

@@ -3,6 +3,7 @@
 #include <iterator>
 #include <boost/filesystem/fstream.hpp>
 #include "Conditions.h"
+#include "CommonParams.h"
 #include "Effect.h"
 #include "PopCenter.h"
 #include "Planet.h"
@@ -29,7 +30,37 @@ FocusType::FocusType(std::string& name, std::string& description,
     m_graphic(std::move(graphic))
 {}
 
+FocusType::FocusType(std::string&& name, std::string&& description,
+                     std::unique_ptr<Condition::Condition>&& location,
+                     std::string&& graphic) :
+    m_name(std::move(name)),
+    m_description(std::move(description)),
+    m_location(std::move(location)),
+    m_graphic(std::move(graphic))
+{}
+
 FocusType::~FocusType() = default;
+
+bool FocusType::operator==(const FocusType& rhs) const {
+    if (&rhs == this)
+        return true;
+
+    if (m_name != rhs.m_name ||
+        m_description != rhs.m_description ||
+        m_graphic != rhs.m_graphic)
+    { return false; }
+
+    if (m_location == rhs.m_location) { // could be nullptr
+        // check next member
+    } else if (!m_location || !rhs.m_location) {
+        return false;
+    } else {
+        if (*m_location != *(rhs.m_location))
+            return false;
+    }
+
+    return true;
+}
 
 std::string FocusType::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "FocusType\n";
@@ -41,8 +72,8 @@ std::string FocusType::Dump(uint8_t ntabs) const {
     return retval;
 }
 
-unsigned int FocusType::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t FocusType::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, m_name);
     CheckSums::CheckSumCombine(retval, m_description);
@@ -55,6 +86,63 @@ unsigned int FocusType::GetCheckSum() const {
 /////////////////////////////////////////////////
 // Species                                     //
 /////////////////////////////////////////////////
+namespace {
+    template <typename S1, typename S2, typename S3>
+    std::string ConcatenateAsString(S1&& s1, S2&& s2, S3&& s3)
+    {
+        std::string retval;
+        for (const auto& s : {s1, s2, s3})
+            for (const auto& t : s)
+                retval += boost::to_upper_copy<std::string>(t);
+        return retval;
+    }
+
+    template <typename S1>
+    std::vector<std::string_view> StringViewsForTags(
+        S1&& tags, std::string_view concat_tags)
+    {
+        std::vector<std::string_view> retval;
+        retval.reserve(tags.size());
+        std::size_t next_idx = 0;
+
+        // store views into concatenated tags/likes string
+        std::for_each(tags.begin(), tags.end(),
+                      [&next_idx, &retval, concat_tags](const auto t)
+        {
+            std::string upper_t = boost::to_upper_copy<std::string>(t);
+            retval.push_back(concat_tags.substr(next_idx, upper_t.size()));
+            next_idx += upper_t.size();
+        });
+        return retval;
+    }
+
+    template <typename S1>
+    std::vector<std::string_view> StringViewsForPediaTags(
+        S1&& tags, std::string_view concat_tags)
+    {
+        std::vector<std::string_view> retval;
+        retval.reserve(tags.size());
+
+        std::size_t next_idx = 0;
+        static constexpr auto len{TAG_PEDIA_PREFIX.length()};
+
+        // store views into concatenated tags/likes string
+        std::for_each(tags.begin(), tags.end(),
+                      [&next_idx, &retval, concat_tags] (const auto tag)
+        {
+            std::string upper_t = boost::to_upper_copy<std::string>(tag);
+            if (tag.substr(0, len) == TAG_PEDIA_PREFIX) {
+                // store string views into the pedia tag after the "PEDIA" prefix
+                auto full_tag = concat_tags.substr(next_idx, upper_t.size());
+                auto after_prefix_tag = full_tag.substr(len);
+                retval.push_back(after_prefix_tag);
+            }
+            next_idx += upper_t.size();
+        });
+        return retval;
+    }
+}
+
 Species::Species(std::string&& name, std::string&& desc,
                  std::string&& gameplay_desc, std::vector<FocusType>&& foci,
                  std::string&& default_focus,
@@ -72,6 +160,7 @@ Species::Species(std::string&& name, std::string&& desc,
     m_foci(std::move(foci)),
     m_default_focus(std::move(default_focus)),
     m_planet_environments(std::move(planet_environments)),
+    m_effects(std::move(effects)),
     m_combat_targets(std::move(combat_targets)),
     m_playable(playable),
     m_native(native),
@@ -79,52 +168,9 @@ Species::Species(std::string&& name, std::string&& desc,
     m_can_produce_ships(can_produce_ships),
     m_spawn_rate(spawn_rate),
     m_spawn_limit(spawn_limit),
-    m_tags_concatenated([&tags, &likes, &dislikes]() {
-        // ensure capitalization and determine size of tags, likes, dislikes
-        std::size_t params_sz = 0;
-        std::vector<std::string> upper_tags;
-        upper_tags.reserve(tags.size());
-        for (const auto& t : tags) {
-            const auto& upper_tag = upper_tags.emplace_back(boost::to_upper_copy<std::string>(t));
-            params_sz += upper_tag.size();
-        }
-        std::vector<std::string> upper_likes;
-        upper_likes.reserve(likes.size());
-        for (const auto& l : likes) {
-            const auto& upper_like = upper_likes.emplace_back(boost::to_upper_copy<std::string>(l));
-            params_sz += upper_like.size();
-        }
-        std::vector<std::string> upper_dislikes;
-        upper_dislikes.reserve(dislikes.size());
-        for (const auto& d : dislikes) {
-            const auto& upper_dislike = upper_dislikes.emplace_back(boost::to_upper_copy<std::string>(d));
-            params_sz += upper_dislike.size();
-        }
-
-        // storage for concatenating tags, likes, and dislikes
-        std::ostringstream retval;
-
-        // concatenate tags, likes, and dislikes
-        std::copy(upper_tags.begin(), upper_tags.end(), std::ostream_iterator<std::string>(retval));
-        std::copy(upper_likes.begin(), upper_likes.end(), std::ostream_iterator<std::string>(retval));
-        std::copy(upper_dislikes.begin(), upper_dislikes.end(), std::ostream_iterator<std::string>(retval));
-        return std::move(retval).str();
-    }()),
-    m_tags([&tags, this]() {
-        std::vector<std::string_view> retval;
-        retval.reserve(tags.size());
-
-        const std::string_view sv{m_tags_concatenated};
-        std::size_t next_idx = 0;
-
-        // store views into concatenated tags/likes string
-        std::for_each(tags.begin(), tags.end(), [&next_idx, &retval, this, sv](const auto& t) {
-            std::string upper_t = boost::to_upper_copy<std::string>(t);
-            retval.push_back(sv.substr(next_idx, upper_t.size()));
-            next_idx += upper_t.size();
-        });
-        return retval;
-    }()),
+    m_tags_concatenated(ConcatenateAsString(tags, likes, dislikes)),
+    m_tags(StringViewsForTags(tags, m_tags_concatenated)),
+    m_pedia_tags(StringViewsForPediaTags(tags, m_tags_concatenated)),
     m_likes([&likes, this]() {
         std::vector<std::string_view> retval;
         retval.reserve(likes.size());
@@ -164,13 +210,99 @@ Species::Species(std::string&& name, std::string&& desc,
     }()),
     m_graphic(std::move(graphic))
 {
-    for (auto&& effect : effects)
-        m_effects.push_back(std::move(effect));
-
     Init();
 }
 
+Species::Species(std::string&& name, std::string&& desc,
+                 std::string&& gameplay_desc, std::vector<FocusType>&& foci,
+                 std::string&& default_focus,
+                 std::map<PlanetType, PlanetEnvironment>&& planet_environments,
+                 std::vector<std::shared_ptr<Effect::EffectsGroup>>&& effects,
+                 std::unique_ptr<Condition::Condition>&& combat_targets,
+                 bool playable, bool native, bool can_colonize, bool can_produce_ships,
+                 const std::set<std::string>& tags,
+                 std::set<std::string>&& likes, std::set<std::string>&& dislikes,
+                 std::string&& graphic,
+                 double spawn_rate, int spawn_limit) :
+    Species(
+        std::move(name), std::move(desc), std::move(gameplay_desc), std::move(foci), std::move(default_focus),
+        std::move(planet_environments),
+        [&effects]() {
+            std::vector<std::unique_ptr<Effect::EffectsGroup>> retval;
+            retval.reserve(effects.size());
+            std::transform(effects.begin(), effects.end(), std::back_inserter(retval),
+                           [](auto& e) {
+                               Effect::EffectsGroup&& er = std::move(*e);
+                               return std::make_unique<Effect::EffectsGroup>(std::move(er));
+                           });
+            return retval;
+        }(),
+        std::move(combat_targets), playable, native, can_colonize, can_produce_ships,
+        tags, std::move(likes), std::move(dislikes), std::move(graphic), spawn_rate, spawn_limit)
+{}
+
 Species::~Species() = default;
+
+bool Species::operator==(const Species& rhs) const {
+    if (&rhs == this)
+        return true;
+
+    if (m_name != rhs.m_name ||
+        m_description != rhs.m_description ||
+        m_gameplay_description != rhs.m_gameplay_description ||
+        m_foci != rhs.m_foci ||
+        m_default_focus != rhs.m_default_focus ||
+        m_planet_environments != rhs.m_planet_environments ||
+        m_playable != rhs.m_playable ||
+        m_native != rhs.m_native ||
+        m_can_colonize != rhs.m_can_colonize ||
+        m_can_produce_ships != rhs.m_can_produce_ships ||
+        m_spawn_rate != rhs.m_spawn_rate ||
+        m_spawn_limit != rhs.m_spawn_limit ||
+        m_tags != rhs.m_tags ||
+        m_likes != rhs.m_likes ||
+        m_dislikes != rhs.m_dislikes ||
+        m_graphic != rhs.m_graphic)
+    { return false; }
+
+    if (m_location == rhs.m_location) { // could be nullptr
+        // check next member
+    } else if (!m_location || !rhs.m_location) {
+        return false;
+    } else {
+        if (*m_location != *(rhs.m_location))
+            return false;
+    }
+
+    if (m_combat_targets == rhs.m_combat_targets) { // could be nullptr
+        // check next member
+    } else if (!m_combat_targets || !rhs.m_combat_targets) {
+        return false;
+    } else {
+        if (*m_combat_targets != *(rhs.m_combat_targets))
+            return false;
+    }
+
+    if (m_effects.size() != rhs.m_effects.size())
+        return false;
+    try {
+        for (std::size_t idx = 0; idx < m_effects.size(); ++idx) {
+            const auto& my_op = m_effects.at(idx);
+            const auto& rhs_op = rhs.m_effects.at(idx);
+
+            if (my_op == rhs_op)
+                continue;
+            if (!my_op || !rhs_op)
+                return false;
+            if (*my_op != *rhs_op)
+                return false;
+        }
+    } catch (...) {
+        return false;
+    }
+
+    return true;
+}
 
 void Species::Init() {
     for (auto& effect : m_effects)
@@ -388,8 +520,8 @@ PlanetType Species::NextBetterPlanetType(PlanetType initial_planet_type) const {
     });
 }
 
-unsigned int Species::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Species::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, m_name);
     CheckSums::CheckSumCombine(retval, m_description);
@@ -682,9 +814,9 @@ void SpeciesManager::SetSpeciesShipsDestroyed(std::map<std::string, std::map<std
 { m_species_species_ships_destroyed = std::move(ssd); }
 
 
-unsigned int SpeciesManager::GetCheckSum() const {
+uint32_t SpeciesManager::GetCheckSum() const {
     CheckPendingSpeciesTypes();
-    unsigned int retval{0};
+    uint32_t retval{0};
     for (auto const& name_type_pair : s_species)
         CheckSums::CheckSumCombine(retval, name_type_pair);
     CheckSums::CheckSumCombine(retval, s_species.size());

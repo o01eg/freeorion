@@ -26,7 +26,7 @@ def _get_unobstructed_systems():
 
 
 def _info_string(path_info):
-    return "dist %.1f, path %s" % (path_info.distance, PlanetUtilsAI.sys_name_ids(path_info.path))
+    return f"dist {path_info.distance:.1f}, path {PlanetUtilsAI.sys_name_ids(path_info.path)}"
 
 
 # Note that this can cover departure from uncontested systems as well as from contested systems where our forces
@@ -165,7 +165,7 @@ def find_path_with_resupply(
 #    - For large graphs, check existence of a path on a simplified graph (use single node to represent supply clusters)
 #    - For large graphs, check if there are any must-visit nodes (e.g. only possible resupplying system),
 #      then try to find the shortest path between those and start/target.
-def find_path_with_resupply_generic(
+def find_path_with_resupply_generic(  # noqa: max-complexity
     start: SystemId,
     target: SystemId,
     start_fuel: float,

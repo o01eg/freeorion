@@ -111,7 +111,7 @@ namespace {
         return hash_value % static_cast<int>(enum_vals_count);
     }
 
-    static char alphanum[] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    constexpr std::string_view alphanum = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 }
 
 const std::string& TextForGalaxySetupSetting(GalaxySetupOptionGeneric gso) {
@@ -121,7 +121,7 @@ const std::string& TextForGalaxySetupSetting(GalaxySetupOptionGeneric gso) {
         case GalaxySetupOptionGeneric::GALAXY_SETUP_MEDIUM: return UserString("GSETUP_MEDIUM");
         case GalaxySetupOptionGeneric::GALAXY_SETUP_HIGH:   return UserString("GSETUP_HIGH");
         case GalaxySetupOptionGeneric::GALAXY_SETUP_RANDOM: return UserString("GSETUP_RANDOM");
-        default:                                     return EMPTY_STRING;
+        default:                                            return EMPTY_STRING;
     }
 }
 
@@ -136,7 +136,7 @@ const std::string& TextForGalaxySetupSetting(GalaxySetupOptionMonsterFreq gso) {
         case GalaxySetupOptionMonsterFreq::MONSTER_SETUP_VERY_HIGH:      return UserString("GSETUP_VERY_HIGH");
         case GalaxySetupOptionMonsterFreq::MONSTER_SETUP_EXTREMELY_HIGH: return UserString("GSETUP_EXTREMELY_HIGH");
         case GalaxySetupOptionMonsterFreq::MONSTER_SETUP_RANDOM:         return UserString("GSETUP_RANDOM");
-        default:                                     return EMPTY_STRING;
+        default:                                                         return EMPTY_STRING;
     }
 }
 
@@ -184,12 +184,6 @@ GalaxySetupData::GalaxySetupData(GalaxySetupData&& base) :
     encoding_empire(base.encoding_empire)
 { SetSeed(seed); }
 
-const std::string& GalaxySetupData::GetSeed() const
-{ return seed; }
-
-int GalaxySetupData::GetSize() const
-{ return size; }
-
 Shape GalaxySetupData::GetShape() const {
     if (shape != Shape::RANDOM)
         return shape;
@@ -233,22 +227,13 @@ GalaxySetupOptionGeneric GalaxySetupData::GetNativeFreq() const {
     return static_cast<GalaxySetupOptionGeneric>(GetIdx(4, seed + "natives"));       // need range 0-3 for native frequency
 }
 
-Aggression GalaxySetupData::GetAggression() const
-{ return ai_aggr; }
-
-const std::map<std::string, std::string>& GalaxySetupData::GetGameRules() const
-{ return game_rules; }
-
-const std::string& GalaxySetupData::GetGameUID() const
-{ return game_uid; }
-
 void GalaxySetupData::SetSeed(const std::string& seed_) {
     std::string new_seed = seed_;
     if (new_seed.empty() || new_seed == "RANDOM") {
         ClockSeed();
         new_seed.clear();
         for (int i = 0; i < 8; ++i)
-            new_seed += alphanum[RandInt(0, (sizeof(alphanum) - 2))];
+            new_seed += alphanum[RandInt(0, alphanum.size() - 2)];
         DebugLogger() << "Set empty or requested random seed to " << new_seed;
     }
     seed = std::move(new_seed);

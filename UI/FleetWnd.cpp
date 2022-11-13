@@ -326,12 +326,12 @@ namespace {
         // order ships moved into target fleet
         GGHumanClientApp::GetApp()->Orders().IssueOrder(
             std::make_shared<FleetTransferOrder>(client_empire_id, target_fleet->ID(),
-                                                 empire_system_ship_ids, context),
+                                                 std::move(empire_system_ship_ids), context),
             context);
     }
 
    /** Returns map from object ID to issued colonize orders affecting it. */
-    std::map<int, int> PendingScrapOrders() {
+    auto PendingScrapOrders() {
         std::map<int, int> retval;
         const ClientApp* app = ClientApp::GetApp();
         if (!app)
@@ -710,7 +710,7 @@ namespace {
             return;
         m_selected = b;
 
-        const GG::Clr& unselected_text_color = ClientUI::TextColor();
+        auto unselected_text_color = ClientUI::TextColor();
         static constexpr GG::Clr selected_text_color = GG::CLR_BLACK;
 
         GG::Clr text_color_to_use = m_selected ? selected_text_color : unselected_text_color;

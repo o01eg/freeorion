@@ -80,8 +80,7 @@ OptionsDB::Option::Option(char short_name_, std::string name_, boost::any value_
     value(std::move(value_)),
     default_value(std::move(default_value_)),
     description(std::move(description_)),
-    validator(std::move(validator_)),
-    option_changed_sig_ptr(new boost::signals2::signal<void ()>())
+    validator(std::move(validator_))
 {
     if (!validator)
         DebugLogger() << "Option " << name << " created with null validator...";
@@ -124,7 +123,7 @@ bool OptionsDB::Option::SetFromString(std::string_view str) {
 
     if (changed) {
         value = std::move(value_);
-        (*option_changed_sig_ptr)();
+        option_changed_sig();
     }
     return changed;
 }
@@ -133,7 +132,7 @@ bool OptionsDB::Option::SetToDefault() {
     bool changed = !ValueIsDefault();
     if (changed) {
         value = default_value;
-        (*option_changed_sig_ptr)();
+        option_changed_sig();
     }
     return changed;
 }
@@ -613,24 +612,25 @@ void OptionsDB::GetXML(XMLDoc& doc, bool non_default_only, bool include_version)
     }
 }
 
-OptionsDB::OptionChangedSignalType& OptionsDB::OptionChangedSignal(const std::string& option) {
+OptionsDB::OptionChangedSignalType& OptionsDB::OptionChangedSignal(std::string_view option) {
+    //DebugLogger() << "getting option changed signal for string" << option;
     auto it = m_options.find(option);
     if (it == m_options.end())
-        throw std::runtime_error("OptionsDB::OptionChangedSignal() : Attempted to get signal for nonexistent option \"" + option + "\".");
-    return *it->second.option_changed_sig_ptr;
+        throw std::runtime_error(std::string{"OptionsDB::OptionChangedSignal() : Attempted to get signal for nonexistent option \""}
+                                 .append(option).append("\"."));
+    return it->second.option_changed_sig;
 }
 
-void OptionsDB::Remove(const std::string& name) {
+void OptionsDB::Remove(std::string_view name) {
     auto it = m_options.find(name);
     if (it != m_options.end()) {
         short_names.erase(it->second.short_name);
         m_options.erase(it);
         m_dirty = true;
     }
-    OptionRemovedSignal(name);
 }
 
-void OptionsDB::RemoveUnrecognized(const std::string& prefix) {
+void OptionsDB::RemoveUnrecognized(std::string_view prefix) {
     auto it = m_options.begin();
     while (it != m_options.end()) {
         if (!it->second.recognized && it->first.find(prefix) == 0)

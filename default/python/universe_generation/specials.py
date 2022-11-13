@@ -61,7 +61,7 @@ def place_special(specials, obj):
 # TODO Bug:  distribute_specials forward checks that a special can be
 # placed, but it doesn't recursively check all previously placed
 # specials against the new special.
-def distribute_specials(specials_freq, universe_objects):
+def distribute_specials(specials_freq, universe_objects):  # noqa: max-complexity
     """
     Adds start-of-game specials to universe objects.
     """
@@ -125,7 +125,7 @@ def distribute_specials(specials_freq, universe_objects):
         for (obj, system, specials_count) in obj_tuple_needing_specials:
             systems_needing_specials[system].add((obj, system, specials_count))
 
-        print(" Placing in {} locations remaining.".format(len(systems_needing_specials)))
+        print(f" Placing in {len(systems_needing_specials)} locations remaining.")
 
         # Find a list of candidates all spaced GALAXY_DECOUPLING_DISTANCE apart
         candidates = []

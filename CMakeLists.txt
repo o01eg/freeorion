@@ -57,7 +57,6 @@ include(UseCodeCoverage)
 include(TargetDependencies)
 include(CPackComponent)
 
-set(FreeOrion_VERSION 0.4.10+)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -355,20 +354,26 @@ set_property(DIRECTORY APPEND
 
 # To run the version generation every compile we need to deferr the
 # execution to a separate target and the existing python command
-add_custom_target(freeorionversion
+execute_process(
     COMMAND
     "${PYTHON_EXECUTABLE}"
     "${CMAKE_SOURCE_DIR}/cmake/make_versioncpp.py"
     "${CMAKE_SOURCE_DIR}"
     "CMake"
     "${Boost_PYTHON_SUFFIX}"
+    RESULT_VARIABLE result
 )
+if(NOT result EQUAL 0)
+        message(FATAL_ERROR "FreeOrion version failed")
+endif()
 
 set_source_files_properties(
     ${CMAKE_CURRENT_SOURCE_DIR}/util/Version.cpp
     PROPERTIES
     GENERATED TRUE
 )
+
+include(FreeOrionVersion)
 
 if(Apple)
     set_source_files_properties(
@@ -452,8 +457,6 @@ if(CMAKE_SYSTEM_NAME MATCHES "Haiku")
 	target_link_libraries(freeorioncommon PUBLIC network)
 endif()
 
-add_dependencies(freeorioncommon freeorionversion)
-
 
 add_library(freeorionparseobj OBJECT "")
 
@@ -486,6 +489,8 @@ if(MSVC)
         PROPERTIES
         COMPILE_OPTIONS "${PARSEOBJ_COMPILE_OPTIONS}"
     )
+
+    target_precompile_headers(freeorionparseobj PRIVATE "msvc2022/Parsers/StdAfx.h")
 endif()
 
 target_compile_options(freeorionparseobj
@@ -699,7 +704,7 @@ if(BUILD_CLIENT_GODOT)
         include(ExternalProject)
         ExternalProject_Add(godotcpp
             GIT_REPOSITORY https://github.com/godotengine/godot-cpp
-            GIT_TAG 476a870d6c02957df63f3b961df8823874549de1
+            GIT_TAG 316b91c5f5d89d82ae935513c28df78f9e238e8b
             SOURCE_DIR ${CMAKE_BINARY_DIR}/godot-cpp
             BINARY_DIR ${CMAKE_BINARY_DIR}/godot-cpp-build
             CMAKE_ARGS
@@ -837,7 +842,7 @@ if(BUILD_CLIENT_GODOT)
         COMMAND
            ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}
         COMMAND
-           ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeoriongodot>" "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}"
+           ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeoriongodot>" "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}/$<TARGET_FILE_NAME:freeoriongodot>"
         COMMAND
             ${CMAKE_COMMAND}
             -DMODE=DATA_LINK
@@ -860,7 +865,11 @@ if(BUILD_CLIENT_GODOT)
     if(ANDROID)
         add_custom_command(TARGET freeoriongodot POST_BUILD
             COMMAND
-                ${CMAKE_COMMAND} -E copy_if_different "${ICONV_LIBRARY}" "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}"
+                ${CMAKE_COMMAND} -E copy_if_different "${ICONV_LIBRARY}" "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}/libiconv.so"
+            COMMAND
+                ${CMAKE_STRIP} -g -S -d --strip-debug "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}/libiconv.so"
+            COMMAND
+                ${CMAKE_STRIP} -g -S -d --strip-debug "${CMAKE_SOURCE_DIR}/godot/bin/${SYSTEM_NAME}.${BITS}/$<TARGET_FILE_NAME:freeoriongodot>"
             COMMAND
                 ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/godot/default/
             COMMAND
@@ -1098,7 +1107,7 @@ if(WIN32)
 endif()
 
 set(CPACK_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
-set(CPACK_PACKAGE_VERSION ${FreeOrion_VERSION})
+set(CPACK_PACKAGE_VERSION ${FreeOrion_VERSION_FILENAME})
 set(CPACK_PACKAGE_VENDOR "FreeOrion Community")
 set(CPACK_PACKAGE_CONTACT http://freeorion.org/forum)
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "FreeOrion is a free, open source, turn-based space empire and galactic conquest (4X) computer game being designed and built by the FreeOrion project. FreeOrion is inspired by the tradition of the Master of Orion games, but is not a clone or remake of that series or any other game.")
@@ -1109,13 +1118,14 @@ else()
     set(CPACK_SYSTEM_NAME MacOSX)
 endif()
 if(WIN32)
-    set(PACKAGE_FILE_SYSTEM_NAME win32)
+    set(PACKAGE_FILE_SYSTEM_NAME Win32)
 elseif(APPLE)
     set(PACKAGE_FILE_SYSTEM_NAME ${CPACK_SYSTEM_NAME}_${CMAKE_OSX_DEPLOYMENT_TARGET})
 else()
     set(PACKAGE_FILE_SYSTEM_NAME ${CPACK_SYSTEM_NAME})
 endif()
-set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${PACKAGE_FILE_SYSTEM_NAME}")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}_${CPACK_PACKAGE_VERSION}_${PACKAGE_FILE_SYSTEM_NAME}")
+set(CPACK_ARCHIVE_BINARIES_FILE_NAME "${CPACK_PACKAGE_NAME}_${CPACK_PACKAGE_VERSION}_${PACKAGE_FILE_SYSTEM_NAME}_BinariesOnly")
 
 # NSIS-specific settings
 set(CPACK_NSIS_COMPRESSOR bzip2)

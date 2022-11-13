@@ -394,7 +394,7 @@ namespace {
             return 0;
         }
 
-        if (!empire->EnqueuableItem(BuildType::BT_BUILDING, item_name, location_id)) {
+        if (!empire->EnqueuableItem(BuildType::BT_BUILDING, item_name, location_id, context)) {
             ErrorLogger() << "IssueEnqueueBuildingProductionOrder : specified item_name and location_id that don't indicate an item that can be enqueued at that location";
             return 0;
         }
@@ -434,7 +434,7 @@ namespace {
             return 0;
         }
 
-        if (!empire->ProducibleItem(BuildType::BT_SHIP, design_id, location_id)) {
+        if (!empire->ProducibleItem(BuildType::BT_SHIP, design_id, location_id, context)) {
             ErrorLogger() << "IssueEnqueueShipProductionOrder : specified design_id and location_id that don't indicate a design that can be built at that location";
             return 0;
         }
@@ -640,7 +640,7 @@ namespace {
                 std::invalid_argument(""), name, description, context.current_turn,
                 empire_id, hull, parts, icon, model, name_desc_in_stringtable, false, uuid);
             AIClientApp::GetApp()->Orders().IssueOrder(
-                std::make_shared<ShipDesignOrder>(empire_id, *design),
+                std::make_shared<ShipDesignOrder>(empire_id, *design, context),
                 context);
             return 1;
 

@@ -314,43 +314,49 @@ namespace {
         return retval;
     }
 
-    const std::map<StarType, std::vector<float>>& GetStarLightColors() {
-        static std::map<StarType, std::vector<float>> light_colors;
-
-        if (light_colors.empty()) {
+    const auto& GetStarLightColors() {
+        static const auto light_colors{[]() -> std::map<StarType, std::array<float, 4>> {
             XMLDoc doc;
             boost::filesystem::ifstream ifs(ClientUI::ArtDir() / "planets" / "planets.xml");
             doc.ReadDoc(ifs);
             ifs.close();
 
-            if (doc.root_node.ContainsChild("GLStars") && 0 < doc.root_node.Child("GLStars").children.size()) {
-                for (const XMLElement& star_definition : doc.root_node.Child("GLStars").children) {
-                    try {
-                        std::string hex_colour("#");
-                        hex_colour.append(star_definition.attributes.at("color"));
-                        std::vector<float>& color_vec = light_colors[boost::lexical_cast<StarType>(star_definition.attributes.at("star_type"))];
-                        GG::Clr color = GG::HexClr(hex_colour);
+            std::map<StarType, std::array<float, 4>> retval;
 
-                        color_vec.push_back(color.r / 255.0f);
-                        color_vec.push_back(color.g / 255.0f);
-                        color_vec.push_back(color.b / 255.0f);
-                        color_vec.push_back(color.a / 255.0f);
-                    } catch(const std::exception& e) {
-                        std::cerr << "planets.xml: " << e.what() << std::endl;
-                    }
-                }
-            } else {
+            if (!doc.root_node.ContainsChild("GLStars") || doc.root_node.Child("GLStars").children.empty()) {
                 for (StarType i = StarType::STAR_BLUE; i < StarType::NUM_STAR_TYPES;
                      i = StarType(int(i) + 1))
-                { light_colors[i].resize(4, 1.0); }
+                { retval[i] = {1.0f, 1.0f, 1.0f, 1.0f}; }
+                return retval;
             }
-        }
+
+            for (const XMLElement& star_definition : doc.root_node.Child("GLStars").children) {
+                auto it = star_definition.attributes.find("star_type");
+                if (it == star_definition.attributes.end())
+                    continue;
+                const auto& star_type_name = it->second;
+                const auto star_type = StarTypeFromString(star_type_name);
+                if (star_type == StarType::INVALID_STAR_TYPE)
+                    continue;
+
+                auto clr_it = star_definition.attributes.find("color");
+                if (clr_it == star_definition.attributes.end())
+                    continue;
+                std::string_view colour_string = clr_it->second;
+                if (colour_string.size() != 6 && colour_string.size() != 8)
+                    continue;
+                GG::Clr color = GG::Clr(colour_string);
+                retval.emplace(star_type, std::array{color.r / 255.0f, color.g / 255.0f,
+                                                     color.b / 255.0f, color.a / 255.0f});
+            }
+            return retval;
+        }()};
 
         return light_colors;
     }
 
-    const std::vector<float>& StarLightColour(StarType star_type) {
-        static const std::vector<float> white(4, 0.0f);
+    const std::array<float, 4>& StarLightColour(StarType star_type) {
+        static constexpr std::array<float, 4> white{1.0f, 1.0f, 1.0f, 1.0f};
         const auto& colour_map = GetStarLightColors();
         auto it = colour_map.find(star_type);
         if (it != colour_map.end())
@@ -386,7 +392,7 @@ namespace {
         glEnable(GL_LIGHTING);
         glEnable(GL_LIGHT0);
 
-        const std::vector<float>& colour = StarLightColour(star_type);
+        auto& colour = StarLightColour(star_type);
         glLightfv(GL_LIGHT0, GL_DIFFUSE, &colour[0]);
         glLightfv(GL_LIGHT0, GL_SPECULAR, &colour[0]);
         glEnable(GL_TEXTURE_2D);
@@ -520,7 +526,7 @@ public:
 
     bool InWindow(const GG::Pt& pt) const override;
 
-    int PlanetID() const { return m_planet_id; }
+    int PlanetID() const noexcept { return m_planet_id; }
 
     void PreRender() override;
 
@@ -883,11 +889,12 @@ namespace {
         return UserString(to_string(planet->Size()));
     }
 
-    const std::string& GetPlanetTypeName(const Planet* planet)
+    auto& GetPlanetTypeName(const Planet* planet)
     { return UserString(to_string(planet->Type())); }
 
-    const std::string& GetPlanetEnvironmentName(const Planet* planet, const std::string& species_name)
-    { return UserString(to_string(planet->EnvironmentForSpecies(species_name))); }
+    auto& GetPlanetEnvironmentName(const Planet* planet, std::string_view species_name,
+                                   const ScriptingContext& context)
+    { return UserString(to_string(planet->EnvironmentForSpecies(context, species_name))); }
 
     const std::string& GetStarTypeName(const System* system) {
         if (!system || system->GetStarType() == StarType::INVALID_STAR_TYPE)
@@ -927,7 +934,8 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
 
     SetName(UserString("PLANET_PANEL"));
 
-    auto planet = Objects().get<Planet>(m_planet_id).get();
+    const ScriptingContext context;
+    auto* planet = context.ContextObjects().getRaw<const Planet>(m_planet_id);
     if (!planet) {
         ErrorLogger() << "SidePanel::PlanetPanel::PlanetPanel couldn't get latest known planet with ID " << m_planet_id;
         return;
@@ -942,7 +950,7 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
     bool capital = false;
 
     // need to check all empires for capitals
-    for (const auto& entry : Empires()) {
+    for (const auto& entry : context.Empires()) {
         const auto& empire = entry.second;
         if (!empire) {
             ErrorLogger() << "PlanetPanel::PlanetPanel got null empire pointer for id " << entry.first;
@@ -1030,8 +1038,8 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
 
     SetChildClippingMode(ChildClippingMode::ClipToWindow);
 
-    ScriptingContext context;
-    Refresh(context);
+    ScriptingContext planet_context(planet, context);
+    Refresh(planet_context);
 
     RequirePreRender();
 }
@@ -1303,7 +1311,7 @@ namespace {
     }
 }
 
-const Ship* ValidSelectedColonyShip(int system_id) {
+const Ship* ValidSelectedColonyShip(int system_id) { // TODO: pass in context?
     // if not looking in a valid system, no valid colony ship can be available
     if (system_id == INVALID_OBJECT_ID)
         return nullptr;
@@ -1401,14 +1409,14 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
                 if (spec_pair_it != species_colony_projections.end()) {
                     planet_capacity = spec_pair_it->second;
                 } else {
-                    const Species* species = GetSpecies(ship_species_name);
+                    const Species* species = context.species.GetSpecies(ship_species_name);
                     PlanetEnvironment planet_environment = PlanetEnvironment::PE_UNINHABITABLE;
                     if (species)
                         planet_environment = species->GetPlanetEnvironment(target_planet->Type());
                     if (planet_environment != PlanetEnvironment::PE_UNINHABITABLE) {
                         changed_planet = true;
                         target_planet->SetOwner(empire_id);
-                        target_planet->SetSpecies(ship_species_name);
+                        target_planet->SetSpecies(ship_species_name, context.current_turn, context.species);
                         target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
 
                         // temporary meter update with currently set species
@@ -1429,7 +1437,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
     }
     if (changed_planet) {
         target_planet->SetOwner(orig_owner);
-        target_planet->SetSpecies(orig_species);
+        target_planet->SetSpecies(orig_species, context.current_turn, context.species);
         target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(orig_initial_target_pop,
                                                                          orig_initial_target_pop);
         u.UpdateMeterEstimates(target_planet_id, context);
@@ -1627,10 +1635,11 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
         bombard_ships.insert(autoselected_bombard_ships.begin(), autoselected_bombard_ships.end());
     }
 
-    static const std::string EMPTY_STRING;
-    auto& colony_ship_species_name{selected_colony_ship ? selected_colony_ship->SpeciesName() : EMPTY_STRING};
+    std::string_view colony_ship_species_name;
+    if (selected_colony_ship)
+        colony_ship_species_name = selected_colony_ship->SpeciesName();
     float colony_ship_capacity{selected_colony_ship ? selected_colony_ship->ColonyCapacity(u) : 0.0f};
-    const Species* colony_ship_species = GetSpecies(colony_ship_species_name);
+    const Species* colony_ship_species = context.species.GetSpecies(colony_ship_species_name);
     PlanetEnvironment planet_env_for_colony_species = PlanetEnvironment::PE_UNINHABITABLE;
     if (colony_ship_species)
         planet_env_for_colony_species = colony_ship_species->GetPlanetEnvironment(planet->Type());
@@ -1719,14 +1728,14 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
             int orig_owner = planet->Owner();
             float orig_initial_target_pop = planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Initial();
             planet->SetOwner(client_empire_id);
-            planet->SetSpecies(colony_ship_species_name);   // const std::string& -> no move
+            planet->SetSpecies(std::string{colony_ship_species_name}, context.current_turn, context.species);
             planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
 
             // temporary meter updates for curently set species
             u.UpdateMeterEstimates(m_planet_id, context);
             planet_capacity = ((planet_env_for_colony_species == PlanetEnvironment::PE_UNINHABITABLE) ? 0.0 : planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current());   // want target pop after meter update, so check current value of meter
             planet->SetOwner(orig_owner);
-            planet->SetSpecies(orig_species);
+            planet->SetSpecies(orig_species, context.current_turn, context.species);
             planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(
                 orig_initial_target_pop, orig_initial_target_pop);
             u.UpdateMeterEstimates(m_planet_id, context);
@@ -1809,8 +1818,13 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
     }
 
     const auto* planet_raw = planet.get();
-    const auto& species_name{!planet_raw->SpeciesName().empty() ? planet_raw->SpeciesName() :
-                             !colony_ship_species_name.empty() ? colony_ship_species_name : ""};
+    const std::string_view planet_species_name = planet_raw->SpeciesName();
+    std::string_view species_name;
+    if (!planet_species_name.empty())
+        species_name = planet_species_name;
+    else if (!colony_ship_species_name.empty())
+        species_name = colony_ship_species_name;
+
     std::string env_size_text{
         species_name.empty() ?
             boost::io::str(FlexibleFormat(UserString("PL_TYPE_SIZE"))
@@ -1819,14 +1833,14 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
             boost::io::str(FlexibleFormat(UserString("PL_TYPE_SIZE_ENV"))
                            % GetPlanetSizeName(planet_raw)
                            % GetPlanetTypeName(planet_raw)
-                           % GetPlanetEnvironmentName(planet_raw, species_name)
+                           % GetPlanetEnvironmentName(planet_raw, species_name, context)
                            % UserString(species_name))};
     m_env_size->SetText(std::move(env_size_text));
 
     if (!planet->SpeciesName().empty()) {
         AttachChild(m_focus_drop);
 
-        auto available_foci = planet->AvailableFoci();
+        auto available_foci = planet->AvailableFoci(context);
 
         // refresh items in list
         m_focus_drop->Clear();
@@ -1834,7 +1848,7 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
         rows.reserve(available_foci.size());
         for (const auto& focus_name : available_foci) {
             auto texture = ClientUI::GetTexture(
-                ClientUI::ArtDir() / planet->FocusIcon(focus_name), true);
+                ClientUI::ArtDir() / planet->FocusIcon(focus_name, context), true);
             auto graphic = GG::Wnd::Create<GG::StaticGraphic>(texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
             graphic->Resize(GG::Pt(MeterIconSize().x*3/2, MeterIconSize().y*3/2));
             auto row = GG::Wnd::Create<GG::DropDownList::Row>(graphic->Width(), graphic->Height());
@@ -2497,21 +2511,25 @@ void SidePanel::PlanetPanel::FocusDropListSelectionChangedSlot(GG::DropDownList:
         return;
     }
 
-    auto res = Objects().get<ResourceCenter>(m_planet_id);
+    const ScriptingContext context;
+
+    auto res = context.ContextObjects().get<ResourceCenter>(m_planet_id);
     if (!res) {
         ErrorLogger() << "PlanetPanel::FocusDropListSelectionChanged couldn't convert object with id " << m_planet_id << " to a ResourceCenter";
         return;
     }
 
+    auto foci = res->AvailableFoci(context);
+
     std::size_t i = m_focus_drop->IteratorToIndex(selected);
-    if (i >= res->AvailableFoci().size()) {
+    if (i >= foci.size()) {
         ErrorLogger() << "PlanetPanel::FocusDropListSelectionChanged got invalid focus selected index: " << i;
         return;
     }
 
     Sound::TempUISoundDisabler sound_disabler;
     DebugLogger() << "About to send focus-changed signal.";
-    FocusChangedSignal(res->AvailableFoci().at(i));
+    FocusChangedSignal(foci[i]);
     DebugLogger() << "Returned from sending focus-changed signal.";
 }
 
@@ -3152,7 +3170,7 @@ void SidePanel::PreRender() {
     // save initial scroll position so it can be restored after repopulating the planet panel container
     const int initial_scroll_pos = m_planet_panel_container->ScrollPosition();
 
-    ScriptingContext context;
+    ScriptingContext context; // mutable because RefreshInPreRender modifies universe to simulate effects
 
     // Needs refresh updates all data related to all SizePanels, including system list etc.
     if (s_needs_refresh)

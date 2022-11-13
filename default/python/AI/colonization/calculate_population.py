@@ -12,7 +12,7 @@ from freeorion_tools import get_species_population, tech_is_complete
 active_growth_specials = {}
 
 
-def calc_max_pop(planet, species, detail):
+def calc_max_pop(planet, species, detail):  # noqa: max-complexity
     planet_size = planet.habitableSize
     planet_env = species.getPlanetEnvironment(planet.type)
     if planet_env == fo.planetEnvironment.uninhabitable:
@@ -74,7 +74,7 @@ def calc_max_pop(planet, species, detail):
 
     for _special in planet_specials.intersection(AIDependencies.POP_PROPORTIONAL_MOD_SPECIALS):
         this_mod = AIDependencies.POP_PROPORTIONAL_MOD_SPECIALS[_special]
-        detail.append("%s (maxPop%+.1f)" % (_special, this_mod))
+        detail.append(f"{_special} (maxPop{this_mod:+.1f})")
         base_pop_not_modified_by_species += this_mod
 
     gaia = AIDependencies.GAIA_SPECIAL

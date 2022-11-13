@@ -61,7 +61,7 @@ namespace {
         return result;
     }
 
-    enum class SpeciesInfo : unsigned char {
+    enum class SpeciesInfo : uint8_t {
         TAGS,
         LIKES,
         DISLIKES
@@ -85,9 +85,10 @@ namespace {
     auto SpeciesFoci(const Species& species) -> std::vector<std::string>
     {
         std::vector<std::string> retval;
-        retval.reserve(species.Foci().size());
-        for (const FocusType& focus : species.Foci())
-            retval.push_back(focus.Name());
+        const auto& foci = species.Foci();
+        retval.reserve(foci.size());
+        std::transform(foci.begin(), foci.end(), std::back_inserter(retval),
+                       [](const auto& f) { return f.Name(); });
         return retval;
     }
 
@@ -112,7 +113,8 @@ namespace {
     {
         auto path = universe.GetPathfinder()->ShortestPath(
             start_sys, end_sys, empire_id, universe.EmpireKnownObjects(empire_id));
-        return std::vector<int>{path.first.begin(), path.first.end()};
+        static_assert(std::is_same_v<std::vector<int>, decltype(path.first)>);
+        return path.first;
     }
 
     auto ShortestNonHostilePath(const Universe& universe, int start_sys, int end_sys, int empire_id) -> std::vector<int>
@@ -121,14 +123,16 @@ namespace {
         auto fleet_pred = std::make_shared<HostileVisitor>(empire_id, empires);
         auto path = universe.GetPathfinder()->ShortestPath(
             start_sys, end_sys, empire_id, fleet_pred, empires, universe.EmpireKnownObjects(empire_id));
-        return std::vector<int>{path.first.begin(), path.first.end()};
+        static_assert(std::is_same_v<std::vector<int>, decltype(path.first)>);
+        return path.first;
     }
 
     auto LeastJumpsPath(const Universe& universe, int start_sys, int end_sys, int empire_id) -> std::vector<int>
     {
         auto path = universe.GetPathfinder()->LeastJumpsPath(
             start_sys, end_sys, empire_id);
-        return std::vector<int>{path.first.begin(), path.first.end()};
+        static_assert(std::is_same_v<std::vector<int>, decltype(path.first)>);
+        return path.first;
     }
 
     auto ImmediateNeighbors(const Universe& universe, int system1_id, int empire_id) -> std::vector<int>
@@ -221,6 +225,15 @@ namespace {
             return py::incref(py::make_tuple(pair.first, pair.second).ptr());
         }
     };
+
+    std::vector<std::string> ExtractList(const py::list& py_string_list) {
+        std::vector<std::string> retval;
+        retval.reserve(len(py_string_list));
+        for (int i = 0; i < len(py_string_list); i++)
+            retval.push_back(py::extract<std::string>(py_string_list[i]));
+        return retval;
+    }
+
 }
 
 namespace FreeOrionPython {
@@ -248,19 +261,19 @@ namespace FreeOrionPython {
         py::class_<std::map<int, int>>("IntIntMap")
             .def(py::map_indexing_suite<std::map<int, int>, true>())
         ;
-        py::class_<std::map<int, double>>("IntDblMap")
+        py::class_<std::map<int, double>>("IntDoubleMap")
             .def(py::map_indexing_suite<std::map<int, double>, true>())
         ;
-        py::class_<std::map<int, float>>("IntFltMap")
+        py::class_<std::map<int, float>>("IntFloatMap")
             .def(py::map_indexing_suite<std::map<int, float>, true>())
         ;
         py::class_<std::map<Visibility, int>>("VisibilityIntMap")
             .def(py::map_indexing_suite<std::map<Visibility, int>, true>())
         ;
-        py::class_<std::vector<ShipSlotType>>("ShipSlotVec")
+        py::class_<std::vector<ShipSlotType>>("ShipSlotTypeVec")
             .def(py::vector_indexing_suite<std::vector<ShipSlotType>, true>())
         ;
-        py::class_<std::map<std::string, std::string>>("StringsMap")
+        py::class_<std::map<std::string, std::string>>("StringStringMap")
             .def(py::map_indexing_suite<std::map<std::string, std::string>, true>())
         ;
 
@@ -271,14 +284,14 @@ namespace FreeOrionPython {
         py::to_python_converter<std::pair<MeterType, std::string>,
                                 PairToTupleConverter<std::pair<MeterType, std::string>>>();
 
-        py::class_<Ship::PartMeterMap>("ShipPartMeterMap")
+        py::class_<Ship::PartMeterMap>("MeterTypeStringPairMeterMap")
             .def(py::map_indexing_suite<Ship::PartMeterMap>())
         ;
 
-        py::class_<std::map<std::string, std::map<int, std::map<int, double>>>>("StatRecordsMap")
+        py::class_<std::map<std::string, std::map<int, std::map<int, double>>>>("StringIntIntDoubleMapMapMap")
             .def(py::map_indexing_suite<std::map<std::string, std::map<int, std::map<int, double>>>, true>())
         ;
-        py::class_<std::map<int, std::map<int, double>>>("IntIntDblMapMap")
+        py::class_<std::map<int, std::map<int, double>>>("IntIntDoubleMapMap")
             .def(py::map_indexing_suite<std::map<int, std::map<int, double>>, true>())
         ;
 
@@ -306,7 +319,7 @@ namespace FreeOrionPython {
         ;
         py::to_python_converter<Effect::AccountingMap::value_type,
             PairToTupleConverter<Effect::AccountingMap::value_type>>();
-        py::class_<Effect::AccountingMap>("TargetIDAccountingMapMap")
+        py::class_<Effect::AccountingMap>("IntMeterTypeAccountingInfoVecMapMap")
             .def(py::map_indexing_suite<Effect::AccountingMap, true>())
         ;
 
@@ -389,7 +402,7 @@ namespace FreeOrionPython {
             .def("destroyedObjectIDs",          +[](const Universe& u, int id) -> std::set<int> { const std::unordered_set<int>& ekdoi{u.EmpireKnownDestroyedObjectIDs(id)}; return {ekdoi.begin(), ekdoi.end()}; },
                                                 py::return_value_policy<py::return_by_value>())
 
-            .def("systemHasStarlane",           +[](const Universe& u, int system_id, int empire_id) -> bool { return u.GetPathfinder()->SystemHasVisibleStarlanes(system_id, EmpireKnownObjects(empire_id)); },
+            .def("systemHasStarlane",           +[](const Universe& u, int system_id, int empire_id) -> bool { return u.GetPathfinder()->SystemHasVisibleStarlanes(system_id, u.EmpireKnownObjects(empire_id)); },
                                                 py::return_value_policy<py::return_by_value>())
 
             .def("updateMeterEstimates",        &UpdateMetersWrapper)
@@ -580,9 +593,9 @@ namespace FreeOrionPython {
             .add_property("hasFighters",        make_function(&ShipDesign::HasFighters,     py::return_value_policy<py::return_by_value>()))
             .add_property("hasDirectWeapons",   make_function(&ShipDesign::HasDirectWeapons,py::return_value_policy<py::return_by_value>()))
             .add_property("isMonster",          make_function(&ShipDesign::IsMonster,       py::return_value_policy<py::return_by_value>()))
-            .def("productionCost",              +[](const ShipDesign& ship_design, int empire_id, int location_id) -> float { return ship_design.ProductionCost(empire_id, location_id); })
-            .def("productionTime",              +[](const ShipDesign& ship_design, int empire_id, int location_id) -> int { return ship_design.ProductionTime(empire_id, location_id); })
-            .def("perTurnCost",                 +[](const ShipDesign& ship_design, int empire_id, int location_id) -> float { return ship_design.PerTurnCost(empire_id, location_id); })
+            .def("productionCost",              +[](const ShipDesign& ship_design, int empire_id, int location_id) -> float { return ship_design.ProductionCost(empire_id, location_id, ScriptingContext{}); })
+            .def("productionTime",              +[](const ShipDesign& ship_design, int empire_id, int location_id) -> int { return ship_design.ProductionTime(empire_id, location_id, ScriptingContext{}); })
+            .def("perTurnCost",                 +[](const ShipDesign& ship_design, int empire_id, int location_id) -> float { return ship_design.PerTurnCost(empire_id, location_id, ScriptingContext{}); })
             .add_property("costTimeLocationInvariant",
                                                 &ShipDesign::ProductionCostTimeLocationInvariant)
             .add_property("hull",               make_function(&ShipDesign::Hull,            py::return_value_policy<py::return_by_value>()))
@@ -599,13 +612,13 @@ namespace FreeOrionPython {
                                                     py::return_value_policy<py::return_by_value>()
                                                 ))
 
-            .def("productionLocationForEmpire", &ShipDesign::ProductionLocation)
+            .def("productionLocationForEmpire", +[](const ShipDesign& ship_design, int empire_id, int location_id) { const ScriptingContext context; return ship_design.ProductionLocation(empire_id, location_id, context); })
             .def("dump",                        &ShipDesign::Dump,                          py::return_value_policy<py::return_by_value>(), "Returns string with debug information, use '0' as argument.")
         ;
         py::def("validShipDesign",
-                +[](const ShipDesign& design, const std::string& hull, const std::vector<std::string>& parts) -> bool { return design.ValidDesign(hull, parts); },
+                +[](const std::string& hull, const py::list& parts) -> bool { return ShipDesign::ValidDesign(hull, ExtractList(parts)); },
                 "Returns true (boolean) if the passed hull (string) and parts"
-                " (StringVec) make up a valid ship design, and false (boolean)"
+                " (list of string) make up a valid ship design, and false (boolean)"
                 " otherwise. Valid ship designs don't have any parts in slots"
                 " that can't accept that type of part, and contain only hulls"
                 " and parts that exist (and may also need to contain the"
@@ -679,8 +692,8 @@ namespace FreeOrionPython {
             .def("productionTime",              +[](const BuildingType& bt, int empire_id, int location_id) -> int { return bt.ProductionTime(empire_id, location_id); })
             .def("perTurnCost",                 +[](const BuildingType& bt, int empire_id, int location_id) -> float { return bt.PerTurnCost(empire_id, location_id); })
             .def("captureResult",               &BuildingType::GetCaptureResult)
-            .def("canBeProduced",               +[](const BuildingType& building_type, int empire_id, int loc_id) -> bool { ScriptingContext context; return building_type.ProductionLocation(empire_id, loc_id, context); })
-            .def("canBeEnqueued",               +[](const BuildingType& building_type, int empire_id, int loc_id) -> bool { ScriptingContext context; return building_type.EnqueueLocation(empire_id, loc_id, context); })
+            .def("canBeProduced",               +[](const BuildingType& building_type, int empire_id, int loc_id) -> bool { const ScriptingContext context; return building_type.ProductionLocation(empire_id, loc_id, context); })
+            .def("canBeEnqueued",               +[](const BuildingType& building_type, int empire_id, int loc_id) -> bool { const ScriptingContext context; return building_type.EnqueueLocation(empire_id, loc_id, context); })
             .add_property("costTimeLocationInvariant",
                                                 &BuildingType::ProductionCostTimeLocationInvariant)
             .def("dump",                        &BuildingType::Dump,                        py::return_value_policy<py::return_by_value>(), "Returns string with debug information, use '0' as argument.")
@@ -694,7 +707,7 @@ namespace FreeOrionPython {
         py::class_<ResourceCenter, boost::noncopyable>("resourceCenter", py::no_init)
             .add_property("focus",                  make_function(&ResourceCenter::Focus,   py::return_value_policy<py::copy_const_reference>()))
             .add_property("turnsSinceFocusChange" , +[](const ResourceCenter& rc) { return rc.TurnsSinceFocusChange(CurrentTurn()); })
-            .add_property("availableFoci",          &ResourceCenter::AvailableFoci)
+            .add_property("availableFoci",          +[](const ResourceCenter& rc) -> std::vector<std::string> { return rc.AvailableFoci(ScriptingContext{}); })
         ;
 
         ///////////////////
@@ -712,7 +725,7 @@ namespace FreeOrionPython {
             .add_property("type",                           &Planet::Type)
             .add_property("originalType",                   &Planet::OriginalType)
             .add_property("distanceFromOriginalType",       &Planet::DistanceFromOriginalType)
-            .def("environmentForSpecies",                   &Planet::EnvironmentForSpecies)
+            .def("environmentForSpecies",                   +[](const Planet& planet, const std::string& species) { return planet.EnvironmentForSpecies(ScriptingContext{}, species); })
             .def("nextBetterPlanetTypeForSpecies",          &Planet::NextBetterPlanetTypeForSpecies)
             .add_property("clockwiseNextPlanetType",        &Planet::ClockwiseNextPlanetType)
             .add_property("counterClockwiseNextPlanetType", &Planet::CounterClockwiseNextPlanetType)
@@ -777,7 +790,7 @@ namespace FreeOrionPython {
             .add_property("spawnrate",          make_function(&Special::SpawnRate,      py::return_value_policy<py::return_by_value>()))
             .add_property("spawnlimit",         make_function(&Special::SpawnLimit,     py::return_value_policy<py::return_by_value>()))
             .def("dump",                        &Special::Dump,                         py::return_value_policy<py::return_by_value>(), "Returns string with debug information, use '0' as argument.")
-            .def("initialCapacity",             +[](const Special& special, int obj_id) -> float { return special.InitialCapacity(obj_id); })
+            .def("initialCapacity",             +[](const Special& special, int obj_id) -> float { const ScriptingContext context; return special.InitialCapacity(obj_id, context); })
         ;
         py::def("getSpecial",                   +[](const std::string& name) { return ::GetSpecial(name); },
                                                 py::return_value_policy<py::reference_existing_object>(),
@@ -803,7 +816,7 @@ namespace FreeOrionPython {
             .def("getPlanetEnvironment",        &Species::GetPlanetEnvironment)
             .def("dump",                        &Species::Dump,                         py::return_value_policy<py::return_by_value>(), "Returns string with debug information, use '0' as argument.")
         ;
-        py::def("getSpecies",                   +[](const std::string& name) { return GetSpecies(name); },
+        py::def("getSpecies",                   +[](const std::string& name) { const ScriptingContext context; return context.species.GetSpecies(name); },
                                                 py::return_value_policy<py::reference_existing_object>(),
                                                 "Returns the species (Species) with the indicated name (string).");
     }

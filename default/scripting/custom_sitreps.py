@@ -65,9 +65,9 @@ effectsgroups = [
     # but haven't yet built or enqueued a GG Generator in that system yet
     EffectsGroup(
         scope=Planet()
-        & Planet(type=GasGiantType)
+        & Planet(type=[GasGiantType])
         & OwnedBy(empire=Source.Owner)
-        & ~Contains(Building(name="BLD_GAS_GIANT_GEN"))
+        & ~Contains(IsBuilding(name=["BLD_GAS_GIANT_GEN"]))
         & ContainedBy(
             Contains(
                 Planet()
@@ -78,7 +78,7 @@ effectsgroups = [
                 Planet()
                 & OwnedBy(empire=Source.Owner)
                 & (
-                    Contains(Building(name="BLD_GAS_GIANT_GEN"))
+                    Contains(IsBuilding(name=["BLD_GAS_GIANT_GEN"]))
                     | Enqueued(type=BuildBuilding, name="BLD_GAS_GIANT_GEN")
                 )
             )
@@ -131,13 +131,15 @@ effectsgroups = [
                 & Turn(low=ETA_NEXT_TURN, high=ETA_NEXT_TURN)
                 & (RootCandidate.ID == LocalCandidate.NextSystemID),
             ),
-            effects=GenerateSitRepMessage(
-                message="SITREP_SYSTEM_GOT_INCOMING_WARNING",
-                label="SITREP_SYSTEM_GOT_INCOMING_WARNING_LABEL",
-                icon="icons/meter/ammo.png",
-                parameters={"system": Target.ID},
-                empire=Source.Owner,
-            ),
+            effects=[
+                GenerateSitRepMessage(
+                    message="SITREP_SYSTEM_GOT_INCOMING_WARNING",
+                    label="SITREP_SYSTEM_GOT_INCOMING_WARNING_LABEL",
+                    icon="icons/meter/ammo.png",
+                    parameters={"system": Target.ID},
+                    empire=Source.Owner,
+                )
+            ],
         ),
     ),
     # *********************************************************************************************************************************************************

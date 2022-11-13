@@ -61,14 +61,6 @@ public:
          std::vector<UnlockableItem>&& unlocked_items,
          std::string&& graphic);
 
-    /** basic ctor taking helper struct to reduce number of direct parameters
-      * in order to making parsing work. */
-    Tech(TechInfo&& tech_info,
-         std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
-         std::set<std::string>&& prerequisites,
-         std::vector<UnlockableItem>&& unlocked_items,
-         std::string&& graphic);
-
     bool operator==(const Tech& rhs) const;
     bool operator!=(const Tech& rhs) const
     { return !(*this == rhs); }
@@ -83,7 +75,8 @@ public:
     [[nodiscard]] int                 ResearchTime(int empire_id, const ScriptingContext& context) const; //!< returns the number of turns required to research this tech, if ResearchCost() RPs are spent per turn
     [[nodiscard]] bool                Researchable() const        { return m_researchable; }              //!< returns whether this tech is researchable by players and appears on the tech tree
 
-    [[nodiscard]] const auto&         Tags() const { return m_tags; }
+    [[nodiscard]] const auto&         Tags() const noexcept { return m_tags; }
+    [[nodiscard]] const auto&         PediaTags() const noexcept { return m_pedia_tags; }
     [[nodiscard]] bool                HasTag(std::string_view tag) const
     { return std::any_of(m_tags.begin(), m_tags.end(), [tag](const auto& t) { return t == tag; }); }
 
@@ -105,7 +98,7 @@ public:
       * and executions of the program and the function. Useful to verify that
       * the parsed content is consistent without sending it all between
       * clients and server. */
-    [[nodiscard]] unsigned int                      GetCheckSum() const;
+    [[nodiscard]] uint32_t GetCheckSum() const;
 
 private:
     Tech(const Tech&) = delete;
@@ -119,8 +112,9 @@ private:
     std::unique_ptr<ValueRef::ValueRef<double>> m_research_cost;
     std::unique_ptr<ValueRef::ValueRef<int>>    m_research_turns;
     bool                            m_researchable = false;
-    const std::string                                  m_tags_concatenated;
-    const std::vector<std::string_view>                m_tags;
+    const std::string                   m_tags_concatenated;
+    const std::vector<std::string_view> m_tags;
+    const std::vector<std::string_view> m_pedia_tags;
     std::vector<std::shared_ptr<Effect::EffectsGroup>> m_effects;
     std::set<std::string>           m_prerequisites;
     std::vector<UnlockableItem>     m_unlocked_items;
@@ -140,13 +134,13 @@ struct FO_COMMON_API TechCategory {
         graphic(std::move(graphic_)),
         colour(colour_)
     {}
-    std::string             name;                           ///< name of category
-    std::string             graphic;                        ///< icon that represents catetegory
-    std::array<uint8_t, 4>  colour{{255, 255, 255, 255}};   ///< colour associatied with category
+    std::string            name;                           ///< name of category
+    std::string            graphic;                        ///< icon that represents catetegory
+    std::array<uint8_t, 4> colour{{255, 255, 255, 255}};   ///< colour associatied with category
 };
 
 namespace CheckSums {
-    FO_COMMON_API void CheckSumCombine(unsigned int& sum, const TechCategory& cat);
+    FO_COMMON_API void CheckSumCombine(uint32_t& sum, const TechCategory& cat);
 }
 
 /** holds all FreeOrion techs.  Techs may be looked up by name and by category, and the next researchable techs can be querried,
@@ -245,7 +239,7 @@ public:
       * and executions of the program and the function. Useful to verify that
       * the parsed content is consistent without sending it all between
       * clients and server. */
-    [[nodiscard]] unsigned int             GetCheckSum() const;
+    [[nodiscard]] uint32_t GetCheckSum() const;
 
     using TechParseTuple = std::tuple<
         TechManager::TechContainer, // techs_

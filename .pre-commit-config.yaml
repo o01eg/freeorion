@@ -3,16 +3,22 @@ default_stages:
   - manual
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.1.0
+    rev: v4.3.0
     hooks:
       - id: check-merge-conflict
       - id: check-yaml
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.2.0
+    hooks:
+      - id: pyupgrade
+        args:
+          - "--py37-plus"
   - repo: https://github.com/timothycrosley/isort
     rev: 5.10.1
     hooks:
       - id: isort
   - repo: https://github.com/psf/black
-    rev: 22.1.0
+    rev: 22.8.0
     hooks:
       - id: black
   - repo: https://gitlab.com/pycqa/flake8/
@@ -30,17 +36,11 @@ repos:
         name: flake8 for AI
         args:
           - --extend-exclude=default/scripting/*,test-scripting/*
-          - --config=default/python/tox.ini
+          - --builtins=''
       - id: flake8
         name: flake8 for scripting
         args:
-          - --extend-exclude=default/python/*,test-scripting/*,cmake/*,doc/*,check/*
-          - --config=default/scripting/tox.ini
-      - id: flake8
-        name: flake8 for test-scripting
-        args:
-          - --extend-exclude=default/python/*,default/scripting/*,cmake/*,doc/*,check/*
-          - --config=test-scripting/tox.ini
+          - '--extend-exclude=default/python/*,cmake/*,doc/*,check/*'
   - repo: local
     hooks:
       - id: string-tables-syntax-check
@@ -50,3 +50,4 @@ repos:
         language: python
         files: 'default/stringtables/[a-z]{2}\.txt'
         types: [ text ]
+

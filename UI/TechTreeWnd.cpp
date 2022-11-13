@@ -1143,13 +1143,13 @@ void TechTreeWnd::LayoutPanel::ConnectKeyboardAcceleratorSignals() {
     HotkeyManager* hkm = HotkeyManager::GetManager();
 
     hkm->Connect(boost::bind(&TechTreeWnd::LayoutPanel::TreeZoomInKeyboard, this), "ui.zoom.in",
-                 AndCondition({VisibleWindowCondition(this), NoModalWndsOpenCondition}));
+                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
     hkm->Connect(boost::bind(&TechTreeWnd::LayoutPanel::TreeZoomInKeyboard, this), "ui.zoom.in.alt",
-                 AndCondition({VisibleWindowCondition(this), NoModalWndsOpenCondition}));
+                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
     hkm->Connect(boost::bind(&TechTreeWnd::LayoutPanel::TreeZoomOutKeyboard, this), "ui.zoom.out",
-                 AndCondition({VisibleWindowCondition(this), NoModalWndsOpenCondition}));
+                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
     hkm->Connect(boost::bind(&TechTreeWnd::LayoutPanel::TreeZoomOutKeyboard, this), "ui.zoom.out.alt",
-                 AndCondition({VisibleWindowCondition(this), NoModalWndsOpenCondition}));
+                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
 
     hkm->RebuildShortcuts();
 }
@@ -1290,7 +1290,7 @@ void TechTreeWnd::LayoutPanel::ShowStatus(TechStatus status) {
 }
 
 void TechTreeWnd::LayoutPanel::HideStatus(TechStatus status) {
-    std::set<TechStatus>::iterator it = m_tech_statuses_shown.find(status);
+    auto it = m_tech_statuses_shown.find(status);
     if (it != m_tech_statuses_shown.end()) {
         m_tech_statuses_shown.erase(it);
         Layout(true);
@@ -1951,7 +1951,7 @@ void TechTreeWnd::TechListBox::ShowStatus(TechStatus status) {
 }
 
 void TechTreeWnd::TechListBox::HideStatus(TechStatus status) {
-    std::set<TechStatus>::iterator it = m_tech_statuses_shown.find(status);
+    auto it = m_tech_statuses_shown.find(status);
     if (it != m_tech_statuses_shown.end()) {
         m_tech_statuses_shown.erase(it);
         Populate();

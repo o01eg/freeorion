@@ -122,7 +122,7 @@ public:
 
     /// These are the only events absolutely necessary for GG to function
     /// properly
-    enum class EventType : char {
+    enum class EventType : uint8_t {
         IDLE,        ///< nothing has changed since the last message, but the GUI might want to update some things anyway
         KEYPRESS,    ///< a down key press or key repeat, with or without modifiers like Alt, Ctrl, Meta, etc.
         KEYRELEASE,  ///< a key release, with or without modifiers like Alt, Ctrl, Meta, etc.
@@ -152,7 +152,7 @@ public:
     bool                        FocusWndAcceptsTypingInput() const; ///< returns true iff the current focus GG::Wnd accepts typing input
     std::shared_ptr<Wnd>        PrevFocusInteractiveWnd() const;    ///< returns the previous Wnd to the current FocusWnd. Cycles through INTERACTIVE Wnds, in order determined by parent-child relationships
     std::shared_ptr<Wnd>        NextFocusInteractiveWnd() const;    ///< returns the next Wnd to the current FocusWnd.
-    std::shared_ptr<Wnd>        GetWindowUnder(const Pt& pt) const; ///< returns the GG::Wnd under the point pt
+    std::shared_ptr<Wnd>        GetWindowUnder(Pt pt) const;        ///< returns the GG::Wnd under the point pt
     virtual unsigned int        Ticks() const = 0;                  ///< returns milliseconds since the app started running
     bool                        RenderingDragDropWnds() const;      ///< returns true iff drag-and-drop Wnds are currently being rendered
     bool                        FPSEnabled() const;                 ///< returns true iff FPS calulations are turned on
@@ -223,8 +223,9 @@ public:
     virtual void    HandleSystemEvents() = 0;
 
     /** Event handler for GG events. */
-    void            HandleGGEvent(EventType event, Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys,
-                                  const Pt& pos, const Pt& rel, std::string text = std::string());
+    void            HandleGGEvent(EventType event, Key key, std::uint32_t key_code_point,
+                                  Flags<ModKey> mod_keys, Pt pos, Pt rel,
+                                  std::string text = std::string());
 
     void            ClearEventState();
 
@@ -251,7 +252,8 @@ public:
         \throw std::runtime_error May throw std::runtime_error if there are
         already other Wnds registered that belong to a window other than \a
         originating_wnd. */
-    void           RegisterDragDropWnd(std::shared_ptr<Wnd> wnd, const Pt& offset, std::shared_ptr<Wnd> originating_wnd);
+    void           RegisterDragDropWnd(std::shared_ptr<Wnd> wnd, Pt offset,
+                                       std::shared_ptr<Wnd> originating_wnd);
     void           CancelDragDrop();             ///< clears the set of current drag-and-drop Wnds
 
     void           RegisterTimer(Timer& timer);  ///< adds \a timer to the list of active timers
@@ -297,7 +299,7 @@ public:
     /** Returns a shared_ptr to the desired font, supporting all printable
         ASCII characters, from the in-memory contents \a file_contents. */
     std::shared_ptr<Font> GetFont(const std::string& font_filename, unsigned int pts,
-                                  const std::vector<unsigned char>& file_contents);
+                                  const std::vector<uint8_t>& file_contents);
 
     /** Returns a shared_ptr to the desired font, supporting all the
         characters in the UnicodeCharsets in the range [first, last). */
@@ -310,7 +312,7 @@ public:
         in-memory contents \a file_contents. */
     template <typename CharSetIter>
     std::shared_ptr<Font> GetFont(const std::string& font_filename, unsigned int pts,
-                                  const std::vector<unsigned char>& file_contents,
+                                  const std::vector<uint8_t>& file_contents,
                                   CharSetIter first, CharSetIter last);
 
     /** Returns a shared_ptr to existing font \a font in a new size, \a pts. */
@@ -433,7 +435,7 @@ private:
 
     // Returns the window under \a pt, sending Mouse{Enter|Leave} or
     // DragDrop{Enter|Leave} as appropriate
-    std::shared_ptr<Wnd> CheckedGetWindowUnder(const Pt& pt, Flags<ModKey> mod_keys);
+    std::shared_ptr<Wnd> CheckedGetWindowUnder(Pt pt, Flags<ModKey> mod_keys);
 
     static GUI*              s_gui;
     std::unique_ptr<GUIImpl> m_impl;
@@ -470,7 +472,7 @@ std::shared_ptr<Font> GUI::GetFont(const std::string& font_filename, unsigned in
 
 template <typename CharSetIter>
 std::shared_ptr<Font> GUI::GetFont(const std::string& font_filename, unsigned int pts,
-                                   const std::vector<unsigned char>& file_contents,
+                                   const std::vector<uint8_t>& file_contents,
                                    CharSetIter first, CharSetIter last)
 { return GetFontManager().GetFont(font_filename, pts, file_contents, first, last); }
 

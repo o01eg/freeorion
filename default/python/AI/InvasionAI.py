@@ -14,7 +14,6 @@ import PlanetUtilsAI
 from AIDependencies import INVALID_ID
 from aistate_interface import get_aistate
 from colonization import calculate_planet_colonization_rating
-from colonization.colony_score import use_new_rating
 from common.fo_typing import SystemId
 from common.print_utils import Number, Table, Text
 from DiplomaticCorp import get_diplomatic_status
@@ -40,7 +39,7 @@ MIN_INVASION_SCORE = 20
 invasion_timer = AITimer("get_invasion_fleets()")
 
 
-def get_invasion_fleets():
+def get_invasion_fleets():  # noqa: max-complexity
     invasion_timer.start("gathering initial info")
     universe = fo.getUniverse()
     empire = fo.getEmpire()
@@ -187,7 +186,7 @@ def get_invasion_fleets():
             if not col_design:
                 continue
             if loc not in build_choices:
-                warning("Best troop design %s can not be produced at planet with id: %s" % (col_design, build_choices))
+                warning(f"Best troop design {col_design} can not be produced at planet with id: {build_choices}")
                 continue
             n_bases = math.ceil((planet_troops + 1) / troops_per_ship)  # TODO: reconsider this +1 safety factor
             # TODO: evaluate cost and time-to-build of best base trooper here versus cost and time-to-build-and-travel
@@ -278,7 +277,7 @@ def assign_invasion_values(planet_ids):
     empire_id = fo.empireID()
     planet_values = {}
     neighbor_values = {}
-    neighbor_val_ratio = 0.95 if not use_new_rating() else 0.3
+    neighbor_val_ratio = 0.3
     universe = fo.getUniverse()
     for pid in planet_ids:
         # Must copy to avoid modifying neighbor_values when adding neighbor_values to planet_values
@@ -337,7 +336,7 @@ def _get_path_from_capital(planet: "fo.planet") -> Tuple[Sequence[SystemId], int
         return [], 8
 
 
-def evaluate_invasion_planet(planet_id):
+def evaluate_invasion_planet(planet_id):  # noqa: max-complexity
     """Return the invasion value (score, troops) of a planet."""
     universe = fo.getUniverse()
     empire_id = fo.empireID()
@@ -380,7 +379,6 @@ def evaluate_invasion_planet(planet_id):
     # get a baseline evaluation of the planet as determined by ColonisationAI
     species_name = planet.speciesName
     species = fo.getSpecies(species_name)
-    empire_research_list = tuple(element.tech for element in fo.getEmpire().researchQueue)
     if not species or AIDependencies.TAG_DESTROYED_ON_CONQUEST in species.tags:
         # this call iterates over this Empire's available species with which it could colonize after an invasion
         planet_eval = ColonisationAI.assign_colonisation_values([planet_id], MissionType.INVASION, None, detail)
@@ -391,7 +389,6 @@ def evaluate_invasion_planet(planet_id):
                 mission_type=MissionType.OUTPOST,
                 spec_name=None,
                 detail=detail,
-                empire_research_list=empire_research_list,
             ),
         )
     else:
@@ -400,7 +397,6 @@ def evaluate_invasion_planet(planet_id):
             mission_type=MissionType.INVASION,
             spec_name=species_name,
             detail=detail,
-            empire_research_list=empire_research_list,
         )
 
     # Add extra score for all buildings on the planet
@@ -436,8 +432,7 @@ def evaluate_invasion_planet(planet_id):
         bld_tally += bval
         detail.append("%s: %d" % (bldType, bval))
     # quick fix, building values dwarf the new planet ratings, and I think they are too high in general
-    if use_new_rating():
-        bld_tally /= 20
+    bld_tally /= 20
 
     # Add extra score for unlocked techs when we conquer the species
     tech_tally = 0
@@ -613,7 +608,7 @@ def send_invasion_fleets(fleet_ids, evaluated_planets, mission_type):
             else:
                 these_fleets = found_fleets
         target = TargetPlanet(planet_id)
-        debug("assigning invasion fleets %s to target %s" % (these_fleets, target))
+        debug(f"assigning invasion fleets {these_fleets} to target {target}")
         if target.get_object().currentMeterValue(fo.meterType.maxShield) > 0.0 and not secure_system(sys_id, True):
             continue
         aistate = get_aistate()

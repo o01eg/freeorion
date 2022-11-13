@@ -104,8 +104,8 @@ public:
 
 
     /** Returns objects in this Universe. */
-    [[nodiscard]] const ObjectMap& Objects() const { return *m_objects; }
-    [[nodiscard]] ObjectMap&       Objects()       { return *m_objects; }
+    [[nodiscard]] const ObjectMap& Objects() const noexcept { return *m_objects; }
+    [[nodiscard]] ObjectMap&       Objects() noexcept       { return *m_objects; }
 
     /** Returns latest known state of objects for the Empire with
       * id \a empire_id or the true / complete state of all objects in this
@@ -139,9 +139,7 @@ public:
 
     void RenameShipDesign(int design_id, const std::string& name = "", const std::string& description = "");
 
-    [[nodiscard]] ship_design_iterator beginShipDesigns() const { return m_ship_designs.begin(); }
-    [[nodiscard]] ship_design_iterator endShipDesigns() const   { return m_ship_designs.end(); }
-    [[nodiscard]] auto                 NumShipDesigns() const   { return m_ship_designs.size(); }
+    [[nodiscard]] const auto& ShipDesigns() const noexcept { return m_ship_designs; }
 
     [[nodiscard]] const ShipDesign* GetGenericShipDesign(std::string_view name) const;
 
@@ -157,12 +155,12 @@ public:
 
     /* Return the map from empire id to (map from id to that empire's current
      * visibility of that object) */
-    [[nodiscard]] const EmpireObjectVisibilityMap& GetEmpireObjectVisibility() const;
+    [[nodiscard]] auto& GetEmpireObjectVisibility() const noexcept { return m_empire_object_visibility; }
 
     /* Returns the map from empire id to (map from object id to (map from
      * visibility level to turn number on which the empire last detected that
      * object at that visibility level)). */
-    [[nodiscard]] const EmpireObjectVisibilityTurnMap& GetEmpireObjectVisibilityTurnMap() const;
+    [[nodiscard]] auto& GetEmpireObjectVisibilityTurnMap() const noexcept { return m_empire_object_visibility_turns; }
 
     /** Returns the map from Visibility level to turn number on which the empire
       * with id \a empire_id last had the various Visibility levels of the
@@ -181,7 +179,8 @@ public:
         GetEmpiresPositionDetectionRanges(const ObjectMap& objects) const;
 
     [[nodiscard]] std::map<int, std::map<std::pair<double, double>, float>>
-        GetEmpiresPositionDetectionRanges(const ObjectMap& objects, const std::unordered_set<int>& exclude_ids) const;
+        GetEmpiresPositionDetectionRanges(const ObjectMap& objects,
+                                          const std::unordered_set<int>& exclude_ids) const;
 
     /** Returns map from empire ID to map from location (X, Y) to detection range
       * that empire is expected to have at that location after the next turn's
@@ -190,16 +189,15 @@ public:
         GetEmpiresPositionNextTurnFleetDetectionRanges(const ScriptingContext& context) const;
 
     /** Return the Pathfinder */
-    [[nodiscard]] std::shared_ptr<const Pathfinder> GetPathfinder() const { return m_pathfinder; }
+    [[nodiscard]] const auto& GetPathfinder() const noexcept { return m_pathfinder; }
 
     /** Returns map, indexed by object id, to map, indexed by MeterType,
       * to vector of EffectAccountInfo for the meter, in order effects
       * were applied to the meter. */
-    [[nodiscard]] const Effect::AccountingMap& GetEffectAccountingMap() const { return m_effect_accounting_map; }
-    [[nodiscard]] Effect::AccountingMap& GetEffectAccountingMap() { return m_effect_accounting_map; }
+    [[nodiscard]] const Effect::AccountingMap& GetEffectAccountingMap() const noexcept { return m_effect_accounting_map; }
+    [[nodiscard]] Effect::AccountingMap& GetEffectAccountingMap() noexcept { return m_effect_accounting_map; }
 
-    [[nodiscard]] const std::map<std::string, std::map<int, std::map<int, double>>>&
-        GetStatRecords() const { return m_stat_records; }
+    [[nodiscard]] const auto& GetStatRecords() const noexcept { return m_stat_records; }
 
     mutable UniverseObjectDeleteSignalType UniverseObjectDeleteSignal; ///< the state changed signal object for this UniverseObject
 
@@ -302,7 +300,7 @@ public:
       * updates the record of the last turn on which each empire has visibility
       * of object that can be seen on the current turn with the level of
       * visibility that the empire has this turn. */
-    void UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    void UpdateEmpireLatestKnownObjectsAndVisibilityTurns(int current_turn);
 
     /** Checks latest known information about each object for each empire and,
       * in cases when the latest known state (stealth and location) suggests
@@ -367,15 +365,15 @@ public:
 
     /** Sets whether to inhibit UniverseObjectSignals.  Inhibits if \a inhibit
       * is true, and (re)enables UniverseObjectSignals if \a inhibit is false. */
-    void InhibitUniverseObjectSignals(bool inhibit = true);
+    void InhibitUniverseObjectSignals(bool inhibit = true) noexcept { m_inhibit_universe_object_signals = inhibit; }
 
     void UpdateStatRecords(const ScriptingContext& context);
 
     /** Returns true if UniverseOjbectSignals are inhibited, false otherwise. */
-    const bool& UniverseObjectSignalsInhibited() const;
+    const bool& UniverseObjectSignalsInhibited() const noexcept { return m_inhibit_universe_object_signals; }
 
-    [[nodiscard]] double UniverseWidth() const;
-    void SetUniverseWidth(double width) { m_universe_width = width; }
+    [[nodiscard]] double UniverseWidth() const noexcept { return m_universe_width; }
+    void SetUniverseWidth(double width) noexcept { m_universe_width = width; }
 
     /** InsertNew constructs and inserts a UniverseObject into the object map with a new
         id. It returns the new object. */

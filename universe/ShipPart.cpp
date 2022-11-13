@@ -185,9 +185,28 @@ ShipPart::ShipPart(ShipPartClass part_class, double capacity, double stat2,
 
         // store views into concatenated tags string
         std::for_each(common_params.tags.begin(), common_params.tags.end(),
-                      [&next_idx, &retval, this, sv](const auto& t)
+                      [&next_idx, &retval, sv](const auto& t)
         {
-            retval.push_back(sv.substr(next_idx, t.size()));
+            auto tag = sv.substr(next_idx, t.size());
+            retval.push_back(tag);
+            next_idx += t.size();
+        });
+        return retval;
+    }()),
+    m_pedia_tags([&common_params, this]() {
+        std::vector<std::string_view> retval;
+        std::size_t next_idx = 0;
+        retval.reserve(common_params.tags.size());
+        std::string_view sv{m_tags_concatenated};
+        static constexpr auto len{TAG_PEDIA_PREFIX.length()};
+
+        // store views into concatenated tags string
+        std::for_each(common_params.tags.begin(), common_params.tags.end(),
+                      [&next_idx, &retval, sv](const auto& t)
+        {
+            auto tag = sv.substr(next_idx, t.size());
+            if (tag.substr(0, len) == TAG_PEDIA_PREFIX)
+                retval.push_back(tag);
             next_idx += t.size();
         });
         return retval;
@@ -469,7 +488,7 @@ float ShipPart::ProductionCost(int empire_id, int location_id, const ScriptingCo
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION") || !m_production_cost)
         return 1.0f;
 
-    constexpr int PRODUCTION_BLOCK_SIZE = 1;
+    static constexpr int PRODUCTION_BLOCK_SIZE = 1;
 
     if (m_production_cost->ConstantExpr()) {
         return static_cast<float>(m_production_cost->Eval());
@@ -533,8 +552,8 @@ int ShipPart::ProductionTime(int empire_id, int location_id, const ScriptingCont
     return m_production_time->Eval(design_id_context);
 }
 
-unsigned int ShipPart::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t ShipPart::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, m_name);
     CheckSums::CheckSumCombine(retval, m_description);
@@ -597,9 +616,9 @@ std::size_t ShipPartManager::size() const {
     return m_parts.size();
 }
 
-unsigned int ShipPartManager::GetCheckSum() const {
+uint32_t ShipPartManager::GetCheckSum() const {
     CheckPendingShipParts();
-    unsigned int retval{0};
+    uint32_t retval{0};
     for (auto const& name_part_pair : m_parts)
         CheckSums::CheckSumCombine(retval, name_part_pair);
     CheckSums::CheckSumCombine(retval, m_parts.size());

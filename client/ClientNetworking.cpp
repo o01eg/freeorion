@@ -28,6 +28,7 @@
 #include <boost/optional/optional.hpp>
 
 #include <thread>
+#include <queue>
 
 using boost::asio::ip::tcp;
 using namespace Networking;
@@ -61,7 +62,7 @@ namespace {
                                        resolver_query_base::address_configured |
                                        resolver_query_base::numeric_service);
             udp::resolver::iterator end_it;
-            for (udp::resolver::iterator it = resolver.resolve(query); it != end_it; ++it) {
+            for (auto it = resolver.resolve(query); it != end_it; ++it) {
                 udp::endpoint receiver_endpoint = *it;
 
                 m_socket.close();
@@ -154,10 +155,10 @@ public:
     bool IsTxConnected() const;
 
     /** Returns the ID of the player on this client. */
-    int PlayerID() const;
+    int PlayerID() const noexcept { return m_player_id; }
 
     /** Returns the ID of the host player, or INVALID_PLAYER_ID if there is no host player. */
-    int HostPlayerID() const;
+    int HostPlayerID() const noexcept { return m_host_player_id; }
 
     /** Returns whether the indicated player ID is the host. */
     bool PlayerIsHost(int player_id) const;
@@ -166,7 +167,7 @@ public:
     bool HasAuthRole(Networking::RoleType role) const;
 
     /** Returns destination address of server. */
-    const std::string& Destination() const;
+    const std::string& Destination() const noexcept { return m_destination; }
 
     /** Returns a list of the addresses and names of all servers on the Local
         Area Network. */
@@ -253,7 +254,7 @@ private:
     bool                            m_tx_connected = false; // accessed from multiple threads
 
     MessageQueue                    m_incoming_messages;    // accessed from multiple threads, but its interface is threadsafe
-    std::list<Message>              m_outgoing_messages;
+    std::queue<Message>             m_outgoing_messages;
 
     Message::HeaderBuffer           m_incoming_header = {};
     Message                         m_incoming_message;
@@ -287,7 +288,6 @@ bool ClientNetworking::Impl::CloseSocketIfNotConnected() {
     bool do_close = !_IsConnected();
     if (do_close)
         m_socket.close();
-    
     return do_close;
 }
 
@@ -300,12 +300,6 @@ bool ClientNetworking::Impl::IsTxConnected() const {
     std::scoped_lock lock(m_mutex);
     return m_tx_connected;
 }
-
-int ClientNetworking::Impl::PlayerID() const
-{ return m_player_id; }
-
-int ClientNetworking::Impl::HostPlayerID() const
-{ return m_host_player_id; }
 
 bool ClientNetworking::Impl::PlayerIsHost(int player_id) const {
     if (player_id == Networking::INVALID_PLAYER_ID)
@@ -328,14 +322,10 @@ ClientNetworking::ServerNames ClientNetworking::Impl::DiscoverLANServerNames() {
     return names;
 }
 
-const std::string& ClientNetworking::Impl::Destination() const
-{ return m_destination; }
 
-
-void ClientNetworking::Impl::LaunchNetworkThread(const ClientNetworking* const self)
-{
+void ClientNetworking::Impl::LaunchNetworkThread(const ClientNetworking* const self) {
     // Prepare the socket
-    
+
     // linger option has different meanings on different platforms.  It affects the
     // behavior of the socket.close().  It can do the following:
     // - close both send and receive immediately,
@@ -602,7 +592,8 @@ void ClientNetworking::Impl::NetworkingThread(const std::shared_ptr<const Client
     } catch (const boost::system::system_error& error) {
         HandleException(error);
     }
-    m_outgoing_messages.clear();
+    decltype(m_outgoing_messages) empty_queue;
+    m_outgoing_messages.swap(empty_queue); // clear queue
     m_io_context.reset();
     { // Mutex scope
         std::scoped_lock lock(m_mutex);
@@ -669,7 +660,7 @@ void ClientNetworking::Impl::HandleMessageWrite(boost::system::error_code error,
     if (static_cast<int>(bytes_transferred) != static_cast<int>(Message::HeaderBufferSize) + m_outgoing_header[Message::Parts::SIZE])
         return;
 
-    m_outgoing_messages.pop_front();
+    m_outgoing_messages.pop();
     if (!m_outgoing_messages.empty())
         AsyncWriteMessage();
 
@@ -680,9 +671,8 @@ void ClientNetworking::Impl::HandleMessageWrite(boost::system::error_code error,
             std::scoped_lock lock(m_mutex);
             should_shutdown = !m_tx_connected;
         }
-        if (should_shutdown) {
+        if (should_shutdown)
             DisconnectFromServerImpl();
-        }
     }
 }
 
@@ -691,21 +681,24 @@ void ClientNetworking::Impl::AsyncWriteMessage() {
         ErrorLogger(network) << "Socket is closed. Dropping message.";
         return;
     }
+    using namespace boost::asio;
+    using boost::asio::buffer;
+    using boost::asio::async_write;
+    using boost::asio::placeholders::error;
+    using boost::asio::placeholders::bytes_transferred;
 
     HeaderToBuffer(m_outgoing_messages.front(), m_outgoing_header);
-    std::vector<boost::asio::const_buffer> buffers;
-    buffers.push_back(boost::asio::buffer(m_outgoing_header));
-    buffers.push_back(boost::asio::buffer(m_outgoing_messages.front().Data(),
-                                          m_outgoing_messages.front().Size()));
-    boost::asio::async_write(m_socket, buffers,
-                             boost::bind(&ClientNetworking::Impl::HandleMessageWrite, this,
-                                         boost::asio::placeholders::error,
-                                         boost::asio::placeholders::bytes_transferred));
+    std::array<const_buffer, 2> buffers{
+        buffer(m_outgoing_header),
+        buffer(m_outgoing_messages.front().Data(), m_outgoing_messages.front().Size())
+    };
+    async_write(m_socket, buffers,
+                boost::bind(&ClientNetworking::Impl::HandleMessageWrite, this, error, bytes_transferred));
 }
 
 void ClientNetworking::Impl::SendMessageImpl(Message message) {
     bool start_write = m_outgoing_messages.empty();
-    m_outgoing_messages.push_back(std::move(message));
+    m_outgoing_messages.push(std::move(message));
     if (start_write)
         AsyncWriteMessage();
 }

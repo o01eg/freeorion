@@ -14,32 +14,32 @@ Tech(
     unlock=Item(type=UnlockPolicy, name="PLC_EXPLORATION"),
     effectsgroups=[
         EffectsGroup(
-            scope=Planet(size=Tiny) & OwnedBy(empire=Source.Owner),
+            scope=Planet(size=[Tiny]) & OwnedBy(empire=Source.Owner),
             accountinglabel="TINY_PLANET_LABEL",
             effects=SetMaxSupply(value=Value + 2),
         ),
         EffectsGroup(
-            scope=Planet(size=Small) & OwnedBy(empire=Source.Owner),
+            scope=Planet(size=[Small]) & OwnedBy(empire=Source.Owner),
             accountinglabel="SMALL_PLANET_LABEL",
             effects=SetMaxSupply(value=Value + 1),
         ),
         EffectsGroup(
-            scope=Planet(size=Large) & OwnedBy(empire=Source.Owner),
+            scope=Planet(size=[Large]) & OwnedBy(empire=Source.Owner),
             accountinglabel="LARGE_PLANET_LABEL",
             effects=SetMaxSupply(value=Value - 1),
         ),
         EffectsGroup(
-            scope=Planet(size=Huge) & OwnedBy(empire=Source.Owner),
+            scope=Planet(size=[Huge]) & OwnedBy(empire=Source.Owner),
             accountinglabel="HUGE_PLANET_LABEL",
             effects=SetMaxSupply(value=Value - 2),
         ),
         EffectsGroup(
-            scope=Planet(type=GasGiantType) & OwnedBy(empire=Source.Owner),
+            scope=Planet(type=[GasGiantType]) & OwnedBy(empire=Source.Owner),
             accountinglabel="GAS_GIANT_LABEL",
             effects=SetMaxSupply(value=Value - 1),
         ),
         EffectsGroup(  # outpost supply increases 1 per turn up to max
-            scope=Planet() & OwnedBy(empire=Source.Owner) & ~Species,
+            scope=Planet() & OwnedBy(empire=Source.Owner) & ~HasSpecies(),
             priority=AFTER_ALL_TARGET_MAX_METERS_PRIORITY,
             effects=SetSupply(value=MinOf(float, Value(Target.MaxSupply), Value + 1)),
         ),

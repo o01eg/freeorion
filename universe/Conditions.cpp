@@ -409,8 +409,8 @@ void Number::SetTopLevelContent(const std::string& content_name) {
         m_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int Number::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Number::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Number");
     CheckSums::CheckSumCombine(retval, m_low);
@@ -560,8 +560,8 @@ void Turn::SetTopLevelContent(const std::string& content_name) {
         m_high->SetTopLevelContent(content_name);
 }
 
-unsigned int Turn::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Turn::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Turn");
     CheckSums::CheckSumCombine(retval, m_low);
@@ -624,9 +624,9 @@ bool SortedNumberOf::operator==(const Condition& rhs) const {
 
 namespace {
     /** Transfers the indicated \a number of objects, randomly selected from from_set to to_set */
-    void TransferRandomObjects(unsigned int number, ObjectSet& from_set, ObjectSet& to_set) {
+    void TransferRandomObjects(uint32_t number, ObjectSet& from_set, ObjectSet& to_set) {
         // ensure number of objects to be moved is within reasonable range
-        number = std::min<unsigned int>(number, from_set.size());
+        number = std::min<uint32_t>(number, from_set.size());
         if (number == 0)
             return;
 
@@ -659,7 +659,7 @@ namespace {
       * of \a sort_key evaluated on them, with the largest / smallest / most
       * common sort keys chosen, or a random selection chosen, depending on the
       * specified \a sorting_method */
-    void TransferSortedObjects(unsigned int number, ValueRef::ValueRef<double>* sort_key,
+    void TransferSortedObjects(uint32_t number, ValueRef::ValueRef<double>* sort_key,
                                const ScriptingContext& context, SortingMethod sorting_method,
                                ObjectSet& from_set, ObjectSet& to_set)
     {
@@ -684,10 +684,10 @@ namespace {
         }
 
         // how many objects to select?
-        number = std::min<unsigned int>(number, sort_key_objects.size());
+        number = std::min<uint32_t>(number, sort_key_objects.size());
         if (number == 0)
             return;
-        unsigned int number_transferred(0);
+        uint32_t number_transferred(0);
 
         // pick max / min / most common values
         if (sorting_method == SortingMethod::SORT_MIN) {
@@ -726,14 +726,14 @@ namespace {
 
         } else if (sorting_method == SortingMethod::SORT_MODE) {
             // compile histogram of of number of times each sort key occurs
-            std::map<float, unsigned int> histogram;
+            std::unordered_map<float, uint32_t> histogram;
             for ([[maybe_unused]] auto& [key, ignored_object] : sort_key_objects) {
                 (void)ignored_object;
                 histogram[key]++;
             }
 
             // invert histogram to index by number of occurances
-            std::multimap<unsigned int, float> inv_histogram;
+            std::multimap<uint32_t, float> inv_histogram;
             for (const auto& [key, count] : histogram)
                 inv_histogram.emplace(count, key);
 
@@ -985,8 +985,8 @@ void SortedNumberOf::SetTopLevelContent(const std::string& content_name) {
         m_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int SortedNumberOf::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SortedNumberOf::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::SortedNumberOf");
     CheckSums::CheckSumCombine(retval, m_number);
@@ -1039,8 +1039,8 @@ std::string All::Description(bool negated) const {
 std::string All::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "All\n"; }
 
-unsigned int All::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t All::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::All");
 
@@ -1084,8 +1084,8 @@ std::string None::Description(bool negated) const {
 std::string None::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "None\n"; }
 
-unsigned int None::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t None::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::None");
 
@@ -1122,8 +1122,8 @@ std::string NoOp::Description(bool negated) const
 std::string NoOp::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "NoOp\n"; }
 
-unsigned int NoOp::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t NoOp::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::NoOp");
 
@@ -1389,8 +1389,8 @@ void EmpireAffiliation::SetTopLevelContent(const std::string& content_name) {
         m_empire_id->SetTopLevelContent(content_name);
 }
 
-unsigned int EmpireAffiliation::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t EmpireAffiliation::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::EmpireAffiliation");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -1439,8 +1439,8 @@ void Source::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_co
         condition_non_targets.push_back(parent_context.source);
 }
 
-unsigned int Source::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Source::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Source");
 
@@ -1485,8 +1485,8 @@ void RootCandidate::GetDefaultInitialCandidateObjects(const ScriptingContext& pa
         condition_non_targets.push_back(parent_context.condition_root_candidate);
 }
 
-unsigned int RootCandidate::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t RootCandidate::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::RootCandidate");
 
@@ -1531,8 +1531,8 @@ void Target::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_co
         condition_non_targets.push_back(parent_context.effect_target);
 }
 
-unsigned int Target::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Target::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Target");
 
@@ -1568,7 +1568,7 @@ bool Homeworld::operator==(const Condition& rhs) const {
 
     if (m_names.size() != rhs_.m_names.size())
         return false;
-    for (unsigned int i = 0; i < m_names.size(); ++i) {
+    for (std::size_t i = 0; i < m_names.size(); ++i) {
         CHECK_COND_VREF_MEMBER(m_names.at(i))
     }
 
@@ -1665,7 +1665,7 @@ void Homeworld::Eval(const ScriptingContext& parent_context,
 
 std::string Homeworld::Description(bool negated) const {
     std::string values_str;
-    for (unsigned int i = 0; i < m_names.size(); ++i) {
+    for (std::size_t i = 0; i < m_names.size(); ++i) {
         values_str += m_names[i]->ConstantExpr() ?
                         UserString(m_names[i]->Eval()) :
                         m_names[i]->Description();
@@ -1740,8 +1740,8 @@ void Homeworld::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int Homeworld::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Homeworld::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Homeworld");
     CheckSums::CheckSumCombine(retval, m_names);
@@ -1760,6 +1760,7 @@ Capital::Capital() {
     m_root_candidate_invariant = true;
     m_target_invariant = true;
     m_source_invariant = true;
+    m_initial_candidates_all_match = true;
 }
 
 bool Capital::operator==(const Condition& rhs) const
@@ -1836,8 +1837,8 @@ void Capital::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_c
     }
 }
 
-unsigned int Capital::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Capital::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Capital");
 
@@ -1889,8 +1890,8 @@ void Monster::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_c
                                                 ObjectSet& condition_non_targets) const
 { AddAllObjectsSet<Ship>(parent_context.ContextObjects(), condition_non_targets); }
 
-unsigned int Monster::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Monster::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Monster");
 
@@ -1938,8 +1939,8 @@ bool Armed::Match(const ScriptingContext& local_context) const {
     return false;
 }
 
-unsigned int Armed::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Armed::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Armed");
 
@@ -1959,6 +1960,11 @@ Type::Type(std::unique_ptr<ValueRef::ValueRef<UniverseObjectType>>&& type) :
     m_root_candidate_invariant = !m_type || m_type->RootCandidateInvariant();
     m_target_invariant = !m_type || m_type->TargetInvariant();
     m_source_invariant = !m_type || m_type->SourceInvariant();
+    m_initial_candidates_all_match =
+        m_type && (
+            m_type->ConstantExpr() || (
+                m_type->LocalCandidateInvariant() &&
+                RootCandidateInvariant()));
 }
 
 Type::Type(UniverseObjectType type) :
@@ -2071,13 +2077,6 @@ bool Type::Match(const ScriptingContext& local_context) const {
     return TypeSimpleMatch(m_type->Eval(local_context))(candidate);
 }
 
-bool Type::InitialCandidatesAllMatch() const {
-    return m_type && (
-        m_type->ConstantExpr() || (
-            m_type->LocalCandidateInvariant() &&
-            RootCandidateInvariant()));
-}
-
 void Type::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                              ObjectSet& condition_non_targets) const
 {
@@ -2122,8 +2121,8 @@ void Type::SetTopLevelContent(const std::string& content_name) {
         m_type->SetTopLevelContent(content_name);
 }
 
-unsigned int Type::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Type::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Type");
     CheckSums::CheckSumCombine(retval, m_type);
@@ -2156,7 +2155,7 @@ bool Building::operator==(const Condition& rhs) const {
 
     if (m_names.size() != rhs_.m_names.size())
         return false;
-    for (unsigned int i = 0; i < m_names.size(); ++i) {
+    for (std::size_t i = 0; i < m_names.size(); ++i) {
         CHECK_COND_VREF_MEMBER(m_names.at(i))
     }
 
@@ -2252,7 +2251,7 @@ void Building::Eval(const ScriptingContext& parent_context,
 
 std::string Building::Description(bool negated) const {
     std::string values_str;
-    for (unsigned int i = 0; i < m_names.size(); ++i) {
+    for (std::size_t i = 0; i < m_names.size(); ++i) {
         values_str += m_names[i]->ConstantExpr() ?
                         UserString(m_names[i]->Eval()) :
                         m_names[i]->Description();
@@ -2321,8 +2320,8 @@ void Building::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int Building::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Building::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Building");
     CheckSums::CheckSumCombine(retval, m_names);
@@ -2355,7 +2354,7 @@ bool Field::operator==(const Condition& rhs) const {
 
     if (m_names.size() != rhs_.m_names.size())
         return false;
-    for (unsigned int i = 0; i < m_names.size(); ++i) {
+    for (std::size_t i = 0; i < m_names.size(); ++i) {
         CHECK_COND_VREF_MEMBER(m_names.at(i))
     }
 
@@ -2419,7 +2418,7 @@ void Field::Eval(const ScriptingContext& parent_context,
 
 std::string Field::Description(bool negated) const {
     std::string values_str;
-    for (unsigned int i = 0; i < m_names.size(); ++i) {
+    for (std::size_t i = 0; i < m_names.size(); ++i) {
         values_str += m_names[i]->ConstantExpr() ?
                         UserString(m_names[i]->Eval()) :
                         m_names[i]->Description();
@@ -2487,8 +2486,8 @@ void Field::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int Field::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Field::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Field");
     CheckSums::CheckSumCombine(retval, m_names);
@@ -2732,8 +2731,8 @@ void HasSpecial::SetTopLevelContent(const std::string& content_name) {
         m_since_turn_high->SetTopLevelContent(content_name);
 }
 
-unsigned int HasSpecial::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t HasSpecial::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::HasSpecial");
     CheckSums::CheckSumCombine(retval, m_name);
@@ -2871,8 +2870,8 @@ void HasTag::SetTopLevelContent(const std::string& content_name) {
         m_name->SetTopLevelContent(content_name);
 }
 
-unsigned int HasTag::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t HasTag::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::HasTag");
     CheckSums::CheckSumCombine(retval, m_name);
@@ -2995,8 +2994,8 @@ void CreatedOnTurn::SetTopLevelContent(const std::string& content_name) {
         m_high->SetTopLevelContent(content_name);
 }
 
-unsigned int CreatedOnTurn::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t CreatedOnTurn::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::CreatedOnTurn");
     CheckSums::CheckSumCombine(retval, m_low);
@@ -3100,7 +3099,7 @@ void Contains::Eval(const ScriptingContext& parent_context,
                     ObjectSet& matches, ObjectSet& non_matches,
                     SearchDomain search_domain) const
 {
-    unsigned int search_domain_size = (search_domain == SearchDomain::MATCHES ? matches.size() : non_matches.size());
+    auto search_domain_size = (search_domain == SearchDomain::MATCHES ? matches.size() : non_matches.size());
     bool simple_eval_safe = parent_context.condition_root_candidate ||
                             RootCandidateInvariant() ||
                             search_domain_size < 2;
@@ -3116,7 +3115,7 @@ void Contains::Eval(const ScriptingContext& parent_context,
     {
         // don't need to evaluate anything...
 
-    } else if (search_domain_size == 1) {
+    } else if (search_domain_size == 1u) {
         // evaluate subcondition on objects contained by the candidate
         ScriptingContext local_context{
             parent_context, search_domain == SearchDomain::MATCHES ? *matches.begin() : *non_matches.begin()};
@@ -3199,8 +3198,8 @@ void Contains::SetTopLevelContent(const std::string& content_name) {
         m_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int Contains::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Contains::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Contains");
     CheckSums::CheckSumCombine(retval, m_condition);
@@ -3306,7 +3305,7 @@ void ContainedBy::Eval(const ScriptingContext& parent_context,
                        ObjectSet& matches, ObjectSet& non_matches,
                        SearchDomain search_domain) const
 {
-    unsigned int search_domain_size = (search_domain == SearchDomain::MATCHES ? matches.size() : non_matches.size());
+    auto search_domain_size = (search_domain == SearchDomain::MATCHES ? matches.size() : non_matches.size());
     bool simple_eval_safe = parent_context.condition_root_candidate ||
                             RootCandidateInvariant() ||
                             search_domain_size < 2;
@@ -3420,8 +3419,8 @@ void ContainedBy::SetTopLevelContent(const std::string& content_name) {
         m_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int ContainedBy::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t ContainedBy::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::ContainedBy");
     CheckSums::CheckSumCombine(retval, m_condition);
@@ -3442,6 +3441,11 @@ InOrIsSystem::InOrIsSystem(std::unique_ptr<ValueRef::ValueRef<int>>&& system_id)
     m_root_candidate_invariant = !m_system_id || m_system_id->RootCandidateInvariant();
     m_target_invariant = !m_system_id || m_system_id->TargetInvariant();
     m_source_invariant = !m_system_id || m_system_id->SourceInvariant();
+    m_initial_candidates_all_match = 
+        m_system_id && (
+            m_system_id->ConstantExpr() || (
+                m_system_id->LocalCandidateInvariant() &&
+                RootCandidateInvariant()));
 }
 
 bool InOrIsSystem::operator==(const Condition& rhs) const {
@@ -3527,13 +3531,6 @@ std::string InOrIsSystem::Dump(uint8_t ntabs) const {
     return retval;
 }
 
-bool InOrIsSystem::InitialCandidatesAllMatch() const {
-    return m_system_id && (
-        m_system_id->ConstantExpr() || (
-            m_system_id->LocalCandidateInvariant() &&
-            RootCandidateInvariant()));
-}
-
 void InOrIsSystem::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                      ObjectSet& condition_non_targets) const
 {
@@ -3584,8 +3581,8 @@ void InOrIsSystem::SetTopLevelContent(const std::string& content_name) {
         m_system_id->SetTopLevelContent(content_name);
 }
 
-unsigned int InOrIsSystem::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t InOrIsSystem::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::InOrIsSystem");
     CheckSums::CheckSumCombine(retval, m_system_id);
@@ -3606,6 +3603,11 @@ OnPlanet::OnPlanet(std::unique_ptr<ValueRef::ValueRef<int>>&& planet_id) :
     m_root_candidate_invariant = !m_planet_id || m_planet_id->RootCandidateInvariant();
     m_target_invariant = !m_planet_id || m_planet_id->TargetInvariant();
     m_source_invariant = !m_planet_id || m_planet_id->SourceInvariant();
+    m_initial_candidates_all_match =
+        m_planet_id && (
+            m_planet_id->ConstantExpr() || (
+                m_planet_id->LocalCandidateInvariant() &&
+                RootCandidateInvariant()));
 }
 
 bool OnPlanet::operator==(const Condition& rhs) const {
@@ -3695,13 +3697,6 @@ std::string OnPlanet::Dump(uint8_t ntabs) const {
     return retval;
 }
 
-bool OnPlanet::InitialCandidatesAllMatch() const {
-    return m_planet_id && (
-        m_planet_id->ConstantExpr() || (
-            m_planet_id->LocalCandidateInvariant() &&
-            RootCandidateInvariant()));
-}
-
 void OnPlanet::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                  ObjectSet& condition_non_targets) const
 {
@@ -3746,8 +3741,8 @@ void OnPlanet::SetTopLevelContent(const std::string& content_name) {
         m_planet_id->SetTopLevelContent(content_name);
 }
 
-unsigned int OnPlanet::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t OnPlanet::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::OnPlanet");
     CheckSums::CheckSumCombine(retval, m_planet_id);
@@ -3768,6 +3763,10 @@ ObjectID::ObjectID(std::unique_ptr<ValueRef::ValueRef<int>>&& object_id) :
     m_root_candidate_invariant = !m_object_id || m_object_id->RootCandidateInvariant();
     m_target_invariant = !m_object_id || m_object_id->TargetInvariant();
     m_source_invariant = !m_object_id || m_object_id->SourceInvariant();
+    m_initial_candidates_all_match =
+        m_object_id->ConstantExpr() || (
+            m_object_id->LocalCandidateInvariant() &&
+            RootCandidateInvariant());
 }
 
 bool ObjectID::operator==(const Condition& rhs) const {
@@ -3840,12 +3839,6 @@ std::string ObjectID::Description(bool negated) const {
 std::string ObjectID::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "Object id = " + m_object_id->Dump(ntabs) + "\n"; }
 
-bool ObjectID::InitialCandidatesAllMatch() const {
-    return m_object_id->ConstantExpr() || (
-        m_object_id->LocalCandidateInvariant() &&
-        RootCandidateInvariant());
-}
-
 void ObjectID::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                                  ObjectSet& condition_non_targets) const
 {
@@ -3885,8 +3878,8 @@ void ObjectID::SetTopLevelContent(const std::string& content_name) {
         m_object_id->SetTopLevelContent(content_name);
 }
 
-unsigned int ObjectID::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t ObjectID::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::ObjectID");
     CheckSums::CheckSumCombine(retval, m_object_id);
@@ -3919,7 +3912,7 @@ bool PlanetType::operator==(const Condition& rhs) const {
 
     if (m_types.size() != rhs_.m_types.size())
         return false;
-    for (unsigned int i = 0; i < m_types.size(); ++i) {
+    for (std::size_t i = 0; i < m_types.size(); ++i) {
         CHECK_COND_VREF_MEMBER(m_types.at(i))
     }
 
@@ -3993,7 +3986,7 @@ void PlanetType::Eval(const ScriptingContext& parent_context,
 
 std::string PlanetType::Description(bool negated) const {
     std::string values_str;
-    for (unsigned int i = 0; i < m_types.size(); ++i) {
+    for (std::size_t i = 0; i < m_types.size(); ++i) {
         values_str += m_types[i]->ConstantExpr() ?
                         UserString(to_string(m_types[i]->Eval())) :
                         m_types[i]->Description();
@@ -4064,8 +4057,8 @@ void PlanetType::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int PlanetType::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t PlanetType::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::PlanetType");
     CheckSums::CheckSumCombine(retval, m_types);
@@ -4098,7 +4091,7 @@ bool PlanetSize::operator==(const Condition& rhs) const {
 
     if (m_sizes.size() != rhs_.m_sizes.size())
         return false;
-    for (unsigned int i = 0; i < m_sizes.size(); ++i) {
+    for (std::size_t i = 0; i < m_sizes.size(); ++i) {
         CHECK_COND_VREF_MEMBER(m_sizes.at(i))
     }
 
@@ -4172,7 +4165,7 @@ void PlanetSize::Eval(const ScriptingContext& parent_context,
 
 std::string PlanetSize::Description(bool negated) const {
     std::string values_str;
-    for (unsigned int i = 0; i < m_sizes.size(); ++i) {
+    for (std::size_t i = 0; i < m_sizes.size(); ++i) {
         values_str += m_sizes[i]->ConstantExpr() ?
                         UserString(to_string(m_sizes[i]->Eval())) :
                         m_sizes[i]->Description();
@@ -4239,8 +4232,8 @@ void PlanetSize::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int PlanetSize::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t PlanetSize::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::PlanetSize");
     CheckSums::CheckSumCombine(retval, m_sizes);
@@ -4283,7 +4276,7 @@ bool PlanetEnvironment::operator==(const Condition& rhs) const {
 
     if (m_environments.size() != rhs_.m_environments.size())
         return false;
-    for (unsigned int i = 0; i < m_environments.size(); ++i) {
+    for (std::size_t i = 0; i < m_environments.size(); ++i) {
         CHECK_COND_VREF_MEMBER(m_environments.at(i))
     }
 
@@ -4293,11 +4286,11 @@ bool PlanetEnvironment::operator==(const Condition& rhs) const {
 namespace {
     struct PlanetEnvironmentSimpleMatch {
         PlanetEnvironmentSimpleMatch(const std::vector< ::PlanetEnvironment>& environments,
-                                     const ObjectMap& objects,
-                                     const std::string& species = "") :
+                                     const ScriptingContext& context,
+                                     std::string_view species = "") :
             m_environments(environments),
             m_species(species),
-            m_objects(objects)
+            m_context(context)
         {}
 
         bool operator()(const UniverseObject* candidate) const {
@@ -4310,19 +4303,19 @@ namespace {
                 planet = static_cast<const ::Planet*>(candidate);
             if (!planet && candidate->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
                 const auto* building = static_cast<const ::Building*>(candidate);
-                planet = m_objects.getRaw<Planet>(building->PlanetID());
+                planet = m_context.ContextObjects().getRaw<Planet>(building->PlanetID());
             }
             if (!planet)
                 return false;
 
             // if no species specified, use planet's own species
-            const auto& species_to_check = m_species.empty() ? planet->SpeciesName() : m_species;
+            std::string_view species_to_check = m_species.empty() ? planet->SpeciesName() : m_species;
             // if no species specified and planet has no species, can't match
             if (species_to_check.empty())
                 return false;
 
             // get plaent's environment for specified species, and check if it matches any of the indicated environments
-            auto planet_env = planet->EnvironmentForSpecies(species_to_check);
+            auto planet_env = planet->EnvironmentForSpecies(m_context, species_to_check);
             for (auto environment : m_environments) {
                 if (environment == planet_env)
                     return true;
@@ -4331,9 +4324,9 @@ namespace {
             return false;
         }
 
-        const std::vector< ::PlanetEnvironment>&    m_environments;
-        const std::string&                          m_species;
-        const ObjectMap&                            m_objects;
+        const std::vector< ::PlanetEnvironment>& m_environments;
+        const std::string_view                   m_species;
+        const ScriptingContext&                  m_context;
     };
 }
 
@@ -4361,7 +4354,7 @@ void PlanetEnvironment::Eval(const ScriptingContext& parent_context,
             environments.push_back(environment->Eval(parent_context));
         std::string species_name{m_species_name ? m_species_name->Eval(parent_context) : ""};
         EvalImpl(matches, non_matches, search_domain,
-                 PlanetEnvironmentSimpleMatch(environments, parent_context.ContextObjects(), species_name));
+                 PlanetEnvironmentSimpleMatch(environments, parent_context, species_name));
     } else {
         // re-evaluate contained objects for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -4370,7 +4363,7 @@ void PlanetEnvironment::Eval(const ScriptingContext& parent_context,
 
 std::string PlanetEnvironment::Description(bool negated) const {
     std::string values_str;
-    for (unsigned int i = 0; i < m_environments.size(); ++i) {
+    for (std::size_t i = 0; i < m_environments.size(); ++i) {
         values_str += m_environments[i]->ConstantExpr() ?
                         UserString(to_string(m_environments[i]->Eval())) :
                         m_environments[i]->Description();
@@ -4440,7 +4433,7 @@ bool PlanetEnvironment::Match(const ScriptingContext& local_context) const {
     if (m_species_name)
         species_name = m_species_name->Eval(local_context);
 
-    auto env_for_planets_species = planet->EnvironmentForSpecies(species_name);
+    auto env_for_planets_species = planet->EnvironmentForSpecies(local_context, species_name);
     for (auto& environment : m_environments) {
         if (environment->Eval(local_context) == env_for_planets_species)
             return true;
@@ -4457,8 +4450,8 @@ void PlanetEnvironment::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int PlanetEnvironment::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t PlanetEnvironment::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::PlanetEnvironment");
     CheckSums::CheckSumCombine(retval, m_environments);
@@ -4498,7 +4491,7 @@ bool Species::operator==(const Condition& rhs) const {
 
     if (m_names.size() != rhs_.m_names.size())
         return false;
-    for (unsigned int i = 0; i < m_names.size(); ++i) {
+    for (std::size_t i = 0; i < m_names.size(); ++i) {
         CHECK_COND_VREF_MEMBER(m_names.at(i))
     }
 
@@ -4579,7 +4572,7 @@ std::string Species::Description(bool negated) const {
     std::string values_str;
     if (m_names.empty())
         values_str = "(" + UserString("CONDITION_ANY") +")";
-    for (unsigned int i = 0; i < m_names.size(); ++i) {
+    for (std::size_t i = 0; i < m_names.size(); ++i) {
         values_str += m_names[i]->ConstantExpr() ?
                         UserString(m_names[i]->Eval()) :
                         m_names[i]->Description();
@@ -4648,8 +4641,8 @@ void Species::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int Species::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Species::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Species");
     CheckSums::CheckSumCombine(retval, m_names);
@@ -4999,9 +4992,9 @@ bool SpeciesOpinion::Match(const ScriptingContext& local_context) const {
 
     const ::Species* species = nullptr;
     if (!m_species)
-        species = GetSpecies(SpeciesForObject(candidate, local_context));
+        species = local_context.species.GetSpecies(SpeciesForObject(candidate, local_context));
     else
-        species = GetSpecies(m_species->Eval(local_context));
+        species = local_context.species.GetSpecies(m_species->Eval(local_context));
     if (!species)
         return false;
 
@@ -5028,8 +5021,8 @@ void SpeciesOpinion::SetTopLevelContent(const std::string& content_name) {
         m_content->SetTopLevelContent(content_name);
 }
 
-unsigned int SpeciesOpinion::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SpeciesOpinion::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::SpeciesOpinion");
     CheckSums::CheckSumCombine(retval, m_species);
@@ -5354,8 +5347,8 @@ void Enqueued::SetTopLevelContent(const std::string& content_name) {
         m_high->SetTopLevelContent(content_name);
 }
 
-unsigned int Enqueued::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Enqueued::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Enqueued");
     CheckSums::CheckSumCombine(retval, m_name);
@@ -5392,7 +5385,7 @@ bool FocusType::operator==(const Condition& rhs) const {
 
     if (m_names.size() != rhs_.m_names.size())
         return false;
-    for (unsigned int i = 0; i < m_names.size(); ++i) {
+    for (std::size_t i = 0; i < m_names.size(); ++i) {
         CHECK_COND_VREF_MEMBER(m_names.at(i))
     }
 
@@ -5469,7 +5462,7 @@ void FocusType::Eval(const ScriptingContext& parent_context,
 
 std::string FocusType::Description(bool negated) const {
     std::string values_str;
-    for (unsigned int i = 0; i < m_names.size(); ++i) {
+    for (std::size_t i = 0; i < m_names.size(); ++i) {
         values_str += m_names[i]->ConstantExpr() ?
             UserString(m_names[i]->Eval()) :
             m_names[i]->Description();
@@ -5535,8 +5528,8 @@ void FocusType::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int FocusType::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t FocusType::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::FocusType");
     CheckSums::CheckSumCombine(retval, m_names);
@@ -5569,7 +5562,7 @@ bool StarType::operator==(const Condition& rhs) const {
 
     if (m_types.size() != rhs_.m_types.size())
         return false;
-    for (unsigned int i = 0; i < m_types.size(); ++i) {
+    for (std::size_t i = 0; i < m_types.size(); ++i) {
         CHECK_COND_VREF_MEMBER(m_types.at(i))
     }
 
@@ -5632,7 +5625,7 @@ void StarType::Eval(const ScriptingContext& parent_context,
 
 std::string StarType::Description(bool negated) const {
     std::string values_str;
-    for (unsigned int i = 0; i < m_types.size(); ++i) {
+    for (std::size_t i = 0; i < m_types.size(); ++i) {
         values_str += m_types[i]->ConstantExpr() ?
                         UserString(to_string(m_types[i]->Eval())) :
                         m_types[i]->Description();
@@ -5697,8 +5690,8 @@ void StarType::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int StarType::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t StarType::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::StarType");
     CheckSums::CheckSumCombine(retval, m_types);
@@ -5826,8 +5819,8 @@ void DesignHasHull::SetTopLevelContent(const std::string& content_name) {
         m_name->SetTopLevelContent(content_name);
 }
 
-unsigned int DesignHasHull::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t DesignHasHull::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::DesignHasHull");
     CheckSums::CheckSumCombine(retval, m_name);
@@ -6008,8 +6001,8 @@ void DesignHasPart::SetTopLevelContent(const std::string& content_name) {
         m_name->SetTopLevelContent(content_name);
 }
 
-unsigned int DesignHasPart::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t DesignHasPart::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::DesignHasPart");
     CheckSums::CheckSumCombine(retval, m_low);
@@ -6178,8 +6171,8 @@ void DesignHasPartClass::SetTopLevelContent(const std::string& content_name) {
         m_high->SetTopLevelContent(content_name);
 }
 
-unsigned int DesignHasPartClass::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t DesignHasPartClass::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::DesignHasPartClass");
     CheckSums::CheckSumCombine(retval, m_low);
@@ -6324,8 +6317,8 @@ void PredefinedShipDesign::SetTopLevelContent(const std::string& content_name) {
         m_name->SetTopLevelContent(content_name);
 }
 
-unsigned int PredefinedShipDesign::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t PredefinedShipDesign::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::PredefinedShipDesign");
     CheckSums::CheckSumCombine(retval, m_name);
@@ -6429,8 +6422,8 @@ void NumberedShipDesign::SetTopLevelContent(const std::string& content_name) {
         m_design_id->SetTopLevelContent(content_name);
 }
 
-unsigned int NumberedShipDesign::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t NumberedShipDesign::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::NumberedShipDesign");
     CheckSums::CheckSumCombine(retval, m_design_id);
@@ -6541,8 +6534,8 @@ void ProducedByEmpire::SetTopLevelContent(const std::string& content_name) {
         m_empire_id->SetTopLevelContent(content_name);
 }
 
-unsigned int ProducedByEmpire::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t ProducedByEmpire::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::ProducedByEmpire");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -6636,8 +6629,8 @@ void Chance::SetTopLevelContent(const std::string& content_name) {
         m_chance->SetTopLevelContent(content_name);
 }
 
-unsigned int Chance::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Chance::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Chance");
     CheckSums::CheckSumCombine(retval, m_chance);
@@ -6829,8 +6822,8 @@ void MeterValue::SetTopLevelContent(const std::string& content_name) {
         m_high->SetTopLevelContent(content_name);
 }
 
-unsigned int MeterValue::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t MeterValue::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::MeterValue");
     CheckSums::CheckSumCombine(retval, m_meter);
@@ -6996,8 +6989,8 @@ void ShipPartMeterValue::SetTopLevelContent(const std::string& content_name) {
         m_high->SetTopLevelContent(content_name);
 }
 
-unsigned int ShipPartMeterValue::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t ShipPartMeterValue::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::ShipPartMeterValue");
     CheckSums::CheckSumCombine(retval, m_part_name);
@@ -7184,8 +7177,8 @@ void EmpireMeterValue::SetTopLevelContent(const std::string& content_name) {
         m_high->SetTopLevelContent(content_name);
 }
 
-unsigned int EmpireMeterValue::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t EmpireMeterValue::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::EmpireMeterValue");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -7364,8 +7357,8 @@ void EmpireStockpileValue::SetTopLevelContent(const std::string& content_name) {
         m_high->SetTopLevelContent(content_name);
 }
 
-unsigned int EmpireStockpileValue::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t EmpireStockpileValue::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::EmpireStockpileValue");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -7514,8 +7507,8 @@ void EmpireHasAdoptedPolicy::SetTopLevelContent(const std::string& content_name)
         m_name->SetTopLevelContent(content_name);
 }
 
-unsigned int EmpireHasAdoptedPolicy::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t EmpireHasAdoptedPolicy::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::EmpireHasAdoptedPolicy");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -7658,8 +7651,8 @@ void OwnerHasTech::SetTopLevelContent(const std::string& content_name) {
         m_name->SetTopLevelContent(content_name);
 }
 
-unsigned int OwnerHasTech::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t OwnerHasTech::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::OwnerHasTech");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -7803,8 +7796,8 @@ void OwnerHasBuildingTypeAvailable::SetTopLevelContent(const std::string& conten
         m_name->SetTopLevelContent(content_name);
 }
 
-unsigned int OwnerHasBuildingTypeAvailable::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t OwnerHasBuildingTypeAvailable::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::OwnerHasBuildingTypeAvailable");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -7947,8 +7940,8 @@ void OwnerHasShipDesignAvailable::SetTopLevelContent(const std::string& content_
         m_id->SetTopLevelContent(content_name);
 }
 
-unsigned int OwnerHasShipDesignAvailable::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t OwnerHasShipDesignAvailable::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::OwnerHasShipDesignAvailable");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -8089,8 +8082,8 @@ void OwnerHasShipPartAvailable::SetTopLevelContent(const std::string& content_na
         m_name->SetTopLevelContent(content_name);
 }
 
-unsigned int OwnerHasShipPartAvailable::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t OwnerHasShipPartAvailable::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::OwnerHasShipPartAvailable");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -8301,8 +8294,8 @@ void VisibleToEmpire::SetTopLevelContent(const std::string& content_name) {
         m_vis->SetTopLevelContent(content_name);
 }
 
-unsigned int VisibleToEmpire::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t VisibleToEmpire::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::VisibleToEmpire");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -8364,14 +8357,12 @@ namespace {
                 return false;
 
             // is candidate object close enough to any of the passed-in objects?
-            for (auto* obj : m_from_objects) { // TODO: if_any
-                double delta_x = candidate->X() - obj->X();
-                double delta_y = candidate->Y() - obj->Y();
-                if (delta_x*delta_x + delta_y*delta_y <= m_distance2)
-                    return true;
-            }
-
-            return false;
+            return std::any_of(m_from_objects.begin(), m_from_objects.end(),
+                               [this, x{candidate->X()}, y{candidate->Y()}](const auto* obj) {
+                                    double delta_x = x - obj->X();
+                                    double delta_y = y - obj->Y();
+                                    return (delta_x*delta_x + delta_y*delta_y <= m_distance2);
+                               });
         }
 
         const ObjectSet& m_from_objects;
@@ -8439,8 +8430,8 @@ void WithinDistance::SetTopLevelContent(const std::string& content_name) {
         m_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int WithinDistance::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t WithinDistance::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::WithinDistance");
     CheckSums::CheckSumCombine(retval, m_distance);
@@ -8560,8 +8551,8 @@ void WithinStarlaneJumps::SetTopLevelContent(const std::string& content_name) {
         m_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int WithinStarlaneJumps::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t WithinStarlaneJumps::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::WithinStarlaneJumps");
     CheckSums::CheckSumCombine(retval, m_jumps);
@@ -9021,8 +9012,8 @@ void CanAddStarlaneConnection::SetTopLevelContent(const std::string& content_nam
         m_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int CanAddStarlaneConnection::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t CanAddStarlaneConnection::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::CanAddStarlaneConnection");
     CheckSums::CheckSumCombine(retval, m_condition);
@@ -9137,8 +9128,8 @@ void ExploredByEmpire::SetTopLevelContent(const std::string& content_name) {
         m_empire_id->SetTopLevelContent(content_name);
 }
 
-unsigned int ExploredByEmpire::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t ExploredByEmpire::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::ExploredByEmpire");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -9200,8 +9191,8 @@ bool Stationary::Match(const ScriptingContext& local_context) const {
     return true;
 }
 
-unsigned int Stationary::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Stationary::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Stationary");
 
@@ -9268,8 +9259,8 @@ bool Aggressive::Match(const ScriptingContext& local_context) const {
     return m_aggressive == fleet->Aggressive();
 }
 
-unsigned int Aggressive::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Aggressive::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Aggressive");
     CheckSums::CheckSumCombine(retval, m_aggressive);
@@ -9385,8 +9376,8 @@ void FleetSupplyableByEmpire::SetTopLevelContent(const std::string& content_name
         m_empire_id->SetTopLevelContent(content_name);
 }
 
-unsigned int FleetSupplyableByEmpire::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t FleetSupplyableByEmpire::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::FleetSupplyableByEmpire");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -9580,8 +9571,8 @@ void ResourceSupplyConnectedByEmpire::SetTopLevelContent(const std::string& cont
         m_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int ResourceSupplyConnectedByEmpire::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t ResourceSupplyConnectedByEmpire::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::ResourceSupplyConnectedByEmpire");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -9625,22 +9616,14 @@ bool CanColonize::Match(const ScriptingContext& local_context) const {
     }
 
     // is it a ship, a planet, or a building on a planet?
-    std::string species_name;
+    std::string_view species_name;
     if (candidate->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-        auto planet = dynamic_cast<const Planet*>(candidate);
-        if (!planet) {
-            ErrorLogger(conditions) << "CanColonize couldn't cast supposedly planet candidate";
-            return false;
-        }
+        auto planet = static_cast<const Planet*>(candidate);
         species_name = planet->SpeciesName();
 
     } else if (candidate->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
-        auto building = dynamic_cast<const ::Building*>(candidate);
-        if (!building) {
-            ErrorLogger(conditions) << "CanColonize couldn't cast supposedly building candidate";
-            return false;
-        }
-        auto planet = local_context.ContextObjects().get<Planet>(building->PlanetID());
+        auto building = static_cast<const ::Building*>(candidate);
+        auto planet = local_context.ContextObjects().getRaw<Planet>(building->PlanetID());
         if (!planet) {
             ErrorLogger(conditions) << "CanColonize couldn't get building's planet";
             return false;
@@ -9648,17 +9631,13 @@ bool CanColonize::Match(const ScriptingContext& local_context) const {
         species_name = planet->SpeciesName();
 
     } else if (candidate->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-        auto ship = dynamic_cast<const Ship*>(candidate);
-        if (!ship) {
-            ErrorLogger(conditions) << "CanColonize couldn't cast supposedly ship candidate";
-            return false;
-        }
+        auto ship = static_cast<const Ship*>(candidate);
         species_name = ship->SpeciesName();
     }
 
     if (species_name.empty())
         return false;
-    auto species = GetSpecies(species_name);
+    auto species = local_context.species.GetSpecies(species_name);
     if (!species) {
         ErrorLogger(conditions) << "CanColonize couldn't get species: " << species_name;
         return false;
@@ -9666,8 +9645,8 @@ bool CanColonize::Match(const ScriptingContext& local_context) const {
     return species->CanColonize();
 }
 
-unsigned int CanColonize::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t CanColonize::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::CanColonize");
 
@@ -9707,22 +9686,14 @@ bool CanProduceShips::Match(const ScriptingContext& local_context) const {
     }
 
     // is it a ship, a planet, or a building on a planet?
-    std::string species_name;
+    std::string_view species_name;
     if (candidate->ObjectType() == UniverseObjectType::OBJ_PLANET) {
         auto planet = static_cast<const Planet*>(candidate);
-        if (!planet) {
-            ErrorLogger(conditions) << "CanProduceShips couldn't cast supposedly planet candidate";
-            return false;
-        }
         species_name = planet->SpeciesName();
 
     } else if (candidate->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
         auto building = static_cast<const ::Building*>(candidate);
-        if (!building) {
-            ErrorLogger(conditions) << "CanProduceShips couldn't cast supposedly building candidate";
-            return false;
-        }
-        auto planet = local_context.ContextObjects().get<Planet>(building->PlanetID());
+        auto planet = local_context.ContextObjects().getRaw<Planet>(building->PlanetID());
         if (!planet) {
             ErrorLogger(conditions) << "CanProduceShips couldn't get building's planet";
             return false;
@@ -9731,16 +9702,12 @@ bool CanProduceShips::Match(const ScriptingContext& local_context) const {
 
     } else if (candidate->ObjectType() == UniverseObjectType::OBJ_SHIP) {
         auto ship = static_cast<const Ship*>(candidate);
-        if (!ship) {
-            ErrorLogger(conditions) << "CanProduceShips couldn't cast supposedly ship candidate";
-            return false;
-        }
         species_name = ship->SpeciesName();
     }
 
     if (species_name.empty())
         return false;
-    auto species = GetSpecies(species_name);
+    auto species = local_context.species.GetSpecies(species_name);
     if (!species) {
         ErrorLogger(conditions) << "CanProduceShips couldn't get species: " << species_name;
         return false;
@@ -9748,8 +9715,8 @@ bool CanProduceShips::Match(const ScriptingContext& local_context) const {
     return species->CanProduceShips();
 }
 
-unsigned int CanProduceShips::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t CanProduceShips::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::CanProduceShips");
 
@@ -9867,8 +9834,8 @@ void OrderedBombarded::SetTopLevelContent(const std::string& content_name) {
         m_by_object_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int OrderedBombarded::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t OrderedBombarded::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::OrderedBombarded");
     CheckSums::CheckSumCombine(retval, m_by_object_condition);
@@ -10521,8 +10488,8 @@ void ValueTest::SetTopLevelContent(const std::string& content_name) {
         m_int_value_ref3->SetTopLevelContent(content_name);
 }
 
-unsigned int ValueTest::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t ValueTest::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::ValueTest");
     CheckSums::CheckSumCombine(retval, m_value_ref1);
@@ -10549,9 +10516,9 @@ std::unique_ptr<Condition> ValueTest::Clone() const
 // Location                                              //
 ///////////////////////////////////////////////////////////
 namespace {
-    [[nodiscard]] const Condition* GetLocationCondition(ContentType content_type,
-                                                        const std::string& name1,
-                                                        const std::string& name2)
+    [[nodiscard]] const Condition* GetLocationCondition(
+        ContentType content_type, std::string_view name1, std::string_view name2,
+        const SpeciesManager& sm)
     {
         if (name1.empty())
             return nullptr;
@@ -10562,7 +10529,7 @@ namespace {
             break;
         }
         case ContentType::CONTENT_SPECIES: {
-            if (auto s = GetSpecies(name1))
+            if (auto s = sm.GetSpecies(name1))
                 return s->Location();
             break;
         }
@@ -10585,7 +10552,7 @@ namespace {
             if (name2.empty())
                 return nullptr;
             // get species, then focus from that species
-            if (auto s = GetSpecies(name1)) {
+            if (auto s = sm.GetSpecies(name1)) {
                 for (auto& f : s->Foci()) {
                     if (f.Name() == name2)
                         return f.Location();
@@ -10657,7 +10624,7 @@ void Location::Eval(const ScriptingContext& parent_context,
         std::string name2 = (m_name2 ? m_name2->Eval(parent_context) : "");
 
         // get condition from content, apply to matches / non_matches
-        const auto condition = GetLocationCondition(m_content_type, name1, name2);
+        const auto condition = GetLocationCondition(m_content_type, name1, name2, parent_context.species);
         if (condition && condition != this) {
             condition->Eval(parent_context, matches, non_matches, search_domain);
         } else {
@@ -10726,7 +10693,7 @@ bool Location::Match(const ScriptingContext& local_context) const {
     std::string name1 = (m_name1 ? m_name1->Eval(local_context) : "");
     std::string name2 = (m_name2 ? m_name2->Eval(local_context) : "");
 
-    const auto condition = GetLocationCondition(m_content_type, name1, name2);
+    const auto condition = GetLocationCondition(m_content_type, name1, name2, local_context.species);
     if (!condition || condition == this)
         return false;
 
@@ -10742,8 +10709,8 @@ void Location::SetTopLevelContent(const std::string& content_name) {
         m_name2->SetTopLevelContent(content_name);
 }
 
-unsigned int Location::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Location::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Location");
     CheckSums::CheckSumCombine(retval, m_name1);
@@ -10765,13 +10732,13 @@ std::unique_ptr<Condition> Location::Clone() const {
 ///////////////////////////////////////////////////////////
 namespace {
     const Condition* GetCombatTargetCondition(
-        ContentType content_type, const std::string& name)
+        ContentType content_type, std::string_view name, const SpeciesManager& sm)
     {
         if (name.empty())
             return nullptr;
         switch (content_type) {
         case ContentType::CONTENT_SPECIES: {
-            if (auto s = GetSpecies(name))
+            if (auto s = sm.GetSpecies(name))
                 return s->CombatTargets();
             break;
         }
@@ -10826,7 +10793,7 @@ void CombatTarget::Eval(const ScriptingContext& parent_context,
         std::string name = (m_name ? m_name->Eval(parent_context) : "");
 
         // get condition from content, apply to matches / non_matches
-        const auto condition = GetCombatTargetCondition(m_content_type, name);
+        const auto condition = GetCombatTargetCondition(m_content_type, name, parent_context.species);
         if (condition && condition != this) {
             condition->Eval(parent_context, matches, non_matches, search_domain);
         } else {
@@ -10887,7 +10854,7 @@ bool CombatTarget::Match(const ScriptingContext& local_context) const {
 
     std::string name = (m_name ? m_name->Eval(local_context) : "");
 
-    const auto condition = GetCombatTargetCondition(m_content_type, name);
+    const auto condition = GetCombatTargetCondition(m_content_type, name, local_context.species);
     if (!condition || condition == this)
         return false;
 
@@ -10901,8 +10868,8 @@ void CombatTarget::SetTopLevelContent(const std::string& content_name) {
         m_name->SetTopLevelContent(content_name);
 }
 
-unsigned int CombatTarget::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t CombatTarget::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::CombatTarget");
     CheckSums::CheckSumCombine(retval, m_name);
@@ -10926,6 +10893,7 @@ And::And(std::vector<std::unique_ptr<Condition>>&& operands) :
     m_root_candidate_invariant = std::all_of(m_operands.begin(), m_operands.end(), [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = std::all_of(m_operands.begin(), m_operands.end(), [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = std::all_of(m_operands.begin(), m_operands.end(), [](auto& e){ return !e || e->SourceInvariant(); });
+    m_initial_candidates_all_match = m_operands.size() == 1 && m_operands[0]->InitialCandidatesAllMatch();
 }
 
 And::And(std::unique_ptr<Condition>&& operand1, std::unique_ptr<Condition>&& operand2,
@@ -10949,6 +10917,7 @@ And::And(std::unique_ptr<Condition>&& operand1, std::unique_ptr<Condition>&& ope
     m_root_candidate_invariant = std::all_of(m_operands.begin(), m_operands.end(), [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = std::all_of(m_operands.begin(), m_operands.end(), [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = std::all_of(m_operands.begin(), m_operands.end(), [](auto& e){ return !e || e->SourceInvariant(); });
+    m_initial_candidates_all_match = m_operands.size() == 1 && m_operands[0]->InitialCandidatesAllMatch();
 }
 
 bool And::operator==(const Condition& rhs) const {
@@ -10961,7 +10930,7 @@ bool And::operator==(const Condition& rhs) const {
 
     if (m_operands.size() != rhs_.m_operands.size())
         return false;
-    for (unsigned int i = 0; i < m_operands.size(); ++i) {
+    for (std::size_t i = 0; i < m_operands.size(); ++i) {
         CHECK_COND_VREF_MEMBER(m_operands.at(i))
     }
 
@@ -11019,7 +10988,7 @@ void And::Eval(const ScriptingContext& parent_context, ObjectSet& matches,
         */
 
         // move items that don't pass one of the other conditions back to non_matches
-        for (unsigned int i = 1; i < m_operands.size(); ++i) {
+        for (std::size_t i = 1; i < m_operands.size(); ++i) {
             if (partly_checked_non_matches.empty()) break;
             m_operands[i]->Eval(parent_context, partly_checked_non_matches, non_matches, SearchDomain::MATCHES);
             /*
@@ -11077,7 +11046,7 @@ std::string And::Description(bool negated) const {
         values_str += (!negated)
             ? UserString("DESC_AND_BEFORE_OPERANDS")
             : UserString("DESC_NOT_AND_BEFORE_OPERANDS");
-        for (unsigned int i = 0; i < m_operands.size(); ++i) {
+        for (std::size_t i = 0; i < m_operands.size(); ++i) {
             // Pushing the negation to the enclosed conditions
             values_str += m_operands[i]->Description(negated);
             if (i != m_operands.size() - 1) {
@@ -11101,9 +11070,6 @@ std::string And::Dump(uint8_t ntabs) const {
     return retval;
 }
 
-bool And::InitialCandidatesAllMatch() const
-{ return m_operands.size() < 2; }
-
 void And::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                             ObjectSet& condition_non_targets) const {
     if (!m_operands.empty())
@@ -11116,8 +11082,8 @@ void And::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int And::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t And::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::And");
     CheckSums::CheckSumCombine(retval, m_operands);
@@ -11146,6 +11112,7 @@ Or::Or(std::vector<std::unique_ptr<Condition>>&& operands) :
     m_root_candidate_invariant = std::all_of(m_operands.begin(), m_operands.end(), [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = std::all_of(m_operands.begin(), m_operands.end(), [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = std::all_of(m_operands.begin(), m_operands.end(), [](auto& e){ return !e || e->SourceInvariant(); });
+    m_initial_candidates_all_match = m_operands.size() == 1 && m_operands[0]->InitialCandidatesAllMatch();
 }
 
 Or::Or(std::unique_ptr<Condition>&& operand1, std::unique_ptr<Condition>&& operand2,
@@ -11169,6 +11136,7 @@ Or::Or(std::unique_ptr<Condition>&& operand1, std::unique_ptr<Condition>&& opera
     m_root_candidate_invariant = std::all_of(m_operands.begin(), m_operands.end(), [](auto& e){ return !e || e->RootCandidateInvariant(); });
     m_target_invariant = std::all_of(m_operands.begin(), m_operands.end(), [](auto& e){ return !e || e->TargetInvariant(); });
     m_source_invariant = std::all_of(m_operands.begin(), m_operands.end(), [](auto& e){ return !e || e->SourceInvariant(); });
+    m_initial_candidates_all_match = m_operands.size() == 1 && m_operands[0]->InitialCandidatesAllMatch();
 }
 
 bool Or::operator==(const Condition& rhs) const {
@@ -11181,7 +11149,7 @@ bool Or::operator==(const Condition& rhs) const {
 
     if (m_operands.size() != rhs_.m_operands.size())
         return false;
-    for (unsigned int i = 0; i < m_operands.size(); ++i) {
+    for (std::size_t i = 0; i < m_operands.size(); ++i) {
         CHECK_COND_VREF_MEMBER(m_operands.at(i))
     }
 
@@ -11254,7 +11222,7 @@ std::string Or::Description(bool negated) const {
         values_str += (!negated)
             ? UserString("DESC_OR_BEFORE_OPERANDS")
             : UserString("DESC_NOT_OR_BEFORE_OPERANDS");
-        for (unsigned int i = 0; i < m_operands.size(); ++i) {
+        for (std::size_t i = 0; i < m_operands.size(); ++i) {
             // Pushing the negation to the enclosed conditions
             values_str += m_operands[i]->Description(negated);
             if (i != m_operands.size() - 1) {
@@ -11269,9 +11237,6 @@ std::string Or::Description(bool negated) const {
     }
     return values_str;
 }
-
-bool Or::InitialCandidatesAllMatch() const
-{ return m_operands.size() < 2; }
 
 void Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
                                            ObjectSet& condition_non_targets) const
@@ -11326,8 +11291,8 @@ void Or::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int Or::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Or::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Or");
     CheckSums::CheckSumCombine(retval, m_operands);
@@ -11396,8 +11361,8 @@ void Not::SetTopLevelContent(const std::string& content_name) {
         m_operand->SetTopLevelContent(content_name);
 }
 
-unsigned int Not::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Not::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Not");
     CheckSums::CheckSumCombine(retval, m_operand);
@@ -11438,7 +11403,7 @@ bool OrderedAlternativesOf::operator==(const Condition& rhs) const {
 
     if (m_operands.size() != rhs_.m_operands.size())
         return false;
-    for (unsigned int i = 0; i < m_operands.size(); ++i) {
+    for (std::size_t i = 0; i < m_operands.size(); ++i) {
         CHECK_COND_VREF_MEMBER(m_operands.at(i))
     }
 
@@ -11559,7 +11524,7 @@ std::string OrderedAlternativesOf::Description(bool negated) const {
         values_str += (!negated)
             ? UserString("DESC_ORDERED_ALTERNATIVES_BEFORE_OPERANDS")
             : UserString("DESC_NOT_ORDERED_ALTERNATIVES_BEFORE_OPERANDS");
-        for (unsigned int i = 0; i < m_operands.size(); ++i) {
+        for (std::size_t i = 0; i < m_operands.size(); ++i) {
             // Pushing the negation of matches to the enclosed conditions
             values_str += m_operands[i]->Description(negated);
             if (i != m_operands.size() - 1) {
@@ -11589,8 +11554,8 @@ void OrderedAlternativesOf::SetTopLevelContent(const std::string& content_name) 
     }
 }
 
-unsigned int OrderedAlternativesOf::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t OrderedAlternativesOf::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::OrderedAlternativesOf");
     CheckSums::CheckSumCombine(retval, m_operands);
@@ -11660,8 +11625,8 @@ void Described::SetTopLevelContent(const std::string& content_name) {
         m_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int Described::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Described::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Condition::Described");
     CheckSums::CheckSumCombine(retval, m_condition);

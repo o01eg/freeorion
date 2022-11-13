@@ -111,16 +111,16 @@ namespace {
 
         std::vector<std::shared_ptr<Effect::EffectsGroup>> effectsgroups;
         if (kw.has_key("effectsgroups")) {
-            py_parse::detail::flatten_list<effect_group_wrapper>(kw["effectsgroups"], [](const effect_group_wrapper& o, std::vector<std::shared_ptr<Effect::EffectsGroup>>& v) {
-                v.push_back(o.effects_group);
-            }, effectsgroups);
+            boost::python::stl_input_iterator<effect_group_wrapper> effectsgroups_begin(kw["effectsgroups"]), effectsgroups_end;
+            for (auto it = effectsgroups_begin; it != effectsgroups_end; ++it) {
+                effectsgroups.push_back(it->effects_group);
+            }
         }
 
         std::set<std::string> prerequisites;
         if (kw.has_key("prerequisites")) {
-            py_parse::detail::flatten_list<std::string>(kw["prerequisites"], [](const std::string& o, std::set<std::string>& v) {
-                v.insert(o);
-            }, prerequisites);
+            prerequisites.insert(boost::python::stl_input_iterator<std::string>(kw["prerequisites"]),
+                boost::python::stl_input_iterator<std::string>());
         }
 
         std::vector<UnlockableItem> unlock;
@@ -173,8 +173,7 @@ namespace {
             RegisterGlobalsSources(globals);
             RegisterGlobalsEnums(globals);
 
-            std::function<boost::python::object(const boost::python::tuple&, const boost::python::dict&)> f_insert_tech = [&techs](const boost::python::tuple& args, const boost::python::dict& kw) { return py_insert_tech_(techs, args, kw); };
-            globals["Tech"] = boost::python::raw_function(f_insert_tech);
+            globals["Tech"] = boost::python::raw_function([&techs](const boost::python::tuple& args, const boost::python::dict& kw) { return py_insert_tech_(techs, args, kw); });
         }
 
         boost::python::dict operator()() const

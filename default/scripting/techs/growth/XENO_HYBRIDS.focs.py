@@ -6,10 +6,14 @@ Tech(
     description="GRO_XENO_HYBRIDS_DESC",
     short_description="POPULATION_SHORT_DESC",
     category="GROWTH_CATEGORY",
-    researchcost=240 * TECH_COST_MULTIPLIER,
+    researchcost=(
+        240
+        * TECH_COST_MULTIPLIER
+        / (1 + StatisticIf(float, condition=OwnedBy(empire=Source.Owner) & HasTag(name="ADAPTIVE")))
+    ),
     researchturns=10,
     tags=["PEDIA_GROWTH_CATEGORY"],
-    prerequisites="GRO_XENO_GENETICS",
+    prerequisites=["GRO_XENO_GENETICS"],
     effectsgroups=[
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner) & Planet(environment=[Poor]),

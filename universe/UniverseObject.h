@@ -112,8 +112,8 @@ public:
             first(vec1),
             second(vec2)
         {}
-        bool empty() const { return first.empty() && second.empty(); }
-        auto size() const { return first.size() + second.size(); }
+        bool empty() const noexcept { return first.empty() && second.empty(); }
+        auto size() const noexcept { return first.size() + second.size(); }
         const std::vector<std::string_view>& first = EMPTY_STRING_VEC;
         const std::vector<std::string_view>& second = EMPTY_STRING_VEC;
         static const inline std::vector<std::string_view> EMPTY_STRING_VEC{};
@@ -129,7 +129,7 @@ public:
 
     /** Returns id of the object that directly contains this object, if any, or
         INVALID_OBJECT_ID if this object is not contained by any other. */
-    [[nodiscard]] virtual int                 ContainerObjectID() const { return INVALID_OBJECT_ID; }
+    [[nodiscard]] virtual int                 ContainerObjectID() const noexcept { return INVALID_OBJECT_ID; }
 
     /** Returns ids of objects contained within this object. */
     [[nodiscard]] virtual const std::set<int>&ContainedObjectIDs() const;
@@ -274,7 +274,7 @@ private:
 
 /** A function that returns the correct amount of spacing for an indentation of
   * \p ntabs during a dump. */
-[[nodiscard]] inline std::string DumpIndent(unsigned short ntabs = 1)
+[[nodiscard]] inline std::string DumpIndent(uint8_t ntabs = 1)
 { return std::string(ntabs * 4 /* conversion to std::size_t is safe */, ' '); }
 
 

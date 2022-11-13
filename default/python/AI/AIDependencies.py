@@ -246,6 +246,14 @@ industry_boost_specials_unmodified = {
 }
 # </editor-fold>
 
+luxury_specials = {
+    "FRACTAL_GEODES_SPECIAL",
+    "MIMETIC_ALLOY_SPECIAL",
+    "SHIMMER_SILK_SPECIAL",
+    "SPARK_FOSSILS_SPECIAL",
+    "SUCCULENT_BARNACLES_SPECIAL",
+}
+
 # <editor-fold desc="Other Population changing specials">
 # Please see the Note at top of this file regarding PlanetSize-Dependent-Lookup
 # Regardless of whether the sub-dictionary here has PlanetSize keys, the final
@@ -341,7 +349,6 @@ PRO_NEUTRONIUM_EXTRACTION = "PRO_NEUTRONIUM_EXTRACTION"
 NEST_DOMESTICATION_TECH = "SHP_DOMESTIC_MONSTER"
 
 LRN_ARTIF_MINDS_1 = "LRN_NASCENT_AI"
-LRN_ARTIF_MINDS_2 = "LRN_NASCENT_AI"
 LRN_ALGO_ELEGANCE = "LRN_ALGO_ELEGANCE"
 GRO_PLANET_ECOL = "GRO_PLANET_ECOL"
 GRO_SUBTER_HAB = "GRO_SUBTER_HAB"

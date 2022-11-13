@@ -57,29 +57,33 @@ public:
 
     [[nodiscard]] std::string             Dump(uint8_t ntabs = 0) const override;
 
-    [[nodiscard]] int                     ContainerObjectID() const override { return this->SystemID(); }
-    [[nodiscard]] const std::set<int>&    ContainedObjectIDs() const override { return m_buildings; }
-    [[nodiscard]] bool                    Contains(int object_id) const override;
-    [[nodiscard]] bool                    ContainedBy(int object_id) const override;
+    [[nodiscard]] int                       ContainerObjectID() const noexcept  override { return this->SystemID(); }
+    [[nodiscard]] const std::set<int>&      ContainedObjectIDs() const override { return m_buildings; }
+    [[nodiscard]] bool                      Contains(int object_id) const override;
+    [[nodiscard]] bool                      ContainedBy(int object_id) const override;
 
-    [[nodiscard]] const Meter*            GetMeter(MeterType type) const override { return UniverseObject::GetMeter(type); }
+    [[nodiscard]] const Meter*              GetMeter(MeterType type) const override { return UniverseObject::GetMeter(type); }
 
-    std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const override;
+    std::shared_ptr<UniverseObject>         Accept(const UniverseObjectVisitor& visitor) const override;
 
-    [[nodiscard]] std::vector<std::string>AvailableFoci() const override;
-    [[nodiscard]] const std::string&      FocusIcon(const std::string& focus_name) const override;
+    [[nodiscard]] std::vector<std::string>  AvailableFoci(const ScriptingContext& context) const override; // TODO: return vector<string_view> ?
+    [[nodiscard]] bool                      FocusAvailable(std::string_view focus, const ScriptingContext& context) const override;
+    [[nodiscard]] const std::string&        FocusIcon(std::string_view focus_name, const ScriptingContext& context) const override;
 
-    [[nodiscard]] PlanetType          Type() const noexcept               { return m_type; }
-    [[nodiscard]] PlanetType          OriginalType() const noexcept       { return m_original_type; }
-    [[nodiscard]] int                 DistanceFromOriginalType() const    { return TypeDifference(m_type, m_original_type); }
-    [[nodiscard]] PlanetSize          Size() const noexcept               { return m_size; }
+    [[nodiscard]] PlanetType          Type() const noexcept            { return m_type; }
+    [[nodiscard]] PlanetType          OriginalType() const noexcept    { return m_original_type; }
+    [[nodiscard]] int                 DistanceFromOriginalType() const { return TypeDifference(m_type, m_original_type); }
+    [[nodiscard]] PlanetSize          Size() const noexcept            { return m_size; }
     [[nodiscard]] int                 HabitableSize() const;
 
     [[nodiscard]] bool                HostileToEmpire(int empire_id, const EmpireManager& empires) const override;
 
-    [[nodiscard]] PlanetEnvironment   EnvironmentForSpecies(const std::string& species_name = "") const;
-    [[nodiscard]] PlanetType          NextBestPlanetTypeForSpecies(const std::string& species_name = "") const;
-    [[nodiscard]] PlanetType          NextBetterPlanetTypeForSpecies(const std::string& species_name = "") const;
+    [[nodiscard]] PlanetEnvironment   EnvironmentForSpecies(const ScriptingContext& context,
+                                                            std::string_view species_name = "") const;
+    [[nodiscard]] PlanetType          NextBestPlanetTypeForSpecies(const ScriptingContext& context,
+                                                                   const std::string& species_name = "") const;
+    [[nodiscard]] PlanetType          NextBetterPlanetTypeForSpecies(const ScriptingContext& context,
+                                                                     const std::string& species_name = "") const;
     [[nodiscard]] PlanetType          NextCloserToOriginalPlanetType() const;
     [[nodiscard]] PlanetType          ClockwiseNextPlanetType() const;
     [[nodiscard]] PlanetType          CounterClockwiseNextPlanetType() const;
@@ -111,8 +115,8 @@ public:
     [[nodiscard]] int LastTurnConquered() const noexcept            { return m_turn_last_conquered; }
     [[nodiscard]] int TurnsSinceLastConquered(int current_turn) const;
 
-    [[nodiscard]] const std::string&  SurfaceTexture() const noexcept { return m_surface_texture; }
-    [[nodiscard]] std::string         CardinalSuffix(const ObjectMap& objects) const; ///< returns a roman number representing this planets orbit in relation to other planets
+    [[nodiscard]] const std::string& SurfaceTexture() const noexcept{ return m_surface_texture; }
+    [[nodiscard]] std::string        CardinalSuffix(const ObjectMap& objects) const; ///< returns a roman number representing this planets orbit in relation to other planets
 
     [[nodiscard]] std::map<int, double> EmpireGroundCombatForces() const;
 
@@ -123,8 +127,8 @@ public:
     [[nodiscard]] Meter* GetMeter(MeterType type) override { return UniverseObject::GetMeter(type); }
 
     void Reset(ObjectMap& objects) override;
-    void Depopulate() override;
-    void SetSpecies(std::string species_name) override;
+    void Depopulate(int current_turn) override;
+    void SetSpecies(std::string species_name, int turn, const SpeciesManager& sm) override;
 
     void SetType(PlanetType type);          ///< sets the type of this Planet to \a type
     void SetOriginalType(PlanetType type);  ///< sets the original type of this Planet to \a type
@@ -136,9 +140,9 @@ public:
     void AddBuilding(int building_id);      ///< adds the building to the planet
     bool RemoveBuilding(int building_id);   ///< removes the building from the planet; returns false if no such building was found
 
-    void Conquer(int conquerer, EmpireManager& empires, Universe& universe);    ///< Called during combat when a planet changes hands
-    bool Colonize(int empire_id, std::string species_name, double population,   ///< Called during colonization handling to do the actual colonizing
-                  ScriptingContext& context);
+    void Conquer(int conquerer, ScriptingContext& context); ///< Called during combat when a planet changes hands
+    bool Colonize(int empire_id, std::string species_name,  ///< Called during colonization handling to do the actual colonizing
+                  double population, ScriptingContext& context);
     void SetIsAboutToBeColonized(bool b);   ///< Called during colonization when a planet is about to be colonized
     void ResetIsAboutToBeColonized();       ///< Called after colonization, to reset the number of prospective colonizers to 0
     void SetIsAboutToBeInvaded(bool b);     ///< Marks planet as being invaded or not, depending on whether \a b is true or false
@@ -156,7 +160,8 @@ public:
 
     /** Given initial set of ground forces on planet, determine ground forces on
       * planet after a turn of ground combat. */
-    static void ResolveGroundCombat(std::map<int, double>& empires_troops, const EmpireManager::DiploStatusMap& diplo_statuses);
+    static void ResolveGroundCombat(std::map<int, double>& empires_troops,
+                                    const EmpireManager::DiploStatusMap& diplo_statuses);
 
     /** Create planet from @p type and @p size. */
     Planet(PlanetType type, PlanetSize size, int creation_turn);

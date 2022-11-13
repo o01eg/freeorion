@@ -40,11 +40,11 @@ public:
     [[nodiscard]] virtual std::string Dump() const { return ""; }
 
     /** Returns the ID of the Empire issuing the order. */
-    [[nodiscard]] int EmpireID() const { return m_empire; }
+    [[nodiscard]] int EmpireID() const noexcept { return m_empire; }
 
     /** Returns true iff this order has been executed (a second execution
       * indicates server-side execution). */
-    [[nodiscard]] bool Executed() const { return m_executed; }
+    [[nodiscard]] bool Executed() const noexcept { return m_executed; }
 
     /** Executes the order on the Universe and Empires.
      *
@@ -96,10 +96,10 @@ public:
     [[nodiscard]] std::string Dump() const override;
 
     /** Returns ID of fleet selected in this order. */
-    [[nodiscard]] int ObjectID() const { return m_object; }
+    [[nodiscard]] int ObjectID() const noexcept { return m_object; }
 
     /** Returns the new name of the fleet. */
-    [[nodiscard]] const std::string& Name() const { return m_name; }
+    [[nodiscard]] const std::string& Name() const noexcept { return m_name; }
 
     //! Returns true when the Order parameters are valid.
     [[nodiscard]] static bool Check(int empire, int object, std::string new_name,
@@ -143,19 +143,15 @@ public:
 
     [[nodiscard]] std::string Dump() const override;
 
-    [[nodiscard]] const std::string& FleetName() const
-    { return m_fleet_name; }
+    [[nodiscard]] const std::string& FleetName() const noexcept { return m_fleet_name; }
 
-    [[nodiscard]] const int& FleetID() const
-    { return m_fleet_id; }
+    [[nodiscard]] const int& FleetID() const noexcept { return m_fleet_id; }
 
-    [[nodiscard]] const std::vector<int>& ShipIDs() const
-    { return m_ship_ids; }
+    [[nodiscard]] const std::vector<int>& ShipIDs() const noexcept { return m_ship_ids; }
 
-    [[nodiscard]] bool Aggressive() const;
+    [[nodiscard]] bool Aggressive() const noexcept;
 
-    [[nodiscard]] FleetAggression Aggression() const
-    { return m_aggression; }
+    [[nodiscard]] FleetAggression Aggression() const noexcept { return m_aggression; }
 
     [[nodiscard]] static bool Check(int empire, const std::string& fleet_name,
                                     const std::vector<int>& ship_ids, FleetAggression aggression,
@@ -198,16 +194,13 @@ public:
     [[nodiscard]] std::string Dump() const override;
 
     /** Returns ID of fleet selected in this order. */
-    [[nodiscard]] int FleetID() const
-    { return m_fleet; }
+    [[nodiscard]] int FleetID() const noexcept { return m_fleet; }
 
     /* Returns ID of system set as destination for this order. */
-    [[nodiscard]] int DestinationSystemID() const
-    { return m_dest_system; }
+    [[nodiscard]] int DestinationSystemID() const noexcept { return m_dest_system; }
 
     /* Returns the IDs of the systems in the route specified by this Order. */
-    [[nodiscard]] const std::vector<int>& Route() const
-    { return m_route; }
+    [[nodiscard]] const std::vector<int>& Route() const noexcept { return m_route; }
 
     static bool Check(int empire_id, int fleet_id, int dest_fleet_id, bool append,
                       const ScriptingContext& context);
@@ -246,18 +239,16 @@ private:
   * another. */
 class FO_COMMON_API FleetTransferOrder : public Order {
 public:
-    FleetTransferOrder(int empire, int dest_fleet, const std::vector<int>& ships,
+    FleetTransferOrder(int empire, int dest_fleet, std::vector<int> ships,
                        const ScriptingContext& context);
 
     [[nodiscard]] std::string Dump() const override;
 
     /* Returns ID of the fleet that the ships will go into. */
-    [[nodiscard]] int DestinationFleet() const
-    { return m_dest_fleet; }
+    [[nodiscard]] int DestinationFleet() const noexcept { return m_dest_fleet; }
 
     /** Returns IDs of the ships selected for addition to the fleet. */
-    [[nodiscard]] const std::vector<int>& Ships() const
-    { return m_add_ships; }
+    [[nodiscard]] const std::vector<int>& Ships() const noexcept { return m_add_ships; }
 
     [[nodiscard]] static bool Check(int empire_id, int dest_fleet_id, const std::vector<int>& ship_ids,
                                     const ScriptingContext& context);
@@ -296,15 +287,12 @@ public:
     [[nodiscard]] std::string Dump() const override;
 
     /** Returns ID of the planet to be colonized. */
-    [[nodiscard]] int PlanetID() const
-    { return m_planet; }
+    [[nodiscard]] int PlanetID() const noexcept { return m_planet; }
 
     /** Returns ID of the ship which is colonizing the planet. */
-    [[nodiscard]] int ShipID() const
-    { return m_ship; }
+    [[nodiscard]] int ShipID() const noexcept { return m_ship; }
 
-    [[nodiscard]] static bool Check(int empire_id, int ship_id, int planet_id,
-                                    const ScriptingContext& context);
+    static bool Check(int empire_id, int ship_id, int planet_id, const ScriptingContext& context);
 
 private:
     ColonizeOrder() = default;
@@ -344,15 +332,12 @@ public:
     [[nodiscard]] std::string Dump() const override;
 
     /** Returns ID of the planet to be invaded. */
-    [[nodiscard]] int PlanetID() const
-    { return m_planet; }
+    [[nodiscard]] int PlanetID() const noexcept { return m_planet; }
 
     /** Returns ID of the ship which is invading the planet. */
-    [[nodiscard]] int ShipID() const
-    { return m_ship; }
+    [[nodiscard]] int ShipID() const noexcept { return m_ship; }
 
-    [[nodiscard]] static bool Check(int empire_id, int ship_id,
-                                    int planet_id, const ScriptingContext& context);
+    static bool Check(int empire_id, int ship_id, int planet_id, const ScriptingContext& context);
 
 private:
     InvadeOrder() = default;
@@ -392,12 +377,10 @@ public:
     [[nodiscard]] std::string Dump() const override;
 
     /** Returns ID of the planet to be bombarded. */
-    [[nodiscard]] int PlanetID() const
-    { return m_planet; }
+    [[nodiscard]] int PlanetID() const noexcept { return m_planet; }
 
     /** Returns ID of the ship which is bombarding the planet. */
-    [[nodiscard]] int ShipID() const
-    { return m_ship; }
+    [[nodiscard]] int ShipID() const noexcept { return m_ship; }
 
     static bool Check(int empire_id, int ship_id, int planet_id, const ScriptingContext& context);
 
@@ -438,11 +421,9 @@ public:
     [[nodiscard]] std::string Dump() const override;
 
     /* Returns ID of the fleet to be deleted. */
-    [[nodiscard]] int PlanetID() const
-    { return m_planet; }
+    [[nodiscard]] int PlanetID() const noexcept { return m_planet; }
 
-    [[nodiscard]] static bool Check(int empire_id, int planet_id, const std::string& focus,
-                                    const ScriptingContext& context);
+    static bool Check(int empire_id, int planet_id, const std::string& focus, const ScriptingContext& context);
 
 private:
     ChangeFocusOrder() = default;
@@ -476,10 +457,10 @@ public:
     [[nodiscard]] std::string Dump() const override;
 
     /** Returns ID of fleet selected in this order. */
-    [[nodiscard]] const std::string& PolicyName() const   { return m_policy_name; }
-    [[nodiscard]] const std::string& CategoryName() const { return m_category; }
-    [[nodiscard]] bool               Adopt() const        { return m_adopt; }
-    [[nodiscard]] int                Slot() const         { return m_slot; }
+    [[nodiscard]] const std::string& PolicyName() const noexcept   { return m_policy_name; }
+    [[nodiscard]] const std::string& CategoryName() const noexcept { return m_category; }
+    [[nodiscard]] bool               Adopt() const noexcept        { return m_adopt; }
+    [[nodiscard]] int                Slot() const noexcept         { return m_slot; }
 
 private:
     PolicyOrder() = default;
@@ -543,7 +524,7 @@ private:
   * \a empire's queue. */
 class FO_COMMON_API ProductionQueueOrder : public Order {
 public:
-    enum class ProdQueueOrderAction : signed char {
+    enum class ProdQueueOrderAction : int8_t {
         INVALID_PROD_QUEUE_ACTION = -1,
         PLACE_IN_QUEUE,
         REMOVE_FROM_QUEUE,
@@ -609,16 +590,30 @@ private:
   */
 class FO_COMMON_API ShipDesignOrder : public Order {
 public:
-    ShipDesignOrder(int empire, int existing_design_id_to_remember);
-    ShipDesignOrder(int empire, int design_id_to_erase, bool dummy);
-    ShipDesignOrder(int empire, const ShipDesign& ship_design);
-    ShipDesignOrder(int empire, int existing_design_id, const std::string& new_name,
-                    const std::string& new_description = "");
+    ShipDesignOrder(int empire_id, int existing_design_id_to_remember,
+                    const ScriptingContext& context);
+    ShipDesignOrder(int empire_id, int design_id_to_erase, bool dummy,
+                    const ScriptingContext& context);
+    ShipDesignOrder(int empire_id, const ShipDesign& ship_design,
+                    const ScriptingContext& context);
+    ShipDesignOrder(int empire_id, int existing_design_id, std::string new_name,
+                    std::string new_description,
+                    const ScriptingContext& context);
 
     [[nodiscard]] std::string Dump() const override;
 
-    [[nodiscard]] int DesignID() const
-    { return m_design_id; }
+    [[nodiscard]] int DesignID() const noexcept { return m_design_id; }
+
+    static bool CheckRemember(int empire_id, int existing_design_id_to_remember, const ScriptingContext& context);
+
+    static bool CheckErase(int empire_id, int design_id_to_erase, bool dummy, const ScriptingContext& context);
+
+    static bool CheckNew(int empire_id, const std::string& name, const std::string& desc,
+                         const std::string& hull, const std::vector<std::string>& parts,
+                         const ScriptingContext& context);
+
+    static bool CheckRename(int empire_id, int existing_design_id, const std::string& new_name,
+                            const std::string& new_description, const ScriptingContext& context);
 
 private:
     ShipDesignOrder() = default;
@@ -643,23 +638,23 @@ private:
      */
     void ExecuteImpl(ScriptingContext& context) const override;
 
-    /// m_design_id is mutable to save the id for the server when the client calls ExecuteImpl.
-    mutable int              m_design_id = INVALID_DESIGN_ID;
-
     boost::uuids::uuid       m_uuid = boost::uuids::nil_generator()();
-    bool                     m_update_name_or_description = false;
-    bool                     m_delete_design_from_empire = false;
-    bool                     m_create_new_design = false;
 
     // details of design to create
     std::string              m_name;
     std::string              m_description;
-    int                      m_designed_on_turn = 0;
     std::string              m_hull;
     std::vector<std::string> m_parts;
-    bool                     m_is_monster  = false;
     std::string              m_icon;
     std::string              m_3D_model;
+
+    mutable int              m_design_id = INVALID_DESIGN_ID; /// m_design_id is mutable to save the id for the server when the client calls ExecuteImpl.
+
+    int                      m_designed_on_turn = 0;
+    bool                     m_update_name_or_description = false;
+    bool                     m_delete_design_from_empire = false;
+    bool                     m_create_new_design = false;
+    bool                     m_is_monster  = false;
     bool                     m_name_desc_in_stringtable = false;
     // end details of design to create
 
@@ -681,8 +676,7 @@ public:
     [[nodiscard]] std::string Dump() const override;
 
     /** Returns ID of object selected in this order. */
-    [[nodiscard]] int ObjectID() const
-    { return m_object_id; }
+    [[nodiscard]] int ObjectID() const noexcept { return m_object_id; }
 
     [[nodiscard]] static bool Check(int empire_id, int object_id, const ScriptingContext& context);
 private:
@@ -721,11 +715,10 @@ public:
     [[nodiscard]] std::string Dump() const override;
 
     /** Returns ID of object selected in this order. */
-    [[nodiscard]] int ObjectID() const
-    { return m_object_id; }
+    [[nodiscard]] int ObjectID() const noexcept { return m_object_id; }
 
     /** Returns aggression state to set object to. */
-    [[nodiscard]] FleetAggression Aggression() const { return m_aggression; }
+    [[nodiscard]] FleetAggression Aggression() const noexcept { return m_aggression; }
 
     [[nodiscard]] static bool Check(int empire_id, int object_id, FleetAggression aggression,
                                     const ScriptingContext& context);
@@ -765,12 +758,10 @@ public:
     [[nodiscard]] std::string Dump() const override;
 
     /** Returns ID of object selected in this order. */
-    [[nodiscard]] int ObjectID() const
-    { return m_object_id; }
+    [[nodiscard]] int ObjectID() const noexcept { return m_object_id; }
 
     /** Returns ID of empire to which object is given. */
-    [[nodiscard]] int RecipientEmpireID()
-    { return m_recipient_empire_id; }
+    [[nodiscard]] int RecipientEmpireID() const noexcept { return m_recipient_empire_id; }
 
     static bool Check(int empire_id, int object_id, int recipient_empire_id,
                       const ScriptingContext& context);
@@ -808,8 +799,7 @@ public:
     [[nodiscard]] std::string Dump() const override;
 
     /** Returns ID of object selected in this order. */
-    [[nodiscard]] int ObjectID() const
-    { return m_object_id; }
+    [[nodiscard]] int ObjectID() const noexcept { return m_object_id; }
 
 private:
     ForgetOrder() = default;

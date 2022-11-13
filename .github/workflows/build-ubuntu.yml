@@ -43,8 +43,8 @@ jobs:
       CACHE_NAME: linux
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
-      - uses: actions/cache@v2
+        uses: actions/checkout@v3
+      - uses: actions/cache@v3
         id: build-ubuntu-install-cache-id
         with:
           path: ${{ runner.temp }}/cache-build-linux-install
@@ -61,9 +61,9 @@ jobs:
         shell: cmake -P {0}
         run: |
           string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
-          message("::set-output name=timestamp::${current_date}")
+          file(APPEND "$ENV{GITHUB_OUTPUT}" "timestamp=${current_date}")
       - name: Cache files with ccache
-        uses: actions/cache@v1.1.0
+        uses: actions/cache@v2
         with:
           path: ${{ runner.temp }}/ccache
           key: build-${{ matrix.os }}-${{ matrix.compiler }}-ccache-${{ steps.build-ubuntu-ccache-timestamp.outputs.timestamp }}
@@ -116,4 +116,4 @@ jobs:
         if: matrix.client-godot == 'ON'
         run: |
           cp `which godot3-server` build/
-          ./build/godot3-server --verbose -s --path godot addons/gut/gut_cmdln.gd -gdir=res://test/ -ginclude_subdirs -gexit
+          ./build/godot3-server --disable-render-loop --verbose -s --path godot addons/gut/gut_cmdln.gd -gdir=res://test/ -ginclude_subdirs -gexit

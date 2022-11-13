@@ -30,7 +30,7 @@ struct FO_COMMON_API ValueRefBase {
 
     virtual void SetTopLevelContent(const std::string& content_name) {}
 
-    [[nodiscard]] virtual unsigned int GetCheckSum() const { return 0; }
+    [[nodiscard]] virtual uint32_t GetCheckSum() const { return 0; }
 
 protected:
     bool m_root_candidate_invariant = false;
@@ -78,7 +78,7 @@ std::string FlexibleToString(T&& t)
 [[nodiscard]] FO_COMMON_API std::string FlexibleToString(UniverseObjectType t);
 
 
-enum class ReferenceType : signed char {
+enum class ReferenceType : int8_t {
     INVALID_REFERENCE_TYPE = -1,
     NON_OBJECT_REFERENCE,               // ValueRef::Variable is not evalulated on any specific object
     SOURCE_REFERENCE,                   // ValueRef::Variable is evaluated on the source object
@@ -158,7 +158,8 @@ template<typename T>
 { return ptr ? ptr->Clone() : nullptr; }
 
 template<typename T>
-[[nodiscard]] inline std::vector<std::unique_ptr<T>> CloneUnique(const std::vector<std::unique_ptr<T>>& vec) {
+[[nodiscard]] inline auto CloneUnique(const std::vector<std::unique_ptr<T>>& vec)
+{
     std::vector<std::unique_ptr<T>> retval;
     retval.reserve(vec.size());
     for (const auto& val : vec)
@@ -167,7 +168,8 @@ template<typename T>
 }
 
 template<typename T>
-[[nodiscard]] inline std::vector<std::pair<std::string, std::unique_ptr<T>>> CloneUnique(const std::vector<std::pair<std::string, std::unique_ptr<T>>>& vec) {
+[[nodiscard]] inline auto CloneUnique(const std::vector<std::pair<std::string, std::unique_ptr<T>>>& vec)
+{
     std::vector<std::pair<std::string, std::unique_ptr<T>>> retval;
     retval.reserve(vec.size());
     for (const auto& val : vec)

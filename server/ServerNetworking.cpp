@@ -220,11 +220,15 @@ PlayerConnection::~PlayerConnection() {
 bool PlayerConnection::EstablishedPlayer() const noexcept
 { return m_ID != INVALID_PLAYER_ID; }
 
-bool PlayerConnection::IsLocalConnection() const
-{ return (m_socket->remote_endpoint().address().is_loopback()); }
-
-void PlayerConnection::Start()
-{ AsyncReadMessage(); }
+void PlayerConnection::Start() {
+    try {
+        m_is_local_connection = m_socket->remote_endpoint().address().is_loopback();
+    } catch (const boost::system::system_error& err) {
+        m_is_local_connection = false;
+        ErrorLogger(network) << "PlayerConnection::Start remote endpont error: " << err.what();
+    }
+    AsyncReadMessage();
+}
 
 void PlayerConnection::SendMessage(const Message& message) {
     if (!m_valid) {
@@ -240,8 +244,14 @@ bool PlayerConnection::IsEstablished() const {
 }
 
 std::string PlayerConnection::GetIpAddress() const {
-    if (m_socket)
-        return m_socket->remote_endpoint().address().to_string();
+    if (m_socket) {
+        try {
+            return m_socket->remote_endpoint().address().to_string();
+        } catch (const boost::system::system_error& err) {
+            ErrorLogger(network) << "PlayerConnection::GetIpAddress remote endpont error: " << err.what();
+            return "";
+        }
+    }
     return "";
 }
 
@@ -523,8 +533,7 @@ void PlayerConnection::AsyncReadMessage() {
 
 void PlayerConnection::SendMessageImpl(PlayerConnectionPtr self, Message message) {
     bool start_write = self->m_outgoing_messages.empty();
-    self->m_outgoing_messages.push_back(Message());
-    swap(self->m_outgoing_messages.back(), message);
+    self->m_outgoing_messages.push(std::move(message));
     if (start_write)
         self->AsyncWriteMessage();
 }
@@ -535,16 +544,20 @@ void PlayerConnection::AsyncWriteMessage() {
                              << ". Socket is closed. Dropping message.";
         return;
     }
+    using namespace boost::asio;
+    using boost::asio::buffer;
+    using boost::asio::async_write;
+    using boost::asio::placeholders::error;
+    using boost::asio::placeholders::bytes_transferred;
 
     HeaderToBuffer(m_outgoing_messages.front(), m_outgoing_header);
-    std::vector<boost::asio::const_buffer> buffers;
-    buffers.push_back(boost::asio::buffer(m_outgoing_header));
-    buffers.push_back(boost::asio::buffer(m_outgoing_messages.front().Data(),
-                                          m_outgoing_messages.front().Size()));
-    boost::asio::async_write(*m_socket, buffers,
-                             boost::bind(&PlayerConnection::HandleMessageWrite, shared_from_this(),
-                                         boost::asio::placeholders::error,
-                                         boost::asio::placeholders::bytes_transferred));
+    std::array<const_buffer, 2> buffers{
+        buffer(m_outgoing_header),
+        buffer(m_outgoing_messages.front().Data(), m_outgoing_messages.front().Size())
+    };
+    async_write(*m_socket, buffers,
+                boost::bind(&PlayerConnection::HandleMessageWrite, shared_from_this(),
+                            error, bytes_transferred));
 }
 
 void PlayerConnection::HandleMessageWrite(PlayerConnectionPtr self,
@@ -563,7 +576,7 @@ void PlayerConnection::HandleMessageWrite(PlayerConnectionPtr self,
     if (static_cast<int>(bytes_transferred) != static_cast<int>(Message::HeaderBufferSize) + self->m_outgoing_header[Message::Parts::SIZE])
         return;
 
-    self->m_outgoing_messages.pop_front();
+    self->m_outgoing_messages.pop();
     if (!self->m_outgoing_messages.empty())
         self->AsyncWriteMessage();
 }
@@ -744,7 +757,7 @@ ServerNetworking::established_iterator ServerNetworking::established_end() {
 
 void ServerNetworking::HandleNextEvent() {
     if (!m_event_queue.empty()) {
-        std::function<void ()> f = m_event_queue.front();
+        auto f = std::move(m_event_queue.front());
         m_event_queue.pop();
         f();
     }
@@ -810,7 +823,7 @@ void ServerNetworking::Init() {
 #endif
 
     // use a dual stack (ipv6 + ipv4) socket
-    tcp::endpoint message_endpoint{tcp::v6(), static_cast<unsigned short>(Networking::MessagePort())};
+    tcp::endpoint message_endpoint{tcp::v6(), static_cast<uint16_t>(Networking::MessagePort())};
 
     if (GetOptionsDB().Get<bool>("singleplayer")) {
         // when hosting a single player game only accept connections from

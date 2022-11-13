@@ -14,13 +14,13 @@ from typing import (
     Union,
 )
 
-import AIDependencies
 from AIDependencies import INVALID_ID, STABILITY_PER_LIKED_FOCUS
 from aistate_interface import get_aistate
 from common.fo_typing import PlanetId, SpeciesName, SystemId
 from empire.colony_builders import get_colony_builders, get_extra_colony_builders
 from empire.ship_builders import get_ship_builders
-from freeorion_tools import get_named_real, ppstring
+from EnumsAI import FocusType
+from freeorion_tools import get_game_rule_int, get_named_real, ppstring
 from freeorion_tools.caching import cache_for_current_turn
 
 
@@ -54,8 +54,8 @@ def planet_string(planet_ids: Union[PlanetId, Iterable[PlanetId]]) -> str:
     return ppstring([_safe_planet_name(pid) for pid in planet_ids])
 
 
-@cache_for_current_turn
-def get_capital() -> PlanetId:
+@cache_for_current_turn  # noqa: max-complexity
+def get_capital() -> PlanetId:  # noqa: max-complexity
     """
     Return current empire capital id.
 
@@ -290,10 +290,12 @@ def _calculate_get_planet_opinions() -> Dict[str, Opinion]:
 
 def dislike_factor() -> float:
     """Returns multiplier for dislike effects."""
-    # See happiness.macros
+    # See opinion.macros
     has_liberty = fo.getEmpire().policyAdopted("PLC_LIBERTY")
-    # conformance not used yet
-    return get_named_real("PLC_LIBERTY_DISLIKE_FACTOR") if has_liberty else 1.0
+    has_conformance = fo.getEmpire().policyAdopted("PLC_CONFORMANCE")
+    liberty_factor = get_named_real("PLC_LIBERTY_DISLIKE_FACTOR") if has_liberty else 1.0
+    conformance_factor = get_named_real("PLC_CONFORMANCE_DISLIKE_FACTOR") if has_conformance else 1.0
+    return liberty_factor * conformance_factor
 
 
 def focus_stability_effect(species: fo.species, focus: str) -> float:
@@ -303,12 +305,14 @@ def focus_stability_effect(species: fo.species, focus: str) -> float:
         result += STABILITY_PER_LIKED_FOCUS
     if focus in species.dislikes:
         result += STABILITY_PER_LIKED_FOCUS * dislike_factor()
+    if focus == FocusType.FOCUS_PROTECTION:
+        result += get_game_rule_int("RULE_PROTECTION_FOCUS_STABILITY", 15)
     empire = fo.getEmpire()
     # TODO move policy definitions to AIDependency? Or used an EnumClass like BuildingType?
-    if focus == AIDependencies.Tags.INDUSTRY and empire.policyAdopted("PLC_INDUSTRIALISM"):
-        result += fo.getNamedValue("PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT")
-    if focus == AIDependencies.Tags.INDUSTRY and empire.policyAdopted("PLC_TECHNOCRACY"):
-        result += fo.getNamedValue("PLC_TECHNOCRACY_TARGET_HAPPINESS_FLAT")
+    if focus == FocusType.FOCUS_INDUSTRY and empire.policyAdopted("PLC_INDUSTRIALISM"):
+        result += get_named_real("PLC_INDUSTRIALISM_TARGET_HAPPINESS_FLAT")
+    if focus == FocusType.FOCUS_RESEARCH and empire.policyAdopted("PLC_TECHNOCRACY"):
+        result += get_named_real("PLC_TECHNOCRACY_TARGET_HAPPINESS_FLAT")
     return result
 
 
@@ -324,3 +328,20 @@ def stability_with_focus(planet: fo.planet, focus: str) -> float:
         # returning a big negative value here should stop it from considering that focus for anything.
         return -99.0
     return stability - focus_stability_effect(species, planet.focus) + focus_stability_effect(species, focus)
+
+
+def adjust_liberty(planet: fo.planet, population: float) -> float:
+    """
+    Adjust liberty research output for changed stability.
+    UpdateMeterEstimate calculates liberty based on current stability, not on target stability.
+    So this may return a positive or negative adjustment, depending on whether stability goes up or down.
+    """
+    # This one is relatively easy to calculate. Still it would be better to have an adjustMeterUpdate with
+    # modified stability...
+    current_stability = planet.currentMeterValue(fo.meterType.happiness)
+    target_stability = planet.currentMeterValue(fo.meterType.targetHappiness)
+    low = get_named_real("PLC_LIBERTY_MIN_STABILITY")
+    high = get_named_real("PLC_LIBERTY_MAX_STABILITY")
+    difference = max(low, min(high, target_stability)) - max(low, min(high, current_stability))
+    debug(f"adjust_liberty on {planet}: difference={difference}, population={population}")
+    return difference * population * get_named_real("PLC_LIBERTY_RESEARCH_BONUS_SCALING")

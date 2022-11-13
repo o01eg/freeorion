@@ -72,7 +72,7 @@ public:
     /** Accessor for known objects of specified empire. */
     [[nodiscard]] virtual ObjectMap& EmpireKnownObjects(int empire_id) = 0;
 
-    [[nodiscard]] virtual std::string GetVisibleObjectName(std::shared_ptr<const UniverseObject> object) = 0;
+    [[nodiscard]] virtual std::string GetVisibleObjectName(const UniverseObject& object) = 0;
 
     /** On server or clients with no player: ALL_EMPIRES
       * On clients with a player: that player's ID */
@@ -135,10 +135,6 @@ protected:
 [[nodiscard]] inline Universe& GetUniverse() noexcept
 { return IApp::GetApp()->GetUniverse(); }
 
-/** Accessor for the App's universe object */
-[[nodiscard]] inline std::shared_ptr<const Pathfinder> GetPathfinder()
-{ return IApp::GetApp()->GetUniverse().GetPathfinder(); }
-
 /** Accessor for all (on server) or all known (on client) objects ObjectMap */
 [[nodiscard]] inline ObjectMap& Objects() {
     static ObjectMap empty_objects;
@@ -152,7 +148,7 @@ protected:
 
 /** Returns the object name of the universe object. This can be apperant object
  * name, if the application isn't supposed to see the real object name. */
-[[nodiscard]] inline std::string GetVisibleObjectName(std::shared_ptr<const UniverseObject> object)
+[[nodiscard]] inline std::string GetVisibleObjectName(const UniverseObject& object)
 { return IApp::GetApp()->GetVisibleObjectName(object); }
 
 /** Returns app's empire ID. This may be an actual empire ID or may be

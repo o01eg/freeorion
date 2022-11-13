@@ -91,7 +91,7 @@ namespace {
                 old_system->Remove(ship->ID());
                 ship->SetSystem(INVALID_OBJECT_ID);
             }
-            system->Insert(ship);
+            system->Insert(ship, System::NO_ORBIT, context.current_turn);
         }
 
         if (ship->FleetID() != INVALID_OBJECT_ID) {
@@ -101,7 +101,7 @@ namespace {
 
         // create new fleet for ship, and put it in new system
         auto fleet = CreateNewFleet(system->X(), system->Y(), std::move(ship), context, aggression);
-        system->Insert(fleet);
+        system->Insert(fleet, System::NO_ORBIT, context.current_turn);
 
         return fleet;
     }
@@ -299,9 +299,6 @@ const std::vector<Effect*> EffectsGroup::EffectsList() const {
     return retval;
 }
 
-const std::string& EffectsGroup::GetDescription() const
-{ return m_description; }
-
 std::string EffectsGroup::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "EffectsGroup";
     if (!m_content_name.empty())
@@ -331,15 +328,15 @@ std::string EffectsGroup::Dump(uint8_t ntabs) const {
     return retval;
 }
 
-bool EffectsGroup::HasMeterEffects() const {
-    for (auto& effect : m_effects) {
+bool EffectsGroup::HasMeterEffects() const noexcept {
+    for (auto& effect : m_effects) { // TODO: cache
         if (effect->IsMeterEffect())
             return true;
     }
     return false;
 }
 
-bool EffectsGroup::HasAppearanceEffects() const {
+bool EffectsGroup::HasAppearanceEffects() const noexcept {
     for (auto& effect : m_effects) {
         if (effect->IsAppearanceEffect())
             return true;
@@ -347,7 +344,7 @@ bool EffectsGroup::HasAppearanceEffects() const {
     return false;
 }
 
-bool EffectsGroup::HasSitrepEffects() const {
+bool EffectsGroup::HasSitrepEffects() const noexcept {
     for (auto& effect : m_effects) {
         if (effect->IsSitrepEffect())
             return true;
@@ -365,8 +362,8 @@ void EffectsGroup::SetTopLevelContent(const std::string& content_name) {
         effect->SetTopLevelContent(content_name);
 }
 
-unsigned int EffectsGroup::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t EffectsGroup::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "EffectsGroup");
     CheckSums::CheckSumCombine(retval, m_scope);
@@ -386,6 +383,15 @@ unsigned int EffectsGroup::GetCheckSum() const {
 // Dump function                                         //
 ///////////////////////////////////////////////////////////
 std::string Dump(const std::vector<std::shared_ptr<EffectsGroup>>& effects_groups) {
+    std::stringstream retval;
+
+    for (auto& effects_group : effects_groups)
+        retval << "\n" << effects_group->Dump();
+
+    return retval.str();
+}
+
+std::string Dump(const std::vector<std::unique_ptr<EffectsGroup>>& effects_groups) {
     std::stringstream retval;
 
     for (auto& effects_group : effects_groups)
@@ -439,8 +445,8 @@ void Effect::Execute(ScriptingContext& context, const TargetSet& targets) const 
     }
 }
 
-unsigned int Effect::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Effect::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Effect");
 
@@ -458,8 +464,8 @@ void NoOp::Execute(ScriptingContext& context) const
 std::string NoOp::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "NoOp\n"; }
 
-unsigned int NoOp::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t NoOp::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "NoOp");
 
@@ -721,8 +727,8 @@ void SetMeter::SetTopLevelContent(const std::string& content_name) {
         m_value->SetTopLevelContent(content_name);
 }
 
-unsigned int SetMeter::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetMeter::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetMeter");
     CheckSums::CheckSumCombine(retval, m_meter);
@@ -990,8 +996,8 @@ void SetShipPartMeter::SetTopLevelContent(const std::string& content_name) {
         m_part_name->SetTopLevelContent(content_name);
 }
 
-unsigned int SetShipPartMeter::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetShipPartMeter::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetShipPartMeter");
     CheckSums::CheckSumCombine(retval, m_part_name);
@@ -1210,8 +1216,8 @@ void SetEmpireMeter::SetTopLevelContent(const std::string& content_name) {
         m_value->SetTopLevelContent(content_name);
 }
 
-unsigned int SetEmpireMeter::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetEmpireMeter::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetEmpireMeter");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -1300,8 +1306,8 @@ void SetEmpireStockpile::SetTopLevelContent(const std::string& content_name) {
         m_value->SetTopLevelContent(content_name);
 }
 
-unsigned int SetEmpireStockpile::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetEmpireStockpile::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetEmpireStockpile");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -1362,8 +1368,8 @@ void SetEmpireCapital::SetTopLevelContent(const std::string& content_name) {
         m_empire_id->SetTopLevelContent(content_name);
 }
 
-unsigned int SetEmpireCapital::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetEmpireCapital::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetEmpireCapital");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -1411,8 +1417,8 @@ void SetPlanetType::SetTopLevelContent(const std::string& content_name) {
         m_type->SetTopLevelContent(content_name);
 }
 
-unsigned int SetPlanetType::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetPlanetType::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetPlanetType");
     CheckSums::CheckSumCombine(retval, m_type);
@@ -1423,6 +1429,55 @@ unsigned int SetPlanetType::GetCheckSum() const {
 
 std::unique_ptr<Effect> SetPlanetType::Clone() const
 { return std::make_unique<SetPlanetType>(ValueRef::CloneUnique(m_type)); }
+
+
+///////////////////////////////////////////////////////////
+// SetOriginalType                                         //
+///////////////////////////////////////////////////////////
+SetOriginalType::SetOriginalType(std::unique_ptr<ValueRef::ValueRef<PlanetType>>&& type) :
+    m_type(std::move(type))
+{}
+
+void SetOriginalType::Execute(ScriptingContext& context) const {
+    if (!context.effect_target || context.effect_target->ObjectType() != UniverseObjectType::OBJ_PLANET)
+        return;
+    auto p = static_cast<Planet*>(context.effect_target);
+
+    ScriptingContext::CurrentValueVariant cvv{p->OriginalType()};
+    ScriptingContext type_context{context, cvv};
+    PlanetType type = m_type->Eval(type_context);
+    p->SetOriginalType(type);
+
+    if (type == PlanetType::PT_ASTEROIDS)
+        p->SetSize(PlanetSize::SZ_ASTEROIDS);
+    else if (type == PlanetType::PT_GASGIANT)
+        p->SetSize(PlanetSize::SZ_GASGIANT);
+    else if (p->Size() == PlanetSize::SZ_ASTEROIDS)
+        p->SetSize(PlanetSize::SZ_TINY);
+    else if (p->Size() == PlanetSize::SZ_GASGIANT)
+        p->SetSize(PlanetSize::SZ_HUGE);
+}
+
+std::string SetOriginalType::Dump(uint8_t ntabs) const
+{ return DumpIndent(ntabs) + "SetOriginalType type = " + m_type->Dump(ntabs) + "\n"; }
+
+void SetOriginalType::SetTopLevelContent(const std::string& content_name) {
+    if (m_type)
+        m_type->SetTopLevelContent(content_name);
+}
+
+uint32_t SetOriginalType::GetCheckSum() const {
+    uint32_t retval{0};
+
+    CheckSums::CheckSumCombine(retval, "SetOriginalType");
+    CheckSums::CheckSumCombine(retval, m_type);
+
+    TraceLogger(effects) << "GetCheckSum(SetOriginalType): retval: " << retval;
+    return retval;
+}
+
+std::unique_ptr<Effect> SetOriginalType::Clone() const
+{ return std::make_unique<SetOriginalType>(ValueRef::CloneUnique(m_type)); }
 
 
 ///////////////////////////////////////////////////////////
@@ -1458,8 +1513,8 @@ void SetPlanetSize::SetTopLevelContent(const std::string& content_name) {
         m_size->SetTopLevelContent(content_name);
 }
 
-unsigned int SetPlanetSize::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetPlanetSize::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetPlanetSize");
     CheckSums::CheckSumCombine(retval, m_size);
@@ -1487,7 +1542,7 @@ void SetSpecies::Execute(ScriptingContext& context) const {
         auto ship = static_cast<Ship*>(context.effect_target);
         ScriptingContext::CurrentValueVariant cvv{ship->SpeciesName()};
         ScriptingContext name_context{context, cvv};
-        ship->SetSpecies(m_species_name->Eval(name_context));
+        ship->SetSpecies(m_species_name->Eval(name_context), context.species);
         return;
 
     } else if (context.effect_target->ObjectType() == UniverseObjectType::OBJ_PLANET) {
@@ -1495,24 +1550,24 @@ void SetSpecies::Execute(ScriptingContext& context) const {
 
         ScriptingContext::CurrentValueVariant cvv{planet->SpeciesName()};
         ScriptingContext name_context{context, cvv};
-        planet->SetSpecies(m_species_name->Eval(name_context));
+        planet->SetSpecies(m_species_name->Eval(name_context), context.current_turn, context.species);
 
         // ensure non-empty and permissible focus setting for new species
         auto& initial_focus = planet->Focus();
-        std::vector<std::string> available_foci = planet->AvailableFoci();
+        auto available_foci = planet->AvailableFoci(context);
 
         // leave current focus unchanged if available.
-        for (const std::string& available_focus : available_foci) {
-            if (available_focus == initial_focus)
-                return;
-        }
+        if (std::any_of(available_foci.begin(), available_foci.end(),
+                        [&initial_focus](const auto& af) { return initial_focus == af; }))
+        { return; }
 
-        const Species* species = GetSpecies(planet->SpeciesName());
-        const auto& default_focus = species ? species->DefaultFocus() : "";
+        const Species* species = context.species.GetSpecies(planet->SpeciesName());
+        static const std::string EMPTY_STRING{};
+        const auto& default_focus = species ? species->DefaultFocus() : EMPTY_STRING;
 
         // chose default focus if available. otherwise use any available focus
         bool default_available = false;
-        for (const std::string& available_focus : available_foci) {
+        for (const auto& available_focus : available_foci) {
             if (available_focus == default_focus) {
                 default_available = true;
                 break;
@@ -1520,9 +1575,9 @@ void SetSpecies::Execute(ScriptingContext& context) const {
         }
 
         if (default_available)
-            planet->SetFocus(default_focus);
+            planet->SetFocus(default_focus, context);
         else if (!available_foci.empty())
-            planet->SetFocus(*available_foci.begin());
+            planet->SetFocus(*available_foci.begin(), context);
     }
 }
 
@@ -1534,8 +1589,8 @@ void SetSpecies::SetTopLevelContent(const std::string& content_name) {
         m_species_name->SetTopLevelContent(content_name);
 }
 
-unsigned int SetSpecies::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetSpecies::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetSpecies");
     CheckSums::CheckSumCombine(retval, m_species_name);
@@ -1612,8 +1667,8 @@ void SetOwner::SetTopLevelContent(const std::string& content_name) {
         m_empire_id->SetTopLevelContent(content_name);
 }
 
-unsigned int SetOwner::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetOwner::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetOwner");
     CheckSums::CheckSumCombine(retval, m_empire_id);
@@ -1673,8 +1728,8 @@ void SetSpeciesEmpireOpinion::SetTopLevelContent(const std::string& content_name
         m_opinion->SetTopLevelContent(content_name);
 }
 
-unsigned int SetSpeciesEmpireOpinion::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetSpeciesEmpireOpinion::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetSpeciesEmpireOpinion");
     CheckSums::CheckSumCombine(retval, m_species_name);
@@ -1739,8 +1794,8 @@ void SetSpeciesSpeciesOpinion::SetTopLevelContent(const std::string& content_nam
         m_opinion->SetTopLevelContent(content_name);
 }
 
-unsigned int SetSpeciesSpeciesOpinion::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetSpeciesSpeciesOpinion::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetSpeciesSpeciesOpinion");
     CheckSums::CheckSumCombine(retval, m_opinionated_species_name);
@@ -1815,7 +1870,7 @@ void CreatePlanet::Execute(ScriptingContext& context) const {
         return;
     }
 
-    system->Insert(planet);   // let system chose an orbit for planet
+    system->Insert(planet, System::NO_ORBIT, context.current_turn); // let system chose an orbit for planet
 
     std::string name_str;
     if (m_name) {
@@ -1862,8 +1917,8 @@ void CreatePlanet::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int CreatePlanet::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t CreatePlanet::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "CreatePlanet");
     CheckSums::CheckSumCombine(retval, m_type);
@@ -1939,7 +1994,7 @@ void CreateBuilding::Execute(ScriptingContext& context) const {
 
     auto system = context.ContextObjects().getRaw<System>(location->SystemID());
     if (system)
-        system->Insert(building);
+        system->Insert(building, System::NO_ORBIT, context.current_turn);
 
     if (m_name) {
         std::string name_str = m_name->Eval(context);
@@ -1977,8 +2032,8 @@ void CreateBuilding::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int CreateBuilding::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t CreateBuilding::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "CreateBuilding");
     CheckSums::CheckSumCombine(retval, m_building_type_name);
@@ -2091,7 +2146,7 @@ void CreateShip::Execute(ScriptingContext& context) const {
     auto ship = context.ContextUniverse().InsertNew<Ship>(
         empire_id, design_id, std::move(species_name), context.ContextUniverse(),
         context.species, ALL_EMPIRES, context.current_turn);
-    system->Insert(ship);
+    system->Insert(ship, System::NO_ORBIT, context.current_turn);
 
     if (m_name) {
         std::string name_str = m_name->Eval(context);
@@ -2162,8 +2217,8 @@ void CreateShip::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int CreateShip::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t CreateShip::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "CreateShip");
     CheckSums::CheckSumCombine(retval, m_design_name);
@@ -2266,7 +2321,7 @@ void CreateField::Execute(ScriptingContext& context) const {
     if (target->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
         auto system = static_cast<System*>(target);
         if ((!m_y || y == system->Y()) && (!m_x || x == system->X()))
-            system->Insert(field);
+            system->Insert(field, System::NO_ORBIT, context.current_turn);
     }
 
     std::string name_str;
@@ -2321,8 +2376,8 @@ void CreateField::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int CreateField::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t CreateField::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "CreateField");
     CheckSums::CheckSumCombine(retval, m_field_type_name);
@@ -2447,8 +2502,8 @@ void CreateSystem::SetTopLevelContent(const std::string& content_name) {
     }
 }
 
-unsigned int CreateSystem::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t CreateSystem::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "CreateSystem");
     CheckSums::CheckSumCombine(retval, m_type);
@@ -2489,8 +2544,8 @@ void Destroy::Execute(ScriptingContext& context) const {
 std::string Destroy::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "Destroy\n"; }
 
-unsigned int Destroy::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Destroy::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Destroy");
 
@@ -2547,8 +2602,8 @@ void AddSpecial::SetTopLevelContent(const std::string& content_name) {
         m_capacity->SetTopLevelContent(content_name);
 }
 
-unsigned int AddSpecial::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t AddSpecial::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "AddSpecial");
     CheckSums::CheckSumCombine(retval, m_name);
@@ -2594,8 +2649,8 @@ void RemoveSpecial::SetTopLevelContent(const std::string& content_name) {
         m_name->SetTopLevelContent(content_name);
 }
 
-unsigned int RemoveSpecial::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t RemoveSpecial::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "RemoveSpecial");
     CheckSums::CheckSumCombine(retval, m_name);
@@ -2666,8 +2721,8 @@ void AddStarlanes::SetTopLevelContent(const std::string& content_name) {
         m_other_lane_endpoint_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int AddStarlanes::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t AddStarlanes::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "AddStarlanes");
     CheckSums::CheckSumCombine(retval, m_other_lane_endpoint_condition);
@@ -2737,8 +2792,8 @@ void RemoveStarlanes::SetTopLevelContent(const std::string& content_name) {
         m_other_lane_endpoint_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int RemoveStarlanes::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t RemoveStarlanes::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "RemoveStarlanes");
     CheckSums::CheckSumCombine(retval, m_other_lane_endpoint_condition);
@@ -2781,8 +2836,8 @@ void SetStarType::SetTopLevelContent(const std::string& content_name) {
         m_type->SetTopLevelContent(content_name);
 }
 
-unsigned int SetStarType::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetStarType::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetStarType");
     CheckSums::CheckSumCombine(retval, m_type);
@@ -2860,13 +2915,13 @@ void MoveTo::Execute(ScriptingContext& context) const {
                 // remove fleet from old system, put into new system
                 if (old_sys)
                     old_sys->Remove(fleet->ID());
-                dest_system->Insert(fleet);
+                dest_system->Insert(fleet, System::NO_ORBIT, context.current_turn);
 
                 // also move ships of fleet
-                for (auto& ship : objects.findRaw<Ship>(fleet->ShipIDs())) {
+                for (auto* ship : objects.findRaw<Ship>(fleet->ShipIDs())) {
                     if (old_sys)
                         old_sys->Remove(ship->ID());
-                    dest_system->Insert(ship);
+                    dest_system->Insert(ship, System::NO_ORBIT, context.current_turn);
                 }
 
                 ExploreSystem(dest_system->ID(), fleet, context);
@@ -2884,7 +2939,7 @@ void MoveTo::Execute(ScriptingContext& context) const {
             fleet->MoveTo(destination);
 
             // also move ships of fleet
-            for (auto& ship : objects.findRaw<Ship>(fleet->ShipIDs())) {
+            for (auto* ship : objects.findRaw<Ship>(fleet->ShipIDs())) {
                 if (old_sys)
                     old_sys->Remove(ship->ID());
                 ship->SetSystem(INVALID_OBJECT_ID);
@@ -2942,7 +2997,7 @@ void MoveTo::Execute(ScriptingContext& context) const {
 
             if (auto new_sys = objects.getRaw<System>(dest_sys_id)) {
                 // ship is moving to a new system. insert it.
-                new_sys->Insert(ship);
+                new_sys->Insert(ship, System::NO_ORBIT, context.current_turn);
             } else {
                 // ship is moving to a non-system location. move it there.
                 ship->MoveTo(dest_fleet);
@@ -3009,13 +3064,13 @@ void MoveTo::Execute(ScriptingContext& context) const {
 
         if (old_sys)
             old_sys->Remove(planet->ID());
-        dest_system->Insert(planet);  // let system pick an orbit
+        dest_system->Insert(planet, System::NO_ORBIT, context.current_turn); // let system pick an orbit
 
         // also insert buildings of planet into system.
-        for (auto& building : objects.findRaw<Building>(planet->BuildingIDs())) {
+        for (auto* building : objects.findRaw<Building>(planet->BuildingIDs())) {
             if (old_sys)
                 old_sys->Remove(building->ID());
-            dest_system->Insert(building);
+            dest_system->Insert(building, System::NO_ORBIT, context.current_turn);
         }
 
         // buildings planet should be unchanged by move, as should planet's
@@ -3052,7 +3107,7 @@ void MoveTo::Execute(ScriptingContext& context) const {
         dest_planet->AddBuilding(building->ID());
         building->SetPlanetID(dest_planet->ID());
 
-        dest_system->Insert(building);
+        dest_system->Insert(building, System::NO_ORBIT, context.current_turn);
         ExploreSystem(dest_system->ID(), building, context);
 
 
@@ -3068,17 +3123,17 @@ void MoveTo::Execute(ScriptingContext& context) const {
         system->MoveTo(destination);
 
         if (destination->ObjectType() == UniverseObjectType::OBJ_FIELD)
-            system->Insert(destination);
+            system->Insert(destination, System::NO_ORBIT, context.current_turn);
 
         // find fleets / ships at destination location and insert into system
         for (auto* obj : objects.allRaw<Fleet>()) {
             if (obj->X() == system->X() && obj->Y() == system->Y())
-                system->Insert(obj);
+                system->Insert(obj, System::NO_ORBIT, context.current_turn);
         }
 
         for (auto* obj : objects.allRaw<Ship>()) {
             if (obj->X() == system->X() && obj->Y() == system->Y())
-                system->Insert(obj);
+                system->Insert(obj, System::NO_ORBIT, context.current_turn);
         }
 
 
@@ -3090,7 +3145,7 @@ void MoveTo::Execute(ScriptingContext& context) const {
         field->MoveTo(destination);
         if (destination->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
             auto dest_system = static_cast<System*>(destination);
-            dest_system->Insert(field);
+            dest_system->Insert(field, System::NO_ORBIT, context.current_turn);
         }
     }
 }
@@ -3103,8 +3158,8 @@ void MoveTo::SetTopLevelContent(const std::string& content_name) {
         m_location_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int MoveTo::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t MoveTo::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "MoveTo");
     CheckSums::CheckSumCombine(retval, m_location_condition);
@@ -3195,7 +3250,7 @@ void MoveInOrbit::Execute(ScriptingContext& context) const {
         fleet->MoveTo(new_x, new_y);
         UpdateFleetRoute(fleet, INVALID_OBJECT_ID, INVALID_OBJECT_ID, context);
 
-        for (auto& ship : context.ContextObjects().findRaw<Ship>(fleet->ShipIDs())) {
+        for (auto* ship : context.ContextObjects().findRaw<Ship>(fleet->ShipIDs())) {
             if (old_sys)
                 old_sys->Remove(ship->ID());
             ship->SetSystem(INVALID_OBJECT_ID);
@@ -3253,8 +3308,8 @@ void MoveInOrbit::SetTopLevelContent(const std::string& content_name) {
         m_focus_y->SetTopLevelContent(content_name);
 }
 
-unsigned int MoveInOrbit::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t MoveInOrbit::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "MoveInOrbit");
     CheckSums::CheckSumCombine(retval, m_speed);
@@ -3361,7 +3416,7 @@ void MoveTowards::Execute(ScriptingContext& context) const {
             old_sys->Remove(fleet->ID());
         fleet->SetSystem(INVALID_OBJECT_ID);
         fleet->MoveTo(new_x, new_y);
-        for (auto& ship : context.ContextObjects().findRaw<Ship>(fleet->ShipIDs())) {
+        for (auto* ship : context.ContextObjects().findRaw<Ship>(fleet->ShipIDs())) {
             if (old_sys)
                 old_sys->Remove(ship->ID());
             ship->SetSystem(INVALID_OBJECT_ID);
@@ -3426,8 +3481,8 @@ void MoveTowards::SetTopLevelContent(const std::string& content_name) {
         m_dest_y->SetTopLevelContent(content_name);
 }
 
-unsigned int MoveTowards::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t MoveTowards::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "MoveTowards");
     CheckSums::CheckSumCombine(retval, m_speed);
@@ -3519,8 +3574,8 @@ void SetDestination::SetTopLevelContent(const std::string& content_name) {
         m_location_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int SetDestination::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetDestination::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetDestination");
     CheckSums::CheckSumCombine(retval, m_location_condition);
@@ -3566,8 +3621,8 @@ std::string SetAggression::Dump(uint8_t ntabs) const {
     }();
 }
 
-unsigned int SetAggression::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetAggression::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetAggression");
     CheckSums::CheckSumCombine(retval, m_aggression);
@@ -3601,8 +3656,8 @@ void Victory::Execute(ScriptingContext& context) const {
 std::string Victory::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "Victory reason = \"" + m_reason_string + "\"\n"; }
 
-unsigned int Victory::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Victory::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Victory");
     CheckSums::CheckSumCombine(retval, m_reason_string);
@@ -3676,8 +3731,8 @@ void SetEmpireTechProgress::SetTopLevelContent(const std::string& content_name) 
         m_empire_id->SetTopLevelContent(content_name);
 }
 
-unsigned int SetEmpireTechProgress::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetEmpireTechProgress::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetEmpireTechProgress");
     CheckSums::CheckSumCombine(retval, m_tech_name);
@@ -3768,8 +3823,8 @@ void GiveEmpireContent::SetTopLevelContent(const std::string& content_name) {
         m_content_name->SetTopLevelContent(content_name);
 }
 
-unsigned int GiveEmpireContent::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t GiveEmpireContent::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "GiveEmpireContent");
     CheckSums::CheckSumCombine(retval, m_content_name);
@@ -4020,8 +4075,8 @@ void GenerateSitRepMessage::SetTopLevelContent(const std::string& content_name) 
         m_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int GenerateSitRepMessage::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t GenerateSitRepMessage::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "GenerateSitRepMessage");
     CheckSums::CheckSumCombine(retval, m_message_string);
@@ -4092,8 +4147,8 @@ void SetOverlayTexture::SetTopLevelContent(const std::string& content_name) {
         m_size->SetTopLevelContent(content_name);
 }
 
-unsigned int SetOverlayTexture::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetOverlayTexture::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetOverlayTexture");
     CheckSums::CheckSumCombine(retval, m_texture);
@@ -4127,8 +4182,8 @@ void SetTexture::Execute(ScriptingContext& context) const {
 std::string SetTexture::Dump(uint8_t ntabs) const
 { return DumpIndent(ntabs) + "SetTexture texture = " + m_texture + "\n"; }
 
-unsigned int SetTexture::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetTexture::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetTexture");
     CheckSums::CheckSumCombine(retval, m_texture);
@@ -4309,8 +4364,8 @@ void SetVisibility::SetTopLevelContent(const std::string& content_name) {
         m_condition->SetTopLevelContent(content_name);
 }
 
-unsigned int SetVisibility::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t SetVisibility::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "SetVisibility");
     CheckSums::CheckSumCombine(retval, m_vis.get());
@@ -4463,7 +4518,7 @@ std::string Conditional::Dump(uint8_t ntabs) const {
     return retval;
 }
 
-bool Conditional::IsMeterEffect() const {
+bool Conditional::IsMeterEffect() const noexcept {
     for (auto& effect : m_true_effects) {
         if (effect->IsMeterEffect())
             return true;
@@ -4475,7 +4530,7 @@ bool Conditional::IsMeterEffect() const {
     return false;
 }
 
-bool Conditional::IsAppearanceEffect() const {
+bool Conditional::IsAppearanceEffect() const noexcept {
     for (auto& effect : m_true_effects) {
         if (effect->IsAppearanceEffect())
             return true;
@@ -4487,7 +4542,7 @@ bool Conditional::IsAppearanceEffect() const {
     return false;
 }
 
-bool Conditional::IsSitrepEffect() const {
+bool Conditional::IsSitrepEffect() const noexcept {
     for (auto& effect : m_true_effects) {
         if (effect->IsSitrepEffect())
             return true;
@@ -4510,8 +4565,8 @@ void Conditional::SetTopLevelContent(const std::string& content_name) {
             (effect)->SetTopLevelContent(content_name);
 }
 
-unsigned int Conditional::GetCheckSum() const {
-    unsigned int retval{0};
+uint32_t Conditional::GetCheckSum() const {
+    uint32_t retval{0};
 
     CheckSums::CheckSumCombine(retval, "Conditional");
     CheckSums::CheckSumCombine(retval, m_target_condition);

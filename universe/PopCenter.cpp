@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include "Enums.h"
 #include "Meter.h"
+#include "Species.h"
 #include "UniverseObject.h"
 #include "../util/AppInterface.h"
 #include "../util/Logger.h"
@@ -52,7 +53,7 @@ void PopCenter::PopCenterResetTargetMaxUnpairedMeters() {
     GetMeter(MeterType::METER_TARGET_HAPPINESS)->ResetCurrent();
 }
 
-void PopCenter::PopCenterPopGrowthProductionResearchPhase() {
+void PopCenter::PopCenterPopGrowthProductionResearchPhase(int turn) {
     if (m_species_name.empty()) {
         // No changes to population or happiness
         return;
@@ -62,7 +63,7 @@ void PopCenter::PopCenterPopGrowthProductionResearchPhase() {
 
     if (!Populated()) {
         // if population falls below threshold, kill off the remainder
-        Depopulate();
+        Depopulate(turn);
     }
 }
 
@@ -77,13 +78,13 @@ void PopCenter::Reset(ObjectMap&) {
     m_species_name.clear();
 }
 
-void PopCenter::Depopulate() {
+void PopCenter::Depopulate(int) {
     GetMeter(MeterType::METER_POPULATION)->Reset();
     GetMeter(MeterType::METER_HAPPINESS)->Reset();
 }
 
-void PopCenter::SetSpecies(std::string species_name) {
-    if (!species_name.empty() && !GetSpecies(species_name))
+void PopCenter::SetSpecies(std::string species_name, int, const SpeciesManager& sm) {
+    if (!species_name.empty() && !sm.GetSpecies(species_name))
         ErrorLogger() << "PopCenter::SetSpecies couldn't get species with name " << species_name;
     m_species_name = std::move(species_name);
 }

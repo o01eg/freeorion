@@ -41,8 +41,8 @@ namespace {
     static constexpr int MAX_PRODUCTION_TURNS = 200;
     static constexpr float EPSILON = 0.001f;
 
-    int ProductionTurns(float total_cost, int minimum_production_time, float local_pp_output,
-                        float stockpile, float stockpile_limit_per_turn)
+    constexpr int ProductionTurns(float total_cost, int minimum_production_time, float local_pp_output,
+                                  float stockpile, float stockpile_limit_per_turn)
     {
         float max_allocation_per_turn = total_cost / minimum_production_time;
         //std::cout << "\nProductionTurnsprod max per turn: " << max_allocation_per_turn << "  total cost: " << total_cost
@@ -402,8 +402,8 @@ namespace {
 
             if (obj || design->ProductionCostTimeLocationInvariant()) {
                 // if location object is available, or cost and time are invariation to location, can safely evaluate cost and time
-                float total_cost = design->ProductionCost(empire_id, candidate_object_id);
-                int minimum_production_time = std::max(1, design->ProductionTime(empire_id, candidate_object_id));
+                float total_cost = design->ProductionCost(empire_id, candidate_object_id, context);
+                int minimum_production_time = std::max(1, design->ProductionTime(empire_id, candidate_object_id, context));
 
                 if (obj) {
                     // if location object is available, can evaluate production time at that location
@@ -427,7 +427,7 @@ namespace {
             } else {
                 // no location object, but have location-dependent cost or time
 
-                int minimum_production_time = std::max(1, design->ProductionTime(empire_id, candidate_object_id));
+                int minimum_production_time = std::max(1, design->ProductionTime(empire_id, candidate_object_id, context));
                 // 9999 is arbitrary large time returned for evaluation failure due to lack of location object but object-dependent time
                 if (minimum_production_time >= 9999) {
                     main_text += "\n" + boost::io::str(FlexibleFormat(UserString("PRODUCTION_WND_TOOLTIP_PROD_TIME_MINIMUM")) %
@@ -437,7 +437,7 @@ namespace {
                                                        std::to_string(minimum_production_time));
                 }
 
-                float total_cost = design->ProductionCost(empire_id, candidate_object_id);
+                float total_cost = design->ProductionCost(empire_id, candidate_object_id, context);
                 // 999999.9f is arbitrary large cost returned for evaluation failure due to lack of location object but object-dependnet cost
                 if (total_cost >= 999999.9f) {
                     main_text += "\n" + boost::io::str(FlexibleFormat(UserString("PRODUCTION_WND_TOOLTIP_PROD_COST")) %
@@ -536,7 +536,7 @@ namespace {
 
             const ScriptingContext context;
             if (auto empire = context.GetEmpire(empire_id)) {
-                if (!empire->ProducibleItem(m_item, location_id)) {
+                if (!empire->ProducibleItem(m_item, location_id, context)) {
                     this->Disable(true);
                     m_panel->Disable(true);
                 }
@@ -898,7 +898,7 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
 
     const ScriptingContext context;
     if (auto empire = context.GetEmpire(m_empire_id))
-        return empire->ProducibleItem(build_type, m_production_location);
+        return empire->ProducibleItem(build_type, m_production_location, context);
     return true;
 }
 
@@ -922,8 +922,10 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
 
     // check that item is both enqueuable and producible, since most buildings currently have
     // nonselective EnqueueLocation conditions
-    bool enqueuable_here = empire->EnqueuableItem(BuildType::BT_BUILDING, name, m_production_location) &&
-                           empire->ProducibleItem(BuildType::BT_BUILDING, name, m_production_location);
+    bool enqueuable_here = empire->EnqueuableItem(BuildType::BT_BUILDING, name, m_production_location,
+                                                  context) &&
+                           empire->ProducibleItem(BuildType::BT_BUILDING, name, m_production_location,
+                                                  context);
 
     if (enqueuable_here)
         return m_availabilities_shown.first;
@@ -947,7 +949,8 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
     if (!empire)
         return true;
 
-    bool producible_here = empire->ProducibleItem(BuildType::BT_SHIP, design_id, m_production_location);
+    bool producible_here = empire->ProducibleItem(BuildType::BT_SHIP, design_id,
+                                                  m_production_location, context);
 
     if (producible_here)
         return m_availabilities_shown.first;
@@ -1521,7 +1524,7 @@ void BuildDesignatorWnd::BuildItemRequested(const ProductionQueue::ProductionIte
 {
     const ScriptingContext context;
     auto empire = context.GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
-    if (empire && empire->EnqueuableItem(item, BuildLocation()))
+    if (empire && empire->EnqueuableItem(item, BuildLocation(), context))
         AddBuildToQueueSignal(item, num_to_build, BuildLocation(), pos);
 }
 

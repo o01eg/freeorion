@@ -219,15 +219,17 @@ void Planet::Init() {
     AddMeter(MeterType::METER_REBEL_TROOPS);
 }
 
-PlanetEnvironment Planet::EnvironmentForSpecies(const std::string& species_name) const {
+PlanetEnvironment Planet::EnvironmentForSpecies(const ScriptingContext& context,
+                                                std::string_view species_name) const
+{
     const Species* species = nullptr;
     if (species_name.empty()) {
-        const std::string& this_planet_species_name = this->SpeciesName();
+        auto& this_planet_species_name = this->SpeciesName();
         if (this_planet_species_name.empty())
             return PlanetEnvironment::PE_UNINHABITABLE;
-        species = GetSpecies(this_planet_species_name);
+        species = context.species.GetSpecies(this_planet_species_name);
     } else {
-        species = GetSpecies(species_name);
+        species = context.species.GetSpecies(species_name);
     }
     if (!species) {
         ErrorLogger() << "Planet::EnvironmentForSpecies couldn't get species with name \"" << species_name << "\"";
@@ -236,15 +238,17 @@ PlanetEnvironment Planet::EnvironmentForSpecies(const std::string& species_name)
     return species->GetPlanetEnvironment(m_type);
 }
 
-PlanetType Planet::NextBestPlanetTypeForSpecies(const std::string& species_name) const {
+PlanetType Planet::NextBestPlanetTypeForSpecies(const ScriptingContext& context,
+                                                const std::string& species_name) const
+{
     const Species* species = nullptr;
     if (species_name.empty()) {
         const std::string& this_planet_species_name = this->SpeciesName();
         if (this_planet_species_name.empty())
             return m_type;
-        species = GetSpecies(this_planet_species_name);
+        species = context.species.GetSpecies(this_planet_species_name);
     } else {
-        species = GetSpecies(species_name);
+        species = context.species.GetSpecies(species_name);
     }
     if (!species) {
         ErrorLogger() << "Planet::NextBestPlanetTypeForSpecies couldn't get species with name \"" << species_name << "\"";
@@ -253,15 +257,17 @@ PlanetType Planet::NextBestPlanetTypeForSpecies(const std::string& species_name)
     return species->NextBestPlanetType(m_type);
 }
 
-PlanetType Planet::NextBetterPlanetTypeForSpecies(const std::string& species_name) const {
+PlanetType Planet::NextBetterPlanetTypeForSpecies(const ScriptingContext& context,
+                                                  const std::string& species_name) const
+{
     const Species* species = nullptr;
     if (species_name.empty()) {
         const std::string& this_planet_species_name = this->SpeciesName();
         if (this_planet_species_name.empty())
             return m_type;
-        species = GetSpecies(this_planet_species_name);
+        species = context.species.GetSpecies(this_planet_species_name);
     } else {
-        species = GetSpecies(species_name);
+        species = context.species.GetSpecies(species_name);
     }
     if (!species) {
         ErrorLogger() << "Planet::NextBetterPlanetTypeForSpecies couldn't get species with name \"" << species_name << "\"";
@@ -364,7 +370,7 @@ int Planet::TypeDifference(PlanetType type1, PlanetType type2) {
     //  8     3
     //  7     4
     //    6 5
-    int diff = std::abs(int(type1) - int(type2));
+    int diff = std::abs(int(type1) - int(type2)); // TODO: replace abs call and make this function noexcept?
     // raw_dist -> actual dist
     //  0 to 4       0 to 4
     //  5 to 8       4 to 1
@@ -490,24 +496,47 @@ bool Planet::Contains(int object_id) const
 bool Planet::ContainedBy(int object_id) const
 { return object_id != INVALID_OBJECT_ID && this->SystemID() == object_id; }
 
-std::vector<std::string> Planet::AvailableFoci() const {    // TODO: pass ScriptingContext
+bool Planet::FocusAvailable(std::string_view focus, const ScriptingContext& context) const {
+    const auto* species = context.species.GetSpecies(this->SpeciesName());
+    if (!species)
+        return false;
+    const auto& foci = species->Foci();
+    const auto it = std::find_if(foci.begin(), foci.end(),
+                                 [focus](const FocusType& focus_type) { return focus_type.Name() == focus; });
+    if (it == foci.end())
+        return false;
+    const auto* location = it->Location();
+    if (!location)
+        return false;
+
+    const ScriptingContext planet_context(this, context);
+    return location->Eval(planet_context, this);
+}
+
+std::vector<std::string> Planet::AvailableFoci(const ScriptingContext& context) const {
     std::vector<std::string> retval;
-    const ScriptingContext context{this};
-    if (const auto* species = GetSpecies(this->SpeciesName())) {
-        retval.reserve(species->Foci().size());
-        for (const auto& focus_type : species->Foci()) {
-            if (const auto* location = focus_type.Location()) {
-                if (location->Eval(context, this))
-                    retval.push_back(focus_type.Name());
-            }
+    const auto* species = context.species.GetSpecies(this->SpeciesName());
+    if (!species)
+        return retval;
+
+    const ScriptingContext planet_context(this, context);
+
+    const auto& foci = species->Foci();
+    retval.reserve(species->Foci().size());
+    for (const auto& focus_type : foci) {
+        if (const auto* location = focus_type.Location()) {
+            if (location->Eval(planet_context, this))
+                retval.push_back(focus_type.Name());
         }
     }
 
     return retval;
 }
 
-const std::string& Planet::FocusIcon(const std::string& focus_name) const {
-    if (const Species* species = GetSpecies(this->SpeciesName())) {
+const std::string& Planet::FocusIcon(std::string_view focus_name,
+                                     const ScriptingContext& context) const
+{
+    if (const Species* species = context.species.GetSpecies(this->SpeciesName())) {
         for (const FocusType& focus_type : species->Foci()) {
             if (focus_type.Name() == focus_name)
                 return focus_type.Graphic();
@@ -628,28 +657,28 @@ void Planet::Reset(ObjectMap& objects) {
     SetOwner(ALL_EMPIRES);
 }
 
-void Planet::Depopulate() {
-    PopCenter::Depopulate();
+void Planet::Depopulate(int current_turn) {
+    PopCenter::Depopulate(current_turn);
 
     GetMeter(MeterType::METER_INDUSTRY)->Reset();
     GetMeter(MeterType::METER_RESEARCH)->Reset();
     GetMeter(MeterType::METER_INFLUENCE)->Reset();
     GetMeter(MeterType::METER_CONSTRUCTION)->Reset();
 
-    ClearFocus();
+    ClearFocus(current_turn);
 }
 
-void Planet::Conquer(int conquerer, EmpireManager& empires, Universe& universe) {
-    m_turn_last_conquered = CurrentTurn();
+void Planet::Conquer(int conquerer, ScriptingContext& context) {
+    m_turn_last_conquered = context.current_turn;
 
     // deal with things on production queue located at this planet
-    Empire::ConquerProductionQueueItemsAtLocation(ID(), conquerer, empires);
+    Empire::ConquerProductionQueueItemsAtLocation(ID(), conquerer, context.Empires());
 
-    ObjectMap& objects{universe.Objects()};
-    const auto& empire_ids = empires.EmpireIDs();
+    ObjectMap& objects{context.ContextObjects()};
+    const auto& empire_ids = context.Empires().EmpireIDs();
 
     // deal with UniverseObjects (eg. buildings) located on this planet
-    for (auto& building : objects.find<Building>(m_buildings)) {
+    for (auto* building : objects.findRaw<Building>(m_buildings)) {
         const BuildingType* type = GetBuildingType(building->BuildingTypeName());
 
         // determine what to do with building of this type...
@@ -663,9 +692,9 @@ void Planet::Conquer(int conquerer, EmpireManager& empires, Universe& universe) 
             // destroy object
             //DebugLogger() << "Planet::Conquer destroying object: " << building->Name();
             this->RemoveBuilding(building->ID());
-            if (auto system = objects.get<System>(this->SystemID()))
+            if (auto system = objects.getRaw<System>(this->SystemID()))
                 system->Remove(building->ID());
-            universe.Destroy(building->ID(), empire_ids);
+            context.ContextUniverse().Destroy(building->ID(), empire_ids);
         } else if (cap_result == CaptureResult::CR_RETAIN) {
             // do nothing
         }
@@ -675,10 +704,10 @@ void Planet::Conquer(int conquerer, EmpireManager& empires, Universe& universe) 
     SetOwner(conquerer);
 
     if (conquerer == ALL_EMPIRES) {
-        if (const auto species = GetSpecies(SpeciesName()))
-            SetFocus(species->DefaultFocus());
+        if (const auto species = context.species.GetSpecies(SpeciesName()))
+            SetFocus(species->DefaultFocus(), context);
         else
-            ClearFocus();
+            ClearFocus(context.current_turn);
     }
 
     GetMeter(MeterType::METER_SUPPLY)->SetCurrent(0.0f);
@@ -703,10 +732,10 @@ void Planet::Conquer(int conquerer, EmpireManager& empires, Universe& universe) 
     GetMeter(MeterType::METER_DETECTION)->BackPropagate();
 }
 
-void Planet::SetSpecies(std::string species_name) {
+void Planet::SetSpecies(std::string species_name, int turn, const SpeciesManager& sm) {
     if (SpeciesName().empty() && !species_name.empty())
-        m_turn_last_colonized = CurrentTurn();  // if setting species with an effect, not via Colonize, consider it a colonization when there was no previous species set
-    PopCenter::SetSpecies(std::move(species_name));
+        m_turn_last_colonized = turn;  // if setting species with an effect, not via Colonize, consider it a colonization when there was no previous species set
+    PopCenter::SetSpecies(std::move(species_name), turn, sm);
 }
 
 bool Planet::Colonize(int empire_id, std::string species_name, double population,
@@ -718,15 +747,17 @@ bool Planet::Colonize(int empire_id, std::string species_name, double population
     // if desired pop > 0, we want a colony, not an outpost, so we need to do some checks
     if (population > 0.0) {
         // check if specified species exists and get reference
-        species = GetSpecies(species_name);
+        species = context.species.GetSpecies(species_name);
         if (!species) {
             ErrorLogger() << "Planet::Colonize couldn't get species: " << species_name;
             return false;
         }
         // check if specified species can colonize this planet
-        if (EnvironmentForSpecies(species_name) < PlanetEnvironment::PE_HOSTILE) {
-            ErrorLogger() << "Planet::Colonize: can't colonize planet with species " << species_name << " because planet is "
-                          << m_type << " which for that species is environment: " << EnvironmentForSpecies(species_name);
+        if (EnvironmentForSpecies(context, species_name) < PlanetEnvironment::PE_HOSTILE) {
+            ErrorLogger() << "Planet::Colonize: can't colonize planet with species " << species_name
+                          << " because planet is " << m_type 
+                          << " which for that species is environment: "
+                          << EnvironmentForSpecies(context, species_name);
             return false;
         }
     }
@@ -736,7 +767,7 @@ bool Planet::Colonize(int empire_id, std::string species_name, double population
         Reset(objects);
     } else {
         PopCenter::Reset(objects);
-        for (const auto& building : objects.find<Building>(m_buildings)) {
+        for (auto* building : objects.findRaw<Building>(m_buildings)) {
             if (!building)
                 continue;
             building->Reset();
@@ -749,25 +780,25 @@ bool Planet::Colonize(int empire_id, std::string species_name, double population
 
     // if desired pop > 0, we want a colony, not an outpost, so we have to set the colony species
     if (population > 0.0)
-        SetSpecies(std::move(species_name));
+        SetSpecies(std::move(species_name), context.current_turn, context.species);
     m_turn_last_colonized = context.current_turn; // may be redundant with same in SetSpecies, but here occurrs always, whereas in SetSpecies is only done if species is initially empty
 
     // find a default focus. use first defined available focus.
     // AvailableFoci function should return a vector of all names of
     // available foci.
-    auto available_foci = AvailableFoci();
+    auto available_foci = AvailableFoci(context);
     if (species && !available_foci.empty()) {
         bool found_preference = false;
         for (const auto& focus : available_foci) {
             if (!focus.empty() && focus == species->DefaultFocus()) {
-                SetFocus(focus);
+                SetFocus(focus, context);
                 found_preference = true;
                 break;
             }
         }
 
         if (!found_preference)
-            SetFocus(*available_foci.begin());
+            SetFocus(*available_foci.begin(), context);
     } else {
         DebugLogger() << "Planet::Colonize unable to find a focus to set for species "
                       << this->SpeciesName();
@@ -783,7 +814,7 @@ bool Planet::Colonize(int empire_id, std::string species_name, double population
     SetOwner(empire_id);
 
     // if there are buildings on the planet, set the specified empire as their owner too
-    for (auto& building : objects.find<Building>(BuildingIDs()))
+    for (auto* building : objects.findRaw<Building>(BuildingIDs()))
         building->SetOwner(empire_id);
 
     return true;
@@ -838,7 +869,7 @@ void Planet::SetSurfaceTexture(const std::string& texture) {
 
 void Planet::PopGrowthProductionResearchPhase(ScriptingContext& context) {
     UniverseObject::PopGrowthProductionResearchPhase(context);
-    PopCenterPopGrowthProductionResearchPhase();
+    PopCenterPopGrowthProductionResearchPhase(context.current_turn);
 
     // should be run after a meter update, but before a backpropagation, so check current, not initial, meter values
 

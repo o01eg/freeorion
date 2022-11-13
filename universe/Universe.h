@@ -104,8 +104,8 @@ public:
 
 
     /** Returns objects in this Universe. */
-    [[nodiscard]] const ObjectMap& Objects() const { return *m_objects; }
-    [[nodiscard]] ObjectMap&       Objects()       { return *m_objects; }
+    [[nodiscard]] const ObjectMap& Objects() const noexcept { return *m_objects; }
+    [[nodiscard]] ObjectMap&       Objects() noexcept       { return *m_objects; }
 
     /** Returns latest known state of objects for the Empire with
       * id \a empire_id or the true / complete state of all objects in this
@@ -155,12 +155,12 @@ public:
 
     /* Return the map from empire id to (map from id to that empire's current
      * visibility of that object) */
-    [[nodiscard]] const EmpireObjectVisibilityMap& GetEmpireObjectVisibility() const;
+    [[nodiscard]] auto& GetEmpireObjectVisibility() const noexcept { return m_empire_object_visibility; }
 
     /* Returns the map from empire id to (map from object id to (map from
      * visibility level to turn number on which the empire last detected that
      * object at that visibility level)). */
-    [[nodiscard]] const EmpireObjectVisibilityTurnMap& GetEmpireObjectVisibilityTurnMap() const;
+    [[nodiscard]] auto& GetEmpireObjectVisibilityTurnMap() const noexcept { return m_empire_object_visibility_turns; }
 
     /** Returns the map from Visibility level to turn number on which the empire
       * with id \a empire_id last had the various Visibility levels of the
@@ -300,7 +300,7 @@ public:
       * updates the record of the last turn on which each empire has visibility
       * of object that can be seen on the current turn with the level of
       * visibility that the empire has this turn. */
-    void UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    void UpdateEmpireLatestKnownObjectsAndVisibilityTurns(int current_turn);
 
     /** Checks latest known information about each object for each empire and,
       * in cases when the latest known state (stealth and location) suggests
@@ -365,15 +365,15 @@ public:
 
     /** Sets whether to inhibit UniverseObjectSignals.  Inhibits if \a inhibit
       * is true, and (re)enables UniverseObjectSignals if \a inhibit is false. */
-    void InhibitUniverseObjectSignals(bool inhibit = true);
+    void InhibitUniverseObjectSignals(bool inhibit = true) noexcept { m_inhibit_universe_object_signals = inhibit; }
 
     void UpdateStatRecords(const ScriptingContext& context);
 
     /** Returns true if UniverseOjbectSignals are inhibited, false otherwise. */
-    const bool& UniverseObjectSignalsInhibited() const;
+    const bool& UniverseObjectSignalsInhibited() const noexcept { return m_inhibit_universe_object_signals; }
 
-    [[nodiscard]] double UniverseWidth() const;
-    void SetUniverseWidth(double width) { m_universe_width = width; }
+    [[nodiscard]] double UniverseWidth() const noexcept { return m_universe_width; }
+    void SetUniverseWidth(double width) noexcept { m_universe_width = width; }
 
     /** InsertNew constructs and inserts a UniverseObject into the object map with a new
         id. It returns the new object. */

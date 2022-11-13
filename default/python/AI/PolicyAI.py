@@ -3,12 +3,13 @@ from __future__ import annotations
 import freeOrionAIInterface as fo
 from copy import copy
 from logging import debug, error
-from typing import Callable, Iterable, NamedTuple, Optional, Set, Tuple, Union
+from typing import Callable, Iterable, NamedTuple
 
 import PlanetUtilsAI
 from AIDependencies import Tags
 from aistate_interface import get_aistate
 from common.fo_typing import PlanetId, SpeciesName
+from DiplomaticCorp import get_diplomatic_status
 from EnumsAI import FocusType, PriorityType
 from freeorion_tools import (
     assertion_fails,
@@ -54,6 +55,8 @@ population = "PLC_POPULATION"
 racial_purity = "PLC_RACIAL_PURITY"
 conformance = "PLC_CONFORMANCE"
 conformance_exclusions = {liberty, diversity, artisans}
+
+initial_influence_priority = 18.0
 
 
 class _EmpireOutput:
@@ -112,31 +115,14 @@ class _EmpireOutput:
             # 10 give a lot of bonuses, increases above 10 are less important
             stability = 11 + (stability - 10) / 2
         if self.has_liberty and planet.focus == FocusType.FOCUS_RESEARCH:
-            self.research += self.adjust_liberty(planet, population)
+            self.research += PlanetUtilsAI.adjust_liberty(planet, population)
         self.population_stability += population * stability * self.stability_scaling
-
-    @staticmethod
-    def adjust_liberty(planet: fo.planet, population: float) -> float:
-        """
-        Adjust liberty research output for changed stability.
-        UpdateMeterEstimate calculates liberty based on current stability, not on target stability.
-        So this may return a positive or negative adjustment, depending on whether stability goes up or down.
-        """
-        # This one is relatively easy to calculate. Still it would be better to have an adjustMeterUpdate with
-        # modified stability...
-        current_stability = planet.currentMeterValue(fo.meterType.happiness)
-        target_stability = planet.currentMeterValue(fo.meterType.targetHappiness)
-        low = get_named_real("PLC_LIBERTY_MIN_STABILITY")
-        high = get_named_real("PLC_LIBERTY_MAX_STABILITY")
-        difference = max(low, min(high, target_stability)) - max(low, min(high, current_stability))
-        debug(f"adjust_liberty on {planet}: difference={difference}, population={population}")
-        return difference * population * get_named_real("PLC_LIBERTY_RESEARCH_BONUS_SCALING")
 
 
 class _Alternative(NamedTuple):
     output: _EmpireOutput
     costs: float
-    adopted: Set
+    adopted: set
 
 
 class PolicyManager:
@@ -166,7 +152,7 @@ class PolicyManager:
         self._adoptable = self._get_adoptable()
         self._available = set(self._empire.availablePolicies)
         self._rating_functions = {
-            propaganda: lambda: 20 + self._rate_opinion(propaganda),
+            propaganda: self._rate_propaganda,
             algo_research: self._rate_algo_research,
             diversity: self._rate_diversity,
             artisans: self._rate_artisans,
@@ -301,7 +287,7 @@ class PolicyManager:
                 if new_rating - old_rating > rated_cost:
                     self._we_want(new_policy, new_cost, old_policy)
 
-    def _we_want(self, name: str, cost: float, replace: Optional[str] = None) -> None:
+    def _we_want(self, name: str, cost: float, replace: str | None = None) -> None:
         if name not in self._empire.availablePolicies:
             self._try_unlock(name)
             return
@@ -314,7 +300,7 @@ class PolicyManager:
             self._wanted_ip += cost
             debug(f"Adopting {name} failed due to insufficient IP, adding {cost} to wanted_ip")
 
-    def _unlocked_by(self, name: str) -> Union[str, Callable, None]:
+    def _unlocked_by(self, name: str) -> str | Callable | None:
         """
         Returns another policy that unlocks the given policy, a function to unlock it, or None.
         Returned functions can be called with False to check whether it could unlock the given policy.
@@ -367,11 +353,10 @@ class PolicyManager:
         """
         # avoid division by zero, with unreserved_ip < 1 the policy won't be adopted anyway
         unreserved_ip = max(1, self._ip - self._wanted_ip)
-        priority = self._aistate.get_priority(PriorityType.RESOURCE_INFLUENCE)
         # For big empires, costs of some policies go over 100 and their rating doesn't grow that much, but they may
         # also have lots of IP and the policy may still be useful. Note that costs should be less than unreserved_ip,
         # so if cost is e.g. 1/3 of unreserved_ip, this limits the rating to 0.5 * priority.
-        return min(costs / 3, 1.5 * priority * costs / unreserved_ip)
+        return min(costs / 3, 1.5 * self._get_influence_priority() * costs / unreserved_ip)
 
     @staticmethod
     def _rate_opinion(name: str) -> float:
@@ -379,15 +364,35 @@ class PolicyManager:
         opinion = PlanetUtilsAI.get_planet_opinion(name)
         return 1.5 * (len(opinion.likes) - len(opinion.dislikes) * PlanetUtilsAI.dislike_factor())
 
+    def _rate_propaganda(self) -> float:
+        """Rate propaganda broadcasts"""
+        ip_gain = get_named_real("PROPAGANDA_INFLUENCE_FLAT")
+        ip_enemy = get_named_real("PROPAGANDA_INFLUENCE_ENEMY_FLAT")
+        # Is there an easy way to determine how many enemies we see? For simplicity assume we see half of them.
+        # Note that the enemy effect may be our gain (if enemy also uses propaganda), or the other player's loss.
+        num_enemies = sum(
+            0.5 for e in fo.allEmpireIDs() if e != fo.empireID() and get_diplomatic_status(e) == fo.diplomaticStatus.war
+        )
+        rating = self._get_influence_priority() * (ip_gain - num_enemies * ip_enemy) + self._rate_opinion(propaganda)
+        debug(f"_rate_propaganda: rating={rating}")
+        return rating
+
     def _rate_algo_research(self) -> float:
         """Rate algorithmic research"""
-        # First should do, but things may change. Liberty is more important!
-        if fo.currentTurn() <= 10 or algo_research not in self._empire.availablePolicies:
-            return 0.0
-        # At 20 there are typically no planets with research focus
-        # TBD: check how many planet have research focus or use meter_update?
-        base_value = max(0, self._aistate.get_priority(PriorityType.RESOURCE_RESEARCH) - 20)
-        rating = base_value + self._rate_opinion(algo_research)
+        min_stability = get_named_real("LRN_ALGO_RESEARCH_MIN_STABILITY")
+        scaling = get_named_real("LRN_ALGO_RESEARCH_TARGET_RESEARCH_PERCONSTRUCTION")
+        research_priority = self._aistate.get_priority(PriorityType.RESOURCE_RESEARCH)
+        gain = sum(
+            scaling
+            * research_priority
+            * min(
+                planet.currentMeterValue(fo.meterType.population),
+                planet.currentMeterValue(fo.meterType.construction),
+            )
+            for planet in PlanetUtilsAI.get_empire_populated_planets()
+            if planet.currentMeterValue(fo.meterType.targetHappiness) >= min_stability
+        )
+        rating = gain + self._rate_opinion(algo_research)
         debug(f"_rate_algo_research: rating={rating}")
         return rating
 
@@ -440,7 +445,7 @@ class PolicyManager:
             # No alternative was better than current_output with conformance.
             self._adopt(conformance)
 
-    def _try_conformance(self, current_output: _EmpireOutput) -> Tuple[_EmpireOutput, float]:
+    def _try_conformance(self, current_output: _EmpireOutput) -> tuple[_EmpireOutput, float]:
         """
         Try adopting conformance, may replace another social policies.
         Conformance is rather good, but has several exclusions. So this may have to de-adopt all exclusions just
@@ -589,7 +594,7 @@ class PolicyManager:
         """
         ships_owned = self._empire.totalShipsOwned
         debug(f"totalShipsOwned={ships_owned}")
-        influence_priority = self._aistate.get_priority(PriorityType.RESOURCE_INFLUENCE)
+        influence_priority = self._get_influence_priority()
         # since influence_priority tends to vary strongly, do not return negative unless
         influence_priority_threshold = 40
         if influence_priority > 2 * influence_priority_threshold:
@@ -714,15 +719,14 @@ class PolicyManager:
         """Try to adopt infrastructure2 and 3."""
         if infra3 in self._adopted:
             return
-        influence_priority = self._aistate.get_priority(PriorityType.RESOURCE_INFLUENCE)
         # Note that bureaucracy is not in the list, because de-adopting it will likely trigger a some focus changes,
         # which will then get penalised when we re-adopt it the next turn.
         could_replace = {industrialism, technocracy, capital_markets, black_markets, traffic_control} & self._adopted
         if infra2 not in self._adopted:
-            if self._can_adopt(infra2, could_replace) and influence_priority < 18:
+            if self._can_adopt(infra2, could_replace) and self._get_influence_priority() < 18:
                 self._maybe_adopt_infrastructure(infra2, could_replace)
         else:
-            if self._can_adopt(infra3, could_replace) and influence_priority < 12:
+            if self._can_adopt(infra3, could_replace) and self._get_influence_priority() < 12:
                 self._maybe_adopt_infrastructure(infra3, could_replace)
 
     def _maybe_adopt_infrastructure(self, policy: str, could_replace: Iterable[str]) -> None:
@@ -749,7 +753,7 @@ class PolicyManager:
             if fo.currentTurn() == 1:
                 # I'd prefer 20, but that makes Abadoni switch to Influence in turn 3.
                 # TBD work on ResourceAI again...
-                self._set_priority(18.0, True)
+                self._set_priority(initial_influence_priority, True)
             return
         # How much IP would we have available if we keep the current production for 3 turns?
         forecast = self._ip - self._wanted_ip + 3 * new_production
@@ -771,7 +775,7 @@ class PolicyManager:
         if ignore_old:
             new_priority = calculated_priority
         else:
-            old_priority = self._aistate.get_priority(PriorityType.RESOURCE_INFLUENCE)
+            old_priority = self._get_influence_priority()
             # to further smoothen the values, only use 1/3 of the calculated value
             new_priority = (2 * old_priority + calculated_priority) / 3
         debug("Setting influence priority to %.1f, turn %d", new_priority, fo.currentTurn())
@@ -796,7 +800,7 @@ class PolicyManager:
         else:
             return unlocker(False)
 
-    def _can_adopt(self, name: str, replace: Union[str, Set[str], None] = None) -> bool:
+    def _can_adopt(self, name: str, replace: str | set[str] | None = None) -> bool:
         """
         Can we adopt named policy, possibly by replacing (one of) replace?
         Note that when replace_other is set, this function currently assumes that with
@@ -821,7 +825,7 @@ class PolicyManager:
             and self._empire.policyPrereqsAndExclusionsOK(name)
         )
 
-    def _get_adoptable(self) -> Set[str]:
+    def _get_adoptable(self) -> set[str]:
         """List of adoptable policies with the still available IP."""
         return {p for p in self._empire.availablePolicies if self._can_adopt(p)}
 
@@ -865,7 +869,7 @@ class PolicyManager:
                 self._ip += fo.getPolicy(name).adoptionCost()
             debug(f"Issued deadoption order for {name} turn {fo.currentTurn()}, remaining IP: {self._ip}")
 
-    def _deadopt_one_of(self, names: Set[str]) -> None:
+    def _deadopt_one_of(self, names: set[str]) -> None:
         """
         Deadopt one of the given policies and store its name.
         This can be used after a decision is made, or to temporarily deadopt one for
@@ -882,6 +886,14 @@ class PolicyManager:
     def _readopt_selected_one(self) -> None:
         """Re-adopt the policy deadopted by the last call to _deadopt_one_of()."""
         self._adopt(self._selected_deadopt)
+
+    def _get_influence_priority(self) -> float:
+        """Return current priority for resource type influence."""
+        if fo.currentTurn() == 1:
+            # AIState starts with 0, and we only set the value at the end of turn 1
+            return initial_influence_priority
+        else:
+            return self._aistate.get_priority(PriorityType.RESOURCE_INFLUENCE)
 
     def print_status(self) -> None:
         # only for interactive debugging

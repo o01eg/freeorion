@@ -568,8 +568,8 @@ void Ship::BackPropagateMeters() {
         entry.second.BackPropagate();
 }
 
-void Ship::Resupply() {
-    m_last_resupplied_on_turn = CurrentTurn();
+void Ship::Resupply(int turn) {
+    m_last_resupplied_on_turn = turn;
 
     Meter* fuel_meter = UniverseObject::GetMeter(MeterType::METER_FUEL);
     const Meter* max_fuel_meter = UniverseObject::GetMeter(MeterType::METER_MAX_FUEL);
@@ -605,8 +605,8 @@ void Ship::Resupply() {
     }
 }
 
-void Ship::SetSpecies(std::string species_name) {
-    if (!GetSpecies(species_name))
+void Ship::SetSpecies(std::string species_name, const SpeciesManager& sm) {
+    if (!sm.GetSpecies(species_name))
         ErrorLogger() << "Ship::SetSpecies couldn't get species with name " << species_name;
     m_species_name = std::move(species_name);
 }

@@ -183,8 +183,8 @@ auto PythonServer::FillListPlayers(std::vector<PlayerSetupData>& players) const 
     const py::extract<py::list> py_players(r);
     if (py_players.check()) {
         py::stl_input_iterator<PlayerSetupData> players_begin(py_players), players_end;
-        for (auto& it = players_begin; it != players_end; ++it)
-            players.push_back(*it);
+        players.reserve(py::len(py_players));
+        players.insert(players.end(), players_begin, players_end);
     } else {
         DebugLogger() << "Wrong players list data: check returns "
                       << py::extract<std::string>(py::str(r))();

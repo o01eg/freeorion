@@ -553,7 +553,8 @@ Meter* Empire::GetMeter(std::string_view name) {
 }
 
 const Meter* Empire::GetMeter(std::string_view name) const {
-    auto it = std::find_if(m_meters.begin(), m_meters.end(), [name](const auto& e) { return e.first == name; });
+    auto it = std::find_if(m_meters.begin(), m_meters.end(),
+                           [name](const auto& e) { return e.first == name; });
     if (it != m_meters.end())
         return &(it->second);
     else
@@ -585,9 +586,6 @@ bool Empire::HasResearchedPrereqAndUnresearchedPrereq(std::string_view name) con
                                       [&](const auto& p) -> bool { return m_techs.count(p) != 0; });
     return one_unresearched && one_researched;
 }
-
-const ResearchQueue& Empire::GetResearchQueue() const
-{ return m_research_queue; }
 
 float Empire::ResearchProgress(const std::string& name, const ScriptingContext& context) const {
     auto it = m_research_progress.find(name);
@@ -879,12 +877,12 @@ bool Empire::ProducibleItem(BuildType build_type, int design_id, int location,
     if (!ship_design || !ship_design->Producible())
         return false;
 
-    auto build_location = context.ContextObjects().get(location);
+    const auto build_location = context.ContextObjects().getRaw(location);
     if (!build_location) return false;
 
     if (build_type == BuildType::BT_SHIP) {
         // specified location must be a valid production location for this design
-        return ship_design->ProductionLocation(m_id, location);
+        return ship_design->ProductionLocation(m_id, location, context);
 
     } else {
         ErrorLogger() << "Empire::ProducibleItem was passed an invalid BuildType";
@@ -1478,28 +1476,30 @@ void Empire::PlaceProductionOnQueue(const ProductionQueue::ProductionItem& item,
         return;
     }
 
+    const ScriptingContext context;
+
     if (item.build_type == BuildType::BT_BUILDING) {
         // only buildings have a distinction between enqueuable and producible...
-        if (!EnqueuableItem(BuildType::BT_BUILDING, item.name, location)) {
+        if (!EnqueuableItem(BuildType::BT_BUILDING, item.name, location, context)) {
             ErrorLogger() << "Empire::PlaceProductionOnQueue() : Attempted to place non-enqueuable item in queue: build_type: Building"
                           << "  name: " << item.name << "  location: " << location;
             return;
         }
-        if (!ProducibleItem(BuildType::BT_BUILDING, item.name, location)) {
+        if (!ProducibleItem(BuildType::BT_BUILDING, item.name, location, context)) {
             ErrorLogger() << "Empire::PlaceProductionOnQueue() : Placed a non-buildable item in queue: build_type: Building"
                           << "  name: " << item.name << "  location: " << location;
             return;
         }
 
     } else if (item.build_type == BuildType::BT_SHIP) {
-        if (!ProducibleItem(BuildType::BT_SHIP, item.design_id, location)) {
+        if (!ProducibleItem(BuildType::BT_SHIP, item.design_id, location, context)) {
             ErrorLogger() << "Empire::PlaceProductionOnQueue() : Placed a non-buildable item in queue: build_type: Ship"
                           << "  design_id: " << item.design_id << "  location: " << location;
             return;
         }
 
     } else if (item.build_type == BuildType::BT_STOCKPILE) {
-        if (!ProducibleItem(BuildType::BT_STOCKPILE, location)) {
+        if (!ProducibleItem(BuildType::BT_STOCKPILE, location, context)) {
             ErrorLogger() << "Empire::PlaceProductionOnQueue() : Placed a non-buildable item in queue: build_type: Stockpile"
                           << "  location: " << location;
             return;
@@ -2312,7 +2312,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                                                          m_id, context.current_turn);
             planet->AddBuilding(building->ID());
             building->SetPlanetID(planet->ID());
-            system->Insert(building);
+            system->Insert(building, System::NO_ORBIT, context.current_turn);
 
             // record building production in empire stats
             m_building_types_produced[elem.item.name]++;
@@ -2360,7 +2360,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 ship = universe.InsertNew<Ship>(
                     m_id, elem.item.design_id, species_name, universe,
                     context.species, m_id, context.current_turn);
-                system->Insert(ship);
+                system->Insert(ship, System::NO_ORBIT, context.current_turn);
 
                 // record ship production in empire stats
                 if (m_ship_designs_produced.count(elem.item.design_id))
@@ -2394,6 +2394,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 if (elem.rally_point_id != INVALID_OBJECT_ID)
                     new_ship_rally_point_ids[SHIP_ID] = elem.rally_point_id;
             }
+
             // add sitrep
             if (elem.blocksize == 1) {
                 AddSitRepEntry(CreateShipBuiltSitRep(ship->ID(), system->ID(),
@@ -2476,7 +2477,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                     fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(), m_id,
                                                       context.current_turn);
 
-                    system->Insert(fleet);
+                    system->Insert(fleet, System::NO_ORBIT, context.current_turn);
                     // set prev system to prevent conflicts with CalculateRouteTo used for
                     // rally points below, but leave next system as INVALID_OBJECT_ID so
                     // fleet won't necessarily be disqualified from making blockades if it
@@ -2493,7 +2494,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                         fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(),
                                                           m_id, context.current_turn);
 
-                        system->Insert(fleet);
+                        system->Insert(fleet, System::NO_ORBIT, context.current_turn);
                         // set prev system to prevent conflicts with CalculateRouteTo used for
                         // rally points below, but leave next system as INVALID_OBJECT_ID so
                         // fleet won't necessarily be disqualified from making blockades if it
@@ -2558,13 +2559,13 @@ void Empire::CheckInfluenceProgress() {
 void Empire::SetColor(const EmpireColor& color)
 { m_color = color; }
 
-void Empire::SetName(const std::string& name)
+void Empire::SetName(const std::string& name) // TODO: pass by value and move
 { m_name = name; }
 
 void Empire::SetPlayerName(const std::string& player_name)
 { m_player_name = player_name; }
 
-void Empire::InitResourcePools(const ObjectMap& objects) {
+void Empire::InitResourcePools(const ObjectMap& objects, const SupplyManager& supply) {
     // get this empire's owned resource centers and ships (which can both produce resources)
     std::vector<int> res_centers;
     res_centers.reserve(objects.allExisting<ResourceCenter>().size());
@@ -2593,7 +2594,7 @@ void Empire::InitResourcePools(const ObjectMap& objects) {
 
 
     // inform the blockadeable resource pools about systems that can share
-    m_resource_pools[ResourceType::RE_INDUSTRY]->SetConnectedSupplyGroups(GetSupplyManager().ResourceSupplyGroups(m_id));
+    m_resource_pools[ResourceType::RE_INDUSTRY]->SetConnectedSupplyGroups(supply.ResourceSupplyGroups(m_id));
 
     // set non-blockadeable resource pools to share resources between all systems
     std::set<std::set<int>> sets_set;

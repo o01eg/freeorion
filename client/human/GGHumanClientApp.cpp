@@ -926,14 +926,13 @@ void GGHumanClientApp::StartTurn(const SaveGameUIData& ui_data) {
     if (auto empire = m_empires.GetEmpire(EmpireID())) {
         double RP = empire->ResourceOutput(ResourceType::RE_RESEARCH);
         double PP = empire->ResourceOutput(ResourceType::RE_INDUSTRY);
-        int turn_number = CurrentTurn();
-        float ratio = RP / std::max(PP, 0.0001);
-        const GG::Clr& color = empire->Color();
-        DebugLogger() << "Current Output (turn " << turn_number << ") RP/PP: " << ratio << " (" << RP << "/" << PP << ")";
-        DebugLogger() << "EmpireColors: " << static_cast<int>(color.r)
-                      << " " << static_cast<int>(color.g)
-                      << " " << static_cast<int>(color.b)
-                      << " " << static_cast<int>(color.a);
+        auto turn_number = this->m_current_turn;
+        auto ratio = RP / std::max(PP, 0.0001);
+        auto [r, g, b, a] = empire->Color();
+        DebugLogger() << "Current Output (turn " << turn_number << ") RP/PP: " << ratio
+                      << " (" << RP << "/" << PP << ")";
+        DebugLogger() << "EmpireColors: " << static_cast<int>(r) << " " << static_cast<int>(g)
+                      << " " << static_cast<int>(b) << " " << static_cast<int>(a);
     }
 
     // Do the turn end autosave.
@@ -1293,7 +1292,7 @@ namespace {
     }
 
     boost::filesystem::path CreateNewAutosaveFilePath(int client_empire_id, bool is_single_player,
-                                                      const EmpireManager& empires)
+                                                      const EmpireManager& empires, int turn)
     {
         static constexpr const char* legal_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-";
 
@@ -1324,11 +1323,14 @@ namespace {
         const auto& extension = is_single_player ? SP_SAVE_FILE_EXTENSION : MP_SAVE_FILE_EXTENSION;
 
         // Add timestamp to autosave generated files
-        std::string datetime_str = FilenameTimestamp();
+        auto datetime_str = FilenameTimestamp();
 
-        boost::filesystem::path autosave_dir_path((is_single_player ? GetSaveDir() : GetServerSaveDir()) / "auto");
+        boost::filesystem::path autosave_dir_path(
+            (is_single_player ? GetSaveDir() : GetServerSaveDir()) / "auto");
 
-        std::string save_filename = boost::io::str(boost::format("FreeOrion_%s_%s_%04d_%s%s") % player_name % empire_name % CurrentTurn() % datetime_str % extension);
+        auto save_filename = boost::io::str(boost::format("FreeOrion_%s_%s_%04d_%s%s")
+                                            % player_name % empire_name % turn
+                                            % datetime_str % extension);
         boost::filesystem::path save_path(autosave_dir_path / save_filename);
 
         try {
@@ -1364,7 +1366,7 @@ void GGHumanClientApp::Autosave() {
          && GetOptionsDB().Get<bool>("save.auto.turn.multiplayer.start.enabled"));
     bool is_valid_autosave =
         (autosave_turns > 0
-         && CurrentTurn() % autosave_turns == 0
+         && this->m_current_turn % autosave_turns == 0
          && (is_single_player_enabled || is_multi_player_enabled));
 
     // is_initial_save is gated in HumanClientFSM for new game vs loaded game
@@ -1378,10 +1380,12 @@ void GGHumanClientApp::Autosave() {
     if (!(is_initial_save || is_valid_autosave || is_final_save))
         return;
 
-    auto autosave_file_path = CreateNewAutosaveFilePath(EmpireID(), m_single_player_game, m_empires);
+    auto autosave_file_path = CreateNewAutosaveFilePath(EmpireID(), m_single_player_game,
+                                                        m_empires, m_current_turn);
 
     // check for and remove excess oldest autosaves.
-    boost::filesystem::path autosave_dir_path((m_single_player_game ? GetSaveDir() : GetServerSaveDir()) / "auto");
+    boost::filesystem::path autosave_dir_path(
+        (m_single_player_game ? GetSaveDir() : GetServerSaveDir()) / "auto");
     int max_turns = std::max(1, GetOptionsDB().Get<int>("save.auto.file.limit"));
     bool is_two_saves_per_turn =
         (m_single_player_game

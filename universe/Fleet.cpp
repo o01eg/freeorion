@@ -20,26 +20,23 @@ namespace {
     const std::set<int> EMPTY_SET;
     constexpr double MAX_SHIP_SPEED = 500.0;        // max allowed speed of ship movement
 
-    bool SystemHasNoVisibleStarlanes(int system_id, const ObjectMap& objects)
-    { return !GetPathfinder()->SystemHasVisibleStarlanes(system_id, objects); }
-
     void MoveFleetWithShips(Fleet& fleet, double x, double y, ObjectMap& objects) {
         fleet.MoveTo(x, y);
-        for (auto& ship : objects.find<Ship>(fleet.ShipIDs()))
+        for (auto* ship : objects.findRaw<Ship>(fleet.ShipIDs()))
             ship->MoveTo(x, y);
     }
 
-    void InsertFleetWithShips(Fleet& fleet, std::shared_ptr<System>& system, ObjectMap& objects) {
-        system->Insert(fleet.shared_from_this());
-        for (auto& ship : objects.find<Ship>(fleet.ShipIDs()))
-            system->Insert(ship);
+    void InsertFleetWithShips(Fleet& fleet, System& system, ObjectMap& objects, int current_turn) {
+        system.Insert(fleet.shared_from_this(), System::NO_ORBIT, current_turn);
+        for (auto* ship : objects.findRaw<Ship>(fleet.ShipIDs()))
+            system.Insert(ship, System::NO_ORBIT, current_turn);
     }
 
     /** Return \p full_route terminates at \p last_system or before the first
       * system not known to the \p empire_id. If \a last_system is INVALID_OBJECT_ID,
       * returns an empty route. */
     std::vector<int> TruncateRouteToEndAtSystem(const std::vector<int>& full_route,
-                                                const ObjectMap& objects, int last_system)
+                                                const Universe& universe, int last_system)
     {
         if (full_route.empty() || (last_system == INVALID_OBJECT_ID))
             return {};
@@ -56,16 +53,15 @@ namespace {
         }
 
         // Remove any extra systems from the route after the apparent destination.
-        // SystemHasNoVisibleStarlanes checks in objects, which is the known universe
-        // on clients or full universe on the server.
         //
         // It is enforced on the server, in the visibility calculations, that an
         // owning empire knows about:
-        // a) the system containing a fleet
-        // b) the starlane on which a fleet is travelling
-        // c) both systems terminating a starlane on which a fleet is travelling.
-        auto end_it = std::find_if(full_route.begin(), visible_end_it,
-                                   [&objects](int id) { return SystemHasNoVisibleStarlanes(id, objects); });
+        // a) the system containing an owned fleet
+        // b) the starlane on which an owned fleet is travelling
+        // c) both systems terminating a starlane on which an owned fleet is travelling.
+        auto has_no_visible_starlanes = [&universe](int system_id)
+        { return !universe.GetPathfinder()->SystemHasVisibleStarlanes(system_id, universe.Objects()); };
+        auto end_it = std::find_if(full_route.begin(), visible_end_it, has_no_visible_starlanes);
 
         return {full_route.begin(), end_it};
     }
@@ -90,10 +86,12 @@ Fleet* Fleet::Clone(const Universe& universe, int empire_id) const {
 void Fleet::Copy(std::shared_ptr<const UniverseObject> copied_object,
                  const Universe& universe, int empire_id)
 {
-    if (copied_object.get() == this)
+    if (!copied_object || copied_object.get() == this)
         return;
-    auto copied_fleet = std::dynamic_pointer_cast<const Fleet>(copied_object);
-    if (!copied_fleet) {
+    const Fleet* copied_fleet = nullptr;
+    if (copied_object->ObjectType() == UniverseObjectType::OBJ_FLEET) {
+        copied_fleet = static_cast<const Fleet*>(copied_object.get());
+    } else {
         ErrorLogger() << "Fleet::Copy passed an object that wasn't a Fleet";
         return;
     }
@@ -107,9 +105,9 @@ void Fleet::Copy(std::shared_ptr<const UniverseObject> copied_object,
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
         m_ships =               copied_fleet->VisibleContainedObjectIDs(empire_id, universe.GetEmpireObjectVisibility());
 
-        m_next_system =         ((EmpireKnownObjects(empire_id).get<System>(copied_fleet->m_next_system))
+        m_next_system =         ((universe.EmpireKnownObjects(empire_id).getRaw<System>(copied_fleet->m_next_system))
                                     ? copied_fleet->m_next_system : INVALID_OBJECT_ID);
-        m_prev_system =         ((EmpireKnownObjects(empire_id).get<System>(copied_fleet->m_prev_system))
+        m_prev_system =         ((universe.EmpireKnownObjects(empire_id).getRaw<System>(copied_fleet->m_prev_system))
                                     ? copied_fleet->m_prev_system : INVALID_OBJECT_ID);
         m_arrived_this_turn =   copied_fleet->m_arrived_this_turn;
         m_arrival_starlane =    copied_fleet->m_arrival_starlane;
@@ -126,7 +124,7 @@ void Fleet::Copy(std::shared_ptr<const UniverseObject> copied_object,
                                 : INVALID_OBJECT_ID)
                              : m_next_system);
 
-            m_travel_route = TruncateRouteToEndAtSystem(copied_fleet->m_travel_route, universe.Objects(), moving_to);
+            m_travel_route = TruncateRouteToEndAtSystem(copied_fleet->m_travel_route, universe, moving_to);
 
 
             if (vis >= Visibility::VIS_FULL_VISIBILITY) {
@@ -440,7 +438,7 @@ std::vector<MovePathNode> Fleet::MovePath(const std::vector<int>& route, bool fl
             ++route_it;
             if (route_it != route.end()) {
                 // update next system on route and distance to it from current position
-                next_system = EmpireKnownObjects(this->Owner()).getRaw<System>(*route_it); // TODO !!!
+                next_system = context.ContextUniverse().EmpireKnownObjects(this->Owner()).getRaw<System>(*route_it);
                 if (next_system) {
                     TraceLogger() << "Fleet::MovePath checking unrestriced lane travel from Sys("
                                   <<  cur_system->ID() << ") to Sys(" << (next_system && next_system->ID()) << ")";
@@ -726,7 +724,7 @@ bool Fleet::UnknownRoute() const
 std::shared_ptr<UniverseObject> Fleet::Accept(const UniverseObjectVisitor& visitor) const
 { return visitor.Visit(std::const_pointer_cast<Fleet>(std::static_pointer_cast<const Fleet>(shared_from_this()))); }
 
-void Fleet::SetRoute(const std::vector<int>& route, const ObjectMap& objects) {
+void Fleet::SetRoute(const std::vector<int>& route, const ObjectMap& objects) { // TODO: pass route by value with move
     if (route.empty()) {
         if (SystemID() == INVALID_OBJECT_ID) {
             ErrorLogger() << "Fleet::SetRoute() : Attempted to change fleet " << this->Name()
@@ -747,7 +745,7 @@ void Fleet::SetRoute(const std::vector<int>& route, const ObjectMap& objects) {
     TraceLogger() << "Fleet::SetRoute: " << this->Name() << " (" << this->ID() << ")  input: " << [&]() {
         std::stringstream ss;
         for (int id : m_travel_route)
-            if (const auto obj = objects.get<UniverseObject>(id))
+            if (const auto obj = objects.getRaw<UniverseObject>(id))
                 ss << obj->Name() << " (" << id << ")  ";
         return ss.str();
     }();
@@ -792,7 +790,7 @@ void Fleet::SetRoute(const std::vector<int>& route, const ObjectMap& objects) {
     TraceLogger() << "Fleet::SetRoute: " << this->Name() << " (" << this->ID() << ")  final: " << [&]() {
         std::stringstream ss;
         for (int id : m_travel_route)
-            if (const auto obj = objects.get<UniverseObject>(id))
+            if (const auto obj = objects.getRaw<UniverseObject>(id))
                 ss << obj->Name() << " (" << id << ")  ";
         return ss.str();
     }();
@@ -836,9 +834,10 @@ void Fleet::MovementPhase(ScriptingContext& context) {
                                            empire->SupplyUnobstructedSystems().end());
 
     auto& objects = context.ContextObjects();
-    auto& supply = context.supply;
+    const auto& universe = context.ContextUniverse();
+    const auto& supply = context.supply;
 
-    auto ships = objects.find<Ship>(m_ships);
+    auto ships = objects.findRaw<Ship>(m_ships);
 
     // if owner of fleet can resupply ships at the location of this fleet, then
     // resupply all ships in this fleet
@@ -846,10 +845,10 @@ void Fleet::MovementPhase(ScriptingContext& context) {
                                     context.diplo_statuses))
     {
         for (auto& ship : ships)
-            ship->Resupply();
+            ship->Resupply(context.current_turn);
     }
 
-    auto current_system = objects.get<System>(SystemID());
+    auto current_system = objects.getRaw<System>(SystemID());
     auto initial_system = current_system;
     auto move_path = MovePath(false, context);
 
@@ -858,7 +857,7 @@ void Fleet::MovementPhase(ScriptingContext& context) {
                       << ")  route:" << [&]() {
             std::stringstream ss;
             for (auto sys_id : this->TravelRoute()) {
-                if (auto sys = objects.get<System>(sys_id))
+                if (auto sys = objects.getRaw<System>(sys_id))
                     ss << "  " << sys->Name() << " (" << sys_id << ")";
                 else
                     ss << "  (???) (" << sys_id << ")";
@@ -868,7 +867,7 @@ void Fleet::MovementPhase(ScriptingContext& context) {
                       << "   move path:" << [&]() {
             std::stringstream ss;
             for (const auto& node : move_path) {
-                auto sys = context.ContextObjects().get<System>(node.object_id);
+                auto sys = context.ContextObjects().getRaw<System>(node.object_id);
                 if (sys)
                     ss << "  " << sys->Name() << " (" << node.object_id << ")";
                 else
@@ -889,7 +888,8 @@ void Fleet::MovementPhase(ScriptingContext& context) {
     if (!move_path.empty() && !m_travel_route.empty() &&
          move_path.back().object_id != m_travel_route.back())
     {
-        auto shortened_route = TruncateRouteToEndAtSystem(m_travel_route, objects, move_path.back().object_id);
+        const int back_id = move_path.back().object_id;
+        auto shortened_route = TruncateRouteToEndAtSystem(m_travel_route, universe, back_id);
         try {
             SetRoute(shortened_route, objects);
         } catch (const std::exception& e) {
@@ -966,7 +966,7 @@ void Fleet::MovementPhase(ScriptingContext& context) {
     for (it = move_path.begin(); it != move_path.end(); ++it) {
         next_it = it;   ++next_it;
 
-        auto system = objects.get<System>(it->object_id);
+        auto system = objects.getRaw<System>(it->object_id);
 
         // is this system the last node reached this turn?  either it's an end of turn node,
         // or there are no more nodes after this one on path
@@ -994,14 +994,14 @@ void Fleet::MovementPhase(ScriptingContext& context) {
                 //DebugLogger() << " ... node has fuel supply.  consumed fuel for movement reset to 0 and fleet resupplied";
                 fuel_consumed = 0.0f;
                 for (auto& ship : ships)
-                    ship->Resupply();
+                    ship->Resupply(context.current_turn);
             }
 
 
             // is system the last node reached this turn?
             if (node_is_next_stop) {
                 // fleet ends turn at this node.  insert fleet and ships into system
-                InsertFleetWithShips(*this, system, objects);
+                InsertFleetWithShips(*this, *system, objects, context.current_turn);
 
                 current_system = system;
 
@@ -1288,7 +1288,7 @@ bool Fleet::BlockadedAtSystem(int start_system_id, int dest_system_id,
 
         bool can_see;
         if (!fleet->Unowned())
-            can_see = (GetEmpire(fleet->Owner())->GetMeter("METER_DETECTION_STRENGTH")->Current() >= lowest_ship_stealth);
+            can_see = (context.GetEmpire(fleet->Owner())->GetMeter("METER_DETECTION_STRENGTH")->Current() >= lowest_ship_stealth);
         else
             can_see = (monster_detection >= lowest_ship_stealth);
         if (!can_see)

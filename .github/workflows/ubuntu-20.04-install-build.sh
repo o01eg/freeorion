@@ -12,5 +12,6 @@ sudo apt install -y libboost1.71-all-dev \
 	python3-pip \
 	ccache \
 	clang \
-	godot3-server
+	godot3-server \
+    python3-psycopg2
 

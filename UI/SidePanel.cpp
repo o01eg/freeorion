@@ -1311,7 +1311,7 @@ namespace {
     }
 }
 
-const Ship* ValidSelectedColonyShip(int system_id) {
+const Ship* ValidSelectedColonyShip(int system_id) { // TODO: pass in context?
     // if not looking in a valid system, no valid colony ship can be available
     if (system_id == INVALID_OBJECT_ID)
         return nullptr;
@@ -1416,7 +1416,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
                     if (planet_environment != PlanetEnvironment::PE_UNINHABITABLE) {
                         changed_planet = true;
                         target_planet->SetOwner(empire_id);
-                        target_planet->SetSpecies(ship_species_name, context.current_turn);
+                        target_planet->SetSpecies(ship_species_name, context.current_turn, context.species);
                         target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
 
                         // temporary meter update with currently set species
@@ -1437,7 +1437,7 @@ int AutomaticallyChosenColonyShip(int target_planet_id) {
     }
     if (changed_planet) {
         target_planet->SetOwner(orig_owner);
-        target_planet->SetSpecies(orig_species, context.current_turn);
+        target_planet->SetSpecies(orig_species, context.current_turn, context.species);
         target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(orig_initial_target_pop,
                                                                          orig_initial_target_pop);
         u.UpdateMeterEstimates(target_planet_id, context);
@@ -1635,7 +1635,9 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
         bombard_ships.insert(autoselected_bombard_ships.begin(), autoselected_bombard_ships.end());
     }
 
-    std::string_view colony_ship_species_name{selected_colony_ship ? selected_colony_ship->SpeciesName() : ""};
+    std::string_view colony_ship_species_name;
+    if (selected_colony_ship)
+        colony_ship_species_name = selected_colony_ship->SpeciesName();
     float colony_ship_capacity{selected_colony_ship ? selected_colony_ship->ColonyCapacity(u) : 0.0f};
     const Species* colony_ship_species = context.species.GetSpecies(colony_ship_species_name);
     PlanetEnvironment planet_env_for_colony_species = PlanetEnvironment::PE_UNINHABITABLE;
@@ -1726,14 +1728,14 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
             int orig_owner = planet->Owner();
             float orig_initial_target_pop = planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Initial();
             planet->SetOwner(client_empire_id);
-            planet->SetSpecies(std::string{colony_ship_species_name}, context.current_turn);
+            planet->SetSpecies(std::string{colony_ship_species_name}, context.current_turn, context.species);
             planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
 
             // temporary meter updates for curently set species
             u.UpdateMeterEstimates(m_planet_id, context);
             planet_capacity = ((planet_env_for_colony_species == PlanetEnvironment::PE_UNINHABITABLE) ? 0.0 : planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current());   // want target pop after meter update, so check current value of meter
             planet->SetOwner(orig_owner);
-            planet->SetSpecies(orig_species, context.current_turn);
+            planet->SetSpecies(orig_species, context.current_turn, context.species);
             planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(
                 orig_initial_target_pop, orig_initial_target_pop);
             u.UpdateMeterEstimates(m_planet_id, context);
@@ -1816,8 +1818,13 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
     }
 
     const auto* planet_raw = planet.get();
-    const auto& species_name{!planet_raw->SpeciesName().empty() ? planet_raw->SpeciesName() :
-                             !colony_ship_species_name.empty() ? colony_ship_species_name : ""};
+    const std::string_view planet_species_name = planet_raw->SpeciesName();
+    std::string_view species_name;
+    if (!planet_species_name.empty())
+        species_name = planet_species_name;
+    else if (!colony_ship_species_name.empty())
+        species_name = colony_ship_species_name;
+
     std::string env_size_text{
         species_name.empty() ?
             boost::io::str(FlexibleFormat(UserString("PL_TYPE_SIZE"))

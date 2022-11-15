@@ -104,8 +104,8 @@ public:
 
 
     /** Returns objects in this Universe. */
-    [[nodiscard]] const ObjectMap& Objects() const { return *m_objects; }
-    [[nodiscard]] ObjectMap&       Objects()       { return *m_objects; }
+    [[nodiscard]] const ObjectMap& Objects() const noexcept { return *m_objects; }
+    [[nodiscard]] ObjectMap&       Objects() noexcept       { return *m_objects; }
 
     /** Returns latest known state of objects for the Empire with
       * id \a empire_id or the true / complete state of all objects in this
@@ -300,7 +300,7 @@ public:
       * updates the record of the last turn on which each empire has visibility
       * of object that can be seen on the current turn with the level of
       * visibility that the empire has this turn. */
-    void UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    void UpdateEmpireLatestKnownObjectsAndVisibilityTurns(int current_turn);
 
     /** Checks latest known information about each object for each empire and,
       * in cases when the latest known state (stealth and location) suggests

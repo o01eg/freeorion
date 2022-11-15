@@ -316,29 +316,14 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
 ServerApp* ServerApp::GetApp()
 { return static_cast<ServerApp*>(s_app); }
 
-Universe& ServerApp::GetUniverse() noexcept
-{ return m_universe; }
-
-EmpireManager& ServerApp::Empires()
-{ return m_empires; }
-
 Empire* ServerApp::GetEmpire(int id)
 { return m_empires.GetEmpire(id).get(); }
-
-SupplyManager& ServerApp::GetSupplyManager()
-{ return m_supply_manager; }
-
-SpeciesManager& ServerApp::GetSpeciesManager()
-{ return m_species_manager; }
 
 const Species* ServerApp::GetSpecies(std::string_view name)
 { return m_species_manager.GetSpecies(name); }
 
 ObjectMap& ServerApp::EmpireKnownObjects(int empire_id)
 { return m_universe.EmpireKnownObjects(empire_id); }
-
-ServerNetworking& ServerApp::Networking()
-{ return m_networking; }
 
 std::string ServerApp::GetVisibleObjectName(const UniverseObject& object)
 { return object.Name(); }
@@ -720,7 +705,7 @@ namespace {
                 // determine population centers and resource centers of empire, tells resource pools
                 // the centers and groups of systems that can share resources (note that being able to
                 // share resources doesn't mean a system produces resources)
-                empire->InitResourcePools(context.ContextObjects());
+                empire->InitResourcePools(context.ContextObjects(), context.supply);
 
                 // determine how much of each resources is available in each resource sharing group
                 empire->UpdateResourcePools(context);
@@ -806,7 +791,7 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
 
     // update visibility information to ensure data sent out is up-to-date
     DebugLogger() << "ServerApp::NewGameInitConcurrentWithJoiners: Updating first-turn Empire stuff";
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
 
     // initialize empire owned object counters
     for (auto& entry : m_empires)
@@ -3460,7 +3445,7 @@ void ServerApp::PreCombatProcessTurns() {
 
     // post-movement visibility update
     m_universe.UpdateEmpireObjectVisibilities(m_empires);
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
     m_universe.UpdateEmpireStaleObjectKnowledge(m_empires);
 
     // SitReps for fleets having arrived at destinations
@@ -3528,7 +3513,7 @@ void ServerApp::ProcessCombats() {
 
     DisseminateSystemCombatInfo(combats, m_universe, m_empires);
     // update visibilities with any new info gleaned during combat
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
     // update stale object info based on any mid- combat glimpses
     // before visibility is totally recalculated in the post combat processing
     m_universe.UpdateEmpireStaleObjectKnowledge(m_empires);
@@ -3586,7 +3571,7 @@ void ServerApp::PostCombatProcessTurns() {
 
     // post-combat visibility update
     m_universe.UpdateEmpireObjectVisibilities(m_empires);
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
 
 
     // check for loss of empire capitals
@@ -3631,7 +3616,7 @@ void ServerApp::PostCombatProcessTurns() {
     // now that we've had combat and applied Effects, update visibilities again, prior
     //  to updating system obstructions below.
     m_universe.UpdateEmpireObjectVisibilities(m_empires);
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
 
     UpdateEmpireSupply(context, m_supply_manager, false);
 
@@ -3710,7 +3695,7 @@ void ServerApp::PostCombatProcessTurns() {
     // visibility update removes an empires ability to detect an object, the
     // empire will still know the latest state on the
     // turn when the empire did have detection ability for the object
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
 
     // post-production and meter-effects visibility update
     m_universe.UpdateEmpireObjectVisibilities(m_empires);
@@ -3765,7 +3750,7 @@ void ServerApp::PostCombatProcessTurns() {
     UpdateEmpireSupply(context, m_supply_manager, true);
 
     // copy latest visible gamestate to each empire's known object state
-    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns();
+    m_universe.UpdateEmpireLatestKnownObjectsAndVisibilityTurns(context.current_turn);
 
 
     // misc. other updates and records

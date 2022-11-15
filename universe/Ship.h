@@ -18,9 +18,9 @@ public:
 
     [[nodiscard]] bool HostileToEmpire(int empire_id, const EmpireManager& empires) const override;
 
-    [[nodiscard]] TagVecs            Tags(const ScriptingContext& context) const override;
-    [[nodiscard]] bool               HasTag(std::string_view name, const ScriptingContext& context) const override;
-    [[nodiscard]] std::string        Dump(uint8_t ntabs = 0) const override;
+    [[nodiscard]] TagVecs     Tags(const ScriptingContext& context) const override;
+    [[nodiscard]] bool        HasTag(std::string_view name, const ScriptingContext& context) const override;
+    [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
 
     [[nodiscard]] int ContainerObjectID() const noexcept override { return m_fleet_id; }
     [[nodiscard]] bool ContainedBy(int object_id) const override;
@@ -95,7 +95,7 @@ public:
     void SetFleetID(int fleet_id); ///< sets the ID of the fleet the ship resides in
     void SetArrivedOnTurn(int turn);
     void Resupply(int turn);
-    void SetSpecies(std::string species_name);
+    void SetSpecies(std::string species_name, const SpeciesManager& sm);
     void SetOrderedScrapped(bool b = true); ///< flags ship for scrapping
     void SetColonizePlanet(int planet_id);  ///< marks ship to colonize the indicated planet
     void ClearColonizePlanet();             ///< marks ship to colonize no planets

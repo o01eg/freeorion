@@ -874,12 +874,12 @@ bool Empire::ProducibleItem(BuildType build_type, int design_id, int location,
     if (!ship_design || !ship_design->Producible())
         return false;
 
-    auto build_location = context.ContextObjects().get(location);
+    const auto build_location = context.ContextObjects().getRaw(location);
     if (!build_location) return false;
 
     if (build_type == BuildType::BT_SHIP) {
         // specified location must be a valid production location for this design
-        return ship_design->ProductionLocation(m_id, location);
+        return ship_design->ProductionLocation(m_id, location, context);
 
     } else {
         ErrorLogger() << "Empire::ProducibleItem was passed an invalid BuildType";
@@ -2301,7 +2301,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                                                          m_id, context.current_turn);
             planet->AddBuilding(building->ID());
             building->SetPlanetID(planet->ID());
-            system->Insert(building);
+            system->Insert(building, System::NO_ORBIT, context.current_turn);
 
             // record building production in empire stats
             m_building_types_produced[elem.item.name]++;
@@ -2349,7 +2349,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 ship = universe.InsertNew<Ship>(
                     m_id, elem.item.design_id, species_name, universe,
                     context.species, m_id, context.current_turn);
-                system->Insert(ship);
+                system->Insert(ship, System::NO_ORBIT, context.current_turn);
 
                 // record ship production in empire stats
                 if (m_ship_designs_produced.count(elem.item.design_id))
@@ -2383,6 +2383,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 if (elem.rally_point_id != INVALID_OBJECT_ID)
                     new_ship_rally_point_ids[SHIP_ID] = elem.rally_point_id;
             }
+
             // add sitrep
             if (elem.blocksize == 1) {
                 AddSitRepEntry(CreateShipBuiltSitRep(ship->ID(), system->ID(),
@@ -2465,7 +2466,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                     fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(), m_id,
                                                       context.current_turn);
 
-                    system->Insert(fleet);
+                    system->Insert(fleet, System::NO_ORBIT, context.current_turn);
                     // set prev system to prevent conflicts with CalculateRouteTo used for
                     // rally points below, but leave next system as INVALID_OBJECT_ID so
                     // fleet won't necessarily be disqualified from making blockades if it
@@ -2482,7 +2483,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                         fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(),
                                                           m_id, context.current_turn);
 
-                        system->Insert(fleet);
+                        system->Insert(fleet, System::NO_ORBIT, context.current_turn);
                         // set prev system to prevent conflicts with CalculateRouteTo used for
                         // rally points below, but leave next system as INVALID_OBJECT_ID so
                         // fleet won't necessarily be disqualified from making blockades if it
@@ -2547,13 +2548,13 @@ void Empire::CheckInfluenceProgress() {
 void Empire::SetColor(const EmpireColor& color)
 { m_color = color; }
 
-void Empire::SetName(const std::string& name)
+void Empire::SetName(const std::string& name) // TODO: pass by value and move
 { m_name = name; }
 
 void Empire::SetPlayerName(const std::string& player_name)
 { m_player_name = player_name; }
 
-void Empire::InitResourcePools(const ObjectMap& objects) {
+void Empire::InitResourcePools(const ObjectMap& objects, const SupplyManager& supply) {
     // get this empire's owned resource centers and ships (which can both produce resources)
     std::vector<int> res_centers;
     res_centers.reserve(objects.allExisting<ResourceCenter>().size());
@@ -2582,7 +2583,7 @@ void Empire::InitResourcePools(const ObjectMap& objects) {
 
 
     // inform the blockadeable resource pools about systems that can share
-    m_resource_pools[ResourceType::RE_INDUSTRY]->SetConnectedSupplyGroups(GetSupplyManager().ResourceSupplyGroups(m_id));
+    m_resource_pools[ResourceType::RE_INDUSTRY]->SetConnectedSupplyGroups(supply.ResourceSupplyGroups(m_id));
 
     // set non-blockadeable resource pools to share resources between all systems
     std::set<std::set<int>> sets_set;

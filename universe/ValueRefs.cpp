@@ -2187,9 +2187,9 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
     std::function<const std::map<int, float>& ()> property_int_key{nullptr};
 
     if (variable_name == "PropagatedSystemSupplyRange") // int_ref2 is system ID
-        property_int_key = []() -> const std::map<int, float>& { return GetSupplyManager().PropagatedSupplyRanges(); };
+        property_int_key = [&context]() { return context.supply.PropagatedSupplyRanges(); };
     else if (variable_name == "PropagatedSystemSupplyDistance") // int_ref2 is system ID
-        property_int_key = []() -> const std::map<int, float>& { return GetSupplyManager().PropagatedSupplyDistances(); };
+        property_int_key = [&context]() { return context.supply.PropagatedSupplyDistances(); };
 
     if (property_int_key) {
         if (!m_int_ref2)
@@ -2278,7 +2278,7 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         if (m_int_ref3)
             location_id = m_int_ref3->Eval(context);
 
-        return design->ProductionCost(empire_id, location_id);
+        return design->ProductionCost(empire_id, location_id, context);
 
     }
     else if (variable_name == "EmpireMeterValue") {

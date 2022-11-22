@@ -141,13 +141,10 @@ const std::string& ShipDesign::Name(bool stringtable_lookup) const {
         return m_name;
 }
 
-void ShipDesign::SetName(const std::string& name) {
+void ShipDesign::SetName(const std::string& name) { // TODO: pass by value, make noexcept
     if (!name.empty() && !m_name.empty())
-        m_name = name;
+        m_name = name; // TODO: pass by value with move
 }
-
-void ShipDesign::SetUUID(const boost::uuids::uuid& uuid)
-{ m_uuid = uuid; }
 
 const std::string& ShipDesign::Description(bool stringtable_lookup) const {
     if (m_name_desc_in_stringtable && stringtable_lookup)
@@ -156,7 +153,7 @@ const std::string& ShipDesign::Description(bool stringtable_lookup) const {
         return m_description;
 }
 
-void ShipDesign::SetDescription(const std::string& description)
+void ShipDesign::SetDescription(const std::string& description) // TODO: pass by value with move
 { m_description = description; }
 
 bool ShipDesign::ProductionCostTimeLocationInvariant() const {
@@ -179,11 +176,9 @@ bool ShipDesign::ProductionCostTimeLocationInvariant() const {
     return true;
 }
 
-float ShipDesign::ProductionCost(int empire_id, int location_id) const {
+float ShipDesign::ProductionCost(int empire_id, int location_id, const ScriptingContext& context) const {
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION"))
         return 1.0f;
-
-    ScriptingContext context; // TODO: pass in and use, instead of creating here...
 
     float cost_accumulator = 0.0f;
     if (const ShipHull* hull = GetShipHull(m_hull))
@@ -204,18 +199,18 @@ float ShipDesign::ProductionCost(int empire_id, int location_id) const {
     return std::min(std::max(0.0f, cost_accumulator), ARBITRARY_LARGE_COST);
 }
 
-float ShipDesign::PerTurnCost(int empire_id, int location_id) const
-{ return ProductionCost(empire_id, location_id) / std::max(1, ProductionTime(empire_id, location_id)); }
+float ShipDesign::PerTurnCost(int empire_id, int location_id, const ScriptingContext& context) const {
+    return ProductionCost(empire_id, location_id, context) /
+        std::max(1, ProductionTime(empire_id, location_id, context));
+}
 
-int ShipDesign::ProductionTime(int empire_id, int location_id) const {
+int ShipDesign::ProductionTime(int empire_id, int location_id, const ScriptingContext& context) const {
     if (GetGameRules().Get<bool>("RULE_CHEAP_AND_FAST_SHIP_PRODUCTION"))
         return 1;
 
-    ScriptingContext context; // TODO: pass in
-
     int time_accumulator = 1;
     if (const ShipHull* hull = GetShipHull(m_hull))
-        time_accumulator = std::max(time_accumulator, hull->ProductionTime(empire_id, location_id));
+        time_accumulator = std::max(time_accumulator, hull->ProductionTime(empire_id, location_id, context));
 
     for (const std::string& part_name : m_parts)
         if (const ShipPart* part = GetShipPart(part_name))
@@ -229,7 +224,7 @@ int ShipDesign::ProductionTime(int empire_id, int location_id) const {
 }
 
 bool ShipDesign::CanColonize() const {
-    for (const std::string& part_name : m_parts) {
+    for (const auto& part_name : m_parts) {
         if (part_name.empty())
             continue;
         if (const ShipPart* part = GetShipPart(part_name))
@@ -243,7 +238,7 @@ float ShipDesign::Defense() const {
     // accumulate defense from defensive parts in design.
     float total_defense = 0.0f;
     const ShipPartManager& part_manager = GetShipPartManager();
-    for (const std::string& part_name : Parts()) {
+    for (const auto& part_name : m_parts) {
         const ShipPart* part = part_manager.GetShipPart(part_name);
         if (part && (part->Class() == ShipPartClass::PC_SHIELD || part->Class() == ShipPartClass::PC_ARMOUR))
             total_defense += part->Capacity();
@@ -345,15 +340,15 @@ int ShipDesign::PartCount() const {
     return count;
 }
 
-bool ShipDesign::ProductionLocation(int empire_id, int location_id) const { // TODO: pass in ScriptingContext
-    Empire* empire = GetEmpire(empire_id); // TODO: get from context
+bool ShipDesign::ProductionLocation(int empire_id, int location_id, const ScriptingContext& context) const {
+    auto empire = context.GetEmpire(empire_id);
     if (!empire) {
         DebugLogger() << "ShipDesign::ProductionLocation: Unable to get pointer to empire " << empire_id;
         return false;
     }
 
     // must own the production location...
-    auto location = Objects().getRaw(location_id); // TODO: get from context
+    auto location = context.ContextObjects().getRaw(location_id);
     if (!location) {
         WarnLogger() << "ShipDesign::ProductionLocation unable to get location object with id " << location_id;
         return false;
@@ -371,7 +366,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id) const { // T
     }
     if (species_name.empty())
         return false;
-    const Species* species = GetSpecies(species_name); // TODO: use context.species.GetSpecies
+    const Species* species = context.species.GetSpecies(species_name);
     if (!species)
         return false;
 
@@ -389,7 +384,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id) const { // T
         return false;
     }
     // evaluate using location as the source, as it should be an object owned by this empire.
-    ScriptingContext location_as_source_context{location, location};
+    const ScriptingContext location_as_source_context{location, context};
     if (!hull->Location()->Eval(location_as_source_context, location))
         return false;
 
@@ -419,14 +414,9 @@ bool ShipDesign::ValidDesign(const std::string& hull, const std::vector<std::str
 }
 
 boost::optional<std::pair<std::string, std::vector<std::string>>>
-ShipDesign::MaybeInvalidDesign(const std::string& hull_in,
-                               std::vector<std::string>& parts_in,
-                               bool produce_log)
+ShipDesign::MaybeInvalidDesign(std::string hull, std::vector<std::string> parts, bool produce_log)
 {
     bool is_valid = true;
-
-    auto hull = hull_in;
-    auto parts = parts_in;
 
     // ensure hull type exists
     auto ship_hull = GetShipHullManager().GetShipHull(hull);
@@ -446,7 +436,7 @@ ShipDesign::MaybeInvalidDesign(const std::string& hull_in,
                 ErrorLogger() << "Invalid ShipDesign no available hulls ";
             hull.clear();
             parts.clear();
-            return std::make_pair(hull, parts);
+            return std::make_pair(std::move(hull), std::move(parts));
         }
     }
 
@@ -461,7 +451,7 @@ ShipDesign::MaybeInvalidDesign(const std::string& hull_in,
 
     // If parts is smaller than the full hull size pad it and the incoming parts
     if (parts.size() < ship_hull->NumSlots())
-        parts_in.resize(ship_hull->NumSlots(), "");
+        parts.resize(ship_hull->NumSlots(), "");
 
     // Truncate or pad with "" parts.
     parts.resize(ship_hull->NumSlots(), "");
@@ -483,62 +473,72 @@ ShipDesign::MaybeInvalidDesign(const std::string& hull_in,
     }
 
     // check part exclusions against other parts and hull
-    std::unordered_map<std::string, unsigned int> component_name_counts;
-    component_name_counts[hull] = 1;
-    for (auto part_name : parts)
-        component_name_counts[part_name]++;
-    component_name_counts.erase("");
 
+    // find how many of each part and hull are present...
+    boost::container::flat_map<std::string_view, uint8_t> component_counts;
+    component_counts.reserve(parts.size() + 1);
+    component_counts.emplace(hull, 1);
+    for (auto& part : parts)
+        component_counts[part]++;
+
+    auto has_component = [&component_counts](std::string_view sv) -> bool
+    { return component_counts.contains(sv); };
+    auto has_multiples_of_component = [&component_counts](std::string_view sv) -> bool
+    { return component_counts.count(sv) > 1; };
+
+
+    // check each part's existance and exclusions
     for (std::size_t ii = 0; ii < parts.size(); ++ii) {
-        const auto part_name = parts[ii];
-        // Ignore empty slots, which are valid.
-        if (part_name.empty())
+        std::string_view part_name = parts[ii];
+        if (part_name.empty()) // ignore empty slots, which are always valid
             continue;
 
         // Parts must exist...
         const auto ship_part = GetShipPart(part_name);
         if (!ship_part) {
+            is_valid = false;
             if (produce_log)
                 WarnLogger() << "Invalid ShipDesign part \"" << part_name << "\" not found"
                              << ". Removing \"" << part_name <<"\"";
-            is_valid = false;
             continue;
         }
 
         for (const auto& excluded : ship_part->Exclusions()) {
             // confict if a different excluded part is present, or if there are
             // two or more of a part that excludes itself
-            if ((excluded == part_name && component_name_counts[excluded] > 1) ||
-                (excluded != part_name && component_name_counts[excluded] > 0))
+            if ((excluded == part_name && has_multiples_of_component(excluded)) ||
+                (excluded != part_name && has_component(excluded)))
             {
                 is_valid = false;
                 if (produce_log)
                     WarnLogger() << "Invalid ShipDesign part " << part_name << " conflicts with \""
                                  << excluded << "\". Removing \"" << part_name <<"\"";
-                continue;
+                else
+                    break; // don't break if logging, so all conflicts will be logged
             }
         }
+        if (!is_valid && !produce_log)
+            continue; // if not logging, don't also need to check slot moutability
 
         // verify part can mount in indicated slot
-        const ShipSlotType& slot_type = slots[ii].type;
+        const auto slot_type = slots[ii].type;
 
         if (!ship_part->CanMountInSlotType(slot_type)) {
             if (produce_log)
                 DebugLogger() << "Invalid ShipDesign part \"" << part_name << "\" can't be mounted in "
                               << slot_type << " slot. Removing \"" << part_name <<"\"";
             is_valid = false;
-            continue;
         }
     }
 
-    if (is_valid)
+    if (is_valid) // if valid, return none to indicate no modifications needed
         return boost::none;
     else
-        return std::make_pair(hull, parts);
+        return std::make_pair(std::move(hull), std::move(parts)); // return modified design
 }
 
 void ShipDesign::ForceValidDesignOrThrow(const boost::optional<std::invalid_argument>& should_throw,
-                                         bool  produce_log)
+                                         bool produce_log)
 {
     auto force_valid = MaybeInvalidDesign(m_hull, m_parts, produce_log);
     if (!force_valid)

@@ -352,7 +352,7 @@ const ShipDesign* Universe::GetShipDesign(int ship_design_id) const {
     return (it != m_ship_designs.end() ? it->second : nullptr);
 }
 
-void Universe::RenameShipDesign(int design_id, const std::string& name,
+void Universe::RenameShipDesign(int design_id, const std::string& name, // TODO: pass by value with move
                                 const std::string& description)
 {
     auto design_it = m_ship_designs.find(design_id);
@@ -483,7 +483,7 @@ bool Universe::InsertShipDesign(ShipDesign* ship_design) {
     return InsertShipDesignID(ship_design, boost::none, GenerateDesignID());
 }
 
-bool Universe::InsertShipDesignID(ShipDesign* ship_design, boost::optional<int> empire_id, int id) {
+bool Universe::InsertShipDesignID(ShipDesign* ship_design, boost::optional<int> empire_id, int id) { // TODO: pass and store ShipDesign as shared_ptr
     if (!ship_design)
         return false;
 
@@ -1945,15 +1945,15 @@ void Universe::ApplyEffectDerivedVisibilities(EmpireManager& empires) {
 void Universe::ForgetKnownObject(int empire_id, int object_id) {
     // Note: Client calls this with empire_id == ALL_EMPIRES to
     // immediately forget information without waiting for the turn update.
-    ObjectMap& objects(EmpireKnownObjects(empire_id));
-
-    if (objects.empty())
+    auto empire_it = m_empire_latest_known_objects.find(empire_id);
+    if (empire_it != m_empire_latest_known_objects.end()) {
+        ErrorLogger() << "ForgetKnownObject bad empire id: " << empire_id;
         return;
-
-    auto obj = objects.get(object_id);
+    }
+    auto& objects{empire_it->second};
+    const auto* const obj = objects.getRaw(object_id);
     if (!obj) {
-        ErrorLogger() << "ForgetKnownObject empire: " << empire_id
-                      << " bad object id: " << object_id;
+        ErrorLogger() << "ForgetKnownObject empire: " << empire_id << " bad object id: " << object_id;
         return;
     }
 
@@ -1969,19 +1969,19 @@ void Universe::ForgetKnownObject(int empire_id, int object_id) {
     for (int child_id : contained_ids)
         ForgetKnownObject(empire_id, child_id);
 
-    int container_id = obj->ContainerObjectID();
+    const int container_id = obj->ContainerObjectID();
     if (container_id != INVALID_OBJECT_ID) {
-        if (auto container = objects.get(container_id)) {
+        if (auto* container = objects.getRaw(container_id)) {
             if (container->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
-                auto system = std::static_pointer_cast<System>(container);
+                auto* system = static_cast<System*>(container);
                 system->Remove(object_id);
 
             } else if (container->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-                auto planet = std::static_pointer_cast<Planet>(container);
+                auto* planet = static_cast<Planet*>(container);
                 planet->RemoveBuilding(object_id);
 
             } else if (container->ObjectType() == UniverseObjectType::OBJ_FLEET) {
-                auto fleet = std::static_pointer_cast<Fleet>(container);
+                auto* fleet = static_cast<Fleet*>(container);
                 fleet->RemoveShips({object_id});
                 if (fleet->Empty())
                     objects.erase(fleet->ID());
@@ -2745,7 +2745,9 @@ void Universe::UpdateEmpireObjectVisibilities(EmpireManager& empires) {
     ShareVisbilitiesBetweenAllies(*this, empires, m_empire_object_visibility, m_empire_object_visible_specials);
 }
 
-void Universe::UpdateEmpireLatestKnownObjectsAndVisibilityTurns() { // TODO: pass in current_turn
+void Universe::UpdateEmpireLatestKnownObjectsAndVisibilityTurns(int current_turn) {
+    if (current_turn == INVALID_GAME_TURN)
+        return;
     //DebugLogger() << "Universe::UpdateEmpireLatestKnownObjectsAndVisibilityTurns()";
 
     // assumes m_empire_object_visibility has been updated
@@ -2754,10 +2756,6 @@ void Universe::UpdateEmpireLatestKnownObjectsAndVisibilityTurns() { // TODO: pas
     //      for each empire that can see object this turn
     //          update empire's information about object, based on visibility
     //          update empire's visbilility turn history
-
-    int current_turn = CurrentTurn();
-    if (current_turn == INVALID_GAME_TURN)
-        return;
 
     // for each object in universe
     for (const auto& full_object : m_objects->all()) {
@@ -2951,8 +2949,6 @@ void Universe::SetEmpireKnowledgeOfShipDesign(int ship_design_id, int empire_id)
     }
     if (empire_id == ALL_EMPIRES)
         return;
-    if (!GetEmpire(empire_id))
-        ErrorLogger() << "SetEmpireKnowledgeOfShipDesign called for invalid empire id: " << empire_id;
 
     m_empire_known_ship_design_ids[empire_id].insert(ship_design_id);
 }

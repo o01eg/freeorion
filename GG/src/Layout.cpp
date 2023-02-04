@@ -143,7 +143,7 @@ std::vector<std::vector<Rect>> Layout::RelativeCellRects() const
 bool Layout::RenderOutline() const
 { return m_render_outline; }
 
-void Layout::StartingChildDragDrop(const Wnd* wnd, const Pt& offset)
+void Layout::StartingChildDragDrop(const Wnd* wnd, Pt offset)
 {
     if (auto&& parent = Parent())
         parent->StartingChildDragDrop(wnd, offset);
@@ -161,7 +161,7 @@ void Layout::ChildrenDraggedAway(const std::vector<Wnd*>& wnds, const Wnd* desti
         parent->ChildrenDraggedAway(wnds, destination);
 }
 
-void Layout::SizeMove(const Pt& ul, const Pt& lr)
+void Layout::SizeMove(Pt ul, Pt lr)
 { DoLayout(ul, lr); }
 
 void Layout::DoLayout(Pt ul, Pt lr)
@@ -659,7 +659,7 @@ void Layout::SetMinimumColumnWidths(std::vector<X> widths)
 void Layout::RenderOutline(bool render_outline)
 { m_render_outline = render_outline; }
 
-void Layout::MouseWheel(const Pt& pt, int move, Flags<ModKey> mod_keys)
+void Layout::MouseWheel(Pt pt, int move, Flags<ModKey> mod_keys)
 { ForwardEventToParent(); }
 
 void Layout::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys)

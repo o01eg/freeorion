@@ -313,14 +313,8 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
     SetAIsProcessPriorityToLow(true);
 }
 
-ServerApp* ServerApp::GetApp()
-{ return static_cast<ServerApp*>(s_app); }
-
 Empire* ServerApp::GetEmpire(int id)
 { return m_empires.GetEmpire(id).get(); }
-
-const Species* ServerApp::GetSpecies(std::string_view name)
-{ return m_species_manager.GetSpecies(name); }
 
 ObjectMap& ServerApp::EmpireKnownObjects(int empire_id)
 { return m_universe.EmpireKnownObjects(empire_id); }
@@ -687,7 +681,7 @@ namespace {
                 continue;   // skip eliminated empires.  presumably this shouldn't be an issue when initializing a new game, but apparently I thought this was worth checking for...
 
             // determine which systems can propagate fleet and resource (same for both)
-            empire->UpdateSupplyUnobstructedSystems(context, precombat);
+            empire->UpdateSupplyUnobstructedSystems(context, precombat); // TODO: pass empire ID to use for known objects lookup?
             // set range systems can propagate fleet and resourse supply (separately)
             empire->UpdateSystemSupplyRanges(context.ContextUniverse());
         }
@@ -718,7 +712,7 @@ namespace {
 
 void ServerApp::NewGameInitConcurrentWithJoiners(
     const GalaxySetupData& galaxy_setup_data,
-    const std::vector<PlayerSetupData>& player_setup_data)
+    const std::vector<PlayerSetupData>& player_setup_data_in)
 {
     DebugLogger() << "ServerApp::NewGameInitConcurrentWithJoiners";
 
@@ -730,7 +724,7 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
     // validate some connection info / determine which players need empires created
     std::map<int, PlayerSetupData> active_empire_id_setup_data;
     int next_empire_id = 1;
-    for (const auto& psd : player_setup_data) {
+    for (const auto& psd : player_setup_data_in) {
         if (!psd.player_name.empty()
             && (psd.client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER
                 || psd.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER))
@@ -767,7 +761,8 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
     // after all game initialization stuff has been created, set current turn to 0 and apply only GenerateSitRep Effects
     // so that a set of SitReps intended as the player's initial greeting will be segregated
     m_current_turn = 0;
-    ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data, m_species_manager, m_supply_manager};
+    ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data,
+                             m_species_manager, m_supply_manager};
     m_universe.ApplyGenerateSitRepEffects(context);
 
     //can set current turn to 1 for start of game
@@ -776,15 +771,15 @@ void ServerApp::NewGameInitConcurrentWithJoiners(
     // record empires for each active player. Note: active_empire_id_setup_data
     // contains only data of players who control an empire; observers and
     // moderators are not included.
-    for (auto& [empire_id, player_setup_data] : active_empire_id_setup_data) {
-        if (player_setup_data.player_id != Networking::INVALID_PLAYER_ID)
-            m_player_empire_ids[player_setup_data.player_id] = empire_id;
+    for (auto& [empire_id, psd] : active_empire_id_setup_data) {
+        if (psd.player_id != Networking::INVALID_PLAYER_ID)
+            m_player_empire_ids[psd.player_id] = empire_id;
 
         // add empires to turn processing
         if (auto empire = m_empires.GetEmpire(empire_id)) {
-            AddEmpireTurn(empire_id, PlayerSaveGameData(player_setup_data.player_name, empire_id,
+            AddEmpireTurn(empire_id, PlayerSaveGameData(psd.player_name, empire_id,
                                                         nullptr, nullptr, std::string(),
-                                                        player_setup_data.client_type));
+                                                        psd.client_type));
             empire->SetReady(false);
         }
     }
@@ -1751,7 +1746,9 @@ bool ServerApp::IsAuthRequiredOrFillRoles(const std::string& player_name, const 
     return result;
 }
 
-bool ServerApp::IsAuthSuccessAndFillRoles(const std::string& player_name, const std::string& auth, Networking::AuthRoles& roles) {
+bool ServerApp::IsAuthSuccessAndFillRoles(const std::string& player_name,
+                                          const std::string& auth, Networking::AuthRoles& roles)
+{
     bool result = false;
     bool success = false;
     try {
@@ -2854,8 +2851,10 @@ namespace {
     }
 
     /** Determines which ships ordered to colonize planet succeed, does
-      * appropriate colonization, and cleans up after colonization orders */
-    void HandleColonization(ScriptingContext& context) {
+      * appropriate colonization, and cleans up after colonization orders.
+      * Returns the IDs of planets that were colonized and IDs of ships that
+      * colonized. */
+    [[nodiscard]] std::pair<std::vector<int>, std::vector<int>> HandleColonization(ScriptingContext& context) {
         Universe& universe = context.ContextUniverse();
         ObjectMap& objects = context.ContextObjects();
         const auto& empire_ids = context.EmpireIDs();
@@ -2890,35 +2889,84 @@ namespace {
         }
 
 
-        std::vector<int> newly_colonize_planet_ids;
+        std::vector<int> colonized_planet_ids;
+        colonized_planet_ids.reserve(planet_empire_colonization_ship_ids.size());
+        std::vector<int> colonizing_ship_ids;
+        colonizing_ship_ids.reserve(planet_empire_colonization_ship_ids.size()); // possibly an underestimate
 
         // execute colonization except when:
         // 1) an enemy empire has armed aggressive ships in the system
         // 2) multiple empires try to colonize a planet on the same turn
-        for (auto& planet_colonization : planet_empire_colonization_ship_ids) {
-            // can't colonize if multiple empires attempting to do so on same turn
-            auto& empires_ships_colonizing = planet_colonization.second;
-            if (empires_ships_colonizing.size() != 1)
-                continue;
-            int colonizing_empire_id = empires_ships_colonizing.begin()->first;
-
-            const auto& empire_ships_colonizing = empires_ships_colonizing.begin()->second;
-            if (empire_ships_colonizing.empty())
-                continue;
-            int colonizing_ship_id = *empire_ships_colonizing.begin();
-
-            int planet_id = planet_colonization.first;
-            auto* planet = objects.getRaw<Planet>(planet_id);
+        for (const auto& [planet_id, empires_ships_colonizing] : planet_empire_colonization_ship_ids) {
+            const auto* const planet = objects.getRaw<Planet>(planet_id);
             if (!planet) {
                 ErrorLogger() << "HandleColonization couldn't get planet with id " << planet_id;
                 continue;
             }
-            int system_id = planet->SystemID();
-            auto* system = objects.getRaw<System>(system_id);
+            const int system_id = planet->SystemID();
+            const auto* const system = objects.getRaw<System>(system_id);
             if (!system) {
                 ErrorLogger() << "HandleColonization couldn't get system with id " << system_id;
                 continue;
             }
+
+            // can't colonize if multiple empires attempting to do so on same turn
+            if (empires_ships_colonizing.size() != 1) {
+                // generate sitreps for every empire that tried to colonize this planet
+                for (const auto& [empire_id, colonizing_ships] : empires_ships_colonizing) {
+                    const auto empire = context.GetEmpire(empire_id);
+                    if (!empire) {
+                        ErrorLogger() << "HandleColonization couldn't get empire with id " << empire_id;
+                        continue;
+                    }
+
+                    const auto is_visible =
+                        [empire_it{context.empire_object_vis.find(empire_id)},
+                         end_it{context.empire_object_vis.end()}](const int obj_id) -> bool
+                    {
+                        if (empire_it == end_it)
+                            return false;
+                        const auto obj_it = empire_it->second.find(obj_id);
+                        if (obj_it == empire_it->second.end())
+                            return false;
+                        return obj_it->second >= Visibility::VIS_BASIC_VISIBILITY;
+                    };
+
+                    for (const int ship_id : colonizing_ships) {
+                        bool created_empire_specific_message = false;
+
+
+                        // check other ships colonizing here...
+                        for (const auto& [other_empire_id, other_empire_colonizing_ships] : empires_ships_colonizing) {
+                            for (const auto other_ship_id : other_empire_colonizing_ships) {
+                                if (!is_visible(other_ship_id))
+                                    continue;
+                                if (other_ship_id == ship_id)
+                                    continue;
+                                empire->AddSitRepEntry(CreatePlanetEstablishFailedVisibleOtherSitRep(planet_id, ship_id, other_empire_id));
+                                created_empire_specific_message = true;
+                                break;
+                            }
+                        }
+                        // can this empire see another ship that attempted to colonize the same planet?
+                        // SITREP_PLANET_ESTABLISH_FAILED_VISIBLE
+                        //Ship %ship% failed to establish a colony or outpost on %planet% because the %empire% also attempted to establish on the same planet.
+                        //SITREP_PLANET_ESTABLISH_FAILED_VISIBLE_LABEL
+
+                        // no, just issue generic message
+                        if (!created_empire_specific_message)
+                            empire->AddSitRepEntry(CreatePlanetEstablishFailedSitRep(planet_id, ship_id));
+                    }
+                }
+                continue;
+            }
+            const int colonizing_empire_id = empires_ships_colonizing.begin()->first;
+            auto empire = context.GetEmpire(colonizing_empire_id);
+
+            const auto& empire_ships_colonizing = empires_ships_colonizing.begin()->second;
+            if (empire_ships_colonizing.empty())
+                continue;
+            const int colonizing_ship_id = *empire_ships_colonizing.begin();
 
             // find which empires have obstructive armed ships in system
             std::set<int> empires_with_armed_ships_in_system;
@@ -2933,9 +2981,11 @@ namespace {
                 if (armed_ship_empire_id == colonizing_empire_id)
                     continue;
                 if (armed_ship_empire_id == ALL_EMPIRES ||
-                    context.ContextDiploStatus(colonizing_empire_id, armed_ship_empire_id) ==
-                        DiplomaticStatus::DIPLO_WAR)
+                    context.ContextDiploStatus(colonizing_empire_id, armed_ship_empire_id) == DiplomaticStatus::DIPLO_WAR)
                 {
+                    if (empire)
+                        empire->AddSitRepEntry(CreatePlanetEstablishFailedArmedSitRep(
+                            planet_id, colonizing_ship_id, armed_ship_empire_id));
                     colonize_blocked = true;
                     break;
                 }
@@ -2951,16 +3001,15 @@ namespace {
             const auto& species_name = ship ? ship->SpeciesName() : "";
             float colonist_capacity = ship ? ship->ColonyCapacity(universe) : 0.0f;
 
-
             // do colonization
             if (!ColonizePlanet(colonizing_ship_id, planet_id, context, empire_ids))
                 continue;   // skip sitrep if colonization failed
 
             // record successful colonization
-            newly_colonize_planet_ids.push_back(planet_id);
+            colonized_planet_ids.push_back(planet_id);
+            colonizing_ship_ids.push_back(colonizing_ship_id);
 
             // sitrep about colonization / outposting
-            auto empire = context.GetEmpire(colonizing_empire_id);
             if (!empire) {
                 ErrorLogger() << "HandleColonization couldn't get empire with id " << colonizing_empire_id;
             } else {
@@ -2970,11 +3019,14 @@ namespace {
                     empire->AddSitRepEntry(CreatePlanetColonizedSitRep(planet_id, species_name));
             }
         }
+
+        return {colonized_planet_ids, colonizing_ship_ids};
     }
 
     /** Determines which ships ordered to invade planets, does invasion and
-      * ground combat resolution */
-    void HandleInvasion(ScriptingContext& context) {
+      * ground combat resolution. Returns IDs of planets that had ground combat
+      * occur on them and of ships that invaded a planet. */
+    [[nodiscard]] std::pair<std::vector<int>, std::vector<int>> HandleInvasion(ScriptingContext& context) {
         std::map<int, std::map<int, double>> planet_empire_troops;  // map from planet ID to map from empire ID to pair consisting of set of ship IDs and amount of troops empires have at planet
         std::vector<Ship*> invade_ships;
         Universe& universe = context.ContextUniverse();
@@ -2983,12 +3035,12 @@ namespace {
         const auto& empire_ids = context.EmpireIDs();
 
         // collect ships that are invading and the troops they carry
-        for (auto* ship : objects.allRaw<Ship>()) {
-            if (!ship->HasTroops(universe))     // can't invade without troops
-                continue;
+        for (auto* ship : objects.allRaw<Ship>()) { // TODO: convert to findRaw
             if (ship->SystemID() == INVALID_OBJECT_ID)
                 continue;
             if (ship->OrderedInvadePlanet() == INVALID_OBJECT_ID)
+                continue;
+            if (!ship->HasTroops(universe)) // can't invade without troops
                 continue;
             invade_ships.push_back(ship);
 
@@ -3010,6 +3062,11 @@ namespace {
                           << " and is destroying ship " << ship->ID()
                           << " named " << ship->Name();
         }
+
+        std::vector<int> invading_ship_ids;
+        invading_ship_ids.reserve(invade_ships.size());
+        std::transform(invade_ships.begin(), invade_ships.end(), std::back_inserter(invading_ship_ids),
+                       [](const auto* ship) { return ship->ID(); });
 
         // delete ships that invaded something
         for (auto* ship : invade_ships) {
@@ -3033,13 +3090,18 @@ namespace {
         // store invasion info in empires
         UpdateEmpireInvasionInfo(planet_empire_troops, empires, objects);
 
-        // check each planet invading or other troops, such as due to empire troops, native troops, or rebel troops
+
+        // check each planet invading or other troops, such as due to empire troops,
+        // native troops, or rebel troops
         for (const auto* planet : objects.allRaw<Planet>()) {
             planet_empire_troops[planet->ID()].merge(planet->EmpireGroundCombatForces());
             //auto empire_forces = planet->EmpireGroundCombatForces();
             //if (!empire_forces.empty())
             //    planet_empire_troops[planet->ID()].insert(empire_forces.begin(), empire_forces.end());
         }
+
+        std::vector<int> ground_combat_planet_ids;
+        ground_combat_planet_ids.reserve(planet_empire_troops.size());
 
         // process each planet's ground combats
         for (auto& [planet_id, empires_troops] : planet_empire_troops) {
@@ -3067,14 +3129,16 @@ namespace {
 
             } else {
                 DebugLogger() << "Ground combat troops on " << planet->Name() << " :";
-                for (const auto& empire_troops : empires_troops)
-                    DebugLogger() << " ... empire: " << empire_troops.first << " : " << empire_troops.second;
+                for (const auto& [empire_with_troops_id, empire_troop_level] : empires_troops)
+                    DebugLogger() << " ... empire: " << empire_with_troops_id << " : " << empire_troop_level;
                 Planet::ResolveGroundCombat(empires_troops, empires.GetDiplomaticStatuses());
+                ground_combat_planet_ids.push_back(planet_id);
             }
 
             for (int empire_id : all_involved_empires) {
                 if (auto empire = empires.GetEmpire(empire_id))
-                    empire->AddSitRepEntry(CreateGroundCombatSitRep(planet_id, EnemyId(empire_id, all_involved_empires)));
+                    empire->AddSitRepEntry(CreateGroundCombatSitRep(
+                        planet_id, EnemyId(empire_id, all_involved_empires), context.current_turn));
             }
 
 
@@ -3090,7 +3154,7 @@ namespace {
                     // create planet conquered sitrep for all involved empires
                     for (int empire_id : all_involved_empires) {
                         if (auto empire = empires.GetEmpire(empire_id))
-                            empire->AddSitRepEntry(CreatePlanetCapturedSitRep(planet_id, victor_id));
+                            empire->AddSitRepEntry(CreatePlanetCapturedSitRep(planet_id, victor_id, context.current_turn));
                     }
 
                     DebugLogger() << "Empire conquers planet";
@@ -3107,7 +3171,7 @@ namespace {
 
                     for (int empire_id : all_involved_empires) {
                         if (auto empire = empires.GetEmpire(empire_id))
-                            empire->AddSitRepEntry(CreatePlanetRebelledSitRep(planet_id, previous_owner_id));
+                            empire->AddSitRepEntry(CreatePlanetRebelledSitRep(planet_id, previous_owner_id, context.current_turn));
                     }
 
                 } else {
@@ -3139,114 +3203,155 @@ namespace {
                 empire_latest_known_objects.CopyObject(std::move(planet), planet_initial_owner_id, universe);
             }
         }
+
+        return {ground_combat_planet_ids, invading_ship_ids};
     }
 
     /** Determines which fleets or planets ordered given to other empires,
-      * and sets their new ownership */
-    void HandleGifting(EmpireManager& empires, ObjectMap& objects) {
-        std::map<int, std::vector<UniverseObject*>> empire_gifted_objects;
+      * and sets their new ownership. Returns the IDs of anything gifted. */
+    template <typename IDsT>
+    std::vector<int> HandleGifting(EmpireManager& empires, ObjectMap& objects,
+                                   const IDsT& invaded_planet_ids, const IDsT& invading_ship_ids,
+                                   const IDsT& colonizing_ship_ids)
+    {
+        // determine system IDs where empires can receive gifts
+        std::map<int, std::set<int>> empire_receiving_locations;
+        auto owned_planet = [](const Planet& p) { return !p.Unowned(); };
+        for (const auto* planet : objects.findRaw<const Planet>(owned_planet))
+            empire_receiving_locations[planet->SystemID()].insert(planet->Owner());
+        auto owned_ship_in_system = [](const Ship& s) { return !s.Unowned() && s.SystemID() != INVALID_OBJECT_ID; };
+        for (const auto* ship : objects.findRaw<const Ship>(owned_ship_in_system))
+            empire_receiving_locations[ship->SystemID()].insert(ship->Owner());
 
-        // collect fleets ordered to be given
-        for (auto* fleet : objects.allRaw<Fleet>()) {
-            int ordered_given_to_empire_id = fleet->OrderedGivenToEmpire();
-            if (ordered_given_to_empire_id == ALL_EMPIRES)
-                continue;
+
+        // collect fleets ordered to be given and their ships
+        std::map<int, std::vector<Fleet*>> empire_gifted_fleets; // indexed by recipient empire id
+        std::map<int, std::vector<Ship*>> empire_gifted_ships;
+        auto owned_given_stationary_fleet = [&empire_receiving_locations](const Fleet& f) {
+            if (f.Unowned() ||
+                f.OrderedGivenToEmpire() == ALL_EMPIRES ||
+                f.OwnedBy(f.OrderedGivenToEmpire()) ||
+                !f.TravelRoute().empty() ||
+                f.SystemID() == INVALID_OBJECT_ID)
+            { return false; }
+            auto it = empire_receiving_locations.find(f.SystemID());
+            return it != empire_receiving_locations.end() &&
+                it->second.count(f.OrderedGivenToEmpire()) > 0;
+        };
+        auto not_invading_not_colonizing_ship = [&invading_ship_ids, &colonizing_ship_ids](const Ship& s) {
+            return std::none_of(invading_ship_ids.begin(), invading_ship_ids.end(),
+                                [sid{s.ID()}] (const auto iid) { return iid == sid; }) &&
+                std::none_of(colonizing_ship_ids.begin(), colonizing_ship_ids.end(),
+                             [sid{s.ID()}] (const auto cid) { return cid == sid; });
+        };
+        for (auto* fleet : objects.findRaw<Fleet>(owned_given_stationary_fleet)) {
+            const auto recipient_empire_id = fleet->OrderedGivenToEmpire();
+            empire_gifted_fleets[recipient_empire_id].push_back(fleet);
+            for (auto* ship : objects.findRaw<Ship>(fleet->ShipIDs())) {
+                if (ship && not_invading_not_colonizing_ship(*ship))
+                    empire_gifted_ships[recipient_empire_id].push_back(ship);
+            }
+        }
+        for (auto& fleet : objects.all<Fleet>())
             fleet->ClearGiveToEmpire(); // in case things fail, to avoid potential inconsistent state
 
-            if (fleet->Unowned()
-                || fleet->OwnedBy(ordered_given_to_empire_id)
-                || !fleet->TravelRoute().empty())
-            { continue; }
 
-            empire_gifted_objects[ordered_given_to_empire_id].push_back(fleet);
-        }
+        // collect planets ordered to be given but that aren't being invaded,
+        // and buildings on them
+        std::map<int, std::vector<Planet*>> empire_gifted_planets; // indexed by recipient empire id
+        std::map<int, std::vector<Building*>> empire_gifted_buildings;
+        auto owned_given_not_invaded_planet =
+            [&invaded_planet_ids, &empire_receiving_locations](const Planet& p)
+        {
+            if (p.Unowned() ||
+                p.OrderedGivenToEmpire() == ALL_EMPIRES ||
+                p.OwnedBy(p.OrderedGivenToEmpire()) ||
+                p.SystemID() == INVALID_OBJECT_ID ||
+                std::any_of(invaded_planet_ids.begin(), invaded_planet_ids.end(),
+                            [pid{p.ID()}](const auto iid) { return iid == pid; }))
+            { return false; }
 
-        // collect planets ordered to be given
-        for (auto* planet : objects.allRaw<Planet>()) {
-            int ordered_given_to_empire_id = planet->OrderedGivenToEmpire();
-            if (ordered_given_to_empire_id == ALL_EMPIRES)
-                continue;
+            auto it = empire_receiving_locations.find(p.SystemID());
+            return it != empire_receiving_locations.end() &&
+                it->second.count(p.OrderedGivenToEmpire()) > 0;
+        };
+        for (auto* planet : objects.findRaw<Planet>(owned_given_not_invaded_planet)) {
+            const auto recipient_empire_id = planet->OrderedGivenToEmpire();
             planet->ClearGiveToEmpire(); // in case things fail, to avoid potential inconsistent state
-
-            if (planet->Unowned() || planet->OwnedBy(ordered_given_to_empire_id))
-                continue;
-
-            empire_gifted_objects[ordered_given_to_empire_id].push_back(planet);
+            empire_gifted_planets[recipient_empire_id].push_back(planet);
+            for (auto* building : objects.findRaw<Building>(planet->BuildingIDs())) {
+                if (building)
+                    empire_gifted_buildings[recipient_empire_id].push_back(building);
+            }
         }
 
-        // further filter ordered given objects and do giving if appropriate
-        std::map<std::pair<int, int>, Effect::TargetSet> filtered_empire_gifted_objects; // ((original owner, recipient), objects)
-        for (auto& [recipient_empire_id, gifted_objects] : empire_gifted_objects) {
-            std::map<int, bool> systems_contain_recipient_empire_owned_objects;
 
-            // for each recipient empire, process objects it is being gifted
-            for (auto* gifted_obj : gifted_objects) {
-                int initial_owner_empire_id = gifted_obj->Owner();
+        // storage for list of all gifted objects
+        std::vector<int> gifted_object_ids;
+        auto do_giving = [&gifted_object_ids, &empires](auto& recipients_objs) {
+            for (auto& [recipient_empire_id, objs] : recipients_objs) {
+                for (auto* gifted_obj : objs) {
+                    const auto initial_owner_empire_id = gifted_obj->Owner();
+                    const auto gifted_obj_id = gifted_obj->ID();
+                    gifted_object_ids.push_back(gifted_obj_id);
 
+                    gifted_obj->SetOwner(recipient_empire_id);
 
-                // gifted object must be in a system
-                if (gifted_obj->SystemID() == INVALID_OBJECT_ID)
-                    continue;
-                auto* system = objects.getRaw<System>(gifted_obj->SystemID());
-                if (!system)
-                    continue;
+                    using ObjsT = std::decay_t<decltype(*gifted_obj)>;
+                    static_assert(!std::is_same_v<ObjsT, UniverseObject>);
+                    static_assert(std::is_same_v<ObjsT, Planet> || std::is_same_v<ObjsT, Building> ||
+                                  std::is_same_v<ObjsT, Fleet> || std::is_same_v<ObjsT, Ship>);
 
-                // the recipient must have an owned object in the same system
-                bool can_receive_here = false;
-
-                // is reception ability for this location cached?
-                auto sys_it = systems_contain_recipient_empire_owned_objects.find(system->ID());
-                if (sys_it != systems_contain_recipient_empire_owned_objects.end()) {
-                    can_receive_here = sys_it->second;
-
-                } else {
-                    // not cached, so scan for objects
-                    for (auto* system_obj : objects.findRaw<const UniverseObject>(system->ObjectIDs())) {
-                        if (system_obj->OwnedBy(recipient_empire_id)) {
-                            can_receive_here = true;
-                            systems_contain_recipient_empire_owned_objects[system->ID()] = true;
-                            break;
-                        }
+                    if constexpr (std::is_same_v<ObjsT, Planet>) {
+                        if (auto empire = empires.GetEmpire(recipient_empire_id))
+                            empire->AddSitRepEntry(CreatePlanetGiftedSitRep(gifted_obj_id, initial_owner_empire_id));
+                    } else if constexpr (std::is_same_v<ObjsT, Fleet>) {
+                        if (auto empire = empires.GetEmpire(recipient_empire_id))
+                            empire->AddSitRepEntry(CreateFleetGiftedSitRep(gifted_obj_id, initial_owner_empire_id));
+                    } else if constexpr (std::is_same_v<ObjsT, Ship>) {
+                        gifted_obj->SetOrderedScrapped(false);
+                        gifted_obj->ClearColonizePlanet();
+                        gifted_obj->ClearInvadePlanet();
+                        gifted_obj->ClearBombardPlanet();
+                    } else if constexpr (std::is_same_v<ObjsT, Building>) {
+                        gifted_obj->SetOrderedScrapped(false);
                     }
-                    if (!can_receive_here)
-                        systems_contain_recipient_empire_owned_objects[system->ID()] = false;
-                }
-                if (!can_receive_here)
-                    continue;
 
-                // recipient empire can receive objects at this system, so do transfer
-                filtered_empire_gifted_objects[{initial_owner_empire_id, recipient_empire_id}].push_back(gifted_obj);
+                    Empire::ConquerProductionQueueItemsAtLocation(gifted_obj_id, recipient_empire_id, empires);
+                }
             }
-        }
+        };
 
-        // do transfers of ownership of gifted stuff without further checks
-        for (auto& [initial_recipient_ids, gifted_objects] : filtered_empire_gifted_objects) {
-            const auto& [initial_owner_empire_id, recipient_empire_id] = initial_recipient_ids;
-            for (auto* gifted_obj : gifted_objects) {
-                for (auto* contained_obj : objects.findRaw<UniverseObject>(gifted_obj->ContainedObjectIDs())) {
-                    if (contained_obj->OwnedBy(initial_owner_empire_id))
-                        contained_obj->SetOwner(recipient_empire_id);
-                }
-                gifted_obj->SetOwner(recipient_empire_id);
+        do_giving(empire_gifted_fleets);
+        do_giving(empire_gifted_ships);
+        do_giving(empire_gifted_planets);
+        do_giving(empire_gifted_buildings);
 
-                if (auto empire = empires.GetEmpire(recipient_empire_id)) {
-                    if (gifted_obj->ObjectType() == UniverseObjectType::OBJ_PLANET)
-                        empire->AddSitRepEntry(CreatePlanetGiftedSitRep(gifted_obj->ID(), initial_owner_empire_id));
-                    else if (gifted_obj->ObjectType() == UniverseObjectType::OBJ_FLEET)
-                        empire->AddSitRepEntry(CreateFleetGiftedSitRep(gifted_obj->ID(), initial_owner_empire_id));
-                }
-
-                Empire::ConquerProductionQueueItemsAtLocation(gifted_obj->ID(), recipient_empire_id, empires);
-            }
-        }
+        return gifted_object_ids;
     }
 
     /** Destroys suitable objects that have been ordered scrapped.*/
-    void HandleScrapping(Universe& universe, EmpireManager& empires) {
+    template <typename IDsT>
+    void HandleScrapping(Universe& universe, EmpireManager& empires,
+                         const IDsT& invading_ship_ids, const IDsT& invaded_planet_ids,
+                         const IDsT& colonizing_ship_ids, const IDsT& colonized_planet_ids,
+                         const IDsT& gifted_ids)
+    {
         ObjectMap& objects{universe.Objects()};
         const auto& empire_ids = empires.EmpireIDs();
 
-        const auto scrapped_ships = objects.findRaw<Ship>([](const Ship* s) { return s->OrderedScrapped(); });
+        // only scap ships that aren't being gifted and that aren't invading or colonizing this turn
+        const auto scrapped_ships = objects.findRaw<Ship>(
+            [&invading_ship_ids, &colonizing_ship_ids, &gifted_ids](const Ship* s) {
+                return s->OrderedScrapped() &&
+                    std::none_of(gifted_ids.begin(), gifted_ids.end(),
+                                 [sid{s->ID()}](const auto gid) { return gid == sid; }) &&
+                    std::none_of(invading_ship_ids.begin(), invading_ship_ids.end(),
+                                 [sid{s->ID()}](const auto iid) { return iid == sid; }) &&
+                    std::none_of(colonizing_ship_ids.begin(), colonizing_ship_ids.end(),
+                                 [sid{s->ID()}](const auto cid) { return cid == sid; });
+        });
+
         for (const auto* ship : scrapped_ships) {
             DebugLogger() << "... ship: " << ship->ID() << " ordered scrapped";
             const auto ship_id = ship->ID();
@@ -3275,7 +3380,14 @@ namespace {
             universe.Destroy(ship_id, empire_ids);
         }
 
-        auto scrapped_buildings = objects.findRaw<Building>([](const Building* b) { return b->OrderedScrapped(); });
+        auto scrapped_buildings = objects.findRaw<Building>(
+            [&invaded_planet_ids, &gifted_ids](const Building* b) {
+                return b->OrderedScrapped() &&
+                    std::none_of(gifted_ids.begin(), gifted_ids.end(),
+                                 [bid{b->ID()}](const auto gid) { return gid == bid; }) &&
+                    std::none_of(invaded_planet_ids.begin(), invaded_planet_ids.end(),
+                                 [pid{b->PlanetID()}](const auto iid) { return iid == pid; });
+        });
         for (auto* building : scrapped_buildings) {
             if (auto* planet = objects.getRaw<Planet>(building->PlanetID()))
                 planet->RemoveBuilding(building->ID());
@@ -3378,7 +3490,7 @@ void ServerApp::PreCombatProcessTurns() {
     // clean up orders, which are no longer needed
     ClearEmpireTurnOrders();
 
-    // update ResourceCenter focus history info
+    // update focus history info
     UpdateResourceCenterFocusHistoryInfo(context.ContextObjects());
 
     // validate adopted policies, and update Empire Policy history
@@ -3400,16 +3512,18 @@ void ServerApp::PreCombatProcessTurns() {
     m_networking.SendMessageAll(TurnProgressMessage(Message::TurnProgressPhase::COLONIZE_AND_SCRAP));
 
     DebugLogger() << "ServerApp::ProcessTurns colonization";
-    HandleColonization(context);
+    auto [colonized_planet_ids, colonizing_ship_ids] = HandleColonization(context);
 
     DebugLogger() << "ServerApp::ProcessTurns invasion";
-    HandleInvasion(context);
+    auto [invaded_planet_ids, invading_ship_ids] = HandleInvasion(context);
 
     DebugLogger() << "ServerApp::ProcessTurns gifting";
-    HandleGifting(m_empires, m_universe.Objects());
+    auto gifted_ids = HandleGifting(m_empires, m_universe.Objects(), invaded_planet_ids,
+                                    invading_ship_ids, colonizing_ship_ids);
 
     DebugLogger() << "ServerApp::ProcessTurns scrapping";
-    HandleScrapping(m_universe, m_empires);
+    HandleScrapping(m_universe, m_empires, invading_ship_ids, invaded_planet_ids,
+                    colonizing_ship_ids, colonized_planet_ids, gifted_ids);
 
 
     DebugLogger() << "ServerApp::ProcessTurns movement";

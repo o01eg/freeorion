@@ -205,10 +205,10 @@ namespace {
                        GG::Flags<GG::TextFormat> format = GG::FORMAT_NONE, GG::Clr color = GG::CLR_BLACK) :
             LinkText(x, y, w, str, font, format, color) {}
 
-        mutable boost::signals2::signal<void(const GG::Pt&, GG::Flags<GG::ModKey>)> RightClickedSignal;
+        mutable boost::signals2::signal<void(GG::Pt, GG::Flags<GG::ModKey>)> RightClickedSignal;
 
     protected:
-        void RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override {
+        void RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override {
             if (GetLinkUnderPt(pt) != -1) {
                 LinkText::RClick(pt, mod_keys);
             } else {
@@ -271,21 +271,21 @@ namespace {
                               background_clr, ClientUI::WndOuterBorderColor(), 1u);
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             if (ul != ClientUpperLeft() || (lr.x - ul.x) != Width())
                 DoLayout(ul, lr.x - ul.x);
         }
 
         const SitRepEntry& GetSitRepEntry() const noexcept { return m_sitrep_entry; }
 
-        mutable boost::signals2::signal<void(const GG::Pt&, GG::Flags<GG::ModKey>)> RightClickedSignal;
+        mutable boost::signals2::signal<void(GG::Pt, GG::Flags<GG::ModKey>)> RightClickedSignal;
 
     protected:
-        void RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod) override
+        void RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod) override
         { RightClickedSignal(pt, mod); }
 
     private:
-        void DoLayout(const GG::Pt& ul, const GG::X& width) {
+        void DoLayout(GG::Pt ul, GG::X width) {
             // Resize the text
             GG::Pt spacer = GG::Pt(GG::X(sitrep_edge_to_content_spacing), GG::Y(sitrep_edge_to_content_spacing));
             GG::X icon_left(ul.x + spacer.x);
@@ -352,7 +352,7 @@ namespace {
             GG::ListBox::Row::Resize(m_panel->Size() + border);
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             if (!m_panel || (Size() != (lr - ul)))
                 RequirePreRender();
             GG::ListBox::Row::SizeMove(ul, lr);
@@ -458,7 +458,7 @@ void SitRepPanel::KeyPress(GG::Key key, std::uint32_t key_code_point,
     }
 }
 
-void SitRepPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void SitRepPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = GG::Wnd::Size();
     std::size_t first_visible_queue_row = std::distance(m_sitreps_lb->begin(),
                                                         m_sitreps_lb->FirstRowShown());
@@ -577,7 +577,8 @@ void SitRepPanel::NextClicked() {
 void SitRepPanel::LastClicked() {
     auto turns = GetUnvalidatedSitRepsSortedByTurn(GGHumanClientApp::GetApp()->EmpireID());
     // search backwards from current turn for a non-empty sitrep turn
-    ShowSitRepsForTurn(GetNextNonEmptySitrepsTurn(turns, CurrentTurn() + 1, false, m_hidden_sitrep_templates));
+    ShowSitRepsForTurn(GetNextNonEmptySitrepsTurn(turns, GGHumanClientApp::GetApp()->CurrentTurn() + 1,
+                                                  false, m_hidden_sitrep_templates));
 }
 
 void SitRepPanel::FilterClicked() {
@@ -644,7 +645,7 @@ void SitRepPanel::FilterClicked() {
     Update();
 }
 
-void SitRepPanel::IgnoreSitRep(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& mod) {
+void SitRepPanel::IgnoreSitRep(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> mod) {
     SitRepRow* sitrep_row = dynamic_cast<SitRepRow*>(it->get());
     if (!sitrep_row)
         return;
@@ -657,7 +658,7 @@ void SitRepPanel::IgnoreSitRep(GG::ListBox::iterator it, const GG::Pt& pt, const
     Update();
 }
 
-void SitRepPanel::DismissalMenu(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& mod) {
+void SitRepPanel::DismissalMenu(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> mod) {
     GG::MenuItem menu_contents, submenu_ignore, submenu_block, separator_item;
     std::string sitrep_text, sitrep_template;
     std::string entry_margin("  ");
@@ -863,7 +864,7 @@ void SitRepPanel::SetHiddenSitRepTemplates(const std::set<std::string>& template
 
 int SitRepPanel::NumVisibleSitrepsThisTurn() const {
     auto turns = GetUnvalidatedSitRepsSortedByTurn(GGHumanClientApp::GetApp()->EmpireID());
-    auto& this_turn_sitreps = turns[CurrentTurn()];
+    auto& this_turn_sitreps = turns[GGHumanClientApp::GetApp()->CurrentTurn()];
     auto is_valid = [this](const auto* s) { return s && !IsSitRepInvalid(*s, m_hidden_sitrep_templates); };
 
     return std::count_if(this_turn_sitreps.begin(), this_turn_sitreps.end(), is_valid);

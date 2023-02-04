@@ -194,7 +194,6 @@ namespace {
         SS&& filename, std::shared_lock<std::shared_mutex>& access_lock,
         std::shared_ptr<const StringTable> fallback = nullptr)
     {
-
         if (auto it = stringtables.find(filename); it != stringtables.end())
             return it->second;
 
@@ -279,9 +278,9 @@ const std::locale& GetLocale(std::string_view name) {
         static boost::locale::generator locale_gen(locale_backend);
         locale_gen.locale_cache_enabled(true);
         try {
-            auto retval = locale_gen.generate(name_str);
-            std::use_facet<boost::locale::info>(retval);
-            return retval;
+            auto retval2 = locale_gen.generate(name_str);
+            std::use_facet<boost::locale::info>(retval2);
+            return retval2;
         } catch (...) {
             return std::locale::classic();
         }
@@ -295,15 +294,12 @@ void FlushLoadedStringTables() {
     stringtables.clear();
 }
 
-const std::map<std::string, std::string, std::less<>>& AllStringtableEntries(bool default_table) {
+AllStringsResultT& AllStringtableEntries(bool default_table) {
     std::shared_lock stringtable_lock(stringtable_access_mutex);
-    if (default_table) {
-        auto& retval = GetDevDefaultStringTable(stringtable_lock).AllStrings();
-        return retval;
-    } else {
-        auto& retval = GetStringTable(stringtable_lock).AllStrings();
-        return retval;
-    }
+    if (default_table)
+        return GetDevDefaultStringTable(stringtable_lock).AllStrings();
+    else
+        return GetStringTable(stringtable_lock).AllStrings();
 }
 
 const std::string& UserString(const std::string& str) {

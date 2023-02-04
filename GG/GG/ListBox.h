@@ -157,12 +157,12 @@ public:
         /** Set normalized.  Used by ListBox to track normalization.*/
         void         SetNormalized(bool normalized);
 
-        boost::signals2::signal<void(const Pt&, GG::Flags<GG::ModKey>)> RightClickedSignal;
+        boost::signals2::signal<void(Pt, GG::Flags<GG::ModKey>)> RightClickedSignal;
 
     protected:
         /** Add elements to m_col_widths, m_col_stretches and m_col_alignments until they reach size nn. */
         void GrowWidthsStretchesAlignmentsTo(std::size_t nn);
-        void RClick(const Pt& pt, GG::Flags<GG::ModKey> mod) override;
+        void RClick(Pt pt, GG::Flags<GG::ModKey> mod) override;
 
         std::vector<std::shared_ptr<Control>>   m_cells;                    ///< the Controls in this Row (each may be null)
         Alignment                               m_row_alignment;            ///< row alignment; one of ALIGN_TOP, ALIGN_VCENTER, or ALIGN_BOTTOM
@@ -185,17 +185,17 @@ public:
     typedef std::unordered_set<iterator, IteratorHash> SelectionSet;
 
     /** emitted when the list box is cleared */
-    typedef boost::signals2::signal<void ()>                                                ClearedRowsSignalType;
+    typedef boost::signals2::signal<void ()>                                   ClearedRowsSignalType;
     /** emitted when one or more rows are selected or deselected */
-    typedef boost::signals2::signal<void (const SelectionSet&)>                             SelRowsChangedSignalType;
+    typedef boost::signals2::signal<void (SelectionSet)>                       SelRowsChangedSignalType;
     /** the signature of row-change-notification signals */
-    typedef boost::signals2::signal<void (iterator)>                                        RowSignalType;
+    typedef boost::signals2::signal<void (iterator)>                           RowSignalType;
     /** the signature of const row-change-notification signals */
-    typedef boost::signals2::signal<void (const_iterator)>                                  ConstRowSignalType;
+    typedef boost::signals2::signal<void (const_iterator)>                     ConstRowSignalType;
     /** the signature of row-click-notification signals */
-    typedef boost::signals2::signal<void(iterator, const Pt&,const GG::Flags<GG::ModKey>&)> RowClickSignalType;
+    typedef boost::signals2::signal<void(iterator, Pt, GG::Flags<GG::ModKey>)> RowClickSignalType;
     /** the signature of row-move-notification signals */
-    typedef boost::signals2::signal<void (iterator, iterator)>                              MovedRowSignalType;
+    typedef boost::signals2::signal<void (iterator, iterator)>                 MovedRowSignalType;
 
     typedef RowSignalType      BeforeInsertRowSignalType;   ///< emitted before a row is inserted into the list box
     typedef RowSignalType      AfterInsertRowSignalType;    ///< emitted after a row is inserted into the list box
@@ -214,9 +214,9 @@ public:
     ~ListBox() = default;
     void CompleteConstruction() override;
 
-    Pt MinUsableSize() const override;
-    Pt ClientUpperLeft() const override;
-    Pt ClientLowerRight() const override;
+    Pt MinUsableSize() const noexcept override;
+    Pt ClientUpperLeft() const noexcept override;
+    Pt ClientLowerRight() const noexcept override;
 
     bool           Empty() const noexcept { return m_rows.empty(); }
     const_iterator begin() const noexcept { return m_rows.begin(); }
@@ -291,14 +291,14 @@ public:
     mutable AfterEraseRowSignalType      AfterEraseRowSignal;      ///< the after erase signal object for this ListBox
     mutable BrowsedRowSignalType         BrowsedRowSignal;         ///< the browsed signal object for this ListBox
 
-    void StartingChildDragDrop(const Wnd* wnd, const GG::Pt& offset) override;
-    void AcceptDrops(const Pt& pt, std::vector<std::shared_ptr<Wnd>> wnds, Flags<ModKey> mod_keys) override;
+    void StartingChildDragDrop(const Wnd* wnd, Pt offset) override;
+    void AcceptDrops(Pt pt, std::vector<std::shared_ptr<Wnd>> wnds, Flags<ModKey> mod_keys) override;
     void ChildrenDraggedAway(const std::vector<Wnd*>& wnds, const Wnd* destination) override;
     void PreRender() override;
     void Render() override;
 
     /** Resizes the control, then resizes the scrollbars as needed. */
-    void SizeMove(const Pt& ul, const Pt& lr) override;
+    void SizeMove(Pt ul, Pt lr) override;
 
     /** Show the  list box.  If \p show_children is true then show the rows that are within the
         boundaries of the list box.*/
@@ -468,9 +468,9 @@ protected:
     bool            AutoScrollingRight() const noexcept { return m_auto_scrolling_right; } ///< returns true iff the list is being autoscrolled right due to drag-and-drop
 
     void KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys) override;
-    void MouseWheel(const Pt& pt, int move, Flags<ModKey> mod_keys) override;
-    void DragDropEnter(const Pt& pt, std::map<const Wnd*, bool>& drop_wnds_acceptable, Flags<ModKey> mod_keys) override;
-    void DragDropHere(const Pt& pt, std::map<const Wnd*, bool>& drop_wnds_acceptable, Flags<ModKey> mod_keys) override;
+    void MouseWheel(Pt pt, int move, Flags<ModKey> mod_keys) override;
+    void DragDropEnter(Pt pt, std::map<const Wnd*, bool>& drop_wnds_acceptable, Flags<ModKey> mod_keys) override;
+    void DragDropHere(Pt pt, std::map<const Wnd*, bool>& drop_wnds_acceptable, Flags<ModKey> mod_keys) override;
     void DragDropLeave() override;
     void CancellingChildDragDrop(const std::vector<const Wnd*>& wnds) override;
     void TimerFiring(unsigned int ticks, Timer* timer) override;
@@ -498,7 +498,7 @@ protected:
     void AdjustScrolls(bool adjust_for_resize, std::pair<bool, bool> force_hv = {false, false});
 
     void DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
-                         const Pt& pt, Flags<ModKey> mod_keys) const override;
+                         Pt pt, Flags<ModKey> mod_keys) const override;
     void HandleRowRightClicked(Pt pt, Flags<ModKey> mod);
 
 private:

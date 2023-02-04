@@ -5,7 +5,6 @@
 #include "Conditions.h"
 #include "CommonParams.h"
 #include "Effect.h"
-#include "PopCenter.h"
 #include "Planet.h"
 #include "Ship.h"
 #include "UniverseObject.h"
@@ -124,13 +123,13 @@ namespace {
         retval.reserve(tags.size());
 
         std::size_t next_idx = 0;
-        static constexpr auto len{TAG_PEDIA_PREFIX.length()};
 
         // store views into concatenated tags/likes string
         std::for_each(tags.begin(), tags.end(),
                       [&next_idx, &retval, concat_tags] (const auto tag)
         {
             std::string upper_t = boost::to_upper_copy<std::string>(tag);
+            static constexpr auto len{TAG_PEDIA_PREFIX.length()};
             if (tag.substr(0, len) == TAG_PEDIA_PREFIX) {
                 // store string views into the pedia tag after the "PEDIA" prefix
                 auto full_tag = concat_tags.substr(next_idx, upper_t.size());
@@ -181,7 +180,7 @@ Species::Species(std::string&& name, std::string&& desc,
         std::for_each(m_tags.begin(), m_tags.end(), [&next_idx](const auto& t) { next_idx += t.size(); });
 
         // store views into concatenated tags/likes string
-        std::for_each(likes.begin(), likes.end(), [&next_idx, &retval, this, sv](const auto& t) {
+        std::for_each(likes.begin(), likes.end(), [&next_idx, &retval, sv](const auto& t) {
             std::string upper_t = boost::to_upper_copy<std::string>(t);
             retval.push_back(sv.substr(next_idx, upper_t.size()));
             next_idx += upper_t.size();
@@ -200,7 +199,7 @@ Species::Species(std::string&& name, std::string&& desc,
         std::for_each(m_likes.begin(), m_likes.end(), [&next_idx](const auto& t) { next_idx += t.size(); });
 
         // store views into concatenated tags/likes string
-        std::for_each(dislikes.begin(), dislikes.end(), [&next_idx, &retval, this, sv](const auto& t) {
+        std::for_each(dislikes.begin(), dislikes.end(), [&next_idx, &retval, sv](const auto& t) {
             std::string upper_t = boost::to_upper_copy<std::string>(t);
             retval.push_back(sv.substr(next_idx, upper_t.size()));
             next_idx += upper_t.size();
@@ -326,7 +325,7 @@ void Species::Init() {
                         std::move(environments), std::move(this_species_name_ref)))));
 
         auto type_cond = std::make_unique<Condition::Type>(
-            std::make_unique<ValueRef::Constant<UniverseObjectType>>(UniverseObjectType::OBJ_POP_CENTER));
+            std::make_unique<ValueRef::Constant<UniverseObjectType>>(UniverseObjectType::OBJ_PLANET));
 
         m_location = std::unique_ptr<Condition::Condition>(std::make_unique<Condition::And>(
             std::move(enviro_cond), std::move(type_cond)));
@@ -690,26 +689,11 @@ void SpeciesManager::SetSpeciesSpeciesOpinion(const std::string& opinionated_spe
                                               const std::string& rated_species, float opinion)
 { m_species_species_opinions[opinionated_species][rated_species] = opinion; }
 
-const std::map<std::string, std::set<int>>& SpeciesManager::GetSpeciesHomeworldsMap(
-    int encoding_empire) const
-{
-    if (encoding_empire == ALL_EMPIRES)
-        return m_species_homeworlds;
-    // TODO: filter, output only info about species an empire has observed...?
-    return m_species_homeworlds;
-}
-
-const std::map<std::string, std::map<int, float>>& SpeciesManager::GetSpeciesEmpireOpinionsMap(int encoding_empire) const
-{ return m_species_empire_opinions; }
-
-const std::map<std::string, std::map<std::string, float>>& SpeciesManager::GetSpeciesSpeciesOpinionsMap(int encoding_empire) const
-{ return m_species_species_opinions; }
-
 float SpeciesManager::SpeciesEmpireOpinion(const std::string& species_name, int empire_id) const {
     auto sp_it = m_species_empire_opinions.find(species_name);
     if (sp_it == m_species_empire_opinions.end())
         return 0.0f;
-    const std::map<int, float>& emp_map = sp_it->second;
+    const auto& emp_map = sp_it->second;
     auto emp_it = emp_map.find(empire_id);
     if (emp_it == emp_map.end())
         return 0.0f;
@@ -783,11 +767,10 @@ void SpeciesManager::UpdatePopulationCounter(const ObjectMap& objects) {
     // ships of each species and design
     m_species_object_populations.clear();
     for (const auto& [obj_id, obj] : objects.allExisting()) {
-        if (obj->ObjectType() != UniverseObjectType::OBJ_PLANET &&
-            obj->ObjectType() != UniverseObjectType::OBJ_POP_CENTER)
-        { continue; }
+        if (obj->ObjectType() != UniverseObjectType::OBJ_PLANET)
+            continue;
 
-        auto pop_center = std::dynamic_pointer_cast<const PopCenter>(obj);
+        auto pop_center = std::dynamic_pointer_cast<const Planet>(obj); // TODO: static_cast
         const std::string& species = pop_center->SpeciesName();
         if (species.empty())
             continue;
@@ -795,17 +778,9 @@ void SpeciesManager::UpdatePopulationCounter(const ObjectMap& objects) {
         try {
             m_species_object_populations[species][obj_id] +=
                 obj->GetMeter(MeterType::METER_POPULATION)->Current();
-        } catch (...) {
-            continue;
-        }
+        } catch (...) {}
     }
 }
-
-const std::map<std::string, std::map<int, float>>& SpeciesManager::SpeciesObjectPopulations(int) const
-{ return m_species_object_populations; }
-
-const std::map<std::string, std::map<std::string, int>>& SpeciesManager::SpeciesShipsDestroyed(int) const
-{ return m_species_species_ships_destroyed; }
 
 void SpeciesManager::SetSpeciesObjectPopulations(std::map<std::string, std::map<int, float>> sop)
 { m_species_object_populations = std::move(sop); }

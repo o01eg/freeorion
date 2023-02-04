@@ -37,7 +37,7 @@ class Timer;
 struct GUIImpl;
 
 template <typename T>
-std::shared_ptr<T> LockAndResetIfExpired(std::weak_ptr<T>& ptr) {
+std::shared_ptr<T> LockAndResetIfExpired(std::weak_ptr<T>& ptr) noexcept {
     auto locked = ptr.lock();
     if (!locked)
         ptr.reset();
@@ -241,7 +241,8 @@ public:
     /** Adds \p wnd onto the modal windows "stack".  Modal windows are owned by the GUI as a
         top-level window. */
     void            RegisterModal(std::shared_ptr<Wnd> wnd);
-    void            RunModal(std::shared_ptr<Wnd> wnd, bool& done);
+    void            RunModal(const bool& done);
+    void            RunModal(std::shared_ptr<Wnd> wnd);
     void            Remove(const std::shared_ptr<Wnd>& wnd);               ///< removes \a wnd from the z-list.  Removing a null pointer or removing the same window multiple times is a no-op.
     void            MoveUp(const std::shared_ptr<Wnd>& wnd);               ///< moves \a wnd to the top of the z-list
     void            MoveDown(const std::shared_ptr<Wnd>& wnd);             ///< moves \a wnd to the bottom of the z-list
@@ -370,7 +371,7 @@ public:
     bool SetPrevFocusWndInCycle();                          ///< sets the focus Wnd to the next INTERACTIVE Wnd in a cycle determined by Wnd parent-child relationships
     bool SetNextFocusWndInCycle();                          ///< sets the focus Wnd to the next in the cycle.
 
-    static GUI*  GetGUI();                  ///< allows any GG code access to GUI framework by calling GUI::GetGUI()
+    static GUI*  GetGUI() noexcept;                         ///< allows any GG code access to GUI framework by calling GUI::GetGUI()
 
     /** If \p wnd is visible recursively call PreRenderWindow() on all \p wnd's children and then
         call \p wnd->PreRender().  The order guarantees that when wnd->PreRender() is called all

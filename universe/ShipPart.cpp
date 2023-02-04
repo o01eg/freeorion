@@ -198,13 +198,13 @@ ShipPart::ShipPart(ShipPartClass part_class, double capacity, double stat2,
         std::size_t next_idx = 0;
         retval.reserve(common_params.tags.size());
         std::string_view sv{m_tags_concatenated};
-        static constexpr auto len{TAG_PEDIA_PREFIX.length()};
 
         // store views into concatenated tags string
         std::for_each(common_params.tags.begin(), common_params.tags.end(),
                       [&next_idx, &retval, sv](const auto& t)
         {
             auto tag = sv.substr(next_idx, t.size());
+            static constexpr auto len{TAG_PEDIA_PREFIX.length()};
             if (tag.substr(0, len) == TAG_PEDIA_PREFIX)
                 retval.push_back(tag);
             next_idx += t.size();
@@ -408,14 +408,14 @@ bool ShipPart::operator==(const ShipPart& rhs) const {
 float ShipPart::Capacity() const {
     switch (m_class) {
     case ShipPartClass::PC_ARMOUR:
-        return m_capacity * GetGameRules().Get<double>("RULE_SHIP_STRUCTURE_FACTOR");
+        return m_capacity * (m_add_standard_capacity_effect ? GetGameRules().Get<double>("RULE_SHIP_STRUCTURE_FACTOR") : 1.0f);
         break;
     case ShipPartClass::PC_DIRECT_WEAPON:
     case ShipPartClass::PC_SHIELD:
-        return m_capacity * GetGameRules().Get<double>("RULE_SHIP_WEAPON_DAMAGE_FACTOR");
+        return m_capacity * (m_add_standard_capacity_effect ? GetGameRules().Get<double>("RULE_SHIP_WEAPON_DAMAGE_FACTOR") : 1.0f);
         break;
     case ShipPartClass::PC_SPEED:
-        return m_capacity * GetGameRules().Get<double>("RULE_SHIP_SPEED_FACTOR");
+        return m_capacity * (m_add_standard_capacity_effect ? GetGameRules().Get<double>("RULE_SHIP_SPEED_FACTOR") : 1.0f);
         break;
     default:
         return m_capacity;
@@ -425,7 +425,7 @@ float ShipPart::Capacity() const {
 float ShipPart::SecondaryStat() const {
     switch (m_class) {
     case ShipPartClass::PC_FIGHTER_HANGAR:
-        return m_secondary_stat * GetGameRules().Get<double>("RULE_FIGHTER_DAMAGE_FACTOR");
+        return m_secondary_stat * (m_add_standard_capacity_effect ? GetGameRules().Get<double>("RULE_FIGHTER_DAMAGE_FACTOR") : 1.0f);
         break;
     default:
         return m_secondary_stat;

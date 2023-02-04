@@ -32,13 +32,13 @@ namespace {
 ////////////////////////////////////////////////
 // GG::Button
 ////////////////////////////////////////////////
-Button::Button(std::string str, const std::shared_ptr<Font>& font, Clr color,
+Button::Button(std::string str, std::shared_ptr<Font> font, Clr color,
                Clr text_color, Flags<WndFlag> flags) :
     Control(X0, Y0, X1, Y1, flags),
     m_label(Wnd::Create<TextControl>(X0, Y0, X1, Y1, str, font,
                                      text_color, FORMAT_NONE, NO_WND_FLAGS)),
     m_label_shadow(Wnd::Create<TextControl>(SHADOW_OFFSET.x, SHADOW_OFFSET.y, X1, Y1, std::move(str),
-                                            font, CLR_SHADOW, FORMAT_NONE, NO_WND_FLAGS))
+                                            std::move(font), CLR_SHADOW, FORMAT_NONE, NO_WND_FLAGS))
 {
     m_color = color;
     m_label->Hide();
@@ -64,20 +64,8 @@ void Button::Show()
     m_label_shadow->Hide();
 }
 
-Button::ButtonState Button::State() const
-{ return m_state; }
-
 const std::string& Button::Text() const
 { return m_label->Text(); }
-
-const SubTexture& Button::UnpressedGraphic() const
-{ return m_unpressed_graphic; }
-
-const SubTexture& Button::PressedGraphic() const
-{ return m_pressed_graphic; }
-
-const SubTexture& Button::RolloverGraphic() const
-{ return m_rollover_graphic; }
 
 void Button::Render()
 {
@@ -88,22 +76,20 @@ void Button::Render()
     }
 }
 
-void Button::SizeMove(const Pt& ul, const Pt& lr)
+void Button::SizeMove(Pt ul, Pt lr)
 {
-    GG::Pt sz = Size();
+    const auto sz = Size();
     Wnd::SizeMove(ul, lr);
-    if (sz == Size())
+    const auto new_sz = Size();
+    if (sz == new_sz)
         return;
 
-    m_label->Resize(Size());
-    m_label_shadow->Resize(Size());
+    m_label->Resize(new_sz);
+    m_label_shadow->Resize(new_sz);
 }
 
 void Button::SetColor(Clr c)
 { Control::SetColor(c); }
-
-void Button::SetState(ButtonState state)
-{ m_state = state; }
 
 void Button::SetText(std::string text)
 {
@@ -120,7 +106,7 @@ void Button::SetPressedGraphic(SubTexture st)
 void Button::SetRolloverGraphic(SubTexture st)
 { m_rollover_graphic = std::move(st); }
 
-void Button::LButtonDown(const Pt& pt, Flags<ModKey> mod_keys)
+void Button::LButtonDown(Pt pt, Flags<ModKey> mod_keys)
 {
     if (Disabled())
         return;
@@ -133,20 +119,20 @@ void Button::LButtonDown(const Pt& pt, Flags<ModKey> mod_keys)
         LeftPressedSignal();
 }
 
-void Button::LDrag(const Pt& pt, const Pt& move, Flags<ModKey> mod_keys)
+void Button::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
 {
     if (!Disabled())
         m_state = ButtonState::BN_PRESSED;
     Wnd::LDrag(pt, move, mod_keys);
 }
 
-void Button::LButtonUp(const Pt& pt, Flags<ModKey> mod_keys)
+void Button::LButtonUp(Pt pt, Flags<ModKey> mod_keys)
 {
     if (!Disabled())
         m_state = ButtonState::BN_UNPRESSED;
 }
 
-void Button::LClick(const Pt& pt, Flags<ModKey> mod_keys)
+void Button::LClick(Pt pt, Flags<ModKey> mod_keys)
 {
     if (!Disabled()) {
         m_state = ButtonState::BN_ROLLOVER;
@@ -154,7 +140,7 @@ void Button::LClick(const Pt& pt, Flags<ModKey> mod_keys)
     }
 }
 
-void Button::RButtonDown(const Pt& pt, Flags<ModKey> mod_keys)
+void Button::RButtonDown(Pt pt, Flags<ModKey> mod_keys)
 {
     if (Disabled())
         return;
@@ -167,20 +153,20 @@ void Button::RButtonDown(const Pt& pt, Flags<ModKey> mod_keys)
         RightPressedSignal();
 }
 
-void Button::RDrag(const Pt& pt, const Pt& move, Flags<ModKey> mod_keys)
+void Button::RDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
 {
     if (!Disabled())
         m_state = ButtonState::BN_PRESSED;
     Wnd::LDrag(pt, move, mod_keys);
 }
 
-void Button::RButtonUp(const Pt& pt, Flags<ModKey> mod_keys)
+void Button::RButtonUp(Pt pt, Flags<ModKey> mod_keys)
 {
     if (!Disabled())
         m_state = ButtonState::BN_UNPRESSED;
 }
 
-void Button::RClick(const Pt& pt, Flags<ModKey> mod_keys)
+void Button::RClick(Pt pt, Flags<ModKey> mod_keys)
 {
     if (!Disabled()) {
         m_state = ButtonState::BN_ROLLOVER;
@@ -188,13 +174,13 @@ void Button::RClick(const Pt& pt, Flags<ModKey> mod_keys)
     }
 }
 
-void Button::MouseEnter(const Pt& pt, Flags<ModKey> mod_keys)
+void Button::MouseEnter(Pt pt, Flags<ModKey> mod_keys)
 {
     if (!Disabled())
         m_state = ButtonState::BN_ROLLOVER;
 }
 
-void Button::MouseHere(const Pt& pt, Flags<ModKey> mod_keys)
+void Button::MouseHere(Pt pt, Flags<ModKey> mod_keys)
 {
     if (!Disabled())
         m_state = ButtonState::BN_ROLLOVER;
@@ -249,10 +235,8 @@ void Button::RenderRollover()
 
 void Button::RenderDefault()
 {
-    Pt ul = UpperLeft(), lr = LowerRight();
-    BeveledRectangle(ul, lr,
-                     Disabled() ? DisabledColor(m_color) : m_color,
-                     Disabled() ? DisabledColor(m_color) : m_color,
+    const auto clr = Disabled() ? DisabledColor(m_color) : m_color;
+    BeveledRectangle(UpperLeft(), LowerRight(), clr, clr,
                      (m_state != ButtonState::BN_PRESSED), 1);
 }
 
@@ -308,19 +292,19 @@ void StateButton::Show()
     m_label->Hide();
 }
 
-void StateButton::LButtonDown(const Pt& pt, Flags<ModKey> mod_keys)
+void StateButton::LButtonDown(Pt pt, Flags<ModKey> mod_keys)
 { SetState(ButtonState::BN_PRESSED); }
 
-void StateButton::LDrag(const Pt& pt, const Pt& move, Flags<ModKey> mod_keys)
+void StateButton::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
 {
     SetState(ButtonState::BN_PRESSED);
     Wnd::LDrag(pt, move, mod_keys);
 }
 
-void StateButton::LButtonUp(const Pt& pt, Flags<ModKey> mod_keys)
+void StateButton::LButtonUp(Pt pt, Flags<ModKey> mod_keys)
 { SetState(ButtonState::BN_UNPRESSED); }
 
-void StateButton::LClick(const Pt& pt, Flags<ModKey> mod_keys)
+void StateButton::LClick(Pt pt, Flags<ModKey> mod_keys)
 {
     if (!Disabled()) {
         SetCheck(!m_checked);
@@ -330,7 +314,7 @@ void StateButton::LClick(const Pt& pt, Flags<ModKey> mod_keys)
     }
 }
 
-void StateButton::MouseHere(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
+void StateButton::MouseHere(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
 { SetState(ButtonState::BN_ROLLOVER); }
 
 void StateButton::MouseLeave()
@@ -345,7 +329,7 @@ void StateButton::SetState(ButtonState next_state) {
     }
 }
 
-void StateButton::SizeMove(const Pt& ul, const Pt& lr)
+void StateButton::SizeMove(Pt ul, Pt lr)
 {
     Control::SizeMove(ul, lr);
     m_label->Resize(Size());

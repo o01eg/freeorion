@@ -30,7 +30,8 @@ ClientAppFixture::ClientAppFixture() :
     //InitLoggingOptionsDBSystem();
 
 #ifdef FREEORION_WIN32
-    GetOptionsDB().Add<std::string>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),        PathToString(GetBinDir() / "freeoriond.exe"));
+    if (!GetOptionsDB().OptionExists("misc.server-local-binary.path"))
+        GetOptionsDB().Add<std::string>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),        PathToString(GetBinDir() / "freeoriond.exe"));
 #else
     GetOptionsDB().Add<std::string>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),        PathToString(GetBinDir() / "freeoriond"));
 #endif
@@ -295,7 +296,8 @@ bool ClientAppFixture::HandleMessage(Message& msg) {
 }
 
 void ClientAppFixture::SaveGame() {
-    std::string save_filename = boost::io::str(boost::format("FreeOrionTestGame_%04d_%s%s") % CurrentTurn() % FilenameTimestamp() % SP_SAVE_FILE_EXTENSION);
+    std::string save_filename = boost::io::str(boost::format("FreeOrionTestGame_%04d_%s%s")
+                                               % m_current_turn % FilenameTimestamp() % SP_SAVE_FILE_EXTENSION);
     boost::filesystem::path save_dir_path(GetSaveDir() / "test");
     boost::filesystem::path save_path(save_dir_path / save_filename);
     if (!exists(save_dir_path))

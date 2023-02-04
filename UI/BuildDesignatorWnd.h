@@ -18,8 +18,8 @@ public:
     BuildDesignatorWnd(GG::X w, GG::Y h);
     void CompleteConstruction() override;
 
-    bool InWindow(const GG::Pt& pt) const override;
-    bool InClient(const GG::Pt& pt) const override;
+    bool InWindow(GG::Pt pt) const override;
+    bool InClient(GG::Pt pt) const override;
 
     /** returns set of BulldType shown in this selector */
     const std::set<BuildType>&      GetBuildTypesShown() const;
@@ -29,7 +29,7 @@ public:
 
     int SelectedPlanetID() const;
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
     /** Centres map wnd on location of item on queue with index \a queue_idx
       * and displays info about that item in encyclopedia window

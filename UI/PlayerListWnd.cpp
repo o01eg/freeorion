@@ -206,8 +206,8 @@ namespace {
             }
         }
 
-        void RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override { ForwardEventToParent(); }
-        void RButtonDown(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override { ForwardEventToParent(); }
+        void RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override { ForwardEventToParent(); }
+        void RButtonDown(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override { ForwardEventToParent(); }
 
     private:
         int                                        m_empire_id;
@@ -270,11 +270,11 @@ namespace {
         }
 
         /** Excludes border from the client area. */
-        GG::Pt ClientUpperLeft() const override
+        GG::Pt ClientUpperLeft() const noexcept override
         { return UpperLeft() + GG::Pt(GG::X(DATA_PANEL_BORDER), GG::Y(DATA_PANEL_BORDER)); }
 
         /** Excludes border from the client area. */
-        GG::Pt ClientLowerRight() const override
+        GG::Pt ClientLowerRight() const noexcept override
         { return LowerRight() - GG::Pt(GG::X(DATA_PANEL_BORDER), GG::Y(DATA_PANEL_BORDER)); }
 
         /** Renders panel background, border with color depending on the current state. */
@@ -358,7 +358,7 @@ namespace {
         void Select(bool b)
         { m_selected = b; }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             const GG::Pt old_size = Size();
             GG::Control::SizeMove(ul, lr);
             if (old_size != Size())
@@ -644,7 +644,7 @@ namespace {
 
         /** This function overridden because otherwise, rows don't expand
           * larger than their initial size when resizing the list. */
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             const GG::Pt old_size = Size();
             GG::ListBox::Row::SizeMove(ul, lr);
             //std::cout << "PlayerRow::SizeMove size: (" << Value(Width()) << ", " << Value(Height()) << ")" << std::endl;
@@ -674,7 +674,7 @@ public:
         LockColWidths();
     }
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+    void SizeMove(GG::Pt ul, GG::Pt lr) override {
         const GG::Pt old_size = Size();
         CUIListBox::SizeMove(ul, lr);
         if (old_size != Size()) {
@@ -850,7 +850,7 @@ void PlayerListWnd::SetSelectedPlayers(const std::set<int>& player_ids) {
 void PlayerListWnd::Clear()
 { m_player_list->Clear(); }
 
-void PlayerListWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void PlayerListWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
     const GG::Pt old_size = Size();
     CUIWnd::SizeMove(ul, lr);
     if (old_size != Size())
@@ -867,12 +867,12 @@ void PlayerListWnd::CloseClicked() {
     StopFlash();
 }
 
-void PlayerListWnd::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void PlayerListWnd::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     CUIWnd::LClick(pt, mod_keys);
     StopFlash();
 }
 
-void PlayerListWnd::LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKey> mod_keys) {
+void PlayerListWnd::LDrag(GG::Pt pt, GG::Pt move, GG::Flags<GG::ModKey> mod_keys) {
     CUIWnd::LDrag(pt, move, mod_keys);
     StopFlash();
 }
@@ -906,7 +906,7 @@ void PlayerListWnd::PlayerSelectionChanged(const GG::ListBox::SelectionSet& rows
     SelectedPlayersChangedSignal();
 }
 
-void PlayerListWnd::PlayerDoubleClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
+void PlayerListWnd::PlayerDoubleClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) {
     int player_id = PlayerInRow(it);
     if (player_id != Networking::INVALID_PLAYER_ID)
         PlayerDoubleClickedSignal(player_id);
@@ -923,7 +923,7 @@ namespace {
     }
 }
 
-void PlayerListWnd::PlayerRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
+void PlayerListWnd::PlayerRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) {
     // check that a valid player was clicked and that it wasn't this client's own player
     int clicked_empire_id = EmpireInRow(it);
     if (clicked_empire_id == ALL_EMPIRES)

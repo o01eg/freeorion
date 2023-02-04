@@ -233,7 +233,8 @@ namespace {
             context);
     }
 
-    void CreateNewFleetFromShipsWithDesign(const std::set<int>& ship_ids,
+    template <typename ShipIDSet>
+    void CreateNewFleetFromShipsWithDesign(const ShipIDSet& ship_ids,
                                            int design_id, FleetAggression aggression,
                                            ScriptingContext& context)
     {
@@ -256,7 +257,8 @@ namespace {
         CreateNewFleetFromShips(ships_of_design_ids, aggression, context);
     }
 
-    void CreateNewFleetsFromShipsForEachDesign(const std::set<int>& ship_ids,
+    template <typename ShipIDSet>
+    void CreateNewFleetsFromShipsForEachDesign(const ShipIDSet& ship_ids,
                                                FleetAggression aggression,
                                                ScriptingContext& context)
     {
@@ -331,7 +333,7 @@ namespace {
     }
 
    /** Returns map from object ID to issued colonize orders affecting it. */
-    auto PendingScrapOrders() {
+    auto PendingScrapOrders() { // TODO: return vector<pair> ?
         std::map<int, int> retval;
         const ClientApp* app = ClientApp::GetApp();
         if (!app)
@@ -616,16 +618,16 @@ namespace {
         ShipDataPanel(GG::X w, GG::Y h, int ship_id);
 
         /** Excludes border from the client area. */
-        GG::Pt ClientUpperLeft() const override;
+        GG::Pt ClientUpperLeft() const noexcept override;
         /** Excludes border from the client area. */
-        GG::Pt ClientLowerRight() const override;
+        GG::Pt ClientLowerRight() const noexcept override;
 
         /** Renders black panel background, border with color depending on the
          *current state and a background for the ship's name text. */
         void Render() override;
         void PreRender() override;
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+        void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
         void Select(bool b);
 
@@ -664,10 +666,10 @@ namespace {
         RequireRefresh();
     }
 
-    GG::Pt ShipDataPanel::ClientUpperLeft() const
+    GG::Pt ShipDataPanel::ClientUpperLeft() const noexcept
     { return UpperLeft() + GG::Pt(GG::X(DATA_PANEL_BORDER), GG::Y(DATA_PANEL_BORDER)); }
 
-    GG::Pt ShipDataPanel::ClientLowerRight() const
+    GG::Pt ShipDataPanel::ClientLowerRight() const noexcept
     { return LowerRight() - GG::Pt(GG::X(DATA_PANEL_BORDER), GG::Y(DATA_PANEL_BORDER));  }
 
     void ShipDataPanel::RequireRefresh() {
@@ -724,7 +726,7 @@ namespace {
             m_design_name_text->SetTextColor(text_color_to_use);
     }
 
-    void ShipDataPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+    void ShipDataPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
         const GG::Pt old_size = Size();
         GG::Control::SizeMove(ul, lr);
         if (old_size != Size())
@@ -1018,7 +1020,7 @@ namespace {
             push_back(m_panel);
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             const GG::Pt old_size = Size();
             GG::ListBox::Row::SizeMove(ul, lr);
             if (!empty() && old_size != Size() && m_panel)
@@ -1045,37 +1047,37 @@ public:
     ~FleetDataPanel() = default;
 
     /** Upper left plus border insets. */
-    GG::Pt ClientUpperLeft() const override;
+    GG::Pt ClientUpperLeft() const noexcept override;
 
     /** Lower right minus border insets. */
-    GG::Pt ClientLowerRight() const override;
+    GG::Pt ClientLowerRight() const noexcept  override;
 
     void PreRender() override;
     void Render() override;
 
-    void DragDropHere(const GG::Pt& pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
+    void DragDropHere(GG::Pt pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
                       GG::Flags<GG::ModKey> mod_keys) override;
 
-    void CheckDrops(const GG::Pt& pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
+    void CheckDrops(GG::Pt pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
                     GG::Flags<GG::ModKey> mod_keys) override;
 
     void DragDropLeave() override;
-    void AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys) override;
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void AcceptDrops(GG::Pt pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
-    bool                Selected() const;
-    FleetAggression     GetFleetAggression() const;
+    bool                Selected() const noexcept { return m_selected; }
+    FleetAggression     GetFleetAggression() const noexcept { return m_new_fleet_aggression; }
     void                Select(bool b);
     void                SetSystemID(int id);
 
     /** Indicate fleet data has changed and needs refresh. */
-    void RequireRefresh();
+    void RequireRefresh() noexcept;
 
     mutable boost::signals2::signal<void (const std::vector<int>&)> NewFleetFromShipsSignal;
 
 protected:
     void DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
-                         const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) const override;
+                         GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) const override;
 
 private:
     void ToggleAggression();
@@ -1128,19 +1130,13 @@ FleetDataPanel::FleetDataPanel(GG::X w, GG::Y h, int system_id, bool new_fleet_d
     SetChildClippingMode(ChildClippingMode::ClipToClient);
 }
 
-GG::Pt FleetDataPanel::ClientUpperLeft() const
+GG::Pt FleetDataPanel::ClientUpperLeft() const noexcept
 { return UpperLeft() + GG::Pt(GG::X(DATA_PANEL_BORDER), GG::Y(DATA_PANEL_BORDER)); }
 
-GG::Pt FleetDataPanel::ClientLowerRight() const
+GG::Pt FleetDataPanel::ClientLowerRight() const noexcept
 { return LowerRight() - GG::Pt(GG::X(DATA_PANEL_BORDER), GG::Y(DATA_PANEL_BORDER));  }
 
-bool FleetDataPanel::Selected() const
-{ return m_selected; }
-
-FleetAggression FleetDataPanel::GetFleetAggression() const
-{ return m_new_fleet_aggression; }
-
-void FleetDataPanel::RequireRefresh() {
+void FleetDataPanel::RequireRefresh() noexcept {
     m_needs_refresh = true;
     RequirePreRender();
 }
@@ -1174,7 +1170,7 @@ void FleetDataPanel::Render() {
     GG::FlatRectangle(text_ul,  text_lr,    border_colour,      GG::CLR_ZERO,  0);                  // title background box
 }
 
-void FleetDataPanel::DragDropHere(const GG::Pt& pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
+void FleetDataPanel::DragDropHere(GG::Pt pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
                                   GG::Flags<GG::ModKey> mod_keys)
 {
     if (!m_is_new_fleet_drop_target) {
@@ -1207,7 +1203,7 @@ void FleetDataPanel::DragDropHere(const GG::Pt& pt, std::map<const Wnd*, bool>& 
     }
 }
 
-void FleetDataPanel::CheckDrops(const GG::Pt& pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
+void FleetDataPanel::CheckDrops(GG::Pt pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
                                 GG::Flags<GG::ModKey> mod_keys)
 {
     if (!m_is_new_fleet_drop_target) {
@@ -1222,7 +1218,7 @@ void FleetDataPanel::DragDropLeave()
 { Select(false); }
 
 void FleetDataPanel::DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
-                                     const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) const
+                                     GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) const
 {
     if (!m_is_new_fleet_drop_target) {
         // reject all
@@ -1277,7 +1273,7 @@ void FleetDataPanel::DropsAcceptable(DropsAcceptableIter first, DropsAcceptableI
     }
 }
 
-void FleetDataPanel::AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys) {
+void FleetDataPanel::AcceptDrops(GG::Pt pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys) {
     if (!m_is_new_fleet_drop_target && Parent()) {
         // normally the containing row (or the listbox that contains that) will
         // handle drag-drops
@@ -1315,7 +1311,7 @@ void FleetDataPanel::Select(bool b) {
 void FleetDataPanel::SetSystemID(int id)
 { m_system_id = id; }
 
-void FleetDataPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void FleetDataPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
     const GG::Pt old_size = Size();
     GG::Control::SizeMove(ul, lr);
     if (old_size != Size())
@@ -1785,7 +1781,7 @@ void FleetDataPanel::Init() {
             stat_icon->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
                 std::move(icon), UserString(to_string(meter_type)), UserString(text)));
 
-            stat_icon->RightClickedSignal.connect([meter_type{meter_type}](const GG::Pt& pt){
+            stat_icon->RightClickedSignal.connect([meter_type{meter_type}](GG::Pt pt){
                 auto zoom_article_action = [meter_type]() { ClientUI::GetClientUI()->ZoomToMeterTypeArticle(meter_type); };
 
                 auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
@@ -1852,7 +1848,7 @@ namespace {
             push_back(m_panel);
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             const GG::Pt old_size = Size();
             GG::ListBox::Row::SizeMove(ul, lr);
             if (!empty() && old_size != Size() && m_panel)
@@ -1884,7 +1880,7 @@ public:
         m_order_issuing_enabled = enable;
     }
 
-    void AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds,
+    void AcceptDrops(GG::Pt pt, std::vector<std::shared_ptr<GG::Wnd>> wnds,
                      GG::Flags<GG::ModKey> mod_keys) override
     {
         //DebugLogger() << "FleetsListBox::AcceptDrops";
@@ -1998,7 +1994,7 @@ public:
                 context);
     }
 
-    void DragDropHere(const GG::Pt& pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
+    void DragDropHere(GG::Pt pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
                       GG::Flags<GG::ModKey> mod_keys) override
     {
         CUIListBox::DragDropHere(pt, drop_wnds_acceptable, mod_keys);
@@ -2090,7 +2086,7 @@ public:
         ClearHighlighting();
     }
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+    void SizeMove(GG::Pt ul, GG::Pt lr) override {
         const GG::Pt old_size = Size();
         CUIListBox::SizeMove(ul, lr);
         if (old_size != Size()) {
@@ -2105,7 +2101,7 @@ public:
 
 protected:
     void DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
-                         const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) const override
+                         GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) const override
     {
         // default result, possibly to be updated later: reject all drops
         for (DropsAcceptableIter it = first; it != last; ++it)
@@ -2324,7 +2320,7 @@ public:
     }
 
     void DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
-                         const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) const override
+                         GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) const override
     {
         for (DropsAcceptableIter it = first; it != last; ++it) {
             it->second = false; // default
@@ -2356,7 +2352,7 @@ public:
         }
     }
 
-    void AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds,
+    void AcceptDrops(GG::Pt pt, std::vector<std::shared_ptr<GG::Wnd>> wnds,
                      GG::Flags<GG::ModKey> mod_keys) override
     {
         if (wnds.empty())
@@ -2387,7 +2383,7 @@ public:
             context);
     }
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+    void SizeMove(GG::Pt ul, GG::Pt lr) override {
         const GG::Pt old_size = Size();
         CUIListBox::SizeMove(ul, lr);
         if (old_size != Size()) {
@@ -2415,7 +2411,7 @@ public:
     FleetDetailPanel(GG::X w, GG::Y h, int fleet_id, bool order_issuing_enabled, GG::Flags<GG::WndFlag> flags = GG::NO_WND_FLAGS);
 
     void CompleteConstruction() override;
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
     int             FleetID() const;
     std::set<int>   SelectedShipIDs() const;    ///< returns ids of ships selected in the detail panel's ShipsListBox
@@ -2434,7 +2430,7 @@ private:
     void DoLayout();
     void UniverseObjectDeleted(const std::shared_ptr<const UniverseObject>& obj);
     void ShipSelectionChanged(const GG::ListBox::SelectionSet& rows);
-    void ShipRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
+    void ShipRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys);
     int  ShipInRow(GG::ListBox::iterator it) const;
 
     int                                m_fleet_id = INVALID_OBJECT_ID;
@@ -2563,7 +2559,7 @@ std::set<int> FleetDetailPanel::SelectedShipIDs() const {
     return retval;
 }
 
-void FleetDetailPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void FleetDetailPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
     const GG::Pt old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
     if (old_size != Size())
@@ -2611,8 +2607,8 @@ void FleetDetailPanel::ShipSelectionChanged(const GG::ListBox::SelectionSet& row
     SelectedShipsChangedSignal(rows);
 }
 
-void FleetDetailPanel::ShipRightClicked(GG::ListBox::iterator it, const GG::Pt& pt,
-                                        const GG::Flags<GG::ModKey>& modkeys)
+void FleetDetailPanel::ShipRightClicked(GG::ListBox::iterator it, GG::Pt pt,
+                                        GG::Flags<GG::ModKey> modkeys)
 {
     // get ship that was clicked, aborting if problems arise doing so
     ShipRow* ship_row = dynamic_cast<ShipRow*>(it->get());
@@ -2965,7 +2961,7 @@ void FleetWnd::SetStatIconValues() {
 
             if (universe.GetShipDesign(ship->DesignID())) {
                 ship_count++;
-                damage_tally += ship->TotalWeaponsShipDamage(context, 0.0f, false);
+                damage_tally += ship->TotalWeaponsShipDamage(context, 0.0f, true);
                 destroy_tally += ship->TotalWeaponsFighterDamage(context, true); // TODO: Is it inconsistent to count fighters killing fighters here?
                 fighters_tally += ship->FighterCount();
                 structure_tally += ship->GetMeter(MeterType::METER_STRUCTURE)->Initial();
@@ -3052,7 +3048,7 @@ void FleetWnd::Refresh() {
         fleets_bounding_box = CreateOrGrowBox(fleets_that_exist.empty(), fleets_bounding_box, fleet_loc);
 
         fleets_that_exist.insert(fleet->ID());
-        fleet_locations_ids.emplace(std::make_pair(fleet->SystemID(), fleet_loc), fleet->ID());
+        fleet_locations_ids.emplace(std::pair(fleet->SystemID(), fleet_loc), fleet->ID());
     }
 
     auto bounding_box_center = GG::Pt(fleets_bounding_box.MidX(), fleets_bounding_box.MidY());
@@ -3072,7 +3068,7 @@ void FleetWnd::Refresh() {
         // Grow the selected fleets bounding box
         selected_fleets_bounding_box = CreateOrGrowBox(selected_fleet_locations_ids.empty(),
                                                        selected_fleets_bounding_box, fleet_loc);
-        selected_fleet_locations_ids.emplace(std::make_pair(fleet->SystemID(), fleet_loc), fleet->ID());
+        selected_fleet_locations_ids.emplace(std::pair(fleet->SystemID(), fleet_loc), fleet->ID());
     }
     auto selected_bounding_box_center = GG::Pt(selected_fleets_bounding_box.MidX(),
                                                selected_fleets_bounding_box.MidY());
@@ -3201,7 +3197,7 @@ void FleetWnd::Refresh() {
 void FleetWnd::CloseClicked()
 { CUIWnd::CloseClicked(); }
 
-void FleetWnd::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void FleetWnd::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     MapWndPopup::LClick(pt, mod_keys);
     ClickedSignal(std::static_pointer_cast<FleetWnd>(shared_from_this()));
 }
@@ -3349,7 +3345,7 @@ void FleetWnd::SelectFleets(const std::set<int>& fleet_ids) {
 void FleetWnd::SelectShips(const std::set<int>& ship_ids)
 { m_fleet_detail_panel->SelectShips(ship_ids); }
 
-void FleetWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void FleetWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = Size();
     MapWndPopup::SizeMove(ul, lr);
     if (Size() != old_size)
@@ -3451,8 +3447,8 @@ void FleetWnd::FleetSelectionChanged(const GG::ListBox::SelectionSet& rows) {
     SelectedFleetsChangedSignal();
 }
 
-void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt,
-                                 const GG::Flags<GG::ModKey>& modkeys)
+void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, GG::Pt pt,
+                                 GG::Flags<GG::ModKey> modkeys)
 {
     int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
@@ -3465,7 +3461,7 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt,
         return;
 
     auto system = o.get<System>(fleet->SystemID());
-    std::set<int> ship_ids_set = fleet->ShipIDs();
+    const auto ship_ids_set{fleet->ShipIDs()};
 
     std::vector<int> damaged_ship_ids;
     std::vector<int> unfueled_ship_ids;
@@ -3673,9 +3669,9 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt,
         && fleet->OwnedBy(client_empire_id))
     {
         auto scrap_action = [fleet, client_empire_id]() {
-            std::set<int> ship_ids = fleet->ShipIDs();
+            const auto ship_ids{fleet->ShipIDs()};
             ScriptingContext context;
-            for (int ship_id : ship_ids) {
+            for (const auto ship_id : ship_ids) {
                 GGHumanClientApp::GetApp()->Orders().IssueOrder(
                     std::make_shared<ScrapOrder>(client_empire_id, ship_id, context),
                     context);
@@ -3760,27 +3756,28 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, const GG::Pt& pt,
 
     // Allow dismissal of stale visibility information
     if (!fleet->OwnedBy(client_empire_id)) {
-        auto forget_fleet_action = [fleet]()
-        { ClientUI::GetClientUI()->GetMapWnd()->ForgetObject(fleet->ID()); };
-        auto visibility_turn_map = u.GetObjectVisibilityTurnMapByEmpire(fleet->ID(), client_empire_id);
+        auto forget_fleet_action = [fleet]() { ClientUI::GetClientUI()->GetMapWnd()->ForgetObject(fleet->ID()); };
+        const auto& visibility_turn_map = u.GetObjectVisibilityTurnMapByEmpire(fleet->ID(), client_empire_id);
         auto last_turn_visible_it = visibility_turn_map.find(Visibility::VIS_BASIC_VISIBILITY);
-        if (last_turn_visible_it != visibility_turn_map.end()
-            && last_turn_visible_it->second < CurrentTurn())
-        {
-            popup->AddMenuItem(GG::MenuItem(UserString("FW_ORDER_DISMISS_SENSOR_GHOST"),
-                                            false, false, std::move(forget_fleet_action)));
+        if (const ClientApp* app = ClientApp::GetApp()) {
+            if (last_turn_visible_it != visibility_turn_map.end()
+                && last_turn_visible_it->second < app->CurrentTurn())
+            {
+                popup->AddMenuItem(GG::MenuItem(UserString("FW_ORDER_DISMISS_SENSOR_GHOST"),
+                                                false, false, std::move(forget_fleet_action)));
+            }
         }
     }
 
     popup->Run();
 }
 
-void FleetWnd::FleetLeftClicked(GG::ListBox::iterator it, const GG::Pt& pt,
-                                const GG::Flags<GG::ModKey>& modkeys)
+void FleetWnd::FleetLeftClicked(GG::ListBox::iterator it, GG::Pt pt,
+                                GG::Flags<GG::ModKey> modkeys)
 { ClickedSignal(std::static_pointer_cast<FleetWnd>(shared_from_this())); }
 
-void FleetWnd::FleetDoubleClicked(GG::ListBox::iterator it, const GG::Pt& pt,
-                                  const GG::Flags<GG::ModKey>& modkeys)
+void FleetWnd::FleetDoubleClicked(GG::ListBox::iterator it, GG::Pt pt,
+                                  GG::Flags<GG::ModKey> modkeys)
 { ClickedSignal(std::static_pointer_cast<FleetWnd>(shared_from_this())); }
 
 int FleetWnd::FleetInRow(GG::ListBox::iterator it) const {

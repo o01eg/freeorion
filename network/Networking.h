@@ -3,6 +3,7 @@
 
 #include <string>
 #include <bitset>
+#include <cstdint>
 
 #include "../util/Enum.h"
 #include "../util/Export.h"
@@ -39,17 +40,19 @@ namespace Networking {
 
     class FO_COMMON_API AuthRoles {
     public:
-        AuthRoles() = default;
+        constexpr AuthRoles() = default;
+        explicit AuthRoles(std::initializer_list<RoleType> roles) {
+            for (RoleType r : roles)
+                m_roles.set(std::size_t(r), true);
+        }
 
-        explicit AuthRoles(const std::initializer_list<RoleType>& roles);
+        void SetRole(RoleType role, bool value = true) { m_roles.set(std::size_t(role), value); }
+        void Clear() noexcept { m_roles.reset(); }
 
-        void SetRole(RoleType role, bool value = true);
-        void Clear();
+        [[nodiscard]] bool HasRole(RoleType role) const { return m_roles.test(std::size_t(role)); }
+        [[nodiscard]] std::string Text() const { return m_roles.to_string(); }
+        void SetText(const std::string& text) { m_roles = std::bitset<std::size_t(RoleType::Roles_Count)>(text); }
 
-        bool HasRole(RoleType role) const;
-
-        [[nodiscard]] std::string Text() const;
-        void SetText(const std::string& text);
     private:
         std::bitset<int(RoleType::Roles_Count)> m_roles;
     };

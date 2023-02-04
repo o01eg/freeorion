@@ -12,7 +12,7 @@
 namespace {
     // sorted pair, so order of empire IDs specified doesn't matter
     std::pair<int, int> DiploKey(int id1, int ind2)
-    { return std::make_pair(std::max(id1, ind2), std::min(id1, ind2)); }
+    { return std::pair(std::max(id1, ind2), std::min(id1, ind2)); }
 
     const std::string EMPTY_STRING;
 }
@@ -37,11 +37,6 @@ std::shared_ptr<const Empire> EmpireManager::GetEmpire(int id) const {
 std::shared_ptr<const UniverseObject> EmpireManager::GetSource(int id, const ObjectMap& objects) const {
     auto it = m_const_empire_map.find(id);
     return it != m_const_empire_map.end() ? it->second->Source(objects) : nullptr;
-}
-
-const std::string& EmpireManager::GetEmpireName(int id) const {
-    auto it = m_const_empire_map.find(id);
-    return it == m_const_empire_map.end() ? EMPTY_STRING : it->second->Name();
 }
 
 int EmpireManager::NumEliminatedEmpires() const {

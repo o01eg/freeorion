@@ -95,55 +95,60 @@ Ship::Ship(int empire_id, int design_id, std::string species_name,
     }
 }
 
-Ship* Ship::Clone(const Universe& universe, int empire_id) const {
+std::shared_ptr<UniverseObject> Ship::Clone(const Universe& universe, int empire_id) const {
     Visibility vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
 
-    auto retval = std::make_unique<Ship>();
-    retval->Copy(shared_from_this(), universe, empire_id);
-    return retval.release();
+    auto retval = std::make_shared<Ship>();
+    retval->Copy(*this, universe, empire_id);
+    return retval;
 }
 
-void Ship::Copy(std::shared_ptr<const UniverseObject> copied_object,
-                const Universe& universe, int empire_id)
-{
-    if (copied_object.get() == this)
+void Ship::Copy(const UniverseObject& copied_object, const Universe& universe, int empire_id) {
+    if (&copied_object == this)
         return;
-    auto copied_ship = std::dynamic_pointer_cast<const Ship>(copied_object);
-    if (!copied_ship) {
+
+    if (copied_object.ObjectType() != UniverseObjectType::OBJ_SHIP) {
         ErrorLogger() << "Ship::Copy passed an object that wasn't a Ship";
         return;
     }
 
-    int copied_object_id = copied_object->ID();
-    Visibility vis = universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
-    auto visible_specials = universe.GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
+    Copy(static_cast<const Ship&>(copied_object), universe, empire_id);
+}
 
-    UniverseObject::Copy(std::move(copied_object), vis, visible_specials, universe);
+void Ship::Copy(const Ship& copied_ship, const Universe& universe, int empire_id) {
+    if (&copied_ship == this)
+        return;
+
+    const int copied_object_id = copied_ship.ID();
+    const Visibility vis = universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
+    const auto visible_specials = universe.GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
+
+    UniverseObject::Copy(copied_ship, vis, visible_specials, universe);
 
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
-        this->m_fleet_id =                      copied_ship->m_fleet_id;
+        this->m_fleet_id =                      copied_ship.m_fleet_id;
 
         if (vis >= Visibility::VIS_PARTIAL_VISIBILITY) {
             if (this->Unowned())
-                this->m_name =                  copied_ship->m_name;
+                this->m_name =                  copied_ship.m_name;
 
-            this->m_design_id =                 copied_ship->m_design_id;
-            this->m_part_meters =               copied_ship->m_part_meters;
-            this->m_species_name =              copied_ship->m_species_name;
+            this->m_design_id =                 copied_ship.m_design_id;
+            this->m_part_meters =               copied_ship.m_part_meters;
+            this->m_species_name =              copied_ship.m_species_name;
 
-            this->m_last_turn_active_in_combat= copied_ship->m_last_turn_active_in_combat;
-            this->m_produced_by_empire_id =     copied_ship->m_produced_by_empire_id;
-            this->m_arrived_on_turn =           copied_ship->m_arrived_on_turn;
-            this->m_last_resupplied_on_turn =   copied_ship->m_last_resupplied_on_turn;
+            this->m_last_turn_active_in_combat= copied_ship.m_last_turn_active_in_combat;
+            this->m_produced_by_empire_id =     copied_ship.m_produced_by_empire_id;
+            this->m_arrived_on_turn =           copied_ship.m_arrived_on_turn;
+            this->m_last_resupplied_on_turn =   copied_ship.m_last_resupplied_on_turn;
 
             if (vis >= Visibility::VIS_FULL_VISIBILITY) {
-                this->m_ordered_scrapped =          copied_ship->m_ordered_scrapped;
-                this->m_ordered_colonize_planet_id= copied_ship->m_ordered_colonize_planet_id;
-                this->m_ordered_invade_planet_id  = copied_ship->m_ordered_invade_planet_id;
-                this->m_ordered_bombard_planet_id = copied_ship->m_ordered_bombard_planet_id;
+                this->m_ordered_scrapped =          copied_ship.m_ordered_scrapped;
+                this->m_ordered_colonize_planet_id= copied_ship.m_ordered_colonize_planet_id;
+                this->m_ordered_invade_planet_id  = copied_ship.m_ordered_invade_planet_id;
+                this->m_ordered_bombard_planet_id = copied_ship.m_ordered_bombard_planet_id;
             }
         }
     }
@@ -644,7 +649,7 @@ void Ship::SetBombardPlanet(int planet_id) {
 void Ship::ClearBombardPlanet()
 { SetBombardPlanet(INVALID_OBJECT_ID); }
 
-void Ship::ResetTargetMaxUnpairedMeters() {
+void Ship::ResetTargetMaxUnpairedMeters() noexcept(UniverseObject::noexcept_rtmum) {
     UniverseObject::ResetTargetMaxUnpairedMeters();
 
     UniverseObject::GetMeter(MeterType::METER_MAX_FUEL)->ResetCurrent();
@@ -676,16 +681,22 @@ void Ship::ResetTargetMaxUnpairedMeters() {
             break;
         }
 
-        auto max_it = m_part_meters.find({paired_meter_type, part_name});
-        if (max_it != m_part_meters.end())
-            continue;   // is a max/target meter associated with the meter, so don't treat this a target/max
+        bool found_secondary_meter = false;
+        for (auto& [type_str2, meter2] : m_part_meters) {
+            if (type_str2.first == paired_meter_type && type_str2.second == part_name) {
+                found_secondary_meter = true;
+                break;
+            }
+        }
+        if (found_secondary_meter)
+            continue; // s a max/target meter associated with the meter, so don't treat this a target/max
 
         // no associated target/max meter, so treat this meter as unpaired
         meter.ResetCurrent();
     }
 }
 
-void Ship::ResetPairedActiveMeters() {
+void Ship::ResetPairedActiveMeters() noexcept(UniverseObject::noexcept_rpam) {
     UniverseObject::ResetPairedActiveMeters();
 
     // meters are paired only if they are not max/target meters, and there is an
@@ -693,8 +704,8 @@ void Ship::ResetPairedActiveMeters() {
     for (auto& [type_str, meter] : m_part_meters) {
         (void)meter;
         const auto& [meter_type, part_name] = type_str;
-        MeterType paired_meter_type = MeterType::INVALID_METER_TYPE;
 
+        MeterType paired_meter_type = MeterType::INVALID_METER_TYPE;
         switch(meter_type) {
         case MeterType::METER_MAX_CAPACITY:
         case MeterType::METER_MAX_SECONDARY_STAT:
@@ -707,12 +718,18 @@ void Ship::ResetPairedActiveMeters() {
             break;
         }
 
-        auto max_it = m_part_meters.find({paired_meter_type, part_name});
-        if (max_it == m_part_meters.end())
-            continue;   // no associated max/target meter
+        bool found_secondary_meter = false;
+        for (auto& [type_str2, meter2] : m_part_meters) {
+            if (type_str2.first == paired_meter_type && type_str2.second == part_name) {
+                found_secondary_meter = true;
+                break;
+            }
+        }
+        if (!found_secondary_meter)
+            continue; // no associated max/target meter
+
 
         // has an associated max/target meter.
-        //std::map<std::pair<MeterType, std::string>, Meter>::iterator
         meter.SetCurrent(meter.Initial());
     }
 }

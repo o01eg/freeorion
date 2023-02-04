@@ -623,7 +623,7 @@ namespace {
 
         auto condition = boost::python::extract<condition_wrapper>(kw["condition"])();
         return condition_wrapper(std::make_shared<Condition::ResourceSupplyConnectedByEmpire>(std::move(empire),
-            std::move(ValueRef::CloneUnique(condition.condition))));
+            ValueRef::CloneUnique(condition.condition)));
     }
 
     condition_wrapper insert_within_starlane_jumps_(const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -638,7 +638,7 @@ namespace {
         }
 
         return condition_wrapper(std::make_shared<Condition::WithinStarlaneJumps>(std::move(jumps),
-            std::move(ValueRef::CloneUnique(condition.condition))));
+            ValueRef::CloneUnique(condition.condition)));
     }
 
     condition_wrapper insert_within_distance_(const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -653,7 +653,7 @@ namespace {
         }
 
         return condition_wrapper(std::make_shared<Condition::WithinDistance>(std::move(distance),
-            std::move(ValueRef::CloneUnique(condition.condition))));
+            ValueRef::CloneUnique(condition.condition)));
     }
 
     condition_wrapper insert_object_id_(const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -695,7 +695,6 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
     globals["Ship"] = condition_wrapper(std::make_shared<Condition::Type>(UniverseObjectType::OBJ_SHIP));
     globals["System"] = condition_wrapper(std::make_shared<Condition::Type>(UniverseObjectType::OBJ_SYSTEM));
     globals["Fleet"] = condition_wrapper(std::make_shared<Condition::Type>(UniverseObjectType::OBJ_FLEET));
-    globals["ProductionCenter"] = condition_wrapper(std::make_shared<Condition::Type>(UniverseObjectType::OBJ_PROD_CENTER));
     globals["Monster"] = condition_wrapper(std::make_shared<Condition::Monster>());
     globals["Capital"] = condition_wrapper(std::make_shared<Condition::Capital>());
     globals["Stationary"] = condition_wrapper(std::make_shared<Condition::Stationary>());

@@ -353,7 +353,7 @@ void BuildingIndicator::Refresh() {
     DoLayout();
 }
 
-void BuildingIndicator::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void BuildingIndicator::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = Size();
 
     GG::Wnd::SizeMove(ul, lr);
@@ -362,10 +362,10 @@ void BuildingIndicator::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
         DoLayout();
 }
 
-void BuildingIndicator::MouseWheel(const GG::Pt& pt, int move, GG::Flags<GG::ModKey> mod_keys)
+void BuildingIndicator::MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
-void BuildingIndicator::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void BuildingIndicator::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     // verify that this indicator represents an existing building, and not a
     // queued production item, and that the owner of the building is this
     // client's player's empire

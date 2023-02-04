@@ -12,7 +12,9 @@ namespace Condition {
 
 /** Matches the source object only. */
 struct FO_COMMON_API Source final : public Condition {
-    Source();
+    constexpr Source() noexcept :
+        Condition(true, true, false)
+    {}
 
     bool operator==(const Condition& rhs) const override;
     void GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
@@ -25,7 +27,7 @@ struct FO_COMMON_API Source final : public Condition {
     [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
 
 private:
-    [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
+    [[nodiscard]] bool Match(const ScriptingContext& local_context) const noexcept override;
 };
 
 }

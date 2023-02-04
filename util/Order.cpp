@@ -1505,33 +1505,35 @@ void ShipDesignOrder::ExecuteImpl(ScriptingContext& context) const {
         if (!CheckNew(EmpireID(), m_name, m_description, m_hull, m_parts, context))
             return;
 
-        // TODO: put into unique_ptr and pass as such...
-        ShipDesign* new_ship_design = nullptr;
         try {
-            new_ship_design = new ShipDesign(std::invalid_argument(""), m_name, m_description,
-                                             m_designed_on_turn, EmpireID(), m_hull, m_parts,
-                                             m_icon, m_3D_model, m_name_desc_in_stringtable,
-                                             m_is_monster, m_uuid);
+            ShipDesign new_ship_design(std::invalid_argument(""), m_name, m_description,
+                                       m_designed_on_turn, EmpireID(), m_hull, m_parts,
+                                       m_icon, m_3D_model, m_name_desc_in_stringtable,
+                                       m_is_monster, m_uuid);
+
+            if (m_design_id == INVALID_DESIGN_ID) {
+                // On the client create a new design id
+                m_design_id = universe.InsertShipDesign(std::move(new_ship_design));
+                DebugLogger() << "ShipDesignOrder::ExecuteImpl inserted new ship design ID " << m_design_id;
+
+            } else {
+                // On the server use the design id passed from the client
+                const auto success = universe.InsertShipDesignID(std::move(new_ship_design), EmpireID(),
+                                                                 m_design_id);
+                if (!success) {
+                    ErrorLogger() << "Couldn't insert ship design by ID " << m_design_id;
+                    return;
+                }
+            }
+
+            universe.SetEmpireKnowledgeOfShipDesign(m_design_id, EmpireID());
+            empire->AddShipDesign(m_design_id, universe);
+
+
         } catch (const std::exception& e) {
             ErrorLogger() << "Couldn't create ship design: " << e.what();
             return;
         }
-
-        if (m_design_id == INVALID_DESIGN_ID) {
-            // On the client create a new design id
-            universe.InsertShipDesign(new_ship_design);
-            m_design_id = new_ship_design->ID();
-            DebugLogger() << "ShipDesignOrder::ExecuteImpl inserted new ship design ID " << m_design_id;
-        } else {
-            // On the server use the design id passed from the client
-            if (!universe.InsertShipDesignID(new_ship_design, EmpireID(), m_design_id)) {
-                ErrorLogger() << "Couldn't insert ship design by ID " << m_design_id;
-                return;
-            }
-        }
-
-        universe.SetEmpireKnowledgeOfShipDesign(m_design_id, EmpireID());
-        empire->AddShipDesign(m_design_id, universe);
 
     } else if (m_update_name_or_description) {
         if (!CheckRename(EmpireID(), m_design_id, m_name, m_description, context))
@@ -1801,8 +1803,18 @@ bool GiveObjectToEmpireOrder::Check(int empire_id, int object_id, int recipient_
         ErrorLogger() << "IssueGiveObjectToEmpireOrder : given invalid recipient empire id";
         return false;
     }
+    const auto giver_empire = context.GetEmpire(empire_id);
+    if (!giver_empire) {
+        ErrorLogger() << "IssueGiveObjectToEmpireOrder : given invalid giver empire id";
+        return false;
+    }
+    if (giver_empire->CapitalID() == object_id) {
+        ErrorLogger() << "IssueGiverObjectToEmpireOrder : giving away capital not allowed";
+        return false;
+    }
 
-    auto dip = context.ContextDiploStatus(empire_id, recipient_empire_id);
+
+    const auto dip = context.ContextDiploStatus(empire_id, recipient_empire_id);
     if (dip < DiplomaticStatus::DIPLO_PEACE) {
         ErrorLogger() << "IssueGiveObjectToEmpireOrder : attempting to give to empire not at peace";
         return false;
@@ -1810,7 +1822,7 @@ bool GiveObjectToEmpireOrder::Check(int empire_id, int object_id, int recipient_
 
     const ObjectMap& objects{context.ContextObjects()};
 
-    auto obj = objects.get(object_id);
+    const auto obj = objects.get(object_id);
     if (!obj) {
         ErrorLogger() << "IssueGiveObjectToEmpireOrder : passed invalid object id";
         return false;
@@ -1821,7 +1833,7 @@ bool GiveObjectToEmpireOrder::Check(int empire_id, int object_id, int recipient_
         return false;
     }
 
-    auto system = objects.get<System>(obj->SystemID());
+    const auto system = objects.get<System>(obj->SystemID());
     if (!system) {
         ErrorLogger() << "IssueGiveObjectToEmpireOrder : couldn't get system of object";
         return false;
@@ -1834,7 +1846,7 @@ bool GiveObjectToEmpireOrder::Check(int empire_id, int object_id, int recipient_
         return false;
     }
 
-    auto system_objects = objects.findRaw<const UniverseObject>(system->ObjectIDs());
+    const auto system_objects = objects.findRaw<const UniverseObject>(system->ObjectIDs());
     if (!std::any_of(system_objects.begin(), system_objects.end(),
                      [recipient_empire_id](const auto& o){ return o->Owner() == recipient_empire_id; }))
     {

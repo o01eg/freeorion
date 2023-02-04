@@ -26,132 +26,106 @@ namespace {
 
 /** A simple server that listens for FreeOrion-server-discovery UDP datagrams
     on the local network and sends out responses to them. */
-class DiscoveryServer {
-public:
-    DiscoveryServer(boost::asio::io_context& io_context) :
-        m_socket(io_context)
-    {
-        // use a dual stack (ipv6 + ipv4) socket
-        udp::endpoint discovery_endpoint(udp::v6(), Networking::DiscoveryPort());
+ServerNetworking::DiscoveryServer::DiscoveryServer(boost::asio::io_context& io_context) :
+    m_socket(io_context)
+{
+    // use a dual stack (ipv6 + ipv4) socket
+    udp::endpoint discovery_endpoint(udp::v6(), Networking::DiscoveryPort());
 
-        if (GetOptionsDB().Get<bool>("singleplayer")) {
-            // when hosting a single player game only accept connections from
-            // the localhost via the loopback interface instead of the any
-            // interface.
-            // This should prevent unnecessary triggering of Desktop Firewalls as
-            // reported by various users when running single player games.
+    if (GetOptionsDB().Get<bool>("singleplayer")) {
+        // when hosting a single player game only accept connections from
+        // the localhost via the loopback interface instead of the any
+        // interface.
+        // This should prevent unnecessary triggering of Desktop Firewalls as
+        // reported by various users when running single player games.
+        discovery_endpoint.address(boost::asio::ip::address_v4::loopback());
+    }
+
+    try {
+        m_socket = udp::socket(io_context, discovery_endpoint);
+    } catch (const std::exception &e) {
+        ErrorLogger(network) << "DiscoveryServer cannot open IPv6 socket: " << e.what()
+                                << ". Fallback to IPv4";
+        discovery_endpoint = udp::endpoint(udp::v4(), Networking::DiscoveryPort());
+        if (GetOptionsDB().Get<bool>("singleplayer"))
             discovery_endpoint.address(boost::asio::ip::address_v4::loopback());
-        }
 
-        try {
-            m_socket = udp::socket(io_context, discovery_endpoint);
-        } catch (const std::exception &e) {
-            ErrorLogger(network) << "DiscoveryServer cannot open IPv6 socket: " << e.what()
-                                 << ". Fallback to IPv4";
-            discovery_endpoint = udp::endpoint(udp::v4(), Networking::DiscoveryPort());
-            if (GetOptionsDB().Get<bool>("singleplayer"))
-                discovery_endpoint.address(boost::asio::ip::address_v4::loopback());
-
-            m_socket = udp::socket(io_context, discovery_endpoint);
-        }
-
-        Listen();
+        m_socket = udp::socket(io_context, discovery_endpoint);
     }
 
-private:
-    void Listen() {
-        m_recv_buffer.fill('\0');
-        m_socket.async_receive_from(
-            boost::asio::buffer(m_recv_buffer),
-            m_remote_endpoint,
-            boost::bind(&DiscoveryServer::HandleReceive, this,
-                        boost::asio::placeholders::error));
-    }
-
-
-    void HandleReceive(const boost::system::error_code& error) {
-        if (error) {
-            ErrorLogger(network) << "DiscoveryServer received and ignored error: " << error
-                                 << "\nfrom: " << m_remote_endpoint;
-            Listen();
-            return;
-        }
-
-        auto message = std::string(m_recv_buffer.begin(), m_recv_buffer.end());
-        message.erase(std::find(message.begin(), message.end(), '\0'), message.end());
-        boost::trim(message);
-
-        if (message == DISCOVERY_QUESTION) {
-            auto reply = DISCOVERY_ANSWER;
-            m_socket.send_to(
-                boost::asio::buffer(reply),
-                m_remote_endpoint);
-            DebugLogger(network) << "DiscoveryServer received from: " << m_remote_endpoint // operator<< outputs "IP:port"
-                                 << "\nmessage: " << message
-                                 << "\nreplied: " << reply;
-            Listen();
-            return;
-        }
-
-        DebugLogger(network) << "DiscoveryServer evaluating FOCS expression: " << message;
-        std::string reply;
-        try {
-            ScriptingContext context;
-            if (parse::int_free_variable(message)) {
-                auto value_ref = std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
-                reply = std::to_string(value_ref->Eval(context));
-                DebugLogger(network) << "DiscoveryServer evaluated expression as integer with result: " << reply;
-
-            } else if (parse::double_free_variable(message)) {
-                auto value_ref = std::make_unique<ValueRef::Variable<double>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
-                reply = std::to_string(value_ref->Eval(context));
-                DebugLogger(network) << "DiscoveryServer evaluated expression as double with result: " << reply;
-
-            } else if (parse::string_free_variable(message)) {
-                auto value_ref = std::make_unique<ValueRef::Variable<std::string>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
-                reply = value_ref->Eval(context);
-                DebugLogger(network) << "DiscoveryServer evaluated expression as string with result: " << reply;
-
-            //} else {
-            //    auto value_ref = std::make_unique<ValueRef::Variable<std::vector<std::string>>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
-            //    auto result = value_ref->Eval(context);
-            //    for (auto entry : result)
-            //        reply += entry + "\n";
-            //    DebugLogger(network) << "DiscoveryServer evaluated expression as string vector with result: " << reply;
-
-            } else {
-                ErrorLogger(network) << "DiscoveryServer couldn't interpret message";
-                reply = "FOCS ERROR";
-            }
-        } catch (...) {
-            ErrorLogger(network) << "DiscoveryServer caught exception processing message";
-            reply = "EXCEPTION ERROR";
-        }
-
-        m_socket.send_to(boost::asio::buffer(reply), m_remote_endpoint);
-
-        Listen();
-    }
-
-    boost::asio::ip::udp::socket            m_socket;
-    boost::asio::ip::udp::endpoint          m_remote_endpoint;
-
-    std::array<char, 1024> m_recv_buffer = {};
-};
-
-namespace {
-    struct PlayerID {
-        PlayerID(int id) :
-            m_id(id)
-        {}
-
-        bool operator()(const PlayerConnectionPtr& player_connection)
-        { return player_connection->PlayerID() == m_id; }
-
-    private:
-        int m_id;
-    };
+    Listen();
 }
+
+void ServerNetworking::DiscoveryServer::Listen() {
+    m_recv_buffer.fill('\0');
+    m_socket.async_receive_from(
+        boost::asio::buffer(m_recv_buffer),
+        m_remote_endpoint,
+        boost::bind(&DiscoveryServer::HandleReceive, this, boost::asio::placeholders::error));
+}
+
+void ServerNetworking::DiscoveryServer::HandleReceive(boost::system::error_code error) {
+    if (error) {
+        ErrorLogger(network) << "DiscoveryServer received and ignored error: " << error
+                                << "\nfrom: " << m_remote_endpoint;
+        Listen();
+        return;
+    }
+
+    auto message = std::string(m_recv_buffer.begin(), m_recv_buffer.end());
+    message.erase(std::find(message.begin(), message.end(), '\0'), message.end());
+    boost::trim(message);
+
+    if (message == DISCOVERY_QUESTION) {
+        m_socket.send_to(boost::asio::buffer(DISCOVERY_ANSWER), m_remote_endpoint);
+        DebugLogger(network) << "DiscoveryServer received from: " << m_remote_endpoint // operator<< outputs "IP:port"
+                             << "\nmessage: " << message
+                             << "\nreplied: " << DISCOVERY_ANSWER;
+        Listen();
+        return;
+    }
+
+    DebugLogger(network) << "DiscoveryServer evaluating FOCS expression: " << message;
+    std::string reply;
+    try {
+        ScriptingContext context;
+        if (parse::int_free_variable(message)) {
+            auto value_ref = std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
+            reply = std::to_string(value_ref->Eval(context));
+            DebugLogger(network) << "DiscoveryServer evaluated expression as integer with result: " << reply;
+
+        } else if (parse::double_free_variable(message)) {
+            auto value_ref = std::make_unique<ValueRef::Variable<double>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
+            reply = std::to_string(value_ref->Eval(context));
+            DebugLogger(network) << "DiscoveryServer evaluated expression as double with result: " << reply;
+
+        } else if (parse::string_free_variable(message)) {
+            auto value_ref = std::make_unique<ValueRef::Variable<std::string>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
+            reply = value_ref->Eval(context);
+            DebugLogger(network) << "DiscoveryServer evaluated expression as string with result: " << reply;
+
+        //} else {
+        //    auto value_ref = std::make_unique<ValueRef::Variable<std::vector<std::string>>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
+        //    auto result = value_ref->Eval(context);
+        //    for (auto entry : result)
+        //        reply += entry + "\n";
+        //    DebugLogger(network) << "DiscoveryServer evaluated expression as string vector with result: " << reply;
+
+        } else {
+            ErrorLogger(network) << "DiscoveryServer couldn't interpret message";
+            reply = "FOCS ERROR";
+        }
+    } catch (...) {
+        ErrorLogger(network) << "DiscoveryServer caught exception processing message";
+        reply = "EXCEPTION ERROR";
+    }
+
+    m_socket.send_to(boost::asio::buffer(reply), m_remote_endpoint);
+
+    Listen();
+}
+
+
 
 constexpr static size_t MaxMessageSize = 1024 * 1024 * 10; // Restrict message size to 10 MiB.
 
@@ -249,31 +223,30 @@ std::string PlayerConnection::GetIpAddress() const {
             return m_socket->remote_endpoint().address().to_string();
         } catch (const boost::system::system_error& err) {
             ErrorLogger(network) << "PlayerConnection::GetIpAddress remote endpont error: " << err.what();
-            return "";
         }
     }
     return "";
 }
 
-void PlayerConnection::AwaitPlayer(Networking::ClientType client_type,
-                                   const std::string& client_version_string)
-{
+void PlayerConnection::AwaitPlayer(Networking::ClientType client_type, std::string client_version_string) {
     TraceLogger(network) << "PlayerConnection(@ " << this << ")::AwaitPlayer("
                          << client_type << ", " << client_version_string << ")";
     if (m_client_type != Networking::ClientType::INVALID_CLIENT_TYPE) {
         ErrorLogger(network) << "PlayerConnection::AwaitPlayer attempting to re-await an already awaiting connection.";
         return;
     }
-    if (client_type == Networking::ClientType::INVALID_CLIENT_TYPE || client_type >= Networking::ClientType::NUM_CLIENT_TYPES) {
+    if (client_type == Networking::ClientType::INVALID_CLIENT_TYPE ||
+        client_type >= Networking::ClientType::NUM_CLIENT_TYPES)
+    {
         ErrorLogger(network) << "PlayerConnection::EstablishPlayer passed invalid client type: " << client_type;
         return;
     }
     m_client_type = client_type;
-    m_client_version_string = client_version_string;
+    m_client_version_string = std::move(client_version_string);
 }
 
-void PlayerConnection::EstablishPlayer(int id, const std::string& player_name, Networking::ClientType client_type,
-                                       const std::string& client_version_string)
+void PlayerConnection::EstablishPlayer(int id, std::string player_name, Networking::ClientType client_type,
+                                       std::string client_version_string)
 {
     TraceLogger(network) << "PlayerConnection(@ " << this << ")::EstablishPlayer("
                          << id << ", " << player_name << ", "
@@ -302,9 +275,9 @@ void PlayerConnection::EstablishPlayer(int id, const std::string& player_name, N
         return;
     }
     m_ID = id;
-    m_player_name = player_name;
+    m_player_name = std::move(player_name);
     m_client_type = client_type;
-    m_client_version_string = client_version_string;
+    m_client_version_string = std::move(client_version_string);
 }
 
 void PlayerConnection::SetClientType(Networking::ClientType client_type) {
@@ -317,12 +290,7 @@ void PlayerConnection::SetAuthenticated() {
     m_authenticated = true;
 }
 
-void PlayerConnection::SetAuthRoles(const std::initializer_list<Networking::RoleType>& roles) {
-    m_roles = Networking::AuthRoles(roles);
-    SendMessage(SetAuthorizationRolesMessage(m_roles));
-}
-
-void PlayerConnection::SetAuthRoles(const Networking::AuthRoles& roles) {
+void PlayerConnection::SetAuthRoles(Networking::AuthRoles roles) {
     m_roles = roles;
     SendMessage(SetAuthorizationRolesMessage(m_roles));
 }
@@ -532,7 +500,7 @@ void PlayerConnection::AsyncReadMessage() {
 }
 
 void PlayerConnection::SendMessageImpl(PlayerConnectionPtr self, Message message) {
-    bool start_write = self->m_outgoing_messages.empty();
+    const bool start_write = self->m_outgoing_messages.empty();
     self->m_outgoing_messages.push(std::move(message));
     if (start_write)
         self->AsyncWriteMessage();
@@ -544,9 +512,9 @@ void PlayerConnection::AsyncWriteMessage() {
                              << ". Socket is closed. Dropping message.";
         return;
     }
-    using namespace boost::asio;
-    using boost::asio::buffer;
     using boost::asio::async_write;
+    using boost::asio::buffer;
+    using boost::asio::const_buffer;
     using boost::asio::placeholders::error;
     using boost::asio::placeholders::bytes_transferred;
 
@@ -573,15 +541,17 @@ void PlayerConnection::HandleMessageWrite(PlayerConnectionPtr self,
         return;
     }
 
-    if (static_cast<int>(bytes_transferred) != static_cast<int>(Message::HeaderBufferSize) + self->m_outgoing_header[Message::Parts::SIZE])
-        return;
+    if (static_cast<int>(bytes_transferred) !=
+        static_cast<int>(Message::HeaderBufferSize) + self->m_outgoing_header[Message::Parts::SIZE])
+    { return; }
 
     self->m_outgoing_messages.pop();
     if (!self->m_outgoing_messages.empty())
         self->AsyncWriteMessage();
 }
 
-void PlayerConnection::AsyncErrorHandler(PlayerConnectionPtr self, boost::system::error_code handled_error,
+void PlayerConnection::AsyncErrorHandler(PlayerConnectionPtr self,
+                                         boost::system::error_code handled_error,
                                          boost::system::error_code error)
 { self->EventSignal(boost::bind(self->m_disconnected_callback, self)); }
 
@@ -589,51 +559,33 @@ void PlayerConnection::AsyncErrorHandler(PlayerConnectionPtr self, boost::system
 ////////////////////////////////////////////////////////////////////////////////
 // ServerNetworking
 ////////////////////////////////////////////////////////////////////////////////
-bool ServerNetworking::EstablishedPlayer::operator()(
-    const PlayerConnectionPtr& player_connection) const
-{ return player_connection->EstablishedPlayer(); }
-
 ServerNetworking::ServerNetworking(boost::asio::io_context& io_context,
                                    MessageAndConnectionFn nonplayer_message_callback,
                                    MessageAndConnectionFn player_message_callback,
                                    ConnectionFn disconnected_callback) :
-    m_host_player_id(Networking::INVALID_PLAYER_ID),
-    m_discovery_server(new DiscoveryServer(io_context)),
+    m_discovery_server{io_context},
     m_player_connection_acceptor(io_context),
     m_nonplayer_message_callback(nonplayer_message_callback),
     m_player_message_callback(player_message_callback),
     m_disconnected_callback(disconnected_callback)
 { Init(); }
 
-ServerNetworking::~ServerNetworking()
-{ delete m_discovery_server; }
-
-bool ServerNetworking::empty() const
-{ return m_player_connections.empty(); }
-
-std::size_t ServerNetworking::size() const
-{ return m_player_connections.size(); }
-
-ServerNetworking::const_iterator ServerNetworking::begin() const
-{ return m_player_connections.begin(); }
-
-ServerNetworking::const_iterator ServerNetworking::end() const
-{ return m_player_connections.end(); }
-
 std::size_t ServerNetworking::NumEstablishedPlayers() const
 { return std::distance(established_begin(), established_end()); }
 
 ServerNetworking::const_established_iterator ServerNetworking::GetPlayer(int id) const
-{ return std::find_if(established_begin(), established_end(), PlayerID(id)); }
+{ return std::find_if(established_begin(), established_end(),
+                      [id](const auto& player_con) noexcept { return player_con->PlayerID() == id; });
+}
 
 ServerNetworking::const_established_iterator ServerNetworking::established_begin() const {
-    return const_established_iterator(EstablishedPlayer(),
+    return const_established_iterator(is_established_player,
                                       m_player_connections.begin(),
                                       m_player_connections.end());
 }
 
 ServerNetworking::const_established_iterator ServerNetworking::established_end() const {
-    return const_established_iterator(EstablishedPlayer(),
+    return const_established_iterator(is_established_player,
                                       m_player_connections.end(),
                                       m_player_connections.end());
 }
@@ -641,23 +593,20 @@ ServerNetworking::const_established_iterator ServerNetworking::established_end()
 int ServerNetworking::NewPlayerID() const {
     int biggest_current_player_id(0);
     for (const PlayerConnectionPtr& player : m_player_connections) {
-        int player_id = player->PlayerID();
+        const int player_id = player->PlayerID();
         if (player_id != INVALID_PLAYER_ID && player_id > biggest_current_player_id)
             biggest_current_player_id = player_id;
     }
     return biggest_current_player_id + 1;
 }
 
-int ServerNetworking::HostPlayerID() const
-{ return m_host_player_id; }
-
-bool ServerNetworking::PlayerIsHost(int player_id) const {
+bool ServerNetworking::PlayerIsHost(int player_id) const noexcept {
     if (player_id == Networking::INVALID_PLAYER_ID)
         return false;
     return player_id == m_host_player_id;
 }
 
-bool ServerNetworking::ModeratorsInGame() const {
+bool ServerNetworking::ModeratorsInGame() const noexcept {
     for (const PlayerConnectionPtr& player : m_player_connections) {
         if (player->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR)
             return true;
@@ -682,9 +631,9 @@ bool ServerNetworking::CheckCookie(boost::uuids::uuid cookie,
     if (cookie.is_nil())
         return false;
 
-    auto it = m_cookies.find(cookie);
+    const auto it = m_cookies.find(cookie);
     if (it != m_cookies.end() && player_name == it->second.player_name) {
-        boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+        const boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
         if (it->second.expired >= now) {
             roles = it->second.roles;
             authenticated = it->second.authenticated;
@@ -694,24 +643,18 @@ bool ServerNetworking::CheckCookie(boost::uuids::uuid cookie,
     return false;
 }
 
-int ServerNetworking::GetCookiesSize() const
-{ return m_cookies.size(); }
-
 void ServerNetworking::SendMessageAll(const Message& message) {
-    for (auto player_it = established_begin();
-        player_it != established_end(); ++player_it)
-    {
+    for (auto player_it = established_begin(); player_it != established_end(); ++player_it)
         (*player_it)->SendMessage(message);
-    }
 }
 
 void ServerNetworking::Disconnect(int id) {
-    established_iterator it = GetPlayer(id);
+    const established_iterator it = GetPlayer(id);
     if (it == established_end()) {
         ErrorLogger(network) << "ServerNetworking::Disconnect couldn't find player with id " << id << " to disconnect.  aborting";
         return;
     }
-    PlayerConnectionPtr player = *it;
+    const PlayerConnectionPtr player = *it;
     if (player->PlayerID() != id) {
         ErrorLogger(network) << "ServerNetworking::Disconnect got PlayerConnectionPtr with inconsistent player id (" << player->PlayerID() << ") to what was requrested (" << id << ")";
         return;
@@ -719,38 +662,31 @@ void ServerNetworking::Disconnect(int id) {
     Disconnect(player);
 }
 
-void ServerNetworking::Disconnect(PlayerConnectionPtr player_connection)
-{
+void ServerNetworking::Disconnect(PlayerConnectionPtr player_connection) {
     DebugLogger(network) << "ServerNetworking::Disconnect";
     DisconnectImpl(player_connection);
 }
 
 void ServerNetworking::DisconnectAll() {
     DebugLogger(network) << "ServerNetworking::DisconnectAll";
-    for (const_iterator it = m_player_connections.begin();
-         it != m_player_connections.end(); ) {
-        PlayerConnectionPtr player_connection = *it++;
-        DisconnectImpl(player_connection);
-    }
+    const auto connections_copy{m_player_connections};
+    for (auto& pcon : connections_copy)
+        DisconnectImpl(pcon);
 }
 
-ServerNetworking::iterator ServerNetworking::begin()
-{ return m_player_connections.begin(); }
-
-ServerNetworking::iterator ServerNetworking::end()
-{ return m_player_connections.end(); }
-
-ServerNetworking::established_iterator ServerNetworking::GetPlayer(int id)
-{ return std::find_if(established_begin(), established_end(), PlayerID(id)); }
+ServerNetworking::established_iterator ServerNetworking::GetPlayer(int id) {
+    return std::find_if(established_begin(), established_end(),
+                      [id](const auto& player_con) noexcept { return player_con->PlayerID() == id; });
+}
 
 ServerNetworking::established_iterator ServerNetworking::established_begin() {
-    return established_iterator(EstablishedPlayer(),
+    return established_iterator(is_established_player,
                                 m_player_connections.begin(),
                                 m_player_connections.end());
 }
 
 ServerNetworking::established_iterator ServerNetworking::established_end() {
-    return established_iterator(EstablishedPlayer(),
+    return established_iterator(is_established_player,
                                 m_player_connections.end(),
                                 m_player_connections.end());
 }
@@ -763,11 +699,8 @@ void ServerNetworking::HandleNextEvent() {
     }
 }
 
-void ServerNetworking::SetHostPlayerID(int host_player_id)
-{ m_host_player_id = host_player_id; }
-
 boost::uuids::uuid ServerNetworking::GenerateCookie(std::string player_name,
-                                                    const Networking::AuthRoles& roles,
+                                                    Networking::AuthRoles roles,
                                                     bool authenticated)
 {
     boost::uuids::uuid cookie = boost::uuids::random_generator()();
@@ -784,7 +717,7 @@ void ServerNetworking::UpdateCookie(boost::uuids::uuid cookie) {
     if (cookie.is_nil())
         return;
 
-    auto it = m_cookies.find(cookie);
+    const auto it = m_cookies.find(cookie);
     if (it != m_cookies.end()) {
         it->second.expired = boost::posix_time::second_clock::local_time() +
             boost::posix_time::minutes(GetOptionsDB().Get<int>("network.server.cookies.expire-minutes"));
@@ -877,7 +810,7 @@ void ServerNetworking::AcceptNextMessagingConnection() {
 }
 
 void ServerNetworking::AcceptPlayerMessagingConnection(PlayerConnectionPtr player_connection,
-                                                       const boost::system::error_code& error)
+                                                       boost::system::error_code error)
 {
     if (!error) {
         DebugLogger(network) << "ServerNetworking::AcceptPlayerMessagingConnection : connected to new player";
@@ -896,5 +829,5 @@ void ServerNetworking::DisconnectImpl(PlayerConnectionPtr player_connection) {
     m_disconnected_callback(player_connection);
 }
 
-void ServerNetworking::EnqueueEvent(const NullaryFn& fn)
-{ m_event_queue.push(fn); }
+void ServerNetworking::EnqueueEvent(NullaryFn fn)
+{ m_event_queue.push(std::move(fn)); }

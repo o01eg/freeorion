@@ -131,14 +131,14 @@ void GraphControl::ScaleToZero(bool zero) {
         DoLayout();
 }
 
-void GraphControl::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void GraphControl::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_sz = Size();
     GG::Control::SizeMove(ul, lr);
     if (Size() != old_sz)
         DoLayout();
 }
 
-void GraphControl::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void GraphControl::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
     auto set_log_scale = [this]()

@@ -364,7 +364,7 @@ namespace {
         return white;
     }
 
-    void RenderPlanet(const GG::Pt& center, int diameter, std::shared_ptr<GG::Texture> texture,
+    void RenderPlanet(GG::Pt center, int diameter, std::shared_ptr<GG::Texture> texture,
                       std::shared_ptr<GG::Texture> overlay_texture,
                       double initial_rotation, double RPM, double axial_tilt, double shininess,
                       StarType star_type)
@@ -524,7 +524,7 @@ public:
     PlanetPanel(GG::X w, int planet_id, StarType star_type);
     void CompleteConstruction() override;
 
-    bool InWindow(const GG::Pt& pt) const override;
+    bool InWindow(GG::Pt pt) const override;
 
     int PlanetID() const noexcept { return m_planet_id; }
 
@@ -532,14 +532,15 @@ public:
 
     void Render() override;
 
-    void LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void LDoubleClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void MouseWheel(const GG::Pt& pt, int move, GG::Flags<GG::ModKey> mod_keys) override;
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
+    void LDoubleClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
+    void RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
+    void MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
     void Select(bool selected);
 
+    void Clear();
     void Refresh(ScriptingContext& context); ///< updates panels, shows / hides colonize button, redoes layout of infopanels
 
     /** Enables, or disables if \a enable is false, issuing orders via this PlanetPanel. */
@@ -562,7 +563,7 @@ public:
     mutable boost::signals2::signal<void ()> ResizedSignal;
 
     /** emitted when focus is changed */
-    mutable boost::signals2::signal<void (const std::string&)> FocusChangedSignal;
+    mutable boost::signals2::signal<void (std::string_view)> FocusChangedSignal;
 
     mutable boost::signals2::signal<void (int)> BuildingRightClickedSignal;
 
@@ -573,10 +574,10 @@ public:
 private:
     void DoLayout();
     void RefreshPlanetGraphic();
-    void SetFocus(const std::string& focus); ///< set the focus of the planet to \a focus
-    void ClickColonize();                    ///< called if colonize button is pressed
-    void ClickInvade();                      ///< called if invade button is pressed
-    void ClickBombard();                     ///< called if bombard button is pressed
+    void SetFocus(std::string focus); ///< set the focus of the planet to \a focus
+    void ClickColonize();             ///< called if colonize button is pressed
+    void ClickInvade();               ///< called if invade button is pressed
+    void ClickBombard();              ///< called if bombard button is pressed
 
     void FocusDropListSelectionChangedSlot(GG::DropDownList::iterator selected); ///< called when droplist selection changes, emits FocusChangedSignal
 
@@ -609,16 +610,16 @@ class SidePanel::PlanetPanelContainer : public GG::Wnd {
 public:
     PlanetPanelContainer();
 
-    bool InWindow(const GG::Pt& pt) const override;
+    bool InWindow(GG::Pt pt) const override;
 
-    void MouseWheel(const GG::Pt& pt, int move, GG::Flags<GG::ModKey> mod_keys) override;
+    void MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys) override;
 
     int                     SelectedPlanetID() const    {return m_selected_planet_id;}
     const std::set<int>&    SelectionCandidates() const {return m_candidate_ids;}
     int                     ScrollPosition() const;
 
-    void LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKey> mod_keys) override;
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void LDrag(GG::Pt pt, GG::Pt move, GG::Flags<GG::ModKey> mod_keys) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
     void PreRender() override;
 
@@ -815,16 +816,14 @@ namespace {
 /** A class to display all of the system names*/
 class SidePanel::SystemNameDropDownList : public CUIDropDownList {
     public:
-    SystemNameDropDownList(std::size_t num_shown_elements) :
-        CUIDropDownList(num_shown_elements),
-        m_order_issuing_enabled(true)
-    { }
+    explicit SystemNameDropDownList(std::size_t num_shown_elements) :
+        CUIDropDownList(num_shown_elements)
+    {}
 
     /** Enable/disable the ability to give orders that modify the system name.*/
-    void EnableOrderIssuing(bool enable = true)
-    { m_order_issuing_enabled = enable; }
+    void EnableOrderIssuing(bool enable = true) noexcept { m_order_issuing_enabled = enable; }
 
-    void RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override {
+    void RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override {
         if (CurrentItem() == end())
             return;
 
@@ -868,7 +867,7 @@ class SidePanel::SystemNameDropDownList : public CUIDropDownList {
         popup->Run();
     }
 
-    bool m_order_issuing_enabled;
+    bool m_order_issuing_enabled = true;
 };
 
 namespace {
@@ -974,15 +973,13 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
     m_planet_name->Resize(m_planet_name->MinUsableSize());
     AttachChild(m_planet_name);
 
-    using boost::placeholders::_1;
+    namespace ph = boost::placeholders;
 
     // focus-selection droplist
     m_focus_drop = GG::Wnd::Create<CUIDropDownList>(6);
     AttachChild(m_focus_drop);
-    m_focus_drop->SelChangedSignal.connect(
-        boost::bind(&SidePanel::PlanetPanel::FocusDropListSelectionChangedSlot, this, _1));
-    this->FocusChangedSignal.connect(
-        boost::bind(&SidePanel::PlanetPanel::SetFocus, this, _1));
+    m_focus_drop->SelChangedSignal.connect(boost::bind(
+        &SidePanel::PlanetPanel::FocusDropListSelectionChangedSlot, this, ph::_1));
     m_focus_drop->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
     m_focus_drop->SetStyle(GG::LIST_NOSORT | GG::LIST_SINGLESEL);
     m_focus_drop->ManuallyManageColProps();
@@ -992,6 +989,7 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
     m_focus_drop->SetColStretch(1, 1.0);
     m_focus_drop->SetOnlyMouseScrollWhenDropped(true);
 
+    this->FocusChangedSignal.connect([this](std::string_view sv) { SetFocus(std::string{sv}); });
 
     // meter panels
     m_population_panel = GG::Wnd::Create<PopulationPanel>(panel_width, m_planet_id);
@@ -1309,254 +1307,255 @@ namespace {
 
         return retval;
     }
-}
 
-const Ship* ValidSelectedColonyShip(int system_id) { // TODO: pass in context?
-    // if not looking in a valid system, no valid colony ship can be available
-    if (system_id == INVALID_OBJECT_ID)
-        return nullptr;
+    const Ship* ValidSelectedColonyShip(int system_id) { // TODO: pass in context?
+        // if not looking in a valid system, no valid colony ship can be available
+        if (system_id == INVALID_OBJECT_ID)
+            return nullptr;
 
-    const Universe& u = GetUniverse();
-    const SpeciesManager& sm = GetSpeciesManager();
+        const Universe& u = GetUniverse();
+        const SpeciesManager& sm = GetSpeciesManager();
 
-    // is there a valid selected ship in the active FleetWnd?
-    for (const auto& ship : Objects().find<Ship>(FleetUIManager::GetFleetUIManager().SelectedShipIDs())) {
-        if (!ship)
-            continue;
-        if (ship->SystemID() == system_id &&
-            ship->CanColonize(u, sm) &&
-            ship->OwnedBy(GGHumanClientApp::GetApp()->EmpireID())) 
-        { return ship.get(); }
-    }
-    return nullptr;
-}
-
-int AutomaticallyChosenColonyShip(int target_planet_id) {
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    if (empire_id == ALL_EMPIRES)
-        return INVALID_OBJECT_ID;
-    Universe& u = GetUniverse();
-
-    if (u.GetObjectVisibilityByEmpire(target_planet_id, empire_id) < Visibility::VIS_PARTIAL_VISIBILITY)
-        return INVALID_OBJECT_ID;
-    auto target_planet = u.Objects().get<Planet>(target_planet_id);
-    if (!target_planet)
-        return INVALID_OBJECT_ID;
-    int system_id = target_planet->SystemID();
-    auto system = u.Objects().get<System>(system_id);
-    if (!system)
-        return INVALID_OBJECT_ID;
-    // is planet a valid colonization target?
-    if (target_planet->GetMeter(MeterType::METER_POPULATION)->Initial() > 0.0f ||
-        (!target_planet->Unowned() && !target_planet->OwnedBy(empire_id)))
-    { return INVALID_OBJECT_ID; }
-
-    PlanetType target_planet_type = target_planet->Type();
-
-    // todo: return vector of ships from system ids using new Objects().find<Ship>(system->FindObjectIDs())
-    auto ships = u.Objects().find<const Ship>(system->ShipIDs());
-    std::vector<const Ship*> capable_and_available_colony_ships;
-    capable_and_available_colony_ships.reserve(ships.size());
-
-    // get all ships that can colonize and that are free to do so in the
-    // specified planet'ssystem and that can colonize the requested planet
-    for (auto& ship : ships) {
-        if (!AvailableToColonize(ship.get(), system_id, empire_id))
-            continue;
-        if (!CanColonizePlanetType(ship.get(), target_planet_type))
-            continue;
-        capable_and_available_colony_ships.emplace_back(ship.get());
-    }
-
-    // simple case early exits: no ships, or just one capable ship
-    if (capable_and_available_colony_ships.empty())
-        return INVALID_OBJECT_ID;
-    if (capable_and_available_colony_ships.size() == 1)
-        return (*capable_and_available_colony_ships.begin())->ID();
-
-    // have more than one ship capable and available to colonize.
-    // pick the "best" one.
-    auto& orig_species = target_planet->SpeciesName(); //should be just ""
-    int orig_owner = target_planet->Owner();
-    float orig_initial_target_pop = target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Initial();
-    int best_ship = INVALID_OBJECT_ID;
-    float best_capacity = -999;
-    bool changed_planet = false;
-
-    ScriptingContext context{u, Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
-
-    u.InhibitUniverseObjectSignals(true);
-    for (const auto* ship : capable_and_available_colony_ships) {
-        // TODO: Also tabulate estimates stabilities of potential colonies
-        if (!ship)
-            continue;
-        int ship_id = ship->ID();
-        float planet_capacity = -999.9f;
-        auto this_pair = std::make_pair(ship_id, target_planet_id);
-        auto pair_it = colony_projections.find(this_pair);
-        if (pair_it != colony_projections.end()) {
-            planet_capacity = pair_it->second;
-        } else {
-            float colony_ship_capacity = 0.0f;
-            const ShipDesign* design = u.GetShipDesign(ship->DesignID());
-            if (!design)
+        // is there a valid selected ship in the active FleetWnd?
+        for (const auto& ship : Objects().find<Ship>(FleetUIManager::GetFleetUIManager().SelectedShipIDs())) {
+            if (!ship)
                 continue;
-            colony_ship_capacity = design->ColonyCapacity();
-            if (colony_ship_capacity > 0.0f) {
-                auto& ship_species_name = ship->SpeciesName();
-                auto spec_pair = std::pair{ship_species_name, target_planet_id};
-                auto spec_pair_it = species_colony_projections.find(spec_pair);
-                if (spec_pair_it != species_colony_projections.end()) {
-                    planet_capacity = spec_pair_it->second;
-                } else {
-                    const Species* species = context.species.GetSpecies(ship_species_name);
-                    PlanetEnvironment planet_environment = PlanetEnvironment::PE_UNINHABITABLE;
-                    if (species)
-                        planet_environment = species->GetPlanetEnvironment(target_planet->Type());
-                    if (planet_environment != PlanetEnvironment::PE_UNINHABITABLE) {
-                        changed_planet = true;
-                        target_planet->SetOwner(empire_id);
-                        target_planet->SetSpecies(ship_species_name, context.current_turn, context.species);
-                        target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
+            if (ship->SystemID() == system_id &&
+                ship->CanColonize(u, sm) &&
+                ship->OwnedBy(GGHumanClientApp::GetApp()->EmpireID())) 
+            { return ship.get(); }
+        }
+        return nullptr;
+    }
 
-                        // temporary meter update with currently set species
-                        u.UpdateMeterEstimates(target_planet_id, context);
-                        planet_capacity = target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current();  // want value after meter update, so check current, not initial value
-                    }
-                    species_colony_projections[std::move(spec_pair)] = planet_capacity;
-                }
+    int AutomaticallyChosenColonyShip(int target_planet_id) {
+        int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+        if (empire_id == ALL_EMPIRES)
+            return INVALID_OBJECT_ID;
+        Universe& u = GetUniverse();
+
+        if (u.GetObjectVisibilityByEmpire(target_planet_id, empire_id) < Visibility::VIS_PARTIAL_VISIBILITY)
+            return INVALID_OBJECT_ID;
+        auto target_planet = u.Objects().get<Planet>(target_planet_id);
+        if (!target_planet)
+            return INVALID_OBJECT_ID;
+        int system_id = target_planet->SystemID();
+        auto system = u.Objects().get<System>(system_id);
+        if (!system)
+            return INVALID_OBJECT_ID;
+        // is planet a valid colonization target?
+        if (target_planet->GetMeter(MeterType::METER_POPULATION)->Initial() > 0.0f ||
+            (!target_planet->Unowned() && !target_planet->OwnedBy(empire_id)))
+        { return INVALID_OBJECT_ID; }
+
+        PlanetType target_planet_type = target_planet->Type();
+
+        // todo: return vector of ships from system ids using new Objects().find<Ship>(system->FindObjectIDs())
+        auto ships = u.Objects().find<const Ship>(system->ShipIDs());
+        std::vector<const Ship*> capable_and_available_colony_ships;
+        capable_and_available_colony_ships.reserve(ships.size());
+
+        // get all ships that can colonize and that are free to do so in the
+        // specified planet'ssystem and that can colonize the requested planet
+        for (auto& ship : ships) {
+            if (!AvailableToColonize(ship.get(), system_id, empire_id))
+                continue;
+            if (!CanColonizePlanetType(ship.get(), target_planet_type))
+                continue;
+            capable_and_available_colony_ships.emplace_back(ship.get());
+        }
+
+        // simple case early exits: no ships, or just one capable ship
+        if (capable_and_available_colony_ships.empty())
+            return INVALID_OBJECT_ID;
+        if (capable_and_available_colony_ships.size() == 1)
+            return (*capable_and_available_colony_ships.begin())->ID();
+
+        // have more than one ship capable and available to colonize.
+        // pick the "best" one.
+        auto& orig_species = target_planet->SpeciesName(); //should be just ""
+        int orig_owner = target_planet->Owner();
+        float orig_initial_target_pop = target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Initial();
+        int best_ship = INVALID_OBJECT_ID;
+        float best_capacity = -999;
+        bool changed_planet = false;
+
+        ScriptingContext context{u, Empires(), GetGalaxySetupData(), GetSpeciesManager(), GetSupplyManager()};
+
+        u.InhibitUniverseObjectSignals(true);
+        for (const auto* ship : capable_and_available_colony_ships) {
+            // TODO: Also tabulate estimates stabilities of potential colonies
+            if (!ship)
+                continue;
+            int ship_id = ship->ID();
+            float planet_capacity = -999.9f;
+            auto this_pair = std::pair(ship_id, target_planet_id);
+            auto pair_it = colony_projections.find(this_pair);
+            if (pair_it != colony_projections.end()) {
+                planet_capacity = pair_it->second;
             } else {
-                planet_capacity = 0.0f;
+                float colony_ship_capacity = 0.0f;
+                const ShipDesign* design = u.GetShipDesign(ship->DesignID());
+                if (!design)
+                    continue;
+                colony_ship_capacity = design->ColonyCapacity();
+                if (colony_ship_capacity > 0.0f) {
+                    auto& ship_species_name = ship->SpeciesName();
+                    auto spec_pair = std::pair{ship_species_name, target_planet_id};
+                    auto spec_pair_it = species_colony_projections.find(spec_pair);
+                    if (spec_pair_it != species_colony_projections.end()) {
+                        planet_capacity = spec_pair_it->second;
+                    } else {
+                        const Species* species = context.species.GetSpecies(ship_species_name);
+                        PlanetEnvironment planet_environment = PlanetEnvironment::PE_UNINHABITABLE;
+                        if (species)
+                            planet_environment = species->GetPlanetEnvironment(target_planet->Type());
+                        if (planet_environment != PlanetEnvironment::PE_UNINHABITABLE) {
+                            changed_planet = true;
+                            target_planet->SetOwner(empire_id);
+                            target_planet->SetSpecies(ship_species_name, context.current_turn, context.species);
+                            target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
+
+                            // temporary meter update with currently set species
+                            u.UpdateMeterEstimates(target_planet_id, context);
+                            planet_capacity = target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Current();  // want value after meter update, so check current, not initial value
+                        }
+                        species_colony_projections[std::move(spec_pair)] = planet_capacity;
+                    }
+                } else {
+                    planet_capacity = 0.0f;
+                }
+                colony_projections[this_pair] = planet_capacity;
             }
-            colony_projections[this_pair] = planet_capacity;
+            if (planet_capacity > best_capacity) {
+                best_capacity = planet_capacity;
+                best_ship = ship_id;
+            }
         }
-        if (planet_capacity > best_capacity) {
-            best_capacity = planet_capacity;
-            best_ship = ship_id;
+        if (changed_planet) {
+            target_planet->SetOwner(orig_owner);
+            target_planet->SetSpecies(orig_species, context.current_turn, context.species);
+            target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(orig_initial_target_pop,
+                                                                             orig_initial_target_pop);
+            u.UpdateMeterEstimates(target_planet_id, context);
         }
-    }
-    if (changed_planet) {
-        target_planet->SetOwner(orig_owner);
-        target_planet->SetSpecies(orig_species, context.current_turn, context.species);
-        target_planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Set(orig_initial_target_pop,
-                                                                         orig_initial_target_pop);
-        u.UpdateMeterEstimates(target_planet_id, context);
-    }
-    u.InhibitUniverseObjectSignals(false);
+        u.InhibitUniverseObjectSignals(false);
 
-    return best_ship;
-}
-
-std::set<const Ship*> AutomaticallyChosenInvasionShips(int target_planet_id) {
-    std::set<const Ship*> retval;
-
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    if (empire_id == ALL_EMPIRES)
-        return retval;
-
-    const Universe& u = GetUniverse();
-
-    auto target_planet = u.Objects().get<Planet>(target_planet_id).get();
-    if (!target_planet)
-        return retval;
-    int system_id = target_planet->SystemID();
-    auto system = u.Objects().get<System>(system_id).get();
-    if (!system)
-        return retval;
-
-    //Can't invade owned-by-self planets; early exit
-    if (target_planet->OwnedBy(empire_id))
-        return retval;
-
-
-    // get "just enough" ships that can invade and that are free to do so
-    double defending_troops = target_planet->GetMeter(MeterType::METER_TROOPS)->Initial();
-
-    double invasion_troops = 0;
-    for (const auto& ship : u.Objects().all<Ship>()) {
-        if (!AvailableToInvade(ship.get(), system_id, empire_id))
-            continue;
-
-        invasion_troops += ship->TroopCapacity(u);
-
-        retval.insert(ship.get());
-
-        if (invasion_troops > defending_troops)
-            break;
+        return best_ship;
     }
 
-    return retval;
-}
+    std::set<const Ship*> AutomaticallyChosenInvasionShips(int target_planet_id) {
+        std::set<const Ship*> retval;
 
-/** Returns valid Ship%s capable of bombarding a given Planet.
- * @param target_planet_id ID of Planet to potentially bombard
- */
-std::set<const Ship*> AutomaticallyChosenBombardShips(int target_planet_id) { // TODO: pass context
-    std::set<const Ship*> retval;
+        int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+        if (empire_id == ALL_EMPIRES)
+            return retval;
 
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    if (empire_id == ALL_EMPIRES)
-        return retval;
+        const Universe& u = GetUniverse();
 
-    const Universe& u = GetUniverse();
-    const ScriptingContext context{u, Empires()};
+        auto target_planet = u.Objects().get<Planet>(target_planet_id).get();
+        if (!target_planet)
+            return retval;
+        int system_id = target_planet->SystemID();
+        auto system = u.Objects().get<System>(system_id).get();
+        if (!system)
+            return retval;
 
-    auto target_planet = u.Objects().get<Planet>(target_planet_id).get();
-    if (!target_planet)
-        return retval;
-    int system_id = target_planet->SystemID();
-    auto system = u.Objects().get<System>(system_id).get();
-    if (!system)
-        return retval;
+        //Can't invade owned-by-self planets; early exit
+        if (target_planet->OwnedBy(empire_id))
+            return retval;
 
-    // Can't bombard owned-by-self planets; early exit
-    if (target_planet->OwnedBy(empire_id))
-        return retval;
 
-    for (const auto& ship : u.Objects().all<Ship>()) {
-        // owned ship is capable of bombarding a planet in this system
-        if (!AvailableToBombard(ship.get(), system_id, empire_id))
-            continue;
+        // get "just enough" ships that can invade and that are free to do so
+        double defending_troops = target_planet->GetMeter(MeterType::METER_TROOPS)->Initial();
 
-        // Select ship if the planet contains a content tag specified by the ship,
-        // or ship is tagged to always be selected
-        for (std::string_view tag : BombardTagsForShip(ship.get(), context)) {
-            if ((tag == TAG_BOMBARD_ALWAYS) || (target_planet->HasTag(tag, context))) {
-                retval.insert(ship.get());
+        double invasion_troops = 0;
+        for (const auto& ship : u.Objects().all<Ship>()) {
+            if (!AvailableToInvade(ship.get(), system_id, empire_id))
+                continue;
+
+            invasion_troops += ship->TroopCapacity(u);
+
+            retval.insert(ship.get());
+
+            if (invasion_troops > defending_troops)
                 break;
-            }
         }
+
+        return retval;
     }
 
-    return retval;
+    /** Returns valid Ship%s capable of bombarding a given Planet.
+      * @param target_planet_id ID of Planet to potentially bombard */
+    std::set<const Ship*> AutomaticallyChosenBombardShips(int target_planet_id) { // TODO: pass context
+        std::set<const Ship*> retval;
+
+        int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+        if (empire_id == ALL_EMPIRES)
+            return retval;
+
+        const Universe& u = GetUniverse();
+        const ScriptingContext context{u, Empires()};
+
+        auto target_planet = u.Objects().get<Planet>(target_planet_id).get();
+        if (!target_planet)
+            return retval;
+        int system_id = target_planet->SystemID();
+        auto system = u.Objects().get<System>(system_id).get();
+        if (!system)
+            return retval;
+
+        // Can't bombard owned-by-self planets; early exit
+        if (target_planet->OwnedBy(empire_id))
+            return retval;
+
+        for (const auto& ship : u.Objects().all<Ship>()) {
+            // owned ship is capable of bombarding a planet in this system
+            if (!AvailableToBombard(ship.get(), system_id, empire_id))
+                continue;
+
+            // Select ship if the planet contains a content tag specified by the ship,
+            // or ship is tagged to always be selected
+            for (std::string_view tag : BombardTagsForShip(ship.get(), context)) {
+                if ((tag == TAG_BOMBARD_ALWAYS) || (target_planet->HasTag(tag, context))) {
+                    retval.insert(ship.get());
+                    break;
+                }
+            }
+        }
+
+        return retval;
+    }
+}
+
+void SidePanel::PlanetPanel::Clear() {
+    m_planet_connection.disconnect();
+    m_focus_drop->Close();
+
+    DetachChild(m_focus_drop);
+    DetachChild(m_population_panel);
+    DetachChild(m_resource_panel);
+    DetachChild(m_military_panel);
+    DetachChild(m_buildings_panel);
+    DetachChild(m_colonize_button);
+    DetachChild(m_invade_button);
+    DetachChild(m_bombard_button);
+    DetachChild(m_specials_panel);
+    DetachChild(m_planet_status_graphic);
 }
 
 void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
-    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    m_planet_connection.disconnect();
+    Clear();
+
+    const int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
     Universe& u = context.ContextUniverse();
     ObjectMap& objects = context.ContextObjects(); // must be mutable to allow setting species and updating to estimate colonize button numbers
     const SpeciesManager& sm = context.species;
     const SupplyManager& supply = context.supply;
 
-    auto planet = objects.get<Planet>(m_planet_id);
+    const auto planet = objects.get<const Planet>(m_planet_id);
     if (!planet) {
-        DebugLogger() << "PlanetPanel::Refresh couldn't get planet!";
-        // clear / hide everything...
-        DetachChildAndReset(m_planet_name);
-        DetachChildAndReset(m_env_size);
-        DetachChildAndReset(m_focus_drop);
-        DetachChildAndReset(m_population_panel);
-        DetachChildAndReset(m_resource_panel);
-        DetachChildAndReset(m_military_panel);
-        DetachChildAndReset(m_buildings_panel);
-        DetachChildAndReset(m_colonize_button);
-        DetachChildAndReset(m_invade_button);
-        DetachChildAndReset(m_bombard_button);
-        DetachChildAndReset(m_specials_panel);
-        DetachChildAndReset(m_planet_status_graphic);
-
         RequirePreRender();
         return;
     }
@@ -1638,7 +1637,7 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
     std::string_view colony_ship_species_name;
     if (selected_colony_ship)
         colony_ship_species_name = selected_colony_ship->SpeciesName();
-    float colony_ship_capacity{selected_colony_ship ? selected_colony_ship->ColonyCapacity(u) : 0.0f};
+    const float colony_ship_capacity{selected_colony_ship ? selected_colony_ship->ColonyCapacity(u) : 0.0f};
     const Species* colony_ship_species = context.species.GetSpecies(colony_ship_species_name);
     PlanetEnvironment planet_env_for_colony_species = PlanetEnvironment::PE_UNINHABITABLE;
     if (colony_ship_species)
@@ -1646,63 +1645,46 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
 
 
     // calculate truth tables for planet colonization and invasion
-    bool has_owner =       !planet->Unowned();
-    bool mine =             planet->OwnedBy(client_empire_id);
-    bool populated =        planet->GetMeter(MeterType::METER_POPULATION)->Initial() > 0.0f;
-    bool habitable =        planet_env_for_colony_species >= PlanetEnvironment::PE_HOSTILE &&
-                            planet_env_for_colony_species <= PlanetEnvironment::PE_GOOD;
-    bool visible =          u.GetObjectVisibilityByEmpire(m_planet_id, client_empire_id) >= Visibility::VIS_PARTIAL_VISIBILITY;
-    bool shielded =         planet->GetMeter(MeterType::METER_SHIELD)->Initial() > 0.0f;
-    bool has_defenses =     planet->GetMeter(MeterType::METER_MAX_SHIELD)->Initial() > 0.0f ||
-                            planet->GetMeter(MeterType::METER_MAX_DEFENSE)->Initial() > 0.0f ||
-                            planet->GetMeter(MeterType::METER_MAX_TROOPS)->Initial() > 0.0f;
-    bool being_colonized =  planet->IsAboutToBeColonized();
-    bool outpostable =                   !populated && (  !has_owner /*&& !shielded*/         ) && visible && !being_colonized;
-    bool colonizable =      habitable && !populated && ( (!has_owner /*&& !shielded*/) || mine) && visible && !being_colonized;
-    bool can_colonize =     selected_colony_ship && (   (colonizable  && (colony_ship_capacity > 0.0f))
-                                                     || (outpostable && (colony_ship_capacity == 0.0f)));
+    const bool has_owner =       !planet->Unowned();
+    const bool mine =             planet->OwnedBy(client_empire_id);
+    const bool populated =        planet->GetMeter(MeterType::METER_POPULATION)->Initial() > 0.0f;
+    const bool habitable =        planet_env_for_colony_species >= PlanetEnvironment::PE_HOSTILE &&
+                                  planet_env_for_colony_species <= PlanetEnvironment::PE_GOOD;
+    const bool visible =          u.GetObjectVisibilityByEmpire(m_planet_id, client_empire_id) >= Visibility::VIS_PARTIAL_VISIBILITY;
+    const bool shielded =         planet->GetMeter(MeterType::METER_SHIELD)->Initial() > 0.0f;
+    const bool has_defenses =     planet->GetMeter(MeterType::METER_MAX_SHIELD)->Initial() > 0.0f ||
+                                  planet->GetMeter(MeterType::METER_MAX_DEFENSE)->Initial() > 0.0f ||
+                                  planet->GetMeter(MeterType::METER_MAX_TROOPS)->Initial() > 0.0f;
+    const bool being_colonized =  planet->IsAboutToBeColonized();
+    const bool outpostable =                   !populated && (  !has_owner /*&& !shielded*/         ) && visible && !being_colonized;
+    const bool colonizable =      habitable && !populated && ( (!has_owner /*&& !shielded*/) || mine) && visible && !being_colonized;
+    const bool can_colonize =     selected_colony_ship && (   (colonizable  && (colony_ship_capacity > 0.0f))
+                                                           || (outpostable && (colony_ship_capacity == 0.0f)));
 
-    bool at_war_with_me =   !mine && (populated || (has_owner && context.ContextDiploStatus(client_empire_id, planet->Owner()) == DiplomaticStatus::DIPLO_WAR));
+    const bool at_war_with_me =   !mine && (populated || (has_owner && context.ContextDiploStatus(client_empire_id, planet->Owner()) == DiplomaticStatus::DIPLO_WAR));
 
-    bool being_invaded =    planet->IsAboutToBeInvaded();
-    bool invadable =        at_war_with_me && !shielded && visible && !being_invaded && !invasion_ships.empty();
+    const bool being_invaded =    planet->IsAboutToBeInvaded();
+    const bool invadable =        at_war_with_me && !shielded && visible && !being_invaded && !invasion_ships.empty();
 
-    bool being_bombarded =  planet->IsAboutToBeBombarded();
-    bool bombardable =      at_war_with_me && visible && !being_bombarded && !bombard_ships.empty();
+    const bool being_bombarded =  planet->IsAboutToBeBombarded();
+    const bool bombardable =      at_war_with_me && visible && !being_bombarded && !bombard_ships.empty();
 
     if (populated || SHOW_ALL_PLANET_PANELS) {
         AttachChild(m_population_panel);
         if (m_population_panel)
             m_population_panel->Refresh();
-    } else {
-        DetachChild(m_population_panel);
     }
 
     if (populated || has_owner || SHOW_ALL_PLANET_PANELS) {
         AttachChild(m_resource_panel);
         if (m_resource_panel)
             m_resource_panel->Refresh();
-    } else {
-        DetachChild(m_resource_panel);
     }
 
     if (populated || has_owner || has_defenses || SHOW_ALL_PLANET_PANELS) {
         AttachChild(m_military_panel);
         if (m_military_panel)
             m_military_panel->Refresh();
-    } else {
-        DetachChild(m_military_panel);
-    }
-
-
-    DetachChild(m_invade_button);
-    DetachChild(m_colonize_button);
-    DetachChild(m_bombard_button);
-    DetachChild(m_focus_drop);
-
-
-    if (Disabled() || !(can_colonize || being_colonized || invadable || being_invaded)) {
-        // hide everything
     }
 
     if (can_colonize) {
@@ -1715,7 +1697,7 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
         // colony_projections map.
         AttachChild(m_colonize_button);
         double planet_capacity;
-        auto this_pair = std::make_pair(selected_colony_ship->ID(), m_planet_id);
+        auto this_pair = std::pair(selected_colony_ship->ID(), m_planet_id);
         auto pair_it = colony_projections.find(this_pair);
         if (pair_it != colony_projections.end()) {
             planet_capacity = pair_it->second;
@@ -1779,15 +1761,15 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
         for (auto& invasion_ship : invasion_ships)
             invasion_troops += invasion_ship->TroopCapacity(u);
 
-        std::string invasion_troops_text = DoubleToString(invasion_troops, 3, false);
+        const std::string invasion_troops_text = DoubleToString(invasion_troops, 3, false);
 
         // adjust defending troops number before passing into DoubleToString to ensure
         // rounding up, as it's better to slightly overestimate defending troops than
         // underestimate, since one needs to drop more droops than there are defenders
         // to capture a planet
         float defending_troops = planet->GetMeter(MeterType::METER_TROOPS)->Initial();
-        float log10_df = floor(std::log10(defending_troops));
-        float rounding_adjustment = std::pow(10.0f, log10_df - 2.0f);
+        const float log10_df = floor(std::log10(defending_troops));
+        const float rounding_adjustment = std::pow(10.0f, log10_df - 2.0f);
         defending_troops += rounding_adjustment;
 
         std::string defending_troops_text = DoubleToString(defending_troops, 3, false);
@@ -1840,10 +1822,10 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
     if (!planet->SpeciesName().empty()) {
         AttachChild(m_focus_drop);
 
-        auto available_foci = planet->AvailableFoci(context);
+        const auto available_foci = planet->AvailableFoci(context);
 
         // refresh items in list
-        m_focus_drop->Clear();
+
         std::vector<std::shared_ptr<GG::DropDownList::Row>> rows;
         rows.reserve(available_foci.size());
         for (const auto& focus_name : available_foci) {
@@ -1862,39 +1844,45 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
             row->push_back(std::move(graphic));
             rows.emplace_back(std::move(row));
         }
-        m_focus_drop->Insert(std::move(rows));
 
-        // set browse text and select appropriate focus in droplist
-        std::string focus_text;
-        if (!planet->Focus().empty()) {
-            for (unsigned int i = 0; i < available_foci.size(); ++i) {
-                if (available_foci[i] == planet->Focus()) {
-                    m_focus_drop->Select(i);
-                    focus_text = boost::io::str(FlexibleFormat(UserString("RP_FOCUS_TOOLTIP"))
-                                                % UserString(planet->Focus()));
-                    break;
+        if (m_focus_drop->Dropped())
+            m_focus_drop->Close();
+
+        if (!m_focus_drop->Dropped()) {
+            m_focus_drop->Clear();
+            m_focus_drop->Insert(std::move(rows));
+
+            // set browse text and select appropriate focus in droplist
+            std::string focus_text;
+            if (!planet->Focus().empty()) {
+                for (unsigned int i = 0; i < available_foci.size(); ++i) {
+                    if (available_foci[i] == planet->Focus()) {
+                        m_focus_drop->Select(i);
+                        focus_text = boost::io::str(FlexibleFormat(UserString("RP_FOCUS_TOOLTIP"))
+                                                    % UserString(planet->Focus()));
+                        break;
+                    }
                 }
+            } else {
+                m_focus_drop->Select(m_focus_drop->end());
             }
-        } else {
-            m_focus_drop->Select(m_focus_drop->end());
-        }
-        m_focus_drop->SetBrowseText(std::move(focus_text));
+            m_focus_drop->SetBrowseText(std::move(focus_text));
 
-        // prevent manipulation for unowned planets
-        if (!planet->OwnedBy(client_empire_id))
-            m_focus_drop->Disable();
+            // prevent manipulation for unowned planets
+            if (!planet->OwnedBy(client_empire_id))
+                m_focus_drop->Disable();
+        }
     }
 
 
     // other panels...
-    if (m_buildings_panel)
-        m_buildings_panel->Refresh();
-    if (m_specials_panel)
-        m_specials_panel->Update();
+    AttachChild(m_buildings_panel);
+    m_buildings_panel->Refresh();
+    AttachChild(m_specials_panel);
+    m_specials_panel->Update();
 
     // create planet status marker
     if (planet->OwnedBy(client_empire_id)) {
-        DetachChild(m_planet_status_graphic);
         std::vector<std::string> planet_status_messages;
         std::shared_ptr<GG::Texture> planet_status_texture;
 
@@ -1908,14 +1896,14 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
         }
 
         // status: attacked on previous turn
-        if (planet->LastTurnAttackedByShip() == CurrentTurn() - 1) {
+        if (planet->LastTurnAttackedByShip() == context.current_turn - 1) {
             planet_status_messages.emplace_back(boost::io::str(FlexibleFormat(
                                                 UserString("OPTIONS_DB_UI_PLANET_STATUS_ATTACKED")) % planet->Name()));
             planet_status_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "planet_status_attacked.png", true);
         }
 
         // status: conquered on previous turn
-        if (planet->LastTurnConquered() == CurrentTurn() - 1) {
+        if (planet->LastTurnConquered() == context.current_turn - 1) {
             planet_status_messages.emplace_back(boost::io::str(FlexibleFormat(
                                                 UserString("OPTIONS_DB_UI_PLANET_STATUS_CONQUERED")) % planet->Name()));
             planet_status_texture = ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "planet_status_conquered.png", true);
@@ -1955,11 +1943,11 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
     ClearBrowseInfoWnd();
 
     if (client_empire_id != ALL_EMPIRES) {
-        auto client_empire = context.GetEmpire(client_empire_id);
-        Visibility visibility = u.GetObjectVisibilityByEmpire(m_planet_id, client_empire_id);
+        const auto client_empire = context.GetEmpire(client_empire_id);
+        const Visibility visibility = u.GetObjectVisibilityByEmpire(m_planet_id, client_empire_id);
         const auto& visibility_turn_map = u.GetObjectVisibilityTurnMapByEmpire(m_planet_id, client_empire_id);
-        float client_empire_detection_strength = client_empire->GetMeter("METER_DETECTION_STRENGTH")->Current();
-        float apparent_stealth = planet->GetMeter(MeterType::METER_STEALTH)->Initial();
+        const float client_empire_detection_strength = client_empire->GetMeter("METER_DETECTION_STRENGTH")->Current();
+        const float apparent_stealth = planet->GetMeter(MeterType::METER_STEALTH)->Initial();
 
         std::string visibility_info;
         std::string detection_info;
@@ -1993,12 +1981,12 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
             }
 
             std::string info = visibility_info + "\n\n" + detection_info;
-            SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(UserString("METER_STEALTH"), info));
+            SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(UserString("METER_STEALTH"), std::move(info)));
         }
         else if (visibility == Visibility::VIS_BASIC_VISIBILITY) {
             visibility_info = UserString("PL_BASIC_VISIBILITY");
 
-            auto last_turn_visible_it = visibility_turn_map.find(Visibility::VIS_PARTIAL_VISIBILITY);
+            const auto last_turn_visible_it = visibility_turn_map.find(Visibility::VIS_PARTIAL_VISIBILITY);
             if (last_turn_visible_it != visibility_turn_map.end() && last_turn_visible_it->second > 0) {
                 visibility_info += "  " + boost::io::str(FlexibleFormat(UserString("PL_LAST_TURN_SCANNED")) %
                                                                         std::to_string(last_turn_visible_it->second));
@@ -2018,7 +2006,7 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
             }
 
             std::string info = visibility_info + "\n\n" + detection_info;
-            SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(UserString("METER_STEALTH"), info));
+            SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(UserString("METER_STEALTH"), std::move(info)));
         }
     }
 
@@ -2033,7 +2021,7 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
         }, boost::signals2::at_front);
 }
 
-void SidePanel::PlanetPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void SidePanel::PlanetPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = GG::Wnd::Size();
 
     GG::Wnd::SizeMove(ul, lr);
@@ -2042,21 +2030,22 @@ void SidePanel::PlanetPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
         RequirePreRender();
 }
 
-void SidePanel::PlanetPanel::SetFocus(const std::string& focus) {
+void SidePanel::PlanetPanel::SetFocus(std::string focus) {
     ScriptingContext context;
     const ObjectMap& objects{context.ContextObjects()};
     auto planet = objects.get<Planet>(m_planet_id);
     if (!planet || !planet->OwnedBy(GGHumanClientApp::GetApp()->EmpireID()))
         return;
+    const int app_empire_id = GGHumanClientApp::GetApp()->EmpireID();
     // todo: if focus is already equal to planet's focus, return early.
     colony_projections.clear();// in case new or old focus was Growth (important that be cleared BEFORE Order is issued)
     species_colony_projections.clear();
     GGHumanClientApp::GetApp()->Orders().IssueOrder(
-        std::make_shared<ChangeFocusOrder>(GGHumanClientApp::GetApp()->EmpireID(), planet->ID(), focus, context),
+        std::make_shared<ChangeFocusOrder>(app_empire_id, planet->ID(), std::move(focus), context),
         context);
 }
 
-bool SidePanel::PlanetPanel::InWindow(const GG::Pt& pt) const {
+bool SidePanel::PlanetPanel::InWindow(GG::Pt pt) const {
     GG::Pt ul = UpperLeft(), lr = LowerRight();
     if (!(ul <= pt && pt < lr))
         return false;
@@ -2088,18 +2077,18 @@ bool SidePanel::PlanetPanel::InWindow(const GG::Pt& pt) const {
     return true;
 }
 
-void SidePanel::PlanetPanel::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void SidePanel::PlanetPanel::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     //std::cout << "SidePanel::PlanetPanel::LClick m_planet_id: " << m_planet_id << std::endl;
     if (!Disabled())
         LeftClickedSignal(m_planet_id);
 }
 
-void SidePanel::PlanetPanel::LDoubleClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void SidePanel::PlanetPanel::LDoubleClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     if (!Disabled())
         LeftDoubleClickedSignal(m_planet_id);
 }
 
-void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void SidePanel::PlanetPanel::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
     ScriptingContext context;
@@ -2214,7 +2203,7 @@ void SidePanel::PlanetPanel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_
     popup->Run();
 }
 
-void SidePanel::PlanetPanel::MouseWheel(const GG::Pt& pt, int move, GG::Flags<GG::ModKey> mod_keys)
+void SidePanel::PlanetPanel::MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
 void SidePanel::PlanetPanel::PreRender() {
@@ -2513,21 +2502,21 @@ void SidePanel::PlanetPanel::FocusDropListSelectionChangedSlot(GG::DropDownList:
 
     const ScriptingContext context;
 
-    auto res = context.ContextObjects().get<ResourceCenter>(m_planet_id);
+    const auto res = context.ContextObjects().get<Planet>(m_planet_id);
     if (!res) {
-        ErrorLogger() << "PlanetPanel::FocusDropListSelectionChanged couldn't convert object with id " << m_planet_id << " to a ResourceCenter";
+        ErrorLogger() << "PlanetPanel::FocusDropListSelectionChanged couldn't get planet with id " << m_planet_id;
         return;
     }
 
-    auto foci = res->AvailableFoci(context);
+    const auto foci = res->AvailableFoci(context);
 
-    std::size_t i = m_focus_drop->IteratorToIndex(selected);
-    if (i >= foci.size()) {
+    const auto i = m_focus_drop->IteratorToIndex(selected);
+    if (i >= foci.size() || i < 0) {
         ErrorLogger() << "PlanetPanel::FocusDropListSelectionChanged got invalid focus selected index: " << i;
         return;
     }
 
-    Sound::TempUISoundDisabler sound_disabler;
+    const Sound::TempUISoundDisabler sound_disabler;
     DebugLogger() << "About to send focus-changed signal.";
     FocusChangedSignal(foci[i]);
     DebugLogger() << "Returned from sending focus-changed signal.";
@@ -2566,7 +2555,7 @@ SidePanel::PlanetPanelContainer::PlanetPanelContainer() :
     RequirePreRender();
 }
 
-bool SidePanel::PlanetPanelContainer::InWindow(const GG::Pt& pt) const {
+bool SidePanel::PlanetPanelContainer::InWindow(GG::Pt pt) const {
     // ensure pt is below top of container
     if (pt.y < Top())
         return false;
@@ -2585,7 +2574,7 @@ bool SidePanel::PlanetPanelContainer::InWindow(const GG::Pt& pt) const {
     return UpperLeft() + GG::Pt(GG::X(MaxPlanetDiameter()), GG::Y0) <= pt && pt < LowerRight();
 }
 
-void SidePanel::PlanetPanelContainer::MouseWheel(const GG::Pt& pt, int move, GG::Flags<GG::ModKey> mod_keys) {
+void SidePanel::PlanetPanelContainer::MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys) {
     if (m_vscroll && m_vscroll->Parent().get() == this) {
         const std::pair<int, int> initial_pos = m_vscroll->PosnRange();
         if (move < 0)
@@ -2597,7 +2586,7 @@ void SidePanel::PlanetPanelContainer::MouseWheel(const GG::Pt& pt, int move, GG:
     }
 }
 
-void SidePanel::PlanetPanelContainer::LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKey> mod_keys)
+void SidePanel::PlanetPanelContainer::LDrag(GG::Pt pt, GG::Pt move, GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
 int SidePanel::PlanetPanelContainer::ScrollPosition() const {
@@ -2617,6 +2606,8 @@ void SidePanel::PlanetPanelContainer::ScrollTo(int pos) {
 }
 
 void SidePanel::PlanetPanelContainer::Clear() {
+    for (auto& pp : m_planet_panels)
+        pp->Clear();
     m_planet_panels.clear();
     m_selected_planet_id = INVALID_OBJECT_ID;
     DetachChildren();
@@ -2866,7 +2857,7 @@ void SidePanel::PlanetPanelContainer::ShowScrollbar()
 void SidePanel::PlanetPanelContainer::HideScrollbar()
 { DetachChild(m_vscroll); }
 
-void SidePanel::PlanetPanelContainer::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void SidePanel::PlanetPanelContainer::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = GG::Wnd::Size();
 
     GG::Wnd::SizeMove(ul, lr);
@@ -2876,9 +2867,8 @@ void SidePanel::PlanetPanelContainer::SizeMove(const GG::Pt& ul, const GG::Pt& l
 }
 
 void SidePanel::PlanetPanelContainer::EnableOrderIssuing(bool enable) {
-    for (auto& panel : m_planet_panels) {
+    for (auto& panel : m_planet_panels)
         panel->EnableOrderIssuing(enable);
-    }
 }
 
 namespace {
@@ -3088,13 +3078,13 @@ SidePanel::~SidePanel() {
     }
 }
 
-bool SidePanel::InWindow(const GG::Pt& pt) const {
+bool SidePanel::InWindow(GG::Pt pt) const {
     return (UpperLeft() + GG::Pt(GG::X(MaxPlanetDiameter()), GG::Y0) <= pt && pt < LowerRight())
            || (m_planet_panel_container && m_planet_panel_container->InWindow(pt))
            || (m_system_resource_summary && m_system_resource_summary->Parent().get() == this && m_system_resource_summary->InWindow(pt));
 }
 
-GG::Pt SidePanel::ClientUpperLeft() const
+GG::Pt SidePanel::ClientUpperLeft() const noexcept
 { return GG::Wnd::UpperLeft() + GG::Pt(BORDER_LEFT, BORDER_BOTTOM); }
 
 void SidePanel::InitBuffers() {
@@ -3521,7 +3511,7 @@ void SidePanel::DoLayout() {
     }
 }
 
-void SidePanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void SidePanel::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = GG::Wnd::Size();
 
     CUIWnd::SizeMove(ul, lr);
@@ -3590,12 +3580,6 @@ void SidePanel::FleetsRemoved(const std::vector<const Fleet*>& fleets) {
     }
     SidePanel::Update();
 }
-
-int SidePanel::SystemID()
-{ return s_system_id; }
-
-int SidePanel::SelectedPlanetID() const
-{ return (m_selection_enabled ? s_planet_id : INVALID_OBJECT_ID); }
 
 bool SidePanel::PlanetSelectable(int planet_id, const ObjectMap& objects) const {
     if (!m_selection_enabled)
@@ -3666,9 +3650,6 @@ void SidePanel::SetSystem(int system_id) {
     // refresh sidepanels
     Refresh();
 }
-
-void SidePanel::EnableSelection(bool enable)
-{ m_selection_enabled = enable; }
 
 void SidePanel::EnableOrderIssuing(bool enable) {
     m_system_name->EnableOrderIssuing(enable);

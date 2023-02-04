@@ -17,7 +17,6 @@
 #include <sstream>
 #include <unordered_set>
 #include <boost/format.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/xpressive/regex_actions.hpp>
 #include <boost/xpressive/xpressive.hpp>
 #include <ft2build.h>
@@ -59,7 +58,7 @@ constexpr std::string_view ALIGN_RIGHT_TAG = "right";
 constexpr std::string_view PRE_TAG = "pre";
 
 template <typename T>
-T NextPowerOfTwo(T input)
+constexpr T NextPowerOfTwo(T input)
 {
     T value(1);
     while (value < input)
@@ -72,7 +71,7 @@ T NextPowerOfTwo(T input)
 struct TempGlyphData
 {
     TempGlyphData() {}
-    TempGlyphData(const Pt& ul_, const Pt& lr_, Y y_ofs, X lb, X a) :
+    TempGlyphData(Pt ul_, Pt lr_, Y y_ofs, X lb, X a) :
         ul(ul_), lr(lr_), y_offset(y_ofs), left_b(lb), adv(a) {}
     Pt ul, lr;   ///< area of glyph subtexture within texture
     Y  y_offset; ///< vertical offset to draw texture (may be negative!)
@@ -380,7 +379,7 @@ Font::Substring& Font::Substring::operator+=(const IterPair& rhs)
 ///////////////////////////////////////
 // Free Functions
 ///////////////////////////////////////
-std::ostream& GG::operator<<(std::ostream& os, const Font::Substring& substr)
+std::ostream& GG::operator<<(std::ostream& os, Font::Substring substr)
 {
     std::ostream_iterator<char> out_it(os);
     std::copy(substr.begin(), substr.end(), out_it);
@@ -841,7 +840,7 @@ public:
     }
 
     /** Add open color tag.*/
-    void AddOpenTag(const Clr& color)
+    void AddOpenTag(Clr color)
     {
         std::vector<std::string> params = { std::to_string(color.r),
                                             std::to_string(color.g),
@@ -909,20 +908,12 @@ Font::TextAndElementsAssembler& Font::TextAndElementsAssembler::AddNewline()
     return *this;
 }
 
-Font::TextAndElementsAssembler& Font::TextAndElementsAssembler::AddOpenTag(const Clr& color)
+Font::TextAndElementsAssembler& Font::TextAndElementsAssembler::AddOpenTag(Clr color)
 {
     m_impl->AddOpenTag(color);
     return *this;
 }
 
-///////////////////////////////////////
-// class GG::Font::LineData
-///////////////////////////////////////
-X Font::LineData::Width() const
-{ return char_data.empty() ? X0 : char_data.back().extent; }
-
-bool Font::LineData::Empty() const
-{ return char_data.empty(); }
 
 ///////////////////////////////////////
 // class GG::Font::RenderState
@@ -953,14 +944,8 @@ void Font::RenderState::PopColor()
         color_index_stack.pop();
 }
 
-int Font::RenderState::CurrentIndex() const
-{ return color_index_stack.top(); }
-
-const Clr& Font::RenderState::CurrentColor() const
+Clr Font::RenderState::CurrentColor() const
 { return used_colors[CurrentIndex()]; }
-
-bool Font::RenderState::ColorsEmpty() const
-{ return color_index_stack.size() <= 1; }
 
 
 ///////////////////////////////////////
@@ -996,7 +981,7 @@ Font::LineData::CharData::CharData(X extent_, StrSize str_index, StrSize str_siz
 ///////////////////////////////////////
 // struct GG::Font::Glyph
 ///////////////////////////////////////
-Font::Glyph::Glyph(const std::shared_ptr<Texture>& texture, const Pt& ul, const Pt& lr,
+Font::Glyph::Glyph(const std::shared_ptr<Texture>& texture, Pt ul, Pt lr,
                    Y y_ofs, X lb, X adv) :
     sub_texture(texture, ul.x, ul.y, lr.x, lr.y),
     y_offset(y_ofs),
@@ -1032,31 +1017,7 @@ Font::Font(std::string font_filename, unsigned int pts,
     Init(wrapper.m_face);
 }
 
-const std::string& Font::FontName() const
-{ return m_font_filename; }
-
-unsigned int Font::PointSize() const
-{ return m_pt_sz; }
-
-const std::vector<UnicodeCharset>& Font::UnicodeCharsets() const
-{ return m_charsets; }
-
-Y Font::Ascent() const
-{ return m_ascent; }
-
-Y Font::Descent() const
-{ return m_descent; }
-
-Y Font::Height() const
-{ return m_height; }
-
-Y Font::Lineskip() const
-{ return m_lineskip; }
-
-X Font::SpaceWidth() const
-{ return m_space_width; }
-
-X Font::RenderText(const Pt& pt_, const std::string& text) const
+X Font::RenderText(Pt pt_, const std::string& text) const
 {
     Pt pt = pt_;
     X orig_x = pt.x;
@@ -1084,7 +1045,7 @@ X Font::RenderText(const Pt& pt_, const std::string& text) const
     return pt.x - orig_x;
 }
 
-void Font::RenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags<TextFormat>& format,
+void Font::RenderText(Pt ul, Pt lr, const std::string& text, Flags<TextFormat>& format,
                       const std::vector<LineData>& line_data, RenderState* render_state) const
 {
     RenderState state;
@@ -1096,7 +1057,7 @@ void Font::RenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags
                line_data.empty() ? CP0 : CPSize(line_data.back().char_data.size()));
 }
 
-void Font::RenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags<TextFormat>& format,
+void Font::RenderText(Pt ul, Pt lr, const std::string& text, Flags<TextFormat>& format,
                       const std::vector<LineData>& line_data, RenderState& render_state,
                       std::size_t begin_line, CPSize begin_char,
                       std::size_t end_line, CPSize end_char) const
@@ -1106,7 +1067,7 @@ void Font::RenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags
     RenderCachedText(cache);
 }
 
-void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags<TextFormat>& format,
+void Font::PreRenderText(Pt ul, Pt lr, const std::string& text, Flags<TextFormat>& format,
                          RenderCache& cache,
                          const std::vector<LineData>& line_data, RenderState* render_state) const
 {
@@ -1120,7 +1081,7 @@ void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Fl
     }
 }
 
-void Font::PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags<TextFormat>& format,
+void Font::PreRenderText(Pt ul, Pt lr, const std::string& text, Flags<TextFormat>& format,
                          const std::vector<LineData>& line_data, RenderState& render_state,
                          std::size_t begin_line, CPSize begin_char,
                          std::size_t end_line, CPSize end_char,
@@ -1402,7 +1363,8 @@ Font::ExpensiveParseFromTextToTextElements(const std::string& text, Flags<TextFo
         sub_match<std::string::const_iterator> const* text_match;
         while (it != end_it
                && (text_match = &(*it)[text_tag])
-               && text_match->matched) {
+               && text_match->matched)
+        {
             need_increment = false;
             if (combined_text.empty())
                 combined_text = Substring(text, *text_match);
@@ -1981,7 +1943,7 @@ void Font::ValidateFormat(Flags<TextFormat>& format) const
         format &= ~FORMAT_LINEWRAP;
 }
 
-void Font::StoreGlyphImpl(Font::RenderCache& cache, Clr color, const Pt& pt,
+void Font::StoreGlyphImpl(Font::RenderCache& cache, Clr color, Pt pt,
                           const Glyph& glyph, int x_top_offset, int y_shift) const
 {
     cache.coordinates->store(glyph.sub_texture.TexCoords()[0], glyph.sub_texture.TexCoords()[1]);
@@ -2004,7 +1966,7 @@ void Font::StoreGlyphImpl(Font::RenderCache& cache, Clr color, const Pt& pt,
     cache.colors->store(color);
 }
 
-void Font::StoreUnderlineImpl(Font::RenderCache& cache, Clr color, const Pt& pt, const Glyph& glyph,
+void Font::StoreUnderlineImpl(Font::RenderCache& cache, Clr color, Pt pt, const Glyph& glyph,
                               Y descent, Y height, Y underline_height, Y underline_offset) const
 {
     X x1 = pt.x;
@@ -2022,7 +1984,7 @@ void Font::StoreUnderlineImpl(Font::RenderCache& cache, Clr color, const Pt& pt,
     cache.underline_colors->store(color);
 }
 
-X Font::StoreGlyph(const Pt& pt, const Glyph& glyph, const Font::RenderState* render_state,
+X Font::StoreGlyph(Pt pt, const Glyph& glyph, const Font::RenderState* render_state,
                    Font::RenderCache& cache) const
 {
     int italic_top_offset = 0;
@@ -2067,31 +2029,52 @@ X Font::StoreGlyph(const Pt& pt, const Glyph& glyph, const Font::RenderState* re
 }
 
 namespace {
-    std::pair<std::array<GLubyte, 4>, bool> TagParamsToColor(const std::vector<Font::Substring>& params) {
-        std::array<GLubyte, 4> retval{};
-        if (params.size() != 4)
+    constexpr uint8_t CharsToUInt8(std::string_view txt) {
+        if (txt.empty())
+            return 0u;
+
+        uint32_t retval = 0u;
+        for (auto c : txt) {
+            if (c > '9' || c < '0')
+                break;
+            retval *= 10;
+            retval += (c - '0');
+        }
+
+        return static_cast<uint8_t>(retval);
+    }
+    static_assert(CharsToUInt8("") == 0);
+    static_assert(CharsToUInt8("abcdefgh") == 0);
+    static_assert(CharsToUInt8("0") == 0);
+    static_assert(CharsToUInt8("-25") == 0);
+    static_assert(CharsToUInt8("25") == 25);
+    static_assert(CharsToUInt8("00001") == 1);
+    static_assert(CharsToUInt8("888") == 888-3*256);
+    static_assert(CharsToUInt8(std::string_view{one_zero_nine.data()}) == 109);
+    static_assert(CharsToUInt8(std::string_view{three_zero.data()}) == 30);
+
+    std::pair<std::array<GLubyte, 4u>, bool> TagParamsToColor(const std::vector<Font::Substring>& params) {
+        std::array<GLubyte, 4u> retval{};
+        if (params.size() != 4u)
             return {retval, false};
 
-        for (std::size_t n = 0; n < 4; ++n) {
 #if defined(__cpp_lib_to_chars)
+        for (std::size_t n = 0u; n < 4u; ++n) {
             const auto& param{params[n]};
             if (param.empty())
                 return {retval, false};
             auto ec = std::from_chars(param.data(), param.data() + param.size(), retval[n]).ec;
             if (ec != std::errc())
                 return {retval, false};
-#else
-            try {
-                auto temp_colour = boost::lexical_cast<int>(params[n]);
-                if (temp_colour >= 0 && temp_colour <= 255)
-                    retval[n] = temp_colour;
-                else
-                    return {retval, false};
-            } catch (const boost::bad_lexical_cast&) {
-                return {retval, false};
-            }
-#endif
         }
+#else
+        for (std::size_t n = 0u; n < 4u; ++n) {
+            const auto& param{params[n]};
+            if (param.empty())
+                return {retval, false};
+            retval[n] = CharsToUInt8(param);
+        }
+#endif
 
         return {retval, true};
     }

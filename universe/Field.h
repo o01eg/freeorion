@@ -12,7 +12,7 @@ namespace Effect {
 }
 
 /** a class representing a region of space */
-class FO_COMMON_API Field : public UniverseObject {
+class FO_COMMON_API Field final : public UniverseObject {
 public:
     [[nodiscard]] TagVecs               Tags(const ScriptingContext&) const override;
     [[nodiscard]] bool                  HasTag(std::string_view name, const ScriptingContext&) const override;
@@ -33,10 +33,10 @@ public:
 
     std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const override;
 
-    void Copy(std::shared_ptr<const UniverseObject> copied_object, const Universe& universe,
-              int empire_id = ALL_EMPIRES) override;
+    void Copy(const UniverseObject& copied_object, const Universe& universe, int empire_id = ALL_EMPIRES) override;
+    void Copy(const Field& copied_field, const Universe& universe, int empire_id = ALL_EMPIRES);
 
-    void ResetTargetMaxUnpairedMeters() override;
+    void ResetTargetMaxUnpairedMeters() noexcept(UniverseObject::noexcept_rtmum) override;
     void ClampMeters() override;
 
     Field(std::string field_type, double x, double y, double radius, int creation_turn);
@@ -46,7 +46,7 @@ private:
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);
 
     /** Returns new copy of this Field. */
-    [[nodiscard]] Field* Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const override;
+    [[nodiscard]] std::shared_ptr<UniverseObject> Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const override;
 
     std::string m_type_name;
 

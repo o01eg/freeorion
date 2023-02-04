@@ -251,7 +251,9 @@ namespace {
      * third point between them is.assumes the "mid" point is between the
      * "start" and "end" points, in which case the returned fraction is between
      * 0.0 and 1.0 */
-    double FractionalDistanceBetweenPoints(double startX, double startY, double midX, double midY, double endX, double endY) {
+    double FractionalDistanceBetweenPoints(double startX, double startY, double midX,
+                                           double midY, double endX, double endY)
+    {
         // get magnitudes of vectors
         double full_deltaX = endX - startX, full_deltaY = endY - startY;
         double mid_deltaX = midX - startX, mid_deltaY = midY - startY;
@@ -264,10 +266,12 @@ namespace {
 
     /* Returns point that is dist ditance away from (X1, Y1) in the direction
      * of (X2, Y2) */
-    std::pair<double, double> PositionFractionalAtDistanceBetweenPoints(double X1, double Y1, double X2, double Y2, double dist) {
+    constexpr auto PositionFractionalAtDistanceBetweenPoints(
+        double X1, double Y1, double X2, double Y2, double dist)
+    {
         double newX = X1 + (X2 - X1) * dist;
         double newY = Y1 + (Y2 - Y1) * dist;
-        return {newX, newY};
+        return std::pair<double, double>{newX, newY};
     }
 
     /* Returns apparent map X and Y position of an object at universe position
@@ -279,19 +283,23 @@ namespace {
      * objects on the lane is compressed into the space between the apparent
      * ends of the lane, but is proportional to the distance of the actual
      * position along the lane. */
-    boost::optional<std::pair<double, double>> ScreenPosOnStarlane(double X, double Y, int lane_start_sys_id, int lane_end_sys_id, const LaneEndpoints& screen_lane_endpoints) {
+    boost::optional<std::pair<double, double>> ScreenPosOnStarlane(
+        double X, double Y, int lane_start_sys_id, int lane_end_sys_id,
+        LaneEndpoints screen_lane_endpoints, const ScriptingContext& context)
+    {
         // get endpoints of lane in universe.  may be different because on-
         // screen lanes are drawn between system circles, not system centres
-        int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-        auto prev = EmpireKnownObjects(empire_id).get(lane_start_sys_id);
-        auto next = EmpireKnownObjects(empire_id).get(lane_end_sys_id);
+        auto prev = context.ContextObjects().get(lane_start_sys_id);
+        auto next = context.ContextObjects().get(lane_end_sys_id);
         if (!next || !prev) {
-            ErrorLogger() << "ScreenPosOnStarlane couldn't find next system " << lane_start_sys_id << " or prev system " << lane_end_sys_id;
+            ErrorLogger() << "ScreenPosOnStarlane couldn't find next system " << lane_start_sys_id
+                          << " or prev system " << lane_end_sys_id;
             return boost::none;
         }
 
         // get fractional distance along lane that fleet's universe position is
-        double dist_along_lane = FractionalDistanceBetweenPoints(prev->X(), prev->Y(), X, Y, next->X(), next->Y());
+        double dist_along_lane = FractionalDistanceBetweenPoints(
+            prev->X(), prev->Y(), X, Y, next->X(), next->Y());
 
         return PositionFractionalAtDistanceBetweenPoints(screen_lane_endpoints.X1, screen_lane_endpoints.Y1,
                                                          screen_lane_endpoints.X2, screen_lane_endpoints.Y2,
@@ -310,13 +318,13 @@ namespace {
         };
     }
 
-    GG::X AppWidth() {
-        if (GGHumanClientApp* app = GGHumanClientApp::GetApp())
+    GG::X AppWidth() noexcept {
+        if (const auto* app = GGHumanClientApp::GetApp())
             return app->AppWidth();
         return GG::X0;
     }
 
-    GG::Y AppHeight() {
+    GG::Y AppHeight() noexcept {
         if (GGHumanClientApp* app = GGHumanClientApp::GetApp())
             return app->AppHeight();
         return GG::Y0;
@@ -464,7 +472,7 @@ namespace {
 
             GG::Y height{ClientUI::Pts()};
             // center format for title label
-            m_labels.emplace(descr, std::make_pair(
+            m_labels.emplace(descr, std::pair(
                 GG::Wnd::Create<CUILabel>(UserString(descr),
                                           title ? GG::FORMAT_CENTER : GG::FORMAT_RIGHT,
                                           GG::NO_WND_FLAGS, GG::X0, GG::Y0,
@@ -922,6 +930,7 @@ MapWnd::MovementLineData::MovementLineData(const std::vector<MovePathNode>& path
     int     prev_eta =                  first_node.eta;
     int     next_sys_id =               INVALID_OBJECT_ID;
 
+    const ScriptingContext context;
     const Empire* empire = GetEmpire(empireID);
     std::set<int> unobstructed;
     bool s_flag = false;
@@ -969,8 +978,8 @@ MapWnd::MovementLineData::MovementLineData(const std::vector<MovePathNode>& path
         const LaneEndpoints& lane_endpoints = ends_it->second;
 
         // get on-screen positions of nodes shifted to fit on starlane
-        auto start_xy = ScreenPosOnStarlane(prev_node_x, prev_node_y, prev_sys_id, next_sys_id, lane_endpoints);
-        auto end_xy =   ScreenPosOnStarlane(node.x,      node.y,      prev_sys_id, next_sys_id, lane_endpoints);
+        auto start_xy = ScreenPosOnStarlane(prev_node_x, prev_node_y, prev_sys_id, next_sys_id, lane_endpoints, context);
+        auto end_xy =   ScreenPosOnStarlane(node.x,      node.y,      prev_sys_id, next_sys_id, lane_endpoints, context);
 
         if (!start_xy) {
             ErrorLogger() << "System " << prev_sys_id << " has invalid screen coordinates.";
@@ -1227,7 +1236,7 @@ void MapWnd::CompleteConstruction() {
     m_industry = GG::Wnd::Create<StatisticIcon>(ClientUI::MeterIcon(MeterType::METER_INDUSTRY),
                                                 0, 3, false, ICON_SINGLE_WIDTH, m_btn_turn->Height());
     m_industry->SetName("Industry StatisticIcon");
-    m_industry->LeftClickedSignal.connect([this](auto&) { ToggleProduction(); });
+    m_industry->LeftClickedSignal.connect([this](auto) { ToggleProduction(); });
 
     m_stockpile = GG::Wnd::Create<StatisticIcon>(ClientUI::MeterIcon(MeterType::METER_STOCKPILE),
                                                  0, 3, false, ICON_DUAL_WIDTH, m_btn_turn->Height());
@@ -1236,12 +1245,12 @@ void MapWnd::CompleteConstruction() {
     m_research = GG::Wnd::Create<StatisticIcon>(ClientUI::MeterIcon(MeterType::METER_RESEARCH),
                                                 0, 3, false, ICON_SINGLE_WIDTH, m_btn_turn->Height());
     m_research->SetName("Research StatisticIcon");
-    m_research->LeftClickedSignal.connect([this](auto&) { ToggleResearch(ScriptingContext{}); });
+    m_research->LeftClickedSignal.connect([this](auto) { ToggleResearch(ScriptingContext{}); });
 
     m_influence = GG::Wnd::Create<StatisticIcon>(ClientUI::MeterIcon(MeterType::METER_INFLUENCE),
                                                  0, 3, false, ICON_DUAL_WIDTH, m_btn_turn->Height());
     m_influence->SetName("Influence StatisticIcon");
-    m_influence->LeftClickedSignal.connect([this](auto&) { ToggleGovernment(); });
+    m_influence->LeftClickedSignal.connect([this](auto) { ToggleGovernment(); });
 
     m_fleet = GG::Wnd::Create<StatisticIcon>(ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "sitrep" / "fleet_arrived.png"),
                                              0, 3, false, ICON_SINGLE_WIDTH, m_btn_turn->Height());
@@ -1391,11 +1400,11 @@ void MapWnd::CompleteConstruction() {
     SidePanel::PlanetRightClickedSignal.connect(    boost::bind(&MapWnd::PlanetRightClicked, this, _1));
     SidePanel::BuildingRightClickedSignal.connect(  boost::bind(&MapWnd::BuildingRightClicked, this, _1));
 
-    // not strictly necessary, as in principle whenever any ResourceCenter
+    // not strictly necessary, as in principle whenever any Planet
     // changes, all meter estimates and resource pools should / could be
     // updated.  however, this is a convenience to limit the updates to
     // what is actually being shown in the sidepanel right now, which is
-    // useful since most ResourceCenter changes will be due to focus
+    // useful since most Planet changes will be due to focus
     // changes on the sidepanel, and most differences in meter estimates
     // and resource pools due to this will be in the same system
     SidePanel::ResourceCenterChangedSignal.connect([this](){
@@ -1598,7 +1607,7 @@ void MapWnd::InitializeWindows() {
     m_government_wnd->   InitSizeMove(gov_ul,           gov_ul + gov_wh);
 }
 
-GG::Pt MapWnd::ClientUpperLeft() const
+GG::Pt MapWnd::ClientUpperLeft() const noexcept
 { return UpperLeft() + GG::Pt(AppWidth(), AppHeight()); }
 
 double MapWnd::ZoomFactor() const
@@ -1979,7 +1988,7 @@ void MapWnd::RenderSystems() {
     // distance between inner and outer system circle
     const double circle_distance = GetOptionsDB().Get<double>("ui.map.system.circle.distance");
     // width of outer...
-    const double outer_circle_width = GetOptionsDB().Get<double>("ui.map.system.circle.outer.width");
+    //const double outer_circle_width = GetOptionsDB().Get<double>("ui.map.system.circle.outer.width");
     // ... and inner circle line at close zoom
     const double inner_circle_width = GetOptionsDB().Get<double>("ui.map.system.circle.inner.width");
     // width of inner circle line when map is zoomed out
@@ -2335,8 +2344,6 @@ void MapWnd::RenderFleetMovementLines() {
 
     glBindTexture(GL_TEXTURE_2D, move_line_dot_texture->OpenGLId());
 
-    const float dot_half_sz = dot_size / 2.0f;
-
     const auto sz = (m_fleet_lines.size() + m_projected_fleet_lines.size()) * 4;
     m_fleet_move_dot_vertices.clear();
     m_fleet_move_dot_vertices.reserve(sz);
@@ -2691,10 +2698,10 @@ bool MapWnd::PanY(GG::Y y) {
     return true;
 }
 
-void MapWnd::LButtonDown(const GG::Pt &pt, GG::Flags<GG::ModKey> mod_keys)
+void MapWnd::LButtonDown(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
 { m_drag_offset = pt - ClientUpperLeft(); }
 
-void MapWnd::LDrag(const GG::Pt &pt, const GG::Pt &move, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::LDrag(GG::Pt pt, GG::Pt move, GG::Flags<GG::ModKey> mod_keys) {
     if (GetOptionsDB().Get<bool>("ui.map.lock"))
         return;
 
@@ -2705,12 +2712,12 @@ void MapWnd::LDrag(const GG::Pt &pt, const GG::Pt &move, GG::Flags<GG::ModKey> m
     m_dragged = true;
 }
 
-void MapWnd::LButtonUp(const GG::Pt &pt, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::LButtonUp(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     m_drag_offset = GG::Pt(-GG::X1, -GG::Y1);
     m_dragged = false;
 }
 
-void MapWnd::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     m_drag_offset = GG::Pt(-GG::X1, -GG::Y1);
     FleetUIManager& manager = FleetUIManager::GetFleetUIManager();
     const auto fleet_wnd = manager.ActiveFleetWnd();
@@ -2726,7 +2733,7 @@ void MapWnd::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
     m_dragged = false;
 }
 
-void MapWnd::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     // if in moderator mode, treat as moderator action click
     if (ClientPlayerIsModerator()) {
         // only supported action on empty map location at present is creating a system
@@ -2783,7 +2790,7 @@ void MapWnd::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
     }
 }
 
-void MapWnd::MouseWheel(const GG::Pt& pt, int move, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys) {
     if (move)
         Zoom(move, pt);
 }
@@ -2829,7 +2836,7 @@ void MapWnd::EnableOrderIssuing(bool enable) {
         button_label = UserString("MAP_BTN_TURN_UPDATE");
     }
 
-    m_btn_turn->SetText(boost::io::str(FlexibleFormat(button_label) % std::to_string(CurrentTurn())));
+    m_btn_turn->SetText(boost::io::str(FlexibleFormat(button_label) % std::to_string(app->CurrentTurn())));
     RefreshTurnButtonTooltip();
     m_side_panel->EnableOrderIssuing(enable);
     m_production_wnd->EnableOrderIssuing(enable);
@@ -2917,16 +2924,14 @@ void MapWnd::InitTurn(ScriptingContext& context) {
 
     timer.EnterSection("sitreps");
     // are there any sitreps to show?
-    bool show_intro_sitreps = CurrentTurn() == 1 &&
+    bool show_intro_sitreps = context.current_turn == 1 &&
         GetOptionsDB().Get<Aggression>("setup.ai.aggression") <= Aggression::TYPICAL;
     DebugLogger() << "showing intro sitreps : " << show_intro_sitreps;
     if (show_intro_sitreps || m_sitrep_panel->NumVisibleSitrepsThisTurn() > 0) {
-        m_sitrep_panel->ShowSitRepsForTurn(CurrentTurn());
+        m_sitrep_panel->ShowSitRepsForTurn(context.current_turn);
         if (!m_design_wnd->Visible() && !m_research_wnd->Visible()
             && !m_production_wnd->Visible())
-        {
-            ShowSitRep();
-        }
+        { ShowSitRep(); }
     }
 
     if (m_sitrep_panel->Visible()) {
@@ -4062,18 +4067,20 @@ void MapWnd::InitFieldRenderingBuffers() {
     ClearFieldRenderingBuffers();
 
     const Universe& universe = GetUniverse();
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const auto* app = GGHumanClientApp::GetApp();
+    const auto empire_id = app->EmpireID();
+    const auto current_turn = app->CurrentTurn();
 
 
     for (auto& field_icon : m_field_icons) {
         bool current_field_visible = universe.GetObjectVisibilityByEmpire(field_icon.first, empire_id) > Visibility::VIS_BASIC_VISIBILITY;
-        auto field = Objects().get<Field>(field_icon.first);
+        auto field = universe.Objects().get<Field>(field_icon.first);
         if (!field)
             continue;
         const float FIELD_SIZE = field->GetMeter(MeterType::METER_SIZE)->Initial();  // field size is its radius
         if (FIELD_SIZE <= 0)
             continue;
-        auto field_texture = field_icon.second->FieldTexture();
+        const auto& field_texture = field_icon.second->FieldTexture();
         if (!field_texture)
             continue;
 
@@ -4086,7 +4093,7 @@ void MapWnd::InitFieldRenderingBuffers() {
         // per-turn rotation of texture. TODO: make depend on something scriptable
         float rotation_speed = 0.03f;               // arbitrary rotation rate in radians
         if (rotation_speed != 0.0f)
-            rotation_angle += CurrentTurn() * rotation_speed;
+            rotation_angle += current_turn * rotation_speed;
 
         const float COS_THETA = std::cos(rotation_angle);
         const float SIN_THETA = std::sin(rotation_angle);
@@ -4131,18 +4138,17 @@ void MapWnd::InitFieldRenderingBuffers() {
     }
     m_field_scanline_circles.createServerBuffer();
 
-    for (auto& field_buffer : m_field_vertices) {
-        auto field_texture = field_buffer.first;
+    for (auto& [field_texture, buffers] : m_field_vertices) {
         if (!field_texture)
             continue;
 
-        // todo: why the binding here?
+        // TODO: why the binding here?
         glBindTexture(GL_TEXTURE_2D, field_texture->OpenGLId());
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
 
-        field_buffer.second.first.createServerBuffer();
-        field_buffer.second.second.createServerBuffer();
+        buffers.first.createServerBuffer();
+        buffers.second.createServerBuffer();
     }
     glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -4191,18 +4197,18 @@ void MapWnd::InitVisibilityRadiiRenderingBuffers() {
             continue;
         }
 
-        for (const auto& [centre, radius] : detection_circles) {
+        for (const auto [centre, radius] : detection_circles) {
             if (radius < 5.0f || radius > 2048.0f)  // hide uselessly small and ridiculously large circles. the latter so super-testers don't have an empire-coloured haze over the whole map.
                 continue;
-            const auto& [X, Y] = centre;
+            const auto [X, Y] = centre;
 
             GG::Clr circle_colour = empire->Color();
             circle_colour.a = 8*GetOptionsDB().Get<int>("ui.map.detection.range.opacity");
 
-            GG::Pt circle_centre = GG::Pt{GG::X(X), GG::Y(Y)};
-            GG::Pt rad_pt{GG::X(radius), GG::Y(radius)};
-            GG::Pt ul = circle_centre - rad_pt;
-            GG::Pt lr = circle_centre + rad_pt;
+            const GG::Pt circle_centre = GG::Pt{GG::X(X), GG::Y(Y)};
+            const GG::Pt rad_pt{GG::X(radius), GG::Y(radius)};
+            const GG::Pt ul = circle_centre - rad_pt;
+            const GG::Pt lr = circle_centre + rad_pt;
 
             circles[circle_colour].emplace_back(ul, lr);
         }
@@ -4218,8 +4224,8 @@ void MapWnd::InitVisibilityRadiiRenderingBuffers() {
         border_colour.a = std::min(255, border_colour.a + 80);
         AdjustBrightness(border_colour, 2.0, true);
 
-        std::size_t radii_start_index = m_visibility_radii_vertices.size();
-        std::size_t border_start_index = m_visibility_radii_border_vertices.size();
+        const std::size_t radii_start_index = m_visibility_radii_vertices.size();
+        const std::size_t border_start_index = m_visibility_radii_border_vertices.size();
 
         for (const auto& [ul, lr] : ul_lrs) {
             static constexpr std::size_t verts_per_circle = 36;
@@ -4992,13 +4998,15 @@ boost::optional<std::pair<double, double>> MapWnd::MovingFleetMapPositionOnLane(
         // couldn't find an entry for the lane this fleet is one, so just
         // return actual position of fleet on starlane - ignore the distance
         // away from the star centre at which starlane endpoints should appear
-        return std::make_pair(fleet->X(), fleet->Y());
+        return std::pair(fleet->X(), fleet->Y());
     }
+
+    const ScriptingContext context;
 
     // return apparent position of fleet on starlane
     const LaneEndpoints& screen_lane_endpoints = endpoints_it->second;
     return ScreenPosOnStarlane(fleet->X(), fleet->Y(), sys1_id, sys2_id,
-                              screen_lane_endpoints);
+                              screen_lane_endpoints, context);
 }
 
 namespace {
@@ -5080,7 +5088,7 @@ namespace {
         if (!sys1)
             return boost::none;
         if (sys1->HasStarlaneTo(sys2_id))
-            return std::make_pair(std::min(sys1_id, sys2_id), std::max(sys1_id, sys2_id));
+            return std::pair(std::min(sys1_id, sys2_id), std::max(sys1_id, sys2_id));
 
         return boost::none;
     }
@@ -7051,14 +7059,14 @@ void MapWnd::RefreshPopulationIndicator() {
     const SpeciesManager& sm = GetSpeciesManager();
 
     //tally up all species population counts
-    for (const auto* pc : objects.findRaw<PopCenter>(pop_center_ids)) {
+    for (const auto* pc : objects.findRaw<Planet>(pop_center_ids)) {
         if (!pc)
             continue;
 
         const auto& species_name = pc->SpeciesName();
         if (species_name.empty())
             continue;
-        float this_pop = pc->GetMeter(MeterType::METER_POPULATION)->Initial();
+        const float this_pop = pc->UniverseObject::GetMeter(MeterType::METER_POPULATION)->Initial();
         population_counts[species_name] += this_pop;
         population_worlds[species_name] += 1;
         if (const Species* species = sm.GetSpecies(species_name) ) {
@@ -7161,7 +7169,7 @@ bool MapWnd::ZoomToPrevOwnedSystem() {
     auto sel_sys = Objects().get<System>(SidePanel::SystemID());
     if (sel_sys) {
         it = std::find(system_names_ids.rbegin(), system_names_ids.rend(),
-                       std::make_pair(sel_sys->Name(), sel_sys->ID()));
+                       std::pair(sel_sys->Name(), sel_sys->ID()));
         if (it != system_names_ids.rend())
             ++it;
     }
@@ -7188,7 +7196,7 @@ bool MapWnd::ZoomToNextOwnedSystem() {
     auto sel_sys = Objects().get<System>(SidePanel::SystemID());
     if (sel_sys) {
         it = std::find(system_names_ids.begin(), system_names_ids.end(),
-                       std::make_pair(sel_sys->Name(), sel_sys->ID()));
+                       std::pair(sel_sys->Name(), sel_sys->ID()));
         if (it != system_names_ids.end())
             ++it;
     }
@@ -7213,7 +7221,7 @@ bool MapWnd::ZoomToPrevSystem() {
     auto sel_sys = Objects().get<System>(SidePanel::SystemID());
     if (sel_sys) {
         it = std::find(system_names_ids.rbegin(), system_names_ids.rend(),
-                       std::make_pair(sel_sys->Name(), sel_sys->ID()));
+                       std::pair(sel_sys->Name(), sel_sys->ID()));
         if (it != system_names_ids.rend())
             ++it;
     }
@@ -7239,7 +7247,7 @@ bool MapWnd::ZoomToNextSystem() {
     auto sel_sys = Objects().get<System>(SidePanel::SystemID());
     if (sel_sys) {
         it = std::find(system_names_ids.begin(), system_names_ids.end(),
-                       std::make_pair(sel_sys->Name(), sel_sys->ID()));
+                       std::pair(sel_sys->Name(), sel_sys->ID()));
         if (it != system_names_ids.end())
             ++it;
     }

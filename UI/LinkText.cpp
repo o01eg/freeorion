@@ -4,6 +4,7 @@
 #include "CUIControls.h"
 #include "../Empire/Empire.h"
 #include "../universe/NamedValueRefManager.h"
+#include "../universe/Species.h"
 #include "../universe/UniverseObject.h"
 #include "../universe/ValueRefs.h"
 #include "../util/AppInterface.h"
@@ -200,19 +201,10 @@ GG::Pt LinkText::TextUpperLeft() const
 GG::Pt LinkText::TextLowerRight() const
 { return GG::TextControl::TextLowerRight(); }
 
-const std::vector<GG::Font::LineData>& LinkText::GetLineData() const
-{ return GG::TextControl::GetLineData(); }
-
-const std::shared_ptr<GG::Font>& LinkText::GetFont() const
-{ return GG::TextControl::GetFont(); }
-
-const std::string& LinkText::RawText() const
-{ return m_raw_text; }
-
-void LinkText::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
+void LinkText::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
 { TextLinker::LClick_(pt, mod_keys); }
 
-void LinkText::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void LinkText::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     auto rclick_action = [this, pt, mod_keys]() { TextLinker::RClick_(pt, mod_keys); };
     auto copy_action = [this]() { GG::GUI::GetGUI()->CopyWndText(this); };
 
@@ -227,13 +219,13 @@ void LinkText::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
     popup->Run();
 }
 
-void LinkText::MouseHere(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
+void LinkText::MouseHere(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
 { TextLinker::MouseHere_(pt, mod_keys); }
 
 void LinkText::MouseLeave()
 { TextLinker::MouseLeave_(); }
 
-void LinkText::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void LinkText::SizeMove(GG::Pt ul, GG::Pt lr) {
     bool resized = Size() != (lr-ul);
     GG::TextControl::SizeMove(ul, lr);
     if (resized)
@@ -348,7 +340,7 @@ void TextLinker::Render_() {
     }
 }
 
-void TextLinker::LClick_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void TextLinker::LClick_(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     int sel_link = GetLinkUnderPt(pt);
     if (sel_link == -1)
         return;
@@ -361,7 +353,7 @@ void TextLinker::LClick_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
     LinkClickedSignal(LINK.type, LINK.data);
 }
 
-void TextLinker::RClick_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void TextLinker::RClick_(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     int sel_link = GetLinkUnderPt(pt);
     if (sel_link == -1)
         return;
@@ -374,7 +366,7 @@ void TextLinker::RClick_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
     LinkClickedSignal(LINK.type, LINK.data);
 }
 
-void TextLinker::LDoubleClick_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void TextLinker::LDoubleClick_(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     int sel_link = GetLinkUnderPt(pt);
     if (sel_link == -1)
         return;
@@ -387,7 +379,7 @@ void TextLinker::LDoubleClick_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
     LinkClickedSignal(LINK.type, LINK.data);
 }
 
-void TextLinker::MouseHere_(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void TextLinker::MouseHere_(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     int rollover_link = GetLinkUnderPt(pt);
     if (rollover_link != m_rollover_link) {
         m_rollover_link = rollover_link;
@@ -519,7 +511,7 @@ void TextLinker::LocateLinks() {
     }
 }
 
-int TextLinker::GetLinkUnderPt(const GG::Pt& pt) {
+int TextLinker::GetLinkUnderPt(GG::Pt pt) {
     std::vector<Link> links;
     try {
         links = m_links;
@@ -588,9 +580,13 @@ void TextLinker::MarkLinks() {
     SetLinkedText(std::move(marked_text));
 }
 
+namespace {
+    auto get_species = [](std::string_view sv) { return GetSpeciesManager().GetSpecies(sv); };
+}
+
 std::string LinkStringIfPossible(std::string_view raw, std::string_view user_string) {
     if      (GetBuildingType(raw)) return LinkTaggedPresetText(VarText::BUILDING_TYPE_TAG, raw, user_string);
-    else if (GetSpecies(raw))      return LinkTaggedPresetText(VarText::SPECIES_TAG,       raw, user_string);
+    else if (get_species(raw))     return LinkTaggedPresetText(VarText::SPECIES_TAG,       raw, user_string);
     else if (GetSpecial(raw))      return LinkTaggedPresetText(VarText::SPECIAL_TAG,       raw, user_string);
     else if (GetPolicy(raw))       return LinkTaggedPresetText(VarText::POLICY_TAG,        raw, user_string);
     else if (GetShipHull(raw))     return LinkTaggedPresetText(VarText::SHIP_HULL_TAG,     raw, user_string);

@@ -30,10 +30,10 @@ namespace {
     constexpr X HORIZONTAL_MARGIN(3);
 }
 
-PopupMenu::PopupMenu(X x, Y y, const std::shared_ptr<Font>& font, Clr text_color,
+PopupMenu::PopupMenu(X x, Y y, std::shared_ptr<Font> font, Clr text_color,
                      Clr border_color, Clr interior_color, Clr hilite_color) :
     Wnd(X0, Y0, GUI::GetGUI()->AppWidth() - 1, GUI::GetGUI()->AppHeight() - 1, INTERACTIVE | MODAL),
-    m_font(font),
+    m_font(std::move(font)),
     m_border_color(border_color),
     m_int_color(interior_color),
     m_text_color(text_color),
@@ -41,33 +41,13 @@ PopupMenu::PopupMenu(X x, Y y, const std::shared_ptr<Font>& font, Clr text_color
     m_sel_text_color(text_color),
     m_caret(1, INVALID_CARET),
     m_origin(x, y)
-{
-    m_open_levels.resize(1);
-}
+{ m_open_levels.resize(1); }
 
 void PopupMenu::AddMenuItem(MenuItem&& menu_item)
 { m_menu_data.next_level.push_back(std::move(menu_item)); }
 
 void PopupMenu::AddMenuItem(std::string str, bool disable, bool check, std::function<void()> selected_on_close_callback)
 { m_menu_data.next_level.emplace_back(std::move(str), disable, check, selected_on_close_callback); }
-
-Pt PopupMenu::ClientUpperLeft() const
-{ return m_origin; }
-
-Clr PopupMenu::BorderColor() const
-{ return m_border_color; }
-
-Clr PopupMenu::InteriorColor() const
-{ return m_int_color; }
-
-Clr PopupMenu::TextColor() const
-{ return m_text_color; }
-
-Clr PopupMenu::HiliteColor() const
-{ return m_hilite_color; }
-
-Clr PopupMenu::SelectedTextColor() const
-{ return m_sel_text_color; }
 
 void PopupMenu::Render()
 {
@@ -188,7 +168,7 @@ void PopupMenu::Render()
     }
 }
 
-void PopupMenu::LButtonUp(const Pt& pt, Flags<ModKey> mod_keys)
+void PopupMenu::LButtonUp(Pt pt, Flags<ModKey> mod_keys)
 {
     if (m_caret[0] != INVALID_CARET) {
         MenuItem* menu_ptr = &m_menu_data;
@@ -199,17 +179,17 @@ void PopupMenu::LButtonUp(const Pt& pt, Flags<ModKey> mod_keys)
         }
         if (!menu_ptr->disabled && !menu_ptr->separator) {
             m_item_selected = menu_ptr;
-            m_done = true;
+            m_modal_done.store(true);
         }
     } else {
-        m_done = true;
+        m_modal_done.store(true);
     }
 }
 
-void PopupMenu::LClick(const Pt& pt, Flags<ModKey> mod_keys)
+void PopupMenu::LClick(Pt pt, Flags<ModKey> mod_keys)
 { LButtonUp(pt, mod_keys); }
 
-void PopupMenu::LDrag(const Pt& pt, const Pt& move, Flags<ModKey> mod_keys)
+void PopupMenu::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
 {
     bool cursor_is_in_menu = false;
     for (int i = static_cast<int>(m_open_levels.size()) - 1; i >= 0; --i) {
@@ -244,13 +224,13 @@ void PopupMenu::LDrag(const Pt& pt, const Pt& move, Flags<ModKey> mod_keys)
     }
 }
 
-void PopupMenu::RButtonUp(const Pt& pt, Flags<ModKey> mod_keys)
+void PopupMenu::RButtonUp(Pt pt, Flags<ModKey> mod_keys)
 { LButtonUp(pt, mod_keys); }
 
-void PopupMenu::RClick(const Pt& pt, Flags<ModKey> mod_keys)
+void PopupMenu::RClick(Pt pt, Flags<ModKey> mod_keys)
 { LButtonUp(pt, mod_keys); }
 
-void PopupMenu::MouseHere(const Pt& pt, Flags<ModKey> mod_keys)
+void PopupMenu::MouseHere(Pt pt, Flags<ModKey> mod_keys)
 { LDrag(pt, Pt(), mod_keys); }
 
 bool PopupMenu::Run()

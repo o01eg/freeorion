@@ -25,7 +25,7 @@ class GraphControl;
 //! UI class that displays in-game encyclopedic information about game content.
 //!
 //! Tech, ShipPart, ShipHull, BuildingType, ShipDesign, etc.
-class EncyclopediaDetailPanel : public CUIWnd {
+class EncyclopediaDetailPanel final : public CUIWnd {
 public:
     EncyclopediaDetailPanel(GG::Flags<GG::WndFlag> flags = GG::ONTOP | GG::INTERACTIVE | GG::DRAGABLE |
                                                            GG::RESIZABLE | CLOSABLE | PINABLE,
@@ -33,14 +33,14 @@ public:
     void CompleteConstruction() override;
     ~EncyclopediaDetailPanel() = default;
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
     void KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override;
     void PreRender() override;
     void Render() override;
 
     /** Need to redefine this so that icons and name can be put at the top of
       * the Wnd, rather than being restricted to the client area of a CUIWnd */
-    GG::Pt ClientUpperLeft() const override;
+    GG::Pt ClientUpperLeft() const noexcept override { return GG::Wnd::UpperLeft(); }
 
     void AddItem(std::string_view type, std::string name); // adds a new item to m_items
     void PopItem();

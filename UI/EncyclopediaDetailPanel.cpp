@@ -2655,15 +2655,12 @@ namespace {
         const ScriptingContext context;
         const Universe& u = GetUniverse();
         const ObjectMap& objects = u.Objects();
-        int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-        std::vector<const Field*> current_fields;
-        current_fields.reserve(objects.size());
-        for (const auto* field : objects.allRaw<Field>())
-            if (field->FieldTypeName() == name)
-                current_fields.push_back(field);
+        const auto current_fields = objects.findRaw<Field>(
+            [item_name](auto* f) { return f->FieldTypeName() == item_name; });
 
         detailed_description.append("\n\n").append(UserString("KNOWN_FIELDS_OF_THIS_TYPE")).append("\n");
         if (!current_fields.empty()) {
+            const int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
             for (auto& obj : current_fields) {
                 auto TEXT_TAG = VarText::FIELD_ID_TAG;
                 detailed_description.append(
@@ -2679,7 +2676,9 @@ namespace {
                 detailed_description.append(", Y=").append(ssy.str());
                 detailed_description.append("\n");
             }
-        } else detailed_description.append(UserString("NO_KNOWN_FIELDS"));
+        } else {
+            detailed_description.append(UserString("NO_KNOWN_FIELDS"));
+        }
         detailed_description.append("\n");
     }
 
@@ -2819,10 +2818,11 @@ namespace {
         }
 
         float tech_level = boost::algorithm::clamp(context.current_turn / 400.0f, 0.0f, 1.0f);
-        float typical_shot = 3 + 27 * tech_level;
-        float enemy_DR = 20 * tech_level;
+        double scaling = GetGameRules().Get<double>("RULE_SHIP_WEAPON_DAMAGE_FACTOR");
+        float typical_shot = (3 + 27 * tech_level) * scaling;
+        float enemy_DR = 20 * tech_level * scaling;
         TraceLogger() << "RefreshDetailPanelShipDesignTag default enemy stats:: tech_level: "
-                      << tech_level << "   DR: " << enemy_DR << "   attack: " << typical_shot;
+                      << tech_level << "   DR: " << enemy_DR << "   attack: " << typical_shot << "  incl.scaling: " << scaling;
         std::set<float> enemy_shots{typical_shot};
 
 
@@ -2977,10 +2977,11 @@ namespace {
         universe.InsertShipDesignID(new ShipDesign(*incomplete_design), client_empire_id, incomplete_design->ID());
         detailed_description = GetDetailedDescriptionBase(incomplete_design.get());
         float tech_level = boost::algorithm::clamp(context.current_turn / 400.0f, 0.0f, 1.0f);
-        float typical_shot = 3 + 27 * tech_level;
-        float enemy_DR = 20 * tech_level;
+        double scaling = GetGameRules().Get<double>("RULE_SHIP_WEAPON_DAMAGE_FACTOR");
+        float typical_shot = (3 + 27 * tech_level) * scaling;
+        float enemy_DR = 20 * tech_level * scaling;
         DebugLogger() << "default enemy stats:: tech_level: " << tech_level
-                      << "   DR: " << enemy_DR << "   attack: " << typical_shot;
+                      << "   DR: " << enemy_DR << "   attack: " << typical_shot << "  incl.scaling: " << scaling;
         std::set<float> enemy_shots;
         enemy_shots.insert(typical_shot);
         std::set<std::string> additional_species; // TODO: from currently selected planet and ship, if any

@@ -6359,7 +6359,7 @@ Modificateurs de base de la Stabilité:
 '''
 
 STABILITY_MODIFIERS
-'''• -/+ 5 Connexion par lignes d'[[metertype METER_SUPPLY]] à la Capitale - Dépend de la distance en nombre de Voies Spatiales à la Capitale ou à une structure [[buildingtype BLD_REGIONAL_ADMIN]]. Ne concerne pas les espèces <encyclopedia INDEPENDENT_SPECIES_TITLE>indépendantistes</encyclopedia> et les empires ayant adopté la Politique [[policy PLC_CONFEDERATION]].
+'''• -/+ 5 Connexion par lignes d'[[metertype METER_SUPPLY]] à la Capitale - Dépend de la distance en nombre de Voies Spatiales à la Capitale ou à une structure [[buildingtype BLD_REGIONAL_ADMIN]]. Ne concerne pas les espèces de type [[encyclopedia INDEPENDENT]] et les empires ayant adopté la Politique [[policy PLC_CONFEDERATION]].
 • +5 Monde Natal - les espèces vivant sur leur propre planète natale sont plus stables.
 • +5 Espèce de la Capitale - Les colonies abritant la même espèce que celle de la Capitale sont plus stables. Ne s'applique pas à la Capitale elle-même.
 • +10 Capitale - La colonie abrite une structure [[buildingtype BLD_IMPERIAL_PALACE]].
@@ -6772,12 +6772,12 @@ ARTISTIC_SPECIES_TRAIT_TEXT
 Liste des espèces artistiques:'''
 
 INDEPENDENT_SPECIES_TITLE
-Attribut Indépendantiste
+Attribut Indépendant
 
 INDEPENDENT_SPECIES_TRAIT_TEXT
-'''La [[metertype METER_HAPPINESS]] des espèces indépendantistes n'est pas modifiée par la distance aux Capitales ou aux Administrations Régionales Impériales.
+'''La [[metertype METER_HAPPINESS]] des espèces indépendantes n'est pas modifiée par la distance aux Capitales ou aux Administrations Régionales Impériales.
 
-Liste des espèces indépendantistes:'''
+Liste des espèces indépendantes:'''
 
 SNEAKY_TITLE
 Sournoise
@@ -9535,7 +9535,7 @@ HIGH_TECH_NATIVES_SPECIAL
 Indigènes Techno-Experts
 
 HIGH_TECH_NATIVES_SPECIAL_DESC
-Les indigènes de cette planète ont développé une maîtrise technologique très avancée. Si leur planète n'appartient pas à un empire, cette dernière profite de défenses bien plus puissantes et résiste très bien aux attaques et aux invasions.
+Les indigènes de cette planète ont développé une maîtrise technologique très avancée. Si leur planète est indépendante de tout empire, cette dernière profite de défenses bien plus puissantes et résiste très bien aux attaques et aux invasions.
 
 NATIVE_FORTIFICATION_MINIMAL
 Fortifications indigènes minimes
@@ -12644,8 +12644,10 @@ PLC_NECESSITY
 Nécessité
 
 PLC_NECESSITY_DESC
-'''Sur les planètes en Focus Recherche dont la [[metertype METER_HAPPINESS]] est inférieure à [[value PLC_NECESSITY_MAX_STABILITY]]:
-• Augmente la [[metertype METER_TARGET_RESEARCH]] par la racine carrée du produit entre la Population et de combien la [[metertype METER_HAPPINESS]] est inférieure à [[value PLC_NECESSITY_MAX_STABILITY]].
+'''Nécessité est mère d'invention.
+
+Sur les planètes en Focus Recherche dont la [[metertype METER_HAPPINESS]] est inférieure à [[value PLC_NECESSITY_MAX_STABILITY]]:
+• Augmente la [[metertype METER_TARGET_RESEARCH]] de [[value PLC_NECESSITY_TARGET_RESEARCH_FACTOR]] multiplié par exposant 1.5 de combien la [[metertype METER_HAPPINESS]] est inférieure à [[value PLC_NECESSITY_MAX_STABILITY]] multiplié par la [[metertype METER_POPULATION]].
 • Augmente la progression de la [[metertype METER_RESEARCH]] de [[value PLC_NECESSITY_RESEARCH_GROWTH_BOOST]] par tour.'''
 
 PLC_NECESSITY_SHORT_DESC
@@ -14847,7 +14849,14 @@ BLD_LIGHTHOUSE
 Phare Interstellaire
 
 BLD_LIGHTHOUSE_DESC
-Diminue de 30 la [[metertype METER_STEALTH]] de tous les objets situés dans le même système et augmente de 20 la [[metertype METER_SPEED]] des astronefs alliés se trouvant à moins de 50 uu au début du tour. [[BUILDING_AVAILABLE_ON_OUTPOSTS]] et peut rendre optimale l'utilisation d'un [[buildingtype BLD_PLANET_DRIVE]].
+'''Diminue la [[metertype METER_STEALTH]] de tous les astronefs situés dans le même système de [[value BLD_LIGHTHOUSE_IMMEDIATE_STEALTH_MALUS]]. De plus, le Phare Interstellaire diminue la [[metertype METER_STEALTH]] de tous les objets d'une valeur égale au nombre de tours depuis sa mise en fonction, jusqu'à un maximum de [[value BLD_LIGHTHOUSE_CATALOG_STEALTH_MALUS]]. Il augmente également la [[metertype METER_SPEED]] des astronefs alliés débutant leur tour dans un périmètre de [[value BLD_LIGHTHOUSE_SPEEDUP_DISTANCE]] uu de [[value BLD_LIGHTHOUSE_SPEEDUP]] pour ce tour. [[BUILDING_AVAILABLE_ON_OUTPOSTS]] et peut rendre optimale l'utilisation d'un [[buildingtype BLD_PLANET_DRIVE]].
+
+Cette structure émet des ondes complexes de pulsations EM et de jets de particules afin de révéler l'emplacement des objets dans un système. Une fois le processus achevé, tous les objets communs dans un système sont enregistrés dans un catalogue, permettant ainsi d'identifier plus efficacement les occurrences inhabituelles.
+
+De par son fonctionnement, la structure s'enregistre elle-même dans le catalogue et s'avère donc très visible, avec une [[metertype METER_STEALTH]] diminuée de [[value BLD_LIGHTHOUSE_SELF_STEALTH_MALUS]].'''
+
+BLD_LIGHTHOUSE_CATALOG_STEALTH_LABEL
+Catalogue du Phare
 
 BLD_SCANNING_FACILITY
 Complexe de Détection
@@ -16277,7 +16286,7 @@ SH_SELF_GRAVITATING
 Coque Auto-Gravitationnelle
 
 SH_SELF_GRAVITATING_DESC
-'''Cette coque immense, à la fois en taille et en puissance, est dotée de six niches externes, de deux niches internes, et d'une niche centrale - faisant de celle-ci l'une des rares capable d'accueillir les équipements d'astronef les plus avancés. Sa [[metertype METER_STRUCTURE]] max élevée en fait également une coque des plus robustes.
+'''Cette coque immense, à la fois en taille et en puissance, est dotée de cinq niches externes, de deux niches internes, et d'une niche centrale - faisant de celle-ci l'une des rares capable d'accueillir les équipements d'astronef les plus avancés. Sa [[metertype METER_STRUCTURE]] max élevée en fait également une coque des plus robustes.
 
 Sa [[metertype METER_STEALTH]] est cependant faible, son [[metertype METER_DETECTION]] standard, tandis que sa [[metertype METER_SPEED]] est moyenne.
 
@@ -17153,7 +17162,7 @@ ULTIMATE_HAPPINESS_DESC
 +++	Parfait en [[metertype METER_HAPPINESS]] : +[[value ULTIMATE_HAPPINESS_VAL]]
 
 INDEPENDENT_HAPPINESS_DESC
-⋄	[[metertype METER_HAPPINESS]] indépendante: la Stabilité de base n'est pas tributaire des connexions aux lignes d'approvisionnement
+⋄	[[metertype METER_HAPPINESS]] [[encyclopedia INDEPENDENT]]e : la Stabilité de base n'est pas tributaire des connexions aux lignes d'approvisionnement
 
 NO_DEFENSE_TROOPS_DESC
 −−−	Pas d'[[metertype METER_TROOPS]] défensive
@@ -18049,6 +18058,9 @@ STYLISH
 
 ARTISTIC
 Artistique
+
+INDEPENDENT
+Indépendant
 
 ORGANIC
 Organique

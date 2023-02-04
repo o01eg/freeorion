@@ -1945,13 +1945,19 @@ void Universe::ApplyEffectDerivedVisibilities(EmpireManager& empires) {
 void Universe::ForgetKnownObject(int empire_id, int object_id) {
     // Note: Client calls this with empire_id == ALL_EMPIRES to
     // immediately forget information without waiting for the turn update.
-    auto empire_it = m_empire_latest_known_objects.find(empire_id);
-    if (empire_it != m_empire_latest_known_objects.end()) {
-        ErrorLogger() << "ForgetKnownObject bad empire id: " << empire_id;
-        return;
-    }
-    auto& objects{empire_it->second};
-    const auto* const obj = objects.getRaw(object_id);
+    ObjectMap& objects = [empire_id, this]() -> ObjectMap& {
+        if (empire_id == ALL_EMPIRES)
+            return *m_objects;
+
+        auto empire_it = m_empire_latest_known_objects.find(empire_id);
+        if (empire_it == m_empire_latest_known_objects.end()) {
+            ErrorLogger() << "ForgetKnownObject bad empire id: " << empire_id;
+            return *m_objects;
+        }
+        return empire_it->second;
+    }();
+
+    const auto obj = objects.get(object_id); // shared to ensure remains valid to end of this function
     if (!obj) {
         ErrorLogger() << "ForgetKnownObject empire: " << empire_id << " bad object id: " << object_id;
         return;
@@ -1965,11 +1971,13 @@ void Universe::ForgetKnownObject(int empire_id, int object_id) {
     }
 
     // Remove all contained objects to avoid breaking fleet+ship, system+planet invariants
-    auto contained_ids = obj->ContainedObjectIDs();
-    for (int child_id : contained_ids)
-        ForgetKnownObject(empire_id, child_id);
-
+    const auto& contained_ids_set = obj->ContainedObjectIDs();
+    const std::vector<int> contained_ids(contained_ids_set.begin(), contained_ids_set.end()); // copy since forgetting will modify container while iterating over it
     const int container_id = obj->ContainerObjectID();
+
+    for (int child_id : contained_ids)
+        ForgetKnownObject(empire_id, child_id); // may remove / erase this object
+
     if (container_id != INVALID_OBJECT_ID) {
         if (auto* container = objects.getRaw(container_id)) {
             if (container->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
@@ -1984,7 +1992,7 @@ void Universe::ForgetKnownObject(int empire_id, int object_id) {
                 auto* fleet = static_cast<Fleet*>(container);
                 fleet->RemoveShips({object_id});
                 if (fleet->Empty())
-                    objects.erase(fleet->ID());
+                    objects.erase(container_id);
             }
         }
     }
@@ -2134,10 +2142,10 @@ Universe::GetEmpiresPositionNextTurnFleetDetectionRanges(const ScriptingContext&
 
 
         // get next turn position of fleet
-        auto path = fleet->MovePath(false, context);
+        const auto path = fleet->MovePath(false, context);
         if (path.empty())
             continue;
-        auto& next_turn_end_position = [&path]() -> const MovePathNode& {
+        const auto next_turn_end_position = [&path]() -> MovePathNode {
             for (const auto& node : path) {
                 if (node.turn_end)
                     return node;
@@ -2151,9 +2159,9 @@ Universe::GetEmpiresPositionNextTurnFleetDetectionRanges(const ScriptingContext&
         { continue; }
 
         // add detection at next position
-        auto object_owner_empire_id = fleet->Owner();
+        const auto object_owner_empire_id = fleet->Owner();
         auto& retval_empire_pos_range = retval[object_owner_empire_id];
-        std::pair<double, double> object_pos{next_turn_end_position.x, next_turn_end_position.y};
+        const std::pair<double, double> object_pos{next_turn_end_position.x, next_turn_end_position.y};
 
         // store range in output map (if new for location or larger than any
         // previously-found range at this location)
@@ -2991,7 +2999,8 @@ std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& 
 
     auto system = m_objects->get<System>(obj->SystemID());
 
-    if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
+    switch (obj->ObjectType()) {
+    case UniverseObjectType::OBJ_SHIP: {
         auto ship = std::static_pointer_cast<Ship>(std::move(obj));
         if (auto fleet = m_objects->get<Fleet>(ship->FleetID())) {
             // if a ship is being deleted, and it is the last ship in
@@ -3008,8 +3017,10 @@ std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& 
             system->Remove(object_id);
         Destroy(object_id, empire_ids);
         retval.insert(object_id);
+        break;
+    }
 
-    } else if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
+    case UniverseObjectType::OBJ_FLEET: {
         auto obj_fleet = std::static_pointer_cast<Fleet>(std::move(obj));
         for (int ship_id : obj_fleet->ShipIDs()) {
             if (system)
@@ -3021,8 +3032,10 @@ std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& 
             system->Remove(object_id);
         Destroy(object_id, empire_ids);
         retval.insert(object_id);
+        break;
+    }
 
-    } else if (obj->ObjectType() == UniverseObjectType::OBJ_PLANET) {
+    case UniverseObjectType::OBJ_PLANET: {
         auto obj_planet = std::static_pointer_cast<Planet>(std::move(obj));
         for (int building_id : obj_planet->BuildingIDs()) {
             if (system)
@@ -3034,8 +3047,10 @@ std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& 
             system->Remove(object_id);
         Destroy(object_id, empire_ids);
         retval.insert(object_id);
+        break;
+    }
 
-    } else if (obj->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
+    case UniverseObjectType::OBJ_SYSTEM: {
         auto obj_system = std::static_pointer_cast<System>(std::move(obj));
         // destroy all objects in system
         for (int system_id : obj_system->ObjectIDs()) {
@@ -3064,8 +3079,10 @@ std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& 
         retval.insert(object_id);
         // don't need to bother with removing things from system, fleets, or
         // ships, since everything in system is being destroyed
+        break;
+    }
 
-    } else if (obj->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
+    case UniverseObjectType::OBJ_BUILDING: {
         auto building = std::static_pointer_cast<Building>(std::move(obj));
         auto planet = m_objects->get<Planet>(building->PlanetID());
         if (planet)
@@ -3074,13 +3091,18 @@ std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& 
             system->Remove(object_id);
         Destroy(object_id, empire_ids);
         retval.insert(object_id);
+        break;
+    }
 
-    } else if (obj->ObjectType() == UniverseObjectType::OBJ_FIELD) {
+    case UniverseObjectType::OBJ_FIELD: {
         if (system)
             system->Remove(object_id);
         Destroy(object_id, empire_ids);
         retval.insert(object_id);
+        break;
     }
+    }
+
     // else ??? object is of some type unknown as of this writing.
     return retval;
 }

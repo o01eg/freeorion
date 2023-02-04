@@ -29,7 +29,7 @@ void PromptRow::CompleteConstruction() {
     push_back(m_prompt);
 }
 
-void PromptRow::SizeMove(const GG::Pt& ul, const GG::Pt& lr)  {
+void PromptRow::SizeMove(GG::Pt ul, GG::Pt lr)  {
     const GG::Pt old_size = Size();
     GG::ListBox::Row::SizeMove(ul, lr);
     if (!empty() && old_size != Size() && m_prompt)
@@ -89,7 +89,7 @@ void QueueListBox::KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags
     }
 }
 
-void QueueListBox::AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys) {
+void QueueListBox::AcceptDrops(GG::Pt pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys) {
     if (wnds.size() > 1)
         ErrorLogger() << "QueueListBox::AcceptDrops given multiple wnds unexpectedly...";
     auto& wnd = *wnds.begin();
@@ -123,7 +123,7 @@ void QueueListBox::Render() {
     }
 }
 
-void QueueListBox::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void QueueListBox::SizeMove(GG::Pt ul, GG::Pt lr) {
     const GG::Pt old_size = Size();
     CUIListBox::SizeMove(ul, lr);
     if (old_size != Size() && !Empty()) {
@@ -133,7 +133,7 @@ void QueueListBox::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
     }
 }
 
-void QueueListBox::DragDropHere(const GG::Pt& pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
+void QueueListBox::DragDropHere(GG::Pt pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
                                  GG::Flags<GG::ModKey> mod_keys)
 {
     CUIListBox::DragDropHere(pt, drop_wnds_acceptable, mod_keys);
@@ -213,10 +213,10 @@ std::function<void()> QueueListBox::DeleteAction(GG::ListBox::iterator it) const
     };
 }
 
-void QueueListBox::ItemRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys)
+void QueueListBox::ItemRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys)
 { this->ItemRightClickedImpl(it, pt, modkeys); }
 
-void QueueListBox::ItemRightClickedImpl(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
+void QueueListBox::ItemRightClickedImpl(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) {
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
     bool disabled = !OrderIssuingEnabled();

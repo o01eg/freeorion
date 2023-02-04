@@ -21,9 +21,9 @@ public:
     int SelectedPlanetID() const;
     int ShownEmpireID() const { return m_empire_shown_id; }
 
-    bool InWindow(const GG::Pt& pt) const override;
-    bool InClient(const GG::Pt& pt) const override;
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    bool InWindow(GG::Pt pt) const override;
+    bool InClient(GG::Pt pt) const override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
     void Render() override;
 
@@ -117,8 +117,8 @@ private:
 
     void DeleteQueueItem(GG::ListBox::iterator it);
     void QueueItemMoved(const GG::ListBox::iterator& row_it, const GG::ListBox::iterator& original_position_it);
-    void QueueItemClickedSlot(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
-    void QueueItemDoubleClickedSlot(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
+    void QueueItemClickedSlot(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys);
+    void QueueItemDoubleClickedSlot(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys);
     void QueueItemRallied(GG::ListBox::iterator it, int object_id);
     void QueueItemPaused(GG::ListBox::iterator it, bool pause);
     void QueueItemDuped(GG::ListBox::iterator it);

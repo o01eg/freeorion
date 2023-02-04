@@ -206,6 +206,7 @@ void FileDlg::CompleteConstruction()
 
     namespace ph = boost::placeholders;
 
+    // TODO: store scoped connections in member vector?
     m_ok_button->LeftClickedSignal.connect(boost::bind(&FileDlg::OkClicked, this));
     m_cancel_button->LeftClickedSignal.connect(boost::bind(&FileDlg::CancelClicked, this));
     m_files_list->SelRowsChangedSignal.connect(boost::bind(&FileDlg::FileSetChanged, this, ph::_1));
@@ -218,15 +219,6 @@ void FileDlg::CompleteConstruction()
         m_files_edit->SetText(filename_path.leaf().string());
     }
 }
-
-std::set<std::string> FileDlg::Result() const
-{ return m_result; }
-
-bool FileDlg::SelectDirectories() const
-{ return m_select_directories; }
-
-bool FileDlg::AppendMissingSaveExtension() const
-{ return m_append_missing_save_extension; }
 
 void FileDlg::Render()
 {
@@ -267,9 +259,6 @@ void FileDlg::SetFileFilters(const std::vector<std::pair<std::string, std::strin
     PopulateFilters();
     UpdateList();
 }
-
-const fs::path& FileDlg::WorkingDirectory()
-{ return s_working_dir; }
 
 const boost::filesystem::path FileDlg::StringToPath(const std::string& str) {
 #if defined(_WIN32)
@@ -423,12 +412,12 @@ void FileDlg::OkHandler(bool double_click)
         }
     }
     if (results_valid)
-        m_done = true;
+        m_modal_done.store(true);
 }
 
 void FileDlg::CancelClicked()
 {
-    m_done = true;
+    m_modal_done.store(true);
     m_result.clear();
 }
 
@@ -458,7 +447,7 @@ void FileDlg::FileSetChanged(const ListBox::SelectionSet& files)
         m_ok_button->SetText(m_open_str);
 }
 
-void FileDlg::FileDoubleClicked(DropDownList::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys)
+void FileDlg::FileDoubleClicked(DropDownList::iterator it, GG::Pt pt, Flags<ModKey> modkeys)
 {
     m_files_list->DeselectAll();
     m_files_list->SelectRow(it);

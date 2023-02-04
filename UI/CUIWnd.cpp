@@ -254,7 +254,7 @@ void CUIWnd::SetName(std::string name) {
         m_title->SetText(std::move(name));
 }
 
-void CUIWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void CUIWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_sz = Size();
     if (m_config_save) {    // can write position/size to OptionsDB
 
@@ -355,13 +355,13 @@ void CUIWnd::Render() {
     glPopMatrix();
 }
 
-void CUIWnd::LButtonDown(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUIWnd::LButtonDown(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     if (!InResizeTab(pt))
         return;
     m_drag_offset = pt - LowerRight();
 }
 
-bool CUIWnd::InResizeTab(const GG::Pt& pt) const {
+bool CUIWnd::InResizeTab(GG::Pt pt) const {
     if (!m_resizable || m_minimized)
         return false;
 
@@ -373,7 +373,7 @@ bool CUIWnd::InResizeTab(const GG::Pt& pt) const {
     return false;
 }
 
-void CUIWnd::LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKey> mod_keys) {
+void CUIWnd::LDrag(GG::Pt pt, GG::Pt move, GG::Flags<GG::ModKey> mod_keys) {
     if (m_pinned)
         return;
 
@@ -401,17 +401,17 @@ void CUIWnd::LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKey> m
     }
 }
 
-void CUIWnd::LButtonUp(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUIWnd::LButtonUp(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     m_drag_offset = GG::Pt(-GG::X1, -GG::Y1);
     SaveOptions();
 }
 
-void CUIWnd::MouseEnter(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUIWnd::MouseEnter(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     m_mouse_in_resize_tab = InResizeTab(pt);
     Wnd::MouseEnter(pt, mod_keys);
 }
 
-void CUIWnd::MouseHere(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUIWnd::MouseHere(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     m_mouse_in_resize_tab = InResizeTab(pt);
     Wnd::MouseHere(pt, mod_keys);
 }
@@ -421,13 +421,13 @@ void CUIWnd::MouseLeave() {
     Wnd::MouseLeave();
 }
 
-GG::Pt CUIWnd::ClientUpperLeft() const
+GG::Pt CUIWnd::ClientUpperLeft() const noexcept
 { return m_minimized ? UpperLeft() : UpperLeft() + GG::Pt(BORDER_LEFT, TopBorder()); }
 
-GG::Pt CUIWnd::ClientLowerRight() const
+GG::Pt CUIWnd::ClientLowerRight() const noexcept
 { return m_minimized ? LowerRight() : LowerRight() - GG::Pt(BORDER_RIGHT, BORDER_BOTTOM); }
 
-bool CUIWnd::InWindow(const GG::Pt& pt) const {
+bool CUIWnd::InWindow(GG::Pt pt) const {
     GG::Pt lr = LowerRight();
     if (m_resizable) {
         return UpperLeft() <= pt && pt < lr;
@@ -495,26 +495,11 @@ void CUIWnd::InitButtons() {
     PositionButtons();
 }
 
-GG::Pt CUIWnd::MinimizedSize() const
-{ return GG::Pt(MINIMIZED_WND_WIDTH, TopBorder()); }
-
-GG::X CUIWnd::LeftBorder() const
-{ return BORDER_LEFT; }
-
 GG::Y CUIWnd::TopBorder() const
 { return GG::Y(ClientUI::TitlePts() + TITLE_OFFSET*4); }
 
-GG::X CUIWnd::RightBorder() const
-{ return BORDER_RIGHT; }
-
-GG::Y CUIWnd::BottomBorder() const
-{ return BORDER_BOTTOM; }
-
-int CUIWnd::InnerBorderAngleOffset() const
-{ return INNER_BORDER_ANGLE_OFFSET; }
-
 void CUIWnd::CloseClicked() {
-    m_done = true;
+    m_modal_done.store(true);
     if (auto&& parent = Parent())
         parent->DetachChild(this);
     else

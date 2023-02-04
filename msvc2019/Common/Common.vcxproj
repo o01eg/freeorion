@@ -226,9 +226,7 @@
     <ClInclude Include="..\..\universe\NamedValueRefManager.h" />
     <ClInclude Include="..\..\universe\ObjectMap.h" />
     <ClInclude Include="..\..\universe\Planet.h" />
-    <ClInclude Include="..\..\universe\PopCenter.h" />
     <ClInclude Include="..\..\universe\UniverseObjectVisitors.h" />
-    <ClInclude Include="..\..\universe\ResourceCenter.h" />
     <ClInclude Include="..\..\universe\Ship.h" />
     <ClInclude Include="..\..\universe\ShipDesign.h" />
     <ClInclude Include="..\..\universe\ShipHull.h" />
@@ -311,9 +309,7 @@
     <ClCompile Include="..\..\universe\ObjectMap.cpp" />
     <ClCompile Include="..\..\universe\NamedValueRefManager.cpp" />
     <ClCompile Include="..\..\universe\Planet.cpp" />
-    <ClCompile Include="..\..\universe\PopCenter.cpp" />
     <ClCompile Include="..\..\universe\UniverseObjectVisitors.cpp" />
-    <ClCompile Include="..\..\universe\ResourceCenter.cpp" />
     <ClCompile Include="..\..\universe\Ship.cpp" />
     <ClCompile Include="..\..\universe\ShipDesign.cpp" />
     <ClCompile Include="..\..\universe\ShipHull.cpp" />

@@ -46,19 +46,19 @@ public:
     /** Emitted when the button is clicked by the user */
     typedef boost::signals2::signal<void ()> ClickedSignalType;
 
-    Button(std::string str, const std::shared_ptr<Font>& font, Clr color,
+    Button(std::string str, std::shared_ptr<Font> font, Clr color,
            Clr text_color = CLR_BLACK, Flags<WndFlag> flags = INTERACTIVE);
     void CompleteConstruction() override;
 
     Pt MinUsableSize() const override;
 
     /** Returns button state \see ButtonState */
-    ButtonState State() const;
+    ButtonState State() const noexcept { return m_state; }
 
     const std::string& Text() const;             ///< Returns the label to be used as the button label
-    const SubTexture& UnpressedGraphic() const;  ///< Returns the SubTexture to be used as the image of the button when unpressed
-    const SubTexture& PressedGraphic() const;    ///< Returns the SubTexture to be used as the image of the button when pressed
-    const SubTexture& RolloverGraphic() const;   ///< Returns the SubTexture to be used as the image of the button when it contains the cursor, but is not pressed
+    const auto& UnpressedGraphic() const { return m_unpressed_graphic; }
+    const auto& PressedGraphic() const { return m_pressed_graphic; }
+    const SubTexture& RolloverGraphic() const { return m_rollover_graphic; }
 
     /** The left clicked signal object for this Button */
     mutable ClickedSignalType LeftClickedSignal;
@@ -71,13 +71,13 @@ public:
 
     void Show() override;
     void Render() override;
-    void SizeMove(const Pt& ul, const Pt& lr) override;
+    void SizeMove(Pt ul, Pt lr) override;
 
     /** Sets the control's color; does not affect the text color. */
     void SetColor(Clr c) override;
 
     /** Sets button state programmatically \see ButtonState */
-    void SetState(ButtonState state);
+    void SetState(ButtonState state) noexcept { m_state = state; }
 
     void SetText(std::string text);             ///< Sets the text to be used as the button label
     void SetUnpressedGraphic(SubTexture st);    ///< Sets the SubTexture to be used as the image of the button when unpressed
@@ -85,16 +85,16 @@ public:
     void SetRolloverGraphic(SubTexture st);     ///< Sets the SubTexture to be used as the image of the button when it contains the cursor, but is not pressed
 
 protected:
-    void LButtonDown(const Pt& pt, Flags<ModKey> mod_keys) override;
-    void LDrag(const Pt& pt, const Pt& move, Flags<ModKey> mod_keys) override;
-    void LButtonUp(const Pt& pt, Flags<ModKey> mod_keys) override;
-    void LClick(const Pt& pt, Flags<ModKey> mod_keys) override;
-    void RButtonDown(const Pt& pt, Flags<ModKey> mod_keys) override;
-    void RDrag(const Pt& pt, const Pt& move, Flags<ModKey> mod_keys) override;
-    void RButtonUp(const Pt& pt, Flags<ModKey> mod_keys) override;
-    void RClick(const Pt& pt, Flags<ModKey> mod_keys) override;
-    void MouseEnter(const Pt& pt, Flags<ModKey> mod_keys) override;
-    void MouseHere(const Pt& pt, Flags<ModKey> mod_keys) override;
+    void LButtonDown(Pt pt, Flags<ModKey> mod_keys) override;
+    void LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys) override;
+    void LButtonUp(Pt pt, Flags<ModKey> mod_keys) override;
+    void LClick(Pt pt, Flags<ModKey> mod_keys) override;
+    void RButtonDown(Pt pt, Flags<ModKey> mod_keys) override;
+    void RDrag(Pt pt, Pt move, Flags<ModKey> mod_keys) override;
+    void RButtonUp(Pt pt, Flags<ModKey> mod_keys) override;
+    void RClick(Pt pt, Flags<ModKey> mod_keys) override;
+    void MouseEnter(Pt pt, Flags<ModKey> mod_keys) override;
+    void MouseHere(Pt pt, Flags<ModKey> mod_keys) override;
     void MouseLeave() override;
 
     /** Draws the button unpressed.  If an unpressed graphic has been supplied, it is used. */
@@ -157,7 +157,7 @@ public:
 
     const std::string&  Text() const;        ///< Returns the label to be used as the button label
 
-    bool                Checked() const;       ///< Returns true if button is checked
+    bool                Checked() const;     ///< Returns true if button is checked
 
     TextControl*        GetLabel() const;
 
@@ -165,18 +165,18 @@ public:
 
     void Show() override;
     void Render() override;
-    void SizeMove(const Pt& ul, const Pt& lr) override;
+    void SizeMove(Pt ul, Pt lr) override;
 
     void Reset();                 ///< Unchecks button
     void SetCheck(bool b = true); ///< (Un)checks button
     void SetTextColor(Clr c); ///< Sets the color of the box label text
 
 protected:
-    void LButtonDown(const Pt& pt, Flags<ModKey> mod_keys) override;
-    void LDrag(const Pt& pt, const Pt& move, Flags<ModKey> mod_keys) override;
-    void LButtonUp(const Pt& pt, Flags<ModKey> mod_keys) override;
-    void LClick(const Pt& pt, Flags<ModKey> mod_keys) override;
-    void MouseHere(const Pt& pt, Flags<ModKey> mod_keys) override;
+    void LButtonDown(Pt pt, Flags<ModKey> mod_keys) override;
+    void LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys) override;
+    void LButtonUp(Pt pt, Flags<ModKey> mod_keys) override;
+    void LClick(Pt pt, Flags<ModKey> mod_keys) override;
+    void MouseHere(Pt pt, Flags<ModKey> mod_keys) override;
     void MouseLeave() override;
 
     /** Sets button state programmatically \see ButtonState */

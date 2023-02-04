@@ -182,9 +182,6 @@ void Universe::Clear() {
     m_marked_destroyed.clear();
     m_destroyed_object_ids.clear();
 
-    // clean up ship designs
-    for (auto& entry : m_ship_designs)
-        delete entry.second;
     m_ship_designs.clear();
 
     m_empire_object_visibility.clear();
@@ -349,30 +346,28 @@ const ShipDesign* Universe::GetShipDesign(int ship_design_id) const {
     if (ship_design_id == INVALID_DESIGN_ID)
         return nullptr;
     ship_design_iterator it = m_ship_designs.find(ship_design_id);
-    return (it != m_ship_designs.end() ? it->second : nullptr);
+    return (it != m_ship_designs.end() ? &it->second : nullptr);
 }
 
-void Universe::RenameShipDesign(int design_id, const std::string& name, // TODO: pass by value with move
-                                const std::string& description)
-{
+void Universe::RenameShipDesign(int design_id, std::string name, std::string description) {
     auto design_it = m_ship_designs.find(design_id);
     if (design_it == m_ship_designs.end()) {
         DebugLogger() << "Universe::RenameShipDesign tried to rename a ship design that doesn't exist!";
         return;
     }
-    ShipDesign* design = design_it->second;
+    auto& design = design_it->second;
 
-    design->SetName(name);
-    design->SetDescription(description);
+    design.SetName(std::move(name));
+    design.SetDescription(std::move(description));
 }
 
 const ShipDesign* Universe::GetGenericShipDesign(std::string_view name) const {
     if (name.empty())
         return nullptr;
-    for (const auto& entry : m_ship_designs) {
-        const ShipDesign* design = entry.second;
-        if (name == design->Name(false))
-            return design;
+    for (const auto& [design_id, design] : m_ship_designs) {
+        (void)design_id;
+        if (name == design.Name(false))
+            return &design;
     }
     return nullptr;
 }
@@ -475,18 +470,16 @@ void Universe::InsertIDCore(std::shared_ptr<UniverseObject> obj, int id) {
     m_objects->insert(std::move(obj), m_destroyed_object_ids.count(id));
 }
 
-bool Universe::InsertShipDesign(ShipDesign* ship_design) {
-    if (!ship_design
-        || (ship_design->ID() != INVALID_DESIGN_ID && m_ship_designs.count(ship_design->ID())))
-    { return false; }
+int Universe::InsertShipDesign(ShipDesign ship_design) {
+    if (ship_design.ID() != INVALID_DESIGN_ID && m_ship_designs.count(ship_design.ID()))
+        return INVALID_DESIGN_ID; // already have a design with that ID
 
-    return InsertShipDesignID(ship_design, boost::none, GenerateDesignID());
+    const auto new_id = GenerateDesignID();
+    const auto success = InsertShipDesignID(std::move(ship_design), boost::none, new_id);
+    return success ? new_id : INVALID_DESIGN_ID;
 }
 
-bool Universe::InsertShipDesignID(ShipDesign* ship_design, boost::optional<int> empire_id, int id) { // TODO: pass and store ShipDesign as shared_ptr
-    if (!ship_design)
-        return false;
-
+bool Universe::InsertShipDesignID(ShipDesign ship_design, boost::optional<int> empire_id, int id) {
     if (!m_design_id_allocator->UpdateIDAndCheckIfOwned(id)) {
         ErrorLogger() << "Ship design id " << id << " is invalid.";
         return false;
@@ -498,8 +491,10 @@ bool Universe::InsertShipDesignID(ShipDesign* ship_design, boost::optional<int> 
         ErrorLogger() << "Ship design id " << id << " already exists.";
         return false;
     }
-    ship_design->SetID(id);
-    m_ship_designs[id] = ship_design;
+
+    ship_design.SetID(id);
+    m_ship_designs[id] = std::move(ship_design);
+
     return true;
 }
 
@@ -900,9 +895,15 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec,
         }
     }
 
-    TraceLogger(effects) << "UpdateMeterEstimatesImpl after resetting meters objects:";
-    for (auto& obj : object_ptrs)
-        TraceLogger(effects) << obj->Dump();
+    auto dump_objs = [&object_ptrs]() -> std::string {
+        std::string retval;
+        retval.reserve(object_ptrs.size() * 400); // guesstimate
+        for (auto& obj : object_ptrs)
+            retval.append(obj->Dump()).append("\n");
+        return retval;
+    };
+
+    TraceLogger(effects) << "UpdateMeterEstimatesImpl after resetting meters objects:\n" << dump_objs();
 
     // cache all activation and scoping condition results before applying Effects, since the application of
     // these Effects may affect the activation and scoping evaluations
@@ -912,9 +913,7 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec,
     // Apply and record effect meter adjustments
     ExecuteEffects(source_effects_targets_causes, context, do_accounting, true, false, false, false);
 
-    TraceLogger(effects) << "UpdateMeterEstimatesImpl after executing effects objects:";
-    for (auto& obj : object_ptrs)
-        TraceLogger(effects) << obj->Dump();
+    TraceLogger(effects) << "UpdateMeterEstimatesImpl after executing effects objects:\n" << dump_objs();
 
     // Apply known discrepancies between expected and calculated meter maxes at start of turn.  This
     // accounts for the unknown effects on the meter, and brings the estimate in line with the actual
@@ -954,9 +953,7 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec,
         obj->ClampMeters();
     }
 
-    TraceLogger(effects) << "UpdateMeterEstimatesImpl after discrepancies and clamping objects:";
-    for (auto& obj : object_ptrs)
-        TraceLogger(effects) << obj->Dump();
+    TraceLogger(effects) << "UpdateMeterEstimatesImpl after discrepancies and clamping objects:\n" << dump_objs();
 }
 
 void Universe::BackPropagateObjectMeters() {
@@ -1153,7 +1150,7 @@ namespace {
                     retval.reserve(source_objects.size());
                     for (auto& obj : source_objects) {
                         source_context.source = obj;
-                        if (activation->Eval(source_context, obj))
+                        if (activation->EvalOne(source_context, obj))
                             retval.push_back(std::move(source_context.source));
                     }
                 }
@@ -1945,13 +1942,19 @@ void Universe::ApplyEffectDerivedVisibilities(EmpireManager& empires) {
 void Universe::ForgetKnownObject(int empire_id, int object_id) {
     // Note: Client calls this with empire_id == ALL_EMPIRES to
     // immediately forget information without waiting for the turn update.
-    auto empire_it = m_empire_latest_known_objects.find(empire_id);
-    if (empire_it != m_empire_latest_known_objects.end()) {
-        ErrorLogger() << "ForgetKnownObject bad empire id: " << empire_id;
-        return;
-    }
-    auto& objects{empire_it->second};
-    const auto* const obj = objects.getRaw(object_id);
+    ObjectMap& objects = [empire_id, this]() -> ObjectMap& {
+        if (empire_id == ALL_EMPIRES)
+            return *m_objects;
+
+        auto empire_it = m_empire_latest_known_objects.find(empire_id);
+        if (empire_it == m_empire_latest_known_objects.end()) {
+            ErrorLogger() << "ForgetKnownObject bad empire id: " << empire_id;
+            return *m_objects;
+        }
+        return empire_it->second;
+    }();
+
+    const auto obj = objects.get(object_id); // shared to ensure remains valid to end of this function
     if (!obj) {
         ErrorLogger() << "ForgetKnownObject empire: " << empire_id << " bad object id: " << object_id;
         return;
@@ -1965,11 +1968,13 @@ void Universe::ForgetKnownObject(int empire_id, int object_id) {
     }
 
     // Remove all contained objects to avoid breaking fleet+ship, system+planet invariants
-    auto contained_ids = obj->ContainedObjectIDs();
-    for (int child_id : contained_ids)
-        ForgetKnownObject(empire_id, child_id);
-
+    const auto& contained_ids_set = obj->ContainedObjectIDs();
+    const std::vector<int> contained_ids(contained_ids_set.begin(), contained_ids_set.end()); // copy since forgetting will modify container while iterating over it
     const int container_id = obj->ContainerObjectID();
+
+    for (int child_id : contained_ids)
+        ForgetKnownObject(empire_id, child_id); // may remove / erase this object
+
     if (container_id != INVALID_OBJECT_ID) {
         if (auto* container = objects.getRaw(container_id)) {
             if (container->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
@@ -1984,7 +1989,7 @@ void Universe::ForgetKnownObject(int empire_id, int object_id) {
                 auto* fleet = static_cast<Fleet*>(container);
                 fleet->RemoveShips({object_id});
                 if (fleet->Empty())
-                    objects.erase(fleet->ID());
+                    objects.erase(container_id);
             }
         }
     }
@@ -2134,10 +2139,10 @@ Universe::GetEmpiresPositionNextTurnFleetDetectionRanges(const ScriptingContext&
 
 
         // get next turn position of fleet
-        auto path = fleet->MovePath(false, context);
+        const auto path = fleet->MovePath(false, context);
         if (path.empty())
             continue;
-        auto& next_turn_end_position = [&path]() -> const MovePathNode& {
+        const auto next_turn_end_position = [&path]() -> MovePathNode {
             for (const auto& node : path) {
                 if (node.turn_end)
                     return node;
@@ -2151,9 +2156,9 @@ Universe::GetEmpiresPositionNextTurnFleetDetectionRanges(const ScriptingContext&
         { continue; }
 
         // add detection at next position
-        auto object_owner_empire_id = fleet->Owner();
+        const auto object_owner_empire_id = fleet->Owner();
         auto& retval_empire_pos_range = retval[object_owner_empire_id];
-        std::pair<double, double> object_pos{next_turn_end_position.x, next_turn_end_position.y};
+        const std::pair<double, double> object_pos{next_turn_end_position.x, next_turn_end_position.y};
 
         // store range in output map (if new for location or larger than any
         // previously-found range at this location)
@@ -2787,11 +2792,16 @@ void Universe::UpdateEmpireLatestKnownObjectsAndVisibilityTurns(int current_turn
             // update empire's latest known data about object, based on current visibility and historical visibility and knowledge of object
 
             // is there already last known version of an UniverseObject stored for this empire?
-            if (auto known_obj = known_object_map.get(object_id)) {
-                known_obj->Copy(full_object, *this, empire_id); // already a stored version of this object for this empire.  update it, limited by visibility this empire has for this object this turn
+            if (auto known_obj = known_object_map.getRaw(object_id)) {
+                // already a stored version of this object for this empire.  update it,
+                // limited by visibility this empire has for this object this turn
+                known_obj->Copy(*full_object, *this, empire_id);
             } else {
-                if (auto new_obj = std::shared_ptr<UniverseObject>(full_object->Clone(*this, empire_id)))   // no previously-recorded version of this object for this empire.  create a new one, copying only the information limtied by visibility, leaving the rest as default values
-                    known_object_map.insert(std::move(new_obj), known_destroyed_ids.count(object_id));
+                // no previously-recorded version of this object for this empire.
+                // create a new one, copying only the information limtied by visibility,
+                // leaving the rest as default values
+                const bool destroyed = known_destroyed_ids.count(object_id) > 0;
+                known_object_map.insert(full_object->Clone(*this, empire_id), destroyed);
             }
 
             //DebugLogger() << "Empire " << empire_id << " can see object " << object_id << " with vis level " << vis;
@@ -2991,7 +3001,8 @@ std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& 
 
     auto system = m_objects->get<System>(obj->SystemID());
 
-    if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
+    switch (obj->ObjectType()) {
+    case UniverseObjectType::OBJ_SHIP: {
         auto ship = std::static_pointer_cast<Ship>(std::move(obj));
         if (auto fleet = m_objects->get<Fleet>(ship->FleetID())) {
             // if a ship is being deleted, and it is the last ship in
@@ -3008,8 +3019,10 @@ std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& 
             system->Remove(object_id);
         Destroy(object_id, empire_ids);
         retval.insert(object_id);
+        break;
+    }
 
-    } else if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
+    case UniverseObjectType::OBJ_FLEET: {
         auto obj_fleet = std::static_pointer_cast<Fleet>(std::move(obj));
         for (int ship_id : obj_fleet->ShipIDs()) {
             if (system)
@@ -3021,8 +3034,10 @@ std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& 
             system->Remove(object_id);
         Destroy(object_id, empire_ids);
         retval.insert(object_id);
+        break;
+    }
 
-    } else if (obj->ObjectType() == UniverseObjectType::OBJ_PLANET) {
+    case UniverseObjectType::OBJ_PLANET: {
         auto obj_planet = std::static_pointer_cast<Planet>(std::move(obj));
         for (int building_id : obj_planet->BuildingIDs()) {
             if (system)
@@ -3034,8 +3049,10 @@ std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& 
             system->Remove(object_id);
         Destroy(object_id, empire_ids);
         retval.insert(object_id);
+        break;
+    }
 
-    } else if (obj->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
+    case UniverseObjectType::OBJ_SYSTEM: {
         auto obj_system = std::static_pointer_cast<System>(std::move(obj));
         // destroy all objects in system
         for (int system_id : obj_system->ObjectIDs()) {
@@ -3064,8 +3081,10 @@ std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& 
         retval.insert(object_id);
         // don't need to bother with removing things from system, fleets, or
         // ships, since everything in system is being destroyed
+        break;
+    }
 
-    } else if (obj->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
+    case UniverseObjectType::OBJ_BUILDING: {
         auto building = std::static_pointer_cast<Building>(std::move(obj));
         auto planet = m_objects->get<Planet>(building->PlanetID());
         if (planet)
@@ -3074,13 +3093,18 @@ std::set<int> Universe::RecursiveDestroy(int object_id, const std::vector<int>& 
             system->Remove(object_id);
         Destroy(object_id, empire_ids);
         retval.insert(object_id);
+        break;
+    }
 
-    } else if (obj->ObjectType() == UniverseObjectType::OBJ_FIELD) {
+    case UniverseObjectType::OBJ_FIELD: {
         if (system)
             system->Remove(object_id);
         Destroy(object_id, empire_ids);
         retval.insert(object_id);
+        break;
     }
+    }
+
     // else ??? object is of some type unknown as of this writing.
     return retval;
 }
@@ -3164,36 +3188,39 @@ void Universe::UpdateStatRecords(const ScriptingContext& context) {
     }
 }
 
-void Universe::GetShipDesignsToSerialize(ShipDesignMap& designs_to_serialize, int encoding_empire) const {
-    if (encoding_empire == ALL_EMPIRES) {
-        designs_to_serialize = m_ship_designs;
-    } else {
-        designs_to_serialize.clear();
+const Universe::ShipDesignMap& Universe::GetShipDesignsToSerialize(
+    ShipDesignMap& designs_to_serialize, int encoding_empire) const
+{
+    if (encoding_empire == ALL_EMPIRES)
+        return m_ship_designs;
 
-        // add generic monster ship designs so they always appear in players' pedias
-        for (const auto& [design_id, design] : m_ship_designs) {
-            if (design->IsMonster() && design->DesignedByEmpire() == ALL_EMPIRES)
-                designs_to_serialize.emplace(design_id, design);
-        }
+    designs_to_serialize.clear();
 
-        // get empire's known ship designs
-        auto it = m_empire_known_ship_design_ids.find(encoding_empire);
-        if (it == m_empire_known_ship_design_ids.end())
-            return; // no known designs to serialize
+    // add generic monster ship designs so they always appear in players' pedias
+    for (const auto& [design_id, design] : m_ship_designs) {
+        if (design.IsMonster() && design.DesignedByEmpire() == ALL_EMPIRES)
+            designs_to_serialize.emplace(design_id, design);
+    }
 
-        const std::set<int>& empire_designs = it->second;
+    // get empire's known ship designs
+    auto it = m_empire_known_ship_design_ids.find(encoding_empire);
+    if (it == m_empire_known_ship_design_ids.end())
+        return designs_to_serialize;
 
-        // add all ship designs of ships this empire knows about
-        for (int design_id : empire_designs) {
-            auto universe_design_it = m_ship_designs.find(design_id);
-            if (universe_design_it != m_ship_designs.end())
-                designs_to_serialize.emplace(design_id, universe_design_it->second);
-            else
-                ErrorLogger() << "Universe::GetShipDesignsToSerialize empire " << encoding_empire
-                              << " should know about design with id " << design_id
-                              << " but no such design exists in the Universe!";
+    // add all ship designs of ships this empire knows about
+    const auto& empire_designs = it->second;
+    for (int design_id : empire_designs) {
+        auto universe_design_it = m_ship_designs.find(design_id);
+        if (universe_design_it != m_ship_designs.end()) {
+            designs_to_serialize.emplace(design_id, universe_design_it->second);
+        } else {
+            ErrorLogger() << "Universe::GetShipDesignsToSerialize empire " << encoding_empire
+                            << " should know about design with id " << design_id
+                            << " but no such design exists in the Universe!";
         }
     }
+
+    return designs_to_serialize;
 }
 
 void Universe::GetObjectsToSerialize(ObjectMap& objects, int encoding_empire) const {

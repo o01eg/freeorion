@@ -87,7 +87,7 @@ public:
     mutable ValueChangedSignalType ValueChangedSignal; ///< the value changed signal object for this Spin
 
     void Render() override;
-    void SizeMove(const Pt& ul, const Pt& lr) override;
+    void SizeMove(Pt ul, Pt lr) override;
     void Disable(bool b = true) override;
     void SetColor(Clr c) override;
     void Incr();  ///< increments the value of the control's text by StepSize(), up to at most MaxValue()
@@ -117,7 +117,7 @@ protected:
     Edit*   GetEdit() const;    ///< returns a pointer to the Edit control used to render this control's text and accept keyboard input
 
     void KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys) override;
-    void MouseWheel(const Pt& pt, int move, Flags<ModKey> mod_keys) override;
+    void MouseWheel(Pt pt, int move, Flags<ModKey> mod_keys) override;
     bool EventFilter(Wnd* w, const WndEvent& event) override;
     virtual void SetEditTextFromValue();
 
@@ -241,7 +241,7 @@ void Spin<T>::Render()
 }
 
 template <typename T>
-void Spin<T>::SizeMove(const Pt& ul, const Pt& lr)
+void Spin<T>::SizeMove(Pt ul, Pt lr)
 {
     Wnd::SizeMove(ul, lr);
     const X BUTTON_X_POS = Width() - m_button_width - BORDER_THICK;
@@ -375,7 +375,7 @@ void Spin<T>::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_
 }
 
 template <typename T>
-void Spin<T>::MouseWheel(const Pt& pt, int move, Flags<ModKey> mod_keys)
+void Spin<T>::MouseWheel(Pt pt, int move, Flags<ModKey> mod_keys)
 {
     if (Disabled()) {
         Control::MouseWheel(pt, move, mod_keys);

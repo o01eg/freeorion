@@ -106,7 +106,7 @@ namespace {
             GG::FlatRectangle(UpperLeft(), LowerRight(), background_clr, ClientUI::WndOuterBorderColor(), 1u);
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             const GG::Pt old_size = Size();
             GG::Control::SizeMove(ul, lr);
             if (old_size != Size())
@@ -554,7 +554,7 @@ namespace {
         const ProductionQueue::ProductionItem& Item() const
         { return m_item; }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             const GG::Pt old_size = Size();
             GG::ListBox::Row::SizeMove(ul, lr);
             if (!empty() && old_size != Size() && m_panel)
@@ -584,7 +584,7 @@ namespace {
             SetVScrollWheelIncrement(Value(ListRowHeight())*3);
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             const GG::Pt old_size = Size();
             CUIListBox::SizeMove(ul, lr);
             if (old_size != Size()) {
@@ -616,7 +616,7 @@ public:
     /** .first -> available items; .second -> unavailable items */
     const std::pair<bool, bool>& GetAvailabilitiesShown() const;
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
     /** Sets build location for this selector, which may be used to filter
       * items in the list or enable / disable them at some point in the
@@ -666,10 +666,10 @@ private:
     void AddBuildItemToQueue(GG::ListBox::iterator it, bool top);
 
     /** respond to the user single-clicking a producible item in the build selector */
-    void BuildItemLeftClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
+    void BuildItemLeftClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys);
 
     /** respond to the user right-clicking a producible item in the build selector */
-    void BuildItemRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
+    void BuildItemRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys);
 
     std::map<BuildType, std::shared_ptr<CUIStateButton>>    m_build_type_buttons;
     std::vector<std::shared_ptr<CUIStateButton>>            m_availability_buttons;
@@ -718,15 +718,15 @@ void BuildDesignatorWnd::BuildSelector::CompleteConstruction() {
     AttachChild(m_buildable_items);
 
     m_buildable_items->LeftClickedRowSignal.connect(
-        [this](GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys)
+        [this](GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys)
         { BuildItemLeftClicked(it, pt, modkeys); });
 
     m_buildable_items->DoubleClickedRowSignal.connect(
-        [this](GG::ListBox::iterator it, const GG::Pt&, const GG::Flags<GG::ModKey>& modkeys)
+        [this](GG::ListBox::iterator it, GG::Pt, GG::Flags<GG::ModKey> modkeys)
         { AddBuildItemToQueue(it, modkeys & GG::MOD_KEY_CTRL); });
 
     m_buildable_items->RightClickedRowSignal.connect(
-        [this](GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys)
+        [this](GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys)
         { BuildItemRightClicked(it, pt, modkeys); });
 
     //auto header = GG::Wnd::Create<GG::ListBox::Row>();
@@ -779,7 +779,7 @@ void BuildDesignatorWnd::BuildSelector::DoLayout() {
                                 ClientSize() - GG::Pt(GG::X0, GG::Y(INNER_BORDER_ANGLE_OFFSET)));
 }
 
-void BuildDesignatorWnd::BuildSelector::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void BuildDesignatorWnd::BuildSelector::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = GG::Wnd::Size();
     CUIWnd::SizeMove(ul, lr);
     if (old_size != GG::Wnd::Size())
@@ -1065,7 +1065,7 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
 }
 
 void BuildDesignatorWnd::BuildSelector::BuildItemLeftClicked(GG::ListBox::iterator it,
-                                                             const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys)
+                                                             GG::Pt pt, GG::Flags<GG::ModKey> modkeys)
 {
     ProductionItemRow* item_row = dynamic_cast<ProductionItemRow*>((*it).get());
     if (!item_row)
@@ -1110,7 +1110,7 @@ void BuildDesignatorWnd::BuildSelector::AddBuildItemToQueue(GG::ListBox::iterato
 }
 
 void BuildDesignatorWnd::BuildSelector::BuildItemRightClicked(GG::ListBox::iterator it,
-                                                              const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys)
+                                                              GG::Pt pt, GG::Flags<GG::ModKey> modkeys)
 {
     ProductionItemRow* item_row = dynamic_cast<ProductionItemRow*>(it->get());
     if (!item_row)
@@ -1228,16 +1228,16 @@ const std::set<BuildType>& BuildDesignatorWnd::GetBuildTypesShown() const
 const std::pair<bool, bool>& BuildDesignatorWnd::GetAvailabilitiesShown() const
 { return m_build_selector->GetAvailabilitiesShown(); }
 
-bool BuildDesignatorWnd::InWindow(const GG::Pt& pt) const
+bool BuildDesignatorWnd::InWindow(GG::Pt pt) const
 { return (m_enc_detail_panel->InWindow(pt) && m_enc_detail_panel->Visible()) || m_build_selector->InWindow(pt) || m_side_panel->InWindow(pt); }
 
-bool BuildDesignatorWnd::InClient(const GG::Pt& pt) const
+bool BuildDesignatorWnd::InClient(GG::Pt pt) const
 { return m_enc_detail_panel->InClient(pt) || m_build_selector->InClient(pt) || m_side_panel->InClient(pt); }
 
 int BuildDesignatorWnd::SelectedPlanetID() const
 { return m_side_panel->SelectedPlanetID(); }
 
-void BuildDesignatorWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void BuildDesignatorWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
     const GG::Pt old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
     if (old_size != Size()) {

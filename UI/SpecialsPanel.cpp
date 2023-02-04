@@ -30,7 +30,7 @@ void SpecialsPanel::CompleteConstruction() {
     Update();
 }
 
-bool SpecialsPanel::InWindow(const GG::Pt& pt) const {
+bool SpecialsPanel::InWindow(GG::Pt pt) const {
     bool retval = false;
     for (const auto& entry : m_icons) {
         if (entry.second->InWindow(pt)) {
@@ -44,10 +44,10 @@ bool SpecialsPanel::InWindow(const GG::Pt& pt) const {
 void SpecialsPanel::Render()
 {}
 
-void SpecialsPanel::MouseWheel(const GG::Pt& pt, int move, GG::Flags<GG::ModKey> mod_keys)
+void SpecialsPanel::MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
-void SpecialsPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void SpecialsPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = GG::Wnd::Size();
 
     GG::Wnd::SizeMove(ul, lr);
@@ -105,7 +105,7 @@ void SpecialsPanel::Update() {
             ClientUI::SpecialIcon(special->Name()), UserString(special->Name()), desc));
         m_icons[special_name] = graphic;
 
-        graphic->RightClickedSignal.connect([name{special_name}](const GG::Pt& pt) {
+        graphic->RightClickedSignal.connect([name{special_name}](GG::Pt pt) {
             auto zoom_action = [name]() {
                 ClientUI::GetClientUI()->ZoomToSpecial(name);
             };

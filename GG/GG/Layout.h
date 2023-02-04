@@ -115,10 +115,10 @@ public:
     //! debugging purposes
     Clr    OutlineColor() const;
 
-    void StartingChildDragDrop(const Wnd* wnd, const Pt& offset) override;
+    void StartingChildDragDrop(const Wnd* wnd, Pt offset) override;
     void CancellingChildDragDrop(const std::vector<const Wnd*>& wnds) override;
     void ChildrenDraggedAway(const std::vector<Wnd*>& wnds, const Wnd* destination) override;
-    void SizeMove(const Pt& ul, const Pt& lr) override;
+    void SizeMove(Pt ul, Pt lr) override;
     void Render() override;
 
     //! Inserts \a w into the layout in the indicated cell, expanding the
@@ -214,7 +214,7 @@ public:
     static constexpr unsigned int INVALID_CELL_MARGIN = std::numeric_limits<unsigned int>::max();
 
 protected:
-    void MouseWheel(const Pt& pt, int move, Flags<ModKey> mod_keys) override;
+    void MouseWheel(Pt pt, int move, Flags<ModKey> mod_keys) override;
     void KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys) override;
     void KeyRelease(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys) override;
 

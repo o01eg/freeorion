@@ -43,7 +43,6 @@
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/trim.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/format.hpp>
@@ -580,16 +579,16 @@ void GGHumanClientApp::NewSinglePlayerGame(bool quickstart) {
     if (colour_index >= 0 && colour_index < static_cast<int>(empire_colours.size()))
         human_player_setup_data.empire_color = empire_colours[colour_index];
     else
-        human_player_setup_data.empire_color = {{GG::CLR_GREEN.r, GG::CLR_GREEN.g, GG::CLR_GREEN.b, GG::CLR_GREEN.a}};
+        human_player_setup_data.empire_color = GG::CLR_GREEN.RGBA();
 
     human_player_setup_data.starting_species_name = GetOptionsDB().Get<std::string>("setup.initial.species");
     if (human_player_setup_data.starting_species_name == "1")
         human_player_setup_data.starting_species_name = "SP_HUMAN";   // kludge / bug workaround for bug with options storage and retreival.  Empty-string options are stored, but read in as "true" boolean, and converted to string equal to "1"
 
+    const SpeciesManager& sm = this->GetSpeciesManager();
     if (human_player_setup_data.starting_species_name != "RANDOM" &&
-        !GetSpecies(human_player_setup_data.starting_species_name))
+        !sm.GetSpecies(human_player_setup_data.starting_species_name))
     {
-        const SpeciesManager& sm = this->GetSpeciesManager();
         if (sm.NumPlayableSpecies() < 1)
             human_player_setup_data.starting_species_name.clear();
         else
@@ -673,15 +672,16 @@ void GGHumanClientApp::MultiPlayerGame() {
     } else {
         boost::uuids::uuid cookie = boost::uuids::nil_uuid();
         try {
-            std::string cookie_option = EncodeServerAddressOption(server_dest);
+            const std::string cookie_option = EncodeServerAddressOption(server_dest);
             if (!GetOptionsDB().OptionExists(cookie_option + ".cookie"))
                 GetOptionsDB().Add<std::string>(cookie_option + ".cookie", "OPTIONS_DB_SERVER_COOKIE", boost::uuids::to_string(cookie));
             if (!GetOptionsDB().OptionExists(cookie_option + ".address"))
                 GetOptionsDB().Add<std::string>(cookie_option + ".address", "OPTIONS_DB_SERVER_COOKIE", "");
             GetOptionsDB().Set(cookie_option + ".address", server_dest);
-            std::string cookie_str = GetOptionsDB().Get<std::string>(cookie_option + ".cookie");
-            boost::uuids::string_generator gen;
+            const std::string cookie_str = GetOptionsDB().Get<std::string>(cookie_option + ".cookie");
+            static constexpr boost::uuids::string_generator gen{};
             cookie = gen(cookie_str);
+
         } catch(const std::exception& err) {
             WarnLogger() << "Cann't get cookie for server " << server_dest << ". Get error message"
                          << err.what();
@@ -1044,8 +1044,9 @@ void GGHumanClientApp::UpdateCombatLogs(const Message& msg) {
         ExtractDispatchCombatLogsMessageData(msg, logs);
 
         // Update the combat log manager with the completed logs.
-        for (auto it = logs.begin(); it != logs.end(); ++it)
-            GetCombatLogManager().CompleteLog(it->first, it->second);
+        auto& clm{GetCombatLogManager()};
+        for (auto& [log_id, log] : logs)
+            clm.CompleteLog(log_id, std::move(log));
     } catch (...) {}
 }
 
@@ -1190,15 +1191,18 @@ void GGHumanClientApp::StartGame(bool is_new_game) {
 
 void GGHumanClientApp::UpdateCombatLogManager() {
     auto incomplete_ids = GetCombatLogManager().IncompleteLogIDs();
-    if (incomplete_ids) {
-        for (auto it = incomplete_ids->begin(); it != incomplete_ids->end();) {
-            // request at most 50 logs per message to avoid trying to allocate too much space to send all at once
-            std::vector<int> a_few_log_ids;
-            for (unsigned int count = 0; count < 50 && it != incomplete_ids->end(); ++it, ++count)
-                a_few_log_ids.push_back(*it);
-            DebugLogger() << "Requesting " << a_few_log_ids.size() << " combat logs from server";
-            m_networking->SendMessage(RequestCombatLogsMessage(a_few_log_ids));
-        }
+    if (incomplete_ids.empty())
+        return;
+
+    static constexpr std::size_t log_batch_size = 50;
+    for (auto it = incomplete_ids.begin(); it != incomplete_ids.end();) {
+        // request at most 50 logs per message to avoid trying to allocate too much space to send all at once
+        std::vector<int> a_few_log_ids;
+        a_few_log_ids.reserve(log_batch_size);
+        for (unsigned int count = 0; count < log_batch_size && it != incomplete_ids.end(); ++it, ++count)
+            a_few_log_ids.push_back(*it);
+        DebugLogger() << "Requesting " << a_few_log_ids.size() << " combat logs from server";
+        m_networking->SendMessage(RequestCombatLogsMessage(a_few_log_ids));
     }
 }
 
@@ -1236,7 +1240,7 @@ namespace {
             for (auto file_it = files_by_write_time.rbegin();
                  file_it != files_by_write_time.rend(); ++file_it)
             {
-                auto file = file_it->second;
+                const auto& file = file_it->second;
                 // attempt to load header
                 if (SaveFileWithValidHeader(file))
                     return PathToString(file);  // load succeeded, return path to OK file
@@ -1621,12 +1625,6 @@ void GGHumanClientApp::DisconnectedFromServer() {
     DebugLogger() << "GGHumanClientApp::DisconnectedFromServer";
     m_fsm->process_event(Disconnection());
 }
-
-GGHumanClientApp* GGHumanClientApp::GetApp()
-{ return static_cast<GGHumanClientApp*>(GG::GUI::GetGUI()); }
-
-void GGHumanClientApp::Initialize()
-{}
 
 void GGHumanClientApp::OpenURL(const std::string& url) {
     // make sure it's a legit url

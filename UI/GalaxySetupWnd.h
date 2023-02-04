@@ -15,7 +15,7 @@ struct GalaxySetupData;
 class CUIEdit;
 
 /** Displays game rules options */
-class GameRulesPanel : public GG::Control {
+class GameRulesPanel final : public GG::Control {
 public:
     GameRulesPanel(GG::X w = GG::X1, GG::Y h = GG::Y1);
     void CompleteConstruction() override;
@@ -24,7 +24,7 @@ public:
 
     mutable boost::signals2::signal<void ()> SettingsChangedSignal;
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
     void Render() override;
     void Disable(bool b = true) override;
 
@@ -55,7 +55,7 @@ private:
 
 /** Encapsulates the galaxy setup options so that they may be reused in the
   * GalaxySetupWnd and the MultiPlayerLobbyWnd. */
-class GalaxySetupPanel : public GG::Control {
+class GalaxySetupPanel final : public GG::Control {
 public:
     static const GG::X DefaultWidth();
 
@@ -83,7 +83,7 @@ public:
     /** the image changed signal object for this GalaxySetupPanel */
     mutable boost::signals2::signal<void (std::shared_ptr<GG::Texture>)> ImageChangedSignal;
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
     void Render() override {}
     void Disable(bool b = true) override;
     void SetFromSetupData(const GalaxySetupData& setup_data); ///< sets the controls from a GalaxySetupData
@@ -125,13 +125,13 @@ private:
 
 //! This class is the Galaxy Setup window.  It is a modal window
 //! that allows the user to choose a galaxy style, size, etc.
-class GalaxySetupWnd : public CUIWnd {
+class GalaxySetupWnd final : public CUIWnd {
 public:
     GalaxySetupWnd();
     void CompleteConstruction() override;
 
     /** returns true iff the dialog is finished running and it was closed with the "OK" button */
-    bool                    EndedWithOk() const {return m_done && m_ended_with_ok;}
+    bool                    EndedWithOk() const noexcept {return m_modal_done.load() && m_ended_with_ok;}
 
     /** returns the panel containing all the user-chosen options. */
     const std::string&      EmpireName() const;
@@ -143,7 +143,7 @@ public:
 
     void Render() override;
     void KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override;
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
 protected:
     GG::Rect CalculatePosition() const override;

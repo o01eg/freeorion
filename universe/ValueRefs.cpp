@@ -58,9 +58,8 @@ namespace {
         static std::atomic<int> string_error_lookup_count = 0;
         if (string_error_lookup_count++ > 10)
             return "";
-        std::stringstream ss;
-        ss << "stacktrace:\n" << boost::stacktrace::stacktrace();
-        return ss.str();
+        using namespace boost::stacktrace;
+        return "stacktrace:\n" + to_string(stacktrace());
     }
 
     const UniverseObject* FollowReference(
@@ -302,7 +301,7 @@ std::string ValueRefBase::InvariancePattern() const {
         .append(ConstantExpr()                  ? "C" : "c");
 }
 
-constexpr MeterType NameToMeter(const std::string_view name) {
+constexpr MeterType NameToMeterCX(std::string_view name) noexcept {
     for (int i = 0; i < static_cast<int>(NAME_BY_METER.size()); i++) {
         if (NAME_BY_METER[i] == name)
             return static_cast<MeterType>(i - 1);
@@ -310,36 +309,39 @@ constexpr MeterType NameToMeter(const std::string_view name) {
 
     return MeterType::INVALID_METER_TYPE;
 }
+MeterType NameToMeter(std::string_view name) noexcept { return NameToMeterCX(name); }
 
-static_assert(NameToMeter("not a meter") == MeterType::INVALID_METER_TYPE, "Name to Meter conversion failed for invalid meter type!");
-static_assert(NameToMeter("Population") == MeterType::METER_POPULATION, "Name to Meter conversion failed for 'Population' meter!");
-static_assert(NameToMeter("Speed") == MeterType::METER_SPEED, "Name to Meter conversion failed for 'Speed' meter!");
+static_assert(NameToMeterCX("not a meter") == MeterType::INVALID_METER_TYPE, "Name to Meter conversion failed for invalid meter type!");
+static_assert(NameToMeterCX("Population") == MeterType::METER_POPULATION, "Name to Meter conversion failed for 'Population' meter!");
+static_assert(NameToMeterCX("Speed") == MeterType::METER_SPEED, "Name to Meter conversion failed for 'Speed' meter!");
 
-std::string_view MeterToName(const MeterType meter) {
+constexpr std::string_view MeterToNameCX(MeterType meter) noexcept {
     // NOTE: INVALID_METER_TYPE (enum's -1 position) <= meter < NUM_METER_TYPES (enum's final position)
     return NAME_BY_METER[static_cast<std::underlying_type_t<MeterType>>(meter) + 1];
 }
+std::string_view MeterToName(MeterType meter) noexcept { return MeterToNameCX(meter); }
 
-std::string_view PlanetTypeToString(const PlanetType planet) {
+constexpr std::string_view PlanetTypeToStringCX(PlanetType planet) noexcept {
     // NOTE: INVALID_PLANET_TYPE (enum's -1 position) <= planet < NUM_PLANET_TYPES (enum's final position)
     return NAME_BY_PLANET[static_cast<std::underlying_type_t<PlanetType>>(planet) + 1]; 
 }
+std::string_view PlanetTypeToString(PlanetType planet) noexcept { return PlanetTypeToStringCX(planet); }
 
 // @return the correct PlanetType enum for a user friendly planet type string (e.g. "Ocean"), else it returns PlanetType::INVALID_PLANET_TYPE
-constexpr PlanetType StringToPlanetType(const std::string_view name) {
+constexpr PlanetType StringToPlanetTypeCX(std::string_view name) noexcept {
     for (int i = 0; i < static_cast<int>(NAME_BY_PLANET.size()); i++) {
         if (NAME_BY_PLANET[i] == name)
             return static_cast<PlanetType>(i - 1);
     }
-
     return PlanetType::INVALID_PLANET_TYPE;
 }
+PlanetType StringToPlanetType(std::string_view name) noexcept { return StringToPlanetTypeCX(name); }
 
-static_assert(StringToPlanetType("not a planet") == PlanetType::INVALID_PLANET_TYPE, "Name to Planet conversion failed for invalid planet type!");
-static_assert(StringToPlanetType("Swamp") == PlanetType::PT_SWAMP, "Name to Planet conversion failed for 'Swamp' planet!");
-static_assert(StringToPlanetType("GasGiant") == PlanetType::PT_GASGIANT, "Name to Planet conversion failed for 'GasGiant' planet!");
+static_assert(StringToPlanetTypeCX("not a planet") == PlanetType::INVALID_PLANET_TYPE, "Name to Planet conversion failed for invalid planet type!");
+static_assert(StringToPlanetTypeCX("Swamp") == PlanetType::PT_SWAMP, "Name to Planet conversion failed for 'Swamp' planet!");
+static_assert(StringToPlanetTypeCX("GasGiant") == PlanetType::PT_GASGIANT, "Name to Planet conversion failed for 'GasGiant' planet!");
 
-std::string_view PlanetEnvironmentToString(PlanetEnvironment env) {
+constexpr std::string_view PlanetEnvironmentToStringCX(PlanetEnvironment env) noexcept {
     switch (env) {
     case PlanetEnvironment::PE_UNINHABITABLE: return "Uninhabitable";
     case PlanetEnvironment::PE_HOSTILE:       return "Hostile";
@@ -349,10 +351,10 @@ std::string_view PlanetEnvironmentToString(PlanetEnvironment env) {
     default:                                  return "?";
     }
 }
+std::string_view PlanetEnvironmentToString(PlanetEnvironment env) noexcept { return PlanetEnvironmentToStringCX(env); }
 
 std::string ReconstructName(const std::vector<std::string>& property_name,
-                            ReferenceType ref_type,
-                            bool return_immediate_value)
+                            ReferenceType ref_type, bool return_immediate_value)
 {
     std::string retval;
     retval.reserve(64);
@@ -508,6 +510,30 @@ std::string StatisticDescription(StatisticType stat_type, std::string_view value
 // Constant                                              //
 ///////////////////////////////////////////////////////////
 template <>
+std::string Constant<PlanetType>::Description() const
+{ return UserString(to_string(m_value)); }
+
+template <>
+std::string Constant<PlanetSize>::Description() const
+{ return UserString(to_string(m_value)); }
+
+template <>
+std::string Constant<PlanetEnvironment>::Description() const
+{ return UserString(to_string(m_value)); }
+
+template <>
+std::string Constant<UniverseObjectType>::Description() const
+{ return UserString(to_string(m_value)); }
+
+template <>
+std::string Constant<StarType>::Description() const
+{ return UserString(to_string(m_value)); }
+
+template <>
+std::string Constant<Visibility>::Description() const
+{ return UserString(to_string(m_value)); }
+
+template <>
 std::string Constant<int>::Description() const
 {
     if (std::abs(m_value) < 1000)
@@ -582,8 +608,6 @@ std::string Constant<UniverseObjectType>::Dump(uint8_t ntabs) const
     case UniverseObjectType::OBJ_SHIP:        return "Ship";
     case UniverseObjectType::OBJ_FLEET:       return "Fleet"; 
     case UniverseObjectType::OBJ_PLANET:      return "Planet";
-    case UniverseObjectType::OBJ_POP_CENTER:  return "PopulationCenter";
-    case UniverseObjectType::OBJ_PROD_CENTER: return "ProductionCenter";
     case UniverseObjectType::OBJ_SYSTEM:      return "System";
     case UniverseObjectType::OBJ_FIELD:       return "Field";
     default:                                  return "?";
@@ -629,25 +653,6 @@ std::string Constant<double>::Dump(uint8_t ntabs) const
 template <>
 std::string Constant<std::string>::Dump(uint8_t ntabs) const
 { return "\"" + Description() + "\""; }
-
-template <>
-std::string Constant<std::string>::Eval(const ScriptingContext& context) const
-{
-    if (m_value == "CurrentContent")
-        return m_top_level_content;
-    return m_value;
-}
-
-template <>
-void Constant<std::string>::SetTopLevelContent(const std::string& content_name)
-{
-    if (m_value == "CurrentContent" && content_name == "THERE_IS_NO_TOP_LEVEL_CONTENT")
-        ErrorLogger() << "Constant<std::string>::SetTopLevelContent()  Scripted Content illegal. Trying to set THERE_IS_NO_TOP_LEVEL_CONTENT for CurrentContent (maybe you tried to use CurrentContent in named_values.focs.txt)";
-    if (!m_top_level_content.empty()) // expected to happen if this value ref is part of a non-named-in-the-middle named value ref 
-        DebugLogger() << "Constant<std::string>::SetTopLevelContent()  Skip overwriting top level content from '" << m_top_level_content << "' to '" << content_name << "'";
-    else
-        m_top_level_content = content_name;
-}
 
 ///////////////////////////////////////////////////////////
 // Variable                                              //
@@ -882,7 +887,7 @@ double Variable<double>::Eval(const ScriptingContext& context) const
         return 0.0;
     }
 
-    MeterType meter_type = NameToMeter(property_name);
+    MeterType meter_type = NameToMeterCX(property_name);
     if (object && meter_type != MeterType::INVALID_METER_TYPE) {
         if (auto* m = object->GetMeter(meter_type)) {
             return m_return_immediate_value ? m->Current() : m->Initial();
@@ -1266,7 +1271,8 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
     else if (property_name == "AvailableFoci") {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
             auto planet = static_cast<const Planet*>(object);
-            return planet->AvailableFoci(context);
+            auto foci_views = planet->AvailableFoci(context);
+            return {foci_views.begin(), foci_views.end()};
         }
         return {};
     }
@@ -1419,16 +1425,10 @@ std::string Statistic<std::string, std::string>::Eval(const ScriptingContext& co
     const auto* scond = m_sampling_condition.get();
     if (!scond)
         return "";
-    Condition::ObjectSet condition_matches = scond->Eval(context);
-
-    if (condition_matches.empty())
-        return "";  // empty string
 
     // special case for IF statistic... return a non-empty string for true
     if (m_stat_type == StatisticType::IF)
-        return " "; // not an empty string
-
-    // todo: consider allowing MAX and MIN using string sorting?
+        return scond->EvalAny(context) ? " " : "";
 
     // the only other statistic that can be computed on non-number property
     // types and that is itself of a non-number type is the most common value
@@ -1437,12 +1437,18 @@ std::string Statistic<std::string, std::string>::Eval(const ScriptingContext& co
                       << m_stat_type;
         return "";
     }
+    // TODO: consider allowing MAX and MIN using string sorting?
+
+    const Condition::ObjectSet condition_matches = scond->Eval(context);
+    if (condition_matches.empty())
+        return "";  // empty string
 
     // evaluate property for each condition-matched object
     auto object_property_values = GetObjectPropertyValues(context, condition_matches);
 
     // count appearances to determine the value that appears the most often
     std::unordered_map<std::string, uint32_t> observed_values;
+    observed_values.reserve(object_property_values.size());
     for (auto& entry : object_property_values)
         observed_values[std::move(entry)]++;
 
@@ -1455,7 +1461,8 @@ std::string Statistic<std::string, std::string>::Eval(const ScriptingContext& co
 ///////////////////////////////////////////////////////////
 // TotalFighterShots (of a carrier during one battle)    //
 ///////////////////////////////////////////////////////////
-TotalFighterShots::TotalFighterShots(std::unique_ptr<ValueRef<int>>&& carrier_id, std::unique_ptr<Condition::Condition>&& sampling_condition) :
+TotalFighterShots::TotalFighterShots(std::unique_ptr<ValueRef<int>>&& carrier_id,
+                                     std::unique_ptr<Condition::Condition>&& sampling_condition) :
     Variable<int>(ReferenceType::NON_OBJECT_REFERENCE),
     m_carrier_id(std::move(carrier_id)),
     m_sampling_condition(std::move(sampling_condition))
@@ -2054,7 +2061,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             pt1 = PlanetType(pt_int1);
         } else if (m_string_ref1) {
             const std::string pt_name1 = m_string_ref1->Eval(context);
-            pt1 = StringToPlanetType(pt_name1);
+            pt1 = StringToPlanetTypeCX(pt_name1);
         } else {
             return 0;
         }
@@ -2065,7 +2072,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             pt2 = PlanetType(pt_int2);
         } else if (m_string_ref2) {
             const std::string pt_name2 = m_string_ref2->Eval(context);
-            pt2 = StringToPlanetType(pt_name2);
+            pt2 = StringToPlanetTypeCX(pt_name2);
         } else {
             return 0;
         }
@@ -2161,7 +2168,7 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         ResourceType res_type = ResourceType::INVALID_RESOURCE_TYPE;
         if (m_string_ref1) {
             const std::string res_name = m_string_ref1->Eval(context);
-            const auto meter_type = NameToMeter(res_name);
+            const auto meter_type = NameToMeterCX(res_name);
             res_type = MeterToResource(meter_type);
         }
         if (res_type == ResourceType::INVALID_RESOURCE_TYPE)
@@ -2187,9 +2194,9 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
     std::function<const std::map<int, float>& ()> property_int_key{nullptr};
 
     if (variable_name == "PropagatedSystemSupplyRange") // int_ref2 is system ID
-        property_int_key = [&context]() { return context.supply.PropagatedSupplyRanges(); };
+        property_int_key = [&context]() -> const auto& { return context.supply.PropagatedSupplyRanges(); };
     else if (variable_name == "PropagatedSystemSupplyDistance") // int_ref2 is system ID
-        property_int_key = [&context]() { return context.supply.PropagatedSupplyDistances(); };
+        property_int_key = [&context]() -> const auto& { return context.supply.PropagatedSupplyDistances(); };
 
     if (property_int_key) {
         if (!m_int_ref2)

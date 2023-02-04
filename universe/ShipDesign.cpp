@@ -385,7 +385,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id, const Script
     }
     // evaluate using location as the source, as it should be an object owned by this empire.
     const ScriptingContext location_as_source_context{location, context};
-    if (!hull->Location()->Eval(location_as_source_context, location))
+    if (!hull->Location()->EvalOne(location_as_source_context, location))
         return false;
 
     // apply external and internal parts' location conditions to potential location
@@ -398,7 +398,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id, const Script
             ErrorLogger() << "ShipDesign::ProductionLocation  ShipDesign couldn't get part with name " << part_name;
             return false;
         }
-        if (!part->Location()->Eval(location_as_source_context, location))
+        if (!part->Location()->EvalOne(location_as_source_context, location))
             return false;
     }
     // location matched all hull and part conditions, so is a valid build location
@@ -408,10 +408,8 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id, const Script
 void ShipDesign::SetID(int id)
 { m_id = id; }
 
-bool ShipDesign::ValidDesign(const std::string& hull, const std::vector<std::string>& parts_in) {
-    auto parts = parts_in;
-    return !MaybeInvalidDesign(hull, parts, true);
-}
+bool ShipDesign::ValidDesign(const std::string& hull, const std::vector<std::string>& parts_in)
+{ return !MaybeInvalidDesign(hull, std::vector<std::string>(parts_in), true); }
 
 boost::optional<std::pair<std::string, std::vector<std::string>>>
 ShipDesign::MaybeInvalidDesign(std::string hull, std::vector<std::string> parts, bool produce_log)
@@ -436,7 +434,7 @@ ShipDesign::MaybeInvalidDesign(std::string hull, std::vector<std::string> parts,
                 ErrorLogger() << "Invalid ShipDesign no available hulls ";
             hull.clear();
             parts.clear();
-            return std::make_pair(std::move(hull), std::move(parts));
+            return std::pair(std::move(hull), std::move(parts));
         }
     }
 
@@ -534,7 +532,7 @@ ShipDesign::MaybeInvalidDesign(std::string hull, std::vector<std::string> parts,
     if (is_valid) // if valid, return none to indicate no modifications needed
         return boost::none;
     else
-        return std::make_pair(std::move(hull), std::move(parts)); // return modified design
+        return std::pair(std::move(hull), std::move(parts)); // return modified design
 }
 
 void ShipDesign::ForceValidDesignOrThrow(const boost::optional<std::invalid_argument>& should_throw,
@@ -749,10 +747,10 @@ bool operator ==(const ShipDesign& first, const ShipDesign& second) {
 
     // don't care if order is different, as long as the types and numbers of parts is the same
     for (const std::string& part_name : first.Parts())
-    { ++first_parts[part_name]; }
+        ++first_parts[part_name];
 
     for (const std::string& part_name : second.Parts())
-    { ++second_parts[part_name]; }
+        ++second_parts[part_name];
 
     return first_parts == second_parts;
 }
@@ -779,35 +777,24 @@ namespace {
             return;
 
         /* check if there already exists this same design in the universe. */
-        for (auto [existing_id, existing_design] : universe.ShipDesigns()) {
-            (void)existing_id;
-            if (!existing_design) {
-                ErrorLogger() << "PredefinedShipDesignManager::AddShipDesignsToUniverse found an invalid design in the Universe";
-                continue;
-            }
-
-            if (DesignsTheSame(*existing_design, *design)) {
+        for (const auto& [existing_id, existing_design] : universe.ShipDesigns()) {
+            if (DesignsTheSame(existing_design, *design)) {
                 WarnLogger() << "AddShipDesignsToUniverse found an exact duplicate of ship design "
                              << design->Name() << "to be added, so is not re-adding it";
-                design_generic_ids[design->Name(false)] = existing_design->ID();
+                design_generic_ids[design->Name(false)] = existing_id;
                 return; // design already added; don't need to do so again
             }
         }
 
         // duplicate design to add to Universe
-        ShipDesign* copy = new ShipDesign(*design);
-
-        bool success = universe.InsertShipDesign(copy);
-        if (!success) {
+        const auto new_design_id = universe.InsertShipDesign(*design);
+        if (new_design_id == INVALID_DESIGN_ID) {
             ErrorLogger() << "Empire::AddShipDesign Unable to add new design to universe";
-            delete copy;
             return;
         }
 
-        auto new_design_id = copy->ID();
         design_generic_ids[design->Name(false)] = new_design_id;
-        TraceLogger() << "AddShipDesignsToUniverse added ship design "
-                      << design->Name() << " to universe.";
+        TraceLogger() << "AddShipDesignsToUniverse added ship design " << design->Name() << " to universe.";
     };
 }
 
@@ -861,7 +848,7 @@ uint32_t PredefinedShipDesignManager::GetCheckSum() const {
         for (auto const& uuid : ordering) {
             auto it = m_designs.find(uuid);
             if (it != m_designs.end())
-                CheckSums::CheckSumCombine(retval, std::make_pair(it->second->Name(false), *it->second));
+                CheckSums::CheckSumCombine(retval, std::pair(it->second->Name(false), *it->second));
         }
         CheckSums::CheckSumCombine(retval, ordering.size());
     };
@@ -1008,7 +995,7 @@ LoadShipDesignsAndManifestOrderFromParseResults(
             TraceLogger() << "Added saved design UUID " << design->UUID()
                           << " with name " << design->Name();
             auto uuid = design->UUID();
-            saved_designs.emplace(std::move(uuid), std::make_pair(std::move(design), design_and_path.second));
+            saved_designs.emplace(std::move(uuid), std::pair(std::move(design), design_and_path.second));
         } else {
             WarnLogger() << "Duplicate ship design UUID " << design->UUID()
                          << " found for ship design " << design->Name()

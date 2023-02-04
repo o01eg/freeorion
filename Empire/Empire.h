@@ -290,7 +290,7 @@ public:
 
     /** inserts given design id into the empire's set of designs in front of next design */
     void AddShipDesign(int ship_design_id, const Universe& universe, int next_design_id = INVALID_DESIGN_ID);
-    int AddShipDesign(ShipDesign* ship_design, Universe& universe); ///< inserts given ShipDesign into the Universe, adds the design's id to the Empire's set of ids, and returns the new design's id, which is INVALID_OBJECT_ID on failure.  If successful, universe takes ownership of passed ShipDesign.
+    int AddShipDesign(ShipDesign ship_design, Universe& universe); ///< inserts given ShipDesign into the Universe, adds the design's id to the Empire's set of ids, and returns the new design's id, which is INVALID_OBJECT_ID on failure.  If successful, universe takes ownership of passed ShipDesign.
 
     [[nodiscard]] std::string NewShipName();         ///< generates a random ship name, appending II, III, etc., to it if it has been used before by this empire
     void Eliminate(EmpireManager& empires);          ///< Marks empire as eliminated and cleans up empire after it is eliminated.  Queues are cleared, capital is reset, and other state info not relevant to an eliminated empire is cleared
@@ -363,9 +363,9 @@ public:
       * stockpile to account for influence production and expenditures.*/
     void CheckInfluenceProgress();
 
-    void SetColor(const EmpireColor& color);                 ///< Mutator for empire color
-    void SetName(const std::string& name);               ///< Mutator for empire name
-    void SetPlayerName(const std::string& player_name);  ///< Mutator for empire's player name
+    void SetColor(EmpireColor color) noexcept { m_color = color; }
+    void SetName(std::string name) noexcept { m_name = std::move(name); }
+    void SetPlayerName(std::string player_name) { m_player_name = std::move(player_name); }
 
     void SetResourceStockpile(ResourceType resource_type, float stockpile); ///< Sets current \a stockpile amount of indicated \a resource_type
 

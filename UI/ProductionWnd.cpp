@@ -173,7 +173,7 @@ namespace {
         bool    amBlockType;
         GG::Y   h;
 
-        void LButtonDown(const GG::Pt&  pt, GG::Flags<GG::ModKey> mod_keys) override {
+        void LButtonDown(GG::Pt  pt, GG::Flags<GG::ModKey> mod_keys) override {
             if (this->Disabled())
                 return;
 
@@ -195,7 +195,7 @@ namespace {
         void CompleteConstruction() override;
         void PreRender() override;
         void Render() override;
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+        void SizeMove(GG::Pt ul, GG::Pt lr) override;
         void ItemQuantityChanged(int quant, int blocksize);
         void ItemBlocksizeChanged(int quant, int blocksize);
 
@@ -273,7 +273,9 @@ namespace {
 
             item_name = UserString(elem.item.name);
             const auto loc = context.ContextObjects().get(elem.location);
-            location_ok = loc && loc->OwnedBy(elem.empire_id) && (std::dynamic_pointer_cast<const ResourceCenter>(loc));
+            location_ok = loc &&
+                loc->OwnedBy(elem.empire_id) &&
+                loc->ObjectType() == UniverseObjectType::OBJ_PLANET;
 
             total_cost = 1.0;
             max_allocation = total_cost * elem.blocksize;
@@ -457,7 +459,7 @@ namespace {
 
         const int FONT_PTS = ClientUI::Pts();
 
-        m_icon = nullptr;
+        m_icon.reset();
         if (graphic)
             m_icon = GG::Wnd::Create<GG::StaticGraphic>(
                 std::move(graphic), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
@@ -648,7 +650,7 @@ namespace {
         PartlyRoundedRect(UpperLeft(), LowerRight() - LINE_WIDTH, CORNER_RADIUS, true, false, true, false, fill);
     }
 
-    void QueueProductionItemPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+    void QueueProductionItemPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
         const GG::Pt old_size = Size();
         GG::Control::SizeMove(ul, lr);
         if (Size() != old_size)
@@ -681,7 +683,7 @@ namespace {
         boost::signals2::signal<void (GG::ListBox::iterator, bool)> QueueItemUseImperialPPSignal;
 
     protected:
-        void ItemRightClickedImpl(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) override {
+        void ItemRightClickedImpl(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) override {
             // mostly duplicated equivalent in QueueListBox, but with extra commands...
             auto rally_to_action = [&it, this]() { this->QueueItemRalliedToSignal(it, SidePanel::SystemID()); };
 
@@ -811,7 +813,7 @@ public:
         SaveDefaultedOptions();
     }
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+    void SizeMove(GG::Pt ul, GG::Pt lr) override {
         GG::Pt sz = Size();
         CUIWnd::SizeMove(ul, lr);
         if (Size() != sz)
@@ -905,13 +907,13 @@ void ProductionWnd::CompleteConstruction() {
 int ProductionWnd::SelectedPlanetID() const
 { return m_build_designator_wnd->SelectedPlanetID(); }
 
-bool ProductionWnd::InWindow(const GG::Pt& pt) const
+bool ProductionWnd::InWindow(GG::Pt pt) const
 { return m_production_info_panel->InWindow(pt) || m_queue_wnd->InWindow(pt) || m_build_designator_wnd->InWindow(pt); }
 
-bool ProductionWnd::InClient(const GG::Pt& pt) const
+bool ProductionWnd::InClient(GG::Pt pt) const
 { return m_production_info_panel->InClient(pt) || m_queue_wnd->InClient(pt) || m_build_designator_wnd->InClient(pt); }
 
-void ProductionWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void ProductionWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
     const GG::Pt old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
     if (old_size != Size())
@@ -1282,7 +1284,7 @@ void ProductionWnd::DeleteQueueItem(GG::ListBox::iterator it) {
     empire->UpdateProductionQueue(context);
 }
 
-void ProductionWnd::QueueItemClickedSlot(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
+void ProductionWnd::QueueItemClickedSlot(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) {
     if (m_queue_wnd->GetQueueListBox()->DisplayingValidQueueItems()) {
         if (modkeys & GG::MOD_KEY_CTRL)
             DeleteQueueItem(it);
@@ -1291,7 +1293,7 @@ void ProductionWnd::QueueItemClickedSlot(GG::ListBox::iterator it, const GG::Pt&
     }
 }
 
-void ProductionWnd::QueueItemDoubleClickedSlot(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
+void ProductionWnd::QueueItemDoubleClickedSlot(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) {
     if (m_queue_wnd->GetQueueListBox()->DisplayingValidQueueItems())
         m_build_designator_wnd->CenterOnBuild(m_queue_wnd->GetQueueListBox()->IteraterIndex(it), true);
 }

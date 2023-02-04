@@ -46,7 +46,7 @@ struct ListSignalEcho
     void operator()(ListBox::const_iterator it)
     { std::cerr << "GG SIGNAL : " << m_name << "(row=" << RowIndex(it) << ")" << std::endl; }
 
-    void operator()(ListBox::const_iterator it, const Pt& pt, const Flags<ModKey>& mod_keys)
+    void operator()(ListBox::const_iterator it, Pt pt, Flags<ModKey> mod_keys)
     { std::cerr << "GG SIGNAL : " << m_name << "(row=" << RowIndex(it) << " pt=" << pt << ")" << std::endl; }
 
     std::size_t RowIndex(ListBox::const_iterator it)
@@ -439,7 +439,7 @@ void ListBox::Row::SetMargin(unsigned int margin)
 void ListBox::Row::SetNormalized(bool normalized)
 { m_is_normalized = normalized; }
 
-void ListBox::Row::RClick(const Pt& pt, GG::Flags<GG::ModKey> mod) {
+void ListBox::Row::RClick(Pt pt, GG::Flags<GG::ModKey> mod) {
      RightClickedSignal(pt, mod);
 }
 
@@ -507,7 +507,7 @@ void ListBox::AllowAllDropTypes(bool allow) {
 }
 
 void ListBox::DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
-                              const Pt& pt, Flags<ModKey> mod_keys) const
+                              Pt pt, Flags<ModKey> mod_keys) const
 {
     for (auto& it = first; it != last; ++it) {
         const auto& row = dynamic_cast<const Row* const>(it->first);
@@ -528,19 +528,19 @@ void ListBox::HandleRowRightClicked(Pt pt, GG::Flags<GG::ModKey> mod) {
     }
 }
 
-Pt ListBox::MinUsableSize() const
+Pt ListBox::MinUsableSize() const noexcept
 {
     return Pt(X(5 * SCROLL_WIDTH + 2 * BORDER_THICK),
               Y(5 * SCROLL_WIDTH + 2 * BORDER_THICK));
 }
 
-Pt ListBox::ClientUpperLeft() const
+Pt ListBox::ClientUpperLeft() const noexcept
 {
     return UpperLeft() +
         Pt(X(BORDER_THICK), static_cast<int>(BORDER_THICK) + (m_header_row->empty() ? Y0 : m_header_row->Height()));
 }
 
-Pt ListBox::ClientLowerRight() const
+Pt ListBox::ClientLowerRight() const noexcept
 { return LowerRight() - Pt(static_cast<int>(BORDER_THICK) + RightMargin(), static_cast<int>(BORDER_THICK) + BottomMargin()); }
 
 const ListBox::Row& ListBox::GetRow(std::size_t n) const
@@ -608,7 +608,7 @@ bool ListBox::AllowedDropType(const std::string& type) const
 unsigned int ListBox::AutoScrollInterval() const noexcept
 { return m_auto_scroll_timer.Interval(); }
 
-void ListBox::StartingChildDragDrop(const Wnd* wnd, const Pt& offset)
+void ListBox::StartingChildDragDrop(const Wnd* wnd, Pt offset)
 {
     if (m_selections.empty())
         return;
@@ -648,7 +648,7 @@ void ListBox::StartingChildDragDrop(const Wnd* wnd, const Pt& offset)
     }
 }
 
-void ListBox::AcceptDrops(const Pt& pt, std::vector<std::shared_ptr<Wnd>> wnds, Flags<ModKey> mod_keys)
+void ListBox::AcceptDrops(Pt pt, std::vector<std::shared_ptr<Wnd>> wnds, Flags<ModKey> mod_keys)
 {
     iterator insertion_it = RowUnderPt(pt);
     bool inserting_at_first_row = insertion_it == m_first_row_shown;
@@ -700,9 +700,8 @@ void ListBox::ChildrenDraggedAway(const std::vector<Wnd*>& wnds, const Wnd* dest
 
         m_selections = new_selections;
 
-        if (m_selections.size() != initially_selected_rows.size()) {
-            SelRowsChangedSignal(m_selections);
-        }
+        if (m_selections.size() != initially_selected_rows.size())
+            SelRowsChangedSignal(std::move(new_selections));
     }
 }
 
@@ -831,7 +830,7 @@ void ListBox::Render()
         GUI::GetGUI()->RenderWindow(m_hscroll.get());
 }
 
-void ListBox::SizeMove(const Pt& ul, const Pt& lr)
+void ListBox::SizeMove(Pt ul, Pt lr)
 {
     const GG::Pt old_size = Size();
     Wnd::SizeMove(ul, lr);
@@ -1455,7 +1454,7 @@ void ListBox::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_
     }
 }
 
-void ListBox::MouseWheel(const Pt& pt, int move, Flags<ModKey> mod_keys)
+void ListBox::MouseWheel(Pt pt, int move, Flags<ModKey> mod_keys)
 {
     if (Disabled() || !m_vscroll)
         return;
@@ -1463,13 +1462,13 @@ void ListBox::MouseWheel(const Pt& pt, int move, Flags<ModKey> mod_keys)
     SignalScroll(*m_vscroll, true);
 }
 
-void ListBox::DragDropEnter(const Pt& pt, std::map<const Wnd*, bool>& drop_wnds_acceptable, Flags<ModKey> mod_keys)
+void ListBox::DragDropEnter(Pt pt, std::map<const Wnd*, bool>& drop_wnds_acceptable, Flags<ModKey> mod_keys)
 {
     ResetAutoScrollVars();
     DragDropHere(pt, drop_wnds_acceptable, mod_keys);
 }
 
-void ListBox::DragDropHere(const Pt& pt, std::map<const Wnd*, bool>& drop_wnds_acceptable, Flags<ModKey> mod_keys)
+void ListBox::DragDropHere(Pt pt, std::map<const Wnd*, bool>& drop_wnds_acceptable, Flags<ModKey> mod_keys)
 {
     this->DropsAcceptable(drop_wnds_acceptable.begin(), drop_wnds_acceptable.end(), pt, mod_keys);
 
@@ -1556,7 +1555,7 @@ bool ListBox::EventFilter(Wnd* w, const WndEvent& event)
     if (Disabled())
         return true;
 
-    const Pt& pt = event.Point();
+    auto pt = event.Point();
     auto mod_keys = event.ModKeys();
 
 

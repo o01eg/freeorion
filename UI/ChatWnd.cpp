@@ -336,12 +336,12 @@ void MessageWnd::CloseClicked() {
     ClosingSignal();
 }
 
-void MessageWnd::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void MessageWnd::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     CUIWnd::LClick(pt, mod_keys);
     StopFlash();
 }
 
-void MessageWnd::LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKey> mod_keys) {
+void MessageWnd::LDrag(GG::Pt pt, GG::Pt move, GG::Flags<GG::ModKey> mod_keys) {
     CUIWnd::LDrag(pt, move, mod_keys);
     StopFlash();
 }
@@ -349,7 +349,7 @@ void MessageWnd::LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKe
 std::string MessageWnd::GetText() const
 { return *m_display; }
 
-void MessageWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void MessageWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
     const GG::Pt old_size = Size();
     CUIWnd::SizeMove(ul, lr);
     if (old_size != Size())

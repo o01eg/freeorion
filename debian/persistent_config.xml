@@ -16,7 +16,7 @@
  </save>
  <setup>
   <game>
-    <uid>FO0022</uid>
+    <uid>FO0023</uid>
   </game>
   <ai>
    <player>
@@ -36,7 +36,7 @@
     <density>GALAXY_SETUP_MEDIUM</density>
   </planet>
   <galaxy>
-   <shape>BOX</shape>
+   <shape>RING</shape>
    <age>GALAXY_SETUP_MEDIUM</age>
   </galaxy>
   <seed>RANDOM</seed>
@@ -46,7 +46,7 @@
   <rules>
    <RULE_ENABLE_SUPER_TESTER>0</RULE_ENABLE_SUPER_TESTER>
    <RULE_ENABLE_EXPERIMENTORS>0</RULE_ENABLE_EXPERIMENTORS>
-   <RULE_THRESHOLD_HUMAN_PLAYER_WIN>9999</RULE_THRESHOLD_HUMAN_PLAYER_WIN>
+   <RULE_THRESHOLD_HUMAN_PLAYER_WIN>1</RULE_THRESHOLD_HUMAN_PLAYER_WIN>
    <RULE_ONLY_ALLIANCE_WIN>1</RULE_ONLY_ALLIANCE_WIN>
    <RULE_ALLOW_CONCEDE>1</RULE_ALLOW_CONCEDE>
    <RULE_CONCEDE_COLONIES_THRESHOLD>9999</RULE_CONCEDE_COLONIES_THRESHOLD>
@@ -120,7 +120,7 @@
    </binary>
    <turn-timeout>
      <fixed-interval>0</fixed-interval>
-     <max-interval>300</max-interval> <!-- 48h to hours = 172800 -->
+     <max-interval>300</max-interval> <!-- 36h to hours = 129600 -->
    </turn-timeout>
    <client-message-size>
      <max>9485760</max>

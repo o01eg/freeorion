@@ -1905,8 +1905,8 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
     }
 
     // empire elimination
-    empire->Eliminate(m_empires);
-    const auto& empire_ids = m_empires.EmpireIDs();
+    empire->Eliminate(m_empires, m_current_turn);
+    const auto empire_ids{m_empires.EmpireIDs()};
 
 #if 0
     // destroy owned ships
@@ -3017,7 +3017,8 @@ namespace {
                                     continue;
                                 if (other_ship_id == ship_id)
                                     continue;
-                                empire->AddSitRepEntry(CreatePlanetEstablishFailedVisibleOtherSitRep(planet_id, ship_id, other_empire_id));
+                                empire->AddSitRepEntry(CreatePlanetEstablishFailedVisibleOtherSitRep(
+                                    planet_id, ship_id, other_empire_id, context.current_turn));
                                 created_empire_specific_message = true;
                                 break;
                             }
@@ -3029,7 +3030,7 @@ namespace {
 
                         // no, just issue generic message
                         if (!created_empire_specific_message)
-                            empire->AddSitRepEntry(CreatePlanetEstablishFailedSitRep(planet_id, ship_id));
+                            empire->AddSitRepEntry(CreatePlanetEstablishFailedSitRep(planet_id, ship_id, context.current_turn));
                     }
                 }
                 continue;
@@ -3059,7 +3060,7 @@ namespace {
                 {
                     if (empire)
                         empire->AddSitRepEntry(CreatePlanetEstablishFailedArmedSitRep(
-                            planet_id, colonizing_ship_id, armed_ship_empire_id));
+                            planet_id, colonizing_ship_id, armed_ship_empire_id, context.current_turn));
                     colonize_blocked = true;
                     break;
                 }
@@ -3088,9 +3089,9 @@ namespace {
                 ErrorLogger() << "HandleColonization couldn't get empire with id " << colonizing_empire_id;
             } else {
                 if (species_name.empty() || colonist_capacity <= 0.0f)
-                    empire->AddSitRepEntry(CreatePlanetOutpostedSitRep(planet_id));
+                    empire->AddSitRepEntry(CreatePlanetOutpostedSitRep(planet_id, context.current_turn));
                 else
-                    empire->AddSitRepEntry(CreatePlanetColonizedSitRep(planet_id, species_name));
+                    empire->AddSitRepEntry(CreatePlanetColonizedSitRep(planet_id, species_name, context.current_turn));
             }
         }
 
@@ -3285,7 +3286,7 @@ namespace {
     /** Determines which fleets or planets ordered given to other empires,
       * and sets their new ownership. Returns the IDs of anything gifted. */
     template <typename IDsT>
-    std::vector<int> HandleGifting(EmpireManager& empires, ObjectMap& objects,
+    std::vector<int> HandleGifting(EmpireManager& empires, ObjectMap& objects, int current_turn,
                                    const IDsT& invaded_planet_ids, const IDsT& invading_ship_ids,
                                    const IDsT& colonizing_ship_ids)
     {
@@ -3363,7 +3364,7 @@ namespace {
 
         // storage for list of all gifted objects
         std::vector<int> gifted_object_ids;
-        auto do_giving = [&gifted_object_ids, &empires](auto& recipients_objs) {
+        auto do_giving = [&gifted_object_ids, &empires, current_turn](auto& recipients_objs) {
             for (auto& [recipient_empire_id, objs] : recipients_objs) {
                 for (auto* gifted_obj : objs) {
                     const auto initial_owner_empire_id = gifted_obj->Owner();
@@ -3379,10 +3380,12 @@ namespace {
 
                     if constexpr (std::is_same_v<ObjsT, Planet>) {
                         if (auto empire = empires.GetEmpire(recipient_empire_id))
-                            empire->AddSitRepEntry(CreatePlanetGiftedSitRep(gifted_obj_id, initial_owner_empire_id));
+                            empire->AddSitRepEntry(CreatePlanetGiftedSitRep(gifted_obj_id, initial_owner_empire_id,
+                                                                            current_turn));
                     } else if constexpr (std::is_same_v<ObjsT, Fleet>) {
                         if (auto empire = empires.GetEmpire(recipient_empire_id))
-                            empire->AddSitRepEntry(CreateFleetGiftedSitRep(gifted_obj_id, initial_owner_empire_id));
+                            empire->AddSitRepEntry(CreateFleetGiftedSitRep(gifted_obj_id, initial_owner_empire_id,
+                                                                           current_turn));
                     } else if constexpr (std::is_same_v<ObjsT, Ship>) {
                         gifted_obj->SetOrderedScrapped(false);
                         gifted_obj->ClearColonizePlanet();
@@ -3594,8 +3597,8 @@ void ServerApp::PreCombatProcessTurns() {
     auto [invaded_planet_ids, invading_ship_ids] = HandleInvasion(context);
 
     DebugLogger() << "ServerApp::ProcessTurns gifting";
-    auto gifted_ids = HandleGifting(m_empires, m_universe.Objects(), invaded_planet_ids,
-                                    invading_ship_ids, colonizing_ship_ids);
+    auto gifted_ids = HandleGifting(m_empires, m_universe.Objects(), context.current_turn,
+                                    invaded_planet_ids, invading_ship_ids, colonizing_ship_ids);
 
     DebugLogger() << "ServerApp::ProcessTurns scrapping";
     HandleScrapping(m_universe, m_empires, invading_ship_ids, invaded_planet_ids,
@@ -4007,7 +4010,7 @@ void ServerApp::CheckForEmpireElimination() {
         if (empire->Eliminated()) {
             continue;   // don't double-eliminate an empire
         } else if (EmpireEliminated(empire_id, m_universe.Objects())) {
-            empire->Eliminate(m_empires);
+            empire->Eliminate(m_empires, m_current_turn);
             RemoveEmpireTurn(empire_id);
             const int player_id = EmpirePlayerID(empire_id);
             DebugLogger() << "ServerApp::CheckForEmpireElimination empire #" << empire_id << " " << empire->Name()
@@ -4034,7 +4037,7 @@ void ServerApp::CheckForEmpireElimination() {
 
     if (surviving_empires.size() == 1) { // last man standing
         auto& only_empire = *surviving_empires.begin();
-        only_empire->Win(UserStringNop("VICTORY_ALL_ENEMIES_ELIMINATED"), m_empires.GetEmpires());
+        only_empire->Win(UserStringNop("VICTORY_ALL_ENEMIES_ELIMINATED"), m_empires.GetEmpires(), m_current_turn);
     } else if (!m_single_player_game &&
                static_cast<int>(non_eliminated_non_ai_controlled_empires.size()) <= GetGameRules().Get<int>("RULE_THRESHOLD_HUMAN_PLAYER_WIN"))
     {
@@ -4055,7 +4058,7 @@ void ServerApp::CheckForEmpireElimination() {
         }
 
         for (auto& empire : non_eliminated_non_ai_controlled_empires)
-            empire->Win(UserStringNop("VICTORY_FEW_HUMANS_ALIVE"), m_empires.GetEmpires());
+            empire->Win(UserStringNop("VICTORY_FEW_HUMANS_ALIVE"), m_empires.GetEmpires(), m_current_turn);
     }
 }
 

@@ -1,11 +1,5 @@
 #include "EffectParserImpl.h"
 
-#include "EffectParser1.h"
-#include "EffectParser2.h"
-#include "EffectParser3.h"
-#include "EffectParser4.h"
-#include "EffectParser5.h"
-
 #include "../universe/Condition.h"
 #include "../universe/Effect.h"
 
@@ -45,19 +39,9 @@ namespace parse {
             detail::Labeller& label,
             const detail::condition_parser_grammar& condition_parser,
             const detail::value_ref_grammar<std::string>& string_grammar
-        ) :
-            effect_parser_1(tok, label, condition_parser, string_grammar),
-            effect_parser_2(tok, label, condition_parser, string_grammar),
-            effect_parser_3(tok, label, condition_parser, string_grammar),
-            effect_parser_4(tok, effects_parser_grammar, label, condition_parser, string_grammar),
-            effect_parser_5(tok, effects_parser_grammar, label, condition_parser)
+        )
         {}
 
-        detail::effect_parser_rules_1 effect_parser_1;
-        detail::effect_parser_rules_2 effect_parser_2;
-        detail::effect_parser_rules_3 effect_parser_3;
-        detail::effect_parser_rules_4 effect_parser_4;
-        detail::effect_parser_rules_5 effect_parser_5;
     };
 
     effects_parser_grammar::effects_parser_grammar(
@@ -69,14 +53,6 @@ namespace parse {
         effects_parser_grammar::base_type(start, "effects_parser_grammar"),
         m_impl(std::make_unique<effects_parser_grammar::Impl>(*this, tok, label, condition_parser, string_grammar))
     {
-        start
-            = m_impl->effect_parser_1
-            | m_impl->effect_parser_2
-            | m_impl->effect_parser_3
-            | m_impl->effect_parser_4
-            | m_impl->effect_parser_5
-            ;
-        start.name("Effect");
     }
 
     effects_parser_grammar::~effects_parser_grammar() = default;

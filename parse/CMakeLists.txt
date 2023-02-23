@@ -8,20 +8,8 @@ if(BUILD_PARSERS)
         PRIVATE
             ${CMAKE_CURRENT_LIST_DIR}/CommonParamsParser.h
             ${CMAKE_CURRENT_LIST_DIR}/ConditionParser.h
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser1.h
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser2.h
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser3.h
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser4.h
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser5.h
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser6.h
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser7.h
             ${CMAKE_CURRENT_LIST_DIR}/ConditionParserImpl.h
             ${CMAKE_CURRENT_LIST_DIR}/EffectParser.h
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParser1.h
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParser2.h
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParser3.h
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParser4.h
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParser5.h
             ${CMAKE_CURRENT_LIST_DIR}/EffectParserImpl.h
             ${CMAKE_CURRENT_LIST_DIR}/EffectPythonParser.h
             ${CMAKE_CURRENT_LIST_DIR}/EnumParser.h
@@ -35,21 +23,9 @@ if(BUILD_PARSERS)
             ${CMAKE_CURRENT_LIST_DIR}/ArithmeticRules.cpp
             ${CMAKE_CURRENT_LIST_DIR}/BuildingsParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/CommonParamsParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser1.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser2.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser3.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser4.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser5.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser6.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser7.cpp
             ${CMAKE_CURRENT_LIST_DIR}/ConditionParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/DoubleComplexValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/DoubleValueRefParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParser1.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParser2.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParser3.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParser4.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParser5.cpp
             ${CMAKE_CURRENT_LIST_DIR}/EffectParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/EffectPythonParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/EmpireStatsParser.cpp

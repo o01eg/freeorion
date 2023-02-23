@@ -19,11 +19,6 @@
 #include "../util/i18n.h"
 #include "../util/Random.h"
 
-std::ostream& operator<<(std::ostream&, PlanetType);
-std::ostream& operator<<(std::ostream&, PlanetSize);
-std::ostream& operator<<(std::ostream&, PlanetEnvironment);
-std::ostream& operator<<(std::ostream&, StarType);
-
 
 namespace CheckSums {
     template <typename T>

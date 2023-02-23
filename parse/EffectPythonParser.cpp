@@ -6,7 +6,9 @@
 
 #include "../universe/Effects.h"
 #include "../universe/Enums.h"
+#include "../universe/Planet.h"
 #include "../universe/Species.h"
+#include "../universe/System.h"
 
 #include "EnumPythonParser.h"
 #include "PythonParserImpl.h"

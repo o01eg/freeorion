@@ -4,6 +4,9 @@
 #include <boost/python/raw_function.hpp>
 
 #include "../universe/Conditions.h"
+#include "../universe/Planet.h"
+#include "../universe/Species.h"
+#include "../universe/System.h"
 
 #include "EnumPythonParser.h"
 #include "PythonParserImpl.h"

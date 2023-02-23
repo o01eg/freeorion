@@ -53,7 +53,7 @@ jobs:
         if: ${{ matrix.compiler == 'gcc' }}
         run: |
           cd build
-          cmake -DBUILD_TESTING=ON -DBUILD_CLIENT_GG=Off -DBUILD_CLIENT_GODOT=Off -DCMAKE_CXX_FLAGS="-fsanitize=address -g"   -DCMAKE_C_FLAGS="-fsanitize=address -g"   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"   -DCMAKE_MODULE_LINKER_FLAGS="-fsanitize=address" -DBUILD_SERVER=On -DBUILD_AI=On -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+          cmake -DBUILD_TESTING=ON -DBUILD_CLIENT_GG=Off -DBUILD_CLIENT_GODOT=Off -DCMAKE_CXX_FLAGS="-fsanitize=address -g"   -DCMAKE_C_FLAGS="-fsanitize=address -g"   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"   -DCMAKE_MODULE_LINKER_FLAGS="-fsanitize=address" -DBUILD_SERVER=Off -DBUILD_AI=Off -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
       - name: Configure for clang
         if: ${{ matrix.compiler == 'clang' }}
         env:
@@ -63,7 +63,7 @@ jobs:
           CXX: clang++
         run: |
           cd build
-          cmake -DBUILD_TESTING=ON -DBUILD_CLIENT_GG=Off -DBUILD_CLIENT_GODOT=Off -DCMAKE_CXX_FLAGS="-fsanitize=address -g"   -DCMAKE_C_FLAGS="-fsanitize=address -g"   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"   -DCMAKE_MODULE_LINKER_FLAGS="-fsanitize=address" -DBUILD_SERVER=On -DBUILD_AI=On -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+          cmake -DBUILD_TESTING=ON -DBUILD_CLIENT_GG=Off -DBUILD_CLIENT_GODOT=Off -DCMAKE_CXX_FLAGS="-fsanitize=address -g"   -DCMAKE_C_FLAGS="-fsanitize=address -g"   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"   -DCMAKE_MODULE_LINKER_FLAGS="-fsanitize=address" -DBUILD_SERVER=Off -DBUILD_AI=Off -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
       - name: Build
         env:
           CMAKE_BUILD_PARALLEL_LEVEL: 2

@@ -31,7 +31,6 @@ add_coverage(fo_systemtest_game
 )
 
 add_dependencies(unittest
-    freeoriond
     fo_systemtest_game
 )
 

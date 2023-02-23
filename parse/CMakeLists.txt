@@ -21,37 +21,23 @@ if(BUILD_PARSERS)
             ${CMAKE_CURRENT_LIST_DIR}/Tokens.h
             ${CMAKE_CURRENT_LIST_DIR}/ValueRefParser.h
             ${CMAKE_CURRENT_LIST_DIR}/ArithmeticRules.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/BuildingsParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/CommonParamsParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/ConditionParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/DoubleComplexValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/DoubleValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/EffectParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/EffectPythonParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/EmpireStatsParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/EncyclopediaParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/EnumParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/EnumPythonParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/FieldsParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/FleetPlansParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/GameRulesParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/IntComplexValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/IntValueRefParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ItemsParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/Lexer.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/MonsterFleetPlansParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/NamedValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/Parse.cpp
             ${CMAKE_CURRENT_LIST_DIR}/PlanetEnvironmentValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/PlanetSizeValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/PlanetTypeValueRefParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/PoliciesParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/ReportParseError.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ShipDesignsParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ShipHullsParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ShipPartsParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/SpecialsParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/SpeciesParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/StarTypeValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/StringComplexValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/StringValueRefParser.cpp

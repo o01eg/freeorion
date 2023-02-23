@@ -62,11 +62,6 @@ void IApp::StartBackgroundParsing(const PythonParser& python, std::promise<void>
 
     DebugLogger() << "Start background parsing...";
 
-    if (IsExistingFile(rdir / "scripting/game_rules.focs.py"))
-        GetGameRules().Add(Pending::ParseSynchronously(parse::game_rules, python, rdir / "scripting/game_rules.focs.py"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/game_rules.focs.py").string();
-
     if (IsExistingDir(rdir / "scripting/techs"))
         GetTechManager().SetTechs(Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, python, rdir / "scripting/techs", std::move(barrier)));
     else {

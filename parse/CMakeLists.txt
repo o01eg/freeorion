@@ -6,46 +6,19 @@ if(BUILD_PARSERS)
             ${CMAKE_CURRENT_LIST_DIR}/Parse.h
             ${CMAKE_CURRENT_LIST_DIR}/PythonParser.h
         PRIVATE
-            ${CMAKE_CURRENT_LIST_DIR}/CommonParamsParser.h
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser.h
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParserImpl.h
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParser.h
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParserImpl.h
             ${CMAKE_CURRENT_LIST_DIR}/EffectPythonParser.h
-            ${CMAKE_CURRENT_LIST_DIR}/EnumParser.h
             ${CMAKE_CURRENT_LIST_DIR}/EnumPythonParser.h
             ${CMAKE_CURRENT_LIST_DIR}/EnumValueRefRules.h
             ${CMAKE_CURRENT_LIST_DIR}/Lexer.h
-            ${CMAKE_CURRENT_LIST_DIR}/ParseImpl.h
             ${CMAKE_CURRENT_LIST_DIR}/ReportParseError.h
             ${CMAKE_CURRENT_LIST_DIR}/Tokens.h
-            ${CMAKE_CURRENT_LIST_DIR}/ValueRefParser.h
-            ${CMAKE_CURRENT_LIST_DIR}/ArithmeticRules.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/CommonParamsParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ConditionParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/DoubleComplexValueRefParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/DoubleValueRefParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/EffectParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/EffectPythonParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/EnumParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/EnumPythonParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/GameRulesParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/IntComplexValueRefParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/IntValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/Lexer.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/Parse.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/PlanetEnvironmentValueRefParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/PlanetSizeValueRefParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/PlanetTypeValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/ReportParseError.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/StarTypeValueRefParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/StringComplexValueRefParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/StringValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/TechsParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/UniverseObjectTypeValueRefParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/ValueRefPythonParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/VisibilityValueRefParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/PythonParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/SourcePythonParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/ConditionPythonParser.cpp

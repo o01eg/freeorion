@@ -10,8 +10,6 @@ on:
       - 'snap/**'
       - '*.md'
       - 'check/**'
-      - 'default/**'
-      - 'test-scripting/**'
   pull_request:
     paths-ignore:
       - 'msvc*/**'
@@ -21,8 +19,6 @@ on:
       - 'snap/**'
       - '*.md'
       - 'check/**'
-      - 'default/**'
-      - 'test-scripting/**'
 
 jobs:
   build-ubuntu:

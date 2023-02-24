@@ -9,14 +9,9 @@ if(BUILD_PARSERS)
             ${CMAKE_CURRENT_LIST_DIR}/EffectPythonParser.h
             ${CMAKE_CURRENT_LIST_DIR}/EnumPythonParser.h
             ${CMAKE_CURRENT_LIST_DIR}/EnumValueRefRules.h
-            ${CMAKE_CURRENT_LIST_DIR}/Lexer.h
-            ${CMAKE_CURRENT_LIST_DIR}/ReportParseError.h
-            ${CMAKE_CURRENT_LIST_DIR}/Tokens.h
             ${CMAKE_CURRENT_LIST_DIR}/EffectPythonParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/EnumPythonParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/GameRulesParser.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/Lexer.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/ReportParseError.cpp
             ${CMAKE_CURRENT_LIST_DIR}/TechsParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/ValueRefPythonParser.cpp
             ${CMAKE_CURRENT_LIST_DIR}/PythonParser.cpp

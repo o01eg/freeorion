@@ -1,6 +1,9 @@
 #include <boost/test/unit_test.hpp>
 
 #include "ClientAppFixture.h"
+#include "util/Directories.h"
+#include "util/PythonCommon.h"
+#include "parse/PythonParser.h"
 
 BOOST_FIXTURE_TEST_SUITE(TestChecksum, ClientAppFixture)
 
@@ -39,6 +42,13 @@ void TestCheckSumFromEnv(const char* env, unsigned int def, unsigned int calcula
  */
 
 BOOST_AUTO_TEST_CASE(compare_checksum) {
+    std::promise<void> barrier;
+    std::future<void> barrier_future = barrier.get_future();
+    PythonCommon python;
+    python.Initialize();
+    StartBackgroundParsing(PythonParser(python, GetResourceDir() / "scripting"), std::move(barrier));
+    barrier_future.wait();
+
     auto checksums = CheckSumContent();
 
     TestCheckSumFromEnv("FO_CHECKSUM_BUILDING", 9738579, checksums["BuildingTypeManager"]);

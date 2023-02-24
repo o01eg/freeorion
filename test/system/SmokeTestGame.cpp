@@ -6,6 +6,8 @@
 #include "util/Directories.h"
 #include "util/Process.h"
 #include "util/SitRepEntry.h"
+#include "util/PythonCommon.h"
+#include "parse/PythonParser.h"
 
 #ifdef FREEORION_MACOSX
 #include <stdlib.h>
@@ -28,6 +30,12 @@ BOOST_FIXTURE_TEST_SUITE(SmokeTestGame, ClientAppFixture)
  */
 
 BOOST_AUTO_TEST_CASE(host_server) {
+    std::promise<void> barrier;
+    std::future<void> barrier_future = barrier.get_future();
+    PythonCommon python;
+    python.Initialize();
+    StartBackgroundParsing(PythonParser(python, GetResourceDir() / "scripting"), std::move(barrier));
+    barrier_future.wait();
 
     BOOST_REQUIRE(!PingLocalHostServer());
 

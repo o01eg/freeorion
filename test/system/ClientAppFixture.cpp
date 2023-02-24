@@ -39,13 +39,6 @@ ClientAppFixture::ClientAppFixture() :
     DebugLogger() << "Test client initialized";
 
     GetOptionsDB().Set<std::string>("resource.path", PathToString(GetBinDir() / "default"));
-
-    std::promise<void> barrier;
-    std::future<void> barrier_future = barrier.get_future();
-    PythonCommon python;
-    python.Initialize();
-    StartBackgroundParsing(PythonParser(python, GetResourceDir() / "scripting"), std::move(barrier));
-    barrier_future.wait();
 }
 
 int ClientAppFixture::EffectsProcessingThreads() const

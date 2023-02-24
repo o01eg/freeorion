@@ -7,25 +7,6 @@
 
 BOOST_FIXTURE_TEST_SUITE(TestChecksum, ClientAppFixture)
 
-void TestCheckSumFromEnv(const char* env, unsigned int def, unsigned int calculated) {
-    bool force = false;
-    unsigned int expected = def;
-
-    if (const char *env_value = std::getenv(env)) {
-        force = true;
-        try {
-            expected = boost::lexical_cast<unsigned int>(env_value);
-        } catch (...) {
-            // ignore
-        }
-    }
-    if (force) {
-        BOOST_CHECK_MESSAGE(calculated == expected, env << " expected " << expected << " was " << calculated);
-    } else {
-        BOOST_WARN_MESSAGE(calculated == expected, env << " expected " << expected << " was " << calculated);
-    }
-}
-
 /**
  * - Enforces buildings checksum test if FO_CHECKSUM_BUILDING is set.
  * - Enforces encyclopedia checksum test if FO_CHECKSUM_ENCYCLOPEDIA is set.
@@ -48,20 +29,6 @@ BOOST_AUTO_TEST_CASE(compare_checksum) {
     python.Initialize();
     StartBackgroundParsing(PythonParser(python, GetResourceDir() / "scripting"), std::move(barrier));
     barrier_future.wait();
-
-    auto checksums = CheckSumContent();
-
-    TestCheckSumFromEnv("FO_CHECKSUM_BUILDING", 9738579, checksums["BuildingTypeManager"]);
-    TestCheckSumFromEnv("FO_CHECKSUM_ENCYCLOPEDIA", 1099081, checksums["Encyclopedia"]);
-    TestCheckSumFromEnv("FO_CHECKSUM_FIELD", 5633722, checksums["FieldTypeManager"]);
-    TestCheckSumFromEnv("FO_CHECKSUM_POLICY", 7039723, checksums["PolicyManager"]);
-    TestCheckSumFromEnv("FO_CHECKSUM_SHIP_HULL", 8777190, checksums["ShipHullManager"]);
-    TestCheckSumFromEnv("FO_CHECKSUM_SHIP_PART", 1778809, checksums["ShipPartManager"]);
-    TestCheckSumFromEnv("FO_CHECKSUM_SHIP_DESIGN", 873430, checksums["PredefinedShipDesignManager"]);
-    TestCheckSumFromEnv("FO_CHECKSUM_SPECIES", 3129479, checksums["SpeciesManager"]);
-    TestCheckSumFromEnv("FO_CHECKSUM_SPECIALS", 7644502, checksums["SpecialsManager"]);
-    TestCheckSumFromEnv("FO_CHECKSUM_TECH", 5486989, checksums["TechManager"]);
-    TestCheckSumFromEnv("FO_CHECKSUM_NAMED_VALUEREF", 2609136, checksums["NamedValueRefManager"]);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

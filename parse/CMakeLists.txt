@@ -2,7 +2,6 @@
 if(BUILD_PARSERS)
     target_sources(freeorionparseobj
         PUBLIC
-            ${CMAKE_CURRENT_LIST_DIR}/MovableEnvelope.h
             ${CMAKE_CURRENT_LIST_DIR}/Parse.h
             ${CMAKE_CURRENT_LIST_DIR}/PythonParser.h
         PRIVATE

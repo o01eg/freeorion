@@ -12,7 +12,6 @@
 #include "UniverseObjectVisitor.h"
 #include "Universe.h"
 #include "ValueRef.h"
-#include "../combat/CombatDamage.h"
 #include "../Empire/EmpireManager.h"
 #include "../Empire/Empire.h"
 #include "../util/AppInterface.h"
@@ -519,31 +518,19 @@ float Ship::TotalWeaponsShipDamage(const ScriptingContext& context, float shield
 std::vector<float> Ship::AllWeaponsFighterDamage(const ScriptingContext& context,
                                                  bool launch_fighters) const
 {
-    return Combat::WeaponDamageImpl(
-        context, std::static_pointer_cast<const Ship>(shared_from_this()),
-        /*target_shield_DR*/0, /*max meters*/false,
-        launch_fighters, /*target_ships*/false);
+    return {};
 }
 
 std::vector<float> Ship::AllWeaponsShipDamage(const ScriptingContext& context, float shield_DR,
                                               bool launch_fighters) const
 {
-    return Combat::WeaponDamageImpl(
-        context, std::static_pointer_cast<const Ship>(shared_from_this()),
-        shield_DR, false, launch_fighters, true);
+    return {};
 }
 
 std::vector<float> Ship::AllWeaponsMaxShipDamage(const ScriptingContext& context, float shield_DR,
                                                  bool launch_fighters) const
 {
-    std::vector<float> retval;
-
-    const ShipDesign* design = context.ContextUniverse().GetShipDesign(m_design_id);
-    if (!design)
-        return retval;
-
-    return Combat::WeaponDamageImpl(context, std::static_pointer_cast<const Ship>(shared_from_this()),
-                                    shield_DR, true, launch_fighters);
+    return {};
 }
 
 void Ship::SetFleetID(int fleet_id) {

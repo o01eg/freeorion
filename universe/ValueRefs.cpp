@@ -28,12 +28,10 @@
 #include "Tech.h"
 #include "UniverseObject.h"
 #include "Universe.h"
-#include "../combat/CombatDamage.h"
 #include "../Empire/Empire.h"
 #include "../Empire/Supply.h"
 #include "../util/GameRules.h"
 #include "../util/Logger.h"
-#include "../util/MultiplayerCommon.h"
 #include "../util/Random.h"
 
 // define needed on Windows due to conflict with windows.h and std::min and std::max
@@ -971,24 +969,6 @@ int Variable<int>::Eval(const ScriptingContext& context) const
             return context.combat_bout;
         if (property_name == "CurrentTurn")
             return context.current_turn;
-        if (property_name == "GalaxySize")
-            return context.galaxy_setup_data.GetSize();
-        if (property_name == "GalaxyShape")
-            return static_cast<int>(context.galaxy_setup_data.GetShape());
-        if (property_name == "GalaxyAge")
-            return static_cast<int>(context.galaxy_setup_data.GetAge());
-        if (property_name == "GalaxyStarlaneFrequency")
-            return static_cast<int>(context.galaxy_setup_data.GetStarlaneFreq());
-        if (property_name == "GalaxyPlanetDensity")
-            return static_cast<int>(context.galaxy_setup_data.GetPlanetDensity());
-        if (property_name == "GalaxySpecialFrequency")
-            return static_cast<int>(context.galaxy_setup_data.GetSpecialsFreq());
-        if (property_name == "GalaxyMonsterFrequency")
-            return static_cast<int>(context.galaxy_setup_data.GetMonsterFreq());
-        if (property_name == "GalaxyNativeFrequency")
-            return static_cast<int>(context.galaxy_setup_data.GetNativeFreq());
-        if (property_name == "GalaxyMaxAIAggression")
-            return static_cast<int>(context.galaxy_setup_data.GetAggression());
         if (property_name == "UsedInDesignID")
             return context.in_design_id;
         if (property_name == "SelectedSystemID")
@@ -1294,9 +1274,6 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
     const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
 
     if (m_ref_type == ReferenceType::NON_OBJECT_REFERENCE) {
-        if (property_name == "GalaxySeed")
-            return context.galaxy_setup_data.GetSeed();
-
         // add more non-object reference string functions here
         LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(std::string)
 
@@ -1529,17 +1506,7 @@ uint32_t TotalFighterShots::GetCheckSum() const
 }
 
 int TotalFighterShots::Eval(const ScriptingContext& context) const {
-    if (!m_carrier_id) {
-        ErrorLogger() << "TotalFighterShots condition without carrier id";
-        return 0;
-    } else {
-        auto carrier = context.ContextObjects().getRaw<Ship>(m_carrier_id->Eval(context));
-        if (!carrier) {
-            ErrorLogger() << "TotalFighterShots condition referenced a carrier which is not a ship";
-            return 0;
-        }
-        return Combat::TotalFighterShots(context, *carrier, m_sampling_condition.get());
-    }
+    return 0;
 }
 
 ///////////////////////////////////////////////////////////

@@ -74,37 +74,7 @@ private:
     int32_t cur = FromFloat(DEFAULT_VALUE);
     int32_t init = FromFloat(DEFAULT_VALUE);
 
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive& ar, const unsigned int version);
 };
 
-BOOST_CLASS_VERSION(Meter, 2)
-
-
-template <typename Archive>
-void Meter::serialize(Archive& ar, const unsigned int version)
-{
-    if constexpr (Archive::is_loading::value) {
-        if (version < 2) {
-            float c = 0.0f, i = 0.0f;
-            ar  & boost::serialization::make_nvp("c", c)
-                & boost::serialization::make_nvp("i", i);
-            cur = FromFloat(c);
-            init = FromFloat(i);
-            return;
-        }
-    }
-    ar  & boost::serialization::make_nvp("c", cur)
-        & boost::serialization::make_nvp("i", init);
-}
-
-namespace boost::archive {
-    class xml_iarchive;
-    class xml_oarchive;
-}
-
-template<> void Meter::serialize(boost::archive::xml_iarchive&, const unsigned int version);
-template<> void Meter::serialize(boost::archive::xml_oarchive&, const unsigned int version);
 
 #endif

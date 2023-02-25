@@ -17,7 +17,7 @@ struct [[nodiscard]] ScriptingContext {
     inline static const CurrentValueVariant DEFAULT_CURRENT_VALUE{0};
 
     ScriptingContext() :
-        ScriptingContext(GetUniverse(), ::Empires(), GetGalaxySetupData(),
+        ScriptingContext(GetUniverse(), ::Empires(), 
                          GetSpeciesManager(), GetSupplyManager())
     {}
 
@@ -34,7 +34,6 @@ struct [[nodiscard]] ScriptingContext {
         current_turn(             parent_context.current_turn),
         in_design_id(             parent_context.in_design_id),
         production_block_size(    parent_context.production_block_size),
-        galaxy_setup_data(        parent_context.galaxy_setup_data),
         species(                  parent_context.species),
         supply(                   parent_context.supply),
         universe(                 parent_context.universe),
@@ -50,7 +49,6 @@ struct [[nodiscard]] ScriptingContext {
 
     explicit ScriptingContext(const UniverseObject* source_) :
         source(           source_),
-        galaxy_setup_data(GetGalaxySetupData()),
         species(          GetSpeciesManager()),
         supply(           GetSupplyManager()),
         universe(         &GetUniverse()),
@@ -71,7 +69,6 @@ struct [[nodiscard]] ScriptingContext {
         current_turn(             parent_context.current_turn),
         in_design_id(             parent_context.in_design_id),
         production_block_size(    parent_context.production_block_size),
-        galaxy_setup_data(        parent_context.galaxy_setup_data),
         species(                  parent_context.species),
         supply(                   parent_context.supply),
         universe(                 parent_context.universe),
@@ -99,7 +96,6 @@ struct [[nodiscard]] ScriptingContext {
         current_turn(             parent_context.current_turn),
         in_design_id(             parent_context.in_design_id),
         production_block_size(    parent_context.production_block_size),
-        galaxy_setup_data(        parent_context.galaxy_setup_data),
         species(                  parent_context.species),
         supply(                   parent_context.supply),
         universe(                 parent_context.universe),
@@ -124,7 +120,6 @@ struct [[nodiscard]] ScriptingContext {
         current_turn(             parent_context.current_turn),
         in_design_id(             parent_context.in_design_id),
         production_block_size(    parent_context.production_block_size),
-        galaxy_setup_data(        parent_context.galaxy_setup_data),
         species(                  parent_context.species),
         supply(                   parent_context.supply),
         universe(                 parent_context.universe),
@@ -149,7 +144,6 @@ struct [[nodiscard]] ScriptingContext {
         current_turn(             parent_context.current_turn),
         in_design_id(             parent_context.in_design_id),
         production_block_size(    parent_context.production_block_size),
-        galaxy_setup_data(        parent_context.galaxy_setup_data),
         species(                  parent_context.species),
         supply(                   parent_context.supply),
         universe(                 parent_context.universe),
@@ -199,7 +193,6 @@ struct [[nodiscard]] ScriptingContext {
         current_turn(             parent_context.current_turn),
         in_design_id(             in_design_id_),
         production_block_size(    production_block_size_),
-        galaxy_setup_data(        parent_context.galaxy_setup_data),
         species(                  parent_context.species),
         supply(                   parent_context.supply),
         universe(                 parent_context.universe),
@@ -225,7 +218,6 @@ struct [[nodiscard]] ScriptingContext {
         current_turn(             parent_context.current_turn),
         in_design_id(             parent_context.in_design_id),
         production_block_size(    parent_context.production_block_size),
-        galaxy_setup_data(        parent_context.galaxy_setup_data),
         species(                  parent_context.species),
         supply(                   parent_context.supply),
         universe(                 parent_context.universe),
@@ -251,7 +243,6 @@ struct [[nodiscard]] ScriptingContext {
         current_turn(             parent_context.current_turn),
         in_design_id(             parent_context.in_design_id),
         production_block_size(    parent_context.production_block_size),
-        galaxy_setup_data(        parent_context.galaxy_setup_data),
         species(                  parent_context.species),
         supply(                   parent_context.supply),
         universe(                 parent_context.universe),
@@ -291,7 +282,6 @@ struct [[nodiscard]] ScriptingContext {
     ScriptingContext(const UniverseObject* source_, UniverseObject* target_) :
         source(           source_),
         effect_target(    target_),
-        galaxy_setup_data(GetGalaxySetupData()),
         species(          GetSpeciesManager()),
         supply(           GetSupplyManager()),
         universe(         &GetUniverse()),
@@ -302,10 +292,8 @@ struct [[nodiscard]] ScriptingContext {
     {}
 
     ScriptingContext(Universe& universe, EmpireManager& empires_,
-                     const GalaxySetupData& galaxy_setup_data_ = GetGalaxySetupData(),
                      SpeciesManager& species_ = GetSpeciesManager(),
                      const SupplyManager& supply_ = GetSupplyManager()) :
-        galaxy_setup_data(galaxy_setup_data_),
         species(          species_),
         supply(           supply_),
         universe(         &universe),
@@ -420,7 +408,6 @@ struct [[nodiscard]] ScriptingContext {
     int                                            current_turn = CurrentTurn();
     int                                            in_design_id = INVALID_DESIGN_ID;
     int                                            production_block_size = 1;
-    const GalaxySetupData&                         galaxy_setup_data{GetGalaxySetupData()};
     SpeciesManager&                                species{GetSpeciesManager()};
     const SupplyManager&                           supply{GetSupplyManager()};
 private: // Universe and ObjectMap getters select one of these based on constness

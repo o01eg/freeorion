@@ -5,8 +5,6 @@
 #include "../util/LoggerWithOptionsDB.h"
 #include "../util/Logger.h"
 #include "../util/Random.h"
-#include "../util/Serialize.h"
-#include "../util/Serialize.ipp"
 
 
 namespace {
@@ -285,80 +283,4 @@ std::string IDAllocator::StateString() const {
     ss << "]";
     return ss.str();
 }
-
-template <typename Archive>
-void IDAllocator::SerializeForEmpire(Archive& ar, const unsigned int version, int empire_id) {
-    DebugLogger(IDallocator) << (Archive::is_loading::value ? "Deserialize " : "Serialize ")
-                             << "IDAllocator()  server id = "
-                             << m_server_id << " empire id = " << empire_id;
-
-    ar  & BOOST_SERIALIZATION_NVP(m_invalid_id)
-        & BOOST_SERIALIZATION_NVP(m_temp_id)
-        & BOOST_SERIALIZATION_NVP(m_stride);
-    if (version > 0)
-        ar & BOOST_SERIALIZATION_NVP(m_zero);
-    ar  & BOOST_SERIALIZATION_NVP(m_server_id)
-        & BOOST_SERIALIZATION_NVP(m_warn_threshold)
-        & BOOST_SERIALIZATION_NVP(m_exhausted_threshold);
-
-    if constexpr (Archive::is_loading::value) {
-        // Always load whatever is there.
-        ar  & BOOST_SERIALIZATION_NVP(m_empire_id)
-            & BOOST_SERIALIZATION_NVP(m_empire_id_to_next_assigned_object_id)
-            & BOOST_SERIALIZATION_NVP(m_offset_to_empire_id);
-
-        DebugLogger(IDallocator) << "Deserialized [" << [this]() {
-            std::stringstream ss;
-            for (auto& empire_and_next_id : m_empire_id_to_next_assigned_object_id) {
-                ss << "empire = " << empire_and_next_id.first << " next id = " << empire_and_next_id.second << ", ";
-            }
-            return ss.str();
-        }() << "]";
-
-    } else {
-
-        if (m_empire_id != empire_id && m_empire_id != m_server_id)
-            ErrorLogger() << "An empire with id = " << m_empire_id << " which is not the server "
-                          << "is attempting to serialize the IDAllocator for a different empire " << empire_id;
-
-        // If the target empire is the server, provide the full map.
-        if (empire_id == m_server_id) {
-            ar  & BOOST_SERIALIZATION_NVP(m_empire_id)
-                & BOOST_SERIALIZATION_NVP(m_empire_id_to_next_assigned_object_id)
-                & BOOST_SERIALIZATION_NVP(m_offset_to_empire_id);
-        } else {
-            ar  & boost::serialization::make_nvp(BOOST_PP_STRINGIZE(m_empire_id), empire_id);
-
-            // Filter the map for empires so they only have their own actual next id and no
-            // information about other clients.
-            std::unordered_map<int, ID_t> temp_empire_id_to_object_id{};
-            auto temp_offset_to_empire_id = std::vector<int>(m_offset_to_empire_id.size(), m_server_id);
-
-            auto&& it = m_empire_id_to_next_assigned_object_id.find(empire_id);
-            if (it == m_empire_id_to_next_assigned_object_id.end()) {
-                ErrorLogger() << "Attempt to serialize allocator for an empire_id "
-                              << empire_id << " not in id manager table.";
-            } else {
-                temp_empire_id_to_object_id.insert(*it);
-                temp_offset_to_empire_id[(it->second - m_zero) % m_stride] = empire_id;
-            }
-
-            ar & boost::serialization::make_nvp(BOOST_PP_STRINGIZE(m_empire_id_to_next_assigned_object_id), temp_empire_id_to_object_id);
-            ar & boost::serialization::make_nvp(BOOST_PP_STRINGIZE(m_offset_to_empire_id), temp_offset_to_empire_id);
-
-            DebugLogger(IDallocator) << "Serialized [" << [&temp_empire_id_to_object_id]() {
-                std::stringstream ss;
-                for (auto& empire_and_next_id : temp_empire_id_to_object_id) {
-                    ss << "empire = " << empire_and_next_id.first << " next id = " << empire_and_next_id.second << ", ";
-                }
-                return ss.str();
-            }() << "]";
-        }
-    }
-}
-
-template void IDAllocator::SerializeForEmpire<freeorion_bin_oarchive>(freeorion_bin_oarchive& ar, const unsigned int version, const int empire_id);
-template void IDAllocator::SerializeForEmpire<freeorion_bin_iarchive>(freeorion_bin_iarchive& ar, const unsigned int version, const int empire_id);
-template void IDAllocator::SerializeForEmpire<freeorion_xml_oarchive>(freeorion_xml_oarchive& ar, const unsigned int version, const int empire_id);
-template void IDAllocator::SerializeForEmpire<freeorion_xml_iarchive>(freeorion_xml_iarchive& ar, const unsigned int version, const int empire_id);
 

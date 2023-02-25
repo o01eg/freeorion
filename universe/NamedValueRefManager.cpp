@@ -31,7 +31,6 @@
 #include "../Empire/Supply.h"
 #include "../util/GameRules.h"
 #include "../util/Logger.h"
-#include "../util/MultiplayerCommon.h"
 #include "../util/Random.h"
 
 NamedValueRefManager* NamedValueRefManager::s_instance = nullptr;

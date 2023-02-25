@@ -67,10 +67,6 @@ public:
         before IDAllocator is serialized and sent to the clients. */
     void ObfuscateBeforeSerialization();
 
-    /** Serialize while stripping out information not known to \p empire_id. */
-    template <typename Archive>
-        void SerializeForEmpire(Archive& ar, const unsigned int version, int empire_id);
-
 private:
     /** Return the empire that should have assigned \p id. */
     ID_t& AssigningEmpireForID(ID_t id);

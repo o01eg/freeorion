@@ -8,7 +8,6 @@
 #include "../util/OptionsDB.h"
 #include "../util/Logger.h"
 #include "../util/GameRules.h"
-#include "../util/MultiplayerCommon.h"
 #include "../util/GameRules.h"
 #include "../util/CheckSums.h"
 #include "../util/ScopedTimer.h"

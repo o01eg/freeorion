@@ -10,7 +10,6 @@ target_sources(freeorioncommon
         ${CMAKE_CURRENT_LIST_DIR}/Logger.h
         ${CMAKE_CURRENT_LIST_DIR}/LoggerWithOptionsDB.h
         ${CMAKE_CURRENT_LIST_DIR}/ModeratorAction.h
-        ${CMAKE_CURRENT_LIST_DIR}/MultiplayerCommon.h
         ${CMAKE_CURRENT_LIST_DIR}/OptionsDB.h
         ${CMAKE_CURRENT_LIST_DIR}/OptionValidators.h
         ${CMAKE_CURRENT_LIST_DIR}/Order.h
@@ -19,10 +18,7 @@ target_sources(freeorioncommon
         ${CMAKE_CURRENT_LIST_DIR}/Process.h
         ${CMAKE_CURRENT_LIST_DIR}/PythonCommon.h
         ${CMAKE_CURRENT_LIST_DIR}/Random.h
-        ${CMAKE_CURRENT_LIST_DIR}/SaveGamePreviewUtils.h
         ${CMAKE_CURRENT_LIST_DIR}/ScopedTimer.h
-        ${CMAKE_CURRENT_LIST_DIR}/Serialize.h
-        ${CMAKE_CURRENT_LIST_DIR}/Serialize.ipp
         ${CMAKE_CURRENT_LIST_DIR}/SitRepEntry.h
         ${CMAKE_CURRENT_LIST_DIR}/StringTable.h
         ${CMAKE_CURRENT_LIST_DIR}/VarText.h
@@ -37,21 +33,13 @@ target_sources(freeorioncommon
         ${CMAKE_CURRENT_LIST_DIR}/Logger.cpp
         ${CMAKE_CURRENT_LIST_DIR}/LoggerWithOptionsDB.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ModeratorAction.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/MultiplayerCommon.cpp
         ${CMAKE_CURRENT_LIST_DIR}/OptionsDB.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Order.cpp
         ${CMAKE_CURRENT_LIST_DIR}/OrderSet.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Process.cpp
         ${CMAKE_CURRENT_LIST_DIR}/PythonCommon.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Random.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/SaveGamePreviewUtils.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ScopedTimer.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/SerializeCombat.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/SerializeEmpire.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/SerializeModeratorAction.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/SerializeMultiplayerCommon.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/SerializeOrderSet.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/SerializeUniverse.cpp
         ${CMAKE_CURRENT_LIST_DIR}/SitRepEntry.cpp
         ${CMAKE_CURRENT_LIST_DIR}/StringTable.cpp
         ${CMAKE_CURRENT_LIST_DIR}/VarText.cpp

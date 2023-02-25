@@ -15,8 +15,6 @@ ParserAppFixture::ParserAppFixture() {
     BOOST_REQUIRE(m_scripting_dir.is_absolute());
     BOOST_REQUIRE(fs::exists(m_scripting_dir));
     BOOST_REQUIRE(fs::is_directory(m_scripting_dir));
-
-    GetOptionsDB().Set<std::string>("resource.path", PathToString(GetBinDir() / "default"));
 }
 
 int ParserAppFixture::EmpireID() const
@@ -27,15 +25,6 @@ int ParserAppFixture::CurrentTurn() const
 
 Universe& ParserAppFixture::GetUniverse() noexcept
 { return m_universe; }
-
-const GalaxySetupData& ParserAppFixture::GetGalaxySetupData() const
-{ return m_galaxy_setup_data; }
-
-Networking::ClientType ParserAppFixture::GetEmpireClientType(int empire_id) const
-{ return Networking::ClientType::INVALID_CLIENT_TYPE; }
-
-Networking::ClientType ParserAppFixture::GetPlayerClientType(int player_id) const
-{ return Networking::ClientType::INVALID_CLIENT_TYPE; }
 
 std::string ParserAppFixture::GetVisibleObjectName(const UniverseObject& object)
 { return object.Name(); }

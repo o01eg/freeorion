@@ -3,7 +3,6 @@
 
 #include "Export.h"
 #include "../universe/Universe.h"
-#include "../network/Networking.h"
 
 class EmpireManager;
 class Empire;
@@ -22,7 +21,6 @@ class Fleet;
 class Building;
 class Field;
 class PythonParser;
-struct GalaxySetupData;
 
 class FO_COMMON_API IApp {
 protected:
@@ -92,15 +90,6 @@ public:
 
     [[nodiscard]] static int MAX_AI_PLAYERS(); ///<Maximum number of AIs
 
-    /** Returns the galaxy setup data used for the current game */
-    [[nodiscard]] virtual const GalaxySetupData& GetGalaxySetupData() const = 0;
-
-    /** Returns the networking client type for the given empire_id. */
-    [[nodiscard]] virtual Networking::ClientType GetEmpireClientType(int empire_id) const = 0;
-
-    /** Returns the networking client type for the given player_id. */
-    [[nodiscard]] virtual Networking::ClientType GetPlayerClientType(int player_id) const = 0;
-
     [[nodiscard]] virtual int EffectsProcessingThreads() const = 0;
 
 protected:
@@ -160,16 +149,6 @@ protected:
   * during galaxy setup, or is INVALID_GAME_TURN at other times */
 [[nodiscard]] inline int CurrentTurn()
 { return IApp::GetApp()->CurrentTurn(); }
-
-/** Returns the galaxy setup settings used in the current game. */
-[[nodiscard]] inline const GalaxySetupData& GetGalaxySetupData()
-{ return IApp::GetApp()->GetGalaxySetupData(); }
-
-[[nodiscard]] inline Networking::ClientType GetEmpireClientType(int empire_id)
-{ return IApp::GetApp()->GetEmpireClientType(empire_id); }
-
-[[nodiscard]] inline Networking::ClientType GetPlayerClientType(int player_id)
-{ return IApp::GetApp()->GetPlayerClientType(player_id); }
 
 [[nodiscard]] inline int EffectsProcessingThreads()
 { return IApp::GetApp()->EffectsProcessingThreads(); }

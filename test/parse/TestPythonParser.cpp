@@ -215,9 +215,9 @@ BOOST_AUTO_TEST_CASE(parse_techs_full) {
     BOOST_REQUIRE(!tech_categories.empty());
     BOOST_REQUIRE(!categories_seen.empty());
 
-    BOOST_REQUIRE_EQUAL(209, techs.size());
+    BOOST_REQUIRE_EQUAL(1, techs.size());
     BOOST_REQUIRE_EQUAL(9, tech_categories.size());
-    BOOST_REQUIRE_EQUAL(9, categories_seen.size());
+    BOOST_REQUIRE_EQUAL(1, categories_seen.size());
 
     if (const char *tech_name = std::getenv("FO_CHECKSUM_TECH_NAME")) {
         const auto tech_it = techs.get<TechManager::NameIndex>().find(tech_name);

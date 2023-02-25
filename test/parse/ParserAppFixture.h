@@ -6,7 +6,6 @@
 #include "universe/Species.h"
 #include "universe/Universe.h"
 #include "util/AppInterface.h"
-#include "util/MultiplayerCommon.h"
 #include "util/PythonCommon.h"
 
 #include <boost/filesystem.hpp>
@@ -28,12 +27,6 @@ public:
 
     Universe& GetUniverse() noexcept override;
 
-    const GalaxySetupData& GetGalaxySetupData() const override;
-
-    Networking::ClientType GetEmpireClientType(int empire_id) const override;
-
-    Networking::ClientType GetPlayerClientType(int player_id) const override;
-
     std::string GetVisibleObjectName(const UniverseObject& object) override;
 
     EmpireManager& Empires() override;
@@ -54,7 +47,6 @@ protected:
 
     // Gamestate...
     Universe                    m_universe;
-    GalaxySetupData             m_galaxy_setup_data;
     EmpireManager               m_empires;
     SpeciesManager              m_species_manager;
     SupplyManager               m_supply_manager;

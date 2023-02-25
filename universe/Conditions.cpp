@@ -1258,8 +1258,6 @@ namespace {
             case EmpireAffiliationType::AFFIL_HUMAN: {
                 if (candidate->Unowned())
                     return false;
-                if (GetEmpireClientType(candidate->Owner()) == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER)
-                    return true;
                 return false;
                 break;
             }

@@ -1,9 +1,8 @@
 #include "Meter.h"
 
-#include "../util/Serialize.h"
-
 #include <algorithm>
 #include <array>
+#include <limits>
 
 #if __has_include(<charconv>)
 #include <charconv>
@@ -144,32 +143,3 @@ size_t Meter::SetFromChars(std::string_view chars) {
 #endif
 }
 
-template <>
-void Meter::serialize(boost::archive::xml_iarchive& ar, const unsigned int version)
-{
-    using namespace boost::serialization;
-    using Archive_t = typename std::remove_reference_t<decltype(ar)>;
-    static_assert(Archive_t::is_loading::value);
-    if (version < 2) {
-        float c = 0.0f, i = 0.0f;
-        ar  & make_nvp("c", c)
-            & make_nvp("i", i);
-        cur = FromFloat(c);
-        init = FromFloat(i);
-
-    } else {
-        std::string buffer;
-        ar >> make_nvp("m", buffer);
-        SetFromChars(buffer);
-    }
-}
-
-template <>
-void Meter::serialize(boost::archive::xml_oarchive& ar, const unsigned int version)
-{
-    using namespace boost::serialization;
-    using Archive_t = typename std::remove_reference_t<decltype(ar)>;
-    static_assert(Archive_t::is_saving::value);
-    std::string s{ToChars().data()};
-    ar << make_nvp("m", s);
-}

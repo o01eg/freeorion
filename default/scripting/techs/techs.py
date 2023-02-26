@@ -1,7 +1,3 @@
-# In typical usage this is used as a plain macro, not a substitution macro; the substitution is instead done within the calling macro
-def EMPIRE_OWNED_SHIP_WITH_PART(part_name: str):
-    return Ship & OwnedBy(empire=Source.Owner) & DesignHasPart(name=part_name)
-
 
 # For inclusion in a scope macro for an upgrade increase to a Max type meter (MaxCapacity or MaxSecondaryStat), and that scope
 # should have already limited scope to ships owned by an empire
@@ -12,7 +8,6 @@ def EMPIRE_OWNED_SHIP_WITH_PART(part_name: str):
 # or
 # SHIP_PART_UPGRADE_RESUPPLY_CHECK(CurrentContent)
 def SHIP_PART_UPGRADE_RESUPPLY_CHECK(tech_name: str):
-    return LocalCandidate.LastTurnResupplied >= TurnTechResearched(empire=LocalCandidate.Owner, name=tech_name)
+    return None
 
 
-ARBITRARY_BIG_NUMBER_FOR_METER_TOPUP = 1000000

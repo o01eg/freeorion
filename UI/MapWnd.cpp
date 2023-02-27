@@ -2883,24 +2883,19 @@ void MapWnd::InitTurn(ScriptingContext& context) {
     // connect system fleet add and remove signals
     for (auto system : objects.allRaw<System>()) {
         m_system_fleet_insert_remove_signals[system->ID()].emplace_back(system->FleetsInsertedSignal.connect(
-            [this](const std::vector<const Fleet*>& fleets) {
+            [this](std::vector<int>&& fleet_ids, const ObjectMap& objects) {
                 RefreshFleetButtons(true);
-                for (auto fleet : fleets) {
-                    if (!m_fleet_state_change_signals.count(fleet->ID()))
-                        m_fleet_state_change_signals[fleet->ID()] = fleet->StateChangedSignal.connect(
-                            boost::bind(&MapWnd::RefreshFleetButtons, this, true));
+                for (const auto* fleet : objects.findRaw<Fleet>(std::move(fleet_ids))) {
+                    m_fleet_state_change_signals.try_emplace(
+                        fleet->ID(),
+                        fleet->StateChangedSignal.connect(boost::bind(&MapWnd::RefreshFleetButtons, this, true)));
                 }
             }));
         m_system_fleet_insert_remove_signals[system->ID()].emplace_back(system->FleetsRemovedSignal.connect(
-            [this](const std::vector<const Fleet*>& fleets) {
+            [this](std::vector<int>&& fleets) {
                 RefreshFleetButtons(true);
-                for (auto fleet : fleets) {
-                    auto found_signal = m_fleet_state_change_signals.find(fleet->ID());
-                    if (found_signal != m_fleet_state_change_signals.end()) {
-                        found_signal->second.disconnect();
-                        m_fleet_state_change_signals.erase(found_signal);
-                    }
-                }
+                for (const auto fleet_id : fleets)
+                    m_fleet_state_change_signals.erase(fleet_id);
             }));
     }
 
@@ -4537,7 +4532,7 @@ void MapWnd::SelectSystem(int system_id) {
     if (SidePanel::SystemID() != system_id) {
         // remove map selection indicator from previously selected system
         if (SidePanel::SystemID() != INVALID_OBJECT_ID) {
-            const auto& it = m_system_icons.find(SidePanel::SystemID());
+            const auto it = m_system_icons.find(SidePanel::SystemID());
             if (it != m_system_icons.end())
                 it->second->SetSelected(false);
         }
@@ -4550,7 +4545,7 @@ void MapWnd::SelectSystem(int system_id) {
 
         // place map selection indicator on newly selected system
         if (SidePanel::SystemID() != INVALID_OBJECT_ID) {
-            const auto& it = m_system_icons.find(SidePanel::SystemID());
+            const auto it = m_system_icons.find(SidePanel::SystemID());
             if (it != m_system_icons.end())
                 it->second->SetSelected(true);
         }
@@ -4942,12 +4937,12 @@ void MapWnd::DoFleetButtonsLayout() {
             std::shared_ptr<const Fleet> fleet;
 
             // skip button if it has no fleets (somehow...?) or if the first fleet in the button is 0
-            if (fb->Fleets().empty() || !(fleet = objects.get<Fleet>(*fb->Fleets().begin()))) {
+            if (fb->Fleets().empty() || !(fleet = objects.get<Fleet>(fb->Fleets().front()))) {
                 ErrorLogger() << "DoFleetButtonsLayout couldn't get first fleet for button";
                 continue;
             }
 
-            auto button_pos = MovingFleetMapPositionOnLane(fleet);
+            const auto button_pos = MovingFleetMapPositionOnLane(fleet);
             if (!button_pos)
                 continue;
 
@@ -4966,7 +4961,7 @@ void MapWnd::DoFleetButtonsLayout() {
             std::shared_ptr<const Fleet> fleet;
 
             // skip button if it has no fleets (somehow...?) or if the first fleet in the button is 0
-            if (fb->Fleets().empty() || !(fleet = objects.get<Fleet>(*fb->Fleets().begin()))) {
+            if (fb->Fleets().empty() || !(fleet = objects.get<Fleet>(fb->Fleets().front()))) {
                 ErrorLogger() << "DoFleetButtonsLayout couldn't get first fleet for button";
                 continue;
             }
@@ -5685,21 +5680,20 @@ void MapWnd::PlotFleetMovement(int system_id, bool execute_move, bool append) {
 std::vector<int> MapWnd::FleetIDsOfFleetButtonsOverlapping(int fleet_id) const {
     std::vector<int> fleet_ids;
 
-    auto fleet = Objects().get<Fleet>(fleet_id);
+    const auto fleet = Objects().get<Fleet>(fleet_id);
     if (!fleet) {
         ErrorLogger() << "MapWnd::FleetIDsOfFleetButtonsOverlapping: Fleet id "
                       << fleet_id << " does not exist.";
         return fleet_ids;
     }
 
-    const auto& it = m_fleet_buttons.find(fleet_id);
+    const auto it = m_fleet_buttons.find(fleet_id);
     if (it == m_fleet_buttons.end()) {
         // Log that a FleetButton could not be found for the requested fleet, and include when the fleet was last seen
-        int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-        auto vis_turn_map = GetUniverse().GetObjectVisibilityTurnMapByEmpire(fleet_id, empire_id);
-        int vis_turn = -1;
-        if (vis_turn_map.find(Visibility::VIS_BASIC_VISIBILITY) != vis_turn_map.end())
-            vis_turn = vis_turn_map[Visibility::VIS_BASIC_VISIBILITY];
+        const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+        const auto& vis_turn_map = GetUniverse().GetObjectVisibilityTurnMapByEmpire(fleet_id, empire_id);
+        const auto vis_it = vis_turn_map.find(Visibility::VIS_BASIC_VISIBILITY);
+        const int vis_turn = (vis_it != vis_turn_map.end()) ? vis_it->second : -1;
         ErrorLogger() << "Couldn't find a FleetButton for fleet " << fleet_id
                       << " with last basic vis turn " << vis_turn;
         return fleet_ids;
@@ -7611,7 +7605,7 @@ namespace {
             WarnLogger() << "Invalid fleet or system";
             return {};
         }
-        if ((fleet->Fuel(objects) < 1.0f) || !fleet->MovePath().empty()) {
+        if ((fleet->Fuel(objects) < 1.0f) || !fleet->MovePath(false, context).empty()) {
             WarnLogger() << "Fleet has no fuel or non-empty move path";
             return {};
         }

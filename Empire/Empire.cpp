@@ -434,11 +434,14 @@ bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name, int current_tur
     const Policy* policy_to_adopt = GetPolicy(name);
     if (!policy_to_adopt)
         return false;
+    const auto& to_adopt_exclusions = policy_to_adopt->Exclusions();
 
     // is there an exclusion conflict?
     for (auto& [already_adopted_policy_name, ignored] : m_adopted_policies) {
         (void)ignored; // quiet warning
-        if (policy_to_adopt->Exclusions().count(already_adopted_policy_name)) {
+        if (std::any_of(to_adopt_exclusions.begin(), to_adopt_exclusions.end(),
+                        [a{already_adopted_policy_name}](auto& x) { return x == a; }))
+        {
             // policy to be adopted has an exclusion with an already-adopted policy
             return false;
         }
@@ -448,9 +451,11 @@ bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name, int current_tur
             ErrorLogger() << "Couldn't get already adopted policy: " << already_adopted_policy_name;
             continue;
         }
-        const auto& excl = already_adopted_policy->Exclusions();
-        if (std::any_of(excl.begin(), excl.end(), [name](const auto& x) { return name == x; })) {
-            // already adopted policy has an exclusion with the policy to be adopted
+        const auto& adopted_exclusions = already_adopted_policy->Exclusions();
+        if (std::any_of(adopted_exclusions.begin(), adopted_exclusions.end(),
+                        [name](const auto& x) { return name == x; }))
+        {
+            // already-adopted policy has an exclusion with the policy to be adopted
             return false;
         }
     }
@@ -2133,7 +2138,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
         const int location_id = INVALID_OBJECT_ID;
         const BuildType build_type = BuildType::INVALID_BUILD_TYPE;
         const int design_id = INVALID_DESIGN_ID;
-        const std::string_view name;
+        const std::string_view name = "";
         const float cost = 0.0f;
         const int time = 0;
     };
@@ -2343,7 +2348,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                                                          m_id, context.current_turn);
             planet->AddBuilding(building->ID());
             building->SetPlanetID(planet->ID());
-            system->Insert(building, System::NO_ORBIT, context.current_turn);
+            system->Insert(building, System::NO_ORBIT, context.current_turn, context.ContextObjects());
 
             // record building production in empire stats
             m_building_types_produced[elem.item.name]++;
@@ -2392,7 +2397,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                 ship = universe.InsertNew<Ship>(
                     m_id, elem.item.design_id, species_name, universe,
                     context.species, m_id, context.current_turn);
-                system->Insert(ship, System::NO_ORBIT, context.current_turn);
+                system->Insert(ship, System::NO_ORBIT, context.current_turn, context.ContextObjects());
 
                 // record ship production in empire stats
                 if (m_ship_designs_produced.count(elem.item.design_id))
@@ -2497,10 +2502,11 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
 
                 // create a single fleet for combat ships and individual
                 // fleets for non-combat ships
-                bool individual_fleets = !(   (*ships.begin())->IsArmed(context)
-                                           || (*ships.begin())->HasFighters(universe)
-                                           || (*ships.begin())->CanHaveTroops(universe)
-                                           || (*ships.begin())->CanBombard(universe));
+                const auto* first_ship = ships.front();
+                const bool individual_fleets = !(first_ship->IsArmed(context)
+                                              || first_ship->HasFighters(universe)
+                                              || first_ship->CanHaveTroops(universe)
+                                              || first_ship->CanBombard(universe));
 
                 std::vector<Fleet*> fleets;
                 std::shared_ptr<Fleet> fleet;
@@ -2509,7 +2515,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                     fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(), m_id,
                                                       context.current_turn);
 
-                    system->Insert(fleet, System::NO_ORBIT, context.current_turn);
+                    system->Insert(fleet, System::NO_ORBIT, context.current_turn, context.ContextObjects());
                     // set prev system to prevent conflicts with CalculateRouteTo used for
                     // rally points below, but leave next system as INVALID_OBJECT_ID so
                     // fleet won't necessarily be disqualified from making blockades if it
@@ -2526,7 +2532,7 @@ void Empire::CheckProductionProgress(ScriptingContext& context) {
                         fleet = universe.InsertNew<Fleet>("", system->X(), system->Y(),
                                                           m_id, context.current_turn);
 
-                        system->Insert(fleet, System::NO_ORBIT, context.current_turn);
+                        system->Insert(fleet, System::NO_ORBIT, context.current_turn, context.ContextObjects());
                         // set prev system to prevent conflicts with CalculateRouteTo used for
                         // rally points below, but leave next system as INVALID_OBJECT_ID so
                         // fleet won't necessarily be disqualified from making blockades if it

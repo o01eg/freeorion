@@ -143,11 +143,11 @@ namespace Condition {
 
     // concatenate (non-duplicated) single-description results
     std::string retval;
-    if (conditions.size() > 1 || dynamic_cast<const And*>(*conditions.begin())) {
+    if (conditions.size() > 1 || dynamic_cast<const And*>(conditions.front())) {
         retval += UserString("ALL_OF") + " ";
         retval += (all_conditions_match_candidate ? UserString("PASSED") : UserString("FAILED")) + "\n";
 
-    } else if (dynamic_cast<const Or*>(*conditions.begin())) {
+    } else if (dynamic_cast<const Or*>(conditions.front())) {
         retval += UserString("ANY_OF") + " ";
         retval += (at_least_one_condition_matches_candidate ? UserString("PASSED") : UserString("FAILED")) + "\n";
     }
@@ -2775,12 +2775,11 @@ HasTag::HasTag(std::string name) :
 {}
 
 HasTag::HasTag(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
+    Condition(!name || name->RootCandidateInvariant(),
+              !name || name->TargetInvariant(),
+              !name || name->SourceInvariant()),
     m_name(std::move(name))
-{
-    m_root_candidate_invariant = !m_name || m_name->RootCandidateInvariant();
-    m_target_invariant = !m_name || m_name->TargetInvariant();
-    m_source_invariant = !m_name || m_name->SourceInvariant();
-}
+{}
 
 bool HasTag::operator==(const Condition& rhs) const {
     if (this == &rhs)
@@ -2901,14 +2900,15 @@ std::unique_ptr<Condition> HasTag::Clone() const
 ///////////////////////////////////////////////////////////
 CreatedOnTurn::CreatedOnTurn(std::unique_ptr<ValueRef::ValueRef<int>>&& low,
                              std::unique_ptr<ValueRef::ValueRef<int>>&& high) :
+    Condition((!low || low->RootCandidateInvariant()) &&
+              (!high || high->RootCandidateInvariant()),
+              (!low || low->TargetInvariant()) &&
+              (!high || high->TargetInvariant()),
+              (!low || low->SourceInvariant()) &&
+              (!high || high->SourceInvariant())),
     m_low(std::move(low)),
     m_high(std::move(high))
-{
-    std::array<const ValueRef::ValueRefBase*, 2> operands = {{m_low.get(), m_high.get()}};
-    m_root_candidate_invariant = std::all_of(operands.begin(), operands.end(), [](auto& e){ return !e || e->RootCandidateInvariant(); });
-    m_target_invariant = std::all_of(operands.begin(), operands.end(), [](auto& e){ return !e || e->TargetInvariant(); });
-    m_source_invariant = std::all_of(operands.begin(), operands.end(), [](auto& e){ return !e || e->SourceInvariant(); });
-}
+{}
 
 bool CreatedOnTurn::operator==(const Condition& rhs) const {
     if (this == &rhs)
@@ -3027,12 +3027,11 @@ std::unique_ptr<Condition> CreatedOnTurn::Clone() const {
 // Contains                                              //
 ///////////////////////////////////////////////////////////
 Contains::Contains(std::unique_ptr<Condition>&& condition) :
+    Condition(condition->RootCandidateInvariant(),
+              condition->TargetInvariant(),
+              condition->SourceInvariant()),
     m_condition(std::move(condition))
-{
-    m_root_candidate_invariant = m_condition->RootCandidateInvariant();
-    m_target_invariant = m_condition->TargetInvariant();
-    m_source_invariant = m_condition->SourceInvariant();
-}
+{}
 
 bool Contains::operator==(const Condition& rhs) const {
     if (this == &rhs)
@@ -3212,12 +3211,11 @@ std::unique_ptr<Condition> Contains::Clone() const
 // ContainedBy                                           //
 ///////////////////////////////////////////////////////////
 ContainedBy::ContainedBy(std::unique_ptr<Condition>&& condition) :
+    Condition(condition->RootCandidateInvariant(),
+              condition->TargetInvariant(),
+              condition->SourceInvariant()),
     m_condition(std::move(condition))
-{
-    m_root_candidate_invariant = m_condition->RootCandidateInvariant();
-    m_target_invariant = m_condition->TargetInvariant();
-    m_source_invariant = m_condition->SourceInvariant();
-}
+{}
 
 bool ContainedBy::operator==(const Condition& rhs) const {
     if (this == &rhs)
@@ -3326,7 +3324,7 @@ void ContainedBy::Eval(const ScriptingContext& parent_context,
     } else if (search_domain_size == 1) {
         // evaluate subcondition on objects that contain the candidate
         const ScriptingContext local_context{
-            parent_context, search_domain == SearchDomain::MATCHES ? *matches.begin() : *non_matches.begin()};
+            parent_context, search_domain == SearchDomain::MATCHES ? matches.front() : non_matches.front()};
 
         // initialize subcondition candidates from local candidate's containers
         std::set<int> container_object_ids;
@@ -4308,7 +4306,7 @@ namespace {
         }
 
         const std::vector< ::PlanetEnvironment>& m_environments;
-        const std::string_view                   m_species;
+        const std::string_view                   m_species = "";
         const ScriptingContext&                  m_context;
     };
 }
@@ -9659,7 +9657,7 @@ bool CanColonize::Match(const ScriptingContext& local_context) const {
     }
 
     // is it a ship, a planet, or a building on a planet?
-    std::string_view species_name;
+    std::string_view species_name = "";
     if (candidate->ObjectType() == UniverseObjectType::OBJ_PLANET) {
         auto planet = static_cast<const Planet*>(candidate);
         species_name = planet->SpeciesName();
@@ -9723,7 +9721,7 @@ bool CanProduceShips::Match(const ScriptingContext& local_context) const {
     }
 
     // is it a ship, a planet, or a building on a planet?
-    std::string_view species_name;
+    std::string_view species_name = "";
     if (candidate->ObjectType() == UniverseObjectType::OBJ_PLANET) {
         auto planet = static_cast<const Planet*>(candidate);
         species_name = planet->SpeciesName();

@@ -74,7 +74,7 @@ namespace {
             return std::make_unique<Condition::None>();
 
         if (object_types.size() == 1)
-            return std::make_unique<Condition::Type>(*object_types.begin());
+            return std::make_unique<Condition::Type>(object_types.front());
 
         std::vector<std::unique_ptr<Condition::Condition>> subconditions;
         for (auto obj_type : object_types)
@@ -374,7 +374,7 @@ namespace {
 
     enum class VIS_DISPLAY : uint8_t { SHOW_VISIBLE, SHOW_PREVIOUSLY_VISIBLE, SHOW_DESTROYED };
 
-    constexpr std::string_view EMPTY_STRING;
+    constexpr std::string_view EMPTY_STRING = "";
     constexpr std::string_view ALL_CONDITION(UserStringNop("CONDITION_ALL"));
     constexpr std::string_view EMPIREAFFILIATION_CONDITION(UserStringNop("CONDITION_EMPIREAFFILIATION"));
     constexpr std::string_view HOMEWORLD_CONDITION(UserStringNop("CONDITION_HOMEWORLD"));

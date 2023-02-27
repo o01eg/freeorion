@@ -325,7 +325,6 @@ namespace {
 ProductionQueue::ProductionItem::ProductionItem(BuildType build_type_, int design_id_,
                                                 const Universe& universe) :
     build_type(build_type_),
-    design_id(design_id_),
     name([bt{build_type_}, id{design_id_}](const Universe& u) -> std::string {
             if (bt == BuildType::BT_SHIP) {
                 try {
@@ -334,7 +333,8 @@ ProductionQueue::ProductionItem::ProductionItem(BuildType build_type_, int desig
                 } catch (...) {}
             }
             return std::string{};
-         }(universe))
+         }(universe)),
+    design_id(design_id_)
 {}
 
 bool ProductionQueue::ProductionItem::CostIsProductionLocationInvariant(const Universe& universe) const {
@@ -719,7 +719,7 @@ void ProductionQueue::Update(const ScriptingContext& context) {
         auto key = std::pair{elem.item, location_id};
 
         if (!queue_item_costs_and_times.count(key))
-            queue_item_costs_and_times[key] = elem.ProductionCostAndTime();
+            queue_item_costs_and_times[key] = elem.ProductionCostAndTime(context);
 
         elem.turns_left_to_next_item = -1;
         elem.turns_left_to_completion = -1;

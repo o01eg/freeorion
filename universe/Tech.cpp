@@ -125,7 +125,7 @@ Tech::Tech(std::string&& name, std::string&& description,
            std::set<std::string>&& prerequisites,
            std::vector<UnlockableItem>&& unlocked_items,
            std::string&& graphic) :
-    m_name(std::move(name)),
+    m_name(name), // not a move so it can be used later in member intializer list
     m_description(std::move(description)),
     m_short_description(std::move(short_description)),
     m_category(std::move(category)),
@@ -181,8 +181,17 @@ Tech::Tech(std::string&& name, std::string&& description,
         });
         return retval;
     }()),
-    m_effects(std::move(effects)),
-    m_prerequisites(std::move(prerequisites)),
+    m_effects([](auto& effects_p, const auto& name) {
+
+        std::vector<Effect::EffectsGroup> retval;
+        retval.reserve(effects_p.size());
+        for (auto& e : effects_p) {
+            e->SetTopLevelContent(name);
+            retval.push_back(std::move(*e));
+        }
+        return retval;
+    }(effects, name)),
+    m_prerequisites{prerequisites.begin(), prerequisites.end()},
     m_unlocked_items(std::move(unlocked_items)),
     m_graphic(std::move(graphic))
 {
@@ -194,9 +203,6 @@ void Tech::Init() {
         m_research_cost->SetTopLevelContent(m_name);
     if (m_research_turns)
         m_research_turns->SetTopLevelContent(m_name);
-
-    for (auto& effect : m_effects)
-        effect->SetTopLevelContent(m_name);
 }
 
 bool Tech::operator==(const Tech& rhs) const {
@@ -219,39 +225,19 @@ bool Tech::operator==(const Tech& rhs) const {
         // check next member
     } else if (!m_research_cost || !rhs.m_research_cost) {
         return false;
-    } else {
-        if (*m_research_cost != *(rhs.m_research_cost))
-            return false;
+    } else if (*m_research_cost != *(rhs.m_research_cost)) {
+        return false;
     }
 
     if (m_research_turns == rhs.m_research_turns) { // could be nullptr
         // check next member
     } else if (!m_research_turns || !rhs.m_research_turns) {
         return false;
-    } else {
-        if (*m_research_turns != *(rhs.m_research_turns))
-            return false;
-    }
-
-    if (m_effects.size() != rhs.m_effects.size())
-        return false;
-    try {
-        for (std::size_t idx = 0; idx < m_effects.size(); ++idx) {
-            const auto& my_op = m_effects.at(idx);
-            const auto& rhs_op = rhs.m_effects.at(idx);
-
-            if (my_op == rhs_op)
-                continue;
-            if (!my_op || !rhs_op)
-                return false;
-            if (*my_op != *rhs_op)
-                return false;
-        }
-    } catch (...) {
+    } else if (*m_research_turns != *(rhs.m_research_turns)) {
         return false;
     }
 
-    return true;
+    return m_effects == rhs.m_effects;
 }
 
 std::string Tech::Dump(uint8_t ntabs) const {
@@ -268,7 +254,7 @@ std::string Tech::Dump(uint8_t ntabs) const {
             retval.append("[ \"").append(m_tags.front()).append("\" ]\n");
         } else {
             retval += "[\n";
-            for (auto tag : m_tags)
+            for (const auto& tag : m_tags)
                 retval.append(DumpIndent(ntabs+2)).append("\"").append(tag).append("\"\n");
             retval += DumpIndent(ntabs+1) + "]\n";
         }
@@ -298,11 +284,11 @@ std::string Tech::Dump(uint8_t ntabs) const {
     if (!m_effects.empty()) {
         if (m_effects.size() == 1) {
             retval += DumpIndent(ntabs+1) + "effectsgroups =\n";
-            retval += m_effects[0]->Dump(ntabs+2);
+            retval += m_effects.front().Dump(ntabs+2);
         } else {
             retval += DumpIndent(ntabs+1) + "effectsgroups = [\n";
             for (auto& effect : m_effects)
-                retval += effect->Dump(ntabs+2);
+                retval += effect.Dump(ntabs+2);
             retval += DumpIndent(ntabs+1) + "]\n";
         }
     }
@@ -392,9 +378,6 @@ uint32_t Tech::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // TechManager                                           //
 ///////////////////////////////////////////////////////////
-// static(s)
-TechManager* TechManager::s_instance = nullptr;
-
 const Tech* TechManager::GetTech(std::string_view name) const {
     CheckPendingTechs();
     iterator it = m_techs.get<NameIndex>().find(name, std::less<>());
@@ -470,8 +453,10 @@ const Tech* TechManager::CheapestNextTechTowards(const std::set<std::string>& kn
                                                  int empire_id, const ScriptingContext& context)
 { return Cheapest(NextTechsTowards(known_techs, desired_tech, empire_id), empire_id, context); }
 
-size_t TechManager::size() const
-{ return m_techs.size(); }
+size_t TechManager::size() const {
+    CheckPendingTechs();
+    return m_techs.size();
+}
 
 TechManager::iterator TechManager::begin() const {
     CheckPendingTechs();
@@ -491,14 +476,6 @@ TechManager::category_iterator TechManager::category_begin(const std::string& na
 TechManager::category_iterator TechManager::category_end(const std::string& name) const {
     CheckPendingTechs();
     return m_techs.get<CategoryIndex>().upper_bound(name);
-}
-
-TechManager::TechManager() {
-    if (s_instance)
-        throw std::runtime_error("Attempted to create more than one TechManager.");
-
-    // Only update the global pointer on sucessful construction.
-    s_instance = this;
 }
 
 void TechManager::SetTechs(Pending::Pending<TechManager::TechParseTuple>&& future)
@@ -562,13 +539,20 @@ void TechManager::CheckPendingTechs() const {
 
     // fill in the unlocked techs data for each loaded tech
     for (const auto& tech : m_techs) {
-        for (const std::string& prereq : tech->Prerequisites()) {
-            if (Tech* prereq_tech = const_cast<Tech*>(GetTech(prereq)))
-                prereq_tech->m_unlocked_techs.insert(tech->Name());
+        for (const auto& prereq : tech->Prerequisites()) {
+            if (Tech* prereq_tech = const_cast<Tech*>(this->GetTech(prereq)))
+                prereq_tech->m_unlocked_techs.push_back(tech->Name());
         }
     }
+    // sort and remove duplicates
+    for (const auto& tech : m_techs) {
+         auto& unlocks = tech->m_unlocked_techs;
+         std::sort(unlocks.begin(), unlocks.end());
+         auto unique_it = std::unique(unlocks.begin(), unlocks.end());
+         unlocks.erase(unique_it, unlocks.end());
+    }
 
-    std::string redundant_dependency = FindRedundantDependency();
+    const std::string redundant_dependency = FindRedundantDependency();
     if (!redundant_dependency.empty())
         ErrorLogger() << redundant_dependency;
 
@@ -621,37 +605,35 @@ std::string TechManager::FindFirstDependencyCycle() const {
             // of its prerequisite techs have already been checked, pop it off the stack and mark it as
             // checked; otherwise, push all its unchecked prerequisites onto the stack.
             const Tech* current_tech = stack.back();
-            unsigned int starting_stack_size = stack.size();
+            auto starting_stack_size = stack.size();
 
-            const std::set<std::string>& prereqs = (current_tech ? current_tech->Prerequisites() : EMPTY_STRING_SET);
-            for (const std::string& prereq_name : prereqs) {
-                const Tech* prereq_tech = GetTech(prereq_name);
-                if (!prereq_tech || checked_techs.count(prereq_tech))
-                    continue;
+            if (current_tech) {
+                for (auto& prereq_name : current_tech->Prerequisites()) {
+                    const Tech* prereq_tech = GetTech(prereq_name);
+                    if (!prereq_tech || checked_techs.count(prereq_tech))
+                        continue;
 
-                // since this is not a checked prereq, see if it is already in the stack somewhere; if so, we have a cycle
-                std::vector<const Tech*>::reverse_iterator stack_duplicate_it =
-                    std::find(stack.rbegin(), stack.rend(), prereq_tech);
-                if (stack_duplicate_it != stack.rend()) {
-                    std::stringstream stream;
-                    std::string current_tech_name = prereq_tech->Name();
-                    stream << "ERROR: Tech dependency cycle found (A <-- B means A is a prerequisite of B): \""
-                            << current_tech_name << "\"";
-                    for (std::vector<const Tech*>::reverse_iterator stack_it = stack.rbegin();
-                            stack_it != stack_duplicate_it;
-                            ++stack_it) {
-                        if ((*stack_it)->Prerequisites().count(current_tech_name)) {
-                            current_tech_name = (*stack_it)->Name();
-                            stream << " <-- \"" << current_tech_name << "\"";
+                    // since this is not a checked prereq, see if it is already in the stack somewhere; if so, we have a cycle
+                    auto stack_duplicate_it = std::find(stack.rbegin(), stack.rend(), prereq_tech);
+                    if (stack_duplicate_it != stack.rend()) {
+                        std::stringstream stream;
+                        std::string current_tech_name = prereq_tech->Name();
+                        stream << "ERROR: Tech dependency cycle found (A <-- B means A is a prerequisite of B): \""
+                                << current_tech_name << "\"";
+                        for (auto stack_it = stack.rbegin(); stack_it != stack_duplicate_it; ++stack_it) {
+                            const auto& prereqs = (*stack_it)->Prerequisites();
+                            if (std::count(prereqs.begin(), prereqs.end(), current_tech_name)) {
+                                current_tech_name = (*stack_it)->Name();
+                                stream << " <-- \"" << current_tech_name << "\"";
+                            }
                         }
+                        stream << " <-- \"" << prereq_tech->Name() << "\" ... ";
+                        return stream.str();
+                    } else {
+                        stack.push_back(prereq_tech);
                     }
-                    stream << " <-- \"" << prereq_tech->Name() << "\" ... ";
-                    return stream.str();
-                } else {
-                    stack.emplace_back(prereq_tech);
                 }
             }
-
             if (starting_stack_size == stack.size()) {
                 stack.pop_back();
                 checked_techs.insert(current_tech);
@@ -671,9 +653,9 @@ std::string TechManager::FindRedundantDependency() const {
             stream << "ERROR: Missing referenced tech for unknown reasons...";
             return stream.str();
         }
-        std::set<std::string> prereqs = tech->Prerequisites();
+        const auto& prereqs = tech->Prerequisites();
         std::map<std::string, std::string> techs_unlocked_by_prereqs;
-        for (const std::string& prereq_name : prereqs) {
+        for (const auto& prereq_name : prereqs) {
             const Tech* prereq_tech = GetTech(prereq_name);
             if (!prereq_tech) {
                 std::stringstream stream;
@@ -682,7 +664,7 @@ std::string TechManager::FindRedundantDependency() const {
             }
             AllChildren(prereq_tech, techs_unlocked_by_prereqs);
         }
-        for (const std::string& prereq_name : prereqs) {
+        for (const auto& prereq_name : prereqs) {
             auto map_it = techs_unlocked_by_prereqs.find(prereq_name);
             if (map_it != techs_unlocked_by_prereqs.end()) {
                 std::stringstream stream;
@@ -708,11 +690,6 @@ void TechManager::AllChildren(const Tech* tech, std::map<std::string, std::strin
         children[unlocked_tech] = tech->Name();
         AllChildren(GetTech(unlocked_tech), children);
     }
-}
-
-TechManager& TechManager::GetTechManager() {
-    static TechManager manager;
-    return manager;
 }
 
 std::vector<std::string> TechManager::RecursivePrereqs(
@@ -780,11 +757,15 @@ uint32_t TechManager::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // Free Functions                                        //
 ///////////////////////////////////////////////////////////
+namespace {
+    TechManager tech_manager;
+}
+
 TechManager& GetTechManager()
-{ return TechManager::GetTechManager(); }
+{ return tech_manager; }
 
 const Tech* GetTech(std::string_view name)
-{ return GetTechManager().GetTech(name); }
+{ return tech_manager.GetTech(name); }
 
 const TechCategory* GetTechCategory(std::string_view name)
-{ return GetTechManager().GetTechCategory(name); }
+{ return tech_manager.GetTechCategory(name); }

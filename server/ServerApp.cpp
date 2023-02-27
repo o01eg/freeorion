@@ -317,9 +317,6 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
 Empire* ServerApp::GetEmpire(int id)
 { return m_empires.GetEmpire(id).get(); }
 
-ObjectMap& ServerApp::EmpireKnownObjects(int empire_id)
-{ return m_universe.EmpireKnownObjects(empire_id); }
-
 std::string ServerApp::GetVisibleObjectName(const UniverseObject& object)
 { return object.Name(); }
 
@@ -2880,10 +2877,10 @@ namespace {
             return false;
         }
 
-        float colonist_capacity = ship->ColonyCapacity(universe);
+        const float colonist_capacity = ship->ColonyCapacity(universe);
 
         if (colonist_capacity > 0.0f &&
-            planet->EnvironmentForSpecies(ScriptingContext{}, species_name) < PlanetEnvironment::PE_HOSTILE)
+            planet->EnvironmentForSpecies(context, species_name) < PlanetEnvironment::PE_HOSTILE)
         {
             ErrorLogger() << "ColonizePlanet nonzero colonist capacity and planet that ship's species can't colonize";
             return false;
@@ -3367,7 +3364,7 @@ namespace {
         auto do_giving = [&gifted_object_ids, &empires, current_turn](auto& recipients_objs) {
             for (auto& [recipient_empire_id, objs] : recipients_objs) {
                 for (auto* gifted_obj : objs) {
-                    const auto initial_owner_empire_id = gifted_obj->Owner();
+                    [[maybe_unused]] const auto initial_owner_empire_id = gifted_obj->Owner();
                     const auto gifted_obj_id = gifted_obj->ID();
                     gifted_object_ids.push_back(gifted_obj_id);
 
@@ -3382,15 +3379,18 @@ namespace {
                         if (auto empire = empires.GetEmpire(recipient_empire_id))
                             empire->AddSitRepEntry(CreatePlanetGiftedSitRep(gifted_obj_id, initial_owner_empire_id,
                                                                             current_turn));
+
                     } else if constexpr (std::is_same_v<ObjsT, Fleet>) {
                         if (auto empire = empires.GetEmpire(recipient_empire_id))
                             empire->AddSitRepEntry(CreateFleetGiftedSitRep(gifted_obj_id, initial_owner_empire_id,
                                                                            current_turn));
+
                     } else if constexpr (std::is_same_v<ObjsT, Ship>) {
                         gifted_obj->SetOrderedScrapped(false);
                         gifted_obj->ClearColonizePlanet();
                         gifted_obj->ClearInvadePlanet();
                         gifted_obj->ClearBombardPlanet();
+
                     } else if constexpr (std::is_same_v<ObjsT, Building>) {
                         gifted_obj->SetOrderedScrapped(false);
                     }

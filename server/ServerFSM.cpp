@@ -361,7 +361,7 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
     int empire_connected_plr_cnt = 0;
     // count of active (non-eliminated) empires, which currently have a unconnected human players
     int empire_unconnected_plr_cnt = 0;
-    for (const auto& empire : Empires()) {
+    for (const auto& empire : m_server.Empires()) {
         if (!empire.second->Eliminated()) {
             switch (m_server.GetEmpireClientType(empire.first)) {
             case Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER:
@@ -466,7 +466,7 @@ void ServerFSM::UpdateIngameLobby() {
             player_setup_data.empire_color = {{255, 255, 255, 255}};
         }
         player_setup_data.authenticated = (*player_it)->IsAuthenticated();
-        dummy_lobby_data.players.push_back({player_id, player_setup_data});
+        dummy_lobby_data.players.emplace_back(player_id, player_setup_data);
     }
     dummy_lobby_data.start_lock_cause = UserStringNop("SERVER_ALREADY_PLAYING_GAME");
 
@@ -1796,9 +1796,9 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 player_setup_data.empire_name =   empire_data_it->second.empire_name;
                 player_setup_data.empire_color =  empire_data_it->second.color;
                 if (m_lobby_data->seed != "")
-                    player_setup_data.starting_species_name = GetSpeciesManager().RandomPlayableSpeciesName();
+                    player_setup_data.starting_species_name = server.GetSpeciesManager().RandomPlayableSpeciesName();
                 else
-                    player_setup_data.starting_species_name = GetSpeciesManager().SequentialPlayableSpeciesName(m_ai_next_index);
+                    player_setup_data.starting_species_name = server.GetSpeciesManager().SequentialPlayableSpeciesName(m_ai_next_index);
                 m_lobby_data->players.push_back({Networking::INVALID_PLAYER_ID, player_setup_data});
             }
 
@@ -1882,7 +1882,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
          player_connection_it != server.m_networking.established_end(); ++player_connection_it)
     {
         const PlayerConnectionPtr& player_connection = *player_connection_it;
-        int player_id = player_connection->PlayerID();
+        const int player_id = player_connection->PlayerID();
         // new save file update needs to be sent to everyone, as does an update
         // after a player is added or dropped.  otherwise, messages can just go
         // to players who didn't send the message that this function is

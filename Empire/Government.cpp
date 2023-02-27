@@ -39,25 +39,29 @@ Policy::Policy(std::string name, std::string description,
                std::vector<std::unique_ptr<Effect::EffectsGroup>>&& effects,
                std::vector<UnlockableItem>&& unlocked_items,
                std::string graphic) :
-    m_name(std::move(name)),
+    m_name(name),
     m_description(std::move(description)),
     m_short_description(std::move(short_description)),
     m_category(std::move(category)),
-    m_adoption_cost(std::move(adoption_cost)),
-    m_prerequisites(std::move(prerequisites)),
-    m_exclusions(std::move(exclusions)),
+    m_adoption_cost([](auto&& c, const std::string& name) {
+        if (c)
+            c->SetTopLevelContent(name);
+        return std::move(c);
+    }(std::move(adoption_cost), name)),
+    m_prerequisites(prerequisites.begin(), prerequisites.end()),
+    m_exclusions(exclusions.begin(), exclusions.end()),
+    m_effects([](auto&& effects, const auto& name) {
+        std::vector<Effect::EffectsGroup> retval;
+        retval.reserve(effects.size());
+        for (auto& e : effects) {
+            e->SetTopLevelContent(name);
+            retval.push_back(std::move(*e));
+        }
+        return retval;
+    }(effects, name)),
     m_unlocked_items(std::move(unlocked_items)),
     m_graphic(std::move(graphic))
-{
-    for (auto&& effect : effects)
-        m_effects.push_back(std::move(effect)); // need to separately move from each input unique_ptr
-
-    if (m_adoption_cost)
-        m_adoption_cost->SetTopLevelContent(m_name);
-
-    for (auto& effect : m_effects)
-        effect->SetTopLevelContent(m_name);
-}
+{}
 
 std::string Policy::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "Policy\n";
@@ -68,7 +72,7 @@ std::string Policy::Dump(uint8_t ntabs) const {
     retval += DumpIndent(ntabs+1) + "adoptioncost = " + m_adoption_cost->Dump(ntabs+1) + "\n";
 
     if (m_prerequisites.size() == 1) {
-        retval += DumpIndent(ntabs+1) + "prerequisites = \"" + *m_prerequisites.begin() + "\"\n";
+        retval += DumpIndent(ntabs+1) + "prerequisites = \"" + m_prerequisites.front() + "\"\n";
     } else if (m_prerequisites.size() > 1) {
         retval += DumpIndent(ntabs+1) + "prerequisites = [\n";
         for (const std::string& prerequisite : m_prerequisites)
@@ -77,7 +81,7 @@ std::string Policy::Dump(uint8_t ntabs) const {
     }
 
     if (m_exclusions.size() == 1) {
-        retval += DumpIndent(ntabs+1) + "exclusions = \"" + *m_exclusions.begin() + "\"\n";
+        retval += DumpIndent(ntabs+1) + "exclusions = \"" + m_exclusions.front() + "\"\n";
     } else if (m_exclusions.size() > 1) {
         retval += DumpIndent(ntabs+1) + "exclusions = [\n";
         for (const std::string& exclusion : m_exclusions)
@@ -89,7 +93,7 @@ std::string Policy::Dump(uint8_t ntabs) const {
     if (m_unlocked_items.empty()) {
         retval += "[]\n";
     } else if (m_unlocked_items.size() == 1) {
-        retval += m_unlocked_items[0].Dump();
+        retval += m_unlocked_items.front().Dump();
     } else {
         retval += "[\n";
         for (const UnlockableItem& unlocked_item : m_unlocked_items)
@@ -100,11 +104,11 @@ std::string Policy::Dump(uint8_t ntabs) const {
     if (!m_effects.empty()) {
         if (m_effects.size() == 1) {
             retval += DumpIndent(ntabs+1) + "effectsgroups =\n";
-            retval += m_effects[0]->Dump(ntabs+2);
+            retval += m_effects.front().Dump(ntabs+2);
         } else {
             retval += DumpIndent(ntabs+1) + "effectsgroups = [\n";
             for (auto& effect : m_effects)
-                retval += effect->Dump(ntabs+2);
+                retval += effect.Dump(ntabs+2);
             retval += DumpIndent(ntabs+1) + "]\n";
         }
     }

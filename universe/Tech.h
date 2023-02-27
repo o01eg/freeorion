@@ -12,13 +12,12 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index_container.hpp>
 #include <boost/optional/optional.hpp>
+#include "Effect.h"
 #include "EnumsFwd.h"
 #include "../util/Export.h"
 #include "../util/Pending.h"
 
 
-namespace Effect
-{ class EffectsGroup; }
 namespace ValueRef {
     template <typename T>
     struct ValueRef;
@@ -65,32 +64,28 @@ public:
     bool operator!=(const Tech& rhs) const
     { return !(*this == rhs); }
 
-    [[nodiscard]] const std::string&  Name() const                { return m_name; }              //!< returns name of this tech
-    [[nodiscard]] const std::string&  Description() const         { return m_description; }       //!< Returns the text description of this tech
-    [[nodiscard]] const std::string&  ShortDescription() const    { return m_short_description; } //!< Returns the single-line short text description of this tech
-    [[nodiscard]] std::string         Dump(uint8_t ntabs = 0) const;                                      //!< Returns a text representation of this object
-    [[nodiscard]] const std::string&  Category() const            { return m_category; }                  //!< retursn the name of the category to which this tech belongs
-    [[nodiscard]] float               ResearchCost(int empire_id, const ScriptingContext& context) const; //!< returns the total research cost in RPs required to research this tech
-    [[nodiscard]] float               PerTurnCost(int empire_id, const ScriptingContext& context) const;  //!< returns the maximum number of RPs per turn allowed to be spent on researching this tech
-    [[nodiscard]] int                 ResearchTime(int empire_id, const ScriptingContext& context) const; //!< returns the number of turns required to research this tech, if ResearchCost() RPs are spent per turn
-    [[nodiscard]] bool                Researchable() const        { return m_researchable; }              //!< returns whether this tech is researchable by players and appears on the tech tree
+    [[nodiscard]] const auto& Name() const noexcept             { return m_name; }
+    [[nodiscard]] const auto& Description() const noexcept      { return m_description; }
+    [[nodiscard]] const auto& ShortDescription() const noexcept { return m_short_description; }
+    [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const;
+    [[nodiscard]] const auto& Category() const noexcept         { return m_category; }
+    [[nodiscard]] float       ResearchCost(int empire_id, const ScriptingContext& context) const;
+    [[nodiscard]] float       PerTurnCost(int empire_id, const ScriptingContext& context) const;
+    [[nodiscard]] int         ResearchTime(int empire_id, const ScriptingContext& context) const;
+    [[nodiscard]] bool        Researchable() const noexcept     { return m_researchable; }
 
-    [[nodiscard]] const auto&         Tags() const noexcept { return m_tags; }
-    [[nodiscard]] const auto&         PediaTags() const noexcept { return m_pedia_tags; }
-    [[nodiscard]] bool                HasTag(std::string_view tag) const
+    [[nodiscard]] const auto& Tags() const noexcept { return m_tags; }
+    [[nodiscard]] const auto& PediaTags() const noexcept { return m_pedia_tags; }
+    [[nodiscard]] bool        HasTag(std::string_view tag) const
     { return std::any_of(m_tags.begin(), m_tags.end(), [tag](const auto& t) { return t == tag; }); }
 
-    /** returns the effects that are applied to the discovering empire's capital
-      * when this tech is researched; not all techs have effects, in which case
-      * this returns 0 */
-    [[nodiscard]] const std::vector<std::shared_ptr<Effect::EffectsGroup>>& Effects() const { return m_effects; }
-
-    [[nodiscard]] const std::set<std::string>&       Prerequisites() const   { return m_prerequisites; }       //!< returns the set of names of all techs required before this one can be researched
-    [[nodiscard]] const std::string&                 Graphic() const         { return m_graphic; }             //!< returns the name of the grapic file for this tech
-    [[nodiscard]] const std::vector<UnlockableItem>& UnlockedItems() const   { return m_unlocked_items; }      //! Returns the set all items that are unlocked by researching this tech
-    [[nodiscard]] const ValueRef::ValueRef<double>*  ResearchCostRef() const { return m_research_cost.get(); } //!< return value ref of research cost
-    [[nodiscard]] const ValueRef::ValueRef<int>*     ResearchTurnsRef() const{ return m_research_turns.get(); }//!< return value ref of research turns
-    [[nodiscard]] const std::set<std::string>&       UnlockedTechs() const   { return m_unlocked_techs; }      //!< returns the set of names of all techs for which this one is a prerequisite
+    [[nodiscard]] const auto& Effects() const noexcept          { return m_effects; }
+    [[nodiscard]] const auto& Prerequisites() const noexcept    { return m_prerequisites; }
+    [[nodiscard]] const auto& Graphic() const noexcept          { return m_graphic; }
+    [[nodiscard]] const auto& UnlockedItems() const noexcept    { return m_unlocked_items; }
+    [[nodiscard]] const auto* ResearchCostRef() const noexcept  { return m_research_cost.get(); }
+    [[nodiscard]] const auto* ResearchTurnsRef() const noexcept { return m_research_turns.get(); }
+    [[nodiscard]] const auto& UnlockedTechs() const noexcept    { return m_unlocked_techs; }
 
     /** Returns a number, calculated from the contained data, which should be
       * different for different contained data, and must be the same for
@@ -111,15 +106,15 @@ private:
     std::string                     m_category;
     std::unique_ptr<ValueRef::ValueRef<double>> m_research_cost;
     std::unique_ptr<ValueRef::ValueRef<int>>    m_research_turns;
-    bool                            m_researchable = false;
+    const bool                          m_researchable = false;
     const std::string                   m_tags_concatenated;
     const std::vector<std::string_view> m_tags;
     const std::vector<std::string_view> m_pedia_tags;
-    std::vector<std::shared_ptr<Effect::EffectsGroup>> m_effects;
-    std::set<std::string>           m_prerequisites;
-    std::vector<UnlockableItem>     m_unlocked_items;
-    std::string                     m_graphic;
-    std::set<std::string>           m_unlocked_techs;
+    std::vector<Effect::EffectsGroup>   m_effects;
+    std::vector<std::string>            m_prerequisites;
+    std::vector<UnlockableItem>         m_unlocked_items;
+    std::string                         m_graphic;
+    std::vector<std::string>            m_unlocked_techs;
 
     friend class TechManager;
 };
@@ -129,14 +124,14 @@ private:
 struct FO_COMMON_API TechCategory {
     TechCategory() = default;
     TechCategory(std::string name_, std::string&& graphic_,
-                 std::array<uint8_t, 4> colour_):
+                 std::array<uint8_t, 4> colour_) noexcept :
         name(std::move(name_)),
         graphic(std::move(graphic_)),
         colour(colour_)
     {}
-    std::string            name;                           ///< name of category
-    std::string            graphic;                        ///< icon that represents catetegory
-    std::array<uint8_t, 4> colour{{255, 255, 255, 255}};   ///< colour associatied with category
+    const std::string            name;                           ///< name of category
+    const std::string            graphic;                        ///< icon that represents catetegory
+    const std::array<uint8_t, 4> colour{{255, 255, 255, 255}};   ///< colour associatied with category
 };
 
 namespace CheckSums {
@@ -213,11 +208,7 @@ public:
         int empire_id, const ScriptingContext& context);
 
     [[nodiscard]] std::size_t              size() const;
-
-    /** iterator to the first tech */
     [[nodiscard]] iterator                 begin() const;
-
-    /** iterator to the last + 1th tech */
     [[nodiscard]] iterator                 end() const;
 
     /** iterator to the first tech in category \a name */
@@ -249,13 +240,7 @@ public:
     /** Sets types to the value of \p future. */
     FO_COMMON_API void SetTechs(Pending::Pending<TechParseTuple>&& future);
 
-
-    /** returns the instance of this singleton class; you should use the free function GetTechManager() instead */
-    [[nodiscard]] static TechManager& GetTechManager();
-
 private:
-    TechManager();
-
     /** Assigns any m_pending_types to m_techs. */
     void CheckPendingTechs() const;
 
@@ -279,8 +264,6 @@ private:
 
     mutable TechCategoryMap m_categories;
     mutable TechContainer   m_techs;
-
-    static TechManager*     s_instance;
 };
 
 /** returns the singleton tech manager */

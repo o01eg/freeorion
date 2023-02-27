@@ -106,32 +106,26 @@ public:
     }
 
     /// Access point \x, \y without any checks
-    T& get(X x, Y y)
+    T& get(X x, Y y) noexcept(noexcept(std::declval<std::vector<T>>()[Value(X{})*Value(X{}) + Value(Y{})]))
     { return m_data[Value(m_capacity_width)*Value(y) + Value(x)]; }
 
     /// Returns the current highest x the user has requested to exist
-    X CurrentWidth() const
-    { return m_current_width; }
+    X CurrentWidth() const noexcept { return m_current_width; }
 
     /// Returns the current highest y the user has requested to exist
-    Y CurrentHeight() const
-    { return m_capacity_height; }
+    Y CurrentHeight() const noexcept { return m_capacity_height; }
 
     /// Returns the actual width of the storage area allocated so far
-    X BufferWidth() const
-    { return m_capacity_width; }
+    X BufferWidth() const noexcept { return m_capacity_width; }
 
     /// Returns the actual height of the storage area allocated so far
-    Y BufferHeight() const
-    { return m_capacity_height; }
+    Y BufferHeight() const noexcept { return m_capacity_height; }
 
     /// Return a pointer to the storage buffer where the data is kept
-    T* Buffer()
-    { return &*m_data.begin(); }
+    T* Buffer() noexcept { return &m_data.front(); }
 
     /// Returns the size of the storage buffer where the data is kept
-    std::size_t BufferSize() const
-    { return m_data.size(); }
+    auto BufferSize() const noexcept { return m_data.size(); }
 
     /// Makes the size of the underlying buffer the smallest power of power of two
     /// rectangle that can accommodate CurrentWidth() and CurrentHeight()
@@ -212,7 +206,8 @@ struct PushSubmatchOntoStackP
 };
 const boost::xpressive::function<PushSubmatchOntoStackP>::type PushP = {{}};
 
-void SetJustification(bool& last_line_of_curr_just, Font::LineData& line_data, Alignment orig_just, Alignment prev_just)
+void SetJustification(bool& last_line_of_curr_just, Font::LineData& line_data,
+                      Alignment orig_just, Alignment prev_just) noexcept
 {
     if (last_line_of_curr_just) {
         line_data.justification = orig_just;
@@ -242,7 +237,8 @@ constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 7> PRINTABLE_ASCII
 namespace {
     // writes 1-3 chars, starting at to_it, and outputs how many were written
     // written chars represent \a n as decimal digits
-    constexpr auto ToChars = [](auto& to_it, uint8_t n) {
+    constexpr auto ToChars = [](auto& to_it, uint8_t n) noexcept
+    {
         uint8_t hundreds = n / 100;
         uint8_t remainder = n % 100;
         uint8_t tens = remainder / 10;
@@ -254,6 +250,9 @@ namespace {
         to_it += (hundreds > 0 || tens > 0);
         (*to_it) = ('0' + ones);
         ++to_it;
+
+        static_assert(noexcept((*std::declval<decltype(to_it)>()) += ('0' + uint8_t(24))));
+        static_assert(noexcept(++std::declval<decltype(to_it)>()));
     };
     constexpr auto one_zero_nine = []() {
         std::array<char, 4> retval = {};
@@ -279,6 +278,8 @@ std::string GG::RgbaTag(Clr c)
 {
     std::array<std::string::value_type, 6 + 4*4 + 1> buffer{"<rgba "}; // rest should be nulls
     auto it = buffer.data() + 6;
+    static_assert(noexcept(*(it++) = ' ') && noexcept(buffer.data() + 6));
+
     ToChars(it, c.r);
     *(it++) = ' ';
     ToChars(it, c.g);
@@ -326,7 +327,7 @@ namespace {
     const std::string EMPTY_STRING;
 }
 
-Font::Substring::Substring() :
+Font::Substring::Substring() noexcept :
     str(&EMPTY_STRING)
 {}
 
@@ -352,7 +353,7 @@ Font::Substring::Substring(const std::string& str_, const IterPair& pair) :
     second = std::distance(str->begin(), pair.second);
 }
 
-void Font::Substring::Bind(const std::string& str_)
+void Font::Substring::Bind(const std::string& str_) noexcept
 {
     assert(std::distance(str_.begin(), str_.end()) >= second);
     str = &str_;
@@ -1256,21 +1257,20 @@ namespace DebugOutput {
         for (auto& elem : text_elements) {
             if (auto tag_elem = std::dynamic_pointer_cast<Font::FormattingTag>(elem)) {
                 std::cout << "FormattingTag\n    text=\"" << tag_elem->text << "\" (@ "
-                          << static_cast<const void*>(&*tag_elem->text.begin()) << ")\n    widths=";
-                for (const X& width : tag_elem->widths) {
+                          << static_cast<const void*>(&tag_elem->text.front()) << ")\n    widths=";
+                for (const X& width : tag_elem->widths)
                     std::cout << width << " ";
-                }
-                std::cout << "\n    whitespace=" << tag_elem->whitespace << "\n    newline=" << tag_elem->newline << "\n    params=\n";
-                for (const Font::Substring& param : tag_elem->params) {
+                std::cout << "\n    whitespace=" << tag_elem->whitespace << "\n    newline="
+                          << tag_elem->newline << "\n    params=\n";
+                for (const Font::Substring& param : tag_elem->params)
                     std::cout << "        \"" << param << "\"\n";
-                }
-                std::cout << "    tag_name=\"" << tag_elem->tag_name << "\"\n    close_tag=" << tag_elem->close_tag << "\n";
+                std::cout << "    tag_name=\"" << tag_elem->tag_name << "\"\n    close_tag="
+                          << tag_elem->close_tag << "\n";
             } else {
                 std::cout << "TextElement\n    text=\"" << elem->text << "\" (@ "
-                          << static_cast<const void*>(&*elem->text.begin()) << ")\n    widths=";
-                for (const X& width : elem->widths) {
+                          << static_cast<const void*>(&elem->text.front()) << ")\n    widths=";
+                for (const X& width : elem->widths)
                     std::cout << width << " ";
-                }
                 std::cout << "\n    whitespace=" << elem->whitespace << "\n    newline=" << elem->newline << "\n";
             }
             std::cout << "    string_size=" << elem->StringSize() << "\n";
@@ -1285,40 +1285,34 @@ namespace DebugOutput {
                             const std::vector<Font::LineData>& line_data)
     {
         std::cout << "Font::DetermineLines(text=\"" << text << "\" (@ "
-                  << static_cast<const void*>(&*text.begin()) << ") format="
+                  << static_cast<const void*>(&text.front()) << ") format="
                   << format << " box_width=" << box_width << ")" << std::endl;
 
         std::cout << "Line breakdown:\n";
         for (std::size_t i = 0; i < line_data.size(); ++i) {
             std::cout << "Line " << i << ":\n    extents=";
-            for (const auto& character : line_data[i].char_data) {
+            for (const auto& character : line_data[i].char_data)
                 std::cout << character.extent << " ";
-            }
             std::cout << "\n    string indices=";
-            for (const auto& character : line_data[i].char_data) {
+            for (const auto& character : line_data[i].char_data)
                 std::cout << character.string_index << " ";
-            }
             std::cout << "\n    code point indices=";
-            for (const auto& character : line_data[i].char_data) {
+            for (const auto& character : line_data[i].char_data)
                 std::cout << character.code_point_index << " ";
-            }
             std::cout << "\n    chars on line: \"";
-            for (const auto& character : line_data[i].char_data) {
+            for (const auto& character : line_data[i].char_data)
                 std::cout << text[Value(character.string_index)];
-            }
             std::cout << "\"\n";
             for (std::size_t j = 0; j < line_data[i].char_data.size(); ++j) {
                 for (auto& tag_elem : line_data[i].char_data[j].tags) {
                     if (tag_elem) {
                         std::cout << "FormattingTag @" << j << "\n    text=\"" << tag_elem->text << "\"\n    widths=";
-                        for (const X& width : tag_elem->widths) {
+                        for (const X& width : tag_elem->widths)
                             std::cout << width << " ";
-                        }
                         std::cout << "\n    whitespace=" << tag_elem->whitespace
                                   << "\n    newline=" << tag_elem->newline << "\n    params=\n";
-                        for (const auto& param : tag_elem->params) {
+                        for (const auto& param : tag_elem->params)
                             std::cout << "        \"" << param << "\"\n";
-                        }
                         std::cout << "    tag_name=\"" << tag_elem->tag_name << "\"\n    close_tag="
                                   << tag_elem->close_tag << "\n";
                     }

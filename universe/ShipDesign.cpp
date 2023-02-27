@@ -356,14 +356,12 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id, const Script
     if (!location->OwnedBy(empire_id))
         return false;
 
-    std::string_view species_name;
-    if (location->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-        auto planet = static_cast<const Planet*>(location);
-        species_name = planet->SpeciesName();
-    } else if (location->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-        auto ship = static_cast<const Ship*>(location);
-        species_name = ship->SpeciesName();
-    }
+    std::string_view species_name = "";
+    if (location->ObjectType() == UniverseObjectType::OBJ_PLANET)
+        species_name = static_cast<const Planet*>(location)->SpeciesName();
+    else if (location->ObjectType() == UniverseObjectType::OBJ_SHIP)
+        species_name = static_cast<const Ship*>(location)->SpeciesName();
+
     if (species_name.empty())
         return false;
     const Species* species = context.species.GetSpecies(species_name);
@@ -461,7 +459,7 @@ ShipDesign::MaybeInvalidDesign(std::string hull, std::vector<std::string> parts,
     for (auto& part_name : parts) {
         if (part_name.empty())
             continue;
-        if (hull_exclusions.count(part_name)) {
+        if (std::count(hull_exclusions.begin(), hull_exclusions.end(), part_name)) {
             is_valid = false;
             if (produce_log)
                 WarnLogger() << "Invalid ShipDesign part \"" << part_name << "\" is excluded by \""
@@ -706,7 +704,7 @@ std::string ShipDesign::Dump(uint8_t ntabs) const {
     if (m_parts.empty()) {
         retval += "[]\n";
     } else if (m_parts.size() == 1) {
-        retval += "\"" + *m_parts.begin() + "\"\n";
+        retval += "\"" + m_parts.front() + "\"\n";
     } else {
         retval += "[\n";
         for (const std::string& part_name : m_parts) {
@@ -834,7 +832,7 @@ std::vector<const ShipDesign*> PredefinedShipDesignManager::GetOrderedMonsterDes
 
 int PredefinedShipDesignManager::GetDesignID(const std::string& name) const {
     CheckPendingDesignsTypes();
-    const auto& it = m_design_generic_ids.find(name);
+    const auto it = m_design_generic_ids.find(name);
     if (it == m_design_generic_ids.end())
         return INVALID_DESIGN_ID;
     return it->second;

@@ -71,7 +71,7 @@ class ChatHistoryProvider:
                     ) d
                     ORDER BY ts""", (SERVER_ID,))
                 for r in curs:
-                    c = fo.GGColor(r[3], r[4], r[5], r[6])
+                    c = (r[3], r[4], r[5], r[6])
                     e = (r[0], r[1], r[2], c)
                     res.append(e)
         return res
@@ -100,7 +100,7 @@ class ChatHistoryProvider:
                                      (timestamp,
                                       player_name,
                                       text,
-                                      256 * (256 * (256 * text_color.r + text_color.g) + text_color.b) + text_color.a,
+                                      256 * (256 * (256 * text_color[0] + text_color[1]) + text_color[2]) + text_color[3],
                                       SERVER_ID))
                         saved = True
                 try:

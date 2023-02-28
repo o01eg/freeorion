@@ -28,7 +28,7 @@
  <network>
   <server>
    <ai>
-    <max>5</max>
+    <max>4</max>
    </ai>
    <human>
     <min>2</min>
@@ -40,6 +40,7 @@
     <max>2</max>
    </unconn-human-empire-players>
    <publish-statistics>0</publish-statistics>
+   <take-over-ai>1</take-over-ai>
    <cookies>
     <expire-minutes>120</expire-minutes>
    </cookies>

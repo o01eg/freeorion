@@ -36,6 +36,10 @@ case "$1" in
 	mkdir -p /var/log/freeorion
 	chown -R freeorion:freeorion /var/log/freeorion
 
+	# create cachedir
+	mkdir -p /var/cache/freeorion
+	chown -R freeorion:freeorion /var/cache/freeorion
+
 	chown -R freeorion:freeorion /etc/freeorion
 
 	# fix persistent_config.xml

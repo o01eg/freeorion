@@ -23,16 +23,16 @@ apps:
       LD_LIBRARY_PATH: $SNAP/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}/freeorion
       LIBGL_DRIVERS_PATH: $SNAP/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}/dri
       # PYTHONPATH: $SNAP/usr/lib/python3.6
-  freeorion-godot:
-    # LD_LIBRARY_PATH=$SNAP/usr/lib/x86_64-linux-gnu/freeorion:$SNAP/usr/lib/x86_64-linux-gnu/:$SNAP/usr/lib/x86_64-linux-gnu/pulseaudio LIBGL_DRIVERS_PATH=$SNAP/usr/lib/x86_64-linux-gnu/dri godot3-runner   --resource.path $SNAP/usr/share/freeorion/default/ -S $SNAP_USER_COMMON/save
-    command: usr/bin/godot3-runner --main-pack $SNAP/usr/share/freeorion/freeorion.pck --resource.path $SNAP/usr/share/freeorion/default/ -S $SNAP_USER_COMMON/save
-    extensions: [gnome-3-38]
-    plugs: [home, pulseaudio, opengl, network, screen-inhibit-control, browser-support, x11]
-    desktop: usr/share/applications/org.freeorion.FreeOrion.desktop
-    environment:
-      LD_LIBRARY_PATH: $SNAP/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}/freeorion
-      LIBGL_DRIVERS_PATH: $SNAP/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}/dri
-      #PYTHONPATH: $SNAP/usr/lib/python3.6
+  ### freeorion-godot:
+    ### LD_LIBRARY_PATH=$SNAP/usr/lib/x86_64-linux-gnu/freeorion:$SNAP/usr/lib/x86_64-linux-gnu/:$SNAP/usr/lib/x86_64-linux-gnu/pulseaudio LIBGL_DRIVERS_PATH=$SNAP/usr/lib/x86_64-linux-gnu/dri godot3-runner   --resource.path $SNAP/usr/share/freeorion/default/ -S $SNAP_USER_COMMON/save
+    ### command: usr/bin/godot3-runner --main-pack $SNAP/usr/share/freeorion/freeorion.pck --resource.path $SNAP/usr/share/freeorion/default/ -S $SNAP_USER_COMMON/save
+    ### extensions: [gnome-3-38]
+    ### plugs: [home, pulseaudio, opengl, network, screen-inhibit-control, browser-support, x11]
+    ### desktop: usr/share/applications/org.freeorion.FreeOrion.desktop
+    ### environment:
+    ###   LD_LIBRARY_PATH: $SNAP/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}/freeorion
+    ###   LIBGL_DRIVERS_PATH: $SNAP/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}/dri
+    ###   #PYTHONPATH: $SNAP/usr/lib/python3.6
   freeoriond:
     command: usr/bin/freeoriond
     plugs: [home, network, network-bind]
@@ -58,27 +58,31 @@ parts:
     override-build: |
       # Icon paths in the desktop file will be rewritten to use ${SNAP}/<file> if specified as desktop file in snapcraft.yaml
       sed -i.bak -e "s|Icon=freeorion$|Icon=meta/gui/icon.png|g" ../src/packaging/org.freeorion.FreeOrion.desktop
-      sed -i.bak -e 's|="res://bin/linux.*/libfreeoriongodot.so"|="/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}/freeorion/libfreeoriongodot.so"|g' ../src/godot/freeoriongodot.gdnlib
+      ### sed -i.bak -e 's|="res://bin/linux.*/libfreeoriongodot.so"|="/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}/freeorion/libfreeoriongodot.so"|g' ../src/godot/freeoriongodot.gdnlib
       snapcraftctl build
       # godot-headless wants a writable homedir, simulate it
       mkdir -p home/
       mkdir -p "${SNAPCRAFT_PART_INSTALL}/usr/share/freeorion/"
       # Note: we use godot3-headless really
-      HOME=$(pwd)/home godot3-server --path ../src/godot --export-pack "Linux/X11" "${SNAPCRAFT_PART_INSTALL}/usr/share/freeorion/freeorion.pck"
+      ### HOME=$(pwd)/home godot3-server --path ../src/godot --export-pack "Linux/X11" "${SNAPCRAFT_PART_INSTALL}/usr/share/freeorion/freeorion.pck"
     plugin: cmake
     cmake-parameters:
-      - -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_CLIENT_GODOT=ON
-    #cmake-parameters: [-DBUILD_TESTING=ON]
+      ### - -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_CLIENT_GODOT=ON
+      - -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_CLIENT_GODOT=OFF
+    # cmake-parameters: [-DBUILD_TESTING=ON]
     override-pull: |
       snapcraftctl pull
-      # this versioning works for e.g. weekly-test-builds
       branchn="$(git rev-parse --abbrev-ref HEAD)"
-      version="$(git log -n1 --date=short --format='%cd.%h' $branchn)"
-      case $version in
-        v*) version=$(echo $version | tail -c +2) ;;
-        *)  version=$(echo $version | head -c 32) ;;
+      daterev="$(git log -n1 --date=short --format='%cd.%h' $branchn)"
+      longtagn="$(git describe --tags || echo none)"
+      case $longtagn in
+        v*) version=${longtagn} ;;
+        *) case $daterev in
+          v*) version=$(echo $daterev | tail -c +2) ;;
+          *)  version=$(echo $daterev | head -c 32) ;;
+        esac ;;
       esac
-      [ -n "$(echo $version | grep '-')" ] && grade=devel || grade=stable
+      [ -n "$(echo $version | grep '^[0-9]+-')" ] && grade=devel || grade=stable
       snapcraftctl set-version "$version"
       snapcraftctl set-grade "$grade"
     override-prime: |
@@ -103,7 +107,7 @@ parts:
       - libtiff-dev
       - libvorbis-dev
       - pkg-config
-      - godot3-server
+      ### - godot3-server
       # - python
     stage-packages:
       - mesa-utils
@@ -129,5 +133,4 @@ parts:
       - libvorbisfile3
       - libpng16-16
       - libfreetype6
-      - godot3-runner
-
+      ### - godot3-runner

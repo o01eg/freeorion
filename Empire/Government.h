@@ -29,6 +29,9 @@ public:
            std::vector<UnlockableItem>&& unlocked_items,
            std::string graphic);
 
+    Policy(Policy&&) = default;
+    Policy& operator=(Policy&&) = default;
+
     [[nodiscard]] const auto& Name() const noexcept             { return m_name; }
     [[nodiscard]] const auto& Description() const noexcept      { return m_description; }
     [[nodiscard]] const auto& ShortDescription() const noexcept { return m_short_description; }
@@ -71,7 +74,7 @@ private:
 //! Keeps track of policies that can be chosen by empires.
 class FO_COMMON_API PolicyManager {
 public:
-    using PoliciesTypeMap = std::map<std::string, std::unique_ptr<Policy>, std::less<>>;
+    using PoliciesTypeMap = boost::container::flat_map<std::string, Policy, std::less<>>;
     using iterator = PoliciesTypeMap::const_iterator;
 
     //! returns the policy with the name \a name; you should use the free
@@ -80,21 +83,21 @@ public:
     [[nodiscard]] std::vector<std::string_view> PolicyNames() const;
     //! returns list of names of policies in specified category
     [[nodiscard]] std::vector<std::string_view> PolicyNames(const std::string& category_name) const;
-    [[nodiscard]] std::set<std::string_view>    PolicyCategories() const;
+    [[nodiscard]] std::vector<std::string_view> PolicyCategories() const; // sorted
     [[nodiscard]] uint32_t                      GetCheckSum() const;
 
     [[nodiscard]] iterator begin() const; //! iterator to the first policy
     [[nodiscard]] iterator end() const;   //! iterator to the last + 1th policy
 
     //! sets types to the value of \p future
-    void SetPolicies(Pending::Pending<PoliciesTypeMap>&& future);
+    void SetPolicies(Pending::Pending<std::vector<Policy>>&& future);
 
 private:
     void CheckPendingPolicies() const;  //! Assigns any m_pending_types to m_policies.
 
     //! Future types being parsed by parser.  mutable so that it can
     //! be assigned to m_species_types when completed.
-    mutable boost::optional<Pending::Pending<PoliciesTypeMap>> m_pending_types = boost::none;
+    mutable boost::optional<Pending::Pending<std::vector<Policy>>> m_pending_types = boost::none;
 
     mutable PoliciesTypeMap m_policies;
 };

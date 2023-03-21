@@ -95,13 +95,12 @@ namespace {
 
     auto PlanetsWithAvailablePP(const Empire& empire) -> std::map<std::set<int>, float>
     {
-        auto industry_pool{empire.GetResourcePool(ResourceType::RE_INDUSTRY)};
         std::map<std::set<int>, float> planets_with_available_pp;
 
         // filter industry pool output to get just planet IDs
-        for (auto& [object_ids, PP] : industry_pool->Output()) {
+        for (auto& [object_ids, PP] : empire.GetIndustryPool().Output()) {
             std::set<int> planet_ids;
-            for (const auto& planet : Objects().find<Planet>(object_ids)) {
+            for (const auto* planet : Objects().findRaw<Planet>(object_ids)) {
                 if (planet)
                     planet_ids.insert(planet->ID());
             }
@@ -130,12 +129,11 @@ namespace {
 
     auto PlanetsWithWastedPP(const Empire& empire) -> std::set<std::set<int>>
     {
-        auto industry_pool{empire.GetResourcePool(ResourceType::RE_INDUSTRY)};
         const ProductionQueue& prod_queue = empire.GetProductionQueue();
         std::set<std::set<int>> planets_with_wasted_pp;
-        for (const auto& object_ids : prod_queue.ObjectsWithWastedPP(industry_pool)) {
+        for (const auto& object_ids : prod_queue.ObjectsWithWastedPP(empire.GetIndustryPool())) {
             std::set<int> planet_ids;
-            for (const auto& planet : Objects().find<Planet>(object_ids)) {
+            for (const auto& planet : Objects().findRaw<Planet>(object_ids)) {
                 if (planet)
                     planet_ids.insert(planet->ID());
             }
@@ -455,7 +453,7 @@ namespace FreeOrionPython {
             .add_property("prerequisites",          make_function(&Tech::Prerequisites,     py::return_internal_reference<>()))
             .add_property("unlockedTechs",          make_function(&Tech::UnlockedTechs,     py::return_internal_reference<>()))
             .add_property("unlockedItems",          make_function(&Tech::UnlockedItems,     py::return_internal_reference<>()))
-            .def("recursivePrerequisites",          +[](const Tech& tech, int empire_id) -> std::vector<std::string> { return GetTechManager().RecursivePrereqs(tech.Name(), empire_id, true, ScriptingContext{}); },
+            .def("recursivePrerequisites",          +[](const Tech& tech, int empire_id) -> std::vector<std::string> { return GetTechManager().RecursivePrereqs(tech.Name(), empire_id, ScriptingContext{}); },
                                                     py::return_value_policy<py::return_by_value>())
         ;
 
@@ -502,7 +500,7 @@ namespace FreeOrionPython {
             "Returns the policy (Policy) with the indicated name (string).");
 
         def("policyCategories",
-            +[]() -> std::vector<std::string> { return ViewSetToStringVec(GetPolicyManager().PolicyCategories()); },
+            +[]() -> std::vector<std::string> { return ViewVecToStringVec(GetPolicyManager().PolicyCategories()); },
             py::return_value_policy<py::return_by_value>(),
             "Returns the names of all policy categories (StringVec).");
 

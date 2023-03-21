@@ -361,21 +361,24 @@ void TechTreeWnd::TechTreeControls::RefreshCategoryButtons(const std::set<std::s
 
     // create a button for each tech category...
     for (const auto& cat_view : GetTechManager().CategoryNames()) {
-        std::string category{cat_view}; // TODO: avoid temporary construction
-        GG::Clr icon_clr = ClientUI::CategoryColor(category);
+        std::string category{cat_view};
+        auto& button = m_cat_buttons[category];
+
+        const GG::Clr icon_clr = ClientUI::CategoryColor(category);
         auto icon = std::make_shared<GG::SubTexture>(ClientUI::CategoryIcon(category));
-        m_cat_buttons[category] = GG::Wnd::Create<GG::StateButton>(
+        button = GG::Wnd::Create<GG::StateButton>(
             "", ClientUI::GetFont(), GG::FORMAT_NONE, GG::CLR_ZERO,
-            std::make_shared<CUIIconButtonRepresenter>(icon, icon_clr));
-        m_cat_buttons[category]->SetBrowseInfoWnd(
-            GG::Wnd::Create<TextBrowseWnd>(UserString(category), ""));
-        m_cat_buttons[category]->SetBrowseModeTime(tooltip_delay);
-        AttachChild(m_cat_buttons[category]);
+            std::make_shared<CUIIconButtonRepresenter>(std::move(icon), icon_clr));
 
-        m_cat_buttons[category]->SetCheck(cats_shown.count(category));
+        button->SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(UserString(category), ""));
+        button->SetBrowseModeTime(tooltip_delay);
 
-        m_cat_buttons[category]->CheckedSignal.connect(
-            boost::bind(&TechTreeControls::CategoryButtonCheckedSlot, this, category, boost::placeholders::_1));
+        AttachChild(button);
+
+        button->SetCheck(cats_shown.count(category));
+
+        button->CheckedSignal.connect(
+            boost::bind(&TechTreeControls::CategoryButtonCheckedSlot, this, std::move(category), boost::placeholders::_1));
     }
 
     DoButtonLayout();
@@ -543,9 +546,9 @@ public:
 
     GG::Pt ClientLowerRight() const override;
 
-    double                  Scale() const;
-    std::set<std::string>   GetCategoriesShown() const;
-    std::set<TechStatus>    GetTechStatusesShown() const;
+    double      Scale() const noexcept { return m_scale; }
+    const auto& GetCategoriesShown() const noexcept { return m_categories_shown; }
+    const auto& GetTechStatusesShown() const noexcept { return m_tech_statuses_shown; }
 
     mutable TechTreeWnd::TechClickSignalType    TechSelectedSignal;
     mutable TechTreeWnd::TechClickSignalType    TechDoubleClickedSignal;
@@ -1155,15 +1158,6 @@ void TechTreeWnd::LayoutPanel::ConnectKeyboardAcceleratorSignals() {
 GG::Pt TechTreeWnd::LayoutPanel::ClientLowerRight() const
 { return LowerRight() - GG::Pt(GG::X(ClientUI::ScrollWidth()), GG::Y(ClientUI::ScrollWidth())); }
 
-std::set<std::string> TechTreeWnd::LayoutPanel::GetCategoriesShown() const
-{ return m_categories_shown; }
-
-double TechTreeWnd::LayoutPanel::Scale() const
-{ return m_scale; }
-
-std::set<TechStatus> TechTreeWnd::LayoutPanel::GetTechStatusesShown() const
-{ return m_tech_statuses_shown; }
-
 void TechTreeWnd::LayoutPanel::Render() {
     GG::FlatRectangle(UpperLeft(), LowerRight(), ClientUI::CtrlColor(), GG::CLR_ZERO);
 
@@ -1372,20 +1366,16 @@ void TechTreeWnd::LayoutPanel::Layout(bool keep_position) {
 
     // create a node for every tech
     const TechManager& manager = GetTechManager();
-    for (const auto& tech : manager) {
-        if (!tech) continue;
-        const std::string& tech_name = tech->Name();
+    for (const auto& [tech_name, tech] : manager) {
         if (!TechVisible(tech_name, m_categories_shown, m_tech_statuses_shown)) continue;
         m_techs[tech_name] = GG::Wnd::Create<TechPanel>(tech_name, this);
         m_graph.AddNode(tech_name, m_techs[tech_name]->Width(), m_techs[tech_name]->Height());
     }
 
     // create an edge for every prerequisite
-    for (const auto& tech : manager) {
-        if (!tech) continue;
-        const std::string& tech_name = tech->Name();
+    for (const auto& [tech_name, tech] : manager) {
         if (!TechVisible(tech_name, m_categories_shown, m_tech_statuses_shown)) continue;
-        for (const std::string& prereq : tech->Prerequisites()) {
+        for (const std::string& prereq : tech.Prerequisites()) {
             if (!TechVisible(prereq, m_categories_shown, m_tech_statuses_shown)) continue;
             m_graph.AddEdge(prereq, tech_name);
         }
@@ -1403,9 +1393,7 @@ void TechTreeWnd::LayoutPanel::Layout(bool keep_position) {
     std::set<std::string> visible_techs;
 
     // create new tech panels and new dependency arcs 
-    for (const auto& tech : manager) {
-        if (!tech) continue;
-        const std::string& tech_name = tech->Name();
+    for (const auto& [tech_name, tech] : manager) {
         if (!TechVisible(tech_name, m_categories_shown, m_tech_statuses_shown)) continue;
         //techpanel
         const TechTreeLayout::Node* node = m_graph.GetNode(tech_name);
@@ -1448,8 +1436,7 @@ void TechTreeWnd::LayoutPanel::Layout(bool keep_position) {
     } else {
         m_selected_tech_name.clear();
         // find a tech to centre view on
-        for (const auto& tech : manager) {
-            const std::string& tech_name = tech->Name();
+        for (const auto& [tech_name, tech] : manager) {
             if (TechVisible(tech_name, m_categories_shown, m_tech_statuses_shown)) {
                 CenterOnTech(tech_name);
                 break;
@@ -1467,8 +1454,7 @@ void TechTreeWnd::LayoutPanel::ScrolledSlot(int, int, int, int) {
     m_scroll_position_y = m_vscroll->PosnRange().first;
 }
 
-void TechTreeWnd::LayoutPanel::SelectTech(const std::string& tech_name)
-{
+void TechTreeWnd::LayoutPanel::SelectTech(const std::string& tech_name) {
     // deselect previously-selected tech panel
     if (m_techs.count(m_selected_tech_name))
         m_techs[m_selected_tech_name]->Select(false);
@@ -1901,8 +1887,10 @@ void TechTreeWnd::TechListBox::Populate(bool update ) {
 
     // Skip lookup check when starting with empty cache
 
-    for (const auto& tech : GetTechManager())
-        m_tech_row_cache.emplace(tech->Name(), GG::Wnd::Create<TechRow>(row_width, tech->Name()));
+    for (const auto& [tech_name, ignored]: GetTechManager()) {
+        (void)ignored;
+        m_tech_row_cache.emplace(tech_name, GG::Wnd::Create<TechRow>(row_width, tech_name));
+    }
 
     DebugLogger() << "Tech List Box Populating Done,  Creation time = " << creation_timer.DurationString();
 
@@ -1997,8 +1985,7 @@ void TechTreeWnd::TechListBox::TechRightClicked(GG::ListBox::iterator it, GG::Pt
 
 void TechTreeWnd::TechListBox::TechDoubleClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) {
     // determine type of row that was clicked, and emit appropriate signal
-    TechRow* tech_row = dynamic_cast<TechRow*>(it->get());
-    if (tech_row)
+    if (TechRow* tech_row = dynamic_cast<TechRow*>(it->get()))
         TechDoubleClickedSignal(tech_row->GetTech(), modkeys);
 }
 
@@ -2022,16 +2009,16 @@ void TechTreeWnd::CompleteConstruction() {
     m_layout_panel = GG::Wnd::Create<LayoutPanel>(Width(), Height());
     m_layout_panel->TechSelectedSignal.connect(boost::bind(&TechTreeWnd::TechLeftClickedSlot, this, _1, _2));
     m_layout_panel->TechDoubleClickedSignal.connect(
-        [this](const std::string& tech_name, GG::Flags<GG::ModKey> modkeys)
-    { this->AddTechToResearchQueue(tech_name, modkeys & GG::MOD_KEY_CTRL); });
+        [this](std::string tech_name, GG::Flags<GG::ModKey> modkeys)
+    { this->AddTechToResearchQueue(std::move(tech_name), modkeys & GG::MOD_KEY_CTRL); });
     m_layout_panel->TechPediaDisplaySignal.connect(boost::bind(&TechTreeWnd::TechPediaDisplaySlot, this, _1));
     AttachChild(m_layout_panel);
 
     m_tech_list = GG::Wnd::Create<TechListBox>(Width(), Height());
     m_tech_list->TechLeftClickedSignal.connect(boost::bind(&TechTreeWnd::TechLeftClickedSlot, this, _1, _2));
     m_tech_list->TechDoubleClickedSignal.connect(
-        [this](const std::string& tech_name, GG::Flags<GG::ModKey> modkeys)
-    { this->AddTechToResearchQueue(tech_name, modkeys & GG::MOD_KEY_CTRL); });
+        [this](std::string tech_name, GG::Flags<GG::ModKey> modkeys)
+    { this->AddTechToResearchQueue(std::move(tech_name), modkeys & GG::MOD_KEY_CTRL); });
     m_tech_list->TechPediaDisplaySignal.connect(
         boost::bind(&TechTreeWnd::TechPediaDisplaySlot, this, _1));
 
@@ -2163,9 +2150,9 @@ void TechTreeWnd::ShowCategory(const std::string& category) {
     m_layout_panel->ShowCategory(category);
     m_tech_list->ShowCategory(category);
 
-    const auto& maybe_button = m_tech_tree_controls->m_cat_buttons.find(category);
-    if (maybe_button != m_tech_tree_controls->m_cat_buttons.end())
-        maybe_button->second->SetCheck(true);
+    const auto button_it = m_tech_tree_controls->m_cat_buttons.find(category);
+    if (button_it != m_tech_tree_controls->m_cat_buttons.end())
+        button_it->second->SetCheck(true);
 }
 
 void TechTreeWnd::ShowAllCategories() {
@@ -2180,9 +2167,9 @@ void TechTreeWnd::HideCategory(const std::string& category) {
     m_layout_panel->HideCategory(category);
     m_tech_list->HideCategory(category);
 
-    const auto& maybe_button = m_tech_tree_controls->m_cat_buttons.find(category);
-    if (maybe_button != m_tech_tree_controls->m_cat_buttons.end())
-        maybe_button->second->SetCheck(false);
+    const auto button_it = m_tech_tree_controls->m_cat_buttons.find(category);
+    if (button_it != m_tech_tree_controls->m_cat_buttons.end())
+        button_it->second->SetCheck(false);
 }
 
 void TechTreeWnd::HideAllCategories() {
@@ -2190,14 +2177,14 @@ void TechTreeWnd::HideAllCategories() {
     m_tech_list->HideAllCategories();
 
     for (auto& cat_button : m_tech_tree_controls->m_cat_buttons)
-    { cat_button.second->SetCheck(false); }
+        cat_button.second->SetCheck(false);
 }
 
 void TechTreeWnd::ToggleAllCategories() {
-    std::set<std::string> shown_cats = m_layout_panel->GetCategoriesShown();
-    auto all_cats = GetTechManager().CategoryNames();
+    const auto num_casts_shown = m_layout_panel->GetCategoriesShown().size();
+    const auto num_cats = GetTechManager().CategoryNames().size();
 
-    if (shown_cats.size() == all_cats.size())
+    if (num_casts_shown == num_cats)
         HideAllCategories();
     else
         ShowAllCategories();
@@ -2255,8 +2242,7 @@ void TechTreeWnd::CenterOnTech(const std::string& tech_name) {
     // ensure tech exists and is visible
     const Tech* tech = ::GetTech(tech_name);
     if (!tech) return;
-    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
-    if (empire)
+    if (const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID()))
         SetTechStatus(empire->GetTechStatus(tech_name), true);
     ShowCategory(tech->Category());
 
@@ -2298,9 +2284,7 @@ bool TechTreeWnd::PediaVisible()
 bool TechTreeWnd::TechIsVisible(const std::string& tech_name) const
 { return TechVisible(tech_name, m_layout_panel->GetCategoriesShown(), m_layout_panel->GetTechStatusesShown()); }
 
-void TechTreeWnd::TechLeftClickedSlot(const std::string& tech_name,
-                                  GG::Flags<GG::ModKey> modkeys)
-{
+void TechTreeWnd::TechLeftClickedSlot(const std::string& tech_name, GG::Flags<GG::ModKey> modkeys) {
     if (modkeys & GG::MOD_KEY_SHIFT) {
         AddTechToResearchQueue(tech_name, modkeys & GG::MOD_KEY_CTRL);
     } else {
@@ -2313,15 +2297,12 @@ void TechTreeWnd::AddTechToResearchQueue(const std::string& tech_name, bool to_f
     const Tech* tech = GetTech(tech_name);
     if (!tech) return;
 
-    ScriptingContext context;
-    auto empire = context.GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
-    TechStatus tech_status = TechStatus::TS_UNRESEARCHABLE;
-    if (empire)
-        tech_status = empire->GetTechStatus(tech_name);
-
-    int queue_pos = -1;
-    if (to_front)
-        queue_pos = 0;
+    const ScriptingContext context;
+    const auto empire = context.GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
+    if (!empire)
+        return;
+    const TechStatus tech_status = empire->GetTechStatus(tech_name);
+    const int queue_pos = to_front ? 0 : -1;
 
     // if tech can be researched already, just add it
     if (tech_status == TechStatus::TS_RESEARCHABLE) {
@@ -2335,10 +2316,15 @@ void TechTreeWnd::AddTechToResearchQueue(const std::string& tech_name, bool to_f
 
     // if tech can't yet be researched, add any prerequisites it requires (recursively) and then add it
     const TechManager& manager = GetTechManager();
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    auto tech_vec = manager.RecursivePrereqs(tech_name, empire_id, true, context);
-    tech_vec.push_back(tech_name);
-    AddTechsToQueueSignal(tech_vec, queue_pos);
+    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    auto all_prereqs = manager.RecursivePrereqs(tech_name, empire_id, context);
+    std::vector<std::string> unresearched_techs;
+    unresearched_techs.reserve(all_prereqs.size() + 1);
+    std::copy_if(std::make_move_iterator(all_prereqs.begin()), std::make_move_iterator(all_prereqs.end()),
+                 std::back_inserter(unresearched_techs),
+                 [&empire](const auto& tech_name) { return !empire->TechResearched(tech_name); });
+    unresearched_techs.push_back(tech_name);
+    AddTechsToQueueSignal(std::move(unresearched_techs), queue_pos);
 }
 
 void TechTreeWnd::TechPediaDisplaySlot(const std::string& tech_name) {

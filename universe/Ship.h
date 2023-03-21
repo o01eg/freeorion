@@ -14,7 +14,14 @@ class ShipPart;
 /** a class representing a single FreeOrion ship */
 class FO_COMMON_API Ship final : public UniverseObject {
 public:
-    typedef std::map<std::pair<MeterType, std::string>, Meter> PartMeterMap;
+    struct string_metertype_pair_less {
+        template <typename S1, typename S2>
+        bool operator()(const std::pair<S1, MeterType>& lhs, const std::pair<S2, MeterType>& rhs) const noexcept
+        { return (lhs.first < rhs.first) || ((lhs.first == rhs.first) && (lhs.second < rhs.second)); }
+
+        using is_transparent = int;
+    };
+    using PartMeterMap = boost::container::flat_map<std::pair<std::string, MeterType>, Meter, string_metertype_pair_less>;
 
     [[nodiscard]] bool HostileToEmpire(int empire_id, const EmpireManager& empires) const override;
 
@@ -33,8 +40,8 @@ public:
     /** Back propagates part meters (which UniverseObject equivalent doesn't). */
     void BackPropagateMeters() override;
 
-    void ResetTargetMaxUnpairedMeters() noexcept(UniverseObject::noexcept_rtmum) override;
-    void ResetPairedActiveMeters() noexcept(UniverseObject::noexcept_rpam) override;
+    void ResetTargetMaxUnpairedMeters() override;
+    void ResetPairedActiveMeters() override;
     void ClampMeters() override;
 
     /** Returns new copy of this Ship. */
@@ -68,10 +75,10 @@ public:
     [[nodiscard]] int   OrderedBombardPlanet() const noexcept   { return m_ordered_bombard_planet_id; } ///< returns the ID of the planet this ship has been ordered to bombard, or INVALID_OBJECT_ID if this ship hasn't been ordered to bombard a planet
     [[nodiscard]] int   LastTurnActiveInCombat() const noexcept { return m_last_turn_active_in_combat; }///< returns the last turn this ship has been actively involved in combat
 
-    [[nodiscard]] const PartMeterMap& PartMeters() const noexcept { return m_part_meters; }                       ///< returns this Ship's part meters
-    [[nodiscard]] const Meter*        GetPartMeter(MeterType type, const std::string& part_name) const;           ///< returns the requested part Meter, or 0 if no such part Meter of that type is found in this ship for that part name
-    [[nodiscard]] float               CurrentPartMeterValue(MeterType type, const std::string& part_name) const;  ///< returns current value of the specified part meter \a type for the specified part name
-    [[nodiscard]] float               InitialPartMeterValue(MeterType type, const std::string& part_name) const;  ///< returns this turn's initial value for the specified part meter \a type for the specified part name
+    [[nodiscard]] const auto&  PartMeters() const noexcept      { return m_part_meters; }                  ///< returns this Ship's part meters
+    [[nodiscard]] const Meter* GetPartMeter(MeterType type, const std::string& part_name) const;           ///< returns the requested part Meter, or 0 if no such part Meter of that type is found in this ship for that part name
+    [[nodiscard]] float        CurrentPartMeterValue(MeterType type, const std::string& part_name) const;  ///< returns current value of the specified part meter \a type for the specified part name
+    [[nodiscard]] float        InitialPartMeterValue(MeterType type, const std::string& part_name) const;  ///< returns this turn's initial value for the specified part meter \a type for the specified part name
 
     /** Returns sum of current value for part meter @p type of all parts with ShipPartClass @p part_class */
     [[nodiscard]] float SumCurrentPartMeterValuesForPartClass(MeterType type, ShipPartClass part_class, const Universe& universe) const;

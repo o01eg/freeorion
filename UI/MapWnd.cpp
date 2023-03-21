@@ -311,10 +311,9 @@ namespace {
 
     auto InWndRect(const GG::Wnd* top_wnd) {
         return [top_wnd](const GG::Wnd* wnd, const GG::Pt pt) -> bool {
-            if (!wnd)
-                return false;
-            return InRect(wnd->Left(), top_wnd ? top_wnd->Top() : wnd->Top(),
-                          wnd->Right(), wnd->Bottom(), pt);
+            return wnd && InRect(wnd->Left(), top_wnd ? top_wnd->Top() : wnd->Top(),
+                                 wnd->Right(), wnd->Bottom(),
+                                 pt);
         };
     }
 
@@ -337,9 +336,39 @@ namespace {
     { Sound::GetSound().PlaySound(GetOptionsDB().Get<std::string>("ui.button.turn.press.sound.path"), true); }
 
     bool ToggleBoolOption(const std::string& option_name) {
-        bool initially_enabled = GetOptionsDB().Get<bool>(option_name);
+        const bool initially_enabled = GetOptionsDB().Get<bool>(option_name);
         GetOptionsDB().Set(option_name, !initially_enabled);
         return !initially_enabled;
+    }
+
+    void ShowTurnButtonPopup(std::shared_ptr<GG::Button> turn_btn,
+                             std::function<void()> end_turn_action,
+                             std::function<void()> revoke_orders_action)
+    {
+        std::cout << "TurnButtonPopup";
+
+        const auto* app = ClientApp::GetApp();
+        if (!app)
+            return;
+        const auto order_count = app->Orders().size();
+        const auto turn = app->CurrentTurn();
+
+
+        // create popup menu with a commands in it
+        const GG::Pt pt = turn_btn ? turn_btn->LowerRight() : GG::Pt{GG::X1, GG::Y1};
+        auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
+
+        //popup->AddMenuItem(GG::MenuItem(true)); // separator
+
+        const bool disable_end_turn = !turn_btn || turn_btn->Disabled();
+        auto start_label = boost::io::str(FlexibleFormat(UserString("MAP_BTN_TURN_SEND_AND_START")) % turn % order_count);
+        popup->AddMenuItem(GG::MenuItem(std::move(start_label), disable_end_turn, false, end_turn_action));
+
+        const bool disable_revoke = disable_end_turn || order_count < 1;
+        auto revoke_label = boost::io::str(FlexibleFormat(UserString("MAP_BTN_TURN_REVOKE")) % turn % order_count);
+        popup->AddMenuItem(GG::MenuItem(std::move(revoke_label), disable_end_turn, false, revoke_orders_action));
+
+        popup->Run();
     }
 
     const std::string FLEET_DETAIL_SHIP_COUNT{UserStringNop("MAP_FLEET_SHIP_COUNT")};
@@ -797,8 +826,8 @@ public:
         m_line_length = GG::X(static_cast<int>(shown_length * m_scale_factor));
 
         // update text
-        std::string&& label_text = boost::io::str(FlexibleFormat(UserString("MAP_SCALE_INDICATOR")) %
-                                                  std::to_string(static_cast<int>(shown_length)));
+        auto label_text = boost::io::str(FlexibleFormat(UserString("MAP_SCALE_INDICATOR")) %
+                                         std::to_string(static_cast<int>(shown_length)));
         m_label->SetText(std::move(label_text));
         m_label->Resize(GG::Pt(GG::X(m_line_length), Height()));
     }
@@ -1051,6 +1080,9 @@ void MapWnd::CompleteConstruction() {
     m_btn_turn->Resize(m_btn_turn->MinUsableSize());
     m_btn_turn->LeftClickedSignal.connect([this]() { EndTurn(); });
     m_btn_turn->LeftClickedSignal.connect(&PlayTurnButtonClickSound);
+    m_btn_turn->RightClickedSignal.connect(
+        [this]() { ShowTurnButtonPopup(m_btn_turn, [this]() { EndTurn(); }, [this]() { RevertOrders(); }); });
+
     RefreshTurnButtonTooltip();
 
     boost::filesystem::path button_texture_dir = ClientUI::ArtDir() / "icons" / "buttons";
@@ -2958,11 +2990,11 @@ void MapWnd::InitTurn(ScriptingContext& context) {
     // (unlike connections to signals from the sidepanel)
     auto this_client_empire = context.GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (this_client_empire) {
-        this_client_empire->GetResourcePool(ResourceType::RE_INFLUENCE)->ChangedSignal.connect(
+        this_client_empire->GetInfluencePool().ChangedSignal.connect(
             boost::bind(&MapWnd::RefreshInfluenceResourceIndicator, this));
-        this_client_empire->GetResourcePool(ResourceType::RE_RESEARCH)->ChangedSignal.connect(
+        this_client_empire->GetResearchPool().ChangedSignal.connect(
             boost::bind(&MapWnd::RefreshResearchResourceIndicator, this));
-        this_client_empire->GetResourcePool(ResourceType::RE_INDUSTRY)->ChangedSignal.connect(
+        this_client_empire->GetIndustryPool().ChangedSignal.connect(
             boost::bind(&MapWnd::RefreshIndustryResourceIndicator, this));
         this_client_empire->GetPopulationPool().ChangedSignal.connect(
             boost::bind(&MapWnd::RefreshPopulationIndicator, this));
@@ -3613,11 +3645,8 @@ namespace {
             return;
 
         const ProductionQueue& queue = empire->GetProductionQueue();
-        const auto& allocated_pp(queue.AllocatedPP());
-        auto industry_pool{empire->GetResourcePool(ResourceType::RE_INDUSTRY)};
-        if (!industry_pool)
-            return;
-        const auto& available_pp(industry_pool->Output());
+        auto& allocated_pp(queue.AllocatedPP());
+        auto& available_pp(empire->GetIndustryPool().Output());
         // For each industry set,
         // add all planet's systems to res_pool_systems[industry set]
         for (const auto& available_pp_group : available_pp) {
@@ -6135,7 +6164,6 @@ void MapWnd::Sanitize() {
     m_projected_fleet_lines.clear();
     m_system_icons.clear();
     m_fleets_exploring.clear();
-    m_line_between_systems = {INVALID_OBJECT_ID, INVALID_OBJECT_ID};
 
     DetachChildren();
 }
@@ -6253,6 +6281,16 @@ bool MapWnd::ReturnToMap() {
         ErrorLogger() << "Unknown GG::Wnd " << wnd->Name() << " found in MapWnd::m_wnd_stack";
     }
 
+    return true;
+}
+
+bool MapWnd::RevertOrders() {
+    ClientUI* cui = ClientUI::GetClientUI();
+    if (!cui) {
+        ErrorLogger() << "MapWnd::RevertOrders: No client UI available";
+        return false;
+    }
+    GGHumanClientApp::GetApp()->RevertOrders();
     return true;
 }
 
@@ -6852,9 +6890,9 @@ void MapWnd::RefreshInfluenceResourceIndicator() {
         return;
     }
     double total_IP_spent = empire->GetInfluenceQueue().TotalIPsSpent();
-    double total_IP_output = empire->GetResourcePool(ResourceType::RE_INFLUENCE)->TotalOutput();
-    double total_IP_target_output = empire->GetResourcePool(ResourceType::RE_INFLUENCE)->TargetOutput();
-    float  stockpile = empire->GetResourcePool(ResourceType::RE_INFLUENCE)->Stockpile();
+    double total_IP_output = empire->GetInfluencePool().TotalOutput();
+    double total_IP_target_output = empire->GetInfluencePool().TargetOutput();
+    float  stockpile = empire->GetInfluencePool().Stockpile();
     float  stockpile_used = empire->GetInfluenceQueue().AllocatedStockpileIP();
     float  expected_stockpile = empire->GetInfluenceQueue().ExpectedNewStockpileAmount();
 
@@ -6908,9 +6946,9 @@ void MapWnd::RefreshResearchResourceIndicator() {
     m_research->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
 
     float total_RP_spent = empire->GetResearchQueue().TotalRPsSpent();
-    float total_RP_output = empire->GetResourcePool(ResourceType::RE_RESEARCH)->TotalOutput();
+    float total_RP_output = empire->GetResearchPool().TotalOutput();
     float total_RP_wasted = total_RP_output - total_RP_spent;
-    float total_RP_target_output = empire->GetResourcePool(ResourceType::RE_RESEARCH)->TargetOutput();
+    float total_RP_target_output = empire->GetResearchPool().TargetOutput();
 
     m_research->SetBrowseInfoWnd(GG::Wnd::Create<ResourceBrowseWnd>(
         UserString("MAP_RESEARCH_TITLE"), UserString("RESEARCH_INFO_RP"),
@@ -6959,9 +6997,9 @@ void MapWnd::RefreshIndustryResourceIndicator() {
     m_industry->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
 
     double total_PP_spent = empire->GetProductionQueue().TotalPPsSpent();
-    double total_PP_output = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->TotalOutput();
-    double total_PP_target_output = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->TargetOutput();
-    float  stockpile = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->Stockpile();
+    double total_PP_output = empire->GetIndustryPool().TotalOutput();
+    double total_PP_target_output = empire->GetIndustryPool().TargetOutput();
+    float  stockpile = empire->GetIndustryPool().Stockpile();
     float  stockpile_used = boost::accumulate(empire->GetProductionQueue().AllocatedStockpilePP() | boost::adaptors::map_values, 0.0f);
     float  stockpile_use_capacity = empire->GetProductionQueue().StockpileCapacity(context.ContextObjects());
     float  expected_stockpile = empire->GetProductionQueue().ExpectedNewStockpileAmount();
@@ -7356,32 +7394,31 @@ bool MapWnd::ZoomToNextFleet() {
 }
 
 bool MapWnd::ZoomToSystemWithWastedPP() {
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    const Empire* empire = GetEmpire(empire_id);
+    const ScriptingContext context;
+
+    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (!empire)
         return false;
 
     const ProductionQueue& queue = empire->GetProductionQueue();
-    const auto pool = empire->GetResourcePool(ResourceType::RE_INDUSTRY);
-    if (!pool)
-        return false;
+    const auto& pool = empire->GetIndustryPool();
     auto wasted_PP_objects(queue.ObjectsWithWastedPP(pool));
     if (wasted_PP_objects.empty())
         return false;
 
-    // pick first object in first group
-    auto& obj_group = *wasted_PP_objects.begin();
-    if (obj_group.empty())
-        return false; // shouldn't happen?
     for (const auto& obj_ids : wasted_PP_objects) {
-        for (const auto* obj : Objects().findRaw<UniverseObject>(obj_ids)) {
-            if (obj && obj->SystemID() != INVALID_OBJECT_ID) {
-                // found object with wasted PP that is in a system.  zoom there.
-                CenterOnObject(obj->SystemID());
-                SelectSystem(obj->SystemID());
-                ShowProduction();
-                return true;
-            }
+        for (auto id : obj_ids) {
+            const auto* obj = context.ContextObjects().getRaw(id);
+            if (!obj)
+                continue;
+            const auto sys_id = obj->SystemID();
+            if (sys_id == INVALID_OBJECT_ID)
+                continue;
+            // found object with wasted PP that is in a system.  zoom there.
+            CenterOnObject(sys_id);
+            SelectSystem(sys_id);
+            ShowProduction();
+            return true;
         }
     }
     return false;

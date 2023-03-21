@@ -23,7 +23,7 @@ int ClientApp::PlayerID() const
 Empire* ClientApp::GetEmpire(int empire_id)
 { return m_empires.GetEmpire(empire_id).get(); }
 
-int ClientApp::EmpirePlayerID(int empire_id) const {
+int ClientApp::EmpirePlayerID(int empire_id) const noexcept {
     for (const auto& [id, info] : m_player_info)
         if (info.empire_id == empire_id)
             return id;
@@ -55,6 +55,13 @@ void ClientApp::StartTurn(const SaveGameUIData& ui_data)
 
 void ClientApp::StartTurn(const std::string& save_state_string)
 { m_networking->SendMessage(TurnOrdersMessage(m_orders, save_state_string)); }
+
+void ClientApp::RevertOrders() {
+    if (!m_networking || !m_networking->IsTxConnected())
+        return;
+    m_orders.Reset();
+    m_networking->SendMessage(RevertOrdersMessage());
+}
 
 void ClientApp::SendPartialOrders() {
     if (!m_networking || !m_networking->IsTxConnected())

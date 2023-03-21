@@ -789,14 +789,14 @@ namespace {
         }
 
         //TODO report the planet damage details more clearly
-        float total_damage = shield_damage + defense_damage + construction_damage;
+        const float total_damage = shield_damage + defense_damage + construction_damage;
 
-        float pierced_shield_value(0.0);
-        CombatEventPtr attack_event = std::make_shared<WeaponFireEvent>(
+        static constexpr float pierced_shield_value(0.0f);
+        auto attack_event = std::make_shared<WeaponFireEvent>(
             bout, round, attacker->ID(), target->ID(), weapon.ship_part_name,
             std::tie(power, pierced_shield_value, total_damage),
             attacker->Owner(), target->Owner());
-        attacks_event->AddEvent(attack_event); // TODO: should this be a move?
+        attacks_event->AddEvent(std::move(attack_event));
 
         target->SetLastTurnAttackedByShip(combat_info.turn);
     }
@@ -862,16 +862,22 @@ namespace {
     }
 
     bool ObjectCanAttack(const UniverseObject* obj, const ScriptingContext& context) {
-        if (auto ship = dynamic_cast<const Ship*>(obj)) {
+        switch (obj->ObjectType()) {
+        case UniverseObjectType::OBJ_SHIP: {
+            auto ship = static_cast<const Ship*>(obj);
             if (!ship->IsArmed(context))
                 return false;
-            auto fleet = context.ContextObjects().get<Fleet>(ship->FleetID());
+            const auto fleet = context.ContextObjects().get<Fleet>(ship->FleetID());
             return !fleet || fleet->Aggression() > FleetAggression::FLEET_PASSIVE;
-        } else if (obj->ObjectType() == UniverseObjectType::OBJ_PLANET) {
+            break;
+        }
+        case UniverseObjectType::OBJ_PLANET:
             return obj->GetMeter(MeterType::METER_DEFENSE)->Current() > 0.0f;
-        } else if (auto fighter = dynamic_cast<const Fighter*>(obj)) {
-            return fighter->Damage() > 0.0f;
-        } else {
+            break;
+        case UniverseObjectType::OBJ_FIGHTER:
+            return static_cast<const Fighter*>(obj)->Damage() > 0.0f;
+            break;
+        default:
             return false;
         }
     }
@@ -896,13 +902,13 @@ namespace {
             const ShipPart* part = GetShipPart(part_name);
             if (!part)
                 continue;
-            ShipPartClass part_class = part->Class();
+            const ShipPartClass part_class = part->Class();
             const ::Condition::Condition* part_combat_targets = part->CombatTargets();
 
             // direct weapon and fighter-related parts all handled differently...
             if (part_class == ShipPartClass::PC_DIRECT_WEAPON) {
-                float part_attack = ship->CurrentPartMeterValue(MeterType::METER_CAPACITY, part_name);
-                int shots = static_cast<int>(ship->CurrentPartMeterValue(MeterType::METER_SECONDARY_STAT, part_name)); // secondary stat is shots per attack)
+                const float part_attack = ship->CurrentPartMeterValue(MeterType::METER_CAPACITY, part_name);
+                const int shots = static_cast<int>(ship->CurrentPartMeterValue(MeterType::METER_SECONDARY_STAT, part_name)); // secondary stat is shots per attack)
                 if (part_attack > 0.0f && shots > 0) {
                     if (!part_combat_targets)
                         part_combat_targets = is_enemy_ship_fighter_or_armed_planet.get();
@@ -993,19 +999,37 @@ namespace {
         }
     };
 
+    // how many base-10 digits are needed to represent a number as text
+    // note that numeric_limits<>::digits10 is how many base 10 digits can be represented by this type
+    template<typename T, std::enable_if<std::is_integral_v<T>>* = nullptr>
+    constexpr std::size_t Digits(T t) {
+        std::size_t retval = 1;
+
+        if constexpr (std::is_same_v<T, bool>) {
+            return 5; // for "false"
+        } else {
+            if constexpr (std::is_signed_v<T>)
+                retval += (t < 0);
+
+            while (t != 0) {
+                retval += 1;
+                t /= 10;
+            }
+            return retval;
+        }
+    }
+
     /// A collection of information the autoresolution must keep around
     struct AutoresolveInfo {
-        std::set<int>                   valid_attacker_object_ids;  // all objects that can attack
-        std::map<int, EmpireCombatInfo> empire_infos;               // empire specific information, indexed by empire id
-        CombatInfo&                     combat_info;
-        int                             next_fighter_id = -1000001; // give fighters negative ids so as to avoid clashes with any positive-id of persistent UniverseObjects
-        std::set<int>                   destroyed_object_ids;       // objects that have been destroyed so far during this combat
+        boost::container::flat_set<int>                   valid_attacker_object_ids;  // all objects that can attack
+        boost::container::flat_map<int, EmpireCombatInfo> empire_infos;               // empire specific information, indexed by empire id
+        CombatInfo&   combat_info;
+        int           next_fighter_id = -1000001; // give fighters negative ids so as to avoid clashes with any positive-id of persistent UniverseObjects
+        std::set<int> destroyed_object_ids;       // objects that have been destroyed so far during this combat
 
         explicit AutoresolveInfo(CombatInfo& combat_info_) :
             combat_info(combat_info_)
-        {
-            PopulateAttackers();
-        }
+        { PopulateAttackers(); }
 
         std::vector<int> AddFighters(int number, float damage, int owner_empire_id,
                                      int from_ship_id, const std::string& species,
@@ -1110,12 +1134,19 @@ namespace {
             if (!incaps_event->AreSubEventsEmpty(ALL_EMPIRES))
                 bout_event->AddEvent(std::move(incaps_event));
 
-            std::stringstream ss;
-            for (auto id : delete_list) {
-                ss << id << " ";
+
+            for (auto id : delete_list)
                 combat_info.objects.erase(id);
-            }
-            DebugLogger() << "Removed destroyed objects from combat state with ids: " << ss.str();
+
+            DebugLogger() << "Removed destroyed objects from combat state with ids: " << [&delete_list]() {
+                using list_v_t = std::decay_t<decltype(delete_list.front())>;
+                static constexpr auto digits_per_id = Digits(std::numeric_limits<list_v_t>::max());
+                std::string str;
+                str.reserve(delete_list.size() * digits_per_id + 2);
+                for (auto id : delete_list)
+                    str.append(std::to_string(id)).append(" ");
+                return str;
+            }();
         }
 
         /// Checks if target is destroyed and if it is, update lists of living objects.
@@ -1597,47 +1628,47 @@ namespace {
         } // end for over weapons
     }
 
-    void IncreaseStoredFighterCount(std::shared_ptr<Ship>& ship, float recovered_fighters, const Universe& universe) {
-        if (!ship || recovered_fighters <= 0)
+    void IncreaseStoredFighterCount(Ship& ship, float recovered_fighters, const Universe& universe) {
+        if (recovered_fighters <= 0)
             return;
 
         // get how many fighters are initialy in each part type...
         // may be multiple hangar part types, each with different capacity (number of stored fighters)
         std::map<std::string, std::pair<Meter*, Meter*>> ship_part_fighter_hangar_capacities;
 
-        const ShipDesign* design = universe.GetShipDesign(ship->DesignID());
+        const ShipDesign* design = universe.GetShipDesign(ship.DesignID());
         if (!design) {
-            ErrorLogger(combat) << "IncreaseStoredFighterCount couldn't get ship design with id " << ship->DesignID();;
+            ErrorLogger(combat) << "IncreaseStoredFighterCount couldn't get ship design with id " << ship.DesignID();;
             return;
         }
 
         // get hangar part meter values
         for (const std::string& part_name : design->Parts()) {
             const ShipPart* part = GetShipPart(part_name);
-            if (!part)
+            if (!part || part->Class() != ShipPartClass::PC_FIGHTER_HANGAR)
                 continue;
-            if (part->Class() != ShipPartClass::PC_FIGHTER_HANGAR)
-                continue;
-            ship_part_fighter_hangar_capacities[part_name].first = ship->GetPartMeter(MeterType::METER_CAPACITY, part_name);
-            ship_part_fighter_hangar_capacities[part_name].second = ship->GetPartMeter(MeterType::METER_MAX_CAPACITY, part_name);
+            ship_part_fighter_hangar_capacities.try_emplace(
+                part_name,
+                ship.GetPartMeter(MeterType::METER_CAPACITY, part_name),
+                ship.GetPartMeter(MeterType::METER_MAX_CAPACITY, part_name));
         }
 
         // increase capacity meters until requested fighter allocation is
         // recovered. ioesn't matter which part's capacity meters are increased,
         // since all fighters are the same on the ship
-        for (auto& part : ship_part_fighter_hangar_capacities) {
-            if (!part.second.first || !part.second.second)
+        for (auto& [part_name, cap_max] : ship_part_fighter_hangar_capacities) {
+            if (!cap_max.first || !cap_max.second)
                 continue;
-            float space = part.second.second->Current() - part.second.first->Current();
+            float space = cap_max.second->Current() - cap_max.first->Current();
             float increase = std::min(space, recovered_fighters);
             recovered_fighters -= increase;
 
-            DebugLogger() << "Increasing stored fighter count of ship " << ship->Name()
-                          << " (" << ship->ID() << ") from " << part.second.first->Current()
+            DebugLogger() << "Increasing stored fighter count of ship " << ship.Name()
+                          << " (" << ship.ID() << ") from " << cap_max.first->Current()
                           << " by " << increase << " towards max of "
-                          << part.second.second->Current();
+                          << cap_max.second->Current();
 
-            part.second.first->AddToCurrent(increase);
+            cap_max.first->AddToCurrent(increase);
 
             // stop if all fighters recovered
             if (recovered_fighters <= 0.0f)
@@ -1670,18 +1701,18 @@ namespace {
             ships_fighters_to_add_back[launched_from_id]++;
         }
         DebugLogger() << "Fighters left at end of combat:";
-        for (auto [ship_id, fighter_count] : ships_fighters_to_add_back)
+        for (const auto [ship_id, fighter_count] : ships_fighters_to_add_back)
             DebugLogger() << " ... from ship id " << ship_id << " : " << fighter_count;
 
 
         DebugLogger() << "Returning fighters to ships:";
-        for (auto [ship_id, fighter_count] : ships_fighters_to_add_back) {
-            auto ship = combat_info.objects.get<Ship>(ship_id);
+        for (const auto [ship_id, fighter_count] : ships_fighters_to_add_back) {
+            auto ship = combat_info.objects.getRaw<Ship>(ship_id);
             if (!ship) {
                 ErrorLogger(combat) << "Couldn't get ship with id " << ship_id << " for fighter to return to...";
                 continue;
             }
-            IncreaseStoredFighterCount(ship, fighter_count, combat_info.universe);
+            IncreaseStoredFighterCount(*ship, fighter_count, combat_info.universe);
             // launching negative ships indicates recovery of them
             launches_event->AddEvent(std::make_shared<FighterLaunchEvent>(
                 bout, ship_id, ship->Owner(), -static_cast<int>(fighter_count)));

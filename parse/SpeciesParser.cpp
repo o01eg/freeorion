@@ -357,7 +357,9 @@ namespace {
             ordering.push_back(*it);
     }
 
-    boost::python::object py_insert_species_(start_rule_payload::first_type& species_, const boost::python::tuple& args, const boost::python::dict& kw) {
+    boost::python::object py_insert_species_(start_rule_payload::first_type& species_, const boost::python::tuple& args,
+                                             const boost::python::dict& kw)
+    {
         auto name = boost::python::extract<std::string>(kw["name"])();
         auto description = boost::python::extract<std::string>(kw["description"])();
         auto gameplay_description = boost::python::extract<std::string>(kw["gameplay_description"])();
@@ -375,7 +377,17 @@ namespace {
         std::vector<std::unique_ptr<Effect::EffectsGroup>> effectsgroups;
         boost::python::stl_input_iterator<effect_group_wrapper> effectsgroups_begin(kw["effectsgroups"]), effectsgroups_end;
         for (auto it = effectsgroups_begin; it != effectsgroups_end; ++it) {
-            effectsgroups.push_back(std::make_unique<Effect::EffectsGroup>(std::move(*it->effects_group)));
+            const auto& effects_group = *it->effects_group;
+            effectsgroups.push_back(std::make_unique<Effect::EffectsGroup>(
+                ValueRef::CloneUnique(effects_group.Scope()),
+                ValueRef::CloneUnique(effects_group.Activation()),
+                ValueRef::CloneUnique(effects_group.Effects()),
+                effects_group.AccountingLabel(),
+                effects_group.StackingGroup(),
+                effects_group.Priority(),
+                effects_group.GetDescription(),
+                effects_group.TopLevelContent()
+            ));
         }
         bool playable = false;
         if (kw.has_key("playable")) {
@@ -395,10 +407,16 @@ namespace {
         }
         boost::python::stl_input_iterator<std::string> tags_begin(kw["tags"]), it_end;
         std::set<std::string> tags(tags_begin, it_end);
-        boost::python::stl_input_iterator<std::string> likes_begin(kw["likes"]);
-        std::set<std::string> likes(likes_begin, it_end);
-        boost::python::stl_input_iterator<std::string> dislikes_begin(kw["dislikes"]);
-        std::set<std::string> dislikes(dislikes_begin, it_end);
+        std::set<std::string> likes;
+        if (kw.has_key("likes")) {
+            boost::python::stl_input_iterator<std::string> likes_begin(kw["likes"]);
+            likes = std::move(std::set<std::string>(likes_begin, it_end));
+        }
+        std::set<std::string> dislikes;
+        if (kw.has_key("dislikes")) {
+            boost::python::stl_input_iterator<std::string> dislikes_begin(kw["dislikes"]);
+            dislikes = std::move(std::set<std::string>(dislikes_begin, it_end));
+        }
         auto graphic = boost::python::extract<std::string>(kw["graphic"])();
         double spawn_rate = 1.0;
         if (kw.has_key("spawnrate")) {

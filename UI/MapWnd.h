@@ -368,6 +368,8 @@ private:
     void RemoveFromWndStack(std::shared_ptr<GG::Wnd> wnd);
     bool ReturnToMap();
 
+    bool RevertOrders();
+
     bool EndTurn();
     void ToggleAutoEndTurn();
 
@@ -505,8 +507,6 @@ private:
 
     std::map<int, MovementLineData> m_fleet_lines;                  //!< lines used for moving fleets in the main map
     std::map<int, MovementLineData> m_projected_fleet_lines;        //!< lines that show the projected path of the active fleet in the FleetWnd
-
-    std::pair<int, int>             m_line_between_systems = {INVALID_OBJECT_ID, INVALID_OBJECT_ID};//!< set when map should render line connecting 2 systems
 
     std::map<std::shared_ptr<GG::Texture>, GG::GL2DVertexBuffer> m_star_core_quad_vertices;
     std::map<std::shared_ptr<GG::Texture>, GG::GL2DVertexBuffer> m_star_halo_quad_vertices;

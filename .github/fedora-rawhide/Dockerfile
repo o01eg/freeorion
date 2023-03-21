@@ -15,6 +15,6 @@ RUN dnf install -y cmake \
 	libogg-devel \
 	libvorbis-devel \
 	glew-devel \
-    godot-headless \
-    python3-psycopg2
+	godot3-headless \
+	python3-psycopg2
 

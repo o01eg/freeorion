@@ -196,10 +196,9 @@ namespace {
         int i = 0;
         for (auto& queue_element : queue) {
             queue_element.allocated_pp = 0.0f;  // default, to be updated below...
-            if (queue_element.paused) {
-                TraceLogger() << "allocation: " << queue_element.allocated_pp
-                              << "  to: " << queue_element.item.name
-                              << "  due to it being paused";
+            if (queue_element.paused || queue_element.to_be_removed) {
+                TraceLogger() << "allocation: " << queue_element.allocated_pp << "  to: " << queue_element.item.name
+                              << "  due to it being paused or marked to be removed";
                 ++i;
                 continue;
             }
@@ -213,8 +212,7 @@ namespace {
             if ((group_pp_available <= 0) &&
                 (available_stockpile <= 0 || !queue_element.allowed_imperial_stockpile_use))
             {
-                TraceLogger() << "allocation: " << queue_element.allocated_pp
-                              << "  to: " << queue_element.item.name
+                TraceLogger() << "allocation: " << queue_element.allocated_pp << "  to: " << queue_element.item.name
                               << "  due to lack of available PP in group";
                 queue_element.allocated_pp = 0.0f;
                 ++i;
@@ -551,22 +549,6 @@ std::string ProductionQueue::ProductionItem::Dump() const {
 //////////////////////////////
 // ProductionQueue::Element //
 //////////////////////////////
-ProductionQueue::Element::Element(ProductionItem item_, int empire_id_,
-                                  boost::uuids::uuid uuid_, int ordered_,
-                                  int remaining_, int blocksize_, int location_, bool paused_,
-                                  bool allowed_imperial_stockpile_use_) :
-    item(item_),
-    empire_id(empire_id_),
-    ordered(ordered_),
-    blocksize(blocksize_),
-    remaining(remaining_),
-    location(location_),
-    blocksize_memory(blocksize_),
-    paused(paused_),
-    allowed_imperial_stockpile_use(allowed_imperial_stockpile_use_),
-    uuid(uuid_)
-{}
-
 std::pair<float, int> ProductionQueue::Element::ProductionCostAndTime(const ScriptingContext& context) const
 { return item.ProductionCostAndTime(empire_id, location, context); }
 
@@ -609,14 +591,17 @@ float ProductionQueue::StockpileCapacity(const ObjectMap& objects) const {
     return retval;
 }
 
-std::set<std::set<int>> ProductionQueue::ObjectsWithWastedPP(const std::shared_ptr<const ResourcePool>& industry_pool) const {
-    std::set<std::set<int>> retval;
-    if (!industry_pool) {
+std::vector<std::vector<int>> ProductionQueue::ObjectsWithWastedPP(const ResourcePool& industry_pool) const {
+    std::vector<std::vector<int>> retval;
+
+    if (industry_pool.Type() != ResourceType::RE_INDUSTRY) {
         ErrorLogger() << "ProductionQueue::ObjectsWithWastedPP passed invalid industry resource pool";
         return retval;
     }
 
-    for (auto& [group, avail_pp_in_group] : industry_pool->Output()) {
+    const auto& output = industry_pool.Output();
+    retval.reserve(output.size());
+    for (auto& [group, avail_pp_in_group] : industry_pool.Output()) {
         //std::cout << "available PP groups size: " << avail_pp.first.size() << " pp: " << avail_pp.second << std::endl;
 
         if (avail_pp_in_group <= 0)
@@ -624,10 +609,11 @@ std::set<std::set<int>> ProductionQueue::ObjectsWithWastedPP(const std::shared_p
 
         // find this group's allocated PP
         auto alloc_it = m_object_group_allocated_pp.find(group);
-        // is less allocated than is available?  if so, some is wasted (assumes stockpile contribuutions can never be lossless)
-        // XXX maybe should check stockpile input ratio
+        // is less allocated than is available? if so, some is wasted
+        // (assuming stockpile contributions can never be lossless)
+        // maybe should check stockpile input ratio
         if (alloc_it == m_object_group_allocated_pp.end() || alloc_it->second < avail_pp_in_group)
-            retval.insert(group);
+            retval.emplace_back(group.begin(), group.end());
     }
     return retval;
 }
@@ -671,9 +657,9 @@ void ProductionQueue::Update(const ScriptingContext& context) {
     SectionedScopedTimer update_timer("ProductionQueue::Update");
     update_timer.EnterSection("Get PP");
 
-    auto industry_resource_pool = empire->GetResourcePool(ResourceType::RE_INDUSTRY);
-    auto& available_pp = industry_resource_pool->Output();
-    float pp_in_stockpile = industry_resource_pool->Stockpile();
+    auto& industry_resource_pool = empire->GetIndustryPool();
+    auto& available_pp = industry_resource_pool.Output();
+    float pp_in_stockpile = industry_resource_pool.Stockpile();
     TraceLogger() << "========= pp_in_stockpile:     " << pp_in_stockpile << " ========";
     float stockpile_limit = StockpileCapacity(context.ContextObjects());
     float available_stockpile = std::min(pp_in_stockpile, stockpile_limit);
@@ -708,7 +694,7 @@ void ProductionQueue::Update(const ScriptingContext& context) {
     update_timer.EnterSection("Cacheing Costs");
     // cache producibility, and production item costs and times
     // initialize production queue item completion status to 'never'
-    std::map<std::pair<ProductionQueue::ProductionItem, int>,
+    std::map<std::pair<ProductionQueue::ProductionItem, int>,  // TODO: rework as vector, avoid allocations esp. for lookup. see Empire ItemCostAndTime caching stuff
              std::pair<float, int>> queue_item_costs_and_times;
     std::vector<bool> is_producible;
     for (auto& elem : m_queue) {
@@ -718,7 +704,7 @@ void ProductionQueue::Update(const ScriptingContext& context) {
                            INVALID_OBJECT_ID : elem.location);
         auto key = std::pair{elem.item, location_id};
 
-        if (!queue_item_costs_and_times.count(key))
+        if (!queue_item_costs_and_times.count(key)) // TOOD: try_emplace?
             queue_item_costs_and_times[key] = elem.ProductionCostAndTime(context);
 
         elem.turns_left_to_next_item = -1;
@@ -734,7 +720,7 @@ void ProductionQueue::Update(const ScriptingContext& context) {
     update_timer.EnterSection("Set Spending");
     // allocate pp to queue elements, returning updated available pp and updated
     // allocated pp for each group of resource sharing objects
-    float project_transfer_to_stockpile = SetProdQueueElementSpending(
+    const float project_transfer_to_stockpile = SetProdQueueElementSpending(
         available_pp, available_stockpile, stockpile_limit, queue_element_groups,
         queue_item_costs_and_times, is_producible, m_queue,
         m_object_group_allocated_pp, m_object_group_allocated_stockpile_pp,
@@ -750,7 +736,7 @@ void ProductionQueue::Update(const ScriptingContext& context) {
 
     // if at least one resource-sharing system group have available PP, simulate
     // future turns to predict when build items will be finished
-    bool simulate_future = false;
+    bool simulate_future = false; // TODO: use any_of, make const
     for (auto& available : available_pp) {
         if (available.second > EPSILON) {
             simulate_future = true;
@@ -781,9 +767,9 @@ void ProductionQueue::Update(const ScriptingContext& context) {
     // this would also be inaccurate anyway due to player choices or random
     // chance, so for simplicity, it is assumed that building location
     // conditions evaluated at the present turn apply indefinitely.
-    update_timer.EnterSection("Remove Unproducible");
+    update_timer.EnterSection("Remove Unproducible and Marked To Remove");
     for (unsigned int i = 0; i < sim_queue.size(); ++i) {
-        if (sim_queue[i].paused || !is_producible[i]) {
+        if (sim_queue[i].paused || sim_queue[i].to_be_removed || !is_producible[i]) {
             sim_queue.erase(sim_queue.begin() + i);
             is_producible.erase(is_producible.begin() + i);
             queue_element_groups.erase(queue_element_groups.begin() + i);
@@ -860,15 +846,7 @@ void ProductionQueue::Update(const ScriptingContext& context) {
     ProductionQueueChangedSignal();
 }
 
-void ProductionQueue::push_back(const Element& element) {
-    if (find(element.uuid) != end()) {
-        ErrorLogger() << "Trying to push back repeated UUID " << element.uuid;
-        throw std::invalid_argument("Repeated use of UUID");
-    }
-    m_queue.push_back(element);
-}
-
-void ProductionQueue::push_back(Element&& element) {
+void ProductionQueue::push_back(Element element) {
     if (find(element.uuid) != end()) {
         ErrorLogger() << "Trying to push back repeated UUID " << element.uuid;
         throw std::invalid_argument("Repeated use of UUID");
@@ -876,12 +854,12 @@ void ProductionQueue::push_back(Element&& element) {
     m_queue.push_back(std::move(element));
 }
 
-void ProductionQueue::insert(iterator it, const Element& element) {
+void ProductionQueue::insert(iterator it, Element element) {
     if (find(element.uuid) != end()) {
         ErrorLogger() << "Trying to insert repeated UUID " << element.uuid;
         throw std::invalid_argument("Repeated use of UUID");
     }
-    m_queue.insert(it, element);
+    m_queue.insert(it, std::move(element));
 }
 
 void ProductionQueue::erase(int i) {

@@ -131,7 +131,7 @@ ServerApp::ServerApp() :
     // to have data initialized before autostart execution
     std::promise<void> barrier;
     std::future<void> barrier_future = barrier.get_future();
-    StartBackgroundParsing(PythonParser(m_python_server, GetResourceDir() / "scripting"), std::move(barrier));
+    StartBackgroundParsing(PythonParser(m_python_server, GetResourceDir() / "scripting", false), std::move(barrier));
     barrier_future.wait();
 
     m_fsm->initiate();
@@ -448,6 +448,7 @@ void ServerApp::HandleMessage(const Message& msg, PlayerConnectionPtr player_con
     case Message::MessageType::MODERATOR_ACTION:         m_fsm->process_event(ModeratorAct(msg, player_connection));     break;
     case Message::MessageType::ELIMINATE_SELF:           m_fsm->process_event(EliminateSelf(msg, player_connection));    break;
     case Message::MessageType::AUTO_TURN:                m_fsm->process_event(AutoTurn(msg, player_connection));         break;
+    case Message::MessageType::REVERT_ORDERS:            m_fsm->process_event(RevertOrders(msg, player_connection));     break;
 
     case Message::MessageType::ERROR_MSG:
     case Message::MessageType::DEBUG:                    break;
@@ -1608,8 +1609,8 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
 
     TraceLogger(effects) << "After First turn meter effect applying: " << m_universe.Objects().Dump();
     // Set active meters to targets or maxes after first meter effects application
+    m_universe.BackPropagateObjectMeters();
     SetActiveMetersToTargetMaxCurrentValues(m_universe.Objects());
-
     m_universe.UpdateMeterEstimates(context);
     m_universe.BackPropagateObjectMeters();
     SetActiveMetersToTargetMaxCurrentValues(m_universe.Objects());
@@ -2138,10 +2139,10 @@ Networking::ClientType ServerApp::GetPlayerClientType(int player_id) const {
     if (player_id == Networking::INVALID_PLAYER_ID)
         return Networking::ClientType::INVALID_CLIENT_TYPE;
 
-   auto it = m_networking.GetPlayer(player_id);
+    const auto it = m_networking.GetPlayer(player_id);
     if (it == m_networking.established_end())
         return Networking::ClientType::INVALID_CLIENT_TYPE;
-    PlayerConnectionPtr player_connection = *it;
+    const auto& player_connection = *it;
     return player_connection->GetClientType();
 }
 
@@ -2154,18 +2155,15 @@ void ServerApp::AddEmpireTurn(int empire_id, const PlayerSaveGameData& psgd)
 void ServerApp::RemoveEmpireTurn(int empire_id)
 { m_turn_sequence.erase(empire_id); }
 
-void ServerApp::ClearEmpireTurnOrders() {
-    for (auto& [empire_id, save_data] : m_turn_sequence) {
-        (void)empire_id;
-        if (save_data) {
+void ServerApp::ClearEmpireTurnOrders(int empire_id) {
+    for (auto& [stored_empire_id, save_game_data] : m_turn_sequence) {
+        if (empire_id != ALL_EMPIRES && stored_empire_id != empire_id)
+            continue; // all empires, unless a single one was specified
+        if (save_game_data) {
             // reset only orders
             // left UI data and AI state intact
-            save_data->orders.reset();
+            save_game_data->orders.reset();
         }
-    }
-    for (auto& [empire_id, empire] : m_empires) {
-        (void)empire_id;
-        empire->AutoTurnSetReady();
     }
 }
 
@@ -3107,13 +3105,12 @@ namespace {
         const auto& empire_ids = context.EmpireIDs();
 
         // collect ships that are invading and the troops they carry
-        for (auto* ship : objects.allRaw<Ship>()) { // TODO: convert to findRaw
-            if (ship->SystemID() == INVALID_OBJECT_ID)
-                continue;
-            if (ship->OrderedInvadePlanet() == INVALID_OBJECT_ID)
-                continue;
-            if (!ship->HasTroops(universe)) // can't invade without troops
-                continue;
+        for (auto* ship : objects.findRaw<Ship>([&universe](const Ship& s) {
+                                                    return s.SystemID() != INVALID_OBJECT_ID &&
+                                                        s.OrderedInvadePlanet() != INVALID_OBJECT_ID &&
+                                                        s.HasTroops(universe);
+                                                }))
+        {
             invade_ships.push_back(ship);
 
             auto* planet = objects.getRaw<Planet>(ship->OrderedInvadePlanet());
@@ -3568,6 +3565,11 @@ void ServerApp::PreCombatProcessTurns() {
 
     // clean up orders, which are no longer needed
     ClearEmpireTurnOrders();
+    // TODO: CHECK THIS: was in ClearEmpireTurnOrders... needed?
+    for (auto& [empire_id, empire] : m_empires) {
+        (void)empire_id;
+        empire->AutoTurnSetReady();
+    }
 
     // update focus history info
     UpdateResourceCenterFocusHistoryInfo(context.ContextObjects());
@@ -3969,12 +3971,29 @@ void ServerApp::PostCombatProcessTurns() {
          player_it != m_networking.established_end(); ++player_it)
     {
         PlayerConnectionPtr player = *player_it;
-        int player_id = player->PlayerID();
+        const int player_id = player->PlayerID();
         players[player_id] = PlayerInfo{player->PlayerName(),
                                         PlayerEmpireID(player_id),
                                         player->GetClientType(),
                                         m_networking.PlayerIsHost(player_id)};
     }
+    // TEST
+    auto server_players = this->GetPlayerInfoMap(); 
+    if (server_players.size() != players.size())
+        WarnLogger() << "PostCombatProcessTurns constructed players has different size than server players";
+    for (auto it1 = server_players.begin(), it2 = players.begin(); it1 != server_players.end(); ++it1, ++it2) {
+        if (it1->first != it2->first)
+            WarnLogger() << "PostCombatProcessTurns constructed player info id " << it1->first
+                         << " differs from server info id " << it2->first;
+        if (it1->second != it2->second) {
+            WarnLogger() << "PostCombatProcessTurns constructed player info differs from server player info:\n" <<
+                it1->second.name << " ? " << it2->second.name << "\n" <<
+                it1->second.empire_id << " ? " << it2->second.empire_id << "\n" <<
+                it1->second.client_type << " ? " << it2->second.client_type << "\n" <<
+                it1->second.host << " ? " << it2->second.host;
+        }
+    }
+    // END TEST
 
     m_universe.ObfuscateIDGenerator();
 
@@ -3985,13 +4004,13 @@ void ServerApp::PostCombatProcessTurns() {
          player_it != m_networking.established_end(); ++player_it)
     {
         PlayerConnectionPtr player = *player_it;
-        int empire_id = PlayerEmpireID(player->PlayerID());
-        auto empire = m_empires.GetEmpire(empire_id);
+        const int empire_id = PlayerEmpireID(player->PlayerID());
+        const auto empire = m_empires.GetEmpire(empire_id);
         if (empire ||
             player->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR ||
             player->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER)
         {
-            bool use_binary_serialization = player->IsBinarySerializationUsed();
+            const bool use_binary_serialization = player->IsBinarySerializationUsed();
             player->SendMessage(TurnUpdateMessage(empire_id,                m_current_turn,
                                                   m_empires,                m_universe,
                                                   m_species_manager,        GetCombatLogManager(),

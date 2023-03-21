@@ -125,6 +125,8 @@ if(APPLE)
     set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/dep/")
     set(CMAKE_FRAMEWORK_PATH "${CMAKE_BINARY_DIR}/dep/Frameworks")
     set(CMAKE_PROGRAM_PATH "${CMAKE_FRAMEWORK_PATH}/Python.framework/Versions/3.7/bin")
+    set(BOOST_ROOT "${CMAKE_BINARY_DIR}/dep/")
+    set(Boost_NO_SYSTEM_PATHS ON)
 endif()
 
 if(UNIX)
@@ -345,6 +347,8 @@ set_property(DIRECTORY APPEND
         $<$<PLATFORM_ID:FreeBSD>:BOOST_DATE_TIME_NO_LOCALE>
         # Forcing backtrace using api for boost stacktrace due to lacking on ::Unwind side
         $<$<PLATFORM_ID:FreeBSD>:BOOST_STACKTRACE_USE_LIBC_BACKTRACE_FUNCTION>
+        # Workaround for boost 1.81 issue https://github.com/boostorg/phoenix/issues/111
+        $<$<VERSION_EQUAL:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.81>:BOOST_PHOENIX_STL_TUPLE_H_>
 )
 
 

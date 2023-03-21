@@ -1,10 +1,13 @@
 from common.base_prod import RESEARCH_PER_POP
+from common.misc import DESCRIPTION_EFFECTSGROUP_MACRO
 from common.priorities import (
     TARGET_AFTER_SCALING_PRIORITY,
     TARGET_EARLY_BEFORE_SCALING_PRIORITY,
     TARGET_SCALING_PRIORITY,
 )
-from species.common.multiplier import BAD_MULTIPLIER
+from species.common.multiplier import BAD_MULTIPLIER, GOOD_MULTIPLIER
+
+NO_RESEARCH = DESCRIPTION_EFFECTSGROUP_MACRO("NO_RESEARCH_DESC")
 
 BASIC_RESEARCH = [
     EffectsGroup(
@@ -32,5 +35,17 @@ BAD_RESEARCH = [
         accountinglabel="BAD_RESEARCH_LABEL",
         priority=TARGET_SCALING_PRIORITY,
         effects=SetTargetResearch(value=Value * BAD_MULTIPLIER),
+    ),
+]
+
+GOOD_RESEARCH = [
+    *BASIC_RESEARCH,
+    EffectsGroup(
+        description="GOOD_RESEARCH_DESC",
+        scope=Source,
+        activation=Planet() & Focus(type=["FOCUS_RESEARCH"]) & Happiness(low=2),
+        accountinglabel="GOOD_RESEARCH_LABEL",
+        priority=TARGET_SCALING_PRIORITY,
+        effects=SetTargetResearch(value=Value * GOOD_MULTIPLIER),
     ),
 ]

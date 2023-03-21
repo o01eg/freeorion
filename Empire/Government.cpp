@@ -170,15 +170,15 @@ uint32_t Policy::GetCheckSum() const {
 const Policy* PolicyManager::GetPolicy(std::string_view name) const {
     CheckPendingPolicies();
     auto it = m_policies.find(name);
-    return it == m_policies.end() ? nullptr : it->second.get();
+    return it == m_policies.end() ? nullptr : &it->second;
 }
 
 std::vector<std::string_view> PolicyManager::PolicyNames() const {
     CheckPendingPolicies();
     std::vector<std::string_view> retval;
     retval.reserve(m_policies.size());
-    for (const auto& policy : m_policies)
-        retval.emplace_back(policy.first);
+    std::transform(m_policies.begin(), m_policies.end(), std::back_inserter(retval),
+                   [](const auto& name_policy) -> std::string_view { return name_policy.first; });
     return retval;
 }
 
@@ -186,17 +186,22 @@ std::vector<std::string_view> PolicyManager::PolicyNames(const std::string& cate
     CheckPendingPolicies();
     std::vector<std::string_view> retval;
     retval.reserve(m_policies.size());
-    for (const auto& policy : m_policies)
-        if (policy.second->Category() == category_name)
-            retval.emplace_back(policy.first);
+    // transform_if
+    for (const auto& [policy_name, policy] : m_policies)
+        if (policy.Category() == category_name)
+            retval.emplace_back(policy_name);
     return retval;
 }
 
-std::set<std::string_view> PolicyManager::PolicyCategories() const {
+std::vector<std::string_view> PolicyManager::PolicyCategories() const {
     CheckPendingPolicies();
-    std::set<std::string_view> retval;
-    for (const auto& policy : m_policies)
-        retval.emplace(policy.second->Category());
+    std::vector<std::string_view> retval;
+    retval.reserve(12); // guesstimate
+    std::transform(m_policies.begin(), m_policies.end(), std::back_inserter(retval),
+                   [](const auto& name_policy) -> std::string_view { return name_policy.second.Category(); });
+    std::sort(retval.begin(), retval.end());
+    auto unique_it = std::unique(retval.begin(), retval.end());
+    retval.erase(unique_it, retval.end());
     return retval;
 }
 
@@ -214,7 +219,22 @@ void PolicyManager::CheckPendingPolicies() const {
     if (!m_pending_types)
         return;
 
-    Pending::SwapPending(m_pending_types, m_policies);
+    auto parsed = WaitForPending(m_pending_types);
+    if (!parsed)
+        return;
+    auto parsed_vec{std::move(*parsed)};
+    if (parsed_vec.empty())
+        return;
+
+    std::sort(parsed_vec.begin(), parsed_vec.end(),
+              [](const auto& lhs, const auto& rhs) { return lhs.Name() < rhs.Name(); });
+
+    m_policies.reserve(parsed_vec.size());
+
+    for (auto& policy : parsed_vec) {
+        auto name{policy.Name()};
+        m_policies.try_emplace(m_policies.end(), std::move(name), std::move(policy));
+    }
 }
 
 uint32_t PolicyManager::GetCheckSum() const {
@@ -228,7 +248,7 @@ uint32_t PolicyManager::GetCheckSum() const {
     return retval;
 }
 
-void PolicyManager::SetPolicies(Pending::Pending<PoliciesTypeMap>&& future)
+void PolicyManager::SetPolicies(Pending::Pending<std::vector<Policy>>&& future)
 { m_pending_types = std::move(future); }
 
 ///////////////////////////////////////////////////////////

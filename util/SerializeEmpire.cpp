@@ -77,6 +77,12 @@ void ProductionQueue::Element::serialize(Archive& ar, const unsigned int version
         & BOOST_SERIALIZATION_NVP(paused)
         & BOOST_SERIALIZATION_NVP(allowed_imperial_stockpile_use);
 
+    if (Archive::is_loading::value && version < 3) {
+        to_be_removed = false;
+    } else {
+        ar  & BOOST_SERIALIZATION_NVP(to_be_removed);
+    }
+
     if constexpr (Archive::is_saving::value) {
         // Serialization of uuid as a primitive doesn't work as expected from
         // the documentation.  This workaround instead serializes a string
@@ -84,7 +90,7 @@ void ProductionQueue::Element::serialize(Archive& ar, const unsigned int version
         auto string_uuid = boost::uuids::to_string(uuid);
         ar & BOOST_SERIALIZATION_NVP(string_uuid);
 
-     } else if (Archive::is_loading::value && version < 2) {
+    } else if (Archive::is_loading::value && version < 2) {
         // assign a random ID to this element so that future-issued orders can refer to it
         uuid = boost::uuids::random_generator()();
 
@@ -101,7 +107,7 @@ void ProductionQueue::Element::serialize(Archive& ar, const unsigned int version
     }
 }
 
-BOOST_CLASS_VERSION(ProductionQueue::Element, 2)
+BOOST_CLASS_VERSION(ProductionQueue::Element, 3)
 
 template void ProductionQueue::Element::serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, const unsigned int);
 template void ProductionQueue::Element::serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, const unsigned int);
@@ -186,7 +192,7 @@ void Empire::serialize(Archive& ar, const unsigned int version)
     bool allied_visible = visible;
     if constexpr (Archive::is_saving::value)
         allied_visible = allied_visible || Empires().GetDiplomaticStatus(m_id, GlobalSerializationEncodingForEmpire()) ==
-            DiplomaticStatus::DIPLO_ALLIED;
+            DiplomaticStatus::DIPLO_ALLIED; // TODO: pass in diplo status map?
 
     TraceLogger() << "serializing empire " << m_id << ": " << m_name;
     TraceLogger() << "encoding empire: " << encoding_empire;
@@ -287,9 +293,26 @@ void Empire::serialize(Archive& ar, const unsigned int version)
     if (visible) {
         try {
         ar  & boost::serialization::make_nvp("m_ship_designs", m_known_ship_designs);
-        ar  & BOOST_SERIALIZATION_NVP(m_sitrep_entries)
-            & BOOST_SERIALIZATION_NVP(m_resource_pools)
-            & BOOST_SERIALIZATION_NVP(m_population_pool);
+        ar  & BOOST_SERIALIZATION_NVP(m_sitrep_entries);
+        if (Archive::is_loading::value && version < 12) {
+            std::map<ResourceType, std::shared_ptr<ResourcePool>> scratch;
+            ar  & boost::serialization::make_nvp("m_resource_pools", scratch);
+            auto it = scratch.find(ResourceType::RE_INDUSTRY);
+            if (it != scratch.end())
+                m_industry_pool = std::move(*it->second);
+            it = scratch.find(ResourceType::RE_RESEARCH);
+            if (it != scratch.end())
+                m_research_pool = std::move(*it->second);
+            it = scratch.find(ResourceType::RE_INFLUENCE);
+            if (it != scratch.end())
+                m_influence_pool = std::move(*it->second);
+
+        } else {
+            ar  & BOOST_SERIALIZATION_NVP(m_industry_pool)
+                & BOOST_SERIALIZATION_NVP(m_research_pool)
+                & BOOST_SERIALIZATION_NVP(m_influence_pool);
+        }
+        ar  & BOOST_SERIALIZATION_NVP(m_population_pool);
 
         if (Archive::is_loading::value && version < 8) {
             std::set<int> explored_system_ids;
@@ -347,7 +370,7 @@ void Empire::serialize(Archive& ar, const unsigned int version)
     TraceLogger() << "DONE serializing empire " << m_id << ": " << m_name;
 }
 
-BOOST_CLASS_VERSION(Empire, 11)
+BOOST_CLASS_VERSION(Empire, 12)
 
 template void Empire::serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, const unsigned int);
 template void Empire::serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, const unsigned int);

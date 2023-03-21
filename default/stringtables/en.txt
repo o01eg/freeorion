@@ -1006,6 +1006,12 @@ Return to Main Menu without saving.
 ABORT_SAVE_AND_EXIT
 Exit FreeOrion without saving.
 
+WRONG_CLIENT_TYPE_AUTOTURN
+Only human players can set automatic cycling.
+
+WRONG_CLIENT_TYPE_REVERT_ORDERS
+Orders cannot be reverted for non-players.
+
 EMPIRE_NOT_FOUND_CANT_HANDLE_ORDERS
 No empire is being controlled by this client; orders cannot be issued.
 
@@ -3548,6 +3554,12 @@ Turn %1%
 MAP_BTN_TURN_UNREADY
 Revise %1%
 
+MAP_BTN_TURN_REVOKE
+Revoke %2% Orders and Restart Turn %1%
+
+MAP_BTN_TURN_SEND_AND_START
+Send %2% Orders and Start Turn %1%
+
 MAP_BTN_TURN_TOOLTIP
 Start Turn
 
@@ -4881,7 +4893,10 @@ RALLY_QUEUE_ITEM
 Rally to %1%
 
 DELETE_QUEUE_ITEM
-<rgba 255 0 0 255>Remove from Queue</rgba>
+<rgba 255 64 64 255>Remove from Queue</rgba>
+
+UNDELETE_QUEUE_ITEM
+<rgba 96 255 96 255>Restore to Queue</rgba>
 
 MOVE_UP_QUEUE_ITEM
 Move to Queue Top
@@ -5459,28 +5474,28 @@ ORDER_FLEET_NEW
 New %3% fleet named %1% with %2% ships
 
 ORDER_FLEET_MOVE
-Fleet Move
+Fleet Move %1% to %2%
 
 ORDER_FLEET_TRANSFER
-Fleet Transfer
+Fleet Transfer %1% to %2%
 
 ORDER_COLONIZE
-Colonize
+Colonize %1% with %2%
 
 ORDER_INVADE
-Invade
+Invade %1% with %2%
 
 ORDER_BOMBARD
-Bombard
+Bombard %1% with %2%
 
 ORDER_FOCUS_CHANGE
-Focus Change
+Focus Change %1% to %2%
 
 ORDER_POLICY_ADOPT
-Adopt Policy
+Adopt Policy %1% in category %2% slot %3%
 
 ORDER_POLICY_ABANDON
-Abandon Policy
+Abandon Policy %1%
 
 ORDER_RESEARCH
 Research
@@ -16404,7 +16419,7 @@ SH_HEAVY_ASTEROID
 Heavy Asteroid Hull
 
 SH_HEAVY_ASTEROID_DESC
-'''This hull is constructed from a gigantic asteroid, and has six external slots and three internal slots.
+'''This hull is constructed from a gigantic asteroid, and has six external slots and two internal slots.
 
 [[metertype METER_STEALTH]] is medium but the hull gets a large bonus on the galaxy map when it is in a system with an asteroid belt, and in combat when it is hiding in an asteroid belt. [[metertype METER_DETECTION]] is medium and [[metertype METER_SPEED]] is low.
 

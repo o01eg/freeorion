@@ -504,7 +504,7 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
 }
 
 std::string FleetMoveOrder::Dump() const
-{ return UserString("ORDER_FLEET_MOVE"); }
+{ return boost::io::str(FlexibleFormat(UserString("ORDER_FLEET_MOVE")) % m_fleet % m_dest_system) + ExecutedTag(this); }
 
 bool FleetMoveOrder::Check(int empire_id, int fleet_id, int dest_system_id,
                            bool append, const ScriptingContext& context)
@@ -607,8 +607,16 @@ FleetTransferOrder::FleetTransferOrder(int empire, int dest_fleet, std::vector<i
         ErrorLogger() << "FleetTransferOrder constructor found problem...";
 }
 
-std::string FleetTransferOrder::Dump() const
-{ return UserString("ORDER_FLEET_TRANSFER"); }
+std::string FleetTransferOrder::Dump() const {
+    std::string ships;
+    if (!m_add_ships.empty()) {
+        ships.reserve(15*m_add_ships.size()); // guesstimate
+        for (auto s : m_add_ships)
+            ships.append(std::to_string(s)).append(" ");
+        ships.resize(ships.length() - 1);
+    }
+    return boost::io::str(FlexibleFormat(UserString("ORDER_FLEET_TRANSFER")) % ships % m_dest_fleet) + ExecutedTag(this);
+}
 
 bool FleetTransferOrder::Check(int empire_id, int dest_fleet_id, const std::vector<int>& ship_ids,
                                const ScriptingContext& context)
@@ -749,7 +757,7 @@ ColonizeOrder::ColonizeOrder(int empire, int ship, int planet, const ScriptingCo
 { Check(empire, m_ship, m_planet, context); }
 
 std::string ColonizeOrder::Dump() const
-{ return UserString("ORDER_COLONIZE"); }
+{ return boost::io::str(FlexibleFormat(UserString("ORDER_COLONIZE")) % m_planet % m_ship) + ExecutedTag(this); }
 
 bool ColonizeOrder::Check(int empire_id, int ship_id, int planet_id,
                           const ScriptingContext& context)
@@ -889,7 +897,7 @@ InvadeOrder::InvadeOrder(int empire, int ship, int planet, const ScriptingContex
 { Check(empire, m_ship, m_planet, context); }
 
 std::string InvadeOrder::Dump() const
-{ return UserString("ORDER_INVADE"); }
+{ return boost::io::str(FlexibleFormat(UserString("ORDER_INVADE")) % m_planet % m_ship) + ExecutedTag(this); }
 
 bool InvadeOrder::Check(int empire_id, int ship_id, int planet_id, const ScriptingContext& context) {
     const Universe& u = context.ContextUniverse();
@@ -1023,7 +1031,7 @@ BombardOrder::BombardOrder(int empire, int ship, int planet, const ScriptingCont
 { Check(empire, m_ship, m_planet, context); }
 
 std::string BombardOrder::Dump() const
-{ return UserString("ORDER_BOMBARD"); }
+{ return boost::io::str(FlexibleFormat(UserString("ORDER_BOMBARD")) % m_planet % m_ship) + ExecutedTag(this); }
 
 bool BombardOrder::Check(int empire_id, int ship_id, int planet_id,
                          const ScriptingContext& context)
@@ -1128,15 +1136,14 @@ bool BombardOrder::UndoImpl(ScriptingContext& context) const {
 ////////////////////////////////////////////////
 // ChangeFocusOrder
 ////////////////////////////////////////////////
-ChangeFocusOrder::ChangeFocusOrder(int empire, int planet, std::string focus,
-                                   const ScriptingContext& context) :
+ChangeFocusOrder::ChangeFocusOrder(int empire, int planet, std::string focus, const ScriptingContext& context) :
     Order(empire),
     m_planet(planet),
     m_focus(std::move(focus))
 { Check(empire, m_planet, m_focus, context); }
 
 std::string ChangeFocusOrder::Dump() const
-{ return UserString("ORDER_FOCUS_CHANGE"); }
+{ return boost::io::str(FlexibleFormat(UserString("ORDER_FOCUS_CHANGE")) % m_planet % m_focus) + ExecutedTag(this); }
 
 bool ChangeFocusOrder::Check(int empire_id, int planet_id, const std::string& focus,
                              const ScriptingContext& context)
@@ -1187,8 +1194,14 @@ PolicyOrder::PolicyOrder(int empire, std::string name, std::string category, boo
     m_adopt(adopt)
 {}
 
-std::string PolicyOrder::Dump() const
-{ return m_adopt ? UserString("ORDER_POLICY_ADOPT") : UserString("ORDER_POLICY_ABANDON"); }
+std::string PolicyOrder::Dump() const {
+    if (m_adopt) {
+        return boost::io::str(FlexibleFormat(UserString("ORDER_POLICY_ADOPT"))
+                              % m_policy_name % m_category % m_slot) + ExecutedTag(this);
+    } else {
+        return boost::io::str(FlexibleFormat(UserString("ORDER_POLICY_ABANDON")) % m_policy_name) + ExecutedTag(this);
+    }
+}
 
 void PolicyOrder::ExecuteImpl(ScriptingContext& context) const {
     auto empire = GetValidatedEmpire(context);
@@ -1208,21 +1221,21 @@ void PolicyOrder::ExecuteImpl(ScriptingContext& context) const {
 ////////////////////////////////////////////////
 // ResearchQueueOrder
 ////////////////////////////////////////////////
-ResearchQueueOrder::ResearchQueueOrder(int empire, const std::string& tech_name) :
+ResearchQueueOrder::ResearchQueueOrder(int empire, std::string tech_name) :
     Order(empire),
-    m_tech_name(tech_name),
+    m_tech_name(std::move(tech_name)),
     m_remove(true)
 {}
 
-ResearchQueueOrder::ResearchQueueOrder(int empire, const std::string& tech_name, int position) :
+ResearchQueueOrder::ResearchQueueOrder(int empire, std::string tech_name, int position) :
     Order(empire),
-    m_tech_name(tech_name),
+    m_tech_name(std::move(tech_name)),
     m_position(position)
 {}
 
-ResearchQueueOrder::ResearchQueueOrder(int empire, const std::string& tech_name, bool pause, float dummy) :
+ResearchQueueOrder::ResearchQueueOrder(int empire, std::string tech_name, bool pause, float dummy) :
     Order(empire),
-    m_tech_name(tech_name),
+    m_tech_name(std::move(tech_name)),
     m_pause(pause ? PAUSE : RESUME)
 {}
 
@@ -1275,6 +1288,7 @@ ProductionQueueOrder::ProductionQueueOrder(ProdQueueOrderAction action, int empi
 {
     switch(m_action) {
     case ProdQueueOrderAction::REMOVE_FROM_QUEUE:
+    case ProdQueueOrderAction::UNREMOVE_FROM_QUEUE:
         break;
     case ProdQueueOrderAction::SPLIT_INCOMPLETE:
     case ProdQueueOrderAction::DUPLICATE_ITEM:
@@ -1325,12 +1339,22 @@ void ProductionQueueOrder::ExecuteImpl(ScriptingContext& context) const {
             break;
         }
         case ProdQueueOrderAction::REMOVE_FROM_QUEUE: {
-            auto idx = empire->GetProductionQueue().IndexOfUUID(m_uuid);
+            const auto idx = empire->GetProductionQueue().IndexOfUUID(m_uuid);
             if (idx == -1) {
                 ErrorLogger() << "ProductionQueueOrder asked to remove invalid UUID: " << boost::uuids::to_string(m_uuid);
             } else {
                 DebugLogger() << "ProductionQueueOrder removing item at index: " << idx;
-                empire->RemoveProductionFromQueue(idx);
+                empire->MarkToBeRemoved(idx);
+            }
+            break;
+        }
+        case ProdQueueOrderAction::UNREMOVE_FROM_QUEUE: {
+            const auto idx = empire->GetProductionQueue().IndexOfUUID(m_uuid);
+            if (idx == -1) {
+                ErrorLogger() << "ProductionQueueOrder asked to unremove invalid UUID: " << boost::uuids::to_string(m_uuid);
+            } else {
+                DebugLogger() << "ProductionQueueOrder unremoving item at index: " << idx;
+                empire->MarkNotToBeRemoved(idx);
             }
             break;
         }

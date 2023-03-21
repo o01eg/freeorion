@@ -89,6 +89,7 @@ struct MessageEventBase {
     (AuthResponse)                          \
     (EliminateSelf)                         \
     (AutoTurn)                              \
+    (RevertOrders)                          \
     (Error)
 
 
@@ -333,6 +334,7 @@ struct WaitingForTurnEnd : sc::state<WaitingForTurnEnd, PlayingGame> {
     typedef boost::mpl::list<
         sc::custom_reaction<TurnOrders>,
         sc::custom_reaction<TurnPartialOrders>,
+        sc::custom_reaction<RevertOrders>,
         sc::custom_reaction<RevokeReadiness>,
         sc::custom_reaction<CheckTurnEndConditions>,
         sc::custom_reaction<SaveGameRequest>
@@ -343,6 +345,7 @@ struct WaitingForTurnEnd : sc::state<WaitingForTurnEnd, PlayingGame> {
 
     sc::result react(const TurnOrders& msg);
     sc::result react(const TurnPartialOrders& msg);
+    sc::result react(const RevertOrders& msg);
     sc::result react(const RevokeReadiness& msg);
     sc::result react(const CheckTurnEndConditions& c);
     sc::result react(const SaveGameRequest& msg);

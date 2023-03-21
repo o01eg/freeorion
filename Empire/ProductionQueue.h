@@ -93,11 +93,18 @@ struct FO_COMMON_API ProductionQueue {
     struct FO_COMMON_API Element {
         Element() = default;
 
-        Element(ProductionItem item_, int empire_id_,
-                boost::uuids::uuid uuid_,
-                int ordered_, int remaining_, int blocksize_,
-                int location_, bool paused_ = false,
-                bool allowed_imperial_stockpile_use_ = true);
+        Element(ProductionItem item_, int empire_id_, boost::uuids::uuid uuid_, int ordered_,
+                int remaining_, int blocksize_, int location_) :
+            item(std::move(item_)),
+            empire_id(empire_id_),
+            ordered(ordered_),
+            blocksize(blocksize_),
+            remaining(remaining_),
+            location(location_),
+            blocksize_memory(blocksize_),
+            allowed_imperial_stockpile_use(item.build_type != BuildType::BT_STOCKPILE),
+            uuid(uuid_)
+        {}
 
         /** Returns the total cost per item (blocksize 1) and the minimum number of
           * turns required to produce the indicated item, or (-1.0, -1) if the item
@@ -119,7 +126,8 @@ struct FO_COMMON_API ProductionQueue {
         int                 turns_left_to_completion = -1;
         int                 rally_point_id = INVALID_OBJECT_ID;
         bool                paused = false;
-        bool                allowed_imperial_stockpile_use = true;
+        bool                to_be_removed = false;
+        bool                allowed_imperial_stockpile_use = false;
         boost::uuids::uuid  uuid = boost::uuids::nil_uuid();
 
         [[nodiscard]] std::string Dump() const;
@@ -146,12 +154,12 @@ struct FO_COMMON_API ProductionQueue {
     /** Returns map from sets of object ids that can share resources to amount
       * of PP allocated to production queue elements that have build locations
       * in systems in the group. */
-    [[nodiscard]] const std::map<std::set<int>, float>& AllocatedPP() const noexcept { return m_object_group_allocated_pp; }
+    [[nodiscard]] auto& AllocatedPP() const noexcept { return m_object_group_allocated_pp; }
 
     /** Returns map from sets of object ids that can share resources to amount
      * of stockpile PP allocated to production queue elements that have build locations
      * in systems in the group. */
-    [[nodiscard]] const std::map<std::set<int>, float>& AllocatedStockpilePP() const noexcept { return m_object_group_allocated_stockpile_pp; }
+    [[nodiscard]] auto& AllocatedStockpilePP() const noexcept { return m_object_group_allocated_stockpile_pp; }
 
     /** Returns sum of stockpile meters of empire-owned objects. */
     [[nodiscard]] float StockpileCapacity(const ObjectMap& objects) const;
@@ -165,8 +173,7 @@ struct FO_COMMON_API ProductionQueue {
     [[nodiscard]] float ExpectedProjectTransferToStockpile() const noexcept { return m_expected_project_transfer_to_stockpile; }
 
     /** Returns sets of object ids that have more available than allocated PP */
-    [[nodiscard]] std::set<std::set<int>> ObjectsWithWastedPP(
-        const std::shared_ptr<const ResourcePool>& industry_pool) const;
+    [[nodiscard]] std::vector<std::vector<int>> ObjectsWithWastedPP(const ResourcePool& industry_pool) const;
 
     // STL container-like interface
     [[nodiscard]] bool           empty() const noexcept { return !m_queue.size(); }
@@ -188,9 +195,8 @@ struct FO_COMMON_API ProductionQueue {
     void Update(const ScriptingContext& context);
 
     // STL container-like interface
-    void     push_back(const Element& element);
-    void     push_back(Element&& element);
-    void     insert(iterator it, const Element& element);
+    void     push_back(Element element);
+    void     insert(iterator it, Element element);
     void     erase(int i);
     iterator erase(iterator it);
 

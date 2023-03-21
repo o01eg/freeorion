@@ -33,6 +33,13 @@ struct FO_COMMON_API Condition {
     bool operator!=(const Condition& rhs) const
     { return !(*this == rhs); }
 
+    /** Moves object pointers from \a matches or \a non_matches (from whichever
+     * is specified in \a search_domain) to the other, if each belongs in the
+     * other, as determined by this condition. If searching in matches, then
+     * all objects in matches that are not matched by this condition are moved
+     * into non_matches. Initial contents of the not-searched container are not
+     * modified, but objects from the searched container may be appended to the
+     * not-searched container. */
     virtual void Eval(const ScriptingContext& parent_context,
                       ObjectSet& matches, ObjectSet& non_matches,
                       SearchDomain search_domain = SearchDomain::NON_MATCHES) const;
@@ -42,8 +49,7 @@ struct FO_COMMON_API Condition {
     [[nodiscard]] virtual bool EvalAny(const ScriptingContext& parent_context,
                                        const ObjectSet& candidates) const;
     [[nodiscard]] bool EvalAny(const ScriptingContext& parent_context) const {
-        ObjectSet candidates;
-        GetDefaultInitialCandidateObjects(parent_context, candidates);
+        ObjectSet candidates = GetDefaultInitialCandidateObjects(parent_context);
 
         if (InitialCandidatesAllMatch())
             return !candidates.empty(); // don't need to evaluate condition further
@@ -73,8 +79,7 @@ struct FO_COMMON_API Condition {
 
     /** Initializes \a condition_non_targets with a set of objects that could
       * match this condition, without checking if they all actually do. */
-    virtual void GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context,
-                                                   ObjectSet& condition_non_targets) const;
+    virtual ObjectSet GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const;
 
     /** Derived Condition classes can override this to true if all objects returned
       * by GetDefaultInitialCandidateObject() are guaranteed to also match this

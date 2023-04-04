@@ -72,7 +72,7 @@ CUILabel::CUILabel(std::string str, std::vector<std::shared_ptr<GG::Font::TextEl
                 ClientUI::GetFont(), ClientUI::TextColor(), format, flags)
 {}
 
-void CUILabel::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUILabel::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     auto copy_wnd_action = [this]() { GG::GUI::GetGUI()->CopyWndText(this); };
     // create popup menu
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
@@ -104,13 +104,13 @@ CUIButton::CUIButton(GG::SubTexture unpressed, GG::SubTexture pressed,
     LeftClickedSignal.connect(-1, &PlayButtonClickSound);
 }
 
-bool CUIButton::InWindow(const GG::Pt& pt) const {
+bool CUIButton::InWindow(GG::Pt pt) const {
     GG::Pt ul = UpperLeft();
     GG::Pt lr = LowerRight();
     return InAngledCornerRect(pt, ul, lr, CUIBUTTON_ANGLE_OFFSET);
 }
 
-void CUIButton::MouseEnter(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUIButton::MouseEnter(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     Button::MouseEnter(pt, mod_keys);
     if (!Disabled())
          PlayButtonRolloverSound();
@@ -195,11 +195,11 @@ void CUIButton::RenderUnpressed() {
 SettableInWindowCUIButton::SettableInWindowCUIButton(GG::SubTexture unpressed,
                                                      GG::SubTexture pressed,
                                                      GG::SubTexture rollover,
-                                                     std::function<bool (const SettableInWindowCUIButton*, const GG::Pt&)> in_window_function) :
+                                                     SettableInWindowCUIButton::TestFuncT in_window_function) :
     CUIButton(std::move(unpressed), std::move(pressed), std::move(rollover))
-{ m_in_window_func = in_window_function; }
+{ m_in_window_func = std::move(in_window_function); }
 
-bool SettableInWindowCUIButton::InWindow(const GG::Pt& pt) const {
+bool SettableInWindowCUIButton::InWindow(GG::Pt pt) const {
     if (m_in_window_func)
         return m_in_window_func(this, pt);
     else
@@ -220,16 +220,17 @@ CUIArrowButton::CUIArrowButton(ShapeOrientation orientation, bool fill_backgroun
         &PlayButtonClickSound);
 }
 
-bool CUIArrowButton::InWindow(const GG::Pt& pt) const {
+bool CUIArrowButton::InWindow(GG::Pt pt) const {
     if (m_fill_background_with_wnd_color) {
         return Button::InWindow(pt);
     } else {
-        GG::Pt ul = UpperLeft() + GG::Pt(GG::X(3), GG::Y(1)), lr = LowerRight() - GG::Pt(GG::X(2), GG::Y(1));
+        const GG::Pt ul = UpperLeft() + GG::Pt(GG::X(3), GG::Y(1));
+        const GG::Pt lr = LowerRight() - GG::Pt(GG::X(2), GG::Y(1));
         return InIsoscelesTriangle(pt, ul, lr, m_orientation);
     }
 }
 
-void CUIArrowButton::MouseHere(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUIArrowButton::MouseHere(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     if (!Disabled()) {
         if (State() != ButtonState::BN_ROLLOVER)
             PlayButtonRolloverSound();
@@ -532,7 +533,9 @@ void CUIIconButtonRepresenter::OnChecked(bool checked) const
 { PlayButtonClickSound(); }
 
 void CUIIconButtonRepresenter::Render(const GG::StateButton& button) const {
-    bool render_checked = button.Checked() ^ (GG::StateButton::ButtonState::BN_ROLLOVER == button.State()); // opposite on mouseover
+    const bool checked = button.Checked();
+    const bool rollover = GG::StateButton::ButtonState::BN_ROLLOVER == button.State();
+    const bool render_checked = (checked ^ rollover); // opposite on mouseover
 
     GG::Clr icon_clr((render_checked && !button.Disabled()) ? m_checked_color : m_unchecked_color);
     GG::Clr bg_clr(ClientUI::CtrlColor());
@@ -547,7 +550,9 @@ void CUIIconButtonRepresenter::Render(const GG::StateButton& button) const {
     GG::Pt border_lr = icon_lr;
 
     // tone color for disabled button, or when unchecked and using a single icon with same color
-    if (button.Disabled() || (!render_checked && (m_checked_color == m_unchecked_color) && (m_checked_icon == m_unchecked_icon)))
+    if (button.Disabled() || (!render_checked &&
+                              (m_checked_color == m_unchecked_color) &&
+                              (m_checked_icon == m_unchecked_icon)))
         icon_clr = DisabledColor(icon_clr) * 0.8f;
 
     // highlight on mouseover
@@ -624,11 +629,9 @@ void CUITabBar::DistinguishCurrentTab(const std::vector<GG::StateButton*>& tab_b
 ///////////////////////////////////////
 CUIScroll::ScrollTab::ScrollTab(GG::Orientation orientation, int scroll_width, GG::Clr color,
                                 GG::Clr border_color) :
-    Button("", nullptr, color),
+    Button("ScrollTab", nullptr, color),
     m_border_color(border_color),
-    m_orientation(orientation),
-    m_mouse_here(false),
-    m_being_dragged(false)
+    m_orientation(orientation)
 {
     MoveTo(GG::Pt(GG::X(orientation == GG::Orientation::VERTICAL ? 0 : 2),
                   GG::Y(orientation == GG::Orientation::VERTICAL ? 2 : 0)));
@@ -636,9 +639,6 @@ CUIScroll::ScrollTab::ScrollTab(GG::Orientation orientation, int scroll_width, G
     SetMinSize(GG::Pt(m_orientation == GG::Orientation::VERTICAL ? MinSize().x : GG::X(10),
                       m_orientation == GG::Orientation::VERTICAL ? GG::Y(10) : MinSize().y));
 }
-
-void CUIScroll::ScrollTab::SetColor(GG::Clr c)
-{}  // intentionally ignored
 
 void CUIScroll::ScrollTab::Render() {
     GG::Pt ul = UpperLeft();
@@ -663,28 +663,17 @@ void CUIScroll::ScrollTab::Render() {
     AngledCornerRectangle(ul, lr, background_color, border_color, CUISCROLL_ANGLE_OFFSET, 1);
 }
 
-void CUIScroll::ScrollTab::LButtonDown(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
-{ m_being_dragged = true; }
-
-void CUIScroll::ScrollTab::LButtonUp(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUIScroll::ScrollTab::LButtonUp(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     m_being_dragged = false;
     if (!InWindow(GG::GUI::GetGUI()->MousePosition()))
         m_mouse_here = false;
 }
 
-void CUIScroll::ScrollTab::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
-{ m_being_dragged = false; }
-
-void CUIScroll::ScrollTab::MouseEnter(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUIScroll::ScrollTab::MouseEnter(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     if (!m_being_dragged && !m_mouse_here) {
         PlayButtonRolloverSound();
         m_mouse_here = true;
     }
-}
-
-void CUIScroll::ScrollTab::MouseLeave() {
-    if (!m_being_dragged)
-        m_mouse_here = false;
 }
 
 
@@ -719,7 +708,7 @@ void CUIScroll::Render() {
     glDisableClientState(GL_VERTEX_ARRAY);
 }
 
-void CUIScroll::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void CUIScroll::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_sz = Size();
     Wnd::SizeMove(ul, lr);
 
@@ -848,7 +837,7 @@ void CUIDropDownList::Render() {
     RenderDisplayedRow();
 }
 
-GG::Pt CUIDropDownList::ClientLowerRight() const
+GG::Pt CUIDropDownList::ClientLowerRight() const noexcept
 {
     GG::Pt sz = Size();
     int margin = 3;
@@ -861,13 +850,13 @@ GG::Pt CUIDropDownList::ClientLowerRight() const
 GG::X CUIDropDownList::DroppedRowWidth() const
 { return (DropDownList::ClientLowerRight().x - DropDownList::ClientUpperLeft().x); }
 
-void CUIDropDownList::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUIDropDownList::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     if (!Disabled())
         PlayDropDownListOpenSound();
     DropDownList::LClick(pt, mod_keys);
 }
 
-void CUIDropDownList::MouseEnter(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUIDropDownList::MouseEnter(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     if (!Disabled())
         PlayButtonRolloverSound();
     m_mouse_here = true;
@@ -901,7 +890,7 @@ void CUIEdit::CompleteConstruction() {
     hkm->RebuildShortcuts();
 }
 
-void CUIEdit::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUIEdit::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     auto hotkey_cut_action        = [this]() { GG::GUI::GetGUI()->CutWndText(this); };
     auto hotkey_copy_action       = [this]() { GG::GUI::GetGUI()->CopyWndText(this); };
     auto hotkey_paste_action      = [this]() { GG::GUI::GetGUI()->PasteWndText(this, GG::GUI::GetGUI()->ClipboardText()); };
@@ -996,10 +985,7 @@ CensoredCUIEdit::CensoredCUIEdit(std::string str, char display_placeholder) :
         m_placeholder = ' ';
 }
 
-const std::string& CensoredCUIEdit::RawText() const
-{ return m_raw_text; }
-
-void CensoredCUIEdit::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CensoredCUIEdit::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     auto hotkey_paste_action      = [this]() { GG::GUI::GetGUI()->PasteWndText(this, GG::GUI::GetGUI()->ClipboardText()); };
     auto hotkey_select_all_action = [this]() { GG::GUI::GetGUI()->WndSelectAll(this); };
     auto hotkey_deselect_action   = [this]() { GG::GUI::GetGUI()->WndDeselect(this); };
@@ -1125,7 +1111,7 @@ void CUIMultiEdit::Render() {
     SetColor(color);
 }
 
-void CUIMultiEdit::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUIMultiEdit::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     auto hotkey_cut_action        = [this]() { GG::GUI::GetGUI()->CutWndText(this); };
     auto hotkey_copy_action       = [this]() { GG::GUI::GetGUI()->CopyWndText(this); };
     auto hotkey_paste_action      = [this]() { GG::GUI::GetGUI()->PasteWndText(this, GG::GUI::GetGUI()->ClipboardText()); };
@@ -1169,32 +1155,23 @@ void CUILinkTextMultiEdit::CompleteConstruction() {
     MarkLinks();
 }
 
-const std::vector<GG::Font::LineData>& CUILinkTextMultiEdit::GetLineData() const
-{ return CUIMultiEdit::GetLineData(); }
-
-const std::shared_ptr<GG::Font>& CUILinkTextMultiEdit::GetFont() const
-{ return CUIMultiEdit::GetFont(); }
-
 GG::Pt CUILinkTextMultiEdit::TextUpperLeft() const
 { return CUIMultiEdit::TextUpperLeft() - ScrollPosition() + GG::Pt(GG::X(5), GG::Y(5)); }
 
 GG::Pt CUILinkTextMultiEdit::TextLowerRight() const
 { return CUIMultiEdit::TextLowerRight() - ScrollPosition() + GG::Pt(GG::X(5), GG::Y(5)); }
 
-const std::string& CUILinkTextMultiEdit::RawText() const
-{ return m_raw_text; }
-
 void CUILinkTextMultiEdit::Render() {
     CUIMultiEdit::Render();
     TextLinker::Render_();
 }
 
-void CUILinkTextMultiEdit::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUILinkTextMultiEdit::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     CUIMultiEdit::LClick(pt, mod_keys);
     TextLinker::LClick_(pt, mod_keys);
 }
 
-void CUILinkTextMultiEdit::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUILinkTextMultiEdit::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     auto rclick_action = [this, pt, mod_keys]() { TextLinker::RClick_(pt, mod_keys); };
     auto hotkey_cut_action        = [this]() { GG::GUI::GetGUI()->CutWndText(this); };
     auto hotkey_copy_action       = [this]() { GG::GUI::GetGUI()->CopyWndText(this); };
@@ -1221,7 +1198,7 @@ void CUILinkTextMultiEdit::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_ke
     // todo: italicize, underline, or colour selected text
 }
 
-void CUILinkTextMultiEdit::MouseHere(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void CUILinkTextMultiEdit::MouseHere(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     CUIMultiEdit::MouseHere(pt, mod_keys);
     TextLinker::MouseHere_(pt, mod_keys);
 }
@@ -1231,7 +1208,7 @@ void CUILinkTextMultiEdit::MouseLeave() {
     TextLinker::MouseLeave_();
 }
 
-void CUILinkTextMultiEdit::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void CUILinkTextMultiEdit::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt lower_right = lr;
     if (Style() & GG::MULTI_INTEGRAL_HEIGHT)
         lower_right.y -= ((lr.y - ul.y) - (2 * PIXEL_MARGIN)) % GetFont()->Lineskip();
@@ -1403,7 +1380,7 @@ void StatisticIcon::SetValue(double value, std::size_t index) {
     DoLayout();
 }
 
-void StatisticIcon::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void StatisticIcon::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = GG::Wnd::Size();
 
     GG::Wnd::SizeMove(ul, lr);
@@ -1412,39 +1389,39 @@ void StatisticIcon::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
         RequirePreRender();
 }
 
-void StatisticIcon::LButtonDown(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
+void StatisticIcon::LButtonDown(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
-void StatisticIcon::RButtonDown(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys)
+void StatisticIcon::RButtonDown(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
-void StatisticIcon::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void StatisticIcon::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     if (Disabled())
         return;
     LeftClickedSignal(pt);
 }
 
-void StatisticIcon::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void StatisticIcon::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     if (Disabled())
         return;
     RightClickedSignal(pt);
 }
 
-void StatisticIcon::MouseWheel(const GG::Pt& pt, int move, GG::Flags<GG::ModKey> mod_keys)
+void StatisticIcon::MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
-void StatisticIcon::AcceptDrops(const GG::Pt& pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys)
+void StatisticIcon::AcceptDrops(GG::Pt pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
-void StatisticIcon::DragDropEnter(const GG::Pt& pt, std::map<const GG::Wnd*, bool>& drop_wnds_acceptable,
+void StatisticIcon::DragDropEnter(GG::Pt pt, std::map<const GG::Wnd*, bool>& drop_wnds_acceptable,
                                   GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
-void StatisticIcon::DragDropHere(const GG::Pt& pt, std::map<const GG::Wnd*, bool>& drop_wnds_acceptable,
+void StatisticIcon::DragDropHere(GG::Pt pt, std::map<const GG::Wnd*, bool>& drop_wnds_acceptable,
                                  GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
-void StatisticIcon::CheckDrops(const GG::Pt& pt, std::map<const GG::Wnd*, bool>& drop_wnds_acceptable, GG::Flags<GG::ModKey> mod_keys)
+void StatisticIcon::CheckDrops(GG::Pt pt, std::map<const GG::Wnd*, bool>& drop_wnds_acceptable, GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
 void StatisticIcon::DragDropLeave()
@@ -1492,7 +1469,7 @@ CUIToolBar::CUIToolBar() :
     GG::Control(GG::X0, GG::Y0, GG::X1, GG::Y1, GG::ONTOP | GG::INTERACTIVE)
 {}
 
-bool CUIToolBar::InWindow(const GG::Pt& pt) const {
+bool CUIToolBar::InWindow(GG::Pt pt) const {
     for (auto& wnd : Children())
         if (wnd->InWindow(pt))
             return true;
@@ -1514,15 +1491,13 @@ namespace {
 
     // row type used in the SpeciesSelector
     struct SpeciesRow : public GG::ListBox::Row {
-        SpeciesRow(const Species* species, GG::X w, GG::Y h) :
+        SpeciesRow(const Species& species, GG::X w, GG::Y h) :
             GG::ListBox::Row(w, h)
         {
             SetMargin(0);
-            if (!species)
-                return;
-            const std::string& species_name = species->Name();
+            const std::string& species_name = species.Name();
             GG::Wnd::SetName(species_name);
-            Init(species_name, UserString(species_name), species->GameplayDescription(), w, h,
+            Init(species_name, UserString(species_name), species.GameplayDescription(), w, h,
                  ClientUI::SpeciesIcon(species_name));
         };
 
@@ -1584,7 +1559,7 @@ SpeciesSelector::SpeciesSelector(const std::string& preselect_species, GG::X w, 
 
     const SpeciesManager& sm = GetSpeciesManager();
     for (auto it = sm.playable_begin(); it != sm.playable_end(); ++it) {
-        auto row_it = Insert(GG::Wnd::Create<SpeciesRow>(it->second.get(), w, h - 4));
+        auto row_it = Insert(GG::Wnd::Create<SpeciesRow>(it->second, w, h - 4));
         if (it->first == preselect_species)
             Select(row_it);
     }
@@ -1648,7 +1623,7 @@ namespace {
             push_back(m_color_square);
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             // Prevent the width from changing
             GG::Control::SizeMove(ul, GG::Pt(ul.x + Width(), lr.y));
         }
@@ -1728,7 +1703,7 @@ void ColorSelector::Render() {
     glDisableClientState(GL_VERTEX_ARRAY);
 }
 
-void ColorSelector::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void ColorSelector::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = GG::Control::Size();
 
     GG::Control::SizeMove(ul, lr);
@@ -1737,7 +1712,7 @@ void ColorSelector::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
         InitBuffer();
 }
 
-void ColorSelector::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void ColorSelector::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     GG::X x = std::min(pt.x, GG::GUI::GetGUI()->AppWidth() - 315);    // 315 is width of ColorDlg from GG::ColorDlg:::ColorDlg
     GG::Y y = std::min(pt.y, GG::GUI::GetGUI()->AppHeight() - 300);   // 300 is height of ColorDlg from GG::ColorDlg:::ColorDlg
     auto dlg = GG::Wnd::Create<GG::ColorDlg>(x, y, Color(), ClientUI::GetFont(),
@@ -1751,7 +1726,7 @@ void ColorSelector::LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
     }
 }
 
-void ColorSelector::RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void ColorSelector::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     auto reset_color_action = [this]() {
         SetColor(m_default_color);
         ColorChangedSignal(m_default_color);
@@ -1841,7 +1816,7 @@ GG::Pt ResourceInfoPanel::MinUsableSize() const {
     return GG::Pt(min_x, min_y);
 }
 
-void ResourceInfoPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void ResourceInfoPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = GG::Wnd::Size();
 
     CUIWnd::SizeMove(ul, lr);
@@ -2250,40 +2225,26 @@ void FPSIndicator::UpdateEnabled() {
 //////////////////////////////////////////////////
 // MultiTextureStaticGraphic
 //////////////////////////////////////////////////
-MultiTextureStaticGraphic::MultiTextureStaticGraphic(
-    const std::vector<std::shared_ptr<GG::Texture>>& textures,
-    const std::vector<GG::Flags<GG::GraphicStyle>>& styles) :
-    GG::Control(GG::X0, GG::Y0, GG::X1, GG::Y1, GG::NO_WND_FLAGS),
-    m_styles(styles)
-{
-    for (auto& texture : textures)
-        m_graphics.emplace_back(texture, GG::X0, GG::Y0, texture->DefaultWidth(), texture->DefaultHeight());
-    Init();
-}
-
-MultiTextureStaticGraphic::MultiTextureStaticGraphic(
-    std::vector<std::shared_ptr<GG::Texture>>&& textures,
-    std::vector<GG::Flags<GG::GraphicStyle>>&& styles) :
+MultiTextureStaticGraphic::MultiTextureStaticGraphic(std::vector<std::shared_ptr<GG::Texture>> textures,
+                                                     std::vector<GG::Flags<GG::GraphicStyle>> styles) :
     GG::Control(GG::X0, GG::Y0, GG::X1, GG::Y1, GG::NO_WND_FLAGS),
     m_styles(std::move(styles))
 {
     for (auto& texture : textures) {
-        GG::Pt sz{texture->DefaultWidth(), texture->DefaultHeight()};
-        m_graphics.emplace_back(std::move(texture), GG::X0, GG::Y0, sz.x, sz.y);
+        auto w = texture->DefaultWidth();
+        auto h = texture->DefaultHeight();
+        m_graphics.emplace_back(std::move(texture), GG::X0, GG::Y0, w, h);
     }
     Init();
 }
 
-MultiTextureStaticGraphic::MultiTextureStaticGraphic(
-    const std::vector<GG::SubTexture>& subtextures,
-    const std::vector<GG::Flags<GG::GraphicStyle>>& styles) :
-    GG::Control(GG::X0, GG::Y0, GG::X1, GG::Y1, GG::NO_WND_FLAGS),
-    m_graphics(subtextures),
-    m_styles(styles)
-{ Init(); }
 
-MultiTextureStaticGraphic::MultiTextureStaticGraphic()
-{}
+MultiTextureStaticGraphic::MultiTextureStaticGraphic(std::vector<GG::SubTexture> subtextures,
+                                                     std::vector<GG::Flags<GG::GraphicStyle>> styles) :
+    GG::Control(GG::X0, GG::Y0, GG::X1, GG::Y1, GG::NO_WND_FLAGS),
+    m_graphics(std::move(subtextures)),
+    m_styles(std::move(styles))
+{ Init(); }
 
 GG::Rect MultiTextureStaticGraphic::RenderedArea(const GG::SubTexture& subtexture,
                                                  GG::Flags<GG::GraphicStyle> style) const
@@ -2341,10 +2302,10 @@ GG::Rect MultiTextureStaticGraphic::RenderedArea(const GG::SubTexture& subtextur
 }
 
 void MultiTextureStaticGraphic::Render() {
-    GG::Clr color_to_use = Disabled() ? DisabledColor(Color()) : Color();
+    const GG::Clr color_to_use = Disabled() ? DisabledColor(Color()) : Color();
     glColor(color_to_use);
-    for (std::vector<GG::SubTexture>::size_type i = 0; i < m_graphics.size(); ++i) {
-        GG::Rect rendered_area = RenderedArea(m_graphics[i], m_styles[i]);
+    for (auto i = 0u; i < m_graphics.size(); ++i) {
+        const GG::Rect rendered_area = RenderedArea(m_graphics[i], m_styles[i]);
         m_graphics[i].OrthoBlit(rendered_area.ul, rendered_area.lr);
     }
 }
@@ -2359,7 +2320,7 @@ void MultiTextureStaticGraphic::ValidateStyles() {
     unsigned int num_graphics = m_graphics.size();
     m_styles.resize(num_graphics, GG::GRAPHIC_CENTER);
 
-    for (GG::Flags<GG::GraphicStyle>& style : m_styles) {
+    for (auto& style : m_styles) {
         int dup_ct = 0;   // duplication count
         if (style & GG::GRAPHIC_LEFT) ++dup_ct;
         if (style & GG::GRAPHIC_RIGHT) ++dup_ct;
@@ -2477,12 +2438,6 @@ CUIPopupMenu::CUIPopupMenu(GG::X x, GG::Y y) :
 namespace {
     ScanlineRenderer scanline_shader;
 }
-
-ScanlineControl::ScanlineControl(GG::X x, GG::Y y, GG::X w, GG::Y h, bool square, GG::Clr clr):
-    Control(x, y, w, h, GG::NO_WND_FLAGS),
-    m_square(square),
-    m_color(clr)
-{}
 
 void ScanlineControl::Render() {
     scanline_shader.SetColor(m_color);

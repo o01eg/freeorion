@@ -469,7 +469,7 @@ namespace {
         void HandleScrolledAndStopped(int start_pos, int end_post, int min_pos, int max_pos)
         { HandleMaybeVisible(); }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr)  override {
+        void SizeMove(GG::Pt ul, GG::Pt lr)  override {
             LinkText::SizeMove(ul, lr);
             if (! m_signals.empty())
                 HandleMaybeVisible();
@@ -487,10 +487,10 @@ std::shared_ptr<LinkText> CombatLogWnd::Impl::DecorateLinkText(std::string text)
 
     links->SetTextFormat(m_text_format_flags);
 
-    links->SetDecorator(VarText::SHIP_ID_TAG, new ColorByOwner());
-    links->SetDecorator(VarText::PLANET_ID_TAG, new ColorByOwner());
-    links->SetDecorator(VarText::SYSTEM_ID_TAG, new ColorByOwner());
-    links->SetDecorator(VarText::EMPIRE_ID_TAG, new ColorByOwner());
+    links->SetDecorator(VarText::SHIP_ID_TAG, TextLinker::DecoratorType::ColorByOwner);
+    links->SetDecorator(VarText::PLANET_ID_TAG, TextLinker::DecoratorType::ColorByOwner);
+    links->SetDecorator(VarText::SYSTEM_ID_TAG, TextLinker::DecoratorType::ColorByOwner);
+    links->SetDecorator(VarText::EMPIRE_ID_TAG, TextLinker::DecoratorType::ColorByOwner);
 
     links->LinkClickedSignal.connect(m_wnd.LinkClickedSignal);
     links->LinkDoubleClickedSignal.connect(m_wnd.LinkDoubleClickedSignal);
@@ -636,10 +636,10 @@ void CombatLogWnd::SetFont(std::shared_ptr<GG::Font> font)
 void CombatLogWnd::SetLog(int log_id)
 { m_impl->SetLog(log_id); }
 
-GG::Pt CombatLogWnd::ClientUpperLeft() const
+GG::Pt CombatLogWnd::ClientUpperLeft() const noexcept
 { return UpperLeft() + GG::Pt(GG::X(MARGIN), GG::Y(MARGIN)); }
 
-GG::Pt CombatLogWnd::ClientLowerRight() const
+GG::Pt CombatLogWnd::ClientLowerRight() const noexcept 
 { return LowerRight() - GG::Pt(GG::X(MARGIN), GG::Y(MARGIN)); }
 
 GG::Pt CombatLogWnd::MinUsableSize() const

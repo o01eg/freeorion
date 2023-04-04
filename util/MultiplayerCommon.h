@@ -154,10 +154,10 @@ struct FO_COMMON_API SaveGameEmpireData {
     SaveGameEmpireData() = default;
     SaveGameEmpireData(int id, std::string ename, std::string pname,
                        std::array<uint8_t, 4> c, bool a, bool e, bool w) :
-        empire_id(id),
         empire_name(std::move(ename)),
         player_name(std::move(pname)),
         color(c),
+        empire_id(id),
         authenticated(a),
         eliminated(e),
         won(w)
@@ -180,7 +180,7 @@ struct FO_COMMON_API PlayerSaveHeaderData {
 };
 
 /** Contains data that must be saved for a single player. */
-struct FO_COMMON_API PlayerSaveGameData : public PlayerSaveHeaderData {
+struct FO_COMMON_API PlayerSaveGameData final : public PlayerSaveHeaderData {
     PlayerSaveGameData() = default;
 
     PlayerSaveGameData(std::string name, int empire_id,
@@ -222,7 +222,7 @@ bool operator!=(const PlayerSetupData& lhs, const PlayerSetupData& rhs);
   * is true, a new game is to be started, using the remaining members besides
   * \a m_filename.  Otherwise, the saved game \a m_filename will be loaded
   * instead. */
-struct SinglePlayerSetupData : public GalaxySetupData {
+struct SinglePlayerSetupData final : public GalaxySetupData {
     SinglePlayerSetupData() = default;
 
     std::string                     filename;
@@ -231,7 +231,7 @@ struct SinglePlayerSetupData : public GalaxySetupData {
 };
 
 /** The data structure that represents the state of the multiplayer lobby. */
-struct FO_COMMON_API MultiplayerLobbyData : public GalaxySetupData {
+struct FO_COMMON_API MultiplayerLobbyData final : public GalaxySetupData {
     MultiplayerLobbyData() = default;
 
     MultiplayerLobbyData(const GalaxySetupData& base) :
@@ -269,6 +269,11 @@ struct PlayerInfo {
     int                     empire_id = ALL_EMPIRES;
     Networking::ClientType  client_type = Networking::ClientType::INVALID_CLIENT_TYPE;
     bool                    host = false; //! true iff this is the host player
+
+    bool operator==(const PlayerInfo& rhs) noexcept
+    { return name == rhs.name && empire_id == rhs.empire_id && client_type == rhs.client_type && host == rhs.host; }
+    bool operator!=(const PlayerInfo& rhs) noexcept
+    { return !operator==(rhs); }
 };
 
 

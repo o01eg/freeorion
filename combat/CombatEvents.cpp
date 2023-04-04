@@ -32,7 +32,7 @@ namespace {
 
     // TODO: Move this code into a common non UI linked location, so that
     // there is no duplicated code between server and clientUI.
-    std::string_view LinkTag(UniverseObjectType obj_type) {
+    constexpr std::string_view LinkTag(UniverseObjectType obj_type) {
         switch (obj_type) {
         case UniverseObjectType::OBJ_SHIP:
             return VarText::SHIP_ID_TAG;
@@ -766,7 +766,7 @@ std::string WeaponsPlatformEvent::CombatLogDescription(int viewing_empire_id, co
         if (target.second.empty())
             continue;
 
-        const auto& fire_event(*target.second.begin());
+        const auto& fire_event(target.second.front());
         std::string target_public_name{
             FighterOrPublicNameLink(viewing_empire_id, target.first, fire_event->target_owner_id, context)};
 

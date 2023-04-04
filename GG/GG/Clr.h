@@ -15,6 +15,7 @@
 #define _GG_Clr_h_
 
 #include <array>
+#include <cstdint>
 #include <sstream>
 #include <string>
 #include <GG/Export.h>
@@ -46,10 +47,9 @@ struct Clr
 
     /** ctor that constructs a Clr from a string that represents the color
         channels in the format 'RRGGBB', 'RRGGBBAA' where each channel value
-        ranges from 00 to FF.  When the alpha component is left out, the alpha
-        value FF is assumed.  When characters out of the range 0-9 and A-F are
+        ranges from 00 to FF. When the alpha component is left out, the alpha
+        value FF is assumed. When characters out of the range 0-9 and A-F are
         passed, results are undefined.
-        @throws std::invalid_argument if the hex_colour string is not well formed
     */
     constexpr Clr(std::string_view hex_colour)
     {
@@ -83,7 +83,7 @@ struct Clr
         return retval;
     }
 
-    operator std::string() const
+    explicit operator std::string() const
     {
         std::string retval;
         retval.reserve(1 + 4*3 + 3*2 + 1 + 1);
@@ -92,6 +92,9 @@ struct Clr
               .append(")");
         return retval;
     }
+
+    constexpr std::array<uint8_t, 4> RGBA() const noexcept
+    { return {r, g, b, a}; }
 
     uint8_t r = 0;    ///< the red channel
     uint8_t g = 0;    ///< the green channel
@@ -104,17 +107,17 @@ static_assert(uint32_t{Clr{0,0,2,3}} == 2*256u + 3u);
 static_assert(uint32_t{Clr{255,1,0,0}} == 256*256*256*255u + 256*256*1u);
 
 /** Returns true iff \a rhs and \a lhs are identical. */
-constexpr bool operator==(const Clr rhs, const Clr lhs) noexcept
+constexpr bool operator==(Clr rhs, Clr lhs) noexcept
 { return rhs.r == lhs.r && rhs.g == lhs.g && rhs.b == lhs.b && rhs.a == lhs.a; }
 
 /** Returns true iff \a rhs and \a lhs are different. */
-constexpr bool operator!=(const Clr rhs, const Clr lhs) noexcept
+constexpr bool operator!=(Clr rhs, Clr lhs) noexcept
 { return !(rhs == lhs); }
 
 static_assert(Clr("A0FF01") == Clr{160, 255, 1, 255});
 static_assert(Clr("12345678") == Clr{16*1+2, 16*3+4, 16*5+6, 16*7+8});
 
-inline std::ostream& operator<<(std::ostream& os, const Clr clr)
+inline std::ostream& operator<<(std::ostream& os, Clr clr)
 {
     os << "(" << +clr.r << ", " << +clr.g << ", " << +clr.b << ", " << +clr.a << ")";
     return os;
@@ -122,7 +125,7 @@ inline std::ostream& operator<<(std::ostream& os, const Clr clr)
 
 //! Returns the lightened version of color clr.  LightenClr leaves the alpha
 //! channel unchanged, and multiplies the other channels by some factor.
-constexpr Clr LightenClr(const Clr& clr, float factor = 2.0) noexcept
+constexpr Clr LightenClr(Clr clr, float factor = 2.0) noexcept
 {
     return Clr(
         static_cast<uint8_t>(std::min(static_cast<int>(clr.r * factor), 255)),
@@ -145,7 +148,7 @@ constexpr Clr DarkenClr(const Clr clr, float factor = 2.0) noexcept
 constexpr Clr InvertClr(const Clr clr) noexcept
 { return Clr(255 - clr.r, 255 - clr.g, 255 - clr.b, clr.a); }
 
-constexpr Clr BlendClr(const Clr src, const Clr dst, float factor) noexcept
+constexpr Clr BlendClr(Clr src, Clr dst, float factor) noexcept
 {
     return Clr(static_cast<uint8_t>(src.r * factor + dst.r * (1 - factor)),
                static_cast<uint8_t>(src.g * factor + dst.g * (1 - factor)),
@@ -164,7 +167,7 @@ constexpr Clr FloatClr(float r, float g, float b, float a) noexcept
 }
 
 /** Returns the input Clr scaned by the input factor \a s. */
-constexpr Clr operator*(const Clr lhs, float s) noexcept
+constexpr Clr operator*(Clr lhs, float s) noexcept
 {
     return Clr(static_cast<uint8_t>(lhs.r * s),
                static_cast<uint8_t>(lhs.g * s),
@@ -173,11 +176,11 @@ constexpr Clr operator*(const Clr lhs, float s) noexcept
 }
 
 /** Returns the component-wise sum of input Clrs. */
-constexpr Clr operator+(const Clr lhs, const Clr rhs) noexcept
+constexpr Clr operator+(Clr lhs, Clr rhs) noexcept
 { return Clr(lhs.r + rhs.r, lhs.g + rhs.g, lhs.b + rhs.b, lhs.a + rhs.a); }
 
 /** Clr comparisons */
-constexpr bool operator<(const Clr lhs, const Clr rhs) noexcept
+constexpr bool operator<(Clr lhs, Clr rhs) noexcept
 {
     if (rhs.r != lhs.r)
         return rhs.r < lhs.r;
@@ -192,7 +195,7 @@ constexpr bool operator<(const Clr lhs, const Clr rhs) noexcept
 
 
 //! Calls the appropriate version of glColor*() with @a clr.
-GG_API void glColor(const GG::Clr clr);
+GG_API void glColor(GG::Clr clr);
 
 
 #endif

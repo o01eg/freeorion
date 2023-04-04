@@ -164,8 +164,8 @@
     </None>
     <CustomBuild Include="..\..\util\Version.cpp.in">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(SolutionDir)..\python3.7.exe" "$(SolutionDir)..\cmake\make_versioncpp.py" "$(SolutionDir).." "MSVC 2019"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"$(SolutionDir)..\python3.7.exe" "$(SolutionDir)..\cmake\make_versioncpp.py" "$(SolutionDir).." "MSVC 2019"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(SolutionDir)..\python3.7.exe" "$(SolutionDir)..\cmake\make_versioncpp.py" "$(SolutionDir).." "MSVC 2019 Win32"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"$(SolutionDir)..\python3.7.exe" "$(SolutionDir)..\cmake\make_versioncpp.py" "$(SolutionDir).." "MSVC 2019 x64"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)..\util\Version.cpp;%(Outputs)</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)..\util\Version.cpp;%(Outputs)</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)..\.git;%(AdditionalInputs)</AdditionalInputs>
@@ -226,9 +226,7 @@
     <ClInclude Include="..\..\universe\NamedValueRefManager.h" />
     <ClInclude Include="..\..\universe\ObjectMap.h" />
     <ClInclude Include="..\..\universe\Planet.h" />
-    <ClInclude Include="..\..\universe\PopCenter.h" />
     <ClInclude Include="..\..\universe\UniverseObjectVisitors.h" />
-    <ClInclude Include="..\..\universe\ResourceCenter.h" />
     <ClInclude Include="..\..\universe\Ship.h" />
     <ClInclude Include="..\..\universe\ShipDesign.h" />
     <ClInclude Include="..\..\universe\ShipHull.h" />
@@ -311,9 +309,7 @@
     <ClCompile Include="..\..\universe\ObjectMap.cpp" />
     <ClCompile Include="..\..\universe\NamedValueRefManager.cpp" />
     <ClCompile Include="..\..\universe\Planet.cpp" />
-    <ClCompile Include="..\..\universe\PopCenter.cpp" />
     <ClCompile Include="..\..\universe\UniverseObjectVisitors.cpp" />
-    <ClCompile Include="..\..\universe\ResourceCenter.cpp" />
     <ClCompile Include="..\..\universe\Ship.cpp" />
     <ClCompile Include="..\..\universe\ShipDesign.cpp" />
     <ClCompile Include="..\..\universe\ShipHull.cpp" />

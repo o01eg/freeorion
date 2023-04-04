@@ -5,7 +5,6 @@
 #include "Conditions.h"
 #include "CommonParams.h"
 #include "Effect.h"
-#include "PopCenter.h"
 #include "Planet.h"
 #include "Ship.h"
 #include "UniverseObject.h"
@@ -124,13 +123,13 @@ namespace {
         retval.reserve(tags.size());
 
         std::size_t next_idx = 0;
-        static constexpr auto len{TAG_PEDIA_PREFIX.length()};
 
         // store views into concatenated tags/likes string
         std::for_each(tags.begin(), tags.end(),
                       [&next_idx, &retval, concat_tags] (const auto tag)
         {
             std::string upper_t = boost::to_upper_copy<std::string>(tag);
+            static constexpr auto len{TAG_PEDIA_PREFIX.length()};
             if (tag.substr(0, len) == TAG_PEDIA_PREFIX) {
                 // store string views into the pedia tag after the "PEDIA" prefix
                 auto full_tag = concat_tags.substr(next_idx, upper_t.size());
@@ -139,6 +138,32 @@ namespace {
             }
             next_idx += upper_t.size();
         });
+        return retval;
+    }
+
+    auto InitLocation(const std::string& name) {
+        // set up a Condition structure to match Planets that have
+        // (not uninhabitable) environment for this species
+
+        std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetEnvironment>>> environments;
+        environments.push_back(
+            std::make_unique<ValueRef::Constant<PlanetEnvironment>>(PlanetEnvironment::PE_UNINHABITABLE));
+
+        auto this_species_name_ref =
+            std::make_unique<ValueRef::Constant<std::string>>(name); // name specifies this species
+
+        auto enviro_cond = std::unique_ptr<Condition::Condition>(
+            std::make_unique<Condition::Not>(
+                std::unique_ptr<Condition::Condition>(
+                    std::make_unique<Condition::PlanetEnvironment>(
+                        std::move(environments), std::move(this_species_name_ref)))));
+
+        auto type_cond = std::make_unique<Condition::Type>(
+            std::make_unique<ValueRef::Constant<UniverseObjectType>>(UniverseObjectType::OBJ_PLANET));
+
+        auto retval = std::make_unique<Condition::And>(std::move(enviro_cond), std::move(type_cond));
+        retval->SetTopLevelContent(name);
+
         return retval;
     }
 }
@@ -154,14 +179,27 @@ Species::Species(std::string&& name, std::string&& desc,
                  std::set<std::string>&& likes, std::set<std::string>&& dislikes,
                  std::string&& graphic,
                  double spawn_rate, int spawn_limit) :
-    m_name(std::move(name)),
+    m_name(name), // not moving so available later in member initializer list
     m_description(std::move(desc)),
     m_gameplay_description(std::move(gameplay_desc)),
     m_foci(std::move(foci)),
     m_default_focus(std::move(default_focus)),
-    m_planet_environments(std::move(planet_environments)),
-    m_effects(std::move(effects)),
-    m_combat_targets(std::move(combat_targets)),
+    m_planet_environments(planet_environments.begin(), planet_environments.end()),
+    m_effects([](auto&& effects, const auto& name) {
+        std::vector<Effect::EffectsGroup> retval;
+        retval.reserve(effects.size());
+        for (auto& e : effects) {
+            e->SetTopLevelContent(name);
+            retval.push_back(std::move(*e));
+        }
+        return retval;
+    }(effects, name)),
+    m_location(InitLocation(name)),
+    m_combat_targets([](auto&& cond, const auto& name) {
+        if (cond)
+            cond->SetTopLevelContent(name);
+        return std::move(cond);
+    }(std::move(combat_targets), name)),
     m_playable(playable),
     m_native(native),
     m_can_colonize(can_colonize),
@@ -181,7 +219,7 @@ Species::Species(std::string&& name, std::string&& desc,
         std::for_each(m_tags.begin(), m_tags.end(), [&next_idx](const auto& t) { next_idx += t.size(); });
 
         // store views into concatenated tags/likes string
-        std::for_each(likes.begin(), likes.end(), [&next_idx, &retval, this, sv](const auto& t) {
+        std::for_each(likes.begin(), likes.end(), [&next_idx, &retval, sv](const auto& t) {
             std::string upper_t = boost::to_upper_copy<std::string>(t);
             retval.push_back(sv.substr(next_idx, upper_t.size()));
             next_idx += upper_t.size();
@@ -200,7 +238,7 @@ Species::Species(std::string&& name, std::string&& desc,
         std::for_each(m_likes.begin(), m_likes.end(), [&next_idx](const auto& t) { next_idx += t.size(); });
 
         // store views into concatenated tags/likes string
-        std::for_each(dislikes.begin(), dislikes.end(), [&next_idx, &retval, this, sv](const auto& t) {
+        std::for_each(dislikes.begin(), dislikes.end(), [&next_idx, &retval, sv](const auto& t) {
             std::string upper_t = boost::to_upper_copy<std::string>(t);
             retval.push_back(sv.substr(next_idx, upper_t.size()));
             next_idx += upper_t.size();
@@ -209,9 +247,7 @@ Species::Species(std::string&& name, std::string&& desc,
         return retval;
     }()),
     m_graphic(std::move(graphic))
-{
-    Init();
-}
+{}
 
 Species::Species(std::string&& name, std::string&& desc,
                  std::string&& gameplay_desc, std::vector<FocusType>&& foci,
@@ -269,74 +305,19 @@ bool Species::operator==(const Species& rhs) const {
         // check next member
     } else if (!m_location || !rhs.m_location) {
         return false;
-    } else {
-        if (*m_location != *(rhs.m_location))
-            return false;
+    } else if (*m_location != *(rhs.m_location)) {
+        return false;
     }
 
     if (m_combat_targets == rhs.m_combat_targets) { // could be nullptr
         // check next member
     } else if (!m_combat_targets || !rhs.m_combat_targets) {
         return false;
-    } else {
-        if (*m_combat_targets != *(rhs.m_combat_targets))
-            return false;
-    }
-
-    if (m_effects.size() != rhs.m_effects.size())
-        return false;
-    try {
-        for (std::size_t idx = 0; idx < m_effects.size(); ++idx) {
-            const auto& my_op = m_effects.at(idx);
-            const auto& rhs_op = rhs.m_effects.at(idx);
-
-            if (my_op == rhs_op)
-                continue;
-            if (!my_op || !rhs_op)
-                return false;
-            if (*my_op != *rhs_op)
-                return false;
-        }
-    } catch (...) {
+    } else if (*m_combat_targets != *(rhs.m_combat_targets)) {
         return false;
     }
 
-    return true;
-}
-
-void Species::Init() {
-    for (auto& effect : m_effects)
-        effect->SetTopLevelContent(m_name);
-
-    if (!m_location) {
-        // set up a Condition structure to match popcenters that have
-        // (not uninhabitable) environment for this species
-
-        std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetEnvironment>>> environments;
-        environments.push_back(
-            std::make_unique<ValueRef::Constant<PlanetEnvironment>>(PlanetEnvironment::PE_UNINHABITABLE));
-
-        auto this_species_name_ref =
-            std::make_unique<ValueRef::Constant<std::string>>(m_name);  // m_name specifies this species
-
-        auto enviro_cond = std::unique_ptr<Condition::Condition>(
-            std::make_unique<Condition::Not>(
-                std::unique_ptr<Condition::Condition>(
-                    std::make_unique<Condition::PlanetEnvironment>(
-                        std::move(environments), std::move(this_species_name_ref)))));
-
-        auto type_cond = std::make_unique<Condition::Type>(
-            std::make_unique<ValueRef::Constant<UniverseObjectType>>(UniverseObjectType::OBJ_POP_CENTER));
-
-        m_location = std::unique_ptr<Condition::Condition>(std::make_unique<Condition::And>(
-            std::move(enviro_cond), std::move(type_cond)));
-    }
-    m_location->SetTopLevelContent(m_name);
-
-    if (m_combat_targets)
-        m_combat_targets->SetTopLevelContent(m_name);
-
-    TraceLogger() << "Species::Init: " << Dump();
+    return m_effects == rhs.m_effects;
 }
 
 std::string Species::Dump(uint8_t ntabs) const {
@@ -365,11 +346,11 @@ std::string Species::Dump(uint8_t ntabs) const {
     }
     if (m_effects.size() == 1) {
         retval += DumpIndent(ntabs+1) + "effectsgroups =\n";
-        retval += m_effects[0]->Dump(ntabs+2);
+        retval += m_effects.front().Dump(ntabs+2);
     } else {
         retval += DumpIndent(ntabs+1) + "effectsgroups = [\n";
         for (auto& effect : m_effects)
-            retval += effect->Dump(ntabs+2);
+            retval += effect.Dump(ntabs+2);
         retval += DumpIndent(ntabs+1) + "]\n";
     }
     if (m_combat_targets)
@@ -409,7 +390,7 @@ std::string Species::GameplayDescription() const {
     bool requires_separator = true;
 
     for (auto& effect : m_effects) {
-        const std::string& description = effect->GetDescription();
+        const std::string& description = effect.GetDescription();
         if (description.empty())
             continue;
 
@@ -433,13 +414,13 @@ PlanetEnvironment Species::GetPlanetEnvironment(PlanetType planet_type) const {
 }
 
 namespace {
-    PlanetType RingNextPlanetType(PlanetType current_type) {
+    constexpr PlanetType RingNextPlanetType(PlanetType current_type) noexcept {
         PlanetType next(PlanetType(int(current_type)+1));
         if (next >= PlanetType::PT_ASTEROIDS)
             next = PlanetType::PT_SWAMP;
         return next;
     }
-    PlanetType RingPreviousPlanetType(PlanetType current_type) {
+    constexpr PlanetType RingPreviousPlanetType(PlanetType current_type) noexcept {
         PlanetType next(PlanetType(int(current_type)-1));
         if (next <= PlanetType::INVALID_PLANET_TYPE)
             next = PlanetType::PT_OCEAN;
@@ -448,7 +429,9 @@ namespace {
 }
 
 template <typename Func>
-PlanetType Species::TheNextBestPlanetTypeApply(PlanetType initial_planet_type, Func apply_for_best_forward_backward) const {
+PlanetType Species::TheNextBestPlanetTypeApply(PlanetType initial_planet_type,
+                                               Func apply_for_best_forward_backward) const
+{
     // some types can't be terraformed
     if (initial_planet_type == PlanetType::PT_GASGIANT)
         return PlanetType::PT_GASGIANT;
@@ -466,14 +449,14 @@ PlanetType Species::TheNextBestPlanetTypeApply(PlanetType initial_planet_type, F
     // excluding gas giants and asteroids
     PlanetEnvironment best_environment = PlanetEnvironment::PE_UNINHABITABLE;
     //std::set<PlanetType> best_types;
-    for (const auto& entry : m_planet_environments) {
-        if (entry.first < PlanetType::PT_ASTEROIDS) {
-            if (entry.second == best_environment) {
-                //best_types.insert(entry.first);
-            } else if (entry.second > best_environment) {
-                best_environment = entry.second;
+    for (const auto& [pt, pe] : m_planet_environments) {
+        if (pt < PlanetType::PT_ASTEROIDS) {
+            if (pe == best_environment) {
+                //best_types.insert(pt);
+            } else if (pe > best_environment) {
+                best_environment = pe;
                 //best_types.clear();
-                //best_types.insert(entry.first);
+                //best_types.insert(pt);
             }
         }
     }
@@ -485,7 +468,9 @@ PlanetType Species::TheNextBestPlanetTypeApply(PlanetType initial_planet_type, F
 
     int forward_steps_to_best = 0;
     PlanetType next_best_planet_type = initial_planet_type;
-    for (PlanetType type = RingNextPlanetType(initial_planet_type); type != initial_planet_type; type = RingNextPlanetType(type)) {
+    for (PlanetType type = RingNextPlanetType(initial_planet_type);
+         type != initial_planet_type; type = RingNextPlanetType(type))
+    {
         forward_steps_to_best++;
         if (GetPlanetEnvironment(type) == best_environment) {
             next_best_planet_type = type;
@@ -493,7 +478,9 @@ PlanetType Species::TheNextBestPlanetTypeApply(PlanetType initial_planet_type, F
         }
     }
     int backward_steps_to_best = 0;
-    for (PlanetType type = RingPreviousPlanetType(initial_planet_type); type != initial_planet_type; type = RingPreviousPlanetType(type)) {
+    for (PlanetType type = RingPreviousPlanetType(initial_planet_type);
+         type != initial_planet_type; type = RingPreviousPlanetType(type))
+    {
         backward_steps_to_best++;
         if (GetPlanetEnvironment(type) == best_environment) {
             if (backward_steps_to_best < forward_steps_to_best)
@@ -506,13 +493,15 @@ PlanetType Species::TheNextBestPlanetTypeApply(PlanetType initial_planet_type, F
 }
 
 PlanetType Species::NextBestPlanetType(PlanetType initial_planet_type) const {
-    return TheNextBestPlanetTypeApply(initial_planet_type, [](PlanetType best_planet_type, int forward_steps_to_best, int backward_steps_to_best) {
-        return best_planet_type;
-    });
+    return TheNextBestPlanetTypeApply(initial_planet_type,
+                                      [](PlanetType best_planet_type, int forward_steps_to_best, int backward_steps_to_best)
+                                      { return best_planet_type; });
 }
 
 PlanetType Species::NextBetterPlanetType(PlanetType initial_planet_type) const {
-    return TheNextBestPlanetTypeApply(initial_planet_type, [initial_planet_type](PlanetType best_planet_type, int forward_steps_to_best, int backward_steps_to_best) {
+    return TheNextBestPlanetTypeApply(initial_planet_type,
+        [initial_planet_type](PlanetType best_planet_type, int forward_steps_to_best, int backward_steps_to_best)
+    {
         if (forward_steps_to_best <= backward_steps_to_best)
             return RingNextPlanetType(initial_planet_type);
         else
@@ -548,66 +537,61 @@ uint32_t Species::GetCheckSum() const {
 /////////////////////////////////////////////////
 // SpeciesManager                              //
 /////////////////////////////////////////////////
-namespace {
-    boost::optional<Pending::Pending<
-        std::pair<SpeciesManager::SpeciesTypeMap,
-                  SpeciesManager::CensusOrder>>> s_pending_types;
-    SpeciesManager::SpeciesTypeMap s_species;
-    SpeciesManager::CensusOrder s_census_order;
+SpeciesManager& SpeciesManager::operator=(SpeciesManager&& rhs) {
+    // intentionally not moving m_pending_types, m_species, or m_census_order
+    // as these are parsed once
+
+    m_species_homeworlds = std::move(rhs.m_species_homeworlds);
+    m_species_empire_opinions = std::move(rhs.m_species_empire_opinions);
+    m_species_species_opinions = std::move(rhs.m_species_species_opinions);
+    m_species_object_populations = std::move(rhs.m_species_object_populations);
+    m_species_species_ships_destroyed = std::move(rhs.m_species_species_ships_destroyed);
+
+    return *this;
 }
-
-bool SpeciesManager::PlayableSpecies::operator()(
-    const std::map<std::string, std::unique_ptr<Species>>::value_type& species_entry) const
-{ return species_entry.second->Playable(); }
-
-bool SpeciesManager::NativeSpecies::operator()(
-    const std::map<std::string, std::unique_ptr<Species>>::value_type& species_entry) const
-{ return species_entry.second->Native(); }
 
 const Species* SpeciesManager::GetSpecies(std::string_view name) const {
     CheckPendingSpeciesTypes();
-    auto it = s_species.find(name);
-    return it != s_species.end() ? it->second.get() : nullptr;
+    const auto it = m_species.find(name);
+    return it != m_species.end() ? &(it->second) : nullptr;
 }
 
 const Species* SpeciesManager::GetSpeciesUnchecked(std::string_view name) const {
-    auto it = s_species.find(name);
-    return it != s_species.end() ? it->second.get() : nullptr;
+    const auto it = m_species.find(name);
+    return it != m_species.end() ? &(it->second) : nullptr;
 }
 
-namespace {
-    std::mutex species_mutex;
+void SpeciesManager::SetSpeciesTypes(Pending::Pending<std::pair<std::map<std::string, Species>, CensusOrder>>&& future) {
+    std::scoped_lock lock(m_species_mutex);
+    m_pending_types = std::move(future);
 }
 
-void SpeciesManager::SetSpeciesTypes(Pending::Pending<std::pair<SpeciesTypeMap, CensusOrder>>&& future) {
-    std::scoped_lock lock(species_mutex);
-    s_pending_types = std::move(future);
-}
+void SpeciesManager::CheckPendingSpeciesTypes() const {
+    std::scoped_lock lock(m_species_mutex);
 
-void SpeciesManager::CheckPendingSpeciesTypes() {
-    std::scoped_lock lock(species_mutex);
-
-    if (!s_pending_types) {
-        if (s_species.empty())
+    if (!m_pending_types) {
+        if (m_species.empty())
             ErrorLogger() << "CheckPendingSpeciesTypes() has no pending species but also no already-parsed species";
         return;
     }
 
-    decltype(s_pending_types)::value_type::result_type container;
-    Pending::SwapPending(s_pending_types, container);
+    decltype(m_pending_types)::value_type::result_type container;
+    Pending::SwapPending(m_pending_types, container); 
 
-    s_species = std::move(container.first);
-    s_census_order = std::move(container.second);
+    m_species.clear();
+    m_species.insert(std::make_move_iterator(container.first.begin()),
+                     std::make_move_iterator(container.first.end()));
+    m_census_order = std::move(container.second);
 }
 
 SpeciesManager::iterator SpeciesManager::begin() const {
     CheckPendingSpeciesTypes();
-    return s_species.begin();
+    return m_species.begin();
 }
 
 SpeciesManager::iterator SpeciesManager::end() const {
     CheckPendingSpeciesTypes();
-    return s_species.end();
+    return m_species.end();
 }
 
 SpeciesManager::playable_iterator SpeciesManager::playable_begin() const
@@ -624,17 +608,17 @@ SpeciesManager::native_iterator SpeciesManager::native_end() const
 
 const SpeciesManager::CensusOrder& SpeciesManager::census_order() const {
     CheckPendingSpeciesTypes();
-    return s_census_order;
+    return m_census_order;
 }
 
 bool SpeciesManager::empty() const {
     CheckPendingSpeciesTypes();
-    return s_species.empty();
+    return m_species.empty();
 }
 
 int SpeciesManager::NumSpecies() const {
     CheckPendingSpeciesTypes();
-    return s_species.size();
+    return m_species.size();
 }
 
 int SpeciesManager::NumPlayableSpecies() const
@@ -649,10 +633,10 @@ namespace {
 
 const std::string& SpeciesManager::RandomSpeciesName() const {
     CheckPendingSpeciesTypes();
-    if (s_species.empty())
+    if (m_species.empty())
         return EMPTY_STRING;
 
-    int species_idx = RandInt(0, static_cast<int>(s_species.size()) - 1);
+    int species_idx = RandInt(0, static_cast<int>(m_species.size()) - 1);
     return std::next(begin(), species_idx)->first;
 }
 
@@ -690,27 +674,12 @@ void SpeciesManager::SetSpeciesSpeciesOpinion(const std::string& opinionated_spe
                                               const std::string& rated_species, float opinion)
 { m_species_species_opinions[opinionated_species][rated_species] = opinion; }
 
-const std::map<std::string, std::set<int>>& SpeciesManager::GetSpeciesHomeworldsMap(
-    int encoding_empire) const
-{
-    if (encoding_empire == ALL_EMPIRES)
-        return m_species_homeworlds;
-    // TODO: filter, output only info about species an empire has observed...?
-    return m_species_homeworlds;
-}
-
-const std::map<std::string, std::map<int, float>>& SpeciesManager::GetSpeciesEmpireOpinionsMap(int encoding_empire) const
-{ return m_species_empire_opinions; }
-
-const std::map<std::string, std::map<std::string, float>>& SpeciesManager::GetSpeciesSpeciesOpinionsMap(int encoding_empire) const
-{ return m_species_species_opinions; }
-
 float SpeciesManager::SpeciesEmpireOpinion(const std::string& species_name, int empire_id) const {
-    auto sp_it = m_species_empire_opinions.find(species_name);
+    const auto sp_it = m_species_empire_opinions.find(species_name);
     if (sp_it == m_species_empire_opinions.end())
         return 0.0f;
-    const std::map<int, float>& emp_map = sp_it->second;
-    auto emp_it = emp_map.find(empire_id);
+    const auto& emp_map = sp_it->second;
+    const auto emp_it = emp_map.find(empire_id);
     if (emp_it == emp_map.end())
         return 0.0f;
     return emp_it->second;
@@ -719,11 +688,11 @@ float SpeciesManager::SpeciesEmpireOpinion(const std::string& species_name, int 
 float SpeciesManager::SpeciesSpeciesOpinion(const std::string& opinionated_species_name,
                                             const std::string& rated_species_name) const
 {
-    auto sp_it = m_species_species_opinions.find(opinionated_species_name);
+    const auto sp_it = m_species_species_opinions.find(opinionated_species_name);
     if (sp_it == m_species_species_opinions.end())
         return 0.0f;
     const auto& ra_sp_map = sp_it->second;
-    auto ra_sp_it = ra_sp_map.find(rated_species_name);
+    const auto ra_sp_it = ra_sp_map.find(rated_species_name);
     if (ra_sp_it == ra_sp_map.end())
         return 0.0f;
     return ra_sp_it->second;
@@ -732,9 +701,9 @@ float SpeciesManager::SpeciesSpeciesOpinion(const std::string& opinionated_speci
 std::vector<std::string_view> SpeciesManager::SpeciesThatLike(std::string_view content_name) const {
     CheckPendingSpeciesTypes();
     std::vector<std::string_view> retval;
-    retval.reserve(s_species.size());
-    std::for_each(s_species.begin(), s_species.end(), [&retval, content_name](const auto& s) {
-        const auto& likes = s.second->Likes();
+    retval.reserve(m_species.size());
+    std::for_each(m_species.begin(), m_species.end(), [&retval, content_name](const auto& s) {
+        const auto& likes = s.second.Likes();
         if (std::any_of(likes.begin(), likes.end(), [content_name](const auto& l) { return l == content_name; }))
             retval.emplace_back(s.first);
     });
@@ -744,9 +713,9 @@ std::vector<std::string_view> SpeciesManager::SpeciesThatLike(std::string_view c
 std::vector<std::string_view> SpeciesManager::SpeciesThatDislike(std::string_view content_name) const {
     CheckPendingSpeciesTypes();
     std::vector<std::string_view> retval;
-    retval.reserve(s_species.size());
-    std::for_each(s_species.begin(), s_species.end(), [&retval, content_name](const auto& s) {
-        const auto& dislikes = s.second->Dislikes();
+    retval.reserve(m_species.size());
+    std::for_each(m_species.begin(), m_species.end(), [&retval, content_name](const auto& s) {
+        const auto& dislikes = s.second.Dislikes();
         if (std::any_of(dislikes.begin(), dislikes.end(), [content_name](const auto& l) { return l == content_name; }))
             retval.emplace_back(s.first);
     });
@@ -783,11 +752,10 @@ void SpeciesManager::UpdatePopulationCounter(const ObjectMap& objects) {
     // ships of each species and design
     m_species_object_populations.clear();
     for (const auto& [obj_id, obj] : objects.allExisting()) {
-        if (obj->ObjectType() != UniverseObjectType::OBJ_PLANET &&
-            obj->ObjectType() != UniverseObjectType::OBJ_POP_CENTER)
-        { continue; }
+        if (obj->ObjectType() != UniverseObjectType::OBJ_PLANET)
+            continue;
 
-        auto pop_center = std::dynamic_pointer_cast<const PopCenter>(obj);
+        auto pop_center = std::dynamic_pointer_cast<const Planet>(obj); // TODO: static_cast
         const std::string& species = pop_center->SpeciesName();
         if (species.empty())
             continue;
@@ -795,17 +763,9 @@ void SpeciesManager::UpdatePopulationCounter(const ObjectMap& objects) {
         try {
             m_species_object_populations[species][obj_id] +=
                 obj->GetMeter(MeterType::METER_POPULATION)->Current();
-        } catch (...) {
-            continue;
-        }
+        } catch (...) {}
     }
 }
-
-const std::map<std::string, std::map<int, float>>& SpeciesManager::SpeciesObjectPopulations(int) const
-{ return m_species_object_populations; }
-
-const std::map<std::string, std::map<std::string, int>>& SpeciesManager::SpeciesShipsDestroyed(int) const
-{ return m_species_species_ships_destroyed; }
 
 void SpeciesManager::SetSpeciesObjectPopulations(std::map<std::string, std::map<int, float>> sop)
 { m_species_object_populations = std::move(sop); }
@@ -813,13 +773,12 @@ void SpeciesManager::SetSpeciesObjectPopulations(std::map<std::string, std::map<
 void SpeciesManager::SetSpeciesShipsDestroyed(std::map<std::string, std::map<std::string, int>> ssd)
 { m_species_species_ships_destroyed = std::move(ssd); }
 
-
 uint32_t SpeciesManager::GetCheckSum() const {
     CheckPendingSpeciesTypes();
     uint32_t retval{0};
-    for (auto const& name_type_pair : s_species)
+    for (auto const& name_type_pair : m_species)
         CheckSums::CheckSumCombine(retval, name_type_pair);
-    CheckSums::CheckSumCombine(retval, s_species.size());
+    CheckSums::CheckSumCombine(retval, m_species.size());
 
     DebugLogger() << "SpeciesManager checksum: " << retval;
     return retval;

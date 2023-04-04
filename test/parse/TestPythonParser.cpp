@@ -48,10 +48,10 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
     const auto cat_it = tech_categories.find("CONSTRUCTION_CATEGORY");
     BOOST_REQUIRE(tech_categories.end() != cat_it);
 
-    BOOST_REQUIRE_EQUAL("CONSTRUCTION_CATEGORY", cat_it->second->name);
-    BOOST_REQUIRE_EQUAL("construction.png", cat_it->second->graphic);
-    const std::array<uint8_t, 4> test_colour{241, 233, 87, 255};
-    BOOST_REQUIRE(test_colour == cat_it->second->colour);
+    BOOST_REQUIRE_EQUAL("CONSTRUCTION_CATEGORY", cat_it->second.name);
+    BOOST_REQUIRE_EQUAL("construction.png", cat_it->second.graphic);
+    static constexpr std::array<uint8_t, 4> test_colour{241, 233, 87, 255};
+    BOOST_REQUIRE(test_colour == cat_it->second.colour);
 
     BOOST_REQUIRE(!techs.empty());
     BOOST_REQUIRE(!categories_seen.empty());
@@ -60,28 +60,28 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
     BOOST_REQUIRE_EQUAL(1, categories_seen.count("GROWTH_CATEGORY"));
 
     {
-        const auto tech_it = techs.get<TechManager::NameIndex>().find("LRN_ALGO_ELEGANCE");
-        BOOST_REQUIRE(techs.get<TechManager::NameIndex>().end() != tech_it);
-        BOOST_REQUIRE_EQUAL("LRN_ALGO_ELEGANCE", (*tech_it)->Name());
-        BOOST_REQUIRE_EQUAL("LRN_ALGO_ELEGANCE_DESC", (*tech_it)->Description());
-        BOOST_REQUIRE_EQUAL("RESEARCH_SHORT_DESC", (*tech_it)->ShortDescription());
-        BOOST_REQUIRE_EQUAL("LEARNING_CATEGORY", (*tech_it)->Category());
-        BOOST_REQUIRE_EQUAL(true, (*tech_it)->Researchable());
-        BOOST_REQUIRE_EQUAL("icons/tech/algorithmic_elegance.png", (*tech_it)->Graphic());
+        const auto tech_it = techs.find("LRN_ALGO_ELEGANCE");
+        BOOST_REQUIRE(techs.end() != tech_it);
+        BOOST_REQUIRE_EQUAL("LRN_ALGO_ELEGANCE", tech_it->second.Name());
+        BOOST_REQUIRE_EQUAL("LRN_ALGO_ELEGANCE_DESC", tech_it->second.Description());
+        BOOST_REQUIRE_EQUAL("RESEARCH_SHORT_DESC", tech_it->second.ShortDescription());
+        BOOST_REQUIRE_EQUAL("LEARNING_CATEGORY", tech_it->second.Category());
+        BOOST_REQUIRE_EQUAL(true, tech_it->second.Researchable());
+        BOOST_REQUIRE_EQUAL("icons/tech/algorithmic_elegance.png", tech_it->second.Graphic());
 
         const ScriptingContext context;
 
-        BOOST_REQUIRE_CLOSE(0.0, (*tech_it)->ResearchCost(ALL_EMPIRES, context), 0.1);
-        BOOST_REQUIRE_EQUAL(3, (*tech_it)->ResearchTime(ALL_EMPIRES, context));
-        BOOST_REQUIRE_EQUAL(0, (*tech_it)->Effects().size());
-        BOOST_REQUIRE_EQUAL(0, (*tech_it)->UnlockedTechs().size());
-        BOOST_REQUIRE_EQUAL(0, (*tech_it)->Prerequisites().size());
+        BOOST_REQUIRE_CLOSE(0.0, tech_it->second.ResearchCost(ALL_EMPIRES, context), 0.1);
+        BOOST_REQUIRE_EQUAL(3, tech_it->second.ResearchTime(ALL_EMPIRES, context));
+        BOOST_REQUIRE_EQUAL(0, tech_it->second.Effects().size());
+        BOOST_REQUIRE_EQUAL(0, tech_it->second.UnlockedTechs().size());
+        BOOST_REQUIRE_EQUAL(0, tech_it->second.Prerequisites().size());
 
-        const auto& tech_tags = (*tech_it)->Tags();
+        const auto& tech_tags = tech_it->second.Tags();
         BOOST_REQUIRE_EQUAL(1, tech_tags.size());
-        BOOST_REQUIRE((*tech_it)->HasTag("PEDIA_LEARNING_CATEGORY"));
+        BOOST_REQUIRE(tech_it->second.HasTag("PEDIA_LEARNING_CATEGORY"));
 
-        const auto& tech_items = (*tech_it)->UnlockedItems();
+        const auto& tech_items = tech_it->second.UnlockedItems();
         BOOST_REQUIRE_EQUAL(1, tech_items.size());
         BOOST_REQUIRE_EQUAL(UnlockableItemType::UIT_POLICY, tech_items[0].type);
         BOOST_REQUIRE_EQUAL("PLC_ALGORITHMIC_RESEARCH", tech_items[0].name);
@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
             "RESEARCH_SHORT_DESC",
             "LEARNING_CATEGORY",
             std::make_unique<ValueRef::Operation<double>>(ValueRef::OpType::TIMES,
-                std::make_unique<ValueRef::Constant<double>>(10),
+                std::make_unique<ValueRef::Constant<double>>(10.0),
                 std::make_unique<ValueRef::ComplexVariable<double>>(
                     "GameRule",
                     nullptr,
@@ -104,54 +104,55 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
             std::make_unique<ValueRef::Constant<int>>(3),
             true,
             {"PEDIA_LEARNING_CATEGORY"},
-            {},
+            std::vector<Effect::EffectsGroup>{},
             {},
             {UnlockableItem{UnlockableItemType::UIT_POLICY, "PLC_ALGORITHMIC_RESEARCH"}},
             "icons/tech/algorithmic_elegance.png"
         };
-        BOOST_REQUIRE(tech == (**tech_it));
+        BOOST_REQUIRE(tech == tech_it->second);
     }
 
     {
-        const auto tech_it = techs.get<TechManager::NameIndex>().find("CON_ORBITAL_HAB");
-        BOOST_REQUIRE(techs.get<TechManager::NameIndex>().end() != tech_it);
+        const auto tech_it = techs.find("CON_ORBITAL_HAB");
+        BOOST_REQUIRE(techs.end() != tech_it);
 
-        BOOST_REQUIRE_EQUAL(1, (*tech_it)->Effects().size());
-        const auto& tech_effect_gr = (*tech_it)->Effects()[0];
-        BOOST_REQUIRE_EQUAL("", tech_effect_gr->StackingGroup());
-        BOOST_REQUIRE_EQUAL("", tech_effect_gr->GetDescription());
-        BOOST_REQUIRE_EQUAL("", tech_effect_gr->AccountingLabel());
-        BOOST_REQUIRE_EQUAL(17, tech_effect_gr->Priority());
+        BOOST_REQUIRE_EQUAL(1, tech_it->second.Effects().size());
+        const auto& tech_effect_gr = tech_it->second.Effects().front();
+        BOOST_REQUIRE_EQUAL("", tech_effect_gr.StackingGroup());
+        BOOST_REQUIRE_EQUAL("", tech_effect_gr.GetDescription());
+        BOOST_REQUIRE_EQUAL("", tech_effect_gr.AccountingLabel());
+        BOOST_REQUIRE_EQUAL(17, tech_effect_gr.Priority());
 
         // scope
-        const auto tech_effect_scope = tech_effect_gr->Scope();
+        const auto tech_effect_scope = tech_effect_gr.Scope();
         BOOST_REQUIRE_EQUAL(true, tech_effect_scope->RootCandidateInvariant());
         BOOST_REQUIRE_EQUAL(false, tech_effect_scope->LocalCandidateInvariant());
         BOOST_REQUIRE_EQUAL(true, tech_effect_scope->TargetInvariant());
         BOOST_REQUIRE_EQUAL(false, tech_effect_scope->SourceInvariant());
 
-        Condition::And *tech_effect_scope_and = dynamic_cast<Condition::And*>(tech_effect_scope);
+        const auto tech_effect_scope_and = dynamic_cast<Condition::And*>(tech_effect_scope);
         BOOST_REQUIRE(tech_effect_scope_and != nullptr);
         BOOST_REQUIRE_EQUAL(2, tech_effect_scope_and->Operands().size());
 
         // effects list
-        BOOST_REQUIRE_EQUAL(1, tech_effect_gr->EffectsList().size());
-        const auto tech_effect = tech_effect_gr->EffectsList()[0];
+        BOOST_REQUIRE_EQUAL(1, tech_effect_gr.Effects().size());
+        const auto& tech_effect = tech_effect_gr.Effects().front();
         BOOST_REQUIRE_EQUAL(true, tech_effect->IsMeterEffect());
         BOOST_REQUIRE_EQUAL(false, tech_effect->IsEmpireMeterEffect());
         BOOST_REQUIRE_EQUAL(false, tech_effect->IsAppearanceEffect());
         BOOST_REQUIRE_EQUAL(false, tech_effect->IsSitrepEffect());
         BOOST_REQUIRE_EQUAL(false, tech_effect->IsConditionalEffect());
 
-        BOOST_REQUIRE_EQUAL(1, (*tech_it)->Prerequisites().size());
-        BOOST_REQUIRE_EQUAL(1, (*tech_it)->Prerequisites().count("PRO_MICROGRAV_MAN"));
+        const auto& prereqs = tech_it->second.Prerequisites();
+        BOOST_REQUIRE_EQUAL(1, prereqs.size());
+        BOOST_REQUIRE_EQUAL(1, std::count(prereqs.begin(), prereqs.end(), "PRO_MICROGRAV_MAN"));
 
         std::vector<std::unique_ptr<Effect::Effect>> effects;
         effects.push_back(std::make_unique<Effect::SetMeter>(MeterType::METER_TARGET_POPULATION,
                         std::make_unique<ValueRef::Operation<double>>(ValueRef::OpType::PLUS,
                             std::make_unique<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE),
                             std::make_unique<ValueRef::Operation<double>>(ValueRef::OpType::TIMES,
-                                std::make_unique<ValueRef::Constant<double>>(1),
+                                std::make_unique<ValueRef::Constant<double>>(1.0),
                                 std::make_unique<ValueRef::Variable<double>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "HabitableSize"))
                         ),
                         std::string("ORBITAL_HAB_LABEL")));
@@ -178,7 +179,7 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
             "POPULATION_SHORT_DESC",
             "GROWTH_CATEGORY",
             std::make_unique<ValueRef::Operation<double>>(ValueRef::OpType::TIMES,
-                std::make_unique<ValueRef::Constant<double>>(250),
+                std::make_unique<ValueRef::Constant<double>>(250.0),
                 std::make_unique<ValueRef::ComplexVariable<double>>(
                     "GameRule",
                     nullptr,
@@ -195,7 +196,7 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
             {},
             "icons/tech/orbital_gardens.png"
         };
-        BOOST_REQUIRE(tech == (**tech_it));
+        BOOST_REQUIRE(tech == tech_it->second);
 
     }
 
@@ -209,7 +210,7 @@ BOOST_AUTO_TEST_CASE(parse_species) {
     PythonParser parser(m_python, m_scripting_dir);
 
     auto species_p = Pending::ParseSynchronously(parse::species, parser, m_scripting_dir / "species");
-    auto [species_map, ordering] = *Pending::WaitForPendingUnlocked(std::move(species_p));
+    const auto [species_map, ordering] = *Pending::WaitForPendingUnlocked(std::move(species_p));
 
     BOOST_REQUIRE(!ordering.empty());
     BOOST_CHECK(!species_map.empty());
@@ -222,42 +223,42 @@ BOOST_AUTO_TEST_CASE(parse_species) {
         const auto species_it = species_map.find("SP_ABADDONI");
         BOOST_REQUIRE(species_it != species_map.end());
 
-        const auto species = species_it->second.get();
-        BOOST_REQUIRE_EQUAL("SP_ABADDONI", species->Name());
-        BOOST_REQUIRE_EQUAL("SP_ABADDONI_DESC", species->Description());
-        // BOOST_REQUIRE_EQUAL("SP_ABADDONI_GAMEPLAY_DESC", species->GameplayDescription()); // already resolved to user string
+        auto& species = species_it->second;
+        BOOST_REQUIRE_EQUAL("SP_ABADDONI", species.Name());
+        BOOST_REQUIRE_EQUAL("SP_ABADDONI_DESC", species.Description());
+        // BOOST_REQUIRE_EQUAL("SP_ABADDONI_GAMEPLAY_DESC", species.GameplayDescription()); // already resolved to user string
 
-        BOOST_REQUIRE(species->Location() != nullptr);
-        BOOST_REQUIRE(species->CombatTargets() == nullptr);
+        BOOST_REQUIRE(species.Location() != nullptr);
+        BOOST_REQUIRE(species.CombatTargets() == nullptr);
 
-        BOOST_REQUIRE_EQUAL(14, species->Foci().size());
-        BOOST_REQUIRE_EQUAL("FOCUS_INDUSTRY", species->Foci()[0].Name());
-        BOOST_REQUIRE_EQUAL("FOCUS_DOMINATION", species->Foci()[13].Name());
-        BOOST_CHECK_EQUAL("FOCUS_INDUSTRY", species->DefaultFocus());
+        BOOST_REQUIRE_EQUAL(14, species.Foci().size());
+        BOOST_REQUIRE_EQUAL("FOCUS_INDUSTRY", species.Foci()[0].Name());
+        BOOST_REQUIRE_EQUAL("FOCUS_DOMINATION", species.Foci()[13].Name());
+        BOOST_CHECK_EQUAL("FOCUS_INDUSTRY", species.DefaultFocus());
 
-        BOOST_CHECK_EQUAL(11, species->PlanetEnvironments().size());
-        BOOST_CHECK_EQUAL(PlanetEnvironment::PE_POOR, species->GetPlanetEnvironment(PlanetType::PT_BARREN));
-        BOOST_CHECK_EQUAL(PlanetEnvironment::PE_ADEQUATE, species->GetPlanetEnvironment(PlanetType::PT_TOXIC));
+        BOOST_CHECK_EQUAL(11, species.PlanetEnvironments().size());
+        BOOST_CHECK_EQUAL(PlanetEnvironment::PE_POOR, species.GetPlanetEnvironment(PlanetType::PT_BARREN));
+        BOOST_CHECK_EQUAL(PlanetEnvironment::PE_ADEQUATE, species.GetPlanetEnvironment(PlanetType::PT_TOXIC));
 
-        BOOST_REQUIRE_EQUAL(1.0, species->SpawnRate());
-        BOOST_REQUIRE_EQUAL(9999, species->SpawnLimit());
-        BOOST_CHECK_EQUAL(true, species->Playable());
-        BOOST_CHECK_EQUAL(false, species->Native());
-        BOOST_CHECK_EQUAL(true, species->CanColonize());
-        BOOST_CHECK_EQUAL(true, species->CanProduceShips());
+        BOOST_REQUIRE_EQUAL(1.0, species.SpawnRate());
+        BOOST_REQUIRE_EQUAL(9999, species.SpawnLimit());
+        BOOST_CHECK_EQUAL(true, species.Playable());
+        BOOST_CHECK_EQUAL(false, species.Native());
+        BOOST_CHECK_EQUAL(true, species.CanColonize());
+        BOOST_CHECK_EQUAL(true, species.CanProduceShips());
 
-        BOOST_REQUIRE_EQUAL(6, species->Tags().size());
-        BOOST_CHECK_EQUAL("AVERAGE_SUPPLY", species->Tags()[0]);
-        BOOST_CHECK_EQUAL("PEDIA_LITHIC_SPECIES_CLASS", species->Tags()[5]);
+        BOOST_REQUIRE_EQUAL(6, species.Tags().size());
+        BOOST_CHECK_EQUAL("AVERAGE_SUPPLY", species.Tags()[0]);
+        BOOST_CHECK_EQUAL("PEDIA_LITHIC_SPECIES_CLASS", species.Tags()[5]);
 
-        BOOST_CHECK_EQUAL(12, species->Likes().size());
+        BOOST_CHECK_EQUAL(12, species.Likes().size());
 
-        BOOST_CHECK_EQUAL(13, species->Dislikes().size());
+        BOOST_CHECK_EQUAL(13, species.Dislikes().size());
 
-        BOOST_CHECK_EQUAL("icons/species/abaddonnian.png", species->Graphic());
+        BOOST_CHECK_EQUAL("icons/species/abaddonnian.png", species.Graphic());
 
-        BOOST_REQUIRE_EQUAL(98, species->Effects().size());
-        const auto& effect_group = *(species->Effects()[0]);
+        BOOST_REQUIRE_EQUAL(98, species.Effects().size());
+        const auto& effect_group = species.Effects().front();
         BOOST_REQUIRE_EQUAL("", effect_group.StackingGroup());
         BOOST_REQUIRE_EQUAL("", effect_group.GetDescription());
         BOOST_REQUIRE_EQUAL("FOCUS_INDUSTRY_LABEL", effect_group.AccountingLabel());
@@ -270,20 +271,20 @@ BOOST_AUTO_TEST_CASE(parse_species) {
         BOOST_REQUIRE_NE(nullptr, effect_group.Scope());
         BOOST_REQUIRE_NE(nullptr, effect_group.Activation());
 
-        BOOST_REQUIRE_EQUAL(1, effect_group.EffectsList().size());
-        const auto& effect = *(effect_group.EffectsList()[0]);
-        BOOST_REQUIRE_EQUAL(true, effect.IsMeterEffect());
-        BOOST_REQUIRE_EQUAL(false, effect.IsEmpireMeterEffect());
-        BOOST_REQUIRE_EQUAL(false, effect.IsAppearanceEffect());
-        BOOST_REQUIRE_EQUAL(false, effect.IsSitrepEffect());
-        BOOST_REQUIRE_EQUAL(false, effect.IsConditionalEffect());
+        BOOST_REQUIRE_EQUAL(1, effect_group.Effects().size());
+        const auto& effect = effect_group.Effects().front();
+        BOOST_REQUIRE_EQUAL(true, effect->IsMeterEffect());
+        BOOST_REQUIRE_EQUAL(false, effect->IsEmpireMeterEffect());
+        BOOST_REQUIRE_EQUAL(false, effect->IsAppearanceEffect());
+        BOOST_REQUIRE_EQUAL(false, effect->IsSitrepEffect());
+        BOOST_REQUIRE_EQUAL(false, effect->IsConditionalEffect());
 
-        BOOST_TEST_MESSAGE("Dump " << species->Name() << ":");
-        BOOST_TEST_MESSAGE(species->Dump(0));
+        BOOST_TEST_MESSAGE("Dump " << species.Name() << ":");
+        BOOST_TEST_MESSAGE(species.Dump(0));
 
-        BOOST_REQUIRE_EQUAL(2461001, species->GetCheckSum());
+        BOOST_REQUIRE_EQUAL(2460986, species.GetCheckSum());
 
-        Species test_species{"SP_ABADDONI",
+        const Species test_species{"SP_ABADDONI",
             "SP_ABADDONI_DESC",
             "SP_ABADDONI_GAMEPLAY_DESC",
             {
@@ -407,7 +408,14 @@ BOOST_AUTO_TEST_CASE(parse_species) {
             "icons/species/abaddonnian.png",
             1.0,
             9999};
-        BOOST_WARN(test_species == (*species));
+        BOOST_WARN(test_species == species);
+        BOOST_WARN(test_species.Name() == species.Name());
+        // TODO: test equality of Effects once they are stored by value not pointer
+        BOOST_WARN(test_species.Likes() == species.Likes());
+        BOOST_WARN(test_species.Dislikes() == species.Dislikes());
+        BOOST_WARN(test_species.CombatTargets() == species.CombatTargets());
+        BOOST_WARN(test_species.Tags() == species.Tags());
+        BOOST_WARN(test_species.Foci() == species.Foci());
     }
 
     // test it last
@@ -441,13 +449,13 @@ BOOST_AUTO_TEST_CASE(parse_techs_full) {
     BOOST_REQUIRE_EQUAL(9, tech_categories.size());
     BOOST_REQUIRE_EQUAL(9, categories_seen.size());
 
-    if (const char *tech_name = std::getenv("FO_CHECKSUM_TECH_NAME")) {
-        const auto tech_it = techs.get<TechManager::NameIndex>().find(tech_name);
-        BOOST_REQUIRE(techs.get<TechManager::NameIndex>().end() != tech_it);
-        BOOST_REQUIRE_EQUAL(tech_name, (*tech_it)->Name());
+    if (const char* tech_name = std::getenv("FO_CHECKSUM_TECH_NAME")) {
+        const auto tech_it = techs.find(tech_name);
+        BOOST_REQUIRE(techs.end() != tech_it);
+        BOOST_REQUIRE_EQUAL(tech_name, tech_it->second.Name());
 
         BOOST_TEST_MESSAGE("Dump " << tech_name << ":");
-        BOOST_TEST_MESSAGE((*tech_it)->Dump(0));
+        BOOST_TEST_MESSAGE(tech_it->second.Dump(0));
 
         if (const char *tech_checksum_str = std::getenv("FO_CHECKSUM_TECH_VALUE")) {
             unsigned int tech_checksum = boost::lexical_cast<unsigned int>(tech_checksum_str);
@@ -474,7 +482,7 @@ BOOST_AUTO_TEST_CASE(parse_species_full) {
     auto named_values = Pending::ParseSynchronously(parse::named_value_refs, scripting_dir / "common");
 
     auto species_p = Pending::ParseSynchronously(parse::species, parser, scripting_dir / "species");
-    auto [species, ordering] = *Pending::WaitForPendingUnlocked(std::move(species_p));
+    const auto [species, ordering] = *Pending::WaitForPendingUnlocked(std::move(species_p));
 
     BOOST_REQUIRE(!ordering.empty());
     BOOST_REQUIRE(!species.empty());
@@ -482,17 +490,23 @@ BOOST_AUTO_TEST_CASE(parse_species_full) {
     BOOST_REQUIRE_EQUAL(7, ordering.size());
     BOOST_REQUIRE_EQUAL(50, species.size());
 
+    for (const auto& s : species) {
+        for (const auto& effects : s.second.Effects()) {
+            BOOST_REQUIRE_MESSAGE(effects.Scope(), s.second.Name());
+        }
+    }
+
     if (const char *species_name = std::getenv("FO_CHECKSUM_SPECIES_NAME")) {
         const auto species_it = species.find(species_name);
         BOOST_REQUIRE(species.end() != species_it);
-        BOOST_REQUIRE_EQUAL(species_name, species_it->second->Name());
+        BOOST_REQUIRE_EQUAL(species_name, species_it->second.Name());
 
         BOOST_TEST_MESSAGE("Dump " << species_name << ":");
-        BOOST_TEST_MESSAGE(species_it->second->Dump(0));
+        BOOST_TEST_MESSAGE(species_it->second.Dump(0));
 
         if (const char *species_checksum_str = std::getenv("FO_CHECKSUM_SPECIES_VALUE")) {
-            unsigned int species_checksum = boost::lexical_cast<unsigned int>(species_checksum_str);
-            unsigned int value{0};
+            uint32_t species_checksum = boost::lexical_cast<uint32_t>(species_checksum_str);
+            uint32_t value{0};
             CheckSums::CheckSumCombine(value, species_it->second);
             BOOST_REQUIRE_EQUAL(species_checksum, value);
         }

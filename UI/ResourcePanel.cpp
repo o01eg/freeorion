@@ -4,9 +4,9 @@
 
 #include "../util/i18n.h"
 #include "../util/Logger.h"
-#include "../universe/ResourceCenter.h"
 #include "../universe/UniverseObject.h"
 #include "../universe/Enums.h"
+#include "../universe/Planet.h"
 #include "../client/human/GGHumanClientApp.h"
 #include "ClientUI.h"
 #include "CUIControls.h"
@@ -16,7 +16,7 @@
 
 
 namespace {
-    constexpr int   EDGE_PAD(3);
+    constexpr int EDGE_PAD(3);
 
     /** How big we want meter icons with respect to the current UI font size.
       * Meters should scale along font size, but not below the size for the
@@ -37,20 +37,14 @@ void ResourcePanel::CompleteConstruction() {
 
     SetName("ResourcePanel");
 
-    auto res = Objects().get<ResourceCenter>(m_rescenter_id);
-    if (!res) {
+    auto obj = Objects().get<Planet>(m_rescenter_id);
+    if (!obj) {
         ErrorLogger() << "ResourcePanel constructed with invalid resource center id " << m_rescenter_id;
         return;
     }
 
     m_expand_button->LeftPressedSignal.connect(
         boost::bind(&ResourcePanel::ExpandCollapseButtonPressed, this));
-
-    const auto obj = Objects().get(m_rescenter_id);
-    if (!obj) {
-        ErrorLogger() << "ResourcePanel constructed with invalid object id " << m_rescenter_id;
-        return;
-    }
 
     // meter and production indicators
     std::vector<std::pair<MeterType, MeterType>> meters;
@@ -60,14 +54,14 @@ void ResourcePanel::CompleteConstruction() {
                             MeterType::METER_INFLUENCE, MeterType::METER_SUPPLY,
                             MeterType::METER_STOCKPILE})
     {
-        auto p_meter = obj->GetMeter(meter);
+        const auto* p_meter = obj->GetMeter(meter);
         if (!p_meter) {
             ErrorLogger() << "ResourcePanel constructed with object " << obj->Dump()
                           << " with no " << to_string(meter) << " meter";
             continue;
         }
-        auto assoc_meter = AssociatedMeterType(meter);
-        auto p_assoc_meter = obj->GetMeter(assoc_meter);
+        const auto assoc_meter = AssociatedMeterType(meter);
+        const auto* p_assoc_meter = obj->GetMeter(assoc_meter);
         if (!p_assoc_meter) {
             ErrorLogger() << "ResourcePanel constructed with object " << obj->Dump()
                           << " with no " << to_string(assoc_meter) << " meter";
@@ -80,7 +74,7 @@ void ResourcePanel::CompleteConstruction() {
         AttachChild(stat);
         m_meter_stats.emplace_back(meter, stat);
         meters.emplace_back(meter, assoc_meter);
-        stat->RightClickedSignal.connect([meter](const GG::Pt& pt) {
+        stat->RightClickedSignal.connect([meter](GG::Pt pt) {
             auto meter_string = to_string(meter);
 
             auto pedia_zoom_to_article_action = [meter_string]() {

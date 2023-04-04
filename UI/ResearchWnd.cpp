@@ -43,14 +43,14 @@ namespace {
         void CompleteConstruction() override;
         void Render() override;
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+        void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
         static GG::Y DefaultHeight();
 
     private:
         void Draw(GG::Clr clr, bool fill);
 
-        std::string_view                        m_tech_name;
+        std::string_view                        m_tech_name = "";
         std::shared_ptr<GG::Label>              m_name_text;
         std::shared_ptr<GG::Label>              m_RPs_and_turns_text;
         std::shared_ptr<GG::Label>              m_turns_remaining_text;
@@ -111,7 +111,7 @@ namespace {
             GG::ListBox::Row::Resize(panel->Size() + border);
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             if (panel) {
                 GG::Pt border(GG::X(2 * GetLayout()->BorderMargin()), GG::Y(2 * GetLayout()->BorderMargin()));
                 panel->Resize(lr - ul - border);
@@ -256,7 +256,7 @@ namespace {
         PartlyRoundedRect(UpperLeft(), LowerRight() - LINE_WIDTH, CORNER_RADIUS, true, false, true, false, fill);
     }
 
-    void QueueTechPanel::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+    void QueueTechPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
         GG::Pt old_size(Size());
         GG::Control::SizeMove(ul, lr);
         if (Size() != old_size) {
@@ -306,7 +306,7 @@ public:
     boost::signals2::signal<void (GG::ListBox::iterator, bool)> QueueItemPausedSignal;
 
 protected:
-    void ItemRightClickedImpl(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) override {
+    void ItemRightClickedImpl(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) override {
         // mostly duplicated equivalent in QueueListBox, but with an extra command...
         auto pedia_action = [&it, this, pt, modkeys]() {
             ShowPediaSignal();
@@ -380,7 +380,7 @@ public:
         SaveOptions();
     }
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+    void SizeMove(GG::Pt ul, GG::Pt lr) override {
         GG::Pt sz = Size();
         CUIWnd::SizeMove(ul, lr);
         if (Size() != sz)
@@ -456,7 +456,7 @@ void ResearchWnd::CompleteConstruction() {
     m_refresh_needed.store(true);
 }
 
-void ResearchWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void ResearchWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
     const GG::Pt old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
     if (old_size != Size())
@@ -638,7 +638,7 @@ void ResearchWnd::UpdateInfoPanel(const ScriptingContext& context) {
     //empire->GetResearchResPool().ChangedSignal();
 }
 
-void ResearchWnd::AddTechsToQueueSlot(const std::vector<std::string>& tech_vec, int pos) {
+void ResearchWnd::AddTechsToQueueSlot(std::vector<std::string> tech_vec, int pos) {
     if (!m_enabled)
         return;
 
@@ -650,7 +650,7 @@ void ResearchWnd::AddTechsToQueueSlot(const std::vector<std::string>& tech_vec, 
         return;
     const ResearchQueue& queue = empire->GetResearchQueue();
     OrderSet& orders = GGHumanClientApp::GetApp()->Orders();
-    for (const std::string& tech_name : tech_vec) {
+    for (std::string& tech_name : tech_vec) {
         if (empire->TechResearched(tech_name))
             continue;
         // AddTechsToQueueSlot is currently used for (i) adding a tech and any not-yet-queued prereqs to the
@@ -666,11 +666,11 @@ void ResearchWnd::AddTechsToQueueSlot(const std::vector<std::string>& tech_vec, 
         // or that we skipped because it happened to already be in the right spot.
         if (pos == -1) {
             if (!queue.InQueue(tech_name)) {
-                orders.IssueOrder(std::make_shared<ResearchQueueOrder>(empire_id, tech_name, pos),
+                orders.IssueOrder(std::make_shared<ResearchQueueOrder>(empire_id, std::move(tech_name), pos),
                                   context);
             }
         } else if (!queue.InQueue(tech_name) || ((queue.find(tech_name) - queue.begin()) > pos)) {
-            orders.IssueOrder(std::make_shared<ResearchQueueOrder>(empire_id, tech_name, pos),
+            orders.IssueOrder(std::make_shared<ResearchQueueOrder>(empire_id, std::move(tech_name), pos),
                               context);
             pos += 1;
         } else {
@@ -695,7 +695,7 @@ void ResearchWnd::DeleteQueueItem(GG::ListBox::iterator it) {
         empire->UpdateResearchQueue(context);
 }
 
-void ResearchWnd::QueueItemClickedSlot(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
+void ResearchWnd::QueueItemClickedSlot(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) {
     if (m_queue_wnd->GetQueueListBox()->IteraterIndex(it) < 0 || !m_queue_wnd->GetQueueListBox()->DisplayingValidQueueItems())
         return;
 
@@ -708,7 +708,7 @@ void ResearchWnd::QueueItemClickedSlot(GG::ListBox::iterator it, const GG::Pt& p
     }
 }
 
-void ResearchWnd::QueueItemDoubleClickedSlot(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
+void ResearchWnd::QueueItemDoubleClickedSlot(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) {
     if (m_queue_wnd->GetQueueListBox()->IteraterIndex(it) < 0 || !m_queue_wnd->GetQueueListBox()->DisplayingValidQueueItems())
         return;
 

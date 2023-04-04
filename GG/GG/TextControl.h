@@ -56,7 +56,7 @@ public:
     using Wnd::SetMinSize;
 
     TextControl(X x, Y y, X w, Y h, std::string str,
-                const std::shared_ptr<Font>& font,
+                std::shared_ptr<Font> font,
                 Clr color = CLR_BLACK, Flags<TextFormat> format = FORMAT_NONE,
                 Flags<WndFlag> flags = NO_WND_FLAGS);
 
@@ -68,7 +68,7 @@ public:
      constructor.*/
     TextControl(X x, Y y, X w, Y h, std::string str,
                 std::vector<std::shared_ptr<Font::TextElement>> text_elements,
-                const std::shared_ptr<Font>& font,
+                std::shared_ptr<Font> font,
                 Clr color = CLR_BLACK, Flags<TextFormat> format = FORMAT_NONE,
                 Flags<WndFlag> flags = NO_WND_FLAGS);
 
@@ -100,7 +100,7 @@ public:
     */
     TextControl& operator=(const TextControl& that);
 
-    Pt MinUsableSize() const override;
+    Pt MinUsableSize() const noexcept override;
 
     /** Returns the minimum usable size if the text were reflowed into a \a width box.*/
     virtual Pt MinUsableSize(X width) const;
@@ -181,7 +181,7 @@ public:
 
     void Render() override;
 
-    void SizeMove(const Pt& ul, const Pt& lr) override;
+    void SizeMove(Pt ul, Pt lr) override;
 
     /** Just like Control::SetColor(), except that this one also adjusts the
         text color. */
@@ -234,7 +234,7 @@ public:
     void ChangeTemplatedText(const std::string& new_text, std::size_t targ_offset);
 
     /** Returns the Font used by this TextControl to render its text. */
-    const std::shared_ptr<Font>& GetFont() const;
+    const auto& GetFont() const noexcept { return m_font; }
 
     /** Sets the Font used by this TextControl to render its text. */
     void SetFont(std::shared_ptr<Font> font);
@@ -296,7 +296,7 @@ public:
 
 protected:
     /** Returns the line data for the text in this TextControl. */
-    virtual const std::vector<Font::LineData>& GetLineData() const;
+    virtual const std::vector<Font::LineData>& GetLineData() const noexcept { return m_line_data; }
 
     friend class StateButtonRepresenter;
 

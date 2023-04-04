@@ -29,11 +29,17 @@ ClientAppFixture::ClientAppFixture() :
 #endif
     //InitLoggingOptionsDBSystem();
 
+    static constexpr auto server_path_option = "misc.server-local-binary.path";
+    static constexpr auto server_filename =
 #ifdef FREEORION_WIN32
-    GetOptionsDB().Add<std::string>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),        PathToString(GetBinDir() / "freeoriond.exe"));
+        "freeoriond.exe";
 #else
-    GetOptionsDB().Add<std::string>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),        PathToString(GetBinDir() / "freeoriond"));
+        "freeoriond";
 #endif
+    if (!GetOptionsDB().OptionExists(server_path_option)) {
+        auto server_path = PathToString(GetBinDir() / server_filename);
+        GetOptionsDB().Add<std::string>(server_path_option, UserStringNop("OPTIONS_DB_FREEORIOND_PATH"), std::move(server_path));
+    }
 
     InfoLogger() << FreeOrionVersionString();
     DebugLogger() << "Test client initialized";
@@ -204,7 +210,7 @@ bool ClientAppFixture::HandleMessage(Message& msg) {
 
         ExtractGameStartMessageData(msg,                     single_player_game,     m_empire_id,
                                     m_current_turn,          m_empires,              m_universe,
-                                    GetSpeciesManager(),     GetCombatLogManager(),  GetSupplyManager(),
+                                    m_species_manager,       GetCombatLogManager(),  m_supply_manager,
                                     m_player_info,           m_orders,               loaded_game_data,
                                     ui_data_available,       ui_data,                state_string_available,
                                     save_state_string,       m_galaxy_setup_data);
@@ -212,7 +218,7 @@ bool ClientAppFixture::HandleMessage(Message& msg) {
         InfoLogger() << "Extracted GameStart message for turn: " << m_current_turn << " with empire: " << m_empire_id;
 
         m_ai_empires.clear();
-        for (const auto& empire : Empires()) {
+        for (const auto& empire : m_empires) {
             if (GetEmpireClientType(empire.first) == Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
                 m_ai_empires.insert(empire.first);
         }
@@ -239,14 +245,14 @@ bool ClientAppFixture::HandleMessage(Message& msg) {
         return true;
     }
     case Message::MessageType::TURN_PARTIAL_UPDATE: {
-        ExtractTurnPartialUpdateMessageData(msg, EmpireID(), GetUniverse());
+        ExtractTurnPartialUpdateMessageData(msg, m_empire_id, m_universe);
         BOOST_TEST_MESSAGE("Partial turn update unpacked");
         return true;
     }
     case Message::MessageType::TURN_UPDATE: {
-        ExtractTurnUpdateMessageData(msg,                   EmpireID(),         m_current_turn,
-                                     Empires(),             GetUniverse(),      GetSpeciesManager(),
-                                     GetCombatLogManager(), GetSupplyManager(), Players());
+        ExtractTurnUpdateMessageData(msg,                   m_empire_id,      m_current_turn,
+                                     m_empires,             m_universe,       m_species_manager,
+                                     GetCombatLogManager(), m_supply_manager, m_player_info);
         m_turn_done = true;
         BOOST_TEST_MESSAGE("Full turn update unpacked");
         return true;
@@ -295,7 +301,8 @@ bool ClientAppFixture::HandleMessage(Message& msg) {
 }
 
 void ClientAppFixture::SaveGame() {
-    std::string save_filename = boost::io::str(boost::format("FreeOrionTestGame_%04d_%s%s") % CurrentTurn() % FilenameTimestamp() % SP_SAVE_FILE_EXTENSION);
+    std::string save_filename = boost::io::str(boost::format("FreeOrionTestGame_%04d_%s%s")
+                                               % m_current_turn % FilenameTimestamp() % SP_SAVE_FILE_EXTENSION);
     boost::filesystem::path save_dir_path(GetSaveDir() / "test");
     boost::filesystem::path save_path(save_dir_path / save_filename);
     if (!exists(save_dir_path))

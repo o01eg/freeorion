@@ -104,7 +104,7 @@ namespace {
     };
 
     void insert_species(
-        SpeciesManager::SpeciesTypeMap& species,
+        std::map<std::string, Species>& species, // in/out
         SpeciesStrings& strings,
         boost::optional<std::map<PlanetType, PlanetEnvironment>>& planet_environments,
         boost::optional<parse::effects_group_payload>& effects,
@@ -113,26 +113,28 @@ namespace {
         SpeciesData& species_data,
         bool& pass)
     {
-        auto species_ptr = std::make_unique<Species>(
-            std::move(strings.name), std::move(strings.desc), std::move(strings.gameplay_desc),
-            (params.foci ? std::move(*params.foci) : std::vector<FocusType>{}),
-            (params.default_focus ? std::move(*params.default_focus) : std::string{}),
-            (planet_environments ? std::move(*planet_environments) : std::map<PlanetType, PlanetEnvironment>{}),
-            (effects ? OpenEnvelopes(*effects, pass) : std::vector<std::unique_ptr<Effect::EffectsGroup>>{}),
-            (combat_targets ? (*combat_targets).OpenEnvelope(pass) : nullptr),
-            params.playable,
-            params.native,
-            params.can_colonize,
-            params.can_produce_ships,
-            params.tags,    // intentionally not moved
-            std::move(params.likes),
-            std::move(params.dislikes),
-            std::move(species_data.graphic),
-            (species_data.spawn_rate ? *species_data.spawn_rate : 1.0),
-            (species_data.spawn_limit ? *species_data.spawn_limit : 9999));
+        auto species_name{strings.name};
 
-        auto& species_name{species_ptr->Name()};
-        species.emplace(species_name, std::move(species_ptr));
+        species.emplace(std::piecewise_construct,
+                        std::forward_as_tuple(std::move(species_name)),
+                        std::forward_as_tuple(
+                            std::move(strings.name), std::move(strings.desc), std::move(strings.gameplay_desc),
+                            (params.foci ? std::move(*params.foci) : std::vector<FocusType>{}),
+                            (params.default_focus ? std::move(*params.default_focus) : std::string{}),
+                            (planet_environments ? std::move(*planet_environments) : std::map<PlanetType, PlanetEnvironment>{}),
+                            (effects ? OpenEnvelopes(*effects, pass) : std::vector<std::unique_ptr<Effect::EffectsGroup>>{}),
+                            (combat_targets ? (*combat_targets).OpenEnvelope(pass) : nullptr),
+                            params.playable,
+                            params.native,
+                            params.can_colonize,
+                            params.can_produce_ships,
+                            params.tags,    // intentionally not moved
+                            std::move(params.likes),
+                            std::move(params.dislikes),
+                            std::move(species_data.graphic),
+                            (species_data.spawn_rate ? *species_data.spawn_rate : 1.0),
+                            (species_data.spawn_limit ? *species_data.spawn_limit : 9999)
+                        ));
     }
 
     BOOST_PHOENIX_ADAPT_FUNCTION(void, insert_species_, insert_species, 8)
@@ -172,8 +174,9 @@ namespace {
         parse::detail::single_or_repeated_string<std::set<std::string>> one_or_more_string_tokens;
     };
 
+    static_assert(std::is_same_v<SpeciesManager::SpeciesTypeMap, std::map<std::string, const Species, std::less<>>>);
     using start_rule_payload = std::pair<
-        SpeciesManager::SpeciesTypeMap, // species_by_name
+        std::map<std::string, Species>, // species_by_name
         std::vector<std::string> // census ordering
     >;
     using start_rule_signature = void(start_rule_payload::first_type&);
@@ -354,7 +357,9 @@ namespace {
             ordering.push_back(*it);
     }
 
-    boost::python::object py_insert_species_(start_rule_payload::first_type& species_, const boost::python::tuple& args, const boost::python::dict& kw) {
+    boost::python::object py_insert_species_(start_rule_payload::first_type& species_, const boost::python::tuple& args,
+                                             const boost::python::dict& kw)
+    {
         auto name = boost::python::extract<std::string>(kw["name"])();
         auto description = boost::python::extract<std::string>(kw["description"])();
         auto gameplay_description = boost::python::extract<std::string>(kw["gameplay_description"])();
@@ -372,7 +377,17 @@ namespace {
         std::vector<std::unique_ptr<Effect::EffectsGroup>> effectsgroups;
         boost::python::stl_input_iterator<effect_group_wrapper> effectsgroups_begin(kw["effectsgroups"]), effectsgroups_end;
         for (auto it = effectsgroups_begin; it != effectsgroups_end; ++it) {
-            effectsgroups.push_back(std::make_unique<Effect::EffectsGroup>(std::move(*it->effects_group)));
+            const auto& effects_group = *it->effects_group;
+            effectsgroups.push_back(std::make_unique<Effect::EffectsGroup>(
+                ValueRef::CloneUnique(effects_group.Scope()),
+                ValueRef::CloneUnique(effects_group.Activation()),
+                ValueRef::CloneUnique(effects_group.Effects()),
+                effects_group.AccountingLabel(),
+                effects_group.StackingGroup(),
+                effects_group.Priority(),
+                effects_group.GetDescription(),
+                effects_group.TopLevelContent()
+            ));
         }
         bool playable = false;
         if (kw.has_key("playable")) {
@@ -392,10 +407,16 @@ namespace {
         }
         boost::python::stl_input_iterator<std::string> tags_begin(kw["tags"]), it_end;
         std::set<std::string> tags(tags_begin, it_end);
-        boost::python::stl_input_iterator<std::string> likes_begin(kw["likes"]);
-        std::set<std::string> likes(likes_begin, it_end);
-        boost::python::stl_input_iterator<std::string> dislikes_begin(kw["dislikes"]);
-        std::set<std::string> dislikes(dislikes_begin, it_end);
+        std::set<std::string> likes;
+        if (kw.has_key("likes")) {
+            boost::python::stl_input_iterator<std::string> likes_begin(kw["likes"]);
+            likes = std::move(std::set<std::string>(likes_begin, it_end));
+        }
+        std::set<std::string> dislikes;
+        if (kw.has_key("dislikes")) {
+            boost::python::stl_input_iterator<std::string> dislikes_begin(kw["dislikes"]);
+            dislikes = std::move(std::set<std::string>(dislikes_begin, it_end));
+        }
         auto graphic = boost::python::extract<std::string>(kw["graphic"])();
         double spawn_rate = 1.0;
         if (kw.has_key("spawnrate")) {
@@ -429,13 +450,13 @@ namespace {
             spawn_limit);
 
         auto& species_name{species_ptr->Name()};
-        species_.emplace(species_name, std::move(species_ptr));
+        species_.emplace(species_name, std::move(*species_ptr));
 
         return boost::python::object();
     }
 
     struct py_grammar {
-         boost::python::dict globals;
+        boost::python::dict globals;
 
         py_grammar(const PythonParser& parser, start_rule_payload::first_type& species_) :
             globals(boost::python::import("builtins").attr("__dict__"))
@@ -449,11 +470,12 @@ namespace {
             RegisterGlobalsSources(globals);
             RegisterGlobalsEnums(globals);
 
-            globals["Species"] = boost::python::raw_function([&species_](const boost::python::tuple& args, const boost::python::dict& kw) { return py_insert_species_(species_, args, kw); });
+            globals["Species"] = boost::python::raw_function(
+                [&species_](const boost::python::tuple& args, const boost::python::dict& kw)
+                { return py_insert_species_(species_, args, kw); });
         }
 
-        boost::python::dict operator()() const
-        { return globals; }
+        boost::python::dict operator()() const { return globals; }
     };
 
     struct py_manifest_grammar {

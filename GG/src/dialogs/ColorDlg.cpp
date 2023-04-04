@@ -108,10 +108,10 @@ void HueSaturationPicker::Render()
     glEnable(GL_TEXTURE_2D);
 }
 
-void HueSaturationPicker::LButtonDown(const Pt& pt, Flags<ModKey> mod_keys)
+void HueSaturationPicker::LButtonDown(Pt pt, Flags<ModKey> mod_keys)
 { SetHueSaturationFromPt(pt); }
 
-void HueSaturationPicker::LDrag(const Pt& pt, const Pt& move, Flags<ModKey> mod_keys)
+void HueSaturationPicker::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
 { SetHueSaturationFromPt(pt); }
 
 void HueSaturationPicker::SetHueSaturation(double hue, double saturation)
@@ -211,10 +211,10 @@ void ValuePicker::Render()
     glEnable(GL_TEXTURE_2D);
 }
 
-void ValuePicker::LButtonDown(const Pt& pt, Flags<ModKey> mod_keys)
+void ValuePicker::LButtonDown(Pt pt, Flags<ModKey> mod_keys)
 { SetValueFromPt(pt); }
 
-void ValuePicker::LDrag(const Pt& pt, const Pt& move, Flags<ModKey> mod_keys)
+void ValuePicker::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
 { SetValueFromPt(pt); }
 
 void ValuePicker::SetHueSaturation(double hue, double saturation)
@@ -409,8 +409,8 @@ ColorDlg::ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<Font>& fo
     m_color_buttons_layout = Wnd::Create<Layout>(X0, m_color_squares_layout->Bottom() + 5,
                                                  m_pickers_layout->Width(), Y(80),
                                                  COLOR_BUTTON_ROWS, COLOR_BUTTON_COLS, 0, 4);
-    for (int i = 0; i < COLOR_BUTTON_ROWS; ++i) {
-        for (int j = 0; j < COLOR_BUTTON_COLS; ++j) {
+    for (std::size_t i = 0u; i < COLOR_BUTTON_ROWS; ++i) {
+        for (std::size_t j = 0u; j < COLOR_BUTTON_COLS; ++j) {
             m_color_buttons.push_back(Wnd::Create<ColorButton>(m_color));
             m_color_buttons.back()->SetRepresentedColor(custom_colors[i * COLOR_BUTTON_COLS + j]);
             m_color_buttons_layout->Add(m_color_buttons.back(), i, j);
@@ -647,11 +647,11 @@ void ColorDlg::ValueSliderChanged(int value, int low, int high)
 void ColorDlg::OkClicked()
 {
     m_color_was_picked = true;
-    m_done = true;
+    m_modal_done.store(true);
 }
 
 void ColorDlg::CancelClicked()
 {
     m_current_color = m_original_color;
-    m_done = true;
+    m_modal_done.store(true);
 }

@@ -28,28 +28,25 @@ public:
     bool operator!=(const FieldType& rhs) const { return !(*this == rhs); }
 
     //! Returns the unique name for this type of field
-    auto Name() const -> const std::string& { return m_name; }
+    const auto& Name() const { return m_name; }
 
     //! Returns a text description of this type of building
-    auto Description() const -> const std::string& { return m_description; }
+    const auto& Description() const noexcept { return m_description; }
 
     //! Returns a data file format representation of this object
     auto Dump(uint8_t ntabs = 0) const -> std::string;
 
     //! Returns stealth of field type
-    auto Stealth() const -> float { return m_stealth; }
+    auto Stealth() const noexcept { return m_stealth; }
 
-    const auto& Tags() const { return m_tags; }
+    const auto& Tags() const noexcept { return m_tags; }
 
-    auto HasTag(std::string_view tag) const -> bool
+    auto HasTag(std::string_view tag) const
     { return std::any_of(m_tags.begin(), m_tags.end(), [tag](const auto& t) { return t == tag; }); }
 
-    //! Returns the EffectsGroups that encapsulate the effects of this
-    //! FieldType.
-    auto Effects() const -> const std::vector<std::shared_ptr<Effect::EffectsGroup>>& { return m_effects; }
+    const auto& Effects() const noexcept { return m_effects; }
 
-    //! Returns the name of the grapic file for this field type
-    auto Graphic() const -> const std::string& { return m_graphic; }
+    const auto& Graphic() const noexcept { return m_graphic; }
 
     //! Returns a number, calculated from the contained data, which should be
     //! different for different contained data, and must be the same for
@@ -60,13 +57,13 @@ public:
     auto GetCheckSum() const -> uint32_t;
 
 private:
-    std::string                                         m_name;
-    std::string                                         m_description;
-    float                                               m_stealth;
-    const std::string                                   m_tags_concatenated;
-    const std::vector<std::string_view>                 m_tags;
-    std::vector<std::shared_ptr<Effect::EffectsGroup>>  m_effects;
-    std::string                                         m_graphic;
+    std::string                         m_name;
+    std::string                         m_description;
+    float                               m_stealth;
+    const std::string                   m_tags_concatenated;
+    const std::vector<std::string_view> m_tags;
+    std::vector<Effect::EffectsGroup>   m_effects;
+    std::string                         m_graphic;
 };
 
 
@@ -77,20 +74,20 @@ public:
 
     //! Returns the field type with the name \a name; you should use the free
     //! free function GetFieldType(...) instead, mainly to save some typing.
-    auto GetFieldType(std::string_view name) const -> const FieldType*;
+    [[nodiscard]] auto GetFieldType(std::string_view name) const -> const FieldType*;
 
     //! iterator to the first field type
-    FO_COMMON_API auto begin() const -> iterator;
+    [[nodiscard]] FO_COMMON_API auto begin() const -> iterator;
 
     //! iterator to the last + 1th field type
-    FO_COMMON_API auto end() const -> iterator;
+    [[nodiscard]] FO_COMMON_API auto end() const -> iterator;
 
     //! How many types are known?
-    FO_COMMON_API auto size() const -> std::size_t;
+    [[nodiscard]] FO_COMMON_API auto size() const -> std::size_t;
 
     //! Returns the instance of this singleton class; you should use the free
     //! function GetFieldTypeManager() instead
-    static auto GetFieldTypeManager() -> FieldTypeManager&;
+    [[nodiscard]] static auto GetFieldTypeManager() -> FieldTypeManager&;
 
     //! Returns a number, calculated from the contained data, which should be
     //! different for different contained data, and must be the same for
@@ -98,7 +95,7 @@ public:
     //! and executions of the program and the function. Useful to verify that
     //! the parsed content is consistent without sending it all between
     //! clients and server.
-    auto GetCheckSum() const -> uint32_t;
+    [[nodiscard]] auto GetCheckSum() const -> uint32_t;
 
     //! Sets types to the value of @p future.
     FO_COMMON_API void SetFieldTypes(Pending::Pending<container_type>&& future);
@@ -120,11 +117,11 @@ private:
 
 
 //! Returns the singleton field type manager
-FO_COMMON_API auto GetFieldTypeManager() -> FieldTypeManager&;
+[[nodiscard]] FO_COMMON_API auto GetFieldTypeManager() -> FieldTypeManager&;
 
 //! Returns the BuildingType specification object for a field of
 //! type @p name.  If no such FieldType exists, nullptr is returned instead.
-FO_COMMON_API auto GetFieldType(std::string_view name) -> const FieldType*;
+[[nodiscard]] FO_COMMON_API auto GetFieldType(std::string_view name) -> const FieldType*;
 
 
 #endif

@@ -9,6 +9,7 @@
 #include <vector>
 #include <boost/container/flat_map.hpp>
 #include "ConstantsFwd.h"
+#include "Condition.h"
 #include "EnumsFwd.h"
 #include "../util/Enum.h"
 #include "../util/Export.h"
@@ -16,10 +17,6 @@
 
 class UniverseObject;
 struct ScriptingContext;
-
-namespace Condition {
-    struct Condition;
-}
 
 //! Types of in-game things that might contain an EffectsGroup, or "cause"
 //! effects to occur
@@ -45,19 +42,20 @@ namespace Effect {
     using TargetSet = std::vector<UniverseObject*>;
     /** Effect accounting information for all meters of all objects that are
       * acted on by effects. */
-    using AccountingMap= std::unordered_map<int, boost::container::flat_map<MeterType, std::vector<AccountingInfo>>>;
+    using AccountingMap = std::unordered_map<int, boost::container::flat_map<MeterType, std::vector<AccountingInfo>>>;
 
     /** Description of cause of an effect: the general cause type, and the
       * specific cause.  eg. Building and a particular BuildingType. */
     struct FO_COMMON_API EffectCause {
         EffectCause() = default;
 
-        EffectCause(EffectsCauseType cause_type_) :
+        explicit EffectCause(EffectsCauseType cause_type_) noexcept(noexcept(std::string{})) :
             cause_type(cause_type_)
         {}
 
         template <typename S1, typename S2>
-        EffectCause(EffectsCauseType cause_type_, S1&& specific_cause_, S2&& custom_label_ = "") :
+        EffectCause(EffectsCauseType cause_type_, S1&& specific_cause_, S2&& custom_label_ = "") 
+            noexcept(noexcept(std::string{std::declval<S1>()}) && noexcept(std::string{std::declval<S2>()})) :
             cause_type(cause_type_),
             specific_cause(std::forward<S1>(specific_cause_)),
             custom_label(std::forward<S2>(custom_label_))
@@ -145,7 +143,8 @@ namespace Effect {
     struct FO_COMMON_API AccountingInfo : public EffectCause {
         AccountingInfo() = default;
 
-        AccountingInfo(float meter_change_, float running_meter_total_) :
+        AccountingInfo(float meter_change_, float running_meter_total_)
+            noexcept(noexcept(EffectCause{EffectsCauseType::ECT_UNKNOWN_CAUSE})) :
             EffectCause(EffectsCauseType::ECT_UNKNOWN_CAUSE),
             source_id(INVALID_OBJECT_ID),
             meter_change(meter_change_),
@@ -153,7 +152,8 @@ namespace Effect {
         {}
 
         AccountingInfo(int source_id_, EffectsCauseType cause_type_, float meter_change_,
-                       float running_meter_total_) :
+                       float running_meter_total_)
+            noexcept(noexcept(EffectCause{std::declval<EffectsCauseType>()})) :
             EffectCause(cause_type_),
             source_id(source_id_),
             meter_change(meter_change_),
@@ -162,14 +162,15 @@ namespace Effect {
 
         template <typename S1, typename S2 = const char*>
         AccountingInfo(int source_id_, EffectsCauseType cause_type_, float meter_change_,
-                       float running_meter_total_, S1&& specific_cause_, S2&& custom_label_ = "") :
+                       float running_meter_total_, S1&& specific_cause_, S2&& custom_label_ = "")
+            noexcept(noexcept(EffectCause{std::declval<EffectsCauseType>(), std::declval<S1>(), std::declval<S2>()})) :
             EffectCause(cause_type_, std::forward<S1>(specific_cause_), std::forward<S2>(custom_label_)),
             source_id(source_id_),
             meter_change(meter_change_),
             running_meter_total(running_meter_total_)
         {}
 
-        bool operator==(const AccountingInfo& rhs) const;
+        bool operator==(const AccountingInfo& rhs) const noexcept;
 
         int     source_id = INVALID_OBJECT_ID;  ///< source object of effect
         float   meter_change = 0.0f;            ///< net change on meter due to this effect, as best known by client's empire
@@ -213,22 +214,23 @@ namespace Effect {
                      bool include_empire_meter_effects = false,
                      bool only_generate_sitrep_effects = false) const;
 
-        const std::string&              StackingGroup() const noexcept   { return m_stacking_group; }
-        Condition::Condition*           Scope() const noexcept           { return m_scope.get(); }
-        Condition::Condition*           Activation() const noexcept      { return m_activation.get(); }
-        const std::vector<Effect*>      EffectsList() const;
-        const std::string&              GetDescription() const noexcept  { return m_description; }
-        const std::string&              AccountingLabel() const noexcept { return m_accounting_label; }
-        int                             Priority() const noexcept        { return m_priority; }
-        std::string                     Dump(uint8_t ntabs = 0) const;
-        bool                            HasMeterEffects() const noexcept;
-        bool                            HasAppearanceEffects() const noexcept;
-        bool                            HasSitrepEffects() const noexcept;
+        [[nodiscard]] auto& StackingGroup() const noexcept   { return m_stacking_group; }
+        [[nodiscard]] auto* Scope() const noexcept           { return m_scope.get(); }
+        [[nodiscard]] auto* Activation() const noexcept      { return m_activation.get(); }
+        [[nodiscard]] auto& Effects() const noexcept         { return m_effects; }
+        [[nodiscard]] auto& GetDescription() const noexcept  { return m_description; }
+        [[nodiscard]] auto& AccountingLabel() const noexcept { return m_accounting_label; }
+        [[nodiscard]] int   Priority() const noexcept        { return m_priority; }
+        [[nodiscard]] bool  HasMeterEffects() const noexcept      { return m_has_meter_effects; }
+        [[nodiscard]] bool  HasAppearanceEffects() const noexcept { return m_has_appearance_effects; }
+        [[nodiscard]] bool  HasSitrepEffects() const noexcept     { return m_has_sitrep_effects; }
 
-        void                            SetTopLevelContent(const std::string& content_name);
-        const std::string&              TopLevelContent() const noexcept { return m_content_name; }
+        void SetTopLevelContent(std::string content_name);
 
-        virtual uint32_t                GetCheckSum() const;
+        [[nodiscard]] auto& TopLevelContent() const noexcept { return m_content_name; }
+
+        [[nodiscard]] std::string      Dump(uint8_t ntabs = 0) const;
+        [[nodiscard]] virtual uint32_t GetCheckSum() const;
 
     protected:
         std::unique_ptr<Condition::Condition>   m_scope;
@@ -236,14 +238,16 @@ namespace Effect {
         std::string                             m_stacking_group;
         std::vector<std::unique_ptr<Effect>>    m_effects;
         std::string                             m_accounting_label;
-        int                                     m_priority; // constructor sets this, so don't need a default value here
+        const int                               m_priority; // constructor sets this, so don't need a default value here
         std::string                             m_description;
         std::string                             m_content_name;
+        const bool                              m_has_meter_effects;
+        const bool                              m_has_appearance_effects;
+        const bool                              m_has_sitrep_effects;
     };
 
     /** Returns a single string which `Dump`s a vector of EffectsGroups. */
-    FO_COMMON_API std::string Dump(const std::vector<std::shared_ptr<EffectsGroup>>& effects_groups);
-    FO_COMMON_API std::string Dump(const std::vector<std::unique_ptr<EffectsGroup>>& effects_groups);
+    FO_COMMON_API std::string Dump(const std::vector<EffectsGroup>& effects_groups);
 }
 
 #endif

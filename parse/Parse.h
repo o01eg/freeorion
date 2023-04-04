@@ -45,15 +45,18 @@ namespace parse {
     FO_PARSE_API std::map<std::string, std::unique_ptr<ValueRef::ValueRefBase>, std::less<>> named_value_refs(const boost::filesystem::path& path);
     FO_PARSE_API std::map<std::string, std::unique_ptr<Special>, std::less<>> specials(const boost::filesystem::path& path);
 
-    FO_PARSE_API std::map<std::string, std::unique_ptr<Policy>, std::less<>> policies(const boost::filesystem::path& path);
+    /* P in policies<P> should be std::vector<Policy>. This avoids having to include
+       the government header here. */
+    template <typename P>
+    FO_PARSE_API P policies(const boost::filesystem::path& path);
 
     /** Parse all species in directory \p path, store them with their name in \p
         species_by_name. If a file exists called SpeciesCensusOrdering.focs.txt, parse it and
         store the census order in \p ordering. */
     using species_type = std::pair<
-        std::map<std::string, std::unique_ptr<Species>, std::less<>>, // species_by_name,
+        std::map<std::string, Species>, // species_by_name,
         std::vector<std::string> // ordering
-        >;
+    >;
     FO_PARSE_API species_type species(const PythonParser& parser, const boost::filesystem::path& path);
 
     /* T in techs<T> can only be TechManager::TechParseTuple.  This decouples

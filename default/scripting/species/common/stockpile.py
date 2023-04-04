@@ -7,7 +7,7 @@ from common.priorities import (
 
 def STOCKPILE_PER_POP_EFFECTSGROUP__SNIP(label: str, value) -> dict:
     return {
-        "scope": Source,
+        "scope": IsSource,
         "activation": Planet(),
         "accountinglabel": label + "_STOCKPILE_LABEL",
         "priority": TARGET_EARLY_BEFORE_SCALING_PRIORITY,
@@ -15,9 +15,15 @@ def STOCKPILE_PER_POP_EFFECTSGROUP__SNIP(label: str, value) -> dict:
     }
 
 
+def STOCKPILE_PER_POP_EFFECTSGROUP(label: str, value):
+    return EffectsGroup(description=label + "_STOCKPILE_DESC", **STOCKPILE_PER_POP_EFFECTSGROUP__SNIP(label, value))
+
+
+NO_STOCKPILE = []
+
 STANDARD_STOCKPILE = [
     EffectsGroup(  # increase or decrease towards target meter, when not recently conquered
-        scope=Source,
+        scope=IsSource,
         activation=Planet()
         & (LocalCandidate.LastTurnConquered < CurrentTurn)
         & (LocalCandidate.System.LastTurnBattleHere < CurrentTurn),
@@ -30,7 +36,7 @@ STANDARD_STOCKPILE = [
     ),
     # increase stockpile for species if Homeworld is set to stockpile focus
     EffectsGroup(
-        scope=ProductionCenter
+        scope=Planet()
         & OwnedBy(empire=Source.Owner)
         & HasSpecies(name=[Source.Species])
         & ~Homeworld(name=[Source.Species]),
@@ -40,7 +46,7 @@ STANDARD_STOCKPILE = [
         effects=SetMaxStockpile(value=(Value + 2 * Target.Population * STOCKPILE_PER_POP)),
     ),
     # removes residual stockpile capacity from a dead planet
-    EffectsGroup(scope=Source, activation=Planet() & TargetPopulation(high=0), effects=SetStockpile(value=0)),
+    EffectsGroup(scope=IsSource, activation=Planet() & TargetPopulation(high=0), effects=SetStockpile(value=0)),
 ]
 
 AVERAGE_STOCKPILE = [
@@ -48,5 +54,10 @@ AVERAGE_STOCKPILE = [
         # Skip the AVERAGE_STOCKPILE_DESC, same as for the other *_STOCKPILE macros
         **STOCKPILE_PER_POP_EFFECTSGROUP__SNIP("AVERAGE", Value + 1 * Target.Population * STOCKPILE_PER_POP)
     ),
+    *STANDARD_STOCKPILE,
+]
+
+GREAT_STOCKPILE = [
+    STOCKPILE_PER_POP_EFFECTSGROUP("GREAT", Value + 10 * Target.Population * STOCKPILE_PER_POP),
     *STANDARD_STOCKPILE,
 ]

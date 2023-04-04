@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <boost/algorithm/string/case_conv.hpp>
+#include <boost/container/flat_map.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/optional/optional.hpp>
 #include "ConstantsFwd.h"
@@ -38,8 +39,8 @@ FO_ENUM(
 )
 
 
-/** A setting that a ResourceCenter can be assigned to influence what it
-  * produces.  Doesn't directly affect the ResourceCenter, but effectsgroups
+/** A setting that a Planet can be assigned to influence what it
+  * produces.  Doesn't directly affect the Planet, but effectsgroups
   * can use activation or scope conditions that check whether a potential
   * target has a particular focus.  By this method, techs or buildings or
   * species can act on planets or other ResourceCenters depending what their
@@ -113,6 +114,9 @@ public:
             double spawn_rate = 1.0, int spawn_limit = 99999);
 
     ~Species();
+    Species() = delete;
+    Species(const Species&) = delete;
+    Species(Species&&) = default;
 
     bool operator==(const Species& rhs) const;
     bool operator!=(const Species& rhs) const
@@ -160,8 +164,6 @@ public:
     [[nodiscard]] uint32_t GetCheckSum() const;
 
 private:
-    void Init();
-
     /** This does the heavy lifting for finding the next better or next best planet type.
       * the callback apply_for_best_forward_backward takes three arguments:
       * 1) the best PlanetType easiest to terraform to for this species for the initial_planet_type
@@ -178,7 +180,8 @@ private:
       * current planet type needs to be returned.
       */
     template <typename Func>
-    [[nodiscard]] PlanetType TheNextBestPlanetTypeApply(PlanetType initial_planet_type, Func apply_for_best_forward_backward) const;
+    [[nodiscard]] PlanetType TheNextBestPlanetTypeApply(PlanetType initial_planet_type,
+                                                        Func apply_for_best_forward_backward) const;
 
     std::string m_name;
     std::string m_description;
@@ -186,11 +189,13 @@ private:
 
     std::vector<FocusType>                  m_foci;
     std::string                             m_default_focus;
-    std::map<PlanetType, PlanetEnvironment> m_planet_environments;
 
-    std::vector<std::unique_ptr<Effect::EffectsGroup>> m_effects;
-    std::unique_ptr<Condition::Condition>              m_location;
-    std::unique_ptr<Condition::Condition>              m_combat_targets;
+    using pt_pe_map = boost::container::flat_map<PlanetType, PlanetEnvironment>;
+    pt_pe_map                               m_planet_environments;
+
+    std::vector<Effect::EffectsGroup>       m_effects;
+    std::unique_ptr<Condition::Condition>   m_location;
+    std::unique_ptr<Condition::Condition>   m_combat_targets;
 
     bool  m_playable = true;
     bool  m_native = true;
@@ -199,31 +204,39 @@ private:
     float m_spawn_rate = 1.0;
     int   m_spawn_limit = 99999;
 
-    const std::string                   m_tags_concatenated;
-    const std::vector<std::string_view> m_tags;
-    const std::vector<std::string_view> m_pedia_tags;
-    std::vector<std::string_view>       m_likes;
-    std::vector<std::string_view>       m_dislikes;
-    std::string                         m_graphic;
+    std::string                   m_tags_concatenated;
+    std::vector<std::string_view> m_tags;
+    std::vector<std::string_view> m_pedia_tags;
+    std::vector<std::string_view> m_likes;
+    std::vector<std::string_view> m_dislikes;
+    std::string                   m_graphic;
 };
 
 
 /** Holds all FreeOrion species.  Types may be looked up by name. */
 class FO_COMMON_API SpeciesManager {
+public:
+    using SpeciesTypeMap = std::map<std::string, const Species, std::less<>>;
+    using iterator = typename SpeciesTypeMap::const_iterator;
+
 private:
+    using species_entry_t = typename iterator::value_type;
+
     struct FO_COMMON_API PlayableSpecies
-    { bool operator()(const std::map<std::string, std::unique_ptr<Species>>::value_type& species_entry) const; };
+    { bool operator()(const species_entry_t& species_entry) const noexcept { return species_entry.second.Playable(); } };
+
     struct FO_COMMON_API NativeSpecies
-    { bool operator()(const std::map<std::string, std::unique_ptr<Species>>::value_type& species_entry) const; };
+    { bool operator()(const species_entry_t& species_entry) const noexcept { return species_entry.second.Native(); } };
 
 public:
-    using SpeciesTypeMap = std::map<std::string, std::unique_ptr<Species>, std::less<>>;
     using CensusOrder = std::vector<std::string>;
-    using iterator = SpeciesTypeMap::const_iterator;
-    typedef boost::filter_iterator<PlayableSpecies, iterator> playable_iterator;
-    typedef boost::filter_iterator<NativeSpecies, iterator>   native_iterator;
+    using playable_iterator = boost::filter_iterator<PlayableSpecies, iterator>;
+    using native_iterator = boost::filter_iterator<NativeSpecies, iterator>;
 
     SpeciesManager() = default;
+    // extracts and moves homeworlds, opinions, populations, and destroyed
+    // counts, but not species or census or pending
+    SpeciesManager& operator=(SpeciesManager&& rhs);
 
     /** returns the species with the name \a name; you should use the
       * free function GetSpecies() instead, mainly to save some typing. */
@@ -267,13 +280,11 @@ public:
 
     /** returns a map from species name to a set of object IDs that are the
       * homeworld(s) of that species in the current game. */
-    [[nodiscard]] const std::map<std::string, std::set<int>>&
-        GetSpeciesHomeworldsMap(int encoding_empire = ALL_EMPIRES) const;
+    [[nodiscard]] const auto& GetSpeciesHomeworldsMap() const noexcept { return m_species_homeworlds; }
 
     /** returns a map from species name to a map from empire id to each the
       * species' opinion of the empire */
-    [[nodiscard]] const std::map<std::string, std::map<int, float>>&
-        GetSpeciesEmpireOpinionsMap(int encoding_empire = ALL_EMPIRES) const;
+    [[nodiscard]] const auto& GetSpeciesEmpireOpinionsMap() const noexcept { return m_species_empire_opinions; }
 
     /** returns opinion of species with name \a species_name about empire with
       * id \a empire_id or 0.0 if there is no such opinion yet recorded. */
@@ -281,8 +292,7 @@ public:
 
     /** returns a map from species name to a map from other species names to the
       * opinion of the first species about the other species. */
-    [[nodiscard]] const std::map<std::string, std::map<std::string, float>>&
-        GetSpeciesSpeciesOpinionsMap(int encoding_empire = ALL_EMPIRES) const;
+    [[nodiscard]] const auto& GetSpeciesSpeciesOpinionsMap() const noexcept { return m_species_species_opinions; }
 
     /** returns opinion of species with name \a opinionated_species_name about
       * other species with name \a rated_species_name or 0.0 if there is no
@@ -320,13 +330,14 @@ public:
 
     void UpdatePopulationCounter(const ObjectMap& objects);
 
-    [[nodiscard]] const std::map<std::string, std::map<int, float>>&       SpeciesObjectPopulations(int encoding_empire = ALL_EMPIRES) const;
-    [[nodiscard]] const std::map<std::string, std::map<std::string, int>>& SpeciesShipsDestroyed(int encoding_empire = ALL_EMPIRES) const;
+    [[nodiscard]] const auto& SpeciesObjectPopulations() const noexcept { return m_species_object_populations; }
+    [[nodiscard]] const auto& SpeciesShipsDestroyed() const noexcept { return m_species_species_ships_destroyed; }
+
     void SetSpeciesObjectPopulations(std::map<std::string, std::map<int, float>> sop);
     void SetSpeciesShipsDestroyed(std::map<std::string, std::map<std::string, int>> ssd);
 
     /** Sets species types to the value of \p future. */
-    void SetSpeciesTypes(Pending::Pending<std::pair<SpeciesTypeMap, CensusOrder>>&& future);
+    void SetSpeciesTypes(Pending::Pending<std::pair<std::map<std::string, Species>, CensusOrder>>&& future);
 
 private:
     /** sets the homeworld ids of species in this SpeciesManager to those
@@ -334,13 +345,22 @@ private:
     void SetSpeciesHomeworlds(std::map<std::string, std::set<int>>&& species_homeworld_ids);
 
     /** Assigns any m_pending_types to m_species. */
-    static void CheckPendingSpeciesTypes();
+    void CheckPendingSpeciesTypes() const;
+
+    // these are mutable because they may be updated in CheckPendingSpeciesTypes
+    mutable boost::optional<Pending::Pending<
+        std::pair<std::map<std::string, Species>,
+        SpeciesManager::CensusOrder>>>     m_pending_types;
+    mutable SpeciesManager::SpeciesTypeMap m_species;
+    mutable SpeciesManager::CensusOrder    m_census_order;
 
     std::map<std::string, std::set<int>>                m_species_homeworlds;
     std::map<std::string, std::map<int, float>>         m_species_empire_opinions;
     std::map<std::string, std::map<std::string, float>> m_species_species_opinions;
     std::map<std::string, std::map<int, float>>         m_species_object_populations;
     std::map<std::string, std::map<std::string, int>>   m_species_species_ships_destroyed;
+
+    mutable std::mutex m_species_mutex;
 
     template <typename Archive>
     friend void serialize(Archive&, SpeciesManager&, unsigned int const);

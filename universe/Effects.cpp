@@ -83,25 +83,24 @@ namespace {
     {
         if (!system || !ship)
             return nullptr;
-        Universe& universe = context.ContextUniverse();
 
         // remove ship from old fleet / system, put into new system if necessary
         if (ship->SystemID() != system->ID()) {
-            if (auto old_system = universe.Objects().getRaw<System>(ship->SystemID())) {
+            if (auto old_system = context.ContextObjects().getRaw<System>(ship->SystemID())) {
                 old_system->Remove(ship->ID());
                 ship->SetSystem(INVALID_OBJECT_ID);
             }
-            system->Insert(ship, System::NO_ORBIT, context.current_turn);
+            system->Insert(ship, System::NO_ORBIT, context.current_turn, context.ContextObjects());
         }
 
         if (ship->FleetID() != INVALID_OBJECT_ID) {
-            if (auto old_fleet = universe.Objects().getRaw<Fleet>(ship->FleetID()))
+            if (auto old_fleet = context.ContextObjects().getRaw<Fleet>(ship->FleetID()))
                 old_fleet->RemoveShips({ship->ID()});
         }
 
         // create new fleet for ship, and put it in new system
         auto fleet = CreateNewFleet(system->X(), system->Y(), std::move(ship), context, aggression);
-        system->Insert(fleet, System::NO_ORBIT, context.current_turn);
+        system->Insert(fleet, System::NO_ORBIT, context.current_turn, context.ContextObjects());
 
         return fleet;
     }
@@ -134,7 +133,7 @@ namespace {
 
         const ObjectMap& objects = context.ContextObjects();
 
-        auto next_system = objects.getRaw<System>(new_next_system);
+        const auto next_system = objects.getRaw<System>(new_next_system);
         if (!next_system) {
             ErrorLogger(effects) << "UpdateFleetRoute couldn't get new next system with id: " << new_next_system;
             return;
@@ -151,7 +150,7 @@ namespace {
         if (start_system == INVALID_OBJECT_ID)
             start_system = new_next_system;
 
-        int dest_system = fleet->FinalDestinationID();
+        const int dest_system = fleet->FinalDestinationID();
 
         auto route_pair = context.ContextUniverse().GetPathfinder()->ShortestPath(
             start_system, dest_system, fleet->Owner(), objects);
@@ -164,7 +163,7 @@ namespace {
 
         // set fleet with newly recalculated route
         try {
-            fleet->SetRoute(route_pair.first, objects);
+            fleet->SetRoute(std::move(route_pair.first), objects);
         } catch (const std::exception& e) {
             ErrorLogger(effects) << "Caught exception updating fleet route in effect code: " << e.what();
         }
@@ -209,7 +208,19 @@ EffectsGroup::EffectsGroup(std::unique_ptr<Condition::Condition>&& scope,
     m_accounting_label(std::move(accounting_label)),
     m_priority(priority),
     m_description(std::move(description)),
-    m_content_name(std::move(content_name))
+    m_content_name(std::move(content_name)),
+    m_has_meter_effects([this]() {
+        return std::any_of(m_effects.begin(), m_effects.end(),
+                           [](const auto& e) noexcept { return e->IsMeterEffect(); });
+    }()),
+    m_has_appearance_effects([this]() {
+        return std::any_of(m_effects.begin(), m_effects.end(),
+                           [](const auto& e) noexcept { return e->IsAppearanceEffect(); });
+    }()),
+    m_has_sitrep_effects([this]() {
+        return std::any_of(m_effects.begin(), m_effects.end(),
+                           [](const auto& e) noexcept { return e->IsSitrepEffect(); });
+    }())
 {}
 
 EffectsGroup::~EffectsGroup() = default;
@@ -291,14 +302,6 @@ void EffectsGroup::Execute(ScriptingContext& context,
     }
 }
 
-const std::vector<Effect*> EffectsGroup::EffectsList() const {
-    std::vector<Effect*> retval;
-    retval.reserve(m_effects.size());
-    std::transform(m_effects.begin(), m_effects.end(), std::back_inserter(retval),
-                   [](const std::unique_ptr<Effect>& xx) {return xx.get();});
-    return retval;
-}
-
 std::string EffectsGroup::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "EffectsGroup";
     if (!m_content_name.empty())
@@ -328,38 +331,14 @@ std::string EffectsGroup::Dump(uint8_t ntabs) const {
     return retval;
 }
 
-bool EffectsGroup::HasMeterEffects() const noexcept {
-    for (auto& effect : m_effects) { // TODO: cache
-        if (effect->IsMeterEffect())
-            return true;
-    }
-    return false;
-}
-
-bool EffectsGroup::HasAppearanceEffects() const noexcept {
-    for (auto& effect : m_effects) {
-        if (effect->IsAppearanceEffect())
-            return true;
-    }
-    return false;
-}
-
-bool EffectsGroup::HasSitrepEffects() const noexcept {
-    for (auto& effect : m_effects) {
-        if (effect->IsSitrepEffect())
-            return true;
-    }
-    return false;
-}
-
-void EffectsGroup::SetTopLevelContent(const std::string& content_name) {
-    m_content_name = content_name;
+void EffectsGroup::SetTopLevelContent(std::string content_name) {
     if (m_scope)
         m_scope->SetTopLevelContent(content_name);
     if (m_activation)
         m_activation->SetTopLevelContent(content_name);
     for (auto& effect : m_effects)
         effect->SetTopLevelContent(content_name);
+    m_content_name = std::move(content_name);
 }
 
 uint32_t EffectsGroup::GetCheckSum() const {
@@ -382,23 +361,15 @@ uint32_t EffectsGroup::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 // Dump function                                         //
 ///////////////////////////////////////////////////////////
-std::string Dump(const std::vector<std::shared_ptr<EffectsGroup>>& effects_groups) {
+std::string Dump(const std::vector<EffectsGroup>& effects_groups) {
     std::stringstream retval;
 
     for (auto& effects_group : effects_groups)
-        retval << "\n" << effects_group->Dump();
+        retval << "\n" << effects_group.Dump();
 
     return retval.str();
 }
 
-std::string Dump(const std::vector<std::unique_ptr<EffectsGroup>>& effects_groups) {
-    std::stringstream retval;
-
-    for (auto& effects_group : effects_groups)
-        retval << "\n" << effects_group->Dump();
-
-    return retval.str();
-}
 
 
 ///////////////////////////////////////////////////////////
@@ -806,16 +777,20 @@ void SetShipPartMeter::Execute(ScriptingContext& context,
     if (only_appearance_effects || only_generate_sitrep_effects)
         return;
 
+    auto dump_targets = [&targets]() {
+        std::string retval;
+        retval.reserve(targets.size() * 2000); // guesstimate
+        for (auto* target : targets)
+            retval.append("\n ... ").append(target->Dump(1));
+        return retval;
+    };
+
     TraceLogger(effects) << "\n\nExecute SetShipPartMeter effect: \n" << Dump();
-    TraceLogger(effects) << "SetShipPartMeter execute targets before: ";
-    for (auto* target : targets)
-        TraceLogger(effects) << " ... " << target->Dump(1);
+    TraceLogger(effects) << "SetShipPartMeter execute targets before: " << dump_targets();
 
     Execute(context, targets);
 
-    TraceLogger(effects) << "SetShipPartMeter execute targets after: ";
-    for (auto* target : targets)
-        TraceLogger(effects) << " ... " << target->Dump(1);
+    TraceLogger(effects) << "SetShipPartMeter execute targets after: " << dump_targets();
 }
 
 void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targets) const {
@@ -1562,8 +1537,7 @@ void SetSpecies::Execute(ScriptingContext& context) const {
         { return; }
 
         const Species* species = context.species.GetSpecies(planet->SpeciesName());
-        static const std::string EMPTY_STRING{};
-        const auto& default_focus = species ? species->DefaultFocus() : EMPTY_STRING;
+        const auto default_focus = species ? std::string_view{species->DefaultFocus()} : "";
 
         // chose default focus if available. otherwise use any available focus
         bool default_available = false;
@@ -1575,9 +1549,9 @@ void SetSpecies::Execute(ScriptingContext& context) const {
         }
 
         if (default_available)
-            planet->SetFocus(default_focus, context);
+            planet->SetFocus(std::string{default_focus}, context);
         else if (!available_foci.empty())
-            planet->SetFocus(*available_foci.begin(), context);
+            planet->SetFocus(std::string{available_foci.front()}, context);
     }
 }
 
@@ -1870,7 +1844,7 @@ void CreatePlanet::Execute(ScriptingContext& context) const {
         return;
     }
 
-    system->Insert(planet, System::NO_ORBIT, context.current_turn); // let system chose an orbit for planet
+    system->Insert(planet, System::NO_ORBIT, context.current_turn, context.ContextObjects()); // let system chose an orbit for planet
 
     std::string name_str;
     if (m_name) {
@@ -1994,7 +1968,7 @@ void CreateBuilding::Execute(ScriptingContext& context) const {
 
     auto system = context.ContextObjects().getRaw<System>(location->SystemID());
     if (system)
-        system->Insert(building, System::NO_ORBIT, context.current_turn);
+        system->Insert(building, System::NO_ORBIT, context.current_turn, context.ContextObjects());
 
     if (m_name) {
         std::string name_str = m_name->Eval(context);
@@ -2146,7 +2120,7 @@ void CreateShip::Execute(ScriptingContext& context) const {
     auto ship = context.ContextUniverse().InsertNew<Ship>(
         empire_id, design_id, std::move(species_name), context.ContextUniverse(),
         context.species, ALL_EMPIRES, context.current_turn);
-    system->Insert(ship, System::NO_ORBIT, context.current_turn);
+    system->Insert(ship, System::NO_ORBIT, context.current_turn, context.ContextObjects());
 
     if (m_name) {
         std::string name_str = m_name->Eval(context);
@@ -2321,7 +2295,7 @@ void CreateField::Execute(ScriptingContext& context) const {
     if (target->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
         auto system = static_cast<System*>(target);
         if ((!m_y || y == system->Y()) && (!m_x || x == system->X()))
-            system->Insert(field, System::NO_ORBIT, context.current_turn);
+            system->Insert(field, System::NO_ORBIT, context.current_turn, context.ContextObjects());
     }
 
     std::string name_str;
@@ -2753,32 +2727,28 @@ void RemoveStarlanes::Execute(ScriptingContext& context) const {
         target_system = context.ContextObjects().getRaw<System>(context.effect_target->SystemID());
     if (!target_system)
         return; // nothing to do!
+    const int target_system_id = target_system->ID();
 
     // get other endpoint systems...
 
     // apply endpoints condition to determine objects whose systems should be
     // connected to the source system
-    Condition::ObjectSet endpoint_objects =
-        m_other_lane_endpoint_condition->Eval(std::as_const(context));
+    const auto endpoint_objects = m_other_lane_endpoint_condition->Eval(std::as_const(context));
 
-    // early exit if there are no valid locations - can't move anything if there's nowhere to move to
-    if (endpoint_objects.empty())
-        return; // nothing to do!
-
-    // get systems containing at least one endpoint object
-    std::set<System*> endpoint_systems;
-    for (auto& endpoint_object : endpoint_objects) {
-        auto endpoint_system = dynamic_cast<const System*>(endpoint_object);
-        if (!endpoint_system)
-            endpoint_system = context.ContextObjects().getRaw<System>(endpoint_object->SystemID());
-        if (!endpoint_system)
-            continue;
-        endpoint_systems.insert(const_cast<System*>(endpoint_system));
-    }
+    // get system IDs of those objects
+    std::vector<int> endpoint_system_ids;
+    endpoint_system_ids.reserve(endpoint_objects.size());
+    std::transform(endpoint_objects.begin(), endpoint_objects.end(), std::back_inserter(endpoint_system_ids),
+                   [](const UniverseObject* obj) { return obj ? obj->SystemID() : INVALID_OBJECT_ID; });
+    // uniquify
+    std::sort(endpoint_system_ids.begin(), endpoint_system_ids.end());
+    auto unique_it = std::unique(endpoint_system_ids.begin(), endpoint_system_ids.end());
+    endpoint_system_ids.erase(unique_it, endpoint_system_ids.end());
+    // get all those systems
+    auto endpoint_systems = context.ContextObjects().findRaw<System>(endpoint_system_ids);
 
     // remove starlanes from target to endpoint systems
-    int target_system_id = target_system->ID();
-    for (auto& endpoint_system : endpoint_systems) {
+    for (auto* endpoint_system : endpoint_systems) {
         target_system->RemoveStarlane(endpoint_system->ID());
         endpoint_system->RemoveStarlane(target_system_id);
     }
@@ -2915,13 +2885,13 @@ void MoveTo::Execute(ScriptingContext& context) const {
                 // remove fleet from old system, put into new system
                 if (old_sys)
                     old_sys->Remove(fleet->ID());
-                dest_system->Insert(fleet, System::NO_ORBIT, context.current_turn);
+                dest_system->Insert(fleet, System::NO_ORBIT, context.current_turn, objects);
 
                 // also move ships of fleet
                 for (auto* ship : objects.findRaw<Ship>(fleet->ShipIDs())) {
                     if (old_sys)
                         old_sys->Remove(ship->ID());
-                    dest_system->Insert(ship, System::NO_ORBIT, context.current_turn);
+                    dest_system->Insert(ship, System::NO_ORBIT, context.current_turn, objects);
                 }
 
                 ExploreSystem(dest_system->ID(), fleet, context);
@@ -2997,7 +2967,7 @@ void MoveTo::Execute(ScriptingContext& context) const {
 
             if (auto new_sys = objects.getRaw<System>(dest_sys_id)) {
                 // ship is moving to a new system. insert it.
-                new_sys->Insert(ship, System::NO_ORBIT, context.current_turn);
+                new_sys->Insert(ship, System::NO_ORBIT, context.current_turn, context.ContextObjects());
             } else {
                 // ship is moving to a non-system location. move it there.
                 ship->MoveTo(dest_fleet);
@@ -3064,13 +3034,13 @@ void MoveTo::Execute(ScriptingContext& context) const {
 
         if (old_sys)
             old_sys->Remove(planet->ID());
-        dest_system->Insert(planet, System::NO_ORBIT, context.current_turn); // let system pick an orbit
+        dest_system->Insert(planet, System::NO_ORBIT, context.current_turn, objects); // let system pick an orbit
 
         // also insert buildings of planet into system.
         for (auto* building : objects.findRaw<Building>(planet->BuildingIDs())) {
             if (old_sys)
                 old_sys->Remove(building->ID());
-            dest_system->Insert(building, System::NO_ORBIT, context.current_turn);
+            dest_system->Insert(building, System::NO_ORBIT, context.current_turn, objects);
         }
 
         // buildings planet should be unchanged by move, as should planet's
@@ -3107,7 +3077,7 @@ void MoveTo::Execute(ScriptingContext& context) const {
         dest_planet->AddBuilding(building->ID());
         building->SetPlanetID(dest_planet->ID());
 
-        dest_system->Insert(building, System::NO_ORBIT, context.current_turn);
+        dest_system->Insert(building, System::NO_ORBIT, context.current_turn, objects);
         ExploreSystem(dest_system->ID(), building, context);
 
 
@@ -3123,17 +3093,17 @@ void MoveTo::Execute(ScriptingContext& context) const {
         system->MoveTo(destination);
 
         if (destination->ObjectType() == UniverseObjectType::OBJ_FIELD)
-            system->Insert(destination, System::NO_ORBIT, context.current_turn);
+            system->Insert(destination, System::NO_ORBIT, context.current_turn, objects);
 
         // find fleets / ships at destination location and insert into system
         for (auto* obj : objects.allRaw<Fleet>()) {
             if (obj->X() == system->X() && obj->Y() == system->Y())
-                system->Insert(obj, System::NO_ORBIT, context.current_turn);
+                system->Insert(obj, System::NO_ORBIT, context.current_turn, objects);
         }
 
         for (auto* obj : objects.allRaw<Ship>()) {
             if (obj->X() == system->X() && obj->Y() == system->Y())
-                system->Insert(obj, System::NO_ORBIT, context.current_turn);
+                system->Insert(obj, System::NO_ORBIT, context.current_turn, objects);
         }
 
 
@@ -3145,7 +3115,7 @@ void MoveTo::Execute(ScriptingContext& context) const {
         field->MoveTo(destination);
         if (destination->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
             auto dest_system = static_cast<System*>(destination);
-            dest_system->Insert(field, System::NO_ORBIT, context.current_turn);
+            dest_system->Insert(field, System::NO_ORBIT, context.current_turn, objects);
         }
     }
 }
@@ -3215,7 +3185,7 @@ void MoveInOrbit::Execute(ScriptingContext& context) const {
         Condition::ObjectSet matches = m_focal_point_condition->Eval(std::as_const(context));
         if (matches.empty())
             return;
-        const auto& focus_object = *matches.begin();
+        const auto* focus_object = matches.front();
         focus_x = focus_object->X();
         focus_y = focus_object->Y();
     }
@@ -3560,7 +3530,7 @@ void SetDestination::Execute(ScriptingContext& context) const {
         return;
 
     try {
-        target_fleet->SetRoute(route_list, context.ContextObjects());
+        target_fleet->SetRoute(std::move(route_list), context.ContextObjects());
     } catch (const std::exception& e) {
         ErrorLogger(effects) << "Caught exception in Effect::SetDestination setting fleet route: " << e.what();
     }
@@ -3638,7 +3608,7 @@ std::unique_ptr<Effect> SetAggression::Clone() const
 ///////////////////////////////////////////////////////////
 // Victory                                               //
 ///////////////////////////////////////////////////////////
-Victory::Victory(std::string& reason_string) :
+Victory::Victory(std::string reason_string) :
     m_reason_string(std::move(reason_string))
 {}
 
@@ -3648,7 +3618,7 @@ void Victory::Execute(ScriptingContext& context) const {
         return;
     }
     if (auto empire = context.GetEmpire(context.effect_target->Owner()))
-        empire->Win(m_reason_string, context.Empires().GetEmpires());
+        empire->Win(m_reason_string, context.Empires().GetEmpires(), context.current_turn);
     else
         ErrorLogger(effects) << "Trying to grant victory to a missing empire!";
 }
@@ -3666,10 +3636,8 @@ uint32_t Victory::GetCheckSum() const {
     return retval;
 }
 
-std::unique_ptr<Effect> Victory::Clone() const {
-    auto reason_string = m_reason_string;
-    return std::make_unique<Victory>(reason_string);
-}
+std::unique_ptr<Effect> Victory::Clone() const
+{ return std::make_unique<Victory>(m_reason_string); }
 
 
 ///////////////////////////////////////////////////////////
@@ -3772,24 +3740,22 @@ void GiveEmpireContent::Execute(ScriptingContext& context) const {
     if (!m_content_name)
         return;
 
-    std::string content_name = m_content_name->Eval(context);
-
     switch (m_unlock_type) {
-    case UnlockableItemType::UIT_BUILDING:  empire->AddBuildingType(content_name, context.current_turn); break;
-    case UnlockableItemType::UIT_SHIP_PART: empire->AddShipPart(content_name, context.current_turn);     break;
-    case UnlockableItemType::UIT_SHIP_HULL: empire->AddShipHull(content_name, context.current_turn);     break;
-    case UnlockableItemType::UIT_POLICY:    empire->AddPolicy(content_name, context.current_turn);       break;
+    case UnlockableItemType::UIT_BUILDING:  empire->AddBuildingType(m_content_name->Eval(context), context.current_turn); break;
+    case UnlockableItemType::UIT_SHIP_PART: empire->AddShipPart(m_content_name->Eval(context), context.current_turn);     break;
+    case UnlockableItemType::UIT_SHIP_HULL: empire->AddShipHull(m_content_name->Eval(context), context.current_turn);     break;
+    case UnlockableItemType::UIT_POLICY:    empire->AddPolicy(m_content_name->Eval(context), context.current_turn);       break;
     case UnlockableItemType::UIT_TECH: {
-        const Tech* tech = GetTech(content_name);
-        if (!tech) {
+        auto content_name = m_content_name->Eval(context);
+        if (!GetTech(content_name)) {
             ErrorLogger(effects) << "GiveEmpireContent::Execute couldn't get tech with name: " << content_name;
             return;
         }
-        empire->AddNewlyResearchedTechToGrantAtStartOfNextTurn(content_name);
+        empire->AddNewlyResearchedTechToGrantAtStartOfNextTurn(std::move(content_name));
         break;
     }
     default: {
-        ErrorLogger(effects) << "GiveEmpireContent::Execute given invalid unlockable item type";
+        ErrorLogger(effects) << "GiveEmpireContent::Execute given invalid unlockable item type: " << to_string(m_unlock_type);
     }
     }
 }
@@ -3845,8 +3811,8 @@ std::unique_ptr<Effect> GiveEmpireContent::Clone() const {
 ///////////////////////////////////////////////////////////
 // GenerateSitRepMessage                                 //
 ///////////////////////////////////////////////////////////
-GenerateSitRepMessage::GenerateSitRepMessage(std::string& message_string,
-                                             std::string& icon,
+GenerateSitRepMessage::GenerateSitRepMessage(std::string message_string,
+                                             std::string icon,
                                              MessageParams&& message_parameters,
                                              std::unique_ptr<ValueRef::ValueRef<int>>&& recipient_empire_id,
                                              EmpireAffiliationType affiliation,
@@ -3861,8 +3827,8 @@ GenerateSitRepMessage::GenerateSitRepMessage(std::string& message_string,
     m_stringtable_lookup(stringtable_lookup)
 {}
 
-GenerateSitRepMessage::GenerateSitRepMessage(std::string& message_string,
-                                             std::string& icon,
+GenerateSitRepMessage::GenerateSitRepMessage(std::string message_string,
+                                             std::string icon,
                                              MessageParams&& message_parameters,
                                              EmpireAffiliationType affiliation,
                                              std::unique_ptr<Condition::Condition>&& condition,
@@ -3877,11 +3843,12 @@ GenerateSitRepMessage::GenerateSitRepMessage(std::string& message_string,
     m_stringtable_lookup(stringtable_lookup)
 {}
 
-GenerateSitRepMessage::GenerateSitRepMessage(std::string& message_string, std::string& icon,
+GenerateSitRepMessage::GenerateSitRepMessage(std::string message_string,
+                                             std::string icon,
                                              MessageParams&& message_parameters,
                                              EmpireAffiliationType affiliation,
                                              std::string label,
-                                             bool stringtable_lookup):
+                                             bool stringtable_lookup) :
     m_message_string(std::move(message_string)),
     m_icon(std::move(icon)),
     m_message_parameters(std::move(message_parameters)),
@@ -4102,10 +4069,8 @@ GenerateSitRepMessage::MessageParameters() const {
 }
 
 std::unique_ptr<Effect> GenerateSitRepMessage::Clone() const {
-    auto message_string = m_message_string;
-    auto icon = m_icon;
     auto retval = std::make_unique<GenerateSitRepMessage>(
-        message_string, icon, ValueRef::CloneUnique(m_message_parameters),
+        m_message_string, m_icon, ValueRef::CloneUnique(m_message_parameters),
         ValueRef::CloneUnique(m_recipient_empire_id), m_affiliation,
         m_label, m_stringtable_lookup);
     retval->m_condition = ValueRef::CloneUnique(m_condition);
@@ -4405,7 +4370,7 @@ void Conditional::Execute(ScriptingContext& context) const {
     if (!context.effect_target)
         return;
 
-    if (!m_target_condition || m_target_condition->Eval(context, context.effect_target)) {
+    if (!m_target_condition || m_target_condition->EvalOne(context, context.effect_target)) {
         for (auto& effect : m_true_effects) {
             if (effect)
                 effect->Execute(context);

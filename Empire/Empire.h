@@ -5,6 +5,8 @@
 #include <array>
 #include <string>
 #include <unordered_set>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/flat_map.hpp>
 #include "InfluenceQueue.h"
 #include "PopulationPool.h"
 #include "ProductionQueue.h"
@@ -51,13 +53,7 @@ public:
     // EmpireManagers must be friends so that they can have access to the constructor and keep it hidden from others
     friend class EmpireManager;
 
-    /** \name Iterator Types */ //@{
-    typedef std::set<int>::const_iterator               SystemIDItr;
-    typedef std::vector<SitRepEntry>::const_iterator    SitRepItr;
-    //@}
-
-    Empire(std::string name, std::string player_name, int ID,
-           EmpireColor color, bool authenticated);
+    Empire(std::string name, std::string player_name, int ID, EmpireColor color, bool authenticated);
 
     [[nodiscard]] const auto&  Name() const noexcept { return m_name; }
     [[nodiscard]] const auto&  PlayerName() const noexcept { return m_player_name; }
@@ -132,15 +128,15 @@ public:
     [[nodiscard]] const ProductionQueue&       GetProductionQueue() const noexcept { return m_production_queue; }
     [[nodiscard]] const InfluenceQueue&        GetInfluenceQueue() const noexcept { return m_influence_queue; }
 
-    [[nodiscard]] bool        ResearchableTech(std::string_view name) const;        ///< Returns true iff \a name is a tech that has not been researched, and has no unresearched prerequisites.
-    [[nodiscard]] float       ResearchProgress(const std::string& name, const ScriptingContext& context) const;        ///< Returns the RPs spent towards tech \a name if it has partial research progress, or 0.0 if it is already researched.
+    [[nodiscard]] bool        ResearchableTech(std::string_view name) const;          ///< Returns true iff \a name is a tech that has not been researched, and has no unresearched prerequisites.
+    [[nodiscard]] float       ResearchProgress(const std::string& name, const ScriptingContext& context) const; ///< Returns the RPs spent towards tech \a name if it has partial research progress, or 0.0 if it is already researched.
     [[nodiscard]] bool        TechResearched(const std::string& name) const;          ///< Returns true iff this tech has been completely researched.
     [[nodiscard]] bool        HasResearchedPrereqAndUnresearchedPrereq(std::string_view name) const;    ///< Returns true iff this tech has some but not all prerequisites researched
     [[nodiscard]] TechStatus  GetTechStatus(const std::string& name) const;           ///< Returns the status (researchable, researched, unresearchable) for this tech for this
 
     [[nodiscard]] bool        BuildingTypeAvailable(const std::string& name) const;   ///< Returns true if the given building type is known to this empire, false if it is not
     [[nodiscard]] bool        ShipDesignAvailable(const ShipDesign& design) const;    ///< Returns true iff this ship design can be built by this empire.
-    [[nodiscard]] bool        ShipDesignAvailable(int ship_design_id, const Universe& unvierse) const;    ///< Returns true iff this ship design can be built by this empire.  If no such ship design exists, returns false
+    [[nodiscard]] bool        ShipDesignAvailable(int ship_design_id, const Universe& unvierse) const; ///< Returns true iff this ship design can be built by this empire.  If no such ship design exists, returns false
     [[nodiscard]] bool        ShipDesignKept(int ship_design_id) const;               ///< Returns true iff the given ship design id is in the set of design ids of this empire.  That is, it has been added to this empire.
     [[nodiscard]] bool        ShipPartAvailable(const std::string& name) const;       ///< Returns true iff this ship part can be built by this empire.  If no such ship part exists, returns false
     [[nodiscard]] bool        ShipHullAvailable(const std::string& name) const;       ///< Returns true iff this ship hull can be built by this empire.  If no such ship hull exists, returns false
@@ -196,7 +192,10 @@ public:
     [[nodiscard]] float       ProductionPoints() const;    ///< Returns the empire's current production point output (this is available industry not including stockpile)
 
     /** Returns ResourcePool for \a resource_type or 0 if no such ResourcePool exists. */
-    [[nodiscard]] std::shared_ptr<const ResourcePool> GetResourcePool(ResourceType resource_type) const;
+    [[nodiscard]] const ResourcePool& GetResourcePool(ResourceType type) const;
+    [[nodiscard]] const auto& GetIndustryPool() const noexcept { return m_industry_pool; }
+    [[nodiscard]] const auto& GetResearchPool() const noexcept { return m_research_pool; }
+    [[nodiscard]] const auto& GetInfluencePool() const noexcept { return m_influence_pool; }
 
     [[nodiscard]] float       ResourceStockpile(ResourceType type) const;         ///< returns current stockpiled amount of resource \a type
     [[nodiscard]] float       ResourceOutput(ResourceType type) const;            ///< returns amount of resource \a type being generated by ResourceCenters
@@ -263,42 +262,41 @@ public:
     void SetProductionQuantity(int index, int quantity);     ///< Changes the remaining number to produce for queue item \a index to \a quantity
     void SetProductionQuantityAndBlocksize(int index, int quantity, int blocksize);   ///< Changes the remaining number and blocksize to produce for queue item \a index to \a quantity and \a blocksize
     void SetProductionRallyPoint(int index, int rally_point_id = INVALID_OBJECT_ID);  ///< Sets the rally point for ships produced by this produce, to which they are automatically ordered to move after they are produced.
-    void MoveProductionWithinQueue(int index, int new_index);///< Moves \a tech from the production queue, if it is in the production queue already.
-    void RemoveProductionFromQueue(int index);               ///< Removes the produce at position \a index in the production queue, if such an index exists.
-    void PauseProduction(int index);                         ///< Sets the production of produce at postion \a index paused, if such an index exists
-    void ResumeProduction(int index);                        ///< Sets the production of produce at postion \a index unpaused, if such an index exists
+    void MoveProductionWithinQueue(int index, int new_index);///< Moves queue item at \a index to \a new_index
+    void MarkToBeRemoved(int index);                         ///< Marks the item at positon \a index to be removed from the queue
+    void MarkNotToBeRemoved(int index);                      ///< Marks the item at position \a index not to be removed from the queue
+    void PauseProduction(int index);                         ///< Sets the item at postion \a index paused, if such an index exists
+    void ResumeProduction(int index);                        ///< Sets the item at postion \a index unpaused, if such an index exists
     void AllowUseImperialPP(int index, bool allow=true);     ///< Allows or disallows the use of the imperial stockpile for production
 
-    void AddNewlyResearchedTechToGrantAtStartOfNextTurn(const std::string& name); ///< Inserts the given Tech into the Empire's list of innovations. Call ApplyAddedTech to make it effective.
-    void ApplyNewTechs(Universe& universe, int current_turn);  ///< Moves all Techs from the Empire's list of innovations into the Empire's list of available technologies.
-    void AddPolicy(const std::string& name, int current_turn); ///< Inserts the given Policy into the Empire's list of available policies
-    void ApplyPolicies(Universe& universe, int current_turn);  ///< Unlocks anything unlocked by adopted policies
+    void RemoveProductionFromQueue(int index);               ///< Removes the produce at position \a index in the production queue, if such an index exists.
+
+    void AddNewlyResearchedTechToGrantAtStartOfNextTurn(std::string name); ///< Inserts the given Tech into the Empire's list of innovations. Call ApplyAddedTech to make it effective.
+    void ApplyNewTechs(Universe& universe, int current_turn);   ///< Moves all Techs from the Empire's list of innovations into the Empire's list of available technologies.
+    void AddPolicy(std::string name, int current_turn);         ///< Inserts the given Policy into the Empire's list of available policies
+    void ApplyPolicies(Universe& universe, int current_turn);   ///< Unlocks anything unlocked by adopted policies
 
     //! Adds a given producible item (Building, Ship Hull, Ship part) to the
     //! list of available items.
     void UnlockItem(const UnlockableItem& item, Universe& universe, int current_turn);
 
-    void AddBuildingType(const std::string& name, int current_turn);  ///< Inserts the given BuildingType into the Empire's list of available BuldingTypes.
-    //! Inserts the given ShipPart into the Empire's list of available ShipPart%s.
-    void AddShipPart(const std::string& name, int current_turn);
-
-    //! Inserts the given ship ShipHull into the Empire's list of available
-    //! ShipHull%s.
-    void AddShipHull(const std::string& name, int current_turn);
+    void AddBuildingType(std::string name, int current_turn);   ///< Inserts the given BuildingType into the Empire's list of available BuldingTypes.
+    void AddShipPart(std::string name, int current_turn);       ///< Inserts the given ShipPart into the Empire's list of available ShipPart%s.
+    void AddShipHull(std::string name, int current_turn);       ///< Inserts the given ship ShipHull into the Empire's list of available ShipHulls.
 
     void AddExploredSystem(int ID, int turn, const ObjectMap& objects); ///< Inserts the given ID into the Empire's list of explored systems.
 
     /** inserts given design id into the empire's set of designs in front of next design */
     void AddShipDesign(int ship_design_id, const Universe& universe, int next_design_id = INVALID_DESIGN_ID);
-    int AddShipDesign(ShipDesign* ship_design, Universe& universe); ///< inserts given ShipDesign into the Universe, adds the design's id to the Empire's set of ids, and returns the new design's id, which is INVALID_OBJECT_ID on failure.  If successful, universe takes ownership of passed ShipDesign.
+    int AddShipDesign(ShipDesign ship_design, Universe& universe); ///< inserts given ShipDesign into the Universe, adds the design's id to the Empire's set of ids, and returns the new design's id, which is INVALID_OBJECT_ID on failure.  If successful, universe takes ownership of passed ShipDesign.
 
-    [[nodiscard]] std::string NewShipName();         ///< generates a random ship name, appending II, III, etc., to it if it has been used before by this empire
-    void Eliminate(EmpireManager& empires);          ///< Marks empire as eliminated and cleans up empire after it is eliminated.  Queues are cleared, capital is reset, and other state info not relevant to an eliminated empire is cleared
-    /** Marks this empire as having won for this reason, and sends the appropriate sitreps */
-    void Win(const std::string& reason, const EmpireManager::container_type& empires);
-    void SetReady(bool ready);                       ///< Marks this empire with readiness status
-    void AutoTurnSetReady();                         ///< Decreases auto-turn counter and set empire ready if not expired or set unready
-    void SetAutoTurn(int turns_count);               ///< Set auto-turn counter
+    [[nodiscard]] std::string NewShipName(); ///< generates a random ship name, appending II, III, etc., to it if it has been used before by this empire
+    void Eliminate(EmpireManager& empires, int current_turn);                         ///< Marks empire as eliminated and cleans up empire after it is eliminated.  Queues are cleared, capital is reset, and other state info not relevant to an eliminated empire is cleared
+    void Win(const std::string& reason, const EmpireManager::container_type& empires, ///< Marks this empire as having won for this reason, and sends the appropriate sitreps
+             int current_turn);
+    void SetReady(bool ready);               ///< Marks this empire with readiness status
+    void AutoTurnSetReady();                 ///< Decreases auto-turn counter and set empire ready if not expired or set unready
+    void SetAutoTurn(int turns_count);       ///< Set auto-turn counter
 
     /** Inserts the given SitRep entry into the empire's sitrep list. */
     void AddSitRepEntry(const SitRepEntry& entry);
@@ -363,9 +361,9 @@ public:
       * stockpile to account for influence production and expenditures.*/
     void CheckInfluenceProgress();
 
-    void SetColor(const EmpireColor& color);                 ///< Mutator for empire color
-    void SetName(const std::string& name);               ///< Mutator for empire name
-    void SetPlayerName(const std::string& player_name);  ///< Mutator for empire's player name
+    void SetColor(EmpireColor color) noexcept { m_color = color; }
+    void SetName(std::string name) noexcept { m_name = std::move(name); }
+    void SetPlayerName(std::string player_name) { m_player_name = std::move(player_name); }
 
     void SetResourceStockpile(ResourceType resource_type, float stockpile); ///< Sets current \a stockpile amount of indicated \a resource_type
 
@@ -418,75 +416,29 @@ public:
     [[nodiscard]] int TotalShipsOwned() const;
     [[nodiscard]] int TotalShipPartsOwned() const;    ///< Total number of parts for all owned ships in this empire
     [[nodiscard]] int TotalBuildingsOwned() const;
-
-    [[nodiscard]] auto SpeciesShipsOwned() const -> const std::map<std::string, int>&
-    { return m_species_ships_owned; }
-
-    [[nodiscard]] auto ShipDesignsOwned() const -> const std::map<int, int>&
-    { return m_ship_designs_owned; }
-
-    [[nodiscard]] auto ShipPartsOwned() const -> const std::map<std::string, int>&
-    { return m_ship_parts_owned; }
-
-    [[nodiscard]] auto ShipPartClassOwned() const -> const std::map<ShipPartClass, int>&
-    { return m_ship_part_class_owned; }
-
-    [[nodiscard]] auto SpeciesColoniesOwned() const -> const std::map<std::string, int>&
-    { return m_species_colonies_owned; }
-
-    [[nodiscard]] auto OutpostsOwned() const -> int
-    { return m_outposts_owned; }
-
-    [[nodiscard]] auto BuildingTypesOwned() const -> const std::map<std::string, int>&
-    { return m_building_types_owned; }
-
-    [[nodiscard]] auto EmpireShipsDestroyed() const -> const std::map<int, int>&
-    { return m_empire_ships_destroyed; }
-
-    [[nodiscard]] auto ShipDesignsDestroyed() const -> const std::map<int, int>&
-    { return m_ship_designs_destroyed; }
-
-    [[nodiscard]] auto SpeciesShipsDestroyed() const -> const std::map<std::string, int>&
-    { return m_species_ships_destroyed; }
-
-    [[nodiscard]] auto SpeciesPlanetsInvaded() const -> const std::map<std::string, int>&
-    { return m_species_planets_invaded; }
-
-    [[nodiscard]] auto ShipDesignsInProduction() const -> const std::map<int, int>&
-    { return m_ship_designs_in_production; }
-
-    [[nodiscard]] auto SpeciesShipsProduced() const -> const std::map<std::string, int>&
-    { return m_species_ships_produced; }
-
-    [[nodiscard]] auto ShipDesignsProduced() const -> const std::map<int, int>&
-    { return m_ship_designs_produced; }
-
-    [[nodiscard]] auto SpeciesShipsLost() const -> const std::map<std::string, int>&
-    { return m_species_ships_lost; }
-
-    [[nodiscard]] auto ShipDesignsLost() const -> const std::map<int, int>&
-    { return m_ship_designs_lost; }
-
-    [[nodiscard]] auto SpeciesShipsScrapped() const -> const std::map<std::string, int>&
-    { return m_species_ships_scrapped; }
-
-    [[nodiscard]] auto ShipDesignsScrapped() const -> const std::map<int, int>&
-    { return m_ship_designs_scrapped; }
-
-    [[nodiscard]] auto SpeciesPlanetsDepoped() const -> const std::map<std::string, int>&
-    { return m_species_planets_depoped; }
-
-    [[nodiscard]] auto SpeciesPlanetsBombed() const -> const std::map<std::string, int>&
-    { return m_species_planets_bombed; }
-
-    [[nodiscard]] auto BuildingTypesProduced() const -> const std::map<std::string, int>&
-    { return m_building_types_produced; }
-
-    [[nodiscard]] auto BuildingTypesScrapped() const -> const std::map<std::string, int>&
-    { return m_building_types_scrapped; }
-
-    [[nodiscard]] auto TurnsSystemsExplored() const -> const std::map<int, int>&
-    { return m_explored_systems; }
+    [[nodiscard]] auto& SpeciesShipsOwned() const noexcept { return m_species_ships_owned; }
+    [[nodiscard]] auto& ShipDesignsOwned() const noexcept { return m_ship_designs_owned; }
+    [[nodiscard]] auto& ShipPartsOwned() const noexcept { return m_ship_parts_owned; }
+    [[nodiscard]] auto& ShipPartClassOwned() const noexcept { return m_ship_part_class_owned; }
+    [[nodiscard]] auto& SpeciesColoniesOwned() const noexcept { return m_species_colonies_owned; }
+    [[nodiscard]] auto OutpostsOwned() const noexcept { return m_outposts_owned; }
+    [[nodiscard]] auto& BuildingTypesOwned() const noexcept { return m_building_types_owned; }
+    [[nodiscard]] auto& EmpireShipsDestroyed() const noexcept { return m_empire_ships_destroyed; }
+    [[nodiscard]] auto& ShipDesignsDestroyed() const noexcept { return m_ship_designs_destroyed; }
+    [[nodiscard]] auto& SpeciesShipsDestroyed() const noexcept { return m_species_ships_destroyed; }
+    [[nodiscard]] auto& SpeciesPlanetsInvaded() const noexcept { return m_species_planets_invaded; }
+    [[nodiscard]] auto& ShipDesignsInProduction() const noexcept { return m_ship_designs_in_production; }
+    [[nodiscard]] auto& SpeciesShipsProduced() const noexcept { return m_species_ships_produced; }
+    [[nodiscard]] auto& ShipDesignsProduced() const noexcept { return m_ship_designs_produced; }
+    [[nodiscard]] auto& SpeciesShipsLost() const noexcept { return m_species_ships_lost; }
+    [[nodiscard]] auto& ShipDesignsLost() const noexcept { return m_ship_designs_lost; }
+    [[nodiscard]] auto& SpeciesShipsScrapped() const noexcept { return m_species_ships_scrapped; }
+    [[nodiscard]] auto& ShipDesignsScrapped() const noexcept { return m_ship_designs_scrapped; }
+    [[nodiscard]] auto& SpeciesPlanetsDepoped() const noexcept { return m_species_planets_depoped; }
+    [[nodiscard]] auto& SpeciesPlanetsBombed() const noexcept { return m_species_planets_bombed; }
+    [[nodiscard]] auto& BuildingTypesProduced() const noexcept { return m_building_types_produced; }
+    [[nodiscard]] auto& BuildingTypesScrapped() const noexcept { return m_building_types_scrapped; }
+    [[nodiscard]] auto& TurnsSystemsExplored() const noexcept { return m_explored_systems; }
 
     /** Processes Builditems on queues of empires other than the indicated
       * empires, at the location with id \a location_id and, as appropriate,
@@ -538,12 +490,14 @@ private:
     std::map<std::string, int>                             m_policy_adoption_current_duration; ///< how many turns each currently-adopted policy has been adopted since it was last adopted. somewhat redundant with adoption_turn in AdoptionInfo, but seems necessary to avoid off-by-one issues between client and server
     std::set<std::string, std::less<>>                     m_available_policies;               ///< names of unlocked policies
 
-    std::set<std::string>                   m_victories;              ///< The ways that the empire has won, if any
+    using StringFlatSet = boost::container::flat_set<std::string, std::less<>>;
+    using StringIntMap = boost::container::flat_map<std::string, int, std::less<>>;
+    using MeterMap = boost::container::flat_map<std::string, Meter, std::less<>>;
 
-    std::set<std::string>                   m_newly_researched_techs; ///< names of researched but not yet effective technologies, and turns on which they were acquired.
-    std::map<std::string, int, std::less<>> m_techs;                  ///< names of researched technologies, and turns on which they were acquired.
-    using MeterMap = std::vector<std::pair<std::string, Meter>>;
-    MeterMap                                m_meters;                 ///< empire meters
+    StringFlatSet                   m_victories;                ///< The ways that the empire has won, if any
+    StringFlatSet                   m_newly_researched_techs;   ///< names of researched but not yet effective technologies, and turns on which they were acquired.
+    StringIntMap                    m_techs;                    ///< names of researched technologies, and turns on which they were acquired.
+    MeterMap                        m_meters;                   ///< empire meters
 
     ResearchQueue                   m_research_queue;           ///< the queue of techs being or waiting to be researched
     std::map<std::string, float>    m_research_progress;        ///< progress of partially-researched techs; fully researched techs are removed
@@ -551,20 +505,18 @@ private:
     ProductionQueue                 m_production_queue;         ///< the queue of items being or waiting to be built
     InfluenceQueue                  m_influence_queue;
 
-    std::set<std::string>           m_available_building_types; ///< list of acquired BuildingType.  These are string names referencing BuildingType objects
-    //! List of acquired ShipPart referenced by name.
-    std::set<std::string>           m_available_ship_parts;
-
-    //! List of acquired ship ShipHull referenced by name.
-    std::set<std::string>           m_available_ship_hulls;
+    StringFlatSet                   m_available_building_types; ///< acquired BuildingTypes
+    StringFlatSet                   m_available_ship_parts;     ///< acquired ShipParts
+    StringFlatSet                   m_available_ship_hulls;     ///< acquired ShipHulls
 
     std::map<int, int>              m_explored_systems;         ///< systems explored by this empire and the turn on which they were explored
     std::set<int>                   m_known_ship_designs;       ///< ids of ship designs in the universe that this empire knows about
 
     std::vector<SitRepEntry>        m_sitrep_entries;           ///< The Empire's sitrep entries
 
-    std::map<ResourceType, std::shared_ptr<ResourcePool>>
-                                    m_resource_pools;
+    ResourcePool                    m_research_pool{ResourceType::RE_RESEARCH};
+    ResourcePool                    m_industry_pool{ResourceType::RE_INDUSTRY};
+    ResourcePool                    m_influence_pool{ResourceType::RE_INFLUENCE};
     PopulationPool                  m_population_pool;
 
     std::map<std::string, int>      m_ship_names_used;          ///< map from name to number of times used

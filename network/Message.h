@@ -107,6 +107,7 @@ public:
         ((TURN_TIMEOUT))           ///< sent by server to client to notify about remaining time before turn advance
         ((PLAYER_INFO))            ///< sent by server to client to notify about changes in the player data
         ((AUTO_TURN))              ///< sent by client to server to move into auto-turn state
+        ((REVERT_ORDERS))          ///< send by client to server to discard any previously-sent orders this turn and to re-send the turn update message
     )
 
     FO_ENUM(
@@ -138,17 +139,21 @@ public:
     )
 
     Message() = default;
-    Message(MessageType message_type, std::string text);
+    Message(MessageType type, std::string text) noexcept :
+        m_type(type),
+        m_message_size(text.size()),
+        m_message_text(std::move(text))
+    {}
 
-    MessageType        Type() const noexcept;      ///< Returns the type of the message.
-    std::size_t        Size() const noexcept;      ///< Returns the size of the underlying buffer.
-    const char*        Data() const noexcept;      ///< Returns the underlying buffer.
-    const std::string& Text() const;               ///< Returns the underlying buffer as a std::string.
+    MessageType Type() const noexcept { return m_type; };
+    std::size_t Size() const noexcept { return m_message_size; }
+    auto&       Text() const noexcept { return m_message_text; }
+    auto        Data() const noexcept { return m_message_text.data(); }
+    auto        Data() noexcept       { return m_message_text.data(); }
 
-    void               Resize(std::size_t size);   ///< Resizes the underlying char buffer to \a size uninitialized bytes.
-    char*              Data() noexcept;            ///< Returns the underlying buffer.
-    void               Swap(Message& rhs) noexcept;///< Swaps the contents of \a *this with \a rhs.  Does not throw.
-    void               Reset() noexcept;           ///< Reverts message to same state as after default constructor
+    void Resize(std::size_t size);   ///< Resizes the underlying char buffer to \a size uninitialized bytes.
+    void Swap(Message& rhs) noexcept;
+    void Reset() noexcept;           ///< Reverts message to same state as after default constructor
 
 private:
     MessageType                 m_type = MessageType::UNDEFINED;
@@ -164,10 +169,10 @@ FO_COMMON_API void BufferToHeader(const Message::HeaderBuffer& buffer, Message& 
 /** Fills \a header_buf from the relevant portions of \a message. */
 FO_COMMON_API void HeaderToBuffer(const Message& message, Message::HeaderBuffer& buffer);
 
-bool operator==(const Message& lhs, const Message& rhs);
-bool operator!=(const Message& lhs, const Message& rhs);
+bool operator==(const Message& lhs, const Message& rhs) noexcept;
+bool operator!=(const Message& lhs, const Message& rhs) noexcept;
 
-FO_COMMON_API void swap(Message& lhs, Message& rhs); ///< Swaps the contents of \a lhs and \a rhs.  Does not throw.
+FO_COMMON_API void swap(Message& lhs, Message& rhs) noexcept;
 
 
 ////////////////////////////////////////////////
@@ -363,7 +368,7 @@ FO_COMMON_API Message AuthRequestMessage(const std::string& player_name, const s
 FO_COMMON_API Message AuthResponseMessage(const std::string& player_name, const std::string& auth);
 
 /** notifies client about changes in his authorization \a roles. */
-FO_COMMON_API Message SetAuthorizationRolesMessage(const Networking::AuthRoles& roles);
+FO_COMMON_API Message SetAuthorizationRolesMessage(Networking::AuthRoles roles);
 
 /** creates a ELIMINATE_SELF message to resign from the game. */
 FO_COMMON_API Message EliminateSelfMessage();
@@ -377,6 +382,10 @@ FO_COMMON_API Message PlayerInfoMessage(const std::map<int, PlayerInfo>& players
 /** creates a AUTO_TURN message to set empire in auto-turn state for \a turns_count turns,
  *  inifinity turns if -1 or set empire to playing state if 0. */
 FO_COMMON_API Message AutoTurnMessage(int turns_count);
+
+/** create a REVERT_ORDERS message to ask the server to discard any received orders this turn,
+  * and to re-send the turn update message for this turn. */
+FO_COMMON_API Message RevertOrdersMessage();
 
 ////////////////////////////////////////////////
 // Message data extractors

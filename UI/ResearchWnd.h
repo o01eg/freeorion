@@ -20,7 +20,7 @@ public:
     int  ShownEmpireID() const { return m_empire_shown_id; };
     bool PediaVisible();
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
     void Render() override;
 
@@ -51,9 +51,9 @@ private:
     void UpdateQueue(const ScriptingContext& context);
     void UpdateInfoPanel(const ScriptingContext& context); ///< Updates research summary at top left of production screen, and signals that the empire's minerals research pool has changed (propagates to the mapwnd to update indicator)
     void DeleteQueueItem(GG::ListBox::iterator it);
-    void AddTechsToQueueSlot(const std::vector<std::string>& tech_vec, int pos = -1);
-    void QueueItemClickedSlot(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
-    void QueueItemDoubleClickedSlot(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
+    void AddTechsToQueueSlot(std::vector<std::string> tech_vec, int pos = -1);
+    void QueueItemClickedSlot(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys);
+    void QueueItemDoubleClickedSlot(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys);
     void QueueItemPaused(GG::ListBox::iterator it, bool pause);
 
     std::shared_ptr<ResourceInfoPanel>  m_research_info_panel;

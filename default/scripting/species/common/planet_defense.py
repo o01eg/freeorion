@@ -5,7 +5,7 @@ from common.priorities import (
 )
 
 STANDARD_DEFENSE_GROWTH = EffectsGroup(  # increase 1 per turn, up to max
-    scope=Source,
+    scope=IsSource,
     activation=Planet() & Unowned & (LocalCandidate.LastTurnAttackedByShip < CurrentTurn),
     accountinglabel="DEF_ROOT_DEFENSE",
     priority=AFTER_ALL_TARGET_MAX_METERS_PRIORITY,
@@ -14,20 +14,14 @@ STANDARD_DEFENSE_GROWTH = EffectsGroup(  # increase 1 per turn, up to max
 
 
 PROTECTION_FOCUS_DEFENSE = EffectsGroup(
-    scope=Source,
+    scope=IsSource,
     activation=Planet() & Focus(type=["FOCUS_PROTECTION"]),
     stackinggroup="FOCUS_PROTECTION_DEFENSE_STACK",
     accountinglabel="FOCUS_PROTECTION_LABEL",
     priority=TARGET_AFTER_2ND_SCALING_PRIORITY,
     effects=[
         SetMaxDefense(value=Value * 2),
-        SetTargetHappiness(
-            value=Value
-            + NamedReal(
-                name="PROTECION_FOCUS_STABILITY_BONUS",
-                value=GameRule(type=float, name="RULE_PROTECTION_FOCUS_STABILITY"),
-            )
-        ),
+        SetTargetHappiness(value=Value + NamedRealLookup(name="PROTECION_FOCUS_STABILITY_BONUS")),
     ],
 )
 

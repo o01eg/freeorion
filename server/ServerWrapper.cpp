@@ -61,9 +61,10 @@ namespace {
     // Wrapper for getting empire objects
     auto GetAllEmpires() -> py::list
     {
+        const ScriptingContext context;
         py::list empire_list;
-        for (const auto& entry : Empires())
-            empire_list.append(entry.second->EmpireID());
+        for (const auto id : context.EmpireIDs())
+            empire_list.append(id);
         return empire_list;
     }
 
@@ -279,7 +280,7 @@ namespace {
     }
 
     // Wrappers for Empire class member functions
-    void EmpireSetName(int empire_id, const std::string& name)
+    void EmpireSetName(int empire_id, std::string name)
     {
         ScriptingContext context;
         auto empire = context.GetEmpire(empire_id);
@@ -287,7 +288,7 @@ namespace {
             ErrorLogger() << "EmpireSetName: couldn't get empire with ID " << empire_id;
             return;
         }
-        empire->SetName(name);
+        empire->SetName(std::move(name));
     }
 
     auto EmpireSetHomeworld(int empire_id, int planet_id, const std::string& species_name) -> bool
@@ -304,44 +305,41 @@ namespace {
     void EmpireUnlockItem(int empire_id, UnlockableItemType item_type,
                           const std::string& item_name)
     {
-        Universe& universe{GetUniverse()};
-        EmpireManager& empires{Empires()};
-        int current_turn{CurrentTurn()};
+        ScriptingContext context;
 
-        auto empire = empires.GetEmpire(empire_id);
+        auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EmpireUnlockItem: couldn't get empire with ID " << empire_id;
             return;
         }
         auto item = UnlockableItem{item_type, item_name};
-        empire->UnlockItem(item, universe, current_turn);
+        empire->UnlockItem(item, context.ContextUniverse(), context.current_turn);
     }
 
     void EmpireAddShipDesign(int empire_id, const std::string& design_name) {
-        Universe& universe{GetUniverse()};
-        EmpireManager& empires{Empires()};
+        ScriptingContext context;
 
-        auto empire = empires.GetEmpire(empire_id);
+        auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EmpireAddShipDesign: couldn't get empire with ID " << empire_id;
             return;
         }
 
         // check if a ship design with ID ship_design_id has been added to the universe
-        const ShipDesign* ship_design = universe.GetGenericShipDesign(design_name);
+        const ShipDesign* ship_design = context.ContextUniverse().GetGenericShipDesign(design_name);
         if (!ship_design) {
             ErrorLogger() << "EmpireAddShipDesign: no ship design with name " << design_name << " has been added to the universe";
             return;
         }
 
-        universe.SetEmpireKnowledgeOfShipDesign(ship_design->ID(), empire_id);
-        empire->AddShipDesign(ship_design->ID(), universe);
+        context.ContextUniverse().SetEmpireKnowledgeOfShipDesign(ship_design->ID(), empire_id);
+        empire->AddShipDesign(ship_design->ID(), context.ContextUniverse());
     }
 
     void EmpireSetStockpile(int empire_id, ResourceType resource_type, double value) {
-        EmpireManager& empires{Empires()};
+        ScriptingContext context;
 
-        auto empire = empires.GetEmpire(empire_id);
+        auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "EmpireSetStockpile: couldn't get empire with ID " << empire_id;
             return;
@@ -355,19 +353,15 @@ namespace {
         }
     }
 
-    void EmpireSetDiplomacy(int empire1_id, int empire2_id, DiplomaticStatus status) {
-         EmpireManager& empires{Empires()};       
-         empires.SetDiplomaticStatus(empire1_id, empire2_id, status);
-    }
+    void EmpireSetDiplomacy(int empire1_id, int empire2_id, DiplomaticStatus status)
+    { ScriptingContext{}.Empires().SetDiplomaticStatus(empire1_id, empire2_id, status); }
 
     // Wrapper for preunlocked items
     auto LoadUnlockableItemList() -> py::list
     {
         py::list py_items;
-        auto& items = GetUniverse().InitiallyUnlockedItems();
-        for (const auto& item : items) {
+        for (const auto& item : ScriptingContext{}.ContextUniverse().InitiallyUnlockedItems())
             py_items.append(py::object(item));
-        }
         return py_items;
     }
 
@@ -375,8 +369,7 @@ namespace {
     auto LoadStartingBuildings() -> py::list
     {
         py::list py_items;
-        auto& buildings = GetUniverse().InitiallyUnlockedBuildings();
-        for (auto building : buildings) {
+        for (auto building : ScriptingContext{}.ContextUniverse().InitiallyUnlockedBuildings()) {
             if (GetBuildingType(building.name))
                 py_items.append(py::object(building));
             else
@@ -391,7 +384,8 @@ namespace {
                           const std::string& icon, const std::string& model,
                           bool monster) -> bool
     {
-        Universe& universe = GetUniverse();
+        ScriptingContext context;
+        Universe& universe = context.ContextUniverse();
         // Check for empty name
         if (name.empty()) {
             ErrorLogger() << "CreateShipDesign: tried to create ship design without a name";
@@ -407,24 +401,23 @@ namespace {
 
         // copy parts list from Python list to C++ vector
         std::vector<std::string> parts;
-        for (int i = 0; i < len(py_parts); i++) {
+        for (int i = 0; i < len(py_parts); i++)
             parts.push_back(py::extract<std::string>(py_parts[i]));
-        }
+
 
         // Create the design and add it to the universe
-        ShipDesign* design;
         try {
-            design = new ShipDesign(std::invalid_argument(""), name, description,
-                                    BEFORE_FIRST_TURN, ALL_EMPIRES,
-                                    hull, parts, icon, model, true, monster);
+            ShipDesign design(std::invalid_argument(""), name, description, BEFORE_FIRST_TURN,
+                              ALL_EMPIRES, hull, parts, icon, model, true, monster);
+
+            const auto new_id = universe.InsertShipDesign(design);
+            if (new_id == INVALID_DESIGN_ID) {
+                ErrorLogger() << "CreateShipDesign: couldn't insert ship design into universe";
+                return false;
+            }
+
         } catch (const std::invalid_argument&) {
             ErrorLogger() << "CreateShipDesign: invalid ship design";
-            return false;
-        }
-
-        if (!universe.InsertShipDesign(design)) {
-            ErrorLogger() << "CreateShipDesign: couldn't insert ship design into universe";
-            delete design;
             return false;
         }
 
@@ -434,9 +427,8 @@ namespace {
     auto ShipDesignGetPremadeList() -> py::list
     {
         py::list py_ship_designs;
-        for (const auto& design : GetPredefinedShipDesignManager().GetOrderedShipDesigns()) {
+        for (const auto& design : GetPredefinedShipDesignManager().GetOrderedShipDesigns())
             py_ship_designs.append(py::object(design->Name(false)));
-        }
         return py::list(py_ship_designs);
     }
 
@@ -444,9 +436,8 @@ namespace {
     {
         py::list py_monster_designs;
         const auto& manager = GetPredefinedShipDesignManager();
-        for (const auto& monster : manager.GetOrderedMonsterDesigns()) {
+        for (const auto& monster : manager.GetOrderedMonsterDesigns())
             py_monster_designs.append(py::object(monster->Name(false)));
-        }
         return py::list(py_monster_designs);
     }
 
@@ -471,14 +462,12 @@ namespace {
 
         py::list ShipDesigns() {
             py::list py_designs;
-            for (const auto& design_name : m_fleet_plan->ShipDesigns()) {
+            for (const auto& design_name : m_fleet_plan->ShipDesigns())
                 py_designs.append(py::object(design_name));
-            }
             return py::list(py_designs);
         }
 
-        const FleetPlan& GetFleetPlan() const noexcept
-        { return *m_fleet_plan; }
+        const auto& GetFleetPlan() const noexcept { return *m_fleet_plan; }
 
     private:
         // Use shared_ptr insead of unique_ptr because boost::python requires a deleter
@@ -568,14 +557,14 @@ namespace {
         return py::object(obj->Name());
     }
 
-    void SetName(int object_id, const std::string& name)
+    void SetName(int object_id, std::string name)
     {
         auto obj = Objects().getRaw(object_id);
         if (!obj) {
             ErrorLogger() << "RenameUniverseObject: Couldn't get object with ID " << object_id;
             return;
         }
-        obj->Rename(name);
+        obj->Rename(std::move(name));
     }
 
     auto GetX(int object_id) -> double
@@ -710,7 +699,7 @@ namespace {
         }
 
         // Check if orbit number is within allowed range
-        if ((orbit < 0) || (orbit >= system->Orbits())) {
+        if ((orbit < 0) || (orbit >= static_cast<int>(system->Orbits()))) {
             ErrorLogger() << "CreatePlanet : There is no orbit " << orbit << " in system " << system_id;
             return INVALID_OBJECT_ID;
         }
@@ -744,15 +733,14 @@ namespace {
 
         // Create planet and insert it into the object map
         auto& universe = context.ContextUniverse();
-        int turn = context.current_turn;
-        auto planet = universe.InsertNew<Planet>(planet_type, size, turn);
+        auto planet = universe.InsertNew<Planet>(planet_type, size, context.current_turn);
         if (!planet) {
             ErrorLogger() << "CreateSystem : Attempt to insert planet into the object map failed";
             return INVALID_OBJECT_ID;
         }
 
         // Add planet to system map
-        system->Insert(std::shared_ptr<UniverseObject>(planet), orbit, turn);
+        system->Insert(planet, orbit, context.current_turn, context.ContextObjects());
 
         // If a name has been specified, set planet name
         if (!(name.empty()))
@@ -790,7 +778,7 @@ namespace {
             return INVALID_OBJECT_ID;
         }
 
-        system->Insert(building, System::NO_ORBIT, context.current_turn);
+        system->Insert(building, System::NO_ORBIT, context.current_turn, context.ContextObjects());
         planet->AddBuilding(building->ID());
         building->SetPlanetID(planet_id);
         return building->ID();
@@ -816,7 +804,7 @@ namespace {
 
         // Insert fleet into specified system
         int turn = CurrentTurn();
-        system->Insert(fleet, System::NO_ORBIT, turn);
+        system->Insert(fleet, System::NO_ORBIT, turn, Objects());
 
         // check if we got a fleet name...
         if (name.empty()) {
@@ -883,7 +871,7 @@ namespace {
             ErrorLogger() << "CreateShip: couldn't create new ship";
             return INVALID_OBJECT_ID;
         }
-        system->Insert(ship, System::NO_ORBIT, turn);
+        system->Insert(ship, System::NO_ORBIT, turn, objects);
 
         // set ship name
         // check if we got a ship name...
@@ -972,7 +960,7 @@ namespace {
             return INVALID_OBJECT_ID;
         int field_id = field->ID();
         int turn = CurrentTurn();
-        system->Insert(std::move(field), System::NO_ORBIT, turn);
+        system->Insert(std::move(field), System::NO_ORBIT, turn, Objects());
         return field_id;
     }
 
@@ -1271,8 +1259,8 @@ namespace {
             ErrorLogger() << "PlanetAvailableFoci: Couldn't get planet with ID " << planet_id;
             return py_foci;
         }
-        for (const std::string& focus : planet->AvailableFoci(context))
-            py_foci.append(py::object(focus));
+        for (const auto& focus : planet->AvailableFoci(context))
+            py_foci.append(py::object(std::string{focus}));
 
         return py_foci;
     }
@@ -1385,10 +1373,10 @@ namespace FreeOrionPython {
         py::def("invalid_position",                 +[]() -> double { return UniverseObject::INVALID_POSITION; });
 
         py::def("get_galaxy_setup_data",            GetGalaxySetupData,             py::return_value_policy<py::reference_existing_object>());
-        py::def("current_turn",                     CurrentTurn);
+        py::def("current_turn",                     CurrentTurn); // TODO: replace these with ScriptingContext calls?
         py::def("generate_sitrep",                  GenerateSitRep);
         py::def("generate_sitrep",                  +[](int empire_id, const std::string& template_string, const std::string& icon) { GenerateSitRep(empire_id, template_string, py::dict(), icon); });
-        py::def("generate_starlanes",               +[](int max_jumps_between_systems, int max_starlane_length) { GenerateStarlanes(max_jumps_between_systems, max_starlane_length, GetUniverse(), Empires()); });
+        py::def("generate_starlanes",               +[](int max_jumps_between_systems, int max_starlane_length) { ScriptingContext context; GenerateStarlanes(max_jumps_between_systems, max_starlane_length, context.ContextUniverse(), context.Empires()); });
 
         py::def("species_preferred_focus",          SpeciesDefaultFocus);
         py::def("species_get_planet_environment",   SpeciesGetPlanetEnvironment);

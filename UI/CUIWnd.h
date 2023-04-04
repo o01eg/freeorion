@@ -10,10 +10,10 @@
 
 
 /** a simple minimize/restore button that toggles its appearance between the styles for minimize and restore */
-class CUI_MinRestoreButton : public GG::Button {
+class CUI_MinRestoreButton final : public GG::Button {
 public:
    /** the two modes of operation of this class of button: as a minimize button or as a restore button */
-   enum class Mode : uint8_t {
+   enum class Mode : bool {
        MINIMIZE,
        RESTORE
    };
@@ -29,7 +29,7 @@ private:
 };
 
 /** a basic Pin-shaped pin button. */
-class CUI_PinButton : public GG::Button {
+class CUI_PinButton final : public GG::Button {
 public:
     CUI_PinButton();
 
@@ -98,26 +98,27 @@ public:
     virtual ~CUIWnd();
 
     bool    Minimized() const noexcept { return m_minimized; } //!< true if window is minimized
-    GG::Pt  ClientUpperLeft() const override;
-    GG::Pt  ClientLowerRight() const override;
-    bool    InWindow(const GG::Pt& pt) const override;
-    GG::X   LeftBorder() const;                 //!< the distance on the left side between the outer edge of the window and the inner border
-    GG::Y   TopBorder() const;                  //!< the distance at the top between the outer edge of the window and the inner border
-    GG::X   RightBorder() const;                //!< the distance on the right side between the outer edge of the window and the inner border
-    GG::Y   BottomBorder() const;               //!< the distance at the bottom between the outer edge of the window and the inner border
+    GG::Pt  ClientUpperLeft() const noexcept override;
+    GG::Pt  ClientLowerRight() const noexcept override;
+    bool    InWindow(GG::Pt pt) const override;
+    GG::X   LeftBorder() const noexcept { return BORDER_LEFT; }                        //!< the distance on the left side between the outer edge of the window and the inner border
+    GG::Y   TopBorder() const;  //!< distance at the top between the outer edge of the window and the inner border
+    GG::X   RightBorder() const noexcept { return BORDER_RIGHT; }                      //!< the distance on the right side between the outer edge of the window and the inner border
+    GG::Y   BottomBorder() const noexcept { return BORDER_BOTTOM; }                    //!< the distance at the bottom between the outer edge of the window and the inner border
+
+    GG::Pt  MinimizedSize() const { return GG::Pt(MINIMIZED_WND_WIDTH, TopBorder()); }
+    int     InnerBorderAngleOffset() const noexcept { return INNER_BORDER_ANGLE_OFFSET; }
 
     void SetName(std::string name) override;
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
     void Render() override;
-    void LButtonDown(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKey> mod_keys) override;
-    void LButtonUp(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
+    void LButtonDown(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
+    void LDrag(GG::Pt pt, GG::Pt move, GG::Flags<GG::ModKey> mod_keys) override;
+    void LButtonUp(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
+    void LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override { return LButtonUp(pt, mod_keys); }
 
-    void LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override
-    { return LButtonUp(pt, mod_keys); }
-
-    void MouseEnter(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void MouseHere(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
+    void MouseEnter(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
+    void MouseHere(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
     void MouseLeave() override;
     void Hide() override;
     void Show() override;
@@ -137,9 +138,7 @@ public:
     static void     InvalidateUnusedOptions();             //!< removes unregistered and registered-but-unused window options from the OptionsDB so that new windows fall back to their default properties.
 
 protected:
-    virtual GG::Pt     MinimizedSize() const;              //!< the size of a minimized CUIWnd
-    int                InnerBorderAngleOffset() const;     //!< the distance from where the lower right corner of the inner border should be to where the angled portion of the inner border meets the right and bottom lines of the border
-    bool               InResizeTab(const GG::Pt& pt) const;//!< returns true iff the specified \a pt is in the region where dragging will resize this Wnd
+    bool               InResizeTab(GG::Pt pt) const;//!< returns true iff the specified \a pt is in the region where dragging will resize this Wnd
     void               SaveOptions() const;                //!< saves options for this window to the OptionsDB if config_name was specified in the constructor
 
     virtual GG::Rect   CalculatePosition() const;          //!< override this if a class determines its own position/size and return the calculated values, called by ResetDefaultPosition()
@@ -210,7 +209,7 @@ protected:
 
 // This didn't seem big enough to warrant its own file, so this seemed like a good enough place for it....
 /** provides a convenient modal wnd for getting text user input. */
-class CUIEditWnd : public CUIWnd {
+class CUIEditWnd final : public CUIWnd {
 public:
     CUIEditWnd(GG::X w, std::string prompt_text, std::string edit_text,
                GG::Flags<GG::WndFlag> flags = GG::MODAL);

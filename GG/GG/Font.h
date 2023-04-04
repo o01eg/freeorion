@@ -123,7 +123,7 @@ public:
     public:
         typedef std::pair<std::string::const_iterator, std::string::const_iterator> IterPair;
 
-        Substring();
+        Substring() noexcept;
 
         /** Ctor.  \a first_ must be <= \a second_. */
         Substring(const std::string& str_,
@@ -139,9 +139,11 @@ public:
             This changes the iterators from pointing into the previous
             std::string to pointing into \p str_.
         */
-        void Bind(const std::string& str_);
+        void Bind(const std::string& str_) noexcept;
 
         [[nodiscard]] auto data() const noexcept { return str->data() + first; }
+
+        [[nodiscard]] const auto& front() const noexcept { return *(str->data() + first); }
 
         /** Returns an iterator to the beginning of the substring. */
         [[nodiscard]] auto begin() const { return std::next(str->begin(), first); }
@@ -157,7 +159,8 @@ public:
 
         /** Implicit conversion to std::string. */
         [[nodiscard]] operator std::string() const { return std::string(begin(), end()); }
-        [[nodiscard]] operator std::string_view() const { return {data(), size()}; }
+        static constexpr bool op_sv_nox = noexcept(std::string_view{(const char*)(nullptr), std::size_t{}});
+        [[nodiscard]] operator std::string_view() const noexcept(op_sv_nox) { return {data(), size()}; }
 
         /** Comparison with std::string. */
         bool operator==(const std::string& rhs) const;
@@ -288,7 +291,7 @@ public:
         TextAndElementsAssembler& AddNewline();
 
         /** Add an open Clr tag.*/
-        TextAndElementsAssembler& AddOpenTag(const Clr& color);
+        TextAndElementsAssembler& AddOpenTag(Clr color);
 
     private:
         class Impl;
@@ -365,8 +368,8 @@ public:
             std::vector<std::shared_ptr<FormattingTag>> tags;
         };
 
-        X    Width() const; ///< Returns the width of the line.
-        bool Empty() const; ///< Returns true iff char_data has size 0.
+        X    Width() const noexcept { return char_data.empty() ? X0 : char_data.back().extent; }
+        bool Empty() const noexcept { return char_data.empty(); }
 
         /** Data on each individual glyph. */
         std::vector<CharData> char_data;
@@ -412,12 +415,12 @@ public:
         void PopColor();
 
         /// Return the index of the current color in used_colors
-        int CurrentIndex() const;
+        int CurrentIndex() const noexcept { return color_index_stack.top(); }
 
-        const Clr& CurrentColor()  const;
+        Clr CurrentColor() const;
 
         /// Return true if there are no more colors to pop.
-        bool ColorsEmpty() const;
+        bool ColorsEmpty() const noexcept { return color_index_stack.size() <= 1; }
     };
 
     /** \brief Holds precomputed glyph position information for rendering.
@@ -468,58 +471,57 @@ public:
     ~Font() = default;
 
     /** Returns the name of the file from which this font was created. */
-    const std::string& FontName() const;
+    const auto& FontName() const noexcept { return m_font_filename; }
 
     /** Returns the point size in which the characters in the font object are
         rendered. */
-    unsigned int PointSize() const;
+    unsigned int PointSize() const noexcept { return m_pt_sz; }
 
-    const std::shared_ptr<Texture> GetTexture() const
-    { return m_texture; }
+    const auto& GetTexture() const noexcept { return m_texture; }
 
     /** Returns the range(s) of code points rendered in the font */
-    const std::vector<UnicodeCharset>& UnicodeCharsets() const;
+    const auto& UnicodeCharsets() const noexcept { return m_charsets; }
 
     /** Returns the maximum amount above the baseline the text can go. */
-    Y    Ascent() const;
+    Y    Ascent() const noexcept { return m_ascent; }
 
     /** Returns the maximum amount below the baseline the text can go. */
-    Y    Descent() const;
+    Y    Descent() const noexcept { return m_descent; }
 
     /** Returns (Ascent() - Descent()). */
-    Y    Height() const;
+    Y    Height() const noexcept { return m_height; }
 
     /** Returns the distance that should be placed between lines.  This is
         usually not equal to Height(). */
-    Y    Lineskip() const;
+    Y    Lineskip() const noexcept { return m_lineskip; }
 
     /** Returns the width of the glyph for the space character. */
-    X    SpaceWidth() const;
+    X    SpaceWidth() const noexcept { return m_space_width; }
 
     /** Unformatted text rendering; repeatedly calls RenderGlyph, then returns
         advance of entire string. */
-    X    RenderText(const Pt& pt, const std::string& text) const;
+    X    RenderText(Pt pt, const std::string& text) const;
 
     /** Formatted text rendering. */
-    void RenderText(const Pt& pt1, const Pt& pt2, const std::string& text, Flags<TextFormat>& format,
+    void RenderText(Pt pt1, Pt pt2, const std::string& text, Flags<TextFormat>& format,
                     const std::vector<LineData>& line_data, RenderState* render_state = nullptr) const;
 
     /** Formatted text rendering over a subset of lines and code points.  The
         glyphs rendered are in the range [CodePointIndexOf(<i>begin_line</i>,
         <i>begin_char</i>, <i>line_data</i>), CodePointIndexOf(<i>end_line</i> -
         1, <i>end_char</i>, <i>line_data</i>)). */
-    void RenderText(const Pt& pt1, const Pt& pt2, const std::string& text, Flags<TextFormat>& format,
+    void RenderText(Pt pt1, Pt pt2, const std::string& text, Flags<TextFormat>& format,
                     const std::vector<LineData>& line_data, RenderState& render_state,
                     std::size_t begin_line, CPSize begin_char,
                     std::size_t end_line, CPSize end_char) const;
 
     /** Wrapper around PreRenderText that provides dummy values for line start and end values.*/
-    void PreRenderText(const Pt& ul, const Pt& lr, const std::string& text, Flags<TextFormat>& format,
+    void PreRenderText(Pt ul, Pt lr, const std::string& text, Flags<TextFormat>& format,
                        RenderCache& cache, const std::vector<LineData>& line_data,
                        RenderState* render_state = nullptr) const;
 
     /** Fill the \p cache with glyphs corresponding to the passed in \p text and \p line_data.*/
-    void PreRenderText(const Pt& pt1, const Pt& pt2, const std::string& text,
+    void PreRenderText(Pt pt1, Pt pt2, const std::string& text,
                        Flags<TextFormat>& format, const std::vector<LineData>& line_data,
                        RenderState& render_state, std::size_t begin_line, CPSize begin_char,
                        std::size_t end_line, CPSize end_char, RenderCache& cache) const;
@@ -661,7 +663,7 @@ private:
     {
         Glyph() = default;
 
-        Glyph(const std::shared_ptr<Texture>& texture, const Pt& ul, const Pt& lr,
+        Glyph(const std::shared_ptr<Texture>& texture, Pt ul, Pt lr,
               Y y_ofs, X lb, X adv);
 
         SubTexture  sub_texture;       ///< The subtexture containing just this glyph
@@ -682,12 +684,12 @@ private:
 
     void              ValidateFormat(Flags<TextFormat>& format) const;
 
-    X                 StoreGlyph(const Pt& pt, const Glyph& glyph, const RenderState* render_state,
+    X                 StoreGlyph(Pt pt, const Glyph& glyph, const RenderState* render_state,
                                  RenderCache& cache) const;
-    void              StoreGlyphImpl(RenderCache& cache, GG::Clr color, const Pt& pt,
+    void              StoreGlyphImpl(RenderCache& cache, GG::Clr color, Pt pt,
                                      const Glyph& glyph, int x_top_offset,
                                      int y_shift) const;
-    void              StoreUnderlineImpl(RenderCache& cache, GG::Clr color, const Pt& pt,
+    void              StoreUnderlineImpl(RenderCache& cache, GG::Clr color, Pt pt,
                                          const Glyph& glyph, Y descent, Y height,
                                          Y underline_height, Y underline_offset) const;
 
@@ -717,7 +719,7 @@ private:
 };
 
 /** Stream output operator for Font::Substring. */
-GG_API std::ostream& operator<<(std::ostream& os, const Font::Substring& substr);
+GG_API std::ostream& operator<<(std::ostream& os, Font::Substring substr);
 
 /** Returns the code point index of the <i>index</i>-th code point on line \a
     line within the text represented by \a line_data.  Returns the index of

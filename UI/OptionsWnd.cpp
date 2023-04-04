@@ -62,7 +62,7 @@ namespace {
             DoLayout();
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             const GG::Pt old_size = Size();
             GG::Control::SizeMove(ul, lr);
             if (old_size != Size())
@@ -215,7 +215,7 @@ namespace {
             m_mods = mod_keys;
             // exit modal loop only if not a modifier
             if (GG::Key::GGK_LCONTROL > m_key || GG::Key::GGK_RGUI < m_key)
-                m_done = true;
+                m_modal_done.store(true);
 
             /// @todo Clean up, ie transform LCTRL or RCTRL into CTRL and
             /// the like...
@@ -224,7 +224,7 @@ namespace {
         static std::pair<GG::Key, GG::Flags<GG::ModKey>> GetKeypress() {
             auto ct = GG::Wnd::Create<KeyPressCatcher>();
             ct->Run();
-            return std::make_pair(ct->m_key, ct->m_mods);
+            return std::pair(ct->m_key, ct->m_mods);
         };
     };
 
@@ -289,7 +289,7 @@ namespace {
         }
 
     public:
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             GG::Pt old_size = GG::Wnd::Size();
 
             CUIWnd::SizeMove(ul, lr);
@@ -351,7 +351,7 @@ namespace {
                 push_back(m_contents);
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             //std::cout << "OptionsListRow::SizeMove(" << ul << ", " << lr << ")" << std::endl;
             const GG::Pt old_size = Size();
             GG::ListBox::Row::SizeMove(ul, lr);
@@ -378,7 +378,7 @@ namespace {
             SetVScrollWheelIncrement(ClientUI::Pts() * 10);
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             const GG::Pt old_size = Size();
             CUIListBox::SizeMove(ul, lr);
             if (old_size != Size()) {
@@ -842,7 +842,7 @@ void OptionsWnd::CompleteConstruction() {
     m_done_button->LeftClickedSignal.connect([this]() { DoneClicked(); });
 }
 
-void OptionsWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void OptionsWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
     const GG::Pt old_size = Size();
     CUIWnd::SizeMove(ul, lr);
     if (old_size != Size())
@@ -1472,7 +1472,7 @@ void OptionsWnd::KeyPress(GG::Key key, std::uint32_t key_code_point,
 
 void OptionsWnd::DoneClicked() {
     GetOptionsDB().Commit();
-    m_done = true;
+    m_modal_done.store(true);
 }
 
 void OptionsWnd::SoundOptionsFeedback::SoundEffectsEnableClicked(bool checked) {

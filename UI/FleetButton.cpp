@@ -278,9 +278,9 @@ void FleetButton::Refresh(SizeType size_type) {
         DetachChild(m_scanline_control);
 }
 
-bool FleetButton::InWindow(const GG::Pt& pt) const {
+bool FleetButton::InWindow(GG::Pt pt) const noexcept {
     // find if cursor is within required distance of centre of icon
-    GG::Pt ul = UpperLeft(), lr = LowerRight();
+    const GG::Pt ul = UpperLeft(), lr = LowerRight();
     const float midX = Value(ul.x + lr.x)/2.0f;
     const float midY = Value(ul.y + lr.y)/2.0f;
 
@@ -294,7 +294,7 @@ bool FleetButton::InWindow(const GG::Pt& pt) const {
     return distx*distx + disty*disty <= RADIUS2;
 }
 
-void FleetButton::MouseHere(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
+void FleetButton::MouseHere(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     const auto& map_wnd = ClientUI::GetClientUI()->GetMapWnd();
     if (!Disabled() && (!map_wnd || !map_wnd->InProductionViewMode())) {
         if (State() != ButtonState::BN_ROLLOVER)
@@ -303,7 +303,7 @@ void FleetButton::MouseHere(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) {
     }
 }
 
-void FleetButton::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void FleetButton::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt sz = Size();
 
     Button::SizeMove(ul, lr);
@@ -339,7 +339,7 @@ void FleetButton::LayoutIcons() {
             return;
 
         // can just pick first fleet because all fleets in system should have same exits
-        auto fleet = context.ContextObjects().get<Fleet>(*m_fleets.begin());
+        auto fleet = context.ContextObjects().get<Fleet>(m_fleets.front());
 
         std::string available_exits;
         int available_exits_count = 0;

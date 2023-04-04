@@ -1006,6 +1006,12 @@ Retourner au Menu Principal sans sauvegarder.
 ABORT_SAVE_AND_EXIT
 Quitter FreeOrion sans sauvegarder.
 
+WRONG_CLIENT_TYPE_AUTOTURN
+Seuls les joueurs humains peuvent définir les tours automatiques.
+
+WRONG_CLIENT_TYPE_REVERT_ORDERS
+Les ordres ne peuvent pas être annulés pour les non-joueurs.
+
 EMPIRE_NOT_FOUND_CANT_HANDLE_ORDERS
 Aucun empire n'est contrôlé par ce client; les ordres ne peuvent pas être exécutés.
 
@@ -3548,8 +3554,14 @@ Tour %1%
 MAP_BTN_TURN_UNREADY
 Réviser %1%
 
+MAP_BTN_TURN_REVOKE
+Annuler ordres %2% et relancer tour %1%
+
+MAP_BTN_TURN_SEND_AND_START
+Envoyer ordres %2% et lancer tour %1%
+
 MAP_BTN_TURN_TOOLTIP
-Lancer Tour
+Lancer le tour
 
 MAP_BTN_TURN_TOOLTIP_DESC_SP
 '''Lance le traitement du tour selon la séquence suivante:
@@ -4881,7 +4893,10 @@ RALLY_QUEUE_ITEM
 Rallier %1%
 
 DELETE_QUEUE_ITEM
-<rgba 255 0 0 255>Retirer le projet de la file d'attente</rgba>
+<rgba 255 64 64 255>Retirer le projet de la file d'attente</rgba>
+
+UNDELETE_QUEUE_ITEM
+<rgba 96 255 96 255>Replacer le projet dans la file d'attente</rgba>
 
 MOVE_UP_QUEUE_ITEM
 Déplacer en haut de la file
@@ -5459,28 +5474,28 @@ ORDER_FLEET_NEW
 Nouvelle flotte %3% nommée %1% avec %2% astronefs
 
 ORDER_FLEET_MOVE
-Déplacement Flotte
+Déplacement Flotte %1% vers %2%
 
 ORDER_FLEET_TRANSFER
-Transfert Flotte
+Transfert Flotte %1% dans %2%
 
 ORDER_COLONIZE
-Coloniser
+Coloniser %1% avec %2%
 
 ORDER_INVADE
-Envahir
+Envahir %1% avec %2%
 
 ORDER_BOMBARD
-Bombarder
+Bombarder %1% avec %2%
 
 ORDER_FOCUS_CHANGE
-Changement Focus
+Changement Focus de %1% pour %2%
 
 ORDER_POLICY_ADOPT
-Adopter Politique
+Adopter Politique %1% de la catégorie %2% choix %3%
 
 ORDER_POLICY_ABANDON
-Abandonner Politique
+Abandonner Politique %1%
 
 ORDER_RESEARCH
 Recherche
@@ -5537,13 +5552,13 @@ NO_BUILDINGS_AVAILABLE
 Aucune Structure disponible
 
 OWNED_PLANETS
-'''Planètes impériales : '''
+'''Planètes possédées : '''
 
 NO_OWNED_PLANETS_KNOWN
 Aucune Planète impériale connue
 
 OWNED_FLEETS
-'''Flottes impériales : '''
+'''Flottes possédées : '''
 
 # %1% link to a fleet.
 # %2% link to a system.
@@ -5780,6 +5795,18 @@ ENC_UNLOCKED_BY
 
 ENC_UNLOCKS
 '''Débloque : 
+'''
+
+ENC_PRODUCTION_LOCATION_REQUIREMENTS
+'''Requis sur le lieu de production :
+'''
+
+ENC_ENQUEUE_LOCATION_REQUIREMENTS
+'''Requis pour ajout à la file d'attente :
+'''
+
+ENC_EFFECTS
+'''Effets :
 '''
 
 ENC_SHIP_PART_CAN_MOUNT_IN_SLOT_TYPES
@@ -6359,7 +6386,7 @@ Modificateurs de base de la Stabilité:
 '''
 
 STABILITY_MODIFIERS
-'''• -/+ 5 Connexion par lignes d'[[metertype METER_SUPPLY]] à la Capitale - Dépend de la distance en nombre de Voies Spatiales à la Capitale ou à une structure [[buildingtype BLD_REGIONAL_ADMIN]]. Ne concerne pas les espèces <encyclopedia INDEPENDENT_SPECIES_TITLE>indépendantistes</encyclopedia> et les empires ayant adopté la Politique [[policy PLC_CONFEDERATION]].
+'''• -/+ 5 Connexion par lignes d'[[metertype METER_SUPPLY]] à la Capitale - Dépend de la distance en nombre de Voies Spatiales à la Capitale ou à une structure [[buildingtype BLD_REGIONAL_ADMIN]]. Ne concerne pas les espèces de type [[encyclopedia INDEPENDENT]] et les empires ayant adopté la Politique [[policy PLC_CONFEDERATION]].
 • +5 Monde Natal - les espèces vivant sur leur propre planète natale sont plus stables.
 • +5 Espèce de la Capitale - Les colonies abritant la même espèce que celle de la Capitale sont plus stables. Ne s'applique pas à la Capitale elle-même.
 • +10 Capitale - La colonie abrite une structure [[buildingtype BLD_IMPERIAL_PALACE]].
@@ -6757,7 +6784,17 @@ XENOPHOBIC_SPECIES_TEXT
 • Distance 1 Voie   : -2.0 Stabilité
 • Dans le même système : -2.5 Stabilité
 
-Une espèce Xénophobe et de [[encyclopedia SELF_SUSTAINING_SPECIES_TITLE]] considère également la présence d'espèces étrangères à proximité comme une entrave à son équilibre naturel, ce qui entraîne une diminution de sa [[metertype METER_TARGET_POPULATION]].
+Une espèce Xénophobe et à [[encyclopedia SELF_SUSTAINING_SPECIES_TITLE]] considère également la présence d'espèces étrangères pleinement conscientes à proximité comme une entrave à son équilibre naturel, diminuant le bonus de [[metertype METER_TARGET_POPULATION]] de l'espèce autosuffisante. La diminution dépend de la [[HABITABLE_SIZE]] de la colonie xénophobe et se cumule avec chaque planète perturbatrice à proximité, selon leur distance (de [[value XENOPHOBIC_TARGET_POPULATION_PERJUMP]] par Voie spatiale), de la même manière que la Stabilité:
+• Distance 4 Voies : -0.2  * [[HABITABLE_SIZE]]
+• Distance 3 Voies : -0.4  * [[HABITABLE_SIZE]]
+• Distance 2 Voies : -0.7  * [[HABITABLE_SIZE]]
+• Distance 1 Voie   : -0.8  * [[HABITABLE_SIZE]]
+• Dans le même système : -1.0  * [[HABITABLE_SIZE]]
+À noter que cette diminution ne peut jamais être supérieure au bonus de population pour l'espèce à [[encyclopedia SELF_SUSTAINING_SPECIES_TITLE]].
+
+Les espèces n'étant pas pleinement conscientes, telles les espèces [[species SP_EXOBOT]] ou [[species SP_ANCIENT_GUARDIANS]] (espèces de type [[LOW_BRAINPOWER]]), ne sont pas assez perturbatrices pour infliger un malus à la Stabilité ou Population.
+
+
 
 La technologie [[tech CON_CONC_CAMP]] est disponible par défaut pour les espèces xénophobes.
 
@@ -6772,12 +6809,12 @@ ARTISTIC_SPECIES_TRAIT_TEXT
 Liste des espèces artistiques:'''
 
 INDEPENDENT_SPECIES_TITLE
-Attribut Indépendantiste
+Attribut Indépendant
 
 INDEPENDENT_SPECIES_TRAIT_TEXT
-'''La [[metertype METER_HAPPINESS]] des espèces indépendantistes n'est pas modifiée par la distance aux Capitales ou aux Administrations Régionales Impériales.
+'''La [[metertype METER_HAPPINESS]] des espèces indépendantes n'est pas modifiée par la distance aux Capitales ou aux Administrations Régionales Impériales.
 
-Liste des espèces indépendantistes:'''
+Liste des espèces indépendantes:'''
 
 SNEAKY_TITLE
 Sournoise
@@ -7734,6 +7771,24 @@ La planète %planet% dispose à présent d'un avant-poste.
 SITREP_PLANET_OUTPOSTED_LABEL
 Planète Avant-Poste
 
+SITREP_PLANET_ESTABLISH_FAILED
+L'astronef %ship% n'a pas réussi à établir une colonie ou un avant-poste sur la planète %planet%.
+
+SITREP_PLANET_ESTABLISH_FAILED_LABEL
+Astronef échoue à s'établir sur une planète
+
+SITREP_PLANET_ESTABLISH_FAILED_VISIBLE_OTHER
+L'astronef %ship% n'a pas réussi à établir une colonie ou un avant-poste sur la planète %planet% en raison de %empire% ayant également essayé de s'établir sur la même planète.
+
+SITREP_PLANET_ESTABLISH_FAILED_VISIBLE_OTHER_LABEL
+Astronef échoue à s'établir sur une planète
+
+SITREP_PLANET_ESTABLISH_FAILED_ARMED
+L'astronef %ship% n'a pas réussi à établir une colonie ou un avant-poste sur la planète %planet% en raison de %empire% ayant des astronefs armés dans le système.
+
+SITREP_PLANET_ESTABLISH_FAILED_ARMED_LABEL
+Astronef échoue à s'établir sur une planète
+
 SITREP_OUTPOST_ABANDONED_PREPARATION
 L'avant-poste de la planète %planet% se prépare à être abandonné au tour %rawtext%.
 
@@ -8568,7 +8623,7 @@ SP_TRITH_DESC
 Les Trith sont un mélange de matière et d'énergie psychique. Leur physionomie est vaguement humanoïde. Tous les Trith sont télépathes, ceci expliquant la raison de leur colère: alors que les Thrith peuvent apprendre à contenir leurs propres pensées, il leur est impossible de réprimer celles des autres. Si pour un Trith adulte, cela est déjà très irritant, l'issue peut s'avérer fatal pour un jeune Trith. En effet, les Thrith développant ce pouvoir avant leur adolescence ne sont parfois pas préparés à endurer les pensées combinées de toutes les espèces intelligentes à travers l'Univers. Cette concentration subite d'influx spirituel peut les mener à la folie ou, dans le pire des cas, à la mort.
 
 Structure sociale:
-La société Trith est une théocratie dominée par les prêtres de Quaran-Dor (le Dieu de l'Esprit). Ils ont prêté le serment solennel de réduire au silence toutes les autres espèces pensantes, afin d'atténuer le fracas spirituel incessant qui parcourt l'Univers.
+La société Trith est une théocratie dominée par les prêtres de Quaran-Dor (le Dieu de l'Esprit). Ils ont prêté le serment solennel de réduire au silence toutes les autres espèces pensantes, afin d'atténuer le fracas spirituel incessant qui parcourt l'Univers. Les seules espèces dont les Trith peuvent s'accommoder sont les espèces de type [[LOW_BRAINPOWER]] telles les espèces [[SP_EXOBOT]] ou [[SP_ANCIENT_GUARDIANS]].
 <img src="species/trith.png"></img>
 '''
 
@@ -8854,7 +8909,7 @@ Replicon
 SP_REPLICON_GAMEPLAY_DESC
 '''Robots auto-réplicants à peine sentients.
 Préfèrent les Planètes [[PT_RADIATED]]s.
-[[encyclopedia ROBOTIC_SPECIES_TITLE]]
+[[encyclopedia ROBOTIC_SPECIES_TITLE]], [[encyclopedia ADAPTIVE_TITLE]]
 '''
 
 SP_REPLICON_DESC
@@ -9535,7 +9590,7 @@ HIGH_TECH_NATIVES_SPECIAL
 Indigènes Techno-Experts
 
 HIGH_TECH_NATIVES_SPECIAL_DESC
-Les indigènes de cette planète ont développé une maîtrise technologique très avancée. Si leur planète n'appartient pas à un empire, cette dernière profite de défenses bien plus puissantes et résiste très bien aux attaques et aux invasions.
+Les indigènes de cette planète ont développé une maîtrise technologique très avancée. Si leur planète est indépendante de tout empire, cette dernière profite de défenses bien plus puissantes et résiste très bien aux attaques et aux invasions.
 
 NATIVE_FORTIFICATION_MINIMAL
 Fortifications indigènes minimes
@@ -9652,7 +9707,7 @@ FORTRESS_SPECIAL
 Forteresse
 
 FORTRESS_SPECIAL_DESC
-'''Augmente les [[metertype METER_SHIELD]] de +[[value FORTRESS_SPECIAL_SHIELD_BONUS]], la [[metertype METER_DEFENSE]] de +[[value FORTRESS_SPECIAL_DEFENSE_BONUS]], l'[[metertype METER_TROOPS]] de +[[value FORTRESS_SPECIAL_TROOPS_BONUS]] et le [[metertype METER_DETECTION]] de +[[value FORTRESS_SPECIAL_DETECTION_BONUS]]. Les Boucliers se régénèrent de 40 par tour et la Défense de [[value FORTRESS_SPECIAL_DEFENSE_REGEN]] par tour. Les Mines réduisent la [[metertype METER_STRUCTURE]] des astronefs ennemis situés dans le système de 24 par tour. À chaque tour, il y a 5% de chance qu'un Factionnaire apparaisse pour protéger le système, à moins qu'un spécimen soit déjà présent.
+'''Augmente les [[metertype METER_SHIELD]] de +[[value FORTRESS_SPECIAL_SHIELD_BONUS]], la [[metertype METER_DEFENSE]] de +[[value FORTRESS_SPECIAL_DEFENSE_BONUS]], l'[[metertype METER_TROOPS]] de +[[value FORTRESS_SPECIAL_TROOPS_BONUS]] et le [[metertype METER_DETECTION]] de +[[value FORTRESS_SPECIAL_DETECTION_BONUS]]. Les Boucliers se régénèrent de 40 par tour et la Défense de [[value FORTRESS_SPECIAL_DEFENSE_REGEN]] par tour. Les Mines réduisent la [[metertype METER_STRUCTURE]] des astronefs ennemis situés dans le système de [[value FORTRESS_SPECIAL_SYSTEM_MINES]] par tour. À chaque tour, il y a 5% de chance qu'un Factionnaire apparaisse pour protéger le système, à moins qu'un spécimen soit déjà présent.
 
 La défense de cette planète fut conçue par l'une des anciennes civilisations de Précurseurs. Elle comprend des boucliers planétaires solides, des armements redoutables et des équipements de détection performants, l'ensemble permettant de faire face à tout type de siège. Les installations sont encore totalement fonctionnelles et étonnamment très simples d'utilisation.'''
 
@@ -12240,7 +12295,10 @@ Modération
 PLC_MODERATION_DESC
 '''Accorde un bonus d'Influence et de Stabilité à la Capitale impériale d'autant plus important lorsque le réglage de Focus le plus commun dans l'empire est moins utilisé. Le nombre d'utilisations des autres réglages de Focus n'entre pas en compte pour ce bonus; seul le nombre de nombre planètes utilisant le réglage de Focus le plus commun ainsi que le nombre total de planètes appartenant à l'empire entrent en ligne de compte.
 
-Les Avant-Postes sans Focus défini comptent également comme un Focus, ce dernier pouvant alors représenter le réglage de Focus le plus commun, rendant par conséquent difficile l'obtention de bonus élevés.'''
+Les Avant-Postes sans Focus défini comptent également comme un Focus, ce dernier pouvant alors représenter le réglage de Focus le plus commun, rendant par conséquent difficile l'obtention de bonus élevés.
+
+Le bonus de Stabilité est égal à [[value PLC_MODERATION_STABILITY_SCALING]] fois le rapport : (( Planètes possédées / Utilisations du Focus le plus commun ) - 1)
+Le bonus d'Influence est égal à [[value PLC_MODERATION_INFLUENCE_SCALING]] fois le rapport : (( Planètes possédées / Utilisations du Focus le plus commun ) - 1)'''
 
 PLC_MODERATION_SHORT_DESC
 Augmente l'Influence et la Stabilité de la Capitale impériale
@@ -12399,7 +12457,10 @@ PLC_VASSALIZATION
 Vassalisation
 
 PLC_VASSALIZATION_DESC
-Augmente la [[metertype METER_TARGET_INFLUENCE]] des planètes en Focus Influence au sein des systèmes abritant des planètes non-colonisées, dont l'espèce est différente de celle peuplant la Capitale de l'empire et la planète bénéficiaire, de [[value PLC_VASSALIZATION_INFLUENCE_SCALING]] multiplié par la racine carrée du total de la Population sur ces planètes non-colonisées.
+'''Augmente la [[metertype METER_TARGET_INFLUENCE]] des planètes en Focus Influence au sein des systèmes abritant des planètes non-colonisées, dont l'espèce est différente de celle peuplant la Capitale de l'empire et la planète bénéficiaire, de [[value PLC_VASSALIZATION_INFLUENCE_SCALING]] multiplié par la racine carrée du total de la Population sur ces planètes non-colonisées.
+
+L'espèce [[species SP_ANCIENT_GUARDIANS]] ne peut pas être vassalisée.
+'''
 
 PLC_VASSALIZATION_SHORT_DESC
 Les planètes neutres améliorent l'Influence
@@ -12644,8 +12705,10 @@ PLC_NECESSITY
 Nécessité
 
 PLC_NECESSITY_DESC
-'''Sur les planètes en Focus Recherche dont la [[metertype METER_HAPPINESS]] est inférieure à [[value PLC_NECESSITY_MAX_STABILITY]]:
-• Augmente la [[metertype METER_TARGET_RESEARCH]] par la racine carrée du produit entre la Population et de combien la [[metertype METER_HAPPINESS]] est inférieure à [[value PLC_NECESSITY_MAX_STABILITY]].
+'''Nécessité est mère d'invention.
+
+Sur les planètes en Focus Recherche dont la [[metertype METER_HAPPINESS]] est inférieure à [[value PLC_NECESSITY_MAX_STABILITY]]:
+• Augmente la [[metertype METER_TARGET_RESEARCH]] de [[value PLC_NECESSITY_TARGET_RESEARCH_FACTOR]] multiplié par exposant 1.5 de combien la [[metertype METER_HAPPINESS]] est inférieure à [[value PLC_NECESSITY_MAX_STABILITY]] multiplié par la [[metertype METER_POPULATION]].
 • Augmente la progression de la [[metertype METER_RESEARCH]] de [[value PLC_NECESSITY_RESEARCH_GROWTH_BOOST]] par tour.'''
 
 PLC_NECESSITY_SHORT_DESC
@@ -13926,7 +13989,7 @@ Mines Défensives 1
 DEF_SYST_DEF_MINE_1_DESC
 '''Lorsqu'aucun astronef allié n'est présent dans un système stellaire, les astronefs ennemis ont tout loisir de procéder à un blocus, interrompant ainsi l'acheminement de ressources, et ce en évitant de se mettre à portée des défenses planétaires, et donc sans subir de dégâts. Un réseau spatial de mines défensives, endommageant à chaque tour les astronefs ennemis se trouvant dans le système, peut les dissuader d'adopter cette tactique.
 
-La [[metertype METER_STRUCTURE]] de tous les astronefs ennemis présents dans un système stellaire abritant une planète de l'empire maîtrisant cette technologie, sera réduite au rythme de 16 par tour.
+La [[metertype METER_STRUCTURE]] de tous les astronefs ennemis présents dans un système stellaire abritant une planète de l'empire maîtrisant cette technologie, sera réduite au rythme de [[value DEF_SYST_DEF_MINE_1_DAMAGE]] par tour.
 
 Les mines sont renouvelées à chaque tour et leur utilisation n'entraîne pas un épuisement des stocks de munitions, ces derniers étant constamment approvisionnés.'''
 
@@ -13934,13 +13997,13 @@ DEF_SYST_DEF_MINE_2
 Mines Défensives 2
 
 DEF_SYST_DEF_MINE_2_DESC
-Réduit la [[metertype METER_STRUCTURE]] des astronefs ennemis de 32 en plus par tour, cumulables avec les dommages des [[tech DEF_SYST_DEF_MINE_1]].
+Amélioration de la technologie [[tech DEF_SYST_DEF_MINE_1]]. Les mines améliorées réduisent la [[metertype METER_STRUCTURE]] des astronefs ennemis d'un total de [[value DEF_SYST_DEF_MINE_2_DAMAGE]] par tour.
 
 DEF_SYST_DEF_MINE_3
 Mines Défensives 3
 
 DEF_SYST_DEF_MINE_3_DESC
-Réduit la [[metertype METER_STRUCTURE]] des astronefs ennemis de 64 en plus par tour, cumulables avec les précédentes technologies de mines défensives.
+Amélioration de la technologie [[tech DEF_SYST_DEF_MINE_2]]. Les mines améliorées réduisent la [[metertype METER_STRUCTURE]] des astronefs ennemis d'un total de [[value DEF_SYST_DEF_MINE_3_DAMAGE]] par tour.
 
 DEF_ROOT_DEFENSE
 Auto-défense
@@ -15002,7 +15065,7 @@ BLD_SOL_ORB_GEN
 Générateur Orbital Solaire
 
 BLD_SOL_ORB_GEN_DESC
-'''Augmente la [[metertype METER_TARGET_INDUSTRY]] sur toutes les planètes lui étant reliées par ligne d'[[metertype METER_SUPPLY]], par [[metertype METER_POPULATION]] et selon le type d'étoile:
+'''Augmente la [[metertype METER_TARGET_INDUSTRY]] sur toutes les planètes lui étant reliées par ligne d'[[metertype METER_SUPPLY]] et réglées sur le [[encyclopedia INDUSTRY_FOCUS_TITLE]], par [[metertype METER_POPULATION]] et selon le type d'étoile du système où se situe la structure:
 • [[STAR_BLUE]] ou [[STAR_WHITE]] (x[[value BLD_SOL_ORB_GEN_BRIGHT_TARGET_INDUSTRY_PERPOP]])
 • [[STAR_YELLOW]] ou [[STAR_ORANGE]] (x[[value BLD_SOL_ORB_GEN_NORMAL_TARGET_INDUSTRY_PERPOP]])
 • [[STAR_RED]] (x[[value BLD_SOL_ORB_GEN_DIM_TARGET_INDUSTRY_PERPOP]])
@@ -15897,7 +15960,9 @@ FU_ZERO_FUEL
 Générateur Zero-Point de Carburant
 
 FU_ZERO_FUEL_DESC
-Produit de l'énergie grâce à la génération Zero-Point et la transforme en [[metertype METER_FUEL]] selon des équations de conversion énergie-matière, approvisionnant ainsi automatiquement un astronef.
+'''Ravitaille l'astronef en carburant à chaque tour.
+
+Produit de l'énergie grâce à la génération Zero-Point et la transforme en [[metertype METER_FUEL]] selon des équations de conversion énergie-matière, ravitaillant ainsi automatiquement un astronef.'''
 
 FU_RAMSCOOP
 Réservoir Collecteur
@@ -16284,7 +16349,7 @@ SH_SELF_GRAVITATING
 Coque Auto-Gravitationnelle
 
 SH_SELF_GRAVITATING_DESC
-'''Cette coque immense, à la fois en taille et en puissance, est dotée de six niches externes, de deux niches internes, et d'une niche centrale - faisant de celle-ci l'une des rares capable d'accueillir les équipements d'astronef les plus avancés. Sa [[metertype METER_STRUCTURE]] max élevée en fait également une coque des plus robustes.
+'''Cette coque immense, à la fois en taille et en puissance, est dotée de cinq niches externes, de deux niches internes, et d'une niche centrale - faisant de celle-ci l'une des rares capable d'accueillir les équipements d'astronef les plus avancés. Sa [[metertype METER_STRUCTURE]] max élevée en fait également une coque des plus robustes.
 
 Sa [[metertype METER_STEALTH]] est cependant faible, son [[metertype METER_DETECTION]] standard, tandis que sa [[metertype METER_SPEED]] est moyenne.
 
@@ -16354,7 +16419,7 @@ SH_HEAVY_ASTEROID
 Coque Astéroïdale Massive
 
 SH_HEAVY_ASTEROID_DESC
-'''Cette coque est conçue à partir d'un gigantesque astéroïde, et dispose par conséquent de six niches externes et de trois niches internes.
+'''Cette coque est conçue à partir d'un gigantesque astéroïde, et dispose par conséquent de six niches externes et de deux niches internes.
 
 Sa [[metertype METER_STEALTH]] est standard mais cette coque bénéficie d'un bonus conséquent de Furtivité lorsqu'elle se trouve dans un système abritant une Ceinture d'Astéroïdes, ou en combat lorsqu'elle se dissimule dans une Ceinture d'Astéroïdes. Son [[metertype METER_DETECTION]] est standard et sa [[metertype METER_SPEED]] est faible.
 
@@ -17160,7 +17225,7 @@ ULTIMATE_HAPPINESS_DESC
 +++	Parfait en [[metertype METER_HAPPINESS]] : +[[value ULTIMATE_HAPPINESS_VAL]]
 
 INDEPENDENT_HAPPINESS_DESC
-⋄	[[metertype METER_HAPPINESS]] indépendante: la Stabilité de base n'est pas tributaire des connexions aux lignes d'approvisionnement
+⋄	[[metertype METER_HAPPINESS]] [[encyclopedia INDEPENDENT]]e : la Stabilité de base n'est pas tributaire des connexions aux lignes d'approvisionnement
 
 NO_DEFENSE_TROOPS_DESC
 −−−	Pas d'[[metertype METER_TROOPS]] défensive
@@ -17181,7 +17246,7 @@ ULTIMATE_DEFENSE_TROOPS_DESC
 +++	Parfait en [[metertype METER_TROOPS]] défensive : 300%
 
 ANCIENT_DEFENSE_TROOPS_DESC
-+++	[[metertype METER_TROOPS]] ancestrale défensive : +10 par [[metertype METER_POPULATION]]
++++	[[metertype METER_TROOPS]] ancestrale défensive : +[[value ANCIENT_PLANETARY_TROOPS]] par [[metertype METER_POPULATION]]
 
 NO_OFFENSE_TROOPS_DESC
 −−−	Pas d'[[metertype METER_TROOPS]] offensive
@@ -17318,7 +17383,7 @@ GOOD_PLANETARY_SHIELD_DESC
 +	Bon en [[metertype METER_SHIELD]] planétaires : +40
 
 ANCIENT_PLANETARY_SHIELD_DESC
-+++	[[metertype METER_SHIELD]] planétaires ancestraux : +4000
++++	[[metertype METER_SHIELD]] planétaires ancestraux : +[[value ANCIENT_PLANETARY_SHIELD]]
 
 GOOD_PLANETARY_DEFENSE_DESC
 +	Bon en [[metertype METER_DEFENSE]] planétaire : +30
@@ -17931,6 +17996,9 @@ Moyenne Vision
 GOOD_VISION_LABEL
 Bonne Vision
 
+VERY_GOOD_VISION_LABEL
+Très Bonne Vision
+
 EXCELLENT_VISION_LABEL
 Excellente Vision
 
@@ -18057,6 +18125,9 @@ STYLISH
 ARTISTIC
 Artistique
 
+INDEPENDENT
+Indépendant
+
 ORGANIC
 Organique
 
@@ -18080,6 +18151,9 @@ Gazeux
 
 ORBITAL  # translated
 Orbital
+
+LOW_BRAINPOWER
+Semi-Conscient
 
 
 ##

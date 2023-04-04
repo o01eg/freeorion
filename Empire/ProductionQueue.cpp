@@ -156,13 +156,13 @@ namespace {
       * Also checks if elements will be completed this turn. 
       * Returns the amount of PP which gets transferred to the stockpile using 
       * stockpile project build items. */
+    template <typename ItemCostsTimesMap, typename FlagsVec>
     float SetProdQueueElementSpending(
         std::map<std::set<int>, float> available_pp, float available_stockpile,
         float stockpile_limit,
         const std::vector<std::set<int>>& queue_element_resource_sharing_object_groups,
-        const std::map<std::pair<ProductionQueue::ProductionItem, int>,
-                       std::pair<float, int>>& queue_item_costs_and_times,
-        const std::vector<bool>& is_producible,
+        const ItemCostsTimesMap& queue_item_costs_and_times,
+        const FlagsVec& is_producible,
         ProductionQueue::QueueType& queue,
         std::map<std::set<int>, float>& allocated_pp,
         std::map<std::set<int>, float>& allocated_stockpile_pp,
@@ -196,10 +196,9 @@ namespace {
         int i = 0;
         for (auto& queue_element : queue) {
             queue_element.allocated_pp = 0.0f;  // default, to be updated below...
-            if (queue_element.paused) {
-                TraceLogger() << "allocation: " << queue_element.allocated_pp
-                              << "  to: " << queue_element.item.name
-                              << "  due to it being paused";
+            if (queue_element.paused || queue_element.to_be_removed) {
+                TraceLogger() << "allocation: " << queue_element.allocated_pp << "  to: " << queue_element.item.name
+                              << "  due to it being paused or marked to be removed";
                 ++i;
                 continue;
             }
@@ -213,8 +212,7 @@ namespace {
             if ((group_pp_available <= 0) &&
                 (available_stockpile <= 0 || !queue_element.allowed_imperial_stockpile_use))
             {
-                TraceLogger() << "allocation: " << queue_element.allocated_pp
-                              << "  to: " << queue_element.item.name
+                TraceLogger() << "allocation: " << queue_element.allocated_pp << "  to: " << queue_element.item.name
                               << "  due to lack of available PP in group";
                 queue_element.allocated_pp = 0.0f;
                 ++i;
@@ -249,7 +247,7 @@ namespace {
             }
             //DebugLogger() << "item " << queue_element.item.name << " costs " << item_cost << " for " << build_turns << " turns";
 
-            float element_this_turn_limit = CalculateProductionPerTurnLimit(
+            const float element_this_turn_limit = CalculateProductionPerTurnLimit(
                 queue_element, item_cost, build_turns);
 
             // determine how many pp to allocate to this queue element block this turn.  allocation is limited by the
@@ -257,7 +255,7 @@ namespace {
             // total cost remaining to complete the last item in the queue element (eg. the element has all but
             // the last item complete already) and by the total pp available in this element's production location's
             // resource sharing group (including any stockpile availability)
-            float stockpile_available_for_this =
+            const float stockpile_available_for_this =
                 (queue_element.allowed_imperial_stockpile_use) ? available_stockpile : 0;
 
             float allocation = std::max(0.0f,
@@ -280,14 +278,16 @@ namespace {
             queue_element.allocated_pp = std::max(allocation, EPSILON);
 
             // record allocation from group
-            float group_drawdown = std::min(allocation, group_pp_available);
+            const float group_drawdown = std::min(allocation, group_pp_available);
 
             allocated_pp[group] += group_drawdown;  // relies on default initial mapped value of 0.0f
             if (queue_element.item.build_type == BuildType::BT_STOCKPILE)
                 stockpile_transfer += group_drawdown;
             group_pp_available -= group_drawdown;
 
-            float stockpile_drawdown = allocation <= group_drawdown ? 0.0f : (allocation - group_drawdown);
+            const float stockpile_drawdown = std::min(available_stockpile,
+                allocation <= group_drawdown ? 0.0f : (allocation - group_drawdown));
+
             TraceLogger() << "allocation: " << allocation
                           << "  to: " << queue_element.item.name
                           << "  from group: " << group_drawdown
@@ -298,14 +298,13 @@ namespace {
             // record allocation from stockpile
             // protect against any slight mismatch that might possible happen from multiplying
             // and dividing by a very very small stockpile_conversion_rate
-            stockpile_drawdown = std::min(stockpile_drawdown, available_stockpile);
             if (stockpile_drawdown > 0) {
                 allocated_stockpile_pp[group] += stockpile_drawdown;
                 available_stockpile -= stockpile_drawdown;
             }
 
             // check for completion
-            float block_cost = item_cost * queue_element.blocksize;
+            const float block_cost = item_cost * queue_element.blocksize;
             if (block_cost*(1.0f - queue_element.progress) - queue_element.allocated_pp < EPSILON)
                 queue_element.turns_left_to_next_item = 1;
 
@@ -322,30 +321,20 @@ namespace {
     }
 }
 
-
-ProductionQueue::ProductionItem::ProductionItem(BuildType build_type_) :
-    build_type(build_type_)
-{
-    if (build_type_ == BuildType::BT_STOCKPILE)
-        name = UserStringNop("PROJECT_BT_STOCKPILE");
-}
-
-ProductionQueue::ProductionItem::ProductionItem(BuildType build_type_, std::string name_) :
+ProductionQueue::ProductionItem::ProductionItem(BuildType build_type_, int design_id_,
+                                                const Universe& universe) :
     build_type(build_type_),
-    name(name_)
-{}
-
-ProductionQueue::ProductionItem::ProductionItem(BuildType build_type_, int design_id_, const Universe& universe) :
-    build_type(build_type_),
+    name([bt{build_type_}, id{design_id_}](const Universe& u) -> std::string {
+            if (bt == BuildType::BT_SHIP) {
+                try {
+                    if (const ShipDesign* ship_design = u.GetShipDesign(id))
+                        return ship_design->Name();
+                } catch (...) {}
+            }
+            return std::string{};
+         }(universe)),
     design_id(design_id_)
-{
-    if (build_type == BuildType::BT_SHIP) {
-        if (const ShipDesign* ship_design = universe.GetShipDesign(design_id))
-            name = ship_design->Name();
-        else
-            ErrorLogger() << "ProductionItem::ProductionItem couldn't get ship design with id: " << design_id;
-    }
-}
+{}
 
 bool ProductionQueue::ProductionItem::CostIsProductionLocationInvariant(const Universe& universe) const {
     if (build_type == BuildType::BT_BUILDING) {
@@ -389,7 +378,9 @@ std::pair<float, int> ProductionQueue::ProductionItem::ProductionCostAndTime(
     return {-1.0f, -1};
 }
 
-bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id, const ScriptingContext& context) const {
+bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id,
+                                                               const ScriptingContext& context) const
+{
     switch (build_type) {
     case BuildType::BT_BUILDING: {
         if (const BuildingType* bt = GetBuildingType(name)) {
@@ -398,7 +389,7 @@ bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id, 
                 return true;
             auto location_obj = context.ContextObjects().getRaw(location_id);
             const ScriptingContext location_context(location_obj, context);
-            return c->Eval(location_context, location_obj);
+            return c->EvalOne(location_context, location_obj);
         }
         return true;
         break;
@@ -408,19 +399,6 @@ bool ProductionQueue::ProductionItem::EnqueueConditionPassedAt(int location_id, 
     default:
         return true;
     }
-}
-
-bool ProductionQueue::ProductionItem::operator<(const ProductionItem& rhs) const {
-    if (build_type < rhs.build_type)
-        return true;
-    if (build_type > rhs.build_type)
-        return false;
-    if (build_type == BuildType::BT_BUILDING)
-        return name < rhs.name;
-    else if (build_type == BuildType::BT_SHIP)
-        return design_id < rhs.design_id;
-
-    return false;
 }
 
 std::map<std::string, std::map<int, float>>
@@ -559,25 +537,6 @@ std::string ProductionQueue::ProductionItem::Dump() const {
 //////////////////////////////
 // ProductionQueue::Element //
 //////////////////////////////
-ProductionQueue::Element::Element(ProductionItem item_, int empire_id_,
-                                  boost::uuids::uuid uuid_, int ordered_,
-                                  int remaining_, int blocksize_, int location_, bool paused_,
-                                  bool allowed_imperial_stockpile_use_) :
-    item(item_),
-    empire_id(empire_id_),
-    ordered(ordered_),
-    blocksize(blocksize_),
-    remaining(remaining_),
-    location(location_),
-    blocksize_memory(blocksize_),
-    paused(paused_),
-    allowed_imperial_stockpile_use(allowed_imperial_stockpile_use_),
-    uuid(uuid_)
-{}
-
-std::pair<float, int> ProductionQueue::Element::ProductionCostAndTime(const ScriptingContext& context) const
-{ return item.ProductionCostAndTime(empire_id, location, context); }
-
 std::string ProductionQueue::Element::Dump() const {
     std::string retval = "ProductionQueue::Element (" + item.Dump() + ") (" +
         std::to_string(blocksize) + ") x" + std::to_string(ordered) + " ";
@@ -611,20 +570,23 @@ float ProductionQueue::StockpileCapacity(const ObjectMap& objects) const {
     auto owned_planets = objects.find<Planet>([empire_id{m_empire_id}](const Planet* p)
                                               { return p->OwnedBy(empire_id); });
     for (const auto& obj : owned_planets) {
-        if (const auto* meter = obj->GetMeter(MeterType::METER_STOCKPILE))
+        if (const auto* meter = obj->UniverseObject::GetMeter(MeterType::METER_STOCKPILE))
             retval += meter->Current();
     }
     return retval;
 }
 
-std::set<std::set<int>> ProductionQueue::ObjectsWithWastedPP(const std::shared_ptr<const ResourcePool>& industry_pool) const {
-    std::set<std::set<int>> retval;
-    if (!industry_pool) {
+std::vector<std::vector<int>> ProductionQueue::ObjectsWithWastedPP(const ResourcePool& industry_pool) const {
+    std::vector<std::vector<int>> retval;
+
+    if (industry_pool.Type() != ResourceType::RE_INDUSTRY) {
         ErrorLogger() << "ProductionQueue::ObjectsWithWastedPP passed invalid industry resource pool";
         return retval;
     }
 
-    for (auto& [group, avail_pp_in_group] : industry_pool->Output()) {
+    const auto& output = industry_pool.Output();
+    retval.reserve(output.size());
+    for (auto& [group, avail_pp_in_group] : industry_pool.Output()) {
         //std::cout << "available PP groups size: " << avail_pp.first.size() << " pp: " << avail_pp.second << std::endl;
 
         if (avail_pp_in_group <= 0)
@@ -632,10 +594,11 @@ std::set<std::set<int>> ProductionQueue::ObjectsWithWastedPP(const std::shared_p
 
         // find this group's allocated PP
         auto alloc_it = m_object_group_allocated_pp.find(group);
-        // is less allocated than is available?  if so, some is wasted (assumes stockpile contribuutions can never be lossless)
-        // XXX maybe should check stockpile input ratio
+        // is less allocated than is available? if so, some is wasted
+        // (assuming stockpile contributions can never be lossless)
+        // maybe should check stockpile input ratio
         if (alloc_it == m_object_group_allocated_pp.end() || alloc_it->second < avail_pp_in_group)
-            retval.insert(group);
+            retval.emplace_back(group.begin(), group.end());
     }
     return retval;
 }
@@ -665,6 +628,31 @@ int ProductionQueue::IndexOfUUID(boost::uuids::uuid uuid) const {
     return std::distance(begin(), it);
 }
 
+namespace {
+    struct PQCacheHasher {
+        using entry_t = std::pair<ProductionQueue::ProductionItem, int>;
+        using build_type_t = decltype(entry_t::first_type::build_type);
+        using name_t = decltype(entry_t::first_type::name);
+        using id_t = decltype(entry_t::first_type::design_id);
+
+        static constexpr std::hash<build_type_t> bt_hasher{};
+        static constexpr std::hash<name_t> name_hasher{};
+        static constexpr std::hash<id_t> id_hasher{};
+        static constexpr bool is_noexcept =
+            noexcept((std::size_t{} ^ name_hasher(std::declval<std::string>())) + 0x9e3779b9 + (53<<6) + (53>>2));
+
+        size_t operator()(const entry_t& key) const noexcept(is_noexcept) {
+            size_t seed = 8334358; // random number
+            // Reimplementation of the boost::hash_range function
+            // using std::hash instead of boost::hash
+            seed ^= bt_hasher(key.first.build_type) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+            seed ^= name_hasher(key.first.name) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+            seed ^= id_hasher(key.first.design_id) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+            return seed;
+        }
+    };
+}
+
 void ProductionQueue::Update(const ScriptingContext& context) {
     const Universe& universe{context.ContextUniverse()};
 
@@ -679,9 +667,9 @@ void ProductionQueue::Update(const ScriptingContext& context) {
     SectionedScopedTimer update_timer("ProductionQueue::Update");
     update_timer.EnterSection("Get PP");
 
-    auto industry_resource_pool = empire->GetResourcePool(ResourceType::RE_INDUSTRY);
-    auto& available_pp = industry_resource_pool->Output();
-    float pp_in_stockpile = industry_resource_pool->Stockpile();
+    auto& industry_resource_pool = empire->GetIndustryPool();
+    auto& available_pp = industry_resource_pool.Output();
+    float pp_in_stockpile = industry_resource_pool.Stockpile();
     TraceLogger() << "========= pp_in_stockpile:     " << pp_in_stockpile << " ========";
     float stockpile_limit = StockpileCapacity(context.ContextObjects());
     float available_stockpile = std::min(pp_in_stockpile, stockpile_limit);
@@ -692,10 +680,10 @@ void ProductionQueue::Update(const ScriptingContext& context) {
     std::vector<std::set<int>> queue_element_groups;
     for (const auto& element : m_queue) {
         // get location object for element
-        int location_id = element.location;
+        const int location_id = element.location;
 
         // search through groups to find object
-        for (auto groups_it = available_pp.begin(); true; ++groups_it) { // TODO: structured binding?
+        for (auto groups_it = available_pp.begin(); true; ++groups_it) {
             if (groups_it == available_pp.end()) {
                 // didn't find a group containing this object, so add an empty group as this element's queue element group
                 queue_element_groups.emplace_back();
@@ -716,18 +704,24 @@ void ProductionQueue::Update(const ScriptingContext& context) {
     update_timer.EnterSection("Cacheing Costs");
     // cache producibility, and production item costs and times
     // initialize production queue item completion status to 'never'
-    std::map<std::pair<ProductionQueue::ProductionItem, int>,
-             std::pair<float, int>> queue_item_costs_and_times;
-    std::vector<bool> is_producible;
-    for (auto& elem : m_queue) {
-        is_producible.push_back(empire->ProducibleItem(elem.item, elem.location, context));
-        // for items that don't depend on location, only store cost/time once
-        int location_id = (elem.item.CostIsProductionLocationInvariant(universe) ?
-                           INVALID_OBJECT_ID : elem.location);
-        auto key = std::pair{elem.item, location_id};
+    std::vector<uint8_t> is_producible;
+    is_producible.reserve(m_queue.size());
+    std::transform(m_queue.begin(), m_queue.end(), std::back_inserter(is_producible),
+                   [&context, &empire](const auto& elem)
+                   { return empire->ProducibleItem(elem.item, elem.location, context); });
 
-        if (!queue_item_costs_and_times.count(key))
-            queue_item_costs_and_times[key] = elem.ProductionCostAndTime();
+    boost::unordered_map<std::pair<ProductionQueue::ProductionItem, int>,
+                         std::pair<float, int>, PQCacheHasher> queue_item_costs_and_times;
+    queue_item_costs_and_times.reserve(m_queue.size());
+
+    for (auto& elem : m_queue) {
+        // for items that don't depend on location, only store cost/time once
+        const int location_id = elem.item.CostIsProductionLocationInvariant(universe) ?
+            INVALID_OBJECT_ID : elem.location;
+
+        using key_t = decltype(queue_item_costs_and_times)::key_type;
+        queue_item_costs_and_times.try_emplace(key_t{elem.item, location_id},
+                                               elem.ProductionCostAndTime(context));
 
         elem.turns_left_to_next_item = -1;
         elem.turns_left_to_completion = -1;
@@ -735,14 +729,15 @@ void ProductionQueue::Update(const ScriptingContext& context) {
 
     // duplicate production queue state for future simulation
     QueueType sim_queue = m_queue;
-    std::vector<unsigned int> sim_queue_original_indices(sim_queue.size());
-    for (unsigned int i = 0; i < sim_queue_original_indices.size(); ++i)
+    std::vector<size_t> sim_queue_original_indices(sim_queue.size());
+    for (size_t i = 0; i < sim_queue_original_indices.size(); ++i)
         sim_queue_original_indices[i] = i;
+
 
     update_timer.EnterSection("Set Spending");
     // allocate pp to queue elements, returning updated available pp and updated
     // allocated pp for each group of resource sharing objects
-    float project_transfer_to_stockpile = SetProdQueueElementSpending(
+    const float project_transfer_to_stockpile = SetProdQueueElementSpending(
         available_pp, available_stockpile, stockpile_limit, queue_element_groups,
         queue_item_costs_and_times, is_producible, m_queue,
         m_object_group_allocated_pp, m_object_group_allocated_stockpile_pp,
@@ -758,13 +753,9 @@ void ProductionQueue::Update(const ScriptingContext& context) {
 
     // if at least one resource-sharing system group have available PP, simulate
     // future turns to predict when build items will be finished
-    bool simulate_future = false;
-    for (auto& available : available_pp) {
-        if (available.second > EPSILON) {
-            simulate_future = true;
-            break;
-        }
-    }
+    const bool simulate_future =
+        std::any_of(available_pp.begin(), available_pp.end(),
+                    [](const auto& available) { return available.second > EPSILON; });
 
     if (!simulate_future) {
         update_timer.EnterSection("Signal and Finish");
@@ -789,9 +780,9 @@ void ProductionQueue::Update(const ScriptingContext& context) {
     // this would also be inaccurate anyway due to player choices or random
     // chance, so for simplicity, it is assumed that building location
     // conditions evaluated at the present turn apply indefinitely.
-    update_timer.EnterSection("Remove Unproducible");
+    update_timer.EnterSection("Remove Unproducible and Marked To Remove");
     for (unsigned int i = 0; i < sim_queue.size(); ++i) {
-        if (sim_queue[i].paused || !is_producible[i]) {
+        if (sim_queue[i].paused || sim_queue[i].to_be_removed || !is_producible[i]) {
             sim_queue.erase(sim_queue.begin() + i);
             is_producible.erase(is_producible.begin() + i);
             queue_element_groups.erase(queue_element_groups.begin() + i);
@@ -868,15 +859,7 @@ void ProductionQueue::Update(const ScriptingContext& context) {
     ProductionQueueChangedSignal();
 }
 
-void ProductionQueue::push_back(const Element& element) {
-    if (find(element.uuid) != end()) {
-        ErrorLogger() << "Trying to push back repeated UUID " << element.uuid;
-        throw std::invalid_argument("Repeated use of UUID");
-    }
-    m_queue.push_back(element);
-}
-
-void ProductionQueue::push_back(Element&& element) {
+void ProductionQueue::push_back(Element element) {
     if (find(element.uuid) != end()) {
         ErrorLogger() << "Trying to push back repeated UUID " << element.uuid;
         throw std::invalid_argument("Repeated use of UUID");
@@ -884,12 +867,12 @@ void ProductionQueue::push_back(Element&& element) {
     m_queue.push_back(std::move(element));
 }
 
-void ProductionQueue::insert(iterator it, const Element& element) {
+void ProductionQueue::insert(iterator it, Element element) {
     if (find(element.uuid) != end()) {
         ErrorLogger() << "Trying to insert repeated UUID " << element.uuid;
         throw std::invalid_argument("Repeated use of UUID");
     }
-    m_queue.insert(it, element);
+    m_queue.insert(it, std::move(element));
 }
 
 void ProductionQueue::erase(int i) {

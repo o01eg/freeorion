@@ -22,7 +22,7 @@ struct SaveGameUIData;
 struct ServerFSM;
 
 /** the application framework class for the FreeOrion server. */
-class ServerApp : public IApp {
+class ServerApp final : public IApp {
 public:
     ServerApp();
     ServerApp(const ServerApp&) = delete;
@@ -33,28 +33,24 @@ public:
     ServerApp& operator=(IApp&&) = delete;
 
     /** Returns a ClientApp pointer to the singleton instance of the app. */
-    [[nodiscard]] static ServerApp* GetApp();
+    [[nodiscard]] static ServerApp* GetApp() noexcept { return static_cast<ServerApp*>(s_app); }
     [[nodiscard]] Universe& GetUniverse() noexcept override { return m_universe; }
-    [[nodiscard]] EmpireManager& Empires() override { return m_empires; }
+    [[nodiscard]] EmpireManager& Empires() noexcept override { return m_empires; }
     [[nodiscard]] Empire* GetEmpire(int id) override;
-    [[nodiscard]] SupplyManager& GetSupplyManager() override { return m_supply_manager; }
-    [[nodiscard]] SpeciesManager& GetSpeciesManager() override { return m_species_manager; }
-    [[nodiscard]] const Species* GetSpecies(std::string_view name) override;
-
-    /** Returns the server's map for known objects of specified empire. */
-    [[nodiscard]] ObjectMap& EmpireKnownObjects(int empire_id) override;
+    [[nodiscard]] SupplyManager& GetSupplyManager() noexcept override { return m_supply_manager; }
+    [[nodiscard]] SpeciesManager& GetSpeciesManager() noexcept override { return m_species_manager; }
 
     [[nodiscard]] std::string GetVisibleObjectName(const UniverseObject& object) override;
 
-    [[nodiscard]] int EmpireID() const override { return ALL_EMPIRES; }
-    [[nodiscard]] int CurrentTurn() const override { return m_current_turn; }
+    [[nodiscard]] int EmpireID() const noexcept override { return ALL_EMPIRES; }
+    [[nodiscard]] int CurrentTurn() const noexcept override { return m_current_turn; }
 
     [[nodiscard]] int SelectedSystemID() const override { throw std::runtime_error{"Server cannot access selected object ID"}; }
     [[nodiscard]] int SelectedPlanetID() const override { throw std::runtime_error{"Server cannot access selected object ID"}; }
     [[nodiscard]] int SelectedFleetID() const override { throw std::runtime_error{"Server cannot access selected object ID"}; }
     [[nodiscard]] int SelectedShipID() const override { throw std::runtime_error{"Server cannot access selected object ID"}; }
 
-    [[nodiscard]] const GalaxySetupData& GetGalaxySetupData() const override { return m_galaxy_setup_data; }
+    [[nodiscard]] const GalaxySetupData& GetGalaxySetupData() const noexcept override { return m_galaxy_setup_data; }
 
     /** Checks if player with ID \a player_id is a human player
         who's client runs on the same machine as the server */
@@ -113,7 +109,7 @@ public:
     void RevokeEmpireTurnReadyness(int empire_id);
 
     /** Sets all empire turn orders to an empty set. */
-    void ClearEmpireTurnOrders();
+    void ClearEmpireTurnOrders(int empire_id = ALL_EMPIRES);
 
     /** Determines if all empired have submitted their orders for this turn It
       * will loop the turn squence vector and check for a set order_set. A

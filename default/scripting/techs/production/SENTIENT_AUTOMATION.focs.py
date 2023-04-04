@@ -12,7 +12,7 @@ Tech(
     prerequisites=["LRN_PSIONICS", "PRO_ADAPTIVE_AUTOMATION"],
     effectsgroups=[
         EffectsGroup(
-            scope=ProductionCenter
+            scope=Planet()
             & OwnedBy(empire=Source.Owner)
             & TargetPopulation(low=0.0001)
             & Focus(type=["FOCUS_INDUSTRY"])
@@ -21,7 +21,7 @@ Tech(
             effects=SetTargetIndustry(value=Value + NamedReal(name="PRO_SENTIENT_AUTO_TARGET_INDUSTRY_FLAT", value=3)),
         ),
         EffectsGroup(
-            scope=Source,
+            scope=IsSource,
             effects=SetEmpireMeter(empire=Source.Owner, meter="ECONOMIC_CATEGORY_NUM_POLICY_SLOTS", value=Value + 1),
         ),
     ],

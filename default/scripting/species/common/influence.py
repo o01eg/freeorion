@@ -1,4 +1,7 @@
-from common.misc import SUPPLY_DISCONNECTED_INFLUENCE_MALUS
+from common.misc import (
+    DESCRIPTION_EFFECTSGROUP_MACRO,
+    SUPPLY_DISCONNECTED_INFLUENCE_MALUS,
+)
 from common.priorities import (
     TARGET_EARLY_BEFORE_SCALING_PRIORITY,
     TARGET_LAST_BEFORE_OVERRIDE_PRIORITY,
@@ -7,7 +10,7 @@ from common.priorities import (
 
 BASE_INFLUENCE_COSTS = [
     EffectsGroup(  # colonies consume influence, proportional to square-root of how many populated planets and non-populated outposts the empire controls
-        scope=Source,
+        scope=IsSource,
         activation=Planet() & ~Unowned & ~Capital,
         stackinggroup="IMPERIAL_PALACE_MANY_PLANETS_INFLUENCE_PENALTY",
         accountinglabel="COLONY_ADMIN_COSTS_LABEL",
@@ -23,6 +26,50 @@ BASE_INFLUENCE_COSTS = [
                         & OwnedBy(empire=Source.Owner)
                         & HasSpecies()
                         & ~HasSpecies(name=["SP_EXOBOT"]),
+                    )
+                    + StatisticCount(
+                        float,
+                        condition=Ship & OwnedBy(empire=Source.Owner) & (LocalCandidate.OrderedColonizePlanetID != -1),
+                    )
+                    + StatisticCount(
+                        float,
+                        condition=IsBuilding()
+                        & OwnedBy(empire=Source.Owner)
+                        & IsBuilding(
+                            name=[
+                                "BLD_COL_SUPER_TEST",
+                                "BLD_COL_ABADDONI",
+                                "BLD_COL_BANFORO",
+                                "BLD_COL_CHATO",
+                                "BLD_COL_CRAY",
+                                "BLD_COL_DERTHREAN",
+                                "BLD_COL_EAXAW",
+                                "BLD_COL_EGASSEM",
+                                "BLD_COL_ETTY",
+                                "BLD_COL_FULVER",
+                                "BLD_COL_FURTHEST",
+                                "BLD_COL_GEORGE",
+                                "BLD_COL_GYSACHE",
+                                "BLD_COL_HAPPY",
+                                "BLD_COL_HHHOH",
+                                "BLD_COL_HUMAN",
+                                "BLD_COL_KILANDOW",
+                                "BLD_COL_KOBUNTURA",
+                                "BLD_COL_LAENFA",
+                                "BLD_COL_MISIORLA",
+                                "BLD_COL_MUURSH",
+                                "BLD_COL_PHINNERT",
+                                "BLD_COL_SCYLIOR",
+                                "BLD_COL_SETINON",
+                                "BLD_COL_SILEXIAN",
+                                "BLD_COL_SLY",
+                                "BLD_COL_SSLITH",
+                                "BLD_COL_TAEGHIRUS",
+                                "BLD_COL_TRITH",
+                                "BLD_COL_REPLICON",
+                                "BLD_COL_UGMORS",
+                            ]
+                        ),
                     )
                     + (
                         NamedReal(name="OUTPOST_RELATIVE_ADMIN_COUNT", value=0.25)
@@ -41,14 +88,14 @@ BASE_INFLUENCE_COSTS = [
         ),
     ),
     EffectsGroup(  # species homeworlds consume more influence
-        scope=Source,
+        scope=IsSource,
         activation=Planet() & ~Unowned & ~Capital & Homeworld(name=[LocalCandidate.Species]),
         accountinglabel="SPECIES_HOMEWORLD_INDEPENDENCE_DESIRE_LABEL",
         priority=TARGET_LAST_BEFORE_OVERRIDE_PRIORITY,
         effects=SetTargetInfluence(value=Value - 1),
     ),
     EffectsGroup(  # colonies consume more influence if not supply connected to empire's capital
-        scope=Source,
+        scope=IsSource,
         activation=Planet()
         & ~Unowned
         & ~EmpireHasAdoptedPolicy(empire=Source.Owner, name="PLC_CONFEDERATION")
@@ -63,7 +110,7 @@ BASE_INFLUENCE_COSTS = [
         ),
     ),
     EffectsGroup(  # gives human bonuses when AI Aggression set to Beginner
-        scope=Source,
+        scope=IsSource,
         activation=Planet() & ~Unowned & IsHuman & (GalaxyMaxAIAggression == 0),  # human player, not human species
         accountinglabel="DIFFICULTY",
         priority=TARGET_LAST_BEFORE_OVERRIDE_PRIORITY,
@@ -71,9 +118,11 @@ BASE_INFLUENCE_COSTS = [
     ),
 ]
 
+NO_INFLUENCE = [DESCRIPTION_EFFECTSGROUP_MACRO("NO_INFLUENCE_DESC"), *BASE_INFLUENCE_COSTS]
+
 ARTISANS_INFLUENCE_STABILITY = [
     EffectsGroup(  # artistic species generate influence when artisans workshops policy adopted
-        scope=Source,
+        scope=IsSource,
         activation=HasTag(name="ARTISTIC")
         & Happiness(low=NamedReal(name="ARTISANS_MIN_STABILITY_FOCUS", value=1))
         & EmpireHasAdoptedPolicy(empire=Source.Owner, name="PLC_ARTISAN_WORKSHOPS")
@@ -82,7 +131,7 @@ ARTISANS_INFLUENCE_STABILITY = [
         effects=SetTargetInfluence(value=Value + NamedReal(name="ARTISANS_INFLUENCE_FLAT_FOCUS", value=2.0)),
     ),
     EffectsGroup(
-        scope=Source,
+        scope=IsSource,
         activation=HasTag(name="ARTISTIC")
         & Happiness(low=NamedReal(name="ARTISANS_MIN_STABILITY_NO_FOCUS", value=10))
         & EmpireHasAdoptedPolicy(empire=Source.Owner, name="PLC_ARTISAN_WORKSHOPS")
@@ -94,7 +143,7 @@ ARTISANS_INFLUENCE_STABILITY = [
     EffectsGroup(  # artistic species make other planets with different artistic species on them and in the same system system more stable
         scope=Planet()
         & InSystem(id=Source.SystemID)
-        & ~Source
+        & ~IsSource
         & HasSpecies()
         & ~HasSpecies(name=[Source.Species])
         & HasTag(name="ARTISTIC")
@@ -108,7 +157,7 @@ ARTISANS_INFLUENCE_STABILITY = [
 
 BASIC_INFLUENCE = [
     EffectsGroup(  # influence focus generates influence from planets, proportional to sqare-root of population
-        scope=Source,
+        scope=IsSource,
         activation=Planet() & Focus(type=["FOCUS_INFLUENCE"]),
         accountinglabel="FOCUS_INFLUENCE_LABEL",
         priority=TARGET_EARLY_BEFORE_SCALING_PRIORITY,
@@ -121,11 +170,25 @@ BASIC_INFLUENCE = [
     *ARTISANS_INFLUENCE_STABILITY,
 ]
 
+AVERAGE_INFLUENCE = BASIC_INFLUENCE
+
+GOOD_INFLUENCE = [
+    *BASIC_INFLUENCE,
+    EffectsGroup(
+        description="GOOD_INFLUENCE_DESC",
+        scope=IsSource,
+        activation=Planet() & Focus(type=["FOCUS_INFLUENCE"]),
+        accountinglabel="GOOD_INFLUENCE_LABEL",
+        priority=TARGET_SCALING_PRIORITY,
+        effects=SetTargetInfluence(value=Value + (1.25 - 1.0) * Abs(float, Value)),
+    ),
+]
+
 GREAT_INFLUENCE = [
     *BASIC_INFLUENCE,
     EffectsGroup(
         description="GREAT_INFLUENCE_DESC",
-        scope=Source,
+        scope=IsSource,
         activation=Planet() & Focus(type=["FOCUS_INFLUENCE"]),
         accountinglabel="GREAT_INFLUENCE_LABEL",
         priority=TARGET_SCALING_PRIORITY,

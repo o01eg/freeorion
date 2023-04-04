@@ -1,14 +1,13 @@
 #include "ResourcePool.h"
 
 #include <cassert>
-#include <boost/lexical_cast.hpp>
 #include "../universe/Enums.h"
 #include "../universe/ObjectMap.h"
 #include "../universe/Planet.h"
 #include "../util/AppInterface.h"
 #include "../util/Logger.h"
 
-MeterType ResourceToMeter(ResourceType type) {
+MeterType ResourceToMeter(ResourceType type) noexcept {
     switch (type) {
     case ResourceType::RE_INDUSTRY:  return MeterType::METER_INDUSTRY;
     case ResourceType::RE_RESEARCH:  return MeterType::METER_RESEARCH;
@@ -20,7 +19,7 @@ MeterType ResourceToMeter(ResourceType type) {
     }
 }
 
-MeterType ResourceToTargetMeter(ResourceType type) {
+MeterType ResourceToTargetMeter(ResourceType type) noexcept {
     switch (type) {
     case ResourceType::RE_INDUSTRY:  return MeterType::METER_TARGET_INDUSTRY;
     case ResourceType::RE_RESEARCH:  return MeterType::METER_TARGET_RESEARCH;
@@ -32,7 +31,7 @@ MeterType ResourceToTargetMeter(ResourceType type) {
     }
 }
 
-ResourceType MeterToResource(MeterType type) {
+ResourceType MeterToResource(MeterType type) noexcept {
     switch (type) {
     case MeterType::METER_INDUSTRY:  return ResourceType::RE_INDUSTRY;
     case MeterType::METER_RESEARCH:  return ResourceType::RE_RESEARCH;
@@ -47,29 +46,12 @@ ResourceType MeterToResource(MeterType type) {
 //////////////////////////////////////////////////
 // ResourcePool
 //////////////////////////////////////////////////
-ResourcePool::ResourcePool() :
-    m_type(ResourceType::INVALID_RESOURCE_TYPE)
-{}
-
-ResourcePool::ResourcePool(ResourceType type) :
-    m_type(type)
-{}
-
-const std::vector<int>& ResourcePool::ObjectIDs() const
-{ return m_object_ids; }
-
-float ResourcePool::Stockpile() const
-{ return m_stockpile; }
-
 float ResourcePool::TotalOutput() const {
     float retval = 0.0f;
     for (const auto& entry : m_connected_object_groups_resource_output)
         retval += entry.second;
     return retval;
 }
-
-const std::map<std::set<int>, float>& ResourcePool::Output() const
-{ return m_connected_object_groups_resource_output; }
 
 float ResourcePool::GroupOutput(int object_id) const {
     // find group containing specified object
@@ -108,9 +90,6 @@ float ResourcePool::TotalAvailable() const {
         retval += entry.second;
     return retval;
 }
-
-std::map<std::set<int>, float> ResourcePool::Available() const
-{ return m_connected_object_groups_resource_output; }
 
 float ResourcePool::GroupAvailable(int object_id) const {
     TraceLogger() << "ResourcePool::GroupAvailable(" << object_id << ")";

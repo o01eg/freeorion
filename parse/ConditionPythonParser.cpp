@@ -10,8 +10,8 @@
 #include "ValueRefPythonParser.h"
 
 condition_wrapper operator&(const condition_wrapper& lhs, const condition_wrapper& rhs) {
-    std::shared_ptr<Condition::ValueTest> lhs_cond = std::dynamic_pointer_cast<Condition::ValueTest>(lhs.condition);
-    std::shared_ptr<Condition::ValueTest> rhs_cond = std::dynamic_pointer_cast<Condition::ValueTest>(rhs.condition);
+    auto lhs_cond = std::dynamic_pointer_cast<const Condition::ValueTest>(lhs.condition);
+    auto rhs_cond = std::dynamic_pointer_cast<const Condition::ValueTest>(rhs.condition);
 
     if (lhs_cond && rhs_cond) {
         const auto lhs_vals = lhs_cond->ValuesDouble();
@@ -588,6 +588,20 @@ namespace {
         return condition_wrapper(std::make_shared<Condition::InOrIsSystem>(std::move(system_id)));
     }
 
+    condition_wrapper insert_on_planet_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        std::unique_ptr<ValueRef::ValueRef<int>> planet_id;
+        if (kw.has_key("id")) {
+            auto id_args = boost::python::extract<value_ref_wrapper<int>>(kw["id"]);
+            if (id_args.check()) {
+                planet_id = ValueRef::CloneUnique(id_args().value_ref);
+            } else {
+                planet_id = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(kw["id"])());
+            }
+        }
+
+        return condition_wrapper(std::make_shared<Condition::OnPlanet>(std::move(planet_id)));
+    }
+
     condition_wrapper insert_turn_(const boost::python::tuple& args, const boost::python::dict& kw) {
         std::unique_ptr<ValueRef::ValueRef<int>> low;
         if (kw.has_key("low")) {
@@ -623,7 +637,7 @@ namespace {
 
         auto condition = boost::python::extract<condition_wrapper>(kw["condition"])();
         return condition_wrapper(std::make_shared<Condition::ResourceSupplyConnectedByEmpire>(std::move(empire),
-            std::move(ValueRef::CloneUnique(condition.condition))));
+            ValueRef::CloneUnique(condition.condition)));
     }
 
     condition_wrapper insert_within_starlane_jumps_(const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -638,7 +652,7 @@ namespace {
         }
 
         return condition_wrapper(std::make_shared<Condition::WithinStarlaneJumps>(std::move(jumps),
-            std::move(ValueRef::CloneUnique(condition.condition))));
+            ValueRef::CloneUnique(condition.condition)));
     }
 
     condition_wrapper insert_within_distance_(const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -653,7 +667,7 @@ namespace {
         }
 
         return condition_wrapper(std::make_shared<Condition::WithinDistance>(std::move(distance),
-            std::move(ValueRef::CloneUnique(condition.condition))));
+            ValueRef::CloneUnique(condition.condition)));
     }
 
     condition_wrapper insert_object_id_(const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -695,7 +709,6 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
     globals["Ship"] = condition_wrapper(std::make_shared<Condition::Type>(UniverseObjectType::OBJ_SHIP));
     globals["System"] = condition_wrapper(std::make_shared<Condition::Type>(UniverseObjectType::OBJ_SYSTEM));
     globals["Fleet"] = condition_wrapper(std::make_shared<Condition::Type>(UniverseObjectType::OBJ_FLEET));
-    globals["ProductionCenter"] = condition_wrapper(std::make_shared<Condition::Type>(UniverseObjectType::OBJ_PROD_CENTER));
     globals["Monster"] = condition_wrapper(std::make_shared<Condition::Monster>());
     globals["Capital"] = condition_wrapper(std::make_shared<Condition::Capital>());
     globals["Stationary"] = condition_wrapper(std::make_shared<Condition::Stationary>());
@@ -707,6 +720,7 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
     globals["Random"] = boost::python::raw_function(insert_random_);
     globals["Star"] = boost::python::raw_function(insert_star_);
     globals["InSystem"] = boost::python::raw_function(insert_in_system_);
+    globals["OnPlanet"] = boost::python::raw_function(insert_on_planet_);
     globals["ResupplyableBy"] = boost::python::raw_function(insert_resupplyable_by_);
     globals["DesignHasPart"] = boost::python::raw_function(insert_design_has_part_);
     globals["IsBuilding"] = boost::python::raw_function(insert_building_);
@@ -770,6 +784,10 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
 
     globals["HasSpecies"] = boost::python::raw_function(insert_has_species_);
     globals["CanColonize"] = condition_wrapper(std::make_shared<Condition::CanColonize>());
+
+    globals["IsSource"] = condition_wrapper(std::make_shared<Condition::Source>());
+    globals["IsTarget"] = condition_wrapper(std::make_shared<Condition::Target>());
+    globals["IsRootCandidate"] = condition_wrapper(std::make_shared<Condition::RootCandidate>());
 
     globals["HasTag"] = boost::python::raw_function(insert_has_tag_);
     globals["Planet"] = boost::python::raw_function(insert_planet_);

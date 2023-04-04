@@ -64,6 +64,14 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
         throw std::runtime_error("Python isn't initialized");
     }
 
+    m_main_thread_state = PyThreadState_Get();
+    m_parser_thread_state = Py_NewInterpreter();
+
+    if (!m_main_thread_state && !m_parser_thread_state) {
+        ErrorLogger() << "Python parser sub-interpreter isn't initialized!";
+        throw std::runtime_error("Python sub-interpreter isn't initialized");
+    }
+
     try {
         type_int = py::import("builtins").attr("int");
         type_float = py::import("builtins").attr("float");
@@ -138,7 +146,9 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(py::self_ns::pow(double(), py::self_ns::self))
             .def(py::self_ns::pow(py::self_ns::self, py::self_ns::self))
             .def(py::self_ns::self & py::self_ns::self);
-        py::class_<value_ref_wrapper<std::string>>("ValueRefString", py::no_init);
+        py::class_<value_ref_wrapper<std::string>>("ValueRefString", py::no_init)
+            .def(py::self_ns::self + std::string())
+            .def(std::string() + py::self_ns::self);
         py::class_<condition_wrapper>("Condition", py::no_init)
             .def(py::self_ns::self & py::self_ns::self)
             .def(py::self_ns::self & py::other<value_ref_wrapper<double>>())
@@ -164,10 +174,7 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
         py::class_<enum_wrapper<BuildType>>("__BuildType", py::no_init);
         py::class_<unlockable_item_wrapper>("UnlockableItem", py::no_init);
         py::class_<FocusType>("__FocusType", py::no_init);
-        auto py_variable_wrapper = py::class_<variable_wrapper>("__Variable", py::no_init)
-            .def(py::self_ns::self & py::other<value_ref_wrapper<double>>())
-            .def(py::self_ns::self & py::other<condition_wrapper>())
-            .def(~py::self_ns::self);
+        auto py_variable_wrapper = py::class_<variable_wrapper>("__Variable", py::no_init);
 
         for (const char* property : {"Owner",
                                      "SupplyingEmpire",
@@ -200,7 +207,8 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
                                      "TurnsSinceFocusChange",
                                      "TurnsSinceLastConquered",
                                      "ETA",
-                                     "LaunchedFrom"})
+                                     "LaunchedFrom",
+                                     "OrderedColonizePlanetID"})
         {
             py_variable_wrapper.add_property(property, py::make_function(
                 [property] (const variable_wrapper& w) { return w.get_int_property(property); },
@@ -278,13 +286,17 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
                 boost::mpl::vector<variable_wrapper, const variable_wrapper&>()));
         }
 
-        py::implicitly_convertible<variable_wrapper, condition_wrapper>();
         py::implicitly_convertible<value_ref_wrapper<double>, condition_wrapper>();
         py::implicitly_convertible<value_ref_wrapper<int>, condition_wrapper>();
 
         m_meta_path = py::extract<py::list>(py::import("sys").attr("meta_path"));
+        const int meta_path_len = py::len(m_meta_path);
+        for (int i = 0; i < meta_path_len; ++ i) {
+            m_meta_path.pop();
+        }
         m_meta_path.append(boost::cref(*this));
 
+        py::import("sys").attr("modules") = py::dict();
     } catch (const boost::python::error_already_set&) {
         m_python.HandleErrorAlreadySet();
         if (!m_python.IsPythonRunning()) {
@@ -302,12 +314,18 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
 PythonParser::~PythonParser() {
     try {
         m_meta_path.pop(py::len(m_meta_path) - 1);
-        // ToDo: ensure type of removed parser
-        // ToDo: clean up sys.modules
+        type_int = py::object();
+        type_float = py::object();
+        type_bool = py::object();
+        type_str = py::object();
+        m_meta_path = py::list();
     } catch (const py::error_already_set&) {
         ErrorLogger() << "Python parser destructor throw exception";
         m_python.HandleErrorAlreadySet();
     }
+
+    Py_EndInterpreter(m_parser_thread_state);
+    PyThreadState_Swap(m_main_thread_state);
 }
 
 bool PythonParser::ParseFileCommon(const boost::filesystem::path& path,
@@ -364,8 +382,10 @@ py::object PythonParser::find_spec(const std::string& fullname, const py::object
         module_path.replace_extension("py");
         if (IsExistingFile(module_path))
             return py::object(module_spec(fullname, parent, *this));
-        else
+        else {
+            ErrorLogger() << "Couldn't find file for module spec " << fullname;
             return py::object();
+        }
     }
 }
 

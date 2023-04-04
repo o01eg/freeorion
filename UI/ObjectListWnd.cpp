@@ -74,7 +74,7 @@ namespace {
             return std::make_unique<Condition::None>();
 
         if (object_types.size() == 1)
-            return std::make_unique<Condition::Type>(*object_types.begin());
+            return std::make_unique<Condition::Type>(object_types.front());
 
         std::vector<std::unique_ptr<Condition::Condition>> subconditions;
         for (auto obj_type : object_types)
@@ -374,7 +374,7 @@ namespace {
 
     enum class VIS_DISPLAY : uint8_t { SHOW_VISIBLE, SHOW_PREVIOUSLY_VISIBLE, SHOW_DESTROYED };
 
-    constexpr std::string_view EMPTY_STRING;
+    constexpr std::string_view EMPTY_STRING = "";
     constexpr std::string_view ALL_CONDITION(UserStringNop("CONDITION_ALL"));
     constexpr std::string_view EMPIREAFFILIATION_CONDITION(UserStringNop("CONDITION_EMPIREAFFILIATION"));
     constexpr std::string_view HOMEWORLD_CONDITION(UserStringNop("CONDITION_HOMEWORLD"));
@@ -1254,12 +1254,12 @@ GG::Rect FilterDialog::CalculatePosition() const
 
 void FilterDialog::AcceptClicked() {
     m_accept_changes = true;
-    m_done = true;
+    m_modal_done.store(true);
 }
 
 void FilterDialog::CancelClicked() {
     m_accept_changes = false;
-    m_done = true;
+    m_modal_done.store(true);
 }
 
 void FilterDialog::UpdateStateButtonsFromVisFilters() {
@@ -1406,8 +1406,8 @@ public:
         m_has_contents(has_contents)
     {
         SetChildClippingMode(ChildClippingMode::ClipToClient);
-        if (auto rcobj = std::dynamic_pointer_cast<const ResourceCenter>(obj))
-            rcobj->ResourceCenterChangedSignal.connect(
+        if (auto rcobj = std::dynamic_pointer_cast<const Planet>(obj))
+            rcobj->ResourceCenterChangedSignal.connect( // TODO: store connection as member, use lambda
                 boost::bind(&ObjectPanel::ResourceCenterChanged, this));
 
         RequirePreRender();
@@ -1452,7 +1452,7 @@ public:
     void Select(bool b)
     { m_selected = b; }
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+    void SizeMove(GG::Pt ul, GG::Pt lr) override {
         const GG::Pt old_size = Size();
         GG::Control::SizeMove(ul, lr);
         if (old_size != Size())
@@ -1656,7 +1656,7 @@ public:
     void Update()
     { m_panel->RequirePreRender(); }
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+    void SizeMove(GG::Pt ul, GG::Pt lr) override {
         const GG::Pt old_size = Size();
         GG::ListBox::Row::SizeMove(ul, lr);
         if (!empty() && old_size != Size() && m_panel){
@@ -1690,7 +1690,7 @@ public:
         SetChildClippingMode(ChildClippingMode::ClipToClient);
     }
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+    void SizeMove(GG::Pt ul, GG::Pt lr) override {
         const GG::Pt old_size = Size();
         GG::Control::SizeMove(ul, lr);
         if (old_size != Size())
@@ -1836,7 +1836,7 @@ public:
         m_panel->ColumnsChangedSignal.connect(ColumnsChangedSignal);
     }
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+    void SizeMove(GG::Pt ul, GG::Pt lr) override {
         const GG::Pt old_size = Size();
         GG::ListBox::Row::SizeMove(ul, lr);
         //std::cout << "ObjectRow::SizeMove size: (" << Value(Width()) << ", " << Value(Height()) << ")" << std::endl;
@@ -1970,7 +1970,7 @@ public:
         ListBox::AdjustScrolls(true);
     }
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+    void SizeMove(GG::Pt ul, GG::Pt lr) override {
         const GG::Pt old_size = Size();
         Wnd::SizeMove(ul, lr);
         if (old_size != Size())
@@ -2039,12 +2039,12 @@ public:
         if (!obj)
             return false;
 
-        if (m_filter_condition && !m_filter_condition->Eval(context, obj))
+        if (m_filter_condition && !m_filter_condition->EvalOne(context, obj))
             return false;
 
-        int object_id = obj->ID();
-        int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-        UniverseObjectType type = obj->ObjectType();
+        const int object_id = obj->ID();
+        const int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+        const UniverseObjectType type = obj->ObjectType();
 
         if (context.ContextUniverse().EmpireKnownDestroyedObjectIDs(client_empire_id).count(object_id))
             return m_visibilities[type].count(VIS_DISPLAY::SHOW_DESTROYED);
@@ -2063,9 +2063,9 @@ public:
 
     void Refresh() {
         SectionedScopedTimer timer("ObjectListBox::Refresh");
-        std::size_t first_visible_queue_row = std::distance(this->begin(), this->FirstRowShown());
+        const std::size_t first_visible_queue_row = std::distance(this->begin(), this->FirstRowShown());
         ClearContents();
-        auto initial_style = this->Style();
+        const auto initial_style = this->Style();
         this->SetStyle(GG::LIST_NOSORT);    // to avoid sorting while inserting
 
         m_header_row->Update();
@@ -2509,7 +2509,7 @@ void ObjectListWnd::DoLayout() {
         m_collapse_button->SetText(UserString("COLLAPSE_ALL"));
 }
 
-void ObjectListWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void ObjectListWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = GG::Wnd::Size();
 
     CUIWnd::SizeMove(ul, lr);
@@ -2550,8 +2550,8 @@ void ObjectListWnd::ObjectSelectionChanged(const GG::ListBox::SelectionSet& rows
     SelectedObjectsChangedSignal();
 }
 
-void ObjectListWnd::ObjectDoubleClicked(GG::ListBox::iterator it, const GG::Pt& pt,
-                                        const GG::Flags<GG::ModKey>& modkeys)
+void ObjectListWnd::ObjectDoubleClicked(GG::ListBox::iterator it, GG::Pt pt,
+                                        GG::Flags<GG::ModKey> modkeys)
 {
     int object_id = ObjectInRow(it);
     if (object_id != INVALID_OBJECT_ID)
@@ -2586,7 +2586,7 @@ void ObjectListWnd::SetSelectedObjects(std::set<int> sel_ids) {
     }
 }
 
-void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys) {
+void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) {
     int object_id = ObjectInRow(it);
     if (object_id == INVALID_OBJECT_ID)
         return;
@@ -2644,8 +2644,8 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
 
             auto one_planet = universe.Objects().getRaw<const Planet>(row->ObjectID());
             if (one_planet && one_planet->OwnedBy(app->EmpireID())) {
-                for (auto& planet_focus : one_planet->AvailableFoci(context))
-                    all_foci[std::move(planet_focus)]++;
+                for (const auto& planet_focus : one_planet->AvailableFoci(context))
+                    all_foci[std::string{planet_focus}]++;
 
                 for (int ship_design_id : cur_empire->AvailableShipDesigns(GetUniverse())) {
                     if (cur_empire->ProducibleItem(BuildType::BT_SHIP, ship_design_id,
@@ -2721,10 +2721,11 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
                         !cur_empire->ProducibleItem(BuildType::BT_SHIP, ship_design,
                                                     row->ObjectID(), context))
                     { continue; }
-                    ProductionQueue::ProductionItem ship_item(BuildType::BT_SHIP, ship_design, universe);
+
                     app->Orders().IssueOrder(std::make_shared<ProductionQueueOrder>(
                         ProductionQueueOrder::ProdQueueOrderAction::PLACE_IN_QUEUE, app->EmpireID(),
-                        ship_item, 1, row->ObjectID(), pos),
+                        ProductionQueue::ProductionItem{BuildType::BT_SHIP, ship_design, universe},
+                        1, row->ObjectID(), pos),
                         context);
                     needs_queue_update = true;
                 }
@@ -2772,10 +2773,10 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, const GG::Pt& p
                                                        row->ObjectID(), context))
                     { continue; }
 
-                    ProductionQueue::ProductionItem bld_item(BuildType::BT_BUILDING, building_type_name);
                     app->Orders().IssueOrder(std::make_shared<ProductionQueueOrder>(
                         ProductionQueueOrder::ProdQueueOrderAction::PLACE_IN_QUEUE, app->EmpireID(),
-                        bld_item, 1, row->ObjectID(), pos), // TODO: pass bld_item with move?
+                        ProductionQueue::ProductionItem{BuildType::BT_BUILDING, building_type_name},
+                        1, row->ObjectID(), pos), // TODO: pass bld_item with move?
                         context);
 
                     needs_queue_update = true;

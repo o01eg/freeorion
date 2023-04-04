@@ -9,7 +9,6 @@
 #include "ClientNetworking.h"
 
 #include <stdexcept>
-#include <boost/lexical_cast.hpp>
 
 ClientApp::ClientApp() :
     IApp(),
@@ -24,20 +23,7 @@ int ClientApp::PlayerID() const
 Empire* ClientApp::GetEmpire(int empire_id)
 { return m_empires.GetEmpire(empire_id).get(); }
 
-const Species* ClientApp::GetSpecies(std::string_view name)
-{ return m_species_manager.GetSpecies(name); }
-
-ObjectMap& ClientApp::EmpireKnownObjects(int empire_id) {
-    // observers and moderators should have accurate info about what each empire knows
-    if (m_empire_id == ALL_EMPIRES)
-        return m_universe.EmpireKnownObjects(empire_id);    // returns player empire's known universe objects if empire_id == ALL_EMPIRES
-
-    // players controlling empires with visibility limitations only know their
-    // own version of the universe, and should use that
-    return m_universe.Objects();
-}
-
-int ClientApp::EmpirePlayerID(int empire_id) const {
+int ClientApp::EmpirePlayerID(int empire_id) const noexcept {
     for (const auto& [id, info] : m_player_info)
         if (info.empire_id == empire_id)
             return id;
@@ -50,7 +36,7 @@ Networking::ClientType ClientApp::GetEmpireClientType(int empire_id) const
 Networking::ClientType ClientApp::GetPlayerClientType(int player_id) const {
     if (player_id == Networking::INVALID_PLAYER_ID)
         return Networking::ClientType::INVALID_CLIENT_TYPE;
-    auto it = m_player_info.find(player_id);
+    const auto it = m_player_info.find(player_id);
     if (it != m_player_info.end())
         return it->second.client_type;
     return Networking::ClientType::INVALID_CLIENT_TYPE;
@@ -69,6 +55,13 @@ void ClientApp::StartTurn(const SaveGameUIData& ui_data)
 
 void ClientApp::StartTurn(const std::string& save_state_string)
 { m_networking->SendMessage(TurnOrdersMessage(m_orders, save_state_string)); }
+
+void ClientApp::RevertOrders() {
+    if (!m_networking || !m_networking->IsTxConnected())
+        return;
+    m_orders.Reset();
+    m_networking->SendMessage(RevertOrdersMessage());
+}
 
 void ClientApp::SendPartialOrders() {
     if (!m_networking || !m_networking->IsTxConnected())
@@ -89,24 +82,28 @@ std::string ClientApp::GetVisibleObjectName(const UniverseObject& object) {
 }
 
 bool ClientApp::VerifyCheckSum(const Message& msg) {
-    std::map<std::string, unsigned int> server_checksums;
+    std::map<std::string, uint32_t> server_checksums;
     ExtractContentCheckSumMessageData(msg, server_checksums);
 
-    auto client_checksums = CheckSumContent();
+    const auto client_checksums = CheckSumContent();
 
     if (server_checksums == client_checksums) {
         InfoLogger() << "Checksum received from server matches client checksum.";
         return true;
-    } else {
-        WarnLogger() << "Checksum received from server does not match client checksum.";
-        for (const auto& name_and_checksum : server_checksums) {
-            const auto& name = name_and_checksum.first;
-            const auto client_checksum = client_checksums[name];
-            if (client_checksum != name_and_checksum.second)
-                WarnLogger() << "Checksum for " << name << " on server "
-                             << name_and_checksum.second << " != client "
-                             << client_checksum;
-        }
-        return false;
     }
+
+    WarnLogger() << "Checksum received from server does not match client checksum.";
+    for (const auto& [name, server_sum] : server_checksums) {
+        const auto it = client_checksums.find(name);
+        if (it == client_checksums.end()) {
+            WarnLogger() << "Checksum for " << name << " on server missing in client checksums";
+            continue;
+        }
+
+        const auto client_checksum = it->second;
+        if (client_checksum != server_sum)
+            WarnLogger() << "Checksum for " << name << " on server "
+                         << server_sum << " != client " << client_checksum;
+    }
+    return false;
 }

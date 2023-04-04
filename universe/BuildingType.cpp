@@ -11,14 +11,13 @@
 #include "Effect.h"
 #include "ValueRef.h"
 
-#define CHECK_COND_VREF_MEMBER(m_ptr) { if (m_ptr == rhs.m_ptr) {           \
-                                            /* check next member */         \
-                                        } else if (!m_ptr || !rhs.m_ptr) {  \
-                                            return false;                   \
-                                        } else {                            \
-                                            if (*m_ptr != *(rhs.m_ptr))     \
-                                                return false;               \
-                                        }   }
+#define CHECK_COND_VREF_MEMBER(m_ptr) if (m_ptr == rhs.m_ptr) {            \
+                                          /* check next member */          \
+                                      } else if (!m_ptr || !rhs.m_ptr) {   \
+                                          return false;                    \
+                                      } else if (*m_ptr != *(rhs.m_ptr)) { \
+                                          return false;                    \
+                                      }
 
 namespace {
     #define UserStringNop(key) key
@@ -36,54 +35,68 @@ namespace {
 BuildingType::BuildingType(std::string&& name, std::string&& description,
                            CommonParams&& common_params, CaptureResult capture_result,
                            std::string&& icon) :
-    m_name(std::move(name)),
+    m_name(name), // intentional copy so name is usable later in member initializers
     m_description(std::move(description)),
-    m_production_cost(std::move(common_params.production_cost)),
-    m_production_time(std::move(common_params.production_time)),
+    m_production_cost([](auto&& pc, const auto& name) {
+        pc->SetTopLevelContent(name);
+        return std::move(pc);
+    }(std::move(common_params.production_cost), name)),
+    m_production_time([](auto&& pt, const auto& name) {
+        pt->SetTopLevelContent(name);
+        return std::move(pt);
+    }(std::move(common_params.production_time), name)),
     m_producible(common_params.producible),
     m_capture_result(capture_result),
-    m_tags_concatenated([&common_params]() {
+    m_tags_concatenated([](auto& tags) {
         // ensure tags are all upper-case
-        std::for_each(common_params.tags.begin(), common_params.tags.end(),
+        std::for_each(tags.begin(), tags.end(),
                       [](auto& t) { boost::to_upper<std::string>(t); });
 
         // allocate storage for concatenated tags
         std::string retval;
         // TODO: transform_reduce when available on all platforms...
         std::size_t params_sz = 0;
-        for (const auto& t : common_params.tags)
+        for (const auto& t : tags)
             params_sz += t.size();
         retval.reserve(params_sz);
 
         // concatenate tags
-        std::for_each(common_params.tags.begin(), common_params.tags.end(),
-                      [&retval](const auto& t) { retval.append(t); });
+        std::for_each(tags.begin(), tags.end(), [&retval](const auto& t) { retval.append(t); });
         return retval;
-    }()),
-    m_tags([&common_params, this]() {
+    }(common_params.tags)),
+    m_tags([](const auto& tags, const std::string_view tags_concatenated) {
         std::vector<std::string_view> retval;
         std::size_t next_idx = 0;
-        retval.reserve(common_params.tags.size());
-        std::string_view sv{m_tags_concatenated};
+        retval.reserve(tags.size());
 
         // store views into concatenated tags string
-        std::for_each(common_params.tags.begin(), common_params.tags.end(),
-                      [&next_idx, &retval, this, sv](const auto& t)
-        {
-            retval.push_back(sv.substr(next_idx, t.size()));
+        std::for_each(tags.begin(), tags.end(), [&next_idx, &retval, tags_concatenated](const auto& t) {
+            retval.push_back(tags_concatenated.substr(next_idx, t.size()));
             next_idx += t.size();
         });
         return retval;
-    }()),
+    }(common_params.tags, m_tags_concatenated)),
     m_production_meter_consumption(std::move(common_params.production_meter_consumption)),
     m_production_special_consumption(std::move(common_params.production_special_consumption)),
-    m_location(std::move(common_params.location)),
-    m_enqueue_location(std::move(common_params.enqueue_location)),
-    m_effects(std::move(common_params.effects)),
+    m_location([](auto&& l, const auto& name) {
+        l->SetTopLevelContent(name);
+        return std::move(l);
+    }(std::move(common_params.location), name)),
+    m_enqueue_location([](auto&& el, const auto& name) {
+        el->SetTopLevelContent(name);
+        return std::move(el);
+    }(std::move(common_params.enqueue_location), name)),
+    m_effects([](auto&& effects, const auto& name) {
+        std::vector<Effect::EffectsGroup> retval;
+        retval.reserve(effects.size());
+        for (auto& e : effects) {
+            e->SetTopLevelContent(name);
+            retval.push_back(std::move(*e));
+        }
+        return retval;
+    }(std::move(common_params.effects), name)),
     m_icon(std::move(icon))
-{
-    Init();
-}
+{}
 
 BuildingType::~BuildingType() = default;
 
@@ -104,26 +117,11 @@ bool BuildingType::operator==(const BuildingType& rhs) const {
     CHECK_COND_VREF_MEMBER(m_location)
     CHECK_COND_VREF_MEMBER(m_enqueue_location)
 
-    if (m_effects.size() != rhs.m_effects.size())
+    if (m_effects != rhs.m_effects)
         return false;
-    try {
-        for (std::size_t idx = 0; idx < m_effects.size(); ++idx) {
-            const auto& my_op = m_effects.at(idx);
-            const auto& rhs_op = rhs.m_effects.at(idx);
-
-            if (my_op == rhs_op) // could both be nullptr
-                continue;
-            if (!my_op || !rhs_op)
-                return false;
-            if (*my_op != *rhs_op)
-                return false;
-        }
-    } catch (...) {
-        return false;
-    }
-
     if (m_production_meter_consumption.size() != rhs.m_production_meter_consumption.size())
         return false;
+
     try {
         for (auto& [meter_type, my_refs_cond_pair] : m_production_meter_consumption) {
             auto& [my_ref, my_cond] = my_refs_cond_pair;
@@ -171,19 +169,6 @@ bool BuildingType::operator==(const BuildingType& rhs) const {
     return true;
 }
 
-void BuildingType::Init() {
-    if (m_production_cost)
-        m_production_cost->SetTopLevelContent(m_name);
-    if (m_production_time)
-        m_production_time->SetTopLevelContent(m_name);
-    if (m_location)
-        m_location->SetTopLevelContent(m_name);
-    if (m_enqueue_location)
-        m_enqueue_location->SetTopLevelContent(m_name);
-    for (auto& effect : m_effects)
-        effect->SetTopLevelContent(m_name);
-}
-
 std::string BuildingType::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "BuildingType\n";
     retval += DumpIndent(ntabs+1) + "name = \"" + m_name + "\"\n";
@@ -218,11 +203,11 @@ std::string BuildingType::Dump(uint8_t ntabs) const {
 
     if (m_effects.size() == 1) {
         retval += DumpIndent(ntabs+1) + "effectsgroups =\n";
-        retval += m_effects[0]->Dump(ntabs+2);
+        retval += m_effects.front().Dump(ntabs+2);
     } else {
         retval += DumpIndent(ntabs+1) + "effectsgroups = [\n";
         for (auto& effect : m_effects)
-            retval += effect->Dump(ntabs+2);
+            retval += effect.Dump(ntabs+2);
         retval += DumpIndent(ntabs+1) + "]\n";
     }
     retval += DumpIndent(ntabs+1) + "icon = \"" + m_icon + "\"\n";
@@ -322,7 +307,7 @@ bool BuildingType::ProductionLocation(int empire_id, int location_id, const Scri
     if (!m_location)
         return true;
 
-    auto location = context.ContextObjects().getRaw(location_id);
+    const auto* location = context.ContextObjects().getRaw(location_id);
     if (!location)
         return false;
 
@@ -331,10 +316,10 @@ bool BuildingType::ProductionLocation(int empire_id, int location_id, const Scri
     if (!source)
         return false;
 
-    const ScriptingContext local_context{context, source.get(), const_cast<UniverseObject*>(location),
-                                         INVALID_DESIGN_ID, 1};
+    UniverseObject* target = const_cast<UniverseObject*>(location); // ... hopefully OK, as evaluating condition should not modify the object
+    const ScriptingContext local_context{context, source.get(), target, INVALID_DESIGN_ID, 1};
 
-    return m_location->Eval(local_context, location);
+    return m_location->EvalOne(local_context, location);
 }
 
 bool BuildingType::EnqueueLocation(int empire_id, int location_id, const ScriptingContext& context) const {
@@ -350,10 +335,10 @@ bool BuildingType::EnqueueLocation(int empire_id, int location_id, const Scripti
     if (!source)
         return false;
 
-    const ScriptingContext local_context{context, source.get(), const_cast<UniverseObject*>(location),
-                                         INVALID_DESIGN_ID, 1};
+    UniverseObject* target = const_cast<UniverseObject*>(location); // ... hopefully OK, as evaluating condition should not modify the object
+    const ScriptingContext local_context{context, source.get(), target, INVALID_DESIGN_ID, 1};
 
-    return m_enqueue_location->Eval(local_context, location);
+    return m_enqueue_location->EvalOne(local_context, location);
 }
 
 uint32_t BuildingType::GetCheckSum() const {
@@ -389,7 +374,7 @@ BuildingTypeManager::BuildingTypeManager() {
 
 const BuildingType* BuildingTypeManager::GetBuildingType(std::string_view name) const {
     CheckPendingBuildingTypes();
-    const auto& it = m_building_types.find(name);
+    const auto it = m_building_types.find(name);
     return it != m_building_types.end() ? it->second.get() : nullptr;
 }
 

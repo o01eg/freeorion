@@ -42,13 +42,13 @@ public:
      *
      * @return An empire identifier.
      */
-    [[nodiscard]] int EmpireID() const override { return m_empire_id; }
+    [[nodiscard]] int EmpireID() const noexcept override { return m_empire_id; }
 
     /** @brief Return the current game turn
      *
      * @return The number representing the current game turn.
      */
-    [[nodiscard]] int CurrentTurn() const override { return m_current_turn; }
+    [[nodiscard]] int CurrentTurn() const noexcept override { return m_current_turn; }
 
     /** @brief Return the player identfier of the player controlling the empire
      *      @a empire_id
@@ -57,7 +57,7 @@ public:
      *
      * @return The player identifier of the client controlling the empire.
      */
-    [[nodiscard]] int EmpirePlayerID(int empire_id) const;
+    [[nodiscard]] int EmpirePlayerID(int empire_id) const noexcept;
 
     /** @brief Return the players in game as ::PlayerInfo map
      *
@@ -65,8 +65,8 @@ public:
      *      their player identifier as key.
      *
      * @{ */
-    [[nodiscard]] std::map<int, PlayerInfo>& Players() noexcept { return m_player_info; }
-    [[nodiscard]] const std::map<int, PlayerInfo>& Players() const noexcept { return m_player_info; }
+    [[nodiscard]] auto& Players() noexcept { return m_player_info; }
+    [[nodiscard]] const auto& Players() const noexcept { return m_player_info; }
     /** @} */
 
     /** @brief Return the ::Universe known to this client
@@ -85,7 +85,7 @@ public:
      *
      * @{ */
     [[nodiscard]] GalaxySetupData& GetGalaxySetupData() noexcept { return m_galaxy_setup_data; }
-    [[nodiscard]] const GalaxySetupData& GetGalaxySetupData() const override { return m_galaxy_setup_data; }
+    [[nodiscard]] const GalaxySetupData& GetGalaxySetupData() const noexcept override { return m_galaxy_setup_data; }
     /** @} */
 
     /** @brief Return the OrderSet of this client
@@ -145,6 +145,9 @@ public:
     /** @brief Send the OrderSet and AI state to the server and start a new turn */
     virtual void StartTurn(const std::string& save_state_string);
 
+    /** @brief Send message to revert all orders and request a new turn update */
+    void RevertOrders();
+
     /** @brief Send turn orders updates to server without starting new turn */
     void SendPartialOrders();
 
@@ -157,7 +160,7 @@ public:
      * @return The EmpireManager instance in charge of maintaining the Empire
      *      object instances.
      * @{ */
-    [[nodiscard]] EmpireManager& Empires() override { return m_empires; }
+    [[nodiscard]] EmpireManager& Empires() noexcept override { return m_empires; }
     [[nodiscard]] const EmpireManager& Empires() const noexcept { return m_empires; }
     /** @} */
 
@@ -171,20 +174,10 @@ public:
      */
     [[nodiscard]] Empire* GetEmpire(int empire_id) override;
 
-    [[nodiscard]] SpeciesManager& GetSpeciesManager() override { return m_species_manager; }
+    [[nodiscard]] SpeciesManager& GetSpeciesManager() noexcept override { return m_species_manager; }
     [[nodiscard]] const SpeciesManager& GetSpeciesManager() const noexcept { return m_species_manager; }
-    [[nodiscard]] const Species* GetSpecies(std::string_view name) override;
 
-    [[nodiscard]] SupplyManager& GetSupplyManager() override { return m_supply_manager; }
-
-    /** @brief Return all Objects known to @a empire_id
-     *
-     * @param empire_id An empire identifier.
-     *
-     * @return A map containing all Objects known to the ::Empire identified by
-     *      @a empire_id.  If there is no ::Empire an empty map is returned.
-     */
-    [[nodiscard]] ObjectMap& EmpireKnownObjects(int empire_id) override;
+    [[nodiscard]] SupplyManager& GetSupplyManager() noexcept override { return m_supply_manager; }
 
     /** @brief Set the identifier of the ::Empire controlled by this client to
      *      @a empire_id
@@ -221,23 +214,23 @@ public:
 
 protected:
     // Gamestate...
-    Universe                    m_universe;
-    GalaxySetupData             m_galaxy_setup_data;
-    EmpireManager               m_empires;
-    SpeciesManager              m_species_manager;
-    SupplyManager               m_supply_manager;
+    Universe        m_universe;
+    GalaxySetupData m_galaxy_setup_data;
+    EmpireManager   m_empires;
+    SpeciesManager  m_species_manager;
+    SupplyManager   m_supply_manager;
     // End Gamestate
 
     // client local order storage
-    OrderSet                    m_orders;
+    OrderSet m_orders;
 
     // other client local info
-    std::shared_ptr<ClientNetworking>   m_networking;
-    int                                 m_empire_id = ALL_EMPIRES;
-    int                                 m_current_turn = INVALID_GAME_TURN;
-    /** Indexed by player id, contains info about all players in the game */
+    std::shared_ptr<ClientNetworking> m_networking;
+    int                               m_empire_id = ALL_EMPIRES;
+    int                               m_current_turn = INVALID_GAME_TURN;
 
-    std::map<int, PlayerInfo>   m_player_info;
+    /** Indexed by player id, contains info about all players in the game */
+    std::map<int, PlayerInfo>         m_player_info;
 };
 
 

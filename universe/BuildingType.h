@@ -67,18 +67,15 @@ public:
 
     //! Returns the number of production points required to build this building
     //! at this location by this empire
-    auto ProductionCost(int empire_id, int location_id,
-                        const ScriptingContext& context = ScriptingContext{}) const -> float;
+    auto ProductionCost(int empire_id, int location_id, const ScriptingContext& context) const -> float;
 
     //! Returns the maximum number of production points per turn that can be
     //! spend on this building
-    auto PerTurnCost(int empire_id, int location_id,
-                     const ScriptingContext& context = ScriptingContext{}) const -> float;
+    auto PerTurnCost(int empire_id, int location_id, const ScriptingContext& context) const -> float;
 
     //! Returns the number of turns required to build this building at this
     //! location by this empire
-    auto ProductionTime(int empire_id, int location_id,
-                        const ScriptingContext& context = ScriptingContext{}) const -> int;
+    auto ProductionTime(int empire_id, int location_id, const ScriptingContext& context) const -> int;
 
     //! Returns the ValueRef that determines ProductionCost()
     const auto* Cost() const noexcept { return m_production_cost.get(); }
@@ -141,22 +138,20 @@ public:
     auto GetCheckSum() const -> uint32_t;
 
 private:
-    void Init();
-
-    std::string                                         m_name;
-    std::string                                         m_description;
-    std::unique_ptr<ValueRef::ValueRef<double>>         m_production_cost;
-    std::unique_ptr<ValueRef::ValueRef<int>>            m_production_time;
-    bool                                                m_producible = true;
-    CaptureResult                                       m_capture_result;
-    const std::string                                   m_tags_concatenated;
-    const std::vector<std::string_view>                 m_tags;
-    ConsumptionMap<MeterType>                           m_production_meter_consumption;
-    ConsumptionMap<std::string>                         m_production_special_consumption;
-    std::unique_ptr<Condition::Condition>               m_location;
-    std::unique_ptr<Condition::Condition>               m_enqueue_location;
-    std::vector<std::unique_ptr<Effect::EffectsGroup>>  m_effects;
-    std::string                                         m_icon;
+    const std::string                                 m_name;
+    const std::string                                 m_description;
+    const std::unique_ptr<const ValueRef::ValueRef<double>> m_production_cost;
+    const std::unique_ptr<const ValueRef::ValueRef<int>>    m_production_time;
+    const bool                                        m_producible = true;
+    const CaptureResult                               m_capture_result;
+    const std::string                                 m_tags_concatenated;
+    const std::vector<std::string_view>               m_tags;
+    const ConsumptionMap<MeterType>                   m_production_meter_consumption;
+    const ConsumptionMap<std::string>                 m_production_special_consumption;
+    const std::unique_ptr<const Condition::Condition> m_location;
+    const std::unique_ptr<const Condition::Condition> m_enqueue_location;
+    const std::vector<Effect::EffectsGroup>           m_effects;
+    const std::string                                 m_icon;
 };
 
 //! Holds all FreeOrion BuildingType%s.  Types may be looked up by name.
@@ -167,19 +162,19 @@ public:
 
     //! Returns the building type with the name @p name; you should use the
     //! free function GetBuildingType(...) instead, mainly to save some typing.
-    auto GetBuildingType(std::string_view name) const -> const BuildingType*;
+    [[nodiscard]] auto GetBuildingType(std::string_view name) const -> const BuildingType*;
 
-    auto NumBuildingTypes() const noexcept { return m_building_types.size(); }
+    [[nodiscard]] auto NumBuildingTypes() const noexcept { return m_building_types.size(); }
 
     //! iterator to the first building type
-    FO_COMMON_API auto begin() const -> iterator;
+    [[nodiscard]] FO_COMMON_API auto begin() const -> iterator;
 
     //! iterator to the last + 1th building type
-    FO_COMMON_API auto end() const -> iterator;
+    [[nodiscard]] FO_COMMON_API auto end() const -> iterator;
 
     //! Returns the instance of this singleton class; you should use the free
     //! function GetBuildingTypeManager() instead
-    static auto GetBuildingTypeManager() -> BuildingTypeManager&;
+    [[nodiscard]] static auto GetBuildingTypeManager() -> BuildingTypeManager&;
 
     //! Returns a number, calculated from the contained data, which should be
     //! different for different contained data, and must be the same for
@@ -187,7 +182,7 @@ public:
     //! and executions of the program and the function. Useful to verify that
     //! the parsed content is consistent without sending it all between
     //! clients and server.
-    auto GetCheckSum() const -> uint32_t;
+    [[nodiscard]] auto GetCheckSum() const -> uint32_t;
 
     //! Sets building types to the future value of \p pending_building_types.
     FO_COMMON_API void SetBuildingTypes(Pending::Pending<container_type>&& pending_building_types);
@@ -210,11 +205,11 @@ private:
 };
 
 //! Returns the singleton building type manager
-FO_COMMON_API auto GetBuildingTypeManager() -> BuildingTypeManager&;
+[[nodiscard]] FO_COMMON_API auto GetBuildingTypeManager() -> BuildingTypeManager&;
 
 //! Returns the BuildingType specification object for a building of type
 //! @p name.  If no such BuildingType exists, nullptr is returned instead.
-FO_COMMON_API auto GetBuildingType(std::string_view name) -> const BuildingType*;
+[[nodiscard]] FO_COMMON_API auto GetBuildingType(std::string_view name) -> const BuildingType*;
 
 
 #endif

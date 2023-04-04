@@ -4,12 +4,12 @@
 #include "CUIWnd.h"
 
 /** Lets the player design ships */
-class GovernmentWnd : public CUIWnd {
+class GovernmentWnd final : public CUIWnd {
 public:
     explicit GovernmentWnd(std::string_view config_name = "");
     void CompleteConstruction() override;
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
     void ClearPolicies();
     void RevertPolicies();

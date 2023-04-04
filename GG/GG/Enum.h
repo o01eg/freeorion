@@ -17,6 +17,7 @@
 
 
 #include <climits>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <map>
@@ -252,6 +253,7 @@ private:
     static_assert(ToInt("0") == 0);
     static_assert(ToInt("0xa0") == 160);
     static_assert(ToInt("0x5d") == 93);
+    static_assert(ToInt(std::string_view{}) == 0);
 
 
     [[nodiscard]] static constexpr EnumType ToEnumType(std::string_view str)

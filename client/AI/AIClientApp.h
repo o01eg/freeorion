@@ -10,7 +10,7 @@
 class PythonAI;
 
 /** the application framework for an AI player FreeOrion client.*/
-class AIClientApp : public ClientApp {
+class AIClientApp final : public ClientApp {
 public:
     AIClientApp() = delete;
     explicit AIClientApp(const std::vector<std::string>& args);
@@ -24,24 +24,23 @@ public:
     //! Executes main event handler
     void Run();
     void ExitApp(int code = 0); ///< does basic clean-up, then calls exit(); callable from anywhere in user code via GetApp()
-    void SetPlayerName(std::string player_name) { m_player_name = std::move(player_name); }
+    void SetPlayerName(std::string player_name) noexcept { m_player_name = std::move(player_name); }
 
-    [[nodiscard]] int   SelectedSystemID() const override { throw std::runtime_error{"AI client cannot access selected object ID"}; }
-    [[nodiscard]] int   SelectedPlanetID() const override { throw std::runtime_error{"AI client cannot access selected object ID"}; }
-    [[nodiscard]] int   SelectedFleetID() const override { throw std::runtime_error{"AI client cannot access selected object ID"}; }
-    [[nodiscard]] int   SelectedShipID() const override { throw std::runtime_error{"AI client cannot access selected object ID"}; }
-    [[nodiscard]] int   EffectsProcessingThreads() const override;
+    [[nodiscard]] [[noreturn]] int SelectedSystemID() const override { throw std::runtime_error{"AI client cannot access selected object ID"}; }
+    [[nodiscard]] [[noreturn]] int SelectedPlanetID() const override { throw std::runtime_error{"AI client cannot access selected object ID"}; }
+    [[nodiscard]] [[noreturn]] int SelectedFleetID() const override { throw std::runtime_error{"AI client cannot access selected object ID"}; }
+    [[nodiscard]] [[noreturn]] int SelectedShipID() const override { throw std::runtime_error{"AI client cannot access selected object ID"}; }
+    [[nodiscard]] int              EffectsProcessingThreads() const override;
 
     /** @brief Return the player name of this client
      *
      * @return An UTF-8 encoded and NUL terminated string containing the player
      *      name of this client.
      */
-    [[nodiscard]] const std::string& PlayerName() const
-    { return m_player_name; }
+    [[nodiscard]] const auto& PlayerName() const noexcept { return m_player_name; }
 
-    static AIClientApp* GetApp();       ///< returns a AIClientApp pointer to the singleton instance of the app
-    const PythonAI*     GetAI();        ///< returns pointer to AIBase implementation of AI for this client
+    static AIClientApp* GetApp() noexcept { return static_cast<AIClientApp*>(s_app); }
+    const PythonAI*     GetAI() noexcept { return m_AI.get(); }
 
 private:
     void ConnectToServer();

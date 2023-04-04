@@ -51,9 +51,9 @@ public:
 
     void Render() override;
 
-    void LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override
+    void LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override
     { OnExit(); }
-    void MouseWheel(const GG::Pt& pt, int move, GG::Flags<GG::ModKey> mod_keys) override
+    void MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys) override
     { m_scroll_offset -= move * 2000; }
 
     void KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override {
@@ -156,7 +156,7 @@ void CreditsWnd::OnExit() {
         glDeleteLists(m_display_list_id, 1);
         m_display_list_id = 0;
     }
-    m_done = true;
+    m_modal_done.store(true);
 }
 
 void CreditsWnd::DrawCredits(GG::X x1, GG::Y y1, GG::X x2, GG::Y y2) {
@@ -407,7 +407,7 @@ void IntroScreen::KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<
 void IntroScreen::Close()
 { OnExitGame(); }
 
-void IntroScreen::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void IntroScreen::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = GG::Wnd::Size();
 
     GG::Wnd::SizeMove(ul, lr);

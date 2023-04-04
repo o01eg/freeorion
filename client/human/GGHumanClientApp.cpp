@@ -43,7 +43,6 @@
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/trim.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/format.hpp>
@@ -121,8 +120,8 @@ namespace {
     /** These options can only be validated after the graphics system (SDL) is initialized,
         so that display size can be detected
      */
-    constexpr int DEFAULT_WIDTH = 1024;
-    constexpr int DEFAULT_HEIGHT = 768;
+    constexpr int DEFAULT_WIDTH = 1280;
+    constexpr int DEFAULT_HEIGHT = 800;
     constexpr int DEFAULT_LEFT = static_cast<int>(SDL_WINDOWPOS_CENTERED);
     constexpr int DEFAULT_TOP = 50;
     constexpr int MIN_WIDTH = 800;
@@ -216,7 +215,8 @@ std::string GGHumanClientApp::EncodeServerAddressOption(const std::string& serve
 GGHumanClientApp::GGHumanClientApp(int width, int height, bool calculate_fps, std::string name,
                                    int x, int y, bool fullscreen, bool fake_mode_change) :
     ClientApp(),
-    SDLGUI(width, height, calculate_fps, std::move(name), x, y, fullscreen, fake_mode_change)
+    SDLGUI(width, height, calculate_fps, std::move(name), x, y, fullscreen, fake_mode_change),
+    m_fsm(*this)
 {
 #ifdef ENABLE_CRASH_BACKTRACE
     signal(SIGSEGV, SigHandler);
@@ -224,7 +224,6 @@ GGHumanClientApp::GGHumanClientApp(int width, int height, bool calculate_fps, st
 #ifdef FREEORION_MACOSX
     SDL_SetHint(SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK, "1");
 #endif
-    m_fsm = std::make_unique<HumanClientFSM>(*this);
 
     // Force the log file if requested.
     if (GetOptionsDB().Get<std::string>("log-file").empty()) {
@@ -355,7 +354,7 @@ GGHumanClientApp::GGHumanClientApp(int width, int height, bool calculate_fps, st
     // Register LinkText tags with GG::Font
     RegisterLinkTags();
 
-    m_fsm->initiate();
+    m_fsm.initiate();
 
     // Start parsing content
     std::promise<void> barrier;
@@ -580,16 +579,16 @@ void GGHumanClientApp::NewSinglePlayerGame(bool quickstart) {
     if (colour_index >= 0 && colour_index < static_cast<int>(empire_colours.size()))
         human_player_setup_data.empire_color = empire_colours[colour_index];
     else
-        human_player_setup_data.empire_color = {{GG::CLR_GREEN.r, GG::CLR_GREEN.g, GG::CLR_GREEN.b, GG::CLR_GREEN.a}};
+        human_player_setup_data.empire_color = GG::CLR_GREEN.RGBA();
 
     human_player_setup_data.starting_species_name = GetOptionsDB().Get<std::string>("setup.initial.species");
     if (human_player_setup_data.starting_species_name == "1")
         human_player_setup_data.starting_species_name = "SP_HUMAN";   // kludge / bug workaround for bug with options storage and retreival.  Empty-string options are stored, but read in as "true" boolean, and converted to string equal to "1"
 
+    const SpeciesManager& sm = this->GetSpeciesManager();
     if (human_player_setup_data.starting_species_name != "RANDOM" &&
-        !GetSpecies(human_player_setup_data.starting_species_name))
+        !sm.GetSpecies(human_player_setup_data.starting_species_name))
     {
-        const SpeciesManager& sm = this->GetSpeciesManager();
         if (sm.NumPlayableSpecies() < 1)
             human_player_setup_data.starting_species_name.clear();
         else
@@ -600,7 +599,7 @@ void GGHumanClientApp::NewSinglePlayerGame(bool quickstart) {
     human_player_setup_data.client_type = Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER;
 
     // add to setup data players
-    setup_data.players.push_back(human_player_setup_data);
+    setup_data.players.push_back(std::move(human_player_setup_data));
 
 
     // AI player setup data.  One entry for each requested AI
@@ -620,7 +619,7 @@ void GGHumanClientApp::NewSinglePlayerGame(bool quickstart) {
 
     TraceLogger() << "Sending host SP setup message";
     m_networking->SendMessage(HostSPGameMessage(setup_data, DependencyVersions()));
-    m_fsm->process_event(HostSPGameRequested());
+    m_fsm.process_event(HostSPGameRequested());
     TraceLogger() << "GGHumanClientApp::NewSinglePlayerGame done";
 }
 
@@ -669,19 +668,20 @@ void GGHumanClientApp::MultiPlayerGame() {
 
     if (server_connect_wnd->GetResult().server_dest == "HOST GAME SELECTED") {
         m_networking->SendMessage(HostMPGameMessage(server_connect_wnd->GetResult().player_name, DependencyVersions()));
-        m_fsm->process_event(HostMPGameRequested());
+        m_fsm.process_event(HostMPGameRequested());
     } else {
         boost::uuids::uuid cookie = boost::uuids::nil_uuid();
         try {
-            std::string cookie_option = EncodeServerAddressOption(server_dest);
+            const std::string cookie_option = EncodeServerAddressOption(server_dest);
             if (!GetOptionsDB().OptionExists(cookie_option + ".cookie"))
                 GetOptionsDB().Add<std::string>(cookie_option + ".cookie", "OPTIONS_DB_SERVER_COOKIE", boost::uuids::to_string(cookie));
             if (!GetOptionsDB().OptionExists(cookie_option + ".address"))
                 GetOptionsDB().Add<std::string>(cookie_option + ".address", "OPTIONS_DB_SERVER_COOKIE", "");
             GetOptionsDB().Set(cookie_option + ".address", server_dest);
-            std::string cookie_str = GetOptionsDB().Get<std::string>(cookie_option + ".cookie");
-            boost::uuids::string_generator gen;
+            const std::string cookie_str = GetOptionsDB().Get<std::string>(cookie_option + ".cookie");
+            static constexpr boost::uuids::string_generator gen{};
             cookie = gen(cookie_str);
+
         } catch(const std::exception& err) {
             WarnLogger() << "Cann't get cookie for server " << server_dest << ". Get error message"
                          << err.what();
@@ -692,15 +692,15 @@ void GGHumanClientApp::MultiPlayerGame() {
                                                   server_connect_wnd->GetResult().type,
                                                   DependencyVersions(),
                                                   cookie));
-        m_fsm->process_event(JoinMPGameRequested());
+        m_fsm.process_event(JoinMPGameRequested());
     }
 }
 
 void GGHumanClientApp::StartMultiPlayerGameFromLobby()
-{ m_fsm->process_event(StartMPGameClicked()); }
+{ m_fsm.process_event(StartMPGameClicked()); }
 
 void GGHumanClientApp::CancelMultiplayerGameFromLobby()
-{ m_fsm->process_event(CancelMPGameClicked()); }
+{ m_fsm.process_event(CancelMPGameClicked()); }
 
 void GGHumanClientApp::SaveGame(const std::string& filename) {
     m_game_saves_in_progress.push(filename);
@@ -805,7 +805,7 @@ void GGHumanClientApp::LoadSinglePlayerGame(std::string filename) {
 
 
     m_networking->SendMessage(HostSPGameMessage(setup_data, DependencyVersions()));
-    m_fsm->process_event(HostSPGameRequested());
+    m_fsm.process_event(HostSPGameRequested());
 }
 
 void GGHumanClientApp::RequestSavePreviews(const std::string& relative_directory) {
@@ -924,11 +924,11 @@ void GGHumanClientApp::StartTurn(const SaveGameUIData& ui_data) {
     DebugLogger() << "GGHumanClientApp::StartTurn";
 
     if (auto empire = m_empires.GetEmpire(EmpireID())) {
-        double RP = empire->ResourceOutput(ResourceType::RE_RESEARCH);
-        double PP = empire->ResourceOutput(ResourceType::RE_INDUSTRY);
-        auto turn_number = this->m_current_turn;
-        auto ratio = RP / std::max(PP, 0.0001);
-        auto [r, g, b, a] = empire->Color();
+        const double RP = empire->ResourceOutput(ResourceType::RE_RESEARCH);
+        const double PP = empire->ResourceOutput(ResourceType::RE_INDUSTRY);
+        const auto turn_number = this->m_current_turn;
+        const auto ratio = RP / std::max(PP, 0.0001);
+        const auto [r, g, b, a] = empire->Color();
         DebugLogger() << "Current Output (turn " << turn_number << ") RP/PP: " << ratio
                       << " (" << RP << "/" << PP << ")";
         DebugLogger() << "EmpireColors: " << static_cast<int>(r) << " " << static_cast<int>(g)
@@ -942,7 +942,7 @@ void GGHumanClientApp::StartTurn(const SaveGameUIData& ui_data) {
     }
 
     ClientApp::StartTurn(ui_data);
-    m_fsm->process_event(TurnEnded());
+    m_fsm.process_event(TurnEnded());
 }
 
 void GGHumanClientApp::UnreadyTurn()
@@ -981,7 +981,7 @@ void GGHumanClientApp::HandleSystemEvents() {
         m_connected = false;
         DisconnectedFromServer();
     } else if (auto event_ptr = GetDeferredPostedEvent()) {
-        m_fsm->process_event(*event_ptr);
+        m_fsm.process_event(*event_ptr);
     } else if (auto msg = Networking().GetMessage()) {
         HandleMessage(std::move(*msg));
     }
@@ -1000,32 +1000,32 @@ void GGHumanClientApp::HandleMessage(Message&& msg) {
 
     try {
         switch (msg_type) {
-        case Message::MessageType::ERROR_MSG:               m_fsm->process_event(Error(msg));                   break;
-        case Message::MessageType::HOST_MP_GAME:            m_fsm->process_event(HostMPGame(msg));              break;
-        case Message::MessageType::HOST_SP_GAME:            m_fsm->process_event(HostSPGame(msg));              break;
-        case Message::MessageType::JOIN_GAME:               m_fsm->process_event(JoinGame(msg));                break;
-        case Message::MessageType::HOST_ID:                 m_fsm->process_event(HostID(msg));                  break;
-        case Message::MessageType::LOBBY_UPDATE:            m_fsm->process_event(LobbyUpdate(msg));             break;
-        case Message::MessageType::SAVE_GAME_COMPLETE:      m_fsm->process_event(SaveGameComplete(msg));        break;
-        case Message::MessageType::CHECKSUM:                m_fsm->process_event(CheckSum(msg));                break;
-        case Message::MessageType::GAME_START:              m_fsm->process_event(GameStart(msg));               break;
-        case Message::MessageType::TURN_UPDATE:             m_fsm->process_event(TurnUpdate(msg));              break;
-        case Message::MessageType::TURN_PARTIAL_UPDATE:     m_fsm->process_event(TurnPartialUpdate(msg));       break;
-        case Message::MessageType::TURN_PROGRESS:           m_fsm->process_event(TurnProgress(msg));            break;
-        case Message::MessageType::UNREADY:                 m_fsm->process_event(TurnRevoked(msg));             break;
-        case Message::MessageType::PLAYER_STATUS:           m_fsm->process_event(::PlayerStatus(msg));          break;
-        case Message::MessageType::PLAYER_CHAT:             m_fsm->process_event(PlayerChat(msg));              break;
-        case Message::MessageType::DIPLOMACY:               m_fsm->process_event(Diplomacy(msg));               break;
-        case Message::MessageType::DIPLOMATIC_STATUS:       m_fsm->process_event(DiplomaticStatusUpdate(msg));  break;
-        case Message::MessageType::END_GAME:                m_fsm->process_event(::EndGame(msg));               break;
+        case Message::MessageType::ERROR_MSG:               m_fsm.process_event(Error(msg));                   break;
+        case Message::MessageType::HOST_MP_GAME:            m_fsm.process_event(HostMPGame(msg));              break;
+        case Message::MessageType::HOST_SP_GAME:            m_fsm.process_event(HostSPGame(msg));              break;
+        case Message::MessageType::JOIN_GAME:               m_fsm.process_event(JoinGame(msg));                break;
+        case Message::MessageType::HOST_ID:                 m_fsm.process_event(HostID(msg));                  break;
+        case Message::MessageType::LOBBY_UPDATE:            m_fsm.process_event(LobbyUpdate(msg));             break;
+        case Message::MessageType::SAVE_GAME_COMPLETE:      m_fsm.process_event(SaveGameComplete(msg));        break;
+        case Message::MessageType::CHECKSUM:                m_fsm.process_event(CheckSum(msg));                break;
+        case Message::MessageType::GAME_START:              m_fsm.process_event(GameStart(msg));               break;
+        case Message::MessageType::TURN_UPDATE:             m_fsm.process_event(TurnUpdate(msg));              break;
+        case Message::MessageType::TURN_PARTIAL_UPDATE:     m_fsm.process_event(TurnPartialUpdate(msg));       break;
+        case Message::MessageType::TURN_PROGRESS:           m_fsm.process_event(TurnProgress(msg));            break;
+        case Message::MessageType::UNREADY:                 m_fsm.process_event(TurnRevoked(msg));             break;
+        case Message::MessageType::PLAYER_STATUS:           m_fsm.process_event(::PlayerStatus(msg));          break;
+        case Message::MessageType::PLAYER_CHAT:             m_fsm.process_event(PlayerChat(msg));              break;
+        case Message::MessageType::DIPLOMACY:               m_fsm.process_event(Diplomacy(msg));               break;
+        case Message::MessageType::DIPLOMATIC_STATUS:       m_fsm.process_event(DiplomaticStatusUpdate(msg));  break;
+        case Message::MessageType::END_GAME:                m_fsm.process_event(::EndGame(msg));               break;
 
-        case Message::MessageType::DISPATCH_COMBAT_LOGS:    m_fsm->process_event(DispatchCombatLogs(msg));      break;
+        case Message::MessageType::DISPATCH_COMBAT_LOGS:    m_fsm.process_event(DispatchCombatLogs(msg));      break;
         case Message::MessageType::DISPATCH_SAVE_PREVIEWS:  HandleSaveGamePreviews(msg);                        break;
-        case Message::MessageType::AUTH_REQUEST:            m_fsm->process_event(AuthRequest(msg));             break;
-        case Message::MessageType::CHAT_HISTORY:            m_fsm->process_event(ChatHistory(msg));             break;
+        case Message::MessageType::AUTH_REQUEST:            m_fsm.process_event(AuthRequest(msg));             break;
+        case Message::MessageType::CHAT_HISTORY:            m_fsm.process_event(ChatHistory(msg));             break;
         case Message::MessageType::SET_AUTH_ROLES:          HandleSetAuthRoles(msg);                            break;
-        case Message::MessageType::TURN_TIMEOUT:            m_fsm->process_event(TurnTimeout(msg));             break;
-        case Message::MessageType::PLAYER_INFO:             m_fsm->process_event(PlayerInfoMsg(msg));           break;
+        case Message::MessageType::TURN_TIMEOUT:            m_fsm.process_event(TurnTimeout(msg));             break;
+        case Message::MessageType::PLAYER_INFO:             m_fsm.process_event(PlayerInfoMsg(msg));           break;
         default:
             ErrorLogger() << "GGHumanClientApp::HandleMessage : Received an unknown message type \"" << msg_type << "\".";
         }
@@ -1044,8 +1044,9 @@ void GGHumanClientApp::UpdateCombatLogs(const Message& msg) {
         ExtractDispatchCombatLogsMessageData(msg, logs);
 
         // Update the combat log manager with the completed logs.
-        for (auto it = logs.begin(); it != logs.end(); ++it)
-            GetCombatLogManager().CompleteLog(it->first, it->second);
+        auto& clm{GetCombatLogManager()};
+        for (auto& [log_id, log] : logs)
+            clm.CompleteLog(log_id, std::move(log));
     } catch (...) {}
 }
 
@@ -1190,15 +1191,18 @@ void GGHumanClientApp::StartGame(bool is_new_game) {
 
 void GGHumanClientApp::UpdateCombatLogManager() {
     auto incomplete_ids = GetCombatLogManager().IncompleteLogIDs();
-    if (incomplete_ids) {
-        for (auto it = incomplete_ids->begin(); it != incomplete_ids->end();) {
-            // request at most 50 logs per message to avoid trying to allocate too much space to send all at once
-            std::vector<int> a_few_log_ids;
-            for (unsigned int count = 0; count < 50 && it != incomplete_ids->end(); ++it, ++count)
-                a_few_log_ids.push_back(*it);
-            DebugLogger() << "Requesting " << a_few_log_ids.size() << " combat logs from server";
-            m_networking->SendMessage(RequestCombatLogsMessage(a_few_log_ids));
-        }
+    if (incomplete_ids.empty())
+        return;
+
+    static constexpr std::size_t log_batch_size = 50;
+    for (auto it = incomplete_ids.begin(); it != incomplete_ids.end();) {
+        // request at most 50 logs per message to avoid trying to allocate too much space to send all at once
+        std::vector<int> a_few_log_ids;
+        a_few_log_ids.reserve(log_batch_size);
+        for (unsigned int count = 0; count < log_batch_size && it != incomplete_ids.end(); ++it, ++count)
+            a_few_log_ids.push_back(*it);
+        DebugLogger() << "Requesting " << a_few_log_ids.size() << " combat logs from server";
+        m_networking->SendMessage(RequestCombatLogsMessage(a_few_log_ids));
     }
 }
 
@@ -1236,7 +1240,7 @@ namespace {
             for (auto file_it = files_by_write_time.rbegin();
                  file_it != files_by_write_time.rend(); ++file_it)
             {
-                auto file = file_it->second;
+                const auto& file = file_it->second;
                 // attempt to load header
                 if (SaveFileWithValidHeader(file))
                     return PathToString(file);  // load succeeded, return path to OK file
@@ -1530,7 +1534,7 @@ void GGHumanClientApp::ResetOrExitApp(bool reset, bool skip_savegame, int exit_c
         // This throws to exit the GUI
         after_server_shutdown_action = boost::bind(&GGHumanClientApp::ExitSDL, this, exit_code);
 
-    m_fsm->process_event(StartQuittingGame(m_server_process, std::move(after_server_shutdown_action)));
+    m_fsm.process_event(StartQuittingGame(m_server_process, std::move(after_server_shutdown_action)));
 
     m_exit_handled = false;
 }
@@ -1619,14 +1623,8 @@ void GGHumanClientApp::HandleResoureDirChange() {
 
 void GGHumanClientApp::DisconnectedFromServer() {
     DebugLogger() << "GGHumanClientApp::DisconnectedFromServer";
-    m_fsm->process_event(Disconnection());
+    m_fsm.process_event(Disconnection());
 }
-
-GGHumanClientApp* GGHumanClientApp::GetApp()
-{ return static_cast<GGHumanClientApp*>(GG::GUI::GetGUI()); }
-
-void GGHumanClientApp::Initialize()
-{}
 
 void GGHumanClientApp::OpenURL(const std::string& url) {
     // make sure it's a legit url

@@ -23,6 +23,7 @@
 namespace {
     // high tilt is arbitrarily taken to mean 45 degrees or more
     constexpr float HIGH_TILT_THERESHOLD = 45.0f;
+    constexpr double MINIMUM_POP_CENTER_POPULATION = 0.01001;  // rounds up to 0.1 when showing 2 digits, down to 0.05 or 50.0 when showing 3
 
     float SizeRotationFactor(PlanetSize size) {
         switch (size) {
@@ -38,7 +39,7 @@ namespace {
 
     static const std::string EMPTY_STRING;
 
-    /** @content_tag{CTRL_STAT_SKIP_DEPOP} Do not count PopCenter%s with this tag for SpeciesPlanetsDepoped stat */
+    /** @content_tag{CTRL_STAT_SKIP_DEPOP} Do not count Planets with this tag for SpeciesPlanetsDepoped stat */
     const std::string TAG_STAT_SKIP_DEPOP = "CTRL_STAT_SKIP_DEPOP";
 }
 
@@ -56,8 +57,6 @@ Planet::Planet(PlanetType type, PlanetSize size, int creation_turn) :
 {
     //DebugLogger() << "Planet::Planet(" << type << ", " << size <<")";
     UniverseObject::Init();
-    PopCenter::Init();
-    ResourceCenter::Init();
     Planet::Init();
 
     static constexpr double SPIN_STD_DEV = 0.1;
@@ -67,63 +66,71 @@ Planet::Planet(PlanetType type, PlanetSize size, int creation_turn) :
         m_rotational_period = -m_rotational_period;
 }
 
-Planet* Planet::Clone(const Universe& universe, int empire_id) const {
+std::shared_ptr<UniverseObject> Planet::Clone(const Universe& universe, int empire_id) const {
     Visibility vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
 
-    auto retval = std::make_unique<Planet>();
-    retval->Copy(UniverseObject::shared_from_this(), universe, empire_id);
-    return retval.release();
+    auto retval = std::make_shared<Planet>();
+    retval->Copy(*this, universe, empire_id);
+    return retval;
 }
 
-void Planet::Copy(std::shared_ptr<const UniverseObject> copied_object,
-                  const Universe& universe, int empire_id)
-{
-    if (copied_object.get() == this)
+void Planet::Copy(const UniverseObject& copied_object, const Universe& universe, int empire_id) {
+    if (&copied_object == this)
         return;
-    auto copied_planet = std::dynamic_pointer_cast<const Planet>(copied_object);
-    if (!copied_planet) {
+
+    if (copied_object.ObjectType() != UniverseObjectType::OBJ_PLANET) {
         ErrorLogger() << "Planet::Copy passed an object that wasn't a Planet";
         return;
     }
 
-    int copied_object_id = copied_object->ID();
-    Visibility vis = universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
-    auto visible_specials = universe.GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
+    Copy(static_cast<const Planet&>(copied_object), universe, empire_id);
+}
 
-    UniverseObject::Copy(std::move(copied_object), vis, visible_specials, universe);
-    PopCenter::Copy(copied_planet, vis);
-    ResourceCenter::Copy(copied_planet, vis);
+void Planet::Copy(const Planet& copied_planet, const Universe& universe, int empire_id) {
+    if (&copied_planet == this)
+        return;
+
+    const int copied_object_id = copied_planet.ID();
+    const Visibility vis = universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
+    const auto visible_specials = universe.GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
+
+    UniverseObject::Copy(copied_planet, vis, visible_specials, universe);
 
     if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
-        this->m_name =                      copied_planet->m_name;
+        this->m_name =                      copied_planet.m_name;
 
-        this->m_buildings =                 copied_planet->VisibleContainedObjectIDs(empire_id, universe.GetEmpireObjectVisibility());
-        this->m_type =                      copied_planet->m_type;
-        this->m_original_type =             copied_planet->m_original_type;
-        this->m_size =                      copied_planet->m_size;
-        this->m_orbital_period =            copied_planet->m_orbital_period;
-        this->m_initial_orbital_position =  copied_planet->m_initial_orbital_position;
-        this->m_rotational_period =         copied_planet->m_rotational_period;
-        this->m_axial_tilt =                copied_planet->m_axial_tilt;
-        this->m_turn_last_conquered =       copied_planet->m_turn_last_conquered;
-        this->m_turn_last_colonized =       copied_planet->m_turn_last_colonized;
-
+        this->m_buildings =                 copied_planet.VisibleContainedObjectIDs(empire_id, universe.GetEmpireObjectVisibility());
+        this->m_type =                      copied_planet.m_type;
+        this->m_original_type =             copied_planet.m_original_type;
+        this->m_size =                      copied_planet.m_size;
+        this->m_orbital_period =            copied_planet.m_orbital_period;
+        this->m_initial_orbital_position =  copied_planet.m_initial_orbital_position;
+        this->m_rotational_period =         copied_planet.m_rotational_period;
+        this->m_axial_tilt =                copied_planet.m_axial_tilt;
+        this->m_turn_last_conquered =       copied_planet.m_turn_last_conquered;
+        this->m_turn_last_colonized =       copied_planet.m_turn_last_colonized;
 
         if (vis >= Visibility::VIS_PARTIAL_VISIBILITY) {
+            this->m_species_name =                          copied_planet.m_species_name;
+            this->m_focus =                                 copied_planet.m_focus;
+            this->m_last_turn_focus_changed =               copied_planet.m_last_turn_focus_changed;
+            this->m_focus_turn_initial =                    copied_planet.m_focus_turn_initial;
+            this->m_last_turn_focus_changed_turn_initial =  copied_planet.m_last_turn_focus_changed_turn_initial;
+
             if (vis >= Visibility::VIS_FULL_VISIBILITY) {
-                this->m_is_about_to_be_colonized =  copied_planet->m_is_about_to_be_colonized;
-                this->m_is_about_to_be_invaded   =  copied_planet->m_is_about_to_be_invaded;
-                this->m_is_about_to_be_bombarded =  copied_planet->m_is_about_to_be_bombarded;
-                this->m_ordered_given_to_empire_id =copied_planet->m_ordered_given_to_empire_id;
-                this->m_last_turn_attacked_by_ship= copied_planet->m_last_turn_attacked_by_ship;
+                this->m_is_about_to_be_colonized =  copied_planet.m_is_about_to_be_colonized;
+                this->m_is_about_to_be_invaded   =  copied_planet.m_is_about_to_be_invaded;
+                this->m_is_about_to_be_bombarded =  copied_planet.m_is_about_to_be_bombarded;
+                this->m_ordered_given_to_empire_id =copied_planet.m_ordered_given_to_empire_id;
+                this->m_last_turn_attacked_by_ship= copied_planet.m_last_turn_attacked_by_ship;
             } else {
                 // copy system name if at partial visibility, as it won't be copied
                 // by UniverseObject::Copy unless at full visibility, but players
                 // should know planet names even if they don't own the planet
-                m_name = copied_planet->Name();
+                m_name = copied_planet.Name();
             }
         }
     }
@@ -138,7 +145,7 @@ bool Planet::HostileToEmpire(int empire_id, const EmpireManager& empires) const 
         return !Unowned();
 
     // Unowned planets are only considered hostile if populated
-    auto pop_meter = GetMeter(MeterType::METER_TARGET_POPULATION);
+    auto pop_meter = UniverseObject::GetMeter(MeterType::METER_TARGET_POPULATION);
     if (Unowned())
         return pop_meter && (pop_meter->Current() != 0.0f);
 
@@ -160,8 +167,9 @@ bool Planet::HasTag(std::string_view name, const ScriptingContext& context) cons
 std::string Planet::Dump(uint8_t ntabs) const {
     std::string retval = UniverseObject::Dump(ntabs);
     retval.reserve(2048);
-    retval += PopCenter::Dump(ntabs);
-    retval += ResourceCenter::Dump(ntabs);
+    retval.append(" species: ").append(m_species_name).append("  ");
+    retval.append(" focus: ").append(m_focus).append(" last changed on turn: ")
+          .append(std::to_string(m_last_turn_focus_changed));
     retval.append(" type: ").append(to_string(m_type))
           .append(" original type: ").append(to_string(m_original_type))
           .append(" size: ").append(to_string(m_size))
@@ -190,6 +198,9 @@ std::string Planet::Dump(uint8_t ntabs) const {
     return retval;
 }
 
+bool Planet::Populated() const
+{ return UniverseObject::GetMeter(MeterType::METER_POPULATION)->Current() >= MINIMUM_POP_CENTER_POPULATION; }
+
 int Planet::HabitableSize() const {
     auto& gr = GetGameRules();
     switch (m_size) {
@@ -205,6 +216,20 @@ int Planet::HabitableSize() const {
 }
 
 void Planet::Init() {
+    AddMeter(MeterType::METER_POPULATION);
+    AddMeter(MeterType::METER_TARGET_POPULATION);
+    AddMeter(MeterType::METER_HAPPINESS);
+    AddMeter(MeterType::METER_TARGET_HAPPINESS);
+
+    AddMeter(MeterType::METER_INDUSTRY);
+    AddMeter(MeterType::METER_RESEARCH);
+    AddMeter(MeterType::METER_INFLUENCE);
+    AddMeter(MeterType::METER_CONSTRUCTION);
+    AddMeter(MeterType::METER_TARGET_INDUSTRY);
+    AddMeter(MeterType::METER_TARGET_RESEARCH);
+    AddMeter(MeterType::METER_TARGET_INFLUENCE);
+    AddMeter(MeterType::METER_TARGET_CONSTRUCTION);
+
     AddMeter(MeterType::METER_SUPPLY);
     AddMeter(MeterType::METER_MAX_SUPPLY);
     AddMeter(MeterType::METER_STOCKPILE);
@@ -217,6 +242,14 @@ void Planet::Init() {
     AddMeter(MeterType::METER_MAX_TROOPS);
     AddMeter(MeterType::METER_DETECTION);
     AddMeter(MeterType::METER_REBEL_TROOPS);
+}
+
+int Planet::TurnsSinceFocusChange(int current_turn) const {
+    if (m_last_turn_focus_changed == INVALID_GAME_TURN)
+        return 0;
+    if (current_turn == INVALID_GAME_TURN)
+        return 0;
+    return current_turn - m_last_turn_focus_changed;
 }
 
 PlanetEnvironment Planet::EnvironmentForSpecies(const ScriptingContext& context,
@@ -510,11 +543,11 @@ bool Planet::FocusAvailable(std::string_view focus, const ScriptingContext& cont
         return false;
 
     const ScriptingContext planet_context(this, context);
-    return location->Eval(planet_context, this);
+    return location->EvalOne(planet_context, this);
 }
 
-std::vector<std::string> Planet::AvailableFoci(const ScriptingContext& context) const {
-    std::vector<std::string> retval;
+std::vector<std::string_view> Planet::AvailableFoci(const ScriptingContext& context) const {
+    std::vector<std::string_view> retval;
     const auto* species = context.species.GetSpecies(this->SpeciesName());
     if (!species)
         return retval;
@@ -525,8 +558,8 @@ std::vector<std::string> Planet::AvailableFoci(const ScriptingContext& context) 
     retval.reserve(species->Foci().size());
     for (const auto& focus_type : foci) {
         if (const auto* location = focus_type.Location()) {
-            if (location->Eval(planet_context, this))
-                retval.push_back(focus_type.Name());
+            if (location->EvalOne(planet_context, this))
+                retval.emplace_back(focus_type.Name());
         }
     }
 
@@ -547,13 +580,13 @@ const std::string& Planet::FocusIcon(std::string_view focus_name,
 
 std::map<int, double> Planet::EmpireGroundCombatForces() const {
     std::map<int, double> empire_troops;
-    if (GetMeter(MeterType::METER_TROOPS)->Initial() > 0.0f) {
+    if (UniverseObject::GetMeter(MeterType::METER_TROOPS)->Initial() > 0.0f) {
         // empires may have garrisons on planets
-        empire_troops[Owner()] += GetMeter(MeterType::METER_TROOPS)->Initial() + 0.0001; // small bonus to ensure ties are won by initial owner
+        empire_troops[Owner()] += UniverseObject::GetMeter(MeterType::METER_TROOPS)->Initial() + 0.0001; // small bonus to ensure ties are won by initial owner
     }
-    if (!Unowned() && GetMeter(MeterType::METER_REBEL_TROOPS)->Initial() > 0.0f) {
+    if (!Unowned() && UniverseObject::GetMeter(MeterType::METER_REBEL_TROOPS)->Initial() > 0.0f) {
         // rebels may be present on empire-owned planets
-        empire_troops[ALL_EMPIRES] += GetMeter(MeterType::METER_REBEL_TROOPS)->Initial();
+        empire_troops[ALL_EMPIRES] += UniverseObject::GetMeter(MeterType::METER_REBEL_TROOPS)->Initial();
     }
     return empire_troops;
 }
@@ -627,8 +660,24 @@ bool Planet::RemoveBuilding(int building_id) {
 }
 
 void Planet::Reset(ObjectMap& objects) {
-    PopCenter::Reset(objects);
-    ResourceCenter::Reset(objects);
+    GetMeter(MeterType::METER_POPULATION)->Reset();
+    GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
+    GetMeter(MeterType::METER_HAPPINESS)->Reset();
+    GetMeter(MeterType::METER_TARGET_HAPPINESS)->Reset();
+    m_species_name.clear();
+
+    m_focus.clear();
+    m_last_turn_focus_changed = INVALID_GAME_TURN;
+
+    GetMeter(MeterType::METER_INDUSTRY)->Reset();
+    GetMeter(MeterType::METER_RESEARCH)->Reset();
+    GetMeter(MeterType::METER_INFLUENCE)->Reset();
+    GetMeter(MeterType::METER_CONSTRUCTION)->Reset();
+
+    GetMeter(MeterType::METER_TARGET_INDUSTRY)->Reset();
+    GetMeter(MeterType::METER_TARGET_RESEARCH)->Reset();
+    GetMeter(MeterType::METER_TARGET_INFLUENCE)->Reset();
+    GetMeter(MeterType::METER_TARGET_CONSTRUCTION)->Reset();
 
     GetMeter(MeterType::METER_SUPPLY)->Reset();
     GetMeter(MeterType::METER_MAX_SUPPLY)->Reset();
@@ -654,12 +703,13 @@ void Planet::Reset(ObjectMap& objects) {
     m_is_about_to_be_colonized = false;
     m_is_about_to_be_invaded = false;
     m_is_about_to_be_bombarded = false;
+    m_ordered_given_to_empire_id = ALL_EMPIRES;
     SetOwner(ALL_EMPIRES);
 }
 
 void Planet::Depopulate(int current_turn) {
-    PopCenter::Depopulate(current_turn);
-
+    GetMeter(MeterType::METER_POPULATION)->Reset();
+    GetMeter(MeterType::METER_HAPPINESS)->Reset();
     GetMeter(MeterType::METER_INDUSTRY)->Reset();
     GetMeter(MeterType::METER_RESEARCH)->Reset();
     GetMeter(MeterType::METER_INFLUENCE)->Reset();
@@ -688,6 +738,7 @@ void Planet::Conquer(int conquerer, ScriptingContext& context) {
         if (cap_result == CaptureResult::CR_CAPTURE) {
             // replace ownership
             building->SetOwner(conquerer);
+            building->SetOrderedScrapped(false);
         } else if (cap_result == CaptureResult::CR_DESTROY) {
             // destroy object
             //DebugLogger() << "Planet::Conquer destroying object: " << building->Name();
@@ -696,18 +747,19 @@ void Planet::Conquer(int conquerer, ScriptingContext& context) {
                 system->Remove(building->ID());
             context.ContextUniverse().Destroy(building->ID(), empire_ids);
         } else if (cap_result == CaptureResult::CR_RETAIN) {
-            // do nothing
+            // do nothing, including leaving scrapping state
         }
     }
 
     // replace ownership
     SetOwner(conquerer);
+    ClearGiveToEmpire();
 
     if (conquerer == ALL_EMPIRES) {
         if (const auto species = context.species.GetSpecies(SpeciesName()))
             SetFocus(species->DefaultFocus(), context);
         else
-            ClearFocus(context.current_turn);
+            ClearFocus(m_turn_last_conquered);
     }
 
     GetMeter(MeterType::METER_SUPPLY)->SetCurrent(0.0f);
@@ -733,9 +785,50 @@ void Planet::Conquer(int conquerer, ScriptingContext& context) {
 }
 
 void Planet::SetSpecies(std::string species_name, int turn, const SpeciesManager& sm) {
-    if (SpeciesName().empty() && !species_name.empty())
+    if (m_species_name.empty() && !species_name.empty())
         m_turn_last_colonized = turn;  // if setting species with an effect, not via Colonize, consider it a colonization when there was no previous species set
-    PopCenter::SetSpecies(std::move(species_name), turn, sm);
+
+    if (!species_name.empty() && !sm.GetSpecies(species_name))
+        ErrorLogger() << "Planet::SetSpecies couldn't get species with name " << species_name;
+
+    m_species_name = std::move(species_name);
+}
+
+void Planet::SetFocus(std::string focus, const ScriptingContext& context) {
+    if (focus == m_focus)
+        return;
+    if (focus.empty()) {
+        ClearFocus(context.current_turn);
+        return;
+    }
+    if (!FocusAvailable(focus, context)) {
+        ErrorLogger() << "Planet::SetFocus Exploiter!-- unavailable focus " << focus
+                      << " attempted to be set for object w/ dump string: " << Dump();
+        return;
+    }
+
+    m_focus = std::move(focus);
+    if (m_focus == m_focus_turn_initial)
+        m_last_turn_focus_changed = m_last_turn_focus_changed_turn_initial;
+    else
+        m_last_turn_focus_changed = context.current_turn;
+    ResourceCenterChangedSignal();
+}
+
+void Planet::ClearFocus(int current_turn) {
+    m_focus.clear();
+    m_last_turn_focus_changed = current_turn;
+    ResourceCenterChangedSignal();
+}
+
+void Planet::UpdateFocusHistory() {
+    TraceLogger() << "Planet::UpdateFocusHistory: focus: " << m_focus
+        << "  initial focus: " << m_focus_turn_initial
+        << "  turns since change initial: " << m_last_turn_focus_changed_turn_initial;
+    if (m_focus != m_focus_turn_initial) {
+        m_focus_turn_initial = m_focus;
+        m_last_turn_focus_changed_turn_initial = m_last_turn_focus_changed;
+    }
 }
 
 bool Planet::Colonize(int empire_id, std::string species_name, double population,
@@ -765,8 +858,14 @@ bool Planet::Colonize(int empire_id, std::string species_name, double population
     // reset the planet to unowned/unpopulated
     if (!OwnedBy(empire_id)) {
         Reset(objects);
+
     } else {
-        PopCenter::Reset(objects);
+        GetMeter(MeterType::METER_POPULATION)->Reset();
+        GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
+        GetMeter(MeterType::METER_HAPPINESS)->Reset();
+        GetMeter(MeterType::METER_TARGET_HAPPINESS)->Reset();
+        m_species_name.clear();
+
         for (auto* building : objects.findRaw<Building>(m_buildings)) {
             if (!building)
                 continue;
@@ -775,11 +874,12 @@ bool Planet::Colonize(int empire_id, std::string species_name, double population
         m_is_about_to_be_colonized = false;
         m_is_about_to_be_invaded = false;
         m_is_about_to_be_bombarded = false;
+        m_ordered_given_to_empire_id = ALL_EMPIRES;
         SetOwner(ALL_EMPIRES);
     }
 
     // if desired pop > 0, we want a colony, not an outpost, so we have to set the colony species
-    if (population > 0.0)
+    if (population > MINIMUM_POP_CENTER_POPULATION)
         SetSpecies(std::move(species_name), context.current_turn, context.species);
     m_turn_last_colonized = context.current_turn; // may be redundant with same in SetSpecies, but here occurrs always, whereas in SetSpecies is only done if species is initially empty
 
@@ -789,16 +889,16 @@ bool Planet::Colonize(int empire_id, std::string species_name, double population
     auto available_foci = AvailableFoci(context);
     if (species && !available_foci.empty()) {
         bool found_preference = false;
-        for (const auto& focus : available_foci) {
+        for (const auto focus : available_foci) {
             if (!focus.empty() && focus == species->DefaultFocus()) {
-                SetFocus(focus, context);
+                SetFocus(std::string{focus}, context);
                 found_preference = true;
                 break;
             }
         }
 
         if (!found_preference)
-            SetFocus(*available_foci.begin(), context);
+            SetFocus(std::string{available_foci.front()}, context);
     } else {
         DebugLogger() << "Planet::Colonize unable to find a focus to set for species "
                       << this->SpeciesName();
@@ -851,9 +951,10 @@ void Planet::ResetIsAboutToBeBombarded()
 { SetIsAboutToBeBombarded(false); }
 
 void Planet::SetGiveToEmpire(int empire_id) {
-    if (empire_id == m_ordered_given_to_empire_id) return;
-    m_ordered_given_to_empire_id = empire_id;
-    StateChangedSignal();
+    if (empire_id != m_ordered_given_to_empire_id) {
+        m_ordered_given_to_empire_id = empire_id;
+        StateChangedSignal();
+    }
 }
 
 void Planet::ClearGiveToEmpire()
@@ -869,20 +970,30 @@ void Planet::SetSurfaceTexture(const std::string& texture) {
 
 void Planet::PopGrowthProductionResearchPhase(ScriptingContext& context) {
     UniverseObject::PopGrowthProductionResearchPhase(context);
-    PopCenterPopGrowthProductionResearchPhase(context.current_turn);
 
-    // should be run after a meter update, but before a backpropagation, so check current, not initial, meter values
+    if (!m_species_name.empty() && !Populated()) {
+        // Should be run after meter update but before a backpropagation,
+        // so check current, not initial, meter values. If population falls
+        // below threshold, kill off the remainder
+        Depopulate(context.current_turn);
+    }
 
     // check for colonies without positive population, and change to outposts
-    if (!SpeciesName().empty() && GetMeter(MeterType::METER_POPULATION)->Current() <= 0.0f) {
+    if (!SpeciesName().empty() &&
+        GetMeter(MeterType::METER_POPULATION)->Current() <= MINIMUM_POP_CENTER_POPULATION)
+    {
         if (auto empire = context.GetEmpire(this->Owner())) {
-            empire->AddSitRepEntry(CreatePlanetDepopulatedSitRep(this->ID()));
+            empire->AddSitRepEntry(CreatePlanetDepopulatedSitRep(this->ID(), context.current_turn));
 
             if (!HasTag(TAG_STAT_SKIP_DEPOP, context))
                 empire->RecordPlanetDepopulated(*this);
         }
         // remove species
-        PopCenter::Reset(context.ContextObjects());
+        GetMeter(MeterType::METER_POPULATION)->Reset();
+        GetMeter(MeterType::METER_TARGET_POPULATION)->Reset();
+        GetMeter(MeterType::METER_HAPPINESS)->Reset();
+        GetMeter(MeterType::METER_TARGET_HAPPINESS)->Reset();
+        m_species_name.clear();
     }
 
     StateChangedSignal();
@@ -890,8 +1001,14 @@ void Planet::PopGrowthProductionResearchPhase(ScriptingContext& context) {
 
 void Planet::ResetTargetMaxUnpairedMeters() {
     UniverseObject::ResetTargetMaxUnpairedMeters();
-    ResourceCenterResetTargetMaxUnpairedMeters();
-    PopCenterResetTargetMaxUnpairedMeters();
+
+    GetMeter(MeterType::METER_TARGET_INDUSTRY)->ResetCurrent();
+    GetMeter(MeterType::METER_TARGET_RESEARCH)->ResetCurrent();
+    GetMeter(MeterType::METER_TARGET_INFLUENCE)->ResetCurrent();
+    GetMeter(MeterType::METER_TARGET_CONSTRUCTION)->ResetCurrent();
+
+    GetMeter(MeterType::METER_TARGET_POPULATION)->ResetCurrent();
+    GetMeter(MeterType::METER_TARGET_HAPPINESS)->ResetCurrent();
 
     GetMeter(MeterType::METER_MAX_SUPPLY)->ResetCurrent();
     GetMeter(MeterType::METER_MAX_STOCKPILE)->ResetCurrent();
@@ -904,8 +1021,18 @@ void Planet::ResetTargetMaxUnpairedMeters() {
 
 void Planet::ClampMeters() {
     UniverseObject::ClampMeters();
-    ResourceCenterClampMeters();
-    PopCenterClampMeters();
+
+    GetMeter(MeterType::METER_TARGET_INDUSTRY)->ClampCurrentToRange();
+    GetMeter(MeterType::METER_TARGET_RESEARCH)->ClampCurrentToRange();
+    //GetMeter(MeterType::METER_TARGET_INFLUENCE)->ClampCurrentToRange(-Meter::LARGE_VALUE, Meter::LARGE_VALUE);
+    GetMeter(MeterType::METER_TARGET_CONSTRUCTION)->ClampCurrentToRange();
+
+    GetMeter(MeterType::METER_INDUSTRY)->ClampCurrentToRange();
+    GetMeter(MeterType::METER_RESEARCH)->ClampCurrentToRange();
+    //GetMeter(MeterType::METER_INFLUENCE)->ClampCurrentToRange(-Meter::LARGE_VALUE, Meter::LARGE_VALUE);
+    GetMeter(MeterType::METER_CONSTRUCTION)->ClampCurrentToRange();
+
+    UniverseObject::GetMeter(MeterType::METER_POPULATION)->ClampCurrentToRange();
 
     UniverseObject::GetMeter(MeterType::METER_MAX_SHIELD)->ClampCurrentToRange();
     UniverseObject::GetMeter(MeterType::METER_SHIELD)->ClampCurrentToRange(Meter::DEFAULT_VALUE, UniverseObject::GetMeter(MeterType::METER_MAX_SHIELD)->Current());
@@ -925,7 +1052,7 @@ void Planet::ClampMeters() {
 namespace {
     // sorted pair, so order of empire IDs specified doesn't matter
     std::pair<int, int> DiploKey(int id1, int ind2)
-    { return std::make_pair(std::max(id1, ind2), std::min(id1, ind2)); }
+    { return {std::max(id1, ind2), std::min(id1, ind2)}; }
 }
 
 void Planet::ResolveGroundCombat(std::map<int, double>& empires_troops,
@@ -964,7 +1091,7 @@ void Planet::ResolveGroundCombat(std::map<int, double>& empires_troops,
     for (auto highest_loser_it = inverted_empires_troops.rbegin();
          highest_loser_it != inverted_empires_troops.rend(); ++highest_loser_it)
     {
-        const auto& [loser_effective_troops, loser_id] = *highest_loser_it;
+        const auto [loser_effective_troops, loser_id] = *highest_loser_it;
         if (loser_id == victor_id)
             continue;
         auto it = diplo_statuses.find(DiploKey(loser_id, victor_id));

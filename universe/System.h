@@ -44,7 +44,7 @@ FO_ENUM(
    functions.  Iteration is available over all starlanes and wormholes
    (together), all system objects, all free system objects (those not in an
    orbit), and all objects in a paricular orbit.*/
-class FO_COMMON_API System : public UniverseObject {
+class FO_COMMON_API System final : public UniverseObject {
 public:
     /** Returns a single empire ID if a single empire controls a planet or
       * planets in this system, or ALL_EMPIRES if no empire controls a planet
@@ -53,11 +53,12 @@ public:
 
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
 
-    [[nodiscard]] const std::set<int>& ContainedObjectIDs() const override { return m_objects; }
+    using UniverseObject::IDSet;
+    [[nodiscard]] const IDSet& ContainedObjectIDs() const noexcept override { return m_objects; }
 
     [[nodiscard]] bool Contains(int object_id) const override;
 
-    [[nodiscard]] bool ContainedBy(int object_id) const override { return false; }
+    [[nodiscard]] bool ContainedBy(int object_id) const noexcept override { return false; }
 
     std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const override;
 
@@ -70,10 +71,10 @@ public:
     [[nodiscard]] std::string   ApparentName(int empire_id, const Universe& u, bool blank_unexplored_and_none = false) const;
 
     [[nodiscard]] StarType      GetStarType() const noexcept { return m_star; }  ///< type of star for this system
-    [[nodiscard]] StarType      NextOlderStarType() const;
-    [[nodiscard]] StarType      NextYoungerStarType() const;
+    [[nodiscard]] StarType      NextOlderStarType() const noexcept;
+    [[nodiscard]] StarType      NextYoungerStarType() const noexcept;
 
-    [[nodiscard]] int           Orbits() const noexcept      { return m_orbits.size(); } ///< number of orbits in this system
+    [[nodiscard]] auto          Orbits() const noexcept      { return m_orbits.size(); } ///< number of orbits in this system
 
     [[nodiscard]] int           NumStarlanes() const;                       ///< returns the number of starlanes from this system to other systems
     [[nodiscard]] int           NumWormholes() const;                       ///< returns the number of wormholes from this system to other systems
@@ -107,12 +108,12 @@ public:
     [[nodiscard]] double                  OverlaySize() const noexcept        { return m_overlay_size; }  ///< size in universe units
 
     /** fleets are inserted into system */
-    mutable boost::signals2::signal<void (const std::vector<const Fleet*>&)> FleetsInsertedSignal;
+    mutable boost::signals2::signal<void (std::vector<int>, const ObjectMap&)> FleetsInsertedSignal;
     /** fleets are removed from system */
-    mutable boost::signals2::signal<void (const std::vector<const Fleet*>&)> FleetsRemovedSignal;
+    mutable boost::signals2::signal<void (std::vector<int>)> FleetsRemovedSignal;
 
-    void Copy(std::shared_ptr<const UniverseObject> copied_object,
-              const Universe& universe, int empire_id = ALL_EMPIRES) override;
+    void Copy(const UniverseObject& copied_object, const Universe& universe, int empire_id = ALL_EMPIRES) override;
+    void Copy(const System& copied_system, const Universe& universe, int empire_id = ALL_EMPIRES);
 
     void SetID(int id) override {
         this->m_system_id = id;
@@ -125,8 +126,8 @@ public:
 
     /** adds an object to this system. */
     static constexpr int NO_ORBIT = -1;
-    void Insert(std::shared_ptr<UniverseObject> obj, int orbit, int current_turn);
-    void Insert(UniverseObject* obj, int orbit, int current_turn);
+    void Insert(std::shared_ptr<UniverseObject> obj, int orbit, int current_turn, const ObjectMap& objects);
+    void Insert(UniverseObject* obj, int orbit, int current_turn, const ObjectMap& objects);
 
     /** removes the object with ID number \a id from this system. */
     void Remove(int id);
@@ -137,7 +138,7 @@ public:
     bool RemoveStarlane(int id);         ///< removes a starlane between this system and the system with ID number \a id.  Returns false if there was no starlane from this system to system \a id.
     bool RemoveWormhole(int id);         ///< removes a wormhole between this system and the system with ID number \a id.  Returns false if there was no wormhole from this system to system \a id.
 
-    void SetLastTurnBattleHere(int turn);///< Sets the last turn there was a battle at this system
+    void SetLastTurnBattleHere(int turn) noexcept { m_last_turn_battle_here = turn; }
 
     void SetOverlayTexture(const std::string& texture, double size);
 
@@ -148,16 +149,16 @@ private:
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);
 
     /** Returns new copy of this System. */
-    [[nodiscard]] System* Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const override;
+    [[nodiscard]] std::shared_ptr<UniverseObject> Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const override;
 
     StarType            m_star = StarType::INVALID_STAR_TYPE;
     std::vector<int>    m_orbits = std::vector<int>(SYSTEM_ORBITS, INVALID_OBJECT_ID);  ///< indexed by orbit number, indicates the id of the planet in that orbit
-    std::set<int>       m_objects;
-    std::set<int>       m_planets;
-    std::set<int>       m_buildings;
-    std::set<int>       m_fleets;
-    std::set<int>       m_ships;
-    std::set<int>       m_fields;
+    IDSet               m_objects;
+    IDSet               m_planets;
+    IDSet               m_buildings;
+    IDSet               m_fleets;
+    IDSet               m_ships;
+    IDSet               m_fields;
     std::map<int, bool> m_starlanes_wormholes;      ///< the ints represent the IDs of other connected systems; the bools indicate whether the connection is a wormhole (true) or a starlane (false)
     int                 m_last_turn_battle_here = INVALID_GAME_TURN;  ///< the turn on which there was last a battle in this system
 

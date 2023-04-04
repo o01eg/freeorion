@@ -457,19 +457,21 @@ namespace SystemPathing {
     auto ImmediateNeighborsImpl(
         const Graph& graph, int system_id, const boost::container::flat_map<int, std::size_t>& id_to_graph_index)
     {
-        const auto& edge_weight_map = boost::get(boost::edge_weight, graph);
-        const auto& sys_id_property_map = boost::get(vertex_system_id_t(), graph);
+        using edge_weights_t = decltype(boost::get(boost::edge_weight, graph));
+        using vertex_sys_id_t = decltype(boost::get(vertex_system_id_t(), graph));
+        static_assert(!std::is_reference_v<edge_weights_t>);
+        static_assert(!std::is_reference_v<vertex_sys_id_t>);
 
-        using OutEdgeIterator = typename Graph::out_edge_iterator;
-        OutEdgeIterator first_edge, last_edge;
-        std::tie(first_edge, last_edge) = boost::out_edges(id_to_graph_index.at(system_id), graph);
+        const auto edge_weight_map = boost::get(boost::edge_weight, graph);
+        const auto sys_id_property_map = boost::get(vertex_system_id_t(), graph);
+        const auto [first_edge, last_edge] = boost::out_edges(id_to_graph_index.at(system_id), graph);
 
-        using val_t = std::pair<double, int>;
-        std::vector<val_t> retval;
+        using val_t = std::pair<std::decay_t<decltype(edge_weight_map[*first_edge])>,
+                                std::decay_t<decltype(sys_id_property_map[boost::target(*first_edge, graph)])>>;
+        std::vector<val_t> retval; // probably vector<pair<double, int>>
         retval.reserve(std::distance(first_edge, last_edge));
 
-        using EdgeInfo = decltype(*std::declval<OutEdgeIterator>());
-        std::transform(first_edge, last_edge, std::back_inserter(retval), [&](const EdgeInfo& e) -> val_t
+        std::transform(first_edge, last_edge, std::back_inserter(retval), [&](const auto& e) -> val_t
                        { return {edge_weight_map[e], sys_id_property_map[boost::target(e, graph)]}; });
         return retval;
     }
@@ -514,7 +516,7 @@ namespace {
                 // sort and ensure uniqueness of entries before moving into flat_set
                 std::sort(edges_vec.begin(), edges_vec.end());
                 edges_vec.erase(std::unique(edges_vec.begin(), edges_vec.end()), edges_vec.end());
-                edges.adopt_sequence(boost::container::ordered_unique_range_t{}, std::move(edges_vec));
+                edges.adopt_sequence(boost::container::ordered_unique_range, std::move(edges_vec));
             }
 
             template <typename EdgeDescriptor>
@@ -836,7 +838,7 @@ namespace {
         }
 
         if (auto fleet = FleetFromObject(obj, objects)) {
-            auto fleet_sys_pair = std::make_pair(fleet->PreviousSystemID(), fleet->NextSystemID());
+            auto fleet_sys_pair = std::pair(fleet->PreviousSystemID(), fleet->NextSystemID());
             if (fleet_sys_pair.first == INVALID_OBJECT_ID || fleet_sys_pair.second == INVALID_OBJECT_ID) {
                 ErrorLogger() << "GeneralizedLocation of " << obj->Name() << " (" << obj->ID()
                               << ") is between " << fleet_sys_pair.first << " and " << fleet_sys_pair.second;
@@ -1466,8 +1468,9 @@ void Pathfinder::PathfinderImpl::InitializeSystemGraph(const ObjectMap& objects,
         system_id_to_graph_idx_vec.emplace_back(system_id, system_index);
     }
     std::sort(system_id_to_graph_idx_vec.begin(), system_id_to_graph_idx_vec.end());
-    m_system_id_to_graph_index.adopt_sequence(boost::container::ordered_unique_range_t{}, std::move(system_id_to_graph_idx_vec));
-    m_system_id_to_graph_index.insert(boost::container::ordered_unique_range_t{},
+    m_system_id_to_graph_index.adopt_sequence(boost::container::ordered_unique_range,
+                                              std::move(system_id_to_graph_idx_vec));
+    m_system_id_to_graph_index.insert(boost::container::ordered_unique_range,
                                       std::make_move_iterator(system_id_to_graph_idx_vec.begin()),
                                       std::make_move_iterator(system_id_to_graph_idx_vec.end()));
 

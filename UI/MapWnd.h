@@ -58,7 +58,7 @@ public:
     MapWnd();
     void CompleteConstruction() override;
 
-    GG::Pt ClientUpperLeft() const override;
+    GG::Pt ClientUpperLeft() const noexcept override;
 
     double ZoomFactor() const;
     int    SystemIconSize() const;
@@ -112,12 +112,12 @@ public:
 
     void PreRender() override;
     void Render() override;
-    void LButtonDown(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void LDrag(const GG::Pt& pt, const GG::Pt& move, GG::Flags<GG::ModKey> mod_keys) override;
-    void LButtonUp(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void LClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void RClick(const GG::Pt& pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void MouseWheel(const GG::Pt& pt, int move, GG::Flags<GG::ModKey> mod_keys) override;
+    void LButtonDown(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
+    void LDrag(GG::Pt pt, GG::Pt move, GG::Flags<GG::ModKey> mod_keys) override;
+    void LButtonUp(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
+    void LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
+    void RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
+    void MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys) override;
     void KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override;
     void KeyRelease(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override;
     void TimerFiring(unsigned int ticks, GG::Timer* timer) override;
@@ -368,6 +368,8 @@ private:
     void RemoveFromWndStack(std::shared_ptr<GG::Wnd> wnd);
     bool ReturnToMap();
 
+    bool RevertOrders();
+
     bool EndTurn();
     void ToggleAutoEndTurn();
 
@@ -505,8 +507,6 @@ private:
 
     std::map<int, MovementLineData> m_fleet_lines;                  //!< lines used for moving fleets in the main map
     std::map<int, MovementLineData> m_projected_fleet_lines;        //!< lines that show the projected path of the active fleet in the FleetWnd
-
-    std::pair<int, int>             m_line_between_systems = {INVALID_OBJECT_ID, INVALID_OBJECT_ID};//!< set when map should render line connecting 2 systems
 
     std::map<std::shared_ptr<GG::Texture>, GG::GL2DVertexBuffer> m_star_core_quad_vertices;
     std::map<std::shared_ptr<GG::Texture>, GG::GL2DVertexBuffer> m_star_halo_quad_vertices;

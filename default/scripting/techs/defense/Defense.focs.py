@@ -1,9 +1,5 @@
 from common.base_prod import TECH_COST_MULTIPLIER
-from common.misc import (
-    PLANET_DEFENSE_FACTOR,
-    PLANET_SHIELD_FACTOR,
-    SYSTEM_MINES_DAMAGE_FACTOR,
-)
+from common.misc import PLANET_DEFENSE_FACTOR, PLANET_SHIELD_FACTOR
 from common.priorities import AFTER_ALL_TARGET_MAX_METERS_PRIORITY
 from techs.defense.mines import EG_SYSTEM_MINES
 
@@ -19,7 +15,7 @@ Tech(
         EffectsGroup(
             scope=Planet() & OwnedBy(empire=Source.Owner),
             stackinggroup="PLANET_SHIELDS_STACK_ROOT",
-            effects=SetMaxShield(value=Value + 1, accountinglabel="DEF_ROOT_DEFENSE"),
+            effects=SetMaxShield(value=Value + PLANET_SHIELD_FACTOR, accountinglabel="DEF_ROOT_DEFENSE"),
         ),
         EffectsGroup(  # base regeneration of troops, defense and shields if not attacked
             scope=Planet()
@@ -67,7 +63,7 @@ Tech(
     tags=["PEDIA_DEFENSE_CATEGORY"],
     prerequisites=["DEF_DEFENSE_NET_1"],
     effectsgroups=EG_SYSTEM_MINES(
-        2 * SYSTEM_MINES_DAMAGE_FACTOR, 75, "EMPIRE"
+        NamedRealLookup(name="DEF_SYST_DEF_MINE_1_DAMAGE"), 75, "EMPIRE"
     ),  # Priority deliberately not a macro and before all priority macros
     graphic="icons/tech/system_defense_mines.png",
 )
@@ -81,7 +77,7 @@ Tech(
     researchturns=6,
     tags=["PEDIA_DEFENSE_CATEGORY"],
     prerequisites=["DEF_SYST_DEF_MINE_1"],
-    effectsgroups=EG_SYSTEM_MINES(6 * SYSTEM_MINES_DAMAGE_FACTOR, 65, "EMPIRE"),
+    effectsgroups=EG_SYSTEM_MINES(NamedRealLookup(name="DEF_SYST_DEF_MINE_2_DAMAGE"), 65, "EMPIRE"),
     graphic="icons/tech/system_defense_mines.png",
 )
 
@@ -94,6 +90,6 @@ Tech(
     researchturns=8,
     tags=["PEDIA_DEFENSE_CATEGORY"],
     prerequisites=["DEF_SYST_DEF_MINE_2"],
-    effectsgroups=EG_SYSTEM_MINES(14 * SYSTEM_MINES_DAMAGE_FACTOR, 60, "EMPIRE"),
+    effectsgroups=EG_SYSTEM_MINES(NamedRealLookup(name="DEF_SYST_DEF_MINE_3_DAMAGE"), 60, "EMPIRE"),
     graphic="icons/tech/system_defense_mines.png",
 )

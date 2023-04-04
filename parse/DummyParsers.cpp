@@ -29,7 +29,8 @@ namespace parse {
     std::map<std::string, std::unique_ptr<Special>, std::less<>> specials(const boost::filesystem::path& path)
     { return {}; }
 
-    std::map<std::string, std::unique_ptr<Policy>, std::less<>> policies(const boost::filesystem::path& path)
+    template <>
+    std::vector<Policy> policies(const boost::filesystem::path& path)
     { return {}; }
 
     species_type species(const PythonParser& parser, const boost::filesystem::path& path)
@@ -84,11 +85,11 @@ namespace parse {
 
 template FO_PARSE_API TechManager::TechParseTuple parse::techs<TechManager::TechParseTuple>(const PythonParser& parser, const boost::filesystem::path& path);
 
-PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path& scripting_dir) 
-    : m_python(_python)
-    , m_scripting_dir(scripting_dir)
+template FO_PARSE_API std::vector<Policy> parse::policies<std::vector<Policy>>(const boost::filesystem::path& path);
+
+PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path& scripting_dir) :
+    m_python(_python),
+    m_scripting_dir(scripting_dir)
 { }
 
-PythonParser::~PythonParser()
-{ }
-
+PythonParser::~PythonParser() = default;

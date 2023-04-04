@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <boost/container/flat_map.hpp>
+#include <boost/container/flat_set.hpp>
 #include <boost/python/detail/destroy.hpp>
 #include <boost/signals2/optional_last_value.hpp>
 #include <boost/signals2/signal.hpp>
@@ -16,8 +17,6 @@
 #include "../util/Enum.h"
 #include "../util/Export.h"
 
-
-using boost::container::flat_map;
 
 class System;
 class SitRepEntry;
@@ -39,8 +38,6 @@ FO_ENUM(
     ((OBJ_SHIP))
     ((OBJ_FLEET))
     ((OBJ_PLANET))
-    ((OBJ_POP_CENTER))
-    ((OBJ_PROD_CENTER))
     ((OBJ_SYSTEM))
     ((OBJ_FIELD))
     ((OBJ_FIGHTER))
@@ -78,42 +75,45 @@ FO_ENUM(
   * that is being displayed has changed.*/
 class FO_COMMON_API UniverseObject : virtual public std::enable_shared_from_this<UniverseObject> {
 public:
-    using MeterMap = flat_map<MeterType, Meter>;
-    static_assert(std::is_same_v<flat_map<MeterType, Meter, std::less<MeterType>>, MeterMap>);
-    using SpecialMap = flat_map<std::string, std::pair<int, float>>;
+    using MeterMap = boost::container::flat_map<MeterType, Meter>;
+    static_assert(std::is_same_v<boost::container::flat_map<MeterType, Meter, std::less<MeterType>>, MeterMap>);
+    using SpecialMap = boost::container::flat_map<std::string, std::pair<int, float>>;
+
+    using IDSet = boost::container::flat_set<int32_t>;
 
     using CombinerType = assignable_blocking_combiner;
     using StateChangedSignalType = boost::signals2::signal<void (), CombinerType>;
 
-    [[nodiscard]] int                           ID() const noexcept { return m_id; }    ///< returns the ID number of this object.  Each object in FreeOrion has a unique ID number.
-    [[nodiscard]] const std::string&            Name() const noexcept { return m_name; }///< returns the name of this object; some valid objects will have no name
-    [[nodiscard]] double                        X() const noexcept { return m_x; }      ///< the X-coordinate of this object
-    [[nodiscard]] double                        Y() const noexcept { return m_y; }      ///< the Y-coordinate of this object
+    [[nodiscard]] int          ID() const noexcept { return m_id; }    ///< returns the ID number of this object.  Each object in FreeOrion has a unique ID number.
+    [[nodiscard]] auto&        Name() const noexcept { return m_name; }///< returns the name of this object; some valid objects will have no name
+    [[nodiscard]] double       X() const noexcept { return m_x; }      ///< the X-coordinate of this object
+    [[nodiscard]] double       Y() const noexcept { return m_y; }      ///< the Y-coordinate of this object
 
-    [[nodiscard]] int                           Owner() const noexcept   { return m_owner_empire_id; };               ///< returns the ID of the empire that owns this object, or ALL_EMPIRES if there is no owner
-    [[nodiscard]] bool                          Unowned() const noexcept { return m_owner_empire_id == ALL_EMPIRES; } ///< returns true iff there are no owners of this object
-    [[nodiscard]] bool                          OwnedBy(int empire) const noexcept { return empire != ALL_EMPIRES && empire == m_owner_empire_id; }; ///< returns true iff the empire with id \a empire owns this object; unowned objects always return false;
+    [[nodiscard]] int          Owner() const noexcept   { return m_owner_empire_id; };               ///< returns the ID of the empire that owns this object, or ALL_EMPIRES if there is no owner
+    [[nodiscard]] bool         Unowned() const noexcept { return m_owner_empire_id == ALL_EMPIRES; } ///< returns true iff there are no owners of this object
+    [[nodiscard]] bool         OwnedBy(int empire) const noexcept { return empire != ALL_EMPIRES && empire == m_owner_empire_id; }; ///< returns true iff the empire with id \a empire owns this object; unowned objects always return false;
     /** Object owner is at war with empire @p empire_id */
-    [[nodiscard]] virtual bool                  HostileToEmpire(int empire_id, const EmpireManager& empires) const { return false; }
+    [[nodiscard]] virtual bool HostileToEmpire(int empire_id, const EmpireManager& empires) const { return false; }
 
-    [[nodiscard]] int                           SystemID() const noexcept { return m_system_id; };  ///< returns the ID number of the system in which this object can be found, or INVALID_OBJECT_ID if the object is not within any system
+    [[nodiscard]] int          SystemID() const noexcept { return m_system_id; };  ///< returns the ID number of the system in which this object can be found, or INVALID_OBJECT_ID if the object is not within any system
 
-    [[nodiscard]] const auto&                   Specials() const noexcept { return m_specials; };   ///< returns the Specials attached to this object
-    [[nodiscard]] bool                          HasSpecial(std::string_view name) const;            ///< returns true iff this object has a special with the indicated \a name
-    [[nodiscard]] int                           SpecialAddedOnTurn(std::string_view name) const;    ///< returns the turn on which the special with name \a name was added to this object, or INVALID_GAME_TURN if that special is not present
-    [[nodiscard]] float                         SpecialCapacity(std::string_view name) const;       ///> returns the capacity of the special with name \a name or 0 if that special is not present
+    [[nodiscard]] auto&        Specials() const noexcept { return m_specials; };   ///< returns the Specials attached to this object
+    [[nodiscard]] bool         HasSpecial(std::string_view name) const;            ///< returns true iff this object has a special with the indicated \a name
+    [[nodiscard]] int          SpecialAddedOnTurn(std::string_view name) const;    ///< returns the turn on which the special with name \a name was added to this object, or INVALID_GAME_TURN if that special is not present
+    [[nodiscard]] float        SpecialCapacity(std::string_view name) const;       ///> returns the capacity of the special with name \a name or 0 if that special is not present
 
-    struct TagVecs {
+    struct [[nodiscard]] TagVecs {
         TagVecs() = default;
-        TagVecs(const std::vector<std::string_view>& vec) :
+        TagVecs(const std::vector<std::string_view>& vec) noexcept :
             first(vec)
         {}
-        TagVecs(const std::vector<std::string_view>& vec1, const std::vector<std::string_view>& vec2) :
+        TagVecs(const std::vector<std::string_view>& vec1,
+                const std::vector<std::string_view>& vec2) noexcept:
             first(vec1),
             second(vec2)
         {}
-        bool empty() const noexcept { return first.empty() && second.empty(); }
-        auto size() const noexcept { return first.size() + second.size(); }
+        [[nodiscard]] bool empty() const noexcept { return first.empty() && second.empty(); }
+        [[nodiscard]] auto size() const noexcept { return first.size() + second.size(); }
         const std::vector<std::string_view>& first = EMPTY_STRING_VEC;
         const std::vector<std::string_view>& second = EMPTY_STRING_VEC;
         static const inline std::vector<std::string_view> EMPTY_STRING_VEC{};
@@ -132,7 +132,7 @@ public:
     [[nodiscard]] virtual int                 ContainerObjectID() const noexcept { return INVALID_OBJECT_ID; }
 
     /** Returns ids of objects contained within this object. */
-    [[nodiscard]] virtual const std::set<int>&ContainedObjectIDs() const;
+    [[nodiscard]] virtual const IDSet&        ContainedObjectIDs() const noexcept { return EMPTY_INT_SET; }
 
     /** Returns true if there is an object with id \a object_id is contained
         within this UniverseObject. */
@@ -143,10 +143,10 @@ public:
     [[nodiscard]] virtual bool                ContainedBy(int object_id) const { return false; }
 
     using EmpireObjectVisMap = std::map<int, std::map<int, Visibility>>;
-    [[nodiscard]] std::set<int>               VisibleContainedObjectIDs(int empire_id, const EmpireObjectVisMap& vis) const; ///< returns the subset of contained object IDs that is visible to empire with id \a empire_id
+    [[nodiscard]] IDSet                       VisibleContainedObjectIDs(int empire_id, const EmpireObjectVisMap& vis) const; ///< returns the subset of contained object IDs that is visible to empire with id \a empire_id
 
     [[nodiscard]] const MeterMap&             Meters() const noexcept { return m_meters; }    ///< returns this UniverseObject's meters
-    [[nodiscard]] const Meter*                GetMeter(MeterType type) const;                 ///< returns the requested Meter, or 0 if no such Meter of that type is found in this object
+    [[nodiscard]] const Meter*                GetMeter(MeterType type) const noexcept;        ///< returns the requested Meter, or 0 if no such Meter of that type is found in this object
 
     using EmpireIDtoObjectIDtoVisMap = std::map<int, std::map<int, Visibility>>; // duplicates Universe::EmpireObjectVisibilityMap
     [[nodiscard]] Visibility                  GetVisibility(int empire_id, const EmpireIDtoObjectIDtoVisMap& v) const;
@@ -166,8 +166,7 @@ public:
     /** copies data from \a copied_object to this object, limited to only copy
       * data about the copied object that is known to the empire with id
       * \a empire_id (or all data if empire_id is ALL_EMPIRES) */
-    virtual void    Copy(std::shared_ptr<const UniverseObject> copied_object,
-                         const Universe&, int empire_id) = 0;
+    virtual void    Copy(const UniverseObject& copied_object, const Universe&, int empire_id) = 0;
 
     virtual void    SetID(int id);              ///< sets the ID number of the object to \a id
     void            Rename(std::string name);   ///< renames this object to \a name
@@ -184,7 +183,7 @@ public:
     void            MoveTo(double x, double y);
 
     [[nodiscard]] MeterMap& Meters() noexcept { return m_meters; }  ///< returns this UniverseObject's meters
-    [[nodiscard]] Meter*    GetMeter(MeterType type);               ///< returns the requested Meter, or 0 if no such Meter of that type is found in this object
+    [[nodiscard]] Meter*    GetMeter(MeterType type) noexcept;      ///< returns the requested Meter, or 0 if no such Meter of that type is found in this object
 
     /** Sets all this UniverseObject's meters' initial values equal to their
         current values. */
@@ -198,6 +197,7 @@ public:
     void RemoveSpecial(const std::string& name);                    ///< removes the Special \a name from this object, if it is already present
     void SetSpecialCapacity(std::string name, float capacity, int turn);
 
+public:
     /** Sets current value of max, target and unpaired meters in in this
       * UniverseObject to Meter::DEFAULT_VALUE.  This should be done before any
       * Effects that alter these meter(s) act on the object. */
@@ -227,7 +227,8 @@ public:
       * is visible to the empire with the specified \a empire_id as determined
       * by the detection and visibility system.  Caller takes ownership of
       * returned pointee. */
-    [[nodiscard]] virtual UniverseObject* Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const = 0;
+    [[nodiscard]] virtual std::shared_ptr<UniverseObject> Clone(
+        const Universe& universe, int empire_id = ALL_EMPIRES) const = 0;
 
 protected:
     friend class Universe;
@@ -248,7 +249,7 @@ protected:
     void Init();                         ///< adds stealth meter
 
     /** Used by public UniverseObject::Copy and derived classes' ::Copy methods. */
-    void Copy(std::shared_ptr<const UniverseObject> copied_object, Visibility vis,
+    void Copy(const UniverseObject& copied_object, Visibility vis,
               const std::set<std::string>& visible_specials,
               const Universe& universe);
 
@@ -267,6 +268,8 @@ private:
     SpecialMap m_specials; // map from special name to pair of (turn added, capacity)
 
     UniverseObjectType m_type = UniverseObjectType::INVALID_UNIVERSE_OBJECT_TYPE;
+
+    static const inline IDSet EMPTY_INT_SET{};
 
     template <typename Archive>
     friend void serialize(Archive&, UniverseObject&, unsigned int const);

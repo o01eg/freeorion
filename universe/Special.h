@@ -68,15 +68,15 @@ public:
 private:
     void Init();
 
-    std::string                                         m_name;
-    std::string                                         m_description;
-    std::unique_ptr<ValueRef::ValueRef<double>>         m_stealth;
-    std::vector<std::shared_ptr<Effect::EffectsGroup>>  m_effects;
-    float                                               m_spawn_rate = 0.0f;
-    int                                                 m_spawn_limit = 99999;
-    std::unique_ptr<ValueRef::ValueRef<double>>         m_initial_capacity;
-    std::unique_ptr<Condition::Condition>               m_location;
-    std::string                                         m_graphic;
+    std::string                                 m_name;
+    std::string                                 m_description;
+    std::unique_ptr<ValueRef::ValueRef<double>> m_stealth;
+    std::vector<Effect::EffectsGroup>           m_effects;
+    float                                       m_spawn_rate = 0.0f;
+    int                                         m_spawn_limit = 99999;
+    std::unique_ptr<ValueRef::ValueRef<double>> m_initial_capacity;
+    std::unique_ptr<Condition::Condition>       m_location;
+    std::string                                 m_graphic;
 };
 
 /** Returns the Special object used to represent specials of type \a name.
@@ -92,7 +92,7 @@ class FO_COMMON_API SpecialsManager {
 public:
     using SpecialsTypeMap = std::map<std::string, std::unique_ptr<Special>, std::less<>>;
 
-    [[nodiscard]] int                           NumSpecials() const noexcept { return m_specials.size(); }
+    [[nodiscard]] auto                          NumSpecials() const noexcept { return m_specials.size(); }
     [[nodiscard]] std::vector<std::string_view> SpecialNames() const;
     [[nodiscard]] const Special*                GetSpecial(std::string_view name) const;
     [[nodiscard]] uint32_t                      GetCheckSum() const;

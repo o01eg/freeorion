@@ -106,7 +106,7 @@ namespace {
             GG::FlatRectangle(UpperLeft(), LowerRight(), background_clr, ClientUI::WndOuterBorderColor(), 1u);
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             const GG::Pt old_size = Size();
             GG::Control::SizeMove(ul, lr);
             if (old_size != Size())
@@ -184,10 +184,10 @@ namespace {
             // cost / turn, and minimum production turns
             if (empire) {
                 // from industry output
-                local_pp_output = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->GroupAvailable(m_location_id);
+                local_pp_output = empire->GetIndustryPool().GroupAvailable(m_location_id);
 
                 // from stockpile
-                stockpile = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->Stockpile();
+                stockpile = empire->GetIndustryPool().Stockpile();
                 stockpile_limit_per_turn = empire->GetProductionQueue().StockpileCapacity(context.ContextObjects());
 
                 auto [total_cost, minimum_production_time] = m_item.ProductionCostAndTime(m_empire_id, m_location_id, context);
@@ -303,14 +303,14 @@ namespace {
         float stockpile_limit_per_turn = 0.0f;
         if (auto empire = context.GetEmpire(empire_id)) {
             // from industry output
-            local_pp_output = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->GroupAvailable(candidate_object_id);
+            local_pp_output = empire->GetIndustryPool().GroupAvailable(candidate_object_id);
 
             // from stockpile
-            stockpile = empire->GetResourcePool(ResourceType::RE_INDUSTRY)->Stockpile();
+            stockpile = empire->GetIndustryPool().Stockpile();
             stockpile_limit_per_turn = empire->GetProductionQueue().StockpileCapacity(context.ContextObjects());
         }
 
-        auto obj = Objects().getRaw(candidate_object_id);
+        auto obj = context.ContextObjects().getRaw(candidate_object_id);
         std::string candidate_name = obj ? obj->Name() : "";
         if (GetOptionsDB().Get<bool>("ui.name.id.shown"))
             candidate_name += " (" + std::to_string(candidate_object_id) + ")";
@@ -327,8 +327,9 @@ namespace {
 
             if (obj || building_type->ProductionCostTimeLocationInvariant()) {
                 // if location object is available, or cost and time are invariation to location, can safely evaluate cost and time
-                float total_cost = building_type->ProductionCost(empire_id, candidate_object_id);
-                int minimum_production_time = std::max(1, building_type->ProductionTime(empire_id, candidate_object_id));
+                const float total_cost = building_type->ProductionCost(empire_id, candidate_object_id, context);
+                const int minimum_production_time = std::max(1, building_type->ProductionTime(
+                    empire_id, candidate_object_id, context));
 
                 if (obj) {
                     // if location object is available, can evaluate production time at that location
@@ -352,7 +353,8 @@ namespace {
             } else {
                 // no location object, but have location-dependent cost or time
 
-                int minimum_production_time = std::max(1, building_type->ProductionTime(empire_id, candidate_object_id));
+                const int minimum_production_time =
+                    std::max(1, building_type->ProductionTime(empire_id, candidate_object_id, context));
                 // 9999 is arbitrary large time returned for evaluation failure due to lack of location object but object-dependent time
                 if (minimum_production_time >= 9999) {
                     main_text += "\n" + boost::io::str(FlexibleFormat(UserString("PRODUCTION_WND_TOOLTIP_PROD_TIME_MINIMUM")) %
@@ -362,7 +364,7 @@ namespace {
                                                        std::to_string(minimum_production_time));
                 }
 
-                float total_cost = building_type->ProductionCost(empire_id, candidate_object_id);
+                const float total_cost = building_type->ProductionCost(empire_id, candidate_object_id, context);
                 // 999999.9f is arbitrary large cost returned for evaluation failure due to lack of location object but object-dependnet cost
                 if (total_cost >= 999999.9f) {
                     main_text += "\n" + boost::io::str(FlexibleFormat(UserString("PRODUCTION_WND_TOOLTIP_PROD_COST")) %
@@ -551,10 +553,9 @@ namespace {
             push_back(m_panel);
         }
 
-        const ProductionQueue::ProductionItem& Item() const
-        { return m_item; }
+        const ProductionQueue::ProductionItem& Item() const noexcept { return m_item; }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             const GG::Pt old_size = Size();
             GG::ListBox::Row::SizeMove(ul, lr);
             if (!empty() && old_size != Size() && m_panel)
@@ -584,7 +585,7 @@ namespace {
             SetVScrollWheelIncrement(Value(ListRowHeight())*3);
         }
 
-        void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override {
+        void SizeMove(GG::Pt ul, GG::Pt lr) override {
             const GG::Pt old_size = Size();
             CUIListBox::SizeMove(ul, lr);
             if (old_size != Size()) {
@@ -611,12 +612,12 @@ public:
     void CompleteConstruction() override;
 
     /** returns set of BulldType shown in this selector */
-    const std::set<BuildType>&   GetBuildTypesShown() const;
+    const auto& GetBuildTypesShown() const noexcept { return m_build_types_shown; }
 
     /** .first -> available items; .second -> unavailable items */
-    const std::pair<bool, bool>& GetAvailabilitiesShown() const;
+    auto GetAvailabilitiesShown() const noexcept { return m_availabilities_shown; }
 
-    void SizeMove(const GG::Pt& ul, const GG::Pt& lr) override;
+    void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
     /** Sets build location for this selector, which may be used to filter
       * items in the list or enable / disable them at some point in the
@@ -645,7 +646,7 @@ public:
     mutable boost::signals2::signal<void (const BuildingType*)> DisplayBuildingTypeSignal;
     mutable boost::signals2::signal<void (const ShipDesign*)>   DisplayShipDesignSignal;
     mutable boost::signals2::signal<void ()>                    DisplayStockpileProjectSignal;
-    mutable boost::signals2::signal<void (const ProductionQueue::ProductionItem&, int, int)>
+    mutable boost::signals2::signal<void (ProductionQueue::ProductionItem, int, int)>
                                                                 RequestBuildItemSignal;
     mutable boost::signals2::signal<void ()>                    ShowPediaSignal;
 
@@ -666,10 +667,10 @@ private:
     void AddBuildItemToQueue(GG::ListBox::iterator it, bool top);
 
     /** respond to the user single-clicking a producible item in the build selector */
-    void BuildItemLeftClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
+    void BuildItemLeftClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys);
 
     /** respond to the user right-clicking a producible item in the build selector */
-    void BuildItemRightClicked(GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys);
+    void BuildItemRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys);
 
     std::map<BuildType, std::shared_ptr<CUIStateButton>>    m_build_type_buttons;
     std::vector<std::shared_ptr<CUIStateButton>>            m_availability_buttons;
@@ -718,15 +719,15 @@ void BuildDesignatorWnd::BuildSelector::CompleteConstruction() {
     AttachChild(m_buildable_items);
 
     m_buildable_items->LeftClickedRowSignal.connect(
-        [this](GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys)
+        [this](GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys)
         { BuildItemLeftClicked(it, pt, modkeys); });
 
     m_buildable_items->DoubleClickedRowSignal.connect(
-        [this](GG::ListBox::iterator it, const GG::Pt&, const GG::Flags<GG::ModKey>& modkeys)
+        [this](GG::ListBox::iterator it, GG::Pt, GG::Flags<GG::ModKey> modkeys)
         { AddBuildItemToQueue(it, modkeys & GG::MOD_KEY_CTRL); });
 
     m_buildable_items->RightClickedRowSignal.connect(
-        [this](GG::ListBox::iterator it, const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys)
+        [this](GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys)
         { BuildItemRightClicked(it, pt, modkeys); });
 
     //auto header = GG::Wnd::Create<GG::ListBox::Row>();
@@ -754,12 +755,6 @@ void BuildDesignatorWnd::BuildSelector::CompleteConstruction() {
     SaveDefaultedOptions();
 }
 
-const std::set<BuildType>& BuildDesignatorWnd::BuildSelector::GetBuildTypesShown() const
-{ return m_build_types_shown; }
-
-const std::pair<bool, bool>& BuildDesignatorWnd::BuildSelector::GetAvailabilitiesShown() const
-{ return m_availabilities_shown; }
-
 void BuildDesignatorWnd::BuildSelector::DoLayout() {
     int num_buttons = 4;
     GG::X x(0);
@@ -779,7 +774,7 @@ void BuildDesignatorWnd::BuildSelector::DoLayout() {
                                 ClientSize() - GG::Pt(GG::X0, GG::Y(INNER_BORDER_ANGLE_OFFSET)));
 }
 
-void BuildDesignatorWnd::BuildSelector::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void BuildDesignatorWnd::BuildSelector::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt old_size = GG::Wnd::Size();
     CUIWnd::SizeMove(ul, lr);
     if (old_size != GG::Wnd::Size())
@@ -902,9 +897,7 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
     return true;
 }
 
-bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_type,
-                                                             const std::string& name)
-{
+bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_type, const std::string& name) {
     if (build_type != BuildType::BT_BUILDING)
         throw std::invalid_argument("BuildableItemVisible was passed an invalid build type with a name");
 
@@ -1065,7 +1058,7 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
 }
 
 void BuildDesignatorWnd::BuildSelector::BuildItemLeftClicked(GG::ListBox::iterator it,
-                                                             const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys)
+                                                             GG::Pt pt, GG::Flags<GG::ModKey> modkeys)
 {
     ProductionItemRow* item_row = dynamic_cast<ProductionItemRow*>((*it).get());
     if (!item_row)
@@ -1101,16 +1094,12 @@ void BuildDesignatorWnd::BuildSelector::BuildItemLeftClicked(GG::ListBox::iterat
 void BuildDesignatorWnd::BuildSelector::AddBuildItemToQueue(GG::ListBox::iterator it, bool top) {
     if ((*it)->Disabled())
         return;
-    ProductionItemRow* item_row = dynamic_cast<ProductionItemRow*>(it->get());
-    if (!item_row)
-        return;
-    const ProductionQueue::ProductionItem& item = item_row->Item();
-
-    RequestBuildItemSignal(item, 1, top ? 0 : -1);
+    if (ProductionItemRow* item_row = dynamic_cast<ProductionItemRow*>(it->get()))
+        RequestBuildItemSignal(item_row->Item(), 1, top ? 0 : -1);
 }
 
 void BuildDesignatorWnd::BuildSelector::BuildItemRightClicked(GG::ListBox::iterator it,
-                                                              const GG::Pt& pt, const GG::Flags<GG::ModKey>& modkeys)
+                                                              GG::Pt pt, GG::Flags<GG::ModKey> modkeys)
 {
     ProductionItemRow* item_row = dynamic_cast<ProductionItemRow*>(it->get());
     if (!item_row)
@@ -1120,7 +1109,7 @@ void BuildDesignatorWnd::BuildSelector::BuildItemRightClicked(GG::ListBox::itera
     ScriptingContext context;
     const Universe& universe{context.ContextUniverse()};
 
-    std::string_view item_name;
+    std::string_view item_name = "";
     if (item.build_type == BuildType::BT_BUILDING) {
         item_name = item.name;
     } else if (item.build_type == BuildType::BT_SHIP) {
@@ -1190,8 +1179,8 @@ void BuildDesignatorWnd::CompleteConstruction() {
     m_build_selector->ShowPediaSignal.connect([this]() { ShowPedia(); });
 
     m_build_selector->RequestBuildItemSignal.connect(
-        [this](const ProductionQueue::ProductionItem& item, int num, int pos)
-        { BuildItemRequested(item, num, pos); });
+        [this](ProductionQueue::ProductionItem item, int num, int pos)
+        { BuildItemRequested(std::move(item), num, pos); });
 
     SidePanel::PlanetSelectedSignal.connect(PlanetSelectedSignal);
     SidePanel::SystemSelectedSignal.connect(SystemSelectedSignal);
@@ -1225,19 +1214,19 @@ void BuildDesignatorWnd::CompleteConstruction() {
 const std::set<BuildType>& BuildDesignatorWnd::GetBuildTypesShown() const
 { return m_build_selector->GetBuildTypesShown(); }
 
-const std::pair<bool, bool>& BuildDesignatorWnd::GetAvailabilitiesShown() const
+std::pair<bool, bool> BuildDesignatorWnd::GetAvailabilitiesShown() const
 { return m_build_selector->GetAvailabilitiesShown(); }
 
-bool BuildDesignatorWnd::InWindow(const GG::Pt& pt) const
+bool BuildDesignatorWnd::InWindow(GG::Pt pt) const
 { return (m_enc_detail_panel->InWindow(pt) && m_enc_detail_panel->Visible()) || m_build_selector->InWindow(pt) || m_side_panel->InWindow(pt); }
 
-bool BuildDesignatorWnd::InClient(const GG::Pt& pt) const
+bool BuildDesignatorWnd::InClient(GG::Pt pt) const
 { return m_enc_detail_panel->InClient(pt) || m_build_selector->InClient(pt) || m_side_panel->InClient(pt); }
 
 int BuildDesignatorWnd::SelectedPlanetID() const
 { return m_side_panel->SelectedPlanetID(); }
 
-void BuildDesignatorWnd::SizeMove(const GG::Pt& ul, const GG::Pt& lr) {
+void BuildDesignatorWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
     const GG::Pt old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
     if (old_size != Size()) {
@@ -1447,7 +1436,7 @@ void BuildDesignatorWnd::HideAvailability(bool available, bool refresh_list) {
 }
 
 void BuildDesignatorWnd::ToggleAvailabilitly(bool available, bool refresh_list) {
-    const std::pair<bool, bool>& avail_shown = m_build_selector->GetAvailabilitiesShown();
+    const auto avail_shown = m_build_selector->GetAvailabilitiesShown();
     if (available) {
         if (avail_shown.first)
             HideAvailability(true, refresh_list);
@@ -1519,13 +1508,13 @@ bool BuildDesignatorWnd::PediaVisible()
 int BuildDesignatorWnd::BuildLocation() const
 { return m_side_panel->SelectedPlanetID(); }
 
-void BuildDesignatorWnd::BuildItemRequested(const ProductionQueue::ProductionItem& item,
+void BuildDesignatorWnd::BuildItemRequested(ProductionQueue::ProductionItem item,
                                             int num_to_build, int pos)
 {
     const ScriptingContext context;
     auto empire = context.GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (empire && empire->EnqueuableItem(item, BuildLocation(), context))
-        AddBuildToQueueSignal(item, num_to_build, BuildLocation(), pos);
+        AddBuildToQueueSignal(std::move(item), num_to_build, BuildLocation(), pos);
 }
 
 void BuildDesignatorWnd::BuildQuantityChanged(int queue_idx, int quantity)

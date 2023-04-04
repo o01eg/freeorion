@@ -4,8 +4,6 @@
 
 #include "EnumsFwd.h"
 #include "Meter.h"
-#include "PopCenter.h"
-#include "ResourceCenter.h"
 #include "UniverseObject.h"
 #include "../Empire/EmpireManager.h"
 #include "../util/Export.h"
@@ -46,29 +44,29 @@ FO_ENUM(
 
 
 /** a class representing a FreeOrion planet. */
-class FO_COMMON_API Planet :
-    public UniverseObject,
-    public PopCenter,
-    public ResourceCenter
-{
+class FO_COMMON_API Planet final : public UniverseObject {
 public:
-    [[nodiscard]] TagVecs                 Tags(const ScriptingContext& context) const override;
-    [[nodiscard]] bool                    HasTag(std::string_view name, const ScriptingContext& context) const override;
+    [[nodiscard]] TagVecs      Tags(const ScriptingContext& context) const override;
+    [[nodiscard]] bool         HasTag(std::string_view name, const ScriptingContext& context) const override;
 
-    [[nodiscard]] std::string             Dump(uint8_t ntabs = 0) const override;
+    [[nodiscard]] std::string  Dump(uint8_t ntabs = 0) const override;
 
-    [[nodiscard]] int                       ContainerObjectID() const noexcept  override { return this->SystemID(); }
-    [[nodiscard]] const std::set<int>&      ContainedObjectIDs() const override { return m_buildings; }
-    [[nodiscard]] bool                      Contains(int object_id) const override;
-    [[nodiscard]] bool                      ContainedBy(int object_id) const override;
+    using UniverseObject::IDSet;
+    [[nodiscard]] int          ContainerObjectID() const noexcept  override { return this->SystemID(); }
+    [[nodiscard]] const IDSet& ContainedObjectIDs() const noexcept override { return m_buildings; }
+    [[nodiscard]] bool         Contains(int object_id) const override;
+    [[nodiscard]] bool         ContainedBy(int object_id) const override;
 
-    [[nodiscard]] const Meter*              GetMeter(MeterType type) const override { return UniverseObject::GetMeter(type); }
+    std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const override;
 
-    std::shared_ptr<UniverseObject>         Accept(const UniverseObjectVisitor& visitor) const override;
+    [[nodiscard]] const auto&                   Focus() const noexcept { return m_focus; }
+    [[nodiscard]] int                           TurnsSinceFocusChange(int current_turn) const;
+    [[nodiscard]] std::vector<std::string_view> AvailableFoci(const ScriptingContext& context) const;
+    [[nodiscard]] bool                          FocusAvailable(std::string_view focus, const ScriptingContext& context) const;
+    [[nodiscard]] const std::string&            FocusIcon(std::string_view focus_name, const ScriptingContext& context) const;
 
-    [[nodiscard]] std::vector<std::string>  AvailableFoci(const ScriptingContext& context) const override; // TODO: return vector<string_view> ?
-    [[nodiscard]] bool                      FocusAvailable(std::string_view focus, const ScriptingContext& context) const override;
-    [[nodiscard]] const std::string&        FocusIcon(std::string_view focus_name, const ScriptingContext& context) const override;
+    [[nodiscard]] bool                Populated() const;
+    [[nodiscard]] auto&               SpeciesName() const noexcept { return m_species_name; }
 
     [[nodiscard]] PlanetType          Type() const noexcept            { return m_type; }
     [[nodiscard]] PlanetType          OriginalType() const noexcept    { return m_original_type; }
@@ -103,7 +101,7 @@ public:
     /** @returns an angle in degree. */
     [[nodiscard]] float AxialTilt() const noexcept                  { return m_axial_tilt; }
 
-    [[nodiscard]] const std::set<int>& BuildingIDs() const noexcept { return m_buildings; }
+    [[nodiscard]] const auto& BuildingIDs() const noexcept          { return m_buildings; }
 
     [[nodiscard]] bool IsAboutToBeColonized() const noexcept        { return m_is_about_to_be_colonized; }
     [[nodiscard]] bool IsAboutToBeInvaded() const noexcept          { return m_is_about_to_be_invaded; }
@@ -120,15 +118,17 @@ public:
 
     [[nodiscard]] std::map<int, double> EmpireGroundCombatForces() const;
 
+    void Copy(const UniverseObject& copied_object, const Universe& universe, int empire_id = ALL_EMPIRES) override;
+    void Copy(const Planet& copied_planet, const Universe& universe, int empire_id = ALL_EMPIRES);
 
-    void Copy(std::shared_ptr<const UniverseObject> copied_object,
-              const Universe& universe, int empire_id = ALL_EMPIRES) override;
+    void Reset(ObjectMap& objects);
 
-    [[nodiscard]] Meter* GetMeter(MeterType type) override { return UniverseObject::GetMeter(type); }
+    void Depopulate(int current_turn);
+    void SetSpecies(std::string species_name, int turn, const SpeciesManager& sm);
 
-    void Reset(ObjectMap& objects) override;
-    void Depopulate(int current_turn) override;
-    void SetSpecies(std::string species_name, int turn, const SpeciesManager& sm) override;
+    void SetFocus(std::string focus, const ScriptingContext& context);
+    void ClearFocus(int current_turn);
+    void UpdateFocusHistory();
 
     void SetType(PlanetType type);          ///< sets the type of this Planet to \a type
     void SetOriginalType(PlanetType type);  ///< sets the original type of this Planet to \a type
@@ -168,7 +168,9 @@ public:
     Planet() : UniverseObject(UniverseObjectType::OBJ_PLANET) {}
 
     /** returns new copy of this Planet. */
-    [[nodiscard]] Planet* Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const override;
+    [[nodiscard]] std::shared_ptr<UniverseObject> Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const override;
+
+    mutable boost::signals2::signal<void ()> ResourceCenterChangedSignal;
 
 private:
     friend class ObjectMap;
@@ -176,12 +178,16 @@ private:
 
     void Init();
 
-    void AddMeter(MeterType meter_type) override
-    { UniverseObject::AddMeter(meter_type); }
-
     void PopGrowthProductionResearchPhase(ScriptingContext& context) override;
 
     void ClampMeters() override;
+
+    std::string     m_species_name;
+
+    std::string     m_focus;
+    int             m_last_turn_focus_changed = INVALID_GAME_TURN;
+    std::string     m_focus_turn_initial;
+    int             m_last_turn_focus_changed_turn_initial = INVALID_GAME_TURN;
 
     PlanetType      m_type = PlanetType::PT_SWAMP;
     PlanetType      m_original_type = PlanetType::PT_SWAMP;
@@ -191,17 +197,18 @@ private:
     float           m_rotational_period = 1.0f;
     float           m_axial_tilt = 23.0f;
 
-    std::set<int>   m_buildings;
+    IDSet       m_buildings;
 
-    int             m_turn_last_colonized = INVALID_GAME_TURN;
-    int             m_turn_last_conquered = INVALID_GAME_TURN;
-    bool            m_is_about_to_be_colonized = false;
-    bool            m_is_about_to_be_invaded = false;
-    bool            m_is_about_to_be_bombarded = false;
-    int             m_ordered_given_to_empire_id = ALL_EMPIRES;
-    int             m_last_turn_attacked_by_ship = -1;
+    int         m_turn_last_colonized = INVALID_GAME_TURN;
+    int         m_turn_last_conquered = INVALID_GAME_TURN;
+    int         m_ordered_given_to_empire_id = ALL_EMPIRES;
+    int         m_last_turn_attacked_by_ship = -1;
 
-    std::string     m_surface_texture;  // intentionally not serialized; set by local effects
+    std::string m_surface_texture;  // intentionally not serialized; set by local effects
+
+    bool        m_is_about_to_be_colonized = false;
+    bool        m_is_about_to_be_invaded = false;
+    bool        m_is_about_to_be_bombarded = false;
 
     template <typename Archive>
     friend void serialize(Archive&, Planet&, unsigned int const);

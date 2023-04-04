@@ -6,18 +6,19 @@
 #include "../../UI/SDLGUI.h"
 #include "../../UI/ClientUI.h"
 #include "../../util/OptionsDB.h"
+#include "HumanClientFSM.h"
 #include <boost/statechart/event_base.hpp>
 #include <memory>
 #include <mutex>
 #include <queue>
 #include <string>
 
-struct HumanClientFSM;
+
 class MultiPlayerLobbyWnd;
 struct PreviewInformation;
 
 /** the application framework class for the human player FreeOrion client. */
-class GGHumanClientApp :
+class GGHumanClientApp final :
     public ClientApp,
     public SDLGUI
 {
@@ -114,7 +115,7 @@ public:
     [[nodiscard]] static std::pair<int, int> GetWindowWidthHeight();
     [[nodiscard]] static std::pair<int, int> GetWindowLeftTop();
 
-    [[nodiscard]] static GGHumanClientApp*   GetApp(); ///< returns GGHumanClientApp pointer to the single instance of the app
+    [[nodiscard]] static GGHumanClientApp* GetApp() noexcept { return static_cast<GGHumanClientApp*>(GG::GUI::GetGUI()); }
 
     /** Adds window dimension options to OptionsDB after the start of main, but before GGHumanClientApp constructor.
         OSX will not tolerate static initialization of SDL, to check screen size. */
@@ -130,7 +131,7 @@ public:
     void PostDeferredEvent(boost::intrusive_ptr<const boost::statechart::event_base> event);
 
 protected:
-    void Initialize() override;
+    void Initialize() noexcept override {};
 
 private:
     /** Starts a server process on localhost.
@@ -178,11 +179,8 @@ private:
         games. \p exit_code is the exit code. */
     void ResetOrExitApp(bool reset, bool skip_savegame, int exit_code = 0);
 
-    std::unique_ptr<HumanClientFSM> m_fsm;
-
-
-
-    Process m_server_process;   ///< the server process (when hosting a game or playing single player); will be empty when playing multiplayer as a non-host player
+    HumanClientFSM m_fsm;
+    Process        m_server_process;   ///< the server process (when hosting a game or playing single player); will be empty when playing multiplayer as a non-host player
 
     /** The only instance of the ClientUI. */
     std::unique_ptr<ClientUI> m_ui;

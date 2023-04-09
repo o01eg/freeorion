@@ -5461,6 +5461,9 @@ Meters:
 UNKNOWN_SPECIES
 Unknown Species
 
+UNKNOWN_EMPIRE
+Unknown Empire (%1%)
+
 RESEARCHED_TECHS
 '''Researched Techs: '''
 

@@ -102,11 +102,11 @@ else()
 endif()
 
 if(APPLE)
-    set(FreeOrionSDK_VERSION 13)
+    set(FreeOrionSDK_VERSION 15)
     set(FreeOrionSDK_FILE "FreeOrionSDK_${FreeOrionSDK_VERSION}_Clang-MacOSX-10.9-x86_64.tar.bz2")
     if(NOT EXISTS "${CMAKE_BINARY_DIR}/${FreeOrionSDK_FILE}")
     file(DOWNLOAD
-            "https://github.com/freeorion/freeorion-sdk/releases/download/v${FreeOrionSDK_VERSION}/${FreeOrionSDK_FILE}"
+            "https://github.com/o01eg/freeorion-sdk/releases/download/v${FreeOrionSDK_VERSION}/${FreeOrionSDK_FILE}"
             "${CMAKE_BINARY_DIR}/${FreeOrionSDK_FILE}"
             SHOW_PROGRESS
         )
@@ -124,9 +124,10 @@ if(APPLE)
     # Location of the FreeOrionSDK root
     set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/dep/")
     set(CMAKE_FRAMEWORK_PATH "${CMAKE_BINARY_DIR}/dep/Frameworks")
-    set(CMAKE_PROGRAM_PATH "${CMAKE_FRAMEWORK_PATH}/Python.framework/Versions/3.7/bin")
+    set(CMAKE_PROGRAM_PATH "${CMAKE_BINARY_DIR}/dep/bin")
     set(BOOST_ROOT "${CMAKE_BINARY_DIR}/dep/")
     set(Boost_NO_SYSTEM_PATHS ON)
+    set(Python_FIND_REGISTRY "LAST")
 endif()
 
 if(UNIX)
@@ -718,6 +719,7 @@ if(BUILD_CLIENT_GODOT)
                 -D CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                 -D PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}
                 -D Python3_EXECUTABLE=${PYTHON_EXECUTABLE}
+		-D CMAKE_FIND_DEBUG_MODE=On
                 ${CL_ARGS}
             INSTALL_COMMAND ""
         )
@@ -802,7 +804,7 @@ if(APPLE AND BUILD_CLIENT_GG)
         COMMAND
             ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeoriond>" "$<TARGET_FILE_DIR:freeorion>/../Executables"
         COMMAND
-            ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
+            ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:freeorion>/../SharedSupport/lib"
         COMMAND
             ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeorioncommon>" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
@@ -835,6 +837,8 @@ if(APPLE AND BUILD_CLIENT_GG)
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_SYSTEM_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_THREAD_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
+        COMMAND
+           ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_BINARY_DIR}/dep/lib/python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}.zip" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport/lib"
         COMMAND
            ${CMAKE_COMMAND} -E remove_directory "$<TARGET_FILE_DIR:freeorion>/../Frameworks"
         COMMAND

@@ -66,7 +66,12 @@ jobs:
           mkdir build
           cd build
           alias cmake="/usr/local/bin/gtimeout 40m /usr/local/bin/cmake"
-          cmake -GXcode -DBUILD_TESTING=ON -DBUILD_CLIENT_GODOT=ON -DBoost_NO_BOOST_CMAKE=ON -DGLEW_USE_STATIC_LIBS=ON ..
+          PYTHONHOME=/Users/runner/work/freeorion/freeorion/build/dep/ cmake -GXcode -DBUILD_TESTING=ON -DBUILD_CLIENT_GODOT=ON -DBoost_NO_BOOST_CMAKE=ON -DGLEW_USE_STATIC_LIBS=ON ..
+      - name: Check deps
+        if: always()
+        run: |
+          ls /Users/runner/work/freeorion/freeorion/build/dep/bin/
+          PYTHONHOME=/Users/runner/work/freeorion/freeorion/build/dep/ /Users/runner/work/freeorion/freeorion/build/dep/bin/python3.9 -m sysconfig 
       - name: Build
         run: |
           export PATH="/usr/local/opt/ccache/libexec:$PATH"
@@ -81,6 +86,13 @@ jobs:
           cmake --build . --config Release --target package -- -parallelizeTargets
           ccache --cleanup
           ccache --show-stats || true
+      - name: Upload artifacts
+        if: github.ref != 'refs/heads/weekly-test-builds' && github.event_name == 'push' && matrix.os == 'macos-11'
+        uses: actions/upload-artifact@v3
+        with:
+          name: freeorion-macos-${{ github.run_number }}
+          path: build/FreeOrion_*.dmg
+          retention-days: 7
       - name: Decrypt deploy SSH key
         if: github.ref == 'refs/heads/weekly-test-builds' && github.event_name == 'push' && matrix.os == 'macos-11'
         run: bash .github/pre-deploy.sh

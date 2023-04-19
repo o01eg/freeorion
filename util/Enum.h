@@ -3,7 +3,7 @@
 
 #include <algorithm>
 #include <iostream>
-#include <vector>
+#include <array>
 #include <string>
 
 #include <boost/preprocessor/comparison/equal.hpp>
@@ -116,10 +116,6 @@ FO_ENUM_NAME_FROM_TYPENAME(typeName)& value) \
     return stream; \
 }
 
-template<typename E>
-struct EnumIterator {
-};
-
 /** @brief Implementation detail for FO_ENUM */
 #define FO_DEF_ENUM_ITERATE_VALUE(r, data, elem) \
     {data::BOOST_PP_TUPLE_ELEM(0, elem), BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(0, elem)) },
@@ -130,28 +126,13 @@ inline \
 BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
         static, \
         BOOST_PP_EMPTY()) \
-std::vector<std::pair< \
-FO_ENUM_NAME_FROM_TYPENAME(typeName), std::string_view>> \
-BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), Values)() {\
-static const std::vector<std::pair< \
-FO_ENUM_NAME_FROM_TYPENAME(typeName), std::string_view>> ret{ \
+constexpr auto \
+BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), Values)() noexcept {\
+    return std::array<std::pair<FO_ENUM_NAME_FROM_TYPENAME(typeName), std::string_view>, BOOST_PP_SEQ_SIZE(values)> {{ \
     BOOST_PP_SEQ_FOR_EACH(FO_DEF_ENUM_ITERATE_VALUE, \
         FO_ENUM_NAME_FROM_TYPENAME(typeName), values) \
-    }; \
-    return ret; \
-}; \
-inline \
-BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-        static, \
-        BOOST_PP_EMPTY()) \
-std::vector<std::pair< \
-FO_ENUM_NAME_FROM_TYPENAME(typeName), std::string_view>> \
-IterateEnum(EnumIterator< \
-FO_ENUM_NAME_FROM_TYPENAME(typeName) >){ return \
-BOOST_PP_IF(BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(typeName), 2), \
-    BOOST_PP_TUPLE_ELEM(0, typeName)::, \
-    BOOST_PP_EMPTY()) \
-BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), Values)();};
+    }}; \
+};
 
 /** @brief Implementation detail for FO_ENUM */
 #define FO_DEF_ENUM_ADD_STRING_REPR(s, data, elem) \
@@ -159,15 +140,14 @@ BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), Values)();};
 
 /** @brief Implementation detail for FO_ENUM */
 #define FO_DEF_ENUM_FROM_STRING(typeName) \
-inline FO_ENUM_NAME_FROM_TYPENAME(typeName) \
+inline constexpr auto \
 BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), FromString)( \
     std::string_view sv, \
     FO_ENUM_NAME_FROM_TYPENAME(typeName) not_found_result = FO_ENUM_NAME_FROM_TYPENAME(typeName)(0) \
-) { \
-    const auto vals = BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), Values)(); \
-    auto val_it = std::find_if(vals.begin(), vals.end(), [sv](const auto& e) { return sv == e.second; }); \
-    if (val_it != vals.end()) \
-        return val_it->first; \
+) noexcept { \
+    constexpr auto vals = BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), Values)(); \
+    for (const auto& [val, val_sv] : vals) \
+        if (val_sv == sv) return val; \
     return not_found_result; \
 }
 
@@ -208,7 +188,7 @@ BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), FromString)( \
  *
  * Iterate over values:
  * @code
- * for (const auto& p : IterateEnum(EnumIterator<Animal>{})) {
+ * for (const auto& [val, string_view] : AnimalValues) {
  *    ...
  * }
  * @endcode
@@ -232,7 +212,7 @@ BOOST_PP_CAT(FO_ENUM_NAME_FROM_TYPENAME(typeName), FromString)( \
  *
  * Iterate over values:
  * @code
- * for (const auto& p : AutomaticGearBox::IterateEnum(EnumIterator<AutomaticGearBox::Animal>{})) {
+ * for (const auto& [val, string_view] : AutomaticGearBox::AnimalValues())) {
  *    ...
  * }
  * @endcode

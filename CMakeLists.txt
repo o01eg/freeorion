@@ -12,7 +12,7 @@ if(POLICY CMP0072)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_HOME_DIRECTORY}/cmake ${CMAKE_HOME_DIRECTORY}/GG/cmake)
-set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12 CACHE STRING "Set the minimum OSX deployment target version")
+set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15 CACHE STRING "Set the minimum OSX deployment target version")
 set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING "Set the architecture the universal binaries for OSX should be built for")
 
 IF(CMAKE_GENERATOR STREQUAL "Xcode")
@@ -348,7 +348,7 @@ set_property(DIRECTORY APPEND
         # Forcing backtrace using api for boost stacktrace due to lacking on ::Unwind side
         $<$<PLATFORM_ID:FreeBSD>:BOOST_STACKTRACE_USE_LIBC_BACKTRACE_FUNCTION>
         # Workaround for boost 1.81 issue https://github.com/boostorg/phoenix/issues/111
-        $<$<VERSION_EQUAL:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.81>:BOOST_PHOENIX_STL_TUPLE_H_>
+        $<$<VERSION_GREATER_EQUAL:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.81>:BOOST_PHOENIX_STL_TUPLE_H_>
 )
 
 
@@ -717,6 +717,7 @@ if(BUILD_CLIENT_GODOT)
                 -D CMAKE_CONFIGURATION_TYPES=${GODOT_CPP_BUILD_TYPE}
                 -D CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                 -D PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}
+                -D Python3_EXECUTABLE=${PYTHON_EXECUTABLE}
                 ${CL_ARGS}
             INSTALL_COMMAND ""
         )

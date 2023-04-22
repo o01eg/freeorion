@@ -8,10 +8,10 @@ on:
 jobs:
   build-ppa:
     name: PPA ${{ matrix.dist }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
-        dist: [focal, jammy, kinetic, lunar]
+        dist: [jammy, kinetic, lunar]
 
     steps:
       - name: Checkout sources

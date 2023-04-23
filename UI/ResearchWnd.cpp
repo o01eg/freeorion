@@ -76,11 +76,11 @@ namespace {
         }
 
         void Init() {
-            ScriptingContext context;
-            auto empire = context.GetEmpire(elem.empire_id);
+            const ScriptingContext context;
+            const auto empire = context.GetEmpire(elem.empire_id);
 
             const Tech* tech = GetTech(elem.name);
-            double per_turn_cost = tech ? tech->PerTurnCost(elem.empire_id, context) : 1;
+            const double per_turn_cost = tech ? tech->PerTurnCost(elem.empire_id, context) : 1;
             double progress = 0.0;
             if (empire && empire->TechResearched(elem.name))
                 progress = tech ? tech->ResearchCost(elem.empire_id, context) : 0.0;
@@ -92,7 +92,7 @@ namespace {
                                                     ClientWidth(), elem.name, elem.allocated_rp,
                                                     elem.turns_left, progress / per_turn_cost,
                                                     elem.empire_id);
-            push_back(panel);
+            push_back(std::move(panel));
 
             SetDragDropDataType("RESEARCH_QUEUE_ROW");
 

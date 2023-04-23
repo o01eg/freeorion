@@ -275,9 +275,9 @@ struct PlayerInfo {
 #if defined(__cpp_impl_three_way_comparison)
     auto operator<=>(const PlayerInfo&) const = default;
 #else
-    bool operator==(const PlayerInfo& rhs) noexcept
+    bool operator==(const PlayerInfo& rhs) const noexcept
     { return name == rhs.name && empire_id == rhs.empire_id && client_type == rhs.client_type && host == rhs.host; }
-    bool operator!=(const PlayerInfo& rhs) noexcept
+    bool operator!=(const PlayerInfo& rhs) const noexcept
     { return !operator==(rhs); }
 #endif
 };

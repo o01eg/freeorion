@@ -601,7 +601,7 @@ float Empire::ResearchProgress(const std::string& name, const ScriptingContext& 
     const auto it = m_research_progress.find(name);
     if (it == m_research_progress.end())
         return 0.0f;
-    const const Tech* tech = GetTech(it->first);
+    const Tech* tech = GetTech(it->first);
     if (!tech)
         return 0.0f;
     const float tech_cost = tech->ResearchCost(m_id, context);

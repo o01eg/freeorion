@@ -46,11 +46,12 @@ namespace {
                     ErrorLogger() << "SetTechQueueElementSpending couldn't find cached cost / time for tech " << elem.name;
                     continue;
                 }
-                const auto& [ignored, tech_cost, tech_min_turns] = *ct_it; // TODO: put back the safety checks...
-
-                const float RPs_needed = tech_cost - progress*tech_cost;
-                const float RPs_per_turn_limit = tech_cost / tech_min_turns;
-                const float RPs_to_spend = std::min(RPs_needed, RPs_per_turn_limit);
+                const float RPs_to_spend = [ct_it, progress]() {
+                    const auto& [ignored, tech_cost, tech_min_turns] = *ct_it;
+                    const float RPs_needed = tech_cost - progress*tech_cost;
+                    const float RPs_per_turn_limit = tech_cost / std::max(1, tech_min_turns);
+                    return std::min(RPs_needed, RPs_per_turn_limit);
+                }();
 
                 if (total_RPs_spent + RPs_to_spend <= RPs - EPSILON) {
                     elem.allocated_rp = RPs_to_spend;
@@ -219,11 +220,11 @@ void ResearchQueue::Update(float RPs, const std::map<std::string, float>& resear
             ErrorLogger() << "ResearchQueue::Update no cost/time for tech " << elem.name;
             continue;
         }
-        const auto& [ignored, cost, time] = *ct_it;
-
-        tech_cost_time.emplace(std::piecewise_construct,
-                               std::forward_as_tuple(i),
-                               std::forward_as_tuple(cost, time));
+        const auto cost_time = [ct_it]() {
+            const auto& [ignored, cost, time] = *ct_it;
+            return std::pair<float, int>{cost, std::max(1, time)};
+        };
+        tech_cost_time.emplace(i, cost_time());
 
         if (dpsim_tech_status_map[elem.name] == TechStatus::TS_RESEARCHABLE) {
             dp_researchable_techs.insert(i);

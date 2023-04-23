@@ -698,19 +698,19 @@ namespace {
             if (empire->Eliminated())
                 continue;
             const auto ct_it = std::find_if(tech_costs_times.begin(), tech_costs_times.end(),
-                                            [empire_id](const auto& tct) { return empire_id == tct.first; });
+                                            [empire_id{empire_id}](const auto& tct) { return empire_id == tct.first; });
             if (ct_it == tech_costs_times.end()) {
                 ErrorLogger() << "UpdateResourcePools in ServerApp couldn't find costs/times for empire " << empire_id;
                 continue;
             }
-            boost::asio::post(thread_pool, [&context, empire{empire.get()}, &ct{ct_it->second}]() {
+            boost::asio::post(thread_pool, [&context, empire{empire.get()}, ct_it]() {
                 // determine population centers and resource centers of empire, tells resource pools
                 // the centers and groups of systems that can share resources (note that being able to
                 // share resources doesn't mean a system produces resources)
                 empire->InitResourcePools(context.ContextObjects(), context.supply);
 
                 // determine how much of each resources is available in each resource sharing group
-                empire->UpdateResourcePools(context, ct);
+                empire->UpdateResourcePools(context, ct_it->second);
             });
         }
 
@@ -3551,7 +3551,7 @@ void ServerApp::CacheCostsTimes(const ScriptingContext& context) {
         for (const auto& [empire_id, empire] : m_empires) {
             retval[empire_id].reserve(tm.size());
 
-            const auto should_cache = [&empire](const auto tech_name, const auto& tech) {
+            const auto should_cache = [empire{empire.get()}](const auto tech_name, const auto& tech) {
                 return (tech.Researchable() &&
                         empire->GetTechStatus(tech_name) == TechStatus::TS_RESEARCHABLE) ||
                     empire->GetResearchQueue().InQueue(tech_name);

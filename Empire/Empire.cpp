@@ -2073,7 +2073,7 @@ std::vector<std::string> Empire::CheckResearchProgress(
         if (!tech.Researchable())
             continue;
 
-        const auto progress_fraction = [this, tech_name]() { // TODO: avoid copy, make m_research_progess use transparent comparator
+        const auto progress_fraction = [this, tech_name{tech_name}]() { // TODO: avoid copy, make m_research_progess use transparent comparator
             const auto progress_it = m_research_progress.find(tech_name);
             if (progress_it == m_research_progress.end())
                 return 0.0f;
@@ -2083,7 +2083,7 @@ std::vector<std::string> Empire::CheckResearchProgress(
             continue;
 
         const auto ct_it = std::find_if(costs_times.begin(), costs_times.end(),
-                                        [tech_name](const std::tuple<std::string_view, double, int>& ct)
+                                        [tech_name{tech_name}](const std::tuple<std::string_view, double, int>& ct)
                                         { return std::get<0>(ct) == tech_name; });
         if (ct_it == costs_times.end()) {
             ErrorLogger() << "Missing tech " << tech_name << " cost time in CheckResearchProgress!";

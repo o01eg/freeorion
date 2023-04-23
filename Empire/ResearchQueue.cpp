@@ -41,7 +41,8 @@ namespace {
                 const float progress = progress_it == research_progress.end() ? 0.0f : progress_it->second;
 
                 const auto ct_it = std::find_if(costs_times.begin(), costs_times.end(),
-                                                [&t{elem.name}](const auto& ct) { return std::get<0>(ct) == t; });
+                                                [t{std::string_view{elem.name}}](const auto& ct)
+                                                { return std::get<0>(ct) == t; });
                 if (ct_it == costs_times.end()) {
                     ErrorLogger() << "SetTechQueueElementSpending couldn't find cached cost / time for tech " << elem.name;
                     continue;
@@ -215,7 +216,7 @@ void ResearchQueue::Update(float RPs, const std::map<std::string, float>& resear
             continue;
 
         const auto ct_it = std::find_if(costs_times.begin(), costs_times.end(),
-                                        [&t{elem.name}](const auto& ct) { return t == std::get<0>(ct); });
+                                        [t{std::string_view{elem.name}}](const auto& ct) { return t == std::get<0>(ct); });
         if (ct_it == costs_times.end()) {
             ErrorLogger() << "ResearchQueue::Update no cost/time for tech " << elem.name;
             continue;

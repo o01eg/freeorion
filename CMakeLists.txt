@@ -57,7 +57,7 @@ include(UseCodeCoverage)
 include(TargetDependencies)
 include(CPackComponent)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -259,7 +259,7 @@ include(TestForBug2795)
 ##
 
 set(MINIMUM_PYTHON_VERSION 3.7)
-set(MINIMUM_BOOST_VERSION 1.69.0)
+set(MINIMUM_BOOST_VERSION 1.73.0)
 
 find_package(Threads)
 find_package(PythonInterp ${MINIMUM_PYTHON_VERSION} REQUIRED)
@@ -278,6 +278,8 @@ find_package(Boost ${MINIMUM_BOOST_VERSION}
         system
         thread
     REQUIRED)
+
+message(STATUS "Boost version detected ${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION}")
 
 find_package(Boost OPTIONAL_COMPONENTS python${Boost_PYTHON_SUFFIX})
 if(NOT Boost_PYTHON${Boost_PYTHON_SUFFIX}_FOUND)

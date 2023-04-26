@@ -12096,7 +12096,6 @@ DESC_UNIQUE_OF
 DESC_UNIQUE_OF_NOT
 ''' that is not one of %1% objects with distinct values of%2% and%3%'''
 
-
 # %1% FIXME
 DESC_VALUE_TEST
 ''' when %1%'''

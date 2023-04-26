@@ -168,7 +168,7 @@ void ServerApp::SignalHandler(const boost::system::error_code& error, int signal
 
 namespace {
     std::string AIClientExe() {
-        static constexpr std::string_view ai_client_exe_filename =
+        static constexpr auto ai_client_exe_filename =
 #ifdef FREEORION_WIN32
             "freeorionca.exe";
 #else

@@ -3012,8 +3012,12 @@ void MapWnd::InitTurn(ScriptingContext& context) {
 
 
     timer.EnterSection("update resource pools");
-    for (auto& entry : context.Empires())
-        entry.second->UpdateResourcePools(context, entry.second->TechCostsTimes(context));
+    for (auto& [ignored, empire] : context.Empires()) {
+        (void)ignored;
+        empire->UpdateResourcePools(context, empire->TechCostsTimes(context),
+                                    empire->PlanetAnnexationCosts(context),
+                                    empire->PolicyAdoptionCosts(context));
+    }
 
     timer.EnterSection("refresh government");
     m_government_wnd->Refresh();
@@ -7128,7 +7132,9 @@ void MapWnd::UpdateEmpireResourcePools() {
      * resources.  When resource pools update, they emit ChangeSignal, which is
      * connected to MapWnd::Refresh???ResourceIndicator, which updates the
      * empire resource pool indicators of the MapWnd. */
-    empire->UpdateResourcePools(context, empire->TechCostsTimes(context));
+    empire->UpdateResourcePools(context, empire->TechCostsTimes(context),
+                                empire->PlanetAnnexationCosts(context),
+                                empire->PolicyAdoptionCosts(context));
 
     // Update indicators on sidepanel, which are not directly connected to from the ResourcePool ChangedSignal
     SidePanel::Update();

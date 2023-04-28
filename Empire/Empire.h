@@ -5,6 +5,8 @@
 #include <array>
 #include <string>
 #include <unordered_set>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/flat_map.hpp>
 #include "InfluenceQueue.h"
 #include "PopulationPool.h"
 #include "ProductionQueue.h"
@@ -50,11 +52,6 @@ class FO_COMMON_API Empire {
 public:
     // EmpireManagers must be friends so that they can have access to the constructor and keep it hidden from others
     friend class EmpireManager;
-
-    /** \name Iterator Types */ //@{
-    typedef std::set<int>::const_iterator               SystemIDItr;
-    typedef std::vector<SitRepEntry>::const_iterator    SitRepItr;
-    //@}
 
     Empire(std::string name, std::string player_name, int ID, EmpireColor color, bool authenticated);
 
@@ -131,15 +128,15 @@ public:
     [[nodiscard]] const ProductionQueue&       GetProductionQueue() const noexcept { return m_production_queue; }
     [[nodiscard]] const InfluenceQueue&        GetInfluenceQueue() const noexcept { return m_influence_queue; }
 
-    [[nodiscard]] bool        ResearchableTech(std::string_view name) const;        ///< Returns true iff \a name is a tech that has not been researched, and has no unresearched prerequisites.
-    [[nodiscard]] float       ResearchProgress(const std::string& name, const ScriptingContext& context) const;        ///< Returns the RPs spent towards tech \a name if it has partial research progress, or 0.0 if it is already researched.
+    [[nodiscard]] bool        ResearchableTech(std::string_view name) const;          ///< Returns true iff \a name is a tech that has not been researched, and has no unresearched prerequisites.
+    [[nodiscard]] float       ResearchProgress(const std::string& name, const ScriptingContext& context) const; ///< Returns the RPs spent towards tech \a name if it has partial research progress, or 0.0 if it is already researched.
     [[nodiscard]] bool        TechResearched(const std::string& name) const;          ///< Returns true iff this tech has been completely researched.
     [[nodiscard]] bool        HasResearchedPrereqAndUnresearchedPrereq(std::string_view name) const;    ///< Returns true iff this tech has some but not all prerequisites researched
     [[nodiscard]] TechStatus  GetTechStatus(const std::string& name) const;           ///< Returns the status (researchable, researched, unresearchable) for this tech for this
 
     [[nodiscard]] bool        BuildingTypeAvailable(const std::string& name) const;   ///< Returns true if the given building type is known to this empire, false if it is not
     [[nodiscard]] bool        ShipDesignAvailable(const ShipDesign& design) const;    ///< Returns true iff this ship design can be built by this empire.
-    [[nodiscard]] bool        ShipDesignAvailable(int ship_design_id, const Universe& unvierse) const;    ///< Returns true iff this ship design can be built by this empire.  If no such ship design exists, returns false
+    [[nodiscard]] bool        ShipDesignAvailable(int ship_design_id, const Universe& unvierse) const; ///< Returns true iff this ship design can be built by this empire.  If no such ship design exists, returns false
     [[nodiscard]] bool        ShipDesignKept(int ship_design_id) const;               ///< Returns true iff the given ship design id is in the set of design ids of this empire.  That is, it has been added to this empire.
     [[nodiscard]] bool        ShipPartAvailable(const std::string& name) const;       ///< Returns true iff this ship part can be built by this empire.  If no such ship part exists, returns false
     [[nodiscard]] bool        ShipHullAvailable(const std::string& name) const;       ///< Returns true iff this ship hull can be built by this empire.  If no such ship hull exists, returns false
@@ -419,75 +416,29 @@ public:
     [[nodiscard]] int TotalShipsOwned() const;
     [[nodiscard]] int TotalShipPartsOwned() const;    ///< Total number of parts for all owned ships in this empire
     [[nodiscard]] int TotalBuildingsOwned() const;
-
-    [[nodiscard]] auto SpeciesShipsOwned() const -> const std::map<std::string, int>& // TODO: auto&
-    { return m_species_ships_owned; }
-
-    [[nodiscard]] auto ShipDesignsOwned() const -> const std::map<int, int>&
-    { return m_ship_designs_owned; }
-
-    [[nodiscard]] auto ShipPartsOwned() const -> const std::map<std::string, int>&
-    { return m_ship_parts_owned; }
-
-    [[nodiscard]] auto ShipPartClassOwned() const -> const std::map<ShipPartClass, int>&
-    { return m_ship_part_class_owned; }
-
-    [[nodiscard]] auto SpeciesColoniesOwned() const -> const std::map<std::string, int>&
-    { return m_species_colonies_owned; }
-
-    [[nodiscard]] auto OutpostsOwned() const -> int
-    { return m_outposts_owned; }
-
-    [[nodiscard]] auto BuildingTypesOwned() const -> const std::map<std::string, int>&
-    { return m_building_types_owned; }
-
-    [[nodiscard]] auto EmpireShipsDestroyed() const -> const std::map<int, int>&
-    { return m_empire_ships_destroyed; }
-
-    [[nodiscard]] auto ShipDesignsDestroyed() const -> const std::map<int, int>&
-    { return m_ship_designs_destroyed; }
-
-    [[nodiscard]] auto SpeciesShipsDestroyed() const -> const std::map<std::string, int>&
-    { return m_species_ships_destroyed; }
-
-    [[nodiscard]] auto SpeciesPlanetsInvaded() const -> const std::map<std::string, int>&
-    { return m_species_planets_invaded; }
-
-    [[nodiscard]] auto ShipDesignsInProduction() const -> const std::map<int, int>&
-    { return m_ship_designs_in_production; }
-
-    [[nodiscard]] auto SpeciesShipsProduced() const -> const std::map<std::string, int>&
-    { return m_species_ships_produced; }
-
-    [[nodiscard]] auto ShipDesignsProduced() const -> const std::map<int, int>&
-    { return m_ship_designs_produced; }
-
-    [[nodiscard]] auto SpeciesShipsLost() const -> const std::map<std::string, int>&
-    { return m_species_ships_lost; }
-
-    [[nodiscard]] auto ShipDesignsLost() const -> const std::map<int, int>&
-    { return m_ship_designs_lost; }
-
-    [[nodiscard]] auto SpeciesShipsScrapped() const -> const std::map<std::string, int>&
-    { return m_species_ships_scrapped; }
-
-    [[nodiscard]] auto ShipDesignsScrapped() const -> const std::map<int, int>&
-    { return m_ship_designs_scrapped; }
-
-    [[nodiscard]] auto SpeciesPlanetsDepoped() const -> const std::map<std::string, int>&
-    { return m_species_planets_depoped; }
-
-    [[nodiscard]] auto SpeciesPlanetsBombed() const -> const std::map<std::string, int>&
-    { return m_species_planets_bombed; }
-
-    [[nodiscard]] auto BuildingTypesProduced() const -> const std::map<std::string, int>&
-    { return m_building_types_produced; }
-
-    [[nodiscard]] auto BuildingTypesScrapped() const -> const std::map<std::string, int>&
-    { return m_building_types_scrapped; }
-
-    [[nodiscard]] auto TurnsSystemsExplored() const -> const std::map<int, int>&
-    { return m_explored_systems; }
+    [[nodiscard]] auto& SpeciesShipsOwned() const noexcept { return m_species_ships_owned; }
+    [[nodiscard]] auto& ShipDesignsOwned() const noexcept { return m_ship_designs_owned; }
+    [[nodiscard]] auto& ShipPartsOwned() const noexcept { return m_ship_parts_owned; }
+    [[nodiscard]] auto& ShipPartClassOwned() const noexcept { return m_ship_part_class_owned; }
+    [[nodiscard]] auto& SpeciesColoniesOwned() const noexcept { return m_species_colonies_owned; }
+    [[nodiscard]] auto OutpostsOwned() const noexcept { return m_outposts_owned; }
+    [[nodiscard]] auto& BuildingTypesOwned() const noexcept { return m_building_types_owned; }
+    [[nodiscard]] auto& EmpireShipsDestroyed() const noexcept { return m_empire_ships_destroyed; }
+    [[nodiscard]] auto& ShipDesignsDestroyed() const noexcept { return m_ship_designs_destroyed; }
+    [[nodiscard]] auto& SpeciesShipsDestroyed() const noexcept { return m_species_ships_destroyed; }
+    [[nodiscard]] auto& SpeciesPlanetsInvaded() const noexcept { return m_species_planets_invaded; }
+    [[nodiscard]] auto& ShipDesignsInProduction() const noexcept { return m_ship_designs_in_production; }
+    [[nodiscard]] auto& SpeciesShipsProduced() const noexcept { return m_species_ships_produced; }
+    [[nodiscard]] auto& ShipDesignsProduced() const noexcept { return m_ship_designs_produced; }
+    [[nodiscard]] auto& SpeciesShipsLost() const noexcept { return m_species_ships_lost; }
+    [[nodiscard]] auto& ShipDesignsLost() const noexcept { return m_ship_designs_lost; }
+    [[nodiscard]] auto& SpeciesShipsScrapped() const noexcept { return m_species_ships_scrapped; }
+    [[nodiscard]] auto& ShipDesignsScrapped() const noexcept { return m_ship_designs_scrapped; }
+    [[nodiscard]] auto& SpeciesPlanetsDepoped() const noexcept { return m_species_planets_depoped; }
+    [[nodiscard]] auto& SpeciesPlanetsBombed() const noexcept { return m_species_planets_bombed; }
+    [[nodiscard]] auto& BuildingTypesProduced() const noexcept { return m_building_types_produced; }
+    [[nodiscard]] auto& BuildingTypesScrapped() const noexcept { return m_building_types_scrapped; }
+    [[nodiscard]] auto& TurnsSystemsExplored() const noexcept { return m_explored_systems; }
 
     /** Processes Builditems on queues of empires other than the indicated
       * empires, at the location with id \a location_id and, as appropriate,
@@ -539,12 +490,14 @@ private:
     std::map<std::string, int>                             m_policy_adoption_current_duration; ///< how many turns each currently-adopted policy has been adopted since it was last adopted. somewhat redundant with adoption_turn in AdoptionInfo, but seems necessary to avoid off-by-one issues between client and server
     std::set<std::string, std::less<>>                     m_available_policies;               ///< names of unlocked policies
 
-    std::set<std::string>                   m_victories;              ///< The ways that the empire has won, if any
+    using StringFlatSet = boost::container::flat_set<std::string, std::less<>>;
+    using StringIntMap = boost::container::flat_map<std::string, int, std::less<>>;
+    using MeterMap = boost::container::flat_map<std::string, Meter, std::less<>>;
 
-    std::set<std::string>                   m_newly_researched_techs; ///< names of researched but not yet effective technologies, and turns on which they were acquired.
-    std::map<std::string, int, std::less<>> m_techs;                  ///< names of researched technologies, and turns on which they were acquired.
-    using MeterMap = std::vector<std::pair<std::string, Meter>>;
-    MeterMap                                m_meters;                 ///< empire meters
+    StringFlatSet                   m_victories;                ///< The ways that the empire has won, if any
+    StringFlatSet                   m_newly_researched_techs;   ///< names of researched but not yet effective technologies, and turns on which they were acquired.
+    StringIntMap                    m_techs;                    ///< names of researched technologies, and turns on which they were acquired.
+    MeterMap                        m_meters;                   ///< empire meters
 
     ResearchQueue                   m_research_queue;           ///< the queue of techs being or waiting to be researched
     std::map<std::string, float>    m_research_progress;        ///< progress of partially-researched techs; fully researched techs are removed
@@ -552,12 +505,9 @@ private:
     ProductionQueue                 m_production_queue;         ///< the queue of items being or waiting to be built
     InfluenceQueue                  m_influence_queue;
 
-    std::set<std::string>           m_available_building_types; ///< list of acquired BuildingType.  These are string names referencing BuildingType objects
-    //! List of acquired ShipPart referenced by name.
-    std::set<std::string>           m_available_ship_parts;
-
-    //! List of acquired ship ShipHull referenced by name.
-    std::set<std::string>           m_available_ship_hulls;
+    StringFlatSet                   m_available_building_types; ///< acquired BuildingTypes
+    StringFlatSet                   m_available_ship_parts;     ///< acquired ShipParts
+    StringFlatSet                   m_available_ship_hulls;     ///< acquired ShipHulls
 
     std::map<int, int>              m_explored_systems;         ///< systems explored by this empire and the turn on which they were explored
     std::set<int>                   m_known_ship_designs;       ///< ids of ship designs in the universe that this empire knows about

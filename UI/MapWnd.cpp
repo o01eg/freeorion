@@ -345,8 +345,6 @@ namespace {
                              std::function<void()> end_turn_action,
                              std::function<void()> revoke_orders_action)
     {
-        std::cout << "TurnButtonPopup";
-
         const auto* app = ClientApp::GetApp();
         if (!app)
             return;
@@ -366,7 +364,7 @@ namespace {
 
         const bool disable_revoke = disable_end_turn || order_count < 1;
         auto revoke_label = boost::io::str(FlexibleFormat(UserString("MAP_BTN_TURN_REVOKE")) % turn % order_count);
-        popup->AddMenuItem(GG::MenuItem(std::move(revoke_label), disable_end_turn, false, revoke_orders_action));
+        popup->AddMenuItem(GG::MenuItem(std::move(revoke_label), disable_revoke, false, revoke_orders_action));
 
         popup->Run();
     }
@@ -3589,13 +3587,14 @@ namespace {
     // Reimplementation of the boost::hash_range function, embedding
     // boost::hash_combine and using std::hash instead of boost::hash
     struct hash_set {
-        std::size_t operator()(const std::set<int>& set) const {
-            std::size_t seed(0);
-            std::hash<int> hasher;
+        static constexpr std::hash<int> hasher{};
 
+        static constexpr bool is_noexcept =
+            noexcept((std::size_t{} ^ hasher(42)) + 0x9e3779b9 + (13<<6) + (13>>2));
+        std::size_t operator()(const std::set<int>& set) const noexcept(is_noexcept) {
+            std::size_t seed(2283351); // arbitrary number
             for (auto element : set)
                 seed ^= hasher(element) + 0x9e3779b9 + (seed<<6) + (seed>>2);
-
             return seed;
         }
     };
@@ -4221,10 +4220,10 @@ void MapWnd::InitVisibilityRadiiRenderingBuffers() {
             continue;
         }
 
-        for (const auto [centre, radius] : detection_circles) {
+        for (const auto& [centre, radius] : detection_circles) {
             if (radius < 5.0f || radius > 2048.0f)  // hide uselessly small and ridiculously large circles. the latter so super-testers don't have an empire-coloured haze over the whole map.
                 continue;
-            const auto [X, Y] = centre;
+            const auto& [X, Y] = centre;
 
             GG::Clr circle_colour = empire->Color();
             circle_colour.a = 8*GetOptionsDB().Get<int>("ui.map.detection.range.opacity");
@@ -5246,9 +5245,8 @@ void MapWnd::CreateFleetButtonsOfType(FleetButtonMap& type_fleet_buttons,
         // sort fleets by position
         std::map<std::pair<double, double>, std::vector<int>> fleet_positions_ids;
         for (const auto* fleet : Objects().findRaw<Fleet>(fleet_IDs)) {
-            if (!fleet)
-                continue;
-            fleet_positions_ids[{fleet->X(), fleet->Y()}].emplace_back(fleet->ID());
+            if (fleet)
+                fleet_positions_ids[{fleet->X(), fleet->Y()}].emplace_back(fleet->ID());
         }
 
         // create separate FleetButton for each cluster of fleets
@@ -5259,7 +5257,8 @@ void MapWnd::CreateFleetButtonsOfType(FleetButtonMap& type_fleet_buttons,
             auto fb = GG::Wnd::Create<FleetButton>(std::move(ids_in_cluster), fleet_button_size);
 
             // store per type of fleet button.
-            type_fleet_buttons[key].insert(fb);
+            using FBM_key_t = typename FleetButtonMap::key_type;
+            type_fleet_buttons[static_cast<FBM_key_t>(key)].insert(fb);
 
             // store FleetButton for fleets in current cluster
             for (int fleet_id : fb->Fleets())

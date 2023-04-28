@@ -17,7 +17,7 @@ runs:
       id: download-sdk
       uses: suisei-cn/actions-download-file@v1.3.0
       with:
-        url: https://github.com/freeorion/freeorion-sdk/releases/download/v13/FreeOrionSDK_13_MSVC-v141-Win32.zip
+        url: https://github.com/freeorion/freeorion-sdk/releases/download/v14/FreeOrionSDK_14_MSVC-v143-Win32.zip
         target: ../
     - name: Add msbuild to PATH
       if:   inputs.mvc == '2019'
@@ -32,6 +32,7 @@ runs:
     - name: Configure
       shell: pwsh
       run: |
+        Remove-Item -LiteralPath "C:/hostedtoolcache/windows/Python/" -Force -Recurse # Ensure that system Python is not used
         unzip -q ../${{ steps.download-sdk.outputs.filename }} -d ..
         mkdir build
         pushd build

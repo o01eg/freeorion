@@ -1,4 +1,5 @@
-from typing import Iterator, Iterable, Optional, List
+from collections.abc import Iterable, Iterator
+from typing import Optional
 
 
 class UnmatchedType(Exception):
@@ -33,7 +34,7 @@ class SimpleCollectionToken(Token):
 
 class PairToken(SimpleCollectionToken):
     def __init__(self, value: str):
-        super().__init__(value, "Tuple")
+        super().__init__(value, "tuple")
 
     def wrap(self, res: str):
         return f"{self.head}{res}, {res}{self.tail}"
@@ -44,7 +45,7 @@ class MapToken(Token):
         super().__init__(value, "Map[", "]", 2)
 
 
-_tokens: List[Token] = [
+_tokens: list[Token] = [
     SimpleCollectionToken("Vec", "Vec"),
     SimpleCollectionToken("Set", "Set"),
     MapToken("Map"),
@@ -112,4 +113,4 @@ def make_type(string: Optional[str]):
 
 def is_collection_type(type_name: str) -> bool:
     type_ = make_type(type_name)
-    return type_.startswith(("Vec", "Set", "Map", "Tuple"))
+    return type_.startswith(("Vec", "Set", "Map", "tuple"))

@@ -1,23 +1,34 @@
 name: AI linters and tests
 on:
   pull_request:
+    branches: [ 'master' ]
+    types: ['opened', 'reopened', 'synchronize']
     paths:
       - '.github/**'
       - 'check/st-tool.py'
       - 'default/python/**'
       - 'default/scripting/**'
       - 'test-scripting/**'
-    types:
-      - opened
-      - edited
-      - reopened
-      - synchronize
 jobs:
-  lint-and-test-python:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install development dependencies
+        run: pip install -r default/python/requirements-dev.txt
+      - name: Lint all python code with Ruff
+        run: ruff .
+      - name: Lint with black
+        run: |
+          black . --check --no-color --diff -q
+  tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.7', '3.10']
+        python-version: ['3.9', '3.10']
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
@@ -26,15 +37,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install development dependencies
         run: pip install -r default/python/requirements-dev.txt
-      - name: Lint AI code with flake8
-        uses: ./.github/actions/flake8-lint
-        with:
-          directories: '.'
-          args: '--builtins="" --extend-exclude=default/scripting/*,test-scripting/*'
-      - name: Lint FOCS with flake8
-        uses: ./.github/actions/flake8-lint
-        with:
-          directories: 'default/scripting test-scripting'
       - name: Test with pytest
         # Run from root to preserve full path in output
         run: pytest -v default/python/tests

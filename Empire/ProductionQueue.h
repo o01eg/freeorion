@@ -36,7 +36,8 @@ FO_ENUM(
     ((BT_STOCKPILE))
     ((NUM_BUILD_TYPES))
 )
-
+static_assert(BuildTypeValues().front() == std::pair{BuildType::INVALID_BUILD_TYPE, std::string_view{"INVALID_BUILD_TYPE"}});
+static_assert(BuildTypeValues()[3].second == "BT_SHIP");
 
 struct FO_COMMON_API ProductionQueue {
     /** The type that specifies a single production item (BuildType and name string). */
@@ -67,7 +68,25 @@ struct FO_COMMON_API ProductionQueue {
         [[nodiscard]] std::pair<float, int> ProductionCostAndTime(int empire_id, int location_id,
                                                                   const ScriptingContext& context) const;
 
-        [[nodiscard]] bool operator<(const ProductionItem& rhs) const noexcept;
+        [[nodiscard]] bool operator<(const ProductionItem& rhs) const noexcept {
+            if (build_type < rhs.build_type)
+                return true;
+            else if (build_type > rhs.build_type)
+                return false;
+            else if (build_type == BuildType::BT_BUILDING)
+                return name < rhs.name;
+            else if (build_type == BuildType::BT_SHIP)
+                return design_id < rhs.design_id;
+            return false;
+        }
+
+        [[nodiscard]] bool operator==(const ProductionItem& rhs) const noexcept {
+            return build_type == rhs.build_type &&
+                design_id == rhs.design_id &&
+                name == rhs.name;
+        }
+        [[nodiscard]] bool operator!=(const ProductionItem& rhs) const noexcept
+        { return !operator==(rhs); }
 
         [[nodiscard]] bool EnqueueConditionPassedAt(int location_id, const ScriptingContext& context) const;
 
@@ -109,7 +128,8 @@ struct FO_COMMON_API ProductionQueue {
         /** Returns the total cost per item (blocksize 1) and the minimum number of
           * turns required to produce the indicated item, or (-1.0, -1) if the item
           * is unknown, unavailable, or invalid. */
-        [[nodiscard]] std::pair<float, int> ProductionCostAndTime(const ScriptingContext& context) const;
+        [[nodiscard]] auto ProductionCostAndTime(const ScriptingContext& context) const
+        { return item.ProductionCostAndTime(empire_id, location, context); }
 
 
         ProductionItem      item;
@@ -176,10 +196,10 @@ struct FO_COMMON_API ProductionQueue {
     [[nodiscard]] std::vector<std::vector<int>> ObjectsWithWastedPP(const ResourcePool& industry_pool) const;
 
     // STL container-like interface
-    [[nodiscard]] bool           empty() const noexcept { return !m_queue.size(); }
-    [[nodiscard]] unsigned int   size() const noexcept { return m_queue.size(); }
-    [[nodiscard]] const_iterator begin() const noexcept { return m_queue.begin(); }
-    [[nodiscard]] const_iterator end() const noexcept { return m_queue.end(); }
+    [[nodiscard]] bool           empty() const noexcept { return m_queue.empty(); }
+    [[nodiscard]] auto           size() const noexcept { return m_queue.size(); }
+    [[nodiscard]] auto           begin() const noexcept { return m_queue.begin(); }
+    [[nodiscard]] auto           end() const noexcept { return m_queue.end(); }
     [[nodiscard]] const_iterator find(int i) const;
     [[nodiscard]] const Element& operator[](int i) const;
 
@@ -200,8 +220,8 @@ struct FO_COMMON_API ProductionQueue {
     void     erase(int i);
     iterator erase(iterator it);
 
-    [[nodiscard]] iterator begin() noexcept { return m_queue.begin(); }
-    [[nodiscard]] iterator end() noexcept { return m_queue.end(); }
+    [[nodiscard]] auto     begin() noexcept { return m_queue.begin(); }
+    [[nodiscard]] auto     end() noexcept { return m_queue.end(); }
     [[nodiscard]] iterator find(int i);
     Element&               operator[](int i);
 

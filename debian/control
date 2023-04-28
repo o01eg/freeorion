@@ -13,7 +13,6 @@ Build-Depends:
  libboost-all-dev,
  pkg-config,
  python3,
- python3-psycopg2
 Standards-Version: 4.0.0
 Homepage: http://www.freeorion.org
 Vcs-Git: https://anonscm.debian.org/git/pkg-games/freeorion.git
@@ -24,7 +23,10 @@ Architecture: alpha amd64 arm64 armel armhf hppa i386 mips64el powerpc ppc64 ppc
 Depends:
  freeorion-data (= ${source:Version}),
  ${misc:Depends},
- ${shlibs:Depends}
+ ${shlibs:Depends},
+ python3-aiosmtplib,
+ python3-psycopg2,
+ python3-aiohttp
 Description: turn-based space empire and galactic conquest game
  FreeOrion is a turn-based space empire and galactic conquest (4X) game being
  designed and built by the FreeOrion project. FreeOrion is inspired by the

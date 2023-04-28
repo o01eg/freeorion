@@ -12,7 +12,7 @@ if(POLICY CMP0072)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_HOME_DIRECTORY}/cmake ${CMAKE_HOME_DIRECTORY}/GG/cmake)
-set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12 CACHE STRING "Set the minimum OSX deployment target version")
+set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15 CACHE STRING "Set the minimum OSX deployment target version")
 set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING "Set the architecture the universal binaries for OSX should be built for")
 
 IF(CMAKE_GENERATOR STREQUAL "Xcode")
@@ -57,7 +57,7 @@ include(UseCodeCoverage)
 include(TargetDependencies)
 include(CPackComponent)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -102,7 +102,7 @@ else()
 endif()
 
 if(APPLE)
-    set(FreeOrionSDK_VERSION 13)
+    set(FreeOrionSDK_VERSION 14)
     set(FreeOrionSDK_FILE "FreeOrionSDK_${FreeOrionSDK_VERSION}_Clang-MacOSX-10.9-x86_64.tar.bz2")
     if(NOT EXISTS "${CMAKE_BINARY_DIR}/${FreeOrionSDK_FILE}")
     file(DOWNLOAD
@@ -124,9 +124,10 @@ if(APPLE)
     # Location of the FreeOrionSDK root
     set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/dep/")
     set(CMAKE_FRAMEWORK_PATH "${CMAKE_BINARY_DIR}/dep/Frameworks")
-    set(CMAKE_PROGRAM_PATH "${CMAKE_FRAMEWORK_PATH}/Python.framework/Versions/3.7/bin")
+    set(CMAKE_PROGRAM_PATH "${CMAKE_BINARY_DIR}/dep/bin")
     set(BOOST_ROOT "${CMAKE_BINARY_DIR}/dep/")
     set(Boost_NO_SYSTEM_PATHS ON)
+    set(Python_FIND_REGISTRY "LAST")
 endif()
 
 if(UNIX)
@@ -258,8 +259,8 @@ include(TestForBug2795)
 ## Collect project dependencies.
 ##
 
-set(MINIMUM_PYTHON_VERSION 3.7)
-set(MINIMUM_BOOST_VERSION 1.69.0)
+set(MINIMUM_PYTHON_VERSION 3.9)
+set(MINIMUM_BOOST_VERSION 1.73.0)
 
 find_package(Threads)
 find_package(PythonInterp ${MINIMUM_PYTHON_VERSION} REQUIRED)
@@ -278,6 +279,8 @@ find_package(Boost ${MINIMUM_BOOST_VERSION}
         system
         thread
     REQUIRED)
+
+message(STATUS "Boost version detected ${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION}")
 
 find_package(Boost OPTIONAL_COMPONENTS python${Boost_PYTHON_SUFFIX})
 if(NOT Boost_PYTHON${Boost_PYTHON_SUFFIX}_FOUND)
@@ -348,7 +351,7 @@ set_property(DIRECTORY APPEND
         # Forcing backtrace using api for boost stacktrace due to lacking on ::Unwind side
         $<$<PLATFORM_ID:FreeBSD>:BOOST_STACKTRACE_USE_LIBC_BACKTRACE_FUNCTION>
         # Workaround for boost 1.81 issue https://github.com/boostorg/phoenix/issues/111
-        $<$<VERSION_EQUAL:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.81>:BOOST_PHOENIX_STL_TUPLE_H_>
+        $<$<VERSION_GREATER_EQUAL:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.81>:BOOST_PHOENIX_STL_TUPLE_H_>
 )
 
 
@@ -717,6 +720,7 @@ if(BUILD_CLIENT_GODOT)
                 -D CMAKE_CONFIGURATION_TYPES=${GODOT_CPP_BUILD_TYPE}
                 -D CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                 -D PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}
+                -D Python3_EXECUTABLE=${PYTHON_EXECUTABLE}
                 ${CL_ARGS}
             INSTALL_COMMAND ""
         )
@@ -801,7 +805,7 @@ if(APPLE AND BUILD_CLIENT_GG)
         COMMAND
             ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeoriond>" "$<TARGET_FILE_DIR:freeorion>/../Executables"
         COMMAND
-            ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
+            ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:freeorion>/../SharedSupport/lib"
         COMMAND
             ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeorioncommon>" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
@@ -834,6 +838,10 @@ if(APPLE AND BUILD_CLIENT_GG)
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_SYSTEM_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_THREAD_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
+        COMMAND
+           ${CMAKE_COMMAND} -E remove_directory "$<TARGET_FILE_DIR:freeorion>/../SharedSupport/lib/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}"
+        COMMAND
+           cp -R "${CMAKE_BINARY_DIR}/dep/lib/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport/lib/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}"
         COMMAND
            ${CMAKE_COMMAND} -E remove_directory "$<TARGET_FILE_DIR:freeorion>/../Frameworks"
         COMMAND

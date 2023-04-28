@@ -1,4 +1,4 @@
-os: Visual Studio 2019
+os: Visual Studio 2022
 
 version: ci-{build}
 
@@ -22,15 +22,15 @@ skip_commits:
 
 install:
   - cd ..
-  - ps: Start-FileDownload https://github.com/freeorion/freeorion-sdk/releases/download/v13/FreeOrionSDK_13_MSVC-v141-Win32.zip -FileName FreeOrionSDK.zip
+  - ps: Start-FileDownload https://github.com/freeorion/freeorion-sdk/releases/download/v14/FreeOrionSDK_14_MSVC-v143-Win32.zip -FileName FreeOrionSDK.zip
   - unzip -q FreeOrionSDK.zip
   - cp bin/* freeorion/
   - cd freeorion
 
 before_build:
-  - cd msvc2019
+  - cd msvc2022
 
 build_script:
-  - msbuild FreeOrion.sln /maxcpucount /property:BuildInParallel=true /property:CL_MPCount=2 /property:PlatformToolset=v142 /property:Configuration=Release /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" /verbosity:minimal
+  - msbuild FreeOrion.sln /maxcpucount /property:BuildInParallel=true /property:CL_MPCount=2 /property:PlatformToolset=v143 /property:Configuration=Release /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" /verbosity:minimal
 
 test: off

@@ -1,6 +1,8 @@
 #ifndef _MultiplayerCommon_h_
 #define _MultiplayerCommon_h_
 
+#include "boost_fix.h"
+
 #include "../universe/ConstantsFwd.h"
 #include "../universe/EnumsFwd.h"
 #include "../network/Networking.h"
@@ -270,10 +272,14 @@ struct PlayerInfo {
     Networking::ClientType  client_type = Networking::ClientType::INVALID_CLIENT_TYPE;
     bool                    host = false; //! true iff this is the host player
 
+#if defined(__cpp_impl_three_way_comparison)
+    auto operator<=>(const PlayerInfo&) const = default;
+#else
     bool operator==(const PlayerInfo& rhs) noexcept
     { return name == rhs.name && empire_id == rhs.empire_id && client_type == rhs.client_type && host == rhs.host; }
     bool operator!=(const PlayerInfo& rhs) noexcept
     { return !operator==(rhs); }
+#endif
 };
 
 

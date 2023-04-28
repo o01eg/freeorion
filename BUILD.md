@@ -24,13 +24,13 @@ Required Software Dependencies
 
 FreeOrion depends on the following software to build:
 
-  * [Visual Studio] - 2019 or 2022 for Windows Desktop ; Windows only
+  * [Visual Studio] - 2022 for Windows Desktop ; Windows only
   * [Xcode] - 10.1 or later ; MacOS only
   * [CMake] - 3.8 or 3.16 (Windows) or later
   * A C++17 compliant compiler - Other Operating Systems
     * [GNU GCC] - 8.0 or later
     * [Clang] - 5 or later
-  * [Python] - 3.7 or later
+  * [Python] - 3.9 or later
   * [Git]
 
 FreeOrion depends on the following libraries or APIs to run:
@@ -38,9 +38,9 @@ FreeOrion depends on the following libraries or APIs to run:
   * OpenGL - 2.1 or later ; usually provided by the graphic card driver or
     Operating System
   * OpenAL - It's recommended to use the [OpenAL Soft] implementation
-  * [Boost] - 1.69 or later, 1.79 should work
+  * [Boost] - 1.73 or later
   * [zlib]
-  * [libpython] - 3.7 or later
+  * [libpython] - 3.9 or later
   * [FreeType2]
   * [libpng]
   * [libogg]
@@ -60,12 +60,12 @@ For Linux or other Operating Systems, the build and runtime dependencies should
 be installed by the preferred way for the respective OS (e.g. via Package
 manager or compiling from source).
 
-Step by step procedure for the v0.5 release and development versions near then:
+Step by step procedure for the development master-branch version:
 
  * On Windows:
-   * Download the [FreeOrionSDK v13] from the FreeOrionSDK respository releases.
+   * Download the [FreeOrionSDK v14] from the FreeOrionSDK respository releases.
  * On MacOS:
-   * The [FreeOrionSDK v13] is downloaded automatically when CMake creates the
+   * The [FreeOrionSDK v14] is downloaded automatically when CMake creates the
      build environment.
  * Linux and other Operating Systems:
    * Install build and runtime dependencies by the preferred way for the
@@ -76,13 +76,13 @@ Step by step procedure for the v0.5 release and development versions near then:
    * Execute the `bootstrap.bat` within the project directory. This will clone
      the FreeOrion repository and place the dependencies at the correct place.
    * If you want to create an out-of-source build using CMake, you should run 
-     `git clone https://github.com/freeorion/freeorion.git FreeOrion` in the 
+     `git clone git@github.com:freeorion/freeorion.git FreeOrion` in the 
      `freeorion-project` directory, instead of running `bootstrap.bat`.
  * On MaxOS, Linux and other Operating Systems:
    * Navigate into the project directory.
    * Clone the project via Git:
      ```
-     git clone https://github.com/freeorion/freeorion.git
+     git clone git@github.com:freeorion/freeorion.git
      ```
 
 This will leave you with the latest development branch `master` and the
@@ -116,11 +116,10 @@ maintained Visual Studio Project is used for building.
 ### Windows (Visual Studio)
 
 To build FreeOrion open the `FreeOrion.sln` project solution within
-`_source directory_\msvc2019` or `_source directory_\msvc2022` with
-Visual Studio.  Make sure that the platform configuration (Win32 or
-x64) matches the version of the FreeOrion SDK that you downloaded.
-Compile the whole project by selecting the `Build` -> `Build Solution`
-menu entry.
+`_source directory_\msvc2022` with Visual Studio.  Make sure that the
+platform configuration (Win32 or x64) matches the version of the
+FreeOrion SDK that you downloaded. Compile the whole project by
+selecting the `Build` -> `Build Solution` menu entry.
 
 After the build finished successfully the binaries can be found within
 the `freeorion-project/FreeOrion` directory.
@@ -140,7 +139,7 @@ cd build
 Execute cmake to generate a Visual Studio solution, eg:
 
 ```
-cmake .. -G "Visual Studio 16 2019" -T v141 -A Win32 -DBUILD_TESTING=On -DCMAKE_C_FLAGS=/MP -DCMAKE_CXX_FLAGS=/MP
+cmake .. -G "Visual Studio 17 2022" -T v143 -A x64 -DBUILD_TESTING=On -DCMAKE_C_FLAGS=/MP -DCMAKE_CXX_FLAGS=/MP
 ```
 
 Then run the build:
@@ -267,7 +266,7 @@ adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeorion-god
 [libvorbis]: https://xiph.org/downloads/
 [SDL2]: https://www.libsdl.org/download-2.0.php
 [Software Development Kit]: https://github.com/freeorion/freeorion-sdk
-[FreeOrionSDK v13]: https://github.com/freeorion/freeorion-sdk/releases/tag/v13
+[FreeOrionSDK v14]: https://github.com/freeorion/freeorion-sdk/releases/tag/v14
 [FreeOrion Releases]: https://github.com/freeorion/freeorion/releases
 [make jobs]: https://www.gnu.org/software/make/manual/html_node/Parallel.html
 [Python-For-Android]: https://github.com/python-cmake-buildsystem/python-cmake-buildsystem/pull/262

@@ -1,9 +1,7 @@
-from itertools import islice
-
 import freeOrionAIInterface as fo
 import random
-from logging import debug, error, warning, info
-from typing import List, Mapping
+from itertools import islice
+from logging import debug, error, info, warning
 
 import AIDependencies as Dep
 import AIstate
@@ -131,7 +129,7 @@ def get_possible_projects():
     return set(preliminary_projects) - set(TechsListsAI.unusable_techs())
 
 
-def get_completed_techs() -> List[str]:
+def get_completed_techs() -> list[str]:
     """Get completed and available for use techs."""
     return [tech for tech in fo.techs() if tech_is_complete(tech)]
 
@@ -544,7 +542,7 @@ def generate_classic_research_orders():  # noqa: max-complexity
             debug("Tech %s gives access to new parts or hulls but there seems to be no military advantage.", tech)
 
 
-def _print_research_queue_head(completed_techs: List[str], first_n_techs=10):
+def _print_research_queue_head(completed_techs: list[str], first_n_techs=10):
     empire_id = fo.getEmpire().empireID
     research_queue = fo.getEmpire().researchQueue
 
@@ -589,8 +587,7 @@ def _print_research_order_header(resource_production, completed_techs):
     debug("")
 
 
-# flake8: noqa: noqa: F821
-def disabled_research_features():
+def disabled_research_features():  # noqa: C901
     """
     Bunch of code that is disabled but might be restored in the future.
     """

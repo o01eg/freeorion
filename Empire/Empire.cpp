@@ -68,26 +68,21 @@ Empire::Empire(std::string name, std::string player_name,
     m_name(std::move(name)),
     m_player_name(std::move(player_name)),
     m_color(color),
+    m_meters{{UserStringNop("METER_DETECTION_STRENGTH"), {}}},
     m_research_queue(m_id),
     m_production_queue(m_id),
     m_influence_queue(m_id),
     m_authenticated(authenticated)
 {
-    DebugLogger() << "Empire::Empire(" << m_name << ", " << m_player_name << ", " << empire_id << ", colour)";
+    //DebugLogger() << "Empire::Empire(" << m_name << ", " << m_player_name << ", " << empire_id << ", colour)";
     Init();
 }
 
 void Empire::Init() {
-    m_meters.emplace_back(std::piecewise_construct,
-                          std::forward_as_tuple(UserStringNop("METER_DETECTION_STRENGTH")),
-                          std::forward_as_tuple());
-    //m_meters[UserStringNop("METER_BUILDING_COST_FACTOR")];
-    //m_meters[UserStringNop("METER_SHIP_COST_FACTOR")];
-    //m_meters[UserStringNop("METER_TECH_COST_FACTOR")];
     for (auto& entry : PolicyCategoriesSlotsMeters())
-        m_meters.emplace_back(std::piecewise_construct,
-                              std::forward_as_tuple(std::move(entry.second)),
-                              std::forward_as_tuple());
+        m_meters.emplace(std::piecewise_construct,
+                         std::forward_as_tuple(std::move(entry.second)),
+                         std::forward_as_tuple());
 }
 
 std::shared_ptr<const UniverseObject> Empire::Source(const ObjectMap& objects) const {
@@ -114,7 +109,7 @@ std::shared_ptr<const UniverseObject> Empire::Source(const ObjectMap& objects) c
     if (p_it != planets.end())
         return p_it->second;
 
-    auto ships = objects.allExisting<Ship>();
+    const auto& ships = objects.allExisting<Ship>();
     auto s_it = std::find_if(ships.begin(), ships.end(), owned);
     if (s_it != ships.end())
         return s_it->second;
@@ -128,9 +123,9 @@ std::string Empire::Dump() const {
                          " ID: " + std::to_string(m_id) +
                          " Capital ID: " + std::to_string(m_capital_id);
     retval += " meters:\n";
-    for (const auto& meter : m_meters) {
-        retval += UserString(meter.first) + ": " +
-                  std::to_string(meter.second.Initial()) + "\n";
+    for (const auto& [name, meter] : m_meters) {
+        retval += UserString(name) + ": " +
+                  std::to_string(meter.Initial()) + "\n";
     }
     return retval;
 }
@@ -147,7 +142,7 @@ void Empire::SetCapitalID(int id, const ObjectMap& objects) {
     if (possible_capital && possible_capital->OwnedBy(m_id))
         m_capital_id = id;
 
-    auto possible_source = objects.get(id);
+    auto possible_source = objects.getRaw(id);
     if (possible_source && possible_source->OwnedBy(m_id))
         m_source_id = id;
 }
@@ -218,8 +213,7 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     }
 
     // get slots for category requested for policy to be adopted in
-    auto total_slots = TotalPolicySlots();
-    auto total_slots_in_category = total_slots[category];
+    const auto total_slots_in_category = TotalPolicySlots()[category];
     if (total_slots_in_category < 1 || slot >= total_slots_in_category) {
         ErrorLogger() << "Empire::AdoptPolicy can't adopt policy: " << name
                       << "  into category: " << category << "  in slot: " << slot
@@ -526,7 +520,7 @@ bool Empire::PolicyAffordable(std::string_view name, const ScriptingContext& con
     }
 }
 
-std::map<std::string_view, int, std::less<>> Empire::TotalPolicySlots() const {
+std::map<std::string_view, int, std::less<>> Empire::TotalPolicySlots() const { // TODO: return flat_map
     std::map<std::string_view, int, std::less<>> retval;
     // collect policy slot category meter values and return
     for (auto& cat_and_slot_strings : PolicyCategoriesSlotsMeters()) {

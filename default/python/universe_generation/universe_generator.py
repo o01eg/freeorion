@@ -176,7 +176,7 @@ def create_universe(psd_map):  # noqa: max-complexity
                 fo.empire_set_diplomacy(int(e1), int(e2), diplomacy_symbols[st.strip()])
     except IOError:
         exctype, value = sys.exc_info()[:2]
-        warning("Read diplomacy: %s %s" % (exctype, value))       
+        warning("Read diplomacy: %s %s" % (exctype, value))
 
     # assign names to all star systems and their planets
     # this needs to be done after all systems have been generated and empire home systems have been set, as

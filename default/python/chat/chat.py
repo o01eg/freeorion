@@ -11,6 +11,7 @@ import freeorion as fo
 
 import psycopg2
 import psycopg2.extensions
+
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
@@ -57,7 +58,8 @@ class ChatHistoryProvider:
         res = []
         with self.conn_ro:
             with self.conn_ro.cursor() as curs:
-                curs.execute(""" SELECT date_part('epoch', ts)::int, player_name, text,
+                curs.execute(
+                    """ SELECT date_part('epoch', ts)::int, player_name, text,
                     text_color / 256 / 256 / 256 %% 256,
                     text_color / 256 / 256 %% 256,
                     text_color / 256 %% 256,
@@ -69,7 +71,9 @@ class ChatHistoryProvider:
                         ORDER BY ts DESC
                         LIMIT 500
                     ) d
-                    ORDER BY ts""", (SERVER_ID,))
+                    ORDER BY ts""",
+                    (SERVER_ID,),
+                )
                 for r in curs:
                     c = (r[3], r[4], r[5], r[6])
                     e = (r[0], r[1], r[2], c)
@@ -94,18 +98,24 @@ class ChatHistoryProvider:
             try:
                 with self.conn:
                     with self.conn.cursor() as curs:
-                        curs.execute(""" INSERT INTO chat_history (ts, player_name, text,
+                        curs.execute(
+                            """ INSERT INTO chat_history (ts, player_name, text,
                                      text_color, server_id)
                                      VALUES (to_timestamp(%s) at time zone 'utc', %s, %s, %s, %s)""",
-                                     (timestamp,
-                                      player_name,
-                                      text,
-                                      256 * (256 * (256 * text_color[0] + text_color[1]) + text_color[2]) + text_color[3],
-                                      SERVER_ID))
+                            (
+                                timestamp,
+                                player_name,
+                                text,
+                                256 * (256 * (256 * text_color[0] + text_color[1]) + text_color[2]) + text_color[3],
+                                SERVER_ID,
+                            ),
+                        )
                         saved = True
                 try:
                     if not (player_name == ""):
-                        req = urllib.request.Request("http://localhost:8083/", ("<%s> %s" % (player_name, text)).encode())
+                        req = urllib.request.Request(
+                            "http://localhost:8083/", ("<%s> %s" % (player_name, text)).encode()
+                        )
                         req.add_header("X-XMPP-Muc", "smac")
                         urllib.request.urlopen(req).read()
                         info("Chat message was send via XMPP")

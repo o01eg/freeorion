@@ -9,6 +9,9 @@ redirect_logging_to_freeorion_logger()
 import freeorion as fo
 import random
 import sys
+import asyncio
+import aiosmtplib
+import email
 
 import psycopg2
 import psycopg2.extensions
@@ -65,6 +68,25 @@ class AuthProvider:
                 roles.append(r)
         return roles
 
+    async def __send_email(self, recipient, otp, player_name):
+        try:
+            message = email.message.EmailMessage()
+            message["From"] = self.mailconf.get("mail", "from")
+            message["To"] = recipient
+            message["Subject"] = "FreeOrion OTP"
+            message.set_content("Password %s for player %s" % (otp, player_name))
+
+            await aiosmtplib.send(message,
+                hostname=self.mailconf.get("mail", "server"),
+                port=465,
+                use_tls=True,
+                username=self.mailconf.get("mail", "login"),
+                password=self.mailconf.get("mail", "passwd"))
+            info("OTP was send to %s via email" % player_name)
+        except Exception:
+            exctype, value = sys.exc_info()[:2]
+            error("Cann't send email in async to %s: %s %s" % (player_name, exctype, value))
+
     def is_require_auth_or_return_roles(self, player_name: str, ip_address: str):
         """Returns True if player should be authenticated, False if user not allowed,
         or list of roles for anonymous players"""
@@ -117,20 +139,10 @@ class AuthProvider:
                                 exctype, value = sys.exc_info()[:2]
                                 error("Cann't send xmpp message to %s: %s %s" % (player_name, exctype, value))
                         elif r[0] == "email":
+                            info("Try to send OTP to %s via email" % player_name)
                             try:
-                                server = smtplib.SMTP_SSL(self.mailconf.get("mail", "server"), 465)
-                                server.ehlo()
-                                server.login(self.mailconf.get("mail", "login"), self.mailconf.get("mail", "passwd"))
-                                server.sendmail(
-                                    self.mailconf.get("mail", "from"),
-                                    r[1],
-                                    """From:
-                                        %s\r\nTo: %s\r\nSubject: FreeOrion OTP\r\n\r\nPassword %s
-                                        for player %s"""
-                                    % (self.mailconf.get("mail", "from"), r[1], otp, player_name),
-                                )
-                                server.close()
-                                info("OTP was send to %s via email" % player_name)
+                                loop = asyncio.get_event_loop()
+                                loop.create_task(self.__send_email(r[1], otp, player_name), name="Email")
                                 sent_otp = True
                             except Exception:
                                 exctype, value = sys.exc_info()[:2]

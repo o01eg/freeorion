@@ -389,7 +389,7 @@ template <typename FlagType>
 constexpr auto operator|(FlagType lhs, Flags<FlagType> rhs)
 { return Flags<FlagType>(lhs) | rhs; }
 
-template <typename FlagType>
+template <typename FlagType, std::enable_if_t<is_flag_type_v<FlagType>>* = nullptr>
 constexpr auto operator|(FlagType lhs, FlagType rhs)
 { return Flags<FlagType>(lhs) | Flags<FlagType>(rhs); }
 

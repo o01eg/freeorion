@@ -108,6 +108,39 @@ target_include_directories(GiGiHeader
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
 
+add_library(GiGiCXX17 OBJECT)
+
+set_property(TARGET GiGiCXX17 PROPERTY CXX_STANDARD 17)
+
+target_compile_definitions(GiGiCXX17
+    PUBLIC
+        GiGiHeader
+    PRIVATE
+        -DFONS_USE_FREETYPE
+        -DBOOST_GIL_IO_ENABLE_GRAY_ALPHA
+        $<$<VERSION_GREATER:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.71>:BOOST_GIL_USES_MP11>
+)
+
+target_include_directories(GiGiCXX17
+    INTERFACE
+        ${OPENGL_INCLUDE_DIR}
+    PRIVATE
+        ${FREETYPE_INCLUDE_DIRS}
+)
+
+target_link_libraries(GiGiCXX17
+    PUBLIC
+        GiGiHeader
+        Boost::disable_autolinking
+        Boost::dynamic_linking
+        GLEW::GLEW
+        $<IF:$<BOOL:${OPENGL_opengl_LIBRARY}>,${OPENGL_opengl_LIBRARY},${OPENGL_gl_LIBRARY}>
+    PRIVATE
+        Boost::filesystem
+        Boost::regex
+        ${FREETYPE_LIBRARIES}
+)
+
 add_library(GiGi "")
 add_library(GiGi::GiGi ALIAS GiGi)
 
@@ -138,6 +171,7 @@ target_link_libraries(GiGi
         Boost::filesystem
         Boost::regex
         ${FREETYPE_LIBRARIES}
+        GiGiCXX17
 )
 
 if(TARGET PNG::PNG)

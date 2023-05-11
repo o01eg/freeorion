@@ -100,7 +100,7 @@ jobs:
           docker run -v "$(pwd):/freeorion" -v "${{ runner.temp }}/ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build ${{ steps.prep.outputs.tagged_image }} /usr/bin/cmake -DBUILD_CLIENT_GODOT=ON -DGODOT_CUSTOM_API_FILE=/freeorion/build/godot-api.json -DBUILD_TESTING=ON ..
       - name: Build freeorion
         run: |
-          docker run -v "$(pwd):/freeorion" -v "${{ runner.temp }}/ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -e GIT_SSL_NO_VERIFY=true -w /freeorion/build ${{ steps.prep.outputs.tagged_image }} /usr/bin/cmake --build . -- -j 2
+          docker run -v "$(pwd):/freeorion" -v "${{ runner.temp }}/ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -e GIT_SSL_NO_VERIFY=true -w /freeorion/build ${{ steps.prep.outputs.tagged_image }} /usr/bin/cmake --build . -- -j 2 VERBOSE=1
       - name: Test freeorion
         run: |
           docker run -v "$(pwd):/freeorion" -v "${{ runner.temp }}/ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -e FO_TEST_HOSTLESS_GAMES=1 -w /freeorion/build ${{ steps.prep.outputs.tagged_image }} /usr/bin/cmake --build . --target unittest

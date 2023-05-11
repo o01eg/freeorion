@@ -11,6 +11,12 @@ add_subdirectory(dialogs)
 add_subdirectory(RichText)
 add_subdirectory(nanovg)
 
+target_sources(GiGiCXX17
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/GUI.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/Texture.cpp
+)
+
 target_sources(GiGi
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/AlignmentFlags.cpp
@@ -27,7 +33,6 @@ target_sources(GiGi
         ${CMAKE_CURRENT_LIST_DIR}/Font.cpp
         ${CMAKE_CURRENT_LIST_DIR}/GLClientAndServerBuffer.cpp
         ${CMAKE_CURRENT_LIST_DIR}/GroupBox.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/GUI.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Layout.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ListBox.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Menu.cpp
@@ -40,7 +45,6 @@ target_sources(GiGi
         ${CMAKE_CURRENT_LIST_DIR}/svg.cpp
         ${CMAKE_CURRENT_LIST_DIR}/TabWnd.cpp
         ${CMAKE_CURRENT_LIST_DIR}/TextControl.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/Texture.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Timer.cpp
         ${CMAKE_CURRENT_LIST_DIR}/UnicodeCharsets.cpp
         ${CMAKE_CURRENT_LIST_DIR}/VectorTexture.cpp

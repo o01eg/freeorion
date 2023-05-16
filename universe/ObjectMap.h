@@ -149,7 +149,7 @@ public:
     }
 
     /** Returns all the ids and objects of type T */
-    template <typename T, std::enable_if_t<std::is_const_v<T>>* = nullptr>
+    template <typename T> requires (std::is_const_v<T>)
     [[nodiscard]] auto allWithIDs()
     {
         const auto& const_this = *this;
@@ -157,7 +157,7 @@ public:
     }
 
     /** Returns all the ids and objects of type T */
-    template <typename T = UniverseObject, std::enable_if_t<!std::is_const_v<T>>* = nullptr>
+    template <typename T = UniverseObject> requires (!std::is_const_v<T>)
     [[nodiscard]] const auto& allWithIDs() noexcept
     {
         using DecayT = std::decay_t<T>;
@@ -262,8 +262,7 @@ public:
       * is false, then \a obj is also added to this ObjectMap's internal lists of
       * existing (ie. not destroyed) objects, which are returned by the Existing*
       * functions. */
-    template <typename T,
-        typename std::enable_if_t<std::is_base_of_v<UniverseObject, T>>* = nullptr>
+    template <typename T> requires (std::is_base_of_v<UniverseObject, T>)
     void insert(std::shared_ptr<T> obj, bool destroyed)
     { insertCore(std::move(obj), destroyed); }
 
@@ -411,22 +410,12 @@ std::decay_t<T>* ObjectMap::getRaw(int id)
 }
 
 namespace {
-    template <typename, typename = void>
-    static constexpr bool is_int_iterable = false;
-
     template <typename T>
-    static constexpr bool is_int_iterable<
-        T,
-        std::void_t<
-            decltype(std::declval<T>().begin()),
-            decltype(std::declval<T>().end()),
-            std::enable_if_t<std::is_same_v<typename T::value_type, int>>
-        >
-    > = true;
+    concept int_iterable = std::is_same_v<typename T::value_type, int> && requires(T t) { t.begin(); t.end(); };
 
-    static_assert(!is_int_iterable<int>);
-    static_assert(!is_int_iterable<std::array<float, 5>>);
-    static_assert(is_int_iterable<std::vector<int>>);
+    static_assert(!int_iterable<int>);
+    static_assert(!int_iterable<std::array<float, 5>>);
+    static_assert(int_iterable<std::vector<int>>);
 }
 
 /** Checks whether and how a predicate can be applied to select objects from the ObjectMap.
@@ -448,7 +437,7 @@ constexpr std::array<bool, 11> ObjectMap::CheckTypes()
     static_assert(std::is_convertible_v<EntryT, ConstEntryT>);
 
 
-    constexpr bool is_int_range = is_int_iterable<Pred>;
+    constexpr bool is_int_range = int_iterable<Pred>;
 
 
     constexpr bool is_visitor = std::is_convertible_v<DecayPred, UniverseObjectVisitor>;
@@ -770,7 +759,7 @@ std::vector<int> ObjectMap::findIDs(Pred pred) const
 
     if constexpr (is_int_range) {
         std::copy_if(pred.begin(), pred.end(), std::back_inserter(result),
-                     [this](int id) { return Map<DecayT>().count(id) != 0; });
+                     [this](int id) { return Map<DecayT>().contains(id); });
 
     } else if constexpr (is_visitor) {
         for (const auto& [id, obj] : Map<DecayT>())
@@ -823,7 +812,7 @@ int ObjectMap::count(Pred pred) const
 
     if constexpr (is_int_range) {
         return std::count_if(pred.begin(), pred.end(),
-                             [this](const int id) { return Map<DecayT>().count(id) != 0; });
+                             [this](const int id) { return Map<DecayT>().contains(id); });
 
     } else if constexpr (is_visitor) {
         return std::count_if(Map<DecayT>().begin(), Map<DecayT>().end(),
@@ -868,7 +857,7 @@ bool ObjectMap::check_if_any(Pred pred) const
 
     if constexpr (is_int_range) {
         return std::any_of(pred.begin(), pred.end(),
-                           [this](int id) { return Map<DecayT>().count(id) != 0; });
+                           [this](int id) { return Map<DecayT>().contains(id); });
 
     } else if constexpr (is_visitor) {
         return std::any_of(Map<DecayT>().begin(), Map<DecayT>().end(),

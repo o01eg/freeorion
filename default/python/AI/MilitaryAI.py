@@ -71,7 +71,7 @@ def get_preferred_max_military_portion_for_single_battle() -> float:
     May be used to downgrade various possible actions requiring military support if they would require an excessive
     allocation of military forces.  At the beginning of the game this max portion starts as 1.0, then is slightly
     reduced to account for desire to reserve some defenses for other locations, and then in mid to late game, as the
-    size of the the military grows, this portion is further reduced to promote pursuit of multiple battlefronts in
+    size of the military grows, this portion is further reduced to promote pursuit of multiple battlefronts in
     parallel as opposed to single battlefronts against heavily defended positions.
 
     :return: a number in range (0:1] for preferred max portion of military to be allocated to a single battle
@@ -430,7 +430,6 @@ class Allocator:
 
 
 class CapitalDefenseAllocator(Allocator):
-
     _allocation_group = "capitol"
     _military_reset_ratio = 0.5
 
@@ -458,7 +457,6 @@ class CapitalDefenseAllocator(Allocator):
 
 
 class PlanetDefenseAllocator(Allocator):
-
     _allocation_group = "occupied"
     _min_alloc_factor = 1.1
     _max_alloc_factor = 1.5
@@ -491,7 +489,6 @@ class PlanetDefenseAllocator(Allocator):
 
 
 class TargetAllocator(Allocator):
-
     _allocation_group = "otherTargets"
     _min_alloc_factor = 1.3
     _max_alloc_factor = 2.5
@@ -553,7 +550,6 @@ class LocalThreatAllocator(Allocator):
     _allocation_group = "otherTargets"
 
     def _calculate_threat(self):
-
         systems_status = get_aistate().systemStatus.get(self.sys_id, {})
         threat = self.safety_factor * combine_ratings(
             systems_status.get("fleetThreat", 0),

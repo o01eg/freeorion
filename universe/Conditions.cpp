@@ -11329,8 +11329,7 @@ std::string Or::Description(bool negated) const {
     return values_str;
 }
 
-ObjectSet Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const
-{
+ObjectSet Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const {
     if (m_operands.empty())
         return {};
 
@@ -11349,9 +11348,11 @@ ObjectSet Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_c
             // TODO: fancier deep inspection of m_operands to determine optimal
             //       way to combine the default candidates...
 
-            if (m_operands[1]->EvalOne(parent_context, parent_context.source))
-                return {parent_context.source};
-            return {};
+            auto retval = m_operands[1]->GetDefaultInitialCandidateObjects(parent_context);
+            if (std::none_of(retval.begin(), retval.end(),
+                             [src{parent_context.source}](const UniverseObject* obj) { return obj == src; }))
+            { retval.push_back(parent_context.source); }
+            return retval;
         }
     }
 
@@ -11373,9 +11374,8 @@ std::string Or::Dump(uint8_t ntabs) const {
 }
 
 void Or::SetTopLevelContent(const std::string& content_name) {
-    for (auto& operand : m_operands) {
+    for (auto& operand : m_operands)
         operand->SetTopLevelContent(content_name);
-    }
 }
 
 uint32_t Or::GetCheckSum() const {

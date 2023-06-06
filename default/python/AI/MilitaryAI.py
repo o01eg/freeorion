@@ -179,8 +179,9 @@ def avail_mil_needing_repair(  # noqa: max-complexity
                         % (fleet_id, universe.getSystem(fleet.systemID))
                     )
                     debug(
-                        "\t my_local_rating: %.1f ; threat: %.1f"
-                        % (my_local_rating, local_status.get("totalThreat", 0))
+                        "\t my_local_rating: {:.1f} ; threat: {:.1f}".format(
+                            my_local_rating, local_status.get("totalThreat", 0)
+                        )
                     )
                 debug("Selecting fleet %d at %s for repair" % (fleet_id, universe.getSystem(fleet.systemID)))
         fleet_buckets[fleet_ok or bool(safely_needed)].append(fleet_id)
@@ -535,14 +536,6 @@ class OutpostTargetAllocator(TargetAllocator):
     _max_alloc_factor = 3
 
 
-class BlockadeAllocator(TargetAllocator):
-    _potential_threat_factor = 0.25
-    _max_alloc_factor = 1.5
-
-    def _maximum_allocation(self, threat):
-        return min(self._minimum_allocation(threat), self._allocation_helper.remaining_rating) * self._max_alloc_factor
-
-
 class LocalThreatAllocator(Allocator):
     _potential_threat_factor = 0
     _min_alloc_factor = 1.3
@@ -573,18 +566,6 @@ class InteriorTargetsAllocator(LocalThreatAllocator):
 
     def _take_any(self):
         return self.assigned_rating > 0
-
-
-class ExplorationTargetAllocator(LocalThreatAllocator):
-    _potential_threat_factor = 0.25
-    _max_alloc_factor = 2.0
-    _allocation_group = "exploreTargets"
-
-    def _calculate_threat(self):
-        return self.safety_factor * self._local_threat() + self._potential_threat()
-
-    def _take_any(self):
-        return False
 
 
 class BorderSecurityAllocator(LocalThreatAllocator):
@@ -690,8 +671,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"): 
         already_assigned_rating[sys_id] = combine_ratings(my_defense_rating, already_assigned_rating[sys_id])
         if _verbose_mil_reporting and already_assigned_rating[sys_id]:
             debug(
-                "\t System %s already assigned rating %.1f"
-                % (universe.getSystem(sys_id), already_assigned_rating[sys_id])
+                f"\t System {universe.getSystem(sys_id)} already assigned rating {already_assigned_rating[sys_id]:.1f}"
             )
 
     # get systems to defend
@@ -866,8 +846,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"): 
         _military_allocations = new_allocations
     if _verbose_mil_reporting or "Main" in thisround:
         debug(
-            "------------------------------\nFinal %s Round Military Allocations: %s \n-----------------------"
-            % (thisround, {sid: alloc for sid, alloc, _, _, _ in new_allocations})
+            f"------------------------------\nFinal {thisround} Round Military Allocations: {{sid: alloc for sid, alloc, _, _, _ in new_allocations}} \n-----------------------"
         )
         debug("(Apparently) remaining military rating: %.1f" % remaining_mil_rating)
 

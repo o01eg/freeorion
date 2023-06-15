@@ -31,7 +31,6 @@ class EmpireResources:
         for planet_info in _get_planets_info().values():
             planet = universe.getPlanet(planet_info.pid)
             if planet.ownedBy(empire_id):
-
                 if AIDependencies.ANCIENT_RUINS_SPECIAL in planet.specials:
                     self.have_ruins = True
 
@@ -65,10 +64,6 @@ class EmpireResources:
 @cache_for_current_turn
 def _get_planet_catalog() -> EmpireResources:
     return EmpireResources()
-
-
-def population_with_research_focus() -> int:
-    return _get_planet_catalog().num_researchers
 
 
 def population_with_industry_focus() -> int:

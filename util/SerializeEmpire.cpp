@@ -182,7 +182,7 @@ void Empire::serialize(Archive& ar, const unsigned int version)
     ar  & BOOST_SERIALIZATION_NVP(m_capital_id)
         & BOOST_SERIALIZATION_NVP(m_source_id)
         & BOOST_SERIALIZATION_NVP(m_eliminated);
-    if (Archive::is_loading::value && version < 12) {
+    if (Archive::is_loading::value && version < 13) {
         std::set<std::string> victories;
         ar  & boost::serialization::make_nvp("m_victories", victories);
         m_victories.clear();
@@ -215,7 +215,7 @@ void Empire::serialize(Archive& ar, const unsigned int version)
         ar  & boost::serialization::make_nvp("m_techs", techs);
         m_techs.insert(boost::container::ordered_unique_range, techs.begin(), techs.end());
 
-    } else if (Archive::is_loading::value && version < 12) {
+    } else if (Archive::is_loading::value && version < 13) {
         std::map<std::string, int, std::less<>> techs;
         ar  & boost::serialization::make_nvp("m_techs", techs);
         m_techs.insert(boost::container::ordered_unique_range, techs.begin(), techs.end());
@@ -267,7 +267,7 @@ void Empire::serialize(Archive& ar, const unsigned int version)
         ar  & boost::serialization::make_nvp("m_meters", meters);
         m_meters.insert(boost::container::ordered_unique_range, meters.begin(), meters.end());
 
-    } else if (Archive::is_loading::value && version < 12) {
+    } else if (Archive::is_loading::value && version < 13) {
         std::vector<std::pair<std::string, Meter>> meters;
         ar  & boost::serialization::make_nvp("m_meters", meters);
         std::sort(meters.begin(), meters.end());
@@ -303,7 +303,7 @@ void Empire::serialize(Archive& ar, const unsigned int version)
             & BOOST_SERIALIZATION_NVP(m_production_queue)
             & BOOST_SERIALIZATION_NVP(m_influence_queue);
 
-        if (Archive::is_loading::value && version < 12) {
+        if (Archive::is_loading::value && version < 13) {
             std::set<std::string> buf;
             ar  & boost::serialization::make_nvp("m_available_building_types", buf);
             m_available_building_types.insert(boost::container::ordered_unique_range, buf.begin(), buf.end());
@@ -398,9 +398,16 @@ void Empire::serialize(Archive& ar, const unsigned int version)
     ar  & BOOST_SERIALIZATION_NVP(m_authenticated);
     ar  & BOOST_SERIALIZATION_NVP(m_ready);
     ar  & BOOST_SERIALIZATION_NVP(m_auto_turn_count);
+
+    if (Archive::is_loading::value && version < 13) {
+        m_last_turn_received = INVALID_GAME_TURN;
+    } else {
+        ar  & BOOST_SERIALIZATION_NVP(m_last_turn_received);
+    }
+
 }
 
-BOOST_CLASS_VERSION(Empire, 12)
+BOOST_CLASS_VERSION(Empire, 13)
 
 template void Empire::serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, const unsigned int);
 template void Empire::serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, const unsigned int);
@@ -462,7 +469,7 @@ void serialize(Archive& ar, EmpireManager& em, unsigned int const version)
         for (auto& [ids, diplo_status] : em.m_empire_diplomatic_statuses) {
             (void)diplo_status; // quiet unused warning
             const auto& [e1, e2] = ids;
-            if (em.m_empire_map.count(e1) < 1 || em.m_empire_map.count(e2) < 1) {
+            if (!em.m_empire_map.contains(e1) || !em.m_empire_map.contains(e2)) {
                 to_erase.emplace_back(e1, e2);
                 ErrorLogger() << "Erased invalid diplomatic status between empires " << e1 << " and " << e2;
             }
@@ -478,7 +485,7 @@ void serialize(Archive& ar, EmpireManager& em, unsigned int const version)
                 if (e1_id >= e2_id)
                     continue;
                 auto dk = DiploKey(e1_id, e2_id);
-                if (em.m_empire_diplomatic_statuses.count(dk) < 1) {
+                if (!em.m_empire_diplomatic_statuses.contains(dk)) {
                     em.m_empire_diplomatic_statuses[dk] = DiplomaticStatus::DIPLO_WAR;
                     ErrorLogger() << "Added missing diplomatic status (default WAR) between empires "
                                   << e1_id << " and " << e2_id;

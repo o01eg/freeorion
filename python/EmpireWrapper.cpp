@@ -75,7 +75,7 @@ namespace {
 
             // propagate to any not-already-counted adjacent system
             for (int lane_end_system_id : lane_ends) {
-                if (retval.count(lane_end_system_id))
+                if (retval.contains(lane_end_system_id))
                     continue;   // system already processed
                 // system not yet processed; add it to list to propagate from, and set its range to one more than this system
                 propagating_list.push_back(lane_end_system_id);
@@ -370,6 +370,7 @@ namespace FreeOrionPython {
             .def("getMeter",                        +[](const Empire& empire, const std::string& name) -> const Meter* { return empire.GetMeter(name); },
                                                     py::return_internal_reference<>(),
                                                     "Returns the empire meter with the indicated name (string).")
+            .add_property("lastTurnReceived",       &Empire::LastTurnReceived);
         ;
 
         //////////////////////

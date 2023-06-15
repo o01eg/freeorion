@@ -1,0 +1,33 @@
+name: "Build PR"
+on:
+  pull_request:
+    branches: [ 'master' ]
+    types: ['opened', 'reopened', 'synchronize']
+    paths-ignore:
+      - 'msvc*/**'
+      - 'check/**'
+      - 'doc/**'
+      - 'packaging/**'
+      - 'snap/**'
+      - '*.md'
+      - 'check/**'
+      - 'default/**'
+      - 'test-scripting/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - "pyproject.toml"
+jobs:
+  android:
+    uses: ./.github/workflows/_build-android.yml
+  macos:
+    strategy:
+      matrix:
+        os: [ macos-13 ]
+    uses: ./.github/workflows/_build-macos.yml
+    with:
+      os: ${{ matrix.os }}
+  ubuntu:
+    uses: ./.github/workflows/_build-ubuntu.yml
+  windows:
+    uses: ./.github/workflows/_build-windows.yml
+  windows-msvc:
+    uses: ./.github/workflows/_build-windows-msvs.yml

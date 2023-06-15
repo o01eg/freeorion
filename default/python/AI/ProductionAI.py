@@ -197,8 +197,7 @@ def generate_production_orders():  # noqa: max-complexity
             for type_id in possible_building_type_ids:
                 building_type = fo.getBuildingType(type_id)
                 debug(
-                    "    %s cost: %s  time: %s"
-                    % (
+                    "    {} cost: {}  time: {}".format(
                         building_type.name,
                         building_type.productionCost(empire.empireID, homeworld.id),
                         building_type.productionTime(empire.empireID, homeworld.id),
@@ -729,8 +728,7 @@ def generate_production_orders():  # noqa: max-complexity
                     else:
                         # TODO: enable location condition reporting a la mapwnd BuildDesignatorWnd
                         warning(
-                            "Enqueing Conc Camp at %s despite building_type.canBeProduced(empire.empireID, pid) reporting %s"
-                            % (planet, can_build_camp)
+                            f"Enqueing Conc Camp at {planet} despite building_type.canBeProduced(empire.empireID, pid) reporting {can_build_camp}"
                         )
     building_expense += _build_scanning_facility()
 
@@ -1105,9 +1103,9 @@ def generate_production_orders():  # noqa: max-complexity
                 if best_design is None:
                     warning(
                         "problem with mil_build_choices;"
-                        " with selector (%s) chose loc (%s), "
-                        "best_design_id (%s), best_design (None) "
-                        "from mil_build_choices: %s" % (selector, loc, best_design_id, mil_build_choices)
+                        " with selector ({}) chose loc ({}), "
+                        "best_design_id ({}), best_design (None) "
+                        "from mil_build_choices: {}".format(selector, loc, best_design_id, mil_build_choices)
                     )
                     continue
             else:
@@ -1380,33 +1378,6 @@ def find_automatic_historic_analyzer_candidates() -> list[int]:
     for i in range(min(max_enqueued, len(possible_locations))):
         chosen_locations.append(possible_locations.pop())
     return chosen_locations
-
-
-def get_number_of_queued_outpost_and_colony_ships() -> int:
-    """
-    Get the total number of queued outpost/colony ships/bases.
-    """
-    num_ships = 0
-    considered_ship_roles = (
-        ShipRoleType.CIVILIAN_OUTPOST,
-        ShipRoleType.BASE_OUTPOST,
-        ShipRoleType.BASE_COLONISATION,
-        ShipRoleType.CIVILIAN_COLONISATION,
-    )
-    for element in fo.getEmpire().productionQueue:
-        if element.turnsLeft >= 0 and element.buildType == EmpireProductionTypes.BT_SHIP:
-            if get_aistate().get_ship_role(element.designID) in considered_ship_roles:
-                num_ships += element.blocksize
-    return num_ships
-
-
-def get_number_of_existing_outpost_and_colony_ships() -> int:
-    """
-    Get the total number of existing outpost/colony ships/bases.
-    """
-    num_colony_fleets = len(FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.COLONISATION))
-    num_outpost_fleets = len(FleetUtilsAI.get_empire_fleet_ids_by_role(MissionType.OUTPOST))
-    return num_outpost_fleets + num_colony_fleets
 
 
 def _location_rating(planet: fo.planet) -> float:

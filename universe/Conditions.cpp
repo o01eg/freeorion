@@ -1590,8 +1590,7 @@ namespace {
             if (m_names.empty()) {
                 // match homeworlds for any species
                 if (std::any_of(m_species_homeworlds.begin(), m_species_homeworlds.end(),
-                                [planet_id](const auto& name_ids)
-                                { return name_ids.second.count(planet_id) > 0; }))
+                                [planet_id](const auto& name_ids) { return name_ids.second.contains(planet_id); }))
                 { return true; }
 
             } else {
@@ -1601,7 +1600,7 @@ namespace {
                     if (it == m_species_homeworlds.end())
                         return false;
                     const auto& planet_ids = it->second;
-                    return planet_ids.count(planet_id) > 0;
+                    return planet_ids.contains(planet_id);
                 }))
                 { return true; }
             }
@@ -1685,7 +1684,7 @@ bool Homeworld::Match(const ScriptingContext& local_context) const {
     if (m_names.empty()) {
         // match homeworlds for any species
         for (const auto& entry : local_context.species.GetSpeciesHomeworldsMap()) {
-            if (entry.second.count(planet_id))
+            if (entry.second.contains(planet_id))
                 return true;
         }
 
@@ -1694,7 +1693,7 @@ bool Homeworld::Match(const ScriptingContext& local_context) const {
         const auto& homeworlds = local_context.species.GetSpeciesHomeworldsMap();
         for (const auto& name_ref : m_names) {
             const auto species_name = name_ref->Eval(local_context);
-            if (homeworlds.count(species_name) && homeworlds.at(species_name).count(planet_id))
+            if (homeworlds.contains(species_name) && homeworlds.at(species_name).contains(planet_id))
                 return true;
         }
     }
@@ -9343,7 +9342,7 @@ namespace {
             auto it = empire_supplyable_systems.find(m_empire_id);
             if (it == empire_supplyable_systems.end())
                 return false;
-            return it->second.count(candidate->SystemID());
+            return it->second.contains(candidate->SystemID());
         }
 
         int m_empire_id;
@@ -9477,9 +9476,8 @@ namespace {
             // first check if candidate object is (or is a building on) a blockaded planet
             // "isolated" objects are anything not in a non-blockaded system
             const bool is_isolated = std::none_of(groups.begin(), groups.end(),
-                                                  [sys_id{candidate->SystemID()}](const auto& group) {
-                                                      return group.count(sys_id) > 0;
-                                                  });
+                                                  [sys_id{candidate->SystemID()}](const auto& group)
+                                                  { return group.contains(sys_id); });
             if (is_isolated) {
                 // planets are still supply-connected to themselves even if blockaded
                 const auto* candidate_planet = candidate->ObjectType() == UniverseObjectType::OBJ_PLANET ?
@@ -9508,9 +9506,9 @@ namespace {
             // candidate is not blockaded, so check for system group matches
             for (auto* from_object : m_from_objects) {
                 for (const auto& group : groups) {
-                    if (group.count(from_object->SystemID())) {
+                    if (group.contains(from_object->SystemID())) {
                         // found resource sharing group containing test object system.  Does it also contain candidate?
-                        if (group.count(candidate->SystemID()))
+                        if (group.contains(candidate->SystemID()))
                             return true;    // test object and candidate object are in same resourse sharing group
                         else
                             // test object is not in resource sharing group with candidate
@@ -9873,7 +9871,13 @@ std::unique_ptr<Condition> OrderedBombarded::Clone() const
 // ValueTest                                             //
 ///////////////////////////////////////////////////////////
 namespace {
-    template <typename T, std::enable_if<std::is_arithmetic_v<T>>* = nullptr>
+    namespace {
+        // <concepts> library not fully implemented in XCode 13.2
+        template <class T>
+        concept arithmetic = std::is_arithmetic_v<T>;
+    }
+
+    template <arithmetic T>
     constexpr bool Comparison(T val1, ComparisonType comp, T val2) noexcept {
         switch (comp) {
             case ComparisonType::EQUAL:                 return val1 == val2;
@@ -9896,7 +9900,7 @@ namespace {
         }
     }
 
-    template <typename T, std::enable_if<std::is_arithmetic_v<T>>* = nullptr>
+    template <arithmetic T>
     auto Comparison(const std::vector<T>& vals1, ComparisonType comp, const T val2)
     {
         std::vector<uint8_t> retval(vals1.size(), false);
@@ -9934,7 +9938,7 @@ namespace {
         }
     }
 
-    template <typename T, std::enable_if<std::is_arithmetic_v<T>>* = nullptr>
+    template <arithmetic T>
     auto Comparison(const std::vector<T>& vals1, ComparisonType comp, const std::vector<T>& vals2)
     {
         std::vector<uint8_t> retval(vals1.size(), false);
@@ -9994,7 +9998,7 @@ namespace {
         return retval;
     }
 
-    template <typename T, std::enable_if<std::is_arithmetic_v<T>>* = nullptr>
+    template <arithmetic T>
     auto Comparison(const T val1, ComparisonType comp, const std::vector<T>& vals2)
     { return Comparison(vals2, SwapSides(comp), val1); }
 
@@ -10926,12 +10930,14 @@ std::unique_ptr<Condition> CombatTarget::Clone() const {
 // And                                                   //
 ///////////////////////////////////////////////////////////
 namespace {
+    namespace {
+        template <class Cond>
+        concept and_or_or_condition = std::is_same_v<Cond, And> || std::is_same_v<Cond, Or>;
+    }
+
     // flattens nested conditions by extracting contained operands, and
     // also removes any null operands
-    template <typename ContainingCondition,
-              std::enable_if<std::is_same_v<ContainingCondition, And> ||
-                             std::is_same_v<ContainingCondition, Or>
-                            >* = nullptr>
+    template <and_or_or_condition ContainingCondition>
     std::vector<std::unique_ptr<Condition>> DenestOps(std::vector<std::unique_ptr<Condition>>& in) {
         std::vector<std::unique_ptr<Condition>> retval;
         retval.reserve(in.size());
@@ -11323,8 +11329,7 @@ std::string Or::Description(bool negated) const {
     return values_str;
 }
 
-ObjectSet Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const
-{
+ObjectSet Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const {
     if (m_operands.empty())
         return {};
 
@@ -11343,9 +11348,11 @@ ObjectSet Or::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_c
             // TODO: fancier deep inspection of m_operands to determine optimal
             //       way to combine the default candidates...
 
-            if (m_operands[1]->EvalOne(parent_context, parent_context.source))
-                return {parent_context.source};
-            return {};
+            auto retval = m_operands[1]->GetDefaultInitialCandidateObjects(parent_context);
+            if (std::none_of(retval.begin(), retval.end(),
+                             [src{parent_context.source}](const UniverseObject* obj) { return obj == src; }))
+            { retval.push_back(parent_context.source); }
+            return retval;
         }
     }
 
@@ -11367,9 +11374,8 @@ std::string Or::Dump(uint8_t ntabs) const {
 }
 
 void Or::SetTopLevelContent(const std::string& content_name) {
-    for (auto& operand : m_operands) {
+    for (auto& operand : m_operands)
         operand->SetTopLevelContent(content_name);
-    }
 }
 
 uint32_t Or::GetCheckSum() const {

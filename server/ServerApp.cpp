@@ -143,6 +143,9 @@ ServerApp::ServerApp() :
     m_empires.DiplomaticMessageChangedSignal.connect(
         boost::bind(&ServerApp::HandleDiplomaticMessageChange,this, ph::_1, ph::_2));
 
+    m_networking.MessageSentSignal.connect(
+        boost::bind(&ServerApp::UpdateEmpireTurnReceived, this, ph::_1, ph::_2, ph::_3));
+
     m_signals.async_wait(boost::bind(&ServerApp::SignalHandler, this, ph::_1, ph::_2));
 }
 
@@ -377,6 +380,14 @@ void ServerApp::AsyncIOTimedoutHandler(const boost::system::error_code& error) {
         ErrorLogger() << "Python scripted authentication failed.";
         ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
                                                                       false));
+    }
+}
+
+void ServerApp::UpdateEmpireTurnReceived(bool success, int empire_id, int turn) {
+    if (success) {
+        if (auto empire = m_empires.GetEmpire(empire_id)) {
+            empire->SetLastTurnReceived(turn);
+        }
     }
 }
 
@@ -893,7 +904,8 @@ void ServerApp::SendNewGameStartMessages() {
                                                         m_universe,              m_species_manager,
                                                         GetCombatLogManager(),   m_supply_manager,
                                                         player_info_map,         m_galaxy_setup_data,
-                                                        use_binary_serialization,!player_connection->IsLocalConnection()));
+                                                        use_binary_serialization,!player_connection->IsLocalConnection()),
+                                       empire_id, m_current_turn);
     }
 }
 
@@ -1500,7 +1512,8 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
                                                             m_species_manager, GetCombatLogManager(),
                                                             m_supply_manager, player_info_map, *orders, sss,
                                                             m_galaxy_setup_data, use_binary_serialization,
-                                                            !player_connection->IsLocalConnection()));
+                                                            !player_connection->IsLocalConnection()),
+                                           empire_id, m_current_turn);
 
         } else if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER) {
             player_connection->SendMessage(GameStartMessage(m_single_player_game, empire_id,
@@ -1509,7 +1522,8 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
                                                             m_supply_manager, player_info_map, *orders,
                                                             psgd.ui_data.get(), m_galaxy_setup_data,
                                                             use_binary_serialization,
-                                                            !player_connection->IsLocalConnection()));
+                                                            !player_connection->IsLocalConnection()),
+                                            empire_id, m_current_turn);
 
         } else if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER ||
                    client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR)
@@ -2079,7 +2093,9 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
         ui_data,
         m_galaxy_setup_data,
         use_binary_serialization,
-        !player_connection->IsLocalConnection()));
+        !player_connection->IsLocalConnection()),
+        empire_id,
+        m_current_turn);
 
     return empire_id;
 }
@@ -2460,7 +2476,7 @@ namespace {
                 if (  (fleet->Aggressive() || fleet->Unowned())  &&
                       (fleet->CanDamageShips(context) || !fleet->Unowned())  )
                 {
-                    if (!empires_with_aggressive_fleets_here.count(empire_id))
+                    if (!empires_with_aggressive_fleets_here.contains(empire_id))
                         DebugLogger(combat) << "\t Empire " << empire_id << " has at least one aggressive fleet present";
                     empires_with_aggressive_fleets_here.emplace(empire_id);
                     break;
@@ -2527,7 +2543,7 @@ namespace {
                 int visible_planet_empire_id = planet->Owner();
 
                 if (aggressive_empire_id != visible_planet_empire_id &&
-                    at_war_with_empire_ids.count(visible_planet_empire_id))
+                    at_war_with_empire_ids.contains(visible_planet_empire_id))
                 {
                     DebugLogger(combat) << "\t Empire " << aggressive_empire_id << " sees target planet " << planet->Name();
                     return true;  // an aggressive empire can see a planet onwned by an empire it is at war with
@@ -2555,7 +2571,7 @@ namespace {
                 int visible_fleet_empire_id = fleet->Owner();
 
                 if (aggressive_empire_id != visible_fleet_empire_id &&
-                    at_war_with_empire_ids.count(visible_fleet_empire_id))
+                    at_war_with_empire_ids.contains(visible_fleet_empire_id))
                 {
                     DebugLogger(combat) << "\t Empire " << aggressive_empire_id << " sees target fleet " << fleet->Name();
                     return true;  // an aggressive empire can see a fleet onwned by an empire it is at war with
@@ -2661,7 +2677,7 @@ namespace {
             // destroyed. If so, need to also update empires knowledge of this
             for (const auto& fleet_empires : empires_to_update_of_fleet_destruction) {
                 int fleet_id = fleet_empires.first;
-                if (!all_destroyed_object_ids.count(fleet_id))
+                if (!all_destroyed_object_ids.contains(fleet_id))
                     continue;   // fleet wasn't destroyed
                 // inform empires
                 for (int empire_id : fleet_empires.second) {
@@ -2717,7 +2733,7 @@ namespace {
             for (int damaged_object_id : combat_info.damaged_object_ids) {
                 //DebugLogger() << "Checking object " << damaged_object_id << " for damaged sitrep";
                 // is object destroyed? If so, don't need a damage sitrep
-                if (combat_info.destroyed_object_ids.count(damaged_object_id)) {
+                if (combat_info.destroyed_object_ids.contains(damaged_object_id)) {
                     //DebugLogger() << " ... Object is destroyed and doesn't need a sitrep.";
                     continue;
                 }
@@ -2779,7 +2795,7 @@ namespace {
             std::vector<WeaponFireEvent::ConstWeaponFireEventPtr> events_that_killed;
             for (auto& event : FlattenEvents(combat_info.combat_events)) { // TODO: could do the filtering in the call function and avoid some moves later...
                 auto fire_event = std::dynamic_pointer_cast<const WeaponFireEvent>(std::move(event));
-                if (fire_event && combat_info.destroyed_object_ids.count(fire_event->target_id)) {
+                if (fire_event && combat_info.destroyed_object_ids.contains(fire_event->target_id)) {
                     TraceLogger() << "Kill event: " << fire_event->DebugString(context);
                     events_that_killed.push_back(std::move(fire_event));
                 }
@@ -2822,7 +2838,7 @@ namespace {
                     attacker_empire->RecordShipShotDown(*target_ship);
 
                 if (target_empire) {
-                    if (already_logged__target_ships.count(attack_event->target_id))
+                    if (already_logged__target_ships.contains(attack_event->target_id))
                         continue;
                     already_logged__target_ships.insert(attack_event->target_id);
                     target_empire->RecordShipLost(*target_ship);
@@ -3306,7 +3322,7 @@ namespace {
             { return false; }
             auto it = empire_receiving_locations.find(f.SystemID());
             return it != empire_receiving_locations.end() &&
-                it->second.count(f.OrderedGivenToEmpire()) > 0;
+                it->second.contains(f.OrderedGivenToEmpire());
         };
         auto not_invading_not_colonizing_ship = [&invading_ship_ids, &colonizing_ship_ids](const Ship& s) {
             return std::none_of(invading_ship_ids.begin(), invading_ship_ids.end(),
@@ -3343,7 +3359,7 @@ namespace {
 
             auto it = empire_receiving_locations.find(p.SystemID());
             return it != empire_receiving_locations.end() &&
-                it->second.count(p.OrderedGivenToEmpire()) > 0;
+                it->second.contains(p.OrderedGivenToEmpire());
         };
         for (auto* planet : objects.findRaw<Planet>(owned_given_not_invaded_planet)) {
             const auto recipient_empire_id = planet->OrderedGivenToEmpire();
@@ -4015,7 +4031,8 @@ void ServerApp::PostCombatProcessTurns() {
                                                   m_empires,                m_universe,
                                                   m_species_manager,        GetCombatLogManager(),
                                                   m_supply_manager,         players,
-                                                  use_binary_serialization, !player->IsLocalConnection()));
+                                                  use_binary_serialization, !player->IsLocalConnection()),
+                                empire_id, m_current_turn);
         }
     }
     m_turn_expired = false;

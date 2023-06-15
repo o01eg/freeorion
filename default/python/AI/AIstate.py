@@ -16,7 +16,7 @@ import PlanetUtilsAI
 from AIDependencies import INVALID_ID, TECH_NATIVE_SPECIALS
 from character.character_module import Aggression, create_character
 from CombatRatingsAI import ShipCombatStats
-from common.print_utils import Number, Table, Text
+from common.print_utils import Number, Table, Text, dict_to_table
 from DiplomaticCorp import get_diplomatic_status
 from EnumsAI import MissionType, ShipRoleType
 from freeorion_tools import combine_ratings, get_partial_visibility_turn
@@ -191,7 +191,6 @@ class AIstate:
         self.systemStatus = {}
         self.needsEmergencyExploration = []
         self.newlySplitFleets = {}
-        self.militaryRating = 0
         self.shipCount = 4
         self.misc = {}  # Keys: "enemies_sighted" (dict[turn: list[fleetIDs]]),
         #                       "observed_empires" (set[enemy empire IDs]),
@@ -636,8 +635,7 @@ class AIstate:
                 )
                 if verbose:
                     debug(
-                        "enemy threat calc parts: enemy rating %.1f, lost fleet rating %.1f, monster_rating %.1f"
-                        % (enemy_rating, lost_fleet_rating, monster_rating)
+                        f"enemy threat calc parts: enemy rating {enemy_rating:.1f}, lost fleet rating {lost_fleet_rating:.1f}, monster_rating {monster_rating:.1f}"
                     )
                 # does NOT include mobile monsters
                 sys_status["enemy_threat"] = max(enemy_rating, 2 * lost_fleet_rating - monster_rating)
@@ -688,8 +686,9 @@ class AIstate:
             this_system = universe.getSystem(sys_id)
             if verbose:
                 debug(
-                    "Regional Assessment for %s with local fleet threat %.1f"
-                    % (this_system, sys_status.get("fleetThreat", 0))
+                    "Regional Assessment for {} with local fleet threat {:.1f}".format(
+                        this_system, sys_status.get("fleetThreat", 0)
+                    )
                 )
             jumps2 = set()
             jumps3 = set()
@@ -941,8 +940,12 @@ class AIstate:
             else:
                 warning("Fleet %s has no valid system." % fleet)
         info(fleet_table)
-        debug("Empire standard fighter summary: %s", CombatRatingsAI.get_empire_standard_military_ship_stats())
-        debug("------------------------")
+        debug(
+            dict_to_table(
+                CombatRatingsAI.get_empire_standard_military_ship_stats().__getstate__(),
+                name="Empire standard fighter summary",
+            )
+        )
 
     def get_explored_system_ids(self):
         return list(self.exploredSystemIDs)

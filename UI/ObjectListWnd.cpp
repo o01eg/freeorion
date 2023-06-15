@@ -1203,7 +1203,7 @@ void FilterDialog::CompleteConstruction() {
         {
             auto button = GG::Wnd::Create<CUIStateButton>(
                 " ", GG::FORMAT_CENTER, std::make_shared<CUICheckBoxRepresenter>());
-            button->SetCheck(vis_display.count(visibility));
+            button->SetCheck(vis_display.contains(visibility));
             button->CheckedSignal.connect(
                 boost::bind(&FilterDialog::UpdateVisFiltersFromStateButtons, this, boost::placeholders::_1));
             m_filters_layout->Add(button, row, col, GG::ALIGN_CENTER | GG::ALIGN_VCENTER);
@@ -1274,7 +1274,7 @@ void FilterDialog::UpdateStateButtonsFromVisFilters() {
         for (auto& button : entry.second) {
             if (!button.second)
                 continue;
-            button.second->SetCheck(shown_vis.count(button.first));
+            button.second->SetCheck(shown_vis.contains(button.first));
         }
     }
 }
@@ -1314,7 +1314,7 @@ void FilterDialog::UpdateVisFilterFromVisibilityButton(VIS_DISPLAY vis) {
     bool all_on = true;
     for (const auto& entry : m_filter_buttons) {
         auto& type_vis = m_vis_filters[entry.first];
-        if (!type_vis.count(vis)) {
+        if (!type_vis.contains(vis)) {
             all_on = false;
             break;
         }
@@ -1855,6 +1855,15 @@ private:
 };
 
 namespace {
+    consteval float Pow(float base, int exp) {
+        float retval = 1.0;
+        const bool invert = exp < 0;
+        std::size_t abs_exp = exp >= 0 ? exp : -exp;
+        while (abs_exp--)
+            retval *= base;
+        return invert ? (1.0f / retval) : retval;
+    }
+
     struct CustomRowCmp {
         static bool StringCompare(const std::string& lhs_key, const std::string& rhs_key) {
 #if defined(FREEORION_MACOSX)
@@ -1870,24 +1879,42 @@ namespace {
             float retval = 0.0f;
             auto result = std::from_chars(key.data(), key.data() + key.size(), retval);
 
+            static constexpr auto micro = u8"\u00B5"; // µ (micro)
+            static constexpr uint8_t microb0 = micro[0];
+            static_assert(microb0 == 0xC2);
+            static constexpr char xC2 = static_cast<char>(microb0);
+            static_assert(xC2 == '\xC2');
+
+            static constexpr auto micro2 = u8"µ";
+            static_assert(micro2[0] == micro[0] && micro2[1] == micro[1]);
+
+            static constexpr auto mu = u8"\u03BC"; // μ (lower case mu)
+            static constexpr uint8_t mub0 = mu[0];
+            static_assert(mub0 == 0xCE);
+            static constexpr char xCE = static_cast<char>(mub0);
+            static_assert(xCE == '\xCE');
+
+
             // adjust for SI postfix
             auto next_char_offset = std::distance(key.data(), result.ptr);
             if (next_char_offset > 0 && static_cast<std::size_t>(next_char_offset) < key.length()) {
                 //std::cout << "key:\"" << key << "\" next char:" << *result.ptr << std::endl;
-                float power = 0.0f;
-                switch (*result.ptr) {
-                case 'f':   power = -15.0f; break;
-                case 'p':   power = -12.0f; break;
-                case 'n':   power = -9.0f; break;
-                case '\xC2':power = -6.0f; break; // first byte of mu in UTF-8
-                case 'm':   power = -3.0f; break;
-                case 'k':   power = 3.0f; break;
-                case 'M':   power = 6.0f; break;
-                case 'G':   power = 9.0f; break;
-                case 'T':   power = 12.0f; break;
-                default: break;
-                }
-                retval *= std::pow(10.0f, power);
+                const float factor = [](auto prefix) {
+                    switch (prefix) {
+                    case 'f': return Pow(10.0f, -15); break;
+                    case 'p': return Pow(10.0f, -12); break;
+                    case 'n': return Pow(10.0f, -9); break;
+                    case xCE: [[fallthrough]];
+                    case xC2: return Pow(10.0f, -6); break;
+                    case 'm': return Pow(10.0f, -3); break;
+                    case 'k': return Pow(10.0f,  3); break;
+                    case 'M': return Pow(10.0f,  6); break;
+                    case 'G': return Pow(10.0f,  9); break;
+                    case 'T': return Pow(10.0f,  1); break;
+                    default:  return 1.0f; break;
+                    }
+                }(*result.ptr);
+                retval *= factor;
             }
 
             return std::pair{retval, result.ec};
@@ -2010,7 +2037,7 @@ public:
     }
 
     bool ObjectCollapsed(int object_id) const
-    { return object_id != INVALID_OBJECT_ID && m_collapsed_objects.count(object_id); }
+    { return object_id != INVALID_OBJECT_ID && m_collapsed_objects.contains(object_id); }
 
     bool AnythingCollapsed() const
     { return !m_collapsed_objects.empty(); }
@@ -2046,13 +2073,13 @@ public:
         const int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
         const UniverseObjectType type = obj->ObjectType();
 
-        if (context.ContextUniverse().EmpireKnownDestroyedObjectIDs(client_empire_id).count(object_id))
-            return m_visibilities[type].count(VIS_DISPLAY::SHOW_DESTROYED);
+        if (context.ContextUniverse().EmpireKnownDestroyedObjectIDs(client_empire_id).contains(object_id))
+            return m_visibilities[type].contains(VIS_DISPLAY::SHOW_DESTROYED);
 
         if (assume_visible_without_checking || context.ContextUniverse().GetObjectVisibilityByEmpire(object_id, client_empire_id) >= Visibility::VIS_PARTIAL_VISIBILITY)
-            return m_visibilities[type].count(VIS_DISPLAY::SHOW_VISIBLE);
+            return m_visibilities[type].contains(VIS_DISPLAY::SHOW_VISIBLE);
 
-        return m_visibilities[type].count(VIS_DISPLAY::SHOW_PREVIOUSLY_VISIBLE);
+        return m_visibilities[type].contains(VIS_DISPLAY::SHOW_PREVIOUSLY_VISIBLE);
     }
 
     template <typename T>
@@ -2544,7 +2571,7 @@ void ObjectListWnd::ObjectSelectionChanged(const GG::ListBox::SelectionSet& rows
             ErrorLogger() << "ObjectListWnd::ObjectSelectionChanged couldn't get ObjectPanel from control";
             continue;
         }
-        data_panel->Select(rows.count(it));
+        data_panel->Select(rows.contains(it));
     }
 
     SelectedObjectsChangedSignal();
@@ -2574,13 +2601,11 @@ std::set<int> ObjectListWnd::SelectedObjectIDs() const {
 
 void ObjectListWnd::SetSelectedObjects(std::set<int> sel_ids) {
     for (auto it = m_list_box->begin(); it != m_list_box->end(); ++it) {
-        ObjectRow *row = dynamic_cast<ObjectRow *>(it->get());
-        if (row) {
-            int selected_object_id = row->ObjectID();
+        if (auto* row = dynamic_cast<ObjectRow*>(it->get())) {
+            const int selected_object_id = row->ObjectID();
             if (selected_object_id != INVALID_OBJECT_ID) {
-                if (sel_ids.count(selected_object_id)) {
+                if (sel_ids.contains(selected_object_id))
                     m_list_box->SelectRow(it);
-                }
             }
         }
     }

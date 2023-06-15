@@ -71,7 +71,7 @@ def get_preferred_max_military_portion_for_single_battle() -> float:
     May be used to downgrade various possible actions requiring military support if they would require an excessive
     allocation of military forces.  At the beginning of the game this max portion starts as 1.0, then is slightly
     reduced to account for desire to reserve some defenses for other locations, and then in mid to late game, as the
-    size of the the military grows, this portion is further reduced to promote pursuit of multiple battlefronts in
+    size of the military grows, this portion is further reduced to promote pursuit of multiple battlefronts in
     parallel as opposed to single battlefronts against heavily defended positions.
 
     :return: a number in range (0:1] for preferred max portion of military to be allocated to a single battle
@@ -179,8 +179,9 @@ def avail_mil_needing_repair(  # noqa: max-complexity
                         % (fleet_id, universe.getSystem(fleet.systemID))
                     )
                     debug(
-                        "\t my_local_rating: %.1f ; threat: %.1f"
-                        % (my_local_rating, local_status.get("totalThreat", 0))
+                        "\t my_local_rating: {:.1f} ; threat: {:.1f}".format(
+                            my_local_rating, local_status.get("totalThreat", 0)
+                        )
                     )
                 debug("Selecting fleet %d at %s for repair" % (fleet_id, universe.getSystem(fleet.systemID)))
         fleet_buckets[fleet_ok or bool(safely_needed)].append(fleet_id)
@@ -430,7 +431,6 @@ class Allocator:
 
 
 class CapitalDefenseAllocator(Allocator):
-
     _allocation_group = "capitol"
     _military_reset_ratio = 0.5
 
@@ -458,7 +458,6 @@ class CapitalDefenseAllocator(Allocator):
 
 
 class PlanetDefenseAllocator(Allocator):
-
     _allocation_group = "occupied"
     _min_alloc_factor = 1.1
     _max_alloc_factor = 1.5
@@ -491,7 +490,6 @@ class PlanetDefenseAllocator(Allocator):
 
 
 class TargetAllocator(Allocator):
-
     _allocation_group = "otherTargets"
     _min_alloc_factor = 1.3
     _max_alloc_factor = 2.5
@@ -538,14 +536,6 @@ class OutpostTargetAllocator(TargetAllocator):
     _max_alloc_factor = 3
 
 
-class BlockadeAllocator(TargetAllocator):
-    _potential_threat_factor = 0.25
-    _max_alloc_factor = 1.5
-
-    def _maximum_allocation(self, threat):
-        return min(self._minimum_allocation(threat), self._allocation_helper.remaining_rating) * self._max_alloc_factor
-
-
 class LocalThreatAllocator(Allocator):
     _potential_threat_factor = 0
     _min_alloc_factor = 1.3
@@ -553,7 +543,6 @@ class LocalThreatAllocator(Allocator):
     _allocation_group = "otherTargets"
 
     def _calculate_threat(self):
-
         systems_status = get_aistate().systemStatus.get(self.sys_id, {})
         threat = self.safety_factor * combine_ratings(
             systems_status.get("fleetThreat", 0),
@@ -577,18 +566,6 @@ class InteriorTargetsAllocator(LocalThreatAllocator):
 
     def _take_any(self):
         return self.assigned_rating > 0
-
-
-class ExplorationTargetAllocator(LocalThreatAllocator):
-    _potential_threat_factor = 0.25
-    _max_alloc_factor = 2.0
-    _allocation_group = "exploreTargets"
-
-    def _calculate_threat(self):
-        return self.safety_factor * self._local_threat() + self._potential_threat()
-
-    def _take_any(self):
-        return False
 
 
 class BorderSecurityAllocator(LocalThreatAllocator):
@@ -694,8 +671,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"): 
         already_assigned_rating[sys_id] = combine_ratings(my_defense_rating, already_assigned_rating[sys_id])
         if _verbose_mil_reporting and already_assigned_rating[sys_id]:
             debug(
-                "\t System %s already assigned rating %.1f"
-                % (universe.getSystem(sys_id), already_assigned_rating[sys_id])
+                f"\t System {universe.getSystem(sys_id)} already assigned rating {already_assigned_rating[sys_id]:.1f}"
             )
 
     # get systems to defend
@@ -870,8 +846,7 @@ def get_military_fleets(mil_fleets_ids=None, try_reset=True, thisround="Main"): 
         _military_allocations = new_allocations
     if _verbose_mil_reporting or "Main" in thisround:
         debug(
-            "------------------------------\nFinal %s Round Military Allocations: %s \n-----------------------"
-            % (thisround, {sid: alloc for sid, alloc, _, _, _ in new_allocations})
+            f"------------------------------\nFinal {thisround} Round Military Allocations: {{sid: alloc for sid, alloc, _, _, _ in new_allocations}} \n-----------------------"
         )
         debug("(Apparently) remaining military rating: %.1f" % remaining_mil_rating)
 

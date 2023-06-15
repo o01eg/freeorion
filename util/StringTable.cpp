@@ -179,17 +179,23 @@ void StringTable::Load(std::shared_ptr<const StringTable> fallback) {
             it = end - matches.suffix().length();
 
             if (well_formed) {
-                for (auto match_it = matches.nested_results().begin();
-                     match_it != matches.nested_results().end(); ++match_it)
-                {
-                    if (match_it->regex_id() == KEY.regex_id()) {
-                        key = match_it->str();
-                    } else if (match_it->regex_id() == SINGLE_LINE_VALUE.regex_id() ||
-                               match_it->regex_id() == MULTI_LINE_VALUE.regex_id())
+                for (const auto& match : matches.nested_results()) {
+                    if (match.regex_id() == KEY.regex_id()) {
+                        key = match.str();
+
+                    } else if (match.regex_id() == SINGLE_LINE_VALUE.regex_id() ||
+                               match.regex_id() == MULTI_LINE_VALUE.regex_id())
                     {
                         assert(key != "");
-                        if (!m_strings.count(key)) {
-                            m_strings[key] = match_it->str();
+                        const bool has_key = [](const auto& strings, const auto& key) {
+                            if constexpr (requires { strings.contains(key); })
+                                return strings.contains(key);
+                            else
+                                return strings.count(key) != 0;
+                        }(m_strings, key);
+
+                        if (!has_key) {
+                            m_strings[key] = match.str();
                             boost::algorithm::replace_all(m_strings[key], "\\n", "\n");
                         } else {
                             ErrorLogger() << "Duplicate string ID found: '" << key
@@ -252,7 +258,7 @@ void StringTable::Load(std::shared_ptr<const StringTable> fallback) {
                     } else
                         ++ref_check_it;
                 }
-                if (!cyclic_reference_check.count(match[1])) {
+                if (!cyclic_reference_check.contains(match[1])) {
                     //DebugLogger() << "Pushing to cyclic ref check: " << match[1];
                     cyclic_reference_check[match[1]] = position + match.length();
 

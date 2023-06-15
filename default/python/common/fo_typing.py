@@ -7,7 +7,7 @@ it is hard to distinguish one int from the another.
 
 from typing import NewType
 
-ObjectId = NewType("TargetId", int)
+ObjectId = NewType("ObjectId", int)
 PlanetId = NewType("PlanetId", ObjectId)
 FleetId = NewType("FleetId", ObjectId)
 SystemId = NewType("SystemId", ObjectId)
@@ -19,3 +19,6 @@ SpeciesName = NewType("SpeciesName", str)
 SpecialName = NewType("SpecialName", str)
 PartName = NewType("PartName", str)
 Turn = NewType("Turn", int)
+PlayerId = NewType("PlayerId", int)
+AttackDamage = NewType("AttackDamage", float)
+AttackCount = NewType("AttackCount", int)

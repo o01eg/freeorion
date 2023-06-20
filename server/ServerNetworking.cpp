@@ -203,11 +203,16 @@ void PlayerConnection::Start() {
 }
 
 void PlayerConnection::SendMessage(const Message& message) {
+    SendMessage(message, ALL_EMPIRES, INVALID_GAME_TURN);
+}
+
+void PlayerConnection::SendMessage(const Message& message, int empire_id, int turn) {
     if (!m_valid) {
         ErrorLogger(network) << "PlayerConnection::SendMessage can't send message when not transmit connected";
+        MessageSentSignal(false, empire_id, turn);
         return;
     }
-    m_service.post(boost::bind(&PlayerConnection::SendMessageImpl, shared_from_this(), message));
+    m_service.post(boost::bind(&PlayerConnection::SendMessageImpl, shared_from_this(), message, empire_id, turn));
 }
 
 bool PlayerConnection::IsEstablished() const {
@@ -305,16 +310,6 @@ bool PlayerConnection::IsBinarySerializationUsed() const {
     return GetOptionsDB().Get<bool>("network.server.binary.enabled")
         && !m_client_version_string.empty()
         && m_client_version_string == FreeOrionVersionString();
-}
-
-PlayerConnectionPtr PlayerConnection::NewConnection(boost::asio::io_context& io_context,
-                                                    MessageAndConnectionFn nonplayer_message_callback,
-                                                    MessageAndConnectionFn player_message_callback,
-                                                    ConnectionFn disconnected_callback)
-{
-    return PlayerConnectionPtr(
-        new PlayerConnection(io_context, nonplayer_message_callback, player_message_callback,
-                             disconnected_callback));
 }
 
 namespace {
@@ -497,9 +492,9 @@ void PlayerConnection::AsyncReadMessage() {
                                         boost::asio::placeholders::bytes_transferred));
 }
 
-void PlayerConnection::SendMessageImpl(PlayerConnectionPtr self, Message message) {
+void PlayerConnection::SendMessageImpl(PlayerConnectionPtr self, Message message, int empire_id, int turn) {
     const bool start_write = self->m_outgoing_messages.empty();
-    self->m_outgoing_messages.push(std::move(message));
+    self->m_outgoing_messages.emplace(std::move(message), empire_id, turn);
     if (start_write)
         self->AsyncWriteMessage();
 }
@@ -516,19 +511,22 @@ void PlayerConnection::AsyncWriteMessage() {
     using boost::asio::placeholders::error;
     using boost::asio::placeholders::bytes_transferred;
 
-    HeaderToBuffer(m_outgoing_messages.front(), m_outgoing_header);
+    HeaderToBuffer(m_outgoing_messages.front().m_message, m_outgoing_header);
     std::array<const_buffer, 2> buffers{
         buffer(m_outgoing_header),
-        buffer(m_outgoing_messages.front().Data(), m_outgoing_messages.front().Size())
+        buffer(m_outgoing_messages.front().m_message.Data(), m_outgoing_messages.front().m_message.Size())
     };
     async_write(*m_socket, buffers,
                 boost::bind(&PlayerConnection::HandleMessageWrite, shared_from_this(),
-                            error, bytes_transferred));
+                            error, bytes_transferred,
+                            m_outgoing_messages.front().m_empire_id,
+                            m_outgoing_messages.front().m_turn));
 }
 
 void PlayerConnection::HandleMessageWrite(PlayerConnectionPtr self,
                                           boost::system::error_code error,
-                                          std::size_t bytes_transferred)
+                                          std::size_t bytes_transferred,
+                                          int empire_id, int turn)
 {
     if (error) {
         self->m_valid = false;
@@ -536,6 +534,7 @@ void PlayerConnection::HandleMessageWrite(PlayerConnectionPtr self,
                              << " error #" << error.value() << " \"" << error.message() << "\"";
         boost::asio::high_resolution_timer t(self->m_service);
         t.async_wait(boost::bind(&PlayerConnection::AsyncErrorHandler, self, error, boost::asio::placeholders::error));
+        self->MessageSentSignal(false, empire_id, turn);
         return;
     }
 
@@ -543,6 +542,7 @@ void PlayerConnection::HandleMessageWrite(PlayerConnectionPtr self,
         static_cast<int>(Message::HeaderBufferSize) + self->m_outgoing_header[Message::Parts::SIZE])
     { return; }
 
+    self->MessageSentSignal(true, empire_id, turn);
     self->m_outgoing_messages.pop();
     if (!self->m_outgoing_messages.empty())
         self->AsyncWriteMessage();
@@ -792,13 +792,15 @@ void ServerNetworking::Init() {
 void ServerNetworking::AcceptNextMessagingConnection() {
     using boost::placeholders::_1;
 
-    auto next_connection = PlayerConnection::NewConnection(
+    auto next_connection = std::make_shared<PlayerConnection>(
         m_player_connection_acceptor.get_executor().context(),
         m_nonplayer_message_callback,
         m_player_message_callback,
         boost::bind(&ServerNetworking::DisconnectImpl, this, _1));
     next_connection->EventSignal.connect(
         boost::bind(&ServerNetworking::EnqueueEvent, this, _1));
+    next_connection->MessageSentSignal.connect(MessageSentSignal);
+
     m_player_connection_acceptor.async_accept(
         *next_connection->m_socket,
         boost::bind(&ServerNetworking::AcceptPlayerMessagingConnection,

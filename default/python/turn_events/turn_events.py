@@ -12,6 +12,7 @@ from random import choice, random, uniform
 
 import psycopg2
 import psycopg2.extensions
+
 from universe_tables import MONSTER_FREQUENCY
 
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
@@ -34,11 +35,11 @@ def execute_turn_events():
             info("Chat notification was send via XMPP")
         except Exception:
             exctype, value = sys.exc_info()[:2]
-            error("Cann't send chat notification: %s %s" % (exctype, value))
+            error(f"Cann't send chat notification: {exctype} {value}")
 
     try:
         dsn = ""
-        with open(fo.get_user_config_dir() + "/db.txt", "r") as f:
+        with open(fo.get_user_config_dir() + "/db.txt") as f:
             for line in f:
                 dsn = line
                 break
@@ -54,7 +55,7 @@ def execute_turn_events():
                 )
     except Exception:
         exctype, value = sys.exc_info()[:2]
-        error("Cann't update turn time: %s %s" % (exctype, value))
+        error(f"Cann't update turn time: {exctype} {value}")
 
     # creating fields
     systems = fo.get_systems()

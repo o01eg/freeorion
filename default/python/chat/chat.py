@@ -1,13 +1,12 @@
-from logging import info, warning, error
+from logging import error, info, warning
 
 from common.configure_logging import redirect_logging_to_freeorion_logger
 
 # Logging is redirected before other imports so that import errors appear in log files.
 redirect_logging_to_freeorion_logger()
 
-import sys
-
 import freeorion as fo
+import sys
 
 import psycopg2
 import psycopg2.extensions
@@ -15,7 +14,9 @@ import psycopg2.extensions
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
-import urllib.request
+import asyncio
+
+import aiohttp
 
 SERVER_ID = 1
 
@@ -26,23 +27,32 @@ class ChatHistoryProvider:
         Initializes ChatProvider. Doesn't accept arguments.
         """
         self.dsn = ""
-        with open(fo.get_user_config_dir() + "/db.txt", "r") as f:
+        with open(fo.get_user_config_dir() + "/db.txt") as f:
             for line in f:
                 self.dsn = line
                 break
         self.dsn_ro = self.dsn
         try:
-            with open(fo.get_user_config_dir() + "/db-ro.txt", "r") as f:
+            with open(fo.get_user_config_dir() + "/db-ro.txt") as f:
                 for line in f:
                     self.dsn_ro = line
                     break
-        except IOError:
+        except OSError:
             exctype, value = sys.exc_info()[:2]
-            warning("Read RO DSN: %s %s" % (exctype, value))
+            warning(f"Read RO DSN: {exctype} {value}")
 
         self.conn = psycopg2.connect(self.dsn)
         self.conn_ro = psycopg2.connect(self.dsn_ro)
         info("Chat initialized")
+
+    async def __send_xmpp(self, text):
+        try:
+            async with aiohttp.ClientSession() as session:
+                await session.post("http://localhost:8083/", data=text, headers={"X-XMPP-Muc": "smac"})
+            info("Chat message was send via XMPP")
+        except Exception:
+            exctype, value = sys.exc_info()[:2]
+            error(f"Cann't send xmpp in async to chat: {exctype} {value}")
 
     def load_history(self):
         """
@@ -113,18 +123,14 @@ class ChatHistoryProvider:
                         saved = True
                 try:
                     if not (player_name == ""):
-                        req = urllib.request.Request(
-                            "http://localhost:8083/", ("<%s> %s" % (player_name, text)).encode()
-                        )
-                        req.add_header("X-XMPP-Muc", "smac")
-                        urllib.request.urlopen(req).read()
-                        info("Chat message was send via XMPP")
+                        loop = asyncio.get_event_loop()
+                        loop.create_task(self.__send_xmpp(f"<{player_name}> {text}"))
                 except Exception:
                     exctype, value = sys.exc_info()[:2]
-                    error("Cann't send chat message %s: %s %s" % (text, exctype, value))
+                    error(f"Cann't send chat message {text}: {exctype} {value}")
             except psycopg2.InterfaceError:
                 self.conn = psycopg2.connect(self.dsn)
                 saved = False
                 exctype, value = sys.exc_info()[:2]
-                error("Cann't save chat message %s: %s %s" % (text, exctype, value))
+                error(f"Cann't save chat message {text}: {exctype} {value}")
         return True

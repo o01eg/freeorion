@@ -6,13 +6,14 @@ from common.configure_logging import redirect_logging_to_freeorion_logger
 redirect_logging_to_freeorion_logger()
 
 
+import asyncio
+import email
 import freeorion as fo
 import random
 import sys
-import asyncio
-import aiosmtplib
-import email
 
+import aiohttp
+import aiosmtplib
 import psycopg2
 import psycopg2.extensions
 
@@ -20,8 +21,6 @@ psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
 import configparser
-import smtplib
-import urllib.request
 
 # Constants defined by the C++ game engine
 NO_TEAM_ID = -1
@@ -30,19 +29,19 @@ NO_TEAM_ID = -1
 class AuthProvider:
     def __init__(self):
         self.dsn = ""
-        with open(fo.get_user_config_dir() + "/db.txt", "r") as f:
+        with open(fo.get_user_config_dir() + "/db.txt") as f:
             for line in f:
                 self.dsn = line
                 break
         self.dsn_ro = self.dsn
         try:
-            with open(fo.get_user_config_dir() + "/db-ro.txt", "r") as f:
+            with open(fo.get_user_config_dir() + "/db-ro.txt") as f:
                 for line in f:
                     self.dsn_ro = line
                     break
-        except IOError:
+        except OSError:
             exctype, value = sys.exc_info()[:2]
-            warning("Read RO DSN: %s %s" % (exctype, value))
+            warning(f"Read RO DSN: {exctype} {value}")
         self.conn = psycopg2.connect(self.dsn)
         self.conn_ro = psycopg2.connect(self.dsn_ro)
         self.roles_symbols = {
@@ -68,24 +67,35 @@ class AuthProvider:
                 roles.append(r)
         return roles
 
-    async def __send_email(self, recipient, otp, player_name):
+    async def __send_email(self, recipient, player_name, subject, text):
         try:
             message = email.message.EmailMessage()
             message["From"] = self.mailconf.get("mail", "from")
             message["To"] = recipient
-            message["Subject"] = "FreeOrion OTP"
-            message.set_content("Password %s for player %s" % (otp, player_name))
+            message["Subject"] = subject
+            message.set_content(text)
 
-            await aiosmtplib.send(message,
+            await aiosmtplib.send(
+                message,
                 hostname=self.mailconf.get("mail", "server"),
                 port=465,
                 use_tls=True,
                 username=self.mailconf.get("mail", "login"),
-                password=self.mailconf.get("mail", "passwd"))
+                password=self.mailconf.get("mail", "passwd"),
+            )
             info("OTP was send to %s via email" % player_name)
         except Exception:
             exctype, value = sys.exc_info()[:2]
-            error("Cann't send email in async to %s: %s %s" % (player_name, exctype, value))
+            error(f"Cann't send email in async to {player_name}: {exctype} {value}")
+
+    async def __send_xmpp(self, recipient, player_name, text):
+        try:
+            async with aiohttp.ClientSession() as session:
+                await session.post("http://localhost:8083/", data=text, headers={"X-XMPP-To": recipient})
+            info("OTP was send to %s via xmpp" % player_name)
+        except Exception:
+            exctype, value = sys.exc_info()[:2]
+            error(f"Cann't send xmpp in async to {player_name}: {exctype} {value}")
 
     def is_require_auth_or_return_roles(self, player_name: str, ip_address: str):
         """Returns True if player should be authenticated, False if user not allowed,
@@ -106,7 +116,7 @@ class AuthProvider:
         except psycopg2.InterfaceError:
             self.conn = psycopg2.connect(self.dsn)
             exctype, value = sys.exc_info()[:2]
-            error("Cann't check player %s: %s %s" % (player_name, exctype, value))
+            error(f"Cann't check player {player_name}: {exctype} {value}")
 
         if not have_user:
             return False
@@ -125,34 +135,39 @@ class AuthProvider:
                     for r in curs:
                         if r[0] == "xmpp":
                             try:
-                                req = urllib.request.Request(
-                                    "http://localhost:8083/",
-                                    (
-                                        "%s is logging. Enter OTP into freeorion client: %s" % (player_name, otp)
-                                    ).encode(),
+                                loop = asyncio.get_event_loop()
+                                loop.create_task(
+                                    self.__send_xmpp(
+                                        r[1],
+                                        player_name,
+                                        f"{player_name} is logging. Enter OTP into freeorion client: {otp}",
+                                    ),
+                                    name="XMPPOTP",
                                 )
-                                req.add_header("X-XMPP-To", r[1])
-                                urllib.request.urlopen(req).read()
-                                info("OTP was send to %s via XMPP" % player_name)
                                 sent_otp = True
                             except Exception:
                                 exctype, value = sys.exc_info()[:2]
-                                error("Cann't send xmpp message to %s: %s %s" % (player_name, exctype, value))
+                                error(f"Cann't send xmpp message to {player_name}: {exctype} {value}")
                         elif r[0] == "email":
                             info("Try to send OTP to %s via email" % player_name)
                             try:
                                 loop = asyncio.get_event_loop()
-                                loop.create_task(self.__send_email(r[1], otp, player_name), name="Email")
+                                loop.create_task(
+                                    self.__send_email(
+                                        r[1], player_name, "FreeOrion OTP", f"Password {otp} for player {player_name}"
+                                    ),
+                                    name="EmailOTP",
+                                )
                                 sent_otp = True
                             except Exception:
                                 exctype, value = sys.exc_info()[:2]
-                                error("Cann't send email to %s: %s %s" % (player_name, exctype, value))
+                                error(f"Cann't send email to {player_name}: {exctype} {value}")
                         else:
-                            warning("Unsupported protocol %s for %s" % (r[0], player_name))
+                            warning(f"Unsupported protocol {r[0]} for {player_name}")
         except psycopg2.InterfaceError:
             self.conn = psycopg2.connect(self.dsn)
             exctype, value = sys.exc_info()[:2]
-            error("Cann't check player %s: %s %s" % (player_name, exctype, value))
+            error(f"Cann't check player {player_name}: {exctype} {value}")
 
         # in longturn games always require authorization
         return sent_otp
@@ -173,11 +188,11 @@ class AuthProvider:
                         role = self.roles_symbols.get(r[1])
                         if role is not None:
                             roles.append(role)
-                        info("Player %s was accepted %r" % (player_name, authenticated))
+                        info(f"Player {player_name} was accepted {authenticated!r}")
         except psycopg2.InterfaceError:
             self.conn = psycopg2.connect(self.dsn)
             exctype, value = sys.exc_info()[:2]
-            error("Cann't check OTP %s: %s %s" % (player_name, exctype, value))
+            error(f"Cann't check OTP {player_name}: {exctype} {value}")
 
         if authenticated:
             return roles
@@ -214,7 +229,7 @@ class AuthProvider:
         except psycopg2.InterfaceError:
             self.conn_ro = psycopg2.connect(self.dsn_ro)
             exctype, value = sys.exc_info()[:2]
-            error("Cann't load players: %s %s" % (exctype, value))
+            error(f"Cann't load players: {exctype} {value}")
         random.shuffle(players)
         return players
 
@@ -250,39 +265,26 @@ class AuthProvider:
                     for r in curs:
                         if r[0] == "xmpp":
                             try:
-                                req = urllib.request.Request(
-                                    "http://localhost:8083/", ("%s\r\n%s" % (subject, text)).encode()
+                                loop = asyncio.get_event_loop()
+                                loop.create_task(
+                                    self.__send_xmpp(r[1], player_name, f"{subject}\r\n{text}"), name="XMPPOTP"
                                 )
-                                req.add_header("X-XMPP-To", r[1])
-                                urllib.request.urlopen(req).read()
-                                info("Message was send to %s via XMPP" % player_name)
                             except Exception:
                                 exctype, value = sys.exc_info()[:2]
-                                error("Cann't send xmpp message to %s: %s %s" % (player_name, exctype, value))
+                                error(f"Cann't send xmpp message to {player_name}: {exctype} {value}")
                         elif r[0] == "email" and allow_email:
                             try:
-                                server = smtplib.SMTP_SSL(self.mailconf.get("mail", "server"), 465)
-                                server.ehlo()
-                                server.login(self.mailconf.get("mail", "login"), self.mailconf.get("mail", "passwd"))
-                                server.sendmail(
-                                    self.mailconf.get("mail", "from"),
-                                    r[1],
-                                    """From:
-                                        %s\r\nTo: %s\r\nSubject: %s\r\n\r\n
-                                        %s"""
-                                    % (self.mailconf.get("mail", "from"), r[1], subject, text),
-                                )
-                                server.close()
-                                info("Message was send to %s via email" % player_name)
+                                loop = asyncio.get_event_loop()
+                                loop.create_task(self.__send_email(r[1], player_name, subject, text), name="EmailTurn")
                             except Exception:
                                 exctype, value = sys.exc_info()[:2]
-                                error("Cann't send email to %s: %s %s" % (player_name, exctype, value))
+                                error(f"Cann't send email to {player_name}: {exctype} {value}")
                         else:
-                            warning("Unsupported protocol %s for %s" % (r[0], player_name))
+                            warning(f"Unsupported protocol {r[0]} for {player_name}")
         except psycopg2.InterfaceError:
             self.conn_ro = psycopg2.connect(self.dsn_ro)
             exctype, value = sys.exc_info()[:2]
-            error("Cann't send message: %s %s" % (exctype, value))
+            error(f"Cann't send message: {exctype} {value}")
             return False
         return True
 
@@ -304,5 +306,5 @@ class AuthProvider:
         except psycopg2.InterfaceError:
             self.conn_ro = psycopg2.connect(self.dsn_ro)
             exctype, value = sys.exc_info()[:2]
-            error("Cann't get delegation info: %s %s" % (exctype, value))
+            error(f"Cann't get delegation info: {exctype} {value}")
         return players

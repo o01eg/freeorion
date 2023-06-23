@@ -172,13 +172,13 @@ def create_universe(psd_map):  # noqa: max-complexity
     }
 
     try:
-        with open(fo.get_user_config_dir() + "/diplomacy.txt", "r") as f:
+        with open(fo.get_user_config_dir() + "/diplomacy.txt") as f:
             for line in f:
                 e1, e2, st = line.rsplit(":", 2)
                 fo.empire_set_diplomacy(int(e1), int(e2), diplomacy_symbols[st.strip()])
-    except IOError:
+    except OSError:
         exctype, value = sys.exc_info()[:2]
-        warning("Read diplomacy: %s %s" % (exctype, value))
+        warning(f"Read diplomacy: {exctype} {value}")
 
     # assign names to all star systems and their planets
     # this needs to be done after all systems have been generated and empire home systems have been set, as
@@ -226,7 +226,7 @@ def create_universe(psd_map):  # noqa: max-complexity
 
     try:
         dsn = ""
-        with open(fo.get_user_config_dir() + "/db.txt", "r") as f:
+        with open(fo.get_user_config_dir() + "/db.txt") as f:
             for line in f:
                 dsn = line
                 break
@@ -242,7 +242,7 @@ def create_universe(psd_map):  # noqa: max-complexity
                 )
     except Exception:
         exctype, value = sys.exc_info()[:2]
-        error("Cann't update turn time: %s %s" % (exctype, value))
+        error(f"Cann't update turn time: {exctype} {value}")
 
     if error_list:
         print("Python Universe Generator completed with errors")

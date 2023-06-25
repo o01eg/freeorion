@@ -3715,6 +3715,8 @@ sc::result ProcessingTurn::react(const ProcessTurn& u) {
     // open statistics if the game ended
     if (server.IsHaveWinner()) {
         GetOptionsDB().Set<bool>("network.server.publish-statistics", true);
+        GetOptionsDB().Set<bool>("network.server.publish-seed", true);
+        GetOptionsDB().Set<bool>("network.server.allow-observers", true);
     }
 
     if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.enabled") && server.CurrentTurn() > 0) {
